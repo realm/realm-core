@@ -20,6 +20,7 @@
 #define REALM_TEST_UTIL_TEST_PATH_HPP
 
 #include <string>
+#include <memory>
 
 #include <realm/util/features.h>
 
@@ -40,6 +41,9 @@
 #define SHARED_GROUP_TEST_PATH(var_name) TEST_PATH_HELPER(realm::test_util::DBTestPathGuard, var_name, "realm");
 
 namespace realm {
+
+class DB;
+
 namespace test_util {
 
 /// Disable automatic removal of test files.
@@ -72,8 +76,8 @@ bool test_dir_is_exfat();
 std::string get_test_resource_path();
 
 /// This function is thread-safe as long as there are no concurrent invocations
-/// of set_test_libexec_path().
-std::string get_test_libexec_path();
+/// of initialize_test_path
+std::string get_test_exe_name();
 
 // This is an adapter class which replaces dragging in the whole test framework
 // by implementing the `get_test_name()` method from the TestContext class.
@@ -108,6 +112,7 @@ public:
 
 protected:
     std::string m_path;
+    bool m_do_remove;
 };
 
 /// The constructor creates the directory if it does not already exist, then
@@ -115,7 +120,7 @@ protected:
 /// directory, then removes the directory.
 class TestDirGuard {
 public:
-    TestDirGuard(const std::string& path);
+    TestDirGuard(const std::string& path, bool init_clean = true);
     ~TestDirGuard() noexcept;
     operator std::string() const
     {
@@ -124,6 +129,13 @@ public:
     const char* c_str() const
     {
         return m_path.c_str();
+    }
+
+    bool do_remove = true;
+
+    void clean_dir()
+    {
+        clean_dir(m_path);
     }
 
 private:
@@ -157,6 +169,7 @@ private:
     std::size_t m_counter = 0;
 };
 
+std::shared_ptr<DB> get_test_db(const std::string& path, const char* crypt_key = nullptr);
 
 } // namespace test_util
 } // namespace realm

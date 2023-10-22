@@ -16,13 +16,15 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include <catch2/catch_all.hpp>
+#include <util/event_loop.hpp>
+#include <util/test_file.hpp>
+#include <util/test_utils.hpp>
+#include <util/sync/baas_admin_api.hpp>
+#include <util/sync/flx_sync_harness.hpp>
 
-#include "sync/flx_sync_harness.hpp"
-#include "util/event_loop.hpp"
-#include "util/test_file.hpp"
-#include "util/test_utils.hpp"
-#include "util/baas_admin_api.hpp"
+#include <realm/set.hpp>
+#include <realm/list.hpp>
+#include <realm/dictionary.hpp>
 
 #include <realm/object-store/audit.hpp>
 #include <realm/object-store/audit_serializer.hpp>
@@ -32,7 +34,6 @@
 #include <realm/object-store/schema.hpp>
 #include <realm/object-store/shared_realm.hpp>
 #include <realm/object-store/impl/object_accessor_impl.hpp>
-
 #include <realm/object-store/sync/sync_user.hpp>
 #include <realm/object-store/sync/sync_manager.hpp>
 #include <realm/object-store/sync/sync_session.hpp>
@@ -40,14 +41,15 @@
 #include <realm/object-store/sync/mongo_database.hpp>
 #include <realm/object-store/sync/mongo_collection.hpp>
 
-#include <realm/set.hpp>
-#include <realm/list.hpp>
-#include <realm/dictionary.hpp>
+#include <realm/util/logger.hpp>
+
+#include <catch2/catch_all.hpp>
 
 #include <external/json/json.hpp>
 
 using namespace realm;
 using namespace std::string_literals;
+using Catch::Matchers::StartsWith;
 using nlohmann::json;
 
 #ifndef AUDIT_LOG_LEVEL
@@ -81,7 +83,7 @@ std::vector<AuditEvent> get_audit_events(TestSyncManager& manager, bool parse_ev
         // If the session is still active (in this case the audit session) wait for audit to complete
         if (session->state() == SyncSession::State::Active) {
             auto [promise, future] = util::make_promise_future<void>();
-            session->wait_for_upload_completion([promise = std::move(promise)](std::error_code) mutable {
+            session->wait_for_upload_completion([promise = std::move(promise)](Status) mutable {
                 // Don't care if error occurred, just finish operation
                 promise.emplace_value();
             });
@@ -165,51 +167,28 @@ void sort_events(std::vector<AuditEvent>& events)
 static std::vector<AuditEvent> get_audit_events_from_baas(TestAppSession& session, SyncUser& user,
                                                           size_t expected_count)
 {
-    auto& app_session = session.app_session();
-    app::MongoClient remote_client = user.mongo_client("BackingDB");
-    app::MongoDatabase db = remote_client.db(app_session.config.mongo_dbname);
-    app::MongoCollection collection = db["AuditEvent"];
-    std::vector<AuditEvent> events;
     static const std::set<std::string> nonmetadata_fields = {"activity", "event", "data", "realm_id"};
 
-    timed_wait_for(
-        [&] {
-            uint64_t count = 0;
-            collection.count({}, [&](uint64_t c, util::Optional<app::AppError> error) {
-                REQUIRE(!error);
-                count = c;
-            });
-            if (count < expected_count) {
-                millisleep(500); // slow down the number of retries
-                return false;
-            }
-            return true;
-        },
-        std::chrono::minutes(5));
-
-    collection.find({}, {},
-                    [&](util::Optional<std::vector<bson::Bson>>&& result, util::Optional<app::AppError> error) {
-                        REQUIRE(!error);
-                        REQUIRE(result->size() >= expected_count);
-                        events.reserve(result->size());
-                        for (auto bson : *result) {
-                            auto doc = static_cast<const bson::BsonDocument&>(bson).entries();
-                            AuditEvent event;
-                            event.activity = static_cast<std::string>(doc["activity"]);
-                            event.timestamp = static_cast<Timestamp>(doc["timestamp"]);
-                            if (auto it = doc.find("event"); it != doc.end() && it->second != bson::Bson()) {
-                                event.event = static_cast<std::string>(it->second);
-                            }
-                            if (auto it = doc.find("data"); it != doc.end() && it->second != bson::Bson()) {
-                                event.data = json::parse(static_cast<std::string>(it->second));
-                            }
-                            for (auto& [key, value] : doc) {
-                                if (value.type() == bson::Bson::Type::String && !nonmetadata_fields.count(key))
-                                    event.metadata.insert({key, static_cast<std::string>(value)});
-                            }
-                            events.push_back(event);
-                        }
-                    });
+    auto documents = session.get_documents(user, "AuditEvent", expected_count);
+    std::vector<AuditEvent> events;
+    events.reserve(documents.size());
+    for (auto document : documents) {
+        auto doc = document.entries();
+        AuditEvent event;
+        event.activity = static_cast<std::string>(doc["activity"]);
+        event.timestamp = static_cast<Timestamp>(doc["timestamp"]);
+        if (auto it = doc.find("event"); it != doc.end() && it->second != bson::Bson()) {
+            event.event = static_cast<std::string>(it->second);
+        }
+        if (auto it = doc.find("data"); it != doc.end() && it->second != bson::Bson()) {
+            event.data = json::parse(static_cast<std::string>(it->second));
+        }
+        for (auto& [key, value] : doc) {
+            if (value.type() == bson::Bson::Type::String && !nonmetadata_fields.count(key))
+                event.metadata.insert({key, static_cast<std::string>(value)});
+        }
+        events.push_back(event);
+    }
     sort_events(events);
     return events;
 }
@@ -281,7 +260,7 @@ struct TestClock {
 
 } // namespace
 
-TEST_CASE("audit object serialization") {
+TEST_CASE("audit object serialization", "[sync][pbs][audit]") {
     TestSyncManager test_session;
     SyncTestFile config(test_session.app(), "parent");
     config.cache = false;
@@ -320,8 +299,8 @@ TEST_CASE("audit object serialization") {
     config.audit_config = std::make_shared<AuditConfig>();
     auto serializer = std::make_shared<CustomSerializer>();
     config.audit_config->serializer = serializer;
-    config.audit_config->logger =
-        std::make_shared<util::ThreadSafeLogger>(std::make_shared<util::StderrLogger>(AUDIT_LOG_LEVEL));
+    config.audit_config->logger = std::make_shared<util::ThreadSafeLogger>(util::Logger::get_default_logger());
+    config.audit_config->logger->set_level_threshold(AUDIT_LOG_LEVEL);
     auto realm = Realm::get_shared_realm(config);
     auto audit = realm->audit_context();
     REQUIRE(audit);
@@ -420,9 +399,9 @@ TEST_CASE("audit object serialization") {
         populate_object(obj);
         realm->commit_transaction();
 
-        audit->begin_scope("scope");
+        auto scope = audit->begin_scope("scope");
         Object object(realm, obj);
-        audit->end_scope(assert_no_error);
+        audit->end_scope(scope, assert_no_error);
         audit->wait_for_completion();
 
         auto events = get_audit_events(test_session);
@@ -446,22 +425,22 @@ TEST_CASE("audit object serialization") {
 
         serializer->expected_obj = &obj1;
 
-        audit->begin_scope("scope 1");
+        auto scope = audit->begin_scope("scope 1");
         Object(realm, obj1);
-        audit->end_scope(assert_no_error);
+        audit->end_scope(scope, assert_no_error);
         audit->wait_for_completion();
         REQUIRE(serializer->completion_count == 1);
 
-        audit->begin_scope("empty scope");
-        audit->end_scope(assert_no_error);
+        scope = audit->begin_scope("empty scope");
+        audit->end_scope(scope, assert_no_error);
         audit->wait_for_completion();
         REQUIRE(serializer->completion_count == 2);
 
         serializer->expected_obj = &obj2;
 
-        audit->begin_scope("scope 2");
+        scope = audit->begin_scope("scope 2");
         Object(realm, obj2);
-        audit->end_scope(assert_no_error);
+        audit->end_scope(scope, assert_no_error);
         audit->wait_for_completion();
         REQUIRE(serializer->completion_count == 3);
 
@@ -484,9 +463,9 @@ TEST_CASE("audit object serialization") {
         realm->begin_transaction();
         auto obj = table->create_object_with_primary_key(2);
         realm->commit_transaction();
-        audit->begin_scope("scope");
+        auto scope = audit->begin_scope("scope");
         Object(realm, obj);
-        audit->end_scope([](auto error) {
+        audit->end_scope(scope, [](auto error) {
             REQUIRE(error);
             REQUIRE_THROWS_CONTAINING(std::rethrow_exception(error), "custom serialization error");
         });
@@ -495,12 +474,12 @@ TEST_CASE("audit object serialization") {
 
     SECTION("write transaction serialization") {
         SECTION("create object") {
-            audit->begin_scope("scope");
+            auto scope = audit->begin_scope("scope");
             realm->begin_transaction();
             auto obj = table->create_object_with_primary_key(2);
             populate_object(obj);
             realm->commit_transaction();
-            audit->end_scope(assert_no_error);
+            audit->end_scope(scope, assert_no_error);
             audit->wait_for_completion();
 
             auto events = get_audit_events(test_session);
@@ -529,12 +508,12 @@ TEST_CASE("audit object serialization") {
             populate_object(obj);
             realm->commit_transaction();
 
-            audit->begin_scope("scope");
+            auto scope = audit->begin_scope("scope");
             realm->begin_transaction();
             obj.set("int", 3);
             obj.set("bool", true);
             realm->commit_transaction();
-            audit->end_scope(assert_no_error);
+            audit->end_scope(scope, assert_no_error);
             audit->wait_for_completion();
 
             auto events = get_audit_events(test_session);
@@ -557,11 +536,11 @@ TEST_CASE("audit object serialization") {
             populate_object(obj);
             realm->commit_transaction();
 
-            audit->begin_scope("scope");
+            auto scope = audit->begin_scope("scope");
             realm->begin_transaction();
             obj.remove();
             realm->commit_transaction();
-            audit->end_scope(assert_no_error);
+            audit->end_scope(scope, assert_no_error);
             audit->wait_for_completion();
 
             auto events = get_audit_events(test_session);
@@ -579,11 +558,11 @@ TEST_CASE("audit object serialization") {
             obj.create_and_set_linked_object(obj.get_table()->get_column_key("embedded object")).set_all(100);
             realm->commit_transaction();
 
-            audit->begin_scope("scope");
+            auto scope = audit->begin_scope("scope");
             realm->begin_transaction();
             obj.get_linked_object("embedded object").remove();
             realm->commit_transaction();
-            audit->end_scope(assert_no_error);
+            audit->end_scope(scope, assert_no_error);
             audit->wait_for_completion();
 
             auto events = get_audit_events(test_session);
@@ -603,7 +582,7 @@ TEST_CASE("audit object serialization") {
                 objects.push_back(target_table->create_object_with_primary_key(i).set_all(i));
             realm->commit_transaction();
 
-            audit->begin_scope("scope");
+            auto scope = audit->begin_scope("scope");
             realm->begin_transaction();
 
             // Mutate then delete should not report the mutate
@@ -621,7 +600,7 @@ TEST_CASE("audit object serialization") {
             obj2.remove();
 
             realm->commit_transaction();
-            audit->end_scope(assert_no_error);
+            audit->end_scope(scope, assert_no_error);
             audit->wait_for_completion();
 
             auto events = get_audit_events(test_session);
@@ -638,10 +617,10 @@ TEST_CASE("audit object serialization") {
         }
 
         SECTION("empty write transactions do not produce an event") {
-            audit->begin_scope("scope");
+            auto scope = audit->begin_scope("scope");
             realm->begin_transaction();
             realm->commit_transaction();
-            audit->end_scope(assert_no_error);
+            audit->end_scope(scope, assert_no_error);
             audit->wait_for_completion();
 
             REQUIRE(get_audit_events(test_session).empty());
@@ -649,9 +628,9 @@ TEST_CASE("audit object serialization") {
     }
 
     SECTION("empty query") {
-        audit->begin_scope("scope");
+        auto scope = audit->begin_scope("scope");
         Results(realm, table->where()).snapshot();
-        audit->end_scope(assert_no_error);
+        audit->end_scope(scope, assert_no_error);
         audit->wait_for_completion();
         REQUIRE(get_audit_events(test_session).empty());
     }
@@ -665,9 +644,9 @@ TEST_CASE("audit object serialization") {
         realm->commit_transaction();
 
         SECTION("query counts as a read on all objects matching the query") {
-            audit->begin_scope("scope");
+            auto scope = audit->begin_scope("scope");
             Results(realm, table->where().less(table->get_column_key("_id"), 5)).snapshot();
-            audit->end_scope(assert_no_error);
+            audit->end_scope(scope, assert_no_error);
             audit->wait_for_completion();
             auto events = get_audit_events(test_session);
             REQUIRE(events.size() == 1);
@@ -675,11 +654,11 @@ TEST_CASE("audit object serialization") {
         }
 
         SECTION("subsequent reads on the same table are folded into the query") {
-            audit->begin_scope("scope");
+            auto scope = audit->begin_scope("scope");
             Results(realm, table->where().less(table->get_column_key("_id"), 5)).snapshot();
             Object(realm, table->get_object(3)); // does not produce any new audit data
             Object(realm, table->get_object(7)); // adds this object to the query's event
-            audit->end_scope(assert_no_error);
+            audit->end_scope(scope, assert_no_error);
             audit->wait_for_completion();
             auto events = get_audit_events(test_session);
             REQUIRE(events.size() == 1);
@@ -687,10 +666,10 @@ TEST_CASE("audit object serialization") {
         }
 
         SECTION("reads on different tables are not folded into query") {
-            audit->begin_scope("scope");
+            auto scope = audit->begin_scope("scope");
             Results(realm, table->where().less(table->get_column_key("_id"), 5)).snapshot();
             Object(realm, target_table->get_object(3));
-            audit->end_scope(assert_no_error);
+            audit->end_scope(scope, assert_no_error);
             audit->wait_for_completion();
             auto events = get_audit_events(test_session);
             REQUIRE(events.size() == 2);
@@ -699,11 +678,11 @@ TEST_CASE("audit object serialization") {
         }
 
         SECTION("reads on same table following a read on a different table are not folded into query") {
-            audit->begin_scope("scope");
+            auto scope = audit->begin_scope("scope");
             Results(realm, table->where().less(table->get_column_key("_id"), 5)).snapshot();
             Object(realm, target_table->get_object(3));
             Object(realm, table->get_object(3));
-            audit->end_scope(assert_no_error);
+            audit->end_scope(scope, assert_no_error);
             audit->wait_for_completion();
             auto events = get_audit_events(test_session);
             REQUIRE(events.size() == 3);
@@ -713,12 +692,12 @@ TEST_CASE("audit object serialization") {
         }
 
         SECTION("reads with intervening writes are not combined") {
-            audit->begin_scope("scope");
+            auto scope = audit->begin_scope("scope");
             Results(realm, table->where().less(table->get_column_key("_id"), 5)).snapshot();
             realm->begin_transaction();
             realm->commit_transaction();
             Object(realm, table->get_object(3));
-            audit->end_scope(assert_no_error);
+            audit->end_scope(scope, assert_no_error);
             audit->wait_for_completion();
             auto events = get_audit_events(test_session);
             REQUIRE(events.size() == 2);
@@ -735,11 +714,11 @@ TEST_CASE("audit object serialization") {
             list.add(target_table->create_object_with_primary_key(i).set_all(i * 2).get_key());
         realm->commit_transaction();
 
-        audit->begin_scope("scope");
+        auto scope = audit->begin_scope("scope");
         Object object(realm, obj);
         auto obj_list = util::any_cast<List>(object.get_property_value<std::any>(context, "object list"));
         obj_list.filter(target_table->where().greater(target_table->get_column_key("value"), 10)).snapshot();
-        audit->end_scope(assert_no_error);
+        audit->end_scope(scope, assert_no_error);
         audit->wait_for_completion();
 
         auto events = get_audit_events(test_session);
@@ -780,9 +759,9 @@ TEST_CASE("audit object serialization") {
         realm->commit_transaction();
 
         SECTION("objects are serialized as just primary key by default") {
-            audit->begin_scope("scope");
+            auto scope = audit->begin_scope("scope");
             Object object(realm, obj);
-            audit->end_scope(assert_no_error);
+            audit->end_scope(scope, assert_no_error);
             audit->wait_for_completion();
 
             auto events = get_audit_events(test_session);
@@ -795,9 +774,9 @@ TEST_CASE("audit object serialization") {
         }
 
         SECTION("embedded objects are always full object") {
-            audit->begin_scope("scope");
+            auto scope = audit->begin_scope("scope");
             Object object(realm, obj);
-            audit->end_scope(assert_no_error);
+            audit->end_scope(scope, assert_no_error);
             audit->wait_for_completion();
 
             auto events = get_audit_events(test_session);
@@ -806,10 +785,10 @@ TEST_CASE("audit object serialization") {
         }
 
         SECTION("links followed serialize the full object") {
-            audit->begin_scope("scope");
+            auto scope = audit->begin_scope("scope");
             Object object(realm, obj);
             object.get_property_value<std::any>(context, "object");
-            audit->end_scope(assert_no_error);
+            audit->end_scope(scope, assert_no_error);
             audit->wait_for_completion();
 
             auto events = get_audit_events(test_session);
@@ -825,13 +804,13 @@ TEST_CASE("audit object serialization") {
         }
 
         SECTION("instantiating a collection accessor does not count as a read") {
-            audit->begin_scope("scope");
+            auto scope = audit->begin_scope("scope");
             Object object(realm, obj);
             util::any_cast<List>(object.get_property_value<std::any>(context, "object list"));
             util::any_cast<object_store::Set>(object.get_property_value<std::any>(context, "object set"));
             util::any_cast<object_store::Dictionary>(
                 object.get_property_value<std::any>(context, "object dictionary"));
-            audit->end_scope(assert_no_error);
+            audit->end_scope(scope, assert_no_error);
             audit->wait_for_completion();
 
             auto events = get_audit_events(test_session);
@@ -844,7 +823,7 @@ TEST_CASE("audit object serialization") {
 
         SECTION("accessing any value from a collection serializes full objects for the entire collection") {
             SECTION("list") {
-                audit->begin_scope("scope");
+                auto scope = audit->begin_scope("scope");
                 Object object(realm, obj);
                 auto list = util::any_cast<List>(object.get_property_value<std::any>(context, "object list"));
                 SECTION("get()") {
@@ -853,7 +832,7 @@ TEST_CASE("audit object serialization") {
                 SECTION("get_any()") {
                     list.get_any(1);
                 }
-                audit->end_scope(assert_no_error);
+                audit->end_scope(scope, assert_no_error);
                 audit->wait_for_completion();
 
                 auto events = get_audit_events(test_session);
@@ -867,7 +846,7 @@ TEST_CASE("audit object serialization") {
             }
 
             SECTION("set") {
-                audit->begin_scope("scope");
+                auto scope = audit->begin_scope("scope");
                 Object object(realm, obj);
                 auto set =
                     util::any_cast<object_store::Set>(object.get_property_value<std::any>(context, "object set"));
@@ -877,7 +856,7 @@ TEST_CASE("audit object serialization") {
                 SECTION("get_any()") {
                     set.get_any(1);
                 }
-                audit->end_scope(assert_no_error);
+                audit->end_scope(scope, assert_no_error);
                 audit->wait_for_completion();
 
                 auto events = get_audit_events(test_session);
@@ -891,7 +870,7 @@ TEST_CASE("audit object serialization") {
             }
 
             SECTION("dictionary") {
-                audit->begin_scope("scope");
+                auto scope = audit->begin_scope("scope");
                 Object object(realm, obj);
                 auto dict = util::any_cast<object_store::Dictionary>(
                     object.get_property_value<std::any>(context, "object dictionary"));
@@ -907,7 +886,7 @@ TEST_CASE("audit object serialization") {
                 SECTION("try_get_any()") {
                     dict.try_get_any("b");
                 }
-                audit->end_scope(assert_no_error);
+                audit->end_scope(scope, assert_no_error);
                 audit->wait_for_completion();
 
                 auto events = get_audit_events(test_session);
@@ -924,9 +903,9 @@ TEST_CASE("audit object serialization") {
         SECTION(
             "link access on an object read outside of a scope does not produce a read on the parent in the scope") {
             Object object(realm, obj);
-            audit->begin_scope("scope");
+            auto scope = audit->begin_scope("scope");
             object.get_property_value<std::any>(context, "object");
-            audit->end_scope(assert_no_error);
+            audit->end_scope(scope, assert_no_error);
             audit->wait_for_completion();
 
             auto events = get_audit_events(test_session);
@@ -937,13 +916,13 @@ TEST_CASE("audit object serialization") {
         }
 
         SECTION("link access in a different scope from the object do not expand linked object in parent read") {
-            audit->begin_scope("scope 1");
+            auto scope = audit->begin_scope("scope 1");
             Object object(realm, obj);
-            audit->end_scope(assert_no_error);
+            audit->end_scope(scope, assert_no_error);
 
-            audit->begin_scope("scope 2");
+            scope = audit->begin_scope("scope 2");
             object.get_property_value<std::any>(context, "object");
-            audit->end_scope(assert_no_error);
+            audit->end_scope(scope, assert_no_error);
             audit->wait_for_completion();
 
             auto events = get_audit_events(test_session);
@@ -956,18 +935,18 @@ TEST_CASE("audit object serialization") {
         }
 
         SECTION("link access tracking is reset between scopes") {
-            audit->begin_scope("scope 1");
+            auto scope = audit->begin_scope("scope 1");
             Object object(realm, obj);
             object.get_property_value<std::any>(context, "object");
-            audit->end_scope(assert_no_error);
+            audit->end_scope(scope, assert_no_error);
 
-            audit->begin_scope("scope 2");
+            scope = audit->begin_scope("scope 2");
             // Perform two unrelated events so that the read on `obj` is at
             // an event index after the link access in the previous scope
             Object(realm, target_table->get_object(obj_set.get(0)));
             Object(realm, target_table->get_object(obj_set.get(1)));
             Object(realm, obj);
-            audit->end_scope(assert_no_error);
+            audit->end_scope(scope, assert_no_error);
             audit->wait_for_completion();
 
             auto events = get_audit_events(test_session);
@@ -992,10 +971,10 @@ TEST_CASE("audit object serialization") {
         SECTION("read on the parent after the link access do not expand the linked object") {
             Object object(realm, obj);
 
-            audit->begin_scope("scope");
+            auto scope = audit->begin_scope("scope");
             object.get_property_value<std::any>(context, "object");
             Object(realm, obj);
-            audit->end_scope(assert_no_error);
+            audit->end_scope(scope, assert_no_error);
             audit->wait_for_completion();
 
             auto events = get_audit_events(test_session);
@@ -1006,10 +985,10 @@ TEST_CASE("audit object serialization") {
 
     SECTION("read on newly created object") {
         realm->begin_transaction();
-        audit->begin_scope("scope");
+        auto scope = audit->begin_scope("scope");
         Object object(realm, table->create_object_with_primary_key(100));
         Results(realm, table->where()).snapshot();
-        audit->end_scope(assert_no_error);
+        audit->end_scope(scope, assert_no_error);
         realm->commit_transaction();
         audit->wait_for_completion();
 
@@ -1024,9 +1003,9 @@ TEST_CASE("audit object serialization") {
 
         realm->begin_transaction();
         table->create_object_with_primary_key(2);
-        audit->begin_scope("scope");
+        auto scope = audit->begin_scope("scope");
         Results(realm, table->where()).snapshot();
-        audit->end_scope(assert_no_error);
+        audit->end_scope(scope, assert_no_error);
         realm->commit_transaction();
         audit->wait_for_completion();
 
@@ -1043,12 +1022,12 @@ TEST_CASE("audit object serialization") {
         realm->commit_transaction();
 
         SECTION("reads of objects that are subsequently deleted are still reported") {
-            audit->begin_scope("scope");
+            auto scope = audit->begin_scope("scope");
             realm->begin_transaction();
             Object(realm, obj2);
             obj2.remove();
             realm->commit_transaction();
-            audit->end_scope(assert_no_error);
+            audit->end_scope(scope, assert_no_error);
             audit->wait_for_completion();
 
             auto events = get_audit_events(test_session);
@@ -1059,14 +1038,14 @@ TEST_CASE("audit object serialization") {
         }
 
         SECTION("reads after deletions report the correct object") {
-            audit->begin_scope("scope");
+            auto scope = audit->begin_scope("scope");
             realm->begin_transaction();
             obj2.remove();
             // In the pre-core-6 version of the code this would incorrectly
             // report a read on obj2
             Object(realm, obj3);
             realm->commit_transaction();
-            audit->end_scope(assert_no_error);
+            audit->end_scope(scope, assert_no_error);
             audit->wait_for_completion();
 
             auto events = get_audit_events(test_session);
@@ -1078,7 +1057,7 @@ TEST_CASE("audit object serialization") {
     }
 }
 
-TEST_CASE("audit management") {
+TEST_CASE("audit management", "[sync][pbs][audit]") {
     TestClock clock;
 
     TestSyncManager test_session;
@@ -1098,33 +1077,33 @@ TEST_CASE("audit management") {
     // but we don't actually want the realm to be synchronizing
     realm->sync_session()->close();
 
-    SECTION("cannot nest scopes") {
-        audit->begin_scope("name");
-        REQUIRE_THROWS(audit->begin_scope("name"));
-    }
-    SECTION("cannot end nonexistent scope") {
-        REQUIRE_THROWS(audit->end_scope());
-    }
-
     SECTION("config validation") {
         SyncTestFile config(test_session.app(), "parent2");
         config.audit_config = std::make_shared<AuditConfig>();
         SECTION("invalid prefix") {
             config.audit_config->partition_value_prefix = "";
-            REQUIRE_THROWS(Realm::get_shared_realm(config));
+            REQUIRE_EXCEPTION(Realm::get_shared_realm(config), InvalidName,
+                              "Audit partition prefix must not be empty");
             config.audit_config->partition_value_prefix = "/audit";
-            REQUIRE_THROWS(Realm::get_shared_realm(config));
+            REQUIRE_EXCEPTION(Realm::get_shared_realm(config), InvalidName,
+                              "Invalid audit parition prefix '/audit': prefix must not contain slashes");
         }
         SECTION("invalid metadata") {
             config.audit_config->metadata = {{"", "a"}};
-            REQUIRE_THROWS(Realm::get_shared_realm(config));
-            std::string long_name('a', 64);
+            REQUIRE_EXCEPTION(Realm::get_shared_realm(config), InvalidName,
+                              "Invalid audit metadata key '': keys must be 1-63 characters long");
+            std::string long_name(64, 'a');
             config.audit_config->metadata = {{long_name, "b"}};
-            REQUIRE_THROWS(Realm::get_shared_realm(config));
+            REQUIRE_EXCEPTION(
+                Realm::get_shared_realm(config), InvalidName,
+                "Invalid audit metadata key 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa': keys "
+                "must be 1-63 characters long");
             config.audit_config->metadata = {{"activity", "c"}};
-            REQUIRE_THROWS(Realm::get_shared_realm(config));
+            REQUIRE_EXCEPTION(Realm::get_shared_realm(config), InvalidName,
+                              "Invalid audit metadata key 'activity': metadata keys cannot overlap with the audit "
+                              "event properties");
             config.audit_config->metadata = {{"a", "d"}, {"a", "e"}};
-            REQUIRE_THROWS(Realm::get_shared_realm(config));
+            REQUIRE_EXCEPTION(Realm::get_shared_realm(config), InvalidName, "Duplicate audit metadata key 'a'");
         }
     }
 
@@ -1133,19 +1112,130 @@ TEST_CASE("audit management") {
         auto obj = table->create_object_with_primary_key(1);
         realm->commit_transaction();
 
-        audit->begin_scope("scope 1");
+        auto scope = audit->begin_scope("scope 1");
         Object(realm, obj);
-        audit->end_scope(assert_no_error);
+        audit->end_scope(scope, assert_no_error);
 
-        audit->begin_scope("scope 2");
+        scope = audit->begin_scope("scope 2");
         Object(realm, obj);
-        audit->end_scope(assert_no_error);
+        audit->end_scope(scope, assert_no_error);
         audit->wait_for_completion();
 
         auto events = get_audit_events(test_session);
         REQUIRE(events.size() == 2);
         REQUIRE(events[0].activity == "scope 1");
         REQUIRE(events[1].activity == "scope 2");
+    }
+
+    SECTION("nested scopes") {
+        realm->begin_transaction();
+        auto obj1 = table->create_object_with_primary_key(1);
+        auto obj2 = table->create_object_with_primary_key(2);
+        auto obj3 = table->create_object_with_primary_key(3);
+        realm->commit_transaction();
+
+        auto scope1 = audit->begin_scope("scope 1");
+        Object(realm, obj1); // read in scope 1 only
+
+        auto scope2 = audit->begin_scope("scope 2");
+        Object(realm, obj2); // read in both scopes
+        audit->end_scope(scope2, assert_no_error);
+
+        Object(realm, obj3); // read in scope 1 only
+
+        audit->end_scope(scope1, assert_no_error);
+        audit->wait_for_completion();
+
+        auto events = get_audit_events(test_session);
+        REQUIRE(events.size() == 4);
+
+        // scope 2 read on obj 2 comes first as it was the first scope ended
+        REQUIRE(events[0].activity == "scope 2");
+        REQUIRE(events[0].data["value"][0]["_id"] == 2);
+
+        // scope 1 then has reads on each object in order
+        REQUIRE(events[1].activity == "scope 1");
+        REQUIRE(events[1].data["value"][0]["_id"] == 1);
+        REQUIRE(events[2].activity == "scope 1");
+        REQUIRE(events[2].data["value"][0]["_id"] == 2);
+        REQUIRE(events[3].activity == "scope 1");
+        REQUIRE(events[3].data["value"][0]["_id"] == 3);
+    }
+
+    SECTION("overlapping scopes") {
+        realm->begin_transaction();
+        auto obj1 = table->create_object_with_primary_key(1);
+        auto obj2 = table->create_object_with_primary_key(2);
+        auto obj3 = table->create_object_with_primary_key(3);
+        realm->commit_transaction();
+
+        auto scope1 = audit->begin_scope("scope 1");
+        Object(realm, obj1); // read in scope 1 only
+
+        auto scope2 = audit->begin_scope("scope 2");
+        Object(realm, obj2); // read in both scopes
+
+        audit->end_scope(scope1, assert_no_error);
+        Object(realm, obj3); // read in scope 2 only
+
+        audit->end_scope(scope2, assert_no_error);
+        audit->wait_for_completion();
+
+        auto events = get_audit_events(test_session);
+        REQUIRE(events.size() == 4);
+
+        // scope 1 only read on obj 1
+        REQUIRE(events[0].activity == "scope 1");
+        REQUIRE(events[0].data["value"][0]["_id"] == 1);
+
+        // both scopes read on obj 2
+        REQUIRE(events[1].activity == "scope 1");
+        REQUIRE(events[1].data["value"][0]["_id"] == 2);
+        REQUIRE(events[2].activity == "scope 2");
+        REQUIRE(events[2].data["value"][0]["_id"] == 2);
+
+        // scope 2 only read on obj 3
+        REQUIRE(events[3].activity == "scope 2");
+        REQUIRE(events[3].data["value"][0]["_id"] == 3);
+    }
+
+    SECTION("scope cancellation") {
+        realm->begin_transaction();
+        auto obj = table->create_object_with_primary_key(1);
+        realm->commit_transaction();
+
+        auto scope1 = audit->begin_scope("scope 1");
+        auto scope2 = audit->begin_scope("scope 2");
+        Object(realm, obj);
+        audit->cancel_scope(scope1);
+        audit->end_scope(scope2, assert_no_error);
+        audit->wait_for_completion();
+
+        auto events = get_audit_events(test_session);
+        REQUIRE(events.size() == 1);
+        REQUIRE(events[0].activity == "scope 2");
+    }
+
+    SECTION("ending invalid scopes") {
+        REQUIRE_FALSE(audit->is_scope_valid(0));
+        REQUIRE_THROWS_WITH(audit->end_scope(0),
+                            "Cannot end event scope: scope '0' not in progress. Scope may have already been ended?");
+
+        auto scope = audit->begin_scope("scope");
+        REQUIRE(audit->is_scope_valid(scope));
+        REQUIRE_NOTHROW(audit->end_scope(scope));
+
+        REQUIRE_FALSE(audit->is_scope_valid(scope));
+        REQUIRE_THROWS_WITH(audit->end_scope(scope),
+                            "Cannot end event scope: scope '1' not in progress. Scope may have already been ended?");
+
+        scope = audit->begin_scope("scope 2");
+        REQUIRE(audit->is_scope_valid(scope));
+        REQUIRE_NOTHROW(audit->cancel_scope(scope));
+
+        REQUIRE_FALSE(audit->is_scope_valid(scope));
+        REQUIRE_THROWS_WITH(audit->cancel_scope(scope),
+                            "Cannot end event scope: scope '2' not in progress. Scope may have already been ended?");
     }
 
     SECTION("event timestamps") {
@@ -1155,12 +1245,12 @@ TEST_CASE("audit management") {
             objects.push_back(table->create_object_with_primary_key(i));
         realm->commit_transaction();
 
-        audit->begin_scope("scope");
+        auto scope = audit->begin_scope("scope");
         for (int i = 0; i < 10; ++i) {
             Object(realm, objects[i]);
             Object(realm, objects[i]);
         }
-        audit->end_scope(assert_no_error);
+        audit->end_scope(scope, assert_no_error);
         audit->wait_for_completion();
 
         auto events = get_audit_events(test_session);
@@ -1181,9 +1271,9 @@ TEST_CASE("audit management") {
 
         SECTION("update before scope") {
             audit->update_metadata({{"a", "aa"}});
-            audit->begin_scope("scope 1");
+            auto scope = audit->begin_scope("scope 1");
             Object(realm, obj1);
-            audit->end_scope(assert_no_error);
+            audit->end_scope(scope, assert_no_error);
             audit->wait_for_completion();
 
             auto events = get_audit_events(test_session);
@@ -1194,10 +1284,10 @@ TEST_CASE("audit management") {
         }
 
         SECTION("update during scope") {
-            audit->begin_scope("scope 1");
+            auto scope = audit->begin_scope("scope 1");
             audit->update_metadata({{"a", "aa"}});
             Object(realm, obj1);
-            audit->end_scope(assert_no_error);
+            audit->end_scope(scope, assert_no_error);
             audit->wait_for_completion();
 
             auto events = get_audit_events(test_session);
@@ -1209,9 +1299,9 @@ TEST_CASE("audit management") {
         SECTION("one metadata field at a time") {
             for (int i = 0; i < 100; ++i) {
                 audit->update_metadata({{util::format("name %1", i), util::format("value %1", i)}});
-                audit->begin_scope(util::format("scope %1", i));
+                auto scope = audit->begin_scope(util::format("scope %1", i));
                 Object(realm, obj1);
-                audit->end_scope(assert_no_error);
+                audit->end_scope(scope, assert_no_error);
             }
             audit->wait_for_completion();
 
@@ -1228,9 +1318,9 @@ TEST_CASE("audit management") {
             for (int i = 0; i < 100; ++i) {
                 metadata.push_back({util::format("name %1", i), util::format("value %1", i)});
                 audit->update_metadata(std::vector(metadata));
-                audit->begin_scope(util::format("scope %1", i));
+                auto scope = audit->begin_scope(util::format("scope %1", i));
                 Object(realm, obj1);
-                audit->end_scope(assert_no_error);
+                audit->end_scope(scope, assert_no_error);
             }
             audit->wait_for_completion();
 
@@ -1246,20 +1336,20 @@ TEST_CASE("audit management") {
             auto realm2 = Realm::get_shared_realm(config);
             auto obj2 = realm2->read_group().get_table("class_object")->get_object(1);
 
-            audit->begin_scope("scope 1");
+            auto scope = audit->begin_scope("scope 1");
             Object(realm, obj1);
             Object(realm2, obj2);
-            audit->end_scope(assert_no_error);
+            audit->end_scope(scope, assert_no_error);
 
             config.audit_config->metadata = {{"a", "aaa"}, {"b", "bb"}};
             auto realm3 = Realm::get_shared_realm(config);
             auto obj3 = realm3->read_group().get_table("class_object")->get_object(2);
 
-            audit->begin_scope("scope 2");
+            scope = audit->begin_scope("scope 2");
             Object(realm, obj1);
             Object(realm2, obj2);
             Object(realm3, obj3);
-            audit->end_scope(assert_no_error);
+            audit->end_scope(scope, assert_no_error);
             audit->wait_for_completion();
 
             auto events = get_audit_events(test_session);
@@ -1289,10 +1379,10 @@ TEST_CASE("audit management") {
 
         audit->record_event("event 1", "event"s, "data"s, expect_completion(0));
         audit->record_event("event 2", none, "data"s, expect_completion(1));
-        audit->begin_scope("scope");
+        auto scope = audit->begin_scope("scope");
         // note: does not use the scope's activity
         audit->record_event("event 3", none, none, expect_completion(2));
-        audit->end_scope(expect_completion(3));
+        audit->end_scope(scope, expect_completion(3));
         audit->record_event("event 4", none, none, expect_completion(4));
 
         util::EventLoop::main().run_until([&] {
@@ -1333,7 +1423,7 @@ TEST_CASE("audit management") {
         obj3.set_all(2);
         realm3->commit_transaction();
 
-        audit->begin_scope("scope");
+        auto scope = audit->begin_scope("scope");
         Object(realm3, obj3); // value 2
         Object(realm2, obj2); // value 1
         Object(realm, obj);   // value 0
@@ -1344,7 +1434,7 @@ TEST_CASE("audit management") {
         Object(realm3, obj3); // value 2
         Object(realm2, obj2); // value 2
         Object(realm, obj);   // value 2
-        audit->end_scope(assert_no_error);
+        audit->end_scope(scope, assert_no_error);
         audit->wait_for_completion();
 
         auto events = get_audit_events(test_session);
@@ -1370,12 +1460,12 @@ TEST_CASE("audit management") {
         auto obj2 = table->create_object_with_primary_key(2);
         realm->commit_transaction();
 
-        audit->begin_scope("large");
+        auto scope = audit->begin_scope("large");
         for (int i = 0; i < 150'000; ++i) {
             Object(realm, obj1);
             Object(realm, obj2);
         }
-        audit->end_scope(assert_no_error);
+        audit->end_scope(scope, assert_no_error);
         audit->wait_for_completion();
 
         auto events = get_audit_events(test_session);
@@ -1384,7 +1474,7 @@ TEST_CASE("audit management") {
 #endif
 }
 
-TEST_CASE("audit realm sharding") {
+TEST_CASE("audit realm sharding", "[sync][pbs][audit]") {
     // Don't start the server immediately so that we're forced to accumulate
     // a lot of local unuploaded data.
     TestSyncManager test_session{{}, {.start_immediately = false}};
@@ -1396,8 +1486,9 @@ TEST_CASE("audit realm sharding") {
         {"object", {{"_id", PropertyType::Int, Property::IsPrimary{true}}, {"value", PropertyType::Int}}},
     };
     config.audit_config = std::make_shared<AuditConfig>();
-    auto logger = std::make_shared<util::StderrLogger>(AUDIT_LOG_LEVEL);
-    config.audit_config->logger = std::make_shared<util::ThreadSafeLogger>(logger);
+    auto logger = std::make_shared<util::ThreadSafeLogger>(util::Logger::get_default_logger());
+    logger->set_level_threshold(AUDIT_LOG_LEVEL);
+    config.audit_config->logger = logger;
     auto realm = Realm::get_shared_realm(config);
     auto audit = realm->audit_context();
     REQUIRE(audit);
@@ -1422,9 +1513,9 @@ TEST_CASE("audit realm sharding") {
 
     // Write a lot of audit scopes while unable to sync
     for (int i = 0; i < 50; ++i) {
-        audit->begin_scope(util::format("scope %1", i));
+        auto scope = audit->begin_scope(util::format("scope %1", i));
         Results(realm, table->where()).snapshot();
-        audit->end_scope(assert_no_error);
+        audit->end_scope(scope, assert_no_error);
     }
     audit->wait_for_completion();
 
@@ -1500,7 +1591,7 @@ TEST_CASE("audit realm sharding") {
         // Open a different Realm with the same user and audit prefix
         SyncTestFile config(test_session.app(), "other");
         config.audit_config = std::make_shared<AuditConfig>();
-        config.audit_config->logger = std::make_shared<util::ThreadSafeLogger>(logger);
+        config.audit_config->logger = logger;
         auto realm = Realm::get_shared_realm(config);
         auto audit2 = realm->audit_context();
         REQUIRE(audit2);
@@ -1527,7 +1618,7 @@ TEST_CASE("audit realm sharding") {
         // Open the same Realm with a different audit prefix
         SyncTestFile config(test_session.app(), "parent");
         config.audit_config = std::make_shared<AuditConfig>();
-        config.audit_config->logger = std::make_shared<util::ThreadSafeLogger>(logger);
+        config.audit_config->logger = logger;
         config.audit_config->partition_value_prefix = "other";
         auto realm = Realm::get_shared_realm(config);
         auto audit2 = realm->audit_context();
@@ -1550,12 +1641,12 @@ static void generate_event(std::shared_ptr<Realm> realm, int call = 0)
     table->create_object_with_primary_key(call + 1).set_all(2);
     realm->commit_transaction();
 
-    audit->begin_scope("scope");
+    auto scope = audit->begin_scope("scope");
     Object(realm, table->get_object(call));
-    audit->end_scope(assert_no_error);
+    audit->end_scope(scope, assert_no_error);
 }
 
-TEST_CASE("audit integration tests") {
+TEST_CASE("audit integration tests", "[sync][pbs][audit][baas]") {
     // None of these tests need a deterministic clock, but the server rounding
     // timestamps to milliseconds can result in events not having monotonically
     // increasing timestamps with an actual clock.
@@ -1584,8 +1675,8 @@ TEST_CASE("audit integration tests") {
     SyncTestFile config(session.app()->current_user(), bson::Bson("default"));
     config.schema = schema;
     config.audit_config = std::make_shared<AuditConfig>();
-    config.audit_config->logger =
-        std::make_shared<util::ThreadSafeLogger>(std::make_shared<util::StderrLogger>(AUDIT_LOG_LEVEL));
+    config.audit_config->logger = std::make_shared<util::ThreadSafeLogger>(util::Logger::get_default_logger());
+    config.audit_config->logger->set_level_threshold(AUDIT_LOG_LEVEL);
 
     auto expect_error = [&](auto&& config, auto&& fn) -> SyncError {
         std::mutex mutex;
@@ -1670,7 +1761,7 @@ TEST_CASE("audit integration tests") {
     SECTION("invalid metadata properties") {
         config.audit_config->metadata = {{"invalid key", "value"}};
         auto error = expect_error(config, generate_event);
-        REQUIRE(error.message.find("Invalid schema change") == 0);
+        REQUIRE_THAT(error.status.reason(), StartsWith("Invalid schema change"));
         REQUIRE(error.is_fatal);
     }
 
@@ -1682,13 +1773,13 @@ TEST_CASE("audit integration tests") {
         session.app()->sync_manager()->remove_user(audit_user->identity());
 
         auto audit = realm->audit_context();
-        audit->begin_scope("scope");
+        auto scope = audit->begin_scope("scope");
         realm->begin_transaction();
         auto table = realm->read_group().get_table("class_object");
         table->create_object_with_primary_key(1).set_all(2);
         realm->commit_transaction();
 
-        audit->end_scope([&](auto error) {
+        audit->end_scope(scope, [&](auto error) {
             REQUIRE(error);
             REQUIRE_THROWS_CONTAINING(std::rethrow_exception(error), "user has been removed");
         });
@@ -1703,7 +1794,7 @@ TEST_CASE("audit integration tests") {
         config.audit_config = std::make_shared<AuditConfig>();
 
         auto error = expect_error(config, generate_event);
-        REQUIRE(error.message.find("Invalid schema change") == 0);
+        REQUIRE_THAT(error.status.reason(), StartsWith("Invalid schema change"));
         REQUIRE(error.is_fatal);
     }
 
@@ -1778,7 +1869,7 @@ TEST_CASE("audit integration tests") {
         SECTION("auditing with a flexible sync user reports a sync error") {
             config.audit_config->audit_user = harness.app()->current_user();
             auto error = expect_error(config, generate_event);
-            REQUIRE_THAT(error.message,
+            REQUIRE_THAT(error.status.reason(),
                          Catch::Matchers::ContainsSubstring(
                              "Client connected using partition-based sync when app is using flexible sync"));
             REQUIRE(error.is_fatal);
@@ -1814,12 +1905,12 @@ TEST_CASE("audit integration tests") {
         auto obj2 = table->create_object_with_primary_key(2);
         realm->commit_transaction();
 
-        audit->begin_scope("large");
+        auto scope = audit->begin_scope("large");
         for (int i = 0; i < 150'000; ++i) {
             Object(realm, obj1);
             Object(realm, obj2);
         }
-        audit->end_scope(assert_no_error);
+        audit->end_scope(scope, assert_no_error);
 
         REQUIRE(get_audit_events_from_baas(session, *session.app()->current_user(), 300'000).size() == 300'000);
     }

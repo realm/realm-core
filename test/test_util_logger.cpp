@@ -94,10 +94,11 @@ TEST(Util_Logger_LevelThreshold)
     auto prefix_logger = PrefixLogger("test", threadsafe_logger); // created using Logger shared_ptr
     auto prefix_logger2 = PrefixLogger("test2", prefix_logger);   // created using PrefixLogger
 
-    CHECK(base_logger->get_level_threshold() == Logger::default_log_level);
-    CHECK(threadsafe_logger->get_level_threshold() == Logger::default_log_level);
-    CHECK(prefix_logger.get_level_threshold() == Logger::default_log_level);
-    CHECK(prefix_logger2.get_level_threshold() == Logger::default_log_level);
+    auto default_log_level = Logger::get_default_level_threshold();
+    CHECK(base_logger->get_level_threshold() == default_log_level);
+    CHECK(threadsafe_logger->get_level_threshold() == default_log_level);
+    CHECK(prefix_logger.get_level_threshold() == default_log_level);
+    CHECK(prefix_logger2.get_level_threshold() == default_log_level);
 
     base_logger->set_level_threshold(Logger::Level::error);
     CHECK(base_logger->get_level_threshold() == Logger::Level::error);
@@ -143,21 +144,24 @@ TEST(Util_Logger_LevelThreshold)
 TEST(Util_Logger_LocalThresholdLogger)
 {
     using namespace realm::util;
+    // Save the original level
+    auto orig_level = Logger::get_default_level_threshold();
+
     auto base_logger = std::make_shared<StderrLogger>();
     auto lt_logger = std::make_shared<LocalThresholdLogger>(base_logger);
     auto lt_logger2 = std::make_shared<LocalThresholdLogger>(base_logger, Logger::Level::trace);
     auto prefix_logger = PrefixLogger("test", lt_logger);
     auto prefix_logger2 = PrefixLogger("test2", lt_logger2);
 
-    CHECK(base_logger->get_level_threshold() == Logger::Level::info);
-    CHECK(lt_logger->get_level_threshold() == Logger::Level::info);
+    CHECK(base_logger->get_level_threshold() == orig_level);
+    CHECK(lt_logger->get_level_threshold() == orig_level);
     CHECK(lt_logger2->get_level_threshold() == Logger::Level::trace);
-    CHECK(prefix_logger.get_level_threshold() == Logger::Level::info);
+    CHECK(prefix_logger.get_level_threshold() == orig_level);
     CHECK(prefix_logger2.get_level_threshold() == Logger::Level::trace);
 
     lt_logger->set_level_threshold(Logger::Level::error);
     lt_logger2->set_level_threshold(Logger::Level::debug);
-    CHECK(base_logger->get_level_threshold() == Logger::Level::info);
+    CHECK(base_logger->get_level_threshold() == orig_level);
     CHECK(lt_logger->get_level_threshold() == Logger::Level::error);
     CHECK(prefix_logger.get_level_threshold() == Logger::Level::error);
     CHECK(lt_logger2->get_level_threshold() == Logger::Level::debug);
@@ -165,7 +169,7 @@ TEST(Util_Logger_LocalThresholdLogger)
 
     prefix_logger.set_level_threshold(Logger::Level::off);
     prefix_logger2.set_level_threshold(Logger::Level::all);
-    CHECK(base_logger->get_level_threshold() == Logger::Level::info);
+    CHECK(base_logger->get_level_threshold() == orig_level);
     CHECK(lt_logger->get_level_threshold() == Logger::Level::off);
     CHECK(prefix_logger.get_level_threshold() == Logger::Level::off);
     CHECK(lt_logger2->get_level_threshold() == Logger::Level::all);
@@ -177,6 +181,9 @@ TEST(Util_Logger_LocalThresholdLogger)
     CHECK(prefix_logger.get_level_threshold() == Logger::Level::off);
     CHECK(lt_logger2->get_level_threshold() == Logger::Level::all);
     CHECK(prefix_logger2.get_level_threshold() == Logger::Level::all);
+
+    // Restore original level
+    Logger::set_default_level_threshold(orig_level);
 }
 
 

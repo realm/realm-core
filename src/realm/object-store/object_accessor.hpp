@@ -83,7 +83,7 @@ struct ValueUpdater {
         policy2.create = false;
         auto link = child_ctx.template unbox<Obj>(value, policy2);
         if (!policy.copy && link && link.get_table()->is_embedded())
-            throw std::logic_error("Cannot set a link to an existing managed embedded object");
+            throw InvalidArgument("Cannot set a link to an existing managed embedded object");
 
         ObjKey curr_link;
         if (policy.diff)
@@ -224,9 +224,7 @@ ValueType Object::get_property_value_impl(ContextType& ctx, const Property& prop
         case PropertyType::LinkingObjects: {
             auto target_object_schema = m_realm->schema().find(property.object_type);
             auto link_property = target_object_schema->property_for_name(property.link_origin_property_name);
-            auto table = m_realm->read_group().get_table(target_object_schema->table_key);
-            auto tv = const_cast<Obj&>(m_obj).get_backlink_view(table, ColKey(link_property->column_key));
-            return ctx.box(Results(m_realm, std::move(tv)));
+            return ctx.box(Results(m_realm, m_obj, target_object_schema->table_key, link_property->column_key));
         }
         default:
             REALM_UNREACHABLE();
@@ -306,9 +304,8 @@ Object Object::create(ContextType& ctx, std::shared_ptr<Realm> const& realm, Obj
             obj = table->create_object_with_primary_key(as_mixed(ctx, primary_value, primary_prop->type), &created);
             if (!created && !policy.update) {
                 if (!realm->is_in_migration()) {
-                    throw std::logic_error(util::format(
-                        "Attempting to create an object of type '%1' with an existing primary key value '%2'.",
-                        object_schema.name, primary_value ? ctx.print(*primary_value) : "null"));
+                    auto pk_val = primary_value ? ctx.print(*primary_value) : "null";
+                    throw ObjectAlreadyExists(object_schema.name, pk_val);
                 }
                 table->set_primary_key_column(ColKey{});
                 skip_primary = false;
@@ -392,7 +389,8 @@ Object Object::get_for_primary_key(ContextType& ctx, std::shared_ptr<Realm> cons
     if (!table)
         return Object(realm, object_schema, Obj());
     if (ctx.is_null(primary_value) && !is_nullable(primary_prop->type))
-        throw std::logic_error("Invalid null value for non-nullable primary key.");
+        throw NotNullable(util::format("Invalid null value for non-nullable primary key '%1.%2'.", object_schema.name,
+                                       primary_prop->name));
 
     auto primary_key_value = switch_on_type(primary_prop->type, [&](auto* t) {
         return Mixed(ctx.template unbox<NonObjTypeT<decltype(*t)>>(primary_value));
@@ -407,7 +405,8 @@ ObjKey Object::get_for_primary_key_in_migration(ContextType& ctx, Table const& t
 {
     bool is_null = ctx.is_null(primary_value);
     if (is_null && !is_nullable(primary_prop.type))
-        throw std::logic_error("Invalid null value for non-nullable primary key.");
+        throw NotNullable(util::format("Invalid null value for non-nullable primary key '%1.%2'.",
+                                       table.get_class_name(), primary_prop.name));
     if (primary_prop.type == PropertyType::String) {
         return table.find_first(primary_prop.column_key, ctx.template unbox<StringData>(primary_value));
     }

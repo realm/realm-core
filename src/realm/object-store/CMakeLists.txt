@@ -6,6 +6,7 @@ set(SOURCES
     dictionary.cpp
     index_set.cpp
     list.cpp
+    class.cpp
     object.cpp
     object_changeset.cpp
     object_schema.cpp
@@ -45,6 +46,7 @@ set(HEADERS
     index_set.hpp
     keypath_helpers.hpp
     list.hpp
+    class.hpp
     object.hpp
     object_accessor.hpp
     object_changeset.hpp
@@ -143,6 +145,13 @@ if(REALM_ENABLE_SYNC)
             audit.mm
             sync/impl/apple/network_reachability_observer.cpp
             sync/impl/apple/system_configuration.cpp)
+    elseif(EMSCRIPTEN)
+        list(APPEND HEADERS
+            sync/impl/emscripten/network_transport.hpp
+            sync/impl/emscripten/socket_provider.hpp)
+        list(APPEND SOURCES
+            sync/impl/emscripten/network_transport.cpp
+            sync/impl/emscripten/socket_provider.cpp)
     endif()
 endif()
 
@@ -157,13 +166,20 @@ check_symbol_exists(epoll_create sys/epoll.h REALM_HAVE_EPOLL)
 
 if(APPLE)
     target_sources(ObjectStore PRIVATE impl/apple/external_commit_helper.cpp impl/apple/keychain_helper.cpp)
+    target_link_options(ObjectStore INTERFACE "SHELL:-framework Security")
 elseif(REALM_HAVE_EPOLL)
     target_compile_definitions(ObjectStore PUBLIC REALM_HAVE_EPOLL=1)
     target_sources(ObjectStore PRIVATE impl/epoll/external_commit_helper.cpp)
 elseif(CMAKE_SYSTEM_NAME MATCHES "^Windows")
     target_sources(ObjectStore PRIVATE impl/windows/external_commit_helper.cpp)
+elseif(EMSCRIPTEN)
+    target_sources(ObjectStore PRIVATE impl/emscripten/external_commit_helper.cpp)
 else()
     target_sources(ObjectStore PRIVATE impl/generic/external_commit_helper.cpp)
+endif()
+
+if(REALM_ENABLE_SYNC AND NOT REALM_SYNC_MULTIPLEXING)
+    target_compile_definitions(ObjectStore PUBLIC REALM_DISABLE_SYNC_MULTIPLEXING=1)
 endif()
 
 if(REALM_ENABLE_SYNC OR REALM_ENABLE_SERVER)
@@ -180,6 +196,9 @@ target_link_libraries(ObjectStore PUBLIC Storage QueryParser)
 if(REALM_ENABLE_SYNC)
     target_link_libraries(ObjectStore PUBLIC Sync)
     target_compile_definitions(ObjectStore PUBLIC REALM_ENABLE_SYNC=1)
+    if(EMSCRIPTEN)
+        target_link_options(ObjectStore PUBLIC -sFETCH=1 -sFETCH_SUPPORT_INDEXEDDB=0 -lwebsocket.js)
+    endif()
 endif()
 
 set_target_properties(ObjectStore PROPERTIES OUTPUT_NAME "realm-object-store")

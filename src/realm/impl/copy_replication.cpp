@@ -28,7 +28,7 @@ void CopyReplication::add_class(TableKey, StringData name, Table::Type table_typ
 {
     if (auto existing_table = m_tr->get_table(name)) {
         if (existing_table->get_table_type() != table_type)
-            throw std::runtime_error(util::format("Incompatible class: %1", name));
+            throw LogicError(ErrorCodes::TypeMismatch, util::format("Incompatible class: %1", name));
         return;
     }
     m_tr->add_table(name, table_type);
@@ -40,7 +40,7 @@ void CopyReplication::add_class_with_primary_key(TableKey, StringData name, Data
     if (auto existing_table = m_tr->get_table(name)) {
         auto pk_col = existing_table->get_primary_key_column();
         if (DataType(pk_col.get_type()) != type || existing_table->get_column_name(pk_col) != pk_name)
-            throw std::runtime_error(util::format("Incompatible class: %1", name));
+            throw LogicError(ErrorCodes::TypeMismatch, util::format("Incompatible class: %1", name));
         return;
     }
     m_tr->add_table_with_primary_key(name, type, pk_name, nullable, table_type);
@@ -52,7 +52,8 @@ void CopyReplication::insert_column(const Table* t, ColKey col_key, DataType typ
     auto table = get_table_in_destination_realm();
     if (ColKey existing_key = table->get_column_key(name)) {
         if (existing_key.get_type() != col_key.get_type() || existing_key.get_attrs() != col_key.get_attrs())
-            throw std::runtime_error(util::format("Incompatible property: %1::%2", t->get_name(), name));
+            throw LogicError(ErrorCodes::TypeMismatch,
+                             util::format("Incompatible property: %1::%2", t->get_name(), name));
         return;
     }
     if (dest) {
@@ -170,17 +171,17 @@ void CopyReplication::dictionary_insert(const CollectionBase& coll, size_t, Mixe
     if (value.is_type(type_Link, type_TypedLink)) {
         value = handle_link(col_key, value, [&](TableRef dest_target_table) {
             // Check if dictionary obj has embedded obj already
-            auto tmp = dict.try_get(key);
-            Obj embedded;
-            if (tmp && tmp->is_type(type_TypedLink)) {
-                ObjKey key = tmp->get<ObjKey>();
-                embedded = dest_target_table->get_object(key);
+            size_t ndx = dict.find_any_key(key);
+            if (ndx != realm::not_found) {
+                auto val = dict.get_any(ndx);
+                if (val.is_type(type_Link)) {
+                    ObjKey key = val.get<ObjKey>();
+                    m_current.obj_in_destination = dest_target_table->get_object(key);
+                    return;
+                }
             }
-            else {
-                // If not, create one
-                embedded = dict.create_and_insert_linked_object(key);
-            }
-            m_current.obj_in_destination = embedded;
+            // If not, create one
+            m_current.obj_in_destination = dict.create_and_insert_linked_object(key);
         });
         if (value.is_null())
             return;

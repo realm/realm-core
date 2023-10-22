@@ -22,122 +22,98 @@ struct QueryArgumentsAdapter : query_parser::Arguments {
     bool bool_for_argument(size_t i) final
     {
         verify_ndx(i);
-        if (m_args[i].arg[0].type == RLM_TYPE_BOOL) {
-            return m_args[i].arg[0].boolean;
-        }
-        // Note: Unreachable.
-        throw LogicError{LogicError::type_mismatch}; // LCOV_EXCL_LINE
+        REALM_ASSERT(m_args[i].arg[0].type == RLM_TYPE_BOOL);
+        return m_args[i].arg[0].boolean;
     }
 
     long long long_for_argument(size_t i) final
     {
         verify_ndx(i);
-        if (m_args[i].arg[0].type == RLM_TYPE_INT) {
-            return m_args[i].arg[0].integer;
-        }
-        // Note: Unreachable.
-        throw LogicError{LogicError::type_mismatch}; // LCOV_EXCL_LINE
+        REALM_ASSERT(m_args[i].arg[0].type == RLM_TYPE_INT);
+        return m_args[i].arg[0].integer;
     }
 
     float float_for_argument(size_t i) final
     {
         verify_ndx(i);
-        if (m_args[i].arg[0].type == RLM_TYPE_FLOAT) {
-            return m_args[i].arg[0].fnum;
-        }
-        // Note: Unreachable.
-        throw LogicError{LogicError::type_mismatch}; // LCOV_EXCL_LINE
+        REALM_ASSERT(m_args[i].arg[0].type == RLM_TYPE_FLOAT);
+        return m_args[i].arg[0].fnum;
     }
 
     double double_for_argument(size_t i) final
     {
         verify_ndx(i);
-        if (m_args[i].arg[0].type == RLM_TYPE_DOUBLE) {
-            return m_args[i].arg[0].dnum;
-        }
-        // Note: Unreachable.
-        throw LogicError{LogicError::type_mismatch}; // LCOV_EXCL_LINE
+        REALM_ASSERT(m_args[i].arg[0].type == RLM_TYPE_DOUBLE);
+        return m_args[i].arg[0].dnum;
     }
 
     StringData string_for_argument(size_t i) final
     {
         verify_ndx(i);
-        if (m_args[i].arg[0].type == RLM_TYPE_STRING) {
-            return from_capi(m_args[i].arg[0].string);
-        }
-        // Note: Unreachable.
-        throw LogicError{LogicError::type_mismatch}; // LCOV_EXCL_LINE
+        REALM_ASSERT(m_args[i].arg[0].type == RLM_TYPE_STRING);
+        return from_capi(m_args[i].arg[0].string);
     }
 
     BinaryData binary_for_argument(size_t i) final
     {
         verify_ndx(i);
-        if (m_args[i].arg[0].type == RLM_TYPE_BINARY) {
-            return from_capi(m_args[i].arg[0].binary);
-        }
-        // Note: Unreachable.
-        throw LogicError{LogicError::type_mismatch}; // LCOV_EXCL_LINE
+        REALM_ASSERT(m_args[i].arg[0].type == RLM_TYPE_BINARY);
+        return from_capi(m_args[i].arg[0].binary);
     }
 
     Timestamp timestamp_for_argument(size_t i) final
     {
         verify_ndx(i);
-        if (m_args[i].arg[0].type == RLM_TYPE_TIMESTAMP) {
-            return from_capi(m_args[i].arg[0].timestamp);
-        }
-        // Note: Unreachable.
-        throw LogicError{LogicError::type_mismatch}; // LCOV_EXCL_LINE
+        REALM_ASSERT(m_args[i].arg[0].type == RLM_TYPE_TIMESTAMP);
+        return from_capi(m_args[i].arg[0].timestamp);
     }
 
     ObjKey object_index_for_argument(size_t i) final
     {
         verify_ndx(i);
-        if (m_args[i].arg[0].type == RLM_TYPE_LINK) {
-            // FIXME: Somehow check the target table type?
-            return from_capi(m_args[i].arg[0].link).get_obj_key();
-        }
-        // Note: Unreachable.
-        throw LogicError{LogicError::type_mismatch}; // LCOV_EXCL_LINE
+        REALM_ASSERT(m_args[i].arg[0].type == RLM_TYPE_LINK);
+        // FIXME: Somehow check the target table type?
+        return from_capi(m_args[i].arg[0].link).get_obj_key();
     }
 
     ObjectId objectid_for_argument(size_t i) final
     {
         verify_ndx(i);
-        if (m_args[i].arg[0].type == RLM_TYPE_OBJECT_ID) {
-            return from_capi(m_args[i].arg[0].object_id);
-        }
-        // Note: Unreachable.
-        throw LogicError{LogicError::type_mismatch}; // LCOV_EXCL_LINE
+        REALM_ASSERT(m_args[i].arg[0].type == RLM_TYPE_OBJECT_ID);
+        return from_capi(m_args[i].arg[0].object_id);
     }
 
     Decimal128 decimal128_for_argument(size_t i) final
     {
         verify_ndx(i);
-        if (m_args[i].arg[0].type == RLM_TYPE_DECIMAL128) {
-            return from_capi(m_args[i].arg[0].decimal128);
-        }
-        // Note: Unreachable.
-        throw LogicError{LogicError::type_mismatch}; // LCOV_EXCL_LINE
+        REALM_ASSERT(m_args[i].arg[0].type == RLM_TYPE_DECIMAL128);
+        return from_capi(m_args[i].arg[0].decimal128);
     }
 
     UUID uuid_for_argument(size_t i) final
     {
         verify_ndx(i);
-        if (m_args[i].arg[0].type == RLM_TYPE_UUID) {
-            return from_capi(m_args[i].arg[0].uuid);
-        }
-        // Note: Unreachable.
-        throw LogicError{LogicError::type_mismatch}; // LCOV_EXCL_LINE
+        REALM_ASSERT(m_args[i].arg[0].type == RLM_TYPE_UUID);
+        return from_capi(m_args[i].arg[0].uuid);
     }
 
     ObjLink objlink_for_argument(size_t i) final
     {
         verify_ndx(i);
-        if (m_args[i].arg[0].type == RLM_TYPE_LINK) {
-            return from_capi(m_args[i].arg[0].link);
-        }
-        throw LogicError{LogicError::type_mismatch}; // LCOV_EXCL_LINE
+        REALM_ASSERT(m_args[i].arg[0].type == RLM_TYPE_LINK);
+        return from_capi(m_args[i].arg[0].link);
     }
+
+#if REALM_ENABLE_GEOSPATIAL
+    Geospatial geospatial_for_argument(size_t i) final
+    {
+        verify_ndx(i);
+        // FIXME: implement this
+        throw LogicError{
+            ErrorCodes::RuntimeError,
+            util::format("geospatial in the C-API is not yet implemented (for argument %1)", i)}; // LCOV_EXCL_LINE
+    }
+#endif
 
     bool is_argument_null(size_t i) final
     {
@@ -191,7 +167,8 @@ struct QueryArgumentsAdapter : query_parser::Arguments {
             case RLM_TYPE_UUID:
                 return type_UUID;
         }
-        throw LogicError{LogicError::type_mismatch}; // LCOV_EXCL_LINE
+        throw LogicError{ErrorCodes::TypeMismatch, "Unsupported type"}; // LCOV_EXCL_LINE
+        return type_Int;
     }
 };
 } // namespace
@@ -353,9 +330,17 @@ RLM_API realm_results_t* realm_get_backlinks(realm_object_t* object, realm_class
     return wrap_err([&]() {
         object->verify_attached();
         auto realm = object->realm();
-        auto source_table = realm->read_group().get_table(TableKey{source_table_key});
-        auto backlink_view = object->obj().get_backlink_view(source_table, ColKey{property_key});
-        return new realm_results_t{Results{realm, backlink_view}};
+        return new realm_results_t{
+            Results{realm, object->get_obj(), TableKey{source_table_key}, ColKey{property_key}}};
+    });
+}
+
+RLM_API bool realm_results_is_valid(const realm_results_t* results, bool* is_valid)
+{
+    return wrap_err([&]() {
+        if (is_valid)
+            *is_valid = results->is_valid();
+        return true;
     });
 }
 
@@ -447,6 +432,16 @@ RLM_API realm_object_t* realm_results_get_object(realm_results_t* results, size_
     });
 }
 
+RLM_API realm_query_t* realm_results_get_query(realm_results_t* results)
+{
+    return wrap_err([&]() {
+        auto query = results->get_query();
+        auto shared_realm = results->get_realm();
+        auto ordering = query.get_ordering();
+        return new realm_query_t{std::move(query), std::move(ordering), shared_realm};
+    });
+}
+
 RLM_API bool realm_results_find_object(realm_results_t* results, realm_object_t* value, size_t* out_index,
                                        bool* out_found)
 {
@@ -457,7 +452,7 @@ RLM_API bool realm_results_find_object(realm_results_t* results, realm_object_t*
 
     return wrap_err([&]() {
         if (out_index) {
-            *out_index = results->index_of(value->obj());
+            *out_index = results->index_of(value->get_obj());
             if (out_found && *out_index != realm::not_found)
                 *out_found = true;
         }
@@ -588,7 +583,7 @@ RLM_API realm_results_t* realm_results_from_thread_safe_reference(const realm_t*
     return wrap_err([&]() {
         auto rtsr = dynamic_cast<realm_results::thread_safe_reference*>(tsr);
         if (!rtsr) {
-            throw std::logic_error{"Thread safe reference type mismatch"};
+            throw LogicError{ErrorCodes::IllegalOperation, "Thread safe reference type mismatch"};
         }
 
         auto results = rtsr->resolve<Results>(*realm);

@@ -766,31 +766,6 @@ ClusterTree::ClusterTree(Table* owner, Allocator& alloc, size_t top_position_for
 
 ClusterTree::~ClusterTree() {}
 
-size_t ClusterTree::size_from_ref(ref_type ref, Allocator& alloc)
-{
-    size_t ret = 0;
-    if (ref) {
-        Array arr(alloc);
-        arr.init_from_ref(ref);
-        if (arr.is_inner_bptree_node()) {
-            ret = size_t(arr.get(2)) >> 1;
-        }
-        else {
-            int64_t rot = arr.get(0);
-            if (rot & 1) {
-                ret = size_t(rot) >> 1;
-            }
-            else {
-                ref_type key_ref = to_ref(rot);
-                MemRef mem(key_ref, alloc);
-                auto header = mem.get_addr();
-                ret = Node::get_size_from_header(header);
-            }
-        }
-    }
-    return ret;
-}
-
 std::unique_ptr<ClusterNode> ClusterTree::create_root_from_parent(ArrayParent* parent, size_t ndx_in_parent)
 {
     ref_type ref = parent->get_child_ref(ndx_in_parent);
@@ -998,7 +973,7 @@ ClusterNode::State ClusterTree::try_get(ObjKey k) const noexcept
 ClusterNode::State ClusterTree::get(size_t ndx, ObjKey& k) const
 {
     if (ndx >= m_size) {
-        throw std::out_of_range("Object was deleted");
+        throw Exception(ErrorCodes::InvalidatedObject, "Object was deleted");
     }
     ClusterNode::State state;
     k = m_root->get(ndx, state);
@@ -1111,7 +1086,7 @@ void ClusterTree::verify() const
 #endif
 }
 
-void ClusterTree::nullify_links(ObjKey obj_key, CascadeState& state)
+void ClusterTree::nullify_incoming_links(ObjKey obj_key, CascadeState& state)
 {
     REALM_ASSERT(state.m_group);
     m_root->nullify_incoming_links(obj_key, state);
@@ -1205,16 +1180,10 @@ void ClusterTree::remove_all_links(CascadeState& state)
                         values.init_from_parent();
 
                         // Iterate through values and insert all link values
-                        values.traverse([&](BPlusTreeNode* node, size_t) {
-                            auto bplustree_leaf = static_cast<BPlusTree<Mixed>::LeafNode*>(node);
-                            auto sz = bplustree_leaf->size();
-                            for (size_t i = 0; i < sz; i++) {
-                                auto mix = bplustree_leaf->get(i);
-                                if (mix.is_type(type_TypedLink)) {
-                                    links.push_back(mix.get<ObjLink>());
-                                }
+                        values.for_all([&](Mixed val) {
+                            if (val.is_type(type_TypedLink)) {
+                                links.push_back(val.get<ObjLink>());
                             }
-                            return IteratorControl::AdvanceToNext;
                         });
 
                         if (links.size() > 0) {
@@ -1325,7 +1294,7 @@ size_t ClusterTree::Iterator::get_position()
 {
     auto ndx = m_tree.get_ndx(m_key);
     if (ndx == realm::npos) {
-        throw std::logic_error("Outdated iterator");
+        throw StaleAccessor("Stale iterator");
     }
     return ndx;
 }
@@ -1350,7 +1319,7 @@ void ClusterTree::Iterator::go(size_t abs_pos)
 {
     size_t sz = m_tree.size();
     if (abs_pos >= sz) {
-        throw std::out_of_range("Index out of range");
+        throw OutOfBounds("go() on Iterator", abs_pos, sz);
     }
 
     m_position = abs_pos;
@@ -1377,7 +1346,7 @@ bool ClusterTree::Iterator::update() const
         ObjKey k = load_leaf(m_key);
         m_leaf_invalid = !k || (k != m_key);
         if (m_leaf_invalid) {
-            throw std::logic_error("Outdated iterator");
+            throw StaleAccessor("Stale iterator");
         }
         return true;
     }

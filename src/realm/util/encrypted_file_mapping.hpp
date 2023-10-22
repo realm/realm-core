@@ -20,8 +20,8 @@
 #define REALM_UTIL_ENCRYPTED_FILE_MAPPING_HPP
 
 #include <realm/util/file.hpp>
-#include <realm/util/thread.hpp>
 #include <realm/util/features.h>
+#include <realm/util/aes_cryptor.hpp>
 
 #if REALM_ENABLE_ENCRYPTION
 
@@ -32,12 +32,12 @@ typedef size_t (*Header_to_size)(const char* addr);
 namespace realm::util {
 
 struct SharedFileInfo;
-class EncryptedFileMapping;
 
 class EncryptedFileMapping {
 public:
     // Adds the newly-created object to file.mappings iff it's successfully constructed
-    EncryptedFileMapping(SharedFileInfo& file, size_t file_offset, void* addr, size_t size, File::AccessMode access);
+    EncryptedFileMapping(SharedFileInfo& file, size_t file_offset, void* addr, size_t size, File::AccessMode access,
+                         util::WriteObserver* observer = nullptr, util::WriteMarker* marker = nullptr);
     ~EncryptedFileMapping();
 
     // Default implementations of copy/assign can trigger multiple destructions
@@ -52,20 +52,21 @@ public:
     void sync() noexcept;
 
     // Make sure that memory in the specified range is synchronized with any
-    // changes made globally visible through call to write_barrier or mark_for_refresh
-    void read_barrier(const void* addr, size_t size, Header_to_size header_to_size, bool allow_missing);
+    // changes made globally visible through call to write_barrier or refresh_outdated_pages().
+    // Optionally mark the pages for later modification
+    void read_barrier(const void* addr, size_t size, Header_to_size header_to_size, bool to_modify);
 
     // Ensures that any changes made to memory in the specified range
     // becomes visible to any later calls to read_barrier()
+    // Pages selected must have been marked for modification at an earlier read barrier
     void write_barrier(const void* addr, size_t size) noexcept;
 
-    // Marks pages in the given range as having been changed on disk (by another process)
-    // this applies to ALL mappings for the same file. The range is specified as offsets
-    // into the file and is not constrained by the specific mapping on which the method is
-    // invoked.
-    // The pages specified can not be in the Dirty state.
-    // The pages specified will be refetched and re-decrypted by calls to read_barrier.
-    void mark_for_refresh(size_t ref_start, size_t ref_end);
+    // Mark pages for later checks of the ivs on disk. If the IVs have changed compared to
+    // the in memory versions the page will later need to be refreshed.
+    // This is the process by which a reader in a multiprocess scenario detects if its
+    // mapping should be refreshed while advancing versions.
+    // The pages marked for IV-checks will be refetched and re-decrypted by later calls to read_barrier.
+    void mark_pages_for_IV_check();
 
     // Set this mapping to a new address and size
     // Flushes any remaining dirty pages from the old mapping
@@ -85,6 +86,7 @@ public:
 
     bool contains_page(size_t page_in_file) const;
     size_t get_local_index_of_address(const void* addr, size_t offset = 0) const;
+    size_t get_offset_of_address(const void* addr) const;
 
     size_t get_end_index()
     {
@@ -93,6 +95,14 @@ public:
     size_t get_start_index()
     {
         return m_first_page;
+    }
+    void set_marker(WriteMarker* marker)
+    {
+        m_marker = marker;
+    }
+    void set_observer(WriteObserver* observer)
+    {
+        m_observer = observer;
     }
 
 private:
@@ -108,10 +118,11 @@ private:
 
     enum PageState {
         Clean = 0,
-        Touched = 1,         // a ref->ptr translation has taken place
-        UpToDate = 2,        // the page is fully up to date
-        RefetchRequired = 4, // the page is valid for old translations, but requires re-decryption for new
-        Dirty = 8            // the page has been modified with respect to what's on file.
+        Touched = 1,  // a ref->ptr translation has taken place
+        UpToDate = 2, // the page is fully up to date
+        StaleIV = 4,  // the page needs to check the on disk IV for changes by other processes
+        Writable = 8, // the page is open for writing
+        Dirty = 16    // the page has been modified with respect to what's on file.
     };
     std::vector<PageState> m_page_state;
     // little helpers:
@@ -137,7 +148,8 @@ private:
     static constexpr size_t page_to_chunk_factor = size_t(1) << page_to_chunk_shift;
 
     File::AccessMode m_access;
-
+    util::WriteObserver* m_observer = nullptr;
+    util::WriteMarker* m_marker = nullptr;
 #ifdef REALM_DEBUG
     std::unique_ptr<char[]> m_validate_buffer;
 #endif
@@ -153,13 +165,19 @@ private:
     void validate() noexcept;
 };
 
+inline size_t EncryptedFileMapping::get_offset_of_address(const void* addr) const
+{
+    return reinterpret_cast<size_t>(addr) & ((1 << m_page_shift) - 1);
+}
+
 inline size_t EncryptedFileMapping::get_local_index_of_address(const void* addr, size_t offset) const
 {
     REALM_ASSERT_EX(addr >= m_addr, addr, m_addr);
 
     size_t local_ndx =
         ((reinterpret_cast<uintptr_t>(addr) - reinterpret_cast<uintptr_t>(m_addr) + offset) >> m_page_shift);
-    REALM_ASSERT_EX(local_ndx < m_page_state.size(), local_ndx, m_page_state.size());
+    REALM_ASSERT_EX(local_ndx < m_page_state.size(), local_ndx, m_page_state.size(), size_t(addr), size_t(m_addr),
+                    m_page_shift);
     return local_ndx;
 }
 
@@ -177,9 +195,13 @@ inline bool EncryptedFileMapping::contains_page(size_t page_in_file) const
 namespace realm::util {
 /// Thrown by EncryptedFileMapping if a file opened is non-empty and does not
 /// contain valid encrypted data
-struct DecryptionFailed : util::File::AccessError {
+struct DecryptionFailed : FileAccessError {
     DecryptionFailed()
-        : util::File::AccessError("Decryption failed", std::string())
+        : FileAccessError(ErrorCodes::DecryptionFailed, "Decryption failed", std::string(), 0)
+    {
+    }
+    DecryptionFailed(const std::string& msg)
+        : FileAccessError(ErrorCodes::DecryptionFailed, util::format("Decryption failed: '%1'", msg), std::string())
     {
     }
 };

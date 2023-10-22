@@ -79,8 +79,6 @@ public:
     // this is enforced in logging.cpp.
     enum class Level { all = 0, trace = 1, debug = 2, detail = 3, info = 4, warn = 5, error = 6, fatal = 7, off = 8 };
 
-    static const Level default_log_level;
-
     template <class... Params>
     void log(Level, const char* message, Params&&...);
 
@@ -104,16 +102,29 @@ public:
 
     virtual inline ~Logger() noexcept = default;
 
+    static void set_default_logger(std::shared_ptr<util::Logger>) noexcept;
+    static std::shared_ptr<util::Logger>& get_default_logger() noexcept;
+    static void set_default_level_threshold(Level level) noexcept;
+    static Level get_default_level_threshold() noexcept;
+    static const std::string_view level_to_string(Level level) noexcept;
+
 protected:
+    // Used by subclasses that link to a base logger
+    std::shared_ptr<Logger> m_base_logger_ptr;
+
+    // Shared level threshold for subclasses that link to a base logger
+    // See PrefixLogger and ThreadSafeLogger
+    std::atomic<Level>& m_level_threshold;
+
     Logger() noexcept
-        : m_threshold_base{Logger::default_log_level}
-        , m_level_threshold{m_threshold_base}
+        : m_level_threshold{m_threshold_base}
+        , m_threshold_base{get_default_level_threshold()}
     {
     }
 
     explicit Logger(Level level) noexcept
-        : m_threshold_base{level}
-        , m_level_threshold{m_threshold_base}
+        : m_level_threshold{m_threshold_base}
+        , m_threshold_base{level}
     {
     }
 
@@ -133,15 +144,6 @@ private:
     // Only used by the base Logger class
     std::atomic<Level> m_threshold_base;
 
-protected:
-    // Used by subclasses that link to a base logger
-    std::shared_ptr<Logger> m_base_logger_ptr;
-
-    // Shared level threshold for subclasses that link to a base logger
-    // See PrefixLogger and ThreadSafeLogger
-    std::atomic<Level>& m_level_threshold;
-
-private:
     template <class... Params>
     REALM_NOINLINE void do_log(Level, const char* message, Params&&...);
 };
@@ -366,36 +368,7 @@ void Logger::do_log(Level level, const char* message, Params&&... params)
 template <class C, class T>
 std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>& out, Logger::Level level)
 {
-    switch (level) {
-        case Logger::Level::all:
-            out << "all";
-            return out;
-        case Logger::Level::trace:
-            out << "trace";
-            return out;
-        case Logger::Level::debug:
-            out << "debug";
-            return out;
-        case Logger::Level::detail:
-            out << "detail";
-            return out;
-        case Logger::Level::info:
-            out << "info";
-            return out;
-        case Logger::Level::warn:
-            out << "warn";
-            return out;
-        case Logger::Level::error:
-            out << "error";
-            return out;
-        case Logger::Level::fatal:
-            out << "fatal";
-            return out;
-        case Logger::Level::off:
-            out << "off";
-            return out;
-    }
-    REALM_ASSERT(false);
+    out << Logger::level_to_string(level);
     return out;
 }
 
@@ -526,6 +499,11 @@ inline LocalThresholdLogger::LocalThresholdLogger(const std::shared_ptr<Logger>&
     REALM_ASSERT(m_chained_logger);
 }
 
+// Intended to be used to get a somewhat smaller number derived from 'this' pointer
+inline unsigned gen_log_id(void* p)
+{
+    return (size_t(p) >> 4) & 0xffff;
+}
 } // namespace realm::util
 
 #endif // REALM_UTIL_LOGGER_HPP

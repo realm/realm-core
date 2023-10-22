@@ -27,6 +27,7 @@
 #include <realm/sync/instruction_applier.hpp>
 #include <realm/sync/instruction_replication.hpp>
 #include <realm/sync/noinst/client_reset.hpp>
+#include <realm/transaction.hpp>
 #include <realm/version.hpp>
 
 #include <algorithm>
@@ -384,8 +385,7 @@ void ClientHistory::integrate_server_changesets(
     const SyncProgress& progress, const std::uint_fast64_t* downloadable_bytes,
     util::Span<const RemoteChangeset> incoming_changesets, VersionInfo& version_info, DownloadBatchState batch_state,
     util::Logger& logger, const TransactionRef& transact,
-    util::UniqueFunction<void(const TransactionRef&, util::Span<Changeset>)> run_in_write_tr,
-    SyncTransactReporter* transact_reporter)
+    util::UniqueFunction<void(const TransactionRef&, util::Span<Changeset>)> run_in_write_tr)
 {
     REALM_ASSERT(incoming_changesets.size() != 0);
     REALM_ASSERT(
@@ -403,8 +403,9 @@ void ClientHistory::integrate_server_changesets(
         }
     }
     catch (const BadChangesetError& e) {
-        throw IntegrationException(ClientError::bad_changeset,
-                                   util::format("Failed to parse received changeset: %1", e.what()));
+        throw IntegrationException(ErrorCodes::BadChangeset,
+                                   util::format("Failed to parse received changeset: %1", e.what()),
+                                   ProtocolError::bad_changeset);
     }
 
     VersionID new_version{0, 0};
@@ -453,11 +454,14 @@ void ClientHistory::integrate_server_changesets(
             update_sync_progress(progress, downloadable_bytes, transact); // Throws
         }
         // Always update progress for download messages from steady state.
-        else if (batch_state == DownloadBatchState::SteadyState) {
+        else if (batch_state == DownloadBatchState::SteadyState && !changesets_to_integrate.empty()) {
             auto partial_progress = progress;
             partial_progress.download.server_version = last_changeset.remote_version;
             partial_progress.download.last_integrated_client_version = last_changeset.last_integrated_local_version;
             update_sync_progress(partial_progress, downloadable_bytes, transact); // Throws
+        }
+        else if (batch_state == DownloadBatchState::SteadyState && changesets_to_integrate.empty()) {
+            update_sync_progress(progress, downloadable_bytes, transact); // Throws
         }
         if (run_in_write_tr) {
             run_in_write_tr(transact, changesets_for_cb);
@@ -486,10 +490,6 @@ void ClientHistory::integrate_server_changesets(
         }
         else {
             new_version = transact->commit_and_continue_as_read(); // Throws
-        }
-
-        if (transact_reporter) {
-            transact_reporter->report_sync_transact(old_version, new_version); // Throws
         }
 
         logger.debug("Integrated %1 changesets out of %2", changesets_transformed_count, num_changesets);
@@ -560,12 +560,14 @@ size_t ClientHistory::transform_and_apply_server_changesets(util::Span<Changeset
         return changesets_transformed_count;
     }
     catch (const BadChangesetError& e) {
-        throw IntegrationException(ClientError::bad_changeset,
-                                   util::format("Failed to apply received changeset: %1", e.what()));
+        throw IntegrationException(ErrorCodes::BadChangeset,
+                                   util::format("Failed to apply received changeset: %1", e.what()),
+                                   ProtocolError::bad_changeset);
     }
     catch (const TransformError& e) {
-        throw IntegrationException(ClientError::bad_changeset,
-                                   util::format("Failed to transform received changeset: %1", e.what()));
+        throw IntegrationException(ErrorCodes::BadChangeset,
+                                   util::format("Failed to transform received changeset: %1", e.what()),
+                                   ProtocolError::bad_changeset);
     }
 }
 
@@ -626,6 +628,11 @@ void ClientHistory::set_reciprocal_transform(version_type version, BinaryData da
 
     std::size_t index = size_t(version - m_sync_history_base_version) - 1;
     REALM_ASSERT(index < sync_history_size());
+
+    if (data.is_null()) {
+        m_arrays->reciprocal_transforms.set(index, BinaryData{"", 0}); // Throws
+        return;
+    }
 
     auto compressed = util::compression::allocate_and_compress_nonportable(data);
     m_arrays->reciprocal_transforms.set(index, BinaryData{compressed.data(), compressed.size()}); // Throws
@@ -764,6 +771,7 @@ Replication::version_type ClientHistory::add_changeset(BinaryData ct_changeset, 
 
 void ClientHistory::add_sync_history_entry(const HistoryEntry& entry)
 {
+    REALM_ASSERT(m_arrays->changesets.size() == sync_history_size());
     REALM_ASSERT(m_arrays->reciprocal_transforms.size() == sync_history_size());
     REALM_ASSERT(m_arrays->remote_versions.size() == sync_history_size());
     REALM_ASSERT(m_arrays->origin_file_idents.size() == sync_history_size());
@@ -775,7 +783,7 @@ void ClientHistory::add_sync_history_entry(const HistoryEntry& entry)
         m_arrays->changesets.add(BinaryData{compressed.data(), compressed.size()}); // Throws
     }
     else {
-        m_arrays->changesets.add(BinaryData()); // Throws
+        m_arrays->changesets.add(BinaryData("", 0)); // Throws
     }
 
     m_arrays->reciprocal_transforms.add(BinaryData{});                                            // Throws
@@ -791,29 +799,45 @@ void ClientHistory::update_sync_progress(const SyncProgress& progress, const std
     Array& root = m_arrays->root;
 
     // Progress must never decrease
-    if (progress.latest_server_version.version <
-        version_type(root.get_as_ref_or_tagged(s_progress_latest_server_version_iip).get_as_int())) {
-        throw IntegrationException(ClientError::bad_progress, "latest server version cannot decrease");
+    if (auto current = version_type(root.get_as_ref_or_tagged(s_progress_latest_server_version_iip).get_as_int());
+        progress.latest_server_version.version < current) {
+        throw IntegrationException(ErrorCodes::SyncProtocolInvariantFailed,
+                                   util::format("latest server version cannot decrease (current: %1, new: %2)",
+                                                current, progress.latest_server_version.version),
+                                   ProtocolError::bad_progress);
     }
-    if (progress.download.server_version <
-        version_type(root.get_as_ref_or_tagged(s_progress_download_server_version_iip).get_as_int())) {
-        throw IntegrationException(ClientError::bad_progress, "server version of download cursor cannot decrease");
+    if (auto current = version_type(root.get_as_ref_or_tagged(s_progress_download_server_version_iip).get_as_int());
+        progress.download.server_version < current) {
+        throw IntegrationException(
+            ErrorCodes::SyncProtocolInvariantFailed,
+            util::format("server version of download cursor cannot decrease (current: %1, new: %2)", current,
+                         progress.download.server_version),
+            ProtocolError::bad_progress);
     }
-    if (progress.download.last_integrated_client_version <
-        version_type(root.get_as_ref_or_tagged(s_progress_download_client_version_iip).get_as_int())) {
-        throw IntegrationException(ClientError::bad_progress,
-                                   "last integrated client version of download cursor cannot decrease");
+    if (auto current = version_type(root.get_as_ref_or_tagged(s_progress_download_client_version_iip).get_as_int());
+        progress.download.last_integrated_client_version < current) {
+        throw IntegrationException(
+            ErrorCodes::SyncProtocolInvariantFailed,
+            util::format("last integrated client version of download cursor cannot decrease (current: %1, new: %2)",
+                         current, progress.download.last_integrated_client_version),
+            ProtocolError::bad_progress);
     }
-    if (progress.upload.client_version <
-        version_type(root.get_as_ref_or_tagged(s_progress_upload_client_version_iip).get_as_int())) {
-        throw IntegrationException(ClientError::bad_progress, "client version of upload cursor cannot decrease");
+    if (auto current = version_type(root.get_as_ref_or_tagged(s_progress_upload_client_version_iip).get_as_int());
+        progress.upload.client_version < current) {
+        throw IntegrationException(
+            ErrorCodes::SyncProtocolInvariantFailed,
+            util::format("client version of upload cursor cannot decrease (current: %1, new: %2)", current,
+                         progress.upload.client_version),
+            ProtocolError::bad_progress);
     }
     const auto last_integrated_server_version = progress.upload.last_integrated_server_version;
-    if (last_integrated_server_version > 0 &&
-        last_integrated_server_version <
-            version_type(root.get_as_ref_or_tagged(s_progress_upload_server_version_iip).get_as_int())) {
-        throw IntegrationException(ClientError::bad_progress,
-                                   "last integrated server version of upload cursor cannot decrease");
+    if (auto current = version_type(root.get_as_ref_or_tagged(s_progress_upload_server_version_iip).get_as_int());
+        last_integrated_server_version > 0 && last_integrated_server_version < current) {
+        throw IntegrationException(
+            ErrorCodes::SyncProtocolInvariantFailed,
+            util::format("last integrated server version of upload cursor cannot decrease (current: %1, new: %2)",
+                         current, last_integrated_server_version),
+            ProtocolError::bad_progress);
     }
 
     auto uploaded_bytes = std::uint_fast64_t(root.get_as_ref_or_tagged(s_progress_uploaded_bytes_iip).get_as_int());
@@ -1175,6 +1199,7 @@ void ClientHistory::update_from_ref_and_version(ref_type ref, version_type versi
 
     m_ct_history_base_version = version - ct_history_size();
     m_sync_history_base_version = version - sync_history_size();
+    REALM_ASSERT(m_arrays->changesets.size() == sync_history_size());
     REALM_ASSERT(m_arrays->reciprocal_transforms.size() == sync_history_size());
     REALM_ASSERT(m_arrays->remote_versions.size() == sync_history_size());
     REALM_ASSERT(m_arrays->origin_file_idents.size() == sync_history_size());

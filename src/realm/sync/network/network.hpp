@@ -24,11 +24,12 @@
 #include <realm/status.hpp>
 #include <realm/util/features.h>
 #include <realm/util/assert.hpp>
+#include <realm/util/backtrace.hpp>
+#include <realm/util/basic_system_errors.hpp>
 #include <realm/util/bind_ptr.hpp>
 #include <realm/util/buffer.hpp>
 #include <realm/util/misc_ext_errors.hpp>
-#include <realm/util/basic_system_errors.hpp>
-#include <realm/util/backtrace.hpp>
+#include <realm/util/scope_exit.hpp>
 
 // Linux epoll
 #if defined(REALM_USE_EPOLL) && !REALM_ANDROID
@@ -281,6 +282,10 @@ public:
     /// ready. If there are no completion handlers ready for execution, and
     /// there are no asynchronous operations in progress, run() returns.
     ///
+    /// run_until_stopped() will continue running even if there are no completion
+    /// handlers ready for execution, and no asynchronous operations in progress,
+    /// until stop() is called.
+    ///
     /// All completion handlers, including handlers submitted via post() will be
     /// executed from run(), that is, by the thread that executes run(). If no
     /// thread executes run(), then the completion handlers will not be
@@ -292,6 +297,7 @@ public:
     /// Syncronous operations (e.g., Socket::connect()) execute independently of
     /// the event loop, and do not require that any thread calls run().
     void run();
+    void run_until_stopped();
 
     /// @{ \brief Stop event loop execution.
     ///
@@ -2355,6 +2361,7 @@ public:
             Want want = Want::nothing;
             std::size_t n = s.m_stream->do_read_some_async(buffer, size, s.m_error_code, want);
             REALM_ASSERT(n > 0 || s.m_error_code || want != Want::nothing); // No busy loop, please
+            // Any errors reported by do_read_some_async() (other than end_of_input) should always return 0
             bool got_nothing = (n == 0);
             if (got_nothing) {
                 if (REALM_UNLIKELY(s.m_error_code)) {
@@ -2524,8 +2531,8 @@ public:
             }
             // Transfer buffered data to callers buffer
             bool complete = s.m_read_ahead_buffer.read(s.m_curr, s.m_end, s.m_delim, s.m_error_code);
-            if (complete) {
-                s.set_is_complete(true); // Success or failure (delim_not_found)
+            if (complete || s.m_error_code == util::MiscExtErrors::end_of_input) {
+                s.set_is_complete(true); // Success or failure (delim_not_found or end_of_input)
                 return Want::nothing;
             }
             if (want != Want::nothing)
@@ -2741,28 +2748,31 @@ inline void Service::AsyncOper::do_recycle_and_execute(bool orphaned, H& handler
     // the memory is available for a new post operation that might be initiated
     // during the execution of the handler.
     bool was_recycled = false;
-    try {
-        // We need to copy or move all arguments to be passed to the handler,
-        // such that there is no risk of references to the recycled operation
-        // object being passed to the handler (the passed arguments may be
-        // references to members of the recycled operation object). The easiest
-        // way to achive this, is by forwarding the reference arguments (passed
-        // to this function) to a helper function whose arguments have
-        // nonreference type (`Args...` rather than `Args&&...`).
-        //
-        // Note that the copying and moving of arguments may throw, and it is
-        // important that the operation is still recycled even if that
-        // happens. For that reason, copying and moving of arguments must not
-        // happen until we are in a scope (this scope) that catches and deals
-        // correctly with such exceptions.
-        do_recycle_and_execute_helper(orphaned, was_recycled, std::move(handler),
-                                      std::forward<Args>(args)...); // Throws
-    }
-    catch (...) {
-        if (!was_recycled)
+
+    // ScopeExit to ensure the AsyncOper object was reclaimed/deleted
+    auto at_exit = util::ScopeExit([this, &was_recycled, &orphaned]() noexcept {
+        if (!was_recycled) {
             do_recycle(orphaned);
-        throw;
-    }
+        }
+    });
+
+    // We need to copy or move all arguments to be passed to the handler,
+    // such that there is no risk of references to the recycled operation
+    // object being passed to the handler (the passed arguments may be
+    // references to members of the recycled operation object). The easiest
+    // way to achive this, is by forwarding the reference arguments (passed
+    // to this function) to a helper function whose arguments have
+    // nonreference type (`Args...` rather than `Args&&...`).
+    //
+    // Note that the copying and moving of arguments may throw, and it is
+    // important that the operation is still recycled even if that
+    // happens. For that reason, copying and moving of arguments must not
+    // happen until we are in a scope (this scope) that catches and deals
+    // correctly with such exceptions.
+    do_recycle_and_execute_helper(orphaned, was_recycled, std::move(handler),
+                                  std::forward<Args>(args)...); // Throws
+
+    // Removed catch to prevent truncating the stack trace on exception
 }
 
 template <class H, class... Args>
@@ -3575,9 +3585,10 @@ inline bool ReadAheadBuffer::refill_async(S& stream, std::error_code& ec, Want& 
     std::size_t size = s_size;
     static_assert(noexcept(stream.do_read_some_async(buffer, size, ec, want)), "");
     std::size_t n = stream.do_read_some_async(buffer, size, ec, want);
+    // Any errors reported by do_read_some_async() (other than end_of_input) should always return 0
     if (n == 0)
         return false;
-    REALM_ASSERT(!ec);
+    REALM_ASSERT(!ec || ec == util::MiscExtErrors::end_of_input);
     REALM_ASSERT(n <= size);
     m_begin = m_buffer.get();
     m_end = m_begin + n;

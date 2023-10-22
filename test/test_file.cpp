@@ -34,7 +34,7 @@
 #include <unistd.h>
 #endif
 
-
+using namespace realm;
 using namespace realm::util;
 using namespace realm::test_util;
 
@@ -197,7 +197,7 @@ TEST(File_ReaderAndWriter)
     File::Map<size_t> read(reader, File::access_ReadOnly, count * sizeof(size_t));
 
     for (size_t i = 0; i < count; i += 100) {
-        realm::util::encryption_read_barrier(write, i);
+        realm::util::encryption_read_barrier(write, i, 1);
         write.get_addr()[i] = i;
         realm::util::encryption_write_barrier(write, i);
         realm::util::encryption_read_barrier(read, i);
@@ -223,7 +223,7 @@ TEST(File_Offset)
         for (size_t i = 0; i < page_count; ++i) {
             File::Map<size_t> map(f, i * size, File::access_ReadWrite, size);
             for (size_t j = 0; j < count_per_page; ++j) {
-                realm::util::encryption_read_barrier(map, j);
+                realm::util::encryption_read_barrier(map, j, 1);
                 map.get_addr()[j] = i * size + j;
                 realm::util::encryption_write_barrier(map, j);
             }
@@ -276,10 +276,10 @@ TEST(File_MultipleWriters)
         }
 
         for (size_t i = 0; i < count; i += increments) {
-            realm::util::encryption_read_barrier(map1, i);
+            realm::util::encryption_read_barrier(map1, i, 1);
             ++map1.get_addr()[i];
             realm::util::encryption_write_barrier(map1, i);
-            realm::util::encryption_read_barrier(map2, i);
+            realm::util::encryption_read_barrier(map2, i, 1);
             ++map2.get_addr()[i];
             realm::util::encryption_write_barrier(map2, i);
         }
@@ -307,7 +307,7 @@ TEST(File_SetEncryptionKey)
 #if REALM_ENABLE_ENCRYPTION
     f.set_encryption_key(key); // should not throw
 #else
-    CHECK_THROW(f.set_encryption_key(key), std::runtime_error);
+    CHECK_THROW_EX(f.set_encryption_key(key), Exception, (e.code() == ErrorCodes::NotSupported));
 #endif
 }
 
@@ -341,7 +341,7 @@ TEST(File_Resize)
     {
         File::Map<unsigned char> m(f, File::access_ReadWrite, page_size() * 2);
         for (unsigned int i = 0; i < page_size() * 2; ++i) {
-            realm::util::encryption_read_barrier(m, i);
+            realm::util::encryption_read_barrier(m, i, 1);
             m.get_addr()[i] = static_cast<unsigned char>(i);
             realm::util::encryption_write_barrier(m, i);
         }
@@ -352,7 +352,7 @@ TEST(File_Resize)
         // encrypted data there, so flush and write a second time
         m.sync();
         for (unsigned int i = 0; i < page_size() * 2; ++i) {
-            realm::util::encryption_read_barrier(m, i);
+            realm::util::encryption_read_barrier(m, i, 1);
             m.get_addr()[i] = static_cast<unsigned char>(i);
             realm::util::encryption_write_barrier(m, i);
         }
@@ -375,7 +375,7 @@ TEST(File_Resize)
     {
         File::Map<unsigned char> m(f, File::access_ReadWrite, page_size() * 2);
         for (unsigned int i = 0; i < page_size() * 2; ++i) {
-            realm::util::encryption_read_barrier(m, i);
+            realm::util::encryption_read_barrier(m, i, 1);
             m.get_addr()[i] = static_cast<unsigned char>(i);
             realm::util::encryption_write_barrier(m, i);
         }
@@ -396,14 +396,14 @@ TEST(File_NotFound)
 {
     TEST_PATH(path);
     File file;
-    CHECK_THROW_EX(file.open(path), File::NotFound, e.get_path() == std::string(path));
+    CHECK_THROW_EX(file.open(path), FileAccessError, e.get_path() == std::string(path));
 }
 
 
 TEST(File_PathNotFound)
 {
     File file;
-    CHECK_THROW(file.open(""), File::NotFound);
+    CHECK_THROW_EX(file.open(""), FileAccessError, e.code() == ErrorCodes::FileNotFound);
 }
 
 
@@ -413,8 +413,8 @@ TEST(File_Exists)
     File file;
     file.open(path, File::mode_Write); // Create the file
     file.close();
-    CHECK_THROW_EX(file.open(path, File::access_ReadWrite, File::create_Must, File::flag_Trunc), File::Exists,
-                   e.get_path() == std::string(path));
+    CHECK_THROW_EX(file.open(path, File::access_ReadWrite, File::create_Must, File::flag_Trunc), FileAccessError,
+                   e.get_path() == std::string(path) && e.code() == ErrorCodes::FileAlreadyExists);
 }
 
 
@@ -531,7 +531,6 @@ TEST(File_parent_dir)
     }
 }
 
-#ifndef _WIN32
 TEST(File_GetUniqueID)
 {
     TEST_PATH(path_1);
@@ -552,16 +551,15 @@ TEST(File_GetUniqueID)
     File::UniqueID uid1_1 = file1_1.get_unique_id();
     File::UniqueID uid1_2 = file1_2.get_unique_id();
     File::UniqueID uid2_1 = file2_1.get_unique_id();
-    File::UniqueID uid2_2;
-    CHECK(File::get_unique_id(path_2, uid2_2));
+    std::optional<File::UniqueID> uid2_2;
+    CHECK(uid2_2 = File::get_unique_id(path_2));
 
     CHECK(uid1_1 == uid1_2);
-    CHECK(uid2_1 == uid2_2);
+    CHECK(uid2_1 == *uid2_2);
     CHECK(uid1_1 != uid2_1);
 
     // Path doesn't exist
-    File::UniqueID uid3_1;
-    CHECK_NOT(File::get_unique_id(path_3, uid3_1));
+    CHECK_NOT(File::get_unique_id(path_3));
 
     // Test operator<
     File::UniqueID uid4_1{0, 5};
@@ -577,7 +575,30 @@ TEST(File_GetUniqueID)
     uid4_1 = uid4_2;
     CHECK_NOT(uid4_1 < uid4_2);
     CHECK_NOT(uid4_2 < uid4_1);
+
+    file1_1.resize(0);
+    file2_1.resize(0);
+    file2_1.resize(1);
+    file1_1.resize(1);
+    if (!test_util::test_dir_is_exfat()) {
+        CHECK(uid1_1 == file1_1.get_unique_id());
+        CHECK(uid2_1 == file2_1.get_unique_id());
+    }
+    else {
+        CHECK(uid1_1 == file2_1.get_unique_id());
+        CHECK(uid2_1 == file1_1.get_unique_id());
+    }
 }
-#endif
+
+TEST(File_Temp)
+{
+    auto tmp_file_name = make_temp_file("foo");
+    {
+        File file1;
+        file1.open(tmp_file_name, File::mode_Write);
+        CHECK(file1.is_attached());
+    }
+    remove(tmp_file_name.c_str());
+}
 
 #endif // TEST_FILE

@@ -20,6 +20,7 @@
 #define REALM_REALM_HPP
 
 #include <realm/object-store/schema.hpp>
+#include <realm/object-store/class.hpp>
 
 #include <realm/util/optional.hpp>
 #include <realm/util/functional.hpp>
@@ -205,9 +206,8 @@ public:
 
     std::shared_ptr<SyncSession> sync_session() const;
 
-    // Returns the latest/active subscription set for a FLX-sync enabled realm. If FLX sync is not currently
-    // enabled for this realm, calling this will cause future connections to the server to be opened in FLX
-    // sync mode if they aren't already.
+    // Returns the latest/active subscription set for a FLX-sync enabled realm.
+    // Throws an exception for a non-FLX realm
     sync::SubscriptionSet get_latest_subscription_set();
     sync::SubscriptionSet get_active_subscription_set();
 #endif
@@ -239,6 +239,9 @@ public:
     {
         return m_schema;
     }
+    bool is_empty();
+    Class get_class(StringData object_type);
+    std::vector<Class> get_classes();
     uint64_t schema_version() const noexcept
     {
         return m_schema_version;
@@ -399,7 +402,7 @@ public:
         return m_scheduler;
     }
 
-    // Close this Realm. Continuing to use a Realm after closing it will throw ClosedRealmException
+    // Close this Realm. Continuing to use a Realm after closing it will throw Exception(ClosedRealm)
     // Closing a Realm will wait for any asynchronous writes which have been commited but not synced
     // to sync. Asynchronous writes which have not yet started are canceled.
     void close();
@@ -424,7 +427,7 @@ public:
      *
      * @throws PermissionDenied if the operation was not permitted.
      * @throws AccessError for any other error while trying to delete the file or folder.
-     * @throws DeleteOnOpenRealmException if the function was called on an open Realm.
+     * @throws Exception(DeleteOnOpenRealm) if the function was called on an open Realm.
      */
     static void delete_files(const std::string& realm_file_path, bool* did_delete_realm = nullptr);
 
@@ -578,110 +581,6 @@ public:
           MakeSharedTag);
 };
 
-class RealmFileException : public std::runtime_error {
-public:
-    enum class Kind {
-        /** Thrown for any I/O related exception scenarios when a realm is opened. */
-        AccessError,
-        /** Thrown if the history type of the on-disk Realm is unexpected or incompatible. */
-        BadHistoryError,
-        /** Thrown if the user does not have permission to open or create
-         the specified file in the specified access mode when the realm is opened. */
-        PermissionDenied,
-        /** Thrown if create_Always was specified and the file did already exist when the realm is opened. */
-        Exists,
-        /** Thrown if no_create was specified and the file was not found when the realm is opened. */
-        NotFound,
-        /** Thrown if the database file is currently open in another
-         process which cannot share with the current process due to an
-         architecture mismatch. */
-        IncompatibleLockFile,
-        /** Thrown if the file needs to be upgraded to a new format, but upgrades have been explicitly disabled. */
-        FormatUpgradeRequired,
-    };
-    RealmFileException(Kind kind, std::string path, std::string message, std::string underlying)
-        : std::runtime_error(std::move(message))
-        , m_kind(kind)
-        , m_path(std::move(path))
-        , m_underlying(std::move(underlying))
-    {
-    }
-    Kind kind() const
-    {
-        return m_kind;
-    }
-    const std::string& path() const
-    {
-        return m_path;
-    }
-    const std::string& underlying() const
-    {
-        return m_underlying;
-    }
-
-private:
-    Kind m_kind;
-    std::string m_path;
-    std::string m_underlying;
-};
-
-class MismatchedConfigException : public std::logic_error {
-public:
-    MismatchedConfigException(StringData message, StringData path);
-};
-
-class MismatchedRealmException : public std::logic_error {
-public:
-    MismatchedRealmException(StringData message);
-};
-
-class InvalidTransactionException : public std::logic_error {
-public:
-    InvalidTransactionException(std::string message)
-        : std::logic_error(message)
-    {
-    }
-};
-
-class IncorrectThreadException : public std::logic_error {
-public:
-    IncorrectThreadException()
-        : std::logic_error("Realm accessed from incorrect thread.")
-    {
-    }
-};
-
-class ClosedRealmException : public std::logic_error {
-public:
-    ClosedRealmException()
-        : std::logic_error("Cannot access realm that has been closed.")
-    {
-    }
-};
-
-class DeleteOnOpenRealmException : public std::logic_error {
-public:
-    DeleteOnOpenRealmException(const std::string& path)
-        : std::logic_error(util::format("Cannot delete files of an open Realm: '%1' is still in use.", path))
-    {
-    }
-};
-
-class UninitializedRealmException : public std::runtime_error {
-public:
-    UninitializedRealmException(std::string message)
-        : std::runtime_error(message)
-    {
-    }
-};
-
-class InvalidEncryptionKeyException : public std::logic_error {
-public:
-    InvalidEncryptionKeyException()
-        : std::logic_error("Encryption key must be 64 bytes.")
-    {
-    }
-};
 } // namespace realm
 
 #endif /* defined(REALM_REALM_HPP) */

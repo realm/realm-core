@@ -193,7 +193,7 @@ inline int ctz(size_t x)
 #ifdef REALM_PTR_64
     return __builtin_ctzll(x); // returns int
 #else
-    return __builtin_ctz(x);      // returns int
+    return __builtin_ctz(x); // returns int
 #endif
 #elif defined(_WIN32)
     unsigned long index = 0;
@@ -250,6 +250,7 @@ enum FindRes {
 enum IndexMethod {
     index_FindFirst,
     index_FindAll_nocopy,
+    index_FindAll_prefix,
     index_Count,
 };
 
@@ -361,33 +362,8 @@ constexpr inline size_t round_down(size_t p, size_t align)
 }
 
 
-template <class T>
-struct Wrap {
-    Wrap(const T& v)
-        : m_value(v)
-    {
-    }
-    operator T() const
-    {
-        return m_value;
-    }
-
-private:
-    T m_value;
-};
-
-// PlacementDelete is intended for use with std::unique_ptr when it holds an object allocated with
-// placement new. It simply calls the object's destructor without freeing the memory.
-struct PlacementDelete {
-    template <class T>
-    void operator()(T* v) const
-    {
-        v->~T();
-    }
-};
-
 #ifdef _WIN32
-typedef void* FileDesc;
+typedef HANDLE FileDesc;
 #else
 typedef int FileDesc;
 #endif

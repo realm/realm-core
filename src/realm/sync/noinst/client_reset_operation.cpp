@@ -25,6 +25,12 @@
 
 namespace realm::_impl {
 
+namespace {
+
+constexpr static std::string_view c_fresh_suffix(".fresh");
+
+} // namespace
+
 ClientResetOperation::ClientResetOperation(util::Logger& logger, DBRef db, DBRef db_fresh, ClientResyncMode mode,
                                            CallbackBeforeType notify_before, CallbackAfterType notify_after,
                                            bool recovery_is_allowed)
@@ -44,12 +50,21 @@ ClientResetOperation::ClientResetOperation(util::Logger& logger, DBRef db, DBRef
 
 std::string ClientResetOperation::get_fresh_path_for(const std::string& path)
 {
-    const std::string fresh_suffix = ".fresh";
-    const size_t suffix_len = fresh_suffix.size();
+    const size_t suffix_len = c_fresh_suffix.size();
     REALM_ASSERT(path.length());
     REALM_ASSERT_DEBUG_EX(
-        path.size() < suffix_len || path.substr(path.size() - suffix_len, suffix_len) != fresh_suffix, path);
-    return path + fresh_suffix;
+        path.size() < suffix_len || path.substr(path.size() - suffix_len, suffix_len) != c_fresh_suffix, path);
+    return path + c_fresh_suffix.data();
+}
+
+bool ClientResetOperation::is_fresh_path(const std::string& path)
+{
+    const size_t suffix_len = c_fresh_suffix.size();
+    REALM_ASSERT(path.length());
+    if (path.size() < suffix_len) {
+        return false;
+    }
+    return path.substr(path.size() - suffix_len, suffix_len) == c_fresh_suffix;
 }
 
 bool ClientResetOperation::finalize(sync::SaltedFileIdent salted_file_ident, sync::SubscriptionStore* sub_store,
@@ -75,14 +90,12 @@ bool ClientResetOperation::finalize(sync::SaltedFileIdent salted_file_ident, syn
         clean_up_state();
     });
 
-    if (m_notify_before) {
-        m_notify_before(latest_version);
-    }
+    VersionID frozen_before_state_version = m_notify_before ? m_notify_before() : latest_version;
 
     // If m_notify_after is set, pin the previous state to keep it around.
     TransactionRef previous_state;
     if (m_notify_after) {
-        previous_state = m_db->start_frozen();
+        previous_state = m_db->start_frozen(frozen_before_state_version);
     }
     bool did_recover_out = false;
     local_version_ids = client_reset::perform_client_reset_diff(

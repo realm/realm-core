@@ -26,11 +26,14 @@
 #include <atomic>
 #include <mutex>
 
+#include <realm/util/checked_mutex.hpp>
 #include <realm/util/features.h>
 #include <realm/util/file.hpp>
+#include <realm/util/functional.hpp>
 #include <realm/util/thread.hpp>
 #include <realm/alloc.hpp>
 #include <realm/disable_sync_to_disk.hpp>
+#include <realm/version_id.hpp>
 
 namespace realm {
 
@@ -40,7 +43,7 @@ class GroupWriter;
 
 namespace util {
 struct SharedFileInfo;
-}
+} // namespace util
 
 /// Thrown by Group and DB constructors if the specified file
 /// (or memory buffer) does not appear to contain a valid Realm
@@ -116,8 +119,7 @@ public:
         const char* encryption_key = nullptr;
     };
 
-    struct Retry {
-    };
+    struct Retry {};
 
     /// \brief Attach this allocator to the specified file.
     ///
@@ -146,9 +148,15 @@ public:
     /// This can happen if the conflicting thread (or process) terminates or
     /// crashes before the next retry.
     ///
-    /// \throw util::File::AccessError
+    /// \throw FileAccessError
     /// \throw SlabAlloc::Retry
-    ref_type attach_file(const std::string& file_path, Config& cfg);
+    ref_type attach_file(const std::string& file_path, Config& cfg, util::WriteObserver* write_observer = nullptr);
+
+    /// @brief Expand or contract file
+    /// @param ref_type ref to the top array
+    /// @param cfg configuration, see attach_file
+    /// \return true if the file size was changed
+    bool align_filesize_for_mmap(size_t ref_type, Config& cfg);
 
     /// If the attached file is in streaming form, convert it to normal form.
     ///
@@ -175,9 +183,17 @@ public:
     /// \throw InvalidDatabase
     ref_type attach_buffer(const char* data, size_t size);
 
+    void init_in_memory_buffer();
+    char* translate_memory_pos(ref_type ref) const noexcept;
+
+    bool is_in_memory() const
+    {
+        return m_attach_mode == attach_Heap;
+    }
+
     /// Reads file format from file header. Must be called from within a write
     /// transaction.
-    int get_committed_file_format_version() const noexcept;
+    int get_committed_file_format_version() noexcept;
 
     bool is_file_on_streaming_form() const
     {
@@ -193,13 +209,18 @@ public:
 
     /// Detach from a previously attached file or buffer.
     ///
+    /// if 'keep_file_attached' is set, only memory mappings will
+    /// be closed, but the file descriptor remains valid for further
+    /// operations on the file. Caller must close the file explicitly
+    /// to bring the allocator to a fully detached state.
+    ///
     /// This function does not reset free space tracking. To
     /// completely reset the allocator, you must also call
     /// reset_free_space_tracking().
     ///
     /// This function has no effect if the allocator is already in the
     /// detached state (idempotency).
-    void detach() noexcept;
+    void detach(bool keep_file_attached = false) noexcept;
 
     class DetachGuard;
 
@@ -326,6 +347,11 @@ public:
         return m_commit_size;
     }
 
+    size_t get_file_size() const
+    {
+        return (m_attach_mode == attach_SharedFile) ? size_t(m_file.get_size()) : m_virtual_file_size;
+    }
+
     /// Returns the total amount of memory currently allocated in slab area
     size_t get_allocated_size() const noexcept;
 
@@ -374,13 +400,16 @@ protected:
     /// If found return the position, if not return 0.
     size_t find_section_in_range(size_t start_pos, size_t free_chunk_size, size_t request_size) const noexcept;
 
+    void schedule_refresh_of_outdated_encrypted_pages();
+
 private:
     enum AttachMode {
-        attach_None,        // Nothing is attached
-        attach_OwnedBuffer, // We own the buffer (m_data = nullptr for empty buffer)
-        attach_UsersBuffer, // We do not own the buffer
-        attach_SharedFile,  // On behalf of DB
-        attach_UnsharedFile // Not on behalf of DB
+        attach_None,         // Nothing is attached
+        attach_OwnedBuffer,  // We own the buffer (m_data = nullptr for empty buffer)
+        attach_UsersBuffer,  // We do not own the buffer
+        attach_SharedFile,   // On behalf of DB
+        attach_UnsharedFile, // Not on behalf of DB
+        attach_Heap          // Memory only DB
     };
 
     // A slab is a dynamically allocated contiguous chunk of memory used to
@@ -410,6 +439,39 @@ private:
 
         Slab& operator=(const Slab&) = delete;
         Slab& operator=(Slab&&) = delete;
+    };
+
+    struct MemBuffer {
+        char* addr;
+        size_t size;
+        ref_type start_ref;
+
+        MemBuffer()
+            : addr(nullptr)
+            , size(0)
+            , start_ref(0)
+        {
+        }
+        MemBuffer(size_t s, ref_type ref)
+            : addr(new char[s])
+            , size(s)
+            , start_ref(ref)
+        {
+        }
+        ~MemBuffer()
+        {
+            if (addr)
+                delete[] addr;
+        }
+
+        MemBuffer(MemBuffer&& other) noexcept
+            : addr(other.addr)
+            , size(other.size)
+            , start_ref(other.start_ref)
+        {
+            other.addr = nullptr;
+            other.size = 0;
+        }
     };
 
     // free blocks that are in the slab area are managed using the following structures:
@@ -624,8 +686,11 @@ private:
     typedef std::vector<Slab> Slabs;
     using Chunks = std::map<ref_type, size_t>;
     Slabs m_slabs;
+    std::vector<MemBuffer> m_virtual_file_buffer;
     Chunks m_free_read_only;
+    util::WriteObserver* m_write_observer = nullptr;
     size_t m_commit_size = 0;
+    size_t m_virtual_file_size = 0;
 
     bool m_debug_out = false;
 
@@ -640,7 +705,7 @@ private:
     /// Returns the top_ref for the latest commit.
     ref_type validate_header(const char* data, size_t len, const std::string& path);
     ref_type validate_header(const Header* header, const StreamingFooter* footer, size_t size,
-                             const std::string& path);
+                             const std::string& path, bool is_encrypted = false);
     void throw_header_exception(std::string msg, const Header& header, const std::string& path);
 
     static bool is_file_on_streaming_form(const Header& header);
@@ -653,9 +718,10 @@ private:
 
     static bool ref_less_than_slab_ref_end(ref_type, const Slab&) noexcept;
 
-    friend class Group;
     friend class DB;
+    friend class Group;
     friend class GroupWriter;
+    friend class GroupCommitter;
 };
 
 
@@ -675,9 +741,12 @@ private:
 
 // Implementation:
 
-struct InvalidDatabase : util::File::AccessError {
+struct InvalidDatabase : FileAccessError {
     InvalidDatabase(const std::string& msg, const std::string& path)
-        : util::File::AccessError(msg, path)
+        : FileAccessError(ErrorCodes::InvalidDatabase,
+                          path.empty() ? "Failed to memory buffer:" + msg
+                                       : util::format("Failed to open Realm file at path '%1': %2", path, msg),
+                          path)
     {
     }
 };

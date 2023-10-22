@@ -27,6 +27,9 @@
 #include <realm/keys.hpp>
 #include <realm/binary_data.hpp>
 #include <realm/data_type.hpp>
+#if REALM_ENABLE_GEOSPATIAL
+#include <realm/geospatial.hpp>
+#endif
 #include <realm/string_data.hpp>
 #include <realm/timestamp.hpp>
 #include <realm/decimal128.hpp>
@@ -146,6 +149,9 @@ public:
     Mixed(UUID) noexcept;
     Mixed(util::Optional<UUID>) noexcept;
     Mixed(const Obj&) noexcept;
+#if REALM_ENABLE_GEOSPATIAL
+    Mixed(Geospatial*) noexcept;
+#endif
 
     // These are shortcuts for Mixed(StringData(c_str)), and are
     // needed to avoid unwanted implicit conversion of char* to bool.
@@ -161,8 +167,6 @@ public:
         : Mixed(StringData(s))
     {
     }
-
-    ~Mixed() noexcept {}
 
     DataType get_type() const noexcept
     {
@@ -187,6 +191,9 @@ public:
 
     template <class T>
     T get() const noexcept;
+
+    template <class T>
+    const T* get_if() const noexcept;
 
     template <class T>
     T export_to_type() const noexcept;
@@ -262,6 +269,9 @@ protected:
         Decimal128 decimal_val;
         ObjLink link_val;
         UUID uuid_val;
+#if REALM_ENABLE_GEOSPATIAL
+        Geospatial* geospatial_val;
+#endif
     };
 
 private:
@@ -289,6 +299,7 @@ private:
         return _is_numeric(head) && _is_numeric(tail...);
     }
 };
+static_assert(std::is_trivially_destructible_v<Mixed>);
 
 class OwnedMixed : public Mixed {
 public:
@@ -508,6 +519,14 @@ inline Mixed::Mixed(Decimal128 v)
     }
 }
 
+#if REALM_ENABLE_GEOSPATIAL
+inline Mixed::Mixed(Geospatial* store) noexcept
+{
+    m_type = int(type_Geospatial) + 1;
+    geospatial_val = store;
+}
+#endif
+
 inline Mixed::Mixed(ObjectId v) noexcept
 {
     m_type = int(type_ObjectId) + 1;
@@ -569,6 +588,12 @@ inline int64_t Mixed::get_int() const noexcept
 }
 
 template <>
+inline const int64_t* Mixed::get_if<int64_t>() const noexcept
+{
+    return is_type(type_Int) ? &int_val : nullptr;
+}
+
+template <>
 inline bool Mixed::get<bool>() const noexcept
 {
     REALM_ASSERT(get_type() == type_Bool);
@@ -578,6 +603,12 @@ inline bool Mixed::get<bool>() const noexcept
 inline bool Mixed::get_bool() const noexcept
 {
     return get<bool>();
+}
+
+template <>
+inline const bool* Mixed::get_if<bool>() const noexcept
+{
+    return is_type(type_Bool) ? &bool_val : nullptr;
 }
 
 template <>
@@ -593,6 +624,12 @@ inline float Mixed::get_float() const noexcept
 }
 
 template <>
+inline const float* Mixed::get_if<float>() const noexcept
+{
+    return is_type(type_Float) ? &float_val : nullptr;
+}
+
+template <>
 inline double Mixed::get<double>() const noexcept
 {
     REALM_ASSERT(get_type() == type_Double);
@@ -602,6 +639,12 @@ inline double Mixed::get<double>() const noexcept
 inline double Mixed::get_double() const noexcept
 {
     return get<double>();
+}
+
+template <>
+inline const double* Mixed::get_if<double>() const noexcept
+{
+    return is_type(type_Double) ? &double_val : nullptr;
 }
 
 template <>
@@ -616,6 +659,12 @@ inline StringData Mixed::get<StringData>() const noexcept
 inline StringData Mixed::get_string() const noexcept
 {
     return get<StringData>();
+}
+
+template <>
+inline const StringData* Mixed::get_if<StringData>() const noexcept
+{
+    return is_type(type_String) ? &string_val : nullptr;
 }
 
 template <>
@@ -636,6 +685,12 @@ inline BinaryData Mixed::get_binary() const noexcept
 }
 
 template <>
+inline const BinaryData* Mixed::get_if<BinaryData>() const noexcept
+{
+    return is_type(type_Binary) ? &binary_val : nullptr;
+}
+
+template <>
 inline Timestamp Mixed::get<Timestamp>() const noexcept
 {
     REALM_ASSERT(get_type() == type_Timestamp);
@@ -645,6 +700,12 @@ inline Timestamp Mixed::get<Timestamp>() const noexcept
 inline Timestamp Mixed::get_timestamp() const noexcept
 {
     return get<Timestamp>();
+}
+
+template <>
+inline const Timestamp* Mixed::get_if<Timestamp>() const noexcept
+{
+    return is_type(type_Timestamp) ? &date_val : nullptr;
 }
 
 template <>
@@ -660,6 +721,12 @@ inline Decimal128 Mixed::get_decimal() const noexcept
 }
 
 template <>
+inline const Decimal128* Mixed::get_if<Decimal128>() const noexcept
+{
+    return is_type(type_Decimal) ? &decimal_val : nullptr;
+}
+
+template <>
 inline ObjectId Mixed::get<ObjectId>() const noexcept
 {
     REALM_ASSERT(get_type() == type_ObjectId);
@@ -672,6 +739,12 @@ inline ObjectId Mixed::get_object_id() const noexcept
 }
 
 template <>
+inline const ObjectId* Mixed::get_if<ObjectId>() const noexcept
+{
+    return is_type(type_ObjectId) ? &id_val : nullptr;
+}
+
+template <>
 inline UUID Mixed::get<UUID>() const noexcept
 {
     REALM_ASSERT(get_type() == type_UUID);
@@ -681,6 +754,12 @@ inline UUID Mixed::get<UUID>() const noexcept
 inline UUID Mixed::get_uuid() const noexcept
 {
     return get<UUID>();
+}
+
+template <>
+inline const UUID* Mixed::get_if<UUID>() const noexcept
+{
+    return is_type(type_UUID) ? &uuid_val : nullptr;
 }
 
 template <>
@@ -698,6 +777,19 @@ inline ObjLink Mixed::get<ObjLink>() const noexcept
     REALM_ASSERT(get_type() == type_TypedLink);
     return link_val;
 }
+
+#if REALM_ENABLE_GEOSPATIAL
+template <>
+inline Geospatial Mixed::get<Geospatial>() const noexcept
+{
+    auto type = get_type();
+    REALM_ASSERT_EX(type == type_Geospatial, type);
+    if (type == type_Geospatial) {
+        return *geospatial_val;
+    }
+    REALM_UNREACHABLE();
+}
+#endif
 
 template <>
 inline Mixed Mixed::get<Mixed>() const noexcept

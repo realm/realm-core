@@ -70,7 +70,6 @@
 #include <set>
 
 using namespace realm;
-using namespace realm::metrics;
 using namespace realm::test_util;
 using namespace realm::util;
 
@@ -293,6 +292,7 @@ static std::vector<std::string> invalid_queries = {
     "0 contains1",
     "a contains_something",
     "endswith 0",
+    "link geoWithin 5.0",
 
     // atoms/groups
     "0=0)",
@@ -534,13 +534,13 @@ TEST(Parser_ConstrainedQuery)
     CHECK_EQUAL(q.count(), 1);
     q.and_query(t->column<Int>(int_col) <= 0);
     CHECK_EQUAL(q.count(), 1);
-    CHECK_THROW(q.get_description(), SerialisationError);
+    CHECK_THROW(q.get_description(), SerializationError);
 
     Query q2(t, list_0);
     CHECK_EQUAL(q2.count(), 2);
     q2.and_query(t->column<Int>(int_col) <= 0);
     CHECK_EQUAL(q2.count(), 1);
-    CHECK_THROW(q2.get_description(), SerialisationError);
+    CHECK_THROW(q2.get_description(), SerializationError);
 }
 
 TEST(Parser_basic_serialisation)
@@ -675,7 +675,7 @@ TEST(Parser_basic_serialisation)
     verify_query(test_context, t, "age > 2 AND !TRUEPREDICATE", 0);
 
     CHECK_THROW_EX(
-        verify_query(test_context, t, "buddy.age > $0", 0), std::out_of_range,
+        verify_query(test_context, t, "buddy.age > $0", 0), query_parser::InvalidQueryArgError,
         CHECK_EQUAL(std::string(e.what()), "Attempt to retreive an argument when no arguments were given"));
     CHECK_THROW_EX(verify_query(test_context, t, "age == infinity", 0), query_parser::InvalidQueryError,
                    CHECK_EQUAL(std::string(e.what()), "Infinity not supported for int"));
@@ -2869,165 +2869,122 @@ TEST(Parser_Limit)
     // solely limit
     TableView tv = get_sorted_view(people, "TRUEPREDICATE LIMIT(0)");
     CHECK_EQUAL(tv.size(), 0);
-    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 3);
     tv = get_sorted_view(people, "TRUEPREDICATE LIMIT(1)");
     CHECK_EQUAL(tv.size(), 1);
-    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 2);
     tv = get_sorted_view(people, "TRUEPREDICATE LIMIT(2)");
     CHECK_EQUAL(tv.size(), 2);
-    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 1);
     tv = get_sorted_view(people, "TRUEPREDICATE LIMIT(3)");
     CHECK_EQUAL(tv.size(), 3);
-    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 0);
     tv = get_sorted_view(people, "TRUEPREDICATE LIMIT(4)");
     CHECK_EQUAL(tv.size(), 3);
-    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 0);
 
     // sort + limit
     tv = get_sorted_view(people, "TRUEPREDICATE SORT(name ASC) LIMIT(0)");
     CHECK_EQUAL(tv.size(), 0);
-    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 3);
     tv = get_sorted_view(people, "TRUEPREDICATE SORT(name ASC) LIMIT(1)");
     CHECK_EQUAL(tv.size(), 1);
-    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 2);
     CHECK_EQUAL(tv[0].get<String>(name_col), "Adam");
     tv = get_sorted_view(people, "TRUEPREDICATE SORT(name ASC) LIMIT(2)");
     CHECK_EQUAL(tv.size(), 2);
-    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 1);
     CHECK_EQUAL(tv[0].get<String>(name_col), "Adam");
     CHECK_EQUAL(tv[1].get<String>(name_col), "Ben");
     tv = get_sorted_view(people, "TRUEPREDICATE SORT(name ASC) LIMIT(3)");
     CHECK_EQUAL(tv.size(), 3);
-    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 0);
     CHECK_EQUAL(tv[0].get<String>(name_col), "Adam");
     CHECK_EQUAL(tv[1].get<String>(name_col), "Ben");
     CHECK_EQUAL(tv[2].get<String>(name_col), "Frank");
     tv = get_sorted_view(people, "TRUEPREDICATE SORT(name ASC) LIMIT(4)");
     CHECK_EQUAL(tv.size(), 3);
-    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 0);
 
     // sort + distinct + limit
     tv = get_sorted_view(people, "TRUEPREDICATE SORT(name ASC) DISTINCT(age) LIMIT(0)");
     CHECK_EQUAL(tv.size(), 0);
-    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 2);
     tv = get_sorted_view(people, "TRUEPREDICATE SORT(name ASC) DISTINCT(age) LIMIT(1)");
     CHECK_EQUAL(tv.size(), 1);
-    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 1);
     CHECK_EQUAL(tv[0].get<String>(name_col), "Adam");
     tv = get_sorted_view(people, "TRUEPREDICATE SORT(name ASC) DISTINCT(age) LIMIT(2)");
     CHECK_EQUAL(tv.size(), 2);
-    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 0);
     CHECK_EQUAL(tv[0].get<String>(name_col), "Adam");
     CHECK_EQUAL(tv[1].get<String>(name_col), "Frank");
     tv = get_sorted_view(people, "TRUEPREDICATE SORT(name ASC) DISTINCT(age) LIMIT(3)");
     CHECK_EQUAL(tv.size(), 2);
-    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 0);
     CHECK_EQUAL(tv[0].get<String>(name_col), "Adam");
     CHECK_EQUAL(tv[1].get<String>(name_col), "Frank");
     tv = get_sorted_view(people, "TRUEPREDICATE SORT(name ASC) DISTINCT(age) LIMIT(4)");
     CHECK_EQUAL(tv.size(), 2);
-    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 0);
 
     // query + limit
     tv = get_sorted_view(people, "age < 30 SORT(name ASC) DISTINCT(age) LIMIT(0)");
     CHECK_EQUAL(tv.size(), 0);
-    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 1);
     tv = get_sorted_view(people, "age < 30 SORT(name ASC) DISTINCT(age) LIMIT(1)");
     CHECK_EQUAL(tv.size(), 1);
-    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 0);
     CHECK_EQUAL(tv[0].get<String>(name_col), "Adam");
     tv = get_sorted_view(people, "age < 30 SORT(name ASC) DISTINCT(age) LIMIT(2)");
     CHECK_EQUAL(tv.size(), 1);
-    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 0);
     CHECK_EQUAL(tv[0].get<String>(name_col), "Adam");
     tv = get_sorted_view(people, "age < 30 SORT(name ASC) DISTINCT(age) LIMIT(3)");
     CHECK_EQUAL(tv.size(), 1);
-    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 0);
     CHECK_EQUAL(tv[0].get<String>(name_col), "Adam");
     tv = get_sorted_view(people, "age < 30 SORT(name ASC) DISTINCT(age) LIMIT(4)");
     CHECK_EQUAL(tv.size(), 1);
-    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 0);
 
     // compound query + limit
     tv = get_sorted_view(people, "age < 30 && name == 'Adam' LIMIT(0)");
     CHECK_EQUAL(tv.size(), 0);
-    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 1);
     tv = get_sorted_view(people, "age < 30 && name == 'Adam' LIMIT(1)");
     CHECK_EQUAL(tv.size(), 1);
-    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 0);
     CHECK_EQUAL(tv[0].get<String>(name_col), "Adam");
 
     // limit multiple times, order matters
     tv = get_sorted_view(people, "TRUEPREDICATE LIMIT(2) LIMIT(1)");
     CHECK_EQUAL(tv.size(), 1);
-    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 2);
     tv = get_sorted_view(people, "TRUEPREDICATE LIMIT(3) LIMIT(2) LIMIT(1) LIMIT(10)");
     CHECK_EQUAL(tv.size(), 1);
-    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 2);
     tv = get_sorted_view(people, "age > 0 SORT(name ASC) LIMIT(2)");
     CHECK_EQUAL(tv.size(), 2);
-    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 1);
     CHECK_EQUAL(tv[0].get<String>(name_col), "Adam");
     CHECK_EQUAL(tv[1].get<String>(name_col), "Ben");
     tv = get_sorted_view(people, "age > 0 LIMIT(2) SORT(name ASC)");
     CHECK_EQUAL(tv.size(), 2);
-    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 1);
     CHECK_EQUAL(tv[0].get<String>(name_col), "Adam");
     CHECK_EQUAL(tv[1].get<String>(name_col), "Frank");
     tv = get_sorted_view(people, "age > 0 SORT(name ASC) LIMIT(2) DISTINCT(age)");
     CHECK_EQUAL(tv.size(), 1);
-    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 1); // the other result is excluded by distinct not limit
     tv = get_sorted_view(people, "age > 0 SORT(name DESC) LIMIT(2) SORT(age ASC) LIMIT(1)");
     CHECK_EQUAL(tv.size(), 1);
-    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 2);
     CHECK_EQUAL(tv[0].get<String>(name_col), "Ben");
 
     // size_unlimited() checks
     tv = get_sorted_view(people, "age == 30");
     CHECK_EQUAL(tv.size(), 1);
-    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 0);
     tv = get_sorted_view(people, "age == 30 LIMIT(0)");
     CHECK_EQUAL(tv.size(), 0);
-    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 1);
     tv = get_sorted_view(people, "age == 1000");
     CHECK_EQUAL(tv.size(), 0);
-    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 0);
     tv = get_sorted_view(people, "age == 1000 LIMIT(0)");
     CHECK_EQUAL(tv.size(), 0);
-    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 0);
     tv = get_sorted_view(people, "age == 1000 SORT(name ASC)");
     CHECK_EQUAL(tv.size(), 0);
-    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 0);
     tv = get_sorted_view(people, "age == 1000 SORT(name ASC) LIMIT(0)");
     CHECK_EQUAL(tv.size(), 0);
-    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 0);
     tv = get_sorted_view(people, "age == 28 SORT(name ASC)");
     CHECK_EQUAL(tv.size(), 2);
-    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 0);
     tv = get_sorted_view(people, "age == 28 SORT(name ASC) LIMIT(1)");
     CHECK_EQUAL(tv.size(), 1);
-    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 1);
     tv = get_sorted_view(people, "age == 28 DISTINCT(age)");
     CHECK_EQUAL(tv.size(), 1);
-    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 0);
     tv = get_sorted_view(people, "age == 28 DISTINCT(age) LIMIT(0)");
     CHECK_EQUAL(tv.size(), 0);
-    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 1);
     tv = get_sorted_view(people, "age == 28 SORT(name ASC) DISTINCT(age)");
     CHECK_EQUAL(tv.size(), 1);
-    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 0);
     tv = get_sorted_view(people, "age == 28 SORT(name ASC) DISTINCT(age) LIMIT(0)");
     CHECK_EQUAL(tv.size(), 0);
-    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 1);
     tv = get_sorted_view(people, "FALSEPREDICATE");
     CHECK_EQUAL(tv.size(), 0);
-    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 0);
     tv = get_sorted_view(people, "FALSEPREDICATE LIMIT(0)");
     CHECK_EQUAL(tv.size(), 0);
-    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 0);
     tv = get_sorted_view(people, "FALSEPREDICATE LIMIT(1)");
     CHECK_EQUAL(tv.size(), 0);
-    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 0);
 
     // errors
     CHECK_THROW_ANY(get_sorted_view(people, "TRUEPREDICATE LIMIT(-1)"));    // only accepting positive integers
@@ -4035,6 +3992,7 @@ TEST(Parser_OperatorIN)
     verify_query(test_context, t, "ALL {8, 10} / 2 >= ANY items.price", 1);
     verify_query(test_context, t, "NONE {1, 2, 3} * 20 <= ANY items.price", 3);
     verify_query(test_context, t, "ANY {1, 2, 3, 4, 5, 6} + 2 == ANY items.price", 1);
+    verify_query(test_context, t, "ANY {0, 1, 2, 3, 5, 6, 7, 8, 9} == ANY items.price", 0); // No hit and all smaller
 
     // list property vs list property
     verify_query(test_context, t, "items.price IN items.price", 3);
@@ -4047,7 +4005,7 @@ TEST(Parser_OperatorIN)
     verify_query(test_context, t, "NONE items.price * 2 > ANY items.price", 0);
 
     // unsupported combinations
-    CHECK_THROW(verify_query(test_context, t, "{1, 2, 3, 4, 5, 6} * {1, 2, 3} == items.price", 1), std::logic_error);
+    CHECK_THROW(verify_query(test_context, t, "{1, 2, 3, 4, 5, 6} * {1, 2, 3} == items.price", 1), LogicError);
     CHECK_THROW(verify_query(test_context, t, "{8, 10}.@size >= ANY items.price", 3), query_parser::SyntaxError);
     CHECK_THROW(verify_query(test_context, t, "{8, 10}.@max >= ANY items.price", 3), query_parser::SyntaxError);
     CHECK_THROW(verify_query(test_context, t, "{8, 10}.@min >= ANY items.price", 3), query_parser::SyntaxError);
@@ -5038,6 +4996,7 @@ TEST(Parser_DictionaryObjects)
 
     Obj adam = persons->create_object_with_primary_key("adam");
     Obj bernie = persons->create_object_with_primary_key("bernie");
+    Obj charlie = persons->create_object_with_primary_key("charlie");
 
     Obj astro = dogs->create_object_with_primary_key("astro", {{col_age, 4}});
     Obj pluto = dogs->create_object_with_primary_key("pluto", {{col_age, 5}});
@@ -5053,17 +5012,55 @@ TEST(Parser_DictionaryObjects)
     bernie_pets.insert("dog1", astro);
     bernie_pets.insert("dog2", snoopy);
 
+    auto charlie_pets = charlie.get_dictionary(col_dict);
+    charlie_pets.insert("dog1", pluto);
+
     adam.set(col_friend, bernie.get_key());
     bernie.set(col_friend, adam.get_key());
 
     auto q = persons->link(col_dict).column<Int>(col_age) > 4;
-    CHECK_EQUAL(q.count(), 1);
+    CHECK_EQUAL(q.count(), 2);
     q = persons->link(col_friend).link(col_dict).column<Int>(col_age) > 4;
     CHECK_EQUAL(q.count(), 1);
 
-    verify_query(test_context, persons, "pets.@values.age > 4", 1);
-    verify_query(test_context, persons, "pets.@values == obj('dog', 'pluto')", 1);
-    verify_query(test_context, persons, "pets.@values == ANY { obj('dog', 'pluto'), obj('dog', 'astro') }", 2);
+    verify_query(test_context, persons, "pets.@values.age > 4", 2);
+    verify_query(test_context, persons, "pets.@values == obj('dog', 'pluto')", 2);
+    verify_query(test_context, persons, "pets.@values != obj('dog', 'pluto')", 2);
+    verify_query(test_context, persons, "pets.@values == ANY { obj('dog', 'lady'), obj('dog', 'astro') }", 2);
+    verify_query(test_context, persons, "pets.@values == ANY { obj('dog', 'astro'), NULL }", 2);
+}
+
+TEST(Parser_DictionarySorting)
+{
+    Group g;
+    auto dogs = g.add_table_with_primary_key("dog", type_String, "name");
+    auto col_meta = dogs->add_column_dictionary(type_Int, "meta");
+
+    Obj astro = dogs->create_object_with_primary_key("astro");
+    Obj pluto = dogs->create_object_with_primary_key("pluto");
+    Obj lady = dogs->create_object_with_primary_key("lady");
+    Obj snoopy = dogs->create_object_with_primary_key("snoopy");
+    Obj scooby = dogs->create_object_with_primary_key("scooby");
+
+    astro.get_dictionary(col_meta).insert("age", 4);
+    pluto.get_dictionary(col_meta).insert("age", 5);
+    lady.get_dictionary(col_meta).insert("age", 6);
+    snoopy.get_dictionary(col_meta).insert("age", 7);
+    scooby.get_dictionary(col_meta).insert("age", 7);
+
+    auto results = get_sorted_view(dogs, "TRUEPREDICATE SORT(meta[\"age\"] ASC) DISTINCT(meta['age'])");
+    CHECK_EQUAL(results.size(), 4);
+    CHECK_EQUAL(results.get_object(0).get_key(), astro.get_key());
+    CHECK_EQUAL(results.get_object(1).get_key(), pluto.get_key());
+    CHECK_EQUAL(results.get_object(2).get_key(), lady.get_key());
+    CHECK_EQUAL(results.get_object(3).get_key(), snoopy.get_key());
+
+    results = get_sorted_view(dogs, "TRUEPREDICATE SORT(meta[\"age\"] DESC) DISTINCT(meta['age'])");
+    CHECK_EQUAL(results.size(), 4);
+    CHECK_EQUAL(results.get_object(0).get_key(), snoopy.get_key());
+    CHECK_EQUAL(results.get_object(1).get_key(), lady.get_key());
+    CHECK_EQUAL(results.get_object(2).get_key(), pluto.get_key());
+    CHECK_EQUAL(results.get_object(3).get_key(), astro.get_key());
 }
 
 TEST_TYPES(Parser_DictionaryAggregates, Prop<float>, Prop<double>, Prop<Decimal128>)
@@ -5646,6 +5643,273 @@ TEST(Parser_PrimaryKey)
     q = linking->query(query_string);
     CHECK_EQUAL(q.count(), 1);
     CHECK_EQUAL(q.get_description(), query_string);
+}
+
+TEST(Parser_Geospatial)
+{
+    Group g;
+    auto table = g.add_table_with_primary_key("Restaurant", type_ObjectId, "_id");
+    auto geo_table = g.add_table("Position", Table::Type::Embedded);
+    geo_table->add_column(type_String, "type");
+    geo_table->add_column_list(type_Double, "coordinates");
+    ColKey self_col = table->add_column(*table, "self_link");
+    ColKey list_col = table->add_column_list(*table, "partners");
+    ColKey name_col = table->add_column(type_String, "name");
+    ColKey col_link = table->add_column(*geo_table, "location");
+
+#if !REALM_ENABLE_GEOSPATIAL
+    auto error = "Support for Geospatial queries is not enabled";
+
+    static_cast<void>(self_col);
+    static_cast<void>(list_col);
+    static_cast<void>(name_col);
+    static_cast<void>(col_link);
+#define CHECK_QUERY(query)                                                                                           \
+    do {                                                                                                             \
+        CHECK_THROW_EX(verify_query(test_context, table, query, 1), realm::LogicError,                               \
+                       CHECK(std::string(e.what()).find(error) != std::string::npos));                               \
+    } while (false)
+
+    CHECK_QUERY("location geoWithin geoBox([0.2, 0.2], [0.7, 0.7])");
+    CHECK_QUERY("location geoWithin geoBox([0.2, 0.2, 0.2], [0.7, 0.7, 0.7])");
+    CHECK_QUERY("location geoWithin geoCircle([0.3, 0.3], 1000.0)");
+    CHECK_QUERY("location geoWithin geoCircle([0.3, 0.3, 0.3], 1000.0)");
+    CHECK_QUERY("location geoWithin geoPolygon({[0.0, 0.0], [1.0, 0.0], [1, 1], [0, 1], [0.0, 0.0]})");
+
+    CHECK_THROW_EX(verify_query_sub(test_context, table, "location GEOWITHIN $0", {}, 1), realm::LogicError,
+                   CHECK(std::string(e.what()).find(error) != std::string::npos));
+#else
+    struct Restaurant {
+        std::string name;
+        GeoPoint location;
+        ObjectId pk;
+    };
+    std::vector<Restaurant> data = {{"one", GeoPoint{0, 0}},
+                                    {"two", GeoPoint{0.5, 0.5}},
+                                    {"three", GeoPoint{1, 1}},
+                                    {"four", GeoPoint{2, 2}},
+                                    {"Red Fish Blue Fish", GeoPoint{-123.37039, 48.42437}},
+                                    {"Foo", GeoPoint{-123.36253, 48.42566}},
+                                    {"Superbaba", GeoPoint{-123.3615, 48.4267}},
+                                    {"Sen Zushi", GeoPoint{-123.3579, 48.42398}}};
+    for (size_t i = 0; i < data.size(); ++i) {
+        Restaurant& r = data[i];
+        r.pk = ObjectId::gen();
+        Obj obj =
+            table->create_object_with_primary_key(r.pk).set(col_link, Geospatial(r.location)).set(name_col, r.name);
+        obj.set(self_col, obj.get_key());
+        LnkLst lst = obj.get_linklist(list_col);
+        for (auto it = table->begin(); it != table->end(); ++it) {
+            if (it->get_key() != obj.get_key()) {
+                lst.add(it->get_key());
+            }
+        }
+    }
+    // add one object with a null link
+    table->create_object_with_primary_key(ObjectId::gen()).set(name_col, "empty");
+
+    verify_query(test_context, table, "location geoWithin geoBox([0.2, 0.2], [0.7, 0.7])", 1);
+    verify_query(test_context, table, "location geoWithin geoBox([0.2, 0.2, 0.2], [0.7, 0.7, 0.7])", 1);
+    verify_query(test_context, table, "location geoWithin geoCircle([0.3, 0.3], 1)", 4);
+    verify_query(test_context, table, "location geoWithin geoCircle([0.3, 0.3, 0.3], 1)", 4);
+    verify_query(test_context, table,
+                 "location geoWithin geoPolygon({[0.0, 0.0], [1.0, 0.0], [1, 1], [0, 1], [0.0, 0.0]})", 1);
+    verify_query(test_context, table,
+                 "location geoWithin geoPolygon({[0.0, 0.0], [1.0, 0.0], [1, 1], [0, 1], [0.0, 0.0]}, "
+                 "{[0.25, 0.25], [0.75, 0.25], [0.75, 0.75], [0.25, 0.75], [0.25, 0.25]})",
+                 0); // polygon with hole
+    verify_query(test_context, table, "location == NULL", 1);
+    // this circle contains "superbaba" and "foo"
+    Geospatial area = GeoCircle{0.000021950110534, GeoPoint{-123.36197, 48.42626}};
+    verify_query(test_context, table, "ANY partners.location GEOWITHIN " + area.to_string(), 2);
+    verify_query(test_context, table, "ALL partners.location GEOWITHIN " + area.to_string(), 0);
+    verify_query(test_context, table, "NONE partners.location GEOWITHIN " + area.to_string(), 7);
+
+    Geospatial box{GeoBox{GeoPoint{0.2, 0.2}, GeoPoint{0.7, 0.7}}};
+    Geospatial circle{GeoCircle{1, GeoPoint{0.3, 0.3}}};
+    Geospatial polygon{
+        GeoPolygon{{{GeoPoint{0, 0}, GeoPoint{1, 0}, GeoPoint{1, 1}, GeoPoint{0, 1}, GeoPoint{0, 0}}}}};
+    Geospatial invalid;
+    Geospatial point{GeoPoint{0, 0}};
+    std::string str_of_box = box.to_string();
+    std::string str_of_circle = circle.to_string();
+    std::string str_of_polygon = polygon.to_string();
+    std::string str_of_point = point.to_string();
+    std::vector<Mixed> args = {Mixed{&box},          Mixed{&circle},        Mixed{&polygon},
+                               Mixed{&invalid},      Mixed{realm::null()},  Mixed{1.2},
+                               Mixed{1000},          Mixed{"string value"}, Mixed{str_of_box},
+                               Mixed{str_of_circle}, Mixed{str_of_polygon}, Mixed{str_of_point}};
+
+    verify_query_sub(test_context, table, "location GEOWITHIN $0", args, 1);
+    verify_query_sub(test_context, table, "location GEOWITHIN $1", args, 4);
+    verify_query_sub(test_context, table, "location GEOWITHIN $2", args, 1);
+    verify_query_sub(test_context, table, "location GEOWITHIN $8", args, 1);
+    verify_query_sub(test_context, table, "location GEOWITHIN $9", args, 4);
+    verify_query_sub(test_context, table, "location GEOWITHIN $10", args, 1);
+
+    GeoCircle c = circle.get<GeoCircle>();
+    std::vector<Mixed> coord_args = {Mixed{c.center.longitude}, Mixed{c.center.latitude}, Mixed{c.radius_radians}};
+    verify_query_sub(test_context, table, "location GEOWITHIN geoCircle([$0, $1], $2)", coord_args, 4);
+    GeoPolygon p = polygon.get<GeoPolygon>();
+    coord_args = {Mixed{p.points[0][0].longitude}, Mixed{p.points[0][0].latitude},  Mixed{p.points[0][1].longitude},
+                  Mixed{p.points[0][1].latitude},  Mixed{p.points[0][2].longitude}, Mixed{p.points[0][2].latitude},
+                  Mixed{p.points[0][3].longitude}, Mixed{p.points[0][3].latitude},  Mixed{p.points[0][4].longitude},
+                  Mixed{p.points[0][4].latitude}};
+    verify_query_sub(test_context, table,
+                     "location GEOWITHIN geoPolygon({[$0, $1], [$2, $3], [$4, $5], [$6, $7], [$8, $9]})", coord_args,
+                     1);
+    GeoPolygon b = box.get<GeoBox>().to_polygon();
+    coord_args = {b.points[0][0].longitude, b.points[0][0].latitude, b.points[0][2].longitude,
+                  b.points[0][2].latitude};
+    verify_query_sub(test_context, table, "location GEOWITHIN geoBox([$0, $1], [$2, $3])", coord_args, 1);
+
+    CHECK_THROW_EX(
+        verify_query(test_context, table, "_id geoWithin geoBox([0.2, 0.2], [0.7, 0.7])", 1),
+        query_parser::InvalidQueryError,
+        CHECK(std::string(e.what()).find("The left hand side of 'geoWithin' must be a link to geoJSON formatted "
+                                         "data. But the provided type is 'objectId'") != std::string::npos));
+    CHECK_THROW_ANY(verify_query(test_context, table, "location geoWithin _id", 0));
+    CHECK_THROW_ANY(verify_query(test_context, table, "location geoWithin location", 0));
+    CHECK_THROW_EX(
+        verify_query(test_context, table, "self_link geoWithin geoBox([0.2, 0.2], [0.7, 0.7])", 0),
+        std::runtime_error,
+        CHECK(std::string(e.what()).find(
+                  "Query 'self_link GEOWITHIN GeoPolygon({[0.2, 0.2], [0.2, 0.7], [0.7, 0.7], [0.7, 0.2], [0.2, "
+                  "0.2]})' links to data in the wrong format for a geoWithin query") != std::string::npos));
+    CHECK_THROW_EX(verify_query(test_context, table, "location geoWithin NULL", 1), query_parser::SyntaxError,
+                   CHECK(std::string(e.what()).find(
+                             "Invalid predicate: 'location geoWithin NULL': syntax error, unexpected null") !=
+                         std::string::npos));
+    CHECK_THROW_EX(verify_query(test_context, table, "location geoWithin 1.2", 1), query_parser::SyntaxError,
+                   CHECK(std::string(e.what()).find(
+                             "Invalid predicate: 'location geoWithin 1.2': syntax error, unexpected float") !=
+                         std::string::npos));
+    CHECK_THROW_EX(
+        verify_query(test_context, table, "location geoWithin 'test string'", 1), query_parser::SyntaxError,
+        CHECK(std::string(e.what()).find(
+                  "Invalid predicate: 'location geoWithin 'test string'': syntax error, unexpected string") !=
+              std::string::npos));
+    CHECK_THROW_EX(
+        verify_query_sub(test_context, table, "location GEOWITHIN $4", args, 1), query_parser::InvalidQueryError,
+        CHECK(std::string(e.what()).find("The right hand side of 'geoWithin' must be a geospatial constant value. "
+                                         "But the provided type is 'null'") != std::string::npos));
+    CHECK_THROW_EX(
+        verify_query_sub(test_context, table, "location GEOWITHIN $5", args, 1), query_parser::InvalidQueryError,
+        CHECK(std::string(e.what()).find("The right hand side of 'geoWithin' must be a geospatial constant value. "
+                                         "But the provided type is 'double'") != std::string::npos));
+    CHECK_THROW_EX(
+        verify_query_sub(test_context, table, "location GEOWITHIN $6", args, 1), query_parser::InvalidQueryError,
+        CHECK(std::string(e.what()).find("The right hand side of 'geoWithin' must be a geospatial constant value. "
+                                         "But the provided type is 'int'") != std::string::npos));
+    CHECK_THROW_EX(
+        verify_query_sub(test_context, table, "location GEOWITHIN $7", args, 1), query_parser::InvalidQueryError,
+        CHECK(std::string(e.what()).find(
+                  "Invalid syntax in serialized geospatial object at argument 7: 'Invalid predicate: 'string value': "
+                  "syntax error, unexpected identifier, expecting geobox or geopolygon or geocircle or argument'") !=
+              std::string::npos));
+
+    CHECK_THROW_EX(verify_query_sub(test_context, table, "location GEOWITHIN $11", args, 1),
+                   query_parser::InvalidQueryError,
+                   CHECK(std::string(e.what()).find(
+                             "Invalid syntax in serialized geospatial object at argument 11: 'Invalid predicate: "
+                             "'GeoPoint([0, 0])': syntax error, unexpected identifier, expecting geobox or "
+                             "geopolygon or geocircle or argument'") != std::string::npos));
+
+    CHECK_THROW_EX(verify_query_sub(test_context, table, "location GEOWITHIN $3", args, 0),
+                   query_parser::InvalidQueryError,
+                   CHECK(std::string(e.what()).find("The right hand side of 'geoWithin' must be a valid "
+                                                    "Geospatial value, got 'NULL'") != std::string::npos));
+    CHECK_THROW_EX(
+        verify_query_sub(test_context, table, "location GEOWITHIN geoCircle([$1, $2], $3)", args, 0),
+        query_parser::InvalidQueryError,
+        CHECK(std::string(e.what()).find("Invalid parameter 'geospatial' used in coordinate at argument '$1'") !=
+              std::string::npos));
+    CHECK_THROW_EX(
+        verify_query_sub(test_context, table, "location GEOWITHIN geoCircle([$4, $4], $4)", args, 0),
+        query_parser::InvalidQueryError,
+        CHECK(std::string(e.what()).find("NULL cannot be used in coordinate at argument '$4'") != std::string::npos));
+    CHECK_THROW_EX(verify_query_sub(test_context, table, "location GEOWITHIN geoCircle([$7, $7], $7)", args, 0),
+                   query_parser::InvalidQueryError,
+                   CHECK(std::string(e.what()).find(
+                             "Invalid parameter 'string' used in coordinate at argument '$7'") != std::string::npos));
+#endif
+}
+
+TEST(Parser_RecursiveLogial)
+{
+    using util::serializer::print_value;
+    Group g;
+    auto table = g.add_table_with_primary_key("table", type_ObjectId, "id");
+    table->create_object_with_primary_key(ObjectId());
+
+    {
+        std::vector<Mixed> args = {ObjectId(), ObjectId::gen(), ObjectId::gen()};
+        verify_query_sub(test_context, table,
+                         "TRUEPREDICATE AND (id == $1 OR id == $2 OR id == $0) AND TRUEPREDICATE", args, 1);
+        verify_query_sub(
+            test_context, table,
+            "(id == $1 OR id == $2 OR id == $0) AND (TRUEPREDICATE AND id == $0 AND id == $0) AND TRUEPREDICATE",
+            args, 1);
+        verify_query_sub(
+            test_context, table,
+            "(id == $1 OR id == $2 OR id == $0) AND (FALSEPREDICATE AND id == $0 AND id == $0) AND TRUEPREDICATE",
+            args, 0);
+        verify_query_sub(test_context, table,
+                         "(id == $1 OR id == $2 OR FALSEPREDICATE) AND (TRUEPREDICATE AND id == $0 AND id == $0) AND "
+                         "TRUEPREDICATE",
+                         args, 0);
+        verify_query_sub(
+            test_context, table,
+            "(id == $1 OR id == $2 OR id == $0) AND (TRUEPREDICATE AND id == $0 AND id == $0) AND FALSEPREDICATE",
+            args, 0);
+    }
+
+    constexpr size_t num_args = 1000;
+    std::vector<Mixed> args;
+    args.reserve(num_args);
+    for (size_t i = 0; i < num_args; ++i) {
+        args.push_back(ObjectId::gen());
+    }
+
+    std::string base_query;
+    for (size_t i = 0; i < 1000; ++i) {
+        base_query += util::format("%1id = $%2", i == 0 ? "" : " OR ", i);
+    }
+    // minimum size to trigger a stack overflow on "my" machine in debug mode
+    constexpr size_t num_repeats = 53;
+    std::string query = "FALSEPREDICATE";
+    query.reserve(query.size() + ((4 + base_query.size()) * num_repeats));
+    for (size_t i = 0; i < num_repeats; ++i) {
+        query.append(" OR ");
+        query.append(base_query);
+    }
+    Query q = table->query(query, args, {});
+    size_t q_count = q.count();
+    CHECK_EQUAL(q_count, 0);
+
+    query.append(util::format(" OR id = oid(%1)", ObjectId()));
+    query.append(" OR ");
+    query.append(base_query);
+    q = table->query(query, args, {});
+    q_count = q.count();
+    CHECK_EQUAL(q_count, 1);
+}
+
+TEST(Parser_issue6831)
+{
+    Group g;
+    auto plant = g.add_table_with_primary_key("Plant", type_ObjectId, "id");
+    plant->add_column(type_String, "Name");
+    auto inventory = g.add_table_with_primary_key("Inventory", type_String, "id");
+    inventory->add_column_dictionary(*plant, "Plants");
+
+    auto petunia = plant->create_object_with_primary_key(ObjectId::gen());
+    petunia.set("Name", "Petunia");
+    auto obj = inventory->create_object_with_primary_key("Inv");
+    auto dict = obj.get_dictionary("Plants");
+    dict.insert("Petunia", petunia);
+    auto q = inventory->query("Plants.@keys == 'Petunia'");
+    CHECK_EQUAL(q.count(), 1);
 }
 
 #endif // TEST_PARSER

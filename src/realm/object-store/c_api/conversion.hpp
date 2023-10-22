@@ -273,6 +273,34 @@ static inline realm_schema_mode_e to_capi(SchemaMode mode)
     REALM_TERMINATE("Invalid schema mode."); // LCOV_EXCL_LINE
 }
 
+static inline SchemaSubsetMode from_capi(realm_schema_subset_mode_e subset_mode)
+{
+    switch (subset_mode) {
+        case RLM_SCHEMA_SUBSET_MODE_ALL_CLASSES:
+            return SchemaSubsetMode::AllClasses;
+        case RLM_SCHEMA_SUBSET_MODE_ALL_PROPERTIES:
+            return SchemaSubsetMode::AllProperties;
+        case RLM_SCHEMA_SUBSET_MODE_COMPLETE:
+            return SchemaSubsetMode::Complete;
+        case RLM_SCHEMA_SUBSET_MODE_STRICT:
+            return SchemaSubsetMode::Strict;
+    }
+    REALM_TERMINATE("Invalid subset schema mode."); // LCOV_EXCL_LINE
+}
+
+static inline realm_schema_subset_mode_e to_capi(const SchemaSubsetMode& subset_mode)
+{
+    if (subset_mode == SchemaSubsetMode::AllClasses)
+        return RLM_SCHEMA_SUBSET_MODE_ALL_CLASSES;
+    else if (subset_mode == SchemaSubsetMode::AllProperties)
+        return RLM_SCHEMA_SUBSET_MODE_ALL_PROPERTIES;
+    else if (subset_mode == SchemaSubsetMode::Complete)
+        return RLM_SCHEMA_SUBSET_MODE_COMPLETE;
+    else if (subset_mode == SchemaSubsetMode::Strict)
+        return RLM_SCHEMA_SUBSET_MODE_STRICT;
+    REALM_TERMINATE("Invalid subset schema mode."); // LCOV_EXCL_LINE
+}
+
 static inline realm_property_type_e to_capi(PropertyType type) noexcept
 {
     type &= ~PropertyType::Flags;
@@ -457,8 +485,14 @@ static inline realm_version_id_t to_capi(const VersionID& v)
     return version_id;
 }
 
-realm_sync_error_code_t to_capi(const std::error_code& error_code, std::string& message);
-void sync_error_to_error_code(const realm_sync_error_code_t& sync_error_code, std::error_code* error_code_out);
+static inline realm_error_t to_capi(const Status& s)
+{
+    realm_error_t err;
+    err.error = static_cast<realm_errno_e>(s.code());
+    err.categories = static_cast<realm_error_category_e>(ErrorCodes::error_categories(s.code()).value());
+    err.message = s.reason().c_str();
+    return err;
+}
 
 } // namespace realm::c_api
 

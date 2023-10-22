@@ -136,11 +136,6 @@ public:
     /// undefined.
     void set_type(Type);
 
-    /// Construct a complete copy of this array (including its subarrays) using
-    /// the specified target allocator and return just the reference to the
-    /// underlying memory.
-    MemRef clone_deep(Allocator& target_alloc) const;
-
     /// Construct an empty integer array of the specified type, and return just
     /// the reference to the underlying memory.
     static MemRef create_empty_array(Type, bool context_flag, Allocator&);
@@ -273,10 +268,6 @@ public:
     /// If neccessary, expand the representation so that it can store the
     /// specified value.
     void ensure_minimum_width(int_fast64_t value);
-
-    /// This one may change the represenation of the array, so be carefull if
-    /// you call it after ensure_minimum_width().
-    void set_all_to_zero();
 
     /// Add \a diff to the element at the specified index.
     void adjust(size_t ndx, int_fast64_t diff);
@@ -441,6 +432,7 @@ public:
     /// FIXME: Belongs in IntegerArray
     static size_t calc_aligned_byte_size(size_t size, int width);
 
+#ifdef REALM_DEBUG
     class MemUsageHandler {
     public:
         virtual void handle(ref_type ref, size_t allocated, size_t used) = 0;
@@ -449,6 +441,7 @@ public:
     void report_memory_usage(MemUsageHandler&) const;
 
     void stats(MemStats& stats_dest) const noexcept;
+#endif
 
     void verify() const;
 
@@ -464,13 +457,15 @@ protected:
     // for the given bit width. Valid widths are 0, 1, 2, 4, 8, 16, 32, and 64.
     static constexpr int_fast64_t ubound_for_width(size_t width) noexcept;
 
+    // This will have to be eventually used, exposing this here for testing.
+    size_t count(int64_t value) const noexcept;
+
 private:
     void update_width_cache_from_header() noexcept;
 
     void do_ensure_minimum_width(int_fast64_t);
 
     int64_t sum(size_t start, size_t end) const;
-    size_t count(int64_t value) const noexcept;
 
     template <size_t w>
     int64_t sum(size_t start, size_t end) const;
@@ -518,8 +513,6 @@ protected:
     /// log2. Posssible results {0, 1, 2, 4, 8, 16, 32, 64}
     static size_t bit_width(int64_t value);
 
-    void report_memory_usage_2(MemUsageHandler&) const;
-
 protected:
     Getter m_getter = nullptr; // cached to avoid indirection
     const VTable* m_vtable = nullptr;
@@ -535,6 +528,10 @@ protected:
 private:
     ref_type do_write_shallow(_impl::ArrayWriterBase&) const;
     ref_type do_write_deep(_impl::ArrayWriterBase&, bool only_if_modified) const;
+
+#ifdef REALM_DEBUG
+    void report_memory_usage_2(MemUsageHandler&) const;
+#endif
 
     friend class Allocator;
     friend class SlabAlloc;
@@ -938,12 +935,6 @@ inline size_t Array::get_byte_size() const noexcept
 
 
 //-------------------------------------------------
-
-inline MemRef Array::clone_deep(Allocator& target_alloc) const
-{
-    char* header = get_header_from_data(m_data);
-    return clone(MemRef(header, m_ref, m_alloc), m_alloc, target_alloc); // Throws
-}
 
 inline MemRef Array::create_empty_array(Type type, bool context_flag, Allocator& alloc)
 {

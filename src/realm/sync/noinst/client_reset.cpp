@@ -55,7 +55,7 @@ std::ostream& operator<<(std::ostream& os, const ClientResyncMode& mode)
             os << "Recover";
             break;
         case ClientResyncMode::RecoverOrDiscard:
-            os << "RecoveOrDiscard";
+            os << "RecoverOrDiscard";
             break;
     }
     return os;
@@ -70,9 +70,17 @@ static inline bool should_skip_table(const Transaction& group, TableKey key)
     return !group.table_is_public(key);
 }
 
-void transfer_group(const Transaction& group_src, Transaction& group_dst, util::Logger& logger)
+void transfer_group(const Transaction& group_src, Transaction& group_dst, util::Logger& logger,
+                    bool allow_schema_additions)
 {
-    logger.debug("transfer_group, src size = %1, dst size = %2", group_src.size(), group_dst.size());
+    logger.debug("transfer_group, src size = %1, dst size = %2, allow_schema_additions = %3", group_src.size(),
+                 group_dst.size(), allow_schema_additions);
+
+    // Turn off the sync history tracking during state transfer since it will be thrown
+    // away immediately after anyways. This reduces the memory footprint of a client reset.
+    ClientReplication* client_repl = dynamic_cast<ClientReplication*>(group_dst.get_replication());
+    REALM_ASSERT_RELEASE(client_repl);
+    TempShortCircuitReplication sync_history_guard(*client_repl);
 
     // Find all tables in dst that should be removed.
     std::set<std::string> tables_to_remove;
@@ -136,7 +144,12 @@ void transfer_group(const Transaction& group_src, Transaction& group_dst, util::
     // 2: Keep the tables locally and ignore them. But the local app schema
     //    still has these classes and trying to modify anything in them will
     //    create sync instructions on tables that sync doesn't know about.
-    if (!tables_to_remove.empty()) {
+    // As an exception in recovery mode, we assume that the corresponding
+    // additive schema changes will be part of the recovery upload. If they
+    // are present, then the server can choose to allow them (if in dev mode).
+    // If they are not present, then the server will emit an error the next time
+    // a value is set on the unknown property.
+    if (!allow_schema_additions && !tables_to_remove.empty()) {
         std::string names_list;
         for (const std::string& table_name : tables_to_remove) {
             names_list += Group::table_name_to_class_name(table_name);
@@ -188,7 +201,7 @@ void transfer_group(const Transaction& group_src, Transaction& group_dst, util::
             if (!should_skip_table(group_dst, table_key))
                 ++num_tables_dst;
         }
-        REALM_ASSERT(num_tables_src == num_tables_dst);
+        REALM_ASSERT_EX(allow_schema_additions || num_tables_src == num_tables_dst, num_tables_src, num_tables_dst);
         num_tables = num_tables_src;
     }
     logger.debug("The number of tables is %1", num_tables);
@@ -210,7 +223,7 @@ void transfer_group(const Transaction& group_src, Transaction& group_dst, util::
                 continue;
             }
         }
-        if (!columns_to_remove.empty()) {
+        if (!allow_schema_additions && !columns_to_remove.empty()) {
             std::string columns_list;
             for (const std::string& col_name : columns_to_remove) {
                 columns_list += col_name;
@@ -329,8 +342,30 @@ void transfer_group(const Transaction& group_src, Transaction& group_dst, util::
         }
     }
 
-    converters::EmbeddedObjectConverter embedded_tracker;
+    // We must re-create any missing objects that are absent in dst before trying to copy
+    // their properties because creating them may re-create any dangling links which would
+    // otherwise cause inconsistencies when re-creating lists of links.
+    for (auto table_key : group_src.get_table_keys()) {
+        ConstTableRef table_src = group_src.get_table(table_key);
+        auto table_name = table_src->get_name();
+        if (should_skip_table(group_src, table_key) || table_src->is_embedded())
+            continue;
+        TableRef table_dst = group_dst.get_table(table_name);
+        auto pk_col = table_src->get_primary_key_column();
+        REALM_ASSERT(pk_col);
+        logger.debug("Creating missing objects for table '%1', number of rows = %2, "
+                     "primary_key_col = %3, primary_key_type = %4",
+                     table_name, table_src->size(), pk_col.get_index().val, pk_col.get_type());
+        for (const Obj& src : *table_src) {
+            bool created = false;
+            table_dst->create_object_with_primary_key(src.get_primary_key(), &created);
+            if (created) {
+                logger.debug("   created %1", src.get_primary_key());
+            }
+        }
+    }
 
+    converters::EmbeddedObjectConverter embedded_tracker;
     // Now src and dst have identical schemas and no extraneous objects from dst.
     // There may be missing object from src and the values of existing objects may
     // still differ. Diff all the values and create missing objects on the fly.
@@ -344,7 +379,8 @@ void transfer_group(const Transaction& group_src, Transaction& group_dst, util::
             continue;
         StringData table_name = table_src->get_name();
         TableRef table_dst = group_dst.get_table(table_name);
-        REALM_ASSERT(table_src->get_column_count() == table_dst->get_column_count());
+        REALM_ASSERT_EX(allow_schema_additions || table_src->get_column_count() == table_dst->get_column_count(),
+                        allow_schema_additions, table_src->get_column_count(), table_dst->get_column_count());
         auto pk_col = table_src->get_primary_key_column();
         REALM_ASSERT(pk_col);
         logger.debug("Updating values for table '%1', number of rows = %2, "
@@ -357,11 +393,11 @@ void transfer_group(const Transaction& group_src, Transaction& group_dst, util::
 
         for (const Obj& src : *table_src) {
             auto src_pk = src.get_primary_key();
-            bool updated = false;
-            // get or create the object
-            auto dst = table_dst->create_object_with_primary_key(src_pk, &updated);
+            // create the object - it should have been created above.
+            auto dst = table_dst->get_object_with_primary_key(src_pk);
             REALM_ASSERT(dst);
 
+            bool updated = false;
             converter.copy(src, dst, &updated);
             if (updated) {
                 logger.debug("  updating %1", src_pk);
@@ -592,7 +628,7 @@ LocalVersionIDs perform_client_reset_diff(DBRef db_local, DBRef db_remote, sync:
         // needs to be done before they are wiped out by remake_active_subscription()
         std::vector<SubscriptionSet> pending_subscriptions = sub_store->get_pending_subscriptions();
         // transform the local Realm such that all public tables become identical to the remote Realm
-        transfer_group(*wt_remote, *wt_local, logger);
+        transfer_group(*wt_remote, *wt_local, logger, recover_local_changes);
         // now that the state of the fresh and local Realms are identical,
         // reset the local sync history.
         // Note that we do not set the new file ident yet! This is done in the last commit.
@@ -609,7 +645,8 @@ LocalVersionIDs perform_client_reset_diff(DBRef db_local, DBRef db_remote, sync:
         // the way to the final state, but since separate commits are necessary, this is
         // unavoidable.
         wt_local = db_local->start_write();
-        RecoverLocalChangesetsHandler handler{*wt_local, *frozen_pre_local_state, logger};
+        RecoverLocalChangesetsHandler handler{*wt_local, *frozen_pre_local_state, logger,
+                                              db_local->get_replication()};
         handler.process_changesets(local_changes, std::move(pending_subscriptions)); // throws on error
         // The new file ident is set as part of the final commit. This is to ensure that if
         // there are any exceptions during recovery, or the process is killed for some
@@ -626,7 +663,8 @@ LocalVersionIDs perform_client_reset_diff(DBRef db_local, DBRef db_remote, sync:
             // In PBS recovery, the strategy is to apply all local changes to the remote realm first,
             // and then transfer the modified state all at once to the local Realm. This creates a
             // nice side effect for notifications because only the minimal state change is made.
-            RecoverLocalChangesetsHandler handler{*wt_remote, *frozen_pre_local_state, logger};
+            RecoverLocalChangesetsHandler handler{*wt_remote, *frozen_pre_local_state, logger,
+                                                  db_remote->get_replication()};
             handler.process_changesets(local_changes, {}); // throws on error
             ClientReplication* client_repl = dynamic_cast<ClientReplication*>(wt_remote->get_replication());
             REALM_ASSERT_RELEASE(client_repl);
@@ -636,7 +674,7 @@ LocalVersionIDs perform_client_reset_diff(DBRef db_local, DBRef db_remote, sync:
         }
 
         // transform the local Realm such that all public tables become identical to the remote Realm
-        transfer_group(*wt_remote, *wt_local, logger);
+        transfer_group(*wt_remote, *wt_local, logger, recover_local_changes);
 
         // now that the state of the fresh and local Realms are identical,
         // reset the local sync history and steal the fresh Realm's ident

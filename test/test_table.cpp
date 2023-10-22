@@ -133,7 +133,7 @@ struct value_copier<Optional<T1>, T2> {
             return *from_value;
         else {
             if (m_throw_on_null)
-                throw realm::LogicError(realm::LogicError::column_not_nullable);
+                throw realm::LogicError(ErrorCodes::BrokenInvariant, "Null found");
             else
                 return T2(); // default value for type
         }
@@ -169,7 +169,7 @@ struct value_copier<StringData, StringData> {
 
             if (m_throw_on_null) {
                 // possibly incorrect - may need to convert to default value for non-nullable entries instead
-                throw realm::LogicError(realm::LogicError::column_not_nullable);
+                throw realm::LogicError(ErrorCodes::BrokenInvariant, "Null found");
             }
             else
                 return StringData("", 0);
@@ -200,7 +200,7 @@ struct value_copier<BinaryData, BinaryData> {
 
             if (m_throw_on_null) {
                 // possibly incorrect - may need to convert to default value for non-nullable entries instead
-                throw realm::LogicError(realm::LogicError::column_not_nullable);
+                throw realm::LogicError(ErrorCodes::BrokenInvariant, "Null Found");
             }
             else
                 return BinaryData("", 0);
@@ -229,7 +229,7 @@ struct value_copier<Timestamp, Timestamp> {
                 return Timestamp();
 
             if (m_throw_on_null)
-                throw realm::LogicError(realm::LogicError::column_not_nullable);
+                throw realm::LogicError(ErrorCodes::BrokenInvariant, "Null found");
             else
                 return Timestamp(0, 0);
         }
@@ -305,7 +305,7 @@ TEST(Table_Null)
         CHECK(!obj.get<String>(col).is_null());
 
         // Test that inserting null in non-nullable column will throw
-        CHECK_LOGIC_ERROR(obj.set_null(col), LogicError::column_not_nullable);
+        CHECK_LOGIC_ERROR(obj.set_null(col), ErrorCodes::PropertyNotNullable);
     }
 
     {
@@ -336,7 +336,7 @@ TEST(Table_Null)
         CHECK_EQUAL(0, obj.get<Int>(col));
 
         // Check that inserting null in non-nullable column will throw
-        CHECK_LOGIC_ERROR(obj.set_null(col), LogicError::column_not_nullable);
+        CHECK_LOGIC_ERROR(obj.set_null(col), ErrorCodes::PropertyNotNullable);
     }
 
     {
@@ -898,9 +898,9 @@ TEST(Table_ColumnNameTooLong)
     const size_t buf_size = 64;
     char buf[buf_size];
     memset(buf, 'A', buf_size);
-    CHECK_LOGIC_ERROR(table->add_column(type_Int, StringData(buf, buf_size)), LogicError::column_name_too_long);
-    CHECK_LOGIC_ERROR(table->add_column_list(type_Int, StringData(buf, buf_size)), LogicError::column_name_too_long);
-    CHECK_LOGIC_ERROR(table->add_column(*table, StringData(buf, buf_size)), LogicError::column_name_too_long);
+    CHECK_LOGIC_ERROR(table->add_column(type_Int, StringData(buf, buf_size)), ErrorCodes::InvalidName);
+    CHECK_LOGIC_ERROR(table->add_column_list(type_Int, StringData(buf, buf_size)), ErrorCodes::InvalidName);
+    CHECK_LOGIC_ERROR(table->add_column(*table, StringData(buf, buf_size)), ErrorCodes::InvalidName);
 
     table->add_column(type_Int, StringData(buf, buf_size - 1));
     memset(buf, 'B', buf_size); // Column names must be unique
@@ -921,8 +921,8 @@ TEST(Table_StringOrBinaryTooBig)
     size_t large_bin_size = 0xFFFFF1;
     size_t large_str_size = 0xFFFFF0; // null-terminate reduces max size by 1
     std::unique_ptr<char[]> large_buf(new char[large_bin_size]);
-    CHECK_LOGIC_ERROR(obj.set(col_string, StringData(large_buf.get(), large_str_size)), LogicError::string_too_big);
-    CHECK_LOGIC_ERROR(obj.set(col_binary, BinaryData(large_buf.get(), large_bin_size)), LogicError::binary_too_big);
+    CHECK_LOGIC_ERROR(obj.set(col_string, StringData(large_buf.get(), large_str_size)), ErrorCodes::LimitExceeded);
+    CHECK_LOGIC_ERROR(obj.set(col_binary, BinaryData(large_buf.get(), large_bin_size)), ErrorCodes::LimitExceeded);
     obj.set(col_string, StringData(large_buf.get(), large_str_size - 1));
     obj.set(col_binary, BinaryData(large_buf.get(), large_bin_size - 1));
 }
@@ -1350,7 +1350,7 @@ TEST_TYPES(Table_Multi_Sort, int64_t, float, double, Decimal128)
     table.create_object(ObjKey(3)).set_all(TEST_TYPE(2), TEST_TYPE(14));
     table.create_object(ObjKey(4)).set_all(TEST_TYPE(1), TEST_TYPE(14));
 
-    std::vector<std::vector<ColKey>> col_ndx1 = {{col_0}, {col_1}};
+    std::vector<std::vector<ExtendedColumnKey>> col_ndx1 = {{col_0}, {col_1}};
     std::vector<bool> asc = {true, true};
 
     // (0, 10); (1, 10); (1, 14); (2, 10); (2; 14)
@@ -1362,7 +1362,7 @@ TEST_TYPES(Table_Multi_Sort, int64_t, float, double, Decimal128)
     CHECK_EQUAL(ObjKey(1), v_sorted1.get_key(3));
     CHECK_EQUAL(ObjKey(3), v_sorted1.get_key(4));
 
-    std::vector<std::vector<ColKey>> col_ndx2 = {{col_1}, {col_0}};
+    std::vector<std::vector<ExtendedColumnKey>> col_ndx2 = {{col_1}, {col_0}};
 
     // (0, 10); (1, 10); (2, 10); (1, 14); (2, 14)
     TableView v_sorted2 = table.get_sorted_view(SortDescriptor{col_ndx2, asc});
@@ -1520,12 +1520,12 @@ TEST(Table_AddInt)
 
     // add_int() has no effect on a NULL
     CHECK(obj.is_null(col_int_null));
-    CHECK_LOGIC_ERROR(obj.add_int(col_int_null, 123), LogicError::illegal_combination);
+    CHECK_LOGIC_ERROR(obj.add_int(col_int_null, 123), ErrorCodes::IllegalOperation);
 
     obj.add_int(col_mixed, 1);
     CHECK_EQUAL(obj.get_any(col_mixed).get_int(), 6);
     obj.set(col_mixed, Mixed("Foo"));
-    CHECK_LOGIC_ERROR(obj.add_int(col_mixed, 123), LogicError::illegal_combination);
+    CHECK_LOGIC_ERROR(obj.add_int(col_mixed, 123), ErrorCodes::IllegalOperation);
 }
 
 TEST(Table_AddIntIndexed)
@@ -2495,7 +2495,9 @@ TEST(Table_Nulls)
 // This triggers a severe bug in the Array::alloc() allocator in which its capacity-doubling
 // scheme forgets to test of the doubling has overflowed the maximum allowed size of an
 // array which is 2^24 - 1 bytes
-TEST(Table_AllocatorCapacityBug)
+// NONCONCURRENT because if run in parallel with other tests which request large amounts of
+// memory, there may be a std::bad_alloc on low memory machines
+NONCONCURRENT_TEST(Table_AllocatorCapacityBug)
 {
     std::unique_ptr<char[]> buf(new char[20000000]);
 
@@ -2580,7 +2582,7 @@ TEST(Table_addRowsToTableWithNoColumns)
     Obj obj = u->create_object();
     CHECK_EQUAL(u->size(), 1);
     CHECK_EQUAL(t->size(), 3);
-    CHECK_LOGIC_ERROR(obj.set(col_link, ObjKey(45)), LogicError::target_row_index_out_of_range);
+    CHECK_LOGIC_ERROR(obj.set(col_link, ObjKey(45)), ErrorCodes::KeyNotFound);
     CHECK(obj.is_null(col_link));
     CHECK_EQUAL(t->size(), 3);
     ObjKey k = t->create_object().get_key();
@@ -5532,7 +5534,7 @@ TEST(Table_EmbeddedObjectCreateAndDestroyDictionary)
     CHECK(table->size() == 6);
     parent_dict.create_and_insert_linked_object("one"); // implicitly remove entry for 02
     CHECK(!o2.is_valid());
-    CHECK(table->size() == 4);
+    CHECK_EQUAL(table->size(), 4);
     parent_dict.clear();
     CHECK(table->size() == 0);
     parent_dict.create_and_insert_linked_object("four");
@@ -5896,8 +5898,8 @@ TEST(Table_AsymmetricObjects)
     tr = sg->start_write();
     auto table2 = tr->add_table("target table");
     table = tr->get_table("mytable");
-    // Outgoing link from asymmetric object is not allowed.
-    CHECK_THROW(table->add_column(*table2, "link"), LogicError);
+    // Outgoing link from asymmetric object is allowed.
+    CHECK_NOTHROW(table->add_column(*table2, "link"));
     // Incoming link to asymmetric object is not allowed.
     CHECK_THROW(table2->add_column(*table, "link"), LogicError);
     tr->commit();

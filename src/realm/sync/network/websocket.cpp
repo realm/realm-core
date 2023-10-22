@@ -8,7 +8,8 @@
 
 using namespace realm;
 using namespace realm::sync;
-using Error = websocket::Error;
+using HttpError = websocket::HttpError;
+using WebSocketError = websocket::WebSocketError;
 
 
 namespace {
@@ -134,22 +135,22 @@ util::Optional<HTTPResponse> do_make_http_response(const HTTPRequest& request,
     std::string sec_websocket_key;
 
     if (!validate_websocket_upgrade(request.headers)) {
-        ec = Error::bad_request_header_upgrade;
+        ec = HttpError::bad_request_header_upgrade;
         return util::none;
     }
 
     if (!validate_websocket_connection(request.headers)) {
-        ec = Error::bad_request_header_connection;
+        ec = HttpError::bad_request_header_connection;
         return util::none;
     }
 
     if (!validate_sec_websocket_version(request.headers)) {
-        ec = Error::bad_request_header_websocket_version;
+        ec = HttpError::bad_request_header_websocket_version;
         return util::none;
     }
 
     if (!find_sec_websocket_key(request.headers, sec_websocket_key)) {
-        ec = Error::bad_request_header_websocket_key;
+        ec = HttpError::bad_request_header_websocket_key;
         return util::none;
     }
 
@@ -662,11 +663,9 @@ public:
     }
 
     void async_write_frame(bool fin, int opcode, const char* data, size_t size,
-                           util::UniqueFunction<void()> write_completion_handler)
+                           sync::websocket::WriteCompletionHandler write_completion_handler)
     {
         REALM_ASSERT(!m_stopped);
-
-        m_write_completion_handler = std::move(write_completion_handler);
 
         bool mask = m_is_client;
 
@@ -678,10 +677,10 @@ public:
         size_t message_size =
             make_frame(fin, opcode, mask, data, size, m_write_buffer.data(), m_config.websocket_get_random());
 
-        auto handler = [this](std::error_code ec, size_t) {
+        auto handler = [this, handler = std::move(write_completion_handler)](std::error_code ec, size_t) mutable {
             // If the operation is aborted, then the write operation was canceled and we should ignore this callback.
             if (ec == util::error::operation_aborted) {
-                return;
+                return handler(ec, 0);
             }
 
             auto is_socket_closed_err = (ec == util::error::make_error_code(util::error::connection_reset) ||
@@ -700,22 +699,20 @@ public:
                 return m_config.websocket_write_error_handler(ec);
             }
 
-            handle_write_message();
+            handle_write_message(std::move(handler));
         };
 
-        m_config.async_write(m_write_buffer.data(), message_size, handler);
+        m_config.async_write(m_write_buffer.data(), message_size, std::move(handler));
     }
 
-    void handle_write_message()
+    void handle_write_message(sync::websocket::WriteCompletionHandler write_handler)
     {
         if (m_write_buffer.size() > s_write_buffer_stable_size) {
             m_write_buffer.resize(s_write_buffer_stable_size);
             m_write_buffer.shrink_to_fit();
         }
 
-        auto handler = std::move(m_write_completion_handler);
-        m_write_completion_handler = nullptr;
-        handler();
+        write_handler(std::error_code(), m_write_buffer.size());
     }
 
     void stop() noexcept
@@ -749,8 +746,6 @@ private:
     std::vector<char> m_write_buffer;
     static const size_t s_write_buffer_stable_size = 2048;
 
-    util::UniqueFunction<void()> m_write_completion_handler;
-
     std::optional<int> m_test_handshake_response;
     std::string m_test_handshake_response_body;
 
@@ -758,7 +753,7 @@ private:
     {
         m_stopped = true;
         m_logger.error("WebSocket: Received malformed HTTP response");
-        std::error_code ec = Error::bad_response_invalid_http;
+        std::error_code ec = HttpError::bad_response_invalid_http;
         m_config.websocket_handshake_error_handler(ec, nullptr, nullptr); // Throws
     }
 
@@ -777,37 +772,37 @@ private:
             status_code = *m_test_handshake_response;
 
         if (status_code == 200)
-            ec = Error::bad_response_200_ok;
+            ec = HttpError::bad_response_200_ok;
         else if (status_code >= 200 && status_code < 300)
-            ec = Error::bad_response_2xx_successful;
+            ec = HttpError::bad_response_2xx_successful;
         else if (status_code == 301)
-            ec = Error::bad_response_301_moved_permanently;
+            ec = HttpError::bad_response_301_moved_permanently;
         else if (status_code == 308)
-            ec = Error::bad_response_308_permanent_redirect;
+            ec = HttpError::bad_response_308_permanent_redirect;
         else if (status_code >= 300 && status_code < 400)
-            ec = Error::bad_response_3xx_redirection;
+            ec = HttpError::bad_response_3xx_redirection;
         else if (status_code == 401)
-            ec = Error::bad_response_401_unauthorized;
+            ec = HttpError::bad_response_401_unauthorized;
         else if (status_code == 403)
-            ec = Error::bad_response_403_forbidden;
+            ec = HttpError::bad_response_403_forbidden;
         else if (status_code == 404)
-            ec = Error::bad_response_404_not_found;
+            ec = HttpError::bad_response_404_not_found;
         else if (status_code == 410)
-            ec = Error::bad_response_410_gone;
+            ec = HttpError::bad_response_410_gone;
         else if (status_code >= 400 && status_code < 500)
-            ec = Error::bad_response_4xx_client_errors;
+            ec = HttpError::bad_response_4xx_client_errors;
         else if (status_code == 500)
-            ec = Error::bad_response_500_internal_server_error;
+            ec = HttpError::bad_response_500_internal_server_error;
         else if (status_code == 502)
-            ec = Error::bad_response_502_bad_gateway;
+            ec = HttpError::bad_response_502_bad_gateway;
         else if (status_code == 503)
-            ec = Error::bad_response_503_service_unavailable;
+            ec = HttpError::bad_response_503_service_unavailable;
         else if (status_code == 504)
-            ec = Error::bad_response_504_gateway_timeout;
+            ec = HttpError::bad_response_504_gateway_timeout;
         else if (status_code >= 500 && status_code < 600)
-            ec = Error::bad_response_5xx_server_error;
+            ec = HttpError::bad_response_5xx_server_error;
         else
-            ec = Error::bad_response_unexpected_status_code;
+            ec = HttpError::bad_response_unexpected_status_code;
 
         std::string_view body;
         std::string_view* body_ptr = nullptr;
@@ -829,7 +824,7 @@ private:
         m_logger.error("Websocket: HTTP response has invalid websocket headers."
                        "HTTP response = \n%1",
                        response);
-        std::error_code ec = Error::bad_response_header_protocol_violation;
+        std::error_code ec = HttpError::bad_response_header_protocol_violation;
         std::string_view body;
         std::string_view* body_ptr = nullptr;
         if (response.body) {
@@ -843,7 +838,7 @@ private:
     {
         m_stopped = true;
         m_logger.error("WebSocket: Received malformed HTTP request");
-        std::error_code ec = Error::bad_request_malformed_http;
+        std::error_code ec = HttpError::bad_request_malformed_http;
         m_config.websocket_handshake_error_handler(ec, nullptr, nullptr); // Throws
     }
 
@@ -943,10 +938,10 @@ private:
         return true;
     }
 
-    std::pair<std::error_code, StringData> parse_close_message(const char* data, size_t size)
+    std::pair<WebSocketError, std::string_view> parse_close_message(const char* data, size_t size)
     {
         uint16_t error_code;
-        StringData error_message;
+        std::string_view error_message;
         if (size < 2) {
             // Error code 1005 is defined as
             //     1005 is a reserved value and MUST NOT be set as a status code in a
@@ -961,11 +956,36 @@ private:
             // network byte order. See https://tools.ietf.org/html/rfc6455#section-5.5.1 for more
             // details.
             error_code = ntohs((uint8_t(data[1]) << 8) | uint8_t(data[0]));
-            error_message = StringData(data + 2, size - 2);
+            error_message = std::string_view(data + 2, size - 2);
         }
 
-        std::error_code error_code_with_category{error_code, websocket::websocket_close_status_category()};
-        return std::make_pair(error_code_with_category, error_message);
+        switch (static_cast<WebSocketError>(error_code)) {
+            case WebSocketError::websocket_ok:
+            case WebSocketError::websocket_going_away:
+            case WebSocketError::websocket_protocol_error:
+            case WebSocketError::websocket_unsupported_data:
+            case WebSocketError::websocket_reserved:
+            case WebSocketError::websocket_no_status_received:
+            case WebSocketError::websocket_abnormal_closure:
+            case WebSocketError::websocket_invalid_payload_data:
+            case WebSocketError::websocket_policy_violation:
+            case WebSocketError::websocket_message_too_big:
+            case WebSocketError::websocket_invalid_extension:
+            case WebSocketError::websocket_internal_server_error:
+            case WebSocketError::websocket_tls_handshake_failed:
+
+            case WebSocketError::websocket_unauthorized:
+            case WebSocketError::websocket_forbidden:
+            case WebSocketError::websocket_moved_permanently:
+            case WebSocketError::websocket_client_too_old:
+            case WebSocketError::websocket_client_too_new:
+            case WebSocketError::websocket_protocol_mismatch:
+                break;
+            default:
+                error_code = 1008;
+        }
+
+        return std::make_pair(static_cast<WebSocketError>(error_code), error_message);
     }
 
     // frame_reader_loop() uses the frame_reader to read and process the incoming
@@ -976,7 +996,7 @@ private:
         m_frame_reader.next();
 
         if (m_frame_reader.protocol_error) {
-            protocol_error(Error::bad_message);
+            protocol_error(HttpError::bad_message);
             return;
         }
 
@@ -1043,71 +1063,71 @@ private:
 };
 
 
-const char* get_error_message(Error error_code)
+const char* get_error_message(HttpError error_code)
 {
     switch (error_code) {
-        case Error::bad_request_malformed_http:
+        case HttpError::bad_request_malformed_http:
             return "Bad WebSocket request malformed HTTP";
-        case Error::bad_request_header_upgrade:
+        case HttpError::bad_request_header_upgrade:
             return "Bad WebSocket request header: Upgrade";
-        case Error::bad_request_header_connection:
+        case HttpError::bad_request_header_connection:
             return "Bad WebSocket request header: Connection";
-        case Error::bad_request_header_websocket_version:
+        case HttpError::bad_request_header_websocket_version:
             return "Bad WebSocket request header: Sec-Websocket-Version";
-        case Error::bad_request_header_websocket_key:
+        case HttpError::bad_request_header_websocket_key:
             return "Bad WebSocket request header: Sec-Websocket-Key";
-        case Error::bad_response_invalid_http:
+        case HttpError::bad_response_invalid_http:
             return "Bad WebSocket response invalid HTTP";
-        case Error::bad_response_2xx_successful:
+        case HttpError::bad_response_2xx_successful:
             return "Bad WebSocket response 2xx successful";
-        case Error::bad_response_200_ok:
+        case HttpError::bad_response_200_ok:
             return "Bad WebSocket response 200 ok";
-        case Error::bad_response_3xx_redirection:
+        case HttpError::bad_response_3xx_redirection:
             return "Bad WebSocket response 3xx redirection";
-        case Error::bad_response_301_moved_permanently:
+        case HttpError::bad_response_301_moved_permanently:
             return "Bad WebSocket response 301 moved permanently";
-        case Error::bad_response_308_permanent_redirect:
+        case HttpError::bad_response_308_permanent_redirect:
             return "Bad WebSocket response 308 permanent redirect";
-        case Error::bad_response_4xx_client_errors:
+        case HttpError::bad_response_4xx_client_errors:
             return "Bad WebSocket response 4xx client errors";
-        case Error::bad_response_401_unauthorized:
+        case HttpError::bad_response_401_unauthorized:
             return "Bad WebSocket response 401 unauthorized";
-        case Error::bad_response_403_forbidden:
+        case HttpError::bad_response_403_forbidden:
             return "Bad WebSocket response 403 forbidden";
-        case Error::bad_response_404_not_found:
+        case HttpError::bad_response_404_not_found:
             return "Bad WebSocket response 404 not found";
-        case Error::bad_response_410_gone:
+        case HttpError::bad_response_410_gone:
             return "Bad WebSocket response 410 gone";
-        case Error::bad_response_5xx_server_error:
+        case HttpError::bad_response_5xx_server_error:
             return "Bad WebSocket response 5xx server error";
-        case Error::bad_response_500_internal_server_error:
+        case HttpError::bad_response_500_internal_server_error:
             return "Bad WebSocket response 500 internal server error";
-        case Error::bad_response_502_bad_gateway:
+        case HttpError::bad_response_502_bad_gateway:
             return "Bad WebSocket response 502 bad gateway";
-        case Error::bad_response_503_service_unavailable:
+        case HttpError::bad_response_503_service_unavailable:
             return "Bad WebSocket response 503 service unavailable";
-        case Error::bad_response_504_gateway_timeout:
+        case HttpError::bad_response_504_gateway_timeout:
             return "Bad WebSocket response 504 gateway timeout";
-        case Error::bad_response_unexpected_status_code:
+        case HttpError::bad_response_unexpected_status_code:
             return "Bad Websocket response unexpected status code";
-        case Error::bad_response_header_protocol_violation:
+        case HttpError::bad_response_header_protocol_violation:
             return "Bad WebSocket response header protocol violation";
-        case Error::bad_message:
+        case HttpError::bad_message:
             return "Ill-formed WebSocket message";
     }
     return nullptr;
 }
 
 
-class ErrorCategoryImpl : public std::error_category {
+class HttpErrorCategory : public std::error_category {
 public:
     const char* name() const noexcept override final
     {
-        return "realm::sync::websocket::Error";
+        return "realm::sync::websocket::HttpError";
     }
     std::string message(int error_code) const override final
     {
-        const char* msg = get_error_message(Error(error_code));
+        const char* msg = get_error_message(HttpError(error_code));
         if (!msg)
             msg = "Unknown error";
         std::string msg_2{msg}; // Throws (copy)
@@ -1115,26 +1135,82 @@ public:
     }
 };
 
-ErrorCategoryImpl g_error_category;
-
-class CloseStatusErrorCategory : public std::error_category {
-    const char* name() const noexcept final
-    {
-        return "realm::sync::websocket::CloseStatus";
-    }
-    std::string message(int error_code) const final
-    {
-        // Converts an error_code to one of the pre-defined status codes in
-        // https://tools.ietf.org/html/rfc6455#section-7.4.1
-        if (error_code == 1000 || error_code == 0) {
-            return ErrorCodes::error_string(ErrorCodes::OK);
-        }
-        return ErrorCodes::error_string(static_cast<ErrorCodes::Error>(error_code));
-    }
-};
-
 } // unnamed namespace
 
+namespace realm::sync::websocket {
+
+std::ostream& operator<<(std::ostream& os, WebSocketError code)
+{
+    /// WebSocket error codes
+    auto str = [&]() -> const char* {
+        switch (code) {
+            case WebSocketError::websocket_ok:
+                return "WebSocket: OK";
+            case WebSocketError::websocket_going_away:
+                return "WebSocket: Going Away";
+            case WebSocketError::websocket_protocol_error:
+                return "WebSocket: Protocol Error";
+            case WebSocketError::websocket_unsupported_data:
+                return "WebSocket: Unsupported Data";
+            case WebSocketError::websocket_reserved:
+                return "WebSocket: Reserved";
+            case WebSocketError::websocket_no_status_received:
+                return "WebSocket: No Status Received";
+            case WebSocketError::websocket_abnormal_closure:
+                return "WebSocket: Abnormal Closure";
+            case WebSocketError::websocket_invalid_payload_data:
+                return "WebSocket: Invalid Payload Data";
+            case WebSocketError::websocket_policy_violation:
+                return "WebSocket: Policy Violation";
+            case WebSocketError::websocket_message_too_big:
+                return "WebSocket: Message Too Big";
+            case WebSocketError::websocket_invalid_extension:
+                return "WebSocket: Invalid Extension";
+            case WebSocketError::websocket_internal_server_error:
+                return "WebSocket: Internal Server Error";
+            case WebSocketError::websocket_tls_handshake_failed:
+                return "WebSocket: TLS Handshake Failed";
+
+            /// WebSocket Errors - reported by server
+            case WebSocketError::websocket_unauthorized:
+                return "WebSocket: Unauthorized";
+            case WebSocketError::websocket_forbidden:
+                return "WebSocket: Forbidden";
+            case WebSocketError::websocket_moved_permanently:
+                return "WebSocket: Moved Permanently";
+            case WebSocketError::websocket_client_too_old:
+                return "WebSocket: Client Too Old";
+            case WebSocketError::websocket_client_too_new:
+                return "WebSocket: Client Too New";
+            case WebSocketError::websocket_protocol_mismatch:
+                return "WebSocket: Protocol Mismatch";
+
+            case WebSocketError::websocket_resolve_failed:
+                return "WebSocket: Resolve Failed";
+            case WebSocketError::websocket_connection_failed:
+                return "WebSocket: Connection Failed";
+            case WebSocketError::websocket_read_error:
+                return "WebSocket: Read Error";
+            case WebSocketError::websocket_write_error:
+                return "WebSocket: Write Error";
+            case WebSocketError::websocket_retry_error:
+                return "WebSocket: Retry Error";
+            case WebSocketError::websocket_fatal_error:
+                return "WebSocket: Fatal Error";
+        }
+        return nullptr;
+    }();
+
+    if (str == nullptr) {
+        os << "WebSocket: Unknown Error (" << static_cast<std::underlying_type_t<WebSocketError>>(code) << ")";
+    }
+    else {
+        os << str;
+    }
+    return os;
+}
+
+} // namespace realm::sync::websocket
 
 bool websocket::Config::websocket_text_message_received(const char*, size_t)
 {
@@ -1146,7 +1222,7 @@ bool websocket::Config::websocket_binary_message_received(const char*, size_t)
     return true;
 }
 
-bool websocket::Config::websocket_close_message_received(std::error_code, StringData)
+bool websocket::Config::websocket_close_message_received(WebSocketError, std::string_view)
 {
     return true;
 }
@@ -1199,32 +1275,32 @@ void websocket::Socket::initiate_server_websocket_after_handshake()
 }
 
 void websocket::Socket::async_write_frame(bool fin, Opcode opcode, const char* data, size_t size,
-                                          util::UniqueFunction<void()> handler)
+                                          WriteCompletionHandler handler)
 {
     m_impl->async_write_frame(fin, int(opcode), data, size, std::move(handler));
 }
 
-void websocket::Socket::async_write_text(const char* data, size_t size, util::UniqueFunction<void()> handler)
+void websocket::Socket::async_write_text(const char* data, size_t size, WriteCompletionHandler handler)
 {
     async_write_frame(true, Opcode::text, data, size, std::move(handler));
 }
 
-void websocket::Socket::async_write_binary(const char* data, size_t size, util::UniqueFunction<void()> handler)
+void websocket::Socket::async_write_binary(const char* data, size_t size, WriteCompletionHandler handler)
 {
     async_write_frame(true, Opcode::binary, data, size, std::move(handler));
 }
 
-void websocket::Socket::async_write_close(const char* data, size_t size, util::UniqueFunction<void()> handler)
+void websocket::Socket::async_write_close(const char* data, size_t size, WriteCompletionHandler handler)
 {
     async_write_frame(true, Opcode::close, data, size, std::move(handler));
 }
 
-void websocket::Socket::async_write_ping(const char* data, size_t size, util::UniqueFunction<void()> handler)
+void websocket::Socket::async_write_ping(const char* data, size_t size, WriteCompletionHandler handler)
 {
     async_write_frame(true, Opcode::ping, data, size, std::move(handler));
 }
 
-void websocket::Socket::async_write_pong(const char* data, size_t size, util::UniqueFunction<void()> handler)
+void websocket::Socket::async_write_pong(const char* data, size_t size, WriteCompletionHandler handler)
 {
     async_write_frame(true, Opcode::pong, data, size, std::move(handler));
 }
@@ -1254,23 +1330,13 @@ util::Optional<HTTPResponse> websocket::make_http_response(const HTTPRequest& re
     return do_make_http_response(request, sec_websocket_protocol, ec);
 }
 
-const std::error_category& websocket::websocket_close_status_category() noexcept
+const std::error_category& websocket::http_error_category() noexcept
 {
-    static const CloseStatusErrorCategory category = {};
+    static const HttpErrorCategory category = {};
     return category;
 }
 
-std::error_code websocket::make_error_code(ErrorCodes::Error error) noexcept
+std::error_code websocket::make_error_code(HttpError error_code) noexcept
 {
-    return std::error_code{error, realm::sync::websocket::websocket_close_status_category()};
-}
-
-const std::error_category& websocket::error_category() noexcept
-{
-    return g_error_category;
-}
-
-std::error_code websocket::make_error_code(Error error_code) noexcept
-{
-    return std::error_code{int(error_code), g_error_category};
+    return std::error_code{int(error_code), http_error_category()};
 }

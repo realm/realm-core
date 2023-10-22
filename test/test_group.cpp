@@ -174,7 +174,7 @@ TEST(Group_Permissions)
     chmod(path.c_str(), S_IWUSR);
 #endif
 
-    CHECK_THROW(Group(path, crypt_key()), File::PermissionDenied);
+    CHECK_THROW_EX(Group(path, crypt_key()), FileAccessError, e.code() == ErrorCodes::PermissionDenied);
 }
 #endif
 
@@ -286,7 +286,7 @@ TEST(Group_TableNameTooLong)
     Group group;
     size_t buf_len = 64;
     std::unique_ptr<char[]> buf(new char[buf_len]);
-    CHECK_LOGIC_ERROR(group.add_table(StringData(buf.get(), buf_len)), LogicError::table_name_too_long);
+    CHECK_LOGIC_ERROR(group.add_table(StringData(buf.get(), buf_len)), ErrorCodes::InvalidName);
     group.add_table(StringData(buf.get(), buf_len - 1));
 }
 
@@ -662,7 +662,7 @@ TEST(Group_Invalid1)
 
     // Try to open non-existing file
     // (read-only files have to exists to before opening)
-    CHECK_THROW(Group(path, crypt_key()), File::NotFound);
+    CHECK_THROW_EX(Group(path, crypt_key()), FileAccessError, e.code() == ErrorCodes::FileNotFound);
 }
 
 TEST(Group_Invalid2)
@@ -678,11 +678,11 @@ TEST(Group_Overwrite)
     {
         Group g;
         g.write(path, crypt_key());
-        CHECK_THROW(g.write(path, crypt_key()), File::Exists);
+        CHECK_THROW_EX(g.write(path, crypt_key()), FileAccessError, e.code() == ErrorCodes::FileAlreadyExists);
     }
     {
         Group g(path, crypt_key());
-        CHECK_THROW(g.write(path, crypt_key()), File::Exists);
+        CHECK_THROW_EX(g.write(path, crypt_key()), FileAccessError, e.code() == ErrorCodes::FileAlreadyExists);
     }
     {
         Group g;
@@ -1090,6 +1090,30 @@ TEST(Group_IndexString)
     auto m8 = t->find_first_string(col_string, "johnny");
     CHECK_EQUAL(null_key, m7);
     CHECK_EQUAL(k6, m8);
+}
+
+TEST(Group_verify_pk_constraints)
+{
+
+    Group to_mem;
+    TableRef table = to_mem.add_table("test");
+    auto col = table->add_column(type_String, "pk", true);
+    auto col2 = table->add_column(type_String, "text");
+    table->set_primary_key_column(col);
+    auto obj = table->create_object_with_primary_key({"a"});
+    obj.set(col2, "Text Text Text");
+
+    // throw when trying to add a full text search for col
+    CHECK_THROW(table->add_fulltext_index(col), InvalidColumnKey);
+
+    // nothrow and remove search index for pk
+    CHECK_NOTHROW(table->remove_search_index(col));
+    auto pk = table->get_primary_key(obj.get_key());
+    CHECK_EQUAL(pk.get_string(), "a");
+
+    // throw when trying to set a col with a full text search as pk
+    table->add_fulltext_index(col2);
+    CHECK_THROW(table->set_primary_key_column(col2), InvalidColumnKey);
 }
 
 TEST(Group_CascadeNotify_SimpleWeak)
@@ -2188,9 +2212,9 @@ TEST(Group_SetColumnWithDuplicateValuesToPrimaryKey)
     std::vector<ObjKey> keys;
     table->create_objects(2, keys);
 
-    CHECK_THROW(table->set_primary_key_column(string_col), DuplicatePrimaryKeyValueException);
+    CHECK_THROW(table->set_primary_key_column(string_col), MigrationFailed);
     CHECK_EQUAL(table->get_primary_key_column(), ColKey());
-    CHECK_THROW(table->set_primary_key_column(int_col), DuplicatePrimaryKeyValueException);
+    CHECK_THROW(table->set_primary_key_column(int_col), MigrationFailed);
     CHECK_EQUAL(table->get_primary_key_column(), ColKey());
 }
 

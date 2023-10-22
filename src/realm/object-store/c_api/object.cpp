@@ -32,7 +32,7 @@ RLM_API bool realm_object_get_parent(const realm_object_t* object, realm_object_
                                      realm_class_key_t* class_key)
 {
     return wrap_err([&]() {
-        auto obj = object->obj().get_parent_object();
+        const auto& obj = object->get_obj().get_parent_object();
         if (class_key)
             *class_key = obj.get_table()->get_key().value;
 
@@ -116,7 +116,8 @@ RLM_API realm_object_t* realm_object_create_with_primary_key(realm_t* realm, rea
     if (object && !did_create) {
         delete object;
         object = wrap_err([&]() {
-            throw DuplicatePrimaryKeyException("Object with this primary key already exists");
+            auto& shared_realm = *realm;
+            throw ObjectAlreadyExists(shared_realm->read_group().get_class_name(TableKey(table_key)), from_capi(pk));
             return nullptr;
         });
     }
@@ -134,21 +135,6 @@ RLM_API realm_object_t* realm_object_get_or_create_with_primary_key(realm_t* rea
         if (did_create)
             *did_create = false;
 
-        ColKey pkcol = table->get_primary_key_column();
-        if (!pkcol) {
-            throw UnexpectedPrimaryKeyException("Class does not have a primary key");
-        }
-
-        if (pkval.is_null() && !pkcol.is_nullable()) {
-            auto& schema = schema_for_table(*realm, tblkey);
-            throw NotNullableException{schema.name, schema.primary_key};
-        }
-
-        if (!pkval.is_null() && pkval.get_type() != DataType(pkcol.get_type())) {
-            auto& schema = schema_for_table(*realm, tblkey);
-            throw WrongPrimaryKeyTypeException{schema.name};
-        }
-
         auto obj = table->create_object_with_primary_key(pkval, did_create);
         auto object = Object{shared_realm, std::move(obj)};
         return new realm_object_t{std::move(object)};
@@ -159,7 +145,7 @@ RLM_API bool realm_object_delete(realm_object_t* obj)
 {
     return wrap_err([&]() {
         obj->verify_attached();
-        obj->obj().remove();
+        obj->get_obj().remove();
         return true;
     });
 }
@@ -223,7 +209,7 @@ RLM_API bool realm_object_add_int(realm_object_t* object, realm_property_key_t p
     REALM_ASSERT(object);
     return wrap_err([&]() {
         object->verify_attached();
-        object->obj().add_int(ColKey(property_key), value);
+        object->get_obj().add_int(ColKey(property_key), value);
         return true;
     });
 }
@@ -236,17 +222,17 @@ RLM_API bool realm_object_is_valid(const realm_object_t* obj)
 
 RLM_API realm_object_key_t realm_object_get_key(const realm_object_t* obj)
 {
-    return obj->obj().get_key().value;
+    return obj->get_obj().get_key().value;
 }
 
 RLM_API realm_class_key_t realm_object_get_table(const realm_object_t* obj)
 {
-    return obj->obj().get_table()->get_key().value;
+    return obj->get_obj().get_table()->get_key().value;
 }
 
 RLM_API realm_link_t realm_object_as_link(const realm_object_t* object)
 {
-    auto obj = object->obj();
+    const auto& obj = object->get_obj();
     auto table = obj.get_table();
     auto table_key = table->get_key();
     auto obj_key = obj.get_key();
@@ -259,7 +245,7 @@ RLM_API realm_object_t* realm_object_from_thread_safe_reference(const realm_t* r
     return wrap_err([&]() {
         auto otsr = dynamic_cast<realm_object::thread_safe_reference*>(tsr);
         if (!otsr) {
-            throw std::logic_error{"Thread safe reference type mismatch"};
+            throw LogicError{ErrorCodes::IllegalOperation, "Thread safe reference type mismatch"};
         }
 
         auto obj = otsr->resolve<Object>(*realm);
@@ -278,7 +264,7 @@ RLM_API bool realm_get_values(const realm_object_t* obj, size_t num_values, cons
     return wrap_err([&]() {
         obj->verify_attached();
 
-        auto o = obj->obj();
+        auto o = obj->get_obj();
 
         for (size_t i = 0; i < num_values; ++i) {
             auto col_key = ColKey(properties[i]);
@@ -310,7 +296,7 @@ RLM_API bool realm_set_values(realm_object_t* obj, size_t num_values, const real
 {
     return wrap_err([&]() {
         obj->verify_attached();
-        auto o = obj->obj();
+        auto o = obj->get_obj();
         auto table = o.get_table();
 
         // Perform validation up front to avoid partial updates. This is
@@ -346,7 +332,7 @@ RLM_API realm_object_t* realm_set_embedded(realm_object_t* obj, realm_property_k
 {
     return wrap_err([&]() {
         obj->verify_attached();
-        auto o = obj->obj();
+        auto& o = obj->get_obj();
         return new realm_object_t({obj->get_realm(), o.create_and_set_linked_object(ColKey(col))});
     });
 }
@@ -355,7 +341,7 @@ RLM_API realm_object_t* realm_get_linked_object(realm_object_t* obj, realm_prope
 {
     return wrap_err([&]() {
         obj->verify_attached();
-        auto o = obj->obj().get_linked_object(ColKey(col));
+        const auto& o = obj->get_obj().get_linked_object(ColKey(col));
         return o ? new realm_object_t({obj->get_realm(), o}) : nullptr;
     });
 }
@@ -365,7 +351,7 @@ RLM_API realm_list_t* realm_get_list(realm_object_t* object, realm_property_key_
     return wrap_err([&]() {
         object->verify_attached();
 
-        auto obj = object->obj();
+        const auto& obj = object->get_obj();
         auto table = obj.get_table();
 
         auto col_key = ColKey(key);
@@ -384,7 +370,7 @@ RLM_API realm_set_t* realm_get_set(realm_object_t* object, realm_property_key_t 
     return wrap_err([&]() {
         object->verify_attached();
 
-        auto obj = object->obj();
+        const auto& obj = object->get_obj();
         auto table = obj.get_table();
 
         auto col_key = ColKey(key);
@@ -403,7 +389,7 @@ RLM_API realm_dictionary_t* realm_get_dictionary(realm_object_t* object, realm_p
     return wrap_err([&]() {
         object->verify_attached();
 
-        auto obj = object->obj();
+        const auto& obj = object->get_obj();
         auto table = obj.get_table();
         auto col_key = ColKey(key);
         table->check_column(col_key);
@@ -421,7 +407,7 @@ RLM_API char* realm_object_to_string(realm_object_t* object)
     return wrap_err([&]() {
         object->verify_attached();
 
-        auto obj = object->obj();
+        const auto& obj = object->get_obj();
         return duplicate_string(obj.to_string());
     });
 }

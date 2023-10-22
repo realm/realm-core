@@ -128,15 +128,16 @@ REALM_NORETURN static void terminate_internal(std::stringstream& ss) noexcept
 {
     util::Backtrace::capture().print(ss);
 
-    ss << "!!! IMPORTANT: Please report this at https://github.com/realm/realm-core/issues/new/choose";
+    ss << "\n!!! IMPORTANT: Please report this at https://github.com/realm/realm-core/issues/new/choose";
+
     if (termination_notification_callback) {
         termination_notification_callback(ss.str().c_str());
     }
     else {
-        std::cerr << ss.rdbuf() << '\n';
+        std::cerr << ss.rdbuf();
         std::string thread_name;
         if (Thread::get_name(thread_name))
-            std::cerr << "Thread name: " << thread_name << "\n";
+            std::cerr << "\nThread name: " << thread_name;
     }
 
     REALM_TERMINATE_AUTO_VERSIONED();
@@ -145,11 +146,7 @@ REALM_NORETURN static void terminate_internal(std::stringstream& ss) noexcept
 REALM_NORETURN void terminate(const char* message, const char* file, long line,
                               std::initializer_list<Printable>&& values) noexcept
 {
-    std::stringstream ss;
-    ss << file << ':' << line << ": " REALM_VER_CHUNK " " << message;
-    Printable::print_all(ss, values, false);
-    ss << '\n';
-    terminate_internal(ss);
+    terminate_with_info(message, file, line, nullptr, std::move(values));
 }
 
 REALM_NORETURN void terminate_with_info(const char* message, const char* file, long line,
@@ -157,8 +154,10 @@ REALM_NORETURN void terminate_with_info(const char* message, const char* file, l
                                         std::initializer_list<Printable>&& values) noexcept
 {
     std::stringstream ss;
-    ss << file << ':' << line << ": " REALM_VER_CHUNK " " << message << " with " << interesting_names << " = ";
-    Printable::print_all(ss, values, true);
+    ss << file << ':' << line << ": " REALM_VER_CHUNK " " << message;
+    if (interesting_names)
+        ss << " with " << interesting_names << " = ";
+    Printable::print_all(ss, values, bool(interesting_names));
     ss << '\n';
     terminate_internal(ss);
 }

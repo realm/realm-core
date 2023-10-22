@@ -130,8 +130,6 @@ public:
 
     /// Check if the object is still alive
     bool is_valid() const noexcept;
-    /// Will throw if object is not valid
-    void check_valid() const;
     /// Delete object from table. Object is invalid afterwards.
     void remove();
     /// Invalidate
@@ -170,7 +168,7 @@ public:
     size_t get_backlink_count() const;
     size_t get_backlink_count(const Table& origin, ColKey origin_col_key) const;
     ObjKey get_backlink(const Table& origin, ColKey origin_col_key, size_t backlink_ndx) const;
-    TableView get_backlink_view(TableRef src_table, ColKey src_col_key);
+    TableView get_backlink_view(TableRef src_table, ColKey src_col_key) const;
 
     // To be used by the query system when a single object should
     // be tested. Will allow a function to be called in the context
@@ -342,11 +340,12 @@ private:
     friend class TableView;
     template <class, class>
     friend class Collection;
-    template <class, class>
+    template <class>
     friend class CollectionBaseImpl;
     template <class>
     friend class Lst;
     friend class LnkLst;
+    friend class LinkCount;
     friend class Dictionary;
     friend class LinkMap;
     template <class>

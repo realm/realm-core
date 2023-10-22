@@ -88,8 +88,8 @@ public:
 private:
     Allocator* m_alloc = nullptr;
     /// Version on which the first changeset in the history is based, or if the
-    /// history is empty, the version associatede with currently bound
-    /// snapshot. In general, the version associatede with currently bound
+    /// history is empty, the version associated with currently bound
+    /// snapshot. In general, the version associated with currently bound
     /// snapshot is equal to `m_base_version + m_size`, but after
     /// add_changeset() is called, it is equal to one minus that.
     version_type m_base_version = 0;
@@ -150,7 +150,6 @@ void InRealmHistory::get_changesets(version_type begin_version, version_type end
     for (size_t i = 0; i < n; ++i)
         buffer[i] = BinaryIterator(m_changesets.get(), offset + i);
 }
-
 
 void InRealmHistory::set_oldest_bound_version(version_type version)
 {

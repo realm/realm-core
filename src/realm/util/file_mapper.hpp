@@ -25,6 +25,9 @@
 #include <realm/util/encrypted_file_mapping.hpp>
 #include <realm/util/functional.hpp>
 
+#include <unordered_map>
+#include <unordered_set>
+
 namespace realm {
 namespace util {
 
@@ -78,14 +81,6 @@ inline void set_page_reclaim_governor_to_default()
     set_page_reclaim_governor(nullptr);
 }
 
-// There are several globals that rely on being process specific.
-// The unit tests which use fork() should start with empty mappings.
-// This also resets the page reclaimer thread because if fork happens while
-// running with the global mutex `mapping_mutex` locked, the child process
-// will hang due to that mutex never being unlocked.
-// We do not support fork() in production.
-void clear_mappings_before_test_forks();
-
 // Retrieves the number of in memory decrypted pages, across all open files.
 size_t get_num_decrypted_pages();
 
@@ -110,15 +105,15 @@ void extend_encrypted_mapping(EncryptedFileMapping* mapping, void* addr, size_t 
                               size_t new_size);
 void remove_encrypted_mapping(void* addr, size_t size);
 void do_encryption_read_barrier(const void* addr, size_t size, HeaderToSize header_to_size,
-                                EncryptedFileMapping* mapping, bool allow_missing);
+                                EncryptedFileMapping* mapping, bool to_modify);
 
 void do_encryption_write_barrier(const void* addr, size_t size, EncryptedFileMapping* mapping);
 
 void inline encryption_read_barrier(const void* addr, size_t size, EncryptedFileMapping* mapping,
-                                    HeaderToSize header_to_size = nullptr)
+                                    HeaderToSize header_to_size = nullptr, bool to_modify = false)
 {
     if (REALM_UNLIKELY(mapping))
-        do_encryption_read_barrier(addr, size, header_to_size, mapping, true);
+        do_encryption_read_barrier(addr, size, header_to_size, mapping, to_modify);
 }
 
 void inline encryption_read_barrier_for_write(const void* addr, size_t size, EncryptedFileMapping* mapping)
@@ -143,10 +138,10 @@ void inline encryption_flush(EncryptedFileMapping* mapping)
 }
 
 inline void do_encryption_read_barrier(const void* addr, size_t size, HeaderToSize header_to_size,
-                                       EncryptedFileMapping* mapping, bool allow_missing)
+                                       EncryptedFileMapping* mapping, bool to_modify)
 {
     UniqueLock lock(mapping_mutex);
-    mapping->read_barrier(addr, size, header_to_size, allow_missing);
+    mapping->read_barrier(addr, size, header_to_size, to_modify);
 }
 
 inline void do_encryption_write_barrier(const void* addr, size_t size, EncryptedFileMapping* mapping)
@@ -184,12 +179,22 @@ void encryption_read_barrier(const File::Map<T>& map, size_t index, size_t num_e
 }
 
 template <typename T>
+void encryption_read_barrier_for_write(const File::Map<T>& map, size_t index, size_t num_elements = 1)
+{
+    if (auto mapping = map.get_encrypted_mapping(); REALM_UNLIKELY(mapping)) {
+        do_encryption_read_barrier(map.get_addr() + index, sizeof(T) * num_elements, nullptr, mapping,
+                                   map.is_writeable());
+    }
+}
+
+template <typename T>
 void encryption_write_barrier(const File::Map<T>& map, size_t index, size_t num_elements = 1)
 {
     if (auto mapping = map.get_encrypted_mapping(); REALM_UNLIKELY(mapping)) {
         do_encryption_write_barrier(map.get_addr() + index, sizeof(T) * num_elements, mapping);
     }
 }
+void encryption_mark_pages_for_IV_check(EncryptedFileMapping* mapping);
 
 File::SizeType encrypted_size_to_data_size(File::SizeType size) noexcept;
 File::SizeType data_size_to_encrypted_size(File::SizeType size) noexcept;

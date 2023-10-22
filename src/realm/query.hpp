@@ -35,32 +35,27 @@
 #endif
 
 #include <realm/aggregate_ops.hpp>
+#include <realm/binary_data.hpp>
+#include <realm/column_type_traits.hpp>
+#include <realm/handover_defs.hpp>
 #include <realm/obj_list.hpp>
 #include <realm/table_ref.hpp>
-#include <realm/binary_data.hpp>
-#include <realm/timestamp.hpp>
-#include <realm/handover_defs.hpp>
-#include <realm/util/serializer.hpp>
 #include <realm/util/bind_ptr.hpp>
-#include <realm/column_type_traits.hpp>
+#include <realm/util/serializer.hpp>
 
 namespace realm {
 
 
 // Pre-declarations
-class ParentNode;
-class Table;
-class TableView;
-class TableView;
 class Array;
 class Expression;
 class Group;
-class Transaction;
 class LinkMap;
-
-namespace metrics {
-class QueryInfo;
-}
+class ParentNode;
+class Table;
+class TableView;
+class Timestamp;
+class Transaction;
 
 struct QueryGroup {
     enum class State {
@@ -105,6 +100,9 @@ public:
     Query& links_to(ColKey column_key, ObjLink target_link);
     // Find links that point to specific target objects
     Query& links_to(ColKey column_key, const std::vector<ObjKey>& target_obj);
+
+    // Find links that does not point to specific target objects
+    Query& not_links_to(ColKey column_key, const std::vector<ObjKey>& target_obj);
 
     // Conditions: null
     Query& equal(ColKey column_key, null);
@@ -312,7 +310,7 @@ public:
     std::string validate() const;
 
     std::string get_description() const;
-    std::string get_description(util::serializer::SerialisationState& state) const;
+    std::string get_description_safe() const noexcept;
 
     Query& set_ordering(util::bind_ptr<DescriptorOrdering> ordering);
     // This will remove the ordering from the Query object
@@ -327,6 +325,7 @@ private:
     size_t find_internal(size_t start = 0, size_t end = size_t(-1)) const;
     void handle_pending_not();
     void set_table(TableRef tr);
+    std::string get_description(util::serializer::SerialisationState& state) const;
 
 public:
     std::unique_ptr<Query> clone_for_handover(Transaction* tr, PayloadPolicy policy) const
@@ -356,7 +355,7 @@ private:
     void aggregate_internal(ParentNode* pn, QueryStateBase* st, size_t start, size_t end,
                             ArrayPayload* source_column) const;
 
-    void do_find_all(TableView& tv, size_t limit) const;
+    void do_find_all(QueryStateBase& st) const;
     size_t do_count(size_t limit = size_t(-1)) const;
     void delete_nodes() noexcept;
 
@@ -376,7 +375,6 @@ private:
     friend class TableView;
     friend class SubQueryCount;
     friend class PrimitiveListCount;
-    friend class metrics::QueryInfo;
     template <class>
     friend class AggregateHelper;
 

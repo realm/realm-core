@@ -33,7 +33,7 @@ int main(int argc, char* argv[])
         exit(3);
     }
 
-    // Spawn daemon proces. Parent will exit causing the daemon to be
+    // Spawn daemon process. Parent will exit causing the daemon to be
     // adopted by the init process. Ensures that the daemon won't become
     // a zombie, but be collected by the init process when it exits.
     // This is the second fork of the double-fork-idiom.
@@ -47,7 +47,7 @@ int main(int argc, char* argv[])
         DBRef async_committer = DB::create(file);
     }
     else if (pid > 0) {
-        // in parent, fork was ok, so return succes
+        // in parent, fork was ok, so return success
         _Exit(0);
     }
     else {

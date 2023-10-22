@@ -4,8 +4,10 @@
 #include <cstdint>
 #include <system_error>
 
+#include <realm/error_codes.h>
 #include <realm/mixed.hpp>
 #include <realm/replication.hpp>
+#include <realm/util/tagged_bool.hpp>
 
 
 // NOTE: The protocol specification is in `/doc/protocol.md`
@@ -33,22 +35,36 @@ namespace sync {
 //   7 Client takes the 'action' specified in the 'json_error' messages received
 //     from server. Client sends 'json_error' messages to the server.
 //
+//   8 Websocket http errors are now sent as websocket close codes
+//     FLX sync BIND message can include JSON data in place of server path string
+//     Updated format for Sec-Websocket-Protocol strings
+//
+//   9 Support for PBS->FLX client migration
+//     Client reset updated to not provide the local schema when creating frozen
+//     realms - this informs the server to not send the schema before sending the
+//     migrate to FLX server action
+//
+//   10 Update BIND message to send information to the server about the reason a
+//      synchronization session is used for; add support for server log messages
+//
 //  XX Changes:
 //     - TBD
 //
 constexpr int get_current_protocol_version() noexcept
 {
-    return 7;
+    // Also update the current protocol version test in flx_sync.cpp when
+    // updating this value
+    return 10;
 }
 
 constexpr std::string_view get_pbs_websocket_protocol_prefix() noexcept
 {
-    return "com.mongodb.realm-sync/";
+    return "com.mongodb.realm-sync#";
 }
 
 constexpr std::string_view get_flx_websocket_protocol_prefix() noexcept
 {
-    return "com.mongodb.realm-query-sync/";
+    return "com.mongodb.realm-query-sync#";
 }
 
 enum class SyncServerMode { PBS, FLX };
@@ -78,6 +94,21 @@ inline bool is_ssl(ProtocolEnvelope protocol) noexcept
             return true;
     }
     return false;
+}
+
+inline std::string_view to_string(ProtocolEnvelope protocol) noexcept
+{
+    switch (protocol) {
+        case ProtocolEnvelope::realm:
+            return "realm://";
+        case ProtocolEnvelope::realms:
+            return "realms://";
+        case ProtocolEnvelope::ws:
+            return "ws://";
+        case ProtocolEnvelope::wss:
+            return "wss://";
+    }
+    return "";
 }
 
 
@@ -204,10 +235,24 @@ struct CompensatingWriteErrorInfo {
 };
 
 struct ResumptionDelayInfo {
+    // This is the maximum delay between trying to resume a session/connection.
     std::chrono::milliseconds max_resumption_delay_interval = std::chrono::minutes{5};
+    // The initial delay between trying to resume a session/connection.
     std::chrono::milliseconds resumption_delay_interval = std::chrono::seconds{1};
+    // After each failure of the same type, the last delay will be multiplied by this value
+    // until it is greater-than-or-equal to the max_resumption_delay_interval.
     int resumption_delay_backoff_multiplier = 2;
+    // When calculating a new delay interval, a random value betwen zero and the result off
+    // dividing the current delay value by the delay_jitter_divisor will be subtracted from the
+    // delay interval. The default is to subtract up to 25% of the current delay interval.
+    //
+    // This is to reduce the likelyhood of a connection storm if the server goes down and
+    // all clients attempt to reconnect at once.
+    int delay_jitter_divisor = 4;
 };
+
+class IsFatalTag {};
+using IsFatal = util::TaggedBool<class IsFatalTag>;
 
 struct ProtocolErrorInfo {
     enum class Action {
@@ -218,14 +263,21 @@ struct ProtocolErrorInfo {
         Transient,
         DeleteRealm,
         ClientReset,
-        ClientResetNoRecovery
+        ClientResetNoRecovery,
+        MigrateToFLX,
+        RevertToPBS,
+        // The RefreshUser/RefreshLocation/LogOutUser actions are currently generated internally when the
+        // sync websocket is closed with specific error codes.
+        RefreshUser,
+        RefreshLocation,
+        LogOutUser,
     };
 
     ProtocolErrorInfo() = default;
-    ProtocolErrorInfo(int error_code, const std::string& msg, bool do_try_again)
+    ProtocolErrorInfo(int error_code, const std::string& msg, IsFatal is_fatal)
         : raw_error_code(error_code)
         , message(msg)
-        , try_again(do_try_again)
+        , is_fatal(is_fatal)
         , client_reset_recovery_is_disabled(false)
         , should_client_reset(util::none)
         , server_requests_action(Action::NoAction)
@@ -233,20 +285,16 @@ struct ProtocolErrorInfo {
     }
     int raw_error_code = 0;
     std::string message;
-    bool try_again = false;
+    IsFatal is_fatal = IsFatal{true};
     bool client_reset_recovery_is_disabled = false;
-    util::Optional<bool> should_client_reset;
-    util::Optional<std::string> log_url;
-    version_type compensating_write_server_version = 0;
+    std::optional<bool> should_client_reset;
+    std::optional<std::string> log_url;
+    std::optional<version_type> compensating_write_server_version;
     version_type compensating_write_rejected_client_version = 0;
     std::vector<CompensatingWriteErrorInfo> compensating_writes;
-    util::Optional<ResumptionDelayInfo> resumption_delay_interval;
+    std::optional<ResumptionDelayInfo> resumption_delay_interval;
     Action server_requests_action;
-
-    bool is_fatal() const
-    {
-        return !try_again;
-    }
+    std::optional<std::string> migration_query_string;
 };
 
 
@@ -262,88 +310,72 @@ enum class ProtocolError {
     // clang-format off
 
     // Connection level and protocol errors
-    connection_closed            = 100, // Connection closed (no error)
-    other_error                  = 101, // Other connection level error
-    unknown_message              = 102, // Unknown type of input message
-    bad_syntax                   = 103, // Bad syntax in input message head
-    limits_exceeded              = 104, // Limits exceeded in input message
-    wrong_protocol_version       = 105, // Wrong protocol version (CLIENT) (obsolete)
-    bad_session_ident            = 106, // Bad session identifier in input message
-    reuse_of_session_ident       = 107, // Overlapping reuse of session identifier (BIND)
-    bound_in_other_session       = 108, // Client file bound in other session (IDENT)
-    bad_message_order            = 109, // Bad input message order
-    bad_decompression            = 110, // Error in decompression (UPLOAD)
-    bad_changeset_header_syntax  = 111, // Bad syntax in a changeset header (UPLOAD)
-    bad_changeset_size           = 112, // Bad size specified in changeset header (UPLOAD)
-    switch_to_flx_sync           = 113, // Connected with wrong wire protocol - should switch to FLX sync
-    switch_to_pbs                = 114, // Connected with wrong wire protocol - should switch to PBS
+    connection_closed            = RLM_SYNC_ERR_CONNECTION_CONNECTION_CLOSED,       // Connection closed (no error)
+    other_error                  = RLM_SYNC_ERR_CONNECTION_OTHER_ERROR,             // Other connection level error
+    unknown_message              = RLM_SYNC_ERR_CONNECTION_UNKNOWN_MESSAGE,         // Unknown type of input message
+    bad_syntax                   = RLM_SYNC_ERR_CONNECTION_BAD_SYNTAX,              // Bad syntax in input message head
+    limits_exceeded              = RLM_SYNC_ERR_CONNECTION_LIMITS_EXCEEDED,         // Limits exceeded in input message
+    wrong_protocol_version       = RLM_SYNC_ERR_CONNECTION_WRONG_PROTOCOL_VERSION,  // Wrong protocol version (CLIENT) (obsolete)
+    bad_session_ident            = RLM_SYNC_ERR_CONNECTION_BAD_SESSION_IDENT,       // Bad session identifier in input message
+    reuse_of_session_ident       = RLM_SYNC_ERR_CONNECTION_REUSE_OF_SESSION_IDENT,  // Overlapping reuse of session identifier (BIND)
+    bound_in_other_session       = RLM_SYNC_ERR_CONNECTION_BOUND_IN_OTHER_SESSION,  // Client file bound in other session (IDENT)
+    bad_message_order            = RLM_SYNC_ERR_CONNECTION_BAD_MESSAGE_ORDER,       // Bad input message order
+    bad_decompression            = RLM_SYNC_ERR_CONNECTION_BAD_DECOMPRESSION,       // Error in decompression (UPLOAD)
+    bad_changeset_header_syntax  = RLM_SYNC_ERR_CONNECTION_BAD_CHANGESET_HEADER_SYNTAX, // Bad syntax in a changeset header (UPLOAD)
+    bad_changeset_size           = RLM_SYNC_ERR_CONNECTION_BAD_CHANGESET_SIZE,      // Bad size specified in changeset header (UPLOAD)
+    switch_to_flx_sync           = RLM_SYNC_ERR_CONNECTION_SWITCH_TO_FLX_SYNC,      // Connected with wrong wire protocol - should switch to FLX sync
+    switch_to_pbs                = RLM_SYNC_ERR_CONNECTION_SWITCH_TO_PBS,           // Connected with wrong wire protocol - should switch to PBS
 
     // Session level errors
-    session_closed               = 200, // Session closed (no error)
-    other_session_error          = 201, // Other session level error
-    token_expired                = 202, // Access token expired
-    bad_authentication           = 203, // Bad user authentication (BIND)
-    illegal_realm_path           = 204, // Illegal Realm path (BIND)
-    no_such_realm                = 205, // No such Realm (BIND)
-    permission_denied            = 206, // Permission denied (BIND)
-    bad_server_file_ident        = 207, // Bad server file identifier (IDENT) (obsolete!)
-    bad_client_file_ident        = 208, // Bad client file identifier (IDENT)
-    bad_server_version           = 209, // Bad server version (IDENT, UPLOAD, TRANSACT)
-    bad_client_version           = 210, // Bad client version (IDENT, UPLOAD)
-    diverging_histories          = 211, // Diverging histories (IDENT)
-    bad_changeset                = 212, // Bad changeset (UPLOAD)
-    partial_sync_disabled        = 214, // Partial sync disabled (BIND)
-    unsupported_session_feature  = 215, // Unsupported session-level feature
-    bad_origin_file_ident        = 216, // Bad origin file identifier (UPLOAD)
-    bad_client_file              = 217, // Synchronization no longer possible for client-side file
-    server_file_deleted          = 218, // Server file was deleted while session was bound to it
-    client_file_blacklisted      = 219, // Client file has been blacklisted (IDENT)
-    user_blacklisted             = 220, // User has been blacklisted (BIND)
-    transact_before_upload       = 221, // Serialized transaction before upload completion
-    client_file_expired          = 222, // Client file has expired
-    user_mismatch                = 223, // User mismatch for client file identifier (IDENT)
-    too_many_sessions            = 224, // Too many sessions in connection (BIND)
-    invalid_schema_change        = 225, // Invalid schema change (UPLOAD)
-    bad_query                    = 226, // Client query is invalid/malformed (IDENT, QUERY)
-    object_already_exists        = 227, // Client tried to create an object that already exists outside their
-                                        // view (UPLOAD)
-    server_permissions_changed   = 228, // Server permissions for this file ident have changed since the last time it
-                                        // was used (IDENT)
-    initial_sync_not_completed   = 229, // Client tried to open a session before initial sync is complete (BIND)
-    write_not_allowed            = 230, // Client attempted a write that is disallowed by permissions, or modifies an
-                                        // object outside the current query - requires client reset (UPLOAD)
-    compensating_write           = 231, // Client attempted a write that is disallowed by permissions, or modifies and
-                                        // object outside the current query, and the server undid the modification
-                                        // (UPLOAD)
+    session_closed               = RLM_SYNC_ERR_SESSION_SESSION_CLOSED,             // Session closed (no error)
+    other_session_error          = RLM_SYNC_ERR_SESSION_OTHER_SESSION_ERROR,        // Other session level error
+    token_expired                = RLM_SYNC_ERR_SESSION_TOKEN_EXPIRED,              // Access token expired
+    bad_authentication           = RLM_SYNC_ERR_SESSION_BAD_AUTHENTICATION,         // Bad user authentication (BIND)
+    illegal_realm_path           = RLM_SYNC_ERR_SESSION_ILLEGAL_REALM_PATH,         // Illegal Realm path (BIND)
+    no_such_realm                = RLM_SYNC_ERR_SESSION_NO_SUCH_REALM,              // No such Realm (BIND)
+    permission_denied            = RLM_SYNC_ERR_SESSION_PERMISSION_DENIED,          // Permission denied (BIND)
+    bad_server_file_ident        = RLM_SYNC_ERR_SESSION_BAD_SERVER_FILE_IDENT,      // Bad server file identifier (IDENT) (obsolete!)
+    bad_client_file_ident        = RLM_SYNC_ERR_SESSION_BAD_CLIENT_FILE_IDENT,      // Bad client file identifier (IDENT)
+    bad_server_version           = RLM_SYNC_ERR_SESSION_BAD_SERVER_VERSION,         // Bad server version (IDENT, UPLOAD, TRANSACT)
+    bad_client_version           = RLM_SYNC_ERR_SESSION_BAD_CLIENT_VERSION,         // Bad client version (IDENT, UPLOAD)
+    diverging_histories          = RLM_SYNC_ERR_SESSION_DIVERGING_HISTORIES,        // Diverging histories (IDENT)
+    bad_changeset                = RLM_SYNC_ERR_SESSION_BAD_CHANGESET,              // Bad changeset (UPLOAD, ERROR)
+    partial_sync_disabled        = RLM_SYNC_ERR_SESSION_PARTIAL_SYNC_DISABLED,      // Partial sync disabled (BIND)
+    unsupported_session_feature  = RLM_SYNC_ERR_SESSION_UNSUPPORTED_SESSION_FEATURE, // Unsupported session-level feature
+    bad_origin_file_ident        = RLM_SYNC_ERR_SESSION_BAD_ORIGIN_FILE_IDENT,      // Bad origin file identifier (UPLOAD)
+    bad_client_file              = RLM_SYNC_ERR_SESSION_BAD_CLIENT_FILE,            // Synchronization no longer possible for client-side file
+    server_file_deleted          = RLM_SYNC_ERR_SESSION_SERVER_FILE_DELETED,        // Server file was deleted while session was bound to it
+    client_file_blacklisted      = RLM_SYNC_ERR_SESSION_CLIENT_FILE_BLACKLISTED,    // Client file has been blacklisted (IDENT)
+    user_blacklisted             = RLM_SYNC_ERR_SESSION_USER_BLACKLISTED,           // User has been blacklisted (BIND)
+    transact_before_upload       = RLM_SYNC_ERR_SESSION_TRANSACT_BEFORE_UPLOAD,     // Serialized transaction before upload completion
+    client_file_expired          = RLM_SYNC_ERR_SESSION_CLIENT_FILE_EXPIRED,        // Client file has expired
+    user_mismatch                = RLM_SYNC_ERR_SESSION_USER_MISMATCH,              // User mismatch for client file identifier (IDENT)
+    too_many_sessions            = RLM_SYNC_ERR_SESSION_TOO_MANY_SESSIONS,          // Too many sessions in connection (BIND)
+    invalid_schema_change        = RLM_SYNC_ERR_SESSION_INVALID_SCHEMA_CHANGE,      // Invalid schema change (UPLOAD)
+    bad_query                    = RLM_SYNC_ERR_SESSION_BAD_QUERY,                  // Client query is invalid/malformed (IDENT, QUERY)
+    object_already_exists        = RLM_SYNC_ERR_SESSION_OBJECT_ALREADY_EXISTS,      // Client tried to create an object that already exists outside their view (UPLOAD)
+    server_permissions_changed   = RLM_SYNC_ERR_SESSION_SERVER_PERMISSIONS_CHANGED, // Server permissions for this file ident have changed since the last time it was used (IDENT)
+    initial_sync_not_completed   = RLM_SYNC_ERR_SESSION_INITIAL_SYNC_NOT_COMPLETED, // Client tried to open a session before initial sync is complete (BIND)
+    write_not_allowed            = RLM_SYNC_ERR_SESSION_WRITE_NOT_ALLOWED,          // Client attempted a write that is disallowed by permissions, or modifies an
+                                                                                    // object outside the current query - requires client reset (UPLOAD)
+    compensating_write           = RLM_SYNC_ERR_SESSION_COMPENSATING_WRITE,         // Client attempted a write that is disallowed by permissions, or modifies an
+                                                                                    // object outside the current query, and the server undid the modification
+                                                                                    // (UPLOAD)
+    migrate_to_flx               = RLM_SYNC_ERR_SESSION_MIGRATE_TO_FLX,             // Server migrated from PBS to FLX - migrate client to FLX (BIND)
+    bad_progress                 = RLM_SYNC_ERR_SESSION_BAD_PROGRESS,               // Bad progress information (ERROR)
+    revert_to_pbs                = RLM_SYNC_ERR_SESSION_REVERT_TO_PBS,              // Server rolled back to PBS after FLX migration - revert FLX client migration (BIND)
 
     // clang-format on
 };
+
+Status protocol_error_to_status(ProtocolError raw_error_code, std::string_view msg);
 
 constexpr bool is_session_level_error(ProtocolError);
 
 /// Returns null if the specified protocol error code is not defined by
 /// ProtocolError.
 const char* get_protocol_error_message(int error_code) noexcept;
-
-const std::error_category& protocol_error_category() noexcept;
-
-std::error_code make_error_code(ProtocolError) noexcept;
-
-} // namespace sync
-} // namespace realm
-
-namespace std {
-
-template <>
-struct is_error_code_enum<realm::sync::ProtocolError> {
-    static const bool value = true;
-};
-
-} // namespace std
-
-namespace realm {
-namespace sync {
-
+std::ostream& operator<<(std::ostream&, ProtocolError protocol_error);
 
 // Implementation
 
@@ -399,6 +431,16 @@ inline std::ostream& operator<<(std::ostream& o, ProtocolErrorInfo::Action actio
             return o << "ClientReset";
         case ProtocolErrorInfo::Action::ClientResetNoRecovery:
             return o << "ClientResetNoRecovery";
+        case ProtocolErrorInfo::Action::MigrateToFLX:
+            return o << "MigrateToFLX";
+        case ProtocolErrorInfo::Action::RevertToPBS:
+            return o << "RevertToPBS";
+        case ProtocolErrorInfo::Action::RefreshUser:
+            return o << "RefreshUser";
+        case ProtocolErrorInfo::Action::RefreshLocation:
+            return o << "RefreshLocation";
+        case ProtocolErrorInfo::Action::LogOutUser:
+            return o << "LogOutUser";
     }
     return o << "Invalid error action: " << int64_t(action);
 }

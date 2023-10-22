@@ -45,6 +45,7 @@
 #include <realm/util/features.h>
 #include <realm/util/file.hpp>
 #include <realm/util/safe_int_ops.hpp>
+#include <realm/util/scope_exit.hpp>
 #include <realm/util/terminate.hpp>
 #include <realm/util/thread.hpp>
 #include <realm/util/to_string.hpp>
@@ -55,6 +56,7 @@
 
 #include "test.hpp"
 #include "test_table_helper.hpp"
+#include "util/spawned_process.hpp"
 
 extern unsigned int unit_test_random_seed;
 
@@ -129,7 +131,7 @@ namespace {
 //
 DWORD winfork(std::string unit_test_name)
 {
-    if (getenv("REALM_FORKED"))
+    if (getenv("REALM_SPAWNED"))
         return GetCurrentProcessId();
 
     wchar_t filename[MAX_PATH];
@@ -142,7 +144,7 @@ DWORD winfork(std::string unit_test_name)
     GetModuleFileName(nullptr, filename, MAX_PATH);
 
     std::string environment;
-    environment.append("REALM_FORKED=1");
+    environment.append("REALM_SPAWNED=1");
     environment.append("\0", 1);
     environment.append("UNITTEST_FILTER=" + unit_test_name);
     environment.append("\0\0", 2);
@@ -419,8 +421,7 @@ TEST(Shared_CompactingOnTheFly)
     SHARED_GROUP_TEST_PATH(path);
     Thread writer_thread;
     {
-        std::unique_ptr<Replication> hist(make_in_realm_history());
-        DBRef sg = DB::create(*hist, path, DBOptions(crypt_key()));
+        DBRef sg = get_test_db(path, crypt_key());
         // Create table entries
         std::vector<ColKey> cols; // unsafe to hold colkeys across transaction! FIXME: should be reported
         {
@@ -463,8 +464,7 @@ TEST(Shared_CompactingOnTheFly)
         writer_thread.join();
     }
     {
-        std::unique_ptr<Replication> hist(make_in_realm_history());
-        DBRef sg2 = DB::create(*hist, path, DBOptions(crypt_key()));
+        DBRef sg2 = get_test_db(path, crypt_key());
         {
             WriteTransaction wt(sg2);
             wt.commit();
@@ -478,8 +478,7 @@ TEST(Shared_CompactingOnTheFly)
         rt2.get_group().verify();
     }
     {
-        std::unique_ptr<Replication> hist(make_in_realm_history());
-        DBRef sg2 = DB::create(*hist, path, DBOptions(crypt_key()));
+        DBRef sg2 = get_test_db(path, crypt_key());
         ReadTransaction rt2(sg2);
         auto table = rt2.get_table("test");
         CHECK(table);
@@ -492,7 +491,7 @@ TEST(Shared_CompactingOnTheFly)
 TEST(Shared_ReadAfterCompact)
 {
     SHARED_GROUP_TEST_PATH(path);
-    DBRef sg = DB::create(path);
+    DBRef sg = get_test_db(path);
     {
         WriteTransaction wt(sg);
         auto table = wt.add_table("table");
@@ -516,7 +515,7 @@ TEST(Shared_ReadAfterCompact)
 TEST(Shared_ReadOverRead)
 {
     SHARED_GROUP_TEST_PATH(path);
-    DBRef sg = DB::create(path);
+    DBRef sg = get_test_db(path);
     {
         WriteTransaction wt(sg);
         auto table = wt.add_table("table");
@@ -524,7 +523,7 @@ TEST(Shared_ReadOverRead)
         table->create_object().set_all(1);
         wt.commit();
     }
-    DBRef sg2 = DB::create(path);
+    DBRef sg2 = get_test_db(path);
     auto rt2 = sg2->start_read();
     auto table2 = rt2->get_table("table");
     for (int i = 2; i < 4; ++i) {
@@ -539,7 +538,7 @@ TEST(Shared_ReadOverRead)
 TEST(Shared_ReadOverReadAfterCompact)
 {
     SHARED_GROUP_TEST_PATH(path);
-    DBRef sg = DB::create(path);
+    DBRef sg = get_test_db(path);
     {
         WriteTransaction wt(sg);
         auto table = wt.add_table("table");
@@ -548,7 +547,7 @@ TEST(Shared_ReadOverReadAfterCompact)
         wt.commit();
     }
     sg->compact();
-    DBRef sg2 = DB::create(path);
+    DBRef sg2 = get_test_db(path);
     auto rt = sg->start_read();
     auto rt2 = sg2->start_read();
     auto table = rt->get_table("table");
@@ -575,7 +574,7 @@ TEST(Shared_ReadOverRead2)
 {
     SHARED_GROUP_TEST_PATH(path);
     {
-        DBRef sg = DB::create(path);
+        DBRef sg = get_test_db(path);
         {
             WriteTransaction wt(sg);
             auto table = wt.add_table("table");
@@ -584,8 +583,8 @@ TEST(Shared_ReadOverRead2)
             wt.commit();
         }
     }
-    DBRef sg3 = DB::create(path);
-    DBRef sg2 = DB::create(path);
+    DBRef sg2 = get_test_db(path);
+    DBRef sg3 = get_test_db(path);
     auto rt2 = sg2->start_read();
     auto table2 = rt2->get_table("table");
     for (int i = 2; i < 4; ++i) {
@@ -601,13 +600,14 @@ TEST(Shared_ReadOverRead2)
 TEST(Shared_EncryptedRemap)
 {
     // Attempts to trigger code coverage in util::mremap() for the case where the file is encrypted.
-    // This requires a "non-encrypted database size" (not physical file sise) which is non-divisible
+    // This requires a "non-encrypted database size" (not physical file size) which is non-divisible
     // by page_size() *and* is bigger than current allocated section. Following row count and payload
     // seems to work on both Windows+Linux
     const int64_t rows = 12;
     SHARED_GROUP_TEST_PATH(path);
     {
-        DBRef sg = DB::create(path, false, DBOptions(crypt_key()));
+        DBRef sg = get_test_db(path, crypt_key());
+
         // Create table entries
 
         WriteTransaction wt(sg);
@@ -620,7 +620,7 @@ TEST(Shared_EncryptedRemap)
         wt.commit();
     }
 
-    DBRef sg2 = DB::create(path, true, DBOptions(crypt_key()));
+    DBRef sg2 = get_test_db(path, crypt_key());
 
     CHECK_EQUAL(true, sg2->compact());
     ReadTransaction rt2(sg2);
@@ -1394,15 +1394,28 @@ TEST(Many_ConcurrentReaders)
     sg_w->close();
 
     auto reader = [path_str]() {
+        std::stringstream logs;
         try {
+            auto logger = util::StreamLogger(logs);
+            DBOptions options;
+            options.logger = std::make_shared<util::StreamLogger>(logs);
+            options.logger->set_level_threshold(Logger::Level::all);
+            constexpr bool no_create = false;
             for (int i = 0; i < 1000; ++i) {
-                DBRef sg_r = DB::create(path_str);
+                DBRef sg_r = DB::create(path_str, no_create, options);
                 ReadTransaction rt(sg_r);
+                ConstTableRef t = rt.get_table("table");
+                auto col_key = t->get_column_key("column");
+                REALM_ASSERT(t->get_object(0).get<StringData>(col_key) == "string");
                 rt.get_group().verify();
             }
         }
-        catch (...) {
-            REALM_ASSERT(false);
+        catch (const std::exception& e) {
+            std::cerr << "Exception during Many_ConcurrentReaders:" << std::endl;
+            std::cerr << "Reason: '" << e.what() << "'" << std::endl;
+            std::cerr << logs.str();
+            constexpr bool unexpected_exception = false;
+            REALM_ASSERT_EX(unexpected_exception, e.what());
         }
     };
 
@@ -1630,7 +1643,7 @@ TEST(Shared_RobustAgainstDeathDuringWrite)
 #endif // encryption enabled
 
 // not ios or android
-//#endif // defined TEST_ROBUSTNESS && defined ENABLE_ROBUST_AGAINST_DEATH_DURING_WRITE && !REALM_ENABLE_ENCRYPTION
+// #endif // defined TEST_ROBUSTNESS && defined ENABLE_ROBUST_AGAINST_DEATH_DURING_WRITE && !REALM_ENABLE_ENCRYPTION
 
 
 TEST(Shared_SpaceOveruse)
@@ -1843,12 +1856,9 @@ TEST(Shared_StringIndexBug3)
     }
 
     Random random(random_int<unsigned long>()); // Seed from slow global generator
-    size_t transactions = 0;
     std::vector<ObjKey> keys;
     for (size_t n = 0; n < 100; ++n) {
         const uint64_t action = random.draw_int_mod(1000);
-
-        transactions++;
 
         if (action <= 500) {
             // delete random user
@@ -2196,6 +2206,7 @@ TEST(Shared_EncryptionKeyCheck_2)
     DBRef sg = DB::create(path, false, DBOptions());
     CHECK_THROW(DB::create(path, false, DBOptions(crypt_key(true))), InvalidDatabase);
     DBRef sg3 = DB::create(path, false, DBOptions());
+    CHECK(sg3);
 }
 
 // if opened by one key, it cannot be opened by a different key
@@ -2211,12 +2222,53 @@ TEST(Shared_EncryptionKeyCheck_3)
     DBRef sg3 = DB::create(path, false, DBOptions(first_key));
 }
 
-#endif
+TEST(Shared_EncryptionPageReadFailure)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    constexpr size_t num_objects = 4096;
+    {
+        DBRef sg = DB::create(path, false, DBOptions(crypt_key(true)));
+        WriteTransaction wt(sg);
+        TableRef table = wt.get_group().add_table_with_primary_key("foo", type_ObjectId, "pk");
+        auto str_col = table->add_column(type_String, "string");
+        for (size_t i = 0; i < num_objects; ++i) {
+            auto obj = table->create_object_with_primary_key(ObjectId::gen());
+            obj.set<String>(str_col, "C");
+        }
+        wt.commit();
+    }
+    {
+        // make a corruption in the first data page
+        util::File f(path, File::Mode::mode_Update);
+        CHECK_GREATER(f.get_size(), 12288); // 4k iv page, then at least 2 pages
+        f.seek(5000);                       // somewhere on the first data page
+        constexpr std::string_view data = "an external corruption in the encrypted page";
+        f.write(data.data(), data.size());
+        f.sync();
+        f.close();
+    }
+    {
+        bool did_throw = false;
+        try {
+            DBRef sg = DB::create(path, false, DBOptions(crypt_key(true)));
+            WriteTransaction wt(sg);
+            TableRef table = wt.get_group().get_table("foo");
+            CHECK_EQUAL(table->size(), num_objects);
+        }
+        catch (const InvalidDatabase& e) {
+            CHECK_STRING_CONTAINS(e.what(), "decryption failed");
+            did_throw = true;
+        }
+        CHECK(did_throw);
+    }
+}
+
+#endif // REALM_ENABLE_ENCRYPTION
 
 TEST(Shared_VersionCount)
 {
     SHARED_GROUP_TEST_PATH(path);
-    DBRef sg = DB::create(path);
+    DBRef sg = get_test_db(path);
     CHECK_EQUAL(1, sg->get_number_of_versions());
     TransactionRef reader = sg->start_read();
     {
@@ -2454,7 +2506,7 @@ TEST(Shared_MovingSearchIndex)
 TEST_IF(Shared_BeginReadFailure, _impl::SimulatedFailure::is_enabled())
 {
     SHARED_GROUP_TEST_PATH(path);
-    DBRef sg = DB::create(path);
+    DBRef sg = get_test_db(path);
     using sf = _impl::SimulatedFailure;
     sf::OneShotPrimeGuard pg(sf::shared_group__grow_reader_mapping);
     CHECK_THROW(sg->start_read(), sf);
@@ -2476,7 +2528,7 @@ TEST(Shared_SessionDurabilityConsistency)
         DBRef sg = DB::create(path, no_create, DBOptions(durability_1));
 
         DBOptions::Durability durability_2 = DBOptions::Durability::MemOnly;
-        CHECK_LOGIC_ERROR(DB::create(path, no_create, DBOptions(durability_2)), LogicError::mixed_durability);
+        CHECK_RUNTIME_ERROR(DB::create(path, no_create, DBOptions(durability_2)), ErrorCodes::IncompatibleSession);
     }
 }
 
@@ -2497,7 +2549,7 @@ TEST(Shared_CompactEmpty)
 {
     SHARED_GROUP_TEST_PATH(path);
     {
-        DBRef sg = DB::create(path);
+        DBRef sg = get_test_db(path);
         CHECK(sg->compact());
     }
 }
@@ -2507,7 +2559,7 @@ TEST(Shared_VersionOfBoundSnapshot)
 {
     SHARED_GROUP_TEST_PATH(path);
     DB::version_type version;
-    DBRef sg = DB::create(path);
+    DBRef sg = get_test_db(path);
     {
         ReadTransaction rt(sg);
         version = rt.get_version();
@@ -2679,7 +2731,7 @@ NONCONCURRENT_TEST(Shared_StaticFuzzTestRunSanityCheck)
 // and can make very very large files so it is not suited to automatic testing.
 TEST_IF(Shared_encrypted_pin_and_write, false)
 {
-    const size_t num_rows = 1000;
+    const size_t num_objects = 1000;
     const size_t num_transactions = 1000000;
     const size_t num_writer_threads = 8;
     SHARED_GROUP_TEST_PATH(path);
@@ -2690,11 +2742,14 @@ TEST_IF(Shared_encrypted_pin_and_write, false)
         Group& group = wt.get_group();
         TableRef t = group.add_table("table");
         t->add_column(type_String, "string_col", true);
-        t->add_empty_row(num_rows);
+        for (size_t i = 0; i < num_objects; ++i) {
+            t->create_object();
+        }
         wt.commit();
     }
 
-    DB sg_reader(path, false, DBOptions(crypt_key(true)));
+    DBRef sg_reader = DB::create(path, false, DBOptions(crypt_key(true)));
+
     ReadTransaction rt(sg_reader); // hold first version
 
     auto do_many_writes = [&]() {
@@ -2704,19 +2759,21 @@ TEST_IF(Shared_encrypted_pin_and_write, false)
         // write many transactions to grow the file
         // around 4.6 GB seems to be the breaking size
         for (size_t t = 0; t < num_transactions; ++t) {
-            std::vector<std::string> rows(num_rows);
+            std::vector<std::string> rows(num_objects);
             // change a character so there's no storage optimizations
-            for (size_t row = 0; row < num_rows; ++row) {
-                base[(t * num_rows + row)%base_size] = 'a' + (row % 52);
+            for (size_t row = 0; row < num_objects; ++row) {
+                base[(t * num_objects + row)%base_size] = 'a' + (row % 52);
                 rows[row] = base;
             }
             WriteTransaction wt(sg);
             Group& g = wt.get_group();
-            auto keys = g.get_keys();
+            auto keys = g.get_table_keys();
             TableRef table = g.get_table(keys[0]);
-            for (size_t row = 0; row < num_rows; ++row) {
-                StringData c(rows[row]);
-                table->set_string(0, row, c);
+            ColKey str_col = table->get_column_key("string_col");
+            size_t count = 0;
+            for (auto it = table->begin(); it != table->end(); ++it, ++count) {
+                StringData c(rows[count]);
+                it->set(str_col, c);
             }
             wt.commit();
         }
@@ -2770,7 +2827,6 @@ NONCONCURRENT_TEST(Shared_BigAllocations)
     sg->close();
 }
 
-#if !REALM_ANDROID // FIXME
 TEST_IF(Shared_CompactEncrypt, REALM_ENABLE_ENCRYPTION)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -2814,7 +2870,6 @@ TEST_IF(Shared_CompactEncrypt, REALM_ENABLE_ENCRYPTION)
         }
     }
 }
-#endif
 
 // Repro case for: Assertion failed: top_size == 3 || top_size == 5 || top_size == 7 [0, 3, 0, 5, 0, 7]
 NONCONCURRENT_TEST(Shared_BigAllocationsMinimized)
@@ -3282,7 +3337,7 @@ TEST(Shared_ConstObject)
 TEST(Shared_ConstObjectIterator)
 {
     SHARED_GROUP_TEST_PATH(path);
-    DBRef sg = DB::create(path);
+    DBRef sg = get_test_db(path);
     ColKey col;
     {
         TransactionRef writer = sg->start_write();
@@ -3321,19 +3376,19 @@ TEST(Shared_ConstObjectIterator)
     t4->clear();
     auto i5(i4);
     // dereferencing an invalid iterator will throw
-    CHECK_THROW(*i5, std::logic_error);
+    CHECK_THROW(*i5, realm::Exception);
     // but moving it will not, it just stays invalid
     ++i5;
     i5 += 3;
     // so, should still throw
-    CHECK_THROW(*i5, std::logic_error);
+    CHECK_THROW(*i5, realm::Exception);
     CHECK(i5 == t4->end());
 }
 
 TEST(Shared_ConstList)
 {
     SHARED_GROUP_TEST_PATH(path);
-    DBRef sg = DB::create(path);
+    DBRef sg = get_test_db(path);
     TransactionRef writer = sg->start_write();
 
     TableRef t = writer->add_table("Foo");
@@ -4290,6 +4345,68 @@ TEST(Shared_WriteToFail)
     dest->commit_and_continue_as_read();
 
     CHECK(*tr == *dest);
+}
+
+NONCONCURRENT_TEST_IF(Shared_LockFileConcurrentInit, testing_supports_spawn_process)
+{
+    auto path = realm::test_util::get_test_path(test_context.get_test_name(), ".test-dir");
+    test_util::TestDirGuard test_dir(path, false);
+    test_dir.do_remove = SpawnedProcess::is_parent();
+    auto lock_prefix = std::string(path) + "/lock";
+
+    struct Lock {
+        std::unique_ptr<InterprocessMutex> mutex;
+        std::unique_ptr<InterprocessMutex::SharedPart> sp;
+
+        Lock(const std::string& name, const std::string& lock_prefix_path)
+            : mutex(std::make_unique<InterprocessMutex>())
+            , sp(std::make_unique<InterprocessMutex::SharedPart>())
+        {
+            mutex->set_shared_part(*sp, lock_prefix_path, name);
+        }
+
+        Lock(Lock&&) = default;
+        Lock& operator=(Lock&&) = default;
+    };
+
+    for (size_t i = 0; i < 10; ++i) {
+        std::vector<std::unique_ptr<SpawnedProcess>> spawned;
+
+        // create multiple processes initializing multiple same purpose locks
+        for (size_t j = 0; j < 10; ++j) {
+            spawned.emplace_back(
+                test_util::spawn_process(test_context.test_details.test_name, util::format("child [%1]", i)));
+
+            if (spawned.back()->is_child()) {
+                std::vector<Lock> locks;
+
+                // mimic the same impl detail as in DB and hope it'd trigger some assertions
+                for (auto tag : {"write", "control", "versions"}) {
+                    locks.emplace_back(tag, lock_prefix);
+                    CHECK(locks.back().mutex->is_valid());
+                }
+
+                // if somehow initialization is scrambled or there is an issues with
+                // underlying files then it should hang here
+                for (int k = 0; k < 3; ++k) {
+                    for (auto&& lock : locks)
+                        lock.mutex->lock();
+                    for (auto&& lock : locks)
+                        lock.mutex->unlock();
+                }
+
+                exit(0);
+            }
+        }
+
+        if (SpawnedProcess::is_parent()) {
+            for (auto&& process : spawned)
+                process->wait_for_child_to_finish();
+
+            // start everytime with no lock files for mutexes
+            test_dir.clean_dir();
+        }
+    }
 }
 
 #endif // TEST_SHARED

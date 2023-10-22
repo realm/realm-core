@@ -32,6 +32,9 @@
 #include "realm/cluster_tree.hpp"
 #include "realm/column_type_traits.hpp"
 #include "realm/dictionary.hpp"
+#if REALM_ENABLE_GEOSPATIAL
+#include "realm/geospatial.hpp"
+#endif
 #include "realm/link_translator.hpp"
 #include "realm/index_string.hpp"
 #include "realm/object_converter.hpp"
@@ -176,12 +179,6 @@ bool Obj::is_valid() const noexcept
     return m_valid;
 }
 
-void Obj::check_valid() const
-{
-    if (!is_valid())
-        throw std::runtime_error("Object not alive");
-}
-
 void Obj::remove()
 {
     m_table.cast_away_const()->remove_object(m_key);
@@ -284,6 +281,33 @@ T Obj::get(ColKey col_key) const
     return _get<T>(col_key.get_index());
 }
 
+#if REALM_ENABLE_GEOSPATIAL
+
+template <>
+Geospatial Obj::get(ColKey col_key) const
+{
+    m_table->check_column(col_key);
+    ColumnType type = col_key.get_type();
+    REALM_ASSERT(type == ColumnTypeTraits<Link>::column_id);
+    return Geospatial::from_link(get_linked_object(col_key));
+}
+
+template <>
+std::optional<Geospatial> Obj::get(ColKey col_key) const
+{
+    m_table->check_column(col_key);
+    ColumnType type = col_key.get_type();
+    REALM_ASSERT(type == ColumnTypeTraits<Link>::column_id);
+
+    auto geo = get_linked_object(col_key);
+    if (!geo) {
+        return {};
+    }
+    return Geospatial::from_link(geo);
+}
+
+#endif
+
 template <class T>
 T Obj::_get(ColKey::Idx col_ndx) const
 {
@@ -356,7 +380,7 @@ int64_t Obj::get<int64_t>(ColKey col_key) const
     if (col_key.get_attrs().test(col_attr_Nullable)) {
         auto val = _get<util::Optional<int64_t>>(col_key.get_index());
         if (!val) {
-            throw std::runtime_error("Cannot return null value");
+            throw IllegalOperation("Obj::get<int64_t> cannot return null");
         }
         return *val;
     }
@@ -375,7 +399,7 @@ bool Obj::get<bool>(ColKey col_key) const
     if (col_key.get_attrs().test(col_attr_Nullable)) {
         auto val = _get<util::Optional<bool>>(col_key.get_index());
         if (!val) {
-            throw std::runtime_error("Cannot return null value");
+            throw IllegalOperation("Obj::get<int64_t> cannot return null");
         }
         return *val;
     }
@@ -522,7 +546,7 @@ Obj Obj::get_parent_object() const
     update_if_needed();
 
     if (!m_table->is_embedded()) {
-        throw std::runtime_error("Object is not embedded");
+        throw LogicError(ErrorCodes::TopLevelObject, "Object is not embedded");
     }
     m_table->for_each_backlink_column([&](ColKey backlink_col_key) {
         if (get_backlink_cnt(backlink_col_key) == 1) {
@@ -660,7 +684,7 @@ ObjKey Obj::get_backlink(const Table& origin, ColKey origin_col_key, size_t back
     return get_backlink(backlink_col_key, backlink_ndx);
 }
 
-TableView Obj::get_backlink_view(TableRef src_table, ColKey src_col_key)
+TableView Obj::get_backlink_view(TableRef src_table, ColKey src_col_key) const
 {
     TableView tv(src_table, src_col_key, *this);
     tv.do_sync();
@@ -1078,12 +1102,7 @@ void Obj::to_json(std::ostream& out, size_t link_depth, const std::map<std::stri
 
             if (output_mode == output_mode_xjson_plus) {
                 open_str = std::string("{ ") + (is_embedded ? "\"$embedded" : "\"$link");
-                if (ck.is_list())
-                    open_str += "List";
-                else if (ck.is_set())
-                    open_str += "Set";
-                else if (ck.is_dictionary())
-                    open_str += "Dictionary";
+                open_str += collection_type_name(ck, true);
                 open_str += "\": ";
                 close_str += " }";
             }
@@ -1254,18 +1273,17 @@ Obj& Obj::set<Mixed>(ColKey col_key, Mixed value, bool is_default)
     update_if_needed();
     get_table()->check_column(col_key);
     auto type = col_key.get_type();
-    auto attrs = col_key.get_attrs();
     auto col_ndx = col_key.get_index();
     bool recurse = false;
     CascadeState state;
 
     if (type != col_type_Mixed)
-        throw LogicError(LogicError::illegal_type);
-    if (value_is_null(value) && !attrs.test(col_attr_Nullable)) {
-        throw LogicError(LogicError::column_not_nullable);
+        throw InvalidArgument(ErrorCodes::TypeMismatch, "Property not a Mixed");
+    if (value_is_null(value) && !col_key.is_nullable()) {
+        throw NotNullable(Group::table_name_to_class_name(m_table->get_name()), m_table->get_column_name(col_key));
     }
     if (value.is_type(type_Link)) {
-        throw LogicError(LogicError::illegal_combination);
+        throw InvalidArgument(ErrorCodes::TypeMismatch, "Link must be fully qualified");
     }
 
     Mixed old_value = get<Mixed>(col_key);
@@ -1277,7 +1295,7 @@ Obj& Obj::set<Mixed>(ColKey col_key, Mixed value, bool is_default)
 
     if (value.is_type(type_TypedLink)) {
         if (m_table->is_asymmetric()) {
-            throw LogicError(LogicError::wrong_kind_of_table);
+            throw IllegalOperation("Links not allowed in asymmetric tables");
         }
         new_link = value.template get<ObjLink>();
         m_table->get_parent_group()->validate(new_link);
@@ -1382,7 +1400,8 @@ Obj& Obj::set<int64_t>(ColKey col_key, int64_t value, bool is_default)
     auto col_ndx = col_key.get_index();
 
     if (col_key.get_type() != ColumnTypeTraits<int64_t>::column_id)
-        throw LogicError(LogicError::illegal_type);
+        throw InvalidArgument(ErrorCodes::TypeMismatch,
+                              util::format("Property not a %1", ColumnTypeTraits<int64_t>::column_id));
 
     StringIndex* index = m_table->get_search_index(col_key);
     if (index && !m_key.is_unresolved()) {
@@ -1449,12 +1468,12 @@ Obj& Obj::add_int(ColKey col_key, int64_t value)
             values.set(m_row_ndx, Mixed(new_val));
         }
         else {
-            throw LogicError{LogicError::illegal_combination};
+            throw IllegalOperation("Value not an int");
         }
     }
     else {
         if (col_key.get_type() != col_type_Int)
-            throw LogicError(LogicError::illegal_type);
+            throw IllegalOperation("Property not an int");
 
         auto attr = col_key.get_attrs();
         if (attr.test(col_attr_Nullable)) {
@@ -1470,7 +1489,7 @@ Obj& Obj::add_int(ColKey col_key, int64_t value)
                 values.set(m_row_ndx, new_val);
             }
             else {
-                throw LogicError{LogicError::illegal_combination};
+                throw IllegalOperation("No prior value");
             }
         }
         else {
@@ -1502,17 +1521,18 @@ Obj& Obj::set<ObjKey>(ColKey col_key, ObjKey target_key, bool is_default)
     get_table()->check_column(col_key);
     ColKey::Idx col_ndx = col_key.get_index();
     ColumnType type = col_key.get_type();
-    if (type != ColumnTypeTraits<ObjKey>::column_id)
-        throw LogicError(LogicError::illegal_type);
+    if (type != col_type_Link)
+        throw InvalidArgument(ErrorCodes::TypeMismatch, "Property not a link");
     TableRef target_table = get_target_table(col_key);
     TableKey target_table_key = target_table->get_key();
     if (target_key) {
         ClusterTree* ct = target_key.is_unresolved() ? target_table->m_tombstones.get() : &target_table->m_clusters;
         if (!ct->is_valid(target_key)) {
-            throw LogicError(LogicError::target_row_index_out_of_range);
+            InvalidArgument(ErrorCodes::KeyNotFound, "Invalid object key");
         }
         if (target_table->is_embedded()) {
-            throw LogicError(LogicError::wrong_kind_of_table);
+            throw IllegalOperation(
+                util::format("Setting not allowed on embedded object: %1", m_table->get_column_name(col_key)));
         }
     }
     ObjKey old_key = get_unfiltered_link(col_key); // Will update if needed
@@ -1555,8 +1575,8 @@ Obj& Obj::set<ObjLink>(ColKey col_key, ObjLink target_link, bool is_default)
     get_table()->check_column(col_key);
     ColKey::Idx col_ndx = col_key.get_index();
     ColumnType type = col_key.get_type();
-    if (type != ColumnTypeTraits<ObjLink>::column_id)
-        throw LogicError(LogicError::illegal_type);
+    if (type != col_type_TypedLink)
+        throw InvalidArgument(ErrorCodes::TypeMismatch, "Property not a typed link");
     m_table->get_parent_group()->validate(target_link);
 
     ObjLink old_link = get<ObjLink>(col_key); // Will update if needed
@@ -1600,7 +1620,7 @@ Obj Obj::create_and_set_linked_object(ColKey col_key, bool is_default)
     ColKey::Idx col_ndx = col_key.get_index();
     ColumnType type = col_key.get_type();
     if (type != col_type_Link)
-        throw LogicError(LogicError::illegal_type);
+        throw InvalidArgument(ErrorCodes::TypeMismatch, "Property not a link type");
     TableRef target_table = get_target_table(col_key);
     Table& t = *target_table;
     // Only links to embedded objects are allowed.
@@ -1612,17 +1632,15 @@ Obj Obj::create_and_set_linked_object(ColKey col_key, bool is_default)
     auto target_key = result.get_key();
     ObjKey old_key = get<ObjKey>(col_key); // Will update if needed
     if (old_key != ObjKey()) {
-        if (!t.is_embedded()) {
-            throw LogicError(LogicError::wrong_kind_of_table);
-        }
-
-        // If this is an embedded object and there was already an embedded object here, then we need to
-        // emit an instruction to set the old embedded object to null to clear the old object on other
-        // sync clients. Without this, you'll only see the Set ObjectValue instruction, which is idempotent,
-        // and then array operations will have a corrupted prior_size.
-        if (Replication* repl = get_replication()) {
-            repl->set(m_table.unchecked_ptr(), col_key, m_key, util::none,
-                      is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
+        if (t.is_embedded()) {
+            // If this is an embedded object and there was already an embedded object here, then we need to
+            // emit an instruction to set the old embedded object to null to clear the old object on other
+            // sync clients. Without this, you'll only see the Set ObjectValue instruction, which is idempotent,
+            // and then array operations will have a corrupted prior_size.
+            if (Replication* repl = get_replication()) {
+                repl->set(m_table.unchecked_ptr(), col_key, m_key, util::none,
+                          is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
+            }
         }
     }
 
@@ -1666,13 +1684,13 @@ template <>
 inline void check_range(const StringData& val)
 {
     if (REALM_UNLIKELY(val.size() > Table::max_string_size))
-        throw LogicError(LogicError::string_too_big);
+        throw LogicError(ErrorCodes::LimitExceeded, "String too big");
 }
 template <>
 inline void check_range(const BinaryData& val)
 {
     if (REALM_UNLIKELY(val.size() > ArrayBlob::max_binary_size))
-        throw LogicError(LogicError::binary_too_big);
+        throw LogicError(ErrorCodes::LimitExceeded, "Binary too big");
 }
 } // namespace
 
@@ -1689,6 +1707,59 @@ inline void Obj::set_spec<ArrayString>(ArrayString& values, ColKey col_key)
     values.set_spec(spec, spec_ndx);
 }
 
+#if REALM_ENABLE_GEOSPATIAL
+
+template <>
+Obj& Obj::set(ColKey col_key, Geospatial value, bool)
+{
+    update_if_needed();
+    get_table()->check_column(col_key);
+    auto type = col_key.get_type();
+
+    if (type != ColumnTypeTraits<Link>::column_id)
+        throw InvalidArgument(ErrorCodes::TypeMismatch,
+                              util::format("Property '%1' must be a link to set a Geospatial value",
+                                           get_table()->get_column_name(col_key)));
+
+    Obj geo = get_linked_object(col_key);
+    if (!geo) {
+        geo = create_and_set_linked_object(col_key);
+    }
+    value.assign_to(geo);
+    return *this;
+}
+
+template <>
+Obj& Obj::set(ColKey col_key, std::optional<Geospatial> value, bool)
+{
+    update_if_needed();
+    auto table = get_table();
+    table->check_column(col_key);
+    auto type = col_key.get_type();
+    auto attrs = col_key.get_attrs();
+
+    if (type != ColumnTypeTraits<Link>::column_id)
+        throw InvalidArgument(ErrorCodes::TypeMismatch,
+                              util::format("Property '%1' must be a link to set a Geospatial value",
+                                           get_table()->get_column_name(col_key)));
+    if (!value && !attrs.test(col_attr_Nullable))
+        throw NotNullable(Group::table_name_to_class_name(table->get_name()), table->get_column_name(col_key));
+
+    if (!value) {
+        set_null(col_key);
+    }
+    else {
+        Obj geo = get_linked_object(col_key);
+        if (!geo) {
+            geo = create_and_set_linked_object(col_key);
+        }
+        value->assign_to(geo);
+    }
+    return *this;
+}
+
+#endif
+
 template <class T>
 Obj& Obj::set(ColKey col_key, T value, bool is_default)
 {
@@ -1699,9 +1770,10 @@ Obj& Obj::set(ColKey col_key, T value, bool is_default)
     auto col_ndx = col_key.get_index();
 
     if (type != ColumnTypeTraits<T>::column_id)
-        throw LogicError(LogicError::illegal_type);
+        throw InvalidArgument(ErrorCodes::TypeMismatch,
+                              util::format("Property not a %1", ColumnTypeTraits<int64_t>::column_id));
     if (value_is_null(value) && !attrs.test(col_attr_Nullable))
-        throw LogicError(LogicError::column_not_nullable);
+        throw NotNullable(Group::table_name_to_class_name(m_table->get_name()), m_table->get_column_name(col_key));
 
     check_range(value);
 
@@ -1942,8 +2014,11 @@ void Obj::set_backlink(ColKey col_key, ObjLink new_link) const
             backlink_col_key = m_table->get_opposite_column(col_key);
         }
         auto obj_key = new_link.get_obj_key();
-        auto target_obj =
-            obj_key.is_unresolved() ? target_table->get_tombstone(obj_key) : target_table->get_object(obj_key);
+        auto target_obj = obj_key.is_unresolved() ? target_table->try_get_tombstone(obj_key)
+                                                  : target_table->try_get_object(obj_key);
+        if (!target_obj) {
+            throw InvalidArgument(ErrorCodes::KeyNotFound, "Target object not found");
+        }
         target_obj.add_backlink(backlink_col_key, m_key);
     }
 }
@@ -1961,7 +2036,11 @@ bool Obj::remove_backlink(ColKey col_key, ObjLink old_link, CascadeState& state)
     if (old_link && old_link.get_obj_key()) {
         REALM_ASSERT(m_table->valid_column(col_key));
         ObjKey old_key = old_link.get_obj_key();
-        auto target_obj = m_table->get_parent_group()->get_object(old_link);
+        auto target_obj = m_table->get_parent_group()->try_get_object(old_link);
+        REALM_ASSERT_DEBUG(target_obj);
+        if (!target_obj) {
+            return false;
+        }
         TableRef target_table = target_obj.get_table();
         ColKey backlink_col_key;
         auto type = col_key.get_type();
@@ -2309,7 +2388,8 @@ Obj& Obj::set_null(ColKey col_key, bool is_default)
     else {
         auto attrs = col_key.get_attrs();
         if (REALM_UNLIKELY(!attrs.test(col_attr_Nullable))) {
-            throw LogicError(LogicError::column_not_nullable);
+            throw NotNullable(Group::table_name_to_class_name(m_table->get_name()),
+                              m_table->get_column_name(col_key));
         }
 
         update_if_needed();

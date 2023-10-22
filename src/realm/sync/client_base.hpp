@@ -1,15 +1,16 @@
 #ifndef REALM_SYNC_CLIENT_BASE_HPP
 #define REALM_SYNC_CLIENT_BASE_HPP
 
-#include <realm/transaction.hpp>
+#include <realm/db.hpp>
 #include <realm/sync/config.hpp>
 #include <realm/sync/protocol.hpp>
-#include <realm/sync/socket_provider.hpp>
+#include <realm/sync/network/websocket_error.hpp>
 #include <realm/util/functional.hpp>
 
 namespace realm::sync {
 class ClientImpl;
 class SessionWrapper;
+class SyncSocketProvider;
 
 /// The presence of the ClientReset config indicates an ongoing or requested client
 /// reset operation. If client_reset is util::none or if the local Realm does not
@@ -62,67 +63,9 @@ struct ClientReset {
     realm::ClientResyncMode mode;
     DBRef fresh_copy;
     bool recovery_is_allowed = true;
-    util::UniqueFunction<void(VersionID)> notify_before_client_reset;
+    util::UniqueFunction<VersionID()> notify_before_client_reset;
     util::UniqueFunction<void(VersionID before_version, bool did_recover)> notify_after_client_reset;
 };
-
-/// \brief Protocol errors discovered by the client.
-///
-/// These errors will terminate the network connection (disconnect all sessions
-/// associated with the affected connection), and the error will be reported to
-/// the application via the connection state change listeners of the affected
-/// sessions.
-enum class ClientError {
-    // clang-format off
-    connection_closed           = 100, ///< Connection closed (no error)
-    unknown_message             = 101, ///< Unknown type of input message
-    bad_syntax                  = 102, ///< Bad syntax in input message head
-    limits_exceeded             = 103, ///< Limits exceeded in input message
-    bad_session_ident           = 104, ///< Bad session identifier in input message
-    bad_message_order           = 105, ///< Bad input message order
-    bad_client_file_ident       = 106, ///< Bad client file identifier (IDENT)
-    bad_progress                = 107, ///< Bad progress information (DOWNLOAD)
-    bad_changeset_header_syntax = 108, ///< Bad syntax in changeset header (DOWNLOAD)
-    bad_changeset_size          = 109, ///< Bad changeset size in changeset header (DOWNLOAD)
-    bad_origin_file_ident       = 110, ///< Bad origin file identifier in changeset header (DOWNLOAD)
-    bad_server_version          = 111, ///< Bad server version in changeset header (DOWNLOAD)
-    bad_changeset               = 112, ///< Bad changeset (DOWNLOAD)
-    bad_request_ident           = 113, ///< Bad request identifier (MARK)
-    bad_error_code              = 114, ///< Bad error code (ERROR),
-    bad_compression             = 115, ///< Bad compression (DOWNLOAD)
-    bad_client_version          = 116, ///< Bad last integrated client version in changeset header (DOWNLOAD)
-    ssl_server_cert_rejected    = 117, ///< SSL server certificate rejected
-    pong_timeout                = 118, ///< Timeout on reception of PONG respone message
-    bad_client_file_ident_salt  = 119, ///< Bad client file identifier salt (IDENT)
-    bad_file_ident              = 120, ///< Bad file identifier (ALLOC)
-    connect_timeout             = 121, ///< Sync connection was not fully established in time
-    bad_timestamp               = 122, ///< Bad timestamp (PONG)
-    bad_protocol_from_server    = 123, ///< Bad or missing protocol version information from server
-    client_too_old_for_server   = 124, ///< Protocol version negotiation failed: Client is too old for server
-    client_too_new_for_server   = 125, ///< Protocol version negotiation failed: Client is too new for server
-    protocol_mismatch           = 126, ///< Protocol version negotiation failed: No version supported by both client and server
-    bad_state_message           = 127, ///< Bad values in state message (STATE)
-    missing_protocol_feature    = 128, ///< Requested feature missing in negotiated protocol version
-    http_tunnel_failed          = 131, ///< Failed to establish HTTP tunnel with configured proxy
-    auto_client_reset_failure   = 132, ///< A fatal error was encountered which prevents completion of a client reset
-    // clang-format on
-};
-
-const std::error_category& client_error_category() noexcept;
-
-std::error_code make_error_code(ClientError) noexcept;
-} // namespace realm::sync
-
-namespace std {
-
-template <>
-struct is_error_code_enum<realm::sync::ClientError> {
-    static const bool value = true;
-};
-
-} // namespace std
-
-namespace realm::sync {
 
 static constexpr milliseconds_type default_connect_timeout = 120000;        // 2 minutes
 static constexpr milliseconds_type default_connection_linger_time = 30000;  // 30 seconds
@@ -133,46 +76,6 @@ static constexpr milliseconds_type default_fast_reconnect_limit = 60000;    // 1
 using RoundtripTimeHandler = void(milliseconds_type roundtrip_time);
 
 struct ClientConfig {
-    ///
-    /// DEPRECATED - Will be removed in a future release
-    ///
-    /// An optional custom platform description to be sent to server as part
-    /// of a user agent description (HTTP `User-Agent` header).
-    ///
-    /// If left empty, the platform description will be whatever is returned
-    /// by util::get_platform_info().
-    std::string user_agent_platform_info;
-
-    ///
-    /// DEPRECATED - Will be removed in a future release
-    ///
-    /// Optional information about the application to be added to the user
-    /// agent description as sent to the server. The intention is that the
-    /// application describes itself using the following (rough) syntax:
-    ///
-    ///     <application info>  ::=  (<space> <layer>)*
-    ///     <layer>             ::=  <name> "/" <version> [<space> <details>]
-    ///     <name>              ::=  (<alnum>)+
-    ///     <version>           ::=  <digit> (<alnum> | "." | "-" | "_")*
-    ///     <details>           ::=  <parentherized>
-    ///     <parentherized>     ::=  "(" (<nonpar> | <parentherized>)* ")"
-    ///
-    /// Where `<space>` is a single space character, `<digit>` is a decimal
-    /// digit, `<alnum>` is any alphanumeric character, and `<nonpar>` is
-    /// any character other than `(` and `)`.
-    ///
-    /// When multiple levels are present, the innermost layer (the one that
-    /// is closest to this API) should appear first.
-    ///
-    /// Example:
-    ///
-    ///     RealmJS/2.13.0 RealmStudio/2.9.0
-    ///
-    /// Note: The user agent description is not intended for machine
-    /// interpretation, but should still follow the specified syntax such
-    /// that it remains easily interpretable by human beings.
-    std::string user_agent_application_info;
-
     /// An optional logger to be used by the client. If no logger is
     /// specified, the client will use an instance of util::StderrLogger
     /// with the log level threshold set to util::Logger::Level::info. The
@@ -193,12 +96,12 @@ struct ClientConfig {
     /// For testing purposes only.
     ReconnectMode reconnect_mode = ReconnectMode::normal;
 
-    /// Create a separate connection for each session. For testing purposes
-    /// only.
-    ///
-    /// FIXME: This setting needs to be true for now, due to limitations in
-    /// the load balancer.
+    /// Create a separate connection for each session.
+#if REALM_DISABLE_SYNC_MULTIPLEXING
     bool one_connection_per_session = true;
+#else
+    bool one_connection_per_session = false;
+#endif
 
     /// Do not access the local file system. Sessions will act as if
     /// initiated on behalf of an empty (or nonexisting) local Realm
@@ -274,6 +177,11 @@ struct ClientConfig {
     /// will be delayed unconditionally.
     milliseconds_type fast_reconnect_limit = default_fast_reconnect_limit;
 
+    /// If a connection is disconnected because of an error that isn't a
+    /// sync protocol ERROR message, this parameter will be used to decide how
+    /// long to wait between each re-connect attempt.
+    ResumptionDelayInfo reconnect_backoff_info;
+
     /// Set to true to completely disable delaying of the upload process. In
     /// this mode, the upload process will be activated immediately, and the
     /// value of `fast_reconnect_limit` is ignored.
@@ -338,25 +246,49 @@ struct ClientConfig {
 ///
 /// \sa set_connection_state_change_listener().
 struct SessionErrorInfo : public ProtocolErrorInfo {
-    SessionErrorInfo(const ProtocolErrorInfo& info, const std::error_code& ec)
+    SessionErrorInfo(const ProtocolErrorInfo& info)
         : ProtocolErrorInfo(info)
-        , error_code(ec)
+        , status(protocol_error_to_status(static_cast<ProtocolError>(info.raw_error_code), message))
     {
     }
-    SessionErrorInfo(const std::error_code& ec, bool try_again)
-        : ProtocolErrorInfo(ec.value(), ec.message(), try_again)
-        , error_code(ec)
+
+    SessionErrorInfo(const ProtocolErrorInfo& info, Status status)
+        : ProtocolErrorInfo(info)
+        , status(std::move(status))
     {
     }
-    SessionErrorInfo(const std::error_code& ec, const std::string& msg, bool try_again)
-        : ProtocolErrorInfo(ec.value(), msg, try_again)
-        , error_code(ec)
+
+    SessionErrorInfo(Status status, IsFatal is_fatal)
+        : ProtocolErrorInfo(0, {}, is_fatal)
+        , status(std::move(status))
     {
     }
-    std::error_code error_code;
+
+    Status status;
 };
 
 enum class ConnectionState { disconnected, connecting, connected };
+
+inline std::ostream& operator<<(std::ostream& os, ConnectionState state)
+{
+    switch (state) {
+        case ConnectionState::disconnected:
+            return os << "Disconnected";
+        case ConnectionState::connecting:
+            return os << "Connecting";
+        case ConnectionState::connected:
+            return os << "Connected";
+    }
+    REALM_TERMINATE("Invalid ConnectionState value");
+}
+
+// The reason a synchronization session is used for.
+enum class SessionReason {
+    // Regular synchronization
+    Sync = 0,
+    // Download a fresh realm
+    ClientReset,
+};
 
 } // namespace realm::sync
 

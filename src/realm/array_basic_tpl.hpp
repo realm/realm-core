@@ -21,10 +21,9 @@
 
 #include <algorithm>
 #include <limits>
-#include <stdexcept>
-#include <iomanip>
 
-#include <realm/impl/destroy_guard.hpp>
+#include <realm/array_basic.hpp>
+#include <realm/node.hpp>
 
 namespace realm {
 
@@ -40,7 +39,7 @@ inline MemRef BasicArray<T>::create_array(size_t init_size, Allocator& allocator
     size_t byte_size_0 = calc_aligned_byte_size(init_size); // Throws
     // Adding zero to Array::initial_capacity to avoid taking the
     // address of that member
-    size_t byte_size = std::max(byte_size_0, Array::initial_capacity + 0); // Throws
+    size_t byte_size = std::max(byte_size_0, Node::initial_capacity + 0); // Throws
 
     MemRef mem = allocator.alloc(byte_size); // Throws
 
@@ -56,9 +55,9 @@ inline MemRef BasicArray<T>::create_array(size_t init_size, Allocator& allocator
 
 
 template <class T>
-inline void BasicArray<T>::create(Array::Type type, bool context_flag)
+inline void BasicArray<T>::create(NodeHeader::Type type, bool context_flag)
 {
-    REALM_ASSERT(type == Array::type_Normal);
+    REALM_ASSERT(type == NodeHeader::type_Normal);
     REALM_ASSERT(!context_flag);
     size_t length = 0;
     MemRef mem = create_array(length, get_alloc()); // Throws
@@ -222,7 +221,7 @@ inline size_t BasicArray<T>::calc_aligned_byte_size(size_t size)
     size_t max = std::numeric_limits<size_t>::max();
     size_t max_2 = max & ~size_t(7); // Allow for upwards 8-byte alignment
     if (size > (max_2 - header_size) / sizeof(T))
-        throw util::overflow_error("Byte size overflow");
+        throw std::overflow_error("Byte size overflow");
     size_t byte_size = header_size + size * sizeof(T);
     REALM_ASSERT_3(byte_size, >, 0);
     size_t aligned_byte_size = ((byte_size - 1) | 7) + 1; // 8-byte alignment

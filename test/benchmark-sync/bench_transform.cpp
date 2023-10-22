@@ -85,16 +85,17 @@ void transform_transactions(TestContext& test_context)
             return SyncClientHookAction::NoAction;
         };
 
-        Session session_1 = fixture.make_session(0, db_1, std::move(session_config));
-        fixture.bind_session(session_1, 0, "/test");
-        Session session_2 = fixture.make_session(1, db_2);
-        fixture.bind_session(session_2, 0, "/test");
+        Session session_1 = fixture.make_session(0, 0, db_1, "/test", std::move(session_config));
+        session_1.bind();
+        Session session_2 = fixture.make_session(1, 0, db_2, "/test");
+        session_2.bind();
 
         // Start server and upload changes of second client.
         fixture.start_server(0);
         fixture.start_client(1);
         session_2.wait_for_upload_complete_or_client_stopped();
         session_2.wait_for_download_complete_or_client_stopped();
+        session_2.detach();
         fixture.stop_client(1);
 
         // Upload changes of first client and wait to integrate changes from second client.
@@ -165,16 +166,17 @@ void transform_instructions(TestContext& test_context)
 
             return SyncClientHookAction::NoAction;
         };
-        Session session_1 = fixture.make_session(0, db_1, std::move(session_config));
-        fixture.bind_session(session_1, 0, "/test");
-        Session session_2 = fixture.make_session(1, db_2);
-        fixture.bind_session(session_2, 0, "/test");
+        Session session_1 = fixture.make_session(0, 0, db_1, "/test", std::move(session_config));
+        session_1.bind();
+        Session session_2 = fixture.make_session(1, 0, db_2, "/test");
+        session_2.bind();
 
         // Start server and upload changes of second client.
         fixture.start_server(0);
         fixture.start_client(1);
         session_2.wait_for_upload_complete_or_client_stopped();
         session_2.wait_for_download_complete_or_client_stopped();
+        session_2.detach();
         fixture.stop_client(1);
 
         // Upload changes of first client and wait to integrate changes from second client.
@@ -243,16 +245,17 @@ void connected_objects(TestContext& test_context)
 
             return SyncClientHookAction::NoAction;
         };
-        Session session_1 = fixture.make_session(0, db_1, std::move(session_config));
-        fixture.bind_session(session_1, 0, "/test");
-        Session session_2 = fixture.make_session(1, db_2);
-        fixture.bind_session(session_2, 0, "/test");
+        Session session_1 = fixture.make_session(0, 0, db_1, "/test", std::move(session_config));
+        session_1.bind();
+        Session session_2 = fixture.make_session(1, 0, db_2, "/test");
+        session_2.bind();
 
         // Start server and upload changes of second client.
         fixture.start_server(0);
         fixture.start_client(1);
         session_2.wait_for_upload_complete_or_client_stopped();
         session_2.wait_for_download_complete_or_client_stopped();
+        session_2.detach();
         fixture.stop_client(1);
 
         // Upload changes of first client and wait to integrate changes from second client.

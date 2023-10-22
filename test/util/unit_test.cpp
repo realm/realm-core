@@ -524,7 +524,7 @@ bool TestList::run(Config config)
             root_logger = std::make_shared<util::TimestampStderrLogger>(std::move(config)); // Throws
         }
         else {
-            root_logger = std::make_shared<util::StderrLogger>(); // Throws
+            root_logger = util::Logger::get_default_logger(); // Throws
         }
     }
     std::shared_ptr<util::Logger> shared_logger = std::make_shared<util::ThreadSafeLogger>(root_logger);
@@ -1034,7 +1034,7 @@ void SimpleReporter::fail(const TestContext& context, const char* file, long lin
     if (m_report_progress) {
         m_error_messages.push_back(msg);
     }
-    context.thread_context.report_logger.info(msg.c_str());
+    context.thread_context.report_logger.info("%1", msg.c_str());
 }
 
 void SimpleReporter::thread_end(const ThreadContext& context)
@@ -1061,6 +1061,9 @@ void SimpleReporter::summary(const SharedContext& context, const Summary& result
         for (auto& str : m_error_messages) {
             logger.info(str.c_str());
         }
+    }
+    if (auto ident = getenv("REALM_CHILD_IDENT")) {
+        logger.info("Spawned process with ident '%1' completed.", ident);
     }
     logger.info("Test time: %1", Timer::format(results_summary.elapsed_seconds));
     if (results_summary.num_excluded_tests >= 1) {

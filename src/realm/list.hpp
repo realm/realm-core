@@ -72,9 +72,9 @@ protected:
 };
 
 template <class T>
-class Lst final : public CollectionBaseImpl<LstBase, Lst<T>> {
+class Lst final : public CollectionBaseImpl<LstBase> {
 public:
-    using Base = CollectionBaseImpl<LstBase, Lst<T>>;
+    using Base = CollectionBaseImpl<LstBase>;
     using iterator = LstIterator<T>;
     using value_type = T;
 
@@ -84,8 +84,6 @@ public:
     Lst(Lst&&) noexcept;
     Lst& operator=(const Lst& other);
     Lst& operator=(Lst&& other) noexcept;
-
-    using Base::operator==;
 
     iterator begin() const noexcept
     {
@@ -291,6 +289,7 @@ private:
             return Mixed{};
         return value;
     }
+    T do_get(size_t ndx, const char* msg) const;
 };
 
 // Specialization of Lst<ObjKey>:
@@ -526,7 +525,7 @@ inline Lst<T>::Lst(const Obj& obj, ColKey col_key)
     : Base(obj, col_key)
 {
     if (!col_key.is_list()) {
-        throw LogicError(LogicError::collection_type_mismatch);
+        throw InvalidArgument(ErrorCodes::TypeMismatch, "Property not a list");
     }
 
     check_column_type<T>(m_col_key);
@@ -677,10 +676,14 @@ inline CollectionBasePtr Lst<T>::clone_collection() const
 template <class T>
 inline T Lst<T>::get(size_t ndx) const
 {
+    return do_get(ndx, "get()");
+}
+
+template <class T>
+inline T Lst<T>::do_get(size_t ndx, const char* msg) const
+{
     const auto current_size = size();
-    if (ndx >= current_size) {
-        throw std::out_of_range("Index out of range");
-    }
+    CollectionBase::validate_index(msg, ndx, current_size);
 
     return unresolved_to_null(m_tree->get(ndx));
 }
@@ -831,9 +834,8 @@ template <class T>
 void Lst<T>::move(size_t from, size_t to)
 {
     auto sz = size();
-    if (from >= sz || to >= sz) {
-        throw std::out_of_range{"index out of bounds"};
-    }
+    CollectionBase::validate_index("move()", from, sz);
+    CollectionBase::validate_index("move()", to, sz);
 
     if (from != to) {
         if (Replication* repl = this->m_obj.get_replication()) {
@@ -861,9 +863,8 @@ template <class T>
 void Lst<T>::swap(size_t ndx1, size_t ndx2)
 {
     auto sz = size();
-    if (ndx1 >= sz || ndx2 >= sz) {
-        throw std::out_of_range{"index out of bounds"};
-    }
+    CollectionBase::validate_index("swap()", ndx1, sz);
+    CollectionBase::validate_index("swap()", ndx2, sz);
 
     if (ndx1 != ndx2) {
         if (Replication* repl = this->m_obj.get_replication()) {
@@ -878,10 +879,11 @@ template <class T>
 T Lst<T>::set(size_t ndx, T value)
 {
     if (value_is_null(value) && !m_nullable)
-        throw LogicError(LogicError::column_not_nullable);
+        throw InvalidArgument(ErrorCodes::PropertyNotNullable,
+                              util::format("List: %1", CollectionBase::get_property_name()));
 
     // get will check for ndx out of bounds
-    T old = get(ndx);
+    T old = do_get(ndx, "set()");
     if (Replication* repl = this->m_obj.get_replication()) {
         repl->list_set(*this, ndx, value);
     }
@@ -904,11 +906,11 @@ template <class T>
 void Lst<T>::insert(size_t ndx, T value)
 {
     if (value_is_null(value) && !m_nullable)
-        throw LogicError(LogicError::column_not_nullable);
+        throw InvalidArgument(ErrorCodes::PropertyNotNullable,
+                              util::format("List: %1", CollectionBase::get_property_name()));
 
     auto sz = size();
-    if (ndx > sz)
-        throw std::out_of_range("Index out of range");
+    CollectionBase::validate_index("insert()", ndx, sz + 1);
 
     ensure_created();
 
@@ -923,7 +925,7 @@ template <class T>
 T Lst<T>::remove(size_t ndx)
 {
     // get will check for ndx out of bounds
-    T old = get(ndx);
+    T old = do_get(ndx, "remove()");
     if (Replication* repl = this->m_obj.get_replication()) {
         repl->list_erase(*this, ndx);
     }
@@ -1095,9 +1097,7 @@ inline void LnkLst::swap(size_t ndx1, size_t ndx2)
 inline ObjKey LnkLst::get(size_t ndx) const
 {
     const auto current_size = size();
-    if (ndx >= current_size) {
-        throw std::out_of_range("Index out of range");
-    }
+    CollectionBase::validate_index("get()", ndx, current_size);
     return m_list.m_tree->get(virtual2real(ndx));
 }
 
@@ -1118,7 +1118,9 @@ inline void LnkLst::insert(size_t ndx, ObjKey value)
 {
     REALM_ASSERT(!value.is_unresolved());
     if (get_target_table()->is_embedded() && value != ObjKey())
-        throw LogicError(LogicError::wrong_kind_of_table);
+        throw IllegalOperation(
+            util::format("Cannot insert an already managed object into list of embedded objects '%1.%2'",
+                         get_table()->get_class_name(), CollectionBase::get_property_name()));
 
     update_if_needed();
     m_list.insert(virtual2real(ndx), value);
@@ -1129,7 +1131,9 @@ inline ObjKey LnkLst::set(size_t ndx, ObjKey value)
 {
     REALM_ASSERT(!value.is_unresolved());
     if (get_target_table()->is_embedded() && value != ObjKey())
-        throw LogicError(LogicError::wrong_kind_of_table);
+        throw IllegalOperation(
+            util::format("Cannot insert an already managed object into list of embedded objects '%1.%2'",
+                         get_table()->get_class_name(), CollectionBase::get_property_name()));
 
     update_if_needed();
     ObjKey old = m_list.set(virtual2real(ndx), value);

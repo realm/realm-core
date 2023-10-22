@@ -136,7 +136,10 @@ void InstructionApplier::operator()(const Instruction::AddTable& instr)
 
                 log("group.get_or_add_table_with_primary_key(group, \"%1\", %2, \"%3\", %4, %5);", table_name,
                     pk_type, pk_field, nullable, table_type);
-                m_transaction.get_or_add_table_with_primary_key(table_name, pk_type, pk_field, nullable, table_type);
+                if (!m_transaction.get_or_add_table_with_primary_key(table_name, pk_type, pk_field, nullable,
+                                                                     table_type)) {
+                    bad_transaction_log("AddTable: The existing table '%1' has different properties", table_name);
+                }
             }
         },
         [&](const Instruction::AddTable::EmbeddedTable&) {
@@ -1297,7 +1300,7 @@ InstructionApplier::PathResolver::Status InstructionApplier::PathResolver::resol
         return begin_status;
     }
     if (!obj) {
-        m_applier->bad_transaction_log("%1: No such object: %3 in class '%2'", m_instr_name,
+        m_applier->bad_transaction_log("%1: No such object: '%2' in class '%3'", m_instr_name,
                                        format_pk(m_applier->m_log->get_key(m_path_instr.object)),
                                        get_string(m_path_instr.table));
     }

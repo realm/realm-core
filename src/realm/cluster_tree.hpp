@@ -68,13 +68,11 @@ public:
         return m_root->nb_columns();
     }
 
-    static size_t size_from_ref(ref_type, Allocator& alloc);
-
     void destroy()
     {
         m_root->destroy_deep();
     }
-    void nullify_links(ObjKey, CascadeState&);
+    void nullify_incoming_links(ObjKey, CascadeState&);
     bool is_empty() const noexcept
     {
         return size() == 0;

@@ -26,6 +26,7 @@
 #include <vector>
 
 #include <realm/alloc_slab.hpp>
+#include <realm/array.hpp>
 #include <realm/group.hpp>
 #include <realm/impl/simulated_failure.hpp>
 #include <realm/util/file.hpp>
@@ -347,10 +348,17 @@ NONCONCURRENT_TEST_IF(Alloc_MapFailureRecovery, _impl::SimulatedFailure::is_enab
 
     { // Verify we can still open the file with the same allocator
         _impl::SimulatedFailure::prime_mmap(nullptr);
-        alloc.attach_file(path, cfg);
+        auto top_ref = alloc.attach_file(path, cfg);
         CHECK(alloc.is_attached());
-        CHECK(alloc.get_baseline() == page_size);
-
+        // file has not (yet) been expanded to match:
+        CHECK(alloc.get_baseline() != page_size);
+        // convert before aligning file size
+        alloc.convert_from_streaming_form(top_ref);
+        // file is expanded:
+        CHECK(alloc.align_filesize_for_mmap(top_ref, cfg));
+        // and consequently needs to be reattached:
+        alloc.detach();
+        alloc.attach_file(path, cfg);
         alloc.init_mapping_management(1);
     }
 
@@ -443,32 +451,6 @@ NONCONCURRENT_TEST_IF(Alloc_MapFailureRecovery, _impl::SimulatedFailure::is_enab
         alloc.purge_old_mappings(5, 5);
     }
 }
-
-namespace {
-
-class TestSlabAlloc : public SlabAlloc {
-
-public:
-    size_t test_get_upper_section_boundary(size_t start_pos)
-    {
-        return get_upper_section_boundary(start_pos);
-    }
-    size_t test_get_lower_section_boundary(size_t start_pos)
-    {
-        return get_lower_section_boundary(start_pos);
-    }
-    size_t test_get_section_base(size_t index)
-    {
-        return get_section_base(index);
-    }
-    size_t test_get_section_index(size_t ref)
-    {
-        return get_section_index(ref);
-    }
-};
-
-} // end anonymous namespace
-
 
 // This test reproduces the sporadic issue that was seen for large refs (addresses)
 // on 32-bit iPhone 5 Simulator runs on certain host machines.

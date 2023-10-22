@@ -24,22 +24,54 @@
 #include <realm/group_writer.hpp>
 
 #include <realm/alloc_slab.hpp>
-#include <realm/db.hpp>
+#include <realm/transaction.hpp>
 #include <realm/disable_sync_to_disk.hpp>
 #include <realm/impl/destroy_guard.hpp>
 #include <realm/impl/simulated_failure.hpp>
-#include <realm/metrics/metric_timer.hpp>
 #include <realm/util/miscellaneous.hpp>
 #include <realm/util/safe_int_ops.hpp>
 
 using namespace realm;
 using namespace realm::util;
-using namespace realm::metrics;
+
+namespace realm {
+class InMemoryWriter : public _impl::ArrayWriterBase {
+public:
+    InMemoryWriter(GroupWriter& owner)
+        : m_owner(owner)
+        , m_alloc(owner.m_alloc)
+    {
+    }
+    ref_type write_array(const char* data, size_t size, uint32_t checksum) override
+    {
+        size_t pos = m_owner.get_free_space(size);
+
+        // Write the block
+        char* dest_addr = translate(pos);
+        REALM_ASSERT_RELEASE(dest_addr && (reinterpret_cast<size_t>(dest_addr) & 7) == 0);
+        memcpy(dest_addr, &checksum, 4);
+        memcpy(dest_addr + 4, data + 4, size - 4);
+        // return ref of the written array
+        ref_type ref = to_ref(pos);
+        return ref;
+    }
+    char* translate(ref_type ref)
+    {
+        return m_alloc.translate_memory_pos(ref);
+    }
+
+private:
+    GroupWriter& m_owner;
+    SlabAlloc& m_alloc;
+};
+} // namespace realm
+
 
 // Class controlling a memory mapped window into a file
-class GroupWriter::MapWindow {
+class WriteWindowMgr::MapWindow {
 public:
-    MapWindow(size_t alignment, util::File& f, ref_type start_ref, size_t initial_size);
+    MapWindow(size_t alignment, util::File& f, ref_type start_ref, size_t initial_size,
+              util::WriteMarker* write_marker = nullptr);
     ~MapWindow();
 
     // translate a ref to a pointer
@@ -67,7 +99,7 @@ private:
 };
 
 // True if a requested block fall within a memory mapping.
-bool GroupWriter::MapWindow::matches(ref_type start_ref, size_t size)
+bool WriteWindowMgr::MapWindow::matches(ref_type start_ref, size_t size)
 {
     if (start_ref < m_base_ref)
         return false;
@@ -83,14 +115,14 @@ bool GroupWriter::MapWindow::matches(ref_type start_ref, size_t size)
 //
 // In cases where a 1MB window would stretch beyond the end of the file, we choose
 // a smaller window. Anything mapped after the end of file would be undefined anyways.
-ref_type GroupWriter::MapWindow::aligned_to_mmap_block(ref_type start_ref)
+ref_type WriteWindowMgr::MapWindow::aligned_to_mmap_block(ref_type start_ref)
 {
     // align to 1MB boundary
     size_t page_mask = m_alignment - 1;
     return start_ref & ~page_mask;
 }
 
-size_t GroupWriter::MapWindow::get_window_size(util::File& f, ref_type start_ref, size_t size)
+size_t WriteWindowMgr::MapWindow::get_window_size(util::File& f, ref_type start_ref, size_t size)
 {
     size_t window_size = start_ref + size - m_base_ref;
     // always map at least to match alignment
@@ -112,7 +144,7 @@ size_t GroupWriter::MapWindow::get_window_size(util::File& f, ref_type start_ref
 //
 // extends_to_match() will extend an existing mapping to accomodate a new request if possible
 // and return true. If the request falls in a different 1MB window, it'll return false.
-bool GroupWriter::MapWindow::extends_to_match(util::File& f, ref_type start_ref, size_t size)
+bool WriteWindowMgr::MapWindow::extends_to_match(util::File& f, ref_type start_ref, size_t size)
 {
     size_t aligned_ref = aligned_to_mmap_block(start_ref);
     if (aligned_ref != m_base_ref)
@@ -124,54 +156,57 @@ bool GroupWriter::MapWindow::extends_to_match(util::File& f, ref_type start_ref,
     return true;
 }
 
-GroupWriter::MapWindow::MapWindow(size_t alignment, util::File& f, ref_type start_ref, size_t size)
+WriteWindowMgr::MapWindow::MapWindow(size_t alignment, util::File& f, ref_type start_ref, size_t size,
+                                     util::WriteMarker* write_marker)
     : m_alignment(alignment)
 {
     m_base_ref = aligned_to_mmap_block(start_ref);
     size_t window_size = get_window_size(f, start_ref, size);
     m_map.map(f, File::access_ReadWrite, window_size, 0, m_base_ref);
+#if REALM_ENABLE_ENCRYPTION
+    if (auto p = m_map.get_encrypted_mapping())
+        p->set_marker(write_marker);
+#else
+    static_cast<void>(write_marker);
+#endif
 }
 
-GroupWriter::MapWindow::~MapWindow()
+WriteWindowMgr::MapWindow::~MapWindow()
 {
     m_map.sync();
     m_map.unmap();
 }
 
-void GroupWriter::MapWindow::flush()
+void WriteWindowMgr::MapWindow::flush()
 {
     m_map.flush();
 }
 
-void GroupWriter::MapWindow::sync()
+void WriteWindowMgr::MapWindow::sync()
 {
     flush();
     m_map.sync();
 }
 
-char* GroupWriter::MapWindow::translate(ref_type ref)
+char* WriteWindowMgr::MapWindow::translate(ref_type ref)
 {
     return m_map.get_addr() + (ref - m_base_ref);
 }
 
-void GroupWriter::MapWindow::encryption_read_barrier(void* start_addr, size_t size)
+void WriteWindowMgr::MapWindow::encryption_read_barrier(void* start_addr, size_t size)
 {
     realm::util::encryption_read_barrier_for_write(start_addr, size, m_map.get_encrypted_mapping());
 }
 
-void GroupWriter::MapWindow::encryption_write_barrier(void* start_addr, size_t size)
+void WriteWindowMgr::MapWindow::encryption_write_barrier(void* start_addr, size_t size)
 {
     realm::util::encryption_write_barrier(start_addr, size, m_map.get_encrypted_mapping());
 }
 
-
-GroupWriter::GroupWriter(Group& group, Durability dura)
-    : m_group(group)
-    , m_alloc(group.m_alloc)
-    , m_free_positions(m_alloc)
-    , m_free_lengths(m_alloc)
-    , m_free_versions(m_alloc)
+WriteWindowMgr::WriteWindowMgr(SlabAlloc& alloc, Durability dura, WriteMarker* write_marker)
+    : m_alloc(alloc)
     , m_durability(dura)
+    , m_write_marker(write_marker)
 {
     m_map_windows.reserve(num_map_windows);
 #if REALM_PLATFORM_APPLE && REALM_MOBILE
@@ -193,6 +228,27 @@ GroupWriter::GroupWriter(Group& group, Durability dura)
         m_window_alignment = wanted_size;
     }
 #endif
+}
+
+GroupCommitter::GroupCommitter(Transaction& group, Durability dura, WriteMarker* write_marker)
+    : m_group(group)
+    , m_alloc(group.m_alloc)
+    , m_durability(dura)
+    , m_window_mgr(group.m_alloc, dura, write_marker)
+{
+}
+
+GroupCommitter::~GroupCommitter() = default;
+
+GroupWriter::GroupWriter(Transaction& group, Durability dura, WriteMarker* write_marker)
+    : m_group(group)
+    , m_alloc(group.m_alloc)
+    , m_durability(dura)
+    , m_window_mgr(group.m_alloc, dura, write_marker)
+    , m_free_positions(m_alloc)
+    , m_free_lengths(m_alloc)
+    , m_free_versions(m_alloc)
+{
     Array& top = m_group.m_top;
     m_logical_size = size_t(top.get_as_ref_or_tagged(Group::s_file_size_ndx).get_as_int());
 
@@ -247,38 +303,18 @@ GroupWriter::GroupWriter(Group& group, Durability dura)
     }
     m_evacuation_limit = 0;
     m_backoff = 0;
-    if (top.size() > Group::s_evacuation_point_ndx) {
-        if (auto val = top.get(Group::s_evacuation_point_ndx)) {
-            Array arr(m_alloc);
-            if (val & 1) {
-                m_evacuation_limit = size_t(val >> 1);
-                arr.create(Node::type_Normal);
-                arr.add(uint64_t(m_evacuation_limit));
-                arr.add(0); // Backoff = false
-                top.set_as_ref(Group::s_evacuation_point_ndx, arr.get_ref());
-            }
-            else {
-                arr.init_from_ref(to_ref(val));
-                auto sz = arr.size();
-                REALM_ASSERT(sz >= 2);
-                m_evacuation_limit = size_t(arr.get(0));
-                m_backoff = arr.get(1);
-                if (m_backoff > 0) {
-                    --m_backoff;
-                }
-                else {
-                    for (size_t i = 2; i < sz; i++) {
-                        m_evacuation_progress.push_back(size_t(arr.get(i)));
-                    }
-                }
-                // We give up if the freelists were allocated above the evacuation limit
-                if (m_evacuation_limit > 0 && free_positions_ref > m_evacuation_limit) {
-                    // Wait 10 commits until trying again
-                    m_backoff = 10;
-                    m_evacuation_limit = 0;
-                }
-            }
-        }
+}
+
+
+void GroupWriter::sync_according_to_durability()
+{
+    switch (m_durability) {
+        case Durability::Full:
+        case Durability::Unsafe:
+            m_window_mgr.sync_all_mappings();
+            break;
+        case Durability::MemOnly:
+            m_window_mgr.flush_all_mappings();
     }
 }
 
@@ -286,18 +322,18 @@ GroupWriter::~GroupWriter() = default;
 
 size_t GroupWriter::get_file_size() const noexcept
 {
-    auto sz = to_size_t(m_alloc.get_file().get_size());
+    auto sz = to_size_t(m_alloc.get_file_size());
     return sz;
 }
 
-void GroupWriter::flush_all_mappings()
+void WriteWindowMgr::flush_all_mappings()
 {
     for (const auto& window : m_map_windows) {
         window->flush();
     }
 }
 
-void GroupWriter::sync_all_mappings()
+void WriteWindowMgr::sync_all_mappings()
 {
     if (m_durability == Durability::Unsafe)
         return;
@@ -310,7 +346,7 @@ void GroupWriter::sync_all_mappings()
 // existing one (possibly extended to accomodate the new request). Maintain a
 // cache of open windows which are sync'ed and closed following a least recently
 // used policy. Entries in the cache are kept in MRU order.
-GroupWriter::MapWindow* GroupWriter::get_window(ref_type start_ref, size_t size)
+WriteWindowMgr::MapWindow* WriteWindowMgr::get_window(ref_type start_ref, size_t size)
 {
     auto match = std::find_if(m_map_windows.begin(), m_map_windows.end(), [&](const auto& window) {
         return window->matches(start_ref, size) || window->extends_to_match(m_alloc.get_file(), start_ref, size);
@@ -325,7 +361,8 @@ GroupWriter::MapWindow* GroupWriter::get_window(ref_type start_ref, size_t size)
         m_map_windows.back()->flush();
         m_map_windows.pop_back();
     }
-    auto new_window = std::make_unique<MapWindow>(m_window_alignment, m_alloc.get_file(), start_ref, size);
+    auto new_window =
+        std::make_unique<MapWindow>(m_window_alignment, m_alloc.get_file(), start_ref, size, m_write_marker);
     m_map_windows.insert(m_map_windows.begin(), std::move(new_window));
     return m_map_windows[0].get();
 }
@@ -565,12 +602,49 @@ void GroupWriter::backdate()
     }
 }
 
+void GroupWriter::prepare_evacuation()
+{
+    Array& top = m_group.m_top;
+    if (top.size() > Group::s_evacuation_point_ndx) {
+        if (auto val = top.get(Group::s_evacuation_point_ndx)) {
+            Array arr(m_alloc);
+            if (val & 1) {
+                m_evacuation_limit = size_t(val >> 1);
+                arr.create(Node::type_Normal);
+                arr.add(uint64_t(m_evacuation_limit));
+                arr.add(0); // Backoff = false
+                top.set_as_ref(Group::s_evacuation_point_ndx, arr.get_ref());
+            }
+            else {
+                arr.init_from_ref(to_ref(val));
+                auto sz = arr.size();
+                REALM_ASSERT(sz >= 2);
+                m_evacuation_limit = size_t(arr.get(0));
+                m_backoff = arr.get(1);
+                if (m_backoff > 0) {
+                    --m_backoff;
+                }
+                else {
+                    for (size_t i = 2; i < sz; i++) {
+                        m_evacuation_progress.push_back(size_t(arr.get(i)));
+                    }
+                }
+                // We give up if the freelists were allocated above the evacuation limit
+                if (m_evacuation_limit > 0 && m_free_positions.get_ref() > m_evacuation_limit) {
+                    // Wait 10 commits until trying again
+                    m_backoff = 10;
+                    m_evacuation_limit = 0;
+                    if (auto logger = m_group.get_logger()) {
+                        logger->log(util::Logger::Level::detail, "Give up compaction");
+                    }
+                }
+            }
+        }
+    }
+}
+
 ref_type GroupWriter::write_group()
 {
-#if REALM_METRICS
-    std::unique_ptr<MetricTimer> fsync_timer = Metrics::report_write_time(m_group);
-#endif // REALM_METRICS
-
     ALLOC_DBG_COUT("Commit nr " << m_current_version << "   ( from " << m_oldest_reachable_version << " )"
                                 << std::endl);
 
@@ -587,8 +661,14 @@ ref_type GroupWriter::write_group()
     // commit), as that would lead to clobbering of the previous database
     // version.
     bool deep = true, only_if_modified = true;
-    ref_type names_ref = m_group.m_table_names.write(*this, deep, only_if_modified); // Throws
-    ref_type tables_ref = m_group.m_tables.write(*this, deep, only_if_modified);     // Throws
+    std::unique_ptr<InMemoryWriter> in_memory_writer;
+    _impl::ArrayWriterBase* writer = this;
+    if (m_alloc.is_in_memory()) {
+        in_memory_writer = std::make_unique<InMemoryWriter>(*this);
+        writer = in_memory_writer.get();
+    }
+    ref_type names_ref = m_group.m_table_names.write(*writer, deep, only_if_modified); // Throws
+    ref_type tables_ref = m_group.m_tables.write(*writer, deep, only_if_modified);     // Throws
 
     int_fast64_t value_1 = from_ref(names_ref);
     int_fast64_t value_2 = from_ref(tables_ref);
@@ -601,8 +681,8 @@ ref_type GroupWriter::write_group()
     if (top.size() > Group::s_hist_ref_ndx) {
         if (ref_type history_ref = top.get_as_ref(Group::s_hist_ref_ndx)) {
             Allocator& alloc = top.get_alloc();
-            ref_type new_history_ref = Array::write(history_ref, alloc, *this, only_if_modified); // Throws
-            top.set(Group::s_hist_ref_ndx, from_ref(new_history_ref));                            // Throws
+            ref_type new_history_ref = Array::write(history_ref, alloc, *writer, only_if_modified); // Throws
+            top.set(Group::s_hist_ref_ndx, from_ref(new_history_ref));                              // Throws
         }
     }
     if (top.size() > Group::s_evacuation_point_ndx) {
@@ -624,7 +704,7 @@ ref_type GroupWriter::write_group()
             for (auto index : m_evacuation_progress) {
                 arr.add(int64_t(index));
             }
-            ref = arr.write(*this, false, only_if_modified);
+            ref = arr.write(*writer, false, only_if_modified);
             top.set_as_ref(Group::s_evacuation_point_ndx, ref);
         }
         else if (ref) {
@@ -710,7 +790,9 @@ ref_type GroupWriter::write_group()
             top.set(Group::s_evacuation_point_ndx, 0);
             m_evacuation_limit = 0;
 
-            // std::cout << "New logical size = " << m_logical_size << std::endl;
+            if (auto logger = m_group.get_logger()) {
+                logger->log(util::Logger::Level::detail, "New logical size %1", m_logical_size);
+            }
         }
     }
 
@@ -788,7 +870,9 @@ ref_type GroupWriter::write_group()
                 top.add(0);
             }
             top.set(Group::s_evacuation_point_ndx, RefOrTagged::make_tagged(m_evacuation_limit));
-            // std::cout << "Evacuation point = " << std::hex << m_evacuation_limit << std::dec << std::endl;
+            if (auto logger = m_group.get_logger()) {
+                logger->log(util::Logger::Level::detail, "Start compaction with limit %1", m_evacuation_limit);
+            }
         }
     }
 
@@ -830,16 +914,36 @@ ref_type GroupWriter::write_group()
 
     // The free-list now have their final form, so we can write them to the file
     // char* start_addr = m_file_map.get_addr() + reserve_ref;
-    MapWindow* window = get_window(reserve_ref, end_ref - reserve_ref);
-    char* start_addr = window->translate(reserve_ref);
-    window->encryption_read_barrier(start_addr, used);
-    write_array_at(window, free_positions_ref, m_free_positions.get_header(), free_positions_size); // Throws
-    write_array_at(window, free_sizes_ref, m_free_lengths.get_header(), free_sizes_size);           // Throws
-    write_array_at(window, free_versions_ref, m_free_versions.get_header(), free_versions_size);    // Throws
+    if (m_alloc.is_in_memory()) {
+        auto translator = in_memory_writer.get();
+        write_array_at(translator, free_positions_ref, m_free_positions.get_header(), free_positions_size); // Throws
+        write_array_at(translator, free_sizes_ref, m_free_lengths.get_header(), free_sizes_size);           // Throws
+        write_array_at(translator, free_versions_ref, m_free_versions.get_header(), free_versions_size);    // Throws
 
-    // Write top
-    write_array_at(window, top_ref, top.get_header(), top_byte_size); // Throws
-    window->encryption_write_barrier(start_addr, used);
+        // Write top
+        write_array_at(translator, top_ref, top.get_header(), top_byte_size); // Throws
+    }
+    else {
+        MapWindow* window = m_window_mgr.get_window(reserve_ref, end_ref - reserve_ref);
+        char* start_addr = window->translate(reserve_ref);
+        window->encryption_read_barrier(start_addr, used);
+        write_array_at(window, free_positions_ref, m_free_positions.get_header(), free_positions_size); // Throws
+        write_array_at(window, free_sizes_ref, m_free_lengths.get_header(), free_sizes_size);           // Throws
+        write_array_at(window, free_versions_ref, m_free_versions.get_header(), free_versions_size);    // Throws
+        REALM_ASSERT_EX(
+            free_positions_ref >= reserve_ref && free_positions_ref + free_positions_size <= reserve_ref + used,
+            reserve_ref, reserve_ref + used, free_positions_ref, free_positions_ref + free_positions_size, top_ref);
+        REALM_ASSERT_EX(free_sizes_ref >= reserve_ref && free_sizes_ref + free_sizes_size <= reserve_ref + used,
+                        reserve_ref, reserve_ref + used, free_sizes_ref, free_sizes_ref + free_sizes_size, top_ref);
+        REALM_ASSERT_EX(
+            free_versions_ref >= reserve_ref && free_versions_ref + free_versions_size <= reserve_ref + used,
+            reserve_ref, reserve_ref + used, free_versions_ref, free_versions_ref + free_versions_size, top_ref);
+
+
+        // Write top
+        write_array_at(window, top_ref, top.get_header(), top_byte_size); // Throws
+        window->encryption_write_barrier(start_addr, used);
+    }
     // Return top_ref so that it can be saved in lock file used for coordination
     return top_ref;
 }
@@ -1137,7 +1241,9 @@ GroupWriter::FreeListElement GroupWriter::reserve_free_space(size_t size)
             m_under_evacuation.clear();
             m_evacuation_limit = 0;
             m_backoff = 10;
-            // std::cout << "Give up" << std::endl;
+            if (auto logger = m_group.get_logger()) {
+                logger->log(util::Logger::Level::detail, "Give up compaction");
+            }
             chunk = search_free_space_in_part_of_freelist(size);
         }
         else {
@@ -1238,7 +1344,7 @@ ref_type GroupWriter::write_array(const char* data, size_t size, uint32_t checks
     size_t pos = get_free_space(size);
 
     // Write the block
-    MapWindow* window = get_window(pos, size);
+    MapWindow* window = m_window_mgr.get_window(pos, size);
     char* dest_addr = window->translate(pos);
     REALM_ASSERT_RELEASE(is_aligned(dest_addr));
     window->encryption_read_barrier(dest_addr, size);
@@ -1250,14 +1356,14 @@ ref_type GroupWriter::write_array(const char* data, size_t size, uint32_t checks
     return ref;
 }
 
-
-void GroupWriter::write_array_at(MapWindow* window, ref_type ref, const char* data, size_t size)
+template <class T>
+void GroupWriter::write_array_at(T* translator, ref_type ref, const char* data, size_t size)
 {
     size_t pos = size_t(ref);
 
     REALM_ASSERT_3(pos + size, <=, to_size_t(m_group.m_top.get(2) / 2));
     // REALM_ASSERT_3(pos + size, <=, m_file_map.get_size());
-    char* dest_addr = window->translate(pos);
+    char* dest_addr = translator->translate(pos);
     REALM_ASSERT_RELEASE(is_aligned(dest_addr));
 
     uint32_t dummy_checksum = 0x41414141UL; // "AAAA" in ASCII
@@ -1266,12 +1372,12 @@ void GroupWriter::write_array_at(MapWindow* window, ref_type ref, const char* da
 }
 
 
-void GroupWriter::commit(ref_type new_top_ref)
+void GroupCommitter::commit(ref_type new_top_ref)
 {
     using _impl::SimulatedFailure;
     SimulatedFailure::trigger(SimulatedFailure::group_writer__commit); // Throws
 
-    MapWindow* window = get_window(0, sizeof(SlabAlloc::Header));
+    MapWindow* window = m_window_mgr.get_window(0, sizeof(SlabAlloc::Header));
     SlabAlloc::Header& file_header = *reinterpret_cast<SlabAlloc::Header*>(window->translate(0));
     window->encryption_read_barrier(&file_header, sizeof file_header);
 
@@ -1289,29 +1395,25 @@ void GroupWriter::commit(ref_type new_top_ref)
     REALM_ASSERT(!util::int_cast_has_overflow<type_1>(file_format_version));
     // only write the file format field if necessary (optimization)
     if (type_1(file_format_version) != file_header.m_file_format[slot_selector]) {
+        // write barrier on the entire `file_header` happens below
         file_header.m_file_format[slot_selector] = type_1(file_format_version);
-        window->encryption_write_barrier(&file_header.m_file_format[slot_selector],
-                                         sizeof(file_header.m_file_format[slot_selector]));
     }
 
     // When running the test suite, device synchronization is disabled
     bool disable_sync = get_disable_sync_to_disk() || m_durability == Durability::Unsafe;
     file_header.m_top_ref[slot_selector] = new_top_ref;
 
-#if REALM_METRICS
-    std::unique_ptr<MetricTimer> fsync_timer = Metrics::report_fsync_time(m_group);
-#endif // REALM_METRICS
-
     // Make sure that that all data relating to the new snapshot is written to
     // stable storage before flipping the slot selector
-    window->encryption_write_barrier(&file_header.m_top_ref[slot_selector],
-                                     sizeof(file_header.m_top_ref[slot_selector]));
-    flush_all_mappings();
+    window->encryption_write_barrier(&file_header, sizeof file_header);
+    m_window_mgr.flush_all_mappings();
     if (!disable_sync) {
-        sync_all_mappings();
+        m_window_mgr.sync_all_mappings();
         m_alloc.get_file().barrier();
     }
+
     // Flip the slot selector bit.
+    window->encryption_read_barrier(&file_header, sizeof file_header);
     using type_2 = std::remove_reference<decltype(file_header.m_flags)>::type;
     file_header.m_flags = type_2(new_flags);
 
@@ -1330,7 +1432,7 @@ void GroupWriter::commit(ref_type new_top_ref)
 void GroupWriter::dump()
 {
     size_t count = m_free_lengths.size();
-    std::cout << "count: " << count << ", m_size = " << m_alloc.get_file().get_size() << ", "
+    std::cout << "count: " << count << ", m_size = " << m_alloc.get_file_size() << ", "
               << "version >= " << m_oldest_reachable_version << "\n";
     for (size_t i = 0; i < count; ++i) {
         std::cout << i << ": " << m_free_positions.get(i) << ", " << m_free_lengths.get(i) << " - "

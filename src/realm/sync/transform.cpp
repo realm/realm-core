@@ -908,7 +908,7 @@ REALM_NORETURN void bad_merge(_impl::TransformerImpl::Side& side, Instruction::P
 {
     std::stringstream ss;
     side.m_changeset->print_path(ss, instr.table, instr.object, instr.field, &instr.path);
-    bad_merge("%1 (instruction target: %2)", msg, ss.str());
+    bad_merge("%1 (instruction target: %2). Please contact support.", msg, ss.str());
 }
 
 template <class LeftInstruction, class RightInstruction, class Enable = void>
@@ -2420,11 +2420,6 @@ void TransformerImpl::Transformer::merge_nested(OuterSide& outer_side, InnerSide
 }
 
 
-TransformerImpl::TransformerImpl()
-    : m_changeset_parser() // Throws
-{
-}
-
 void TransformerImpl::merge_changesets(file_ident_type local_file_ident, Changeset* their_changesets,
                                        size_t their_size, Changeset** our_changesets, size_t our_size,
                                        util::Logger& logger)
@@ -2433,7 +2428,7 @@ void TransformerImpl::merge_changesets(file_ident_type local_file_ident, Changes
     REALM_ASSERT(our_size != 0);
     bool trace = false;
 #if REALM_DEBUG && !REALM_UWP
-    // FIXME: Not thread-safe (use config parameter instead and confine enviromnent reading to test/test_all.cpp)
+    // FIXME: Not thread-safe (use config parameter instead and confine environment reading to test/test_all.cpp)
     const char* trace_p = ::getenv("UNITTEST_TRACE_TRANSFORM");
     trace = (trace_p && StringData{trace_p} != "no");
     static std::mutex trace_mutex;

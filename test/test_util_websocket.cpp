@@ -171,7 +171,7 @@ public:
 
     std::vector<std::string> text_messages;
     std::vector<std::string> binary_messages;
-    std::vector<std::pair<std::error_code, std::string>> close_messages;
+    std::vector<std::pair<websocket::WebSocketError, std::string>> close_messages;
     std::vector<std::string> ping_messages;
     std::vector<std::string> pong_messages;
 
@@ -244,7 +244,8 @@ public:
         return true;
     }
 
-    bool websocket_close_message_received(std::error_code error_code, StringData error_message) override
+    bool websocket_close_message_received(websocket::WebSocketError error_code,
+                                          std::string_view error_message) override
     {
         close_messages.push_back(std::make_pair(error_code, std::string{error_message}));
         return true;
@@ -362,7 +363,7 @@ TEST(WebSocket_Messages)
     CHECK_EQUAL(config_1.ping_messages.size(), 0);
     CHECK_EQUAL(config_2.ping_messages.size(), 0);
 
-    auto handler_no_op = [=]() {};
+    auto handler_no_op = [=](std::error_code, size_t) {};
     socket_1.async_write_ping("ping example", 12, handler_no_op);
     CHECK_EQUAL(config_1.ping_messages.size(), 0);
     CHECK_EQUAL(config_2.ping_messages.size(), 1);
@@ -389,7 +390,7 @@ TEST(WebSocket_Messages)
                                "close message",
                                15, handler_no_op);
     CHECK_EQUAL(config_1.close_messages.size(), 1);
-    CHECK_EQUAL(config_1.close_messages[0].first.value(), 1000);
+    CHECK_EQUAL(static_cast<uint16_t>(config_1.close_messages[0].first), 1000);
     CHECK_EQUAL(config_1.close_messages[0].second, "close message");
 
     std::vector<size_t> message_sizes{1, 2, 100, 125, 126, 127, 128, 200, 1000, 65000, 65535, 65536, 100000, 1000000};
@@ -421,7 +422,7 @@ TEST(WebSocket_Fragmented_Messages)
     CHECK_EQUAL(config_1.n_handshake_completed, 1);
     CHECK_EQUAL(config_2.n_handshake_completed, 1);
 
-    auto handler_no_op = [=]() {};
+    auto handler_no_op = [=](std::error_code, size_t) {};
 
     socket_1.async_write_frame(false, websocket::Opcode::binary, "abc", 3, handler_no_op);
     CHECK_EQUAL(config_2.binary_messages.size(), 0);
@@ -456,7 +457,7 @@ TEST(WebSocket_Interleaved_Fragmented_Messages)
     CHECK_EQUAL(config_1.n_handshake_completed, 1);
     CHECK_EQUAL(config_2.n_handshake_completed, 1);
 
-    auto handler_no_op = [=]() {};
+    auto handler_no_op = [=](std::error_code, size_t) {};
 
     CHECK_EQUAL(config_2.ping_messages.size(), 0);
     socket_1.async_write_frame(false, websocket::Opcode::binary, "a", 1, handler_no_op);

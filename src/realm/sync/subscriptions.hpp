@@ -249,6 +249,9 @@ public:
     bool erase(StringData name);
     bool erase(const Query& query);
 
+    bool erase_by_class_name(StringData object_class_name);
+    bool erase_by_id(ObjectId id);
+
     // Updates the state of the transaction and optionally updates its error information.
     //
     // You may only set an error_str when the State is State::Error.
@@ -264,6 +267,9 @@ public:
 
 protected:
     friend class SubscriptionStore;
+    // Allow the MigrationStore access to insert_sub because it cannot use insert_or_assign due to having the query as
+    // a string and not a Query object.
+    friend class MigrationStore;
 
     MutableSubscriptionSet(std::weak_ptr<const SubscriptionStore> mgr, TransactionRef tr, Obj obj,
                            MakingMutableCopy making_mutable_copy = MakingMutableCopy{false});
@@ -295,7 +301,7 @@ using SubscriptionStoreRef = std::shared_ptr<SubscriptionStore>;
 // A SubscriptionStore manages the FLX metadata tables, SubscriptionSets and Subscriptions.
 class SubscriptionStore : public std::enable_shared_from_this<SubscriptionStore> {
 public:
-    static SubscriptionStoreRef create(DBRef db, util::UniqueFunction<void(int64_t)> on_new_subscription_set);
+    static SubscriptionStoreRef create(DBRef db);
 
     SubscriptionStore(const SubscriptionStore&) = delete;
     SubscriptionStore& operator=(const SubscriptionStore&) = delete;
@@ -327,10 +333,6 @@ public:
     // version ID. If there is no SubscriptionSet with that version ID, this throws KeyNotFound.
     SubscriptionSet get_by_version(int64_t version_id) const;
 
-    // Fulfill all previous subscriptions by superceding them. This does not
-    // affect the mutable subscription identified by the parameter.
-    void supercede_all_except(MutableSubscriptionSet& mut_sub) const;
-
     // Returns true if there have been commits to the DB since the given version
     bool would_refresh(DB::version_type version) const noexcept;
 
@@ -346,12 +348,22 @@ public:
                                                                  DB::version_type after_client_version) const;
     std::vector<SubscriptionSet> get_pending_subscriptions() const;
 
+    // Notify all subscription state change notification handlers on this subscription store with the
+    // provided Status - this does not change the state of any pending subscriptions.
+    // Does not necessarily need to be called from the event loop thread.
+    void notify_all_state_change_notifications(Status status);
+
+    // Reset SubscriptionStore and erase all current subscriptions and supersede any pending
+    // subscriptions. Must be called from the event loop thread to prevent data race issues
+    // with the subscription store.
+    void terminate();
+
 private:
     using std::enable_shared_from_this<SubscriptionStore>::weak_from_this;
     DBRef m_db;
 
 protected:
-    explicit SubscriptionStore(DBRef db, util::UniqueFunction<void(int64_t)> on_new_subscription_set);
+    explicit SubscriptionStore(DBRef db);
 
     struct NotificationRequest {
         NotificationRequest(int64_t version, util::Promise<SubscriptionSet::State> promise,
@@ -372,6 +384,10 @@ protected:
     SubscriptionSet get_by_version_impl(int64_t flx_version, util::Optional<DB::VersionID> version) const;
     MutableSubscriptionSet make_mutable_copy(const SubscriptionSet& set) const;
 
+    // Ensure the subscriptions table is properly initialized
+    // If clear_table is true, the subscriptions table will be cleared before initialization
+    void initialize_subscriptions_table(TransactionRef&& tr, bool clear_table);
+
     friend class MutableSubscriptionSet;
     friend class Subscription;
     friend class SubscriptionSet;
@@ -390,8 +406,6 @@ protected:
     ColKey m_sub_set_state;
     ColKey m_sub_set_error_str;
     ColKey m_sub_set_subscriptions;
-
-    util::UniqueFunction<void(int64_t)> m_on_new_subscription_set;
 
     mutable std::mutex m_pending_notifications_mutex;
     mutable std::condition_variable m_pending_notifications_cv;

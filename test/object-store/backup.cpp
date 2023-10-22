@@ -43,24 +43,9 @@
 #include <realm/util/fifo_helper.hpp>
 #include <realm/util/scope_exit.hpp>
 
-namespace realm {
-class TestHelper {
-public:
-    static DBRef& get_db(SharedRealm const& shared_realm)
-    {
-        return Realm::Internal::get_db(*shared_realm);
-    }
-
-    static void begin_read(SharedRealm const& shared_realm, VersionID version)
-    {
-        Realm::Internal::begin_read(*shared_realm, version);
-    }
-};
-} // namespace realm
-
 using namespace realm;
 
-TEST_CASE("Automated backup") {
+TEST_CASE("Automated backup", "[backup]") {
     TestFile config;
     std::string copy_from_file_name = test_util::get_test_resource_path() + "test_backup-olden-and-golden.realm";
     config.path = test_util::get_test_path_prefix() + "test_backup.realm";

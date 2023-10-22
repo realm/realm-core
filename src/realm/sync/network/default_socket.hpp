@@ -1,16 +1,17 @@
 #pragma once
 
-#include <random>
-#include <system_error>
-#include <map>
-
+#include <realm/sync/binding_callback_thread_observer.hpp>
 #include <realm/sync/config.hpp>
 #include <realm/sync/socket_provider.hpp>
 #include <realm/sync/network/http.hpp>
 #include <realm/sync/network/network.hpp>
 #include <realm/util/future.hpp>
-#include <realm/util/random.hpp>
 #include <realm/util/tagged_bool.hpp>
+
+#include <map>
+#include <random>
+#include <system_error>
+#include <thread>
 
 namespace realm::sync::network {
 class Service;
@@ -50,6 +51,7 @@ public:
 
     using AutoStart = util::TaggedBool<AutoStartTag>;
     DefaultSocketProvider(const std::shared_ptr<util::Logger>& logger, const std::string user_agent,
+                          const std::shared_ptr<BindingCallbackThreadObserver>& observer_ptr = nullptr,
                           AutoStart auto_start = AutoStart{true});
 
     // Don't allow move or copy constructor
@@ -65,7 +67,7 @@ public:
     /// Stops the internal event loop (provided by network::Service)
     void stop(bool wait_for_stop = false) override;
 
-    std::unique_ptr<WebSocketInterface> connect(WebSocketObserver*, WebSocketEndpoint&&) override;
+    std::unique_ptr<WebSocketInterface> connect(std::unique_ptr<WebSocketObserver>, WebSocketEndpoint&&) override;
 
     void post(FunctionHandler&& handler) override
     {
@@ -80,6 +82,14 @@ public:
         return std::unique_ptr<Timer>(new DefaultSocketProvider::Timer(m_service, delay, std::move(handler)));
     }
 
+    struct OnlyForTesting {
+        // Runs the event loop as though start() was called on the current thread so that the caller
+        // can catch and handle any thrown exceptions in tests.
+        static void run_event_loop_on_current_thread(DefaultSocketProvider* provider);
+
+        static void prep_event_loop_for_restart(DefaultSocketProvider* provider);
+    };
+
 private:
     enum class State { Starting, Running, Stopping, Stopped };
 
@@ -90,21 +100,11 @@ private:
     /// The execution code for the event loop thread
     void event_loop();
 
-    // TODO: Revisit Service::run() so the keep running timer is no longer needed
-    void start_keep_running_timer()
-    {
-        auto handler = [this](Status status) {
-            if (status.code() != ErrorCodes::OperationAborted)
-                start_keep_running_timer();
-        };
-        m_keep_running_timer = create_timer(std::chrono::hours(1000), std::move(handler)); // Throws
-    }
-
     std::shared_ptr<util::Logger> m_logger_ptr;
+    std::shared_ptr<BindingCallbackThreadObserver> m_observer_ptr;
     network::Service m_service;
     std::mt19937_64 m_random;
     const std::string m_user_agent;
-    SyncTimer m_keep_running_timer;
     std::mutex m_mutex;
     uint64_t m_event_loop_generation = 0;
     State m_state;                      // protected by m_mutex

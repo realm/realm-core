@@ -39,136 +39,21 @@ static_assert(realm_auth_provider_e(AuthProvider::APPLE) == RLM_AUTH_PROVIDER_AP
 static_assert(realm_auth_provider_e(AuthProvider::CUSTOM) == RLM_AUTH_PROVIDER_CUSTOM);
 static_assert(realm_auth_provider_e(AuthProvider::USERNAME_PASSWORD) == RLM_AUTH_PROVIDER_EMAIL_PASSWORD);
 static_assert(realm_auth_provider_e(AuthProvider::FUNCTION) == RLM_AUTH_PROVIDER_FUNCTION);
-static_assert(realm_auth_provider_e(AuthProvider::USER_API_KEY) == RLM_AUTH_PROVIDER_USER_API_KEY);
-static_assert(realm_auth_provider_e(AuthProvider::SERVER_API_KEY) == RLM_AUTH_PROVIDER_SERVER_API_KEY);
+static_assert(realm_auth_provider_e(AuthProvider::API_KEY) == RLM_AUTH_PROVIDER_API_KEY);
 
-static_assert(realm_app_errno_json_e(JSONErrorCode::bad_token) == RLM_APP_ERR_JSON_BAD_TOKEN);
-static_assert(realm_app_errno_json_e(JSONErrorCode::malformed_json) == RLM_APP_ERR_JSON_MALFORMED_JSON);
-static_assert(realm_app_errno_json_e(JSONErrorCode::missing_json_key) == RLM_APP_ERR_JSON_MISSING_JSON_KEY);
-static_assert(realm_app_errno_json_e(JSONErrorCode::bad_bson_parse) == RLM_APP_ERR_JSON_BAD_BSON_PARSE);
-
-static_assert(realm_app_errno_client_e(ClientErrorCode::user_not_found) == RLM_APP_ERR_CLIENT_USER_NOT_FOUND);
-static_assert(realm_app_errno_client_e(ClientErrorCode::user_not_logged_in) == RLM_APP_ERR_CLIENT_USER_NOT_LOGGED_IN);
-static_assert(realm_app_errno_client_e(ClientErrorCode::app_deallocated) == RLM_APP_ERR_CLIENT_APP_DEALLOCATED);
-
-static_assert(realm_app_errno_service_e(ServiceErrorCode::missing_auth_req) == RLM_APP_ERR_SERVICE_MISSING_AUTH_REQ);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::invalid_session) == RLM_APP_ERR_SERVICE_INVALID_SESSION);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::user_app_domain_mismatch) ==
-              RLM_APP_ERR_SERVICE_USER_APP_DOMAIN_MISMATCH);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::domain_not_allowed) ==
-              RLM_APP_ERR_SERVICE_DOMAIN_NOT_ALLOWED);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::read_size_limit_exceeded) ==
-              RLM_APP_ERR_SERVICE_READ_SIZE_LIMIT_EXCEEDED);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::invalid_parameter) ==
-              RLM_APP_ERR_SERVICE_INVALID_PARAMETER);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::missing_parameter) ==
-              RLM_APP_ERR_SERVICE_MISSING_PARAMETER);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::twilio_error) == RLM_APP_ERR_SERVICE_TWILIO_ERROR);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::gcm_error) == RLM_APP_ERR_SERVICE_GCM_ERROR);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::http_error) == RLM_APP_ERR_SERVICE_HTTP_ERROR);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::aws_error) == RLM_APP_ERR_SERVICE_AWS_ERROR);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::mongodb_error) == RLM_APP_ERR_SERVICE_MONGODB_ERROR);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::arguments_not_allowed) ==
-              RLM_APP_ERR_SERVICE_ARGUMENTS_NOT_ALLOWED);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::function_execution_error) ==
-              RLM_APP_ERR_SERVICE_FUNCTION_EXECUTION_ERROR);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::no_matching_rule_found) ==
-              RLM_APP_ERR_SERVICE_NO_MATCHING_RULE_FOUND);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::internal_server_error) ==
-              RLM_APP_ERR_SERVICE_INTERNAL_SERVER_ERROR);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::auth_provider_not_found) ==
-              RLM_APP_ERR_SERVICE_AUTH_PROVIDER_NOT_FOUND);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::auth_provider_already_exists) ==
-              RLM_APP_ERR_SERVICE_AUTH_PROVIDER_ALREADY_EXISTS);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::service_not_found) ==
-              RLM_APP_ERR_SERVICE_SERVICE_NOT_FOUND);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::service_type_not_found) ==
-              RLM_APP_ERR_SERVICE_SERVICE_TYPE_NOT_FOUND);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::service_already_exists) ==
-              RLM_APP_ERR_SERVICE_SERVICE_ALREADY_EXISTS);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::service_command_not_found) ==
-              RLM_APP_ERR_SERVICE_SERVICE_COMMAND_NOT_FOUND);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::value_not_found) == RLM_APP_ERR_SERVICE_VALUE_NOT_FOUND);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::value_already_exists) ==
-              RLM_APP_ERR_SERVICE_VALUE_ALREADY_EXISTS);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::value_duplicate_name) ==
-              RLM_APP_ERR_SERVICE_VALUE_DUPLICATE_NAME);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::function_not_found) ==
-              RLM_APP_ERR_SERVICE_FUNCTION_NOT_FOUND);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::function_already_exists) ==
-              RLM_APP_ERR_SERVICE_FUNCTION_ALREADY_EXISTS);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::function_duplicate_name) ==
-              RLM_APP_ERR_SERVICE_FUNCTION_DUPLICATE_NAME);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::function_syntax_error) ==
-              RLM_APP_ERR_SERVICE_FUNCTION_SYNTAX_ERROR);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::function_invalid) == RLM_APP_ERR_SERVICE_FUNCTION_INVALID);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::incoming_webhook_not_found) ==
-              RLM_APP_ERR_SERVICE_INCOMING_WEBHOOK_NOT_FOUND);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::incoming_webhook_already_exists) ==
-              RLM_APP_ERR_SERVICE_INCOMING_WEBHOOK_ALREADY_EXISTS);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::incoming_webhook_duplicate_name) ==
-              RLM_APP_ERR_SERVICE_INCOMING_WEBHOOK_DUPLICATE_NAME);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::rule_not_found) == RLM_APP_ERR_SERVICE_RULE_NOT_FOUND);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::api_key_not_found) ==
-              RLM_APP_ERR_SERVICE_API_KEY_NOT_FOUND);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::rule_already_exists) ==
-              RLM_APP_ERR_SERVICE_RULE_ALREADY_EXISTS);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::rule_duplicate_name) ==
-              RLM_APP_ERR_SERVICE_RULE_DUPLICATE_NAME);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::auth_provider_duplicate_name) ==
-              RLM_APP_ERR_SERVICE_AUTH_PROVIDER_DUPLICATE_NAME);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::restricted_host) == RLM_APP_ERR_SERVICE_RESTRICTED_HOST);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::api_key_already_exists) ==
-              RLM_APP_ERR_SERVICE_API_KEY_ALREADY_EXISTS);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::incoming_webhook_auth_failed) ==
-              RLM_APP_ERR_SERVICE_INCOMING_WEBHOOK_AUTH_FAILED);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::execution_time_limit_exceeded) ==
-              RLM_APP_ERR_SERVICE_EXECUTION_TIME_LIMIT_EXCEEDED);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::not_callable) == RLM_APP_ERR_SERVICE_NOT_CALLABLE);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::user_already_confirmed) ==
-              RLM_APP_ERR_SERVICE_USER_ALREADY_CONFIRMED);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::user_not_found) == RLM_APP_ERR_SERVICE_USER_NOT_FOUND);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::user_disabled) == RLM_APP_ERR_SERVICE_USER_DISABLED);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::auth_error) == RLM_APP_ERR_SERVICE_AUTH_ERROR);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::bad_request) == RLM_APP_ERR_SERVICE_BAD_REQUEST);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::account_name_in_use) ==
-              RLM_APP_ERR_SERVICE_ACCOUNT_NAME_IN_USE);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::invalid_email_password) ==
-              RLM_APP_ERR_SERVICE_INVALID_EMAIL_PASSWORD);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::unknown) == RLM_APP_ERR_SERVICE_UNKNOWN);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::none) == RLM_APP_ERR_SERVICE_NONE);
 
 static realm_app_error_t to_capi(const AppError& error)
 {
     auto ret = realm_app_error_t();
 
-    const std::error_category& category = error.error_code.category();
-    if (category == http_error_category()) {
-        ret.error_category = RLM_APP_ERROR_CATEGORY_HTTP;
-    }
-    else if (category == json_error_category()) {
-        ret.error_category = RLM_APP_ERROR_CATEGORY_JSON;
-    }
-    else if (category == client_error_category()) {
-        ret.error_category = RLM_APP_ERROR_CATEGORY_CLIENT;
-    }
-    else if (category == service_error_category()) {
-        ret.error_category = RLM_APP_ERROR_CATEGORY_SERVICE;
-    }
-    else if (category == custom_error_category()) {
-        ret.error_category = RLM_APP_ERROR_CATEGORY_CUSTOM;
-    }
-    else {
-        REALM_TERMINATE("Unexpected error category");
+    ret.error = realm_errno_e(error.code());
+    ret.categories = ErrorCodes::error_categories(error.code()).value();
+
+    if (error.additional_status_code) {
+        ret.http_status_code = *error.additional_status_code;
     }
 
-    ret.error_code = error.error_code.value();
-
-    if (error.http_status_code) {
-        ret.http_status_code = *error.http_status_code;
-    }
-
-    ret.message = error.message.c_str();
+    ret.message = error.what();
 
     if (error.link_to_server_logs.size() > 0) {
         ret.link_to_server_logs = error.link_to_server_logs.c_str();
@@ -283,14 +168,9 @@ RLM_API realm_app_credentials_t* realm_app_credentials_new_function(const char* 
     });
 }
 
-RLM_API realm_app_credentials_t* realm_app_credentials_new_user_api_key(const char* api_key) noexcept
+RLM_API realm_app_credentials_t* realm_app_credentials_new_api_key(const char* api_key) noexcept
 {
-    return new realm_app_credentials_t(AppCredentials::user_api_key(api_key));
-}
-
-RLM_API realm_app_credentials_t* realm_app_credentials_new_server_api_key(const char* api_key) noexcept
-{
-    return new realm_app_credentials_t(AppCredentials::server_api_key(api_key));
+    return new realm_app_credentials_t(AppCredentials::api_key(api_key));
 }
 
 RLM_API realm_auth_provider_e realm_auth_credentials_get_provider(realm_app_credentials_t* credentials) noexcept
@@ -312,25 +192,9 @@ RLM_API void realm_app_config_set_base_url(realm_app_config_t* config, const cha
     config->base_url = std::string(base_url);
 }
 
-RLM_API void realm_app_config_set_local_app_name(realm_app_config_t* config, const char* local_app_name) noexcept
-{
-    config->local_app_name = std::string(local_app_name);
-}
-
-RLM_API void realm_app_config_set_local_app_version(realm_app_config_t* config,
-                                                    const char* local_app_version) noexcept
-{
-    config->local_app_version = std::string(local_app_version);
-}
-
 RLM_API void realm_app_config_set_default_request_timeout(realm_app_config_t* config, uint64_t ms) noexcept
 {
     config->default_request_timeout_ms = ms;
-}
-
-RLM_API void realm_app_config_set_platform(realm_app_config_t* config, const char* platform) noexcept
-{
-    config->device_info.platform = std::string(platform);
 }
 
 RLM_API void realm_app_config_set_platform_version(realm_app_config_t* config, const char* platform_version) noexcept
@@ -346,11 +210,6 @@ RLM_API void realm_app_config_set_sdk_version(realm_app_config_t* config, const 
 RLM_API void realm_app_config_set_sdk(realm_app_config_t* config, const char* sdk) noexcept
 {
     config->device_info.sdk = std::string(sdk);
-}
-
-RLM_API void realm_app_config_set_cpu_arch(realm_app_config_t* config, const char* cpu_arch) noexcept
-{
-    config->device_info.cpu_arch = std::string(cpu_arch);
 }
 
 RLM_API void realm_app_config_set_device_name(realm_app_config_t* config, const char* device_name) noexcept
@@ -374,6 +233,11 @@ RLM_API void realm_app_config_set_framework_version(realm_app_config_t* config,
     config->device_info.framework_version = std::string(framework_version);
 }
 
+RLM_API void realm_app_config_set_bundle_id(realm_app_config_t* config, const char* bundle_id) noexcept
+{
+    config->device_info.bundle_id = std::string(bundle_id);
+}
+
 RLM_API const char* realm_app_credentials_serialize_as_json(realm_app_credentials_t* app_credentials) noexcept
 {
     return wrap_err([&] {
@@ -387,23 +251,6 @@ RLM_API realm_app_t* realm_app_create(const realm_app_config_t* app_config,
     return wrap_err([&] {
         return new realm_app_t(App::get_uncached_app(*app_config, *sync_client_config));
     });
-}
-
-RLM_API realm_app_t* realm_app_get(const realm_app_config_t* app_config,
-                                   const realm_sync_client_config_t* sync_client_config)
-{
-    return wrap_err([&] {
-        return new realm_app_t(App::get_shared_app(*app_config, *sync_client_config));
-    });
-}
-
-RLM_API realm_app_t* realm_app_get_cached(const char* app_id) noexcept
-{
-    if (auto app = App::get_cached_app(app_id)) {
-        return new realm_app_t(std::move(app));
-    };
-
-    return nullptr;
 }
 
 RLM_API void realm_clear_cached_apps(void) noexcept
@@ -721,8 +568,9 @@ RLM_API bool realm_app_push_notification_client_deregister_device(const realm_ap
 }
 
 RLM_API bool realm_app_call_function(const realm_app_t* app, const realm_user_t* user, const char* function_name,
-                                     const char* serialized_ejson_payload, realm_return_string_func_t callback,
-                                     realm_userdata_t userdata, realm_free_userdata_func_t userdata_free)
+                                     const char* serialized_ejson_payload, const char* service_name,
+                                     realm_return_string_func_t callback, realm_userdata_t userdata,
+                                     realm_free_userdata_func_t userdata_free)
 {
     return wrap_err([&] {
         auto cb = [callback, userdata = SharedUserdata{userdata, FreeUserdata(userdata_free)}](
@@ -735,8 +583,9 @@ RLM_API bool realm_app_call_function(const realm_app_t* app, const realm_user_t*
                 callback(userdata.get(), reply->c_str(), nullptr);
             }
         };
-        (*app)->call_function(*user, function_name, serialized_ejson_payload, /*service_name=*/std::nullopt,
-                              std::move(cb));
+        util::Optional<std::string> service_name_opt =
+            service_name ? util::some<std::string>(service_name) : util::none;
+        (*app)->call_function(*user, function_name, serialized_ejson_payload, service_name_opt, std::move(cb));
         return true;
     });
 }
@@ -793,11 +642,6 @@ RLM_API bool realm_user_get_all_identities(const realm_user_t* user, realm_user_
     });
 }
 
-RLM_API const char* realm_user_get_local_identity(const realm_user_t* user) noexcept
-{
-    return (*user)->local_identity().c_str();
-}
-
 RLM_API char* realm_user_get_device_id(const realm_user_t* user) noexcept
 {
     if ((*user)->has_device_id()) {
@@ -805,11 +649,6 @@ RLM_API char* realm_user_get_device_id(const realm_user_t* user) noexcept
     }
 
     return nullptr;
-}
-
-RLM_API realm_auth_provider_e realm_user_get_auth_provider(const realm_user_t* user) noexcept
-{
-    return realm_auth_provider_e(enum_from_provider_type((*user)->provider_type()));
 }
 
 RLM_API bool realm_user_log_out(realm_user_t* user)
@@ -912,9 +751,8 @@ to_mongodb_collection_find_one_and_modify_options(const realm_mongodb_find_one_a
     return mongodb_options;
 }
 
-using UserDataPtr = std::unique_ptr<void, realm_free_userdata_func_t>;
 static void handle_mongodb_collection_result(util::Optional<bson::Bson> bson, util::Optional<AppError> app_error,
-                                             UserDataPtr data, realm_mongodb_callback_t callback)
+                                             UserdataPtr data, realm_mongodb_callback_t callback)
 {
     if (app_error) {
         auto error = to_capi(*app_error);
@@ -948,7 +786,7 @@ RLM_API bool realm_mongo_collection_find(realm_mongodb_collection_t* collection,
     return wrap_err([&] {
         collection->find_bson(convert_to_bson<bson::BsonDocument>(filter_ejson),
                               to_mongodb_collection_find_options(options),
-                              [&](util::Optional<bson::Bson> bson, util::Optional<AppError> app_error) {
+                              [=](util::Optional<bson::Bson> bson, util::Optional<AppError> app_error) {
                                   handle_mongodb_collection_result(bson, app_error, {data, delete_data}, callback);
                               });
         return true;
@@ -965,7 +803,7 @@ RLM_API bool realm_mongo_collection_find_one(realm_mongodb_collection_t* collect
     return wrap_err([&] {
         collection->find_one_bson(
             convert_to_bson<bson::BsonDocument>(filter_ejson), to_mongodb_collection_find_options(options),
-            [&](util::Optional<bson::Bson> bson, util::Optional<AppError> app_error) {
+            [=](util::Optional<bson::Bson> bson, util::Optional<AppError> app_error) {
                 handle_mongodb_collection_result(bson, app_error, {data, delete_data}, callback);
             });
         return true;
@@ -980,7 +818,7 @@ RLM_API bool realm_mongo_collection_aggregate(realm_mongodb_collection_t* collec
     return wrap_err([&] {
         collection->aggregate_bson(
             convert_to_bson<bson::BsonArray>(filter_ejson),
-            [&](util::Optional<bson::Bson> bson, util::Optional<AppError> app_error) {
+            [=](util::Optional<bson::Bson> bson, util::Optional<AppError> app_error) {
                 handle_mongodb_collection_result(bson, app_error, {data, delete_data}, callback);
             });
         return true;
@@ -994,7 +832,7 @@ RLM_API bool realm_mongo_collection_count(realm_mongodb_collection_t* collection
     REALM_ASSERT(collection);
     return wrap_err([&] {
         collection->count_bson(convert_to_bson<bson::BsonDocument>(filter_ejson), limit,
-                               [&](util::Optional<bson::Bson> bson, util::Optional<app::AppError> app_error) {
+                               [=](util::Optional<bson::Bson> bson, util::Optional<app::AppError> app_error) {
                                    handle_mongodb_collection_result(bson, app_error, {data, delete_data}, callback);
                                });
         return true;
@@ -1009,7 +847,7 @@ RLM_API bool realm_mongo_collection_insert_one(realm_mongodb_collection_t* colle
     return wrap_err([&] {
         collection->insert_one_bson(
             convert_to_bson<bson::BsonDocument>(filter_ejson),
-            [&](util::Optional<bson::Bson> bson, util::Optional<AppError> app_error) {
+            [=](util::Optional<bson::Bson> bson, util::Optional<AppError> app_error) {
                 handle_mongodb_collection_result(bson, app_error, {data, delete_data}, callback);
             });
         return true;
@@ -1024,7 +862,7 @@ RLM_API bool realm_mongo_collection_insert_many(realm_mongodb_collection_t* coll
     return wrap_err([&] {
         collection->insert_many_bson(
             convert_to_bson<bson::BsonArray>(filter_ejson),
-            [&](util::Optional<bson::Bson> bson, util::Optional<AppError> app_error) {
+            [=](util::Optional<bson::Bson> bson, util::Optional<AppError> app_error) {
                 handle_mongodb_collection_result(bson, app_error, {data, delete_data}, callback);
             });
         return true;
@@ -1039,7 +877,7 @@ RLM_API bool realm_mongo_collection_delete_one(realm_mongodb_collection_t* colle
     return wrap_err([&] {
         collection->delete_one_bson(
             convert_to_bson<bson::BsonDocument>(filter_ejson),
-            [&](util::Optional<bson::Bson> bson, util::Optional<AppError> app_error) {
+            [=](util::Optional<bson::Bson> bson, util::Optional<AppError> app_error) {
                 handle_mongodb_collection_result(bson, app_error, {data, delete_data}, callback);
             });
         return true;
@@ -1054,7 +892,7 @@ RLM_API bool realm_mongo_collection_delete_many(realm_mongodb_collection_t* coll
     return wrap_err([&] {
         collection->delete_many_bson(
             convert_to_bson<bson::BsonDocument>(filter_ejson),
-            [&](util::Optional<bson::Bson> bson, util::Optional<AppError> app_error) {
+            [=](util::Optional<bson::Bson> bson, util::Optional<AppError> app_error) {
                 handle_mongodb_collection_result(bson, app_error, {data, delete_data}, callback);
             });
         return true;
@@ -1072,7 +910,7 @@ RLM_API bool realm_mongo_collection_update_one(realm_mongodb_collection_t* colle
         const auto& bson_update = convert_to_bson<bson::BsonDocument>(update_ejson);
         collection->update_one_bson(
             bson_filter, bson_update, upsert,
-            [&](util::Optional<bson::Bson> bson, util::Optional<AppError> app_error) {
+            [=](util::Optional<bson::Bson> bson, util::Optional<AppError> app_error) {
                 handle_mongodb_collection_result(bson, app_error, {data, delete_data}, callback);
             });
         return true;
@@ -1090,7 +928,7 @@ RLM_API bool realm_mongo_collection_update_many(realm_mongodb_collection_t* coll
         const auto& bson_update = convert_to_bson<bson::BsonDocument>(update_ejson);
         collection->update_many_bson(
             bson_filter, bson_update, upsert,
-            [&](util::Optional<bson::Bson> bson, util::Optional<AppError> app_error) {
+            [=](util::Optional<bson::Bson> bson, util::Optional<AppError> app_error) {
                 handle_mongodb_collection_result(bson, app_error, {data, delete_data}, callback);
             });
         return true;
@@ -1109,7 +947,7 @@ RLM_API bool realm_mongo_collection_find_one_and_update(realm_mongodb_collection
         const auto& bson_update = convert_to_bson<bson::BsonDocument>(update_ejson);
         collection->find_one_and_update_bson(
             bson_filter, bson_update, to_mongodb_collection_find_one_and_modify_options(options),
-            [&](util::Optional<bson::Bson> bson, util::Optional<AppError> app_error) {
+            [=](util::Optional<bson::Bson> bson, util::Optional<AppError> app_error) {
                 handle_mongodb_collection_result(bson, app_error, {data, delete_data}, callback);
             });
         return true;
@@ -1127,7 +965,7 @@ RLM_API bool realm_mongo_collection_find_one_and_replace(
         const auto& replacement_bson = convert_to_bson<bson::BsonDocument>(replacement_ejson);
         collection->find_one_and_replace_bson(
             filter_bson, replacement_bson, to_mongodb_collection_find_one_and_modify_options(options),
-            [&](util::Optional<bson::Bson> bson, util::Optional<AppError> app_error) {
+            [=](util::Optional<bson::Bson> bson, util::Optional<AppError> app_error) {
                 handle_mongodb_collection_result(bson, app_error, {data, delete_data}, callback);
             });
         return true;
@@ -1145,7 +983,7 @@ RLM_API bool realm_mongo_collection_find_one_and_delete(realm_mongodb_collection
         const auto& bson_filter = convert_to_bson<bson::BsonDocument>(filter_ejson);
         collection->find_one_and_delete_bson(
             bson_filter, to_mongodb_collection_find_one_and_modify_options(options),
-            [&](util::Optional<bson::Bson> bson, util::Optional<AppError> app_error) {
+            [=](util::Optional<bson::Bson> bson, util::Optional<AppError> app_error) {
                 handle_mongodb_collection_result(bson, app_error, {data, delete_data}, callback);
             });
         return true;
