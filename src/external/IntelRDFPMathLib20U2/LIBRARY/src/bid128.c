@@ -36,7 +36,7 @@
 // number is less than the value represented by the second and third entries
 // concatenated, then the number of decimal digits k is the fourth entry, else
 // the number of decimal digits is the fourth entry plus 1
-DEC_DIGITS bid_nr_digits[] = {	// only the first entry is used if it is not 0
+const DEC_DIGITS bid_nr_digits[] = {	// only the first entry is used if it is not 0
   {1, 0x0000000000000000ULL, 0x000000000000000aULL, 1}
   ,	//   1-bit n < 10^1
   {1, 0x0000000000000000ULL, 0x000000000000000aULL, 1}
@@ -266,7 +266,7 @@ DEC_DIGITS bid_nr_digits[] = {	// only the first entry is used if it is not 0
 };
 
 // bid_midpoint64[i - 1] = 1/2 * 10^i = 5 * 10^(i-1), 1 <= i <= 19
-BID_UINT64 bid_midpoint64[] = {
+const BID_UINT64 bid_midpoint64[] = {
   0x0000000000000005ULL,	// 1/2 * 10^1 = 5 * 10^0
   0x0000000000000032ULL,	// 1/2 * 10^2 = 5 * 10^1
   0x00000000000001f4ULL,	// 1/2 * 10^3 = 5 * 10^2
@@ -289,7 +289,7 @@ BID_UINT64 bid_midpoint64[] = {
 };
 
 // bid_midpoint128[i - 20] = 1/2 * 10^i = 5 * 10^(i-1), 20 <= i <= 38
-BID_UINT128 bid_midpoint128[] = {	// the 64-bit word order is L, H
+const BID_UINT128 bid_midpoint128[] = {	// the 64-bit word order is L, H
   {{0xb5e3af16b1880000ULL, 0x0000000000000002ULL}
    }
   ,	// 1/2 * 10^20 = 5 * 10^19
@@ -349,7 +349,7 @@ BID_UINT128 bid_midpoint128[] = {	// the 64-bit word order is L, H
 };
 
 // bid_midpoint192[i - 39] = 1/2 * 10^i = 5 * 10^(i-1), 39 <= i <= 58
-BID_UINT192 bid_midpoint192[] = {	// the 64-bit word order is L, M, H
+const BID_UINT192 bid_midpoint192[] = {	// the 64-bit word order is L, M, H
   {{0x2fb2ab4000000000ULL, 0x78287f49c4a1d662ULL, 0x0000000000000001ULL}
    }
   ,
@@ -432,7 +432,7 @@ BID_UINT192 bid_midpoint192[] = {	// the 64-bit word order is L, M, H
 };
 
 // bid_midpoint256[i - 59] = 1/2 * 10^i = 5 * 10^(i-1), 59 <= i <= 68
-BID_UINT256 bid_midpoint256[] = {	// the 64-bit word order is LL, LH, HL, HH
+const BID_UINT256 bid_midpoint256[] = {	// the 64-bit word order is LL, LH, HL, HH
   {{0x7400000000000000ULL, 0x1791b6823a9eada4ULL,
     0xf7285b812e1b5040ULL, 0x0000000000000007ULL}
    }
@@ -511,7 +511,7 @@ BID_UINT256 bid_midpoint256[] = {	// the 64-bit word order is LL, LH, HL, HH
 };
 
 // bid_ten2k64[i] = 10^i, 0 <= i <= 19
-BID_UINT64 bid_ten2k64[] = {
+const BID_UINT64 bid_ten2k64[] = {
   0x0000000000000001ULL,	// 10^0
   0x000000000000000aULL,	// 10^1
   0x0000000000000064ULL,	// 10^2
@@ -536,7 +536,7 @@ BID_UINT64 bid_ten2k64[] = {
 
 
 // bid_ten2k128[i - 20] = 10^i, 20 <= i <= 38
-BID_UINT128 bid_ten2k128[] = {	// the 64-bit word order is L, H
+const BID_UINT128 bid_ten2k128[] = {	// the 64-bit word order is L, H
   {{0x6bc75e2d63100000ULL, 0x0000000000000005ULL}
    }
   ,	// 10^20
@@ -598,7 +598,7 @@ BID_UINT128 bid_ten2k128[] = {	// the 64-bit word order is L, H
 // might split into ten2k192[] and bid_ten2k256[]
 
 // bid_ten2k256[i - 39] = 10^i, 39 <= i <= 68
-BID_UINT256 bid_ten2k256[] = {	// the 64-bit word order is LL, LH, HL, HH
+const BID_UINT256 bid_ten2k256[] = {	// the 64-bit word order is LL, LH, HL, HH
   {{0x5f65568000000000ULL, 0xf050fe938943acc4ULL,
     0x0000000000000002ULL, 0x0000000000000000ULL}
    }
@@ -758,7 +758,7 @@ BID_UINT256 bid_ten2k256[] = {	// the 64-bit word order is LL, LH, HL, HH
 
 // bid_ten2mk128[k - 1] = 10^(-k) * 2^exp (k), where 1 <= k <= 34 and
 // exp (k) = bid_shiftright128[k - 1] + 128
-BID_UINT128 bid_ten2mk128[] = {
+const BID_UINT128 bid_ten2mk128[] = {
   {{0x999999999999999aULL, 0x1999999999999999ULL}
    }
   ,	//  10^(-1) * 2^128
@@ -866,7 +866,7 @@ BID_UINT128 bid_ten2mk128[] = {
 
 // bid_shiftright128[] contains the right shift count to obtain C2* from the top
 // 128 bits of the 128x128-bit product C2 * Kx
-int bid_shiftright128[] = {
+const int bid_shiftright128[] = {
   0,	// 128 - 128
   0,	// 128 - 128
   0,	// 128 - 128
@@ -909,7 +909,7 @@ int bid_shiftright128[] = {
 // bid_maskhigh128[] contains the mask to apply to the top 128 bits of the 
 // 128x128-bit product in order to obtain the high bits of f2*
 // the 64-bit word order is L, H
-BID_UINT64 bid_maskhigh128[] = {
+const BID_UINT64 bid_maskhigh128[] = {
   0x0000000000000000ULL,	//  0 = 128 - 128 bits
   0x0000000000000000ULL,	//  0 = 128 - 128 bits
   0x0000000000000000ULL,	//  0 = 128 - 128 bits
@@ -950,7 +950,7 @@ BID_UINT64 bid_maskhigh128[] = {
 // bid_onehalf128[] contains the high bits of 1/2 positioned correctly for 
 // comparison with the high bits of f2*
 // the 64-bit word order is L, H
-BID_UINT64 bid_onehalf128[] = {
+const BID_UINT64 bid_onehalf128[] = {
   0x0000000000000000ULL,	//  0 bits
   0x0000000000000000ULL,	//  0 bits
   0x0000000000000000ULL,	//  0 bits
@@ -987,7 +987,7 @@ BID_UINT64 bid_onehalf128[] = {
   0x0000002000000000ULL	// 102 bits
 };
 
-BID_UINT64 bid_ten2mk64[] = {
+const BID_UINT64 bid_ten2mk64[] = {
   0x199999999999999aULL,	//  10^(-1) * 2^ 64
   0x028f5c28f5c28f5dULL,	//  10^(-2) * 2^ 64 
   0x004189374bc6a7f0ULL,	//  10^(-3) * 2^ 64 
@@ -1009,7 +1009,7 @@ BID_UINT64 bid_ten2mk64[] = {
 // bid_ten2mk128trunc[] contains T*, the top Ex >= 128 bits of 10^(-k), 
 // for 1 <= k <= 34 
 // the 64-bit word order is L, H
-BID_UINT128 bid_ten2mk128trunc[] = {
+const BID_UINT128 bid_ten2mk128trunc[] = {
   {{0x9999999999999999ULL, 0x1999999999999999ULL}},	//  10^(-1) * 2^128
   {{0x28f5c28f5c28f5c2ULL, 0x028f5c28f5c28f5cULL}},	//  10^(-2) * 2^128 
   {{0x9db22d0e56041893ULL, 0x004189374bc6a7efULL}},	//  10^(-3) * 2^128 
@@ -1049,7 +1049,7 @@ BID_UINT128 bid_ten2mk128trunc[] = {
 // bid_ten2mk128M[k - 1] = 10^(-k) * 2^exp (k), where 1 <= k <= 4 and
 // exp (k) = bid_shiftright128[k - 1] + 128
 // the 64-bit word order is L, H
-BID_UINT128 bid_ten2mk128M[] = {
+const BID_UINT128 bid_ten2mk128M[] = {
   {{0xcccccccccccccccdULL, 0xccccccccccccccccULL}},	//  10^(-1) * 2^131
   {{0x3d70a3d70a3d70a4ULL, 0xa3d70a3d70a3d70aULL}},	//  10^(-2) * 2^134
   {{0x645a1cac083126eaULL, 0x83126e978d4fdf3bULL}},	//  10^(-3) * 2^137
@@ -1059,7 +1059,7 @@ BID_UINT128 bid_ten2mk128M[] = {
 // bid_ten2mk128truncM[] contains T*, the top Ex >= 128 bits of 10^(-k),
 // for 1 <= k <= 4; the top bits which are 0 are not represented
 // the 64-bit word order is L, H
-BID_UINT128 bid_ten2mk128truncM[] = {
+const BID_UINT128 bid_ten2mk128truncM[] = {
   {{0xccccccccccccccccULL, 0xccccccccccccccccULL}},	//  10^(-1) * 2^131
   {{0x3d70a3d70a3d70a3ULL, 0xa3d70a3d70a3d70aULL}},	//  10^(-2) * 2^134
   {{0x645a1cac083126e9ULL, 0x83126e978d4fdf3bULL}},	//  10^(-3) * 2^137
@@ -1068,7 +1068,7 @@ BID_UINT128 bid_ten2mk128truncM[] = {
 
 // bid_shiftright128M[] contains the right shift count to obtain C2* from the top
 // 128 bits of the 128x128-bit product C2 * Kx
-int bid_shiftright128M[] = {
+const int bid_shiftright128M[] = {
   3,	// 131 - 128
   6,	// 134 - 128
   9,	// 137 - 128
@@ -1078,7 +1078,7 @@ int bid_shiftright128M[] = {
 // bid_maskhigh128M[] contains the mask to apply to the top 128 bits of the
 // 128x128-bit product in order to obtain the high bits of f*
 // the high 64 bits of the mask are 0, so only the low 64 bits are represented
-BID_UINT64 bid_maskhigh128M[] = {
+const BID_UINT64 bid_maskhigh128M[] = {
   0x0000000000000007ULL,	//  3 = 131 - 128 bits
   0x000000000000003fULL,	//  6 = 134 - 128 bits
   0x00000000000001ffULL,	//  9 = 137 - 128 bits
@@ -1088,7 +1088,7 @@ BID_UINT64 bid_maskhigh128M[] = {
 // bid_onehalf128M[] contains 1/2 positioned correctly for
 // comparison with the high bits of f*
 // the high 64 bits are 0, so only the low 64 bits are represented
-BID_UINT64 bid_onehalf128M[] = {
+const BID_UINT64 bid_onehalf128M[] = {
   0x0000000000000004ULL,	//  3 bits
   0x0000000000000020ULL,	//  6 bits
   0x0000000000000100ULL,	//  9 bits
@@ -1098,7 +1098,7 @@ BID_UINT64 bid_onehalf128M[] = {
 // bid_ten2mk192M[k - 1] = 10^(-k-4) * 2^exp (k), where 1 <= k <= 19 and
 // exp (k) = bid_shiftright128[k - 1] + 128
 // the 64-bit word order is L, M, H
-BID_UINT192 bid_ten2mk192M[] = {
+const BID_UINT192 bid_ten2mk192M[] = {
   {{0xcddd6e04c0592104ULL, 0x0fcf80dc33721d53ULL,
     0xa7c5ac471b478423ULL}},
   //  10^(-5) * 2^208
@@ -1160,7 +1160,7 @@ BID_UINT192 bid_ten2mk192M[] = {
 // bid_ten2mk192truncM[] contains T*, the top Ex >= 192 bits of 10^(-k),
 // for 5 <= k <= 23; the top bits which are 0 are not represented
 // the 64-bit word order is L, M, H
-BID_UINT192 bid_ten2mk192truncM[] = {
+const BID_UINT192 bid_ten2mk192truncM[] = {
   {{0xcddd6e04c0592103ULL, 0x0fcf80dc33721d53ULL,
     0xa7c5ac471b478423ULL}},
   //  10^(-5) * 2^208
@@ -1222,7 +1222,7 @@ BID_UINT192 bid_ten2mk192truncM[] = {
 // bid_shiftright192M[] contains the right shift count to obtain C2* from the top
 // 192 bits of the 192x192-bit product C2 * Kx if 0 <= ind <= 14 where ind is 
 // the index in the table, or from the top 128 bits if 15 <= ind <= 18
-int bid_shiftright192M[] = {
+const int bid_shiftright192M[] = {
   16,	// 208 - 192
   19,	// 211 - 192
   23,	// 215 - 192
@@ -1248,7 +1248,7 @@ int bid_shiftright192M[] = {
 // 192x192-bit product in order to obtain the high bits of f*
 // if 0 <= ind <= 14 where ind is the index in the table, then the high 128 bits
 // of the 384-bit mask are 0;  if 15 <= ind <= 18 then the high 64 bits are 0
-BID_UINT64 bid_maskhigh192M[] = {
+const BID_UINT64 bid_maskhigh192M[] = {
   0x000000000000ffffULL,	//  16 = 208 - 192 bits
   0x000000000007ffffULL,	//  19 = 211 - 192 bits
   0x00000000007fffffULL,	//  23 = 215 - 192 bits
@@ -1274,7 +1274,7 @@ BID_UINT64 bid_maskhigh192M[] = {
 // comparison with the high bits of f*
 // if 0 <= ind <= 14 where ind is the index in the table, then the high 128 bits
 // of the 384-bit mask are 0;  if 15 <= ind <= 18 then the high 648 bits are 0
-BID_UINT64 bid_onehalf192M[] = {
+const BID_UINT64 bid_onehalf192M[] = {
   0x0000000000008000ULL,	//  16 = 208 - 192 bits
   0x0000000000040000ULL,	//  19 = 211 - 192 bits
   0x0000000000400000ULL,	//  23 = 215 - 192 bits
@@ -1298,7 +1298,7 @@ BID_UINT64 bid_onehalf192M[] = {
 
 // bid_ten2mk256M[k - 1] = 10^(-k-23) * 2^exp (k), where 1 <= k <= 11 and
 // exp (k) = bid_shiftright128[k - 1] + 128
-BID_UINT256 bid_ten2mk256M[] = {	// the 64-bit word order is LL, LH, HL, HH
+const BID_UINT256 bid_ten2mk256M[] = {	// the 64-bit word order is LL, LH, HL, HH
   {{0xf23472530ce6e3edULL, 0xd78c3615cf3a050cULL,
     0xc4926a9672793542ULL, 0x9abe14cd44753b52ULL}},	//  10^(-24) * 2^335
   {{0xe9ed83b814a49fe1ULL, 0x8c1389bc7ec33b47ULL,
@@ -1325,7 +1325,7 @@ BID_UINT256 bid_ten2mk256M[] = {	// the 64-bit word order is LL, LH, HL, HH
 
 // bid_ten2mk256truncM[] contains T*, the top Ex >= 256 bits of 10^(-k),
 // for 24 <= k <= 34; the top bits which are 0 are not represented
-BID_UINT256 bid_ten2mk256truncM[] = {	// the 64-bit word order is LL, LH, HL, HH
+const BID_UINT256 bid_ten2mk256truncM[] = {	// the 64-bit word order is LL, LH, HL, HH
   {{0xf23472530ce6e3ecULL, 0xd78c3615cf3a050cULL,
     0xc4926a9672793542ULL, 0x9abe14cd44753b52ULL}},	//  10^(-24) * 2^335
   {{0xe9ed83b814a49fe0ULL, 0x8c1389bc7ec33b47ULL,
@@ -1352,7 +1352,7 @@ BID_UINT256 bid_ten2mk256truncM[] = {	// the 64-bit word order is LL, LH, HL, HH
 
 // bid_shiftright256M[] contains the right shift count to obtain C2* from the top
 // 192 bits of the 256x256-bit product C2 * Kx 
-int bid_shiftright256M[] = {
+const int bid_shiftright256M[] = {
   15,	// 335 - 320
   19,	// 339 - 320
   22,	// 342 - 320
@@ -1368,7 +1368,7 @@ int bid_shiftright256M[] = {
 
 // bid_maskhigh256M[] contains the mask to apply to the top 192 bits of the
 // 256x256-bit product in order to obtain the high bits of f*
-BID_UINT64 bid_maskhigh256M[] = {
+const BID_UINT64 bid_maskhigh256M[] = {
   0x0000000000007fffULL,	//  15 = 335 - 320 bits
   0x000000000007ffffULL,	//  19 = 339 - 320 bits
   0x00000000003fffffULL,	//  22 = 342 - 320 bits
@@ -1384,7 +1384,7 @@ BID_UINT64 bid_maskhigh256M[] = {
 
 // bid_onehalf256M[] contains 1/2 positioned correctly for comparison with the 
 // high bits of f*; the high 128 bits of the 512-bit mask are 0
-BID_UINT64 bid_onehalf256M[] = {
+const BID_UINT64 bid_onehalf256M[] = {
   0x0000000000004000ULL,	//  15 = 335 - 320 bits
   0x0000000000040000ULL,	//  19 = 339 - 320 bits
   0x0000000000200000ULL,	//  22 = 342 - 320 bits
@@ -1400,7 +1400,7 @@ BID_UINT64 bid_onehalf256M[] = {
 
 
 // bid_char_table2[] is used to convert n to string, where 10 <= n <= 99
-unsigned char bid_char_table2[180] = {
+const unsigned char bid_char_table2[180] = {
   '1', '0',
   '1', '1',
   '1', '2',
@@ -1495,7 +1495,7 @@ unsigned char bid_char_table2[180] = {
 
 
 // bid_char_table3[] is used to convert n to string, where 000 <= n <= 999
-unsigned char bid_char_table3[3000] = {
+const unsigned char bid_char_table3[3000] = {
   '0', '0', '0',
   '0', '0', '1',
   '0', '0', '2',
@@ -2499,7 +2499,7 @@ unsigned char bid_char_table3[3000] = {
 };
 
 // bid_ten2m3k64[], bid_shift_ten2m3k64[] used for conversion from BID128 to string
-BID_UINT64 bid_ten2m3k64[] = {
+const BID_UINT64 bid_ten2m3k64[] = {
   0x4189374bc6a7ef9eull,	// 4189374bc6a7ef9e * 2^-72 = (10^-3)RP,63
   0x10c6f7a0b5ed8d37ull,	// 10c6f7a0b5ed8d37 * 2^-80 = (10^-6)RP,61
   0x44b82fa09b5a52ccull,	// 44b82fa09b5a52cc * 2^-92 = (10^-9)RP,63
@@ -2507,7 +2507,7 @@ BID_UINT64 bid_ten2m3k64[] = {
   0x480ebe7b9d58566dull	// 480ebe7b9d58566d * 2^-112 = (10^-15)RP,63
 };
 
-unsigned int bid_shift_ten2m3k64[] = {
+const unsigned int bid_shift_ten2m3k64[] = {
   8,	// 72 - 64
   16,	// 80 - 64
   28,	// 92 - 64
@@ -2515,7 +2515,7 @@ unsigned int bid_shift_ten2m3k64[] = {
   48	// 112 - 64
 };
 
-BID_UINT128 bid_ten2m3k128[] = {
+const BID_UINT128 bid_ten2m3k128[] = {
   {{0xb22d0e5604189375ull, 0x4189374bc6a7ef9dull}},
   // 4189374bc6a7ef9d  b22d0e5604189375  * 2^-136 = (10^-3)RP,127
   {{0xb4c7f34938583622ull, 0x10c6f7a0b5ed8d36ull}},
@@ -2540,7 +2540,7 @@ BID_UINT128 bid_ten2m3k128[] = {
   // 5313a5dee87d6eb0  f658d6c57566eac8  * 2^-236 = (10^-33)RP,127
 };
 
-unsigned int bid_shift_ten2m3k128[] = {
+const unsigned int bid_shift_ten2m3k128[] = {
   8,	// 136 - 128
   16,	// 144 - 128
   28,	// 156 - 128
@@ -2581,7 +2581,7 @@ unsigned int bid_shift_ten2m3k128[] = {
 // Note: 64-bit tables generated with ten2mx64.ma; output in ten2mx64.out
 
 // Kx from 10^(-x) ~= Kx * 2^(-Ex); Kx rounded up to 64 bits, 1 <= x <= 17
-BID_UINT64 bid_Kx64[] = {
+const BID_UINT64 bid_Kx64[] = {
   0xcccccccccccccccdULL,	// 10^-1 ~= cccccccccccccccd * 2^-67
   0xa3d70a3d70a3d70bULL,	// 10^-2 ~= a3d70a3d70a3d70b * 2^-70
   0x83126e978d4fdf3cULL,	// 10^-3 ~= 83126e978d4fdf3c * 2^-73
@@ -2602,7 +2602,7 @@ BID_UINT64 bid_Kx64[] = {
 };
 
 // Ex-64 from 10^(-x) ~= Kx * 2^(-Ex); Kx rounded up to 64 bits, 1 <= x <= 17
-unsigned int bid_Ex64m64[] = {
+const unsigned int bid_Ex64m64[] = {
   3,	// 67 - 64, Ex = 67
   6,	// 70 - 64, Ex = 70
   9,	// 73 - 64, Ex = 73
@@ -2625,7 +2625,7 @@ unsigned int bid_Ex64m64[] = {
 // Values of 1/2 in the right position to be compared with the fraction from
 // C * kx, 1 <= x <= 17; the fraction consists of the low Ex bits in C * kx
 // (these values are aligned with the high 64 bits of the fraction)
-BID_UINT64 bid_half64[] = {
+const BID_UINT64 bid_half64[] = {
   0x0000000000000004ULL,	// half / 2^64 = 4
   0x0000000000000020ULL,	// half / 2^64 = 20
   0x0000000000000100ULL,	// half / 2^64 = 100
@@ -2648,7 +2648,7 @@ BID_UINT64 bid_half64[] = {
 // Values of mask in the right position to obtain the high Ex - 64 bits
 // of the fraction from C * kx, 1 <= x <= 17; the fraction consists of
 // the low Ex bits in C * kx
-BID_UINT64 bid_mask64[] = {
+const BID_UINT64 bid_mask64[] = {
   0x0000000000000007ULL,	// mask / 2^64
   0x000000000000003fULL,	// mask / 2^64
   0x00000000000001ffULL,	// mask / 2^64
@@ -2672,7 +2672,7 @@ BID_UINT64 bid_mask64[] = {
 // in the right position to be compared with the fraction from C * kx,
 // 1 <= x <= 17; the fraction consists of the low Ex bits in C * kx
 // (these values are aligned with the low 64 bits of the fraction)
-BID_UINT64 bid_ten2mxtrunc64[] = {
+const BID_UINT64 bid_ten2mxtrunc64[] = {
   0xccccccccccccccccULL,	// (ten2mx >> 64) = cccccccccccccccc
   0xa3d70a3d70a3d70aULL,	// (ten2mx >> 64) = a3d70a3d70a3d70a
   0x83126e978d4fdf3bULL,	// (ten2mx >> 64) = 83126e978d4fdf3b
@@ -2696,7 +2696,7 @@ BID_UINT64 bid_ten2mxtrunc64[] = {
 // The order of the 64-bit components is L, H
 
 // Kx from 10^(-x) ~= Kx * 2^(-Ex); Kx rounded up to 128 bits, 1 <= x <= 37
-BID_UINT128 bid_Kx128[] = {
+const BID_UINT128 bid_Kx128[] = {
   {{0xcccccccccccccccdULL, 0xccccccccccccccccULL}},
   // 10^-1 ~= cccccccccccccccccccccccccccccccd * 2^-131
   {{0x3d70a3d70a3d70a4ULL, 0xa3d70a3d70a3d70aULL}},
@@ -2774,7 +2774,7 @@ BID_UINT128 bid_Kx128[] = {
 };
 
 // Ex-128 from 10^(-x) ~= Kx*2^(-Ex); Kx rounded up to 128 bits, 1 <= x <= 37
-unsigned int bid_Ex128m128[] = {
+const unsigned int bid_Ex128m128[] = {
   3,	// 131 - 128, Ex = 131
   6,	// 134 - 128, Ex = 134
   9,	// 137 - 128, Ex = 137
@@ -2817,7 +2817,7 @@ unsigned int bid_Ex128m128[] = {
 // Values of 1/2 in the right position to be compared with the fraction from
 // C * kx, 1 <= x <= 37; the fraction consists of the low Ex bits in C * kx
 // (these values are aligned with the high 128 bits of the fraction)
-BID_UINT64 bid_half128[] = {
+const BID_UINT64 bid_half128[] = {
   0x0000000000000004ULL,	// half / 2^128 = 4
   0x0000000000000020ULL,	// half / 2^128 = 20
   0x0000000000000100ULL,	// half / 2^128 = 100
@@ -2860,7 +2860,7 @@ BID_UINT64 bid_half128[] = {
 // Values of mask in the right position to obtain the high Ex - 128 or Ex - 192
 // bits of the fraction from C * kx, 1 <= x <= 37; the fraction consists of
 // the low Ex bits in C * kx
-BID_UINT64 bid_mask128[] = {
+const BID_UINT64 bid_mask128[] = {
   0x0000000000000007ULL,	// mask / 2^128
   0x000000000000003fULL,	// mask / 2^128
   0x00000000000001ffULL,	// mask / 2^128
@@ -2904,7 +2904,7 @@ BID_UINT64 bid_mask128[] = {
 // in the right position to be compared with the fraction from C * kx,
 // 1 <= x <= 37; the fraction consists of the low Ex bits in C * kx
 // (these values are aligned with the low 128 bits of the fraction)
-BID_UINT128 bid_ten2mxtrunc128[] = {
+const BID_UINT128 bid_ten2mxtrunc128[] = {
   {{0xccccccccccccccccULL, 0xccccccccccccccccULL}},
   // (ten2mx >> 128) = cccccccccccccccccccccccccccccccc
   {{0x3d70a3d70a3d70a3ULL, 0xa3d70a3d70a3d70aULL}},
@@ -2981,7 +2981,7 @@ BID_UINT128 bid_ten2mxtrunc128[] = {
   // (ten2mx >> 128) = 881cea14545c75757e50d64177da2e54
 };
 
-BID_UINT192 bid_Kx192[] = {
+const BID_UINT192 bid_Kx192[] = {
   {{0xcccccccccccccccdULL, 0xccccccccccccccccULL,
     0xccccccccccccccccULL}},
   // 10^-1 ~= cccccccccccccccccccccccccccccccccccccccccccccccd * 2^-195
@@ -3151,7 +3151,7 @@ BID_UINT192 bid_Kx192[] = {
   // 10^-56 ~= fb158592be068d2eeed6e2f0f0d56712ac2e4f162cfad40b * 2^-378
 };
 
-unsigned int bid_Ex192m192[] = {
+const unsigned int bid_Ex192m192[] = {
   3,	// 195 - 192, Ex = 195
   6,	// 198 - 192, Ex = 198
   9,	// 201 - 192, Ex = 201
@@ -3210,7 +3210,7 @@ unsigned int bid_Ex192m192[] = {
   58	// 378 - 320, Ex = 378
 };
 
-BID_UINT64 bid_half192[] = {
+const BID_UINT64 bid_half192[] = {
   0x0000000000000004ULL,	// half / 2^192 = 4
   0x0000000000000020ULL,	// half / 2^192 = 20
   0x0000000000000100ULL,	// half / 2^192 = 100
@@ -3269,7 +3269,7 @@ BID_UINT64 bid_half192[] = {
   0x0200000000000000ULL	// half / 2^320 = 200000000000000
 };
 
-BID_UINT64 bid_mask192[] = {
+const BID_UINT64 bid_mask192[] = {
   0x0000000000000007ULL,	// mask / 2^192
   0x000000000000003fULL,	// mask / 2^192
   0x00000000000001ffULL,	// mask / 2^192
@@ -3328,7 +3328,7 @@ BID_UINT64 bid_mask192[] = {
   0x03ffffffffffffffULL	// mask / 2^320
 };
 
-BID_UINT192 bid_ten2mxtrunc192[] = {
+const BID_UINT192 bid_ten2mxtrunc192[] = {
   {{0xccccccccccccccccULL, 0xccccccccccccccccULL,
     0xccccccccccccccccULL}},
   // (ten2mx >> 192) = cccccccccccccccccccccccccccccccccccccccccccccccc
@@ -3498,7 +3498,7 @@ BID_UINT192 bid_ten2mxtrunc192[] = {
   // (ten2mx >> 192) = fb158592be068d2eeed6e2f0f0d56712ac2e4f162cfad40a
 };
 
-BID_UINT256 bid_Kx256[] = {
+const BID_UINT256 bid_Kx256[] = {
   {{0xcccccccccccccccdULL, 0xccccccccccccccccULL,
     0xccccccccccccccccULL, 0xccccccccccccccccULL}},
   // 10^-1 ~= cccccccccccccccc  cccccccccccccccc   
@@ -3801,7 +3801,7 @@ BID_UINT256 bid_Kx256[] = {
   //   2f7a81a88ffbf95d2465fb01377a4696   * 2^-505
 };
 
-unsigned int bid_Ex256m256[] = {
+const unsigned int bid_Ex256m256[] = {
   3,	// 259 - 256, Ex = 259
   6,	// 262 - 256, Ex = 262
   9,	// 265 - 256, Ex = 265
@@ -3879,7 +3879,7 @@ unsigned int bid_Ex256m256[] = {
   57	// 505 - 448, Ex = 505
 };
 
-BID_UINT64 bid_half256[] = {
+const BID_UINT64 bid_half256[] = {
   0x0000000000000004ULL,	// half / 2^256 = 4
   0x0000000000000020ULL,	// half / 2^256 = 20
   0x0000000000000100ULL,	// half / 2^256 = 100
@@ -3957,7 +3957,7 @@ BID_UINT64 bid_half256[] = {
   0x0100000000000000ULL	// half / 2^448 = 100000000000000
 };
 
-BID_UINT64 bid_mask256[] = {
+const BID_UINT64 bid_mask256[] = {
   0x0000000000000007ULL,	// mask / 2^256
   0x000000000000003fULL,	// mask / 2^256
   0x00000000000001ffULL,	// mask / 2^256
@@ -4035,7 +4035,7 @@ BID_UINT64 bid_mask256[] = {
   0x01ffffffffffffffULL	// mask / 2^448
 };
 
-BID_UINT256 bid_ten2mxtrunc256[] = {
+const BID_UINT256 bid_ten2mxtrunc256[] = {
   {{0xccccccccccccccccULL, 0xccccccccccccccccULL,
     0xccccccccccccccccULL, 0xccccccccccccccccULL}},
   // (ten2mx >> 256) = cccccccccccccccc  cccccccccccccccc   

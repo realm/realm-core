@@ -2821,42 +2821,42 @@ typedef struct BID_ALIGN (16)
        unsigned int digits1;
      } DEC_DIGITS;
 
-     BID_EXTERN_C DEC_DIGITS bid_nr_digits[];
-     BID_EXTERN_C BID_UINT64 bid_midpoint64[];
-     BID_EXTERN_C BID_UINT128 bid_midpoint128[];
-     BID_EXTERN_C BID_UINT192 bid_midpoint192[];
-     BID_EXTERN_C BID_UINT256 bid_midpoint256[];
-     BID_EXTERN_C BID_UINT64 bid_ten2k64[];
-     BID_EXTERN_C BID_UINT128 bid_ten2k128[];
-     BID_EXTERN_C BID_UINT256 bid_ten2k256[];
-     BID_EXTERN_C BID_UINT128 bid_ten2mk128[];
-     BID_EXTERN_C BID_UINT64 bid_ten2mk64[];
-     BID_EXTERN_C BID_UINT128 bid_ten2mk128trunc[];
-     BID_EXTERN_C int bid_shiftright128[];
-     BID_EXTERN_C BID_UINT64 bid_maskhigh128[];
-     BID_EXTERN_C BID_UINT64 bid_maskhigh128M[];
-     BID_EXTERN_C BID_UINT64 bid_maskhigh192M[];
-     BID_EXTERN_C BID_UINT64 bid_maskhigh256M[];
-     BID_EXTERN_C BID_UINT64 bid_onehalf128[];
-     BID_EXTERN_C BID_UINT64 bid_onehalf128M[];
-     BID_EXTERN_C BID_UINT64 bid_onehalf192M[];
-     BID_EXTERN_C BID_UINT64 bid_onehalf256M[];
-     BID_EXTERN_C BID_UINT128 bid_ten2mk128M[];
-     BID_EXTERN_C BID_UINT128 bid_ten2mk128truncM[];
-     BID_EXTERN_C BID_UINT192 bid_ten2mk192truncM[];
-     BID_EXTERN_C BID_UINT256 bid_ten2mk256truncM[];
-     BID_EXTERN_C int bid_shiftright128M[];
-     BID_EXTERN_C int bid_shiftright192M[];
-     BID_EXTERN_C int bid_shiftright256M[];
-     BID_EXTERN_C BID_UINT192 bid_ten2mk192M[];
-     BID_EXTERN_C BID_UINT256 bid_ten2mk256M[];
-     BID_EXTERN_C unsigned char bid_char_table2[];
-     BID_EXTERN_C unsigned char bid_char_table3[];
+     BID_EXTERN_C const DEC_DIGITS bid_nr_digits[];
+     BID_EXTERN_C const BID_UINT64 bid_midpoint64[];
+     BID_EXTERN_C const BID_UINT128 bid_midpoint128[];
+     BID_EXTERN_C const BID_UINT192 bid_midpoint192[];
+     BID_EXTERN_C const BID_UINT256 bid_midpoint256[];
+     BID_EXTERN_C const BID_UINT64 bid_ten2k64[];
+     BID_EXTERN_C const BID_UINT128 bid_ten2k128[];
+     BID_EXTERN_C const BID_UINT256 bid_ten2k256[];
+     BID_EXTERN_C const BID_UINT128 bid_ten2mk128[];
+     BID_EXTERN_C const BID_UINT64 bid_ten2mk64[];
+     BID_EXTERN_C const BID_UINT128 bid_ten2mk128trunc[];
+     BID_EXTERN_C const int bid_shiftright128[];
+     BID_EXTERN_C const BID_UINT64 bid_maskhigh128[];
+     BID_EXTERN_C const BID_UINT64 bid_maskhigh128M[];
+     BID_EXTERN_C const BID_UINT64 bid_maskhigh192M[];
+     BID_EXTERN_C const BID_UINT64 bid_maskhigh256M[];
+     BID_EXTERN_C const BID_UINT64 bid_onehalf128[];
+     BID_EXTERN_C const BID_UINT64 bid_onehalf128M[];
+     BID_EXTERN_C const BID_UINT64 bid_onehalf192M[];
+     BID_EXTERN_C const BID_UINT64 bid_onehalf256M[];
+     BID_EXTERN_C const BID_UINT128 bid_ten2mk128M[];
+     BID_EXTERN_C const BID_UINT128 bid_ten2mk128truncM[];
+     BID_EXTERN_C const BID_UINT192 bid_ten2mk192truncM[];
+     BID_EXTERN_C const BID_UINT256 bid_ten2mk256truncM[];
+     BID_EXTERN_C const int bid_shiftright128M[];
+     BID_EXTERN_C const int bid_shiftright192M[];
+     BID_EXTERN_C const int bid_shiftright256M[];
+     BID_EXTERN_C const BID_UINT192 bid_ten2mk192M[];
+     BID_EXTERN_C const BID_UINT256 bid_ten2mk256M[];
+     BID_EXTERN_C const unsigned char bid_char_table2[];
+     BID_EXTERN_C const unsigned char bid_char_table3[];
 
-     BID_EXTERN_C BID_UINT64 bid_ten2m3k64[];
-     BID_EXTERN_C unsigned int bid_shift_ten2m3k64[];
-     BID_EXTERN_C BID_UINT128 bid_ten2m3k128[];
-     BID_EXTERN_C unsigned int bid_shift_ten2m3k128[];
+     BID_EXTERN_C const BID_UINT64 bid_ten2m3k64[];
+     BID_EXTERN_C const unsigned int bid_shift_ten2m3k64[];
+     BID_EXTERN_C const BID_UINT128 bid_ten2m3k128[];
+     BID_EXTERN_C const unsigned int bid_shift_ten2m3k128[];
 
 
 
@@ -2864,29 +2864,29 @@ typedef struct BID_ALIGN (16)
  *************** TABLES FOR GENERAL ROUNDING FUNCTIONS *********************
  ***************************************************************************/
 
-     BID_EXTERN_C BID_UINT64 bid_Kx64[];
-     BID_EXTERN_C unsigned int bid_Ex64m64[];
-     BID_EXTERN_C BID_UINT64 bid_half64[];
-     BID_EXTERN_C BID_UINT64 bid_mask64[];
-     BID_EXTERN_C BID_UINT64 bid_ten2mxtrunc64[];
+     BID_EXTERN_C const BID_UINT64 bid_Kx64[];
+     BID_EXTERN_C const unsigned int bid_Ex64m64[];
+     BID_EXTERN_C const BID_UINT64 bid_half64[];
+     BID_EXTERN_C const BID_UINT64 bid_mask64[];
+     BID_EXTERN_C const BID_UINT64 bid_ten2mxtrunc64[];
 
-     BID_EXTERN_C BID_UINT128 bid_Kx128[];
-     BID_EXTERN_C unsigned int bid_Ex128m128[];
-     BID_EXTERN_C BID_UINT64 bid_half128[];
-     BID_EXTERN_C BID_UINT64 bid_mask128[];
-     BID_EXTERN_C BID_UINT128 bid_ten2mxtrunc128[];
+     BID_EXTERN_C const BID_UINT128 bid_Kx128[];
+     BID_EXTERN_C const unsigned int bid_Ex128m128[];
+     BID_EXTERN_C const BID_UINT64 bid_half128[];
+     BID_EXTERN_C const BID_UINT64 bid_mask128[];
+     BID_EXTERN_C const BID_UINT128 bid_ten2mxtrunc128[];
 
-     BID_EXTERN_C BID_UINT192 bid_Kx192[];
-     BID_EXTERN_C unsigned int bid_Ex192m192[];
-     BID_EXTERN_C BID_UINT64 bid_half192[];
-     BID_EXTERN_C BID_UINT64 bid_mask192[];
-     BID_EXTERN_C BID_UINT192 bid_ten2mxtrunc192[];
+     BID_EXTERN_C const BID_UINT192 bid_Kx192[];
+     BID_EXTERN_C const unsigned int bid_Ex192m192[];
+     BID_EXTERN_C const BID_UINT64 bid_half192[];
+     BID_EXTERN_C const BID_UINT64 bid_mask192[];
+     BID_EXTERN_C const BID_UINT192 bid_ten2mxtrunc192[];
 
-     BID_EXTERN_C BID_UINT256 bid_Kx256[];
-     BID_EXTERN_C unsigned int bid_Ex256m256[];
-     BID_EXTERN_C BID_UINT64 bid_half256[];
-     BID_EXTERN_C BID_UINT64 bid_mask256[];
-     BID_EXTERN_C BID_UINT256 bid_ten2mxtrunc256[];
+     BID_EXTERN_C const BID_UINT256 bid_Kx256[];
+     BID_EXTERN_C const unsigned int bid_Ex256m256[];
+     BID_EXTERN_C const BID_UINT64 bid_half256[];
+     BID_EXTERN_C const BID_UINT64 bid_mask256[];
+     BID_EXTERN_C const BID_UINT256 bid_ten2mxtrunc256[];
 
      typedef union BID_ALIGN (16) __bid64_128 {
        BID_UINT64 b64;
