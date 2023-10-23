@@ -913,15 +913,18 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions& opt
     if (m_replication) {
         m_replication->set_logger(m_logger.get());
     }
-    if (m_logger)
+    if (m_logger) {
         m_logger->log(util::Logger::Level::detail, "Open file: %1", path);
+    }
     SlabAlloc& alloc = m_alloc;
+    ref_type top_ref = 0;
+
     if (options.is_immutable) {
         SlabAlloc::Config cfg;
         cfg.read_only = true;
         cfg.no_create = true;
         cfg.encryption_key = options.encryption_key;
-        auto top_ref = alloc.attach_file(path, cfg);
+        top_ref = alloc.attach_file(path, cfg);
         SlabAlloc::DetachGuard dg(alloc);
         Group::read_only_version_check(alloc, top_ref, path);
         m_fake_read_lock_if_immutable = ReadLockInfo::make_fake(top_ref, m_alloc.get_baseline());
@@ -1152,7 +1155,6 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions& opt
             cfg.clear_file = (options.durability == Durability::MemOnly && begin_new_session);
 
             cfg.encryption_key = options.encryption_key;
-            ref_type top_ref;
             m_marker_observer = std::make_unique<EncryptionMarkerObserver>(*version_manager);
             try {
                 top_ref = alloc.attach_file(path, cfg, m_marker_observer.get()); // Throws
@@ -1413,6 +1415,30 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions& opt
         }
         ulg.release(); // Do not release shared lock
         break;
+    }
+
+    if (m_logger) {
+        m_logger->log(util::Logger::Level::debug, "   Number of participants: %1", m_info->num_participants);
+        m_logger->log(util::Logger::Level::debug, "   Durability: %1", [&] {
+            switch (options.durability) {
+                case DBOptions::Durability::Full:
+                    return "Full";
+                case DBOptions::Durability::MemOnly:
+                    return "MemOnly";
+                case realm::DBOptions::Durability::Unsafe:
+                    return "Unsafe";
+            }
+            return "";
+        }());
+        m_logger->log(util::Logger::Level::debug, "   EncryptionKey: %1", options.encryption_key ? "yes" : "no");
+        if (top_ref && m_logger->would_log(util::Logger::Level::debug)) {
+            Array top(alloc);
+            top.init_from_ref(top_ref);
+            auto file_size = Group::get_logical_file_size(top);
+            auto freee_space_size = Group::get_free_space_size(top);
+            m_logger->log(util::Logger::Level::debug, "   File size: %1", file_size);
+            m_logger->log(util::Logger::Level::debug, "   User data size: %1", file_size - freee_space_size);
+        }
     }
 
     // Upgrade file format and/or history schema

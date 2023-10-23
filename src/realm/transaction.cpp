@@ -536,6 +536,10 @@ void Transaction::upgrade_file_format(int target_file_format_version)
     int current_file_format_version = get_file_format_version();
     REALM_ASSERT(current_file_format_version < target_file_format_version);
 
+    if (auto logger = get_logger()) {
+        logger->info("Upgrading from file format version %1 to %2", current_file_format_version,
+                     target_file_format_version);
+    }
     // Ensure we have search index on all primary key columns.
     auto table_keys = get_table_keys();
     if (current_file_format_version < 22) {
