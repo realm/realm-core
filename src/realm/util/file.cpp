@@ -1720,7 +1720,7 @@ void File::MapBase::unmap() noexcept
         util::remove_encrypted_mapping(m_addr, m_size);
     }
 #endif
-    ::munmap(m_addr, m_reservation_size);
+    realm::util::munmap(m_addr, m_reservation_size);
     m_addr = nullptr;
     m_size = 0;
     m_reservation_size = 0;
