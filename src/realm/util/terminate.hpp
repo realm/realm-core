@@ -30,8 +30,9 @@
 namespace realm {
 namespace util {
 
+REALM_NORETURN void terminate(const char* message, const char* file, long line) noexcept;
 REALM_NORETURN void terminate(const char* message, const char* file, long line,
-                              std::initializer_list<Printable>&& = {}) noexcept;
+                              std::initializer_list<Printable>&&) noexcept;
 REALM_NORETURN void terminate_with_info(const char* message, const char* file, long line,
                                         const char* interesting_names,
                                         std::initializer_list<Printable>&& = {}) noexcept;

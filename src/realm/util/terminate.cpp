@@ -142,6 +142,11 @@ REALM_NORETURN void terminate(const char* message, const char* file, long line,
     terminate_with_info(message, file, line, nullptr, std::move(values));
 }
 
+REALM_NORETURN void terminate(const char* message, const char* file, long line) noexcept
+{
+    terminate_with_info(message, file, line, nullptr, {});
+}
+
 REALM_NORETURN void terminate_with_info(const char* message, const char* file, long line,
                                         const char* interesting_names,
                                         std::initializer_list<Printable>&& values) noexcept
