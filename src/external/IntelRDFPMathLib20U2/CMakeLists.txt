@@ -31,4 +31,4 @@ if(HAVE-Wunused-but-set-variable)
     target_compile_options(Bid PRIVATE -Wno-unused-but-set-variable)
 endif()
 
-set_target_properties(Bid PROPERTIES CXX_VISIBILITY_PRESET hidden)
+set_target_properties(Bid PROPERTIES C_VISIBILITY_PRESET hidden)

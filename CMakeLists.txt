@@ -39,9 +39,9 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 if(NOT APPLE)
-    # TODO: Core APIs should always built for internal usage. But there seems to be issues with cocoa. Enable it only for Android for now.
     set(CMAKE_CXX_VISIBILITY_PRESET hidden)
-elseif(APPLE)
+else()
+    # On Apple platforms we sometimes need to export core symbols from dynamic libraries
     set(CMAKE_VISIBILITY_INLINES_HIDDEN 1)
 endif()
 
