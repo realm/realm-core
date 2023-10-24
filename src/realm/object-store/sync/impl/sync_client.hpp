@@ -26,6 +26,7 @@
 
 #include <thread>
 
+#include <realm/version.hpp>
 #include <realm/object-store/sync/sync_manager.hpp>
 #include <realm/object-store/sync/impl/network_reachability.hpp>
 
@@ -50,8 +51,9 @@ struct SyncClient {
 #ifdef __EMSCRIPTEN__
             return std::make_shared<EmscriptenSocketProvider>();
 #else
-            auto user_agent = util::format("RealmSync/%1 (%2) %3 %4", REALM_VERSION_STRING, util::get_platform_info(),
-                                           config.user_agent_binding_info, config.user_agent_application_info);
+            auto user_agent =
+                util::format("RealmSync/%1 (%2) %3 %4", Version::get_version(), util::get_platform_info(),
+                             config.user_agent_binding_info, config.user_agent_application_info);
             return std::make_shared<sync::websocket::DefaultSocketProvider>(
                 logger, std::move(user_agent), config.default_socket_provider_thread_observer);
 #endif

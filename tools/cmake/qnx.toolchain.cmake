@@ -5,7 +5,7 @@ set(QNX TRUE)
 
 set(CMAKE_SYSTEM_PROCESSOR x86_64 CACHE STRING "Target architecture")
 
-set(QNX_BASE "${CMAKE_CURRENT_LIST_DIR}" CACHE STRING "Path to the QNX installation")
+#set(QNX_BASE "${CMAKE_CURRENT_LIST_DIR}" CACHE STRING "Path to the QNX installation")
 set(QNX_TARGET "${QNX_BASE}/target/qnx7")
 if(CMAKE_HOST_SYSTEM_NAME STREQUAL Darwin)
   set(QNX_HOST "${QNX_BASE}/host/darwin/x86_64")

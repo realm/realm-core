@@ -212,12 +212,19 @@
 #if defined ANDROID || defined __ANDROID_API__
 #define REALM_ANDROID 1
 #define REALM_LINUX 0
+#define REALM_QNX 0
+#elif defined(__QNX__)
+#define REALM_ANDROID 0
+#define REALM_LINUX 0
+#define REALM_QNX 1
 #elif defined(__linux__)
 #define REALM_ANDROID 0
 #define REALM_LINUX 1
+#define REALM_QNX 0
 #else
 #define REALM_ANDROID 0
 #define REALM_LINUX 0
+#define REALM_QNX 0
 #endif
 
 #if defined _WIN32

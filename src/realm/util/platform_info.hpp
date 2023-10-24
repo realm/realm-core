@@ -56,6 +56,8 @@ inline std::string get_library_platform()
     return "macOS";
 #elif REALM_LINUX
     return "Linux";
+#elif REALM_QNX
+    return "qnx";
 #endif
 
     return "unknown";
