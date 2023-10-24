@@ -171,9 +171,9 @@ void Dictionary::do_accumulate(size_t* return_ndx, AggregateType& agg) const
 
     m_values->traverse([&](BPlusTreeNode* node, size_t offset) {
         auto leaf = static_cast<BPlusTree<Mixed>::LeafNode*>(node);
-        size_t e = leaf->size();
+        size_t e = leaf->array.size();
         for (size_t i = 0; i < e; i++) {
-            auto val = leaf->get(i);
+            auto val = leaf->array.get(i);
             if (agg.accumulate(val)) {
                 ndx = i + offset;
             }

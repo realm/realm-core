@@ -29,14 +29,14 @@ BinaryData BinaryColumn::get_at(size_t ndx, size_t& pos) const noexcept
 {
     REALM_ASSERT_3(ndx, <, size());
     if (m_cached_leaf_begin <= ndx && ndx < m_cached_leaf_end) {
-        return m_leaf_cache.get_at(ndx - m_cached_leaf_begin, pos);
+        return m_leaf_cache.array.get_at(ndx - m_cached_leaf_begin, pos);
     }
     else {
         BinaryData value;
 
         auto func = [&value, &pos](BPlusTreeNode* node, size_t ndx_in_leaf) {
             LeafNode* leaf = static_cast<LeafNode*>(node);
-            value = leaf->get_at(ndx_in_leaf, pos);
+            value = leaf->array.get_at(ndx_in_leaf, pos);
         };
 
         m_root->bptree_access(ndx, func);

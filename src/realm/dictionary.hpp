@@ -103,9 +103,9 @@ public:
             values.init_from_ref(m_dictionary_top->get_as_ref(1));
             auto func = [&f](BPlusTreeNode* node, size_t) {
                 auto leaf = static_cast<BPlusTree<Mixed>::LeafNode*>(node);
-                size_t sz = leaf->size();
+                size_t sz = leaf->array.size();
                 for (size_t i = 0; i < sz; i++) {
-                    f(leaf->get(i));
+                    f(leaf->array.get(i));
                 }
                 return IteratorControl::AdvanceToNext;
             };
@@ -122,9 +122,9 @@ public:
             keys.init_from_ref(m_dictionary_top->get_as_ref(0));
             auto func = [&f](BPlusTreeNode* node, size_t) {
                 auto leaf = static_cast<typename BPlusTree<T>::LeafNode*>(node);
-                size_t sz = leaf->size();
+                size_t sz = leaf->array.size();
                 for (size_t i = 0; i < sz; i++) {
-                    f(leaf->get(i));
+                    f(leaf->array.get(i));
                 }
                 return IteratorControl::AdvanceToNext;
             };

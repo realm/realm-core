@@ -1475,23 +1475,23 @@ public:
     std::unique_ptr<BPlusTreeLeaf> init_leaf_node(ref_type ref) override
     {
         auto leaf = std::make_unique<LeafNode>(this);
-        leaf->ArrayString::set_spec(m_spec, m_col_ndx);
-        leaf->set_nullability(m_nullable);
-        leaf->init_from_ref(ref);
+        leaf->array.set_spec(m_spec, m_col_ndx);
+        leaf->array.set_nullability(m_nullable);
+        leaf->array.init_from_ref(ref);
         return leaf;
     }
 
     StringData get_legacy(size_t n) const
     {
         if (m_cached_leaf_begin <= n && n < m_cached_leaf_end) {
-            return m_leaf_cache.get_legacy(n - m_cached_leaf_begin);
+            return m_leaf_cache.array.get_legacy(n - m_cached_leaf_begin);
         }
         else {
             StringData value;
 
             auto func = [&value](BPlusTreeNode* node, size_t ndx) {
                 auto leaf = static_cast<LeafNode*>(node);
-                value = leaf->get_legacy(ndx);
+                value = leaf->array.get_legacy(ndx);
             };
 
             m_root->bptree_access(n, func);

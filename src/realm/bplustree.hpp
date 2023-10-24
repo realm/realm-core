@@ -280,52 +280,54 @@ public:
      * Actual class for the leaves. Maps the abstract interface defined
      * in BPlusTreeNode onto the specific array class
      **/
-    class LeafNode : public BPlusTreeLeaf, public LeafArray {
-    public:
+    struct LeafNode final : public BPlusTreeLeaf {
+        LeafArray array;
+
         LeafNode(BPlusTreeBase* tree)
             : BPlusTreeLeaf(tree)
-            , LeafArray(tree->get_alloc())
+            , array(tree->get_alloc())
         {
         }
 
         void init_from_ref(ref_type ref) noexcept override
         {
-            LeafArray::init_from_ref(ref);
+            array.init_from_ref(ref);
         }
 
         ref_type get_ref() const override
         {
-            return LeafArray::get_ref();
+            return array.get_ref();
         }
 
         void bp_set_parent(realm::ArrayParent* p, size_t n) override
         {
-            LeafArray::set_parent(p, n);
+            array.set_parent(p, n);
         }
 
         void update_parent() override
         {
-            LeafArray::update_parent();
+            array.update_parent();
         }
 
         size_t get_node_size() const override
         {
-            return LeafArray::size();
+            return array.size();
         }
 
         size_t get_tree_size() const override
         {
-            return LeafArray::size();
+            return array.size();
         }
 
         void move(BPlusTreeNode* new_node, size_t ndx, int64_t) override
         {
-            LeafNode* dst(static_cast<LeafNode*>(new_node));
-            LeafArray::move(*dst, ndx);
+            auto& dst = static_cast<LeafNode*>(new_node)->array;
+            array.move(dst, ndx);
         }
+
         void verify() const override
         {
-            LeafArray::verify();
+            array.verify();
         }
     };
 
@@ -350,9 +352,9 @@ public:
     void insert(size_t n, T value)
     {
         auto func = [value](BPlusTreeNode* node, size_t ndx) {
-            LeafNode* leaf = static_cast<LeafNode*>(node);
-            leaf->LeafArray::insert(ndx, value);
-            return leaf->size();
+            auto& leaf = static_cast<LeafNode*>(node)->array;
+            leaf.insert(ndx, value);
+            return leaf.size();
         };
 
         bptree_insert(n, func);
@@ -363,7 +365,7 @@ public:
     {
         // Fast path
         if (m_cached_leaf_begin <= n && n < m_cached_leaf_end) {
-            return m_leaf_cache.get(n - m_cached_leaf_begin);
+            return m_leaf_cache.array.get(n - m_cached_leaf_begin);
         }
         else {
             // Slow path
@@ -376,8 +378,8 @@ public:
         T value;
 
         auto func = [&value](BPlusTreeNode* node, size_t ndx) {
-            LeafNode* leaf = static_cast<LeafNode*>(node);
-            value = leaf->get(ndx);
+            auto& leaf = static_cast<LeafNode*>(node)->array;
+            value = leaf.get(ndx);
         };
 
         m_root->bptree_access(n, func);
@@ -391,10 +393,10 @@ public:
         all_values.reserve(m_size);
 
         auto func = [&all_values](BPlusTreeNode* node, size_t) {
-            LeafNode* leaf = static_cast<LeafNode*>(node);
-            size_t sz = leaf->size();
+            auto& leaf = static_cast<LeafNode*>(node)->array;
+            size_t sz = leaf.size();
             for (size_t i = 0; i < sz; i++) {
-                all_values.push_back(leaf->get(i));
+                all_values.push_back(leaf.get(i));
             }
             return IteratorControl::AdvanceToNext;
         };
@@ -407,8 +409,8 @@ public:
     void set(size_t n, T value)
     {
         auto func = [value](BPlusTreeNode* node, size_t ndx) {
-            LeafNode* leaf = static_cast<LeafNode*>(node);
-            leaf->set(ndx, value);
+            auto& leaf = static_cast<LeafNode*>(node)->array;
+            leaf.set(ndx, value);
         };
 
         m_root->bptree_access(n, func);
@@ -459,9 +461,9 @@ public:
     void erase(size_t n) override
     {
         auto func = [](BPlusTreeNode* node, size_t ndx) {
-            LeafNode* leaf = static_cast<LeafNode*>(node);
-            leaf->LeafArray::erase(ndx);
-            return leaf->size();
+            auto& leaf = static_cast<LeafNode*>(node)->array;
+            leaf.erase(ndx);
+            return leaf.size();
         };
 
         bptree_erase(n, func);
@@ -471,8 +473,8 @@ public:
     void clear() override
     {
         if (m_root->is_leaf()) {
-            LeafNode* leaf = static_cast<LeafNode*>(m_root.get());
-            leaf->clear();
+            auto& leaf = static_cast<LeafNode*>(m_root.get())->array;
+            leaf.clear();
         }
         else {
             destroy();
@@ -496,9 +498,9 @@ public:
         size_t result = realm::npos;
 
         auto func = [&result, value](BPlusTreeNode* node, size_t offset) {
-            LeafNode* leaf = static_cast<LeafNode*>(node);
-            size_t sz = leaf->size();
-            auto i = leaf->find_first(value, 0, sz);
+            auto& leaf = static_cast<LeafNode*>(node)->array;
+            size_t sz = leaf.size();
+            auto i = leaf.find_first(value, 0, sz);
             if (i < sz) {
                 result = i + offset;
                 return IteratorControl::Stop;
@@ -515,9 +517,9 @@ public:
     void find_all(T value, Func&& callback) const noexcept
     {
         auto func = [&callback, value](BPlusTreeNode* node, size_t offset) {
-            LeafNode* leaf = static_cast<LeafNode*>(node);
-            size_t i = -1, sz = leaf->size();
-            while ((i = leaf->find_first(value, i + 1, sz)) < sz) {
+            auto& leaf = static_cast<LeafNode*>(node)->array;
+            size_t i = -1, sz = leaf.size();
+            while ((i = leaf.find_first(value, i + 1, sz)) < sz) {
                 callback(i + offset);
             }
             return IteratorControl::AdvanceToNext;
@@ -531,14 +533,14 @@ public:
     {
         using Ret = std::invoke_result_t<Func, T>;
         m_root->bptree_traverse([&callback](BPlusTreeNode* node, size_t) {
-            LeafNode* leaf = static_cast<LeafNode*>(node);
-            size_t sz = leaf->size();
+            auto& leaf = static_cast<LeafNode*>(node)->array;
+            size_t sz = leaf.size();
             for (size_t i = 0; i < sz; i++) {
                 if constexpr (std::is_same_v<Ret, void>) {
-                    callback(leaf->get(i));
+                    callback(leaf.get(i));
                 }
                 else {
-                    if (!callback(leaf->get(i)))
+                    if (!callback(leaf.get(i)))
                         return IteratorControl::Stop;
                 }
             }
@@ -554,7 +556,7 @@ protected:
     std::unique_ptr<BPlusTreeLeaf> create_leaf_node() override
     {
         std::unique_ptr<BPlusTreeLeaf> leaf = std::make_unique<LeafNode>(this);
-        static_cast<LeafNode*>(leaf.get())->create();
+        static_cast<LeafNode*>(leaf.get())->array.create();
         return leaf;
     }
     std::unique_ptr<BPlusTreeLeaf> init_leaf_node(ref_type ref) override
@@ -565,7 +567,7 @@ protected:
     }
     BPlusTreeLeaf* cache_leaf(MemRef mem) override
     {
-        m_leaf_cache.init_from_mem(mem);
+        m_leaf_cache.array.init_from_mem(mem);
         return &m_leaf_cache;
     }
     void replace_root(std::unique_ptr<BPlusTreeNode> new_root) override
@@ -596,9 +598,9 @@ typename SumAggType<T>::ResultType bptree_sum(const BPlusTree<T>& tree, size_t* 
 
     auto func = [&agg](BPlusTreeNode* node, size_t) {
         auto leaf = static_cast<typename BPlusTree<T>::LeafNode*>(node);
-        size_t sz = leaf->size();
+        size_t sz = leaf->array.size();
         for (size_t i = 0; i < sz; i++) {
-            auto val = leaf->get(i);
+            auto val = leaf->array.get(i);
             agg.accumulate(val);
         }
         return IteratorControl::AdvanceToNext;
@@ -625,9 +627,9 @@ util::Optional<typename util::RemoveOptional<T>::type> bptree_min_max(const BPlu
 
     auto func = [&agg, return_ndx](BPlusTreeNode* node, size_t offset) {
         auto leaf = static_cast<typename BPlusTree<T>::LeafNode*>(node);
-        size_t sz = leaf->size();
+        size_t sz = leaf->array.size();
         for (size_t i = 0; i < sz; i++) {
-            auto val_or_null = leaf->get(i);
+            auto val_or_null = leaf->array.get(i);
             bool found_new_min = agg.accumulate(val_or_null);
             if (found_new_min && return_ndx) {
                 *return_ndx = i + offset;

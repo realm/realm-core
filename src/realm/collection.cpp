@@ -21,12 +21,12 @@ size_t virtual2real(const BPlusTree<ObjKey>* tree, size_t ndx) noexcept
         size_t adjust = 0;
         auto func = [&adjust, ndx](BPlusTreeNode* node, size_t offset) {
             auto leaf = static_cast<BPlusTree<ObjKey>::LeafNode*>(node);
-            size_t sz = leaf->size();
+            size_t sz = leaf->array.size();
             for (size_t i = 0; i < sz; i++) {
                 if (i + offset == ndx) {
                     return IteratorControl::Stop;
                 }
-                auto k = leaf->get(i);
+                auto k = leaf->array.get(i);
                 if (k.is_unresolved()) {
                     adjust++;
                 }
@@ -58,9 +58,9 @@ void update_unresolved(std::vector<size_t>& vec, const BPlusTree<ObjKey>* tree)
     if (tree && tree->is_attached() && tree->get_context_flag()) {
         auto func = [&vec](BPlusTreeNode* node, size_t offset) {
             auto leaf = static_cast<BPlusTree<ObjKey>::LeafNode*>(node);
-            size_t sz = leaf->size();
+            size_t sz = leaf->array.size();
             for (size_t i = 0; i < sz; i++) {
-                auto k = leaf->get(i);
+                auto k = leaf->array.get(i);
                 if (k.is_unresolved()) {
                     vec.push_back(i + offset);
                 }
