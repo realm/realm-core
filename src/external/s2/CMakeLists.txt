@@ -79,6 +79,7 @@ add_library(s2geometry OBJECT
 )
 
 target_include_directories(s2geometry PRIVATE "." "..")
+target_compile_options(s2geometry PUBLIC ${REALM_TRIVIAL_ABI_FLAGS})
 
 # suppress s2 specific warnings (lib is very noisy)
 target_compile_options(s2geometry PRIVATE

@@ -137,12 +137,6 @@ else()
         add_compile_options(-Wunreachable-code -Wshorten-64-to-32 -Wconditional-uninitialized -Wextra-semi -Wno-nested-anon-types -Wdocumentation -Wthread-safety -Wthread-safety-negative -Wmissing-prototypes)
     endif()
 
-    if(CMAKE_CXX_STANDARD EQUAL 20)
-        # std::is_pod was deprecated in c++20, but is still used by 3rd party json parser.
-        # TODO remove this once we upgrade it.
-        add_cxx_flag_if_supported(-Wno-deprecated-declarations)
-    endif()
-
     # By default GCC warns that it changed how it passes bitfields by value as
     # function arguments on arm64 every time this happens. This warning is just
     # an FYI and not pointing out a problem, so just disable it.
@@ -266,6 +260,14 @@ option(REALM_VALGRIND "Tell the test suite we are running with valgrind" OFF)
 option(REALM_SYNC_MULTIPLEXING "Enables/disables sync session multiplexing by default" ON)
 set(REALM_MAX_BPNODE_SIZE "1000" CACHE STRING "Max B+ tree node size.")
 option(REALM_ENABLE_GEOSPATIAL "Enable geospatial types and queries." ON)
+option(REALM_TRIVIAL_ABI "Use trivial_abi mode for std::unique_ptr" ON)
+
+if(REALM_TRIVIAL_ABI)
+    set(REALM_TRIVIAL_ABI_FLAGS -D_LIBCPP_ABI_ENABLE_UNIQUE_PTR_TRIVIAL_ABI -D_LIBCPP_ABI_ENABLE_SHARED_PTR_TRIVIAL_ABI)
+else()
+    set(REALM_TRIVIAL_ABI_FLAGS)
+endif()
+
 
 # Find dependencies
 set(THREADS_PREFER_PTHREAD_FLAG ON)
@@ -387,6 +389,7 @@ add_subdirectory(external EXCLUDE_FROM_ALL)
 # Cmake does not let us easily set the deployment target per-target, but Catch2
 # can use modern features because we only run tests on recent OS versions.
 target_compile_definitions(Catch2 PRIVATE _LIBCPP_DISABLE_AVAILABILITY)
+target_compile_definitions(Catch2 PUBLIC ${REALM_TRIVIAL_ABI_FLAGS})
 
 # Enable CTest and include unit tests
 enable_testing()
