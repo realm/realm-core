@@ -259,8 +259,8 @@
 /// since the latter it an invariant.
 
 
-using namespace realm;
-using namespace realm::util;
+namespace realm {
+using namespace util;
 
 Replication* Table::g_dummy_replication = nullptr;
 
@@ -277,7 +277,6 @@ bool TableVersions::operator==(const TableVersions& other) const
     return true;
 }
 
-namespace realm {
 const char* get_data_type_name(DataType type) noexcept
 {
     switch (type) {
@@ -334,7 +333,6 @@ std::ostream& operator<<(std::ostream& o, Table::Type table_type)
     }
     return o << "Invalid table type: " << uint8_t(table_type);
 }
-} // namespace realm
 
 bool LinkChain::add(ColKey ck)
 {
@@ -1648,8 +1646,6 @@ ObjKey Table::find_first(ColKey col_key, T value) const
     return key;
 }
 
-namespace realm {
-
 template <>
 ObjKey Table::find_first(ColKey col_key, util::Optional<float> value) const
 {
@@ -1667,7 +1663,6 @@ ObjKey Table::find_first(ColKey col_key, null) const
 {
     return find_first_null(col_key);
 }
-} // namespace realm
 
 // Explicitly instantiate the generic case of the template for the types we care about.
 template ObjKey Table::find_first(ColKey col_key, bool) const;
@@ -2241,6 +2236,61 @@ Obj Table::create_object_with_primary_key(const Mixed& primary_key, FieldValues&
         get_parent_group()->m_objects_to_delete.emplace_back(this->m_key, ret.get_key());
     }
     return ret;
+}
+
+class BulkInserter {
+public:
+    BulkInserter(ClusterTree& clusters)
+        : m_clusters(clusters)
+        , m_space_in_cluster(m_clusters.get_space_in_last_cluster())
+    {
+    }
+    void add(FieldValues&& values)
+    {
+        m_values.emplace_back(std::move(values));
+        if (m_values.size() == m_space_in_cluster) {
+            flush();
+        }
+    }
+    ~BulkInserter()
+    {
+        flush();
+    }
+
+private:
+    std::vector<FieldValues> m_values;
+    ClusterTree& m_clusters;
+    size_t m_space_in_cluster;
+    void flush()
+    {
+        if (!m_values.empty()) {
+            m_clusters.bulk_insert(m_values);
+            m_values.clear();
+            m_space_in_cluster = m_clusters.get_space_in_last_cluster();
+        }
+    }
+};
+
+Table::BulkInsertToken::BulkInsertToken(std::unique_ptr<BulkInserter> inserter)
+    : m_inserter(std::move(inserter))
+{
+}
+
+Table::BulkInsertToken::~BulkInsertToken() {}
+
+void Table::BulkInsertToken::reset()
+{
+    m_inserter.reset();
+}
+
+Table::BulkInsertToken Table::start_bulk_insert()
+{
+    return BulkInsertToken(std::make_unique<BulkInserter>(m_clusters));
+}
+
+void Table::bulk_insert(BulkInsertToken& token, FieldValues&& values)
+{
+    token.m_inserter->add(std::move(values));
 }
 
 ObjKey Table::find_primary_key(Mixed primary_key) const
@@ -2978,3 +3028,5 @@ ColKey Table::find_opposite_column(ColKey col_key) const
     }
     return ColKey();
 }
+
+} // namespace realm

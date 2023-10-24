@@ -46,7 +46,9 @@ using namespace std::chrono;
 #include "test_types_helper.hpp"
 
 //#include <valgrind/callgrind.h>
+#ifndef REALM_DEBUG
 //#define PERFORMACE_TESTING
+#endif
 
 using namespace realm;
 using namespace realm::util;
@@ -60,6 +62,8 @@ using unit_test::TestContext;
 #ifndef CALLGRIND_STOP_INSTRUMENTATION
 #define CALLGRIND_STOP_INSTRUMENTATION
 #endif
+
+// valgrind --tool=callgrind --instr-atstart=no test/realm-tests
 
 // Test independence and thread-safety
 // -----------------------------------
@@ -3011,7 +3015,6 @@ NONCONCURRENT_TEST(Table_object_sequential)
     ColKey c0;
     ColKey c1;
 
-    CALLGRIND_START_INSTRUMENTATION;
 
     std::cout << nb_rows << " rows - sequential" << std::endl;
 
@@ -3023,13 +3026,16 @@ NONCONCURRENT_TEST(Table_object_sequential)
         c1 = table->add_column(type_Int, "int2", true);
 
 
+        CALLGRIND_START_INSTRUMENTATION;
         auto t1 = steady_clock::now();
 
+        auto token = table->start_bulk_insert();
         for (int i = 0; i < nb_rows; i++) {
-            table->create_object(ObjKey(i)).set_all(i << 1, i << 2);
+            table->bulk_insert(token, FieldValues{{c0, i << 1}, {c1, i << 2}});
         }
-
+        token.reset();
         auto t2 = steady_clock::now();
+        CALLGRIND_STOP_INSTRUMENTATION;
         std::cout << "   insertion time: " << duration_cast<nanoseconds>(t2 - t1).count() / nb_rows << " ns/key"
                   << std::endl;
 
@@ -3045,6 +3051,7 @@ NONCONCURRENT_TEST(Table_object_sequential)
     {
         ReadTransaction rt(sg);
         auto table = rt.get_table("test");
+        CHECK_EQUAL(table->size(), nb_rows);
 
         auto t1 = steady_clock::now();
 
@@ -3120,6 +3127,7 @@ NONCONCURRENT_TEST(Table_object_sequential)
     {
         WriteTransaction wt(sg);
         auto table = wt.get_table("test");
+        CHECK_EQUAL(table->size(), nb_rows);
 
         auto t1 = steady_clock::now();
 
@@ -3142,8 +3150,6 @@ NONCONCURRENT_TEST(Table_object_sequential)
 
         wt.commit();
     }
-
-    CALLGRIND_STOP_INSTRUMENTATION;
 }
 
 NONCONCURRENT_TEST(Table_object_seq_rnd)

@@ -81,6 +81,10 @@ public:
     {
         return m_root->get_last_key_value();
     }
+    int64_t get_space_in_last_cluster() const
+    {
+        return m_root->get_space_in_last_cluster();
+    }
     MemRef ensure_writeable(ObjKey k)
     {
         return m_root->ensure_writeable(k);
@@ -129,6 +133,7 @@ public:
 
     // Create and return object
     Obj insert(ObjKey k, const FieldValues& values);
+    void bulk_insert(const std::vector<FieldValues>& values);
 
     // Lookup and return object
     Obj get(ObjKey k) const
@@ -160,8 +165,6 @@ public:
         return m_owner;
     }
 
-    // Insert entry for object, but do not create and return the object accessor
-    void insert_fast(ObjKey k, const FieldValues& init_values, ClusterNode::State& state);
     // Delete object with given key
     void erase(ObjKey k, CascadeState& state);
     // Check if an object with given key exists

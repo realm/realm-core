@@ -61,6 +61,7 @@ class Subexpr;
 template <class>
 class SubQuery;
 class TableView;
+class BulkInserter;
 
 struct Link {
 };
@@ -301,6 +302,17 @@ public:
     {
         return create_object_with_primary_key(primary_key, {{}}, UpdateMode::all, did_create);
     }
+
+    struct BulkInsertToken {
+        BulkInsertToken(std::unique_ptr<BulkInserter> inserter);
+        ~BulkInsertToken();
+        void reset();
+        std::unique_ptr<BulkInserter> m_inserter;
+    };
+
+    BulkInsertToken start_bulk_insert();
+    void bulk_insert(BulkInsertToken&, FieldValues&&);
+
     // Return key for existing object or return null key.
     ObjKey find_primary_key(Mixed value) const;
     // Return key for existing object or return unresolved key.

@@ -54,6 +54,8 @@ public:
     FieldValues() {}
     FieldValues(std::initializer_list<FieldValue>);
     void insert(ColKey k, Mixed val, bool is_default = false);
+    std::optional<Mixed> find(unsigned col_ndx) const;
+
     auto begin() const noexcept
     {
         return m_values.begin();
@@ -77,6 +79,7 @@ private:
 
 class ClusterNode : public Array {
 public:
+    using ValueIterator = std::vector<FieldValues>::const_iterator;
     // This structure is used to bring information back to the upper nodes when
     // inserting new objects or finding existing ones.
     struct State {
@@ -137,6 +140,7 @@ public:
     virtual size_t get_tree_size() const = 0;
     /// Last key in this subtree
     virtual int64_t get_last_key_value() const = 0;
+    virtual int64_t get_space_in_last_cluster() const = 0;
     virtual void ensure_general_form() = 0;
 
     /// Initialize node from 'mem'
@@ -160,6 +164,8 @@ public:
     /// Create a new object identified by 'key' and update 'state' accordingly
     /// Return reference to new node created (if any)
     virtual ref_type insert(ObjKey k, const FieldValues& init_values, State& state) = 0;
+    /// Bulk insert values
+    virtual ref_type bulk_insert(ValueIterator begin, ValueIterator end, State& state) = 0;
     /// Locate object identified by 'key' and update 'state' accordingly
     void get(ObjKey key, State& state) const;
     /// Locate object identified by 'key' and update 'state' accordingly
@@ -270,6 +276,11 @@ public:
         auto sz = node_size();
         return sz ? get_key_value(sz - 1) : -1;
     }
+    int64_t get_space_in_last_cluster() const
+    {
+        auto space_left = cluster_node_size - node_size();
+        return space_left ? space_left : cluster_node_size;
+    }
     size_t lower_bound_key(ObjKey key) const
     {
         if (m_keys.is_attached()) {
@@ -301,6 +312,7 @@ public:
         return size() - s_first_col_index;
     }
     ref_type insert(ObjKey k, const FieldValues& init_values, State& state) override;
+    ref_type bulk_insert(ValueIterator begin, ValueIterator end, State& state) override;
     bool try_get(ObjKey k, State& state) const noexcept override;
     ObjKey get(size_t, State& state) const override;
     size_t get_ndx(ObjKey key, size_t ndx) const noexcept override;
@@ -328,14 +340,14 @@ private:
     {
         return size_t(Array::get(s_key_ref_or_size_index)) >> 1; // Size is stored as tagged value
     }
-    void insert_row(size_t ndx, ObjKey k, const FieldValues& init_values);
+    void insert_rows(size_t ndx, ObjKey k, const FieldValues* init_values, size_t num_init_values);
     void move(size_t ndx, ClusterNode* new_node, int64_t key_adj) override;
     template <class T>
     void do_create(ColKey col);
     template <class T>
     void do_insert_column(ColKey col, bool nullable);
     template <class T>
-    void do_insert_row(size_t ndx, ColKey col, Mixed init_val, bool nullable);
+    void do_insert_rows(size_t ndx, ColKey col, const FieldValues* begin, const FieldValues* end, bool nullable);
     template <class T>
     void do_move(size_t ndx, ColKey col, Cluster* to);
     template <class T>
@@ -351,9 +363,10 @@ private:
         remove_backlinks(get_owning_table(), origin_key, col, links, state);
     }
     void do_erase_key(size_t ndx, ColKey col, CascadeState& state);
-    void do_insert_key(size_t ndx, ColKey col, Mixed init_val, ObjKey origin_key);
-    void do_insert_link(size_t ndx, ColKey col, Mixed init_val, ObjKey origin_key);
-    void do_insert_mixed(size_t ndx, ColKey col_key, Mixed init_value, ObjKey origin_key);
+    void do_insert_keys(size_t ndx, ColKey col, const FieldValues* begin, const FieldValues* end, ObjKey origin_key);
+    void do_insert_links(size_t ndx, ColKey col, const FieldValues* begin, const FieldValues* end, ObjKey origin_key);
+    void do_insert_mixeds(size_t ndx, ColKey col_key, const FieldValues* begin, const FieldValues* end,
+                          ObjKey origin_key);
     template <class T>
     void set_spec(T&, ColKey::Idx) const;
     template <class ArrayType>

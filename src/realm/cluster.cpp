@@ -65,6 +65,17 @@ void FieldValues::insert(ColKey k, Mixed val, bool is_default)
     m_values.insert(it, {k, val, is_default});
 }
 
+std::optional<Mixed> FieldValues::find(unsigned idx) const
+{
+    auto it = std::lower_bound(m_values.begin(), m_values.end(), idx, [](const auto& a, unsigned int i) {
+        return a.col_key.get_index().val < i;
+    });
+    if (it != m_values.end() && it->col_key.get_index().val == idx) {
+        return it->value;
+    }
+    return {};
+}
+
 /******************************* ClusterNode *********************************/
 
 void ClusterNode::IteratorState::clear()
@@ -262,7 +273,8 @@ inline void Cluster::set_spec(ArrayString& arr, ColKey::Idx col_ndx) const
 }
 
 template <class T>
-inline void Cluster::do_insert_row(size_t ndx, ColKey col, Mixed init_val, bool nullable)
+inline void Cluster::do_insert_rows(size_t ndx, ColKey col, const FieldValues* begin, const FieldValues* end,
+                                    bool nullable)
 {
     using U = typename util::RemoveOptional<typename T::value_type>::type;
 
@@ -271,108 +283,136 @@ inline void Cluster::do_insert_row(size_t ndx, ColKey col, Mixed init_val, bool 
     arr.set_parent(this, col_ndx.val + s_first_col_index);
     set_spec<T>(arr, col_ndx);
     arr.init_from_parent();
-    if (init_val.is_null()) {
-        arr.insert(ndx, T::default_value(nullable));
-    }
-    else {
-        arr.insert(ndx, init_val.get<U>());
+    while (begin != end) {
+        if (auto val = begin->find(col.get_index().val); val && !val->is_null()) {
+            arr.insert(ndx, val->get<U>());
+        }
+        else {
+            arr.insert(ndx, T::default_value(nullable));
+        }
+        ++begin;
+        ++ndx;
     }
 }
 
-inline void Cluster::do_insert_key(size_t ndx, ColKey col_key, Mixed init_val, ObjKey origin_key)
+inline void Cluster::do_insert_keys(size_t ndx, ColKey col_key, const FieldValues* begin, const FieldValues* end,
+                                    ObjKey origin_key)
 {
-    ObjKey target_key = init_val.is_null() ? ObjKey{} : init_val.get<ObjKey>();
     ArrayKey arr(m_alloc);
     auto col_ndx = col_key.get_index();
     arr.set_parent(this, col_ndx.val + s_first_col_index);
     arr.init_from_parent();
-    arr.insert(ndx, target_key);
-
-    // Insert backlink if link is not null
-    if (target_key) {
-        const Table* origin_table = m_tree_top.get_owning_table();
-        ColKey opp_col = origin_table->get_opposite_column(col_key);
-        TableRef opp_table = origin_table->get_opposite_table(col_key);
-        Obj target_obj = opp_table->get_object(target_key);
-        target_obj.add_backlink(opp_col, origin_key);
+    while (begin != end) {
+        if (auto val = begin->find(col_key.get_index().val)) {
+            ObjKey target_key = val->get<ObjKey>();
+            arr.insert(ndx, target_key);
+            // Insert backlink if link is not null
+            if (target_key) {
+                const Table* origin_table = m_tree_top.get_owning_table();
+                ColKey opp_col = origin_table->get_opposite_column(col_key);
+                TableRef opp_table = origin_table->get_opposite_table(col_key);
+                Obj target_obj = opp_table->get_object(target_key);
+                target_obj.add_backlink(opp_col, origin_key);
+            }
+        }
+        else {
+            arr.insert(ndx, ObjKey());
+        }
+        ++begin;
+        ++ndx;
     }
 }
 
-inline void Cluster::do_insert_mixed(size_t ndx, ColKey col_key, Mixed init_value, ObjKey origin_key)
+inline void Cluster::do_insert_mixeds(size_t ndx, ColKey col_key, const FieldValues* begin, const FieldValues* end,
+                                      ObjKey origin_key)
 {
     ArrayMixed arr(m_alloc);
     arr.set_parent(this, col_key.get_index().val + s_first_col_index);
     arr.init_from_parent();
-    arr.insert(ndx, init_value);
-
-    // Insert backlink if needed
-    if (init_value.is_type(type_TypedLink)) {
-        // In case we are inserting in a Dictionary cluster, the backlink will
-        // be handled in Dictionary::insert function
-        if (Table* origin_table = const_cast<Table*>(m_tree_top.get_owning_table())) {
-            if (origin_table->is_asymmetric()) {
-                throw IllegalOperation("Object value not supported in asymmetric table");
-            }
-            ObjLink link = init_value.get<ObjLink>();
-            auto target_table = origin_table->get_parent_group()->get_table(link.get_table_key());
-            if (target_table->is_asymmetric()) {
-                throw IllegalOperation("Ephemeral object value not supported");
-            }
-            ColKey backlink_col_key = target_table->find_or_add_backlink_column(col_key, origin_table->get_key());
-            target_table->get_object(link.get_obj_key()).add_backlink(backlink_col_key, origin_key);
+    while (begin != end) {
+        Mixed init_value;
+        if (auto val = begin->find(col_key.get_index().val)) {
+            init_value = *val;
         }
+        arr.insert(ndx, init_value);
+        // Insert backlink if needed
+        if (init_value.is_type(type_TypedLink)) {
+            // In case we are inserting in a Dictionary cluster, the backlink will
+            // be handled in Dictionary::insert function
+            if (Table* origin_table = const_cast<Table*>(m_tree_top.get_owning_table())) {
+                if (origin_table->is_asymmetric()) {
+                    throw IllegalOperation("Object value not supported in asymmetric table");
+                }
+                ObjLink link = init_value.get<ObjLink>();
+                auto target_table = origin_table->get_parent_group()->get_table(link.get_table_key());
+                if (target_table->is_asymmetric()) {
+                    throw IllegalOperation("Ephemeral object value not supported");
+                }
+                ColKey backlink_col_key = target_table->find_or_add_backlink_column(col_key, origin_table->get_key());
+                target_table->get_object(link.get_obj_key()).add_backlink(backlink_col_key, origin_key);
+            }
+        }
+
+        ++begin;
+        ++ndx;
     }
 }
 
-inline void Cluster::do_insert_link(size_t ndx, ColKey col_key, Mixed init_val, ObjKey origin_key)
+inline void Cluster::do_insert_links(size_t ndx, ColKey col_key, const FieldValues* begin, const FieldValues* end,
+                                     ObjKey origin_key)
 {
-    ObjLink target_link = init_val.is_null() ? ObjLink{} : init_val.get<ObjLink>();
     ArrayTypedLink arr(m_alloc);
     auto col_ndx = col_key.get_index();
     arr.set_parent(this, col_ndx.val + s_first_col_index);
     arr.init_from_parent();
-    arr.insert(ndx, target_link);
+    while (begin != end) {
+        if (auto val = begin->find(col_key.get_index().val)) {
+            ObjLink target_link = val->get<ObjLink>();
+            arr.insert(ndx, target_link);
+            // Insert backlink if link is not null
+            if (target_link) {
+                Table* origin_table = const_cast<Table*>(m_tree_top.get_owning_table());
+                auto target_table = origin_table->get_parent_group()->get_table(target_link.get_table_key());
 
-    // Insert backlink if link is not null
-    if (target_link) {
-        Table* origin_table = const_cast<Table*>(m_tree_top.get_owning_table());
-        auto target_table = origin_table->get_parent_group()->get_table(target_link.get_table_key());
-
-        ColKey backlink_col_key = target_table->find_or_add_backlink_column(col_key, origin_table->get_key());
-        target_table->get_object(target_link.get_obj_key()).add_backlink(backlink_col_key, origin_key);
+                ColKey backlink_col_key = target_table->find_or_add_backlink_column(col_key, origin_table->get_key());
+                target_table->get_object(target_link.get_obj_key()).add_backlink(backlink_col_key, origin_key);
+            }
+        }
+        else {
+            arr.insert(ndx, ObjLink());
+        }
+        ++begin;
+        ++ndx;
     }
 }
 
-void Cluster::insert_row(size_t ndx, ObjKey k, const FieldValues& init_values)
+void Cluster::insert_rows(size_t ndx, ObjKey k, const FieldValues* init_values, size_t num_init_values)
 {
+    REALM_ASSERT(num_init_values + node_size() <= cluster_node_size);
     // Ensure the cluster array is big enough to hold 64 bit values.
     copy_on_write(m_size * 8);
+    auto key_val = k.value;
 
     if (m_keys.is_attached()) {
-        m_keys.insert(ndx, k.value);
+        for (size_t n = 0; n < num_init_values; n++, key_val++)
+            m_keys.insert(ndx + n, key_val);
     }
     else {
-        Array::set(s_key_ref_or_size_index, Array::get(s_key_ref_or_size_index) + 2); // Increments size by 1
+        Array::set(s_key_ref_or_size_index,
+                   Array::get(s_key_ref_or_size_index) + (num_init_values << 1)); // Increments size by num_rows
     }
 
-    auto val = init_values.begin();
     auto insert_in_column = [&](ColKey col_key) {
         auto col_ndx = col_key.get_index();
         auto attr = col_key.get_attrs();
-        Mixed init_value;
-        // init_values must be sorted in col_ndx order - this is ensured by ClustTree::insert()
-        if (val != init_values.end() && val->col_key.get_index().val == col_ndx.val) {
-            init_value = val->value;
-            ++val;
-        }
 
         auto type = col_key.get_type();
         if (attr.test(col_attr_Collection)) {
-            REALM_ASSERT(init_value.is_null());
             ArrayRef arr(m_alloc);
             arr.set_parent(this, col_ndx.val + s_first_col_index);
             arr.init_from_parent();
-            arr.insert(ndx, 0);
+            for (size_t n = 0; n < num_init_values; n++)
+                arr.insert(ndx + n, 0);
             return IteratorControl::AdvanceToNext;
         }
 
@@ -380,54 +420,58 @@ void Cluster::insert_row(size_t ndx, ObjKey k, const FieldValues& init_values)
         switch (type) {
             case col_type_Int:
                 if (attr.test(col_attr_Nullable)) {
-                    do_insert_row<ArrayIntNull>(ndx, col_key, init_value, nullable);
+                    do_insert_rows<ArrayIntNull>(ndx, col_key, init_values, init_values + num_init_values, nullable);
                 }
                 else {
-                    do_insert_row<ArrayInteger>(ndx, col_key, init_value, nullable);
+                    do_insert_rows<ArrayInteger>(ndx, col_key, init_values, init_values + num_init_values, nullable);
                 }
                 break;
             case col_type_Bool:
-                do_insert_row<ArrayBoolNull>(ndx, col_key, init_value, nullable);
+                do_insert_rows<ArrayBoolNull>(ndx, col_key, init_values, init_values + num_init_values, nullable);
                 break;
             case col_type_Float:
-                do_insert_row<ArrayFloatNull>(ndx, col_key, init_value, nullable);
+                do_insert_rows<ArrayFloatNull>(ndx, col_key, init_values, init_values + num_init_values, nullable);
                 break;
             case col_type_Double:
-                do_insert_row<ArrayDoubleNull>(ndx, col_key, init_value, nullable);
+                do_insert_rows<ArrayDoubleNull>(ndx, col_key, init_values, init_values + num_init_values, nullable);
                 break;
             case col_type_String:
-                do_insert_row<ArrayString>(ndx, col_key, init_value, nullable);
+                do_insert_rows<ArrayString>(ndx, col_key, init_values, init_values + num_init_values, nullable);
                 break;
             case col_type_Binary:
-                do_insert_row<ArrayBinary>(ndx, col_key, init_value, nullable);
+                do_insert_rows<ArrayBinary>(ndx, col_key, init_values, init_values + num_init_values, nullable);
                 break;
             case col_type_Mixed: {
-                do_insert_mixed(ndx, col_key, init_value, ObjKey(k.value + get_offset()));
+                do_insert_mixeds(ndx, col_key, init_values, init_values + num_init_values,
+                                 ObjKey(k.value + get_offset()));
                 break;
             }
             case col_type_Timestamp:
-                do_insert_row<ArrayTimestamp>(ndx, col_key, init_value, nullable);
+                do_insert_rows<ArrayTimestamp>(ndx, col_key, init_values, init_values + num_init_values, nullable);
                 break;
             case col_type_Decimal:
-                do_insert_row<ArrayDecimal128>(ndx, col_key, init_value, nullable);
+                do_insert_rows<ArrayDecimal128>(ndx, col_key, init_values, init_values + num_init_values, nullable);
                 break;
             case col_type_ObjectId:
-                do_insert_row<ArrayObjectIdNull>(ndx, col_key, init_value, nullable);
+                do_insert_rows<ArrayObjectIdNull>(ndx, col_key, init_values, init_values + num_init_values, nullable);
                 break;
             case col_type_UUID:
-                do_insert_row<ArrayUUIDNull>(ndx, col_key, init_value, nullable);
+                do_insert_rows<ArrayUUIDNull>(ndx, col_key, init_values, init_values + num_init_values, nullable);
                 break;
             case col_type_Link:
-                do_insert_key(ndx, col_key, init_value, ObjKey(k.value + get_offset()));
+                do_insert_keys(ndx, col_key, init_values, init_values + num_init_values,
+                               ObjKey(k.value + get_offset()));
                 break;
             case col_type_TypedLink:
-                do_insert_link(ndx, col_key, init_value, ObjKey(k.value + get_offset()));
+                do_insert_links(ndx, col_key, init_values, init_values + num_init_values,
+                                ObjKey(k.value + get_offset()));
                 break;
             case col_type_BackLink: {
                 ArrayBacklink arr(m_alloc);
                 arr.set_parent(this, col_ndx.val + s_first_col_index);
                 arr.init_from_parent();
-                arr.insert(ndx, 0);
+                for (size_t n = 0; n < num_init_values; n++)
+                    arr.insert(ndx + n, 0);
                 break;
             }
             default:
@@ -437,6 +481,39 @@ void Cluster::insert_row(size_t ndx, ObjKey k, const FieldValues& init_values)
         return IteratorControl::AdvanceToNext;
     };
     m_tree_top.m_owner->for_each_and_every_column(insert_in_column);
+}
+
+ref_type Cluster::bulk_insert(ValueIterator begin, ValueIterator end, State& state)
+{
+    size_t sz = node_size();
+    uint64_t key_value;
+    if (m_keys.is_attached()) {
+        key_value = m_keys.get(m_keys.size() - 1);
+    }
+    else {
+        key_value = Array::get(s_key_ref_or_size_index) >> 1;
+    }
+
+    size_t values_to_insert = end - begin;
+    if (size_t space_left = cluster_node_size - sz) {
+        if (size_t rows_to_insert = (values_to_insert <= space_left) ? values_to_insert : space_left) {
+            insert_rows(node_size(), ObjKey(++key_value), &*begin, rows_to_insert);
+            values_to_insert -= rows_to_insert;
+            begin += rows_to_insert;
+        }
+    }
+
+    if (values_to_insert == 0)
+        return 0;
+
+    REALM_ASSERT(values_to_insert <= cluster_node_size);
+    Cluster new_leaf(0, m_alloc, m_tree_top);
+    new_leaf.create();
+    new_leaf.bulk_insert(begin, end, state);
+    state.mem = new_leaf.get_mem();
+    state.index = 0;
+    state.split_key = key_value;
+    return new_leaf.get_ref();
 }
 
 template <class T>
@@ -700,7 +777,7 @@ ref_type Cluster::insert(ObjKey k, const FieldValues& init_values, ClusterNode::
 
     REALM_ASSERT_DEBUG(sz <= cluster_node_size);
     if (REALM_LIKELY(sz < cluster_node_size)) {
-        insert_row(ndx, k, init_values); // Throws
+        insert_rows(ndx, k, &init_values, 1); // Throws
         state.mem = get_mem();
         state.index = ndx;
     }
@@ -709,7 +786,7 @@ ref_type Cluster::insert(ObjKey k, const FieldValues& init_values, ClusterNode::
         Cluster new_leaf(0, m_alloc, m_tree_top);
         new_leaf.create();
         if (ndx == sz) {
-            new_leaf.insert_row(0, ObjKey(0), init_values); // Throws
+            new_leaf.insert_rows(0, ObjKey(0), &init_values, 1); // Throws
             state.split_key = k.value;
             state.mem = new_leaf.get_mem();
             state.index = 0;
@@ -719,7 +796,7 @@ ref_type Cluster::insert(ObjKey k, const FieldValues& init_values, ClusterNode::
             REALM_ASSERT_DEBUG(m_keys.is_attached());
             new_leaf.ensure_general_form();
             move(ndx, &new_leaf, current_key_value);
-            insert_row(ndx, k, init_values); // Throws
+            insert_rows(ndx, k, &init_values, 1); // Throws
             state.mem = get_mem();
             state.split_key = current_key_value;
             state.index = ndx;
@@ -1310,33 +1387,19 @@ void Cluster::dump_objects(int64_t key_offset, std::string lead) const
         std::cout << lead << "key: " << std::hex << key_value + key_offset << std::dec;
         m_tree_top.m_owner->for_each_and_every_column([&](ColKey col) {
             size_t j = col.get_index().val + 1;
-            if (col.get_attrs().test(col_attr_List)) {
-                ref_type ref = Array::get_as_ref(j);
+            ref_type ref = Array::get_as_ref(j);
+
+            if (col.is_collection()) {
                 ArrayRef refs(m_alloc);
                 refs.init_from_ref(ref);
-                std::cout << ", {";
                 ref = refs.get(i);
-                if (ref) {
-                    if (col.get_type() == col_type_Int) {
-                        // This is easy to handle
-                        Array ints(m_alloc);
-                        ints.init_from_ref(ref);
-                        for (size_t n = 0; n < ints.size(); n++) {
-                            std::cout << ints.get(n) << ", ";
-                        }
-                    }
-                    else {
-                        std::cout << col.get_type();
-                    }
-                }
-                std::cout << "}";
+                std::cout << ", " << m_tree_top.m_owner->get_collection_type(col);
                 return IteratorControl::AdvanceToNext;
             }
 
             switch (col.get_type()) {
                 case col_type_Int: {
                     bool nullable = col.get_attrs().test(col_attr_Nullable);
-                    ref_type ref = Array::get_as_ref(j);
                     if (nullable) {
                         ArrayIntNull arr_int_null(m_alloc);
                         arr_int_null.init_from_ref(ref);
@@ -1356,7 +1419,6 @@ void Cluster::dump_objects(int64_t key_offset, std::string lead) const
                 }
                 case col_type_Bool: {
                     ArrayBoolNull arr(m_alloc);
-                    ref_type ref = Array::get_as_ref(j);
                     arr.init_from_ref(ref);
                     auto val = arr.get(i);
                     std::cout << ", " << (val ? (*val ? "true" : "false") : "null");
@@ -1364,7 +1426,6 @@ void Cluster::dump_objects(int64_t key_offset, std::string lead) const
                 }
                 case col_type_Float: {
                     ArrayFloatNull arr(m_alloc);
-                    ref_type ref = Array::get_as_ref(j);
                     arr.init_from_ref(ref);
                     auto val = arr.get(i);
                     if (val)
@@ -1375,7 +1436,6 @@ void Cluster::dump_objects(int64_t key_offset, std::string lead) const
                 }
                 case col_type_Double: {
                     ArrayDoubleNull arr(m_alloc);
-                    ref_type ref = Array::get_as_ref(j);
                     arr.init_from_ref(ref);
                     auto val = arr.get(i);
                     if (val)
@@ -1386,28 +1446,24 @@ void Cluster::dump_objects(int64_t key_offset, std::string lead) const
                 }
                 case col_type_String: {
                     ArrayString arr(m_alloc);
-                    ref_type ref = Array::get_as_ref(j);
                     arr.init_from_ref(ref);
                     std::cout << ", " << arr.get(i);
                     break;
                 }
                 case col_type_Binary: {
                     ArrayBinary arr(m_alloc);
-                    ref_type ref = Array::get_as_ref(j);
                     arr.init_from_ref(ref);
                     std::cout << ", " << arr.get(i);
                     break;
                 }
                 case col_type_Mixed: {
                     ArrayMixed arr(m_alloc);
-                    ref_type ref = Array::get_as_ref(j);
                     arr.init_from_ref(ref);
                     std::cout << ", " << arr.get(i);
                     break;
                 }
                 case col_type_Timestamp: {
                     ArrayTimestamp arr(m_alloc);
-                    ref_type ref = Array::get_as_ref(j);
                     arr.init_from_ref(ref);
                     if (arr.is_null(i)) {
                         std::cout << ", null";
@@ -1419,7 +1475,6 @@ void Cluster::dump_objects(int64_t key_offset, std::string lead) const
                 }
                 case col_type_Decimal: {
                     ArrayDecimal128 arr(m_alloc);
-                    ref_type ref = Array::get_as_ref(j);
                     arr.init_from_ref(ref);
                     if (arr.is_null(i)) {
                         std::cout << ", null";
@@ -1431,7 +1486,6 @@ void Cluster::dump_objects(int64_t key_offset, std::string lead) const
                 }
                 case col_type_ObjectId: {
                     ArrayObjectIdNull arr(m_alloc);
-                    ref_type ref = Array::get_as_ref(j);
                     arr.init_from_ref(ref);
                     if (arr.is_null(i)) {
                         std::cout << ", null";
@@ -1443,7 +1497,6 @@ void Cluster::dump_objects(int64_t key_offset, std::string lead) const
                 }
                 case col_type_UUID: {
                     ArrayUUIDNull arr(m_alloc);
-                    ref_type ref = Array::get_as_ref(j);
                     arr.init_from_ref(ref);
                     if (arr.is_null(i)) {
                         std::cout << ", null";
@@ -1455,7 +1508,6 @@ void Cluster::dump_objects(int64_t key_offset, std::string lead) const
                 }
                 case col_type_Link: {
                     ArrayKey arr(m_alloc);
-                    ref_type ref = Array::get_as_ref(j);
                     arr.init_from_ref(ref);
                     std::cout << ", " << arr.get(i);
                     break;
