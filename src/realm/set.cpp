@@ -16,23 +16,101 @@
  *
  **************************************************************************/
 
-
 #include "realm/set.hpp"
+
 #include "realm/array_basic.hpp"
-#include "realm/array_integer.hpp"
-#include "realm/array_bool.hpp"
-#include "realm/array_string.hpp"
 #include "realm/array_binary.hpp"
-#include "realm/array_timestamp.hpp"
+#include "realm/array_bool.hpp"
 #include "realm/array_decimal128.hpp"
 #include "realm/array_fixed_bytes.hpp"
-#include "realm/array_typed_link.hpp"
+#include "realm/array_integer.hpp"
 #include "realm/array_mixed.hpp"
+#include "realm/array_string.hpp"
+#include "realm/array_timestamp.hpp"
+#include "realm/array_typed_link.hpp"
 #include "realm/replication.hpp"
+
+#include <numeric> // std::iota
 
 namespace realm {
 
-// FIXME: This method belongs in obj.cpp.
+template <typename T>
+UpdateStatus Set<T>::update_if_needed() const
+{
+    auto status = Base::update_if_needed();
+    switch (status) {
+        case UpdateStatus::Detached: {
+            m_tree.reset();
+            return UpdateStatus::Detached;
+        }
+        case UpdateStatus::NoChange:
+            if (m_tree && m_tree->is_attached()) {
+                return UpdateStatus::NoChange;
+            }
+            // The tree has not been initialized yet for this accessor, so
+            // perform lazy initialization by treating it as an update.
+            [[fallthrough]];
+        case UpdateStatus::Updated: {
+            bool attached = init_from_parent(false);
+            return attached ? UpdateStatus::Updated : UpdateStatus::Detached;
+        }
+    }
+    REALM_UNREACHABLE();
+}
+
+template <typename T>
+UpdateStatus Set<T>::ensure_created()
+{
+    auto status = Base::ensure_created();
+    switch (status) {
+        case UpdateStatus::Detached:
+            break; // Not possible (would have thrown earlier).
+        case UpdateStatus::NoChange: {
+            if (m_tree && m_tree->is_attached()) {
+                return UpdateStatus::NoChange;
+            }
+            // The tree has not been initialized yet for this accessor, so
+            // perform lazy initialization by treating it as an update.
+            [[fallthrough]];
+        }
+        case UpdateStatus::Updated: {
+            bool attached = init_from_parent(true);
+            REALM_ASSERT(attached);
+            return attached ? UpdateStatus::Updated : UpdateStatus::Detached;
+        }
+    }
+
+    REALM_UNREACHABLE();
+}
+
+static bool do_init_from_parent(BPlusTreeBase& tree, bool allow_create)
+{
+    if (tree.init_from_parent()) {
+        // All is well
+        return true;
+    }
+
+    if (!allow_create) {
+        return false;
+    }
+
+    // The ref in the column was NULL, create the tree in place.
+    tree.create();
+    REALM_ASSERT(tree.is_attached());
+    return true;
+}
+
+template <typename T>
+bool Set<T>::init_from_parent(bool allow_create) const
+{
+    if (!m_tree) {
+        m_tree.reset(new BPlusTree<T>(m_obj.get_alloc()));
+        const ArrayParent* parent = this;
+        m_tree->set_parent(const_cast<ArrayParent*>(parent), 0);
+    }
+    return do_init_from_parent(*m_tree, allow_create);
+}
+
 SetBasePtr Obj::get_setbase_ptr(ColKey col_key) const
 {
     auto attr = get_table()->get_column_attr(col_key);
@@ -40,67 +118,47 @@ SetBasePtr Obj::get_setbase_ptr(ColKey col_key) const
     bool nullable = attr.test(col_attr_Nullable);
 
     switch (get_table()->get_column_type(col_key)) {
-        case type_Int: {
+        case type_Int:
             if (nullable)
                 return std::make_unique<Set<util::Optional<Int>>>(*this, col_key);
-            else
-                return std::make_unique<Set<Int>>(*this, col_key);
-        }
-        case type_Bool: {
+            return std::make_unique<Set<Int>>(*this, col_key);
+        case type_Bool:
             if (nullable)
                 return std::make_unique<Set<util::Optional<Bool>>>(*this, col_key);
-            else
-                return std::make_unique<Set<Bool>>(*this, col_key);
-        }
-        case type_Float: {
+            return std::make_unique<Set<Bool>>(*this, col_key);
+        case type_Float:
             if (nullable)
                 return std::make_unique<Set<util::Optional<Float>>>(*this, col_key);
-            else
-                return std::make_unique<Set<Float>>(*this, col_key);
-        }
-        case type_Double: {
+            return std::make_unique<Set<Float>>(*this, col_key);
+        case type_Double:
             if (nullable)
                 return std::make_unique<Set<util::Optional<Double>>>(*this, col_key);
-            else
-                return std::make_unique<Set<Double>>(*this, col_key);
-        }
-        case type_String: {
+            return std::make_unique<Set<Double>>(*this, col_key);
+        case type_String:
             return std::make_unique<Set<String>>(*this, col_key);
-        }
-        case type_Binary: {
+        case type_Binary:
             return std::make_unique<Set<Binary>>(*this, col_key);
-        }
-        case type_Timestamp: {
+        case type_Timestamp:
             return std::make_unique<Set<Timestamp>>(*this, col_key);
-        }
-        case type_Decimal: {
+        case type_Decimal:
             return std::make_unique<Set<Decimal128>>(*this, col_key);
-        }
-        case type_ObjectId: {
+        case type_ObjectId:
             if (nullable)
                 return std::make_unique<Set<util::Optional<ObjectId>>>(*this, col_key);
-            else
-                return std::make_unique<Set<ObjectId>>(*this, col_key);
-        }
-        case type_UUID: {
+            return std::make_unique<Set<ObjectId>>(*this, col_key);
+        case type_UUID:
             if (nullable)
                 return std::make_unique<Set<util::Optional<UUID>>>(*this, col_key);
-            else
-                return std::make_unique<Set<UUID>>(*this, col_key);
-        }
-        case type_TypedLink: {
+            return std::make_unique<Set<UUID>>(*this, col_key);
+        case type_TypedLink:
             return std::make_unique<Set<ObjLink>>(*this, col_key);
-        }
-        case type_Mixed: {
+        case type_Mixed:
             return std::make_unique<Set<Mixed>>(*this, col_key);
-        }
-        case type_Link: {
+        case type_Link:
             return std::make_unique<LnkSet>(*this, col_key);
-        }
-        case type_LinkList:
-            break;
+        default:
+            REALM_TERMINATE("Unsupported column type.");
     }
-    REALM_TERMINATE("Unsupported column type.");
 }
 
 void SetBase::insert_repl(Replication* repl, size_t index, Mixed value) const
@@ -136,7 +194,7 @@ void Set<ObjKey>::do_insert(size_t ndx, ObjKey target_key)
     auto origin_table = m_obj.get_table();
     auto target_table_key = origin_table->get_opposite_table_key(m_col_key);
     m_obj.set_backlink(m_col_key, {target_table_key, target_key});
-    m_tree->insert(ndx, target_key);
+    tree().insert(ndx, target_key);
     if (target_key.is_unresolved()) {
         m_tree->set_context_flag(true);
     }
@@ -162,7 +220,7 @@ void Set<ObjKey>::do_erase(size_t ndx)
 
         // FIXME: Exploit the fact that the values are sorted and unresolved
         // keys have a negative value.
-        _impl::check_for_last_unresolved(m_tree.get());
+        _impl::check_for_last_unresolved(&tree());
     }
 }
 
@@ -181,7 +239,7 @@ template <>
 void Set<ObjLink>::do_insert(size_t ndx, ObjLink target_link)
 {
     m_obj.set_backlink(m_col_key, target_link);
-    m_tree->insert(ndx, target_link);
+    tree().insert(ndx, target_link);
 }
 
 template <>
@@ -208,7 +266,7 @@ void Set<Mixed>::do_insert(size_t ndx, Mixed value)
         m_obj.get_table()->get_parent_group()->validate(target_link);
         m_obj.set_backlink(m_col_key, target_link);
     }
-    m_tree->insert(ndx, value);
+    tree().insert(ndx, value);
 }
 
 template <>
@@ -248,16 +306,16 @@ void Set<Mixed>::migrate()
     // We should just move all string values to be before the binary values
     size_t first_binary = size();
     for (size_t n = 0; n < size(); n++) {
-        if (m_tree->get(n).is_type(type_Binary)) {
+        if (tree().get(n).is_type(type_Binary)) {
             first_binary = n;
             break;
         }
     }
 
     for (size_t n = first_binary; n < size(); n++) {
-        if (m_tree->get(n).is_type(type_String)) {
-            m_tree->insert(first_binary, Mixed());
-            m_tree->swap(n + 1, first_binary);
+        if (tree().get(n).is_type(type_String)) {
+            tree().insert(first_binary, Mixed());
+            tree().swap(n + 1, first_binary);
             m_tree->erase(n + 1);
             first_binary++;
         }
@@ -275,7 +333,7 @@ void LnkSet::remove_target_row(size_t link_ndx)
 void LnkSet::remove_all_target_rows()
 {
     if (m_set.update()) {
-        _impl::TableFriend::batch_erase_rows(*get_target_table(), *m_set.m_tree);
+        _impl::TableFriend::batch_erase_rows(*get_target_table(), m_set.tree());
     }
 }
 
