@@ -1712,6 +1712,61 @@ TEST_CASE("flx: query on non-queryable field results in query error message", "[
 }
 
 #if REALM_ENABLE_GEOSPATIAL
+
+TEST_CASE("flx: demo geospatial", "[sync][flx][geospatial][baas]") {
+    Schema schema{
+        {"restaurant",
+            {
+                {"_id", PropertyType::ObjectId | PropertyType::Nullable, Property::IsPrimary{true}},
+                {"location", PropertyType::Object | PropertyType::Nullable, "GeoPoint"},
+                {"name", PropertyType::String | PropertyType::Nullable},
+//                {"array", PropertyType::Object | PropertyType::Array, "geoPointType"},
+            }},
+        {"GeoPoint",
+            ObjectSchema::ObjectType::Embedded,
+            {
+                {"type", PropertyType::String},
+                {"coordinates", PropertyType::Double | PropertyType::Array},
+            }},
+    };
+
+    auto create_subscription = [](SharedRealm realm, StringData table_name, StringData column_name, auto make_query) {
+        auto table = realm->read_group().get_table(table_name);
+        auto queryable_field = table->get_column_key(column_name);
+        auto new_query = realm->get_active_subscription_set().make_mutable_copy();
+        new_query.insert_or_assign(make_query(Query(table), queryable_field));
+        return new_query.commit();
+    };
+
+    SECTION("Server supports a basic geowithin FLX query") {
+        TestSyncManager::Config app_config;
+        app_config.transport = instance_of<SynchronousTestTransport>;
+        app_config.log_level = realm::util::Logger::Level::trace;
+        app_config.app_config.app_id = "devicesync-wwriw";
+        TestSyncManager sync_manager(app_config);
+        auto app = sync_manager.app();
+        app->log_in_with_credentials(realm::app::AppCredentials::anonymous(),
+                                     [&](std::shared_ptr<realm::SyncUser> user, util::Optional<app::AppError> error) {
+                                         REQUIRE(user);
+                                         CHECK(!error);
+                                     });
+        CppContext c;
+        SyncTestFile config(app->current_user(), schema, realm::SyncConfig::FLXSyncEnabled{});
+
+        auto realm = realm::Realm::get_shared_realm(config);
+        auto subs = create_subscription(realm, "class_restaurant", "location", [](Query q, ColKey c) {
+            GeoBox area{GeoPoint{0.2, 0.2}, GeoPoint{0.7, 0.7}};
+            Query query = q.get_table()->column<Link>(c).geo_within(area);
+            std::string ser = query.get_description();
+            return query;
+        });
+        auto sub_res = subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get_no_throw();
+        CHECK(sub_res.is_ok());
+        CHECK(realm->get_active_subscription_set().version() == 1);
+        CHECK(realm->get_latest_subscription_set().version() == 1);
+    }
+}
+
 TEST_CASE("flx: geospatial", "[sync][flx][geospatial][baas]") {
     static std::optional<FLXSyncTestHarness> harness;
     if (!harness) {
