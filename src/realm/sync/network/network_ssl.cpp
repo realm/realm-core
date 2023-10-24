@@ -770,6 +770,11 @@ long Stream::bio_ctrl(BIO*, int cmd, long, void*) noexcept
         case BIO_CTRL_FLUSH:
             // Ignoring in alignment with `crypto/bio/bss_sock.c` of OpenSSL.
             return 1;
+#if OPENSSL_VERSION_NUMBER >= 0x30000000L
+        case BIO_CTRL_GET_KTLS_SEND:
+        case BIO_CTRL_GET_KTLS_RECV:
+            return 0;
+#endif
         default:
             REALM_ASSERT_EX(false, "Got BIO_ctrl with unknown command %d", cmd);
     }
