@@ -389,7 +389,7 @@ size_t Group::get_free_space_size(const Array& top) noexcept
         auto ref = top.get_as_ref(s_free_size_ndx);
         Array free_list_sizes(top.get_alloc());
         free_list_sizes.init_from_ref(ref);
-        return free_list_sizes.get_sum();
+        return size_t(free_list_sizes.get_sum());
     }
     return 0;
 }
