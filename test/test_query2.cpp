@@ -217,12 +217,15 @@ TEST(Query_FindAllBetween)
 }
 
 
-TEST(Query_FindAllOr)
+TEST_TYPES(Query_FindAllOr, std::false_type, std::true_type)
 {
     Table ttt;
     auto col_id = ttt.add_column(type_Int, "id");
     auto col_int = ttt.add_column(type_Int, "1");
     auto col_str = ttt.add_column(type_String, "2");
+    if (TEST_TYPE::value) {
+        ttt.add_search_index(col_str);
+    }
 
     ttt.create_object().set_all(0, 1, "a");
     ttt.create_object().set_all(1, 2, "a");
@@ -249,8 +252,21 @@ TEST(Query_FindAllOr)
     CHECK_EQUAL(2, tv2[0].get<Int>(col_id));
     CHECK_EQUAL(6, tv2[1].get<Int>(col_id));
     CHECK_EQUAL(7, tv2[2].get<Int>(col_id));
-}
 
+    // NOT(second == X || second == b || second == z || first == -1)
+    Query q3 = ttt.where();
+    q3.Not();
+    q3.group();
+    q3.equal(col_str, "X").Or().equal(col_str, "b").Or().equal(col_str, "z").Or().equal(col_int, -1);
+    q3.end_group();
+    TableView tv3 = q3.find_all();
+    CHECK_EQUAL(5, tv3.size());
+    CHECK_EQUAL(0, tv3[0].get<Int>(col_id));
+    CHECK_EQUAL(1, tv3[1].get<Int>(col_id));
+    CHECK_EQUAL(3, tv3[2].get<Int>(col_id));
+    CHECK_EQUAL(4, tv3[3].get<Int>(col_id));
+    CHECK_EQUAL(5, tv3[4].get<Int>(col_id));
+}
 
 TEST(Query_FindAllParens1)
 {

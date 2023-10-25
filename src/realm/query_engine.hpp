@@ -110,11 +110,7 @@ public:
     ParentNode() = default;
     virtual ~ParentNode() = default;
 
-    virtual bool has_search_index() const
-    {
-        return false;
-    }
-    virtual const IndexEvaluator* index_based_keys()
+    virtual const IndexEvaluator* search_index() const noexcept
     {
         return nullptr;
     }
@@ -205,17 +201,24 @@ public:
 
     virtual std::unique_ptr<ParentNode> clone() const = 0;
 
-    virtual std::string describe(util::serializer::SerialisationState&) const
+    virtual std::string describe(util::serializer::SerialisationState& state) const
     {
-        return "";
+        REALM_ASSERT(m_condition_column_key);
+        return util::format("%1 %2 %3", state.describe_column(m_table, m_condition_column_key), describe_condition(),
+                            describe_value());
     }
 
     virtual std::string describe_condition() const
     {
-        return "matches";
+        return "";
     }
 
-    virtual std::string describe_expression(util::serializer::SerialisationState& state) const
+    virtual std::string describe_value() const
+    {
+        return "";
+    }
+
+    std::string describe_expression(util::serializer::SerialisationState& state) const
     {
         std::string s;
         s = describe(state);
@@ -245,7 +248,7 @@ public:
         // choose 2. The exception is if we're inside a Not group or if the query is restricted to a view, as in those
         // cases end will always be start+1 and we'll have O(N*M) runtime even with a search index, so we want to
         // combine even with an index.
-        if (has_search_index() && !ignore_indexes)
+        if (!ignore_indexes && search_index())
             return false;
         return do_consume_condition(other);
     }
@@ -271,6 +274,14 @@ protected:
         return m_table.unchecked_ptr()->get_real_column_type(key);
     }
 
+    bool has_index() const noexcept
+    {
+        REALM_ASSERT(m_condition_column_key);
+        return m_table.unchecked_ptr()->search_index_type(m_condition_column_key) == IndexType::General;
+    }
+
+    void construct_index_evaluator(std::optional<IndexEvaluator>& evaluator) const;
+
 private:
     virtual void table_changed()
     {
@@ -283,21 +294,6 @@ private:
     {
         return false;
     }
-};
-
-
-class ColumnNodeBase : public ParentNode {
-protected:
-    ColumnNodeBase(ColKey column_key)
-    {
-        m_condition_column_key = column_key;
-    }
-
-    ColumnNodeBase(const ColumnNodeBase& from)
-        : ParentNode(from)
-    {
-    }
-
 };
 
 class IndexEvaluator {
@@ -345,20 +341,30 @@ private:
     std::vector<ObjKey>* m_matching_keys = nullptr;
 };
 
+inline void ParentNode::construct_index_evaluator(std::optional<IndexEvaluator>& evaluator) const
+{
+    if (has_index()) {
+        evaluator.emplace();
+    }
+    else {
+        evaluator.reset();
+    }
+}
+
 template <class LeafType>
-class IntegerNodeBase : public ColumnNodeBase {
+class IntegerNodeBase : public ParentNode {
 public:
     using TConditionValue = typename LeafType::value_type;
 
 protected:
     IntegerNodeBase(TConditionValue value, ColKey column_key)
-        : ColumnNodeBase(column_key)
-        , m_value(std::move(value))
+        : m_value(std::move(value))
     {
+        m_condition_column_key = column_key;
     }
 
     IntegerNodeBase(const IntegerNodeBase& from)
-        : ColumnNodeBase(from)
+        : ParentNode(from)
         , m_value(from.m_value)
     {
     }
@@ -371,7 +377,7 @@ protected:
 
     void init(bool will_query_ranges) override
     {
-        ColumnNodeBase::init(will_query_ranges);
+        ParentNode::init(will_query_ranges);
 
         m_dT = .25;
     }
@@ -383,10 +389,9 @@ protected:
         return end;
     }
 
-    std::string describe(util::serializer::SerialisationState& state) const override
+    std::string describe_value() const override
     {
-        return state.describe_column(ParentNode::m_table, ColumnNodeBase::m_condition_column_key) + " " +
-               describe_condition() + " " + util::serializer::print_value(this->m_value);
+        return util::serializer::print_value(m_value);
     }
 
     // Search value:
@@ -398,7 +403,7 @@ protected:
 
 
 template <class LeafType, class TConditionFunction>
-class IntegerNode : public IntegerNodeBase<LeafType> {
+class IntegerNode final : public IntegerNodeBase<LeafType> {
     using BaseType = IntegerNodeBase<LeafType>;
     using ThisType = IntegerNode<LeafType, TConditionFunction>;
 
@@ -407,10 +412,6 @@ public:
 
     IntegerNode(TConditionValue value, ColKey column_key)
         : BaseType(value, column_key)
-    {
-    }
-    IntegerNode(const IntegerNode& from)
-        : BaseType(from)
     {
     }
 
@@ -458,7 +459,7 @@ static size_t find_first_haystack(LeafType& leaf, NeedleContainer& needles, size
 }
 
 template <class LeafType>
-class IntegerNode<LeafType, Equal> : public IntegerNodeBase<LeafType> {
+class IntegerNode<LeafType, Equal> final : public IntegerNodeBase<LeafType> {
 public:
     using BaseType = IntegerNodeBase<LeafType>;
     using TConditionValue = typename BaseType::TConditionValue;
@@ -474,9 +475,9 @@ public:
         BaseType::init(will_query_ranges);
         m_nb_needles = m_needles.size();
 
-        if (has_search_index() && m_nb_needles == 0) {
+        if (search_index() && m_nb_needles == 0) {
             StringIndex* index = ParentNode::m_table->get_search_index(ParentNode::m_condition_column_key);
-            m_index_evaluator = IndexEvaluator();
+            m_index_evaluator.emplace();
             m_index_evaluator->init(index, BaseType::m_value);
             IntegerNodeBase<LeafType>::m_dT = 0;
         }
@@ -494,15 +495,9 @@ public:
         return true;
     }
 
-    bool has_search_index() const override
+    const IndexEvaluator* search_index() const noexcept override
     {
-        return this->m_table->search_index_type(IntegerNodeBase<LeafType>::m_condition_column_key) ==
-               IndexType::General;
-    }
-
-    const IndexEvaluator* index_based_keys() override
-    {
-        return m_index_evaluator ? &(*m_index_evaluator) : nullptr;
+        return m_index_evaluator ? &*m_index_evaluator : nullptr;
     }
 
     size_t find_first_local(size_t start, size_t end) override
@@ -573,21 +568,19 @@ private:
     }
 };
 
-
-// This node is currently used for floats and doubles only
-template <class LeafType, class TConditionFunction>
-class FloatDoubleNode : public ParentNode {
+template <class LeafType>
+class FloatDoubleNodeBase : public ParentNode {
 public:
     using TConditionValue = typename LeafType::value_type;
     static const bool special_null_node = false;
 
-    FloatDoubleNode(TConditionValue v, ColKey column_key)
+    FloatDoubleNodeBase(TConditionValue v, ColKey column_key)
         : m_value(v)
     {
         m_condition_column_key = column_key;
         m_dT = 1.0;
     }
-    FloatDoubleNode(null, ColKey column_key)
+    FloatDoubleNodeBase(null, ColKey column_key)
         : m_value(null::get_null_float<TConditionValue>())
     {
         m_condition_column_key = column_key;
@@ -600,45 +593,12 @@ public:
         m_cluster->init_leaf(this->m_condition_column_key, &*m_leaf);
     }
 
-    size_t find_first_local(size_t start, size_t end) override
+    std::string describe_value() const override
     {
-        TConditionFunction cond;
-
-        auto find = [&](bool nullability) {
-            bool value_nan = nullability ? null::is_null_float(m_value) : false;
-            for (size_t s = start; s < end; ++s) {
-                TConditionValue v = m_leaf->get(s);
-                REALM_ASSERT(!(null::is_null_float(v) && !nullability));
-                if (cond(v, m_value, nullability ? null::is_null_float<TConditionValue>(v) : false, value_nan))
-                    return s;
-            }
-            return not_found;
-        };
-
-        // This will inline the second case but no the first. Todo, use templated lambda when switching to c++14
-        if (m_table->is_nullable(m_condition_column_key))
-            return find(true);
-        else
-            return find(false);
+        return util::serializer::print_value(m_value);
     }
 
-    std::string describe(util::serializer::SerialisationState& state) const override
-    {
-        REALM_ASSERT(m_condition_column_key);
-        return state.describe_column(ParentNode::m_table, m_condition_column_key) + " " + describe_condition() + " " +
-               util::serializer::print_value(FloatDoubleNode::m_value);
-    }
-    std::string describe_condition() const override
-    {
-        return TConditionFunction::description();
-    }
-
-    std::unique_ptr<ParentNode> clone() const override
-    {
-        return std::unique_ptr<ParentNode>(new FloatDoubleNode(*this));
-    }
-
-    FloatDoubleNode(const FloatDoubleNode& from)
+    FloatDoubleNodeBase(const FloatDoubleNodeBase& from)
         : ParentNode(from)
         , m_value(from.m_value)
     {
@@ -649,10 +609,41 @@ protected:
     std::optional<LeafType> m_leaf;
 };
 
-template <class T, class TConditionFunction>
-class SizeNode : public ParentNode {
+template <class LeafType, class TConditionFunction>
+class FloatDoubleNode final : public FloatDoubleNodeBase<LeafType> {
 public:
-    SizeNode(int64_t v, ColKey column)
+    using Base = FloatDoubleNodeBase<LeafType>;
+    using Base::Base;
+
+    size_t find_first_local(size_t start, size_t end) override
+    {
+        TConditionFunction cond;
+        bool nullable = Base::m_table->is_nullable(Base::m_condition_column_key);
+        bool value_nan = nullable && null::is_null_float(Base::m_value);
+        for (size_t s = start; s < end; ++s) {
+            auto v = Base::m_leaf->get(s);
+            REALM_ASSERT(nullable || !null::is_null_float(v));
+            if (cond(v, Base::m_value, nullable && null::is_null_float(v), value_nan))
+                return s;
+        }
+        return not_found;
+    }
+
+    std::string describe_condition() const override
+    {
+        return TConditionFunction::description();
+    }
+
+    std::unique_ptr<ParentNode> clone() const override
+    {
+        return std::unique_ptr<ParentNode>(new FloatDoubleNode(*this));
+    }
+};
+
+template <class T>
+class SizeNodeBase : public ParentNode {
+public:
+    SizeNodeBase(int64_t v, ColKey column)
         : m_value(v)
     {
         m_condition_column_key = column;
@@ -665,12 +656,30 @@ public:
         m_cluster->init_leaf(m_condition_column_key, &*m_leaf);
     }
 
+    SizeNodeBase(const SizeNodeBase& from)
+        : ParentNode(from)
+        , m_value(from.m_value)
+    {
+    }
+
+protected:
+    using LeafType = typename ColumnTypeTraits<T>::cluster_leaf_type;
+    std::optional<LeafType> m_leaf;
+    int64_t m_value;
+};
+
+template <class T, class TConditionFunction>
+class SizeNode final : public SizeNodeBase<T> {
+public:
+    using Base = SizeNodeBase<T>;
+    using Base::Base;
+
     size_t find_first_local(size_t start, size_t end) override
     {
         for (size_t s = start; s < end; ++s) {
-            if (T v = m_leaf->get(s)) {
+            if (T v = Base::m_leaf->get(s)) {
                 int64_t sz = v.size();
-                if (TConditionFunction()(sz, m_value))
+                if (TConditionFunction()(sz, Base::m_value))
                     return s;
             }
         }
@@ -681,23 +690,12 @@ public:
     {
         return std::unique_ptr<ParentNode>(new SizeNode(*this));
     }
-
-    SizeNode(const SizeNode& from)
-        : ParentNode(from)
-        , m_value(from.m_value)
-    {
-    }
-
-private:
-    using LeafType = typename ColumnTypeTraits<T>::cluster_leaf_type;
-    std::optional<LeafType> m_leaf;
-    int64_t m_value;
 };
 
 extern size_t size_of_list_from_ref(ref_type ref, Allocator& alloc, ColumnType col_type, bool nullable);
 
 template <class TConditionFunction>
-class SizeListNode : public ParentNode {
+class SizeListNode final : public ParentNode {
 public:
     SizeListNode(int64_t v, ColKey column)
         : m_value(v)
@@ -761,7 +759,7 @@ private:
 
 
 template <class TConditionFunction>
-class BinaryNode : public ParentNode {
+class BinaryNode final : public ParentNode {
 public:
     using TConditionValue = BinaryData;
     static const bool special_null_node = false;
@@ -795,11 +793,14 @@ public:
         return not_found;
     }
 
-    std::string describe(util::serializer::SerialisationState& state) const override
+    std::string describe_condition() const final
     {
-        REALM_ASSERT(m_condition_column_key);
-        return state.describe_column(ParentNode::m_table, m_condition_column_key) + " " +
-               TConditionFunction::description() + " " + util::serializer::print_value(BinaryNode::m_value.get());
+        return TConditionFunction::description();
+    }
+
+    std::string describe_value() const override
+    {
+        return util::serializer::print_value(m_value.get());
     }
 
     std::unique_ptr<ParentNode> clone() const override
@@ -819,7 +820,7 @@ private:
 };
 
 template <class TConditionFunction>
-class BoolNode : public ParentNode {
+class BoolNode final : public ParentNode {
 public:
     using TConditionValue = bool;
 
@@ -852,19 +853,13 @@ public:
     void table_changed() override
     {
         if constexpr (std::is_same_v<TConditionFunction, Equal>) {
-            const bool has_index = m_table->search_index_type(m_condition_column_key) == IndexType::General;
-            m_index_evaluator = has_index ? std::make_optional(IndexEvaluator{}) : std::nullopt;
+            construct_index_evaluator(m_index_evaluator);
         }
     }
 
-    const IndexEvaluator* index_based_keys() override
+    const IndexEvaluator* search_index() const noexcept override
     {
-        return m_index_evaluator ? &(*m_index_evaluator) : nullptr;
-    }
-
-    bool has_search_index() const override
-    {
-        return bool(m_index_evaluator);
+        return m_index_evaluator ? &*m_index_evaluator : nullptr;
     }
 
     void cluster_changed() override
@@ -891,10 +886,14 @@ public:
         return not_found;
     }
 
-    std::string describe(util::serializer::SerialisationState& state) const override
+    std::string describe_condition() const final
     {
-        return state.describe_column(ParentNode::m_table, m_condition_column_key) + " " +
-               TConditionFunction::description() + " " + util::serializer::print_value(m_value);
+        return TConditionFunction::description();
+    }
+
+    std::string describe_value() const override
+    {
+        return util::serializer::print_value(m_value);
     }
 
     std::unique_ptr<ParentNode> clone() const override
@@ -931,6 +930,11 @@ public:
         m_cluster->init_leaf(m_condition_column_key, &*m_leaf);
     }
 
+    std::string describe_value() const override
+    {
+        return util::serializer::print_value(m_value);
+    }
+
 protected:
     TimestampNodeBase(const TimestampNodeBase& from)
         : ParentNode(from)
@@ -943,7 +947,28 @@ protected:
 };
 
 template <class TConditionFunction>
-class TimestampNode : public TimestampNodeBase {
+class TimestampNode final : public TimestampNodeBase {
+public:
+    using TimestampNodeBase::TimestampNodeBase;
+
+    size_t find_first_local(size_t start, size_t end) override
+    {
+        return m_leaf->find_first<TConditionFunction>(m_value, start, end);
+    }
+
+    std::string describe_condition() const final
+    {
+        return TConditionFunction::description();
+    }
+
+    std::unique_ptr<ParentNode> clone() const override
+    {
+        return std::unique_ptr<ParentNode>(new TimestampNode(*this));
+    }
+};
+
+template <>
+class TimestampNode<Equal> final : public TimestampNodeBase {
 public:
     using TimestampNodeBase::TimestampNodeBase;
 
@@ -951,50 +976,34 @@ public:
     {
         TimestampNodeBase::init(will_query_ranges);
 
-        if constexpr (std::is_same_v<TConditionFunction, Equal>) {
-            if (m_index_evaluator) {
-                StringIndex* index =
-                    TimestampNodeBase::m_table->get_search_index(TimestampNodeBase::m_condition_column_key);
-                m_index_evaluator->init(index, TimestampNodeBase::m_value);
-                this->m_dT = 0;
-            }
+        if (m_index_evaluator) {
+            StringIndex* index = TimestampNodeBase::m_table->get_search_index(m_condition_column_key);
+            m_index_evaluator->init(index, TimestampNodeBase::m_value);
+            this->m_dT = 0;
         }
     }
 
     void table_changed() override
     {
-        if constexpr (std::is_same_v<TConditionFunction, Equal>) {
-            const bool has_index =
-                this->m_table->search_index_type(TimestampNodeBase::m_condition_column_key) == IndexType::General;
-            m_index_evaluator = has_index ? std::make_optional(IndexEvaluator{}) : std::nullopt;
-        }
+        construct_index_evaluator(m_index_evaluator);
     }
 
-    const IndexEvaluator* index_based_keys() override
+    const IndexEvaluator* search_index() const noexcept override
     {
         return m_index_evaluator ? &*m_index_evaluator : nullptr;
     }
 
-    bool has_search_index() const override
-    {
-        return bool(m_index_evaluator);
-    }
-
     size_t find_first_local(size_t start, size_t end) override
     {
-        if constexpr (std::is_same_v<TConditionFunction, Equal>) {
-            if (m_index_evaluator) {
-                return m_index_evaluator->do_search_index(this->m_cluster, start, end);
-            }
+        if (m_index_evaluator) {
+            return m_index_evaluator->do_search_index(this->m_cluster, start, end);
         }
-        return m_leaf->find_first<TConditionFunction>(m_value, start, end);
+        return m_leaf->find_first<Equal>(m_value, start, end);
     }
 
-    std::string describe(util::serializer::SerialisationState& state) const override
+    std::string describe_condition() const final
     {
-        REALM_ASSERT(m_condition_column_key);
-        return state.describe_column(ParentNode::m_table, m_condition_column_key) + " " +
-               TConditionFunction::description() + " " + util::serializer::print_value(TimestampNode::m_value);
+        return Equal::description();
     }
 
     std::unique_ptr<ParentNode> clone() const override
@@ -1002,7 +1011,7 @@ public:
         return std::unique_ptr<ParentNode>(new TimestampNode(*this));
     }
 
-protected:
+private:
     std::optional<IndexEvaluator> m_index_evaluator;
 };
 
@@ -1035,6 +1044,11 @@ public:
         m_dD = 100.0;
     }
 
+    std::string describe_value() const override
+    {
+        return util::serializer::print_value(m_value);
+    }
+
 protected:
     DecimalNodeBase(const DecimalNodeBase& from)
         : ParentNode(from)
@@ -1047,7 +1061,7 @@ protected:
 };
 
 template <class TConditionFunction>
-class DecimalNode : public DecimalNodeBase {
+class DecimalNode final : public DecimalNodeBase {
 public:
     using DecimalNodeBase::DecimalNodeBase;
 
@@ -1063,16 +1077,14 @@ public:
         return realm::npos;
     }
 
-    std::string describe(util::serializer::SerialisationState& state) const override
-    {
-        REALM_ASSERT(m_condition_column_key);
-        return state.describe_column(ParentNode::m_table, m_condition_column_key) + " " +
-               TConditionFunction::description() + " " + util::serializer::print_value(DecimalNode::m_value);
-    }
-
     std::unique_ptr<ParentNode> clone() const override
     {
         return std::unique_ptr<ParentNode>(new DecimalNode(*this));
+    }
+
+    std::string describe_condition() const final
+    {
+        return TConditionFunction::description();
     }
 };
 
@@ -1107,6 +1119,12 @@ public:
         m_dD = 100.0;
     }
 
+    std::string describe_value() const override
+    {
+        return this->m_value_is_null ? util::serializer::print_value(realm::null())
+                                     : util::serializer::print_value(this->m_value);
+    }
+
 protected:
     FixedBytesNodeBase(const FixedBytesNodeBase& from)
         : ParentNode(from)
@@ -1121,7 +1139,7 @@ protected:
 };
 
 template <class TConditionFunction, class ObjectType, class ArrayType>
-class FixedBytesNode : public FixedBytesNodeBase<ObjectType, ArrayType> {
+class FixedBytesNode final : public FixedBytesNodeBase<ObjectType, ArrayType> {
 public:
     using FixedBytesNodeBase<ObjectType, ArrayType>::FixedBytesNodeBase;
 
@@ -1142,13 +1160,9 @@ public:
         return realm::npos;
     }
 
-    std::string describe(util::serializer::SerialisationState& state) const override
+    std::string describe_condition() const final
     {
-        REALM_ASSERT(this->m_condition_column_key);
-        return state.describe_column(ParentNode::m_table, this->m_condition_column_key) + " " +
-               TConditionFunction::description() + " " +
-               (this->m_value_is_null ? util::serializer::print_value(realm::null())
-                                      : util::serializer::print_value(this->m_value));
+        return TConditionFunction::description();
     }
 
     std::unique_ptr<ParentNode> clone() const override
@@ -1158,7 +1172,7 @@ public:
 };
 
 template <class ObjectType, class ArrayType>
-class FixedBytesNode<Equal, ObjectType, ArrayType> : public FixedBytesNodeBase<ObjectType, ArrayType> {
+class FixedBytesNode<Equal, ObjectType, ArrayType> final : public FixedBytesNodeBase<ObjectType, ArrayType> {
 public:
     using FixedBytesNodeBase<ObjectType, ArrayType>::FixedBytesNodeBase;
     using BaseType = FixedBytesNodeBase<ObjectType, ArrayType>;
@@ -1180,31 +1194,23 @@ public:
 
     void table_changed() override
     {
-        const bool has_index =
-            this->m_table->search_index_type(BaseType::m_condition_column_key) == IndexType::General;
-        m_index_evaluator = has_index ? std::make_optional(IndexEvaluator{}) : std::nullopt;
+        ParentNode::construct_index_evaluator(m_index_evaluator);
     }
 
-    const IndexEvaluator* index_based_keys() override
+    const IndexEvaluator* search_index() const noexcept override
     {
-        return m_index_evaluator ? &(*m_index_evaluator) : nullptr;
-    }
-
-    bool has_search_index() const override
-    {
-        return bool(m_index_evaluator);
+        return m_index_evaluator ? &*m_index_evaluator : nullptr;
     }
 
     size_t find_first_local(size_t start, size_t end) override
     {
+        if (m_index_evaluator) {
+            return m_index_evaluator->do_search_index(this->m_cluster, start, end);
+        }
+
         REALM_ASSERT(this->m_table);
         size_t s = realm::npos;
-
         if (start < end) {
-            if (m_index_evaluator) {
-                return m_index_evaluator->do_search_index(this->m_cluster, start, end);
-            }
-
             if (end - start == 1) {
                 if (this->m_leaf->get(start) == m_optional_value) {
                     s = start;
@@ -1218,13 +1224,9 @@ public:
         return s;
     }
 
-    std::string describe(util::serializer::SerialisationState& state) const override
+    std::string describe_condition() const final
     {
-        REALM_ASSERT(this->m_condition_column_key);
-        return state.describe_column(ParentNode::m_table, this->m_condition_column_key) + " " + Equal::description() +
-               " " +
-               (this->m_value_is_null ? util::serializer::print_value(realm::null())
-                                      : util::serializer::print_value(this->m_value));
+        return Equal::description();
     }
 
     std::unique_ptr<ParentNode> clone() const override
@@ -1286,8 +1288,8 @@ public:
         else {
             value = util::serializer::print_value(m_value);
         }
-        return state.describe_column(ParentNode::m_table, m_condition_column_key) + " " + this->describe_condition() +
-               " " + value;
+        return util::format("%1 %2 %3", state.describe_column(m_table, m_condition_column_key), describe_condition(),
+                            value);
     }
 
 protected:
@@ -1321,7 +1323,7 @@ protected:
 };
 
 template <class TConditionFunction>
-class MixedNode : public MixedNodeBase {
+class MixedNode final : public MixedNodeBase {
 public:
     using MixedNodeBase::MixedNodeBase;
 
@@ -1356,37 +1358,28 @@ public:
 };
 
 template <>
-class MixedNode<Equal> : public MixedNodeBase {
+class MixedNode<Equal> final : public MixedNodeBase {
 public:
-    MixedNode(Mixed v, ColKey column)
-        : MixedNodeBase(v, column)
-    {
-    }
-    MixedNode(const MixedNode<Equal>& other)
-        : MixedNodeBase(other)
-        , m_index_evaluator(other.m_index_evaluator)
-    {
-    }
+    using MixedNodeBase::MixedNodeBase;
+
     void init(bool will_query_ranges) override;
 
     void cluster_changed() override
     {
         // If we use searchindex, we do not need further access to clusters
-        if (!has_search_index()) {
+        if (!search_index()) {
             MixedNodeBase::cluster_changed();
         }
     }
 
     void table_changed() override
     {
-        const bool has_index =
-            m_table.unchecked_ptr()->search_index_type(m_condition_column_key) == IndexType::General;
-        m_index_evaluator = has_index ? std::make_optional(IndexEvaluator{}) : std::nullopt;
+        construct_index_evaluator(m_index_evaluator);
     }
 
-    bool has_search_index() const override
+    const IndexEvaluator* search_index() const noexcept override
     {
-        return bool(m_index_evaluator);
+        return m_index_evaluator ? &*m_index_evaluator : nullptr;
     }
 
     size_t find_first_local(size_t start, size_t end) override;
@@ -1401,17 +1394,12 @@ public:
         return std::unique_ptr<ParentNode>(new MixedNode<Equal>(*this));
     }
 
-protected:
+private:
     std::optional<IndexEvaluator> m_index_evaluator;
-
-    const IndexEvaluator* index_based_keys() override
-    {
-        return m_index_evaluator ? &(*m_index_evaluator) : nullptr;
-    }
 };
 
 template <>
-class MixedNode<EqualIns> : public MixedNodeBase {
+class MixedNode<EqualIns> final : public MixedNodeBase {
 public:
     MixedNode(Mixed v, ColKey column)
         : MixedNodeBase(v, column)
@@ -1429,21 +1417,19 @@ public:
     void cluster_changed() override
     {
         // If we use searchindex, we do not need further access to clusters
-        if (!has_search_index()) {
+        if (!search_index()) {
             MixedNodeBase::cluster_changed();
         }
     }
 
     void table_changed() override
     {
-        const bool has_index =
-            m_table.unchecked_ptr()->search_index_type(m_condition_column_key) == IndexType::General;
-        m_index_evaluator = has_index ? std::make_optional(IndexEvaluator{}) : std::nullopt;
+        construct_index_evaluator(m_index_evaluator);
     }
 
-    bool has_search_index() const override
+    const IndexEvaluator* search_index() const noexcept override
     {
-        return bool(m_index_evaluator);
+        return m_index_evaluator ? &*m_index_evaluator : nullptr;
     }
 
     std::string describe_condition() const override
@@ -1456,16 +1442,11 @@ public:
         return std::unique_ptr<ParentNode>(new MixedNode<EqualIns>(*this));
     }
 
-protected:
+private:
     std::string m_ucase;
     std::string m_lcase;
     std::optional<IndexEvaluator> m_index_evaluator;
     std::vector<ObjKey> m_index_matches;
-
-    const IndexEvaluator* index_based_keys() override
-    {
-        return m_index_evaluator ? &(*m_index_evaluator) : nullptr;
-    }
 };
 
 class StringNodeBase : public ParentNode {
@@ -1514,15 +1495,13 @@ public:
     {
     }
 
-    std::string describe(util::serializer::SerialisationState& state) const override
+    std::string describe_value() const override
     {
-        REALM_ASSERT(m_condition_column_key);
         StringData sd;
-        if (bool(StringNodeBase::m_value)) {
-            sd = StringData(*StringNodeBase::m_value);
+        if (m_value) {
+            sd = *m_value;
         }
-        return state.describe_column(ParentNode::m_table, m_condition_column_key) + " " + describe_condition() + " " +
-               util::serializer::print_value(sd);
+        return util::serializer::print_value(sd);
     }
 
 protected:
@@ -1541,11 +1520,9 @@ protected:
     }
 };
 
-// Conditions for strings. Note that Equal is specialized later in this file!
-template <class TConditionFunction>
-class StringNode : public StringNodeBase {
+class StringNodeCommon : public StringNodeBase {
 public:
-    StringNode(StringData v, ColKey column)
+    StringNodeCommon(StringData v, ColKey column)
         : StringNodeBase(v, column)
     {
         auto upper = case_map(v, true);
@@ -1564,6 +1541,18 @@ public:
         StringNodeBase::init(will_query_ranges);
         clear_leaf_state();
     }
+
+protected:
+    std::string m_ucase;
+    std::string m_lcase;
+};
+
+
+// Conditions for strings. Note that Equal is specialized later in this file!
+template <class TConditionFunction>
+class StringNode final : public StringNodeCommon {
+public:
+    using StringNodeCommon::StringNodeCommon;
 
     size_t find_first_local(size_t start, size_t end) override
     {
@@ -1587,17 +1576,6 @@ public:
     {
         return std::unique_ptr<ParentNode>(new StringNode<TConditionFunction>(*this));
     }
-
-    StringNode(const StringNode& from)
-        : StringNodeBase(from)
-        , m_ucase(from.m_ucase)
-        , m_lcase(from.m_lcase)
-    {
-    }
-
-protected:
-    std::string m_ucase;
-    std::string m_lcase;
 };
 
 // Specialization for Contains condition on Strings - we specialize because we can utilize Boyer-Moore
@@ -1667,7 +1645,7 @@ protected:
 
 // Specialization for ContainsIns condition on Strings - we specialize because we can utilize Boyer-Moore
 template <>
-class StringNode<ContainsIns> : public StringNodeBase {
+class StringNode<ContainsIns> final : public StringNodeBase {
 public:
     StringNode(StringData v, ColKey column)
         : StringNodeBase(v, column)
@@ -1766,14 +1744,12 @@ public:
     void table_changed() override
     {
         StringNodeBase::table_changed();
-        const bool has_index =
-            m_table.unchecked_ptr()->search_index_type(m_condition_column_key) == IndexType::General;
-        m_index_evaluator = has_index ? std::make_optional(IndexEvaluator{}) : std::nullopt;
+        construct_index_evaluator(m_index_evaluator);
     }
 
-    bool has_search_index() const override
+    const IndexEvaluator* search_index() const noexcept override
     {
-        return bool(m_index_evaluator);
+        return m_index_evaluator ? &*m_index_evaluator : nullptr;
     }
 
     void cluster_changed() override
@@ -1791,20 +1767,15 @@ public:
         return Equal::description();
     }
 
-    const IndexEvaluator* index_based_keys() override
-    {
-        return m_index_evaluator ? &(*m_index_evaluator) : nullptr;
-    }
-
 protected:
     std::optional<IndexEvaluator> m_index_evaluator;
 
-    inline BinaryData str_to_bin(const StringData& s) noexcept
+    BinaryData str_to_bin(const StringData& s) noexcept
     {
         return BinaryData(s.data(), s.size());
     }
 
-    virtual void _search_index_init() = 0;
+    virtual void search_index_init() = 0;
     virtual size_t _find_first_local(size_t start, size_t end) = 0;
 };
 
@@ -1813,14 +1784,14 @@ protected:
 // optimise the non-indexed linear search that can be happen when many conditions are OR'd together in an "IN" query.
 // Future optimization: make specialization for greater, notequal, etc
 template <>
-class StringNode<Equal> : public StringNodeEqualBase {
+class StringNode<Equal> final : public StringNodeEqualBase {
 public:
     StringNode(StringData v, ColKey column)
         : StringNodeEqualBase(v, column)
     {
     }
 
-    void _search_index_init() override;
+    void search_index_init() override;
 
     bool do_consume_condition(ParentNode& other) override;
 
@@ -1856,7 +1827,7 @@ private:
 // Specialization for EqualIns condition on Strings - we specialize because we can utilize indexes (if they exist) for
 // EqualIns.
 template <>
-class StringNode<EqualIns> : public StringNodeEqualBase {
+class StringNode<EqualIns> final : public StringNodeEqualBase {
 public:
     StringNode(StringData v, ColKey column)
         : StringNodeEqualBase(v, column)
@@ -1872,7 +1843,7 @@ public:
         }
     }
 
-    void _search_index_init() override;
+    void search_index_init() override;
 
     std::string describe_condition() const override
     {
@@ -1901,18 +1872,13 @@ private:
 
 
 class LinkMap;
-class StringNodeFulltext : public StringNodeEqualBase {
+class StringNodeFulltext final : public StringNodeEqualBase {
 public:
     StringNodeFulltext(StringData v, ColKey column, std::unique_ptr<LinkMap> lm = {});
 
+    void init(bool) override;
     void table_changed() override;
-
-    void _search_index_init() override;
-
-    bool has_search_index() const override
-    {
-        return true; // it's a required precondition for fulltext queries
-    }
+    void search_index_init() override;
 
     std::unique_ptr<ParentNode> clone() const override
     {
@@ -1931,6 +1897,7 @@ private:
 
     size_t _find_first_local(size_t, size_t) override
     {
+        // Fulltext search requires an index, so the no-index fallback can't be hit
         REALM_UNREACHABLE();
     }
 };
@@ -1942,7 +1909,7 @@ private:
 // will first set m_conditions[0] = left-hand-side through constructor, and then later, when .first.equal(222) is
 // invoked, invocation will set m_conditions[1] = right-hand-side through Query& Query::Or() (see query.cpp).
 // In there, m_child is also set to next AND condition (if any exists) following the OR.
-class OrNode : public ParentNode {
+class OrNode final : public ParentNode {
 public:
     OrNode(std::unique_ptr<ParentNode> condition)
     {
@@ -2115,7 +2082,7 @@ private:
 };
 
 
-class NotNode : public ParentNode {
+class NotNode final : public ParentNode {
 public:
     NotNode(std::unique_ptr<ParentNode> condition)
         : m_condition(std::move(condition))
@@ -2243,8 +2210,8 @@ public:
     std::string describe(util::serializer::SerialisationState& state) const override
     {
         REALM_ASSERT(m_condition_column_key1 && m_condition_column_key2);
-        return state.describe_column(ParentNode::m_table, m_condition_column_key1) + " " + describe_condition() +
-               " " + state.describe_column(ParentNode::m_table, m_condition_column_key2);
+        return util::format("%1 %2 %3", state.describe_column(m_table, m_condition_column_key1), describe_condition(),
+                            state.describe_column(m_table, m_condition_column_key2));
     }
 
     TwoColumnsNodeBase(const TwoColumnsNodeBase& from)
@@ -2263,7 +2230,7 @@ protected:
 
 
 template <class TConditionFunction>
-class TwoColumnsNode : public TwoColumnsNodeBase {
+class TwoColumnsNode final : public TwoColumnsNodeBase {
 public:
     using TwoColumnsNodeBase::TwoColumnsNodeBase;
     size_t find_first_local(size_t start, size_t end) override
@@ -2293,7 +2260,7 @@ public:
 
 
 // For Next-Generation expressions like col1 / col2 + 123 > col4 * 100.
-class ExpressionNode : public ParentNode {
+class ExpressionNode final : public ParentNode {
 public:
     ExpressionNode(std::unique_ptr<Expression>);
 
@@ -2345,9 +2312,8 @@ public:
         m_cluster->init_leaf(this->m_condition_column_key, m_leaf);
     }
 
-    std::string describe(util::serializer::SerialisationState& state) const override
+    std::string describe_value() const override
     {
-        REALM_ASSERT(m_condition_column_key);
         std::string links = m_target_keys.size() > 1 ? "{" : "";
         Group* g = m_table->get_parent_group();
         auto target_table_key = m_table->get_opposite_table(m_condition_column_key)->get_key();
@@ -2361,8 +2327,7 @@ public:
         if (m_target_keys.size() > 1) {
             links += "}";
         }
-        return state.describe_column(ParentNode::m_table, m_condition_column_key) + " " + describe_condition() + " " +
-               links;
+        return links;
     }
 
 protected:
@@ -2386,7 +2351,7 @@ protected:
 };
 
 template <class TConditionFunction>
-class LinksToNode : public LinksToNodeBase {
+class LinksToNode final : public LinksToNodeBase {
 public:
     using LinksToNodeBase::LinksToNodeBase;
 

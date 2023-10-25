@@ -405,7 +405,7 @@ public:
     std::optional<Mixed> avg(ColKey col_key, size_t* value_count = nullptr) const;
 
     // Will return pointer to search index accessor. Will return nullptr if no index
-    StringIndex* get_search_index(ColKey col) const noexcept
+    StringIndex* get_search_index(ColKey col) const
     {
         check_column(col);
         return m_index_accessors[col.get_index().val].get();

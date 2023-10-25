@@ -266,7 +266,7 @@ void StringNodeEqualBase::init(bool will_query_ranges)
 {
     StringNodeBase::init(will_query_ranges);
 
-    const bool uses_index = has_search_index();
+    const bool uses_index = has_index();
     if (m_is_string_enum) {
         m_dT = 1.0;
     }
@@ -278,7 +278,7 @@ void StringNodeEqualBase::init(bool will_query_ranges)
     }
 
     if (uses_index) {
-        _search_index_init();
+        search_index_init();
     }
 }
 
@@ -375,11 +375,18 @@ size_t IndexEvaluator::do_search_index(const Cluster* cluster, size_t start, siz
     return not_found;
 }
 
-void StringNode<Equal>::_search_index_init()
+void StringNode<Equal>::search_index_init()
 {
-    REALM_ASSERT(bool(m_index_evaluator));
+    // If we merged nodes then we don't have an index evaluator even if the column
+    // is indexed because a table scan is faster than using the index
+    if (!m_index_evaluator) {
+        REALM_ASSERT(m_needles.size());
+        return;
+    }
+
     auto index = ParentNode::m_table.unchecked_ptr()->get_search_index(ParentNode::m_condition_column_key);
-    m_index_evaluator->init(index, StringData(StringNodeBase::m_value));
+    REALM_ASSERT(index);
+    m_index_evaluator->init(index, StringData(m_value));
 }
 
 bool StringNode<Equal>::do_consume_condition(ParentNode& node)
@@ -437,9 +444,13 @@ std::string StringNode<Equal>::describe(util::serializer::SerialisationState& st
 }
 
 
-void StringNode<EqualIns>::_search_index_init()
+void StringNode<EqualIns>::search_index_init()
 {
+    // Note that this is different from StringNode<Equal>::search_index_init()
+    // because EqualIns currently doesn't implement consume_condition()
+
     auto index = ParentNode::m_table->get_search_index(ParentNode::m_condition_column_key);
+    REALM_ASSERT(index);
     m_index_matches.clear();
     constexpr bool case_insensitive = true;
     index->find_all(m_index_matches, StringData(StringNodeBase::m_value), case_insensitive);
@@ -479,7 +490,14 @@ StringNodeFulltext::StringNodeFulltext(const StringNodeFulltext& other)
     m_link_map = std::make_unique<LinkMap>(*other.m_link_map);
 }
 
-void StringNodeFulltext::_search_index_init()
+void StringNodeFulltext::init(bool will_query_ranges)
+{
+    StringNodeBase::init(will_query_ranges);
+    m_dT = 0.0;
+    search_index_init();
+}
+
+void StringNodeFulltext::search_index_init()
 {
     auto index = m_link_map->get_target_table()->get_search_index(ParentNode::m_condition_column_key);
     REALM_ASSERT(index && index->is_fulltext_index());

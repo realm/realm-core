@@ -994,9 +994,7 @@ void Query::aggregate(QueryStateBase& st, ColKey column_key) const
             auto pn = root_node();
             auto best = find_best_node(pn);
             auto node = pn->m_children[best];
-            if (node->has_search_index()) {
-                auto keys = node->index_based_keys();
-                REALM_ASSERT(keys);
+            if (auto keys = node->search_index()) {
                 // The node having the search index can be removed from the query as we know that
                 // all the objects will match this condition
                 pn->m_children[best] = pn->m_children.back();
@@ -1319,10 +1317,7 @@ void Query::do_find_all(QueryStateBase& st) const
             auto pn = root_node();
             auto best = find_best_node(pn);
             auto node = pn->m_children[best];
-            if (node->has_search_index()) {
-                auto keys = node->index_based_keys();
-                REALM_ASSERT(keys);
-
+            if (auto keys = node->search_index()) {
                 // The node having the search index can be removed from the query as we know that
                 // all the objects will match this condition
                 pn->m_children[best] = pn->m_children.back();
@@ -1438,9 +1433,7 @@ size_t Query::do_count(size_t limit) const
         auto pn = root_node();
         auto best = find_best_node(pn);
         auto node = pn->m_children[best];
-        if (node->has_search_index()) {
-            auto keys = node->index_based_keys();
-            REALM_ASSERT(keys);
+        if (auto keys = node->search_index()) {
             if (pn->m_children.size() > 1) {
                 // The node having the search index can be removed from the query as we know that
                 // all the objects will match this condition
