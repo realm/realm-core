@@ -279,15 +279,6 @@ public:
     }
     template <Action action, typename T>
     Mixed aggregate(ColKey column_key, size_t* result_count = nullptr, ObjKey* return_key = nullptr) const;
-    template <typename T>
-    size_t aggregate_count(ColKey column_key, T count_target) const;
-
-    size_t count_int(ColKey column_key, int64_t target) const;
-    size_t count_float(ColKey column_key, float target) const;
-    size_t count_double(ColKey column_key, double target) const;
-    size_t count_timestamp(ColKey column_key, Timestamp target) const;
-    size_t count_decimal(ColKey column_key, Decimal128 target) const;
-    size_t count_mixed(ColKey column_key, Mixed target) const;
 
     /// Get the min element, according to whatever comparison function is
     /// meaningful for the collection, or none if min is not supported for this type.

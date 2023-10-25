@@ -151,65 +151,6 @@ Mixed TableView::aggregate(ColKey column_key, size_t* result_count, ObjKey* retu
     return Mixed();
 }
 
-template <typename T>
-size_t TableView::aggregate_count(ColKey column_key, T count_target) const
-{
-    REALM_ASSERT(m_table->valid_column(column_key));
-
-    if ((m_key_values.size()) == 0) {
-        return {};
-    }
-
-    size_t cnt = 0;
-    for (size_t tv_index = 0; tv_index < m_key_values.size(); ++tv_index) {
-        ObjKey key(get_key(tv_index));
-
-        // skip detached references:
-        if (key == realm::null_key)
-            continue;
-
-        const Obj obj = m_table->try_get_object(key);
-        if (!obj.is_valid())
-            continue;
-
-        auto v = obj.get<T>(column_key);
-        if (v == count_target) {
-            cnt++;
-        }
-    }
-
-    return cnt;
-}
-
-// Count
-size_t TableView::count_int(ColKey column_key, int64_t target) const
-{
-    if (m_table->is_nullable(column_key))
-        return aggregate_count<util::Optional<int64_t>>(column_key, target);
-    else
-        return aggregate_count<int64_t>(column_key, target);
-}
-size_t TableView::count_float(ColKey column_key, float target) const
-{
-    return aggregate_count<float>(column_key, target);
-}
-size_t TableView::count_double(ColKey column_key, double target) const
-{
-    return aggregate_count<double>(column_key, target);
-}
-size_t TableView::count_timestamp(ColKey column_key, Timestamp target) const
-{
-    return aggregate_count<Timestamp>(column_key, target);
-}
-size_t TableView::count_decimal(ColKey column_key, Decimal128 target) const
-{
-    return aggregate_count<Decimal128>(column_key, target);
-}
-size_t TableView::count_mixed(ColKey column_key, Mixed target) const
-{
-    return aggregate_count<Mixed>(column_key, target);
-}
-
 template <Action action>
 std::optional<Mixed> TableView::aggregate(ColKey column_key, size_t* count, ObjKey* return_key) const
 {

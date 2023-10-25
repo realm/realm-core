@@ -111,13 +111,6 @@ TEST(TableView_TimestampMaxMinCount)
     CHECK_EQUAL(key, max_key);
     ts = tv.min(col, &key);
     CHECK_EQUAL(key, min_key);
-
-    size_t cnt;
-    cnt = tv.count_timestamp(col, Timestamp(100, 100));
-    CHECK_EQUAL(cnt, 1);
-
-    cnt = tv.count_timestamp(col, Timestamp{});
-    CHECK_EQUAL(cnt, 1);
 }
 
 
@@ -213,14 +206,6 @@ TEST(TableView_FloatsFindAndAggregations)
     CHECK_APPROXIMATELY_EQUAL((-1.2 + -1.2) / 2.0, v_some.avg(col_double)->get_double(), 10 * epsilon);
     CHECK_APPROXIMATELY_EQUAL(sum_f / 6.0, v_all.avg(col_float)->get_double(), 10 * epsilon);
     CHECK_APPROXIMATELY_EQUAL((double(1.2f) + double(-1.1f)) / 2, v_some.avg(col_float)->get_double(), 10 * epsilon);
-
-    CHECK_EQUAL(1, v_some.count_float(col_float, 1.2f));
-    CHECK_EQUAL(2, v_some.count_double(col_double, -1.2));
-    CHECK_EQUAL(2, v_some.count_int(col_int, 1));
-
-    CHECK_EQUAL(2, v_all.count_float(col_float, 2.1f));
-    CHECK_EQUAL(2, v_all.count_double(col_double, -1.2));
-    CHECK_EQUAL(6, v_all.count_int(col_int, 1));
 }
 
 TEST(TableView_Sum)

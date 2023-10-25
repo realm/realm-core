@@ -47,6 +47,7 @@
 
 ### Breaking changes
 * Removed sync::ClientConfig::dry_run. This was not actually used anywhere.
+* Remove the count_X() functions on TableView, which appear to be entirely unused. The Table versions used by realm-java remain.
 
 ### Compatibility
 * Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
