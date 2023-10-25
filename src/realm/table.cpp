@@ -2387,7 +2387,7 @@ ObjKey Table::find_first(ColKey col_key, T value) const
     using LeafType = typename ColumnTypeTraits<T>::cluster_leaf_type;
     LeafType leaf(get_alloc());
 
-    auto f = [&key, &col_key, &value, &leaf](const Cluster* cluster) {
+    auto f = [&key, col_key, &value, &leaf](const Cluster* cluster) {
         cluster->init_leaf(col_key, &leaf);
         size_t row = leaf.find_first(value, 0, cluster->node_size());
         if (row != realm::npos) {
@@ -3693,13 +3693,12 @@ UUID remove_optional<Optional<UUID>>(Optional<UUID> val)
 {
     return *val;
 }
-} // namespace
 
 template <class F, class T>
-void Table::change_nullability(ColKey key_from, ColKey key_to, bool throw_on_null)
+bool change_nullability(Allocator& allocator, ClusterTree& clusters, ColKey key_from, ColKey key_to)
 {
-    Allocator& allocator = this->get_alloc();
-    bool from_nullability = is_nullable(key_from);
+    bool any_null = false;
+    bool from_nullability = key_from.get_attrs().test(col_attr_Nullable);
     auto func = [&](Cluster* cluster) {
         size_t sz = cluster->node_size();
 
@@ -3710,14 +3709,8 @@ void Table::change_nullability(ColKey key_from, ColKey key_to, bool throw_on_nul
 
         for (size_t i = 0; i < sz; i++) {
             if (from_nullability && from_arr.is_null(i)) {
-                if (throw_on_null) {
-                    throw RuntimeError(ErrorCodes::BrokenInvariant,
-                                       util::format("Objects in '%1' has null value(s) in property '%2'", get_name(),
-                                                    get_column_name(key_from)));
-                }
-                else {
-                    to_arr.set(i, ColumnTypeTraits<T>::cluster_leaf_type::default_value(false));
-                }
+                any_null = true;
+                to_arr.set(i, ColumnTypeTraits<T>::cluster_leaf_type::default_value(false));
             }
             else {
                 auto v = remove_optional(from_arr.get(i));
@@ -3726,15 +3719,14 @@ void Table::change_nullability(ColKey key_from, ColKey key_to, bool throw_on_nul
         }
     };
 
-    m_clusters.update(func);
+    clusters.update(func);
+    return any_null;
 }
 
-template <class F, class T>
-void Table::change_nullability_list(ColKey key_from, ColKey key_to, bool throw_on_null)
+void transform_each_list(Allocator& allocator, ClusterTree& clusters, ColKey key_from, ColKey key_to,
+                         util::FunctionRef<ref_type(ref_type)> func)
 {
-    Allocator& allocator = this->get_alloc();
-    bool from_nullability = is_nullable(key_from);
-    auto func = [&](Cluster* cluster) {
+    clusters.update([&](Cluster* cluster) {
         size_t sz = cluster->node_size();
 
         ArrayInteger from_arr(allocator);
@@ -3748,84 +3740,89 @@ void Table::change_nullability_list(ColKey key_from, ColKey key_to, bool throw_o
             REALM_ASSERT(!ref_to);
 
             if (ref_from) {
-                BPlusTree<F> from_list(allocator);
-                BPlusTree<T> to_list(allocator);
-                from_list.init_from_ref(ref_from);
-                to_list.create();
-                size_t n = from_list.size();
-                for (size_t j = 0; j < n; j++) {
-                    auto v = from_list.get(j);
-                    if (!from_nullability || aggregate_operations::valid_for_agg(v)) {
-                        to_list.add(remove_optional(v));
-                    }
-                    else {
-                        if (throw_on_null) {
-                            throw RuntimeError(ErrorCodes::BrokenInvariant,
-                                               util::format("Objects in '%1' has null value(s) in list property '%2'",
-                                                            get_name(), get_column_name(key_from)));
-                        }
-                        else {
-                            to_list.add(ColumnTypeTraits<T>::cluster_leaf_type::default_value(false));
-                        }
-                    }
-                }
-                to_arr.set(i, from_ref(to_list.get_ref()));
+                auto new_ref = func(ref_from);
+                to_arr.set(i, from_ref(new_ref));
             }
         }
-    };
-
-    m_clusters.update(func);
+    });
 }
+
+template <class F, class T>
+bool change_nullability_list(Allocator& allocator, ClusterTree& clusters, ColKey key_from, ColKey key_to)
+{
+    bool any_null = false;
+    bool from_nullability = key_from.get_attrs().test(col_attr_Nullable);
+    transform_each_list(allocator, clusters, key_from, key_to, [&](ref_type ref_from) {
+        BPlusTree<F> from_list(allocator);
+        BPlusTree<T> to_list(allocator);
+        from_list.init_from_ref(ref_from);
+        to_list.create();
+        size_t n = from_list.size();
+        for (size_t j = 0; j < n; j++) {
+            auto v = from_list.get(j);
+            if (!from_nullability || aggregate_operations::valid_for_agg(v)) {
+                to_list.add(remove_optional(v));
+            }
+            else {
+                any_null = true;
+                to_list.add(ColumnTypeTraits<T>::cluster_leaf_type::default_value(false));
+            }
+        }
+        return to_list.get_ref();
+    });
+    return any_null;
+}
+} // namespace
 
 void Table::convert_column(ColKey from, ColKey to, bool throw_on_null)
 {
     realm::DataType type_id = get_column_type(from);
-    bool _is_list = is_list(from);
-    if (_is_list) {
+    bool any_null = false;
+    if (is_list(from)) {
         switch (type_id) {
             case type_Int:
                 if (is_nullable(from)) {
-                    change_nullability_list<Optional<int64_t>, int64_t>(from, to, throw_on_null);
+                    any_null = change_nullability_list<Optional<int64_t>, int64_t>(m_alloc, m_clusters, from, to);
                 }
                 else {
-                    change_nullability_list<int64_t, Optional<int64_t>>(from, to, throw_on_null);
+                    any_null = change_nullability_list<int64_t, Optional<int64_t>>(m_alloc, m_clusters, from, to);
                 }
                 break;
             case type_Float:
-                change_nullability_list<float, float>(from, to, throw_on_null);
+                any_null = change_nullability_list<float, float>(m_alloc, m_clusters, from, to);
                 break;
             case type_Double:
-                change_nullability_list<double, double>(from, to, throw_on_null);
+                any_null = change_nullability_list<double, double>(m_alloc, m_clusters, from, to);
                 break;
             case type_Bool:
-                change_nullability_list<Optional<bool>, Optional<bool>>(from, to, throw_on_null);
+                any_null = change_nullability_list<Optional<bool>, Optional<bool>>(m_alloc, m_clusters, from, to);
                 break;
             case type_String:
-                change_nullability_list<StringData, StringData>(from, to, throw_on_null);
+                any_null = change_nullability_list<StringData, StringData>(m_alloc, m_clusters, from, to);
                 break;
             case type_Binary:
-                change_nullability_list<BinaryData, BinaryData>(from, to, throw_on_null);
+                any_null = change_nullability_list<BinaryData, BinaryData>(m_alloc, m_clusters, from, to);
                 break;
             case type_Timestamp:
-                change_nullability_list<Timestamp, Timestamp>(from, to, throw_on_null);
+                any_null = change_nullability_list<Timestamp, Timestamp>(m_alloc, m_clusters, from, to);
                 break;
             case type_ObjectId:
                 if (is_nullable(from)) {
-                    change_nullability_list<Optional<ObjectId>, ObjectId>(from, to, throw_on_null);
+                    any_null = change_nullability_list<Optional<ObjectId>, ObjectId>(m_alloc, m_clusters, from, to);
                 }
                 else {
-                    change_nullability_list<ObjectId, Optional<ObjectId>>(from, to, throw_on_null);
+                    any_null = change_nullability_list<ObjectId, Optional<ObjectId>>(m_alloc, m_clusters, from, to);
                 }
                 break;
             case type_Decimal:
-                change_nullability_list<Decimal128, Decimal128>(from, to, throw_on_null);
+                any_null = change_nullability_list<Decimal128, Decimal128>(m_alloc, m_clusters, from, to);
                 break;
             case type_UUID:
                 if (is_nullable(from)) {
-                    change_nullability_list<Optional<UUID>, UUID>(from, to, throw_on_null);
+                    any_null = change_nullability_list<Optional<UUID>, UUID>(m_alloc, m_clusters, from, to);
                 }
                 else {
-                    change_nullability_list<UUID, Optional<UUID>>(from, to, throw_on_null);
+                    any_null = change_nullability_list<UUID, Optional<UUID>>(m_alloc, m_clusters, from, to);
                 }
                 break;
             case type_Link:
@@ -3833,7 +3830,7 @@ void Table::convert_column(ColKey from, ColKey to, bool throw_on_null)
             case type_LinkList:
                 // Can't have lists of these types
             case type_Mixed:
-                // These types are no longer supported at all
+                // Mixed is always nullable
                 REALM_UNREACHABLE();
                 break;
         }
@@ -3842,58 +3839,71 @@ void Table::convert_column(ColKey from, ColKey to, bool throw_on_null)
         switch (type_id) {
             case type_Int:
                 if (is_nullable(from)) {
-                    change_nullability<Optional<int64_t>, int64_t>(from, to, throw_on_null);
+                    any_null = change_nullability<Optional<int64_t>, int64_t>(m_alloc, m_clusters, from, to);
                 }
                 else {
-                    change_nullability<int64_t, Optional<int64_t>>(from, to, throw_on_null);
+                    any_null = change_nullability<int64_t, Optional<int64_t>>(m_alloc, m_clusters, from, to);
                 }
                 break;
             case type_Float:
-                change_nullability<float, float>(from, to, throw_on_null);
+                any_null = change_nullability<float, float>(m_alloc, m_clusters, from, to);
                 break;
             case type_Double:
-                change_nullability<double, double>(from, to, throw_on_null);
+                any_null = change_nullability<double, double>(m_alloc, m_clusters, from, to);
                 break;
             case type_Bool:
-                change_nullability<Optional<bool>, Optional<bool>>(from, to, throw_on_null);
+                any_null = change_nullability<Optional<bool>, Optional<bool>>(m_alloc, m_clusters, from, to);
                 break;
             case type_String:
-                change_nullability<StringData, StringData>(from, to, throw_on_null);
+                any_null = change_nullability<StringData, StringData>(m_alloc, m_clusters, from, to);
                 break;
             case type_Binary:
-                change_nullability<BinaryData, BinaryData>(from, to, throw_on_null);
+                any_null = change_nullability<BinaryData, BinaryData>(m_alloc, m_clusters, from, to);
                 break;
             case type_Timestamp:
-                change_nullability<Timestamp, Timestamp>(from, to, throw_on_null);
+                any_null = change_nullability<Timestamp, Timestamp>(m_alloc, m_clusters, from, to);
                 break;
             case type_ObjectId:
                 if (is_nullable(from)) {
-                    change_nullability<Optional<ObjectId>, ObjectId>(from, to, throw_on_null);
+                    any_null = change_nullability<Optional<ObjectId>, ObjectId>(m_alloc, m_clusters, from, to);
                 }
                 else {
-                    change_nullability<ObjectId, Optional<ObjectId>>(from, to, throw_on_null);
+                    any_null = change_nullability<ObjectId, Optional<ObjectId>>(m_alloc, m_clusters, from, to);
                 }
                 break;
             case type_Decimal:
-                change_nullability<Decimal128, Decimal128>(from, to, throw_on_null);
+                any_null = change_nullability<Decimal128, Decimal128>(m_alloc, m_clusters, from, to);
                 break;
             case type_UUID:
                 if (is_nullable(from)) {
-                    change_nullability<Optional<UUID>, UUID>(from, to, throw_on_null);
+                    any_null = change_nullability<Optional<UUID>, UUID>(m_alloc, m_clusters, from, to);
                 }
                 else {
-                    change_nullability<UUID, Optional<UUID>>(from, to, throw_on_null);
+                    any_null = change_nullability<UUID, Optional<UUID>>(m_alloc, m_clusters, from, to);
                 }
                 break;
             case type_TypedLink:
             case type_Link:
+            case type_Mixed:
                 // Always nullable, so can't convert
             case type_LinkList:
                 // Never nullable, so can't convert
-            case type_Mixed:
-                // These types are no longer supported at all
                 REALM_UNREACHABLE();
                 break;
+        }
+    }
+
+    if (throw_on_null && any_null) {
+        remove_column(to);
+        if (is_list(from)) {
+            throw RuntimeError(ErrorCodes::BrokenInvariant,
+                               util::format("Objects in '%1' has null value(s) in list property '%2'", get_name(),
+                                            get_column_name(from)));
+        }
+        else {
+            throw RuntimeError(ErrorCodes::BrokenInvariant,
+                               util::format("Objects in '%1' has null value(s) in property '%2'", get_name(),
+                                            get_column_name(from)));
         }
     }
 }
@@ -3920,15 +3930,7 @@ ColKey Table::set_nullability(ColKey col_key, bool nullable, bool throw_on_null)
 
     ColKey new_col = generate_col_key(type, attr);
     do_insert_root_column(new_col, type, "__temporary");
-
-    try {
-        convert_column(col_key, new_col, throw_on_null);
-    }
-    catch (...) {
-        // remove any partially filled column
-        remove_column(new_col);
-        throw;
-    }
+    convert_column(col_key, new_col, throw_on_null);
 
     if (is_pk_col) {
         // If we go from non nullable to nullable, no values change,

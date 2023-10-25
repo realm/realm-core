@@ -520,10 +520,6 @@ private:
     void build_column_mapping();
     ColKey generate_col_key(ColumnType ct, ColumnAttrMask attrs);
     void convert_column(ColKey from, ColKey to, bool throw_on_null);
-    template <class F, class T>
-    void change_nullability(ColKey from, ColKey to, bool throw_on_null);
-    template <class F, class T>
-    void change_nullability_list(ColKey from, ColKey to, bool throw_on_null);
     Obj create_linked_object();
     // Change the embedded property of a table. If switching to being embedded, the table must
     // not have a primary key and all objects must have exactly 1 backlink.
