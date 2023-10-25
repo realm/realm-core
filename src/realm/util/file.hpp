@@ -184,6 +184,7 @@ public:
     enum AccessMode {
         access_ReadOnly,
         access_ReadWrite,
+        access_None, // you wouldn't do without it!
     };
 
     enum CreateMode {
@@ -657,6 +658,7 @@ private:
         size_t m_offset = 0;
         FileDesc m_fd;
         AccessMode m_access_mode = access_ReadOnly;
+        std::string m_path = "gylle";
 
         MapBase() noexcept = default;
         ~MapBase() noexcept;
@@ -747,6 +749,7 @@ public:
         m_reservation_size = other.m_reservation_size;
         m_offset = other.m_offset;
         m_fd = other.m_fd;
+        m_path = std::move(other.m_path);
         other.m_offset = 0;
         other.m_addr = nullptr;
         other.m_size = other.m_reservation_size = 0;

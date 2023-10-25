@@ -20,6 +20,8 @@
 
 #include <realm/util/file_mapper.hpp>
 #include <realm/util/logger.hpp>
+#include <sstream>
+#include <iomanip>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -94,33 +96,37 @@ size_t round_up_to_page_size(size_t size) noexcept
 // Support for logging memory mappings
 std::mutex mmap_log_mutex;
 struct MMapEntry {
-    bool is_file;
+    enum class Type { Reserved, File, Memory };
+    Type type;
     size_t offset;
     char* start;
     char* end;
+    std::string path;
 };
 
 std::map<void*, MMapEntry> all_mappings;
+static std::string dump_logged_mappings();
+
 static void remove_logged_mapping(char* start, size_t size)
 {
     REALM_ASSERT(start != (char*)-1);
     REALM_ASSERT(size != 0);
     char* end = start + size;
-    // auto it = all_mappings.lower_bound(start);
-    auto it = all_mappings.begin();
+    auto it = all_mappings.lower_bound(start);
+    // auto it = all_mappings.begin();
     if (it == all_mappings.end())
         return;
     // previous entry may overlap, so must be included in scan:
-    // if (it != all_mappings.begin()) {
-    //    --it;
-    //}
+    if (it != all_mappings.begin()) {
+        --it;
+    }
     // scan for and adjust/remove entries which overlaps range:
     while (it != all_mappings.end() && it->second.start < end) {
         // handle case where the range "punches a hole" in existing entry
         if (it->second.start < start && end < it->second.end) {
             // collect info for part after hole
             size_t offset = 0;
-            if (it->second.is_file) {
+            if (it->second.type == MMapEntry::Type::File) {
                 offset = it->second.offset + end - it->second.start;
             }
             REALM_ASSERT((offset % 4096) == 0);
@@ -129,7 +135,7 @@ static void remove_logged_mapping(char* start, size_t size)
             auto old_end = it->second.end;
             it->second.end = start;
             // create new entry for part after hole
-            MMapEntry entry{it->second.is_file, offset, end, old_end};
+            MMapEntry entry{it->second.type, offset, end, old_end, it->second.path};
             all_mappings[end] = entry;
             // aaaaand we're done
             return;
@@ -141,7 +147,10 @@ static void remove_logged_mapping(char* start, size_t size)
             continue;
         }
         // no overlap
-        if (it->second.end <= start) { it++; continue; }
+        if (it->second.end <= start) {
+            it++;
+            continue;
+        }
         // for the rest we have start < it->second.end && it->second.start < end
         // partial overlap
         if (it->second.start < start) {
@@ -155,7 +164,7 @@ static void remove_logged_mapping(char* start, size_t size)
             REALM_ASSERT(it->second.start >= start);
             auto entry = it->second;
             all_mappings.erase(it);
-            if (entry.is_file) {
+            if (entry.type == MMapEntry::Type::File) {
                 entry.offset += end - entry.start;
                 REALM_ASSERT((entry.offset % 4096) == 0);
             }
@@ -167,22 +176,26 @@ static void remove_logged_mapping(char* start, size_t size)
         it++;
     }
 }
-static void add_logged_mapping(bool is_file, size_t offset, char* start, char* end)
+static void add_logged_mapping(MMapEntry::Type type, size_t offset, char* start, char* end, const std::string path)
 {
     REALM_ASSERT(start != (char*)-1);
     REALM_ASSERT(end != start);
     REALM_ASSERT((offset % 4096) == 0);
     // TODO: Expand this to unify neightbouring mappings when possible.
     // This will require capturing unique file IDs.
-    MMapEntry entry{is_file, offset, start, end};
+    MMapEntry entry{type, offset, start, end, path};
+    if (path == "gylle") {
+        dump_logged_mappings();
+        REALM_ASSERT(false);
+    }
     all_mappings[start] = entry;
 }
-static void add_logged_file_mapping(size_t offset, char* start, size_t size)
+static void add_logged_file_mapping(size_t offset, char* start, size_t size, const std::string& path)
 {
     // establishing a new mapping may transparently remove old ones
     remove_logged_mapping(start, size);
     // not the little new
-    add_logged_mapping(true, offset, start, start + size);
+    add_logged_mapping(MMapEntry::Type::File, offset, start, start + size, path);
 }
 
 static void add_logged_priv_mapping(char* start, size_t size)
@@ -190,7 +203,14 @@ static void add_logged_priv_mapping(char* start, size_t size)
     // establishing a new mapping may transparently remove old ones
     remove_logged_mapping(start, size);
     // not the little new
-    add_logged_mapping(false, 0, start, start + size);
+    add_logged_mapping(MMapEntry::Type::Memory, 0, start, start + size, "");
+}
+static void add_logged_reserved_mapping(char* start, size_t size, const std::string& path)
+{
+    // establishing a new mapping may transparently remove old ones
+    remove_logged_mapping(start, size);
+    // not the little new
+    add_logged_mapping(MMapEntry::Type::Reserved, 0, start, start + size, path);
 }
 static std::string dump_logged_mappings()
 {
@@ -198,11 +218,14 @@ static std::string dump_logged_mappings()
     std::string message = "\nMappings at point of failure:\n";
     stream << message;
     for (auto& e : all_mappings) {
-        if (e.second.is_file)
-            stream << "    " << std::hex << (void*)e.second.start << " - " << (void*)e.second.end << "  File @"
-                   << e.second.offset << std::endl;
+        stream << "    " << std::hex << (void*)e.second.start << " - " << (void*)e.second.end << "    "
+               << std::setw(10) << e.second.end - e.second.start;
+        if (e.second.type == MMapEntry::Type::File)
+            stream << "    F-- " << std::setw(12) << e.second.offset << " in File     " << e.second.path << std::endl;
+        else if (e.second.type == MMapEntry::Type::Reserved)
+            stream << "    FR-                          " << e.second.path << std::endl;
         else
-            stream << "    " << std::hex << (void*)e.second.start << " - " << (void*)e.second.end << std::endl;
+            stream << "    --M" << std::endl;
     }
     message = std::move(stream.str());
     auto logger = Logger::get_default_logger();
@@ -421,7 +444,7 @@ void remove_encrypted_mapping(void* addr, size_t size)
 void* mmap_reserve(const FileAttributes& file, size_t reservation_size, size_t offset_in_file,
                    EncryptedFileMapping*& mapping)
 {
-    auto addr = mmap_reserve(file.fd, reservation_size, offset_in_file);
+    auto addr = mmap_reserve(file, reservation_size, offset_in_file);
     if (file.encryption_key) {
         REALM_ASSERT(reservation_size == round_up_to_page_size(reservation_size));
         // we create a mapping for the entire reserved area. This causes full initialization of some fairly
@@ -479,8 +502,8 @@ void* mmap_anon(size_t size)
 #endif
 }
 
-void* mmap_fixed(FileDesc fd, void* address_request, size_t size, File::AccessMode access, size_t offset,
-                 const char* enc_key)
+void* mmap_fixed(const FileAttributes& file, void* address_request, size_t size, File::AccessMode access,
+                 size_t offset, const char* enc_key)
 {
     _impl::SimulatedFailure::trigger_mmap(size);
     static_cast<void>(enc_key); // FIXME: Consider removing this parameter
@@ -492,29 +515,29 @@ void* mmap_fixed(FileDesc fd, void* address_request, size_t size, File::AccessMo
     auto prot = PROT_READ;
     if (access == File::access_ReadWrite)
         prot |= PROT_WRITE;
-    auto flags = (fd == -1) ? (MAP_FIXED | MAP_PRIVATE | MAP_ANON) : (MAP_SHARED | MAP_FIXED);
-    auto addr = ::mmap(address_request, size, prot, flags, fd, offset);
+    auto flags = (file.fd == -1) ? (MAP_FIXED | MAP_PRIVATE | MAP_ANON) : (MAP_SHARED | MAP_FIXED);
+    auto addr = ::mmap(address_request, size, prot, flags, file.fd, offset);
     if (addr != MAP_FAILED && addr != address_request) {
         auto dump = dump_logged_mappings();
         throw std::runtime_error(get_errno_msg("mmap() failed: ", errno) +
                                  ", when mapping an already reserved memory area" + dump);
     }
     if (addr != MAP_FAILED) {
-        if (fd == -1)
+        if (file.fd == -1)
             add_logged_priv_mapping((char*)addr, size);
         else
-            add_logged_file_mapping(offset, (char*)addr, size);
+            add_logged_file_mapping(offset, (char*)addr, size, file.path);
     }
     return addr;
 #endif
 }
 
-void* mmap_reserve(FileDesc fd, size_t reservation_size, size_t offset_in_file)
+void* mmap_reserve(const FileAttributes& file, size_t reservation_size, size_t offset_in_file)
 {
     // The other mmap operations take an fd as a parameter, so we do too.
     // We're not using it for anything currently, but this may change.
     // Similarly for offset_in_file.
-    static_cast<void>(fd);
+    static_cast<void>(file);
     static_cast<void>(offset_in_file);
 #ifdef _WIN32
     REALM_ASSERT(false); // unsupported on windows
@@ -526,7 +549,7 @@ void* mmap_reserve(FileDesc fd, size_t reservation_size, size_t offset_in_file)
         auto dump = dump_logged_mappings();
         throw std::runtime_error(get_errno_msg("mmap() failed: ", errno) + dump);
     }
-    add_logged_priv_mapping((char*)addr, reservation_size);
+    add_logged_reserved_mapping((char*)addr, reservation_size, file.path);
     return addr;
 #endif
 }
@@ -549,18 +572,22 @@ void* mmap(const FileAttributes& file, size_t size, size_t offset)
     {
         std::unique_lock lock(mmap_log_mutex);
 #ifndef _WIN32
-        int prot = PROT_READ;
+        int prot;
         switch (file.access) {
             case File::access_ReadWrite:
-                prot |= PROT_WRITE;
+                prot = PROT_READ | PROT_WRITE;
                 break;
             case File::access_ReadOnly:
+                prot = PROT_READ;
+                break;
+            case File::access_None:
+                prot = PROT_NONE;
                 break;
         }
 
         void* addr = ::mmap(nullptr, size, prot, MAP_SHARED, file.fd, offset);
         if (addr != MAP_FAILED) {
-            add_logged_file_mapping(offset, (char*)addr, size);
+            add_logged_file_mapping(offset, (char*)addr, size, file.path);
             return addr;
         }
         auto dump = dump_logged_mappings();
@@ -605,7 +632,7 @@ void* mmap(const FileAttributes& file, size_t size, size_t offset)
             throw AddressSpaceExhausted(get_errno_msg("MapViewOfFileFromApp() failed: ", GetLastError()) +
                                         " size: " + util::to_string(_size) + " offset: " + util::to_string(offset));
 
-        add_logged_file_mapping(offset, (char*)addr, size);
+        add_logged_file_mapping(offset, (char*)addr, size, file.path);
         return addr;
 #endif
     }
