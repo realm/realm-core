@@ -102,9 +102,7 @@ public:
     template <typename F>
     constexpr FunctionRef(F&& f) noexcept
         : m_obj(const_cast<void*>(reinterpret_cast<const void*>(std::addressof(f))))
-        , m_callback([](void* obj, Args... args) -> Return {
-            return (*reinterpret_cast<typename std::add_pointer<F>::type>(obj))(std::forward<Args>(args)...);
-        })
+        , m_callback(&invoke<F>)
     {
     }
 
@@ -136,6 +134,12 @@ public:
 private:
     void* m_obj;
     Return (*m_callback)(void*, Args...);
+
+    template <typename F>
+    static Return invoke(void* obj, Args... args)
+    {
+        return (*reinterpret_cast<typename std::add_pointer<F>::type>(obj))(std::forward<Args>(args)...);
+    }
 };
 
 template <typename R, typename... Args>
