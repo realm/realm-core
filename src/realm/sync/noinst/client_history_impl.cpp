@@ -543,9 +543,9 @@ size_t ClientHistory::transform_and_apply_server_changesets(util::Span<Changeset
     REALM_ASSERT(transact->get_transact_stage() == DB::transact_Writing);
 
     if (!m_replication.apply_server_changes()) {
-        std::for_each(changesets_to_integrate.begin(), changesets_to_integrate.end(), [&](const Changeset c) {
+        for (auto& c : changesets_to_integrate) {
             downloaded_bytes += c.original_changeset_size;
-        });
+        }
         // Skip over all changesets if they don't need to be transformed and applied.
         return changesets_to_integrate.size();
     }
