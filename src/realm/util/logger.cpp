@@ -84,7 +84,7 @@ const char* Logger::get_level_prefix(Level level) noexcept
     return "";
 }
 
-const std::string_view Logger::level_to_string(Level level) noexcept
+std::string_view Logger::level_to_string(Level level) noexcept
 {
     switch (level) {
         case Logger::Level::all:
@@ -108,6 +108,38 @@ const std::string_view Logger::level_to_string(Level level) noexcept
     }
     REALM_ASSERT(false);
     return "";
+}
+
+std::optional<Logger::Level> Logger::level_from_string(std::string_view str)
+{
+    if (str == "all") {
+        return Logger::Level::all;
+    }
+    if (str == "trace") {
+        return Logger::Level::trace;
+    }
+    if (str == "debug") {
+        return Logger::Level::debug;
+    }
+    if (str == "detail") {
+        return Logger::Level::detail;
+    }
+    if (str == "info") {
+        return Logger::Level::info;
+    }
+    if (str == "warn") {
+        return Logger::Level::warn;
+    }
+    if (str == "error") {
+        return Logger::Level::error;
+    }
+    if (str == "fatal") {
+        return Logger::Level::fatal;
+    }
+    if (str == "off") {
+        return Logger::Level::off;
+    }
+    return std::nullopt;
 }
 
 void StderrLogger::do_log(Level level, const std::string& message)

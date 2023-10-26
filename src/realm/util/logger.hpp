@@ -106,7 +106,8 @@ public:
     static std::shared_ptr<util::Logger>& get_default_logger() noexcept;
     static void set_default_level_threshold(Level level) noexcept;
     static Level get_default_level_threshold() noexcept;
-    static const std::string_view level_to_string(Level level) noexcept;
+    static std::string_view level_to_string(Level level) noexcept;
+    static std::optional<Level> level_from_string(std::string_view);
 
 protected:
     // Used by subclasses that link to a base logger
@@ -376,43 +377,9 @@ template <class C, class T>
 std::basic_istream<C, T>& operator>>(std::basic_istream<C, T>& in, Logger::Level& level)
 {
     std::basic_string<C, T> str;
-    auto check = [&](const char* name) {
-        size_t n = strlen(name);
-        if (n != str.size())
-            return false;
-        for (size_t i = 0; i < n; ++i) {
-            if (in.widen(name[i]) != str[i])
-                return false;
-        }
-        return true;
-    };
     if (in >> str) {
-        if (check("all")) {
-            level = Logger::Level::all;
-        }
-        else if (check("trace")) {
-            level = Logger::Level::trace;
-        }
-        else if (check("debug")) {
-            level = Logger::Level::debug;
-        }
-        else if (check("detail")) {
-            level = Logger::Level::detail;
-        }
-        else if (check("info")) {
-            level = Logger::Level::info;
-        }
-        else if (check("warn")) {
-            level = Logger::Level::warn;
-        }
-        else if (check("error")) {
-            level = Logger::Level::error;
-        }
-        else if (check("fatal")) {
-            level = Logger::Level::fatal;
-        }
-        else if (check("off")) {
-            level = Logger::Level::off;
+        if (auto parsed = Logger::level_from_string(str)) {
+            level = *parsed;
         }
         else {
             in.setstate(std::ios_base::failbit);

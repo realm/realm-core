@@ -516,12 +516,6 @@ private:
         catch (const nlohmann::json::exception& e) {
             return report_error("Malformed json in log_message message: \"%1\": %2", message_body_str, e.what());
         }
-        static const std::unordered_map<std::string_view, util::Logger::Level> name_to_level = {
-            {"fatal", util::Logger::Level::fatal},   {"error", util::Logger::Level::error},
-            {"warn", util::Logger::Level::warn},     {"info", util::Logger::Level::info},
-            {"detail", util::Logger::Level::detail}, {"debug", util::Logger::Level::debug},
-            {"trace", util::Logger::Level::trace},
-        };
 
         // See if the log_message contains the appservices_request_id
         if (auto it = message_body.find("co_id"); it != message_body.end() && it->is_string()) {
@@ -548,8 +542,8 @@ private:
         // If a log level wasn't provided, default to debug
         util::Logger::Level parsed_level = util::Logger::Level::debug;
         if (has_level) {
-            if (auto it = name_to_level.find(log_level); it != name_to_level.end()) {
-                parsed_level = it->second;
+            if (auto parsed = util::Logger::level_from_string(log_level)) {
+                parsed_level = *parsed;
             }
             else {
                 return report_error("Unknown log level found in log_message: \"%1\"", log_level);
