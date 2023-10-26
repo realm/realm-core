@@ -539,7 +539,7 @@ void GroupWriter::backdate()
             auto it = std::lower_bound(info_begin, info_end, entry.ref, [](const Reachable& a, size_t val) {
                 return val > a.pos;
             });
-            if (it != info_end) {
+            if (it != info_end) { // FSA: Check if this could lead us to miss overlap with last block
                 if (it != info_begin)
                     --it;
                 while (it != info_end && it->pos < entry.ref + entry.size) {

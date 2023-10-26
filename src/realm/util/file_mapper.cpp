@@ -183,20 +183,22 @@ static void add_logged_mapping(MMapEntry::Type type, size_t offset, char* start,
         --it;
     }
     while (it != all_mappings.end() && it->second.start < end) {
-        if (it->second.end == start && it->second.type == type && it->second.path == path) {
+        if (it->second.end == start && it->second.type == type && it->second.path == path &&
+            it->second.offset + (size_t)(it->second.end - it->second.start) == offset) {
             // merge into back part of existing entry
             it->second.end = end;
             // if this lines up with next entry, merge that too
             auto next_it = it;
             next_it++;
             if (next_it != all_mappings.end() && end == next_it->second.start && type == next_it->second.type &&
-                path == next_it->second.path) {
+                path == next_it->second.path && next_it->second.offset == offset + (size_t)(end - start)) {
                 it->second.end = next_it->second.end;
                 all_mappings.erase(next_it);
             }
             return;
         }
-        if (it->second.start == end && it->second.type == type && it->second.path == path) {
+        if (it->second.start == end && it->second.type == type && it->second.path == path &&
+            it->second.offset == offset + (size_t)(end - start)) {
             auto entry = it->second;
             entry.offset += start - entry.start;
             entry.start = start;
@@ -207,10 +209,6 @@ static void add_logged_mapping(MMapEntry::Type type, size_t offset, char* start,
         ++it;
     }
     MMapEntry entry{type, offset, start, end, path};
-    if (path == "gylle") {
-        dump_logged_mappings();
-        REALM_ASSERT(false);
-    }
     all_mappings[start] = entry;
 }
 static void add_logged_file_mapping(size_t offset, char* start, size_t size, const std::string& path)
@@ -508,7 +506,7 @@ void* mmap_anon(size_t size)
 #else
     void* addr = ::mmap(nullptr, size, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0);
     if ((std::rand() % 100) == 42)
-        addr = MAP_FAILED;
+        dump_logged_mappings();
     if (addr == MAP_FAILED) {
         auto dump = dump_logged_mappings();
         int err = errno; // Eliminate any risk of clobbering
@@ -663,6 +661,7 @@ void* mmap(const FileAttributes& file, size_t size, size_t offset)
 
 void munmap(void* addr, size_t size)
 {
+    size = round_up_to_page_size(size);
 #if REALM_ENABLE_ENCRYPTION
     remove_mapping(addr, size);
 #endif
@@ -683,12 +682,12 @@ void munmap(void* addr, size_t size)
 
 void* mremap(const FileAttributes& file, size_t file_offset, void* old_addr, size_t old_size, size_t new_size)
 {
+    size_t rounded_old_size = round_up_to_page_size(old_size);
+    size_t rounded_new_size = round_up_to_page_size(new_size);
 #if REALM_ENABLE_ENCRYPTION
     if (file.encryption_key) {
         LockGuard lock(mapping_mutex);
-        size_t rounded_old_size = round_up_to_page_size(old_size);
         if (mapping_and_addr* m = find_mapping_for_addr(old_addr, rounded_old_size)) {
-            size_t rounded_new_size = round_up_to_page_size(new_size);
             if (rounded_old_size == rounded_new_size)
                 return old_addr;
 
@@ -719,10 +718,10 @@ void* mremap(const FileAttributes& file, size_t file_offset, void* old_addr, siz
 
 #ifdef _GNU_SOURCE
     {
-        void* new_addr = ::mremap(old_addr, old_size, new_size, MREMAP_MAYMOVE);
+        void* new_addr = ::mremap(old_addr, rounded_old_size, rounded_new_size, MREMAP_MAYMOVE);
         if (new_addr != MAP_FAILED) {
-            remove_logged_mapping((char*)old_addr, old_size);
-            add_logged_priv_mapping((char*)new_addr, new_size);
+            remove_logged_mapping((char*)old_addr, rounded_old_size);
+            add_logged_priv_mapping((char*)new_addr, rounded_new_size);
             return new_addr;
         }
         int err = errno; // Eliminate any risk of clobbering
@@ -741,14 +740,14 @@ void* mremap(const FileAttributes& file, size_t file_offset, void* old_addr, siz
     }
 #endif
 
-    void* new_addr = mmap(file, new_size, file_offset);
+    void* new_addr = mmap(file, rounded_new_size, file_offset);
     std::unique_lock lock(mmap_log_mutex);
 
 #ifdef _WIN32
     if (!UnmapViewOfFile(old_addr))
         throw std::system_error(GetLastError(), std::system_category(), "UnmapViewOfFile() failed");
 #else
-    if (::munmap(old_addr, old_size) != 0) {
+    if (::munmap(old_addr, rounded_old_size) != 0) {
         int err = errno;
         throw std::system_error(err, std::system_category(), "munmap() failed");
     }
