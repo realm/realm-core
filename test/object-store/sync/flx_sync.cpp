@@ -1716,18 +1716,17 @@ TEST_CASE("flx: query on non-queryable field results in query error message", "[
 TEST_CASE("flx: demo geospatial", "[sync][flx][geospatial][baas]") {
     Schema schema{
         {"restaurant",
-            {
-                {"_id", PropertyType::ObjectId | PropertyType::Nullable, Property::IsPrimary{true}},
-                {"location", PropertyType::Object | PropertyType::Nullable, "GeoPoint"},
-                {"name", PropertyType::String | PropertyType::Nullable},
-//                {"array", PropertyType::Object | PropertyType::Array, "geoPointType"},
-            }},
+         {
+             {"_id", PropertyType::ObjectId | PropertyType::Nullable, Property::IsPrimary{true}},
+             {"location", PropertyType::Object | PropertyType::Nullable, "GeoPoint"},
+             {"name", PropertyType::String | PropertyType::Nullable},
+         }},
         {"GeoPoint",
-            ObjectSchema::ObjectType::Embedded,
-            {
-                {"type", PropertyType::String},
-                {"coordinates", PropertyType::Double | PropertyType::Array},
-            }},
+         ObjectSchema::ObjectType::Embedded,
+         {
+             {"type", PropertyType::String},
+             {"coordinates", PropertyType::Double | PropertyType::Array},
+         }},
     };
 
     auto create_subscription = [](SharedRealm realm, StringData table_name, StringData column_name, auto make_query) {
@@ -1738,32 +1737,100 @@ TEST_CASE("flx: demo geospatial", "[sync][flx][geospatial][baas]") {
         return new_query.commit();
     };
 
+    auto make_polygon_filter = [&](const GeoPolygon& polygon) -> bson::BsonDocument {
+        bson::BsonArray inner{};
+        REALM_ASSERT_3(polygon.points.size(), ==, 1);
+        for (auto& point : polygon.points[0]) {
+            inner.push_back(bson::BsonArray{point.longitude, point.latitude});
+        }
+        bson::BsonArray coords;
+        coords.push_back(inner);
+        bson::BsonDocument geo_bson{{{"type", "Polygon"}, {"coordinates", coords}}};
+        bson::BsonDocument filter{
+            {"location", bson::BsonDocument{{"$geoWithin", bson::BsonDocument{{"$geometry", geo_bson}}}}}};
+        util::format(std::cout, "bson filter for polygon: \"%1\"\n", filter);
+        return filter;
+    };
+
+    auto make_circle_filter = [&](const GeoCircle& circle) -> bson::BsonDocument {
+        bson::BsonArray coords{circle.center.longitude, circle.center.latitude};
+        bson::BsonArray inner;
+        inner.push_back(coords);
+        inner.push_back(circle.radius_radians);
+        bson::BsonDocument filter{
+            {"location", bson::BsonDocument{{"$geoWithin", bson::BsonDocument{{"$centerSphere", inner}}}}}};
+        util::format(std::cout, "bson filter for circle: \"%1\"\n", filter);
+        return filter;
+    };
+
+    auto get_neighborhood_shape = [&](std::shared_ptr<SyncUser> user, const std::string& name) -> GeoPolygon {
+        auto remote_client = user->mongo_client("mongodb-atlas");
+        auto db = remote_client.db("geodata");
+        auto hoods = db["neighborhoods"];
+        bson::BsonDocument filter{{"name", name}};
+        GeoPolygon polygon;
+        polygon.points.push_back({});
+        hoods.find_one(filter, [&](util::Optional<bson::BsonDocument> document, util::Optional<AppError> error) {
+            REQUIRE_FALSE(error);
+            REQUIRE(document);
+            //            util::format(std::cout, "found result: \"%1\"\n", document);
+
+            const bson::IndexedMap<bson::Bson>& geometry(document->at("geometry"));
+            const std::vector<bson::Bson>& coords(geometry.at("coordinates"));
+            REQUIRE(coords.size() >= 1);
+            const std::vector<bson::Bson>& outer_loop(coords[0]);
+            for (auto it = outer_loop.begin(); it != outer_loop.end(); ++it) {
+                const std::vector<bson::Bson>& point(*it);
+                REQUIRE(point.size() >= 2);
+                GeoPoint geo{(double)point[0], (double)point[1]};
+                polygon.points[0].push_back(geo);
+            }
+        });
+        return polygon;
+    };
+
     SECTION("Server supports a basic geowithin FLX query") {
         TestSyncManager::Config app_config;
         app_config.transport = instance_of<SynchronousTestTransport>;
-        app_config.log_level = realm::util::Logger::Level::trace;
-        app_config.app_config.app_id = "devicesync-wwriw";
+        // app_config.log_level = realm::util::Logger::Level::trace;
+        app_config.app_config.app_id = "<your-app-id-here>"; // NOTE: use your own app id.
         TestSyncManager sync_manager(app_config);
         auto app = sync_manager.app();
+
         app->log_in_with_credentials(realm::app::AppCredentials::anonymous(),
                                      [&](std::shared_ptr<realm::SyncUser> user, util::Optional<app::AppError> error) {
                                          REQUIRE(user);
                                          CHECK(!error);
                                      });
+
+        GeoPolygon bounds = get_neighborhood_shape(app->current_user(), "Chinatown");
+        make_polygon_filter(bounds);
         CppContext c;
         SyncTestFile config(app->current_user(), schema, realm::SyncConfig::FLXSyncEnabled{});
 
         auto realm = realm::Realm::get_shared_realm(config);
-        auto subs = create_subscription(realm, "class_restaurant", "location", [](Query q, ColKey c) {
-            GeoBox area{GeoPoint{0.2, 0.2}, GeoPoint{0.7, 0.7}};
-            Query query = q.get_table()->column<Link>(c).geo_within(area);
+        auto subs = create_subscription(realm, "class_restaurant", "location", [&](Query q, ColKey c) {
+            GeoCircle circle = GeoCircle::from_kms(0.5, GeoPoint{-73.9983, 40.715051}); // Mee Sum Coffee Shop
+            make_circle_filter(circle);
+            Query query = q.get_table()->column<Link>(c).geo_within(circle);
+            //            Query query =
+            //            q.get_table()->column<Link>(c).geo_within(circle).and_query(q.get_table()->column<String>(q.get_table()->get_column_key("name")).contains("bakery",
+            //            false)).and_query(q.get_table()->column<Link>(c).geo_within(bounds));
             std::string ser = query.get_description();
+            util::format(std::cout, "subscribing to \"%1\"\n", ser);
             return query;
         });
         auto sub_res = subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get_no_throw();
         CHECK(sub_res.is_ok());
         CHECK(realm->get_active_subscription_set().version() == 1);
         CHECK(realm->get_latest_subscription_set().version() == 1);
+        realm->refresh();
+        auto restaurants = realm->get_class("restaurant").get_table();
+        ColKey name_col = restaurants->get_column_key("name");
+        util::format(std::cout, "results (%1):\n", restaurants->size());
+        for (auto r : *restaurants) {
+            std::cout << r.get<StringData>(name_col) << std::endl;
+        }
     }
 }
 
