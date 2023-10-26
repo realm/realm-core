@@ -188,7 +188,7 @@ struct Helpers {
     }
 
     using LoggerFactory = std::function<std::shared_ptr<util::Logger>(util::Logger::Level)>;
-    using LogCallback = std::function<void(util::Logger::Level, const std::string& message)>;
+    using LogCallback = std::function<void(const std::string&, util::Logger::Level, const std::string& message)>;
     static LoggerFactory make_logger_factory(LogCallback&& logger)
     {
         return [logger = std::move(logger)](util::Logger::Level level) mutable {
@@ -208,9 +208,9 @@ struct Helpers {
             }
 
         private:
-            void do_log(Level level, const std::string& message) final
+            void do_log(const realm::util::LogCategory& category, Level level, const std::string& message) final
             {
-                m_log(level, message);
+                m_log(category.get_name(), level, message);
             }
             LogCallback m_log;
         };

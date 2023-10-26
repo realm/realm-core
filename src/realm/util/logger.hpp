@@ -116,6 +116,25 @@ private:
     void set_default_level_threshold(Logger*) const;
 };
 
+class LogCategoryRef {
+public:
+    LogCategoryRef(LogCategory& cat)
+        : m_category(cat)
+    {
+    }
+    LogCategory& operator*()
+    {
+        return m_category;
+    }
+    static LogCategoryRef get_category(std::string_view name)
+    {
+        return LogCategoryRef(LogCategory::get_category(name));
+    }
+
+private:
+    LogCategory& m_category;
+};
+
 /// All messages logged with a level that is lower than the current threshold
 /// will be dropped. For the sake of efficiency, this test happens before the
 /// message is formatted. This class allows for the log level threshold to be
