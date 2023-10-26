@@ -113,9 +113,6 @@ static void remove_logged_mapping(char* start, size_t size)
     REALM_ASSERT(size != 0);
     char* end = start + size;
     auto it = all_mappings.lower_bound(start);
-    // auto it = all_mappings.begin();
-    if (it == all_mappings.end())
-        return;
     // previous entry may overlap, so must be included in scan:
     if (it != all_mappings.begin()) {
         --it;
@@ -181,8 +178,34 @@ static void add_logged_mapping(MMapEntry::Type type, size_t offset, char* start,
     REALM_ASSERT(start != (char*)-1);
     REALM_ASSERT(end != start);
     REALM_ASSERT((offset % 4096) == 0);
-    // TODO: Expand this to unify neightbouring mappings when possible.
-    // This will require capturing unique file IDs.
+    auto it = all_mappings.lower_bound(start);
+    if (it != all_mappings.begin()) {
+        --it;
+    }
+    while (it != all_mappings.end() && it->second.start < end) {
+        if (it->second.end == start && it->second.type == type && it->second.path == path) {
+            // merge into back part of existing entry
+            it->second.end = end;
+            // if this lines up with next entry, merge that too
+            auto next_it = it;
+            next_it++;
+            if (next_it != all_mappings.end() && end == next_it->second.start && type == next_it->second.type &&
+                path == next_it->second.path) {
+                it->second.end = next_it->second.end;
+                all_mappings.erase(next_it);
+            }
+            return;
+        }
+        if (it->second.start == end && it->second.type == type && it->second.path == path) {
+            auto entry = it->second;
+            entry.offset += start - entry.start;
+            entry.start = start;
+            all_mappings.erase(it);
+            all_mappings[start] = entry;
+            return;
+        }
+        ++it;
+    }
     MMapEntry entry{type, offset, start, end, path};
     if (path == "gylle") {
         dump_logged_mappings();
