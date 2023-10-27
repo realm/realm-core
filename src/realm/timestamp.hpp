@@ -23,6 +23,7 @@
 #include <ostream>
 #include <chrono>
 #include <ctime>
+#include <iomanip>
 #include <realm/util/assert.hpp>
 #include <realm/null.hpp>
 
@@ -182,9 +183,6 @@ public:
         return size_t(m_seconds) ^ size_t(m_nanoseconds);
     }
 
-    // Buffer must be at least 32 bytes long
-    const char* to_string(char* buffer) const;
-
     template <class Ch, class Tr>
     friend std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out, const Timestamp&);
     static constexpr int32_t nanoseconds_per_second = 1000000000;
@@ -199,8 +197,26 @@ private:
 template <class C, class T>
 inline std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>& out, const Timestamp& d)
 {
-    char buffer[32];
-    out << d.to_string(buffer);
+    std::timespec ts;
+    ts.tv_sec = d.get_seconds();
+    ts.tv_nsec = d.get_nanoseconds();
+    if (ts.tv_nsec < 0) {
+        ts.tv_sec -= 1;
+        ts.tv_nsec += Timestamp::nanoseconds_per_second;
+    }
+    auto tm = std::gmtime(&ts.tv_sec); // TODO: Not thread safe
+    auto year = tm->tm_year + 1900; // correct for offset
+    
+    if (year < 0) out << '-'; // prepend with - if year is negative
+    out << std::setfill('0') // prepend with 0s to fill width        
+        << std::setw(4) << std::abs(year) << '-'
+        << std::setw(2) << tm->tm_mon + 1 << '-' // months since January [0-11]
+        << std::setw(2) << tm->tm_mday << 'T'
+        << std::setw(2) << tm->tm_hour << ':'
+        << std::setw(2) << tm->tm_min << ':'
+        << std::setw(2) << tm->tm_sec << '.'
+        << std::setw(9) << ts.tv_nsec << 'Z'; // always UTC
+
     return out;
 }
 // LCOV_EXCL_STOP
