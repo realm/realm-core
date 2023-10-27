@@ -248,7 +248,7 @@ static std::string dump_logged_mappings()
         else
             stream << "    --M" << std::endl;
     }
-    message = std::move(stream.str());
+    message = stream.str();
     auto logger = Logger::get_default_logger();
     logger->fatal(message.data());
     return message;
@@ -602,6 +602,7 @@ void* mmap(const FileAttributes& file, size_t size, size_t offset)
                 prot = PROT_READ;
                 break;
             case File::access_None:
+            default:
                 prot = PROT_NONE;
                 break;
         }
