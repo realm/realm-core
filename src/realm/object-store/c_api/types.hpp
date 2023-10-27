@@ -21,6 +21,7 @@
 #include <realm/object-store/sync/sync_user.hpp>
 #include <realm/object-store/sync/mongo_collection.hpp>
 #include <realm/sync/binding_callback_thread_observer.hpp>
+#include <realm/sync/socket_provider.hpp>
 #include <realm/sync/subscriptions.hpp>
 #endif
 
@@ -800,17 +801,24 @@ struct realm_sync_socket_callback : realm::c_api::WrapC,
     {
     }
 
-    realm_sync_socket_callback* clone() const override
-    {
-        return new realm_sync_socket_callback{*this};
-    }
-
     bool equals(const WrapC& other) const noexcept final
     {
         if (auto ptr = dynamic_cast<const realm_sync_socket_callback*>(&other)) {
             return get() == ptr->get();
         }
         return false;
+    }
+
+    void operator()(realm_sync_socket_callback_result_e result, const char* reason)
+    {
+        if (!get()) {
+            return;
+        }
+
+        auto complete_status = result == RLM_ERR_SYNC_SOCKET_SUCCESS
+                                   ? realm::Status::OK()
+                                   : realm::Status{static_cast<realm::ErrorCodes::Error>(result), reason};
+        (*get())(complete_status);
     }
 };
 

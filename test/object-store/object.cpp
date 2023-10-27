@@ -2390,6 +2390,15 @@ TEST_CASE("Asymmetric Object") {
         REQUIRE(realm->is_empty());
     }
 
+    SECTION("Delete ephemeral object before comitting") {
+        realm->begin_transaction();
+        auto obj = realm->read_group().get_table("class_asymmetric")->create_object_with_primary_key(1);
+        obj.remove();
+        realm->commit_transaction();
+        REQUIRE(!obj.is_valid());
+        REQUIRE(realm->is_empty());
+    }
+
     SECTION("Outgoing link not allowed") {
         auto obj = create(AnyDict{{"_id", INT64_C(1)}}, "table");
         auto table = realm->read_group().get_table("class_table");

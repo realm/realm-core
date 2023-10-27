@@ -58,11 +58,35 @@ Searching: The main finding function is:
 
 namespace realm {
 
+namespace {
 template <class T>
-inline T no0(T v)
+inline constexpr T no0(T v)
 {
     return v == 0 ? 1 : v;
 }
+
+template <size_t width>
+inline constexpr uint64_t lower_bits()
+{
+    if (width == 1)
+        return 0xFFFFFFFFFFFFFFFFULL;
+    else if (width == 2)
+        return 0x5555555555555555ULL;
+    else if (width == 4)
+        return 0x1111111111111111ULL;
+    else if (width == 8)
+        return 0x0101010101010101ULL;
+    else if (width == 16)
+        return 0x0001000100010001ULL;
+    else if (width == 32)
+        return 0x0000000100000001ULL;
+    else if (width == 64)
+        return 0x0000000000000001ULL;
+    else {
+        return uint64_t(-1);
+    }
+}
+} // namespace
 
 class ArrayWithFind {
 public:
@@ -132,9 +156,6 @@ public:
     template <bool gt, size_t width>
     int64_t
     find_gtlt_magic(int64_t v) const; // Compute magic constant needed for searching for value 'v' using bit hacks
-
-    template <size_t width>
-    inline int64_t lower_bits() const; // Return chunk with lower bit set in each element
 
     size_t first_set_bit(uint32_t v) const;
     size_t first_set_bit64(int64_t v) const;
@@ -419,36 +440,13 @@ bool ArrayWithFind::find_optimized(int64_t value, size_t start, size_t end, size
 #endif
 }
 
-template <size_t width>
-inline int64_t ArrayWithFind::lower_bits() const
-{
-    if (width == 1)
-        return 0xFFFFFFFFFFFFFFFFULL;
-    else if (width == 2)
-        return 0x5555555555555555ULL;
-    else if (width == 4)
-        return 0x1111111111111111ULL;
-    else if (width == 8)
-        return 0x0101010101010101ULL;
-    else if (width == 16)
-        return 0x0001000100010001ULL;
-    else if (width == 32)
-        return 0x0000000100000001ULL;
-    else if (width == 64)
-        return 0x0000000000000001ULL;
-    else {
-        REALM_ASSERT_DEBUG(false);
-        return int64_t(-1);
-    }
-}
-
 // Tests if any chunk in 'value' is 0
 template <size_t width>
 inline bool ArrayWithFind::test_zero(uint64_t value) const
 {
     uint64_t hasZeroByte;
-    uint64_t lower = lower_bits<width>();
-    uint64_t upper = lower_bits<width>() * 1ULL << (width == 0 ? 0 : (width - 1ULL));
+    constexpr uint64_t lower = lower_bits<width>();
+    constexpr uint64_t upper = lower_bits<width>() * 1ULL << (width == 0 ? 0 : (width - 1ULL));
     hasZeroByte = (value - lower) & ~value & upper;
     return hasZeroByte != 0;
 }
@@ -804,7 +802,7 @@ REALM_FORCEINLINE bool ArrayWithFind::find_sse_intern(__m128i* action_data, __m1
         size_t s = i * sizeof(__m128i) * 8 / no0(width);
 
         while (resmask != 0) {
-            uint64_t upper = lower_bits<width / 8>() << (no0(width / 8) - 1);
+            constexpr uint64_t upper = lower_bits<width / 8>() << (no0(width / 8) - 1);
             uint64_t pattern =
                 resmask &
                 upper; // fixme, bits at wrong offsets. Only OK because we only use them in 'count' aggregate
