@@ -1,11 +1,9 @@
-# NEXT RELEASE
+# 13.23.2 Release notes
 
 ### Enhancements
-* <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
 * None.
 
 ### Fixed
-* <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Deleting an object in an asymmetric table would cause a crash. Likely to solve [#1537](https://github.com/realm/realm-kotlin/issues/1537), since v12.1.0.
 * Implement BIO_CTRL_GET_KTLS_SEND and BIO_CTRL_GET_KTLS_RECV as OpenSSL versions < 3.0.4 depend on it.
 
