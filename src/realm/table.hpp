@@ -370,6 +370,8 @@ public:
     // - turns the object into a tombstone if links exist
     // - otherwise works just as remove_object()
     ObjKey invalidate_object(ObjKey key);
+    // Remove several objects
+    void batch_erase_objects(std::vector<ObjKey>& keys);
     Obj try_get_tombstone(ObjKey key) const
     {
         REALM_ASSERT(key.is_unresolved());
@@ -736,7 +738,6 @@ private:
     TableRef m_own_ref;
 
     void batch_erase_rows(const KeyColumn& keys);
-    void batch_erase_objects(std::vector<ObjKey>& keys);
     size_t do_set_link(ColKey col_key, size_t row_ndx, size_t target_row_ndx);
 
     void populate_search_index(ColKey col_key);

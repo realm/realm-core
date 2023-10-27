@@ -2440,11 +2440,11 @@ Replication::version_type DB::do_commit(Transaction& transaction, bool commit_to
     }
     version_type new_version = current_version + 1;
 
-    if (!transaction.m_objects_to_delete.empty()) {
-        for (auto it : transaction.m_objects_to_delete) {
-            transaction.get_table(it.table_key)->remove_object(it.obj_key);
+    if (!transaction.m_tables_to_clear.empty()) {
+        for (auto table_key : transaction.m_tables_to_clear) {
+            transaction.get_table_unchecked(table_key)->clear();
         }
-        transaction.m_objects_to_delete.clear();
+        transaction.m_tables_to_clear.clear();
     }
     if (Replication* repl = get_replication()) {
         // If Replication::prepare_commit() fails, then the entire transaction
@@ -2458,6 +2458,14 @@ Replication::version_type DB::do_commit(Transaction& transaction, bool commit_to
     else {
         low_level_commit(new_version, transaction); // Throws
     }
+
+    {
+        std::lock_guard lock(m_commit_listener_mutex);
+        for (auto listener : m_commit_listeners) {
+            listener->on_commit(new_version);
+        }
+    }
+
     return new_version;
 }
 
@@ -2864,6 +2872,19 @@ void DB::end_write_on_correct_thread() noexcept
     if (!m_commit_helper || !m_commit_helper->blocking_end_write()) {
         do_end_write();
     }
+}
+
+void DB::add_commit_listener(CommitListener* listener)
+{
+    std::lock_guard lock(m_commit_listener_mutex);
+    m_commit_listeners.push_back(listener);
+}
+
+void DB::remove_commit_listener(CommitListener* listener)
+{
+    std::lock_guard lock(m_commit_listener_mutex);
+    m_commit_listeners.erase(std::remove(m_commit_listeners.begin(), m_commit_listeners.end(), listener),
+                             m_commit_listeners.end());
 }
 
 DisableReplication::DisableReplication(Transaction& t)

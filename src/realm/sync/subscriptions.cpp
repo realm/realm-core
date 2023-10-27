@@ -603,10 +603,6 @@ SubscriptionSet MutableSubscriptionSet::commit()
 
     process_notifications();
 
-    if (state() == State::Pending) {
-        mgr->m_on_new_subscription_set(flx_version);
-    }
-
     return mgr->get_by_version_impl(flx_version, m_tr->get_version_of_current_transaction());
 }
 
@@ -658,21 +654,20 @@ std::string SubscriptionSet::to_ext_json() const
 namespace {
 class SubscriptionStoreInit : public SubscriptionStore {
 public:
-    explicit SubscriptionStoreInit(DBRef db, util::UniqueFunction<void(int64_t)> on_new_subscription_set)
-        : SubscriptionStore(std::move(db), std::move(on_new_subscription_set))
+    explicit SubscriptionStoreInit(DBRef db)
+        : SubscriptionStore(std::move(db))
     {
     }
 };
 } // namespace
 
-SubscriptionStoreRef SubscriptionStore::create(DBRef db, util::UniqueFunction<void(int64_t)> on_new_subscription_set)
+SubscriptionStoreRef SubscriptionStore::create(DBRef db)
 {
-    return std::make_shared<SubscriptionStoreInit>(std::move(db), std::move(on_new_subscription_set));
+    return std::make_shared<SubscriptionStoreInit>(std::move(db));
 }
 
-SubscriptionStore::SubscriptionStore(DBRef db, util::UniqueFunction<void(int64_t)> on_new_subscription_set)
+SubscriptionStore::SubscriptionStore(DBRef db)
     : m_db(std::move(db))
-    , m_on_new_subscription_set(std::move(on_new_subscription_set))
 {
     std::vector<SyncMetadataTable> internal_tables{
         {&m_sub_set_table,
@@ -888,8 +883,11 @@ MutableSubscriptionSet SubscriptionStore::get_mutable_by_version(int64_t version
 {
     auto tr = m_db->start_write();
     auto sub_sets = tr->get_table(m_sub_set_table);
-    return MutableSubscriptionSet(weak_from_this(), std::move(tr),
-                                  sub_sets->get_object_with_primary_key(Mixed{version_id}));
+    auto obj = sub_sets->get_object_with_primary_key(Mixed{version_id});
+    if (!obj) {
+        throw KeyNotFound(util::format("Subscription set with version %1 not found", version_id));
+    }
+    return MutableSubscriptionSet(weak_from_this(), std::move(tr), obj);
 }
 
 SubscriptionSet SubscriptionStore::get_by_version(int64_t version_id) const
@@ -902,15 +900,16 @@ SubscriptionSet SubscriptionStore::get_by_version_impl(int64_t version_id,
 {
     auto tr = m_db->start_frozen(db_version.value_or(VersionID{}));
     auto sub_sets = tr->get_table(m_sub_set_table);
-    try {
-        return SubscriptionSet(weak_from_this(), *tr, sub_sets->get_object_with_primary_key(Mixed{version_id}));
+    auto obj = sub_sets->get_object_with_primary_key(Mixed{version_id});
+    if (obj) {
+        return SubscriptionSet(weak_from_this(), *tr, obj);
     }
-    catch (const KeyNotFound&) {
+    else {
         std::lock_guard<std::mutex> lk(m_pending_notifications_mutex);
         if (version_id < m_min_outstanding_version) {
             return SubscriptionSet(weak_from_this(), version_id, SubscriptionSet::SupersededTag{});
         }
-        throw;
+        throw KeyNotFound(util::format("Subscription set with version %1 not found", version_id));
     }
 }
 

@@ -385,8 +385,7 @@ void ClientHistory::integrate_server_changesets(
     const SyncProgress& progress, const std::uint_fast64_t* downloadable_bytes,
     util::Span<const RemoteChangeset> incoming_changesets, VersionInfo& version_info, DownloadBatchState batch_state,
     util::Logger& logger, const TransactionRef& transact,
-    util::UniqueFunction<void(const TransactionRef&, util::Span<Changeset>)> run_in_write_tr,
-    SyncTransactReporter* transact_reporter)
+    util::UniqueFunction<void(const TransactionRef&, util::Span<Changeset>)> run_in_write_tr)
 {
     REALM_ASSERT(incoming_changesets.size() != 0);
     REALM_ASSERT(
@@ -491,10 +490,6 @@ void ClientHistory::integrate_server_changesets(
         }
         else {
             new_version = transact->commit_and_continue_as_read(); // Throws
-        }
-
-        if (transact_reporter) {
-            transact_reporter->report_sync_transact(old_version, new_version); // Throws
         }
 
         logger.debug(util::LogCategory::changeset, "Integrated %1 changesets out of %2", changesets_transformed_count,

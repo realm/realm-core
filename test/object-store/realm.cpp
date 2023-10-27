@@ -2822,6 +2822,24 @@ TEST_CASE("SharedRealm: notifications") {
         REQUIRE(change_count == 4);
         REQUIRE_FALSE(realm->refresh());
     }
+
+#if REALM_ENABLE_SYNC
+    SECTION("SubscriptionStore writes produce notifications") {
+        auto subscription_store = sync::SubscriptionStore::create(TestHelper::get_db(realm));
+        REQUIRE(change_count == 0);
+        util::EventLoop::main().run_until([&] {
+            return change_count > 0;
+        });
+        REQUIRE(change_count == 1);
+
+        subscription_store->get_active().make_mutable_copy().commit();
+        REQUIRE(change_count == 1);
+        util::EventLoop::main().run_until([&] {
+            return change_count > 1;
+        });
+        REQUIRE(change_count == 2);
+    }
+#endif
 }
 
 TEST_CASE("SharedRealm: schema updating from external changes") {

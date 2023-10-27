@@ -1647,13 +1647,13 @@ TEST_CASE("flx: query on non-queryable field results in query error message", "[
 
     auto check_status = [](auto status) {
         CHECK(!status.is_ok());
+        std::string reason = status.get_status().reason();
         // Depending on the version of baas used, it may return 'Invalid query:' or
         // 'Client provided query with bad syntax:'
-        if ((status.get_status().reason().find("Invalid query:") == std::string::npos &&
-             status.get_status().reason().find("Client provided query with bad syntax:") == std::string::npos) ||
-            status.get_status().reason().find("\"TopLevel\": key \"non_queryable_field\" is not a queryable field") ==
-                std::string::npos) {
-            FAIL(status.get_status().reason());
+        if ((reason.find("Invalid query:") == std::string::npos &&
+             reason.find("Client provided query with bad syntax:") == std::string::npos) ||
+            reason.find("\"TopLevel\": key \"non_queryable_field\" is not a queryable field") == std::string::npos) {
+            FAIL(reason);
         }
     };
 
@@ -2036,7 +2036,7 @@ TEST_CASE("flx: interrupted bootstrap restarts/recovers on reconnect", "[sync][f
         DBOptions options;
         options.encryption_key = test_util::crypt_key();
         auto realm = DB::create(sync::make_client_replication(), interrupted_realm_config.path, options);
-        auto sub_store = sync::SubscriptionStore::create(realm, [](int64_t) {});
+        auto sub_store = sync::SubscriptionStore::create(realm);
         auto version_info = sub_store->get_version_info();
         REQUIRE(version_info.active == 0);
         REQUIRE(version_info.latest == 1);
@@ -2340,6 +2340,8 @@ TEST_CASE("flx: writes work without waiting for sync", "[sync][flx][baas]") {
         realm->refresh();
         Results results(realm, table);
         CHECK(results.size() == 1);
+        Obj obj = results.get(0);
+        CHECK(obj.get_primary_key().get_object_id() == bar_obj_id);
         CHECK(table->get_object_with_primary_key({bar_obj_id}).is_valid());
     });
 }
@@ -2511,7 +2513,7 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][boot
         REQUIRE(top_level);
         REQUIRE(top_level->is_empty());
 
-        auto sub_store = sync::SubscriptionStore::create(realm, [](int64_t) {});
+        auto sub_store = sync::SubscriptionStore::create(realm);
         auto version_info = sub_store->get_version_info();
         REQUIRE(version_info.latest == 1);
         REQUIRE(version_info.active == 0);
@@ -4362,7 +4364,7 @@ TEST_CASE("flx sync: resend pending subscriptions when reconnecting", "[sync][fl
         DBOptions options;
         options.encryption_key = test_util::crypt_key();
         auto realm = DB::create(sync::make_client_replication(), interrupted_realm_config.path, options);
-        auto sub_store = sync::SubscriptionStore::create(realm, [](int64_t) {});
+        auto sub_store = sync::SubscriptionStore::create(realm);
         auto version_info = sub_store->get_version_info();
         REQUIRE(version_info.latest > version_info.active);
     }
