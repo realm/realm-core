@@ -94,7 +94,18 @@ public:
     {
     }
 
-    virtual ~Array() noexcept override;
+    virtual ~Array() noexcept override = default;
+
+    void destroy();
+    void destroy_node();
+    static void destroy(ref_type ref, Allocator& alloc) noexcept
+    {
+        Node::destroy(MemRef(ref, alloc), alloc);
+    }
+    static void destroy(MemRef mem, Allocator& alloc) noexcept
+    {
+        Node::destroy(mem, alloc);
+    }
 
     /// Set encoding/deconding array for this array in order to implement the
     /// encoding algorithm selected for this type of Array.
@@ -412,6 +423,9 @@ public:
     template <class cond>
     size_t find_first(int64_t value, size_t start = 0, size_t end = size_t(-1)) const
     {
+        // TODO: find first needs to find the index first and the value later if array is encoded.
+
+
         REALM_ASSERT(start <= m_size && (end <= m_size || end == size_t(-1)) && start <= end);
         // todo, would be nice to avoid this in order to speed up find_first loops
         QueryStateFindFirst state;
@@ -476,6 +490,10 @@ public:
     static size_t bit_width(int64_t value);
 
 protected:
+    // for compressed arrays only
+    void insert_no_encoding(size_t ndx, int_fast64_t value);
+    void add_no_encoding(int_fast64_t value);
+
     // This returns the minimum value ("lower bound") of the representable values
     // for the given bit width. Valid widths are 0, 1, 2, 4, 8, 16, 32, and 64.
     static constexpr int_fast64_t lbound_for_width(size_t width) noexcept;
@@ -568,6 +586,7 @@ public:
     friend class SlabAlloc;
     friend class GroupWriter;
     friend class ArrayWithFind;
+    friend class ArrayFlex;
 };
 
 // Implementation:
@@ -849,6 +868,12 @@ inline void Array::add(int_fast64_t value)
 {
     insert(m_size, value);
 }
+
+inline void Array::add_no_encoding(int_fast64_t value)
+{
+    insert_no_encoding(m_size, value);
+}
+
 
 inline void Array::erase(size_t ndx)
 {

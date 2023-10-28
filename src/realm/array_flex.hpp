@@ -38,7 +38,7 @@ public:
     int64_t get(size_t) const final override;
 
 private:
-    bool try_encode(std::vector<int64_t>&, std::vector<size_t>&);
+    bool try_encode(std::vector<uint64_t>&, std::vector<size_t>&);
     bool get_encode_info(size_t& value_width, size_t& index_width, size_t& value_size, size_t& index_size) const;
 };
 } // namespace realm

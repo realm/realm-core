@@ -39,21 +39,6 @@ Mixed ArrayInteger::get_any(size_t ndx) const
     return Mixed(get(ndx));
 }
 
-void ArrayInteger::copy_on_write()
-{
-    if (m_encode_array->is_encoded())
-        m_encode_array->decode();
-    Array::copy_on_write();
-}
-
-void ArrayInteger::copy_on_write(size_t min_size)
-{
-    if (m_encode_array->is_encoded())
-        m_encode_array->decode();
-    Array::copy_on_write(min_size);
-}
-
-
 Mixed ArrayIntNull::get_any(size_t ndx) const
 {
     return Mixed(get(ndx));

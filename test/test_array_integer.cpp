@@ -65,7 +65,6 @@ TEST(Test_ArrayInt_compress_data)
     CHECK(a.size() == 6);
     // Current: [16388:16, 409:16, 16388:16, 16388:16, 409:16, 16388:16], space needed: 6*16 bits = 96 bits + header
     // compress the array is a good option.
-    CHECK(a.try_encode());
     CHECK(a.is_encoded());
     CHECK_NOT(a.try_encode());
     CHECK(a.try_decode());
@@ -80,9 +79,9 @@ TEST(Test_ArrayInt_compress_data)
     CHECK(a.get(3) == 16388);
     CHECK(a.get(4) == 409);
     CHECK(a.get(5) == 16388);
-    // this automatically decompresses the array.
+    // this automatically decompresses the array and compresses it again.
     a.add(20);
-    CHECK_NOT(a.is_encoded());
+    CHECK(a.is_encoded());
     CHECK(a.size() == 7);
     CHECK(a.get(0) == 16388);
     CHECK(a.get(1) == 409);
@@ -92,7 +91,6 @@ TEST(Test_ArrayInt_compress_data)
     CHECK(a.get(5) == 16388);
     CHECK(a.get(6) == 20);
     // compress again.
-    CHECK(a.try_encode());
     CHECK(a.is_encoded());
     // array should now be in compressed form
     CHECK(a.get(0) == 16388);
@@ -117,11 +115,11 @@ TEST(Test_ArrayInt_compress_data_init_from_mem)
     a.add(16388);
     CHECK(a.size() == 6);
     // Current: [16388:16, 409:16, 16388:16, 16388:16, 409:16, 16388:16], space needed: 6*16 bits = 96 bits + header
-    // compress the array is a good option.
-    CHECK_NOT(a.is_encoded());
-    CHECK(a.try_encode());
+    // compress the array is a good option (it should already be compressed).
     CHECK(a.is_encoded());
-    // Array should be in compressed from
+    // CHECK(a.try_encode());
+    // CHECK(a.is_encoded());
+    //  Array should be in compressed from
     auto mem = a.get_mem();
     ArrayInteger a1(Allocator::get_default());
     a1.init_from_mem(mem); // initialise a1 with a
@@ -135,10 +133,10 @@ TEST(Test_ArrayInt_compress_data_init_from_mem)
     CHECK(a1.get(4) == 409);
     CHECK(a1.get(5) == 16388);
 
-    // decompress a1
+    // decompress a1 and compresses again
     a1.add(20);
 
-    CHECK_NOT(a1.is_encoded());
+    CHECK(a1.is_encoded());
     CHECK(a1.size() == 7);
     CHECK(a1.get(0) == 16388);
     CHECK(a1.get(1) == 409);
@@ -149,7 +147,7 @@ TEST(Test_ArrayInt_compress_data_init_from_mem)
     CHECK(a1.get(6) == 20);
 
     // compress again via a1
-    CHECK(a1.try_encode());
+    // CHECK(a1.try_encode());
     CHECK(a1.is_encoded());
 
     CHECK(a1.get(0) == 16388);

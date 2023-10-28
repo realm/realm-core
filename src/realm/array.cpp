@@ -197,32 +197,38 @@ void Array::set_encode_array(ArrayEncode* encode_array)
     m_encode_array = encode_array;
 }
 
-Array::~Array() noexcept
+void Array::destroy_node()
 {
-    // this breaks our invariant that accessors do not do heavy
-    // lifting in the dtor. TODO: find a solution to this.
+    Node::destroy();
+}
+
+void Array::destroy()
+{
     if (m_encode_array && m_encode_array->is_attached()) {
         m_encode_array->destroy();
     }
-    delete m_encode_array;
-    m_encode_array = nullptr;
+    if (m_encode_array) {
+        delete m_encode_array;
+        m_encode_array = nullptr;
+    }
+    destroy_node();
 }
 
 template <size_t w>
 int64_t Array::get(size_t ndx) const noexcept
 {
-    REALM_ASSERT_DEBUG(is_attached());
-    if (m_encode_array && m_encode_array->is_encoded()) {
+    if (is_encoded())
         return m_encode_array->get(ndx);
-    }
+
+    REALM_ASSERT_DEBUG(is_attached());
     return get_universal<w>(m_data, ndx);
 }
 
 int64_t Array::get(size_t ndx) const noexcept
 {
-    if (m_encode_array && m_encode_array->is_encoded()) {
+    // std::cout << "Directory array::get" << std::hex << this << std::endl;
+    if (is_encoded())
         return m_encode_array->get(ndx);
-    }
 
     REALM_ASSERT_DEBUG(is_attached());
     REALM_ASSERT_DEBUG_EX(ndx < m_size, ndx, m_size);
@@ -527,10 +533,14 @@ size_t Array::blob_size() const noexcept
 
 void Array::insert(size_t ndx, int_fast64_t value)
 {
-    REALM_ASSERT_DEBUG(ndx <= m_size);
-
     decode_array();
+    insert_no_encoding(ndx, value);
+    encode_array();
+}
 
+void Array::insert_no_encoding(size_t ndx, int_fast64_t value)
+{
+    REALM_ASSERT_DEBUG(ndx <= m_size);
     const auto old_width = m_width;
     const auto old_size = m_size;
     const Getter old_getter = m_getter; // Save old getter before potential width expansion
@@ -577,7 +587,6 @@ void Array::insert(size_t ndx, int_fast64_t value)
         }
     }
 }
-
 
 void Array::truncate(size_t new_size)
 {
@@ -665,12 +674,16 @@ size_t Array::size() const noexcept
 
 bool Array::encode_array() const
 {
-    return !Array::is_encoded() ? m_encode_array->encode() : false;
+    if (m_encode_array)
+        return !is_encoded() ? m_encode_array->encode() : false;
+    return false;
 }
 
 bool Array::decode_array() const
 {
-    return Array::is_encoded() ? m_encode_array->decode() : false;
+    if (m_encode_array)
+        return is_encoded() ? m_encode_array->decode() : false;
+    return false;
 }
 
 bool Array::is_encoded() const

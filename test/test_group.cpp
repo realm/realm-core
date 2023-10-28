@@ -2315,4 +2315,60 @@ TEST(Group_UniqueColumnKeys)
     CHECK_NOT_EQUAL(col_foo, col_bar);
 }
 
+TEST(Group_ArrayCompression_Correctness)
+{
+    GROUP_TEST_PATH(path);
+
+    // Create group with one list<int> which maps to array_integer
+    Group to_disk;
+    TableRef table = to_disk.add_table("test");
+    auto col_key = table->add_column_list(type_Int, "lint");
+    auto obj = table->create_object();
+    auto array = obj.get_list<int64_t>(col_key);
+    array.add(16388);
+    array.add(409);
+    array.add(16388);
+    array.add(16388);
+    array.add(409);
+    array.add(16388);
+    // the integer array in the cluster tree should now be in compressed format
+    CHECK_EQUAL(array.size(), 6);
+    // fetch and verify that all the data is there. (this is not passing, it seems we have 2 arrays..)
+    auto v1 = array.get_any(0);
+    auto v2 = array.get_any(1);
+    auto v3 = array.get_any(2);
+    auto v4 = array.get_any(3);
+    auto v5 = array.get_any(4);
+    auto v6 = array.get_any(5);
+    CHECK_EQUAL(v1.get_int(), 16388);
+    CHECK_EQUAL(v2.get_int(), 409);
+    CHECK_EQUAL(v3.get_int(), 16388);
+    CHECK_EQUAL(v4.get_int(), 16388);
+    CHECK_EQUAL(v5.get_int(), 409);
+    CHECK_EQUAL(v6.get_int(), 16388);
+
+    // #ifdef REALM_DEBUG
+    //     to_disk.verify();
+    // #endif
+
+    // Serialize to disk
+    //    to_disk.write(path, crypt_key());
+    //
+    //    // Load the tables
+    //    Group from_disk(path, crypt_key());
+    //    TableRef read_table = from_disk.get_table("test");
+    //    auto col_key1 = read_table->get_column_key("lint");
+    //    auto obj1 = read_table->get_object(0);
+    //    auto l1 = obj1.get_list<int64_t>(col_key1);
+    //    //CHECK(l1 == array);
+
+    // Verify that original values are there
+    // CHECK(*read_table == *table);
+
+    // #ifdef REALM_DEBUG
+    //     to_disk.verify();
+    //     from_disk.verify();
+    // #endif
+}
+
 #endif // TEST_GROUP
