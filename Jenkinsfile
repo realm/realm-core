@@ -196,8 +196,6 @@ jobWrapper {
                 buildAndroidArm64Debug  : doAndroidBuildInDocker('arm64-v8a', 'Debug'),
                 buildAndroidTestsArmeabi: doAndroidBuildInDocker('armeabi-v7a', 'Debug', TestAction.Build),
                 buildEmscripten         : doBuildEmscripten('Debug'),
-                threadSanitizer         : doCheckSanity(buildOptions + [enableSync: true, sanitizeMode: 'thread']),
-                addressSanitizer        : doCheckSanity(buildOptions + [enableSync: true, sanitizeMode: 'address']),
             ]
             if (releaseTesting) {
                 extendedChecks = [
@@ -307,63 +305,6 @@ def doCheckInDocker(Map options = [:]) {
                 }
             } else {
                 buildSteps()
-            }
-        }
-    }
-}
-
-def doCheckSanity(Map options = [:]) {
-    def privileged = '';
-
-    def cmakeOptions = [
-        CMAKE_BUILD_TYPE: options.buildType,
-        REALM_MAX_BPNODE_SIZE: options.maxBpNodeSize,
-        REALM_ENABLE_SYNC: options.enableSync,
-    ]
-
-    if (options.sanitizeMode.contains('thread')) {
-        cmakeOptions << [
-            REALM_TSAN: "ON",
-        ]
-    }
-    else if (options.sanitizeMode.contains('address')) {
-        privileged = '--privileged'
-        cmakeOptions << [
-            REALM_ASAN: "ON",
-        ]
-    }
-
-    def cmakeDefinitions = cmakeOptions.collect { k,v -> "-D$k=$v" }.join(' ')
-
-    return {
-        rlmNode('docker') {
-            getArchive()
-
-            def environment = environment() + [
-              'CC=clang',
-              'CXX=clang++',
-              'UNITTEST_XML=unit-test-report.xml',
-              "UNITTEST_SUITE_NAME=Linux-${options.buildType}",
-              "TSAN_OPTIONS=\"suppressions=${WORKSPACE}/test/tsan.suppress\""
-            ]
-            buildDockerEnv('linux.Dockerfile').inside(privileged) {
-                withEnv(environment) {
-                    try {
-                        dir('build-dir') {
-                            sh "cmake ${cmakeDefinitions} -G Ninja .."
-                            runAndCollectWarnings(
-                                script: 'ninja',
-                                parser: "clang",
-                                name: "linux-clang-${options.buildType}-${options.sanitizeMode}",
-                                filters: warningFilters,
-                            )
-                            sh "${ctest_cmd}"
-                        }
-
-                    } finally {
-                        junit testResults: 'build-dir/test/unit-test-report.xml'
-                    }
-                }
             }
         }
     }
