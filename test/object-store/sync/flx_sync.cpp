@@ -4428,10 +4428,11 @@ TEST_CASE("flx: fatal errors and session becoming inactive cancel pending waits"
     realm->sync_session()->wait_for_upload_completion([promise = std::move(download_complete_promise)](auto) mutable {
         promise.emplace_value();
     });
-    subs = create_subscription(realm);
-    subs_future = subs.get_state_change_notification(sync::SubscriptionSet::State::Complete);
     schema[0].persisted_properties.push_back({"other_col", PropertyType::Int | PropertyType::Nullable});
     realm->update_schema(schema);
+
+    subs = create_subscription(realm);
+    subs_future = subs.get_state_change_notification(sync::SubscriptionSet::State::Complete);
 
     harness.load_initial_data([&](SharedRealm realm) {
         CppContext c(realm);
