@@ -787,6 +787,7 @@ private:
     static ref_type get_history_ref(const Array& top) noexcept;
     static size_t get_logical_file_size(const Array& top) noexcept;
     static size_t get_free_space_size(const Array& top) noexcept;
+    static size_t get_history_size(const Array& top) noexcept;
     size_t get_logical_file_size() const noexcept
     {
         return get_logical_file_size(m_top);

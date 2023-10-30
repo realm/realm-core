@@ -1431,13 +1431,22 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions& opt
             return "";
         }());
         m_logger->log(util::Logger::Level::debug, "   EncryptionKey: %1", options.encryption_key ? "yes" : "no");
-        if (top_ref && m_logger->would_log(util::Logger::Level::debug)) {
-            Array top(alloc);
-            top.init_from_ref(top_ref);
-            auto file_size = Group::get_logical_file_size(top);
-            auto freee_space_size = Group::get_free_space_size(top);
-            m_logger->log(util::Logger::Level::debug, "   File size: %1", file_size);
-            m_logger->log(util::Logger::Level::debug, "   User data size: %1", file_size - freee_space_size);
+        if (m_logger->would_log(util::Logger::Level::debug)) {
+            if (top_ref) {
+                Array top(alloc);
+                top.init_from_ref(top_ref);
+                auto file_size = Group::get_logical_file_size(top);
+                auto history_size = Group::get_history_size(top);
+                auto freee_space_size = Group::get_free_space_size(top);
+                m_logger->log(util::Logger::Level::debug, "   File size: %1", file_size);
+                m_logger->log(util::Logger::Level::debug, "   User data size: %1",
+                              file_size - (freee_space_size + history_size));
+                m_logger->log(util::Logger::Level::debug, "   Free space size: %1", freee_space_size);
+                m_logger->log(util::Logger::Level::debug, "   History size: %1", history_size);
+            }
+            else {
+                m_logger->log(util::Logger::Level::debug, "   Empty file");
+            }
         }
     }
 
