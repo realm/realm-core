@@ -24,13 +24,9 @@ Searching: The main finding function is:
     cond:       One of Equal, NotEqual, Greater, etc. classes
     Action:     One of act_ReturnFirst, act_FindAll, act_Max, etc, constants
 
-    find() will call find_action_pattern() or QueryStateBase::match() for each search result
-
-        find() -----------> bool QueryStateBase::match()
-             |                            ^
-             +-> find_action_pattern()----+
-
-    If match() returns false, find() will exit, otherwise it will keep searching remaining items in array.
+    find() will call QueryStateBase::match() for each search result If match()
+    returns false, find() will exit, otherwise it will keep searching remaining
+    items in array.
 */
 
 #ifndef REALM_ARRAY_WITH_FIND_HPP
@@ -164,33 +160,12 @@ public:
 private:
     const Array& m_array;
 
-    bool find_action_pattern(size_t index, uint64_t pattern, QueryStateBase* state) const;
     template <size_t bitwidth>
     bool find_all_will_match(size_t start, size_t end, size_t baseindex, QueryStateBase* state) const;
 };
 //*************************************************************************************
 // Finding code                                                                       *
 //*************************************************************************************
-
-
-/*
-find() (calls find_optimized()) may call find_action_pattern before calling QueryStateBase->match().
-
-'indexpattern' contains a 64-bit chunk of elements, each of 'width' bits in size where each element indicates a
-match if its lower bit is set, otherwise it indicates a non-match. 'index' tells the database row index of the
-first element. You must return true if you chose to 'consume' the chunk or false if not. If not, then Array-finder
-will afterwards call match() successive times with pattern == false.
-
-Array-finder decides itself if - and when - it wants to pass you an indexpattern. It depends on array bit width, match
-frequency, and whether the arithemetic and computations for the given search criteria makes it feasible to construct
-such a pattern.
-*/
-inline bool ArrayWithFind::find_action_pattern(size_t /*index*/, uint64_t /*pattern*/, QueryStateBase* /*st*/) const
-{
-    // return st->match_pattern(index, pattern); FIXME: Use for act_Count
-    return false;
-}
-
 
 template <size_t width, bool zero>
 uint64_t ArrayWithFind::cascade(uint64_t a) const
@@ -313,10 +288,10 @@ REALM_NOINLINE bool ArrayWithFind::find_all_will_match(size_t start2, size_t end
     return true;
 }
 
-// This is the main finding function for Array. Other finding functions are just wrappers around this one.
-// Search for 'value' using condition cond (Equal, NotEqual, Less, etc) and call QueryStateBase->match() or
-// find_action_pattern() for each match. Break and return if QueryStateBase->match() returns false or 'end' is
-// reached.
+// This is the main finding function for Array. Other finding functions are just
+// wrappers around this one. Search for 'value' using condition cond (Equal,
+// NotEqual, Less, etc) and call QueryStateBase::match() for each match. Break and
+// return if QueryStateBase::match() returns false or 'end' is reached.
 template <class cond, size_t bitwidth>
 bool ArrayWithFind::find_optimized(int64_t value, size_t start, size_t end, size_t baseindex, QueryStateBase* state) const
 {
@@ -488,9 +463,6 @@ bool ArrayWithFind::find_gtlt_fast(uint64_t chunk, uint64_t magic, QueryStateBas
                     : ((chunk - magic) & ~chunk & ~0ULL / no0(mask1) * (mask2 + 1));
     size_t p = 0;
     while (m) {
-        if (find_action_pattern(baseindex, m >> (no0(width) - 1), state))
-            break; // consumed, so do not call QueryStateBase->match()
-
         size_t t = first_set_bit64(m) / no0(width);
         p += t;
         if (!state->match(p + baseindex, Mixed{int64_t((chunk >> (p * width)) & mask1)}))
@@ -624,10 +596,6 @@ inline bool ArrayWithFind::compare_equality(int64_t value, size_t start, size_t 
             size_t a = 0;
 
             while (eq ? test_zero<width>(v2) : v2) {
-
-                if (find_action_pattern(start + baseindex, cascade<width, eq>(v2), state))
-                    break; // consumed
-
                 size_t t = find_zero<eq, width>(v2);
                 a += t;
 
@@ -757,13 +725,6 @@ REALM_FORCEINLINE bool ArrayWithFind::find_sse_intern(__m128i* action_data, __m1
         size_t s = i * sizeof(__m128i) * 8 / no0(width);
 
         while (resmask != 0) {
-            constexpr uint64_t upper = lower_bits<width / 8>() << (no0(width / 8) - 1);
-            uint64_t pattern =
-                resmask &
-                upper; // fixme, bits at wrong offsets. Only OK because we only use them in 'count' aggregate
-            if (find_action_pattern(s + baseindex, pattern, state))
-                break;
-
             size_t idx = first_set_bit(resmask) * 8 / no0(width);
             s += idx;
             if (!state->match(s + baseindex))
