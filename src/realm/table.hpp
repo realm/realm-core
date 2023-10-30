@@ -903,10 +903,10 @@ public:
 
 private:
     friend class ColKeys;
-    const Table* m_table;
+    ConstTableRef m_table;
     size_t m_pos;
 
-    ColKeyIterator(const Table* t, size_t p)
+    ColKeyIterator(const ConstTableRef& t, size_t p)
         : m_table(t)
         , m_pos(p)
     {
@@ -915,8 +915,8 @@ private:
 
 class ColKeys {
 public:
-    ColKeys(const Table* t)
-        : m_table(t)
+    ColKeys(ConstTableRef&& t)
+        : m_table(std::move(t))
     {
     }
 
@@ -947,7 +947,7 @@ public:
     }
 
 private:
-    const Table* m_table;
+    ConstTableRef m_table;
 };
 
 // Class used to collect a chain of links when building up a Query following links.
@@ -1079,7 +1079,7 @@ private:
 
 inline ColKeys Table::get_column_keys() const
 {
-    return ColKeys(this);
+    return ColKeys(ConstTableRef(this, m_alloc.get_instance_version()));
 }
 
 inline uint_fast64_t Table::get_content_version() const noexcept
