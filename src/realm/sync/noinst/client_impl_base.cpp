@@ -2001,13 +2001,10 @@ void Session::send_upload_message()
     if (REALM_UNLIKELY(get_client().is_dry_run()))
         return;
 
-    version_type target_upload_version = get_db()->get_version_of_latest_snapshot();
+    version_type target_upload_version = m_last_version_available;
     if (m_pending_flx_sub_set) {
         REALM_ASSERT(m_is_flx_sync_session);
         target_upload_version = m_pending_flx_sub_set->snapshot_version;
-    }
-    if (target_upload_version > m_last_version_available) {
-        m_last_version_available = target_upload_version;
     }
 
     const ClientReplication& repl = access_realm(); // Throws
