@@ -1138,9 +1138,7 @@ SessionWrapper::SessionWrapper(ClientImpl& client, DBRef db, std::shared_ptr<Sub
     REALM_ASSERT(m_db->get_replication());
     REALM_ASSERT(dynamic_cast<ClientReplication*>(m_db->get_replication()));
 
-    if (m_flx_subscription_store) {
-        update_subscription_version_info();
-    }
+    update_subscription_version_info();
 }
 
 SessionWrapper::~SessionWrapper() noexcept
@@ -1830,6 +1828,8 @@ void SessionWrapper::handle_pending_client_reset_acknowledgement()
 
 void SessionWrapper::update_subscription_version_info()
 {
+    if (!m_flx_subscription_store)
+        return;
     auto versions_info = m_flx_subscription_store->get_version_info();
     m_flx_active_version = versions_info.active;
     m_flx_pending_mark_version = versions_info.pending_mark;
