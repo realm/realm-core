@@ -112,15 +112,13 @@ const std::string_view Logger::level_to_string(Level level) noexcept
 
 void StderrLogger::do_log(Level level, const std::string& message)
 {
-    static Mutex mutex;
-    LockGuard l(mutex);
     // std::cerr is unbuffered, so no need to flush
-    std::cerr << get_level_prefix(level) << message << '\n'; // Throws
+    std::cerr << util::format("%1%2\n", get_level_prefix(level), message); // Throws
 }
 
 void StreamLogger::do_log(Level level, const std::string& message)
 {
-    m_out << get_level_prefix(level) << message << std::endl; // Throws
+    m_out << util::format("%1%2\n", get_level_prefix(level), message); // Throws
 }
 
 void ThreadSafeLogger::do_log(Level level, const std::string& message)
