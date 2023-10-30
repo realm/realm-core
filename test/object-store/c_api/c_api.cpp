@@ -1254,12 +1254,12 @@ TEST_CASE("C API", "[c_api]") {
         auto obj1 = cptr_checked(realm_object_create(realm, class_foo.key));
         realm_set_value(obj1.get(), info.key, rlm_int_val(123), false);
         realm_commit(realm);
-        CHECK(userdata.log.size() == 10);
+        CHECK(userdata.log.size() == 11);
         realm_set_log_level(RLM_LOG_LEVEL_INFO);
         // Commit begin/end should not be logged at INFO level
         realm_begin_write(realm);
         realm_commit(realm);
-        CHECK(userdata.log.size() == 10);
+        CHECK(userdata.log.size() == 11);
         realm_release(realm);
         userdata.log.clear();
         realm_set_log_level(RLM_LOG_LEVEL_ERROR);
