@@ -2303,6 +2303,8 @@ Status Session::receive_ident_message(SaltedFileIdent client_file_ident)
             handle_pending_client_reset_acknowledgement();
         }
 
+        update_subscription_version_info();
+
         // If a migration or rollback is in progress, mark it complete when client reset is completed.
         if (auto migration_store = get_migration_store()) {
             migration_store->complete_migration_or_rollback();
