@@ -17,14 +17,18 @@ set(CMAKE_XCODE_ATTRIBUTE_TARGETED_DEVICE_FAMILY "1,2,3,4,7")
 
 # With Xcode 14+ the base SDK *mostly* doesn't matter any more, as it
 # officially supports multi-platform builds from a single target.
-# However, as of Xcode 15 beta 2 xcodebuild (but not Xcode itself) requires the
-# visionOS SDK to build for visionOS. Hopefully this is just a beta bug.
+# However, as of Xcode 15 beta 8 xcodebuild (but not Xcode itself) requires the
+# visionOS SDK to build for visionOS. 15.0 final doesn't include the visionOS
+# SDK, so the SDKROOT is explicitly set by the invoker when building with the
+# beta Xcode rather than here.
 # Xcode 13 requires using the correct SDK. We no longer support Xcode 13, but
 # still use it on evergreen to build the macOS tests (and nothing else).
-set(CMAKE_XCODE_ATTRIBUTE_SDKROOT_1500 "xros")
-set(CMAKE_XCODE_ATTRIBUTE_SDKROOT_1400 "iphoneos")
-set(CMAKE_XCODE_ATTRIBUTE_SDKROOT_1300 "macosx")
-set(CMAKE_XCODE_ATTRIBUTE_SDKROOT "$(SDKROOT_$(XCODE_VERSION_MAJOR))")
+if(NOT DEFINED CMAKE_XCODE_ATTRIBUTE_SDKROOT)
+    set(CMAKE_XCODE_ATTRIBUTE_SDKROOT_1500 "iphoneos")
+    set(CMAKE_XCODE_ATTRIBUTE_SDKROOT_1400 "iphoneos")
+    set(CMAKE_XCODE_ATTRIBUTE_SDKROOT_1300 "macosx")
+    set(CMAKE_XCODE_ATTRIBUTE_SDKROOT "$(SDKROOT_$(XCODE_VERSION_MAJOR))")
+endif()
 
 set(CMAKE_XCODE_ATTRIBUTE_IPHONEOS_DEPLOYMENT_TARGET "11.0")
 set(CMAKE_XCODE_ATTRIBUTE_MACOSX_DEPLOYMENT_TARGET_CATALYST_NO "10.13")

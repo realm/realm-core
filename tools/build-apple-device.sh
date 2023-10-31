@@ -52,6 +52,11 @@ if [ "${platform}" == 'maccatalyst' ]; then
     buildDestination='generic/platform=macOS,variant=Mac Catalyst'
 fi
 
+sdkroot=iphoneos
+if [[ "${platform}" == xr* ]]; then
+    sdkroot=xros
+fi
+
 mkdir -p build-xcode-platforms
 cd build-xcode-platforms
 cmake \
@@ -59,6 +64,7 @@ cmake \
     -D REALM_VERSION="${VERSION}" \
     -D REALM_BUILD_LIB_ONLY=ON \
     -D CPACK_PACKAGE_DIRECTORY=.. \
+    -D CMAKE_XCODE_ATTRIBUTE_SDKROOT="$sdkroot" \
     ${CMAKE_FLAGS} \
     -G Xcode \
     ..
