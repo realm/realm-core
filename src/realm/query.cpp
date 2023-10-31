@@ -1198,8 +1198,9 @@ ObjKey Query::find() const
     bool do_log = false;
     std::chrono::steady_clock::time_point t1;
 
-    if (logger && logger->would_log(util::Logger::Level::debug)) {
-        logger->log(util::Logger::Level::debug, "Query find first: '%1'", get_description_safe());
+    if (logger && logger->would_log(util::LogCategory::query, util::Logger::Level::debug)) {
+        logger->log(util::LogCategory::query, util::Logger::Level::debug, "Query find first: '%1'",
+                    get_description_safe());
         t1 = std::chrono::steady_clock::now();
         do_log = true;
     }
@@ -1258,8 +1259,8 @@ ObjKey Query::find() const
 
     if (do_log) {
         auto t2 = std::chrono::steady_clock::now();
-        logger->log(util::Logger::Level::debug, "Query first found: %1, Duration: %2 us", ret,
-                    std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count());
+        logger->log(util::LogCategory::query, util::Logger::Level::debug, "Query first found: %1, Duration: %2 us",
+                    ret, std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count());
     }
 
     return ret;
@@ -1273,14 +1274,15 @@ void Query::do_find_all(QueryStateBase& st) const
 
     if (st.limit() == 0) {
         if (logger) {
-            logger->log(util::Logger::Level::debug, "Query find all: limit = 0 -> result: 0");
+            logger->log(util::LogCategory::query, util::Logger::Level::debug,
+                        "Query find all: limit = 0 -> result: 0");
         }
         return;
     }
 
-    if (logger && logger->would_log(util::Logger::Level::debug)) {
-        logger->log(util::Logger::Level::debug, "Query find all: '%1', limit = %2", get_description_safe(),
-                    int64_t(st.limit()));
+    if (logger && logger->would_log(util::LogCategory::query, util::Logger::Level::debug)) {
+        logger->log(util::LogCategory::query, util::Logger::Level::debug, "Query find all: '%1', limit = %2",
+                    get_description_safe(), int64_t(st.limit()));
         t1 = std::chrono::steady_clock::now();
         do_log = true;
     }
@@ -1368,8 +1370,8 @@ void Query::do_find_all(QueryStateBase& st) const
 
     if (do_log) {
         auto t2 = std::chrono::steady_clock::now();
-        logger->log(util::Logger::Level::debug, "Query found: %1, Duration: %2 us", st.match_count(),
-                    std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count());
+        logger->log(util::LogCategory::query, util::Logger::Level::debug, "Query found: %1, Duration: %2 us",
+                    st.match_count(), std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count());
     }
 }
 
@@ -1395,7 +1397,7 @@ size_t Query::do_count(size_t limit) const
 
     if (limit == 0) {
         if (logger) {
-            logger->log(util::Logger::Level::debug, "Query count: limit = 0 -> result: 0");
+            logger->log(util::LogCategory::query, util::Logger::Level::debug, "Query count: limit = 0 -> result: 0");
         }
         return 0;
     }
@@ -1410,15 +1412,15 @@ size_t Query::do_count(size_t limit) const
             cnt_all = std::min(m_table->size(), limit);
         }
         if (logger) {
-            logger->log(util::Logger::Level::debug, "Query count (no condition): limit = %1 -> result: %2",
-                        int64_t(limit), cnt_all);
+            logger->log(util::LogCategory::query, util::Logger::Level::debug,
+                        "Query count (no condition): limit = %1 -> result: %2", int64_t(limit), cnt_all);
         }
         return cnt_all;
     }
 
-    if (logger && logger->would_log(util::Logger::Level::debug)) {
-        logger->log(util::Logger::Level::debug, "Query count: '%1', limit = %2", get_description_safe(),
-                    int64_t(limit));
+    if (logger && logger->would_log(util::LogCategory::query, util::Logger::Level::debug)) {
+        logger->log(util::LogCategory::query, util::Logger::Level::debug, "Query count: '%1', limit = %2",
+                    get_description_safe(), int64_t(limit));
         t1 = std::chrono::steady_clock::now();
         do_log = true;
     }
@@ -1485,7 +1487,7 @@ size_t Query::do_count(size_t limit) const
 
     if (do_log) {
         auto t2 = std::chrono::steady_clock::now();
-        logger->log(util::Logger::Level::debug, "Query matches: %1, Duration: %2 us", cnt,
+        logger->log(util::LogCategory::query, util::Logger::Level::debug, "Query matches: %1, Duration: %2 us", cnt,
                     std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count());
     }
 
@@ -1540,7 +1542,7 @@ size_t Query::count(const DescriptorOrdering& descriptor) const
 
     size_t limit = size_t(-1);
 
-    if (!descriptor.will_apply_distinct()) {
+    if (!descriptor.will_apply_distinct() && !descriptor.will_apply_filter()) {
         if (bool(min_limit)) {
             limit = *min_limit;
         }
@@ -1707,19 +1709,19 @@ std::string Query::validate() const
 
 std::string Query::get_description(util::serializer::SerialisationState& state) const
 {
-    if (m_view) {
-        throw SerializationError("Serialization of a query constrained by a view is not currently supported");
-    }
     std::string description;
     if (auto root = root_node()) {
         description = root->describe_expression(state);
     }
-    else {
+    if (m_view) {
+        description += util::format(" VIEW { %1 element(s) }", m_view->size());
+    }
+    if (description.length() == 0) {
         // An empty query returns all results and one way to indicate this
         // is to serialise TRUEPREDICATE which is functionally equivalent
         description = "TRUEPREDICATE";
     }
-    if (this->m_ordering) {
+    if (m_ordering) {
         description += " " + m_ordering->get_description(m_table);
     }
     return description;

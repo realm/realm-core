@@ -156,6 +156,7 @@ StableIndex Obj::build_index(ColKey col_key) const
         return {col_key, 0};
     }
     REALM_ASSERT(col_key.get_type() == col_type_Mixed);
+    _update_if_needed();
     ArrayMixed values(_get_alloc());
     ref_type ref = to_ref(Array::get(m_mem.get_addr(), col_key.get_index().val + 1));
     values.init_from_ref(ref);
@@ -168,6 +169,7 @@ bool Obj::check_index(StableIndex index) const
     if (index.is_collection()) {
         return true;
     }
+    _update_if_needed();
     ArrayMixed values(_get_alloc());
     ref_type ref = to_ref(Array::get(m_mem.get_addr(), index.get_index().val + 1));
     values.init_from_ref(ref);
@@ -205,6 +207,11 @@ bool Obj::compare_values(Mixed val1, Mixed val2, ColKey ck, Obj other, StringDat
                 Lst<Mixed> lst1(*this, ck);
                 Lst<Mixed> lst2(other, other.get_column_key(col_name));
                 return compare_list_in_mixed(lst1, lst2, ck, other, col_name);
+            }
+            else if (type == type_Set) {
+                Set<Mixed> set1(*this, ck);
+                Set<Mixed> set2(other, other.get_column_key(col_name));
+                return set1 == set2;
             }
             else if (type == type_Dictionary) {
                 Dictionary dict1(*this, ck);
@@ -814,7 +821,7 @@ ObjKey Obj::get_backlink(const Table& origin, ColKey origin_col_key, size_t back
     return get_backlink(backlink_col_key, backlink_ndx);
 }
 
-TableView Obj::get_backlink_view(TableRef src_table, ColKey src_col_key)
+TableView Obj::get_backlink_view(TableRef src_table, ColKey src_col_key) const
 {
     TableView tv(src_table, src_col_key, *this);
     tv.do_sync();
@@ -1140,11 +1147,11 @@ Obj& Obj::set<Mixed>(ColKey col_key, Mixed value, bool is_default)
     }
     else if (old_value.is_type(type_Dictionary)) {
         Dictionary dict(*this, col_key);
-        dict.remove_backlinks(state);
+        recurse = dict.remove_backlinks(state);
     }
     else if (old_value.is_type(type_List)) {
         Lst<Mixed> list(*this, col_key);
-        list.remove_backlinks(state);
+        recurse = list.remove_backlinks(state);
     }
 
     if (value.is_type(type_TypedLink)) {
@@ -1947,18 +1954,43 @@ Obj& Obj::set_collection(ColKey col_key, CollectionType type)
     update_if_needed();
     Mixed new_val(0, type);
 
-    ArrayMixed values(_get_alloc());
+    ArrayMixed arr(_get_alloc());
     ref_type ref = to_ref(Array::get(m_mem.get_addr(), col_key.get_index().val + 1));
-    values.init_from_ref(ref);
-    auto old_val = values.get(m_row_ndx);
+    arr.init_from_ref(ref);
+    auto old_val = arr.get(m_row_ndx);
 
     if (old_val != new_val) {
-        set(col_key, Mixed(0, type));
-        // Update ref after write
-        ref = to_ref(Array::get(m_mem.get_addr(), col_key.get_index().val + 1));
-        values.init_from_ref(ref);
+        CascadeState state;
+        if (old_val.is_type(type_TypedLink)) {
+            remove_backlink(col_key, old_val.get<ObjLink>(), state);
+        }
+        else if (old_val.is_type(type_Dictionary)) {
+            Dictionary dict(*this, col_key);
+            dict.remove_backlinks(state);
+        }
+        else if (old_val.is_type(type_List)) {
+            Lst<Mixed> list(*this, col_key);
+            list.remove_backlinks(state);
+        }
+
+        Allocator& alloc = _get_alloc();
+        alloc.bump_content_version();
+
+        Array fallback(alloc);
+        Array& fields = get_tree_top()->get_fields_accessor(fallback, m_mem);
+        ArrayMixed values(alloc);
+        values.set_parent(&fields, col_key.get_index().val + 1);
+        values.init_from_parent();
+
+        values.set(m_row_ndx, new_val);
         values.set_key(m_row_ndx, generate_key(0x10));
+
+        sync(fields);
+
+        if (Replication* repl = get_replication())
+            repl->set(m_table.unchecked_ptr(), col_key, m_key, new_val); // Throws
     }
+
     return *this;
 }
 
@@ -2023,16 +2055,25 @@ CollectionPtr Obj::get_collection_by_stable_path(const StablePath& path) const
     while (level < path.size()) {
         auto& index = path[level];
         auto get_ref = [&]() -> std::pair<Mixed, PathElement> {
+            Mixed ref;
+            PathElement path_elem;
             if (collection->get_collection_type() == CollectionType::List) {
                 auto list_of_mixed = dynamic_cast<Lst<Mixed>*>(collection.get());
                 size_t ndx = list_of_mixed->find_index(index);
-                return {list_of_mixed->get(ndx), PathElement(ndx)};
+                if (ndx != realm::not_found) {
+                    ref = list_of_mixed->get(ndx);
+                    path_elem = ndx;
+                }
             }
             else {
                 auto dict = dynamic_cast<Dictionary*>(collection.get());
                 size_t ndx = dict->find_index(index);
-                return {dict->get_any(ndx), PathElement(dict->get_key(ndx).get_string())};
+                if (ndx != realm::not_found) {
+                    ref = dict->get_any(ndx);
+                    path_elem = dict->get_key(ndx).get_string();
+                }
             }
+            return {ref, path_elem};
         };
         auto [ref, path_elem] = get_ref();
         if (ref.is_type(type_List)) {

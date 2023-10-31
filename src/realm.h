@@ -359,35 +359,70 @@ typedef struct realm_websocket_endpoint {
     bool is_ssl;            // true if SSL should be used
 } realm_websocket_endpoint_t;
 
+// The following definitions are intended for internal state and structures
+// used by the Sync Client. These values should be retained by the Platform
+// Networking CAPI implementation so they can be provided back to the Platform
+// Networking CAPI functions.
 typedef struct realm_sync_socket realm_sync_socket_t;
-typedef struct realm_sync_socket_callback realm_sync_socket_callback_t;
+typedef struct realm_sync_socket_callback realm_sync_socket_post_callback_t;
+typedef struct realm_sync_socket_callback realm_sync_socket_timer_callback_t;
+typedef struct realm_sync_socket_callback realm_sync_socket_write_callback_t;
 typedef void* realm_sync_socket_timer_t;
 typedef void* realm_sync_socket_websocket_t;
 typedef struct realm_websocket_observer realm_websocket_observer_t;
 
+// Called when the Sync Client posts a callback handler to be run within the context
+// of the event loop.
+// The post_callback pointer does not need to be released by the CAPI implementation.
 typedef void (*realm_sync_socket_post_func_t)(realm_userdata_t userdata,
-                                              realm_sync_socket_callback_t* realm_callback);
+                                              realm_sync_socket_post_callback_t* post_callback);
 
+// Called when a Sync Socket Timer is being created, which will start the timer countdown
+// immediately. The Timer CAPI implementation will need to be stored locally so it can
+// be used when calling realm_sync_socket_timer_complete() when the timer countdown
+// reaches 0 (i.e. expired) or realm_sync_socket_timer_canceled() when the timer is canceled.
+// The timer_callback pointer does not need to be released by the CAPI implementation.
 typedef realm_sync_socket_timer_t (*realm_sync_socket_create_timer_func_t)(
-    realm_userdata_t userdata, uint64_t delay_ms, realm_sync_socket_callback_t* realm_callback);
+    realm_userdata_t userdata, uint64_t delay_ms, realm_sync_socket_timer_callback_t* timer_callback);
 
+// Called when a Sync Socket Timer has been explicitly canceled or the Timer is being
+// destroyed. Use the realm_sync_socket_timer_canceled() function to notify the Sync Client
+// that the timer cancel is complete. NOTE: This function will always be called before the
+// timer is destroyed (even if the timer has completed), but the timer callback should only
+// be executed one time.
 typedef void (*realm_sync_socket_timer_canceled_func_t)(realm_userdata_t userdata,
                                                         realm_sync_socket_timer_t timer_userdata);
 
+// Called when the timer object has been destroyed so the Sync Socket Timer CAPI
+// implementation can clean up its timer resources.
 typedef void (*realm_sync_socket_timer_free_func_t)(realm_userdata_t userdata,
                                                     realm_sync_socket_timer_t timer_userdata);
 
+// Called when the Sync Client is initiating a connection to the server. The endpoint
+// structure contains the server address/URL and the websocket_observer will need to
+// be stored locally in the WebSocket CAPI implementation so it can be used with the
+// realm_sync_socket_websocket_[connected|message|error|closed]() functions when
+// providing WebSocket status or data to the Sync Client.
 typedef realm_sync_socket_websocket_t (*realm_sync_socket_connect_func_t)(
-    realm_userdata_t userdata, realm_websocket_endpoint_t endpoint,
-    realm_websocket_observer_t* realm_websocket_observer);
+    realm_userdata_t userdata, realm_websocket_endpoint_t endpoint, realm_websocket_observer_t* websocket_observer);
 
+// Called by a connection in the Sync Client when it needs to send data to the server. The
+// write_callback is used with realm_sync_socket_write_complete() to inform the connection
+// that the data has been transferred successfully.
+// If an error occurs during the async write operation, it needs to be provided to the
+// write_callback handler, and the websocket is exepected to be closed by calling
+// realm_sync_socket_websocket_error() followed by providing the error code and reason to
+// realm_sync_socket_websocket_closed().
+// The write_callback pointer does not need to be released by the CAPI implementation.
 typedef void (*realm_sync_socket_websocket_async_write_func_t)(realm_userdata_t userdata,
-                                                               realm_sync_socket_websocket_t websocket_userdata,
+                                                               realm_sync_socket_websocket_t websocket,
                                                                const char* data, size_t size,
-                                                               realm_sync_socket_callback_t* realm_callback);
+                                                               realm_sync_socket_write_callback_t* write_callback);
 
+// Called when the websocket has been destroyed in the Sync Client - no more write callbacks or observer
+// functions should be called when this function is called.
 typedef void (*realm_sync_socket_websocket_free_func_t)(realm_userdata_t userdata,
-                                                        realm_sync_socket_websocket_t websocket_userdata);
+                                                        realm_sync_socket_websocket_t websocket);
 
 /**
  * Get the VersionID of the current transaction.
@@ -578,6 +613,7 @@ typedef void (*realm_log_func_t)(realm_userdata_t userdata, realm_log_level_e le
 RLM_API void realm_set_log_callback(realm_log_func_t, realm_log_level_e, realm_userdata_t userdata,
                                     realm_free_userdata_func_t userdata_free) RLM_API_NOEXCEPT;
 RLM_API void realm_set_log_level(realm_log_level_e) RLM_API_NOEXCEPT;
+RLM_API void realm_set_log_level_category(const char*, realm_log_level_e) RLM_API_NOEXCEPT;
 
 /**
  * Get a thread-safe reference representing the same underlying object as some
@@ -3816,6 +3852,12 @@ RLM_API bool realm_sync_subscription_set_erase_by_query(realm_flx_sync_mutable_s
 RLM_API bool realm_sync_subscription_set_erase_by_results(realm_flx_sync_mutable_subscription_set_t*,
                                                           realm_results_t*, bool* erased);
 /**
+ *  Remove all subscriptions for a given class type. If operation completes successfully set the bool out param.
+ *  @return true if no error occurred, false otherwise (use realm_get_last_error for fetching the error).
+ */
+RLM_API bool realm_sync_subscription_set_erase_by_class_name(realm_flx_sync_mutable_subscription_set_t*, const char*,
+                                                             bool* erased);
+/**
  *  Commit the subscription_set passed as parameter (in order that all the changes made will take effect)
  *  @return pointer to a valid immutable subscription if commit was successful
  */
@@ -4185,6 +4227,26 @@ RLM_API bool realm_mongo_collection_find_one_and_delete(realm_mongodb_collection
                                                         realm_userdata_t data, realm_free_userdata_func_t delete_data,
                                                         realm_mongodb_callback_t callback);
 
+/**
+ * Creates a new sync socket instance for the Sync Client that handles the operations for a custom
+ * websocket and event loop implementation.
+ * @param userdata CAPI implementation specific pointer containing custom context data that is provided to
+ *                 each of the provided functions.
+ * @param userdata_free function that will be called when the sync socket is destroyed to delete userdata. This
+ *                      is required if userdata is not null.
+ * @param post_func function that will be called to post a callback handler onto the event loop - use the
+ *                  realm_sync_socket_post_complete() function when the callback handler is scheduled to run.
+ * @param create_timer_func function that will be called to create a new timer resource with the callback
+ *                          handler that will be run when the timer expires or an erorr occurs - use the
+ *                          realm_sync_socket_timer_canceled() function if the timer is canceled or the
+ *                          realm_sync_socket_timer_complete() function if the timer expires or an error occurs.
+ * @param cancel_timer_func function that will be called when the timer has been canceled by the sync client.
+ * @param free_timer_func function that will be called when the timer resource has been destroyed by the sync client.
+ * @param websocket_connect_func function that will be called when the sync client creates a websocket.
+ * @param websocket_write_func function that will be called when the sync client sends data over the websocket.
+ * @param websocket_free_func function that will be called when the sync client closes the websocket conneciton.
+ * @return a realm_sync_socket_t pointer suitable for passing to realm_sync_client_config_set_sync_socket()
+ */
 RLM_API realm_sync_socket_t* realm_sync_socket_new(
     realm_userdata_t userdata, realm_free_userdata_func_t userdata_free, realm_sync_socket_post_func_t post_func,
     realm_sync_socket_create_timer_func_t create_timer_func,
@@ -4193,18 +4255,103 @@ RLM_API realm_sync_socket_t* realm_sync_socket_new(
     realm_sync_socket_websocket_async_write_func_t websocket_write_func,
     realm_sync_socket_websocket_free_func_t websocket_free_func);
 
-RLM_API void realm_sync_socket_callback_complete(realm_sync_socket_callback_t* realm_callback, realm_errno_e status,
-                                                 const char* reason);
+/**
+ * To be called to execute the callback handler provided to the create_timer_func when the timer is
+ * complete or an error occurs while processing the timer.
+ * @param timer_handler the timer callback handler that was provided when the timer was created.
+ * @param result the error code for the error that occurred or RLM_ERR_SYNC_SOCKET_SUCCESS if the timer
+ *               expired normally.
+ * @param reason a string describing details about the error that occurred or empty string if no error.
+ * NOTE: This function must be called by the event loop execution thread.
+ */
+RLM_API void realm_sync_socket_timer_complete(realm_sync_socket_timer_callback_t* timer_handler,
+                                              realm_sync_socket_callback_result_e result, const char* reason);
 
+/**
+ * To be called to execute the callback handler provided to the create_timer_func when the timer has been
+ * canceled.
+ * @param timer_handler the timer callback handler that was provided when the timer was created.
+ * NOTE: This function must be called by the event loop execution thread.
+ */
+RLM_API void realm_sync_socket_timer_canceled(realm_sync_socket_timer_callback_t* timer_handler);
+
+/**
+ * To be called to execute the callback function provided to the post_func when the event loop executes
+ * that post'ed operation. The post_handler resource will automatically be destroyed during this
+ * operation.
+ * @param post_handler the post callback handler that was originally provided to the post_func
+ * @param result the error code for the error that occurred or RLM_ERR_SYNC_SOCKET_SUCCESS if the
+ *               callback handler should be executed normally.
+ * @param reason a string describing details about the error that occurred or empty string if no error.
+ * NOTE: This function must be called by the event loop execution thread.
+ */
+RLM_API void realm_sync_socket_post_complete(realm_sync_socket_post_callback_t* post_handler,
+                                             realm_sync_socket_callback_result_e result, const char* reason);
+
+/**
+ * To be called to execute the callback function provided to the websocket_write_func when the write
+ * operation is complete. The write_handler resource will automatically be destroyed during this
+ * operation.
+ * @param write_handler the write callback handler that was originally provided to the websocket_write_func
+ * @param result the error code for the error that occurred or RLM_ERR_SYNC_SOCKET_SUCCESS if write completed
+ *               successfully
+ * @param reason a string describing details about the error that occurred or empty string if no error.
+ * NOTE: This function must be called by the event loop execution thread.
+ */
+RLM_API void realm_sync_socket_write_complete(realm_sync_socket_write_callback_t* write_handler,
+                                              realm_sync_socket_callback_result_e result, const char* reason);
+
+/**
+ * To be called when the websocket successfully connects to the server.
+ * @param realm_websocket_observer the websocket observer object that was provided to the websocket_connect_func
+ * @param protocol the value of the Sec-WebSocket-Protocol header in the connect response from the server.
+ * NOTE: This function must be called by the event loop execution thread and should not be called
+ *       after the websocket_free_func has been called to release the websocket resources.
+ */
 RLM_API void realm_sync_socket_websocket_connected(realm_websocket_observer_t* realm_websocket_observer,
                                                    const char* protocol);
 
+/**
+ * To be called when an error occurs - the actual error value will be provided when the websocket_closed
+ * function is called. This function informs that the socket object is in an error state and no further
+ * TX operations should be performed.
+ * @param realm_websocket_observer the websocket observer object that was provided to the websocket_connect_func
+ * NOTE: This function must be called by the event loop execution thread and should not be called
+ *       after the websocket_free_func has been called to release the websocket resources.
+ */
 RLM_API void realm_sync_socket_websocket_error(realm_websocket_observer_t* realm_websocket_observer);
 
-RLM_API void realm_sync_socket_websocket_message(realm_websocket_observer_t* realm_websocket_observer,
+/**
+ * To be called to provide the received data to the Sync Client when a write operation has completed.
+ * The data buffer can be safely discarded after this function has completed.
+ * @param realm_websocket_observer the websocket observer object that was provided to the websocket_connect_func
+ * @param data a pointer to the buffer that contains the data received over the websocket
+ * @param data_size the number of bytes in the data buffer
+ * @return bool designates whether the WebSocket object should continue processing messages. The normal return
+ *         value is true. False must be returned if the websocket object has been destroyed during execution of
+ *         the function.
+ * NOTE: This function must be called by the event loop execution thread and should not be called
+ *       after the websocket_free_func has been called to release the websocket resources.
+ */
+RLM_API bool realm_sync_socket_websocket_message(realm_websocket_observer_t* realm_websocket_observer,
                                                  const char* data, size_t data_size);
 
-RLM_API void realm_sync_socket_websocket_closed(realm_websocket_observer_t* realm_websocket_observer, bool was_clean,
-                                                realm_web_socket_errno_e status, const char* reason);
+/**
+ * To be called when the websocket has been closed, either due to an error or a normal close operation.
+ * @param realm_websocket_observer the websocket observer object that was provided to the websocket_connect_func
+ * @param was_clean boolean value that indicates whether this is a normal close situation (true), the
+ *                  close code was provided by the server via a close message (true), or if the close code was
+ *                  generated by the local websocket as a result of some other error (false) (e.g. host
+ *                  unreachable, etc.)
+ * @param code the websocket close code (per the WebSocket spec) that describes why the websocket was closed.
+ * @param reason a string describing details about the error that occurred or empty string if no error.
+ * @return bool designates whether the WebSocket object has been destroyed during the execution of this
+ *         function. The normal return value is True to indicate the WebSocket object is no longer valid. If
+ *         False is returned, the WebSocket object will be destroyed at some point in the future.
+ * NOTE: This function must be called by the event loop execution thread and should not be called
+ *       after the websocket_free_func has been called to release the websocket resources.
+ */
+RLM_API bool realm_sync_socket_websocket_closed(realm_websocket_observer_t* realm_websocket_observer, bool was_clean,
+                                                realm_web_socket_errno_e code, const char* reason);
 
 #endif // REALM_H

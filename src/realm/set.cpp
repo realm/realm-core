@@ -226,6 +226,57 @@ void Set<Mixed>::migrate()
     }
 }
 
+template <class T>
+void Set<T>::do_resort(size_t start, size_t end)
+{
+    if (end > size()) {
+        end = size();
+    }
+    if (start >= end) {
+        return;
+    }
+    std::vector<size_t> indices;
+    indices.resize(end - start);
+    std::iota(indices.begin(), indices.end(), 0);
+    std::sort(indices.begin(), indices.end(), [&](auto a, auto b) {
+        return get(a + start) < get(b + start);
+    });
+    for (size_t i = 0; i < indices.size(); ++i) {
+        if (indices[i] != i) {
+            m_tree->swap(i + start, start + indices[i]);
+            auto it = std::find(indices.begin() + i, indices.end(), i);
+            REALM_ASSERT(it != indices.end());
+            *it = indices[i];
+            indices[i] = i;
+        }
+    }
+}
+
+template <>
+void Set<Mixed>::migration_resort()
+{
+    // sort order of strings and binaries changed
+    auto first_string = std::lower_bound(begin(), end(), StringData(""));
+    auto last_binary = std::partition_point(first_string, end(), [](const Mixed& item) {
+        return item.is_type(type_String, type_Binary);
+    });
+    do_resort(first_string.index(), last_binary.index());
+}
+
+template <>
+void Set<StringData>::migration_resort()
+{
+    // sort order of strings changed
+    do_resort(0, size());
+}
+
+template <>
+void Set<BinaryData>::migration_resort()
+{
+    // sort order of binaries changed
+    do_resort(0, size());
+}
+
 void LnkSet::remove_target_row(size_t link_ndx)
 {
     // Deleting the object will automatically remove all links

@@ -383,6 +383,28 @@ uint64_t Group::get_sync_file_id() const noexcept
     return 0;
 }
 
+size_t Group::get_free_space_size(const Array& top) noexcept
+{
+    if (top.is_attached() && top.size() > s_free_size_ndx) {
+        auto ref = top.get_as_ref(s_free_size_ndx);
+        Array free_list_sizes(top.get_alloc());
+        free_list_sizes.init_from_ref(ref);
+        return size_t(free_list_sizes.get_sum());
+    }
+    return 0;
+}
+
+size_t Group::get_history_size(const Array& top) noexcept
+{
+    if (top.is_attached() && top.size() > s_hist_ref_ndx) {
+        auto ref = top.get_as_ref(s_hist_ref_ndx);
+        Array hist(top.get_alloc());
+        hist.init_from_ref(ref);
+        return hist.get_byte_size_deep();
+    }
+    return 0;
+}
+
 int Group::read_only_version_check(SlabAlloc& alloc, ref_type top_ref, const std::string& path)
 {
     // Select file format if it is still undecided.

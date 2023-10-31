@@ -120,7 +120,7 @@ protected:
 /// directory, then removes the directory.
 class TestDirGuard {
 public:
-    TestDirGuard(const std::string& path);
+    TestDirGuard(const std::string& path, bool init_clean = true);
     ~TestDirGuard() noexcept;
     operator std::string() const
     {
@@ -129,6 +129,13 @@ public:
     const char* c_str() const
     {
         return m_path.c_str();
+    }
+
+    bool do_remove = true;
+
+    void clean_dir()
+    {
+        clean_dir(m_path);
     }
 
 private:

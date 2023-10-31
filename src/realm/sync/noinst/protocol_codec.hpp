@@ -255,7 +255,7 @@ public:
                 auto json_raw = msg.read_sized_data<std::string_view>(message_size);
                 try {
                     auto json = nlohmann::json::parse(json_raw);
-                    logger.trace("Error message encoded as json: %1", json_raw);
+                    logger.trace(util::LogCategory::session, "Error message encoded as json: %1", json_raw);
                     info.client_reset_recovery_is_disabled = json["isRecoveryModeDisabled"];
                     info.is_fatal = sync::IsFatal{!json["tryAgain"]};
                     info.message = json["message"];
@@ -304,8 +304,12 @@ public:
                             info.compensating_writes.push_back(std::move(cwei));
                         }
 
-                        info.compensating_write_server_version =
-                            json.at("compensatingWriteServerVersion").get<int64_t>();
+                        // Not provided when 'write_not_allowed' (230) error is received from the server.
+                        if (auto server_version = json.find("compensatingWriteServerVersion");
+                            server_version != json.end()) {
+                            info.compensating_write_server_version =
+                                std::make_optional<version_type>(server_version->get<int64_t>());
+                        }
                         info.compensating_write_rejected_client_version =
                             json.at("rejectedClientVersion").get<int64_t>();
                     }
@@ -410,7 +414,8 @@ private:
             msg = HeaderLineParser(std::string_view(uncompressed_body_buffer.get(), uncompressed_body_size));
         }
 
-        logger.debug("Download message compression: session_ident=%1, is_body_compressed=%2, "
+        logger.debug(util::LogCategory::changeset,
+                     "Download message compression: session_ident=%1, is_body_compressed=%2, "
                      "compressed_body_size=%3, uncompressed_body_size=%4",
                      session_ident, is_body_compressed, compressed_body_size, uncompressed_body_size);
 
@@ -435,19 +440,20 @@ private:
                                     "Server version in downloaded changeset cannot be zero");
             }
             auto changeset_data = msg.read_sized_data<BinaryData>(changeset_size);
-            logger.debug("Received: DOWNLOAD CHANGESET(session_ident=%1, server_version=%2, "
+            logger.debug(util::LogCategory::changeset,
+                         "Received: DOWNLOAD CHANGESET(session_ident=%1, server_version=%2, "
                          "client_version=%3, origin_timestamp=%4, origin_file_ident=%5, "
                          "original_changeset_size=%6, changeset_size=%7)",
                          session_ident, cur_changeset.remote_version, cur_changeset.last_integrated_local_version,
                          cur_changeset.origin_timestamp, cur_changeset.origin_file_ident,
                          cur_changeset.original_changeset_size, changeset_size); // Throws
-            if (logger.would_log(util::Logger::Level::trace)) {
+            if (logger.would_log(util::LogCategory::changeset, util::Logger::Level::trace)) {
                 if (changeset_data.size() < 1056) {
-                    logger.trace("Changeset: %1",
+                    logger.trace(util::LogCategory::changeset, "Changeset: %1",
                                  clamped_hex_dump(changeset_data)); // Throws
                 }
                 else {
-                    logger.trace("Changeset(comp): %1 %2", changeset_data.size(),
+                    logger.trace(util::LogCategory::changeset, "Changeset(comp): %1 %2", changeset_data.size(),
                                  compressed_hex_dump(changeset_data)); // Throws
                 }
 #if REALM_DEBUG
@@ -456,7 +462,7 @@ private:
                 sync::parse_changeset(in, log);
                 std::stringstream ss;
                 log.print(ss);
-                logger.trace("Changeset (parsed):\n%1", ss.str());
+                logger.trace(util::LogCategory::changeset, "Changeset (parsed):\n%1", ss.str());
 #endif
             }
 
@@ -707,7 +713,8 @@ public:
                     msg = HeaderLineParser(std::string_view(uncompressed_body_buffer.get(), uncompressed_body_size));
                 }
 
-                logger.debug("Upload message compression: is_body_compressed = %1, "
+                logger.debug(util::LogCategory::changeset,
+                             "Upload message compression: is_body_compressed = %1, "
                              "compressed_body_size=%2, uncompressed_body_size=%3, "
                              "progress_client_version=%4, progress_server_version=%5, "
                              "locked_server_version=%6",
@@ -740,13 +747,14 @@ public:
                     upload_changeset.changeset = msg.read_sized_data<BinaryData>(changeset_size);
 
                     if (logger.would_log(util::Logger::Level::trace)) {
-                        logger.trace("Received: UPLOAD CHANGESET(client_version=%1, server_version=%2, "
+                        logger.trace(util::LogCategory::changeset,
+                                     "Received: UPLOAD CHANGESET(client_version=%1, server_version=%2, "
                                      "origin_timestamp=%3, origin_file_ident=%4, changeset_size=%5)",
                                      upload_changeset.upload_cursor.client_version,
                                      upload_changeset.upload_cursor.last_integrated_server_version,
                                      upload_changeset.origin_timestamp, upload_changeset.origin_file_ident,
                                      changeset_size); // Throws
-                        logger.trace("Changeset: %1",
+                        logger.trace(util::LogCategory::changeset, "Changeset: %1",
                                      clamped_hex_dump(upload_changeset.changeset)); // Throws
                     }
                     upload_changesets.push_back(std::move(upload_changeset)); // Throws

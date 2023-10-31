@@ -546,7 +546,7 @@ public:
         std::string suffix = out.str();
         std::string test_path = get_test_path(test_context.get_test_name(), suffix);
         return std::unique_ptr<Peer>(
-            new Peer(client_file_ident, test_path, changeset_dump_dir_gen, *(test_context.logger)));
+            new Peer(client_file_ident, test_path, changeset_dump_dir_gen, *test_context.logger));
     }
 
     // FIXME: Remove the dependency on the unit_test namespace.
@@ -562,7 +562,7 @@ public:
         std::string suffix = out.str();
         std::string test_path = get_test_path(test_context.get_test_name(), suffix);
         return std::unique_ptr<Peer>(
-            new Peer(client_file_ident, test_path, changeset_dump_dir_gen, *(test_context.logger)));
+            new Peer(client_file_ident, test_path, changeset_dump_dir_gen, *test_context.logger));
     }
 
     template <class F>
@@ -829,7 +829,7 @@ struct Associativity {
             ReadTransaction read_server{server->shared_group};
             for (auto& client : clients) {
                 ReadTransaction read_client{client->shared_group};
-                if (!CHECK(compare_groups(read_server, read_client, *(test_context.logger)))) {
+                if (!CHECK(compare_groups(read_server, read_client, *test_context.logger))) {
                     return false;
                 }
             }
@@ -874,7 +874,7 @@ struct Associativity {
             // Check that all permutations converge on the same state.
             ReadTransaction read_first{first.server->shared_group};
             ReadTransaction read_current{iter.server->shared_group};
-            if (!CHECK(compare_groups(read_first, read_current, *(test_context.logger)))) {
+            if (!CHECK(compare_groups(read_first, read_current, *test_context.logger))) {
                 return false;
             }
         }

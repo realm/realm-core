@@ -134,9 +134,8 @@ bool ClientImpl::decompose_server_url(const std::string& url, ProtocolEnvelope& 
     return true;
 }
 
-
 ClientImpl::ClientImpl(ClientConfig config)
-    : logger_ptr{config.logger ? std::move(config.logger) : std::make_shared<util::StderrLogger>()}
+    : logger_ptr{std::make_shared<util::CategoryLogger>(util::LogCategory::session, std::move(config.logger))}
     , logger{*logger_ptr}
     , m_reconnect_mode{config.reconnect_mode}
     , m_connect_timeout{config.connect_timeout}
@@ -955,11 +954,13 @@ void Connection::initiate_write_message(const OutputBuffer& out, Session* sess)
         if (sentinel->destroyed) {
             return;
         }
-        if (status == ErrorCodes::OperationAborted)
+        if (!status.is_ok()) {
+            if (status != ErrorCodes::Error::OperationAborted) {
+                // Write errors will be handled by the websocket_write_error_handler() callback
+                logger.error("Connection: write failed %1: %2", status.code_string(), status.reason());
+            }
             return;
-        else if (!status.is_ok())
-            throw Exception(status);
-
+        }
         handle_write_message(); // Throws
     });                         // Throws
     m_sending_session = sess;
@@ -1038,11 +1039,13 @@ void Connection::initiate_write_ping(const OutputBuffer& out)
         if (sentinel->destroyed) {
             return;
         }
-        if (status == ErrorCodes::OperationAborted)
+        if (!status.is_ok()) {
+            if (status != ErrorCodes::Error::OperationAborted) {
+                // Write errors will be handled by the websocket_write_error_handler() callback
+                logger.error("Connection: send ping failed %1: %2", status.code_string(), status.reason());
+            }
             return;
-        else if (!status.is_ok())
-            throw Exception(status);
-
+        }
         handle_write_ping(); // Throws
     });                      // Throws
     m_sending = true;
@@ -1419,11 +1422,12 @@ void Connection::receive_server_log_message(session_ident_type session_ident, ut
 
     if (session_ident != 0) {
         if (auto sess = get_session(session_ident)) {
-            sess->logger.log(level, "%1 log: %2", prefix, message);
+            sess->logger.log(LogCategory::session, level, "%1 log: %2", prefix, message);
             return;
         }
 
-        logger.log(level, "%1 log for unknown session %2: %3", prefix, session_ident, message);
+        logger.log(util::LogCategory::session, level, "%1 log for unknown session %2: %3", prefix, session_ident,
+                   message);
         return;
     }
 
@@ -1436,7 +1440,8 @@ void Connection::receive_appservices_request_id(std::string_view coid)
     // Only set once per connection
     if (!coid.empty() && m_appservices_coid.empty()) {
         m_appservices_coid = coid;
-        logger.info("Connected to app services with request id: \"%1\"", m_appservices_coid);
+        logger.log(util::LogCategory::session, util::LogCategory::Level::info,
+                   "Connected to app services with request id: \"%1\"", m_appservices_coid);
     }
 }
 
@@ -1500,15 +1505,17 @@ void Session::gather_pending_compensating_writes(util::Span<Changeset> changeset
     REALM_ASSERT_DEBUG(
         std::is_sorted(m_pending_compensating_write_errors.begin(), m_pending_compensating_write_errors.end(),
                        [](const ProtocolErrorInfo& lhs, const ProtocolErrorInfo& rhs) {
-                           return lhs.compensating_write_server_version < rhs.compensating_write_server_version;
+                           REALM_ASSERT_DEBUG(lhs.compensating_write_server_version.has_value());
+                           REALM_ASSERT_DEBUG(rhs.compensating_write_server_version.has_value());
+                           return *lhs.compensating_write_server_version < *rhs.compensating_write_server_version;
                        }));
 #endif
 
     while (!m_pending_compensating_write_errors.empty() &&
-           m_pending_compensating_write_errors.front().compensating_write_server_version <=
+           *m_pending_compensating_write_errors.front().compensating_write_server_version <=
                changesets.back().version) {
         auto& cur_error = m_pending_compensating_write_errors.front();
-        REALM_ASSERT_3(cur_error.compensating_write_server_version, >=, changesets.front().version);
+        REALM_ASSERT_3(*cur_error.compensating_write_server_version, >=, changesets.front().version);
         out->push_back(std::move(cur_error));
         m_pending_compensating_write_errors.pop_front();
     }
@@ -1537,8 +1544,7 @@ void Session::integrate_changesets(ClientReplication& repl, const SyncProgress& 
         progress, &downloadable_bytes, received_changesets, version_info, download_batch_state, logger, transact,
         [&](const TransactionRef&, util::Span<Changeset> changesets) {
             gather_pending_compensating_writes(changesets, &pending_compensating_write_errors);
-        },
-        get_transact_reporter()); // Throws
+        }); // Throws
     if (received_changesets.size() == 1) {
         logger.debug("1 remote changeset integrated, producing client version %1",
                      version_info.sync_version.version); // Throws
@@ -1551,7 +1557,7 @@ void Session::integrate_changesets(ClientReplication& repl, const SyncProgress& 
     for (const auto& pending_error : pending_compensating_write_errors) {
         logger.info("Reporting compensating write for client version %1 in server version %2: %3",
                     pending_error.compensating_write_rejected_client_version,
-                    pending_error.compensating_write_server_version, pending_error.message);
+                    *pending_error.compensating_write_server_version, pending_error.message);
         try {
             on_connection_state_changed(
                 m_conn.get_state(),
@@ -1676,7 +1682,6 @@ void Session::activate()
     }
     logger.debug("client_file_ident = %1, client_file_ident_salt = %2", m_client_file_ident.ident,
                  m_client_file_ident.salt); // Throws
-    m_upload_target_version = m_last_version_available;
     m_upload_progress = m_progress.upload;
     m_last_version_selected_for_upload = m_upload_progress.client_version;
     m_download_progress = m_progress.download;
@@ -1859,9 +1864,7 @@ void Session::send_message()
         return send_query_change_message(); // throws
     }
 
-    REALM_ASSERT_3(m_upload_progress.client_version, <=, m_upload_target_version);
-    REALM_ASSERT_3(m_upload_target_version, <=, m_last_version_available);
-    if (m_allow_upload && (m_upload_target_version > m_upload_progress.client_version)) {
+    if (m_allow_upload && (m_last_version_available > m_upload_progress.client_version)) {
         return send_upload_message(); // Throws
     }
 }
@@ -1994,20 +1997,17 @@ void Session::send_upload_message()
     REALM_ASSERT_EX(m_state == Active, m_state);
     REALM_ASSERT(m_ident_message_sent);
     REALM_ASSERT(!m_unbind_message_sent);
-    REALM_ASSERT_3(m_upload_target_version, >, m_upload_progress.client_version);
 
     if (REALM_UNLIKELY(get_client().is_dry_run()))
         return;
 
-    auto target_upload_version = m_upload_target_version;
-    if (m_is_flx_sync_session) {
-        if (!m_pending_flx_sub_set || m_pending_flx_sub_set->snapshot_version < m_upload_progress.client_version) {
-            m_pending_flx_sub_set = get_flx_subscription_store()->get_next_pending_version(
-                m_last_sent_flx_query_version, m_upload_progress.client_version);
-        }
-        if (m_pending_flx_sub_set && m_pending_flx_sub_set->snapshot_version < m_upload_target_version) {
-            target_upload_version = m_pending_flx_sub_set->snapshot_version;
-        }
+    version_type target_upload_version = get_db()->get_version_of_latest_snapshot();
+    if (m_pending_flx_sub_set) {
+        REALM_ASSERT(m_is_flx_sync_session);
+        target_upload_version = m_pending_flx_sub_set->snapshot_version;
+    }
+    if (target_upload_version > m_last_version_available) {
+        m_last_version_available = target_upload_version;
     }
 
     const ClientReplication& repl = access_realm(); // Throws
@@ -2022,7 +2022,7 @@ void Session::send_upload_message()
         check_for_upload_completion(); // Throws
         // If we need to limit upload up to some version other than the last client version available and there are no
         // changes to upload, then there is no need to send an empty message.
-        if (target_upload_version != m_upload_target_version) {
+        if (m_pending_flx_sub_set) {
             logger.debug("Empty UPLOAD was skipped (progress_client_version=%1, progress_server_version=%2)",
                          m_upload_progress.client_version, m_upload_progress.last_integrated_server_version);
             // Other messages may be waiting to be sent
@@ -2033,7 +2033,7 @@ void Session::send_upload_message()
         m_last_version_selected_for_upload = uploadable_changesets.back().progress.client_version;
     }
 
-    if (m_is_flx_sync_session && m_pending_flx_sub_set && target_upload_version != m_upload_target_version) {
+    if (m_pending_flx_sub_set && target_upload_version < m_last_version_available) {
         logger.trace("Limiting UPLOAD message up to version %1 to send QUERY version %2",
                      m_pending_flx_sub_set->snapshot_version, m_pending_flx_sub_set->query_version);
     }
@@ -2050,18 +2050,19 @@ void Session::send_upload_message()
     ClientProtocol::UploadMessageBuilder upload_message_builder = protocol.make_upload_message_builder(); // Throws
 
     for (const UploadChangeset& uc : uploadable_changesets) {
-        logger.debug("Fetching changeset for upload (client_version=%1, server_version=%2, "
+        logger.debug(util::LogCategory::changeset,
+                     "Fetching changeset for upload (client_version=%1, server_version=%2, "
                      "changeset_size=%3, origin_timestamp=%4, origin_file_ident=%5)",
                      uc.progress.client_version, uc.progress.last_integrated_server_version, uc.changeset.size(),
                      uc.origin_timestamp, uc.origin_file_ident); // Throws
         if (logger.would_log(util::Logger::Level::trace)) {
             BinaryData changeset_data = uc.changeset.get_first_chunk();
             if (changeset_data.size() < 1024) {
-                logger.trace("Changeset: %1",
+                logger.trace(util::LogCategory::changeset, "Changeset: %1",
                              _impl::clamped_hex_dump(changeset_data)); // Throws
             }
             else {
-                logger.trace("Changeset(comp): %1 %2", changeset_data.size(),
+                logger.trace(util::LogCategory::changeset, "Changeset(comp): %1 %2", changeset_data.size(),
                              protocol.compressed_hex_dump(changeset_data));
             }
 
@@ -2072,10 +2073,10 @@ void Session::send_upload_message()
                 parse_changeset(in, log);
                 std::stringstream ss;
                 log.print(ss);
-                logger.trace("Changeset (parsed):\n%1", ss.str());
+                logger.trace(util::LogCategory::changeset, "Changeset (parsed):\n%1", ss.str());
             }
             catch (const BadChangesetError& err) {
-                logger.error("Unable to parse changeset: %1", err.what());
+                logger.error(util::LogCategory::changeset, "Unable to parse changeset: %1", err.what());
             }
 #endif
         }
@@ -2099,7 +2100,7 @@ void Session::send_upload_message()
                 compact_changesets(&changeset, 1);
                 encode_changeset(changeset, encode_buffer);
 
-                logger.debug("Upload compaction: original size = %1, compacted size = %2", uc.changeset.size(),
+                logger.debug(util::LogCategory::changeset, "Upload compaction: original size = %1, compacted size = %2", uc.changeset.size(),
                              encode_buffer.size()); // Throws
             }
 
@@ -2277,8 +2278,6 @@ Status Session::receive_ident_message(SaltedFileIdent client_file_ident)
                                               std::move(on_flx_subscription_complete))) {
             return false;
         }
-        realm::VersionID client_reset_old_version = client_reset_operation->get_client_reset_old_version();
-        realm::VersionID client_reset_new_version = client_reset_operation->get_client_reset_new_version();
 
         // The fresh Realm has been used to reset the state
         logger.debug("Client reset is completed, path=%1", get_realm_path()); // Throws
@@ -2294,9 +2293,8 @@ Status Session::receive_ident_message(SaltedFileIdent client_file_ident)
         REALM_ASSERT_EX(m_progress.upload.client_version == 0, m_progress.upload.client_version);
         REALM_ASSERT_EX(m_progress.upload.last_integrated_server_version == 0,
                         m_progress.upload.last_integrated_server_version);
-        logger.trace("last_version_available  = %1", m_last_version_available); // Throws
+        logger.trace(util::LogCategory::reset, "last_version_available  = %1", m_last_version_available); // Throws
 
-        m_upload_target_version = m_last_version_available;
         m_upload_progress = m_progress.upload;
         m_download_progress = m_progress.download;
         // In recovery mode, there may be new changesets to upload and nothing left to download.
@@ -2304,8 +2302,6 @@ Status Session::receive_ident_message(SaltedFileIdent client_file_ident)
         // For both, we want to allow uploads again without needing external changes to download first.
         m_allow_upload = true;
         REALM_ASSERT_EX(m_last_version_selected_for_upload == 0, m_last_version_selected_for_upload);
-
-        get_transact_reporter()->report_sync_transact(client_reset_old_version, client_reset_new_version);
 
         if (has_pending_client_reset) {
             handle_pending_client_reset_acknowledgement();
@@ -2519,7 +2515,7 @@ Status Session::receive_query_error_message(int error_code, std::string_view mes
     // because in that case, the associated Realm and SessionWrapper must
     // not be accessed any longer.
     if (m_state == Active) {
-        on_flx_sync_error(query_version, std::string_view(message.data(), message.size())); // throws
+        on_flx_sync_error(query_version, message); // throws
     }
     return Status::OK();
 }
@@ -2559,6 +2555,7 @@ Status Session::receive_error_message(const ProtocolErrorInfo& info)
         // If the client is not active, the compensating writes will not be processed now, but will be
         // sent again the next time the client connects
         if (m_state == Active) {
+            REALM_ASSERT(info.compensating_write_server_version.has_value());
             m_pending_compensating_write_errors.push_back(info);
         }
         return Status::OK();

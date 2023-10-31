@@ -24,7 +24,7 @@
 #include <optional>
 #include <stdexcept>
 #include <string>
-#include <vector>
+#include <set>
 #include <chrono>
 
 #include <realm/alloc_slab.hpp>
@@ -538,18 +538,6 @@ protected:
 private:
     static constexpr StringData g_class_name_prefix = "class_";
 
-    struct ToDeleteRef {
-        ToDeleteRef(TableKey tk, ObjKey k)
-            : table_key(tk)
-            , obj_key(k)
-            , ttl(std::chrono::steady_clock::now())
-        {
-        }
-        TableKey table_key;
-        ObjKey obj_key;
-        std::chrono::steady_clock::time_point ttl;
-    };
-
     // nullptr, if we're sharing an allocator provided during initialization
     std::unique_ptr<SlabAlloc> m_local_alloc;
     // in-use allocator. If local, then equal to m_local_alloc.
@@ -614,7 +602,7 @@ private:
 
     util::UniqueFunction<void(const CascadeNotification&)> m_notify_handler;
     util::UniqueFunction<void()> m_schema_change_handler;
-    std::vector<ToDeleteRef> m_objects_to_delete;
+    std::set<TableKey> m_tables_to_clear;
 
     Group(SlabAlloc* alloc) noexcept;
     void init_array_parents() noexcept;
@@ -773,6 +761,7 @@ private:
     ///  24 Variable sized arrays for Decimal128.
     ///     Nested collections
     ///     Backlinks in BPlusTree
+    ///     Sort order of Strings changed (affects sets and the string index)
     ///
     /// IMPORTANT: When introducing a new file format version, be sure to review
     /// the file validity checks in Group::open() and DB::do_open, the file
@@ -797,6 +786,8 @@ private:
                                              int& history_type, int& history_schema_version) noexcept;
     static ref_type get_history_ref(const Array& top) noexcept;
     static size_t get_logical_file_size(const Array& top) noexcept;
+    static size_t get_free_space_size(const Array& top) noexcept;
+    static size_t get_history_size(const Array& top) noexcept;
     size_t get_logical_file_size() const noexcept
     {
         return get_logical_file_size(m_top);
@@ -813,6 +804,7 @@ private:
                                    std::optional<size_t> read_lock_file_size = util::none,
                                    std::optional<uint_fast64_t> read_lock_version = util::none);
 
+    Table* get_table_unchecked(TableKey);
     size_t find_table_index(StringData name) const noexcept;
     TableKey ndx2key(size_t ndx) const;
     size_t key2ndx(TableKey key) const;
@@ -950,11 +942,16 @@ inline TableKey Group::find_table(StringData name) const noexcept
     return (ndx != npos) ? ndx2key(ndx) : TableKey{};
 }
 
+inline Table* Group::get_table_unchecked(TableKey key)
+{
+    auto ndx = key2ndx_checked(key);
+    return do_get_table(ndx); // Throws
+}
+
 inline TableRef Group::get_table(TableKey key)
 {
     check_attached();
-    auto ndx = key2ndx_checked(key);
-    Table* table = do_get_table(ndx); // Throws
+    Table* table = get_table_unchecked(key);
     return TableRef(table, table ? table->m_alloc.get_instance_version() : 0);
 }
 

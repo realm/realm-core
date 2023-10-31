@@ -573,13 +573,13 @@ public:
         , m_logger{*m_logger_ptr}
         , m_frame_reader(m_logger, m_is_client)
     {
-        m_logger.debug("WebSocket::Websocket()");
+        m_logger.debug(util::LogCategory::network, "WebSocket::Websocket()");
     }
 
     void initiate_client_handshake(const std::string& request_uri, const std::string& host,
                                    const std::string& sec_websocket_protocol, HTTPHeaders headers)
     {
-        m_logger.debug("WebSocket::initiate_client_handshake()");
+        m_logger.debug(util::LogCategory::network, "WebSocket::initiate_client_handshake()");
 
         m_stopped = false;
         m_is_client = true;
@@ -599,7 +599,7 @@ public:
         req.headers["Sec-WebSocket-Version"] = sec_websocket_version;
         req.headers["Sec-WebSocket-Protocol"] = sec_websocket_protocol;
 
-        m_logger.trace("HTTP request =\n%1", req);
+        m_logger.trace(util::LogCategory::network, "HTTP request =\n%1", req);
 
         auto handler = [this](HTTPResponse response, std::error_code ec) {
             // If the operation is aborted, the WebSocket object may have been destroyed.
@@ -635,7 +635,7 @@ public:
 
     void initiate_server_handshake()
     {
-        m_logger.debug("WebSocket::initiate_server_handshake()");
+        m_logger.debug(util::LogCategory::network, "WebSocket::initiate_server_handshake()");
 
         m_stopped = false;
         m_is_client = false;
@@ -663,11 +663,9 @@ public:
     }
 
     void async_write_frame(bool fin, int opcode, const char* data, size_t size,
-                           util::UniqueFunction<void()> write_completion_handler)
+                           sync::websocket::WriteCompletionHandler write_completion_handler)
     {
         REALM_ASSERT(!m_stopped);
-
-        m_write_completion_handler = std::move(write_completion_handler);
 
         bool mask = m_is_client;
 
@@ -679,10 +677,10 @@ public:
         size_t message_size =
             make_frame(fin, opcode, mask, data, size, m_write_buffer.data(), m_config.websocket_get_random());
 
-        auto handler = [this](std::error_code ec, size_t) {
+        auto handler = [this, handler = std::move(write_completion_handler)](std::error_code ec, size_t) mutable {
             // If the operation is aborted, then the write operation was canceled and we should ignore this callback.
             if (ec == util::error::operation_aborted) {
-                return;
+                return handler(ec, 0);
             }
 
             auto is_socket_closed_err = (ec == util::error::make_error_code(util::error::connection_reset) ||
@@ -701,22 +699,20 @@ public:
                 return m_config.websocket_write_error_handler(ec);
             }
 
-            handle_write_message();
+            handle_write_message(std::move(handler));
         };
 
-        m_config.async_write(m_write_buffer.data(), message_size, handler);
+        m_config.async_write(m_write_buffer.data(), message_size, std::move(handler));
     }
 
-    void handle_write_message()
+    void handle_write_message(sync::websocket::WriteCompletionHandler write_handler)
     {
         if (m_write_buffer.size() > s_write_buffer_stable_size) {
             m_write_buffer.resize(s_write_buffer_stable_size);
             m_write_buffer.shrink_to_fit();
         }
 
-        auto handler = std::move(m_write_completion_handler);
-        m_write_completion_handler = nullptr;
-        handler();
+        write_handler(std::error_code(), m_write_buffer.size());
     }
 
     void stop() noexcept
@@ -750,15 +746,13 @@ private:
     std::vector<char> m_write_buffer;
     static const size_t s_write_buffer_stable_size = 2048;
 
-    util::UniqueFunction<void()> m_write_completion_handler;
-
     std::optional<int> m_test_handshake_response;
     std::string m_test_handshake_response_body;
 
     void error_client_malformed_response()
     {
         m_stopped = true;
-        m_logger.error("WebSocket: Received malformed HTTP response");
+        m_logger.error(util::LogCategory::network, "WebSocket: Received malformed HTTP response");
         std::error_code ec = HttpError::bad_response_invalid_http;
         m_config.websocket_handshake_error_handler(ec, nullptr, nullptr); // Throws
     }
@@ -767,7 +761,8 @@ private:
     {
         m_stopped = true;
 
-        m_logger.error("Websocket: Expected HTTP response 101 Switching Protocols, "
+        m_logger.error(util::LogCategory::network,
+                       "Websocket: Expected HTTP response 101 Switching Protocols, "
                        "but received:\n%1",
                        response);
 
@@ -827,7 +822,8 @@ private:
     {
         m_stopped = true;
 
-        m_logger.error("Websocket: HTTP response has invalid websocket headers."
+        m_logger.error(util::LogCategory::network,
+                       "Websocket: HTTP response has invalid websocket headers."
                        "HTTP response = \n%1",
                        response);
         std::error_code ec = HttpError::bad_response_header_protocol_violation;
@@ -843,7 +839,7 @@ private:
     void error_server_malformed_request()
     {
         m_stopped = true;
-        m_logger.error("WebSocket: Received malformed HTTP request");
+        m_logger.error(util::LogCategory::network, "WebSocket: Received malformed HTTP request");
         std::error_code ec = HttpError::bad_request_malformed_http;
         m_config.websocket_handshake_error_handler(ec, nullptr, nullptr); // Throws
     }
@@ -852,7 +848,8 @@ private:
     {
         m_stopped = true;
 
-        m_logger.error("Websocket: HTTP request has invalid websocket headers."
+        m_logger.error(util::LogCategory::network,
+                       "Websocket: HTTP request has invalid websocket headers."
                        "HTTP request = \n%1",
                        request);
         m_config.websocket_handshake_error_handler(ec, &request.headers, nullptr); // Throws
@@ -867,8 +864,8 @@ private:
     // The client receives the HTTP response.
     void handle_http_response_received(HTTPResponse response)
     {
-        m_logger.debug("WebSocket::handle_http_response_received()");
-        m_logger.trace("HTTP response = %1", response);
+        m_logger.debug(util::LogCategory::network, "WebSocket::handle_http_response_received()");
+        m_logger.trace(util::LogCategory::network, "HTTP response = %1", response);
 
         if (response.status != HTTPStatus::SwitchingProtocols ||
             (m_test_handshake_response && *m_test_handshake_response != 101)) {
@@ -893,7 +890,7 @@ private:
 
     void handle_http_request_received(HTTPRequest request)
     {
-        m_logger.trace("WebSocket::handle_http_request_received()");
+        m_logger.trace(util::LogCategory::network, "WebSocket::handle_http_request_received()");
 
         util::Optional<std::string> sec_websocket_protocol = websocket::read_sec_websocket_protocol(request);
 
@@ -1281,32 +1278,32 @@ void websocket::Socket::initiate_server_websocket_after_handshake()
 }
 
 void websocket::Socket::async_write_frame(bool fin, Opcode opcode, const char* data, size_t size,
-                                          util::UniqueFunction<void()> handler)
+                                          WriteCompletionHandler handler)
 {
     m_impl->async_write_frame(fin, int(opcode), data, size, std::move(handler));
 }
 
-void websocket::Socket::async_write_text(const char* data, size_t size, util::UniqueFunction<void()> handler)
+void websocket::Socket::async_write_text(const char* data, size_t size, WriteCompletionHandler handler)
 {
     async_write_frame(true, Opcode::text, data, size, std::move(handler));
 }
 
-void websocket::Socket::async_write_binary(const char* data, size_t size, util::UniqueFunction<void()> handler)
+void websocket::Socket::async_write_binary(const char* data, size_t size, WriteCompletionHandler handler)
 {
     async_write_frame(true, Opcode::binary, data, size, std::move(handler));
 }
 
-void websocket::Socket::async_write_close(const char* data, size_t size, util::UniqueFunction<void()> handler)
+void websocket::Socket::async_write_close(const char* data, size_t size, WriteCompletionHandler handler)
 {
     async_write_frame(true, Opcode::close, data, size, std::move(handler));
 }
 
-void websocket::Socket::async_write_ping(const char* data, size_t size, util::UniqueFunction<void()> handler)
+void websocket::Socket::async_write_ping(const char* data, size_t size, WriteCompletionHandler handler)
 {
     async_write_frame(true, Opcode::ping, data, size, std::move(handler));
 }
 
-void websocket::Socket::async_write_pong(const char* data, size_t size, util::UniqueFunction<void()> handler)
+void websocket::Socket::async_write_pong(const char* data, size_t size, WriteCompletionHandler handler)
 {
     async_write_frame(true, Opcode::pong, data, size, std::move(handler));
 }

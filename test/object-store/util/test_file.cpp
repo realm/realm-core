@@ -32,6 +32,9 @@
 #include <realm/util/file.hpp>
 
 #if REALM_ENABLE_SYNC
+#include <realm/object-store/sync/mongo_client.hpp>
+#include <realm/object-store/sync/mongo_database.hpp>
+#include <realm/object-store/sync/mongo_collection.hpp>
 #include <realm/object-store/sync/sync_manager.hpp>
 #include <realm/object-store/sync/sync_session.hpp>
 #include <realm/object-store/sync/sync_user.hpp>
@@ -62,12 +65,62 @@ inline static int mkstemp(char* _template)
 
 using namespace realm;
 
+static std::vector<std::pair<std::string_view, realm::util::Logger::Level>> default_log_levels = {
+    {"Realm", realm::util::Logger::Level::TEST_LOGGING_LEVEL},
+#ifdef TEST_LOGGING_LEVEL_STORAGE
+    {"Realm.Storage", realm::util::Logger::Level::TEST_LOGGING_LEVEL_STORAGE},
+#endif
+#ifdef TEST_LOGGING_LEVEL_TRANSACTION
+    {"Realm.Storage.Transaction", realm::util::Logger::Level::TEST_LOGGING_LEVEL_TRANSACTION},
+#endif
+#ifdef TEST_LOGGING_LEVEL_QUERY
+    {"Realm.Storage.Query", realm::util::Logger::Level::TEST_LOGGING_LEVEL_QUERY},
+#endif
+#ifdef TEST_LOGGING_LEVEL_OBJECT
+    {"Realm.Storage.Object", realm::util::Logger::Level::TEST_LOGGING_LEVEL_OBJECT},
+#endif
+#ifdef TEST_LOGGING_LEVEL_NOTIFICATION
+    {"Realm.Storage.Notification", realm::util::Logger::Level::TEST_LOGGING_LEVEL_NOTIFICATION},
+#endif
+#ifdef TEST_LOGGING_LEVEL_SYNC
+    {"Realm.Sync", realm::util::Logger::Level::TEST_LOGGING_LEVEL_SYNC},
+#endif
+#ifdef TEST_LOGGING_LEVEL_CLIENT
+    {"Realm.Sync.Client", realm::util::Logger::Level::TEST_LOGGING_LEVEL_CLIENT},
+#endif
+#ifdef TEST_LOGGING_LEVEL_SESSION
+    {"Realm.Sync.Client.Session", realm::util::Logger::Level::TEST_LOGGING_LEVEL_SESSION},
+#endif
+#ifdef TEST_LOGGING_LEVEL_CHANGESET
+    {"Realm.Sync.Client.Changeset", realm::util::Logger::Level::TEST_LOGGING_LEVEL_CHANGESET},
+#endif
+#ifdef TEST_LOGGING_LEVEL_NETWORK
+    {"Realm.Sync.Client.Network", realm::util::Logger::Level::TEST_LOGGING_LEVEL_NETWORK},
+#endif
+#ifdef TEST_LOGGING_LEVEL_RESET
+    {"Realm.Sync.Client.Reset", realm::util::Logger::Level::TEST_LOGGING_LEVEL_RESET},
+#endif
+#ifdef TEST_LOGGING_LEVEL_SERVER
+    {"Realm.Sync.Server", realm::util::Logger::Level::TEST_LOGGING_LEVEL_SERVER},
+#endif
+#ifdef TEST_LOGGING_LEVEL_APP
+    {"Realm.App", realm::util::Logger::Level::TEST_LOGGING_LEVEL_APP},
+#endif
+};
+
+static void set_default_level_thresholds()
+{
+    for (auto [cat, level] : default_log_levels) {
+        realm::util::LogCategory::get_category(cat).set_default_level_threshold(level);
+    }
+}
+
 TestFile::TestFile()
 {
     disable_sync_to_disk();
     m_temp_dir = util::make_temp_dir();
     path = (fs::path(m_temp_dir) / "realm.XXXXXX").string();
-    util::Logger::set_default_level_threshold(realm::util::Logger::Level::TEST_LOGGING_LEVEL);
+    set_default_level_thresholds();
     if (const char* crypt_key = test_util::crypt_key()) {
         encryption_key = std::vector<char>(crypt_key, crypt_key + 64);
     }
@@ -114,7 +167,7 @@ InMemoryTestFile::InMemoryTestFile()
     in_memory = true;
     schema_version = 0;
     encryption_key = std::vector<char>();
-    util::Logger::set_default_level_threshold(realm::util::Logger::Level::TEST_LOGGING_LEVEL);
+    set_default_level_thresholds();
 }
 
 DBOptions InMemoryTestFile::options() const
@@ -195,7 +248,7 @@ SyncServer::SyncServer(const SyncServer::Config& config)
     , m_server(m_local_root_dir, util::none, ([&] {
                    using namespace std::literals::chrono_literals;
 
-                   m_logger = std::make_shared<util::StderrLogger>(realm::util::Logger::Level::TEST_LOGGING_LEVEL);
+                   m_logger = util::Logger::get_default_logger();
 
                    sync::Server::Config c;
                    c.logger = m_logger;
@@ -331,7 +384,7 @@ TestAppSession::TestAppSession(AppSession session,
     if (!m_transport)
         m_transport = instance_of<SynchronousTestTransport>;
     auto app_config = get_config(m_transport, *m_app_session);
-    util::Logger::set_default_level_threshold(realm::util::Logger::Level::TEST_LOGGING_LEVEL);
+    set_default_level_thresholds();
     set_app_config_defaults(app_config, m_transport);
 
     util::try_make_dir(m_base_file_path);
@@ -369,9 +422,55 @@ TestAppSession::~TestAppSession()
     }
 }
 
+std::vector<bson::BsonDocument> TestAppSession::get_documents(SyncUser& user, const std::string& object_type,
+                                                              size_t expected_count) const
+{
+    app::MongoClient remote_client = user.mongo_client("BackingDB");
+    app::MongoDatabase db = remote_client.db(m_app_session->config.mongo_dbname);
+    app::MongoCollection collection = db[object_type];
+    int sleep_time = 10;
+    timed_wait_for(
+        [&] {
+            uint64_t count = 0;
+            collection.count({}, [&](uint64_t c, util::Optional<app::AppError> error) {
+                REQUIRE(!error);
+                count = c;
+            });
+            if (count < expected_count) {
+                // querying the server too frequently makes it take longer to process the sync changesets we're
+                // waiting for
+                millisleep(sleep_time);
+                if (sleep_time < 500) {
+                    sleep_time *= 2;
+                }
+                return false;
+            }
+            return true;
+        },
+        std::chrono::minutes(5));
+
+    std::vector<bson::BsonDocument> documents;
+    collection.find({}, {},
+                    [&](util::Optional<std::vector<bson::Bson>>&& result, util::Optional<app::AppError> error) {
+                        REQUIRE(result);
+                        REQUIRE(!error);
+                        REQUIRE(result->size() == expected_count);
+                        documents.reserve(result->size());
+                        for (auto&& bson : *result) {
+                            REQUIRE(bson.type() == bson::Bson::Type::Document);
+                            documents.push_back(std::move(static_cast<bson::BsonDocument&>(bson)));
+                        }
+                    });
+    return documents;
+}
 #endif // REALM_ENABLE_AUTH_TESTS
 
 // MARK: - TestSyncManager
+
+TestSyncManager::Config::Config()
+{
+    set_default_level_thresholds();
+}
 
 TestSyncManager::TestSyncManager(const Config& config, const SyncServer::Config& sync_server_config)
     : transport(config.transport ? config.transport : std::make_shared<Transport>(network_callback))
@@ -380,7 +479,6 @@ TestSyncManager::TestSyncManager(const Config& config, const SyncServer::Config&
 {
     app::App::Config app_config = config.app_config;
     set_app_config_defaults(app_config, transport);
-    util::Logger::set_default_level_threshold(config.log_level);
 
     SyncClientConfig sc_config;
     m_base_file_path = config.base_path.empty() ? util::make_temp_dir() + random_string(10) : config.base_path;

@@ -33,6 +33,7 @@
 #include <realm/object-store/property.hpp>
 #include <realm/object-store/results.hpp>
 #include <realm/object-store/schema.hpp>
+#include <realm/object-store/class.hpp>
 #include <realm/object-store/thread_safe_reference.hpp>
 #include <realm/object-store/impl/realm_coordinator.hpp>
 #include <realm/object-store/util/event_loop_dispatcher.hpp>
@@ -971,7 +972,8 @@ TEST_CASE("Get Realm using Async Open", "[sync][pbs][async open]") {
         // Create some content
         auto origin = Realm::get_shared_realm(config);
         origin->begin_transaction();
-        origin->read_group().get_table("class_object")->create_object_with_primary_key(0);
+        Class cls = origin->get_class("object");
+        cls.create_object(0);
         origin->commit_transaction();
         wait_for_upload(*origin);
 
@@ -983,7 +985,7 @@ TEST_CASE("Get Realm using Async Open", "[sync][pbs][async open]") {
             // Write some data
             SharedRealm realm = Realm::get_shared_realm(std::move(ref));
             realm->begin_transaction();
-            realm->read_group().get_table("class_object")->create_object_with_primary_key(2);
+            realm->get_class("object").create_object(2);
             realm->commit_transaction();
             wait_for_upload(*realm);
             wait_for_download(*realm);
@@ -994,29 +996,30 @@ TEST_CASE("Get Realm using Async Open", "[sync][pbs][async open]") {
 
         // Create some more content on the server
         origin->begin_transaction();
-        origin->read_group().get_table("class_object")->create_object_with_primary_key(7);
+        cls.create_object(7);
         origin->commit_transaction();
         wait_for_upload(*origin);
 
         // Now open a realm based on the realm file created above
         auto realm = Realm::get_shared_realm(config3);
+        Class cls2 = realm->get_class("object");
         wait_for_download(*realm);
         wait_for_upload(*realm);
 
         // Make sure we have got a new client file id
         REQUIRE(realm->read_group().get_sync_file_id() != client_file_id);
-        REQUIRE(realm->read_group().get_table("class_object")->size() == 3);
+        REQUIRE(cls.num_objects() == 3);
 
         // Check that we can continue committing to this realm
         realm->begin_transaction();
-        realm->read_group().get_table("class_object")->create_object_with_primary_key(5);
+        cls2.create_object(5);
         realm->commit_transaction();
         wait_for_upload(*realm);
 
         // Check that this change is now in the original realm
         wait_for_download(*origin);
         origin->refresh();
-        REQUIRE(origin->read_group().get_table("class_object")->size() == 4);
+        REQUIRE(cls.num_objects() == 4);
     }
 
     SECTION("downloads Realms which exist on the server") {
@@ -2819,6 +2822,24 @@ TEST_CASE("SharedRealm: notifications") {
         REQUIRE(change_count == 4);
         REQUIRE_FALSE(realm->refresh());
     }
+
+#if REALM_ENABLE_SYNC
+    SECTION("SubscriptionStore writes produce notifications") {
+        auto subscription_store = sync::SubscriptionStore::create(TestHelper::get_db(realm));
+        REQUIRE(change_count == 0);
+        util::EventLoop::main().run_until([&] {
+            return change_count > 0;
+        });
+        REQUIRE(change_count == 1);
+
+        subscription_store->get_active().make_mutable_copy().commit();
+        REQUIRE(change_count == 1);
+        util::EventLoop::main().run_until([&] {
+            return change_count > 1;
+        });
+        REQUIRE(change_count == 2);
+    }
+#endif
 }
 
 TEST_CASE("SharedRealm: schema updating from external changes") {
@@ -3561,7 +3582,7 @@ TEST_CASE("SharedRealm: SchemaChangedFunction") {
     size_t schema_changed_called = 0;
     Schema changed_fixed_schema;
     TestFile config;
-    auto dynamic_config = config;
+    RealmConfig dynamic_config = config;
 
     config.schema = Schema{{"object1",
                             {
@@ -4237,4 +4258,31 @@ TEST_CASE("Concurrent operations") {
         // This is just to check that the section above did not leave any realms open
         _impl::RealmCoordinator::assert_no_open_realms();
     }
+}
+
+TEST_CASE("Notification logging") {
+    using namespace std::chrono_literals;
+    TestFile config;
+    // util::LogCategory::realm.set_default_level_threshold(util::Logger::Level::all);
+    config.schema_version = 1;
+    config.schema = Schema{{"object", {{"value", PropertyType::Int}}}};
+
+    auto realm = Realm::get_shared_realm(config);
+    auto table = realm->read_group().get_table("class_object");
+    int changed = 0;
+    Results res(realm, table->query("value == 5"));
+    auto token = res.add_notification_callback([&changed](CollectionChangeSet const&) {
+        changed++;
+    });
+
+    int commit_nr = 0;
+    util::EventLoop::main().run_until([&] {
+        for (int64_t i = 0; i < 10; i++) {
+            realm->begin_transaction();
+            table->create_object().set("value", i);
+            realm->commit_transaction();
+            std::this_thread::sleep_for(2ms);
+        }
+        return ++commit_nr == 10;
+    });
 }

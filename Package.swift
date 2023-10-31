@@ -3,7 +3,7 @@
 import PackageDescription
 import Foundation
 
-let versionStr = "13.21.0"
+let versionStr = "13.23.2"
 let versionPieces = versionStr.split(separator: "-")
 let versionCompontents = versionPieces[0].split(separator: ".")
 let versionExtra = versionPieces.count > 1 ? versionPieces[1] : ""
@@ -16,7 +16,7 @@ var cxxSettings: [CXXSetting] = [
     .define("REALM_ENABLE_ASSERTIONS", to: "1"),
     .define("REALM_ENABLE_ENCRYPTION", to: "1"),
     .define("REALM_ENABLE_SYNC", to: "1"),
-    .define("REALM_ENABLE_GEOSPATIAL", to: "0"),
+    .define("REALM_ENABLE_GEOSPATIAL", to: "1"),
 
     .define("REALM_VERSION_MAJOR", to: String(versionCompontents[0])),
     .define("REALM_VERSION_MINOR", to: String(versionCompontents[1])),
@@ -64,7 +64,6 @@ let notSyncServerSources: [String] = [
     "realm/cluster.cpp",
     "realm/cluster_tree.cpp",
     "realm/collection.cpp",
-    "realm/collection_list.cpp",
     "realm/collection_parent.cpp",
     "realm/column_binary.cpp",
     "realm/db.cpp",
@@ -73,6 +72,7 @@ let notSyncServerSources: [String] = [
     "realm/disable_sync_to_disk.cpp",
     "realm/error_codes.cpp",
     "realm/exceptions.cpp",
+    "realm/geospatial.cpp",
     "realm/global_key.cpp",
     "realm/group.cpp",
     "realm/group_writer.cpp",
@@ -397,14 +397,13 @@ let package = Package(
             ] + cxxSettings) as [CXXSetting]),
         .target(
             name: "RealmCore",
-            dependencies: ["Bid"],
+            dependencies: ["Bid", "s2geometry"],
             path: "src",
             exclude: ([
                 "CMakeLists.txt",
                 "external",
                 "realm/CMakeLists.txt",
                 "realm/exec",
-                "realm/geospatial.cpp",
                 "realm/object-store/CMakeLists.txt",
                 "realm/object-store/c_api",
                 "realm/object-store/impl/epoll",

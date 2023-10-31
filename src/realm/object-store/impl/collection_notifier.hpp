@@ -33,6 +33,11 @@
 #include <functional>
 #include <mutex>
 #include <unordered_set>
+#include <chrono>
+
+namespace realm::util {
+class Logger;
+}
 
 namespace realm::_impl {
 
@@ -210,6 +215,10 @@ protected:
     bool all_callbacks_filtered() const noexcept;
 
     void update_related_tables(Table const& table) REQUIRES(m_callback_mutex);
+
+    std::shared_ptr<util::Logger> m_logger;
+    std::string m_description;
+    std::chrono::steady_clock::time_point m_run_time_point;
 
     // The actual change, calculated in run() and delivered in prepare_handover()
     CollectionChangeBuilder m_change;

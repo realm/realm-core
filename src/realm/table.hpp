@@ -314,7 +314,7 @@ public:
     /// Does the key refer to an object within the table?
     bool is_valid(ObjKey key) const noexcept
     {
-        return m_clusters.is_valid(key);
+        return key && m_clusters.is_valid(key);
     }
     Obj get_object(ObjKey key) const
     {
@@ -357,6 +357,8 @@ public:
     // - turns the object into a tombstone if links exist
     // - otherwise works just as remove_object()
     ObjKey invalidate_object(ObjKey key);
+    // Remove several objects
+    void batch_erase_objects(std::vector<ObjKey>& keys);
     Obj try_get_tombstone(ObjKey key) const
     {
         REALM_ASSERT(key.is_unresolved());
@@ -733,6 +735,7 @@ private:
 
     // Migration support
     void migrate_sets_and_dictionaries();
+    void migrate_set_orderings();
 
     /// Disable copying assignment.
     ///
@@ -1385,6 +1388,10 @@ public:
         table.remove_recursive(rows); // Throws
     }
 
+    static void batch_erase_objects(Table& table, std::vector<ObjKey>& keys)
+    {
+        table.batch_erase_objects(keys); // Throws
+    }
     static void batch_erase_rows(Table& table, const KeyColumn& keys)
     {
         table.batch_erase_rows(keys); // Throws

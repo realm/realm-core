@@ -148,9 +148,8 @@ if(REALM_TEST_LOGGING)
         target_compile_definitions(ObjectStoreTests PRIVATE
             TEST_LOGGING_LEVEL=${REALM_TEST_LOGGING_LEVEL}
         )
-    else()
-        message(STATUS "Test logging enabled")
     endif()
+    message(STATUS "Test logging enabled")
 endif()
 
 target_include_directories(ObjectStoreTests PRIVATE
@@ -200,4 +199,7 @@ if(NOT APPLE AND NOT EMSCRIPTEN AND NOT WINDOWS_STORE)
 endif()
 
 add_subdirectory(notifications-fuzzer)
-add_subdirectory(benchmarks)
+
+if(NOT EMSCRIPTEN AND NOT WINDOWS_STORE)
+    add_subdirectory(benchmarks)
+endif()

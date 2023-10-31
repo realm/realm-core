@@ -25,6 +25,7 @@
 #include <set>
 
 #include <realm/array.hpp>
+#include <realm/column_integer.hpp>
 #include <realm/search_index.hpp>
 
 /*
@@ -248,7 +249,6 @@ private:
     void do_delete(ObjKey key, StringData, size_t offset);
 
     Mixed get(ObjKey key) const;
-
     void node_add_key(ref_type ref);
 
 #ifdef REALM_DEBUG
@@ -267,8 +267,12 @@ public:
     {
     }
 
-    bool operator()(int64_t key_value, Mixed needle);
-    bool operator()(Mixed needle, int64_t key_value);
+    bool operator()(int64_t key_value, const Mixed& b);
+    bool operator()(const Mixed& a, int64_t key_value);
+
+    IntegerColumn::const_iterator find_start_of_unsorted(const Mixed& value, const IntegerColumn& key_values) const;
+    IntegerColumn::const_iterator find_end_of_unsorted(const Mixed& value, const IntegerColumn& key_values,
+                                                       IntegerColumn::const_iterator begin) const;
 
 private:
     const ClusterColumn m_column;

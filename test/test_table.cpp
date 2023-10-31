@@ -5366,7 +5366,7 @@ TEST(Table_LoggingMutations)
     SHARED_GROUP_TEST_PATH(path);
     DBOptions options;
     options.logger = std::make_shared<StreamLogger>(buffer);
-    options.logger->set_level_threshold(util::Logger::Level::all);
+    options.logger->set_level_threshold("Realm", util::Logger::Level::all);
     auto db = DB::create(make_in_realm_history(), path, options);
     ColKey col;
     ColKey col_int;
@@ -5414,7 +5414,7 @@ TEST(Table_LoggingMutations)
     CHECK(str.find("abcdefghijklmno ...") != std::string::npos);
     CHECK(str.find("14 15 16 17 18 19 ...") != std::string::npos);
     CHECK(str.find("2023-09-20 10:53:35") != std::string::npos);
-    CHECK(str.find("Query::get_description() failed:") != std::string::npos);
+    CHECK(str.find("VIEW { 6 element(s) }") != std::string::npos);
     CHECK(str.find("Set 'any' to dictionary") != std::string::npos);
     CHECK(str.find("Set 'any' to list") != std::string::npos);
     CHECK(str.find("Set 'any' to set") != std::string::npos);

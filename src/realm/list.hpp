@@ -490,7 +490,7 @@ public:
 
     bool nullify(ObjLink);
     bool replace_link(ObjLink old_link, ObjLink replace_link);
-    void remove_backlinks(CascadeState& state) const;
+    bool remove_backlinks(CascadeState& state) const;
     TableRef get_table() const noexcept override
     {
         return get_obj().get_table();
@@ -548,6 +548,7 @@ private:
 
         return unresolved_to_null(m_tree->get(ndx));
     }
+    bool clear_backlink(size_t ndx, CascadeState& state) const;
 };
 
 // Specialization of Lst<ObjKey>:

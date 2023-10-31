@@ -137,7 +137,7 @@ public:
     void nullify(size_t);
     bool nullify(ObjLink target_link);
     bool replace_link(ObjLink old_link, ObjLink replace_link);
-    void remove_backlinks(CascadeState& state) const;
+    bool remove_backlinks(CascadeState& state) const;
     size_t find_first(Mixed value) const;
 
     void clear() final;
@@ -242,7 +242,7 @@ private:
     size_t do_find_key(Mixed key) const noexcept;
     std::pair<size_t, Mixed> find_impl(Mixed key) const noexcept;
     std::pair<Mixed, Mixed> do_get_pair(size_t ndx) const;
-    bool clear_backlink(Mixed value, CascadeState& state) const;
+    bool clear_backlink(size_t ndx, CascadeState& state) const;
     void align_indices(std::vector<size_t>& indices) const;
     void swap_content(Array& fields1, Array& fields2, size_t index1, size_t index2);
 

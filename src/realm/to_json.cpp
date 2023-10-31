@@ -146,8 +146,9 @@ void Dictionary::insert_json(const std::string& key, const T& value)
             }
             break;
         }
+        case Json::value_t::binary:
         case Json::value_t::discarded:
-            REALM_TERMINATE("should never see discarded");
+            REALM_TERMINATE("should never see discarded or binary");
     }
 }
 
@@ -189,8 +190,9 @@ void Lst<Mixed>::add_json(const T& value)
             }
             break;
         }
+        case Json::value_t::binary:
         case Json::value_t::discarded:
-            REALM_TERMINATE("should never see discarded");
+            REALM_TERMINATE("should never see discarded or binary");
     }
 }
 
@@ -230,6 +232,8 @@ Obj& Obj::set_json(ColKey col_key, StringData json)
                 list.add_json(elem);
             }
         } break;
+        case Json::value_t::binary:
+            // Parser will never return binary
         case Json::value_t::discarded:
             throw InvalidArgument(ErrorCodes::MalformedJson, "Illegal json");
     }

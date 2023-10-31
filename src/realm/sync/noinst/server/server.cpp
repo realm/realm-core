@@ -704,7 +704,8 @@ inline void ServerFile::group_finalize_work_stage_2()
 // transactions, but only on subtier nodes of a star topology server cluster.
 class Worker : public ServerHistory::Context {
 public:
-    util::PrefixLogger logger;
+    std::shared_ptr<util::Logger> logger_ptr;
+    util::Logger& logger;
 
     explicit Worker(ServerImpl&);
 
@@ -1088,7 +1089,8 @@ public:
                    std::unique_ptr<network::ssl::Stream>&& ssl_stream,
                    std::unique_ptr<network::ReadAheadBuffer>&& read_ahead_buffer, int client_protocol_version,
                    std::string client_user_agent, std::string remote_endpoint, std::string appservices_request_id)
-        : logger_ptr{std::make_shared<util::PrefixLogger>(make_logger_prefix(id), serv.logger_ptr)} // Throws
+        : logger_ptr{std::make_shared<util::PrefixLogger>(util::LogCategory::server, make_logger_prefix(id),
+                                                          serv.logger_ptr)} // Throws
         , logger{*logger_ptr}
         , m_server{serv}
         , m_id{id}
@@ -1407,7 +1409,7 @@ private:
     void handle_pong_output_buffer();
 
     void initiate_write_error(ProtocolError, session_ident_type);
-    void handle_write_error();
+    void handle_write_error(std::error_code ec);
 
     void do_initiate_soft_close(ProtocolError, session_ident_type);
     void read_error(std::error_code);
@@ -1469,7 +1471,8 @@ public:
     util::Logger& logger;
 
     HTTPConnection(ServerImpl& serv, int_fast64_t id, bool is_ssl)
-        : logger_ptr{std::make_shared<PrefixLogger>(make_logger_prefix(id), serv.logger_ptr)} // Throws
+        : logger_ptr{std::make_shared<PrefixLogger>(util::LogCategory::server, make_logger_prefix(id),
+                                                    serv.logger_ptr)} // Throws
         , logger{*logger_ptr}
         , m_server{serv}
         , m_id{id}
@@ -2098,7 +2101,7 @@ public:
     util::PrefixLogger logger;
 
     Session(SyncConnection& conn, session_ident_type session_ident)
-        : logger{make_logger_prefix(session_ident), conn.logger_ptr} // Throws
+        : logger{util::LogCategory::server, make_logger_prefix(session_ident), conn.logger_ptr} // Throws
         , m_connection{conn}
         , m_session_ident{session_ident}
     {
@@ -3218,8 +3221,8 @@ void SessionQueue::clear() noexcept
 
 ServerFile::ServerFile(ServerImpl& server, ServerFileAccessCache& cache, const std::string& virt_path,
                        std::string real_path, bool disable_sync_to_disk)
-    : logger{"ServerFile[" + virt_path + "]: ", server.logger_ptr}           // Throws
-    , wlogger{"ServerFile[" + virt_path + "]: ", server.get_worker().logger} // Throws
+    : logger{util::LogCategory::server, "ServerFile[" + virt_path + "]: ", server.logger_ptr}               // Throws
+    , wlogger{util::LogCategory::server, "ServerFile[" + virt_path + "]: ", server.get_worker().logger_ptr} // Throws
     , m_server{server}
     , m_file{cache, real_path, virt_path, false, disable_sync_to_disk} // Throws
     , m_worker_file{server.get_worker().get_file_access_cache(), real_path, virt_path, true, disable_sync_to_disk}
@@ -3754,7 +3757,9 @@ void ServerFile::finalize_work_stage_2()
 // ============================ Worker implementation ============================
 
 Worker::Worker(ServerImpl& server)
-    : logger{"Worker: ", server.logger_ptr} // Throws
+    : logger_ptr{std::make_shared<util::PrefixLogger>(util::LogCategory::server, "Worker: ", server.logger_ptr)}
+    // Throws
+    , logger(*logger_ptr)
     , m_server{server}
     , m_transformer{make_transformer()} // Throws
     , m_file_access_cache{server.get_config().max_open_files, logger, *this, server.get_config().encryption_key}
@@ -3820,9 +3825,8 @@ void Worker::stop() noexcept
 
 // ============================ ServerImpl implementation ============================
 
-
 ServerImpl::ServerImpl(const std::string& root_dir, util::Optional<sync::PKey> pkey, Server::Config config)
-    : logger_ptr{config.logger ? std::move(config.logger) : std::make_shared<util::StderrLogger>()}
+    : logger_ptr{std::make_shared<util::CategoryLogger>(util::LogCategory::server, std::move(config.logger))}
     , logger{*logger_ptr}
     , m_config{std::move(config)}
     , m_max_upload_backlog{determine_max_upload_backlog(config)}
@@ -4587,8 +4591,10 @@ void SyncConnection::send_next_message()
 
 void SyncConnection::initiate_write_output_buffer()
 {
-    auto handler = [this]() {
-        handle_write_output_buffer();
+    auto handler = [this](std::error_code ec, size_t) {
+        if (!ec) {
+            handle_write_output_buffer();
+        }
     };
 
     m_websocket.async_write_binary(m_output_buffer.data(), m_output_buffer.size(),
@@ -4599,8 +4605,10 @@ void SyncConnection::initiate_write_output_buffer()
 
 void SyncConnection::initiate_pong_output_buffer()
 {
-    auto handler = [this]() {
-        handle_pong_output_buffer();
+    auto handler = [this](std::error_code ec, size_t) {
+        if (!ec) {
+            handle_pong_output_buffer();
+        }
     };
 
     REALM_ASSERT(!m_is_sending);
@@ -4669,20 +4677,19 @@ void SyncConnection::initiate_write_error(ProtocolError error_code, session_iden
     get_server_protocol().make_error_message(protocol_version, out, error_code, message, message_size, try_again,
                                              session_ident); // Throws
 
-    auto handler = [this]() {
-        handle_write_error(); // Throws
+    auto handler = [this](std::error_code ec, size_t) {
+        handle_write_error(ec); // Throws
     };
     m_websocket.async_write_binary(out.data(), out.size(), std::move(handler));
     m_is_sending = true;
 }
 
 
-void SyncConnection::handle_write_error()
+void SyncConnection::handle_write_error(std::error_code ec)
 {
     m_is_sending = false;
     REALM_ASSERT(m_is_closing);
     if (!m_ssl_stream) {
-        std::error_code ec;
         m_socket->shutdown(network::Socket::shutdown_send, ec);
         if (ec && ec != make_basic_system_error_code(ENOTCONN))
             throw std::system_error(ec);

@@ -23,6 +23,7 @@
 #include <realm/dictionary.hpp>
 #include <realm/table_view.hpp>
 #include <realm/group_writer.hpp>
+
 namespace {
 
 using namespace realm;
@@ -166,8 +167,8 @@ Transaction::Transaction(DBRef _db, SlabAlloc* alloc, DB::ReadLockInfo& rli, DB:
     attach_shared(m_read_lock.m_top_ref, m_read_lock.m_file_size, writable,
                   VersionID{rli.m_version, rli.m_reader_idx});
     if (db->m_logger) {
-        db->m_logger->log(util::Logger::Level::trace, "Start %1 %2: %3 ref %4", log_stage[stage], m_log_id,
-                          rli.m_version, m_read_lock.m_top_ref);
+        db->m_logger->log(util::LogCategory::transaction, util::Logger::Level::trace, "Start %1 %2: %3 ref %4",
+                          log_stage[stage], m_log_id, rli.m_version, m_read_lock.m_top_ref);
     }
 }
 
@@ -323,8 +324,8 @@ VersionID Transaction::commit_and_continue_as_read(bool commit_to_disk)
     }
     catch (std::exception& e) {
         if (db->m_logger) {
-            db->m_logger->log(util::Logger::Level::error, "Tr %1: Commit failed with exception: \"%2\"", m_log_id,
-                              e.what());
+            db->m_logger->log(util::LogCategory::transaction, util::Logger::Level::error,
+                              "Tr %1: Commit failed with exception: \"%2\"", m_log_id, e.what());
         }
         // In case of failure, further use of the transaction for reading is unsafe
         set_transact_stage(DB::transact_Ready);
@@ -535,6 +536,10 @@ void Transaction::upgrade_file_format(int target_file_format_version)
     int current_file_format_version = get_file_format_version();
     REALM_ASSERT(current_file_format_version < target_file_format_version);
 
+    if (auto logger = get_logger()) {
+        logger->info("Upgrading from file format version %1 to %2", current_file_format_version,
+                     target_file_format_version);
+    }
     // Ensure we have search index on all primary key columns.
     auto table_keys = get_table_keys();
     if (current_file_format_version < 22) {
@@ -566,9 +571,12 @@ void Transaction::upgrade_file_format(int target_file_format_version)
         for (auto k : table_keys) {
             auto t = get_table(k);
             t->free_collision_table();
+            t->migrate_set_orderings(); // rewrite sets to use the new string/binary order
+            // Although StringIndex sort order has been changed in this format, we choose to
+            // avoid upgrading them because it affects a small niche case. Instead, there is a
+            // workaround in the String Index search code for not relying on items being ordered.
         }
     }
-
     // NOTE: Additional future upgrade steps go here.
 }
 
@@ -657,8 +665,8 @@ void Transaction::complete_async_commit()
     try {
         read_lock = db->grab_read_lock(DB::ReadLockInfo::Live, VersionID());
         if (db->m_logger) {
-            db->m_logger->log(util::Logger::Level::trace, "Tr %1: Committing ref %2 to disk", m_log_id,
-                              read_lock.m_top_ref);
+            db->m_logger->log(util::LogCategory::transaction, util::Logger::Level::trace,
+                              "Tr %1: Committing ref %2 to disk", m_log_id, read_lock.m_top_ref);
         }
         GroupCommitter out(*this);
         out.commit(read_lock.m_top_ref); // Throws
@@ -673,8 +681,8 @@ void Transaction::complete_async_commit()
     catch (const std::exception& e) {
         m_commit_exception = std::current_exception();
         if (db->m_logger) {
-            db->m_logger->log(util::Logger::Level::error, "Tr %1: Committing to disk failed with exception: \"%2\"",
-                              m_log_id, e.what());
+            db->m_logger->log(util::LogCategory::transaction, util::Logger::Level::error,
+                              "Tr %1: Committing to disk failed with exception: \"%2\"", m_log_id, e.what());
         }
         m_async_commit_has_failed = true;
         db->release_read_lock(read_lock);
@@ -793,7 +801,7 @@ void Transaction::acquire_write_lock()
 void Transaction::do_end_read() noexcept
 {
     if (db->m_logger)
-        db->m_logger->log(util::Logger::Level::trace, "End transaction %1", m_log_id);
+        db->m_logger->log(util::LogCategory::transaction, util::Logger::Level::trace, "End transaction %1", m_log_id);
 
     prepare_for_close();
     detach();
