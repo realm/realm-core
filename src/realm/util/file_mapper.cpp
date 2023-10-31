@@ -795,6 +795,15 @@ void* mmap(const FileAttributes& file, size_t size, size_t offset)
         }
 
         void* addr = ::mmap(nullptr, size, prot, MAP_SHARED, file.fd, offset);
+        // if(::madvise(addr, size, MADV_NORMAL) == -1) {
+        // if(::madvise(addr, size, MADV_SEQUENTIAL) == -1) {
+        // if(::madvise(addr, size, MADV_RANDOM) == -1) {
+        if (::madvise(addr, size, MADV_WILLNEED) == -1) {
+            // if(::madvise(addr, size, MADV_DONTNEED) == -1) {
+            // if(::madvise(addr, size, MADV_FREE) == -1) {
+            throw SystemError(errno, get_errno_msg("madvise() failed: ", errno).c_str());
+        }
+
         if (addr != MAP_FAILED)
             return addr;
 
