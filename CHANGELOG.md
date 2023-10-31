@@ -20,6 +20,7 @@
 
 ### Internals
 * REALM_[ATMU]SAN cmake flags no longer override compilation options and can be combined with Debug|RelWithDebInfo|etc. build types. Rel[ATMU]SAN build type shortcuts are now all slightly optimized debug-based builds with sanitizers. REALM_ASAN now works with msvc (2019/2022) builds. ([PR #6911](https://github.com/realm/realm-core/pull/6911))
+* Remove ArrayWithFind's ability to use a templated callback parameter. The QueryStateBase consumers now use an index and the array leaf to get the actual value if needed. This allows certain queries such as count() to not do as many lookups to the actual values and results in a small performance gain. Also remove `find_action_pattern()` which was unused for a long time. This reduction in templating throughout the query system produces a small (~100k) binary size reduction. ([#7095](https://github.com/realm/realm-core/pull/7095))
 
 ----------------------------------------------
 
