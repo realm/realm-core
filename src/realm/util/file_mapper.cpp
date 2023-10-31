@@ -509,8 +509,9 @@ void* mmap_anon(size_t size, const char* cause)
     return (void*)pBuf;
 #else
     void* addr = ::mmap(nullptr, size, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0);
-    if ((std::rand() % 100) == 42)
-        dump_logged_mappings();
+    // optionally use this to trigger a dump
+    // if ((std::rand() % 100) == 42)
+    //    dump_logged_mappings();
     if (addr == MAP_FAILED) {
         auto dump = dump_logged_mappings();
         int err = errno; // Eliminate any risk of clobbering
