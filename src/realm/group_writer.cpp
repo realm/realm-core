@@ -152,7 +152,7 @@ bool WriteWindowMgr::MapWindow::extends_to_match(util::File& f, ref_type start_r
     size_t window_size = get_window_size(f, start_ref, size);
     m_map.sync();
     m_map.unmap();
-    m_map.map(f, File::access_ReadWrite, window_size, 0, m_base_ref);
+    m_map.map("block wr", f, File::access_ReadWrite, window_size, 0, m_base_ref);
     return true;
 }
 
@@ -162,7 +162,7 @@ WriteWindowMgr::MapWindow::MapWindow(size_t alignment, util::File& f, ref_type s
 {
     m_base_ref = aligned_to_mmap_block(start_ref);
     size_t window_size = get_window_size(f, start_ref, size);
-    m_map.map(f, File::access_ReadWrite, window_size, 0, m_base_ref);
+    m_map.map("block wr", f, File::access_ReadWrite, window_size, 0, m_base_ref);
 #if REALM_ENABLE_ENCRYPTION
     if (auto p = m_map.get_encrypted_mapping())
         p->set_marker(write_marker);

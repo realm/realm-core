@@ -3124,7 +3124,7 @@ TEST(Shared_LockFileOfWrongSizeThrows)
         // On Windows, we implement a shared lock on a file by locking the first byte of the file. Since
         // you cannot write to a locked region using WriteFile(), we use memory mapping which works fine, and
         // which is also the same method used by the .lock file initialization in SharedGroup::do_open()
-        char* mem = static_cast<char*>(f.map(realm::util::File::access_ReadWrite, 1));
+        char* mem = static_cast<char*>(f.map("", realm::util::File::access_ReadWrite, 1));
 
         // set init_complete flag to 1 and sync
         mem[0] = 1;

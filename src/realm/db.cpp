@@ -776,7 +776,7 @@ public:
             auto new_size = static_cast<size_t>(m_file.get_size());
             REALM_ASSERT(new_size > size);
             size = new_size;
-            m_reader_map.remap(m_file, File::access_ReadWrite, size, File::map_NoSync);
+            m_reader_map.remap("versions", m_file, File::access_ReadWrite, size, File::map_NoSync);
             m_info = m_reader_map.get_addr();
 
             std::lock_guard lock(m_mutex);
@@ -789,8 +789,8 @@ public:
     void expand_version_list(unsigned new_entries) override REQUIRES(m_info_mutex)
     {
         size_t new_info_size = sizeof(SharedInfo) + m_info->readers.compute_required_space(new_entries);
-        m_file.prealloc(new_info_size);                                          // Throws
-        m_reader_map.remap(m_file, util::File::access_ReadWrite, new_info_size); // Throws
+        m_file.prealloc(new_info_size);                                                      // Throws
+        m_reader_map.remap("versions", m_file, util::File::access_ReadWrite, new_info_size); // Throws
         m_info = m_reader_map.get_addr();
     }
 
@@ -807,7 +807,7 @@ private:
         if (new_max_entry > m_local_max_entry) {
             // handle mapping expansion if required
             size_t info_size = sizeof(DB::SharedInfo) + m_info->readers.compute_required_space(new_max_entry);
-            m_reader_map.remap(m_file, util::File::access_ReadWrite, info_size); // Throws
+            m_reader_map.remap("versions", m_file, util::File::access_ReadWrite, info_size); // Throws
             m_local_max_entry = new_max_entry;
             m_info = m_reader_map.get_addr();
         }
@@ -982,7 +982,7 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions& opt
             // get the exclusive lock because we hold it, and hence were
             // waiting for the shared lock instead, to observe and use an
             // old lock file.
-            m_file_map.map(m_file, File::access_ReadWrite, sizeof(SharedInfo), File::map_NoSync); // Throws
+            m_file_map.map("meta", m_file, File::access_ReadWrite, sizeof(SharedInfo), File::map_NoSync); // Throws
             File::UnmapGuard fug(m_file_map);
             SharedInfo* info = m_file_map.get_addr();
 
@@ -1047,7 +1047,7 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions& opt
         // the SharedInfo struct, or less if the file is smaller. We know that
         // we have at least one byte, and that is enough to read the
         // `init_complete` flag.
-        m_file_map.map(m_file, File::access_ReadWrite, info_size, File::map_NoSync);
+        m_file_map.map("meta", m_file, File::access_ReadWrite, info_size, File::map_NoSync);
         File::UnmapGuard fug_1(m_file_map);
         SharedInfo* info = m_file_map.get_addr();
 

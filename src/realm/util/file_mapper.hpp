@@ -34,6 +34,7 @@ namespace util {
 struct FileAttributes {
     FileDesc fd;
     std::string path;
+    const char* cause;
     File::AccessMode access;
     const char* encryption_key = nullptr;
 };
@@ -45,7 +46,7 @@ void* mmap_reserve(const FileAttributes& fd, size_t size, size_t offset);
 void munmap(void* addr, size_t size);
 void* mremap(const FileAttributes& file, size_t file_offset, void* old_addr, size_t old_size, size_t new_size);
 void msync(FileDesc fd, void* addr, size_t size);
-void* mmap_anon(size_t size);
+void* mmap_anon(size_t size, const char* cause);
 
 // A function which may be given to encryption_read_barrier. If present, the read barrier is a
 // a barrier for a full array. If absent, the read barrier is a barrier only for the address

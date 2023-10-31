@@ -427,9 +427,13 @@ public:
     ///
     /// Calling this function with a size that is greater than the
     /// size of the file has undefined behavior.
-    void* map(AccessMode, size_t size, int map_flags = 0, size_t offset = 0) const;
-    void* map_fixed(AccessMode, void* address, size_t size, int map_flags = 0, size_t offset = 0) const;
-    void* map_reserve(AccessMode, size_t size, size_t offset) const;
+    ///
+    /// The 'cause' parameter is a short explanation of the cause of the
+    /// allocation. For debugging purposes.
+    void* map(const char* cause, AccessMode, size_t size, int map_flags = 0, size_t offset = 0) const;
+    void* map_fixed(const char* cause, AccessMode, void* address, size_t size, int map_flags = 0,
+                    size_t offset = 0) const;
+    void* map_reserve(const char* cause, AccessMode, size_t size, size_t offset) const;
     /// The same as unmap(old_addr, old_size) followed by map(a,
     /// new_size, map_flags), but more efficient on some systems.
     ///
@@ -442,11 +446,12 @@ public:
     ///
     /// If this function throws, the old address range will remain
     /// mapped.
-    void* remap(void* old_addr, size_t old_size, AccessMode a, size_t new_size, int map_flags = 0,
+    void* remap(const char* cause, void* old_addr, size_t old_size, AccessMode a, size_t new_size, int map_flags = 0,
                 size_t file_offset = 0) const;
 
 #if REALM_ENABLE_ENCRYPTION
-    void* map(AccessMode, size_t size, EncryptedFileMapping*& mapping, int map_flags = 0, size_t offset = 0) const;
+    void* map(const char* cause, AccessMode, size_t size, EncryptedFileMapping*& mapping, int map_flags = 0,
+              size_t offset = 0) const;
 #endif
     /// Unmap the specified address range which must have been
     /// previously returned by map().
@@ -656,9 +661,13 @@ private:
         mutable size_t m_size = 0;
         size_t m_reservation_size = 0;
         size_t m_offset = 0;
-        FileDesc m_fd;
+#ifdef _WIN32
+        FileDesc m_fd = nullptr;
+#else
+        FileDesc m_fd = -1;
+#endif
         AccessMode m_access_mode = access_ReadOnly;
-        std::string m_path = "gylle";
+        std::string m_path = "na";
 
         MapBase() = default;
         ~MapBase() noexcept;
@@ -669,13 +678,13 @@ private:
         MapBase& operator=(const MapBase&) = delete;
 
         // Use
-        void map(const File&, AccessMode, size_t size, int map_flags, size_t offset = 0,
+        void map(const char* cause, const File&, AccessMode, size_t size, int map_flags, size_t offset = 0,
                  util::WriteObserver* observer = nullptr);
         // reserve address space for later mapping operations.
         // returns false if reservation can't be done.
-        bool try_reserve(const File&, AccessMode, size_t size, size_t offset = 0,
+        bool try_reserve(const char* cause, const File&, AccessMode, size_t size, size_t offset = 0,
                          util::WriteObserver* observer = nullptr);
-        void remap(const File&, AccessMode, size_t size, int map_flags);
+        void remap(const char* cause, const File&, AccessMode, size_t size, int map_flags);
         void unmap() noexcept;
         // fully update any process shared representation (e.g. buffer cache).
         // other processes will be able to see changes, but a full platform crash
@@ -683,7 +692,7 @@ private:
         void flush();
         // try to extend the mapping in-place. Virtual address space must have
         // been set aside earlier by a call to reserve()
-        bool try_extend_to(size_t size) noexcept;
+        bool try_extend_to(const char* cause, size_t size) noexcept;
         // fully synchronize any underlying storage. After completion, a full platform
         // crash will *not* have lost data.
         void sync();
@@ -722,11 +731,11 @@ template <class T>
 class File::Map : private MapBase {
 public:
     /// Equivalent to calling map() on a default constructed instance.
-    explicit Map(const File&, AccessMode = access_ReadOnly, size_t size = sizeof(T), int map_flags = 0,
-                 util::WriteObserver* observer = nullptr);
+    explicit Map(const char* cause, const File&, AccessMode = access_ReadOnly, size_t size = sizeof(T),
+                 int map_flags = 0, util::WriteObserver* observer = nullptr);
 
-    explicit Map(const File&, size_t offset, AccessMode = access_ReadOnly, size_t size = sizeof(T), int map_flags = 0,
-                 util::WriteObserver* observer = nullptr);
+    explicit Map(const char* cause, const File&, size_t offset, AccessMode = access_ReadOnly, size_t size = sizeof(T),
+                 int map_flags = 0, util::WriteObserver* observer = nullptr);
 
     /// Create an instance that is not initially attached to a memory
     /// mapped file.
@@ -770,16 +779,16 @@ public:
     /// attached to a memory mapped file has undefined behavior. The
     /// returned pointer is the same as what will subsequently be
     /// returned by get_addr().
-    T* map(const File&, AccessMode = access_ReadOnly, size_t size = sizeof(T), int map_flags = 0, size_t offset = 0,
-           util::WriteObserver* observer = nullptr);
+    T* map(const char* cause, const File&, AccessMode = access_ReadOnly, size_t size = sizeof(T), int map_flags = 0,
+           size_t offset = 0, util::WriteObserver* observer = nullptr);
 
     /// See File::unmap(). This function is idempotent, that is, it is
     /// valid to call it regardless of whether this instance is
     /// currently attached to a memory mapped file.
     void unmap() noexcept;
 
-    bool try_reserve(const File&, AccessMode a = access_ReadOnly, size_t size = sizeof(T), size_t offset = 0,
-                     util::WriteObserver* observer = nullptr);
+    bool try_reserve(const char* cause, const File&, AccessMode a = access_ReadOnly, size_t size = sizeof(T),
+                     size_t offset = 0, util::WriteObserver* observer = nullptr);
 
     /// See File::remap().
     ///
@@ -787,10 +796,11 @@ public:
     /// to a memory mapped file is equivalent to calling map(). The returned
     /// pointer is the same as what will subsequently be returned by
     /// get_addr().
-    T* remap(const File&, AccessMode = access_ReadOnly, size_t size = sizeof(T), int map_flags = 0);
+    T* remap(const char* cause, const File&, AccessMode = access_ReadOnly, size_t size = sizeof(T),
+             int map_flags = 0);
 
     /// Try to extend the existing mapping to a given size
-    bool try_extend_to(size_t size) noexcept;
+    bool try_extend_to(const char* cause, size_t size) noexcept;
 
     /// See File::sync_map().
     ///
@@ -1107,16 +1117,17 @@ inline File::MapBase::~MapBase() noexcept
 
 
 template <class T>
-inline File::Map<T>::Map(const File& f, AccessMode a, size_t size, int map_flags, util::WriteObserver* observer)
+inline File::Map<T>::Map(const char* cause, const File& f, AccessMode a, size_t size, int map_flags,
+                         util::WriteObserver* observer)
 {
-    map(f, a, size, map_flags, 0, observer);
+    map(cause, f, a, size, map_flags, 0, observer);
 }
 
 template <class T>
-inline File::Map<T>::Map(const File& f, size_t offset, AccessMode a, size_t size, int map_flags,
+inline File::Map<T>::Map(const char* cause, const File& f, size_t offset, AccessMode a, size_t size, int map_flags,
                          util::WriteObserver* observer)
 {
-    map(f, a, size, map_flags, offset, observer);
+    map(cause, f, a, size, map_flags, offset, observer);
 }
 
 template <class T>
@@ -1125,18 +1136,18 @@ inline File::Map<T>::Map() noexcept
 }
 
 template <class T>
-inline T* File::Map<T>::map(const File& f, AccessMode a, size_t size, int map_flags, size_t offset,
+inline T* File::Map<T>::map(const char* cause, const File& f, AccessMode a, size_t size, int map_flags, size_t offset,
                             util::WriteObserver* observer)
 {
-    MapBase::map(f, a, size, map_flags, offset, observer);
+    MapBase::map(cause, f, a, size, map_flags, offset, observer);
     return static_cast<T*>(m_addr);
 }
 
 template <class T>
-inline bool File::Map<T>::try_reserve(const File& f, AccessMode a, size_t size, size_t offset,
+inline bool File::Map<T>::try_reserve(const char* cause, const File& f, AccessMode a, size_t size, size_t offset,
                                       util::WriteObserver* observer)
 {
-    return MapBase::try_reserve(f, a, size, offset, observer);
+    return MapBase::try_reserve(cause, f, a, size, offset, observer);
 }
 
 template <class T>
@@ -1146,20 +1157,20 @@ inline void File::Map<T>::unmap() noexcept
 }
 
 template <class T>
-inline T* File::Map<T>::remap(const File& f, AccessMode a, size_t size, int map_flags)
+inline T* File::Map<T>::remap(const char* cause, const File& f, AccessMode a, size_t size, int map_flags)
 {
     // MapBase::remap(f, a, size, map_flags);
     // missing sync() here?
     unmap();
-    map(f, a, size, map_flags);
+    map(cause, f, a, size, map_flags);
 
     return static_cast<T*>(m_addr);
 }
 
 template <class T>
-inline bool File::Map<T>::try_extend_to(size_t size) noexcept
+inline bool File::Map<T>::try_extend_to(const char* cause, size_t size) noexcept
 {
-    return MapBase::try_extend_to(sizeof(T) * size);
+    return MapBase::try_extend_to(cause, sizeof(T) * size);
 }
 
 template <class T>

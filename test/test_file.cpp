@@ -134,7 +134,7 @@ TEST(File_Map)
         f.set_encryption_key(crypt_key());
         f.resize(len);
 
-        File::Map<char> map(f, File::access_ReadWrite, len);
+        File::Map<char> map("", f, File::access_ReadWrite, len);
         realm::util::encryption_read_barrier(map, 0, len);
         memcpy(map.get_addr(), data, len);
         realm::util::encryption_write_barrier(map, 0, len);
@@ -142,7 +142,7 @@ TEST(File_Map)
     {
         File f(path, File::mode_Read);
         f.set_encryption_key(crypt_key());
-        File::Map<char> map(f, File::access_ReadOnly, len);
+        File::Map<char> map("", f, File::access_ReadOnly, len);
         realm::util::encryption_read_barrier(map, 0, len);
         CHECK(memcmp(map.get_addr(), data, len) == 0);
     }
@@ -160,7 +160,7 @@ TEST(File_MapMultiplePages)
         f.set_encryption_key(crypt_key());
         f.resize(count * sizeof(size_t));
 
-        File::Map<size_t> map(f, File::access_ReadWrite, count * sizeof(size_t));
+        File::Map<size_t> map("", f, File::access_ReadWrite, count * sizeof(size_t));
         realm::util::encryption_read_barrier(map, 0, count);
         for (size_t i = 0; i < count; ++i)
             map.get_addr()[i] = i;
@@ -169,7 +169,7 @@ TEST(File_MapMultiplePages)
     {
         File f(path, File::mode_Read);
         f.set_encryption_key(crypt_key());
-        File::Map<size_t> map(f, File::access_ReadOnly, count * sizeof(size_t));
+        File::Map<size_t> map("", f, File::access_ReadOnly, count * sizeof(size_t));
         realm::util::encryption_read_barrier(map, 0, count);
         for (size_t i = 0; i < count; ++i) {
             CHECK_EQUAL(map.get_addr()[i], i);
@@ -193,8 +193,8 @@ TEST(File_ReaderAndWriter)
     reader.set_encryption_key(crypt_key());
     CHECK_EQUAL(writer.get_size(), reader.get_size());
 
-    File::Map<size_t> write(writer, File::access_ReadWrite, count * sizeof(size_t));
-    File::Map<size_t> read(reader, File::access_ReadOnly, count * sizeof(size_t));
+    File::Map<size_t> write("", writer, File::access_ReadWrite, count * sizeof(size_t));
+    File::Map<size_t> read("", reader, File::access_ReadOnly, count * sizeof(size_t));
 
     for (size_t i = 0; i < count; i += 100) {
         realm::util::encryption_read_barrier(write, i, 1);
@@ -221,7 +221,7 @@ TEST(File_Offset)
         f.resize(page_count * size);
 
         for (size_t i = 0; i < page_count; ++i) {
-            File::Map<size_t> map(f, i * size, File::access_ReadWrite, size);
+            File::Map<size_t> map("", f, i * size, File::access_ReadWrite, size);
             for (size_t j = 0; j < count_per_page; ++j) {
                 realm::util::encryption_read_barrier(map, j, 1);
                 map.get_addr()[j] = i * size + j;
@@ -233,7 +233,7 @@ TEST(File_Offset)
         File f(path, File::mode_Read);
         f.set_encryption_key(crypt_key());
         for (size_t i = 0; i < page_count; ++i) {
-            File::Map<size_t> map(f, i * size, File::access_ReadOnly, size);
+            File::Map<size_t> map("", f, i * size, File::access_ReadOnly, size);
             for (size_t j = 0; j < count_per_page; ++j) {
                 realm::util::encryption_read_barrier(map, j);
                 CHECK_EQUAL(map.get_addr()[j], i * size + j);
@@ -265,8 +265,8 @@ TEST(File_MultipleWriters)
         w2.set_encryption_key(crypt_key());
         w2.resize(count * sizeof(size_t));
 
-        File::Map<size_t> map1(w1, File::access_ReadWrite, count * sizeof(size_t));
-        File::Map<size_t> map2(w2, File::access_ReadWrite, count * sizeof(size_t));
+        File::Map<size_t> map1("", w1, File::access_ReadWrite, count * sizeof(size_t));
+        File::Map<size_t> map2("", w2, File::access_ReadWrite, count * sizeof(size_t));
 
         // Place zeroes in selected places
         for (size_t i = 0; i < count; i += increments) {
@@ -288,7 +288,7 @@ TEST(File_MultipleWriters)
     File reader(path, File::mode_Read);
     reader.set_encryption_key(crypt_key());
 
-    File::Map<size_t> read(reader, File::access_ReadOnly, count * sizeof(size_t));
+    File::Map<size_t> read("", reader, File::access_ReadOnly, count * sizeof(size_t));
     realm::util::encryption_read_barrier(read, 0, count);
     for (size_t i = 0; i < count; i += increments) {
         CHECK_EQUAL(read.get_addr()[i], 2);
@@ -339,7 +339,7 @@ TEST(File_Resize)
     f.resize(page_size() * 2);
     CHECK_EQUAL(page_size() * 2, f.get_size());
     {
-        File::Map<unsigned char> m(f, File::access_ReadWrite, page_size() * 2);
+        File::Map<unsigned char> m("", f, File::access_ReadWrite, page_size() * 2);
         for (unsigned int i = 0; i < page_size() * 2; ++i) {
             realm::util::encryption_read_barrier(m, i, 1);
             m.get_addr()[i] = static_cast<unsigned char>(i);
@@ -361,7 +361,7 @@ TEST(File_Resize)
     f.resize(page_size());
     CHECK_EQUAL(page_size(), f.get_size());
     {
-        File::Map<unsigned char> m(f, File::access_ReadOnly, page_size());
+        File::Map<unsigned char> m("", f, File::access_ReadOnly, page_size());
         for (unsigned int i = 0; i < page_size(); ++i) {
             realm::util::encryption_read_barrier(m, i);
             CHECK_EQUAL(static_cast<unsigned char>(i), m.get_addr()[i]);
@@ -373,7 +373,7 @@ TEST(File_Resize)
     f.resize(page_size() * 2);
     CHECK_EQUAL(page_size() * 2, f.get_size());
     {
-        File::Map<unsigned char> m(f, File::access_ReadWrite, page_size() * 2);
+        File::Map<unsigned char> m("", f, File::access_ReadWrite, page_size() * 2);
         for (unsigned int i = 0; i < page_size() * 2; ++i) {
             realm::util::encryption_read_barrier(m, i, 1);
             m.get_addr()[i] = static_cast<unsigned char>(i);
@@ -381,7 +381,7 @@ TEST(File_Resize)
         }
     }
     {
-        File::Map<unsigned char> m(f, File::access_ReadOnly, page_size() * 2);
+        File::Map<unsigned char> m("", f, File::access_ReadOnly, page_size() * 2);
         for (unsigned int i = 0; i < page_size() * 2; ++i) {
             realm::util::encryption_read_barrier(m, i);
             CHECK_EQUAL(static_cast<unsigned char>(i), m.get_addr()[i]);
