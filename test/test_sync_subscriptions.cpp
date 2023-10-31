@@ -477,15 +477,15 @@ TEST(Sync_SubscriptionStoreNextPendingVersion)
     mut_sub_set.update_state(SubscriptionSet::State::Bootstrapping);
     mut_sub_set.commit();
 
-    auto pending_version = store->get_next_pending_version(0, DB::version_type{});
+    auto pending_version = store->get_next_pending_version(0);
     CHECK(pending_version);
     CHECK_EQUAL(pending_version->query_version, bootstrapping_set);
 
-    pending_version = store->get_next_pending_version(bootstrapping_set, DB::version_type{});
+    pending_version = store->get_next_pending_version(bootstrapping_set);
     CHECK(pending_set);
     CHECK_EQUAL(pending_version->query_version, pending_set);
 
-    pending_version = store->get_next_pending_version(pending_set, DB::version_type{});
+    pending_version = store->get_next_pending_version(pending_set);
     CHECK(!pending_version);
 }
 

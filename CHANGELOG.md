@@ -8,6 +8,7 @@
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Potential stack-use-after-scope issue on changesets integration with msvc-2019 and mpack code ([PR #6911](https://github.com/realm/realm-core/pull/6911))
 * Fix compilation with non-beta Xcode 15. Building for visionOS now requires explicitly specifying `-DCMAKE_XCODE_ATTRIBUTE_SDKROOT=xros` (PR [#7055](https://github.com/realm/realm-core/pull/7055)).
+* Fixed FLX subscriptions not being sent to the server if the session was interrupted during bootstrapping. ([#7077](https://github.com/realm/realm-core/issues/7077), since v11.8.0)
 
 ### Breaking changes
 * None.
