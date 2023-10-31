@@ -1230,7 +1230,7 @@ void SlabAlloc::update_reader_view(size_t file_size)
                                                                   section_size, 0, m_write_observer)});
                 }
                 else {
-                    new_mappings.push_back({util::File::Map<char>()});
+                    new_mappings.emplace_back(MapEntry());
                     auto& mapping = new_mappings.back().primary_mapping;
                     bool reserved = mapping.try_reserve(m_file, File::access_ReadOnly, 1 << section_shift,
                                                         section_start_offset, m_write_observer);
