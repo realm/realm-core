@@ -18,13 +18,12 @@
 
 /*
 Searching: The main finding function is:
-    template <class cond, Action action, size_t bitwidth>
+    template <class cond, size_t bitwidth>
     void find(int64_t value, size_t start, size_t end, size_t baseindex, QueryState *state) const
 
     cond:       One of Equal, NotEqual, Greater, etc. classes
-    Action:     One of act_ReturnFirst, act_FindAll, act_Max, etc, constants
 
-    find() will call QueryStateBase::match() for each search result If match()
+    find() will call QueryStateBase::match() for each search result. If match()
     returns false, find() will exit, otherwise it will keep searching remaining
     items in array.
 */
@@ -104,14 +103,16 @@ public:
 
     // Non-SSE find for Equal/NotEqual
     template <bool eq, size_t width>
-    inline bool compare_equality(int64_t value, size_t start, size_t end, size_t baseindex, QueryStateBase* state) const;
+    inline bool compare_equality(int64_t value, size_t start, size_t end, size_t baseindex,
+                                 QueryStateBase* state) const;
 
     // Non-SSE find for Less/Greater
     template <bool gt, size_t bitwidth>
     bool compare_relation(int64_t value, size_t start, size_t end, size_t baseindex, QueryStateBase* state) const;
 
     template <class cond, size_t foreign_width, size_t width>
-    bool compare_leafs_4(const Array* foreign, size_t start, size_t end, size_t baseindex, QueryStateBase* state) const;
+    bool compare_leafs_4(const Array* foreign, size_t start, size_t end, size_t baseindex,
+                         QueryStateBase* state) const;
 
     template <class cond>
     bool compare_leafs(const Array* foreign, size_t start, size_t end, size_t baseindex, QueryStateBase* state) const;
@@ -293,7 +294,8 @@ REALM_NOINLINE bool ArrayWithFind::find_all_will_match(size_t start2, size_t end
 // NotEqual, Less, etc) and call QueryStateBase::match() for each match. Break and
 // return if QueryStateBase::match() returns false or 'end' is reached.
 template <class cond, size_t bitwidth>
-bool ArrayWithFind::find_optimized(int64_t value, size_t start, size_t end, size_t baseindex, QueryStateBase* state) const
+bool ArrayWithFind::find_optimized(int64_t value, size_t start, size_t end, size_t baseindex,
+                                   QueryStateBase* state) const
 {
     REALM_ASSERT_DEBUG(start <= m_array.m_size && (end <= m_array.m_size || end == size_t(-1)) && start <= end);
 
@@ -335,9 +337,8 @@ bool ArrayWithFind::find_optimized(int64_t value, size_t start, size_t end, size
         __m128i* const b =
             reinterpret_cast<__m128i*>(round_down(m_array.m_data + end * bitwidth / 8, sizeof(__m128i)));
 
-        if (!compare<cond, bitwidth>(value, start2,
-                                               (reinterpret_cast<char*>(a) - m_array.m_data) * 8 / no0(bitwidth),
-                                               baseindex, state))
+        if (!compare<cond, bitwidth>(value, start2, (reinterpret_cast<char*>(a) - m_array.m_data) * 8 / no0(bitwidth),
+                                     baseindex, state))
             return false;
 
         // Search aligned area with SSE
@@ -358,9 +359,8 @@ bool ArrayWithFind::find_optimized(int64_t value, size_t start, size_t end, size
         }
 
         // Search remainder with compare_equality()
-        if (!compare<cond, bitwidth>(value,
-                                               (reinterpret_cast<char*>(b) - m_array.m_data) * 8 / no0(bitwidth), end,
-                                               baseindex, state))
+        if (!compare<cond, bitwidth>(value, (reinterpret_cast<char*>(b) - m_array.m_data) * 8 / no0(bitwidth), end,
+                                     baseindex, state))
             return false;
 
         return true;
@@ -641,15 +641,15 @@ inline bool ArrayWithFind::compare_equality(int64_t value, size_t start, size_t 
 template <class cond>
 bool ArrayWithFind::find(int64_t value, size_t start, size_t end, size_t baseindex, QueryStateBase* state) const
 {
-    REALM_TEMPEX2(return find_optimized, cond, m_array.m_width,
-                         (value, start, end, baseindex, state));
+    REALM_TEMPEX2(return find_optimized, cond, m_array.m_width, (value, start, end, baseindex, state));
 }
 
 #ifdef REALM_COMPILER_SSE
 // 'items' is the number of 16-byte SSE chunks. Returns index of packed element relative to first integer of first
 // chunk
 template <class cond, size_t width>
-bool ArrayWithFind::find_sse(int64_t value, __m128i* data, size_t items, QueryStateBase* state, size_t baseindex) const
+bool ArrayWithFind::find_sse(int64_t value, __m128i* data, size_t items, QueryStateBase* state,
+                             size_t baseindex) const
 {
     __m128i search = {0};
 
@@ -782,8 +782,7 @@ bool ArrayWithFind::compare_leafs(const Array* foreign, size_t start, size_t end
     }
 
     bool r;
-    REALM_TEMPEX2(r = compare_leafs, cond, m_array.m_width,
-                  (foreign, start, end, baseindex, state))
+    REALM_TEMPEX2(r = compare_leafs, cond, m_array.m_width, (foreign, start, end, baseindex, state))
     return r;
 }
 
@@ -846,8 +845,7 @@ bool ArrayWithFind::compare_leafs_4(const Array* foreign, size_t start, size_t e
                 __m128i* a = reinterpret_cast<__m128i*>(m_array.m_data + start * width / 8);
                 __m128i* b = reinterpret_cast<__m128i*>(foreign_m_data + start * width / 8);
 
-                bool continue_search =
-                    find_sse_intern<cond, width>(a, b, 1, state, baseindex + start);
+                bool continue_search = find_sse_intern<cond, width>(a, b, 1, state, baseindex + start);
 
                 if (!continue_search)
                     return false;
@@ -894,7 +892,8 @@ bool ArrayWithFind::compare(int64_t value, size_t start, size_t end, size_t base
 }
 
 template <bool gt, size_t bitwidth>
-bool ArrayWithFind::compare_relation(int64_t value, size_t start, size_t end, size_t baseindex, QueryStateBase* state) const
+bool ArrayWithFind::compare_relation(int64_t value, size_t start, size_t end, size_t baseindex,
+                                     QueryStateBase* state) const
 {
     REALM_ASSERT(start <= m_array.m_size && (end <= m_array.m_size || end == size_t(-1)) && start <= end);
     uint64_t mask = (bitwidth == 64 ? ~0ULL

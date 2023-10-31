@@ -1169,8 +1169,7 @@ struct BenchmarkQueryChainedOrIntsCount : BenchmarkQueryChainedOrInts {
             query.Or().equal(m_col, values_to_query[i]);
         }
         size_t matches = query.count();
-        REALM_ASSERT_EX(matches == num_queried_matches, matches, num_queried_matches,
-                        values_to_query.size());
+        REALM_ASSERT_EX(matches == num_queried_matches, matches, num_queried_matches, values_to_query.size());
     }
 };
 

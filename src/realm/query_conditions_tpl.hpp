@@ -39,9 +39,6 @@ public:
             REALM_ASSERT_DEBUG(value.is_null());
             value = m_source_column->get_any(index);
         }
-        else {
-            static_cast<void>(m_source_column);
-        }
         if (!value.is_null()) {
             auto v = value.get<T>();
             if (!m_state.accumulate(v))
