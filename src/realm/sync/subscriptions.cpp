@@ -795,7 +795,7 @@ SubscriptionStore::VersionInfo SubscriptionStore::get_version_info() const
 }
 
 util::Optional<SubscriptionStore::PendingSubscription>
-SubscriptionStore::get_next_pending_version(int64_t last_query_version, DB::version_type after_client_version) const
+SubscriptionStore::get_next_pending_version(int64_t last_query_version) const
 {
     auto tr = m_db->start_read();
     auto sub_sets = tr->get_table(m_sub_set_table);
@@ -811,7 +811,6 @@ SubscriptionStore::get_next_pending_version(int64_t last_query_version, DB::vers
                    .Or()
                    .equal(m_sub_set_state, state_to_storage(SubscriptionSet::State::Bootstrapping))
                    .end_group()
-                   .greater_equal(m_sub_set_snapshot_version, static_cast<int64_t>(after_client_version))
                    .find_all(descriptor_ordering);
 
     if (res.is_empty()) {
@@ -829,15 +828,9 @@ std::vector<SubscriptionSet> SubscriptionStore::get_pending_subscriptions() cons
     std::vector<SubscriptionSet> subscriptions_to_recover;
     auto active_sub = get_active();
     auto cur_query_version = active_sub.version();
-    DB::version_type db_version = 0;
-    if (active_sub.state() == SubscriptionSet::State::Complete) {
-        db_version = active_sub.snapshot_version();
-    }
-    REALM_ASSERT_EX(db_version != DB::version_type(-1), active_sub.state());
     // get a copy of the pending subscription sets since the active version
-    while (auto next_pending = get_next_pending_version(cur_query_version, db_version)) {
+    while (auto next_pending = get_next_pending_version(cur_query_version)) {
         cur_query_version = next_pending->query_version;
-        db_version = next_pending->snapshot_version;
         subscriptions_to_recover.push_back(get_by_version(cur_query_version));
     }
     return subscriptions_to_recover;

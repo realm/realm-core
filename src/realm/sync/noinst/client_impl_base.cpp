@@ -1850,8 +1850,7 @@ void Session::send_message()
             return false;
         }
 
-        m_pending_flx_sub_set = get_flx_subscription_store()->get_next_pending_version(
-            m_last_sent_flx_query_version, m_upload_progress.client_version);
+        m_pending_flx_sub_set = get_flx_subscription_store()->get_next_pending_version(m_last_sent_flx_query_version);
 
         if (!m_pending_flx_sub_set) {
             return false;
