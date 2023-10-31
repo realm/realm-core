@@ -72,7 +72,7 @@ public:
     {
         m_root->destroy_deep();
     }
-    void nullify_links(ObjKey, CascadeState&);
+    void nullify_incoming_links(ObjKey, CascadeState&);
     bool is_empty() const noexcept
     {
         return size() == 0;

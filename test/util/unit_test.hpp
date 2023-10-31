@@ -200,7 +200,7 @@ static const bool running_with_asan = false;
 // android doesn't implement posix_spawn(), iOS doesn't permit starting another process
 constexpr bool testing_supports_spawn_process = false;
 #else
-constexpr bool testing_supports_spawn_process = !running_with_valgrind && !running_with_tsan && !running_with_asan;
+constexpr bool testing_supports_spawn_process = !running_with_valgrind;
 #endif
 
 //@{

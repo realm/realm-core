@@ -2324,6 +2324,8 @@ TEST_CASE("migration: Additive", "[migration]") {
         REQUIRE(realm->schema().find("object")->persisted_properties[0].column_key == col_keys[0]);
         REQUIRE(realm->schema().find("object")->persisted_properties[1].column_key == col_keys[1]);
 
+        ColKey k0 = col_keys[0], k1 = col_keys[1];
+
         // Close and re-open the file entirely so that the coordinator is recreated
         realm.reset();
         realm2.reset();
@@ -2331,8 +2333,8 @@ TEST_CASE("migration: Additive", "[migration]") {
 
         realm = Realm::get_shared_realm(config);
         REQUIRE(realm->schema() == schema);
-        REQUIRE(realm->schema().find("object")->persisted_properties[0].column_key == col_keys[0]);
-        REQUIRE(realm->schema().find("object")->persisted_properties[1].column_key == col_keys[1]);
+        REQUIRE(realm->schema().find("object")->persisted_properties[0].column_key == k0);
+        REQUIRE(realm->schema().find("object")->persisted_properties[1].column_key == k1);
     }
 
     SECTION("obtaining a frozen Realm from before an external schema change") {

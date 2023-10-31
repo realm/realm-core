@@ -6,7 +6,8 @@
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Potential stack-use-after-scope issue on changesets integration with msvc-2019 and mpack code ([PR #6911](https://github.com/realm/realm-core/pull/6911))
+* Fix compilation with non-beta Xcode 15. Building for visionOS now requires explicitly specifying `-DCMAKE_XCODE_ATTRIBUTE_SDKROOT=xros` (PR [#7055](https://github.com/realm/realm-core/pull/7055)).
 
 ### Breaking changes
 * None.
@@ -17,7 +18,31 @@
 -----------
 
 ### Internals
+* REALM_[ATMU]SAN cmake flags no longer override compilation options and can be combined with Debug|RelWithDebInfo|etc. build types. Rel[ATMU]SAN build type shortcuts are now all slightly optimized debug-based builds with sanitizers. REALM_ASAN now works with msvc (2019/2022) builds. ([PR #6911](https://github.com/realm/realm-core/pull/6911))
+
+----------------------------------------------
+
+# 13.23.2 Release notes
+
+### Enhancements
 * None.
+
+### Fixed
+* Deleting an object in an asymmetric table would cause a crash. Likely to solve [#1537](https://github.com/realm/realm-kotlin/issues/1537), since v12.1.0.
+* Implement BIO_CTRL_GET_KTLS_SEND and BIO_CTRL_GET_KTLS_RECV as OpenSSL versions < 3.0.4 depend on it.
+
+### Breaking changes
+* Added separate enum for callback handler result values in the platform networking C API. ([PR #7015](https://github.com/realm/realm-core/pull/7015))
+* Platform networking CAPI now uses different callback types depending on where callback is used. ([PR #7015](https://github.com/realm/realm-core/pull/7015))
+
+### Compatibility
+* Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
+* Update JSON library from 3.7.3 to 3.11.2.
+* Updated async_write_binary in the Default Socket Provider to properly return a status to the callback handler. ([PR #7015](https://github.com/realm/realm-core/pull/7015))
 
 ----------------------------------------------
 
@@ -30,6 +55,7 @@
 * `SyncManager::path_for_realm()` would return `/<path>/filename.realm.realm` if `custom_file_name` was set to `filename.realm` and the file didn't exist. It would correctly return `/<path>/filename.realm` if the file already existed. After this fix `/<path>/filename.realm` is returned in all cases. ([#7038](https://github.com/realm/realm-core/issues/7038))
 * Fixed a bug preventing SSL handshake from completing successfuly due to failed hostname verification when linking against BoringSSL. (PR [#7034](https://github.com/realm/realm-core/pull/7034))
 * Updating subscriptions did not trigger Realm autorefreshes, sometimes resulting in async refresh hanging until another write was performed by something else ([PR #7031](https://github.com/realm/realm-core/pull/7031)).
+* Fix interprocess locking for concurrent realm file access resulting in a interprocess deadlock on FAT32/exFAT filesystems ([PR #6959](https://github.com/realm/realm-core/pull/6959)).
 
 ### Breaking changes
 * None.
@@ -49,7 +75,7 @@
 ### Enhancements
 * Allow collections of non-embedded links in asymmetric objects. ([PR #7003](https://github.com/realm/realm-core/pull/7003))
 * Flexible sync API improvements:
-  - Erase Subscriptions by class type for C API. 
+  - Erase Subscriptions by class type for C API.
   - `MutableSubscriptionSet::erase(iterator)` now runs in constant time.
   - Introduce `MutableSubscriptionSet::erase_by_id()`.
   - Introduce `MutableSubscriptionSet::erase_by_class_name()`.

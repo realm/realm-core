@@ -663,11 +663,9 @@ public:
     }
 
     void async_write_frame(bool fin, int opcode, const char* data, size_t size,
-                           util::UniqueFunction<void()> write_completion_handler)
+                           sync::websocket::WriteCompletionHandler write_completion_handler)
     {
         REALM_ASSERT(!m_stopped);
-
-        m_write_completion_handler = std::move(write_completion_handler);
 
         bool mask = m_is_client;
 
@@ -679,10 +677,10 @@ public:
         size_t message_size =
             make_frame(fin, opcode, mask, data, size, m_write_buffer.data(), m_config.websocket_get_random());
 
-        auto handler = [this](std::error_code ec, size_t) {
+        auto handler = [this, handler = std::move(write_completion_handler)](std::error_code ec, size_t) mutable {
             // If the operation is aborted, then the write operation was canceled and we should ignore this callback.
             if (ec == util::error::operation_aborted) {
-                return;
+                return handler(ec, 0);
             }
 
             auto is_socket_closed_err = (ec == util::error::make_error_code(util::error::connection_reset) ||
@@ -701,22 +699,20 @@ public:
                 return m_config.websocket_write_error_handler(ec);
             }
 
-            handle_write_message();
+            handle_write_message(std::move(handler));
         };
 
-        m_config.async_write(m_write_buffer.data(), message_size, handler);
+        m_config.async_write(m_write_buffer.data(), message_size, std::move(handler));
     }
 
-    void handle_write_message()
+    void handle_write_message(sync::websocket::WriteCompletionHandler write_handler)
     {
         if (m_write_buffer.size() > s_write_buffer_stable_size) {
             m_write_buffer.resize(s_write_buffer_stable_size);
             m_write_buffer.shrink_to_fit();
         }
 
-        auto handler = std::move(m_write_completion_handler);
-        m_write_completion_handler = nullptr;
-        handler();
+        write_handler(std::error_code(), m_write_buffer.size());
     }
 
     void stop() noexcept
@@ -749,8 +745,6 @@ private:
 
     std::vector<char> m_write_buffer;
     static const size_t s_write_buffer_stable_size = 2048;
-
-    util::UniqueFunction<void()> m_write_completion_handler;
 
     std::optional<int> m_test_handshake_response;
     std::string m_test_handshake_response_body;
@@ -1281,32 +1275,32 @@ void websocket::Socket::initiate_server_websocket_after_handshake()
 }
 
 void websocket::Socket::async_write_frame(bool fin, Opcode opcode, const char* data, size_t size,
-                                          util::UniqueFunction<void()> handler)
+                                          WriteCompletionHandler handler)
 {
     m_impl->async_write_frame(fin, int(opcode), data, size, std::move(handler));
 }
 
-void websocket::Socket::async_write_text(const char* data, size_t size, util::UniqueFunction<void()> handler)
+void websocket::Socket::async_write_text(const char* data, size_t size, WriteCompletionHandler handler)
 {
     async_write_frame(true, Opcode::text, data, size, std::move(handler));
 }
 
-void websocket::Socket::async_write_binary(const char* data, size_t size, util::UniqueFunction<void()> handler)
+void websocket::Socket::async_write_binary(const char* data, size_t size, WriteCompletionHandler handler)
 {
     async_write_frame(true, Opcode::binary, data, size, std::move(handler));
 }
 
-void websocket::Socket::async_write_close(const char* data, size_t size, util::UniqueFunction<void()> handler)
+void websocket::Socket::async_write_close(const char* data, size_t size, WriteCompletionHandler handler)
 {
     async_write_frame(true, Opcode::close, data, size, std::move(handler));
 }
 
-void websocket::Socket::async_write_ping(const char* data, size_t size, util::UniqueFunction<void()> handler)
+void websocket::Socket::async_write_ping(const char* data, size_t size, WriteCompletionHandler handler)
 {
     async_write_frame(true, Opcode::ping, data, size, std::move(handler));
 }
 
-void websocket::Socket::async_write_pong(const char* data, size_t size, util::UniqueFunction<void()> handler)
+void websocket::Socket::async_write_pong(const char* data, size_t size, WriteCompletionHandler handler)
 {
     async_write_frame(true, Opcode::pong, data, size, std::move(handler));
 }
