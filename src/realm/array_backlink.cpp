@@ -146,7 +146,9 @@ void ArrayBacklink::erase(size_t ndx)
 {
     uint64_t value = Array::get(ndx);
     if (value && (value & 1) == 0) {
-        Array::destroy(ref_type(value), m_alloc);
+        Array value_array(m_alloc);
+        value_array.init_from_ref(ref_type(value));
+        value_array.destroy();
     }
     Array::erase(ndx);
 }

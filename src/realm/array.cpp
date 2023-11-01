@@ -1404,6 +1404,9 @@ void Array::stats(MemStats& stats_dest) const noexcept
 
 void Array::report_memory_usage(MemUsageHandler& handler) const
 {
+    if (is_encoded())
+        decode_array();
+
     if (m_has_refs)
         report_memory_usage_2(handler); // Throws
 
@@ -1423,6 +1426,8 @@ void Array::report_memory_usage(MemUsageHandler& handler) const
 void Array::report_memory_usage_2(MemUsageHandler& handler) const
 {
     Array subarray(m_alloc);
+    if (subarray.is_encoded())
+        subarray.decode_array();
     for (size_t i = 0; i < m_size; ++i) {
         int_fast64_t value = get(i);
         // Skip null refs and values that are not refs. Values are not refs when

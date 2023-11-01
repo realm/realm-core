@@ -94,18 +94,18 @@ public:
     {
     }
 
-    virtual ~Array() noexcept override = default;
+    virtual ~Array() noexcept = default;
 
     void destroy();
     void destroy_node();
-    static void destroy(ref_type ref, Allocator& alloc) noexcept
-    {
-        Node::destroy(MemRef(ref, alloc), alloc);
-    }
-    static void destroy(MemRef mem, Allocator& alloc) noexcept
-    {
-        Node::destroy(mem, alloc);
-    }
+    //    static void destroy(ref_type ref, Allocator& alloc) noexcept
+    //    {
+    //        Node::destroy(MemRef(ref, alloc), alloc);
+    //    }
+    //    static void destroy(MemRef mem, Allocator& alloc) noexcept
+    //    {
+    //        Node::destroy(mem, alloc);
+    //    }
 
     /// Set encoding/deconding array for this array in order to implement the
     /// encoding algorithm selected for this type of Array.

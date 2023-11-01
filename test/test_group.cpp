@@ -2347,28 +2347,27 @@ ONLY(Group_ArrayCompression_Correctness)
     CHECK_EQUAL(v5.get_int(), 409);
     CHECK_EQUAL(v6.get_int(), 16388);
 
-    // #ifdef REALM_DEBUG
-    //     to_disk.verify();
-    // #endif
+    // Still failing
+    //    #ifdef REALM_DEBUG
+    //        to_disk.verify();
+    //    #endif
 
     // Serialize to disk
-    //    to_disk.write(path, crypt_key());
+    to_disk.write(path, crypt_key());
     //
     //    // Load the tables
-    //    Group from_disk(path, crypt_key());
-    //    TableRef read_table = from_disk.get_table("test");
-    //    auto col_key1 = read_table->get_column_key("lint");
-    //    auto obj1 = read_table->get_object(0);
-    //    auto l1 = obj1.get_list<int64_t>(col_key1);
-    //    //CHECK(l1 == array);
-
+    Group from_disk(path, crypt_key());
+    TableRef read_table = from_disk.get_table("test");
+    auto col_key1 = read_table->get_column_key("lint");
+    auto obj1 = read_table->get_object(0);
+    auto l1 = obj1.get_list<int64_t>(col_key1);
     // Verify that original values are there
-    // CHECK(*read_table == *table);
+    CHECK(*read_table == *table);
 
-    // #ifdef REALM_DEBUG
-    //     to_disk.verify();
-    //     from_disk.verify();
-    // #endif
+    //    #ifdef REALM_DEBUG
+    //         to_disk.verify();
+    //         from_disk.verify();
+    //    #endif
 }
 
 #endif // TEST_GROUP

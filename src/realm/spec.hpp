@@ -129,7 +129,9 @@ private:
     }
     void destroy_subspec()
     {
-        Node::destroy(m_top.get_as_ref(3), m_top.get_alloc());
+        Array ref_array{m_top.get_alloc()};
+        ref_array.init_from_ref(m_top.get_as_ref(3));
+        ref_array.destroy();
         m_top.set(3, 0);
     }
     TableKey get_opposite_link_table_key(size_t column_ndx) const noexcept;

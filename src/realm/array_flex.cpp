@@ -97,12 +97,10 @@ bool ArrayFlex::encode()
         bf_iterator it_index{data, offset, index_width, index_width, 0};
         for (size_t i = 0; i < values.size(); ++i) {
             it_value.set_value(values[i]);
-            // REALM_ASSERT(it_value.get_value() == (uint64_t)values[i]);
             ++it_value;
         }
         for (size_t i = 0; i < indices.size(); ++i) {
             it_index.set_value(indices[i]);
-            // REALM_ASSERT(it_index.get_value() == indices[i]);
             ++it_index;
         }
         REALM_ASSERT(indices.size() == sz);
@@ -230,8 +228,6 @@ bool ArrayFlex::try_encode(std::vector<uint64_t>& values, std::vector<size_t>& i
         init_from_mem(mem);
 
         using Encoding = NodeHeader::Encoding;
-
-        // is it needed??
         auto addr = (uint64_t*)get_header();
         NodeHeader::set_kind(addr, static_cast<std::underlying_type_t<Encoding>>(NodeHeader::Encoding::Flex));
         NodeHeader::set_arrayA_num_elements<Encoding::Flex>(addr, values.size());

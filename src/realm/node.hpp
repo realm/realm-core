@@ -115,7 +115,7 @@ public:
     {
     }
 
-    virtual ~Node() {}
+    virtual ~Node() noexcept = default;
 
     /**************************** Initializers *******************************/
 
@@ -219,17 +219,17 @@ public:
     void destroy() noexcept;
 
     /// Shorthand for `destroy(MemRef(ref, alloc), alloc)`.
-    static void destroy(ref_type ref, Allocator& alloc) noexcept
-    {
-        destroy(MemRef(ref, alloc), alloc);
-    }
-
-    /// Destroy only the specified array node, not its children. See also
-    /// destroy_deep(MemRef, Allocator&).
-    static void destroy(MemRef mem, Allocator& alloc) noexcept
-    {
-        alloc.free_(mem);
-    }
+    //    static void destroy(ref_type ref, Allocator& alloc) noexcept
+    //    {
+    //        destroy(MemRef(ref, alloc), alloc);
+    //    }
+    //
+    //    /// Destroy only the specified array node, not its children. See also
+    //    /// destroy_deep(MemRef, Allocator&).
+    //    static void destroy(MemRef mem, Allocator& alloc) noexcept
+    //    {
+    //        alloc.free_(mem);
+    //    }
 
 
     /// Setting a new parent affects ownership of the attached array node, if
@@ -274,7 +274,7 @@ protected:
     Allocator& m_alloc;
     size_t m_size = 0; // Number of elements currently stored.
 
-    ArrayEncode* m_encode_array = nullptr; // encode array for encoding and decoding array.
+    ArrayEncode* m_encode_array{nullptr}; // encode array for encoding and decoding array.
 
 #if REALM_ENABLE_MEMDEBUG
     // If m_no_relocation is false, then copy_on_write() will always relocate this array, regardless if it's

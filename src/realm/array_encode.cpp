@@ -32,7 +32,7 @@ ArrayEncode* ArrayEncode::create_encoded_array(NodeHeader::Encoding encoding, Ar
     using Encoding = NodeHeader::Encoding;
     switch (encoding) {
         case Encoding::Flex:
-            return new ArrayFlex(array); // TODO small ptr here?
+            return new ArrayFlex(array);
         case Encoding::Packed:
         case Encoding::AofP:
         case Encoding::PofA:
