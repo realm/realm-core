@@ -1556,6 +1556,82 @@ TEST_CASE("C API logging", "[c_api]") {
     util::Logger::set_default_level_threshold(log_level_old);
 }
 
+TEST_CASE("C API - scheduler", "[c_api]") {
+    TestFile test_file;
+    realm_t* realm;
+
+    struct SchedulerData {
+        bool free_called = false;
+        realm_work_queue_t* work_queue;
+        std::mutex mutex;
+        std::condition_variable cond;
+        void wait()
+        {
+            std::unique_lock<std::mutex> lk(mutex);
+            cond.wait(lk);
+        }
+        void notify(realm_work_queue_t* wq)
+        {
+            std::unique_lock<std::mutex> lk(mutex);
+            work_queue = wq;
+            cond.notify_one();
+        }
+        void execute()
+        {
+            realm_scheduler_perform_work(work_queue);
+        }
+    } scheduler_data;
+
+    struct NotifierData {
+        bool notify_called = false;
+    } notifier_data;
+
+    {
+        auto config = make_config(test_file.path.c_str());
+        auto scheduler = realm_scheduler_new(
+            &scheduler_data,
+            [](void* data) {
+                static_cast<SchedulerData*>(data)->free_called = true;
+            },
+            [](void* data, realm_work_queue_t* work_queue) {
+                static_cast<SchedulerData*>(data)->notify(work_queue);
+            },
+            [](void*) {
+                return true;
+            },
+            nullptr, nullptr);
+        realm_config_set_scheduler(config.get(), scheduler);
+        realm = realm_open(config.get());
+        realm_release(scheduler);
+    }
+
+    bool found = false;
+    realm_class_info_t class_foo;
+    realm_find_class(realm, "Foo", &found, &class_foo);
+    auto res = realm_object_find_all(realm, class_foo.key);
+    auto token = realm_results_add_notification_callback(res, &notifier_data, nullptr, nullptr,
+                                                         [](void* data, const realm_collection_changes_t*) {
+                                                             static_cast<NotifierData*>(data)->notify_called = true;
+                                                         });
+
+    realm_begin_write(realm);
+    auto obj = realm_object_create(realm, class_foo.key);
+    realm_release(obj);
+    realm_commit(realm);
+
+    scheduler_data.wait();
+
+    notifier_data.notify_called = false;
+    scheduler_data.execute();
+    CHECK(notifier_data.notify_called);
+
+    CHECK(!scheduler_data.free_called);
+    realm_release(token);
+    realm_release(res);
+    realm_release(realm);
+    CHECK(scheduler_data.free_called);
+}
+
 TEST_CASE("C API - properties", "[c_api]") {
     TestFile test_file;
     realm_t* realm = open_realm(test_file);
