@@ -377,7 +377,10 @@ TEST_TYPES(Set_Types, Prop<Int>, Prop<String>, Prop<Float>, Prop<Double>, Prop<T
             s.insert(v);
             l.add(v);
         }
-        CHECK_EQUAL(s.size(), values.size());
+        auto sz = values.size();
+        CHECK_EQUAL(s.size(), sz);
+        auto s1 = s;
+        CHECK_EQUAL(s1.size(), sz);
         CHECK(s.set_equals(l));
         for (auto v : values) {
             auto ndx = s.find(v);

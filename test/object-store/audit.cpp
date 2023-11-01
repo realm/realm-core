@@ -1372,7 +1372,7 @@ TEST_CASE("audit management", "[sync][pbs][audit]") {
     SECTION("custom audit event") {
         // Verify that each of the completion handlers is called in the expected order
         std::atomic<size_t> completions = 0;
-        std::array<std::pair<size_t, bool>, 5> completion_results;
+        std::array<std::pair<std::atomic<size_t>, std::atomic<bool>>, 5> completion_results;
         auto expect_completion = [&](size_t expected) {
             return [&, expected](std::exception_ptr e) {
                 completion_results[expected].second = bool(e);
