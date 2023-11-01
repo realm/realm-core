@@ -11,6 +11,7 @@ set(SYNC_SOURCES
     noinst/pending_bootstrap_store.cpp
     noinst/protocol_codec.cpp
     noinst/sync_metadata_schema.cpp
+    noinst/sync_schema_migration.cpp
     changeset_encoder.cpp
     changeset_parser.cpp
     changeset.cpp
@@ -79,6 +80,7 @@ set(NOINST_HEADERS
     noinst/protocol_codec.hpp
     noinst/root_certs.hpp
     noinst/sync_metadata_schema.hpp
+    noinst/sync_schema_migration.hpp
 )
 
 set(SYNC_HEADERS ${IMPL_INSTALL_HEADESR}
