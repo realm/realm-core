@@ -19,6 +19,7 @@
 
 ### Internals
 * REALM_[ATMU]SAN cmake flags no longer override compilation options and can be combined with Debug|RelWithDebInfo|etc. build types. Rel[ATMU]SAN build type shortcuts are now all slightly optimized debug-based builds with sanitizers. REALM_ASAN now works with msvc (2019/2022) builds. ([PR #6911](https://github.com/realm/realm-core/pull/6911))
+* Added suport for building against the musl library. ([PR #7067](https://github.com/realm/realm-core/pull/7067))
 
 ----------------------------------------------
 
