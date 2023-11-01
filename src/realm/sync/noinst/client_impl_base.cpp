@@ -2000,13 +2000,10 @@ void Session::send_upload_message()
     if (REALM_UNLIKELY(get_client().is_dry_run()))
         return;
 
-    version_type target_upload_version = get_db()->get_version_of_latest_snapshot();
+    version_type target_upload_version = m_last_version_available;
     if (m_pending_flx_sub_set) {
         REALM_ASSERT(m_is_flx_sync_session);
         target_upload_version = m_pending_flx_sub_set->snapshot_version;
-    }
-    if (target_upload_version > m_last_version_available) {
-        m_last_version_available = target_upload_version;
     }
 
     const ClientReplication& repl = access_realm(); // Throws
@@ -2304,6 +2301,8 @@ Status Session::receive_ident_message(SaltedFileIdent client_file_ident)
         if (has_pending_client_reset) {
             handle_pending_client_reset_acknowledgement();
         }
+
+        update_subscription_version_info();
 
         // If a migration or rollback is in progress, mark it complete when client reset is completed.
         if (auto migration_store = get_migration_store()) {
