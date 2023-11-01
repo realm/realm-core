@@ -608,7 +608,6 @@ LocalVersionIDs perform_client_reset_diff(DBRef db_local, DBRef db_remote, sync:
         logger.info("Local changesets to recover: %1", local_changes.size());
     }
 
-    sync::SaltedVersion fresh_server_version = {0, 0};
     auto wt_remote = db_remote->start_write();
     auto history_remote = dynamic_cast<ClientHistory*>(wt_remote->get_replication()->_get_history_write());
     REALM_ASSERT(history_remote);
@@ -619,7 +618,7 @@ LocalVersionIDs perform_client_reset_diff(DBRef db_local, DBRef db_remote, sync:
         SaltedFileIdent remote_ident_unused;
         history_remote->get_status(remote_version_unused, remote_ident_unused, remote_progress);
     }
-    fresh_server_version = remote_progress.latest_server_version;
+    sync::SaltedVersion fresh_server_version = remote_progress.latest_server_version;
     BinaryData recovered_changeset;
 
     // FLX with recovery has to be done in multiple commits, which is significantly different than other modes
@@ -644,7 +643,7 @@ LocalVersionIDs perform_client_reset_diff(DBRef db_local, DBRef db_remote, sync:
         // as needed. This has the consequence that there may be extra notifications along
         // the way to the final state, but since separate commits are necessary, this is
         // unavoidable.
-        wt_local = db_local->start_write();
+        wt_local->promote_to_write();
         RecoverLocalChangesetsHandler handler{*wt_local, *frozen_pre_local_state, logger,
                                               db_local->get_replication()};
         handler.process_changesets(local_changes, std::move(pending_subscriptions)); // throws on error
