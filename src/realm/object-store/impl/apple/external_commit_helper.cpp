@@ -199,7 +199,7 @@ ExternalCommitHelper::~ExternalCommitHelper()
 
 void ExternalCommitHelper::listen()
 {
-    pthread_setname_np("Realm notification listener");
+    util::Thread::set_name("Realm notification listener");
 
     // Set up the kqueue
     // EVFILT_READ indicates that we care about data being available to read

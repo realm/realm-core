@@ -880,7 +880,7 @@ void File::prealloc(size_t size)
 #endif
     };
 
-#if defined(_POSIX_C_SOURCE) && _POSIX_C_SOURCE >= 200112L // POSIX.1-2001 version
+#if REALM_HAVE_POSIX_FALLOCATE
     // Mostly Linux only
     if (!prealloc_if_supported(0, new_size)) {
         consume_space_interlocked();
@@ -946,7 +946,14 @@ void File::prealloc(size_t size)
         // so this is some other runtime error and not OutOfDiskSpace
         throw SystemError(err, "ftruncate() inside prealloc() failed");
     }
-#elif REALM_ANDROID || defined(_WIN32) || defined(__EMSCRIPTEN__)
+#elif defined(_WIN32)
+    // FileEndOfFileInfo will update the logical file size, and also grow the file if necessary
+    FILE_END_OF_FILE_INFO eof_info{};
+    eof_info.EndOfFile.QuadPart = new_size;
+    if (!SetFileInformationByHandle(m_fd, FileEndOfFileInfo, &eof_info, sizeof(eof_info))) {
+        throw SystemError(GetLastError(), "SetFileInformationByHandle(FileEndOfFileInfo) inside prealloc() failed");
+    }
+#elif REALM_ANDROID || defined(__EMSCRIPTEN__)
 
     consume_space_interlocked();
 
@@ -954,7 +961,7 @@ void File::prealloc(size_t size)
 #error Please check if/how your OS supports file preallocation
 #endif
 
-#endif // !(_POSIX_C_SOURCE >= 200112L)
+#endif // REALM_HAVE_POSIX_FALLOCATE
 }
 
 
@@ -962,7 +969,7 @@ bool File::prealloc_if_supported(SizeType offset, size_t size)
 {
     REALM_ASSERT_RELEASE(is_attached());
 
-#if defined(_POSIX_C_SOURCE) && _POSIX_C_SOURCE >= 200112L // POSIX.1-2001 version
+#if REALM_HAVE_POSIX_FALLOCATE
 
     REALM_ASSERT_RELEASE(is_prealloc_supported());
 
@@ -1015,7 +1022,7 @@ bool File::prealloc_if_supported(SizeType offset, size_t size)
 
 bool File::is_prealloc_supported()
 {
-#if defined(_POSIX_C_SOURCE) && _POSIX_C_SOURCE >= 200112L // POSIX.1-2001 version
+#if REALM_HAVE_POSIX_FALLOCATE
     return true;
 #else
     return false;

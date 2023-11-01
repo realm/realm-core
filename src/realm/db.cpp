@@ -2021,6 +2021,7 @@ private:
 
 void DB::AsyncCommitHelper::main()
 {
+    util::Thread::set_name("Realm DB AsyncCommitHelper");
     std::unique_lock lg(m_mutex);
     while (m_running) {
 #if 0 // Enable for testing purposes

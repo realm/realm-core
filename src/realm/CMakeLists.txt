@@ -358,7 +358,26 @@ elseif(APPLE)
     target_link_options(Storage INTERFACE "SHELL:-framework Foundation")
 endif()
 
+set(THREADS_PREFER_PTHREAD_FLAG ON)
+find_package(Threads REQUIRED)
 target_link_libraries(Storage INTERFACE Threads::Threads)
+
+# Threads library is pthread-compatible
+# Check for these explicitly because older versions of musl define only one or the other
+if(CMAKE_USE_PTHREADS_INIT)
+    check_symbol_exists(pthread_getname_np "pthread.h" REALM_HAVE_PTHREAD_GETNAME)
+    check_symbol_exists(pthread_setname_np "pthread.h" REALM_HAVE_PTHREAD_SETNAME)
+endif()
+
+find_package(Backtrace)
+if(Backtrace_FOUND)
+    target_link_libraries(Storage INTERFACE ${Backtrace_LIBRARIES})
+    target_include_directories(Storage PRIVATE ${Backtrace_INCLUDE_DIRS})
+    target_compile_definitions(Storage PRIVATE
+        REALM_HAVE_BACKTRACE=1
+        REALM_BACKTRAE_HEADER=${Backtrace_HEADER}
+    )
+endif()
 
 if(REALM_ENABLE_ENCRYPTION AND UNIX AND NOT APPLE AND REALM_HAVE_OPENSSL)
     target_link_libraries(Storage PUBLIC OpenSSL::Crypto)

@@ -92,6 +92,7 @@ void ExternalCommitHelper::notify_others()
 
 void ExternalCommitHelper::listen()
 {
+    util::Thread::set_name("Realm notification listener");
     auto lock = std::unique_lock(m_mutex);
     while (true) {
         m_commit_available.wait(m_mutex, nullptr, [&] {

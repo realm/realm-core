@@ -130,6 +130,7 @@
 
 ### Enhancements
 * Allow non-embedded links in asymmetric objects. ([PR #6981](https://github.com/realm/realm-core/pull/6981))
+* Preallocating files on Windows is now atomic and more efficient. ([PR #6469](https://github.com/realm/realm-core/pull/6469))
 
 ### Fixed
 * Logging into a single user using multiple auth providers created a separate SyncUser per auth provider. This mostly worked, but had some quirks:
