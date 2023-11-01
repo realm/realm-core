@@ -33,8 +33,24 @@ public:
     using Type = T;
     using ResultType = typename aggregate_operations::Sum<T>::ResultType;
     using QueryStateBase::QueryStateBase;
-    bool match(size_t, Mixed value) noexcept final
+    bool match(size_t index, Mixed value) noexcept final
     {
+        if (m_source_column) {
+            REALM_ASSERT_DEBUG(value.is_null());
+            value = m_source_column->get_any(index);
+        }
+        if (!value.is_null()) {
+            auto v = value.get<T>();
+            if (!m_state.accumulate(v))
+                return true; // no match, continue searching
+            ++m_match_count;
+        }
+        return (m_limit > m_match_count);
+    }
+    bool match(size_t index) noexcept final
+    {
+        REALM_ASSERT(m_source_column);
+        Mixed value{m_source_column->get_any(index)};
         if (!value.is_null()) {
             auto v = value.get<T>();
             if (!m_state.accumulate(v))
@@ -62,6 +78,24 @@ public:
     using QueryStateBase::QueryStateBase;
     bool match(size_t index, Mixed value) noexcept final
     {
+        if (m_source_column) {
+            REALM_ASSERT_DEBUG(value.is_null());
+            value = m_source_column->get_any(index);
+        }
+        if (!value.is_null()) {
+            auto v = value.get<R>();
+            if (!m_state.accumulate(v)) {
+                return true; // no match, continue searching
+            }
+            ++m_match_count;
+            m_minmax_key = (m_key_values ? m_key_values->get(index) : index) + m_key_offset;
+        }
+        return m_limit > m_match_count;
+    }
+    bool match(size_t index) noexcept final
+    {
+        REALM_ASSERT(m_source_column);
+        Mixed value{m_source_column->get_any(index)};
         if (!value.is_null()) {
             auto v = value.get<R>();
             if (!m_state.accumulate(v)) {
