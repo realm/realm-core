@@ -120,38 +120,6 @@ struct Side {
         return intern_string(string);
     }
 
-    Instruction::PrimaryKey adopt_key(const Side& other_side, const Instruction::PrimaryKey& other_key)
-    {
-        if (auto str = mpark::get_if<InternString>(&other_key)) {
-            return adopt_string(other_side, *str);
-        }
-        else {
-            // Non-string keys do not need to be adopted.
-            return other_key;
-        }
-    }
-
-    void adopt_path(Instruction::PathInstruction& instr, const Side& other_side,
-                    const Instruction::PathInstruction& other)
-    {
-        instr.table = adopt_string(other_side, other.table);
-        instr.object = adopt_key(other_side, other.object);
-        instr.field = adopt_string(other_side, other.field);
-        instr.path.m_path.clear();
-        instr.path.m_path.reserve(other.path.size());
-        for (auto& element : other.path.m_path) {
-            auto push = util::overload{
-                [&](uint32_t index) {
-                    instr.path.m_path.push_back(index);
-                },
-                [&](InternString str) {
-                    instr.path.m_path.push_back(adopt_string(other_side, str));
-                },
-            };
-            mpark::visit(push, element);
-        }
-    }
-
 protected:
     void init_with_instruction(const Instruction& instr) noexcept
     {
@@ -1152,36 +1120,6 @@ struct MergeUtils {
     bool is_container_prefix_of(const Instruction::PathInstruction&, const Instruction::TableInstruction&) const
     {
         return false;
-    }
-
-    bool value_targets_table(const Instruction::Payload& value,
-                             const Instruction::TableInstruction& right) const noexcept
-    {
-        if (value.type == Instruction::Payload::Type::Link) {
-            StringData target_table = m_left_side.get_string(value.data.link.target_table);
-            StringData right_table = m_right_side.get_string(right.table);
-            return target_table == right_table;
-        }
-        return false;
-    }
-
-    bool value_targets_object(const Instruction::Payload& value,
-                              const Instruction::ObjectInstruction& right) const noexcept
-    {
-        if (value_targets_table(value, right)) {
-            return same_key(value.data.link.target, right.object);
-        }
-        return false;
-    }
-
-    bool value_targets_object(const Instruction::Update& left, const Instruction::ObjectInstruction& right) const
-    {
-        return value_targets_object(left.value, right);
-    }
-
-    bool value_targets_object(const Instruction::ArrayInsert& left, const Instruction::ObjectInstruction& right) const
-    {
-        return value_targets_object(left.value, right);
     }
 
     // When the left side has a shorter path, get the path component on the
