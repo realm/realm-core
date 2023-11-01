@@ -174,12 +174,7 @@ TEST_CASE("flx: connect to FLX-enabled app", "[sync][flx][baas]") {
         }
 
         {
-            timed_wait_for(
-                [&]() {
-                    Results results(realm, table);
-                    return results.size() > 0;
-                },
-                std::chrono::seconds(60));
+            wait_for_advance(*realm);
             Results results(realm, table);
             CHECK(results.size() == 1);
             auto obj = results.get<Obj>(0);
@@ -196,12 +191,11 @@ TEST_CASE("flx: connect to FLX-enabled app", "[sync][flx][baas]") {
             subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
         }
 
-        timed_wait_for(
-            [&]() {
-                Results results(realm, Query(table));
-                return results.size() == 2;
-            },
-            std::chrono::seconds(60));
+        {
+            wait_for_advance(*realm);
+            Results results(realm, Query(table));
+            CHECK(results.size() == 2);
+        }
 
         {
             auto mut_subs = realm->get_latest_subscription_set().make_mutable_copy();
@@ -214,12 +208,7 @@ TEST_CASE("flx: connect to FLX-enabled app", "[sync][flx][baas]") {
         }
 
         {
-            timed_wait_for(
-                [&]() {
-                    Results results(realm, Query(table));
-                    return results.size() == 1;
-                },
-                std::chrono::seconds(60));
+            wait_for_advance(*realm);
             Results results(realm, Query(table));
             CHECK(results.size() == 1);
             auto obj = results.get<Obj>(0);
@@ -234,12 +223,11 @@ TEST_CASE("flx: connect to FLX-enabled app", "[sync][flx][baas]") {
             subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
         }
 
-        timed_wait_for(
-            [&]() {
-                Results results(realm, Query(table));
-                return results.size() == 0;
-            },
-            std::chrono::seconds(60));
+        {
+            wait_for_advance(*realm);
+            Results results(realm, table);
+            CHECK(results.size() == 0);
+        }
     });
 }
 
@@ -2094,18 +2082,14 @@ TEST_CASE("flx: interrupted bootstrap restarts/recovers on reconnect", "[sync][f
     }
 
     auto realm = Realm::get_shared_realm(interrupted_realm_config);
-
-    timed_wait_for(
-        [&]() -> bool {
-            auto table = realm->read_group().get_table("class_TopLevel");
-            return table->size() == obj_ids_at_end.size() &&
-                   std::all_of(obj_ids_at_end.begin(), obj_ids_at_end.end(), [&table](auto pk) {
-                       return bool(table->find_primary_key(Mixed{pk}));
-                   });
-        },
-        std::chrono::seconds(120));
-
+    auto table = realm->read_group().get_table("class_TopLevel");
     realm->get_latest_subscription_set().get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
+    wait_for_advance(*realm);
+    REQUIRE(table->size() == obj_ids_at_end.size());
+    for (auto& id : obj_ids_at_end) {
+        REQUIRE(table->find_primary_key(Mixed{id}));
+    }
+
     auto active_subs = realm->get_active_subscription_set();
     auto latest_subs = realm->get_latest_subscription_set();
     REQUIRE(active_subs.version() == latest_subs.version());
@@ -2716,16 +2700,14 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][boot
         realm->get_latest_subscription_set()
             .get_state_change_notification(sync::SubscriptionSet::State::Complete)
             .get();
+
+        wait_for_advance(*realm);
         auto expected_obj_ids = util::Span<ObjectId>(obj_ids_at_end).sub_span(0, 3);
 
-        timed_wait_for(
-            [&]() {
-                return table->size() == expected_obj_ids.size() &&
-                       std::all_of(expected_obj_ids.begin(), expected_obj_ids.end(), [&table](auto pk) {
-                           return bool(table->find_primary_key(Mixed{pk}));
-                       });
-            },
-            std::chrono::seconds(60));
+        REQUIRE(table->size() == expected_obj_ids.size());
+        for (auto& id : expected_obj_ids) {
+            REQUIRE(table->find_primary_key(Mixed{id}));
+        }
     }
 
     SECTION("interrupted after final bootstrap message before processing") {
@@ -2840,15 +2822,14 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][boot
             .get_state_change_notification(sync::SubscriptionSet::State::Complete)
             .get();
 
+        wait_for_advance(*realm);
         auto expected_obj_ids = util::Span<ObjectId>(obj_ids_at_end).sub_span(0, 3);
-        timed_wait_for(
-            [&]() {
-                return table->size() == expected_obj_ids.size() &&
-                       std::all_of(expected_obj_ids.begin(), expected_obj_ids.end(), [&table](auto pk) {
-                           return bool(table->find_primary_key(Mixed{pk}));
-                       });
-            },
-            std::chrono::seconds(60));
+
+        // After we've downloaded all the mutations there should only by 3 objects left.
+        REQUIRE(table->size() == expected_obj_ids.size());
+        for (auto& id : expected_obj_ids) {
+            REQUIRE(table->find_primary_key(Mixed{id}));
+        }
     }
 }
 

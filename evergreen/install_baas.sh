@@ -460,6 +460,7 @@ echo "Adding fake appid to skip baas server drop optimization"
 # Start the baas server on port *:9090 with the provided config JSON files
 echo "Starting baas app server"
 
+# see config overrides at https://github.com/10gen/baas/blob/master/etc/configs/test_rcore_config.json
 "${WORK_PATH}/baas_server" \
     --configFile=etc/configs/test_config.json --configFile=etc/configs/test_rcore_config.json > "${BAAS_SERVER_LOG}" 2>&1 &
 echo $! > "${BAAS_PID_FILE}"
