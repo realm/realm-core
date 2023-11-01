@@ -344,8 +344,7 @@ public:
         DB::version_type snapshot_version;
     };
 
-    util::Optional<PendingSubscription> get_next_pending_version(int64_t last_query_version,
-                                                                 DB::version_type after_client_version) const;
+    util::Optional<PendingSubscription> get_next_pending_version(int64_t last_query_version) const;
     std::vector<SubscriptionSet> get_pending_subscriptions() const;
 
     // Notify all subscription state change notification handlers on this subscription store with the

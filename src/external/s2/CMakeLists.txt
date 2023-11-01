@@ -10,6 +10,7 @@ set(S2_SOURCES
     s1interval.cc
     s2cap.cc
     s2cell.cc
+    s2cellunion.cc
     s2edgeindex.cc
     s2edgeutil.cc
     s2latlngrect.cc

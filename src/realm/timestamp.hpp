@@ -19,6 +19,7 @@
 #ifndef REALM_TIMESTAMP_HPP
 #define REALM_TIMESTAMP_HPP
 
+#include <array>
 #include <cstdint>
 #include <ostream>
 #include <chrono>
@@ -182,8 +183,7 @@ public:
         return size_t(m_seconds) ^ size_t(m_nanoseconds);
     }
 
-    // Buffer must be at least 32 bytes long
-    const char* to_string(char* buffer) const;
+    const char* to_string(std::array<char, 32>& buffer) const;
 
     template <class Ch, class Tr>
     friend std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out, const Timestamp&);
@@ -199,7 +199,7 @@ private:
 template <class C, class T>
 inline std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>& out, const Timestamp& d)
 {
-    char buffer[32];
+    std::array<char, 32> buffer{};
     out << d.to_string(buffer);
     return out;
 }

@@ -22,9 +22,11 @@
 #include <cstdlib> // size_t
 #include <cstdint> // unint8_t etc
 
+#include <realm/node.hpp>
+
 namespace realm {
 
-enum Action { act_ReturnFirst, act_Sum, act_Max, act_Min, act_Count, act_FindAll, act_CallbackIdx, act_Average };
+enum Action { act_ReturnFirst, act_Sum, act_Max, act_Min, act_Count, act_FindAll, act_Average };
 
 
 // Array::VTable only uses the first 4 conditions (enums) in an array of function pointers
@@ -47,6 +49,11 @@ public:
     // Called when we have a match.
     // The return value indicates if the query should continue.
     virtual bool match(size_t, Mixed) noexcept = 0;
+    // This version of match is called when m_source_column
+    // has been set to the current leaf so that we can get the value
+    // from the leaf if needed. Some consumers may not need the value
+    // such as when just counting the results in QueryStateCount.
+    virtual bool match(size_t index) noexcept = 0;
 
     virtual bool match_pattern(size_t, uint64_t)
     {
@@ -63,9 +70,17 @@ public:
         return m_limit;
     }
 
+    inline void set_payload_column(ArrayPayload* payload) noexcept
+    {
+        m_source_column = payload;
+    }
+
 protected:
     size_t m_match_count = 0;
     size_t m_limit;
+    // Array leaf of column currently in use by the query engine
+    // the match index points to an index in this leaf.
+    ArrayPayload* m_source_column = nullptr;
 
 private:
     virtual void dyncast();
@@ -84,6 +99,7 @@ public:
     {
     }
     bool match(size_t, Mixed) noexcept final;
+    bool match(size_t index) noexcept final;
     size_t get_count() const noexcept
     {
         return m_match_count;
