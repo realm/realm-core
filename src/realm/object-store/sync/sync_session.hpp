@@ -291,11 +291,6 @@ public:
             return session.m_db;
         }
 
-        static void set_sync_schema_migration_callback(SyncSession& session, std::function<void()>&& callback)
-        {
-            session.set_sync_schema_migration_callback(std::move(callback));
-        }
-
         static util::Future<void> pause_async(SyncSession& session);
     };
 
@@ -513,6 +508,9 @@ private:
     mutable util::CheckedMutex m_external_reference_mutex;
     class ExternalReference;
     std::weak_ptr<ExternalReference> m_external_reference GUARDED_BY(m_external_reference_mutex);
+
+    // Set if ProtocolError::schema_version_changed error is received from the server.
+    std::optional<uint64_t> m_previous_schema_version GUARDED_BY(m_state_mutex);
 };
 
 } // namespace realm

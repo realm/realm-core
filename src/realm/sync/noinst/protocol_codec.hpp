@@ -284,6 +284,16 @@ public:
                         info.migration_query_string.emplace(query_string->get<std::string_view>());
                     }
 
+                    if (info.raw_error_code == static_cast<int>(sync::ProtocolError::schema_version_changed)) {
+                        auto schema_version = json.find("previousSchemaVersion");
+                        if (schema_version == json.end() || !schema_version->is_number_unsigned()) {
+                            return report_error(
+                                "Missing/invalid previous schema version in schema migration error response");
+                        }
+
+                        info.previous_schema_version.emplace(schema_version->get<uint64_t>());
+                    }
+
                     if (auto rejected_updates = json.find("rejectedUpdates"); rejected_updates != json.end()) {
                         if (!rejected_updates->is_array()) {
                             return report_error(

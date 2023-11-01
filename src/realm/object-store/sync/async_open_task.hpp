@@ -72,7 +72,6 @@ private:
     std::vector<uint64_t> m_registered_callbacks GUARDED_BY(m_mutex);
     mutable util::CheckedMutex m_mutex;
     const bool m_db_first_open;
-    bool m_sync_schema_migration_required GUARDED_BY(m_mutex) = false;
 };
 
 } // namespace realm
