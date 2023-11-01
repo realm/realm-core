@@ -22,6 +22,8 @@
 #include <cstdlib> // size_t
 #include <cstdint> // unint8_t etc
 
+#include <realm/node.hpp>
+
 namespace realm {
 
 enum Action { act_ReturnFirst, act_Sum, act_Max, act_Min, act_Count, act_FindAll, act_Average };
