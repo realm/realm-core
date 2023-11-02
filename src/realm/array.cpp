@@ -197,21 +197,14 @@ void Array::set_encode_array(ArrayEncode* encode_array)
     m_encode_array = encode_array;
 }
 
-void Array::destroy_node()
+void Array::destroy_encode_array()
 {
-    Node::destroy();
-}
-
-void Array::destroy()
-{
-    if (m_encode_array && m_encode_array->is_attached()) {
-        m_encode_array->destroy();
-    }
     if (m_encode_array) {
+        if (m_encode_array->is_attached())
+            m_encode_array->destroy();
         delete m_encode_array;
         m_encode_array = nullptr;
     }
-    destroy_node();
 }
 
 template <size_t w>
@@ -226,7 +219,6 @@ int64_t Array::get(size_t ndx) const noexcept
 
 int64_t Array::get(size_t ndx) const noexcept
 {
-    // std::cout << "Directory array::get" << std::hex << this << std::endl;
     if (is_encoded())
         return m_encode_array->get(ndx);
 
@@ -255,14 +247,16 @@ int64_t Array::get(size_t ndx) const noexcept
 
 bool Array::try_encode()
 {
-    REALM_ASSERT(m_encode_array);
-    return m_encode_array->encode();
+    if (m_encode_array)
+        return m_encode_array->encode();
+    return false;
 }
 
 bool Array::try_decode()
 {
-    REALM_ASSERT(m_encode_array);
-    return m_encode_array->decode();
+    if (m_encode_array)
+        return m_encode_array->decode();
+    return false;
 }
 
 #endif
@@ -307,9 +301,10 @@ void Array::init_from_mem(MemRef mem) noexcept
 
 MemRef Array::get_mem() const noexcept
 {
-    if (m_encode_array && m_encode_array->is_encoded()) {
-        return MemRef(get_header_from_data(m_encode_array->get_data()), m_encode_array->get_ref(), m_alloc);
-    }
+    decode_array();
+    // if (is_encoded) {
+    //     return MemRef(get_header_from_data(m_encode_array->get_data()), m_encode_array->get_ref(), m_alloc);
+    // }
     return MemRef(get_header_from_data(m_data), m_ref, m_alloc);
 }
 
@@ -416,13 +411,14 @@ ref_type Array::do_write_deep(_impl::ArrayWriterBase& out, bool only_if_modified
 
 void Array::move(size_t begin, size_t end, size_t dest_begin)
 {
+    decode_array();
+
     REALM_ASSERT_3(begin, <=, end);
     REALM_ASSERT_3(end, <=, m_size);
     REALM_ASSERT_3(dest_begin, <=, m_size);
     REALM_ASSERT_3(end - begin, <=, m_size - dest_begin);
     REALM_ASSERT(!(dest_begin >= begin && dest_begin < end)); // Required by std::copy
 
-    decode_array();
 
     // Check if we need to copy before modifying
     copy_on_write(); // Throws
@@ -518,6 +514,8 @@ void Array::add_positive_local(int64_t value)
 
 size_t Array::blob_size() const noexcept
 {
+    decode_array();
+
     if (get_context_flag()) {
         size_t total_size = 0;
         for (size_t i = 0; i < size(); ++i) {
@@ -535,7 +533,7 @@ void Array::insert(size_t ndx, int_fast64_t value)
 {
     decode_array();
     insert_no_encoding(ndx, value);
-    encode_array();
+    // encode_array();
 }
 
 void Array::insert_no_encoding(size_t ndx, int_fast64_t value)
@@ -647,6 +645,7 @@ void Array::truncate_and_destroy_children(size_t new_size)
 
 void Array::do_ensure_minimum_width(int_fast64_t value)
 {
+    decode_array();
 
     // Make room for the new value
     const size_t width = bit_width(value);
@@ -668,8 +667,8 @@ void Array::do_ensure_minimum_width(int_fast64_t value)
 size_t Array::size() const noexcept
 {
     if (is_encoded())
-        return m_encode_array->size();
-    return Node::size();
+        m_encode_array->size();
+    return m_size;
 }
 
 bool Array::encode_array() const
@@ -779,6 +778,7 @@ size_t find_zero(uint64_t v)
 
 int64_t Array::sum(size_t start, size_t end) const
 {
+    decode_array();
     REALM_TEMPEX(return sum, m_width, (start, end));
 }
 
@@ -947,6 +947,7 @@ int64_t Array::sum(size_t start, size_t end) const
 
 size_t Array::count(int64_t value) const noexcept
 {
+    decode_array();
     const uint64_t* next = reinterpret_cast<uint64_t*>(m_data);
     size_t value_count = 0;
     const size_t end = m_size;
@@ -1174,11 +1175,14 @@ MemRef Array::clone(MemRef mem, Allocator& alloc, Allocator& target_alloc)
         return clone_mem;
     }
 
+    // this can break for integer arrays
+
     // Refs are integers, and integers arrays use wtype_Bits.
     REALM_ASSERT_3(get_wtype_from_header(header), ==, wtype_Bits);
 
     Array array{alloc};
     array.init_from_mem(mem);
+    array.decode_array();
 
     // Create new empty array of refs
     Array new_array(target_alloc);
@@ -1259,6 +1263,7 @@ MemRef Array::create(Type type, bool context_flag, WidthType width_type, size_t 
 template <class cond, size_t bitwidth>
 bool Array::find_vtable(int64_t value, size_t start, size_t end, size_t baseindex, QueryStateBase* state) const
 {
+    decode_array();
     return ArrayWithFind(*this).find_optimized<cond, bitwidth>(value, start, end, baseindex, state, nullptr);
 }
 
@@ -1285,6 +1290,7 @@ const typename Array::VTableForWidth<width>::PopulatedVTable Array::VTableForWid
 
 void Array::update_width_cache_from_header() noexcept
 {
+    decode_array();
     auto width = get_width_from_header(get_header());
     m_lbound = lbound_for_width(width);
     m_ubound = ubound_for_width(width);
@@ -1301,6 +1307,8 @@ template <size_t w>
 void Array::get_chunk(size_t ndx, int64_t res[8]) const noexcept
 {
     REALM_ASSERT_3(ndx, <, m_size);
+
+    decode_array();
 
     size_t i = 0;
 
@@ -1361,6 +1369,7 @@ void Array::get_chunk(size_t ndx, int64_t res[8]) const noexcept
 template <>
 void Array::get_chunk<0>(size_t ndx, int64_t res[8]) const noexcept
 {
+    decode_array();
     REALM_ASSERT_3(ndx, <, m_size);
     memset(res, 0, sizeof(int64_t) * 8);
 }
@@ -1369,6 +1378,7 @@ void Array::get_chunk<0>(size_t ndx, int64_t res[8]) const noexcept
 template <size_t width>
 void Array::set(size_t ndx, int64_t value)
 {
+    decode_array();
     set_direct<width>(m_data, ndx, value);
 }
 
@@ -1404,8 +1414,7 @@ void Array::stats(MemStats& stats_dest) const noexcept
 
 void Array::report_memory_usage(MemUsageHandler& handler) const
 {
-    if (is_encoded())
-        decode_array();
+    decode_array();
 
     if (m_has_refs)
         report_memory_usage_2(handler); // Throws
@@ -1426,8 +1435,7 @@ void Array::report_memory_usage(MemUsageHandler& handler) const
 void Array::report_memory_usage_2(MemUsageHandler& handler) const
 {
     Array subarray(m_alloc);
-    if (subarray.is_encoded())
-        subarray.decode_array();
+    subarray.decode_array();
     for (size_t i = 0; i < m_size; ++i) {
         int_fast64_t value = get(i);
         // Skip null refs and values that are not refs. Values are not refs when
@@ -1464,6 +1472,9 @@ void Array::report_memory_usage_2(MemUsageHandler& handler) const
 void Array::verify() const
 {
 #ifdef REALM_DEBUG
+
+    decode_array();
+
     REALM_ASSERT(is_attached());
 
     REALM_ASSERT(m_width == 0 || m_width == 1 || m_width == 2 || m_width == 4 || m_width == 8 || m_width == 16 ||
@@ -1480,23 +1491,28 @@ void Array::verify() const
 
 size_t Array::lower_bound_int(int64_t value) const noexcept
 {
+    decode_array();
     REALM_TEMPEX(return lower_bound, m_width, (m_data, m_size, value));
 }
 
 size_t Array::upper_bound_int(int64_t value) const noexcept
 {
+    decode_array();
     REALM_TEMPEX(return upper_bound, m_width, (m_data, m_size, value));
 }
 
 
 size_t Array::find_first(int64_t value, size_t start, size_t end) const
 {
+    decode_array();
     return find_first<Equal>(value, start, end);
 }
 
 
 int_fast64_t Array::get(const char* header, size_t ndx) noexcept
 {
+    // this is going to break for compressed arrays
+
     const char* data = get_data_from_header(header);
     uint_least8_t width = get_width_from_header(header);
     return get_direct(data, width, ndx);
@@ -1505,6 +1521,8 @@ int_fast64_t Array::get(const char* header, size_t ndx) noexcept
 
 std::pair<int64_t, int64_t> Array::get_two(const char* header, size_t ndx) noexcept
 {
+    // this is going to break for compressed arrays
+
     const char* data = get_data_from_header(header);
     uint_least8_t width = get_width_from_header(header);
     std::pair<int64_t, int64_t> p = ::get_two(data, width, ndx);

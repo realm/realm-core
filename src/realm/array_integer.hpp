@@ -32,7 +32,10 @@ public:
     using Array::find_first;
 
     explicit ArrayInteger(Allocator&) noexcept;
-    ~ArrayInteger() noexcept override {}
+    ~ArrayInteger() noexcept override
+    {
+        destroy_encode_array();
+    }
 
     static value_type default_value(bool)
     {
@@ -64,11 +67,6 @@ public:
     }
     template <class cond, class Callback>
     bool find(value_type value, size_t start, size_t end, QueryStateBase* state, Callback callback) const;
-
-private:
-    // copy on write for compressed array
-    void copy_on_write();
-    void copy_on_write(size_t min_size);
 };
 
 class ArrayIntNull : public Array, public ArrayPayload {

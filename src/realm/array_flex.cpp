@@ -153,7 +153,7 @@ size_t ArrayFlex::size() const
     if (get_encode_info(value_width, index_width, value_size, index_size)) {
         return index_size;
     }
-    return m_array.size();
+    return 0;
 }
 
 int64_t ArrayFlex::get(size_t ndx) const
@@ -233,10 +233,10 @@ bool ArrayFlex::try_encode(std::vector<uint64_t>& values, std::vector<size_t>& i
         NodeHeader::set_arrayA_num_elements<Encoding::Flex>(addr, values.size());
         NodeHeader::set_arrayB_num_elements<Encoding::Flex>(addr, indices.size());
         NodeHeader::set_elementA_size<Encoding::Flex>(addr, value_bit_width);
-        NodeHeader::set_elementB_size<Encoding::Flex>(addr, index_bit_width);
+        NodeHeader::set_elementB_size<Encoding::Flex>(addr, index_bit_width == 0 ? 1 : index_bit_width);
 
         m_array.detach();
-        m_array.destroy_node();
+        m_array.destroy();
         return true;
     }
     return false;

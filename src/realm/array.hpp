@@ -96,16 +96,6 @@ public:
 
     virtual ~Array() noexcept = default;
 
-    void destroy();
-    void destroy_node();
-    //    static void destroy(ref_type ref, Allocator& alloc) noexcept
-    //    {
-    //        Node::destroy(MemRef(ref, alloc), alloc);
-    //    }
-    //    static void destroy(MemRef mem, Allocator& alloc) noexcept
-    //    {
-    //        Node::destroy(mem, alloc);
-    //    }
 
     /// Set encoding/deconding array for this array in order to implement the
     /// encoding algorithm selected for this type of Array.
@@ -490,6 +480,9 @@ public:
     static size_t bit_width(int64_t value);
 
 protected:
+    // destroy encoded array
+    void destroy_encode_array();
+
     // for compressed arrays only
     void insert_no_encoding(size_t ndx, int_fast64_t value);
     void add_no_encoding(int_fast64_t value);

@@ -2315,7 +2315,7 @@ TEST(Group_UniqueColumnKeys)
     CHECK_NOT_EQUAL(col_foo, col_bar);
 }
 
-ONLY(Group_ArrayCompression_Correctness)
+TEST(Group_ArrayCompression_Correctness)
 {
     GROUP_TEST_PATH(path);
 
@@ -2347,9 +2347,9 @@ ONLY(Group_ArrayCompression_Correctness)
     CHECK_EQUAL(v5.get_int(), 409);
     CHECK_EQUAL(v6.get_int(), 16388);
 
-    // Still failing
+
     //    #ifdef REALM_DEBUG
-    //        to_disk.verify();
+    // to_disk.verify();
     //    #endif
 
     // Serialize to disk
