@@ -784,14 +784,16 @@ TEST_CASE("New table is synced after migration", "[sync][flx][flx migration][baa
         REQUIRE(!wait_for_upload(*realm));
         REQUIRE(!wait_for_download(*realm));
 
-        auto table = realm->read_group().get_table("class_Object");
-        CHECK(table->size() == 5);
-        auto table2 = realm->read_group().get_table("class_Object2");
-        CHECK(table2->size() == 1);
         auto sync_session = realm->sync_session();
         REQUIRE(sync_session);
         auto sub_store = sync_session->get_flx_subscription_store();
         REQUIRE(sub_store);
+        sub_store->get_latest().get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
+
+        auto table = realm->read_group().get_table("class_Object");
+        CHECK(table->size() == 5);
+        auto table2 = realm->read_group().get_table("class_Object2");
+        CHECK(table2->size() == 1);
         auto active_subs = sub_store->get_active();
         REQUIRE(active_subs.size() == 2);
         REQUIRE(active_subs.find("flx_migrated_Object2"));
