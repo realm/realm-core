@@ -127,19 +127,9 @@ private:
 
     void set_column_attr(size_t column_ndx, ColumnAttrMask attr);
 
-    // Migration
-    bool convert_column_attributes();
-    bool convert_column_keys(TableKey table_key);
-    void fix_column_keys(TableKey table_key);
-
-
-    // Generate a column key only from state in the spec.
-    ColKey update_colkey(ColKey existing_key, size_t spec_ndx, TableKey table_key);
     /// Construct an empty spec and return just the reference to the
     /// underlying memory.
     static MemRef create_empty_spec(Allocator&);
-
-    size_t get_subspec_ndx(size_t column_ndx) const noexcept;
 
     friend class Group;
     friend class Table;
