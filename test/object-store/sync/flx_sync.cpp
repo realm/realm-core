@@ -1185,19 +1185,23 @@ TEST_CASE("flx: client reset", "[sync][flx][client reset][baas]") {
         return schema;
     };
     SECTION("Recover: additive schema changes are recovered in dev mode") {
+        const AppSession& app_session = harness.session().app_session();
+        app_session.admin_api.set_development_mode_to(app_session.server_app_id, true);
         seed_realm(config_local, ResetMode::InitiateClientReset);
         std::vector<ObjectSchema> changed_schema = make_additive_changes(schema);
         config_local.schema = changed_schema;
         config_local.sync_config->client_resync_mode = ClientResyncMode::Recover;
+        ThreadSafeReference ref_async;
         auto future = setup_reset_handlers_for_schema_validation(config_local, changed_schema);
         async_open_realm(config_local, [&](ThreadSafeReference&& ref, std::exception_ptr error) {
             REQUIRE(ref);
             REQUIRE_FALSE(error);
+            ref_async = std::move(ref);
         });
         future.get();
         CHECK(before_reset_count == 1);
         CHECK(after_reset_count == 1);
-        auto realm = Realm::get_shared_realm(config_local);
+        auto realm = Realm::get_shared_realm(std::move(ref_async));
         {
             // make changes to the newly added property
             realm->begin_transaction();
@@ -1223,7 +1227,7 @@ TEST_CASE("flx: client reset", "[sync][flx][client reset][baas]") {
                           .get_state_change_notification(sync::SubscriptionSet::State::Complete)
                           .get();
         CHECK(result == sync::SubscriptionSet::State::Complete);
-        wait_for_download(*realm);
+        wait_for_advance(*realm);
     }
 
     SECTION("DiscardLocal: additive schema changes not allowed") {

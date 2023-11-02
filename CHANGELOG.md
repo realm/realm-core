@@ -11,6 +11,7 @@
 * Fixed FLX subscriptions not being sent to the server if the session was interrupted during bootstrapping. ([#7077](https://github.com/realm/realm-core/issues/7077), since v11.8.0)
 * Fixed FLX subscriptions not being sent to the server if an upload message was sent immediately after a subscription was committed but before the sync client checks for new subscriptions via `SubscriptionStore::get_next_pending_version()`. ([#7076](https://github.com/realm/realm-core/issues/7076), since v13.23.1)
 * Fixed application crash with 'KeyNotFound' exception when subscriptions are marked complete after a client reset. ([#7090](https://github.com/realm/realm-core/issues/7090), since v12.3.0)
+* Fixed an error "Invalid schema change (UPLOAD): cannot process AddColumn instruction for non-existent table" when using automatic client reset with recovery in dev mode to recover schema changes made locally while offline. ([#7042](https://github.com/realm/realm-core/pull/7042) since the server introduced the feature that allows client to redefine the server's schema if the server is in dev mode - fall 2023)
 
 ### Breaking changes
 * None.
