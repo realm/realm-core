@@ -3303,6 +3303,11 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
         }
         r->commit_transaction();
 
+        auto delay = std::chrono::seconds(300);
+        if (TEST_TIMEOUT_EXTRA > 0) {
+            delay += std::chrono::seconds(TEST_TIMEOUT_EXTRA * 5);
+        }
+
         auto error = wait_for_future(std::move(pf.future), std::chrono::minutes(5)).get();
         REQUIRE(error.status == ErrorCodes::LimitExceeded);
         REQUIRE(error.status.reason() ==

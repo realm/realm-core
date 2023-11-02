@@ -80,6 +80,10 @@ int main(int argc, const char** argv)
         }
     }
 
+#ifdef TEST_TIMEOUT_EXTRA
+    std::cout << "Test wait timeouts extended by " << TEST_TIMEOUT_EXTRA << " seconds" << std::endl;
+#endif
+
 #if TEST_SCHEDULER_UV
     realm::util::Scheduler::set_default_factory([]() {
         return std::make_shared<realm::util::UvMainLoopScheduler>();

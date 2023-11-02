@@ -139,7 +139,7 @@ functions:
           set_cmake_var realm_vars REALM_TEST_LOGGING_LEVEL STRING "${test_logging_level|debug}"
 
           if [[ -n "${test_timeout_extra|}" ]]; then
-              set_cmake_var realm_vars REALM_TEST_TIMEOUT_EXTRA ${test_timeout_extra}
+              set_cmake_var realm_vars REALM_TEST_TIMEOUT_EXTRA STRING ${test_timeout_extra}
           fi
 
           GENERATOR="${cmake_generator}"
@@ -1442,7 +1442,7 @@ buildvariants:
   - name: fuzzer-tests
 
 - name: ubuntu2004-network-nonideal
-  display_name: "Ubuntu 20.04 x86_64 (Utunbu2004 Baas network tests - nonideal transfer)"
+  display_name: "Ubuntu 20.04 x86_64 (Utunbu2004 - nonideal transfer)"
   run_on: ubuntu2004-large
   expansions:
     clang_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/clang%2Bllvm-11.0.0-x86_64-linux-gnu-ubuntu-20.04.tar.xz"
@@ -1464,7 +1464,7 @@ buildvariants:
   - name: network_tests
 
 - name: ubuntu2004-network-faulty
-  display_name: "Ubuntu 20.04 x86_64 (Utunbu2004 Baas network tests - network faults)"
+  display_name: "Ubuntu 20.04 x86_64 (Utunbu2004 - network faults)"
   run_on: ubuntu2004-large
   expansions:
     clang_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/clang%2Bllvm-11.0.0-x86_64-linux-gnu-ubuntu-20.04.tar.xz"
