@@ -38,11 +38,27 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-if(NOT APPLE)
-    # TODO: Core APIs should always built for internal usage. But there seems to be issues with cocoa. Enable it only for Android for now.
-    set(CMAKE_CXX_VISIBILITY_PRESET hidden)
-elseif(APPLE)
-    set(CMAKE_VISIBILITY_INLINES_HIDDEN 1)
+if (REALM_BUILD_LIB_ONLY OR REALM_NO_TESTS)
+    if (NOT APPLE)
+        # TODO: Core APIs should always built for internal usage. But there seems to be issues with cocoa. Enable it only for Android for now.
+        set(CMAKE_CXX_VISIBILITY_PRESET hidden)
+    elseif (APPLE)
+        set(CMAKE_VISIBILITY_INLINES_HIDDEN 1)
+    endif()
+elseif (UNIX)
+    if (NOT APPLE)
+        # This enables symbols in backtraces, should be the same as -rdynamic
+        if (${CMAKE_VERSION} VERSION_GREATER_EQUAL "3.27.0")
+            set(CMAKE_EXECUTABLE_ENABLE_EXPORTS ON)
+        else()
+            set(CMAKE_ENABLE_EXPORTS ON)
+        endif()
+    endif()
+
+    # MEMO: -fvisibility=hidden prevents -rdynamic and symbols in backtrace_symbols
+    # so omit set(CMAKE_CXX_VISIBILITY_PRESET hidden)
+    # ...also add more details for backtraces on assertions
+    set(CMAKE_VISIBILITY_INLINES_HIDDEN 0)
 endif()
 
 function(check_if_cxx_compiler_flag_supported flag out_var)
