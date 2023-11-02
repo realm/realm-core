@@ -127,9 +127,7 @@ public:
         m_ref = mem.get_ref();
         m_data = get_data_from_header(header);
         auto v = NodeHeader::get_kind((uint64_t*)header);
-        if (Encoding{v} == Encoding::Flex)
-            m_size = NodeHeader::get_arrayB_num_elements<Encoding::Flex>((uint64_t*)header);
-        else
+        if (Encoding{v} != Encoding::Flex)
             m_size = get_size_from_header(header);
         return header;
     }

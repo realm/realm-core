@@ -23,6 +23,11 @@
 #include <vector>
 #include <algorithm>
 
+#ifdef REALM_DEBUG
+#include <iostream>
+#include <sstream>
+#endif
+
 using namespace realm;
 
 ArrayFlex::ArrayFlex(Array& array)
@@ -45,7 +50,7 @@ void ArrayFlex::init_array_encode(MemRef mem)
     const auto compressed_indices_size = index_width * index_size;
     const auto compressed_size = compressed_values_size + compressed_indices_size;
     const size_t size = Array::header_size + compressed_size;
-    create(Type::type_Normal, false, size);
+    create(Type::type_Normal);
     auto dst_header = Array::get_header();
     using Encoding = NodeHeader::Encoding;
     NodeHeader::set_kind((uint64_t*)dst_header,
@@ -72,16 +77,14 @@ void ArrayFlex::init_array_encode(MemRef mem)
         ++dst_it_index;
         ++src_it_index;
     }
-    m_size = index_size;
-    m_data = dst_data;
     REALM_ASSERT(Encoding{NodeHeader::get_kind((uint64_t*)dst_header)} == Encoding::Flex);
 }
 
 bool ArrayFlex::encode()
 {
+    const auto sz = m_array.size();
     std::vector<uint64_t> values;
     std::vector<size_t> indices;
-    auto sz = m_array.size();
     if (!is_encoded() && try_encode(values, indices)) {
         REALM_ASSERT(!values.empty());
         REALM_ASSERT(!indices.empty());
@@ -111,23 +114,29 @@ bool ArrayFlex::encode()
 
 bool ArrayFlex::decode()
 {
+    // std::cout << "Check flex decoded " << std::endl;
     size_t value_width, index_width, value_size, index_size;
     if (get_encode_info(value_width, index_width, value_size, index_size)) {
-        // recreate the array
-        m_array.create(NodeHeader::Type::type_Normal);
+        // std::cout << "Array flex decoded " << std::endl;
+        std::vector<uint64_t> values;
         auto data = (uint64_t*)get_data_from_header(get_header());
         const auto offset = value_size * value_width;
         bf_iterator index_iterator{data, offset, index_width, index_width, 0};
         for (size_t i = 0; i < index_size; ++i) {
-            const auto index = (int)index_iterator.get_value();
+            const auto index = (uint64_t)index_iterator.get_value();
             const auto value = read_bitfield(data, index * value_width, value_width);
-            // avoid a chicken&egg problem.
-            m_array.add_no_encoding(value);
+            values.push_back(value);
             ++index_iterator;
         }
-        REALM_ASSERT(m_array.size() == index_size);
         // free encoded array
         destroy();
+        // std::cout << "Re-adding into array " << std::endl;
+        m_array.create(NodeHeader::Type::type_Normal);
+        size_t i = 0;
+        for (const auto& v : values)
+            m_array.insert_no_encoding(i++, v);
+        const auto sz = m_array.size();
+        REALM_ASSERT(sz == values.size());
         return true;
     }
     return false;
@@ -153,7 +162,8 @@ size_t ArrayFlex::size() const
     if (get_encode_info(value_width, index_width, value_size, index_size)) {
         return index_size;
     }
-    return 0;
+    // calling array flex size for a uncompressed array is an error.
+    REALM_UNREACHABLE();
 }
 
 int64_t ArrayFlex::get(size_t ndx) const
@@ -171,7 +181,7 @@ int64_t ArrayFlex::get(size_t ndx) const
         int64_t v = read_bitfield(data, index * value_width, value_width);
         return v;
     }
-    return m_array.get(ndx);
+    REALM_UNREACHABLE();
 }
 
 bool ArrayFlex::try_encode(std::vector<uint64_t>& values, std::vector<size_t>& indices)
@@ -212,8 +222,8 @@ bool ArrayFlex::try_encode(std::vector<uint64_t>& values, std::vector<size_t>& i
 
     const auto value = *std::max_element(values.begin(), values.end());
     const auto index = *std::max_element(indices.begin(), indices.end());
-    const auto value_bit_width = bit_width(value);
-    const auto index_bit_width = bit_width(index);
+    const auto value_bit_width = value == 0 ? 1 : bit_width(value);
+    const auto index_bit_width = index == 0 ? 1 : bit_width(index);
     const auto compressed_values_size = value_bit_width * values.size();
     const auto compressed_indices_size = index_bit_width * indices.size();
     const auto compressed_size = compressed_values_size + compressed_indices_size;
@@ -233,10 +243,13 @@ bool ArrayFlex::try_encode(std::vector<uint64_t>& values, std::vector<size_t>& i
         NodeHeader::set_arrayA_num_elements<Encoding::Flex>(addr, values.size());
         NodeHeader::set_arrayB_num_elements<Encoding::Flex>(addr, indices.size());
         NodeHeader::set_elementA_size<Encoding::Flex>(addr, value_bit_width);
-        NodeHeader::set_elementB_size<Encoding::Flex>(addr, index_bit_width == 0 ? 1 : index_bit_width);
+        NodeHeader::set_elementB_size<Encoding::Flex>(addr, index_bit_width);
+
+        REALM_ASSERT(indices.size() == sz);
 
         m_array.detach();
         m_array.destroy();
+        m_array.m_size = indices.size();
         return true;
     }
     return false;

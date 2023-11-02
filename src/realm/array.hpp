@@ -184,6 +184,7 @@ public:
     /// returns false (noexcept:array-set). Note that for a value of zero, the
     /// first criterion is trivially satisfied.
     void set(size_t ndx, int64_t value);
+    void set_no_decode(size_t ndx, int64_t value);
 
     void set_as_ref(size_t ndx, ref_type ref);
 
@@ -753,7 +754,6 @@ inline int64_t Array::back() const noexcept
 
 inline ref_type Array::get_as_ref(size_t ndx) const noexcept
 {
-    decode_array();
     REALM_ASSERT_DEBUG(is_attached());
     REALM_ASSERT_DEBUG_EX(m_has_refs, m_ref, ndx, m_size);
     int64_t v = get(ndx);
@@ -811,6 +811,7 @@ inline bool Array::get_context_flag() const noexcept
 inline void Array::set_context_flag(bool value) noexcept
 {
     if (m_context_flag != value) {
+        decode_array();
         copy_on_write();
         m_context_flag = value;
         set_context_flag_in_header(value, get_header());
@@ -859,6 +860,7 @@ inline ref_type Array::write(ref_type ref, Allocator& alloc, _impl::ArrayWriterB
 
 inline void Array::add(int_fast64_t value)
 {
+    decode_array();
     insert(m_size, value);
 }
 

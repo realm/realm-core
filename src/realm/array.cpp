@@ -219,8 +219,11 @@ int64_t Array::get(size_t ndx) const noexcept
 
 int64_t Array::get(size_t ndx) const noexcept
 {
-    if (is_encoded())
+    if (is_encoded()) {
+        // std::cout << "Encode array::get() " << std::endl;
         return m_encode_array->get(ndx);
+    }
+
 
     REALM_ASSERT_DEBUG(is_attached());
     REALM_ASSERT_DEBUG_EX(ndx < m_size, ndx, m_size);
@@ -289,22 +292,20 @@ void Array::init_from_mem(MemRef mem) noexcept
     m_has_refs = get_hasrefs_from_header(header);
     m_context_flag = get_context_flag_from_header(header);
     update_width_cache_from_header();
-
     // deal with encoding array
     Encoding enconding{NodeHeader::get_kind((uint64_t*)header)};
     if (enconding == Encoding::Flex) {
         // it is an error not to have the encoded array if the array type supports it
         REALM_ASSERT(m_encode_array);
         m_encode_array->init_array_encode(mem);
+        m_size = m_encode_array->size();
     }
 }
 
 MemRef Array::get_mem() const noexcept
 {
-    decode_array();
-    // if (is_encoded) {
-    //     return MemRef(get_header_from_data(m_encode_array->get_data()), m_encode_array->get_ref(), m_alloc);
-    // }
+    if (is_encoded())
+        return MemRef(get_header_from_data(m_encode_array->get_data()), m_encode_array->get_ref(), m_alloc);
     return MemRef(get_header_from_data(m_data), m_ref, m_alloc);
 }
 
@@ -471,7 +472,11 @@ void Array::move(Array& dst, size_t ndx)
 void Array::set(size_t ndx, int64_t value)
 {
     decode_array();
+    set_no_decode(ndx, value);
+}
 
+void Array::set_no_decode(size_t ndx, int64_t value)
+{
     REALM_ASSERT_3(ndx, <, m_size);
     if ((this->*(m_vtable->getter))(ndx) == value)
         return;
@@ -531,9 +536,17 @@ size_t Array::blob_size() const noexcept
 
 void Array::insert(size_t ndx, int_fast64_t value)
 {
-    decode_array();
+    // std::cout << "Array size = " << m_size << std::endl;
+    if (decode_array())
+        ;
+    // std::cout << "Decoded first " << std::endl;
+
+    // std::cout << "Array size = " << m_size << std::endl;
+    // std::cout << "Insert " << ndx << std::endl;
     insert_no_encoding(ndx, value);
-    // encode_array();
+    if (encode_array())
+        ;
+    //    std::cout << "Encoded " << std::endl;
 }
 
 void Array::insert_no_encoding(size_t ndx, int_fast64_t value)
@@ -645,7 +658,7 @@ void Array::truncate_and_destroy_children(size_t new_size)
 
 void Array::do_ensure_minimum_width(int_fast64_t value)
 {
-    decode_array();
+    // decode_array();
 
     // Make room for the new value
     const size_t width = bit_width(value);
@@ -680,8 +693,12 @@ bool Array::encode_array() const
 
 bool Array::decode_array() const
 {
-    if (m_encode_array)
-        return is_encoded() ? m_encode_array->decode() : false;
+    if (m_encode_array) {
+        if (is_encoded()) {
+            // std::cout << "is encoded !! " << std::endl;
+            return m_encode_array->decode();
+        }
+    }
     return false;
 }
 
@@ -947,7 +964,7 @@ int64_t Array::sum(size_t start, size_t end) const
 
 size_t Array::count(int64_t value) const noexcept
 {
-    decode_array();
+    // decode_array();
     const uint64_t* next = reinterpret_cast<uint64_t*>(m_data);
     size_t value_count = 0;
     const size_t end = m_size;
@@ -1182,7 +1199,6 @@ MemRef Array::clone(MemRef mem, Allocator& alloc, Allocator& target_alloc)
 
     Array array{alloc};
     array.init_from_mem(mem);
-    array.decode_array();
 
     // Create new empty array of refs
     Array new_array(target_alloc);
@@ -1263,7 +1279,6 @@ MemRef Array::create(Type type, bool context_flag, WidthType width_type, size_t 
 template <class cond, size_t bitwidth>
 bool Array::find_vtable(int64_t value, size_t start, size_t end, size_t baseindex, QueryStateBase* state) const
 {
-    decode_array();
     return ArrayWithFind(*this).find_optimized<cond, bitwidth>(value, start, end, baseindex, state, nullptr);
 }
 
@@ -1290,7 +1305,6 @@ const typename Array::VTableForWidth<width>::PopulatedVTable Array::VTableForWid
 
 void Array::update_width_cache_from_header() noexcept
 {
-    decode_array();
     auto width = get_width_from_header(get_header());
     m_lbound = lbound_for_width(width);
     m_ubound = ubound_for_width(width);
@@ -1306,10 +1320,8 @@ void Array::update_width_cache_from_header() noexcept
 template <size_t w>
 void Array::get_chunk(size_t ndx, int64_t res[8]) const noexcept
 {
-    REALM_ASSERT_3(ndx, <, m_size);
-
     decode_array();
-
+    REALM_ASSERT_3(ndx, <, m_size);
     size_t i = 0;
 
     // if constexpr to avoid producing spurious warnings resulting from
@@ -1435,7 +1447,6 @@ void Array::report_memory_usage(MemUsageHandler& handler) const
 void Array::report_memory_usage_2(MemUsageHandler& handler) const
 {
     Array subarray(m_alloc);
-    subarray.decode_array();
     for (size_t i = 0; i < m_size; ++i) {
         int_fast64_t value = get(i);
         // Skip null refs and values that are not refs. Values are not refs when
