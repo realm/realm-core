@@ -193,10 +193,10 @@ protected:
     using MakingMutableCopy = util::TaggedBool<class MakingMutableCopyTag>;
 
     explicit SubscriptionSet(std::weak_ptr<const SubscriptionStore> mgr, int64_t version, SupersededTag);
-    explicit SubscriptionSet(std::weak_ptr<const SubscriptionStore> mgr, const Transaction& tr, Obj obj,
-                             MakingMutableCopy making_mutable_copy = MakingMutableCopy(false));
+    explicit SubscriptionSet(std::weak_ptr<const SubscriptionStore> mgr, const Transaction& tr, const Obj& obj,
+                             MakingMutableCopy making_mutable_copy = false);
 
-    void load_from_database(Obj obj);
+    void load_from_database(const Obj& obj);
 
     // Get a reference to the SubscriptionStore. It may briefly extend the lifetime of the store.
     std::shared_ptr<const SubscriptionStore> get_flx_subscription_store() const;
@@ -209,6 +209,7 @@ protected:
     std::string m_error_str;
     DB::version_type m_snapshot_version = -1;
     std::vector<Subscription> m_subs;
+    ObjKey m_obj_key;
 };
 
 class MutableSubscriptionSet : public SubscriptionSet {
@@ -357,6 +358,10 @@ public:
     // with the subscription store.
     void terminate();
 
+    // Recreate the active subscription set, marking any newer pending ones as
+    // superseded. This is a no-op if there are no pending subscription sets.
+    int64_t set_active_as_latest(Transaction& wt);
+
 private:
     using std::enable_shared_from_this<SubscriptionStore>::weak_from_this;
     DBRef m_db;
@@ -380,7 +385,9 @@ protected:
 
     void supercede_prior_to(TransactionRef tr, int64_t version_id) const;
 
-    SubscriptionSet get_by_version_impl(int64_t flx_version, util::Optional<DB::VersionID> version) const;
+    Obj get_active(const Transaction& tr) const;
+    SubscriptionSet get_refreshed(ObjKey, int64_t flx_version,
+                                  std::optional<DB::VersionID> version = util::none) const;
     MutableSubscriptionSet make_mutable_copy(const SubscriptionSet& set) const;
 
     // Ensure the subscriptions table is properly initialized
