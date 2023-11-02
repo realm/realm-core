@@ -1194,6 +1194,7 @@ void ClientHistory::update_from_ref_and_version(ref_type ref, version_type versi
         m_arrays->init_from_ref(ref);
     }
     else {
+        REALM_ASSERT_RELEASE(m_group);
         m_arrays.emplace(m_db->get_alloc(), *m_group, ref);
     }
 

@@ -2,14 +2,47 @@
 
 ### Enhancements
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
-* None.
+* Cancel asynchronous notifications on subscription state change in case of fatal session errors and when the session becomes inactive. ([PR #7073](https://github.com/realm/realm-core/pull/7073))
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* A new design around using a scheduler in C API has enabled the proper release of the user data (See "Breaking Changes") ([#7094](https://github.com/realm/realm-core/issues/7094), since v10.4.0)
+* Potential stack-use-after-scope issue on changesets integration with msvc-2019 and mpack code ([PR #6911](https://github.com/realm/realm-core/pull/6911))
+* Fix compilation with non-beta Xcode 15. Building for visionOS now requires explicitly specifying `-DCMAKE_XCODE_ATTRIBUTE_SDKROOT=xros` (PR [#7055](https://github.com/realm/realm-core/pull/7055)).
+* Fixed FLX subscriptions not being sent to the server if the session was interrupted during bootstrapping. ([#7077](https://github.com/realm/realm-core/issues/7077), since v11.8.0)
+* Fixed FLX subscriptions not being sent to the server if an upload message was sent immediately after a subscription was committed but before the sync client checks for new subscriptions via `SubscriptionStore::get_next_pending_version()`. ([#7076](https://github.com/realm/realm-core/issues/7076), since v13.23.1)
+* Fixed application crash with 'KeyNotFound' exception when subscriptions are marked complete after a client reset. ([#7090](https://github.com/realm/realm-core/issues/7090), since v12.3.0)
 
 ### Breaking changes
+* In the C API, the callback function realm_scheduler_notify_func_t now has a second parameter pointing to a work_queue. This pointer has to be kept until the notifications can be run on the proper thread. Then it has to be passed on to realm_scheduler_perform_work. The value returned from realm_scheduler_new (and friends) should be released after it has been used in realm_config_set_scheduler.
+
+### Compatibility
+* Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
+* REALM_[ATMU]SAN cmake flags no longer override compilation options and can be combined with Debug|RelWithDebInfo|etc. build types. Rel[ATMU]SAN build type shortcuts are now all slightly optimized debug-based builds with sanitizers. REALM_ASAN now works with msvc (2019/2022) builds. ([PR #6911](https://github.com/realm/realm-core/pull/6911))
+* Add support for building against the musl library. ([PR #7067](https://github.com/realm/realm-core/pull/7067))
+* Remove ArrayWithFind's ability to use a templated callback parameter. The QueryStateBase consumers now use an index and the array leaf to get the actual value if needed. This allows certain queries such as count() to not do as many lookups to the actual values and results in a small performance gain. Also remove `find_action_pattern()` which was unused for a long time. This reduction in templating throughout the query system produces a small (~100k) binary size reduction. ([#7095](https://github.com/realm/realm-core/pull/7095))
+* Rework the implemenatation of the set algrebra functions on Set<T> to reduce the compiled size.
+* Add baas-network-tests nightly task for testing sync client operation with non-ideal network conditions. ([PR #6852](https://github.com/realm/realm-core/pull/6852))
+* Added non-ideal network conditions and network fault tests to the evergreen nightly test runs. ([PR #7063](https://github.com/realm/realm-core/pull/7063))
+
+----------------------------------------------
+
+# 13.23.2 Release notes
+
+### Enhancements
 * None.
+
+### Fixed
+* Deleting an object in an asymmetric table would cause a crash. Likely to solve [#1537](https://github.com/realm/realm-kotlin/issues/1537), since v12.1.0.
+* Implement BIO_CTRL_GET_KTLS_SEND and BIO_CTRL_GET_KTLS_RECV as OpenSSL versions < 3.0.4 depend on it.
+
+### Breaking changes
+* Added separate enum for callback handler result values in the platform networking C API. ([PR #7015](https://github.com/realm/realm-core/pull/7015))
+* Platform networking CAPI now uses different callback types depending on where callback is used. ([PR #7015](https://github.com/realm/realm-core/pull/7015))
 
 ### Compatibility
 * Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
@@ -18,8 +51,7 @@
 
 ### Internals
 * Update JSON library from 3.7.3 to 3.11.2.
-* Add baas-network-tests nightly task for testing sync client operation with non-ideal network conditions. ([PR #6852](https://github.com/realm/realm-core/pull/6852))
-* Added non-ideal network conditions and network fault tests to the evergreen nightly test runs. ([PR #7063](https://github.com/realm/realm-core/pull/7063))
+* Updated async_write_binary in the Default Socket Provider to properly return a status to the callback handler. ([PR #7015](https://github.com/realm/realm-core/pull/7015))
 
 ----------------------------------------------
 
@@ -32,6 +64,7 @@
 * `SyncManager::path_for_realm()` would return `/<path>/filename.realm.realm` if `custom_file_name` was set to `filename.realm` and the file didn't exist. It would correctly return `/<path>/filename.realm` if the file already existed. After this fix `/<path>/filename.realm` is returned in all cases. ([#7038](https://github.com/realm/realm-core/issues/7038))
 * Fixed a bug preventing SSL handshake from completing successfuly due to failed hostname verification when linking against BoringSSL. (PR [#7034](https://github.com/realm/realm-core/pull/7034))
 * Updating subscriptions did not trigger Realm autorefreshes, sometimes resulting in async refresh hanging until another write was performed by something else ([PR #7031](https://github.com/realm/realm-core/pull/7031)).
+* Fix interprocess locking for concurrent realm file access resulting in a interprocess deadlock on FAT32/exFAT filesystems ([PR #6959](https://github.com/realm/realm-core/pull/6959)).
 
 ### Breaking changes
 * None.
@@ -51,7 +84,7 @@
 ### Enhancements
 * Allow collections of non-embedded links in asymmetric objects. ([PR #7003](https://github.com/realm/realm-core/pull/7003))
 * Flexible sync API improvements:
-  - Erase Subscriptions by class type for C API. 
+  - Erase Subscriptions by class type for C API.
   - `MutableSubscriptionSet::erase(iterator)` now runs in constant time.
   - Introduce `MutableSubscriptionSet::erase_by_id()`.
   - Introduce `MutableSubscriptionSet::erase_by_class_name()`.

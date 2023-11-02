@@ -828,7 +828,7 @@ TEST_CASE("Async open + client reset", "[sync][flx][flx migration][baas]") {
         REQUIRE(before);
         auto table_before = before->read_group().get_table("class_Object");
         CHECK(table_before);
-        SharedRealm after = Realm::get_shared_realm(std::move(after_ref), util::Scheduler::make_default());
+        SharedRealm after = Realm::get_shared_realm(std::move(after_ref), util::Scheduler::make_dummy());
         REQUIRE(after);
         auto table_after = after->read_group().get_table("class_Object");
         REQUIRE(table_after);

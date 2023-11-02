@@ -2340,6 +2340,8 @@ TEST_CASE("flx: writes work without waiting for sync", "[sync][flx][baas]") {
         realm->refresh();
         Results results(realm, table);
         CHECK(results.size() == 1);
+        Obj obj = results.get(0);
+        CHECK(obj.get_primary_key().get_object_id() == bar_obj_id);
         CHECK(table->get_object_with_primary_key({bar_obj_id}).is_valid());
     });
 }
@@ -3467,10 +3469,11 @@ TEST_CASE("flx: bootstraps contain all changes", "[sync][flx][bootstrap][baas]")
 
         interrupted.get();
         problem_realm->sync_session()->shutdown_and_wait();
-        REQUIRE(!sub_complete_future.is_ready());
+        REQUIRE(sub_complete_future.is_ready());
         sub_set.refresh();
         REQUIRE(sub_set.state() == sync::SubscriptionSet::State::AwaitingMark);
 
+        sub_complete_future = sub_set.get_state_change_notification(sync::SubscriptionSet::State::Complete);
         problem_realm->sync_session()->resume();
         sub_complete_future.get();
         wait_for_advance(*problem_realm);
@@ -4368,6 +4371,79 @@ TEST_CASE("flx sync: resend pending subscriptions when reconnecting", "[sync][fl
     auto realm = Realm::get_shared_realm(interrupted_realm_config);
     wait_for_upload(*realm);
     wait_for_download(*realm);
+}
+
+TEST_CASE("flx: fatal errors and session becoming inactive cancel pending waits", "[sync][flx][baas]") {
+    std::vector<ObjectSchema> schema{
+        {"TopLevel",
+         {
+             {"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+             {"queryable_int_field", PropertyType::Int | PropertyType::Nullable},
+         }},
+    };
+
+    FLXSyncTestHarness harness("flx_cancel_pending_waits", {schema, {"queryable_int_field"}});
+    SyncTestFile config(harness.app()->current_user(), harness.schema(), SyncConfig::FLXSyncEnabled{});
+
+    auto check_status = [](auto status) {
+        CHECK(!status.is_ok());
+        std::string reason = status.get_status().reason();
+        // Subscription notification is cancelled either because the sync session is inactive, or because a fatal
+        // error is received from the server.
+        if (reason.find("Sync session became inactive") == std::string::npos &&
+            reason.find("Invalid schema change (UPLOAD): non-breaking schema change: adding \"Int\" column at field "
+                        "\"other_col\" in schema \"TopLevel\", schema changes from clients are restricted when "
+                        "developer mode is disabled") == std::string::npos) {
+            FAIL(reason);
+        }
+    };
+
+    auto create_subscription = [](auto realm) -> realm::sync::SubscriptionSet {
+        auto mut_subs = realm->get_latest_subscription_set().make_mutable_copy();
+        auto table = realm->read_group().get_table("class_TopLevel");
+        mut_subs.insert_or_assign(Query(table));
+        return mut_subs.commit();
+    };
+
+    auto [error_occured_promise, error_occurred] = util::make_promise_future<void>();
+    config.sync_config->error_handler = [promise = util::CopyablePromiseHolder(std::move(error_occured_promise))](
+                                            std::shared_ptr<SyncSession>, SyncError) mutable {
+        promise.get_promise().emplace_value();
+    };
+
+    auto realm = Realm::get_shared_realm(config);
+    wait_for_download(*realm);
+
+    auto subs = create_subscription(realm);
+    auto subs_future = subs.get_state_change_notification(sync::SubscriptionSet::State::Complete);
+
+    realm->sync_session()->pause();
+    auto state = subs_future.get_no_throw();
+    check_status(state);
+
+    auto [download_complete_promise, download_complete] = util::make_promise_future<void>();
+    realm->sync_session()->wait_for_upload_completion([promise = std::move(download_complete_promise)](auto) mutable {
+        promise.emplace_value();
+    });
+    schema[0].persisted_properties.push_back({"other_col", PropertyType::Int | PropertyType::Nullable});
+    realm->update_schema(schema);
+
+    subs = create_subscription(realm);
+    subs_future = subs.get_state_change_notification(sync::SubscriptionSet::State::Complete);
+
+    harness.load_initial_data([&](SharedRealm realm) {
+        CppContext c(realm);
+        Object::create(c, realm, "TopLevel",
+                       std::any(AnyDict{{"_id", ObjectId::gen()},
+                                        {"queryable_int_field", static_cast<int64_t>(5)},
+                                        {"other_col", static_cast<int64_t>(42)}}));
+    });
+
+    realm->sync_session()->resume();
+    download_complete.get();
+    error_occurred.get();
+    state = subs_future.get_no_throw();
+    check_status(state);
 }
 
 } // namespace realm::app

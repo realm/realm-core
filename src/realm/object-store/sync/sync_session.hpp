@@ -382,8 +382,7 @@ private:
         REQUIRES(!m_state_mutex, !m_config_mutex);
     // If sub_notify_error is set (including Status::OK()), then the pending subscription waiters will
     // also be called with the sub_notify_error status value.
-    void cancel_pending_waits(util::CheckedUniqueLock, Status, std::optional<Status> subs_notify_error = std::nullopt)
-        RELEASE(m_state_mutex);
+    void cancel_pending_waits(util::CheckedUniqueLock, Status) RELEASE(m_state_mutex);
     enum class ShouldBackup { yes, no };
     void update_error_and_mark_file_for_deletion(SyncError&, ShouldBackup) REQUIRES(m_state_mutex, !m_config_mutex);
     void handle_progress_update(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t);
@@ -398,7 +397,7 @@ private:
 
     void become_active() REQUIRES(m_state_mutex, !m_config_mutex);
     void become_dying(util::CheckedUniqueLock) RELEASE(m_state_mutex) REQUIRES(!m_connection_state_mutex);
-    void become_inactive(util::CheckedUniqueLock, Status ec = Status::OK()) RELEASE(m_state_mutex)
+    void become_inactive(util::CheckedUniqueLock, Status = Status::OK(), bool = true) RELEASE(m_state_mutex)
         REQUIRES(!m_connection_state_mutex);
     void become_paused(util::CheckedUniqueLock) RELEASE(m_state_mutex) REQUIRES(!m_connection_state_mutex);
     void become_waiting_for_access_token() REQUIRES(m_state_mutex);
@@ -409,7 +408,7 @@ private:
 
     // do_become_inactive is called from both become_paused()/become_inactive() and does all the steps to
     // shutdown and cleanup the sync session besides setting m_state.
-    void do_become_inactive(util::CheckedUniqueLock, Status) RELEASE(m_state_mutex)
+    void do_become_inactive(util::CheckedUniqueLock, Status, bool) RELEASE(m_state_mutex)
         REQUIRES(!m_connection_state_mutex);
     // do_revive is called from both revive_if_needed() and resume(). It does all the steps to transition
     // from a state that is not Active to Active.

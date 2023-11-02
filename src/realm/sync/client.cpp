@@ -123,6 +123,8 @@ public:
 
     void handle_pending_client_reset_acknowledgement();
 
+    void update_subscription_version_info();
+
     std::string get_appservices_connection_id();
 
 private:
@@ -784,6 +786,13 @@ void SessionImpl::handle_pending_client_reset_acknowledgement()
     }
 }
 
+void SessionImpl::update_subscription_version_info()
+{
+    // Ignore the call if the session is not active
+    if (m_state == State::Active) {
+        m_wrapper.update_subscription_version_info();
+    }
+}
 
 bool SessionImpl::process_flx_bootstrap_message(const SyncProgress& progress, DownloadBatchState batch_state,
                                                 int64_t query_version, const ReceivedChangesets& received_changesets)
@@ -1129,11 +1138,7 @@ SessionWrapper::SessionWrapper(ClientImpl& client, DBRef db, std::shared_ptr<Sub
     REALM_ASSERT(m_db->get_replication());
     REALM_ASSERT(dynamic_cast<ClientReplication*>(m_db->get_replication()));
 
-    if (m_flx_subscription_store) {
-        auto versions_info = m_flx_subscription_store->get_version_info();
-        m_flx_active_version = versions_info.active;
-        m_flx_pending_mark_version = versions_info.pending_mark;
-    }
+    update_subscription_version_info();
 }
 
 SessionWrapper::~SessionWrapper() noexcept
@@ -1819,6 +1824,15 @@ void SessionWrapper::handle_pending_client_reset_acknowledgement()
         _impl::client_reset::remove_pending_client_resets(wt);
         wt->commit();
     });
+}
+
+void SessionWrapper::update_subscription_version_info()
+{
+    if (!m_flx_subscription_store)
+        return;
+    auto versions_info = m_flx_subscription_store->get_version_info();
+    m_flx_active_version = versions_info.active;
+    m_flx_pending_mark_version = versions_info.pending_mark;
 }
 
 std::string SessionWrapper::get_appservices_connection_id()
