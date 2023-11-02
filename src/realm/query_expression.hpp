@@ -1548,15 +1548,15 @@ public:
         ArrayPayload* array_ptr;
         switch (m_link_types[0]) {
             case col_type_Link:
-                if (m_link_column_keys[0].is_dictionary()) {
+                if (m_link_column_keys[0].is_list()) {
+                    array_ptr = &m_leaf.emplace<ArrayList>(alloc);
+                }
+                else if (m_link_column_keys[0].is_dictionary()) {
                     array_ptr = &m_leaf.emplace<ArrayInteger>(alloc);
                 }
                 else {
                     array_ptr = &m_leaf.emplace<ArrayKey>(alloc);
                 }
-                break;
-            case col_type_LinkList:
-                array_ptr = &m_leaf.emplace<ArrayList>(alloc);
                 break;
             case col_type_BackLink:
                 array_ptr = &m_leaf.emplace<ArrayBacklink>(alloc);
@@ -3692,7 +3692,7 @@ Query compare(const Subexpr2<Link>& left, const Obj& obj)
 #ifdef REALM_OLDQUERY_FALLBACK
         if (link_map.get_nb_hops() == 1) {
             // We can fall back to Query::links_to for != and == operations on links
-            if (link_map.m_link_types[0] == col_type_Link || (link_map.m_link_types[0] == col_type_LinkList)) {
+            if (link_map.m_link_types[0] == col_type_Link) {
                 ConstTableRef t = column->get_base_table();
                 Query query(t);
 

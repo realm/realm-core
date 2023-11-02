@@ -824,8 +824,6 @@ size_t Cluster::erase(ObjKey key, CascadeState& state)
 
     auto erase_in_column = [&](ColKey col_key) {
         auto col_type = col_key.get_type();
-        if (col_type == col_type_LinkList)
-            col_type = col_type_Link;
         auto attr = col_key.get_attrs();
         if (attr.test(col_attr_Collection)) {
             auto col_ndx = col_key.get_index();
@@ -1151,7 +1149,7 @@ void Cluster::verify() const
                 case col_type_UUID:
                     verify_list<UUID>(arr, *sz);
                     break;
-                case col_type_LinkList:
+                case col_type_Link:
                     verify_list<ObjKey>(arr, *sz);
                     break;
                 default:

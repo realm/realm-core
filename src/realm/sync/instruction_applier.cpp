@@ -410,7 +410,7 @@ void InstructionApplier::operator()(const Instruction::Update& instr)
                         auto& mixed_list = static_cast<Lst<Mixed>&>(list);
                         mixed_list.set(index, link);
                     }
-                    else if (data_type == type_LinkList || data_type == type_Link) {
+                    else if (data_type == type_Link) {
                         REALM_ASSERT(dynamic_cast<Lst<ObjKey>*>(&list));
                         auto& link_list = static_cast<Lst<ObjKey>&>(list);
                         // Validate the target.
@@ -561,9 +561,6 @@ void InstructionApplier::operator()(const Instruction::AddColumn& instr)
     if (ColKey existing_key = table->get_column_key(col_name)) {
         DataType new_type = get_data_type(instr.type);
         ColumnType existing_type = existing_key.get_type();
-        if (existing_type == col_type_LinkList) {
-            existing_type = col_type_Link;
-        }
         if (existing_type != ColumnType(new_type)) {
             bad_transaction_log("AddColumn: Schema mismatch for existing column in '%1.%2' (expected %3, got %4)",
                                 table->get_name(), col_name, existing_type, new_type);
@@ -1273,7 +1270,7 @@ LstBasePtr InstructionApplier::get_list_from_path(Obj& obj, ColKey col)
     // links.
     REALM_ASSERT(col.is_list());
     LstBasePtr list;
-    if (col.get_type() == col_type_Link || col.get_type() == col_type_LinkList) {
+    if (col.get_type() == col_type_Link) {
         auto table = obj.get_table();
         if (!table->get_link_target(col)->is_embedded()) {
             list = obj.get_list_ptr<ObjKey>(col);
@@ -1509,7 +1506,7 @@ InstructionApplier::PathResolver::Status InstructionApplier::PathResolver::resol
     auto col = list.get_col_key();
     auto field_name = list.get_table()->get_column_name(col);
 
-    if (col.get_type() == col_type_LinkList) {
+    if (col.get_type() == col_type_Link) {
         auto target = list.get_table()->get_link_target(col);
         if (!target->is_embedded()) {
             on_error(util::format("%1: Reference through non-embedded link at '%3.%2[%4]'", m_instr_name, field_name,

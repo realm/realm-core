@@ -750,6 +750,7 @@ private:
     // Migration support
     void migrate_sets_and_dictionaries();
     void migrate_set_orderings();
+    void migrate_col_keys();
 
     /// Disable copying assignment.
     ///
@@ -1062,8 +1063,6 @@ public:
 
         // Check if user-given template type equals Realm type.
         auto ct = col_key.get_type();
-        if (ct == col_type_LinkList)
-            ct = col_type_Link;
         if constexpr (std::is_same_v<T, Dictionary>) {
             if (!col_key.is_dictionary())
                 throw LogicError(ErrorCodes::TypeMismatch, "Not a dictionary");
@@ -1337,7 +1336,7 @@ inline bool Table::operator!=(const Table& t) const
 
 inline bool Table::is_link_type(ColumnType col_type) noexcept
 {
-    return col_type == col_type_Link || col_type == col_type_LinkList;
+    return col_type == col_type_Link;
 }
 
 inline void Table::set_ndx_in_parent(size_t ndx_in_parent) noexcept

@@ -225,7 +225,6 @@ static inline realm_value_t to_capi(Mixed value)
                 break;
             }
 
-            case type_LinkList:
             case type_Mixed:
                 REALM_TERMINATE("Invalid Mixed value type"); // LCOV_EXCL_LINE
             default:

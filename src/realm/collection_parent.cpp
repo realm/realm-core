@@ -207,10 +207,8 @@ LstBasePtr CollectionParent::get_listbase_ptr(ColKey col_key) const
         case type_Mixed: {
             return std::make_unique<Lst<Mixed>>(col_key, get_level() + 1);
         }
-        case type_LinkList:
-            return std::make_unique<LnkLst>(col_key);
         case type_Link:
-            break;
+            return std::make_unique<LnkLst>(col_key);
     }
     REALM_TERMINATE("Unsupported column type");
 }
@@ -280,8 +278,6 @@ SetBasePtr CollectionParent::get_setbase_ptr(ColKey col_key) const
         case type_Link: {
             return std::make_unique<LnkSet>(col_key);
         }
-        case type_LinkList:
-            break;
     }
     REALM_TERMINATE("Unsupported column type.");
 }

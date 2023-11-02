@@ -260,8 +260,6 @@ void Obj::to_json(std::ostream& out, size_t link_depth, const std::map<std::stri
     for (auto ck : col_keys) {
         name = m_table->get_column_name(ck);
         auto type = ck.get_type();
-        if (type == col_type_LinkList)
-            type = col_type_Link;
         if (renames.count(name))
             name = renames.at(name);
 
@@ -481,7 +479,6 @@ void Mixed::to_xjson(std::ostream& out) const noexcept
             break;
         }
         case type_Link:
-        case type_LinkList:
         case type_Mixed:
             break;
     }
@@ -570,7 +567,6 @@ void Mixed::to_json(std::ostream& out, JSONOutputMode output_mode) const noexcep
                     out << "\"";
                     break;
                 case type_Link:
-                case type_LinkList:
                 case type_Mixed:
                     break;
             }

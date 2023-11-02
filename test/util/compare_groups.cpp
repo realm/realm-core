@@ -344,7 +344,7 @@ bool compare_schemas(const Table& table_1, const Table& table_2, util::Logger& l
                 equal = false;
                 continue;
             }
-            if (type_1 == type_Link || type_1 == type_LinkList) {
+            if (type_1 == type_Link) {
                 ConstTableRef target_1 = table_1.get_link_target(key_1);
                 ConstTableRef target_2 = table_2.get_link_target(key_2);
                 if (target_1->get_name() != target_2->get_name()) {
@@ -476,7 +476,7 @@ bool compare_lists(const Column& col, const Obj& obj_1, const Obj& obj_2, util::
         case type_TypedLink:
             // FIXME: Implement
             break;
-        case type_LinkList: {
+        case type_Link: {
             auto a = obj_1.get_list<ObjKey>(col.key_1);
             auto b = obj_2.get_list<ObjKey>(col.key_2);
             if (a.size() != b.size()) {
@@ -541,8 +541,6 @@ bool compare_lists(const Column& col, const Obj& obj_1, const Obj& obj_2, util::
             }
             break;
         }
-        case type_Link:
-            REALM_TERMINATE("Unsupported column type.");
     }
 
     return true;
@@ -702,8 +700,6 @@ bool compare_sets(const Column& col, const Obj& obj_1, const Obj& obj_2, util::L
         case type_TypedLink:
             // FIXME: Implement
             break;
-        case type_LinkList:
-            REALM_TERMINATE("Unsupported column type.");
     }
 
     return true;
@@ -933,8 +929,6 @@ bool compare_objects(const Obj& obj_1, const Obj& obj_2, const std::vector<Colum
 
                 continue;
             }
-            case type_LinkList:
-                break;
         }
         REALM_TERMINATE("Unsupported column type.");
     }

@@ -1112,8 +1112,6 @@ void ClusterTree::remove_all_links(CascadeState& state)
                 return IteratorControl::AdvanceToNext;
             }
             auto col_type = col_key.get_type();
-            if (col_type == col_type_LinkList)
-                col_type = col_type_Link;
             if (col_key.is_collection()) {
                 ArrayInteger values(alloc);
                 cluster->init_leaf(col_key, &values);

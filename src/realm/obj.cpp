@@ -1008,7 +1008,7 @@ FullPath Obj::get_path() const
                 ColumnAttrMask attr = next_col_key.get_attrs();
                 Mixed index;
                 if (attr.test(col_attr_List)) {
-                    REALM_ASSERT(next_col_key.get_type() == col_type_LinkList);
+                    REALM_ASSERT(next_col_key.get_type() == col_type_Link);
                     Lst<ObjKey> link_list(next_col_key);
                     size_t i = find_link_value_in_collection(link_list, obj, next_col_key, get_key());
                     REALM_ASSERT(i != realm::not_found);
@@ -2369,7 +2369,6 @@ Obj& Obj::set_null(ColKey col_key, bool is_default)
                 break;
             case col_type_Mixed:
             case col_type_Link:
-            case col_type_LinkList:
             case col_type_BackLink:
             case col_type_TypedLink:
                 REALM_UNREACHABLE();

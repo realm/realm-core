@@ -54,7 +54,6 @@ struct DataType {
         Double = 10,
         Decimal = 11,
         Link = 12,
-        LinkList = 13,
         ObjectId = 15,
         TypedLink = 16,
         UUID = 17,
@@ -118,7 +117,6 @@ struct DataType {
             case Type::Double:
             case Type::Decimal:
             case Type::Link:
-            case Type::LinkList:
             case Type::ObjectId:
             case Type::TypedLink:
             case Type::UUID:
@@ -140,7 +138,6 @@ static constexpr DataType type_Float = DataType{DataType::Type::Float};
 static constexpr DataType type_Double = DataType{DataType::Type::Double};
 static constexpr DataType type_Decimal = DataType{DataType::Type::Decimal};
 static constexpr DataType type_Link = DataType{DataType::Type::Link};
-static constexpr DataType type_LinkList = DataType{DataType::Type::LinkList};
 static constexpr DataType type_ObjectId = DataType{DataType::Type::ObjectId};
 static constexpr DataType type_TypedLink = DataType{DataType::Type::TypedLink};
 static constexpr DataType type_UUID = DataType{DataType::Type::UUID};
@@ -183,8 +180,6 @@ constexpr inline DataType::operator util::Printable() const noexcept
             return "type_Decimal";
         case type_Link:
             return "type_Link";
-        case type_LinkList:
-            return "type_LinkList";
         case type_ObjectId:
             return "type_ObjectId";
         case type_TypedLink:

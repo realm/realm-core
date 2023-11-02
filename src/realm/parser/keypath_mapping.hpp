@@ -39,7 +39,7 @@ struct KeyPathElement {
     enum class KeyPathOperation { None, BacklinkTraversal, BacklinkCount, ListOfPrimitivesElementLength } operation;
     bool is_list_of_primitives() const
     {
-        return bool(col_key) && col_key.get_type() != col_type_LinkList && col_key.get_attrs().test(col_attr_List);
+        return bool(col_key) && col_key.get_type() != col_type_Link && col_key.is_list();
     }
 };
 

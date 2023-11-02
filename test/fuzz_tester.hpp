@@ -282,11 +282,10 @@ private:
         REALM_ASSERT(count_classes(client) > 1);
 
         const char* column_names[] = {"e", "f"};
-        const DataType column_types[] = {type_Link, type_LinkList};
 
         size_t which = draw_int_max(1);
         const char* name = column_names[which];
-        DataType type = column_types[which];
+        bool is_list = bool(which);
 
         TableRef table = client.selected_table;
         if (table->get_column_key(name))
@@ -301,20 +300,17 @@ private:
 
         if (m_trace) {
             const char* type_name;
-            if (type == type_Link) {
-                type_name = "type_Link";
-            }
-            else if (type == type_LinkList) {
+            if (is_list) {
                 type_name = "type_LinkList";
             }
             else {
-                REALM_TERMINATE("Missing trace support for column type.");
+                type_name = "type_Link";
             }
             std::cerr << trace_selected_table(client) << "->add_column_link(" << type_name << ", \"" << name
                       << "\", *client_" << client.local_file_ident << "->group->get_table(\"A\"));\n";
         }
 
-        if (type == type_LinkList) {
+        if (is_list) {
             ColKey col_key = table->add_column_list(*link_target_table, name);
             m_link_list_columns.push_back(col_key);
         }
@@ -838,7 +834,7 @@ void FuzzTester<S>::round(unit_test::TestContext& test_context, std::string path
                         if (table->get_primary_key_column() == key)
                             continue; // don't make normal modifications to primary keys
                         DataType type = table->get_column_type(key);
-                        if (type == type_LinkList) {
+                        if (key.is_list() && type == type_Link) {
                             // Only consider LinkList columns that target tables
                             // with rows in them.
                             if (table->get_link_target(key)->size() != 0) {

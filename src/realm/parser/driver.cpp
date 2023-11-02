@@ -1040,11 +1040,12 @@ std::unique_ptr<Subexpr> SubqueryNode::visit(ParserDriver* drv, DataType)
     }
 
     auto col_type = col_key.get_type();
-    if (col_key.is_list() && col_type != col_type_LinkList) {
+    if (col_key.is_list() && col_type != col_type_Link) {
         throw InvalidQueryError(
             util::format("A subquery can not operate on a list of primitive values (property '%1')", identifier));
     }
-    if (col_type != col_type_LinkList && col_type != col_type_BackLink) {
+    // col_key.is_list => col_type == col_type_Link
+    if (!(col_key.is_list() || col_type == col_type_BackLink)) {
         throw InvalidQueryError(util::format("A subquery must operate on a list property, but '%1' is type '%2'",
                                              identifier, realm::get_data_type_name(DataType(col_type))));
     }
@@ -1949,7 +1950,7 @@ std::unique_ptr<Subexpr> LinkChain::column(const std::string& col)
     }
     size_t list_count = 0;
     for (ColKey link_key : m_link_cols) {
-        if (link_key.get_type() == col_type_LinkList || link_key.get_type() == col_type_BackLink) {
+        if (link_key.is_collection() || link_key.get_type() == col_type_BackLink) {
             list_count++;
         }
     }

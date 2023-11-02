@@ -162,6 +162,28 @@ MemRef Spec::create_empty_spec(Allocator& alloc)
     return spec_set.get_mem();
 }
 
+bool Spec::migrate_column_keys()
+{
+    // Replace col_type_LinkList with col_type_Link
+    constexpr int col_type_LinkList = 13;
+    bool updated = false;
+    auto sz = m_names.size();
+
+    for (size_t n = 0; n < sz; n++) {
+        auto t = m_types.get(n);
+        if (t == col_type_LinkList) {
+            auto attrs = get_column_attr(n);
+            REALM_ASSERT(attrs.test(col_attr_List));
+            auto col_key = ColKey(m_keys.get(n));
+            ColKey new_key(col_key.get_index(), col_type_Link, attrs, col_key.get_tag());
+            m_keys.insert(n, new_key.value);
+            updated = true;
+        }
+    }
+
+    return updated;
+}
+
 void Spec::insert_column(size_t column_ndx, ColKey col_key, ColumnType type, StringData name, int attr)
 {
     REALM_ASSERT(column_ndx <= m_types.size());
@@ -287,8 +309,7 @@ bool Spec::operator==(const Spec& spec) const noexcept
         ColumnType col_type = ColumnType(int(m_types.get(col_ndx)));
         switch (col_type) {
             case col_type_Link:
-            case col_type_TypedLink:
-            case col_type_LinkList: {
+            case col_type_TypedLink: {
                 // In addition to name and attributes, the link target table must also be compared
                 REALM_ASSERT(false); // We can no longer compare specs - in fact we don't want to
                 break;
@@ -319,7 +340,6 @@ bool Spec::operator==(const Spec& spec) const noexcept
 ColKey Spec::get_key(size_t column_ndx) const
 {
     auto key = ColKey(m_keys.get(column_ndx));
-    REALM_ASSERT(key.get_type().is_valid());
     return key;
 }
 

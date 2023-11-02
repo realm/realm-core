@@ -305,8 +305,6 @@ const char* get_data_type_name(DataType type) noexcept
             return "mixed";
         case type_Link:
             return "link";
-        case type_LinkList:
-            return "linklist";
         case type_TypedLink:
             return "typedLink";
         default:
@@ -341,7 +339,7 @@ bool LinkChain::add(ColKey ck)
     // Link column can be a single Link, LinkList, or BackLink.
     REALM_ASSERT(m_current_table->valid_column(ck));
     ColumnType type = ck.get_type();
-    if (type == col_type_LinkList || type == col_type_Link || type == col_type_BackLink) {
+    if (type == col_type_Link || type == col_type_BackLink) {
         m_current_table = m_current_table->get_opposite_table(ck);
         m_link_cols.push_back(ck);
         return true;
@@ -442,7 +440,6 @@ ColKey Table::add_column(Table& target, StringData name, std::optional<Collectio
         switch (*collection_type) {
             case CollectionType::List:
                 attr.set(col_attr_List);
-                data_type = type_LinkList;
                 break;
             case CollectionType::Set:
                 if (target.is_embedded())
@@ -1304,6 +1301,13 @@ void Table::migrate_set_orderings()
                 }
             }
         }
+    }
+}
+
+void Table::migrate_col_keys()
+{
+    if (m_spec.migrate_column_keys()) {
+        build_column_mapping();
     }
 }
 
@@ -3102,7 +3106,6 @@ void Table::convert_column(ColKey from, ColKey to, bool throw_on_null)
                 break;
             case type_Link:
             case type_TypedLink:
-            case type_LinkList:
                 // Can't have lists of these types
             case type_Mixed:
                 // These types are no longer supported at all
@@ -3160,8 +3163,6 @@ void Table::convert_column(ColKey from, ColKey to, bool throw_on_null)
             case type_TypedLink:
             case type_Link:
                 // Always nullable, so can't convert
-            case type_LinkList:
-                // Never nullable, so can't convert
             case type_Mixed:
                 // These types are no longer supported at all
                 REALM_UNREACHABLE();
