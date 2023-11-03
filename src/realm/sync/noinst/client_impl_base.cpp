@@ -2379,7 +2379,7 @@ Status Session::receive_download_message(const SyncProgress& progress, std::uint
 
     version_type server_version = m_progress.download.server_version;
     version_type last_integrated_client_version = m_progress.download.last_integrated_client_version;
-    for (const Transformer::RemoteChangeset& changeset : received_changesets) {
+    for (const RemoteChangeset& changeset : received_changesets) {
         // Check that per-changeset server version is strictly increasing, except in FLX sync where the server
         // version must be increasing, but can stay the same during bootstraps.
         bool good_server_version = m_is_flx_sync_session ? (changeset.remote_version >= server_version)

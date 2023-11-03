@@ -246,72 +246,52 @@ std::pair<size_t, bool> Set::insert<Obj>(Obj obj)
 
 bool Set::is_subset_of(const Collection& rhs) const
 {
-    return dispatch([&](auto t) {
-        return this->as<std::decay_t<decltype(*t)>>().is_subset_of(rhs.get_impl());
-    });
+    return set_base().is_subset_of(rhs.get_impl());
 }
 
 bool Set::is_strict_subset_of(const Collection& rhs) const
 {
-    return dispatch([&](auto t) {
-        return this->as<std::decay_t<decltype(*t)>>().is_strict_subset_of(rhs.get_impl());
-    });
+    return set_base().is_strict_subset_of(rhs.get_impl());
 }
 
 bool Set::is_superset_of(const Collection& rhs) const
 {
-    return dispatch([&](auto t) {
-        return this->as<std::decay_t<decltype(*t)>>().is_superset_of(rhs.get_impl());
-    });
+    return set_base().is_superset_of(rhs.get_impl());
 }
 
 bool Set::is_strict_superset_of(const Collection& rhs) const
 {
-    return dispatch([&](auto t) {
-        return this->as<std::decay_t<decltype(*t)>>().is_strict_superset_of(rhs.get_impl());
-    });
+    return set_base().is_strict_superset_of(rhs.get_impl());
 }
 
 bool Set::intersects(const Collection& rhs) const
 {
-    return dispatch([&](auto t) {
-        return this->as<std::decay_t<decltype(*t)>>().intersects(rhs.get_impl());
-    });
+    return set_base().intersects(rhs.get_impl());
 }
 
 bool Set::set_equals(const Collection& rhs) const
 {
-    return dispatch([&](auto t) {
-        return this->as<std::decay_t<decltype(*t)>>().set_equals(rhs.get_impl());
-    });
+    return set_base().set_equals(rhs.get_impl());
 }
 
 void Set::assign_intersection(const Collection& rhs)
 {
-    return dispatch([&](auto t) {
-        return this->as<std::decay_t<decltype(*t)>>().assign_intersection(rhs.get_impl());
-    });
+    set_base().assign_intersection(rhs.get_impl());
 }
 
 void Set::assign_union(const Collection& rhs)
 {
-    return dispatch([&](auto t) {
-        return this->as<std::decay_t<decltype(*t)>>().assign_union(rhs.get_impl());
-    });
+    set_base().assign_union(rhs.get_impl());
 }
 
 void Set::assign_difference(const Collection& rhs)
 {
-    return dispatch([&](auto t) {
-        return this->as<std::decay_t<decltype(*t)>>().assign_difference(rhs.get_impl());
-    });
+    set_base().assign_difference(rhs.get_impl());
 }
 
 void Set::assign_symmetric_difference(const Collection& rhs)
 {
-    return dispatch([&](auto t) {
-        return this->as<std::decay_t<decltype(*t)>>().assign_symmetric_difference(rhs.get_impl());
-    });
+    set_base().assign_symmetric_difference(rhs.get_impl());
 }
 
 } // namespace realm::object_store

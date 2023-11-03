@@ -540,7 +540,6 @@ size_t ClientHistory::transform_and_apply_server_changesets(util::Span<Changeset
                 changeset.last_integrated_remote_version = m_sync_history_base_version;
         }
 
-        Transformer& transformer = get_transformer();          // Throws
         constexpr std::size_t commit_byte_size_limit = 102400; // 100 KB
 
         auto changeset_applier = [&](const Changeset* transformed_changeset) -> bool {
@@ -551,12 +550,12 @@ size_t ClientHistory::transform_and_apply_server_changesets(util::Span<Changeset
             }
             downloaded_bytes += transformed_changeset->original_changeset_size;
 
-            return !(m_db->other_writers_waiting_for_lock() &&
-                     transact->get_commit_size() >= commit_byte_size_limit && allow_lock_release);
+            return !(allow_lock_release && m_db->other_writers_waiting_for_lock() &&
+                     transact->get_commit_size() >= commit_byte_size_limit);
         };
-        auto changesets_transformed_count =
-            transformer.transform_remote_changesets(*this, sync_file_id, local_version, changesets_to_integrate,
-                                                    std::move(changeset_applier), logger); // Throws
+        sync::Transformer transformer;
+        auto changesets_transformed_count = transformer.transform_remote_changesets(
+            *this, sync_file_id, local_version, changesets_to_integrate, changeset_applier, logger); // Throws
         return changesets_transformed_count;
     }
     catch (const BadChangesetError& e) {

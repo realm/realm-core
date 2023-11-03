@@ -965,6 +965,7 @@ tasks:
             --ignore='src/external/**' \
             --ignore='src/realm/parser/generated/**' \
             --ignore='test/large_tests/**' \
+            --excl-line='LCOV_EXCL_LINE|REALM_TERMINATE|REALM_UNREACHABLE' \
             --parallel \
             --output-path=coveralls_${task_name}.json
 
