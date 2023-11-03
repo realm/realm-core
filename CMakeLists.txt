@@ -58,7 +58,7 @@ elseif (UNIX)
     # MEMO: -fvisibility=hidden prevents -rdynamic and symbols in backtrace_symbols
     # so omit set(CMAKE_CXX_VISIBILITY_PRESET hidden)
     # ...also add more details for backtraces on assertions
-    set(CMAKE_VISIBILITY_INLINES_HIDDEN 0)
+    # set(CMAKE_VISIBILITY_INLINES_HIDDEN 0)
 endif()
 
 function(check_if_cxx_compiler_flag_supported flag out_var)
