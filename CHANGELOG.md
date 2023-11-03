@@ -1,11 +1,9 @@
-# NEXT RELEASE
+# 13.23.3 Release notes
 
 ### Enhancements
-* <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
 * Cancel asynchronous notifications on subscription state change in case of fatal session errors and when the session becomes inactive. ([PR #7073](https://github.com/realm/realm-core/pull/7073))
 
 ### Fixed
-* <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * A new design around using a scheduler in C API has enabled the proper release of the user data (See "Breaking Changes") ([#7094](https://github.com/realm/realm-core/issues/7094), since v10.4.0)
 * Potential stack-use-after-scope issue on changesets integration with msvc-2019 and mpack code ([PR #6911](https://github.com/realm/realm-core/pull/6911))
 * Fix compilation with non-beta Xcode 15. Building for visionOS now requires explicitly specifying `-DCMAKE_XCODE_ATTRIBUTE_SDKROOT=xros` (PR [#7055](https://github.com/realm/realm-core/pull/7055)).
