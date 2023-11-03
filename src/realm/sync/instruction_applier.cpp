@@ -941,11 +941,9 @@ bool InstructionApplier::check_links_exist(const Instruction::Payload& payload)
                                         [&](InternString interned_pk) {
                                             return Mixed{get_string(interned_pk)};
                                         },
-                                        [&](GlobalKey) {
+                                        [&](GlobalKey) -> Mixed {
                                             bad_transaction_log(
                                                 "Unexpected link to embedded object while validating a primary key");
-                                            return Mixed{}; // appease the compiler; visitors must have a single
-                                                            // return type
                                         },
                                         [&](ObjectId pk) {
                                             return Mixed{pk};
