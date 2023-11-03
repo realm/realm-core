@@ -242,26 +242,6 @@ void SyncReplication::add_class_with_primary_key(TableKey tk, StringData name, D
     }
 }
 
-void SyncReplication::create_object(const Table* table, GlobalKey oid)
-{
-    if (table->is_embedded()) {
-        unsupported_instruction(); // FIXME: TODO
-    }
-
-    Replication::create_object(table, oid);
-    if (select_table(*table)) {
-        if (table->get_primary_key_column()) {
-            // Trying to create object without a primary key in a table that
-            // has a primary key column.
-            unsupported_instruction();
-        }
-        Instruction::CreateObject instr;
-        instr.table = m_last_class_name;
-        instr.object = oid;
-        emit(instr);
-    }
-}
-
 Instruction::PrimaryKey SyncReplication::as_primary_key(Mixed value)
 {
     if (value.is_null()) {
@@ -749,13 +729,7 @@ Instruction::PrimaryKey SyncReplication::primary_key_for_object(const Table& tab
 {
     bool should_emit = select_table(table);
     REALM_ASSERT(should_emit);
-
-    if (table.get_primary_key_column()) {
-        return as_primary_key(table.get_primary_key(key));
-    }
-
-    GlobalKey global_key = table.get_object_id(key);
-    return global_key;
+    return as_primary_key(table.get_primary_key(key));
 }
 
 void SyncReplication::populate_path_instr(Instruction::PathInstruction& instr, const Table& table, ObjKey key,

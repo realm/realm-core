@@ -1592,7 +1592,11 @@ TEMPLATE_TEST_CASE("DeepChangeChecker collections", "[notifications]", cf::ListO
     auto r = Realm::get_shared_realm(config);
     r->update_schema({
         {"table",
-         {{"int", PropertyType::Int},
+         {{
+              "int",
+              PropertyType::Int,
+              Property::IsPrimary{true},
+          },
           {"link1", PropertyType::Object | PropertyType::Nullable, "table"},
           {"link2", PropertyType::Object | PropertyType::Nullable, "table"},
           test_type.property()}},
@@ -1603,7 +1607,7 @@ TEMPLATE_TEST_CASE("DeepChangeChecker collections", "[notifications]", cf::ListO
     std::vector<Obj> objects;
     r->begin_transaction();
     for (int i = 0; i < 10; ++i)
-        objects.push_back(table->create_object().set_all(i));
+        objects.push_back(table->create_object_with_primary_key(i));
     r->commit_transaction();
 
     auto track_changes = [&](auto&& f) {
@@ -1835,7 +1839,7 @@ TEST_CASE("DeepChangeChecker singular links", "[notifications]") {
     r->update_schema({{
         "table",
         {
-            {"int", PropertyType::Int},
+            {"int", PropertyType::Int, Property::IsPrimary{true}},
             {"link1", PropertyType::Object | PropertyType::Nullable, "table"},
             {"link2", PropertyType::Object | PropertyType::Nullable, "table"},
             {"mixed_link", PropertyType::Mixed | PropertyType::Nullable},
@@ -1847,7 +1851,7 @@ TEST_CASE("DeepChangeChecker singular links", "[notifications]") {
     std::vector<Obj> objects;
     r->begin_transaction();
     for (int i = 0; i < 10; ++i)
-        objects.push_back(table->create_object().set_all(i));
+        objects.push_back(table->create_object_with_primary_key(i));
     r->commit_transaction();
 
     auto track_changes = [&](auto&& f) {
@@ -2124,7 +2128,7 @@ TEST_CASE("DeepChangeChecker singular links", "[notifications]") {
             table->clear();
             objects.clear();
             for (int i = 0; i < 20; ++i)
-                objects.push_back(table->create_object().set_all(i));
+                objects.push_back(table->create_object_with_primary_key(i));
             for (int i = 0; i < 19; ++i)
                 set_link(objects[i], link_column, ObjLink{dst_table_key, objects[i + 1].get_key()});
             r->commit_transaction();

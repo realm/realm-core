@@ -226,11 +226,8 @@ void InstructionApplier::operator()(const Instruction::CreateObject& instr)
                 }
                 m_last_object = table->create_object_with_primary_key(id);
             },
-            [&](GlobalKey key) {
-                if (pk_col) {
-                    bad_transaction_log("CreateObject(GlobalKey) on table with a primary key");
-                }
-                m_last_object = table->create_object(key);
+            [&](GlobalKey) {
+                bad_transaction_log("CreateObject(GlobalKey) not supported");
             },
         },
         instr.object);
@@ -1684,14 +1681,9 @@ ObjKey InstructionApplier::get_object_key(Table& table, const Instruction::Prima
                 ObjKey key = table.get_objkey_from_primary_key(pk);
                 return key;
             },
-            [&](GlobalKey id) {
-                if (pk_col) {
-                    bad_transaction_log(
-                        "%1 instruction without primary key, but table '%2' has a primary key column of type %3",
-                        name, table_name, pk_type);
-                }
-                ObjKey key = table.get_objkey_from_global_key(id);
-                return key;
+            [&](GlobalKey) {
+                bad_transaction_log("%1 instruction without primary key not supported", name);
+                return ObjKey();
             },
             [&](ObjectId pk) {
                 if (!pk_col) {

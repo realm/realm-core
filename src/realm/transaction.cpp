@@ -570,6 +570,7 @@ void Transaction::upgrade_file_format(int target_file_format_version)
     if (current_file_format_version < 24) {
         for (auto k : table_keys) {
             auto t = get_table(k);
+            t->free_collision_table();
             t->migrate_set_orderings(); // rewrite sets to use the new string/binary order
             // Although StringIndex sort order has been changed in this format, we choose to
             // avoid upgrading them because it affects a small niche case. Instead, there is a
