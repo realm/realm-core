@@ -1013,6 +1013,8 @@ private:
 
     void handle_pending_client_reset_acknowledgement();
 
+    void update_subscription_version_info();
+
     void gather_pending_compensating_writes(util::Span<Changeset> changesets, std::vector<ProtocolErrorInfo>* out);
 
     void begin_resumption_delay(const ProtocolErrorInfo& error_info);

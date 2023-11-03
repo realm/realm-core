@@ -245,7 +245,7 @@ PendingBootstrapStore::PendingBatch PendingBootstrapStore::peek_pending(size_t l
         }
         REALM_ASSERT_3(ec, ==, std::error_code{});
 
-        Transformer::RemoteChangeset parsed_changeset;
+        RemoteChangeset parsed_changeset;
         parsed_changeset.original_changeset_size =
             static_cast<size_t>(cur_changeset.get<int64_t>(m_changeset_original_changeset_size));
         parsed_changeset.origin_timestamp = cur_changeset.get<int64_t>(m_changeset_origin_timestamp);

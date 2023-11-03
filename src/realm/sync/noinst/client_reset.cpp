@@ -575,8 +575,9 @@ LocalVersionIDs perform_client_reset_diff(DBRef db_local, DBRef db_remote, sync:
         if (!sub_store) {
             return;
         }
-        auto mut_subs = sub_store->get_active().make_mutable_copy();
-        int64_t before_version = mut_subs.version();
+        auto subs = sub_store->get_active();
+        int64_t before_version = subs.version();
+        auto mut_subs = subs.make_mutable_copy();
         mut_subs.update_state(sync::SubscriptionSet::State::Complete);
         auto sub = std::move(mut_subs).commit();
         if (on_flx_version_complete) {

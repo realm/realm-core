@@ -956,11 +956,13 @@ void Connection::initiate_write_message(const OutputBuffer& out, Session* sess)
         if (sentinel->destroyed) {
             return;
         }
-        if (status == ErrorCodes::OperationAborted)
+        if (!status.is_ok()) {
+            if (status != ErrorCodes::Error::OperationAborted) {
+                // Write errors will be handled by the websocket_write_error_handler() callback
+                logger.error("Connection: write failed %1: %2", status.code_string(), status.reason());
+            }
             return;
-        else if (!status.is_ok())
-            throw Exception(status);
-
+        }
         handle_write_message(); // Throws
     });                         // Throws
     m_sending_session = sess;
@@ -1039,11 +1041,13 @@ void Connection::initiate_write_ping(const OutputBuffer& out)
         if (sentinel->destroyed) {
             return;
         }
-        if (status == ErrorCodes::OperationAborted)
+        if (!status.is_ok()) {
+            if (status != ErrorCodes::Error::OperationAborted) {
+                // Write errors will be handled by the websocket_write_error_handler() callback
+                logger.error("Connection: send ping failed %1: %2", status.code_string(), status.reason());
+            }
             return;
-        else if (!status.is_ok())
-            throw Exception(status);
-
+        }
         handle_write_ping(); // Throws
     });                      // Throws
     m_sending = true;
@@ -1846,8 +1850,7 @@ void Session::send_message()
             return false;
         }
 
-        m_pending_flx_sub_set = get_flx_subscription_store()->get_next_pending_version(
-            m_last_sent_flx_query_version, m_upload_progress.client_version);
+        m_pending_flx_sub_set = get_flx_subscription_store()->get_next_pending_version(m_last_sent_flx_query_version);
 
         if (!m_pending_flx_sub_set) {
             return false;
@@ -1997,13 +2000,10 @@ void Session::send_upload_message()
     if (REALM_UNLIKELY(get_client().is_dry_run()))
         return;
 
-    version_type target_upload_version = get_db()->get_version_of_latest_snapshot();
+    version_type target_upload_version = m_last_version_available;
     if (m_pending_flx_sub_set) {
         REALM_ASSERT(m_is_flx_sync_session);
         target_upload_version = m_pending_flx_sub_set->snapshot_version;
-    }
-    if (target_upload_version > m_last_version_available) {
-        m_last_version_available = target_upload_version;
     }
 
     const ClientReplication& repl = access_realm(); // Throws
@@ -2302,6 +2302,8 @@ Status Session::receive_ident_message(SaltedFileIdent client_file_ident)
             handle_pending_client_reset_acknowledgement();
         }
 
+        update_subscription_version_info();
+
         // If a migration or rollback is in progress, mark it complete when client reset is completed.
         if (auto migration_store = get_migration_store()) {
             migration_store->complete_migration_or_rollback();
@@ -2377,7 +2379,7 @@ Status Session::receive_download_message(const SyncProgress& progress, std::uint
 
     version_type server_version = m_progress.download.server_version;
     version_type last_integrated_client_version = m_progress.download.last_integrated_client_version;
-    for (const Transformer::RemoteChangeset& changeset : received_changesets) {
+    for (const RemoteChangeset& changeset : received_changesets) {
         // Check that per-changeset server version is strictly increasing, except in FLX sync where the server
         // version must be increasing, but can stay the same during bootstraps.
         bool good_server_version = m_is_flx_sync_session ? (changeset.remote_version >= server_version)
