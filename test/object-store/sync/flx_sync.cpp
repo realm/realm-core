@@ -1234,10 +1234,10 @@ TEST_CASE("flx: client reset", "[sync][flx][client reset][baas]") {
             changed_schema[0].persisted_properties.push_back(
                 {"added_oid_field_second", PropertyType::ObjectId | PropertyType::Nullable});
             changed_schema.push_back({"AddedClassSecond",
-                              {
-                                  {"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
-                                  {"str_field_2", PropertyType::String | PropertyType::Nullable},
-                              }});
+                                      {
+                                          {"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+                                          {"str_field_2", PropertyType::String | PropertyType::Nullable},
+                                      }});
             config_local.schema = changed_schema;
             async_open_realm(config_local, [&](ThreadSafeReference&& ref, std::exception_ptr error) {
                 REQUIRE(ref);
