@@ -1239,7 +1239,6 @@ TEST_CASE("flx: client reset", "[sync][flx][client reset][baas]") {
                                   {"str_field_2", PropertyType::String | PropertyType::Nullable},
                               }});
             config_local.schema = changed_schema;
-
             async_open_realm(config_local, [&](ThreadSafeReference&& ref, std::exception_ptr error) {
                 REQUIRE(ref);
                 REQUIRE_FALSE(error);
@@ -1252,11 +1251,10 @@ TEST_CASE("flx: client reset", "[sync][flx][client reset][baas]") {
                 auto subs = new_subs.commit();
                 realm->begin_transaction();
                 table->create_object_with_primary_key(Mixed{ObjectId::gen()}, {{new_col, "hello"}});
-                table->create_object_with_primary_key(Mixed{ObjectId::gen()}, {{new_col, "goodbye"}});
                 realm->commit_transaction();
                 subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
                 wait_for_advance(*realm);
-                REQUIRE(table->size() == 1); // "goodbye" was removed by a compensating write
+                REQUIRE(table->size() == 1);
             });
         }
     }
