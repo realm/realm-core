@@ -1201,8 +1201,8 @@ TEST_CASE("flx: client reset", "[sync][flx][client reset][baas]") {
         future.get();
         CHECK(before_reset_count == 1);
         CHECK(after_reset_count == 1);
-        auto realm = Realm::get_shared_realm(std::move(ref_async));
         {
+            auto realm = Realm::get_shared_realm(std::move(ref_async));
             // make changes to the newly added property
             realm->begin_transaction();
             auto table = realm->read_group().get_table("class_TopLevel");
@@ -1222,12 +1222,43 @@ TEST_CASE("flx: client reset", "[sync][flx][client reset][baas]") {
             REQUIRE(new_table);
             new_table->create_object_with_primary_key(ObjectId::gen());
             realm->commit_transaction();
+            auto result = realm->get_latest_subscription_set()
+                              .get_state_change_notification(sync::SubscriptionSet::State::Complete)
+                              .get();
+            CHECK(result == sync::SubscriptionSet::State::Complete);
+            wait_for_advance(*realm);
+            realm->close();
         }
-        auto result = realm->get_latest_subscription_set()
-                          .get_state_change_notification(sync::SubscriptionSet::State::Complete)
-                          .get();
-        CHECK(result == sync::SubscriptionSet::State::Complete);
-        wait_for_advance(*realm);
+        {
+            // ensure that an additional schema change after the successful reset is also accepted by the server
+            changed_schema[0].persisted_properties.push_back(
+                {"added_oid_field_second", PropertyType::ObjectId | PropertyType::Nullable});
+            changed_schema.push_back({"AddedClassSecond",
+                              {
+                                  {"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+                                  {"str_field_2", PropertyType::String | PropertyType::Nullable},
+                              }});
+            config_local.schema = changed_schema;
+
+            async_open_realm(config_local, [&](ThreadSafeReference&& ref, std::exception_ptr error) {
+                REQUIRE(ref);
+                REQUIRE_FALSE(error);
+                auto realm = Realm::get_shared_realm(std::move(ref));
+                auto table = realm->read_group().get_table("class_AddedClassSecond");
+                ColKey new_col = table->get_column_key("str_field_2");
+                REQUIRE(new_col);
+                auto new_subs = realm->get_latest_subscription_set().make_mutable_copy();
+                new_subs.insert_or_assign(Query(table).equal(new_col, "hello"));
+                auto subs = new_subs.commit();
+                realm->begin_transaction();
+                table->create_object_with_primary_key(Mixed{ObjectId::gen()}, {{new_col, "hello"}});
+                table->create_object_with_primary_key(Mixed{ObjectId::gen()}, {{new_col, "goodbye"}});
+                realm->commit_transaction();
+                subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
+                wait_for_advance(*realm);
+                REQUIRE(table->size() == 1); // "goodbye" was removed by a compensating write
+            });
+        }
     }
 
     SECTION("DiscardLocal: additive schema changes not allowed") {
