@@ -246,24 +246,6 @@ int64_t Array::get(size_t ndx) const noexcept
     */
 }
 
-#ifdef REALM_DEBUG
-
-bool Array::try_encode()
-{
-    if (m_encode_array)
-        return m_encode_array->encode();
-    return false;
-}
-
-bool Array::try_decode()
-{
-    if (m_encode_array)
-        return m_encode_array->decode();
-    return false;
-}
-
-#endif
-
 size_t Array::bit_width(int64_t v)
 {
     // FIXME: Assuming there is a 64-bit CPU reverse bitscan
@@ -536,17 +518,9 @@ size_t Array::blob_size() const noexcept
 
 void Array::insert(size_t ndx, int_fast64_t value)
 {
-    // std::cout << "Array size = " << m_size << std::endl;
-    if (decode_array())
-        ;
-    // std::cout << "Decoded first " << std::endl;
-
-    // std::cout << "Array size = " << m_size << std::endl;
-    // std::cout << "Insert " << ndx << std::endl;
+    decode_array();
     insert_no_encoding(ndx, value);
-    if (encode_array())
-        ;
-    //    std::cout << "Encoded " << std::endl;
+    encode_array();
 }
 
 void Array::insert_no_encoding(size_t ndx, int_fast64_t value)

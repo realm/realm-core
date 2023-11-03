@@ -103,11 +103,6 @@ public:
     /// correct encoding array to this method.
     void set_encode_array(ArrayEncode* encode_array);
 
-#ifdef REALM_DEBUG
-    // ONLY for testing
-    bool try_encode();
-    bool try_decode();
-#endif
 
     /// Create a new integer array of the specified type and size, and filled
     /// with the specified value, and attach this accessor to it. This does not
@@ -569,13 +564,11 @@ private:
     // encode/decode this array
     bool encode_array() const;
     bool decode_array() const;
-#ifdef REALM_DEBUG
+
 public:
     bool is_encoded() const;
-#else
-    bool is_encoded() const;
-#endif
 
+private:
     friend class Allocator;
     friend class SlabAlloc;
     friend class GroupWriter;

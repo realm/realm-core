@@ -5201,63 +5201,62 @@ void test_dynamic_conversion_list_combi_sametype(TestContext& test_context, DBRe
 
 TEST(Table_Column_DynamicConversions)
 {
-    //    SHARED_GROUP_TEST_PATH(path);
-    //
-    //    std::unique_ptr<Replication> hist(make_in_realm_history());
-    //    DBRef sg = DB::create(*hist, path, DBOptions(crypt_key()));
-    //
-    //    test_dynamic_conversion_combi<int64_t>(test_context, sg, type_Int);
-    //    test_dynamic_conversion_combi<float>(test_context, sg, type_Float);
-    //    test_dynamic_conversion_combi<double>(test_context, sg, type_Double);
-    //    test_dynamic_conversion_combi<bool>(test_context, sg, type_Bool);
-    //    test_dynamic_conversion_combi<ObjectId>(test_context, sg, type_ObjectId);
-    //
-    //    test_dynamic_conversion_combi_sametype<StringData>(test_context, sg, type_String);
-    //    test_dynamic_conversion_combi_sametype<BinaryData>(test_context, sg, type_Binary);
-    //    test_dynamic_conversion_combi_sametype<Timestamp>(test_context, sg, type_Timestamp);
-    //    test_dynamic_conversion_combi_sametype<Decimal128>(test_context, sg, type_Decimal);
-    //    test_dynamic_conversion_combi_sametype<UUID>(test_context, sg, type_UUID);
-    //    // lists...:
-    //    test_dynamic_conversion_list_combi<int64_t>(test_context, sg, type_Int);
-    //    test_dynamic_conversion_list_combi<float>(test_context, sg, type_Float);
-    //    test_dynamic_conversion_list_combi<double>(test_context, sg, type_Double);
-    //    test_dynamic_conversion_list_combi<bool>(test_context, sg, type_Bool);
-    //    test_dynamic_conversion_list_combi<ObjectId>(test_context, sg, type_ObjectId);
-    //
-    //    test_dynamic_conversion_list_combi_sametype<StringData>(test_context, sg, type_String);
-    //    test_dynamic_conversion_list_combi_sametype<BinaryData>(test_context, sg, type_Binary);
-    //    test_dynamic_conversion_list_combi_sametype<Timestamp>(test_context, sg, type_Timestamp);
-    //    test_dynamic_conversion_list_combi_sametype<Decimal128>(test_context, sg, type_Decimal);
-    //    test_dynamic_conversion_list_combi_sametype<UUID>(test_context, sg, type_UUID);
-}
-
-/*
-TEST(Table_Column_Conversions)
-{
     SHARED_GROUP_TEST_PATH(path);
 
     std::unique_ptr<Replication> hist(make_in_realm_history());
     DBRef sg = DB::create(*hist, path, DBOptions(crypt_key()));
 
-    test_column_conversion<int64_t, Optional<int64_t>>(test_context, sg, type_Int);
-    test_column_conversion<float, Optional<float>>(test_context, sg, type_Float);
-    test_column_conversion<double, Optional<double>>(test_context, sg, type_Double);
-    test_column_conversion<bool, Optional<bool>>(test_context, sg, type_Bool);
-    test_column_conversion<StringData, StringData>(test_context, sg, type_String);
-    test_column_conversion<BinaryData, BinaryData>(test_context, sg, type_Binary);
-    test_column_conversion<Timestamp, Timestamp>(test_context, sg, type_Timestamp);
+    test_dynamic_conversion_combi<int64_t>(test_context, sg, type_Int);
+    test_dynamic_conversion_combi<float>(test_context, sg, type_Float);
+    test_dynamic_conversion_combi<double>(test_context, sg, type_Double);
+    test_dynamic_conversion_combi<bool>(test_context, sg, type_Bool);
+    test_dynamic_conversion_combi<ObjectId>(test_context, sg, type_ObjectId);
 
-    test_column_conversion_optional<int64_t>(test_context, sg, type_Int);
-    test_column_conversion_optional<float>(test_context, sg, type_Float);
-    test_column_conversion_optional<double>(test_context, sg, type_Double);
-    test_column_conversion_optional<bool>(test_context, sg, type_Bool);
+    test_dynamic_conversion_combi_sametype<StringData>(test_context, sg, type_String);
+    test_dynamic_conversion_combi_sametype<BinaryData>(test_context, sg, type_Binary);
+    test_dynamic_conversion_combi_sametype<Timestamp>(test_context, sg, type_Timestamp);
+    test_dynamic_conversion_combi_sametype<Decimal128>(test_context, sg, type_Decimal);
+    test_dynamic_conversion_combi_sametype<UUID>(test_context, sg, type_UUID);
+    // lists...:
+    // test_dynamic_conversion_list_combi<int64_t>(test_context, sg, type_Int);
+    test_dynamic_conversion_list_combi<float>(test_context, sg, type_Float);
+    test_dynamic_conversion_list_combi<double>(test_context, sg, type_Double);
+    test_dynamic_conversion_list_combi<bool>(test_context, sg, type_Bool);
+    test_dynamic_conversion_list_combi<ObjectId>(test_context, sg, type_ObjectId);
 
-    test_column_conversion_sametype<StringData>(test_context, sg, type_String);
-    test_column_conversion_sametype<BinaryData>(test_context, sg, type_Binary);
-    test_column_conversion_sametype<Timestamp>(test_context, sg, type_Timestamp);
-
+    test_dynamic_conversion_list_combi_sametype<StringData>(test_context, sg, type_String);
+    test_dynamic_conversion_list_combi_sametype<BinaryData>(test_context, sg, type_Binary);
+    // test_dynamic_conversion_list_combi_sametype<Timestamp>(test_context, sg, type_Timestamp);
+    test_dynamic_conversion_list_combi_sametype<Decimal128>(test_context, sg, type_Decimal);
+    test_dynamic_conversion_list_combi_sametype<UUID>(test_context, sg, type_UUID);
 }
-*/
+
+
+// TEST(Table_Column_Conversions)
+//{
+//     SHARED_GROUP_TEST_PATH(path);
+//
+//     std::unique_ptr<Replication> hist(make_in_realm_history());
+//     DBRef sg = DB::create(*hist, path, DBOptions(crypt_key()));
+//
+//     test_column_conversion<int64_t, Optional<int64_t>>(test_context, sg, type_Int);
+//     test_column_conversion<float, Optional<float>>(test_context, sg, type_Float);
+//     test_column_conversion<double, Optional<double>>(test_context, sg, type_Double);
+//     test_column_conversion<bool, Optional<bool>>(test_context, sg, type_Bool);
+//     test_column_conversion<StringData, StringData>(test_context, sg, type_String);
+//     test_column_conversion<BinaryData, BinaryData>(test_context, sg, type_Binary);
+//     test_column_conversion<Timestamp, Timestamp>(test_context, sg, type_Timestamp);
+//
+//     test_column_conversion_optional<int64_t>(test_context, sg, type_Int);
+//     test_column_conversion_optional<float>(test_context, sg, type_Float);
+//     test_column_conversion_optional<double>(test_context, sg, type_Double);
+//     test_column_conversion_optional<bool>(test_context, sg, type_Bool);
+//
+//     test_column_conversion_sametype<StringData>(test_context, sg, type_String);
+//     test_column_conversion_sametype<BinaryData>(test_context, sg, type_Binary);
+//     test_column_conversion_sametype<Timestamp>(test_context, sg, type_Timestamp);
+// }
+
 
 TEST(Table_ChangePKNullability)
 {

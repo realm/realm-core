@@ -46,10 +46,6 @@ void ArrayFlex::init_array_encode(MemRef mem)
     auto index_width = NodeHeader::get_elementB_size<Encoding::Flex>((uint64_t*)src_header);
 
     // deep copy.
-    const auto compressed_values_size = value_width * value_size;
-    const auto compressed_indices_size = index_width * index_size;
-    const auto compressed_size = compressed_values_size + compressed_indices_size;
-    const size_t size = Array::header_size + compressed_size;
     create(Type::type_Normal);
     auto dst_header = Array::get_header();
     using Encoding = NodeHeader::Encoding;
@@ -63,7 +59,6 @@ void ArrayFlex::init_array_encode(MemRef mem)
     const auto offset = value_size * value_width;
     bf_iterator src_it_value{(uint64_t*)src_data, 0, value_width, value_width, 0};
     bf_iterator dst_it_value{(uint64_t*)dst_data, 0, value_width, value_width, 0};
-
     bf_iterator src_it_index{(uint64_t*)src_data, offset, index_width, index_width, 0};
     bf_iterator dst_it_index{(uint64_t*)dst_data, offset, index_width, index_width, 0};
 
@@ -95,15 +90,18 @@ bool ArrayFlex::encode()
         auto value_size = values.size();
         // fill data
         auto data = (uint64_t*)get_data_from_header(get_header());
-        const auto offset = value_size * value_width;
+        uint64_t offset = value_size * value_width;
         bf_iterator it_value{data, 0, value_width, value_width, 0};
         bf_iterator it_index{data, offset, index_width, index_width, 0};
         for (size_t i = 0; i < values.size(); ++i) {
             it_value.set_value(values[i]);
+            // REALM_ASSERT_3(sign_extend_field(value_width, it_value.get_value()), ==,
+            // sign_extend_field(value_width,values[i]));
             ++it_value;
         }
         for (size_t i = 0; i < indices.size(); ++i) {
             it_index.set_value(indices[i]);
+            REALM_ASSERT(indices[i] == it_index.get_value());
             ++it_index;
         }
         REALM_ASSERT(indices.size() == sz);
@@ -114,23 +112,21 @@ bool ArrayFlex::encode()
 
 bool ArrayFlex::decode()
 {
-    // std::cout << "Check flex decoded " << std::endl;
     size_t value_width, index_width, value_size, index_size;
     if (get_encode_info(value_width, index_width, value_size, index_size)) {
-        // std::cout << "Array flex decoded " << std::endl;
-        std::vector<uint64_t> values;
+        std::vector<int64_t> values;
         auto data = (uint64_t*)get_data_from_header(get_header());
         const auto offset = value_size * value_width;
         bf_iterator index_iterator{data, offset, index_width, index_width, 0};
         for (size_t i = 0; i < index_size; ++i) {
-            const auto index = (uint64_t)index_iterator.get_value();
+            const auto index = index_iterator.get_value();
             const auto value = read_bitfield(data, index * value_width, value_width);
-            values.push_back(value);
+            const auto ivalue = sign_extend_field(value_width, value);
+            values.push_back(ivalue);
             ++index_iterator;
         }
         // free encoded array
         destroy();
-        // std::cout << "Re-adding into array " << std::endl;
         m_array.create(NodeHeader::Type::type_Normal);
         size_t i = 0;
         for (const auto& v : values)
@@ -178,8 +174,8 @@ int64_t ArrayFlex::get(size_t ndx) const
         REALM_ASSERT(data == (uint64_t*)m_data);
         const auto offset = (value_size * value_width) + (ndx * index_width);
         const auto index = read_bitfield(data, offset, index_width);
-        int64_t v = read_bitfield(data, index * value_width, value_width);
-        return v;
+        const auto v = read_bitfield(data, index * value_width, value_width);
+        return sign_extend_field(value_width, v);
     }
     REALM_UNREACHABLE();
 }
@@ -208,6 +204,7 @@ bool ArrayFlex::try_encode(std::vector<uint64_t>& values, std::vector<size_t>& i
     for (size_t i = 0; i < sz; ++i) {
         auto item = m_array.get(i);
         values.push_back(item);
+        REALM_ASSERT_3(values.back(), ==, item);
         indices.push_back(item);
     }
 
