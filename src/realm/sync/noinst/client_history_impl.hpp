@@ -152,6 +152,9 @@ public:
     /// when engaging in future synchronization sessions.
     void set_client_file_ident(SaltedFileIdent client_file_ident, bool fix_up_object_ids);
 
+    /// Gets the client file ident set with `set_client_file_ident`, or `{0, 0}` if it has never been set.
+    SaltedFileIdent get_client_file_ident(const Transaction& tr) const;
+
     /// Stores the synchronization progress in the associated Realm file in a
     /// way that makes it available via get_status() during future
     /// synchronization sessions. Progress is reported by the server in the

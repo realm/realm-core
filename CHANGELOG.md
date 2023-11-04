@@ -6,7 +6,7 @@
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* A crash at a very specific time during a DiscardLocal client reset on a FLX Realm could leave subscriptions in an invalid state ([#7110](https://github.com/realm/realm-core/pull/7110), since v12.3.0).
 
 ### Breaking changes
 * None.

@@ -265,10 +265,23 @@ void ClientHistory::get_status(version_type& current_client_version, SaltedFileI
         current_client_version = 0;
 
     if (has_pending_client_reset) {
-        *has_pending_client_reset = _impl::client_reset::has_pending_reset(rt).has_value();
+        *has_pending_client_reset = _impl::client_reset::has_pending_reset(*rt).has_value();
     }
 }
 
+SaltedFileIdent ClientHistory::get_client_file_ident(const Transaction& rt) const
+{
+    SaltedFileIdent client_file_ident{rt.get_sync_file_id(), 0};
+
+    using gf = _impl::GroupFriend;
+    if (ref_type ref = gf::get_history_ref(rt)) {
+        Array root(m_db->get_alloc());
+        root.init_from_ref(ref);
+        client_file_ident.salt = salt_type(root.get_as_ref_or_tagged(s_client_file_ident_salt_iip).get_as_int());
+    }
+
+    return client_file_ident;
+}
 
 void ClientHistory::set_client_file_ident(SaltedFileIdent client_file_ident, bool fix_up_object_ids)
 {

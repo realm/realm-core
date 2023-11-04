@@ -21,19 +21,18 @@
 #include "external/json/json.hpp"
 
 #include "realm/data_type.hpp"
-#include "realm/transaction.hpp"
 #include "realm/keys.hpp"
 #include "realm/list.hpp"
 #include "realm/sort_descriptor.hpp"
 #include "realm/sync/noinst/sync_metadata_schema.hpp"
 #include "realm/table.hpp"
 #include "realm/table_view.hpp"
+#include "realm/transaction.hpp"
 #include "realm/util/flat_map.hpp"
+
 #include <algorithm>
 #include <initializer_list>
 #include <stdexcept>
-
-#include <algorithm>
 
 namespace realm::sync {
 namespace {
@@ -155,15 +154,16 @@ Subscription::Subscription(util::Optional<std::string> name, std::string object_
 }
 
 
-SubscriptionSet::SubscriptionSet(std::weak_ptr<const SubscriptionStore> mgr, const Transaction& tr, Obj obj,
+SubscriptionSet::SubscriptionSet(std::weak_ptr<const SubscriptionStore> mgr, const Transaction& tr, const Obj& obj,
                                  MakingMutableCopy making_mutable_copy)
     : m_mgr(mgr)
     , m_cur_version(tr.get_version())
     , m_version(obj.get_primary_key().get_int())
+    , m_obj_key(obj.get_key())
 {
     REALM_ASSERT(obj.is_valid());
     if (!making_mutable_copy) {
-        load_from_database(std::move(obj));
+        load_from_database(obj);
     }
 }
 
@@ -174,7 +174,7 @@ SubscriptionSet::SubscriptionSet(std::weak_ptr<const SubscriptionStore> mgr, int
 {
 }
 
-void SubscriptionSet::load_from_database(Obj obj)
+void SubscriptionSet::load_from_database(const Obj& obj)
 {
     auto mgr = get_flx_subscription_store(); // Throws
 
@@ -455,7 +455,7 @@ void SubscriptionSet::refresh()
 {
     auto mgr = get_flx_subscription_store(); // Throws
     if (mgr->would_refresh(m_cur_version)) {
-        *this = mgr->get_by_version(version());
+        *this = mgr->get_refreshed(m_obj_key, version());
     }
 }
 
@@ -488,7 +488,7 @@ util::Future<SubscriptionSet::State> SubscriptionSet::get_state_change_notificat
     // If there have been writes to the database since this SubscriptionSet was created, we need to fetch
     // the updated version from the DB to know the true current state and maybe return a ready future.
     if (m_cur_version < mgr->m_db->get_version_of_latest_snapshot()) {
-        auto refreshed_self = mgr->get_by_version(version());
+        auto refreshed_self = mgr->get_refreshed(m_obj_key, version());
         cur_state = refreshed_self.state();
         err_str = refreshed_self.error_str();
     }
@@ -603,7 +603,7 @@ SubscriptionSet MutableSubscriptionSet::commit()
 
     process_notifications();
 
-    return mgr->get_by_version_impl(flx_version, m_tr->get_version_of_current_transaction());
+    return mgr->get_refreshed(m_obj.get_key(), flx_version, m_tr->get_version_of_current_transaction());
 }
 
 std::string SubscriptionSet::to_ext_json() const
@@ -734,7 +734,7 @@ SubscriptionSet SubscriptionStore::get_latest() const
 {
     auto tr = m_db->start_frozen();
     auto sub_sets = tr->get_table(m_sub_set_table);
-    // There should always be at least one SubscriptionSet - the zero'th subscription set for schema instructions.
+    // There should always be at least one SubscriptionSet - the zeroth subscription set for schema instructions.
     REALM_ASSERT(!sub_sets->is_empty());
 
     auto latest_id = sub_sets->max(sub_sets->get_primary_key_column())->get_int();
@@ -746,8 +746,13 @@ SubscriptionSet SubscriptionStore::get_latest() const
 SubscriptionSet SubscriptionStore::get_active() const
 {
     auto tr = m_db->start_frozen();
-    auto sub_sets = tr->get_table(m_sub_set_table);
-    // There should always be at least one SubscriptionSet - the zero'th subscription set for schema instructions.
+    return SubscriptionSet(weak_from_this(), *tr, get_active(*tr));
+}
+
+Obj SubscriptionStore::get_active(const Transaction& tr) const
+{
+    auto sub_sets = tr.get_table(m_sub_set_table);
+    // There should always be at least one SubscriptionSet - the zeroth subscription set for schema instructions.
     REALM_ASSERT(!sub_sets->is_empty());
 
     DescriptorOrdering descriptor_ordering;
@@ -759,18 +764,18 @@ SubscriptionSet SubscriptionStore::get_active() const
                    .equal(m_sub_set_state, state_to_storage(SubscriptionSet::State::AwaitingMark))
                    .find_all(descriptor_ordering);
 
-    // If there is no active subscription yet, return the zero'th subscription.
+    // If there is no active subscription yet, return the zeroth subscription.
     if (res.is_empty()) {
-        return SubscriptionSet(weak_from_this(), *tr, sub_sets->get_object_with_primary_key(int64_t(0)));
+        return sub_sets->get_object_with_primary_key(0);
     }
-    return SubscriptionSet(weak_from_this(), *tr, res.get_object(0));
+    return res.get_object(0);
 }
 
 SubscriptionStore::VersionInfo SubscriptionStore::get_version_info() const
 {
     auto tr = m_db->start_read();
     auto sub_sets = tr->get_table(m_sub_set_table);
-    // There should always be at least one SubscriptionSet - the zero'th subscription set for schema instructions.
+    // There should always be at least one SubscriptionSet - the zeroth subscription set for schema instructions.
     REALM_ASSERT(!sub_sets->is_empty());
 
     VersionInfo ret;
@@ -799,7 +804,7 @@ SubscriptionStore::get_next_pending_version(int64_t last_query_version) const
 {
     auto tr = m_db->start_read();
     auto sub_sets = tr->get_table(m_sub_set_table);
-    // There should always be at least one SubscriptionSet - the zero'th subscription set for schema instructions.
+    // There should always be at least one SubscriptionSet - the zeroth subscription set for schema instructions.
     REALM_ASSERT(!sub_sets->is_empty());
 
     DescriptorOrdering descriptor_ordering;
@@ -885,31 +890,34 @@ MutableSubscriptionSet SubscriptionStore::get_mutable_by_version(int64_t version
 
 SubscriptionSet SubscriptionStore::get_by_version(int64_t version_id) const
 {
-    return get_by_version_impl(version_id, util::none);
+    auto tr = m_db->start_frozen();
+    auto sub_sets = tr->get_table(m_sub_set_table);
+    if (auto obj = sub_sets->get_object_with_primary_key(version_id)) {
+        return SubscriptionSet(weak_from_this(), *tr, obj);
+    }
+
+    std::lock_guard lk(m_pending_notifications_mutex);
+    if (version_id < m_min_outstanding_version) {
+        return SubscriptionSet(weak_from_this(), version_id, SubscriptionSet::SupersededTag{});
+    }
+    throw KeyNotFound(util::format("Subscription set with version %1 not found", version_id));
 }
 
-SubscriptionSet SubscriptionStore::get_by_version_impl(int64_t version_id,
-                                                       util::Optional<DB::VersionID> db_version) const
+SubscriptionSet SubscriptionStore::get_refreshed(ObjKey key, int64_t version,
+                                                 std::optional<DB::VersionID> db_version) const
 {
     auto tr = m_db->start_frozen(db_version.value_or(VersionID{}));
     auto sub_sets = tr->get_table(m_sub_set_table);
-    auto obj = sub_sets->get_object_with_primary_key(Mixed{version_id});
-    if (obj) {
+    if (auto obj = sub_sets->try_get_object(key)) {
         return SubscriptionSet(weak_from_this(), *tr, obj);
     }
-    else {
-        std::lock_guard<std::mutex> lk(m_pending_notifications_mutex);
-        if (version_id < m_min_outstanding_version) {
-            return SubscriptionSet(weak_from_this(), version_id, SubscriptionSet::SupersededTag{});
-        }
-        throw KeyNotFound(util::format("Subscription set with version %1 not found", version_id));
-    }
+    return SubscriptionSet(weak_from_this(), version, SubscriptionSet::SupersededTag{});
 }
 
 SubscriptionStore::TableSet SubscriptionStore::get_tables_for_latest(const Transaction& tr) const
 {
     auto sub_sets = tr.get_table(m_sub_set_table);
-    // There should always be at least one SubscriptionSet - the zero'th subscription set for schema instructions.
+    // There should always be at least one SubscriptionSet - the zeroth subscription set for schema instructions.
     REALM_ASSERT(!sub_sets->is_empty());
 
     auto latest_id = sub_sets->max(sub_sets->get_primary_key_column())->get_int();
@@ -953,6 +961,18 @@ MutableSubscriptionSet SubscriptionStore::make_mutable_copy(const SubscriptionSe
 bool SubscriptionStore::would_refresh(DB::version_type version) const noexcept
 {
     return version < m_db->get_version_of_latest_snapshot();
+}
+
+int64_t SubscriptionStore::set_active_as_latest(Transaction& wt)
+{
+    auto sub_sets = wt.get_table(m_sub_set_table);
+    auto active = get_active(wt);
+    // Delete all newer subscription sets, if any
+    sub_sets->where().greater(sub_sets->get_primary_key_column(), active.get_primary_key().get_int()).remove();
+    // Mark the active set as complete even if it was previously WaitingForMark
+    // as we've completed rebootstrapping before calling this.
+    active.set(m_sub_set_state, state_to_storage(SubscriptionSet::State::Complete));
+    return active.get_primary_key().get_int();
 }
 
 } // namespace realm::sync
