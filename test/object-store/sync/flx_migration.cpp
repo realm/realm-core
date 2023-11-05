@@ -539,7 +539,7 @@ TEST_CASE("An interrupted migration or rollback can recover on the next session"
         auto realm = Realm::get_shared_realm(config);
 
         timed_wait_for([&] {
-            return util::File::exists(_impl::ClientResetOperation::get_fresh_path_for(config.path));
+            return util::File::exists(_impl::client_reset::get_fresh_path_for(config.path));
         });
 
         // Pause then resume the session. This triggers the server to send a new client reset request.
@@ -567,7 +567,7 @@ TEST_CASE("An interrupted migration or rollback can recover on the next session"
         auto realm = Realm::get_shared_realm(config);
 
         timed_wait_for([&] {
-            return util::File::exists(_impl::ClientResetOperation::get_fresh_path_for(config.path));
+            return util::File::exists(_impl::client_reset::get_fresh_path_for(config.path));
         });
 
         // Pause then resume the session. This triggers the server to send a new client reset request.

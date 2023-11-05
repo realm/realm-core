@@ -408,7 +408,7 @@ struct FakeLocalClientReset : public TestClientReset {
             using _impl::client_reset::perform_client_reset_diff;
             constexpr bool recovery_is_allowed = true;
             perform_client_reset_diff(*local_db, *remote_db, fake_ident, *logger, m_mode, recovery_is_allowed,
-                                      nullptr, nullptr, nullptr);
+                                      nullptr, nullptr, [](int64_t) {});
 
             remote_realm->close();
             if (m_on_post_reset) {
