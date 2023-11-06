@@ -19,15 +19,19 @@
 #ifndef REALM_NOINST_CLIENT_RESET_RECOVERY_HPP
 #define REALM_NOINST_CLIENT_RESET_RECOVERY_HPP
 
-#include <realm/sync/subscriptions.hpp>
 #include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/transaction.hpp>
 #include <realm/util/logger.hpp>
 
 namespace realm::_impl::client_reset {
-void process_recovered_changesets(Transaction& dest_tr, Transaction& pre_reset_state, util::Logger& logger,
-                                  const std::vector<sync::ClientHistory::LocalChange>& changesets,
-                                  std::vector<sync::SubscriptionSet>&& pending_subscriptions = {});
+struct RecoveredChange {
+    util::AppendBuffer<char> encoded_changeset;
+    sync::ClientHistory::version_type version;
+};
+
+std::vector<RecoveredChange>
+process_recovered_changesets(Transaction& dest_tr, Transaction& pre_reset_state, util::Logger& logger,
+                             const std::vector<sync::ClientHistory::LocalChange>& changesets);
 } // namespace realm::_impl::client_reset
 
 #endif // REALM_NOINST_CLIENT_RESET_RECOVERY_HPP

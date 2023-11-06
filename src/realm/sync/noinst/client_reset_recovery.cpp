@@ -170,8 +170,7 @@ private:
 
 struct RecoverLocalChangesetsHandler : public sync::InstructionApplier {
     RecoverLocalChangesetsHandler(Transaction& dest_wt, Transaction& frozen_pre_local_state, util::Logger& logger);
-    void process_changesets(const std::vector<sync::ClientHistory::LocalChange>& changesets,
-                            std::vector<sync::SubscriptionSet>&& pending_subs);
+    util::AppendBuffer<char> process_changeset(const ChunkedBinaryData& changeset);
 
 private:
     using Instruction = sync::Instruction;
@@ -571,72 +570,38 @@ REALM_NORETURN void RecoverLocalChangesetsHandler::handle_error(const std::strin
     throw realm::_impl::client_reset::ClientResetFailed(full_message);
 }
 
-void RecoverLocalChangesetsHandler::process_changesets(const std::vector<ClientHistory::LocalChange>& changesets,
-                                                       std::vector<sync::SubscriptionSet>&& pending_subscriptions)
+util::AppendBuffer<char> RecoverLocalChangesetsHandler::process_changeset(const ChunkedBinaryData& changeset)
 {
-    // When recovering in PBS, we can iterate through all the changes and apply them in a single commit.
-    // This has the nice property that any exception while applying will revert the entire recovery and leave
-    // the Realm in a "pre reset" state.
-    //
-    // When recovering in FLX mode, we must apply subscription sets interleaved between the correct commits.
-    // This handles the case where some objects were subscribed to for only one commit and then unsubscribed after.
+    ChunkedBinaryInputStream in{changeset};
+    size_t decompressed_size;
+    auto decompressed = util::compression::decompress_nonportable_input_stream(in, decompressed_size);
+    if (!decompressed)
+        return {};
 
-    size_t subscription_index = 0;
-    auto write_pending_subscriptions_up_to = [&](version_type version) {
-        while (subscription_index < pending_subscriptions.size() &&
-               pending_subscriptions[subscription_index].snapshot_version() <= version) {
-            if (m_transaction.get_transact_stage() == DB::TransactStage::transact_Writing) {
-                // List modifications may have happened on an object which we are only subscribed to
-                // for this commit so we need to apply them as we go.
-                copy_lists_with_unrecoverable_changes();
-                m_transaction.commit_and_continue_as_read();
-            }
-            auto pre_sub = pending_subscriptions[subscription_index++];
-            auto post_sub = pre_sub.make_mutable_copy().commit();
-            m_logger.info("Recovering pending subscription version: %1 -> %2, snapshot: %3 -> %4", pre_sub.version(),
-                          post_sub.version(), pre_sub.snapshot_version(), post_sub.snapshot_version());
-        }
-        if (m_transaction.get_transact_stage() != DB::TransactStage::transact_Writing) {
-            m_transaction.promote_to_write();
-        }
-    };
-
-    for (const ClientHistory::LocalChange& change : changesets) {
-        if (change.changeset.size() == 0)
-            continue;
-
-        ChunkedBinaryInputStream in{change.changeset};
-        size_t decompressed_size;
-        auto decompressed = util::compression::decompress_nonportable_input_stream(in, decompressed_size);
-        if (!decompressed)
-            continue;
-
-        write_pending_subscriptions_up_to(change.version);
-
-        sync::Changeset parsed_changeset;
-        sync::parse_changeset(*decompressed, parsed_changeset); // Throws
+    sync::Changeset parsed_changeset;
+    sync::parse_changeset(*decompressed, parsed_changeset); // Throws
 #if REALM_DEBUG
-        if (m_logger.would_log(util::Logger::Level::trace)) {
-            std::stringstream dumped_changeset;
-            parsed_changeset.print(dumped_changeset);
-            m_logger.trace("Recovering changeset: %1", dumped_changeset.str());
-        }
+    if (m_logger.would_log(util::Logger::Level::trace)) {
+        std::stringstream dumped_changeset;
+        parsed_changeset.print(dumped_changeset);
+        m_logger.trace("Recovering changeset: %1", dumped_changeset.str());
+    }
 #endif
 
-        InstructionApplier::begin_apply(parsed_changeset, &m_logger);
-        for (auto instr : parsed_changeset) {
-            if (!instr)
-                continue;
-            instr->visit(*this); // Throws
-        }
-        InstructionApplier::end_apply();
+    InstructionApplier::begin_apply(parsed_changeset, &m_logger);
+    for (auto instr : parsed_changeset) {
+        if (!instr)
+            continue;
+        instr->visit(*this); // Throws
     }
-
-    // write any remaining subscriptions
-    write_pending_subscriptions_up_to(std::numeric_limits<version_type>::max());
-    REALM_ASSERT_EX(subscription_index == pending_subscriptions.size(), subscription_index);
+    InstructionApplier::end_apply();
 
     copy_lists_with_unrecoverable_changes();
+
+    auto& repl = static_cast<ClientReplication&>(*m_replication);
+    auto buffer = repl.get_instruction_encoder().release();
+    repl.reset();
+    return buffer;
 }
 
 void RecoverLocalChangesetsHandler::copy_lists_with_unrecoverable_changes()
@@ -1209,11 +1174,14 @@ void RecoverLocalChangesetsHandler::operator()(const Instruction::SetErase& inst
 
 } // anonymous namespace
 
-void client_reset::process_recovered_changesets(Transaction& dest_tr, Transaction& pre_reset_state,
-                                                util::Logger& logger,
-                                                const std::vector<sync::ClientHistory::LocalChange>& changesets,
-                                                std::vector<sync::SubscriptionSet>&& pending_subscriptions)
+std::vector<client_reset::RecoveredChange>
+client_reset::process_recovered_changesets(Transaction& dest_tr, Transaction& pre_reset_state, util::Logger& logger,
+                                           const std::vector<sync::ClientHistory::LocalChange>& local_changes)
 {
     RecoverLocalChangesetsHandler handler(dest_tr, pre_reset_state, logger);
-    handler.process_changesets(changesets, std::move(pending_subscriptions));
+    std::vector<RecoveredChange> encoded;
+    for (auto& local_change : local_changes) {
+        encoded.push_back({handler.process_changeset(local_change.changeset), local_change.version});
+    }
+    return encoded;
 }

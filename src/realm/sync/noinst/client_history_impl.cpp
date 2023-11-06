@@ -16,18 +16,19 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "realm/util/functional.hpp"
 #include <realm/sync/noinst/client_history_impl.hpp>
 
-#include <realm/util/compression.hpp>
-#include <realm/util/features.h>
-#include <realm/util/scope_exit.hpp>
 #include <realm/sync/changeset.hpp>
 #include <realm/sync/changeset_parser.hpp>
 #include <realm/sync/instruction_applier.hpp>
 #include <realm/sync/instruction_replication.hpp>
 #include <realm/sync/noinst/client_reset.hpp>
+#include <realm/sync/noinst/client_reset_recovery.hpp>
 #include <realm/transaction.hpp>
+#include <realm/util/compression.hpp>
+#include <realm/util/features.h>
+#include <realm/util/functional.hpp>
+#include <realm/util/scope_exit.hpp>
 #include <realm/version.hpp>
 
 #include <algorithm>
@@ -37,44 +38,77 @@
 
 namespace realm::sync {
 
-void ClientHistory::set_client_file_ident_in_wt(version_type current_version, SaltedFileIdent client_file_ident)
-{
-    ensure_updated(current_version); // Throws
-    prepare_for_write();             // Throws
-
-    Array& root = m_arrays->root;
-    m_group->set_sync_file_id(client_file_ident.ident); // Throws
-    root.set(s_client_file_ident_salt_iip,
-             RefOrTagged::make_tagged(client_file_ident.salt)); // Throws
-}
-
-
-void ClientHistory::set_client_reset_adjustments(version_type current_version, SaltedFileIdent client_file_ident,
-                                                 SaltedVersion server_version, BinaryData uploadable_changeset)
+void ClientHistory::set_client_reset_adjustments(
+    util::Logger& logger, version_type current_version, SaltedFileIdent client_file_ident,
+    SaltedVersion server_version, const std::vector<_impl::client_reset::RecoveredChange>& recovered_changesets)
 {
     ensure_updated(current_version); // Throws
     prepare_for_write();             // Throws
 
     version_type client_version = m_sync_history_base_version + sync_history_size();
     REALM_ASSERT(client_version == current_version); // For now
-    DownloadCursor download_progress = {server_version.version, 0};
-    UploadCursor upload_progress = {0, 0};
     Array& root = m_arrays->root;
     m_group->set_sync_file_id(client_file_ident.ident); // Throws
+
+    size_t uploadable_bytes = 0;
+    if (recovered_changesets.empty()) {
+        // Either we had nothing to upload or we're discarding the unsynced changes
+        logger.debug("Client reset adjustments: discarding %1 history entries", sync_history_size());
+        do_trim_sync_history(sync_history_size()); // Throws
+    }
+    else {
+        // Discard all sync history before the first recovered changeset. This is
+        // required because we are going to discard our progress information and
+        // so won't know which history entries have been uploaded already.
+        auto first_version = recovered_changesets.front().version;
+        REALM_ASSERT(first_version >= m_sync_history_base_version);
+        auto discard_count = std::size_t(first_version - m_sync_history_base_version);
+        do_trim_sync_history(discard_count);
+
+        if (logger.would_log(util::Logger::Level::debug)) {
+            logger.debug("Client reset adjustments: trimming %1 history entries and updating %2 of %3 remaining "
+                         "history entries:",
+                         discard_count, recovered_changesets.size(), sync_history_size());
+            for (size_t i = 0, size = m_arrays->changesets.size(); i < size; ++i) {
+                logger.debug("- %1: ident(%2) changeset_size(%3) remote_version(%4)", i,
+                             m_arrays->origin_file_idents.get(i), m_arrays->changesets.get(i).size(),
+                             m_arrays->remote_versions.get(i));
+            }
+        }
+
+        util::compression::CompressMemoryArena arena;
+        util::AppendBuffer<char> compressed;
+        for (auto& [changeset, version] : recovered_changesets) {
+            uploadable_bytes += changeset.size();
+            auto i = size_t(version - m_sync_history_base_version);
+            util::compression::allocate_and_compress_nonportable(arena, changeset, compressed);
+            m_arrays->changesets.set(i, BinaryData{compressed.data(), compressed.size()}); // Throws
+            m_arrays->remote_versions.set(i, server_version.version);
+            logger.debug("Updating %1: client_version(%2) changeset_size(%3) server_version(%4)", i, version,
+                         compressed.size(), server_version.version);
+        }
+    }
+    logger.debug("New uploadable bytes after client reset adjustment: %1", uploadable_bytes);
+
+    // Client progress versions are set to 0 to signal to the server that we've
+    // reset our versioning. If we send the actual values, the server would
+    // complain that the versions (probably) don't correspond to the ones sent
+    // when downloading the fresh realm.
+    root.set(s_progress_download_client_version_iip,
+             RefOrTagged::make_tagged(0)); // Throws
+    root.set(s_progress_upload_client_version_iip,
+             RefOrTagged::make_tagged(0)); // Throws
+
     root.set(s_client_file_ident_salt_iip,
              RefOrTagged::make_tagged(client_file_ident.salt)); // Throws
     root.set(s_progress_download_server_version_iip,
-             RefOrTagged::make_tagged(download_progress.server_version)); // Throws
-    root.set(s_progress_download_client_version_iip,
-             RefOrTagged::make_tagged(download_progress.last_integrated_client_version)); // Throws
+             RefOrTagged::make_tagged(server_version.version)); // Throws
     root.set(s_progress_latest_server_version_iip,
              RefOrTagged::make_tagged(server_version.version)); // Throws
     root.set(s_progress_latest_server_version_salt_iip,
              RefOrTagged::make_tagged(server_version.salt)); // Throws
-    root.set(s_progress_upload_client_version_iip,
-             RefOrTagged::make_tagged(upload_progress.client_version)); // Throws
     root.set(s_progress_upload_server_version_iip,
-             RefOrTagged::make_tagged(upload_progress.last_integrated_server_version)); // Throws
+             RefOrTagged::make_tagged(server_version.version)); // Throws
     root.set(s_progress_downloaded_bytes_iip,
              RefOrTagged::make_tagged(0)); // Throws
     root.set(s_progress_downloadable_bytes_iip,
@@ -82,13 +116,10 @@ void ClientHistory::set_client_reset_adjustments(version_type current_version, S
     root.set(s_progress_uploaded_bytes_iip,
              RefOrTagged::make_tagged(0)); // Throws
     root.set(s_progress_uploadable_bytes_iip,
-             RefOrTagged::make_tagged(0)); // Throws
+             RefOrTagged::make_tagged(uploadable_bytes)); // Throws
 
-    // Discard existing synchronization history
-    do_trim_sync_history(sync_history_size()); // Throws
-
-    m_progress_download = download_progress;
-    m_client_reset_changeset = uploadable_changeset; // Picked up by prepare_changeset()
+    m_progress_download = {server_version.version, 0};
+    m_applying_client_reset = true;
 }
 
 std::vector<ClientHistory::LocalChange> ClientHistory::get_local_changes(version_type current_version) const
@@ -116,7 +147,9 @@ std::vector<ClientHistory::LocalChange> ClientHistory::get_local_changes(version
         std::int_fast64_t origin_file_ident = m_arrays->origin_file_idents.get(ndx);
         bool not_from_server = (origin_file_ident == 0);
         if (not_from_server) {
-            changesets.push_back({version, m_arrays->changesets.get(ndx)});
+            if (auto changeset = m_arrays->changesets.get(ndx); changeset.size()) {
+                changesets.push_back({version, changeset});
+            }
         }
     }
     return changesets;
@@ -267,20 +300,6 @@ void ClientHistory::get_status(version_type& current_client_version, SaltedFileI
     if (has_pending_client_reset) {
         *has_pending_client_reset = _impl::client_reset::has_pending_reset(*rt).has_value();
     }
-}
-
-SaltedFileIdent ClientHistory::get_client_file_ident(const Transaction& rt) const
-{
-    SaltedFileIdent client_file_ident{rt.get_sync_file_id(), 0};
-
-    using gf = _impl::GroupFriend;
-    if (ref_type ref = gf::get_history_ref(rt)) {
-        Array root(m_db->get_alloc());
-        root.init_from_ref(ref);
-        client_file_ident.salt = salt_type(root.get_as_ref_or_tagged(s_client_file_ident_salt_iip).get_as_int());
-    }
-
-    return client_file_ident;
 }
 
 void ClientHistory::set_client_file_ident(SaltedFileIdent client_file_ident, bool fix_up_object_ids)
@@ -737,7 +756,7 @@ Replication::version_type ClientHistory::add_changeset(BinaryData ct_changeset, 
         ct_changeset = BinaryData("", 0);
     m_arrays->ct_history.add(ct_changeset); // Throws
 
-    REALM_ASSERT(!m_applying_server_changeset || !m_client_reset_changeset);
+    REALM_ASSERT(!m_applying_server_changeset || !m_applying_client_reset);
 
     // If we're applying a changeset from the server then we should have already
     // added the history entry and don't need to do so here
@@ -751,21 +770,19 @@ Replication::version_type ClientHistory::add_changeset(BinaryData ct_changeset, 
         return m_ct_history_base_version + ct_history_size();
     }
 
-    BinaryData changeset = sync_changeset;
-    if (m_client_reset_changeset) {
-        // When performing a client reset, `sync_changeset` is generated from
-        // the operations performed to bring the local Realm in sync with the
-        // server, so we don't want to send that to the server. Instead we
-        // send m_client_reset_changeset which is the recovered local writes
-        // (or null in discard local mode).
-        changeset = *std::exchange(m_client_reset_changeset, util::none);
+    // We don't generate a changeset for any of the changes made as part of
+    // applying a client reset as those changes are just bringing us into
+    // alignment with the new server state
+    if (m_applying_client_reset) {
+        m_applying_client_reset = false;
+        sync_changeset = {};
     }
 
     HistoryEntry entry;
     entry.origin_timestamp = m_local_origin_timestamp_source();
     entry.origin_file_ident = 0; // Of local origin
     entry.remote_version = m_progress_download.server_version;
-    entry.changeset = changeset;
+    entry.changeset = sync_changeset;
     add_sync_history_entry(entry); // Throws
 
     // uploadable_bytes is updated at every local Realm change. The total
@@ -920,7 +937,7 @@ void ClientHistory::trim_ct_history()
 // Definition: An *upload skippable history entry* is one whose changeset is
 // either empty, or of remote origin.
 //
-// Then, a history entry, E, can be trimmed away if it preceeds C, or E is
+// Then, a history entry, E, can be trimmed away if it precedes C, or E is
 // upload skippable, and there are no upload nonskippable entries between C and
 // E.
 //
@@ -1004,8 +1021,14 @@ void ClientHistory::do_trim_sync_history(std::size_t n)
     REALM_ASSERT(m_arrays->origin_timestamps.size() == sync_history_size());
     REALM_ASSERT(n <= sync_history_size());
 
-    if (n > 0) {
-        // FIXME: shouldn't this be using truncate()?
+    if (n == sync_history_size()) {
+        m_arrays->changesets.clear();
+        m_arrays->reciprocal_transforms.clear();
+        m_arrays->remote_versions.clear();
+        m_arrays->origin_file_idents.clear();
+        m_arrays->origin_timestamps.clear();
+    }
+    else if (n > 0) {
         for (std::size_t i = 0; i < n; ++i) {
             std::size_t j = (n - 1) - i;
             m_arrays->changesets.erase(j); // Throws
@@ -1026,9 +1049,9 @@ void ClientHistory::do_trim_sync_history(std::size_t n)
             std::size_t j = (n - 1) - i;
             m_arrays->origin_timestamps.erase(j); // Throws
         }
-
-        m_sync_history_base_version += n;
     }
+
+    m_sync_history_base_version += n;
 }
 
 void ClientHistory::fix_up_client_file_ident_in_stored_changesets(Transaction& group,

@@ -1202,7 +1202,9 @@ TEST(ClientReset_DiscardLocal_DiscardsPendingSubscriptions)
     }
 }
 
-TEST(ClientReset_DiscardLocal_MakesAwaitingMarkActiveSubscriptionsComplete)
+TEST_TYPES(ClientReset_DiscardLocal_MakesAwaitingMarkActiveSubscriptionsComplete,
+           std::integral_constant<ClientResyncMode, ClientResyncMode::DiscardLocal>,
+           std::integral_constant<ClientResyncMode, ClientResyncMode::Recover>)
 {
     SHARED_GROUP_TEST_PATH(path_1);
     SHARED_GROUP_TEST_PATH(path_2);
@@ -1216,12 +1218,262 @@ TEST(ClientReset_DiscardLocal_MakesAwaitingMarkActiveSubscriptionsComplete)
     auto set = add_subscription(*sub_store, "complete", query, SubscriptionSet::State::AwaitingMark);
     auto future = set.get_state_change_notification(SubscriptionSet::State::Complete);
 
-    expect_reset(test_context, *db, *db_fresh, ClientResyncMode::DiscardLocal, sub_store.get());
+    expect_reset(test_context, *db, *db_fresh, TEST_TYPE::value, sub_store.get());
 
     CHECK_EQUAL(future.get(), SubscriptionSet::State::Complete);
     CHECK_EQUAL(set.state(), SubscriptionSet::State::AwaitingMark);
     set.refresh();
     CHECK_EQUAL(set.state(), SubscriptionSet::State::Complete);
+}
+
+TEST(ClientReset_Recover_DoesNotCompletePendingSubscriptions)
+{
+    SHARED_GROUP_TEST_PATH(path_1);
+    SHARED_GROUP_TEST_PATH(path_2);
+    auto [db, db_fresh] = prepare_db(path_1, path_2, [&](Transaction& tr) {
+        tr.add_table_with_primary_key("class_table", type_Int, "pk");
+    });
+
+    auto tr = db->start_read();
+    auto sub_store = SubscriptionStore::create(db);
+    auto query = tr->get_table("class_table")->where();
+
+    add_subscription(*sub_store, "complete", query, SubscriptionSet::State::Complete);
+
+    std::vector<util::Future<SubscriptionSet::State>> futures;
+    for (int i = 0; i < 3; ++i) {
+        auto subs = add_subscription(*sub_store, util::format("pending %1", i), query);
+        futures.push_back(subs.get_state_change_notification(SubscriptionSet::State::Complete));
+    }
+
+    expect_reset(test_context, *db, *db_fresh, ClientResyncMode::Recover, sub_store.get());
+
+    for (auto& fut : futures) {
+        CHECK_NOT(fut.is_ready());
+    }
+
+    auto pending = sub_store->get_pending_subscriptions();
+    CHECK_EQUAL(pending.size(), 3);
+    for (int i = 0; i < 3; ++i) {
+        CHECK_EQUAL(pending[i].size(), i + 2);
+        CHECK_EQUAL(std::prev(pending[i].end())->name, util::format("pending %1", i));
+    }
+}
+
+TEST(ClientReset_Recover_UpdatesRemoteServerVersions)
+{
+    SHARED_GROUP_TEST_PATH(path_1);
+    SHARED_GROUP_TEST_PATH(path_2);
+    auto [db, db_fresh] = prepare_db(path_1, path_2, [&](Transaction& tr) {
+        tr.add_table_with_primary_key("class_table", type_Int, "pk");
+    });
+
+    // Create local unsynchronized changes
+    for (int i = 0; i < 5; ++i) {
+        auto wt = db->start_write();
+        auto table = wt->get_table("class_table");
+        table->create_object_with_primary_key(i);
+        wt->commit();
+    }
+
+    // Change the last seen server version for the freshly download DB
+    {
+        sync::SyncProgress progress;
+        // Set to a valid but incorrect client version which should not be
+        // copied over by client reset
+        auto client_version = db_fresh->get_version_of_latest_snapshot() - 1;
+        progress.download.last_integrated_client_version = client_version;
+        progress.upload.client_version = client_version;
+
+        // Server versions are opaque increasing values, so they can be whatever.
+        // Set to known values that we can verify are used
+        progress.latest_server_version.version = 123;
+        progress.latest_server_version.salt = 456;
+        progress.download.server_version = 123;
+        progress.upload.last_integrated_server_version = 789;
+
+        sync::VersionInfo info_out;
+        auto& history = static_cast<ClientReplication*>(db_fresh->get_replication())->get_history();
+        history.set_sync_progress(progress, nullptr, info_out);
+    }
+
+    expect_reset(test_context, *db, *db_fresh, ClientResyncMode::Recover, nullptr);
+
+    auto& history = static_cast<ClientReplication*>(db->get_replication())->get_history();
+    history.ensure_updated(db->get_version_of_latest_snapshot());
+
+    version_type current_client_version;
+    SaltedFileIdent file_ident;
+    SyncProgress sync_progress;
+    history.get_status(current_client_version, file_ident, sync_progress);
+
+    CHECK_EQUAL(file_ident.ident, 100);
+    CHECK_EQUAL(file_ident.salt, 200);
+    CHECK_EQUAL(sync_progress.upload.client_version, 0);
+    CHECK_EQUAL(sync_progress.download.last_integrated_client_version, 0);
+    CHECK_EQUAL(sync_progress.upload.last_integrated_server_version, 123);
+    CHECK_EQUAL(sync_progress.download.server_version, 123);
+
+    std::vector<ClientHistory::UploadChangeset> uploadable_changesets;
+    version_type locked_server_version;
+    history.find_uploadable_changesets(sync_progress.upload, db->get_version_of_latest_snapshot(),
+                                       uploadable_changesets, locked_server_version);
+
+    CHECK_EQUAL(uploadable_changesets.size(), 5);
+    for (auto& uc : uploadable_changesets) {
+        CHECK_EQUAL(uc.progress.last_integrated_server_version, 123);
+    }
+}
+
+TEST(ClientReset_Recover_UploadableBytes)
+{
+    SHARED_GROUP_TEST_PATH(path_1);
+    SHARED_GROUP_TEST_PATH(path_2);
+    auto [db, db_fresh] = prepare_db(path_1, path_2, [&](Transaction& tr) {
+        tr.add_table_with_primary_key("class_table", type_Int, "pk");
+    });
+
+    // Create local unsynchronized changes
+    for (int i = 0; i < 5; ++i) {
+        auto wt = db->start_write();
+        auto table = wt->get_table("class_table");
+        table->create_object_with_primary_key(i);
+        wt->commit();
+    }
+
+    // Create some of the same objects in the fresh realm so that the post-reset
+    // uploadable_bytes should be different from pre-reset (but still not zero)
+    {
+        auto wt = db_fresh->start_write();
+        auto table = wt->get_table("class_table");
+        for (int i = 0; i < 3; ++i) {
+            table->create_object_with_primary_key(i);
+        }
+        wt->commit();
+    }
+
+    auto& history = static_cast<ClientReplication*>(db->get_replication())->get_history();
+    uint_fast64_t unused, pre_reset_uploadable_bytes;
+    history.get_upload_download_bytes(db.get(), unused, unused, unused, pre_reset_uploadable_bytes, unused);
+    CHECK_GREATER(pre_reset_uploadable_bytes, 0);
+
+    expect_reset(test_context, *db, *db_fresh, ClientResyncMode::Recover, nullptr);
+
+    uint_fast64_t post_reset_uploadable_bytes;
+    history.get_upload_download_bytes(db.get(), unused, unused, unused, post_reset_uploadable_bytes, unused);
+    CHECK_GREATER(post_reset_uploadable_bytes, 0);
+    CHECK_GREATER(pre_reset_uploadable_bytes, post_reset_uploadable_bytes);
+}
+
+TEST(ClientReset_Recover_ListsAreOnlyCopiedOnce)
+{
+    SHARED_GROUP_TEST_PATH(path_1);
+    SHARED_GROUP_TEST_PATH(path_2);
+    auto [db, db_fresh] = prepare_db(path_1, path_2, [&](Transaction& tr) {
+        auto table = tr.add_table_with_primary_key("class_table", type_Int, "pk");
+        auto col = table->add_column_list(type_Int, "list");
+        auto list = table->create_object_with_primary_key(0).get_list<Int>(col);
+        list.add(0);
+        list.add(1);
+        list.add(2);
+    });
+
+    // Perform some conflicting list writes which aren't recoverable and require
+    // a copy
+    { // modify local
+        auto wt = db->start_write();
+        auto list = wt->get_table("class_table")->begin()->get_list<Int>("list");
+        list.remove(0);
+        list.add(4);
+        wt->commit_and_continue_writing();
+        list.remove(0);
+        list.add(5);
+        wt->commit_and_continue_writing();
+        list.remove(0);
+        list.add(6);
+        wt->commit();
+    }
+    { // modify remote
+        auto wt = db_fresh->start_write();
+        auto list = wt->get_table("class_table")->begin()->get_list<Int>("list");
+        list.clear();
+        list.add(7);
+        list.add(8);
+        list.add(9);
+        wt->commit();
+    }
+
+    expect_reset(test_context, *db, *db_fresh, ClientResyncMode::Recover, nullptr);
+
+    // List should match the pre-reset local state
+    auto rt = db->start_read();
+    auto list = rt->get_table("class_table")->begin()->get_list<Int>("list");
+    CHECK_EQUAL(list.size(), 3);
+    CHECK_EQUAL(list.get(0), 4);
+    CHECK_EQUAL(list.get(1), 5);
+    CHECK_EQUAL(list.get(2), 6);
+
+    // The second and third changeset should now be empty and so excluded from
+    // get_local_changes()
+    auto repl = static_cast<ClientReplication*>(db->get_replication());
+    auto changes = repl->get_history().get_local_changes(rt->get_version());
+    CHECK_EQUAL(changes.size(), 1);
+}
+
+TEST(ClientReset_Recover_RecoverableChangesOnListsAfterUnrecoverableAreNotDuplicated)
+{
+    SHARED_GROUP_TEST_PATH(path_1);
+    SHARED_GROUP_TEST_PATH(path_2);
+    auto [db, db_fresh] = prepare_db(path_1, path_2, [&](Transaction& tr) {
+        auto table = tr.add_table_with_primary_key("class_table", type_Int, "pk");
+        auto col = table->add_column_list(type_Int, "list");
+        auto list = table->create_object_with_primary_key(0).get_list<Int>(col);
+        list.add(0);
+        list.add(1);
+    });
+
+    auto sub_store = SubscriptionStore::create(db);
+    add_subscription(*sub_store, "complete", db->start_read()->get_table("class_table")->where(),
+                     SubscriptionSet::State::Complete);
+
+    { // offline modify local
+        auto wt = db->start_write();
+        auto list = wt->get_table("class_table")->begin()->get_list<Int>("list");
+        // triggers a copy since it's unrecoverable
+        list.remove(0);
+        list.add(4);
+        wt->commit_and_continue_as_read();
+
+        // Pending subscription in between the two writes makes this recovered
+        // in a second write, which shouldn't actually do anything as the new
+        // element was already added by the copy
+        add_subscription(*sub_store, "pending 1", wt->get_table("class_table")->where());
+        wt->promote_to_write();
+        list.add(5);
+        wt->commit();
+    }
+    { // remote modification that should be discarded
+        auto wt = db_fresh->start_write();
+        auto list = wt->get_table("class_table")->begin()->get_list<Int>("list");
+        list.clear();
+        list.add(8);
+        wt->commit();
+    }
+
+    expect_reset(test_context, *db, *db_fresh, ClientResyncMode::Recover, sub_store.get());
+
+    // List should match the pre-reset local state
+    auto rt = db->start_read();
+    auto list = rt->get_table("class_table")->begin()->get_list<Int>("list");
+    CHECK_EQUAL(list.size(), 3);
+    CHECK_EQUAL(list.get(0), 1);
+    CHECK_EQUAL(list.get(1), 4);
+    CHECK_EQUAL(list.get(2), 5);
+
+    // The second changeset should now be empty and so excluded from get_local_changes()
+    auto repl = static_cast<ClientReplication*>(db->get_replication());
+    auto changes = repl->get_history().get_local_changes(rt->get_version());
+    CHECK_EQUAL(changes.size(), 1);
 }
 
 } // unnamed namespace

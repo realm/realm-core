@@ -969,4 +969,25 @@ int64_t SubscriptionStore::set_active_as_latest(Transaction& wt)
     return version;
 }
 
+int64_t SubscriptionStore::mark_active_as_complete(Transaction& wt)
+{
+    auto active = get_active(wt);
+    active.set(m_sub_set_state, state_to_storage(State::Complete));
+    auto version = active.get_primary_key().get_int();
+
+    std::list<NotificationRequest> to_finish;
+    {
+        util::CheckedLockGuard lock(m_pending_notifications_mutex);
+        splice_if(m_pending_notifications, to_finish, [&](auto& req) {
+            return req.version == version && state_to_order(req.notify_when) <= state_to_order(State::Complete);
+        });
+    }
+
+    for (auto& req : to_finish) {
+        req.promise.emplace_value(State::Complete);
+    }
+
+    return version;
+}
+
 } // namespace realm::sync

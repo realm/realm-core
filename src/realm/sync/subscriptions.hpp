@@ -348,6 +348,7 @@ public:
     void update_state(int64_t version_id, SubscriptionSet::State state,
                       std::optional<std::string_view> error_str = util::none)
         REQUIRES(!m_pending_notifications_mutex);
+    int64_t mark_active_as_complete(Transaction& wt) REQUIRES(!m_pending_notifications_mutex);
 
     // Notify all subscription state change notification handlers on this subscription store with the
     // provided Status - this does not change the state of any pending subscriptions.
