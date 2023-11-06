@@ -1575,7 +1575,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
         auto has_reset_cycle_flag = [](SharedRealm realm) -> util::Optional<_impl::client_reset::PendingReset> {
             auto db = TestHelper::get_db(realm);
             auto rt = db->start_read();
-            return _impl::client_reset::has_pending_reset(rt);
+            return _impl::client_reset::has_pending_reset(*rt);
         };
         ThreadSafeSyncError err;
         local_config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
@@ -1585,7 +1585,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
             local_config.sync_config->notify_before_client_reset = [previous_type = type](SharedRealm realm) {
                 auto db = TestHelper::get_db(realm);
                 auto wt = db->start_write();
-                _impl::client_reset::track_reset(wt, previous_type);
+                _impl::client_reset::track_reset(*wt, previous_type);
                 wt->commit();
             };
         };

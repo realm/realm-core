@@ -2,10 +2,33 @@
 
 ### Enhancements
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
-* Cancel asynchronous notifications on subscription state change in case of fatal session errors and when the session becomes inactive. ([PR #7073](https://github.com/realm/realm-core/pull/7073))
+* None.
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
+* A crash at a very specific time during a DiscardLocal client reset on a FLX Realm could leave subscriptions in an invalid state ([#7110](https://github.com/realm/realm-core/pull/7110), since v12.3.0).
+
+### Breaking changes
+* None.
+
+### Compatibility
+* Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
+* Add baas-network-tests nightly task for testing sync client operation with non-ideal network conditions. ([PR #6852](https://github.com/realm/realm-core/pull/6852))
+* Added non-ideal network conditions and network fault tests to the evergreen nightly test runs. ([PR #7063](https://github.com/realm/realm-core/pull/7063))
+* Updated baas tests to run with dev mode disabled by default. ([PR #6852](https://github.com/realm/realm-core/pull/6852))
+
+----------------------------------------------
+
+# 13.23.3 Release notes
+
+### Enhancements
+* Cancel asynchronous notifications on subscription state change in case of fatal session errors and when the session becomes inactive. ([PR #7073](https://github.com/realm/realm-core/pull/7073))
+
+### Fixed
 * A new design around using a scheduler in C API has enabled the proper release of the user data (See "Breaking Changes") ([#7094](https://github.com/realm/realm-core/issues/7094), since v10.4.0)
 * Potential stack-use-after-scope issue on changesets integration with msvc-2019 and mpack code ([PR #6911](https://github.com/realm/realm-core/pull/6911))
 * Fix compilation with non-beta Xcode 15. Building for visionOS now requires explicitly specifying `-DCMAKE_XCODE_ATTRIBUTE_SDKROOT=xros` (PR [#7055](https://github.com/realm/realm-core/pull/7055)).
@@ -26,8 +49,7 @@
 * Add support for building against the musl library. ([PR #7067](https://github.com/realm/realm-core/pull/7067))
 * Remove ArrayWithFind's ability to use a templated callback parameter. The QueryStateBase consumers now use an index and the array leaf to get the actual value if needed. This allows certain queries such as count() to not do as many lookups to the actual values and results in a small performance gain. Also remove `find_action_pattern()` which was unused for a long time. This reduction in templating throughout the query system produces a small (~100k) binary size reduction. ([#7095](https://github.com/realm/realm-core/pull/7095))
 * Rework the implemenatation of the set algrebra functions on Set<T> to reduce the compiled size.
-* Add baas-network-tests nightly task for testing sync client operation with non-ideal network conditions. ([PR #6852](https://github.com/realm/realm-core/pull/6852))
-* Added non-ideal network conditions and network fault tests to the evergreen nightly test runs. ([PR #7063](https://github.com/realm/realm-core/pull/7063))
+* Rework the internal interface for sync Transformers to simplify it and reduce the compiled size ([PR #7098](https://github.com/realm/realm-core/pull/7098)).
 
 ----------------------------------------------
 

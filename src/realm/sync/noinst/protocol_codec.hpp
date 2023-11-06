@@ -144,7 +144,7 @@ public:
     // clang-format on
 
     using OutputBuffer = util::ResettableExpandableBufferOutputStream;
-    using RemoteChangeset = sync::Transformer::RemoteChangeset;
+    using RemoteChangeset = sync::RemoteChangeset;
     using ReceivedChangesets = std::vector<RemoteChangeset>;
 
     /// Messages sent by the client.
@@ -422,7 +422,7 @@ private:
 
         // Loop through the body and find the changesets.
         while (!msg.at_end()) {
-            realm::sync::Transformer::RemoteChangeset cur_changeset;
+            RemoteChangeset cur_changeset;
             cur_changeset.remote_version = msg.read_next<version_type>();
             cur_changeset.last_integrated_local_version = msg.read_next<version_type>();
             cur_changeset.origin_timestamp = msg.read_next<timestamp_type>();

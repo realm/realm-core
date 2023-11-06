@@ -19,7 +19,7 @@ TEST(Sync_PendingBootstrapStoreBatching)
         sync::PendingBootstrapStore store(db, *test_context.logger);
 
         CHECK(!store.has_pending());
-        std::vector<Transformer::RemoteChangeset> changesets;
+        std::vector<RemoteChangeset> changesets;
         std::vector<std::string> changeset_data;
 
         changeset_data.emplace_back(1024, 'a');
@@ -117,7 +117,7 @@ TEST(Sync_PendingBootstrapStoreClear)
     sync::PendingBootstrapStore store(db, *test_context.logger);
 
     CHECK(!store.has_pending());
-    std::vector<Transformer::RemoteChangeset> changesets;
+    std::vector<RemoteChangeset> changesets;
     std::vector<std::string> changeset_data;
 
     changeset_data.emplace_back(1024, 'a');
