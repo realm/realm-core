@@ -3696,16 +3696,14 @@ TEST_CASE("client reset with embedded object", "[sync][pbs][client reset][embedd
             reset_embedded_object({local}, {remote}, expected_recovered);
         }
         SECTION("local ArraySet to an embedded object through a deep link->linklist element which is removed by the "
-                "remote "
-                "triggers a list copy") {
+                "remote triggers a list copy") {
             local.link_value->array_vals[0] = 12345;
             remote.link_value->array_vals.erase(remote.link_value->array_vals.begin());
             TopLevelContent expected_recovered = local;
             reset_embedded_object({local}, {remote}, expected_recovered);
         }
         SECTION("local ArrayErase to an embedded object through a deep link->linklist element which is removed by "
-                "the remote "
-                "triggers a list copy") {
+                "the remote triggers a list copy") {
             local.link_value->array_vals.erase(local.link_value->array_vals.begin());
             remote.link_value->array_vals.clear();
             TopLevelContent expected_recovered = local;
@@ -3833,21 +3831,19 @@ TEST_CASE("client reset with embedded object", "[sync][pbs][client reset][embedd
             expected_recovered.dict_values["foo"]->array_vals = local.dict_values["foo"]->array_vals;
             reset_embedded_object({local}, {remote}, expected_recovered);
         }
-        std::vector<std::string> keys = {"new key", "", "\0"};
-        for (auto key : keys) {
-            SECTION(util::format("both add the same dictionary key: '%1'", key)) {
-                EmbeddedContent new_local, new_remote;
-                local.dict_values[key] = new_local;
-                remote.dict_values[key] = new_remote;
-                TopLevelContent expected_recovered = remote;
-                expected_recovered.dict_values[key]->apply_recovery_from(*local.dict_values[key]);
-                // a verbatim list copy is triggered by modifications to items which were not just inserted
-                expected_recovered.dict_values[key]->array_vals = local.dict_values[key]->array_vals;
-                expected_recovered.dict_values[key]->second_level = local.dict_values[key]->second_level;
-                reset_embedded_object({local}, {remote}, expected_recovered);
-            }
+        SECTION("both add the same dictionary key") {
+            auto key = GENERATE("new key", "", "\0");
+            EmbeddedContent new_local, new_remote;
+            local.dict_values[key] = new_local;
+            remote.dict_values[key] = new_remote;
+            TopLevelContent expected_recovered = remote;
+            expected_recovered.dict_values[key]->apply_recovery_from(*local.dict_values[key]);
+            // a verbatim list copy is triggered by modifications to items which were not just inserted
+            expected_recovered.dict_values[key]->array_vals = local.dict_values[key]->array_vals;
+            expected_recovered.dict_values[key]->second_level = local.dict_values[key]->second_level;
+            reset_embedded_object({local}, {remote}, expected_recovered);
         }
-        SECTION("deep modifications to inserted and swaped list items are recovered") {
+        SECTION("deep modifications to inserted and swapped list items are recovered") {
             EmbeddedContent local_added_at_begin, local_added_at_end, local_added_before_end, remote_added;
             size_t list_end = initial.array_values.size();
             test_reset
@@ -3857,14 +3853,14 @@ TEST_CASE("client reset with embedded object", "[sync][pbs][client reset][embedd
                     auto embedded = list.create_and_insert_linked_object(0);
                     local_added_at_begin.assign_to(embedded);
                     embedded = list.create_and_insert_linked_object(list_end - 1);
-                    local_added_before_end.assign_to(embedded); // this item is needed here so that move does not
-                                                                // trigger a copy of the list
+                    // this item is needed here so that move does not trigger a copy of the list
+                    local_added_before_end.assign_to(embedded);
                     embedded = list.create_and_insert_linked_object(list_end);
                     local_added_at_end.assign_to(embedded);
                     local->commit_transaction();
                     local->begin_transaction();
-                    list.swap(0,
-                              list_end); // generates two move instructions, move(0, list_end), move(list_end - 1, 0)
+                    // generates two move instructions, move(0, list_end), move(list_end - 1, 0)
+                    list.swap(0, list_end);
                     local->commit_transaction();
                     local->begin_transaction();
                     local_added_at_end.name = "should be at begin now";

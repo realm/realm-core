@@ -2233,8 +2233,6 @@ bool Session::client_reset_if_needed()
     REALM_ASSERT_EX(m_progress.download.last_integrated_client_version == 0,
                     m_progress.download.last_integrated_client_version);
     REALM_ASSERT_EX(m_progress.upload.client_version == 0, m_progress.upload.client_version);
-    REALM_ASSERT_EX(m_progress.upload.last_integrated_server_version == 0,
-                    m_progress.upload.last_integrated_server_version);
     logger.trace("last_version_available  = %1", m_last_version_available); // Throws
 
     m_upload_progress = m_progress.upload;
