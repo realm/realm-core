@@ -1788,10 +1788,7 @@ void SessionWrapper::handle_pending_client_reset_acknowledgement()
 {
     REALM_ASSERT(!m_finalized);
 
-    auto pending_reset = [&] {
-        auto ft = m_db->start_frozen();
-        return _impl::client_reset::has_pending_reset(ft);
-    }();
+    auto pending_reset = _impl::client_reset::has_pending_reset(*m_db->start_frozen());
     REALM_ASSERT(pending_reset);
     m_sess->logger.info("Tracking pending client reset of type \"%1\" from %2", pending_reset->type,
                         pending_reset->time);
@@ -1807,7 +1804,7 @@ void SessionWrapper::handle_pending_client_reset_acknowledgement()
         }
 
         auto wt = self->m_db->start_write();
-        auto cur_pending_reset = _impl::client_reset::has_pending_reset(wt);
+        auto cur_pending_reset = _impl::client_reset::has_pending_reset(*wt);
         if (!cur_pending_reset) {
             logger.debug(
                 "Was going to remove client reset tracker for type \"%1\" from %2, but it was already removed",
@@ -1824,7 +1821,7 @@ void SessionWrapper::handle_pending_client_reset_acknowledgement()
                          "Removing cycle detection tracker.",
                          pending_reset.type, pending_reset.time);
         }
-        _impl::client_reset::remove_pending_client_resets(wt);
+        _impl::client_reset::remove_pending_client_resets(*wt);
         wt->commit();
     });
 }
