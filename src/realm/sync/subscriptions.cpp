@@ -438,10 +438,8 @@ void MutableSubscriptionSet::update_state(State new_state, util::Optional<std::s
         }
         case State::Superseded:
             throw std::logic_error("Cannot set a subscription to the superseded state");
-            break;
         case State::Pending:
             throw std::logic_error("Cannot set subscription set to the pending state");
-            break;
     }
 }
 
@@ -463,24 +461,12 @@ util::Future<SubscriptionSet::State> SubscriptionSet::get_state_change_notificat
 {
     auto mgr = get_flx_subscription_store(); // Throws
 
-    std::unique_lock<std::mutex> lk(mgr->m_pending_notifications_mutex);
+    util::CheckedLockGuard lk(mgr->m_pending_notifications_mutex);
     // If we've already been superceded by another version getting completed, then we should skip registering
     // a notification because it may never fire.
     if (mgr->m_min_outstanding_version > version()) {
         return util::Future<State>::make_ready(State::Superseded);
     }
-
-    // Begin by blocking process_notifications from starting to fill futures. No matter the outcome, we'll
-    // unblock process_notifications() at the end of this function via the guard we construct below.
-    mgr->m_outstanding_requests++;
-    auto guard = util::make_scope_exit([&]() noexcept {
-        if (!lk.owns_lock()) {
-            lk.lock();
-        }
-        --mgr->m_outstanding_requests;
-        mgr->m_pending_notifications_cv.notify_one();
-    });
-    lk.unlock();
 
     State cur_state = state();
     StringData err_str = error_str();
@@ -500,9 +486,6 @@ util::Future<SubscriptionSet::State> SubscriptionSet::get_state_change_notificat
     else if (state_to_order(cur_state) >= state_to_order(notify_when)) {
         return util::Future<State>::make_ready(cur_state);
     }
-
-    // Otherwise put in a new request to be filled in by process_notifications().
-    lk.lock();
 
     // Otherwise, make a promise/future pair and add it to the list of pending notifications.
     auto [promise, future] = util::make_promise_future<State>();
@@ -530,27 +513,23 @@ void MutableSubscriptionSet::process_notifications()
     auto my_version = version();
 
     std::list<SubscriptionStore::NotificationRequest> to_finish;
-    std::unique_lock<std::mutex> lk(mgr->m_pending_notifications_mutex);
-    mgr->m_pending_notifications_cv.wait(lk, [&] {
-        return mgr->m_outstanding_requests == 0;
-    });
-
-    for (auto it = mgr->m_pending_notifications.begin(); it != mgr->m_pending_notifications.end();) {
-        if ((it->version == my_version &&
-             (new_state == State::Error || state_to_order(new_state) >= state_to_order(it->notify_when))) ||
-            (new_state == State::Complete && it->version < my_version)) {
-            to_finish.splice(to_finish.end(), mgr->m_pending_notifications, it++);
+    {
+        util::CheckedLockGuard lk(mgr->m_pending_notifications_mutex);
+        for (auto it = mgr->m_pending_notifications.begin(); it != mgr->m_pending_notifications.end();) {
+            if ((it->version == my_version &&
+                 (new_state == State::Error || state_to_order(new_state) >= state_to_order(it->notify_when))) ||
+                (new_state == State::Complete && it->version < my_version)) {
+                to_finish.splice(to_finish.end(), mgr->m_pending_notifications, it++);
+            }
+            else {
+                ++it;
+            }
         }
-        else {
-            ++it;
+
+        if (new_state == State::Complete) {
+            mgr->m_min_outstanding_version = my_version;
         }
     }
-
-    if (new_state == State::Complete) {
-        mgr->m_min_outstanding_version = my_version;
-    }
-
-    lk.unlock();
 
     for (auto& req : to_finish) {
         if (new_state == State::Error && req.version == my_version) {
@@ -843,11 +822,7 @@ std::vector<SubscriptionSet> SubscriptionStore::get_pending_subscriptions() cons
 
 void SubscriptionStore::notify_all_state_change_notifications(Status status)
 {
-    std::unique_lock<std::mutex> lk(m_pending_notifications_mutex);
-    m_pending_notifications_cv.wait(lk, [&] {
-        return m_outstanding_requests == 0;
-    });
-
+    util::CheckedUniqueLock lk(m_pending_notifications_mutex);
     auto to_finish = std::move(m_pending_notifications);
     lk.unlock();
 
@@ -863,13 +838,9 @@ void SubscriptionStore::terminate()
     // Clear out and initialize the subscription store
     initialize_subscriptions_table(m_db->start_read(), true);
 
-    std::unique_lock<std::mutex> lk(m_pending_notifications_mutex);
-    m_pending_notifications_cv.wait(lk, [&] {
-        return m_outstanding_requests == 0;
-    });
+    util::CheckedUniqueLock lk(m_pending_notifications_mutex);
     auto to_finish = std::move(m_pending_notifications);
     m_min_outstanding_version = 0;
-
     lk.unlock();
 
     for (auto& req : to_finish) {
@@ -896,7 +867,7 @@ SubscriptionSet SubscriptionStore::get_by_version(int64_t version_id) const
         return SubscriptionSet(weak_from_this(), *tr, obj);
     }
 
-    std::lock_guard lk(m_pending_notifications_mutex);
+    util::CheckedLockGuard lk(m_pending_notifications_mutex);
     if (version_id < m_min_outstanding_version) {
         return SubscriptionSet(weak_from_this(), version_id, SubscriptionSet::SupersededTag{});
     }
