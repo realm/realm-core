@@ -130,6 +130,19 @@ size_t state_to_order(SubscriptionSet::State needle)
     REALM_UNREACHABLE();
 }
 
+template <typename T, typename Predicate>
+void splice_if(std::list<T>& src, std::list<T>& dst, Predicate pred)
+{
+    for (auto it = src.begin(); it != src.end();) {
+        if (pred(*it)) {
+            dst.splice(dst.end(), src, it++);
+        }
+        else {
+            ++it;
+        }
+    }
+}
+
 } // namespace
 
 Subscription::Subscription(const SubscriptionStore* parent, Obj obj)
@@ -510,32 +523,26 @@ void MutableSubscriptionSet::process_notifications()
 {
     auto mgr = get_flx_subscription_store(); // Throws
     auto new_state = state();
-    auto my_version = version();
 
     std::list<SubscriptionStore::NotificationRequest> to_finish;
     {
         util::CheckedLockGuard lk(mgr->m_pending_notifications_mutex);
-        for (auto it = mgr->m_pending_notifications.begin(); it != mgr->m_pending_notifications.end();) {
-            if ((it->version == my_version &&
-                 (new_state == State::Error || state_to_order(new_state) >= state_to_order(it->notify_when))) ||
-                (new_state == State::Complete && it->version < my_version)) {
-                to_finish.splice(to_finish.end(), mgr->m_pending_notifications, it++);
-            }
-            else {
-                ++it;
-            }
-        }
+        splice_if(mgr->m_pending_notifications, to_finish, [&](auto& req) {
+            return (req.version == m_version &&
+                    (new_state == State::Error || state_to_order(new_state) >= state_to_order(req.notify_when))) ||
+                   (new_state == State::Complete && req.version < m_version);
+        });
 
         if (new_state == State::Complete) {
-            mgr->m_min_outstanding_version = my_version;
+            mgr->m_min_outstanding_version = m_version;
         }
     }
 
     for (auto& req : to_finish) {
-        if (new_state == State::Error && req.version == my_version) {
+        if (new_state == State::Error && req.version == m_version) {
             req.promise.set_error({ErrorCodes::SubscriptionFailed, std::string_view(error_str())});
         }
-        else if (req.version < my_version) {
+        else if (req.version < m_version) {
             req.promise.emplace_value(State::Superseded);
         }
         else {
@@ -942,8 +949,24 @@ int64_t SubscriptionStore::set_active_as_latest(Transaction& wt)
     sub_sets->where().greater(sub_sets->get_primary_key_column(), active.get_primary_key().get_int()).remove();
     // Mark the active set as complete even if it was previously WaitingForMark
     // as we've completed rebootstrapping before calling this.
-    active.set(m_sub_set_state, state_to_storage(SubscriptionSet::State::Complete));
-    return active.get_primary_key().get_int();
+    active.set(m_sub_set_state, state_to_storage(State::Complete));
+    auto version = active.get_primary_key().get_int();
+
+    std::list<NotificationRequest> to_finish;
+    {
+        util::CheckedLockGuard lock(m_pending_notifications_mutex);
+        splice_if(m_pending_notifications, to_finish, [&](auto& req) {
+            if (req.version == version && state_to_order(req.notify_when) <= state_to_order(State::Complete))
+                return true;
+            return req.version != version;
+        });
+    }
+
+    for (auto& req : to_finish) {
+        req.promise.emplace_value(req.version == version ? State::Complete : State::Superseded);
+    }
+
+    return version;
 }
 
 } // namespace realm::sync

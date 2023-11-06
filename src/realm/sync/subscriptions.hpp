@@ -362,14 +362,15 @@ public:
 
     // Recreate the active subscription set, marking any newer pending ones as
     // superseded. This is a no-op if there are no pending subscription sets.
-    int64_t set_active_as_latest(Transaction& wt);
-
-private:
-    using std::enable_shared_from_this<SubscriptionStore>::weak_from_this;
-    DBRef m_db;
+    int64_t set_active_as_latest(Transaction& wt) REQUIRES(!m_pending_notifications_mutex);
 
 protected:
     explicit SubscriptionStore(DBRef db);
+
+private:
+    using State = SubscriptionSet::State;
+    using std::enable_shared_from_this<SubscriptionStore>::weak_from_this;
+    DBRef m_db;
 
     struct NotificationRequest {
         NotificationRequest(int64_t version, util::Promise<SubscriptionSet::State> promise,
