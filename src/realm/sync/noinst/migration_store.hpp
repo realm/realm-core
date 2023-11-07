@@ -78,13 +78,13 @@ public:
 
     // Create subscriptions for each table that does not have a subscription.
     // If new subscriptions are created, they are committed and a change of query is sent to the server.
-    void create_subscriptions(const SubscriptionStore& subs_store);
-    void create_subscriptions(const SubscriptionStore& subs_store, const std::string& rql_query_string);
+    void create_subscriptions(SubscriptionStore& subs_store);
+    void create_subscriptions(SubscriptionStore& subs_store, const std::string& rql_query_string);
 
     // Create a subscription set used as sentinel. No-op if not in 'Migrated' state.
     // This method is idempotent (i.e, at most one subscription set can be created during the lifetime of a
     // migration)
-    void create_sentinel_subscription_set(const SubscriptionStore& subs_store);
+    void create_sentinel_subscription_set(SubscriptionStore& subs_store);
     std::optional<int64_t> get_sentinel_subscription_set_version();
 
 protected:
