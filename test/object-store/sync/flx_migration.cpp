@@ -813,6 +813,7 @@ TEST_CASE("Async open + client reset", "[sync][flx][flx migration][baas]") {
     size_t num_before_reset_notifications = 0;
     size_t num_after_reset_notifications = 0;
     auto server_app_config = minimal_app_config("async_open_during_migration", mig_schema);
+    server_app_config.dev_mode_enabled = true;
     std::optional<SyncTestFile> config; // destruct this after the sessions are torn down
     TestAppSession session(create_app(server_app_config));
     config.emplace(session.app(), partition, server_app_config.schema);
