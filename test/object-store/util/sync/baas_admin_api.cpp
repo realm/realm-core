@@ -412,8 +412,7 @@ app::Response AdminAPIEndpoint::post(std::string body) const
 nlohmann::json AdminAPIEndpoint::post_json(nlohmann::json body) const
 {
     auto resp = post(body.dump());
-    REALM_ASSERT_EX(resp.http_status_code >= 200 && resp.http_status_code < 300,
-                    util::format("url: %1 request: %2, reply: %3", m_url, body.dump(), resp.body));
+    REALM_ASSERT_EX(resp.http_status_code >= 200 && resp.http_status_code < 300, m_url, body.dump(), resp.body);
     return nlohmann::json::parse(resp.body.empty() ? "{}" : resp.body);
 }
 
@@ -1074,7 +1073,7 @@ AppSession create_app(const AppCreateConfig& config)
 
     // Create the schemas in two passes: first populate just the primary key and
     // partition key, then add the rest of the properties. This ensures that the
-    // targest of links exist before adding the links.
+    // targets of links exist before adding the links.
     std::vector<std::pair<std::string, const ObjectSchema*>> object_schema_to_create;
     BaasRuleBuilder rule_builder(config.schema, config.partition_key, mongo_service_name, config.mongo_dbname,
                                  static_cast<bool>(config.flx_sync_config));

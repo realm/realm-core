@@ -510,49 +510,45 @@ void SyncSession::download_fresh_realm(sync::ProtocolErrorInfo::Action server_re
         auto fresh_sub = fresh_sub_store->get_latest();
         // The local realm uses flexible sync as well so copy the active subscription set to the fresh realm.
         if (auto local_subs_store = m_flx_subscription_store) {
-            sync::SubscriptionSet active = local_subs_store->get_active();
             auto fresh_mut_sub = fresh_sub.make_mutable_copy();
-            fresh_mut_sub.import(active);
+            fresh_mut_sub.import(local_subs_store->get_active());
             fresh_sub = fresh_mut_sub.commit();
         }
-        fresh_sub.get_state_change_notification(sync::SubscriptionSet::State::Complete)
-            .then([=, weak_self = weak_from_this()](sync::SubscriptionSet::State state) {
+
+        auto self = shared_from_this();
+        using SubscriptionState = sync::SubscriptionSet::State;
+        fresh_sub.get_state_change_notification(SubscriptionState::Complete)
+            .then([=](SubscriptionState) -> util::Future<sync::SubscriptionSet> {
                 if (server_requests_action != sync::ProtocolErrorInfo::Action::MigrateToFLX) {
-                    return util::Future<sync::SubscriptionSet::State>::make_ready(state);
+                    return fresh_sub;
                 }
-                auto strong_self = weak_self.lock();
-                if (!strong_self || !strong_self->m_migration_store->is_migration_in_progress()) {
-                    return util::Future<sync::SubscriptionSet::State>::make_ready(state);
+                if (!self->m_migration_store->is_migration_in_progress()) {
+                    return fresh_sub;
                 }
 
                 // fresh_sync_session is using a new realm file that doesn't have the migration_store info
                 // so the query string from the local migration store will need to be provided
-                auto query_string = strong_self->m_migration_store->get_query_string();
+                auto query_string = self->m_migration_store->get_query_string();
                 REALM_ASSERT(query_string);
                 // Create subscriptions in the fresh realm based on the schema instructions received in the bootstrap
                 // message.
                 fresh_sync_session->m_migration_store->create_subscriptions(*fresh_sub_store, *query_string);
-                auto latest_subs = fresh_sub_store->get_latest();
-                {
-                    util::CheckedLockGuard lock(strong_self->m_state_mutex);
-                    // Save a copy of the subscriptions so we add them to the local realm once the
-                    // subscription store is created.
-                    strong_self->m_active_subscriptions_after_migration = latest_subs;
-                }
-
-                return latest_subs.get_state_change_notification(sync::SubscriptionSet::State::Complete);
+                return fresh_sub_store->get_latest()
+                    .get_state_change_notification(SubscriptionState::Complete)
+                    .then([=](SubscriptionState) {
+                        return fresh_sub_store->get_latest();
+                    });
             })
-            .get_async([=, weak_self = weak_from_this()](StatusWith<sync::SubscriptionSet::State> s) {
+            .get_async([=](StatusWith<sync::SubscriptionSet>&& subs) {
                 // Keep the sync session alive while it's downloading, but then close
                 // it immediately
                 fresh_sync_session->force_close();
-                if (auto strong_self = weak_self.lock()) {
-                    if (s.is_ok()) {
-                        strong_self->handle_fresh_realm_downloaded(db, Status::OK(), server_requests_action);
-                    }
-                    else {
-                        strong_self->handle_fresh_realm_downloaded(nullptr, s.get_status(), server_requests_action);
-                    }
+                if (subs.is_ok()) {
+                    self->handle_fresh_realm_downloaded(db, Status::OK(), server_requests_action,
+                                                        std::move(subs.get_value()));
+                }
+                else {
+                    self->handle_fresh_realm_downloaded(nullptr, subs.get_status(), server_requests_action);
                 }
             });
     }
@@ -570,7 +566,8 @@ void SyncSession::download_fresh_realm(sync::ProtocolErrorInfo::Action server_re
 }
 
 void SyncSession::handle_fresh_realm_downloaded(DBRef db, Status status,
-                                                sync::ProtocolErrorInfo::Action server_requests_action)
+                                                sync::ProtocolErrorInfo::Action server_requests_action,
+                                                std::optional<sync::SubscriptionSet> new_subs)
 {
     util::CheckedUniqueLock lock(m_state_mutex);
     if (m_state != State::Active) {
@@ -625,7 +622,7 @@ void SyncSession::handle_fresh_realm_downloaded(DBRef db, Status status,
             server_requests_action == sync::ProtocolErrorInfo::Action::RevertToPBS) {
             apply_sync_config_after_migration_or_rollback();
             auto flx_sync_requested = config(&SyncConfig::flx_sync_requested);
-            update_subscription_store(flx_sync_requested);
+            update_subscription_store(flx_sync_requested, std::move(new_subs));
         }
     }
     revive_if_needed();
@@ -1320,7 +1317,7 @@ void SyncSession::save_sync_config_after_migration_or_rollback()
     m_migrated_sync_config = m_migration_store->convert_sync_config(m_original_sync_config);
 }
 
-void SyncSession::update_subscription_store(bool flx_sync_requested)
+void SyncSession::update_subscription_store(bool flx_sync_requested, std::optional<sync::SubscriptionSet> new_subs)
 {
     util::CheckedUniqueLock lock(m_state_mutex);
 
@@ -1350,11 +1347,15 @@ void SyncSession::update_subscription_store(bool flx_sync_requested)
     create_subscription_store();
 
     std::weak_ptr<sync::SubscriptionStore> weak_sub_mgr(m_flx_subscription_store);
-    lock.unlock();
 
     // If migrated to FLX, create subscriptions in the local realm to cover the existing data.
     // This needs to be done before setting the write validator to avoid NoSubscriptionForWrite errors.
-    make_active_subscription_set();
+    if (new_subs) {
+        auto active_mut_sub = m_flx_subscription_store->get_active().make_mutable_copy();
+        active_mut_sub.import(std::move(*new_subs));
+        active_mut_sub.set_state(sync::SubscriptionSet::State::Complete);
+        active_mut_sub.commit();
+    }
 
     auto tr = m_db->start_write();
     set_write_validator_factory(weak_sub_mgr);
@@ -1600,22 +1601,4 @@ util::Future<std::string> SyncSession::send_test_command(std::string body)
     }
 
     return m_session->send_test_command(std::move(body));
-}
-
-void SyncSession::make_active_subscription_set()
-{
-    util::CheckedUniqueLock lock(m_state_mutex);
-
-    if (!m_active_subscriptions_after_migration)
-        return;
-
-    REALM_ASSERT(m_flx_subscription_store);
-
-    // Create subscription set from the subscriptions used to download the fresh realm after migration.
-    auto active_mut_sub = m_flx_subscription_store->get_active().make_mutable_copy();
-    active_mut_sub.import(*m_active_subscriptions_after_migration);
-    active_mut_sub.update_state(sync::SubscriptionSet::State::Complete);
-    active_mut_sub.commit();
-
-    m_active_subscriptions_after_migration.reset();
 }

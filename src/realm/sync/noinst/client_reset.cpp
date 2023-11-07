@@ -624,7 +624,7 @@ LocalVersionIDs perform_client_reset_diff(DB& db_local, DB& db_remote, sync::Sal
         auto subs = sub_store->get_active();
         int64_t before_version = subs.version();
         auto mut_subs = subs.make_mutable_copy();
-        mut_subs.update_state(sync::SubscriptionSet::State::Complete);
+        mut_subs.set_state(sync::SubscriptionSet::State::Complete);
         auto sub = std::move(mut_subs).commit();
         on_flx_version_complete(sub.version());
         logger.info("Recreated the active subscription set in the complete state (%1 -> %2)", before_version,

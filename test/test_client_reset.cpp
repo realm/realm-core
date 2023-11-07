@@ -1156,7 +1156,7 @@ SubscriptionSet add_subscription(SubscriptionStore& sub_store, const std::string
     auto mut = sub_store.get_latest().make_mutable_copy();
     mut.insert_or_assign(name, q);
     if (state) {
-        mut.update_state(*state);
+        mut.set_state(*state);
     }
     return mut.commit();
 }
