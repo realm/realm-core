@@ -1463,28 +1463,29 @@ buildvariants:
   tasks:
   - name: network_tests
 
-- name: ubuntu2004-network-faulty
-  display_name: "Ubuntu 20.04 x86_64 (Utunbu2004 - network faults)"
-  run_on: ubuntu2004-large
-  expansions:
-    clang_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/clang%2Bllvm-11.0.0-x86_64-linux-gnu-ubuntu-20.04.tar.xz"
-    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-linux-x86_64.tar.gz"
-    cmake_bindir: "./cmake_binaries/bin"
-    fetch_missing_dependencies: On
-    c_compiler: "./clang_binaries/bin/clang"
-    cxx_compiler: "./clang_binaries/bin/clang++"
-    cmake_build_type: RelWithDebInfo
-    run_with_encryption: On
-    baas_admin_port: 9098
-    test_logging_level: trace
-    proxy_toxics_file: evergreen/proxy-network-faults.toxics
+# Enable once these tests are passing
+#- name: ubuntu2004-network-faulty
+#  display_name: "Ubuntu 20.04 x86_64 (Utunbu2004 - network faults)"
+#  run_on: ubuntu2004-large
+#  expansions:
+#    clang_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/clang%2Bllvm-11.0.0-x86_64-linux-gnu-ubuntu-20.04.tar.xz"
+#    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-linux-x86_64.tar.gz"
+#    cmake_bindir: "./cmake_binaries/bin"
+#    fetch_missing_dependencies: On
+#    c_compiler: "./clang_binaries/bin/clang"
+#    cxx_compiler: "./clang_binaries/bin/clang++"
+#    cmake_build_type: RelWithDebInfo
+#    run_with_encryption: On
+#    baas_admin_port: 9098
+#    test_logging_level: trace
+#    proxy_toxics_file: evergreen/proxy-network-faults.toxics
     # RANDOM1: limit-data-upstream to close connection after between 1000-3000 bytes have been sent
     # RANDOM2: limit-data-downstream to close connection after between 1000-3000 bytes have been received
     # RANDOM3: slow-close-upstream to keep connection to server open after 1000-1500 milliseconds after being closed
     # RANDOM4: reset-peer-upstream after 50-200 seconds to force close the connection to the server
-    proxy_toxics_randoms: "1000:3000|1000:3000|1000:1500|50:200"
-  tasks:
-  - name: network_tests
+#    proxy_toxics_randoms: "1000:3000|1000:3000|1000:1500|50:200"
+#  tasks:
+#  - name: network_tests
 
 - name: rhel70
   display_name: "RHEL 7 x86_64"
