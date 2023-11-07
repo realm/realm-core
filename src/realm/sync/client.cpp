@@ -1137,6 +1137,9 @@ SessionWrapper::SessionWrapper(ClientImpl& client, DBRef db, std::shared_ptr<Sub
     REALM_ASSERT(m_db);
     REALM_ASSERT(m_db->get_replication());
     REALM_ASSERT(dynamic_cast<ClientReplication*>(m_db->get_replication()));
+    if (m_client_reset_config) {
+        m_session_reason = SessionReason::ClientReset;
+    }
 
     update_subscription_version_info();
 }

@@ -266,6 +266,5 @@ if [[ -n "${BAAS_PROXY}" ]]; then
     fi
 fi
 
-# shellcheck disable=SC2029
 ssh -t "${SSH_OPTIONS[@]}" -o ConnectTimeout=60 "${BAAS_TUNNELS[@]}" "${SSH_USER}" \
     "${EVERGREEN_DEST_DIR}/setup_baas_host.sh" "${SETUP_OPTIONS[@]}" "${FILE_DEST_DIR}/baas_host_vars.sh"

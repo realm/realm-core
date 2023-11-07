@@ -62,6 +62,7 @@ function setup_baas_dependencies() {
     LIBMONGO_URL=
     ASSISTED_AGG_URL=
     target="$(uname -s)"
+    platform_string="unknown"
     case "${target}" in
         Darwin)
             if [[ "$(uname -m)" == "arm64" ]]; then
@@ -69,7 +70,7 @@ function setup_baas_dependencies() {
                 MONGODB_DOWNLOAD_URL="https://downloads.mongodb.com/osx/mongodb-macos-arm64-enterprise-6.0.0-rc13.tgz"
                 MONGOSH_DOWNLOAD_URL="https://downloads.mongodb.com/compass/mongosh-1.5.0-darwin-arm64.zip"
                 # <-- Remove after enabling constants.sh
-                STITCH_SUPPORT_LIB_URL="https://s3.amazonaws.com/static.realm.io/stitch-support/stitch-support-macos-arm64-6.1.0-rc3-8-gb6e0525.tgz"
+                STITCH_SUPPORT_LIB_URL="https://stitch-artifacts.s3.amazonaws.com/stitch-support/macos-arm64/stitch-support-6.1.0-alpha-527-g796351f.tgz"
                 ASSISTED_AGG_URL="https://stitch-artifacts.s3.amazonaws.com/stitch-mongo-libs/stitch_mongo_libs_osx_patch_1e7861d9b7462f01ea220fad334f10e00f0f3cca_6513254ad6d80abfffa5fbdc_23_09_26_18_39_06/assisted_agg"
                 GOLANG_URL="https://s3.amazonaws.com/static.realm.io/evergreen-assets/go1.21.1.darwin-arm64.tar.gz"
                 # -->
@@ -88,12 +89,13 @@ function setup_baas_dependencies() {
                 export GOARCH=amd64
                 MONGODB_DOWNLOAD_URL="https://downloads.mongodb.com/osx/mongodb-macos-x86_64-enterprise-5.0.3.tgz"
                 # <-- Remove after enabling constants.sh
-                STITCH_SUPPORT_LIB_URL="https://s3.amazonaws.com/static.realm.io/stitch-support/stitch-support-macos-4.4.17-rc1-2-g85de0cc.tgz"
+                STITCH_SUPPORT_LIB_URL="https://stitch-artifacts.s3.amazonaws.com/stitch-support/macos-arm64/stitch-support-4.4.17-rc1-2-g85de0cc.tgz"
                 ASSISTED_AGG_URL="https://stitch-artifacts.s3.amazonaws.com/stitch-mongo-libs/stitch_mongo_libs_osx_patch_1e7861d9b7462f01ea220fad334f10e00f0f3cca_6513254ad6d80abfffa5fbdc_23_09_26_18_39_06/assisted_agg"
                 GOLANG_URL="https://s3.amazonaws.com/static.realm.io/evergreen-assets/go1.21.1.darwin-amd64.tar.gz"
                 # -->
                 BAAS_PLATFORM="Darwin_x86_64"
             fi
+            platform_string="${BAAS_PLATFORM}"
         ;;
         Linux)
             BAAS_PLATFORM="Linux_x86_64"
@@ -110,6 +112,7 @@ function setup_baas_dependencies() {
                 DISTRO_VERSION="$(lsb_release -s -r)"
                 DISTRO_VERSION_MAJOR="$(cut -d. -f1 <<< "${DISTRO_VERSION}")"
             fi
+            platform_string="${BAAS_PLATFORM} - ${DISTRO_NAME} ${DISTRO_VERSION}"
             case "${DISTRO_NAME}" in
                 ubuntu | linuxmint)
                     MONGODB_DOWNLOAD_URL="http://downloads.10gen.com/linux/mongodb-linux-$(uname -m)-enterprise-ubuntu${DISTRO_VERSION_MAJOR}04-5.0.3.tgz"
@@ -147,6 +150,7 @@ function setup_baas_dependencies() {
         ;;
     esac
     export BAAS_PLATFORM
+    echo "Platform: ${platform_string}"
     # shellcheck source=/dev/null
     # <-- Uncomment to enable constants.sh
     # source "${baas_contents_file}"
@@ -155,19 +159,19 @@ function setup_baas_dependencies() {
     exit_code=0
 
     if [[ -z "${GOLANG_URL}" ]]; then
-        echo "Error: GOLANG_URL not defined"
+        echo "Error: go download URL (GOLANG_URL) not defined for this platform"
         exit_code=1
     fi
     if [[ -z "${STITCH_SUPPORT_LIB_URL}" ]]; then
-        echo "Error: STITCH_SUPPORT_LIB_URL not defined"
+        echo "Error: baas support library URL (STITCH_SUPPORT_LIB_URL) not defined for this platform"
         exit_code=1
     fi
     if [[ "${target}" == "Linux" && -z "${LIBMONGO_URL}" ]]; then
-        echo "Error: LIBMONGO_URL not defined"
+        echo "Error: baas assisted agg library URL (LIBMONGO_URL) not defined for this Linux platform"
         exit_code=1
     fi
     if [[ "${target}" == "Darwin" && -z "${ASSISTED_AGG_URL}" ]]; then
-        echo "Error: ASSISTED_AGG_URL not defined for Mac OS target"
+        echo "Error: baas assisted agg library URL (ASSISTED_AGG_URL) not defined for this Mac OS platform"
         exit_code=1
     fi
     if [[ ${exit_code} -eq 1 ]]; then
@@ -543,8 +547,9 @@ echo "Adding fake appid to skip baas server drop optimization"
 # Start the baas server on port *:9090 with the provided config JSON files
 echo "Starting baas app server"
 
+# see config overrides at https://github.com/10gen/baas/blob/master/etc/configs/test_rcore_config.json
 "${WORK_PATH}/baas_server" \
-    --configFile=etc/configs/test_config.json --configFile="${BASE_PATH}/config_overrides.json" > "${BAAS_SERVER_LOG}" 2>&1 &
+    --configFile=etc/configs/test_config.json --configFile=etc/configs/test_rcore_config.json > "${BAAS_SERVER_LOG}" 2>&1 &
 echo $! > "${BAAS_PID_FILE}"
 
 "${BASE_PATH}/wait_for_baas.sh" -w "${WORK_PATH}"
@@ -568,5 +573,4 @@ echo "---------------------------------------------"
 echo "Baas server ready"
 echo "---------------------------------------------"
 wait
-
 popd > /dev/null  # baas
