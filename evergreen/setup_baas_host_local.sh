@@ -86,7 +86,12 @@ elif [[ ! -f "${BAAS_HOST_KEY}" ]]; then
     echo "Error: Baas host private key not found: ${BAAS_HOST_KEY}"
     usage 1
 fi
-FILE_DEST_DIR="/home/${BAAS_USER}"
+
+if [[ "${BAAS_USER}" = "root" ]]; then
+    FILE_DEST_DIR="/root/remote-baas"
+else
+    FILE_DEST_DIR="/home/${BAAS_USER}/remote-baas"
+fi
 EVERGREEN_DEST_DIR="${FILE_DEST_DIR}/evergreen"
 
 function check_port()
@@ -196,12 +201,12 @@ echo "running ssh with ${SSH_OPTIONS[*]}"
 RETRY_COUNT=25
 WAIT_COUNTER=0
 WAIT_START=$(date -u +'%s')
-CONNECT_COUNT=4
+CONNECT_COUNT=2
 
 # Check for remote connectivity - try to connect twice to verify server is "really" ready
 # The tests failed one time due to this ssh command passing, but the next scp command failed
 while [[ ${CONNECT_COUNT} -gt 0 ]]; do
-    until ssh "${SSH_OPTIONS[@]}" -o ConnectTimeout=10 "${SSH_USER}" "echo -n 'hello from '; hostname" ; do
+    until ssh "${SSH_OPTIONS[@]}" -o ConnectTimeout=10 "${SSH_USER}" "mkdir -p ${EVERGREEN_DEST_DIR} && echo -n 'hello from '; hostname" ; do
         if [[ ${WAIT_COUNTER} -ge ${RETRY_COUNT} ]] ; then
             secs_spent_waiting=$(($(date -u +'%s') - WAIT_START))
             echo "Timed out after waiting ${secs_spent_waiting} seconds for host ${BAAS_HOST_NAME} to start"
@@ -221,26 +226,24 @@ echo "Transferring setup scripts to ${SSH_USER}:${FILE_DEST_DIR}"
 scp "${SSH_OPTIONS[@]}" -o ConnectTimeout=60 "${BAAS_HOST_VARS}" "${SSH_USER}:${FILE_DEST_DIR}/"
 # Copy the entire evergreen/ directory from the working copy of realm-core to the remote host
 # This ensures the remote host the latest copy, esp when running evergreen patches
+echo "Transferring evergreen scripts to ${SSH_USER}:${FILE_DEST_DIR}"
 scp -r "${SSH_OPTIONS[@]}" -o ConnectTimeout=60 "${EVERGREEN_PATH}/" "${SSH_USER}:${FILE_DEST_DIR}/"
 
 BAAS_TUNNELS=()
-EXTRA_OPTIONS=()
+SETUP_OPTIONS=()
 
 if [[ -n "${VERBOSE}" ]]; then
-    EXTRA_OPTIONS+=("-v")
+    SETUP_OPTIONS+=("-v")
 fi
 
 if [[ -n "${BAAS_PROXY}" ]]; then
-    echo "Transferring baas proxy setup script to ${SSH_USER}:${FILE_DEST_DIR}"
-    scp "${SSH_OPTIONS[@]}" "${EVERGREEN_PATH}/setup_baas_proxy.sh" "${SSH_USER}:${FILE_DEST_DIR}/"
-
     # Add extra tunnel for baas proxy HTTP API config interface and direct connection to baas
-    BAAS_TUNNELS=("-L" "${CONFIG_PORT}:127.0.0.1:8474")
+    BAAS_TUNNELS+=("-L" "${CONFIG_PORT}:127.0.0.1:8474")
     if [[ -n "${DIRECT_PORT}" ]]; then
         BAAS_TUNNELS+=("-L" "${DIRECT_PORT}:127.0.0.1:9090")
     fi
     # Enable baas proxy and use LISTEN_PORT as the proxy listen port
-    EXTRA_OPTIONS+=("-t" "${LISTEN_PORT}")
+    SETUP_OPTIONS+=("-t" "${LISTEN_PORT}")
 else
     # Force remote port to 9090 if baas proxy is not used - connect directly to baas
     LISTEN_PORT=9090
@@ -254,7 +257,7 @@ BAAS_TUNNELS+=("-L" "9090:127.0.0.1:${LISTEN_PORT}")
 echo "Running setup script (with forward tunnel on :9090 to 127.0.0.1:${LISTEN_PORT})"
 if [[ -n "${BAAS_BRANCH}" ]]; then
     echo "- Starting remote baas with branch/commit: '${BAAS_BRANCH}'"
-    EXTRA_OPTIONS+=("-b" "${BAAS_BRANCH}")
+    SETUP_OPTIONS+=("-b" "${BAAS_BRANCH}")
 fi
 if [[ -n "${BAAS_PROXY}" ]]; then
     echo "- Baas proxy enabled - local HTTP API config port on :${CONFIG_PORT}"
@@ -265,4 +268,4 @@ fi
 
 # shellcheck disable=SC2029
 ssh -t "${SSH_OPTIONS[@]}" -o ConnectTimeout=60 "${BAAS_TUNNELS[@]}" "${SSH_USER}" \
-    "${EVERGREEN_DEST_DIR}/setup_baas_host.sh" "${EXTRA_OPTIONS[@]}" "${FILE_DEST_DIR}/baas_host_vars.sh"
+    "${EVERGREEN_DEST_DIR}/setup_baas_host.sh" "${SETUP_OPTIONS[@]}" "${FILE_DEST_DIR}/baas_host_vars.sh"

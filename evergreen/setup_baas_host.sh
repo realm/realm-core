@@ -243,10 +243,10 @@ setup_data_dir
 
 pushd "${BAAS_REMOTE_DIR}" > /dev/null
 
-if [[ -d "${HOME}/evergreen/" ]]; then
-    cp -R "${HOME}/evergreen/" ./evergreen/
+if [[ -d "${HOME}/remote-baas/evergreen/" ]]; then
+    cp -R "${HOME}/remote-baas/evergreen/" ./evergreen/
 else
-    echo "evergreen/ directory not found in ${HOME}"
+    echo "remote-baas/evergreen/ directory not found in ${HOME}"
     exit 1
 fi
 

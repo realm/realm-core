@@ -104,6 +104,6 @@ compile_commands.json
 node_modules/
 tsconfig.tsbuildinfo
 
-# Ignore artifacts from setup_baas_host_local.sh
-/baas-work-dir
+# Baas remote host artifacts
+baas-work-dir/
 ssh_agent_commands.sh
