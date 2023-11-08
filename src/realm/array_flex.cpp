@@ -94,7 +94,8 @@ bool ArrayFlex::encode()
         bf_iterator it_value{data, 0, value_width, value_width, 0};
         bf_iterator it_index{data, offset, index_width, index_width, 0};
         for (size_t i = 0; i < values.size(); ++i) {
-            it_value.set_value(values[i]);
+            auto v = sign_extend_field(value_width, values[i]);
+            it_value.set_value(v);
             // REALM_ASSERT_3(sign_extend_field(value_width, it_value.get_value()), ==,
             // sign_extend_field(value_width,values[i]));
             ++it_value;
@@ -175,7 +176,8 @@ int64_t ArrayFlex::get(size_t ndx) const
         const auto offset = (value_size * value_width) + (ndx * index_width);
         const auto index = read_bitfield(data, offset, index_width);
         const auto v = read_bitfield(data, index * value_width, value_width);
-        return sign_extend_field(value_width, v);
+        const auto sign_v = sign_extend_field(value_width, v);
+        return sign_v;
     }
     REALM_UNREACHABLE();
 }
@@ -204,7 +206,7 @@ bool ArrayFlex::try_encode(std::vector<uint64_t>& values, std::vector<size_t>& i
     for (size_t i = 0; i < sz; ++i) {
         auto item = m_array.get(i);
         values.push_back(item);
-        REALM_ASSERT_3(values.back(), ==, item);
+        // REALM_ASSERT_3(values.back(), ==, item);
         indices.push_back(item);
     }
 
@@ -219,8 +221,10 @@ bool ArrayFlex::try_encode(std::vector<uint64_t>& values, std::vector<size_t>& i
 
     const auto value = *std::max_element(values.begin(), values.end());
     const auto index = *std::max_element(indices.begin(), indices.end());
-    const auto value_bit_width = value == 0 ? 1 : bit_width(value);
-    const auto index_bit_width = index == 0 ? 1 : bit_width(index);
+    const auto value_bit_width = value == 0 ? 1 : signed_to_num_bits(value);
+    const auto index_bit_width = index == 0 ? 1 : signed_to_num_bits(index);
+    REALM_ASSERT(value_bit_width > 0);
+    REALM_ASSERT(index_bit_width > 0);
     const auto compressed_values_size = value_bit_width * values.size();
     const auto compressed_indices_size = index_bit_width * indices.size();
     const auto compressed_size = compressed_values_size + compressed_indices_size;

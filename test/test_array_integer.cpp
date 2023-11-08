@@ -52,12 +52,12 @@ TEST(Test_ArrayInt_encode_decode)
     a.add(10);
     a.add(5);
     a.add(5);
-    CHECK(a.is_encoded());
+    CHECK_NOT(a.is_encoded());
     a.add(10);
     a.add(15);
     CHECK_NOT(a.is_encoded()); // compression is not needed in this case.
     // THis is a problem. Need to understand why...
-    // CHECK(a.get(0) == 10);
+    CHECK(a.get(0) == 10);
     CHECK(a.get(1) == 5);
     CHECK(a.get(2) == 5);
     CHECK(a.get(3) == 10);

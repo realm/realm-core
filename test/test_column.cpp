@@ -399,9 +399,8 @@ TEST(Column_Basic)
 
     // expand to 64-bit width
 
-    // NICO: this is still causing issues
-    //    c.add(4294967296LL);
-    //    CHECK_EQUAL(10, c.find_first(4294967296LL));
+    c.add(4294967296LL);
+    CHECK_EQUAL(10, c.find_first(4294967296LL));
 
     // TEST(Column_Destroy)
 
