@@ -95,6 +95,27 @@ void has_zero_byte(TestContext& test_context, int64_t value, size_t reps)
 
 } // anonymous namespace
 
+TEST(Array_Bits)
+{
+    CHECK_EQUAL(NodeHeader::unsigned_to_num_bits(0), 0);
+    CHECK_EQUAL(NodeHeader::unsigned_to_num_bits(1), 1);
+    CHECK_EQUAL(NodeHeader::unsigned_to_num_bits(2), 2);
+    CHECK_EQUAL(NodeHeader::unsigned_to_num_bits(3), 2);
+    CHECK_EQUAL(NodeHeader::unsigned_to_num_bits(4), 3);
+    CHECK_EQUAL(NodeHeader::unsigned_to_num_bits(5), 3);
+    CHECK_EQUAL(NodeHeader::unsigned_to_num_bits(7), 3);
+    CHECK_EQUAL(NodeHeader::unsigned_to_num_bits(8), 4);
+    CHECK_EQUAL(NodeHeader::signed_to_num_bits(0), 1);
+    CHECK_EQUAL(NodeHeader::signed_to_num_bits(1), 2);
+    CHECK_EQUAL(NodeHeader::signed_to_num_bits(-1), 1);
+    CHECK_EQUAL(NodeHeader::signed_to_num_bits(-2), 2);
+    CHECK_EQUAL(NodeHeader::signed_to_num_bits(-3), 3);
+    CHECK_EQUAL(NodeHeader::signed_to_num_bits(-4), 3);
+    CHECK_EQUAL(NodeHeader::signed_to_num_bits(3), 3);
+    CHECK_EQUAL(NodeHeader::signed_to_num_bits(4), 4);
+    CHECK_EQUAL(NodeHeader::signed_to_num_bits(7), 4);
+}
+
 TEST(Array_General)
 {
     Array c(Allocator::get_default());
