@@ -3303,12 +3303,14 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
         }
         r->commit_transaction();
 
-        auto delay = std::chrono::seconds(300);
-        if (TEST_TIMEOUT_EXTRA > 0) {
-            delay += std::chrono::seconds(TEST_TIMEOUT_EXTRA * 5);
-        }
+#if defined(TEST_TIMEOUT_EXTRA) && TEST_TIMEOUT_EXTRA > 0
+        // It may take 30 minutes to transfer 16MB at 10KB/s
+        auto delay = std::chrono::minutes(35);
+#else
+        auto delay = std::chrono::minutes(5);
+#endif
 
-        auto error = wait_for_future(std::move(pf.future), std::chrono::minutes(5)).get();
+        auto error = wait_for_future(std::move(pf.future), delay).get();
         REQUIRE(error.status == ErrorCodes::LimitExceeded);
         REQUIRE(error.status.reason() ==
                 "Sync websocket closed because the server received a message that was too large: "
