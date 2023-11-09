@@ -50,8 +50,8 @@ void ArrayFlex::init_array_encode(MemRef mem)
     create(Type::type_Normal);
     auto dst_header = Array::get_header();
     using Encoding = NodeHeader::Encoding;
-    NodeHeader::set_kind((uint64_t*)dst_header,
-                         static_cast<std::underlying_type_t<Encoding>>(NodeHeader::Encoding::Flex));
+    NodeHeader::set_kind((uint64_t*)dst_header, 'B');
+    NodeHeader::set_encoding((uint64_t*)dst_header, NodeHeader::Encoding::Flex);
     NodeHeader::set_arrayA_num_elements<Encoding::Flex>((uint64_t*)dst_header, value_size);
     NodeHeader::set_arrayB_num_elements<Encoding::Flex>((uint64_t*)dst_header, index_size);
     NodeHeader::set_elementA_size<Encoding::Flex>((uint64_t*)dst_header, value_width);
@@ -247,7 +247,8 @@ bool ArrayFlex::try_encode(std::vector<uint64_t>& values, std::vector<size_t>& i
 
         using Encoding = NodeHeader::Encoding;
         auto addr = (uint64_t*)get_header();
-        NodeHeader::set_kind(addr, static_cast<std::underlying_type_t<Encoding>>(NodeHeader::Encoding::Flex));
+        NodeHeader::set_kind(addr, 'B');
+        NodeHeader::set_encoding(addr, NodeHeader::Encoding::Flex);
         NodeHeader::set_arrayA_num_elements<Encoding::Flex>(addr, values.size());
         NodeHeader::set_arrayB_num_elements<Encoding::Flex>(addr, indices.size());
         NodeHeader::set_elementA_size<Encoding::Flex>(addr, value_bit_width);
