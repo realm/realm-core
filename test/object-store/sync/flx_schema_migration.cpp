@@ -618,19 +618,19 @@ TEST_CASE("Upgrade schema version (with recovery) then downgrade", "[sync][flx][
         CHECK(table->size() == 4);
         table = realm->read_group().get_table("class_TopLevel2");
         CHECK(table->is_empty());
-        table = realm->read_group().get_table("class_TopLevel3");
-        CHECK(table->is_empty());
+        auto table3 = realm->read_group().get_table("class_TopLevel3");
+        CHECK(table3->is_empty());
 
         // The existing subscription for 'TopLevel3' is on a removed field (in version 1), so data cannot be sync'd.
         // Update subscription so data can be sync'd.
         auto subs = realm->get_latest_subscription_set().make_mutable_copy();
         CHECK(subs.erase_by_class_name("TopLevel3"));
-        subs.insert_or_assign(Query(table));
+        subs.insert_or_assign(Query(table3));
         auto new_subs = subs.commit();
         new_subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
         realm->refresh();
-        CHECK(table->size() == 1);
-        CHECK(table->get_object_with_primary_key(obj3_id));
+        CHECK(table3->size() == 1);
+        CHECK(table3->get_object_with_primary_key(obj3_id));
     }
 }
 

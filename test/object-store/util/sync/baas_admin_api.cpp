@@ -622,7 +622,7 @@ void AdminAPISession::create_schema(const std::string& app_id, const AppCreateCo
 
     // Create the schemas in two passes: first populate just the primary key and
     // partition key, then add the rest of the properties. This ensures that the
-    // targest of links exist before adding the links.
+    // targets of links exist before adding the links.
     std::vector<std::pair<std::string, const ObjectSchema*>> object_schema_to_create;
     BaasRuleBuilder rule_builder(target_schema, config.partition_key, mongo_service_name, config.mongo_dbname,
                                  static_cast<bool>(config.flx_sync_config));
