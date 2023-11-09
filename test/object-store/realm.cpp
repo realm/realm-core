@@ -1059,12 +1059,12 @@ TEST_CASE("Get Realm using Async Open", "[sync][pbs][async open]") {
         std::shared_ptr<AsyncOpenTask> task2 = Realm::get_synchronized_realm(config);
         REQUIRE(task);
         REQUIRE(task2);
-        task->register_download_progress_notifier([&](uint64_t, uint64_t) {
+        task->register_download_progress_notifier([&](uint64_t, uint64_t, double) {
             std::lock_guard<std::mutex> guard(mutex);
             REQUIRE(!task1_completed);
             progress_notifier1_called = true;
         });
-        task2->register_download_progress_notifier([&](uint64_t, uint64_t) {
+        task2->register_download_progress_notifier([&](uint64_t, uint64_t, double) {
             std::lock_guard<std::mutex> guard(mutex);
             REQUIRE(!task2_completed);
             progress_notifier2_called = true;

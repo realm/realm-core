@@ -1237,10 +1237,9 @@ void SyncSession::initiate_access_token_refresh()
     }
 }
 
-void SyncSession::add_completion_callback(util::UniqueFunction<void(Status)> callback,
-                                          _impl::SyncProgressNotifier::NotifierType direction)
+void SyncSession::add_completion_callback(util::UniqueFunction<void(Status)> callback, ProgressDirection direction)
 {
-    bool is_download = (direction == _impl::SyncProgressNotifier::NotifierType::download);
+    bool is_download = (direction == ProgressDirection::download);
 
     m_completion_request_counter++;
     m_completion_callbacks.emplace_hint(m_completion_callbacks.end(), m_completion_request_counter,
@@ -1586,7 +1585,9 @@ void SyncProgressNotifier::update(uint64_t downloaded, uint64_t downloadable, ui
     std::vector<util::UniqueFunction<void()>> invocations;
     {
         std::lock_guard<std::mutex> lock(m_mutex);
-        m_current_progress = Progress{uploadable, downloadable, uploaded, downloaded, snapshot_version};
+        double upload_estimate = double(uploaded) / uploadable, download_estimate = double(downloaded) / downloadable;
+        m_current_progress = Progress{uploadable,      downloadable,      uploaded,        downloaded,
+                                      upload_estimate, download_estimate, snapshot_version};
 
         for (auto it = m_packages.begin(); it != m_packages.end();) {
             bool should_delete = false;
@@ -1610,6 +1611,8 @@ SyncProgressNotifier::NotifierPackage::create_invocation(Progress const& current
 {
     uint64_t transferred = is_download ? current_progress.downloaded : current_progress.uploaded;
     uint64_t transferrable = is_download ? current_progress.downloadable : current_progress.uploadable;
+    double progress_estimate =
+        is_streaming ? 1.0 : (is_download ? current_progress.dowload_estimate : current_progress.upload_estimate);
     if (!is_streaming) {
         // If the sync client has not yet processed all of the local
         // transactions then the uploadable data is incorrect and we should
@@ -1630,7 +1633,7 @@ SyncProgressNotifier::NotifierPackage::create_invocation(Progress const& current
     // as were originally considered transferrable.
     is_expired = !is_streaming && transferred >= transferrable;
     return [=, notifier = notifier] {
-        notifier(transferred, transferrable);
+        notifier(transferred, transferrable, progress_estimate);
     };
 }
 
