@@ -843,7 +843,6 @@ inline ref_type Array::write(ref_type ref, Allocator& alloc, _impl::ArrayWriterB
 
 inline void Array::add(int_fast64_t value)
 {
-    decode_array();
     insert(m_size, value);
 }
 

@@ -79,7 +79,7 @@ void ArrayFlex::init_array_encode(MemRef mem)
 bool ArrayFlex::encode()
 {
     const auto sz = m_array.size();
-    std::vector<uint64_t> values;
+    std::vector<int64_t> values;
     std::vector<size_t> indices;
     if (!is_encoded() && try_encode(values, indices)) {
         REALM_ASSERT(!values.empty());
@@ -95,10 +95,8 @@ bool ArrayFlex::encode()
         bf_iterator it_value{data, 0, value_width, value_width, 0};
         bf_iterator it_index{data, offset, index_width, index_width, 0};
         for (size_t i = 0; i < values.size(); ++i) {
-            auto v = sign_extend_field(value_width, values[i]);
-            it_value.set_value(v);
-            // REALM_ASSERT_3(sign_extend_field(value_width, it_value.get_value()), ==,
-            // sign_extend_field(value_width,values[i]));
+            it_value.set_value(values[i]);
+            REALM_ASSERT_3(sign_extend_field(value_width, it_value.get_value()), ==, values[i]);
             ++it_value;
         }
         for (size_t i = 0; i < indices.size(); ++i) {
@@ -118,12 +116,14 @@ bool ArrayFlex::decode()
     size_t value_width, index_width, value_size, index_size;
     if (get_encode_info(value_width, index_width, value_size, index_size)) {
         std::vector<int64_t> values;
+        values.reserve(index_size);
         auto data = (uint64_t*)get_data_from_header(get_header());
         const auto offset = value_size * value_width;
         bf_iterator index_iterator{data, offset, index_width, index_width, 0};
         for (size_t i = 0; i < index_size; ++i) {
             const auto index = index_iterator.get_value();
-            const auto value = read_bitfield(data, index * value_width, value_width);
+            bf_iterator it_value{data, index * value_width, value_width, value_width, 0};
+            const auto value = it_value.get_value();
             const auto ivalue = sign_extend_field(value_width, value);
             values.push_back(ivalue);
             ++index_iterator;
@@ -182,14 +182,14 @@ int64_t ArrayFlex::get(size_t ndx) const
         REALM_ASSERT(data == (uint64_t*)m_data);
         const auto offset = (value_size * value_width) + (ndx * index_width);
         const auto index = read_bitfield(data, offset, index_width);
-        const auto v = read_bitfield(data, index * value_width, value_width);
-        const auto sign_v = sign_extend_field(value_width, v);
+        bf_iterator it_value{data, index * value_width, value_width, value_width, 0};
+        const auto sign_v = sign_extend_field(value_width, it_value.get_value());
         return sign_v;
     }
     REALM_UNREACHABLE();
 }
 
-bool ArrayFlex::try_encode(std::vector<uint64_t>& values, std::vector<size_t>& indices)
+bool ArrayFlex::try_encode(std::vector<int64_t>& values, std::vector<size_t>& indices)
 {
     // Implements the main logic for supporting the encondig Flex protocol.
     // Flex enconding works keeping 2 arrays, one for storing the values and, the other one for storing the indices of
@@ -213,7 +213,7 @@ bool ArrayFlex::try_encode(std::vector<uint64_t>& values, std::vector<size_t>& i
     for (size_t i = 0; i < sz; ++i) {
         auto item = m_array.get(i);
         values.push_back(item);
-        // REALM_ASSERT_3(values.back(), ==, item);
+        REALM_ASSERT_3(values.back(), ==, item);
         indices.push_back(item);
     }
 
@@ -226,10 +226,10 @@ bool ArrayFlex::try_encode(std::vector<uint64_t>& values, std::vector<size_t>& i
         v = std::distance(values.begin(), pos);
     }
 
-    const auto value = *std::max_element(values.begin(), values.end());
+    const auto [min_value, max_value] = std::minmax_element(values.begin(), values.end());
     const auto index = *std::max_element(indices.begin(), indices.end());
-    const auto value_bit_width = value == 0 ? 1 : signed_to_num_bits(value);
-    const auto index_bit_width = index == 0 ? 1 : signed_to_num_bits(index);
+    const auto value_bit_width = std::max(signed_to_num_bits(*min_value), signed_to_num_bits(*max_value));
+    const auto index_bit_width = signed_to_num_bits(index);
     REALM_ASSERT(value_bit_width > 0);
     REALM_ASSERT(index_bit_width > 0);
     const auto compressed_values_size = value_bit_width * values.size();

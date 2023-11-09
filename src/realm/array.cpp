@@ -217,11 +217,8 @@ int64_t Array::get(size_t ndx) const noexcept
 
 int64_t Array::get(size_t ndx) const noexcept
 {
-    if (is_encoded()) {
-        // std::cout << "Encode array::get() " << std::endl;
+    if (is_encoded())
         return m_encode_array.get(ndx);
-    }
-
 
     REALM_ASSERT_DEBUG(is_attached());
     REALM_ASSERT_DEBUG_EX(ndx < m_size, ndx, m_size);

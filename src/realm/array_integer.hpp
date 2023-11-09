@@ -33,11 +33,7 @@ public:
     using Array::find_first;
 
     explicit ArrayInteger(Allocator&) noexcept;
-    ~ArrayInteger() noexcept override
-    {
-
-        m_array_flex.destroy();
-    }
+    ~ArrayInteger() noexcept override = default;
 
     static value_type default_value(bool)
     {
@@ -216,7 +212,7 @@ inline void ArrayIntNull::set_null(size_t ndx)
 
 inline ArrayIntNull::value_type ArrayIntNull::get(size_t ndx) const noexcept
 {
-    int64_t value = Array::get(ndx + 1);
+    int64_t value = Array::get(ndx + 1); //
     if (value == null_value()) {
         return util::none;
     }

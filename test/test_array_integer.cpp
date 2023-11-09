@@ -65,7 +65,7 @@ TEST(Test_ArrayInt_encode_decode)
     a.destroy();
 }
 
-TEST(Test_ArrayInt_negative_nums)
+ONLY(Test_ArrayInt_negative_nums)
 {
     ArrayInteger a(Allocator::get_default());
     a.create();

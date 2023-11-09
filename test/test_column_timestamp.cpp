@@ -396,11 +396,12 @@ TEST(Timestamp_Conversions)
         c.add(ts);
     }
 
-    //    for (size_t i = 0; i < num_millis; ++i) {
-    //        const Timestamp ts = c.get(i);
-    //        const int64_t milliseconds = timestamp_to_milliseconds(ts);
-    //        CHECK_EQUAL(milliseconds, millis[i]);
-    //    }
+    for (size_t i = 0; i < num_millis; ++i) {
+        const auto v = c.get(i);
+        const Timestamp ts = v;
+        const int64_t milliseconds = timestamp_to_milliseconds(ts);
+        CHECK_EQUAL(milliseconds, millis[i]);
+    }
 
     c.destroy();
 }

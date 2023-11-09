@@ -30,7 +30,10 @@ namespace realm {
 class ArrayFlex : public ArrayEncode, public Array {
 public:
     explicit ArrayFlex(Array& array);
-    virtual ~ArrayFlex() = default;
+    virtual ~ArrayFlex()
+    {
+        destroy();
+    }
     void init_array_encode(MemRef) final override;
     bool encode() final override;
     bool decode() final override;
@@ -40,7 +43,7 @@ public:
     MemRef get_mem_ref() const final override;
 
 private:
-    bool try_encode(std::vector<uint64_t>&, std::vector<size_t>&);
+    bool try_encode(std::vector<int64_t>&, std::vector<size_t>&);
     bool get_encode_info(size_t& value_width, size_t& index_width, size_t& value_size, size_t& index_size) const;
 
     Array& m_array;
