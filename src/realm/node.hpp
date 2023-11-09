@@ -365,6 +365,7 @@ inline void Node::init_header(char* header, bool is_inner_bptree_node, bool has_
     // bytes, it is important that we put the entire header into a
     // well defined state initially.
     std::fill(header, header + header_size, 0);
+    set_kind((uint64_t*)header, 'A');
     set_is_inner_bptree_node_in_header(is_inner_bptree_node, header);
     set_hasrefs_in_header(has_refs, header);
     set_context_flag_in_header(context_flag, header);

@@ -217,20 +217,32 @@ public:
 
     static size_t get_capacity_from_header(const char* header) noexcept
     {
-        typedef unsigned char uchar;
-        const uchar* h = reinterpret_cast<const uchar*>(header);
-        return (size_t(h[0]) << 19) + (size_t(h[1]) << 11) + (h[2] << 3);
+        if (get_kind((uint64_t*)header) == 'A') {
+            typedef unsigned char uchar;
+            const uchar* h = reinterpret_cast<const uchar*>(header);
+            return (size_t(h[0]) << 19) + (size_t(h[1]) << 11) + (h[2] << 3);
+        }
+        else {
+            return ((uint16_t*)header)[0] << 3;
+        }
     }
 
-    // Note: There is a copy of this function is test_alloc.cpp
+    // Note: There is a (no longer a correct) copy of this function is test_alloc.cpp
     static void set_capacity_in_header(size_t value, char* header) noexcept
     {
-        REALM_ASSERT_3(value, <=, (0xffffff << 3));
-        typedef unsigned char uchar;
-        uchar* h = reinterpret_cast<uchar*>(header);
-        h[0] = uchar((value >> 19) & 0x000000FF);
-        h[1] = uchar((value >> 11) & 0x000000FF);
-        h[2] = uchar(value >> 3 & 0x000000FF);
+        if (get_kind((uint64_t*)header) == 'A') {
+            REALM_ASSERT_3(value, <=, (0xffffff << 3));
+            typedef unsigned char uchar;
+            uchar* h = reinterpret_cast<uchar*>(header);
+            h[0] = uchar((value >> 19) & 0x000000FF);
+            h[1] = uchar((value >> 11) & 0x000000FF);
+            h[2] = uchar(value >> 3 & 0x000000FF);
+        }
+        else {
+            REALM_ASSERT(value < (65536 << 3));
+            REALM_ASSERT((value & 0x7) == 0);
+            ((uint16_t*)header)[0] = value >> 3;
+        }
     }
 
     static size_t get_byte_size_from_header(const char* header) noexcept
@@ -372,10 +384,6 @@ public:
     template <Encoding>
     inline size_t calc_size(size_t arrayA_num_elements, size_t arrayB_num_elements, size_t elementA_size,
                             size_t elementB_size);
-    template <Encoding>
-    inline void set_capacity(uint64_t* header, size_t capacity);
-    template <Encoding>
-    inline size_t get_capacity(uint64_t* header);
 
     // Accessing flags.
     enum class Flags { // bit positions in flags "byte", used for masking
@@ -740,84 +748,6 @@ inline size_t NodeHeader::calc_size<NodeHeader::Encoding::Flex>(size_t arrayA_nu
 {
     return NodeHeader::header_size +
            align_bits_to8(arrayA_num_elements * elementA_size + arrayB_num_elements * elementB_size);
-}
-
-
-template <>
-inline void NodeHeader::set_capacity<NodeHeader::Encoding::WTypBits>(uint64_t* header, size_t capacity)
-{
-    NodeHeader::set_capacity_in_header(capacity, (char*)header);
-}
-template <>
-inline void NodeHeader::set_capacity<NodeHeader::Encoding::WTypMult>(uint64_t* header, size_t capacity)
-{
-    NodeHeader::set_capacity_in_header(capacity, (char*)header);
-}
-template <>
-inline void NodeHeader::set_capacity<NodeHeader::Encoding::WTypIgn>(uint64_t* header, size_t capacity)
-{
-    NodeHeader::set_capacity_in_header(capacity, (char*)header);
-}
-template <>
-inline void NodeHeader::set_capacity<NodeHeader::Encoding::Packed>(uint64_t* header, size_t capacity)
-{
-    REALM_ASSERT(capacity <= 65536);
-    ((uint16_t*)header)[0] = capacity;
-}
-template <>
-inline void NodeHeader::set_capacity<NodeHeader::Encoding::AofP>(uint64_t* header, size_t capacity)
-{
-    REALM_ASSERT(capacity <= 65536);
-    ((uint16_t*)header)[0] = capacity;
-}
-template <>
-inline void NodeHeader::set_capacity<NodeHeader::Encoding::PofA>(uint64_t* header, size_t capacity)
-{
-    REALM_ASSERT(capacity <= 65536);
-    ((uint16_t*)header)[0] = capacity;
-}
-template <>
-inline void NodeHeader::set_capacity<NodeHeader::Encoding::Flex>(uint64_t* header, size_t capacity)
-{
-    REALM_ASSERT(capacity <= 65536);
-    ((uint16_t*)header)[0] = capacity;
-}
-
-
-template <>
-inline size_t NodeHeader::get_capacity<NodeHeader::Encoding::WTypBits>(uint64_t* header)
-{
-    return NodeHeader::get_capacity_from_header((const char*)header);
-}
-template <>
-inline size_t NodeHeader::get_capacity<NodeHeader::Encoding::WTypMult>(uint64_t* header)
-{
-    return NodeHeader::get_capacity_from_header((const char*)header);
-}
-template <>
-inline size_t NodeHeader::get_capacity<NodeHeader::Encoding::WTypIgn>(uint64_t* header)
-{
-    return NodeHeader::get_capacity_from_header((const char*)header);
-}
-template <>
-inline size_t NodeHeader::get_capacity<NodeHeader::Encoding::Packed>(uint64_t* header)
-{
-    return ((uint16_t*)header)[0];
-}
-template <>
-inline size_t NodeHeader::get_capacity<NodeHeader::Encoding::AofP>(uint64_t* header)
-{
-    return ((uint16_t*)header)[0];
-}
-template <>
-inline size_t NodeHeader::get_capacity<NodeHeader::Encoding::PofA>(uint64_t* header)
-{
-    return ((uint16_t*)header)[0];
-}
-template <>
-inline size_t NodeHeader::get_capacity<NodeHeader::Encoding::Flex>(uint64_t* header)
-{
-    return ((uint16_t*)header)[0];
 }
 
 template <>
