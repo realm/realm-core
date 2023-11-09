@@ -8,6 +8,7 @@
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * A crash at a very specific time during a DiscardLocal client reset on a FLX Realm could leave subscriptions in an invalid state ([#7110](https://github.com/realm/realm-core/pull/7110), since v12.3.0).
 * Fixed an error "Invalid schema change (UPLOAD): cannot process AddColumn instruction for non-existent table" when using automatic client reset with recovery in dev mode to recover schema changes made locally while offline. ([#7042](https://github.com/realm/realm-core/pull/7042) since the server introduced the feature that allows client to redefine the server's schema if the server is in dev mode - fall 2023)
+* Fix missing symbol linker error for `Set<ObjKey>` when building with Clang and LTO enabled ([#7121](https://github.com/realm/realm-core/pull/7121), since v12.23.3).
 
 ### Breaking changes
 * None.
