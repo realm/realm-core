@@ -612,7 +612,7 @@ inline void NodeHeader::set_elementA_size<NodeHeader::Encoding::Flex>(uint64_t* 
     REALM_ASSERT(bits_per_element > 0);
     uint32_t word = ((uint32_t*)header)[1];
     word &= ~(0b111111 << 20);
-    word |= (bits_per_element - 1) << 26;
+    word |= (bits_per_element - 1) << 20;
     ((uint32_t*)header)[1] = word;
 }
 
@@ -637,7 +637,7 @@ inline void NodeHeader::set_elementB_size<NodeHeader::Encoding::Flex>(uint64_t* 
     REALM_ASSERT(bits_per_element > 0);
     uint32_t word = ((uint32_t*)header)[1];
     word &= ~(0b111111 << 26);
-    word |= (bits_per_element - 1) << 20;
+    word |= (bits_per_element - 1) << 26;
     ((uint32_t*)header)[1] = word;
 }
 
