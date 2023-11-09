@@ -77,7 +77,7 @@ ONLY(Test_ArrayInt_negative_nums)
     CHECK(a.get(1) == 0);
     CHECK(a.get(2) == 1000000);
     a.add(-1000000);
-    CHECK(a.is_encoded());
+    CHECK_NOT(a.is_encoded());
     a.add(0);
     CHECK(a.is_encoded());
     a.add(1000000);

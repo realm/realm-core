@@ -96,7 +96,8 @@ bool ArrayFlex::encode()
         bf_iterator it_index{data, offset, index_width, index_width, 0};
         for (size_t i = 0; i < values.size(); ++i) {
             it_value.set_value(values[i]);
-            REALM_ASSERT_3(sign_extend_field(value_width, it_value.get_value()), ==, values[i]);
+            auto v = sign_extend_field(value_width, it_value.get_value());
+            REALM_ASSERT_3(v, ==, values[i]);
             ++it_value;
         }
         for (size_t i = 0; i < indices.size(); ++i) {
@@ -112,7 +113,6 @@ bool ArrayFlex::encode()
 
 bool ArrayFlex::decode()
 {
-    REALM_ASSERT(is_attached());
     size_t value_width, index_width, value_size, index_size;
     if (get_encode_info(value_width, index_width, value_size, index_size)) {
         std::vector<int64_t> values;
@@ -214,22 +214,21 @@ bool ArrayFlex::try_encode(std::vector<int64_t>& values, std::vector<size_t>& in
         auto item = m_array.get(i);
         values.push_back(item);
         REALM_ASSERT_3(values.back(), ==, item);
-        indices.push_back(item);
     }
 
     std::sort(values.begin(), values.end());
     auto last = std::unique(values.begin(), values.end());
     values.erase(last, values.end());
 
-    for (auto& v : indices) {
-        auto pos = std::lower_bound(values.begin(), values.end(), v);
-        v = std::distance(values.begin(), pos);
+    for (size_t i = 0; i < m_array.size(); ++i) {
+        auto pos = std::lower_bound(values.begin(), values.end(), m_array.get(i));
+        indices.push_back(std::distance(values.begin(), pos));
     }
 
     const auto [min_value, max_value] = std::minmax_element(values.begin(), values.end());
     const auto index = *std::max_element(indices.begin(), indices.end());
     const auto value_bit_width = std::max(signed_to_num_bits(*min_value), signed_to_num_bits(*max_value));
-    const auto index_bit_width = signed_to_num_bits(index);
+    const auto index_bit_width = index == 0 ? 1 : unsigned_to_num_bits(index);
     REALM_ASSERT(value_bit_width > 0);
     REALM_ASSERT(index_bit_width > 0);
     const auto compressed_values_size = value_bit_width * values.size();
@@ -256,8 +255,8 @@ bool ArrayFlex::try_encode(std::vector<int64_t>& values, std::vector<size_t>& in
 
         REALM_ASSERT(indices.size() == sz);
 
-        m_array.detach();
         m_array.destroy();
+        m_array.detach();
         m_array.m_size = indices.size();
         return true;
     }

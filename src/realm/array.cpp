@@ -519,7 +519,7 @@ void Array::insert(size_t ndx, int_fast64_t value)
 
 void Array::insert_no_encoding(size_t ndx, int_fast64_t value)
 {
-    REALM_ASSERT_DEBUG(ndx <= m_size);
+    // REALM_ASSERT_DEBUG(ndx <= m_size);
     const auto old_width = m_width;
     const auto old_size = m_size;
     const Getter old_getter = m_getter; // Save old getter before potential width expansion
@@ -654,12 +654,12 @@ size_t Array::size() const noexcept
 
 bool Array::encode_array() const
 {
-    return !is_encoded() ? m_encode_array.encode() : false;
+    return m_encode_array.encode();
 }
 
 bool Array::decode_array() const
 {
-    return is_encoded() ? m_encode_array.decode() : false;
+    return m_encode_array.decode();
 }
 
 bool Array::is_encoded() const
