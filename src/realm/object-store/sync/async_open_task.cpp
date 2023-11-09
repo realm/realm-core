@@ -19,6 +19,7 @@
 #include <realm/object-store/sync/async_open_task.hpp>
 
 #include <realm/sync/subscriptions.hpp>
+#include <realm/sync/noinst/sync_schema_migration.hpp>
 #include <realm/object-store/impl/realm_coordinator.hpp>
 #include <realm/object-store/sync/sync_manager.hpp>
 #include <realm/object-store/sync/sync_session.hpp>
@@ -60,15 +61,6 @@ void AsyncOpenTask::start(AsyncOpenCallback callback)
         }
 
         self->migrate_schema_or_complete(std::move(callback), coordinator, status);
-    });
-    // The callback does not extend the lifetime of the task if it's never invoked.
-    SyncSession::Internal::set_sync_schema_migration_callback(*session, [weak_self = weak_from_this(), this]() {
-        if (auto self = weak_self.lock()) {
-            util::CheckedLockGuard lock(m_mutex);
-            if (!m_session)
-                return;
-            m_sync_schema_migration_required = true;
-        }
     });
     session->revive_if_needed();
 }
@@ -128,7 +120,13 @@ void AsyncOpenTask::attach_to_subscription_initializer(AsyncOpenCallback&& callb
     // If the same Realm file is already opened, there is the possibility that this code may wait on a subscription
     // that was not committed by init_subscription_initializer.
 
-    auto shared_realm = coordinator->get_realm(nullptr, m_db_first_open);
+    SharedRealm shared_realm;
+    try {
+        shared_realm = coordinator->get_realm(nullptr, m_db_first_open);
+    }
+    catch (...) {
+        return callback({}, std::current_exception());
+    }
     const auto init_subscription = shared_realm->get_latest_subscription_set();
     const auto sub_state = init_subscription.state();
 
@@ -181,18 +179,32 @@ void AsyncOpenTask::migrate_schema_or_complete(AsyncOpenCallback&& callback,
     if (!m_session)
         return;
     auto session = m_session;
-    auto migrate_schema = m_sync_schema_migration_required;
     lock.unlock();
 
-    if (!migrate_schema) {
+    auto pending_migration = [&] {
+        auto rt = coordinator->begin_read();
+        return _impl::sync_schema_migration::has_pending_migration(*rt);
+    }();
+
+    if (!pending_migration) {
         wait_for_bootstrap_or_complete(std::move(callback), coordinator, status);
+        return;
+    }
+
+    // Sync schema migrations require setting a subscription initializer callback to bootstrap the data. The
+    // subscriptions in the current realm file may not be compatible with the new schema so cannot rely on them.
+    auto config = coordinator->get_config();
+    if (!config.sync_config->subscription_initializer) {
+        status = Status(ErrorCodes::SyncSchemaMigrationError,
+                        "Sync schema migrations must provide a subscription initializer callback in the sync config");
+        async_open_complete(std::move(callback), coordinator, status);
         return;
     }
 
     // Migrate the schema.
     //  * First upload the changes at the old schema version
-    //  * Then delete the realm, reopen it, and rebootstrap at new schema version
-    // The lifetime of the task is extended until the bootstrap completes.
+    //  * Then delete the realm, reopen it, and bootstrap at new schema version
+    // The lifetime of the task is extended until bootstrap completes.
     std::shared_ptr<AsyncOpenTask> self(shared_from_this());
     session->wait_for_upload_completion([callback = std::move(callback), coordinator, session, self,
                                          this](Status status) mutable {
@@ -240,7 +252,7 @@ void AsyncOpenTask::wait_for_bootstrap_or_complete(AsyncOpenCallback&& callback,
 {
     auto config = coordinator->get_config();
     if (config.sync_config && config.sync_config->flx_sync_requested &&
-        config.sync_config->subscription_initializer) {
+        config.sync_config->subscription_initializer && status.is_ok()) {
         const bool rerun_on_launch = config.sync_config->rerun_init_subscription_on_open;
         attach_to_subscription_initializer(std::move(callback), coordinator, rerun_on_launch);
     }

@@ -296,6 +296,7 @@ struct ProtocolErrorInfo {
     std::optional<ResumptionDelayInfo> resumption_delay_interval;
     Action server_requests_action;
     std::optional<std::string> migration_query_string;
+    std::optional<uint64_t> previous_schema_version;
 };
 
 

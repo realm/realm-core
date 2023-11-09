@@ -181,7 +181,7 @@ SyncTestFile::SyncTestFile(std::shared_ptr<realm::SyncUser> user, realm::Schema 
                      error.status, session->path());
         abort();
     };
-    schema_version = 1;
+    schema_version = 0;
     schema = _schema;
     schema_mode = SchemaMode::AdditiveExplicit;
 }

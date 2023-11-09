@@ -36,6 +36,7 @@
 #include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/noinst/client_reset_operation.hpp>
 #include <realm/sync/noinst/migration_store.hpp>
+#include <realm/sync/noinst/sync_schema_migration.hpp>
 #include <realm/sync/protocol.hpp>
 
 using namespace realm;
@@ -366,6 +367,7 @@ SyncSession::SyncSession(Private, SyncClient& client, std::shared_ptr<DB> db, co
     , m_migration_store{sync::MigrationStore::create(m_db)}
     , m_client(client)
     , m_sync_manager(sync_manager)
+    , m_previous_schema_version(_impl::sync_schema_migration::has_pending_migration(*m_db->start_read()))
 {
     REALM_ASSERT(m_config.sync_config);
     // we don't want the following configs enabled during a client reset
@@ -497,6 +499,10 @@ void SyncSession::download_fresh_realm(sync::ProtocolErrorInfo::Action server_re
         // deep copy the sync config so we don't modify the live session's config
         config.sync_config = std::make_shared<SyncConfig>(fresh_config);
         config.sync_config->client_resync_mode = ClientResyncMode::Manual;
+        // Do not run the subscription initializer on fresh realms used in client resets.
+        config.sync_config->rerun_init_subscription_on_open = false;
+        config.sync_config->subscription_initializer = nullptr;
+        config.schema_version = m_previous_schema_version.value_or(m_config.schema_version);
         fresh_sync_session = m_sync_manager->get_session(db, config);
         auto& history = static_cast<sync::ClientReplication&>(*db->get_replication());
         // the fresh Realm may apply writes to this db after it has outlived its sync session
@@ -703,7 +709,7 @@ void SyncSession::handle_error(sync::SessionErrorInfo error)
                         [[fallthrough]];
                     case ClientResyncMode::Recover:
                         download_fresh_realm(error.server_requests_action);
-                        return; // do not propgate the error to the user at this point
+                        return; // do not propagate the error to the user at this point
                 }
                 break;
             case sync::ProtocolErrorInfo::Action::MigrateToFLX:
@@ -747,15 +753,11 @@ void SyncSession::handle_error(sync::SessionErrorInfo error)
                 log_out_user = true;
                 break;
             case sync::ProtocolErrorInfo::Action::MigrateSchema:
-                std::function<void()> callback;
-                {
-                    util::CheckedLockGuard l(m_state_mutex);
-                    callback = std::move(m_sync_schema_migration_callback);
-                }
-                if (callback) {
-                    callback();
-                }
-                return; // do not propgate the error to the user at this point
+                util::CheckedUniqueLock lock(m_state_mutex);
+                // Should only be received for FLX sync.
+                REALM_ASSERT(m_original_sync_config->flx_sync_requested);
+                m_previous_schema_version = error.previous_schema_version;
+                return; // do not propagate the error to the user at this point
         }
     }
     else {
@@ -837,7 +839,8 @@ void SyncSession::handle_progress_update(uint64_t downloaded, uint64_t downloada
 
 static sync::Session::Config::ClientReset make_client_reset_config(const RealmConfig& base_config,
                                                                    const std::shared_ptr<SyncConfig>& sync_config,
-                                                                   DBRef&& fresh_copy, bool recovery_is_allowed)
+                                                                   DBRef&& fresh_copy, bool recovery_is_allowed,
+                                                                   bool schema_migration_detected)
 {
     REALM_ASSERT(sync_config->client_resync_mode != ClientResyncMode::Manual);
 
@@ -850,6 +853,11 @@ static sync::Session::Config::ClientReset make_client_reset_config(const RealmCo
     // or after callback we need to make sure to initialize the local schema
     // before the client reset happens.
     if (!sync_config->notify_before_client_reset && !sync_config->notify_after_client_reset)
+        return config;
+
+    // Do not run the client reset callbacks in case of a sync schema migration.
+    // (opening the realm with the new schema will result in a crash due to breaking changes)
+    if (schema_migration_detected)
         return config;
 
     RealmConfig realm_config = base_config;
@@ -942,8 +950,10 @@ void SyncSession::create_sync_session()
                                         m_server_requests_action == sync::ProtocolErrorInfo::Action::MigrateToFLX ||
                                         m_server_requests_action == sync::ProtocolErrorInfo::Action::RevertToPBS;
         // Use the original sync config, not the updated one from the migration store
-        session_config.client_reset_config = make_client_reset_config(
-            m_config, m_original_sync_config, std::move(m_client_reset_fresh_copy), allowed_to_recover);
+        session_config.client_reset_config =
+            make_client_reset_config(m_config, m_original_sync_config, std::move(m_client_reset_fresh_copy),
+                                     allowed_to_recover, m_previous_schema_version.has_value());
+        session_config.schema_version = m_previous_schema_version.value_or(m_config.schema_version);
         m_server_requests_action = sync::ProtocolErrorInfo::Action::NoAction;
     }
 
@@ -996,12 +1006,6 @@ void SyncSession::create_sync_session()
                 self->handle_error(std::move(*error));
             }
         });
-}
-
-void SyncSession::set_sync_schema_migration_callback(std::function<void()>&& callback)
-{
-    util::CheckedLockGuard l(m_state_mutex);
-    m_sync_schema_migration_callback = std::move(callback);
 }
 
 void SyncSession::nonsync_transact_notify(sync::version_type version)
