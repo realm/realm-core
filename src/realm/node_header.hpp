@@ -92,6 +92,7 @@ public:
     // handles all header formats
     static bool get_is_inner_bptree_node_from_header(const char* header) noexcept
     {
+        REALM_ASSERT(get_kind((uint64_t*)header) == 'A');
         typedef unsigned char uchar;
         const uchar* h = reinterpret_cast<const uchar*>(header);
         return (int(h[4]) & 0x80) != 0;
@@ -99,6 +100,7 @@ public:
 
     static bool get_hasrefs_from_header(const char* header) noexcept
     {
+        REALM_ASSERT(get_kind((uint64_t*)header) == 'A');
         typedef unsigned char uchar;
         const uchar* h = reinterpret_cast<const uchar*>(header);
         return (int(h[4]) & 0x40) != 0;
@@ -106,6 +108,7 @@ public:
 
     static Type get_type_from_header(const char* header) noexcept
     {
+        REALM_ASSERT(get_kind((uint64_t*)header) == 'A');
         if (get_is_inner_bptree_node_from_header(header))
             return type_InnerBptreeNode;
         if (get_hasrefs_from_header(header))
@@ -115,12 +118,14 @@ public:
 
     static bool get_context_flag_from_header(const char* header) noexcept
     {
+        REALM_ASSERT(get_kind((uint64_t*)header) == 'A');
         typedef unsigned char uchar;
         const uchar* h = reinterpret_cast<const uchar*>(header);
         return (int(h[4]) & 0x20) != 0;
     }
     static void set_is_inner_bptree_node_in_header(bool value, char* header) noexcept
     {
+        REALM_ASSERT(get_kind((uint64_t*)header) == 'A');
         typedef unsigned char uchar;
         uchar* h = reinterpret_cast<uchar*>(header);
         h[4] = uchar((int(h[4]) & ~0x80) | int(value) << 7);
@@ -128,6 +133,7 @@ public:
 
     static void set_hasrefs_in_header(bool value, char* header) noexcept
     {
+        REALM_ASSERT(get_kind((uint64_t*)header) == 'A');
         typedef unsigned char uchar;
         uchar* h = reinterpret_cast<uchar*>(header);
         h[4] = uchar((int(h[4]) & ~0x40) | int(value) << 6);
@@ -135,6 +141,7 @@ public:
 
     static void set_context_flag_in_header(bool value, char* header) noexcept
     {
+        REALM_ASSERT(get_kind((uint64_t*)header) == 'A');
         typedef unsigned char uchar;
         uchar* h = reinterpret_cast<uchar*>(header);
         h[4] = uchar((int(h[4]) & ~0x20) | int(value) << 5);
@@ -144,6 +151,7 @@ public:
     // handles all header formats
     static WidthType get_wtype_from_header(const char* header) noexcept
     {
+        REALM_ASSERT(get_kind((uint64_t*)header) == 'A');
         typedef unsigned char uchar;
         const uchar* h = reinterpret_cast<const uchar*>(header);
         int h4 = h[4];
@@ -152,6 +160,7 @@ public:
 
     static void set_wtype_in_header(WidthType value, char* header) noexcept
     {
+        REALM_ASSERT(get_kind((uint64_t*)header) == 'A');
         typedef unsigned char uchar;
         uchar* h = reinterpret_cast<uchar*>(header);
         auto h4 = h[4];
@@ -177,6 +186,7 @@ public:
     // Handling width and sizes:
     static uint_least8_t get_width_from_header(const char* header) noexcept
     {
+        REALM_ASSERT(get_kind((uint64_t*)header) == 'A');
         typedef unsigned char uchar;
         const uchar* h = reinterpret_cast<const uchar*>(header);
         return uint_least8_t((1 << (int(h[4]) & 0x07)) >> 1);
@@ -184,6 +194,7 @@ public:
 
     static size_t get_size_from_header(const char* header) noexcept
     {
+        REALM_ASSERT(get_kind((uint64_t*)header) == 'A');
         typedef unsigned char uchar;
         const uchar* h = reinterpret_cast<const uchar*>(header);
         return (size_t(h[5]) << 16) + (size_t(h[6]) << 8) + h[7];
@@ -191,6 +202,7 @@ public:
 
     static void set_width_in_header(size_t value, char* header) noexcept
     {
+        REALM_ASSERT(get_kind((uint64_t*)header) == 'A');
         // Pack width in 3 bits (log2)
         int w = 0;
         while (value) {
@@ -206,6 +218,7 @@ public:
 
     static void set_size_in_header(size_t value, char* header) noexcept
     {
+        REALM_ASSERT(get_kind((uint64_t*)header) == 'A');
         REALM_ASSERT_3(value, <=, max_array_size);
         typedef unsigned char uchar;
         uchar* h = reinterpret_cast<uchar*>(header);
@@ -247,6 +260,7 @@ public:
 
     static size_t get_byte_size_from_header(const char* header) noexcept
     {
+        REALM_ASSERT(get_kind((uint64_t*)header) == 'A');
         WidthType wtype = get_wtype_from_header(header);
         size_t width;
         size_t size;
