@@ -70,13 +70,16 @@ using namespace realm::util;
 
 namespace {
 
+
 void set_capacity(char* header, size_t value)
 {
+    NodeHeader::set_kind((uint64_t*)header, 'A');
     typedef unsigned char uchar;
     uchar* h = reinterpret_cast<uchar*>(header);
     h[0] = uchar((value >> 19) & 0x000000FF);
     h[1] = uchar((value >> 11) & 0x000000FF);
     h[2] = uchar((value >> 3) & 0x000000FF);
+    REALM_ASSERT(NodeHeader::get_capacity_from_header(header) == value);
 }
 
 size_t get_capacity(const char* header)
