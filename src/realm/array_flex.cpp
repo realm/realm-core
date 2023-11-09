@@ -31,7 +31,8 @@
 using namespace realm;
 
 ArrayFlex::ArrayFlex(Array& array)
-    : ArrayEncode(array)
+    : Array(array.get_alloc())
+    , m_array(array)
 {
 }
 
@@ -113,6 +114,7 @@ bool ArrayFlex::encode()
 
 bool ArrayFlex::decode()
 {
+    REALM_ASSERT(is_attached());
     size_t value_width, index_width, value_size, index_size;
     if (get_encode_info(value_width, index_width, value_size, index_size)) {
         std::vector<int64_t> values;
@@ -151,6 +153,11 @@ bool ArrayFlex::is_encoded() const
         return enconding == Encoding::Flex;
     }
     return false;
+}
+
+MemRef ArrayFlex::get_mem_ref() const
+{
+    return MemRef(get_header_from_data(m_data), m_ref, m_alloc);
 }
 
 size_t ArrayFlex::size() const

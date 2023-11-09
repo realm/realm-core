@@ -20,13 +20,14 @@
 #define REALM_ARRAY_FLEX_HPP
 
 #include <realm/array_encode.hpp>
+#include <realm/array.hpp>
 
 namespace realm {
 //
 // Compress array in Flex format
 // Decompress array in WTypeBits formats
 //
-class ArrayFlex : public ArrayEncode {
+class ArrayFlex : public ArrayEncode, public Array {
 public:
     explicit ArrayFlex(Array& array);
     virtual ~ArrayFlex() = default;
@@ -36,10 +37,13 @@ public:
     bool is_encoded() const final override;
     size_t size() const final override;
     int64_t get(size_t) const final override;
+    MemRef get_mem_ref() const final override;
 
 private:
     bool try_encode(std::vector<uint64_t>&, std::vector<size_t>&);
     bool get_encode_info(size_t& value_width, size_t& index_width, size_t& value_size, size_t& index_size) const;
+
+    Array& m_array;
 };
 } // namespace realm
 #endif // REALM_ARRAY_COMPRESS_HPP

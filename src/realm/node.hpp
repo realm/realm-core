@@ -272,8 +272,6 @@ protected:
     Allocator& m_alloc;
     size_t m_size = 0; // Number of elements currently stored.
 
-    ArrayEncode* m_encode_array{nullptr}; // encode array for encoding and decoding array.
-
 #if REALM_ENABLE_MEMDEBUG
     // If m_no_relocation is false, then copy_on_write() will always relocate this array, regardless if it's
     // required or not. If it's true, then it will never relocate, which is currently only expeted inside

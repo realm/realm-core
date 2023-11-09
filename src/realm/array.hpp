@@ -89,20 +89,10 @@ public:
 class Array : public Node, public ArrayParent {
 public:
     /// Create an array accessor in the unattached state.
-    explicit Array(Allocator& allocator) noexcept
-        : Node(allocator)
-    {
-    }
+    explicit Array(Allocator& allocator) noexcept;
+    explicit Array(Allocator& allocator, ArrayEncode& array_encode) noexcept;
 
     virtual ~Array() noexcept = default;
-
-
-    /// Set encoding/deconding array for this array in order to implement the
-    /// encoding algorithm selected for this type of Array.
-    /// The derived class is responsible to invoke this method and pass the
-    /// correct encoding array to this method.
-    void set_encode_array(ArrayEncode* encode_array);
-
 
     /// Create a new integer array of the specified type and size, and filled
     /// with the specified value, and attach this accessor to it. This does not
@@ -476,9 +466,6 @@ public:
     static size_t bit_width(int64_t value);
 
 protected:
-    // destroy encoded array
-    void destroy_encode_array();
-
     // for compressed arrays only
     void insert_no_encoding(size_t ndx, int_fast64_t value);
     void add_no_encoding(int_fast64_t value);
@@ -564,6 +551,9 @@ private:
     // encode/decode this array
     bool encode_array() const;
     bool decode_array() const;
+
+    ArrayEncode& m_encode_array; // encode array for encoding and decoding array.
+
 
 public:
     bool is_encoded() const;

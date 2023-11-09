@@ -191,27 +191,25 @@ using namespace realm::util;
 
 void QueryStateBase::dyncast() {}
 
+DummyArrayEncode dummy_encode;
 
-void Array::set_encode_array(ArrayEncode* encode_array)
+Array::Array(Allocator& allocator) noexcept
+    : Node(allocator)
+    , m_encode_array(dummy_encode)
 {
-    m_encode_array = encode_array;
 }
 
-void Array::destroy_encode_array()
+Array::Array(Allocator& allocator, ArrayEncode& array_encode) noexcept
+    : Node(allocator)
+    , m_encode_array(array_encode)
 {
-    if (m_encode_array) {
-        if (m_encode_array->is_attached())
-            m_encode_array->destroy();
-        delete m_encode_array;
-        m_encode_array = nullptr;
-    }
 }
 
 template <size_t w>
 int64_t Array::get(size_t ndx) const noexcept
 {
     if (is_encoded())
-        return m_encode_array->get(ndx);
+        return m_encode_array.get(ndx);
 
     REALM_ASSERT_DEBUG(is_attached());
     return get_universal<w>(m_data, ndx);
@@ -221,7 +219,7 @@ int64_t Array::get(size_t ndx) const noexcept
 {
     if (is_encoded()) {
         // std::cout << "Encode array::get() " << std::endl;
-        return m_encode_array->get(ndx);
+        return m_encode_array.get(ndx);
     }
 
 
@@ -278,16 +276,15 @@ void Array::init_from_mem(MemRef mem) noexcept
     Encoding enconding{NodeHeader::get_kind((uint64_t*)header)};
     if (enconding == Encoding::Flex) {
         // it is an error not to have the encoded array if the array type supports it
-        REALM_ASSERT(m_encode_array);
-        m_encode_array->init_array_encode(mem);
-        m_size = m_encode_array->size();
+        m_encode_array.init_array_encode(mem);
+        m_size = m_encode_array.size();
     }
 }
 
 MemRef Array::get_mem() const noexcept
 {
     if (is_encoded())
-        return MemRef(get_header_from_data(m_encode_array->get_data()), m_encode_array->get_ref(), m_alloc);
+        return m_encode_array.get_mem_ref();
     return MemRef(get_header_from_data(m_data), m_ref, m_alloc);
 }
 
@@ -654,31 +651,23 @@ void Array::do_ensure_minimum_width(int_fast64_t value)
 size_t Array::size() const noexcept
 {
     if (is_encoded())
-        m_encode_array->size();
+        m_encode_array.size();
     return m_size;
 }
 
 bool Array::encode_array() const
 {
-    if (m_encode_array)
-        return !is_encoded() ? m_encode_array->encode() : false;
-    return false;
+    return !is_encoded() ? m_encode_array.encode() : false;
 }
 
 bool Array::decode_array() const
 {
-    if (m_encode_array) {
-        if (is_encoded()) {
-            // std::cout << "is encoded !! " << std::endl;
-            return m_encode_array->decode();
-        }
-    }
-    return false;
+    return is_encoded() ? m_encode_array.decode() : false;
 }
 
 bool Array::is_encoded() const
 {
-    return m_encode_array ? m_encode_array->is_encoded() : false;
+    return m_encode_array.is_encoded();
 }
 
 namespace {

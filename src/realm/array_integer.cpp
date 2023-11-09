@@ -17,7 +17,6 @@
  **************************************************************************/
 
 #include <vector>
-#include <set>
 
 #include <realm/array_integer_tpl.hpp>
 #include <realm/impl/destroy_guard.hpp>
@@ -27,11 +26,10 @@
 using namespace realm;
 
 ArrayInteger::ArrayInteger(Allocator& allocator) noexcept
-    : Array(allocator)
+    : Array(allocator, m_array_flex)
+    , m_array_flex(*this)
 {
     m_is_inner_bptree_node = false;
-    using Encoding = NodeHeader::Encoding;
-    set_encode_array(ArrayEncode::create_encoded_array(Encoding::Flex, *this));
 }
 
 Mixed ArrayInteger::get_any(size_t ndx) const

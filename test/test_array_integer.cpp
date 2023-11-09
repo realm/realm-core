@@ -177,10 +177,9 @@ TEST(Test_ArrayInt_compress_data_init_from_mem)
     CHECK(a1.get(3) == 16388);
     CHECK(a1.get(4) == 409);
     CHECK(a1.get(5) == 16388);
-
     // decompress a1 and compresses again
+    CHECK(a1.is_encoded());
     a1.add(20);
-
     CHECK(a1.is_encoded());
     CHECK(a1.size() == 7);
     CHECK(a1.get(0) == 16388);
@@ -190,10 +189,8 @@ TEST(Test_ArrayInt_compress_data_init_from_mem)
     CHECK(a1.get(4) == 409);
     CHECK(a1.get(5) == 16388);
     CHECK(a1.get(6) == 20);
-
     // compress again via a1
     CHECK(a1.is_encoded());
-
     CHECK(a1.get(0) == 16388);
     CHECK(a1.get(1) == 409);
     CHECK(a1.get(2) == 16388);

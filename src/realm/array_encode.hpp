@@ -19,35 +19,55 @@
 #ifndef REALM_ARRAY_COMPRESS_HPP
 #define REALM_ARRAY_COMPRESS_HPP
 
-#include <realm/array.hpp>
+#include <realm/alloc.hpp>
 
 namespace realm {
 //
 // This class represents the basic interface that every compressed array must implement.
 //
-class ArrayEncode : public Array {
+class ArrayEncode {
 public:
-    explicit ArrayEncode(Array& array);
+    explicit ArrayEncode() = default;
     virtual ~ArrayEncode() = default;
     virtual void init_array_encode(MemRef) = 0;
     virtual bool encode() = 0;
     virtual bool decode() = 0;
     virtual bool is_encoded() const = 0;
 
-    char* get_data() const
-    {
-        return m_data;
-    }
+    virtual MemRef get_mem_ref() const = 0;
     virtual size_t size() const = 0;
     virtual int64_t get(size_t) const = 0;
+};
 
-    //
-    // Factory method to construct the proper encoded array
-    //
-    static ArrayEncode* create_encoded_array(NodeHeader::Encoding encoding, Array& array);
-
-protected:
-    Array& m_array;
+class DummyArrayEncode : public ArrayEncode {
+public:
+    explicit DummyArrayEncode() = default;
+    virtual ~DummyArrayEncode() = default;
+    void init_array_encode(MemRef) final override {}
+    bool encode() final override
+    {
+        return false;
+    }
+    bool decode() final override
+    {
+        return false;
+    }
+    bool is_encoded() const final override
+    {
+        return false;
+    }
+    size_t size() const final override
+    {
+        return 0;
+    }
+    int64_t get(size_t) const final override
+    {
+        return 0;
+    }
+    MemRef get_mem_ref() const
+    {
+        return MemRef();
+    }
 };
 
 

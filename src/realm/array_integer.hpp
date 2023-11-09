@@ -23,6 +23,7 @@
 #include <realm/util/safe_int_ops.hpp>
 #include <realm/util/optional.hpp>
 #include <realm/array_key.hpp>
+#include <realm/array_flex.hpp>
 
 namespace realm {
 
@@ -34,7 +35,8 @@ public:
     explicit ArrayInteger(Allocator&) noexcept;
     ~ArrayInteger() noexcept override
     {
-        destroy_encode_array();
+
+        m_array_flex.destroy();
     }
 
     static value_type default_value(bool)
@@ -67,6 +69,9 @@ public:
     }
     template <class cond, class Callback>
     bool find(value_type value, size_t start, size_t end, QueryStateBase* state, Callback callback) const;
+
+private:
+    ArrayFlex m_array_flex;
 };
 
 class ArrayIntNull : public Array, public ArrayPayload {

@@ -20,26 +20,3 @@
 #include <realm/array_flex.hpp>
 
 using namespace realm;
-
-ArrayEncode::ArrayEncode(Array& array)
-    : Array(array.get_alloc())
-    , m_array(array)
-{
-}
-
-ArrayEncode* ArrayEncode::create_encoded_array(NodeHeader::Encoding encoding, Array& array)
-{
-    using Encoding = NodeHeader::Encoding;
-    switch (encoding) {
-        case Encoding::Flex:
-            return new ArrayFlex(array);
-        case Encoding::Packed:
-        case Encoding::AofP:
-        case Encoding::PofA:
-        case Encoding::WTypBits:
-        case Encoding::WTypMult:
-        case Encoding::WTypIgn:
-        default:
-            return nullptr; // no other implementations for now.
-    }
-}
