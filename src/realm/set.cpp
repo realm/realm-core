@@ -404,6 +404,8 @@ void Set<ObjKey>::do_clear()
     m_tree->set_context_flag(false);
 }
 
+template class Set<ObjKey>;
+
 template <>
 void Set<ObjLink>::do_insert(size_t ndx, ObjLink target_link)
 {
