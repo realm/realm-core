@@ -185,7 +185,7 @@ void AsyncOpenTask::migrate_schema_or_complete(AsyncOpenCallback&& callback,
 
     auto pending_migration = [&] {
         auto rt = coordinator->begin_read();
-        return _impl::sync_schema_migration::has_pending_migration(rt);
+        return _impl::sync_schema_migration::has_pending_migration(*rt);
     }();
 
     if (!pending_migration) {

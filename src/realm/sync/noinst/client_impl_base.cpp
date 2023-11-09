@@ -2573,7 +2573,7 @@ Status Session::receive_error_message(const ProtocolErrorInfo& info)
         // Enable upload immediately if the session is still active.
         if (m_state == Active) {
             auto wt = get_db()->start_write();
-            _impl::sync_schema_migration::track_sync_schema_migration(wt, *info.previous_schema_version);
+            _impl::sync_schema_migration::track_sync_schema_migration(*wt, *info.previous_schema_version);
             wt->commit();
             // Notify SyncSession a schema migration is required.
             on_connection_state_changed(m_conn.get_state(), SessionErrorInfo{info});

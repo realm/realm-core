@@ -35,10 +35,9 @@ constexpr static std::string_view s_timestamp_col_name("event_time");
 constexpr static std::string_view s_previous_schema_version_col_name("previous_schema_version");
 constexpr int64_t metadata_version = 1;
 
-std::optional<uint64_t> has_pending_migration(TransactionRef rt)
+std::optional<uint64_t> has_pending_migration(const Transaction& rt)
 {
-    REALM_ASSERT(rt);
-    ConstTableRef table = rt->get_table(s_meta_schema_migration_table_name);
+    ConstTableRef table = rt.get_table(s_meta_schema_migration_table_name);
     if (!table || table->size() == 0) {
         return none;
     }
@@ -61,13 +60,12 @@ std::optional<uint64_t> has_pending_migration(TransactionRef rt)
     return first.get<int64_t>(previous_schema_version_col);
 }
 
-void track_sync_schema_migration(TransactionRef wt, uint64_t previous_schema_version)
+void track_sync_schema_migration(Transaction& wt, uint64_t previous_schema_version)
 {
-    REALM_ASSERT(wt);
-    TableRef table = wt->get_table(s_meta_schema_migration_table_name);
+    TableRef table = wt.get_table(s_meta_schema_migration_table_name);
     ColKey version_col, timestamp_col, previous_schema_version_col;
     if (!table) {
-        table = wt->add_table_with_primary_key(s_meta_schema_migration_table_name, type_ObjectId, s_pk_col_name);
+        table = wt.add_table_with_primary_key(s_meta_schema_migration_table_name, type_ObjectId, s_pk_col_name);
         REALM_ASSERT(table);
         version_col = table->add_column(type_Int, s_version_column_name);
         timestamp_col = table->add_column(type_Timestamp, s_timestamp_col_name);

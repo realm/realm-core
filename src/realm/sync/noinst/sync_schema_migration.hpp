@@ -25,9 +25,9 @@
 namespace realm {
 namespace _impl::sync_schema_migration {
 
-std::optional<uint64_t> has_pending_migration(TransactionRef rt);
+std::optional<uint64_t> has_pending_migration(const Transaction& rt);
 
-void track_sync_schema_migration(TransactionRef wt, uint64_t previous_schema_version);
+void track_sync_schema_migration(Transaction& wt, uint64_t previous_schema_version);
 
 } // namespace _impl::sync_schema_migration
 } // namespace realm

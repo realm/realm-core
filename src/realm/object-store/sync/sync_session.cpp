@@ -361,7 +361,7 @@ SyncSession::SyncSession(SyncClient& client, std::shared_ptr<DB> db, const Realm
     , m_migration_store{sync::MigrationStore::create(m_db)}
     , m_client(client)
     , m_sync_manager(sync_manager)
-    , m_previous_schema_version(_impl::sync_schema_migration::has_pending_migration(m_db->start_read()))
+    , m_previous_schema_version(_impl::sync_schema_migration::has_pending_migration(*m_db->start_read()))
 {
     REALM_ASSERT(m_config.sync_config);
     // we don't want the following configs enabled during a client reset
