@@ -19,7 +19,7 @@
 #ifndef MONGO_COLLECTION_HPP
 #define MONGO_COLLECTION_HPP
 
-#include <realm/object-store/util/bson/bson.hpp>
+#include <realm/util/bson/bson.hpp>
 #include <realm/util/functional.hpp>
 #include <realm/util/optional.hpp>
 
