@@ -16,7 +16,7 @@
  *
  **************************************************************************/
 
-#include "realm/parser/driver.hpp"
+#include "realm/parser/query_ast.hpp"
 #include "realm/parser/keypath_mapping.hpp"
 #include "realm/parser/query_parser.hpp"
 #include "realm/sort_descriptor.hpp"
@@ -1158,7 +1158,7 @@ std::unique_ptr<Subexpr> AggrNode::aggregate(Subexpr* subexpr)
     return agg;
 }
 
-std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
+std::unique_ptr<Subexpr> StringConstantNode::visit(ParserDriver* drv, DataType hint)
 {
     std::unique_ptr<Subexpr> ret;
     std::string explain_value_message = text;
@@ -1399,7 +1399,7 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
     return ret;
 }
 
-std::unique_ptr<ConstantMixedList> ConstantNode::copy_list_of_args(std::vector<Mixed>& mixed_args)
+std::unique_ptr<ConstantMixedList> StringConstantNode::copy_list_of_args(std::vector<Mixed>& mixed_args)
 {
     std::unique_ptr<ConstantMixedList> args_in_list = std::make_unique<ConstantMixedList>(mixed_args.size());
     size_t ndx = 0;
@@ -1412,8 +1412,8 @@ std::unique_ptr<ConstantMixedList> ConstantNode::copy_list_of_args(std::vector<M
     return args_in_list;
 }
 
-std::unique_ptr<Subexpr> ConstantNode::copy_arg(ParserDriver* drv, DataType type, size_t arg_no, DataType hint,
-                                                std::string& err)
+std::unique_ptr<Subexpr> StringConstantNode::copy_arg(ParserDriver* drv, DataType type, size_t arg_no, DataType hint,
+                                                      std::string& err)
 {
     switch (type) {
         case type_Int:

@@ -5016,6 +5016,135 @@ TEST_CASE("results: public name declared", "[results]") {
     }
 }
 
+TEST_CASE("results: bson constructor", "[results]") {
+    InMemoryTestFile config;
+    // config.cache = false;
+    config.automatic_change_notifications = false;
+    config.schema = Schema{
+        {"shared",
+         ObjectSchema::ObjectType::Embedded,
+         {
+             {"weight", PropertyType::Double},
+             {"height", PropertyType::Double},
+         }},
+        {"object",
+         {{"int_col", PropertyType::Int},
+          {"str_col", PropertyType::String},
+          {"link_col", PropertyType::Object | PropertyType::Nullable, "shared"}}},
+    };
+
+    auto realm = Realm::get_shared_realm(config);
+    auto table = realm->read_group().get_table("class_object");
+    auto int_col = table->get_column_key("int_col");
+    auto str_col = table->get_column_key("str_col");
+    auto link_col = table->get_column_key("link_col");
+
+    realm->begin_transaction();
+    for (int i = 0; i < 8; ++i) {
+        Obj obj = table->create_object();
+        obj.set(int_col, (i + 2) % 4);
+        obj.set(str_col, "hello");
+        auto sub = obj.create_and_set_linked_object(link_col);
+        sub.set("weight", 60. + i);
+        sub.set("height", 170. + i);
+    }
+    realm->commit_transaction();
+    Results r(realm, table);
+
+    SECTION("test no operator equals") {
+        auto object_results = r.find("int_col = 0");
+        CHECK(object_results.size() == 2);
+        object_results = r.find(R""""(
+            {
+                "int_col": 0
+            }
+        )"""");
+        CHECK(object_results.size() == 2);
+        object_results = r.find(R""""(
+            {
+                "int_col": 1
+            }
+        )"""");
+        CHECK(object_results.size() == 2);
+        object_results = r.find(R""""(
+            {
+                "str_col": "hello"
+            }
+        )"""");
+        CHECK(object_results.size() == 8);
+        object_results = r.find(R""""(
+            {
+                "str_col": "bye"
+            }
+        )"""");
+        CHECK(object_results.size() == 0);
+    }
+    SECTION("test int comparison operators") {
+        auto object_results = r.find(R""""(
+            {
+                "int_col": { "$eq": 1 }
+            }
+        )"""");
+        CHECK(object_results.size() == 2);
+        object_results = r.find(R""""(
+            {
+                "int_col": { "$gt": 2 }
+            }
+        )"""");
+        CHECK(object_results.size() == 2);
+        object_results = r.find(R""""(
+            {
+                "int_col": { "$gte": 2 }
+            }
+        )"""");
+        CHECK(object_results.size() == 4);
+        object_results = r.find(R""""(
+            {
+                "int_col": { "$lt": 2 }
+            }
+        )"""");
+        CHECK(object_results.size() == 4);
+        object_results = r.find(R""""(
+            {
+                "int_col": { "$lte": 2 }
+            }
+        )"""");
+        CHECK(object_results.size() == 6);
+        object_results = r.find(R""""(
+            {
+                "link_col.weight": { "$gt": 62 }
+            }
+        )"""");
+        CHECK(object_results.size() == 5);
+        object_results = r.find(R""""(
+            {
+                "int_col": { "$in": [2, 3] }
+            }
+        )"""");
+        CHECK(object_results.size() == 4);
+    }
+    SECTION("test logical AND operator") {
+        auto object_results = r.find(R""""(
+            {
+                "$and": [
+                    { "int_col": { "$gt": 2 } },
+                    { "str_col": { "$eq": "hello" } }
+                ]
+            }
+        )"""");
+        CHECK(object_results.size() == 2);
+        object_results = r.find(R""""(
+            {
+                "$and": [
+                    { "int_col": { "$gt": 2 } },
+                    { "str_col": { "$eq": "bye" } }
+                ]
+            }
+        )"""");
+        CHECK(object_results.size() == 0);
+    }
+}
+
 TEST_CASE("notifications: objects with PK recreated", "[results]") {
     _impl::RealmCoordinator::assert_no_open_realms();
     InMemoryTestFile config;

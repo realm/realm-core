@@ -145,10 +145,11 @@ public:
 
 /******************************** Value Nodes ********************************/
 
-class ValueNode : public ExpressionNode {
-};
+class ValueNode : public ExpressionNode {};
 
-class ConstantNode : public ValueNode {
+class ConstantNode : public ValueNode {};
+
+class StringConstantNode : public ConstantNode {
 public:
     enum Type {
         NUMBER,
@@ -172,12 +173,12 @@ public:
     std::string text;
 
 
-    ConstantNode(Type t, const std::string& str)
+    StringConstantNode(Type t, const std::string& str)
         : type(t)
         , text(str)
     {
     }
-    ConstantNode(ExpressionComparisonType comp_type, const std::string& str)
+    StringConstantNode(ExpressionComparisonType comp_type, const std::string& str)
         : type(Type::ARG)
         , text(str)
         , m_comp_type(comp_type)
@@ -199,7 +200,7 @@ public:
     std::string target_table;
 };
 
-class GeospatialNode : public ValueNode {
+class GeospatialNode : public ConstantNode {
 public:
     struct Box {};
     struct Polygon {};
@@ -275,6 +276,7 @@ class PathNode : public ParserNode {
 public:
     std::vector<PathElem> path_elems;
 
+    PathNode() {}
     PathNode(PathElem first)
     {
         add_element(first);
@@ -618,6 +620,8 @@ public:
     // Run the parser on file F.  Return 0 on success.
     int parse(const std::string& str);
 
+    void parse(const bson::BsonDocument& document);
+
     // Handling the scanner.
     void scan_begin(void*, bool trace_scanning);
 
@@ -649,6 +653,9 @@ private:
 
     static NoArguments s_default_args;
     static query_parser::KeyPathMapping s_default_mapping;
+
+    std::vector<QueryNode*> get_query_nodes(const bson::BsonArray& bson_array);
+    QueryNode* get_query_node(const bson::BsonDocument& document);
 };
 
 template <class T>

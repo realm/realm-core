@@ -7,7 +7,7 @@
 # include <cstdlib>
 # include <cstring> // strerror
 # include <string>
-# include "realm/parser/driver.hpp"
+# include "realm/parser/query_ast.hpp"
 %}
 
 %option nounistd never-interactive noyywrap nounput noinput batch debug noyylineno reentrant

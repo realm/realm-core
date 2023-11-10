@@ -51,6 +51,8 @@ public:
     Results();
     Results(const Class&);
     Results(std::shared_ptr<Realm> r, ConstTableRef table);
+    Results(std::shared_ptr<Realm> r, ConstTableRef, const bson::BsonDocument& document);
+    Results(std::shared_ptr<Realm> r, ConstTableRef, const std::string& document);
     Results(std::shared_ptr<Realm> r, Query q, DescriptorOrdering o = {});
     Results(std::shared_ptr<Realm> r, TableView tv, DescriptorOrdering o = {});
     Results(std::shared_ptr<Realm> r, const Obj& obj, TableKey src_table, ColKey src_col_key)
@@ -152,6 +154,9 @@ public:
 
     // Create a new Results by further filtering or sorting this Results
     Results filter(Query&& q) const REQUIRES(!m_mutex);
+    Results find(const bson::BsonDocument& document) const REQUIRES(!m_mutex);
+    Results find(const std::string& document) const REQUIRES(!m_mutex);
+
     // Create a new Results by sorting this Result.
     Results sort(SortDescriptor&& sort) const REQUIRES(!m_mutex);
     // Create a new Results by sorting this Result based on the specified key paths.

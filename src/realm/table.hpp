@@ -79,6 +79,14 @@ class KeyPathMapping;
 class ParserDriver;
 } // namespace query_parser
 
+namespace bson {
+class Bson;
+using BsonArray = std::vector<Bson>;
+template <typename T>
+class IndexedMap;
+using BsonDocument = IndexedMap<Bson>;
+} // namespace bson
+
 enum class ExpressionComparisonType : unsigned char {
     Any,
     All,
@@ -568,6 +576,7 @@ public:
                 const query_parser::KeyPathMapping& mapping) const;
     Query query(const std::string& query_string, query_parser::Arguments& arguments,
                 const query_parser::KeyPathMapping&) const;
+    Query query(const bson::BsonDocument& document) const;
 
     //@{
     /// WARNING: The link() and backlink() methods will alter a state on the Table object and return a reference

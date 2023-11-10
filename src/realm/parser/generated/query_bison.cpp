@@ -43,7 +43,7 @@
 
 // Unqualified %code blocks.
 
-#include <realm/parser/driver.hpp>
+#include <realm/parser/query_ast.hpp>
 #include <realm/table.hpp>
 using namespace realm;
 using namespace realm::query_parser;
@@ -204,11 +204,6 @@ namespace yy {
         value.YY_MOVE_OR_COPY< CompareType > (YY_MOVE (that.value));
         break;
 
-      case symbol_kind::SYM_constant: // constant
-      case symbol_kind::SYM_primary_key: // primary_key
-        value.YY_MOVE_OR_COPY< ConstantNode* > (YY_MOVE (that.value));
-        break;
-
       case symbol_kind::SYM_distinct: // distinct
       case symbol_kind::SYM_distinct_param: // distinct_param
       case symbol_kind::SYM_sort: // sort
@@ -257,6 +252,11 @@ namespace yy {
       case symbol_kind::SYM_query: // query
       case symbol_kind::SYM_compare: // compare
         value.YY_MOVE_OR_COPY< QueryNode* > (YY_MOVE (that.value));
+        break;
+
+      case symbol_kind::SYM_constant: // constant
+      case symbol_kind::SYM_primary_key: // primary_key
+        value.YY_MOVE_OR_COPY< StringConstantNode* > (YY_MOVE (that.value));
         break;
 
       case symbol_kind::SYM_subquery: // subquery
@@ -348,11 +348,6 @@ namespace yy {
         value.move< CompareType > (YY_MOVE (that.value));
         break;
 
-      case symbol_kind::SYM_constant: // constant
-      case symbol_kind::SYM_primary_key: // primary_key
-        value.move< ConstantNode* > (YY_MOVE (that.value));
-        break;
-
       case symbol_kind::SYM_distinct: // distinct
       case symbol_kind::SYM_distinct_param: // distinct_param
       case symbol_kind::SYM_sort: // sort
@@ -401,6 +396,11 @@ namespace yy {
       case symbol_kind::SYM_query: // query
       case symbol_kind::SYM_compare: // compare
         value.move< QueryNode* > (YY_MOVE (that.value));
+        break;
+
+      case symbol_kind::SYM_constant: // constant
+      case symbol_kind::SYM_primary_key: // primary_key
+        value.move< StringConstantNode* > (YY_MOVE (that.value));
         break;
 
       case symbol_kind::SYM_subquery: // subquery
@@ -492,11 +492,6 @@ namespace yy {
         value.copy< CompareType > (that.value);
         break;
 
-      case symbol_kind::SYM_constant: // constant
-      case symbol_kind::SYM_primary_key: // primary_key
-        value.copy< ConstantNode* > (that.value);
-        break;
-
       case symbol_kind::SYM_distinct: // distinct
       case symbol_kind::SYM_distinct_param: // distinct_param
       case symbol_kind::SYM_sort: // sort
@@ -545,6 +540,11 @@ namespace yy {
       case symbol_kind::SYM_query: // query
       case symbol_kind::SYM_compare: // compare
         value.copy< QueryNode* > (that.value);
+        break;
+
+      case symbol_kind::SYM_constant: // constant
+      case symbol_kind::SYM_primary_key: // primary_key
+        value.copy< StringConstantNode* > (that.value);
         break;
 
       case symbol_kind::SYM_subquery: // subquery
@@ -634,11 +634,6 @@ namespace yy {
         value.move< CompareType > (that.value);
         break;
 
-      case symbol_kind::SYM_constant: // constant
-      case symbol_kind::SYM_primary_key: // primary_key
-        value.move< ConstantNode* > (that.value);
-        break;
-
       case symbol_kind::SYM_distinct: // distinct
       case symbol_kind::SYM_distinct_param: // distinct_param
       case symbol_kind::SYM_sort: // sort
@@ -687,6 +682,11 @@ namespace yy {
       case symbol_kind::SYM_query: // query
       case symbol_kind::SYM_compare: // compare
         value.move< QueryNode* > (that.value);
+        break;
+
+      case symbol_kind::SYM_constant: // constant
+      case symbol_kind::SYM_primary_key: // primary_key
+        value.move< StringConstantNode* > (that.value);
         break;
 
       case symbol_kind::SYM_subquery: // subquery
@@ -1175,11 +1175,11 @@ namespace yy {
         break;
 
       case symbol_kind::SYM_constant: // constant
-                 { yyo << yysym.value.template as < ConstantNode* > (); }
+                 { yyo << yysym.value.template as < StringConstantNode* > (); }
         break;
 
       case symbol_kind::SYM_primary_key: // primary_key
-                 { yyo << yysym.value.template as < ConstantNode* > (); }
+                 { yyo << yysym.value.template as < StringConstantNode* > (); }
         break;
 
       case symbol_kind::SYM_boolexpr: // boolexpr
@@ -1456,11 +1456,6 @@ namespace yy {
         yylhs.value.emplace< CompareType > ();
         break;
 
-      case symbol_kind::SYM_constant: // constant
-      case symbol_kind::SYM_primary_key: // primary_key
-        yylhs.value.emplace< ConstantNode* > ();
-        break;
-
       case symbol_kind::SYM_distinct: // distinct
       case symbol_kind::SYM_distinct_param: // distinct_param
       case symbol_kind::SYM_sort: // sort
@@ -1509,6 +1504,11 @@ namespace yy {
       case symbol_kind::SYM_query: // query
       case symbol_kind::SYM_compare: // compare
         yylhs.value.emplace< QueryNode* > ();
+        break;
+
+      case symbol_kind::SYM_constant: // constant
+      case symbol_kind::SYM_primary_key: // primary_key
+        yylhs.value.emplace< StringConstantNode* > ();
         break;
 
       case symbol_kind::SYM_subquery: // subquery
@@ -1686,7 +1686,7 @@ namespace yy {
     break;
 
   case 24: // value: constant
-                                { yylhs.value.as < ValueNode* > () = yystack_[0].value.as < ConstantNode* > ();}
+                                { yylhs.value.as < ValueNode* > () = yystack_[0].value.as < StringConstantNode* > ();}
     break;
 
   case 25: // value: prop
@@ -1848,7 +1848,7 @@ namespace yy {
     break;
 
   case 63: // list_content: constant
-                                { yylhs.value.as < ListNode* > () = drv.m_parse_nodes.create<ListNode>(yystack_[0].value.as < ConstantNode* > ()); }
+                                { yylhs.value.as < ListNode* > () = drv.m_parse_nodes.create<ListNode>(yystack_[0].value.as < StringConstantNode* > ()); }
     break;
 
   case 64: // list_content: %empty
@@ -1856,87 +1856,87 @@ namespace yy {
     break;
 
   case 65: // list_content: list_content ',' constant
-                                { yystack_[2].value.as < ListNode* > ()->add_element(yystack_[0].value.as < ConstantNode* > ()); yylhs.value.as < ListNode* > () = yystack_[2].value.as < ListNode* > (); }
+                                { yystack_[2].value.as < ListNode* > ()->add_element(yystack_[0].value.as < StringConstantNode* > ()); yylhs.value.as < ListNode* > () = yystack_[2].value.as < ListNode* > (); }
     break;
 
   case 66: // constant: primary_key
-                                { yylhs.value.as < ConstantNode* > () = yystack_[0].value.as < ConstantNode* > (); }
+                                { yylhs.value.as < StringConstantNode* > () = yystack_[0].value.as < StringConstantNode* > (); }
     break;
 
   case 67: // constant: "infinity"
-                                { yylhs.value.as < ConstantNode* > () = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::INFINITY_VAL, yystack_[0].value.as < std::string > ()); }
+                                { yylhs.value.as < StringConstantNode* > () = drv.m_parse_nodes.create<StringConstantNode>(StringConstantNode::INFINITY_VAL, yystack_[0].value.as < std::string > ()); }
     break;
 
   case 68: // constant: "NaN"
-                                { yylhs.value.as < ConstantNode* > () = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::NAN_VAL, yystack_[0].value.as < std::string > ()); }
+                                { yylhs.value.as < StringConstantNode* > () = drv.m_parse_nodes.create<StringConstantNode>(StringConstantNode::NAN_VAL, yystack_[0].value.as < std::string > ()); }
     break;
 
   case 69: // constant: "base64"
-                                { yylhs.value.as < ConstantNode* > () = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::BASE64, yystack_[0].value.as < std::string > ()); }
+                                { yylhs.value.as < StringConstantNode* > () = drv.m_parse_nodes.create<StringConstantNode>(StringConstantNode::BASE64, yystack_[0].value.as < std::string > ()); }
     break;
 
   case 70: // constant: "float"
-                                { yylhs.value.as < ConstantNode* > () = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::FLOAT, yystack_[0].value.as < std::string > ()); }
+                                { yylhs.value.as < StringConstantNode* > () = drv.m_parse_nodes.create<StringConstantNode>(StringConstantNode::FLOAT, yystack_[0].value.as < std::string > ()); }
     break;
 
   case 71: // constant: "date"
-                                { yylhs.value.as < ConstantNode* > () = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::TIMESTAMP, yystack_[0].value.as < std::string > ()); }
+                                { yylhs.value.as < StringConstantNode* > () = drv.m_parse_nodes.create<StringConstantNode>(StringConstantNode::TIMESTAMP, yystack_[0].value.as < std::string > ()); }
     break;
 
   case 72: // constant: "link"
-                                { yylhs.value.as < ConstantNode* > () = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::LINK, yystack_[0].value.as < std::string > ()); }
+                                { yylhs.value.as < StringConstantNode* > () = drv.m_parse_nodes.create<StringConstantNode>(StringConstantNode::LINK, yystack_[0].value.as < std::string > ()); }
     break;
 
   case 73: // constant: "typed link"
-                                { yylhs.value.as < ConstantNode* > () = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::TYPED_LINK, yystack_[0].value.as < std::string > ()); }
+                                { yylhs.value.as < StringConstantNode* > () = drv.m_parse_nodes.create<StringConstantNode>(StringConstantNode::TYPED_LINK, yystack_[0].value.as < std::string > ()); }
     break;
 
   case 74: // constant: "true"
-                                { yylhs.value.as < ConstantNode* > () = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::TRUE, ""); }
+                                { yylhs.value.as < StringConstantNode* > () = drv.m_parse_nodes.create<StringConstantNode>(StringConstantNode::TRUE, ""); }
     break;
 
   case 75: // constant: "false"
-                                { yylhs.value.as < ConstantNode* > () = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::FALSE, ""); }
+                                { yylhs.value.as < StringConstantNode* > () = drv.m_parse_nodes.create<StringConstantNode>(StringConstantNode::FALSE, ""); }
     break;
 
   case 76: // constant: "null"
-                                { yylhs.value.as < ConstantNode* > () = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::NULL_VAL, ""); }
+                                { yylhs.value.as < StringConstantNode* > () = drv.m_parse_nodes.create<StringConstantNode>(StringConstantNode::NULL_VAL, ""); }
     break;
 
   case 77: // constant: "argument"
-                                { yylhs.value.as < ConstantNode* > () = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::ARG, yystack_[0].value.as < std::string > ()); }
+                                { yylhs.value.as < StringConstantNode* > () = drv.m_parse_nodes.create<StringConstantNode>(StringConstantNode::ARG, yystack_[0].value.as < std::string > ()); }
     break;
 
   case 78: // constant: comp_type "argument"
-                                { yylhs.value.as < ConstantNode* > () = drv.m_parse_nodes.create<ConstantNode>(ExpressionComparisonType(yystack_[1].value.as < int > ()), yystack_[0].value.as < std::string > ()); }
+                                { yylhs.value.as < StringConstantNode* > () = drv.m_parse_nodes.create<StringConstantNode>(ExpressionComparisonType(yystack_[1].value.as < int > ()), yystack_[0].value.as < std::string > ()); }
     break;
 
   case 79: // constant: "obj" '(' "string" ',' primary_key ')'
                                 { 
-                                    auto tmp = yystack_[1].value.as < ConstantNode* > ();
+                                    auto tmp = yystack_[1].value.as < StringConstantNode* > ();
                                     tmp->add_table(yystack_[3].value.as < std::string > ());
-                                    yylhs.value.as < ConstantNode* > () = tmp;
+                                    yylhs.value.as < StringConstantNode* > () = tmp;
                                 }
     break;
 
   case 80: // primary_key: "natural0"
-                                { yylhs.value.as < ConstantNode* > () = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::NUMBER, yystack_[0].value.as < std::string > ()); }
+                                { yylhs.value.as < StringConstantNode* > () = drv.m_parse_nodes.create<StringConstantNode>(StringConstantNode::NUMBER, yystack_[0].value.as < std::string > ()); }
     break;
 
   case 81: // primary_key: "number"
-                                { yylhs.value.as < ConstantNode* > () = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::NUMBER, yystack_[0].value.as < std::string > ()); }
+                                { yylhs.value.as < StringConstantNode* > () = drv.m_parse_nodes.create<StringConstantNode>(StringConstantNode::NUMBER, yystack_[0].value.as < std::string > ()); }
     break;
 
   case 82: // primary_key: "string"
-                                { yylhs.value.as < ConstantNode* > () = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::STRING, yystack_[0].value.as < std::string > ()); }
+                                { yylhs.value.as < StringConstantNode* > () = drv.m_parse_nodes.create<StringConstantNode>(StringConstantNode::STRING, yystack_[0].value.as < std::string > ()); }
     break;
 
   case 83: // primary_key: "UUID"
-                                { yylhs.value.as < ConstantNode* > () = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::UUID_T, yystack_[0].value.as < std::string > ()); }
+                                { yylhs.value.as < StringConstantNode* > () = drv.m_parse_nodes.create<StringConstantNode>(StringConstantNode::UUID_T, yystack_[0].value.as < std::string > ()); }
     break;
 
   case 84: // primary_key: "ObjectId"
-                                { yylhs.value.as < ConstantNode* > () = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::OID, yystack_[0].value.as < std::string > ()); }
+                                { yylhs.value.as < StringConstantNode* > () = drv.m_parse_nodes.create<StringConstantNode>(StringConstantNode::OID, yystack_[0].value.as < std::string > ()); }
     break;
 
   case 85: // boolexpr: "truepredicate"
