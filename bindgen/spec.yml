@@ -998,6 +998,7 @@ classes:
       insert_any: '(list_ndx: count_t, value: Mixed)'
       insert_embedded: '(ndx: count_t) -> Obj'
       set_any: '(list_ndx: count_t, value: Mixed)'
+      set_embedded: '(ndx: count_t) -> Obj'
       filter: '(q: Query) const -> Results'
       freeze: '(frozen_realm: SharedRealm const&) const -> List'
 
