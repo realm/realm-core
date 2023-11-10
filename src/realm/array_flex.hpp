@@ -32,7 +32,7 @@ public:
     explicit ArrayFlex(Array& array);
     virtual ~ArrayFlex()
     {
-        destroy();
+        // destroy();
     }
     void init_array_encode(MemRef) final override;
     bool encode() final override;

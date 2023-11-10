@@ -209,7 +209,8 @@ public:
     // Handling width and sizes:
     static uint_least8_t get_width_from_header(const char* header) noexcept
     {
-        REALM_ASSERT(get_kind((uint64_t*)header) == 'A');
+        auto kind = (char)get_kind((uint64_t*)header);
+        REALM_ASSERT(kind == 'A');
         typedef unsigned char uchar;
         const uchar* h = reinterpret_cast<const uchar*>(header);
         return uint_least8_t((1 << (int(h[4]) & 0x07)) >> 1);
@@ -259,6 +260,7 @@ public:
             return (size_t(h[0]) << 19) + (size_t(h[1]) << 11) + (h[2] << 3);
         }
         else {
+            /*I don't see this set while debugging*/
             return ((uint16_t*)header)[0] << 3;
         }
     }
@@ -889,8 +891,10 @@ inline size_t NodeHeader::get_num_elements<NodeHeader::Encoding::WTypIgn>(uint64
 template <>
 inline size_t NodeHeader::get_arrayA_num_elements<NodeHeader::Encoding::Flex>(uint64_t* header)
 {
-    REALM_ASSERT(get_kind(header) != 'A');
-    REALM_ASSERT(get_encoding(header) == Encoding::Flex);
+    const auto kind = (char)get_kind(header);
+    REALM_ASSERT(kind == 'B');
+    const auto encoding = get_encoding(header);
+    REALM_ASSERT(encoding == Encoding::Flex);
     uint32_t word = ((uint32_t*)header)[1];
     auto num_elements = (word >> 10) & 0b1111111111;
     return num_elements;
@@ -899,7 +903,7 @@ inline size_t NodeHeader::get_arrayA_num_elements<NodeHeader::Encoding::Flex>(ui
 template <>
 inline size_t NodeHeader::get_arrayB_num_elements<NodeHeader::Encoding::Flex>(uint64_t* header)
 {
-    REALM_ASSERT(get_kind(header) != 'A');
+    REALM_ASSERT(get_kind(header) == 'B');
     REALM_ASSERT(get_encoding(header) == Encoding::Flex);
     uint32_t word = ((uint32_t*)header)[1];
     auto num_elements = word & 0b1111111111;

@@ -150,16 +150,7 @@ bool ArrayFlex::decode()
 bool ArrayFlex::is_encoded() const
 {
     using Encoding = NodeHeader::Encoding;
-    if (is_attached()) {
-        return NodeHeader::get_encoding((uint64_t*)get_header()) == Encoding::Flex;
-    }
-    /*
-    else if (m_array.is_attached()) {
-        // this looks weird - if we're not attached, how can we ever be encoded() ?
-        return NodeHeader::get_encoding((uint64_t*)get_header()) == Encoding::Flex;
-    }
-    */
-    return false;
+    return is_attached() && NodeHeader::get_encoding((uint64_t*)get_header()) == Encoding::Flex;
 }
 
 MemRef ArrayFlex::get_mem_ref() const
@@ -261,17 +252,25 @@ bool ArrayFlex::try_encode(std::vector<int64_t>& values, std::vector<size_t>& in
     if (compressed_size < uncompressed_size) {
         // allocate new space for the encoded array
         const size_t size = header_size + compressed_size;
+        //
+        // I think the problem lies here, since create_array sets the capacity when the array is created.
+        // Since kind is not set to B yet, the capacity for the B type is not set or it goes in the A representation
+        // version of it, creating most of the havoc. This code looks ugly though, so probably the best thing to do is
+        // to create a type B/flex array
+        //
         auto mem = create_array(Type::type_Normal, false, size, 0, m_array.get_alloc());
-        init_from_mem(mem);
-
+        char* header = mem.get_addr();
+        Array::init_from_mem(mem);
         using Encoding = NodeHeader::Encoding;
         auto addr = (uint64_t*)get_header();
-        NodeHeader::set_kind(addr, 'B');
-        NodeHeader::set_encoding(addr, NodeHeader::Encoding::Flex);
-        NodeHeader::set_arrayA_num_elements<Encoding::Flex>(addr, values.size());
-        NodeHeader::set_arrayB_num_elements<Encoding::Flex>(addr, indices.size());
-        NodeHeader::set_elementA_size<Encoding::Flex>(addr, value_bit_width);
-        NodeHeader::set_elementB_size<Encoding::Flex>(addr, index_bit_width);
+        set_kind(addr, 'B');
+        set_encoding(addr, NodeHeader::Encoding::Flex);
+        set_arrayA_num_elements<Encoding::Flex>(addr, values.size());
+        set_arrayB_num_elements<Encoding::Flex>(addr, indices.size());
+        set_elementA_size<Encoding::Flex>(addr, value_bit_width);
+        set_elementB_size<Encoding::Flex>(addr, index_bit_width);
+        size_t byte_size = std::max(indices.size() * value_bit_width, initial_capacity + 0);
+        set_capacity_in_header(byte_size, header);
 
         REALM_ASSERT(indices.size() == sz);
 
