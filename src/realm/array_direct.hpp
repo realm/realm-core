@@ -236,8 +236,8 @@ public:
         size_t mask = (1ULL << field_size) - 1;
         value &= mask;
         // zero out field in first word:
-        auto first_word_mask = mask << in_word_position;
-        first_word &= ~first_word_mask;
+        auto first_word_mask = ~(mask << in_word_position);
+        first_word &= first_word_mask;
         // or in relevant part of value
         first_word |= value << in_word_position;
         first_word_ptr[0] = first_word;
@@ -308,13 +308,13 @@ inline bf_ref bf_iterator::operator*()
 
 inline uint64_t read_bitfield(uint64_t* data_area, size_t field_position, size_t width)
 {
-    bf_iterator it(data_area, field_position, width, 0, 0);
+    bf_iterator it(data_area, field_position, width, width, 0);
     return *it;
 }
 
 inline void write_bitfield(uint64_t* data_area, size_t field_position, size_t width, uint64_t value)
 {
-    bf_iterator it(data_area, field_position, width, 0, 0);
+    bf_iterator it(data_area, field_position, width, width, 0);
     *it = value;
 }
 

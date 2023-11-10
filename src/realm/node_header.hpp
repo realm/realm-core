@@ -797,6 +797,7 @@ inline void NodeHeader::set_arrayA_num_elements<NodeHeader::Encoding::Flex>(uint
     uint32_t word = ((uint32_t*)header)[1];
     word &= ~(0b1111111111 << 10);
     word |= num_elements << 10;
+    ((uint32_t*)header)[1] = word;
 }
 template <>
 inline void NodeHeader::set_arrayB_num_elements<NodeHeader::Encoding::Flex>(uint64_t* header, size_t num_elements)
@@ -807,6 +808,7 @@ inline void NodeHeader::set_arrayB_num_elements<NodeHeader::Encoding::Flex>(uint
     uint32_t word = ((uint32_t*)header)[1];
     word &= ~(0b1111111111);
     word |= num_elements;
+    ((uint32_t*)header)[1] = word;
 }
 
 template <>

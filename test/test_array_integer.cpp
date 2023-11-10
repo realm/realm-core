@@ -65,7 +65,7 @@ TEST(Test_ArrayInt_encode_decode)
     a.destroy();
 }
 
-ONLY(Test_ArrayInt_negative_nums)
+TEST(Test_ArrayInt_negative_nums)
 {
     ArrayInteger a(Allocator::get_default());
     a.create();
@@ -77,15 +77,37 @@ ONLY(Test_ArrayInt_negative_nums)
     CHECK(a.get(1) == 0);
     CHECK(a.get(2) == 1000000);
     a.add(-1000000);
-    CHECK_NOT(a.is_encoded());
+    CHECK(a.get(0) == -1000000);
+    CHECK(a.get(1) == 0);
+    CHECK(a.get(2) == 1000000);
+    CHECK(a.get(3) == -1000000);
+    CHECK(a.is_encoded());
+    CHECK(a.get(0) == -1000000);
+    CHECK(a.get(1) == 0);
+    CHECK(a.get(2) == 1000000);
+    CHECK(a.get(3) == -1000000);
     a.add(0);
     CHECK(a.is_encoded());
+    CHECK(a.get(0) == -1000000);
+    CHECK(a.get(1) == 0);
+    CHECK(a.get(2) == 1000000);
+    CHECK(a.get(3) == -1000000);
+    CHECK(a.get(4) == 0);
     a.add(1000000);
     CHECK(a.is_encoded());
+    CHECK(a.get(0) == -1000000);
+    CHECK(a.get(1) == 0);
+    CHECK(a.get(2) == 1000000);
     a.add(-1000000);
     CHECK(a.is_encoded());
+    CHECK(a.get(0) == -1000000);
+    CHECK(a.get(1) == 0);
+    CHECK(a.get(2) == 1000000);
     a.add(0);
     CHECK(a.is_encoded());
+    CHECK(a.get(0) == -1000000);
+    CHECK(a.get(1) == 0);
+    CHECK(a.get(2) == 1000000);
     a.add(1000000);
     CHECK(a.is_encoded());
     CHECK(a.size() == 9);
