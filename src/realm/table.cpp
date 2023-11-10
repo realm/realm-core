@@ -34,7 +34,6 @@
 #include <realm/replication.hpp>
 #include <realm/table_view.hpp>
 #include <realm/util/features.h>
-#include <realm/util/miscellaneous.hpp>
 #include <realm/util/serializer.hpp>
 
 #include <stdexcept>

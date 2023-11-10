@@ -1,5 +1,6 @@
 #include <realm/object-store/c_api/types.hpp>
 #include <realm/object-store/c_api/util.hpp>
+#include <realm/object-store/keypath_helpers.hpp>
 
 namespace realm::c_api {
 namespace {
@@ -65,23 +66,70 @@ struct DictionaryNotificationsCallback {
 
 std::optional<KeyPathArray> build_key_path_array(realm_key_path_array_t* key_path_array)
 {
-    if (key_path_array) {
-        KeyPathArray ret;
-        for (size_t i = 0; i < key_path_array->nb_elements; i++) {
-            realm_key_path_t* key_path = key_path_array->paths + i;
-            ret.emplace_back();
-            KeyPath& kp = ret.back();
-            for (size_t j = 0; j < key_path->nb_elements; j++) {
-                realm_key_path_elem_t* path_elem = key_path->path_elements + j;
-                kp.emplace_back(TableKey(path_elem->object), ColKey(path_elem->property));
-            }
-        }
-        return ret;
+    std::optional<KeyPathArray> ret;
+    if (key_path_array && key_path_array->size()) {
+        ret.emplace(std::move(*key_path_array));
     }
-    return std::nullopt;
+    return ret;
+}
+
+static KeyPathArray create_key_path_array(const ObjectSchema& object_schema, const Schema& schema,
+                                          const char** all_key_paths_begin, const char** all_key_paths_end)
+{
+    KeyPathArray resolved_key_path_array;
+    for (auto it = all_key_paths_begin; it != all_key_paths_end; it++) {
+        KeyPath resolved_key_path;
+        const ObjectSchema* schema_at_index = &object_schema;
+        const Property* prop = nullptr;
+        // Split string based on '.'
+        const char* path = *it;
+        do {
+            auto p = find_chr(path, '.');
+            StringData property(path, p - path);
+            path = p;
+            if (!schema_at_index) {
+                auto found_schema = schema.find(prop->object_type);
+                if (found_schema != schema.end()) {
+                    schema_at_index = &*found_schema;
+                }
+                else {
+                    throw InvalidArgument(
+                        util::format("Property '%1' in KeyPath '%2' is not a collection of objects or an object "
+                                     "reference, so it cannot be used as an intermediate keypath element.",
+                                     prop->public_name, *it));
+                }
+            }
+            prop = schema_at_index->property_for_public_name(property);
+            if (prop) {
+                resolved_key_path.emplace_back(schema_at_index->table_key, prop->column_key);
+                schema_at_index = nullptr;
+            }
+            else {
+                throw InvalidArgument(util::format("Property '%1' in KeyPath '%2' is not a valid property in %3.",
+                                                   property, *it, schema_at_index->name));
+            }
+        } while (*path++ == '.');
+        resolved_key_path_array.push_back(std::move(resolved_key_path));
+    }
+    return resolved_key_path_array;
 }
 
 } // namespace
+
+RLM_API realm_key_path_array_t* realm_create_key_path_array(const realm_t* realm,
+                                                            const realm_class_key_t object_class_key,
+                                                            int user_key_paths_count, const char** user_key_paths)
+{
+    return wrap_err([&]() {
+        KeyPathArray ret;
+        if (user_key_paths) {
+            const Schema& schema = (*realm)->schema();
+            const ObjectSchema& object_schema = schema_for_table(*realm, TableKey(object_class_key));
+            ret = create_key_path_array(object_schema, schema, user_key_paths, user_key_paths + user_key_paths_count);
+        }
+        return new realm_key_path_array_t(std::move(ret));
+    });
+}
 
 RLM_API realm_notification_token_t* realm_object_add_notification_callback(realm_object_t* obj,
                                                                            realm_userdata_t userdata,

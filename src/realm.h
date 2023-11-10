@@ -65,6 +65,7 @@ typedef void (*realm_free_userdata_func_t)(realm_userdata_t userdata);
 typedef realm_userdata_t (*realm_clone_userdata_func_t)(const realm_userdata_t userdata);
 typedef void (*realm_on_object_store_thread_callback_t)(realm_userdata_t userdata);
 typedef bool (*realm_on_object_store_error_callback_t)(realm_userdata_t userdata, const char*);
+typedef struct realm_key_path_array realm_key_path_array_t;
 
 /* Accessor types */
 typedef struct realm_object realm_object_t;
@@ -201,18 +202,6 @@ typedef struct realm_value {
     } RLM_ANON_UNION_MEMBER(values);
     realm_value_type_e type;
 } realm_value_t;
-typedef struct realm_key_path_elem {
-    realm_class_key_t object;
-    realm_property_key_t property;
-} realm_key_path_elem_t;
-typedef struct realm_key_path {
-    size_t nb_elements;
-    realm_key_path_elem_t* path_elements;
-} realm_key_path_t;
-typedef struct realm_key_path_array {
-    size_t nb_elements;
-    realm_key_path_t* paths;
-} realm_key_path_array_t;
 typedef struct realm_query_arg {
     size_t nb_args;
     bool is_list;
@@ -1607,13 +1596,23 @@ RLM_API realm_class_key_t realm_object_get_table(const realm_object_t* object);
 RLM_API realm_link_t realm_object_as_link(const realm_object_t* object);
 
 /**
+ * Helper method for making it easier to to convert SDK input to the underlying
+ * `realm_key_path_array_t`.
+ *
+ * @return A pointer to the converted key path array. NULL in case of an error.
+ */
+RLM_API realm_key_path_array_t* realm_create_key_path_array(const realm_t* realm,
+                                                            const realm_class_key_t object_class_key,
+                                                            int user_key_paths_count, const char** user_key_paths);
+
+/**
  * Subscribe to notifications for this object.
  *
  * @return A non-null pointer if no exception occurred.
  */
 RLM_API realm_notification_token_t* realm_object_add_notification_callback(realm_object_t*, realm_userdata_t userdata,
                                                                            realm_free_userdata_func_t userdata_free,
-                                                                           realm_key_path_array_t*,
+                                                                           realm_key_path_array_t* key_path_array,
                                                                            realm_on_object_change_func_t on_change);
 
 /**
@@ -1872,7 +1871,7 @@ RLM_API bool realm_list_remove_all(realm_list_t*);
  */
 RLM_API realm_notification_token_t* realm_list_add_notification_callback(realm_list_t*, realm_userdata_t userdata,
                                                                          realm_free_userdata_func_t userdata_free,
-                                                                         realm_key_path_array_t*,
+                                                                         realm_key_path_array_t* key_path_array,
                                                                          realm_on_collection_change_func_t on_change);
 
 /**
@@ -2165,7 +2164,7 @@ RLM_API bool realm_set_remove_all(realm_set_t*);
  */
 RLM_API realm_notification_token_t* realm_set_add_notification_callback(realm_set_t*, realm_userdata_t userdata,
                                                                         realm_free_userdata_func_t userdata_free,
-                                                                        realm_key_path_array_t*,
+                                                                        realm_key_path_array_t* key_path_array,
                                                                         realm_on_collection_change_func_t on_change);
 /**
  * Get an set from a thread-safe reference, potentially originating in a
@@ -2345,10 +2344,9 @@ RLM_API bool realm_dictionary_clear(realm_dictionary_t*);
  *
  * @return A non-null pointer if no exception occurred.
  */
-RLM_API realm_notification_token_t*
-realm_dictionary_add_notification_callback(realm_dictionary_t*, realm_userdata_t userdata,
-                                           realm_free_userdata_func_t userdata_free, realm_key_path_array_t*,
-                                           realm_on_dictionary_change_func_t on_change);
+RLM_API realm_notification_token_t* realm_dictionary_add_notification_callback(
+    realm_dictionary_t*, realm_userdata_t userdata, realm_free_userdata_func_t userdata_free,
+    realm_key_path_array_t* key_path_array, realm_on_dictionary_change_func_t on_change);
 
 /**
  * Get an dictionary from a thread-safe reference, potentially originating in a
@@ -2696,7 +2694,7 @@ RLM_API bool realm_results_average(realm_results_t*, realm_property_key_t, realm
 RLM_API realm_notification_token_t* realm_results_add_notification_callback(realm_results_t*,
                                                                             realm_userdata_t userdata,
                                                                             realm_free_userdata_func_t userdata_free,
-                                                                            realm_key_path_array_t*,
+                                                                            realm_key_path_array_t* key_path_array,
                                                                             realm_on_collection_change_func_t);
 
 /**

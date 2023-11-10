@@ -232,7 +232,6 @@ set(REALM_INSTALL_HEADERS
     util/memory_stream.hpp
     util/misc_errors.hpp
     util/misc_ext_errors.hpp
-    util/miscellaneous.hpp
     util/optional.hpp
     util/overload.hpp
     util/platform_info.hpp
