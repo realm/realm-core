@@ -560,12 +560,15 @@ public:
 template <>
 void inline NodeHeader::set_element_size<NodeHeader::Encoding::Packed>(uint64_t* header, size_t bits_per_element)
 {
+    REALM_ASSERT(get_kind(header) != 'A');
+    REALM_ASSERT(get_encoding(header) == Encoding::Packed);
     REALM_ASSERT(bits_per_element <= 64);
     ((uint16_t*)header)[2] = bits_per_element;
 }
 template <>
 void inline NodeHeader::set_element_size<NodeHeader::Encoding::WTypBits>(uint64_t* header, size_t bits_per_element)
 {
+    REALM_ASSERT(get_kind(header) == 'A');
     REALM_ASSERT(bits_per_element <= 64);
     // TODO: Only powers of two allowed
     // TODO: Optimize
@@ -575,6 +578,7 @@ void inline NodeHeader::set_element_size<NodeHeader::Encoding::WTypBits>(uint64_
 template <>
 void inline NodeHeader::set_element_size<NodeHeader::Encoding::WTypMult>(uint64_t* header, size_t bits_per_element)
 {
+    REALM_ASSERT(get_kind(header) == 'A');
     REALM_ASSERT(bits_per_element <= 64);
     REALM_ASSERT((bits_per_element & 0x7) == 0);
     // TODO: Only powers of two allowed
@@ -587,6 +591,8 @@ void inline NodeHeader::set_element_size<NodeHeader::Encoding::WTypMult>(uint64_
 template <>
 inline size_t NodeHeader::get_element_size<NodeHeader::Encoding::Packed>(uint64_t* header)
 {
+    REALM_ASSERT(get_kind(header) != 'A');
+    REALM_ASSERT(get_encoding(header) == Encoding::Packed);
     auto bits_per_element = ((uint16_t*)header)[2];
     REALM_ASSERT(bits_per_element <= 64);
     return bits_per_element;
@@ -594,6 +600,7 @@ inline size_t NodeHeader::get_element_size<NodeHeader::Encoding::Packed>(uint64_
 template <>
 inline size_t NodeHeader::get_element_size<NodeHeader::Encoding::WTypBits>(uint64_t* header)
 {
+    REALM_ASSERT(get_kind(header) == 'A');
     auto bits_per_element = NodeHeader::get_width_from_header((char*)header);
     REALM_ASSERT(bits_per_element <= 64);
     return bits_per_element;
@@ -601,6 +608,7 @@ inline size_t NodeHeader::get_element_size<NodeHeader::Encoding::WTypBits>(uint6
 template <>
 inline size_t NodeHeader::get_element_size<NodeHeader::Encoding::WTypMult>(uint64_t* header)
 {
+    REALM_ASSERT(get_kind(header) == 'A');
     auto bits_per_element = NodeHeader::get_width_from_header((char*)header) << 3;
     REALM_ASSERT(bits_per_element <= 64);
     return bits_per_element;
@@ -609,12 +617,16 @@ inline size_t NodeHeader::get_element_size<NodeHeader::Encoding::WTypMult>(uint6
 template <>
 inline void NodeHeader::set_elementA_size<NodeHeader::Encoding::AofP>(uint64_t* header, size_t bits_per_element)
 {
+    REALM_ASSERT(get_kind(header) != 'A');
+    REALM_ASSERT(get_encoding(header) == Encoding::AofP);
     REALM_ASSERT(bits_per_element <= 64);
     ((uint8_t*)header)[4] = bits_per_element;
 }
 template <>
 inline void NodeHeader::set_elementA_size<NodeHeader::Encoding::PofA>(uint64_t* header, size_t bits_per_element)
 {
+    REALM_ASSERT(get_kind(header) != 'A');
+    REALM_ASSERT(get_encoding(header) == Encoding::PofA);
     REALM_ASSERT(bits_per_element <= 64);
     ((uint8_t*)header)[4] = bits_per_element;
 }
@@ -622,6 +634,8 @@ template <>
 inline void NodeHeader::set_elementA_size<NodeHeader::Encoding::Flex>(uint64_t* header, size_t bits_per_element)
 {
     // we're a bit low on bits for the Flex encoding, so we need to squeeze stuff
+    REALM_ASSERT(get_kind(header) != 'A');
+    REALM_ASSERT(get_encoding(header) == Encoding::Flex);
     REALM_ASSERT(bits_per_element <= 64);
     REALM_ASSERT(bits_per_element > 0);
     uint32_t word = ((uint32_t*)header)[1];
@@ -634,12 +648,16 @@ inline void NodeHeader::set_elementA_size<NodeHeader::Encoding::Flex>(uint64_t* 
 template <>
 inline void NodeHeader::set_elementB_size<NodeHeader::Encoding::AofP>(uint64_t* header, size_t bits_per_element)
 {
+    REALM_ASSERT(get_kind(header) != 'A');
+    REALM_ASSERT(get_encoding(header) == Encoding::AofP);
     REALM_ASSERT(bits_per_element <= 64);
     ((uint8_t*)header)[5] = bits_per_element;
 }
 template <>
 inline void NodeHeader::set_elementB_size<NodeHeader::Encoding::PofA>(uint64_t* header, size_t bits_per_element)
 {
+    REALM_ASSERT(get_kind(header) != 'A');
+    REALM_ASSERT(get_encoding(header) == Encoding::PofA);
     REALM_ASSERT(bits_per_element <= 64);
     ((uint8_t*)header)[5] = bits_per_element;
 }
@@ -647,6 +665,8 @@ template <>
 inline void NodeHeader::set_elementB_size<NodeHeader::Encoding::Flex>(uint64_t* header, size_t bits_per_element)
 {
     // we're a bit low on bits for the Flex encoding, so we need to squeeze stuff
+    REALM_ASSERT(get_kind(header) != 'A');
+    REALM_ASSERT(get_encoding(header) == Encoding::Flex);
     REALM_ASSERT(bits_per_element <= 64);
     REALM_ASSERT(bits_per_element > 0);
     uint32_t word = ((uint32_t*)header)[1];
@@ -659,6 +679,8 @@ inline void NodeHeader::set_elementB_size<NodeHeader::Encoding::Flex>(uint64_t* 
 template <>
 inline size_t NodeHeader::get_elementA_size<NodeHeader::Encoding::AofP>(uint64_t* header)
 {
+    REALM_ASSERT(get_kind(header) != 'A');
+    REALM_ASSERT(get_encoding(header) == Encoding::AofP);
     auto bits_per_element = ((uint8_t*)header)[4];
     REALM_ASSERT(bits_per_element <= 64);
     return bits_per_element;
@@ -666,6 +688,8 @@ inline size_t NodeHeader::get_elementA_size<NodeHeader::Encoding::AofP>(uint64_t
 template <>
 inline size_t NodeHeader::get_elementA_size<NodeHeader::Encoding::PofA>(uint64_t* header)
 {
+    REALM_ASSERT(get_kind(header) != 'A');
+    REALM_ASSERT(get_encoding(header) == Encoding::PofA);
     auto bits_per_element = ((uint8_t*)header)[4];
     REALM_ASSERT(bits_per_element <= 64);
     return bits_per_element;
@@ -673,6 +697,8 @@ inline size_t NodeHeader::get_elementA_size<NodeHeader::Encoding::PofA>(uint64_t
 template <>
 inline size_t NodeHeader::get_elementA_size<NodeHeader::Encoding::Flex>(uint64_t* header)
 {
+    REALM_ASSERT(get_kind(header) != 'A');
+    REALM_ASSERT(get_encoding(header) == Encoding::Flex);
     uint32_t word = ((uint32_t*)header)[1];
     auto bits_per_element = (word >> 26) & 0b111111;
     bits_per_element++;
@@ -684,6 +710,8 @@ inline size_t NodeHeader::get_elementA_size<NodeHeader::Encoding::Flex>(uint64_t
 template <>
 inline size_t NodeHeader::get_elementB_size<NodeHeader::Encoding::AofP>(uint64_t* header)
 {
+    REALM_ASSERT(get_kind(header) != 'A');
+    REALM_ASSERT(get_encoding(header) == Encoding::AofP);
     auto bits_per_element = ((uint8_t*)header)[5];
     REALM_ASSERT(bits_per_element <= 64);
     return bits_per_element;
@@ -691,6 +719,8 @@ inline size_t NodeHeader::get_elementB_size<NodeHeader::Encoding::AofP>(uint64_t
 template <>
 inline size_t NodeHeader::get_elementB_size<NodeHeader::Encoding::PofA>(uint64_t* header)
 {
+    REALM_ASSERT(get_kind(header) != 'A');
+    REALM_ASSERT(get_encoding(header) == Encoding::PofA);
     auto bits_per_element = ((uint8_t*)header)[5];
     REALM_ASSERT(bits_per_element <= 64);
     return bits_per_element;
@@ -698,6 +728,8 @@ inline size_t NodeHeader::get_elementB_size<NodeHeader::Encoding::PofA>(uint64_t
 template <>
 inline size_t NodeHeader::get_elementB_size<NodeHeader::Encoding::Flex>(uint64_t* header)
 {
+    REALM_ASSERT(get_kind(header) != 'A');
+    REALM_ASSERT(get_encoding(header) == Encoding::Flex);
     uint32_t word = ((uint32_t*)header)[1];
     auto bits_per_element = (word >> 20) & 0b111111;
     bits_per_element++;
@@ -709,6 +741,8 @@ inline size_t NodeHeader::get_elementB_size<NodeHeader::Encoding::Flex>(uint64_t
 template <>
 inline void NodeHeader::set_num_elements<NodeHeader::Encoding::Packed>(uint64_t* header, size_t num_elements)
 {
+    REALM_ASSERT(get_kind(header) != 'A');
+    REALM_ASSERT(get_encoding(header) == Encoding::Packed);
     REALM_ASSERT(num_elements < 0x10000);
     ((uint16_t*)header)[3] = num_elements;
 }
@@ -716,6 +750,7 @@ template <>
 inline void NodeHeader::set_num_elements<NodeHeader::Encoding::WTypBits>(uint64_t* header, size_t num_elements)
 {
     // TODO optimize
+    REALM_ASSERT(get_kind(header) == 'A');
     NodeHeader::set_wtype_in_header(wtype_Bits, (char*)header);
     NodeHeader::set_size_in_header(num_elements, (char*)header);
 }
@@ -723,6 +758,7 @@ template <>
 inline void NodeHeader::set_num_elements<NodeHeader::Encoding::WTypMult>(uint64_t* header, size_t num_elements)
 {
     // TODO optimize
+    REALM_ASSERT(get_kind(header) == 'A');
     NodeHeader::set_wtype_in_header(wtype_Multiply, (char*)header);
     NodeHeader::set_size_in_header(num_elements, (char*)header);
 }
@@ -730,18 +766,23 @@ template <>
 inline void NodeHeader::set_num_elements<NodeHeader::Encoding::WTypIgn>(uint64_t* header, size_t num_elements)
 {
     // TODO optimize
+    REALM_ASSERT(get_kind(header) == 'A');
     NodeHeader::set_wtype_in_header(wtype_Ignore, (char*)header);
     NodeHeader::set_size_in_header(num_elements, (char*)header);
 }
 template <>
 inline void NodeHeader::set_num_elements<NodeHeader::Encoding::AofP>(uint64_t* header, size_t num_elements)
 {
+    REALM_ASSERT(get_kind(header) != 'A');
+    REALM_ASSERT(get_encoding(header) == Encoding::AofP);
     REALM_ASSERT(num_elements < 0x10000);
     ((uint16_t*)header)[3] = num_elements;
 }
 template <>
 inline void NodeHeader::set_num_elements<NodeHeader::Encoding::PofA>(uint64_t* header, size_t num_elements)
 {
+    REALM_ASSERT(get_kind(header) != 'A');
+    REALM_ASSERT(get_encoding(header) == Encoding::PofA);
     REALM_ASSERT(num_elements < 0x10000);
     ((uint16_t*)header)[3] = num_elements;
 }
@@ -750,6 +791,8 @@ inline void NodeHeader::set_num_elements<NodeHeader::Encoding::PofA>(uint64_t* h
 template <>
 inline void NodeHeader::set_arrayA_num_elements<NodeHeader::Encoding::Flex>(uint64_t* header, size_t num_elements)
 {
+    REALM_ASSERT(get_kind(header) != 'A');
+    REALM_ASSERT(get_encoding(header) == Encoding::Flex);
     REALM_ASSERT(num_elements < 0b10000000000); // 10 bits
     uint32_t word = ((uint32_t*)header)[1];
     word &= ~(0b1111111111 << 10);
@@ -758,6 +801,8 @@ inline void NodeHeader::set_arrayA_num_elements<NodeHeader::Encoding::Flex>(uint
 template <>
 inline void NodeHeader::set_arrayB_num_elements<NodeHeader::Encoding::Flex>(uint64_t* header, size_t num_elements)
 {
+    REALM_ASSERT(get_kind(header) != 'A');
+    REALM_ASSERT(get_encoding(header) == Encoding::Flex);
     REALM_ASSERT(num_elements < 0b10000000000); // 10 bits
     uint32_t word = ((uint32_t*)header)[1];
     word &= ~(0b1111111111);
@@ -767,37 +812,48 @@ inline void NodeHeader::set_arrayB_num_elements<NodeHeader::Encoding::Flex>(uint
 template <>
 inline size_t NodeHeader::get_num_elements<NodeHeader::Encoding::Packed>(uint64_t* header)
 {
+    REALM_ASSERT(get_kind(header) != 'A');
+    REALM_ASSERT(get_encoding(header) == Encoding::Packed);
     return ((uint16_t*)header)[3];
 }
 template <>
 inline size_t NodeHeader::get_num_elements<NodeHeader::Encoding::AofP>(uint64_t* header)
 {
+    REALM_ASSERT(get_kind(header) != 'A');
+    REALM_ASSERT(get_encoding(header) == Encoding::AofP);
     return ((uint16_t*)header)[3];
 }
 template <>
 inline size_t NodeHeader::get_num_elements<NodeHeader::Encoding::PofA>(uint64_t* header)
 {
+    REALM_ASSERT(get_kind(header) != 'A');
+    REALM_ASSERT(get_encoding(header) == Encoding::PofA);
     return ((uint16_t*)header)[3];
 }
 template <>
 inline size_t NodeHeader::get_num_elements<NodeHeader::Encoding::WTypBits>(uint64_t* header)
 {
+    REALM_ASSERT(get_kind(header) == 'A');
     return NodeHeader::get_size_from_header((const char*)header);
 }
 template <>
 inline size_t NodeHeader::get_num_elements<NodeHeader::Encoding::WTypMult>(uint64_t* header)
 {
+    REALM_ASSERT(get_kind(header) == 'A');
     return NodeHeader::get_size_from_header((const char*)header);
 }
 template <>
 inline size_t NodeHeader::get_num_elements<NodeHeader::Encoding::WTypIgn>(uint64_t* header)
 {
+    REALM_ASSERT(get_kind(header) == 'A');
     return NodeHeader::get_size_from_header((const char*)header);
 }
 
 template <>
 inline size_t NodeHeader::get_arrayA_num_elements<NodeHeader::Encoding::Flex>(uint64_t* header)
 {
+    REALM_ASSERT(get_kind(header) != 'A');
+    REALM_ASSERT(get_encoding(header) == Encoding::Flex);
     uint32_t word = ((uint32_t*)header)[1];
     auto num_elements = (word >> 10) & 0b1111111111;
     return num_elements;
@@ -806,6 +862,8 @@ inline size_t NodeHeader::get_arrayA_num_elements<NodeHeader::Encoding::Flex>(ui
 template <>
 inline size_t NodeHeader::get_arrayB_num_elements<NodeHeader::Encoding::Flex>(uint64_t* header)
 {
+    REALM_ASSERT(get_kind(header) != 'A');
+    REALM_ASSERT(get_encoding(header) == Encoding::Flex);
     uint32_t word = ((uint32_t*)header)[1];
     auto num_elements = word & 0b1111111111;
     return num_elements;
@@ -822,16 +880,19 @@ inline size_t align_bits_to8(size_t n)
 template <>
 inline size_t NodeHeader::get_byte_size<NodeHeader::Encoding::WTypBits>(uint64_t* header)
 {
+    REALM_ASSERT(get_kind(header) == 'A');
     return NodeHeader::get_byte_size_from_header((const char*)header);
 }
 template <>
 inline size_t NodeHeader::get_byte_size<NodeHeader::Encoding::WTypMult>(uint64_t* header)
 {
+    REALM_ASSERT(get_kind(header) == 'A');
     return NodeHeader::get_byte_size_from_header((const char*)header);
 }
 template <>
 inline size_t NodeHeader::get_byte_size<NodeHeader::Encoding::WTypIgn>(uint64_t* header)
 {
+    REALM_ASSERT(get_kind(header) == 'A');
     return NodeHeader::get_byte_size_from_header((const char*)header);
 }
 
@@ -859,9 +920,9 @@ template <>
 inline size_t NodeHeader::get_byte_size<NodeHeader::Encoding::Flex>(uint64_t* header)
 {
     return NodeHeader::header_size + align_bits_to8(get_arrayA_num_elements<NodeHeader::Encoding::Flex>(header) *
-                                                        get_elementA_size<NodeHeader::Encoding::PofA>(header) +
+                                                        get_elementA_size<NodeHeader::Encoding::Flex>(header) +
                                                     get_arrayB_num_elements<NodeHeader::Encoding::Flex>(header) *
-                                                        get_elementB_size<NodeHeader::Encoding::PofA>(header));
+                                                        get_elementB_size<NodeHeader::Encoding::Flex>(header));
 }
 
 template <>
@@ -911,6 +972,7 @@ inline size_t NodeHeader::calc_size<NodeHeader::Encoding::Flex>(size_t arrayA_nu
 template <>
 inline void NodeHeader::set_flags<NodeHeader::Encoding::WTypBits>(uint64_t* header, uint8_t flags)
 {
+    REALM_ASSERT(get_kind(header) == 'A');
     REALM_ASSERT(flags <= 7);
     auto h = (uint8_t*)header;
     h[4] = (h[4] & 0b00011111) | flags << 5;
@@ -918,6 +980,7 @@ inline void NodeHeader::set_flags<NodeHeader::Encoding::WTypBits>(uint64_t* head
 template <>
 inline void NodeHeader::set_flags<NodeHeader::Encoding::WTypMult>(uint64_t* header, uint8_t flags)
 {
+    REALM_ASSERT(get_kind(header) == 'A');
     REALM_ASSERT(flags <= 7);
     auto h = (uint8_t*)header;
     h[4] = (h[4] & 0b00011111) | flags << 5;
@@ -925,6 +988,7 @@ inline void NodeHeader::set_flags<NodeHeader::Encoding::WTypMult>(uint64_t* head
 template <>
 inline void NodeHeader::set_flags<NodeHeader::Encoding::WTypIgn>(uint64_t* header, uint8_t flags)
 {
+    REALM_ASSERT(get_kind(header) == 'A');
     REALM_ASSERT(flags <= 7);
     auto h = (uint8_t*)header;
     h[4] = (h[4] & 0b00011111) | flags << 5;
@@ -932,24 +996,32 @@ inline void NodeHeader::set_flags<NodeHeader::Encoding::WTypIgn>(uint64_t* heade
 template <>
 inline void NodeHeader::set_flags<NodeHeader::Encoding::Packed>(uint64_t* header, uint8_t flags)
 {
+    REALM_ASSERT(get_kind(header) != 'A');
+    REALM_ASSERT(get_encoding(header) == Encoding::Packed);
     auto h = (uint8_t*)header;
     h[2] = (h[2] & 0x00001111) | flags << 4;
 }
 template <>
 inline void NodeHeader::set_flags<NodeHeader::Encoding::AofP>(uint64_t* header, uint8_t flags)
 {
+    REALM_ASSERT(get_kind(header) != 'A');
+    REALM_ASSERT(get_encoding(header) == Encoding::AofP);
     auto h = (uint8_t*)header;
     h[2] = (h[2] & 0x00001111) | flags << 4;
 }
 template <>
 inline void NodeHeader::set_flags<NodeHeader::Encoding::PofA>(uint64_t* header, uint8_t flags)
 {
+    REALM_ASSERT(get_kind(header) != 'A');
+    REALM_ASSERT(get_encoding(header) == Encoding::PofA);
     auto h = (uint8_t*)header;
     h[2] = (h[2] & 0x00001111) | flags << 4;
 }
 template <>
 inline void NodeHeader::set_flags<NodeHeader::Encoding::Flex>(uint64_t* header, uint8_t flags)
 {
+    REALM_ASSERT(get_kind(header) != 'A');
+    REALM_ASSERT(get_encoding(header) == Encoding::Flex);
     auto h = (uint8_t*)header;
     h[2] = (h[2] & 0x00001111) | flags << 4;
 }
@@ -957,42 +1029,53 @@ inline void NodeHeader::set_flags<NodeHeader::Encoding::Flex>(uint64_t* header, 
 template <>
 inline uint8_t NodeHeader::get_flags<NodeHeader::Encoding::WTypBits>(uint64_t* header)
 {
+    REALM_ASSERT(get_kind(header) == 'A');
     auto h = (uint8_t*)header;
     return h[4] >> 5;
 }
 template <>
 inline uint8_t NodeHeader::get_flags<NodeHeader::Encoding::WTypMult>(uint64_t* header)
 {
+    REALM_ASSERT(get_kind(header) == 'A');
     auto h = (uint8_t*)header;
     return h[4] >> 5;
 }
 template <>
 inline uint8_t NodeHeader::get_flags<NodeHeader::Encoding::WTypIgn>(uint64_t* header)
 {
+    REALM_ASSERT(get_kind(header) == 'A');
     auto h = (uint8_t*)header;
     return h[4] >> 5;
 }
 template <>
 inline uint8_t NodeHeader::get_flags<NodeHeader::Encoding::Packed>(uint64_t* header)
 {
+    REALM_ASSERT(get_kind(header) != 'A');
+    REALM_ASSERT(get_encoding(header) == Encoding::Packed);
     auto h = (uint8_t*)header;
     return h[2] >> 4;
 }
 template <>
 inline uint8_t NodeHeader::get_flags<NodeHeader::Encoding::AofP>(uint64_t* header)
 {
+    REALM_ASSERT(get_kind(header) != 'A');
+    REALM_ASSERT(get_encoding(header) == Encoding::AofP);
     auto h = (uint8_t*)header;
     return h[2] >> 4;
 }
 template <>
 inline uint8_t NodeHeader::get_flags<NodeHeader::Encoding::PofA>(uint64_t* header)
 {
+    REALM_ASSERT(get_kind(header) != 'A');
+    REALM_ASSERT(get_encoding(header) == Encoding::PofA);
     auto h = (uint8_t*)header;
     return h[2] >> 4;
 }
 template <>
 inline uint8_t NodeHeader::get_flags<NodeHeader::Encoding::Flex>(uint64_t* header)
 {
+    REALM_ASSERT(get_kind(header) != 'A');
+    REALM_ASSERT(get_encoding(header) == Encoding::Flex);
     auto h = (uint8_t*)header;
     return h[2] >> 4;
 }
