@@ -263,19 +263,32 @@ size_t Array::bit_width(int64_t v)
 
 void Array::init_from_mem(MemRef mem) noexcept
 {
-    char* header = Node::init_from_mem(mem);
+    char* header = mem.get_addr();
+    bool old_style = get_kind((uint64_t*)header) == 'A';
+    if (old_style) {
+        header = Node::init_from_mem(mem);
+    }
+    else {
+        m_encode_array.init_array_encode(mem);
+        m_size = m_encode_array.size();
+    }
     // Parse header
     m_is_inner_bptree_node = get_is_inner_bptree_node_from_header(header);
     m_has_refs = get_hasrefs_from_header(header);
     m_context_flag = get_context_flag_from_header(header);
-    update_width_cache_from_header();
+    // it is unclear how to handle the width limits while compressed.
+    // they will likely need to be set explicitly as part of decompressing
+    if (old_style)
+        update_width_cache_from_header();
     // deal with encoding array
+    /*
     Encoding enconding{NodeHeader::get_kind((uint64_t*)header)};
     if (enconding == Encoding::Flex) {
         // it is an error not to have the encoded array if the array type supports it
         m_encode_array.init_array_encode(mem);
         m_size = m_encode_array.size();
     }
+    */
 }
 
 MemRef Array::get_mem() const noexcept

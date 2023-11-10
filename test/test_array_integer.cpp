@@ -52,7 +52,7 @@ TEST(Test_ArrayInt_encode_decode)
     a.add(10);
     a.add(5);
     a.add(5);
-    CHECK_NOT(a.is_encoded());
+    CHECK(a.is_encoded());
     a.add(10);
     a.add(15);
     CHECK_NOT(a.is_encoded()); // compression is not needed in this case.

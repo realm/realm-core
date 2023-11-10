@@ -68,6 +68,14 @@ public:
         wtype_Multiply = 1, // width indicates how many bytes every element occupies
         wtype_Ignore = 2,   // each element is 1 byte
     };
+    // Accessing flags.
+    enum class Flags { // bit positions in flags "byte", used for masking
+        Context = 1,
+        HasRefs = 2,
+        InnerBPTree = 4,
+        // additional flags can be supported by new layouts, but old layout (kind=='A') is full
+    };
+
     static const int header_size = 8; // Number of bytes used by header
 
     // The encryption layer relies on headers always fitting within a single page.
@@ -92,18 +100,22 @@ public:
     // handles all header formats
     static bool get_is_inner_bptree_node_from_header(const char* header) noexcept
     {
-        REALM_ASSERT(get_kind((uint64_t*)header) == 'A');
-        typedef unsigned char uchar;
-        const uchar* h = reinterpret_cast<const uchar*>(header);
-        return (int(h[4]) & 0x80) != 0;
+        return get_flags((uint64_t*)header) & (int)Flags::InnerBPTree;
+
+        //        REALM_ASSERT(get_kind((uint64_t*)header) == 'A');
+        //        typedef unsigned char uchar;
+        //        const uchar* h = reinterpret_cast<const uchar*>(header);
+        //        return (int(h[4]) & 0x80) != 0;
     }
 
     static bool get_hasrefs_from_header(const char* header) noexcept
     {
-        REALM_ASSERT(get_kind((uint64_t*)header) == 'A');
-        typedef unsigned char uchar;
-        const uchar* h = reinterpret_cast<const uchar*>(header);
-        return (int(h[4]) & 0x40) != 0;
+        return get_flags((uint64_t*)header) & (int)Flags::HasRefs;
+
+        // REALM_ASSERT(get_kind((uint64_t*)header) == 'A');
+        // typedef unsigned char uchar;
+        // const uchar* h = reinterpret_cast<const uchar*>(header);
+        // return (int(h[4]) & 0x40) != 0;
     }
 
     static Type get_type_from_header(const char* header) noexcept
@@ -118,33 +130,44 @@ public:
 
     static bool get_context_flag_from_header(const char* header) noexcept
     {
-        REALM_ASSERT(get_kind((uint64_t*)header) == 'A');
-        typedef unsigned char uchar;
-        const uchar* h = reinterpret_cast<const uchar*>(header);
-        return (int(h[4]) & 0x20) != 0;
+        return get_flags((uint64_t*)header) & (int)Flags::Context;
+
+        // REALM_ASSERT(get_kind((uint64_t*)header) == 'A');
+        // typedef unsigned char uchar;
+        // const uchar* h = reinterpret_cast<const uchar*>(header);
+        // return (int(h[4]) & 0x20) != 0;
     }
     static void set_is_inner_bptree_node_in_header(bool value, char* header) noexcept
     {
-        REALM_ASSERT(get_kind((uint64_t*)header) == 'A');
-        typedef unsigned char uchar;
-        uchar* h = reinterpret_cast<uchar*>(header);
-        h[4] = uchar((int(h[4]) & ~0x80) | int(value) << 7);
+        uint64_t* h = (uint64_t*)header;
+        set_flags(h, (get_flags(h) & ~(int)Flags::InnerBPTree) | (value ? (int)Flags::InnerBPTree : 0));
+
+        // REALM_ASSERT(get_kind((uint64_t*)header) == 'A');
+        // typedef unsigned char uchar;
+        // uchar* h = reinterpret_cast<uchar*>(header);
+        // h[4] = uchar((int(h[4]) & ~0x80) | int(value) << 7);
     }
 
     static void set_hasrefs_in_header(bool value, char* header) noexcept
     {
-        REALM_ASSERT(get_kind((uint64_t*)header) == 'A');
-        typedef unsigned char uchar;
-        uchar* h = reinterpret_cast<uchar*>(header);
-        h[4] = uchar((int(h[4]) & ~0x40) | int(value) << 6);
+        uint64_t* h = (uint64_t*)header;
+        set_flags(h, (get_flags(h) & ~(int)Flags::HasRefs) | (value ? (int)Flags::HasRefs : 0));
+
+        // REALM_ASSERT(get_kind((uint64_t*)header) == 'A');
+        // typedef unsigned char uchar;
+        // uchar* h = reinterpret_cast<uchar*>(header);
+        // h[4] = uchar((int(h[4]) & ~0x40) | int(value) << 6);
     }
 
     static void set_context_flag_in_header(bool value, char* header) noexcept
     {
-        REALM_ASSERT(get_kind((uint64_t*)header) == 'A');
-        typedef unsigned char uchar;
-        uchar* h = reinterpret_cast<uchar*>(header);
-        h[4] = uchar((int(h[4]) & ~0x20) | int(value) << 5);
+        uint64_t* h = (uint64_t*)header;
+        set_flags(h, (get_flags(h) & ~(int)Flags::Context) | (value ? (int)Flags::Context : 0));
+
+        // REALM_ASSERT(get_kind((uint64_t*)header) == 'A');
+        // typedef unsigned char uchar;
+        // uchar* h = reinterpret_cast<uchar*>(header);
+        // h[4] = uchar((int(h[4]) & ~0x20) | int(value) << 5);
     }
 
     // Helpers for NodeHeader::WidthType:
@@ -543,17 +566,29 @@ public:
     inline size_t calc_size(size_t arrayA_num_elements, size_t arrayB_num_elements, size_t elementA_size,
                             size_t elementB_size);
 
-    // Accessing flags.
-    enum class Flags { // bit positions in flags "byte", used for masking
-        Context = 1,
-        HasRefs = 2,
-        InnerBPTree = 4,
-        // additional flags can be supported by new layouts, but old layout (kind=='A') is full
-    };
-    template <Encoding>
-    inline void set_flags(uint64_t* header, uint8_t flags);
-    template <Encoding>
-    inline uint8_t get_flags(uint64_t* header);
+    static inline void set_flags(uint64_t* header, uint8_t flags)
+    {
+        if (get_kind(header) == 'A') {
+            REALM_ASSERT(flags <= 7);
+            auto h = (uint8_t*)header;
+            h[4] = (h[4] & 0b00011111) | flags << 5;
+        }
+        else {
+            auto h = (uint8_t*)header;
+            h[2] = (h[2] & 0x00001111) | flags << 4;
+        }
+    }
+    static inline uint8_t get_flags(uint64_t* header)
+    {
+        if (get_kind(header) == 'A') {
+            auto h = (uint8_t*)header;
+            return h[4] >> 5;
+        }
+        else {
+            auto h = (uint8_t*)header;
+            return h[2] >> 4;
+        }
+    }
 };
 
 
@@ -970,118 +1005,6 @@ inline size_t NodeHeader::calc_size<NodeHeader::Encoding::Flex>(size_t arrayA_nu
     return NodeHeader::header_size +
            align_bits_to8(arrayA_num_elements * elementA_size + arrayB_num_elements * elementB_size);
 }
-
-template <>
-inline void NodeHeader::set_flags<NodeHeader::Encoding::WTypBits>(uint64_t* header, uint8_t flags)
-{
-    REALM_ASSERT(get_kind(header) == 'A');
-    REALM_ASSERT(flags <= 7);
-    auto h = (uint8_t*)header;
-    h[4] = (h[4] & 0b00011111) | flags << 5;
-}
-template <>
-inline void NodeHeader::set_flags<NodeHeader::Encoding::WTypMult>(uint64_t* header, uint8_t flags)
-{
-    REALM_ASSERT(get_kind(header) == 'A');
-    REALM_ASSERT(flags <= 7);
-    auto h = (uint8_t*)header;
-    h[4] = (h[4] & 0b00011111) | flags << 5;
-}
-template <>
-inline void NodeHeader::set_flags<NodeHeader::Encoding::WTypIgn>(uint64_t* header, uint8_t flags)
-{
-    REALM_ASSERT(get_kind(header) == 'A');
-    REALM_ASSERT(flags <= 7);
-    auto h = (uint8_t*)header;
-    h[4] = (h[4] & 0b00011111) | flags << 5;
-}
-template <>
-inline void NodeHeader::set_flags<NodeHeader::Encoding::Packed>(uint64_t* header, uint8_t flags)
-{
-    REALM_ASSERT(get_kind(header) != 'A');
-    REALM_ASSERT(get_encoding(header) == Encoding::Packed);
-    auto h = (uint8_t*)header;
-    h[2] = (h[2] & 0x00001111) | flags << 4;
-}
-template <>
-inline void NodeHeader::set_flags<NodeHeader::Encoding::AofP>(uint64_t* header, uint8_t flags)
-{
-    REALM_ASSERT(get_kind(header) != 'A');
-    REALM_ASSERT(get_encoding(header) == Encoding::AofP);
-    auto h = (uint8_t*)header;
-    h[2] = (h[2] & 0x00001111) | flags << 4;
-}
-template <>
-inline void NodeHeader::set_flags<NodeHeader::Encoding::PofA>(uint64_t* header, uint8_t flags)
-{
-    REALM_ASSERT(get_kind(header) != 'A');
-    REALM_ASSERT(get_encoding(header) == Encoding::PofA);
-    auto h = (uint8_t*)header;
-    h[2] = (h[2] & 0x00001111) | flags << 4;
-}
-template <>
-inline void NodeHeader::set_flags<NodeHeader::Encoding::Flex>(uint64_t* header, uint8_t flags)
-{
-    REALM_ASSERT(get_kind(header) != 'A');
-    REALM_ASSERT(get_encoding(header) == Encoding::Flex);
-    auto h = (uint8_t*)header;
-    h[2] = (h[2] & 0x00001111) | flags << 4;
-}
-
-template <>
-inline uint8_t NodeHeader::get_flags<NodeHeader::Encoding::WTypBits>(uint64_t* header)
-{
-    REALM_ASSERT(get_kind(header) == 'A');
-    auto h = (uint8_t*)header;
-    return h[4] >> 5;
-}
-template <>
-inline uint8_t NodeHeader::get_flags<NodeHeader::Encoding::WTypMult>(uint64_t* header)
-{
-    REALM_ASSERT(get_kind(header) == 'A');
-    auto h = (uint8_t*)header;
-    return h[4] >> 5;
-}
-template <>
-inline uint8_t NodeHeader::get_flags<NodeHeader::Encoding::WTypIgn>(uint64_t* header)
-{
-    REALM_ASSERT(get_kind(header) == 'A');
-    auto h = (uint8_t*)header;
-    return h[4] >> 5;
-}
-template <>
-inline uint8_t NodeHeader::get_flags<NodeHeader::Encoding::Packed>(uint64_t* header)
-{
-    REALM_ASSERT(get_kind(header) != 'A');
-    REALM_ASSERT(get_encoding(header) == Encoding::Packed);
-    auto h = (uint8_t*)header;
-    return h[2] >> 4;
-}
-template <>
-inline uint8_t NodeHeader::get_flags<NodeHeader::Encoding::AofP>(uint64_t* header)
-{
-    REALM_ASSERT(get_kind(header) != 'A');
-    REALM_ASSERT(get_encoding(header) == Encoding::AofP);
-    auto h = (uint8_t*)header;
-    return h[2] >> 4;
-}
-template <>
-inline uint8_t NodeHeader::get_flags<NodeHeader::Encoding::PofA>(uint64_t* header)
-{
-    REALM_ASSERT(get_kind(header) != 'A');
-    REALM_ASSERT(get_encoding(header) == Encoding::PofA);
-    auto h = (uint8_t*)header;
-    return h[2] >> 4;
-}
-template <>
-inline uint8_t NodeHeader::get_flags<NodeHeader::Encoding::Flex>(uint64_t* header)
-{
-    REALM_ASSERT(get_kind(header) != 'A');
-    REALM_ASSERT(get_encoding(header) == Encoding::Flex);
-    auto h = (uint8_t*)header;
-    return h[2] >> 4;
-}
-
 
 } // namespace realm
 
