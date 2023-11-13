@@ -579,7 +579,7 @@ TEST_CASE("flx: client reset", "[sync][flx][client reset][baas]") {
         auto&& [error_future, error_handler] = make_error_handler();
         config_local.sync_config->error_handler = error_handler;
 
-        std::string fresh_path = realm::_impl::ClientResetOperation::get_fresh_path_for(config_local.path);
+        std::string fresh_path = realm::_impl::client_reset::get_fresh_path_for(config_local.path);
         // create a non-empty directory that we'll fail to delete
         util::make_dir(fresh_path);
         util::File(util::File::resolve("file", fresh_path), util::File::mode_Write);
@@ -1005,7 +1005,7 @@ TEST_CASE("flx: client reset", "[sync][flx][client reset][baas]") {
         auto&& [error_future, error_handler] = make_error_handler();
         config_local.sync_config->error_handler = error_handler;
 
-        std::string fresh_path = realm::_impl::ClientResetOperation::get_fresh_path_for(config_local.path);
+        std::string fresh_path = realm::_impl::client_reset::get_fresh_path_for(config_local.path);
         // create a non-empty directory that we'll fail to delete
         util::make_dir(fresh_path);
         util::File(util::File::resolve("file", fresh_path), util::File::mode_Write);
