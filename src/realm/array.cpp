@@ -264,10 +264,14 @@ size_t Array::bit_width(int64_t v)
 void Array::init_from_mem(MemRef mem) noexcept
 {
     char* header = mem.get_addr();
+    auto kind = get_kind((uint64_t*)header);
+    if (kind == 0x4)
+        set_kind((uint64_t*)header, 'A');
+    // be sure that the node is either A or B
+    REALM_ASSERT(get_kind((uint64_t*)header) == 'A' || get_kind((uint64_t*)header) == 'B');
     bool old_style = get_kind((uint64_t*)header) == 'A';
-    if (old_style) {
-        header = Node::init_from_mem(mem);
-    }
+
+    header = Node::init_from_mem(mem);
     // Parse header
     m_is_inner_bptree_node = get_is_inner_bptree_node_from_header(header);
     m_has_refs = get_hasrefs_from_header(header);
@@ -277,14 +281,10 @@ void Array::init_from_mem(MemRef mem) noexcept
     if (old_style)
         update_width_cache_from_header();
 
-    // deal with encoding array
     if (!old_style) {
-        Encoding enconding{NodeHeader::get_kind((uint64_t*)header)};
-        if (enconding == Encoding::Flex) {
-            // it is an error not to have the encoded array if the array type supports it
-            m_encode_array.init_array_encode(mem);
-            m_size = m_encode_array.size();
-        }
+        // deal with type B nodes in compressed format
+        m_encode_array.init_array_encode(mem);
+        m_size = m_encode_array.size();
     }
 }
 
@@ -351,6 +351,24 @@ void Array::destroy_children(size_t offset) noexcept
         ref_type ref = to_ref(value);
         destroy_deep(ref, m_alloc);
     }
+}
+
+size_t Array::get_byte_size() const noexcept
+{
+    // For compressed arrays this does not make sense anymore.
+    // The size of a compressed array in flex format is
+
+    if (m_encode_array.is_encoded()) {
+        return m_encode_array.byte_size();
+    }
+
+    const char* header = get_header_from_data(m_data);
+    WidthType wtype = Node::get_wtype_from_header(header);
+    size_t num_bytes = NodeHeader::calc_byte_size(wtype, m_size, m_width);
+
+    REALM_ASSERT_7(m_alloc.is_read_only(m_ref), ==, true, ||, num_bytes, <=, get_capacity_from_header(header));
+
+    return num_bytes;
 }
 
 

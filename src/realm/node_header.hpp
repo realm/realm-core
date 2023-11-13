@@ -174,7 +174,8 @@ public:
     // handles all header formats
     static WidthType get_wtype_from_header(const char* header) noexcept
     {
-        REALM_ASSERT(get_kind((uint64_t*)header) == 'A');
+        char kind = (char)get_kind((uint64_t*)header);
+        REALM_ASSERT(kind == 'A');
         typedef unsigned char uchar;
         const uchar* h = reinterpret_cast<const uchar*>(header);
         int h4 = h[4];

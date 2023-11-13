@@ -2348,13 +2348,13 @@ ONLY(Group_ArrayCompression_Correctness)
     CHECK_EQUAL(v6.get_int(), 16388);
 
 
-    //    #ifdef REALM_DEBUG
-    // to_disk.verify();
-    //    #endif
-
     // Serialize to disk
     to_disk.write(path, crypt_key());
-    //
+
+    // #ifdef REALM_DEBUG
+    //      to_disk.verify();
+    // #endif
+
     //    // Load the tables
     Group from_disk(path, crypt_key());
     TableRef read_table = from_disk.get_table("test");

@@ -37,6 +37,7 @@ public:
     virtual MemRef get_mem_ref() const = 0;
     virtual size_t size() const = 0;
     virtual int64_t get(size_t) const = 0;
+    virtual size_t byte_size() const = 0;
 };
 
 class DummyArrayEncode : public ArrayEncode {
@@ -64,9 +65,13 @@ public:
     {
         return 0;
     }
-    MemRef get_mem_ref() const
+    MemRef get_mem_ref() const final override
     {
         return MemRef();
+    }
+    size_t byte_size() const final override
+    {
+        return 0;
     }
 };
 

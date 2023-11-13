@@ -126,8 +126,9 @@ public:
         char* header = mem.get_addr();
         m_ref = mem.get_ref();
         m_data = get_data_from_header(header);
-        auto v = NodeHeader::get_kind((uint64_t*)header);
-        if (Encoding{v} != Encoding::Flex)
+        auto kind = get_kind((uint64_t*)header);
+        REALM_ASSERT(kind == 'A' || kind == 'B');
+        if (kind == 'A')
             m_size = get_size_from_header(header);
         return header;
     }

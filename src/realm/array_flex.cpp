@@ -73,7 +73,7 @@ void ArrayFlex::init_array_encode(MemRef mem)
         ++dst_it_index;
         ++src_it_index;
     }
-    REALM_ASSERT(Encoding{NodeHeader::get_encoding((uint64_t*)dst_header)} == Encoding::Flex);
+    REALM_ASSERT(NodeHeader::get_encoding((uint64_t*)dst_header) == Encoding::Flex);
 }
 
 bool ArrayFlex::encode()
@@ -276,6 +276,8 @@ bool ArrayFlex::try_encode(std::vector<int64_t>& values, std::vector<size_t>& in
 
         // what is the idea behind setting m_array.m_size here?
         m_array.m_size = indices.size();
+        // m_array.set_kind((uint64_t*)m_array.get_header(), 'B');
+        // m_array.set_encoding((uint64_t*)m_array.get_header(), Encoding::Flex);
         m_array.destroy();
         m_array.detach();
         return true;
@@ -296,4 +298,18 @@ bool ArrayFlex::get_encode_info(size_t& value_width, size_t& index_width, size_t
         return true;
     }
     return false;
+}
+
+size_t ArrayFlex::byte_size() const
+{
+    size_t value_width, index_width, value_size, index_size;
+    if (get_encode_info(value_width, index_width, value_size, index_size)) {
+        // this is hacky, but essentially the memory occupied is equal to to WidthA*SizeA + WidthB*SizeB;
+        size_t num_bytes =
+            NodeHeader::calc_byte_size(WidthType::wtype_Multiply, value_size + index_size, value_width + index_width);
+        REALM_ASSERT_7(m_alloc.is_read_only(m_ref), ==, true, ||, num_bytes, <=,
+                       get_capacity_from_header(get_header()));
+        return num_bytes;
+    }
+    REALM_UNREACHABLE();
 }
