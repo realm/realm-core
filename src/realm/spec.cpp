@@ -176,7 +176,7 @@ bool Spec::migrate_column_keys()
             REALM_ASSERT(attrs.test(col_attr_List));
             auto col_key = ColKey(m_keys.get(n));
             ColKey new_key(col_key.get_index(), col_type_Link, attrs, col_key.get_tag());
-            m_keys.insert(n, new_key.value);
+            m_keys.set(n, new_key.value);
             updated = true;
         }
     }

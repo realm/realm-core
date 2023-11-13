@@ -1309,6 +1309,20 @@ void Table::migrate_col_keys()
     if (m_spec.migrate_column_keys()) {
         build_column_mapping();
     }
+
+    // Fix also m_opposite_column col_keys
+    ColumnType col_type_LinkList(13);
+    auto sz = m_opposite_column.size();
+
+    for (size_t n = 0; n < sz; n++) {
+        ColKey col_key(m_opposite_column.get(n));
+        if (col_key.get_type() == col_type_LinkList) {
+            auto attrs = col_key.get_attrs();
+            REALM_ASSERT(attrs.test(col_attr_List));
+            ColKey new_key(col_key.get_index(), col_type_Link, attrs, col_key.get_tag());
+            m_opposite_column.set(n, new_key.value);
+        }
+    }
 }
 
 StringData Table::get_name() const noexcept
