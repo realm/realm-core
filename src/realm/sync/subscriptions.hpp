@@ -16,16 +16,18 @@
  *
  **************************************************************************/
 
-#pragma once
+#ifndef REALM_SYNC_SUBSCRIPTIONS_HPP
+#define REALM_SYNC_SUBSCRIPTIONS_HPP
 
-#include "realm/db.hpp"
-#include "realm/obj.hpp"
-#include "realm/query.hpp"
-#include "realm/timestamp.hpp"
-#include "realm/util/future.hpp"
-#include "realm/util/functional.hpp"
-#include "realm/util/optional.hpp"
-#include "realm/util/tagged_bool.hpp"
+#include <realm/db.hpp>
+#include <realm/obj.hpp>
+#include <realm/query.hpp>
+#include <realm/timestamp.hpp>
+#include <realm/util/checked_mutex.hpp>
+#include <realm/util/future.hpp>
+#include <realm/util/functional.hpp>
+#include <realm/util/optional.hpp>
+#include <realm/util/tagged_bool.hpp>
 
 #include <list>
 #include <set>
@@ -193,10 +195,10 @@ protected:
     using MakingMutableCopy = util::TaggedBool<class MakingMutableCopyTag>;
 
     explicit SubscriptionSet(std::weak_ptr<const SubscriptionStore> mgr, int64_t version, SupersededTag);
-    explicit SubscriptionSet(std::weak_ptr<const SubscriptionStore> mgr, const Transaction& tr, Obj obj,
-                             MakingMutableCopy making_mutable_copy = MakingMutableCopy(false));
+    explicit SubscriptionSet(std::weak_ptr<const SubscriptionStore> mgr, const Transaction& tr, const Obj& obj,
+                             MakingMutableCopy making_mutable_copy = false);
 
-    void load_from_database(Obj obj);
+    void load_from_database(const Obj& obj);
 
     // Get a reference to the SubscriptionStore. It may briefly extend the lifetime of the store.
     std::shared_ptr<const SubscriptionStore> get_flx_subscription_store() const;
@@ -209,6 +211,7 @@ protected:
     std::string m_error_str;
     DB::version_type m_snapshot_version = -1;
     std::vector<Subscription> m_subs;
+    ObjKey m_obj_key;
 };
 
 class MutableSubscriptionSet : public SubscriptionSet {
@@ -331,7 +334,7 @@ public:
 
     // To be used internally by the sync client. This returns a read-only view of a subscription set by its
     // version ID. If there is no SubscriptionSet with that version ID, this throws KeyNotFound.
-    SubscriptionSet get_by_version(int64_t version_id) const;
+    SubscriptionSet get_by_version(int64_t version_id) const REQUIRES(!m_pending_notifications_mutex);
 
     // Returns true if there have been commits to the DB since the given version
     bool would_refresh(DB::version_type version) const noexcept;
@@ -345,24 +348,29 @@ public:
     };
 
     util::Optional<PendingSubscription> get_next_pending_version(int64_t last_query_version) const;
-    std::vector<SubscriptionSet> get_pending_subscriptions() const;
+    std::vector<SubscriptionSet> get_pending_subscriptions() const REQUIRES(!m_pending_notifications_mutex);
 
     // Notify all subscription state change notification handlers on this subscription store with the
     // provided Status - this does not change the state of any pending subscriptions.
     // Does not necessarily need to be called from the event loop thread.
-    void notify_all_state_change_notifications(Status status);
+    void notify_all_state_change_notifications(Status status) REQUIRES(!m_pending_notifications_mutex);
 
     // Reset SubscriptionStore and erase all current subscriptions and supersede any pending
     // subscriptions. Must be called from the event loop thread to prevent data race issues
     // with the subscription store.
-    void terminate();
+    void terminate() REQUIRES(!m_pending_notifications_mutex);
 
-private:
-    using std::enable_shared_from_this<SubscriptionStore>::weak_from_this;
-    DBRef m_db;
+    // Recreate the active subscription set, marking any newer pending ones as
+    // superseded. This is a no-op if there are no pending subscription sets.
+    int64_t set_active_as_latest(Transaction& wt) REQUIRES(!m_pending_notifications_mutex);
 
 protected:
     explicit SubscriptionStore(DBRef db);
+
+private:
+    using State = SubscriptionSet::State;
+    using std::enable_shared_from_this<SubscriptionStore>::weak_from_this;
+    DBRef m_db;
 
     struct NotificationRequest {
         NotificationRequest(int64_t version, util::Promise<SubscriptionSet::State> promise,
@@ -380,7 +388,9 @@ protected:
 
     void supercede_prior_to(TransactionRef tr, int64_t version_id) const;
 
-    SubscriptionSet get_by_version_impl(int64_t flx_version, util::Optional<DB::VersionID> version) const;
+    Obj get_active(const Transaction& tr) const;
+    SubscriptionSet get_refreshed(ObjKey, int64_t flx_version,
+                                  std::optional<DB::VersionID> version = util::none) const;
     MutableSubscriptionSet make_mutable_copy(const SubscriptionSet& set) const;
 
     // Ensure the subscriptions table is properly initialized
@@ -406,11 +416,11 @@ protected:
     ColKey m_sub_set_error_str;
     ColKey m_sub_set_subscriptions;
 
-    mutable std::mutex m_pending_notifications_mutex;
-    mutable std::condition_variable m_pending_notifications_cv;
-    mutable int64_t m_outstanding_requests = 0;
-    mutable int64_t m_min_outstanding_version = 0;
-    mutable std::list<NotificationRequest> m_pending_notifications;
+    mutable util::CheckedMutex m_pending_notifications_mutex;
+    mutable int64_t m_min_outstanding_version GUARDED_BY(m_pending_notifications_mutex) = 0;
+    mutable std::list<NotificationRequest> m_pending_notifications GUARDED_BY(m_pending_notifications_mutex);
 };
 
 } // namespace realm::sync
+
+#endif // REALM_SYNC_SUBSCRIPTIONS_HPP

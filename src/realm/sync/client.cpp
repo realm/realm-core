@@ -688,11 +688,16 @@ DBRef SessionImpl::get_db() const noexcept
     return m_wrapper.m_db;
 }
 
-ClientReplication& SessionImpl::access_realm()
+ClientReplication& SessionImpl::get_repl() const noexcept
 {
     // Can only be called if the session is active or being activated
     REALM_ASSERT_EX(m_state == State::Active || m_state == State::Unactivated, m_state);
     return m_wrapper.get_replication();
+}
+
+ClientHistory& SessionImpl::get_history() const noexcept
+{
+    return get_repl().get_history();
 }
 
 util::Optional<ClientReset>& SessionImpl::get_client_reset_config() noexcept
@@ -725,9 +730,7 @@ void SessionImpl::initiate_integrate_changesets(std::uint_fast64_t downloadable_
         version_type client_version;
         if (REALM_LIKELY(!get_client().is_dry_run())) {
             VersionInfo version_info;
-            ClientReplication& repl = access_realm(); // Throws
-            integrate_changesets(repl, progress, downloadable_bytes, changesets, version_info,
-                                 batch_state); // Throws
+            integrate_changesets(progress, downloadable_bytes, changesets, version_info, batch_state); // Throws
             client_version = version_info.realm_version;
         }
         else {
@@ -873,7 +876,7 @@ void SessionImpl::process_pending_flx_bootstrap()
                 "changeset size: %3)",
                 pending_batch_stats.query_version, pending_batch_stats.pending_changesets,
                 pending_batch_stats.pending_changeset_bytes);
-    auto& history = access_realm().get_history();
+    auto& history = get_repl().get_history();
     VersionInfo new_version;
     SyncProgress progress;
     int64_t query_version = -1;
@@ -1137,6 +1140,9 @@ SessionWrapper::SessionWrapper(ClientImpl& client, DBRef db, std::shared_ptr<Sub
     REALM_ASSERT(m_db);
     REALM_ASSERT(m_db->get_replication());
     REALM_ASSERT(dynamic_cast<ClientReplication*>(m_db->get_replication()));
+    if (m_client_reset_config) {
+        m_session_reason = SessionReason::ClientReset;
+    }
 
     update_subscription_version_info();
 }
@@ -1785,15 +1791,11 @@ void SessionWrapper::handle_pending_client_reset_acknowledgement()
 {
     REALM_ASSERT(!m_finalized);
 
-    auto pending_reset = [&] {
-        auto ft = m_db->start_frozen();
-        return _impl::client_reset::has_pending_reset(ft);
-    }();
+    auto pending_reset = _impl::client_reset::has_pending_reset(*m_db->start_frozen());
     REALM_ASSERT(pending_reset);
     m_sess->logger.info("Tracking pending client reset of type \"%1\" from %2", pending_reset->type,
                         pending_reset->time);
-    util::bind_ptr<SessionWrapper> self(this);
-    async_wait_for(true, true, [self = std::move(self), pending_reset = *pending_reset](Status status) {
+    async_wait_for(true, true, [self = util::bind_ptr(this), pending_reset = *pending_reset](Status status) {
         if (status == ErrorCodes::OperationAborted) {
             return;
         }
@@ -1804,7 +1806,7 @@ void SessionWrapper::handle_pending_client_reset_acknowledgement()
         }
 
         auto wt = self->m_db->start_write();
-        auto cur_pending_reset = _impl::client_reset::has_pending_reset(wt);
+        auto cur_pending_reset = _impl::client_reset::has_pending_reset(*wt);
         if (!cur_pending_reset) {
             logger.debug(
                 "Was going to remove client reset tracker for type \"%1\" from %2, but it was already removed",
@@ -1821,7 +1823,7 @@ void SessionWrapper::handle_pending_client_reset_acknowledgement()
                          "Removing cycle detection tracker.",
                          pending_reset.type, pending_reset.time);
         }
-        _impl::client_reset::remove_pending_client_resets(wt);
+        _impl::client_reset::remove_pending_client_resets(*wt);
         wt->commit();
     });
 }

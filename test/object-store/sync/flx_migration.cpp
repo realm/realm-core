@@ -441,8 +441,12 @@ TEST_CASE("Test client migration and rollback with recovery", "[sync][flx][flx m
     //  Migrate back to FLX - and keep the realm session open
     trigger_server_migration(session.app_session(), MigrateToFLX, logger_ptr);
 
-    REQUIRE(!wait_for_upload(*outer_realm));
-    REQUIRE(!wait_for_download(*outer_realm));
+    // wait for the subscription store to initialize after downloading
+    timed_wait_for(
+        [&outer_realm]() {
+            return outer_realm->sync_session() && outer_realm->sync_session()->get_flx_subscription_store();
+        },
+        std::chrono::seconds(180));
 
     // Verify data has been sync'ed and there is only 1 subscription for the Object table
     {
@@ -535,7 +539,7 @@ TEST_CASE("An interrupted migration or rollback can recover on the next session"
         auto realm = Realm::get_shared_realm(config);
 
         timed_wait_for([&] {
-            return util::File::exists(_impl::ClientResetOperation::get_fresh_path_for(config.path));
+            return util::File::exists(_impl::client_reset::get_fresh_path_for(config.path));
         });
 
         // Pause then resume the session. This triggers the server to send a new client reset request.
@@ -563,7 +567,7 @@ TEST_CASE("An interrupted migration or rollback can recover on the next session"
         auto realm = Realm::get_shared_realm(config);
 
         timed_wait_for([&] {
-            return util::File::exists(_impl::ClientResetOperation::get_fresh_path_for(config.path));
+            return util::File::exists(_impl::client_reset::get_fresh_path_for(config.path));
         });
 
         // Pause then resume the session. This triggers the server to send a new client reset request.

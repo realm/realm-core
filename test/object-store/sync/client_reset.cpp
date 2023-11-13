@@ -185,7 +185,7 @@ TEST_CASE("sync: large reset with recovery is restartable", "[sync][pbs][client 
 
     realm->sync_session()->resume();
     timed_wait_for([&] {
-        return util::File::exists(_impl::ClientResetOperation::get_fresh_path_for(realm_config.path));
+        return util::File::exists(_impl::client_reset::get_fresh_path_for(realm_config.path));
     });
     realm->sync_session()->pause();
     realm->sync_session()->resume();
@@ -371,7 +371,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
 
     local_config.cache = false;
     local_config.automatic_change_notifications = false;
-    const std::string fresh_path = realm::_impl::ClientResetOperation::get_fresh_path_for(local_config.path);
+    const std::string fresh_path = realm::_impl::client_reset::get_fresh_path_for(local_config.path);
     size_t before_callback_invocations = 0;
     size_t after_callback_invocations = 0;
     std::mutex mtx;
@@ -968,7 +968,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
                 ->run();
 
             timed_wait_for([&] {
-                return util::File::exists(_impl::ClientResetOperation::get_fresh_path_for(local_config.path));
+                return util::File::exists(_impl::client_reset::get_fresh_path_for(local_config.path));
             });
 
             // Restart the session before the client reset finishes.
@@ -996,7 +996,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
             local_config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
                 err = error;
             };
-            std::string fresh_path = realm::_impl::ClientResetOperation::get_fresh_path_for(local_config.path);
+            std::string fresh_path = realm::_impl::client_reset::get_fresh_path_for(local_config.path);
             util::File f(fresh_path, util::File::Mode::mode_Write);
             f.write("a non empty file");
             f.sync();
@@ -1013,7 +1013,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
             local_config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
                 err = error;
             };
-            std::string fresh_path = realm::_impl::ClientResetOperation::get_fresh_path_for(local_config.path);
+            std::string fresh_path = realm::_impl::client_reset::get_fresh_path_for(local_config.path);
             // create a non-empty directory that we'll fail to delete
             util::make_dir(fresh_path);
             util::File(util::File::resolve("file", fresh_path), util::File::mode_Write);
@@ -1575,7 +1575,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
         auto has_reset_cycle_flag = [](SharedRealm realm) -> util::Optional<_impl::client_reset::PendingReset> {
             auto db = TestHelper::get_db(realm);
             auto rt = db->start_read();
-            return _impl::client_reset::has_pending_reset(rt);
+            return _impl::client_reset::has_pending_reset(*rt);
         };
         ThreadSafeSyncError err;
         local_config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
@@ -1585,7 +1585,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
             local_config.sync_config->notify_before_client_reset = [previous_type = type](SharedRealm realm) {
                 auto db = TestHelper::get_db(realm);
                 auto wt = db->start_write();
-                _impl::client_reset::track_reset(wt, previous_type);
+                _impl::client_reset::track_reset(*wt, previous_type);
                 wt->commit();
             };
         };

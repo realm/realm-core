@@ -67,9 +67,9 @@ struct PendingReset {
     ClientResyncMode type;
     Timestamp time;
 };
-void remove_pending_client_resets(TransactionRef wt);
-util::Optional<PendingReset> has_pending_reset(TransactionRef wt);
-void track_reset(TransactionRef wt, ClientResyncMode mode);
+void remove_pending_client_resets(Transaction& wt);
+util::Optional<PendingReset> has_pending_reset(const Transaction& wt);
+void track_reset(Transaction& wt, ClientResyncMode mode);
 
 // preform_client_reset_diff() takes the Realm performs a client reset on
 // the Realm in 'path_local' given the Realm 'path_fresh' as the source of truth.
@@ -86,10 +86,10 @@ struct LocalVersionIDs {
     realm::VersionID new_version;
 };
 
-LocalVersionIDs perform_client_reset_diff(DBRef db, DBRef db_remote, sync::SaltedFileIdent client_file_ident,
+LocalVersionIDs perform_client_reset_diff(DB& db, DB& db_remote, sync::SaltedFileIdent client_file_ident,
                                           util::Logger& logger, ClientResyncMode mode, bool recovery_is_allowed,
                                           bool* did_recover_out, sync::SubscriptionStore* sub_store,
-                                          util::UniqueFunction<void(int64_t)> on_flx_version_complete);
+                                          util::FunctionRef<void(int64_t)> on_flx_version_complete);
 
 } // namespace _impl::client_reset
 } // namespace realm
