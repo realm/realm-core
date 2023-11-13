@@ -1232,7 +1232,7 @@ void SlabAlloc::update_reader_view(size_t file_size)
                                                section_size, 0, m_write_observer)});
                 }
                 else {
-                    new_mappings.emplace_back(MapEntry());
+                    new_mappings.emplace_back();
                     auto& mapping = new_mappings.back().primary_mapping;
                     bool reserved = mapping.try_reserve("primary", m_file, File::access_ReadOnly, 1 << section_shift,
                                                         section_start_offset, m_write_observer);
@@ -1242,9 +1242,8 @@ void SlabAlloc::update_reader_view(size_t file_size)
                             throw std::bad_alloc();
                     }
                     else {
-                        new_mappings.back().primary_mapping.map("primary", m_file, File::access_ReadOnly,
-                                                                section_size, 0, section_start_offset,
-                                                                m_write_observer);
+                        mapping.map("primary", m_file, File::access_ReadOnly, section_size, 0, section_start_offset,
+                                    m_write_observer);
                     }
                 }
             }

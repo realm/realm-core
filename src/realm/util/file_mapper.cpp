@@ -133,15 +133,13 @@ static void remove_logged_mapping(char* start, size_t size)
             auto old_end = it->second.end;
             it->second.end = start;
             // create new entry for part after hole
-            MMapEntry entry{it->second.type, offset, end, old_end, it->second.path};
-            all_mappings[end] = entry;
+            all_mappings.emplace(end, MMapEntry{it->second.type, offset, end, old_end, it->second.path, it->second.cause});
             // aaaaand we're done
             return;
         }
         if (start <= it->second.start && it->second.end <= end) {
             // new range completely covers entry so it must die
-            auto old_it = it++;
-            all_mappings.erase(old_it);
+            it = all_mappings.erase(it);
             continue;
         }
         // no overlap

@@ -3,6 +3,7 @@
 ### Enhancements
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
 * Cancel asynchronous notifications on subscription state change in case of fatal session errors and when the session becomes inactive. ([PR #7073](https://github.com/realm/realm-core/pull/7073))
+* Log a detailed list of established memory mappings whenever memory mapping fails to help debugging ([PR #7057](https://github.com/realm/realm-core/pull/7057))
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
