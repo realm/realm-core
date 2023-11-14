@@ -647,8 +647,8 @@ TEST(List_Nested_InMixed)
     Obj obj = table->create_object_with_primary_key(1);
 
     obj.set_collection(col_any, CollectionType::Dictionary);
-    auto set = obj.get_set_ptr<Mixed>(col_any);
-    CHECK_THROW(set->insert("xyz"), IllegalOperation);
+    auto illegal = obj.get_list_ptr<Mixed>(col_any);
+    CHECK_THROW(illegal->insert(0, "xyz"), IllegalOperation);
     auto dict = obj.get_dictionary_ptr(col_any);
     CHECK(dict->is_empty());
     dict->insert("Four", 4);

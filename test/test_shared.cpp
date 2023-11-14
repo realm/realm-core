@@ -4237,7 +4237,6 @@ TEST(Shared_WriteTo)
         auto any_nested_list = baa.get_collection_ptr(col_key_mixed_list);
         any_nested_list->insert_collection(0, CollectionType::List);
         any_nested_list->insert_collection(1, CollectionType::Dictionary);
-        any_nested_list->insert_collection(2, CollectionType::Set);
         auto nested_list1 = any_nested_list->get_list(0);
         nested_list1->add(1);
         nested_list1->add(2);
@@ -4245,9 +4244,6 @@ TEST(Shared_WriteTo)
         auto nested_dict1 = any_nested_list->get_dictionary(1);
         nested_dict1->insert("test", 10);
         nested_dict1->insert("test", "test");
-        auto nested_set1 = any_nested_list->get_set(2);
-        nested_set1->insert(10);
-        nested_set1->insert(12);
 
         // nested dictionary
         auto col_key_mixed_dict = baas->get_column_key("mixed_nested_dictionary");
@@ -4255,7 +4251,6 @@ TEST(Shared_WriteTo)
         auto any_nested_dict = baa.get_collection_ptr(col_key_mixed_dict);
         any_nested_dict->insert_collection("List", CollectionType::List);
         any_nested_dict->insert_collection("Dict", CollectionType::Dictionary);
-        any_nested_dict->insert_collection("Set", CollectionType::Set);
         auto nested_list2 = any_nested_dict->get_list("List");
         nested_list2->add(1);
         nested_list2->add(2);
@@ -4263,9 +4258,6 @@ TEST(Shared_WriteTo)
         auto nested_dict2 = any_nested_dict->get_dictionary("Dict");
         nested_dict2->insert("test", 10);
         nested_dict2->insert("test", "test");
-        auto nested_set2 = any_nested_dict->get_set("Set");
-        nested_set2->insert(10);
-        nested_set2->insert(12);
 
         auto baa1 = baas->create_object_with_primary_key(666).set("link", foo.get_key());
         obj = baa1.create_and_set_linked_object(baas->get_column_key("embedded"));
