@@ -72,11 +72,12 @@ TEST(Util_MMap_Logging)
         }
         CHECK_NOT_EQUAL(log.find(s_string), std::string::npos);
     };
+    TEST_PATH(path);
     std::stringstream stream;
     auto logger = std::make_shared<util::StreamLogger>(stream);
     util::Logger::set_default_logger(logger);
     util::File f;
-    f.open("test.test", util::File::mode_Write);
+    f.open(path, util::File::mode_Write);
     // single mapping
     char* singular = (char*)f.map("singular", util::File::access_ReadWrite, 1024);
 
