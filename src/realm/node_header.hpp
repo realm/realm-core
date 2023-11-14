@@ -286,7 +286,8 @@ public:
 
     static size_t get_byte_size_from_header(const char* header) noexcept
     {
-        REALM_ASSERT(get_kind((uint64_t*)header) == 'A');
+        auto kind = get_kind((uint64_t*)header);
+        REALM_ASSERT(kind == 'A');
         WidthType wtype = get_wtype_from_header(header);
         size_t width;
         size_t size;

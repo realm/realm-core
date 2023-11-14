@@ -265,7 +265,7 @@ void Array::init_from_mem(MemRef mem) noexcept
 {
     char* header = mem.get_addr();
     auto kind = get_kind((uint64_t*)header);
-    if (kind == 0x4)
+    if (kind != 'A' && kind != 'B')
         set_kind((uint64_t*)header, 'A');
     // be sure that the node is either A or B
     REALM_ASSERT(get_kind((uint64_t*)header) == 'A' || get_kind((uint64_t*)header) == 'B');
@@ -1434,6 +1434,7 @@ void Array::report_memory_usage(MemUsageHandler& handler) const
 
 void Array::report_memory_usage_2(MemUsageHandler& handler) const
 {
+    decode_array();
     Array subarray(m_alloc);
     for (size_t i = 0; i < m_size; ++i) {
         int_fast64_t value = get(i);

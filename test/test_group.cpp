@@ -2351,9 +2351,9 @@ ONLY(Group_ArrayCompression_Correctness)
     // Serialize to disk
     to_disk.write(path, crypt_key());
 
-    // #ifdef REALM_DEBUG
-    //      to_disk.verify();
-    // #endif
+#ifdef REALM_DEBUG
+    to_disk.verify();
+#endif
 
     //    // Load the tables
     Group from_disk(path, crypt_key());
