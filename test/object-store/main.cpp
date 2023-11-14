@@ -32,14 +32,18 @@
 #include <catch2/reporters/catch_reporter_registrars.hpp>
 #include <external/json/json.hpp>
 
+#include <chrono>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <limits.h>
 
+using namespace std::chrono;
 
 int main(int argc, const char** argv)
 {
+    auto t1 = steady_clock::now();
+
     realm::test_util::initialize_test_path(1, argv);
 
     Catch::ConfigData config;
@@ -76,6 +80,10 @@ int main(int argc, const char** argv)
         }
     }
 
+#ifdef TEST_TIMEOUT_EXTRA
+    std::cout << "Test wait timeouts extended by " << TEST_TIMEOUT_EXTRA << " seconds" << std::endl;
+#endif
+
 #if TEST_SCHEDULER_UV
     realm::util::Scheduler::set_default_factory([]() {
         return std::make_shared<realm::util::UvMainLoopScheduler>();
@@ -85,6 +93,10 @@ int main(int argc, const char** argv)
     Catch::Session session;
     session.useConfigData(config);
     int result = session.run(argc, argv);
+
+    auto t2 = steady_clock::now();
+    auto ms_int = duration_cast<milliseconds>(t2 - t1);
+    std::cout << "Test time: " << (ms_int.count() / 1000.0) << "s" << std::endl << std::endl;
     return result < 0xff ? result : 0xff;
 }
 

@@ -18,7 +18,9 @@
 -----------
 
 ### Internals
-* None.
+* Add baas-network-tests nightly task for testing sync client operation with non-ideal network conditions. ([PR #6852](https://github.com/realm/realm-core/pull/6852))
+* Added non-ideal network conditions and network fault tests to the evergreen nightly test runs. ([PR #7063](https://github.com/realm/realm-core/pull/7063))
+* Updated baas tests to run with dev mode disabled by default. ([PR #6852](https://github.com/realm/realm-core/pull/6852))
 
 ----------------------------------------------
 

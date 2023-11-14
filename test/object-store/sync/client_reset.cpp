@@ -122,9 +122,7 @@ TEST_CASE("sync: large reset with recovery is restartable", "[sync][pbs][client 
          }},
     };
 
-    std::string base_url = get_base_url();
-    REQUIRE(!base_url.empty());
-    auto server_app_config = minimal_app_config(base_url, "client_reset_tests", schema);
+    auto server_app_config = minimal_app_config("client_reset_tests", schema);
     server_app_config.partition_key = partition_prop;
     TestAppSession test_app_session(create_app(server_app_config));
     auto app = test_app_session.app();
@@ -217,9 +215,7 @@ TEST_CASE("sync: pending client resets are cleared when downloads are complete",
          }},
     };
 
-    std::string base_url = get_base_url();
-    REQUIRE(!base_url.empty());
-    auto server_app_config = minimal_app_config(base_url, "client_reset_tests", schema);
+    auto server_app_config = minimal_app_config("client_reset_tests", schema);
     server_app_config.partition_key = partition_prop;
     TestAppSession test_app_session(create_app(server_app_config));
     auto app = test_app_session.app();
@@ -293,9 +289,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
              partition_prop,
          }},
     };
-    std::string base_url = get_base_url();
-    REQUIRE(!base_url.empty());
-    auto server_app_config = minimal_app_config(base_url, "client_reset_tests", schema);
+    auto server_app_config = minimal_app_config("client_reset_tests", schema);
     server_app_config.partition_key = partition_prop;
     TestAppSession test_app_session(create_app(server_app_config));
     auto app = test_app_session.app();
@@ -604,6 +598,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
                 }
             };
             make_reset(local_config, remote_config)
+                ->set_development_mode(true)
                 ->setup([&](SharedRealm before) {
                     before->update_schema(
                         {
@@ -703,6 +698,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
                 err = error;
             };
             make_reset(local_config, remote_config)
+                ->set_development_mode(true)
                 ->make_local_changes([&](SharedRealm local) {
                     local->update_schema(
                         {
@@ -1180,6 +1176,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
                 err = error;
             };
             make_reset(local_config, remote_config)
+                ->set_development_mode(true)
                 ->make_local_changes([&](SharedRealm local) {
                     local->update_schema(
                         {
@@ -1212,6 +1209,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
                 err = error;
             };
             make_reset(local_config, remote_config)
+                ->set_development_mode(true)
                 ->make_local_changes([](SharedRealm local) {
                     local->update_schema(
                         {
@@ -1243,7 +1241,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
         }
 
         SECTION("compatible schema changes in both remote and local transactions") {
-            test_reset
+            test_reset->set_development_mode(true)
                 ->make_local_changes([](SharedRealm local) {
                     local->update_schema(
                         {
@@ -1295,6 +1293,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
                 err = error;
             };
             make_reset(local_config, remote_config)
+                ->set_development_mode(true)
                 ->make_local_changes([](SharedRealm local) {
                     local->update_schema(
                         {
@@ -1337,6 +1336,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
             };
 
             make_reset(local_config, remote_config)
+                ->set_development_mode(true)
                 ->make_local_changes([](SharedRealm local) {
                     local->update_schema(
                         {
@@ -1794,9 +1794,7 @@ TEST_CASE("sync: Client reset during async open", "[sync][pbs][client reset][baa
          }},
     };
 
-    std::string base_url = get_base_url();
-    REQUIRE(!base_url.empty());
-    auto server_app_config = minimal_app_config(base_url, "client_reset_tests", schema);
+    auto server_app_config = minimal_app_config("client_reset_tests", schema);
     server_app_config.partition_key = partition_prop;
     TestAppSession test_app_session(create_app(server_app_config));
     auto app = test_app_session.app();
