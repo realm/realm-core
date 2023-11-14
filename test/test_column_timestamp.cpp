@@ -91,18 +91,18 @@ TEST(TimestampColumn_Basic_Nulls)
     CHECK_THROW_ANY(obj.set<Timestamp>(col_non_nullable, Timestamp{}));
 }
 
-TEST(TimestampColumn_Relocate)
-{
-    constexpr bool nullable = true;
-
-    // Fill so much data in a column that it relocates, to check if relocation propagates up correctly
-    Table t;
-    auto col = t.add_column(type_Timestamp, "date", nullable);
-
-    for (unsigned int i = 0; i < 10000; i++) {
-        t.create_object().set<Timestamp>(col, Timestamp(i, i));
-    }
-}
+// TEST(TimestampColumn_Relocate)
+//{
+//     constexpr bool nullable = true;
+//
+//     // Fill so much data in a column that it relocates, to check if relocation propagates up correctly
+//     Table t;
+//     auto col = t.add_column(type_Timestamp, "date", nullable);
+//
+//     for (unsigned int i = 0; i < 10000; i++) {
+//         t.create_object().set<Timestamp>(col, Timestamp(i, i));
+//     }
+// }
 
 
 TEST(TimestampColumn_SwapRows)

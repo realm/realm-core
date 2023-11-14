@@ -1553,9 +1553,11 @@ public:
         iter i_1 = m_chunks.begin(), end = m_chunks.end();
         iter i_2 = i_1;
         sort(i_1, end);
+        int i = 1;
         if (i_1 != end) {
             while (++i_2 != end) {
                 ref_type prev_ref_end = i_1->ref + i_1->size;
+                std::cout << "Iteration = " << i++ << std::endl;
                 REALM_ASSERT_3(prev_ref_end, <=, i_2->ref);
                 if (i_2->ref == prev_ref_end) { // in-file
                     i_1->size += i_2->size;     // Merge
@@ -1713,7 +1715,7 @@ void Group::verify() const
     mem_usage_2.canonicalize();
     mem_usage_1.add(mem_usage_2);
     // this fails
-    // mem_usage_1.canonicalize();
+    mem_usage_1.canonicalize();
     mem_usage_2.clear();
 
     // There may be a hole between the end of file and the beginning of the slab area.
@@ -1725,14 +1727,14 @@ void Group::verify() const
         size_t corrected_size = slab_start - real_immutable_ref_end;
         mem_usage_1.add_immutable(ref, corrected_size);
         // fails here
-        // mem_usage_1.canonicalize();
+        mem_usage_1.canonicalize();
     }
 
     // At this point we have accounted for all memory managed by the slab
     // allocator
 
     // this fails
-    // mem_usage_1.check_total_coverage();
+    mem_usage_1.check_total_coverage();
 #endif
 }
 

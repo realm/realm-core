@@ -265,11 +265,12 @@ void Array::init_from_mem(MemRef mem) noexcept
 {
     char* header = mem.get_addr();
     auto kind = get_kind((uint64_t*)header);
+    bool old_style = true;
     if (kind != 'A' && kind != 'B')
         set_kind((uint64_t*)header, 'A');
     // be sure that the node is either A or B
     REALM_ASSERT(get_kind((uint64_t*)header) == 'A' || get_kind((uint64_t*)header) == 'B');
-    bool old_style = get_kind((uint64_t*)header) == 'A';
+    old_style = get_kind((uint64_t*)header) == 'A';
 
     header = Node::init_from_mem(mem);
     // Parse header
@@ -1414,7 +1415,7 @@ void Array::stats(MemStats& stats_dest) const noexcept
 
 void Array::report_memory_usage(MemUsageHandler& handler) const
 {
-    decode_array();
+    // decode_array();
 
     if (m_has_refs)
         report_memory_usage_2(handler); // Throws
@@ -1434,7 +1435,7 @@ void Array::report_memory_usage(MemUsageHandler& handler) const
 
 void Array::report_memory_usage_2(MemUsageHandler& handler) const
 {
-    decode_array();
+    // decode_array();
     Array subarray(m_alloc);
     for (size_t i = 0; i < m_size; ++i) {
         int_fast64_t value = get(i);
@@ -1473,7 +1474,7 @@ void Array::verify() const
 {
 #ifdef REALM_DEBUG
 
-    decode_array();
+    // decode_array();
 
     REALM_ASSERT(is_attached());
 
