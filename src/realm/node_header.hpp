@@ -518,7 +518,7 @@ public:
         else
             REALM_ASSERT(false && "Illegal header encoding for chosen kind of header");
         auto hw = (uint32_t*)header;
-        hw[1] = (bits_pr_elemA << 26) | (bits_pr_elemB << 20) | (num_elemsA << 10) | num_elemsB;
+        hw[1] = (uint32_t)((bits_pr_elemA << 26) | (bits_pr_elemB << 20) | (num_elemsA << 10) | num_elemsB);
         hb[3] = kind;
     }
 
