@@ -404,6 +404,11 @@ void Set<ObjKey>::do_clear()
     m_tree->set_context_flag(false);
 }
 
+template <>
+void Set<ObjKey>::migrate()
+{
+}
+
 template class Set<ObjKey>;
 
 template <>
