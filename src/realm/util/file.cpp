@@ -1335,8 +1335,7 @@ void* File::map_fixed(const char* cause, AccessMode a, void* address, size_t siz
     return nullptr;
 #else
     // unencrypted - mmap part of already reserved space
-    return realm::util::mmap_fixed({m_fd, m_path, cause, a, m_encryption_key.get()}, address, size, a, offset,
-                                   m_encryption_key.get());
+    return realm::util::mmap_fixed({m_fd, m_path, cause, a, m_encryption_key.get()}, address, size, offset);
 #endif
 }
 
@@ -1791,7 +1790,7 @@ bool File::MapBase::try_extend_to(const char* cause, size_t size) noexcept
         void* got_addr;
         try {
             got_addr = util::mmap_fixed({-1, "Encryption", cause, access_ReadWrite, nullptr}, extension_start_addr,
-                                        extension_size, access_ReadWrite, 0, nullptr);
+                                        extension_size, 0);
         }
         catch (...) {
             return false;
@@ -1806,7 +1805,7 @@ bool File::MapBase::try_extend_to(const char* cause, size_t size) noexcept
 #endif
     try {
         void* got_addr = util::mmap_fixed({m_fd, m_path, cause, m_access_mode, nullptr}, extension_start_addr,
-                                          extension_size, m_access_mode, extension_start_offset, nullptr);
+                                          extension_size, extension_start_offset);
         if (got_addr == extension_start_addr) {
             m_size = size;
             return true;

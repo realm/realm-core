@@ -133,7 +133,8 @@ static void remove_logged_mapping(char* start, size_t size)
             auto old_end = it->second.end;
             it->second.end = start;
             // create new entry for part after hole
-            all_mappings.emplace(end, MMapEntry{it->second.type, offset, end, old_end, it->second.path, it->second.cause});
+            all_mappings.emplace(end,
+                                 MMapEntry{it->second.type, offset, end, old_end, it->second.path, it->second.cause});
             // aaaaand we're done
             return;
         }
@@ -240,7 +241,7 @@ static std::string dump_logged_mappings()
     std::string message = "\nMappings at point of failure:\n";
     stream << message;
     for (auto& e : all_mappings) {
-        stream << "    " << std::hex << (void*)e.second.start << " - " << (void*)e.second.end << "    "
+        stream << "    " << std::hex << (size_t)e.second.start << " - " << (size_t)e.second.end << "    "
                << std::setw(10) << e.second.end - e.second.start << "    " << std::setw(10) << std::left
                << e.second.cause << std::right;
         if (e.second.type == MMapEntry::Type::File)
@@ -526,18 +527,17 @@ void* mmap_anon(size_t size, const char* cause)
 #endif
 }
 
-void* mmap_fixed(const FileAttributes& file, void* address_request, size_t size, File::AccessMode access,
-                 size_t offset, const char* enc_key)
+void* mmap_fixed(const FileAttributes& file, void* address_request, size_t size, size_t offset)
 {
     _impl::SimulatedFailure::trigger_mmap(size);
-    static_cast<void>(enc_key); // FIXME: Consider removing this parameter
+    static_cast<void>(file.encryption_key); // FIXME: Consider removing this parameter
 #ifdef _WIN32
     REALM_ASSERT(false);
     return nullptr; // silence warning
 #else
     std::unique_lock lock(mmap_log_mutex);
     auto prot = PROT_READ;
-    if (access == File::access_ReadWrite)
+    if (file.access == File::access_ReadWrite)
         prot |= PROT_WRITE;
     auto flags = (file.fd == -1) ? (MAP_FIXED | MAP_PRIVATE | MAP_ANON) : (MAP_SHARED | MAP_FIXED);
     auto addr = ::mmap(address_request, size, prot, flags, file.fd, offset);

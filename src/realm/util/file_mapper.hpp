@@ -40,8 +40,7 @@ struct FileAttributes {
 };
 
 void* mmap(const FileAttributes& file, size_t size, size_t offset);
-void* mmap_fixed(const FileAttributes& file, void* address_request, size_t size, File::AccessMode access,
-                 size_t offset, const char* enc_key);
+void* mmap_fixed(const FileAttributes& file, void* address_request, size_t size, size_t offset);
 void* mmap_reserve(const FileAttributes& fd, size_t size, size_t offset);
 void munmap(void* addr, size_t size);
 void* mremap(const FileAttributes& file, size_t file_offset, void* old_addr, size_t old_size, size_t new_size);

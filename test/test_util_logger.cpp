@@ -25,6 +25,7 @@
 #include <realm/binary_data.hpp>
 
 #include "test.hpp"
+#include "realm/util/file_mapper.hpp"
 
 using namespace realm;
 
@@ -59,9 +60,51 @@ using namespace realm;
 
 namespace {
 
+TEST(Util_MMap_Logging)
+{
+    auto expect_range = [&](std::string log, char* begin, char* end) {
+        std::stringstream search_for;
+        search_for << std::hex << (size_t)begin << " - " << (size_t)end;
+        auto s_string = search_for.str();
+        if (log.find(s_string) == std::string::npos) {
+            std::cout << "Substring '" << s_string << "' not found!   ...in:" << std::endl;
+            std::cout << log;
+        }
+        CHECK_NOT_EQUAL(log.find(s_string), std::string::npos);
+    };
+    std::stringstream stream;
+    auto logger = std::make_shared<util::StreamLogger>(stream);
+    util::Logger::set_default_logger(logger);
+    util::File f;
+    f.open("test.test", util::File::mode_Write);
+    // single mapping
+    char* singular = (char*)f.map("singular", util::File::access_ReadWrite, 1024);
+
+    // neighbouring mappings are unified
+    char* addr = (char*)util::mmap_anon(16384, "memory");
+    util::munmap(addr + 4096, 4096);
+    util::mmap_fixed({-1, "", "memory 2", util::File::access_ReadWrite, nullptr}, addr + 4096, 4096, 0);
+
+    char* first = (char*)f.map("first", util::File::access_ReadWrite, 4096, 0, 16384);
+    char* second = (char*)f.map("second", util::File::access_ReadWrite, 4096, 0, 16384 + 4096);
+    try {
+        // this will fail and throw -- then caught below
+        f.map("failing", util::File::access_ReadWrite, -1);
+    }
+    catch (...) {
+        expect_range(stream.str(), addr, addr + 4096);
+        expect_range(stream.str(), addr + 4096, addr + 8192);
+        expect_range(stream.str(), addr + 8192, addr + 16384);
+        expect_range(stream.str(), singular, singular + 1024);
+        expect_range(stream.str(), first, first + 4096);
+        expect_range(stream.str(), second, second + 4096);
+        CHECK_EQUAL(stream.str().find("failing"), std::string::npos);
+    }
+}
+
 TEST(Util_Logger_LevelToFromString)
 {
-    auto check = [& test_context = test_context](util::Logger::Level level, const char* name) {
+    auto check = [&test_context = test_context](util::Logger::Level level, const char* name) {
         std::ostringstream out;
         out.imbue(std::locale::classic());
         out << level;
@@ -318,7 +361,9 @@ TEST(Util_Logger_ThreadSafe)
     const int num_threads = 8;
     std::unique_ptr<test_util::ThreadWrapper[]> threads(new test_util::ThreadWrapper[num_threads]);
     for (int i = 0; i < num_threads; ++i)
-        threads[i].start([&func, i] { func(i); });
+        threads[i].start([&func, i] {
+            func(i);
+        });
     for (int i = 0; i < num_threads; ++i)
         CHECK_NOT(threads[i].join());
 
