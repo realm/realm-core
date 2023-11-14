@@ -30,6 +30,7 @@ ArrayInteger::ArrayInteger(Allocator& allocator) noexcept
     , m_array_flex(*this)
 {
     m_is_inner_bptree_node = false;
+    name = "Flex";
 }
 
 Mixed ArrayInteger::get_any(size_t ndx) const

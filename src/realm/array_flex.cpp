@@ -317,3 +317,9 @@ size_t ArrayFlex::byte_size() const
     }
     REALM_UNREACHABLE();
 }
+
+char* ArrayFlex::get_encode_header()
+{
+    REALM_ASSERT(is_attached());
+    return Node::get_header_from_data(m_data);
+}

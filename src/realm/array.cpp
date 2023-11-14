@@ -368,18 +368,64 @@ size_t Array::get_byte_size() const noexcept
     return num_bytes;
 }
 
+ref_type Array::write(_impl::ArrayWriterBase& out, bool deep, bool only_if_modified) const
+{
+    REALM_ASSERT(is_attached());
+
+    std::cout << "Array name = " << name << std::endl;
+
+    if (only_if_modified && m_alloc.is_read_only(m_ref))
+        return m_ref;
+
+    if (!deep || !m_has_refs) {
+        // this is not compressing anymore somehow the array encoder ref is set to default
+        encode_array();
+        return do_write_shallow(out); // Throws
+    }
+
+    return do_write_deep(out, only_if_modified); // Throws
+}
+
+ref_type Array::write(ref_type ref, Allocator& alloc, _impl::ArrayWriterBase& out, bool only_if_modified,
+                      ArrayEncode& encode)
+{
+    if (only_if_modified && alloc.is_read_only(ref))
+        return ref;
+
+    Array array(alloc, encode);
+    array.init_from_ref(ref);
+    std::cout << "Array name = " << array.name << std::endl;
+
+
+    if (!array.m_has_refs) {
+        array.encode_array();
+        return array.do_write_shallow(out); // Throws
+    }
+
+    return array.do_write_deep(out, only_if_modified); // Throws
+}
+
 
 ref_type Array::do_write_shallow(_impl::ArrayWriterBase& out) const
 {
     // here we might want to compress the array and write down.
-
-    // Write flat array
-    const char* header = get_header_from_data(m_data);
-    size_t byte_size = get_byte_size();
-    uint32_t dummy_checksum = 0x41414141UL;                                // "AAAA" in ASCII
-    ref_type new_ref = out.write_array(header, byte_size, dummy_checksum); // Throws
-    REALM_ASSERT_3(new_ref % 8, ==, 0);                                    // 8-byte alignment
-    return new_ref;
+    if (is_encoded()) {
+        const char* header = m_encode_array.get_encode_header();
+        size_t byte_size = m_encode_array.byte_size();
+        uint32_t dummy_checksum = 0x42424242UL;                                // "BBBB" in ASCII
+        ref_type new_ref = out.write_array(header, byte_size, dummy_checksum); // Throws
+        REALM_ASSERT_3(new_ref % 8, ==, 0);                                    // 8-byte alignment
+        return new_ref;
+    }
+    else {
+        // type A array.
+        const char* header = get_header_from_data(m_data);
+        size_t byte_size = get_byte_size();
+        uint32_t dummy_checksum = 0x41414141UL;                                // "AAAA" in ASCII
+        ref_type new_ref = out.write_array(header, byte_size, dummy_checksum); // Throws
+        REALM_ASSERT_3(new_ref % 8, ==, 0);                                    // 8-byte alignment
+        return new_ref;
+    }
 }
 
 
@@ -389,7 +435,7 @@ ref_type Array::do_write_deep(_impl::ArrayWriterBase& out, bool only_if_modified
     // We need to verify if for encoded arrays we need to do anything special.
 
     // Temp array for updated refs
-    Array new_array(Allocator::get_default());
+    Array new_array(Allocator::get_default(), m_encode_array);
     Type type = m_is_inner_bptree_node ? type_InnerBptreeNode : type_HasRefs;
     new_array.create(type, m_context_flag); // Throws
     _impl::ShallowArrayDestroyGuard dg(&new_array);
@@ -401,7 +447,7 @@ ref_type Array::do_write_deep(_impl::ArrayWriterBase& out, bool only_if_modified
         bool is_ref = (value != 0 && (value & 1) == 0);
         if (is_ref) {
             ref_type subref = to_ref(value);
-            ref_type new_subref = write(subref, m_alloc, out, only_if_modified); // Throws
+            ref_type new_subref = write(subref, m_alloc, out, only_if_modified, m_encode_array); // Throws
             value = from_ref(new_subref);
         }
         new_array.add(value); // Throws

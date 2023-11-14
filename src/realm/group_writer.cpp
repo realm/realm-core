@@ -31,6 +31,7 @@
 #include <realm/metrics/metric_timer.hpp>
 #include <realm/util/miscellaneous.hpp>
 #include <realm/util/safe_int_ops.hpp>
+#include <realm/array_encode.hpp>
 
 using namespace realm;
 using namespace realm::util;
@@ -687,7 +688,10 @@ ref_type GroupWriter::write_group()
     if (top.size() > Group::s_hist_ref_ndx) {
         if (ref_type history_ref = top.get_as_ref(Group::s_hist_ref_ndx)) {
             Allocator& alloc = top.get_alloc();
-            ref_type new_history_ref = Array::write(history_ref, alloc, *writer, only_if_modified); // Throws
+            // DummyArrayEncode dummy_encode;
+
+            ref_type new_history_ref =
+                Array::write(history_ref, alloc, *writer, only_if_modified, top.m_encode_array);    // Throws
             top.set(Group::s_hist_ref_ndx, from_ref(new_history_ref));                              // Throws
         }
     }

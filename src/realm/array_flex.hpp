@@ -42,6 +42,7 @@ public:
     int64_t get(size_t) const final override;
     MemRef get_mem_ref() const final override;
     size_t byte_size() const final override;
+    char* get_encode_header() final override;
 
 private:
     bool try_encode(std::vector<int64_t>&, std::vector<size_t>&);

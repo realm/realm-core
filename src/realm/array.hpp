@@ -87,6 +87,9 @@ public:
 };
 
 class Array : public Node, public ArrayParent {
+protected:
+    const char* name = "Dummy";
+
 public:
     /// Create an array accessor in the unattached state.
     explicit Array(Allocator& allocator) noexcept;
@@ -389,7 +392,7 @@ public:
 
     /// Same as non-static write() with `deep` set to true. This is for the
     /// cases where you do not already have an array accessor available.
-    static ref_type write(ref_type, Allocator&, _impl::ArrayWriterBase&, bool only_if_modified);
+    static ref_type write(ref_type, Allocator&, _impl::ArrayWriterBase&, bool only_if_modified, ArrayEncode& encode);
 
     size_t find_first(int64_t value, size_t begin = 0, size_t end = size_t(-1)) const;
 
@@ -810,35 +813,6 @@ inline void Array::destroy_deep() noexcept
     char* header = get_header_from_data(m_data);
     m_alloc.free_(m_ref, header);
     m_data = nullptr;
-}
-
-inline ref_type Array::write(_impl::ArrayWriterBase& out, bool deep, bool only_if_modified) const
-{
-    REALM_ASSERT(is_attached());
-
-    encode_array();
-
-    if (only_if_modified && m_alloc.is_read_only(m_ref))
-        return m_ref;
-
-    if (!deep || !m_has_refs)
-        return do_write_shallow(out); // Throws
-
-    return do_write_deep(out, only_if_modified); // Throws
-}
-
-inline ref_type Array::write(ref_type ref, Allocator& alloc, _impl::ArrayWriterBase& out, bool only_if_modified)
-{
-    if (only_if_modified && alloc.is_read_only(ref))
-        return ref;
-
-    Array array(alloc);
-    array.init_from_ref(ref);
-
-    if (!array.m_has_refs)
-        return array.do_write_shallow(out); // Throws
-
-    return array.do_write_deep(out, only_if_modified); // Throws
 }
 
 inline void Array::add(int_fast64_t value)
