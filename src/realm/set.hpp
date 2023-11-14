@@ -23,15 +23,15 @@
 #include <realm/bplustree.hpp>
 #include <realm/array_key.hpp>
 
-#include <numeric> // std::iota
-
 namespace realm {
 
 class SetBase : public CollectionBase {
 public:
     using CollectionBase::CollectionBase;
+    SetBase(const SetBase& other);
+    SetBase(SetBase&& other) noexcept;
+    SetBase& operator=(const SetBase& other);
 
-    virtual ~SetBase() {}
     virtual SetBasePtr clone() const = 0;
     virtual std::pair<size_t, bool> insert_null() = 0;
     virtual std::pair<size_t, bool> erase_null() = 0;
@@ -40,11 +40,19 @@ public:
 
 protected:
     static constexpr CollectionType s_collection_type = CollectionType::Set;
+    mutable std::unique_ptr<BPlusTreeBase> m_tree;
 
     void insert_repl(Replication* repl, size_t index, Mixed value) const;
     void erase_repl(Replication* repl, size_t index, Mixed value) const;
     void clear_repl(Replication* repl) const;
     static std::vector<Mixed> convert_to_mixed_set(const CollectionBase& rhs);
+    bool do_init_from_parent(ref_type ref, bool allow_create) const;
+
+    REALM_COLD REALM_NORETURN void throw_invalid_null()
+    {
+        throw InvalidArgument(ErrorCodes::PropertyNotNullable,
+                              util::format("Set: %1", CollectionBase::get_property_name()));
+    }
 };
 
 template <class T>
@@ -88,7 +96,7 @@ public:
     {
         const auto current_size = size();
         CollectionBase::validate_index("get()", ndx, current_size);
-        return m_tree->get(ndx);
+        return tree().get(ndx);
     }
 
     iterator begin() const noexcept
@@ -164,43 +172,11 @@ public:
 
     const BPlusTree<T>& get_tree() const
     {
-        return *m_tree;
+        return tree();
     }
 
-    UpdateStatus update_if_needed_with_status() const final
-    {
-        auto status = Base::get_update_status();
-        switch (status) {
-            case UpdateStatus::Detached: {
-                m_tree.reset();
-                return UpdateStatus::Detached;
-            }
-            case UpdateStatus::NoChange:
-                if (m_tree && m_tree->is_attached()) {
-                    return UpdateStatus::NoChange;
-                }
-                // The tree has not been initialized yet for this accessor, so
-                // perform lazy initialization by treating it as an update.
-                [[fallthrough]];
-            case UpdateStatus::Updated: {
-                bool attached = init_from_parent(false);
-                Base::update_content_version();
-                return attached ? UpdateStatus::Updated : UpdateStatus::Detached;
-            }
-        }
-        REALM_UNREACHABLE();
-    }
-
-    void ensure_created()
-    {
-        if (Base::should_update() || !(m_tree && m_tree->is_attached())) {
-            // When allow_create is true, init_from_parent will always succeed
-            // In case of errors, an exception is thrown.
-            constexpr bool allow_create = true;
-            init_from_parent(allow_create); // Throws
-            Base::update_content_version();
-        }
-    }
+    UpdateStatus update_if_needed_with_status() const final;
+    void ensure_created();
 
     void migrate();
     void migration_resort();
@@ -210,46 +186,17 @@ private:
     // `ObjCollectionBase::get_mutable_tree()`.
     friend class LnkSet;
 
-    // BPlusTree must be wrapped in an `std::unique_ptr` because it is not
-    // default-constructible, due to its `Allocator&` member.
-    mutable std::unique_ptr<BPlusTree<T>> m_tree;
-
     using Base::bump_content_version;
     using Base::get_alloc;
     using Base::m_col_key;
     using Base::m_nullable;
 
-    bool init_from_parent(bool allow_create) const
+    BPlusTree<T>& tree() const
     {
-        if (!m_tree) {
-            m_tree.reset(new BPlusTree<T>(get_alloc()));
-            const ArrayParent* parent = this;
-            m_tree->set_parent(const_cast<ArrayParent*>(parent), 0);
-        }
-        try {
-            auto ref = Base::get_collection_ref();
-            if (ref) {
-                m_tree->init_from_ref(ref);
-            }
-            else {
-                if (m_tree->init_from_parent()) {
-                    // All is well
-                    return true;
-                }
-                if (!allow_create) {
-                    return false;
-                }
-                // The ref in the column was NULL, create the tree in place.
-                m_tree->create();
-                REALM_ASSERT(m_tree->is_attached());
-            }
-        }
-        catch (...) {
-            m_tree->detach();
-            throw;
-        }
-        return true;
+        return static_cast<BPlusTree<T>&>(*m_tree);
     }
+
+    bool init_from_parent(bool allow_create) const;
 
     /// Update the accessor and return true if it is attached after the update.
     inline bool update() const
@@ -450,7 +397,7 @@ private:
 
     BPlusTree<ObjKey>* get_mutable_tree() const final
     {
-        return m_set.m_tree.get();
+        return &m_set.tree();
     }
 };
 
@@ -566,6 +513,29 @@ struct SetElementEquals<Mixed> {
     }
 };
 
+inline SetBase::SetBase(const SetBase& other)
+    : CollectionBase(other)
+{
+    // Note: does not copy m_tree and instead that's initialized on demand
+}
+
+inline SetBase::SetBase(SetBase&& other) noexcept
+    : CollectionBase(std::move(other))
+    , m_tree(std::exchange(other.m_tree, nullptr))
+{
+}
+
+inline SetBase& SetBase::operator=(const SetBase& other)
+{
+    if (this != &other) {
+        // Just reset the pointer and rely on init_from_parent() being called
+        // when the accessor is actually used.
+        m_tree.reset();
+    }
+
+    return *this;
+}
+
 template <class T>
 inline Set<T>::Set(const Set& other)
     : Base(static_cast<const Base&>(other))
@@ -578,7 +548,6 @@ inline Set<T>::Set(const Set& other)
 template <class T>
 inline Set<T>::Set(Set&& other) noexcept
     : Base(static_cast<Base&&>(other))
-    , m_tree(std::exchange(other.m_tree, nullptr))
 {
     if (m_tree) {
         m_tree->set_parent(this, 0);
@@ -593,7 +562,6 @@ inline Set<T>& Set<T>::operator=(const Set& other)
     if (this != &other) {
         // Just reset the pointer and rely on init_from_parent() being called
         // when the accessor is actually used.
-        m_tree.reset();
         Base::reset_content_version();
     }
 
@@ -606,7 +574,6 @@ inline Set<T>& Set<T>::operator=(Set&& other) noexcept
     Base::operator=(static_cast<Base&&>(other));
 
     if (this != &other) {
-        m_tree = std::exchange(other.m_tree, nullptr);
         if (m_tree) {
             m_tree->set_parent(this, 0);
             // Note: We do not need to call reset_content_version(), because we
@@ -615,6 +582,54 @@ inline Set<T>& Set<T>::operator=(Set&& other) noexcept
     }
 
     return *this;
+}
+
+template <typename T>
+UpdateStatus Set<T>::update_if_needed_with_status() const
+{
+    auto status = Base::get_update_status();
+    switch (status) {
+        case UpdateStatus::Detached: {
+            m_tree.reset();
+            return UpdateStatus::Detached;
+        }
+        case UpdateStatus::NoChange:
+            if (m_tree && tree().is_attached()) {
+                return UpdateStatus::NoChange;
+            }
+            // The tree has not been initialized yet for this accessor, so
+            // perform lazy initialization by treating it as an update.
+            [[fallthrough]];
+        case UpdateStatus::Updated: {
+            bool attached = init_from_parent(false);
+            Base::update_content_version();
+            return attached ? UpdateStatus::Updated : UpdateStatus::Detached;
+        }
+    }
+    REALM_UNREACHABLE();
+}
+
+template <typename T>
+void Set<T>::ensure_created()
+{
+    if (Base::should_update() || !(m_tree && tree().is_attached())) {
+        // When allow_create is true, init_from_parent will always succeed
+        // In case of errors, an exception is thrown.
+        constexpr bool allow_create = true;
+        init_from_parent(allow_create); // Throws
+        Base::update_content_version();
+    }
+}
+
+template <typename T>
+bool Set<T>::init_from_parent(bool allow_create) const
+{
+    if (!m_tree) {
+        m_tree.reset(new BPlusTree<T>(get_alloc()));
+        const ArrayParent* parent = this;
+        m_tree->set_parent(const_cast<ArrayParent*>(parent), 0);
+    }
+    return do_init_from_parent(Base::get_collection_ref(), allow_create);
 }
 
 template <typename U>
@@ -797,7 +812,7 @@ template <class T>
 inline util::Optional<Mixed> Set<T>::min(size_t* return_ndx) const
 {
     if (update()) {
-        return MinHelper<T>::eval(*m_tree, return_ndx);
+        return MinHelper<T>::eval(tree(), return_ndx);
     }
     return MinHelper<T>::not_found(return_ndx);
 }
@@ -806,7 +821,7 @@ template <class T>
 inline util::Optional<Mixed> Set<T>::max(size_t* return_ndx) const
 {
     if (update()) {
-        return MaxHelper<T>::eval(*m_tree, return_ndx);
+        return MaxHelper<T>::eval(tree(), return_ndx);
     }
     return MaxHelper<T>::not_found(return_ndx);
 }
@@ -815,7 +830,7 @@ template <class T>
 inline util::Optional<Mixed> Set<T>::sum(size_t* return_cnt) const
 {
     if (update()) {
-        return SumHelper<T>::eval(*m_tree, return_cnt);
+        return SumHelper<T>::eval(tree(), return_cnt);
     }
     return SumHelper<T>::not_found(return_cnt);
 }
@@ -824,7 +839,7 @@ template <class T>
 inline util::Optional<Mixed> Set<T>::avg(size_t* return_cnt) const
 {
     if (update()) {
-        return AverageHelper<T>::eval(*m_tree, return_cnt);
+        return AverageHelper<T>::eval(tree(), return_cnt);
     }
     return AverageHelper<T>::not_found(return_cnt);
 }
@@ -851,19 +866,19 @@ inline void Set<T>::distinct(std::vector<size_t>& indices, util::Optional<bool> 
 template <class T>
 inline void Set<T>::do_insert(size_t ndx, T value)
 {
-    m_tree->insert(ndx, value);
+    tree().insert(ndx, value);
 }
 
 template <class T>
 inline void Set<T>::do_erase(size_t ndx)
 {
-    m_tree->erase(ndx);
+    tree().erase(ndx);
 }
 
 template <class T>
 inline void Set<T>::do_clear()
 {
-    m_tree->clear();
+    tree().clear();
 }
 
 template <class T>
@@ -1102,7 +1117,7 @@ inline ObjKey LnkSet::get(size_t ndx) const
         throw OutOfBounds(util::format("Invalid index into set: %1", CollectionBase::get_property_name()), ndx,
                           current_size);
     }
-    return m_set.m_tree->get(virtual2real(ndx));
+    return m_set.tree().get(virtual2real(ndx));
 }
 
 inline size_t LnkSet::find(ObjKey value) const

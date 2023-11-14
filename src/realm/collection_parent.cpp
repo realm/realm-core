@@ -223,63 +223,44 @@ SetBasePtr CollectionParent::get_setbase_ptr(ColKey col_key) const
     bool nullable = attr.test(col_attr_Nullable);
 
     switch (table->get_column_type(col_key)) {
-        case type_Int: {
+        case type_Int:
             if (nullable)
                 return std::make_unique<Set<util::Optional<Int>>>(col_key);
-            else
-                return std::make_unique<Set<Int>>(col_key);
-        }
-        case type_Bool: {
+            return std::make_unique<Set<Int>>(col_key);
+        case type_Bool:
             if (nullable)
                 return std::make_unique<Set<util::Optional<Bool>>>(col_key);
-            else
-                return std::make_unique<Set<Bool>>(col_key);
-        }
-        case type_Float: {
+            return std::make_unique<Set<Bool>>(col_key);
+        case type_Float:
             if (nullable)
                 return std::make_unique<Set<util::Optional<Float>>>(col_key);
-            else
-                return std::make_unique<Set<Float>>(col_key);
-        }
-        case type_Double: {
+            return std::make_unique<Set<Float>>(col_key);
+        case type_Double:
             if (nullable)
                 return std::make_unique<Set<util::Optional<Double>>>(col_key);
-            else
-                return std::make_unique<Set<Double>>(col_key);
-        }
-        case type_String: {
+            return std::make_unique<Set<Double>>(col_key);
+        case type_String:
             return std::make_unique<Set<String>>(col_key);
-        }
-        case type_Binary: {
+        case type_Binary:
             return std::make_unique<Set<Binary>>(col_key);
-        }
-        case type_Timestamp: {
+        case type_Timestamp:
             return std::make_unique<Set<Timestamp>>(col_key);
-        }
-        case type_Decimal: {
+        case type_Decimal:
             return std::make_unique<Set<Decimal128>>(col_key);
-        }
-        case type_ObjectId: {
+        case type_ObjectId:
             if (nullable)
                 return std::make_unique<Set<util::Optional<ObjectId>>>(col_key);
-            else
-                return std::make_unique<Set<ObjectId>>(col_key);
-        }
-        case type_UUID: {
+            return std::make_unique<Set<ObjectId>>(col_key);
+        case type_UUID:
             if (nullable)
                 return std::make_unique<Set<util::Optional<UUID>>>(col_key);
-            else
-                return std::make_unique<Set<UUID>>(col_key);
-        }
-        case type_TypedLink: {
+            return std::make_unique<Set<UUID>>(col_key);
+        case type_TypedLink:
             return std::make_unique<Set<ObjLink>>(col_key);
-        }
-        case type_Mixed: {
+        case type_Mixed:
             return std::make_unique<Set<Mixed>>(col_key);
-        }
-        case type_Link: {
+        case type_Link:
             return std::make_unique<LnkSet>(col_key);
-        }
         case type_LinkList:
             break;
     }

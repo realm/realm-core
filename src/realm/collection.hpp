@@ -588,7 +588,8 @@ protected:
 
     CollectionBaseImpl() = default;
     CollectionBaseImpl(const CollectionBaseImpl& other)
-        : m_obj_mem(other.m_obj_mem)
+        : Interface(static_cast<const Interface&>(other))
+        , m_obj_mem(other.m_obj_mem)
         , m_col_parent(other.m_col_parent)
         , m_index(other.m_index)
         , m_col_key(other.m_col_key)
@@ -626,6 +627,7 @@ protected:
 
     CollectionBaseImpl& operator=(const CollectionBaseImpl& other)
     {
+        Interface::operator=(static_cast<const Interface&>(other));
         if (this != &other) {
             m_obj_mem = other.m_obj_mem;
             m_col_parent = other.m_col_parent;
