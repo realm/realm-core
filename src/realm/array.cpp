@@ -308,8 +308,6 @@ void Array::update_from_parent() noexcept
 
 void Array::set_type(Type type)
 {
-    decode_array();
-
     REALM_ASSERT(is_attached());
 
     copy_on_write(); // Throws
@@ -357,8 +355,6 @@ void Array::destroy_children(size_t offset) noexcept
 size_t Array::get_byte_size() const noexcept
 {
     // For compressed arrays this does not make sense anymore.
-    // The size of a compressed array in flex format is
-
     if (m_encode_array.is_encoded()) {
         return m_encode_array.byte_size();
     }
@@ -417,8 +413,6 @@ ref_type Array::do_write_deep(_impl::ArrayWriterBase& out, bool only_if_modified
 
 void Array::move(size_t begin, size_t end, size_t dest_begin)
 {
-    decode_array();
-
     REALM_ASSERT_3(begin, <=, end);
     REALM_ASSERT_3(end, <=, m_size);
     REALM_ASSERT_3(dest_begin, <=, m_size);
@@ -453,8 +447,6 @@ void Array::move(size_t begin, size_t end, size_t dest_begin)
 
 void Array::move(Array& dst, size_t ndx)
 {
-    decode_array();
-
     size_t dest_begin = dst.m_size;
     size_t nb_to_move = m_size - ndx;
     dst.copy_on_write();
@@ -475,12 +467,6 @@ void Array::move(Array& dst, size_t ndx)
 }
 
 void Array::set(size_t ndx, int64_t value)
-{
-    decode_array();
-    set_no_decode(ndx, value);
-}
-
-void Array::set_no_decode(size_t ndx, int64_t value)
 {
     REALM_ASSERT_3(ndx, <, m_size);
     if ((this->*(m_vtable->getter))(ndx) == value)
@@ -524,8 +510,6 @@ void Array::add_positive_local(int64_t value)
 
 size_t Array::blob_size() const noexcept
 {
-    decode_array();
-
     if (get_context_flag()) {
         size_t total_size = 0;
         for (size_t i = 0; i < size(); ++i) {
@@ -541,14 +525,7 @@ size_t Array::blob_size() const noexcept
 
 void Array::insert(size_t ndx, int_fast64_t value)
 {
-    decode_array();
-    insert_no_encoding(ndx, value);
-    encode_array();
-}
-
-void Array::insert_no_encoding(size_t ndx, int_fast64_t value)
-{
-    // REALM_ASSERT_DEBUG(ndx <= m_size);
+    REALM_ASSERT_DEBUG(ndx <= m_size);
     const auto old_width = m_width;
     const auto old_size = m_size;
     const Getter old_getter = m_getter; // Save old getter before potential width expansion
@@ -596,10 +573,20 @@ void Array::insert_no_encoding(size_t ndx, int_fast64_t value)
     }
 }
 
-void Array::truncate(size_t new_size)
+void Array::copy_on_write()
 {
     decode_array();
+    Node::copy_on_write();
+}
 
+void Array::copy_on_write(size_t min_size)
+{
+    decode_array();
+    Node::copy_on_write(min_size);
+}
+
+void Array::truncate(size_t new_size)
+{
     REALM_ASSERT(is_attached());
     REALM_ASSERT_3(new_size, <=, m_size);
 
@@ -624,8 +611,6 @@ void Array::truncate(size_t new_size)
 
 void Array::truncate_and_destroy_children(size_t new_size)
 {
-    decode_array();
-
     REALM_ASSERT(is_attached());
     REALM_ASSERT_3(new_size, <=, m_size);
 
@@ -655,8 +640,6 @@ void Array::truncate_and_destroy_children(size_t new_size)
 
 void Array::do_ensure_minimum_width(int_fast64_t value)
 {
-    // decode_array();
-
     // Make room for the new value
     const size_t width = bit_width(value);
 
@@ -694,6 +677,16 @@ bool Array::decode_array() const
 bool Array::is_encoded() const
 {
     return m_encode_array.is_encoded();
+}
+
+bool Array::try_encode() const
+{
+    return encode_array();
+}
+
+bool Array::try_decode() const
+{
+    return decode_array();
 }
 
 namespace {
@@ -953,7 +946,7 @@ int64_t Array::sum(size_t start, size_t end) const
 
 size_t Array::count(int64_t value) const noexcept
 {
-    // decode_array();
+    // This is not used
     const uint64_t* next = reinterpret_cast<uint64_t*>(m_data);
     size_t value_count = 0;
     const size_t end = m_size;
@@ -1309,7 +1302,6 @@ void Array::update_width_cache_from_header() noexcept
 template <size_t w>
 void Array::get_chunk(size_t ndx, int64_t res[8]) const noexcept
 {
-    decode_array();
     REALM_ASSERT_3(ndx, <, m_size);
     size_t i = 0;
 
@@ -1370,7 +1362,6 @@ void Array::get_chunk(size_t ndx, int64_t res[8]) const noexcept
 template <>
 void Array::get_chunk<0>(size_t ndx, int64_t res[8]) const noexcept
 {
-    decode_array();
     REALM_ASSERT_3(ndx, <, m_size);
     memset(res, 0, sizeof(int64_t) * 8);
 }
@@ -1415,8 +1406,6 @@ void Array::stats(MemStats& stats_dest) const noexcept
 
 void Array::report_memory_usage(MemUsageHandler& handler) const
 {
-    // decode_array();
-
     if (m_has_refs)
         report_memory_usage_2(handler); // Throws
 
@@ -1435,7 +1424,6 @@ void Array::report_memory_usage(MemUsageHandler& handler) const
 
 void Array::report_memory_usage_2(MemUsageHandler& handler) const
 {
-    // decode_array();
     Array subarray(m_alloc);
     for (size_t i = 0; i < m_size; ++i) {
         int_fast64_t value = get(i);
@@ -1473,8 +1461,6 @@ void Array::report_memory_usage_2(MemUsageHandler& handler) const
 void Array::verify() const
 {
 #ifdef REALM_DEBUG
-
-    // decode_array();
 
     REALM_ASSERT(is_attached());
 

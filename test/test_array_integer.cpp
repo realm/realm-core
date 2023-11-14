@@ -39,6 +39,7 @@ TEST(Test_ArrayInt_no_encode)
     a.add(10);
     a.add(11);
     a.add(12);
+    CHECK_NOT(a.try_encode());
     CHECK_NOT(a.is_encoded());
     CHECK(a.get(0) == 10);
     CHECK(a.get(1) == 11);
@@ -52,11 +53,14 @@ TEST(Test_ArrayInt_encode_decode)
     a.add(10);
     a.add(5);
     a.add(5);
+    CHECK(a.try_encode());
     CHECK(a.is_encoded());
+    CHECK(a.try_decode());
+    CHECK_NOT(a.is_encoded());
     a.add(10);
     a.add(15);
+    CHECK_NOT(a.try_encode());
     CHECK_NOT(a.is_encoded()); // compression is not needed in this case.
-    // THis is a problem. Need to understand why...
     CHECK(a.get(0) == 10);
     CHECK(a.get(1) == 5);
     CHECK(a.get(2) == 5);
@@ -77,38 +81,45 @@ TEST(Test_ArrayInt_negative_nums)
     CHECK(a.get(1) == 0);
     CHECK(a.get(2) == 1000000);
     a.add(-1000000);
-    CHECK(a.get(0) == -1000000);
-    CHECK(a.get(1) == 0);
-    CHECK(a.get(2) == 1000000);
-    CHECK(a.get(3) == -1000000);
+    CHECK(a.try_encode());
     CHECK(a.is_encoded());
     CHECK(a.get(0) == -1000000);
     CHECK(a.get(1) == 0);
     CHECK(a.get(2) == 1000000);
     CHECK(a.get(3) == -1000000);
+    CHECK(a.try_decode());
     a.add(0);
+    CHECK(a.try_encode());
     CHECK(a.is_encoded());
     CHECK(a.get(0) == -1000000);
     CHECK(a.get(1) == 0);
     CHECK(a.get(2) == 1000000);
     CHECK(a.get(3) == -1000000);
     CHECK(a.get(4) == 0);
+    CHECK(a.try_decode());
     a.add(1000000);
+    CHECK(a.try_encode());
     CHECK(a.is_encoded());
     CHECK(a.get(0) == -1000000);
     CHECK(a.get(1) == 0);
     CHECK(a.get(2) == 1000000);
+    CHECK(a.try_decode());
     a.add(-1000000);
+    CHECK(a.try_encode());
     CHECK(a.is_encoded());
     CHECK(a.get(0) == -1000000);
     CHECK(a.get(1) == 0);
     CHECK(a.get(2) == 1000000);
+    CHECK(a.try_decode());
     a.add(0);
+    CHECK(a.try_encode());
     CHECK(a.is_encoded());
     CHECK(a.get(0) == -1000000);
     CHECK(a.get(1) == 0);
     CHECK(a.get(2) == 1000000);
+    CHECK(a.try_decode());
     a.add(1000000);
+    CHECK(a.try_encode());
     CHECK(a.is_encoded());
     CHECK(a.size() == 9);
     CHECK(a.is_encoded());
@@ -137,6 +148,7 @@ TEST(Test_ArrayInt_compress_data)
     // Current: [16388:16, 409:16, 16388:16, 16388:16, 409:16, 16388:16], space needed: 6*16 bits = 96 bits +
     // header
     // compress the array is a good option.
+    CHECK(a.try_encode());
     CHECK(a.is_encoded());
     // Compressed: [409:16, 16388:16][1:1,0:1,1:1,1:1,0:1,1:1], space needed: 2*16 bits + 6 * 1 bit = 38 bits +
     // header
@@ -147,8 +159,11 @@ TEST(Test_ArrayInt_compress_data)
     CHECK(a.get(3) == 16388);
     CHECK(a.get(4) == 409);
     CHECK(a.get(5) == 16388);
-    // this automatically decompresses the array and compresses it again.
+    // decompress
+    CHECK(a.try_decode());
     a.add(20);
+    // compress again, it should be a viable option
+    CHECK(a.try_encode());
     CHECK(a.is_encoded());
     CHECK(a.size() == 7);
     CHECK(a.get(0) == 16388);
@@ -158,9 +173,8 @@ TEST(Test_ArrayInt_compress_data)
     CHECK(a.get(4) == 409);
     CHECK(a.get(5) == 16388);
     CHECK(a.get(6) == 20);
-    // compress again.
-    CHECK(a.is_encoded());
-    // array should now be in compressed form
+    CHECK(a.try_decode());
+    CHECK_NOT(a.is_encoded());
     CHECK(a.get(0) == 16388);
     CHECK(a.get(1) == 409);
     CHECK(a.get(2) == 16388);
@@ -185,8 +199,9 @@ TEST(Test_ArrayInt_compress_data_init_from_mem)
     // Current: [16388:16, 409:16, 16388:16, 16388:16, 409:16, 16388:16],
     // space needed: 6*16 bits = 96 bits + header
     // compress the array is a good option (it should already be compressed).
+    CHECK(a.try_encode());
     CHECK(a.is_encoded());
-    //  Array should be in compressed from
+    //  Array should be in compressed form now
     auto mem = a.get_mem();
     ArrayInteger a1(Allocator::get_default());
     a1.init_from_mem(mem); // initialise a1 with a
@@ -201,7 +216,10 @@ TEST(Test_ArrayInt_compress_data_init_from_mem)
     CHECK(a1.get(5) == 16388);
     // decompress a1 and compresses again
     CHECK(a1.is_encoded());
+    CHECK(a1.try_decode());
+    CHECK_NOT(a1.is_encoded());
     a1.add(20);
+    CHECK(a1.try_encode());
     CHECK(a1.is_encoded());
     CHECK(a1.size() == 7);
     CHECK(a1.get(0) == 16388);
@@ -211,15 +229,16 @@ TEST(Test_ArrayInt_compress_data_init_from_mem)
     CHECK(a1.get(4) == 409);
     CHECK(a1.get(5) == 16388);
     CHECK(a1.get(6) == 20);
-    // compress again via a1
-    CHECK(a1.is_encoded());
-    CHECK(a1.get(0) == 16388);
-    CHECK(a1.get(1) == 409);
-    CHECK(a1.get(2) == 16388);
-    CHECK(a1.get(3) == 16388);
-    CHECK(a1.get(4) == 409);
-    CHECK(a1.get(5) == 16388);
-    CHECK(a1.get(6) == 20);
+    CHECK(a1.try_decode());
+    // check a
+    CHECK(a.is_encoded());
+    CHECK(a.size() == 6);
+    CHECK(a.get(0) == 16388);
+    CHECK(a.get(1) == 409);
+    CHECK(a.get(2) == 16388);
+    CHECK(a.get(3) == 16388);
+    CHECK(a.get(4) == 409);
+    CHECK(a.get(5) == 16388);
 
     a1.destroy();
     a.destroy();

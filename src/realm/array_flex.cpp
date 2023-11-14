@@ -139,7 +139,7 @@ bool ArrayFlex::decode()
         m_array.create(NodeHeader::Type::type_Normal);
         size_t i = 0;
         for (const auto& v : values)
-            m_array.insert_no_encoding(i++, v);
+            m_array.insert(i++, v);
         const auto sz = m_array.size();
         REALM_ASSERT(sz == values.size());
         return true;
@@ -269,8 +269,12 @@ bool ArrayFlex::try_encode(std::vector<int64_t>& values, std::vector<size_t>& in
         set_arrayB_num_elements<Encoding::Flex>(addr, indices.size());
         set_elementA_size<Encoding::Flex>(addr, value_bit_width);
         set_elementB_size<Encoding::Flex>(addr, index_bit_width);
-        size_t byte_size = std::max(indices.size() * value_bit_width, initial_capacity + 0);
-        set_capacity_in_header(byte_size, header);
+        const auto width_b_array = value_bit_width + index_bit_width;
+        const auto array_b_capacity = (width_b_array) * (indices.size() + values.size());
+        size_t byte_size = std::max(array_b_capacity, initial_capacity + 0);
+        // need to round up to the next power of 8?
+        auto rounded_byte_size = (byte_size + 7) & (-8);
+        set_capacity_in_header(rounded_byte_size, header);
 
         REALM_ASSERT(indices.size() == sz);
 

@@ -2364,10 +2364,10 @@ ONLY(Group_ArrayCompression_Correctness)
     // Verify that original values are there
     CHECK(*read_table == *table);
 
-    //    #ifdef REALM_DEBUG
-    //         to_disk.verify();
-    //         from_disk.verify();
-    //    #endif
+#ifdef REALM_DEBUG
+    to_disk.verify();
+    from_disk.verify();
+#endif
 }
 
 #endif // TEST_GROUP

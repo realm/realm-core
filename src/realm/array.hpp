@@ -169,7 +169,6 @@ public:
     /// returns false (noexcept:array-set). Note that for a value of zero, the
     /// first criterion is trivially satisfied.
     void set(size_t ndx, int64_t value);
-    void set_no_decode(size_t ndx, int64_t value);
 
     void set_as_ref(size_t ndx, ref_type ref);
 
@@ -464,8 +463,9 @@ public:
     static size_t bit_width(int64_t value);
 
 protected:
-    // for compressed arrays only
-    void insert_no_encoding(size_t ndx, int_fast64_t value);
+    friend class NodeTree;
+    void copy_on_write();
+    void copy_on_write(size_t min_size);
 
     // This returns the minimum value ("lower bound") of the representable values
     // for the given bit width. Valid widths are 0, 1, 2, 4, 8, 16, 32, and 64.
@@ -554,6 +554,8 @@ private:
 
 public:
     bool is_encoded() const;
+    bool try_encode() const;
+    bool try_decode() const;
 
 private:
     friend class Allocator;
@@ -791,7 +793,6 @@ inline bool Array::get_context_flag() const noexcept
 inline void Array::set_context_flag(bool value) noexcept
 {
     if (m_context_flag != value) {
-        decode_array();
         copy_on_write();
         m_context_flag = value;
         set_context_flag_in_header(value, get_header());
@@ -814,6 +815,8 @@ inline void Array::destroy_deep() noexcept
 inline ref_type Array::write(_impl::ArrayWriterBase& out, bool deep, bool only_if_modified) const
 {
     REALM_ASSERT(is_attached());
+
+    encode_array();
 
     if (only_if_modified && m_alloc.is_read_only(m_ref))
         return m_ref;

@@ -1557,7 +1557,6 @@ public:
         if (i_1 != end) {
             while (++i_2 != end) {
                 ref_type prev_ref_end = i_1->ref + i_1->size;
-                std::cout << "Iteration = " << i++ << std::endl;
                 REALM_ASSERT_3(prev_ref_end, <=, i_2->ref);
                 if (i_2->ref == prev_ref_end) { // in-file
                     i_1->size += i_2->size;     // Merge
