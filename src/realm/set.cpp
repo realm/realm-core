@@ -30,7 +30,10 @@
 #include "realm/array_mixed.hpp"
 #include "realm/replication.hpp"
 
+#include <numeric> // std::iota
+
 namespace realm {
+
 
 /********************************** SetBase *********************************/
 
@@ -89,6 +92,32 @@ void CollectionBaseImpl<SetBase>::to_json(std::ostream& out, size_t, JSONOutputM
         out << "}";
 }
 
+bool SetBase::do_init_from_parent(ref_type ref, bool allow_create) const
+{
+    try {
+        if (ref) {
+            m_tree->init_from_ref(ref);
+        }
+        else {
+            if (m_tree->init_from_parent()) {
+                // All is well
+                return true;
+            }
+            if (!allow_create) {
+                return false;
+            }
+            // The ref in the column was NULL, create the tree in place.
+            m_tree->create();
+            REALM_ASSERT(m_tree->is_attached());
+        }
+    }
+    catch (...) {
+        m_tree->detach();
+        throw;
+    }
+    return true;
+}
+
 /********************************* Set<Key> *********************************/
 
 template <>
@@ -97,9 +126,9 @@ void Set<ObjKey>::do_insert(size_t ndx, ObjKey target_key)
     auto origin_table = get_table_unchecked();
     auto target_table_key = origin_table->get_opposite_table_key(m_col_key);
     set_backlink(m_col_key, {target_table_key, target_key});
-    m_tree->insert(ndx, target_key);
+    tree().insert(ndx, target_key);
     if (target_key.is_unresolved()) {
-        m_tree->set_context_flag(true);
+        tree().set_context_flag(true);
     }
 }
 
@@ -113,7 +142,7 @@ void Set<ObjKey>::do_erase(size_t ndx)
 
     bool recurse = remove_backlink(m_col_key, {target_table_key, old_key}, state);
 
-    m_tree->erase(ndx);
+    tree().erase(ndx);
 
     if (recurse) {
         _impl::TableFriend::remove_recursive(*origin_table, state); // Throws
@@ -123,7 +152,7 @@ void Set<ObjKey>::do_erase(size_t ndx)
 
         // FIXME: Exploit the fact that the values are sorted and unresolved
         // keys have a negative value.
-        _impl::check_for_last_unresolved(m_tree.get());
+        _impl::check_for_last_unresolved(&tree());
     }
 }
 
@@ -135,14 +164,14 @@ void Set<ObjKey>::do_clear()
         do_erase(ndx);
     }
 
-    m_tree->set_context_flag(false);
+    tree().set_context_flag(false);
 }
 
 template <>
 void Set<ObjLink>::do_insert(size_t ndx, ObjLink target_link)
 {
     set_backlink(m_col_key, target_link);
-    m_tree->insert(ndx, target_link);
+    tree().insert(ndx, target_link);
 }
 
 template <>
@@ -153,7 +182,7 @@ void Set<ObjLink>::do_erase(size_t ndx)
 
     bool recurse = remove_backlink(m_col_key, old_link, state);
 
-    m_tree->erase(ndx);
+    tree().erase(ndx);
 
     if (recurse) {
         auto table = get_table_unchecked();
@@ -170,7 +199,7 @@ void Set<Mixed>::do_insert(size_t ndx, Mixed value)
         get_table_unchecked()->get_parent_group()->validate(target_link);
         set_backlink(m_col_key, target_link);
     }
-    m_tree->insert(ndx, value);
+    tree().insert(ndx, value);
 }
 
 template <>
@@ -183,7 +212,7 @@ void Set<Mixed>::do_erase(size_t ndx)
                                                                   : CascadeState::Mode::Strong);
         bool recurse = remove_backlink(m_col_key, old_link, state);
 
-        m_tree->erase(ndx);
+        tree().erase(ndx);
 
         if (recurse) {
             auto table = get_table_unchecked();
@@ -191,7 +220,7 @@ void Set<Mixed>::do_erase(size_t ndx)
         }
     }
     else {
-        m_tree->erase(ndx);
+        tree().erase(ndx);
     }
 }
 
@@ -210,17 +239,17 @@ void Set<Mixed>::migrate()
     // We should just move all string values to be before the binary values
     size_t first_binary = size();
     for (size_t n = 0; n < size(); n++) {
-        if (m_tree->get(n).is_type(type_Binary)) {
+        if (tree().get(n).is_type(type_Binary)) {
             first_binary = n;
             break;
         }
     }
 
     for (size_t n = first_binary; n < size(); n++) {
-        if (m_tree->get(n).is_type(type_String)) {
-            m_tree->insert(first_binary, Mixed());
-            m_tree->swap(n + 1, first_binary);
-            m_tree->erase(n + 1);
+        if (tree().get(n).is_type(type_String)) {
+            tree().insert(first_binary, Mixed());
+            tree().swap(n + 1, first_binary);
+            tree().erase(n + 1);
             first_binary++;
         }
     }
@@ -243,7 +272,7 @@ void Set<T>::do_resort(size_t start, size_t end)
     });
     for (size_t i = 0; i < indices.size(); ++i) {
         if (indices[i] != i) {
-            m_tree->swap(i + start, start + indices[i]);
+            tree().swap(i + start, start + indices[i]);
             auto it = std::find(indices.begin() + i, indices.end(), i);
             REALM_ASSERT(it != indices.end());
             *it = indices[i];
@@ -288,7 +317,7 @@ void LnkSet::remove_target_row(size_t link_ndx)
 void LnkSet::remove_all_target_rows()
 {
     if (m_set.update()) {
-        _impl::TableFriend::batch_erase_rows(*get_target_table(), *m_set.m_tree);
+        _impl::TableFriend::batch_erase_rows(*get_target_table(), m_set.tree());
     }
 }
 
