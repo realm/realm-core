@@ -5053,7 +5053,6 @@ TEST_CASE("C API: nested collections", "[c_api]") {
             auto dict = cptr_checked(realm_get_dictionary(obj1.get(), foo_any_col_key));
             auto nlist = cptr_checked(realm_dictionary_insert_list(dict.get(), rlm_str_val("A")));
             auto ndict = cptr_checked(realm_dictionary_insert_dictionary(dict.get(), rlm_str_val("B")));
-            auto nset = cptr_checked(realm_dictionary_insert_set(dict.get(), rlm_str_val("C")));
 
             // verify that we can fetch a collection from a result of mixed
             auto results = cptr_checked(realm_dictionary_to_results(dict.get()));
@@ -5065,17 +5064,12 @@ TEST_CASE("C API: nested collections", "[c_api]") {
             REQUIRE(val.type == RLM_TYPE_LIST);
             realm_results_get(results.get(), 1, &val);
             REQUIRE(val.type == RLM_TYPE_DICTIONARY);
-            realm_results_get(results.get(), 2, &val);
-            REQUIRE(val.type == RLM_TYPE_SET);
             auto result_list = cptr_checked(realm_results_get_list(results.get(), 0));
             REQUIRE(result_list);
             REQUIRE(result_list->size() == nlist->size());
             auto result_dictionary = cptr_checked(realm_results_get_dictionary(results.get(), 1));
             REQUIRE(result_dictionary);
             REQUIRE(result_dictionary->size() == ndict->size());
-            auto result_set = cptr_checked(realm_results_get_set(results.get(), 2));
-            REQUIRE(result_set);
-            REQUIRE(result_set->size() == nset->size());
         }
         SECTION("list") {
             REQUIRE(realm_set_list(obj1.get(), foo_any_col_key));
@@ -5085,7 +5079,6 @@ TEST_CASE("C API: nested collections", "[c_api]") {
             auto list = cptr_checked(realm_get_list(obj1.get(), foo_any_col_key));
             auto nlist = cptr_checked(realm_list_insert_list(list.get(), 0));
             auto ndict = cptr_checked(realm_list_insert_dictionary(list.get(), 1));
-            auto nset = cptr_checked(realm_list_insert_set(list.get(), 2));
 
             // verify that we can fetch a collection from a result of mixed
             auto results = cptr_checked(realm_list_to_results(list.get()));
@@ -5097,17 +5090,12 @@ TEST_CASE("C API: nested collections", "[c_api]") {
             REQUIRE(val.type == RLM_TYPE_LIST);
             realm_results_get(results.get(), 1, &val);
             REQUIRE(val.type == RLM_TYPE_DICTIONARY);
-            realm_results_get(results.get(), 2, &val);
-            REQUIRE(val.type == RLM_TYPE_SET);
             auto result_list = cptr_checked(realm_results_get_list(results.get(), 0));
             REQUIRE(result_list);
             REQUIRE(result_list->size() == nlist->size());
             auto result_dictionary = cptr_checked(realm_results_get_dictionary(results.get(), 1));
             REQUIRE(result_dictionary);
             REQUIRE(result_dictionary->size() == ndict->size());
-            auto result_set = cptr_checked(realm_results_get_set(results.get(), 2));
-            REQUIRE(result_set);
-            REQUIRE(result_set->size() == nset->size());
         }
     }
 
@@ -5166,19 +5154,6 @@ TEST_CASE("C API: nested collections", "[c_api]") {
         });
         CHECK(user_data.deletions == 2);
         CHECK(user_data.was_deleted);
-
-        checked(realm_begin_write(realm));
-        // dict -> set
-        auto set = cptr_checked(realm_dictionary_insert_set(dict.get(), rlm_str_val("Leaf-Set")));
-        bool inserted;
-        size_t index;
-        realm_set_insert(set.get(), rlm_str_val("Set-Hello"), &index, &inserted);
-        CHECK(index == 0);
-        CHECK(inserted);
-        size_t size;
-        checked(realm_dictionary_size(dict.get(), &size));
-        REQUIRE(size == 4);
-        checked(realm_commit(realm));
     }
 
     SECTION("list") {
@@ -5235,18 +5210,6 @@ TEST_CASE("C API: nested collections", "[c_api]") {
         });
         CHECK(user_data.deletions == 2);
         CHECK(user_data.was_deleted);
-
-        // list -> set
-        checked(realm_begin_write(realm));
-        auto set = cptr_checked(realm_list_insert_set(list.get(), 3));
-        bool inserted;
-        size_t index;
-        realm_set_insert(set.get(), rlm_str_val("Set-Hello"), &index, &inserted);
-        CHECK(index == 0);
-        CHECK(inserted);
-        size_t size;
-        checked(realm_list_size(list.get(), &size));
-        REQUIRE(size == 5);
     }
 
     SECTION("set list for collection in mixed, verify that previous reference is invalid") {
@@ -5273,18 +5236,15 @@ TEST_CASE("C API: nested collections", "[c_api]") {
         REQUIRE(realm_dictionary_insert(n_dict.get(), key, val, &ndx, &inserted));
         REQUIRE(ndx == 0);
         REQUIRE(inserted);
-        auto n_set = cptr_checked(realm_list_set_set(list.get(), 0));
+
+        CHECK(realm_list_set(list.get(), 0, rlm_int_val(5)));
         // accessor invalid
         REQUIRE(!realm_dictionary_insert(n_dict.get(), key, val, &ndx, &inserted));
         CHECK_ERR(RLM_ERR_INVALIDATED_OBJECT);
-        n_set = cptr_checked(realm_list_get_set(list.get(), 0));
-        REQUIRE(realm_set_insert(n_set.get(), val, &ndx, &inserted));
-        REQUIRE(ndx == 0);
-        REQUIRE(inserted);
+        realm_value_t out;
+        CHECK(realm_list_get(list.get(), 0, &out));
+
         n_list = cptr_checked(realm_list_set_list(list.get(), 0));
-        // accessor invalid
-        REQUIRE(!realm_set_insert(n_set.get(), val, &ndx, &inserted));
-        CHECK_ERR(RLM_ERR_INVALIDATED_OBJECT);
         // get a list should work
         n_list = cptr_checked(realm_list_get_list(list.get(), 0));
         REQUIRE(realm_list_insert(n_list.get(), 0, rlm_str_val("Test1")));
@@ -5296,35 +5256,10 @@ TEST_CASE("C API: nested collections", "[c_api]") {
         REQUIRE(size == 2);
     }
 
-    SECTION("set") {
-        REQUIRE(realm_set_set(obj1.get(), foo_any_col_key));
-        realm_value_t value;
-        realm_get_value(obj1.get(), foo_any_col_key, &value);
-        REQUIRE(value.type == RLM_TYPE_SET);
-        auto set = cptr_checked(realm_get_set(obj1.get(), foo_any_col_key));
-        size_t index;
-        bool inserted = false;
-        REQUIRE(realm_set_insert(set.get(), rlm_str_val("Hello"), &index, &inserted));
-        CHECK(index == 0);
-        CHECK(inserted);
-        REQUIRE(realm_set_insert(set.get(), rlm_int_val(42), &index, &inserted));
-        CHECK(index == 0);
-        CHECK(inserted);
-        size_t size;
-        checked(realm_set_size(set.get(), &size));
-        REQUIRE(size == 2);
-        checked(realm_set_get(set.get(), 0, &value));
-        CHECK(value.type == RLM_TYPE_INT);
-        CHECK(value.integer == 42);
-        checked(realm_set_get(set.get(), 1, &value));
-        CHECK(value.type == RLM_TYPE_STRING);
-        CHECK(strncmp(value.string.data, "Hello", value.string.size) == 0);
-    }
-
     SECTION("json") {
         REQUIRE(realm_set_json(
             obj1.get(), foo_any_col_key,
-            "[{\"Seven\":7, \"Six\":6}, \"Hello\", {\"Points\": [1.25, 4.5, 6.75], \"Hello\": \"World\"}]"));
+            R"( [ { "Seven":7, "Six":6 }, "Hello", { "Points": [1.25, 4.5, 6.75], "Hello": "World" } ])"));
         realm_value_t value;
         realm_get_value(obj1.get(), foo_any_col_key, &value);
         REQUIRE(value.type == RLM_TYPE_LIST);

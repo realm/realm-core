@@ -4243,12 +4243,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 auto n_dict = list.get_dictionary(2);
                 n_dict.insert("Test", Mixed{"10"});
                 n_dict.insert("Test1", Mixed{10});
-                // List<Set<Mixed>>
-                list.insert_collection(3, CollectionType::Set);
-                auto n_set = list.get_set(3);
-                n_set.insert(Mixed{"Hello"});
-                n_set.insert(Mixed{"World"});
-                REQUIRE(list.size() == 4);
+                REQUIRE(list.size() == 3);
                 REQUIRE(table->size() == 1);
             })
             ->on_post_reset([&](SharedRealm local) {
@@ -4269,10 +4264,6 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 REQUIRE(n_dict.size() == 2);
                 REQUIRE(n_dict.get<Mixed>("Test").get_string() == "10");
                 REQUIRE(n_dict.get<Mixed>("Test1").get_int() == 10);
-                auto n_set = list.get_set(3);
-                REQUIRE(n_set.size() == 2);
-                REQUIRE(n_set.find_any("Hello") == 0);
-                REQUIRE(n_set.find_any("World") == 1);
             })
             ->run();
     }
@@ -4303,12 +4294,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 auto n_dict = dict.get_dictionary("Dict");
                 n_dict.insert("Test", Mixed{"10"});
                 n_dict.insert("Test1", Mixed{10});
-                // List<Set<Mixed>>
-                dict.insert_collection("Set", CollectionType::Set);
-                auto n_set = dict.get_set("Set");
-                n_set.insert(Mixed{"Hello"});
-                n_set.insert(Mixed{"World"});
-                REQUIRE(dict.size() == 4);
+                REQUIRE(dict.size() == 3);
                 REQUIRE(table->size() == 1);
             })
             ->on_post_reset([&](SharedRealm local) {
@@ -4329,10 +4315,6 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 REQUIRE(n_dict.size() == 2);
                 REQUIRE(n_dict.get<Mixed>("Test").get_string() == "10");
                 REQUIRE(n_dict.get<Mixed>("Test1").get_int() == 10);
-                auto n_set = dict.get_set("Set");
-                REQUIRE(n_set.size() == 2);
-                REQUIRE(n_set.find_any("Hello") == 0);
-                REQUIRE(n_set.find_any("World") == 1);
             })
             ->run();
     }

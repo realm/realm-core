@@ -92,11 +92,10 @@ TEST_CASE("nested dictionary in mixed", "[dictionary]") {
 
     write([&] {
         dict_mixed.insert_collection("list", CollectionType::List);
-        dict_mixed.insert_collection("set", CollectionType::Set);
         dict_mixed.insert_collection("dictionary", CollectionType::Dictionary);
     });
 
-    REQUIRE(change_dictionary.insertions.count() == 3);
+    REQUIRE(change_dictionary.insertions.count() == 2);
 
     auto list = dict_mixed.get_list("list");
 
@@ -189,11 +188,6 @@ TEST_CASE("nested dictionary in mixed", "[dictionary]") {
         REQUIRE(val.is_type(type_List));
         auto list = results.get_list(1);
         REQUIRE(list.is_valid());
-
-        val = results.get<Mixed>(2);
-        REQUIRE(val.is_type(type_Set));
-        auto set = results.get_set(2);
-        REQUIRE(set.is_valid());
     }
 }
 

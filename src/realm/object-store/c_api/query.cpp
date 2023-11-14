@@ -421,17 +421,6 @@ RLM_API realm_list_t* realm_results_get_list(realm_results_t* results, size_t in
     });
 }
 
-RLM_API realm_set_t* realm_results_get_set(realm_results_t* results, size_t index)
-{
-    return wrap_err([&]() {
-        realm_set_t* out = nullptr;
-        auto result_set = results->get_set(index);
-        if (result_set.is_valid())
-            out = new realm_set_t{result_set};
-        return out;
-    });
-}
-
 RLM_API realm_dictionary_t* realm_results_get_dictionary(realm_results_t* results, size_t index)
 {
     return wrap_err([&]() {
