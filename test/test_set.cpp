@@ -751,6 +751,8 @@ TEST(Set_Difference)
     Group g;
     auto foos = g.add_table("class_Foo");
     ColKey col_set = foos->add_column_set(type_Int, "int set");
+    ColKey col_set_bin = foos->add_column_set(type_Binary, "bin set");
+    ColKey col_set_str = foos->add_column_set(type_String, "str set");
     ColKey col_list = foos->add_column_list(type_Int, "int list");
 
     auto obj1 = foos->create_object();
@@ -781,6 +783,37 @@ TEST(Set_Difference)
     CHECK_EQUAL(set1.size(), 2);
     CHECK_EQUAL(set1.get(0), 2);
     CHECK_EQUAL(set1.get(1), 3);
+
+    auto set3 = obj1.get_set<BinaryData>(col_set_bin);
+    auto set4 = obj2.get_set<BinaryData>(col_set_bin);
+
+    char buffer[5];
+    auto gen_bin = [&](char c) {
+        for (auto& b : buffer) {
+            b = c;
+        }
+        return BinaryData(buffer, 5);
+    };
+    for (int64_t x : {1, 2}) {
+        set3.insert(gen_bin(x));
+    }
+    for (int64_t x : {255, 1, 2, 3, 2}) {
+        set4.insert(gen_bin(x));
+    }
+    set3.assign_difference(set4);
+    CHECK_EQUAL(set3.size(), 0);
+
+    auto set5 = obj1.get_set<StringData>(col_set_str);
+    auto set6 = obj2.get_set<StringData>(col_set_str);
+
+    for (const char* x : {"Apple", "Banana"}) {
+        set5.insert(x);
+    }
+    for (const char* x : {"Æbler", "Apple", "Banana", "Citrus", "Dade"}) {
+        set6.insert(x);
+    }
+    set5.assign_difference(set6);
+    CHECK_EQUAL(set5.size(), 0);
 }
 
 TEST(Set_SymmetricDifference)
