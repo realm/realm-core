@@ -1457,7 +1457,7 @@ buildvariants:
     cmake_build_type: RelWithDebInfo
     run_with_encryption: On
     baas_admin_port: 9098
-    test_logging_level: trace
+    test_logging_level: debug
     test_timeout_extra: 60
     proxy_toxics_file: evergreen/proxy-nonideal-transfer.toxics
     # RANDOM1: bandwidth-upstream limited to between 10-50 KB/s from the client to the server
@@ -1479,7 +1479,7 @@ buildvariants:
     cmake_build_type: RelWithDebInfo
     run_with_encryption: On
     baas_admin_port: 9098
-    test_logging_level: trace
+    test_logging_level: debug
     proxy_toxics_file: evergreen/proxy-network-faults.toxics
     # RANDOM1: limit-data-upstream to close connection after between 1000-3000 bytes have been sent
     # RANDOM2: limit-data-downstream to close connection after between 1000-3000 bytes have been received
