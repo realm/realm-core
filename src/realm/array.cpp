@@ -265,12 +265,9 @@ void Array::init_from_mem(MemRef mem) noexcept
 {
     char* header = mem.get_addr();
     auto kind = get_kind((uint64_t*)header);
-    bool old_style = true;
-    // if (kind != 'A' && kind != 'B')
-    //    set_kind((uint64_t*)header, 'A');
     // be sure that the node is either A or B
     REALM_ASSERT(kind == 'A' || kind == 'B');
-    old_style = kind == 'A';
+    bool old_style = kind == 'A';
 
     header = Node::init_from_mem(mem);
     // Parse header

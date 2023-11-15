@@ -230,16 +230,24 @@ TEST(Test_ArrayInt_compress_data_init_from_mem)
     CHECK(a1.get(5) == 16388);
     CHECK(a1.get(6) == 20);
     CHECK(a1.try_decode());
-    // check a
-    CHECK(a.is_encoded());
-    CHECK(a.size() == 6);
-    CHECK(a.get(0) == 16388);
-    CHECK(a.get(1) == 409);
-    CHECK(a.get(2) == 16388);
-    CHECK(a.get(3) == 16388);
-    CHECK(a.get(4) == 409);
-    CHECK(a.get(5) == 16388);
+    // a now is in some sort of bad state, this is happening because we are using a different array for compressing.
+    // so a.flex_array is still attached (m_data is not null) whereas a1.flex_array is not.
+    // But when we query to header for getting the type of
+    // the compressed array we read a bad value, since the memory is freed and memory may or may not be there.
+    // So A is not in a unsuable state and needs to be destroyed.
 
+    //    CHECK(a.try_decode());
+    //    CHECK_NOT(a.is_encoded());
+    //    CHECK(a.size() == 7);
+    //    CHECK(a.get(0) == 16388);
+    //    CHECK(a.get(1) == 409);
+    //    CHECK(a.get(2) == 16388);
+    //    CHECK(a.get(3) == 16388);
+    //    CHECK(a.get(4) == 409);
+    //    CHECK(a.get(5) == 16388);
+    //    CHECK(a1.get(6) == 20);
+
+    // destroy either a1 or a, the same memory should be freed
     a1.destroy();
     a.destroy();
     // this is something to clarify, should we deep copy the encoded array duting init_from_mem?

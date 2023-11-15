@@ -38,44 +38,25 @@ ArrayFlex::ArrayFlex(Array& array)
 
 void ArrayFlex::init_array_encode(MemRef mem)
 {
-    auto src_header = mem.get_addr();
-    auto src_data = get_data_from_header(src_header);
-
-    auto value_size = NodeHeader::get_arrayA_num_elements<Encoding::Flex>((uint64_t*)src_header);
-    auto index_size = NodeHeader::get_arrayB_num_elements<Encoding::Flex>((uint64_t*)src_header);
-    auto value_width = NodeHeader::get_elementA_size<Encoding::Flex>((uint64_t*)src_header);
-    auto index_width = NodeHeader::get_elementB_size<Encoding::Flex>((uint64_t*)src_header);
-
-    // build a new compressed header
-
-
-    create(Type::type_Normal);
-    auto dst_header = Array::get_header();
+    // array flex is just a view around the memory that has been passed.
+    // so the memory does not need to be copied. We need to still only the information that is required
+    // for this array to interpret the memory.
+    Node::init_from_mem(mem);
     using Encoding = NodeHeader::Encoding;
-    NodeHeader::set_kind((uint64_t*)dst_header, 'B');
-    NodeHeader::set_encoding((uint64_t*)dst_header, NodeHeader::Encoding::Flex);
-    NodeHeader::set_arrayA_num_elements<Encoding::Flex>((uint64_t*)dst_header, value_size);
-    NodeHeader::set_arrayB_num_elements<Encoding::Flex>((uint64_t*)dst_header, index_size);
-    NodeHeader::set_elementA_size<Encoding::Flex>((uint64_t*)dst_header, value_width);
-    NodeHeader::set_elementB_size<Encoding::Flex>((uint64_t*)dst_header, index_width);
-    auto dst_data = get_data_from_header(dst_header);
-    const auto offset = value_size * value_width;
-    bf_iterator src_it_value{(uint64_t*)src_data, 0, value_width, value_width, 0};
-    bf_iterator dst_it_value{(uint64_t*)dst_data, 0, value_width, value_width, 0};
-    bf_iterator src_it_index{(uint64_t*)src_data, offset, index_width, index_width, 0};
-    bf_iterator dst_it_index{(uint64_t*)dst_data, offset, index_width, index_width, 0};
-
-    for (size_t i = 0; i < value_size; ++i) {
-        *dst_it_value = src_it_value.get_value();
-        ++dst_it_value;
-        ++src_it_value;
-    }
-    for (size_t i = 0; i < index_size; ++i) {
-        *dst_it_index = src_it_index.get_value();
-        ++dst_it_index;
-        ++src_it_index;
-    }
-    REALM_ASSERT(NodeHeader::get_encoding((uint64_t*)dst_header) == Encoding::Flex);
+    auto src_header = (uint64_t*)mem.get_addr();
+    auto dst_header = (uint64_t*)get_header();
+    set_encoding(dst_header, get_encoding(src_header));
+    set_arrayA_num_elements<Encoding::Flex>(dst_header, get_arrayA_num_elements<Encoding::Flex>(src_header));
+    set_arrayB_num_elements<Encoding::Flex>(dst_header, get_arrayB_num_elements<Encoding::Flex>(src_header));
+    set_elementA_size<Encoding::Flex>(dst_header, get_elementA_size<Encoding::Flex>(src_header));
+    set_elementB_size<Encoding::Flex>(dst_header, get_elementB_size<Encoding::Flex>(src_header));
+    REALM_ASSERT(get_encoding((uint64_t*)get_header()) == Encoding::Flex);
+    REALM_ASSERT(get_arrayA_num_elements<Encoding::Flex>(dst_header) ==
+                 get_arrayA_num_elements<Encoding::Flex>(src_header));
+    REALM_ASSERT(get_arrayB_num_elements<Encoding::Flex>(dst_header) ==
+                 get_arrayB_num_elements<Encoding::Flex>(src_header));
+    REALM_ASSERT(get_elementA_size<Encoding::Flex>(dst_header) == get_elementA_size<Encoding::Flex>(src_header));
+    REALM_ASSERT(get_elementB_size<Encoding::Flex>(dst_header) == get_elementB_size<Encoding::Flex>(src_header));
 }
 
 bool ArrayFlex::encode()
@@ -233,7 +214,6 @@ bool ArrayFlex::try_encode(std::vector<int64_t>& values, std::vector<size_t>& in
         REALM_ASSERT_3(new_value, ==, old_value);
     }
 
-
     const auto [min_value, max_value] = std::minmax_element(values.begin(), values.end());
     const auto index = *std::max_element(indices.begin(), indices.end());
     const auto value_bit_width = std::max(signed_to_num_bits(*min_value), signed_to_num_bits(*max_value));
@@ -258,16 +238,17 @@ bool ArrayFlex::try_encode(std::vector<int64_t>& values, std::vector<size_t>& in
         // we will for now just keep capacity identical to the size we need.
         // byte_size = std::max(byte_size, initial_capacity);
         MemRef mem = m_alloc.alloc(byte_size); // Throws
+        // MemRef mem = create_array(type_Normal, false, NodeHeader::header_size+compressed_size, 0, m_alloc);
         auto header = (uint64_t*)mem.get_addr();
         uint8_t flags = 0; // I'm assuming that flags are taken from the owning Array.
         init_header(header, 'B', Encoding::Flex, flags, value_bit_width, index_bit_width, values.size(),
                     indices.size());
         set_capacity_in_header(byte_size, mem.get_addr());
+        init_from_mem(mem);
 
         REALM_ASSERT(indices.size() == sz);
 
         // what is the idea behind setting m_array.m_size here?
-        m_array.m_size = indices.size();
         m_array.destroy();
         m_array.detach();
         return true;

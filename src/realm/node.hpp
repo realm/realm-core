@@ -126,10 +126,11 @@ public:
         char* header = mem.get_addr();
         m_ref = mem.get_ref();
         m_data = get_data_from_header(header);
-        auto kind = get_kind((uint64_t*)header);
+        const auto kind = get_kind((uint64_t*)header);
         REALM_ASSERT(kind == 'A' || kind == 'B');
         if (kind == 'A')
             m_size = get_size_from_header(header);
+        // the actual initialization of the B kind fields related to the encoding is deffered to Array.
         return header;
     }
 

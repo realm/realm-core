@@ -2315,7 +2315,7 @@ TEST(Group_UniqueColumnKeys)
     CHECK_NOT_EQUAL(col_foo, col_bar);
 }
 
-ONLY(Group_ArrayCompression_Correctness)
+TEST(Group_ArrayCompression_Correctness)
 {
     GROUP_TEST_PATH(path);
 
