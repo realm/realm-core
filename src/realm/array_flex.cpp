@@ -46,7 +46,9 @@ void ArrayFlex::init_array_encode(MemRef mem)
     auto value_width = NodeHeader::get_elementA_size<Encoding::Flex>((uint64_t*)src_header);
     auto index_width = NodeHeader::get_elementB_size<Encoding::Flex>((uint64_t*)src_header);
 
-    // deep copy.
+    // build a new compressed header
+
+
     create(Type::type_Normal);
     auto dst_header = Array::get_header();
     using Encoding = NodeHeader::Encoding;
@@ -251,37 +253,21 @@ bool ArrayFlex::try_encode(std::vector<int64_t>& values, std::vector<size_t>& in
     // constantly equal to 8 bytes.
     if (compressed_size < uncompressed_size) {
         // allocate new space for the encoded array
-        const size_t size = header_size + compressed_size;
-        //
-        // I think the problem lies here, since create_array sets the capacity when the array is created.
-        // Since kind is not set to B yet, the capacity for the B type is not set or it goes in the A representation
-        // version of it, creating most of the havoc. This code looks ugly though, so probably the best thing to do is
-        // to create a type B/flex array
-        //
-        auto mem = create_array(Type::type_Normal, false, size, 0, m_array.get_alloc());
-        char* header = mem.get_addr();
-        Array::init_from_mem(mem);
-        using Encoding = NodeHeader::Encoding;
-        auto addr = (uint64_t*)get_header();
-        set_kind(addr, 'B');
-        set_encoding(addr, NodeHeader::Encoding::Flex);
-        set_arrayA_num_elements<Encoding::Flex>(addr, values.size());
-        set_arrayB_num_elements<Encoding::Flex>(addr, indices.size());
-        set_elementA_size<Encoding::Flex>(addr, value_bit_width);
-        set_elementB_size<Encoding::Flex>(addr, index_bit_width);
-        const auto width_b_array = value_bit_width + index_bit_width;
-        const auto array_b_capacity = (width_b_array) * (indices.size() + values.size());
-        size_t byte_size = std::max(array_b_capacity, initial_capacity + 0);
-        // need to round up to the next power of 8?
-        auto rounded_byte_size = (byte_size + 7) & (-8);
-        set_capacity_in_header(rounded_byte_size, header);
+        auto byte_size = calc_size<Encoding::Flex>(values.size(), indices.size(), value_bit_width, index_bit_width);
+        // Since we don't grow an encoded array in-place, but decode it into a different array,
+        // we will for now just keep capacity identical to the size we need.
+        // byte_size = std::max(byte_size, initial_capacity);
+        MemRef mem = m_alloc.alloc(byte_size); // Throws
+        auto header = (uint64_t*)mem.get_addr();
+        uint8_t flags = 0; // I'm assuming that flags are taken from the owning Array.
+        init_header(header, 'B', Encoding::Flex, flags, value_bit_width, index_bit_width, values.size(),
+                    indices.size());
+        set_capacity_in_header(byte_size, mem.get_addr());
 
         REALM_ASSERT(indices.size() == sz);
 
         // what is the idea behind setting m_array.m_size here?
         m_array.m_size = indices.size();
-        // m_array.set_kind((uint64_t*)m_array.get_header(), 'B');
-        // m_array.set_encoding((uint64_t*)m_array.get_header(), Encoding::Flex);
         m_array.destroy();
         m_array.detach();
         return true;
