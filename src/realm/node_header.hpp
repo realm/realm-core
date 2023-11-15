@@ -284,18 +284,15 @@ public:
         }
     }
 
-    static size_t get_byte_size_from_header(const char* header) noexcept
+    // helper converting a number of bits into bytes and aligning to 8 byte boundary
+    static inline size_t align_bits_to8(size_t n)
     {
-        auto kind = get_kind((uint64_t*)header);
-        REALM_ASSERT(kind == 'A');
-        WidthType wtype = get_wtype_from_header(header);
-        size_t width;
-        size_t size;
-        width = get_width_from_header(header);
-        size = get_size_from_header(header);
-        return calc_byte_size(wtype, size, width);
+        n = (n + 7) >> 3;
+        return (n + 7) & ~size_t(7);
     }
 
+
+    static size_t get_byte_size_from_header(const char* header) noexcept;
 
     static size_t calc_byte_size(WidthType wtype, size_t size, uint_least8_t width) noexcept
     {
@@ -556,9 +553,6 @@ public:
     static inline size_t get_arrayA_num_elements(uint64_t* header);
     template <Encoding>
     static inline size_t get_arrayB_num_elements(uint64_t* header);
-    // Get the size in bytes (aligned to 8) of a block
-    template <Encoding>
-    static inline size_t get_byte_size(uint64_t* header);
     // Compute required size in bytes - multiple forms depending on encoding
     template <Encoding>
     inline size_t calc_size(size_t num_elements);
@@ -913,61 +907,6 @@ inline size_t NodeHeader::get_arrayB_num_elements<NodeHeader::Encoding::Flex>(ui
 }
 
 
-// helper converting a number of bits into bytes and aligning to 8 byte boundary
-inline size_t align_bits_to8(size_t n)
-{
-    n = (n + 7) >> 3;
-    return (n + 7) & ~size_t(7);
-}
-
-template <>
-inline size_t NodeHeader::get_byte_size<NodeHeader::Encoding::WTypBits>(uint64_t* header)
-{
-    REALM_ASSERT(get_kind(header) == 'A');
-    return NodeHeader::get_byte_size_from_header((const char*)header);
-}
-template <>
-inline size_t NodeHeader::get_byte_size<NodeHeader::Encoding::WTypMult>(uint64_t* header)
-{
-    REALM_ASSERT(get_kind(header) == 'A');
-    return NodeHeader::get_byte_size_from_header((const char*)header);
-}
-template <>
-inline size_t NodeHeader::get_byte_size<NodeHeader::Encoding::WTypIgn>(uint64_t* header)
-{
-    REALM_ASSERT(get_kind(header) == 'A');
-    return NodeHeader::get_byte_size_from_header((const char*)header);
-}
-
-template <>
-inline size_t NodeHeader::get_byte_size<NodeHeader::Encoding::Packed>(uint64_t* header)
-{
-    return NodeHeader::header_size + align_bits_to8(get_num_elements<NodeHeader::Encoding::Packed>(header) *
-                                                    get_element_size<NodeHeader::Encoding::Packed>(header));
-}
-template <>
-inline size_t NodeHeader::get_byte_size<NodeHeader::Encoding::AofP>(uint64_t* header)
-{
-    return NodeHeader::header_size + align_bits_to8(get_num_elements<NodeHeader::Encoding::AofP>(header) *
-                                                    (get_elementA_size<NodeHeader::Encoding::AofP>(header) +
-                                                     get_elementB_size<NodeHeader::Encoding::AofP>(header)));
-}
-template <>
-inline size_t NodeHeader::get_byte_size<NodeHeader::Encoding::PofA>(uint64_t* header)
-{
-    return NodeHeader::header_size + align_bits_to8(get_num_elements<NodeHeader::Encoding::PofA>(header) *
-                                                    (get_elementA_size<NodeHeader::Encoding::PofA>(header) +
-                                                     get_elementB_size<NodeHeader::Encoding::PofA>(header)));
-}
-template <>
-inline size_t NodeHeader::get_byte_size<NodeHeader::Encoding::Flex>(uint64_t* header)
-{
-    return NodeHeader::header_size + align_bits_to8(get_arrayA_num_elements<NodeHeader::Encoding::Flex>(header) *
-                                                        get_elementA_size<NodeHeader::Encoding::Flex>(header) +
-                                                    get_arrayB_num_elements<NodeHeader::Encoding::Flex>(header) *
-                                                        get_elementB_size<NodeHeader::Encoding::Flex>(header));
-}
-
 template <>
 inline size_t NodeHeader::calc_size<NodeHeader::Encoding::Packed>(size_t num_elements, size_t element_size)
 {
@@ -1011,6 +950,42 @@ inline size_t NodeHeader::calc_size<NodeHeader::Encoding::Flex>(size_t arrayA_nu
     return NodeHeader::header_size +
            align_bits_to8(arrayA_num_elements * elementA_size + arrayB_num_elements * elementB_size);
 }
+
+size_t inline NodeHeader::get_byte_size_from_header(const char* header) noexcept
+{
+    auto h = (uint64_t*)header;
+    auto kind = get_kind(h);
+    if (kind == 'A') {
+        WidthType wtype = get_wtype_from_header(header);
+        size_t width;
+        size_t size;
+        width = get_width_from_header(header);
+        size = get_size_from_header(header);
+        return calc_byte_size(wtype, size, width);
+    }
+    else {
+        auto encoding = get_encoding((uint64_t*)header);
+        switch (encoding) {
+            case Encoding::Packed:
+                return NodeHeader::header_size + align_bits_to8(get_num_elements<NodeHeader::Encoding::Packed>(h) *
+                                                                get_element_size<NodeHeader::Encoding::Packed>(h));
+            case Encoding::AofP:
+            case Encoding::PofA:
+                return NodeHeader::header_size + align_bits_to8(get_num_elements<NodeHeader::Encoding::AofP>(h) *
+                                                                (get_elementA_size<NodeHeader::Encoding::AofP>(h) +
+                                                                 get_elementB_size<NodeHeader::Encoding::AofP>(h)));
+            case Encoding::Flex:
+                return NodeHeader::header_size +
+                       align_bits_to8(get_arrayA_num_elements<NodeHeader::Encoding::Flex>(h) *
+                                          get_elementA_size<NodeHeader::Encoding::Flex>(h) +
+                                      get_arrayB_num_elements<NodeHeader::Encoding::Flex>(h) *
+                                          get_elementB_size<NodeHeader::Encoding::Flex>(h));
+            default:
+                REALM_ASSERT(false && "unknown encoding");
+        }
+    }
+}
+
 
 } // namespace realm
 

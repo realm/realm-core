@@ -1553,7 +1553,6 @@ public:
         iter i_1 = m_chunks.begin(), end = m_chunks.end();
         iter i_2 = i_1;
         sort(i_1, end);
-        int i = 1;
         if (i_1 != end) {
             while (++i_2 != end) {
                 ref_type prev_ref_end = i_1->ref + i_1->size;
