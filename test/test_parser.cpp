@@ -2229,7 +2229,7 @@ TEST(Parser_list_of_primitive_strings)
 
     constexpr bool nullable = true;
     auto col_str_list = t->add_column_list(type_String, "strings", nullable);
-    CHECK_THROW_ANY(t->add_search_index(col_str_list));
+    t->add_search_index(col_str_list);
 
     auto get_string = [](size_t i) -> std::string {
         return util::format("string_%1", i);

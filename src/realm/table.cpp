@@ -770,8 +770,16 @@ void Table::populate_search_index(ColKey col_key)
             }
         }
         else if (type == type_String) {
-            StringData value = o.get<StringData>(col_key);
-            index->insert(key, value); // Throws
+            if (col_key.is_list()) {
+                auto list = o.get_list<String>(col_key);
+                for (auto& s : list) {
+                    index->insert(key, s); // Throws
+                }
+            }
+            else {
+                StringData value = o.get<StringData>(col_key);
+                index->insert(key, value); // Throws
+            }
         }
         else if (type == type_Timestamp) {
             Timestamp value = o.get<Timestamp>(col_key);
@@ -840,6 +848,8 @@ void Table::update_indexes(ObjKey key, const FieldValues& values)
         if (auto&& index = m_index_accessors[column_ndx]) {
             // There is an index for this column
             auto col_key = m_leaf_ndx2colkey[column_ndx];
+            if (col_key.is_collection())
+                continue;
             auto type = col_key.get_type();
             auto attr = col_key.get_attrs();
             bool nullable = attr.test(col_attr_Nullable);
@@ -919,7 +929,8 @@ void Table::do_add_search_index(ColKey col_key, IndexType type)
     if (m_index_accessors[column_ndx] != nullptr)
         return;
 
-    if (!StringIndex::type_supported(DataType(col_key.get_type())) || col_key.is_collection() ||
+    if (!StringIndex::type_supported(DataType(col_key.get_type())) ||
+        (col_key.is_collection() && !(col_key.is_list() && col_key.get_type() == col_type_String)) ||
         (type == IndexType::Fulltext && col_key.get_type() != col_type_String)) {
         // Not ideal, but this is what we used to throw, so keep throwing that for compatibility reasons, even though
         // it should probably be a type mismatch exception instead.

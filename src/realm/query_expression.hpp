@@ -3028,8 +3028,42 @@ public:
     {
         return make_subexpr<Columns<Lst<T>>>(*this);
     }
-    friend class Table;
-    friend class LinkChain;
+};
+
+template <>
+class Columns<Lst<String>> : public ColumnsCollection<String> {
+public:
+    using ColumnsCollection<String>::ColumnsCollection;
+    using ColumnListBase::m_column_key;
+    using ColumnListBase::m_link_map;
+
+    std::unique_ptr<Subexpr> clone() const override
+    {
+        return make_subexpr<Columns<Lst<String>>>(*this);
+    }
+
+    bool has_search_index() const final
+    {
+        auto target_table = m_link_map.get_target_table();
+        return target_table->search_index_type(m_column_key) == IndexType::General;
+    }
+
+    std::vector<ObjKey> find_all(Mixed value) const final
+    {
+        std::vector<ObjKey> ret;
+        std::vector<ObjKey> result;
+
+        StringIndex* index = m_link_map.get_target_table()->get_search_index(m_column_key);
+        REALM_ASSERT(index);
+        index->find_all(result, value);
+
+        for (ObjKey k : result) {
+            auto ndxs = m_link_map.get_origin_ndxs(k);
+            ret.insert(ret.end(), ndxs.begin(), ndxs.end());
+        }
+
+        return ret;
+    }
 };
 
 template <typename T>
