@@ -44,6 +44,12 @@ public:
     size_t byte_size() const final override;
     char* get_encode_header() final override;
 
+    char type() final override
+    {
+        return 'B';
+    }
+
+
 private:
     bool try_encode(std::vector<int64_t>&, std::vector<size_t>&);
     bool get_encode_info(size_t& value_width, size_t& index_width, size_t& value_size, size_t& index_size) const;

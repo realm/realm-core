@@ -87,9 +87,6 @@ public:
 };
 
 class Array : public Node, public ArrayParent {
-protected:
-    const char* name = "Dummy";
-
 public:
     /// Create an array accessor in the unattached state.
     explicit Array(Allocator& allocator) noexcept;

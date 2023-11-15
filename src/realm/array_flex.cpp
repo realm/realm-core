@@ -34,6 +34,7 @@ ArrayFlex::ArrayFlex(Array& array)
     : Array(array.get_alloc())
     , m_array(array)
 {
+    std::cout << "Building array flex " << std::endl;
 }
 
 void ArrayFlex::init_array_encode(MemRef mem)
@@ -220,20 +221,13 @@ bool ArrayFlex::try_encode(std::vector<int64_t>& values, std::vector<size_t>& in
     const auto index_bit_width = index == 0 ? 1 : unsigned_to_num_bits(index);
     REALM_ASSERT(value_bit_width > 0);
     REALM_ASSERT(index_bit_width > 0);
-    const auto compressed_values_size = value_bit_width * values.size();
-    const auto compressed_indices_size = index_bit_width * indices.size();
-    const auto compressed_size = compressed_values_size + compressed_indices_size;
-
     // we should remember to reconsider this. The old type of array has value sizes aligned to the power of two,
     // so uncompressed size is not actually the size of the old type. It is the size we could get by using
     // Encoding::Packed instead of LocalDir... which is something we should do.
     const auto uncompressed_size = value_bit_width * sz;
-
-    // encode array only if there is some gain, for simplicity the header is not taken into consideration, since it is
-    // constantly equal to 8 bytes.
-    if (compressed_size < uncompressed_size) {
-        // allocate new space for the encoded array
-        auto byte_size = calc_size<Encoding::Flex>(values.size(), indices.size(), value_bit_width, index_bit_width);
+    // we need to round compressed size in order to make % 8 compliant, since memory is aligned in this way
+    auto byte_size = calc_size<Encoding::Flex>(values.size(), indices.size(), value_bit_width, index_bit_width);
+    if (byte_size < uncompressed_size) {
         // Since we don't grow an encoded array in-place, but decode it into a different array,
         // we will for now just keep capacity identical to the size we need.
         // byte_size = std::max(byte_size, initial_capacity);

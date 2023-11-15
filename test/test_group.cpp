@@ -2315,7 +2315,7 @@ TEST(Group_UniqueColumnKeys)
     CHECK_NOT_EQUAL(col_foo, col_bar);
 }
 
-TEST(Group_ArrayCompression_Correctness)
+ONLY(Group_ArrayCompression_Correctness)
 {
     GROUP_TEST_PATH(path);
 
@@ -2348,7 +2348,7 @@ TEST(Group_ArrayCompression_Correctness)
     CHECK_EQUAL(v6.get_int(), 16388);
 
 
-    // Serialize to disk
+    // Serialize to disk (compression should happen when the proper leaf array is serialized to disk)
     to_disk.write(path, crypt_key());
 
 #ifdef REALM_DEBUG

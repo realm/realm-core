@@ -366,14 +366,13 @@ size_t Array::get_byte_size() const noexcept
 ref_type Array::write(_impl::ArrayWriterBase& out, bool deep, bool only_if_modified) const
 {
     REALM_ASSERT(is_attached());
-
-    std::cout << "Array name = " << name << std::endl;
-
     if (only_if_modified && m_alloc.is_read_only(m_ref))
         return m_ref;
 
     if (!deep || !m_has_refs) {
-        // this is not compressing anymore somehow the array encoder ref is set to default
+        // this is not going to work, because the encoding we have set a this time is Dummy.
+        // Since we have constructed a temporary accessor before, while recursively expanding
+        // our arrays.
         encode_array();
         return do_write_shallow(out); // Throws
     }
@@ -389,10 +388,11 @@ ref_type Array::write(ref_type ref, Allocator& alloc, _impl::ArrayWriterBase& ou
 
     Array array(alloc, encode);
     array.init_from_ref(ref);
-    std::cout << "Array name = " << array.name << std::endl;
-
 
     if (!array.m_has_refs) {
+        // this is not going to work, because the encoding we have set a this time is Dummy.
+        //  Since we have constructed a temporary accessor before, while recursively expanding
+        //  our arrays.
         array.encode_array();
         return array.do_write_shallow(out); // Throws
     }
@@ -405,6 +405,7 @@ ref_type Array::do_write_shallow(_impl::ArrayWriterBase& out) const
 {
     // here we might want to compress the array and write down.
     if (is_encoded()) {
+        // this is never hit since we have lost our information about the encoding type while expanding to disk.
         const char* header = m_encode_array.get_encode_header();
         size_t byte_size = m_encode_array.byte_size();
         uint32_t dummy_checksum = 0x42424242UL;                                // "BBBB" in ASCII
@@ -429,6 +430,11 @@ ref_type Array::do_write_deep(_impl::ArrayWriterBase& out, bool only_if_modified
     // This is recursively expanding each array and writing it down to disk...
     // We need to verify if for encoded arrays we need to do anything special.
 
+    // This machinery is problematic, since we constuct a new array for following refs that
+    // eventually will get us to the actual array that can be compressed.
+    // The encoded type for this array has nothing to do with what the eventual encoding type
+    // will be. Moreover we have lost the information about whether we need compression or not for the leaf array.
+
     // Temp array for updated refs
     Array new_array(Allocator::get_default(), m_encode_array);
     Type type = m_is_inner_bptree_node ? type_InnerBptreeNode : type_HasRefs;
@@ -442,7 +448,7 @@ ref_type Array::do_write_deep(_impl::ArrayWriterBase& out, bool only_if_modified
         bool is_ref = (value != 0 && (value & 1) == 0);
         if (is_ref) {
             ref_type subref = to_ref(value);
-            ref_type new_subref = write(subref, m_alloc, out, only_if_modified, m_encode_array); // Throws
+            ref_type new_subref = write(subref, m_alloc, out, only_if_modified, new_array.m_encode_array); // Throws
             value = from_ref(new_subref);
         }
         new_array.add(value); // Throws

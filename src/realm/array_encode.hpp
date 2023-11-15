@@ -40,6 +40,7 @@ public:
     virtual size_t byte_size() const = 0;
 
     virtual char* get_encode_header() = 0;
+    virtual char type() = 0;
 };
 
 class DummyArrayEncode : public ArrayEncode {
@@ -78,6 +79,10 @@ public:
     char* get_encode_header() final override
     {
         return nullptr;
+    }
+    char type() final override
+    {
+        return 'A';
     }
 };
 
