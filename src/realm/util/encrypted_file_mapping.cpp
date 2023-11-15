@@ -150,6 +150,25 @@ size_t check_read(FileDesc fd, off_t pos, void* dst, size_t len)
     return ret;
 }
 
+inline void memcpy_tsan_safe(char* dst, char* src, size_t num_bytes)
+{
+#if REALM_SANITIZE_THREAD
+            // Copying an entire page may overwrite arrays which is being read concurrently by
+            // another thread. This is benign because it overwrites data from old version with
+            // the same value as is already there, so the reader sees the correct value. This
+            // is all by design. However, when doing a memcpy of the entire page, TSAN sees
+            // this as a race even though we are replacing concurrently read data with the same
+            // values.
+            for (size_t i = 0; i < num_bytes; ++i) {
+                if (src[i] != dst[i]) {
+                    dst[i] = src[i];
+                }
+            }
+#else
+            memcpy(dst, src, num_bytes);
+#endif
+}
+
 } // anonymous namespace
 
 AESCryptor::AESCryptor(const uint8_t* key)
@@ -438,7 +457,7 @@ size_t AESCryptor::read(FileDesc fd, off_t pos, char* dst, size_t size, WriteObs
         // We therefore decrypt to a temporary buffer first and then copy the
         // completely decrypted data after.
         crypt(mode_Decrypt, pos, m_dst_buffer.get(), m_rw_buffer.get(), reinterpret_cast<const char*>(&iv.iv1));
-        memcpy(dst, m_dst_buffer.get(), block_size);
+        memcpy_tsan_safe(dst, m_dst_buffer.get(), block_size);
 
         pos += block_size;
         dst += block_size;
@@ -630,7 +649,7 @@ bool EncryptedFileMapping::copy_up_to_date_page(size_t local_page_ndx) noexcept
 
         size_t shadow_mapping_local_ndx = page_ndx_in_file - m->m_first_page;
         if (is(m->m_page_state[shadow_mapping_local_ndx], UpToDate)) {
-            memcpy(page_addr(local_page_ndx), m->page_addr(shadow_mapping_local_ndx),
+            memcpy_tsan_safe(page_addr(local_page_ndx), m->page_addr(shadow_mapping_local_ndx),
                    static_cast<size_t>(1ULL << m_page_shift));
             return true;
         }
