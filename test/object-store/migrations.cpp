@@ -18,9 +18,11 @@
 
 #include <util/test_file.hpp>
 #include <util/test_utils.hpp>
+#include "../util/test_path.hpp"
 
 #include <realm/group.hpp>
 #include <realm/table.hpp>
+#include <realm/util/file.hpp>
 
 #include <realm/object-store/object_schema.hpp>
 #include <realm/object-store/object_store.hpp>
@@ -2021,6 +2023,32 @@ TEST_CASE("migration: ReadOnly", "[migration]") {
         }
     }
 }
+
+TEST_CASE("file format upgrade + migration: SoftResetFile", "[migration]") {
+    TestFile config;
+    config.schema_mode = SchemaMode::ReadOnly;
+    config.disable_format_upgrade = false;
+
+    std::string path = test_util::get_test_resource_path() + "foo.realm";
+    std::string temp_copy1 = test_util::get_test_resource_path() + "foo_copy1.realm";
+    config.path = temp_copy1;
+
+    realm::util::File::copy(path, temp_copy1);
+
+    auto realm1 = Realm::get_shared_realm(config);
+    REQUIRE(realm1->schema().size() == 1);
+    REQUIRE(!realm1->is_empty());
+
+    config.schema_mode = SchemaMode::SoftResetFile;
+    std::string temp_copy2 = test_util::get_test_resource_path() + "foo_copy2.realm";
+    config.path = temp_copy2;
+
+    realm::util::File::copy(path, temp_copy2);
+    auto realm2 = Realm::get_shared_realm(config);
+    REQUIRE(realm2->schema().size() == 1);
+    REQUIRE(!realm2->is_empty());
+}
+
 
 TEST_CASE("migration: SoftResetFile", "[migration]") {
     TestFile config;
