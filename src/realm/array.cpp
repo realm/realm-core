@@ -358,11 +358,9 @@ size_t Array::get_byte_size() const noexcept
     if (m_encode_array.is_encoded()) {
         return m_encode_array.byte_size();
     }
-
     const char* header = get_header_from_data(m_data);
-    WidthType wtype = Node::get_wtype_from_header(header);
-    size_t num_bytes = NodeHeader::calc_byte_size(wtype, m_size, m_width);
-
+    REALM_ASSERT(get_kind((uint64_t*)header) == 'A');
+    auto num_bytes = get_byte_size_from_header(header);
     REALM_ASSERT_7(m_alloc.is_read_only(m_ref), ==, true, ||, num_bytes, <=, get_capacity_from_header(header));
 
     return num_bytes;

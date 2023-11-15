@@ -306,16 +306,10 @@ bool ArrayFlex::get_encode_info(size_t& value_width, size_t& index_width, size_t
 
 size_t ArrayFlex::byte_size() const
 {
-    size_t value_width, index_width, value_size, index_size;
-    if (get_encode_info(value_width, index_width, value_size, index_size)) {
-        // this is hacky, but essentially the memory occupied is equal to to WidthA*SizeA + WidthB*SizeB;
-        size_t num_bytes =
-            NodeHeader::calc_byte_size(WidthType::wtype_Bits, value_size + index_size, value_width + index_width);
-        REALM_ASSERT_7(m_alloc.is_read_only(m_ref), ==, true, ||, num_bytes, <=,
-                       get_capacity_from_header(get_header()));
-        return num_bytes;
-    }
-    REALM_UNREACHABLE();
+    auto num_bytes = get_byte_size_from_header(get_header());
+
+    REALM_ASSERT_7(m_alloc.is_read_only(m_ref), ==, true, ||, num_bytes, <=, get_capacity_from_header(get_header()));
+    return num_bytes;
 }
 
 char* ArrayFlex::get_encode_header()
