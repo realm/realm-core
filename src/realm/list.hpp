@@ -285,7 +285,9 @@ private:
 
     static Mixed unresolved_to_null(Mixed value) noexcept
     {
-        return value.is_unresolved_link() ? Mixed{} : value;
+        if (value.is_type(type_TypedLink) && value.is_unresolved_link())
+            return Mixed{};
+        return value;
     }
     T do_get(size_t ndx, const char* msg) const;
 };
