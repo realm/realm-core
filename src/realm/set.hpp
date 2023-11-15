@@ -24,19 +24,30 @@
 #include <realm/array_key.hpp>
 
 namespace realm {
-
 class SetBase : public CollectionBase {
 public:
     using CollectionBase::CollectionBase;
     SetBase(const SetBase& other);
     SetBase(SetBase&& other) noexcept;
     SetBase& operator=(const SetBase& other);
+    SetBase& operator=(SetBase&& other) noexcept;
 
     virtual SetBasePtr clone() const = 0;
     virtual std::pair<size_t, bool> insert_null() = 0;
     virtual std::pair<size_t, bool> erase_null() = 0;
     virtual std::pair<size_t, bool> insert_any(Mixed value) = 0;
     virtual std::pair<size_t, bool> erase_any(Mixed value) = 0;
+
+    bool is_subset_of(const CollectionBase&) const;
+    bool is_strict_subset_of(const CollectionBase& rhs) const;
+    bool is_superset_of(const CollectionBase& rhs) const;
+    bool is_strict_superset_of(const CollectionBase& rhs) const;
+    bool intersects(const CollectionBase& rhs) const;
+    bool set_equals(const CollectionBase& rhs) const;
+    void assign_union(const CollectionBase&);
+    void assign_intersection(const CollectionBase&);
+    void assign_difference(const CollectionBase&);
+    void assign_symmetric_difference(const CollectionBase&);
 
 protected:
     static constexpr CollectionType s_collection_type = CollectionType::Set;
@@ -53,6 +64,28 @@ protected:
         throw InvalidArgument(ErrorCodes::PropertyNotNullable,
                               util::format("Set: %1", CollectionBase::get_property_name()));
     }
+
+private:
+    template <class It1, class It2>
+    bool is_subset_of(It1, It2) const;
+
+    template <class It1, class It2>
+    bool is_superset_of(It1, It2) const;
+
+    template <class It1, class It2>
+    bool intersects(It1, It2) const;
+
+    template <class It1, class It2>
+    void assign_union(It1, It2);
+
+    template <class It1, class It2>
+    void assign_intersection(It1, It2);
+
+    template <class It1, class It2>
+    void assign_difference(It1, It2);
+
+    template <class It1, class It2>
+    void assign_symmetric_difference(It1, It2);
 };
 
 template <class T>
@@ -122,17 +155,6 @@ public:
             func(found);
         }
     }
-
-    bool is_subset_of(const CollectionBase&) const;
-    bool is_strict_subset_of(const CollectionBase& rhs) const;
-    bool is_superset_of(const CollectionBase& rhs) const;
-    bool is_strict_superset_of(const CollectionBase& rhs) const;
-    bool intersects(const CollectionBase& rhs) const;
-    bool set_equals(const CollectionBase& rhs) const;
-    void assign_union(const CollectionBase&);
-    void assign_intersection(const CollectionBase&);
-    void assign_difference(const CollectionBase&);
-    void assign_symmetric_difference(const CollectionBase&);
 
     /// Insert a value into the set if it does not already exist, returning the index of the inserted value,
     /// or the index of the already-existing value.
@@ -212,29 +234,6 @@ private:
     void do_resort(size_t from, size_t to);
 
     iterator find_impl(const T& value) const;
-
-    template <class It1, class It2>
-    bool is_subset_of(It1, It2) const;
-
-    template <class It1, class It2>
-    bool is_superset_of(It1, It2) const;
-
-    template <class It1, class It2>
-    bool intersects(It1, It2) const;
-
-    template <class It1, class It2>
-    void assign_union(It1, It2);
-
-    template <class It1, class It2>
-    void assign_intersection(It1, It2);
-
-    template <class It1, class It2>
-    void assign_difference(It1, It2);
-
-    template <class It1, class It2>
-    void assign_symmetric_difference(It1, It2);
-
-    static std::vector<T> convert_to_set(const CollectionBase& rhs, bool nullable);
 };
 
 class LnkSet final : public ObjCollectionBase<SetBase> {
@@ -266,17 +265,6 @@ public:
     size_t find_first(ObjKey) const;
     std::pair<size_t, bool> insert(ObjKey);
     std::pair<size_t, bool> erase(ObjKey);
-
-    bool is_subset_of(const CollectionBase&) const;
-    bool is_strict_subset_of(const CollectionBase& rhs) const;
-    bool is_superset_of(const CollectionBase& rhs) const;
-    bool is_strict_superset_of(const CollectionBase& rhs) const;
-    bool intersects(const CollectionBase& rhs) const;
-    bool set_equals(const CollectionBase& rhs) const;
-    void assign_union(const CollectionBase&);
-    void assign_intersection(const CollectionBase&);
-    void assign_difference(const CollectionBase&);
-    void assign_symmetric_difference(const CollectionBase&);
 
     // Overriding members of CollectionBase:
     using CollectionBase::get_owner_key;
@@ -536,6 +524,15 @@ inline SetBase& SetBase::operator=(const SetBase& other)
     return *this;
 }
 
+inline SetBase& SetBase::operator=(SetBase&& other) noexcept
+{
+    if (this != &other) {
+        m_tree = std::exchange(other.m_tree, nullptr);
+    }
+
+    return *this;
+}
+
 template <class T>
 inline Set<T>::Set(const Set& other)
     : Base(static_cast<const Base&>(other))
@@ -701,12 +698,10 @@ std::pair<size_t, bool> Set<T>::insert(T value)
 {
     ensure_created();
 
-    if (value_is_null(value) && !m_nullable)
-        throw InvalidArgument(ErrorCodes::PropertyNotNullable,
-                              util::format("Set: %1", CollectionBase::get_property_name()));
+    if (!m_nullable && value_is_null(value))
+        throw_invalid_null();
 
     auto it = find_impl(value);
-
     if (it != this->end() && SetElementEquals<T>{}(*it, value)) {
         return {it.index(), false};
     }
@@ -844,7 +839,7 @@ inline util::Optional<Mixed> Set<T>::avg(size_t* return_cnt) const
     return AverageHelper<T>::not_found(return_cnt);
 }
 
-void set_sorted_indices(size_t sz, std::vector<size_t>& indices, bool ascending);
+REALM_NOINLINE void set_sorted_indices(size_t sz, std::vector<size_t>& indices, bool ascending);
 
 template <class T>
 inline void Set<T>::sort(std::vector<size_t>& indices, bool ascending) const
@@ -857,10 +852,10 @@ template <>
 void Set<Mixed>::sort(std::vector<size_t>& indices, bool ascending) const;
 
 template <class T>
-inline void Set<T>::distinct(std::vector<size_t>& indices, util::Optional<bool> sort_order) const
+void Set<T>::distinct(std::vector<size_t>& indices, util::Optional<bool> sort_order) const
 {
     auto ascending = !sort_order || *sort_order;
-    sort(indices, ascending);
+    set_sorted_indices(size(), indices, ascending);
 }
 
 template <class T>
@@ -879,225 +874,6 @@ template <class T>
 inline void Set<T>::do_clear()
 {
     tree().clear();
-}
-
-template <class T>
-std::vector<T> Set<T>::convert_to_set(const CollectionBase& rhs, bool nullable)
-{
-    if constexpr (std::is_same_v<T, Mixed>) {
-        return SetBase::convert_to_mixed_set(rhs);
-    }
-
-    std::vector<Mixed> mixed = SetBase::convert_to_mixed_set(rhs);
-    std::vector<T> ret;
-    ret.reserve(mixed.size());
-    for (auto&& val : mixed) {
-        if constexpr (std::is_same_v<T, ObjKey>) {
-            static_cast<void>(nullable);
-            if (val.is_type(type_Link, type_TypedLink)) {
-                ret.push_back(val.get<ObjKey>());
-            }
-        }
-        else {
-            if (val.is_type(ColumnTypeTraits<T>::id)) {
-                ret.push_back(val.get<T>());
-            }
-            else if (val.is_null() && nullable) {
-                ret.push_back(BPlusTree<T>::default_value(true));
-            }
-        }
-    }
-    return ret;
-}
-
-template <class T>
-bool Set<T>::is_subset_of(const CollectionBase& rhs) const
-{
-    if (auto other_set = dynamic_cast<const Set<T>*>(&rhs)) {
-        return is_subset_of(other_set->begin(), other_set->end());
-    }
-    auto other_set = convert_to_set(rhs, m_nullable);
-    return is_subset_of(other_set.begin(), other_set.end());
-}
-
-template <class T>
-template <class It1, class It2>
-bool Set<T>::is_subset_of(It1 first, It2 last) const
-{
-    return std::includes(first, last, begin(), end(), SetElementLessThan<T>{});
-}
-
-template <class T>
-bool Set<T>::is_strict_subset_of(const CollectionBase& rhs) const
-{
-    if (auto other_set = dynamic_cast<const Set<T>*>(&rhs)) {
-        return size() != rhs.size() && is_subset_of(other_set->begin(), other_set->end());
-    }
-    auto other_set = convert_to_set(rhs, m_nullable);
-    return size() != other_set.size() && is_subset_of(other_set.begin(), other_set.end());
-}
-
-template <class T>
-bool Set<T>::is_superset_of(const CollectionBase& rhs) const
-{
-    if (auto other_set = dynamic_cast<const Set<T>*>(&rhs)) {
-        return is_superset_of(other_set->begin(), other_set->end());
-    }
-    auto other_set = convert_to_set(rhs, m_nullable);
-    return is_superset_of(other_set.begin(), other_set.end());
-}
-
-template <class T>
-template <class It1, class It2>
-bool Set<T>::is_superset_of(It1 first, It2 last) const
-{
-    return std::includes(begin(), end(), first, last, SetElementLessThan<T>{});
-}
-
-template <class T>
-bool Set<T>::is_strict_superset_of(const CollectionBase& rhs) const
-{
-    if (auto other_set = dynamic_cast<const Set<T>*>(&rhs)) {
-        return size() != rhs.size() && is_superset_of(other_set->begin(), other_set->end());
-    }
-    auto other_set = convert_to_set(rhs, m_nullable);
-    return size() != other_set.size() && is_superset_of(other_set.begin(), other_set.end());
-}
-
-template <class T>
-bool Set<T>::intersects(const CollectionBase& rhs) const
-{
-    if (auto other_set = dynamic_cast<const Set<T>*>(&rhs)) {
-        return intersects(other_set->begin(), other_set->end());
-    }
-    auto other_set = convert_to_set(rhs, m_nullable);
-    return intersects(other_set.begin(), other_set.end());
-}
-
-template <class T>
-template <class It1, class It2>
-bool Set<T>::intersects(It1 first, It2 last) const
-{
-    SetElementLessThan<T> less;
-    auto it = begin();
-    while (it != end() && first != last) {
-        if (less(*it, *first)) {
-            ++it;
-        }
-        else if (less(*first, *it)) {
-            ++first;
-        }
-        else {
-            return true;
-        }
-    }
-    return false;
-}
-
-template <class T>
-bool Set<T>::set_equals(const CollectionBase& rhs) const
-{
-    if (auto other_set = dynamic_cast<const Set<T>*>(&rhs)) {
-        return size() == rhs.size() && is_subset_of(other_set->begin(), other_set->end());
-    }
-    auto other_set = convert_to_set(rhs, m_nullable);
-    return size() == other_set.size() && is_subset_of(other_set.begin(), other_set.end());
-}
-
-template <class T>
-inline void Set<T>::assign_union(const CollectionBase& rhs)
-{
-    if (auto other_set = dynamic_cast<const Set<T>*>(&rhs)) {
-        return assign_union(other_set->begin(), other_set->end());
-    }
-    auto other_set = convert_to_set(rhs, m_nullable);
-    return assign_union(other_set.begin(), other_set.end());
-}
-
-template <class T>
-template <class It1, class It2>
-void Set<T>::assign_union(It1 first, It2 last)
-{
-    std::vector<T> the_diff;
-    std::set_difference(first, last, begin(), end(), std::back_inserter(the_diff), SetElementLessThan<T>{});
-    // 'the_diff' now contains all the elements that are in foreign set, but not in 'this'
-    // Now insert those elements
-    for (auto&& value : the_diff) {
-        insert(value);
-    }
-}
-
-template <class T>
-inline void Set<T>::assign_intersection(const CollectionBase& rhs)
-{
-    if (auto other_set = dynamic_cast<const Set<T>*>(&rhs)) {
-        return assign_intersection(other_set->begin(), other_set->end());
-    }
-    auto other_set = convert_to_set(rhs, m_nullable);
-    return assign_intersection(other_set.begin(), other_set.end());
-}
-
-template <class T>
-template <class It1, class It2>
-void Set<T>::assign_intersection(It1 first, It2 last)
-{
-    std::vector<T> intersection;
-    std::set_intersection(first, last, begin(), end(), std::back_inserter(intersection), SetElementLessThan<T>{});
-    clear();
-    // Elements in intersection comes from foreign set, so ok to use here
-    for (auto&& value : intersection) {
-        insert(value);
-    }
-}
-
-template <class T>
-inline void Set<T>::assign_difference(const CollectionBase& rhs)
-{
-    if (auto other_set = dynamic_cast<const Set<T>*>(&rhs)) {
-        return assign_difference(other_set->begin(), other_set->end());
-    }
-    auto other_set = convert_to_set(rhs, m_nullable);
-    return assign_difference(other_set.begin(), other_set.end());
-}
-
-template <class T>
-template <class It1, class It2>
-void Set<T>::assign_difference(It1 first, It2 last)
-{
-    std::vector<T> intersection;
-    std::set_intersection(first, last, begin(), end(), std::back_inserter(intersection), SetElementLessThan<T>{});
-    // 'intersection' now contains all the elements that are in both foreign set and 'this'.
-    // Remove those elements. The elements comes from the foreign set, so ok to refer to.
-    for (auto&& value : intersection) {
-        erase(value);
-    }
-}
-
-template <class T>
-inline void Set<T>::assign_symmetric_difference(const CollectionBase& rhs)
-{
-    if (auto other_set = dynamic_cast<const Set<T>*>(&rhs)) {
-        return assign_symmetric_difference(other_set->begin(), other_set->end());
-    }
-    auto other_set = convert_to_set(rhs, m_nullable);
-    return assign_symmetric_difference(other_set.begin(), other_set.end());
-}
-
-template <class T>
-template <class It1, class It2>
-void Set<T>::assign_symmetric_difference(It1 first, It2 last)
-{
-    std::vector<T> difference;
-    std::set_difference(first, last, begin(), end(), std::back_inserter(difference), SetElementLessThan<T>{});
-    std::vector<T> intersection;
-    std::set_intersection(first, last, begin(), end(), std::back_inserter(intersection), SetElementLessThan<T>{});
-    // Now remove the common elements and add the differences
-    for (auto&& value : intersection) {
-        erase(value);
-    }
-    for (auto&& value : difference) {
-        insert(value);
-    }
 }
 
 inline bool LnkSet::operator==(const LnkSet& other) const
@@ -1348,30 +1124,6 @@ inline Obj LnkSet::get_object(size_t ndx) const
 inline ObjKey LnkSet::get_key(size_t ndx) const
 {
     return get(ndx);
-}
-
-inline void LnkSet::assign_union(const CollectionBase& rhs)
-{
-    m_set.assign_union(rhs);
-    update_unresolved(UpdateStatus::Updated);
-}
-
-inline void LnkSet::assign_intersection(const CollectionBase& rhs)
-{
-    m_set.assign_intersection(rhs);
-    update_unresolved(UpdateStatus::Updated);
-}
-
-inline void LnkSet::assign_difference(const CollectionBase& rhs)
-{
-    m_set.assign_difference(rhs);
-    update_unresolved(UpdateStatus::Updated);
-}
-
-inline void LnkSet::assign_symmetric_difference(const CollectionBase& rhs)
-{
-    m_set.assign_symmetric_difference(rhs);
-    update_unresolved(UpdateStatus::Updated);
 }
 
 } // namespace realm

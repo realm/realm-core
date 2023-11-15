@@ -211,7 +211,7 @@ TEST_IF(ColumnLarge_Less, TEST_DURATION >= 3)
                         // LESS
                         a.set(match, v[w] - 1);
                         QueryStateFindFirst state;
-                        a.find<Less>(v[w], from, to, &state, nullptr);
+                        a.find<Less>(v[w], from, to, &state);
                         size_t f = to_size_t(state.m_state);
                         a.set(match, v[w]);
                         if (match >= from && match < to) {
@@ -226,7 +226,7 @@ TEST_IF(ColumnLarge_Less, TEST_DURATION >= 3)
                         // GREATER
                         a.set(match, v[w] + 1);
                         QueryStateFindFirst state;
-                        a.find<Greater>(v[w], from, to, &state, nullptr);
+                        a.find<Greater>(v[w], from, to, &state);
                         size_t f = to_size_t(state.m_state);
                         a.set(match, v[w]);
                         if (match >= from && match < to) {
@@ -257,7 +257,7 @@ TEST_IF(ColumnLarge_Less, TEST_DURATION >= 3)
 
                             accu.clear();
                             QueryStateFindAll state(accu);
-                            a.find<Less>(v[w], from, to, &state, nullptr);
+                            a.find<Less>(v[w], from, to, &state);
 
                             a.set(match, v[w]);
                             a.set(match + off, v[w]);
@@ -284,7 +284,7 @@ TEST_IF(ColumnLarge_Less, TEST_DURATION >= 3)
 
                             accu.clear();
                             QueryStateFindAll state(accu);
-                            a.find<Greater>(v[w], from, to, &state, nullptr);
+                            a.find<Greater>(v[w], from, to, &state);
 
                             a.set(match, v[w]);
                             a.set(match + off, v[w]);
@@ -310,7 +310,7 @@ TEST_IF(ColumnLarge_Less, TEST_DURATION >= 3)
 
                             accu.clear();
                             QueryStateFindAll state(accu);
-                            a.find<Equal>(v[w] + 1, from, to, &state, nullptr);
+                            a.find<Equal>(v[w] + 1, from, to, &state);
 
                             a.set(match, v[w]);
                             a.set(match + off, v[w]);

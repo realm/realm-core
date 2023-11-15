@@ -237,6 +237,11 @@ public:
         return get_table()->get_column_name(get_col_key());
     }
 
+    // These are shadowed by typed versions in subclasses
+    using value_type = Mixed;
+    CollectionIterator<CollectionBase> begin() const;
+    CollectionIterator<CollectionBase> end() const;
+
 protected:
     friend class Transaction;
     CollectionBase() noexcept = default;
@@ -991,7 +996,12 @@ struct CollectionIterator {
 
     pointer operator->() const
     {
-        m_val = m_list->get(m_ndx);
+        if constexpr (std::is_same_v<L, CollectionBase>) {
+            m_val = m_list->get_any(m_ndx);
+        }
+        else {
+            m_val = m_list->get(m_ndx);
+        }
         return &m_val;
     }
 
@@ -1077,6 +1087,15 @@ private:
     size_t m_ndx = size_t(-1);
 };
 
+
+inline CollectionIterator<CollectionBase> CollectionBase::begin() const
+{
+    return CollectionIterator<CollectionBase>(this, 0);
+}
+inline CollectionIterator<CollectionBase> CollectionBase::end() const
+{
+    return CollectionIterator<CollectionBase>(this, size());
+}
 template <class T>
 class IteratorAdapter {
 public:

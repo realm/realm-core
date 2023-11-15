@@ -16,18 +16,18 @@
  *
  **************************************************************************/
 
-
 #include "realm/set.hpp"
+
 #include "realm/array_basic.hpp"
-#include "realm/array_integer.hpp"
-#include "realm/array_bool.hpp"
-#include "realm/array_string.hpp"
 #include "realm/array_binary.hpp"
-#include "realm/array_timestamp.hpp"
+#include "realm/array_bool.hpp"
 #include "realm/array_decimal128.hpp"
 #include "realm/array_fixed_bytes.hpp"
-#include "realm/array_typed_link.hpp"
+#include "realm/array_integer.hpp"
 #include "realm/array_mixed.hpp"
+#include "realm/array_string.hpp"
+#include "realm/array_timestamp.hpp"
+#include "realm/array_typed_link.hpp"
 #include "realm/replication.hpp"
 
 #include <numeric> // std::iota
@@ -52,16 +52,185 @@ void SetBase::clear_repl(Replication* repl) const
     repl->set_clear(*this);
 }
 
-std::vector<Mixed> SetBase::convert_to_mixed_set(const CollectionBase& rhs)
+static std::vector<Mixed> convert_to_set(const CollectionBase& rhs)
 {
-    std::vector<Mixed> mixed;
-    mixed.reserve(rhs.size());
-    for (size_t i = 0; i < rhs.size(); i++) {
-        mixed.push_back(rhs.get_any(i));
-    }
+    std::vector<Mixed> mixed(rhs.begin(), rhs.end());
     std::sort(mixed.begin(), mixed.end(), SetElementLessThan<Mixed>());
     mixed.erase(std::unique(mixed.begin(), mixed.end()), mixed.end());
     return mixed;
+}
+
+bool SetBase::is_subset_of(const CollectionBase& rhs) const
+{
+    if (auto other_set = dynamic_cast<const SetBase*>(&rhs)) {
+        return is_subset_of(other_set->begin(), other_set->end());
+    }
+    auto other_set = convert_to_set(rhs);
+    return is_subset_of(other_set.begin(), other_set.end());
+}
+
+template <class It1, class It2>
+bool SetBase::is_subset_of(It1 first, It2 last) const
+{
+    return std::includes(first, last, begin(), end(), SetElementLessThan<Mixed>{});
+}
+
+bool SetBase::is_strict_subset_of(const CollectionBase& rhs) const
+{
+    if (auto other_set = dynamic_cast<const SetBase*>(&rhs)) {
+        return size() != rhs.size() && is_subset_of(other_set->begin(), other_set->end());
+    }
+    auto other_set = convert_to_set(rhs);
+    return size() != other_set.size() && is_subset_of(other_set.begin(), other_set.end());
+}
+
+bool SetBase::is_superset_of(const CollectionBase& rhs) const
+{
+    if (auto other_set = dynamic_cast<const SetBase*>(&rhs)) {
+        return is_superset_of(other_set->begin(), other_set->end());
+    }
+    auto other_set = convert_to_set(rhs);
+    return is_superset_of(other_set.begin(), other_set.end());
+}
+
+template <class It1, class It2>
+bool SetBase::is_superset_of(It1 first, It2 last) const
+{
+    return std::includes(begin(), end(), first, last, SetElementLessThan<Mixed>{});
+}
+
+bool SetBase::is_strict_superset_of(const CollectionBase& rhs) const
+{
+    if (auto other_set = dynamic_cast<const SetBase*>(&rhs)) {
+        return size() != rhs.size() && is_superset_of(other_set->begin(), other_set->end());
+    }
+    auto other_set = convert_to_set(rhs);
+    return size() != other_set.size() && is_superset_of(other_set.begin(), other_set.end());
+}
+
+bool SetBase::intersects(const CollectionBase& rhs) const
+{
+    if (auto other_set = dynamic_cast<const SetBase*>(&rhs)) {
+        return intersects(other_set->begin(), other_set->end());
+    }
+    auto other_set = convert_to_set(rhs);
+    return intersects(other_set.begin(), other_set.end());
+}
+
+template <class It1, class It2>
+bool SetBase::intersects(It1 first, It2 last) const
+{
+    SetElementLessThan<Mixed> less;
+    auto it = begin();
+    while (it != end() && first != last) {
+        if (less(*it, *first)) {
+            ++it;
+        }
+        else if (less(*first, *it)) {
+            ++first;
+        }
+        else {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool SetBase::set_equals(const CollectionBase& rhs) const
+{
+    if (auto other_set = dynamic_cast<const SetBase*>(&rhs)) {
+        return size() == rhs.size() && is_subset_of(other_set->begin(), other_set->end());
+    }
+    auto other_set = convert_to_set(rhs);
+    return size() == other_set.size() && is_subset_of(other_set.begin(), other_set.end());
+}
+
+void SetBase::assign_union(const CollectionBase& rhs)
+{
+    if (auto other_set = dynamic_cast<const SetBase*>(&rhs)) {
+        return assign_union(other_set->begin(), other_set->end());
+    }
+    auto other_set = convert_to_set(rhs);
+    return assign_union(other_set.begin(), other_set.end());
+}
+
+template <class It1, class It2>
+void SetBase::assign_union(It1 first, It2 last)
+{
+    std::vector<Mixed> the_diff;
+    std::set_difference(first, last, begin(), end(), std::back_inserter(the_diff), SetElementLessThan<Mixed>{});
+    // 'the_diff' now contains all the elements that are in foreign set, but not in 'this'
+    // Now insert those elements
+    for (auto&& value : the_diff) {
+        insert_any(value);
+    }
+}
+
+void SetBase::assign_intersection(const CollectionBase& rhs)
+{
+    if (auto other_set = dynamic_cast<const SetBase*>(&rhs)) {
+        return assign_intersection(other_set->begin(), other_set->end());
+    }
+    auto other_set = convert_to_set(rhs);
+    return assign_intersection(other_set.begin(), other_set.end());
+}
+
+template <class It1, class It2>
+void SetBase::assign_intersection(It1 first, It2 last)
+{
+    std::vector<Mixed> intersection;
+    std::set_intersection(first, last, begin(), end(), std::back_inserter(intersection), SetElementLessThan<Mixed>{});
+    clear();
+    // Elements in intersection comes from foreign set, so ok to use here
+    for (auto&& value : intersection) {
+        insert_any(value);
+    }
+}
+
+void SetBase::assign_difference(const CollectionBase& rhs)
+{
+    if (auto other_set = dynamic_cast<const SetBase*>(&rhs)) {
+        return assign_difference(other_set->begin(), other_set->end());
+    }
+    auto other_set = convert_to_set(rhs);
+    return assign_difference(other_set.begin(), other_set.end());
+}
+
+template <class It1, class It2>
+void SetBase::assign_difference(It1 first, It2 last)
+{
+    std::vector<Mixed> intersection;
+    std::set_intersection(first, last, begin(), end(), std::back_inserter(intersection), SetElementLessThan<Mixed>{});
+    // 'intersection' now contains all the elements that are in both foreign set and 'this'.
+    // Remove those elements. The elements comes from the foreign set, so ok to refer to.
+    for (auto&& value : intersection) {
+        erase_any(value);
+    }
+}
+
+void SetBase::assign_symmetric_difference(const CollectionBase& rhs)
+{
+    if (auto other_set = dynamic_cast<const SetBase*>(&rhs)) {
+        return assign_symmetric_difference(other_set->begin(), other_set->end());
+    }
+    auto other_set = convert_to_set(rhs);
+    return assign_symmetric_difference(other_set.begin(), other_set.end());
+}
+
+template <class It1, class It2>
+void SetBase::assign_symmetric_difference(It1 first, It2 last)
+{
+    std::vector<Mixed> difference;
+    std::set_difference(first, last, begin(), end(), std::back_inserter(difference), SetElementLessThan<Mixed>{});
+    std::vector<Mixed> intersection;
+    std::set_intersection(first, last, begin(), end(), std::back_inserter(intersection), SetElementLessThan<Mixed>{});
+    // Now remove the common elements and add the differences
+    for (auto&& value : intersection) {
+        erase_any(value);
+    }
+    for (auto&& value : difference) {
+        insert_any(value);
+    }
 }
 
 template <>
@@ -168,6 +337,13 @@ void Set<ObjKey>::do_clear()
 }
 
 template <>
+void Set<ObjKey>::migrate()
+{
+}
+
+template class Set<ObjKey>;
+
+template <>
 void Set<ObjLink>::do_insert(size_t ndx, ObjLink target_link)
 {
     set_backlink(m_col_key, target_link);
@@ -238,18 +414,19 @@ void Set<Mixed>::migrate()
 {
     // We should just move all string values to be before the binary values
     size_t first_binary = size();
+    BPlusTree<Mixed>& my_tree(tree());
     for (size_t n = 0; n < size(); n++) {
-        if (tree().get(n).is_type(type_Binary)) {
+        if (my_tree.get(n).is_type(type_Binary)) {
             first_binary = n;
             break;
         }
     }
 
     for (size_t n = first_binary; n < size(); n++) {
-        if (tree().get(n).is_type(type_String)) {
-            tree().insert(first_binary, Mixed());
-            tree().swap(n + 1, first_binary);
-            tree().erase(n + 1);
+        if (my_tree.get(n).is_type(type_String)) {
+            my_tree.insert(first_binary, Mixed());
+            my_tree.swap(n + 1, first_binary);
+            my_tree.erase(n + 1);
             first_binary++;
         }
     }
@@ -319,36 +496,6 @@ void LnkSet::remove_all_target_rows()
     if (m_set.update()) {
         _impl::TableFriend::batch_erase_rows(*get_target_table(), m_set.tree());
     }
-}
-
-bool LnkSet::is_subset_of(const CollectionBase& rhs) const
-{
-    return this->m_set.is_subset_of(rhs);
-}
-
-bool LnkSet::is_strict_subset_of(const CollectionBase& rhs) const
-{
-    return this->m_set.is_strict_subset_of(rhs);
-}
-
-bool LnkSet::is_superset_of(const CollectionBase& rhs) const
-{
-    return this->m_set.is_superset_of(rhs);
-}
-
-bool LnkSet::is_strict_superset_of(const CollectionBase& rhs) const
-{
-    return this->m_set.is_strict_superset_of(rhs);
-}
-
-bool LnkSet::intersects(const CollectionBase& rhs) const
-{
-    return this->m_set.intersects(rhs);
-}
-
-bool LnkSet::set_equals(const CollectionBase& rhs) const
-{
-    return this->m_set.set_equals(rhs);
 }
 
 void LnkSet::to_json(std::ostream& out, size_t link_depth, JSONOutputMode output_mode,

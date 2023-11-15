@@ -59,6 +59,7 @@
 typedef struct shared_realm realm_t;
 typedef struct realm_schema realm_schema_t;
 typedef struct realm_scheduler realm_scheduler_t;
+typedef struct realm_work_queue realm_work_queue_t;
 typedef struct realm_thread_safe_reference realm_thread_safe_reference_t;
 typedef void (*realm_free_userdata_func_t)(realm_userdata_t userdata);
 typedef realm_userdata_t (*realm_clone_userdata_func_t)(const realm_userdata_t userdata);
@@ -342,7 +343,7 @@ typedef void (*realm_async_commit_func_t)(realm_userdata_t userdata, bool error,
 typedef void (*realm_on_schema_change_func_t)(realm_userdata_t userdata, const realm_schema_t* new_schema);
 
 /* Scheduler types */
-typedef void (*realm_scheduler_notify_func_t)(realm_userdata_t userdata);
+typedef void (*realm_scheduler_notify_func_t)(realm_userdata_t userdata, realm_work_queue_t* work_queue);
 typedef bool (*realm_scheduler_is_on_thread_func_t)(realm_userdata_t userdata);
 typedef bool (*realm_scheduler_is_same_as_func_t)(const realm_userdata_t scheduler_userdata_1,
                                                   const realm_userdata_t scheduler_userdata_2);
@@ -929,7 +930,7 @@ realm_scheduler_new(realm_userdata_t userdata, realm_free_userdata_func_t userda
  * be called each time the notify callback passed to the scheduler
  * is invoked.
  */
-RLM_API void realm_scheduler_perform_work(realm_scheduler_t*);
+RLM_API void realm_scheduler_perform_work(realm_work_queue_t*);
 /**
  * Create an instance of the default scheduler for the current platform,
  * normally confined to the calling thread.

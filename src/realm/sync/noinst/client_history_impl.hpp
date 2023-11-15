@@ -82,7 +82,6 @@ public:
 class ClientHistory final : public _impl::History, public TransformHistory {
 public:
     using version_type = sync::version_type;
-    using RemoteChangeset = Transformer::RemoteChangeset;
 
     struct UploadChangeset {
         timestamp_type origin_timestamp;
@@ -152,6 +151,9 @@ public:
     /// reestablish the connection between the client file and the server file
     /// when engaging in future synchronization sessions.
     void set_client_file_ident(SaltedFileIdent client_file_ident, bool fix_up_object_ids);
+
+    /// Gets the client file ident set with `set_client_file_ident`, or `{0, 0}` if it has never been set.
+    SaltedFileIdent get_client_file_ident(const Transaction& tr) const;
 
     /// Stores the synchronization progress in the associated Realm file in a
     /// way that makes it available via get_status() during future
@@ -272,10 +274,6 @@ private:
 
     ClientReplication& m_replication;
     DB* m_db = nullptr;
-
-    // FIXME: All history objects belonging to a particular client object
-    // (sync::Client) should use a single shared transformer object.
-    std::unique_ptr<Transformer> m_transformer;
 
     /// The version on which the first changeset in the continuous transactions
     /// history is based, or if that history is empty, the version associated
@@ -413,7 +411,6 @@ private:
     void trim_sync_history();
     void do_trim_sync_history(std::size_t n);
     void clamp_sync_version_range(version_type& begin, version_type& end) const noexcept;
-    Transformer& get_transformer();
     void fix_up_client_file_ident_in_stored_changesets(Transaction&, file_ident_type);
     void record_current_schema_version();
     static void record_current_schema_version(Array& schema_versions, version_type snapshot_version);
@@ -534,13 +531,6 @@ inline void ClientHistory::clamp_sync_version_range(version_type& begin, version
         if (end < m_sync_history_base_version)
             end = m_sync_history_base_version;
     }
-}
-
-inline auto ClientHistory::get_transformer() -> Transformer&
-{
-    if (!m_transformer)
-        m_transformer = make_transformer(); // Throws
-    return *m_transformer;
 }
 
 

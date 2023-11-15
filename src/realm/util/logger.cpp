@@ -167,6 +167,8 @@ const std::string_view Logger::level_to_string(Level level) noexcept
 
 void StderrLogger::do_log(const LogCategory& cat, Level level, const std::string& message)
 {
+    static Mutex mutex;
+    LockGuard l(mutex);
     // std::cerr is unbuffered, so no need to flush
     std::cerr << cat.get_name() << " - " << get_level_prefix(level) << message << '\n'; // Throws
 }

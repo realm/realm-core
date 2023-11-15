@@ -1070,18 +1070,18 @@ TEST_CASE("Get Realm using Async Open", "[sync][pbs][async open]") {
             progress_notifier2_called = true;
         });
         task->start([&](ThreadSafeReference realm_ref, std::exception_ptr err) {
-            REQUIRE(!err);
-            SharedRealm realm = Realm::get_shared_realm(std::move(realm_ref));
-            REQUIRE(realm);
             std::lock_guard<std::mutex> guard(mutex);
+            REQUIRE(!err);
+            REQUIRE(realm_ref);
             task1_completed = true;
         });
         task->cancel();
+        ThreadSafeReference rref;
         task2->start([&](ThreadSafeReference realm_ref, std::exception_ptr err) {
-            REQUIRE(!err);
-            SharedRealm realm = Realm::get_shared_realm(std::move(realm_ref));
-            REQUIRE(realm);
             std::lock_guard<std::mutex> guard(mutex);
+            REQUIRE(!err);
+            REQUIRE(realm_ref);
+            rref = std::move(realm_ref);
             task2_completed = true;
         });
         write = nullptr; // unblock sync
@@ -1094,6 +1094,8 @@ TEST_CASE("Get Realm using Async Open", "[sync][pbs][async open]") {
         REQUIRE(!task1_completed);
         REQUIRE(progress_notifier2_called);
         REQUIRE(task2_completed);
+        SharedRealm realm = Realm::get_shared_realm(std::move(rref));
+        REQUIRE(realm);
     }
 
     SECTION("downloads latest state for Realms which already exist locally") {

@@ -537,9 +537,7 @@ private:
 
     static Mixed unresolved_to_null(Mixed value) noexcept
     {
-        if (value.is_type(type_TypedLink) && value.is_unresolved_link())
-            return Mixed{};
-        return value;
+        return value.is_unresolved_link() ? Mixed{} : value;
     }
     Mixed do_get(size_t ndx, const char* msg) const
     {

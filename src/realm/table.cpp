@@ -1603,12 +1603,11 @@ void Table::aggregate(QueryStateBase& st, ColKey column_key) const
         cluster->init_leaf(column_key, &leaf);
         st.m_key_offset = cluster->get_offset();
         st.m_key_values = cluster->get_key_array();
-
+        st.set_payload_column(&leaf);
         bool cont = true;
         size_t sz = leaf.size();
         for (size_t local_index = 0; cont && local_index < sz; local_index++) {
-            auto v = leaf.get(local_index);
-            cont = st.match(local_index, v);
+            cont = st.match(local_index);
         }
         return IteratorControl::AdvanceToNext;
     };

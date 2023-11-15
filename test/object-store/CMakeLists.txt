@@ -128,10 +128,18 @@ if(REALM_ENABLE_SYNC)
             message(FATAL_ERROR "REALM_MONGODB_ENDPOINT must be set when specifying REALM_ENABLE_AUTH_TESTS.")
         endif()
 
+        message(STATUS "Auth tests enabled: ${REALM_MONGODB_ENDPOINT}")
         target_compile_definitions(ObjectStoreTests PRIVATE
             REALM_ENABLE_AUTH_TESTS=1
             REALM_MONGODB_ENDPOINT="${REALM_MONGODB_ENDPOINT}"
         )
+
+        if(REALM_ADMIN_ENDPOINT)
+            message(STATUS "BAAS admin endpoint: ${REALM_ADMIN_ENDPOINT}")
+            target_compile_definitions(ObjectStoreTests PRIVATE
+                REALM_ADMIN_ENDPOINT="${REALM_ADMIN_ENDPOINT}"
+            )
+        endif()
 
         find_package(CURL REQUIRED)
         target_link_libraries(ObjectStoreTests CURL::libcurl)
@@ -150,6 +158,14 @@ if(REALM_TEST_LOGGING)
         )
     endif()
     message(STATUS "Test logging enabled")
+endif()
+
+# Optional extra time to add to test timeout values
+if(REALM_TEST_TIMEOUT_EXTRA)
+    target_compile_definitions(ObjectStoreTests PRIVATE
+        TEST_TIMEOUT_EXTRA=${REALM_TEST_TIMEOUT_EXTRA}
+    )
+    message(STATUS "Test wait timeouts extended by ${REALM_TEST_TIMEOUT_EXTRA} seconds")
 endif()
 
 target_include_directories(ObjectStoreTests PRIVATE

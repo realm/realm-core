@@ -1032,7 +1032,7 @@ MemRef Array::create(Type type, bool context_flag, WidthType width_type, size_t 
 template <class cond, size_t bitwidth>
 bool Array::find_vtable(int64_t value, size_t start, size_t end, size_t baseindex, QueryStateBase* state) const
 {
-    return ArrayWithFind(*this).find_optimized<cond, bitwidth>(value, start, end, baseindex, state, nullptr);
+    return ArrayWithFind(*this).find_optimized<cond, bitwidth>(value, start, end, baseindex, state);
 }
 
 
@@ -1300,9 +1300,22 @@ bool QueryStateCount::match(size_t, Mixed) noexcept
     return (m_limit > m_match_count);
 }
 
+bool QueryStateCount::match(size_t) noexcept
+{
+    ++m_match_count;
+    return (m_limit > m_match_count);
+}
+
 bool QueryStateFindFirst::match(size_t index, Mixed) noexcept
 {
     m_match_count++;
+    m_state = index;
+    return false;
+}
+
+bool QueryStateFindFirst::match(size_t index) noexcept
+{
+    ++m_match_count;
     m_state = index;
     return false;
 }
@@ -1319,7 +1332,26 @@ bool QueryStateFindAll<std::vector<ObjKey>>::match(size_t index, Mixed) noexcept
 }
 
 template <>
+bool QueryStateFindAll<std::vector<ObjKey>>::match(size_t index) noexcept
+{
+    ++m_match_count;
+    int64_t key_value = (m_key_values ? m_key_values->get(index) : index) + m_key_offset;
+    m_keys.push_back(ObjKey(key_value));
+
+    return (m_limit > m_match_count);
+}
+
+template <>
 bool QueryStateFindAll<IntegerColumn>::match(size_t index, Mixed) noexcept
+{
+    ++m_match_count;
+    m_keys.add(index);
+
+    return (m_limit > m_match_count);
+}
+
+template <>
+bool QueryStateFindAll<IntegerColumn>::match(size_t index) noexcept
 {
     ++m_match_count;
     m_keys.add(index);

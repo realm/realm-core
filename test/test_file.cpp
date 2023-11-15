@@ -585,8 +585,13 @@ TEST(File_GetUniqueID)
         CHECK(uid2_1 == file2_1.get_unique_id());
     }
     else {
-        CHECK(uid1_1 == file2_1.get_unique_id());
-        CHECK(uid2_1 == file1_1.get_unique_id());
+        // fat32/exfat could reuse or reassign uid after truncate
+        // there is not much to guarantee about the values of uids
+        auto u1 = file1_1.get_unique_id();
+        auto u2 = file2_1.get_unique_id();
+        CHECK(u1 != u2);
+        auto u1_2 = file1_2.get_unique_id();
+        CHECK(u1 == u1_2);
     }
 }
 

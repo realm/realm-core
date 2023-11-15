@@ -221,8 +221,12 @@ struct Helpers {
     static void simulate_sync_error(SyncSession& session, const int& code, const std::string& message,
                                     const std::string& type, bool is_fatal)
     {
-        sync::SessionErrorInfo error(Status{type == "realm::sync::ProtocolError" ? ErrorCodes::SyncClientResetRequired : ErrorCodes::UnknownError, message}, sync::IsFatal(is_fatal));
-        error.server_requests_action = code == 211 ? sync::ProtocolErrorInfo::Action::ClientReset : sync::ProtocolErrorInfo::Action::Warning;
+        sync::SessionErrorInfo error(Status{type == "realm::sync::ProtocolError" ? ErrorCodes::SyncClientResetRequired
+                                                                                 : ErrorCodes::UnknownError,
+                                            message},
+                                     sync::IsFatal(is_fatal));
+        error.server_requests_action =
+            code == 211 ? sync::ProtocolErrorInfo::Action::ClientReset : sync::ProtocolErrorInfo::Action::Warning;
         SyncSession::OnlyForTesting::handle_error(session, std::move(error));
     }
 

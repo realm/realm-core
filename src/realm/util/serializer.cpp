@@ -74,7 +74,7 @@ static void out_dec(char** buffer, unsigned val, int width)
 static constexpr long epoc_julian_days = date_to_julian(1970, 1, 1); // 2440588
 static constexpr int seconds_in_a_day = 24 * 60 * 60;
 
-const char* Timestamp::to_string(char* buffer) const
+const char* Timestamp::to_string(std::array<char, 32>& buffer) const
 {
     if (is_null()) {
         return "null";
@@ -105,7 +105,7 @@ const char* Timestamp::to_string(char* buffer) const
 
     julian_to_date(julian_days, &year, &month, &day);
 
-    char* p = buffer;
+    char* p = buffer.data();
     if (year < 0) {
         *p++ = '-';
         year = -year;
@@ -123,9 +123,9 @@ const char* Timestamp::to_string(char* buffer) const
     out_dec(&p, secs, 2);
     *p = '\0';
     if (nano) {
-        snprintf(p, 32 - (p - buffer), ".%09d", nano);
+        snprintf(p, 32 - (p - buffer.data()), ".%09d", nano);
     }
-    return buffer;
+    return buffer.data();
 }
 
 namespace util {

@@ -311,7 +311,6 @@ set_target_properties(Storage PROPERTIES
     OUTPUT_NAME "realm"
 )
 
-target_compile_options(Storage PUBLIC ${REALM_SANITIZER_FLAGS})
 if(REALM_USE_FAST_LINKER)
     target_link_options(Storage PUBLIC ${REALM_USE_FAST_LINKER})
 endif()
@@ -320,9 +319,12 @@ target_compile_definitions(Storage PUBLIC
   $<$<CONFIG:Debug>:REALM_DEBUG=1>
 )
 
-if(NOT MSVC)
+if (REALM_SANITIZER_FLAGS)
     target_compile_options(Storage PUBLIC ${REALM_SANITIZER_FLAGS})
-    target_link_options(Storage PUBLIC ${REALM_SANITIZER_FLAGS})
+
+    if (REALM_SANITIZER_LINK_FLAGS)
+        target_link_options(Storage PUBLIC ${REALM_SANITIZER_LINK_FLAGS})
+    endif()
 endif()
 
 target_include_directories(Storage INTERFACE
@@ -362,6 +364,10 @@ elseif(APPLE)
 endif()
 
 target_link_libraries(Storage INTERFACE Threads::Threads)
+
+if(TARGET Backtrace::Backtrace)
+    target_link_libraries(Storage PUBLIC Backtrace::Backtrace)
+endif()
 
 if(REALM_ENABLE_ENCRYPTION AND UNIX AND NOT APPLE AND REALM_HAVE_OPENSSL)
     target_link_libraries(Storage PUBLIC OpenSSL::Crypto)
