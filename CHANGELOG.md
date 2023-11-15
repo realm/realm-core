@@ -6,7 +6,7 @@
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Fixed issues when manipulating sets of strings or sets of binary data ([#7135](https://github.com/realm/realm-core/issues/7135), since 13.23.2)
 
 ### Breaking changes
 * None.
