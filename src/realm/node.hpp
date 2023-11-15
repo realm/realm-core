@@ -329,8 +329,8 @@ protected:
     // Includes array header. Not necessarily 8-byte aligned.
     virtual size_t calc_byte_len(size_t num_items, size_t width) const;
     virtual size_t calc_item_count(size_t bytes, size_t width) const noexcept;
-    static void init_header(char* header, bool is_inner_bptree_node, bool has_refs, bool context_flag,
-                            WidthType width_type, int width, size_t size, size_t capacity) noexcept;
+    // static void init_header(char* header, bool is_inner_bptree_node, bool has_refs, bool context_flag,
+    //                        WidthType width_type, int width, size_t size, size_t capacity) noexcept;
 
 private:
     ArrayParent* m_parent = nullptr;
@@ -357,7 +357,7 @@ public:
     virtual void set_spec(Spec*, size_t) const {}
 };
 
-
+/*
 inline void Node::init_header(char* header, bool is_inner_bptree_node, bool has_refs, bool context_flag,
                               WidthType width_type, int width, size_t size, size_t capacity) noexcept
 {
@@ -374,6 +374,7 @@ inline void Node::init_header(char* header, bool is_inner_bptree_node, bool has_
     set_size_in_header(size, header);
     set_capacity_in_header(capacity, header);
 }
+*/
 } // namespace realm
 
 #endif /* REALM_NODE_HPP */

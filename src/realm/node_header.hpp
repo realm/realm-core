@@ -453,7 +453,9 @@ public:
     static void init_header(uint64_t* header, uint8_t kind, Encoding enc, uint8_t flags, size_t bits_pr_elem,
                             size_t num_elems)
     {
+        std::fill(header, header + header_size, 0);
         auto hb = (uint8_t*)header;
+        hb[3] = kind;
         if (kind == 0x41) {
             uint8_t wtype;
             if (enc == Encoding::WTypBits)
@@ -487,6 +489,7 @@ public:
     static void init_header(uint64_t* header, uint8_t kind, Encoding enc, uint8_t flags, size_t bits_pr_elemA,
                             size_t bits_pr_elemB, size_t num_elems)
     {
+        std::fill(header, header + header_size, 0);
         auto hb = (uint8_t*)header;
         if (kind == 0x41)
             REALM_ASSERT(false && "Illegal init args for legacy header");
@@ -507,6 +510,7 @@ public:
     static void init_header(uint64_t* header, uint8_t kind, Encoding enc, uint8_t flags, size_t bits_pr_elemA,
                             size_t bits_pr_elemB, size_t num_elemsA, size_t num_elemsB)
     {
+        std::fill(header, header + header_size, 0);
         auto hb = (uint8_t*)header;
         if (kind == 0x41)
             REALM_ASSERT(false && "Illegal init args for legacy header");

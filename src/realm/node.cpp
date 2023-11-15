@@ -33,11 +33,32 @@ MemRef Node::create_node(size_t size, Allocator& alloc, bool context_flag, Type 
     size_t byte_size = std::max(byte_size_0, size_t(initial_capacity));
 
     MemRef mem = alloc.alloc(byte_size); // Throws
-    char* header = mem.get_addr();
+    auto header = (uint64_t*)mem.get_addr();
+    Encoding encoding;
+    if (width_type == wtype_Bits)
+        encoding = Encoding::WTypBits;
+    else if (width_type == wtype_Multiply)
+        encoding = Encoding::WTypMult;
+    else if (width_type == wtype_Ignore)
+        encoding = Encoding::WTypIgn;
+    else {
+        REALM_ASSERT(false && "Wrong width type for encoding");
+    }
+    uint8_t flags = 0;
+    if (type == type_InnerBptreeNode)
+        flags |= (uint8_t)Flags::InnerBPTree | (uint8_t)Flags::HasRefs;
+    if (type != type_Normal)
+        flags |= (uint8_t)Flags::HasRefs;
+    if (context_flag)
+        flags |= (uint8_t)Flags::Context;
+    // size must be given in bits, but for wtype_Multiply an wtype_Ignore it is provided in bytes
+    if (width_type != wtype_Multiply)
+        size = size * 8;
+    init_header(header, 'A', encoding, flags, width, size);
 
-    init_header(header, type == type_InnerBptreeNode, type != type_Normal, context_flag, width_type, width, size,
-                byte_size);
-
+    // init_header(header, type == type_InnerBptreeNode, type != type_Normal, context_flag, width_type, width, size,
+    //             byte_size);
+    set_capacity_in_header(byte_size, mem.get_addr());
     return mem;
 }
 
