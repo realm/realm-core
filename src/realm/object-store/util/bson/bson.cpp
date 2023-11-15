@@ -20,9 +20,7 @@
 #include <realm/util/base64.hpp>
 #include <external/json/json.hpp>
 #include <sstream>
-#include <stack>
 #include <algorithm>
-#include <sstream>
 
 namespace realm {
 namespace bson {
@@ -536,6 +534,7 @@ struct LinearMap {
     using storage_type = std::vector<value_type>;
     using iterator = typename storage_type::iterator;
     using const_iterator = typename storage_type::const_iterator;
+    using key_compare = std::equal_to<K>;
 
     auto begin()
     {
@@ -601,6 +600,13 @@ Bson dom_elem_to_bson(const Json& json)
             return Bson(json.get<std::string>());
         case Json::value_t::boolean:
             return Bson(json.get<bool>());
+        case Json::value_t::binary: {
+            std::vector<char> out;
+            for (auto&& elem : json.get_binary()) {
+                out.push_back(elem);
+            }
+            return Bson(std::move(out));
+        }
         case Json::value_t::number_integer:
             return Bson(json.get<int64_t>());
         case Json::value_t::number_unsigned: {

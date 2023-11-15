@@ -72,9 +72,9 @@ protected:
 };
 
 template <class T>
-class Lst final : public CollectionBaseImpl<LstBase, Lst<T>> {
+class Lst final : public CollectionBaseImpl<LstBase> {
 public:
-    using Base = CollectionBaseImpl<LstBase, Lst<T>>;
+    using Base = CollectionBaseImpl<LstBase>;
     using iterator = LstIterator<T>;
     using value_type = T;
 
@@ -84,8 +84,6 @@ public:
     Lst(Lst&&) noexcept;
     Lst& operator=(const Lst& other);
     Lst& operator=(Lst&& other) noexcept;
-
-    using Base::operator==;
 
     iterator begin() const noexcept
     {
@@ -287,9 +285,7 @@ private:
 
     static Mixed unresolved_to_null(Mixed value) noexcept
     {
-        if (value.is_type(type_TypedLink) && value.is_unresolved_link())
-            return Mixed{};
-        return value;
+        return value.is_unresolved_link() ? Mixed{} : value;
     }
     T do_get(size_t ndx, const char* msg) const;
 };

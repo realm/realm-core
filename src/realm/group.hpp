@@ -24,14 +24,13 @@
 #include <optional>
 #include <stdexcept>
 #include <string>
-#include <vector>
+#include <set>
 #include <chrono>
 
 #include <realm/alloc_slab.hpp>
 #include <realm/exceptions.hpp>
 #include <realm/impl/cont_transact_hist.hpp>
 #include <realm/impl/output_stream.hpp>
-#include <realm/metrics/metrics.hpp>
 #include <realm/table.hpp>
 #include <realm/util/features.h>
 #include <realm/util/input_stream.hpp>
@@ -326,6 +325,7 @@ public:
     void rename_table(StringData name, StringData new_name, bool require_unique_name = true);
 
     Obj get_object(ObjLink link);
+    Obj try_get_object(ObjLink link) noexcept;
     void validate(ObjLink link) const;
 
     //@}
@@ -538,18 +538,6 @@ protected:
 private:
     static constexpr StringData g_class_name_prefix = "class_";
 
-    struct ToDeleteRef {
-        ToDeleteRef(TableKey tk, ObjKey k)
-            : table_key(tk)
-            , obj_key(k)
-            , ttl(std::chrono::steady_clock::now())
-        {
-        }
-        TableKey table_key;
-        ObjKey obj_key;
-        std::chrono::steady_clock::time_point ttl;
-    };
-
     // nullptr, if we're sharing an allocator provided during initialization
     std::unique_ptr<SlabAlloc> m_local_alloc;
     // in-use allocator. If local, then equal to m_local_alloc.
@@ -614,9 +602,7 @@ private:
 
     util::UniqueFunction<void(const CascadeNotification&)> m_notify_handler;
     util::UniqueFunction<void()> m_schema_change_handler;
-    std::shared_ptr<metrics::Metrics> m_metrics;
-    std::vector<ToDeleteRef> m_objects_to_delete;
-    size_t m_total_rows;
+    std::set<TableKey> m_tables_to_clear;
 
     Group(SlabAlloc* alloc) noexcept;
     void init_array_parents() noexcept;
@@ -689,9 +675,6 @@ private:
     void write(util::File& file, const char* encryption_key, uint_fast64_t version_number, TableWriter& writer) const;
     void write(std::ostream&, bool pad, uint_fast64_t version_numer, TableWriter& writer) const;
 
-    std::shared_ptr<metrics::Metrics> get_metrics() const noexcept;
-    void set_metrics(std::shared_ptr<metrics::Metrics> other) noexcept;
-    void update_num_objects();
     /// Memory mappings must have been updated to reflect any growth in filesize before
     /// calling advance_transact()
     void advance_transact(ref_type new_top_ref, util::InputStream*, bool writable);
@@ -814,6 +797,7 @@ private:
                                    std::optional<size_t> read_lock_file_size = util::none,
                                    std::optional<uint_fast64_t> read_lock_version = util::none);
 
+    Table* get_table_unchecked(TableKey);
     size_t find_table_index(StringData name) const noexcept;
     TableKey ndx2key(size_t ndx) const;
     size_t key2ndx(TableKey key) const;
@@ -833,10 +817,9 @@ private:
 
     friend class Table;
     friend class GroupWriter;
+    friend class GroupCommitter;
     friend class DB;
     friend class _impl::GroupFriend;
-    friend class metrics::QueryInfo;
-    friend class metrics::Metrics;
     friend class Transaction;
     friend class TableKeyIterator;
     friend class CascadeState;
@@ -952,11 +935,16 @@ inline TableKey Group::find_table(StringData name) const noexcept
     return (ndx != npos) ? ndx2key(ndx) : TableKey{};
 }
 
+inline Table* Group::get_table_unchecked(TableKey key)
+{
+    auto ndx = key2ndx_checked(key);
+    return do_get_table(ndx); // Throws
+}
+
 inline TableRef Group::get_table(TableKey key)
 {
     check_attached();
-    auto ndx = key2ndx_checked(key);
-    Table* table = do_get_table(ndx); // Throws
+    Table* table = get_table_unchecked(key);
     return TableRef(table, table ? table->m_alloc.get_instance_version() : 0);
 }
 
@@ -1173,16 +1161,6 @@ inline void Group::reset_free_space_tracking()
     m_alloc.reset_free_space_tracking(); // Throws
 }
 
-inline std::shared_ptr<metrics::Metrics> Group::get_metrics() const noexcept
-{
-    return m_metrics;
-}
-
-inline void Group::set_metrics(std::shared_ptr<metrics::Metrics> shared) noexcept
-{
-    m_metrics = shared;
-}
-
 // The purpose of this class is to give internal access to some, but
 // not all of the non-public parts of the Group class.
 class _impl::GroupFriend {
@@ -1326,7 +1304,9 @@ public:
     {
         // Nullify immediately if we don't need to send cascade notifications
         if (!notification_handler()) {
-            src_table.get_object(origin_key).nullify_link(src_col_key, target_link);
+            if (Obj obj = src_table.try_get_object(origin_key)) {
+                std::move(obj).nullify_link(src_col_key, target_link);
+            }
             return;
         }
 

@@ -59,6 +59,7 @@
 typedef struct shared_realm realm_t;
 typedef struct realm_schema realm_schema_t;
 typedef struct realm_scheduler realm_scheduler_t;
+typedef struct realm_work_queue realm_work_queue_t;
 typedef struct realm_thread_safe_reference realm_thread_safe_reference_t;
 typedef void (*realm_free_userdata_func_t)(realm_userdata_t userdata);
 typedef realm_userdata_t (*realm_clone_userdata_func_t)(const realm_userdata_t userdata);
@@ -194,7 +195,6 @@ typedef struct realm_value {
         realm_decimal128_t decimal128;
         realm_object_id_t object_id;
         realm_uuid_t uuid;
-
         realm_link_t link;
 
         char data[16];
@@ -339,7 +339,7 @@ typedef void (*realm_async_commit_func_t)(realm_userdata_t userdata, bool error,
 typedef void (*realm_on_schema_change_func_t)(realm_userdata_t userdata, const realm_schema_t* new_schema);
 
 /* Scheduler types */
-typedef void (*realm_scheduler_notify_func_t)(realm_userdata_t userdata);
+typedef void (*realm_scheduler_notify_func_t)(realm_userdata_t userdata, realm_work_queue_t* work_queue);
 typedef bool (*realm_scheduler_is_on_thread_func_t)(realm_userdata_t userdata);
 typedef bool (*realm_scheduler_is_same_as_func_t)(const realm_userdata_t scheduler_userdata_1,
                                                   const realm_userdata_t scheduler_userdata_2);
@@ -356,35 +356,70 @@ typedef struct realm_websocket_endpoint {
     bool is_ssl;            // true if SSL should be used
 } realm_websocket_endpoint_t;
 
+// The following definitions are intended for internal state and structures
+// used by the Sync Client. These values should be retained by the Platform
+// Networking CAPI implementation so they can be provided back to the Platform
+// Networking CAPI functions.
 typedef struct realm_sync_socket realm_sync_socket_t;
-typedef struct realm_sync_socket_callback realm_sync_socket_callback_t;
+typedef struct realm_sync_socket_callback realm_sync_socket_post_callback_t;
+typedef struct realm_sync_socket_callback realm_sync_socket_timer_callback_t;
+typedef struct realm_sync_socket_callback realm_sync_socket_write_callback_t;
 typedef void* realm_sync_socket_timer_t;
 typedef void* realm_sync_socket_websocket_t;
 typedef struct realm_websocket_observer realm_websocket_observer_t;
 
+// Called when the Sync Client posts a callback handler to be run within the context
+// of the event loop.
+// The post_callback pointer does not need to be released by the CAPI implementation.
 typedef void (*realm_sync_socket_post_func_t)(realm_userdata_t userdata,
-                                              realm_sync_socket_callback_t* realm_callback);
+                                              realm_sync_socket_post_callback_t* post_callback);
 
+// Called when a Sync Socket Timer is being created, which will start the timer countdown
+// immediately. The Timer CAPI implementation will need to be stored locally so it can
+// be used when calling realm_sync_socket_timer_complete() when the timer countdown
+// reaches 0 (i.e. expired) or realm_sync_socket_timer_canceled() when the timer is canceled.
+// The timer_callback pointer does not need to be released by the CAPI implementation.
 typedef realm_sync_socket_timer_t (*realm_sync_socket_create_timer_func_t)(
-    realm_userdata_t userdata, uint64_t delay_ms, realm_sync_socket_callback_t* realm_callback);
+    realm_userdata_t userdata, uint64_t delay_ms, realm_sync_socket_timer_callback_t* timer_callback);
 
+// Called when a Sync Socket Timer has been explicitly canceled or the Timer is being
+// destroyed. Use the realm_sync_socket_timer_canceled() function to notify the Sync Client
+// that the timer cancel is complete. NOTE: This function will always be called before the
+// timer is destroyed (even if the timer has completed), but the timer callback should only
+// be executed one time.
 typedef void (*realm_sync_socket_timer_canceled_func_t)(realm_userdata_t userdata,
                                                         realm_sync_socket_timer_t timer_userdata);
 
+// Called when the timer object has been destroyed so the Sync Socket Timer CAPI
+// implementation can clean up its timer resources.
 typedef void (*realm_sync_socket_timer_free_func_t)(realm_userdata_t userdata,
                                                     realm_sync_socket_timer_t timer_userdata);
 
+// Called when the Sync Client is initiating a connection to the server. The endpoint
+// structure contains the server address/URL and the websocket_observer will need to
+// be stored locally in the WebSocket CAPI implementation so it can be used with the
+// realm_sync_socket_websocket_[connected|message|error|closed]() functions when
+// providing WebSocket status or data to the Sync Client.
 typedef realm_sync_socket_websocket_t (*realm_sync_socket_connect_func_t)(
-    realm_userdata_t userdata, realm_websocket_endpoint_t endpoint,
-    realm_websocket_observer_t* realm_websocket_observer);
+    realm_userdata_t userdata, realm_websocket_endpoint_t endpoint, realm_websocket_observer_t* websocket_observer);
 
+// Called by a connection in the Sync Client when it needs to send data to the server. The
+// write_callback is used with realm_sync_socket_write_complete() to inform the connection
+// that the data has been transferred successfully.
+// If an error occurs during the async write operation, it needs to be provided to the
+// write_callback handler, and the websocket is exepected to be closed by calling
+// realm_sync_socket_websocket_error() followed by providing the error code and reason to
+// realm_sync_socket_websocket_closed().
+// The write_callback pointer does not need to be released by the CAPI implementation.
 typedef void (*realm_sync_socket_websocket_async_write_func_t)(realm_userdata_t userdata,
-                                                               realm_sync_socket_websocket_t websocket_userdata,
+                                                               realm_sync_socket_websocket_t websocket,
                                                                const char* data, size_t size,
-                                                               realm_sync_socket_callback_t* realm_callback);
+                                                               realm_sync_socket_write_callback_t* write_callback);
 
+// Called when the websocket has been destroyed in the Sync Client - no more write callbacks or observer
+// functions should be called when this function is called.
 typedef void (*realm_sync_socket_websocket_free_func_t)(realm_userdata_t userdata,
-                                                        realm_sync_socket_websocket_t websocket_userdata);
+                                                        realm_sync_socket_websocket_t websocket);
 
 /**
  * Get the VersionID of the current transaction.
@@ -444,9 +479,10 @@ RLM_API bool realm_get_last_error(realm_error_t* err);
  *
  * @param err A pointer to a `realm_error_t` struct that will be populated with
  *            information about the error. May not be NULL.
+ * @return A bool indicating whether or not an error is available to be returned
  * @see realm_get_last_error()
  */
-RLM_API void realm_get_async_error(const realm_async_error_t* err, realm_error_t* out_err);
+RLM_API bool realm_get_async_error(const realm_async_error_t* err, realm_error_t* out_err);
 
 /**
  * Convert the last error to `realm_async_error_t`, which can safely be passed
@@ -889,7 +925,7 @@ realm_scheduler_new(realm_userdata_t userdata, realm_free_userdata_func_t userda
  * be called each time the notify callback passed to the scheduler
  * is invoked.
  */
-RLM_API void realm_scheduler_perform_work(realm_scheduler_t*);
+RLM_API void realm_scheduler_perform_work(realm_work_queue_t*);
 /**
  * Create an instance of the default scheduler for the current platform,
  * normally confined to the calling thread.
@@ -1170,7 +1206,7 @@ RLM_API bool realm_compact(realm_t*, bool* did_compact);
  * Find and delete the table passed as parementer for the realm instance passed to this function.
  * @param table_name for the table the user wants to delete
  * @param table_deleted in order to indicate if the table was actually deleted from realm
- * @return true if no error has occured, false otherwise
+ * @return true if no error has occurred, false otherwise
  */
 RLM_API bool realm_remove_table(realm_t*, const char* table_name, bool* table_deleted);
 
@@ -1959,7 +1995,7 @@ RLM_API void realm_collection_changes_get_ranges(
     realm_collection_move_t* out_moves, size_t max_moves);
 
 /**
- * Returns the number of changes occured to the dictionary passed as argument
+ * Returns the number of changes occurred to the dictionary passed as argument
  *
  * @param changes valid ptr to the dictionary changes structure
  * @param out_deletions_size number of deletions
@@ -2283,7 +2319,7 @@ RLM_API bool realm_dictionary_get_keys(realm_dictionary_t*, size_t* out_size, re
  *
  * @param key to search in the dictionary
  * @param found True if the such key exists
- * @return True if no exception occured
+ * @return True if no exception occurred
  */
 RLM_API bool realm_dictionary_contains_key(const realm_dictionary_t*, realm_value_t key, bool* found);
 
@@ -2292,7 +2328,7 @@ RLM_API bool realm_dictionary_contains_key(const realm_dictionary_t*, realm_valu
  *
  * @param value to search in the dictionary
  * @param index the index of the value in the dictionry if such value exists
- * @return True if no exception occured
+ * @return True if no exception occurred
  */
 RLM_API bool realm_dictionary_contains_value(const realm_dictionary_t*, realm_value_t value, size_t* index);
 
@@ -2481,7 +2517,7 @@ RLM_API bool realm_query_delete_all(const realm_query_t*);
 
 /**
  * Set the boolean passed as argument to true or false whether the realm_results passed is valid or not
- * @return true/false if no exception has occured.
+ * @return true/false if no exception has occurred.
  */
 RLM_API bool realm_results_is_valid(const realm_results_t*, bool*);
 
@@ -2553,7 +2589,7 @@ RLM_API bool realm_results_get(realm_results_t*, size_t index, realm_value_t* ou
  *  @param value the value to find inside the realm results
  *  @param out_index the index where the object has been found, or realm::not_found
  *  @param out_found boolean indicating if the value has been found or not
- *  @return true if no error occured, false otherwise
+ *  @return true if no error occurred, false otherwise
  */
 RLM_API bool realm_results_find(realm_results_t*, realm_value_t* value, size_t* out_index, bool* out_found);
 
@@ -2575,11 +2611,19 @@ RLM_API bool realm_results_find(realm_results_t*, realm_value_t* value, size_t* 
 RLM_API realm_object_t* realm_results_get_object(realm_results_t*, size_t index);
 
 /**
+ * Return the query associated to the results passed as argument.
+ *
+ * @param results the ptr to a valid results object.
+ * @return a valid ptr to realm_query_t if no error has occurred
+ */
+RLM_API realm_query_t* realm_results_get_query(realm_results_t* results);
+
+/**
  * Find the index for the realm object passed as parameter inside realm results pointer passed a input parameter.
  *  @param value the value to find inside the realm results
  *  @param out_index the index where the object has been found, or realm::not_found
  *  @param out_found boolean indicating if the value has been found or not
- *  @return true if no error occured, false otherwise
+ *  @return true if no error occurred, false otherwise
  */
 RLM_API bool realm_results_find_object(realm_results_t*, realm_object_t* value, size_t* out_index, bool* out_found);
 
@@ -2744,8 +2788,7 @@ typedef enum realm_auth_provider {
     RLM_AUTH_PROVIDER_CUSTOM,
     RLM_AUTH_PROVIDER_EMAIL_PASSWORD,
     RLM_AUTH_PROVIDER_FUNCTION,
-    RLM_AUTH_PROVIDER_USER_API_KEY,
-    RLM_AUTH_PROVIDER_SERVER_API_KEY,
+    RLM_AUTH_PROVIDER_API_KEY,
 } realm_auth_provider_e;
 
 typedef struct realm_app_user_apikey {
@@ -2821,8 +2864,7 @@ RLM_API realm_app_credentials_t* realm_app_credentials_new_apple(const char* id_
 RLM_API realm_app_credentials_t* realm_app_credentials_new_jwt(const char* jwt_token) RLM_API_NOEXCEPT;
 RLM_API realm_app_credentials_t* realm_app_credentials_new_email_password(const char* email,
                                                                           realm_string_t password) RLM_API_NOEXCEPT;
-RLM_API realm_app_credentials_t* realm_app_credentials_new_user_api_key(const char* api_key) RLM_API_NOEXCEPT;
-RLM_API realm_app_credentials_t* realm_app_credentials_new_server_api_key(const char* api_key) RLM_API_NOEXCEPT;
+RLM_API realm_app_credentials_t* realm_app_credentials_new_api_key(const char* api_key) RLM_API_NOEXCEPT;
 
 /**
  * Create Custom Function authentication app credentials.
@@ -2845,14 +2887,10 @@ RLM_API realm_app_config_t* realm_app_config_new(const char* app_id,
                                                  const realm_http_transport_t* http_transport) RLM_API_NOEXCEPT;
 
 RLM_API void realm_app_config_set_base_url(realm_app_config_t*, const char*) RLM_API_NOEXCEPT;
-RLM_API void realm_app_config_set_local_app_name(realm_app_config_t*, const char*) RLM_API_NOEXCEPT;
-RLM_API void realm_app_config_set_local_app_version(realm_app_config_t*, const char*) RLM_API_NOEXCEPT;
 RLM_API void realm_app_config_set_default_request_timeout(realm_app_config_t*, uint64_t ms) RLM_API_NOEXCEPT;
-RLM_API void realm_app_config_set_platform(realm_app_config_t*, const char*) RLM_API_NOEXCEPT;
 RLM_API void realm_app_config_set_platform_version(realm_app_config_t*, const char*) RLM_API_NOEXCEPT;
 RLM_API void realm_app_config_set_sdk_version(realm_app_config_t*, const char*) RLM_API_NOEXCEPT;
 RLM_API void realm_app_config_set_sdk(realm_app_config_t* config, const char* sdk) RLM_API_NOEXCEPT;
-RLM_API void realm_app_config_set_cpu_arch(realm_app_config_t* config, const char* cpu_arch) RLM_API_NOEXCEPT;
 RLM_API void realm_app_config_set_device_name(realm_app_config_t* config, const char* device_name) RLM_API_NOEXCEPT;
 RLM_API void realm_app_config_set_device_version(realm_app_config_t* config,
                                                  const char* device_version) RLM_API_NOEXCEPT;
@@ -2860,6 +2898,7 @@ RLM_API void realm_app_config_set_framework_name(realm_app_config_t* config,
                                                  const char* framework_name) RLM_API_NOEXCEPT;
 RLM_API void realm_app_config_set_framework_version(realm_app_config_t* config,
                                                     const char* framework_version) RLM_API_NOEXCEPT;
+RLM_API void realm_app_config_set_bundle_id(realm_app_config_t* config, const char* bundle_id) RLM_API_NOEXCEPT;
 
 /**
  * Get an existing @a realm_app_credentials_t and return it's json representation
@@ -2875,25 +2914,6 @@ RLM_API const char* realm_app_credentials_serialize_as_json(realm_app_credential
  * @return A non-null pointer if no error occurred.
  */
 RLM_API realm_app_t* realm_app_create(const realm_app_config_t*, const realm_sync_client_config_t*);
-
-/**
- * @note this API will be removed and it is now deprecated in favour of realm_app_create
- *
- * Get an existing @a realm_app_t* instance with the same app id, or create it with the
- * configuration if it doesn't exist.
- *
- * @return A non-null pointer if no error occurred.
- */
-RLM_API realm_app_t* realm_app_get(const realm_app_config_t*, const realm_sync_client_config_t*);
-
-/**
- * @note this API will be removed and it is now deprecated in favour of realm_app_create
- *
- * Get an existing @a realm_app_t* instance from the cache.
- *
- * @return Cached app instance, or null if no cached app exists for this @a app_id.
- */
-RLM_API realm_app_t* realm_app_get_cached(const char* app_id) RLM_API_NOEXCEPT;
 
 /**
  * Clear all the cached @a realm_app_t* instances in the process.
@@ -3180,12 +3200,15 @@ RLM_API bool realm_app_push_notification_client_deregister_device(const realm_ap
  * Run a named MongoDB Realm function.
  *
  * @param serialized_ejson_args The arguments array to invoke the function with,
- *                              serialized as an Extended JSON string.
+ *                        serialized as an Extended JSON string.
+ * @param service_name The name of the remote service whose system function to call. Can be null,
+ *                        in which case the called function is expected to be a user function.
  * @return true, if no error occurred.
  */
 RLM_API bool realm_app_call_function(const realm_app_t*, const realm_user_t*, const char* function_name,
-                                     const char* serialized_ejson_args, realm_return_string_func_t callback,
-                                     realm_userdata_t userdata, realm_free_userdata_func_t userdata_free);
+                                     const char* serialized_ejson_args, const char* service_name,
+                                     realm_return_string_func_t callback, realm_userdata_t userdata,
+                                     realm_free_userdata_func_t userdata_free);
 
 /**
  * Instruct this app's sync client to immediately reconnect.
@@ -3245,12 +3268,8 @@ RLM_API realm_user_state_e realm_user_get_state(const realm_user_t* user) RLM_AP
 RLM_API bool realm_user_get_all_identities(const realm_user_t* user, realm_user_identity_t* out_identities,
                                            size_t capacity, size_t* out_n);
 
-RLM_API const char* realm_user_get_local_identity(const realm_user_t*) RLM_API_NOEXCEPT;
-
 // returned pointer must be manually released with realm_free()
 RLM_API char* realm_user_get_device_id(const realm_user_t*) RLM_API_NOEXCEPT;
-
-RLM_API realm_auth_provider_e realm_user_get_auth_provider(const realm_user_t*) RLM_API_NOEXCEPT;
 
 /**
  * Log out the user and mark it as logged out.
@@ -3346,26 +3365,6 @@ typedef enum realm_sync_progress_direction {
     RLM_SYNC_PROGRESS_DIRECTION_DOWNLOAD,
 } realm_sync_progress_direction_e;
 
-/**
- * Possible error categories realm_sync_error_code_t can fall in.
- */
-typedef enum realm_sync_error_category {
-    RLM_SYNC_ERROR_CATEGORY_CLIENT,
-    RLM_SYNC_ERROR_CATEGORY_CONNECTION,
-    RLM_SYNC_ERROR_CATEGORY_SESSION,
-    RLM_SYNC_ERROR_CATEGORY_WEBSOCKET,
-
-    /**
-     * System error - POSIX errno, Win32 HRESULT, etc.
-     */
-    RLM_SYNC_ERROR_CATEGORY_SYSTEM,
-
-    /**
-     * Unknown source of error.
-     */
-    RLM_SYNC_ERROR_CATEGORY_UNKNOWN,
-} realm_sync_error_category_e;
-
 typedef enum realm_sync_error_action {
     RLM_SYNC_ERROR_ACTION_NO_ACTION,
     RLM_SYNC_ERROR_ACTION_PROTOCOL_VIOLATION,
@@ -3381,17 +3380,6 @@ typedef enum realm_sync_error_action {
 
 typedef struct realm_sync_session realm_sync_session_t;
 typedef struct realm_async_open_task realm_async_open_task_t;
-
-// This type should never be returned from a function.
-// It's only meant as an asynchronous callback argument.
-// Pointers to this struct and its pointer members are only valid inside the scope
-// of the callback they were passed to.
-typedef struct realm_sync_error_code {
-    realm_sync_error_category_e category;
-    int value;
-    const char* message;
-    const char* category_name;
-} realm_sync_error_code_t;
 
 typedef struct realm_sync_error_user_info {
     const char* key;
@@ -3409,8 +3397,7 @@ typedef struct realm_sync_error_compensating_write_info {
 // Pointers to this struct and its pointer members are only valid inside the scope
 // of the callback they were passed to.
 typedef struct realm_sync_error {
-    realm_sync_error_code_t error_code;
-    const char* detailed_message;
+    realm_error_t status;
     const char* c_original_file_path_key;
     const char* c_recovery_file_path_key;
     bool is_fatal;
@@ -3434,7 +3421,7 @@ typedef struct realm_sync_error {
  *
  * @param error Null, if the operation completed successfully.
  */
-typedef void (*realm_sync_wait_for_completion_func_t)(realm_userdata_t userdata, realm_sync_error_code_t* error);
+typedef void (*realm_sync_wait_for_completion_func_t)(realm_userdata_t userdata, realm_error_t* error);
 typedef void (*realm_sync_connection_state_changed_func_t)(realm_userdata_t userdata,
                                                            realm_sync_connection_state_e old_state,
                                                            realm_sync_connection_state_e new_state);
@@ -3480,9 +3467,15 @@ typedef struct realm_sync_session_connection_state_notification_token
  *              the object and must release it when used.
  * @param error Null, if the operation complete successfully.
  */
+
+// invoked when the synchronized realm file has been downloaded
 typedef void (*realm_async_open_task_completion_func_t)(realm_userdata_t userdata,
                                                         realm_thread_safe_reference_t* realm,
                                                         const realm_async_error_t* error);
+
+// invoked once the file has been downloaded. Allows the caller to run some initial subscription before the completion
+// callback runs.
+typedef void (*realm_async_open_task_init_subscription_func_t)(realm_t* realm, realm_userdata_t userdata);
 
 RLM_API realm_sync_client_config_t* realm_sync_client_config_new(void) RLM_API_NOEXCEPT;
 RLM_API void realm_sync_client_config_set_base_file_path(realm_sync_client_config_t*, const char*) RLM_API_NOEXCEPT;
@@ -3545,7 +3538,10 @@ RLM_API void
 realm_sync_config_set_after_client_reset_handler(realm_sync_config_t*, realm_sync_after_client_reset_func_t,
                                                  realm_userdata_t userdata,
                                                  realm_free_userdata_func_t userdata_free) RLM_API_NOEXCEPT;
-
+RLM_API void realm_sync_config_set_initial_subscription_handler(realm_sync_config_t*,
+                                                                realm_async_open_task_init_subscription_func_t,
+                                                                bool rerun_on_open, realm_userdata_t userdata,
+                                                                realm_free_userdata_func_t userdata_free);
 /**
  * Fetch subscription id for the subscription passed as argument.
  * @return realm_object_id_t for the subscription passed as argument
@@ -3732,6 +3728,12 @@ RLM_API bool realm_sync_subscription_set_erase_by_query(realm_flx_sync_mutable_s
 RLM_API bool realm_sync_subscription_set_erase_by_results(realm_flx_sync_mutable_subscription_set_t*,
                                                           realm_results_t*, bool* erased);
 /**
+ *  Remove all subscriptions for a given class type. If operation completes successfully set the bool out param.
+ *  @return true if no error occurred, false otherwise (use realm_get_last_error for fetching the error).
+ */
+RLM_API bool realm_sync_subscription_set_erase_by_class_name(realm_flx_sync_mutable_subscription_set_t*, const char*,
+                                                             bool* erased);
+/**
  *  Commit the subscription_set passed as parameter (in order that all the changes made will take effect)
  *  @return pointer to a valid immutable subscription if commit was successful
  */
@@ -3867,13 +3869,13 @@ RLM_API void realm_sync_session_wait_for_upload_completion(realm_sync_session_t*
 /**
  * Wrapper for SyncSession::OnlyForTesting::handle_error. This routine should be used only for testing.
  * @param session ptr to a valid sync session
- * @param error_code error code to simulate
- * @param category category of the error to simulate
- * @param error_message string representing the error
+ * @param error_code realm_errno_e representing the error to simulate
+ * @param error_str error message to be included with Status
  * @param is_fatal boolean to signal if the error is fatal or not
  */
-RLM_API void realm_sync_session_handle_error_for_testing(const realm_sync_session_t* session, int error_code,
-                                                         int category, const char* error_message, bool is_fatal);
+RLM_API void realm_sync_session_handle_error_for_testing(const realm_sync_session_t* session,
+                                                         realm_errno_e error_code, const char* error_str,
+                                                         bool is_fatal);
 
 /**
  * In case of exception thrown in user code callbacks, this api will allow the sdk to store the user code exception
@@ -4101,6 +4103,26 @@ RLM_API bool realm_mongo_collection_find_one_and_delete(realm_mongodb_collection
                                                         realm_userdata_t data, realm_free_userdata_func_t delete_data,
                                                         realm_mongodb_callback_t callback);
 
+/**
+ * Creates a new sync socket instance for the Sync Client that handles the operations for a custom
+ * websocket and event loop implementation.
+ * @param userdata CAPI implementation specific pointer containing custom context data that is provided to
+ *                 each of the provided functions.
+ * @param userdata_free function that will be called when the sync socket is destroyed to delete userdata. This
+ *                      is required if userdata is not null.
+ * @param post_func function that will be called to post a callback handler onto the event loop - use the
+ *                  realm_sync_socket_post_complete() function when the callback handler is scheduled to run.
+ * @param create_timer_func function that will be called to create a new timer resource with the callback
+ *                          handler that will be run when the timer expires or an erorr occurs - use the
+ *                          realm_sync_socket_timer_canceled() function if the timer is canceled or the
+ *                          realm_sync_socket_timer_complete() function if the timer expires or an error occurs.
+ * @param cancel_timer_func function that will be called when the timer has been canceled by the sync client.
+ * @param free_timer_func function that will be called when the timer resource has been destroyed by the sync client.
+ * @param websocket_connect_func function that will be called when the sync client creates a websocket.
+ * @param websocket_write_func function that will be called when the sync client sends data over the websocket.
+ * @param websocket_free_func function that will be called when the sync client closes the websocket conneciton.
+ * @return a realm_sync_socket_t pointer suitable for passing to realm_sync_client_config_set_sync_socket()
+ */
 RLM_API realm_sync_socket_t* realm_sync_socket_new(
     realm_userdata_t userdata, realm_free_userdata_func_t userdata_free, realm_sync_socket_post_func_t post_func,
     realm_sync_socket_create_timer_func_t create_timer_func,
@@ -4109,18 +4131,103 @@ RLM_API realm_sync_socket_t* realm_sync_socket_new(
     realm_sync_socket_websocket_async_write_func_t websocket_write_func,
     realm_sync_socket_websocket_free_func_t websocket_free_func);
 
-RLM_API void realm_sync_socket_callback_complete(realm_sync_socket_callback_t* realm_callback,
-                                                 realm_web_socket_errno_e status, const char* reason);
+/**
+ * To be called to execute the callback handler provided to the create_timer_func when the timer is
+ * complete or an error occurs while processing the timer.
+ * @param timer_handler the timer callback handler that was provided when the timer was created.
+ * @param result the error code for the error that occurred or RLM_ERR_SYNC_SOCKET_SUCCESS if the timer
+ *               expired normally.
+ * @param reason a string describing details about the error that occurred or empty string if no error.
+ * NOTE: This function must be called by the event loop execution thread.
+ */
+RLM_API void realm_sync_socket_timer_complete(realm_sync_socket_timer_callback_t* timer_handler,
+                                              realm_sync_socket_callback_result_e result, const char* reason);
 
+/**
+ * To be called to execute the callback handler provided to the create_timer_func when the timer has been
+ * canceled.
+ * @param timer_handler the timer callback handler that was provided when the timer was created.
+ * NOTE: This function must be called by the event loop execution thread.
+ */
+RLM_API void realm_sync_socket_timer_canceled(realm_sync_socket_timer_callback_t* timer_handler);
+
+/**
+ * To be called to execute the callback function provided to the post_func when the event loop executes
+ * that post'ed operation. The post_handler resource will automatically be destroyed during this
+ * operation.
+ * @param post_handler the post callback handler that was originally provided to the post_func
+ * @param result the error code for the error that occurred or RLM_ERR_SYNC_SOCKET_SUCCESS if the
+ *               callback handler should be executed normally.
+ * @param reason a string describing details about the error that occurred or empty string if no error.
+ * NOTE: This function must be called by the event loop execution thread.
+ */
+RLM_API void realm_sync_socket_post_complete(realm_sync_socket_post_callback_t* post_handler,
+                                             realm_sync_socket_callback_result_e result, const char* reason);
+
+/**
+ * To be called to execute the callback function provided to the websocket_write_func when the write
+ * operation is complete. The write_handler resource will automatically be destroyed during this
+ * operation.
+ * @param write_handler the write callback handler that was originally provided to the websocket_write_func
+ * @param result the error code for the error that occurred or RLM_ERR_SYNC_SOCKET_SUCCESS if write completed
+ *               successfully
+ * @param reason a string describing details about the error that occurred or empty string if no error.
+ * NOTE: This function must be called by the event loop execution thread.
+ */
+RLM_API void realm_sync_socket_write_complete(realm_sync_socket_write_callback_t* write_handler,
+                                              realm_sync_socket_callback_result_e result, const char* reason);
+
+/**
+ * To be called when the websocket successfully connects to the server.
+ * @param realm_websocket_observer the websocket observer object that was provided to the websocket_connect_func
+ * @param protocol the value of the Sec-WebSocket-Protocol header in the connect response from the server.
+ * NOTE: This function must be called by the event loop execution thread and should not be called
+ *       after the websocket_free_func has been called to release the websocket resources.
+ */
 RLM_API void realm_sync_socket_websocket_connected(realm_websocket_observer_t* realm_websocket_observer,
                                                    const char* protocol);
 
+/**
+ * To be called when an error occurs - the actual error value will be provided when the websocket_closed
+ * function is called. This function informs that the socket object is in an error state and no further
+ * TX operations should be performed.
+ * @param realm_websocket_observer the websocket observer object that was provided to the websocket_connect_func
+ * NOTE: This function must be called by the event loop execution thread and should not be called
+ *       after the websocket_free_func has been called to release the websocket resources.
+ */
 RLM_API void realm_sync_socket_websocket_error(realm_websocket_observer_t* realm_websocket_observer);
 
-RLM_API void realm_sync_socket_websocket_message(realm_websocket_observer_t* realm_websocket_observer,
+/**
+ * To be called to provide the received data to the Sync Client when a write operation has completed.
+ * The data buffer can be safely discarded after this function has completed.
+ * @param realm_websocket_observer the websocket observer object that was provided to the websocket_connect_func
+ * @param data a pointer to the buffer that contains the data received over the websocket
+ * @param data_size the number of bytes in the data buffer
+ * @return bool designates whether the WebSocket object should continue processing messages. The normal return
+ *         value is true. False must be returned if the websocket object has been destroyed during execution of
+ *         the function.
+ * NOTE: This function must be called by the event loop execution thread and should not be called
+ *       after the websocket_free_func has been called to release the websocket resources.
+ */
+RLM_API bool realm_sync_socket_websocket_message(realm_websocket_observer_t* realm_websocket_observer,
                                                  const char* data, size_t data_size);
 
-RLM_API void realm_sync_socket_websocket_closed(realm_websocket_observer_t* realm_websocket_observer, bool was_clean,
-                                                realm_web_socket_errno_e status, const char* reason);
+/**
+ * To be called when the websocket has been closed, either due to an error or a normal close operation.
+ * @param realm_websocket_observer the websocket observer object that was provided to the websocket_connect_func
+ * @param was_clean boolean value that indicates whether this is a normal close situation (true), the
+ *                  close code was provided by the server via a close message (true), or if the close code was
+ *                  generated by the local websocket as a result of some other error (false) (e.g. host
+ *                  unreachable, etc.)
+ * @param code the websocket close code (per the WebSocket spec) that describes why the websocket was closed.
+ * @param reason a string describing details about the error that occurred or empty string if no error.
+ * @return bool designates whether the WebSocket object has been destroyed during the execution of this
+ *         function. The normal return value is True to indicate the WebSocket object is no longer valid. If
+ *         False is returned, the WebSocket object will be destroyed at some point in the future.
+ * NOTE: This function must be called by the event loop execution thread and should not be called
+ *       after the websocket_free_func has been called to release the websocket resources.
+ */
+RLM_API bool realm_sync_socket_websocket_closed(realm_websocket_observer_t* realm_websocket_observer, bool was_clean,
+                                                realm_web_socket_errno_e code, const char* reason);
 
 #endif // REALM_H

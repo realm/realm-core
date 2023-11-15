@@ -249,11 +249,6 @@ set(REALM_INSTALL_HEADERS
     util/to_string.hpp
     util/type_traits.hpp
     util/uri.hpp
-
-    metrics/metrics.hpp
-    metrics/metric_timer.hpp
-    metrics/query_info.hpp
-    metrics/transaction_info.hpp
 ) # REALM_INSTALL_HEADERS
 
 set(REALM_NOINST_HEADERS
@@ -279,14 +274,21 @@ set(REALM_NOINST_HEADERS
     util/value_reset_guard.hpp
 ) # REALM_NOINST_HEADERS
 
-list(APPEND REALM_SOURCES
-    metrics/metrics.cpp
-    metrics/metric_timer.cpp
-    metrics/query_info.cpp
-    metrics/transaction_info.cpp)
-
 if(NOT MSVC)
     list(APPEND REALM_SOURCES util/interprocess_mutex.cpp)
+endif()
+
+if (REALM_ENABLE_GEOSPATIAL)
+    list(APPEND REALM_SOURCES geospatial.cpp)
+    list(APPEND REALM_INSTALL_HEADERS geospatial.hpp)
+
+    set_source_files_properties(geospatial.cpp PROPERTIES
+        INCLUDE_DIRECTORIES "${RealmCore_SOURCE_DIR}/src/external"
+        # the only flag not supported with pragma diagnostic disable in src file by gcc until 13.
+        COMPILE_FLAGS "$<$<CXX_COMPILER_ID:GNU>: -Wno-unknown-pragmas>"
+    )
+
+    list(APPEND REALM_OBJECT_FILES $<TARGET_OBJECTS:s2geometry>)
 endif()
 
 add_library(Storage STATIC
@@ -297,13 +299,13 @@ add_library(Storage STATIC
     ${REALM_OBJECT_FILES}
     $<TARGET_OBJECTS:Bid>
 )
+
 add_library(Realm::Storage ALIAS Storage)
 
 set_target_properties(Storage PROPERTIES
     OUTPUT_NAME "realm"
 )
 
-target_compile_options(Storage PUBLIC ${REALM_SANITIZER_FLAGS})
 if(REALM_USE_FAST_LINKER)
     target_link_options(Storage PUBLIC ${REALM_USE_FAST_LINKER})
 endif()
@@ -312,9 +314,12 @@ target_compile_definitions(Storage PUBLIC
   $<$<CONFIG:Debug>:REALM_DEBUG=1>
 )
 
-if(NOT MSVC)
+if (REALM_SANITIZER_FLAGS)
     target_compile_options(Storage PUBLIC ${REALM_SANITIZER_FLAGS})
-    target_link_options(Storage PUBLIC ${REALM_SANITIZER_FLAGS})
+
+    if (REALM_SANITIZER_LINK_FLAGS)
+        target_link_options(Storage PUBLIC ${REALM_SANITIZER_LINK_FLAGS})
+    endif()
 endif()
 
 target_include_directories(Storage INTERFACE
@@ -355,6 +360,10 @@ endif()
 
 target_link_libraries(Storage INTERFACE Threads::Threads)
 
+if(TARGET Backtrace::Backtrace)
+    target_link_libraries(Storage PUBLIC Backtrace::Backtrace)
+endif()
+
 if(REALM_ENABLE_ENCRYPTION AND UNIX AND NOT APPLE AND REALM_HAVE_OPENSSL)
     target_link_libraries(Storage PUBLIC OpenSSL::Crypto)
 endif()
@@ -364,6 +373,9 @@ if(TARGET ZLIB::ZLIB)
     target_link_libraries(Storage PUBLIC ZLIB::ZLIB)
 elseif(APPLE)
     target_link_options(Storage PUBLIC "-lz")
+elseif(EMSCRIPTEN)
+    target_compile_options(Storage PUBLIC "-sUSE_ZLIB=1")
+    target_link_options(Storage PUBLIC "-sUSE_ZLIB=1")
 else()
     message(FATAL_ERROR "No zlib dependency defined")
 endif()
@@ -396,4 +408,5 @@ if (REALM_ENABLE_SYNC)
 endif()
 if(NOT REALM_BUILD_LIB_ONLY AND NOT WINDOWS_STORE)
     add_subdirectory(exec)
+    set_macos_only(exec)
 endif()

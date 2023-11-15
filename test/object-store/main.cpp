@@ -16,11 +16,15 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "util/crypt_key.hpp"
-#include "util/test_path.hpp"
+#include <util/crypt_key.hpp>
+#include <util/test_path.hpp>
 
 #include <realm/util/features.h>
 #include <realm/util/to_string.hpp>
+
+#if TEST_SCHEDULER_UV
+#include <realm/object-store/util/uv/scheduler.hpp>
+#endif
 
 #include <catch2/catch_all.hpp>
 #include <catch2/reporters/catch_reporter_cumulative_base.hpp>
@@ -28,20 +32,36 @@
 #include <catch2/reporters/catch_reporter_registrars.hpp>
 #include <external/json/json.hpp>
 
+#include <chrono>
+#include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <limits.h>
 
+using namespace std::chrono;
+
 int main(int argc, const char** argv)
 {
+    auto t1 = steady_clock::now();
+
     realm::test_util::initialize_test_path(1, argv);
 
     Catch::ConfigData config;
 
     if (const char* str = getenv("UNITTEST_EVERGREEN_TEST_RESULTS"); str && strlen(str) != 0) {
         std::cout << "Configuring evergreen reporter to store test results in " << str << std::endl;
+        // If the output file already exists, make a copy so these results can be appended to it
+        std::map<std::string, std::string> custom_options;
+        if (std::filesystem::exists(str)) {
+            std::string results_copy = realm::util::format("%1.bak", str);
+            std::filesystem::copy(str, results_copy, std::filesystem::copy_options::overwrite_existing);
+            custom_options["json_file"] = results_copy;
+            std::cout << "Existing results file copied to " << results_copy << std::endl;
+        }
         config.showDurations = Catch::ShowDurations::Always; // this is to help debug hangs in Evergreen
         config.reporterSpecifications.push_back(Catch::ReporterSpec{"console", {}, {}, {}});
-        config.reporterSpecifications.push_back(Catch::ReporterSpec{"evergreen", {str}, {}, {}});
+        config.reporterSpecifications.push_back(
+            Catch::ReporterSpec{"evergreen", {str}, {}, std::move(custom_options)});
     }
     else if (const char* str = getenv("UNITTEST_XML"); str && strlen(str) != 0) {
         std::cout << "Configuring jUnit reporter to store test results in " << str << std::endl;
@@ -60,9 +80,23 @@ int main(int argc, const char** argv)
         }
     }
 
+#ifdef TEST_TIMEOUT_EXTRA
+    std::cout << "Test wait timeouts extended by " << TEST_TIMEOUT_EXTRA << " seconds" << std::endl;
+#endif
+
+#if TEST_SCHEDULER_UV
+    realm::util::Scheduler::set_default_factory([]() {
+        return std::make_shared<realm::util::UvMainLoopScheduler>();
+    });
+#endif
+
     Catch::Session session;
     session.useConfigData(config);
     int result = session.run(argc, argv);
+
+    auto t2 = steady_clock::now();
+    auto ms_int = duration_cast<milliseconds>(t2 - t1);
+    std::cout << "Test time: " << (ms_int.count() / 1000.0) << "s" << std::endl << std::endl;
     return result < 0xff ? result : 0xff;
 }
 
@@ -150,7 +184,30 @@ public:
     }
     void testRunEndedCumulative() override
     {
-        auto results_arr = nlohmann::json::array();
+        auto& options = m_customOptions;
+        auto& json_file = options["json_file"];
+        nlohmann::json results_arr = nlohmann::json::array();
+        // If the results file already exists, include the results from that file
+        try {
+            if (!json_file.empty() && std::filesystem::exists(json_file)) {
+                std::ifstream f(json_file);
+                // Make sure the file was successfully opened and is not empty
+                if (f.is_open() && !f.eof()) {
+                    nlohmann::json existing_data = nlohmann::json::parse(f);
+                    auto results = existing_data.find("results");
+                    if (results != existing_data.end() && results->is_array()) {
+                        std::cout << "Appending tests from previous results" << std::endl;
+                        results_arr = *results;
+                    }
+                }
+            }
+        }
+        catch (nlohmann::json::exception&) {
+            // json parse error, ignore the entries
+        }
+        catch (std::exception&) {
+            // unable to open/read file
+        }
         for (const auto& [test_name, cur_result] : m_results) {
             auto to_millis = [](const auto& tp) -> double {
                 return static_cast<double>(
@@ -170,6 +227,10 @@ public:
         }
         auto result_file_obj = nlohmann::json{{"results", std::move(results_arr)}};
         m_stream << result_file_obj << std::endl;
+        if (!json_file.empty() && std::filesystem::exists(json_file)) {
+            // Delete the old results file
+            std::filesystem::remove(json_file);
+        }
     }
 
     TestResult m_pending_test;

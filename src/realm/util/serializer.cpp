@@ -19,6 +19,7 @@
 #include <realm/util/serializer.hpp>
 
 #include <realm/binary_data.hpp>
+#include <realm/geospatial.hpp>
 #include <realm/keys.hpp>
 #include <realm/null.hpp>
 #include <realm/query_expression.hpp>
@@ -26,12 +27,107 @@
 #include <realm/table.hpp>
 #include <realm/timestamp.hpp>
 #include <realm/util/base64.hpp>
-#include <realm/table.hpp>
 
 #include <cctype>
 #include <cmath>
+#include <iomanip>
 
 namespace realm {
+
+/* Uses Fliegel & Van Flandern algorithm */
+static constexpr long date_to_julian(int y, int m, int d)
+{
+    return (1461 * (y + 4800 + (m - 14) / 12)) / 4 + (367 * (m - 2 - 12 * ((m - 14) / 12))) / 12 -
+           (3 * ((y + 4900 + (m - 14) / 12) / 100)) / 4 + d - 32075;
+}
+
+static void julian_to_date(int jd, int* y, int* m, int* d)
+{
+    int L = jd + 68569;
+    int n = (4 * L) / 146097;
+    int i, j;
+
+    L = L - (146097 * n + 3) / 4;
+    i = (4000 * (L + 1)) / 1461001;
+    L = L - (1461 * i) / 4 + 31;
+    j = (80 * L) / 2447;
+    *d = L - (2447 * j) / 80;
+    L = j / 11;
+    *m = j + 2 - (12 * L);
+    *y = 100 * (n - 49) + i + L;
+}
+
+// Confirmed to work for all val < 16389
+static void out_dec(char** buffer, unsigned val, int width)
+{
+    int w = width;
+    char* p = *buffer;
+    while (width > 0) {
+        width--;
+        unsigned div10 = (val * 6554) >> 16;
+        p[width] = char(val - div10 * 10) + '0';
+        val = div10;
+    }
+    *buffer += w;
+}
+
+static constexpr long epoc_julian_days = date_to_julian(1970, 1, 1); // 2440588
+static constexpr int seconds_in_a_day = 24 * 60 * 60;
+
+const char* Timestamp::to_string(std::array<char, 32>& buffer) const
+{
+    if (is_null()) {
+        return "null";
+    }
+    int64_t seconds = get_seconds();
+    int32_t nano = get_nanoseconds();
+    if (nano < 0) {
+        nano += Timestamp::nanoseconds_per_second;
+        seconds--;
+    }
+
+    int64_t days = seconds / seconds_in_a_day;
+    int julian_days = int(days + epoc_julian_days);
+
+    int seconds_in_day = int(seconds - days * seconds_in_a_day);
+    if (seconds_in_day < 0) {
+        seconds_in_day += seconds_in_a_day;
+        julian_days--;
+    }
+
+    int year;
+    int month;
+    int day;
+    int hours = seconds_in_day / 3600;
+    int remainingSeconds = seconds_in_day - hours * 3600;
+    int minutes = remainingSeconds / 60;
+    int secs = remainingSeconds - minutes * 60;
+
+    julian_to_date(julian_days, &year, &month, &day);
+
+    char* p = buffer.data();
+    if (year < 0) {
+        *p++ = '-';
+        year = -year;
+    }
+    out_dec(&p, year, 4);
+    *p++ = '-';
+    out_dec(&p, month, 2);
+    *p++ = '-';
+    out_dec(&p, day, 2);
+    *p++ = ' ';
+    out_dec(&p, hours, 2);
+    *p++ = ':';
+    out_dec(&p, minutes, 2);
+    *p++ = ':';
+    out_dec(&p, secs, 2);
+    *p = '\0';
+    if (nano) {
+        snprintf(p, 32 - (p - buffer.data()), ".%09d", nano);
+    }
+    return buffer.data();
+}
+
 namespace util {
 namespace serializer {
 
@@ -213,6 +309,14 @@ std::string print_value<>(realm::TypeOfValue type)
     return '"' + type.to_string() + '"';
 }
 
+#if REALM_ENABLE_GEOSPATIAL
+template <>
+std::string print_value<>(const realm::Geospatial& geo)
+{
+    return geo.to_string();
+}
+#endif
+
 // The variable name must be unique with respect to the already chosen variables at
 // this level of subquery nesting and with respect to the names of the columns in the table.
 // This assumes that columns can start with '$' and that we might one day want to support
@@ -258,11 +362,10 @@ std::string SerialisationState::get_column_name(ConstTableRef table, ColKey col_
     if (col_type == col_type_BackLink) {
         const Table::BacklinkOrigin origin = table->find_backlink_origin(col_key);
         REALM_ASSERT(origin);
-        std::string source_table_name = origin->first->get_class_name();
+        StringData source_table_name = origin->first->get_class_name();
         std::string source_col_name = get_column_name(origin->first, origin->second);
 
-        return "@links" + util::serializer::value_separator + source_table_name + util::serializer::value_separator +
-               source_col_name;
+        return format("@links.%1.%2", source_table_name, source_col_name);
     }
     else if (col_key != ColKey()) {
         std::string col_name = table->get_column_name(col_key);
@@ -284,7 +387,7 @@ std::string SerialisationState::get_column_name(ConstTableRef table, ColKey col_
             }
             col_name = col_name.substr(0, pos) + "\\" + col_name.substr(pos);
             pos += 2;
-            pos = col_name.find_first_of(" \b\n\r", pos);
+            pos = col_name.find_first_of(" \t\r\n", pos);
         }
         return col_name;
     }

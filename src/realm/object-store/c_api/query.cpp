@@ -104,6 +104,17 @@ struct QueryArgumentsAdapter : query_parser::Arguments {
         return from_capi(m_args[i].arg[0].link);
     }
 
+#if REALM_ENABLE_GEOSPATIAL
+    Geospatial geospatial_for_argument(size_t i) final
+    {
+        verify_ndx(i);
+        // FIXME: implement this
+        throw LogicError{
+            ErrorCodes::RuntimeError,
+            util::format("geospatial in the C-API is not yet implemented (for argument %1)", i)}; // LCOV_EXCL_LINE
+    }
+#endif
+
     bool is_argument_null(size_t i) final
     {
         verify_ndx(i);
@@ -319,9 +330,8 @@ RLM_API realm_results_t* realm_get_backlinks(realm_object_t* object, realm_class
     return wrap_err([&]() {
         object->verify_attached();
         auto realm = object->realm();
-        auto source_table = realm->read_group().get_table(TableKey{source_table_key});
-        auto backlink_view = object->obj().get_backlink_view(source_table, ColKey{property_key});
-        return new realm_results_t{Results{realm, backlink_view}};
+        return new realm_results_t{
+            Results{realm, object->get_obj(), TableKey{source_table_key}, ColKey{property_key}}};
     });
 }
 
@@ -422,6 +432,16 @@ RLM_API realm_object_t* realm_results_get_object(realm_results_t* results, size_
     });
 }
 
+RLM_API realm_query_t* realm_results_get_query(realm_results_t* results)
+{
+    return wrap_err([&]() {
+        auto query = results->get_query();
+        auto shared_realm = results->get_realm();
+        auto ordering = query.get_ordering();
+        return new realm_query_t{std::move(query), std::move(ordering), shared_realm};
+    });
+}
+
 RLM_API bool realm_results_find_object(realm_results_t* results, realm_object_t* value, size_t* out_index,
                                        bool* out_found)
 {
@@ -432,7 +452,7 @@ RLM_API bool realm_results_find_object(realm_results_t* results, realm_object_t*
 
     return wrap_err([&]() {
         if (out_index) {
-            *out_index = results->index_of(value->obj());
+            *out_index = results->index_of(value->get_obj());
             if (out_found && *out_index != realm::not_found)
                 *out_found = true;
         }

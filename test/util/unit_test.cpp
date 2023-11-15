@@ -512,22 +512,21 @@ bool TestList::run(Config config)
     if (config.num_threads < 1)
         throw std::runtime_error("Bad number of threads");
 
-    std::shared_ptr<util::Logger> root_logger;
+    std::shared_ptr<util::Logger> shared_logger;
     if (config.logger) {
-        root_logger = config.logger;
+        shared_logger = config.logger;
     }
     else {
         if (config.log_timestamps) {
             util::TimestampStderrLogger::Config config;
             config.precision = util::TimestampStderrLogger::Precision::milliseconds;
             config.format = "%FT%T";
-            root_logger = std::make_shared<util::TimestampStderrLogger>(std::move(config)); // Throws
+            shared_logger = std::make_shared<util::TimestampStderrLogger>(std::move(config)); // Throws
         }
         else {
-            root_logger = std::make_shared<util::StderrLogger>(); // Throws
+            shared_logger = util::Logger::get_default_logger(); // Throws
         }
     }
-    std::shared_ptr<util::Logger> shared_logger = std::make_shared<util::ThreadSafeLogger>(root_logger);
 
     Reporter fallback_reporter;
     Reporter& reporter = config.reporter ? *config.reporter : fallback_reporter;
@@ -1034,7 +1033,7 @@ void SimpleReporter::fail(const TestContext& context, const char* file, long lin
     if (m_report_progress) {
         m_error_messages.push_back(msg);
     }
-    context.thread_context.report_logger.info(msg.c_str());
+    context.thread_context.report_logger.info("%1", msg.c_str());
 }
 
 void SimpleReporter::thread_end(const ThreadContext& context)

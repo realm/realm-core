@@ -119,8 +119,7 @@ public:
         const char* encryption_key = nullptr;
     };
 
-    struct Retry {
-    };
+    struct Retry {};
 
     /// \brief Attach this allocator to the specified file.
     ///
@@ -152,6 +151,12 @@ public:
     /// \throw FileAccessError
     /// \throw SlabAlloc::Retry
     ref_type attach_file(const std::string& file_path, Config& cfg, util::WriteObserver* write_observer = nullptr);
+
+    /// @brief Expand or contract file
+    /// @param ref_type ref to the top array
+    /// @param cfg configuration, see attach_file
+    /// \return true if the file size was changed
+    bool align_filesize_for_mmap(size_t ref_type, Config& cfg);
 
     /// If the attached file is in streaming form, convert it to normal form.
     ///
@@ -188,7 +193,7 @@ public:
 
     /// Reads file format from file header. Must be called from within a write
     /// transaction.
-    int get_committed_file_format_version() const noexcept;
+    int get_committed_file_format_version() noexcept;
 
     bool is_file_on_streaming_form() const
     {
@@ -204,13 +209,18 @@ public:
 
     /// Detach from a previously attached file or buffer.
     ///
+    /// if 'keep_file_attached' is set, only memory mappings will
+    /// be closed, but the file descriptor remains valid for further
+    /// operations on the file. Caller must close the file explicitly
+    /// to bring the allocator to a fully detached state.
+    ///
     /// This function does not reset free space tracking. To
     /// completely reset the allocator, you must also call
     /// reset_free_space_tracking().
     ///
     /// This function has no effect if the allocator is already in the
     /// detached state (idempotency).
-    void detach() noexcept;
+    void detach(bool keep_file_attached = false) noexcept;
 
     class DetachGuard;
 
@@ -711,6 +721,7 @@ private:
     friend class DB;
     friend class Group;
     friend class GroupWriter;
+    friend class GroupCommitter;
 };
 
 

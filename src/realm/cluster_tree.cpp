@@ -766,31 +766,6 @@ ClusterTree::ClusterTree(Table* owner, Allocator& alloc, size_t top_position_for
 
 ClusterTree::~ClusterTree() {}
 
-size_t ClusterTree::size_from_ref(ref_type ref, Allocator& alloc)
-{
-    size_t ret = 0;
-    if (ref) {
-        Array arr(alloc);
-        arr.init_from_ref(ref);
-        if (arr.is_inner_bptree_node()) {
-            ret = size_t(arr.get(2)) >> 1;
-        }
-        else {
-            int64_t rot = arr.get(0);
-            if (rot & 1) {
-                ret = size_t(rot) >> 1;
-            }
-            else {
-                ref_type key_ref = to_ref(rot);
-                MemRef mem(key_ref, alloc);
-                auto header = mem.get_addr();
-                ret = Node::get_size_from_header(header);
-            }
-        }
-    }
-    return ret;
-}
-
 std::unique_ptr<ClusterNode> ClusterTree::create_root_from_parent(ArrayParent* parent, size_t ndx_in_parent)
 {
     ref_type ref = parent->get_child_ref(ndx_in_parent);
@@ -1111,7 +1086,7 @@ void ClusterTree::verify() const
 #endif
 }
 
-void ClusterTree::nullify_links(ObjKey obj_key, CascadeState& state)
+void ClusterTree::nullify_incoming_links(ObjKey obj_key, CascadeState& state)
 {
     REALM_ASSERT(state.m_group);
     m_root->nullify_incoming_links(obj_key, state);
@@ -1205,16 +1180,10 @@ void ClusterTree::remove_all_links(CascadeState& state)
                         values.init_from_parent();
 
                         // Iterate through values and insert all link values
-                        values.traverse([&](BPlusTreeNode* node, size_t) {
-                            auto bplustree_leaf = static_cast<BPlusTree<Mixed>::LeafNode*>(node);
-                            auto sz = bplustree_leaf->size();
-                            for (size_t i = 0; i < sz; i++) {
-                                auto mix = bplustree_leaf->get(i);
-                                if (mix.is_type(type_TypedLink)) {
-                                    links.push_back(mix.get<ObjLink>());
-                                }
+                        values.for_all([&](Mixed val) {
+                            if (val.is_type(type_TypedLink)) {
+                                links.push_back(val.get<ObjLink>());
                             }
-                            return IteratorControl::AdvanceToNext;
                         });
 
                         if (links.size() > 0) {

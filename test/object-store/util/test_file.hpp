@@ -38,6 +38,9 @@
 
 #endif // REALM_ENABLE_SYNC
 
+#ifndef TEST_TIMEOUT_EXTRA
+#define TEST_TIMEOUT_EXTRA 0
+#endif
 
 namespace realm {
 struct AppSession;
@@ -72,6 +75,9 @@ private:
 struct TestFile : realm::Realm::Config {
     TestFile();
     ~TestFile();
+
+    TestFile(const TestFile&) = delete;
+    TestFile& operator=(const TestFile&) = delete;
 
     // The file should outlive the object, ie. should not be deleted in destructor
     void persist()
@@ -109,11 +115,13 @@ void on_change_but_no_notify(realm::Realm& realm);
 #if REALM_ENABLE_SYNC
 
 using StartImmediately = realm::util::TaggedBool<class StartImmediatelyTag>;
+using EnableSSL = realm::util::TaggedBool<class EnableSSLTag>;
 
 class SyncServer : private realm::sync::Clock {
 public:
     struct Config {
-        bool start_immediately = true;
+        StartImmediately start_immediately = true;
+        EnableSSL ssl = false;
         std::string local_dir;
     };
 
@@ -199,6 +207,9 @@ public:
         return m_transport.get();
     }
 
+    std::vector<realm::bson::BsonDocument> get_documents(realm::SyncUser& user, const std::string& object_type,
+                                                         size_t expected_count) const;
+
 private:
     std::shared_ptr<realm::app::App> m_app;
     std::unique_ptr<realm::AppSession> m_app_session;
@@ -219,6 +230,7 @@ public:
         realm::util::Logger::Level log_level = realm::util::Logger::Level::TEST_LOGGING_LEVEL;
         bool override_sync_route = true;
         std::shared_ptr<realm::app::GenericNetworkTransport> transport;
+        bool start_sync_client = true;
     };
 
     TestSyncManager(realm::SyncManager::MetadataMode mode);

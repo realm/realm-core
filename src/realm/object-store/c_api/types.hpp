@@ -21,6 +21,7 @@
 #include <realm/object-store/sync/sync_user.hpp>
 #include <realm/object-store/sync/mongo_collection.hpp>
 #include <realm/sync/binding_callback_thread_observer.hpp>
+#include <realm/sync/socket_provider.hpp>
 #include <realm/sync/subscriptions.hpp>
 #endif
 
@@ -273,8 +274,8 @@ struct realm_object : realm::c_api::WrapC, realm::Object {
     bool equals(const WrapC& other) const noexcept final
     {
         if (auto ptr = dynamic_cast<const realm_object_t*>(&other)) {
-            auto a = obj();
-            auto b = ptr->obj();
+            auto a = get_obj();
+            auto b = ptr->get_obj();
             return a.get_table() == b.get_table() && a.get_key() == b.get_key();
         }
         return false;
@@ -661,7 +662,7 @@ struct realm_user : realm::c_api::WrapC, std::shared_ptr<realm::SyncUser> {
     bool equals(const WrapC& other) const noexcept final
     {
         if (auto ptr = dynamic_cast<const realm_user*>(&other)) {
-            return *get() == *(ptr->get());
+            return get() == ptr->get();
         }
         return false;
     }
@@ -800,17 +801,24 @@ struct realm_sync_socket_callback : realm::c_api::WrapC,
     {
     }
 
-    realm_sync_socket_callback* clone() const override
-    {
-        return new realm_sync_socket_callback{*this};
-    }
-
     bool equals(const WrapC& other) const noexcept final
     {
         if (auto ptr = dynamic_cast<const realm_sync_socket_callback*>(&other)) {
             return get() == ptr->get();
         }
         return false;
+    }
+
+    void operator()(realm_sync_socket_callback_result_e result, const char* reason)
+    {
+        if (!get()) {
+            return;
+        }
+
+        auto complete_status = result == RLM_ERR_SYNC_SOCKET_SUCCESS
+                                   ? realm::Status::OK()
+                                   : realm::Status{static_cast<realm::ErrorCodes::Error>(result), reason};
+        (*get())(complete_status);
     }
 };
 

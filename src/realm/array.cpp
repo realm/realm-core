@@ -550,105 +550,6 @@ void Array::do_ensure_minimum_width(int_fast64_t value)
     }
 }
 
-void Array::set_all_to_zero()
-{
-    if (m_size == 0 || m_width == 0)
-        return;
-
-    copy_on_write(); // Throws
-
-    set_width_in_header(0, get_header());
-    update_width_cache_from_header();
-}
-
-
-namespace {
-
-template <size_t width>
-inline int64_t lower_bits()
-{
-    if (width == 1)
-        return 0xFFFFFFFFFFFFFFFFULL;
-    else if (width == 2)
-        return 0x5555555555555555ULL;
-    else if (width == 4)
-        return 0x1111111111111111ULL;
-    else if (width == 8)
-        return 0x0101010101010101ULL;
-    else if (width == 16)
-        return 0x0001000100010001ULL;
-    else if (width == 32)
-        return 0x0000000100000001ULL;
-    else if (width == 64)
-        return 0x0000000000000001ULL;
-    else {
-        REALM_ASSERT_DEBUG(false);
-        return int64_t(-1);
-    }
-}
-
-// Return true if 'value' has an element (of bit-width 'width') which is 0
-template <size_t width>
-inline bool has_zero_element(uint64_t value)
-{
-    uint64_t hasZeroByte;
-    uint64_t lower = lower_bits<width>();
-    uint64_t upper = lower_bits<width>() * 1ULL << (width == 0 ? 0 : (width - 1ULL));
-    hasZeroByte = (value - lower) & ~value & upper;
-    return hasZeroByte != 0;
-}
-
-
-// Finds zero element of bit width 'width'
-template <bool eq, size_t width>
-size_t find_zero(uint64_t v)
-{
-    size_t start = 0;
-    uint64_t hasZeroByte;
-
-    // Bisection optimization, speeds up small bitwidths with high match frequency. More partions than 2 do NOT pay
-    // off because the work done by test_zero() is wasted for the cases where the value exists in first half, but
-    // useful if it exists in last half. Sweet spot turns out to be the widths and partitions below.
-    if (width <= 8) {
-        hasZeroByte = has_zero_element<width>(v | 0xffffffff00000000ULL);
-        if (eq ? !hasZeroByte : (v & 0x00000000ffffffffULL) == 0) {
-            // 00?? -> increasing
-            start += 64 / no0(width) / 2;
-            if (width <= 4) {
-                hasZeroByte = has_zero_element<width>(v | 0xffff000000000000ULL);
-                if (eq ? !hasZeroByte : (v & 0x0000ffffffffffffULL) == 0) {
-                    // 000?
-                    start += 64 / no0(width) / 4;
-                }
-            }
-        }
-        else {
-            if (width <= 4) {
-                // ??00
-                hasZeroByte = has_zero_element<width>(v | 0xffffffffffff0000ULL);
-                if (eq ? !hasZeroByte : (v & 0x000000000000ffffULL) == 0) {
-                    // 0?00
-                    start += 64 / no0(width) / 4;
-                }
-            }
-        }
-    }
-
-    uint64_t mask =
-        (width == 64
-             ? ~0ULL
-             : ((1ULL << (width == 64 ? 0 : width)) - 1ULL)); // Warning free way of computing (1ULL << width) - 1
-    while (eq == (((v >> (width * start)) & mask) != 0)) {
-        start++;
-    }
-
-    return start;
-}
-
-} // namespace
-
-
-
 int64_t Array::sum(size_t start, size_t end) const
 {
     REALM_TEMPEX(return sum, m_width, (start, end));
@@ -1131,7 +1032,7 @@ MemRef Array::create(Type type, bool context_flag, WidthType width_type, size_t 
 template <class cond, size_t bitwidth>
 bool Array::find_vtable(int64_t value, size_t start, size_t end, size_t baseindex, QueryStateBase* state) const
 {
-    return ArrayWithFind(*this).find_optimized<cond, bitwidth>(value, start, end, baseindex, state, nullptr);
+    return ArrayWithFind(*this).find_optimized<cond, bitwidth>(value, start, end, baseindex, state);
 }
 
 
@@ -1168,60 +1069,73 @@ void Array::update_width_cache_from_header() noexcept
 }
 
 // This method reads 8 concecutive values into res[8], starting from index 'ndx'. It's allowed for the 8 values to
-// exceed array length; in this case, remainder of res[8] will be left untouched.
+// exceed array length; in this case, remainder of res[8] will be be set to 0.
 template <size_t w>
 void Array::get_chunk(size_t ndx, int64_t res[8]) const noexcept
 {
     REALM_ASSERT_3(ndx, <, m_size);
 
-    // To make Valgrind happy. Todo, I *think* it should work without, now, but if it reappears, add memset again.
-    // memset(res, 0, 8*8);
+    size_t i = 0;
 
-    if (REALM_X86_OR_X64_TRUE && (w == 1 || w == 2 || w == 4) && ndx + 32 < m_size) {
-        // This method is *multiple* times faster than performing 8 times get<w>, even if unrolled. Apparently
-        // compilers
-        // can't figure out to optimize it.
-        uint64_t c;
-        size_t bytealign = ndx / (8 / no0(w));
-        if (w == 1) {
-            c = *reinterpret_cast<uint16_t*>(m_data + bytealign);
-            c >>= (ndx - bytealign * 8) * w;
-        }
-        else if (w == 2) {
-            c = *reinterpret_cast<uint32_t*>(m_data + bytealign);
-            c >>= (ndx - bytealign * 4) * w;
-        }
-        else if (w == 4) {
-            c = *reinterpret_cast<uint64_t*>(m_data + bytealign);
-            c >>= (ndx - bytealign * 2) * w;
-        }
-        uint64_t mask = (w == 64 ? ~0ULL : ((1ULL << (w == 64 ? 0 : w)) - 1ULL));
-        // The '?' is to avoid warnings about shifting too much
-        res[0] = (c >> 0 * (w > 4 ? 0 : w)) & mask;
-        res[1] = (c >> 1 * (w > 4 ? 0 : w)) & mask;
-        res[2] = (c >> 2 * (w > 4 ? 0 : w)) & mask;
-        res[3] = (c >> 3 * (w > 4 ? 0 : w)) & mask;
-        res[4] = (c >> 4 * (w > 4 ? 0 : w)) & mask;
-        res[5] = (c >> 5 * (w > 4 ? 0 : w)) & mask;
-        res[6] = (c >> 6 * (w > 4 ? 0 : w)) & mask;
-        res[7] = (c >> 7 * (w > 4 ? 0 : w)) & mask;
-    }
-    else {
-        size_t i = 0;
-        for (; i + ndx < m_size && i < 8; i++)
-            res[i] = get<w>(ndx + i);
+    // if constexpr to avoid producing spurious warnings resulting from
+    // instantiating for too large w
+    if constexpr (w > 0 && w <= 4) {
+        // Calling get<w>() in a loop results in one load per call to get, but
+        // for w < 8 we can do better than that
+        constexpr size_t elements_per_byte = 8 / w;
 
-        for (; i < 8; i++)
-            res[i] = 0;
+        // Round m_size down to byte granularity as the trailing bits in the last
+        // byte are uninitialized
+        size_t bytes_available = m_size / elements_per_byte;
+
+        // Round start and end to be byte-aligned. Start is rounded down and
+        // end is rounded up as we may read up to 7 unused bits at each end.
+        size_t start = ndx / elements_per_byte;
+        size_t end = std::min(bytes_available, (ndx + 8 + elements_per_byte - 1) / elements_per_byte);
+
+        if (end > start) {
+            // Loop in reverse order because data is stored in little endian order
+            uint64_t c = 0;
+            for (size_t i = end; i > start; --i) {
+                c <<= 8;
+                c += *reinterpret_cast<const uint8_t*>(m_data + i - 1);
+            }
+            // Trim off leading bits which aren't part of the requested range
+            c >>= (ndx - start * elements_per_byte) * w;
+
+            uint64_t mask = (1ULL << w) - 1ULL;
+            res[0] = (c >> 0 * w) & mask;
+            res[1] = (c >> 1 * w) & mask;
+            res[2] = (c >> 2 * w) & mask;
+            res[3] = (c >> 3 * w) & mask;
+            res[4] = (c >> 4 * w) & mask;
+            res[5] = (c >> 5 * w) & mask;
+            res[6] = (c >> 6 * w) & mask;
+            res[7] = (c >> 7 * w) & mask;
+
+            // Read the last few elements via get<w> if needed
+            i = std::min<size_t>(8, end * elements_per_byte - ndx);
+        }
     }
+
+    for (; i + ndx < m_size && i < 8; i++)
+        res[i] = get<w>(ndx + i);
+    for (; i < 8; i++)
+        res[i] = 0;
 
 #ifdef REALM_DEBUG
     for (int j = 0; j + ndx < m_size && j < 8; j++) {
         int64_t expected = get<w>(ndx + j);
-        if (res[j] != expected)
-            REALM_ASSERT(false);
+        REALM_ASSERT(res[j] == expected);
     }
 #endif
+}
+
+template <>
+void Array::get_chunk<0>(size_t ndx, int64_t res[8]) const noexcept
+{
+    REALM_ASSERT_3(ndx, <, m_size);
+    memset(res, 0, sizeof(int64_t) * 8);
 }
 
 
@@ -1371,6 +1285,12 @@ bool QueryStateCount::match(size_t, Mixed) noexcept
     return (m_limit > m_match_count);
 }
 
+bool QueryStateCount::match(size_t) noexcept
+{
+    ++m_match_count;
+    return (m_limit > m_match_count);
+}
+
 bool QueryStateFindFirst::match(size_t index, Mixed) noexcept
 {
     m_match_count++;
@@ -1378,20 +1298,45 @@ bool QueryStateFindFirst::match(size_t index, Mixed) noexcept
     return false;
 }
 
+bool QueryStateFindFirst::match(size_t index) noexcept
+{
+    ++m_match_count;
+    m_state = index;
+    return false;
+}
+
 template <>
-bool QueryStateFindAll<KeyColumn>::match(size_t index, Mixed) noexcept
+bool QueryStateFindAll<std::vector<ObjKey>>::match(size_t index, Mixed) noexcept
 {
     ++m_match_count;
 
-    REALM_ASSERT(m_key_values);
-    int64_t key_value = m_key_values->get(index) + m_key_offset;
-    m_keys.add(ObjKey(key_value));
+    int64_t key_value = (m_key_values ? m_key_values->get(index) : index) + m_key_offset;
+    m_keys.push_back(ObjKey(key_value));
+
+    return (m_limit > m_match_count);
+}
+
+template <>
+bool QueryStateFindAll<std::vector<ObjKey>>::match(size_t index) noexcept
+{
+    ++m_match_count;
+    int64_t key_value = (m_key_values ? m_key_values->get(index) : index) + m_key_offset;
+    m_keys.push_back(ObjKey(key_value));
 
     return (m_limit > m_match_count);
 }
 
 template <>
 bool QueryStateFindAll<IntegerColumn>::match(size_t index, Mixed) noexcept
+{
+    ++m_match_count;
+    m_keys.add(index);
+
+    return (m_limit > m_match_count);
+}
+
+template <>
+bool QueryStateFindAll<IntegerColumn>::match(size_t index) noexcept
 {
     ++m_match_count;
     m_keys.add(index);

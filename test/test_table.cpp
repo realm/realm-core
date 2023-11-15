@@ -1350,7 +1350,7 @@ TEST_TYPES(Table_Multi_Sort, int64_t, float, double, Decimal128)
     table.create_object(ObjKey(3)).set_all(TEST_TYPE(2), TEST_TYPE(14));
     table.create_object(ObjKey(4)).set_all(TEST_TYPE(1), TEST_TYPE(14));
 
-    std::vector<std::vector<ColKey>> col_ndx1 = {{col_0}, {col_1}};
+    std::vector<std::vector<ExtendedColumnKey>> col_ndx1 = {{col_0}, {col_1}};
     std::vector<bool> asc = {true, true};
 
     // (0, 10); (1, 10); (1, 14); (2, 10); (2; 14)
@@ -1362,7 +1362,7 @@ TEST_TYPES(Table_Multi_Sort, int64_t, float, double, Decimal128)
     CHECK_EQUAL(ObjKey(1), v_sorted1.get_key(3));
     CHECK_EQUAL(ObjKey(3), v_sorted1.get_key(4));
 
-    std::vector<std::vector<ColKey>> col_ndx2 = {{col_1}, {col_0}};
+    std::vector<std::vector<ExtendedColumnKey>> col_ndx2 = {{col_1}, {col_0}};
 
     // (0, 10); (1, 10); (2, 10); (1, 14); (2, 14)
     TableView v_sorted2 = table.get_sorted_view(SortDescriptor{col_ndx2, asc});
@@ -2495,7 +2495,9 @@ TEST(Table_Nulls)
 // This triggers a severe bug in the Array::alloc() allocator in which its capacity-doubling
 // scheme forgets to test of the doubling has overflowed the maximum allowed size of an
 // array which is 2^24 - 1 bytes
-TEST(Table_AllocatorCapacityBug)
+// NONCONCURRENT because if run in parallel with other tests which request large amounts of
+// memory, there may be a std::bad_alloc on low memory machines
+NONCONCURRENT_TEST(Table_AllocatorCapacityBug)
 {
     std::unique_ptr<char[]> buf(new char[20000000]);
 
@@ -3399,7 +3401,7 @@ TEST(Table_object_by_index)
 }
 
 // String query benchmark
-TEST(Table_QuickSort2)
+NONCONCURRENT_TEST(Table_QuickSort2)
 {
     Table ttt;
     auto strings = ttt.add_column(type_String, "2");
@@ -4005,7 +4007,7 @@ TEST(Table_PrimaryKeyIndexBug)
     CHECK_EQUAL(cnt, 1);
 }
 
-TEST(Table_PrimaryKeyString)
+NONCONCURRENT_TEST(Table_PrimaryKeyString)
 {
 #ifdef REALM_DEBUG
     int nb_rows = 1000;
@@ -5532,7 +5534,7 @@ TEST(Table_EmbeddedObjectCreateAndDestroyDictionary)
     CHECK(table->size() == 6);
     parent_dict.create_and_insert_linked_object("one"); // implicitly remove entry for 02
     CHECK(!o2.is_valid());
-    CHECK(table->size() == 4);
+    CHECK_EQUAL(table->size(), 4);
     parent_dict.clear();
     CHECK(table->size() == 0);
     parent_dict.create_and_insert_linked_object("four");
@@ -5896,8 +5898,8 @@ TEST(Table_AsymmetricObjects)
     tr = sg->start_write();
     auto table2 = tr->add_table("target table");
     table = tr->get_table("mytable");
-    // Outgoing link from asymmetric object is not allowed.
-    CHECK_THROW(table->add_column(*table2, "link"), LogicError);
+    // Outgoing link from asymmetric object is allowed.
+    CHECK_NOTHROW(table->add_column(*table2, "link"));
     // Incoming link to asymmetric object is not allowed.
     CHECK_THROW(table2->add_column(*table, "link"), LogicError);
     tr->commit();

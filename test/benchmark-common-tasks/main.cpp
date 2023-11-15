@@ -23,6 +23,9 @@
 #include <set>
 
 #include <realm.hpp>
+#if REALM_ENABLE_GEOSPATIAL
+#include <realm/geospatial.hpp>
+#endif
 #include <realm/string_data.hpp>
 #include <realm/util/file.hpp>
 
@@ -39,6 +42,8 @@
 using namespace realm;
 using namespace realm::util;
 using namespace realm::test_util;
+
+static std::set<std::string> g_bench_filter;
 
 namespace {
 // not smaller than 100.000 or the UID based benchmarks has to be modified!
@@ -246,6 +251,60 @@ struct BenchmarkWithStringsManyDup : BenchmarkWithStringsTable {
     }
 };
 
+struct BenchmarkLongStringsManyDup : BenchmarkWithStringsTable {
+    void before_all(DBRef group)
+    {
+        const char* strings[] = {
+            "An object database (also object-oriented database management system) is a database management system in "
+            "which information is represented in the form of objects as used in object-oriented programming. Object "
+            "databases are different from relational databases which are table-oriented. Object-relational databases "
+            "are a hybrid of both approaches.",
+            "Object database management systems grew out of research during the early to mid-1970s into having "
+            "intrinsic database management support for graph-structured objects. The term 'object-oriented database "
+            "system' first appeared around 1985.[4] Notable research projects included Encore-Ob/Server (Brown "
+            "University), EXODUS (University of Wisconsin–Madison), IRIS (Hewlett-Packard), ODE (Bell Labs), ORION "
+            "(Microelectronics and Computer Technology Corporation or MCC), Vodak (GMD-IPSI), and Zeitgeist (Texas "
+            "Instruments). The ORION project had more published papers than any of the other efforts. Won Kim of MCC "
+            "compiled the best of those papers in a book published by The MIT Press.",
+            "Early commercial products included Gemstone (Servio Logic, name changed to GemStone Systems), Gbase "
+            "(Graphael), and Vbase (Ontologic). The early to mid-1990s saw additional commercial products enter the "
+            "market. These included ITASCA (Itasca Systems), Jasmine (Fujitsu, marketed by Computer Associates), "
+            "Matisse (Matisse Software), Objectivity/DB (Objectivity, Inc.), ObjectStore (Progress Software, "
+            "acquired from eXcelon which was originally Object Design), ONTOS (Ontos, Inc., name changed from "
+            "Ontologic), O2[6] (O2 Technology, merged with several companies, acquired by Informix, which was in "
+            "turn acquired by IBM), POET (now FastObjects from Versant which acquired Poet Software), Versant Object "
+            "Database (Versant Corporation), VOSS (Logic Arts) and JADE (Jade Software Corporation). Some of these "
+            "products remain on the market and have been joined by new open source and commercial products such as "
+            "InterSystems Caché.",
+            "As the usage of web-based technology increases with the implementation of Intranets and extranets, "
+            "companies have a vested interest in OODBMSs to display their complex data. Using a DBMS that has been "
+            "specifically designed to store data as objects gives an advantage to those companies that are geared "
+            "towards multimedia presentation or organizations that utilize computer-aided design (CAD).[3]",
+            "Object database management systems added the concept of persistence to object programming languages. "
+            "The early commercial products were integrated with various languages: GemStone (Smalltalk), Gbase "
+            "(LISP), Vbase (COP) and VOSS (Virtual Object Storage System for Smalltalk). For much of the 1990s, C++ "
+            "dominated the commercial object database management market. Vendors added Java in the late 1990s and "
+            "more recently, C#.",
+            "L’archive ouverte pluridisciplinaire HAL, est destinée au dépôt et à la diffusion de documents "
+            "scientifiques de niveau recherche, publiés ou non, émanant des établissements d’enseignement et de "
+            "recherche français ou étrangers, des laboratoires publics ou privés.",
+            "object object object object object duplicates",
+        };
+
+        BenchmarkWithStringsTable::before_all(group);
+        WriteTransaction tr(group);
+        TableRef t = tr.get_table(name());
+        Random r;
+        for (size_t i = 0; i < BASE_SIZE; ++i) {
+            Obj obj = t->create_object();
+            obj.set<StringData>(m_col, strings[i % 7]);
+            m_keys.push_back(obj.get_key());
+        }
+        t->add_fulltext_index(m_col);
+        tr.commit();
+    }
+};
+
 struct BenchmarkFindAllStringFewDupes : BenchmarkWithStringsFewDup {
     const char* name() const
     {
@@ -269,6 +328,19 @@ struct BenchmarkFindAllStringManyDupes : BenchmarkWithStringsManyDup {
     {
         ConstTableRef table = m_table;
         TableView view = table->where().equal(m_col, StringData("10", 2)).find_all();
+    }
+};
+
+struct BenchmarkFindAllFulltextStringManyDupes : BenchmarkLongStringsManyDup {
+    const char* name() const
+    {
+        return "FindAllFulltextStringManyDupes";
+    }
+
+    void operator()(DBRef)
+    {
+        ConstTableRef table = m_table;
+        TableView view = table->where().fulltext(m_col, "object gemstone").find_all();
     }
 };
 
@@ -524,6 +596,44 @@ struct BenchmarkMixedCaseInsensitiveEqual : public BenchmarkWithType<Type> {
         }
     }
 };
+
+template <typename Type>
+struct BenchmarkRangeForType : public BenchmarkWithType<Type> {
+    using Base = BenchmarkWithType<Type>;
+    using underlying_type = typename Type::underlying_type;
+    BenchmarkRangeForType<Type>()
+        : BenchmarkWithType<Type>()
+    {
+        BenchmarkWithType<Type>::set_name_with_prefix("QueryRange");
+    }
+
+    void before_all(DBRef group) override
+    {
+        BenchmarkWithType<Type>::before_all(group);
+        std::sort(this->needles.begin(), this->needles.end());
+    }
+
+    void operator()(DBRef) override
+    {
+        for (size_t i = 1; i < Base::needles.size(); i++) {
+            if constexpr (std::is_same_v<underlying_type, Mixed>) {
+                TableView results = Base::m_table->where()
+                                        .greater(Base::m_col, Base::needles[i - 1])
+                                        .less(Base::m_col, Base::needles[i])
+                                        .find_all();
+                static_cast<void>(results);
+            }
+            else {
+                TableView results = Base::m_table->where()
+                                        .greater(Base::m_col, Base::needles[i - 1].template get<underlying_type>())
+                                        .less(Base::m_col, Base::needles[i].template get<underlying_type>())
+                                        .find_all();
+                static_cast<void>(results);
+            }
+        }
+    }
+};
+
 
 struct BenchmarkWithTimestamps : Benchmark {
     std::multiset<Timestamp> values;
@@ -1045,6 +1155,24 @@ struct BenchmarkQueryChainedOrInts : BenchmarkWithIntsTable {
     }
 };
 
+struct BenchmarkQueryChainedOrIntsCount : BenchmarkQueryChainedOrInts {
+    const char* name() const
+    {
+        return "QueryChainedOrIntsCount";
+    }
+
+    void operator()(DBRef)
+    {
+        ConstTableRef table = m_table;
+        Query query = table->where();
+        for (size_t i = 0; i < values_to_query.size(); ++i) {
+            query.Or().equal(m_col, values_to_query[i]);
+        }
+        size_t matches = query.count();
+        REALM_ASSERT_EX(matches == num_queried_matches, matches, num_queried_matches, values_to_query.size());
+    }
+};
+
 struct BenchmarkQueryChainedOrIntsIndexed : BenchmarkQueryChainedOrInts {
     const char* name() const
     {
@@ -1091,6 +1219,52 @@ struct BenchmarkQueryIntEqualityIndexed : BenchmarkQueryIntEquality {
         TableRef t = tr.get_table(name());
         t->add_search_index(m_col);
         tr.commit();
+    }
+};
+
+struct BenchmarkForeignAggAvg : BenchmarkWithIntsTable {
+    ColKey m_double_col;
+    Random m_rand;
+    const size_t num_queried_matches = 1000;
+    const size_t num_rows = BASE_SIZE;
+    std::vector<int64_t> values_to_query;
+
+    const char* name() const
+    {
+        return "QueryWithForeignAggAvg";
+    }
+
+    void before_all(DBRef group)
+    {
+        BenchmarkWithIntsTable::before_all(group);
+        WriteTransaction tr(group);
+        TableRef t = tr.get_table(name());
+        m_double_col = t->add_column(type_Double, "double_col");
+        std::vector<ObjKey> keys;
+        t->create_objects(num_rows, keys);
+        REALM_ASSERT(num_rows > num_queried_matches);
+        Random r;
+        size_t i = 0;
+        for (auto e : *t) {
+            e.set<Int>(m_col, i).set<Double>(m_double_col, double(i));
+            ++i;
+        }
+        for (i = 0; i < num_queried_matches; ++i) {
+            size_t ndx_to_match = (num_rows / num_queried_matches) * i;
+            values_to_query.push_back(t->get_object(ndx_to_match).get<Int>(m_col));
+        }
+        tr.commit();
+    }
+
+    void operator()(DBRef)
+    {
+        ConstTableRef table = m_table;
+        for (size_t i = 0; i < 50; ++i) {
+            auto result = table->where()
+                              .not_equal(m_col, values_to_query[m_rand.draw_int<size_t>(0, values_to_query.size())])
+                              .avg(m_double_col);
+            REALM_ASSERT(result);
+        }
     }
 };
 
@@ -1181,6 +1355,38 @@ struct BenchmarkQueryChainedOrStrings : BenchmarkWithStringsTableForIn {
             query.Or().equal(m_col, StringData(values_to_query[i]));
         }
         TableView results = query.find_all();
+        REALM_ASSERT_EX(results.size() == num_queried_matches, results.size(), num_queried_matches,
+                        values_to_query.size());
+        static_cast<void>(results);
+    }
+};
+
+struct BenchmarkQueryChainedOrStringsPredicate : BenchmarkWithStringsTableForIn {
+    std::set<std::string> uniq;
+
+    void before_all(DBRef group)
+    {
+        create_table(group, false);
+        uniq = std::set<std::string>(values_to_query.begin(), values_to_query.end());
+    }
+};
+
+struct BenchmarkQueryChainedOrStringsViewFilterPredicate : BenchmarkQueryChainedOrStringsPredicate {
+    const char* name() const
+    {
+        return "QueryChainedOrStringsViewFilterPredicate";
+    }
+
+    void operator()(DBRef)
+    {
+        ConstTableRef table = m_table;
+
+        auto predicate = [this](const Obj& obj) {
+            return uniq.find(obj.get<String>(m_col)) != uniq.end();
+        };
+
+        TableView results = table->where().find_all();
+        results.filter(FilterDescriptor(predicate));
         REALM_ASSERT_EX(results.size() == num_queried_matches, results.size(), num_queried_matches,
                         values_to_query.size());
         static_cast<void>(results);
@@ -1317,6 +1523,49 @@ struct BenchmarkSortIntDictionary : Benchmark {
     ColKey m_col;
     ObjKey m_obj;
     std::vector<size_t> m_indices;
+};
+
+struct BenchmarkSortThenLimit : Benchmark {
+    const char* name() const
+    {
+        return "SortThenLimit";
+    }
+
+    void before_all(DBRef group)
+    {
+        WriteTransaction tr(group);
+        TableRef t = tr.add_table(name());
+        m_col = t->add_column(type_Int, "first");
+
+        std::vector<int> values(10000);
+        std::iota(values.begin(), values.end(), 0);
+        std::shuffle(values.begin(), values.end(), std::mt19937(std::random_device()()));
+
+        for (auto i : values) {
+            t->create_object().set(m_col, i);
+        }
+        tr.commit();
+    }
+
+    void after_all(DBRef db)
+    {
+        WriteTransaction tr(db);
+        tr.get_group().remove_table(name());
+        tr.commit();
+    }
+
+    void operator()(DBRef db)
+    {
+        realm::ReadTransaction tr(db);
+        auto tv = tr.get_group().get_table(name())->where().find_all();
+        DescriptorOrdering ordering;
+        ordering.append_sort(SortDescriptor({{m_col}}));
+        ordering.append_limit(100);
+
+        tv.apply_descriptor_ordering(ordering);
+    }
+
+    ColKey m_col;
 };
 
 struct BenchmarkInsert : BenchmarkWithStringsTable {
@@ -1846,6 +2095,197 @@ struct TransactionDuplicate : Benchmark {
     void after_each(DBRef) {}
 };
 
+#if REALM_ENABLE_GEOSPATIAL
+
+struct BenchmarkWithGeospatial : Benchmark {
+    std::string loc_name() const
+    {
+        return std::string(name()) + "Location";
+    }
+
+    void before_all(DBRef group) override
+    {
+        WriteTransaction tr(group);
+
+        bool was_added = false;
+        auto t = tr.get_or_add_table(name(), Table::Type::TopLevel, &was_added);
+
+        if (was_added) {
+            auto loc = tr.add_table(loc_name(), Table::Type::Embedded);
+            loc->add_column(type_String, "type");
+            loc->add_column_list(type_Double, "coordinates");
+            m_col = t->add_column(*loc, "location");
+        }
+
+        tr.commit();
+    }
+
+    void after_all(DBRef group) override
+    {
+        (void)group;
+        WriteTransaction tr(group);
+        tr.get_group().remove_table(name());
+        tr.get_group().remove_table(loc_name());
+        tr.commit();
+    }
+
+    void assign_points(TableRef table)
+    {
+        for (size_t i = 0; i < BASE_SIZE; ++i) {
+            double lon = ((double)i / BASE_SIZE) * 360 - 180;
+            double lat = (i / 1000.0) / (BASE_SIZE / 1000.0) * 180 - 90;
+            table->get_object(i).set(m_col, Geospatial{GeoPoint{lon, lat, 42.24}});
+        }
+    }
+
+    void add_records(TableRef table, bool assign_value = true)
+    {
+        for (size_t i = 0; i < BASE_SIZE; ++i)
+            table->create_object();
+
+        if (assign_value)
+            assign_points(table);
+    }
+};
+
+struct BenchmarkWithGeoPoints : BenchmarkWithGeospatial {
+    void before_all(DBRef group) override
+    {
+        BenchmarkWithGeospatial::before_all(group);
+        WriteTransaction tr(group);
+        add_records(tr.get_table(name()));
+        tr.commit();
+    }
+};
+
+struct BenchmarkAssignGeoPoints : BenchmarkWithGeoPoints {
+    const char* name() const override
+    {
+        return "AssignGeoPoints";
+    }
+
+    void operator()(DBRef) override
+    {
+        assign_points(m_table);
+    }
+};
+
+struct BenchmarkAssignGeoPointsFromNull : BenchmarkWithGeoPoints {
+    const char* name() const override
+    {
+        return "AssignGeoPointsFromNull";
+    }
+
+    void before_all(DBRef group) override
+    {
+        BenchmarkWithGeospatial::before_all(group);
+        WriteTransaction tr(group);
+        add_records(tr.get_table(name()), false);
+        tr.commit();
+    }
+
+    void operator()(DBRef) override
+    {
+        assign_points(m_table);
+    }
+};
+
+struct BenchmarkFetchGeoPoints : BenchmarkWithGeoPoints {
+    const char* name() const override
+    {
+        return "FetchGeoPoints";
+    }
+
+    void operator()(DBRef) override
+    {
+        for (size_t i = 0; i < BASE_SIZE; ++i) {
+            auto g = m_table->get_object(i).get<Geospatial>(m_col);
+            if (!g.is_valid().is_ok() || g.get_type() != Geospatial::Type::Point)
+                throw std::logic_error("Invalid GeoPoint");
+        }
+    }
+};
+
+struct BenchmarkGeoPointsWithinBox : BenchmarkWithGeoPoints {
+    const char* name() const override
+    {
+        return "GeoPointsWithinBox";
+    }
+
+    void operator()(DBRef) override
+    {
+        auto geometry = GeoBox{{-34.0, -34.0}, {42.0, 42.0}};
+        m_table->column<Link>(m_col).geo_within(geometry).count();
+    }
+};
+
+struct BenchmarkGeoPointsWithinBoxRQL : BenchmarkWithGeoPoints {
+    const char* name() const override
+    {
+        return "GeoPointsWithinBoxRQL";
+    }
+
+    void operator()(DBRef) override
+    {
+        m_table->query("location geoWithin geoBox([-34.0, -34.0], [42.0, 42.0])").count();
+    }
+};
+
+struct BenchmarkGeoPointsWithinCircle : BenchmarkWithGeoPoints {
+    const char* name() const override
+    {
+        return "GeoPointsWithinCircle";
+    }
+
+    void operator()(DBRef) override
+    {
+        auto geometry = GeoCircle::from_kms(5000, {42.0, 42.0});
+        m_table->column<Link>(m_col).geo_within(geometry).count();
+    }
+};
+
+struct BenchmarkGeoPointsWithinCircleRQL : BenchmarkWithGeoPoints {
+    const char* name() const override
+    {
+        return "GeoPointsWithinCircleRQL";
+    }
+
+    void operator()(DBRef) override
+    {
+        m_table->query("location geoWithin geoCircle([42.0, 42.0], 0.78393252)").count();
+    }
+};
+
+struct BenchmarkGeoPointsWithinPolygon : BenchmarkWithGeoPoints {
+    const char* name() const override
+    {
+        return "GeoPointsWithinPolygon";
+    }
+
+    void operator()(DBRef) override
+    {
+        GeoPolygon geometry{{{{-24, -24}, {-34, 34}, {44, 44}, {-55, 55}, {-24, -24}}}};
+        m_table->column<Link>(m_col).geo_within(geometry).count();
+    }
+};
+
+struct BenchmarkGeoPointsWithinPolygonRQL : BenchmarkWithGeoPoints {
+    const char* name() const override
+    {
+        return "GeoPointsWithinPolygonRQL";
+    }
+
+    void operator()(DBRef) override
+    {
+        m_table
+            ->query("location geoWithin geoPolygon({[-24.0, -24.0], [-34.0, 34.0], [44.0, 44.0], [-55.0, 55], "
+                    "[-24.0, -24.0]})")
+            .count();
+    }
+};
+
+#endif
+
 const char* to_lead_cstr(DBOptions::Durability level)
 {
     switch (level) {
@@ -1909,7 +2349,11 @@ void run_benchmark(BenchmarkResults& results, bool force_full = false)
     for (auto it = configs.begin(); it != configs.end(); ++it) {
         DBOptions::Durability level = it->first;
         const char* key = it->second;
+
         B benchmark;
+        if (!g_bench_filter.empty() && g_bench_filter.find(benchmark.name()) == g_bench_filter.end())
+            return;
+
         benchmark.m_durability = level;
         benchmark.m_encryption_key = key;
 
@@ -1982,7 +2426,6 @@ int benchmark_common_tasks_main()
 
 #define BENCH(B) run_benchmark<B>(results)
 #define BENCH2(B, mode) run_benchmark<B>(results, mode)
-
     BENCH2(BenchmarkEmptyCommit, true);
     BENCH2(BenchmarkEmptyCommit, false);
     BENCH2(BenchmarkNonInitiatorOpen, true);
@@ -2000,6 +2443,7 @@ int benchmark_common_tasks_main()
     BENCH(BenchmarkSortInt);
     BENCH(BenchmarkSortIntList);
     BENCH(BenchmarkSortIntDictionary);
+    BENCH(BenchmarkSortThenLimit);
 
     BENCH(BenchmarkUnorderedTableViewClear);
     BENCH(BenchmarkUnorderedTableViewClearIndexed);
@@ -2017,6 +2461,7 @@ int benchmark_common_tasks_main()
     // queries / searching
     BENCH(BenchmarkFindAllStringFewDupes);
     BENCH(BenchmarkFindAllStringManyDupes);
+    BENCH(BenchmarkFindAllFulltextStringManyDupes);
     BENCH(BenchmarkFindFirstStringFewDupes);
     BENCH(BenchmarkFindFirstStringManyDupes);
     BENCH(BenchmarkCountStringManyDupes<false>);
@@ -2029,12 +2474,15 @@ int benchmark_common_tasks_main()
     BENCH(BenchmarkQueryInsensitiveStringIndexed);
     BENCH(BenchmarkQueryChainedOrStrings<false>);
     BENCH(BenchmarkQueryChainedOrStrings<true>);
+    BENCH(BenchmarkQueryChainedOrStringsViewFilterPredicate);
     BENCH(BenchmarkQueryNotChainedOrStrings<false>);
     BENCH(BenchmarkQueryNotChainedOrStrings<true>);
     BENCH(BenchmarkQueryChainedOrInts);
     BENCH(BenchmarkQueryChainedOrIntsIndexed);
+    BENCH(BenchmarkQueryChainedOrIntsCount);
     BENCH(BenchmarkQueryIntEquality);
     BENCH(BenchmarkQueryIntEqualityIndexed);
+    BENCH(BenchmarkForeignAggAvg);
     BENCH(BenchmarkIntVsDoubleColumns);
     BENCH(BenchmarkQueryStringOverLinks);
     BENCH(BenchmarkSubQuery);
@@ -2052,6 +2500,8 @@ int benchmark_common_tasks_main()
     BENCH(BenchmarkMixedCaseInsensitiveEqual<Indexed<Mixed>>);
     BENCH(BenchmarkMixedCaseInsensitiveEqual<Prop<String>>);
     BENCH(BenchmarkMixedCaseInsensitiveEqual<Indexed<String>>);
+
+    BENCH(BenchmarkRangeForType<Prop<Int>>);
 
     BENCH(BenchmarkQueryTimestampGreaterOverLinks);
     BENCH(BenchmarkQueryTimestampGreater);
@@ -2071,6 +2521,18 @@ int benchmark_common_tasks_main()
 
     BENCH(TransactionDuplicate);
 
+#if REALM_ENABLE_GEOSPATIAL
+    BENCH(BenchmarkAssignGeoPoints);
+    BENCH(BenchmarkAssignGeoPointsFromNull);
+    BENCH(BenchmarkFetchGeoPoints);
+    BENCH(BenchmarkGeoPointsWithinBox);
+    BENCH(BenchmarkGeoPointsWithinBoxRQL);
+    BENCH(BenchmarkGeoPointsWithinCircle);
+    BENCH(BenchmarkGeoPointsWithinCircleRQL);
+    BENCH(BenchmarkGeoPointsWithinPolygon);
+    BENCH(BenchmarkGeoPointsWithinPolygonRQL);
+#endif
+
 #undef BENCH
 #undef BENCH2
     return 0;
@@ -2081,7 +2543,7 @@ int main(int argc, const char** argv)
     if (argc > 1) {
         std::string arg_path = argv[1];
         if (arg_path == "-h" || arg_path == "--help") {
-            std::cout << "Usage: " << argv[0] << " [-h|--help] [PATH]" << std::endl
+            std::cout << "Usage: " << argv[0] << " [-h|--help] [PATH] [NAMES]" << std::endl
                       << "Run the common tasks benchmark test application." << std::endl
                       << "Results are placed in the executable directory by default." << std::endl
                       << std::endl
@@ -2089,6 +2551,7 @@ int main(int argc, const char** argv)
                       << "  -h, --help      display this help" << std::endl
                       << "  PATH            alternate path to store the results files;" << std::endl
                       << "                  this path should end with a slash." << std::endl
+                      << "  NAMES           benchmark names to run (',' separated)" << std::endl
                       << std::endl;
             return 1;
         }
@@ -2096,5 +2559,17 @@ int main(int argc, const char** argv)
 
     if (!initialize_test_path(argc, argv))
         return 1;
+
+    if (argc > 2) {
+        std::string filter = argv[2];
+        for (size_t i = 0, j = 0, len = filter.size(); i <= len; ++i) {
+            if (i == len || filter[i] == ',') {
+                if (j < i)
+                    g_bench_filter.insert(filter.substr(j, i - j));
+                j = i + 1;
+            }
+        }
+    }
+
     return benchmark_common_tasks_main();
 }

@@ -535,7 +535,7 @@ auto ServerHistory::allocate_file_ident(file_ident_type proxy_file_ident, Client
     std::size_t file_index = m_num_client_files;
     salt_type salt = register_client_file_by_index(file_index, proxy_file_ident, client_type); // Throws
 
-    if (file_index > std::uint_fast64_t(get_max_file_ident()))
+    if (uint64_t(file_index) > get_max_file_ident())
         throw util::overflow_error{"File identifier"};
 
     file_ident_type ident = file_ident_type(file_index);
@@ -1200,10 +1200,9 @@ bool ServerHistory::integrate_remote_changesets(file_ident_type remote_file_iden
         // Merge with causally unrelated changesets, and resolve the
         // conflicts if there are any.
         TransformHistoryImpl transform_hist{remote_file_ident, *this, recip_hist};
-        Transformer& transformer = m_context.get_transformer(); // Throws
+        Transformer transformer;
         transformer.transform_remote_changesets(transform_hist, m_local_file_ident, current_server_version,
-                                                parsed_transformed_changesets, std::move(apply),
-                                                logger); // Throws
+                                                parsed_transformed_changesets, apply, logger); // Throws
 
         for (std::size_t i = 0; i < num_changesets; ++i) {
             REALM_ASSERT(get_instruction_encoder().buffer().size() == 0);
@@ -2244,18 +2243,6 @@ void ServerHistory::record_current_schema_version(Array& schema_versions, versio
         std::time_t timestamp = std::time(nullptr);
         sv_timestamps.add(std::int_fast64_t(timestamp)); // Throws
     }
-}
-
-
-Transformer& ServerHistory::Context::get_transformer()
-{
-    throw util::runtime_error("Not supported");
-}
-
-
-util::Buffer<char>& ServerHistory::Context::get_transform_buffer()
-{
-    throw util::runtime_error("Not supported");
 }
 
 

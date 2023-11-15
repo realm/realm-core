@@ -40,7 +40,7 @@ TEST(Sync_SubscriptionStoreBasic)
     SHARED_GROUP_TEST_PATH(sub_store_path);
     {
         SubscriptionStoreFixture fixture(sub_store_path);
-        auto store = SubscriptionStore::create(fixture.db, [](int64_t) {});
+        auto store = SubscriptionStore::create(fixture.db);
         // Because there are no subscription sets yet, get_latest should point to an empty object
         auto latest = store->get_latest();
         CHECK(latest.begin() == latest.end());
@@ -83,7 +83,7 @@ TEST(Sync_SubscriptionStoreBasic)
     // Destroy the DB and reload it and make sure we can get the subscriptions we set in the previous block.
     {
         SubscriptionStoreFixture fixture(sub_store_path);
-        auto store = SubscriptionStore::create(fixture.db, [](int64_t) {});
+        auto store = SubscriptionStore::create(fixture.db);
 
         auto read_tr = fixture.db->start_read();
         Query query_a(read_tr->get_table(fixture.a_table_key));
@@ -113,7 +113,7 @@ TEST(Sync_SubscriptionStoreStateUpdates)
 {
     SHARED_GROUP_TEST_PATH(sub_store_path);
     SubscriptionStoreFixture fixture(sub_store_path);
-    auto store = SubscriptionStore::create(fixture.db, [](int64_t) {});
+    auto store = SubscriptionStore::create(fixture.db);
 
     auto read_tr = fixture.db->start_read();
     Query query_a(read_tr->get_table("class_a"));
@@ -208,7 +208,7 @@ TEST(Sync_SubscriptionStoreUpdateExisting)
 {
     SHARED_GROUP_TEST_PATH(sub_store_path);
     SubscriptionStoreFixture fixture(sub_store_path);
-    auto store = SubscriptionStore::create(fixture.db, [](int64_t) {});
+    auto store = SubscriptionStore::create(fixture.db);
 
     auto read_tr = fixture.db->start_read();
     Query query_a(read_tr->get_table("class_a"));
@@ -248,7 +248,7 @@ TEST(Sync_SubscriptionStoreAssignAnonAndNamed)
 {
     SHARED_GROUP_TEST_PATH(sub_store_path);
     SubscriptionStoreFixture fixture(sub_store_path);
-    auto store = SubscriptionStore::create(fixture.db, [](int64_t) {});
+    auto store = SubscriptionStore::create(fixture.db);
 
     auto read_tr = fixture.db->start_read();
     Query query_a(read_tr->get_table("class_a"));
@@ -284,7 +284,7 @@ TEST(Sync_SubscriptionStoreNotifications)
 {
     SHARED_GROUP_TEST_PATH(sub_store_path);
     SubscriptionStoreFixture fixture(sub_store_path);
-    auto store = SubscriptionStore::create(fixture.db, [](int64_t) {});
+    auto store = SubscriptionStore::create(fixture.db);
 
     std::vector<util::Future<SubscriptionSet::State>> notification_futures;
     auto sub_set = store->get_latest().make_mutable_copy();
@@ -404,7 +404,7 @@ TEST(Sync_SubscriptionStoreRefreshSubscriptionSetInvalid)
 {
     SHARED_GROUP_TEST_PATH(sub_store_path)
     SubscriptionStoreFixture fixture(sub_store_path);
-    auto store = SubscriptionStore::create(fixture.db, [](int64_t) {});
+    auto store = SubscriptionStore::create(fixture.db);
     // Because there are no subscription sets yet, get_latest should point to an empty object
     auto latest = std::make_unique<SubscriptionSet>(store->get_latest());
     CHECK(latest->begin() == latest->end());
@@ -431,7 +431,7 @@ TEST(Sync_SubscriptionStoreInternalSchemaMigration)
     CHECK(util::File::exists(path.string()));
     util::File::copy(path.string(), sub_store_path);
     SubscriptionStoreFixture fixture(sub_store_path);
-    auto store = SubscriptionStore::create(fixture.db, [](int64_t) {});
+    auto store = SubscriptionStore::create(fixture.db);
     auto [active_version, latest_version, pending_mark_version] = store->get_version_info();
     CHECK_EQUAL(active_version, latest_version);
     auto active = store->get_active();
@@ -455,7 +455,7 @@ TEST(Sync_SubscriptionStoreNextPendingVersion)
 {
     SHARED_GROUP_TEST_PATH(sub_store_path)
     SubscriptionStoreFixture fixture(sub_store_path);
-    auto store = SubscriptionStore::create(fixture.db, [](int64_t) {});
+    auto store = SubscriptionStore::create(fixture.db);
 
     auto mut_sub_set = store->get_latest().make_mutable_copy();
     auto sub_set = mut_sub_set.commit();
@@ -477,15 +477,15 @@ TEST(Sync_SubscriptionStoreNextPendingVersion)
     mut_sub_set.update_state(SubscriptionSet::State::Bootstrapping);
     mut_sub_set.commit();
 
-    auto pending_version = store->get_next_pending_version(0, DB::version_type{});
+    auto pending_version = store->get_next_pending_version(0);
     CHECK(pending_version);
     CHECK_EQUAL(pending_version->query_version, bootstrapping_set);
 
-    pending_version = store->get_next_pending_version(bootstrapping_set, DB::version_type{});
+    pending_version = store->get_next_pending_version(bootstrapping_set);
     CHECK(pending_set);
     CHECK_EQUAL(pending_version->query_version, pending_set);
 
-    pending_version = store->get_next_pending_version(pending_set, DB::version_type{});
+    pending_version = store->get_next_pending_version(pending_set);
     CHECK(!pending_version);
 }
 
@@ -493,7 +493,7 @@ TEST(Sync_SubscriptionStoreSubSetHasTable)
 {
     SHARED_GROUP_TEST_PATH(sub_store_path)
     SubscriptionStoreFixture fixture(sub_store_path);
-    auto store = SubscriptionStore::create(fixture.db, [](int64_t) {});
+    auto store = SubscriptionStore::create(fixture.db);
 
     auto read_tr = fixture.db->start_read();
     // We should have no subscriptions yet so this should return false.
@@ -537,7 +537,7 @@ TEST(Sync_SubscriptionStoreNotifyAll)
 {
     SHARED_GROUP_TEST_PATH(sub_store_path)
     SubscriptionStoreFixture fixture(sub_store_path);
-    auto store = SubscriptionStore::create(fixture.db, [](int64_t) {});
+    auto store = SubscriptionStore::create(fixture.db);
 
     const Status status_abort(ErrorCodes::OperationAborted, "operation aborted");
 
@@ -612,7 +612,7 @@ TEST(Sync_SubscriptionStoreTerminate)
 {
     SHARED_GROUP_TEST_PATH(sub_store_path)
     SubscriptionStoreFixture fixture(sub_store_path);
-    auto store = SubscriptionStore::create(fixture.db, [](int64_t) {});
+    auto store = SubscriptionStore::create(fixture.db);
 
     size_t hit_count = 0;
 
@@ -841,6 +841,117 @@ TEST(Sync_SyncMetadataSchemaVersions_LegacyTable)
         CHECK(*schema_version == version);
         // Verify the legacy table has been deleted after the conversion
         CHECK(!tr->has_table(c_flx_metadata_table));
+    }
+}
+
+TEST(Sync_MutableSubscriptionSetOperations)
+{
+    SHARED_GROUP_TEST_PATH(sub_store_path);
+    SubscriptionStoreFixture fixture(sub_store_path);
+    auto store = SubscriptionStore::create(fixture.db);
+
+    auto read_tr = fixture.db->start_read();
+    Query query_a(read_tr->get_table("class_a"));
+    query_a.greater_equal(fixture.bar_col, int64_t(1));
+    Query query_b(read_tr->get_table(fixture.a_table_key));
+    query_b.equal(fixture.foo_col, "Realm");
+    Query query_c(read_tr->get_table(fixture.a_table_key));
+
+    // insert_or_assign
+    {
+        auto out = store->get_latest().make_mutable_copy();
+        auto [it, inserted] = out.insert_or_assign("a sub", query_a);
+        CHECK(inserted);
+        auto named_id = it->id;
+        out.insert_or_assign("b sub", query_b);
+        CHECK_EQUAL(out.size(), 2);
+        std::tie(it, inserted) = out.insert_or_assign("a sub", query_a);
+        CHECK_NOT(inserted);
+        CHECK_EQUAL(it->id, named_id);
+        CHECK_EQUAL(out.size(), 2);
+    }
+
+    // find
+    {
+        auto out = store->get_latest().make_mutable_copy();
+        auto [it, inserted] = out.insert_or_assign("a sub", query_a);
+        std::tie(it, inserted) = out.insert_or_assign("b sub", query_b);
+        CHECK(out.find(query_b));
+        CHECK(out.find("a sub"));
+    }
+
+    // erase
+    {
+        auto out = store->get_latest().make_mutable_copy();
+        out.insert_or_assign("a sub", query_a);
+        out.insert_or_assign("b sub", query_b);
+        out.insert_or_assign("c sub", query_c);
+        CHECK_EQUAL(out.size(), 3);
+        auto it = out.erase(out.begin());
+        // Iterator points to last query inserted due do "swap and pop" idiom.
+        CHECK_EQUAL(it->query_string, query_c.get_description());
+        CHECK_EQUAL(out.size(), 2);
+        CHECK_NOT(out.erase("a sub"));
+        CHECK_EQUAL(out.size(), 2);
+        CHECK(out.erase(query_b));
+        CHECK_EQUAL(out.size(), 1);
+        CHECK(out.erase("c sub"));
+        CHECK_EQUAL(out.size(), 0);
+    }
+
+    // erase_by_class_name
+    {
+        auto out = store->get_latest().make_mutable_copy();
+        out.insert_or_assign("a sub", query_a);
+        out.insert_or_assign("b sub", query_b);
+        out.insert_or_assign("c sub", query_c);
+        // Nothing to erase.
+        CHECK_NOT(out.erase_by_class_name("foo"));
+        // Erase all queries for the class type of the first query.
+        CHECK(out.erase_by_class_name(out.begin()->object_class_name));
+        // No queries left.
+        CHECK_EQUAL(out.size(), 0);
+    }
+
+    // erase_by_id
+    {
+        auto out = store->get_latest().make_mutable_copy();
+        out.insert_or_assign("a sub", query_a);
+        out.insert_or_assign("b sub", query_b);
+        // Nothing to erase.
+        CHECK_NOT(out.erase_by_id(ObjectId::gen()));
+        // Erase first query.
+        CHECK(out.erase_by_id(out.begin()->id));
+        CHECK_EQUAL(out.size(), 1);
+    }
+
+    // clear
+    {
+        auto out = store->get_latest().make_mutable_copy();
+        out.insert_or_assign("a sub", query_a);
+        out.insert_or_assign("b sub", query_b);
+        out.insert_or_assign("c sub", query_c);
+        CHECK_EQUAL(out.size(), 3);
+        out.clear();
+        CHECK_EQUAL(out.size(), 0);
+    }
+
+    // import
+    {
+        auto out = store->get_latest().make_mutable_copy();
+        out.insert_or_assign("a sub", query_a);
+        out.insert_or_assign("b sub", query_b);
+        auto subs = out.commit();
+
+        // This is an empty subscription set.
+        auto out2 = store->get_active().make_mutable_copy();
+        out2.insert_or_assign("c sub", query_c);
+        out2.import(subs);
+        // "c sub" is erased when 'import' is used.
+        CHECK_EQUAL(out2.size(), 2);
+        // insert "c sub" again.
+        out2.insert_or_assign("c sub", query_c);
+        CHECK_EQUAL(out2.size(), 3);
     }
 }
 

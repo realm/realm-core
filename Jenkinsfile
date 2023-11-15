@@ -15,6 +15,7 @@ branch = tokens[tokens.size()-1]
 ctest_cmd = "ctest -VV"
 warningFilters = [
     excludeFile('/external/*'), // submodules and external libraries
+    excludeFile('/src/external/*'), // submodules and external libraries
     excludeFile('/libuv-src/*'), // libuv, where it was downloaded and built inside cmake
     excludeFile('/src/realm/parser/generated/*'), // the auto generated parser code we didn't write
 ]
@@ -52,7 +53,7 @@ jobWrapper {
 
             isCoreCronJob = isCronJob()
             requireNightlyBuild = false
-            if(isCoreCronJob) {
+            if (isCoreCronJob) {
                 requireNightlyBuild = isNightlyBuildNeeded()
             }
         }
@@ -67,7 +68,7 @@ jobWrapper {
         if (gitTag) {
             isPublishingRun = currentBranch.contains('release')
         }
-        else if(isCoreCronJob && requireNightlyBuild) {
+        else if (isCoreCronJob && requireNightlyBuild) {
             isPublishingRun = true
             longRunningTests = true
             def localDate = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.BASIC_ISO_DATE)
@@ -81,7 +82,7 @@ jobWrapper {
         echo "Is nightly build: ${requireNightlyBuild ? 'yes' : 'no'}"
         echo "Long running test: ${longRunningTests ? 'yes' : 'no'}"
 
-        if(isCoreCronJob && !requireNightlyBuild) {
+        if (isCoreCronJob && !requireNightlyBuild) {
             currentBuild.result = 'ABORTED'
             error 'Nightly build is not needed because there are no new commits to build'
         }
@@ -93,79 +94,7 @@ jobWrapper {
         }
     }
 
-    if (isPullRequest) {
-        stage('FormatCheck') {
-            rlmNode('docker') {
-                getArchive()
-
-                buildDockerEnv('testing.Dockerfile').inside {
-                    echo "Checking code formatting"
-                    modifications = sh(returnStdout: true, script: "git clang-format --diff ${targetSHA1}").trim()
-                    try {
-                        if (!modifications.equals('no modified files to format')) {
-                            if (!modifications.equals('clang-format did not modify any files')) {
-                                echo "Commit violates formatting rules"
-                                sh "git clang-format --diff ${targetSHA1} > format_error.txt"
-                                archiveArtifacts('format_error.txt')
-                                sh 'exit 1'
-                            }
-                        }
-                        currentBuild.result = 'SUCCESS'
-                    } catch (Exception err) {
-                        currentBuild.result = 'FAILURE'
-                        throw err
-                    }
-                }
-            }
-        }
-    }
-
-    stage('Checking') {
-        def buildOptions = [
-            buildType : 'Debug',
-            maxBpNodeSize: 1000,
-            enableEncryption: true,
-            useEncryption: false,
-            enableSync: false,
-            runTests: true,
-        ]
-
-        parallelExecutors = [
-            buildLinuxRelease       : doBuildLinux('Release'),
-            checkLinuxDebug         : doCheckInDocker(buildOptions),
-            checkLinuxDebugEncrypt  : doCheckInDocker(buildOptions + [useEncryption : true]),
-            checkLinuxRelease_4     : doCheckInDocker(buildOptions + [maxBpNodeSize: 4, buildType : 'Release']),
-            checkLinuxDebug_Sync    : doCheckInDocker(buildOptions + [enableSync: true, dumpChangesetTransform: true]),
-            checkLinuxDebugNoEncryp : doCheckInDocker(buildOptions + [enableEncryption: false]),
-            checkMacOsRelease_Sync  : doBuildMacOs(buildOptions + [buildType: 'Release', enableSync: true]),
-            checkWindows_x86_Release: doBuildWindows('Release', false, 'Win32', true),
-            checkWindows_x64_Debug  : doBuildWindows('Debug', false, 'x64', true),
-            buildUWP_x86_Release    : doBuildWindows('Release', true, 'Win32', false),
-            buildWindows_ARM64_Debug: doBuildWindows('Debug', false, 'ARM64', false),
-            buildUWP_ARM64_Debug    : doBuildWindows('Debug', true, 'ARM64', false),
-            checkiOSSimulator_Debug : doBuildApplePlatform('iphonesimulator', 'Debug', true),
-            buildAppleTV_Debug      : doBuildApplePlatform('appletvos', 'Debug', false),
-            buildAndroidArm64Debug  : doAndroidBuildInDocker('arm64-v8a', 'Debug'),
-            buildAndroidTestsArmeabi: doAndroidBuildInDocker('armeabi-v7a', 'Debug', TestAction.Build),
-            threadSanitizer         : doCheckSanity(buildOptions + [enableSync: true, sanitizeMode: 'thread']),
-            addressSanitizer        : doCheckSanity(buildOptions + [enableSync: true, sanitizeMode: 'address']),
-        ]
-        if (releaseTesting) {
-            extendedChecks = [
-                checkMacOsDebug               : doBuildMacOs(buildOptions + [buildType: "Release"]),
-                checkAndroidarmeabiDebug      : doAndroidBuildInDocker('armeabi-v7a', 'Debug', TestAction.Run),
-                // FIXME: https://github.com/realm/realm-core/issues/4159
-                //checkAndroidx86Release        : doAndroidBuildInDocker('x86', 'Release', TestAction.Run),
-                // FIXME: https://github.com/realm/realm-core/issues/4162
-                //coverage                      : doBuildCoverage(),
-            ]
-            parallelExecutors.putAll(extendedChecks)
-        }
-        parallel parallelExecutors
-    }
-
     if (isPublishingRun) {
-
         stage('BuildPackages') {
             def buildOptions = [
                 enableSync: "ON",
@@ -173,26 +102,20 @@ jobWrapper {
             ]
 
             parallelExecutors = [
-                buildMacOsRelease   : doBuildMacOs(buildOptions + [buildType : "Release"]),
-                buildCatalystRelease: doBuildApplePlatform('maccatalyst', 'Release'),
-
-                buildLinuxASAN      : doBuildLinuxClang("RelASAN"),
-                buildLinuxTSAN      : doBuildLinuxClang("RelTSAN")
+                macOS      : doBuildMacOs(buildOptions + [buildType: "Release"]),
+                catalyst   : doBuildApplePlatform('maccatalyst', 'Release'),
+                xros       : doBuildApplePlatformXcode15('xros', 'Release'),
+                xrsimulator: doBuildApplePlatformXcode15('xrsimulator', 'Release'),
             ]
 
             androidAbis = ['armeabi-v7a', 'x86', 'x86_64', 'arm64-v8a']
-            androidBuildTypes = ['Debug', 'Release']
-
             for (abi in androidAbis) {
-                for (buildType in androidBuildTypes) {
-                    parallelExecutors["android-${abi}-${buildType}"] = doAndroidBuildInDocker(abi, buildType)
-                }
+                parallelExecutors["android-${abi}"] = doAndroidBuildInDocker(abi, 'Release')
             }
 
-            appleSdks = ['iphoneos', 'iphonesimulator',
+            appleSdks = ['iphoneos',  'iphonesimulator',
                          'appletvos', 'appletvsimulator',
-                         'watchos', 'watchsimulator']
-
+                         'watchos',   'watchsimulator']
             for (sdk in appleSdks) {
                 parallelExecutors[sdk] = doBuildApplePlatform(sdk, 'Release')
             }
@@ -202,31 +125,29 @@ jobWrapper {
                 parallelExecutors["buildLinux${buildType}"] = doBuildLinux(buildType)
             }
 
-            windowsBuildTypes = ['Debug', 'Release']
             windowsPlatforms = ['Win32', 'x64', 'ARM64']
-
-            for (buildType in windowsBuildTypes) {
-                for (platform in windowsPlatforms) {
-                    parallelExecutors["buildWindows-${platform}-${buildType}"] = doBuildWindows(buildType, false, platform, false)
-                    parallelExecutors["buildWindowsUniversal-${platform}-${buildType}"] = doBuildWindows(buildType, true, platform, false)
-                }
-                parallelExecutors["buildWindowsUniversal-ARM-${buildType}"] = doBuildWindows(buildType, true, 'ARM', false)
+            for (platform in windowsPlatforms) {
+                parallelExecutors["buildWindows-${platform}"] = doBuildWindows('Release', false, platform, false)
+                parallelExecutors["buildWindowsUniversal-${platform}"] = doBuildWindows('Release', true, platform, false)
             }
+            parallelExecutors["buildWindowsUniversal-ARM"] = doBuildWindows('Release', true, 'ARM', false)
 
             parallel parallelExecutors
         }
+
         stage('Aggregate Cocoa xcframeworks') {
             rlmNode('osx') {
                 getArchive()
                 for (cocoaStash in cocoaStashes) {
                     unstash name: cocoaStash
                 }
-                sh "tools/build-cocoa.sh -x -v \"${gitDescribeVersion}\""
+                sh "tools/build-cocoa.sh -v \"${gitDescribeVersion}\""
                 archiveArtifacts('realm-*.tar.xz')
                 stash includes: 'realm-*.tar.xz', name: "cocoa"
                 publishingStashes << "cocoa"
             }
         }
+
         stage('Publish to S3') {
             rlmNode('docker') {
                 deleteDir()
@@ -239,15 +160,57 @@ jobWrapper {
                                 def files = findFiles(glob: '**')
                                 for (file in files) {
                                     s3Upload file: file.path, path: "downloads/core/${gitDescribeVersion}/${path}/${file.name}", bucket: 'static.realm.io'
-                                    if (!requireNightlyBuild) { // don't publish nightly builds in the non-versioned folder path
-                                        s3Upload file: file.path, path: "downloads/core/${file.name}", bucket: 'static.realm.io'
-                                    }
                                 }
                             }
                         }
                     }
                 }
             }
+        }
+    }
+    else {
+        stage('Checking') {
+            def buildOptions = [
+                buildType : 'Debug',
+                maxBpNodeSize: 1000,
+                enableEncryption: true,
+                useEncryption: false,
+                enableSync: false,
+                runTests: true,
+            ]
+
+            parallelExecutors = [
+                buildLinuxRelease       : doBuildLinux('Release'),
+                checkAlpine             : doCheckAlpine(buildOptions + [enableSync: true]),
+                checkLinuxDebug         : doCheckInDocker(buildOptions + [useToolchain : true]),
+                checkLinuxDebugEncrypt  : doCheckInDocker(buildOptions + [useEncryption : true]),
+                checkLinuxRelease_4     : doCheckInDocker(buildOptions + [maxBpNodeSize: 4, buildType : 'Release', useToolchain : true]),
+                checkLinuxDebug_Sync    : doCheckInDocker(buildOptions + [enableSync: true, dumpChangesetTransform: true]),
+                checkLinuxDebugNoEncryp : doCheckInDocker(buildOptions + [enableEncryption: false]),
+                checkMacOsRelease_Sync  : doBuildMacOs(buildOptions + [buildType: 'Release', enableSync: true]),
+                checkWindows_x86_Release: doBuildWindows('Release', false, 'Win32', true),
+                checkWindows_x64_Debug  : doBuildWindows('Debug', false, 'x64', true),
+                buildUWP_x86_Release    : doBuildWindows('Release', true, 'Win32', false),
+                buildWindows_ARM64_Debug: doBuildWindows('Debug', false, 'ARM64', false),
+                buildUWP_ARM64_Debug    : doBuildWindows('Debug', true, 'ARM64', false),
+                checkiOSSimulator_Debug : doBuildApplePlatform('iphonesimulator', 'Debug', true),
+                buildAppleTV_Debug      : doBuildApplePlatform('appletvos', 'Debug', false),
+                buildAndroidArm64Debug  : doAndroidBuildInDocker('arm64-v8a', 'Debug'),
+                buildAndroidTestsArmeabi: doAndroidBuildInDocker('armeabi-v7a', 'Debug', TestAction.Build),
+                buildEmscripten         : doBuildEmscripten('Debug'),
+            ]
+            if (releaseTesting) {
+                extendedChecks = [
+                    checkMacOsDebug               : doBuildMacOs(buildOptions + [buildType: "Release"]),
+                    checkAndroidarmeabiDebug      : doAndroidBuildInDocker('armeabi-v7a', 'Debug', TestAction.Run),
+                    // FIXME: https://github.com/realm/realm-core/issues/4159
+                    //checkAndroidx86Release        : doAndroidBuildInDocker('x86', 'Release', TestAction.Run),
+                    // FIXME: https://github.com/realm/realm-core/issues/4162
+                    //coverage                      : doBuildCoverage(),
+                ]
+                parallelExecutors.putAll(extendedChecks)
+            }
+            parallel parallelExecutors
         }
     }
 }
@@ -277,13 +240,19 @@ def doCheckInDocker(Map options = [:]) {
         rlmNode('docker') {
             getArchive()
 
-            def buildEnv = buildDockerEnv('testing.Dockerfile')
+            def buildEnv = buildDockerEnv('linux.Dockerfile')
 
             def environment = environment()
             environment << 'UNITTEST_XML=unit-test-report.xml'
             environment << "UNITTEST_SUITE_NAME=Linux-${options.buildType}"
             if (options.useEncryption) {
                 environment << 'UNITTEST_ENCRYPT_ALL=1'
+            }
+
+            // We don't enable this by default, because using a toolchain with its own sysroot
+            // prevents CMake from finding system libraries like curl which we use in sync tests.
+            if (options.useToolchain) {
+                cmakeDefinitions += " -DCMAKE_TOOLCHAIN_FILE=\"${env.WORKSPACE}/tools/cmake/x86_64-linux-gnu.toolchain.cmake\""
             }
 
             def buildSteps = { String dockerArgs = "" ->
@@ -343,26 +312,15 @@ def doCheckInDocker(Map options = [:]) {
     }
 }
 
-def doCheckSanity(Map options = [:]) {
-    def privileged = '';
-
+def doCheckAlpine(Map options = [:]) {
     def cmakeOptions = [
         CMAKE_BUILD_TYPE: options.buildType,
         REALM_MAX_BPNODE_SIZE: options.maxBpNodeSize,
-        REALM_ENABLE_SYNC: options.enableSync,
+        REALM_ENABLE_ENCRYPTION: options.enableEncryption ? 'ON' : 'OFF',
+        REALM_ENABLE_SYNC: options.enableSync ? 'ON' : 'OFF',
+        REALM_USE_SYSTEM_OPENSSL: 'ON',
+        OPENSSL_USE_STATIC_LIBS: 'OFF',
     ]
-
-    if (options.sanitizeMode.contains('thread')) {
-        cmakeOptions << [
-            REALM_TSAN: "ON",
-        ]
-    }
-    else if (options.sanitizeMode.contains('address')) {
-        privileged = '--privileged'
-        cmakeOptions << [
-            REALM_ASAN: "ON",
-        ]
-    }
 
     def cmakeDefinitions = cmakeOptions.collect { k,v -> "-D$k=$v" }.join(' ')
 
@@ -370,32 +328,38 @@ def doCheckSanity(Map options = [:]) {
         rlmNode('docker') {
             getArchive()
 
-            def environment = environment() + [
-              'CC=clang',
-              'CXX=clang++',
-              'UNITTEST_XML=unit-test-report.xml',
-              "UNITTEST_SUITE_NAME=Linux-${options.buildType}",
-              "TSAN_OPTIONS=\"suppressions=${WORKSPACE}/test/tsan.suppress\""
-            ]
-            buildDockerEnv('testing.Dockerfile').inside(privileged) {
-                withEnv(environment) {
-                    try {
-                        dir('build-dir') {
-                            sh "cmake ${cmakeDefinitions} -G Ninja .."
-                            runAndCollectWarnings(
-                                script: 'ninja',
-                                parser: "clang",
-                                name: "linux-clang-${options.buildType}-${options.sanitizeMode}",
-                                filters: warningFilters,
-                            )
-                            sh "${ctest_cmd}"
-                        }
+            def buildEnv = buildDockerEnv('alpine.Dockerfile')
 
-                    } finally {
-                        junit testResults: 'build-dir/test/unit-test-report.xml'
+            def environment = environment()
+            environment << 'UNITTEST_XML=unit-test-report.xml'
+            environment << "UNITTEST_SUITE_NAME=Alpine-${options.buildType}"
+            if (options.useEncryption) {
+                environment << 'UNITTEST_ENCRYPT_ALL=1'
+            }
+
+            // We don't enable this by default, because using a toolchain with its own sysroot
+            // prevents CMake from finding system libraries like curl which we use in sync tests.
+            if (options.useToolchain) {
+                cmakeDefinitions += " -DCMAKE_TOOLCHAIN_FILE=\"${env.WORKSPACE}/tools/cmake/x86_64-linux-musl.toolchain.cmake\""
+            }
+
+            buildEnv.inside {
+                    withEnv(environment) {
+                        try {
+                            dir('build-dir') {
+                                sh "cmake ${cmakeDefinitions} -G Ninja .."
+                                runAndCollectWarnings(
+                                    script: 'ninja',
+                                    name: "alpine-${options.buildType}-encrypt${options.enableEncryption}-BPNODESIZE_${options.maxBpNodeSize}",
+                                    filters: warningFilters,
+                                )
+                                sh "${ctest_cmd}"
+                            }
+                        } finally {
+                            junit testResults: 'build-dir/test/unit-test-report.xml'
+                        }
                     }
                 }
-            }
         }
     }
 }
@@ -405,22 +369,15 @@ def doBuildLinux(String buildType) {
         rlmNode('docker') {
             getSourceArchive()
 
-            buildDockerEnv('packaging.Dockerfile').inside {
+            buildDockerEnv('linux.Dockerfile').inside {
                 sh """
                    rm -rf build-dir
                    mkdir build-dir
                    cd build-dir
-                   cmake -DCMAKE_BUILD_TYPE=${buildType} -DREALM_NO_TESTS=1 -DREALM_VERSION="${gitDescribeVersion}" -G Ninja ..
+                   cmake -DCMAKE_BUILD_TYPE=${buildType} -DCMAKE_TOOLCHAIN_FILE=../tools/cmake/x86_64-linux-gnu.toolchain.cmake -DREALM_NO_TESTS=1 -DREALM_VERSION="${gitDescribeVersion}" -G Ninja ..
                    ninja
                    cpack -G TGZ
                 """
-            }
-
-            dir('build-dir') {
-                archiveArtifacts("*.tar.gz")
-                def stashName = "linux___${buildType}"
-                stash includes:"*.tar.gz", name:stashName
-                publishingStashes << stashName
             }
         }
     }
@@ -436,7 +393,7 @@ def doBuildLinuxClang(String buildType) {
               'CXX=clang++'
             ]
 
-            buildDockerEnv('testing.Dockerfile').inside {
+            buildDockerEnv('linux.Dockerfile').inside {
                 withEnv(environment) {
                     dir('build-dir') {
                         sh "cmake -D CMAKE_BUILD_TYPE=${buildType} -DREALM_NO_TESTS=1 -DREALM_VERSION=\"${gitDescribeVersion}\" -G Ninja .."
@@ -449,13 +406,6 @@ def doBuildLinuxClang(String buildType) {
                         sh 'cpack -G TGZ'
                     }
                 }
-            }
-
-            dir('build-dir') {
-                archiveArtifacts("*.tar.gz")
-                def stashName = "linux___${buildType}"
-                stash includes:"*.tar.gz", name:stashName
-                publishingStashes << stashName
             }
         }
     }
@@ -489,16 +439,6 @@ def doAndroidBuildInDocker(String abi, String buildType, TestAction test = TestA
                         name: "android-armeabi-${abi}-${buildType}",
                         filters: warningFilters,
                     )
-                }
-                if (test == TestAction.None) {
-                    dir(buildDir) {
-                        archiveArtifacts('realm-*.tar.gz')
-                        stash includes: 'realm-*.tar.gz', name: stashName
-                    }
-                    androidStashes << stashName
-                    if (gitTag) {
-                        publishingStashes << stashName
-                    }
                 }
             }
 
@@ -590,12 +530,6 @@ def doBuildWindows(String buildType, boolean isUWP, String platform, boolean run
                     )
                 }
                 bat "\"${tool 'cmake'}\\..\\cpack.exe\" -C ${buildType} -D CPACK_GENERATOR=TGZ"
-                archiveArtifacts('*.tar.gz')
-                if (gitTag) {
-                    def stashName = "windows___${platform}___${isUWP?'uwp':'nouwp'}___${buildType}"
-                    stash includes:'*.tar.gz', name:stashName
-                    publishingStashes << stashName
-                }
             }
             if (runTests && !isUWP) {
                 def prefix = "Windows-${platform}-${buildType}";
@@ -655,7 +589,7 @@ def doBuildMacOs(Map options = [:]) {
     ]
     if (!options.runTests) {
         cmakeOptions << [
-            REALM_NO_TESTS: 'ON',
+            REALM_BUILD_LIB_ONLY: 'ON',
         ]
     }
     if (longRunningTests) {
@@ -671,25 +605,18 @@ def doBuildMacOs(Map options = [:]) {
             getArchive()
 
             dir('build-macosx') {
-                withEnv(['DEVELOPER_DIR=/Applications/Xcode-13.1.app/Contents/Developer/']) {
-                    // This is a dirty trick to work around a bug in xcode
-                    // It will hang if launched on the same project (cmake trying the compiler out)
-                    // in parallel.
-                    retry(3) {
-                        timeout(time: 2, unit: 'MINUTES') {
-                            sh "cmake ${cmakeDefinitions} -G Xcode .."
-                        }
-                    }
+                withEnv(['DEVELOPER_DIR=/Applications/Xcode-14.app/Contents/Developer/']) {
+                    sh "cmake ${cmakeDefinitions} -G Xcode .."
 
                     runAndCollectWarnings(
                         parser: 'clang',
-                        script: "cmake --build . --config ${buildType} --target package -- ONLY_ACTIVE_ARCH=NO",
+                        script: "cmake --build . --config ${buildType} --target package -- ONLY_ACTIVE_ARCH=NO -destination generic/name=macOS -sdk macosx",
                         name: "xcode-macosx-${buildType}",
                         filters: warningFilters,
                     )
                 }
             }
-            withEnv(['DEVELOPER_DIR=/Applications/Xcode-13.1.app/Contents/Developer']) {
+            withEnv(['DEVELOPER_DIR=/Applications/Xcode-14.app/Contents/Developer']) {
                 runAndCollectWarnings(
                     parser: 'clang',
                     script: 'xcrun swift build',
@@ -732,8 +659,7 @@ def doBuildApplePlatform(String platform, String buildType, boolean test = false
         rlmNode('osx') {
             getArchive()
 
-            withEnv(['DEVELOPER_DIR=/Applications/Xcode-13.1.app/Contents/Developer/',
-                     'XCODE_14_DEVELOPER_DIR=/Applications/Xcode-14.app/Contents/Developer/']) {
+            withEnv(['DEVELOPER_DIR=/Applications/Xcode-14.app/Contents/Developer/']) {
                 sh "tools/build-apple-device.sh -p '${platform}' -c '${buildType}' -v '${gitDescribeVersion}'"
 
                 if (test) {
@@ -778,12 +704,54 @@ def doBuildApplePlatform(String platform, String buildType, boolean test = false
     }
 }
 
+def doBuildApplePlatformXcode15(String platform, String buildType) {
+    return {
+        rlmNode('macos_13') {
+            getArchive()
+
+            withEnv(['DEVELOPER_DIR=/Applications/Xcode-15.app/Contents/Developer/']) {
+                sh "tools/build-apple-device.sh -p '${platform}' -c '${buildType}' -v '${gitDescribeVersion}'"
+            }
+
+            String tarball = "realm-${buildType}-${gitDescribeVersion}-${platform}-devel.tar.gz";
+            archiveArtifacts tarball
+
+            def stashName = "${platform}___${buildType}"
+            stash includes: tarball, name: stashName
+            cocoaStashes << stashName
+            publishingStashes << stashName
+        }
+    }
+}
+
+
+def doBuildEmscripten(String buildType) {
+    return {
+        rlmNode('docker') {
+            getArchive()
+
+            docker.image('emscripten/emsdk:3.1.37').inside {
+                dir('build') {
+                    sh "emcmake cmake .. -DCMAKE_BUILD_TYPE=${buildType}"
+
+                    runAndCollectWarnings(
+                        parser: 'clang',
+                        script: 'make -j$(nproc) 2>&1',
+                        name: "emscripten-${buildType}",
+                        filters: warningFilters,
+                    )
+                }
+            }
+        }
+    }
+}
+
 def doBuildCoverage() {
   return {
     rlmNode('docker') {
       getArchive()
 
-      buildDockerEnv('testing.Dockerfile').inside {
+      buildDockerEnv('linux.Dockerfile').inside {
         sh '''
           mkdir build
           cd build
@@ -829,7 +797,7 @@ def isCronJob() {
     for(upstream in upstreams) {
         def upstreamProjectName = upstream.getFullProjectName()
         def isRealmCronBuild = upstreamProjectName == 'realm-core-cron'
-        if(isRealmCronBuild)
+        if (isRealmCronBuild)
             return true;
     }
     return false;
