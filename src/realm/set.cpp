@@ -271,6 +271,9 @@ bool SetBase::set_equals(const CollectionBase& rhs) const
 
 void SetBase::assign_union(const CollectionBase& rhs)
 {
+    if (*this == rhs) {
+        return;
+    }
     if (auto other_set = dynamic_cast<const SetBase*>(&rhs)) {
         return assign_union(other_set->begin(), other_set->end());
     }
@@ -292,6 +295,9 @@ void SetBase::assign_union(It1 first, It2 last)
 
 void SetBase::assign_intersection(const CollectionBase& rhs)
 {
+    if (*this == rhs) {
+        return;
+    }
     if (auto other_set = dynamic_cast<const SetBase*>(&rhs)) {
         return assign_intersection(other_set->begin(), other_set->end());
     }
@@ -313,6 +319,10 @@ void SetBase::assign_intersection(It1 first, It2 last)
 
 void SetBase::assign_difference(const CollectionBase& rhs)
 {
+    if (*this == rhs) {
+        clear();
+        return;
+    }
     if (auto other_set = dynamic_cast<const SetBase*>(&rhs)) {
         return assign_difference(other_set->begin(), other_set->end());
     }
@@ -334,6 +344,10 @@ void SetBase::assign_difference(It1 first, It2 last)
 
 void SetBase::assign_symmetric_difference(const CollectionBase& rhs)
 {
+    if (*this == rhs) {
+        clear();
+        return;
+    }
     if (auto other_set = dynamic_cast<const SetBase*>(&rhs)) {
         return assign_symmetric_difference(other_set->begin(), other_set->end());
     }

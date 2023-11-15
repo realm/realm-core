@@ -6,7 +6,7 @@
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* `Set::assign_intersection()` on `Set<StringData>`, `Set<BinaryData>`, and `Set<Mixed>` containing string or binary would cause a use-after-free if a set was intersected with itself ([PR #7144](https://github.com/realm/realm-core/pull/7144), since v10.0.0).
 
 ### Breaking changes
 * None.

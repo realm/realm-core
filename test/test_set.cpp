@@ -369,44 +369,68 @@ TEST_TYPES(Set_Types, Prop<Int>, Prop<String>, Prop<Float>, Prop<Double>, Prop<T
     CHECK(col.is_set());
 
     auto obj = t->create_object();
-    {
-        auto s = obj.get_set<type>(col);
-        auto l = obj.get_list<type>(col_list);
-        auto values = gen.values_from_int<type>({0, 1, 2, 3});
-        for (auto v : values) {
-            s.insert(v);
-            l.add(v);
-        }
-        auto sz = values.size();
-        CHECK_EQUAL(s.size(), sz);
-        auto s1 = s;
-        CHECK_EQUAL(s1.size(), sz);
-        CHECK(s.set_equals(l));
-        for (auto v : values) {
-            auto ndx = s.find(v);
-            CHECK_NOT_EQUAL(ndx, realm::npos);
-        }
-        auto [erased_ndx, erased] = s.erase(values[0]);
-        CHECK(erased);
-        CHECK_EQUAL(erased_ndx, 0);
-        CHECK_EQUAL(s.size(), values.size() - 1);
-        CHECK(s.is_subset_of(l));
+    auto values = gen.values_from_int<type>({0, 1, 2, 3});
 
+    auto l = obj.get_list<type>(col_list);
+    for (auto&& v : values) {
+        l.add(v);
+    }
+
+    auto s = obj.get_set<type>(col);
+    auto populate_set = [&] {
         s.clear();
-        CHECK_EQUAL(s.size(), 0);
-
-        if (TEST_TYPE::is_nullable) {
-            s.insert_null();
-            CHECK_EQUAL(s.size(), 1);
-            auto null_value = TEST_TYPE::default_value();
-            CHECK(value_is_null(null_value));
-            auto ndx = s.find(null_value);
-            CHECK_NOT_EQUAL(ndx, realm::npos);
-            s.erase_null();
-            CHECK_EQUAL(s.size(), 0);
-            ndx = s.find(null_value);
-            CHECK_EQUAL(ndx, realm::npos);
+        for (auto&& v : values) {
+            s.insert(v);
         }
+    };
+
+    populate_set();
+    auto sz = values.size();
+    CHECK_EQUAL(s.size(), sz);
+    auto s1 = s;
+    CHECK_EQUAL(s1.size(), sz);
+    CHECK(s.set_equals(l));
+    for (auto v : values) {
+        auto ndx = s.find(v);
+        CHECK_NOT_EQUAL(ndx, realm::npos);
+    }
+
+    auto [erased_ndx, erased] = s.erase(values[0]);
+    CHECK(erased);
+    CHECK_EQUAL(erased_ndx, 0);
+    CHECK_EQUAL(s.size(), values.size() - 1);
+    CHECK(s.is_subset_of(l));
+
+    s.clear();
+    CHECK_EQUAL(s.size(), 0);
+
+    // Union and intersection with self is a no-op
+    populate_set();
+    s.assign_union(s);
+    CHECK_EQUAL(s.size(), sz);
+    s.assign_intersection(s);
+    CHECK_EQUAL(s.size(), sz);
+
+    // Difference with self is clear()
+    populate_set();
+    s.assign_difference(s);
+    CHECK_EQUAL(s.size(), 0);
+
+    populate_set();
+    s.assign_symmetric_difference(s);
+    CHECK_EQUAL(s.size(), 0);
+
+    if (TEST_TYPE::is_nullable) {
+        s.insert_null();
+        CHECK_EQUAL(s.size(), 1);
+        auto null_value = TEST_TYPE::default_value();
+        CHECK(value_is_null(null_value));
+        auto ndx = s.find(null_value);
+        CHECK_NOT_EQUAL(ndx, realm::npos);
+        s.erase_null();
+        CHECK_EQUAL(s.size(), 0);
+        ndx = s.find(null_value);
+        CHECK_EQUAL(ndx, realm::npos);
     }
 }
 
@@ -848,4 +872,57 @@ TEST(Set_SymmetricDifferenceString)
     CHECK_EQUAL(set1.get(1), "Cosmic love");
     CHECK_EQUAL(set1.get(2), "The fox jumps over the lazy dog");
     CHECK_EQUAL(set1.get(3), "World");
+}
+
+namespace realm {
+template <typename T>
+static std::ostream& operator<<(std::ostream& os, const Set<T>& set)
+{
+    os << "Set(" << set.get_table()->get_key() << ", " << set.get_obj().get_key() << ", " << set.get_col_key() << ")";
+    return os;
+}
+} // namespace realm
+
+TEST(Set_Equality)
+{
+    // Table tries to avoid ColKey collisions, but we specifically want to trigger
+    // them to test that operator== handles them correctly
+    auto set_next_col_key = [](Table& table, int64_t value) {
+        table.set_col_key_sequence_number(value ^ table.get_key().value);
+    };
+
+    Group g_1;
+    auto table_1 = g_1.add_table("table 1");
+    set_next_col_key(*table_1, 5);
+    table_1->add_column_set(type_Int, "set 1");
+    set_next_col_key(*table_1, 10);
+    table_1->add_column_set(type_Int, "set 2");
+    auto table_2 = g_1.add_table("table 2");
+    set_next_col_key(*table_2, 5);
+    table_2->add_column_set(type_Int, "set 1");
+    Group g_2;
+    auto table_3 = g_2.add_table("table 1");
+    set_next_col_key(*table_3, 5);
+    table_3->add_column_set(type_Int, "set 1");
+
+    auto obj_1 = table_1->create_object();
+    auto obj_2 = table_1->create_object();
+    auto obj_3 = table_2->create_object();
+    auto obj_4 = table_3->create_object();
+
+    // Validate our assumptions that we actually do have key overlaps
+    CHECK_EQUAL(table_1->get_key(), table_3->get_key());
+    CHECK_EQUAL(table_1->get_column_key("set 1"), table_2->get_column_key("set 1"));
+    CHECK_EQUAL(obj_1.get_key(), obj_3.get_key());
+    CHECK_EQUAL(obj_1.get_key(), obj_4.get_key());
+
+    CHECK_EQUAL(obj_1.get_set<Int>("set 1"), obj_1.get_set<Int>("set 1"));
+    // Same obj, different col
+    CHECK_NOT_EQUAL(obj_1.get_set<Int>("set 1"), obj_1.get_set<Int>("set 2"));
+    // Same col, different obj
+    CHECK_NOT_EQUAL(obj_1.get_set<Int>("set 1"), obj_2.get_set<Int>("set 1"));
+    // Same col, same obj, different table
+    CHECK_NOT_EQUAL(obj_1.get_set<Int>("set 1"), obj_3.get_set<Int>("set 1"));
+    // Same col, same obj, same table, different group
+    CHECK_NOT_EQUAL(obj_1.get_set<Int>("set 1"), obj_4.get_set<Int>("set 1"));
 }
