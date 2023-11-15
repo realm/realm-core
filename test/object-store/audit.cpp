@@ -52,11 +52,18 @@ using namespace std::string_literals;
 using Catch::Matchers::StartsWith;
 using nlohmann::json;
 
+namespace {
+class NullLogger : public util::Logger {
+    // Since we don't want to log anything, do_log() does nothing
+    void do_log(const util::LogCategory&, Level, const std::string&) override {}
+};
+} // namespace
+
 static auto audit_logger =
 #ifdef AUDIT_LOG_LEVEL
     std::make_shared<util::StderrLogger>(AUDIT_LOG_LEVEL);
 #else
-    std::make_shared<util::NullLogger>();
+    std::make_shared<NullLogger>();
 #endif
 
 namespace {
