@@ -73,7 +73,7 @@ std::optional<KeyPathArray> build_key_path_array(realm_key_path_array_t* key_pat
     return ret;
 }
 
-static KeyPathArray create_key_path_array(const ObjectSchema& object_schema, const Schema& schema,
+static KeyPathArray create_key_path_array(Group& g, const ObjectSchema& object_schema, const Schema& schema,
                                           const char** all_key_paths_begin, const char** all_key_paths_end)
 {
     KeyPathArray resolved_key_path_array;
@@ -88,21 +88,27 @@ static KeyPathArray create_key_path_array(const ObjectSchema& object_schema, con
             StringData property(path, p - path);
             path = p;
             if (!schema_at_index) {
-                auto found_schema = schema.find(prop->object_type);
-                if (found_schema != schema.end()) {
-                    schema_at_index = &*found_schema;
-                }
-                else {
-                    throw InvalidArgument(
-                        util::format("Property '%1' in KeyPath '%2' is not a collection of objects or an object "
-                                     "reference, so it cannot be used as an intermediate keypath element.",
-                                     prop->public_name, *it));
-                }
+                throw InvalidArgument(
+                    util::format("Property '%1' in KeyPath '%2' is not a collection of objects or an object "
+                                 "reference, so it cannot be used as an intermediate keypath element.",
+                                 prop->public_name, *it));
             }
             prop = schema_at_index->property_for_public_name(property);
             if (prop) {
-                resolved_key_path.emplace_back(schema_at_index->table_key, prop->column_key);
-                schema_at_index = nullptr;
+                ColKey col_key = prop->column_key;
+                if (prop->type == PropertyType::Object || prop->type == PropertyType::LinkingObjects) {
+                    auto found_schema = schema.find(prop->object_type);
+                    if (found_schema != schema.end()) {
+                        schema_at_index = &*found_schema;
+                        if (prop->type == PropertyType::LinkingObjects) {
+                            // Find backlink column key
+                            auto origin_prop = schema_at_index->property_for_name(prop->link_origin_property_name);
+                            auto origin_table = ObjectStore::table_for_object_type(g, schema_at_index->name);
+                            col_key = origin_table->get_opposite_column(origin_prop->column_key);
+                        }
+                    }
+                }
+                resolved_key_path.emplace_back(schema_at_index->table_key, col_key);
             }
             else {
                 throw InvalidArgument(util::format("Property '%1' in KeyPath '%2' is not a valid property in %3.",
@@ -125,7 +131,8 @@ RLM_API realm_key_path_array_t* realm_create_key_path_array(const realm_t* realm
         if (user_key_paths) {
             const Schema& schema = (*realm)->schema();
             const ObjectSchema& object_schema = schema_for_table(*realm, TableKey(object_class_key));
-            ret = create_key_path_array(object_schema, schema, user_key_paths, user_key_paths + user_key_paths_count);
+            ret = create_key_path_array((*realm)->read_group(), object_schema, schema, user_key_paths,
+                                        user_key_paths + user_key_paths_count);
         }
         return new realm_key_path_array_t(std::move(ret));
     });
