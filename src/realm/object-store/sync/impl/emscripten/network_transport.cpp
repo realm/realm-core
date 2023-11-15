@@ -77,7 +77,8 @@ static void error(emscripten_fetch_t* fetch)
     emscripten_fetch_get_response_headers(fetch, packed_headers.data(), packed_headers.size());
 
     std::unique_ptr<FetchState> state(reinterpret_cast<FetchState*>(fetch->userData));
-    state->completion_block({fetch->status, 0, parse_headers(packed_headers), std::string(fetch->data, size_t(fetch->numBytes)), ErrorCodes::HTTPError});
+    state->completion_block({fetch->status, 0, parse_headers(packed_headers),
+                             std::string(fetch->data, size_t(fetch->numBytes)), ErrorCodes::HTTPError});
 }
 
 void EmscriptenNetworkTransport::send_request_to_server(
