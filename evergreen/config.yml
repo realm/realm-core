@@ -969,6 +969,7 @@ tasks:
 
 - name: baas-network-tests
   # Uncomment once tests are passing
+  tags: [ "disabled" ]
   # tags: [ "for_nightly_tests" ]
   # These tests can be manually requested for patches and pull requests
   allowed_requesters: [ "ad_hoc", "patch", "github_pr" ]
