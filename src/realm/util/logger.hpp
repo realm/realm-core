@@ -496,6 +496,23 @@ protected:
     std::shared_ptr<Logger> m_chained_logger;
 };
 
+/// A logger that essentially performs a noop when logging functions are called
+/// The log level threshold for this logger is always Logger::Level::off and
+/// cannot be changed.
+class NullLogger : public Logger {
+public:
+    NullLogger() noexcept = default;
+
+    NullLogger(Level level) noexcept
+        : Logger()
+    {
+        set_level_threshold(level);
+    }
+
+protected:
+    void do_log(const LogCategory&, Level, const std::string&) final {}
+};
+
 
 // Implementation
 
