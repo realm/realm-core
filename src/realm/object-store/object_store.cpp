@@ -131,8 +131,11 @@ ColKey add_column(Group& group, Table& table, Property const& property)
         }
     }
     else if (is_array(property.type)) {
-        return table.add_column_list(to_core_type(property.type & ~PropertyType::Flags), property.name,
-                                     is_nullable(property.type));
+        auto key = table.add_column_list(to_core_type(property.type & ~PropertyType::Flags), property.name,
+                                         is_nullable(property.type));
+        if (property.requires_index())
+            table.add_search_index(key);
+        return key;
     }
     else if (is_set(property.type)) {
         return table.add_column_set(to_core_type(property.type & ~PropertyType::Flags), property.name,
