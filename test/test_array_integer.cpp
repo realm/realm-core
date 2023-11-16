@@ -46,21 +46,23 @@ TEST(Test_ArrayInt_no_encode)
     CHECK(a.get(2) == 12);
 }
 
-TEST(Test_ArrayInt_encode_decode)
+TEST(Test_ArrayInt_encode_decode_need)
 {
     ArrayInteger a(Allocator::get_default());
     a.create();
     a.add(10);
     a.add(5);
     a.add(5);
-    CHECK(a.try_encode());
-    CHECK(a.is_encoded());
-    CHECK(a.try_decode());
+    // we allocate 16 bits for the compressed version which is not giving us any gain (15bits needed for data at this
+    // stage)
+    CHECK_NOT(a.try_encode());
+    CHECK_NOT(a.is_encoded());
+    CHECK_NOT(a.try_decode());
     CHECK_NOT(a.is_encoded());
     a.add(10);
     a.add(15);
-    CHECK_NOT(a.try_encode());
-    CHECK_NOT(a.is_encoded()); // compression is not needed in this case.
+    CHECK(a.try_encode());
+    CHECK(a.is_encoded());
     CHECK(a.get(0) == 10);
     CHECK(a.get(1) == 5);
     CHECK(a.get(2) == 5);
@@ -195,7 +197,8 @@ TEST(Test_ArrayInt_compress_data_init_from_mem)
     a.add(16388);
     a.add(409);
     a.add(16388);
-    CHECK(a.size() == 6);
+    const auto sz = a.size();
+    CHECK(sz == 6);
     // Current: [16388:16, 409:16, 16388:16, 16388:16, 409:16, 16388:16],
     // space needed: 6*16 bits = 96 bits + header
     // compress the array is a good option (it should already be compressed).
@@ -207,7 +210,8 @@ TEST(Test_ArrayInt_compress_data_init_from_mem)
     a1.init_from_mem(mem); // initialise a1 with a
     // check a1
     CHECK(a1.is_encoded());
-    CHECK(a1.size() == 6);
+    const auto sz1 = a1.size();
+    CHECK(sz1 == 6);
     CHECK(a1.get(0) == 16388);
     CHECK(a1.get(1) == 409);
     CHECK(a1.get(2) == 16388);
@@ -230,28 +234,8 @@ TEST(Test_ArrayInt_compress_data_init_from_mem)
     CHECK(a1.get(5) == 16388);
     CHECK(a1.get(6) == 20);
     CHECK(a1.try_decode());
-    // a now is in some sort of bad state, this is happening because we are using a different array for compressing.
-    // so a.flex_array is still attached (m_data is not null) whereas a1.flex_array is not.
-    // But when we query to header for getting the type of
-    // the compressed array we read a bad value, since the memory is freed and memory may or may not be there.
-    // So A is not in a unsuable state and needs to be destroyed.
-
-    //    CHECK(a.try_decode());
-    //    CHECK_NOT(a.is_encoded());
-    //    CHECK(a.size() == 7);
-    //    CHECK(a.get(0) == 16388);
-    //    CHECK(a.get(1) == 409);
-    //    CHECK(a.get(2) == 16388);
-    //    CHECK(a.get(3) == 16388);
-    //    CHECK(a.get(4) == 409);
-    //    CHECK(a.get(5) == 16388);
-    //    CHECK(a1.get(6) == 20);
-
-    // destroy either a1 or a, the same memory should be freed
+    // a1 is now in charge of destroying the memory
     a1.destroy();
-    a.destroy();
-    // this is something to clarify, should we deep copy the encoded array duting init_from_mem?
-    CHECK_NOT(a.is_attached());
     CHECK_NOT(a1.is_attached());
 }
 

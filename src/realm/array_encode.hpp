@@ -29,63 +29,14 @@ class ArrayEncode {
 public:
     explicit ArrayEncode() = default;
     virtual ~ArrayEncode() = default;
-    virtual void init_array_encode(MemRef) = 0;
-    virtual bool encode() = 0;
-    virtual bool decode() = 0;
+    virtual bool encode() const = 0;
+    virtual bool decode() const = 0;
     virtual bool is_encoded() const = 0;
 
-    virtual MemRef get_mem_ref() const = 0;
     virtual size_t size() const = 0;
     virtual int64_t get(size_t) const = 0;
     virtual size_t byte_size() const = 0;
-
-    virtual char* get_encode_header() = 0;
-    virtual char type() = 0;
 };
-
-class DummyArrayEncode : public ArrayEncode {
-public:
-    explicit DummyArrayEncode() = default;
-    virtual ~DummyArrayEncode() = default;
-    void init_array_encode(MemRef) final override {}
-    bool encode() final override
-    {
-        return false;
-    }
-    bool decode() final override
-    {
-        return false;
-    }
-    bool is_encoded() const final override
-    {
-        return false;
-    }
-    size_t size() const final override
-    {
-        return 0;
-    }
-    int64_t get(size_t) const final override
-    {
-        return 0;
-    }
-    MemRef get_mem_ref() const final override
-    {
-        return MemRef();
-    }
-    size_t byte_size() const final override
-    {
-        return 0;
-    }
-    char* get_encode_header() final override
-    {
-        return nullptr;
-    }
-    char type() final override
-    {
-        return 'A';
-    }
-};
-
 
 } // namespace realm
 #endif // REALM_ARRAY_COMPRESS_HPP

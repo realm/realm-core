@@ -30,8 +30,7 @@ using namespace realm;
 // this is a bad idea. Since Accessors are constructed everywhere, we need to store the information that array
 // integers can be compressed in the header
 ArrayInteger::ArrayInteger(Allocator& allocator) noexcept
-    : Array(allocator, m_array_flex)
-    , m_array_flex(*this)
+    : Array(allocator)
 {
     m_is_inner_bptree_node = false;
 }

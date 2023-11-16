@@ -20,39 +20,34 @@
 #define REALM_ARRAY_FLEX_HPP
 
 #include <realm/array_encode.hpp>
-#include <realm/array.hpp>
 
 namespace realm {
 //
 // Compress array in Flex format
 // Decompress array in WTypeBits formats
 //
-class ArrayFlex : public ArrayEncode, public Array {
+class Array;
+class ArrayFlex : public ArrayEncode {
 public:
     explicit ArrayFlex(Array& array);
-    virtual ~ArrayFlex()
-    {
-        // destroy();
-    }
-    void init_array_encode(MemRef) final override;
-    bool encode() final override;
-    bool decode() final override;
+    virtual ~ArrayFlex() = default;
+    bool encode() const final override;
+    bool decode() const final override;
     bool is_encoded() const final override;
     size_t size() const final override;
     int64_t get(size_t) const final override;
-    MemRef get_mem_ref() const final override;
     size_t byte_size() const final override;
-    char* get_encode_header() final override;
-
-    char type() final override
-    {
-        return 'B';
-    }
-
 
 private:
-    bool try_encode(std::vector<int64_t>&, std::vector<size_t>&);
+    // read info about the encoded array from header
     bool get_encode_info(size_t& value_width, size_t& index_width, size_t& value_size, size_t& index_size) const;
+
+    // encode array methods
+    bool try_encode(std::vector<int64_t>&, std::vector<size_t>&) const;
+    void do_encode_array(std::vector<int64_t>&, std::vector<size_t>&) const;
+    bool check_gain(std::vector<int64_t>&, std::vector<size_t>&, int&, int&) const;
+    void setup_header_in_flex_format(std::vector<int64_t>&, std::vector<size_t>&, int, int) const;
+    void copy_into_encoded_array(std::vector<int64_t>&, std::vector<size_t>&) const;
 
     Array& m_array;
 };

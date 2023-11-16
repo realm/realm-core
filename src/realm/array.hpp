@@ -23,12 +23,12 @@
 #include <realm/query_state.hpp>
 #include <realm/column_fwd.hpp>
 #include <realm/array_direct.hpp>
+#include <realm/array_flex.hpp>
 
 namespace realm {
 
 // Pre-definitions
 class GroupWriter;
-class ArrayEncode;
 namespace _impl {
 class ArrayWriterBase;
 }
@@ -90,8 +90,6 @@ class Array : public Node, public ArrayParent {
 public:
     /// Create an array accessor in the unattached state.
     explicit Array(Allocator& allocator) noexcept;
-    explicit Array(Allocator& allocator, ArrayEncode& array_encode) noexcept;
-
     virtual ~Array() noexcept = default;
 
     /// Create a new integer array of the specified type and size, and filled
@@ -389,7 +387,7 @@ public:
 
     /// Same as non-static write() with `deep` set to true. This is for the
     /// cases where you do not already have an array accessor available.
-    static ref_type write(ref_type, Allocator&, _impl::ArrayWriterBase&, bool only_if_modified, ArrayEncode& encode);
+    static ref_type write(ref_type, Allocator&, _impl::ArrayWriterBase&, bool only_if_modified);
 
     size_t find_first(int64_t value, size_t begin = 0, size_t end = size_t(-1)) const;
 
@@ -537,6 +535,11 @@ protected:
     bool m_has_refs;             // Elements whose first bit is zero are refs to subarrays.
     bool m_context_flag;         // Meaning depends on context.
 
+    // TODO: This should be an opaque reference to a generic encode that is constructed via a factory. In order to
+    // implement a
+    //  different compression algorithm on demand
+    ArrayFlex m_encode;
+
 private:
     ref_type do_write_shallow(_impl::ArrayWriterBase&) const;
     ref_type do_write_deep(_impl::ArrayWriterBase&, bool only_if_modified) const;
@@ -548,9 +551,6 @@ private:
     // encode/decode this array
     bool encode_array() const;
     bool decode_array() const;
-
-    ArrayEncode& m_encode_array; // encode array for encoding and decoding array.
-
 
 public:
     bool is_encoded() const;

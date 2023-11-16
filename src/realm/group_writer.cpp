@@ -688,8 +688,7 @@ ref_type GroupWriter::write_group()
     if (top.size() > Group::s_hist_ref_ndx) {
         if (ref_type history_ref = top.get_as_ref(Group::s_hist_ref_ndx)) {
             Allocator& alloc = top.get_alloc();
-            DummyArrayEncode encode;
-            ref_type new_history_ref = Array::write(history_ref, alloc, *writer, only_if_modified, encode); // Throws
+            ref_type new_history_ref = Array::write(history_ref, alloc, *writer, only_if_modified); // Throws
             top.set(Group::s_hist_ref_ndx, from_ref(new_history_ref));                              // Throws
         }
     }

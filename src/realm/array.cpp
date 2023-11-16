@@ -25,7 +25,7 @@
 #include <realm/array_integer.hpp>
 #include <realm/array_key.hpp>
 #include <realm/impl/array_writer.hpp>
-#include <realm/array_encode.hpp>
+#include <realm/array_flex.hpp>
 
 #include <array>
 #include <cstring> // std::memcpy
@@ -191,17 +191,10 @@ using namespace realm::util;
 
 void QueryStateBase::dyncast() {}
 
-DummyArrayEncode dummy_encode;
-
 Array::Array(Allocator& allocator) noexcept
     : Node(allocator)
-    , m_encode_array(dummy_encode)
-{
-}
-
-Array::Array(Allocator& allocator, ArrayEncode& array_encode) noexcept
-    : Node(allocator)
-    , m_encode_array(array_encode)
+    , m_encode(
+          ArrayFlex(*this)) // TODO: this needs to become a sort of factory in order to support multiple encodings
 {
 }
 
@@ -209,7 +202,7 @@ template <size_t w>
 int64_t Array::get(size_t ndx) const noexcept
 {
     if (is_encoded())
-        return m_encode_array.get(ndx);
+        return m_encode.get(ndx);
 
     REALM_ASSERT_DEBUG(is_attached());
     return get_universal<w>(m_data, ndx);
@@ -218,7 +211,7 @@ int64_t Array::get(size_t ndx) const noexcept
 int64_t Array::get(size_t ndx) const noexcept
 {
     if (is_encoded())
-        return m_encode_array.get(ndx);
+        return m_encode.get(ndx);
 
     REALM_ASSERT_DEBUG(is_attached());
     REALM_ASSERT_DEBUG_EX(ndx < m_size, ndx, m_size);
@@ -278,18 +271,10 @@ void Array::init_from_mem(MemRef mem) noexcept
     // they will likely need to be set explicitly as part of decompressing
     if (old_style)
         update_width_cache_from_header();
-
-    if (!old_style) {
-        // deal with type B nodes in compressed format
-        m_encode_array.init_array_encode(mem);
-        m_size = m_encode_array.size();
-    }
 }
 
 MemRef Array::get_mem() const noexcept
 {
-    if (is_encoded())
-        return m_encode_array.get_mem_ref();
     return MemRef(get_header_from_data(m_data), m_ref, m_alloc);
 }
 
@@ -352,8 +337,8 @@ void Array::destroy_children(size_t offset) noexcept
 size_t Array::get_byte_size() const noexcept
 {
     // For compressed arrays this does not make sense anymore.
-    if (m_encode_array.is_encoded()) {
-        return m_encode_array.byte_size();
+    if (m_encode.is_encoded()) {
+        return m_encode.byte_size();
     }
     const char* header = get_header_from_data(m_data);
     REALM_ASSERT(get_kind((uint64_t*)header) == 'A');
@@ -370,9 +355,6 @@ ref_type Array::write(_impl::ArrayWriterBase& out, bool deep, bool only_if_modif
         return m_ref;
 
     if (!deep || !m_has_refs) {
-        // this is not going to work, because the encoding we have set a this time is Dummy.
-        // Since we have constructed a temporary accessor before, while recursively expanding
-        // our arrays.
         encode_array();
         return do_write_shallow(out); // Throws
     }
@@ -380,19 +362,15 @@ ref_type Array::write(_impl::ArrayWriterBase& out, bool deep, bool only_if_modif
     return do_write_deep(out, only_if_modified); // Throws
 }
 
-ref_type Array::write(ref_type ref, Allocator& alloc, _impl::ArrayWriterBase& out, bool only_if_modified,
-                      ArrayEncode& encode)
+ref_type Array::write(ref_type ref, Allocator& alloc, _impl::ArrayWriterBase& out, bool only_if_modified)
 {
     if (only_if_modified && alloc.is_read_only(ref))
         return ref;
 
-    Array array(alloc, encode);
+    Array array(alloc);
     array.init_from_ref(ref);
 
     if (!array.m_has_refs) {
-        // this is not going to work, because the encoding we have set a this time is Dummy.
-        //  Since we have constructed a temporary accessor before, while recursively expanding
-        //  our arrays.
         array.encode_array();
         return array.do_write_shallow(out); // Throws
     }
@@ -406,8 +384,8 @@ ref_type Array::do_write_shallow(_impl::ArrayWriterBase& out) const
     // here we might want to compress the array and write down.
     if (is_encoded()) {
         // this is never hit since we have lost our information about the encoding type while expanding to disk.
-        const char* header = m_encode_array.get_encode_header();
-        size_t byte_size = m_encode_array.byte_size();
+        const char* header = get_header_from_data(m_data);
+        size_t byte_size = m_encode.byte_size();
         uint32_t dummy_checksum = 0x42424242UL;                                // "BBBB" in ASCII
         ref_type new_ref = out.write_array(header, byte_size, dummy_checksum); // Throws
         REALM_ASSERT_3(new_ref % 8, ==, 0);                                    // 8-byte alignment
@@ -436,7 +414,7 @@ ref_type Array::do_write_deep(_impl::ArrayWriterBase& out, bool only_if_modified
     // will be. Moreover we have lost the information about whether we need compression or not for the leaf array.
 
     // Temp array for updated refs
-    Array new_array(Allocator::get_default(), m_encode_array);
+    Array new_array(Allocator::get_default());
     Type type = m_is_inner_bptree_node ? type_InnerBptreeNode : type_HasRefs;
     new_array.create(type, m_context_flag); // Throws
     _impl::ShallowArrayDestroyGuard dg(&new_array);
@@ -448,7 +426,7 @@ ref_type Array::do_write_deep(_impl::ArrayWriterBase& out, bool only_if_modified
         bool is_ref = (value != 0 && (value & 1) == 0);
         if (is_ref) {
             ref_type subref = to_ref(value);
-            ref_type new_subref = write(subref, m_alloc, out, only_if_modified, new_array.m_encode_array); // Throws
+            ref_type new_subref = write(subref, m_alloc, out, only_if_modified); // Throws
             value = from_ref(new_subref);
         }
         new_array.add(value); // Throws
@@ -707,23 +685,41 @@ void Array::do_ensure_minimum_width(int_fast64_t value)
 size_t Array::size() const noexcept
 {
     if (is_encoded())
-        m_encode_array.size();
+        return m_encode.size();
     return m_size;
 }
 
 bool Array::encode_array() const
 {
-    return m_encode_array.encode();
+    const auto header = get_header();
+    auto kind = get_kind((uint64_t*)header);
+    if (kind == 'A') {
+        auto encoding = get_encoding((uint64_t*)header);
+        // encode everything that is WtypeBits
+        if (encoding == NodeHeader::Encoding::WTypBits) {
+            return m_encode.encode();
+        }
+    }
+    return false;
 }
 
 bool Array::decode_array() const
 {
-    return m_encode_array.decode();
+    const auto header = get_header();
+    auto kind = get_kind((uint64_t*)header);
+    // if it is encoded and it is in flex format decode all
+    if (kind == 'B') {
+        auto encoding = get_encoding((uint64_t*)header);
+        if (encoding == NodeHeader::Encoding::Flex) {
+            return m_encode.decode();
+        }
+    }
+    return false;
 }
 
 bool Array::is_encoded() const
 {
-    return m_encode_array.is_encoded();
+    return m_encode.is_encoded();
 }
 
 bool Array::try_encode() const
