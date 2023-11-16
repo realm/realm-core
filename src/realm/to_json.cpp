@@ -357,11 +357,6 @@ void Obj::to_json(std::ostream& out, size_t link_depth, const std::map<std::stri
                     Dictionary dict(parent, 0);
                     dict.to_json(out, link_depth, output_mode, print_link);
                 }
-                else if (val.is_type(type_Set)) {
-                    DummyParent parent(this->get_table(), val.get_ref());
-                    Set<Mixed> set(parent, 0);
-                    set.to_json(out, link_depth, output_mode, print_link);
-                }
                 else if (val.is_type(type_List)) {
                     DummyParent parent(m_table, val.get_ref());
                     Lst<Mixed> list(parent, 0);

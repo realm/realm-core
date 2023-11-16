@@ -1959,6 +1959,10 @@ Obj& Obj::set_collection(ColKey col_key, CollectionType type)
     update_if_needed();
     Mixed new_val(0, type);
 
+    if (type == CollectionType::Set) {
+        throw IllegalOperation("Set nested in Mixed is not supported");
+    }
+
     ArrayMixed arr(_get_alloc());
     ref_type ref = to_ref(Array::get(m_mem.get_addr(), col_key.get_index().val + 1));
     arr.init_from_ref(ref);
@@ -2035,9 +2039,6 @@ CollectionPtr Obj::get_collection_ptr(const Path& path) const
         if (ref.is_type(type_List)) {
             collection = collection->get_list(path_elem);
         }
-        else if (ref.is_type(type_Set)) {
-            collection = collection->get_set(path_elem);
-        }
         else if (ref.is_type(type_Dictionary)) {
             collection = collection->get_dictionary(path_elem);
         }
@@ -2084,9 +2085,6 @@ CollectionPtr Obj::get_collection_by_stable_path(const StablePath& path) const
         if (ref.is_type(type_List)) {
             collection = collection->get_list(path_elem);
         }
-        else if (ref.is_type(type_Set)) {
-            collection = collection->get_set(path_elem);
-        }
         else if (ref.is_type(type_Dictionary)) {
             collection = collection->get_dictionary(path_elem);
         }
@@ -2110,9 +2108,6 @@ CollectionBasePtr Obj::get_collection_ptr(ColKey col_key) const
     auto val = get<Mixed>(col_key);
     if (val.is_type(type_List)) {
         return std::make_shared<Lst<Mixed>>(*this, col_key);
-    }
-    else if (val.is_type(type_Set)) {
-        return std::make_shared<Set<Mixed>>(*this, col_key);
     }
     REALM_ASSERT(val.is_type(type_Dictionary));
     return std::make_shared<Dictionary>(*this, col_key);

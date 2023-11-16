@@ -219,10 +219,6 @@ public:
     {
         throw IllegalOperation("get_dictionary for this collection is not allowed");
     }
-    virtual SetMixedPtr get_set(const PathElement&) const
-    {
-        throw IllegalOperation("get_set for this collection is not allowed");
-    }
     virtual ListMixedPtr get_list(const PathElement&) const
     {
         throw IllegalOperation("get_list for this collection is not allowed");

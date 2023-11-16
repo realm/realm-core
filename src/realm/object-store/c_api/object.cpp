@@ -363,15 +363,6 @@ RLM_API bool realm_set_list(realm_object_t* obj, realm_property_key_t col)
     });
 }
 
-RLM_API bool realm_set_set(realm_object_t* obj, realm_property_key_t col)
-{
-    return wrap_err([&]() {
-        obj->verify_attached();
-        obj->get_obj().set_collection(ColKey(col), CollectionType::Set);
-        return true;
-    });
-}
-
 RLM_API bool realm_set_dictionary(realm_object_t* obj, realm_property_key_t col)
 {
     return wrap_err([&]() {

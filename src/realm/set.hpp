@@ -105,15 +105,11 @@ public:
     Set(ColKey col_key)
         : Base(col_key)
     {
-        if (!(col_key.is_set() || col_key.get_type() == col_type_Mixed)) {
+        if (!col_key.is_set()) {
             throw InvalidArgument(ErrorCodes::TypeMismatch, "Property not a set");
         }
 
         check_column_type<value_type>(m_col_key);
-    }
-    Set(CollectionParent& parent, CollectionParent::Index index)
-        : Base(parent, index)
-    {
     }
     Set(const Set& other);
     Set(Set&& other) noexcept;
@@ -874,6 +870,11 @@ template <class T>
 inline void Set<T>::do_clear()
 {
     tree().clear();
+}
+
+template <class T>
+inline void Set<T>::migration_resort()
+{
 }
 
 inline bool LnkSet::operator==(const LnkSet& other) const

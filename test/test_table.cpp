@@ -5386,9 +5386,6 @@ TEST(Table_LoggingMutations)
             t->create_object_with_primary_key(2).set_collection(col, CollectionType::List).get_list<Mixed>(col);
         list.add(47.50);
 
-        auto set = t->create_object_with_primary_key(3).set_collection(col, CollectionType::Set).get_set<Mixed>(col);
-        set.insert(false);
-
         std::vector<char> str_data(90);
         std::iota(str_data.begin(), str_data.end(), ' ');
         t->create_object_with_primary_key(5).set_any(col, StringData(str_data.data(), str_data.size()));
@@ -5414,10 +5411,9 @@ TEST(Table_LoggingMutations)
     CHECK(str.find("abcdefghijklmno ...") != std::string::npos);
     CHECK(str.find("14 15 16 17 18 19 ...") != std::string::npos);
     CHECK(str.find("2023-09-20 10:53:35") != std::string::npos);
-    CHECK(str.find("VIEW { 6 element(s) }") != std::string::npos);
+    CHECK(str.find("VIEW { 5 element(s) }") != std::string::npos);
     CHECK(str.find("Set 'any' to dictionary") != std::string::npos);
     CHECK(str.find("Set 'any' to list") != std::string::npos);
-    CHECK(str.find("Set 'any' to set") != std::string::npos);
 }
 
 #endif // TEST_TABLE
