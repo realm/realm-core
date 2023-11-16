@@ -872,6 +872,11 @@ inline void Set<T>::do_clear()
     tree().clear();
 }
 
+template <class T>
+inline void Set<T>::migration_resort()
+{
+}
+
 inline bool LnkSet::operator==(const LnkSet& other) const
 {
     return m_set == other.m_set;
