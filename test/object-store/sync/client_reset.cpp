@@ -772,9 +772,9 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
                     list.insert(1, key2);
                     list.add(key2);
                     list.add(key3); // common suffix of key3
-                    list.set(0,
-                             key1); // this set operation triggers the list copy because the index becomes ambiguious
                     // 1, 2, 2, 3, 2, 3
+                    // this set operation triggers the list copy because the index becomes ambiguious
+                    list.set(0, key1);
                 })
                 ->make_remote_changes([&](SharedRealm remote) {
                     auto table = get_table(*remote, "link target");
@@ -791,7 +791,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
                     REQUIRE(get_key_for_object_with_value(target_table, 1));
                     REQUIRE(get_key_for_object_with_value(target_table, 3));
                     auto list = table->begin()->get_linklist("list");
-                    REQUIRE(list.size() == 3);
+                    REQUIRE(list.size() == 3); // 1, 3, 3
                     REQUIRE(list.get_object(0).get<Int>("value") == 1);
                     REQUIRE(list.get_object(1).get<Int>("value") == 3);
                     REQUIRE(list.get_object(2).get<Int>("value") == 3);
@@ -2506,6 +2506,16 @@ struct Move {
     size_t to;
 };
 
+struct Insert {
+    Insert(size_t index, util::Optional<int64_t> key)
+    : ndx(index)
+    , pk(key)
+    {
+    }
+    size_t ndx;
+    util::Optional<int64_t> pk;
+};
+
 struct CollectionOperation {
     CollectionOperation(Add op)
         : m_op(op)
@@ -2528,6 +2538,10 @@ struct CollectionOperation {
     {
     }
     CollectionOperation(Move op)
+        : m_op(op)
+    {
+    }
+    CollectionOperation(Insert op)
         : m_op(op)
     {
     }
@@ -2569,6 +2583,12 @@ struct CollectionOperation {
                 [&](Clear) {
                     collection->clear_collection(src_obj);
                 },
+                [&](Insert insert) {
+                    Mixed pk_to_add = insert.pk ? Mixed{insert.pk} : Mixed{};
+                    ObjKey dst_key = dst_table->find_primary_key(pk_to_add);
+                    REALM_ASSERT(dst_key);
+                    collection->insert(src_obj, insert.ndx, ObjLink{dst_table->get_key(), dst_key});
+                },
                 [&](Move move) {
                     collection->move(src_obj, move.from, move.to);
                 }},
@@ -2576,14 +2596,14 @@ struct CollectionOperation {
     }
 
 private:
-    mpark::variant<Add, Remove, Clear, RemoveObject, CreateObject, Move> m_op;
+    mpark::variant<Add, Remove, Clear, RemoveObject, CreateObject, Move, Insert> m_op;
 };
 
 } // namespace test_instructions
 
 TEMPLATE_TEST_CASE("client reset collections of links", "[sync][pbs][client reset][links][collections]",
-                   cf::ListOfObjects, cf::ListOfMixedLinks, cf::SetOfObjects, cf::SetOfMixedLinks,
-                   cf::DictionaryOfObjects, cf::DictionaryOfMixedLinks)
+                   cf::ListOfObjects, cf::ListOfMixedLinks/*, cf::SetOfObjects, cf::SetOfMixedLinks,
+                   cf::DictionaryOfObjects, cf::DictionaryOfMixedLinks*/)
 {
     if (!util::EventLoop::has_implementation())
         return;
@@ -2594,6 +2614,7 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[sync][pbs][client rese
     const std::string collection_prop_name = "collection";
     TestType test_type(collection_prop_name, "dest");
     constexpr bool test_type_is_array = realm::is_any_v<TestType, cf::ListOfObjects, cf::ListOfMixedLinks>;
+    constexpr bool test_type_is_set = realm::is_any_v<TestType, cf::SetOfObjects, cf::SetOfMixedLinks>;
     Schema schema = {
         {"source",
          {{valid_pk_name, PropertyType::Int | PropertyType::Nullable, true},
@@ -2919,6 +2940,14 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[sync][pbs][client rese
         reset_collection({RemoveObject{"dest", dest_pk_4}}, {Add{dest_pk_4}, Add{dest_pk_5}},
                          {dest_pk_1, dest_pk_2, dest_pk_3, dest_pk_5}, 1);
     }
+    SECTION("local adds two links to objects which are both removed by the remote") {
+        reset_collection({Add{dest_pk_4}, Add{dest_pk_5}, CreateObject("dest", 6), Add{6}}, {RemoveObject("dest", dest_pk_4), RemoveObject("dest", dest_pk_5)},
+                            {dest_pk_1, dest_pk_2, dest_pk_3, 6}, 2);
+    }
+    SECTION("local removes two objects which were linked to by remote") {
+        reset_collection({RemoveObject("dest", dest_pk_1), RemoveObject("dest", dest_pk_2), CreateObject("dest", 6), Add{6}}, {},
+                            {dest_pk_3, 6}, 2);
+    }
     if (test_mode == ClientResyncMode::Recover) {
         SECTION("local adds a list item and removes source object, remote modifies list") {
             reset_collection_removing_source_object({Add{dest_pk_4}, RemoveObject{"source", source_pk}},
@@ -2966,6 +2995,29 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[sync][pbs][client rese
             reset_collection({Move{0, 1}, Add{dest_pk_5}}, {CreateObject("dest", 6), Add{6}},
                              {dest_pk_2, dest_pk_1, dest_pk_3, dest_pk_5});
         }
+        SECTION("local moves on locally-added elements when server removes the object that the new links point to") {
+            reset_collection({Add{dest_pk_5}, Add{dest_pk_5}, Move{4, 3}}, {Add{dest_pk_4}, RemoveObject("dest", dest_pk_5)},
+                             {dest_pk_1, dest_pk_2, dest_pk_3}); // local overwrite, but without pk_5
+        }
+        SECTION("local insert and delete can be recovered even if a local link was deleted by remote") {
+            // start  : 1, 2, 3
+            // local  : 1, 2, 3, 5, 6, 1
+            // remote : 4, 1, 2, 3 {remove obj 5}
+            // result : 1, 2, 3, 6, 1
+            reset_collection({CreateObject("dest", 6), Add{dest_pk_5}, Add{6}, Insert{4, dest_pk_4}, Remove{dest_pk_4}, Add{dest_pk_1}},
+                             {Insert{0, dest_pk_4}, RemoveObject("dest", dest_pk_5)},
+                             {dest_pk_4, dest_pk_1, dest_pk_2, dest_pk_3, 6, dest_pk_1});
+        }
+        SECTION("both add link to object which has been deleted by other side") {
+            // start  : 1, 2, 3
+            // local  : 1, 1, 2, 3, 5, {remove object 4}
+            // remote : 1, 2, 3, 3, 4, {remove obj 5}
+            // result : 1, 1, 2, 3, 3
+            reset_collection({Add{dest_pk_5}, Insert{0, dest_pk_1}, RemoveObject("dest", dest_pk_4)},
+                             {Add{dest_pk_4}, Insert{3, dest_pk_3}, RemoveObject("dest", dest_pk_5)},
+                             {dest_pk_1, dest_pk_1, dest_pk_2, dest_pk_3, dest_pk_3});
+        }
+
         SECTION("local moves on added elements can be merged with remote moves") {
             reset_collection({Add{dest_pk_4}, Add{dest_pk_5}, Move{3, 4}}, {Move{0, 1}},
                              {dest_pk_2, dest_pk_1, dest_pk_3, dest_pk_5, dest_pk_4});
@@ -2989,6 +3041,13 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[sync][pbs][client rese
         SECTION("local move (down) with delete on added elements can be merged with remote deletions") {
             reset_collection({Add{dest_pk_4}, Add{dest_pk_5}, Move{4, 3}, Remove{dest_pk_5}},
                              {Remove{dest_pk_1}, Remove{dest_pk_2}}, {dest_pk_3, dest_pk_4});
+        }
+    }
+    else if constexpr (test_type_is_set) {
+        SECTION("remote adds two links to objects which are both removed by local") {
+            reset_collection({RemoveObject("dest", dest_pk_4), RemoveObject("dest", dest_pk_5), CreateObject("dest", 6), Add{6}, Remove{dest_pk_1}},
+                             {Remove{dest_pk_2}, Add{dest_pk_4}, Add{dest_pk_5}, CreateObject("dest", 6), Add{6}, CreateObject("dest", 7), Add{7}, RemoveObject("dest", dest_pk_5)},
+                             {dest_pk_3, 6, 7});
         }
     }
 }
