@@ -7,6 +7,7 @@
 #   * Add the `allowed_requesters: [ "ad_hoc", "patch" ]` entry to the nightly task to only run for periodic tests
 # * Commit Builds:
 #   * All other tasks will be included in the set run when a PR is merged to master
+# * To prevent a task from running at all, add the `"disabled"` tag so it will be skipped by the any of the test runs.
 
 # Some tests take up to 4 hours to run, so give a very generous timeout project-wide, but generally try to complete tasks within 30 minutes.
 exec_timeout_secs: 14400
@@ -969,6 +970,7 @@ tasks:
 
 - name: baas-network-tests
   # Uncomment once tests are passing
+  tags: [ "disabled" ]
   # tags: [ "for_nightly_tests" ]
   # These tests can be manually requested for patches and pull requests
   allowed_requesters: [ "ad_hoc", "patch", "github_pr" ]
@@ -1456,7 +1458,7 @@ buildvariants:
     cmake_build_type: RelWithDebInfo
     run_with_encryption: On
     baas_admin_port: 9098
-    test_logging_level: trace
+    test_logging_level: debug
     test_timeout_extra: 60
     proxy_toxics_file: evergreen/proxy-nonideal-transfer.toxics
     # RANDOM1: bandwidth-upstream limited to between 10-50 KB/s from the client to the server
@@ -1478,7 +1480,7 @@ buildvariants:
     cmake_build_type: RelWithDebInfo
     run_with_encryption: On
     baas_admin_port: 9098
-    test_logging_level: trace
+    test_logging_level: debug
     proxy_toxics_file: evergreen/proxy-network-faults.toxics
     # RANDOM1: limit-data-upstream to close connection after between 1000-3000 bytes have been sent
     # RANDOM2: limit-data-downstream to close connection after between 1000-3000 bytes have been received
