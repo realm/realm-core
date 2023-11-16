@@ -7,6 +7,7 @@
 #   * Add the `allowed_requesters: [ "ad_hoc", "patch" ]` entry to the nightly task to only run for periodic tests
 # * Commit Builds:
 #   * All other tasks will be included in the set run when a PR is merged to master
+# * To prevent a task from running at all, add the `"disabled"` tag so it will be skipped by the any of the test runs.
 
 # Some tests take up to 4 hours to run, so give a very generous timeout project-wide, but generally try to complete tasks within 30 minutes.
 exec_timeout_secs: 14400
