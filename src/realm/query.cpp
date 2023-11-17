@@ -380,7 +380,6 @@ std::unique_ptr<ParentNode> make_condition_node(const Table& table, ColKey colum
             return MakeConditionNode<UUIDNode<Cond>>::make(column_key, value);
         }
         case type_Link:
-        case type_LinkList:
             if constexpr (std::is_same_v<T, Mixed> && realm::is_any_v<Cond, Equal, NotEqual>) {
                 ObjKey key;
                 if (value.is_type(type_Link)) {

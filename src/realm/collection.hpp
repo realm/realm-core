@@ -301,9 +301,7 @@ template <>
 inline void check_column_type<ObjKey>(ColKey col)
 {
     if (col) {
-        bool is_link_list = (col.get_type() == col_type_LinkList);
-        bool is_link_set = (col.is_set() && col.get_type() == col_type_Link);
-        if (!(is_link_list || is_link_set))
+        if (!((col.is_list() || col.is_set()) && col.get_type() == col_type_Link))
             throw InvalidArgument(ErrorCodes::TypeMismatch, "Property not a list or set");
     }
 }

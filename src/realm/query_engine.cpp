@@ -538,7 +538,6 @@ std::unique_ptr<ArrayPayload> TwoColumnsNodeBase::update_cached_leaf_pointers_fo
             return std::make_unique<ArrayUUIDNull>(alloc);
         case col_type_TypedLink:
         case col_type_BackLink:
-        case col_type_LinkList:
             break;
     };
     REALM_UNREACHABLE();
@@ -610,7 +609,7 @@ size_t size_of_list_from_ref(ref_type ref, Allocator& alloc, ColumnType col_type
             list.init_from_ref(ref);
             return list.size();
         }
-        case col_type_LinkList: {
+        case col_type_Link: {
             BPlusTree<ObjKey> list(alloc);
             list.init_from_ref(ref);
             return list.size();
@@ -620,7 +619,6 @@ size_t size_of_list_from_ref(ref_type ref, Allocator& alloc, ColumnType col_type
             list.init_from_ref(ref);
             return list.size();
         }
-        case col_type_Link:
         case col_type_BackLink:
             break;
     }

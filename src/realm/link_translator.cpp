@@ -34,7 +34,7 @@ void LinkTranslator::run()
 {
     ColumnAttrMask attr = m_origin_col_key.get_attrs();
     if (attr.test(col_attr_List)) {
-        if (m_origin_col_key.get_type() == col_type_LinkList) {
+        if (m_origin_col_key.get_type() == col_type_Link) {
             LnkLst link_list = m_origin_obj.get_linklist(m_origin_col_key);
             on_list_of_links(link_list);
         }

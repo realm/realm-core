@@ -239,6 +239,10 @@ public:
     {
         return m_colkey.is_dictionary();
     }
+    bool is_list() const
+    {
+        return m_colkey.is_list();
+    }
     bool has_index() const
     {
         return !m_index.is_all();

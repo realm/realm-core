@@ -75,9 +75,7 @@ Instruction::Payload SyncReplication::as_payload(Mixed value)
             REALM_TERMINATE("as_payload() needs table/collection for links");
             break;
         }
-        case type_Mixed:
-            [[fallthrough]];
-        case type_LinkList: {
+        case type_Mixed: {
             REALM_TERMINATE("Invalid payload type");
             break;
         }
@@ -178,8 +176,6 @@ Instruction::Payload::Type SyncReplication::get_payload_type(DataType type) cons
         case type_Decimal:
             return Type::Decimal;
         case type_Link:
-            return Type::Link;
-        case type_LinkList:
             return Type::Link;
         case type_TypedLink:
             return Type::Link;
@@ -346,6 +342,7 @@ void SyncReplication::insert_column(const Table* table, ColKey col_key, DataType
         instr.field = m_encoder.intern_string(name);
         instr.nullable = col_key.is_nullable();
         instr.type = get_payload_type(type);
+        instr.key_type = Instruction::Payload::Type::Null;
 
         if (col_key.is_list()) {
             instr.collection_type = CollectionType::List;
@@ -358,15 +355,10 @@ void SyncReplication::insert_column(const Table* table, ColKey col_key, DataType
         }
         else if (col_key.is_set()) {
             instr.collection_type = CollectionType::Set;
-            auto value_type = table->get_column_type(col_key);
-            REALM_ASSERT(value_type != type_LinkList);
-            instr.type = get_payload_type(value_type);
-            instr.key_type = Instruction::Payload::Type::Null;
         }
         else {
             REALM_ASSERT(!col_key.is_collection());
             instr.collection_type = CollectionType::Single;
-            instr.key_type = Instruction::Payload::Type::Null;
         }
 
         // Mixed columns are always nullable.

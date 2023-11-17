@@ -233,8 +233,6 @@ std::pair<std::string, std::string> CollectionBase::get_open_close_strings(size_
     Table* target_table = get_target_table().unchecked_ptr();
     auto ck = get_col_key();
     auto type = ck.get_type();
-    if (type == col_type_LinkList)
-        type = col_type_Link;
     if (type == col_type_Link) {
         bool is_embedded = target_table->is_embedded();
         bool link_depth_reached = !is_embedded && (link_depth == 0);

@@ -2329,7 +2329,7 @@ public:
         m_dT = 50.0;
         m_condition_column_key = origin_column_key;
         auto column_type = origin_column_key.get_type();
-        REALM_ASSERT(column_type == col_type_Link || column_type == col_type_LinkList);
+        REALM_ASSERT(column_type == col_type_Link);
         REALM_ASSERT(!m_target_keys.empty());
     }
 

@@ -37,8 +37,7 @@ void LinkMap::set_base_table(ConstTableRef table)
         // Link column can be either LinkList or single Link
         ColumnType type = link_column_key.get_type();
         REALM_ASSERT(Table::is_link_type(type) || type == col_type_BackLink);
-        if (type == col_type_LinkList || type == col_type_BackLink ||
-            (type == col_type_Link && link_column_key.is_collection())) {
+        if (type == col_type_BackLink || (type == col_type_Link && link_column_key.is_collection())) {
             m_only_unary_links = false;
         }
 

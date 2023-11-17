@@ -112,8 +112,6 @@ TypeOfValue::Attribute attribute_from(DataType type)
             return TypeOfValue::Attribute::ObjectLink;
         case DataType::Type::UUID:
             return TypeOfValue::Attribute::UUID;
-        case DataType::Type::LinkList:
-            break;
     }
     throw query_parser::InvalidQueryArgError(
         util::format("Invalid value '%1' cannot be converted to 'TypeOfValue'", type));

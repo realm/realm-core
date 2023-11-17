@@ -574,6 +574,7 @@ void Transaction::upgrade_file_format(int target_file_format_version)
             // Although StringIndex sort order has been changed in this format, we choose to
             // avoid upgrading them because it affects a small niche case. Instead, there is a
             // workaround in the String Index search code for not relying on items being ordered.
+            t->migrate_col_keys();
         }
     }
     // NOTE: Additional future upgrade steps go here.

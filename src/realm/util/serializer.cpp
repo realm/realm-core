@@ -410,7 +410,7 @@ std::string SerialisationState::describe_column(ConstTableRef table, ColKey col_
 std::string SerialisationState::get_backlink_column_name(ConstTableRef from, ColKey col_key)
 {
     ColumnType col_type = col_key.get_type();
-    REALM_ASSERT_EX(col_type == col_type_Link || col_type == col_type_LinkList, col_type);
+    REALM_ASSERT_EX(col_type == col_type_Link, col_type);
 
     auto target_table = from->get_opposite_table(col_key);
     auto backlink_col = from->get_opposite_column(col_key);

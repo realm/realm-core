@@ -237,7 +237,7 @@ BaseDescriptor::Sorter::Sorter(std::vector<std::vector<ExtendedColumnKey>> const
             if (!tables[j]->valid_column(col)) {
                 throw InvalidArgument(ErrorCodes::InvalidSortDescriptor, "Invalid property");
             }
-            if (col.get_type() != col_type_Link) {
+            if (!(col.get_type() == col_type_Link && !col.is_list())) {
                 // Only last column in link chain is allowed to be non-link
                 throw InvalidArgument(ErrorCodes::InvalidSortDescriptor, "All but last property must be a link");
             }
