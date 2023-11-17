@@ -41,8 +41,7 @@ macro(enable_stdfilesystem _target)
         # CMake doesn't reasonably support setting a per-target deployment
         # check, so just disable libc++ availability checks (which will result
         # in crashes at runtime if running on too old of a macOS version).
-        #target_compile_definitions("${_target}" PRIVATE _LIBCPP_DISABLE_AVAILABILITY)
-        add_compile_options(-nostdinc++)
+        target_compile_definitions("${_target}" PRIVATE _LIBCPP_DISABLE_AVAILABILITY)
     elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
         if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 9.0)
             target_link_libraries("${_target}" stdc++fs)
