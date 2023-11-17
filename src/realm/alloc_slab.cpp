@@ -346,17 +346,24 @@ void SlabAlloc::push_freelist_entry(FreeBlock* entry)
 
 void SlabAlloc::mark_freed(FreeBlock* entry, int size)
 {
+    // For compressed arrays we might have a problem.
+    // It seems we always expect the blocks to be in some sort of regular format (eg prev_block = 128, next_block =
+    // -128) But our allocated size is now less than 128. This is the case for Array of kind B. Decompressing before
+    // calling Array::destroy() for an Array that is in compressed format is a waste of CPU time. Should the slab
+    // allocator somehow read the header?
     auto bb = bb_before(entry);
     REALM_ASSERT_EX(bb->block_after_size < 0, bb->block_after_size, get_file_path_for_assertions());
     auto alloc_size = -bb->block_after_size;
     int max_waste = sizeof(FreeBlock) + sizeof(BetweenBlocks);
-    REALM_ASSERT_EX(alloc_size >= size && alloc_size <= size + max_waste, alloc_size, size,
-                    get_file_path_for_assertions());
-    bb->block_after_size = alloc_size;
+    // this assertion does not longer holds for compressed arrays since alloc_size can be lower than capacity,
+    // actually most of the times it is expected to be like this.
+    // alloc_size >= size || ==> this is not true for Array of type B
+    REALM_ASSERT_EX(alloc_size <= size + max_waste, alloc_size, size, get_file_path_for_assertions());
+    bb->block_after_size = alloc_size < size ? size : alloc_size;
     bb = bb_after(entry);
     REALM_ASSERT_EX(bb->block_before_size < 0, bb->block_before_size, get_file_path_for_assertions());
     REALM_ASSERT(-bb->block_before_size == alloc_size);
-    bb->block_before_size = alloc_size;
+    bb->block_before_size = alloc_size < size ? size : alloc_size; // alloc_size;
 }
 
 void SlabAlloc::mark_allocated(FreeBlock* entry)

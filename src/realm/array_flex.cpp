@@ -139,7 +139,7 @@ bool ArrayFlex::try_encode(std::vector<int64_t>& values, std::vector<size_t>& in
     if (check_gain(values, indices, value_bit_width, index_bit_width)) {
         // release array's memory and re-init the same array with a B header and flex encoding
         setup_header_in_flex_format(values, indices, value_bit_width, index_bit_width);
-        return true;
+        return false; // true;
     }
     return false;
 }
@@ -247,23 +247,20 @@ void ArrayFlex::setup_header_in_flex_format(std::vector<int64_t>& values, std::v
     // we need to round compressed size in order to make % 8 compliant, since memory is aligned in this way
     auto byte_size =
         m_array.calc_size<Encoding::Flex>(values.size(), indices.size(), value_bit_width, index_bit_width);
-    MemRef mem = m_array.get_alloc().alloc(byte_size); // Throws
-    auto header = (uint64_t*)mem.get_addr();
+
+    MemRef mem = m_array.get_alloc().alloc(byte_size);
+    auto header = (uint64_t*)mem.get_addr(); // mem.get_addr();
     // I'm assuming that flags are taken from the owning Array.
     uint8_t flags = m_array.get_flags((uint64_t*)m_array.get_header());
-
-    m_array.init_header(header, 'B', Encoding::Flex, flags, value_bit_width, index_bit_width, values.size(),
-                        indices.size());
-    // Since we don't grow an encoded array in-place, but decode it into a different array,
-    // we will for now just keep capacity identical to the size we need.
-    // byte_size = std::max(byte_size, initial_capacity);
-    m_array.set_capacity_in_header(byte_size, mem.get_addr());
-    // TODO: check if this can be done better.
-    // destroy the memory currently referenced by the array since we need to replace it in place with a compressed
-    // version.
+    NodeHeader::init_header(header, 'B', Encoding::Flex, flags, value_bit_width, index_bit_width, values.size(),
+                            indices.size());
+    // Array is replaced in place so capacity is the max between byte_size and initial_capacity
+    const auto capacity = std::max(byte_size, size_t{128}); // TODO expose initiali capacity to flex array
+    NodeHeader::set_capacity_in_header(capacity, mem.get_addr());
+    // TODO: check if this can be done better. (e.g use realloc and not destroy)
     m_array.destroy();
-    // re-init the array with the new chunk of memory just allocated in compressed format.
     m_array.init_from_mem(mem);
+    REALM_ASSERT(m_array.m_ref == mem.get_ref());
 }
 
 bool ArrayFlex::get_encode_info(size_t& value_width, size_t& index_width, size_t& value_size,

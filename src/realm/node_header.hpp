@@ -262,6 +262,7 @@ public:
         }
         else {
             /*I don't see this set while debugging*/
+            // NOTE this is set inside array_flex::setup_header_in_flex_format for B arrays
             return ((uint16_t*)header)[0] << 3;
         }
     }
