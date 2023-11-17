@@ -5915,7 +5915,7 @@ TEST(Query_FullText)
 
     // Add before index creation
     table->create_object().set(col, " This is a test, with  spaces!");
-    Obj obj2 = table->create_object().set(col, "Ål, ø og 你好世界Æbler"); // "Hello world" should be filtered out
+    Obj obj2 = table->create_object().set(col, "Ål, ø og 你好世界 Æbler"); // "Hello world" should not be filtered out
     Obj obj3 = table->create_object().set(
         col,
         "An object database (also object-oriented database management system) is a database management system in "
@@ -6002,6 +6002,9 @@ TEST(Query_FullText)
 
     tv = table->where().fulltext(col, "æbler").find_all();
     CHECK_EQUAL(2, tv.size());
+
+    tv = table->where().fulltext(col, "你好世界").find_all();
+    CHECK_EQUAL(1, tv.size());
 
     table->create_object().set(
         col, "The song \"Supercalifragilisticexpialidocious\" is from the 1964 Disney musical film \"Mary Poppins\"");
