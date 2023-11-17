@@ -606,7 +606,7 @@ def doBuildMacOs(Map options = [:]) {
 
             dir('build-macosx') {
                 withEnv(['DEVELOPER_DIR=/Applications/Xcode-14.app/Contents/Developer/']) {
-                    try {
+                     try {
                         sh "cmake ${cmakeDefinitions} -G Xcode .."
                     } catch(Exception e) {
                         archiveArtifacts '**/*'
