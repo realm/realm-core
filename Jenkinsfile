@@ -201,7 +201,7 @@ jobWrapper {
             ]
             if (true) {
                 extendedChecks = [
-                    checkMacOsDebug               : doBuildMacOs(buildOptions + [buildType: "Release"]),
+                    checkMacOsDebug               : doBuildMacOs(buildOptions + [buildType: "Debug"]),
                     checkAndroidarmeabiDebug      : doAndroidBuildInDocker('armeabi-v7a', 'Debug', TestAction.Run),
                     // FIXME: https://github.com/realm/realm-core/issues/4159
                     //checkAndroidx86Release        : doAndroidBuildInDocker('x86', 'Release', TestAction.Run),
