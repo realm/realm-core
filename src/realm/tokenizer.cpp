@@ -172,6 +172,7 @@ bool DefaultTokenizer::next()
                 *bufp++ = c + 0x20;
         }
         else if (traits::to_int_type(c) > 0x7f) {
+            is_alnum = true;
             auto i = traits::to_int_type(c);
             if ((i & 0xE0) == 0xc0) {
                 // 2 byte utf-8
@@ -180,7 +181,6 @@ bool DefaultTokenizer::next()
                 auto u = ((i << 6) + (traits::to_int_type(*m_cur_pos) & 0x3F)) & 0x7FF;
                 if ((u >= 0xC0) && (u < 0xff)) {
                     // u is a letter from Latin-1 Supplement block - map to output
-                    is_alnum = true;
                     if (auto o = utf8_map[u & 0x3f]) {
                         if (o < 0x80) {
                             // ASCII
@@ -195,14 +195,40 @@ bool DefaultTokenizer::next()
                         }
                     }
                 }
+                else {
+                    // Other 2 byte utf-8
+                    if (bufp < end_buffer - 1) {
+                        *bufp++ = *m_cur_pos++;
+                        *bufp++ = *m_cur_pos;
+                    }
+                }
             }
             else if ((i & 0xF0) == 0xE0) {
                 // 3 byte utf-8
-                m_cur_pos += 2;
+                auto u = ((i << 12) + ((traits::to_int_type(*(m_cur_pos + 1)) & 0x3F) << 6) +
+                          (traits::to_int_type(*(m_cur_pos + 2)) & 0x3F)) &
+                         0xFFFF;
+                // Skip some punctuations
+                if (u >= 0x2000 && u < 0x2c00) {
+                    is_alnum = false;
+                    m_cur_pos += 2;
+                }
+                else {
+                    if (bufp < end_buffer - 2) {
+                        *bufp++ = *m_cur_pos++;
+                        *bufp++ = *m_cur_pos++;
+                        *bufp++ = *m_cur_pos;
+                    }
+                }
             }
             else if ((i & 0xF8) == 0xF0) {
                 // 4 byte utf-8
-                m_cur_pos += 3;
+                if (bufp < end_buffer - 3) {
+                    *bufp++ = *m_cur_pos++;
+                    *bufp++ = *m_cur_pos++;
+                    *bufp++ = *m_cur_pos++;
+                    *bufp++ = *m_cur_pos;
+                }
             }
         }
 
