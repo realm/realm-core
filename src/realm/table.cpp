@@ -2257,6 +2257,11 @@ void Table::set_collision_map(ref_type ref)
     m_top.set(top_position_for_collision_map, RefOrTagged::make_ref(ref));
 }
 
+void Table::set_col_key_sequence_number(uint64_t seq)
+{
+    m_top.set(top_position_for_column_key, RefOrTagged::make_tagged(seq));
+}
+
 TableRef Table::get_link_target(ColKey col_key) noexcept
 {
     return get_opposite_table(col_key);
