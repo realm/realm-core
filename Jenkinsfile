@@ -199,7 +199,7 @@ jobWrapper {
                 buildAndroidTestsArmeabi: doAndroidBuildInDocker('armeabi-v7a', 'Debug', TestAction.Build),
                 buildEmscripten         : doBuildEmscripten('Debug'),
             ]
-            if (true) {
+            if (releaseTesting) {
                 extendedChecks = [
                     checkMacOsDebug               : doBuildMacOs(buildOptions + [buildType: "Debug"]),
                     checkAndroidarmeabiDebug      : doAndroidBuildInDocker('armeabi-v7a', 'Debug', TestAction.Run),
