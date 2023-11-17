@@ -155,7 +155,6 @@ TEST_CASE("flx: connect to FLX-enabled app", "[sync][flx][baas]") {
 
 
     harness.do_with_new_realm([&](SharedRealm realm) {
-        wait_for_download(*realm);
         {
             auto empty_subs = realm->get_latest_subscription_set();
             CHECK(empty_subs.size() == 0);
@@ -174,7 +173,6 @@ TEST_CASE("flx: connect to FLX-enabled app", "[sync][flx][baas]") {
             subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
         }
 
-        wait_for_download(*realm);
         {
             wait_for_advance(*realm);
             Results results(realm, table);
@@ -581,7 +579,7 @@ TEST_CASE("flx: client reset", "[sync][flx][client reset][baas]") {
         auto&& [error_future, error_handler] = make_error_handler();
         config_local.sync_config->error_handler = error_handler;
 
-        std::string fresh_path = realm::_impl::ClientResetOperation::get_fresh_path_for(config_local.path);
+        std::string fresh_path = realm::_impl::client_reset::get_fresh_path_for(config_local.path);
         // create a non-empty directory that we'll fail to delete
         util::make_dir(fresh_path);
         util::File(util::File::resolve("file", fresh_path), util::File::mode_Write);
@@ -1007,7 +1005,7 @@ TEST_CASE("flx: client reset", "[sync][flx][client reset][baas]") {
         auto&& [error_future, error_handler] = make_error_handler();
         config_local.sync_config->error_handler = error_handler;
 
-        std::string fresh_path = realm::_impl::ClientResetOperation::get_fresh_path_for(config_local.path);
+        std::string fresh_path = realm::_impl::client_reset::get_fresh_path_for(config_local.path);
         // create a non-empty directory that we'll fail to delete
         util::make_dir(fresh_path);
         util::File(util::File::resolve("file", fresh_path), util::File::mode_Write);
@@ -1187,20 +1185,24 @@ TEST_CASE("flx: client reset", "[sync][flx][client reset][baas]") {
         return schema;
     };
     SECTION("Recover: additive schema changes are recovered in dev mode") {
+        const AppSession& app_session = harness.session().app_session();
+        app_session.admin_api.set_development_mode_to(app_session.server_app_id, true);
         seed_realm(config_local, ResetMode::InitiateClientReset);
         std::vector<ObjectSchema> changed_schema = make_additive_changes(schema);
         config_local.schema = changed_schema;
         config_local.sync_config->client_resync_mode = ClientResyncMode::Recover;
+        ThreadSafeReference ref_async;
         auto future = setup_reset_handlers_for_schema_validation(config_local, changed_schema);
         async_open_realm(config_local, [&](ThreadSafeReference&& ref, std::exception_ptr error) {
             REQUIRE(ref);
             REQUIRE_FALSE(error);
+            ref_async = std::move(ref);
         });
         future.get();
         CHECK(before_reset_count == 1);
         CHECK(after_reset_count == 1);
-        auto realm = Realm::get_shared_realm(config_local);
         {
+            auto realm = Realm::get_shared_realm(std::move(ref_async));
             // make changes to the newly added property
             realm->begin_transaction();
             auto table = realm->read_group().get_table("class_TopLevel");
@@ -1220,12 +1222,41 @@ TEST_CASE("flx: client reset", "[sync][flx][client reset][baas]") {
             REQUIRE(new_table);
             new_table->create_object_with_primary_key(ObjectId::gen());
             realm->commit_transaction();
+            auto result = realm->get_latest_subscription_set()
+                              .get_state_change_notification(sync::SubscriptionSet::State::Complete)
+                              .get();
+            CHECK(result == sync::SubscriptionSet::State::Complete);
+            wait_for_advance(*realm);
+            realm->close();
         }
-        auto result = realm->get_latest_subscription_set()
-                          .get_state_change_notification(sync::SubscriptionSet::State::Complete)
-                          .get();
-        CHECK(result == sync::SubscriptionSet::State::Complete);
-        wait_for_download(*realm);
+        {
+            // ensure that an additional schema change after the successful reset is also accepted by the server
+            changed_schema[0].persisted_properties.push_back(
+                {"added_oid_field_second", PropertyType::ObjectId | PropertyType::Nullable});
+            changed_schema.push_back({"AddedClassSecond",
+                                      {
+                                          {"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+                                          {"str_field_2", PropertyType::String | PropertyType::Nullable},
+                                      }});
+            config_local.schema = changed_schema;
+            async_open_realm(config_local, [&](ThreadSafeReference&& ref, std::exception_ptr error) {
+                REQUIRE(ref);
+                REQUIRE_FALSE(error);
+                auto realm = Realm::get_shared_realm(std::move(ref));
+                auto table = realm->read_group().get_table("class_AddedClassSecond");
+                ColKey new_col = table->get_column_key("str_field_2");
+                REQUIRE(new_col);
+                auto new_subs = realm->get_latest_subscription_set().make_mutable_copy();
+                new_subs.insert_or_assign(Query(table).equal(new_col, "hello"));
+                auto subs = new_subs.commit();
+                realm->begin_transaction();
+                table->create_object_with_primary_key(Mixed{ObjectId::gen()}, {{new_col, "hello"}});
+                realm->commit_transaction();
+                subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
+                wait_for_advance(*realm);
+                REQUIRE(table->size() == 1);
+            });
+        }
     }
 
     SECTION("DiscardLocal: additive schema changes not allowed") {
@@ -1469,7 +1500,7 @@ TEST_CASE("flx: uploading an object that is out-of-view results in compensating 
 
         validate_sync_error(
             std::move(error_future).get(), invalid_obj, "TopLevel",
-            util::format("write to \"%1\" in table \"TopLevel\" not allowed", invalid_obj.to_string()));
+            util::format("write to ObjectID(\"%1\") in table \"TopLevel\" not allowed", invalid_obj.to_string()));
 
         wait_for_advance(*realm);
 
@@ -1500,7 +1531,7 @@ TEST_CASE("flx: uploading an object that is out-of-view results in compensating 
 
         validate_sync_error(
             std::move(error_future).get(), invalid_obj, "TopLevel",
-            util::format("write to \"%1\" in table \"TopLevel\" not allowed", invalid_obj.to_string()));
+            util::format("write to ObjectID(\"%1\") in table \"TopLevel\" not allowed", invalid_obj.to_string()));
 
         wait_for_advance(*realm);
 
@@ -1575,7 +1606,7 @@ TEST_CASE("flx: uploading an object that is out-of-view results in compensating 
             realm->commit_transaction();
 
             validate_sync_error(std::move(error_future).get(), 123456, "Int PK",
-                                "write to \"123456\" in table \"Int PK\" not allowed");
+                                "write to 123456 in table \"Int PK\" not allowed");
         }
 
         SECTION("short string") {
@@ -1613,7 +1644,7 @@ TEST_CASE("flx: uploading an object that is out-of-view results in compensating 
             realm->commit_transaction();
 
             validate_sync_error(std::move(error_future).get(), pk, "UUID PK",
-                                util::format("write to \"UUID(%1)\" in table \"UUID PK\" not allowed", pk));
+                                util::format("write to UUID(%1) in table \"UUID PK\" not allowed", pk));
         }
     }
 
@@ -1730,7 +1761,7 @@ TEST_CASE("flx: geospatial", "[sync][flx][geospatial][baas]") {
                  {"coordinates", PropertyType::Double | PropertyType::Array},
              }},
         };
-        FLXSyncTestHarness::ServerSchema server_schema{schema, {"queryable_str_field"}};
+        FLXSyncTestHarness::ServerSchema server_schema{schema, {"queryable_str_field", "location"}};
         harness.emplace("flx_geospatial", server_schema);
     }
 
@@ -1742,33 +1773,38 @@ TEST_CASE("flx: geospatial", "[sync][flx][geospatial][baas]") {
         return new_query.commit();
     };
 
-    // TODO: when this test starts failing because the server implements the new
-    // syntax, then we should implement an actual geospatial FLX query test here
-    /*
-    auto check_failed_status = [](auto status) {
-        CHECK(!status.is_ok());
-        if (status.get_status().reason().find("Client provided query with bad syntax:") == std::string::npos ||
-            status.get_status().reason().find("\"restaurant\": syntax error") == std::string::npos) {
-            FAIL(status.get_status().reason());
-        }
-    };
-
-    SECTION("Server doesn't support GEOWITHIN yet") {
+    SECTION("Server supports a basic geowithin FLX query") {
         harness->do_with_new_realm([&](SharedRealm realm) {
+            const realm::AppSession& app_session = harness->session().app_session();
+            auto sync_service = app_session.admin_api.get_sync_service(app_session.server_app_id);
+
+            AdminAPISession::ServiceConfig config =
+                app_session.admin_api.get_config(app_session.server_app_id, sync_service);
             auto subs = create_subscription(realm, "class_restaurant", "location", [](Query q, ColKey c) {
                 GeoBox area{GeoPoint{0.2, 0.2}, GeoPoint{0.7, 0.7}};
-                return q.get_table()->column<Link>(c).geo_within(area);
+                Query query = q.get_table()->column<Link>(c).geo_within(area);
+                std::string ser = query.get_description();
+                return query;
             });
             auto sub_res = subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get_no_throw();
-            check_failed_status(sub_res);
-            CHECK(realm->get_active_subscription_set().version() == 0);
+            CHECK(sub_res.is_ok());
+            CHECK(realm->get_active_subscription_set().version() == 1);
             CHECK(realm->get_latest_subscription_set().version() == 1);
         });
     }
-     */
 
-    SECTION("non-geospatial FLX query syncs data which can be queried locally") {
-        harness->do_with_new_realm([&](SharedRealm realm) {
+    SECTION("geospatial query consistency: local/server/FLX") {
+        harness->do_with_new_user([&](std::shared_ptr<SyncUser> user) {
+            SyncTestFile config(user, harness->schema(), SyncConfig::FLXSyncEnabled{});
+            auto error_pf = util::make_promise_future<SyncError>();
+            config.sync_config->error_handler =
+                [promise = std::make_shared<util::Promise<SyncError>>(std::move(error_pf.promise))](
+                    std::shared_ptr<SyncSession>, SyncError error) {
+                    promise->emplace_value(std::move(error));
+                };
+
+            auto realm = Realm::get_shared_realm(config);
+
             auto subs = create_subscription(realm, "class_restaurant", "queryable_str_field", [](Query q, ColKey c) {
                 return q.equal(c, "synced");
             });
@@ -1831,8 +1867,6 @@ TEST_CASE("flx: geospatial", "[sync][flx][geospatial][baas]") {
             CHECK(realm->get_active_subscription_set().version() == 1);
             CHECK(realm->get_latest_subscription_set().version() == 1);
 
-            realm->begin_transaction();
-
             CppContext c(realm);
             int64_t pk = 0;
             auto add_point = [&](GeoPoint p) {
@@ -1854,11 +1888,20 @@ TEST_CASE("flx: geospatial", "[sync][flx][geospatial][baas]") {
                 GeoPoint{82.55243, 84.54981}, // another northern point, but on the other side of the pole
                 GeoPoint{2129, 89},           // invalid
             };
+            constexpr size_t invalids_to_be_compensated = 2; // 4, 8
+            realm->begin_transaction();
             for (auto& point : points) {
                 add_point(point);
             }
             realm->commit_transaction();
-            wait_for_upload(*realm);
+            const auto& error = error_pf.future.get();
+            REQUIRE(!error.is_fatal);
+            REQUIRE(error.status == ErrorCodes::SyncCompensatingWrite);
+            REQUIRE(error.compensating_writes_info.size() == invalids_to_be_compensated);
+            REQUIRE_THAT(error.compensating_writes_info[0].reason,
+                         Catch::Matchers::ContainsSubstring("in table \"restaurant\" will corrupt geojson data"));
+            REQUIRE_THAT(error.compensating_writes_info[1].reason,
+                         Catch::Matchers::ContainsSubstring("in table \"restaurant\" will corrupt geojson data"));
 
             {
                 auto table = realm->read_group().get_table("class_restaurant");
@@ -1877,22 +1920,43 @@ TEST_CASE("flx: geospatial", "[sync][flx][geospatial][baas]") {
                     Query query = table->column<Link>(location_col).geo_within(Geospatial(bounds));
                     return query.find_all().size();
                 };
+                auto run_query_as_flx = [&](Geospatial bounds) -> size_t {
+                    size_t num_objects = 0;
+                    harness->do_with_new_realm([&](SharedRealm realm) {
+                        auto subs =
+                            create_subscription(realm, "class_restaurant", "location", [&](Query q, ColKey c) {
+                                return q.get_table()->column<Link>(c).geo_within(Geospatial(bounds));
+                            });
+                        auto sub_res =
+                            subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get_no_throw();
+                        CHECK(sub_res.is_ok());
+                        CHECK(realm->get_active_subscription_set().version() == 1);
+                        realm->refresh();
+                        num_objects = realm->get_class("restaurant").num_objects();
+                    });
+                    return num_objects;
+                };
 
-                reset_utils::wait_for_num_objects_in_atlas(
-                    harness->app()->current_user(), harness->session().app_session(), "restaurant", points.size());
+                reset_utils::wait_for_num_objects_in_atlas(harness->app()->current_user(),
+                                                           harness->session().app_session(), "restaurant",
+                                                           points.size() - invalids_to_be_compensated);
 
                 {
                     GeoPolygon bounds{
                         {{GeoPoint{-80, 40.7128}, GeoPoint{20, 60}, GeoPoint{20, 20}, GeoPoint{-80, 40.7128}}}};
                     size_t local_matches = run_query_locally(bounds);
                     size_t server_results = run_query_on_server(make_polygon_filter(bounds));
+                    size_t flx_results = run_query_as_flx(bounds);
+                    CHECK(flx_results == local_matches);
                     CHECK(server_results == local_matches);
                 }
                 {
                     GeoCircle circle{.5, GeoPoint{0, 90}};
                     size_t local_matches = run_query_locally(circle);
                     size_t server_results = run_query_on_server(make_circle_filter(circle));
+                    size_t flx_results = run_query_as_flx(circle);
                     CHECK(server_results == local_matches);
+                    CHECK(flx_results == local_matches);
                 }
                 { // a ring with 3 points without a matching begin/end is an error
                     GeoPolygon open_bounds{{{GeoPoint{-80, 40.7128}, GeoPoint{20, 60}, GeoPoint{20, 20}}}};
@@ -1934,8 +1998,10 @@ TEST_CASE("flx: geospatial", "[sync][flx][geospatial][baas]") {
                         size_t local_matches = run_query_locally(geo);
                         size_t server_matches =
                             run_query_on_server(make_polygon_filter(geo.get<GeoBox>().to_polygon()));
+                        size_t flx_matches = run_query_as_flx(geo);
                         CHECK(local_matches == expected_results);
                         CHECK(server_matches == expected_results);
+                        CHECK(flx_matches == expected_results);
                     }
                     std::vector<Geospatial> invalid_boxes = {
                         GeoBox{GeoPoint{11.97575, 55.71601}, GeoPoint{11.97575, 55.71601}}, // same point twice
@@ -1961,8 +2027,10 @@ TEST_CASE("flx: geospatial", "[sync][flx][geospatial][baas]") {
                     size_t local_matches = run_query_locally(north_pole_box);
                     size_t server_matches =
                         run_query_on_server(make_polygon_filter(north_pole_box.get<GeoPolygon>()));
+                    size_t flx_matches = run_query_as_flx(north_pole_box);
                     CHECK(local_matches == num_matching_points);
                     CHECK(server_matches == num_matching_points);
+                    CHECK(flx_matches == num_matching_points);
                 }
             }
         });
@@ -1977,7 +2045,7 @@ TEST_CASE("flx: geospatial", "[sync][flx][geospatial][baas]") {
 #endif // REALM_ENABLE_GEOSPATIAL
 
 TEST_CASE("flx: interrupted bootstrap restarts/recovers on reconnect", "[sync][flx][bootstrap][baas]") {
-    FLXSyncTestHarness harness("flx_bootstrap_batching", {g_large_array_schema, {"queryable_int_field"}});
+    FLXSyncTestHarness harness("flx_bootstrap_reconnect", {g_large_array_schema, {"queryable_int_field"}});
 
     std::vector<ObjectId> obj_ids_at_end = fill_large_array_schema(harness);
     SyncTestFile interrupted_realm_config(harness.app()->current_user(), harness.schema(),
@@ -2049,9 +2117,6 @@ TEST_CASE("flx: interrupted bootstrap restarts/recovers on reconnect", "[sync][f
     auto realm = Realm::get_shared_realm(interrupted_realm_config);
     auto table = realm->read_group().get_table("class_TopLevel");
     realm->get_latest_subscription_set().get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
-    wait_for_upload(*realm);
-    wait_for_download(*realm);
-
     wait_for_advance(*realm);
     REQUIRE(table->size() == obj_ids_at_end.size());
     for (auto& id : obj_ids_at_end) {
@@ -2379,8 +2444,7 @@ TEST_CASE("flx: subscriptions persist after closing/reopening", "[sync][flx][baa
 #endif
 
 TEST_CASE("flx: no subscription store created for PBS app", "[sync][flx][baas]") {
-    const std::string base_url = get_base_url();
-    auto server_app_config = minimal_app_config(base_url, "flx_connect_as_pbs", g_minimal_schema);
+    auto server_app_config = minimal_app_config("flx_connect_as_pbs", g_minimal_schema);
     TestAppSession session(create_app(server_app_config));
     SyncTestFile config(session.app(), bson::Bson{}, g_minimal_schema);
 
@@ -2423,9 +2487,7 @@ TEST_CASE("flx: connect to FLX with partition value returns an error", "[sync][f
 }
 
 TEST_CASE("flx: connect to PBS as FLX returns an error", "[sync][flx][protocol][baas]") {
-    const std::string base_url = get_base_url();
-
-    auto server_app_config = minimal_app_config(base_url, "flx_connect_as_pbs", g_minimal_schema);
+    auto server_app_config = minimal_app_config("flx_connect_as_pbs", g_minimal_schema);
     TestAppSession session(create_app(server_app_config));
     auto app = session.app();
     auto user = app->current_user();
@@ -2668,8 +2730,6 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][boot
         realm->get_latest_subscription_set()
             .get_state_change_notification(sync::SubscriptionSet::State::Complete)
             .get();
-        wait_for_upload(*realm);
-        wait_for_download(*realm);
 
         wait_for_advance(*realm);
         auto expected_obj_ids = util::Span<ObjectId>(obj_ids_at_end).sub_span(0, 3);
@@ -2791,10 +2851,8 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][boot
         realm->get_latest_subscription_set()
             .get_state_change_notification(sync::SubscriptionSet::State::Complete)
             .get();
-        wait_for_upload(*realm);
-        wait_for_download(*realm);
-        wait_for_advance(*realm);
 
+        wait_for_advance(*realm);
         auto expected_obj_ids = util::Span<ObjectId>(obj_ids_at_end).sub_span(0, 3);
 
         // After we've downloaded all the mutations there should only by 3 objects left.
@@ -3278,7 +3336,6 @@ TEST_CASE("flx: data ingest - write not allowed", "[sync][flx][data ingest][baas
         Object::create(c, realm, "Asymmetric",
                        std::any(AnyDict{{"_id", ObjectId::gen()}, {"embedded_obj", AnyDict{{"value", "foo"s}}}}));
         realm->commit_transaction();
-        wait_for_upload(*realm);
     }
 
     error_received_pf.future.get();
@@ -3472,10 +3529,11 @@ TEST_CASE("flx: bootstraps contain all changes", "[sync][flx][bootstrap][baas]")
 
         interrupted.get();
         problem_realm->sync_session()->shutdown_and_wait();
-        REQUIRE(!sub_complete_future.is_ready());
+        REQUIRE(sub_complete_future.is_ready());
         sub_set.refresh();
         REQUIRE(sub_set.state() == sync::SubscriptionSet::State::AwaitingMark);
 
+        sub_complete_future = sub_set.get_state_change_notification(sync::SubscriptionSet::State::Complete);
         problem_realm->sync_session()->resume();
         sub_complete_future.get();
         wait_for_advance(*problem_realm);
@@ -3654,7 +3712,7 @@ TEST_CASE("flx: convert flx sync realm to bundled realm", "[app][flx][baas]") {
         create_user_and_log_in(harness->app());
         SyncTestFile target_config(harness->app()->current_user(), harness->schema(), SyncConfig::FLXSyncEnabled{});
 
-        auto pbs_app_config = minimal_app_config(harness->app()->base_url(), "pbs_to_flx_convert", harness->schema());
+        auto pbs_app_config = minimal_app_config("pbs_to_flx_convert", harness->schema());
 
         TestAppSession pbs_app_session(create_app(pbs_app_config));
         SyncTestFile source_config(pbs_app_session.app()->current_user(), "54321"s, pbs_app_config.schema);
@@ -3856,13 +3914,14 @@ TEST_CASE("flx: compensating write errors get re-sent across sessions", "[sync][
     REQUIRE(write_info.primary_key.is_type(type_ObjectId));
     REQUIRE(write_info.primary_key.get_object_id() == test_obj_id_2);
     REQUIRE(write_info.object_name == "TopLevel");
-    REQUIRE(write_info.reason == util::format("write to \"%1\" in table \"TopLevel\" not allowed", test_obj_id_2));
+    REQUIRE(write_info.reason ==
+            util::format("write to ObjectID(\"%1\") in table \"TopLevel\" not allowed", test_obj_id_2));
     auto top_level_table = realm->read_group().get_table("class_TopLevel");
     REQUIRE(top_level_table->is_empty());
 }
 
 TEST_CASE("flx: bootstrap changesets are applied continuously", "[sync][flx][bootstrap][baas]") {
-    FLXSyncTestHarness harness("flx_bootstrap_batching", {g_large_array_schema, {"queryable_int_field"}});
+    FLXSyncTestHarness harness("flx_bootstrap_ordering", {g_large_array_schema, {"queryable_int_field"}});
     fill_large_array_schema(harness);
 
     std::unique_ptr<std::thread> th;
@@ -3945,7 +4004,7 @@ TEST_CASE("flx: bootstrap changesets are applied continuously", "[sync][flx][boo
 
 TEST_CASE("flx: open realm + register subscription callback while bootstrapping",
           "[sync][flx][bootstrap][async open][baas]") {
-    FLXSyncTestHarness harness("flx_bootstrap_batching");
+    FLXSyncTestHarness harness("flx_bootstrap_and_subscribe");
     auto foo_obj_id = ObjectId::gen();
     harness.load_initial_data([&](SharedRealm realm) {
         CppContext c(realm);
@@ -4212,7 +4271,7 @@ TEST_CASE("flx: open realm + register subscription callback while bootstrapping"
     }
 }
 TEST_CASE("flx sync: Client reset during async open", "[sync][flx][client reset][async open][baas]") {
-    FLXSyncTestHarness harness("flx_bootstrap_batching");
+    FLXSyncTestHarness harness("flx_bootstrap_reset");
     auto foo_obj_id = ObjectId::gen();
     std::atomic<bool> subscription_invoked = false;
     harness.load_initial_data([&](SharedRealm realm) {
@@ -4373,6 +4432,79 @@ TEST_CASE("flx sync: resend pending subscriptions when reconnecting", "[sync][fl
     auto realm = Realm::get_shared_realm(interrupted_realm_config);
     wait_for_upload(*realm);
     wait_for_download(*realm);
+}
+
+TEST_CASE("flx: fatal errors and session becoming inactive cancel pending waits", "[sync][flx][baas]") {
+    std::vector<ObjectSchema> schema{
+        {"TopLevel",
+         {
+             {"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+             {"queryable_int_field", PropertyType::Int | PropertyType::Nullable},
+         }},
+    };
+
+    FLXSyncTestHarness harness("flx_cancel_pending_waits", {schema, {"queryable_int_field"}});
+    SyncTestFile config(harness.app()->current_user(), harness.schema(), SyncConfig::FLXSyncEnabled{});
+
+    auto check_status = [](auto status) {
+        CHECK(!status.is_ok());
+        std::string reason = status.get_status().reason();
+        // Subscription notification is cancelled either because the sync session is inactive, or because a fatal
+        // error is received from the server.
+        if (reason.find("Sync session became inactive") == std::string::npos &&
+            reason.find("Invalid schema change (UPLOAD): non-breaking schema change: adding \"Int\" column at field "
+                        "\"other_col\" in schema \"TopLevel\", schema changes from clients are restricted when "
+                        "developer mode is disabled") == std::string::npos) {
+            FAIL(reason);
+        }
+    };
+
+    auto create_subscription = [](auto realm) -> realm::sync::SubscriptionSet {
+        auto mut_subs = realm->get_latest_subscription_set().make_mutable_copy();
+        auto table = realm->read_group().get_table("class_TopLevel");
+        mut_subs.insert_or_assign(Query(table));
+        return mut_subs.commit();
+    };
+
+    auto [error_occured_promise, error_occurred] = util::make_promise_future<void>();
+    config.sync_config->error_handler = [promise = util::CopyablePromiseHolder(std::move(error_occured_promise))](
+                                            std::shared_ptr<SyncSession>, SyncError) mutable {
+        promise.get_promise().emplace_value();
+    };
+
+    auto realm = Realm::get_shared_realm(config);
+    wait_for_download(*realm);
+
+    auto subs = create_subscription(realm);
+    auto subs_future = subs.get_state_change_notification(sync::SubscriptionSet::State::Complete);
+
+    realm->sync_session()->pause();
+    auto state = subs_future.get_no_throw();
+    check_status(state);
+
+    auto [download_complete_promise, download_complete] = util::make_promise_future<void>();
+    realm->sync_session()->wait_for_upload_completion([promise = std::move(download_complete_promise)](auto) mutable {
+        promise.emplace_value();
+    });
+    schema[0].persisted_properties.push_back({"other_col", PropertyType::Int | PropertyType::Nullable});
+    realm->update_schema(schema);
+
+    subs = create_subscription(realm);
+    subs_future = subs.get_state_change_notification(sync::SubscriptionSet::State::Complete);
+
+    harness.load_initial_data([&](SharedRealm realm) {
+        CppContext c(realm);
+        Object::create(c, realm, "TopLevel",
+                       std::any(AnyDict{{"_id", ObjectId::gen()},
+                                        {"queryable_int_field", static_cast<int64_t>(5)},
+                                        {"other_col", static_cast<int64_t>(42)}}));
+    });
+
+    realm->sync_session()->resume();
+    download_complete.get();
+    error_occurred.get();
+    state = subs_future.get_no_throw();
+    check_status(state);
 }
 
 } // namespace realm::app

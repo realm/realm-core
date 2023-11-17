@@ -52,8 +52,18 @@ using namespace std::string_literals;
 using Catch::Matchers::StartsWith;
 using nlohmann::json;
 
-#ifndef AUDIT_LOG_LEVEL
-#define AUDIT_LOG_LEVEL util::Logger::Level::off
+namespace {
+class NullLogger : public util::Logger {
+    // Since we don't want to log anything, do_log() does nothing
+    void do_log(const util::LogCategory&, Level, const std::string&) override {}
+};
+} // namespace
+
+static auto audit_logger =
+#ifdef AUDIT_LOG_LEVEL
+    std::make_shared<util::StderrLogger>(AUDIT_LOG_LEVEL);
+#else
+    std::make_shared<NullLogger>();
 #endif
 
 namespace {
@@ -299,8 +309,7 @@ TEST_CASE("audit object serialization", "[sync][pbs][audit]") {
     config.audit_config = std::make_shared<AuditConfig>();
     auto serializer = std::make_shared<CustomSerializer>();
     config.audit_config->serializer = serializer;
-    config.audit_config->logger = std::make_shared<util::ThreadSafeLogger>(util::Logger::get_default_logger());
-    config.audit_config->logger->set_level_threshold(AUDIT_LOG_LEVEL);
+    config.audit_config->logger = audit_logger;
     auto realm = Realm::get_shared_realm(config);
     auto audit = realm->audit_context();
     REQUIRE(audit);
@@ -1370,10 +1379,11 @@ TEST_CASE("audit management", "[sync][pbs][audit]") {
     SECTION("custom audit event") {
         // Verify that each of the completion handlers is called in the expected order
         std::atomic<size_t> completions = 0;
+        std::array<std::pair<std::atomic<size_t>, std::atomic<bool>>, 5> completion_results;
         auto expect_completion = [&](size_t expected) {
-            return [&completions, expected](std::exception_ptr e) {
-                REQUIRE_FALSE(e);
-                REQUIRE(completions++ == expected);
+            return [&, expected](std::exception_ptr e) {
+                completion_results[expected].second = bool(e);
+                completion_results[expected].first = completions++;
             };
         };
 
@@ -1388,6 +1398,11 @@ TEST_CASE("audit management", "[sync][pbs][audit]") {
         util::EventLoop::main().run_until([&] {
             return completions == 5;
         });
+
+        for (size_t i = 0; i < 5; ++i) {
+            REQUIRE(i == completion_results[i].first);
+            REQUIRE_FALSE(completion_results[i].second);
+        }
 
         auto events = get_audit_events(test_session, false);
         REQUIRE(events.size() == 4);
@@ -1486,9 +1501,7 @@ TEST_CASE("audit realm sharding", "[sync][pbs][audit]") {
         {"object", {{"_id", PropertyType::Int, Property::IsPrimary{true}}, {"value", PropertyType::Int}}},
     };
     config.audit_config = std::make_shared<AuditConfig>();
-    auto logger = std::make_shared<util::ThreadSafeLogger>(util::Logger::get_default_logger());
-    logger->set_level_threshold(AUDIT_LOG_LEVEL);
-    config.audit_config->logger = logger;
+    config.audit_config->logger = audit_logger;
     auto realm = Realm::get_shared_realm(config);
     auto audit = realm->audit_context();
     REQUIRE(audit);
@@ -1591,7 +1604,7 @@ TEST_CASE("audit realm sharding", "[sync][pbs][audit]") {
         // Open a different Realm with the same user and audit prefix
         SyncTestFile config(test_session.app(), "other");
         config.audit_config = std::make_shared<AuditConfig>();
-        config.audit_config->logger = logger;
+        config.audit_config->logger = audit_logger;
         auto realm = Realm::get_shared_realm(config);
         auto audit2 = realm->audit_context();
         REQUIRE(audit2);
@@ -1618,7 +1631,7 @@ TEST_CASE("audit realm sharding", "[sync][pbs][audit]") {
         // Open the same Realm with a different audit prefix
         SyncTestFile config(test_session.app(), "parent");
         config.audit_config = std::make_shared<AuditConfig>();
-        config.audit_config->logger = logger;
+        config.audit_config->logger = audit_logger;
         config.audit_config->partition_value_prefix = "other";
         auto realm = Realm::get_shared_realm(config);
         auto audit2 = realm->audit_context();
@@ -1667,7 +1680,7 @@ TEST_CASE("audit integration tests", "[sync][pbs][audit][baas]") {
     const Schema no_audit_event_schema{
         {"object", {{"_id", PropertyType::Int, Property::IsPrimary{true}}, {"value", PropertyType::Int}}}};
 
-    auto app_create_config = default_app_config(get_base_url());
+    auto app_create_config = default_app_config();
     app_create_config.schema = schema;
     app_create_config.dev_mode_enabled = false;
     TestAppSession session = create_app(app_create_config);
@@ -1675,8 +1688,7 @@ TEST_CASE("audit integration tests", "[sync][pbs][audit][baas]") {
     SyncTestFile config(session.app()->current_user(), bson::Bson("default"));
     config.schema = schema;
     config.audit_config = std::make_shared<AuditConfig>();
-    config.audit_config->logger = std::make_shared<util::ThreadSafeLogger>(util::Logger::get_default_logger());
-    config.audit_config->logger->set_level_threshold(AUDIT_LOG_LEVEL);
+    config.audit_config->logger = audit_logger;
 
     auto expect_error = [&](auto&& config, auto&& fn) -> SyncError {
         std::mutex mutex;

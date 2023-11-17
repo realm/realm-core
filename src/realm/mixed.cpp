@@ -787,7 +787,7 @@ std::string Mixed::to_string(size_t max_size) const noexcept
         ostr << '"';
     }
     else if (is_type(type_Timestamp)) {
-        char buffer[32];
+        std::array<char, 32> buffer{};
         return date_val.to_string(buffer);
     }
     else {

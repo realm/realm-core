@@ -525,11 +525,6 @@ void InterRealmValueConverter::copy_list_in_mixed(const Lst<Mixed>& src_list, Ls
         auto n_dst_list = dst_list.get_list(ndx);
         handle_list_in_mixed(*n_src_list, *n_dst_list);
     }
-    else if (type == CollectionType::Set) {
-        auto n_src_set = src_list.get_set(ndx);
-        auto n_dst_set = dst_list.get_set(ndx);
-        copy_set(*n_src_set, *n_dst_set, nullptr);
-    }
     else if (type == CollectionType::Dictionary) {
         auto n_src_dict = src_list.get_dictionary(ndx);
         auto n_dst_dict = dst_list.get_dictionary(ndx);
@@ -544,11 +539,6 @@ void InterRealmValueConverter::copy_dictionary_in_mixed(const Dictionary& src_di
         auto n_src_list = src_dictionary.get_list(key);
         auto n_dst_list = dst_dictionary.get_list(key);
         handle_list_in_mixed(*n_src_list, *n_dst_list);
-    }
-    else if (type == CollectionType::Set) {
-        auto n_src_set = src_dictionary.get_set(key);
-        auto n_dst_set = dst_dictionary.get_set(key);
-        copy_set(*n_src_set, *n_dst_set, nullptr);
     }
     else if (type == CollectionType::Dictionary) {
         auto n_src_dictionary = src_dictionary.get_dictionary(key);

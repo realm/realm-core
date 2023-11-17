@@ -286,10 +286,4 @@ Dictionary Collection::get_dictionary(const PathElement& path) const
     return Dictionary{m_realm, m_coll_base->get_dictionary(path)};
 }
 
-Set Collection::get_set(const PathElement& path) const
-{
-    return Set{m_realm, m_coll_base->get_set(path)};
-}
-
-
 } // namespace realm::object_store

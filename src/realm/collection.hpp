@@ -219,10 +219,6 @@ public:
     {
         throw IllegalOperation("get_dictionary for this collection is not allowed");
     }
-    virtual SetMixedPtr get_set(const PathElement&) const
-    {
-        throw IllegalOperation("get_set for this collection is not allowed");
-    }
     virtual ListMixedPtr get_list(const PathElement&) const
     {
         throw IllegalOperation("get_list for this collection is not allowed");
@@ -236,6 +232,11 @@ public:
     {
         return get_table()->get_column_name(get_col_key());
     }
+
+    // These are shadowed by typed versions in subclasses
+    using value_type = Mixed;
+    CollectionIterator<CollectionBase> begin() const;
+    CollectionIterator<CollectionBase> end() const;
 
 protected:
     friend class Transaction;
@@ -586,7 +587,8 @@ protected:
 
     CollectionBaseImpl() = default;
     CollectionBaseImpl(const CollectionBaseImpl& other)
-        : m_obj_mem(other.m_obj_mem)
+        : Interface(static_cast<const Interface&>(other))
+        , m_obj_mem(other.m_obj_mem)
         , m_col_parent(other.m_col_parent)
         , m_index(other.m_index)
         , m_col_key(other.m_col_key)
@@ -624,6 +626,7 @@ protected:
 
     CollectionBaseImpl& operator=(const CollectionBaseImpl& other)
     {
+        Interface::operator=(static_cast<const Interface&>(other));
         if (this != &other) {
             m_obj_mem = other.m_obj_mem;
             m_col_parent = other.m_col_parent;
@@ -987,7 +990,12 @@ struct CollectionIterator {
 
     pointer operator->() const
     {
-        m_val = m_list->get(m_ndx);
+        if constexpr (std::is_same_v<L, CollectionBase>) {
+            m_val = m_list->get_any(m_ndx);
+        }
+        else {
+            m_val = m_list->get(m_ndx);
+        }
         return &m_val;
     }
 
@@ -1073,6 +1081,15 @@ private:
     size_t m_ndx = size_t(-1);
 };
 
+
+inline CollectionIterator<CollectionBase> CollectionBase::begin() const
+{
+    return CollectionIterator<CollectionBase>(this, 0);
+}
+inline CollectionIterator<CollectionBase> CollectionBase::end() const
+{
+    return CollectionIterator<CollectionBase>(this, size());
+}
 template <class T>
 class IteratorAdapter {
 public:

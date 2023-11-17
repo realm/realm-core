@@ -97,7 +97,7 @@ size_t ParentNode::aggregate_local(QueryStateBase* st, size_t start, size_t end,
     // data type array to make array call match() directly on each match, like for integers.
 
     m_state = st;
-    m_source_column = source_column;
+    m_state->set_payload_column(source_column);
     size_t local_matches = 0;
 
     if (m_children.size() == 1) {
@@ -134,11 +134,7 @@ size_t ParentNode::aggregate_local(QueryStateBase* st, size_t start, size_t end,
         // If index of first match in this node equals index of first match in all remaining nodes, we have a final
         // match
         if (m == r) {
-            Mixed val;
-            if (source_column) {
-                val = source_column->get_any(r);
-            }
-            bool cont = st->match(r, val);
+            bool cont = st->match(r);
             if (!cont) {
                 return static_cast<size_t>(-1);
             }
@@ -151,11 +147,7 @@ size_t ParentNode::find_all_local(size_t start, size_t end)
     while (start < end) {
         start = find_first_local(start, end);
         if (start != not_found) {
-            Mixed val;
-            if (m_source_column) {
-                val = m_source_column->get_any(start);
-            }
-            bool cont = m_state->match(start, val);
+            bool cont = m_state->match(start);
             if (!cont) {
                 return static_cast<size_t>(-1);
             }

@@ -59,6 +59,7 @@
 typedef struct shared_realm realm_t;
 typedef struct realm_schema realm_schema_t;
 typedef struct realm_scheduler realm_scheduler_t;
+typedef struct realm_work_queue realm_work_queue_t;
 typedef struct realm_thread_safe_reference realm_thread_safe_reference_t;
 typedef void (*realm_free_userdata_func_t)(realm_userdata_t userdata);
 typedef realm_userdata_t (*realm_clone_userdata_func_t)(const realm_userdata_t userdata);
@@ -342,7 +343,7 @@ typedef void (*realm_async_commit_func_t)(realm_userdata_t userdata, bool error,
 typedef void (*realm_on_schema_change_func_t)(realm_userdata_t userdata, const realm_schema_t* new_schema);
 
 /* Scheduler types */
-typedef void (*realm_scheduler_notify_func_t)(realm_userdata_t userdata);
+typedef void (*realm_scheduler_notify_func_t)(realm_userdata_t userdata, realm_work_queue_t* work_queue);
 typedef bool (*realm_scheduler_is_on_thread_func_t)(realm_userdata_t userdata);
 typedef bool (*realm_scheduler_is_same_as_func_t)(const realm_userdata_t scheduler_userdata_1,
                                                   const realm_userdata_t scheduler_userdata_2);
@@ -929,7 +930,7 @@ realm_scheduler_new(realm_userdata_t userdata, realm_free_userdata_func_t userda
  * be called each time the notify callback passed to the scheduler
  * is invoked.
  */
-RLM_API void realm_scheduler_perform_work(realm_scheduler_t*);
+RLM_API void realm_scheduler_perform_work(realm_work_queue_t*);
 /**
  * Create an instance of the default scheduler for the current platform,
  * normally confined to the calling thread.
@@ -1688,7 +1689,6 @@ RLM_API realm_object_t* realm_set_embedded(realm_object_t*, realm_property_key_t
  *
  */
 RLM_API bool realm_set_list(realm_object_t*, realm_property_key_t);
-RLM_API bool realm_set_set(realm_object_t*, realm_property_key_t);
 RLM_API bool realm_set_dictionary(realm_object_t*, realm_property_key_t);
 
 /** Return the object linked by the given property
@@ -1840,7 +1840,6 @@ RLM_API bool realm_list_insert(realm_list_t*, size_t index, realm_value_t value)
  * @return pointer to a valid collection that has been just inserted at the index passed as argument
  */
 RLM_API realm_list_t* realm_list_insert_list(realm_list_t* list, size_t index);
-RLM_API realm_set_t* realm_list_insert_set(realm_list_t* list, size_t index);
 RLM_API realm_dictionary_t* realm_list_insert_dictionary(realm_list_t* list, size_t index);
 
 /**
@@ -1853,7 +1852,6 @@ RLM_API realm_dictionary_t* realm_list_insert_dictionary(realm_list_t* list, siz
  * @return a valid ptr representing the collection just set
  */
 RLM_API realm_list_t* realm_list_set_list(realm_list_t* list, size_t index);
-RLM_API realm_set_t* realm_list_set_set(realm_list_t* list, size_t index);
 RLM_API realm_dictionary_t* realm_list_set_dictionary(realm_list_t* list, size_t index);
 
 /**
@@ -1864,15 +1862,6 @@ RLM_API realm_dictionary_t* realm_list_set_dictionary(realm_list_t* list, size_t
  * @return a pointer to the the nested list found at the index passed as argument
  */
 RLM_API realm_list_t* realm_list_get_list(realm_list_t* list, size_t index);
-
-/**
- * Returns a nested set if such collection exists and it is a leaf collection, NULL otherwise.
- *
- * @param list pointer to the list that containes the nested collection into
- * @param index position of collection in the list
- * @return a pointer to the the nested dictionary found at index passed as argument
- */
-RLM_API realm_set_t* realm_list_get_set(realm_list_t* list, size_t index);
 
 /**
  * Returns a nested dictionary if such collection exists, NULL otherwise.
@@ -2372,7 +2361,6 @@ RLM_API realm_object_t* realm_dictionary_insert_embedded(realm_dictionary_t*, re
  * @return pointer to a valid collection that has been just inserted at the key passed as argument
  */
 RLM_API realm_list_t* realm_dictionary_insert_list(realm_dictionary_t* dictionary, realm_value_t key);
-RLM_API realm_set_t* realm_dictionary_insert_set(realm_dictionary_t*, realm_value_t);
 RLM_API realm_dictionary_t* realm_dictionary_insert_dictionary(realm_dictionary_t*, realm_value_t);
 
 
@@ -2381,12 +2369,6 @@ RLM_API realm_dictionary_t* realm_dictionary_insert_dictionary(realm_dictionary_
  * @return a valid list that needs to be deleted by the caller or nullptr in case of an error.
  */
 RLM_API realm_list_t* realm_dictionary_get_list(realm_dictionary_t* dictionary, realm_value_t key);
-
-/**
- * Fetch a set from a dictionary.
- * @return a valid dictionary that needs to be deleted by the caller or nullptr in case of an error.
- */
-RLM_API realm_set_t* realm_dictionary_get_set(realm_dictionary_t* dictionary, realm_value_t key);
 
 /**
  * Fetch a dictioanry from a dictionary.
@@ -2695,12 +2677,6 @@ RLM_API bool realm_results_get(realm_results_t*, size_t index, realm_value_t* ou
  * @return A valid ptr to a list instance or nullptr in case of errors
  */
 RLM_API realm_list_t* realm_results_get_list(realm_results_t*, size_t index);
-
-/**
- * Returns an instance of realm_set_t for the index passed as argument.
- * @return A valid ptr to a set instance or nullptr in case of errors
- */
-RLM_API realm_set_t* realm_results_get_set(realm_results_t*, size_t index);
 
 /**
  * Returns an instance of realm_dictionary for the index passed as argument.

@@ -2,37 +2,34 @@
 #ifndef REALM_NOINST_CLIENT_IMPL_BASE_HPP
 #define REALM_NOINST_CLIENT_IMPL_BASE_HPP
 
-#include <cstdint>
-#include <utility>
-#include <functional>
-#include <deque>
-#include <map>
-#include <string>
-#include <random>
-#include <list>
+#include <realm/sync/client_base.hpp>
 
 #include <realm/binary_data.hpp>
-#include <realm/util/optional.hpp>
-#include <realm/util/buffer_stream.hpp>
-#include <realm/util/logger.hpp>
-#include <realm/util/tagged_bool.hpp>
-#include <realm/sync/network/network_ssl.hpp>
+#include <realm/sync/history.hpp>
 #include <realm/sync/network/default_socket.hpp>
-#include <realm/util/span.hpp>
+#include <realm/sync/network/network_ssl.hpp>
 #include <realm/sync/noinst/client_history_impl.hpp>
-#include <realm/sync/noinst/client_reset_operation.hpp>
+#include <realm/sync/noinst/migration_store.hpp>
 #include <realm/sync/noinst/migration_store.hpp>
 #include <realm/sync/noinst/protocol_codec.hpp>
-#include <realm/sync/client_base.hpp>
-#include <realm/sync/history.hpp>
 #include <realm/sync/protocol.hpp>
 #include <realm/sync/subscriptions.hpp>
 #include <realm/sync/trigger.hpp>
-#include <realm/sync/noinst/migration_store.hpp>
+#include <realm/util/buffer_stream.hpp>
+#include <realm/util/logger.hpp>
+#include <realm/util/optional.hpp>
+#include <realm/util/span.hpp>
 
+#include <cstdint>
+#include <deque>
+#include <functional>
+#include <list>
+#include <map>
+#include <random>
+#include <string>
+#include <utility>
 
-namespace realm {
-namespace sync {
+namespace realm::sync {
 
 // (protocol, address, port, session_multiplex_ident)
 //
@@ -162,7 +159,6 @@ public:
     using port_type = network::Endpoint::port_type;
     using OutputBuffer = util::ResettableExpandableBufferOutputStream;
     using ClientProtocol = _impl::ClientProtocol;
-    using ClientResetOperation = _impl::ClientResetOperation;
     using RandomEngine = std::mt19937_64;
 
     /// Per-server endpoint information used to determine reconnect delays.
@@ -426,7 +422,7 @@ public:
     ///
     /// Prior to being activated, no messages will be sent or received on behalf
     /// of this session, and the associated Realm file will not be accessed,
-    /// i.e., Session::access_realm() will not be called.
+    /// i.e., `Session::get_db()` will not be called.
     ///
     /// If activation is successful, the connection keeps the session alive
     /// until the application calls initiated_session_deactivation() or until
@@ -449,7 +445,7 @@ public:
     /// initiate_session_deactivation().
     ///
     /// After the initiation of the deactivation process, the associated Realm
-    /// file will no longer be accessed, i.e., access_realm() will not be called
+    /// file will no longer be accessed, i.e., `get_db()` will not be called
     /// again, and a previously returned reference will also not be accessed
     /// again.
     ///
@@ -844,12 +840,8 @@ public:
 
     /// To be used in connection with implementations of
     /// initiate_integrate_changesets().
-    ///
-    /// This function is thread-safe, but if called from a thread other than the
-    /// event loop thread of the associated client object, the specified history
-    /// accessor must **not** be the one made available by access_realm().
-    void integrate_changesets(ClientReplication&, const SyncProgress&, std::uint_fast64_t downloadable_bytes,
-                              const ReceivedChangesets&, VersionInfo&, DownloadBatchState last_in_batch);
+    void integrate_changesets(const SyncProgress&, std::uint_fast64_t downloadable_bytes, const ReceivedChangesets&,
+                              VersionInfo&, DownloadBatchState last_in_batch);
 
     /// To be used in connection with implementations of
     /// initiate_integrate_changesets().
@@ -900,18 +892,11 @@ private:
     const std::string& get_virt_path() const noexcept;
 
     const std::string& get_realm_path() const noexcept;
-    DBRef get_db() const noexcept;
 
-    /// The implementation need only ensure that the returned reference stays valid
-    /// until the next invocation of access_realm() on one of the session
-    /// objects associated with the same client object.
-    ///
-    /// This function is always called by the event loop thread of the
-    /// associated client object.
-    ///
-    /// This function is guaranteed to not be called before activation, and also
-    /// not after initiation of deactivation.
-    ClientReplication& access_realm();
+    // Can only be called if the session is active or being activated
+    DBRef get_db() const noexcept;
+    ClientReplication& get_repl() const noexcept;
+    ClientHistory& get_history() const noexcept;
 
     // client_reset_config() returns the config for client
     // reset. If it returns none, ordinary sync is used. If it returns a
@@ -934,10 +919,6 @@ private:
     /// progress has been persisted, this function must provide for
     /// on_changesets_integrated() to be called without unnecessary delay,
     /// although never after initiation of session deactivation.
-    ///
-    /// The integration of the specified changesets must happen by means of an
-    /// invocation of integrate_changesets(), but not necessarily using the
-    /// history accessor made available by access_realm().
     ///
     /// The implementation is allowed, but not obliged to aggregate changesets
     /// from multiple invocations of initiate_integrate_changesets() and pass
@@ -1011,7 +992,10 @@ private:
     // Processes any pending FLX bootstraps, if one exists. Otherwise this is a noop.
     void process_pending_flx_bootstrap();
 
+    bool client_reset_if_needed();
     void handle_pending_client_reset_acknowledgement();
+
+    void update_subscription_version_info();
 
     void gather_pending_compensating_writes(util::Span<Changeset> changesets, std::vector<ProtocolErrorInfo>* out);
 
@@ -1068,8 +1052,8 @@ private:
     // `ident == 0` means unassigned.
     SaltedFileIdent m_client_file_ident = {0, 0};
 
-    // m_client_reset_operation stores state for the lifetime of a client reset
-    std::unique_ptr<ClientResetOperation> m_client_reset_operation;
+    // True while this session is in the process of performing a client reset.
+    bool m_performing_client_reset = false;
 
     // The latest sync progress reported by the server via a DOWNLOAD
     // message. See struct SyncProgress for a description. The values stored in
@@ -1616,7 +1600,6 @@ inline void ClientImpl::Session::enlist_to_send()
     m_conn.enlist_to_send(this); // Throws
 }
 
-} // namespace sync
-} // namespace realm
+} // namespace realm::sync
 
 #endif // REALM_NOINST_CLIENT_IMPL_BASE_HPP

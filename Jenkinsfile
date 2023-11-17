@@ -15,6 +15,7 @@ branch = tokens[tokens.size()-1]
 ctest_cmd = "ctest -VV"
 warningFilters = [
     excludeFile('/external/*'), // submodules and external libraries
+    excludeFile('/src/external/*'), // submodules and external libraries
     excludeFile('/libuv-src/*'), // libuv, where it was downloaded and built inside cmake
     excludeFile('/src/realm/parser/generated/*'), // the auto generated parser code we didn't write
 ]
@@ -180,6 +181,7 @@ jobWrapper {
 
             parallelExecutors = [
                 buildLinuxRelease       : doBuildLinux('Release'),
+                checkAlpine             : doCheckAlpine(buildOptions + [enableSync: true]),
                 checkLinuxDebug         : doCheckInDocker(buildOptions + [useToolchain : true]),
                 checkLinuxDebugEncrypt  : doCheckInDocker(buildOptions + [useEncryption : true]),
                 checkLinuxRelease_4     : doCheckInDocker(buildOptions + [maxBpNodeSize: 4, buildType : 'Release', useToolchain : true]),
@@ -196,8 +198,6 @@ jobWrapper {
                 buildAndroidArm64Debug  : doAndroidBuildInDocker('arm64-v8a', 'Debug'),
                 buildAndroidTestsArmeabi: doAndroidBuildInDocker('armeabi-v7a', 'Debug', TestAction.Build),
                 buildEmscripten         : doBuildEmscripten('Debug'),
-                threadSanitizer         : doCheckSanity(buildOptions + [enableSync: true, sanitizeMode: 'thread']),
-                addressSanitizer        : doCheckSanity(buildOptions + [enableSync: true, sanitizeMode: 'address']),
             ]
             if (releaseTesting) {
                 extendedChecks = [
@@ -312,26 +312,15 @@ def doCheckInDocker(Map options = [:]) {
     }
 }
 
-def doCheckSanity(Map options = [:]) {
-    def privileged = '';
-
+def doCheckAlpine(Map options = [:]) {
     def cmakeOptions = [
         CMAKE_BUILD_TYPE: options.buildType,
         REALM_MAX_BPNODE_SIZE: options.maxBpNodeSize,
-        REALM_ENABLE_SYNC: options.enableSync,
+        REALM_ENABLE_ENCRYPTION: options.enableEncryption ? 'ON' : 'OFF',
+        REALM_ENABLE_SYNC: options.enableSync ? 'ON' : 'OFF',
+        REALM_USE_SYSTEM_OPENSSL: 'ON',
+        OPENSSL_USE_STATIC_LIBS: 'OFF',
     ]
-
-    if (options.sanitizeMode.contains('thread')) {
-        cmakeOptions << [
-            REALM_TSAN: "ON",
-        ]
-    }
-    else if (options.sanitizeMode.contains('address')) {
-        privileged = '--privileged'
-        cmakeOptions << [
-            REALM_ASAN: "ON",
-        ]
-    }
 
     def cmakeDefinitions = cmakeOptions.collect { k,v -> "-D$k=$v" }.join(' ')
 
@@ -339,32 +328,38 @@ def doCheckSanity(Map options = [:]) {
         rlmNode('docker') {
             getArchive()
 
-            def environment = environment() + [
-              'CC=clang',
-              'CXX=clang++',
-              'UNITTEST_XML=unit-test-report.xml',
-              "UNITTEST_SUITE_NAME=Linux-${options.buildType}",
-              "TSAN_OPTIONS=\"suppressions=${WORKSPACE}/test/tsan.suppress\""
-            ]
-            buildDockerEnv('linux.Dockerfile').inside(privileged) {
-                withEnv(environment) {
-                    try {
-                        dir('build-dir') {
-                            sh "cmake ${cmakeDefinitions} -G Ninja .."
-                            runAndCollectWarnings(
-                                script: 'ninja',
-                                parser: "clang",
-                                name: "linux-clang-${options.buildType}-${options.sanitizeMode}",
-                                filters: warningFilters,
-                            )
-                            sh "${ctest_cmd}"
-                        }
+            def buildEnv = buildDockerEnv('alpine.Dockerfile')
 
-                    } finally {
-                        junit testResults: 'build-dir/test/unit-test-report.xml'
+            def environment = environment()
+            environment << 'UNITTEST_XML=unit-test-report.xml'
+            environment << "UNITTEST_SUITE_NAME=Alpine-${options.buildType}"
+            if (options.useEncryption) {
+                environment << 'UNITTEST_ENCRYPT_ALL=1'
+            }
+
+            // We don't enable this by default, because using a toolchain with its own sysroot
+            // prevents CMake from finding system libraries like curl which we use in sync tests.
+            if (options.useToolchain) {
+                cmakeDefinitions += " -DCMAKE_TOOLCHAIN_FILE=\"${env.WORKSPACE}/tools/cmake/x86_64-linux-musl.toolchain.cmake\""
+            }
+
+            buildEnv.inside {
+                    withEnv(environment) {
+                        try {
+                            dir('build-dir') {
+                                sh "cmake ${cmakeDefinitions} -G Ninja .."
+                                runAndCollectWarnings(
+                                    script: 'ninja',
+                                    name: "alpine-${options.buildType}-encrypt${options.enableEncryption}-BPNODESIZE_${options.maxBpNodeSize}",
+                                    filters: warningFilters,
+                                )
+                                sh "${ctest_cmd}"
+                            }
+                        } finally {
+                            junit testResults: 'build-dir/test/unit-test-report.xml'
+                        }
                     }
                 }
-            }
         }
     }
 }

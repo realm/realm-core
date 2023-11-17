@@ -5320,30 +5320,15 @@ namespace issue2104 {
 
 class ServerHistoryContext : public _impl::ServerHistory::Context {
 public:
-    ServerHistoryContext()
-        : m_transformer{make_transformer()}
-    {
-    }
+    ServerHistoryContext() {}
 
     std::mt19937_64& server_history_get_random() noexcept override
     {
         return m_random;
     }
 
-    sync::Transformer& get_transformer() override
-    {
-        return *m_transformer;
-    }
-
-    util::Buffer<char>& get_transform_buffer() override
-    {
-        return m_transform_buffer;
-    }
-
 private:
     std::mt19937_64 m_random;
-    std::unique_ptr<sync::Transformer> m_transformer;
-    util::Buffer<char> m_transform_buffer;
 };
 
 } // namespace issue2104
@@ -6998,7 +6983,7 @@ TEST(Sync_NonIncreasingServerVersions)
     ++server_changesets.back().version;
 
     std::vector<ChangesetEncoder::Buffer> encoded;
-    std::vector<Transformer::RemoteChangeset> server_changesets_encoded;
+    std::vector<RemoteChangeset> server_changesets_encoded;
     for (const auto& changeset : server_changesets) {
         encoded.emplace_back();
         encode_changeset(changeset, encoded.back());
@@ -7036,7 +7021,7 @@ TEST(Sync_InvalidChangesetFromServer)
 
     ChangesetEncoder::Buffer encoded;
     encode_changeset(changeset, encoded);
-    Transformer::RemoteChangeset server_changeset;
+    RemoteChangeset server_changeset;
     server_changeset.origin_file_ident = 1;
     server_changeset.remote_version = 1;
     server_changeset.data = BinaryData(encoded.data(), encoded.size());
@@ -7147,7 +7132,7 @@ TEST(Sync_SetAndGetEmptyReciprocalChangeset)
     changeset.origin_file_ident = 2;
 
     ChangesetEncoder::Buffer encoded;
-    std::vector<Transformer::RemoteChangeset> server_changesets_encoded;
+    std::vector<RemoteChangeset> server_changesets_encoded;
     encode_changeset(changeset, encoded);
     server_changesets_encoded.emplace_back(changeset.version, changeset.last_integrated_remote_version,
                                            BinaryData(encoded.data(), encoded.size()), changeset.origin_timestamp,
@@ -7290,7 +7275,7 @@ TEST(Sync_ServerVersionsSkippedFromDownloadCursor)
     server_changeset.origin_file_ident = 1;
 
     std::vector<ChangesetEncoder::Buffer> encoded;
-    std::vector<Transformer::RemoteChangeset> server_changesets_encoded;
+    std::vector<RemoteChangeset> server_changesets_encoded;
     encoded.emplace_back();
     encode_changeset(server_changeset, encoded.back());
     server_changesets_encoded.emplace_back(server_changeset.version, server_changeset.last_integrated_remote_version,

@@ -349,7 +349,6 @@ public:
     void insert_collection(const PathElement&, CollectionType dict_or_list) override;
     void set_collection(const PathElement& path_element, CollectionType dict_or_list) override;
     DictionaryPtr get_dictionary(const PathElement& path_elem) const override;
-    SetMixedPtr get_set(const PathElement& path_elem) const override;
     ListMixedPtr get_list(const PathElement& path_elem) const override;
 
     int64_t get_key(size_t ndx)
@@ -537,9 +536,7 @@ private:
 
     static Mixed unresolved_to_null(Mixed value) noexcept
     {
-        if (value.is_type(type_TypedLink) && value.is_unresolved_link())
-            return Mixed{};
-        return value;
+        return value.is_unresolved_link() ? Mixed{} : value;
     }
     Mixed do_get(size_t ndx, const char* msg) const
     {

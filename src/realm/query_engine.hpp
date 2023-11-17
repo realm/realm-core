@@ -254,7 +254,6 @@ public:
     std::unique_ptr<ParentNode> m_child;
     std::vector<ParentNode*> m_children;
     mutable ColKey m_condition_column_key = ColKey(); // Column of search criteria
-    ArrayPayload* m_source_column = nullptr;
 
     double m_dD;       // Average row distance between each local match at current position
     double m_dT = 1.0; // Time overhead of testing index i + 1 if we have just tested index i. > 1 for linear scans, 0
@@ -378,29 +377,10 @@ protected:
         m_dT = .25;
     }
 
-    bool run_single() const
-    {
-        if (m_source_column == nullptr)
-            return true;
-        // Compare leafs to see if they are the same
-        auto leaf = dynamic_cast<LeafType*>(m_source_column);
-        return leaf && leaf->get_ref() == m_leaf->get_ref();
-    }
-
     template <class TConditionFunction>
     size_t find_all_local(size_t start, size_t end)
     {
-        if (run_single()) {
-            m_leaf->template find<TConditionFunction>(m_value, start, end, m_state, nullptr);
-        }
-        else {
-            auto callback = [this](size_t index) {
-                auto val = m_source_column->get_any(index);
-                return m_state->match(index, val);
-            };
-            m_leaf->template find<TConditionFunction>(m_value, start, end, m_state, callback);
-        }
-
+        m_leaf->template find<TConditionFunction>(m_value, start, end, m_state);
         return end;
     }
 
@@ -409,7 +389,6 @@ protected:
         return state.describe_column(ParentNode::m_table, ColumnNodeBase::m_condition_column_key) + " " +
                describe_condition() + " " + util::serializer::print_value(this->m_value);
     }
-
 
     // Search value:
     TConditionValue m_value;

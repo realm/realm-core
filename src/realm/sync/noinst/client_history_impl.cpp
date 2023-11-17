@@ -265,10 +265,23 @@ void ClientHistory::get_status(version_type& current_client_version, SaltedFileI
         current_client_version = 0;
 
     if (has_pending_client_reset) {
-        *has_pending_client_reset = _impl::client_reset::has_pending_reset(rt).has_value();
+        *has_pending_client_reset = _impl::client_reset::has_pending_reset(*rt).has_value();
     }
 }
 
+SaltedFileIdent ClientHistory::get_client_file_ident(const Transaction& rt) const
+{
+    SaltedFileIdent client_file_ident{rt.get_sync_file_id(), 0};
+
+    using gf = _impl::GroupFriend;
+    if (ref_type ref = gf::get_history_ref(rt)) {
+        Array root(m_db->get_alloc());
+        root.init_from_ref(ref);
+        client_file_ident.salt = salt_type(root.get_as_ref_or_tagged(s_client_file_ident_salt_iip).get_as_int());
+    }
+
+    return client_file_ident;
+}
 
 void ClientHistory::set_client_file_ident(SaltedFileIdent client_file_ident, bool fix_up_object_ids)
 {
@@ -541,7 +554,6 @@ size_t ClientHistory::transform_and_apply_server_changesets(util::Span<Changeset
                 changeset.last_integrated_remote_version = m_sync_history_base_version;
         }
 
-        Transformer& transformer = get_transformer();          // Throws
         constexpr std::size_t commit_byte_size_limit = 102400; // 100 KB
 
         auto changeset_applier = [&](const Changeset* transformed_changeset) -> bool {
@@ -552,12 +564,12 @@ size_t ClientHistory::transform_and_apply_server_changesets(util::Span<Changeset
             }
             downloaded_bytes += transformed_changeset->original_changeset_size;
 
-            return !(m_db->other_writers_waiting_for_lock() &&
-                     transact->get_commit_size() >= commit_byte_size_limit && allow_lock_release);
+            return !(allow_lock_release && m_db->other_writers_waiting_for_lock() &&
+                     transact->get_commit_size() >= commit_byte_size_limit);
         };
-        auto changesets_transformed_count =
-            transformer.transform_remote_changesets(*this, sync_file_id, local_version, changesets_to_integrate,
-                                                    std::move(changeset_applier), logger); // Throws
+        sync::Transformer transformer;
+        auto changesets_transformed_count = transformer.transform_remote_changesets(
+            *this, sync_file_id, local_version, changesets_to_integrate, changeset_applier, logger); // Throws
         return changesets_transformed_count;
     }
     catch (const BadChangesetError& e) {
@@ -1195,6 +1207,7 @@ void ClientHistory::update_from_ref_and_version(ref_type ref, version_type versi
         m_arrays->init_from_ref(ref);
     }
     else {
+        REALM_ASSERT_RELEASE(m_group);
         m_arrays.emplace(m_db->get_alloc(), *m_group, ref);
     }
 

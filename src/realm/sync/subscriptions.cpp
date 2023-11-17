@@ -21,19 +21,18 @@
 #include "external/json/json.hpp"
 
 #include "realm/data_type.hpp"
-#include "realm/transaction.hpp"
 #include "realm/keys.hpp"
 #include "realm/list.hpp"
 #include "realm/sort_descriptor.hpp"
 #include "realm/sync/noinst/sync_metadata_schema.hpp"
 #include "realm/table.hpp"
 #include "realm/table_view.hpp"
+#include "realm/transaction.hpp"
 #include "realm/util/flat_map.hpp"
+
 #include <algorithm>
 #include <initializer_list>
 #include <stdexcept>
-
-#include <algorithm>
 
 namespace realm::sync {
 namespace {
@@ -131,6 +130,19 @@ size_t state_to_order(SubscriptionSet::State needle)
     REALM_UNREACHABLE();
 }
 
+template <typename T, typename Predicate>
+void splice_if(std::list<T>& src, std::list<T>& dst, Predicate pred)
+{
+    for (auto it = src.begin(); it != src.end();) {
+        if (pred(*it)) {
+            dst.splice(dst.end(), src, it++);
+        }
+        else {
+            ++it;
+        }
+    }
+}
+
 } // namespace
 
 Subscription::Subscription(const SubscriptionStore* parent, Obj obj)
@@ -155,15 +167,16 @@ Subscription::Subscription(util::Optional<std::string> name, std::string object_
 }
 
 
-SubscriptionSet::SubscriptionSet(std::weak_ptr<const SubscriptionStore> mgr, const Transaction& tr, Obj obj,
+SubscriptionSet::SubscriptionSet(std::weak_ptr<const SubscriptionStore> mgr, const Transaction& tr, const Obj& obj,
                                  MakingMutableCopy making_mutable_copy)
     : m_mgr(mgr)
     , m_cur_version(tr.get_version())
     , m_version(obj.get_primary_key().get_int())
+    , m_obj_key(obj.get_key())
 {
     REALM_ASSERT(obj.is_valid());
     if (!making_mutable_copy) {
-        load_from_database(std::move(obj));
+        load_from_database(obj);
     }
 }
 
@@ -174,7 +187,7 @@ SubscriptionSet::SubscriptionSet(std::weak_ptr<const SubscriptionStore> mgr, int
 {
 }
 
-void SubscriptionSet::load_from_database(Obj obj)
+void SubscriptionSet::load_from_database(const Obj& obj)
 {
     auto mgr = get_flx_subscription_store(); // Throws
 
@@ -438,10 +451,8 @@ void MutableSubscriptionSet::update_state(State new_state, util::Optional<std::s
         }
         case State::Superseded:
             throw std::logic_error("Cannot set a subscription to the superseded state");
-            break;
         case State::Pending:
             throw std::logic_error("Cannot set subscription set to the pending state");
-            break;
     }
 }
 
@@ -455,7 +466,7 @@ void SubscriptionSet::refresh()
 {
     auto mgr = get_flx_subscription_store(); // Throws
     if (mgr->would_refresh(m_cur_version)) {
-        *this = mgr->get_by_version(version());
+        *this = mgr->get_refreshed(m_obj_key, version());
     }
 }
 
@@ -463,24 +474,12 @@ util::Future<SubscriptionSet::State> SubscriptionSet::get_state_change_notificat
 {
     auto mgr = get_flx_subscription_store(); // Throws
 
-    std::unique_lock<std::mutex> lk(mgr->m_pending_notifications_mutex);
+    util::CheckedLockGuard lk(mgr->m_pending_notifications_mutex);
     // If we've already been superceded by another version getting completed, then we should skip registering
     // a notification because it may never fire.
     if (mgr->m_min_outstanding_version > version()) {
         return util::Future<State>::make_ready(State::Superseded);
     }
-
-    // Begin by blocking process_notifications from starting to fill futures. No matter the outcome, we'll
-    // unblock process_notifications() at the end of this function via the guard we construct below.
-    mgr->m_outstanding_requests++;
-    auto guard = util::make_scope_exit([&]() noexcept {
-        if (!lk.owns_lock()) {
-            lk.lock();
-        }
-        --mgr->m_outstanding_requests;
-        mgr->m_pending_notifications_cv.notify_one();
-    });
-    lk.unlock();
 
     State cur_state = state();
     StringData err_str = error_str();
@@ -488,7 +487,7 @@ util::Future<SubscriptionSet::State> SubscriptionSet::get_state_change_notificat
     // If there have been writes to the database since this SubscriptionSet was created, we need to fetch
     // the updated version from the DB to know the true current state and maybe return a ready future.
     if (m_cur_version < mgr->m_db->get_version_of_latest_snapshot()) {
-        auto refreshed_self = mgr->get_by_version(version());
+        auto refreshed_self = mgr->get_refreshed(m_obj_key, version());
         cur_state = refreshed_self.state();
         err_str = refreshed_self.error_str();
     }
@@ -500,9 +499,6 @@ util::Future<SubscriptionSet::State> SubscriptionSet::get_state_change_notificat
     else if (state_to_order(cur_state) >= state_to_order(notify_when)) {
         return util::Future<State>::make_ready(cur_state);
     }
-
-    // Otherwise put in a new request to be filled in by process_notifications().
-    lk.lock();
 
     // Otherwise, make a promise/future pair and add it to the list of pending notifications.
     auto [promise, future] = util::make_promise_future<State>();
@@ -527,36 +523,26 @@ void MutableSubscriptionSet::process_notifications()
 {
     auto mgr = get_flx_subscription_store(); // Throws
     auto new_state = state();
-    auto my_version = version();
 
     std::list<SubscriptionStore::NotificationRequest> to_finish;
-    std::unique_lock<std::mutex> lk(mgr->m_pending_notifications_mutex);
-    mgr->m_pending_notifications_cv.wait(lk, [&] {
-        return mgr->m_outstanding_requests == 0;
-    });
+    {
+        util::CheckedLockGuard lk(mgr->m_pending_notifications_mutex);
+        splice_if(mgr->m_pending_notifications, to_finish, [&](auto& req) {
+            return (req.version == m_version &&
+                    (new_state == State::Error || state_to_order(new_state) >= state_to_order(req.notify_when))) ||
+                   (new_state == State::Complete && req.version < m_version);
+        });
 
-    for (auto it = mgr->m_pending_notifications.begin(); it != mgr->m_pending_notifications.end();) {
-        if ((it->version == my_version &&
-             (new_state == State::Error || state_to_order(new_state) >= state_to_order(it->notify_when))) ||
-            (new_state == State::Complete && it->version < my_version)) {
-            to_finish.splice(to_finish.end(), mgr->m_pending_notifications, it++);
-        }
-        else {
-            ++it;
+        if (new_state == State::Complete) {
+            mgr->m_min_outstanding_version = m_version;
         }
     }
-
-    if (new_state == State::Complete) {
-        mgr->m_min_outstanding_version = my_version;
-    }
-
-    lk.unlock();
 
     for (auto& req : to_finish) {
-        if (new_state == State::Error && req.version == my_version) {
+        if (new_state == State::Error && req.version == m_version) {
             req.promise.set_error({ErrorCodes::SubscriptionFailed, std::string_view(error_str())});
         }
-        else if (req.version < my_version) {
+        else if (req.version < m_version) {
             req.promise.emplace_value(State::Superseded);
         }
         else {
@@ -603,7 +589,7 @@ SubscriptionSet MutableSubscriptionSet::commit()
 
     process_notifications();
 
-    return mgr->get_by_version_impl(flx_version, m_tr->get_version_of_current_transaction());
+    return mgr->get_refreshed(m_obj.get_key(), flx_version, m_tr->get_version_of_current_transaction());
 }
 
 std::string SubscriptionSet::to_ext_json() const
@@ -734,7 +720,7 @@ SubscriptionSet SubscriptionStore::get_latest() const
 {
     auto tr = m_db->start_frozen();
     auto sub_sets = tr->get_table(m_sub_set_table);
-    // There should always be at least one SubscriptionSet - the zero'th subscription set for schema instructions.
+    // There should always be at least one SubscriptionSet - the zeroth subscription set for schema instructions.
     REALM_ASSERT(!sub_sets->is_empty());
 
     auto latest_id = sub_sets->max(sub_sets->get_primary_key_column())->get_int();
@@ -746,8 +732,13 @@ SubscriptionSet SubscriptionStore::get_latest() const
 SubscriptionSet SubscriptionStore::get_active() const
 {
     auto tr = m_db->start_frozen();
-    auto sub_sets = tr->get_table(m_sub_set_table);
-    // There should always be at least one SubscriptionSet - the zero'th subscription set for schema instructions.
+    return SubscriptionSet(weak_from_this(), *tr, get_active(*tr));
+}
+
+Obj SubscriptionStore::get_active(const Transaction& tr) const
+{
+    auto sub_sets = tr.get_table(m_sub_set_table);
+    // There should always be at least one SubscriptionSet - the zeroth subscription set for schema instructions.
     REALM_ASSERT(!sub_sets->is_empty());
 
     DescriptorOrdering descriptor_ordering;
@@ -759,18 +750,18 @@ SubscriptionSet SubscriptionStore::get_active() const
                    .equal(m_sub_set_state, state_to_storage(SubscriptionSet::State::AwaitingMark))
                    .find_all(descriptor_ordering);
 
-    // If there is no active subscription yet, return the zero'th subscription.
+    // If there is no active subscription yet, return the zeroth subscription.
     if (res.is_empty()) {
-        return SubscriptionSet(weak_from_this(), *tr, sub_sets->get_object_with_primary_key(int64_t(0)));
+        return sub_sets->get_object_with_primary_key(0);
     }
-    return SubscriptionSet(weak_from_this(), *tr, res.get_object(0));
+    return res.get_object(0);
 }
 
 SubscriptionStore::VersionInfo SubscriptionStore::get_version_info() const
 {
     auto tr = m_db->start_read();
     auto sub_sets = tr->get_table(m_sub_set_table);
-    // There should always be at least one SubscriptionSet - the zero'th subscription set for schema instructions.
+    // There should always be at least one SubscriptionSet - the zeroth subscription set for schema instructions.
     REALM_ASSERT(!sub_sets->is_empty());
 
     VersionInfo ret;
@@ -795,11 +786,11 @@ SubscriptionStore::VersionInfo SubscriptionStore::get_version_info() const
 }
 
 util::Optional<SubscriptionStore::PendingSubscription>
-SubscriptionStore::get_next_pending_version(int64_t last_query_version, DB::version_type after_client_version) const
+SubscriptionStore::get_next_pending_version(int64_t last_query_version) const
 {
     auto tr = m_db->start_read();
     auto sub_sets = tr->get_table(m_sub_set_table);
-    // There should always be at least one SubscriptionSet - the zero'th subscription set for schema instructions.
+    // There should always be at least one SubscriptionSet - the zeroth subscription set for schema instructions.
     REALM_ASSERT(!sub_sets->is_empty());
 
     DescriptorOrdering descriptor_ordering;
@@ -811,7 +802,6 @@ SubscriptionStore::get_next_pending_version(int64_t last_query_version, DB::vers
                    .Or()
                    .equal(m_sub_set_state, state_to_storage(SubscriptionSet::State::Bootstrapping))
                    .end_group()
-                   .greater_equal(m_sub_set_snapshot_version, static_cast<int64_t>(after_client_version))
                    .find_all(descriptor_ordering);
 
     if (res.is_empty()) {
@@ -829,15 +819,9 @@ std::vector<SubscriptionSet> SubscriptionStore::get_pending_subscriptions() cons
     std::vector<SubscriptionSet> subscriptions_to_recover;
     auto active_sub = get_active();
     auto cur_query_version = active_sub.version();
-    DB::version_type db_version = 0;
-    if (active_sub.state() == SubscriptionSet::State::Complete) {
-        db_version = active_sub.snapshot_version();
-    }
-    REALM_ASSERT_EX(db_version != DB::version_type(-1), active_sub.state());
     // get a copy of the pending subscription sets since the active version
-    while (auto next_pending = get_next_pending_version(cur_query_version, db_version)) {
+    while (auto next_pending = get_next_pending_version(cur_query_version)) {
         cur_query_version = next_pending->query_version;
-        db_version = next_pending->snapshot_version;
         subscriptions_to_recover.push_back(get_by_version(cur_query_version));
     }
     return subscriptions_to_recover;
@@ -845,11 +829,7 @@ std::vector<SubscriptionSet> SubscriptionStore::get_pending_subscriptions() cons
 
 void SubscriptionStore::notify_all_state_change_notifications(Status status)
 {
-    std::unique_lock<std::mutex> lk(m_pending_notifications_mutex);
-    m_pending_notifications_cv.wait(lk, [&] {
-        return m_outstanding_requests == 0;
-    });
-
+    util::CheckedUniqueLock lk(m_pending_notifications_mutex);
     auto to_finish = std::move(m_pending_notifications);
     lk.unlock();
 
@@ -865,13 +845,9 @@ void SubscriptionStore::terminate()
     // Clear out and initialize the subscription store
     initialize_subscriptions_table(m_db->start_read(), true);
 
-    std::unique_lock<std::mutex> lk(m_pending_notifications_mutex);
-    m_pending_notifications_cv.wait(lk, [&] {
-        return m_outstanding_requests == 0;
-    });
+    util::CheckedUniqueLock lk(m_pending_notifications_mutex);
     auto to_finish = std::move(m_pending_notifications);
     m_min_outstanding_version = 0;
-
     lk.unlock();
 
     for (auto& req : to_finish) {
@@ -892,31 +868,34 @@ MutableSubscriptionSet SubscriptionStore::get_mutable_by_version(int64_t version
 
 SubscriptionSet SubscriptionStore::get_by_version(int64_t version_id) const
 {
-    return get_by_version_impl(version_id, util::none);
+    auto tr = m_db->start_frozen();
+    auto sub_sets = tr->get_table(m_sub_set_table);
+    if (auto obj = sub_sets->get_object_with_primary_key(version_id)) {
+        return SubscriptionSet(weak_from_this(), *tr, obj);
+    }
+
+    util::CheckedLockGuard lk(m_pending_notifications_mutex);
+    if (version_id < m_min_outstanding_version) {
+        return SubscriptionSet(weak_from_this(), version_id, SubscriptionSet::SupersededTag{});
+    }
+    throw KeyNotFound(util::format("Subscription set with version %1 not found", version_id));
 }
 
-SubscriptionSet SubscriptionStore::get_by_version_impl(int64_t version_id,
-                                                       util::Optional<DB::VersionID> db_version) const
+SubscriptionSet SubscriptionStore::get_refreshed(ObjKey key, int64_t version,
+                                                 std::optional<DB::VersionID> db_version) const
 {
     auto tr = m_db->start_frozen(db_version.value_or(VersionID{}));
     auto sub_sets = tr->get_table(m_sub_set_table);
-    auto obj = sub_sets->get_object_with_primary_key(Mixed{version_id});
-    if (obj) {
+    if (auto obj = sub_sets->try_get_object(key)) {
         return SubscriptionSet(weak_from_this(), *tr, obj);
     }
-    else {
-        std::lock_guard<std::mutex> lk(m_pending_notifications_mutex);
-        if (version_id < m_min_outstanding_version) {
-            return SubscriptionSet(weak_from_this(), version_id, SubscriptionSet::SupersededTag{});
-        }
-        throw KeyNotFound(util::format("Subscription set with version %1 not found", version_id));
-    }
+    return SubscriptionSet(weak_from_this(), version, SubscriptionSet::SupersededTag{});
 }
 
 SubscriptionStore::TableSet SubscriptionStore::get_tables_for_latest(const Transaction& tr) const
 {
     auto sub_sets = tr.get_table(m_sub_set_table);
-    // There should always be at least one SubscriptionSet - the zero'th subscription set for schema instructions.
+    // There should always be at least one SubscriptionSet - the zeroth subscription set for schema instructions.
     REALM_ASSERT(!sub_sets->is_empty());
 
     auto latest_id = sub_sets->max(sub_sets->get_primary_key_column())->get_int();
@@ -960,6 +939,34 @@ MutableSubscriptionSet SubscriptionStore::make_mutable_copy(const SubscriptionSe
 bool SubscriptionStore::would_refresh(DB::version_type version) const noexcept
 {
     return version < m_db->get_version_of_latest_snapshot();
+}
+
+int64_t SubscriptionStore::set_active_as_latest(Transaction& wt)
+{
+    auto sub_sets = wt.get_table(m_sub_set_table);
+    auto active = get_active(wt);
+    // Delete all newer subscription sets, if any
+    sub_sets->where().greater(sub_sets->get_primary_key_column(), active.get_primary_key().get_int()).remove();
+    // Mark the active set as complete even if it was previously WaitingForMark
+    // as we've completed rebootstrapping before calling this.
+    active.set(m_sub_set_state, state_to_storage(State::Complete));
+    auto version = active.get_primary_key().get_int();
+
+    std::list<NotificationRequest> to_finish;
+    {
+        util::CheckedLockGuard lock(m_pending_notifications_mutex);
+        splice_if(m_pending_notifications, to_finish, [&](auto& req) {
+            if (req.version == version && state_to_order(req.notify_when) <= state_to_order(State::Complete))
+                return true;
+            return req.version != version;
+        });
+    }
+
+    for (auto& req : to_finish) {
+        req.promise.emplace_value(req.version == version ? State::Complete : State::Superseded);
+    }
+
+    return version;
 }
 
 } // namespace realm::sync
