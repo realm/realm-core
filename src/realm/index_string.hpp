@@ -224,7 +224,7 @@ public:
     void set(ObjKey key, util::Optional<T> new_value);
 
     void erase(ObjKey key);
-    void erase_list(ObjKey key);
+    void erase_list(ObjKey key, const Lst<String>&);
     // Erase without getting value from parent column (useful when string stored
     // does not directly match string in parent, like with full-text indexing)
     void erase_string(ObjKey key, StringData value);

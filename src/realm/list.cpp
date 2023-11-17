@@ -199,10 +199,8 @@ template <>
 void Lst<StringData>::do_insert(size_t ndx, StringData value)
 {
     if (auto index = m_obj.get_table()->get_search_index(m_col_key)) {
-        if (m_tree->find_first(value) == realm::not_found) {
-            // Value not present - insert
-            index->insert(m_obj.get_key(), value);
-        }
+        // Inserting a value already present is idempotent
+        index->insert(m_obj.get_key(), value);
     }
     m_tree->insert(ndx, value);
 }
@@ -213,24 +211,19 @@ void Lst<StringData>::do_set(size_t ndx, StringData value)
     if (auto index = m_obj.get_table()->get_search_index(m_col_key)) {
         auto old_value = m_tree->get(ndx);
         size_t nb_old = 0;
-        size_t nb_new = 0;
         m_tree->for_all([&](StringData val) {
             if (val == old_value) {
                 nb_old++;
             }
-            if (val == value) {
-                nb_new++;
-            }
-            return !(nb_new && nb_old > 1);
+            return !(nb_old > 1);
         });
 
         if (nb_old == 1) {
+            // Remove last one
             index->erase_string(m_obj.get_key(), old_value);
         }
-        if (!nb_new) {
-            // Value not present - insert
-            index->insert(m_obj.get_key(), value);
-        }
+        // Inserting a value already present is idempotent
+        index->insert(m_obj.get_key(), value);
     }
     m_tree->set(ndx, value);
 }
@@ -259,7 +252,7 @@ template <>
 inline void Lst<StringData>::do_clear()
 {
     if (auto index = m_obj.get_table()->get_search_index(m_col_key)) {
-        index->erase_list(m_obj.get_key());
+        index->erase_list(m_obj.get_key(), *this);
     }
     m_tree->clear();
 }

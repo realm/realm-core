@@ -1963,10 +1963,9 @@ TEST(StringIndex_ListOfRandomStrings)
     // std::cout << tv.get_object(0).get<Int>("_id") << std::endl;
 }
 
-// TEST_TYPES(StringIndex_ListOfStrings, std::true_type, std::false_type)
-TEST(StringIndex_ListOfStrings)
+TEST_TYPES(StringIndex_ListOfStrings, std::true_type, std::false_type)
 {
-    constexpr bool add_index = true;
+    constexpr bool add_index = TEST_TYPE::value;
     Group g;
 
     auto t = g.add_table("foo");
@@ -1979,7 +1978,7 @@ TEST(StringIndex_ListOfStrings)
     auto obj2 = t->create_object();
     auto obj3 = t->create_object();
 
-    for (auto obj : {&obj2, &obj3}) {
+    for (Obj* obj : {&obj2, &obj3}) {
         auto list = obj->get_list<String>(col);
         list.add("Johnny");
         list.add("John");

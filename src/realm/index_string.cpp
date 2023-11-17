@@ -837,7 +837,9 @@ void StringIndex::insert_to_existing_list_at_lower(ObjKey key, Mixed value, Inte
     }
     else {
         IntegerColumn::const_iterator inner_lower = std::lower_bound(lower, upper, key.value);
-        list.insert(inner_lower.get_position(), key.value);
+        if (*inner_lower != key.value) {
+            list.insert(inner_lower.get_position(), key.value);
+        }
     }
 }
 
@@ -1184,15 +1186,17 @@ bool StringIndex::leaf_insert(ObjKey obj_key, key_type key, size_t offset, Strin
         ObjKey obj_key2 = ObjKey(int64_t(slot_value >> 1));
         Mixed v2 = m_target_column.full_word() ? reconstruct_string(offset, key, index_data) : get(obj_key2);
         if (v2 == value) {
-            // Strings are equal but this is not a list.
-            // Create a list and add both rows.
+            if (obj_key.value != obj_key2.value) {
+                // Strings are equal but this is not a list.
+                // Create a list and add both rows.
 
-            // convert to list (in sorted order)
-            Array row_list(alloc);
-            row_list.create(Array::type_Normal); // Throws
-            row_list.add(obj_key < obj_key2 ? obj_key.value : obj_key2.value);
-            row_list.add(obj_key < obj_key2 ? obj_key2.value : obj_key.value);
-            m_array->set(ins_pos_refs, row_list.get_ref());
+                // convert to list (in sorted order)
+                Array row_list(alloc);
+                row_list.create(Array::type_Normal); // Throws
+                row_list.add(obj_key < obj_key2 ? obj_key.value : obj_key2.value);
+                row_list.add(obj_key < obj_key2 ? obj_key2.value : obj_key.value);
+                m_array->set(ins_pos_refs, row_list.get_ref());
+            }
         }
         else {
             StringConversionBuffer buffer;
@@ -1319,7 +1323,7 @@ void StringIndex::erase(ObjKey key)
         }
         else {
             // This is a list (of strings)
-            erase_list(key);
+            erase_list(key, m_target_column.get_list(key));
         }
     }
     else {
@@ -1327,15 +1331,15 @@ void StringIndex::erase(ObjKey key)
     }
 }
 
-void StringIndex::erase_list(ObjKey key)
+void StringIndex::erase_list(ObjKey key, const Lst<String>& list)
 {
-    auto list = m_target_column.get_list(key);
     std::vector<StringData> strings;
     strings.reserve(list.size());
     for (auto& val : list) {
         strings.push_back(val);
     }
 
+    std::sort(strings.begin(), strings.end());
     auto last = std::unique(strings.begin(), strings.end());
     for (auto it = strings.begin(); it != last; ++it) {
         erase_string(key, *it);
