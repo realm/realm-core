@@ -5449,6 +5449,102 @@ TEST_CASE("C API - client reset", "[sync][pbs][c_api][client reset][baas]") {
             REQUIRE(before_client_reset_counter.load() == 1);
             REQUIRE(after_client_reset_counter.load() == 0);
         }
+
+        SECTION("Simulate failure client reset") {
+            baas_client_stop.store(false);
+
+            struct MyExceptionWrapper {
+                std::exception_ptr m_ptr{nullptr};
+            };
+
+            realm_sync_config_set_error_handler(
+                local_sync_config,
+                [](realm_userdata_t, realm_sync_session_t*, const realm_sync_error_t sync_error) {
+                    REQUIRE(sync_error.c_original_file_path_key);
+                    REQUIRE(sync_error.c_recovery_file_path_key);
+                    REQUIRE(sync_error.is_client_reset_requested);
+                    // Callback in `realm_sync_config_set_before_client_reset_handler` fails, so
+                    // a synthetic error is created with no action.
+                    REQUIRE(sync_error.server_requests_action == RLM_SYNC_ERROR_ACTION_NO_ACTION);
+                    ResetRealmFiles::instance().reset_realm(sync_error.c_original_file_path_key);
+                    error_handler_counter.fetch_add(1);
+                    baas_client_stop.store(true);
+                },
+                nullptr, nullptr);
+
+            realm_sync_config_set_before_client_reset_handler(
+                local_sync_config,
+                [](realm_userdata_t, realm_t*) -> bool {
+                    try {
+                        throw std::runtime_error("Test error in callback before client reset");
+                    }
+                    catch (...) {
+                        auto wrapper = new MyExceptionWrapper();
+                        wrapper->m_ptr = std::current_exception();
+                        realm_register_user_code_callback_error((void*)(wrapper));
+                    }
+                    return false;
+                },
+                nullptr, nullptr);
+
+            realm_sync_config_set_after_client_reset_handler(
+                local_sync_config,
+                [](realm_userdata_t, realm_t*, realm_thread_safe_reference_t*, bool) -> bool {
+                    try {
+                        throw std::runtime_error("Test error in callback after client reset");
+                    }
+                    catch (...) {
+                        auto wrapper = new MyExceptionWrapper();
+                        wrapper->m_ptr = std::current_exception();
+                        realm_register_user_code_callback_error((void*)(wrapper));
+                    }
+                    return false;
+                },
+                nullptr, nullptr);
+
+            make_reset(local_config, remote_config)
+                ->on_post_reset([&](SharedRealm) {
+                    util::EventLoop::main().run_until([&] {
+                        return baas_client_stop.load();
+                    });
+                })
+                ->run();
+
+            REQUIRE(error_handler_counter.load() == 1);
+
+            realm_error_t _err;
+            _err.message = "";
+            _err.error = RLM_ERR_NONE;
+            CHECK(realm_get_last_error(&_err));
+            CHECK(_err.error == RLM_ERR_CALLBACK);
+            CHECK(std::string{_err.message} == "User-provided callback failed");
+            REQUIRE(_err.usercode_error); // this is the error registered inside the callback
+            auto ex = (MyExceptionWrapper*)_err.usercode_error;
+            try {
+                std::rethrow_exception(ex->m_ptr);
+            }
+            catch (const std::exception& ex) {
+                CHECK(std::string{ex.what()} == std::string{"Test error in callback after client reset"});
+            }
+            CHECK(realm_clear_last_error());
+            delete ex;
+
+            _err.message = "";
+            _err.error = RLM_ERR_NONE;
+            CHECK(realm_get_last_error(&_err));
+            CHECK(_err.error == RLM_ERR_CALLBACK);
+            CHECK(std::string{_err.message} == "User-provided callback failed");
+            REQUIRE(_err.usercode_error); // this is the error registered inside the callback
+            ex = (MyExceptionWrapper*)_err.usercode_error;
+            try {
+                std::rethrow_exception(ex->m_ptr);
+            }
+            catch (const std::exception& ex) {
+                CHECK(std::string{ex.what()} == std::string{"Test error in callback before client reset"});
+            }
+            CHECK(realm_clear_last_error());
+            delete ex;
+        }
     }
 }
 
