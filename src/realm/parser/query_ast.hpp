@@ -53,6 +53,10 @@ public:
         children.emplace_back(left);
         children.emplace_back(right);
     }
+    LogicalNode(std::vector<QueryNode*>&& vec)
+        : children(std::move(vec))
+    {
+    }
     void canonicalize() override
     {
         std::vector<LogicalNode*> todo;

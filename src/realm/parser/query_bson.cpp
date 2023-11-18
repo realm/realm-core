@@ -85,7 +85,7 @@ public:
             case bson::Bson::Type::Null:
                 return std::make_unique<Value<null>>(realm::null());
             default:
-                throw Exception(ErrorCodes::Error::MalformedJson, "Unsupported Bson Type");
+                throw query_parser::InvalidQueryError("Unsupported Bson Type");
         }
         return {};
     }
@@ -139,22 +139,23 @@ QueryNode* ParserDriver::get_query_node(const bson::BsonDocument& document)
         if (logical_operators.count(key)) {
             switch (logical_operators[key]) {
                 case QueryLogicalOperators::$and: {
-                    REALM_ASSERT(value.type() == bson::Bson::Type::Array);
-                    std::vector<QueryNode*> nodes = get_query_nodes(static_cast<bson::BsonArray>(value));
-                    REALM_ASSERT(nodes.size() >= 2);
-                    node = m_parse_nodes.create<AndNode>(nodes[0], nodes[1]);
+                    if (value.type() != bson::Bson::Type::Array)
+                        throw InvalidQueryError("Array expected");
+                    node = m_parse_nodes.create<AndNode>(get_query_nodes(static_cast<bson::BsonArray>(value)));
                     break;
                 }
                 case QueryLogicalOperators::$not:
+                    if (value.type() != bson::Bson::Type::Document)
+                        throw InvalidQueryError("Array expected");
                     node = m_parse_nodes.create<NotNode>(get_query_node(static_cast<bson::BsonDocument>(value)));
                     break;
                 case QueryLogicalOperators::$nor:
+                    throw InvalidQueryError("$nor not supported");
                     break;
                 case QueryLogicalOperators::$or: {
-                    REALM_ASSERT(value.type() == bson::Bson::Type::Array);
-                    std::vector<QueryNode*> nodes = get_query_nodes(static_cast<bson::BsonArray>(value));
-                    REALM_ASSERT(nodes.size() >= 2);
-                    node = m_parse_nodes.create<OrNode>(nodes[0], nodes[1]);
+                    if (value.type() != bson::Bson::Type::Array)
+                        throw InvalidQueryError("Array expected");
+                    node = m_parse_nodes.create<OrNode>(get_query_nodes(static_cast<bson::BsonArray>(value)));
                     break;
                 }
             }

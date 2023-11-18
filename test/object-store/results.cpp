@@ -5143,6 +5143,16 @@ TEST_CASE("results: bson constructor", "[results]") {
         )"""");
         CHECK(object_results.size() == 0);
     }
+    SECTION("Rainy day") {
+        CHECK_THROWS_AS(r.find(R"({"non-existing-property": "something"})"), query_parser::InvalidQueryError);
+        CHECK_THROWS_AS(r.find(R"({"$and": { "int_col": { "$gt": 2 } }})"), query_parser::InvalidQueryError);
+        CHECK_THROWS_AS(r.find(R"({"$annd": [
+            { "int_col": { "$gt": 2 } }, 
+            { "str_col": { "$eq": "hello" } }
+        ]})"),
+                        query_parser::InvalidQueryError);
+        CHECK_THROWS_AS(r.find(R"({"int_col": })"), query_parser::SyntaxError);
+    }
 }
 
 TEST_CASE("notifications: objects with PK recreated", "[results]") {

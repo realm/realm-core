@@ -18,6 +18,7 @@
 
 #include <realm/util/bson/bson.hpp>
 #include <realm/util/base64.hpp>
+#include <realm/exceptions.hpp>
 #include <external/json/json.hpp>
 #include <sstream>
 #include <algorithm>
@@ -797,7 +798,13 @@ Bson dom_obj_to_bson(const Json& json)
 
 Bson parse(const std::string_view& json)
 {
-    return dom_elem_to_bson(Json::parse(json));
+    try {
+        return dom_elem_to_bson(Json::parse(json));
+    }
+    catch (const std::exception& e) {
+        throw query_parser::SyntaxError(e.what());
+    }
+    return {};
 }
 
 } // namespace bson
