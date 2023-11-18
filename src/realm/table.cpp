@@ -686,6 +686,20 @@ void do_bulk_insert_index(Table* table, SearchIndex* index, ColKey col_key, Allo
     table->traverse_clusters(f);
 }
 
+
+void do_bulk_insert_index_list(Table* table, SearchIndex* index, ColKey col_key, Allocator& alloc)
+{
+    ArrayInteger leaf(alloc);
+
+    auto f = [&col_key, &index, &leaf](const Cluster* cluster) {
+        cluster->init_leaf(col_key, &leaf);
+        index->insert_bulk_list(cluster->get_key_array(), cluster->get_offset(), cluster->node_size(), leaf);
+        return IteratorControl::AdvanceToNext;
+    };
+
+    table->traverse_clusters(f);
+}
+
 void Table::populate_search_index(ColKey col_key)
 {
     auto col_ndx = col_key.get_index().val;
@@ -709,7 +723,12 @@ void Table::populate_search_index(ColKey col_key)
         }
     }
     else if (type == type_String) {
-        do_bulk_insert_index<StringData>(this, index, col_key, get_alloc());
+        if (col_key.is_list()) {
+            do_bulk_insert_index_list(this, index, col_key, get_alloc());
+        }
+        else {
+            do_bulk_insert_index<StringData>(this, index, col_key, get_alloc());
+        }
     }
     else if (type == type_Timestamp) {
         do_bulk_insert_index<Timestamp>(this, index, col_key, get_alloc());
@@ -772,6 +791,8 @@ void Table::update_indexes(ObjKey key, const FieldValues& values)
         if (auto&& index = m_index_accessors[column_ndx]) {
             // There is an index for this column
             auto col_key = m_leaf_ndx2colkey[column_ndx];
+            if (col_key.is_collection())
+                continue;
             auto type = col_key.get_type();
             auto attr = col_key.get_attrs();
             bool nullable = attr.test(col_attr_Nullable);
@@ -851,7 +872,8 @@ void Table::do_add_search_index(ColKey col_key, IndexType type)
     if (m_index_accessors[column_ndx] != nullptr)
         return;
 
-    if (!StringIndex::type_supported(DataType(col_key.get_type())) || col_key.is_collection() ||
+    if (!StringIndex::type_supported(DataType(col_key.get_type())) ||
+        (col_key.is_collection() && !(col_key.is_list() && col_key.get_type() == col_type_String)) ||
         (type == IndexType::Fulltext && col_key.get_type() != col_type_String)) {
         // Not ideal, but this is what we used to throw, so keep throwing that for compatibility reasons, even though
         // it should probably be a type mismatch exception instead.

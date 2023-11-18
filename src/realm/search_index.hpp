@@ -31,7 +31,8 @@ public:
     ClusterColumn(const ClusterTree* cluster_tree, ColKey column_key, IndexType type)
         : m_cluster_tree(cluster_tree)
         , m_column_key(column_key)
-        , m_type(type)
+        , m_tokenize(type == IndexType::Fulltext)
+        , m_full_word(m_tokenize | column_key.is_collection())
     {
     }
     size_t size() const
@@ -58,17 +59,23 @@ public:
     {
         return m_column_key.is_nullable();
     }
-    bool is_fulltext() const
+    bool tokenize() const
     {
-        return m_type == IndexType::Fulltext;
+        return m_tokenize;
+    }
+    bool full_word() const
+    {
+        return m_full_word;
     }
     Mixed get_value(ObjKey key) const;
+    Lst<String> get_list(ObjKey key) const;
     std::vector<ObjKey> get_all_keys() const;
 
 private:
     const ClusterTree* m_cluster_tree;
     ColKey m_column_key;
-    IndexType m_type;
+    bool m_tokenize;
+    bool m_full_word;
 };
 
 
@@ -94,6 +101,8 @@ public:
     virtual bool is_empty() const = 0;
     virtual void insert_bulk(const ArrayUnsigned* keys, uint64_t key_offset, size_t num_values,
                              ArrayPayload& values) = 0;
+    virtual void insert_bulk_list(const ArrayUnsigned* keys, uint64_t key_offset, size_t num_values,
+                                  ArrayInteger& ref_array) = 0;
     virtual void verify() const = 0;
 
 #ifdef REALM_DEBUG

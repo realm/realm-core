@@ -138,17 +138,24 @@ public:
     bool is_empty() const override;
     bool is_fulltext_index() const
     {
-        return this->m_target_column.is_fulltext();
+        return this->m_target_column.tokenize();
     }
 
     void insert(ObjKey key, const Mixed& value) final;
     void set(ObjKey key, const Mixed& new_value) final;
     void erase(ObjKey key) final;
+    void erase_list(ObjKey key, const Lst<String>&);
+    // Erase without getting value from parent column (useful when string stored
+    // does not directly match string in parent, like with full-text indexing)
+    void erase_string(ObjKey key, StringData value);
+
     ObjKey find_first(const Mixed& value) const final;
     void find_all(std::vector<ObjKey>& result, Mixed value, bool case_insensitive = false) const final;
     FindRes find_all_no_copy(Mixed value, InternalFindResult& result) const final;
     size_t count(const Mixed& value) const final;
     void insert_bulk(const ArrayUnsigned* keys, uint64_t key_offset, size_t num_values, ArrayPayload& values) final;
+    void insert_bulk_list(const ArrayUnsigned* keys, uint64_t key_offset, size_t num_values,
+                          ArrayInteger& ref_array) final;
 
     void find_all_fulltext(std::vector<ObjKey>& result, StringData value) const;
 
@@ -159,6 +166,7 @@ public:
 #ifdef REALM_DEBUG
     template <class T>
     void verify_entries(const ClusterColumn& column) const;
+    void dump_node_structure() const;
     void do_dump_node_structure(std::ostream&, int) const;
     void print() const final;
 #endif
@@ -243,9 +251,6 @@ private:
                      bool noextend = false);
     void node_insert_split(size_t ndx, size_t new_ref);
     void node_insert(size_t ndx, size_t ref);
-    // Erase without getting value from parent column (useful when string stored
-    // does not directly match string in parent, like with full-text indexing)
-    void erase_string(ObjKey key, StringData value);
     void do_delete(ObjKey key, StringData, size_t offset);
 
     Mixed get(ObjKey key) const;
@@ -355,23 +360,6 @@ inline StringIndex::key_type StringIndex::create_key(StringData str, size_t offs
     }
     // else fallback
     return create_key(str.substr(offset));
-}
-
-inline void StringIndex::insert_bulk(const ArrayUnsigned* keys, uint64_t key_offset, size_t num_values,
-                                     ArrayPayload& values)
-{
-    if (keys) {
-        for (size_t i = 0; i < num_values; ++i) {
-            ObjKey key(keys->get(i) + key_offset);
-            insert(key, values.get_any(i));
-        }
-    }
-    else {
-        for (size_t i = 0; i < num_values; ++i) {
-            ObjKey key(i + key_offset);
-            insert(key, values.get_any(i));
-        }
-    }
 }
 
 inline ObjKey StringIndex::find_first(const Mixed& value) const
