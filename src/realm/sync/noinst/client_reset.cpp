@@ -496,6 +496,8 @@ void track_reset(Transaction& wt, ClientResyncMode mode)
                                           {{version_col, metadata_version},
                                            {timestamp_col, Timestamp(std::chrono::system_clock::now())},
                                            {type_col, mode_val}});
+
+    wt.commit_and_continue_writing();
 }
 
 static ClientResyncMode reset_precheck_guard(Transaction& wt, ClientResyncMode mode, bool recovery_is_allowed,
