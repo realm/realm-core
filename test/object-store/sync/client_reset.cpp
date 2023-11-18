@@ -2547,6 +2547,14 @@ struct CollectionOperation {
     }
     void apply(collection_fixtures::LinkedCollectionBase* collection, Obj src_obj, TableRef dst_table)
     {
+        auto get_table = [&](std::string_view name) -> TableRef {
+            Group* group = dst_table->get_parent_group();
+            Group::TableNameBuffer buffer;
+            TableRef table =
+                group->get_table(Group::class_name_to_table_name(name, buffer));
+            REALM_ASSERT(table);
+            return table;
+        };
         mpark::visit(
             util::overload{
                 [&](Add add_link) {
@@ -2563,21 +2571,13 @@ struct CollectionOperation {
                     REALM_ASSERT(did_remove);
                 },
                 [&](RemoveObject remove_object) {
-                    Group* group = dst_table->get_parent_group();
-                    Group::TableNameBuffer buffer;
-                    TableRef table =
-                        group->get_table(Group::class_name_to_table_name(remove_object.class_name, buffer));
-                    REALM_ASSERT(table);
+                    TableRef table = get_table(remove_object.class_name);
                     ObjKey dst_key = table->find_primary_key(Mixed{remove_object.pk});
                     REALM_ASSERT(dst_key);
                     table->remove_object(dst_key);
                 },
                 [&](CreateObject create_object) {
-                    Group* group = dst_table->get_parent_group();
-                    Group::TableNameBuffer buffer;
-                    TableRef table =
-                        group->get_table(Group::class_name_to_table_name(create_object.class_name, buffer));
-                    REALM_ASSERT(table);
+                    TableRef table = get_table(create_object.class_name);
                     table->create_object_with_primary_key(Mixed{create_object.pk});
                 },
                 [&](Clear) {
@@ -2602,8 +2602,8 @@ private:
 } // namespace test_instructions
 
 TEMPLATE_TEST_CASE("client reset collections of links", "[sync][pbs][client reset][links][collections]",
-                   cf::ListOfObjects, cf::ListOfMixedLinks/*, cf::SetOfObjects, cf::SetOfMixedLinks,
-                   cf::DictionaryOfObjects, cf::DictionaryOfMixedLinks*/)
+                   cf::ListOfObjects, cf::ListOfMixedLinks, cf::SetOfObjects, cf::SetOfMixedLinks,
+                   cf::DictionaryOfObjects, cf::DictionaryOfMixedLinks)
 {
     if (!util::EventLoop::has_implementation())
         return;
@@ -2768,8 +2768,10 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[sync][pbs][client rese
                     REQUIRE_NOTHROW(advance_and_notify(*realm));
                     CHECK(results.size() == 1);
                     CHECK(object.is_valid());
-                    auto linked_objects = test_type.get_links(results.get(0));
+                    Obj origin = results.get(0);
+                    auto linked_objects = test_type.get_links(origin);
                     std::vector<util::Optional<int64_t>>& expected_links = remote_pks;
+                    const size_t actual_size = test_type.size_of_collection(origin);
                     if (test_mode == ClientResyncMode::Recover) {
                         expected_links = expected_recovered_state;
                         size_t expected_size = expected_links.size();
@@ -2777,7 +2779,15 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[sync][pbs][client rese
                             // dictionary size will remain the same because the key is preserved with a null value
                             expected_size += num_expected_nulls;
                         }
-                        CHECK(test_type.size_of_collection(results.get(0)) == expected_size);
+                        CHECK(actual_size == expected_size);
+                        if (actual_size != expected_size) {
+                            std::vector<Obj> links = test_type.get_links(origin);
+                            std::cout << "actual {";
+                            for (auto link : links) {
+                                std::cout << link.get_primary_key() << ", ";
+                            }
+                            std::cout << "}\n";
+                        }
                     }
                     if (!test_type_is_array) {
                         // order should not matter except for lists
@@ -2785,13 +2795,13 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[sync][pbs][client rese
                         std::sort(expected_links.begin(), expected_links.end());
                     }
                     require_links_to_match_ids(linked_objects, expected_links, !test_type_is_array);
-                    if (local_pks == expected_links) {
-                        REQUIRE_INDICES(results_changes.modifications);
-                        REQUIRE_INDICES(object_changes.modifications);
-                    }
-                    else {
+                    if (local_pks != expected_links) {
                         REQUIRE_INDICES(results_changes.modifications, 0);
                         REQUIRE_INDICES(object_changes.modifications, 0);
+                    }
+                    else {
+                        REQUIRE_INDICES(results_changes.modifications);
+                        REQUIRE_INDICES(object_changes.modifications);
                     }
                     REQUIRE_INDICES(results_changes.insertions);
                     REQUIRE_INDICES(results_changes.deletions);
@@ -2817,8 +2827,7 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[sync][pbs][client rese
             })
             ->run();
     };
-
-    test_reset->setup([&](SharedRealm realm) {
+    auto populate_initial_state = [&](SharedRealm realm) {
         test_type.reset_test_state();
         // add a container collection with three valid links
         ObjLink dest1 = create_one_dest_object(realm, dest_pk_1);
@@ -2827,6 +2836,10 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[sync][pbs][client rese
         create_one_dest_object(realm, dest_pk_4);
         create_one_dest_object(realm, dest_pk_5);
         create_one_source_object(realm, source_pk, {dest1, dest2, dest3});
+    };
+
+    test_reset->setup([&](SharedRealm realm) {
+        populate_initial_state(realm);
     });
 
     SECTION("no changes") {
@@ -2948,6 +2961,53 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[sync][pbs][client rese
         reset_collection({RemoveObject("dest", dest_pk_1), RemoveObject("dest", dest_pk_2), CreateObject("dest", 6), Add{6}}, {},
                             {dest_pk_3, 6}, 2);
     }
+    SECTION("local has unresolved links") {
+        test_reset->setup([&](SharedRealm realm) {
+            populate_initial_state(realm);
+
+            auto invalidate_object = [&](SharedRealm realm, std::string_view table_name, Mixed pk) {
+                TableRef table = get_table(*realm, table_name);
+                Obj obj = table->get_object_with_primary_key(pk);
+                REALM_ASSERT(obj.is_valid());
+                if (realm->config().path == config.path) {
+                    // the local realm does an invalidation
+                    table->invalidate_object(obj.get_key());
+                }
+                else {
+                    // the remote realm has deleted it
+                    table->remove_object(obj.get_key());
+                }
+            };
+
+            invalidate_object(realm, "dest", dest_pk_1);
+        });
+
+        SECTION("remote adds a link") {
+            reset_collection({}, {Add{dest_pk_4}},
+                                {dest_pk_2, dest_pk_3, dest_pk_4}, 1);
+        }
+        SECTION("remote removes a link") {
+            reset_collection({}, {Remove{dest_pk_2}},
+                                {dest_pk_3}, 1);
+        }
+        SECTION("remote deletes a dest object that local links to") {
+            reset_collection({Add{dest_pk_4}}, {RemoveObject{"dest", dest_pk_4}},
+                                {dest_pk_2, dest_pk_3}, 2);
+        }
+        SECTION("remote deletes a different dest object") {
+            reset_collection({Add{dest_pk_4}}, {RemoveObject{"dest", dest_pk_2}},
+                                {dest_pk_3, dest_pk_4}, 2);
+        }
+        SECTION("local adds two new links and remote deletes a different dest object") {
+            reset_collection({Add{dest_pk_4}, Add{dest_pk_5}}, {RemoveObject{"dest", dest_pk_2}},
+                                {dest_pk_3, dest_pk_4, dest_pk_5}, 2);
+        }
+        SECTION("remote deletes an object, then removes and adds to the list") {
+            reset_collection({}, {RemoveObject{"dest", dest_pk_2}, Remove{dest_pk_3}, Add{dest_pk_4}},
+                                {dest_pk_4}, 2);
+        }
+    }
+
     if (test_mode == ClientResyncMode::Recover) {
         SECTION("local adds a list item and removes source object, remote modifies list") {
             reset_collection_removing_source_object({Add{dest_pk_4}, RemoveObject{"source", source_pk}},
