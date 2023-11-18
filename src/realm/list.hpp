@@ -290,6 +290,15 @@ private:
     T do_get(size_t ndx, const char* msg) const;
 };
 
+// Specialization of Lst<StringData>:
+template <>
+void Lst<StringData>::do_insert(size_t, StringData);
+template <>
+void Lst<StringData>::do_set(size_t, StringData);
+template <>
+void Lst<StringData>::do_remove(size_t);
+template <>
+void Lst<StringData>::do_clear();
 // Specialization of Lst<ObjKey>:
 template <>
 void Lst<ObjKey>::do_set(size_t, ObjKey);

@@ -2222,14 +2222,16 @@ TEST(Parser_list_of_primitive_ints)
     CHECK_EQUAL(message, "Cannot convert 'string' to a number");
 }
 
-TEST(Parser_list_of_primitive_strings)
+TEST_TYPES(Parser_list_of_primitive_strings, std::true_type, std::false_type)
 {
     Group g;
     TableRef t = g.add_table("table");
 
     constexpr bool nullable = true;
     auto col_str_list = t->add_column_list(type_String, "strings", nullable);
-    CHECK_THROW_ANY(t->add_search_index(col_str_list));
+    if constexpr (TEST_TYPE::value) {
+        t->add_search_index(col_str_list);
+    }
 
     auto get_string = [](size_t i) -> std::string {
         return util::format("string_%1", i);
