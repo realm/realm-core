@@ -771,8 +771,9 @@ TEST(ClientReset_DoNotRecoverSchema)
         CHECK(!compare_groups(rt_1, rt_2));
 
         const Group& group = rt_1.get_group();
-        CHECK_EQUAL(group.size(), 1);
+        CHECK_EQUAL(group.size(), 2);
         CHECK(group.get_table("class_table1"));
+        CHECK(group.get_table("client_reset_metadata"));
         CHECK_NOT(group.get_table("class_table2"));
         const Group& group2 = rt_2.get_group();
         CHECK_EQUAL(group2.size(), 1);
@@ -867,8 +868,9 @@ void expect_reset(unit_test::TestContext& test_context, DB& target, DB& fresh, C
     CHECK_NOT(fresh.is_attached());
     CHECK_NOT(util::File::exists(fresh_path));
 
-    // Should have performed exactly one write on the target DB
-    CHECK_EQUAL(target.get_version_of_latest_snapshot(), db_version + 1);
+    // Should have performed exactly two writes on the target DB: one to track
+    // that we're attempting recovery, and one with the actual reset
+    CHECK_EQUAL(target.get_version_of_latest_snapshot(), db_version + 2);
 
     // Should have set the client file ident
     CHECK_EQUAL(target.start_read()->get_sync_file_id(), 100);
@@ -895,8 +897,9 @@ void expect_reset(unit_test::TestContext& test_context, DB& target, DB& fresh, C
     CHECK_NOT(fresh.is_attached());
     CHECK_NOT(util::File::exists(fresh_path));
 
-    // Should have performed exactly one write on the target DB
-    CHECK_EQUAL(target.get_version_of_latest_snapshot(), db_version + 1);
+    // Should have performed exactly two writes on the target DB: one to track
+    // that we're attempting recovery, and one with the actual reset
+    CHECK_EQUAL(target.get_version_of_latest_snapshot(), db_version + 2);
 
     // Should have set the client file ident
     CHECK_EQUAL(target.start_read()->get_sync_file_id(), 100);
