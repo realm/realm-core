@@ -35,7 +35,6 @@
 #include "realm/table_view.hpp"
 #include "realm/group.hpp"
 #include "realm/replication.hpp"
-#include "realm/index_string.hpp"
 
 namespace realm {
 
@@ -191,70 +190,6 @@ void Lst<T>::distinct(std::vector<size_t>& indices, util::Optional<bool> sort_or
         // Restore original order
         std::sort(indices.begin(), indices.end());
     }
-}
-
-/***************************** Lst<Stringdata> ******************************/
-
-template <>
-void Lst<StringData>::do_insert(size_t ndx, StringData value)
-{
-    if (auto index = m_obj.get_table()->get_search_index(m_col_key)) {
-        // Inserting a value already present is idempotent
-        index->insert(m_obj.get_key(), value);
-    }
-    m_tree->insert(ndx, value);
-}
-
-template <>
-void Lst<StringData>::do_set(size_t ndx, StringData value)
-{
-    if (auto index = m_obj.get_table()->get_search_index(m_col_key)) {
-        auto old_value = m_tree->get(ndx);
-        size_t nb_old = 0;
-        m_tree->for_all([&](StringData val) {
-            if (val == old_value) {
-                nb_old++;
-            }
-            return !(nb_old > 1);
-        });
-
-        if (nb_old == 1) {
-            // Remove last one
-            index->erase_string(m_obj.get_key(), old_value);
-        }
-        // Inserting a value already present is idempotent
-        index->insert(m_obj.get_key(), value);
-    }
-    m_tree->set(ndx, value);
-}
-
-template <>
-inline void Lst<StringData>::do_remove(size_t ndx)
-{
-    if (auto index = m_obj.get_table()->get_search_index(m_col_key)) {
-        auto old_value = m_tree->get(ndx);
-        size_t nb_old = 0;
-        m_tree->for_all([&](StringData val) {
-            if (val == old_value) {
-                nb_old++;
-            }
-            return !(nb_old > 1);
-        });
-
-        if (nb_old == 1) {
-            index->erase_string(m_obj.get_key(), old_value);
-        }
-    }
-    m_tree->erase(ndx);
-}
-
-template <>
-inline void Lst<StringData>::do_clear()
-{
-    if (auto index = m_obj.get_table()->get_search_index(m_col_key)) {
-        index->erase_list(m_obj.get_key(), *this);
-    }
-    m_tree->clear();
 }
 
 /********************************* Lst<Key> *********************************/
