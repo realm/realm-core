@@ -338,7 +338,7 @@ inline Property::Property(std::string name, PropertyType type, std::string objec
 
 inline bool Property::type_is_indexable() const noexcept
 {
-    return (!is_collection(type) || (is_array(type) && type == PropertyType::String)) &&
+    return !is_collection(type) &&
            (type == PropertyType::Int || type == PropertyType::Bool || type == PropertyType::Date ||
             type == PropertyType::String || type == PropertyType::ObjectId || type == PropertyType::UUID ||
             type == PropertyType::Mixed);

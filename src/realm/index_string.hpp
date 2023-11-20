@@ -125,8 +125,7 @@ public:
     ClusterColumn(const ClusterTree* cluster_tree, ColKey column_key, IndexType type)
         : m_cluster_tree(cluster_tree)
         , m_column_key(column_key)
-        , m_tokenize(type == IndexType::Fulltext)
-        , m_full_word(m_tokenize | column_key.is_collection())
+        , m_type(type)
     {
     }
     size_t size() const
@@ -153,23 +152,17 @@ public:
     {
         return m_column_key.is_nullable();
     }
-    bool tokenize() const
+    bool is_fulltext() const
     {
-        return m_tokenize;
-    }
-    bool full_word() const
-    {
-        return m_full_word;
+        return m_type == IndexType::Fulltext;
     }
     Mixed get_value(ObjKey key) const;
-    Lst<String> get_list(ObjKey key) const;
     std::vector<ObjKey> get_all_keys() const;
 
 private:
     const ClusterTree* m_cluster_tree;
     ColKey m_column_key;
-    bool m_tokenize;
-    bool m_full_word;
+    IndexType m_type;
 };
 
 class StringIndex {
@@ -210,7 +203,7 @@ public:
     bool is_empty() const;
     bool is_fulltext_index() const
     {
-        return this->m_target_column.tokenize();
+        return this->m_target_column.is_fulltext();
     }
 
     template <class T>
@@ -224,10 +217,6 @@ public:
     void set(ObjKey key, util::Optional<T> new_value);
 
     void erase(ObjKey key);
-    void erase_list(ObjKey key, const Lst<String>&);
-    // Erase without getting value from parent column (useful when string stored
-    // does not directly match string in parent, like with full-text indexing)
-    void erase_string(ObjKey key, StringData value);
 
     template <class T>
     ObjKey find_first(T value) const;
@@ -248,7 +237,6 @@ public:
 #ifdef REALM_DEBUG
     template <class T>
     void verify_entries(const ClusterColumn& column) const;
-    void dump_node_structure() const;
     void do_dump_node_structure(std::ostream&, int) const;
 #endif
 
@@ -328,6 +316,9 @@ private:
                      bool noextend = false);
     void node_insert_split(size_t ndx, size_t new_ref);
     void node_insert(size_t ndx, size_t ref);
+    // Erase without getting value from parent column (useful when string stored
+    // does not directly match string in parent, like with full-text indexing)
+    void erase_string(ObjKey key, StringData value);
     void do_delete(ObjKey key, StringData, size_t offset);
 
     Mixed get(ObjKey key) const;
