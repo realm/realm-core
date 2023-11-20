@@ -522,6 +522,16 @@ TEST_CASE("C API (non-database)", "[c_api]") {
         }
     }
 
+    SECTION("realm_error_t is properly initialized from Status") {
+        Status status(ErrorCodes::RuntimeError, "I am a runtime error!");
+        realm_error_t c_err = c_api::to_capi(status);
+        REQUIRE(c_err.error == RLM_ERR_RUNTIME);
+        REQUIRE(c_err.message == status.reason());
+        REQUIRE(c_err.categories == RLM_ERR_CAT_RUNTIME);
+        REQUIRE(c_err.path == nullptr);
+        REQUIRE(c_err.usercode_error == nullptr);
+    }
+
 #if REALM_ENABLE_SYNC
     SECTION("realm_app_config_t") {
         const uint64_t request_timeout = 2500;
