@@ -5450,7 +5450,7 @@ TEST_CASE("C API - client reset", "[sync][pbs][c_api][client reset][baas]") {
             REQUIRE(after_client_reset_counter.load() == 0);
         }
 
-        SECTION("Simulate failure client reset") {
+        SECTION("Simulate failure during client reset with expection in user code") {
             baas_client_stop.store(false);
 
             struct MyExceptionWrapper {
@@ -5510,7 +5510,7 @@ TEST_CASE("C API - client reset", "[sync][pbs][c_api][client reset][baas]") {
                 })
                 ->run();
 
-            REQUIRE(error_handler_counter.load() == 1);
+            REQUIRE(error_handler_counter.load() == 2);
 
             realm_error_t _err;
             _err.message = "";
