@@ -1,0 +1,5 @@
+{"name": "latency-upstream","type": "latency","stream": "upstream","toxicity": 0.5,"attributes": {"latency": 250,"jitter": 250}}
+{"name": "latency-downstream","type": "latency","stream": "downstream","toxicity": 0.5,"attributes": {"latency": 0,"jitter": 250}}
+{"name": "bandwidth-upstream","type": "bandwidth","stream": "upstream","toxicity": 0.5,"attributes": {"rate": %RANDOM1%}}
+{"name": "bandwidth-downstream","type": "bandwidth","stream": "downstream","toxicity": 0.5,"attributes": {"rate": %RANDOM2%}}
+{"name": "slicer-downstream","type": "slicer","stream": "downstream","toxicity": 0.5,"attributes": {"average_size": 500,"size_variation": 250,"delay": 10000}}

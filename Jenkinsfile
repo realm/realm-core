@@ -201,7 +201,7 @@ jobWrapper {
             ]
             if (releaseTesting) {
                 extendedChecks = [
-                    checkMacOsDebug               : doBuildMacOs(buildOptions + [buildType: "Release"]),
+                    checkMacOsDebug               : doBuildMacOs(buildOptions + [buildType: "Debug"]),
                     checkAndroidarmeabiDebug      : doAndroidBuildInDocker('armeabi-v7a', 'Debug', TestAction.Run),
                     // FIXME: https://github.com/realm/realm-core/issues/4159
                     //checkAndroidx86Release        : doAndroidBuildInDocker('x86', 'Release', TestAction.Run),
@@ -606,8 +606,11 @@ def doBuildMacOs(Map options = [:]) {
 
             dir('build-macosx') {
                 withEnv(['DEVELOPER_DIR=/Applications/Xcode-14.app/Contents/Developer/']) {
-                    sh "cmake ${cmakeDefinitions} -G Xcode .."
-
+                     try {
+                        sh "cmake ${cmakeDefinitions} -G Xcode .."
+                    } catch(Exception e) {
+                        archiveArtifacts '**/*'
+                    }                
                     runAndCollectWarnings(
                         parser: 'clang',
                         script: "cmake --build . --config ${buildType} --target package -- ONLY_ACTIVE_ARCH=NO -destination generic/name=macOS -sdk macosx",
