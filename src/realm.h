@@ -3410,6 +3410,7 @@ typedef struct realm_sync_error {
 
     realm_sync_error_compensating_write_info_t* compensating_writes;
     size_t compensating_writes_length;
+    void* usercode_error;
 } realm_sync_error_t;
 
 /**

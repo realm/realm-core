@@ -110,6 +110,18 @@ RuntimeError::RuntimeError(Status&& status)
 }
 RuntimeError::~RuntimeError() noexcept = default;
 
+UserCodeCallbackError::UserCodeCallbackError(ErrorCodes::Error code, std::string_view msg, void* usercode_error)
+    : RuntimeError(code, msg)
+    , usercode_error(usercode_error)
+{
+}
+UserCodeCallbackError::UserCodeCallbackError(Status&& status, void* usercode_error)
+    : RuntimeError(std::move(status))
+    , usercode_error(usercode_error)
+{
+}
+UserCodeCallbackError::~UserCodeCallbackError() noexcept = default;
+
 InvalidArgument::InvalidArgument(std::string_view msg)
     : InvalidArgument(ErrorCodes::InvalidArgument, msg)
 {

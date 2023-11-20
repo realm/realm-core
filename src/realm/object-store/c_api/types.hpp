@@ -37,21 +37,11 @@ public:
     }
 };
 
-class CallbackFailed : public RuntimeError {
+class CallbackFailed : public UserCodeCallbackError {
 public:
-    // SDK-provided opaque error value when error == RLM_ERR_CALLBACK with a callout to
-    // realm_register_user_code_callback_error()
-    void* usercode_error{nullptr};
-
-    CallbackFailed()
-        : RuntimeError(ErrorCodes::CallbackFailed, "User-provided callback failed")
+    CallbackFailed(void* error = nullptr)
+        : UserCodeCallbackError(ErrorCodes::CallbackFailed, "User-provided callback failed", error)
     {
-    }
-
-    CallbackFailed(void* str)
-        : CallbackFailed()
-    {
-        usercode_error = str;
     }
 };
 

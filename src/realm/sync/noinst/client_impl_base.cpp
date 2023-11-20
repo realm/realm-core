@@ -2293,15 +2293,24 @@ Status Session::receive_ident_message(SaltedFileIdent client_file_ident)
     // if a client reset happens, it will take care of setting the file ident
     // and if not, we do it here
     bool did_client_reset = false;
+
+    auto on_session_error = [this](const auto& e, void* error_code = nullptr) {
+        auto err_msg = util::format("A fatal error occurred during client reset: '%1'", e.what());
+        SessionErrorInfo err_info(Status{ErrorCodes::AutoClientResetFailed, err_msg}, IsFatal{true}, error_code);
+        logger.error(err_msg.c_str());
+        suspend(err_info);
+        return Status::OK();
+    };
+
     try {
         did_client_reset = client_reset_if_needed();
     }
+    catch (const UserCodeCallbackError& e) {
+        // pass opaque ptr back to SDKs in case of failure in the client reset callbacks
+        return on_session_error(e, e.usercode_error);
+    }
     catch (const std::exception& e) {
-        auto err_msg = util::format("A fatal error occurred during client reset: '%1'", e.what());
-        logger.error(err_msg.c_str());
-        SessionErrorInfo err_info(Status{ErrorCodes::AutoClientResetFailed, err_msg}, IsFatal{true});
-        suspend(err_info);
-        return Status::OK();
+        return on_session_error(e);
     }
     if (!did_client_reset) {
         get_history().set_client_file_ident(client_file_ident,
