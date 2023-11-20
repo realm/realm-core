@@ -2508,8 +2508,8 @@ struct Move {
 
 struct Insert {
     Insert(size_t index, util::Optional<int64_t> key)
-    : ndx(index)
-    , pk(key)
+        : ndx(index)
+        , pk(key)
     {
     }
     size_t ndx;
@@ -2550,8 +2550,7 @@ struct CollectionOperation {
         auto get_table = [&](std::string_view name) -> TableRef {
             Group* group = dst_table->get_parent_group();
             Group::TableNameBuffer buffer;
-            TableRef table =
-                group->get_table(Group::class_name_to_table_name(name, buffer));
+            TableRef table = group->get_table(Group::class_name_to_table_name(name, buffer));
             REALM_ASSERT(table);
             return table;
         };
@@ -2954,12 +2953,14 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[sync][pbs][client rese
                          {dest_pk_1, dest_pk_2, dest_pk_3, dest_pk_5}, 1);
     }
     SECTION("local adds two links to objects which are both removed by the remote") {
-        reset_collection({Add{dest_pk_4}, Add{dest_pk_5}, CreateObject("dest", 6), Add{6}}, {RemoveObject("dest", dest_pk_4), RemoveObject("dest", dest_pk_5)},
-                            {dest_pk_1, dest_pk_2, dest_pk_3, 6}, 2);
+        reset_collection({Add{dest_pk_4}, Add{dest_pk_5}, CreateObject("dest", 6), Add{6}},
+                         {RemoveObject("dest", dest_pk_4), RemoveObject("dest", dest_pk_5)},
+                         {dest_pk_1, dest_pk_2, dest_pk_3, 6}, 2);
     }
     SECTION("local removes two objects which were linked to by remote") {
-        reset_collection({RemoveObject("dest", dest_pk_1), RemoveObject("dest", dest_pk_2), CreateObject("dest", 6), Add{6}}, {},
-                            {dest_pk_3, 6}, 2);
+        reset_collection(
+            {RemoveObject("dest", dest_pk_1), RemoveObject("dest", dest_pk_2), CreateObject("dest", 6), Add{6}}, {},
+            {dest_pk_3, 6}, 2);
     }
     SECTION("local has unresolved links") {
         test_reset->setup([&](SharedRealm realm) {
@@ -2983,28 +2984,24 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[sync][pbs][client rese
         });
 
         SECTION("remote adds a link") {
-            reset_collection({}, {Add{dest_pk_4}},
-                                {dest_pk_2, dest_pk_3, dest_pk_4}, 1);
+            reset_collection({}, {Add{dest_pk_4}}, {dest_pk_2, dest_pk_3, dest_pk_4}, 1);
         }
         SECTION("remote removes a link") {
-            reset_collection({}, {Remove{dest_pk_2}},
-                                {dest_pk_3}, 1);
+            reset_collection({}, {Remove{dest_pk_2}}, {dest_pk_3}, 1);
         }
         SECTION("remote deletes a dest object that local links to") {
-            reset_collection({Add{dest_pk_4}}, {RemoveObject{"dest", dest_pk_4}},
-                                {dest_pk_2, dest_pk_3}, 2);
+            reset_collection({Add{dest_pk_4}}, {RemoveObject{"dest", dest_pk_4}}, {dest_pk_2, dest_pk_3}, 2);
         }
         SECTION("remote deletes a different dest object") {
-            reset_collection({Add{dest_pk_4}}, {RemoveObject{"dest", dest_pk_2}},
-                                {dest_pk_3, dest_pk_4}, 2);
+            reset_collection({Add{dest_pk_4}}, {RemoveObject{"dest", dest_pk_2}}, {dest_pk_3, dest_pk_4}, 2);
         }
         SECTION("local adds two new links and remote deletes a different dest object") {
             reset_collection({Add{dest_pk_4}, Add{dest_pk_5}}, {RemoveObject{"dest", dest_pk_2}},
-                                {dest_pk_3, dest_pk_4, dest_pk_5}, 2);
+                             {dest_pk_3, dest_pk_4, dest_pk_5}, 2);
         }
         SECTION("remote deletes an object, then removes and adds to the list") {
-            reset_collection({}, {RemoveObject{"dest", dest_pk_2}, Remove{dest_pk_3}, Add{dest_pk_4}},
-                                {dest_pk_4}, 2);
+            reset_collection({}, {RemoveObject{"dest", dest_pk_2}, Remove{dest_pk_3}, Add{dest_pk_4}}, {dest_pk_4},
+                             2);
         }
     }
 
@@ -3056,7 +3053,8 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[sync][pbs][client rese
                              {dest_pk_2, dest_pk_1, dest_pk_3, dest_pk_5});
         }
         SECTION("local moves on locally-added elements when server removes the object that the new links point to") {
-            reset_collection({Add{dest_pk_5}, Add{dest_pk_5}, Move{4, 3}}, {Add{dest_pk_4}, RemoveObject("dest", dest_pk_5)},
+            reset_collection({Add{dest_pk_5}, Add{dest_pk_5}, Move{4, 3}},
+                             {Add{dest_pk_4}, RemoveObject("dest", dest_pk_5)},
                              {dest_pk_1, dest_pk_2, dest_pk_3}); // local overwrite, but without pk_5
         }
         SECTION("local insert and delete can be recovered even if a local link was deleted by remote") {
@@ -3064,7 +3062,8 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[sync][pbs][client rese
             // local  : 1, 2, 3, 5, 6, 1
             // remote : 4, 1, 2, 3 {remove obj 5}
             // result : 1, 2, 3, 6, 1
-            reset_collection({CreateObject("dest", 6), Add{dest_pk_5}, Add{6}, Insert{4, dest_pk_4}, Remove{dest_pk_4}, Add{dest_pk_1}},
+            reset_collection({CreateObject("dest", 6), Add{dest_pk_5}, Add{6}, Insert{4, dest_pk_4},
+                              Remove{dest_pk_4}, Add{dest_pk_1}},
                              {Insert{0, dest_pk_4}, RemoveObject("dest", dest_pk_5)},
                              {dest_pk_4, dest_pk_1, dest_pk_2, dest_pk_3, 6, dest_pk_1});
         }
@@ -3105,8 +3104,10 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[sync][pbs][client rese
     }
     else if constexpr (test_type_is_set) {
         SECTION("remote adds two links to objects which are both removed by local") {
-            reset_collection({RemoveObject("dest", dest_pk_4), RemoveObject("dest", dest_pk_5), CreateObject("dest", 6), Add{6}, Remove{dest_pk_1}},
-                             {Remove{dest_pk_2}, Add{dest_pk_4}, Add{dest_pk_5}, CreateObject("dest", 6), Add{6}, CreateObject("dest", 7), Add{7}, RemoveObject("dest", dest_pk_5)},
+            reset_collection({RemoveObject("dest", dest_pk_4), RemoveObject("dest", dest_pk_5),
+                              CreateObject("dest", 6), Add{6}, Remove{dest_pk_1}},
+                             {Remove{dest_pk_2}, Add{dest_pk_4}, Add{dest_pk_5}, CreateObject("dest", 6), Add{6},
+                              CreateObject("dest", 7), Add{7}, RemoveObject("dest", dest_pk_5)},
                              {dest_pk_3, 6, 7});
         }
     }
