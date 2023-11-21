@@ -103,3 +103,7 @@ compile_commands.json
 /bindgen/generated/
 node_modules/
 tsconfig.tsbuildinfo
+
+# Baas remote host artifacts
+baas-work-dir/
+ssh_agent_commands.sh

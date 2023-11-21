@@ -61,28 +61,6 @@ protected:
         throw InvalidArgument(ErrorCodes::PropertyNotNullable,
                               util::format("Set: %1", CollectionBase::get_property_name()));
     }
-
-private:
-    template <class It1, class It2>
-    bool is_subset_of(It1, It2) const;
-
-    template <class It1, class It2>
-    bool is_superset_of(It1, It2) const;
-
-    template <class It1, class It2>
-    bool intersects(It1, It2) const;
-
-    template <class It1, class It2>
-    void assign_union(It1, It2);
-
-    template <class It1, class It2>
-    void assign_intersection(It1, It2);
-
-    template <class It1, class It2>
-    void assign_difference(It1, It2);
-
-    template <class It1, class It2>
-    void assign_symmetric_difference(It1, It2);
 };
 
 template <class T>

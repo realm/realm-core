@@ -122,9 +122,7 @@ TEST_CASE("sync: large reset with recovery is restartable", "[sync][pbs][client 
          }},
     };
 
-    std::string base_url = get_base_url();
-    REQUIRE(!base_url.empty());
-    auto server_app_config = minimal_app_config(base_url, "client_reset_tests", schema);
+    auto server_app_config = minimal_app_config("client_reset_tests", schema);
     server_app_config.partition_key = partition_prop;
     TestAppSession test_app_session(create_app(server_app_config));
     auto app = test_app_session.app();
@@ -185,7 +183,7 @@ TEST_CASE("sync: large reset with recovery is restartable", "[sync][pbs][client 
 
     realm->sync_session()->resume();
     timed_wait_for([&] {
-        return util::File::exists(_impl::ClientResetOperation::get_fresh_path_for(realm_config.path));
+        return util::File::exists(_impl::client_reset::get_fresh_path_for(realm_config.path));
     });
     realm->sync_session()->pause();
     realm->sync_session()->resume();
@@ -217,9 +215,7 @@ TEST_CASE("sync: pending client resets are cleared when downloads are complete",
          }},
     };
 
-    std::string base_url = get_base_url();
-    REQUIRE(!base_url.empty());
-    auto server_app_config = minimal_app_config(base_url, "client_reset_tests", schema);
+    auto server_app_config = minimal_app_config("client_reset_tests", schema);
     server_app_config.partition_key = partition_prop;
     TestAppSession test_app_session(create_app(server_app_config));
     auto app = test_app_session.app();
@@ -293,9 +289,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
              partition_prop,
          }},
     };
-    std::string base_url = get_base_url();
-    REQUIRE(!base_url.empty());
-    auto server_app_config = minimal_app_config(base_url, "client_reset_tests", schema);
+    auto server_app_config = minimal_app_config("client_reset_tests", schema);
     server_app_config.partition_key = partition_prop;
     TestAppSession test_app_session(create_app(server_app_config));
     auto app = test_app_session.app();
@@ -371,7 +365,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
 
     local_config.cache = false;
     local_config.automatic_change_notifications = false;
-    const std::string fresh_path = realm::_impl::ClientResetOperation::get_fresh_path_for(local_config.path);
+    const std::string fresh_path = realm::_impl::client_reset::get_fresh_path_for(local_config.path);
     size_t before_callback_invocations = 0;
     size_t after_callback_invocations = 0;
     std::mutex mtx;
@@ -604,6 +598,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
                 }
             };
             make_reset(local_config, remote_config)
+                ->set_development_mode(true)
                 ->setup([&](SharedRealm before) {
                     before->update_schema(
                         {
@@ -703,6 +698,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
                 err = error;
             };
             make_reset(local_config, remote_config)
+                ->set_development_mode(true)
                 ->make_local_changes([&](SharedRealm local) {
                     local->update_schema(
                         {
@@ -968,7 +964,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
                 ->run();
 
             timed_wait_for([&] {
-                return util::File::exists(_impl::ClientResetOperation::get_fresh_path_for(local_config.path));
+                return util::File::exists(_impl::client_reset::get_fresh_path_for(local_config.path));
             });
 
             // Restart the session before the client reset finishes.
@@ -996,7 +992,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
             local_config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
                 err = error;
             };
-            std::string fresh_path = realm::_impl::ClientResetOperation::get_fresh_path_for(local_config.path);
+            std::string fresh_path = realm::_impl::client_reset::get_fresh_path_for(local_config.path);
             util::File f(fresh_path, util::File::Mode::mode_Write);
             f.write("a non empty file");
             f.sync();
@@ -1013,7 +1009,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
             local_config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
                 err = error;
             };
-            std::string fresh_path = realm::_impl::ClientResetOperation::get_fresh_path_for(local_config.path);
+            std::string fresh_path = realm::_impl::client_reset::get_fresh_path_for(local_config.path);
             // create a non-empty directory that we'll fail to delete
             util::make_dir(fresh_path);
             util::File(util::File::resolve("file", fresh_path), util::File::mode_Write);
@@ -1180,6 +1176,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
                 err = error;
             };
             make_reset(local_config, remote_config)
+                ->set_development_mode(true)
                 ->make_local_changes([&](SharedRealm local) {
                     local->update_schema(
                         {
@@ -1212,6 +1209,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
                 err = error;
             };
             make_reset(local_config, remote_config)
+                ->set_development_mode(true)
                 ->make_local_changes([](SharedRealm local) {
                     local->update_schema(
                         {
@@ -1243,7 +1241,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
         }
 
         SECTION("compatible schema changes in both remote and local transactions") {
-            test_reset
+            test_reset->set_development_mode(true)
                 ->make_local_changes([](SharedRealm local) {
                     local->update_schema(
                         {
@@ -1295,6 +1293,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
                 err = error;
             };
             make_reset(local_config, remote_config)
+                ->set_development_mode(true)
                 ->make_local_changes([](SharedRealm local) {
                     local->update_schema(
                         {
@@ -1337,6 +1336,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
             };
 
             make_reset(local_config, remote_config)
+                ->set_development_mode(true)
                 ->make_local_changes([](SharedRealm local) {
                     local->update_schema(
                         {
@@ -1592,9 +1592,8 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
         SECTION("a normal reset adds and removes a cycle detection flag") {
             local_config.sync_config->client_resync_mode = ClientResyncMode::RecoverOrDiscard;
             local_config.sync_config->notify_before_client_reset = [&](SharedRealm realm) {
-                auto flag = has_reset_cycle_flag(realm);
-                REQUIRE(!flag);
-                std::lock_guard<std::mutex> lock(mtx);
+                REQUIRE_FALSE(has_reset_cycle_flag(realm));
+                std::lock_guard lock(mtx);
                 ++before_callback_invocations;
             };
             local_config.sync_config->notify_after_client_reset = [&](SharedRealm, ThreadSafeReference realm_ref,
@@ -1604,19 +1603,35 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
                 REQUIRE(bool(flag));
                 REQUIRE(flag->type == ClientResyncMode::Recover);
                 REQUIRE(did_recover);
-                std::lock_guard<std::mutex> lock(mtx);
+                std::lock_guard lock(mtx);
                 ++after_callback_invocations;
             };
             make_reset(local_config, remote_config)
                 ->on_post_local_changes([&](SharedRealm realm) {
-                    auto flag = has_reset_cycle_flag(realm);
-                    REQUIRE(!flag);
+                    REQUIRE_FALSE(has_reset_cycle_flag(realm));
                 })
                 ->run();
             REQUIRE(!err);
             REQUIRE(before_callback_invocations == 1);
             REQUIRE(after_callback_invocations == 1);
         }
+
+        SECTION("a failed reset leaves a cycle detection flag") {
+            local_config.sync_config->client_resync_mode = ClientResyncMode::Recover;
+            make_reset(local_config, remote_config)
+                ->make_local_changes([](SharedRealm realm) {
+                    auto table = realm->read_group().get_table("class_object");
+                    table->remove_column(table->add_column(type_Int, "new col"));
+                })
+                ->run();
+            local_config.sync_config.reset();
+            local_config.force_sync_history = true;
+            auto realm = Realm::get_shared_realm(local_config);
+            auto flag = has_reset_cycle_flag(realm);
+            REQUIRE(flag);
+            CHECK(flag->type == ClientResyncMode::Recover);
+        }
+
         SECTION("In DiscardLocal mode: a previous failed discard reset is detected and generates an error") {
             local_config.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
             make_fake_previous_reset(ClientResyncMode::DiscardLocal);
@@ -1794,9 +1809,7 @@ TEST_CASE("sync: Client reset during async open", "[sync][pbs][client reset][baa
          }},
     };
 
-    std::string base_url = get_base_url();
-    REQUIRE(!base_url.empty());
-    auto server_app_config = minimal_app_config(base_url, "client_reset_tests", schema);
+    auto server_app_config = minimal_app_config("client_reset_tests", schema);
     server_app_config.partition_key = partition_prop;
     TestAppSession test_app_session(create_app(server_app_config));
     auto app = test_app_session.app();

@@ -496,6 +496,8 @@ void track_reset(Transaction& wt, ClientResyncMode mode)
                                           {{version_col, metadata_version},
                                            {timestamp_col, Timestamp(std::chrono::system_clock::now())},
                                            {type_col, mode_val}});
+
+    wt.commit_and_continue_writing();
 }
 
 static ClientResyncMode reset_precheck_guard(Transaction& wt, ClientResyncMode mode, bool recovery_is_allowed,
@@ -554,7 +556,7 @@ static ClientResyncMode reset_precheck_guard(Transaction& wt, ClientResyncMode m
 LocalVersionIDs perform_client_reset_diff(DB& db_local, DB& db_remote, sync::SaltedFileIdent client_file_ident,
                                           util::Logger& logger, ClientResyncMode mode, bool recovery_is_allowed,
                                           bool* did_recover_out, sync::SubscriptionStore* sub_store,
-                                          util::UniqueFunction<void(int64_t)> on_flx_version_complete)
+                                          util::FunctionRef<void(int64_t)> on_flx_version_complete)
 {
     auto wt_local = db_local.start_write();
     auto actual_mode = reset_precheck_guard(*wt_local, mode, recovery_is_allowed, logger);
@@ -605,9 +607,7 @@ LocalVersionIDs perform_client_reset_diff(DB& db_local, DB& db_remote, sync::Sal
         if (did_recover_out) {
             *did_recover_out = false;
         }
-        if (on_flx_version_complete) {
-            on_flx_version_complete(subscription_version);
-        }
+        on_flx_version_complete(subscription_version);
 
         VersionID new_version_local = wt_local->get_version_of_current_transaction();
         logger.info("perform_client_reset_diff is done: old_version = (version: %1, index: %2), "
@@ -626,9 +626,7 @@ LocalVersionIDs perform_client_reset_diff(DB& db_local, DB& db_remote, sync::Sal
         auto mut_subs = subs.make_mutable_copy();
         mut_subs.update_state(sync::SubscriptionSet::State::Complete);
         auto sub = std::move(mut_subs).commit();
-        if (on_flx_version_complete) {
-            on_flx_version_complete(sub.version());
-        }
+        on_flx_version_complete(sub.version());
         logger.info("Recreated the active subscription set in the complete state (%1 -> %2)", before_version,
                     sub.version());
     };

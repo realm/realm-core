@@ -460,7 +460,7 @@ void SyncSession::download_fresh_realm(sync::ProtocolErrorInfo::Action server_re
         options.encryption_key = encryption_key.data();
 
     DBRef db;
-    auto fresh_path = ClientResetOperation::get_fresh_path_for(m_db->get_path());
+    auto fresh_path = client_reset::get_fresh_path_for(m_db->get_path());
     try {
         // We want to attempt to use a pre-existing file to reduce the chance of
         // downloading the first part of the file only to then delete it over
@@ -876,9 +876,8 @@ void SyncSession::create_sync_session()
     session_config.proxy_config = sync_config.proxy_config;
     session_config.simulate_integration_error = sync_config.simulate_integration_error;
     session_config.flx_bootstrap_batch_size_bytes = sync_config.flx_bootstrap_batch_size_bytes;
-    session_config.session_reason = ClientResetOperation::is_fresh_path(m_config.path)
-                                        ? sync::SessionReason::ClientReset
-                                        : sync::SessionReason::Sync;
+    session_config.session_reason =
+        client_reset::is_fresh_path(m_config.path) ? sync::SessionReason::ClientReset : sync::SessionReason::Sync;
 
     if (sync_config.on_sync_client_event_hook) {
         session_config.on_sync_client_event_hook = [hook = sync_config.on_sync_client_event_hook,

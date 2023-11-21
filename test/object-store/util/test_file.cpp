@@ -263,6 +263,7 @@ static Status wait_for_session(Realm& realm, void (SyncSession::*fn)(util::Uniqu
 {
     auto shared_state = std::make_shared<WaitForSessionState>();
     auto& session = *realm.config().sync_config->user->session_for_on_disk_path(realm.config().path);
+    auto delay = TEST_TIMEOUT_EXTRA > 0 ? timeout + std::chrono::seconds(TEST_TIMEOUT_EXTRA) : timeout;
     (session.*fn)([weak_state = std::weak_ptr<WaitForSessionState>(shared_state)](Status s) {
         auto shared_state = weak_state.lock();
         if (!shared_state) {
@@ -274,11 +275,11 @@ static Status wait_for_session(Realm& realm, void (SyncSession::*fn)(util::Uniqu
         shared_state->cv.notify_one();
     });
     std::unique_lock<std::mutex> lock(shared_state->mutex);
-    bool completed = shared_state->cv.wait_for(lock, timeout, [&]() {
+    bool completed = shared_state->cv.wait_for(lock, delay, [&]() {
         return shared_state->complete == true;
     });
     if (!completed) {
-        throw std::runtime_error("wait_for_session() timed out");
+        throw std::runtime_error(util::format("wait_for_session() exceeded %1 ms", delay.count()));
     }
     return shared_state->status;
 }
@@ -323,7 +324,7 @@ void set_app_config_defaults(app::App::Config& app_config,
 #if REALM_ENABLE_AUTH_TESTS
 
 TestAppSession::TestAppSession()
-    : TestAppSession(get_runtime_app_session(get_base_url()), nullptr, DeleteApp{false})
+    : TestAppSession(get_runtime_app_session(), nullptr, DeleteApp{false})
 {
 }
 

@@ -20,15 +20,15 @@ BAAS_STOPPED_FILE=
 RETRY_COUNT=120
 BAAS_SERVER_LOG=
 STATUS_OUT=
-VERBOSE=
 
 function usage()
 {
     echo "Usage: wait_for_baas.sh [-w PATH] [-p FILE] [-r COUNT] [-l FILE] [-s] [-v] [-h]"
+    echo "Options:"
     echo -e "\t-w PATH\t\tPath to baas server working directory"
-    echo -e "\t-p FILE\t\tPath to baas server pid file"
+    echo -e "\t-p FILE\t\tPath to baas server pid file (also set by -w option)"
     echo -e "\t-r COUNT\tNumber of attempts to check for baas server (default 120)"
-    echo -e "\t-l FILE\t\tPath to baas server log file"
+    echo -e "\t-l FILE\t\tPath to baas server log file (also set by -w option)"
     echo -e "\t-s\t\tDisplay a status for each attempt"
     echo -e "\t-v\t\tEnable verbose script debugging"
     echo -e "\t-h\t\tShow this usage summary and exit"
@@ -52,7 +52,7 @@ while getopts "w:p:r:l:svh" opt; do
         r) RETRY_COUNT="${OPTARG}";;
         l) BAAS_SERVER_LOG="${OPTARG}";;
         s) STATUS_OUT="yes";;
-        v) VERBOSE="yes"; set -o verbose; set -o xtrace;;
+        v) set -o verbose; set -o xtrace;;
         h) usage 0;;
         *) usage 1;;
     esac
@@ -61,29 +61,39 @@ done
 WAIT_COUNTER=0
 WAIT_START=$(date -u +'%s')
 
+function output_log_tail()
+{
+    if [[ -n "${BAAS_SERVER_LOG}" && -f "${BAAS_SERVER_LOG}" ]]; then
+        tail -n 10 "${BAAS_SERVER_LOG}"
+    fi
+}
+
+echo "Waiting for baas server to start..."
 until $CURL --output /dev/null --head --fail http://localhost:9090 --silent ; do
     if [[ -n "${BAAS_STOPPED_FILE}" && -f "${BAAS_STOPPED_FILE}" ]]; then
         echo "Baas server failed to start (found baas_stopped file)"
+        output_log_tail
         exit 1
     fi
 
     if [[ -n "${BAAS_PID_FILE}" && -f "${BAAS_PID_FILE}" ]]; then
-        pgrep -F "${BAAS_PID_FILE}" > /dev/null || (echo "Baas server $(< "${BAAS_PID_FILE}") is not running"; exit 1)
+        if ! pgrep -F "${BAAS_PID_FILE}" > /dev/null; then
+            echo "Baas server $(< "${BAAS_PID_FILE}") is no longer running"
+            output_log_tail
+            exit 1
+        fi
     fi
 
     ((++WAIT_COUNTER))
+    secs_spent_waiting=$(($(date -u +'%s') - WAIT_START))
     if [[ ${WAIT_COUNTER} -ge ${RETRY_COUNT} ]]; then
-        echo "Timed out waiting for baas server to start"
+        echo "Timed out after ${secs_spent_waiting} secs waiting for baas server to start"
+        output_log_tail
         exit 1
     fi
 
     if [[ -n "${STATUS_OUT}" ]]; then
-        secs_spent_waiting=$(($(date -u +'%s') - WAIT_START))
         echo "Waiting for baas server to start... ${secs_spent_waiting} secs so far"
-    fi
-
-    if [[ -n "${VERBOSE}" && -n "${BAAS_SERVER_LOG}" && -f "${BAAS_SERVER_LOG}" ]]; then
-        tail -n 5 "${BAAS_SERVER_LOG}"
     fi
 
     sleep 5

@@ -1,0 +1,4 @@
+{"name": "limit-data-upstream","type": "limit_data","stream": "upstream","toxicity": 0.6,"attributes": {"bytes": %RANDOM1%}}
+{"name": "limit-data-downstream","type": "limit_data","stream": "downstream","toxicity": 0.6,"attributes": {"bytes": %RANDOM2%}}
+{"name": "slow-close-upstream","type": "slow_close","stream": "upstream","toxicity": 0.6,"attributes": {"delay": %RANDOM3%}}
+{"name": "reset-peer-upstream","type": "reset_peer","stream": "upstream","toxicity": 0.6,"attributes": {"timeout": %RANDOM4%}}
