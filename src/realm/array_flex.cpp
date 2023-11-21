@@ -88,8 +88,8 @@ bool ArrayFlex::is_encoded() const
 {
     using Encoding = NodeHeader::Encoding;
     REALM_ASSERT(m_array.is_attached());
-    auto header = m_array.get_header();
-    return Node::get_encoding((uint64_t*)header) == Encoding::Flex;
+    auto header = (uint64_t*)m_array.get_header();
+    return Node::get_kind(header) == 'B' && Node::get_encoding((uint64_t*)header) == Encoding::Flex;
 }
 
 size_t ArrayFlex::size() const
@@ -139,7 +139,7 @@ bool ArrayFlex::try_encode(std::vector<int64_t>& values, std::vector<size_t>& in
     if (check_gain(values, indices, value_bit_width, index_bit_width)) {
         // release array's memory and re-init the same array with a B header and flex encoding
         setup_header_in_flex_format(values, indices, value_bit_width, index_bit_width);
-        return false; // true;
+        return true;
     }
     return false;
 }
@@ -248,18 +248,20 @@ void ArrayFlex::setup_header_in_flex_format(std::vector<int64_t>& values, std::v
     auto byte_size =
         m_array.calc_size<Encoding::Flex>(values.size(), indices.size(), value_bit_width, index_bit_width);
 
-    MemRef mem = m_array.get_alloc().alloc(byte_size);
-    auto header = (uint64_t*)mem.get_addr(); // mem.get_addr();
     // I'm assuming that flags are taken from the owning Array.
-    uint8_t flags = m_array.get_flags((uint64_t*)m_array.get_header());
-    NodeHeader::init_header(header, 'B', Encoding::Flex, flags, value_bit_width, index_bit_width, values.size(),
-                            indices.size());
-    // Array is rewritten in place so capacity is the max between byte_size and initial_capacity
-    // const auto capacity = std::max(byte_size, size_t{128}); // TODO make flex array friend of node header
-    const auto capacity = byte_size; // std::max(byte_size,(size_t)24);// std::max(byte_size, (size_t)128);
-    NodeHeader::set_capacity_in_header(capacity, mem.get_addr());
+    uint8_t flags = NodeHeader::get_flags((uint64_t*)m_array.get_header());
     // TODO: check if this can be done better. (e.g use realloc and not destroy)
     m_array.destroy();
+    // TODO: this is temporary because it means that we are not really gaining any benefit from compressing and array
+    // that is less than 128bytes
+    MemRef mem = m_array.get_alloc().alloc(std::max(byte_size, size_t{128}));
+    auto header = (uint64_t*)mem.get_addr();
+    NodeHeader::init_header(header, 'B', Encoding::Flex, flags, value_bit_width, index_bit_width, values.size(),
+                            indices.size());
+    // TODO: same as above, do we need to set capacity to 128 or actual needed size?
+    const auto capacity = std::max(byte_size, size_t{128});
+    NodeHeader::set_capacity_in_header(capacity, (char*)header);
+    // NodeHeader::set_flags(header, flags);
     m_array.init_from_mem(mem);
     REALM_ASSERT(m_array.m_ref == mem.get_ref());
 }

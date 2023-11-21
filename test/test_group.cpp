@@ -2315,6 +2315,7 @@ TEST(Group_UniqueColumnKeys)
     CHECK_NOT_EQUAL(col_foo, col_bar);
 }
 
+// NICO
 ONLY(Group_ArrayCompression_Correctness)
 {
     GROUP_TEST_PATH(path);
@@ -2361,7 +2362,7 @@ ONLY(Group_ArrayCompression_Correctness)
     auto col_key1 = read_table->get_column_key("lint");
     auto obj1 = read_table->get_object(0);
     auto l1 = obj1.get_list<int64_t>(col_key1);
-    // Verify that original values are there
+    CHECK(l1.size() == array.size());
     CHECK(*read_table == *table);
 
 #ifdef REALM_DEBUG

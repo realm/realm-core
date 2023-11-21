@@ -374,8 +374,9 @@ public:
                     return Encoding::Packed;
                 case 1:
                     return Encoding::AofP;
-                case 2:
-                    return Encoding::PofA;
+                case 2: // TODO: there is bug, init_from_ref is reading Encodiging::PofA.
+                    // return Encoding::PofA;
+                    return Encoding::Flex;
                 case 3:
                     return Encoding::Flex;
                 default:
@@ -515,13 +516,11 @@ public:
         auto hb = (uint8_t*)header;
         if (kind == 0x41)
             REALM_ASSERT(false && "Illegal init args for legacy header");
-        if (enc == Encoding::Flex) {
-            hb[2] = (flags << 4) | 3;
-        }
-        else
+        if (enc != Encoding::Flex)
             REALM_ASSERT(false && "Illegal header encoding for chosen kind of header");
         auto hw = (uint32_t*)header;
         hw[1] = (uint32_t)((bits_pr_elemA << 26) | (bits_pr_elemB << 20) | (num_elemsA << 10) | num_elemsB);
+        hb[2] = (flags << 4) | 3;
         hb[3] = kind;
     }
 
@@ -589,7 +588,7 @@ public:
         }
         else {
             auto h = (uint8_t*)header;
-            return h[2] >> 4;
+            return h[2] >> 4; // TODO: the flag is not set correctly somehow. fix this.
         }
     }
 };
@@ -736,7 +735,8 @@ template <>
 inline size_t NodeHeader::get_elementA_size<NodeHeader::Encoding::Flex>(uint64_t* header)
 {
     REALM_ASSERT(get_kind(header) != 'A');
-    REALM_ASSERT(get_encoding(header) == Encoding::Flex);
+    const auto encoding = get_encoding(header);
+    REALM_ASSERT(encoding == Encoding::Flex);
     uint32_t word = ((uint32_t*)header)[1];
     auto bits_per_element = (word >> 26) & 0b111111;
     bits_per_element++;

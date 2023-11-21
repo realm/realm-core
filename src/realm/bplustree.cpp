@@ -246,6 +246,8 @@ BPlusTreeInner::~BPlusTreeInner()
 void BPlusTreeInner::init_from_mem(MemRef mem)
 {
     Array::init_from_mem(mem);
+    // TODO: during BPlusTreeInner initialization the first value of this array is used as ref.
+    //       but this is a mistake... since the array is not a ref array, but is a leaf array.
     auto rot = Array::get(0);
     if ((rot & 1) == 0) {
         // rot is a ref

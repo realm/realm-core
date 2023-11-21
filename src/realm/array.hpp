@@ -536,8 +536,7 @@ protected:
     bool m_context_flag;         // Meaning depends on context.
 
     // TODO: This should be an opaque reference to a generic encode that is constructed via a factory. In order to
-    // implement a
-    //  different compression algorithm on demand
+    // implement a different compression algorithm on demand
     ArrayFlex m_encode;
 
 private:

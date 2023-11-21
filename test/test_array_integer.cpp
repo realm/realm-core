@@ -46,6 +46,20 @@ TEST(Test_ArrayInt_no_encode)
     CHECK(a.get(2) == 12);
 }
 
+TEST(Test_array_same_size_less_bits)
+{
+    ArrayInteger a(Allocator::get_default());
+    a.create();
+    a.add(24);
+    a.add(240);
+    a.add(545);
+    CHECK(a.try_encode());
+    CHECK(a.is_encoded());
+    CHECK(a.get_any(0) == 24);
+    CHECK(a.get_any(1) == 240);
+    CHECK(a.get_any(2) == 545);
+}
+
 TEST(Test_ArrayInt_encode_decode_need)
 {
     ArrayInteger a(Allocator::get_default());

@@ -260,7 +260,6 @@ void Array::init_from_mem(MemRef mem) noexcept
     auto kind = get_kind((uint64_t*)header);
     // be sure that the node is either A or B
     REALM_ASSERT(kind == 'A' || kind == 'B');
-    bool old_style = kind == 'A';
 
     header = Node::init_from_mem(mem);
     // Parse header
@@ -269,8 +268,8 @@ void Array::init_from_mem(MemRef mem) noexcept
     m_context_flag = get_context_flag_from_header(header);
     // it is unclear how to handle the width limits while compressed.
     // they will likely need to be set explicitly as part of decompressing
-    if (old_style)
-        update_width_cache_from_header();
+    // TODO: for now grab A size and use that..
+    update_width_cache_from_header();
 }
 
 MemRef Array::get_mem() const noexcept
@@ -1346,14 +1345,27 @@ const typename Array::VTableForWidth<width>::PopulatedVTable Array::VTableForWid
 
 void Array::update_width_cache_from_header() noexcept
 {
-    auto width = get_width_from_header(get_header());
-    m_lbound = lbound_for_width(width);
-    m_ubound = ubound_for_width(width);
+    auto header = get_header();
+    if (get_kind((uint64_t*)header) == 'A') {
+        auto width = get_width_from_header(get_header());
+        m_lbound = lbound_for_width(width);
+        m_ubound = ubound_for_width(width);
 
-    m_width = width;
+        m_width = width;
 
-    REALM_TEMPEX(m_vtable = &VTableForWidth, width, ::vtable);
-    m_getter = m_vtable->getter;
+        REALM_TEMPEX(m_vtable = &VTableForWidth, width, ::vtable);
+        m_getter = m_vtable->getter;
+    }
+    else {
+        // type B only flex for now.
+        // auto width = get_elementA_size<Encoding::Flex>((uint64_t*)header);
+        m_lbound = 64; // width; //this is not OK since width is not longer a power of 2 //lbound_for_width(width);
+        m_ubound = 64; // width; //this is not OK since width is not longer a power of 2 // ubound_for_width(width);
+        m_width = 64;  // width;
+        // REALM_TEMPEX(m_vtable = &VTableForWidth, width, ::vtable);
+        REALM_TEMPEX(m_vtable = &VTableForWidth, 64, ::vtable);
+        m_getter = m_vtable->getter;
+    }
 }
 
 // This method reads 8 concecutive values into res[8], starting from index 'ndx'. It's allowed for the 8 values to

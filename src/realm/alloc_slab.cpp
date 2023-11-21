@@ -350,14 +350,12 @@ void SlabAlloc::mark_freed(FreeBlock* entry, int size)
     REALM_ASSERT_EX(bb->block_after_size < 0, bb->block_after_size, get_file_path_for_assertions());
     auto alloc_size = -bb->block_after_size;
     int max_waste = sizeof(FreeBlock) + sizeof(BetweenBlocks);
-    //
     REALM_ASSERT_EX(alloc_size >= size && alloc_size <= size + max_waste, alloc_size, size,
                     get_file_path_for_assertions());
+    // the BetweenBlocks has prev and next set to nullptr, it seems to be constructed correctly, since it is sought at
+    // address, block + size. There should be a block with before_size = <byte_size> for compressed arrays that have
+    // allocated less than 128 bytes, and next set to <big number> but something is wrong.
     bb->block_after_size = alloc_size;
-    // the BetweenBlocks has prev and next set to nullptr, it seems to be constructed correctly, since it sought at
-    // address, block + size. There should a block with before size = -24, and next set to <big number> but something
-    // is wrong.
-
     bb = bb_after(entry);
     REALM_ASSERT_EX(bb->block_before_size < 0, bb->block_before_size, get_file_path_for_assertions());
     REALM_ASSERT(-bb->block_before_size == alloc_size);
@@ -369,8 +367,8 @@ void SlabAlloc::mark_allocated(FreeBlock* entry)
     auto bb = bb_before(entry);
     REALM_ASSERT_EX(bb->block_after_size > 0, bb->block_after_size, get_file_path_for_assertions());
     auto bb2 = bb_after(entry);
-    bb->block_after_size = 0 - bb->block_after_size;
     REALM_ASSERT_EX(bb2->block_before_size > 0, bb2->block_before_size, get_file_path_for_assertions());
+    bb->block_after_size = 0 - bb->block_after_size;
     bb2->block_before_size = 0 - bb2->block_before_size;
 }
 
@@ -392,6 +390,9 @@ SlabAlloc::FreeBlock* SlabAlloc::allocate_block(int size)
     FreeBlock* remaining = break_block(block, size);
     if (remaining)
         push_freelist_entry(remaining);
+    auto block_before = bb_before(block);
+    REALM_ASSERT_EX(block_before && block_before->block_after_size >= size, block_before,
+                    get_file_path_for_assertions());
     auto after_block_size = size_from_block(block);
     REALM_ASSERT_EX(after_block_size >= size, after_block_size, size, get_file_path_for_assertions());
     return block;
@@ -578,7 +579,9 @@ void SlabAlloc::do_free(ref_type ref, char* addr)
     }
     else {
         // TODO: the commit size becomes negative with 128 in the capacity instead of the actual size
+        // REALM_ASSERT(m_commit_size >= size); //commit size should never wrap around to size_t{MAX}
         m_commit_size -= size;
+
         // fixup size to take into account the allocator's need to store a FreeBlock in a freed block
         if (size < sizeof(FreeBlock))
             size = sizeof(FreeBlock);
