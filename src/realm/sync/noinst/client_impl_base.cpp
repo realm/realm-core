@@ -2564,10 +2564,10 @@ void Session::suspend(const SessionErrorInfo& info)
         // Life cycle state is now Deactivated
     }
 
-    call_debug_hook(SyncClientHookEvent::SessionSuspended, info);
     // Notify the application of the suspension of the session if the session is
     // still in the Active state
     if (m_state == Active) {
+        call_debug_hook(SyncClientHookEvent::SessionSuspended, info);
         m_conn.one_less_active_unsuspended_session(); // Throws
         on_suspended(info);                           // Throws
     }
