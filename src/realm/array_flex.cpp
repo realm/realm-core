@@ -254,8 +254,9 @@ void ArrayFlex::setup_header_in_flex_format(std::vector<int64_t>& values, std::v
     uint8_t flags = m_array.get_flags((uint64_t*)m_array.get_header());
     NodeHeader::init_header(header, 'B', Encoding::Flex, flags, value_bit_width, index_bit_width, values.size(),
                             indices.size());
-    // Array is replaced in place so capacity is the max between byte_size and initial_capacity
-    const auto capacity = std::max(byte_size, size_t{128}); // TODO expose initiali capacity to flex array
+    // Array is rewritten in place so capacity is the max between byte_size and initial_capacity
+    // const auto capacity = std::max(byte_size, size_t{128}); // TODO make flex array friend of node header
+    const auto capacity = byte_size; // std::max(byte_size,(size_t)24);// std::max(byte_size, (size_t)128);
     NodeHeader::set_capacity_in_header(capacity, mem.get_addr());
     // TODO: check if this can be done better. (e.g use realloc and not destroy)
     m_array.destroy();
