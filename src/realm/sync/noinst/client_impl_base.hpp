@@ -1015,8 +1015,6 @@ private:
     State m_state = Unactivated;
 
     bool m_suspended = false;
-    uint64_t m_cur_suspend_generation = 0;
-    uint64_t m_next_suspend_generation = 0;
 
     SyncSocketProvider::SyncTimer m_try_again_activation_timer;
     ErrorBackoffState<sync::ProtocolError, RandomEngine> m_try_again_delay_info;
