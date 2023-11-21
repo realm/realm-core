@@ -644,18 +644,18 @@ void SyncSession::handle_error(sync::SessionErrorInfo error)
     auto next_state = error.is_fatal ? NextStateAfterError::error : NextStateAfterError::none;
     util::Optional<ShouldBackup> delete_file;
     bool log_out_user = false;
-    bool unrecognized_by_client = false;
+    bool unrecognized_by_client = error.status == ErrorCodes::UnknownError;
 
     if (error.status == ErrorCodes::AutoClientResetFailed) {
         // At this point, automatic recovery has been attempted but it failed.
         // Fallback to a manual reset and let the user try to handle it.
         next_state = NextStateAfterError::inactive;
         delete_file = ShouldBackup::yes;
-    }
-    else if (error.server_requests_action != sync::ProtocolErrorInfo::Action::NoAction) {
+    } else {
         switch (error.server_requests_action) {
             case sync::ProtocolErrorInfo::Action::NoAction:
-                REALM_UNREACHABLE(); // This is not sent by the MongoDB server
+                next_state = NextStateAfterError::none;
+                break;
             case sync::ProtocolErrorInfo::Action::ApplicationBug:
                 [[fallthrough]];
             case sync::ProtocolErrorInfo::Action::ProtocolViolation:
@@ -728,11 +728,6 @@ void SyncSession::handle_error(sync::SessionErrorInfo error)
                 log_out_user = true;
                 break;
         }
-    }
-    else {
-        // Unrecognized error code.
-        unrecognized_by_client = true;
-        next_state = NextStateAfterError::inactive;
     }
 
     util::CheckedUniqueLock lock(m_state_mutex);
