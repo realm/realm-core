@@ -197,6 +197,7 @@ private:
     bool m_force_closed = false;
 
     bool m_suspended = false;
+    std::atomic<uint64_t> m_cur_suspend_generation = 0;
 
     // Has the SessionWrapper been finalized?
     bool m_finalized = false;
@@ -1312,16 +1313,28 @@ void SessionWrapper::cancel_reconnect_delay()
     }
 
     util::bind_ptr<SessionWrapper> self{this};
-    m_client.post([self = std::move(self)](Status status) {
+    // We need to make sure that if the session is currently being suspended (i.e. we're racing with the sync
+    // connection listener reporting an error to the user) that we only cancel the resumption delay after the
+    // session has been fully torn down and object-store has taken any appropriate error handling actions.
+    //
+    // To that end, we include a generation count that gets incremented on the event loop after the error
+    // has been reported to the user and check whether it's changed below before resuming the session.
+    auto generation = m_cur_suspend_generation.load();
+    m_client.post([self = std::move(self), generation](Status status) {
         if (status == ErrorCodes::OperationAborted)
             return;
         else if (!status.is_ok())
             throw Exception(status);
 
+        if (self->m_cur_suspend_generation != generation) {
+            return;
+        }
+
         REALM_ASSERT(self->m_actualized);
         if (REALM_UNLIKELY(!self->m_sess))
             return; // Already finalized
         SessionImpl& sess = *self->m_sess;
+
         sess.cancel_resumption_delay(); // Throws
         ClientImpl::Connection& conn = sess.get_connection();
         conn.cancel_reconnect_delay(); // Throws
@@ -1708,6 +1721,9 @@ void SessionWrapper::on_suspended(const SessionErrorInfo& error_info)
     if (m_connection_state_change_listener) {
         m_connection_state_change_listener(ConnectionState::disconnected, error_info); // Throws
     }
+    // This mitigates a race between a user calling cancel_resumption_delay() and the sync client reporting
+    // an error message from the server to the user. See SessionWrapper::cancel_reconnect_delay() for more details.
+    ++m_cur_suspend_generation;
 }
 
 

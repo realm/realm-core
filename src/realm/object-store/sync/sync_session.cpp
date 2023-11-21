@@ -659,6 +659,7 @@ void SyncSession::handle_error(sync::SessionErrorInfo error)
             case sync::ProtocolErrorInfo::Action::ApplicationBug:
                 [[fallthrough]];
             case sync::ProtocolErrorInfo::Action::ProtocolViolation:
+                next_state = NextStateAfterError::inactive;
                 break;
             case sync::ProtocolErrorInfo::Action::Warning:
                 break; // not fatal, but should be bubbled up to the user below.
@@ -731,6 +732,7 @@ void SyncSession::handle_error(sync::SessionErrorInfo error)
     else {
         // Unrecognized error code.
         unrecognized_by_client = true;
+        next_state = NextStateAfterError::inactive;
     }
 
     util::CheckedUniqueLock lock(m_state_mutex);

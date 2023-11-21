@@ -97,11 +97,6 @@ struct SyncClient {
     }
 #endif
 
-    void cancel_reconnect_delay()
-    {
-        m_client.cancel_reconnect_delay();
-    }
-
     void stop()
     {
         m_client.shutdown();
