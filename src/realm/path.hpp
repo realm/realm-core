@@ -83,6 +83,11 @@ struct PathElement {
         , m_type(Type::key)
     {
     }
+    PathElement(std::string_view str)
+        : string_val(str)
+        , m_type(Type::key)
+    {
+    }
     PathElement(const PathElement& other)
         : m_type(other.m_type)
     {

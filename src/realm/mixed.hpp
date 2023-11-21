@@ -276,6 +276,7 @@ public:
     void use_buffer(std::string& buf) noexcept;
 
     void to_json(std::ostream& out, JSONOutputMode output_mode) const noexcept;
+    std::string to_json(JSONOutputMode output_mode = JSONOutputMode::output_mode_json) const noexcept;
     bson::Bson to_bson() const noexcept;
 
 protected:

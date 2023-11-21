@@ -108,8 +108,7 @@ public:
     std::pair<Iterator, bool> insert(Mixed key, Mixed value);
     std::pair<Iterator, bool> insert(Mixed key, const Obj& obj);
 
-    template <typename T>
-    void insert_json(const std::string&, const T&);
+    void set(const bson::BsonDocument&);
 
     Obj create_and_insert_linked_object(Mixed key);
 
@@ -225,6 +224,7 @@ public:
     StableIndex build_index(Mixed key) const;
 
     void to_json(std::ostream&, JSONOutputMode, util::FunctionRef<void(const Mixed&)>) const override;
+    void to_bson(bson::BsonDocument&) const;
 
 private:
     template <typename T, typename Op>

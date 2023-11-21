@@ -18,7 +18,7 @@
 
 #include "realm/sync/subscriptions.hpp"
 
-#include "external/json/json.hpp"
+#include "realm/util/bson/bson.hpp"
 
 #include "realm/data_type.hpp"
 #include "realm/keys.hpp"
@@ -574,9 +574,7 @@ std::string SubscriptionSet::to_ext_json() const
         return "{}";
     }
 
-    // TODO this is pulling in a giant compile-time dependency. We should have a better way of escaping the
-    // query strings into a json object.
-    nlohmann::json output_json;
+    bson::BsonDocument doc;
     for (auto& table : table_to_query) {
         // We want to make sure that the queries appear in some kind of canonical order so that if there are
         // two subscription sets with the same subscriptions in different orders, the server doesn't have to
@@ -592,10 +590,10 @@ std::string SubscriptionSet::to_ext_json() const
             is_first = false;
             obuf << "(" << query_str << ")";
         }
-        output_json[table.first] = obuf.str();
+        doc.append(table.first, obuf.str());
     }
 
-    return output_json.dump();
+    return doc.dump();
 }
 
 SubscriptionStoreRef SubscriptionStore::create(DBRef db)

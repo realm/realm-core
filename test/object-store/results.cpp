@@ -5119,3 +5119,192 @@ TEST_CASE("notifications: objects with PK recreated", "[results]") {
         REQUIRE(calls3 == 2);
     }
 }
+
+TEST_CASE("bson import export", "[results]") {
+    _impl::RealmCoordinator::assert_no_open_realms();
+    InMemoryTestFile config;
+    config.cache = false;
+    config.automatic_change_notifications = false;
+
+    auto r = Realm::get_shared_realm(config);
+    r->update_schema({
+        {"Person",
+         {
+             {"_id", PropertyType::Int, Property::IsPrimary{true}},
+             {"name", PropertyType::String},
+             {"age", PropertyType::Int},
+             {"spouse", PropertyType::Object | PropertyType::Nullable, "Person"},
+             {"address", PropertyType::Object | PropertyType::Array, "Address"},
+             {"additional", PropertyType::Mixed | PropertyType::Dictionary | PropertyType::Nullable},
+         }},
+        {"Address",
+         ObjectSchema::ObjectType::Embedded,
+         {
+             {"address_1", PropertyType::String},
+             {"address_2", PropertyType::String | PropertyType::Nullable},
+             {"city", PropertyType::String},
+             {"postal code", PropertyType::Int},
+         }},
+        {"Dog",
+         {
+             {"_id", PropertyType::Int, Property::IsPrimary{true}},
+             {"info", PropertyType::Object | PropertyType::Nullable, "Info"},
+             {"offspring", PropertyType::Object | PropertyType::Array, "Dog"},
+         }},
+        {"Cat",
+         {
+             {"_id", PropertyType::Int, Property::IsPrimary{true}},
+             {"info", PropertyType::Object | PropertyType::Nullable, "Info"},
+         }},
+        {"Info",
+         ObjectSchema::ObjectType::Embedded,
+         {
+             {"gender", PropertyType::String},
+             {"weight", PropertyType::Double},
+         }},
+    });
+
+    auto write = [&](auto&& f) {
+        r->begin_transaction();
+        f();
+        r->commit_transaction();
+        advance_and_notify(*r);
+    };
+
+    auto persons = r->read_group().get_table("class_Person");
+    auto dogs = r->read_group().get_table("class_Dog");
+    auto cats = r->read_group().get_table("class_Cat");
+    write([&] {
+        cats->create_objects(R"([
+          {
+            "_id": 1,
+            "info": {
+              "gender": "male",
+              "weight": 5.6
+            }
+          }
+        ])");
+        dogs->create_objects(R"([
+          {
+            "_id": 11,
+            "info": {
+              "gender": "male",
+              "weight": 25.2
+            },
+            "offspring": [22, 33]
+          },
+          {
+            "_id": 22,
+            "info": {
+              "gender": "female",
+              "weight": 10.5
+            }
+          },
+          {
+            "_id": 33,
+            "info": {
+              "gender": "male",
+              "weight": 13.7
+            }
+          },
+          {
+            "_id": 44,
+            "info": {
+              "gender": "female",
+              "weight": 32.8
+            },
+            "offspring": [11]
+          }
+        ])");
+        persons->create_objects(R"([
+          {
+            "_id": 103600000,
+            "name": "Paul",
+            "age": 47,
+            "address": [
+              {
+                "address_1": "Ryparken 5",
+                "address_2": null,
+                "city": "København N",
+                "postal code": 2200
+              }
+            ],
+            "additional": {
+              "Pjevs": {
+                "$link" : {
+                  "table": "Cat",
+                  "key": 1
+                }
+              },
+              "Pluto": {
+                "$link" : {
+                  "table": "Dog",
+                  "key": 11
+                }
+              }
+            }
+          },
+          {
+            "_id": 2205550000,
+            "name": "John",
+            "age": 52,
+            "spouse": {
+              "_id": 11111959,
+              "name": "Yoko",
+              "age": 30
+            },
+            "address": [
+              {
+                "address_1": "Gammel Kongevej 42",
+                "address_2": null,
+                "city": "Frederiksberg C",
+                "postal code": 1921
+              }
+            ]
+          },
+          {
+            "_id": 1504580000,
+            "name": "George",
+            "age": 50,
+            "address": [
+              {
+                "address_1": "Brandes Alle 10",
+                "address_2": null,
+                "city": "Frederiksberg C",
+                "postal code": 1850
+              }
+            ],
+            "additional": {
+              "dict": {
+                "one": 1,
+                "two": 2
+              }
+            }
+          },
+          {
+            "_id": 708510000,
+            "name": "Ringo",
+            "age": 61,
+            "spouse": 103600000,
+            "address": [
+              {
+                "address_1": "Platanvej 7",
+                "address_2": "c/o Olsen",
+                "city": "Frederiksberg C",
+                "postal code": 1810
+              }
+            ],
+            "additional": {
+              "dict": [
+                1,
+                2
+              ]
+            }
+          }
+        ])");
+    });
+    std::stringstream ss;
+    ss << persons->to_bson() << std::endl;
+    ss << dogs->to_bson() << std::endl;
+    ss << cats->to_bson() << std::endl;
+}

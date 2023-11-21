@@ -22,6 +22,9 @@
 #include <realm/array_key.hpp>
 #include <realm/array_string.hpp>
 #include <realm/array_mixed.hpp>
+#include <realm/dictionary.hpp>
+#include <realm/list.hpp>
+#include <realm/util/bson/bson.hpp>
 
 namespace realm {
 
@@ -225,6 +228,67 @@ void Collection::get_any(QueryCtrlBlock& ctrl, Mixed val, size_t index)
             }
         }
     }
+}
+
+bson::Bson CollectionBase::link_to_bson(ObjKey obj_key) const
+{
+    REALM_ASSERT(obj_key);
+    auto target_table = get_obj().get_target_table(get_col_key());
+    auto obj = target_table->get_object(obj_key);
+    if (target_table->is_embedded()) {
+        bson::BsonDocument doc;
+        obj.to_bson(doc);
+        return doc;
+    }
+    else {
+        return obj.get_primary_key().to_bson();
+    }
+}
+
+bson::Bson CollectionBase::mixed_to_bson(Mixed value) const
+{
+    if (value.is_type(type_Dictionary)) {
+        DummyParent parent(get_obj().get_table(), value.get_ref());
+        Dictionary dict(parent, 0);
+        bson::BsonDocument doc;
+        dict.to_bson(doc);
+        return doc;
+    }
+    else if (value.is_type(type_List)) {
+        DummyParent parent(get_obj().get_table(), value.get_ref());
+        Lst<Mixed> list(parent, 0);
+        bson::BsonArray arr;
+        list.to_bson(arr);
+        return arr;
+    }
+    else if (value.is_type(type_TypedLink)) {
+        bson::BsonDocument link;
+        {
+            bson::BsonDocument sub_doc = link.append_document("$link");
+            auto obj = get_table()->get_parent_group()->get_object(value.get_link());
+            auto target_table = obj.get_table();
+            sub_doc.append("table", std::string(target_table->get_class_name()));
+            sub_doc.append("key", obj.get_primary_key().to_bson());
+        }
+        return link;
+    }
+    else {
+        return value.to_bson();
+    }
+}
+
+ObjLink CollectionBase::is_link(const bson::BsonDocument& document)
+{
+    auto val = document.find("$link");
+    if (val) {
+        auto sub_doc = static_cast<const bson::BsonDocument&>(*val);
+        std::string table_name = static_cast<const std::string&>(sub_doc["table"]);
+        Mixed pk(sub_doc["key"]);
+        Group::TableNameBuffer buffer;
+        auto table = get_table()->get_parent_group()->get_table(Group::class_name_to_table_name(table_name, buffer));
+        return {table->get_key(), table->get_objkey_from_primary_key(pk)};
+    }
+    return {};
 }
 
 } // namespace realm

@@ -35,6 +35,7 @@
 #include <realm/table_view.hpp>
 #include <realm/util/features.h>
 #include <realm/util/serializer.hpp>
+#include <realm/util/bson/bson.hpp>
 
 #include <stdexcept>
 
@@ -2284,6 +2285,68 @@ Obj Table::create_object(GlobalKey object_id, const FieldValues& values)
     catch (const KeyAlreadyUsed&) {
         return m_clusters.get(key);
     }
+}
+
+Obj Table::create_object(const bson::BsonDocument& document)
+{
+    REALM_ASSERT(m_primary_key_col);
+    Mixed pk;
+    FieldValues primitive_values;
+    bson::BsonDocument collection_values;
+    for (auto [key, val] : document) {
+        auto col = get_column_key(StringData(key));
+        if (col == m_primary_key_col) {
+            pk = val;
+        }
+        else if (col.is_collection() || col.get_type() == col_type_Link) {
+            collection_values.append(key, val);
+        }
+        else {
+            primitive_values.insert(col, val);
+        }
+    }
+    Obj obj = create_object_with_primary_key(pk, std::move(primitive_values));
+    if (!collection_values.empty()) {
+        obj.set(collection_values);
+    }
+    return obj;
+}
+
+void Table::create_objects(BinaryData bson_documents)
+{
+    bson::BsonArray arr(reinterpret_cast<const uint8_t*>(bson_documents.data()));
+    for (auto& doc : arr) {
+        REALM_ASSERT(doc.type() == bson::Bson::Type::Document);
+        create_object(static_cast<const bson::BsonDocument&>(doc));
+    }
+}
+
+bson::BsonArray Table::to_bson() const
+{
+    bson::BsonArray ret;
+    to_bson(ret);
+    return ret;
+}
+
+void Table::to_bson(bson::BsonArray& arr) const
+{
+    for (auto& o : *this) {
+        auto doc = arr.append_document();
+        o.to_bson(doc);
+    }
+}
+
+Obj Table::create_object(std::string_view json_string)
+{
+    return create_object(static_cast<const bson::BsonDocument&>(bson::parse(json_string)));
+}
+
+void Table::create_objects(std::string_view json_string)
+{
+    auto bson = bson::parse(json_string);
+    REALM_ASSERT(bson.type() == bson::Bson::Type::Array);
+    auto& arr = static_cast<const bson::BsonArray&>(bson);
+    create_objects(arr.serialize());
 }
 
 Obj Table::create_object_with_primary_key(const Mixed& primary_key, FieldValues&& field_values, UpdateMode mode,

@@ -305,6 +305,9 @@ public:
     {
         return create_object_with_primary_key(primary_key, {{}}, UpdateMode::all, did_create);
     }
+    void create_objects(BinaryData bson_documents);
+    Obj create_object(std::string_view json_string);
+    void create_objects(std::string_view json_string);
     // Return key for existing object or return null key.
     ObjKey find_primary_key(Mixed value) const;
     // Return ObjKey for object identified by id. If objects does not exist, return null key
@@ -634,6 +637,8 @@ public:
     // Conversion
     void schema_to_json(std::ostream& out) const;
     void to_json(std::ostream& out, JSONOutputMode output_mode = output_mode_json) const;
+    bson::BsonArray to_bson() const;
+    void to_bson(bson::BsonArray&) const;
 
     /// \brief Compare two tables for equality.
     ///
@@ -831,6 +836,8 @@ private:
     /// Create an empty table with independent spec and return just
     /// the reference to the underlying memory.
     static ref_type create_empty_table(Allocator&, TableKey = TableKey());
+
+    Obj create_object(const bson::BsonDocument& document);
 
     void nullify_links(CascadeState&);
     void remove_recursive(CascadeState&);

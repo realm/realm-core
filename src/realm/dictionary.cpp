@@ -24,6 +24,7 @@
 #include <realm/list.hpp>
 #include <realm/set.hpp>
 #include <realm/replication.hpp>
+#include <realm/util/bson/bson.hpp>
 
 #include <algorithm>
 
@@ -1165,6 +1166,68 @@ void Dictionary::to_json(std::ostream& out, JSONOutputMode output_mode,
     out << "}";
     if (output_mode == output_mode_xjson_plus) {
         out << "}";
+    }
+}
+
+void Dictionary::set(const bson::BsonDocument& document)
+{
+    auto this_type = get_value_data_type();
+    clear();
+    for (const auto& [key, value] : document) {
+        if (value.type() == bson::Bson::Type::Document) {
+            const bson::BsonDocument& document = static_cast<const bson::BsonDocument&>(value);
+            if (this_type == type_Link) {
+                auto target_table = get_target_table();
+                ObjKey obj_key;
+                if (target_table->is_embedded()) {
+                    Obj obj = create_and_insert_linked_object(key);
+                    obj.set(document);
+                }
+                else {
+                    auto obj = target_table->create_object(document);
+                    insert(key, obj.get_key());
+                }
+            }
+            else {
+                REALM_ASSERT(this_type == type_Mixed);
+                if (auto obj_link = is_link(document)) {
+                    insert(key, obj_link);
+                }
+                else {
+                    insert_collection(key, CollectionType::Dictionary);
+                    get_dictionary(key)->set(document);
+                }
+            }
+        }
+        else if (value.type() == bson::Bson::Type::Array) {
+            REALM_ASSERT(this_type == type_Mixed);
+            insert_collection(key, CollectionType::List);
+            get_list(key)->LstBase::set(static_cast<const bson::BsonArray&>(value));
+        }
+        else {
+            Mixed val(value);
+            if (this_type == type_Link) {
+                auto target_table = get_target_table();
+                insert(key, target_table->get_objkey_from_primary_key(Mixed(value)));
+            }
+            else {
+                REALM_ASSERT(this_type == type_Mixed || val.is_type(this_type));
+                insert(key, val);
+            }
+        }
+    }
+}
+
+void Dictionary::to_bson(bson::BsonDocument& doc) const
+{
+    for (auto [_key, value] : *this) {
+        std::string key(_key.get_string());
+        if (get_value_data_type() == type_Link) {
+            doc.append(key, link_to_bson(value.get<ObjKey>()));
+        }
+        else {
+            doc.append(key, mixed_to_bson(value));
+        }
     }
 }
 

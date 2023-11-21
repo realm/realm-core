@@ -34,6 +34,7 @@
 #include <realm/group_writer.hpp>
 #include <realm/transaction.hpp>
 #include <realm/replication.hpp>
+#include <realm/util/bson/bson.hpp>
 
 using namespace realm;
 using namespace realm::util;
@@ -1181,6 +1182,24 @@ void Group::update_refs(ref_type top_ref) noexcept
             table_accessor->update_from_parent();
         }
     }
+}
+
+bson::BsonDocument Group::to_bson() const
+{
+    bson::BsonDocument ret;
+    auto keys = get_table_keys();
+    for (size_t i = 0; i < keys.size(); ++i) {
+        auto key = keys[i];
+        auto name = std::string_view(get_class_name(key));
+
+        ConstTableRef table = get_table(key);
+
+        if (!table->is_embedded()) {
+            bson::BsonArray arr(ret.append_array(name));
+            table->to_bson(arr);
+        }
+    }
+    return ret;
 }
 
 bool Group::operator==(const Group& g) const

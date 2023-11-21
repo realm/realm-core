@@ -16,11 +16,11 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "external/json/json.hpp"
 #include <realm/object-store/sync/app.hpp>
 
 #include <realm/sync/network/http.hpp>
 #include <realm/util/base64.hpp>
+#include <realm/util/bson/bson.hpp>
 #include <realm/util/flat_map.hpp>
 #include <realm/util/platform_info.hpp>
 #include <realm/util/uri.hpp>
@@ -1254,8 +1254,8 @@ void App::call_function(const std::shared_ptr<SyncUser>& user, const std::string
         log_debug("App: call_function: %1 service_name: %2 args_bson: %3", name, service_name, args_ejson);
     }
 
-    auto args = util::format("{\"arguments\":%1,\"name\":%2%3}", args_ejson, nlohmann::json(name).dump(),
-                             service_name_opt ? (",\"service\":" + nlohmann::json(service_name).dump()) : "");
+    auto args = util::format("{\"arguments\":%1,\"name\":%2%3}", args_ejson, Mixed(name).to_json(),
+                             service_name_opt ? (",\"service\":" + Mixed(service_name).to_json()) : "");
 
     do_authenticated_request(
         Request{HttpMethod::post, function_call_url_path(), m_request_timeout_ms, {}, std::move(args), false}, user,

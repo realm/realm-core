@@ -372,6 +372,7 @@ public:
         return {this, size()};
     }
 
+    std::string dump() const;
 
 private:
     friend class BsonArray;

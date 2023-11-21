@@ -37,6 +37,7 @@
 #include "realm/replication.hpp"
 #include "realm/dictionary.hpp"
 #include "realm/index_string.hpp"
+#include "realm/util/bson/bson.hpp"
 
 namespace realm {
 
@@ -144,6 +145,51 @@ void CollectionBaseImpl<LstBase>::to_json(std::ostream& out, JSONOutputMode outp
         }
     }
     out << "]";
+}
+
+void LstBase::set(const bson::BsonArray& arr)
+{
+    auto this_type = get_data_type();
+    clear();
+    auto ndx = 0;
+    for (auto& value : arr) {
+        if (value.type() == bson::Bson::Type::Document) {
+            REALM_ASSERT(this_type == type_Mixed);
+            const bson::BsonDocument& document = static_cast<const bson::BsonDocument&>(value);
+            if (auto obj_link = is_link(document)) {
+                insert_any(ndx, obj_link);
+            }
+            else {
+                insert_collection(ndx, CollectionType::Dictionary);
+                get_dictionary(ndx)->set(document);
+            }
+        }
+        else if (value.type() == bson::Bson::Type::Array) {
+            REALM_ASSERT(this_type == type_Mixed);
+            insert_collection(ndx, CollectionType::List);
+            get_list(ndx)->LstBase::set(static_cast<const bson::BsonArray&>(value));
+        }
+        else {
+            Mixed val(value);
+            REALM_ASSERT(this_type == type_Mixed || val.is_type(this_type));
+            insert_any(ndx, val);
+        }
+        ++ndx;
+    }
+}
+
+void LstBase::to_bson(bson::BsonArray& arr) const
+{
+    auto sz = size();
+    for (size_t ndx = 0; ndx < sz; ++ndx) {
+        Mixed value = get_any(ndx);
+        if (get_data_type() == type_Link) {
+            arr.append(link_to_bson(value.get<ObjKey>()));
+        }
+        else {
+            arr.append(mixed_to_bson(value));
+        }
+    }
 }
 
 /***************************** Lst<Stringdata> ******************************/
@@ -953,6 +999,26 @@ void LnkLst::remove_all_target_rows()
         update_if_needed();
         _impl::TableFriend::batch_erase_rows(*get_target_table(), *m_list.m_tree);
     }
+}
+
+void LnkLst::set(const bson::BsonArray& arr)
+{
+    clear();
+    auto ndx = 0;
+    for (auto& value : arr) {
+        auto target_table = get_target_table();
+        ObjKey obj_key;
+        if (target_table->is_embedded()) {
+            Obj obj = create_and_insert_linked_object(ndx);
+            if (value.type() != bson::Bson::Type::Null)
+                obj.set(static_cast<const bson::BsonDocument&>(value));
+        }
+        else {
+            m_list.insert(ndx, target_table->get_objkey_from_primary_key(Mixed(value)));
+        }
+        ++ndx;
+    }
+    update_unresolved(UpdateStatus::Updated);
 }
 
 void LnkLst::to_json(std::ostream& out, JSONOutputMode, util::FunctionRef<void(const Mixed&)> fn) const

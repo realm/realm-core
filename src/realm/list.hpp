@@ -66,6 +66,8 @@ public:
     virtual void remove(size_t from, size_t to) = 0;
     virtual void move(size_t from, size_t to) = 0;
     virtual void swap(size_t ndx1, size_t ndx2) = 0;
+    virtual void set(const bson::BsonArray&);
+    void to_bson(bson::BsonArray&) const;
 
 protected:
     static constexpr CollectionType s_collection_type = CollectionType::List;
@@ -423,9 +425,6 @@ public:
         insert(size(), std::move(value));
     }
 
-    template <typename T>
-    void add_json(const T&);
-
     Mixed operator[](size_t ndx) const
     {
         return this->get(ndx);
@@ -695,6 +694,8 @@ public:
     {
         return clone_linklist();
     }
+    void set(const bson::BsonArray&) override;
+
     // Overriding members of ObjList:
     LinkCollectionPtr clone_obj_list() const override
     {

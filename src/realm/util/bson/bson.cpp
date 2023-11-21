@@ -854,6 +854,13 @@ bool BsonDocument::operator==(const BsonDocument& other) const
     return true;
 }
 
+std::string BsonDocument::dump() const
+{
+    std::ostringstream ss;
+    ss << *this;
+    return ss.str();
+}
+
 /************************** BsonDocument::iterator ***************************/
 
 const BsonDocument::entry* BsonDocument::iterator::operator->()

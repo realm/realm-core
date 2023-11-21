@@ -44,6 +44,7 @@
 #include "realm/table_view.hpp"
 #include "realm/util/base64.hpp"
 #include "realm/util/overload.hpp"
+#include "realm/util/bson/bson.hpp"
 
 #include <ostream>
 
@@ -1565,6 +1566,7 @@ Obj Obj::create_and_set_linked_object(ColKey col_key, bool is_default)
     return result;
 }
 
+
 namespace {
 template <class T>
 inline void check_range(const T&)
@@ -2405,6 +2407,140 @@ Obj& Obj::set_null(ColKey col_key, bool is_default)
                   is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
 
     return *this;
+}
+
+Obj& Obj::set(ColKey col_key, const bson::Bson& value)
+{
+    if (value.type() == bson::Bson::Type::Document) {
+        const bson::BsonDocument& document = static_cast<const bson::BsonDocument&>(value);
+        if (col_key.get_type() == col_type_Link) {
+            auto target_table = m_table->get_opposite_table(col_key);
+            if (target_table->is_embedded()) {
+                Obj obj = create_and_set_linked_object(col_key);
+                obj.set(document);
+            }
+            else {
+                auto obj = target_table->create_object(document);
+                set(col_key, obj.get_key());
+            }
+        }
+        else {
+            if (!col_key.is_dictionary()) {
+                if (col_key.get_type() != col_type_Mixed) {
+                    throw InvalidArgument(
+                        util::format("Property '%1' not a dictionary", m_table->get_column_name(col_key)));
+                }
+                set_collection(col_key, CollectionType::Dictionary);
+            }
+            auto dict = get_dictionary(col_key);
+            dict.set(document);
+        }
+    }
+    else if (value.type() == bson::Bson::Type::Array) {
+        if (!col_key.is_list()) {
+            if (col_key.get_type() != col_type_Mixed) {
+                throw InvalidArgument(util::format("Property '%1' not a list", m_table->get_column_name(col_key)));
+            }
+            set_collection(col_key, CollectionType::List);
+        }
+        get_listbase_ptr(col_key)->set(static_cast<const bson::BsonArray&>(value));
+    }
+    else {
+        if (col_key.get_type() == col_type_Link) {
+            auto target_table = m_table->get_opposite_table(col_key);
+            set(col_key, target_table->get_objkey_from_primary_key(Mixed(value)));
+        }
+        else {
+            set_any(col_key, Mixed(value));
+        }
+    }
+    return *this;
+}
+
+Obj& Obj::set(const bson::BsonDocument& document)
+{
+    auto primary_key_col = m_table->get_primary_key_column();
+    for (const auto& [key, value] : document) {
+        auto col_key = get_column_key(key);
+        if (!col_key) {
+            throw InvalidArgument(util::format("Invalid property '%1'", key));
+        }
+        if (col_key != primary_key_col) {
+            set(col_key, value);
+        }
+    }
+
+    return *this;
+}
+
+
+Obj& Obj::set_json(ColKey col_key, std::string_view json)
+{
+    return set(col_key, bson::parse(json));
+}
+
+void Obj::to_bson(bson::BsonDocument& doc) const
+{
+    auto col_keys = m_table->get_column_keys();
+    for (auto ck : col_keys) {
+        std::string name = m_table->get_column_name(ck);
+        auto col_type = ck.get_type();
+
+        if (ck.is_list()) {
+            auto list = get_listbase_ptr(ck);
+            bson::BsonArray arr(doc.append_array(name));
+            list->to_bson(arr);
+        }
+        else if (ck.is_dictionary()) {
+            auto dict = get_dictionary(ck);
+            auto sub_doc = doc.append_document(name);
+            dict.to_bson(sub_doc);
+        }
+        else if (col_type == col_type_Mixed) {
+            auto mixed_val = get<Mixed>(ck);
+            if (mixed_val.is_type(type_Dictionary)) {
+                auto dict = get_dictionary(ck);
+                auto sub_doc = doc.append_document(name);
+                dict.to_bson(sub_doc);
+            }
+            else if (mixed_val.is_type(type_List)) {
+                auto list = get_list<Mixed>(ck);
+                bson::BsonArray arr(doc.append_array(name));
+                list.to_bson(arr);
+            }
+            else if (mixed_val.is_type(type_TypedLink)) {
+                bson::BsonDocument link = doc.append_document(name);
+                bson::BsonDocument sub_doc = link.append_document("$link");
+                auto obj = get_table()->get_parent_group()->get_object(mixed_val.get_link());
+                auto target_table = obj.get_table();
+                sub_doc.append("table", std::string(target_table->get_class_name()));
+                sub_doc.append("key", obj.get_primary_key().to_bson());
+            }
+            else {
+                doc.append(name, mixed_val.to_bson());
+            }
+        }
+        else if (col_type == col_type_Link) {
+            if (auto obj_key = get<ObjKey>(ck)) {
+                auto target_table = get_target_table(ck);
+                auto obj = target_table->get_object(obj_key);
+                if (target_table->is_embedded()) {
+                    auto sub_doc = doc.append_document(name);
+                    obj.to_bson(sub_doc);
+                }
+                else {
+                    doc.append(name, obj.get_primary_key().to_bson());
+                }
+            }
+            else {
+                doc.append(name, bson::Bson());
+            }
+        }
+        else {
+            auto mixed_val = get_any(ck);
+            doc.append(name, mixed_val.to_bson());
+        }
+    }
 }
 
 
