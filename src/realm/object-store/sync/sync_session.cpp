@@ -651,7 +651,8 @@ void SyncSession::handle_error(sync::SessionErrorInfo error)
         // Fallback to a manual reset and let the user try to handle it.
         next_state = NextStateAfterError::inactive;
         delete_file = ShouldBackup::yes;
-    } else {
+    }
+    else {
         switch (error.server_requests_action) {
             case sync::ProtocolErrorInfo::Action::NoAction:
                 next_state = NextStateAfterError::none;
