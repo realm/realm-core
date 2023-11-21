@@ -1142,6 +1142,12 @@ bool StringIndex::leaf_insert(ObjKey obj_key, key_type key, size_t offset, Strin
                               bool noextend)
 {
     REALM_ASSERT(!m_array->is_inner_bptree_node());
+    if (offset >= s_max_offset && m_target_column.full_word()) {
+        size_t len = value.get_string().size();
+        size_t max = s_max_offset;
+        throw LogicError(ErrorCodes::LimitExceeded,
+                         util::format("String of length %1 exceeds maximum string length of %2.", len, max));
+    }
 
     // Get subnode table
     Allocator& alloc = m_array->get_alloc();

@@ -2021,6 +2021,15 @@ TEST_TYPES(StringIndex_ListOfStrings, std::true_type, std::false_type)
     obj2.remove();
     CHECK_EQUAL(t->query(R"(names = "John")").count(), 1);
     CHECK_EQUAL(t->query(R"(names = "Johnny")").count(), 1);
+
+    std::string long1 = std::string(StringIndex::s_max_offset, 'a');
+    std::string long2 = long1 + "b";
+
+    list = obj1.get_list<String>(col);
+    list.add(long1);
+    if (add_index) {
+        CHECK_THROW_ANY(list.add(long2));
+    }
 }
 
 #endif // TEST_INDEX_STRING
