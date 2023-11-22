@@ -89,7 +89,9 @@ bool ArrayFlex::is_encoded() const
     using Encoding = NodeHeader::Encoding;
     REALM_ASSERT(m_array.is_attached());
     auto header = (uint64_t*)m_array.get_header();
-    return Node::get_kind(header) == 'B' && Node::get_encoding((uint64_t*)header) == Encoding::Flex;
+    auto kind = Node::get_kind(header);
+    auto encoding = Node::get_encoding(header);
+    return kind == 'B' && encoding == Encoding::Flex;
 }
 
 size_t ArrayFlex::size() const
@@ -172,6 +174,8 @@ void ArrayFlex::copy_into_encoded_array(std::vector<int64_t>& values, std::vecto
         REALM_ASSERT(values[indices[i]] == v);
         ++it_index;
     }
+    REALM_ASSERT(m_array.get_kind(header) == 'B');
+    REALM_ASSERT(m_array.get_encoding(header) == Encoding::Flex);
 }
 
 void ArrayFlex::do_encode_array(std::vector<int64_t>& values, std::vector<size_t>& indices) const
@@ -258,6 +262,8 @@ void ArrayFlex::setup_header_in_flex_format(std::vector<int64_t>& values, std::v
     auto header = (uint64_t*)mem.get_addr();
     NodeHeader::init_header(header, 'B', Encoding::Flex, flags, value_bit_width, index_bit_width, values.size(),
                             indices.size());
+    REALM_ASSERT(m_array.get_kind(header) == 'B');
+    REALM_ASSERT(m_array.get_encoding(header) == Encoding::Flex);
     // TODO: same as above, do we need to set capacity to 128 or actual needed size?
     const auto capacity = std::max(byte_size, size_t{128});
     NodeHeader::set_capacity_in_header(capacity, (char*)header);

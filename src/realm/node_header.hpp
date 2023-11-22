@@ -371,7 +371,8 @@ public:
         }
         else {
             auto h = (const uint8_t*)header;
-            const auto v = (h[2] & 0b1111);
+            auto byte = (uint8_t)h[2];
+            const auto v = (byte & 0b00001111);
             switch (v) {
                 case 0:
                     return Encoding::Packed;
@@ -524,9 +525,8 @@ public:
         }
         auto hw = (uint32_t*)header;
         hw[1] = (uint32_t)((bits_pr_elemA << 26) | (bits_pr_elemB << 20) | (num_elemsA << 10) | num_elemsB);
-        // flags in the first nibble
-        // encoding in the second nibble (3 means flex)
-        hb[2] = (hb[2] & 0b11110000) | (flags << 4) | 3;
+        hb[2] = (hb[2] & 0b11110000) | (flags << 4); // flags
+        hb[2] = (hb[2] & 0b11110000) | 3;            // flex
         hb[3] = kind;
     }
 
