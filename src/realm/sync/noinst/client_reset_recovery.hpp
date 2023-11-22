@@ -47,10 +47,12 @@ struct ListTracker {
     bool remove(uint32_t index, uint32_t& remote_index_out);
     bool requires_manual_copy() const;
     void queue_for_manual_copy();
+    void mark_as_copied();
 
 private:
     std::vector<CrossListIndex> m_indices_allowed;
     bool m_requires_manual_copy = false;
+    bool m_has_been_copied = false;
 };
 
 struct InternDictKey {
@@ -154,9 +156,7 @@ private:
 };
 
 struct RecoverLocalChangesetsHandler : public sync::InstructionApplier {
-    RecoverLocalChangesetsHandler(Transaction& dest_wt, Transaction& frozen_pre_local_state, util::Logger& logger,
-                                  Replication* repl);
-    virtual ~RecoverLocalChangesetsHandler();
+    RecoverLocalChangesetsHandler(Transaction& dest_wt, Transaction& frozen_pre_local_state, util::Logger& logger);
     void process_changesets(const std::vector<sync::ClientHistory::LocalChange>& changesets,
                             std::vector<sync::SubscriptionSet>&& pending_subs);
 
@@ -167,7 +167,6 @@ protected:
     struct RecoveryResolver : public InstructionApplier::PathResolver {
         RecoveryResolver(RecoverLocalChangesetsHandler* applier, Instruction::PathInstruction& instr,
                          const std::string_view& instr_name);
-        virtual ~RecoveryResolver();
         void on_property(Obj&, ColKey) override;
         void on_list(LstBase&) override;
         Status on_list_index(LstBase&, uint32_t) override;
