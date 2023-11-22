@@ -101,6 +101,8 @@ set(UTIL_SOURCES
     util/random.cpp
     util/resource_limits.cpp
     util/uri.cpp
+    util/bson/bson.cpp
+    util/bson/regular_expression.cpp
 )
 
 set(REALM_INSTALL_HEADERS
@@ -272,6 +274,12 @@ set(REALM_NOINST_HEADERS
     util/timestamp_formatter.hpp
     util/timestamp_logger.hpp
     util/value_reset_guard.hpp
+    util/bson/bson.hpp
+    util/bson/min_key.hpp
+    util/bson/max_key.hpp
+    util/bson/regular_expression.hpp
+    util/bson/indexed_map.hpp
+    util/bson/mongo_timestamp.hpp
 ) # REALM_NOINST_HEADERS
 
 if(NOT MSVC)
