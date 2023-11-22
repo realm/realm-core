@@ -2316,7 +2316,7 @@ TEST(Group_UniqueColumnKeys)
 }
 
 // NICO
-ONLY(Group_ArrayCompression_Correctness)
+TEST(Group_ArrayCompression_Correctness)
 {
     GROUP_TEST_PATH(path);
 

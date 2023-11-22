@@ -369,14 +369,14 @@ public:
         }
         else {
             auto h = (const uint8_t*)header;
-            switch (h[2] & 0b1111) {
+            const auto v = h[2] & 0b1111;
+            switch (v) {
                 case 0:
                     return Encoding::Packed;
                 case 1:
                     return Encoding::AofP;
-                case 2: // TODO: there is bug, init_from_ref is reading Encodiging::PofA.
-                    // return Encoding::PofA;
-                    return Encoding::Flex;
+                case 2:
+                    return Encoding::PofA;
                 case 3:
                     return Encoding::Flex;
                 default:
@@ -516,11 +516,13 @@ public:
         auto hb = (uint8_t*)header;
         if (kind == 0x41)
             REALM_ASSERT(false && "Illegal init args for legacy header");
-        if (enc != Encoding::Flex)
+        if (enc != Encoding::Flex) {
             REALM_ASSERT(false && "Illegal header encoding for chosen kind of header");
+        }
         auto hw = (uint32_t*)header;
         hw[1] = (uint32_t)((bits_pr_elemA << 26) | (bits_pr_elemB << 20) | (num_elemsA << 10) | num_elemsB);
-        hb[2] = (flags << 4) | 3;
+        hb[2] |= 3;            // encoding flex
+        hb[2] |= (flags << 4); // set the flags
         hb[3] = kind;
     }
 
@@ -577,7 +579,7 @@ public:
         }
         else {
             auto h = (uint8_t*)header;
-            h[2] = (h[2] & 0x00001111) | flags << 4;
+            h[2] = (h[2] & 0b00001111) | flags << 4;
         }
     }
     static inline uint8_t get_flags(uint64_t* header)
@@ -588,7 +590,7 @@ public:
         }
         else {
             auto h = (uint8_t*)header;
-            return h[2] >> 4; // TODO: the flag is not set correctly somehow. fix this.
+            return h[2] >> 4;
         }
     }
 };
@@ -739,7 +741,9 @@ inline size_t NodeHeader::get_elementA_size<NodeHeader::Encoding::Flex>(uint64_t
     REALM_ASSERT(encoding == Encoding::Flex);
     uint32_t word = ((uint32_t*)header)[1];
     auto bits_per_element = (word >> 26) & 0b111111;
-    bits_per_element++;
+    // TODO: why there is an increment here?? if I need 1 bit, I should not read 2 from the header.
+    //       I suspect this is done for supporting the sign bit... but the sign should be an implementation detail.
+    // bits_per_element++;
     REALM_ASSERT(bits_per_element <= 64);
     REALM_ASSERT(bits_per_element > 0);
     return bits_per_element;
@@ -770,7 +774,8 @@ inline size_t NodeHeader::get_elementB_size<NodeHeader::Encoding::Flex>(uint64_t
     REALM_ASSERT(get_encoding(header) == Encoding::Flex);
     uint32_t word = ((uint32_t*)header)[1];
     auto bits_per_element = (word >> 20) & 0b111111;
-    bits_per_element++;
+    // same as above
+    // bits_per_element++;
     REALM_ASSERT(bits_per_element <= 64);
     REALM_ASSERT(bits_per_element > 0);
     return bits_per_element;
