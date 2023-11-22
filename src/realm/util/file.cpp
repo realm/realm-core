@@ -572,6 +572,32 @@ void File::close() noexcept
 #endif
 }
 
+void File::close_static(FileDesc fd)
+{
+#ifdef _WIN32
+    if (!fd)
+        return;
+
+    if (!CloseHandle(fd))
+        throw std::system_error(GetLastError(), std::system_category(),
+                                "CloseHandle() failed from File::close_static()");
+#else
+    if (fd < 0)
+        return;
+
+    int ret = -1;
+    do {
+        ret = ::close(fd);
+    } while (ret == -1 && errno == EINTR);
+
+    if (ret != 0) {
+        int err = errno; // Eliminate any risk of clobbering
+        if (err == EBADF || err == EIO)
+            throw SystemError(err, "File::close_static() failed");
+    }
+#endif
+}
+
 size_t File::read_static(FileDesc fd, char* data, size_t size)
 {
 #ifdef _WIN32 // Windows version
@@ -1568,6 +1594,23 @@ bool File::is_same_file(const File& f) const
     REALM_ASSERT_RELEASE(is_attached());
     REALM_ASSERT_RELEASE(f.is_attached());
     return is_same_file_static(m_fd, f.m_fd);
+}
+
+FileDesc File::dup_file_desc(FileDesc fd)
+{
+    FileDesc fd_duped;
+#ifdef _WIN32
+    if (!DuplicateHandle(GetCurrentProcess(), fd, GetCurrentProcess(), &fd_duped, 0, FALSE, DUPLICATE_SAME_ACCESS))
+        throw std::system_error(GetLastError(), std::system_category(), "DuplicateHandle() failed");
+#else
+    fd_duped = dup(fd);
+
+    if (fd_duped == -1) {
+        int err = errno; // Eliminate any risk of clobbering
+        throw std::system_error(err, std::system_category(), "dup() failed");
+    }
+#endif // conditonal on _WIN32
+    return fd_duped;
 }
 
 File::UniqueID File::get_unique_id() const

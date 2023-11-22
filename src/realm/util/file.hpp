@@ -176,6 +176,7 @@ public:
     /// regardless of whether this instance currently is attached to
     /// an open file.
     void close() noexcept;
+    static void close_static(FileDesc fd); // throws
 
     /// Check whether this File instance is currently attached to an
     /// open file.
@@ -530,6 +531,8 @@ public:
     /// not, this function has undefined behavior.
     bool is_same_file(const File&) const;
     static bool is_same_file_static(FileDesc f1, FileDesc f2);
+
+    static FileDesc dup_file_desc(FileDesc fd);
 
     /// Resolve the specified path against the specified base directory.
     ///
