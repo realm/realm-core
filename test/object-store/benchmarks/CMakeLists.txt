@@ -35,9 +35,8 @@ target_include_directories(object-store-benchmarks PRIVATE
 
 if(REALM_ENABLE_SYNC)
     target_link_libraries(object-store-benchmarks SyncServer)
-    enable_stdfilesystem(object-store-benchmarks)
 endif()
-
+enable_stdfilesystem(object-store-benchmarks)
 target_link_libraries(object-store-benchmarks ObjectStore TestUtil Catch2::Catch2)
 
 add_dependencies(benchmarks object-store-benchmarks)
