@@ -96,6 +96,7 @@ static KeyPathArray create_key_path_array(Group& g, const ObjectSchema& object_s
             prop = schema_at_index->property_for_public_name(property);
             if (prop) {
                 ColKey col_key = prop->column_key;
+                TableKey table_key = schema_at_index->table_key;
                 if (prop->type == PropertyType::Object || prop->type == PropertyType::LinkingObjects) {
                     auto found_schema = schema.find(prop->object_type);
                     if (found_schema != schema.end()) {
@@ -108,7 +109,7 @@ static KeyPathArray create_key_path_array(Group& g, const ObjectSchema& object_s
                         }
                     }
                 }
-                resolved_key_path.emplace_back(schema_at_index->table_key, col_key);
+                resolved_key_path.emplace_back(table_key, col_key);
             }
             else {
                 throw InvalidArgument(util::format("Property '%1' in KeyPath '%2' is not a valid property in %3.",
