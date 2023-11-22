@@ -454,7 +454,6 @@ TEST_CASE("app: error handling integration test", "[sync][flx][baas]") {
         auto error_future = install_error_handler(config);
         auto r = Realm::get_shared_realm(config);
         wait_for_upload(*r);
-        wait_for_download(*r);
         nlohmann::json error_body = {
             {"tryAgain", false},
             {"message", "fake error"},
@@ -468,7 +467,7 @@ TEST_CASE("app: error handling integration test", "[sync][flx][baas]") {
                 .get();
         REQUIRE(test_cmd_res == "{}");
 
-        // Resume the session _while_ the error is being handled but before the session is marked inactive.
+        // Resume the session while the error is being handled but before the session is marked inactive.
         {
             std::unique_lock lock{barrier_mutex};
             barrier_cv.wait(lock, [&] {
