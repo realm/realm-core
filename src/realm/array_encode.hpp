@@ -35,7 +35,6 @@ public:
 
     virtual size_t size() const = 0;
     virtual int64_t get(size_t) const = 0;
-    virtual size_t byte_size() const = 0;
 };
 
 } // namespace realm

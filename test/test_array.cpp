@@ -1622,19 +1622,38 @@ TEST(B_Array_creation)
     auto array_header = (uint64_t*)array.get_header();
     CHECK_EQUAL(array.get_kind(array_header), 'B');
     auto encoding = array.get_encoding(array_header);
-    REALM_ASSERT(encoding == Encoding::Flex);
+    REALM_ASSERT(encoding == Encoding::Flex); // this is missing << operator in order to be printed in case of error
     CHECK_EQUAL(array.get_flags(array_header), 14);
     CHECK_EQUAL(array.get_elementA_size<Encoding::Flex>(array_header), 1);
     CHECK_EQUAL(array.get_elementB_size<Encoding::Flex>(array_header), 1);
     CHECK_EQUAL(array.get_arrayA_num_elements<Encoding::Flex>(array_header), 1);
     CHECK_EQUAL(array.get_arrayB_num_elements<Encoding::Flex>(array_header), 1);
-
     // set flags explicitely (this should not change kind and encoding)
     array.set_flags(array_header, 11);
     auto flags = array.get_flags(array_header);
     CHECK_EQUAL(flags, 11);
     CHECK_EQUAL(array.get_kind(array_header), 'B');
     REALM_ASSERT(array.get_encoding(array_header) == Encoding::Flex);
+}
+
+TEST(B_Array_encoding)
+{
+    using Encoding = NodeHeader::Encoding;
+    Array array(Allocator::get_default());
+    auto mem = array.get_alloc().alloc(10);
+    NodeHeader::init_header((uint64_t*)mem.get_addr(), 'B', Encoding::Flex, 14, 1, 1, 1, 1);
+    array.init_from_mem(mem);
+    auto array_header = (uint64_t*)array.get_header();
+    CHECK_EQUAL(array.get_kind(array_header), 'B');
+    auto encoding = array.get_encoding(array_header);
+    CHECK(encoding == Encoding::Flex);
+
+    Array another_array(Allocator::get_default());
+    another_array.init_from_ref(array.get_ref());
+    auto another_header = (uint64_t*)another_array.get_header();
+    CHECK_EQUAL(another_array.get_kind(another_header), 'B');
+    auto another_encoding = another_array.get_encoding(another_header);
+    CHECK(encoding == another_encoding);
 }
 
 #endif // TEST_ARRAY

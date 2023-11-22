@@ -2316,7 +2316,7 @@ TEST(Group_UniqueColumnKeys)
 }
 
 // NICO
-TEST(Group_ArrayCompression_Correctness)
+ONLY(Group_ArrayCompression_Correctness)
 {
     GROUP_TEST_PATH(path);
 
@@ -2332,22 +2332,13 @@ TEST(Group_ArrayCompression_Correctness)
     array.add(16388);
     array.add(409);
     array.add(16388);
-    // the integer array in the cluster tree should now be in compressed format
     CHECK_EQUAL(array.size(), 6);
-    // fetch and verify that all the data is there. (this is not passing, it seems we have 2 arrays..)
-    auto v1 = array.get_any(0);
-    auto v2 = array.get_any(1);
-    auto v3 = array.get_any(2);
-    auto v4 = array.get_any(3);
-    auto v5 = array.get_any(4);
-    auto v6 = array.get_any(5);
-    CHECK_EQUAL(v1.get_int(), 16388);
-    CHECK_EQUAL(v2.get_int(), 409);
-    CHECK_EQUAL(v3.get_int(), 16388);
-    CHECK_EQUAL(v4.get_int(), 16388);
-    CHECK_EQUAL(v5.get_int(), 409);
-    CHECK_EQUAL(v6.get_int(), 16388);
-
+    CHECK_EQUAL(array.get_any(0).get_int(), 16388);
+    CHECK_EQUAL(array.get_any(1).get_int(), 409);
+    CHECK_EQUAL(array.get_any(2).get_int(), 16388);
+    CHECK_EQUAL(array.get_any(3).get_int(), 16388);
+    CHECK_EQUAL(array.get_any(4).get_int(), 409);
+    CHECK_EQUAL(array.get_any(5).get_int(), 16388);
 
     // Serialize to disk (compression should happen when the proper leaf array is serialized to disk)
     to_disk.write(path, crypt_key());
@@ -2356,7 +2347,7 @@ TEST(Group_ArrayCompression_Correctness)
     to_disk.verify();
 #endif
 
-    //    // Load the tables
+    // Load the tables
     Group from_disk(path, crypt_key());
     TableRef read_table = from_disk.get_table("test");
     auto col_key1 = read_table->get_column_key("lint");

@@ -260,6 +260,11 @@ void Array::init_from_mem(MemRef mem) noexcept
     auto kind = get_kind((uint64_t*)header);
     // be sure that the node is either A or B
     REALM_ASSERT(kind == 'A' || kind == 'B');
+    if (kind == 'B') {
+        // the only encoding supported at the moment
+        auto encoding = get_encoding((uint64_t*)header);
+        REALM_ASSERT(encoding == Encoding::Flex);
+    }
 
     header = Node::init_from_mem(mem);
     // Parse header
@@ -335,15 +340,12 @@ void Array::destroy_children(size_t offset) noexcept
 
 size_t Array::get_byte_size() const noexcept
 {
-    // For compressed arrays this does not make sense anymore.
-    if (m_encode.is_encoded()) {
-        return m_encode.byte_size();
-    }
+    // A and B type array
     const char* header = get_header_from_data(m_data);
-    REALM_ASSERT(get_kind((uint64_t*)header) == 'A');
+    auto kind = get_kind((uint64_t*)header);
+    REALM_ASSERT(kind == 'A' || kind == 'B');
     auto num_bytes = get_byte_size_from_header(header);
     REALM_ASSERT_7(m_alloc.is_read_only(m_ref), ==, true, ||, num_bytes, <=, get_capacity_from_header(header));
-
     return num_bytes;
 }
 
@@ -381,24 +383,12 @@ ref_type Array::write(ref_type ref, Allocator& alloc, _impl::ArrayWriterBase& ou
 ref_type Array::do_write_shallow(_impl::ArrayWriterBase& out) const
 {
     // here we might want to compress the array and write down.
-    if (is_encoded()) {
-        // this is never hit since we have lost our information about the encoding type while expanding to disk.
-        const char* header = get_header_from_data(m_data);
-        size_t byte_size = m_encode.byte_size();
-        uint32_t dummy_checksum = 0x42424242UL;                                // "BBBB" in ASCII
-        ref_type new_ref = out.write_array(header, byte_size, dummy_checksum); // Throws
-        REALM_ASSERT_3(new_ref % 8, ==, 0);                                    // 8-byte alignment
-        return new_ref;
-    }
-    else {
-        // type A array.
-        const char* header = get_header_from_data(m_data);
-        size_t byte_size = get_byte_size();
-        uint32_t dummy_checksum = 0x41414141UL;                                // "AAAA" in ASCII
-        ref_type new_ref = out.write_array(header, byte_size, dummy_checksum); // Throws
-        REALM_ASSERT_3(new_ref % 8, ==, 0);                                    // 8-byte alignment
-        return new_ref;
-    }
+    const char* header = get_header_from_data(m_data);
+    size_t byte_size = get_byte_size();
+    uint32_t dummy_checksum = is_encoded() ? 0x42424242UL : 0x41414141UL;  // AAAA or BBBB
+    ref_type new_ref = out.write_array(header, byte_size, dummy_checksum); // Throws
+    REALM_ASSERT_3(new_ref % 8, ==, 0);                                    // 8-byte alignment
+    return new_ref;
 }
 
 
@@ -694,7 +684,7 @@ bool Array::encode_array() const
     auto kind = get_kind((uint64_t*)header);
     if (kind == 'A') {
         auto encoding = get_encoding((uint64_t*)header);
-        // encode everything that is WtypeBits
+        // encode everything that is WtypeBits (all integer arrays included ref arrays)
         if (encoding == NodeHeader::Encoding::WTypBits) {
             return m_encode.encode();
         }
@@ -1350,19 +1340,16 @@ void Array::update_width_cache_from_header() noexcept
         auto width = get_width_from_header(get_header());
         m_lbound = lbound_for_width(width);
         m_ubound = ubound_for_width(width);
-
         m_width = width;
-
         REALM_TEMPEX(m_vtable = &VTableForWidth, width, ::vtable);
         m_getter = m_vtable->getter;
     }
     else {
-        // type B only flex for now.
-        // auto width = get_elementA_size<Encoding::Flex>((uint64_t*)header);
-        m_lbound = 64; // width; //this is not OK since width is not longer a power of 2 //lbound_for_width(width);
-        m_ubound = 64; // width; //this is not OK since width is not longer a power of 2 // ubound_for_width(width);
-        m_width = 64;  // width;
-        // REALM_TEMPEX(m_vtable = &VTableForWidth, width, ::vtable);
+        // For type B arrays the width should not be important, since the data is not
+        // organized in any standard format.
+        m_lbound = 64;
+        m_ubound = 64;
+        m_width = 64;
         REALM_TEMPEX(m_vtable = &VTableForWidth, 64, ::vtable);
         m_getter = m_vtable->getter;
     }

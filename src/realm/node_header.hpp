@@ -281,6 +281,8 @@ public:
         else {
             REALM_ASSERT(value < (65536 << 3));
             REALM_ASSERT((value & 0x7) == 0);
+            // this could be a problem, it assumes that the last 3 less significant bits are 0.
+            // For flex arrays this could not be true if we were to set capacity lower than 128
             ((uint16_t*)header)[0] = value >> 3;
         }
     }
@@ -369,7 +371,7 @@ public:
         }
         else {
             auto h = (const uint8_t*)header;
-            const auto v = h[2] & 0b1111;
+            const auto v = (h[2] & 0b1111);
             switch (v) {
                 case 0:
                     return Encoding::Packed;
@@ -409,6 +411,7 @@ public:
                 REALM_ASSERT(get_kind(header) != 0x41);
                 auto h = (uint8_t*)header;
                 h[2] = (h[2] & 0b11110000) | 3;
+                REALM_ASSERT(get_encoding(header) == Encoding::Flex);
                 break;
             }
             case Encoding::WTypBits: {
@@ -521,8 +524,9 @@ public:
         }
         auto hw = (uint32_t*)header;
         hw[1] = (uint32_t)((bits_pr_elemA << 26) | (bits_pr_elemB << 20) | (num_elemsA << 10) | num_elemsB);
-        hb[2] |= 3;            // encoding flex
-        hb[2] |= (flags << 4); // set the flags
+        // flags in the first nibble
+        // encoding in the second nibble (3 means flex)
+        hb[2] = (hb[2] & 0b11110000) | (flags << 4) | 3;
         hb[3] = kind;
     }
 
@@ -719,7 +723,8 @@ template <>
 inline size_t NodeHeader::get_elementA_size<NodeHeader::Encoding::AofP>(uint64_t* header)
 {
     REALM_ASSERT(get_kind(header) != 'A');
-    REALM_ASSERT(get_encoding(header) == Encoding::AofP);
+    auto encoding = get_encoding(header);
+    REALM_ASSERT(encoding == Encoding::AofP);
     auto bits_per_element = ((uint8_t*)header)[4];
     REALM_ASSERT(bits_per_element <= 64);
     return bits_per_element;
@@ -966,6 +971,8 @@ size_t inline NodeHeader::get_byte_size_from_header(const char* header) noexcept
     auto h = (uint64_t*)header;
     auto kind = get_kind(h);
     if (kind == 'A') {
+        auto encoding = get_encoding(h);
+        REALM_ASSERT(encoding != Encoding::Flex);
         WidthType wtype = get_wtype_from_header(header);
         size_t width;
         size_t size;
@@ -974,16 +981,20 @@ size_t inline NodeHeader::get_byte_size_from_header(const char* header) noexcept
         return calc_byte_size(wtype, size, width);
     }
     else {
-        auto encoding = get_encoding((uint64_t*)header);
+        auto encoding = get_encoding(h);
+        REALM_ASSERT(encoding == NodeHeader::Encoding::Flex); // this is the only encoding supported right now.
         switch (encoding) {
             case Encoding::Packed:
                 return NodeHeader::header_size + align_bits_to8(get_num_elements<NodeHeader::Encoding::Packed>(h) *
                                                                 get_element_size<NodeHeader::Encoding::Packed>(h));
             case Encoding::AofP:
-            case Encoding::PofA:
                 return NodeHeader::header_size + align_bits_to8(get_num_elements<NodeHeader::Encoding::AofP>(h) *
                                                                 (get_elementA_size<NodeHeader::Encoding::AofP>(h) +
                                                                  get_elementB_size<NodeHeader::Encoding::AofP>(h)));
+            case Encoding::PofA:
+                return NodeHeader::header_size + align_bits_to8(get_num_elements<NodeHeader::Encoding::PofA>(h) *
+                                                                (get_elementA_size<NodeHeader::Encoding::PofA>(h) +
+                                                                 get_elementB_size<NodeHeader::Encoding::PofA>(h)));
             case Encoding::Flex:
                 return NodeHeader::header_size +
                        align_bits_to8(get_arrayA_num_elements<NodeHeader::Encoding::Flex>(h) *

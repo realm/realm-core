@@ -261,9 +261,10 @@ void ArrayFlex::setup_header_in_flex_format(std::vector<int64_t>& values, std::v
     // TODO: same as above, do we need to set capacity to 128 or actual needed size?
     const auto capacity = std::max(byte_size, size_t{128});
     NodeHeader::set_capacity_in_header(capacity, (char*)header);
-    // NodeHeader::set_flags(header, flags);
     m_array.init_from_mem(mem);
     REALM_ASSERT(m_array.m_ref == mem.get_ref());
+    REALM_ASSERT(m_array.get_kind(header) == 'B');
+    REALM_ASSERT(m_array.get_encoding(header) == Encoding::Flex);
 }
 
 bool ArrayFlex::get_encode_info(size_t& value_width, size_t& index_width, size_t& value_size,
@@ -280,18 +281,4 @@ bool ArrayFlex::get_encode_info(size_t& value_width, size_t& index_width, size_t
         return true;
     }
     return false;
-}
-
-size_t ArrayFlex::byte_size() const
-{
-    REALM_ASSERT(m_array.is_attached());
-    // auto ref = m_array.get_ref();
-    auto num_bytes = m_array.get_byte_size_from_header(m_array.get_header());
-    //    REALM_ASSERT_7(m_array.get_alloc().is_read_only(ref), ==, true, ||, num_bytes, <=,
-    //                   m_array.get_capacity_from_header(m_array.get_header()));
-    // this is somehow failing.. TODO: investigate this
-    // REALM_ASSERT(m_array.get_alloc().is_read_only(ref) == true);
-    // REALM_ASSERT(num_bytes <= m_array.get_capacity_from_header(m_array.get_header()));
-
-    return num_bytes;
 }

@@ -36,7 +36,6 @@ public:
     bool is_encoded() const final override;
     size_t size() const final override;
     int64_t get(size_t) const final override;
-    size_t byte_size() const final override;
 
 private:
     // read info about the encoded array from header
