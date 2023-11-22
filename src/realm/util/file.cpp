@@ -1644,6 +1644,12 @@ std::optional<File::UniqueID> File::get_unique_id(const std::string& path)
 #else // POSIX version
     struct stat statbuf;
     if (::stat(path.c_str(), &statbuf) == 0) {
+        // On exFAT systems the inode and device are not populated
+        // until the file has been allocated some space. This has led
+        // to bugs where a unique id returned here was reused by different
+        // files. The following assertion ensures that this is not happening
+        // anywhere else in future code.
+        REALM_ASSERT_EX(statbuf.st_size > 0, statbuf.st_size, path);
         return File::UniqueID(statbuf.st_dev, statbuf.st_ino);
     }
     int err = errno; // Eliminate any risk of clobbering
@@ -1668,6 +1674,12 @@ File::UniqueID File::get_unique_id(FileDesc file)
     REALM_ASSERT(file >= 0);
     struct stat statbuf;
     if (::fstat(file, &statbuf) == 0) {
+        // On exFAT systems the inode and device are not populated
+        // until the file has been allocated some space. This has led
+        // to bugs where a unique id returned here was reused by different
+        // files. The following assertion ensures that this is not happening
+        // anywhere else in future code.
+        REALM_ASSERT_EX(statbuf.st_size > 0, statbuf.st_size, file);
         return UniqueID(statbuf.st_dev, statbuf.st_ino);
     }
     throw std::system_error(errno, std::system_category(), "fstat() failed");

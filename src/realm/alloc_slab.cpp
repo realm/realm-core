@@ -828,6 +828,11 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg, util::Writ
         if (REALM_UNLIKELY(cfg.read_only))
             throw InvalidDatabase("Read-only access to empty Realm file", path);
 
+        // exFAT does not allocate a unique id for the file until it's non-empty
+        // It must be valid at this point because File::get_unique_id() is used to distinguish mappings_for_file in
+        // the encryption layer
+        m_file.resize(1);
+
         const char* data = reinterpret_cast<const char*>(&empty_file_header);
         m_file.write(data, sizeof empty_file_header); // Throws
 
