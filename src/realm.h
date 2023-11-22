@@ -1603,7 +1603,7 @@ RLM_API realm_link_t realm_object_as_link(const realm_object_t* object);
  */
 RLM_API realm_key_path_array_t* realm_create_key_path_array(const realm_t* realm,
                                                             const realm_class_key_t object_class_key,
-                                                            int user_key_paths_count, const char** user_key_paths);
+                                                            size_t num_key_paths, const char** user_key_paths);
 
 /**
  * Subscribe to notifications for this object.

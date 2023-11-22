@@ -124,7 +124,7 @@ static KeyPathArray create_key_path_array(Group& g, const ObjectSchema& object_s
 
 RLM_API realm_key_path_array_t* realm_create_key_path_array(const realm_t* realm,
                                                             const realm_class_key_t object_class_key,
-                                                            int user_key_paths_count, const char** user_key_paths)
+                                                            size_t num_key_paths, const char** user_key_paths)
 {
     return wrap_err([&]() {
         KeyPathArray ret;
@@ -132,7 +132,7 @@ RLM_API realm_key_path_array_t* realm_create_key_path_array(const realm_t* realm
             const Schema& schema = (*realm)->schema();
             const ObjectSchema& object_schema = schema_for_table(*realm, TableKey(object_class_key));
             ret = create_key_path_array((*realm)->read_group(), object_schema, schema, user_key_paths,
-                                        user_key_paths + user_key_paths_count);
+                                        user_key_paths + num_key_paths);
         }
         return new realm_key_path_array_t(std::move(ret));
     });
