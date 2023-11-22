@@ -9,6 +9,7 @@
 * `Set::assign_intersection()` on `Set<StringData>`, `Set<BinaryData>`, and `Set<Mixed>` containing string or binary would cause a use-after-free if a set was intersected with itself ([PR #7144](https://github.com/realm/realm-core/pull/7144), since v10.0.0).
 * Set algebra on `Set<StringData>` and `Set<BinaryData>` gave incorrect results when used on platforms where `char` is signed ([#7135](https://github.com/realm/realm-core/issues/7135), since v13.23.3).
 * Errors encountered while reapplying local changes for client reset recovery on partition-based sync Realms would result in the client reset attempt not being recorded, possibly resulting in an endless loop of attempting and failing to automatically recover the client reset. Flexible sync and errors from the server after completing the local recovery were handled correctly ([PR #7149](https://github.com/realm/realm-core/pull/7149), since v10.2.0).
+* Some fields in `realm_error_t` were uninitialized and contained invalid values when being converted from sync errors - now they should properly be nullptr ([PR #7154](https://github.com/realm/realm-core/pull/7154), since v13.18.0)
 
 ### Breaking changes
 * None.
