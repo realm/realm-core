@@ -1592,9 +1592,8 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
         SECTION("a normal reset adds and removes a cycle detection flag") {
             local_config.sync_config->client_resync_mode = ClientResyncMode::RecoverOrDiscard;
             local_config.sync_config->notify_before_client_reset = [&](SharedRealm realm) {
-                auto flag = has_reset_cycle_flag(realm);
-                REQUIRE(!flag);
-                std::lock_guard<std::mutex> lock(mtx);
+                REQUIRE_FALSE(has_reset_cycle_flag(realm));
+                std::lock_guard lock(mtx);
                 ++before_callback_invocations;
             };
             local_config.sync_config->notify_after_client_reset = [&](SharedRealm, ThreadSafeReference realm_ref,
@@ -1604,19 +1603,35 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
                 REQUIRE(bool(flag));
                 REQUIRE(flag->type == ClientResyncMode::Recover);
                 REQUIRE(did_recover);
-                std::lock_guard<std::mutex> lock(mtx);
+                std::lock_guard lock(mtx);
                 ++after_callback_invocations;
             };
             make_reset(local_config, remote_config)
                 ->on_post_local_changes([&](SharedRealm realm) {
-                    auto flag = has_reset_cycle_flag(realm);
-                    REQUIRE(!flag);
+                    REQUIRE_FALSE(has_reset_cycle_flag(realm));
                 })
                 ->run();
             REQUIRE(!err);
             REQUIRE(before_callback_invocations == 1);
             REQUIRE(after_callback_invocations == 1);
         }
+
+        SECTION("a failed reset leaves a cycle detection flag") {
+            local_config.sync_config->client_resync_mode = ClientResyncMode::Recover;
+            make_reset(local_config, remote_config)
+                ->make_local_changes([](SharedRealm realm) {
+                    auto table = realm->read_group().get_table("class_object");
+                    table->remove_column(table->add_column(type_Int, "new col"));
+                })
+                ->run();
+            local_config.sync_config.reset();
+            local_config.force_sync_history = true;
+            auto realm = Realm::get_shared_realm(local_config);
+            auto flag = has_reset_cycle_flag(realm);
+            REQUIRE(flag);
+            CHECK(flag->type == ClientResyncMode::Recover);
+        }
+
         SECTION("In DiscardLocal mode: a previous failed discard reset is detected and generates an error") {
             local_config.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
             make_fake_previous_reset(ClientResyncMode::DiscardLocal);
