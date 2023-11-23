@@ -1712,7 +1712,6 @@ void Group::verify() const
     });
     mem_usage_2.canonicalize();
     mem_usage_1.add(mem_usage_2);
-    // this fails
     mem_usage_1.canonicalize();
     mem_usage_2.clear();
 
@@ -1730,8 +1729,6 @@ void Group::verify() const
 
     // At this point we have accounted for all memory managed by the slab
     // allocator
-
-    // this fails
     mem_usage_1.check_total_coverage();
 #endif
 }

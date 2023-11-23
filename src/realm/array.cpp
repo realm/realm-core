@@ -390,17 +390,13 @@ ref_type Array::do_write_shallow(_impl::ArrayWriterBase& out) const
     // here we might want to compress the array and write down.
     const char* header = get_header_from_data(m_data);
     size_t byte_size = get_byte_size();
-    // this has given me a huge headache!!! I thought that the checksum was set to AAAA because we were
-    // written a type A array, but setting that to BBBB creates trouble while initializing
-    // the top array if it is in compressed format, since the encoding is impacted!!!!
-    // TODO: investigate this.. I should be able to set the checksum I want without any problem what so ever in
-    // regards of the header
-
-    uint32_t dummy_checksum = is_encoded() ? 0x42424242UL : 0x41414141UL; // AAAA or BBBB
-    // TODO: fix this, the checksum is impacting the header... it needs some fixing, the array is written with a bad
-    // encoding.
-    ref_type new_ref = out.write_array(header, byte_size, dummy_checksum); // Throws
-    REALM_ASSERT_3(new_ref % 8, ==, 0);                                    // 8-byte alignment
+    const auto is_encode = is_encoded();
+    uint32_t dummy_checksum =
+        is_encode ? 0x42424242UL : 0x41414141UL; // A/B (A for normal arrays, B for compressed arrays)
+    uint32_t dummy_checksum_bytes =
+        is_encode ? 2 : 4; // AAAA / BB (only 2 bytes for B arrays, since B arrays use more header space)
+    ref_type new_ref = out.write_array(header, byte_size, dummy_checksum, dummy_checksum_bytes); // Throws
+    REALM_ASSERT_3(new_ref % 8, ==, 0);                                                          // 8-byte alignment
     return new_ref;
 }
 
