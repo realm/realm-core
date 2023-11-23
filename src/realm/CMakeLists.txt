@@ -210,6 +210,12 @@ set(REALM_INSTALL_HEADERS
     util/base64.hpp
     util/basic_system_errors.hpp
     util/bind_ptr.hpp
+    util/bson/bson.hpp
+    util/bson/indexed_map.hpp
+    util/bson/max_key.hpp
+    util/bson/min_key.hpp
+    util/bson/mongo_timestamp.hpp
+    util/bson/regular_expression.hpp
     util/buffer.hpp
     util/buffer_stream.hpp
     util/cf_ptr.hpp
@@ -273,12 +279,6 @@ set(REALM_NOINST_HEADERS
     util/timestamp_formatter.hpp
     util/timestamp_logger.hpp
     util/value_reset_guard.hpp
-    util/bson/bson.hpp
-    util/bson/min_key.hpp
-    util/bson/max_key.hpp
-    util/bson/regular_expression.hpp
-    util/bson/indexed_map.hpp
-    util/bson/mongo_timestamp.hpp
 ) # REALM_NOINST_HEADERS
 
 if(NOT MSVC)
