@@ -73,54 +73,6 @@ std::optional<KeyPathArray> build_key_path_array(realm_key_path_array_t* key_pat
     return ret;
 }
 
-static KeyPathArray create_key_path_array(Group& g, const ObjectSchema& object_schema, const Schema& schema,
-                                          const char** all_key_paths_begin, const char** all_key_paths_end)
-{
-    KeyPathArray resolved_key_path_array;
-    for (auto it = all_key_paths_begin; it != all_key_paths_end; it++) {
-        KeyPath resolved_key_path;
-        const ObjectSchema* schema_at_index = &object_schema;
-        const Property* prop = nullptr;
-        // Split string based on '.'
-        const char* path = *it;
-        do {
-            auto p = find_chr(path, '.');
-            StringData property(path, p - path);
-            path = p;
-            if (!schema_at_index) {
-                throw InvalidArgument(
-                    util::format("Property '%1' in KeyPath '%2' is not a collection of objects or an object "
-                                 "reference, so it cannot be used as an intermediate keypath element.",
-                                 prop->public_name, *it));
-            }
-            prop = schema_at_index->property_for_public_name(property);
-            if (prop) {
-                ColKey col_key = prop->column_key;
-                TableKey table_key = schema_at_index->table_key;
-                if (prop->type == PropertyType::Object || prop->type == PropertyType::LinkingObjects) {
-                    auto found_schema = schema.find(prop->object_type);
-                    if (found_schema != schema.end()) {
-                        schema_at_index = &*found_schema;
-                        if (prop->type == PropertyType::LinkingObjects) {
-                            // Find backlink column key
-                            auto origin_prop = schema_at_index->property_for_name(prop->link_origin_property_name);
-                            auto origin_table = ObjectStore::table_for_object_type(g, schema_at_index->name);
-                            col_key = origin_table->get_opposite_column(origin_prop->column_key);
-                        }
-                    }
-                }
-                resolved_key_path.emplace_back(table_key, col_key);
-            }
-            else {
-                throw InvalidArgument(util::format("Property '%1' in KeyPath '%2' is not a valid property in %3.",
-                                                   property, *it, schema_at_index->name));
-            }
-        } while (*path++ == '.');
-        resolved_key_path_array.push_back(std::move(resolved_key_path));
-    }
-    return resolved_key_path_array;
-}
-
 } // namespace
 
 RLM_API realm_key_path_array_t* realm_create_key_path_array(const realm_t* realm,
@@ -130,10 +82,7 @@ RLM_API realm_key_path_array_t* realm_create_key_path_array(const realm_t* realm
     return wrap_err([&]() {
         KeyPathArray ret;
         if (user_key_paths) {
-            const Schema& schema = (*realm)->schema();
-            const ObjectSchema& object_schema = schema_for_table(*realm, TableKey(object_class_key));
-            ret = create_key_path_array((*realm)->read_group(), object_schema, schema, user_key_paths,
-                                        user_key_paths + num_key_paths);
+            ret = (*realm)->create_key_path_array(TableKey(object_class_key), num_key_paths, user_key_paths);
         }
         return new realm_key_path_array_t(std::move(ret));
     });

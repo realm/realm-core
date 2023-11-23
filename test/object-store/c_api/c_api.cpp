@@ -2811,6 +2811,13 @@ TEST_CASE("C API - properties", "[c_api]") {
                         CHECK(!state.error);
                         CHECK(state.changes);
                     }
+                    SECTION("using star notation") {
+                        const char* bar_strings[1] = {"*.int"};
+                        auto key_path_array = realm_create_key_path_array(realm, class_bar.key, 1, bar_strings);
+                        REQUIRE(key_path_array);
+                        // (*realm)->print_key_path_array(*key_path_array);
+                        realm_release(key_path_array);
+                    }
                     SECTION("using backlink") {
                         const char* bar_strings[1] = {"linking_objects.public_int"};
                         auto key_path_array = realm_create_key_path_array(realm, class_bar.key, 1, bar_strings);

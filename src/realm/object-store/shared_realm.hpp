@@ -493,6 +493,11 @@ public:
         static void begin_read(Realm&, VersionID);
     };
 
+    KeyPathArray create_key_path_array(TableKey table_key, size_t num_key_paths, const char** all_key_paths);
+#ifdef REALM_DEBUG
+    void print_key_path_array(const KeyPathArray&);
+#endif
+
 private:
     struct MakeSharedTag {
     };
