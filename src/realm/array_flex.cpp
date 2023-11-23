@@ -54,10 +54,10 @@ bool ArrayFlex::encode() const
 
 bool ArrayFlex::decode() const
 {
+    using Encoding = NodeHeader::Encoding;
     REALM_ASSERT(m_array.is_attached());
     size_t value_width, index_width, value_size, index_size;
     if (get_encode_info(value_width, index_width, value_size, index_size)) {
-
         std::vector<int64_t> values;
         values.reserve(index_size);
         auto data = (uint64_t*)m_array.get_data_from_header(m_array.get_header());
@@ -71,9 +71,21 @@ bool ArrayFlex::decode() const
             values.push_back(ivalue);
             ++index_iterator;
         }
-        // TODO understand if it is possible to do better than this.
-        m_array.destroy(); // free the memory containing the compressed representation for this array.
-        m_array.create(NodeHeader::Type::type_Normal); // recreate the array from scratch as type A
+        // do the reverse of compressing the array
+        const auto flags = m_array.get_flags((uint64_t*)m_array.get_header());
+        const auto size = index_size;
+        const auto [min_value, max_value] = std::minmax_element(values.begin(), values.end());
+        auto width = std::max(Node::signed_to_num_bits(*min_value), Node::signed_to_num_bits(*max_value));
+        REALM_ASSERT(width != 0 && width % 2 == 0); // it is a power of 2
+        auto byte_size = m_array.calc_size<Encoding::WTypBits>(size, width);
+        REALM_ASSERT(byte_size % 8 == 0); // 8 bytes aligned value
+        m_array.destroy();
+        MemRef mem = m_array.get_alloc().alloc(std::max(byte_size, size_t{128}));
+        auto header = (uint64_t*)mem.get_addr();
+        NodeHeader::init_header(header, 'A', Encoding::WTypBits, flags, 0, 0); // width and size not importat here.
+        const auto capacity = std::max(byte_size, size_t{128});
+        NodeHeader::set_capacity_in_header(capacity, (char*)header);
+        m_array.init_from_mem(mem);
         size_t i = 0;
         for (const auto& v : values)
             m_array.insert(i++, v);
@@ -258,7 +270,8 @@ void ArrayFlex::setup_header_in_flex_format(std::vector<int64_t>& values, std::v
     m_array.destroy();
     // TODO: this is temporary because it means that we are not really gaining any benefit from compressing and array
     // that is less than 128bytes
-    MemRef mem = m_array.get_alloc().alloc(std::max(byte_size, size_t{128}));
+    const auto sz = std::max(byte_size, size_t{128});
+    MemRef mem = m_array.get_alloc().alloc(sz);
     auto header = (uint64_t*)mem.get_addr();
     NodeHeader::init_header(header, 'B', Encoding::Flex, flags, value_bit_width, index_bit_width, values.size(),
                             indices.size());

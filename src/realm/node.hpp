@@ -130,7 +130,6 @@ public:
         REALM_ASSERT(kind == 'A' || kind == 'B');
         if (kind == 'A')
             m_size = get_size_from_header(header);
-        // the actual initialization of the B kind fields related to the encoding is deffered to Array.
         return header;
     }
 

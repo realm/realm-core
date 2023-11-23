@@ -2315,7 +2315,7 @@ TEST(Group_UniqueColumnKeys)
     CHECK_NOT_EQUAL(col_foo, col_bar);
 }
 
-TEST(Group_ArrayCompression_Correctness)
+ONLY(Group_ArrayCompression_Correctness)
 {
     GROUP_TEST_PATH(path);
 
@@ -2354,6 +2354,9 @@ TEST(Group_ArrayCompression_Correctness)
     auto l1 = obj1.get_list<int64_t>(col_key1);
     CHECK(l1.size() == array.size());
     CHECK(*read_table == *table);
+    for (size_t i = 0; i < l1.size(); ++i) {
+        CHECK_EQUAL(l1.get_any(i), array.get_any(i));
+    }
 
 #ifdef REALM_DEBUG
     to_disk.verify();

@@ -60,7 +60,7 @@ TEST(Test_array_same_size_less_bits)
     CHECK(a.get_any(2) == 545);
 }
 
-TEST(Test_ArrayInt_encode_decode_need)
+TEST(Test_ArrayInt_encode_decode_needed)
 {
     ArrayInteger a(Allocator::get_default());
     a.create();

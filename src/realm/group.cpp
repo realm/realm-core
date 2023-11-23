@@ -1723,7 +1723,6 @@ void Group::verify() const
         ref_type ref = real_immutable_ref_end;
         size_t corrected_size = slab_start - real_immutable_ref_end;
         mem_usage_1.add_immutable(ref, corrected_size);
-        // fails here
         mem_usage_1.canonicalize();
     }
 

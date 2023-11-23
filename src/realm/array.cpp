@@ -273,7 +273,6 @@ void Array::init_from_mem(MemRef mem) noexcept
     m_context_flag = get_context_flag_from_header(header);
     // it is unclear how to handle the width limits while compressed.
     // they will likely need to be set explicitly as part of decompressing
-    // TODO: for now grab A size and use that..
     update_width_cache_from_header();
 }
 

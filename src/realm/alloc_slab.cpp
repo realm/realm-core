@@ -353,7 +353,7 @@ void SlabAlloc::mark_freed(FreeBlock* entry, int size)
     REALM_ASSERT_EX(alloc_size >= size && alloc_size <= size + max_waste, alloc_size, size,
                     get_file_path_for_assertions());
     // the BetweenBlocks has prev and next set to nullptr, it seems to be constructed correctly, since it is sought at
-    // address, block + size. There should be a block with before_size = <byte_size> for compressed arrays that have
+    // address: block + size. There should be a block with before_size = <byte_size> for compressed arrays that have
     // allocated less than 128 bytes, and next set to <big number> but something is wrong.
     bb->block_after_size = alloc_size;
     bb = bb_after(entry);
