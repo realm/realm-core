@@ -366,9 +366,9 @@ void transfer_group(const Transaction& group_src, Transaction& group_dst, util::
     }
 
     converters::EmbeddedObjectConverter embedded_tracker;
-    // Now src and dst have identical schemas and no extraneous objects from dst.
-    // There may be missing object from src and the values of existing objects may
-    // still differ. Diff all the values and create missing objects on the fly.
+    // Now src and dst have identical schemas and all the top level objects are created.
+    // What is left to do is to diff all properties of the existing objects.
+    // Embedded objects are created on the fly.
     for (auto table_key : group_src.get_table_keys()) {
         if (should_skip_table(group_src, table_key))
             continue;

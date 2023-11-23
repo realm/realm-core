@@ -454,6 +454,7 @@ struct LinkedCollectionBase {
     virtual void clear_collection(Obj obj) = 0;
     virtual std::vector<Obj> get_links(Obj obj) = 0;
     virtual void move(Obj, size_t, size_t) {}
+    virtual void insert(Obj, size_t, ObjLink) {}
     bool remove_linked_object(Obj obj, ObjLink to)
     {
         auto links = get_links(obj);
@@ -517,6 +518,12 @@ struct ListOfObjects : public LinkedCollectionBase {
         ColKey col = get_link_col_key(source.get_table());
         auto coll = source.get_linklist(col);
         coll.move(from, to);
+    }
+    void insert(Obj source, size_t ndx, ObjLink to) override
+    {
+        ColKey col = get_link_col_key(source.get_table());
+        auto coll = source.get_linklist(col);
+        coll.insert(ndx, to.get_obj_key());
     }
     size_t size_of_collection(Obj obj)
     {
@@ -586,6 +593,16 @@ struct ListOfMixedLinks : public LinkedCollectionBase {
     {
         ColKey col = get_link_col_key(obj.get_table());
         obj.get_list<Mixed>(col).move(from, to);
+    }
+    void insert(Obj from, size_t ndx, ObjLink to) override
+    {
+        ColKey col = get_link_col_key(from.get_table());
+        from.get_list<Mixed>(col).insert(ndx, to);
+        // When adding dynamic links through a mixed value, the relationship map needs to be dynamically updated.
+        // In practice, this is triggered by the addition of backlink columns to any table.
+        if (m_relation_updater) {
+            m_relation_updater();
+        }
     }
 
     size_t count_unresolved_links(Obj obj)
