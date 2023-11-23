@@ -615,6 +615,8 @@ public:
     std::string get_path() const;
 
     // Return none if the file doesn't exist. Throws on other errors.
+    // If the file does exist but has a size of zero, the file may be resized
+    // to force the file system to allocate a unique id.
     static std::optional<UniqueID> get_unique_id(const std::string& path);
 
     // Return the unique id for the file descriptor. Throws if the underlying stat operation fails.
