@@ -610,7 +610,7 @@ functions:
         set -o verbose
 
         if [[ -n "${disable_tests_against_baas|}" ]]; then
-          echo "Error: Bass is disabled for network tests"
+          echo "Error: Baas is disabled for network tests"
           exit 1
         fi
 
@@ -956,7 +956,7 @@ tasks:
   commands:
   - func: "launch remote baas"
     vars:
-      baas_branch: 27f42f55a7944ed7d8ba9fad1854a4b22714cb8d
+      baas_branch: e8004ddf10dba21b45581d93fcf1e3d9a1c319ba
   - func: "compile"
     vars:
       target_to_build: ObjectStoreTests
@@ -980,7 +980,7 @@ tasks:
   commands:
   - func: "launch remote baas"
     vars:
-      baas_branch: 27f42f55a7944ed7d8ba9fad1854a4b22714cb8d
+      baas_branch: e8004ddf10dba21b45581d93fcf1e3d9a1c319ba
       baas_proxy: On
   - func: "compile"
     vars:
