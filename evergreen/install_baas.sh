@@ -465,8 +465,8 @@ if [[ -n "${MONGOSH_DOWNLOAD_URL}" ]]; then
         ${CURL} -sLS "${MONGOSH_DOWNLOAD_URL}" --output mongosh-binaries.zip
         unzip -jnqq mongosh-binaries.zip '*/bin/*' -d "${MONGO_BINARIES_DIR}/bin/"
         rm mongosh-binaries.zip
-        MONGOSH="mongosh"
     fi
+    MONGOSH="mongosh"
 else
     # Use the mongo shell provided with mongod
     MONGOSH="mongo"
