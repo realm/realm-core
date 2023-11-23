@@ -493,7 +493,11 @@ public:
         static void begin_read(Realm&, VersionID);
     };
 
-    KeyPathArray create_key_path_array(TableKey table_key, size_t num_key_paths, const char** all_key_paths);
+    KeyPathArray create_key_path_array(StringData table_name, std::vector<const char*> vec)
+    {
+        return create_key_path_array(m_schema.find(table_name)->table_key, vec.size(), &vec.front());
+    }
+    KeyPathArray create_key_path_array(TableKey table_key, size_t num_key_paths, const char* all_key_paths[]);
 #ifdef REALM_DEBUG
     void print_key_path_array(const KeyPathArray&);
 #endif
