@@ -1475,7 +1475,9 @@ public:
     void resolve(const ObjectSchema* object_schema, const char* path)
     {
         m_full_path = path;
-        _resolve(m_props, object_schema, path, true);
+        if (!_resolve(m_props, object_schema, path, true)) {
+            throw InvalidArgument(util::format("'%1' does not resolve in any valid key paths.", m_full_path));
+        }
     }
 
     void expand(KeyPathArray& key_path_array) const
@@ -1489,8 +1491,8 @@ public:
 
 private:
     std::pair<ColKey, const ObjectSchema*> get_col_key(const Property* prop);
-    void _resolve(std::vector<PropId>& props, const ObjectSchema* object_schema, const char* path, bool mandatory);
-    void _resolve(PropId& current, const char* path);
+    bool _resolve(std::vector<PropId>& props, const ObjectSchema* object_schema, const char* path, bool mandatory);
+    bool _resolve(PropId& current, const char* path);
 
     Group& m_group;
     const char* m_full_path = nullptr;
@@ -1516,7 +1518,7 @@ std::pair<ColKey, const ObjectSchema*> KeyPathResolver::get_col_key(const Proper
     return {col_key, target_schema};
 }
 
-void KeyPathResolver::_resolve(std::vector<PropId>& props, const ObjectSchema* object_schema, const char* path,
+bool KeyPathResolver::_resolve(std::vector<PropId>& props, const ObjectSchema* object_schema, const char* path,
                                bool mandatory)
 {
     if (*path == '*') {
@@ -1546,17 +1548,27 @@ void KeyPathResolver::_resolve(std::vector<PropId>& props, const ObjectSchema* o
                 throw InvalidArgument(util::format("Property '%1' in KeyPath '%2' is not a valid property in %3.",
                                                    property, m_full_path, object_schema->name));
             }
+            else {
+                return false;
+            }
         }
     }
 
     if (*path++ == '.') {
-        for (auto& p : props) {
-            _resolve(p, path);
+        auto it = props.begin();
+        while (it != props.end()) {
+            if (_resolve(*it, path)) {
+                ++it;
+            }
+            else {
+                it = props.erase(it);
+            }
         }
     }
+    return props.size();
 }
 
-void KeyPathResolver::_resolve(PropId& current, const char* path)
+bool KeyPathResolver::_resolve(PropId& current, const char* path)
 {
     auto object_schema = current.target_schema;
     if (!object_schema) {
@@ -1566,10 +1578,19 @@ void KeyPathResolver::_resolve(PropId& current, const char* path)
                              "reference, so it cannot be used as an intermediate keypath element.",
                              current.origin_prop->public_name, m_full_path));
         }
-        return;
+        // Check if the rest of the path is stars. If not, we should exclude this property
+        do {
+            auto p = find_chr(path, '.');
+            StringData property(path, p - path);
+            path = p;
+            if (property != "*") {
+                return false;
+            }
+        } while (*path++ == '.');
+        return true;
     }
     // Target schema exists - proceed
-    _resolve(current.children, object_schema, path, current.mandatory);
+    return _resolve(current.children, object_schema, path, current.mandatory);
 }
 
 } // namespace
@@ -1578,7 +1599,7 @@ KeyPathArray Realm::create_key_path_array(StringData table_name, const std::vect
 {
     std::vector<const char*> vec;
     vec.reserve(key_paths.size());
-    for (auto kp : key_paths) {
+    for (auto& kp : key_paths) {
         vec.push_back(kp.c_str());
     }
     return create_key_path_array(m_schema.find(table_name)->table_key, vec.size(), &vec.front());

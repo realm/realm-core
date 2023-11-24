@@ -2388,4 +2388,46 @@ TEST_CASE("Asymmetric Object") {
     }
 }
 
+TEST_CASE("KeyPath generation - star notation") {
+    Schema schema{
+        {"Person",
+         {
+             {"name", PropertyType::String},
+             {"age", PropertyType::Int},
+             {"children", PropertyType::Object | PropertyType::Array, "Child"},
+         }},
+        {"Child",
+         {
+             {"name", PropertyType::String},
+             {"favoritePet", PropertyType::Object | PropertyType::Nullable, "Pet"},
+         }},
+        {"Pet",
+         ObjectSchema::ObjectType::Embedded,
+         {
+             {"name", PropertyType::String},
+             {"breed", PropertyType::String},
+         }},
+    };
+    InMemoryTestFile config;
+    config.automatic_change_notifications = false;
+    config.schema_mode = SchemaMode::Automatic;
+    config.schema = schema;
+
+    auto realm = Realm::get_shared_realm(config);
+    auto kpa = realm->create_key_path_array("Person", {"*.*.*"});
+    CHECK(kpa.size() == 5);
+    // realm->print_key_path_array(kpa);
+    kpa = realm->create_key_path_array("Person", {"*.name"});
+    CHECK(kpa.size() == 1); // {"children", "name"}
+    // realm->print_key_path_array(kpa);
+    kpa = realm->create_key_path_array("Person", {"*.*.breed"});
+    CHECK(kpa.size() == 1); // {"children", "favoritePet", "breed"}
+    // realm->print_key_path_array(kpa);
+    kpa = realm->create_key_path_array("Person", {"children.*.breed"});
+    CHECK(kpa.size() == 1); // {"children", "favoritePet", "breed"}
+    // realm->print_key_path_array(kpa);
+    CHECK_THROWS_AS(realm->create_key_path_array("Person", {"children.favoritePet.colour"}), InvalidArgument);
+    CHECK_THROWS_AS(realm->create_key_path_array("Person", {"*.myPet.breed"}), InvalidArgument);
+}
+
 #endif // REALM_ENABLE_SYNC
