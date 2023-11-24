@@ -75,8 +75,9 @@ bool ArrayFlex::decode() const
         const auto flags = m_array.get_flags((uint64_t*)m_array.get_header());
         const auto size = index_size;
         const auto [min_value, max_value] = std::minmax_element(values.begin(), values.end());
-        auto width = std::max(Node::signed_to_num_bits(*min_value), Node::signed_to_num_bits(*max_value));
-        REALM_ASSERT(width != 0 && width % 2 == 0); // it is a power of 2
+        auto width = NodeHeader::align_bits_to8(
+            std::max(Node::signed_to_num_bits(*min_value), Node::signed_to_num_bits(*max_value)));
+        REALM_ASSERT(width != 0 && width % 8 == 0);
         auto byte_size = m_array.calc_size<Encoding::WTypBits>(size, width);
         REALM_ASSERT(byte_size % 8 == 0); // 8 bytes aligned value
         m_array.destroy();

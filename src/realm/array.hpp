@@ -544,7 +544,7 @@ protected:
 
 private:
     ref_type do_write_shallow(_impl::ArrayWriterBase&) const;
-    ref_type do_write_deep(_impl::ArrayWriterBase&, bool only_if_modified) const;
+    ref_type do_write_deep(_impl::ArrayWriterBase&, bool only_if_modified, bool compress) const;
 
 #ifdef REALM_DEBUG
     void report_memory_usage_2(MemUsageHandler&) const;

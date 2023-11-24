@@ -690,7 +690,7 @@ ref_type GroupWriter::write_group()
     if (top.size() > Group::s_hist_ref_ndx) {
         if (ref_type history_ref = top.get_as_ref(Group::s_hist_ref_ndx)) {
             Allocator& alloc = top.get_alloc();
-            ref_type new_history_ref = Array::write(history_ref, alloc, *writer, only_if_modified, true); // Throws
+            ref_type new_history_ref = Array::write(history_ref, alloc, *writer, only_if_modified, false); // Throws
             top.set(Group::s_hist_ref_ndx, from_ref(new_history_ref));                                    // Throws
         }
     }
@@ -1373,6 +1373,7 @@ ref_type GroupWriter::write_array(const char* data, size_t size, uint32_t checks
 template <class T>
 void GroupWriter::write_array_at(T* translator, ref_type ref, const char* data, size_t size)
 {
+    // TODO this cannot not be used in case of B arrays...
     size_t pos = size_t(ref);
 
     REALM_ASSERT_3(pos + size, <=, to_size_t(m_group.m_top.get(2) / 2));

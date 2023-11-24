@@ -355,18 +355,16 @@ ref_type Array::write(_impl::ArrayWriterBase& out, bool deep, bool only_if_modif
         return m_ref;
 
     if (!deep || !m_has_refs) {
-        if (compress_in_flight) {
-            if (encode_array()) {
-                const auto header = get_header();
-                const auto h = (uint64_t*)header;
-                REALM_ASSERT(get_kind(h) == 'B');
-                REALM_ASSERT(get_encoding(h) == Encoding::Flex);
-            }
-            return do_write_shallow(out); // Throws
+        if (compress_in_flight && encode_array()) {
+            const auto header = get_header();
+            const auto h = (uint64_t*)header;
+            REALM_ASSERT(get_kind(h) == 'B');
+            REALM_ASSERT(get_encoding(h) == Encoding::Flex);
         }
+        return do_write_shallow(out); // Throws
     }
 
-    return do_write_deep(out, only_if_modified); // Throws
+    return do_write_deep(out, only_if_modified, compress_in_flight); // Throws
 }
 
 ref_type Array::write(ref_type ref, Allocator& alloc, _impl::ArrayWriterBase& out, bool only_if_modified,
@@ -379,13 +377,16 @@ ref_type Array::write(ref_type ref, Allocator& alloc, _impl::ArrayWriterBase& ou
     array.init_from_ref(ref);
 
     if (!array.m_has_refs) {
-        if (compress_in_flight) {
-            array.encode_array();
-            return array.do_write_shallow(out); // Throws
+        if (compress_in_flight && array.encode_array()) {
+            const auto header = array.get_header();
+            const auto h = (uint64_t*)header;
+            REALM_ASSERT(get_kind(h) == 'B');
+            REALM_ASSERT(get_encoding(h) == Encoding::Flex);
         }
+        return array.do_write_shallow(out); // Throws
     }
 
-    return array.do_write_deep(out, only_if_modified); // Throws
+    return array.do_write_deep(out, only_if_modified, compress_in_flight); // Throws
 }
 
 
@@ -405,7 +406,7 @@ ref_type Array::do_write_shallow(_impl::ArrayWriterBase& out) const
 }
 
 
-ref_type Array::do_write_deep(_impl::ArrayWriterBase& out, bool only_if_modified) const
+ref_type Array::do_write_deep(_impl::ArrayWriterBase& out, bool only_if_modified, bool compress) const
 {
     // This is recursively expanding each array and writing it down to disk...
     // We need to verify if for encoded arrays we need to do anything special.
@@ -428,7 +429,7 @@ ref_type Array::do_write_deep(_impl::ArrayWriterBase& out, bool only_if_modified
         bool is_ref = (value != 0 && (value & 1) == 0);
         if (is_ref) {
             ref_type subref = to_ref(value);
-            ref_type new_subref = write(subref, m_alloc, out, only_if_modified, true); // Throws
+            ref_type new_subref = write(subref, m_alloc, out, only_if_modified, compress); // Throws
             value = from_ref(new_subref);
         }
         new_array.add(value); // Throws

@@ -1138,8 +1138,8 @@ void Group::write(std::ostream& out, int file_format_version, TableWriter& table
         // Write the top array
         bool deep = false;             // Shallow
         bool only_if_modified = false; // Always
-        bool compress_in_flight = false;
-        top.write(out_2, deep, only_if_modified, compress_in_flight); // Throws
+        bool compress = false;
+        top.write(out_2, deep, only_if_modified, compress); // Throws
         REALM_ASSERT_3(size_t(out_2.get_ref_of_next_array()), ==, final_file_size);
 
         dg_top.reset(nullptr); // Destroy now
@@ -1730,9 +1730,8 @@ void Group::verify() const
         mem_usage_1.add_immutable(ref, corrected_size);
         mem_usage_1.canonicalize();
     }
-
-    // At this point we have accounted for all memory managed by the slab
-    // allocator
+    //  At this point we have accounted for all memory managed by the slab
+    //  allocator
     mem_usage_1.check_total_coverage();
 #endif
 }
