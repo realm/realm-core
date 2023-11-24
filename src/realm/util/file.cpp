@@ -1648,14 +1648,9 @@ std::optional<File::UniqueID> File::get_unique_id(const std::string& path)
             // On exFAT systems the inode and device are not populated
             // until the file has been allocated some space. This has led
             // to bugs where a unique id returned here was reused by different
-            // files. To prevent this from happening, this method allocates
-            // one byte to the file to ensure the unique ids persist.
-            File f(path, mode_Append);
-            // this is assumed be done under some external lock
-            // that prevents file system races (eg. s_mutex)
-            REALM_ASSERT_3(f.get_size(), ==, 0);
-            f.resize(1);
-            return get_unique_id(f.get_descriptor());
+            // files. Returning `none` here assumes that the caller knows this
+            // and will create non-empty files.
+            return none;
         }
         return File::UniqueID(statbuf.st_dev, statbuf.st_ino);
     }
