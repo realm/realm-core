@@ -1574,6 +1574,16 @@ void KeyPathResolver::_resolve(PropId& current, const char* path)
 
 } // namespace
 
+KeyPathArray Realm::create_key_path_array(StringData table_name, const std::vector<std::string>& key_paths)
+{
+    std::vector<const char*> vec;
+    vec.reserve(key_paths.size());
+    for (auto kp : key_paths) {
+        vec.push_back(kp.c_str());
+    }
+    return create_key_path_array(m_schema.find(table_name)->table_key, vec.size(), &vec.front());
+}
+
 KeyPathArray Realm::create_key_path_array(TableKey table_key, size_t num_key_paths, const char** all_key_paths)
 {
     auto object_schema = m_schema.find(table_key);

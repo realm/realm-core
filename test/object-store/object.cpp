@@ -817,8 +817,7 @@ TEST_CASE("object") {
 
                 r->commit_transaction();
 
-                KeyPathArray kpa_to_depth_5 =
-                    r->create_key_path_array("table2", {"link2.link2.link2.link2.value"});
+                KeyPathArray kpa_to_depth_5 = r->create_key_path_array("table2", {"link2.link2.link2.link2.value"});
                 KeyPathArray kpa_to_depth_6 =
                     r->create_key_path_array("table2", {"link2.link2.link2.link2.link2.value"});
 
