@@ -352,9 +352,6 @@ void SlabAlloc::mark_freed(FreeBlock* entry, int size)
     int max_waste = sizeof(FreeBlock) + sizeof(BetweenBlocks);
     REALM_ASSERT_EX(alloc_size >= size && alloc_size <= size + max_waste, alloc_size, size,
                     get_file_path_for_assertions());
-    // the BetweenBlocks has prev and next set to nullptr, it seems to be constructed correctly, since it is sought at
-    // address: block + size. There should be a block with before_size = <byte_size> for compressed arrays that have
-    // allocated less than 128 bytes, and next set to <big number> but something is wrong.
     bb->block_after_size = alloc_size;
     bb = bb_after(entry);
     REALM_ASSERT_EX(bb->block_before_size < 0, bb->block_before_size, get_file_path_for_assertions());
@@ -578,8 +575,6 @@ void SlabAlloc::do_free(ref_type ref, char* addr)
         }
     }
     else {
-        // TODO: the commit size becomes negative with 128 in the capacity instead of the actual size
-        // REALM_ASSERT(m_commit_size >= size); //commit size should never wrap around to size_t{MAX}
         m_commit_size -= size;
 
         // fixup size to take into account the allocator's need to store a FreeBlock in a freed block

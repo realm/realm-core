@@ -45,7 +45,7 @@ private:
     bool try_encode(std::vector<int64_t>&, std::vector<size_t>&) const;
     void do_encode_array(std::vector<int64_t>&, std::vector<size_t>&) const;
     bool check_gain(std::vector<int64_t>&, std::vector<size_t>&, int&, int&) const;
-    void setup_header_in_flex_format(std::vector<int64_t>&, std::vector<size_t>&, int, int) const;
+    void setup_array_in_flex_format(std::vector<int64_t>&, std::vector<size_t>&, int, int) const;
     void copy_into_encoded_array(std::vector<int64_t>&, std::vector<size_t>&) const;
 
     Array& m_array;

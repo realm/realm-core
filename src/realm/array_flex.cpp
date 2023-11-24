@@ -80,11 +80,10 @@ bool ArrayFlex::decode() const
         auto byte_size = m_array.calc_size<Encoding::WTypBits>(size, width);
         REALM_ASSERT(byte_size % 8 == 0); // 8 bytes aligned value
         m_array.destroy();
-        MemRef mem = m_array.get_alloc().alloc(std::max(byte_size, size_t{128}));
+        MemRef mem = m_array.get_alloc().alloc(byte_size);
         auto header = (uint64_t*)mem.get_addr();
         NodeHeader::init_header(header, 'A', Encoding::WTypBits, flags, 0, 0); // width and size not importat here.
-        const auto capacity = std::max(byte_size, size_t{128});
-        NodeHeader::set_capacity_in_header(capacity, (char*)header);
+        NodeHeader::set_capacity_in_header(byte_size, (char*)header);
         m_array.init_from_mem(mem);
         size_t i = 0;
         for (const auto& v : values)
@@ -103,7 +102,9 @@ bool ArrayFlex::is_encoded() const
     auto header = (uint64_t*)m_array.get_header();
     auto kind = Node::get_kind(header);
     auto encoding = Node::get_encoding(header);
-    return kind == 'B' && encoding == Encoding::Flex;
+    if (kind == 'B' && encoding == Encoding::Flex)
+        return true;
+    return false;
 }
 
 size_t ArrayFlex::size() const
@@ -152,7 +153,7 @@ bool ArrayFlex::try_encode(std::vector<int64_t>& values, std::vector<size_t>& in
     int index_bit_width = 0;
     if (check_gain(values, indices, value_bit_width, index_bit_width)) {
         // release array's memory and re-init the same array with a B header and flex encoding
-        setup_header_in_flex_format(values, indices, value_bit_width, index_bit_width);
+        setup_array_in_flex_format(values, indices, value_bit_width, index_bit_width);
         return true;
     }
     return false;
@@ -255,31 +256,24 @@ bool ArrayFlex::check_gain(std::vector<int64_t>& values, std::vector<size_t>& in
     return byte_size < uncompressed_size;
 }
 
-void ArrayFlex::setup_header_in_flex_format(std::vector<int64_t>& values, std::vector<size_t>& indices,
-                                            int value_bit_width, int index_bit_width) const
+void ArrayFlex::setup_array_in_flex_format(std::vector<int64_t>& values, std::vector<size_t>& indices,
+                                           int value_bit_width, int index_bit_width) const
 {
     using Encoding = NodeHeader::Encoding;
     // at this stage we know we need to compress the array.
     // we need to round compressed size in order to make % 8 compliant, since memory is aligned in this way
     auto byte_size =
         m_array.calc_size<Encoding::Flex>(values.size(), indices.size(), value_bit_width, index_bit_width);
-
     // I'm assuming that flags are taken from the owning Array.
     uint8_t flags = NodeHeader::get_flags((uint64_t*)m_array.get_header());
-    // TODO: check if this can be done better. (e.g use realloc and not destroy)
     m_array.destroy();
-    // TODO: this is temporary because it means that we are not really gaining any benefit from compressing and array
-    // that is less than 128bytes
-    const auto sz = std::max(byte_size, size_t{128});
-    MemRef mem = m_array.get_alloc().alloc(sz);
+    MemRef mem = m_array.get_alloc().alloc(byte_size);
     auto header = (uint64_t*)mem.get_addr();
     NodeHeader::init_header(header, 'B', Encoding::Flex, flags, value_bit_width, index_bit_width, values.size(),
                             indices.size());
     REALM_ASSERT(m_array.get_kind(header) == 'B');
     REALM_ASSERT(m_array.get_encoding(header) == Encoding::Flex);
-    // TODO: same as above, do we need to set capacity to 128 or actual needed size?
-    const auto capacity = std::max(byte_size, size_t{128});
-    NodeHeader::set_capacity_in_header(capacity, (char*)header);
+    NodeHeader::set_capacity_in_header(byte_size, (char*)header);
     m_array.init_from_mem(mem);
     REALM_ASSERT(m_array.m_ref == mem.get_ref());
     REALM_ASSERT(m_array.get_kind(header) == 'B');

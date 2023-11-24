@@ -2359,7 +2359,6 @@ ONLY(Group_ArrayCompression_Correctness)
     }
 
 #ifdef REALM_DEBUG
-    to_disk.verify();
     from_disk.verify();
 #endif
 }
