@@ -383,11 +383,14 @@ public:
     ///
     /// \param only_if_modified Set to `false` to always write, or to `true` to
     /// only write the array if it has been modified.
-    ref_type write(_impl::ArrayWriterBase& out, bool deep, bool only_if_modified) const;
+    ref_type write(_impl::ArrayWriterBase& out, bool deep, bool only_if_modified, bool compress_in_flight) const;
 
     /// Same as non-static write() with `deep` set to true. This is for the
     /// cases where you do not already have an array accessor available.
-    static ref_type write(ref_type, Allocator&, _impl::ArrayWriterBase&, bool only_if_modified);
+    /// Compression may be attempted if `compress_in_flight` is true.
+    /// This should be avoided if you rely on the size of the array beeing unchanged.
+    static ref_type write(ref_type, Allocator&, _impl::ArrayWriterBase&, bool only_if_modified,
+                          bool compress_in_flight);
 
     size_t find_first(int64_t value, size_t begin = 0, size_t end = size_t(-1)) const;
 

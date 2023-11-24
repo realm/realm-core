@@ -933,21 +933,24 @@ void Group::validate(ObjLink link) const
 
 ref_type Group::DefaultTableWriter::write_names(_impl::OutputStream& out)
 {
-    bool deep = true;                                                 // Deep
-    bool only_if_modified = false;                                    // Always
-    return m_group->m_table_names.write(out, deep, only_if_modified); // Throws
+    bool deep = true;              // Deep
+    bool only_if_modified = false; // Always
+    bool compress = true;
+    return m_group->m_table_names.write(out, deep, only_if_modified, compress); // Throws
 }
 ref_type Group::DefaultTableWriter::write_tables(_impl::OutputStream& out)
 {
-    bool deep = true;                                            // Deep
-    bool only_if_modified = false;                               // Always
-    return m_group->m_tables.write(out, deep, only_if_modified); // Throws
+    bool deep = true;              // Deep
+    bool only_if_modified = false; // Always
+    bool compress = true;
+    return m_group->m_tables.write(out, deep, only_if_modified, compress); // Throws
 }
 
 auto Group::DefaultTableWriter::write_history(_impl::OutputStream& out) -> HistoryInfo
 {
     bool deep = true;              // Deep
     bool only_if_modified = false; // Always
+    bool compress = true;
     ref_type history_ref = _impl::GroupFriend::get_history_ref(*m_group);
     HistoryInfo info;
     if (history_ref) {
@@ -965,7 +968,7 @@ auto Group::DefaultTableWriter::write_history(_impl::OutputStream& out) -> Histo
         info.version = history_schema_version;
         Array history{const_cast<Allocator&>(_impl::GroupFriend::get_alloc(*m_group))};
         history.init_from_ref(history_ref);
-        info.ref = history.write(out, deep, only_if_modified); // Throws
+        info.ref = history.write(out, deep, only_if_modified, compress); // Throws
     }
     info.sync_file_id = m_group->get_sync_file_id();
     return info;
@@ -1097,9 +1100,10 @@ void Group::write(std::ostream& out, int file_format_version, TableWriter& table
             _impl::DeepArrayDestroyGuard dg_3(&version_list);
             bool deep = true;              // Deep
             bool only_if_modified = false; // Always
-            ref_type free_list_ref = free_list.write(out_2, deep, only_if_modified);
-            ref_type size_list_ref = size_list.write(out_2, deep, only_if_modified);
-            ref_type version_list_ref = version_list.write(out_2, deep, only_if_modified);
+            bool compress = false;
+            ref_type free_list_ref = free_list.write(out_2, deep, only_if_modified, compress);
+            ref_type size_list_ref = size_list.write(out_2, deep, only_if_modified, compress);
+            ref_type version_list_ref = version_list.write(out_2, deep, only_if_modified, compress);
             top.add(RefOrTagged::make_ref(free_list_ref));     // Throws
             top.add(RefOrTagged::make_ref(size_list_ref));     // Throws
             top.add(RefOrTagged::make_ref(version_list_ref));  // Throws
@@ -1132,9 +1136,10 @@ void Group::write(std::ostream& out, int file_format_version, TableWriter& table
         top.set(2, RefOrTagged::make_tagged(final_file_size)); // Throws
 
         // Write the top array
-        bool deep = false;                        // Shallow
-        bool only_if_modified = false;            // Always
-        top.write(out_2, deep, only_if_modified); // Throws
+        bool deep = false;             // Shallow
+        bool only_if_modified = false; // Always
+        bool compress_in_flight = false;
+        top.write(out_2, deep, only_if_modified, compress_in_flight); // Throws
         REALM_ASSERT_3(size_t(out_2.get_ref_of_next_array()), ==, final_file_size);
 
         dg_top.reset(nullptr); // Destroy now

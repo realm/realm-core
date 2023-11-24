@@ -348,26 +348,29 @@ size_t Array::get_byte_size() const noexcept
     return num_bytes;
 }
 
-ref_type Array::write(_impl::ArrayWriterBase& out, bool deep, bool only_if_modified) const
+ref_type Array::write(_impl::ArrayWriterBase& out, bool deep, bool only_if_modified, bool compress_in_flight) const
 {
     REALM_ASSERT(is_attached());
     if (only_if_modified && m_alloc.is_read_only(m_ref))
         return m_ref;
 
     if (!deep || !m_has_refs) {
-        if (encode_array()) {
-            const auto header = get_header();
-            const auto h = (uint64_t*)header;
-            REALM_ASSERT(get_kind(h) == 'B');
-            REALM_ASSERT(get_encoding(h) == Encoding::Flex);
+        if (compress_in_flight) {
+            if (encode_array()) {
+                const auto header = get_header();
+                const auto h = (uint64_t*)header;
+                REALM_ASSERT(get_kind(h) == 'B');
+                REALM_ASSERT(get_encoding(h) == Encoding::Flex);
+            }
+            return do_write_shallow(out); // Throws
         }
-        return do_write_shallow(out); // Throws
     }
 
     return do_write_deep(out, only_if_modified); // Throws
 }
 
-ref_type Array::write(ref_type ref, Allocator& alloc, _impl::ArrayWriterBase& out, bool only_if_modified)
+ref_type Array::write(ref_type ref, Allocator& alloc, _impl::ArrayWriterBase& out, bool only_if_modified,
+                      bool compress_in_flight)
 {
     if (only_if_modified && alloc.is_read_only(ref))
         return ref;
@@ -376,8 +379,10 @@ ref_type Array::write(ref_type ref, Allocator& alloc, _impl::ArrayWriterBase& ou
     array.init_from_ref(ref);
 
     if (!array.m_has_refs) {
-        array.encode_array();
-        return array.do_write_shallow(out); // Throws
+        if (compress_in_flight) {
+            array.encode_array();
+            return array.do_write_shallow(out); // Throws
+        }
     }
 
     return array.do_write_deep(out, only_if_modified); // Throws
@@ -423,7 +428,7 @@ ref_type Array::do_write_deep(_impl::ArrayWriterBase& out, bool only_if_modified
         bool is_ref = (value != 0 && (value & 1) == 0);
         if (is_ref) {
             ref_type subref = to_ref(value);
-            ref_type new_subref = write(subref, m_alloc, out, only_if_modified); // Throws
+            ref_type new_subref = write(subref, m_alloc, out, only_if_modified, true); // Throws
             value = from_ref(new_subref);
         }
         new_array.add(value); // Throws
