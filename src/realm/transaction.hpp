@@ -164,6 +164,11 @@ public:
         return static_cast<bool>(m_oldest_version_not_persisted);
     }
 
+    util::Logger* get_logger() const noexcept
+    {
+        return db->m_logger.get();
+    }
+
 private:
     enum class AsyncState { Idle, Requesting, HasLock, HasCommits, Syncing };
 
@@ -208,6 +213,7 @@ private:
     bool m_waiting_for_sync GUARDED_BY(m_async_mutex) = false;
 
     DB::TransactStage m_transact_stage = DB::transact_Ready;
+    unsigned m_log_id;
 
     friend class DB;
     friend class DisableReplication;
@@ -346,11 +352,7 @@ inline void Transaction::advance_read(O* observer, VersionID version_id)
     if (!hist)
         throw IllegalOperation("No transaction log when advancing");
 
-    auto old_version = m_read_lock.m_version;
     internal_advance_read(observer, version_id, *hist, false); // Throws
-    if (db->m_logger) {
-        db->m_logger->log(util::Logger::Level::trace, "Advance read: %1 -> %2", old_version, m_read_lock.m_version);
-    }
 }
 
 template <class O>
@@ -371,7 +373,7 @@ inline bool Transaction::promote_to_write(O* observer, bool nonblocking)
             acquire_write_lock(); // Throws
             if (db->m_logger) {
                 auto t2 = std::chrono::steady_clock::now();
-                db->m_logger->log(util::Logger::Level::trace, "Acquired write lock in %1 us",
+                db->m_logger->log(util::Logger::Level::trace, "Tr %1: Acquired write lock in %2 us", m_log_id,
                                   std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count());
             }
         }
@@ -405,7 +407,7 @@ inline bool Transaction::promote_to_write(O* observer, bool nonblocking)
     }
 
     if (db->m_logger) {
-        db->m_logger->log(util::Logger::Level::trace, "Promote to write: %1 -> %2", old_version,
+        db->m_logger->log(util::Logger::Level::trace, "Tr %1: Promote to write: %2 -> %3", m_log_id, old_version,
                           m_read_lock.m_version);
     }
 
@@ -456,7 +458,7 @@ inline void Transaction::rollback_and_continue_as_read()
         db->end_write_on_correct_thread();
 
     if (db->m_logger) {
-        db->m_logger->log(util::Logger::Level::trace, "Rollback");
+        db->m_logger->log(util::Logger::Level::trace, "Tr %1, Rollback", m_log_id);
     }
 
     m_history = nullptr;
@@ -473,6 +475,10 @@ inline bool Transaction::internal_advance_read(O* observer, VersionID version_id
         // _impl::History::update_early_from_top_ref() was not called
         // update allocator wrappers merely to update write protection
         update_allocator_wrappers(writable);
+        if (db->m_logger) {
+            db->m_logger->log(util::Logger::Level::trace, "Tr %1: Already on version: %2", m_log_id,
+                              m_read_lock.m_version);
+        }
         return false;
     }
 
@@ -511,6 +517,11 @@ inline bool Transaction::internal_advance_read(O* observer, VersionID version_id
     g.release();
     db->release_read_lock(m_read_lock);
     m_read_lock = new_read_lock;
+
+    if (db->m_logger) {
+        db->m_logger->log(util::Logger::Level::trace, "Tr %1: Advance read: %2 -> %3 ref %4", m_log_id, old_version,
+                          m_read_lock.m_version, m_read_lock.m_top_ref);
+    }
 
     return true; // _impl::History::update_early_from_top_ref() was called
 }

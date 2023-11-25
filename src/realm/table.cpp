@@ -34,7 +34,6 @@
 #include <realm/replication.hpp>
 #include <realm/table_view.hpp>
 #include <realm/util/features.h>
-#include <realm/util/miscellaneous.hpp>
 #include <realm/util/serializer.hpp>
 
 #include <stdexcept>
@@ -415,10 +414,6 @@ ColKey Table::add_column(Table& target, StringData name)
     Group* target_group = target.get_parent_group();
     REALM_ASSERT_RELEASE(origin_group && target_group);
     REALM_ASSERT_RELEASE(origin_group == target_group);
-    // Only links to embedded objects are allowed.
-    if (is_asymmetric() && !target.is_embedded()) {
-        throw IllegalOperation("Object property not supported in asymmetric table");
-    }
     // Incoming links from an asymmetric table are not allowed.
     if (target.is_asymmetric()) {
         throw IllegalOperation("Ephemeral objects not supported");
@@ -463,10 +458,6 @@ ColKey Table::add_column_list(Table& target, StringData name)
     Group* target_group = target.get_parent_group();
     REALM_ASSERT_RELEASE(origin_group && target_group);
     REALM_ASSERT_RELEASE(origin_group == target_group);
-    // Only links to embedded objects are allowed.
-    if (is_asymmetric() && !target.is_embedded()) {
-        throw IllegalOperation("List of objects not supported in asymmetric table");
-    }
     // Incoming links from an asymmetric table are not allowed.
     if (target.is_asymmetric()) {
         throw IllegalOperation("List of ephemeral objects not supported");
@@ -490,10 +481,6 @@ ColKey Table::add_column_set(Table& target, StringData name)
     REALM_ASSERT_RELEASE(origin_group == target_group);
     if (target.is_embedded())
         throw IllegalOperation("Set of embedded objects not supported");
-    // Outgoing links from an asymmetric table are not allowed.
-    if (is_asymmetric()) {
-        throw IllegalOperation("Set of objects not supported in asymmetric table");
-    }
     // Incoming links from an asymmetric table are not allowed.
     if (target.is_asymmetric()) {
         throw IllegalOperation("Set of ephemeral objects not supported");
@@ -537,10 +524,6 @@ ColKey Table::add_column_dictionary(Table& target, StringData name, DataType key
     Group* target_group = target.get_parent_group();
     REALM_ASSERT_RELEASE(origin_group && target_group);
     REALM_ASSERT_RELEASE(origin_group == target_group);
-    // Only links to embedded objects are allowed.
-    if (is_asymmetric() && !target.is_embedded()) {
-        throw IllegalOperation("Dictionary of objects not supported in asymmetric table");
-    }
     // Incoming links from an asymmetric table are not allowed.
     if (target.is_asymmetric()) {
         throw IllegalOperation("Dictionary of ephemeral objects not supported");
@@ -564,7 +547,7 @@ void Table::remove_recursive(CascadeState& cascade_state)
         cascade_state.send_notifications();
 
         for (auto& l : cascade_state.m_to_be_nullified) {
-            Obj obj = group->get_table(l.origin_table)->try_get_object(l.origin_key);
+            Obj obj = group->get_table_unchecked(l.origin_table)->try_get_object(l.origin_key);
             REALM_ASSERT_DEBUG(obj);
             if (obj) {
                 std::move(obj).nullify_link(l.origin_col_key, l.old_target_link);
@@ -574,7 +557,7 @@ void Table::remove_recursive(CascadeState& cascade_state)
 
         auto to_delete = std::move(cascade_state.m_to_be_deleted);
         for (auto obj : to_delete) {
-            auto table = group->get_table(obj.first);
+            auto table = obj.first == m_key ? this : group->get_table_unchecked(obj.first);
             // This might add to the list of objects that should be deleted
             REALM_ASSERT(!obj.second.is_unresolved());
             table->m_clusters.erase(obj.second, cascade_state);
@@ -588,8 +571,9 @@ void Table::nullify_links(CascadeState& cascade_state)
     Group* group = get_parent_group();
     REALM_ASSERT(group);
     for (auto& to_delete : cascade_state.m_to_be_deleted) {
-        auto table = group->get_table(to_delete.first);
-        table->m_clusters.nullify_links(to_delete.second, cascade_state);
+        auto table = to_delete.first == m_key ? this : group->get_table_unchecked(to_delete.first);
+        if (!table->is_asymmetric())
+            table->m_clusters.nullify_incoming_links(to_delete.second, cascade_state);
     }
 }
 
@@ -2175,8 +2159,6 @@ void Table::ensure_graveyard()
 
 void Table::batch_erase_rows(const KeyColumn& keys)
 {
-    Group* g = get_parent_group();
-
     size_t num_objs = keys.size();
     std::vector<ObjKey> vec;
     vec.reserve(num_objs);
@@ -2186,28 +2168,38 @@ void Table::batch_erase_rows(const KeyColumn& keys)
             vec.push_back(key);
         }
     }
+
     sort(vec.begin(), vec.end());
     vec.erase(unique(vec.begin(), vec.end()), vec.end());
 
+    batch_erase_objects(vec);
+}
+
+void Table::batch_erase_objects(std::vector<ObjKey>& keys)
+{
+    Group* g = get_parent_group();
+    bool maybe_has_incoming_links = g && !is_asymmetric();
+
     if (has_any_embedded_objects() || (g && g->has_cascade_notification_handler())) {
         CascadeState state(CascadeState::Mode::Strong, g);
-        std::for_each(vec.begin(), vec.end(), [this, &state](ObjKey k) {
+        std::for_each(keys.begin(), keys.end(), [this, &state](ObjKey k) {
             state.m_to_be_deleted.emplace_back(m_key, k);
         });
-        nullify_links(state);
+        if (maybe_has_incoming_links)
+            nullify_links(state);
         remove_recursive(state);
     }
     else {
         CascadeState state(CascadeState::Mode::None, g);
-        for (auto k : vec) {
-            if (g) {
-                m_clusters.nullify_links(k, state);
+        for (auto k : keys) {
+            if (maybe_has_incoming_links) {
+                m_clusters.nullify_incoming_links(k, state);
             }
             m_clusters.erase(k, state);
         }
     }
+    keys.clear();
 }
-
 
 void Table::clear()
 {
@@ -2262,6 +2254,11 @@ void Table::set_sequence_number(uint64_t seq)
 void Table::set_collision_map(ref_type ref)
 {
     m_top.set(top_position_for_collision_map, RefOrTagged::make_ref(ref));
+}
+
+void Table::set_col_key_sequence_number(uint64_t seq)
+{
+    m_top.set(top_position_for_column_key, RefOrTagged::make_tagged(seq));
 }
 
 TableRef Table::get_link_target(ColKey col_key) noexcept
@@ -2327,12 +2324,11 @@ void Table::aggregate(QueryStateBase& st, ColKey column_key) const
         cluster->init_leaf(column_key, &leaf);
         st.m_key_offset = cluster->get_offset();
         st.m_key_values = cluster->get_key_array();
-
+        st.set_payload_column(&leaf);
         bool cont = true;
         size_t sz = leaf.size();
         for (size_t local_index = 0; cont && local_index < sz; local_index++) {
-            auto v = leaf.get(local_index);
-            cont = st.match(local_index, v);
+            cont = st.match(local_index);
         }
         return IteratorControl::AdvanceToNext;
     };
@@ -3063,7 +3059,7 @@ Obj Table::create_object_with_primary_key(const Mixed& primary_key, FieldValues&
         }
     }
     if (is_asymmetric() && repl && repl->get_history_type() == Replication::HistoryType::hist_SyncClient) {
-        get_parent_group()->m_objects_to_delete.emplace_back(this->m_key, ret.get_key());
+        get_parent_group()->m_tables_to_clear.insert(this->m_key);
     }
     return ret;
 }
@@ -3157,7 +3153,8 @@ Obj Table::get_object_with_primary_key(Mixed primary_key) const
     DataType type = DataType(primary_key_col.get_type());
     REALM_ASSERT((primary_key.is_null() && primary_key_col.get_attrs().test(col_attr_Nullable)) ||
                  primary_key.get_type() == type);
-    return m_clusters.get(m_index_accessors[primary_key_col.get_index().val]->find_first(primary_key));
+    ObjKey k = m_index_accessors[primary_key_col.get_index().val]->find_first(primary_key);
+    return k ? m_clusters.get(k) : Obj{};
 }
 
 Mixed Table::get_primary_key(ObjKey key) const
@@ -3398,13 +3395,13 @@ void Table::remove_object(ObjKey key)
     if (has_any_embedded_objects() || (g && g->has_cascade_notification_handler())) {
         CascadeState state(CascadeState::Mode::Strong, g);
         state.m_to_be_deleted.emplace_back(m_key, key);
-        m_clusters.nullify_links(key, state);
+        m_clusters.nullify_incoming_links(key, state);
         remove_recursive(state);
     }
     else {
         CascadeState state(CascadeState::Mode::None, g);
         if (g) {
-            m_clusters.nullify_links(key, state);
+            m_clusters.nullify_incoming_links(key, state);
         }
         m_clusters.erase(key, state);
     }
@@ -3956,7 +3953,7 @@ bool Table::has_any_embedded_objects()
         for_each_public_column([&](ColKey col_key) {
             auto target_table_key = get_opposite_table_key(col_key);
             if (target_table_key && is_link_type(col_key.get_type())) {
-                auto target_table = get_parent_group()->get_table(target_table_key);
+                auto target_table = get_parent_group()->get_table_unchecked(target_table_key);
                 if (target_table->is_embedded()) {
                     m_has_any_embedded_objects = true;
                     return IteratorControl::Stop; // early out
@@ -3994,7 +3991,7 @@ ColKey Table::find_or_add_backlink_column(ColKey origin_col_key, TableKey origin
         set_opposite_column(backlink_col_key, origin_table, origin_col_key);
 
         if (Replication* repl = get_repl())
-            repl->typed_link_change(get_parent_group()->get_table(origin_table).unchecked_ptr(), origin_col_key,
+            repl->typed_link_change(get_parent_group()->get_table_unchecked(origin_table), origin_col_key,
                                     m_key); // Throws
     }
 

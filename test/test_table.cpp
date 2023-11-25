@@ -3401,7 +3401,7 @@ TEST(Table_object_by_index)
 }
 
 // String query benchmark
-TEST(Table_QuickSort2)
+NONCONCURRENT_TEST(Table_QuickSort2)
 {
     Table ttt;
     auto strings = ttt.add_column(type_String, "2");
@@ -4007,7 +4007,7 @@ TEST(Table_PrimaryKeyIndexBug)
     CHECK_EQUAL(cnt, 1);
 }
 
-TEST(Table_PrimaryKeyString)
+NONCONCURRENT_TEST(Table_PrimaryKeyString)
 {
 #ifdef REALM_DEBUG
     int nb_rows = 1000;
@@ -5898,8 +5898,8 @@ TEST(Table_AsymmetricObjects)
     tr = sg->start_write();
     auto table2 = tr->add_table("target table");
     table = tr->get_table("mytable");
-    // Outgoing link from asymmetric object is not allowed.
-    CHECK_THROW(table->add_column(*table2, "link"), LogicError);
+    // Outgoing link from asymmetric object is allowed.
+    CHECK_NOTHROW(table->add_column(*table2, "link"));
     // Incoming link to asymmetric object is not allowed.
     CHECK_THROW(table2->add_column(*table, "link"), LogicError);
     tr->commit();

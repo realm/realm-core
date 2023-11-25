@@ -46,8 +46,8 @@ namespace realm {
 namespace test_util {
 
 using realm::sync::HistoryEntry;
+using realm::sync::RemoteChangeset;
 using realm::sync::SyncReplication;
-using realm::sync::Transformer;
 using realm::sync::TransformHistory;
 
 
@@ -71,16 +71,15 @@ public:
     }
 
     version_type integrate_remote_changeset(file_ident_type remote_file_ident, DB& sg,
-                                            const Transformer::RemoteChangeset& changeset,
-                                            util::Logger& replay_logger)
+                                            const RemoteChangeset& changeset, util::Logger& replay_logger)
     {
         std::size_t num_changesets = 1;
         return integrate_remote_changesets(remote_file_ident, sg, &changeset, num_changesets, replay_logger);
     }
 
     version_type integrate_remote_changesets(file_ident_type remote_file_ident, DB&,
-                                             const Transformer::RemoteChangeset* incoming_changesets,
-                                             std::size_t num_changesets, util::Logger& replay_logger);
+                                             const RemoteChangeset* incoming_changesets, std::size_t num_changesets,
+                                             util::Logger& replay_logger);
 
     version_type prepare_changeset(const char* data, std::size_t size, version_type orig_version) override
     {
@@ -357,96 +356,87 @@ private:
 };
 
 
-class ShortCircuitHistory::TransformerImpl : public _impl::TransformerImpl {
+class ShortCircuitHistory::TransformerImpl final : public sync::Transformer {
 public:
     TransformerImpl(TestDirNameGenerator* changeset_dump_dir_gen)
-        : _impl::TransformerImpl()
-        , m_changeset_dump_dir_gen{changeset_dump_dir_gen}
+        : m_changeset_dump_dir_gen{changeset_dump_dir_gen}
     {
     }
 
 protected:
-    void merge_changesets(file_ident_type local_file_ident, Changeset* their_changesets, std::size_t their_size,
-                          Changeset** our_changesets, std::size_t our_size, util::Logger& logger) final
+    void merge_changesets(file_ident_type local_file_ident, util::Span<Changeset> their_changesets,
+                          util::Span<Changeset*> our_changesets, util::Logger& logger) final
     {
         std::string directory;
         if (m_changeset_dump_dir_gen) {
             directory = m_changeset_dump_dir_gen->next();
             util::try_make_dir(directory);
 
-            encode_changesets(our_changesets, our_size, logger);
-            write_changesets_to_file(directory + "/ours_original", our_size, logger);
+            encode_changesets(our_changesets, logger);
+            write_changesets_to_file(directory + "/ours_original", logger);
 
-            encode_changesets(their_changesets, their_size, logger);
-            write_changesets_to_file(directory + "/theirs_original", their_size, logger);
+            encode_changesets(their_changesets, logger);
+            write_changesets_to_file(directory + "/theirs_original", logger);
         }
 
-        _impl::TransformerImpl::merge_changesets(local_file_ident, their_changesets, their_size, our_changesets,
-                                                 our_size, logger);
+        sync::Transformer::merge_changesets(local_file_ident, their_changesets, our_changesets, logger);
 
         if (m_changeset_dump_dir_gen) {
-            encode_changesets(our_changesets, our_size, logger);
-            write_changesets_to_file(directory + "/ours_transformed", our_size, logger);
+            encode_changesets(our_changesets, logger);
+            write_changesets_to_file(directory + "/ours_transformed", logger);
 
-            encode_changesets(their_changesets, their_size, logger);
-            write_changesets_to_file(directory + "/theirs_transformed", their_size, logger);
+            encode_changesets(their_changesets, logger);
+            write_changesets_to_file(directory + "/theirs_transformed", logger);
         }
     }
 
 private:
     using OutputBuffer = util::ResettableExpandableBufferOutputStream;
 
-    void encode_changesets(Changeset* changesets, std::size_t num_changesets, util::Logger& logger)
+    void encode_changesets(util::Span<Changeset> changesets, util::Logger& logger)
     {
         sync::ChangesetEncoder::Buffer encode_buffer;
-        for (size_t i = 0; i < num_changesets; ++i) {
-            encode_changeset(changesets[i], encode_buffer); // Throws
-
-            HistoryEntry entry;
-            entry.remote_version = changesets[i].last_integrated_remote_version;
-            entry.origin_file_ident = changesets[i].origin_file_ident;
-            entry.origin_timestamp = changesets[i].origin_timestamp;
-            entry.changeset = BinaryData{encode_buffer.data(), encode_buffer.size()};
-
-            _impl::ServerProtocol::ChangesetInfo info{changesets[i].version, entry.remote_version, entry,
-                                                      entry.changeset.size()};
-
-            m_protocol.insert_single_changeset_download_message(m_history_entries_buffer, info, logger); // Throws
-
-            encode_buffer.clear();
+        for (auto& changeset : changesets) {
+            encode_and_store_changeset(changeset, encode_buffer, logger);
         }
     }
 
-    void encode_changesets(Changeset** changesets, std::size_t num_changesets, util::Logger& logger)
+    void encode_changesets(util::Span<Changeset*> changesets, util::Logger& logger)
     {
         sync::ChangesetEncoder::Buffer encode_buffer;
-        for (size_t i = 0; i < num_changesets; ++i) {
-            encode_changeset(*changesets[i], encode_buffer); // Throws
-
-            HistoryEntry entry;
-            entry.remote_version = changesets[i]->last_integrated_remote_version;
-            entry.origin_file_ident = changesets[i]->origin_file_ident;
-            entry.origin_timestamp = changesets[i]->origin_timestamp;
-            entry.changeset = BinaryData{encode_buffer.data(), encode_buffer.size()};
-
-            _impl::ServerProtocol::ChangesetInfo info{changesets[i]->version, entry.remote_version, entry,
-                                                      entry.changeset.size()};
-
-            m_protocol.insert_single_changeset_download_message(m_history_entries_buffer, info, logger); // Throws
-
-            encode_buffer.clear();
+        for (auto& changeset : changesets) {
+            encode_and_store_changeset(*changeset, encode_buffer, logger);
         }
     }
 
-    void write_changesets_to_file(const std::string& pathname, std::size_t num_changesets, util::Logger& logger)
+    void encode_and_store_changeset(const Changeset& changeset, sync::ChangesetEncoder::Buffer& encode_buffer,
+                                    util::Logger& logger)
+    {
+        encode_changeset(changeset, encode_buffer); // Throws
+
+        HistoryEntry entry;
+        entry.remote_version = changeset.last_integrated_remote_version;
+        entry.origin_file_ident = changeset.origin_file_ident;
+        entry.origin_timestamp = changeset.origin_timestamp;
+        entry.changeset = BinaryData{encode_buffer.data(), encode_buffer.size()};
+
+        _impl::ServerProtocol::ChangesetInfo info{changeset.version, entry.remote_version, entry,
+                                                  entry.changeset.size()};
+        m_protocol.insert_single_changeset_download_message(m_history_entries_buffer, info, logger); // Throws
+
+        encode_buffer.clear();
+    }
+
+    void write_changesets_to_file(const std::string& pathname, util::Logger& logger)
     {
         m_protocol.make_download_message(sync::get_current_protocol_version(), m_download_message_buffer,
                                          file_ident_type(0), version_type(0), version_type(0), version_type(0), 0,
-                                         version_type(0), version_type(0), 0, num_changesets,
+                                         version_type(0), version_type(0), 0, m_history_entry_count,
                                          m_history_entries_buffer.data(), m_history_entries_buffer.size(), 0, false,
                                          logger); // Throws
 
         m_history_entries_buffer.reset();
+        m_history_entry_count = 0;
 
         std::ofstream file(pathname, std::ios::binary);
         file.write(m_download_message_buffer.data(), m_download_message_buffer.size());
@@ -456,13 +446,14 @@ private:
     _impl::ServerProtocol m_protocol;
     TestDirNameGenerator* m_changeset_dump_dir_gen;
 
+    size_t m_history_entry_count = 0;
     OutputBuffer m_history_entries_buffer;
     OutputBuffer m_download_message_buffer;
 };
 
 
 inline auto ShortCircuitHistory::integrate_remote_changesets(file_ident_type remote_file_ident, DB& sg,
-                                                             const Transformer::RemoteChangeset* incoming_changesets,
+                                                             const RemoteChangeset* incoming_changesets,
                                                              size_t num_changesets, util::Logger& logger)
     -> version_type
 {
@@ -546,7 +537,7 @@ public:
         std::string suffix = out.str();
         std::string test_path = get_test_path(test_context.get_test_name(), suffix);
         return std::unique_ptr<Peer>(
-            new Peer(client_file_ident, test_path, changeset_dump_dir_gen, *(test_context.logger)));
+            new Peer(client_file_ident, test_path, changeset_dump_dir_gen, *test_context.logger));
     }
 
     // FIXME: Remove the dependency on the unit_test namespace.
@@ -562,7 +553,7 @@ public:
         std::string suffix = out.str();
         std::string test_path = get_test_path(test_context.get_test_name(), suffix);
         return std::unique_ptr<Peer>(
-            new Peer(client_file_ident, test_path, changeset_dump_dir_gen, *(test_context.logger)));
+            new Peer(client_file_ident, test_path, changeset_dump_dir_gen, *test_context.logger));
     }
 
     template <class F>
@@ -625,7 +616,7 @@ public:
         version_type& last_remote_version = last_remote_versions_integrated[remote.local_file_ident];
         if (last_remote_version == 0)
             last_remote_version = 1;
-        std::unique_ptr<Transformer::RemoteChangeset[]> changesets{new Transformer::RemoteChangeset[num_changesets]};
+        std::unique_ptr<RemoteChangeset[]> changesets{new RemoteChangeset[num_changesets]};
         remote.get_next_changesets_for_remote(local_file_ident, last_remote_version, changesets.get(),
                                               num_changesets);
         /*
@@ -670,7 +661,7 @@ private:
 
     void get_next_changesets_for_remote(file_ident_type remote_file_ident,
                                         version_type last_version_integrated_by_remote,
-                                        Transformer::RemoteChangeset* out_changesets, size_t num_changesets) const
+                                        RemoteChangeset* out_changesets, size_t num_changesets) const
     {
         // At least one transaction can be assumed to have been performed
         REALM_ASSERT(current_version != 0);
@@ -829,7 +820,7 @@ struct Associativity {
             ReadTransaction read_server{server->shared_group};
             for (auto& client : clients) {
                 ReadTransaction read_client{client->shared_group};
-                if (!CHECK(compare_groups(read_server, read_client, *(test_context.logger)))) {
+                if (!CHECK(compare_groups(read_server, read_client, *test_context.logger))) {
                     return false;
                 }
             }
@@ -874,7 +865,7 @@ struct Associativity {
             // Check that all permutations converge on the same state.
             ReadTransaction read_first{first.server->shared_group};
             ReadTransaction read_current{iter.server->shared_group};
-            if (!CHECK(compare_groups(read_first, read_current, *(test_context.logger)))) {
+            if (!CHECK(compare_groups(read_first, read_current, *test_context.logger))) {
                 return false;
             }
         }

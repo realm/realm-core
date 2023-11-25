@@ -52,7 +52,6 @@ set(CORE_TEST_SOURCES
     test_json.cpp
     test_link_query_view.cpp
     test_links.cpp
-    test_metrics.cpp
     test_mixed_null_assertions.cpp
     test_object_id.cpp
     test_optional.cpp
@@ -127,7 +126,10 @@ set_source_files_properties(test_query_geo.cpp PROPERTIES
 )
 
 if (MSVC)
-    append_source_file_compile_options(FILES test_query.cpp test_query_big.cpp FLAGS /bigobj)
+    append_source_file_compile_options(
+        FILES test_parser.cpp test_table.cpp test_query.cpp test_query_big.cpp
+        FLAGS /bigobj
+    )
 endif()
 
 # Resources required for running the tests

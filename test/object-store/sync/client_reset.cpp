@@ -122,9 +122,7 @@ TEST_CASE("sync: large reset with recovery is restartable", "[sync][pbs][client 
          }},
     };
 
-    std::string base_url = get_base_url();
-    REQUIRE(!base_url.empty());
-    auto server_app_config = minimal_app_config(base_url, "client_reset_tests", schema);
+    auto server_app_config = minimal_app_config("client_reset_tests", schema);
     server_app_config.partition_key = partition_prop;
     TestAppSession test_app_session(create_app(server_app_config));
     auto app = test_app_session.app();
@@ -185,7 +183,7 @@ TEST_CASE("sync: large reset with recovery is restartable", "[sync][pbs][client 
 
     realm->sync_session()->resume();
     timed_wait_for([&] {
-        return util::File::exists(_impl::ClientResetOperation::get_fresh_path_for(realm_config.path));
+        return util::File::exists(_impl::client_reset::get_fresh_path_for(realm_config.path));
     });
     realm->sync_session()->pause();
     realm->sync_session()->resume();
@@ -217,9 +215,7 @@ TEST_CASE("sync: pending client resets are cleared when downloads are complete",
          }},
     };
 
-    std::string base_url = get_base_url();
-    REQUIRE(!base_url.empty());
-    auto server_app_config = minimal_app_config(base_url, "client_reset_tests", schema);
+    auto server_app_config = minimal_app_config("client_reset_tests", schema);
     server_app_config.partition_key = partition_prop;
     TestAppSession test_app_session(create_app(server_app_config));
     auto app = test_app_session.app();
@@ -293,9 +289,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
              partition_prop,
          }},
     };
-    std::string base_url = get_base_url();
-    REQUIRE(!base_url.empty());
-    auto server_app_config = minimal_app_config(base_url, "client_reset_tests", schema);
+    auto server_app_config = minimal_app_config("client_reset_tests", schema);
     server_app_config.partition_key = partition_prop;
     TestAppSession test_app_session(create_app(server_app_config));
     auto app = test_app_session.app();
@@ -371,7 +365,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
 
     local_config.cache = false;
     local_config.automatic_change_notifications = false;
-    const std::string fresh_path = realm::_impl::ClientResetOperation::get_fresh_path_for(local_config.path);
+    const std::string fresh_path = realm::_impl::client_reset::get_fresh_path_for(local_config.path);
     size_t before_callback_invocations = 0;
     size_t after_callback_invocations = 0;
     std::mutex mtx;
@@ -400,6 +394,16 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
         REQUIRE(after->read_group().get_table("class_object"));
         REQUIRE(after->config().path == local_config.path);
         REQUIRE(after->current_transaction_version() > before->current_transaction_version());
+    };
+    auto get_key_for_object_with_value = [&](TableRef table, int64_t value) -> ObjKey {
+        REQUIRE(table);
+        auto target = std::find_if(table->begin(), table->end(), [&](auto& it) -> bool {
+            return it.template get<Int>("value") == value;
+        });
+        if (target == table->end()) {
+            return {};
+        }
+        return target->get_key();
     };
 
     Results results;
@@ -604,6 +608,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
                 }
             };
             make_reset(local_config, remote_config)
+                ->set_development_mode(true)
                 ->setup([&](SharedRealm before) {
                     before->update_schema(
                         {
@@ -703,6 +708,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
                 err = error;
             };
             make_reset(local_config, remote_config)
+                ->set_development_mode(true)
                 ->make_local_changes([&](SharedRealm local) {
                     local->update_schema(
                         {
@@ -738,6 +744,59 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
             REQUIRE(err.value()->is_client_reset_requested());
             REQUIRE(before_callback_invocations == 1);
             REQUIRE(after_callback_invocations == 0);
+        }
+
+        SECTION("add remotely deleted object to list") {
+            test_reset
+                ->setup([&](SharedRealm realm) {
+                    ObjKey k1 =
+                        create_object(*realm, "link target", ObjectId::gen(), partition).set("value", 1).get_key();
+                    ObjKey k2 =
+                        create_object(*realm, "link target", ObjectId::gen(), partition).set("value", 2).get_key();
+                    ObjKey k3 =
+                        create_object(*realm, "link target", ObjectId::gen(), partition).set("value", 3).get_key();
+                    Obj o = create_object(*realm, "link origin", ObjectId::gen(), partition);
+                    auto list = o.get_linklist("list");
+                    list.add(k1);
+                    list.add(k2);
+                    list.add(k3);
+                    // 1, 2, 3
+                })
+                ->make_local_changes([&](SharedRealm local) {
+                    auto key1 = get_key_for_object_with_value(get_table(*local, "link target"), 1);
+                    auto key2 = get_key_for_object_with_value(get_table(*local, "link target"), 2);
+                    auto key3 = get_key_for_object_with_value(get_table(*local, "link target"), 3);
+                    auto table = get_table(*local, "link origin");
+                    auto list = table->begin()->get_linklist("list");
+                    REQUIRE(list.size() == 3);
+                    list.insert(1, key2);
+                    list.add(key2);
+                    list.add(key3); // common suffix of key3
+                    // 1, 2, 2, 3, 2, 3
+                    // this set operation triggers the list copy because the index becomes ambiguious
+                    list.set(0, key1);
+                })
+                ->make_remote_changes([&](SharedRealm remote) {
+                    auto table = get_table(*remote, "link target");
+                    auto key = get_key_for_object_with_value(table, 2);
+                    REQUIRE(key);
+                    table->remove_object(key);
+                })
+                ->on_post_reset([&](SharedRealm realm) {
+                    REQUIRE_NOTHROW(realm->refresh());
+                    auto table = get_table(*realm, "link origin");
+                    auto target_table = get_table(*realm, "link target");
+                    REQUIRE(table->size() == 1);
+                    REQUIRE(target_table->size() == 2);
+                    REQUIRE(get_key_for_object_with_value(target_table, 1));
+                    REQUIRE(get_key_for_object_with_value(target_table, 3));
+                    auto list = table->begin()->get_linklist("list");
+                    REQUIRE(list.size() == 3); // 1, 3, 3
+                    REQUIRE(list.get_object(0).get<Int>("value") == 1);
+                    REQUIRE(list.get_object(1).get<Int>("value") == 3);
+                    REQUIRE(list.get_object(2).get<Int>("value") == 3);
+                })
+                ->run();
         }
     } // end recovery section
 
@@ -968,7 +1027,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
                 ->run();
 
             timed_wait_for([&] {
-                return util::File::exists(_impl::ClientResetOperation::get_fresh_path_for(local_config.path));
+                return util::File::exists(_impl::client_reset::get_fresh_path_for(local_config.path));
             });
 
             // Restart the session before the client reset finishes.
@@ -996,7 +1055,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
             local_config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
                 err = error;
             };
-            std::string fresh_path = realm::_impl::ClientResetOperation::get_fresh_path_for(local_config.path);
+            std::string fresh_path = realm::_impl::client_reset::get_fresh_path_for(local_config.path);
             util::File f(fresh_path, util::File::Mode::mode_Write);
             f.write("a non empty file");
             f.sync();
@@ -1013,7 +1072,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
             local_config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
                 err = error;
             };
-            std::string fresh_path = realm::_impl::ClientResetOperation::get_fresh_path_for(local_config.path);
+            std::string fresh_path = realm::_impl::client_reset::get_fresh_path_for(local_config.path);
             // create a non-empty directory that we'll fail to delete
             util::make_dir(fresh_path);
             util::File(util::File::resolve("file", fresh_path), util::File::mode_Write);
@@ -1180,6 +1239,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
                 err = error;
             };
             make_reset(local_config, remote_config)
+                ->set_development_mode(true)
                 ->make_local_changes([&](SharedRealm local) {
                     local->update_schema(
                         {
@@ -1212,6 +1272,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
                 err = error;
             };
             make_reset(local_config, remote_config)
+                ->set_development_mode(true)
                 ->make_local_changes([](SharedRealm local) {
                     local->update_schema(
                         {
@@ -1243,7 +1304,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
         }
 
         SECTION("compatible schema changes in both remote and local transactions") {
-            test_reset
+            test_reset->set_development_mode(true)
                 ->make_local_changes([](SharedRealm local) {
                     local->update_schema(
                         {
@@ -1295,6 +1356,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
                 err = error;
             };
             make_reset(local_config, remote_config)
+                ->set_development_mode(true)
                 ->make_local_changes([](SharedRealm local) {
                     local->update_schema(
                         {
@@ -1337,6 +1399,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
             };
 
             make_reset(local_config, remote_config)
+                ->set_development_mode(true)
                 ->make_local_changes([](SharedRealm local) {
                     local->update_schema(
                         {
@@ -1484,17 +1547,6 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
                 ->run();
         }
 
-        auto get_key_for_object_with_value = [&](TableRef table, int64_t value) -> ObjKey {
-            REQUIRE(table);
-            auto target = std::find_if(table->begin(), table->end(), [&](auto& it) -> bool {
-                return it.template get<Int>("value") == value;
-            });
-            if (target == table->end()) {
-                return {};
-            }
-            return target->get_key();
-        };
-
         SECTION("link to remotely deleted object") {
             test_reset
                 ->setup([&](SharedRealm realm) {
@@ -1575,7 +1627,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
         auto has_reset_cycle_flag = [](SharedRealm realm) -> util::Optional<_impl::client_reset::PendingReset> {
             auto db = TestHelper::get_db(realm);
             auto rt = db->start_read();
-            return _impl::client_reset::has_pending_reset(rt);
+            return _impl::client_reset::has_pending_reset(*rt);
         };
         ThreadSafeSyncError err;
         local_config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
@@ -1585,16 +1637,15 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
             local_config.sync_config->notify_before_client_reset = [previous_type = type](SharedRealm realm) {
                 auto db = TestHelper::get_db(realm);
                 auto wt = db->start_write();
-                _impl::client_reset::track_reset(wt, previous_type);
+                _impl::client_reset::track_reset(*wt, previous_type);
                 wt->commit();
             };
         };
         SECTION("a normal reset adds and removes a cycle detection flag") {
             local_config.sync_config->client_resync_mode = ClientResyncMode::RecoverOrDiscard;
             local_config.sync_config->notify_before_client_reset = [&](SharedRealm realm) {
-                auto flag = has_reset_cycle_flag(realm);
-                REQUIRE(!flag);
-                std::lock_guard<std::mutex> lock(mtx);
+                REQUIRE_FALSE(has_reset_cycle_flag(realm));
+                std::lock_guard lock(mtx);
                 ++before_callback_invocations;
             };
             local_config.sync_config->notify_after_client_reset = [&](SharedRealm, ThreadSafeReference realm_ref,
@@ -1604,19 +1655,35 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
                 REQUIRE(bool(flag));
                 REQUIRE(flag->type == ClientResyncMode::Recover);
                 REQUIRE(did_recover);
-                std::lock_guard<std::mutex> lock(mtx);
+                std::lock_guard lock(mtx);
                 ++after_callback_invocations;
             };
             make_reset(local_config, remote_config)
                 ->on_post_local_changes([&](SharedRealm realm) {
-                    auto flag = has_reset_cycle_flag(realm);
-                    REQUIRE(!flag);
+                    REQUIRE_FALSE(has_reset_cycle_flag(realm));
                 })
                 ->run();
             REQUIRE(!err);
             REQUIRE(before_callback_invocations == 1);
             REQUIRE(after_callback_invocations == 1);
         }
+
+        SECTION("a failed reset leaves a cycle detection flag") {
+            local_config.sync_config->client_resync_mode = ClientResyncMode::Recover;
+            make_reset(local_config, remote_config)
+                ->make_local_changes([](SharedRealm realm) {
+                    auto table = realm->read_group().get_table("class_object");
+                    table->remove_column(table->add_column(type_Int, "new col"));
+                })
+                ->run();
+            local_config.sync_config.reset();
+            local_config.force_sync_history = true;
+            auto realm = Realm::get_shared_realm(local_config);
+            auto flag = has_reset_cycle_flag(realm);
+            REQUIRE(flag);
+            CHECK(flag->type == ClientResyncMode::Recover);
+        }
+
         SECTION("In DiscardLocal mode: a previous failed discard reset is detected and generates an error") {
             local_config.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
             make_fake_previous_reset(ClientResyncMode::DiscardLocal);
@@ -1794,9 +1861,7 @@ TEST_CASE("sync: Client reset during async open", "[sync][pbs][client reset][baa
          }},
     };
 
-    std::string base_url = get_base_url();
-    REQUIRE(!base_url.empty());
-    auto server_app_config = minimal_app_config(base_url, "client_reset_tests", schema);
+    auto server_app_config = minimal_app_config("client_reset_tests", schema);
     server_app_config.partition_key = partition_prop;
     TestAppSession test_app_session(create_app(server_app_config));
     auto app = test_app_session.app();
@@ -2441,6 +2506,16 @@ struct Move {
     size_t to;
 };
 
+struct Insert {
+    Insert(size_t index, util::Optional<int64_t> key)
+        : ndx(index)
+        , pk(key)
+    {
+    }
+    size_t ndx;
+    util::Optional<int64_t> pk;
+};
+
 struct CollectionOperation {
     CollectionOperation(Add op)
         : m_op(op)
@@ -2466,8 +2541,19 @@ struct CollectionOperation {
         : m_op(op)
     {
     }
+    CollectionOperation(Insert op)
+        : m_op(op)
+    {
+    }
     void apply(collection_fixtures::LinkedCollectionBase* collection, Obj src_obj, TableRef dst_table)
     {
+        auto get_table = [&](std::string_view name) -> TableRef {
+            Group* group = dst_table->get_parent_group();
+            Group::TableNameBuffer buffer;
+            TableRef table = group->get_table(Group::class_name_to_table_name(name, buffer));
+            REALM_ASSERT(table);
+            return table;
+        };
         mpark::visit(
             util::overload{
                 [&](Add add_link) {
@@ -2484,25 +2570,23 @@ struct CollectionOperation {
                     REALM_ASSERT(did_remove);
                 },
                 [&](RemoveObject remove_object) {
-                    Group* group = dst_table->get_parent_group();
-                    Group::TableNameBuffer buffer;
-                    TableRef table =
-                        group->get_table(Group::class_name_to_table_name(remove_object.class_name, buffer));
-                    REALM_ASSERT(table);
+                    TableRef table = get_table(remove_object.class_name);
                     ObjKey dst_key = table->find_primary_key(Mixed{remove_object.pk});
                     REALM_ASSERT(dst_key);
                     table->remove_object(dst_key);
                 },
                 [&](CreateObject create_object) {
-                    Group* group = dst_table->get_parent_group();
-                    Group::TableNameBuffer buffer;
-                    TableRef table =
-                        group->get_table(Group::class_name_to_table_name(create_object.class_name, buffer));
-                    REALM_ASSERT(table);
+                    TableRef table = get_table(create_object.class_name);
                     table->create_object_with_primary_key(Mixed{create_object.pk});
                 },
                 [&](Clear) {
                     collection->clear_collection(src_obj);
+                },
+                [&](Insert insert) {
+                    Mixed pk_to_add = insert.pk ? Mixed{insert.pk} : Mixed{};
+                    ObjKey dst_key = dst_table->find_primary_key(pk_to_add);
+                    REALM_ASSERT(dst_key);
+                    collection->insert(src_obj, insert.ndx, ObjLink{dst_table->get_key(), dst_key});
                 },
                 [&](Move move) {
                     collection->move(src_obj, move.from, move.to);
@@ -2511,7 +2595,7 @@ struct CollectionOperation {
     }
 
 private:
-    mpark::variant<Add, Remove, Clear, RemoveObject, CreateObject, Move> m_op;
+    mpark::variant<Add, Remove, Clear, RemoveObject, CreateObject, Move, Insert> m_op;
 };
 
 } // namespace test_instructions
@@ -2529,6 +2613,7 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[sync][pbs][client rese
     const std::string collection_prop_name = "collection";
     TestType test_type(collection_prop_name, "dest");
     constexpr bool test_type_is_array = realm::is_any_v<TestType, cf::ListOfObjects, cf::ListOfMixedLinks>;
+    constexpr bool test_type_is_set = realm::is_any_v<TestType, cf::SetOfObjects, cf::SetOfMixedLinks>;
     Schema schema = {
         {"source",
          {{valid_pk_name, PropertyType::Int | PropertyType::Nullable, true},
@@ -2682,8 +2767,10 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[sync][pbs][client rese
                     REQUIRE_NOTHROW(advance_and_notify(*realm));
                     CHECK(results.size() == 1);
                     CHECK(object.is_valid());
-                    auto linked_objects = test_type.get_links(results.get(0));
+                    Obj origin = results.get(0);
+                    auto linked_objects = test_type.get_links(origin);
                     std::vector<util::Optional<int64_t>>& expected_links = remote_pks;
+                    const size_t actual_size = test_type.size_of_collection(origin);
                     if (test_mode == ClientResyncMode::Recover) {
                         expected_links = expected_recovered_state;
                         size_t expected_size = expected_links.size();
@@ -2691,7 +2778,15 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[sync][pbs][client rese
                             // dictionary size will remain the same because the key is preserved with a null value
                             expected_size += num_expected_nulls;
                         }
-                        CHECK(test_type.size_of_collection(results.get(0)) == expected_size);
+                        CHECK(actual_size == expected_size);
+                        if (actual_size != expected_size) {
+                            std::vector<Obj> links = test_type.get_links(origin);
+                            std::cout << "actual {";
+                            for (auto link : links) {
+                                std::cout << link.get_primary_key() << ", ";
+                            }
+                            std::cout << "}\n";
+                        }
                     }
                     if (!test_type_is_array) {
                         // order should not matter except for lists
@@ -2699,13 +2794,13 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[sync][pbs][client rese
                         std::sort(expected_links.begin(), expected_links.end());
                     }
                     require_links_to_match_ids(linked_objects, expected_links, !test_type_is_array);
-                    if (local_pks == expected_links) {
-                        REQUIRE_INDICES(results_changes.modifications);
-                        REQUIRE_INDICES(object_changes.modifications);
-                    }
-                    else {
+                    if (local_pks != expected_links) {
                         REQUIRE_INDICES(results_changes.modifications, 0);
                         REQUIRE_INDICES(object_changes.modifications, 0);
+                    }
+                    else {
+                        REQUIRE_INDICES(results_changes.modifications);
+                        REQUIRE_INDICES(object_changes.modifications);
                     }
                     REQUIRE_INDICES(results_changes.insertions);
                     REQUIRE_INDICES(results_changes.deletions);
@@ -2731,8 +2826,7 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[sync][pbs][client rese
             })
             ->run();
     };
-
-    test_reset->setup([&](SharedRealm realm) {
+    auto populate_initial_state = [&](SharedRealm realm) {
         test_type.reset_test_state();
         // add a container collection with three valid links
         ObjLink dest1 = create_one_dest_object(realm, dest_pk_1);
@@ -2741,6 +2835,10 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[sync][pbs][client rese
         create_one_dest_object(realm, dest_pk_4);
         create_one_dest_object(realm, dest_pk_5);
         create_one_source_object(realm, source_pk, {dest1, dest2, dest3});
+    };
+
+    test_reset->setup([&](SharedRealm realm) {
+        populate_initial_state(realm);
     });
 
     SECTION("no changes") {
@@ -2854,6 +2952,59 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[sync][pbs][client rese
         reset_collection({RemoveObject{"dest", dest_pk_4}}, {Add{dest_pk_4}, Add{dest_pk_5}},
                          {dest_pk_1, dest_pk_2, dest_pk_3, dest_pk_5}, 1);
     }
+    SECTION("local adds two links to objects which are both removed by the remote") {
+        reset_collection({Add{dest_pk_4}, Add{dest_pk_5}, CreateObject("dest", 6), Add{6}},
+                         {RemoveObject("dest", dest_pk_4), RemoveObject("dest", dest_pk_5)},
+                         {dest_pk_1, dest_pk_2, dest_pk_3, 6}, 2);
+    }
+    SECTION("local removes two objects which were linked to by remote") {
+        reset_collection(
+            {RemoveObject("dest", dest_pk_1), RemoveObject("dest", dest_pk_2), CreateObject("dest", 6), Add{6}}, {},
+            {dest_pk_3, 6}, 2);
+    }
+    SECTION("local has unresolved links") {
+        test_reset->setup([&](SharedRealm realm) {
+            populate_initial_state(realm);
+
+            auto invalidate_object = [&](SharedRealm realm, std::string_view table_name, Mixed pk) {
+                TableRef table = get_table(*realm, table_name);
+                Obj obj = table->get_object_with_primary_key(pk);
+                REALM_ASSERT(obj.is_valid());
+                if (realm->config().path == config.path) {
+                    // the local realm does an invalidation
+                    table->invalidate_object(obj.get_key());
+                }
+                else {
+                    // the remote realm has deleted it
+                    table->remove_object(obj.get_key());
+                }
+            };
+
+            invalidate_object(realm, "dest", dest_pk_1);
+        });
+
+        SECTION("remote adds a link") {
+            reset_collection({}, {Add{dest_pk_4}}, {dest_pk_2, dest_pk_3, dest_pk_4}, 1);
+        }
+        SECTION("remote removes a link") {
+            reset_collection({}, {Remove{dest_pk_2}}, {dest_pk_3}, 1);
+        }
+        SECTION("remote deletes a dest object that local links to") {
+            reset_collection({Add{dest_pk_4}}, {RemoveObject{"dest", dest_pk_4}}, {dest_pk_2, dest_pk_3}, 2);
+        }
+        SECTION("remote deletes a different dest object") {
+            reset_collection({Add{dest_pk_4}}, {RemoveObject{"dest", dest_pk_2}}, {dest_pk_3, dest_pk_4}, 2);
+        }
+        SECTION("local adds two new links and remote deletes a different dest object") {
+            reset_collection({Add{dest_pk_4}, Add{dest_pk_5}}, {RemoveObject{"dest", dest_pk_2}},
+                             {dest_pk_3, dest_pk_4, dest_pk_5}, 2);
+        }
+        SECTION("remote deletes an object, then removes and adds to the list") {
+            reset_collection({}, {RemoveObject{"dest", dest_pk_2}, Remove{dest_pk_3}, Add{dest_pk_4}}, {dest_pk_4},
+                             2);
+        }
+    }
+
     if (test_mode == ClientResyncMode::Recover) {
         SECTION("local adds a list item and removes source object, remote modifies list") {
             reset_collection_removing_source_object({Add{dest_pk_4}, RemoveObject{"source", source_pk}},
@@ -2885,6 +3036,47 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[sync][pbs][client rese
             reset_collection({Move{0, 1}, Add{dest_pk_5}}, {Add{dest_pk_4}},
                              {dest_pk_2, dest_pk_1, dest_pk_3, dest_pk_5});
         }
+        SECTION("local moves on non-added elements with server dest obj removal") {
+            reset_collection(
+                {Move{0, 1}, Add{dest_pk_5}}, {Add{dest_pk_4}, RemoveObject("dest", dest_pk_1)},
+                {dest_pk_2, dest_pk_3,
+                 dest_pk_5}); // copy over local list, but without the dest_pk_1 link because that object was deleted
+        }
+        SECTION("local moves on non-added elements with all server dest objs removed") {
+            reset_collection({Move{0, 1}, Add{dest_pk_5}},
+                             {Add{dest_pk_4}, RemoveObject("dest", dest_pk_1), RemoveObject("dest", dest_pk_2),
+                              RemoveObject("dest", dest_pk_3), RemoveObject("dest", dest_pk_5)},
+                             {}); // copy over local list, but all links have been removed
+        }
+        SECTION("local moves on non-added elements when server creates a new object and adds it to the list") {
+            reset_collection({Move{0, 1}, Add{dest_pk_5}}, {CreateObject("dest", 6), Add{6}},
+                             {dest_pk_2, dest_pk_1, dest_pk_3, dest_pk_5});
+        }
+        SECTION("local moves on locally-added elements when server removes the object that the new links point to") {
+            reset_collection({Add{dest_pk_5}, Add{dest_pk_5}, Move{4, 3}},
+                             {Add{dest_pk_4}, RemoveObject("dest", dest_pk_5)},
+                             {dest_pk_1, dest_pk_2, dest_pk_3}); // local overwrite, but without pk_5
+        }
+        SECTION("local insert and delete can be recovered even if a local link was deleted by remote") {
+            // start  : 1, 2, 3
+            // local  : 1, 2, 3, 5, 6, 1
+            // remote : 4, 1, 2, 3 {remove obj 5}
+            // result : 1, 2, 3, 6, 1
+            reset_collection({CreateObject("dest", 6), Add{dest_pk_5}, Add{6}, Insert{4, dest_pk_4},
+                              Remove{dest_pk_4}, Add{dest_pk_1}},
+                             {Insert{0, dest_pk_4}, RemoveObject("dest", dest_pk_5)},
+                             {dest_pk_4, dest_pk_1, dest_pk_2, dest_pk_3, 6, dest_pk_1});
+        }
+        SECTION("both add link to object which has been deleted by other side") {
+            // start  : 1, 2, 3
+            // local  : 1, 1, 2, 3, 5, {remove object 4}
+            // remote : 1, 2, 3, 3, 4, {remove obj 5}
+            // result : 1, 1, 2, 3, 3
+            reset_collection({Add{dest_pk_5}, Insert{0, dest_pk_1}, RemoveObject("dest", dest_pk_4)},
+                             {Add{dest_pk_4}, Insert{3, dest_pk_3}, RemoveObject("dest", dest_pk_5)},
+                             {dest_pk_1, dest_pk_1, dest_pk_2, dest_pk_3, dest_pk_3});
+        }
+
         SECTION("local moves on added elements can be merged with remote moves") {
             reset_collection({Add{dest_pk_4}, Add{dest_pk_5}, Move{3, 4}}, {Move{0, 1}},
                              {dest_pk_2, dest_pk_1, dest_pk_3, dest_pk_5, dest_pk_4});
@@ -2908,6 +3100,15 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[sync][pbs][client rese
         SECTION("local move (down) with delete on added elements can be merged with remote deletions") {
             reset_collection({Add{dest_pk_4}, Add{dest_pk_5}, Move{4, 3}, Remove{dest_pk_5}},
                              {Remove{dest_pk_1}, Remove{dest_pk_2}}, {dest_pk_3, dest_pk_4});
+        }
+    }
+    else if constexpr (test_type_is_set) {
+        SECTION("remote adds two links to objects which are both removed by local") {
+            reset_collection({RemoveObject("dest", dest_pk_4), RemoveObject("dest", dest_pk_5),
+                              CreateObject("dest", 6), Add{6}, Remove{dest_pk_1}},
+                             {Remove{dest_pk_2}, Add{dest_pk_4}, Add{dest_pk_5}, CreateObject("dest", 6), Add{6},
+                              CreateObject("dest", 7), Add{7}, RemoveObject("dest", dest_pk_5)},
+                             {dest_pk_3, 6, 7});
         }
     }
 }

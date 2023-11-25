@@ -48,13 +48,15 @@ endif()
 
 if(REALM_ENABLE_SYNC)
     list(APPEND HEADERS
+        util/sync/baas_admin_api.hpp
         util/sync/flx_sync_harness.hpp
         util/sync/session_util.hpp
         util/sync/sync_test_utils.hpp
-        util/sync/baas_admin_api.hpp
+        util/unit_test_transport.hpp
     )
     list(APPEND SOURCES
         bson.cpp
+        sync/app.cpp
         sync/client_reset.cpp
         sync/file.cpp
         sync/flx_migration.cpp
@@ -68,8 +70,8 @@ if(REALM_ENABLE_SYNC)
         sync/session/wait_for_completion.cpp
         sync/sync_manager.cpp
         sync/user.cpp
-        sync/app.cpp
         util/sync/sync_test_utils.cpp
+        util/unit_test_transport.cpp
     )
     if(APPLE)
         list(APPEND SOURCES audit.cpp)
@@ -131,10 +133,18 @@ if(REALM_ENABLE_SYNC)
             message(FATAL_ERROR "REALM_MONGODB_ENDPOINT must be set when specifying REALM_ENABLE_AUTH_TESTS.")
         endif()
 
+        message(STATUS "Auth tests enabled: ${REALM_MONGODB_ENDPOINT}")
         target_compile_definitions(ObjectStoreTestLib PRIVATE
             REALM_ENABLE_AUTH_TESTS=1
             REALM_MONGODB_ENDPOINT="${REALM_MONGODB_ENDPOINT}"
         )
+
+        if(REALM_ADMIN_ENDPOINT)
+            message(STATUS "BAAS admin endpoint: ${REALM_ADMIN_ENDPOINT}")
+            target_compile_definitions(ObjectStoreTests PRIVATE
+                REALM_ADMIN_ENDPOINT="${REALM_ADMIN_ENDPOINT}"
+            )
+        endif()
 
         find_package(CURL REQUIRED)
         target_link_libraries(ObjectStoreTestLib CURL::libcurl)
@@ -154,6 +164,14 @@ if(REALM_TEST_LOGGING)
     else()
         message(STATUS "Test logging enabled")
     endif()
+endif()
+
+# Optional extra time to add to test timeout values
+if(REALM_TEST_TIMEOUT_EXTRA)
+    target_compile_definitions(ObjectStoreTests PRIVATE
+        TEST_TIMEOUT_EXTRA=${REALM_TEST_TIMEOUT_EXTRA}
+    )
+    message(STATUS "Test wait timeouts extended by ${REALM_TEST_TIMEOUT_EXTRA} seconds")
 endif()
 
 target_include_directories(ObjectStoreTestLib PRIVATE
@@ -194,7 +212,7 @@ if(NOT APPLE AND NOT EMSCRIPTEN AND NOT WINDOWS_STORE AND NOT ANDROID)
 
     target_link_libraries(ObjectStoreTestLib ${libuv_target})
     # FIXME: ObjectStore itself shouldn't care about this, but we need to refactor scheduler.cpp to make it happen
-    target_compile_definitions(ObjectStore PUBLIC REALM_HAVE_UV=1)
+    target_compile_definitions(ObjectStoreTests PRIVATE TEST_SCHEDULER_UV=1)
     get_property(libuv_include_dir TARGET ${libuv_target} PROPERTY INCLUDE_DIRECTORIES)
     target_include_directories(ObjectStore PRIVATE ${libuv_include_dir})
 
@@ -206,4 +224,7 @@ if(NOT APPLE AND NOT EMSCRIPTEN AND NOT WINDOWS_STORE AND NOT ANDROID)
 endif()
 
 add_subdirectory(notifications-fuzzer)
-add_subdirectory(benchmarks)
+
+if(NOT EMSCRIPTEN AND NOT WINDOWS_STORE)
+    add_subdirectory(benchmarks)
+endif()

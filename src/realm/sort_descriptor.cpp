@@ -18,6 +18,7 @@
 
 #include <realm/sort_descriptor.hpp>
 #include <realm/table.hpp>
+#include <realm/table_view.hpp>
 #include <realm/db.hpp>
 #include <realm/util/assert.hpp>
 #include <realm/list.hpp>
@@ -347,14 +348,38 @@ std::unique_ptr<BaseDescriptor> LimitDescriptor::clone() const
     return std::unique_ptr<BaseDescriptor>(new LimitDescriptor(*this));
 }
 
-void LimitDescriptor::execute(IndexPairs& v, const Sorter&, const BaseDescriptor*) const
+void LimitDescriptor::execute(const Table&, KeyValues& key_values, const BaseDescriptor*) const
 {
-    if (v.size() > m_limit) {
-        v.m_removed_by_limit += v.size() - m_limit;
-        v.erase(v.begin() + m_limit, v.end());
+    if (key_values.size() > m_limit) {
+        key_values.erase(key_values.begin() + m_limit, key_values.end());
     }
 }
 
+std::string FilterDescriptor::get_description(ConstTableRef) const
+{
+    throw SerializationError("Serialization of FilterDescriptor is not supported");
+    return "";
+}
+
+std::unique_ptr<BaseDescriptor> FilterDescriptor::clone() const
+{
+    return std::unique_ptr<BaseDescriptor>(new FilterDescriptor(*this));
+}
+
+void FilterDescriptor::execute(const Table& table, KeyValues& key_values, const BaseDescriptor*) const
+{
+    KeyValues filtered;
+    filtered.create();
+    auto sz = key_values.size();
+    for (size_t i = 0; i < sz; i++) {
+        auto key = key_values.get(i);
+        Obj obj = table.try_get_object(key);
+        if (obj && m_predicate(obj)) {
+            filtered.add(key);
+        }
+    }
+    key_values = std::move(filtered);
+}
 
 // This function must conform to 'is less' predicate - that is:
 // return true if i is strictly smaller than j
@@ -494,6 +519,13 @@ void DescriptorOrdering::append_limit(LimitDescriptor limit)
     }
 }
 
+void DescriptorOrdering::append_filter(FilterDescriptor filter)
+{
+    if (filter.is_valid()) {
+        m_descriptors.emplace_back(new FilterDescriptor(std::move(filter)));
+    }
+}
+
 void DescriptorOrdering::append(const DescriptorOrdering& other)
 {
     for (const auto& d : other.m_descriptors) {
@@ -542,6 +574,14 @@ bool DescriptorOrdering::will_apply_limit() const
     return std::any_of(m_descriptors.begin(), m_descriptors.end(), [](const std::unique_ptr<BaseDescriptor>& desc) {
         REALM_ASSERT(desc->is_valid());
         return desc->get_type() == DescriptorType::Limit;
+    });
+}
+
+bool DescriptorOrdering::will_apply_filter() const
+{
+    return std::any_of(m_descriptors.begin(), m_descriptors.end(), [](const std::unique_ptr<BaseDescriptor>& desc) {
+        REALM_ASSERT(desc->is_valid());
+        return desc->get_type() == DescriptorType::Filter;
     });
 }
 

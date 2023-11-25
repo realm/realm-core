@@ -140,6 +140,11 @@ public:
     /// SSL_CTX_load_verify_locations().
     void use_verify_file(const std::string& path);
 
+#if REALM_INCLUDE_CERTS
+    /// Load the bundled certificates from noinst/root_certs.hpp
+    void use_included_certificate_roots();
+#endif
+
 private:
     void ssl_init();
     void ssl_destroy() noexcept;
@@ -147,6 +152,7 @@ private:
     void ssl_use_private_key_file(const std::string& path, std::error_code&);
     void ssl_use_default_verify(std::error_code&);
     void ssl_use_verify_file(const std::string& path, std::error_code&);
+    void ssl_use_included_certificate_roots(std::error_code&);
 
 #if REALM_HAVE_OPENSSL
     SSL_CTX* m_ssl_ctx = nullptr;
@@ -292,15 +298,6 @@ public:
     /// certificates until depth = 0, and present the entire chain for
     /// independent verification.
     void use_verify_callback(const std::function<SSLVerifyCallback>& callback);
-
-#if REALM_INCLUDE_CERTS
-    /// use_included_certificates() loads a set of certificates that are
-    /// included in the header file src/realm/noinst/root_certs.hpp. By using
-    /// the included certificates, the client can verify a server in the case
-    /// where the relevant certificate cannot be found, or is absent, in the
-    /// system trust store. This function is only implemented for OpenSSL.
-    void use_included_certificates();
-#endif
 
     /// @{
     ///
@@ -465,7 +462,6 @@ private:
     void ssl_set_verify_mode(VerifyMode, std::error_code&);
     void ssl_set_host_name(const std::string&, std::error_code&);
     void ssl_use_verify_callback(const std::function<SSLVerifyCallback>&, std::error_code&);
-    void ssl_use_included_certificates(std::error_code&);
 
     void ssl_handshake(std::error_code&, Want& want) noexcept;
     bool ssl_shutdown(std::error_code& ec, Want& want) noexcept;
@@ -504,10 +500,6 @@ private:
     // verify_callback_using_delegate() is also used as an argument to OpenSSL's set_verify_function.
     // verify_callback_using_delegate() calls out to the user supplied verify callback.
     static int verify_callback_using_delegate(int preverify_ok, X509_STORE_CTX* ctx) noexcept;
-
-    // verify_callback_using_root_certs is used by OpenSSL to handle certificate verification
-    // using the included root certifictes.
-    static int verify_callback_using_root_certs(int preverify_ok, X509_STORE_CTX* ctx);
 #elif REALM_HAVE_SECURE_TRANSPORT
     util::CFPtr<SSLContextRef> m_ssl;
     VerifyMode m_verify_mode = VerifyMode::none;
@@ -601,6 +593,17 @@ inline void Context::use_verify_file(const std::string& path)
         throw std::system_error(ec);
     }
 }
+
+#if REALM_INCLUDE_CERTS
+inline void Context::use_included_certificate_roots()
+{
+    std::error_code ec;
+    ssl_use_included_certificate_roots(ec);
+    if (ec) {
+        throw std::system_error(ec);
+    }
+}
+#endif
 
 class Stream::HandshakeOperBase : public Service::IoOper {
 public:
@@ -787,16 +790,6 @@ inline void Stream::use_verify_callback(const std::function<SSLVerifyCallback>& 
     if (ec)
         throw std::system_error(ec);
 }
-
-#if REALM_INCLUDE_CERTS
-inline void Stream::use_included_certificates()
-{
-    std::error_code ec;
-    ssl_use_included_certificates(ec); // Throws
-    if (ec)
-        throw std::system_error(ec);
-}
-#endif
 
 inline void Stream::handshake()
 {

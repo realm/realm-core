@@ -410,16 +410,16 @@ TEST_CASE("Schema") {
                     "Property 'object.link' of type 'object' cannot be a link to an asymmetric object."));
         }
 
-        SECTION("rejects link properties with asymmetric origin object") {
+        SECTION("allow link properties with asymmetric origin object") {
             Schema schema = {
                 {"object",
                  ObjectSchema::ObjectType::TopLevelAsymmetric,
-                 {{"link", PropertyType::Object | PropertyType::Nullable, "link target"}}},
-                {"link target", {{"value", PropertyType::Int}}},
+                 {{"_id", PropertyType::Int, Property::IsPrimary{true}},
+                  {"link", PropertyType::Object | PropertyType::Nullable, "link target"}}},
+                {"link target",
+                 {{"_id", PropertyType::Int, Property::IsPrimary{true}}, {"value", PropertyType::Int}}},
             };
-            REQUIRE_EXCEPTION(schema.validate(SchemaValidationMode::SyncFLX), SchemaValidationFailed,
-                              ContainsSubstring("Asymmetric table with property 'object.link' of type 'object' "
-                                                "cannot have a non-embedded object type."));
+            REQUIRE_NOTHROW(schema.validate(SchemaValidationMode::SyncFLX));
         }
 
         SECTION("allow embedded objects with asymmetric sync") {

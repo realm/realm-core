@@ -107,12 +107,11 @@ private:
     auto name = DB::create(make_client_replication(), name##_path);
 
 template <typename Function>
-void write_transaction_notifying_session(DBRef db, Session& session, Function&& function)
+void write_transaction(DBRef db, Function&& function)
 {
     WriteTransaction wt(db);
     function(wt);
-    auto new_version = wt.commit();
-    session.nonsync_transact_notify(new_version);
+    wt.commit();
 }
 
 ClientReplication& get_replication(DBRef db)
@@ -196,7 +195,7 @@ TEST(Sync_AsyncWaitForUploadCompletion)
     wait();
 
     // Nonempty
-    write_transaction_notifying_session(db, session, [](WriteTransaction& wt) {
+    write_transaction(db, [](WriteTransaction& wt) {
         wt.get_group().add_table_with_primary_key("class_foo", type_Int, "id");
     });
     wait();
@@ -205,7 +204,7 @@ TEST(Sync_AsyncWaitForUploadCompletion)
     wait();
 
     // More
-    write_transaction_notifying_session(db, session, [](WriteTransaction& wt) {
+    write_transaction(db, [](WriteTransaction& wt) {
         wt.get_group().add_table_with_primary_key("class_bar", type_Int, "id");
     });
     wait();
@@ -221,7 +220,7 @@ TEST(Sync_AsyncWaitForUploadCompletionNoPendingLocalChanges)
 
     Session session = fixture.make_bound_session(db, "/test");
 
-    write_transaction_notifying_session(db, session, [](WriteTransaction& wt) {
+    write_transaction(db, [](WriteTransaction& wt) {
         wt.get_group().add_table_with_primary_key("class_foo", type_Int, "id");
     });
 
@@ -263,7 +262,7 @@ TEST(Sync_AsyncWaitForDownloadCompletion)
 
     // Upload something via session 2
     Session session_2 = fixture.make_bound_session(db_2, "/test");
-    write_transaction_notifying_session(db_2, session_2, [](WriteTransaction& wt) {
+    write_transaction(db_2, [](WriteTransaction& wt) {
         wt.get_group().add_table_with_primary_key("class_foo", type_Int, "id");
     });
     session_2.wait_for_upload_complete_or_client_stopped();
@@ -273,7 +272,7 @@ TEST(Sync_AsyncWaitForDownloadCompletion)
     {
         ReadTransaction rt_1(db_1);
         ReadTransaction rt_2(db_2);
-        CHECK(compare_groups(rt_1, rt_2));
+        CHECK(compare_groups(rt_1, rt_2, *test_context.logger));
     }
 
     // Again
@@ -283,7 +282,7 @@ TEST(Sync_AsyncWaitForDownloadCompletion)
     wait(session_2);
 
     // Upload something via session 1
-    write_transaction_notifying_session(db_1, session_1, [](WriteTransaction& wt) {
+    write_transaction(db_1, [](WriteTransaction& wt) {
         wt.get_group().add_table_with_primary_key("class_bar", type_Int, "id");
     });
     session_1.wait_for_upload_complete_or_client_stopped();
@@ -293,7 +292,7 @@ TEST(Sync_AsyncWaitForDownloadCompletion)
     {
         ReadTransaction rt_1(db_1);
         ReadTransaction rt_2(db_2);
-        CHECK(compare_groups(rt_1, rt_2));
+        CHECK(compare_groups(rt_1, rt_2, *test_context.logger));
     }
 }
 
@@ -325,13 +324,13 @@ TEST(Sync_AsyncWaitForSyncCompletion)
 
     // Generate changes to be downloaded (uploading via session 2)
     Session session_2 = fixture.make_bound_session(db_2);
-    write_transaction_notifying_session(db_2, session_2, [](WriteTransaction& wt) {
+    write_transaction(db_2, [](WriteTransaction& wt) {
         wt.get_group().add_table_with_primary_key("class_foo", type_Int, "id");
     });
     session_2.wait_for_upload_complete_or_client_stopped();
 
     // Generate changes to be uploaded
-    write_transaction_notifying_session(db_1, session_1, [](WriteTransaction& wt) {
+    write_transaction(db_1, [](WriteTransaction& wt) {
         wt.get_group().add_table_with_primary_key("class_bar", type_Int, "id");
     });
 
@@ -342,7 +341,7 @@ TEST(Sync_AsyncWaitForSyncCompletion)
     {
         ReadTransaction rt_1(db_1);
         ReadTransaction rt_2(db_2);
-        CHECK(compare_groups(rt_1, rt_2));
+        CHECK(compare_groups(rt_1, rt_2, *test_context.logger));
     }
 }
 
@@ -388,7 +387,7 @@ TEST(Sync_WaitForUploadCompletion)
     session.wait_for_upload_complete_or_client_stopped();
 
     // Nonempty
-    write_transaction_notifying_session(db, session, [](WriteTransaction& wt) {
+    write_transaction(db, [](WriteTransaction& wt) {
         wt.get_group().add_table_with_primary_key("class_foo", type_Int, "id");
     });
     // Since the Realm is no longer empty, the following wait operation cannot
@@ -401,7 +400,7 @@ TEST(Sync_WaitForUploadCompletion)
     session.wait_for_upload_complete_or_client_stopped();
 
     // More changes
-    write_transaction_notifying_session(db, session, [](WriteTransaction& wt) {
+    write_transaction(db, [](WriteTransaction& wt) {
         wt.get_group().add_table_with_primary_key("class_bar", type_Int, "id");
     });
     session.wait_for_upload_complete_or_client_stopped();
@@ -418,15 +417,13 @@ TEST(Sync_WaitForUploadCompletionAfterEmptyTransaction)
     Session session = fixture.make_bound_session(db);
     for (int i = 0; i < 100; ++i) {
         WriteTransaction wt(db);
-        version_type new_version = wt.commit();
-        session.nonsync_transact_notify(new_version);
+        wt.commit();
         session.wait_for_upload_complete_or_client_stopped();
     }
     {
         WriteTransaction wt(db);
         wt.get_group().add_table_with_primary_key("class_foo", type_Int, "id");
-        version_type new_version = wt.commit();
-        session.nonsync_transact_notify(new_version);
+        wt.commit();
         session.wait_for_upload_complete_or_client_stopped();
     }
 }
@@ -449,7 +446,7 @@ TEST(Sync_WaitForDownloadCompletion)
 
     // Upload something via session 2
     Session session_2 = fixture.make_bound_session(db_2);
-    write_transaction_notifying_session(db_2, session_2, [](WriteTransaction& wt) {
+    write_transaction(db_2, [](WriteTransaction& wt) {
         wt.get_group().add_table_with_primary_key("class_foo", type_Int, "id");
     });
     session_2.wait_for_upload_complete_or_client_stopped();
@@ -459,7 +456,7 @@ TEST(Sync_WaitForDownloadCompletion)
     {
         ReadTransaction rt_1(db_1);
         ReadTransaction rt_2(db_2);
-        CHECK(compare_groups(rt_1, rt_2));
+        CHECK(compare_groups(rt_1, rt_2, *test_context.logger));
     }
 
     // Again
@@ -469,7 +466,7 @@ TEST(Sync_WaitForDownloadCompletion)
     session_2.wait_for_download_complete_or_client_stopped();
 
     // Upload something via session 1
-    write_transaction_notifying_session(db_1, session_1, [](WriteTransaction& wt) {
+    write_transaction(db_1, [](WriteTransaction& wt) {
         wt.get_group().add_table_with_primary_key("class_bar", type_Int, "id");
     });
     session_1.wait_for_upload_complete_or_client_stopped();
@@ -479,7 +476,7 @@ TEST(Sync_WaitForDownloadCompletion)
     {
         ReadTransaction rt_1(db_1);
         ReadTransaction rt_2(db_2);
-        CHECK(compare_groups(rt_1, rt_2));
+        CHECK(compare_groups(rt_1, rt_2, *test_context.logger));
     }
 }
 
@@ -583,7 +580,7 @@ TEST(Sync_TokenWithoutExpirationAllowed)
         Session session = fixture.make_session(db, "/test", std::move(sess_config));
         session.set_connection_state_change_listener(listener);
         session.bind();
-        write_transaction_notifying_session(db, session, [](WriteTransaction& wt) {
+        write_transaction(db, [](WriteTransaction& wt) {
             wt.get_group().add_table_with_primary_key("class_foo", type_Int, "id");
         });
         session.wait_for_upload_complete_or_client_stopped();
@@ -612,7 +609,7 @@ TEST(Sync_TokenWithNullExpirationAllowed)
         Session session = fixture.make_session(db, "/test", std::move(config));
         session.bind();
         {
-            write_transaction_notifying_session(db, session, [](WriteTransaction& wt) {
+            write_transaction(db, [](WriteTransaction& wt) {
                 wt.get_group().add_table_with_primary_key("class_foo", type_Int, "id");
             });
         }
@@ -633,7 +630,7 @@ TEST(Sync_Upload)
     Session session = fixture.make_bound_session(db);
 
     {
-        write_transaction_notifying_session(db, session, [](WriteTransaction& wt) {
+        write_transaction(db, [](WriteTransaction& wt) {
             TableRef table = wt.get_group().add_table_with_primary_key("class_foo", type_Int, "id");
             table->add_column(type_Int, "i");
         });
@@ -641,8 +638,7 @@ TEST(Sync_Upload)
             WriteTransaction wt(db);
             TableRef table = wt.get_table("class_foo");
             table->create_object_with_primary_key(i);
-            version_type new_version = wt.commit();
-            session.nonsync_transact_notify(new_version);
+            wt.commit();
         }
     }
     session.wait_for_upload_complete_or_client_stopped();
@@ -662,20 +658,13 @@ TEST(Sync_Replication)
         ClientServerFixture fixture(dir, test_context);
         fixture.start();
 
-        version_type sync_transact_callback_version = 0;
-        auto sync_transact_callback = [&](VersionID, VersionID new_version) {
-            // May be called once or multiple times depending on timing
-            sync_transact_callback_version = new_version.version;
-        };
-
         Session session_1 = fixture.make_bound_session(db_1);
 
         Session session_2 = fixture.make_session(db_2, "/test");
-        session_2.set_sync_transact_callback(std::move(sync_transact_callback));
         session_2.bind();
 
         // Create schema
-        write_transaction_notifying_session(db_1, session_1, [](WriteTransaction& wt) {
+        write_transaction(db_1, [](WriteTransaction& wt) {
             TableRef table = wt.get_group().add_table_with_primary_key("class_foo", type_Int, "id");
             table->add_column(type_Int, "i");
         });
@@ -686,17 +675,11 @@ TEST(Sync_Replication)
             table->create_object_with_primary_key(i);
             Obj obj = *(table->begin() + random.draw_int_mod(table->size()));
             obj.set<int64_t>("i", random.draw_int_max(0x7FFFFFFFFFFFFFFF));
-            version_type new_version = wt.commit();
-            session_1.nonsync_transact_notify(new_version);
+            wt.commit();
         }
 
         session_1.wait_for_upload_complete_or_client_stopped();
         session_2.wait_for_download_complete_or_client_stopped();
-
-        {
-            ReadTransaction rt(db_2);
-            CHECK_EQUAL(rt.get_version(), sync_transact_callback_version);
-        }
     }
 
     ReadTransaction rt_1(db_1);
@@ -705,7 +688,7 @@ TEST(Sync_Replication)
     const Group& group_2 = rt_2;
     group_1.verify();
     group_2.verify();
-    CHECK(compare_groups(rt_1, rt_2));
+    CHECK(compare_groups(rt_1, rt_2, *test_context.logger));
     ConstTableRef table = group_1.get_table("class_foo");
     CHECK_EQUAL(100, table->size());
 }
@@ -729,24 +712,23 @@ TEST(Sync_Merge)
         session_2.bind();
 
         // Create schema on both clients.
-        auto create_schema = [](Session& sess, DBRef db) {
+        auto create_schema = [](DBRef db) {
             WriteTransaction wt(db);
             if (wt.has_table("class_foo"))
                 return;
             TableRef table = wt.get_group().add_table_with_primary_key("class_foo", type_Int, "id");
             table->add_column(type_Int, "i");
-            version_type new_version = wt.commit();
-            sess.nonsync_transact_notify(new_version);
+            wt.commit();
         };
-        create_schema(session_1, db_1);
-        create_schema(session_2, db_2);
+        create_schema(db_1);
+        create_schema(db_2);
 
-        write_transaction_notifying_session(db_1, session_1, [](WriteTransaction& wt) {
+        write_transaction(db_1, [](WriteTransaction& wt) {
             TableRef table = wt.get_table("class_foo");
             table->create_object_with_primary_key(1).set("i", 5);
             table->create_object_with_primary_key(2).set("i", 6);
         });
-        write_transaction_notifying_session(db_2, session_2, [](WriteTransaction& wt) {
+        write_transaction(db_2, [](WriteTransaction& wt) {
             TableRef table = wt.get_table("class_foo");
             table->create_object_with_primary_key(3).set("i", 7);
             table->create_object_with_primary_key(4).set("i", 8);
@@ -764,7 +746,7 @@ TEST(Sync_Merge)
     const Group& group_2 = rt_2;
     group_1.verify();
     group_2.verify();
-    CHECK(compare_groups(rt_1, rt_2));
+    CHECK(compare_groups(rt_1, rt_2, *test_context.logger));
     ConstTableRef table = group_1.get_table("class_foo");
     CHECK_EQUAL(4, table->size());
 }
@@ -790,20 +772,23 @@ struct ExpectChangesetError {
     }
 };
 
-void test_schema_mismatch(unit_test::TestContext& test_context, util::FunctionRef<void(WriteTransaction&)>&& fn_1,
-                          util::FunctionRef<void(WriteTransaction&)>&& fn_2, const char* expected_error_1,
+void test_schema_mismatch(unit_test::TestContext& test_context, util::FunctionRef<void(WriteTransaction&)> fn_1,
+                          util::FunctionRef<void(WriteTransaction&)> fn_2, const char* expected_error_1,
                           const char* expected_error_2 = nullptr)
 {
-    auto perform_write_transaction = [](DBRef db, util::FunctionRef<void(WriteTransaction&)>&& function) {
+    auto perform_write_transaction = [](DBRef db, util::FunctionRef<void(WriteTransaction&)> function) {
         WriteTransaction wt(db);
         function(wt);
         return wt.commit();
     };
 
+    TEST_DIR(dir);
     TEST_CLIENT_DB(db_1);
     TEST_CLIENT_DB(db_2);
 
-    TEST_DIR(dir);
+    perform_write_transaction(db_1, fn_1);
+    perform_write_transaction(db_2, fn_2);
+
     MultiClientServerFixture fixture(2, 1, dir, test_context);
     fixture.allow_server_errors(0, 1);
     fixture.start();
@@ -819,15 +804,6 @@ void test_schema_mismatch(unit_test::TestContext& test_context, util::FunctionRe
 
     session_1.bind();
     session_2.bind();
-
-    // NOTE: There was a race condition with `write_transaction_notifying_session` where session_2
-    // was completing sync before the write transaction was completed, leading to a
-    // `realm::TableNameInUse` exception. Broke up this function and moved the call to
-    // `nonsync_transact_notify()` to after the write transactions.
-    auto version_1 = perform_write_transaction(db_1, std::move(fn_1));
-    auto version_2 = perform_write_transaction(db_2, std::move(fn_2));
-    session_1.nonsync_transact_notify(version_1);
-    session_2.nonsync_transact_notify(version_2);
 
     session_1.wait_for_upload_complete_or_client_stopped();
     session_2.wait_for_upload_complete_or_client_stopped();
@@ -954,13 +930,13 @@ TEST(Sync_LateBind)
         fixture.start();
 
         Session session_1 = fixture.make_bound_session(db_1);
-        write_transaction_notifying_session(db_1, session_1, [](WriteTransaction& wt) {
+        write_transaction(db_1, [](WriteTransaction& wt) {
             wt.get_group().add_table_with_primary_key("class_foo", type_Int, "id");
         });
         session_1.wait_for_upload_complete_or_client_stopped();
 
         Session session_2 = fixture.make_bound_session(db_2);
-        write_transaction_notifying_session(db_2, session_2, [](WriteTransaction& wt) {
+        write_transaction(db_2, [](WriteTransaction& wt) {
             wt.get_group().add_table_with_primary_key("class_bar", type_Int, "id");
         });
         session_2.wait_for_upload_complete_or_client_stopped();
@@ -975,7 +951,7 @@ TEST(Sync_LateBind)
     const Group& group_2 = rt_2;
     group_1.verify();
     group_2.verify();
-    CHECK(compare_groups(rt_1, rt_2));
+    CHECK(compare_groups(rt_1, rt_2, *test_context.logger));
     CHECK_EQUAL(2, group_1.size());
 }
 
@@ -996,7 +972,7 @@ TEST(Sync_EarlyUnbind)
     Session session_1 = fixture.make_bound_session(db_1, "/dummy");
     {
         Session session_2 = fixture.make_bound_session(db_2);
-        write_transaction_notifying_session(db_2, session_2, [](WriteTransaction& wt) {
+        write_transaction(db_2, [](WriteTransaction& wt) {
             wt.get_group().add_table_with_primary_key("class_foo", type_Int, "id");
         });
         session_2.wait_for_upload_complete_or_client_stopped();
@@ -1034,8 +1010,7 @@ TEST(Sync_FastRebind)
         TableRef table = wt.get_group().add_table_with_primary_key("class_foo", type_Int, "id");
         table->add_column(type_Int, "i");
         table->create_object_with_primary_key(1);
-        version_type new_version = wt.commit();
-        session_2.nonsync_transact_notify(new_version);
+        wt.commit();
         session_2.wait_for_upload_complete_or_client_stopped();
     }
     for (int i = 0; i < 100; ++i) {
@@ -1043,8 +1018,7 @@ TEST(Sync_FastRebind)
         WriteTransaction wt(db_2);
         TableRef table = wt.get_table("class_foo");
         table->begin()->set<int64_t>("i", i);
-        version_type new_version = wt.commit();
-        session_2.nonsync_transact_notify(new_version);
+        wt.commit();
         session_2.wait_for_upload_complete_or_client_stopped();
     }
 }
@@ -1378,9 +1352,9 @@ TEST(Sync_Randomized)
 {
     constexpr size_t num_clients = 7;
 
-    auto client_test_program = [](DBRef db, Session& session) {
+    auto client_test_program = [](DBRef db) {
         // Create the schema
-        write_transaction_notifying_session(db, session, [](WriteTransaction& wt) {
+        write_transaction(db, [](WriteTransaction& wt) {
             if (wt.has_table("class_foo"))
                 return;
             TableRef table = wt.get_group().add_table_with_primary_key("class_foo", type_Int, "id");
@@ -1400,8 +1374,7 @@ TEST(Sync_Randomized)
                 size_t row_ndx = random.draw_int_mod(table->size());
                 table->get_object(row_ndx).set("i", value);
             }
-            version_type new_version = wt.commit();
-            session.nonsync_transact_notify(new_version);
+            wt.commit();
         }
     };
 
@@ -1427,7 +1400,7 @@ TEST(Sync_Randomized)
 
     auto run_client_test_program = [&](size_t i) {
         try {
-            client_test_program(client_shared_groups[i], *sessions[i]);
+            client_test_program(client_shared_groups[i]);
         }
         catch (...) {
             fixture.stop();
@@ -1527,12 +1500,12 @@ TEST(Sync_FailingReadsOnClientSide)
 
         Session session_2 = fixture.make_bound_session(db_2);
 
-        write_transaction_notifying_session(db_1, session_1, [](WriteTransaction& wt) {
+        write_transaction(db_1, [](WriteTransaction& wt) {
             TableRef table = wt.get_group().add_table_with_primary_key("class_foo", type_Int, "id");
             table->add_column(type_Int, "i");
             table->create_object_with_primary_key(1);
         });
-        write_transaction_notifying_session(db_2, session_2, [](WriteTransaction& wt) {
+        write_transaction(db_2, [](WriteTransaction& wt) {
             TableRef table = wt.get_group().add_table_with_primary_key("class_bar", type_Int, "id");
             table->add_column(type_Int, "i");
             table->create_object_with_primary_key(2);
@@ -1541,11 +1514,11 @@ TEST(Sync_FailingReadsOnClientSide)
             session_1.wait_for_upload_complete_or_client_stopped();
             session_2.wait_for_upload_complete_or_client_stopped();
             for (int i = 0; i < 10; ++i) {
-                write_transaction_notifying_session(db_1, session_1, [=](WriteTransaction& wt) {
+                write_transaction(db_1, [=](WriteTransaction& wt) {
                     TableRef table = wt.get_table("class_foo");
                     table->begin()->set("i", i);
                 });
-                write_transaction_notifying_session(db_2, session_2, [=](WriteTransaction& wt) {
+                write_transaction(db_2, [=](WriteTransaction& wt) {
                     TableRef table = wt.get_table("class_bar");
                     table->begin()->set("i", i);
                 });
@@ -1563,7 +1536,7 @@ TEST(Sync_FailingReadsOnClientSide)
     const Group& group_2 = rt_2;
     group_1.verify();
     group_2.verify();
-    CHECK(compare_groups(rt_1, rt_2));
+    CHECK(compare_groups(rt_1, rt_2, *test_context.logger));
 }
 
 
@@ -1587,12 +1560,12 @@ TEST(Sync_FailingReadsOnServerSide)
 
         Session session_2 = fixture.make_bound_session(db_2);
 
-        write_transaction_notifying_session(db_1, session_1, [](WriteTransaction& wt) {
+        write_transaction(db_1, [](WriteTransaction& wt) {
             TableRef table = wt.get_group().add_table_with_primary_key("class_foo", type_Int, "id");
             table->add_column(type_Int, "i");
             table->create_object_with_primary_key(1);
         });
-        write_transaction_notifying_session(db_2, session_2, [](WriteTransaction& wt) {
+        write_transaction(db_2, [](WriteTransaction& wt) {
             TableRef table = wt.get_group().add_table_with_primary_key("class_bar", type_Int, "id");
             table->add_column(type_Int, "i");
             table->create_object_with_primary_key(2);
@@ -1601,11 +1574,11 @@ TEST(Sync_FailingReadsOnServerSide)
             session_1.wait_for_upload_complete_or_client_stopped();
             session_2.wait_for_upload_complete_or_client_stopped();
             for (int i = 0; i < 10; ++i) {
-                write_transaction_notifying_session(db_1, session_1, [=](WriteTransaction& wt) {
+                write_transaction(db_1, [=](WriteTransaction& wt) {
                     TableRef table = wt.get_table("class_foo");
                     table->begin()->set("i", i);
                 });
-                write_transaction_notifying_session(db_2, session_2, [=](WriteTransaction& wt) {
+                write_transaction(db_2, [=](WriteTransaction& wt) {
                     TableRef table = wt.get_table("class_bar");
                     table->begin()->set("i", i);
                 });
@@ -1623,7 +1596,7 @@ TEST(Sync_FailingReadsOnServerSide)
     const Group& group_2 = rt_2;
     group_1.verify();
     group_2.verify();
-    CHECK(compare_groups(rt_1, rt_2));
+    CHECK(compare_groups(rt_1, rt_2, *test_context.logger));
 }
 
 
@@ -1642,8 +1615,7 @@ TEST(Sync_ErrorAfterServerRestore_BadClientFileIdent)
         Session session = fixture.make_bound_session(db, server_path);
         WriteTransaction wt{db};
         wt.get_group().add_table_with_primary_key("class_table", type_Int, "id");
-        auto new_version = wt.commit();
-        session.nonsync_transact_notify(new_version);
+        wt.commit();
         fixture.start();
         session.wait_for_upload_complete_or_client_stopped();
     }
@@ -1836,8 +1808,7 @@ TEST(Sync_ErrorAfterServerRestore_BadServerVersion)
         WriteTransaction wt{db};
         TableRef table = wt.get_group().add_table_with_primary_key("class_table", type_Int, "id");
         table->add_column(type_Int, "column");
-        auto new_version = wt.commit();
-        session.nonsync_transact_notify(new_version);
+        wt.commit();
         fixture.start();
         session.wait_for_upload_complete_or_client_stopped();
     }
@@ -1852,8 +1823,7 @@ TEST(Sync_ErrorAfterServerRestore_BadServerVersion)
         WriteTransaction wt{db};
         TableRef table = wt.get_table("class_table");
         table->create_object_with_primary_key(1);
-        auto new_version = wt.commit();
-        session.nonsync_transact_notify(new_version);
+        wt.commit();
         fixture.start();
         session.wait_for_upload_complete_or_client_stopped();
     }
@@ -1900,8 +1870,7 @@ TEST(Sync_ErrorAfterServerRestore_BadClientVersion)
         WriteTransaction wt{db_1};
         TableRef table = wt.get_group().add_table_with_primary_key("class_table", type_Int, "id");
         table->add_column(type_Int, "column");
-        auto new_version = wt.commit();
-        session_1.nonsync_transact_notify(new_version);
+        wt.commit();
         fixture.start();
         session_1.wait_for_upload_complete_or_client_stopped();
         session_2.wait_for_download_complete_or_client_stopped();
@@ -1917,8 +1886,7 @@ TEST(Sync_ErrorAfterServerRestore_BadClientVersion)
         WriteTransaction wt{db_1};
         TableRef table = wt.get_table("class_table");
         table->create_object_with_primary_key(1);
-        auto new_version = wt.commit();
-        session.nonsync_transact_notify(new_version);
+        wt.commit();
         fixture.start();
         session.wait_for_upload_complete_or_client_stopped();
     }
@@ -1933,8 +1901,7 @@ TEST(Sync_ErrorAfterServerRestore_BadClientVersion)
         WriteTransaction wt{db_2};
         TableRef table = wt.get_table("class_table");
         table->create_object_with_primary_key(2);
-        auto new_version = wt.commit();
-        session.nonsync_transact_notify(new_version);
+        wt.commit();
         fixture.start();
         session.wait_for_upload_complete_or_client_stopped();
     }
@@ -1978,8 +1945,7 @@ TEST(Sync_ErrorAfterServerRestore_BadClientFileIdentSalt)
         WriteTransaction wt{db_1};
         TableRef table = wt.get_group().add_table_with_primary_key("class_table_1", type_Int, "id");
         table->add_column(type_Int, "column");
-        auto new_version = wt.commit();
-        session.nonsync_transact_notify(new_version);
+        wt.commit();
         fixture.start();
         session.wait_for_upload_complete_or_client_stopped();
     }
@@ -2047,8 +2013,7 @@ TEST(Sync_ErrorAfterServerRestore_BadServerVersionSalt)
         WriteTransaction wt{db_1};
         TableRef table = wt.get_group().add_table_with_primary_key("class_table", type_Int, "id");
         table->add_column(type_Int, "column");
-        auto new_version = wt.commit();
-        session_1.nonsync_transact_notify(new_version);
+        wt.commit();
         fixture.start();
         session_1.wait_for_upload_complete_or_client_stopped();
         session_2.wait_for_download_complete_or_client_stopped();
@@ -2067,8 +2032,7 @@ TEST(Sync_ErrorAfterServerRestore_BadServerVersionSalt)
         WriteTransaction wt{db_1};
         TableRef table = wt.get_table("class_table");
         table->create_object_with_primary_key(1);
-        auto new_version = wt.commit();
-        session_1.nonsync_transact_notify(new_version);
+        wt.commit();
         fixture.start();
         session_1.wait_for_upload_complete_or_client_stopped();
         session_2.wait_for_download_complete_or_client_stopped();
@@ -2084,8 +2048,7 @@ TEST(Sync_ErrorAfterServerRestore_BadServerVersionSalt)
         WriteTransaction wt{db_3};
         TableRef table = wt.get_table("class_table");
         table->create_object_with_primary_key(2);
-        auto new_version = wt.commit();
-        session.nonsync_transact_notify(new_version);
+        wt.commit();
         fixture.start();
         session.wait_for_upload_complete_or_client_stopped();
     }
@@ -2161,8 +2124,7 @@ TEST(Sync_MultipleServers)
                     obj.set("file_index", file_index);
                     obj.set("session_index", i);
                     obj.set("transact_index", j);
-                    version_type new_version = wt.commit();
-                    session.nonsync_transact_notify(new_version);
+                    wt.commit();
                 }
                 session.wait_for_upload_complete_or_client_stopped();
             }
@@ -2294,7 +2256,7 @@ TEST_IF(Sync_ReadOnlyClient, false)
         table->add_column(type_Int, "i");
         table->create_object_with_primary_key(1);
         table->begin()->set("i", 123);
-        session_1.nonsync_transact_notify(wt.commit());
+        wt.commit();
         session_1.wait_for_upload_complete_or_client_stopped();
     }
 
@@ -2312,7 +2274,7 @@ TEST_IF(Sync_ReadOnlyClient, false)
             WriteTransaction wt(db_2);
             auto table = wt.get_table("class_foo");
             table->begin()->set("i", 456);
-            session_2.nonsync_transact_notify(wt.commit());
+            wt.commit();
         }
         session_2.wait_for_upload_complete_or_client_stopped();
         CHECK(did_get_permission_denied);
@@ -2336,7 +2298,7 @@ TEST(Sync_SingleClientUploadForever_CreateObjects)
 {
     int_fast32_t number_of_transactions = 100; // Set to low number in ordinary testing.
 
-    util::Logger& logger = *(test_context.logger);
+    util::Logger& logger = *test_context.logger;
 
     logger.info("Sync_SingleClientUploadForever_CreateObjects test. Number of transactions = %1",
                 number_of_transactions);
@@ -2376,9 +2338,8 @@ TEST(Sync_SingleClientUploadForever_CreateObjects)
         obj.set(col_str, str_data);
         obj.set(col_dbl, double(number));
         obj.set(col_time, Timestamp{123, 456});
-        version_type version = wt.commit();
+        wt.commit();
         auto before_upload = std::chrono::steady_clock::now();
-        session.nonsync_transact_notify(version);
         session.wait_for_upload_complete_or_client_stopped();
         auto after_upload = std::chrono::steady_clock::now();
 
@@ -2399,7 +2360,7 @@ TEST(Sync_SingleClientUploadForever_MutateObject)
 {
     int_fast32_t number_of_transactions = 100; // Set to low number in ordinary testing.
 
-    util::Logger& logger = *(test_context.logger);
+    util::Logger& logger = *test_context.logger;
 
     logger.info("Sync_SingleClientUploadForever_MutateObject test. Number of transactions = %1",
                 number_of_transactions);
@@ -2441,9 +2402,8 @@ TEST(Sync_SingleClientUploadForever_MutateObject)
         obj.set(col_str, str_data);
         obj.set(col_dbl, double(number));
         obj.set(col_time, Timestamp{123, 456});
-        version_type version = wt.commit();
+        wt.commit();
         auto before_upload = std::chrono::steady_clock::now();
-        session.nonsync_transact_notify(version);
         session.wait_for_upload_complete_or_client_stopped();
         auto after_upload = std::chrono::steady_clock::now();
 
@@ -2558,7 +2518,7 @@ TEST(Sync_LargeUploadDownloadPerformance)
     for (int i = 0; i < number_of_download_clients; ++i) {
         ReadTransaction rt_1(db_upload);
         ReadTransaction rt_2(dbs[i]);
-        CHECK(compare_groups(rt_1, rt_2));
+        CHECK(compare_groups(rt_1, rt_2, *test_context.logger));
     }
 }
 
@@ -2613,8 +2573,7 @@ TEST_IF(Sync_4GB_Messages, false)
                     obj.set(col_key, bd_c);
             }
         }
-        version_type new_version = wt.commit();
-        session_1.nonsync_transact_notify(new_version);
+        wt.commit();
     }
     session_1.wait_for_upload_complete_or_client_stopped();
     session_2.wait_for_download_complete_or_client_stopped();
@@ -2623,7 +2582,7 @@ TEST_IF(Sync_4GB_Messages, false)
     {
         ReadTransaction rt_1(db_1);
         ReadTransaction rt_2(db_2);
-        CHECK(compare_groups(rt_1, rt_2));
+        CHECK(compare_groups(rt_1, rt_2, *test_context.logger));
     }
 }
 
@@ -2684,7 +2643,6 @@ TEST(Sync_Permissions)
     // Insert some dummy data
     WriteTransaction wt_valid{db_valid};
     wt_valid.get_group().add_table_with_primary_key("class_a", type_Int, "id");
-    session_valid.nonsync_transact_notify(wt_valid.commit());
     session_valid.wait_for_upload_complete_or_client_stopped();
 
     CHECK_NOT(did_see_error_for_valid);
@@ -3085,7 +3043,6 @@ TEST(Sync_UploadDownloadProgress_1)
             TableRef tr = wt.get_group().add_table_with_primary_key("class_table", type_Int, "id");
             tr->add_column(type_Int, "integer column");
             commit_version = wt.commit();
-            session.nonsync_transact_notify(commit_version);
         }
 
         session.wait_for_upload_complete_or_client_stopped();
@@ -3103,7 +3060,6 @@ TEST(Sync_UploadDownloadProgress_1)
             TableRef tr = wt.get_table("class_table");
             tr->create_object_with_primary_key(1).set("integer column", 42);
             commit_version = wt.commit();
-            session.nonsync_transact_notify(commit_version);
         }
 
         session.wait_for_upload_complete_or_client_stopped();
@@ -3256,7 +3212,7 @@ TEST(Sync_UploadDownloadProgress_2)
     CHECK_GREATER(progress_version_2, 0);
     CHECK_GREATER(snapshot_version_2, 0);
 
-    write_transaction_notifying_session(db_1, session_1, [](WriteTransaction& wt) {
+    write_transaction(db_1, [](WriteTransaction& wt) {
         TableRef tr = wt.get_group().add_table_with_primary_key("class_table", type_Int, "id");
         tr->add_column(type_Int, "integer column");
     });
@@ -3281,17 +3237,17 @@ TEST(Sync_UploadDownloadProgress_2)
     CHECK_GREATER(snapshot_version_1, 1);
     CHECK_GREATER(snapshot_version_2, 1);
 
-    write_transaction_notifying_session(db_1, session_1, [](WriteTransaction& wt) {
+    write_transaction(db_1, [](WriteTransaction& wt) {
         TableRef tr = wt.get_table("class_table");
         tr->create_object_with_primary_key(1).set("integer column", 42);
     });
 
-    write_transaction_notifying_session(db_1, session_1, [](WriteTransaction& wt) {
+    write_transaction(db_1, [](WriteTransaction& wt) {
         TableRef tr = wt.get_table("class_table");
         tr->create_object_with_primary_key(2).set("integer column", 44);
     });
 
-    write_transaction_notifying_session(db_2, session_2, [](WriteTransaction& wt) {
+    write_transaction(db_2, [](WriteTransaction& wt) {
         TableRef tr = wt.get_table("class_table");
         tr->create_object_with_primary_key(3).set("integer column", 43);
     });
@@ -3316,12 +3272,12 @@ TEST(Sync_UploadDownloadProgress_2)
     CHECK_GREATER(snapshot_version_1, 4);
     CHECK_GREATER(snapshot_version_2, 3);
 
-    write_transaction_notifying_session(db_1, session_1, [](WriteTransaction& wt) {
+    write_transaction(db_1, [](WriteTransaction& wt) {
         TableRef tr = wt.get_table("class_table");
         tr->begin()->set("integer column", 101);
     });
 
-    write_transaction_notifying_session(db_2, session_2, [](WriteTransaction& wt) {
+    write_transaction(db_2, [](WriteTransaction& wt) {
         TableRef tr = wt.get_table("class_table");
         tr->begin()->set("integer column", 102);
     });
@@ -3355,7 +3311,7 @@ TEST(Sync_UploadDownloadProgress_2)
     {
         ReadTransaction rt_1(db_1);
         ReadTransaction rt_2(db_2);
-        CHECK(compare_groups(rt_1, rt_2));
+        CHECK(compare_groups(rt_1, rt_2, *test_context.logger));
     }
 }
 
@@ -3490,7 +3446,6 @@ TEST(Sync_UploadDownloadProgress_3)
         TableRef tr = wt.get_table("class_table");
         tr->create_object_with_primary_key(123).set("integer column", 42);
         commited_version = wt.commit();
-        session.nonsync_transact_notify(commited_version);
     }
 
     signal_pf.future.get();
@@ -3555,14 +3510,37 @@ TEST(Sync_UploadDownloadProgress_4)
         CHECK_EQUAL(downloadable_bytes, 0);
         CHECK_NOT_EQUAL(uploadable_bytes, 0);
 
-        if (entry_1 == 0) {
-            CHECK_EQUAL(progress_version, 0);
-            CHECK_EQUAL(uploaded_bytes, 0);
-            CHECK_EQUAL(snapshot_version, 3);
-        }
-        else {
-            CHECK_GREATER(progress_version, 0);
-            CHECK_GREATER(snapshot_version, 3);
+        switch (entry_1) {
+            case 0:
+                // Session is bound and initial state is reported
+                CHECK_EQUAL(progress_version, 0);
+                CHECK_EQUAL(uploaded_bytes, 0);
+                CHECK_EQUAL(snapshot_version, 3);
+                break;
+
+            case 1:
+                // We've received the empty DOWNLOAD message and now have reliable
+                // download progress
+                CHECK_EQUAL(progress_version, 1);
+                CHECK_EQUAL(uploaded_bytes, 0);
+                CHECK_EQUAL(snapshot_version, 5);
+                break;
+
+            case 2:
+                // First UPLOAD is complete, but we still have more to upload
+                // because the changesets are too large to batch into a single upload
+                CHECK_EQUAL(progress_version, 1);
+                CHECK_GREATER(uploaded_bytes, 0);
+                CHECK_LESS(uploaded_bytes, uploadable_bytes);
+                CHECK_EQUAL(snapshot_version, 6);
+                break;
+
+            case 3:
+                // Second UPLOAD is complete and we're done uploading
+                CHECK_EQUAL(progress_version, 1);
+                CHECK_EQUAL(uploaded_bytes, uploadable_bytes);
+                CHECK_EQUAL(snapshot_version, 7);
+                break;
         }
 
         ++entry_1;
@@ -3575,7 +3553,7 @@ TEST(Sync_UploadDownloadProgress_4)
     session_1.wait_for_upload_complete_or_client_stopped();
     session_1.wait_for_download_complete_or_client_stopped();
 
-    CHECK_NOT_EQUAL(entry_1, 0);
+    CHECK_EQUAL(entry_1, 4);
 
     Session session_2 = fixture.make_session(db_2, "/test");
 
@@ -3587,25 +3565,34 @@ TEST(Sync_UploadDownloadProgress_4)
         CHECK_EQUAL(uploaded_bytes, 0);
         CHECK_EQUAL(uploadable_bytes, 0);
 
-        if (entry_2 == 0) {
-            CHECK_EQUAL(progress_version, 0);
-            CHECK_EQUAL(downloaded_bytes, 0);
-            CHECK_EQUAL(downloadable_bytes, 0);
-            CHECK_EQUAL(snapshot_version, 1);
-        }
-        else if (entry_2 == 1) {
-            CHECK_GREATER(progress_version, 0);
-            CHECK_NOT_EQUAL(downloaded_bytes, 0);
-            CHECK_NOT_EQUAL(downloadable_bytes, 0);
-            CHECK_EQUAL(snapshot_version, 3);
-        }
-        else if (entry_2 == 2) {
-            CHECK_GREATER(progress_version, 0);
-            CHECK_NOT_EQUAL(downloaded_bytes, 0);
-            CHECK_NOT_EQUAL(downloadable_bytes, 0);
-            CHECK_EQUAL(snapshot_version, 4);
-        }
+        switch (entry_2) {
+            case 0:
+                // Session is bound and initial state is reported
+                CHECK_EQUAL(progress_version, 0);
+                CHECK_EQUAL(downloaded_bytes, 0);
+                CHECK_EQUAL(downloadable_bytes, 0);
+                CHECK_EQUAL(snapshot_version, 1);
+                break;
 
+            case 1:
+                // First DOWNLOAD message received. Some data is downloaded, but
+                // download isn't compelte
+                CHECK_EQUAL(progress_version, 1);
+                CHECK_GREATER(downloaded_bytes, 0);
+                CHECK_GREATER(downloadable_bytes, 0);
+                CHECK_LESS(downloaded_bytes, downloadable_bytes);
+                CHECK_EQUAL(snapshot_version, 3);
+                break;
+
+            case 2:
+                // Second DOWNLOAD message received. Download is now complete.
+                CHECK_EQUAL(progress_version, 1);
+                CHECK_GREATER(downloaded_bytes, 0);
+                CHECK_GREATER(downloadable_bytes, 0);
+                CHECK_EQUAL(downloaded_bytes, downloadable_bytes);
+                CHECK_EQUAL(snapshot_version, 4);
+                break;
+        }
         ++entry_2;
     };
 
@@ -3615,6 +3602,7 @@ TEST(Sync_UploadDownloadProgress_4)
 
     session_2.wait_for_upload_complete_or_client_stopped();
     session_2.wait_for_download_complete_or_client_stopped();
+    CHECK_EQUAL(entry_2, 3);
 }
 
 
@@ -3782,6 +3770,76 @@ TEST(Sync_UploadDownloadProgress_7)
 
     // The check is that we reach this point without deadlocking or throwing an assert while tearing
     // down the session that is in the process of being created.
+}
+
+TEST(Sync_UploadProgress_EmptyCommits)
+{
+    TEST_DIR(server_dir);
+    TEST_CLIENT_DB(db);
+
+    ClientServerFixture fixture(server_dir, test_context);
+    fixture.start();
+    Session session = fixture.make_session(db, "/test");
+
+    {
+        WriteTransaction wt{db};
+        wt.get_group().add_table_with_primary_key("class_table", type_Int, "_id");
+        wt.commit();
+    }
+
+    std::atomic<int> entry = 0;
+    session.set_progress_handler(
+        [&](uint_fast64_t, uint_fast64_t, uint_fast64_t, uint_fast64_t, uint_fast64_t, uint_fast64_t) {
+            ++entry;
+        });
+    session.bind();
+
+    // Each step calls wait_for_upload_complete twice because upload completion
+    // is fired before progress handlers, so we need another hop through the
+    // event loop after upload completion to know that the handler has been called
+    session.wait_for_upload_complete_or_client_stopped();
+    session.wait_for_upload_complete_or_client_stopped();
+
+    // Binding produces three notifications: the initial state, one after receiving
+    // the DOWNLOAD message, and one after uploading the schema
+    CHECK_EQUAL(entry, 3);
+
+    // No notification sent because an empty commit doesn't change uploadable_bytes
+    {
+        WriteTransaction wt{db};
+        wt.commit();
+    }
+    session.wait_for_upload_complete_or_client_stopped();
+    session.wait_for_upload_complete_or_client_stopped();
+    CHECK_EQUAL(entry, 3);
+
+    // Both the external and local commits are empty, so again no change in
+    // uploadable_bytes
+    {
+        auto db2 = DB::create(make_client_replication(), db_path);
+        WriteTransaction wt{db2};
+        wt.commit();
+        WriteTransaction wt2{db};
+        wt2.commit();
+    }
+    session.wait_for_upload_complete_or_client_stopped();
+    session.wait_for_upload_complete_or_client_stopped();
+    CHECK_EQUAL(entry, 3);
+
+    // Local commit is empty, but the changeset created by the external write
+    // is discovered after the local write, resulting in two notifications (one
+    // before uploading and one after).
+    {
+        auto db2 = DB::create(make_client_replication(), db_path);
+        WriteTransaction wt{db2};
+        wt.get_table("class_table")->create_object_with_primary_key(0);
+        wt.commit();
+        WriteTransaction wt2{db};
+        wt2.commit();
+    }
+    session.wait_for_upload_complete_or_client_stopped();
+    session.wait_for_upload_complete_or_client_stopped();
+    CHECK_EQUAL(entry, 5);
 }
 
 TEST(Sync_MultipleSyncAgentsNotAllowed)
@@ -4689,7 +4747,7 @@ TEST(Sync_UploadLogCompactionEnabled)
     {
         ReadTransaction rt_1(db_1);
         ReadTransaction rt_2(db_2);
-        CHECK(compare_groups(rt_1, rt_2));
+        CHECK(compare_groups(rt_1, rt_2, *test_context.logger));
         ConstTableRef table = rt_1.get_table("class_foo");
         CHECK_EQUAL(2, table->size());
         CHECK_EQUAL(9999, table->begin()->get<Int>("integer column"));
@@ -4747,7 +4805,7 @@ TEST(Sync_UploadLogCompactionDisabled)
     {
         ReadTransaction rt_1(db_1);
         ReadTransaction rt_2(db_2);
-        CHECK(compare_groups(rt_1, rt_2));
+        CHECK(compare_groups(rt_1, rt_2, *test_context.logger));
         ConstTableRef table = rt_1.get_table("class_foo");
         CHECK_EQUAL(2, table->size());
         CHECK_EQUAL(9999, table->begin()->get<Int>("integer column"));
@@ -4783,8 +4841,7 @@ TEST(Sync_ReadOnlyClientSideHistoryTrim)
             WriteTransaction wt{db_1};
             TableRef blobs = wt.get_table("class_Blob");
             blobs->begin()->set(col_ndx_blob_data, BinaryData{blob});
-            version_type new_version = wt.commit();
-            session_1.nonsync_transact_notify(new_version);
+            wt.commit();
         }
         session_1.wait_for_upload_complete_or_client_stopped();
         session_2.wait_for_download_complete_or_client_stopped();
@@ -4839,7 +4896,7 @@ TEST(Sync_ContainerInsertAndSetLogCompaction)
     {
         ReadTransaction rt_1(db_1);
         ReadTransaction rt_2(db_2);
-        CHECK(compare_groups(rt_1, rt_2));
+        CHECK(compare_groups(rt_1, rt_2, *test_context.logger));
     }
 }
 
@@ -4883,7 +4940,7 @@ TEST(Sync_MultipleContainerColumns)
     {
         ReadTransaction rt_1(db_1);
         ReadTransaction rt_2(db_2);
-        CHECK(compare_groups(rt_1, rt_2));
+        CHECK(compare_groups(rt_1, rt_2, *test_context.logger));
 
         ConstTableRef table = rt_1.get_table("class_Table");
         const Obj row = *table->begin();
@@ -5058,8 +5115,7 @@ TEST(Sync_ServerSideModify_Randomize)
             ;
             Obj obj = *(table->begin() + random.draw_int_mod(table->size()));
             obj.set<int64_t>("i", random.draw_int_max(0x0'7FFF'FFFF'FFFF'FFFF));
-            version_type new_version = wt.commit();
-            session.nonsync_transact_notify(new_version);
+            wt.commit();
             if (i % 16 == 0)
                 session.wait_for_upload_complete_or_client_stopped();
         }
@@ -5075,7 +5131,7 @@ TEST(Sync_ServerSideModify_Randomize)
 
     ReadTransaction rt_1{db_1};
     ReadTransaction rt_2{db_2};
-    CHECK(compare_groups(rt_1, rt_2, *(test_context.logger)));
+    CHECK(compare_groups(rt_1, rt_2, *test_context.logger));
 }
 
 
@@ -5265,30 +5321,15 @@ namespace issue2104 {
 
 class ServerHistoryContext : public _impl::ServerHistory::Context {
 public:
-    ServerHistoryContext()
-        : m_transformer{make_transformer()}
-    {
-    }
+    ServerHistoryContext() {}
 
     std::mt19937_64& server_history_get_random() noexcept override
     {
         return m_random;
     }
 
-    sync::Transformer& get_transformer() override
-    {
-        return *m_transformer;
-    }
-
-    util::Buffer<char>& get_transform_buffer() override
-    {
-        return m_transform_buffer;
-    }
-
 private:
     std::mt19937_64 m_random;
-    std::unique_ptr<sync::Transformer> m_transformer;
-    util::Buffer<char> m_transform_buffer;
 };
 
 } // namespace issue2104
@@ -5490,7 +5531,7 @@ TEST_IF(Sync_Issue2104, false)
     bool backup_whole_realm;
     _impl::ServerHistory::IntegrationResult result;
     history.integrate_client_changesets(integratable_changesets, version_info, backup_whole_realm, result,
-                                        *(test_context.logger));
+                                        *test_context.logger);
 }
 
 
@@ -5657,7 +5698,7 @@ TEST(Sync_CreateObjects_EraseObjects)
     Session session_1 = fixture.make_bound_session(db_1);
     Session session_2 = fixture.make_bound_session(db_2);
 
-    write_transaction_notifying_session(db_1, session_1, [](WriteTransaction& wt) {
+    write_transaction(db_1, [](WriteTransaction& wt) {
         TableRef table = wt.get_group().add_table_with_primary_key("class_persons", type_Int, "id");
         table->create_object_with_primary_key(1);
         table->create_object_with_primary_key(2);
@@ -5665,7 +5706,7 @@ TEST(Sync_CreateObjects_EraseObjects)
     session_1.wait_for_upload_complete_or_client_stopped();
     session_2.wait_for_download_complete_or_client_stopped();
 
-    write_transaction_notifying_session(db_1, session_1, [&](WriteTransaction& wt) {
+    write_transaction(db_1, [&](WriteTransaction& wt) {
         TableRef table = wt.get_table("class_persons");
         CHECK_EQUAL(table->size(), 2);
         table->get_object(0).remove();
@@ -5685,7 +5726,7 @@ TEST(Sync_CreateDeleteCreateTableWithPrimaryKey)
 
     Session session = fixture.make_bound_session(db);
 
-    write_transaction_notifying_session(db, session, [](WriteTransaction& wt) {
+    write_transaction(db, [](WriteTransaction& wt) {
         TableRef table = wt.get_group().add_table_with_primary_key("class_t", type_Int, "pk");
         wt.get_group().remove_table(table->get_key());
         table = wt.get_group().add_table_with_primary_key("class_t", type_String, "pk");
@@ -5786,7 +5827,8 @@ NONCONCURRENT_TEST_TYPES(Sync_PrimaryKeyTypes, Int, String, ObjectId, UUID, util
         list.insert(0, obj_2_id);
         list.insert(1, default_or_null);
         list.add(default_or_null);
-        session_1.nonsync_transact_notify(tr.commit());
+
+        tr.commit();
     }
 
     session_1.wait_for_upload_complete_or_client_stopped();
@@ -5851,7 +5893,7 @@ TEST(Sync_Mixed)
         values.insert(2, ObjLink{fops->get_key(), fop.get_key()});
         values.insert(3, 123.f);
 
-        session_1.nonsync_transact_notify(tr.commit());
+        tr.commit();
     }
 
     session_1.wait_for_upload_complete_or_client_stopped();
@@ -5910,7 +5952,7 @@ TEST(Sync_TypedLinks)
     session_1.bind();
     session_2.bind();
 
-    write_transaction_notifying_session(db_1, session_1, [](WriteTransaction& tr) {
+    write_transaction(db_1, [](WriteTransaction& tr) {
         auto& g = tr.get_group();
         auto foos = g.add_table_with_primary_key("class_Foo", type_Int, "id");
         auto bars = g.add_table_with_primary_key("class_Bar", type_String, "id");
@@ -5973,7 +6015,7 @@ TEST(Sync_Dictionary)
 
     Timestamp now{std::chrono::system_clock::now()};
 
-    write_transaction_notifying_session(db_1, session_1, [&](WriteTransaction& tr) {
+    write_transaction(db_1, [&](WriteTransaction& tr) {
         auto& g = tr.get_group();
         auto foos = g.add_table_with_primary_key("class_Foo", type_Int, "id");
         auto col_dict = foos->add_column_dictionary(type_Mixed, "dict");
@@ -5994,7 +6036,7 @@ TEST(Sync_Dictionary)
     session_1.wait_for_upload_complete_or_client_stopped();
     session_2.wait_for_download_complete_or_client_stopped();
 
-    write_transaction_notifying_session(db_2, session_2, [&](WriteTransaction& tr) {
+    write_transaction(db_2, [&](WriteTransaction& tr) {
         auto foos = tr.get_table("class_Foo");
         CHECK_EQUAL(foos->size(), 1);
 
@@ -6023,7 +6065,7 @@ TEST(Sync_Dictionary)
     session_2.wait_for_upload_complete_or_client_stopped();
     session_1.wait_for_download_complete_or_client_stopped();
 
-    write_transaction_notifying_session(db_1, session_1, [&](WriteTransaction& tr) {
+    write_transaction(db_1, [&](WriteTransaction& tr) {
         auto foos = tr.get_table("class_Foo");
         CHECK_EQUAL(foos->size(), 1);
 
@@ -6077,7 +6119,7 @@ TEST(Sync_Dictionary_Links)
 
     ColKey col_dict;
 
-    write_transaction_notifying_session(db_1, session_1, [&](WriteTransaction& tr) {
+    write_transaction(db_1, [&](WriteTransaction& tr) {
         auto& g = tr.get_group();
         auto foos = g.add_table_with_primary_key("class_Foo", type_Int, "id");
         auto bars = g.add_table_with_primary_key("class_Bar", type_String, "id");
@@ -6119,7 +6161,7 @@ TEST(Sync_Dictionary_Links)
 
     // Test that we can create tombstones for objects in dictionaries.
 
-    write_transaction_notifying_session(db_1, session_1, [&](WriteTransaction& tr) {
+    write_transaction(db_1, [&](WriteTransaction& tr) {
         auto& g = tr.get_group();
 
         auto bars = g.get_table("class_Bar");
@@ -6227,14 +6269,14 @@ TEST(Sync_Set)
         CHECK_EQUAL(mixeds.find(456.0), 1);
         CHECK_EQUAL(mixeds.find("a"), 2);
 
-        session_1.nonsync_transact_notify(wt.commit());
+        wt.commit();
     }
 
     session_1.wait_for_upload_complete_or_client_stopped();
     session_2.wait_for_download_complete_or_client_stopped();
 
     // Create a conflict. Session 1 should lose, because it has a lower peer ID.
-    write_transaction_notifying_session(db_1, session_1, [=](WriteTransaction& wt) {
+    write_transaction(db_1, [=](WriteTransaction& wt) {
         auto t = wt.get_table("class_Foo");
         auto obj = t->get_object_with_primary_key(0);
 
@@ -6242,7 +6284,7 @@ TEST(Sync_Set)
         ints.insert(999);
     });
 
-    write_transaction_notifying_session(db_2, session_2, [=](WriteTransaction& wt) {
+    write_transaction(db_2, [=](WriteTransaction& wt) {
         auto t = wt.get_table("class_Foo");
         auto obj = t->get_object_with_primary_key(0);
 
@@ -6262,7 +6304,7 @@ TEST(Sync_Set)
         CHECK(compare_groups(read_1, read_2));
     }
 
-    write_transaction_notifying_session(db_1, session_1, [=](WriteTransaction& wt) {
+    write_transaction(db_1, [=](WriteTransaction& wt) {
         auto t = wt.get_table("class_Foo");
         auto obj = t->get_object_with_primary_key(0);
         auto ints = obj.get_set<int64_t>(col_ints);
@@ -6290,7 +6332,7 @@ TEST(Sync_BundledRealmFile)
 
     Session session = fixture.make_bound_session(db);
 
-    write_transaction_notifying_session(db, session, [](WriteTransaction& tr) {
+    write_transaction(db, [](WriteTransaction& tr) {
         auto foos = tr.get_group().add_table_with_primary_key("class_Foo", type_Int, "id");
         foos->create_object_with_primary_key(123);
     });
@@ -6388,7 +6430,7 @@ TEST(Sync_UpgradeToClientHistory)
     session_1.bind();
     session_2.bind();
 
-    write_transaction_notifying_session(db_1, session_1, [](WriteTransaction& tr) {
+    write_transaction(db_1, [](WriteTransaction& tr) {
         auto foos = tr.get_group().get_table("class_Foo");
         foos->create_object_with_primary_key("456");
     });
@@ -6646,7 +6688,7 @@ TEST(Sync_SetAndGetEmptyReciprocalChangeset)
     changeset.origin_file_ident = 2;
 
     ChangesetEncoder::Buffer encoded;
-    std::vector<Transformer::RemoteChangeset> server_changesets_encoded;
+    std::vector<RemoteChangeset> server_changesets_encoded;
     encode_changeset(changeset, encoded);
     server_changesets_encoded.emplace_back(changeset.version, changeset.last_integrated_remote_version,
                                            BinaryData(encoded.data(), encoded.size()), changeset.origin_timestamp,
@@ -6660,10 +6702,9 @@ TEST(Sync_SetAndGetEmptyReciprocalChangeset)
 
     uint_fast64_t downloadable_bytes = 0;
     VersionInfo version_info;
-    util::StderrLogger logger;
     auto transact = db->start_read();
     history.integrate_server_changesets(progress, &downloadable_bytes, server_changesets_encoded, version_info,
-                                        DownloadBatchState::SteadyState, logger, transact);
+                                        DownloadBatchState::SteadyState, *test_context.logger, transact);
 
     bool is_compressed = false;
     auto data = history.get_reciprocal_transform(latest_local_version, is_compressed);
@@ -6682,7 +6723,6 @@ TEST(Sync_SetAndGetEmptyReciprocalChangeset)
     CHECK(reciprocal_changeset.empty());
 }
 
-
 TEST(Sync_InvalidChangesetFromServer)
 {
     TEST_CLIENT_DB(db);
@@ -6699,16 +6739,16 @@ TEST(Sync_InvalidChangesetFromServer)
 
     ChangesetEncoder::Buffer encoded;
     encode_changeset(changeset, encoded);
-    Transformer::RemoteChangeset server_changeset;
+    RemoteChangeset server_changeset;
     server_changeset.origin_file_ident = 1;
     server_changeset.remote_version = 1;
     server_changeset.data = BinaryData(encoded.data(), encoded.size());
 
     VersionInfo version_info;
-    util::StderrLogger logger;
     auto transact = db->start_read();
     CHECK_THROW_EX(history.integrate_server_changesets({}, nullptr, util::Span(&server_changeset, 1), version_info,
-                                                       DownloadBatchState::SteadyState, logger, transact),
+                                                       DownloadBatchState::SteadyState, *test_context.logger,
+                                                       transact),
                    sync::IntegrationException,
                    StringData(e.what()).contains("Failed to parse received changeset: Invalid interned string"));
 }
@@ -6737,7 +6777,7 @@ TEST(Sync_ServerVersionsSkippedFromDownloadCursor)
     server_changeset.origin_file_ident = 1;
 
     std::vector<ChangesetEncoder::Buffer> encoded;
-    std::vector<Transformer::RemoteChangeset> server_changesets_encoded;
+    std::vector<RemoteChangeset> server_changesets_encoded;
     encoded.emplace_back();
     encode_changeset(server_changeset, encoded.back());
     server_changesets_encoded.emplace_back(server_changeset.version, server_changeset.last_integrated_remote_version,
@@ -6753,10 +6793,9 @@ TEST(Sync_ServerVersionsSkippedFromDownloadCursor)
 
     uint_fast64_t downloadable_bytes = 0;
     VersionInfo version_info;
-    util::StderrLogger logger;
     auto transact = db->start_read();
     history.integrate_server_changesets(progress, &downloadable_bytes, server_changesets_encoded, version_info,
-                                        DownloadBatchState::SteadyState, logger, transact);
+                                        DownloadBatchState::SteadyState, *test_context.logger, transact);
 
     version_type current_version;
     SaltedFileIdent file_ident;
@@ -6824,7 +6863,7 @@ TEST(Sync_NonIncreasingServerVersions)
     ++server_changesets.back().version;
 
     std::vector<ChangesetEncoder::Buffer> encoded;
-    std::vector<Transformer::RemoteChangeset> server_changesets_encoded;
+    std::vector<RemoteChangeset> server_changesets_encoded;
     for (const auto& changeset : server_changesets) {
         encoded.emplace_back();
         encode_changeset(changeset, encoded.back());
@@ -6841,12 +6880,10 @@ TEST(Sync_NonIncreasingServerVersions)
 
     uint_fast64_t downloadable_bytes = 0;
     VersionInfo version_info;
-    util::StderrLogger logger;
     auto transact = db->start_read();
     history.integrate_server_changesets(progress, &downloadable_bytes, server_changesets_encoded, version_info,
-                                        DownloadBatchState::SteadyState, logger, transact);
+                                        DownloadBatchState::SteadyState, *test_context.logger, transact);
 }
-
 
 TEST(Sync_DanglingLinksCountInPriorSize)
 {

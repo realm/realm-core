@@ -32,6 +32,9 @@
 #include <realm/util/file.hpp>
 
 #if REALM_ENABLE_SYNC
+#include <realm/object-store/sync/mongo_client.hpp>
+#include <realm/object-store/sync/mongo_database.hpp>
+#include <realm/object-store/sync/mongo_collection.hpp>
 #include <realm/object-store/sync/sync_manager.hpp>
 #include <realm/object-store/sync/sync_session.hpp>
 #include <realm/object-store/sync/sync_user.hpp>
@@ -131,8 +134,7 @@ static const std::string fake_device_id = "123400000000000000000000";
 
 static std::shared_ptr<SyncUser> get_fake_user(app::App& app, const std::string& user_name)
 {
-    return app.sync_manager()->get_user(user_name, fake_refresh_token, fake_access_token, app.base_url(),
-                                        fake_device_id);
+    return app.sync_manager()->get_user(user_name, fake_refresh_token, fake_access_token, fake_device_id);
 }
 
 SyncTestFile::SyncTestFile(std::shared_ptr<app::App> app, std::string name, std::string user_name)
@@ -196,8 +198,8 @@ SyncServer::SyncServer(const SyncServer::Config& config)
                    using namespace std::literals::chrono_literals;
 
 #if TEST_ENABLE_LOGGING
-                   auto logger = new util::StderrLogger(realm::util::Logger::Level::TEST_LOGGING_LEVEL);
-                   m_logger.reset(logger);
+                   m_logger = util::Logger::get_default_logger();
+
 #else
                    // Logging is disabled, use a NullLogger to prevent printing anything
                    m_logger.reset(new util::NullLogger());
@@ -261,6 +263,7 @@ static Status wait_for_session(Realm& realm, void (SyncSession::*fn)(util::Uniqu
 {
     auto shared_state = std::make_shared<WaitForSessionState>();
     auto& session = *realm.config().sync_config->user->session_for_on_disk_path(realm.config().path);
+    auto delay = TEST_TIMEOUT_EXTRA > 0 ? timeout + std::chrono::seconds(TEST_TIMEOUT_EXTRA) : timeout;
     (session.*fn)([weak_state = std::weak_ptr<WaitForSessionState>(shared_state)](Status s) {
         auto shared_state = weak_state.lock();
         if (!shared_state) {
@@ -272,11 +275,11 @@ static Status wait_for_session(Realm& realm, void (SyncSession::*fn)(util::Uniqu
         shared_state->cv.notify_one();
     });
     std::unique_lock<std::mutex> lock(shared_state->mutex);
-    bool completed = shared_state->cv.wait_for(lock, timeout, [&]() {
+    bool completed = shared_state->cv.wait_for(lock, delay, [&]() {
         return shared_state->complete == true;
     });
     if (!completed) {
-        throw std::runtime_error("wait_for_session() timed out");
+        throw std::runtime_error(util::format("wait_for_session() exceeded %1 ms", delay.count()));
     }
     return shared_state->status;
 }
@@ -321,7 +324,7 @@ void set_app_config_defaults(app::App::Config& app_config,
 #if REALM_ENABLE_AUTH_TESTS
 
 TestAppSession::TestAppSession()
-    : TestAppSession(get_runtime_app_session(get_base_url()), nullptr, DeleteApp{false})
+    : TestAppSession(get_runtime_app_session(), nullptr, DeleteApp{false})
 {
 }
 
@@ -375,6 +378,47 @@ TestAppSession::~TestAppSession()
     }
 }
 
+std::vector<bson::BsonDocument> TestAppSession::get_documents(SyncUser& user, const std::string& object_type,
+                                                              size_t expected_count) const
+{
+    app::MongoClient remote_client = user.mongo_client("BackingDB");
+    app::MongoDatabase db = remote_client.db(m_app_session->config.mongo_dbname);
+    app::MongoCollection collection = db[object_type];
+    int sleep_time = 10;
+    timed_wait_for(
+        [&] {
+            uint64_t count = 0;
+            collection.count({}, [&](uint64_t c, util::Optional<app::AppError> error) {
+                REQUIRE(!error);
+                count = c;
+            });
+            if (count < expected_count) {
+                // querying the server too frequently makes it take longer to process the sync changesets we're
+                // waiting for
+                millisleep(sleep_time);
+                if (sleep_time < 500) {
+                    sleep_time *= 2;
+                }
+                return false;
+            }
+            return true;
+        },
+        std::chrono::minutes(5));
+
+    std::vector<bson::BsonDocument> documents;
+    collection.find({}, {},
+                    [&](util::Optional<std::vector<bson::Bson>>&& result, util::Optional<app::AppError> error) {
+                        REQUIRE(result);
+                        REQUIRE(!error);
+                        REQUIRE(result->size() == expected_count);
+                        documents.reserve(result->size());
+                        for (auto&& bson : *result) {
+                            REQUIRE(bson.type() == bson::Bson::Type::Document);
+                            documents.push_back(std::move(static_cast<bson::BsonDocument&>(bson)));
+                        }
+                    });
+    return documents;
+}
 #endif // REALM_ENABLE_AUTH_TESTS
 
 // MARK: - TestSyncManager

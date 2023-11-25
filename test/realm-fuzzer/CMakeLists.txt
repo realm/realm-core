@@ -32,14 +32,3 @@ if(REALM_LIBFUZZER)
         target_link_libraries(realm-libfuzz TestUtil ObjectStore)
     endif()
 endif()
-
-# on Apple platforms we use the built-in CFRunLoop
-# everywhere else it's libuv, except UWP where it doesn't build
-if(NOT APPLE AND NOT WINDOWS_STORE)
-    target_link_libraries(realm-afl++ uv_a)
-    if(REALM_LIBFUZZER)
-        if(${CMAKE_CXX_COMPILER_ID} MATCHES "Clang")
-        target_link_libraries(realm-libfuzz uv_a)
-        endif()
-    endif()
-endif()

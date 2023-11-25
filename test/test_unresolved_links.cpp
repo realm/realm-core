@@ -262,6 +262,20 @@ TEST(Unresolved_LinkList)
 
 TEST(Unresolved_LinkSet)
 {
+    auto check_sorted = [&](LnkSet& set, std::vector<Obj> expected) {
+        std::vector<size_t> indices;
+        set.sort(indices);
+        CHECK_EQUAL(indices.size(), expected.size());
+        for (size_t i = 0; i < indices.size(); ++i) {
+            CHECK_EQUAL(set.get(indices[i]), expected[i].get_key());
+        }
+        indices.clear();
+        set.distinct(indices);
+        CHECK_EQUAL(indices.size(), expected.size());
+        for (size_t i = 0; i < indices.size(); ++i) {
+            CHECK_EQUAL(set.get(indices[i]), expected[i].get_key());
+        }
+    };
     Group g;
 
     auto cars = g.add_table_with_primary_key("Car", type_String, "model");
@@ -285,14 +299,17 @@ TEST(Unresolved_LinkSet)
 
     CHECK_EQUAL(stock1.size(), 4);
     CHECK_EQUAL(stock2.size(), 4);
+    check_sorted(stock1, {skoda, tesla, volvo, bmw});
     tesla.invalidate();
     CHECK_EQUAL(stock1.size(), 3);
     CHECK_EQUAL(stock2.size(), 3);
+    check_sorted(stock1, {skoda, volvo, bmw});
 
     stock1.insert(mercedes.get_key());
     // If REALM_MAX_BPNODE_SIZE is 4, we test that context flag is copied over when replacing root
     CHECK_EQUAL(stock1.size(), 4);
     CHECK_EQUAL(stock2.size(), 4);
+    check_sorted(stock1, {skoda, volvo, bmw, mercedes});
 
     LnkSet stock_copy{stock1};
     CHECK_EQUAL(stock_copy.get(3), mercedes.get_key());

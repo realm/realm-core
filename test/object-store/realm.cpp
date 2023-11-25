@@ -33,6 +33,7 @@
 #include <realm/object-store/property.hpp>
 #include <realm/object-store/results.hpp>
 #include <realm/object-store/schema.hpp>
+#include <realm/object-store/class.hpp>
 #include <realm/object-store/thread_safe_reference.hpp>
 #include <realm/object-store/impl/realm_coordinator.hpp>
 #include <realm/object-store/util/event_loop_dispatcher.hpp>
@@ -58,6 +59,9 @@
 #include <external/json/json.hpp>
 
 #include <array>
+#if REALM_HAVE_UV
+#include <uv.h>
+#endif
 
 namespace realm {
 class TestHelper {
@@ -968,7 +972,8 @@ TEST_CASE("Get Realm using Async Open", "[sync][pbs][async open]") {
         // Create some content
         auto origin = Realm::get_shared_realm(config);
         origin->begin_transaction();
-        origin->read_group().get_table("class_object")->create_object_with_primary_key(0);
+        Class cls = origin->get_class("object");
+        cls.create_object(0);
         origin->commit_transaction();
         wait_for_upload(*origin);
 
@@ -980,7 +985,7 @@ TEST_CASE("Get Realm using Async Open", "[sync][pbs][async open]") {
             // Write some data
             SharedRealm realm = Realm::get_shared_realm(std::move(ref));
             realm->begin_transaction();
-            realm->read_group().get_table("class_object")->create_object_with_primary_key(2);
+            realm->get_class("object").create_object(2);
             realm->commit_transaction();
             wait_for_upload(*realm);
             wait_for_download(*realm);
@@ -991,29 +996,30 @@ TEST_CASE("Get Realm using Async Open", "[sync][pbs][async open]") {
 
         // Create some more content on the server
         origin->begin_transaction();
-        origin->read_group().get_table("class_object")->create_object_with_primary_key(7);
+        cls.create_object(7);
         origin->commit_transaction();
         wait_for_upload(*origin);
 
         // Now open a realm based on the realm file created above
         auto realm = Realm::get_shared_realm(config3);
+        Class cls2 = realm->get_class("object");
         wait_for_download(*realm);
         wait_for_upload(*realm);
 
         // Make sure we have got a new client file id
         REQUIRE(realm->read_group().get_sync_file_id() != client_file_id);
-        REQUIRE(realm->read_group().get_table("class_object")->size() == 3);
+        REQUIRE(cls.num_objects() == 3);
 
         // Check that we can continue committing to this realm
         realm->begin_transaction();
-        realm->read_group().get_table("class_object")->create_object_with_primary_key(5);
+        cls2.create_object(5);
         realm->commit_transaction();
         wait_for_upload(*realm);
 
         // Check that this change is now in the original realm
         wait_for_download(*origin);
         origin->refresh();
-        REQUIRE(origin->read_group().get_table("class_object")->size() == 4);
+        REQUIRE(cls.num_objects() == 4);
     }
 
     SECTION("downloads Realms which exist on the server") {
@@ -1064,18 +1070,18 @@ TEST_CASE("Get Realm using Async Open", "[sync][pbs][async open]") {
             progress_notifier2_called = true;
         });
         task->start([&](ThreadSafeReference realm_ref, std::exception_ptr err) {
-            REQUIRE(!err);
-            SharedRealm realm = Realm::get_shared_realm(std::move(realm_ref));
-            REQUIRE(realm);
             std::lock_guard<std::mutex> guard(mutex);
+            REQUIRE(!err);
+            REQUIRE(realm_ref);
             task1_completed = true;
         });
         task->cancel();
+        ThreadSafeReference rref;
         task2->start([&](ThreadSafeReference realm_ref, std::exception_ptr err) {
-            REQUIRE(!err);
-            SharedRealm realm = Realm::get_shared_realm(std::move(realm_ref));
-            REQUIRE(realm);
             std::lock_guard<std::mutex> guard(mutex);
+            REQUIRE(!err);
+            REQUIRE(realm_ref);
+            rref = std::move(realm_ref);
             task2_completed = true;
         });
         write = nullptr; // unblock sync
@@ -1088,6 +1094,8 @@ TEST_CASE("Get Realm using Async Open", "[sync][pbs][async open]") {
         REQUIRE(!task1_completed);
         REQUIRE(progress_notifier2_called);
         REQUIRE(task2_completed);
+        SharedRealm realm = Realm::get_shared_realm(std::move(rref));
+        REQUIRE(realm);
     }
 
     SECTION("downloads latest state for Realms which already exist locally") {
@@ -1181,8 +1189,7 @@ TEST_CASE("Get Realm using Async Open", "[sync][pbs][async open]") {
         TestSyncManager tsm(tsm_config);
 
         SyncTestFile config(tsm.app(), "realm");
-        config.sync_config->user->update_refresh_token(std::string(invalid_token));
-        config.sync_config->user->update_access_token(std::move(invalid_token));
+        config.sync_config->user->log_in(invalid_token, invalid_token);
 
         bool got_error = false;
         config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError) {
@@ -2817,6 +2824,24 @@ TEST_CASE("SharedRealm: notifications") {
         REQUIRE(change_count == 4);
         REQUIRE_FALSE(realm->refresh());
     }
+
+#if REALM_ENABLE_SYNC
+    SECTION("SubscriptionStore writes produce notifications") {
+        auto subscription_store = sync::SubscriptionStore::create(TestHelper::get_db(realm));
+        REQUIRE(change_count == 0);
+        util::EventLoop::main().run_until([&] {
+            return change_count > 0;
+        });
+        REQUIRE(change_count == 1);
+
+        subscription_store->get_active().make_mutable_copy().commit();
+        REQUIRE(change_count == 1);
+        util::EventLoop::main().run_until([&] {
+            return change_count > 1;
+        });
+        REQUIRE(change_count == 2);
+    }
+#endif
 }
 
 TEST_CASE("SharedRealm: schema updating from external changes") {
@@ -3559,7 +3584,7 @@ TEST_CASE("SharedRealm: SchemaChangedFunction") {
     size_t schema_changed_called = 0;
     Schema changed_fixed_schema;
     TestFile config;
-    auto dynamic_config = config;
+    RealmConfig dynamic_config = config;
 
     config.schema = Schema{{"object1",
                             {
@@ -4172,5 +4197,67 @@ TEST_CASE("KeyPathMapping generation") {
         std::vector<Mixed> args{0};
         auto q = table->query("parents.value = $0", args, mapping);
         REQUIRE(q.count() == 0);
+    }
+}
+
+TEST_CASE("Concurrent operations") {
+    SECTION("Async commits together with online compaction") {
+        // This is a reproduction test for issue https://github.com/realm/realm-dart/issues/1396
+        // First create a relatively large realm, then delete the content and do some more
+        // commits using async commits. If a compaction is started when doing an async commit
+        // then the subsequent committing done in the helper thread will illegally COW the
+        // top array. When the next mutation is done, the top array will be reported as being
+        // already freed.
+        TestFile config;
+        config.schema_version = 1;
+        config.schema = Schema{{"object", {{"value", PropertyType::Int}}}};
+
+        auto realm_1 = Realm::get_shared_realm(config);
+        Results res(realm_1, realm_1->read_group().get_table("class_object")->where());
+        auto realm_2 = Realm::get_shared_realm(config);
+
+        {
+            // Create a lot of objects
+            realm_2->begin_transaction();
+            auto table = realm_2->read_group().get_table("class_object");
+            for (int i = 0; i < 400000; i++) {
+                table->create_object().set("value", i);
+            }
+            realm_2->commit_transaction();
+        }
+
+        int commit_1 = 0;
+        int commit_2 = 0;
+
+        for (int i = 0; i < 4; i++) {
+            realm_1->async_begin_transaction([&]() {
+                // Clearing the DB will reduce the need for space
+                // This will trigger an online compaction
+                // Before the fix, the probram would crash here next time around.
+                res.clear();
+                realm_1->async_commit_transaction([&](std::exception_ptr) {
+                    commit_1++;
+                });
+            });
+            realm_2->async_begin_transaction([&]() {
+                // Make sure we will continue to have something to delete
+                auto table = realm_2->read_group().get_table("class_object");
+                for (int i = 0; i < 100; i++) {
+                    table->create_object().set("value", i);
+                }
+                realm_2->async_commit_transaction([&](std::exception_ptr) {
+                    commit_2++;
+                });
+            });
+        }
+
+        util::EventLoop::main().run_until([&] {
+            return commit_1 == 4 && commit_2 == 4;
+        });
+    }
+
+    SECTION("No open realms") {
+        // This is just to check that the section above did not leave any realms open
+        _impl::RealmCoordinator::assert_no_open_realms();
     }
 }

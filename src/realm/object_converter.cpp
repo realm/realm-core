@@ -41,9 +41,9 @@ void InterRealmValueConverter::copy_list(const Obj& src_obj, Obj& dst_obj, bool*
     LstBasePtr dst = dst_obj.get_listbase_ptr(m_dst_col);
 
     bool updated = false;
-    size_t len_src = src->size();
-    size_t len_dst = dst->size();
-    size_t len_min = std::min(len_src, len_dst);
+    const size_t len_src = src->size();
+    const size_t len_dst_orig = dst->size();
+    size_t len_min = std::min(len_src, len_dst_orig);
 
     size_t ndx = 0;
     size_t suffix_len = 0;
@@ -52,24 +52,46 @@ void InterRealmValueConverter::copy_list(const Obj& src_obj, Obj& dst_obj, bool*
         ndx++;
     }
 
+    if (ndx == len_src && len_src == len_dst_orig) {
+        // all are equal, early out
+        if (update_out) {
+            *update_out = false;
+        }
+        return;
+    }
+
     size_t suffix_len_max = len_min - ndx;
 
     while (suffix_len < suffix_len_max &&
-           cmp_src_to_dst(src->get_any(len_src - 1 - suffix_len), dst->get_any(len_dst - 1 - suffix_len), nullptr,
-                          update_out) == 0) {
+           cmp_src_to_dst(src->get_any(len_src - 1 - suffix_len), dst->get_any(len_dst_orig - 1 - suffix_len),
+                          nullptr, update_out) == 0) {
         suffix_len++;
     }
 
     len_min -= (ndx + suffix_len);
 
+    auto dst_as_link_list = dynamic_cast<LnkLst*>(dst.get());
+    auto dst_as_lst_mixed = dynamic_cast<Lst<Mixed>*>(dst.get());
+    auto is_link_to_deleted_object = [&](const Mixed& src_value, const Mixed& converted_value) -> bool {
+        return (dst_as_link_list && converted_value.is_null()) ||
+               (dst_as_lst_mixed && converted_value.is_null() && src_value.is_type(type_TypedLink));
+    };
+
+    std::vector<size_t> dst_to_erase;
     for (size_t i = 0; i < len_min; i++) {
         InterRealmValueConverter::ConversionResult converted_src;
-        if (cmp_src_to_dst(src->get_any(ndx), dst->get_any(ndx), &converted_src, update_out)) {
+        const Mixed src_value = src->get_any(ndx);
+        if (cmp_src_to_dst(src_value, dst->get_any(ndx), &converted_src, update_out)) {
             if (converted_src.requires_new_embedded_object) {
-                auto lnklist = dynamic_cast<LnkLst*>(dst.get());
-                REALM_ASSERT(lnklist); // this is the only type of list that supports embedded objects
-                Obj embedded = lnklist->create_and_set_linked_object(ndx);
+                REALM_ASSERT(dst_as_link_list); // this is the only type of list that supports embedded objects
+                Obj embedded = dst_as_link_list->create_and_set_linked_object(ndx);
                 track_new_embedded(converted_src.src_embedded_to_check, embedded);
+            }
+            else if (is_link_to_deleted_object(src_value, converted_src.converted_value)) {
+                // this can happen when the source linked list points to an object
+                // which has been deleted in the dest Realm. Lists do not support
+                // setting an element to null, so it must be deleted later.
+                dst_to_erase.push_back(ndx);
             }
             else {
                 dst->set_any(ndx, converted_src.converted_value);
@@ -80,29 +102,36 @@ void InterRealmValueConverter::copy_list(const Obj& src_obj, Obj& dst_obj, bool*
     }
 
     // New elements must be inserted in dst.
-    while (len_dst < len_src) {
+    while (ndx < len_src - suffix_len) {
         InterRealmValueConverter::ConversionResult converted_src;
-        cmp_src_to_dst(src->get_any(ndx), Mixed{}, &converted_src, update_out);
+        const Mixed src_value = src->get_any(ndx);
+        cmp_src_to_dst(src_value, Mixed{}, &converted_src, update_out);
+        size_t dst_ndx_to_insert = dst->size() - suffix_len;
         if (converted_src.requires_new_embedded_object) {
-            auto lnklist = dynamic_cast<LnkLst*>(dst.get());
-            REALM_ASSERT(lnklist); // this is the only type of list that supports embedded objects
-            Obj embedded = lnklist->create_and_insert_linked_object(ndx);
+            REALM_ASSERT(dst_as_link_list); // this is the only type of list that supports embedded objects
+            Obj embedded = dst_as_link_list->create_and_insert_linked_object(dst_ndx_to_insert);
             track_new_embedded(converted_src.src_embedded_to_check, embedded);
         }
-        else {
-            dst->insert_any(ndx, converted_src.converted_value);
+        else if (is_link_to_deleted_object(src_value, converted_src.converted_value)) {
+            // ignore trying to insert a link to a object which no longer exists
         }
-        len_dst++;
+        else {
+            dst->insert_any(dst_ndx_to_insert, converted_src.converted_value);
+        }
         ndx++;
         updated = true;
     }
     // Excess elements must be removed from ll_dst.
-    if (len_dst > len_src) {
-        dst->remove(len_src - suffix_len, len_dst - suffix_len);
+    if (dst->size() > len_src) {
+        dst->remove(len_src - suffix_len, dst->size() - suffix_len);
         updated = true;
     }
 
-    REALM_ASSERT(dst->size() == len_src);
+    while (dst_to_erase.size()) {
+        size_t ndx_to_remove = dst_to_erase.back();
+        dst_as_link_list ? dst_as_link_list->remove(ndx_to_remove) : dst_as_lst_mixed->remove(ndx_to_remove);
+        dst_to_erase.pop_back();
+    }
     if (updated && update_out) {
         *update_out = updated;
     }
@@ -373,7 +402,8 @@ int InterRealmValueConverter::cmp_src_to_dst(Mixed src, Mixed dst, ConversionRes
                 // in different Realms we create a new object
                 if (m_opposite_of_src->get_primary_key_column()) {
                     Mixed src_link_pk = m_opposite_of_src->get_primary_key(src_link_key);
-                    dst_link = m_opposite_of_dst->create_object_with_primary_key(src_link_pk, did_update_out);
+                    dst_link =
+                        m_opposite_of_dst->get_object_with_primary_key(src_link_pk); // returns ObjKey{} if not found
                 }
                 else {
                     dst_link = m_opposite_of_dst->create_object();
@@ -404,8 +434,9 @@ int InterRealmValueConverter::cmp_src_to_dst(Mixed src, Mixed dst, ConversionRes
             // regular table, convert by pk
             if (src_link_table->get_primary_key_column()) {
                 Mixed src_pk = src_link_table->get_primary_key(src_link.get_obj_key());
-                Obj dst_link = dst_link_table->create_object_with_primary_key(src_pk, did_update_out);
-                converted_src = ObjLink{dst_link_table->get_key(), dst_link.get_key()};
+                if (Obj dst_link = dst_link_table->get_object_with_primary_key(src_pk)) {
+                    converted_src = ObjLink{dst_link_table->get_key(), dst_link.get_key()};
+                }
             }
             else if (src_link_table == dst_link_table) {
                 // no pk, but this is the same Realm, so convert by ObjKey

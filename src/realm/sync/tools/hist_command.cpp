@@ -12,6 +12,7 @@
 #include <iostream>
 
 #include <realm/array_integer.hpp>
+#include <realm/util/compression.hpp>
 #include <realm/util/features.h>
 #include <realm/util/optional.hpp>
 #include <realm/util/enum.hpp>
@@ -790,20 +791,18 @@ protected:
 };
 
 
-class ClientHistoryCursor_1_to_2 : public RegularSyncHistoryCursor {
+class ClientHistoryCursor : public RegularSyncHistoryCursor {
 public:
-    ClientHistoryCursor_1_to_2(Allocator& alloc, ref_type root_ref, int schema_version,
-                               version_type current_snapshot_version)
+    ClientHistoryCursor(Allocator& alloc, ref_type root_ref, int schema_version,
+                        version_type current_snapshot_version)
     {
-        REALM_ASSERT(schema_version >= 1 && schema_version <= 2);
+        REALM_ASSERT(schema_version == 12);
 
         if (root_ref == 0)
             return;
 
         // Size of fixed-size arrays
         std::size_t root_size = 21;
-        if (schema_version < 2)
-            root_size = 23;
 
         // Slots in root array of history compartment
         std::size_t changesets_iip = 13;
@@ -811,13 +810,6 @@ public:
         std::size_t remote_versions_iip = 15;
         std::size_t origin_file_idents_iip = 16;
         std::size_t origin_timestamps_iip = 17;
-        if (schema_version < 2) {
-            changesets_iip = 0;
-            reciprocal_transforms_iip = 1;
-            remote_versions_iip = 2;
-            origin_file_idents_iip = 3;
-            origin_timestamps_iip = 4;
-        }
 
         Array root{alloc};
         root.init_from_ref(root_ref);
@@ -836,17 +828,17 @@ public:
         {
             m_remote_versions.reset(new IntegerBpTree(alloc));         // Throws
             m_remote_versions->set_parent(&root, remote_versions_iip); // Throws
-            m_remote_versions->create();
+            m_remote_versions->init_from_parent();
         }
         {
             m_origin_file_idents.reset(new IntegerBpTree(alloc));            // Throws
             m_origin_file_idents->set_parent(&root, origin_file_idents_iip); // Throws
-            m_origin_file_idents->create();
+            m_origin_file_idents->init_from_parent();
         }
         {
             m_origin_timestamps.reset(new IntegerBpTree(alloc));           // Throws
             m_origin_timestamps->set_parent(&root, origin_timestamps_iip); // Throws
-            m_origin_timestamps->create();
+            m_origin_timestamps->init_from_parent();
         }
         std::size_t history_size = m_changesets->size();
         m_base_version = version_type(current_snapshot_version - history_size);
@@ -950,10 +942,10 @@ private:
 };
 
 
-class ClientCursorFactory_1_to_2 : public RegularCursorFactory {
+class ClientCursorFactory : public RegularCursorFactory {
 public:
-    ClientCursorFactory_1_to_2(Allocator& alloc, ref_type root_ref, int schema_version,
-                               version_type current_snapshot_version) noexcept
+    ClientCursorFactory(Allocator& alloc, ref_type root_ref, int schema_version,
+                        version_type current_snapshot_version) noexcept
         : m_alloc{alloc}
         , m_root_ref{root_ref}
         , m_schema_version{schema_version}
@@ -964,8 +956,8 @@ public:
 protected:
     std::unique_ptr<RegularSyncHistoryCursor> do_create_history_cursor() override
     {
-        return std::make_unique<ClientHistoryCursor_1_to_2>(m_alloc, m_root_ref, m_schema_version,
-                                                            m_current_snapshot_version); // Throws
+        return std::make_unique<ClientHistoryCursor>(m_alloc, m_root_ref, m_schema_version,
+                                                     m_current_snapshot_version); // Throws
     }
 
     std::unique_ptr<RegularClientFilesCursor> do_create_client_files_cursor() override
@@ -1602,8 +1594,10 @@ void inspect_history(SyncHistoryCursor& cursor, util::Optional<file_ident_type> 
             buffer.clear();
             cursor.get_changeset(buffer); // Throws
             util::SimpleInputStream in{buffer};
+            size_t decompressed_size;
+            auto decompressed = util::compression::decompress_nonportable_input_stream(in, decompressed_size);
             sync::Changeset changeset;
-            sync::parse_changeset(in, changeset); // Throws
+            sync::parse_changeset(*decompressed, changeset); // Throws
             expression->reset(changeset);
             InstructionMatcher matcher{*expression};
             bool instr_was_found = false;
@@ -1646,8 +1640,10 @@ void inspect_history(SyncHistoryCursor& cursor, util::Optional<file_ident_type> 
                 buffer.clear();
                 cursor.get_changeset(buffer); // Throws
                 util::SimpleInputStream in{buffer};
+                size_t decompressed_size;
+                auto decompressed = util::compression::decompress_nonportable_input_stream(in, decompressed_size);
                 sync::Changeset changeset;
-                sync::parse_changeset(in, changeset); // Throws
+                sync::parse_changeset(*decompressed, changeset); // Throws
 #if REALM_DEBUG
                 changeset.print(out); // Throws
 #else
@@ -2246,7 +2242,7 @@ int main(int argc, char* argv[])
     Group group{realm_path, encryption_key_3}; // Throws
     using gf = _impl::GroupFriend;
     int file_format_version = gf::get_file_format_version(group);
-    if (file_format_version != 9) {
+    if (file_format_version != 23) {
         std::cerr << "ERROR: Unexpected file format version "
                      ""
                   << file_format_version << "\n"; // Throws
@@ -2267,9 +2263,9 @@ int main(int argc, char* argv[])
         int history_schema_version;
         gf::get_version_and_history_info(alloc, top_ref, version, history_type, history_schema_version);
         if (history_type == Replication::hist_SyncClient) {
-            if (history_schema_version >= 1 && history_schema_version <= 2) {
-                factory = std::make_unique<ClientCursorFactory_1_to_2>(alloc, history_ref, history_schema_version,
-                                                                       version); // Throws
+            if (history_schema_version == 12) {
+                factory = std::make_unique<ClientCursorFactory>(alloc, history_ref, history_schema_version,
+                                                                version); // Throws
             }
             else {
                 std::cerr << "ERROR: Unsupported schema version "

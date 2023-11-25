@@ -195,7 +195,7 @@ TEST_CASE("Migration store", "[sync][flx migration]") {
     }
 
     SECTION("Migration store subscriptions") {
-        auto sub_store = sync::SubscriptionStore::create(mig_db, [](int64_t) {});
+        auto sub_store = sync::SubscriptionStore::create(mig_db);
         auto orig_version = sub_store->get_latest().version();
 
         // Create some dummy tables

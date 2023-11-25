@@ -1,0 +1,195 @@
+package {
+    default_applicable_licenses: [
+        "external_realm_license",
+        "external_realm_dep_intel_math_library_license",
+        "external_realm_dep_mpark_variant_license",
+        "external_realm_dep_nlohmann_json_license",
+        "external_realm_dep_s2_license",
+    ],
+}
+
+license {
+    name: "external_realm_license",
+    visibility: [":__subpackages__"],
+    license_kinds: [
+        "SPDX-license-identifier-Apache-2.0",
+    ],
+    license_text: [
+        "LICENSE",
+    ],
+}
+
+license {
+    name: "external_realm_dep_intel_math_library_license",
+    visibility: [":__subpackages__"],
+    license_kinds: [
+        "legacy_notice",
+    ],
+    license_text: [
+        "src/external/IntelRDFPMathLib20U2/eula.txt",
+    ],
+}
+
+license {
+    name: "external_realm_dep_mpark_variant_license",
+    visibility: [":__subpackages__"],
+    license_kinds: [
+        "SPDX-license-identifier-BSL-1.0",
+    ],
+    license_text: [
+        "src/external/mpark/LICENSE.md",
+    ],
+}
+
+license {
+    name: "external_realm_dep_nlohmann_json_license",
+    visibility: [":__subpackages__"],
+    license_kinds: [
+        "SPDX-license-identifier-MIT",
+    ],
+    license_text: [
+        "src/external/json/LICENSE.MIT",
+    ],
+}
+
+license {
+    name: "external_realm_dep_s2_license",
+    visibility: [":__subpackages__"],
+    license_kinds: [
+        "SPDX-license-identifier-Apache-2.0",
+    ],
+    license_text: [
+        "src/external/s2/LICENSE-2.0.txt",
+    ],
+}
+
+cc_object {
+    name: "IntelRDFPMathLib20U2",
+    srcs: [
+        "src/external/IntelRDFPMathLib20U2/LIBRARY/src/bid128.c",
+        "src/external/IntelRDFPMathLib20U2/LIBRARY/src/bid128_compare.c",
+        "src/external/IntelRDFPMathLib20U2/LIBRARY/src/bid128_mul.c",
+        "src/external/IntelRDFPMathLib20U2/LIBRARY/src/bid128_div.c",
+        "src/external/IntelRDFPMathLib20U2/LIBRARY/src/bid128_add.c",
+        "src/external/IntelRDFPMathLib20U2/LIBRARY/src/bid128_fma.c",
+        "src/external/IntelRDFPMathLib20U2/LIBRARY/src/bid128_string.c",
+        "src/external/IntelRDFPMathLib20U2/LIBRARY/src/bid128_2_str_tables.c",
+        "src/external/IntelRDFPMathLib20U2/LIBRARY/src/bid64_to_bid128.c",
+        "src/external/IntelRDFPMathLib20U2/LIBRARY/src/bid128_to_int64.c",
+        "src/external/IntelRDFPMathLib20U2/LIBRARY/src/bid128_quantize.c",
+        "src/external/IntelRDFPMathLib20U2/LIBRARY/src/bid_convert_data.c",
+        "src/external/IntelRDFPMathLib20U2/LIBRARY/src/bid_decimal_data.c",
+        "src/external/IntelRDFPMathLib20U2/LIBRARY/src/bid_decimal_globals.c",
+        "src/external/IntelRDFPMathLib20U2/LIBRARY/src/bid_from_int.c",
+        "src/external/IntelRDFPMathLib20U2/LIBRARY/src/bid_round.c",
+    ],
+}
+
+cc_object {
+    name: "s2",
+    srcs: ["src/external/s2/**/*.cc"],
+    defaults: [
+        "realm_consumer_defaults",
+        "realm_defaults",
+    ],
+    local_include_dirs: [
+        "src",
+        "src/external",
+        "src/external/s2",
+    ],
+    cflags: [
+        "-Wno-deprecated-declarations",
+        "-Wno-ignored-qualifiers",
+        "-Wno-macro-redefined",
+        "-Wno-missing-prototypes",
+        "-Wno-shorten-64-to-32",
+        "-Wno-undefined-var-template",
+        "-Wno-unknown-pragmas",
+        "-Wno-unused-const-variable",
+        "-Wno-unused-function",
+        "-Wno-unused-local-typedefs",
+        "-Wno-unused-parameter",
+    ],
+}
+
+genrule {
+    name: "version_numbers.hpp",
+    srcs: [
+        "dependencies.list",
+        "src/realm/version_numbers.hpp.in",
+    ],
+    out: ["realm/version_numbers.hpp"],
+    tool_files: ["tools/generate-version-numbers-for-soong.sh"],
+    cmd: "$(location) $(in) > $(out)",
+}
+
+cc_defaults {
+    name: "realm_consumer_defaults",
+    cpp_std: "c++17",
+    rtti: true,
+    cppflags: [
+        "-fexceptions",
+    ],
+    debug: {
+        cflags: ["-DREALM_DEBUG"],
+    },
+    shared_libs: [
+        "liblog",
+        "libandroid",
+        "libz",
+        "libcrypto",
+        "libssl",
+    ],
+}
+
+cc_defaults {
+    name: "realm_defaults",
+    cflags: [
+        "-fPIC",
+        "-DREALM_NO_CONFIG",
+        "-DREALM_HAVE_OPENSSL=1",
+        "-DREALM_INCLUDE_CERTS=1",
+        "-DREALM_ENABLE_ENCRYPTION=1",
+        "-DREALM_ENABLE_SYNC=1",
+        "-DREALM_ENABLE_GEOSPATIAL=1",
+        "-DREALM_HAVE_EPOLL=1",
+        "-Wno-non-virtual-dtor",
+        "-Wno-missing-field-initializers",
+    ],
+    lto: {
+        thin: true,
+    },
+    include_build_directory: false,
+    generated_headers: ["version_numbers.hpp"],
+}
+
+cc_library_static {
+    name: "realm",
+    defaults: [
+        "realm_consumer_defaults",
+        "realm_defaults",
+    ],
+    cflags: [
+        "-fvisibility=hidden",
+    ],
+    local_include_dirs: ["src/external"],
+    export_include_dirs: ["src"],
+    export_generated_headers: ["version_numbers.hpp"],
+    srcs: [
+        ":IntelRDFPMathLib20U2",
+        ":s2",
+        "src/realm/**/*.cpp",
+    ],
+    exclude_srcs: [
+        "src/realm/tools/**/*",
+        "src/realm/exec/**/*",
+        "src/realm/sync/tools/**/*",
+        "src/realm/object-store/c_api/**/*",
+        "src/realm/object-store/impl/apple/**/*",
+        "src/realm/object-store/impl/emscripten/**/*",
+        "src/realm/object-store/impl/generic/**/*",
+        "src/realm/object-store/impl/windows/**/*",
+        "src/realm/object-store/sync/impl/emscripten/**/*",
+    ],
+    export_shared_lib_headers: ["libcrypto"],
+}

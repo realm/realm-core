@@ -264,7 +264,7 @@ TEST(HTTPParser_RequestLine)
 
 TEST(HTTPParser_ResponseLine)
 {
-    auto& logger = *(test_context.logger);
+    auto& logger = *test_context.logger;
     HTTPStatus s;
     struct expect_t {
         bool success;

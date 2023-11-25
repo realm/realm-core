@@ -45,6 +45,7 @@
 #include <realm/util/features.h>
 #include <realm/util/file.hpp>
 #include <realm/util/safe_int_ops.hpp>
+#include <realm/util/scope_exit.hpp>
 #include <realm/util/terminate.hpp>
 #include <realm/util/thread.hpp>
 #include <realm/util/to_string.hpp>
@@ -55,6 +56,7 @@
 
 #include "test.hpp"
 #include "test_table_helper.hpp"
+#include "util/spawned_process.hpp"
 
 extern unsigned int unit_test_random_seed;
 
@@ -4343,6 +4345,68 @@ TEST(Shared_WriteToFail)
     dest->commit_and_continue_as_read();
 
     CHECK(*tr == *dest);
+}
+
+NONCONCURRENT_TEST_IF(Shared_LockFileConcurrentInit, testing_supports_spawn_process)
+{
+    auto path = realm::test_util::get_test_path(test_context.get_test_name(), ".test-dir");
+    test_util::TestDirGuard test_dir(path, false);
+    test_dir.do_remove = SpawnedProcess::is_parent();
+    auto lock_prefix = std::string(path) + "/lock";
+
+    struct Lock {
+        std::unique_ptr<InterprocessMutex> mutex;
+        std::unique_ptr<InterprocessMutex::SharedPart> sp;
+
+        Lock(const std::string& name, const std::string& lock_prefix_path)
+            : mutex(std::make_unique<InterprocessMutex>())
+            , sp(std::make_unique<InterprocessMutex::SharedPart>())
+        {
+            mutex->set_shared_part(*sp, lock_prefix_path, name);
+        }
+
+        Lock(Lock&&) = default;
+        Lock& operator=(Lock&&) = default;
+    };
+
+    for (size_t i = 0; i < 10; ++i) {
+        std::vector<std::unique_ptr<SpawnedProcess>> spawned;
+
+        // create multiple processes initializing multiple same purpose locks
+        for (size_t j = 0; j < 10; ++j) {
+            spawned.emplace_back(
+                test_util::spawn_process(test_context.test_details.test_name, util::format("child [%1]", i)));
+
+            if (spawned.back()->is_child()) {
+                std::vector<Lock> locks;
+
+                // mimic the same impl detail as in DB and hope it'd trigger some assertions
+                for (auto tag : {"write", "control", "versions"}) {
+                    locks.emplace_back(tag, lock_prefix);
+                    CHECK(locks.back().mutex->is_valid());
+                }
+
+                // if somehow initialization is scrambled or there is an issues with
+                // underlying files then it should hang here
+                for (int k = 0; k < 3; ++k) {
+                    for (auto&& lock : locks)
+                        lock.mutex->lock();
+                    for (auto&& lock : locks)
+                        lock.mutex->unlock();
+                }
+
+                exit(0);
+            }
+        }
+
+        if (SpawnedProcess::is_parent()) {
+            for (auto&& process : spawned)
+                process->wait_for_child_to_finish();
+
+            // start everytime with no lock files for mutexes
+            test_dir.clean_dir();
+        }
+    }
 }
 
 #endif // TEST_SHARED

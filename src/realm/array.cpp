@@ -550,92 +550,6 @@ void Array::do_ensure_minimum_width(int_fast64_t value)
     }
 }
 
-namespace {
-
-template <size_t width>
-inline int64_t lower_bits()
-{
-    if (width == 1)
-        return 0xFFFFFFFFFFFFFFFFULL;
-    else if (width == 2)
-        return 0x5555555555555555ULL;
-    else if (width == 4)
-        return 0x1111111111111111ULL;
-    else if (width == 8)
-        return 0x0101010101010101ULL;
-    else if (width == 16)
-        return 0x0001000100010001ULL;
-    else if (width == 32)
-        return 0x0000000100000001ULL;
-    else if (width == 64)
-        return 0x0000000000000001ULL;
-    else {
-        REALM_ASSERT_DEBUG(false);
-        return int64_t(-1);
-    }
-}
-
-// Return true if 'value' has an element (of bit-width 'width') which is 0
-template <size_t width>
-inline bool has_zero_element(uint64_t value)
-{
-    uint64_t hasZeroByte;
-    uint64_t lower = lower_bits<width>();
-    uint64_t upper = lower_bits<width>() * 1ULL << (width == 0 ? 0 : (width - 1ULL));
-    hasZeroByte = (value - lower) & ~value & upper;
-    return hasZeroByte != 0;
-}
-
-
-// Finds zero element of bit width 'width'
-template <bool eq, size_t width>
-size_t find_zero(uint64_t v)
-{
-    size_t start = 0;
-    uint64_t hasZeroByte;
-
-    // Bisection optimization, speeds up small bitwidths with high match frequency. More partions than 2 do NOT pay
-    // off because the work done by test_zero() is wasted for the cases where the value exists in first half, but
-    // useful if it exists in last half. Sweet spot turns out to be the widths and partitions below.
-    if (width <= 8) {
-        hasZeroByte = has_zero_element<width>(v | 0xffffffff00000000ULL);
-        if (eq ? !hasZeroByte : (v & 0x00000000ffffffffULL) == 0) {
-            // 00?? -> increasing
-            start += 64 / no0(width) / 2;
-            if (width <= 4) {
-                hasZeroByte = has_zero_element<width>(v | 0xffff000000000000ULL);
-                if (eq ? !hasZeroByte : (v & 0x0000ffffffffffffULL) == 0) {
-                    // 000?
-                    start += 64 / no0(width) / 4;
-                }
-            }
-        }
-        else {
-            if (width <= 4) {
-                // ??00
-                hasZeroByte = has_zero_element<width>(v | 0xffffffffffff0000ULL);
-                if (eq ? !hasZeroByte : (v & 0x000000000000ffffULL) == 0) {
-                    // 0?00
-                    start += 64 / no0(width) / 4;
-                }
-            }
-        }
-    }
-
-    uint64_t mask =
-        (width == 64
-             ? ~0ULL
-             : ((1ULL << (width == 64 ? 0 : width)) - 1ULL)); // Warning free way of computing (1ULL << width) - 1
-    while (eq == (((v >> (width * start)) & mask) != 0)) {
-        start++;
-    }
-
-    return start;
-}
-
-} // namespace
-
-
 int64_t Array::sum(size_t start, size_t end) const
 {
     REALM_TEMPEX(return sum, m_width, (start, end));
@@ -1118,7 +1032,7 @@ MemRef Array::create(Type type, bool context_flag, WidthType width_type, size_t 
 template <class cond, size_t bitwidth>
 bool Array::find_vtable(int64_t value, size_t start, size_t end, size_t baseindex, QueryStateBase* state) const
 {
-    return ArrayWithFind(*this).find_optimized<cond, bitwidth>(value, start, end, baseindex, state, nullptr);
+    return ArrayWithFind(*this).find_optimized<cond, bitwidth>(value, start, end, baseindex, state);
 }
 
 
@@ -1371,6 +1285,12 @@ bool QueryStateCount::match(size_t, Mixed) noexcept
     return (m_limit > m_match_count);
 }
 
+bool QueryStateCount::match(size_t) noexcept
+{
+    ++m_match_count;
+    return (m_limit > m_match_count);
+}
+
 bool QueryStateFindFirst::match(size_t index, Mixed) noexcept
 {
     m_match_count++;
@@ -1378,19 +1298,45 @@ bool QueryStateFindFirst::match(size_t index, Mixed) noexcept
     return false;
 }
 
+bool QueryStateFindFirst::match(size_t index) noexcept
+{
+    ++m_match_count;
+    m_state = index;
+    return false;
+}
+
 template <>
-bool QueryStateFindAll<KeyColumn>::match(size_t index, Mixed) noexcept
+bool QueryStateFindAll<std::vector<ObjKey>>::match(size_t index, Mixed) noexcept
 {
     ++m_match_count;
 
     int64_t key_value = (m_key_values ? m_key_values->get(index) : index) + m_key_offset;
-    m_keys.add(ObjKey(key_value));
+    m_keys.push_back(ObjKey(key_value));
+
+    return (m_limit > m_match_count);
+}
+
+template <>
+bool QueryStateFindAll<std::vector<ObjKey>>::match(size_t index) noexcept
+{
+    ++m_match_count;
+    int64_t key_value = (m_key_values ? m_key_values->get(index) : index) + m_key_offset;
+    m_keys.push_back(ObjKey(key_value));
 
     return (m_limit > m_match_count);
 }
 
 template <>
 bool QueryStateFindAll<IntegerColumn>::match(size_t index, Mixed) noexcept
+{
+    ++m_match_count;
+    m_keys.add(index);
+
+    return (m_limit > m_match_count);
+}
+
+template <>
+bool QueryStateFindAll<IntegerColumn>::match(size_t index) noexcept
 {
     ++m_match_count;
     m_keys.add(index);
