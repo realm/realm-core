@@ -6,13 +6,39 @@
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* `Set::assign_intersection()` on `Set<StringData>`, `Set<BinaryData>`, and `Set<Mixed>` containing string or binary would cause a use-after-free if a set was intersected with itself ([PR #7144](https://github.com/realm/realm-core/pull/7144), since v10.0.0).
-* Set algebra on `Set<StringData>` and `Set<BinaryData>` gave incorrect results when used on platforms where `char` is signed ([#7135](https://github.com/realm/realm-core/issues/7135), since v13.23.3).
-* Errors encountered while reapplying local changes for client reset recovery on partition-based sync Realms would result in the client reset attempt not being recorded, possibly resulting in an endless loop of attempting and failing to automatically recover the client reset. Flexible sync and errors from the server after completing the local recovery were handled correctly ([PR #7149](https://github.com/realm/realm-core/pull/7149), since v10.2.0).
 * Update existing std exceptions thrown by the Sync Client to use Realm exceptions. ([#6255](https://github.com/realm/realm-core/issues/6255), since v10.2.0)
 
 ### Breaking changes
 * Update existing std exceptions thrown by the Sync Client to use Realm exceptions. ([PR #7141](https://github.com/realm/realm-core/pull/7141/files))
+
+### Compatibility
+* Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
+* None.
+
+----------------------------------------------
+
+# 13.24.0 Release notes
+
+### Enhancements
+* Refactored how KeyPathArrays are created in the C-API by adding `realm_create_key_path_array` which allows a SDK to pass in the string representation of the keypath and then let Core calculate the correct TableKey/ColKey pairs instead of doing this on the SDK side. (PR [#7087](https://github.com/realm/realm-core/pull/7087))
+* KeyPathArrays can be constructed with a wildcard notation. (Issue [#7125](https://github.com/realm/realm-core/issues/7125))
+
+### Fixed
+* `Set::assign_intersection()` on `Set<StringData>`, `Set<BinaryData>`, and `Set<Mixed>` containing string or binary would cause a use-after-free if a set was intersected with itself ([PR #7144](https://github.com/realm/realm-core/pull/7144), since v10.0.0).
+* Set algebra on `Set<StringData>` and `Set<BinaryData>` gave incorrect results when used on platforms where `char` is signed ([#7135](https://github.com/realm/realm-core/issues/7135), since v13.23.3).
+* Errors encountered while reapplying local changes for client reset recovery on partition-based sync Realms would result in the client reset attempt not being recorded, possibly resulting in an endless loop of attempting and failing to automatically recover the client reset. Flexible sync and errors from the server after completing the local recovery were handled correctly ([PR #7149](https://github.com/realm/realm-core/pull/7149), since v10.2.0).
+* During a client reset with recovery when recovering a move or set operation on a `LnkLst` or `Lst<Mixed>` that operated on indices that were not also added in the recovery, links to an object which had been deleted by another client while offline would be recreated by the recovering client. But the objects of these links would only have the primary key populated and all other fields would be default values. Now, instead of creating these zombie objects, the lists being recovered skip such deleted links. ([#7112](https://github.com/realm/realm-core/issues/7112) since the beginning of client reset with recovery in v11.16.0)
+* During a client reset recovery a Set of links could be missing items, or an exception could be thrown that prevents recovery ex: "Requested index 1 calling get() on set 'source.collection' when max is 0" ([#7112](https://github.com/realm/realm-core/issues/7112), since the beginning of client reset with recovery in v11.16.0)
+* Calling `sort()` or `distinct()` on a `LnkSet` that had unresolved links in it would produce duplicate indices.
+* Some fields in `realm_error_t` were uninitialized and contained invalid values when being converted from sync errors - now they should properly be nullptr ([PR #7154](https://github.com/realm/realm-core/pull/7154), since v13.18.0)
+* Automatic client reset recovery would duplicate insertions in a list when recovering a write which made an unrecoverable change to a list (i.e. modifying or deleting a pre-existing entry), followed by a subscription change, followed by a write which added an entry to the list ([PR #7155](https://github.com/realm/realm-core/pull/7155), since v12.3.0).
+
+### Breaking changes
+* None.
 
 ### Compatibility
 * Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
