@@ -237,8 +237,8 @@ InternDictKey InterningBuffer::get_interned_key(const std::string_view& str) con
             return key;
         }
     }
-    throw std::runtime_error(
-        util::format("InterningBuffer::get_interned_key(%1) did not contain the requested key", str));
+    throw RuntimeError(ErrorCodes::InvalidArgument,
+                       util::format("InterningBuffer::get_interned_key(%1) did not contain the requested key", str));
     return {};
 }
 

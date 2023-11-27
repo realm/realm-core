@@ -83,7 +83,8 @@ bool MigrationStore::load_data(bool read_only)
     // Load the metadata schema unless it was just created
     if (!m_migration_table) {
         if (*schema_version != c_schema_version) {
-            throw std::runtime_error("Invalid schema version for flexible sync migration store metadata");
+            throw RuntimeError(ErrorCodes::UnsupportedFileFormatVersion,
+                               "Invalid schema version for flexible sync migration store metadata");
         }
         load_sync_metadata_schema(tr, &internal_tables);
     }
