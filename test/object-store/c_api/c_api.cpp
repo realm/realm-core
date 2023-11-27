@@ -2783,9 +2783,10 @@ TEST_CASE("C API - properties", "[c_api]") {
                         REQUIRE(!key_path_array);
                         realm_clear_last_error();
                     }
-                    SECTION("using valid nesting") {
+                    SECTION("Embedded objects") {
                         realm_property_info_t info;
                         bool found = false;
+                        realm_key_path_array_t* key_path_array;
                         realm_find_property(realm, class_bar.key, "sub", &found, &info);
                         auto bar_sub_key = info.key;
                         realm_find_property(realm, class_embedded.key, "int", &found, &info);
@@ -2795,12 +2796,23 @@ TEST_CASE("C API - properties", "[c_api]") {
                             embedded = cptr_checked(realm_set_embedded(obj2.get(), bar_sub_key));
                         });
 
-                        const char* bar_strings[1] = {"sub.int"};
-                        auto key_path_array = realm_create_key_path_array(realm, class_bar.key, 1, bar_strings);
+                        SECTION("using valid nesting") {
+
+                            const char* bar_strings[1] = {"sub.int"};
+                            key_path_array = realm_create_key_path_array(realm, class_bar.key, 1, bar_strings);
+                            REQUIRE(key_path_array);
+                        }
+                        SECTION("using star notation") {
+                            const char* bar_strings[1] = {"*.int"};
+                            key_path_array = realm_create_key_path_array(realm, class_bar.key, 1, bar_strings);
+                            // (*realm)->print_key_path_array(*key_path_array);
+                        }
+
                         REQUIRE(key_path_array);
                         auto token = cptr_checked(realm_list_add_notification_callback(bars.get(), &state, nullptr,
                                                                                        key_path_array, on_change));
                         realm_release(key_path_array);
+
                         checked(realm_refresh(realm, nullptr));
 
                         state.called = false;
