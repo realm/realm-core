@@ -525,6 +525,16 @@ TEST_CASE("C API (non-database)", "[c_api]") {
         }
     }
 
+    SECTION("realm_error_t is properly initialized from Status") {
+        Status status(ErrorCodes::RuntimeError, "I am a runtime error!");
+        realm_error_t c_err = c_api::to_capi(status);
+        REQUIRE(c_err.error == RLM_ERR_RUNTIME);
+        REQUIRE(c_err.message == status.reason());
+        REQUIRE(c_err.categories == RLM_ERR_CAT_RUNTIME);
+        REQUIRE(c_err.path == nullptr);
+        REQUIRE(c_err.usercode_error == nullptr);
+    }
+
 #if REALM_ENABLE_SYNC
     SECTION("realm_app_config_t") {
         const uint64_t request_timeout = 2500;
@@ -2752,28 +2762,100 @@ TEST_CASE("C API - properties", "[c_api]") {
                         CHECK(checked(realm_list_insert(bars.get(), 0, bar_link_val)));
                     });
 
-                    realm_key_path_elem_t bar_strings[] = {{class_bar.key, bar_doubles_key}};
-                    realm_key_path_t key_path_bar_strings[] = {{1, bar_strings}};
-                    realm_key_path_array_t key_path_array = {1, key_path_bar_strings};
-                    auto token = cptr_checked(realm_list_add_notification_callback(bars.get(), &state, nullptr,
-                                                                                   &key_path_array, on_change));
-                    checked(realm_refresh(realm, nullptr));
+                    SECTION("using valid key") {
+                        const char* bar_strings[1] = {"doubles"};
+                        auto key_path_array = realm_create_key_path_array(realm, class_bar.key, 1, bar_strings);
+                        REQUIRE(key_path_array);
+                        auto token = cptr_checked(realm_list_add_notification_callback(bars.get(), &state, nullptr,
+                                                                                       key_path_array, on_change));
+                        realm_release(key_path_array);
+                        checked(realm_refresh(realm, nullptr));
 
-                    state.called = false;
-                    write([&]() {
-                        checked(realm_set_value(obj2.get(), bar_doubles_key, rlm_double_val(5.0), false));
-                    });
-                    REQUIRE(state.called);
-                    CHECK(!state.error);
-                    CHECK(state.changes);
+                        state.called = false;
+                        write([&]() {
+                            checked(realm_set_value(obj2.get(), bar_doubles_key, rlm_double_val(5.0), false));
+                        });
+                        REQUIRE(state.called);
+                        CHECK(!state.error);
+                        CHECK(state.changes);
 
-                    state.called = false;
-                    write([&]() {
-                        checked(realm_list_insert(strings.get(), 0, str1));
-                        checked(realm_list_insert(strings.get(), 1, str2));
-                        checked(realm_list_insert(strings.get(), 2, null));
-                    });
-                    REQUIRE(!state.called);
+                        state.called = false;
+                        write([&]() {
+                            checked(realm_list_insert(strings.get(), 0, str1));
+                            checked(realm_list_insert(strings.get(), 1, str2));
+                            checked(realm_list_insert(strings.get(), 2, null));
+                        });
+                        REQUIRE(!state.called);
+                    }
+                    SECTION("using invalid key") {
+                        const char* bar_strings[1] = {"dobles"};
+                        auto key_path_array = realm_create_key_path_array(realm, class_bar.key, 1, bar_strings);
+                        REQUIRE(!key_path_array);
+                        realm_clear_last_error();
+                    }
+                    SECTION("Embedded objects") {
+                        realm_property_info_t info;
+                        bool found = false;
+                        realm_key_path_array_t* key_path_array = nullptr;
+                        realm_find_property(realm, class_bar.key, "sub", &found, &info);
+                        auto bar_sub_key = info.key;
+                        realm_find_property(realm, class_embedded.key, "int", &found, &info);
+                        auto embedded_int_key = info.key;
+                        CPtr<realm_object_t> embedded;
+                        write([&]() {
+                            embedded = cptr_checked(realm_set_embedded(obj2.get(), bar_sub_key));
+                        });
+
+                        SECTION("using valid nesting") {
+
+                            const char* bar_strings[1] = {"sub.int"};
+                            key_path_array = realm_create_key_path_array(realm, class_bar.key, 1, bar_strings);
+                            REQUIRE(key_path_array);
+                        }
+                        SECTION("using star notation") {
+                            const char* bar_strings[1] = {"*.int"};
+                            key_path_array = realm_create_key_path_array(realm, class_bar.key, 1, bar_strings);
+                            // (*realm)->print_key_path_array(*key_path_array);
+                        }
+
+                        REQUIRE(key_path_array);
+                        auto token = cptr_checked(realm_list_add_notification_callback(bars.get(), &state, nullptr,
+                                                                                       key_path_array, on_change));
+                        realm_release(key_path_array);
+
+                        checked(realm_refresh(realm, nullptr));
+
+                        state.called = false;
+                        write([&]() {
+                            checked(realm_set_value(embedded.get(), embedded_int_key, rlm_int_val(999), false));
+                        });
+                        REQUIRE(state.called);
+                        CHECK(!state.error);
+                        CHECK(state.changes);
+                    }
+                    SECTION("using backlink") {
+                        const char* bar_strings[1] = {"linking_objects.public_int"};
+                        auto key_path_array = realm_create_key_path_array(realm, class_bar.key, 1, bar_strings);
+                        REQUIRE(key_path_array);
+                        auto token = cptr_checked(realm_list_add_notification_callback(bars.get(), &state, nullptr,
+                                                                                       key_path_array, on_change));
+                        realm_release(key_path_array);
+                        checked(realm_refresh(realm, nullptr));
+
+                        state.called = false;
+                        write([&]() {
+                            checked(realm_set_value(obj1.get(), foo_int_key, rlm_int_val(999), false));
+                        });
+                        REQUIRE(state.called);
+                        CHECK(!state.error);
+                        CHECK(state.changes);
+                    }
+                    SECTION("using invalid nesting") {
+                        const char* bar_strings[1] = {"doubles.age"};
+                        auto key_path_array = realm_create_key_path_array(realm, class_bar.key, 1, bar_strings);
+                        REQUIRE(!key_path_array);
+                        realm_clear_last_error();
+                    }
                 }
 
                 SECTION("insertion, deletion, modification, modification after") {
@@ -3928,11 +4010,12 @@ TEST_CASE("C API - properties", "[c_api]") {
                 CHECK(n == 0);
             }
             SECTION("modifying the object while observing a specific value") {
-                realm_key_path_elem_t origin_value[] = {{class_foo.key, foo_int_key}};
-                realm_key_path_t key_path_origin_value[] = {{1, origin_value}};
-                realm_key_path_array_t key_path_array = {1, key_path_origin_value};
+                const char* foo_strings[1] = {"public_int"};
+                auto key_path_array = realm_create_key_path_array(realm, class_foo.key, 1, foo_strings);
+                REQUIRE(key_path_array);
                 auto token = cptr(
-                    realm_object_add_notification_callback(obj1.get(), &state, nullptr, &key_path_array, on_change));
+                    realm_object_add_notification_callback(obj1.get(), &state, nullptr, key_path_array, on_change));
+                realm_release(key_path_array);
                 checked(realm_refresh(realm, nullptr));
                 state.called = false;
                 write([&]() {

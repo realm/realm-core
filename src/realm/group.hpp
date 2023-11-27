@@ -44,7 +44,6 @@ namespace _impl {
 class GroupFriend;
 } // namespace _impl
 
-
 /// A group is a collection of named tables.
 ///
 class Group : public ArrayParent {

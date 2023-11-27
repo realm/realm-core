@@ -20,7 +20,7 @@
 #define REALM_OS_SYNC_USER_HPP
 
 #include <realm/object-store/util/atomic_shared_ptr.hpp>
-#include <realm/object-store/util/bson/bson.hpp>
+#include <realm/util/bson/bson.hpp>
 #include <realm/object-store/sync/subscribable.hpp>
 
 #include <realm/util/checked_mutex.hpp>

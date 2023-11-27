@@ -103,6 +103,8 @@ set(UTIL_SOURCES
     util/random.cpp
     util/resource_limits.cpp
     util/uri.cpp
+    util/bson/bson.cpp
+    util/bson/regular_expression.cpp
 )
 
 set(REALM_INSTALL_HEADERS
@@ -213,6 +215,12 @@ set(REALM_INSTALL_HEADERS
     util/base64.hpp
     util/basic_system_errors.hpp
     util/bind_ptr.hpp
+    util/bson/bson.hpp
+    util/bson/indexed_map.hpp
+    util/bson/max_key.hpp
+    util/bson/min_key.hpp
+    util/bson/mongo_timestamp.hpp
+    util/bson/regular_expression.hpp
     util/buffer.hpp
     util/buffer_stream.hpp
     util/cf_ptr.hpp
@@ -237,7 +245,6 @@ set(REALM_INSTALL_HEADERS
     util/memory_stream.hpp
     util/misc_errors.hpp
     util/misc_ext_errors.hpp
-    util/miscellaneous.hpp
     util/optional.hpp
     util/overload.hpp
     util/platform_info.hpp

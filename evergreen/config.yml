@@ -7,6 +7,7 @@
 #   * Add the `allowed_requesters: [ "ad_hoc", "patch" ]` entry to the nightly task to only run for periodic tests
 # * Commit Builds:
 #   * All other tasks will be included in the set run when a PR is merged to master
+# * To prevent a task from running at all, add the `"disabled"` tag so it will be skipped by the any of the test runs.
 
 # Some tests take up to 4 hours to run, so give a very generous timeout project-wide, but generally try to complete tasks within 30 minutes.
 exec_timeout_secs: 14400
@@ -265,7 +266,8 @@ functions:
           if [[ -n "${run_with_encryption}" ]]; then
               export UNITTEST_ENCRYPT_ALL=1
           fi
-          export TSAN_OPTIONS="suppressions=$(pwd)/test/tsan.suppress"
+          export TSAN_OPTIONS="suppressions=$(pwd)/test/tsan.suppress history_size=4"
+          export UBSAN_OPTIONS="print_stacktrace=1"
 
           cd build
           if ! $CTEST -C ${cmake_build_type|Debug} $TEST_FLAGS; then
@@ -609,7 +611,7 @@ functions:
         set -o verbose
 
         if [[ -n "${disable_tests_against_baas|}" ]]; then
-          echo "Error: Bass is disabled for network tests"
+          echo "Error: Baas is disabled for network tests"
           exit 1
         fi
 
@@ -720,6 +722,7 @@ tasks:
 
 - name: validate-installed-headers
   exec_timeout_secs: 1800
+  tags: [ "for_pull_requests" ]
   commands:
   - func: "fetch source"
   - func: "fetch binaries"
@@ -955,7 +958,7 @@ tasks:
   commands:
   - func: "launch remote baas"
     vars:
-      baas_branch: 27f42f55a7944ed7d8ba9fad1854a4b22714cb8d
+      baas_branch: e8004ddf10dba21b45581d93fcf1e3d9a1c319ba
   - func: "compile"
     vars:
       target_to_build: ObjectStoreTests
@@ -969,6 +972,7 @@ tasks:
 
 - name: baas-network-tests
   # Uncomment once tests are passing
+  tags: [ "disabled" ]
   # tags: [ "for_nightly_tests" ]
   # These tests can be manually requested for patches and pull requests
   allowed_requesters: [ "ad_hoc", "patch", "github_pr" ]
@@ -978,7 +982,7 @@ tasks:
   commands:
   - func: "launch remote baas"
     vars:
-      baas_branch: 27f42f55a7944ed7d8ba9fad1854a4b22714cb8d
+      baas_branch: e8004ddf10dba21b45581d93fcf1e3d9a1c319ba
       baas_proxy: On
   - func: "compile"
     vars:
@@ -1456,7 +1460,7 @@ buildvariants:
     cmake_build_type: RelWithDebInfo
     run_with_encryption: On
     baas_admin_port: 9098
-    test_logging_level: trace
+    test_logging_level: debug
     test_timeout_extra: 60
     proxy_toxics_file: evergreen/proxy-nonideal-transfer.toxics
     # RANDOM1: bandwidth-upstream limited to between 10-50 KB/s from the client to the server
@@ -1478,7 +1482,7 @@ buildvariants:
     cmake_build_type: RelWithDebInfo
     run_with_encryption: On
     baas_admin_port: 9098
-    test_logging_level: trace
+    test_logging_level: debug
     proxy_toxics_file: evergreen/proxy-network-faults.toxics
     # RANDOM1: limit-data-upstream to close connection after between 1000-3000 bytes have been sent
     # RANDOM2: limit-data-downstream to close connection after between 1000-3000 bytes have been received

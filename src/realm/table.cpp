@@ -34,7 +34,6 @@
 #include <realm/replication.hpp>
 #include <realm/table_view.hpp>
 #include <realm/util/features.h>
-#include <realm/util/miscellaneous.hpp>
 #include <realm/util/serializer.hpp>
 
 #include <stdexcept>
@@ -1578,6 +1577,11 @@ void Table::set_sequence_number(uint64_t seq)
 void Table::set_collision_map(ref_type ref)
 {
     m_top.set(top_position_for_collision_map, RefOrTagged::make_ref(ref));
+}
+
+void Table::set_col_key_sequence_number(uint64_t seq)
+{
+    m_top.set(top_position_for_column_key, RefOrTagged::make_tagged(seq));
 }
 
 TableRef Table::get_link_target(ColKey col_key) noexcept

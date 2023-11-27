@@ -418,6 +418,8 @@ public:
     // Used by upgrade
     void set_sequence_number(uint64_t seq);
     void set_collision_map(ref_type ref);
+    // Used for testing purposes.
+    void set_col_key_sequence_number(uint64_t seq);
 
     // Get the key of this table directly, without needing a Table accessor.
     static TableKey get_key_direct(Allocator& alloc, ref_type top_ref);
