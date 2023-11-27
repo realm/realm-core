@@ -2786,7 +2786,7 @@ TEST_CASE("C API - properties", "[c_api]") {
                     SECTION("Embedded objects") {
                         realm_property_info_t info;
                         bool found = false;
-                        realm_key_path_array_t* key_path_array;
+                        realm_key_path_array_t* key_path_array = nullptr;
                         realm_find_property(realm, class_bar.key, "sub", &found, &info);
                         auto bar_sub_key = info.key;
                         realm_find_property(realm, class_embedded.key, "int", &found, &info);
