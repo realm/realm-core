@@ -1428,6 +1428,9 @@ namespace {
 
 /*********************************** PropId **********************************/
 
+// The KeyPathResolver will build up a tree of these objects starting with the
+// first property. If a wildcard specifier is part of the path, one object can
+// have several children.
 struct PropId {
     PropId(TableKey tk, ColKey ck, const Property* prop, const ObjectSchema* os, bool b)
         : table_key(tk)
@@ -1447,7 +1450,8 @@ struct PropId {
     bool mandatory;
 };
 
-
+// This function will create one KeyPath entry in key_path_array for every
+// branch in the tree,
 void PropId::expand(KeyPath& key_path, KeyPathArray& key_path_array) const
 {
     key_path.emplace_back(table_key, col_key);
@@ -1475,14 +1479,14 @@ public:
     void resolve(const ObjectSchema* object_schema, const char* path)
     {
         m_full_path = path;
-        if (!_resolve(m_props, object_schema, path, true)) {
+        if (!_resolve(m_root_props, object_schema, path, true)) {
             throw InvalidArgument(util::format("'%1' does not resolve in any valid key paths.", m_full_path));
         }
     }
 
     void expand(KeyPathArray& key_path_array) const
     {
-        for (auto& elem : m_props) {
+        for (auto& elem : m_root_props) {
             KeyPath key_path;
             key_path.reserve(4);
             elem.expand(key_path, key_path_array);
@@ -1497,9 +1501,11 @@ private:
     Group& m_group;
     const char* m_full_path = nullptr;
     const Schema& m_schema;
-    std::vector<PropId> m_props;
+    std::vector<PropId> m_root_props;
 };
 
+// Get the column key for a specific Property. In case the property is representing a backlink
+// we need to look up the backlink column based on the forward link properties.
 std::pair<ColKey, const ObjectSchema*> KeyPathResolver::get_col_key(const Property* prop)
 {
     ColKey col_key = prop->column_key;
@@ -1518,6 +1524,8 @@ std::pair<ColKey, const ObjectSchema*> KeyPathResolver::get_col_key(const Proper
     return {col_key, target_schema};
 }
 
+// This function will add one or more PropId objects to the props array. This array can either be the root
+// array in the KeyPathResolver or it can be the 'children' array in one PropId.
 bool KeyPathResolver::_resolve(std::vector<PropId>& props, const ObjectSchema* object_schema, const char* path,
                                bool mandatory)
 {
@@ -1612,7 +1620,9 @@ KeyPathArray Realm::create_key_path_array(TableKey table_key, size_t num_key_pat
     KeyPathArray resolved_key_path_array;
     for (size_t n = 0; n < num_key_paths; n++) {
         KeyPathResolver resolver(read_group(), m_schema);
+        // Build property tree
         resolver.resolve(&*object_schema, all_key_paths[n]);
+        // Expand tree into separate lines
         resolver.expand(resolved_key_path_array);
     }
     return resolved_key_path_array;

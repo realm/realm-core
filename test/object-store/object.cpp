@@ -2400,6 +2400,9 @@ TEST_CASE("KeyPath generation - star notation") {
          {
              {"name", PropertyType::String},
              {"favoritePet", PropertyType::Object | PropertyType::Nullable, "Pet"},
+         },
+         {
+             {"parent", PropertyType::LinkingObjects | PropertyType::Array, "Person", "children"},
          }},
         {"Pet",
          ObjectSchema::ObjectType::Embedded,
@@ -2414,18 +2417,40 @@ TEST_CASE("KeyPath generation - star notation") {
     config.schema = schema;
 
     auto realm = Realm::get_shared_realm(config);
+
     auto kpa = realm->create_key_path_array("Person", {"*.*.*"});
-    CHECK(kpa.size() == 5);
+    CHECK(kpa.size() == 8);
+    // {class_Person:name}
+    // {class_Person:age}
+    // {class_Person:children}{class_Child:name}
+    // {class_Person:children}{class_Child:favoritePet}{class_Pet:name}
+    // {class_Person:children}{class_Child:favoritePet}{class_Pet:breed}
+    // {class_Person:children}{class_Child:{class_Person:children}->}{class_Person:name}
+    // {class_Person:children}{class_Child:{class_Person:children}->}{class_Person:age}
+    // {class_Person:children}{class_Child:{class_Person:children}->}{class_Person:children}
     // realm->print_key_path_array(kpa);
+
     kpa = realm->create_key_path_array("Person", {"*.name"});
-    CHECK(kpa.size() == 1); // {"children", "name"}
+    CHECK(kpa.size() == 1);
+    // {class_Person:children}{class_Child:name}
     // realm->print_key_path_array(kpa);
+
     kpa = realm->create_key_path_array("Person", {"*.*.breed"});
-    CHECK(kpa.size() == 1); // {"children", "favoritePet", "breed"}
+    CHECK(kpa.size() == 1);
+    // {class_Person:children}{class_Child:favoritePet}{class_Pet:breed}
     // realm->print_key_path_array(kpa);
+
+    kpa = realm->create_key_path_array("Child", {"*.name"});
+    CHECK(kpa.size() == 2);
+    // {class_Child:favoritePet}{class_Pet:name}
+    // {class_Child:{class_Person:children}->}{class_Person:name}
+    // realm->print_key_path_array(kpa);
+
     kpa = realm->create_key_path_array("Person", {"children.*.breed"});
-    CHECK(kpa.size() == 1); // {"children", "favoritePet", "breed"}
+    CHECK(kpa.size() == 1);
+    // {class_Person:children}{class_Child:favoritePet}{class_Pet:breed}
     // realm->print_key_path_array(kpa);
+
     CHECK_THROWS_AS(realm->create_key_path_array("Person", {"children.favoritePet.colour"}), InvalidArgument);
     CHECK_THROWS_AS(realm->create_key_path_array("Person", {"*.myPet.breed"}), InvalidArgument);
 }
