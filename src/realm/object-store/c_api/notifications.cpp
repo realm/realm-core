@@ -1,5 +1,6 @@
 #include <realm/object-store/c_api/types.hpp>
 #include <realm/object-store/c_api/util.hpp>
+#include <realm/object-store/keypath_helpers.hpp>
 
 namespace realm::c_api {
 namespace {
@@ -65,23 +66,27 @@ struct DictionaryNotificationsCallback {
 
 std::optional<KeyPathArray> build_key_path_array(realm_key_path_array_t* key_path_array)
 {
-    if (key_path_array) {
-        KeyPathArray ret;
-        for (size_t i = 0; i < key_path_array->nb_elements; i++) {
-            realm_key_path_t* key_path = key_path_array->paths + i;
-            ret.emplace_back();
-            KeyPath& kp = ret.back();
-            for (size_t j = 0; j < key_path->nb_elements; j++) {
-                realm_key_path_elem_t* path_elem = key_path->path_elements + j;
-                kp.emplace_back(TableKey(path_elem->object), ColKey(path_elem->property));
-            }
-        }
-        return ret;
+    std::optional<KeyPathArray> ret;
+    if (key_path_array && key_path_array->size()) {
+        ret.emplace(std::move(*key_path_array));
     }
-    return std::nullopt;
+    return ret;
 }
 
 } // namespace
+
+RLM_API realm_key_path_array_t* realm_create_key_path_array(const realm_t* realm,
+                                                            const realm_class_key_t object_class_key,
+                                                            size_t num_key_paths, const char** user_key_paths)
+{
+    return wrap_err([&]() {
+        KeyPathArray ret;
+        if (user_key_paths) {
+            ret = (*realm)->create_key_path_array(TableKey(object_class_key), num_key_paths, user_key_paths);
+        }
+        return new realm_key_path_array_t(std::move(ret));
+    });
+}
 
 RLM_API realm_notification_token_t* realm_object_add_notification_callback(realm_object_t* obj,
                                                                            realm_userdata_t userdata,
