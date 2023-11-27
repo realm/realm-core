@@ -1062,13 +1062,12 @@ public:
         m_current_table->check_column(col_key);
 
         // Check if user-given template type equals Realm type.
-        auto ct = col_key.get_type();
         if constexpr (std::is_same_v<T, Dictionary>) {
             if (!col_key.is_dictionary())
                 throw LogicError(ErrorCodes::TypeMismatch, "Not a dictionary");
         }
         else {
-            if (ct != ColumnTypeTraits<T>::column_id)
+            if (col_key.get_type() != ColumnTypeTraits<T>::column_id)
                 throw LogicError(ErrorCodes::TypeMismatch,
                                  util::format("Expected %1 to be a %2", m_current_table->get_column_name(col_key),
                                               ColumnTypeTraits<T>::column_id));

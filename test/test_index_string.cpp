@@ -1904,4 +1904,132 @@ TEST(Unicode_Casemap)
         CHECK_EQUAL(*out, inp);
     }
 }
+
+static std::string random_string(std::string::size_type length)
+{
+    static auto& chrs = "0123456789"
+                        "abcdefghijklmnopqrstuvwxyz"
+                        "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+    thread_local static std::mt19937 rg{std::random_device{}()};
+    thread_local static std::uniform_int_distribution<std::string::size_type> pick(0, sizeof(chrs) - 2);
+
+    std::string s;
+
+    s.reserve(length);
+
+    while (length--)
+        s += chrs[pick(rg)];
+
+    return s;
+}
+
+TEST(StringIndex_ListOfRandomStrings)
+{
+    using namespace std::chrono;
+
+    SHARED_GROUP_TEST_PATH(path);
+    auto db = DB::create(path);
+    auto wt = db->start_write();
+
+    auto t = wt->add_table_with_primary_key("foo", type_Int, "_id");
+    ColKey col_codes = t->add_column_list(type_String, "codes");
+    std::string some_string;
+
+    for (size_t i = 0; i < 10000; i++) {
+        auto obj = t->create_object_with_primary_key(int64_t(i));
+        auto list = obj.get_list<String>(col_codes);
+        for (size_t j = 0; j < 3; j++) {
+            std::string str(random_string(14));
+            if (i == 5000 && j == 0) {
+                some_string = str;
+            }
+            list.add(StringData(str));
+        }
+    }
+
+    std::vector<Mixed> arguments{Mixed(some_string)};
+    auto q = wt->get_table("foo")->query("codes = $0", arguments);
+    // auto t1 = steady_clock::now();
+    auto tv = q.find_all();
+    // auto t2 = steady_clock::now();
+    // std::cout << "time without index: " << duration_cast<microseconds>(t2 - t1).count() << " us" << std::endl;
+    CHECK_EQUAL(tv.size(), 1);
+    t->add_search_index(col_codes);
+
+    // t1 = steady_clock::now();
+    tv = q.find_all();
+    // t2 = steady_clock::now();
+    // std::cout << "time with index: " << duration_cast<microseconds>(t2 - t1).count() << " us" << std::endl;
+    CHECK_EQUAL(tv.size(), 1);
+    t->add_search_index(col_codes);
+
+    // std::cout << tv.get_object(0).get<Int>("_id") << std::endl;
+}
+
+TEST_TYPES(StringIndex_ListOfStrings, std::true_type, std::false_type)
+{
+    constexpr bool add_index = TEST_TYPE::value;
+    Group g;
+
+    auto t = g.add_table("foo");
+    ColKey col = t->add_column_list(type_String, "names", true);
+    if constexpr (add_index) {
+        t->add_search_index(col);
+    }
+
+    auto obj1 = t->create_object();
+    auto obj2 = t->create_object();
+    auto obj3 = t->create_object();
+
+    for (Obj* obj : {&obj2, &obj3}) {
+        auto list = obj->get_list<String>(col);
+        list.add("Johnny");
+        list.add("John");
+    }
+
+    auto list = obj1.get_list<String>(col);
+    list.add("Johnny");
+    list.add("John");
+    list.add("Ivan");
+    list.add("Ivan");
+    list.add(StringData());
+
+    CHECK_EQUAL(t->query(R"(names = "John")").count(), 3);
+    CHECK_EQUAL(t->query(R"(names = "Johnny")").count(), 3);
+    CHECK_EQUAL(t->query(R"(names = NULL)").count(), 1);
+
+    list.set(0, "Paul");
+    CHECK_EQUAL(t->query(R"(names = "John")").count(), 3);
+    CHECK_EQUAL(t->query(R"(names = "Johnny")").count(), 2);
+    CHECK_EQUAL(t->query(R"(names = "Paul")").count(), 1);
+
+    list.remove(1);
+    CHECK_EQUAL(t->query(R"(names = "John")").count(), 2);
+    CHECK_EQUAL(t->query(R"(names = "Johnny")").count(), 2);
+    CHECK_EQUAL(t->query(R"(names = "Paul")").count(), 1);
+    CHECK_EQUAL(t->query(R"(names = "Ivan")").count(), 1);
+
+    list.clear();
+    CHECK_EQUAL(t->query(R"(names = "John")").count(), 2);
+    CHECK_EQUAL(t->query(R"(names = "Johnny")").count(), 2);
+    CHECK_EQUAL(t->query(R"(names = "Paul")").count(), 0);
+
+    list = obj2.get_list<String>(col);
+    list.insert(0, "Adam");
+    list.insert(0, "Adam");
+    obj2.remove();
+    CHECK_EQUAL(t->query(R"(names = "John")").count(), 1);
+    CHECK_EQUAL(t->query(R"(names = "Johnny")").count(), 1);
+
+    std::string long1 = std::string(StringIndex::s_max_offset, 'a');
+    std::string long2 = long1 + "b";
+
+    list = obj1.get_list<String>(col);
+    list.add(long1);
+    if (add_index) {
+        CHECK_THROW_ANY(list.add(long2));
+    }
+}
+
 #endif // TEST_INDEX_STRING

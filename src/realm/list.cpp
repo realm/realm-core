@@ -36,6 +36,7 @@
 #include "realm/group.hpp"
 #include "realm/replication.hpp"
 #include "realm/dictionary.hpp"
+#include "realm/index_string.hpp"
 
 namespace realm {
 
@@ -143,6 +144,70 @@ void CollectionBaseImpl<LstBase>::to_json(std::ostream& out, size_t, JSONOutputM
         }
     }
     out << "]";
+}
+
+/***************************** Lst<Stringdata> ******************************/
+
+template <>
+void Lst<StringData>::do_insert(size_t ndx, StringData value)
+{
+    if (auto index = get_table_unchecked()->get_string_index(m_col_key)) {
+        // Inserting a value already present is idempotent
+        index->insert(get_owner_key(), value);
+    }
+    m_tree->insert(ndx, value);
+}
+
+template <>
+void Lst<StringData>::do_set(size_t ndx, StringData value)
+{
+    if (auto index = get_table_unchecked()->get_string_index(m_col_key)) {
+        auto old_value = m_tree->get(ndx);
+        size_t nb_old = 0;
+        m_tree->for_all([&](StringData val) {
+            if (val == old_value) {
+                nb_old++;
+            }
+            return !(nb_old > 1);
+        });
+
+        if (nb_old == 1) {
+            // Remove last one
+            index->erase_string(get_owner_key(), old_value);
+        }
+        // Inserting a value already present is idempotent
+        index->insert(get_owner_key(), value);
+    }
+    m_tree->set(ndx, value);
+}
+
+template <>
+inline void Lst<StringData>::do_remove(size_t ndx)
+{
+    if (auto index = get_table_unchecked()->get_string_index(m_col_key)) {
+        auto old_value = m_tree->get(ndx);
+        size_t nb_old = 0;
+        m_tree->for_all([&](StringData val) {
+            if (val == old_value) {
+                nb_old++;
+            }
+            return !(nb_old > 1);
+        });
+
+        if (nb_old == 1) {
+            index->erase_string(get_owner_key(), old_value);
+        }
+    }
+    m_tree->erase(ndx);
+}
+
+template <>
+inline void Lst<StringData>::do_clear()
+{
+    if (auto index = get_table_unchecked()->get_string_index(m_col_key)) {
+        index->erase_list(get_owner_key(), *this);
+    }
+    m_tree->clear();
 }
 
 /********************************* Lst<Key> *********************************/
