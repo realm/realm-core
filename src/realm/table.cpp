@@ -672,7 +672,7 @@ ColKey Table::do_insert_column(ColKey col_key, DataType type, StringData name, T
 }
 
 template <typename Type>
-void do_bulk_insert_index(Table* table, SearchIndex* index, ColKey col_key, Allocator& alloc)
+static void do_bulk_insert_index(Table* table, SearchIndex* index, ColKey col_key, Allocator& alloc)
 {
     using LeafType = typename ColumnTypeTraits<Type>::cluster_leaf_type;
     LeafType leaf(alloc);
@@ -687,7 +687,7 @@ void do_bulk_insert_index(Table* table, SearchIndex* index, ColKey col_key, Allo
 }
 
 
-void do_bulk_insert_index_list(Table* table, SearchIndex* index, ColKey col_key, Allocator& alloc)
+static void do_bulk_insert_index_list(Table* table, SearchIndex* index, ColKey col_key, Allocator& alloc)
 {
     ArrayInteger leaf(alloc);
 
