@@ -127,9 +127,8 @@ public:
         m_ref = mem.get_ref();
         m_data = get_data_from_header(header);
         const auto kind = get_kind((uint64_t*)header);
-        REALM_ASSERT(kind == 'A' || kind == 'B');
-        if (kind == 'A')
-            m_size = get_size_from_header(header);
+        REALM_ASSERT(kind == 'A');
+        m_size = get_size_from_header(header);
         return header;
     }
 

@@ -75,9 +75,9 @@ bool ArrayFlex::decode() const
         const auto flags = m_array.get_flags((uint64_t*)m_array.get_header());
         const auto size = index_size;
         const auto [min_value, max_value] = std::minmax_element(values.begin(), values.end());
-        auto width = NodeHeader::align_bits_to8(
-            std::max(Node::signed_to_num_bits(*min_value), Node::signed_to_num_bits(*max_value)));
-        REALM_ASSERT(width != 0 && width % 8 == 0);
+        auto width_a = NodeHeader::signed_to_num_bits(*min_value);
+        auto width_b = NodeHeader::signed_to_num_bits(*max_value);
+        auto width = std::max(width_a, width_b);
         auto byte_size = m_array.calc_size<Encoding::WTypBits>(size, width);
         REALM_ASSERT(byte_size % 8 == 0); // 8 bytes aligned value
         m_array.destroy();
@@ -110,12 +110,11 @@ bool ArrayFlex::is_encoded() const
 
 size_t ArrayFlex::size() const
 {
-    size_t value_width, index_width, value_size, index_size;
-    if (get_encode_info(value_width, index_width, value_size, index_size)) {
-        return index_size;
-    }
-    // calling array flex size for a uncompressed array is an error.
-    REALM_UNREACHABLE();
+    REALM_ASSERT(m_array.is_attached());
+    using Encoding = NodeHeader::Encoding;
+    auto header = (uint64_t*)m_array.get_header();
+    REALM_ASSERT(m_array.get_kind(header) == 'B' && m_array.get_encoding(header) == Encoding::Flex);
+    return NodeHeader::get_arrayB_num_elements<NodeHeader::Encoding::Flex>(header);
 }
 
 int64_t ArrayFlex::get(size_t ndx) const
@@ -264,7 +263,7 @@ void ArrayFlex::setup_array_in_flex_format(std::vector<int64_t>& values, std::ve
     // at this stage we know we need to compress the array.
     // we need to round compressed size in order to make % 8 compliant, since memory is aligned in this way
     auto byte_size =
-        m_array.calc_size<Encoding::Flex>(values.size(), indices.size(), value_bit_width, index_bit_width);
+        NodeHeader::calc_size<Encoding::Flex>(values.size(), indices.size(), value_bit_width, index_bit_width);
     // I'm assuming that flags are taken from the owning Array.
     uint8_t flags = NodeHeader::get_flags((uint64_t*)m_array.get_header());
     m_array.destroy();

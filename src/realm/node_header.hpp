@@ -299,6 +299,22 @@ public:
 
     static size_t calc_byte_size(WidthType wtype, size_t size, uint_least8_t width) noexcept
     {
+        // the width need to be adjusted to nearest power of two:
+        if (width > 8) {
+            if (width > 32)
+                width = 64;
+            else if (width > 16)
+                width = 32;
+            else
+                width = 16;
+        }
+        else { // width <= 8
+            if (width > 4)
+                width = 8;
+            else if (width > 2)
+                width = 4;
+            // else width is already a power of 2
+        }
         size_t num_bytes = 0;
         switch (wtype) {
             case wtype_Bits: {
@@ -565,14 +581,14 @@ public:
     static inline size_t get_arrayB_num_elements(uint64_t* header);
     // Compute required size in bytes - multiple forms depending on encoding
     template <Encoding>
-    inline size_t calc_size(size_t num_elements);
+    static inline size_t calc_size(size_t num_elements);
     template <Encoding>
-    inline size_t calc_size(size_t num_elements, size_t element_size);
+    static inline size_t calc_size(size_t num_elements, size_t element_size);
     template <Encoding>
-    inline size_t calc_size(size_t num_elements, size_t elementA_size, size_t elementB_size);
+    static inline size_t calc_size(size_t num_elements, size_t elementA_size, size_t elementB_size);
     template <Encoding>
-    inline size_t calc_size(size_t arrayA_num_elements, size_t arrayB_num_elements, size_t elementA_size,
-                            size_t elementB_size);
+    static inline size_t calc_size(size_t arrayA_num_elements, size_t arrayB_num_elements, size_t elementA_size,
+                                   size_t elementB_size);
 
     static inline void set_flags(uint64_t* header, uint8_t flags)
     {

@@ -264,9 +264,13 @@ void Array::init_from_mem(MemRef mem) noexcept
         // the only encoding supported at the moment
         auto encoding = get_encoding((uint64_t*)header);
         REALM_ASSERT(encoding == Encoding::Flex);
+        char* header = mem.get_addr();
+        m_ref = mem.get_ref();
+        m_data = get_data_from_header(header);
+        m_size = NodeHeader::get_arrayB_num_elements<Encoding::Flex>((uint64_t*)header);
     }
-
-    header = Node::init_from_mem(mem);
+    if (kind == 'A')
+        header = Node::init_from_mem(mem);
     // Parse header
     m_is_inner_bptree_node = get_is_inner_bptree_node_from_header(header);
     m_has_refs = get_hasrefs_from_header(header);
