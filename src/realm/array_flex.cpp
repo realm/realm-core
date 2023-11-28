@@ -58,39 +58,9 @@ bool ArrayFlex::decode() const
     REALM_ASSERT(m_array.is_attached());
     size_t value_width, index_width, value_size, index_size;
     if (get_encode_info(value_width, index_width, value_size, index_size)) {
-        std::vector<int64_t> values;
-        values.reserve(index_size);
-        auto data = (uint64_t*)m_array.get_data_from_header(m_array.get_header());
-        const auto offset = value_size * value_width;
-        bf_iterator index_iterator{data, offset, index_width, index_width, 0};
-        for (size_t i = 0; i < index_size; ++i) {
-            const auto index = index_iterator.get_value();
-            bf_iterator it_value{data, index * value_width, value_width, value_width, 0};
-            const auto value = it_value.get_value();
-            const auto ivalue = sign_extend_field(value_width, value);
-            values.push_back(ivalue);
-            ++index_iterator;
-        }
-        // do the reverse of compressing the array
-        const auto flags = m_array.get_flags((uint64_t*)m_array.get_header());
-        const auto size = index_size;
-        const auto [min_value, max_value] = std::minmax_element(values.begin(), values.end());
-        auto width_a = NodeHeader::signed_to_num_bits(*min_value);
-        auto width_b = NodeHeader::signed_to_num_bits(*max_value);
-        auto width = std::max(width_a, width_b);
-        auto byte_size = m_array.calc_size<Encoding::WTypBits>(size, width);
-        REALM_ASSERT(byte_size % 8 == 0); // 8 bytes aligned value
-        m_array.destroy();
-        MemRef mem = m_array.get_alloc().alloc(byte_size);
-        auto header = (uint64_t*)mem.get_addr();
-        NodeHeader::init_header(header, 'A', Encoding::WTypBits, flags, 0, 0); // width and size not importat here.
-        NodeHeader::set_capacity_in_header(byte_size, (char*)header);
-        m_array.init_from_mem(mem);
-        size_t i = 0;
-        for (const auto& v : values)
-            m_array.insert(i++, v);
-        const auto sz = m_array.size();
-        REALM_ASSERT(sz == values.size());
+        auto values = fetch_values(value_width, index_width, value_size, index_size);
+        REALM_ASSERT(values.size() == index_size);
+        restore_array(values);
         return true;
     }
     return false;
@@ -291,4 +261,48 @@ bool ArrayFlex::get_encode_info(size_t& value_width, size_t& index_width, size_t
         return true;
     }
     return false;
+}
+
+std::vector<int64_t> ArrayFlex::fetch_values(size_t value_width, size_t index_width, size_t value_size,
+                                             size_t index_size) const
+{
+    std::vector<int64_t> values;
+    values.reserve(index_size);
+    auto data = (uint64_t*)m_array.get_data_from_header(m_array.get_header());
+    const auto offset = value_size * value_width;
+    bf_iterator index_iterator{data, offset, index_width, index_width, 0};
+    for (size_t i = 0; i < index_size; ++i) {
+        const auto index = index_iterator.get_value();
+        bf_iterator it_value{data, index * value_width, value_width, value_width, 0};
+        const auto value = it_value.get_value();
+        const auto ivalue = sign_extend_field(value_width, value);
+        values.push_back(ivalue);
+        ++index_iterator;
+    }
+    return values;
+}
+
+void ArrayFlex::restore_array(const std::vector<int64_t>& values) const
+{
+    // do the reverse of compressing the array
+    using Encoding = NodeHeader::Encoding;
+    const auto flags = m_array.get_flags((uint64_t*)m_array.get_header());
+    const auto size = values.size();
+    const auto [min_value, max_value] = std::minmax_element(values.begin(), values.end());
+    auto width_a = NodeHeader::signed_to_num_bits(*min_value);
+    auto width_b = NodeHeader::signed_to_num_bits(*max_value);
+    auto width = std::max(width_a, width_b);
+    auto byte_size = m_array.calc_size<Encoding::WTypBits>(size, width);
+    REALM_ASSERT(byte_size % 8 == 0); // 8 bytes aligned value
+    m_array.destroy();
+    MemRef mem = m_array.get_alloc().alloc(byte_size);
+    auto header = (uint64_t*)mem.get_addr();
+    NodeHeader::init_header(header, 'A', Encoding::WTypBits, flags, 0, 0); // width and size not importat here.
+    NodeHeader::set_capacity_in_header(byte_size, (char*)header);
+    m_array.init_from_mem(mem);
+    size_t i = 0;
+    for (const auto& v : values)
+        m_array.insert(i++, v);
+    const auto sz = m_array.size();
+    REALM_ASSERT(sz == values.size());
 }
