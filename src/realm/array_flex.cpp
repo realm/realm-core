@@ -54,7 +54,6 @@ bool ArrayFlex::encode() const
 
 bool ArrayFlex::decode() const
 {
-    using Encoding = NodeHeader::Encoding;
     REALM_ASSERT(m_array.is_attached());
     size_t value_width, index_width, value_size, index_size;
     if (get_encode_info(value_width, index_width, value_size, index_size)) {
@@ -303,6 +302,9 @@ void ArrayFlex::restore_array(const std::vector<int64_t>& values) const
     size_t i = 0;
     for (const auto& v : values)
         m_array.insert(i++, v);
+    REALM_ASSERT(m_array.get_width() != 0);
+    REALM_ASSERT(m_array.get_width() % 8 == 0);
+    REALM_ASSERT(m_array.size() == values.size());
     const auto sz = m_array.size();
     REALM_ASSERT(sz == values.size());
 }
