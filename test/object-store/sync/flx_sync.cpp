@@ -4306,67 +4306,59 @@ TEST_CASE("flx sync: Client reset during async open", "[sync][flx][client reset]
         mutable_subscription.commit();
     };
 
-    auto before_callback_called = util::make_promise_future<void>();
-    auto after_callback_called = util::make_promise_future<void>();
     realm_config.sync_config->client_resync_mode = ClientResyncMode::Recover;
     realm_config.sync_config->subscription_initializer = subscription_callback;
 
-    realm_config.sync_config->on_sync_client_event_hook =
-        [&, client_reset_triggered = false](std::weak_ptr<SyncSession> weak_sess,
-                                            const SyncClientHookData& event_data) mutable {
-            auto sess = weak_sess.lock();
-            if (!sess) {
-                return SyncClientHookAction::NoAction;
-            }
-            if (sess->path() != realm_config.path) {
-                return SyncClientHookAction::NoAction;
-            }
+    bool client_reset_triggered = false;
+    realm_config.sync_config->on_sync_client_event_hook = [&](std::weak_ptr<SyncSession> weak_sess,
+                                                              const SyncClientHookData& event_data) {
+        auto sess = weak_sess.lock();
+        if (!sess) {
+            return SyncClientHookAction::NoAction;
+        }
+        if (sess->path() != realm_config.path) {
+            return SyncClientHookAction::NoAction;
+        }
 
-            if (event_data.event != SyncClientHookEvent::DownloadMessageReceived) {
-                return SyncClientHookAction::NoAction;
-            }
+        if (event_data.event != SyncClientHookEvent::DownloadMessageReceived) {
+            return SyncClientHookAction::NoAction;
+        }
 
-            if (client_reset_triggered) {
-                return SyncClientHookAction::NoAction;
-            }
-            client_reset_triggered = true;
-            reset_utils::trigger_client_reset(harness.session().app_session());
-            return SyncClientHookAction::EarlyReturn;
-        };
+        if (client_reset_triggered) {
+            return SyncClientHookAction::NoAction;
+        }
 
-    realm_config.sync_config->notify_before_client_reset =
-        [promise = util::CopyablePromiseHolder(std::move(before_callback_called.promise))](
-            std::shared_ptr<Realm> realm) mutable {
-            CHECK(realm->schema_version() == 1);
-            promise.get_promise().emplace_value();
-        };
+        client_reset_triggered = true;
+        reset_utils::trigger_client_reset(harness.session().app_session(), *sess);
+        return SyncClientHookAction::SuspendWithRetryableError;
+    };
 
-    realm_config.sync_config->notify_after_client_reset =
-        [promise = util::CopyablePromiseHolder(std::move(after_callback_called.promise))](
-            std::shared_ptr<Realm> realm, ThreadSafeReference, bool) mutable {
-            CHECK(realm->schema_version() == 1);
-            promise.get_promise().emplace_value();
-        };
+    auto before_callback_called = util::make_promise_future<void>();
+    realm_config.sync_config->notify_before_client_reset = [&](std::shared_ptr<Realm> realm) {
+        CHECK(realm->schema_version() == 1);
+        before_callback_called.promise.emplace_value();
+    };
+
+    auto after_callback_called = util::make_promise_future<void>();
+    realm_config.sync_config->notify_after_client_reset = [&](std::shared_ptr<Realm> realm, ThreadSafeReference,
+                                                              bool) {
+        CHECK(realm->schema_version() == 1);
+        after_callback_called.promise.emplace_value();
+    };
 
     auto realm_task = Realm::get_synchronized_realm(realm_config);
     auto realm_pf = util::make_promise_future<SharedRealm>();
-    realm_task->start([promise_holder = util::CopyablePromiseHolder(std::move(realm_pf.promise))](
-                          ThreadSafeReference ref, std::exception_ptr ex) mutable {
-        auto promise = promise_holder.get_promise();
-        if (ex) {
-            try {
+    realm_task->start([&](ThreadSafeReference ref, std::exception_ptr ex) {
+        auto& promise = realm_pf.promise;
+        try {
+            if (ex) {
                 std::rethrow_exception(ex);
             }
-            catch (...) {
-                promise.set_error(exception_to_status());
-            }
-            return;
+            promise.emplace_value(Realm::get_shared_realm(std::move(ref)));
         }
-        auto realm = Realm::get_shared_realm(std::move(ref));
-        if (!realm) {
-            promise.set_error({ErrorCodes::RuntimeError, "could not get realm from threadsaferef"});
+        catch (...) {
+            promise.set_error(exception_to_status());
         }
-        promise.emplace_value(std::move(realm));
     });
     auto realm = realm_pf.future.get();
     before_callback_called.future.get();

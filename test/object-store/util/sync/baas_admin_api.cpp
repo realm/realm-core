@@ -1177,6 +1177,17 @@ AppSession create_app(const AppCreateConfig& config)
         {"version", 1},
     });
 
+    // Wait for initial sync to complete, as connecting while this is happening
+    // causes various problems
+    bool any_sync_types = std::any_of(config.schema.begin(), config.schema.end(), [](auto& object_schema) {
+        return object_schema.table_type == ObjectSchema::ObjectType::TopLevel;
+    });
+    if (any_sync_types) {
+        timed_sleeping_wait_for([&] {
+            return session.is_initial_sync_complete(app_id);
+        });
+    }
+
     return {client_app_id, app_id, session, config};
 }
 
