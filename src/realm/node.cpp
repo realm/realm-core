@@ -51,9 +51,11 @@ MemRef Node::create_node(size_t size, Allocator& alloc, bool context_flag, Type 
         flags |= (uint8_t)Flags::HasRefs;
     if (context_flag)
         flags |= (uint8_t)Flags::Context;
-    // size must be given in bits, but for wtype_Multiply an wtype_Ignore it is provided in bytes
-    if (width_type != wtype_Multiply)
-        size = size * 8;
+    // width must be passed to init_header in bits, but for wtype_Multiply and wtype_Ignore
+    // it is provided by the caller of this function in bytes, so convert to bits
+    if (width_type != wtype_Bits)
+        width = width * 8;
+
     init_header(header, 'A', encoding, flags, width, size);
 
     // init_header(header, type == type_InnerBptreeNode, type != type_Normal, context_flag, width_type, width, size,
