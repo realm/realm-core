@@ -246,13 +246,10 @@ bool ArrayFlex::check_gain(std::vector<int64_t>& values, std::vector<size_t>& in
     REALM_ASSERT(value_bit_width > 0);
     REALM_ASSERT(index_bit_width > 0);
 
-    // we should remember to reconsider this. The old type of array has value sizes aligned to the power of two,
-    // so uncompressed size is not actually the size of the old type. It is the size we could get by using
-    // Encoding::Packed instead of LocalDir... which is something we should do.
-    const auto uncompressed_size = value_bit_width * indices.size();
-    // we need to round compressed size in order to make % 8 compliant, since memory is aligned in this way
+    // we should consider Encoding::Packed as well here.
+    const auto uncompressed_size = m_array.get_byte_size();
     auto byte_size =
-        m_array.calc_size<Encoding::Flex>(values.size(), indices.size(), value_bit_width, index_bit_width);
+        NodeHeader::calc_size<Encoding::Flex>(values.size(), indices.size(), value_bit_width, index_bit_width);
     return byte_size < uncompressed_size;
 }
 
