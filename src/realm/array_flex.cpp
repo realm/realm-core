@@ -67,14 +67,13 @@ bool ArrayFlex::decode() const
 
 bool ArrayFlex::is_encoded() const
 {
+    // We are calling this when the header is not yet initiliased!
     using Encoding = NodeHeader::Encoding;
     REALM_ASSERT(m_array.is_attached());
     auto header = (uint64_t*)m_array.get_header();
     auto kind = Node::get_kind(header);
-    auto encoding = Node::get_encoding(header);
-    if (kind == 'B' && encoding == Encoding::Flex)
-        return true;
-    return false;
+    // REALM_ASSERT(kind == 'A' || kind == 'B');
+    return kind == 'B' && Node::get_encoding(header) == Encoding::Flex;
 }
 
 size_t ArrayFlex::size() const

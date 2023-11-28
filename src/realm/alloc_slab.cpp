@@ -303,7 +303,8 @@ void SlabAlloc::FreeBlock::unlink()
 {
     auto _next = next;
     auto _prev = prev;
-    _next->prev = prev;
+    if (_next)
+        _next->prev = prev;
     _prev->next = next;
     clear_links();
 }

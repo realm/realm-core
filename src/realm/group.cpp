@@ -477,7 +477,6 @@ void Group::validate_top_array(const Array& arr, const SlabAlloc& alloc, std::op
 {
     size_t top_size = arr.size();
     ref_type top_ref = arr.get_ref();
-
     switch (top_size) {
         // These are the valid sizes
         case 3:

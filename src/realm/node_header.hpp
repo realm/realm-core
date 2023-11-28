@@ -373,7 +373,9 @@ public:
     enum class Encoding { Packed, AofP, PofA, Flex, WTypBits, WTypMult, WTypIgn };
     static Encoding get_encoding(const uint64_t* header)
     {
-        if (get_kind(header) == 0x41) {
+        const auto kind = get_kind(header);
+        // REALM_ASSERT(kind == 'A' || kind == 'B');
+        if (kind == 'A') {
             switch (get_wtype_from_header((const char*)header)) {
                 case wtype_Bits:
                     return Encoding::WTypBits;
@@ -385,7 +387,7 @@ public:
                     REALM_ASSERT(false && "Undefined header encoding");
             }
         }
-        else {
+        else if (kind == 'B') {
             auto h = (const uint8_t*)header;
             auto byte = (uint8_t)h[2];
             const auto v = (byte & 0b00001111);
@@ -986,17 +988,8 @@ size_t inline NodeHeader::get_byte_size_from_header(const char* header) noexcept
 {
     auto h = (uint64_t*)header;
     auto kind = get_kind(h);
-    if (kind == 'A') {
-        auto encoding = get_encoding(h);
-        REALM_ASSERT(encoding != Encoding::Flex);
-        WidthType wtype = get_wtype_from_header(header);
-        size_t width;
-        size_t size;
-        width = get_width_from_header(header);
-        size = get_size_from_header(header);
-        return calc_byte_size(wtype, size, width);
-    }
-    else {
+    // REALM_ASSERT(kind == 'A' || kind == 'B');
+    if (kind == 'B') {
         auto encoding = get_encoding(h);
         REALM_ASSERT(encoding == NodeHeader::Encoding::Flex); // this is the only encoding supported right now.
         switch (encoding) {
@@ -1021,6 +1014,13 @@ size_t inline NodeHeader::get_byte_size_from_header(const char* header) noexcept
                 REALM_ASSERT(false && "unknown encoding");
         }
     }
+    /*(kind == 'A')*/
+    WidthType wtype = get_wtype_from_header(header);
+    size_t width;
+    size_t size;
+    width = get_width_from_header(header);
+    size = get_size_from_header(header);
+    return calc_byte_size(wtype, size, width);
 }
 
 
