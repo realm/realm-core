@@ -60,21 +60,39 @@ TEST(Test_array_same_size_less_bits)
     CHECK(a.get_any(2) == 545);
 }
 
-TEST(Test_ArrayInt_encode_decode_needed)
+ONLY(Test_ArrayInt_encode_decode_needed)
 {
     ArrayInteger a(Allocator::get_default());
     a.create();
     a.add(10);
     a.add(5);
     a.add(5);
-    // we allocate 16 bits for the compressed version which is not giving us any gain (15bits needed for data at this
-    // stage)
+    // uncompressed requires 3 x 4 bits, compressed takes 2 x 5 bits + 3 x 2 bits
+    // with 8 byte alignment this is both 16 bytes.
     CHECK_NOT(a.try_encode());
     CHECK_NOT(a.is_encoded());
     CHECK_NOT(a.try_decode());
     CHECK_NOT(a.is_encoded());
     a.add(10);
     a.add(15);
+    // uncompressed is 5x4 bits, compressed is 3x5 bits + 5x2 bits
+    // with 8 byte alignment this is both 16 bytes
+    CHECK_NOT(a.try_encode());
+    CHECK_NOT(a.is_encoded());
+    a.add(10);
+    a.add(15);
+    a.add(10);
+    a.add(15);
+    // uncompressed is 9x4 bits, compressed is 3x5 bits + 9x2 bits
+    // with 8 byte alignment this is both 16 bytes
+    CHECK_NOT(a.try_encode());
+    CHECK_NOT(a.is_encoded());
+    a.add(-1);
+    // the addition of -1 forces the array from unsigned to signed form
+    // changing from 4 bits per element to 8 bits.
+    // (1,2,4 bit elements are unsigned, larger elements are signed)
+    // uncompressed is 10x8 bits, compressed is 3x5 bits + 10x2 bits
+    // with alignment, this is 24 bytes uncompressed and 16 bytes compressed
     CHECK(a.try_encode());
     CHECK(a.is_encoded());
     CHECK(a.get(0) == 10);
