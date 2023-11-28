@@ -232,7 +232,7 @@ void wait_for_object_to_persist_to_atlas(std::shared_ptr<SyncUser> user, const A
 void wait_for_num_objects_in_atlas(std::shared_ptr<SyncUser> user, const AppSession& app_session,
                                    const std::string& schema_name, size_t expected_size);
 
-void trigger_client_reset(const AppSession& app_session);
+void trigger_client_reset(const AppSession& app_session, const SyncSession& sync_session);
 void trigger_client_reset(const AppSession& app_session, const SharedRealm& realm);
 #endif // REALM_ENABLE_AUTH_TESTS
 

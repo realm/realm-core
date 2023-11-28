@@ -305,7 +305,7 @@ public:
             return session.send_test_command(std::move(request));
         }
 
-        static sync::SaltedFileIdent get_file_ident(SyncSession& session)
+        static sync::SaltedFileIdent get_file_ident(const SyncSession& session)
         {
             return session.get_file_ident();
         }
