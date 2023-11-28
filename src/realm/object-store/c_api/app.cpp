@@ -263,6 +263,24 @@ RLM_API const char* realm_app_get_app_id(const realm_app_t* app) noexcept
     return (*app)->config().app_id.c_str();
 }
 
+RLM_API bool realm_app_update_base_url(realm_app_t* app, realm_string_t base_url,
+                                       realm_app_void_completion_func_t callback, realm_userdata_t userdata,
+                                       realm_free_userdata_func_t userdata_free)
+{
+    return wrap_err([&] {
+        (*app)->update_base_url(from_capi(base_url), make_callback(callback, userdata, userdata_free));
+        return true;
+    });
+}
+
+RLM_API char* realm_app_get_base_url(realm_app_t* app) noexcept
+{
+    return wrap_err([&] {
+        auto url_stg = (*app)->get_base_url();
+        return duplicate_string(url_stg);
+    });
+}
+
 RLM_API realm_user_t* realm_app_get_current_user(const realm_app_t* app) noexcept
 {
     if (auto user = (*app)->current_user()) {
@@ -574,14 +592,15 @@ RLM_API bool realm_app_call_function(const realm_app_t* app, const realm_user_t*
 {
     return wrap_err([&] {
         auto cb = [callback, userdata = SharedUserdata{userdata, FreeUserdata(userdata_free)}](
-                      const std::string* reply, util::Optional<AppError> error) {
+                      util::Optional<std::string_view> reply, util::Optional<AppError> error) {
             if (error) {
                 realm_app_error_t c_error(to_capi(*error));
-                callback(userdata.get(), nullptr, &c_error);
+                return callback(userdata.get(), nullptr, 0, &c_error);
             }
-            else {
-                callback(userdata.get(), reply->c_str(), nullptr);
+            if (!reply) {
+                return callback(userdata.get(), nullptr, 0, nullptr);
             }
+            callback(userdata.get(), reply->data(), reply->size(), nullptr);
         };
         util::Optional<std::string> service_name_opt =
             service_name ? util::some<std::string>(service_name) : util::none;

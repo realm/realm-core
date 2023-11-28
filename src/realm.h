@@ -2837,7 +2837,7 @@ typedef void (*realm_return_apikey_list_func_t)(realm_userdata_t userdata, realm
                                                 realm_app_error_t*);
 
 typedef void (*realm_return_string_func_t)(realm_userdata_t userdata, const char* serialized_ejson_response,
-                                           const realm_app_error_t*);
+                                           size_t count, const realm_app_error_t*);
 /**
  * Generic completion callback for asynchronous Realm App operations.
  *
@@ -2925,6 +2925,34 @@ RLM_API void realm_clear_cached_apps(void) RLM_API_NOEXCEPT;
 
 RLM_API const char* realm_app_get_app_id(const realm_app_t*) RLM_API_NOEXCEPT;
 RLM_API realm_user_t* realm_app_get_current_user(const realm_app_t*) RLM_API_NOEXCEPT;
+
+/**
+ * Update the URL used to communicate with the Realm server. This function will update the location
+ * information used for http and websocket requests to the server. Once this operation has completed,
+ * the new base_url value returned by realm_app_get_base_url() will match the base_url value provided
+ * to this function.
+ *
+ * @param app ptr to realm_app
+ * @param base_url The new base URL value to set as the Realm server URL.
+ * @param callback invoked once operation has completed
+ * @return True if no error has been recorded, False otherwise
+ */
+RLM_API bool realm_app_update_base_url(realm_app_t* app, realm_string_t base_url,
+                                       realm_app_void_completion_func_t callback, realm_userdata_t userdata,
+                                       realm_free_userdata_func_t userdata_free);
+
+/**
+ * Return the current base URL value used by the app. If the realm_app_update_base_url() is called, this
+ * value will match the base_url value provided to that function when the update is complete. The value
+ * provided by this function is undefined if the realm_app_update_base_url() operation is in progress,
+ * since it will likely be the base_url value prior to realm_app_update_base_url() being called.
+ *
+ * @param app ptr to realm_app
+ * @return The current base URL string used by the app
+ *
+ * Return value must be manually released with realm_free().
+ */
+RLM_API char* realm_app_get_base_url(realm_app_t* app) RLM_API_NOEXCEPT;
 
 /**
  * Get the list of active users in this @a app.

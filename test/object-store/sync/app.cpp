@@ -2475,8 +2475,6 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
                     REQUIRE(app_metadata->hostname.find(original_host) != std::string::npos);
                     REQUIRE(request.url.find(redirect_scheme + original_host) != std::string::npos);
                     redir_transport->simulated_response.reset();
-                    // Validate the retry count tracked in the original message
-                    REQUIRE(request.redirect_count == 3);
                     request_count++;
                 }
             };
@@ -2486,6 +2484,82 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
                 creds.email, creds.password, [&](util::Optional<app::AppError> error) {
                     REQUIRE(!error);
                 });
+        }
+        SECTION("Test Update BaseURL") {
+            int request_count = 0;
+            // redirect URL is localhost or 127.0.0.1 depending on what the initial value is
+            std::string original_host = "localhost:9090";
+            std::string redirect_scheme = "http://";
+            std::string websocket_scheme = "ws://";
+            std::string redirect_host = "127.0.0.1:9090";
+            std::string redirect_url = "http://127.0.0.1:9090";
+            std::string websocket_url = "ws://127.0.0.1:9090";
+            redir_transport->request_hook = [&](const Request& request) {
+                logger->trace("Received request[%1]: %2", request_count, request.url);
+                if (request_count == 0) {
+                    // First request should be to location
+                    REQUIRE(request.url.find("/location") != std::string::npos);
+                    if (request.url.find("https://") != std::string::npos) {
+                        redirect_scheme = "https://";
+                        websocket_scheme = "wss://";
+                    }
+                    // using local baas
+                    if (request.url.find("127.0.0.1:9090") != std::string::npos) {
+                        redirect_host = "localhost:9090";
+                        original_host = "127.0.0.1:9090";
+                    }
+                    // using baas docker - can't test redirect
+                    else if (request.url.find("mongodb-realm:9090") != std::string::npos) {
+                        redirect_host = "mongodb-realm:9090";
+                        original_host = "mongodb-realm:9090";
+                    }
+
+                    redirect_url = redirect_scheme + redirect_host;
+                    websocket_url = websocket_scheme + redirect_host;
+                    logger->trace("redirect_url (%1): %2 / %3", request_count, redirect_url, websocket_url);
+                    request_count++;
+                }
+                else if (request.url.find("/location") != std::string::npos) {
+                    REQUIRE(request.url.find(redirect_host) != std::string::npos);
+                    // app hostname will be updated via the metadata info
+                    redir_transport->simulated_response = {
+                        static_cast<int>(sync::HTTPStatus::Ok),
+                        0,
+                        {{"Content-Type", "application/json"}},
+                        util::format(
+                            "{\"deployment_model\":\"GLOBAL\",\"location\":\"US-VA\",\"hostname\":\"%1\",\"ws_"
+                            "hostname\":\"%2\"}",
+                            redirect_url, websocket_url)};
+                    request_count++;
+                }
+                else if (request_count > 2) {
+                    // Make sure future requests are using the updated URL
+                    REQUIRE(request.url.find(redirect_url) != std::string::npos);
+                }
+            };
+
+            // This will be successful after a couple of retries due to the redirect response
+            auto&& [email_promise, email_future] = util::make_promise_future<util::Optional<app::AppError>>();
+            redir_app->provider_client<app::App::UsernamePasswordProviderClient>().register_email(
+                creds.email, creds.password,
+                [promise = util::CopyablePromiseHolder<util::Optional<app::AppError>>(std::move(email_promise))](
+                    util::Optional<app::AppError> error) mutable {
+                    REQUIRE(!error);
+                    promise.get_promise().emplace_value(std::move(error));
+                });
+            auto result_1 = wait_for_future(std::move(email_future)).get();
+            REQUIRE(!result_1);
+            REQUIRE(redir_app->get_base_url() == get_base_url());
+            auto&& [update_promise, update_future] = util::make_promise_future<util::Optional<app::AppError>>();
+            redir_app->update_base_url(redirect_url,
+                                       [promise = util::CopyablePromiseHolder<util::Optional<app::AppError>>(
+                                            std::move(update_promise))](util::Optional<app::AppError> error) mutable {
+                                           REQUIRE(!error);
+                                           promise.get_promise().emplace_value(std::move(error));
+                                       });
+            auto result_2 = wait_for_future(std::move(update_future)).get();
+            REQUIRE(!result_2);
+            REQUIRE(redir_app->get_base_url() == redirect_url);
         }
         SECTION("Test too many redirects") {
             int request_count = 0;

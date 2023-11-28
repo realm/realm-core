@@ -18,8 +18,8 @@
 
 #include "app_utils.hpp"
 #include <realm/object-store/sync/app_utils.hpp>
-
 #include <realm/object-store/sync/generic_network_transport.hpp>
+#include <realm/sync/network/http.hpp>
 
 #include <external/json/json.hpp>
 
@@ -45,11 +45,49 @@ AppUtils::find_header(const std::string& key_name, const std::map<std::string, s
     return nullptr;
 }
 
+bool AppUtils::is_success_status_code(int status_code)
+{
+    return status_code == 0 || (status_code < 300 && status_code >= 200);
+}
+
+bool AppUtils::is_redirect_status_code(int status_code)
+{
+    using namespace realm::sync;
+    if (!AppUtils::is_success_status_code(status_code)) {
+        // If the response contains a redirection, then return true
+        auto code = HTTPStatus(status_code);
+        if (code == HTTPStatus::MovedPermanently || code == HTTPStatus::PermanentRedirect) {
+            return true;
+        }
+    }
+    return false;
+}
+
+util::Optional<std::string> AppUtils::extract_location(const Response& response)
+{
+    // Look for case insensitive redirect "location" in headers
+    auto location = AppUtils::find_header("location", response.headers);
+    if (!location || location->second.empty()) {
+        // Location not found in the response, return empty
+        return std::nullopt;
+    }
+
+    // Update the metadata from the new location after trimming the url (limit to `scheme://host[:port]`)
+    std::string_view new_url = location->second;
+    // Find the end of the scheme/protocol part (e.g. 'https://', 'http://')
+    auto scheme_end = new_url.find("://");
+    scheme_end = scheme_end != std::string_view::npos ? scheme_end + std::char_traits<char>::length("://") : 0;
+    // Trim off any trailing path/anchor/query string after the host/port
+    if (auto split = new_url.find_first_of("/#?", scheme_end); split != std::string_view::npos) {
+        new_url.remove_suffix(new_url.size() - split);
+    }
+    return std::string(new_url);
+}
+
 util::Optional<AppError> AppUtils::check_for_errors(const Response& response)
 {
     std::string error_msg;
-    bool http_status_code_is_fatal =
-        response.http_status_code >= 300 || (response.http_status_code < 200 && response.http_status_code != 0);
+    bool http_status_code_is_fatal = !AppUtils::is_success_status_code(response.http_status_code);
 
     try {
         auto ct = find_header("content-type", response.headers);
@@ -88,18 +126,18 @@ util::Optional<AppError> AppUtils::check_for_errors(const Response& response)
 
     if (response.client_error_code) {
         error_msg = response.body.empty() ? "client error code value considered fatal" : response.body;
-        return AppError(*(response.client_error_code), error_msg, "", response.http_status_code);
+        return AppError(*(response.client_error_code), error_msg, {}, response.http_status_code);
     }
 
     if (response.custom_status_code != 0) {
         error_msg = response.body.empty() ? "non-zero custom status code considered fatal" : response.body;
-        return AppError(ErrorCodes::CustomError, error_msg, "", response.custom_status_code);
+        return AppError(ErrorCodes::CustomError, error_msg, {}, response.custom_status_code);
     }
 
     if (http_status_code_is_fatal) {
         error_msg = response.body.empty() ? "http error code considered fatal"
                                           : "http error code considered fatal: " + response.body;
-        return AppError(ErrorCodes::HTTPError, error_msg, "", response.http_status_code);
+        return AppError(ErrorCodes::HTTPError, error_msg, {}, response.http_status_code);
     }
 
     return {};

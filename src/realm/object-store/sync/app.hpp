@@ -267,6 +267,25 @@ public:
     static SharedApp get_cached_app(const std::string& app_id,
                                     const std::optional<std::string>& base_url = std::nullopt);
 
+    /// Get the current base URL for the AppServices server used for http requests and sync connections.
+    /// If an update_base_url() operation is currently in progress, this value will not be updated with the
+    /// new value until that operation is complete.
+    /// @return String containing the current base url value
+    std::string get_base_url() const;
+
+    /// Update the base URL after the app has been created. The location info will be retrieved using the
+    /// provided base URL. If this operation fails, the app will continue to use the original base URL and
+    /// false will be returned. If the operation is successful, the app and sync client will use the new
+    /// location info for future connections.
+    /// IMPORTANT: This function cannot be called if another App operation is in progress and any other
+    ///            App operation cannot be initiated until this operation is complete. Otherwise, the
+    ///            behavior of update_base_url() is undefined. The base URL update can be confirmed by
+    ///            checking the value of get_base_url() against the new base_url value provided.
+    /// @param base_url The new base URL to use for future app and sync connections.
+    /// @param completion A callback block to be invoked once the location update completes.
+    void update_base_url(const std::string& base_url,
+                         util::UniqueFunction<void(util::Optional<AppError>)>&& completion);
+
     /// Log in a user and asynchronously retrieve a user object.
     /// If the log in completes successfully, the completion block will be called, and a
     /// `SyncUser` representing the logged-in user will be passed to it. This user object
@@ -336,9 +355,10 @@ public:
         return T(this);
     }
 
-    void call_function(const std::shared_ptr<SyncUser>& user, const std::string& name, std::string_view args_ejson,
-                       const util::Optional<std::string>& service_name,
-                       util::UniqueFunction<void(const std::string*, util::Optional<AppError>)>&& completion) final;
+    void call_function(
+        const std::shared_ptr<SyncUser>& user, const std::string& name, std::string_view args_ejson,
+        const util::Optional<std::string>& service_name,
+        util::UniqueFunction<void(util::Optional<std::string_view>, util::Optional<AppError>)>&& completion) final;
 
     void call_function(
         const std::shared_ptr<SyncUser>& user, const std::string& name, const bson::BsonArray& args_bson,
@@ -435,14 +455,12 @@ private:
 
     /// Checks if an auth failure has taken place and if so it will attempt to refresh the
     /// access token and then perform the orginal request again with the new access token
-    /// @param error The error to check for auth failures
-    /// @param response The original response to pass back should this not be an auth error
+    /// @param result The app response containing auth failures or the original response
     /// @param request The request to perform
     /// @param completion returns the original response in the case it is not an auth error, or if a failure
     /// occurs, if the refresh was a success the newly attempted response will be passed back
-    void handle_auth_failure(const AppError& error, const Response& response, Request&& request,
-                             const std::shared_ptr<SyncUser>& user,
-                             util::UniqueFunction<void(const Response&)>&& completion);
+    void handle_auth_failure(AppResponse&& result, Request&& request, const std::shared_ptr<SyncUser>& sync_user,
+                             util::UniqueFunction<void(AppResponse&&)>&& completion);
 
     std::string url_for_path(const std::string& path) const override;
 
@@ -455,15 +473,22 @@ private:
     /// a new hostname is provided, the app metadata will be refreshed using the new hostname.
     /// @param completion The server response if an error was encountered during the update
     /// @param new_hostname If provided, the metadata will be requested from this hostname
-    void init_app_metadata(util::UniqueFunction<void(const util::Optional<Response>&)>&& completion,
-                           const util::Optional<std::string>& new_hostname = util::none);
+    /// @param retry_count The current number of redirects that have occurred in a row
+    void init_app_metadata(util::UniqueFunction<void(util::Optional<AppError>)>&& completion,
+                           const util::Optional<std::string> new_hostname = util::none, int retry_count = 0);
+
+    /// Update the location metadata from the location response
+    /// @param result The app response returned from the location request
+    /// @param new_base_url The URL path used to request the location
+    /// @return std::nullopt if the updated was successful, otherwise an AppError with the error
+    std::optional<AppError> update_location(AppResponse&& result, util::Optional<std::string>&& new_base_url);
 
     /// Update the app metadata and resend the request with the updated metadata
     /// @param request The original request object that needs to be sent after the update
     /// @param completion The original completion object that will be called with the response to the request
     /// @param new_hostname If provided, the metadata will be requested from this hostname
-    void update_metadata_and_resend(Request&& request, util::UniqueFunction<void(const Response&)>&& completion,
-                                    const util::Optional<std::string>& new_hostname = util::none);
+    void update_metadata_and_resend(Request&& request, util::UniqueFunction<void(AppResponse&&)>&& completion,
+                                    const util::Optional<std::string> new_hostname = util::none);
 
     void post(std::string&& route, util::UniqueFunction<void(util::Optional<AppError>)>&& completion,
               const bson::BsonDocument& body);
@@ -472,28 +497,21 @@ private:
     /// @param request The request to be performed
     /// @param completion Returns the response from the server
     /// @param update_location Force the location metadata to be updated prior to sending the request
-    void do_request(Request&& request, util::UniqueFunction<void(const Response&)>&& completion,
+    void do_request(Request&& request, util::UniqueFunction<void(AppResponse&&)>&& completion,
                     bool update_location = false);
-
-    /// Check to see if hte response is a redirect and handle, otherwise pass the response to compleetion
-    /// @param request The request to be performed (in case it needs to be sent again)
-    /// @param response The response from the send_request_to_server operation
-    /// @param completion Returns the response from the server if not a redirect
-    void handle_possible_redirect_response(Request&& request, const Response& response,
-                                           util::UniqueFunction<void(const Response&)>&& completion);
 
     /// Process the redirect response received from the last request that was sent to the server
     /// @param request The request to be performed (in case it needs to be sent again)
     /// @param response The response from the send_request_to_server operation
     /// @param completion Returns the response from the server if not a redirect
     void handle_redirect_response(Request&& request, const Response& response,
-                                  util::UniqueFunction<void(const Response&)>&& completion);
+                                  util::UniqueFunction<void(AppResponse&&)>&& completion);
 
     /// Performs an authenticated request to the Stitch server, using the current authentication state
     /// @param request The request to be performed
     /// @param completion Returns the response from the server
     void do_authenticated_request(Request&& request, const std::shared_ptr<SyncUser>& user,
-                                  util::UniqueFunction<void(const Response&)>&& completion) override;
+                                  util::UniqueFunction<void(AppResponse&&)>&& completion) override;
 
 
     /// Gets the social profile for a `SyncUser`
