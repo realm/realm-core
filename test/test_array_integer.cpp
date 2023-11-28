@@ -60,7 +60,7 @@ TEST(Test_array_same_size_less_bits)
     CHECK(a.get_any(2) == 545);
 }
 
-ONLY(Test_ArrayInt_encode_decode_needed)
+TEST(Test_ArrayInt_encode_decode_needed)
 {
     ArrayInteger a(Allocator::get_default());
     a.create();
@@ -115,13 +115,13 @@ TEST(Test_ArrayInt_negative_nums)
     CHECK(a.get(1) == 0);
     CHECK(a.get(2) == 1000000);
     a.add(-1000000);
-    CHECK(a.try_encode());
-    CHECK(a.is_encoded());
+    CHECK_NOT(a.try_encode());
+    CHECK_NOT(a.is_encoded());
     CHECK(a.get(0) == -1000000);
     CHECK(a.get(1) == 0);
     CHECK(a.get(2) == 1000000);
     CHECK(a.get(3) == -1000000);
-    CHECK(a.try_decode());
+    CHECK_NOT(a.try_decode());
     a.add(0);
     CHECK(a.try_encode());
     CHECK(a.is_encoded());
