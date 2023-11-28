@@ -101,8 +101,6 @@ private:
 struct InterningBuffer {
     std::string_view get_key(const InternDictKey& key) const;
     InternDictKey get_or_add(const std::string_view& str);
-    InternDictKey get_interned_key(const std::string_view& str) const; // throws if the str is not found
-    std::string print() const;
 
 private:
     std::string m_dict_keys_buffer;
@@ -118,7 +116,6 @@ struct ListPath {
     ListPath(TableKey table_key, ObjKey obj_key);
 
     struct Element {
-        explicit Element(size_t stable_ndx);
         explicit Element(const InternDictKey& str);
         explicit Element(ColKey key);
         union {
@@ -191,9 +188,8 @@ private:
         Status on_list_index_advance(uint32_t) override;
         Status on_null_link_advance(StringData, StringData) override;
         Status on_begin(const util::Optional<Obj>&) override;
-        void on_finish() override;
+        void on_finish() override {}
 
-        ListPath& list_path();
         void set_last_path_index(uint32_t ndx);
 
         ListPath m_list_path;
@@ -408,33 +404,6 @@ InternDictKey InterningBuffer::get_or_add(const std::string_view& str)
         m_dict_keys.push_back(new_key);
     }
     return new_key;
-}
-
-InternDictKey InterningBuffer::get_interned_key(const std::string_view& str) const
-{
-    if (str.data() == nullptr) {
-        return {};
-    }
-    for (auto& key : m_dict_keys) {
-        StringData existing = get_key(key);
-        if (existing == str) {
-            return key;
-        }
-    }
-    throw RuntimeError(ErrorCodes::InvalidArgument,
-                       util::format("InterningBuffer::get_interned_key(%1) did not contain the requested key", str));
-    return {};
-}
-
-std::string InterningBuffer::print() const
-{
-    return util::format("InterningBuffer of size=%1:'%2'", m_dict_keys.size(), m_dict_keys_buffer);
-}
-
-ListPath::Element::Element(size_t stable_ndx)
-    : index(stable_ndx)
-    , type(Type::ListIndex)
-{
 }
 
 ListPath::Element::Element(const InternDictKey& str)
@@ -838,13 +807,6 @@ RecoverLocalChangesetsHandler::RecoveryResolver::on_begin(const util::Optional<O
     }
     m_list_path = ListPath(obj->get_table()->get_key(), obj->get_key());
     return Status::Pending;
-}
-
-void RecoverLocalChangesetsHandler::RecoveryResolver::on_finish() {}
-
-ListPath& RecoverLocalChangesetsHandler::RecoveryResolver::list_path()
-{
-    return m_list_path;
 }
 
 void RecoverLocalChangesetsHandler::RecoveryResolver::set_last_path_index(uint32_t ndx)
