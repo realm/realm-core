@@ -21,7 +21,7 @@ headers:
   - "realm/object-store/sync/sync_session.hpp"
   - "realm/object-store/sync/sync_user.hpp"
   - "realm/object-store/sync/mongo_collection.hpp"
-  - "realm/object-store/util/bson/bson.hpp"
+  - "realm/util/bson/bson.hpp"
 
 primitives:
   # TODO need to distinguish 64bit types where all bits are needed vs where double would be fine
@@ -920,6 +920,8 @@ classes:
         - () const
         - suffix: maybe_throw
           sig: '(throw_on_error: bool) const'
+      
+      create_key_path_array: '(table_name: StringData, key_paths: const std::vector<std::string>&) -> KeyPathArray'
 
       close: ()
 

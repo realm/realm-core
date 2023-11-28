@@ -932,6 +932,14 @@ inline void LnkSet::sort(std::vector<size_t>& indices, bool ascending) const
 
     m_set.sort(indices, ascending);
 
+    if (has_unresolved()) {
+        indices.erase(std::remove_if(indices.begin(), indices.end(),
+                                     [&](size_t ndx) {
+                                         return real_is_unresolved(ndx);
+                                     }),
+                      indices.end());
+    }
+
     // Map the output indices to virtual indices.
     std::transform(indices.begin(), indices.end(), indices.begin(), [this](size_t ndx) {
         return real2virtual(ndx);
@@ -948,6 +956,14 @@ inline void LnkSet::distinct(std::vector<size_t>& indices, util::Optional<bool> 
     });
 
     m_set.distinct(indices, sort_order);
+
+    if (has_unresolved()) {
+        indices.erase(std::remove_if(indices.begin(), indices.end(),
+                                     [&](size_t ndx) {
+                                         return real_is_unresolved(ndx);
+                                     }),
+                      indices.end());
+    }
 
     // Map the output indices to virtual indices.
     std::transform(indices.begin(), indices.end(), indices.begin(), [this](size_t ndx) {

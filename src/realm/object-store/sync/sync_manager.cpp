@@ -29,6 +29,8 @@
 #include <realm/util/sha_crypto.hpp>
 #include <realm/util/hex_dump.hpp>
 
+#include <realm/exceptions.hpp>
+
 using namespace realm;
 using namespace realm::_impl;
 
@@ -275,7 +277,8 @@ void SyncManager::set_logger_factory(SyncClientConfig::LoggerFactory factory)
     m_config.logger_factory = std::move(factory);
 
     if (m_sync_client)
-        throw std::logic_error("Cannot set the logger factory after creating the sync client");
+        throw LogicError(ErrorCodes::IllegalOperation,
+                         "Cannot set the logger factory after creating the sync client");
 
     // Create a new logger using the new factory
     do_make_logger();
@@ -723,7 +726,8 @@ void SyncManager::set_session_multiplexing(bool allowed)
         return; // Already enabled, we can ignore
 
     if (m_sync_client)
-        throw std::logic_error("Cannot enable session multiplexing after creating the sync client");
+        throw LogicError(ErrorCodes::IllegalOperation,
+                         "Cannot enable session multiplexing after creating the sync client");
 
     m_config.multiplex_sessions = allowed;
 }

@@ -771,8 +771,9 @@ TEST(ClientReset_DoNotRecoverSchema)
         CHECK(!compare_groups(rt_1, rt_2));
 
         const Group& group = rt_1.get_group();
-        CHECK_EQUAL(group.size(), 1);
+        CHECK_EQUAL(group.size(), 2);
         CHECK(group.get_table("class_table1"));
+        CHECK(group.get_table("client_reset_metadata"));
         CHECK_NOT(group.get_table("class_table2"));
         const Group& group2 = rt_2.get_group();
         CHECK_EQUAL(group2.size(), 1);
@@ -867,8 +868,9 @@ void expect_reset(unit_test::TestContext& test_context, DB& target, DB& fresh, C
     CHECK_NOT(fresh.is_attached());
     CHECK_NOT(util::File::exists(fresh_path));
 
-    // Should have performed exactly one write on the target DB
-    CHECK_EQUAL(target.get_version_of_latest_snapshot(), db_version + 1);
+    // Should have performed exactly two writes on the target DB: one to track
+    // that we're attempting recovery, and one with the actual reset
+    CHECK_EQUAL(target.get_version_of_latest_snapshot(), db_version + 2);
 
     // Should have set the client file ident
     CHECK_EQUAL(target.start_read()->get_sync_file_id(), 100);
@@ -895,8 +897,9 @@ void expect_reset(unit_test::TestContext& test_context, DB& target, DB& fresh, C
     CHECK_NOT(fresh.is_attached());
     CHECK_NOT(util::File::exists(fresh_path));
 
-    // Should have performed exactly one write on the target DB
-    CHECK_EQUAL(target.get_version_of_latest_snapshot(), db_version + 1);
+    // Should have performed exactly two writes on the target DB: one to track
+    // that we're attempting recovery, and one with the actual reset
+    CHECK_EQUAL(target.get_version_of_latest_snapshot(), db_version + 2);
 
     // Should have set the client file ident
     CHECK_EQUAL(target.start_read()->get_sync_file_id(), 100);
@@ -1217,6 +1220,69 @@ TEST(ClientReset_DiscardLocal_MakesAwaitingMarkActiveSubscriptionsComplete)
     CHECK_EQUAL(set.state(), SubscriptionSet::State::AwaitingMark);
     set.refresh();
     CHECK_EQUAL(set.state(), SubscriptionSet::State::Complete);
+}
+
+TEST(ClientReset_Recover_RecoverableChangesOnListsAfterUnrecoverableAreNotDuplicated)
+{
+    SHARED_GROUP_TEST_PATH(path_1);
+    SHARED_GROUP_TEST_PATH(path_2);
+    auto [db, db_fresh] = prepare_db(path_1, path_2, [&](Transaction& tr) {
+        auto table = tr.add_table_with_primary_key("class_table", type_Int, "pk");
+        auto col = table->add_column_list(type_Int, "list");
+        auto list = table->create_object_with_primary_key(0).get_list<Int>(col);
+        list.add(0);
+        list.add(1);
+    });
+
+    auto sub_store = SubscriptionStore::create(db);
+    add_subscription(*sub_store, "complete", db->start_read()->get_table("class_table")->where(),
+                     SubscriptionSet::State::Complete);
+
+    { // offline modify local
+        auto wt = db->start_write();
+        auto list = wt->get_table("class_table")->begin()->get_list<Int>("list");
+        // triggers a copy since it's unrecoverable
+        list.remove(0);
+        list.add(4);
+        wt->commit_and_continue_as_read();
+
+        // Pending subscription in between the two writes makes this recovered
+        // in a second write, which shouldn't actually do anything as the new
+        // element was already added by the copy
+        add_subscription(*sub_store, "pending 1", wt->get_table("class_table")->where());
+        wt->promote_to_write();
+        list.add(5);
+        wt->commit();
+    }
+    { // remote modification that should be discarded
+        auto wt = db_fresh->start_write();
+        auto list = wt->get_table("class_table")->begin()->get_list<Int>("list");
+        list.clear();
+        list.add(8);
+        wt->commit();
+    }
+
+    bool did_reset = _impl::client_reset::perform_client_reset(
+        *test_context.logger, *db, *db_fresh, ClientResyncMode::Recover, nullptr, nullptr, {100, 200},
+        sub_store.get(), [](int64_t) {}, true);
+    CHECK(did_reset);
+
+    // List should match the pre-reset local state
+    auto rt = db->start_read();
+    auto list = rt->get_table("class_table")->begin()->get_list<Int>("list");
+    CHECK_EQUAL(list.size(), 3);
+    CHECK_EQUAL(list.get(0), 1);
+    CHECK_EQUAL(list.get(1), 4);
+    CHECK_EQUAL(list.get(2), 5);
+
+    // There should only be one non-empty changeset as the second one did not
+    // write anything
+    auto repl = static_cast<ClientReplication*>(db->get_replication());
+    auto changes = repl->get_history().get_local_changes(rt->get_version());
+    auto non_empty_count = std::count_if(changes.begin(), changes.end(), [](auto&& c) {
+        return c.changeset.size() > 0;
+    });
+    CHECK_EQUAL(non_empty_count, 1);
 }
 
 } // unnamed namespace

@@ -21,7 +21,7 @@
 #include <realm/object-store/sync/app_utils.hpp>
 #include <realm/object-store/sync/auth_request_client.hpp>
 #include <realm/object-store/sync/generic_network_transport.hpp>
-#include <realm/object-store/util/bson/bson.hpp>
+#include <realm/util/bson/bson.hpp>
 
 namespace realm::app {
 

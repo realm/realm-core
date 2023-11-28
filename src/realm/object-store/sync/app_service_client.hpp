@@ -19,7 +19,7 @@
 #ifndef APP_SERVICE_CLIENT_HPP
 #define APP_SERVICE_CLIENT_HPP
 
-#include <realm/object-store/util/bson/bson.hpp>
+#include <realm/util/bson/bson.hpp>
 #include <realm/util/functional.hpp>
 #include <realm/util/optional.hpp>
 

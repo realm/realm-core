@@ -23,7 +23,7 @@
 #include <catch2/catch_all.hpp>
 #include "util/test_utils.hpp"
 #include "util/test_file.hpp"
-#include <realm/object-store/util/bson/bson.hpp>
+#include <realm/util/bson/bson.hpp>
 
 using namespace nlohmann;
 using namespace realm;

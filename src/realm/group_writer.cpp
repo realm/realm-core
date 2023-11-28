@@ -28,7 +28,6 @@
 #include <realm/disable_sync_to_disk.hpp>
 #include <realm/impl/destroy_guard.hpp>
 #include <realm/impl/simulated_failure.hpp>
-#include <realm/util/miscellaneous.hpp>
 #include <realm/util/safe_int_ops.hpp>
 
 using namespace realm;

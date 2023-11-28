@@ -176,13 +176,19 @@ bool ListTracker::remove(uint32_t index, uint32_t& remote_index_out)
 
 bool ListTracker::requires_manual_copy() const
 {
-    return m_requires_manual_copy;
+    // We only ever need to copy a list once as we go straight to the final state
+    return m_requires_manual_copy && !m_has_been_copied;
 }
 
 void ListTracker::queue_for_manual_copy()
 {
     m_requires_manual_copy = true;
     m_indices_allowed.clear();
+}
+
+void ListTracker::mark_as_copied()
+{
+    m_has_been_copied = true;
 }
 
 std::string_view InterningBuffer::get_key(const InternDictKey& key) const
@@ -231,8 +237,8 @@ InternDictKey InterningBuffer::get_interned_key(const std::string_view& str) con
             return key;
         }
     }
-    throw std::runtime_error(
-        util::format("InterningBuffer::get_interned_key(%1) did not contain the requested key", str));
+    throw RuntimeError(ErrorCodes::InvalidArgument,
+                       util::format("InterningBuffer::get_interned_key(%1) did not contain the requested key", str));
     return {};
 }
 
@@ -364,15 +370,13 @@ std::string ListPath::path_to_string(Transaction& remote, const InterningBuffer&
 
 RecoverLocalChangesetsHandler::RecoverLocalChangesetsHandler(Transaction& dest_wt,
                                                              Transaction& frozen_pre_local_state,
-                                                             util::Logger& logger, Replication* repl)
+                                                             util::Logger& logger)
     : InstructionApplier(dest_wt)
     , m_frozen_pre_local_state{frozen_pre_local_state}
     , m_logger{logger}
-    , m_replication{repl}
+    , m_replication{dest_wt.get_replication()}
 {
 }
-
-RecoverLocalChangesetsHandler::~RecoverLocalChangesetsHandler() {}
 
 REALM_NORETURN void RecoverLocalChangesetsHandler::handle_error(const std::string& message) const
 {
@@ -467,12 +471,12 @@ void RecoverLocalChangesetsHandler::copy_lists_with_unrecoverable_changes()
     // we would know where list elements ended up or if they were deleted by the server.
     using namespace realm::converters;
     EmbeddedObjectConverter embedded_object_tracker;
-    for (auto& it : m_lists) {
-        if (!it.second.requires_manual_copy())
+    for (auto& [path, tracker] : m_lists) {
+        if (!tracker.requires_manual_copy())
             continue;
 
-        std::string path_str = it.first.path_to_string(m_transaction, m_intern_keys);
-        bool did_translate = resolve(it.first, [&](LstBase& remote_list, LstBase& local_list) {
+        std::string path_str = path.path_to_string(m_transaction, m_intern_keys);
+        bool did_translate = resolve(path, [&](LstBase& remote_list, LstBase& local_list) {
             ConstTableRef local_table = local_list.get_table();
             ConstTableRef remote_table = remote_list.get_table();
             ColKey local_col_key = local_list.get_col_key();
@@ -486,7 +490,10 @@ void RecoverLocalChangesetsHandler::copy_lists_with_unrecoverable_changes()
             value_converter.copy_value(local_obj, remote_obj, nullptr);
             embedded_object_tracker.process_pending();
         });
-        if (!did_translate) {
+        if (did_translate) {
+            tracker.mark_as_copied();
+        }
+        else {
             // object no longer exists in the local state, ignore and continue
             m_logger.warn("Discarding a list recovery made to an object which could not be resolved. "
                           "remote_path='%1'",
@@ -494,7 +501,6 @@ void RecoverLocalChangesetsHandler::copy_lists_with_unrecoverable_changes()
         }
     }
     embedded_object_tracker.process_pending();
-    m_lists.clear();
 }
 
 bool RecoverLocalChangesetsHandler::resolve_path(ListPath& path, Obj remote_obj, Obj local_obj,
@@ -700,8 +706,6 @@ void RecoverLocalChangesetsHandler::RecoveryResolver::set_last_path_index(uint32
     m_mutable_instr.path[distance] = ndx;
 }
 
-RecoverLocalChangesetsHandler::RecoveryResolver::~RecoveryResolver() {}
-
 void RecoverLocalChangesetsHandler::operator()(const Instruction::AddTable& instr)
 {
     // Rely on InstructionApplier to validate existing tables
@@ -875,11 +879,10 @@ void RecoverLocalChangesetsHandler::operator()(const Instruction::AddColumn& ins
     }
 }
 
-void RecoverLocalChangesetsHandler::operator()(const Instruction::EraseColumn& instr)
+void RecoverLocalChangesetsHandler::operator()(const Instruction::EraseColumn&)
 {
     // Destructive schema changes are not allowed by the resetting client.
-    static_cast<void>(instr);
-    handle_error(util::format("Properties cannot be erased during client reset recovery"));
+    handle_error("Properties cannot be erased during client reset recovery");
 }
 
 void RecoverLocalChangesetsHandler::operator()(const Instruction::ArrayInsert& instr)
