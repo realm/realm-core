@@ -43,7 +43,7 @@ int run_object_store_tests(int argc, const char** argv);
 
 int run_object_store_tests(int argc, const char** argv)
 {
-    auto t1 = steady_clock::now();
+    auto t1 = std::chrono::steady_clock::now();
 
     realm::test_util::initialize_test_path(1, argv);
 
@@ -95,8 +95,8 @@ int run_object_store_tests(int argc, const char** argv)
     session.useConfigData(config);
     int result = session.run(argc, argv);
 
-    auto t2 = steady_clock::now();
-    auto ms_int = duration_cast<milliseconds>(t2 - t1);
+    auto t2 = std::chrono::steady_clock::now();
+    auto ms_int = std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1);
     std::cout << "Test time: " << (ms_int.count() / 1000.0) << "s" << std::endl << std::endl;
     return result < 0xff ? result : 0xff;
 }
