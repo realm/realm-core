@@ -525,9 +525,9 @@ bool Connection::websocket_closed_handler(bool was_clean, WebSocketError error_c
         case WebSocketError::websocket_resolve_failed:
             [[fallthrough]];
         case WebSocketError::websocket_connection_failed: {
-            close_due_to_transient_error(
-                {ErrorCodes::SyncConnectFailed, util::format("Failed to connect to sync: %1", msg)},
-                ConnectionTerminationReason::connect_operation_failed);
+            close_due_to_client_side_error(
+                {ErrorCodes::SyncConnectFailed, util::format("Failed to connect to sync: %1", msg)}, IsFatal{false},
+                ProtocolErrorInfo::Action::Warning, ConnectionTerminationReason::connect_operation_failed);
             break;
         }
         case WebSocketError::websocket_read_error:
@@ -569,7 +569,7 @@ bool Connection::websocket_closed_handler(bool was_clean, WebSocketError error_c
         case WebSocketError::websocket_tls_handshake_failed: {
             close_due_to_client_side_error(
                 Status(ErrorCodes::TlsHandshakeFailed, util::format("TLS handshake failed: %1", msg)), IsFatal{false},
-                ProtocolErrorInfo::Action::Transient,
+                ProtocolErrorInfo::Action::Warning,
                 ConnectionTerminationReason::ssl_certificate_rejected); // Throws
             break;
         }
