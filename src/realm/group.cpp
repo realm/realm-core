@@ -27,7 +27,6 @@
 
 #include <realm/util/file_mapper.hpp>
 #include <realm/util/memory_stream.hpp>
-#include <realm/util/miscellaneous.hpp>
 #include <realm/util/thread.hpp>
 #include <realm/impl/destroy_guard.hpp>
 #include <realm/utilities.hpp>
@@ -1731,7 +1730,6 @@ MemStats Group::get_stats()
 
     return mem_stats;
 }
-
 
 void Group::print() const
 {

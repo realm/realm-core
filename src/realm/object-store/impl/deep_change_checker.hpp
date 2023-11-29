@@ -33,8 +33,6 @@ class Table;
 class TableRef;
 class Transaction;
 
-using KeyPath = std::vector<std::pair<TableKey, ColKey>>;
-using KeyPathArray = std::vector<KeyPath>;
 using ref_type = size_t;
 
 namespace _impl {

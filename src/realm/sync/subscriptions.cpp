@@ -86,7 +86,8 @@ SubscriptionSet::State state_from_storage(int64_t value)
         case SubscriptionStateForStorage::Error:
             return SubscriptionSet::State::Error;
         default:
-            throw std::runtime_error(util::format("Invalid state for SubscriptionSet stored on disk: %1", value));
+            throw RuntimeError(ErrorCodes::InvalidArgument,
+                               util::format("Invalid state for SubscriptionSet stored on disk: %1", value));
     }
 }
 
@@ -206,7 +207,7 @@ std::shared_ptr<const SubscriptionStore> SubscriptionSet::get_flx_subscription_s
     if (auto mgr = m_mgr.lock()) {
         return mgr;
     }
-    throw std::logic_error("Active SubscriptionSet without a SubscriptionStore");
+    throw RuntimeError(ErrorCodes::BrokenInvariant, "Active SubscriptionSet without a SubscriptionStore");
 }
 
 int64_t SubscriptionSet::version() const
@@ -420,19 +421,21 @@ void MutableSubscriptionSet::update_state(State new_state, util::Optional<std::s
     check_is_mutable();
     auto old_state = state();
     if (error_str && new_state != State::Error) {
-        throw std::logic_error("Cannot supply an error message for a subscription set when state is not Error");
+        throw LogicError(ErrorCodes::InvalidArgument,
+                         "Cannot supply an error message for a subscription set when state is not Error");
     }
     switch (new_state) {
         case State::Uncommitted:
-            throw std::logic_error("cannot set subscription set state to uncommitted");
+            throw LogicError(ErrorCodes::InvalidArgument, "cannot set subscription set state to uncommitted");
 
         case State::Error:
             if (old_state != State::Bootstrapping && old_state != State::Pending && old_state != State::Uncommitted) {
-                throw std::logic_error(
-                    "subscription set must be in Bootstrapping or Pending to update state to error");
+                throw LogicError(ErrorCodes::InvalidArgument,
+                                 "subscription set must be in Bootstrapping or Pending to update state to error");
             }
             if (!error_str) {
-                throw std::logic_error("Must supply an error message when setting a subscription to the error state");
+                throw LogicError(ErrorCodes::InvalidArgument,
+                                 "Must supply an error message when setting a subscription to the error state");
             }
 
             m_state = new_state;
@@ -450,9 +453,9 @@ void MutableSubscriptionSet::update_state(State new_state, util::Optional<std::s
             break;
         }
         case State::Superseded:
-            throw std::logic_error("Cannot set a subscription to the superseded state");
+            throw LogicError(ErrorCodes::InvalidArgument, "Cannot set a subscription to the superseded state");
         case State::Pending:
-            throw std::logic_error("Cannot set subscription set to the pending state");
+            throw LogicError(ErrorCodes::InvalidArgument, "Cannot set subscription set to the pending state");
     }
 }
 
@@ -554,7 +557,7 @@ void MutableSubscriptionSet::process_notifications()
 SubscriptionSet MutableSubscriptionSet::commit()
 {
     if (m_tr->get_transact_stage() != DB::transact_Writing) {
-        throw std::logic_error("SubscriptionSet is not in a commitable state");
+        throw RuntimeError(ErrorCodes::WrongTransactionState, "SubscriptionSet is not in a commitable state");
     }
     auto mgr = get_flx_subscription_store(); // Throws
 
@@ -690,7 +693,8 @@ SubscriptionStore::SubscriptionStore(DBRef db)
     }
     else {
         if (*schema_version != c_flx_schema_version) {
-            throw std::runtime_error("Invalid schema version for flexible sync metadata");
+            throw RuntimeError(ErrorCodes::UnsupportedFileFormatVersion,
+                               "Invalid schema version for flexible sync metadata");
         }
         load_sync_metadata_schema(tr, &internal_tables);
     }

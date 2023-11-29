@@ -44,6 +44,8 @@ size_t real2virtual(const std::vector<size_t>& vec, size_t ndx) noexcept
 {
     // Subtract the number of tombstones below ndx.
     auto it = std::lower_bound(vec.begin(), vec.end(), ndx);
+    // A tombstone index has no virtual mapping. This is an error.
+    REALM_ASSERT_DEBUG_EX(it == vec.end() || *it != ndx, ndx, vec.size());
     auto n = it - vec.begin();
     return ndx - n;
 }

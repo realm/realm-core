@@ -37,7 +37,6 @@
 
 #include <realm/util/errno.hpp>
 #include <realm/util/encrypted_file_mapping.hpp>
-#include <realm/util/miscellaneous.hpp>
 #include <realm/util/terminate.hpp>
 #include <realm/util/thread.hpp>
 #include <realm/util/scope_exit.hpp>

@@ -601,6 +601,11 @@ protected:
         return _impl::real2virtual(m_unresolved, ndx);
     }
 
+    bool real_is_unresolved(size_t ndx) const noexcept
+    {
+        return std::find(m_unresolved.begin(), m_unresolved.end(), ndx) != m_unresolved.end();
+    }
+
     /// Rebuild the list of tombstones if there is a possibility that it has
     /// changed.
     ///
