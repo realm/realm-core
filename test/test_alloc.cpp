@@ -321,7 +321,23 @@ TEST(Alloc_Fuzzy)
     }
 }
 
-NONCONCURRENT_TEST_IF(Alloc_MapFailureRecovery, _impl::SimulatedFailure::is_enabled())
+#if 0
+/*
+    This test is disabled because it indirectly makes assumptions about the content of
+    uninitialized memory.
+
+    It does this by asking for a ref-translation for a ref which does not point to
+    allocated memory. Since the introduction of xover-mappings (see the slab allocator),
+    ref-translation not only requires a ref, but also requires it to point to initialized
+    memory such that the total size of the object referenced can be determined.
+
+    This has accidentally worked, because the memory referenced has accidentally
+    been zero, which led to the size of the array presumed to be there to also be zero,
+    which allowed the test to pass.
+
+    Otherwise the test is important and need to be enabled again at some point.
+*/
+// NONCONCURRENT_TEST_IF(Alloc_MapFailureRecovery, _impl::SimulatedFailure::is_enabled())
 {
     GROUP_TEST_PATH(path);
 
@@ -455,6 +471,7 @@ NONCONCURRENT_TEST_IF(Alloc_MapFailureRecovery, _impl::SimulatedFailure::is_enab
         alloc.purge_old_mappings(5, 5);
     }
 }
+#endif
 
 // This test reproduces the sporadic issue that was seen for large refs (addresses)
 // on 32-bit iPhone 5 Simulator runs on certain host machines.
