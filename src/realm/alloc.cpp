@@ -24,6 +24,7 @@
 #include <realm/array.hpp>
 #include <realm/alloc_slab.hpp>
 #include <realm/group.hpp>
+#include <iostream>
 
 using namespace realm;
 
@@ -47,6 +48,7 @@ public:
     MemRef do_alloc(const size_t size) override
     {
         char* addr = static_cast<char*>(::malloc(size));
+        std::cout << "alloc(" << size << ") -> " << (void*)addr << std::endl;
         if (REALM_UNLIKELY(REALM_COVER_NEVER(!addr))) {
             // LCOV_EXCL_START
             REALM_ASSERT_DEBUG(errno == ENOMEM);
@@ -61,7 +63,9 @@ public:
 
     MemRef do_realloc(ref_type, char* addr, size_t old_size, size_t new_size) override
     {
+        std::cout << "realloc(" << (void*)addr << ", " << old_size << " to " << new_size << ")" << std::endl;
         char* new_addr = static_cast<char*>(::realloc(const_cast<char*>(addr), new_size));
+        std::cout << "    --> " << (void*)new_addr << std::endl;
         if (REALM_UNLIKELY(REALM_COVER_NEVER(!new_addr))) {
             // LCOV_EXCL_START
             REALM_ASSERT_DEBUG(errno == ENOMEM);
@@ -78,6 +82,7 @@ public:
 
     void do_free(ref_type, char* addr) override
     {
+        std::cout << "free(" << (void*)addr << ")" << std::endl;
         ::free(addr);
     }
 

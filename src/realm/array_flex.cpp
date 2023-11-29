@@ -231,13 +231,14 @@ void ArrayFlex::setup_array_in_flex_format(std::vector<int64_t>& values, std::ve
         NodeHeader::calc_size<Encoding::Flex>(values.size(), indices.size(), value_bit_width, index_bit_width);
     // I'm assuming that flags are taken from the owning Array.
     uint8_t flags = NodeHeader::get_flags((uint64_t*)m_array.get_header());
-    
-    //This is a problem, the memory allocated is interleaving with the memory destroyed.
+
+    // This is a problem, the memory allocated is interleaving with the memory destroyed.
     Array array_to_destroy{m_array.get_alloc()};
     array_to_destroy.Node::init_from_mem(m_array.get_mem());
-    //destroying here, creates a hole which eventualy could result in some block not having a valid before and after block.
+    // destroying here, creates a hole which eventualy could result in some block not having a valid before and after
+    // block.
     array_to_destroy.destroy();
-    
+
     MemRef mem = m_array.get_alloc().alloc(byte_size);
     auto header = (uint64_t*)mem.get_addr();
     NodeHeader::init_header(header, 'B', Encoding::Flex, flags, value_bit_width, index_bit_width, values.size(),
@@ -249,11 +250,9 @@ void ArrayFlex::setup_array_in_flex_format(std::vector<int64_t>& values, std::ve
     REALM_ASSERT(m_array.m_ref == mem.get_ref());
     REALM_ASSERT(m_array.get_kind(header) == 'B');
     REALM_ASSERT(m_array.get_encoding(header) == Encoding::Flex);
-    
-    //destorying here breaks the links between the blocks
-    //array_to_destroy.destroy();
 
-    
+    // destorying here breaks the links between the blocks
+    // array_to_destroy.destroy();
 }
 
 bool ArrayFlex::get_encode_info(size_t& value_width, size_t& index_width, size_t& value_size,
