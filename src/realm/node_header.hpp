@@ -174,8 +174,8 @@ public:
     // handles all header formats
     static WidthType get_wtype_from_header(const char* header) noexcept
     {
-        char kind = (char)get_kind((uint64_t*)header);
-        REALM_ASSERT(kind == 'A');
+        // char kind = (char)get_kind((uint64_t*)header);
+        // REALM_ASSERT(kind == 'A');
         typedef unsigned char uchar;
         const uchar* h = reinterpret_cast<const uchar*>(header);
         int h4 = h[4];
@@ -210,8 +210,7 @@ public:
     // Handling width and sizes:
     static uint_least8_t get_width_from_header(const char* header) noexcept
     {
-        auto kind = (char)get_kind((uint64_t*)header);
-        REALM_ASSERT(kind == 'A');
+        // REALM_ASSERT(get_kind((uint64_t*)header == 'A');
         typedef unsigned char uchar;
         const uchar* h = reinterpret_cast<const uchar*>(header);
         return uint_least8_t((1 << (int(h[4]) & 0x07)) >> 1);
@@ -219,7 +218,7 @@ public:
 
     static size_t get_size_from_header(const char* header) noexcept
     {
-        REALM_ASSERT(get_kind((uint64_t*)header) == 'A');
+        // REALM_ASSERT(get_kind((uint64_t*)header) == 'A');
         typedef unsigned char uchar;
         const uchar* h = reinterpret_cast<const uchar*>(header);
         return (size_t(h[5]) << 16) + (size_t(h[6]) << 8) + h[7];

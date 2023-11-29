@@ -48,7 +48,7 @@ private:
     void setup_array_in_flex_format(std::vector<int64_t>&, std::vector<size_t>&, int, int) const;
     void copy_into_encoded_array(std::vector<int64_t>&, std::vector<size_t>&) const;
     std::vector<int64_t> fetch_values(size_t, size_t, size_t, size_t) const;
-    void restore_array(const std::vector<int64_t>&) const;
+    void restore_array(const std::vector<int64_t>&, size_t) const;
 
     Array& m_array;
 };
