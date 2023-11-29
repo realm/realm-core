@@ -404,6 +404,7 @@ public:
                     REALM_ASSERT(false && "Undefined header encoding");
             }
         }
+        REALM_UNREACHABLE();
     }
     static void set_encoding(uint64_t* header, Encoding enc)
     {
