@@ -106,8 +106,8 @@ TEST_CASE("SyncSession: wait_for_download_completion() API", "[sync][pbs][sessio
         });
         REQUIRE(handler_called == false);
         // Now trigger an error
-        sync::SessionErrorInfo err{err_status, sync::IsFatal{true}};
-        err.server_requests_action = sync::ProtocolErrorInfo::Action::ProtocolViolation;
+        sync::SessionErrorInfo err{err_status, sync::IsFatal{true},
+                                   sync::ProtocolErrorInfo::Action::ProtocolViolation};
         SyncSession::OnlyForTesting::handle_error(*session, std::move(err));
         EventLoop::main().run_until([&] {
             return error_count > 0;

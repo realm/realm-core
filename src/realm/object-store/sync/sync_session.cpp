@@ -589,7 +589,7 @@ void SyncSession::handle_fresh_realm_downloaded(DBRef db, Status status,
         sync::SessionErrorInfo synthetic(
             Status{ErrorCodes::AutoClientResetFailed,
                    util::format("A fatal error occurred during client reset: '%1'", status.reason())},
-            sync::IsFatal{true});
+            sync::IsFatal{true}, sync::ProtocolErrorInfo::Action::ApplicationBug);
         handle_error(synthetic);
         return;
     }
@@ -655,8 +655,7 @@ void SyncSession::handle_error(sync::SessionErrorInfo error)
     else {
         switch (error.server_requests_action) {
             case sync::ProtocolErrorInfo::Action::NoAction:
-                next_state = NextStateAfterError::none;
-                break;
+                REALM_UNREACHABLE();
             case sync::ProtocolErrorInfo::Action::ApplicationBug:
                 [[fallthrough]];
             case sync::ProtocolErrorInfo::Action::ProtocolViolation:
@@ -741,8 +740,7 @@ void SyncSession::handle_error(sync::SessionErrorInfo error)
         update_error_and_mark_file_for_deletion(sync_error, *delete_file);
 
     if (m_state == State::Dying && error.is_fatal) {
-        become_inactive(std::move(lock), error.status);
-        return;
+        next_state = NextStateAfterError::inactive;
     }
 
     // Don't bother invoking m_config.error_handler if the sync is inactive.

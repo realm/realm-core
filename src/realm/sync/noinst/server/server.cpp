@@ -3119,8 +3119,8 @@ private:
         ServerProtocol& protocol = get_server_protocol();
         OutputBuffer& out = m_connection.get_output_buffer();
         int protocol_version = m_connection.get_client_protocol_version();
-        protocol.make_error_message(protocol_version, out, error_code, message, message_size, try_again,
-                                    m_session_ident); // Throws
+        protocol.make_json_error_message(protocol_version, out, error_code, message, message_size, try_again,
+                                         m_session_ident); // Throws
         m_connection.initiate_write_output_buffer();  // Throws
 
         m_error_message_sent = true;
@@ -4636,8 +4636,8 @@ void SyncConnection::initiate_write_error(ProtocolError error_code, session_iden
 
     OutputBuffer& out = get_output_buffer();
     int protocol_version = get_client_protocol_version();
-    get_server_protocol().make_error_message(protocol_version, out, error_code, message, message_size, try_again,
-                                             session_ident); // Throws
+    get_server_protocol().make_json_error_message(protocol_version, out, error_code, message, message_size, try_again,
+                                                  session_ident); // Throws
 
     auto handler = [this](std::error_code ec, size_t) {
         handle_write_error(ec); // Throws

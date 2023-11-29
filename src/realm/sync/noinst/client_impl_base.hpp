@@ -557,7 +557,8 @@ private:
     void initiate_disconnect_wait();
     void handle_disconnect_wait(Status status);
     void close_due_to_protocol_error(Status status);
-    void close_due_to_client_side_error(Status, IsFatal is_fatal, ConnectionTerminationReason reason);
+    void close_due_to_client_side_error(Status, IsFatal is_fatal, ProtocolErrorInfo::Action error_action,
+                                        ConnectionTerminationReason reason);
     void close_due_to_transient_error(Status status, ConnectionTerminationReason reason);
     void close_due_to_server_side_error(ProtocolError, const ProtocolErrorInfo& info);
     void involuntary_disconnect(const SessionErrorInfo& info, ConnectionTerminationReason reason);
@@ -1277,8 +1278,8 @@ void ClientImpl::Connection::for_each_active_session(H handler)
 inline void ClientImpl::Connection::voluntary_disconnect()
 {
     m_reconnect_info.update(ConnectionTerminationReason::closed_voluntarily, std::nullopt);
-    SessionErrorInfo error_info{Status{ErrorCodes::ConnectionClosed, "Connection closed"}, IsFatal{false}};
-    error_info.server_requests_action = ProtocolErrorInfo::Action::Transient;
+    SessionErrorInfo error_info{Status{ErrorCodes::ConnectionClosed, "Connection closed"}, IsFatal{false},
+                                ProtocolErrorInfo::Action::Transient};
 
     disconnect(std::move(error_info)); // Throws
 }

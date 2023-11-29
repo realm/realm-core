@@ -3873,7 +3873,7 @@ RLM_API void realm_sync_session_wait_for_upload_completion(realm_sync_session_t*
  */
 RLM_API void realm_sync_session_handle_error_for_testing(const realm_sync_session_t* session,
                                                          realm_errno_e error_code, const char* error_str,
-                                                         bool is_fatal);
+                                                         bool is_fatal, realm_sync_error_action_e action);
 
 /**
  * In case of exception thrown in user code callbacks, this api will allow the sdk to store the user code exception

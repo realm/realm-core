@@ -405,8 +405,8 @@ TEST_CASE("sync: error handling", "[sync][session]") {
             return sessions_are_active(*session);
         });
 
-        sync::SessionErrorInfo err{Status{ErrorCodes::UnknownError, "unknown error"}, true};
-        err.server_requests_action = ProtocolErrorInfo::Action::Transient;
+        sync::SessionErrorInfo err{Status{ErrorCodes::UnknownError, "unknown error"}, true,
+                                   ProtocolErrorInfo::Action::Transient};
         SyncSession::OnlyForTesting::handle_error(*session, std::move(err));
         CHECK(!sessions_are_inactive(*session));
         // Error is non-fatal so it's not reported to the error handler
@@ -425,8 +425,8 @@ TEST_CASE("sync: error handling", "[sync][session]") {
         auto code = GENERATE(ProtocolError::bad_client_file_ident, ProtocolError::bad_server_version,
                              ProtocolError::diverging_histories);
 
-        sync::SessionErrorInfo initial_error{sync::protocol_error_to_status(code, "Something bad happened"), true};
-        initial_error.server_requests_action = ProtocolErrorInfo::Action::ClientReset;
+        sync::SessionErrorInfo initial_error{sync::protocol_error_to_status(code, "Something bad happened"), true,
+                                             ProtocolErrorInfo::Action::ClientReset};
         std::time_t just_before_raw = std::time(nullptr);
         SyncSession::OnlyForTesting::handle_error(*session, std::move(initial_error));
         REQUIRE(session->state() == SyncSession::State::Inactive);
@@ -535,8 +535,8 @@ TEST_CASE("sync: stop policy behavior", "[sync][session]") {
 
         SECTION("transitions to Inactive if a fatal error occurs") {
             sync::SessionErrorInfo err{Status{ErrorCodes::SyncProtocolInvariantFailed, "Not a real error message"},
-                                       sync::IsFatal{true}};
-            err.server_requests_action = realm::sync::ProtocolErrorInfo::Action::ProtocolViolation;
+                                       sync::IsFatal{true},
+                                       realm::sync::ProtocolErrorInfo::Action::ProtocolViolation};
             SyncSession::OnlyForTesting::handle_error(*session, std::move(err));
             CHECK(sessions_are_inactive(*session));
             // The session shouldn't report fatal errors when in the dying state.
@@ -546,8 +546,7 @@ TEST_CASE("sync: stop policy behavior", "[sync][session]") {
         SECTION("ignores non-fatal errors and does not transition to Inactive") {
             // Fire a simulated *non-fatal* error.
             sync::SessionErrorInfo err{Status{ErrorCodes::ConnectionClosed, "Not a real error message"},
-                                       sync::IsFatal{false}};
-            err.server_requests_action = realm::sync::ProtocolErrorInfo::Action::Transient;
+                                       sync::IsFatal{false}, realm::sync::ProtocolErrorInfo::Action::Transient};
             SyncSession::OnlyForTesting::handle_error(*session, std::move(err));
             REQUIRE(session->state() == SyncSession::State::Dying);
             CHECK(!error_handler_invoked);

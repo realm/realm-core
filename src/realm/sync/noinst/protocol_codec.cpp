@@ -269,15 +269,19 @@ void ServerProtocol::make_mark_message(OutputBuffer& out, session_ident_type ses
 }
 
 
-void ServerProtocol::make_error_message(int protocol_version, OutputBuffer& out, sync::ProtocolError error_code,
-                                        const char* message, std::size_t message_size, bool try_again,
-                                        session_ident_type session_ident)
+void ServerProtocol::make_json_error_message(int protocol_version, OutputBuffer& out, sync::ProtocolError error_code,
+                                             const char* message, std::size_t message_size, bool try_again,
+                                             session_ident_type session_ident)
 {
     static_cast<void>(protocol_version);
-    sync::ProtocolError error_code_2 = error_code;
-    out << "error " << int(error_code_2) << " " << message_size << " " << int(try_again) << " " << session_ident
-        << "\n";                      // Throws
-    out.write(message, message_size); // Throws
+    nlohmann::json error_body = {{"message", std::string_view(message, message_size)},
+                                 {"tryAgain", try_again},
+                                 {"action", try_again ? "Transient" : "ApplicationBug"},
+                                 {"isRecoveryModeDisabled", false},
+                                 {"logURL", ""}};
+    std::string error_body_str = error_body.dump();
+    out << "json_error " << int(error_code) << " " << error_body_str.size() << " " << session_ident << "\n"; // Throws
+    out.write(error_body_str.c_str(), error_body_str.size());                                                // Throws
 }
 
 

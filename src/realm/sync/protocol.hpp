@@ -274,13 +274,13 @@ struct ProtocolErrorInfo {
     };
 
     ProtocolErrorInfo() = default;
-    ProtocolErrorInfo(int error_code, const std::string& msg, IsFatal is_fatal)
+    ProtocolErrorInfo(int error_code, const std::string& msg, IsFatal is_fatal, Action error_action)
         : raw_error_code(error_code)
         , message(msg)
         , is_fatal(is_fatal)
         , client_reset_recovery_is_disabled(false)
         , should_client_reset(util::none)
-        , server_requests_action(Action::NoAction)
+        , server_requests_action(error_action)
     {
     }
     int raw_error_code = 0;
