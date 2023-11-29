@@ -740,7 +740,8 @@ void SyncSession::handle_error(sync::SessionErrorInfo error)
         update_error_and_mark_file_for_deletion(sync_error, *delete_file);
 
     if (m_state == State::Dying && error.is_fatal) {
-        next_state = NextStateAfterError::inactive;
+        become_inactive(std::move(lock), sync_error.status);
+        return;
     }
 
     // Don't bother invoking m_config.error_handler if the sync is inactive.
