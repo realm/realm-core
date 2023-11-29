@@ -840,12 +840,13 @@ static sync::Session::Config::ClientReset make_client_reset_config(const RealmCo
         // to the user here. Note that the schema changes made here will be considered
         // an "offline write" to be recovered if this is recovery mode.
         auto before = Realm::get_shared_realm(config);
-        before->read_group();
         if (auto& notify_before = config.sync_config->notify_before_client_reset) {
             notify_before(config.sync_config->freeze_before_reset_realm ? before->freeze() : before);
         }
-        // Note that if the SDK requested a live Realm this may be a different
-        // version than what we had before calling the callback.
+        // Note that if the SDK wrote to the Realm (hopefully by requesting a
+        // live instance and not opening a secondary one), this may be a
+        // different version than what we had before calling the callback.
+        before->refresh();
         return before->read_transaction_version();
     };
 
