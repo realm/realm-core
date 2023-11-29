@@ -278,7 +278,8 @@ void ServerProtocol::make_json_error_message(int protocol_version, OutputBuffer&
                                  {"tryAgain", try_again},
                                  {"action", try_again ? "Transient" : "ApplicationBug"},
                                  {"isRecoveryModeDisabled", false},
-                                 {"logURL", ""}};
+                                 {"logURL", ""},
+                                 {"shouldClientReset", false}};
     std::string error_body_str = error_body.dump();
     out << "json_error " << int(error_code) << " " << error_body_str.size() << " " << session_ident << "\n"; // Throws
     out.write(error_body_str.c_str(), error_body_str.size());                                                // Throws
