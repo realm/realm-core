@@ -701,6 +701,7 @@ inline void NodeHeader::set_elementA_size<NodeHeader::Encoding::Flex>(uint64_t* 
     REALM_ASSERT(bits_per_element > 0);
     uint32_t word = ((uint32_t*)header)[1];
     word &= ~(0b111111 << 26);
+    //  we only have 6 bits, so store values in range 1-64 as 0-63
     word |= (bits_per_element - 1) << 26;
     ((uint32_t*)header)[1] = word;
 }
@@ -732,6 +733,7 @@ inline void NodeHeader::set_elementB_size<NodeHeader::Encoding::Flex>(uint64_t* 
     REALM_ASSERT(bits_per_element > 0);
     uint32_t word = ((uint32_t*)header)[1];
     word &= ~(0b111111 << 20);
+    //  we only have 6 bits, so store values in range 1-64 as 0-63
     word |= (bits_per_element - 1) << 20;
     ((uint32_t*)header)[1] = word;
 }
@@ -764,9 +766,9 @@ inline size_t NodeHeader::get_elementA_size<NodeHeader::Encoding::Flex>(uint64_t
     REALM_ASSERT(encoding == Encoding::Flex);
     uint32_t word = ((uint32_t*)header)[1];
     auto bits_per_element = (word >> 26) & 0b111111;
-    // TODO: why there is an increment here?? if I need 1 bit, I should not read 2 from the header.
-    //       I suspect this is done for supporting the sign bit... but the sign should be an implementation detail.
-    // bits_per_element++;
+    //  we only have 6 bits, so store values in range 1-64 as 0-63
+    // this means that Flex cannot support element sizes of 0
+    bits_per_element++;
     REALM_ASSERT(bits_per_element <= 64);
     REALM_ASSERT(bits_per_element > 0);
     return bits_per_element;
@@ -798,7 +800,7 @@ inline size_t NodeHeader::get_elementB_size<NodeHeader::Encoding::Flex>(uint64_t
     uint32_t word = ((uint32_t*)header)[1];
     auto bits_per_element = (word >> 20) & 0b111111;
     // same as above
-    // bits_per_element++;
+    bits_per_element++;
     REALM_ASSERT(bits_per_element <= 64);
     REALM_ASSERT(bits_per_element > 0);
     return bits_per_element;
