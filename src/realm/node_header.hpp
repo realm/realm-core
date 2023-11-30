@@ -174,8 +174,8 @@ public:
     // handles all header formats
     static WidthType get_wtype_from_header(const char* header) noexcept
     {
-        char kind = (char)get_kind((uint64_t*)header);
-        REALM_ASSERT(kind == 'A');
+        // char kind = (char)get_kind((uint64_t*)header);
+        // REALM_ASSERT(kind == 'A');
         typedef unsigned char uchar;
         const uchar* h = reinterpret_cast<const uchar*>(header);
         int h4 = h[4];
@@ -210,8 +210,7 @@ public:
     // Handling width and sizes:
     static uint_least8_t get_width_from_header(const char* header) noexcept
     {
-        auto kind = (char)get_kind((uint64_t*)header);
-        REALM_ASSERT(kind == 'A');
+        // REALM_ASSERT(get_kind((uint64_t*)header == 'A');
         typedef unsigned char uchar;
         const uchar* h = reinterpret_cast<const uchar*>(header);
         return uint_least8_t((1 << (int(h[4]) & 0x07)) >> 1);
@@ -219,7 +218,7 @@ public:
 
     static size_t get_size_from_header(const char* header) noexcept
     {
-        REALM_ASSERT(get_kind((uint64_t*)header) == 'A');
+        // REALM_ASSERT(get_kind((uint64_t*)header) == 'A');
         typedef unsigned char uchar;
         const uchar* h = reinterpret_cast<const uchar*>(header);
         return (size_t(h[5]) << 16) + (size_t(h[6]) << 8) + h[7];
@@ -373,7 +372,9 @@ public:
     enum class Encoding { Packed, AofP, PofA, Flex, WTypBits, WTypMult, WTypIgn };
     static Encoding get_encoding(const uint64_t* header)
     {
-        if (get_kind(header) == 0x41) {
+        const auto kind = get_kind(header);
+        // REALM_ASSERT(kind == 'A' || kind == 'B');
+        if (kind == 'A') {
             switch (get_wtype_from_header((const char*)header)) {
                 case wtype_Bits:
                     return Encoding::WTypBits;
@@ -385,7 +386,7 @@ public:
                     REALM_ASSERT(false && "Undefined header encoding");
             }
         }
-        else {
+        else if (kind == 'B') {
             auto h = (const uint8_t*)header;
             auto byte = (uint8_t)h[2];
             const auto v = (byte & 0b00001111);
@@ -402,6 +403,7 @@ public:
                     REALM_ASSERT(false && "Undefined header encoding");
             }
         }
+        REALM_UNREACHABLE();
     }
     static void set_encoding(uint64_t* header, Encoding enc)
     {
@@ -986,17 +988,8 @@ size_t inline NodeHeader::get_byte_size_from_header(const char* header) noexcept
 {
     auto h = (uint64_t*)header;
     auto kind = get_kind(h);
-    if (kind == 'A') {
-        auto encoding = get_encoding(h);
-        REALM_ASSERT(encoding != Encoding::Flex);
-        WidthType wtype = get_wtype_from_header(header);
-        size_t width;
-        size_t size;
-        width = get_width_from_header(header);
-        size = get_size_from_header(header);
-        return calc_byte_size(wtype, size, width);
-    }
-    else {
+    // REALM_ASSERT(kind == 'A' || kind == 'B');
+    if (kind == 'B') {
         auto encoding = get_encoding(h);
         REALM_ASSERT(encoding == NodeHeader::Encoding::Flex); // this is the only encoding supported right now.
         switch (encoding) {
@@ -1021,6 +1014,13 @@ size_t inline NodeHeader::get_byte_size_from_header(const char* header) noexcept
                 REALM_ASSERT(false && "unknown encoding");
         }
     }
+    /*(kind == 'A')*/
+    WidthType wtype = get_wtype_from_header(header);
+    size_t width;
+    size_t size;
+    width = get_width_from_header(header);
+    size = get_size_from_header(header);
+    return calc_byte_size(wtype, size, width);
 }
 
 

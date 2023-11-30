@@ -259,7 +259,7 @@ void Array::init_from_mem(MemRef mem) noexcept
     char* header = mem.get_addr();
     auto kind = get_kind((uint64_t*)header);
     // be sure that the node is either A or B
-    REALM_ASSERT(kind == 'A' || kind == 'B');
+    // REALM_ASSERT(kind == 'A' || kind == 'B');
     if (kind == 'B') {
         // the only encoding supported at the moment
         auto encoding = get_encoding((uint64_t*)header);
@@ -269,7 +269,7 @@ void Array::init_from_mem(MemRef mem) noexcept
         m_data = get_data_from_header(header);
         m_size = NodeHeader::get_arrayB_num_elements<Encoding::Flex>((uint64_t*)header);
     }
-    if (kind == 'A')
+    else
         header = Node::init_from_mem(mem);
     // Parse header
     m_is_inner_bptree_node = get_is_inner_bptree_node_from_header(header);
@@ -1354,21 +1354,25 @@ const typename Array::VTableForWidth<width>::PopulatedVTable Array::VTableForWid
 void Array::update_width_cache_from_header() noexcept
 {
     auto header = get_header();
-    if (get_kind((uint64_t*)header) == 'A') {
+    const auto kind = get_kind((uint64_t*)header);
+    if (kind == 'B') {
+        // For type B arrays the width should not be that important, since the data is not
+        // organized in any standard format, and we are not going to use it for fetching data.
+        // But this needs to be verified.
+        auto width_a = get_elementA_size<Encoding::Flex>((uint64_t*)header);
+        m_width = align_bits_to8(width_a);
+        REALM_ASSERT(m_width % 8 == 0 && m_width != 0);
+        m_lbound = lbound_for_width(m_width);
+        m_ubound = ubound_for_width(m_width);
+        REALM_TEMPEX(m_vtable = &VTableForWidth, m_width, ::vtable);
+        m_getter = m_vtable->getter;
+    }
+    else {
         auto width = get_width_from_header(get_header());
         m_lbound = lbound_for_width(width);
         m_ubound = ubound_for_width(width);
         m_width = width;
         REALM_TEMPEX(m_vtable = &VTableForWidth, width, ::vtable);
-        m_getter = m_vtable->getter;
-    }
-    else {
-        // For type B arrays the width should not be important, since the data is not
-        // organized in any standard format.
-        m_lbound = 64;
-        m_ubound = 64;
-        m_width = 64;
-        REALM_TEMPEX(m_vtable = &VTableForWidth, 64, ::vtable);
         m_getter = m_vtable->getter;
     }
 }

@@ -301,6 +301,7 @@ SlabAlloc::FreeBlock* SlabAlloc::pop_freelist_entry(FreeList list)
 
 void SlabAlloc::FreeBlock::unlink()
 {
+    REALM_ASSERT(next != nullptr && prev != nullptr);
     auto _next = next;
     auto _prev = prev;
     _next->prev = prev;

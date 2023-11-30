@@ -159,6 +159,9 @@ void Node::destroy() noexcept
 void Node::do_copy_on_write(size_t minimum_size)
 {
     const char* header = get_header_from_data(m_data);
+    // only type A arrays are possible during copy on write
+    //    const auto kind = get_kind((uint64_t*)header);
+    //    REALM_ASSERT(kind == 'A');
 
     // Calculate size in bytes
     size_t array_size = calc_byte_size(get_wtype_from_header(header), m_size, get_width_from_header(header));
@@ -167,8 +170,13 @@ void Node::do_copy_on_write(size_t minimum_size)
     // Plus a bit of matchcount room for expansion
     new_size += 64;
 
-    // Create new copy of array
+    // Create new copy of array.
+    // Chicken egg problem, along the way we call SlabAllocator::do_alloc
+    // which tries to translate the ref and calls get_byte_size_from_header,
+    // which triggers an assertion since the header is not yet initialised at
+    // that point
     MemRef mref = m_alloc.alloc(new_size); // Throws
+
     const char* old_begin = header;
     const char* old_end = header + array_size;
     char* new_begin = mref.get_addr();
