@@ -1727,7 +1727,6 @@ MemStats Group::get_stats()
     return mem_stats;
 }
 
-
 void Group::print() const
 {
     m_alloc.print();

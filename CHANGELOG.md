@@ -2,10 +2,32 @@
 
 ### Enhancements
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
-* Refactored how KeyPathArrays are created in the C-API by adding `realm_create_key_path_array` which allows a SDK to pass in the string representation of the keypath and then let Core calculate the correct TableKey/ColKey pairs instead of doing this on the SDK side. (Issue [#7087](https://github.com/realm/realm-core/pull/7087))
+* None.
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
+* Update existing std exceptions thrown by the Sync Client to use Realm exceptions. ([#6255](https://github.com/realm/realm-core/issues/6255), since v10.2.0)
+
+### Breaking changes
+* Update existing std exceptions thrown by the Sync Client to use Realm exceptions. ([PR #7141](https://github.com/realm/realm-core/pull/7141/files))
+
+### Compatibility
+* Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
+* Added a CombinedTests target that runs tests from object-store, sync, and core together. ([PR #6964](https://github.com/realm/realm-core/pull/6964))
+
+----------------------------------------------
+
+# 13.24.0 Release notes
+
+### Enhancements
+* Refactored how KeyPathArrays are created in the C-API by adding `realm_create_key_path_array` which allows a SDK to pass in the string representation of the keypath and then let Core calculate the correct TableKey/ColKey pairs instead of doing this on the SDK side. (PR [#7087](https://github.com/realm/realm-core/pull/7087))
+* KeyPathArrays can be constructed with a wildcard notation. (Issue [#7125](https://github.com/realm/realm-core/issues/7125))
+
+### Fixed
 * `Set::assign_intersection()` on `Set<StringData>`, `Set<BinaryData>`, and `Set<Mixed>` containing string or binary would cause a use-after-free if a set was intersected with itself ([PR #7144](https://github.com/realm/realm-core/pull/7144), since v10.0.0).
 * Set algebra on `Set<StringData>` and `Set<BinaryData>` gave incorrect results when used on platforms where `char` is signed ([#7135](https://github.com/realm/realm-core/issues/7135), since v13.23.3).
 * Errors encountered while reapplying local changes for client reset recovery on partition-based sync Realms would result in the client reset attempt not being recorded, possibly resulting in an endless loop of attempting and failing to automatically recover the client reset. Flexible sync and errors from the server after completing the local recovery were handled correctly ([PR #7149](https://github.com/realm/realm-core/pull/7149), since v10.2.0).
@@ -24,7 +46,7 @@
 -----------
 
 ### Internals
-* Added a CombinedTests target that runs tests from object-store, sync, and core together. ([PR #6964](https://github.com/realm/realm-core/pull/6964))
+* None.
 
 ----------------------------------------------
 
