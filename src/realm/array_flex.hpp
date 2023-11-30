@@ -29,28 +29,28 @@ namespace realm {
 class Array;
 class ArrayFlex : public ArrayEncode {
 public:
-    explicit ArrayFlex(Array& array);
+    explicit ArrayFlex() = default;
     virtual ~ArrayFlex() = default;
-    bool encode() const final override;
-    bool decode() const final override;
-    bool is_encoded() const final override;
-    size_t size() const final override;
-    int64_t get(size_t) const final override;
+    bool encode(const Array&, Array&) const final override;
+    bool decode(const Array&) const final override;
+    bool is_encoded(const Array&) const final override;
+    size_t size(const Array&) const final override;
+    int64_t get(const Array&, size_t) const final override;
 
 private:
     // read info about the encoded array from header
-    bool get_encode_info(size_t& value_width, size_t& index_width, size_t& value_size, size_t& index_size) const;
-
+    bool get_encode_info(const Array&, size_t& value_width, size_t& index_width, size_t& value_size,
+                         size_t& index_size) const;
     // encode array methods
-    bool try_encode(std::vector<int64_t>&, std::vector<size_t>&) const;
-    void do_encode_array(std::vector<int64_t>&, std::vector<size_t>&) const;
-    bool check_gain(std::vector<int64_t>&, std::vector<size_t>&, int&, int&) const;
-    void setup_array_in_flex_format(std::vector<int64_t>&, std::vector<size_t>&, int, int) const;
-    void copy_into_encoded_array(std::vector<int64_t>&, std::vector<size_t>&) const;
-    std::vector<int64_t> fetch_values(size_t, size_t, size_t, size_t) const;
-    void restore_array(const std::vector<int64_t>&, size_t) const;
-
-    Array& m_array;
+    bool try_encode(const Array&, Array&, std::vector<int64_t>&, std::vector<size_t>&) const;
+    void arrange_data_in_flex_format(const Array&, std::vector<int64_t>&, std::vector<size_t>&) const;
+    bool check_gain(const Array&, std::vector<int64_t>&, std::vector<size_t>&, int&, int&) const;
+    void setup_array_in_flex_format(const Array&, Array&, std::vector<int64_t>&, std::vector<size_t>&, int,
+                                    int) const;
+    void copy_into_encoded_array(Array&, std::vector<int64_t>&, std::vector<size_t>&) const;
+    // decode array methods
+    std::vector<int64_t> fetch_values_from_encoded_array(const Array&, size_t, size_t, size_t, size_t) const;
+    void restore_array(const Array&, const std::vector<int64_t>&) const;
 };
 } // namespace realm
 #endif // REALM_ARRAY_COMPRESS_HPP

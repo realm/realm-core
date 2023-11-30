@@ -31,71 +31,65 @@
 
 using namespace realm;
 
-ArrayFlex::ArrayFlex(Array& array)
-    : m_array(array)
+bool ArrayFlex::encode(const Array& origin, Array& encoded) const
 {
-}
-
-bool ArrayFlex::encode() const
-{
-    REALM_ASSERT(m_array.is_attached());
-    const auto sz = m_array.size();
+    REALM_ASSERT(origin.is_attached());
+    const auto sz = origin.size();
     std::vector<int64_t> values;
     std::vector<size_t> indices;
-    if (!is_encoded() && try_encode(values, indices)) {
+    if (!is_encoded(origin) && try_encode(origin, encoded, values, indices)) {
         REALM_ASSERT(!values.empty());
         REALM_ASSERT(!indices.empty());
         REALM_ASSERT(indices.size() == sz);
-        copy_into_encoded_array(values, indices);
+        copy_into_encoded_array(encoded, values, indices);
         return true;
     }
     return false;
 }
 
-bool ArrayFlex::decode() const
+bool ArrayFlex::decode(const Array& arr) const
 {
     using Encoding = NodeHeader::Encoding;
-    REALM_ASSERT(m_array.is_attached());
+    REALM_ASSERT(arr.is_attached());
     size_t value_width, index_width, value_size, index_size;
-    if (get_encode_info(value_width, index_width, value_size, index_size)) {
-        auto values = fetch_values(value_width, index_width, value_size, index_size);
+    if (get_encode_info(arr, value_width, index_width, value_size, index_size)) {
+        auto values = fetch_values_from_encoded_array(arr, value_width, index_width, value_size, index_size);
         REALM_ASSERT(values.size() == index_size);
-        auto byte_size = NodeHeader::calc_size<Encoding::Flex>(value_size, index_size, value_width, index_width);
-        restore_array(values, byte_size);
+        restore_array(arr, values);
         return true;
     }
     return false;
 }
 
-bool ArrayFlex::is_encoded() const
+bool ArrayFlex::is_encoded(const Array& arr) const
 {
     // We are calling this when the header is not yet initiliased!
     using Encoding = NodeHeader::Encoding;
-    REALM_ASSERT(m_array.is_attached());
-    auto header = (uint64_t*)m_array.get_header();
+    REALM_ASSERT(arr.is_attached());
+    auto header = (uint64_t*)arr.get_header();
     auto kind = Node::get_kind(header);
     return kind == 'B' && Node::get_encoding(header) == Encoding::Flex;
 }
 
-size_t ArrayFlex::size() const
+size_t ArrayFlex::size(const Array& arr) const
 {
-    REALM_ASSERT(m_array.is_attached());
+    REALM_ASSERT(arr.is_attached());
     using Encoding = NodeHeader::Encoding;
-    auto header = (uint64_t*)m_array.get_header();
-    REALM_ASSERT(m_array.get_kind(header) == 'B' && m_array.get_encoding(header) == Encoding::Flex);
+    auto header = (uint64_t*)arr.get_header();
+    REALM_ASSERT(NodeHeader::get_kind(header) == 'B' && NodeHeader::get_encoding(header) == Encoding::Flex);
     return NodeHeader::get_arrayB_num_elements<NodeHeader::Encoding::Flex>(header);
 }
 
-int64_t ArrayFlex::get(size_t ndx) const
+int64_t ArrayFlex::get(const Array& arr, size_t ndx) const
 {
-    REALM_ASSERT(m_array.is_attached());
+    REALM_ASSERT(arr.is_attached());
     size_t value_width, index_width, value_size, index_size;
-    if (get_encode_info(value_width, index_width, value_size, index_size)) {
+    if (get_encode_info(arr, value_width, index_width, value_size, index_size)) {
 
         if (ndx >= index_size)
             return realm::not_found;
 
-        auto data = (uint64_t*)m_array.get_data_from_header(m_array.get_header());
+        auto data = (uint64_t*)NodeHeader::get_data_from_header(arr.get_header());
         const auto offset = (value_size * value_width) + (ndx * index_width);
         const auto index = read_bitfield(data, offset, index_width);
         bf_iterator it_value{data, 0, value_width, value_width, index};
@@ -106,37 +100,37 @@ int64_t ArrayFlex::get(size_t ndx) const
     REALM_UNREACHABLE();
 }
 
-bool ArrayFlex::try_encode(std::vector<int64_t>& values, std::vector<size_t>& indices) const
+bool ArrayFlex::try_encode(const Array& origin, Array& encoded, std::vector<int64_t>& values,
+                           std::vector<size_t>& indices) const
 {
-    const auto sz = m_array.size();
+    const auto sz = origin.size();
 
     if (sz <= 1)
         return false;
 
-    // encode the array in values and indices in order to verify if we can gain
-    // something from this different format
-    do_encode_array(values, indices);
+    // put data in flex format, essentially arrays of values + arrays of indices
+    arrange_data_in_flex_format(origin, values, indices);
 
     // check if makes sense to move forward and replace the current array's data with an encoded version of it
     int value_bit_width = 0;
     int index_bit_width = 0;
-    if (check_gain(values, indices, value_bit_width, index_bit_width)) {
-        setup_array_in_flex_format(values, indices, value_bit_width, index_bit_width);
+    if (check_gain(origin, values, indices, value_bit_width, index_bit_width)) {
+        setup_array_in_flex_format(origin, encoded, values, indices, value_bit_width, index_bit_width);
         return true;
     }
     return false;
 }
 
-void ArrayFlex::copy_into_encoded_array(std::vector<int64_t>& values, std::vector<size_t>& indices) const
+void ArrayFlex::copy_into_encoded_array(Array& arr, std::vector<int64_t>& values, std::vector<size_t>& indices) const
 {
-    REALM_ASSERT(m_array.is_attached());
+    REALM_ASSERT(arr.is_attached());
     using Encoding = NodeHeader::Encoding;
-    auto header = (uint64_t*)m_array.get_header();
-    auto value_width = m_array.get_elementA_size<Encoding::Flex>(header);
-    auto index_width = m_array.get_elementB_size<Encoding::Flex>(header);
+    auto header = (uint64_t*)arr.get_header();
+    auto value_width = NodeHeader::get_elementA_size<Encoding::Flex>(header);
+    auto index_width = NodeHeader::get_elementB_size<Encoding::Flex>(header);
     auto value_size = values.size();
     // fill data
-    auto data = (uint64_t*)NodeHeader::get_data_from_header(m_array.get_header());
+    auto data = (uint64_t*)NodeHeader::get_data_from_header(arr.get_header());
     uint64_t offset = value_size * value_width;
     bf_iterator it_value{data, 0, value_width, value_width, 0};
     bf_iterator it_index{data, offset, index_width, index_width, 0};
@@ -155,11 +149,12 @@ void ArrayFlex::copy_into_encoded_array(std::vector<int64_t>& values, std::vecto
         REALM_ASSERT(values[indices[i]] == v);
         ++it_index;
     }
-    REALM_ASSERT(m_array.get_kind(header) == 'B');
-    REALM_ASSERT(m_array.get_encoding(header) == Encoding::Flex);
+    REALM_ASSERT(arr.get_kind(header) == 'B');
+    REALM_ASSERT(arr.get_encoding(header) == Encoding::Flex);
 }
 
-void ArrayFlex::do_encode_array(std::vector<int64_t>& values, std::vector<size_t>& indices) const
+void ArrayFlex::arrange_data_in_flex_format(const Array& arr, std::vector<int64_t>& values,
+                                            std::vector<size_t>& indices) const
 {
     // Implements the main logic for supporting the encondig Flex protocol.
     // Flex enconding works keeping 2 arrays, one for storing the values and, the other one for storing the indices of
@@ -172,7 +167,7 @@ void ArrayFlex::do_encode_array(std::vector<int64_t>& values, std::vector<size_t
     //
     // The encoding algorithm runs in O(n lg n).
 
-    const auto sz = m_array.size();
+    const auto sz = arr.size();
 
     if (sz <= 1)
         return;
@@ -181,7 +176,7 @@ void ArrayFlex::do_encode_array(std::vector<int64_t>& values, std::vector<size_t
     indices.reserve(sz);
 
     for (size_t i = 0; i < sz; ++i) {
-        auto item = m_array.get(i);
+        auto item = arr.get(i);
         values.push_back(item);
         REALM_ASSERT_3(values.back(), ==, item);
     }
@@ -190,21 +185,21 @@ void ArrayFlex::do_encode_array(std::vector<int64_t>& values, std::vector<size_t
     auto last = std::unique(values.begin(), values.end());
     values.erase(last, values.end());
 
-    for (size_t i = 0; i < m_array.size(); ++i) {
-        auto pos = std::lower_bound(values.begin(), values.end(), m_array.get(i));
+    for (size_t i = 0; i < arr.size(); ++i) {
+        auto pos = std::lower_bound(values.begin(), values.end(), arr.get(i));
         indices.push_back(std::distance(values.begin(), pos));
-        REALM_ASSERT(values[indices[i]] == m_array.get(i));
+        REALM_ASSERT(values[indices[i]] == arr.get(i));
     }
 
     for (size_t i = 0; i < sz; ++i) {
-        auto old_value = m_array.get(i);
+        auto old_value = arr.get(i);
         auto new_value = values[indices[i]];
         REALM_ASSERT_3(new_value, ==, old_value);
     }
 }
 
-bool ArrayFlex::check_gain(std::vector<int64_t>& values, std::vector<size_t>& indices, int& value_bit_width,
-                           int& index_bit_width) const
+bool ArrayFlex::check_gain(const Array& arr, std::vector<int64_t>& values, std::vector<size_t>& indices,
+                           int& value_bit_width, int& index_bit_width) const
 {
     using Encoding = NodeHeader::Encoding;
     const auto [min_value, max_value] = std::minmax_element(values.begin(), values.end());
@@ -213,51 +208,47 @@ bool ArrayFlex::check_gain(std::vector<int64_t>& values, std::vector<size_t>& in
     index_bit_width = index == 0 ? 1 : Node::unsigned_to_num_bits(index);
     REALM_ASSERT(value_bit_width > 0);
     REALM_ASSERT(index_bit_width > 0);
-
     // we should consider Encoding::Packed as well here.
-    const auto uncompressed_size = m_array.get_byte_size();
+    const auto uncompressed_size = arr.get_byte_size();
     auto byte_size =
         NodeHeader::calc_size<Encoding::Flex>(values.size(), indices.size(), value_bit_width, index_bit_width);
     return byte_size < uncompressed_size;
 }
 
-void ArrayFlex::setup_array_in_flex_format(std::vector<int64_t>& values, std::vector<size_t>& indices,
-                                           int value_bit_width, int index_bit_width) const
+void ArrayFlex::setup_array_in_flex_format(const Array& origin, Array& arr, std::vector<int64_t>& values,
+                                           std::vector<size_t>& indices, int value_bit_width,
+                                           int index_bit_width) const
 {
     using Encoding = NodeHeader::Encoding;
 
     // I'm assuming that flags are taken from the owning Array.
-    uint8_t flags = NodeHeader::get_flags((uint64_t*)m_array.get_header());
+    uint8_t flags = NodeHeader::get_flags((uint64_t*)origin.get_header());
 
     auto byte_size =
         NodeHeader::calc_size<Encoding::Flex>(values.size(), indices.size(), value_bit_width, index_bit_width);
 
-    Allocator& allocator = m_array.get_alloc();
-    auto mem_to_del = m_array.get_mem();
+
+    Allocator& allocator = arr.get_alloc();
     auto mem = allocator.alloc(byte_size);
-    // auto mem = allocator.realloc_(m_array.get_ref(), m_array.get_header(),
-    // m_array.get_capacity_from_header(m_array.get_header()), byte_size);
     auto header = (uint64_t*)mem.get_addr();
     NodeHeader::init_header(header, 'B', Encoding::Flex, flags, value_bit_width, index_bit_width, values.size(),
                             indices.size());
     REALM_ASSERT(NodeHeader::get_kind(header) == 'B');
     REALM_ASSERT(NodeHeader::get_encoding(header) == Encoding::Flex);
     NodeHeader::set_capacity_in_header(byte_size, (char*)header);
-    m_array.init_from_mem(mem);
-    m_array.update_parent();
-    REALM_ASSERT(m_array.m_ref == mem.get_ref());
-    REALM_ASSERT(m_array.get_kind(header) == 'B');
-    REALM_ASSERT(m_array.get_encoding(header) == Encoding::Flex);
-    allocator.free_(mem_to_del);
+    arr.init_from_mem(mem);
+    REALM_ASSERT(arr.m_ref == mem.get_ref());
+    REALM_ASSERT(arr.get_kind(header) == 'B');
+    REALM_ASSERT(arr.get_encoding(header) == Encoding::Flex);
 }
 
-bool ArrayFlex::get_encode_info(size_t& value_width, size_t& index_width, size_t& value_size,
+bool ArrayFlex::get_encode_info(const Array& arr, size_t& value_width, size_t& index_width, size_t& value_size,
                                 size_t& index_size) const
 {
-    REALM_ASSERT(m_array.is_attached());
+    REALM_ASSERT(arr.is_attached());
     using Encoding = NodeHeader::Encoding;
-    auto header = (uint64_t*)m_array.get_header();
-    if (m_array.get_kind(header) == 'B' && m_array.get_encoding(header) == Encoding::Flex) {
+    auto header = (uint64_t*)arr.get_header();
+    if (NodeHeader::get_kind(header) == 'B' && NodeHeader::get_encoding(header) == Encoding::Flex) {
         value_size = NodeHeader::get_arrayA_num_elements<Encoding::Flex>(header);
         index_size = NodeHeader::get_arrayB_num_elements<Encoding::Flex>(header);
         value_width = NodeHeader::get_elementA_size<Encoding::Flex>(header);
@@ -267,12 +258,13 @@ bool ArrayFlex::get_encode_info(size_t& value_width, size_t& index_width, size_t
     return false;
 }
 
-std::vector<int64_t> ArrayFlex::fetch_values(size_t value_width, size_t index_width, size_t value_size,
-                                             size_t index_size) const
+std::vector<int64_t> ArrayFlex::fetch_values_from_encoded_array(const Array& arr, size_t value_width,
+                                                                size_t index_width, size_t value_size,
+                                                                size_t index_size) const
 {
     std::vector<int64_t> values;
     values.reserve(index_size);
-    auto data = (uint64_t*)m_array.get_data_from_header(m_array.get_header());
+    auto data = (uint64_t*)NodeHeader::get_data_from_header(arr.get_header());
     const auto offset = value_size * value_width;
     bf_iterator index_iterator{data, offset, index_width, index_width, 0};
     for (size_t i = 0; i < index_size; ++i) {
@@ -286,11 +278,12 @@ std::vector<int64_t> ArrayFlex::fetch_values(size_t value_width, size_t index_wi
     return values;
 }
 
-void ArrayFlex::restore_array(const std::vector<int64_t>& values, size_t) const
+void ArrayFlex::restore_array(const Array& arr, const std::vector<int64_t>& values) const
 {
     // do the reverse of compressing the array
+    REALM_ASSERT(arr.is_attached());
     using Encoding = NodeHeader::Encoding;
-    const auto flags = m_array.get_flags((uint64_t*)m_array.get_header());
+    const auto flags = NodeHeader::get_flags((uint64_t*)arr.get_header());
     const auto size = values.size();
     const auto [min_value, max_value] = std::minmax_element(values.begin(), values.end());
     auto width_a = NodeHeader::signed_to_num_bits(*min_value);
@@ -298,20 +291,18 @@ void ArrayFlex::restore_array(const std::vector<int64_t>& values, size_t) const
     auto width = std::max(width_a, width_b);
     auto byte_size = NodeHeader::calc_size<Encoding::WTypBits>(size, width);
     REALM_ASSERT(byte_size % 8 == 0); // 8 bytes aligned value
-    Allocator& allocator = m_array.get_alloc();
-    auto mem_to_del = m_array.get_mem();
+    Allocator& allocator = arr.get_alloc();
+    Array& tmp = (Array&)arr; // TODO: this is temporary... it requires a static method in Array.
+    tmp.destroy();
     auto mem = allocator.alloc(byte_size);
-    // auto mem = allocator.realloc_(m_array.get_ref(), m_array.get_header(), compressed_byte_size, byte_size);
     auto header = (uint64_t*)mem.get_addr();
-    NodeHeader::init_header(header, 'A', Encoding::WTypBits, flags, 0, 0); // width and size not importat here.
+    NodeHeader::init_header(header, 'A', Encoding::WTypBits, flags, 0, 0);
     NodeHeader::set_capacity_in_header(byte_size, (char*)header);
-    m_array.init_from_mem(mem);
-    m_array.update_parent();
+    tmp.init_from_mem(mem);
     size_t i = 0;
     for (const auto& v : values)
-        m_array.insert(i++, v);
-    REALM_ASSERT(m_array.get_width() != 0);
-    REALM_ASSERT(m_array.get_width() % 8 == 0 && m_array.get_width() != 0);
-    REALM_ASSERT(m_array.size() == values.size());
-    allocator.free_(mem_to_del);
+        tmp.insert(i++, v);
+    REALM_ASSERT(arr.get_width() != 0);
+    REALM_ASSERT(arr.get_width() % 8 == 0 && arr.get_width() != 0);
+    REALM_ASSERT(arr.size() == values.size());
 }

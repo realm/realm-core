@@ -190,19 +190,21 @@ using namespace realm;
 using namespace realm::util;
 
 void QueryStateBase::dyncast() {}
+static ArrayFlex s_array_flex;
 
 Array::Array(Allocator& allocator) noexcept
     : Node(allocator)
-    , m_encode(
-          ArrayFlex(*this)) // TODO: this needs to become a sort of factory in order to support multiple encodings
+    // TODO: this needs to become a sort of factory in order to support multiple encodings
+    , m_encode(s_array_flex)
 {
 }
 
 template <size_t w>
 int64_t Array::get(size_t ndx) const noexcept
 {
+    // TODO this can be a static method, in which we pass the array and the encode implementation ref.
     if (is_encoded())
-        return m_encode.get(ndx);
+        return m_encode.get(*this, ndx);
 
     REALM_ASSERT_DEBUG(is_attached());
     return get_universal<w>(m_data, ndx);
@@ -211,7 +213,7 @@ int64_t Array::get(size_t ndx) const noexcept
 int64_t Array::get(size_t ndx) const noexcept
 {
     if (is_encoded())
-        return m_encode.get(ndx);
+        return m_encode.get(*this, ndx);
 
     REALM_ASSERT_DEBUG(is_attached());
     REALM_ASSERT_DEBUG_EX(ndx < m_size, ndx, m_size);
@@ -359,13 +361,18 @@ ref_type Array::write(_impl::ArrayWriterBase& out, bool deep, bool only_if_modif
         return m_ref;
 
     if (!deep || !m_has_refs) {
-        if (compress_in_flight && encode_array()) {
-            const auto header = get_header();
-            const auto h = (uint64_t*)header;
+        Array encoded_array{m_alloc};
+        if (compress_in_flight && encode_array(encoded_array)) {
+            const auto h = (uint64_t*)encoded_array.get_header();
             REALM_ASSERT(get_kind(h) == 'B');
             REALM_ASSERT(get_encoding(h) == Encoding::Flex);
+            auto ref = encoded_array.do_write_shallow(out);
+            encoded_array.destroy();
+            return ref;
         }
-        return do_write_shallow(out); // Throws
+        else {
+            return do_write_shallow(out); // Throws
+        }
     }
 
     return do_write_deep(out, only_if_modified, compress_in_flight); // Throws
@@ -381,15 +388,20 @@ ref_type Array::write(ref_type ref, Allocator& alloc, _impl::ArrayWriterBase& ou
     array.init_from_ref(ref);
 
     if (!array.m_has_refs) {
-        if (compress_in_flight && array.encode_array()) {
-            const auto header = array.get_header();
+        Array encoded_array{alloc};
+        if (compress_in_flight && array.encode_array(encoded_array)) {
+            const auto header = encoded_array.get_header();
             const auto h = (uint64_t*)header;
             REALM_ASSERT(get_kind(h) == 'B');
             REALM_ASSERT(get_encoding(h) == Encoding::Flex);
+            auto ref = encoded_array.do_write_shallow(out);
+            encoded_array.destroy();
+            return ref;
         }
-        return array.do_write_shallow(out); // Throws
+        else {
+            return array.do_write_shallow(out); // Throws
+        }
     }
-
     return array.do_write_deep(out, only_if_modified, compress_in_flight); // Throws
 }
 
@@ -692,11 +704,11 @@ void Array::do_ensure_minimum_width(int_fast64_t value)
 size_t Array::size() const noexcept
 {
     if (is_encoded())
-        return m_encode.size();
+        return m_encode.size(*this);
     return m_size;
 }
 
-bool Array::encode_array() const
+bool Array::encode_array(Array& arr) const
 {
     const auto header = get_header();
     auto kind = get_kind((uint64_t*)header);
@@ -704,7 +716,7 @@ bool Array::encode_array() const
         auto encoding = get_encoding((uint64_t*)header);
         // encode everything that is WtypeBits (all integer arrays included ref arrays)
         if (encoding == NodeHeader::Encoding::WTypBits) {
-            return m_encode.encode();
+            return m_encode.encode(*this, arr);
         }
     }
     return false;
@@ -718,7 +730,7 @@ bool Array::decode_array() const
     if (kind == 'B') {
         auto encoding = get_encoding((uint64_t*)header);
         if (encoding == NodeHeader::Encoding::Flex) {
-            return m_encode.decode();
+            return m_encode.decode(*this);
         }
     }
     return false;
@@ -726,15 +738,15 @@ bool Array::decode_array() const
 
 bool Array::is_encoded() const
 {
-    return m_encode.is_encoded();
+    return m_encode.is_encoded(*this);
 }
 
-bool Array::try_encode() const
+bool Array::try_encode(Array& arr) const
 {
-    return encode_array();
+    return encode_array(arr);
 }
 
-bool Array::try_decode() const
+bool Array::try_decode()
 {
     return decode_array();
 }

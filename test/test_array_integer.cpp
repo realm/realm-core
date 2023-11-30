@@ -35,77 +35,108 @@ using namespace realm::test_util;
 TEST(Test_ArrayInt_no_encode)
 {
     ArrayInteger a(Allocator::get_default());
+    ArrayInteger a1(Allocator::get_default());
     a.create();
     a.add(10);
     a.add(11);
     a.add(12);
-    CHECK_NOT(a.try_encode());
+    CHECK_NOT(a.try_encode(a1));
     CHECK_NOT(a.is_encoded());
+    CHECK_NOT(a1.is_encoded());
     CHECK(a.get(0) == 10);
     CHECK(a.get(1) == 11);
     CHECK(a.get(2) == 12);
+    CHECK(a1.get(0) == 10);
+    CHECK(a1.get(1) == 11);
+    CHECK(a1.get(2) == 12);
+    a.destroy();
+    a1.destroy();
 }
 
 TEST(Test_array_same_size_less_bits)
 {
     ArrayInteger a(Allocator::get_default());
+    ArrayInteger a1(Allocator::get_default());
     a.create();
     a.add(24);
     a.add(240);
     a.add(545);
-    CHECK(a.try_encode());
-    CHECK(a.is_encoded());
+    CHECK(a.try_encode(a1));
+    CHECK_NOT(a.is_encoded());
+    CHECK(a1.is_encoded());
     CHECK(a.get_any(0) == 24);
     CHECK(a.get_any(1) == 240);
     CHECK(a.get_any(2) == 545);
+    CHECK(a1.get_any(0) == 24);
+    CHECK(a1.get_any(1) == 240);
+    CHECK(a1.get_any(2) == 545);
+    a.destroy();
+    a1.destroy();
 }
 
 TEST(Test_ArrayInt_encode_decode_needed)
 {
     ArrayInteger a(Allocator::get_default());
+    ArrayInteger a1(Allocator::get_default());
     a.create();
     a.add(10);
     a.add(5);
     a.add(5);
     // uncompressed requires 3 x 4 bits, compressed takes 2 x 5 bits + 3 x 2 bits
     // with 8 byte alignment this is both 16 bytes.
-    CHECK_NOT(a.try_encode());
+    CHECK_NOT(a.try_encode(a1));
     CHECK_NOT(a.is_encoded());
+    CHECK_NOT(a1.is_encoded());
     CHECK_NOT(a.try_decode());
+    CHECK_NOT(a1.try_decode());
     CHECK_NOT(a.is_encoded());
+    CHECK_NOT(a1.is_encoded());
     a.add(10);
     a.add(15);
     // uncompressed is 5x4 bits, compressed is 3x5 bits + 5x2 bits
     // with 8 byte alignment this is both 16 bytes
-    CHECK_NOT(a.try_encode());
+    a1.clear();
+    CHECK_NOT(a.try_encode(a1));
     CHECK_NOT(a.is_encoded());
+    CHECK_NOT(a1.is_encoded());
     a.add(10);
     a.add(15);
     a.add(10);
     a.add(15);
     // uncompressed is 9x4 bits, compressed is 3x5 bits + 9x2 bits
     // with 8 byte alignment this is both 16 bytes
-    CHECK_NOT(a.try_encode());
+    a1.clear();
+    CHECK_NOT(a.try_encode(a1));
     CHECK_NOT(a.is_encoded());
+    CHECK_NOT(a1.is_encoded());
     a.add(-1);
     // the addition of -1 forces the array from unsigned to signed form
     // changing from 4 bits per element to 8 bits.
     // (1,2,4 bit elements are unsigned, larger elements are signed)
     // uncompressed is 10x8 bits, compressed is 3x5 bits + 10x2 bits
     // with alignment, this is 24 bytes uncompressed and 16 bytes compressed
-    CHECK(a.try_encode());
-    CHECK(a.is_encoded());
+    a1.clear();
+    CHECK(a.try_encode(a1));
+    CHECK_NOT(a.is_encoded());
+    CHECK(a1.is_encoded());
     CHECK(a.get(0) == 10);
     CHECK(a.get(1) == 5);
     CHECK(a.get(2) == 5);
     CHECK(a.get(3) == 10);
     CHECK(a.get(4) == 15);
+    CHECK(a1.get(0) == 10);
+    CHECK(a1.get(1) == 5);
+    CHECK(a1.get(2) == 5);
+    CHECK(a1.get(3) == 10);
+    CHECK(a1.get(4) == 15);
     a.destroy();
+    a1.destroy();
 }
 
 TEST(Test_ArrayInt_negative_nums)
 {
     ArrayInteger a(Allocator::get_default());
+    ArrayInteger a1(Allocator::get_default());
     a.create();
     a.add(-1000000);
     a.add(0);
@@ -115,62 +146,87 @@ TEST(Test_ArrayInt_negative_nums)
     CHECK(a.get(1) == 0);
     CHECK(a.get(2) == 1000000);
     a.add(-1000000);
-    CHECK_NOT(a.try_encode());
+    CHECK_NOT(a.try_encode(a1));
     CHECK_NOT(a.is_encoded());
+    CHECK_NOT(a1.is_encoded());
     CHECK(a.get(0) == -1000000);
     CHECK(a.get(1) == 0);
     CHECK(a.get(2) == 1000000);
     CHECK(a.get(3) == -1000000);
-    CHECK_NOT(a.try_decode());
+    CHECK_NOT(a1.try_decode());
     a.add(0);
-    CHECK(a.try_encode());
-    CHECK(a.is_encoded());
-    CHECK(a.get(0) == -1000000);
-    CHECK(a.get(1) == 0);
-    CHECK(a.get(2) == 1000000);
-    CHECK(a.get(3) == -1000000);
-    CHECK(a.get(4) == 0);
-    CHECK(a.try_decode());
+    a1.clear();
+    CHECK(a.try_encode(a1));
+    CHECK_NOT(a.is_encoded());
+    CHECK(a1.is_encoded());
+    CHECK(a1.get(0) == -1000000);
+    CHECK(a1.get(1) == 0);
+    CHECK(a1.get(2) == 1000000);
+    CHECK(a1.get(3) == -1000000);
+    CHECK(a1.get(4) == 0);
+    CHECK(a1.try_decode());
+
     a.add(1000000);
-    CHECK(a.try_encode());
-    CHECK(a.is_encoded());
+    a1.clear();
+    CHECK(a.try_encode(a1));
+    CHECK_NOT(a.is_encoded());
+    CHECK(a1.is_encoded());
     CHECK(a.get(0) == -1000000);
     CHECK(a.get(1) == 0);
     CHECK(a.get(2) == 1000000);
-    CHECK(a.try_decode());
+    CHECK(a1.get(0) == -1000000);
+    CHECK(a1.get(1) == 0);
+    CHECK(a1.get(2) == 1000000);
+    CHECK(a1.try_decode());
+
     a.add(-1000000);
-    CHECK(a.try_encode());
-    CHECK(a.is_encoded());
+    a1.clear();
+    CHECK(a.try_encode(a1));
+    CHECK_NOT(a.is_encoded());
+    CHECK(a1.is_encoded());
     CHECK(a.get(0) == -1000000);
     CHECK(a.get(1) == 0);
     CHECK(a.get(2) == 1000000);
-    CHECK(a.try_decode());
+    CHECK(a1.get(0) == -1000000);
+    CHECK(a1.get(1) == 0);
+    CHECK(a1.get(2) == 1000000);
+    CHECK(a1.try_decode());
+
     a.add(0);
-    CHECK(a.try_encode());
-    CHECK(a.is_encoded());
-    CHECK(a.get(0) == -1000000);
-    CHECK(a.get(1) == 0);
-    CHECK(a.get(2) == 1000000);
-    CHECK(a.try_decode());
+    a1.clear();
+    CHECK(a.try_encode(a1));
+    CHECK_NOT(a.is_encoded());
+    CHECK(a1.is_encoded());
+    CHECK(a1.get(0) == -1000000);
+    CHECK(a1.get(1) == 0);
+    CHECK(a1.get(2) == 1000000);
+    CHECK(a1.try_decode());
+
     a.add(1000000);
-    CHECK(a.try_encode());
-    CHECK(a.is_encoded());
+    a1.clear();
+    CHECK(a.try_encode(a1));
+    CHECK_NOT(a.is_encoded());
+    CHECK(a1.is_encoded());
     CHECK(a.size() == 9);
-    CHECK(a.is_encoded());
-    CHECK(a.get(0) == -1000000);
-    CHECK(a.get(1) == 0);
-    CHECK(a.get(2) == 1000000);
-    CHECK(a.get(3) == -1000000);
-    CHECK(a.get(4) == 0);
-    CHECK(a.get(5) == 1000000);
-    CHECK(a.get(6) == -1000000);
-    CHECK(a.get(7) == 0);
-    CHECK(a.get(8) == 1000000);
+    CHECK(a.size() == a1.size());
+    CHECK(a1.is_encoded());
+    CHECK(a1.get(0) == -1000000);
+    CHECK(a1.get(1) == 0);
+    CHECK(a1.get(2) == 1000000);
+    CHECK(a1.get(3) == -1000000);
+    CHECK(a1.get(4) == 0);
+    CHECK(a1.get(5) == 1000000);
+    CHECK(a1.get(6) == -1000000);
+    CHECK(a1.get(7) == 0);
+    CHECK(a1.get(8) == 1000000);
+    a.destroy();
+    a1.destroy();
 }
 
 TEST(Test_ArrayInt_compress_data)
 {
     ArrayInteger a(Allocator::get_default());
+    ArrayInteger a1(Allocator::get_default());
     a.create();
     a.add(16388);
     a.add(409);
@@ -182,46 +238,49 @@ TEST(Test_ArrayInt_compress_data)
     // Current: [16388:16, 409:16, 16388:16, 16388:16, 409:16, 16388:16], space needed: 6*16 bits = 96 bits +
     // header
     // compress the array is a good option.
-    CHECK(a.try_encode());
-    CHECK(a.is_encoded());
+    CHECK(a.try_encode(a1));
+    CHECK(a1.is_encoded());
     // Compressed: [409:16, 16388:16][1:1,0:1,1:1,1:1,0:1,1:1], space needed: 2*16 bits + 6 * 1 bit = 38 bits +
     // header
-    CHECK(a.size() == 6);
-    CHECK(a.get(0) == 16388);
-    CHECK(a.get(1) == 409);
-    CHECK(a.get(2) == 16388);
-    CHECK(a.get(3) == 16388);
-    CHECK(a.get(4) == 409);
-    CHECK(a.get(5) == 16388);
+    CHECK(a1.size() == 6);
+    CHECK(a1.get(0) == 16388);
+    CHECK(a1.get(1) == 409);
+    CHECK(a1.get(2) == 16388);
+    CHECK(a1.get(3) == 16388);
+    CHECK(a1.get(4) == 409);
+    CHECK(a1.get(5) == 16388);
     // decompress
-    CHECK(a.try_decode());
+    CHECK(a1.try_decode());
     a.add(20);
     // compress again, it should be a viable option
-    CHECK(a.try_encode());
-    CHECK(a.is_encoded());
-    CHECK(a.size() == 7);
-    CHECK(a.get(0) == 16388);
-    CHECK(a.get(1) == 409);
-    CHECK(a.get(2) == 16388);
-    CHECK(a.get(3) == 16388);
-    CHECK(a.get(4) == 409);
-    CHECK(a.get(5) == 16388);
-    CHECK(a.get(6) == 20);
-    CHECK(a.try_decode());
-    CHECK_NOT(a.is_encoded());
-    CHECK(a.get(0) == 16388);
-    CHECK(a.get(1) == 409);
-    CHECK(a.get(2) == 16388);
-    CHECK(a.get(3) == 16388);
-    CHECK(a.get(4) == 409);
-    CHECK(a.get(5) == 16388);
-    CHECK(a.get(6) == 20);
+    a1.clear();
+    CHECK(a.try_encode(a1));
+    CHECK(a1.is_encoded());
+    CHECK(a1.size() == 7);
+    CHECK(a1.get(0) == 16388);
+    CHECK(a1.get(1) == 409);
+    CHECK(a1.get(2) == 16388);
+    CHECK(a1.get(3) == 16388);
+    CHECK(a1.get(4) == 409);
+    CHECK(a1.get(5) == 16388);
+    CHECK(a1.get(6) == 20);
+    CHECK(a1.try_decode());
+    CHECK_NOT(a1.is_encoded());
+    CHECK(a1.get(0) == 16388);
+    CHECK(a1.get(1) == 409);
+    CHECK(a1.get(2) == 16388);
+    CHECK(a1.get(3) == 16388);
+    CHECK(a1.get(4) == 409);
+    CHECK(a1.get(5) == 16388);
+    CHECK(a1.get(6) == 20);
     a.destroy();
+    a1.destroy();
 }
 
 TEST(Test_ArrayInt_compress_data_init_from_mem)
 {
     ArrayInteger a(Allocator::get_default());
+    ArrayInteger a1(Allocator::get_default());
     a.create();
     a.add(16388);
     a.add(409);
@@ -234,28 +293,29 @@ TEST(Test_ArrayInt_compress_data_init_from_mem)
     // Current: [16388:16, 409:16, 16388:16, 16388:16, 409:16, 16388:16],
     // space needed: 6*16 bits = 96 bits + header
     // compress the array is a good option (it should already be compressed).
-    CHECK(a.try_encode());
-    CHECK(a.is_encoded());
+    CHECK(a.try_encode(a1));
+    CHECK(a1.is_encoded());
     //  Array should be in compressed form now
-    auto mem = a.get_mem();
-    ArrayInteger a1(Allocator::get_default());
-    a1.init_from_mem(mem); // initialise a1 with a
+    auto mem = a1.get_mem();
+    ArrayInteger a2(Allocator::get_default());
+    a2.init_from_mem(mem); // initialise a1 with a
     // check a1
-    CHECK(a1.is_encoded());
-    const auto sz1 = a1.size();
-    CHECK(sz1 == 6);
-    CHECK(a1.get(0) == 16388);
-    CHECK(a1.get(1) == 409);
-    CHECK(a1.get(2) == 16388);
-    CHECK(a1.get(3) == 16388);
-    CHECK(a1.get(4) == 409);
-    CHECK(a1.get(5) == 16388);
-    // decompress a1 and compresses again
-    CHECK(a1.is_encoded());
-    CHECK(a1.try_decode());
-    CHECK_NOT(a1.is_encoded());
-    a1.add(20);
-    CHECK(a1.try_encode());
+    CHECK(a2.is_encoded());
+    const auto sz2 = a2.size();
+    CHECK(sz2 == 6);
+    CHECK(a2.get(0) == 16388);
+    CHECK(a2.get(1) == 409);
+    CHECK(a2.get(2) == 16388);
+    CHECK(a2.get(3) == 16388);
+    CHECK(a2.get(4) == 409);
+    CHECK(a2.get(5) == 16388);
+    // decompress a2 and compresses again
+    CHECK(a2.is_encoded());
+    CHECK(a2.try_decode());
+    CHECK_NOT(a2.is_encoded());
+    a2.add(20);
+    a1.clear();
+    CHECK(a2.try_encode(a1));
     CHECK(a1.is_encoded());
     CHECK(a1.size() == 7);
     CHECK(a1.get(0) == 16388);
@@ -268,7 +328,9 @@ TEST(Test_ArrayInt_compress_data_init_from_mem)
     CHECK(a1.try_decode());
     // a1 is now in charge of destroying the memory
     a1.destroy();
+    a2.destroy();
     CHECK_NOT(a1.is_attached());
+    CHECK_NOT(a2.is_attached());
 }
 
 TEST(ArrayIntNull_SetNull)

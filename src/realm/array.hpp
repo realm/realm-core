@@ -23,9 +23,10 @@
 #include <realm/query_state.hpp>
 #include <realm/column_fwd.hpp>
 #include <realm/array_direct.hpp>
-#include <realm/array_flex.hpp>
 
 namespace realm {
+
+class ArrayEncode;
 
 // Pre-definitions
 class GroupWriter;
@@ -542,9 +543,7 @@ protected:
     bool m_has_refs;             // Elements whose first bit is zero are refs to subarrays.
     bool m_context_flag;         // Meaning depends on context.
 
-    // TODO: This should be an opaque reference to a generic encode that is constructed via a factory. In order to
-    // implement a different compression algorithm on demand
-    ArrayFlex m_encode;
+    ArrayEncode& m_encode;
 
 private:
     ref_type do_write_shallow(_impl::ArrayWriterBase&) const;
@@ -555,13 +554,13 @@ private:
 #endif
 
     // encode/decode this array
-    bool encode_array() const;
+    bool encode_array(Array&) const;
     bool decode_array() const;
 
 public:
     bool is_encoded() const;
-    bool try_encode() const;
-    bool try_decode() const;
+    bool try_encode(Array&) const;
+    bool try_decode();
 
 private:
     friend class Allocator;
