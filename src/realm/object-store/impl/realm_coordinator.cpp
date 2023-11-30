@@ -786,6 +786,7 @@ void RealmCoordinator::commit_write(Realm& realm, bool commit_to_disk)
     }
 
     if (realm.m_binding_context) {
+        get_logger()->error("Call did_change from within RealmCoordinator, line 789");
         realm.m_binding_context->did_change({}, {});
     }
     // note: no longer safe to access `realm` or `this` after this point as
