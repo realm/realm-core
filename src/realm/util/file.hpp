@@ -530,7 +530,7 @@ public:
     /// Both instances have to be attached to open files. If they are
     /// not, this function has undefined behavior.
     bool is_same_file(const File&) const;
-    static bool is_same_file_static(FileDesc f1, FileDesc f2);
+    static bool is_same_file_static(FileDesc f1, FileDesc f2, const std::string& path1, const std::string& path2);
 
     static FileDesc dup_file_desc(FileDesc fd);
 
@@ -620,7 +620,7 @@ public:
     static std::optional<UniqueID> get_unique_id(const std::string& path);
 
     // Return the unique id for the file descriptor. Throws if the underlying stat operation fails.
-    static UniqueID get_unique_id(FileDesc file);
+    static UniqueID get_unique_id(FileDesc file, const std::string& debug_path);
 
     template <class>
     class Map;

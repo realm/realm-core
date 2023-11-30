@@ -1584,16 +1584,16 @@ bool File::compare(const std::string& path_1, const std::string& path_2)
     return true;
 }
 
-bool File::is_same_file_static(FileDesc f1, FileDesc f2)
+bool File::is_same_file_static(FileDesc f1, FileDesc f2, const std::string& path1, const std::string& path2)
 {
-    return get_unique_id(f1) == get_unique_id(f2);
+    return get_unique_id(f1, path1) == get_unique_id(f2, path2);
 }
 
 bool File::is_same_file(const File& f) const
 {
     REALM_ASSERT_RELEASE(is_attached());
     REALM_ASSERT_RELEASE(f.is_attached());
-    return is_same_file_static(m_fd, f.m_fd);
+    return is_same_file_static(m_fd, f.m_fd, m_path, f.m_path);
 }
 
 FileDesc File::dup_file_desc(FileDesc fd)
@@ -1616,7 +1616,7 @@ FileDesc File::dup_file_desc(FileDesc fd)
 File::UniqueID File::get_unique_id() const
 {
     REALM_ASSERT_RELEASE(is_attached());
-    return File::get_unique_id(m_fd);
+    return File::get_unique_id(m_fd, m_path);
 }
 
 FileDesc File::get_descriptor() const
@@ -1640,7 +1640,7 @@ std::optional<File::UniqueID> File::get_unique_id(const std::string& path)
         throw SystemError(GetLastError(), "CreateFileW failed");
     }
 
-    return get_unique_id(fileHandle);
+    return get_unique_id(fileHandle, path);
 #else // POSIX version
     struct stat statbuf;
     if (::stat(path.c_str(), &statbuf) == 0) {
@@ -1658,17 +1658,18 @@ std::optional<File::UniqueID> File::get_unique_id(const std::string& path)
     // File doesn't exist
     if (err == ENOENT)
         return none;
-    throw SystemError(err, format_errno("fstat() failed: %1", err));
+    throw SystemError(err, format_errno("fstat() failed: %1 for '%2'", err, path));
 #endif
 }
 
-File::UniqueID File::get_unique_id(FileDesc file)
+File::UniqueID File::get_unique_id(FileDesc file, const std::string& debug_path)
 {
 #ifdef _WIN32 // Windows version
     REALM_ASSERT(file != nullptr);
     File::UniqueID ret;
     if (GetFileInformationByHandleEx(file, FileIdInfo, &ret.id_info, sizeof(ret.id_info)) == 0) {
-        throw std::system_error(GetLastError(), std::system_category(), "GetFileInformationByHandleEx() failed");
+        throw std::system_error(GetLastError(), std::system_category(),
+                                util::format("GetFileInformationByHandleEx() failed for '%1'", debug_path));
     }
 
     return ret;
@@ -1679,12 +1680,17 @@ File::UniqueID File::get_unique_id(FileDesc file)
         // On exFAT systems the inode and device are not populated
         // until the file has been allocated some space. This has led
         // to bugs where a unique id returned here was reused by different
-        // files. The following assertion ensures that this is not happening
+        // files. The following check ensures that this is not happening
         // anywhere else in future code.
-        REALM_ASSERT_EX(statbuf.st_size > 0, statbuf.st_size, file);
+        if (statbuf.st_size == 0) {
+            throw FileAccessError(ErrorCodes::FileOperationFailed,
+                                  "Attempt to get unique id on an empty file. This could be due to an external "
+                                  "process modifying Realm files.",
+                                  debug_path);
+        }
         return UniqueID(statbuf.st_dev, statbuf.st_ino);
     }
-    throw std::system_error(errno, std::system_category(), "fstat() failed");
+    throw std::system_error(errno, std::system_category(), util::format("fstat() failed for '%1'", debug_path));
 #endif
 }
 

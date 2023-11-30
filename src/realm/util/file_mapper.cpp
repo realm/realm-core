@@ -495,7 +495,7 @@ EncryptedFileMapping* add_mapping(void* addr, size_t size, const FileAttributes&
 
     LockGuard lock(mapping_mutex);
 
-    File::UniqueID fuid = File::get_unique_id(file.fd);
+    File::UniqueID fuid = File::get_unique_id(file.fd, file.path);
 
     std::vector<mappings_for_file>::iterator it;
     for (it = mappings_by_file.begin(); it != mappings_by_file.end(); ++it) {
