@@ -225,6 +225,11 @@ public:
         return m_audit_context.get();
     }
 
+    util::Logger* get_logger() const noexcept
+    {
+        return m_db->get_logger();
+    }
+
 private:
     friend Realm::Internal;
     Realm::Config m_config;

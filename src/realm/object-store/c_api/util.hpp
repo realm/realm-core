@@ -145,6 +145,7 @@ public:
 
     void invoke(Args... args)
     {
+        printf("Invoking callbackRegistry: %ld", (long) m_callbacks.size());
         for (auto& callback : m_callbacks) {
             callback.second(args...);
         }

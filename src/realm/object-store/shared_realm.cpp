@@ -52,6 +52,7 @@
 #endif
 
 #include <thread>
+#include <inttypes.h>
 
 using namespace realm;
 using namespace realm::_impl;
@@ -233,16 +234,20 @@ void Realm::read_schema_from_group_if_needed()
             m_schema_version = ObjectStore::get_schema_version(*m_transaction);
             m_schema = ObjectStore::schema_from_group(*m_transaction);
             m_schema_transaction_version = m_transaction->get_version_of_current_transaction().version;
+            m_transaction->get_logger()->error("Transaction version: %1, line 236", (int)m_schema_transaction_version);
         }
         return;
     }
 
     Group& group = read_group();
     auto current_version = transaction().get_version_of_current_transaction().version;
-    if (m_schema_transaction_version == current_version)
+    if (m_schema_transaction_version == current_version) {
+        m_transaction->get_logger()->error("Same Transaction version: %1, line 245", (int)m_schema_transaction_version);
         return;
+    }
 
     m_schema_transaction_version = current_version;
+    m_transaction->get_logger()->error("Transaction version: %1, line 250", (int)m_schema_transaction_version);
     m_schema_version = ObjectStore::get_schema_version(group);
     auto schema = ObjectStore::schema_from_group(group);
 
@@ -1208,7 +1213,9 @@ OwnedBinaryData Realm::write_copy()
 
 void Realm::notify()
 {
+    m_coordinator->get_logger()->error("Entering Realm::notify()");
     if (is_closed() || is_in_transaction() || is_frozen()) {
+        m_coordinator->get_logger()->error("Return early Realm::notify(), line 1213");
         return;
     }
 
@@ -1221,6 +1228,7 @@ void Realm::notify()
     if (m_binding_context) {
         m_binding_context->before_notify();
         if (is_closed() || is_in_transaction()) {
+            m_coordinator->get_logger()->error("Return early Realm::notify(), line 1226");
             return;
         }
     }
@@ -1228,6 +1236,7 @@ void Realm::notify()
     if (!m_coordinator->can_advance(*this)) {
         CountGuard sending_notifications(m_is_sending_notifications);
         m_coordinator->process_available_async(*this);
+        m_coordinator->get_logger()->error("Return early Realm::notify(), line 1234");
         return;
     }
 
@@ -1236,13 +1245,17 @@ void Realm::notify()
 
         // changes_available() may have advanced the read version, and if
         // so we don't need to do anything further
-        if (!m_coordinator->can_advance(*this))
+        if (!m_coordinator->can_advance(*this)) {
+            m_coordinator->get_logger()->error("Return early Realm::notify(), line 1244");
             return;
+        }
     }
 
     CountGuard sending_notifications(m_is_sending_notifications);
+    m_coordinator->get_logger()->error("Check auto-refresh, line 1249");
     if (m_auto_refresh) {
         if (m_transaction) {
+            m_coordinator->get_logger()->error("Found transaction, do not trigger did_change, line 1252");
             try {
                 m_coordinator->advance_to_ready(*this);
             }
@@ -1253,7 +1266,9 @@ void Realm::notify()
                 cache_new_schema();
         }
         else {
+            m_coordinator->get_logger()->error("Dit not Found transaction, line 1263");
             if (m_binding_context) {
+                m_coordinator->get_logger()->error("Call did_change, line 1265");
                 m_binding_context->did_change({}, {});
             }
             if (!is_closed()) {
