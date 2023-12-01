@@ -78,7 +78,7 @@ util::Optional<std::string> to_optional_string(StringData sd)
 std::vector<AuditEvent> get_audit_events(TestSyncManager& manager, bool parse_events = true)
 {
     // Wait for all sessions to be fully uploaded and then tear them down
-    auto sync_manager = manager.app()->sync_manager();
+    auto sync_manager = manager.sync_manager();
     REALM_ASSERT(sync_manager);
     auto sessions = sync_manager->get_all_sessions();
     for (auto& session : sessions) {
@@ -1676,7 +1676,7 @@ TEST_CASE("audit integration tests", "[sync][pbs][audit][baas]") {
     auto app_create_config = default_app_config();
     app_create_config.schema = schema;
     app_create_config.dev_mode_enabled = false;
-    TestAppSession session = create_app(app_create_config);
+    TestAppSession session(TestAppSession::Config{create_app(app_create_config)});
 
     SyncTestFile config(session.app()->current_user(), bson::Bson("default"));
     config.schema = schema;
@@ -1734,7 +1734,7 @@ TEST_CASE("audit integration tests", "[sync][pbs][audit][baas]") {
         // Create an app which does not include AuditEvent in the schema so that
         // things will break if audit tries to use it
         app_create_config.schema = no_audit_event_schema;
-        TestAppSession session_2 = create_app(app_create_config);
+        TestAppSession session_2(TestAppSession::Config{create_app(app_create_config)});
         SyncTestFile config(session_2.app()->current_user(), bson::Bson("default"));
         config.schema = no_audit_event_schema;
         config.audit_config = std::make_shared<AuditConfig>();
@@ -1775,7 +1775,7 @@ TEST_CASE("audit integration tests", "[sync][pbs][audit][baas]") {
         auto audit_user = session.app()->current_user();
         config.audit_config->audit_user = audit_user;
         auto realm = Realm::get_shared_realm(config);
-        session.app()->sync_manager()->remove_user(audit_user->identity());
+        session.app()->backing_store()->remove_user(audit_user->identity());
 
         auto audit = realm->audit_context();
         auto scope = audit->begin_scope("scope");
@@ -1793,7 +1793,7 @@ TEST_CASE("audit integration tests", "[sync][pbs][audit][baas]") {
 
     SECTION("AuditEvent missing from server schema") {
         app_create_config.schema = no_audit_event_schema;
-        TestAppSession session_2 = create_app(app_create_config);
+        TestAppSession session_2(TestAppSession::Config{create_app(app_create_config)});
         SyncTestFile config(session_2.app()->current_user(), bson::Bson("default"));
         config.schema = no_audit_event_schema;
         config.audit_config = std::make_shared<AuditConfig>();

@@ -81,19 +81,22 @@ public:
         std::shared_ptr<GenericNetworkTransport> transport = instance_of<SynchronousTestTransport>;
         ReconnectMode reconnect_mode = ReconnectMode::testing;
         std::shared_ptr<realm::sync::SyncSocketProvider> custom_socket_provider = nullptr;
+        std::optional<app::App::StoreFactory> factory = std::nullopt;
     };
 
     explicit FLXSyncTestHarness(Config&& config)
-        : m_test_session(make_app_from_server_schema(config.test_name, config.server_schema), config.transport, true,
-                         config.reconnect_mode, config.custom_socket_provider)
+        : m_test_session(TestAppSession::Config{make_app_from_server_schema(config.test_name, config.server_schema),
+                                                config.transport, true, config.reconnect_mode,
+                                                config.custom_socket_provider, config.factory})
         , m_schema(std::move(config.server_schema.schema))
     {
     }
     FLXSyncTestHarness(const std::string& test_name, ServerSchema server_schema = default_server_schema(),
                        std::shared_ptr<GenericNetworkTransport> transport = instance_of<SynchronousTestTransport>,
                        std::shared_ptr<realm::sync::SyncSocketProvider> custom_socket_provider = nullptr)
-        : m_test_session(make_app_from_server_schema(test_name, server_schema), std::move(transport), true,
-                         realm::ReconnectMode::normal, custom_socket_provider)
+        : m_test_session(TestAppSession::Config{make_app_from_server_schema(test_name, server_schema),
+                                                std::move(transport), true, realm::ReconnectMode::normal,
+                                                custom_socket_provider})
         , m_schema(std::move(server_schema.schema))
     {
     }

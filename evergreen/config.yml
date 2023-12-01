@@ -265,7 +265,7 @@ functions:
           if [[ -n "${run_with_encryption}" ]]; then
               export UNITTEST_ENCRYPT_ALL=1
           fi
-          export TSAN_OPTIONS="suppressions=$(pwd)/test/tsan.suppress history_size=4"
+          export TSAN_OPTIONS="suppressions=$(pwd)/test/tsan.suppress history_size=4 second_deadlock_stack=1"
           export UBSAN_OPTIONS="print_stacktrace=1"
 
           cd build

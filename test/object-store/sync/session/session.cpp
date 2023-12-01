@@ -45,8 +45,8 @@ static const std::string dummy_device_id = "123400000000000000000000";
 
 static std::shared_ptr<SyncUser> get_user(const std::shared_ptr<app::App>& app)
 {
-    return app->sync_manager()->get_user("user_id", ENCODE_FAKE_JWT("fake_refresh_token"),
-                                         ENCODE_FAKE_JWT("fake_access_token"), dummy_device_id);
+    return app->backing_store()->get_user("user_id", ENCODE_FAKE_JWT("fake_refresh_token"),
+                                          ENCODE_FAKE_JWT("fake_access_token"), dummy_device_id);
 }
 
 TEST_CASE("SyncSession: management by SyncUser", "[sync][session]") {
@@ -54,9 +54,8 @@ TEST_CASE("SyncSession: management by SyncUser", "[sync][session]") {
         return;
 
     TestSyncManager init_sync_manager;
-    auto& server = init_sync_manager.sync_server();
     auto app = init_sync_manager.app();
-    const std::string realm_base_url = server.base_url();
+    const std::string realm_base_url = init_sync_manager.sync_server().base_url();
 
     SECTION("a SyncUser can properly retrieve its owned sessions") {
         auto user = get_user(app);
@@ -67,10 +66,10 @@ TEST_CASE("SyncSession: management by SyncUser", "[sync][session]") {
         });
 
         // Check the sessions on the SyncUser.
-        REQUIRE(user->all_sessions().size() == 2);
-        auto s1 = user->session_for_on_disk_path(session1->path());
+        REQUIRE(app->sync_manager()->get_all_sessions_for(*user).size() == 2);
+        auto s1 = app->sync_manager()->get_existing_session(session1->path());
         REQUIRE(s1 == session1);
-        auto s2 = user->session_for_on_disk_path(session2->path());
+        auto s2 = app->sync_manager()->get_existing_session(session2->path());
         REQUIRE(s2 == session2);
     }
 
@@ -88,7 +87,10 @@ TEST_CASE("SyncSession: management by SyncUser", "[sync][session]") {
         EventLoop::main().run_until([&] {
             return sessions_are_inactive(*session1, *session2);
         });
-        CHECK(user->all_sessions().size() == 0);
+        auto all_sessions = app->sync_manager()->get_all_sessions_for(*user);
+        REQUIRE(all_sessions.size() == 2);
+        CHECK(all_sessions[0]->state() == SyncSession::State::Inactive);
+        CHECK(all_sessions[1]->state() == SyncSession::State::Inactive);
     }
 
     SECTION("a SyncUser defers binding new sessions until it is logged in") {
@@ -101,13 +103,23 @@ TEST_CASE("SyncSession: management by SyncUser", "[sync][session]") {
         spin_runloop();
         REQUIRE(session1->state() == SyncSession::State::Inactive);
         REQUIRE(session2->state() == SyncSession::State::Inactive);
-        REQUIRE(user->all_sessions().size() == 0);
+        {
+            auto all_sessions = app->sync_manager()->get_all_sessions_for(*user);
+            REQUIRE(all_sessions.size() == 2);
+            CHECK(all_sessions[0]->state() == SyncSession::State::Inactive);
+            CHECK(all_sessions[1]->state() == SyncSession::State::Inactive);
+        }
         // Log the user back in via the sync manager.
         user = get_user(app);
         EventLoop::main().run_until([&] {
             return sessions_are_active(*session1, *session2);
         });
-        REQUIRE(user->all_sessions().size() == 2);
+        {
+            auto all_sessions = app->sync_manager()->get_all_sessions_for(*user);
+            REQUIRE(all_sessions.size() == 2);
+            CHECK(all_sessions[0]->state() == SyncSession::State::Active);
+            CHECK(all_sessions[1]->state() == SyncSession::State::Active);
+        }
     }
 
     SECTION("a SyncUser properly rebinds existing sessions upon logging back in") {
@@ -118,7 +130,7 @@ TEST_CASE("SyncSession: management by SyncUser", "[sync][session]") {
         EventLoop::main().run_until([&] {
             return sessions_are_active(*session1, *session2);
         });
-        REQUIRE(user->all_sessions().size() == 2);
+        REQUIRE(app->sync_manager()->get_all_sessions_for(*user).size() == 2);
         // Log the user out.
         user->log_out();
         REQUIRE(user->state() == SyncUser::State::LoggedOut);
@@ -126,13 +138,23 @@ TEST_CASE("SyncSession: management by SyncUser", "[sync][session]") {
         spin_runloop();
         REQUIRE(session1->state() == SyncSession::State::Inactive);
         REQUIRE(session2->state() == SyncSession::State::Inactive);
-        REQUIRE(user->all_sessions().size() == 0);
+        {
+            auto all_sessions = app->sync_manager()->get_all_sessions_for(*user);
+            REQUIRE(all_sessions.size() == 2);
+            CHECK(all_sessions[0]->state() == SyncSession::State::Inactive);
+            CHECK(all_sessions[1]->state() == SyncSession::State::Inactive);
+        }
         // Log the user back in via the sync manager.
         user = get_user(app);
         EventLoop::main().run_until([&] {
             return sessions_are_active(*session1, *session2);
         });
-        REQUIRE(user->all_sessions().size() == 2);
+        {
+            auto all_sessions = app->sync_manager()->get_all_sessions_for(*user);
+            REQUIRE(all_sessions.size() == 2);
+            CHECK(all_sessions[0]->state() == SyncSession::State::Active);
+            CHECK(all_sessions[1]->state() == SyncSession::State::Active);
+        }
     }
 
     SECTION("sessions that were destroyed can be properly recreated when requested again") {
@@ -161,7 +183,7 @@ TEST_CASE("SyncSession: management by SyncUser", "[sync][session]") {
         auto session = sync_session(
             user, path, [](auto, auto) {}, SyncSessionStopPolicy::Immediately, &on_disk_path);
         CHECK(session);
-        session = user->session_for_on_disk_path(on_disk_path);
+        session = app->sync_manager()->get_existing_session(on_disk_path);
         CHECK(session);
     }
 
@@ -311,7 +333,7 @@ TEST_CASE("SyncSession: shutdown_and_wait() API", "[sync][session]") {
 TEST_CASE("SyncSession: internal pause_async API", "[sync][session]") {
     TestSyncManager init_sync_manager;
     auto app = init_sync_manager.app();
-    auto user = app->sync_manager()->get_user("close-api-tests-user", ENCODE_FAKE_JWT("fake_refresh_token"),
+    auto user = app->backing_store()->get_user("close-api-tests-user", ENCODE_FAKE_JWT("fake_refresh_token"),
                                               ENCODE_FAKE_JWT("fake_access_token"), dummy_device_id);
 
     auto session = sync_session(
@@ -467,7 +489,7 @@ TEST_CASE("sync: error handling", "[sync][session]") {
         std::string recovery_path = error->user_info[SyncError::c_recovery_file_path_key];
         auto idx = recovery_path.find("recovered_realm");
         CHECK(idx != std::string::npos);
-        idx = recovery_path.find(app->sync_manager()->recovery_directory_path());
+        idx = recovery_path.find(app->backing_store()->recovery_directory_path());
         CHECK(idx != std::string::npos);
         if (just_before.tm_year == just_after.tm_year) {
             idx = recovery_path.find(util::format_local_time(just_after_raw, "%Y"));
@@ -551,7 +573,7 @@ TEST_CASE("sync: stop policy behavior", "[sync][session]") {
             std::shared_ptr<SyncSession> session2;
             {
                 auto realm = Realm::get_shared_realm(config);
-                session2 = user->sync_manager()->get_existing_session(config.path);
+                session2 = realm->sync_session();
             }
             REQUIRE(session->state() == SyncSession::State::Active);
             REQUIRE(session2 == session);

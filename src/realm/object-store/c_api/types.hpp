@@ -620,6 +620,30 @@ struct realm_sync_client_config : realm::c_api::WrapC, realm::SyncClientConfig {
     using SyncClientConfig::SyncClientConfig;
 };
 
+struct realm_backing_store_config : realm::c_api::WrapC, realm::app::RealmBackingStoreConfig {
+    using RealmBackingStoreConfig::RealmBackingStoreConfig;
+};
+
+struct realm_backing_store : realm::c_api::WrapC, std::shared_ptr<realm::app::RealmBackingStore> {
+    realm_backing_store(std::shared_ptr<realm::app::RealmBackingStore> store)
+        : std::shared_ptr<realm::app::RealmBackingStore>{std::move(store)}
+    {
+    }
+
+    realm_backing_store* clone() const override
+    {
+        return new realm_backing_store{*this};
+    }
+
+    bool equals(const WrapC& other) const noexcept final
+    {
+        if (auto ptr = dynamic_cast<const realm_backing_store*>(&other)) {
+            return get() == ptr->get();
+        }
+        return false;
+    }
+};
+
 struct realm_sync_config : realm::c_api::WrapC, realm::SyncConfig {
     using SyncConfig::SyncConfig;
     realm_sync_config(const SyncConfig& c)

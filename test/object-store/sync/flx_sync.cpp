@@ -2632,7 +2632,7 @@ TEST_CASE("flx: commit subscription while refreshing the access token", "[sync][
     transport->request_hook = [&](const Request&) {
         auto user = app->current_user();
         REQUIRE(user);
-        for (auto& session : user->all_sessions()) {
+        for (auto& session : app->sync_manager()->get_all_sessions_for(*user)) {
             if (session->state() == SyncSession::State::WaitingForAccessToken) {
                 REQUIRE(!seen_waiting_for_access_token);
                 seen_waiting_for_access_token = true;
@@ -4526,18 +4526,18 @@ TEST_CASE("flx sync: Client reset during async open", "[sync][flx][client reset]
 
     auto realm_task = Realm::get_synchronized_realm(realm_config);
     auto realm_pf = util::make_promise_future<SharedRealm>();
-    realm_task->start([&](ThreadSafeReference ref, std::exception_ptr ex) {
-        auto& promise = realm_pf.promise;
-        try {
-            if (ex) {
-                std::rethrow_exception(ex);
+    realm_task->start(
+        [promise = std::move(realm_pf.promise)](ThreadSafeReference ref, std::exception_ptr ex) mutable {
+            try {
+                if (ex) {
+                    std::rethrow_exception(ex);
+                }
+                promise.emplace_value(Realm::get_shared_realm(std::move(ref)));
             }
-            promise.emplace_value(Realm::get_shared_realm(std::move(ref)));
-        }
-        catch (...) {
-            promise.set_error(exception_to_status());
-        }
-    });
+            catch (...) {
+                promise.set_error(exception_to_status());
+            }
+        });
     auto realm = realm_pf.future.get();
     before_callback_called.future.get();
     after_callback_called.future.get();

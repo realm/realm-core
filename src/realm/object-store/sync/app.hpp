@@ -19,11 +19,13 @@
 #ifndef REALM_APP_HPP
 #define REALM_APP_HPP
 
+#include <realm/object-store/sync/app_backing_store.hpp>
 #include <realm/object-store/sync/app_credentials.hpp>
 #include <realm/object-store/sync/app_service_client.hpp>
 #include <realm/object-store/sync/auth_request_client.hpp>
 #include <realm/object-store/sync/generic_network_transport.hpp>
 #include <realm/object-store/sync/push_client.hpp>
+#include <realm/object-store/sync/realm_backing_store.hpp>
 #include <realm/object-store/sync/subscribable.hpp>
 
 #include <realm/object_id.hpp>
@@ -108,6 +110,12 @@ public:
 
     /// Get all users.
     std::vector<std::shared_ptr<SyncUser>> all_users() const;
+
+    /// Get the BackingStore for this App.
+    std::shared_ptr<BackingStore> const& backing_store() const
+    {
+        return m_app_backing_store;
+    }
 
     std::shared_ptr<SyncManager> const& sync_manager() const
     {
@@ -255,8 +263,12 @@ public:
         Enabled, // Return a cached app instance if one was previously generated for `config`'s app_id+base_url combo,
         Disabled // Bypass the app cache; return a new app instance.
     };
-    /// Get a shared pointer to a configured App instance.
-    static SharedApp get_app(CacheMode mode, const Config& config, const SyncClientConfig& sync_client_config);
+    using StoreFactory = util::FunctionRef<std::shared_ptr<BackingStore>(SharedApp)>;
+    /// Get a shared pointer to a configured App instance. Sync is fully enabled and the external backing store
+    /// factory provided is used to create a store if the cache is not used. If you want the
+    /// default storage engine, construct a RealmBackingStore instance in the factory.
+    static SharedApp get_app(CacheMode mode, const Config& config, const SyncClientConfig& sync_client_config,
+                             StoreFactory store_factory);
 
     /// Return a cached app instance if one was previously generated for the `app_id`+`base_url` combo using
     /// `App::get_app()`.
@@ -465,6 +477,7 @@ private:
     std::string m_ws_host_url GUARDED_BY(m_route_mutex);
 
     uint64_t m_request_timeout_ms;
+    std::shared_ptr<BackingStore> m_app_backing_store;
     std::shared_ptr<SyncManager> m_sync_manager;
     std::shared_ptr<util::Logger> m_logger_ptr;
 
@@ -582,7 +595,7 @@ private:
 
     std::string function_call_url_path() const REQUIRES(!m_route_mutex);
 
-    void configure(const SyncClientConfig& sync_client_config) REQUIRES(!m_route_mutex);
+    static SharedApp do_get_app(CacheMode mode, const Config& config, util::FunctionRef<void(SharedApp)> do_config);
 
     // Requires locking m_route_mutex before calling
     std::string make_sync_route(util::Optional<std::string> ws_host_url = util::none) REQUIRES(m_route_mutex);

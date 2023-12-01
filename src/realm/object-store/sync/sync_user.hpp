@@ -19,10 +19,10 @@
 #ifndef REALM_OS_SYNC_USER_HPP
 #define REALM_OS_SYNC_USER_HPP
 
-#include <realm/object-store/util/atomic_shared_ptr.hpp>
-#include <realm/util/bson/bson.hpp>
 #include <realm/object-store/sync/subscribable.hpp>
+#include <realm/object-store/util/atomic_shared_ptr.hpp>
 
+#include <realm/util/bson/bson.hpp>
 #include <realm/util/checked_mutex.hpp>
 #include <realm/util/optional.hpp>
 #include <realm/table.hpp>
@@ -35,7 +35,9 @@
 
 namespace realm {
 namespace app {
+class App;
 struct AppError;
+class BackingStore;
 class MongoClient;
 } // namespace app
 class SyncManager;
@@ -54,6 +56,8 @@ struct RealmJWT {
     // Custom user data embedded in the encoded token.
     util::Optional<bson::BsonDocument> user_data;
 
+    explicit RealmJWT(std::string_view token);
+    explicit RealmJWT(StringData token);
     explicit RealmJWT(const std::string& token);
     RealmJWT() = default;
 
@@ -162,7 +166,7 @@ struct SyncUserIdentity {
 // A `SyncUser` represents a single user account. Each user manages the sessions that
 // are associated with it.
 class SyncUser : public std::enable_shared_from_this<SyncUser>, public Subscribable<SyncUser> {
-    friend class SyncSession;
+    friend class app::BackingStore; // only this is expected to construct a SyncUser
     struct Private {};
 
 public:
@@ -171,15 +175,6 @@ public:
         LoggedIn,
         Removed,
     };
-
-    // Return a list of all sessions belonging to this user.
-    std::vector<std::shared_ptr<SyncSession>> all_sessions() REQUIRES(!m_mutex);
-
-    // Return a session for a given on disk path.
-    // In most cases, bindings shouldn't expose this to consumers, since the on-disk
-    // path for a synced Realm is an opaque implementation detail. This API is retained
-    // for testing purposes, and for bindings for consumers that are servers or tools.
-    std::shared_ptr<SyncSession> session_for_on_disk_path(const std::string& path) REQUIRES(!m_mutex);
 
     // Log the user out and mark it as such. This will also close its associated Sessions.
     void log_out() REQUIRES(!m_mutex, !m_tokens_mutex);
@@ -211,26 +206,28 @@ public:
     // Custom user data embedded in the access token.
     util::Optional<bson::BsonDocument> custom_data() const REQUIRES(!m_tokens_mutex);
 
-    std::shared_ptr<SyncManager> sync_manager() const REQUIRES(!m_mutex);
+    // Get the app instance that this user belongs to.
+    // This may not lock() if this SyncUser has become detached.
+    std::weak_ptr<app::App> app() const REQUIRES(!m_mutex);
 
     /// Retrieves a general-purpose service client for the Realm Cloud service
     /// @param service_name The name of the cluster
     app::MongoClient mongo_client(const std::string& service_name) REQUIRES(!m_mutex);
 
     // ------------------------------------------------------------------------
-    // All of the following are called by `SyncManager` and are public only for
+    // All of the following are called by `RealmBackingStore` and are public only for
     // testing purposes. SDKs should not call these directly in non-test code
     // or expose them in the public API.
 
-    explicit SyncUser(Private, const std::string& refresh_token, const std::string& id,
-                      const std::string& access_token, const std::string& device_id, SyncManager* sync_manager);
-    explicit SyncUser(Private, const SyncUserMetadata& data, SyncManager* sync_manager);
+    // Don't use this directly; use the `BackingStore` APIs. Public for use with `make_shared`.
+    SyncUser(Private, std::string_view refresh_token, std::string_view id, std::string_view access_token,
+             std::string_view device_id, std::shared_ptr<app::App> app);
+    SyncUser(Private, const SyncUserMetadata& data, std::shared_ptr<app::App> app);
     SyncUser(const SyncUser&) = delete;
     SyncUser& operator=(const SyncUser&) = delete;
 
     // Atomically set the user to be logged in and update both tokens.
-    void log_in(const std::string& access_token, const std::string& refresh_token)
-        REQUIRES(!m_mutex, !m_tokens_mutex);
+    void log_in(std::string_view access_token, std::string_view refresh_token) REQUIRES(!m_mutex, !m_tokens_mutex);
 
     // Atomically set the user to be removed and remove tokens.
     void invalidate() REQUIRES(!m_mutex, !m_tokens_mutex);
@@ -241,12 +238,6 @@ public:
 
     // Update the user's profile and identities.
     void update_user_profile(std::vector<SyncUserIdentity> identities, SyncUserProfile profile) REQUIRES(!m_mutex);
-
-    // Register a session to this user.
-    // A registered session will be bound at the earliest opportunity: either
-    // immediately, or upon the user becoming Active.
-    // Note that this is called by the SyncManager, and should not be directly called.
-    void register_session(std::shared_ptr<SyncSession>) REQUIRES(!m_mutex);
 
     /// Refreshes the custom data for this user
     /// If `update_location` is true, the location metadata will be queried before the request
@@ -266,14 +257,11 @@ public:
         m_seconds_to_adjust_time_for_testing.store(seconds);
     }
 
-protected:
-    friend class SyncManager;
-    void detach_from_sync_manager() REQUIRES(!m_mutex);
+    // FIXME: Not for public use.
+    void detach_from_backing_store() REQUIRES(!m_mutex);
 
 private:
     bool do_is_anonymous() const REQUIRES(m_mutex);
-
-    std::vector<std::shared_ptr<SyncSession>> revive_sessions() REQUIRES(m_mutex);
 
     State m_state GUARDED_BY(m_mutex);
 
@@ -285,13 +273,6 @@ private:
 
     // Set by the server. The unique ID of the user account on the Realm Application.
     const std::string m_identity;
-
-    // Sessions are owned by the SyncManager, but the user keeps a map of weak references
-    // to them.
-    std::unordered_map<std::string, std::weak_ptr<SyncSession>> m_sessions;
-
-    // Waiting sessions are those that should be asked to connect once this user is logged in.
-    std::unordered_map<std::string, std::weak_ptr<SyncSession>> m_waiting_sessions;
 
     mutable util::CheckedMutex m_tokens_mutex;
 
@@ -308,7 +289,7 @@ private:
 
     const std::string m_device_id;
 
-    SyncManager* m_sync_manager;
+    std::weak_ptr<app::App> m_app;
 
     std::atomic<int> m_seconds_to_adjust_time_for_testing = 0;
 };
