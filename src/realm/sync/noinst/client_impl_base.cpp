@@ -2307,7 +2307,7 @@ Status Session::receive_ident_message(SaltedFileIdent client_file_ident)
         auto err_msg = util::format("A fatal error occurred during client reset: '%1'", e.what());
         logger.error(err_msg.c_str());
         SessionErrorInfo err_info(Status{ErrorCodes::AutoClientResetFailed, err_msg}, IsFatal{true},
-                                  ProtocolErrorInfo::Action::ApplicationBug);
+                                  ProtocolErrorInfo::Action::BackupThenDeleteRealm);
         suspend(err_info);
         return Status::OK();
     }

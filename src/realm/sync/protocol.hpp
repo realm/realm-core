@@ -271,6 +271,7 @@ struct ProtocolErrorInfo {
         RefreshUser,
         RefreshLocation,
         LogOutUser,
+        BackupThenDeleteRealm,
     };
 
     ProtocolErrorInfo() = default;
@@ -425,6 +426,8 @@ inline std::ostream& operator<<(std::ostream& o, ProtocolErrorInfo::Action actio
             return o << "Warning";
         case ProtocolErrorInfo::Action::Transient:
             return o << "Transient";
+        case ProtocolErrorInfo::Action::BackupThenDeleteRealm:
+            return o << "BackupThenDeleteRealm";
         case ProtocolErrorInfo::Action::DeleteRealm:
             return o << "DeleteRealm";
         case ProtocolErrorInfo::Action::ClientReset:

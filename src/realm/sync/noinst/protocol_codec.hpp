@@ -472,6 +472,7 @@ private:
             {"ApplicationBug", action::ApplicationBug},
             {"Warning", action::Warning},
             {"Transient", action::Transient},
+            {"BackupThenDeleteRealm", action::BackupThenDeleteRealm},
             {"DeleteRealm", action::DeleteRealm},
             {"ClientReset", action::ClientReset},
             {"ClientResetNoRecovery", action::ClientResetNoRecovery},

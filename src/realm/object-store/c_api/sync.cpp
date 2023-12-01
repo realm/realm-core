@@ -105,6 +105,13 @@ static_assert(realm_sync_error_action_e(ProtocolErrorInfo::Action::MigrateToFLX)
               RLM_SYNC_ERROR_ACTION_MIGRATE_TO_FLX);
 static_assert(realm_sync_error_action_e(ProtocolErrorInfo::Action::RevertToPBS) ==
               RLM_SYNC_ERROR_ACTION_REVERT_TO_PBS);
+static_assert(realm_sync_error_action_e(ProtocolErrorInfo::Action::RefreshUser) ==
+              RLM_SYNC_ERROR_ACTION_REFRESH_USER);
+static_assert(realm_sync_error_action_e(ProtocolErrorInfo::Action::RefreshLocation) ==
+              RLM_SYNC_ERROR_ACTION_REFRESH_LOCATION);
+static_assert(realm_sync_error_action_e(ProtocolErrorInfo::Action::LogOutUser) == RLM_SYNC_ERROR_ACTION_LOG_OUT_USER);
+static_assert(realm_sync_error_action_e(ProtocolErrorInfo::Action::BackupThenDeleteRealm) ==
+              RLM_SYNC_ERROR_ACTION_BACKUP_THEN_DELETE_REALM);
 
 static_assert(realm_flx_sync_subscription_set_state_e(SubscriptionSet::State::Pending) ==
               RLM_SYNC_SUBSCRIPTION_PENDING);
