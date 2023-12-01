@@ -552,6 +552,7 @@ private:
     void report_memory_usage_2(MemUsageHandler&) const;
 #endif
 
+protected:
     // encode/decode this array
     bool encode_array(Array&) const;
     static bool decode_array(Array& arr);

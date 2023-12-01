@@ -91,6 +91,7 @@ void ArrayUnsigned::update_from_parent() noexcept
 
 size_t ArrayUnsigned::lower_bound(uint64_t value) const noexcept
 {
+    Array::decode_array((Array&)*this);
     if (m_width == 8) {
         uint8_t* arr = reinterpret_cast<uint8_t*>(m_data);
         uint8_t* pos = std::lower_bound(arr, arr + m_size, value);
@@ -129,6 +130,7 @@ size_t ArrayUnsigned::lower_bound(uint64_t value) const noexcept
 
 size_t ArrayUnsigned::upper_bound(uint64_t value) const noexcept
 {
+    Array::decode_array((Array&)*this);
     if (m_width == 8) {
         uint8_t* arr = reinterpret_cast<uint8_t*>(m_data);
         uint8_t* pos = std::upper_bound(arr, arr + m_size, value);

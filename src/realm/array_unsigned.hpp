@@ -19,16 +19,16 @@
 #ifndef REALM_ARRAY_UNSIGNED_HPP
 #define REALM_ARRAY_UNSIGNED_HPP
 
-#include <realm/node.hpp>
+#include <realm/array.hpp>
 
 namespace realm {
 
 // Array holding unsigned values only
-class ArrayUnsigned : public Node {
+class ArrayUnsigned : public Array {
 
 public:
     ArrayUnsigned(Allocator& allocator)
-        : Node(allocator)
+        : Array(allocator)
     {
     }
 
