@@ -373,7 +373,7 @@ public:
     static Encoding get_encoding(const uint64_t* header)
     {
         const auto kind = get_kind(header);
-        // REALM_ASSERT(kind == 'A' || kind == 'B');
+        REALM_ASSERT(kind == 'A' || kind == 'B');
         if (kind == 'A') {
             switch (get_wtype_from_header((const char*)header)) {
                 case wtype_Bits:
@@ -992,6 +992,7 @@ size_t inline NodeHeader::get_byte_size_from_header(const char* header) noexcept
 {
     auto h = (uint64_t*)header;
     auto kind = get_kind(h);
+    // this is required for making tests ok TODO: fix this!
     // REALM_ASSERT(kind == 'A' || kind == 'B');
     if (kind == 'B') {
         auto encoding = get_encoding(h);

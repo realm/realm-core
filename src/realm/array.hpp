@@ -107,10 +107,8 @@ public:
     {
         REALM_ASSERT_DEBUG(ref);
         char* header = m_alloc.translate(ref);
-        // auto kind = get_kind((uint64_t*)header);
-        //        if(kind != 'A' && kind != 'B')
-        //            set_kind((uint64_t*)header, 'A');
-        // REALM_ASSERT(kind == 'A' || kind == 'B');
+        auto kind = get_kind((uint64_t*)header);
+        REALM_ASSERT(kind == 'A' || kind == 'B');
         init_from_mem(MemRef(header, ref, m_alloc));
     }
 

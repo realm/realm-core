@@ -114,6 +114,10 @@ bool ArrayFlex::try_encode(const Array& origin, Array& encoded, std::vector<int6
     int value_bit_width = 0;
     int index_bit_width = 0;
     if (check_gain(origin, values, indices, value_bit_width, index_bit_width)) {
+#if REALM_DEBUG
+        for (size_t i = 0; i < sz; ++i)
+            REALM_ASSERT(origin.get(i) == values[indices[i]]);
+#endif
         setup_array_in_flex_format(origin, encoded, values, indices, value_bit_width, index_bit_width);
         return true;
     }
