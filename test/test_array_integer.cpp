@@ -40,15 +40,13 @@ TEST(Test_ArrayInt_no_encode)
     a.add(10);
     a.add(11);
     a.add(12);
+    // the original array is never encoded. a1 is the array to write down to disk
+    // in this case compression is not needed
     CHECK_NOT(a.try_encode(a1));
     CHECK_NOT(a.is_encoded());
-    CHECK_NOT(a1.is_encoded());
     CHECK(a.get(0) == 10);
     CHECK(a.get(1) == 11);
     CHECK(a.get(2) == 12);
-    CHECK(a1.get(0) == 10);
-    CHECK(a1.get(1) == 11);
-    CHECK(a1.get(2) == 12);
     a.destroy();
     a1.destroy();
 }
@@ -58,18 +56,18 @@ TEST(Test_array_same_size_less_bits)
     ArrayInteger a(Allocator::get_default());
     ArrayInteger a1(Allocator::get_default());
     a.create();
-    a.add(24);
-    a.add(240);
-    a.add(545);
+    a.add(1000000);
+    a.add(1000000);
+    a.add(1000000);
     CHECK(a.try_encode(a1));
     CHECK_NOT(a.is_encoded());
+    CHECK(a.get_any(0) == 1000000);
+    CHECK(a.get_any(1) == 1000000);
+    CHECK(a.get_any(2) == 1000000);
     CHECK(a1.is_encoded());
-    CHECK(a.get_any(0) == 24);
-    CHECK(a.get_any(1) == 240);
-    CHECK(a.get_any(2) == 545);
-    CHECK(a1.get_any(0) == 24);
-    CHECK(a1.get_any(1) == 240);
-    CHECK(a1.get_any(2) == 545);
+    CHECK(a1.get_any(0) == 1000000);
+    CHECK(a1.get_any(1) == 1000000);
+    CHECK(a1.get_any(2) == 1000000);
     a.destroy();
     a1.destroy();
 }
@@ -86,44 +84,34 @@ TEST(Test_ArrayInt_encode_decode_needed)
     // with 8 byte alignment this is both 16 bytes.
     CHECK_NOT(a.try_encode(a1));
     CHECK_NOT(a.is_encoded());
-    CHECK_NOT(a1.is_encoded());
-    CHECK_NOT(a.try_decode());
-    CHECK_NOT(a1.try_decode());
-    CHECK_NOT(a.is_encoded());
-    CHECK_NOT(a1.is_encoded());
     a.add(10);
     a.add(15);
     // uncompressed is 5x4 bits, compressed is 3x5 bits + 5x2 bits
     // with 8 byte alignment this is both 16 bytes
-    a1.clear();
     CHECK_NOT(a.try_encode(a1));
     CHECK_NOT(a.is_encoded());
-    CHECK_NOT(a1.is_encoded());
     a.add(10);
     a.add(15);
     a.add(10);
     a.add(15);
     // uncompressed is 9x4 bits, compressed is 3x5 bits + 9x2 bits
     // with 8 byte alignment this is both 16 bytes
-    a1.clear();
     CHECK_NOT(a.try_encode(a1));
     CHECK_NOT(a.is_encoded());
-    CHECK_NOT(a1.is_encoded());
     a.add(-1);
     // the addition of -1 forces the array from unsigned to signed form
     // changing from 4 bits per element to 8 bits.
     // (1,2,4 bit elements are unsigned, larger elements are signed)
     // uncompressed is 10x8 bits, compressed is 3x5 bits + 10x2 bits
     // with alignment, this is 24 bytes uncompressed and 16 bytes compressed
-    a1.clear();
     CHECK(a.try_encode(a1));
     CHECK_NOT(a.is_encoded());
-    CHECK(a1.is_encoded());
     CHECK(a.get(0) == 10);
     CHECK(a.get(1) == 5);
     CHECK(a.get(2) == 5);
     CHECK(a.get(3) == 10);
     CHECK(a.get(4) == 15);
+    CHECK(a1.is_encoded());
     CHECK(a1.get(0) == 10);
     CHECK(a1.get(1) == 5);
     CHECK(a1.get(2) == 5);
@@ -141,21 +129,19 @@ TEST(Test_ArrayInt_negative_nums)
     a.add(-1000000);
     a.add(0);
     a.add(1000000);
-    CHECK(!a.is_encoded());
+    CHECK_NOT(a.is_encoded());
+    CHECK_NOT(a.try_encode(a1));
     CHECK(a.get(0) == -1000000);
     CHECK(a.get(1) == 0);
     CHECK(a.get(2) == 1000000);
     a.add(-1000000);
     CHECK_NOT(a.try_encode(a1));
     CHECK_NOT(a.is_encoded());
-    CHECK_NOT(a1.is_encoded());
     CHECK(a.get(0) == -1000000);
     CHECK(a.get(1) == 0);
     CHECK(a.get(2) == 1000000);
     CHECK(a.get(3) == -1000000);
-    CHECK_NOT(a1.try_decode());
     a.add(0);
-    a1.clear();
     CHECK(a.try_encode(a1));
     CHECK_NOT(a.is_encoded());
     CHECK(a1.is_encoded());
@@ -164,34 +150,23 @@ TEST(Test_ArrayInt_negative_nums)
     CHECK(a1.get(2) == 1000000);
     CHECK(a1.get(3) == -1000000);
     CHECK(a1.get(4) == 0);
-    CHECK(a1.try_decode());
-
     a.add(1000000);
-    a1.clear();
+    a1.clear(); // this decodes the array
     CHECK(a.try_encode(a1));
     CHECK_NOT(a.is_encoded());
     CHECK(a1.is_encoded());
-    CHECK(a.get(0) == -1000000);
-    CHECK(a.get(1) == 0);
-    CHECK(a.get(2) == 1000000);
     CHECK(a1.get(0) == -1000000);
     CHECK(a1.get(1) == 0);
     CHECK(a1.get(2) == 1000000);
     CHECK(a1.try_decode());
-
     a.add(-1000000);
     a1.clear();
     CHECK(a.try_encode(a1));
     CHECK_NOT(a.is_encoded());
     CHECK(a1.is_encoded());
-    CHECK(a.get(0) == -1000000);
-    CHECK(a.get(1) == 0);
-    CHECK(a.get(2) == 1000000);
     CHECK(a1.get(0) == -1000000);
     CHECK(a1.get(1) == 0);
     CHECK(a1.get(2) == 1000000);
-    CHECK(a1.try_decode());
-
     a.add(0);
     a1.clear();
     CHECK(a.try_encode(a1));
@@ -200,8 +175,6 @@ TEST(Test_ArrayInt_negative_nums)
     CHECK(a1.get(0) == -1000000);
     CHECK(a1.get(1) == 0);
     CHECK(a1.get(2) == 1000000);
-    CHECK(a1.try_decode());
-
     a.add(1000000);
     a1.clear();
     CHECK(a.try_encode(a1));
@@ -314,7 +287,6 @@ TEST(Test_ArrayInt_compress_data_init_from_mem)
     CHECK(a2.try_decode());
     CHECK_NOT(a2.is_encoded());
     a2.add(20);
-    a1.clear();
     CHECK(a2.try_encode(a1));
     CHECK(a1.is_encoded());
     CHECK(a1.size() == 7);

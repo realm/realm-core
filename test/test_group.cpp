@@ -2343,8 +2343,6 @@ TEST(Group_ArrayCompression_Correctness)
     to_disk.write(path, crypt_key());
 
 #ifdef REALM_DEBUG
-    // mem_usage_1.check_total_coverage(); fails at the end of verify(), we have 2 chunks instead of 1 allocated for
-    // top array.
     to_disk.verify();
 #endif
 
