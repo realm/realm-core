@@ -19,6 +19,7 @@
 #ifndef REALM_APP_HPP
 #define REALM_APP_HPP
 
+#include <realm/object-store/sync/app_backing_store.hpp>
 #include <realm/object-store/sync/app_credentials.hpp>
 #include <realm/object-store/sync/app_service_client.hpp>
 #include <realm/object-store/sync/auth_request_client.hpp>
@@ -108,6 +109,12 @@ public:
 
     /// Get all users.
     std::vector<std::shared_ptr<SyncUser>> all_users() const;
+
+    /// Get the BackingStore for this App.
+    std::shared_ptr<BackingStore> const& backing_store() const
+    {
+        return m_app_backing_store;
+    }
 
     std::shared_ptr<SyncManager> const& sync_manager() const
     {
@@ -255,8 +262,13 @@ public:
         Enabled, // Return a cached app instance if one was previously generated for `config`'s app_id+base_url combo,
         Disabled // Bypass the app cache; return a new app instance.
     };
-    /// Get a shared pointer to a configured App instance.
+#if REALM_ENABLE_SYNC
+    /// Get a shared pointer to a configured App instance. Sync is fully enabled.
     static SharedApp get_app(CacheMode mode, const Config& config, const SyncClientConfig& sync_client_config);
+#endif // REALM_ENABLE_SYNC
+    /// Get a shared pointer to a configured App instance. Sync is disabled, but the internal Realm backing store is
+    /// enabled.
+    static SharedApp get_app(CacheMode mode, const Config& config, const BackingStoreConfig& store_config);
 
     /// Return a cached app instance if one was previously generated for the `app_id`+`base_url` combo using
     /// `App::get_app()`.
@@ -403,10 +415,12 @@ public:
 
     static void clear_cached_apps();
 
+#if REALM_ENABLE_SYNC
     // Immediately close all open sync sessions for all cached apps.
     // Used by JS SDK to ensure no sync clients remain open when a developer
     // reloads an app (#5411).
     static void close_all_sync_sessions();
+#endif // REALM_ENABLE_SYNC
 
 private:
     friend class Internal;
@@ -424,6 +438,7 @@ private:
     bool m_location_updated GUARDED_BY(m_route_mutex) = false;
 
     uint64_t m_request_timeout_ms;
+    std::shared_ptr<BackingStore> m_app_backing_store;
     std::shared_ptr<SyncManager> m_sync_manager;
     std::shared_ptr<util::Logger> m_logger_ptr;
 
@@ -539,7 +554,10 @@ private:
 
     std::string function_call_url_path() const REQUIRES(!m_route_mutex);
 
+#if REALM_ENABLE_SYNC
     void configure(const SyncClientConfig& sync_client_config) REQUIRES(!m_route_mutex);
+#endif // REALM_ENABLE_SYNC
+    void configure(const BackingStoreConfig& store_config) REQUIRES(!m_route_mutex);
 
     static std::string make_sync_route(const std::string& http_app_route);
     void update_hostname(const util::Optional<realm::SyncAppMetadata>& metadata) REQUIRES(!m_route_mutex);

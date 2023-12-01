@@ -326,7 +326,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
             recovery_path = recovery_path_it->second;
             REQUIRE(util::File::exists(orig_path));
             REQUIRE(!util::File::exists(recovery_path));
-            bool did_reset_files = test_app_session.app()->sync_manager()->immediately_run_file_actions(orig_path);
+            bool did_reset_files = test_app_session.app()->backing_store()->immediately_run_file_actions(orig_path);
             REQUIRE(did_reset_files);
             REQUIRE(!util::File::exists(orig_path));
             REQUIRE(util::File::exists(recovery_path));

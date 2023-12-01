@@ -42,11 +42,11 @@ realm_sync_session_connection_state_notification_token::~realm_sync_session_conn
 
 namespace realm::c_api {
 
-static_assert(realm_sync_client_metadata_mode_e(SyncClientConfig::MetadataMode::NoEncryption) ==
+static_assert(realm_sync_client_metadata_mode_e(app::BackingStoreConfig::MetadataMode::NoEncryption) ==
               RLM_SYNC_CLIENT_METADATA_MODE_PLAINTEXT);
-static_assert(realm_sync_client_metadata_mode_e(SyncClientConfig::MetadataMode::Encryption) ==
+static_assert(realm_sync_client_metadata_mode_e(app::BackingStoreConfig::MetadataMode::Encryption) ==
               RLM_SYNC_CLIENT_METADATA_MODE_ENCRYPTED);
-static_assert(realm_sync_client_metadata_mode_e(SyncClientConfig::MetadataMode::NoMetadata) ==
+static_assert(realm_sync_client_metadata_mode_e(app::BackingStoreConfig::MetadataMode::NoMetadata) ==
               RLM_SYNC_CLIENT_METADATA_MODE_DISABLED);
 
 static_assert(realm_sync_client_reconnect_mode_e(ReconnectMode::normal) == RLM_SYNC_CLIENT_RECONNECT_MODE_NORMAL);
@@ -139,19 +139,19 @@ RLM_API realm_sync_client_config_t* realm_sync_client_config_new(void) noexcept
 RLM_API void realm_sync_client_config_set_base_file_path(realm_sync_client_config_t* config,
                                                          const char* path) noexcept
 {
-    config->base_file_path = path;
+    config->backing_store_config.base_file_path = path;
 }
 
 RLM_API void realm_sync_client_config_set_metadata_mode(realm_sync_client_config_t* config,
                                                         realm_sync_client_metadata_mode_e mode) noexcept
 {
-    config->metadata_mode = SyncClientConfig::MetadataMode(mode);
+    config->backing_store_config.metadata_mode = app::BackingStoreConfig::MetadataMode(mode);
 }
 
 RLM_API void realm_sync_client_config_set_metadata_encryption_key(realm_sync_client_config_t* config,
                                                                   const uint8_t key[64]) noexcept
 {
-    config->custom_encryption_key = std::vector<char>(key, key + 64);
+    config->backing_store_config.custom_encryption_key = std::vector<char>(key, key + 64);
 }
 
 RLM_API void realm_sync_client_config_set_reconnect_mode(realm_sync_client_config_t* config,
@@ -763,7 +763,7 @@ RLM_API bool realm_sync_immediately_run_file_actions(realm_app_t* realm_app, con
                                                      bool* did_run) noexcept
 {
     return wrap_err([&]() {
-        *did_run = (*realm_app)->sync_manager()->immediately_run_file_actions(sync_path);
+        *did_run = (*realm_app)->backing_store()->immediately_run_file_actions(sync_path);
         return true;
     });
 }

@@ -35,7 +35,7 @@
 
 #include <realm/util/any.hpp>
 
-#if REALM_ENABLE_AUTH_TESTS
+#if REALM_ENABLE_AUTH_TESTS && REALM_ENABLE_SYNC
 #include <util/sync/flx_sync_harness.hpp>
 #endif // REALM_ENABLE_AUTH_TESTS
 

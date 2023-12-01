@@ -20,12 +20,16 @@
 
 #include <realm/object-store/sync/app_credentials.hpp>
 
+#include <external/json/json.hpp>
 #include <external/mpark/variant.hpp>
 
 #if REALM_ENABLE_AUTH_TESTS
 
 #include <realm/exceptions.hpp>
 #include <realm/object_id.hpp>
+#include <realm/object-store/property.hpp>
+#include <realm/object-store/schema.hpp>
+#include <realm/object-store/sync/generic_network_transport.hpp>
 
 #include <realm/util/scope_exit.hpp>
 

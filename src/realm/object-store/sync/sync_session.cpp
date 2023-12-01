@@ -411,6 +411,7 @@ void SyncSession::detach_from_sync_manager()
 
 void SyncSession::update_error_and_mark_file_for_deletion(SyncError& error, ShouldBackup should_backup)
 {
+    auto backing_store = user()->backing_store();
     util::CheckedLockGuard config_lock(m_config_mutex);
     // Add a SyncFileActionMetadata marking the Realm as needing to be deleted.
     std::string recovery_path;
@@ -418,16 +419,16 @@ void SyncSession::update_error_and_mark_file_for_deletion(SyncError& error, Shou
     error.user_info[SyncError::c_original_file_path_key] = original_path;
     if (should_backup == ShouldBackup::yes) {
         recovery_path = util::reserve_unique_file_name(
-            m_sync_manager->recovery_directory_path(m_config.sync_config->recovery_directory),
+            backing_store->recovery_directory_path(m_config.sync_config->recovery_directory),
             util::create_timestamped_template("recovered_realm"));
         error.user_info[SyncError::c_recovery_file_path_key] = recovery_path;
     }
     using Action = SyncFileActionMetadata::Action;
     auto action = should_backup == ShouldBackup::yes ? Action::BackUpThenDeleteRealm : Action::DeleteRealm;
-    m_sync_manager->perform_metadata_update([action, original_path = std::move(original_path),
-                                             recovery_path = std::move(recovery_path),
-                                             partition_value = m_config.sync_config->partition_value,
-                                             identity = m_config.sync_config->user->identity()](const auto& manager) {
+    backing_store->perform_metadata_update([action, original_path = std::move(original_path),
+                                            recovery_path = std::move(recovery_path),
+                                            partition_value = m_config.sync_config->partition_value,
+                                            identity = m_config.sync_config->user->identity()](const auto& manager) {
         manager.make_file_action_metadata(original_path, partition_value, identity, action, recovery_path);
     });
 }

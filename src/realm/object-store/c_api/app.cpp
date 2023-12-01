@@ -630,9 +630,12 @@ RLM_API char* realm_app_sync_client_get_default_file_path_for_realm(const realm_
                                                                     const char* custom_filename)
 {
     return wrap_err([&]() {
-        util::Optional<std::string> filename =
-            custom_filename ? util::some<std::string>(custom_filename) : util::none;
-        std::string file_path = config->user->sync_manager()->path_for_realm(*config, std::move(filename));
+        std::optional<std::string> filename = custom_filename ? util::some<std::string>(custom_filename) : util::none;
+        std::optional<std::string> partition =
+            config->flx_sync_requested ? none : std::make_optional(config->partition_value);
+
+        std::string file_path =
+            config->user->backing_store()->path_for_realm(config->user, std::move(filename), partition);
         return duplicate_string(file_path);
     });
 }
@@ -721,7 +724,7 @@ RLM_API realm_app_t* realm_user_get_app(const realm_user_t* user) noexcept
 {
     REALM_ASSERT(user);
     try {
-        if (auto shared_app = (*user)->sync_manager()->app().lock()) {
+        if (auto shared_app = (*user)->backing_store()->app().lock()) {
             return new realm_app_t(shared_app);
         }
     }

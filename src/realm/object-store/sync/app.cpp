@@ -28,6 +28,7 @@
 #include <realm/object-store/sync/impl/sync_metadata.hpp>
 #include <realm/object-store/sync/sync_manager.hpp>
 #include <realm/object-store/sync/sync_user.hpp>
+#include <realm/object-store/sync/realm_backing_store.hpp>
 
 #ifdef __EMSCRIPTEN__
 #include <realm/object-store/sync/impl/emscripten/network_transport.hpp>
@@ -214,6 +215,7 @@ App::Config::DeviceInfo::DeviceInfo(std::string a_platform_version, std::string 
 // NO_THREAD_SAFETY_ANALYSIS because clang generates a false positive.
 // "Calling function configure requires negative capability '!app->m_route_mutex'"
 // But 'app' is an object just created in this static method so it is not possible to annotate this in the header.
+#if REALM_ENABLE_SYNC
 SharedApp App::get_app(CacheMode mode, const Config& config,
                        const SyncClientConfig& sync_client_config) NO_THREAD_SAFETY_ANALYSIS
 {
@@ -229,6 +231,25 @@ SharedApp App::get_app(CacheMode mode, const Config& config,
     REALM_ASSERT(mode == CacheMode::Disabled);
     auto app = std::make_shared<App>(Private(), config);
     app->configure(sync_client_config);
+    return app;
+}
+#endif // REALM_ENABLE_SYNC
+
+SharedApp App::get_app(CacheMode mode, const Config& config,
+                       const BackingStoreConfig& store_config) NO_THREAD_SAFETY_ANALYSIS
+{
+    if (mode == CacheMode::Enabled) {
+        std::lock_guard<std::mutex> lock(s_apps_mutex);
+        auto& app = s_apps_cache[config.app_id][config.base_url.value_or(std::string(s_default_base_url))];
+        if (!app) {
+            app = std::make_shared<App>(PrivateConstructionOnly(), config);
+            app->configure(store_config);
+        }
+        return app;
+    }
+    REALM_ASSERT(mode == CacheMode::Disabled);
+    auto app = std::make_shared<App>(PrivateConstructionOnly(), config);
+    app->configure(store_config);
     return app;
 }
 
@@ -252,7 +273,7 @@ void App::clear_cached_apps()
     std::lock_guard<std::mutex> lock(s_apps_mutex);
     s_apps_cache.clear();
 }
-
+#if REALM_ENABLE_SYNC
 void App::close_all_sync_sessions()
 {
     std::lock_guard<std::mutex> lock(s_apps_mutex);
@@ -262,6 +283,20 @@ void App::close_all_sync_sessions()
         }
     }
 }
+
+void App::configure(const SyncClientConfig& sync_client_config)
+{
+    std::string sync_route;
+    {
+        util::CheckedLockGuard guard(m_route_mutex);
+        sync_route = make_sync_route(m_app_route);
+    }
+    m_sync_manager = std::make_shared<SyncManager>();
+    m_sync_manager->configure(shared_from_this(), sync_route, sync_client_config);
+    configure(sync_client_config.backing_store_config);
+}
+
+#endif
 
 App::App(Private, const Config& config)
     : m_config(std::move(config))
@@ -291,17 +326,12 @@ App::App(Private, const Config& config)
 
 App::~App() {}
 
-void App::configure(const SyncClientConfig& sync_client_config)
+void App::configure(const BackingStoreConfig& store_config)
 {
-    std::string sync_route;
-    {
-        util::CheckedLockGuard guard(m_route_mutex);
-        sync_route = make_sync_route(m_app_route);
-    }
-    m_sync_manager = std::make_shared<SyncManager>();
-    m_sync_manager->configure(shared_from_this(), sync_route, sync_client_config);
+    m_app_backing_store = std::make_shared<RealmBackingStore>(shared_from_this(), store_config);
+    m_app_backing_store->initialize(); // separate from construction so that shared_from_this() works
 
-    if (auto metadata = m_sync_manager->app_metadata()) {
+    if (auto metadata = m_app_backing_store->app_metadata()) {
         // If there is app metadata stored, then set up the initial hostname/syncroute
         // using that info - it will be updated upon first request to the server
         update_hostname(metadata);
@@ -315,8 +345,15 @@ void App::configure(const SyncClientConfig& sync_client_config)
 
 bool App::init_logger()
 {
-    if (!m_logger_ptr && m_sync_manager) {
-        m_logger_ptr = m_sync_manager->get_logger();
+    if (!m_logger_ptr) {
+#if REALM_ENABLE_SYNC
+        if (m_sync_manager) {
+            m_logger_ptr = m_sync_manager->get_logger();
+        }
+#endif
+        if (!m_logger_ptr) {
+            m_logger_ptr = util::Logger::get_default_logger();
+        }
     }
     return bool(m_logger_ptr);
 }
@@ -580,12 +617,12 @@ void App::UserAPIKeyProviderClient::disable_api_key(const realm::ObjectId& id, c
 
 std::shared_ptr<SyncUser> App::current_user() const
 {
-    return m_sync_manager->get_current_user();
+    return m_app_backing_store->get_current_user();
 }
 
 std::vector<std::shared_ptr<SyncUser>> App::all_users() const
 {
-    return m_sync_manager->all_users();
+    return m_app_backing_store->all_users();
 }
 
 void App::get_profile(const std::shared_ptr<SyncUser>& sync_user,
@@ -621,7 +658,7 @@ void App::get_profile(const std::shared_ptr<SyncUser>& sync_user,
 
                 sync_user->update_user_profile(std::move(identities),
                                                SyncUserProfile(get<BsonDocument>(profile_json, "data")));
-                self->m_sync_manager->set_current_user(sync_user->identity());
+                self->m_app_backing_store->set_current_user(sync_user->identity());
                 self->emit_change_to_subscribers(*self);
             }
             catch (const AppError& err) {
@@ -666,7 +703,7 @@ void App::log_in_with_credentials(
     // if we try logging in with an anonymous user while there
     // is already an anonymous session active, reuse it
     if (credentials.provider() == AuthProvider::ANONYMOUS) {
-        for (auto&& user : m_sync_manager->all_users()) {
+        for (auto&& user : m_app_backing_store->all_users()) {
             if (user->is_anonymous()) {
                 completion(switch_user(user), util::none);
                 return;
@@ -707,7 +744,7 @@ void App::log_in_with_credentials(
                     linking_user->update_access_token(get<std::string>(json, "access_token"));
                 }
                 else {
-                    sync_user = self->m_sync_manager->get_user(
+                    sync_user = self->m_app_backing_store->get_user(
                         get<std::string>(json, "user_id"), get<std::string>(json, "refresh_token"),
                         get<std::string>(json, "access_token"), get<std::string>(json, "device_id"));
                 }
@@ -761,12 +798,12 @@ void App::log_out(const std::shared_ptr<SyncUser>& user, UniqueFunction<void(Opt
 void App::log_out(UniqueFunction<void(Optional<AppError>)>&& completion)
 {
     log_debug("App: log_out()");
-    log_out(m_sync_manager->get_current_user(), std::move(completion));
+    log_out(m_app_backing_store->get_current_user(), std::move(completion));
 }
 
 bool App::verify_user_present(const std::shared_ptr<SyncUser>& user) const
 {
-    auto users = m_sync_manager->all_users();
+    auto users = m_app_backing_store->all_users();
     return std::any_of(users.begin(), users.end(), [&](auto&& u) {
         return u == user;
     });
@@ -781,7 +818,7 @@ std::shared_ptr<SyncUser> App::switch_user(const std::shared_ptr<SyncUser>& user
         throw AppError(ErrorCodes::ClientUserNotFound, "User does not exist");
     }
 
-    m_sync_manager->set_current_user(user->identity());
+    m_app_backing_store->set_current_user(user->identity());
     emit_change_to_subscribers(*this);
     return current_user();
 }
@@ -798,12 +835,12 @@ void App::remove_user(const std::shared_ptr<SyncUser>& user, UniqueFunction<void
     if (user->is_logged_in()) {
         log_out(user, [user, completion = std::move(completion),
                        self = shared_from_this()](const Optional<AppError>& error) {
-            self->m_sync_manager->remove_user(user->identity());
+            self->m_app_backing_store->remove_user(user->identity());
             return completion(error);
         });
     }
     else {
-        m_sync_manager->remove_user(user->identity());
+        m_app_backing_store->remove_user(user->identity());
         return completion({});
     }
 }
@@ -831,7 +868,7 @@ void App::delete_user(const std::shared_ptr<SyncUser>& user, UniqueFunction<void
                                  auto error = AppUtils::check_for_errors(response);
                                  if (!error) {
                                      self->emit_change_to_subscribers(*self);
-                                     self->m_sync_manager->delete_user(identitiy);
+                                     self->m_app_backing_store->delete_user(identitiy);
                                  }
                                  completion(error);
                              });
@@ -923,11 +960,11 @@ void App::init_app_metadata(UniqueFunction<void(const Optional<Response>&)>&& co
             auto ws_hostname = get<std::string>(json, "ws_hostname");
             auto deployment_model = get<std::string>(json, "deployment_model");
             auto location = get<std::string>(json, "location");
-            if (self->m_sync_manager->perform_metadata_update([&](SyncMetadataManager& manager) {
+            if (self->m_app_backing_store->perform_metadata_update([&](SyncMetadataManager& manager) {
                     manager.set_app_metadata(deployment_model, location, hostname, ws_hostname);
                 })) {
                 // Update the hostname and sync route using the new app metadata info
-                self->update_hostname(self->m_sync_manager->app_metadata());
+                self->update_hostname(self->m_app_backing_store->app_metadata());
             }
             else {
                 // No metadata in use, update the hostname and sync route directly
@@ -969,7 +1006,7 @@ void App::update_metadata_and_resend(Request&& request, UniqueFunction<void(cons
             // if this is the first time we have received app metadata, the
             // original request will not have the correct URL hostname for
             // non global deployments.
-            auto app_metadata = self->m_sync_manager->app_metadata();
+            auto app_metadata = self->m_app_backing_store->app_metadata();
             if (app_metadata && request.url.rfind(base_url, 0) != std::string::npos &&
                 app_metadata->hostname != base_url) {
                 request.url.replace(0, base_url.size(), app_metadata->hostname);
@@ -1244,13 +1281,13 @@ void App::call_function(const std::string& name, const BsonArray& args_bson,
                         const Optional<std::string>& service_name,
                         UniqueFunction<void(Optional<bson::Bson>&&, Optional<AppError>)>&& completion)
 {
-    call_function(m_sync_manager->get_current_user(), name, args_bson, service_name, std::move(completion));
+    call_function(m_app_backing_store->get_current_user(), name, args_bson, service_name, std::move(completion));
 }
 
 void App::call_function(const std::string& name, const BsonArray& args_bson,
                         UniqueFunction<void(Optional<bson::Bson>&&, Optional<AppError>)>&& completion)
 {
-    call_function(m_sync_manager->get_current_user(), name, args_bson, std::move(completion));
+    call_function(m_app_backing_store->get_current_user(), name, args_bson, std::move(completion));
 }
 
 Request App::make_streaming_request(const std::shared_ptr<SyncUser>& user, const std::string& name,

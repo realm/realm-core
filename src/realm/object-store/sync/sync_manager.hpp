@@ -20,6 +20,7 @@
 #define REALM_OS_SYNC_MANAGER_HPP
 
 #include <realm/object-store/shared_realm.hpp>
+#include <realm/object-store/sync/app_backing_store.hpp>
 
 #include <realm/util/checked_mutex.hpp>
 #include <realm/util/logger.hpp>
@@ -41,10 +42,6 @@ class DB;
 struct SyncConfig;
 class SyncSession;
 class SyncUser;
-class SyncFileManager;
-class SyncMetadataManager;
-class SyncFileActionMetadata;
-class SyncAppMetadata;
 
 namespace _impl {
 struct SyncClient;
@@ -65,16 +62,7 @@ struct SyncClientTimeouts {
 };
 
 struct SyncClientConfig {
-    enum class MetadataMode {
-        NoEncryption, // Enable metadata, but disable encryption.
-        Encryption,   // Enable metadata, and use encryption (automatic if possible).
-        NoMetadata,   // Disable metadata.
-    };
-
-    std::string base_file_path;
-    MetadataMode metadata_mode = MetadataMode::Encryption;
-    util::Optional<std::vector<char>> custom_encryption_key;
-
+    app::BackingStoreConfig backing_store_config;
     using LoggerFactory = std::function<std::shared_ptr<util::Logger>(util::Logger::Level)>;
     LoggerFactory logger_factory;
     util::Logger::Level log_level = util::Logger::Level::info;
@@ -111,13 +99,7 @@ class SyncManager : public std::enable_shared_from_this<SyncManager> {
     friend class ::TestAppSession;
 
 public:
-    using MetadataMode = SyncClientConfig::MetadataMode;
-
-    // Immediately run file actions for a single Realm at a given original path.
-    // Returns whether or not a file action was successfully executed for the specified Realm.
-    // Preconditions: all references to the Realm at the given path must have already been invalidated.
-    // The metadata and file management subsystems must also have already been configured.
-    bool immediately_run_file_actions(const std::string& original_name) REQUIRES(!m_file_system_mutex);
+    using MetadataMode = app::BackingStoreConfig::MetadataMode;
 
     // Enables/disables using a single connection for all sync sessions for each host/port/user rather
     // than one per session.
@@ -157,6 +139,8 @@ public:
     util::Logger::Level log_level() const noexcept REQUIRES(!m_mutex);
 
     std::vector<std::shared_ptr<SyncSession>> get_all_sessions() const REQUIRES(!m_session_mutex);
+    std::vector<std::shared_ptr<SyncSession>> get_all_sessions_for(std::shared_ptr<SyncUser> user) const
+        REQUIRES(!m_session_mutex);
     std::shared_ptr<SyncSession> get_session(std::shared_ptr<DB> db, const RealmConfig& config)
         REQUIRES(!m_mutex, !m_session_mutex);
     std::shared_ptr<SyncSession> get_existing_session(const std::string& path) const REQUIRES(!m_session_mutex);
@@ -174,55 +158,10 @@ public:
     // makes it possible to guarantee that all sessions have, in fact, been closed.
     void wait_for_sessions_to_terminate() REQUIRES(!m_mutex);
 
-    // If the metadata manager is configured, perform an update. Returns `true` if the code was run.
-    bool perform_metadata_update(util::FunctionRef<void(SyncMetadataManager&)> update_function) const
-        REQUIRES(!m_file_system_mutex);
-
-    // Get a sync user for a given identity, or create one if none exists yet, and set its token.
-    // If a logged-out user exists, it will marked as logged back in.
-    std::shared_ptr<SyncUser> get_user(const std::string& user_id, const std::string& refresh_token,
-                                       const std::string& access_token, const std::string& device_id)
-        REQUIRES(!m_user_mutex, !m_file_system_mutex);
-
-    // Get an existing user for a given identifier, if one exists and is logged in.
-    std::shared_ptr<SyncUser> get_existing_logged_in_user(const std::string& user_id) const REQUIRES(!m_user_mutex);
-
-    // Get all the users that are logged in and not errored out.
-    std::vector<std::shared_ptr<SyncUser>> all_users() REQUIRES(!m_user_mutex);
-
-    // Gets the currently active user.
-    std::shared_ptr<SyncUser> get_current_user() const REQUIRES(!m_user_mutex, !m_file_system_mutex);
-
-    // Log out a given user
-    void log_out_user(const SyncUser& user) REQUIRES(!m_user_mutex, !m_file_system_mutex);
-
-    // Sets the currently active user.
-    void set_current_user(const std::string& user_id) REQUIRES(!m_user_mutex, !m_file_system_mutex);
-
-    // Removes a user
-    void remove_user(const std::string& user_id) REQUIRES(!m_user_mutex, !m_file_system_mutex);
-
-    // Permanently deletes a user.
-    void delete_user(const std::string& user_id) REQUIRES(!m_user_mutex, !m_file_system_mutex);
-
-    // Get the default path for a Realm for the given configuration.
-    // The default value is `<rootDir>/<appId>/<userId>/<partitionValue>.realm`.
-    // If the file cannot be created at this location, for example due to path length restrictions,
-    // this function may pass back `<rootDir>/<hashedFileName>.realm`
-    std::string path_for_realm(const SyncConfig& config, util::Optional<std::string> custom_file_name = none) const
-        REQUIRES(!m_file_system_mutex);
-
-    // Get the path of the recovery directory for backed-up or recovered Realms.
-    std::string recovery_directory_path(util::Optional<std::string> const& custom_dir_name = none) const
-        REQUIRES(!m_file_system_mutex);
-
     // Reset the singleton state for testing purposes. DO NOT CALL OUTSIDE OF TESTING CODE.
     // Precondition: any synced Realms or `SyncSession`s must be closed or rendered inactive prior to
     // calling this method.
-    void reset_for_testing() REQUIRES(!m_mutex, !m_file_system_mutex, !m_user_mutex, !m_session_mutex);
-
-    // Get the app metadata for the active app.
-    util::Optional<SyncAppMetadata> app_metadata() const REQUIRES(!m_file_system_mutex);
+    void reset_for_testing() REQUIRES(!m_mutex, !m_session_mutex);
 
     // Immediately closes any open sync sessions for this sync manager
     void close_all_sessions() REQUIRES(!m_mutex, !m_session_mutex);
@@ -274,8 +213,8 @@ protected:
 private:
     friend class app::App;
 
-    void configure(std::shared_ptr<app::App> app, const std::string& sync_route, const SyncClientConfig& config)
-        REQUIRES(!m_mutex, !m_file_system_mutex, !m_user_mutex, !m_session_mutex);
+    void configure(std::shared_ptr<app::App> app, std::string sync_route, const SyncClientConfig& config)
+        REQUIRES(!m_mutex, !m_session_mutex);
 
     // Stop tracking the session for the given path if it is inactive.
     // No-op if the session is either still active or in the active sessions list
@@ -287,33 +226,17 @@ private:
 
     std::shared_ptr<SyncSession> get_existing_session_locked(const std::string& path) const REQUIRES(m_session_mutex);
 
-    std::shared_ptr<SyncUser> get_user_for_identity(std::string const& identity) const noexcept
-        REQUIRES(m_user_mutex);
-
     mutable util::CheckedMutex m_mutex;
 
-    bool run_file_action(SyncFileActionMetadata&) REQUIRES(m_file_system_mutex);
     void init_metadata(SyncClientConfig config, const std::string& app_id);
 
     // internally create a new logger - used by configure() and set_logger_factory()
     void do_make_logger() REQUIRES(m_mutex);
 
-    // Protects m_users
-    mutable util::CheckedMutex m_user_mutex;
-
-    // A vector of all SyncUser objects.
-    std::vector<std::shared_ptr<SyncUser>> m_users GUARDED_BY(m_user_mutex);
-    std::shared_ptr<SyncUser> m_current_user GUARDED_BY(m_user_mutex);
-
     mutable std::unique_ptr<_impl::SyncClient> m_sync_client GUARDED_BY(m_mutex);
 
     SyncClientConfig m_config GUARDED_BY(m_mutex);
     mutable std::shared_ptr<util::Logger> m_logger_ptr GUARDED_BY(m_mutex);
-
-    // Protects m_file_manager and m_metadata_manager
-    mutable util::CheckedMutex m_file_system_mutex;
-    std::unique_ptr<SyncFileManager> m_file_manager GUARDED_BY(m_file_system_mutex);
-    std::unique_ptr<SyncMetadataManager> m_metadata_manager GUARDED_BY(m_file_system_mutex);
 
     // Protects m_sessions
     mutable util::CheckedMutex m_session_mutex;

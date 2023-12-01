@@ -18,7 +18,6 @@
 
 #pragma once
 
-#ifdef REALM_ENABLE_SYNC
 #ifdef REALM_ENABLE_AUTH_TESTS
 
 #include <util/sync/sync_test_utils.hpp>
@@ -298,4 +297,3 @@ inline app::App::Config get_config(Factory factory, const AppSession& app_sessio
 } // namespace realm
 
 #endif // REALM_ENABLE_AUTH_TESTS
-#endif // REALM_ENABLE_SYNC

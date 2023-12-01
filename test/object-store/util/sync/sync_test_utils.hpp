@@ -131,11 +131,6 @@ struct ExpectedRealmPaths {
 #if REALM_ENABLE_SYNC
 
 template <typename Transport>
-const std::shared_ptr<app::GenericNetworkTransport> instance_of = std::make_shared<Transport>();
-
-std::ostream& operator<<(std::ostream& os, util::Optional<app::AppError> error);
-
-template <typename Transport>
 TestSyncManager::Config get_config(Transport&& transport)
 {
     TestSyncManager::Config config;
@@ -144,8 +139,18 @@ TestSyncManager::Config get_config(Transport&& transport)
 }
 
 void subscribe_to_all_and_bootstrap(Realm& realm);
+void wait_for_advance(Realm& realm);
+void async_open_realm(const Realm::Config& config,
+                      util::UniqueFunction<void(ThreadSafeReference&& ref, std::exception_ptr e)> finish);
+
+#endif // REALM_ENABLE_SYNC
 
 #if REALM_ENABLE_AUTH_TESTS
+
+template <typename Transport>
+const std::shared_ptr<app::GenericNetworkTransport> instance_of = std::make_shared<Transport>();
+
+std::ostream& operator<<(std::ostream& os, util::Optional<app::AppError> error);
 
 #ifdef REALM_MONGODB_ENDPOINT
 std::string get_base_url();
@@ -161,14 +166,7 @@ struct AutoVerifiedEmailCredentials : app::AppCredentials {
 
 AutoVerifiedEmailCredentials create_user_and_log_in(app::SharedApp app);
 
-void wait_for_advance(Realm& realm);
-
-void async_open_realm(const Realm::Config& config,
-                      util::UniqueFunction<void(ThreadSafeReference&& ref, std::exception_ptr e)> finish);
-
 #endif // REALM_ENABLE_AUTH_TESTS
-
-#endif // REALM_ENABLE_SYNC
 
 namespace reset_utils {
 
@@ -236,10 +234,10 @@ void trigger_client_reset(const AppSession& app_session, const SyncSession& sync
 void trigger_client_reset(const AppSession& app_session, const SharedRealm& realm);
 #endif // REALM_ENABLE_AUTH_TESTS
 
-#endif // REALM_ENABLE_SYNC
-
 std::unique_ptr<TestClientReset> make_fake_local_client_reset(const Realm::Config& local_config,
                                                               const Realm::Config& remote_config);
+#endif // REALM_ENABLE_SYNC
+
 
 } // namespace reset_utils
 

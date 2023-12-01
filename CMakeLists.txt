@@ -255,6 +255,7 @@ endif()
 
 # Options (passed to CMake)
 option(REALM_ENABLE_SYNC "Enable synchronized realms." ON)
+option(REALM_APP_SERVICES, "Enable MongoDB Application Services" ON)
 option(REALM_BUILD_TEST_CLIENT "Build the test client" OFF)
 option(REALM_ENABLE_ASSERTIONS "Enable assertions in release mode." OFF)
 option(REALM_ENABLE_ALLOC_SET_ZERO "Zero all allocations." OFF)
@@ -295,6 +296,7 @@ endif()
 
 if(REALM_ENABLE_SYNC)
     option(REALM_FORCE_OPENSSL "Always use OpenSSL for SSL needs, regardless of target platform." OFF)
+    set(REALM_APP_SERVICES, TRUE) # sync requires this
     if(CMAKE_SYSTEM_NAME MATCHES "^Windows|Linux|Android")
         set(REALM_NEEDS_OPENSSL TRUE)
     endif()

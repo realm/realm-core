@@ -175,25 +175,6 @@ ExpectedRealmPaths::ExpectedRealmPaths(const std::string& base_path, const std::
     legacy_sync_path = (dir_builder / cleaned_partition).string();
 }
 
-#if REALM_ENABLE_SYNC
-
-void subscribe_to_all_and_bootstrap(Realm& realm)
-{
-    auto mut_subs = realm.get_latest_subscription_set().make_mutable_copy();
-    auto& group = realm.read_group();
-    for (auto key : group.get_table_keys()) {
-        if (group.table_is_public(key)) {
-            auto table = group.get_table(key);
-            if (table->get_table_type() == Table::Type::TopLevel) {
-                mut_subs.insert_or_assign(table->where());
-            }
-        }
-    }
-    auto subs = std::move(mut_subs).commit();
-    subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
-    wait_for_download(realm);
-}
-
 #if REALM_ENABLE_AUTH_TESTS
 
 static std::string unquote_string(std::string_view possibly_quoted_string)
@@ -255,6 +236,27 @@ AutoVerifiedEmailCredentials create_user_and_log_in(app::SharedApp app)
     return creds;
 }
 
+#endif // REALM_ENABLE_AUTH_TESTS
+
+#if REALM_ENABLE_SYNC
+
+void subscribe_to_all_and_bootstrap(Realm& realm)
+{
+    auto mut_subs = realm.get_latest_subscription_set().make_mutable_copy();
+    auto& group = realm.read_group();
+    for (auto key : group.get_table_keys()) {
+        if (group.table_is_public(key)) {
+            auto table = group.get_table(key);
+            if (table->get_table_type() == Table::Type::TopLevel) {
+                mut_subs.insert_or_assign(table->where());
+            }
+        }
+    }
+    auto subs = std::move(mut_subs).commit();
+    subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
+    wait_for_download(realm);
+}
+
 void wait_for_advance(Realm& realm)
 {
     struct Context : BindingContext {
@@ -306,7 +308,6 @@ void async_open_realm(const Realm::Config& config,
     finish(std::move(tsr), err);
 }
 
-#endif // REALM_ENABLE_AUTH_TESTS
 #endif // REALM_ENABLE_SYNC
 
 class TestHelper {
@@ -796,6 +797,12 @@ std::unique_ptr<TestClientReset> make_baas_flx_client_reset(const Realm::Config&
 
 #endif // REALM_ENABLE_AUTH_TESTS
 
+std::unique_ptr<TestClientReset> make_fake_local_client_reset(const Realm::Config& local_config,
+                                                              const Realm::Config& remote_config)
+{
+    return std::make_unique<FakeLocalClientReset>(local_config, remote_config);
+}
+
 #endif // REALM_ENABLE_SYNC
 
 
@@ -859,12 +866,6 @@ ObjectId TestClientReset::get_pk_of_object_driving_reset() const
 void TestClientReset::disable_wait_for_reset_completion()
 {
     m_wait_for_reset_completion = false;
-}
-
-std::unique_ptr<TestClientReset> make_fake_local_client_reset(const Realm::Config& local_config,
-                                                              const Realm::Config& remote_config)
-{
-    return std::make_unique<FakeLocalClientReset>(local_config, remote_config);
 }
 
 } // namespace reset_utils

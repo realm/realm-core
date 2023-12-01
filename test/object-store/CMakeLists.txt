@@ -43,7 +43,13 @@ endif()
 file(GLOB RESOURCES "*.realm" "../*.pem")
 
 if(REALM_ENABLE_AUTH_TESTS)
-    list(APPEND SOURCES util/sync/baas_admin_api.cpp)
+    list(APPEND HEADERS
+        util/unit_test_transport.hpp
+    )
+    list(APPEND SOURCES 
+	util/sync/baas_admin_api.cpp
+        util/unit_test_transport.cpp
+    )
 endif()
 
 if(REALM_ENABLE_SYNC)
@@ -52,7 +58,6 @@ if(REALM_ENABLE_SYNC)
         util/sync/flx_sync_harness.hpp
         util/sync/session_util.hpp
         util/sync/sync_test_utils.hpp
-        util/unit_test_transport.hpp
     )
     list(APPEND SOURCES
         bson.cpp
@@ -71,11 +76,19 @@ if(REALM_ENABLE_SYNC)
         sync/sync_manager.cpp
         sync/user.cpp
         util/sync/sync_test_utils.cpp
-        util/unit_test_transport.cpp
     )
     if(APPLE)
         list(APPEND SOURCES audit.cpp)
     endif()
+
+elseif(REALM_APP_SERVICES)
+    list(APPEND HEADERS
+        util/sync/baas_admin_api.hpp
+    )
+    list(APPEND SOURCES
+        sync/app_services.cpp
+        util/sync/sync_test_utils.cpp
+    )
 endif()
 
 set_property(DIRECTORY PROPERTY TEST_RESOURCES "${RESOURCES}")
@@ -125,8 +138,11 @@ if(REALM_ENABLE_SYNC)
     endif()
 endif()
 
-if(REALM_ENABLE_SYNC)
+if (REALM_ENABLE_SYNC) 
     target_link_libraries(ObjectStoreTestLib SyncServer)
+endif()
+
+if(REALM_ENABLE_SYNC OR REALM_APP_SERVICES)
     option(REALM_ENABLE_AUTH_TESTS "" OFF)
     if(REALM_ENABLE_AUTH_TESTS)
         if(NOT REALM_MONGODB_ENDPOINT)

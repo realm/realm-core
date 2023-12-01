@@ -78,7 +78,7 @@ util::Optional<std::string> to_optional_string(StringData sd)
 std::vector<AuditEvent> get_audit_events(TestSyncManager& manager, bool parse_events = true)
 {
     // Wait for all sessions to be fully uploaded and then tear them down
-    auto sync_manager = manager.app()->sync_manager();
+    auto sync_manager = manager.sync_manager();
     REALM_ASSERT(sync_manager);
     auto sessions = sync_manager->get_all_sessions();
     for (auto& session : sessions) {
@@ -1775,7 +1775,7 @@ TEST_CASE("audit integration tests", "[sync][pbs][audit][baas]") {
         auto audit_user = session.app()->current_user();
         config.audit_config->audit_user = audit_user;
         auto realm = Realm::get_shared_realm(config);
-        session.app()->sync_manager()->remove_user(audit_user->identity());
+        session.app()->backing_store()->remove_user(audit_user->identity());
 
         auto audit = realm->audit_context();
         auto scope = audit->begin_scope("scope");

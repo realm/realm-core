@@ -590,11 +590,10 @@ TEST_CASE("C API (non-database)", "[c_api]") {
         auto guard = util::make_scope_exit([&temp_dir]() noexcept {
             util::try_remove_dir_recursive(temp_dir);
         });
-        SyncClientConfig sync_client_config;
-        sync_client_config.base_file_path = temp_dir;
-        sync_client_config.metadata_mode = SyncClientConfig::MetadataMode::NoMetadata;
-
-        auto test_app = app::App::get_app(app::App::CacheMode::Disabled, *app_config, sync_client_config);
+        app::BackingStoreConfig backing_config;
+        backing_config.base_file_path = temp_dir;
+        backing_config.metadata_mode = app::BackingStoreConfig::MetadataMode::NoMetadata;
+        auto test_app = app::App::get_app(app::App::CacheMode::Enabled, *app_config, backing_config);
         auto credentials = app::AppCredentials::anonymous();
         // Verify the values above are included in the login request
         test_app->log_in_with_credentials(credentials, [&](const std::shared_ptr<realm::SyncUser>&,
@@ -5376,7 +5375,7 @@ TEST_CASE("C API - binding callback thread observer", "[sync][c_api]") {
 }
 #endif
 
-#if REALM_ENABLE_AUTH_TESTS
+#if REALM_ENABLE_AUTH_TESTS && REALM_ENABLE_SYNC
 
 std::atomic_bool baas_client_stop{false};
 std::atomic<std::size_t> error_handler_counter{0};

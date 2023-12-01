@@ -18,7 +18,7 @@
 
 #pragma once
 
-#ifdef REALM_ENABLE_AUTH_TESTS
+#if defined(REALM_ENABLE_AUTH_TESTS) && REALM_ENABLE_AUTH_TESTS && REALM_ENABLE_SYNC
 
 #include <util/sync/baas_admin_api.hpp>
 #include <util/sync/sync_test_utils.hpp>
@@ -149,4 +149,4 @@ private:
 };
 } // namespace realm::app
 
-#endif // REALM_ENABLE_AUTH_TESTS
+#endif // REALM_ENABLE_AUTH_TESTS && REALM_ENABLE_SYNC
