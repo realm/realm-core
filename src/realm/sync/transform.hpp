@@ -2,13 +2,6 @@
 #ifndef REALM_SYNC_TRANSFORM_HPP
 #define REALM_SYNC_TRANSFORM_HPP
 
-#include <stddef.h>
-
-#include <realm/util/buffer.hpp>
-#include <realm/impl/cont_transact_hist.hpp>
-#include <realm/impl/transact_log.hpp>
-#include <realm/db.hpp>
-#include <realm/impl/transact_log.hpp>
 #include <realm/chunked_binary.hpp>
 #include <realm/sync/instructions.hpp>
 #include <realm/sync/protocol.hpp>
@@ -125,8 +118,12 @@ class TransformError; // Exception
 
 class Transformer {
 public:
-    class RemoteChangeset;
-
+    using Changeset = sync::Changeset;
+    using file_ident_type = sync::file_ident_type;
+    using HistoryEntry = sync::HistoryEntry;
+    using Instruction = sync::Instruction;
+    using TransformHistory = sync::TransformHistory;
+    using version_type = sync::version_type;
     using iterator = util::Span<Changeset>::iterator;
 
     /// Produce operationally transformed versions of the specified changesets,
@@ -174,47 +171,11 @@ public:
     /// \throw TransformError Thrown if operational transformation fails due to
     /// a problem with the specified changeset.
     ///
-    /// FIXME: Consider using std::error_code instead of throwing
+    /// FIXME: Consider using Status instead of throwing
     /// TransformError.
-    virtual size_t transform_remote_changesets(TransformHistory&, file_ident_type local_file_ident,
-                                               version_type current_local_version, util::Span<Changeset> changesets,
-                                               util::UniqueFunction<bool(const Changeset*)> changeset_applier,
-                                               util::Logger&) = 0;
-
-    virtual ~Transformer() noexcept {}
-};
-
-std::unique_ptr<Transformer> make_transformer();
-
-} // namespace sync
-
-
-namespace _impl {
-
-class TransformerImpl : public sync::Transformer {
-public:
-    using Changeset = sync::Changeset;
-    using file_ident_type = sync::file_ident_type;
-    using HistoryEntry = sync::HistoryEntry;
-    using Instruction = sync::Instruction;
-    using TransformHistory = sync::TransformHistory;
-    using version_type = sync::version_type;
-
-    TransformerImpl() = default;
-
-    size_t transform_remote_changesets(TransformHistory&, file_ident_type, version_type, util::Span<Changeset>,
-                                       util::UniqueFunction<bool(const Changeset*)>, util::Logger&) override;
-
-    struct Side;
-    struct MajorSide;
-    struct MinorSide;
-
-protected:
-    virtual void merge_changesets(file_ident_type local_file_ident, Changeset* their_changesets,
-                                  std::size_t their_size,
-                                  // our_changesets is a pointer-pointer because these changesets
-                                  // are held by the reciprocal transform cache.
-                                  Changeset** our_changesets, std::size_t our_size, util::Logger& logger);
+    size_t transform_remote_changesets(TransformHistory&, file_ident_type local_file_ident, version_type,
+                                       util::Span<Changeset>,
+                                       util::FunctionRef<bool(const Changeset*)> changeset_applier, util::Logger&);
 
 private:
     std::map<version_type, Changeset> m_reciprocal_transform_cache;
@@ -223,20 +184,15 @@ private:
                                         const HistoryEntry&);
     void flush_reciprocal_transform_cache(TransformHistory&);
 
-    struct Discriminant;
-    struct Transformer;
-    struct MergeTracer;
-
-    template <class LeftSide, class RightSide>
-    void merge_instructions(LeftSide&, RightSide&);
+protected:
+    // A hook which is overriden in tests to dump the changesets
+    virtual void merge_changesets(file_ident_type local_file_ident, util::Span<Changeset> their_changesets,
+                                  // our_changesets is a pointer because these changesets are held by the reciprocal
+                                  // transform cache which is non-contiguous storage.
+                                  util::Span<Changeset*> our_changesets, util::Logger& logger);
 };
 
-} // namespace _impl
-
-
-namespace sync {
-
-class Transformer::RemoteChangeset {
+class RemoteChangeset {
 public:
     /// The version produced on the remote peer by this changeset.
     ///
@@ -280,8 +236,7 @@ public:
     RemoteChangeset(version_type rv, version_type lv, ChunkedBinaryData d, timestamp_type ot, file_ident_type fi);
 };
 
-
-void parse_remote_changeset(const Transformer::RemoteChangeset&, Changeset&);
+void parse_remote_changeset(const RemoteChangeset&, Changeset&);
 
 
 // Implementation
@@ -294,8 +249,8 @@ public:
     }
 };
 
-inline Transformer::RemoteChangeset::RemoteChangeset(version_type rv, version_type lv, ChunkedBinaryData d,
-                                                     timestamp_type ot, file_ident_type fi)
+inline RemoteChangeset::RemoteChangeset(version_type rv, version_type lv, ChunkedBinaryData d, timestamp_type ot,
+                                        file_ident_type fi)
     : remote_version(rv)
     , last_integrated_local_version(lv)
     , data(d)

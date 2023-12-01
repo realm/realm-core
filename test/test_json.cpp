@@ -865,16 +865,16 @@ using namespace std::chrono;
 
 TEST(Json_Timestamp)
 {
-    char buffer1[31];
-    char buffer2[31];
+    std::array<char, 32> buffer1{};
+    std::array<char, 32> buffer2{};
     Timestamp(-63549305085, 0).to_string(buffer1);
-    CHECK(strcmp(buffer1, "-0044-03-15 15:15:15") == 0);
+    CHECK(strcmp(buffer1.data(), "-0044-03-15 15:15:15") == 0);
     Timestamp(0, 0).to_string(buffer1);
-    CHECK(strcmp(buffer1, "1970-01-01 00:00:00") == 0);
+    CHECK(strcmp(buffer1.data(), "1970-01-01 00:00:00") == 0);
     Timestamp(-1, 0).to_string(buffer1);
-    CHECK(strcmp(buffer1, "1969-12-31 23:59:59") == 0);
+    CHECK(strcmp(buffer1.data(), "1969-12-31 23:59:59") == 0);
     Timestamp(-1, -100000000).to_string(buffer1);
-    CHECK(strcmp(buffer1, "1969-12-31 23:59:58.900000000") == 0);
+    CHECK(strcmp(buffer1.data(), "1969-12-31 23:59:58.900000000") == 0);
 
     // Compare our own to_string with standard implementation
     // for years 1900 to 2050
@@ -895,8 +895,8 @@ TEST(Json_Timestamp)
 #else
         gmtime_r(&seconds, &buf);
 #endif
-        strftime(buffer2, sizeof(buffer2), "%Y-%m-%d %H:%M:%S", &buf);
-        CHECK(strcmp(buffer1, buffer2) == 0);
+        strftime(buffer2.data(), sizeof(buffer2), "%Y-%m-%d %H:%M:%S", &buf);
+        CHECK(strcmp(buffer1.data(), buffer2.data()) == 0);
     }
     /*
     auto t1 = steady_clock::now();

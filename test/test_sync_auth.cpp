@@ -16,6 +16,8 @@ using namespace realm::sync;
 
 namespace {
 
+#if !REALM_MOBILE
+
 TEST(Sync_Auth_JWTAccessToken)
 {
     AccessToken tok;
@@ -78,5 +80,7 @@ TEST(Sync_Auth_JWTAccessTokenStitchFields)
         Privilege::Download | Privilege::Upload | Privilege::ModifySchema | Privilege::SetPermissions;
     CHECK_EQUAL(tok.access, admin_access);
 }
+
+#endif // !REALM_MOBILE
 
 } // unnamed namespace

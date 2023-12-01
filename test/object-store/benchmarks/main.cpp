@@ -16,8 +16,11 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#define CATCH_CONFIG_ENABLE_BENCHMARKING
+#if TEST_SCHEDULER_UV
+#include <realm/object-store/util/uv/scheduler.hpp>
+#endif
 
+#define CATCH_CONFIG_ENABLE_BENCHMARKING
 #include <catch2/catch_all.hpp>
 
 #include <limits.h>
@@ -42,9 +45,15 @@ int main(int argc, char** argv)
     SetCurrentDirectoryA(path);
 #else
     char executable[PATH_MAX];
-    realpath(argv[0], executable);
+    (void)realpath(argv[0], executable);
     const char* directory = dirname(executable);
     chdir(directory);
+#endif
+
+#if TEST_SCHEDULER_UV
+    realm::util::Scheduler::set_default_factory([]() {
+        return std::make_shared<realm::util::UvMainLoopScheduler>();
+    });
 #endif
 
     int result = Catch::Session().run(argc, argv);

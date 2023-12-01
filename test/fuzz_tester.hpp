@@ -909,8 +909,8 @@ void FuzzTester<S>::round(unit_test::TestContext& test_context, std::string path
                                 std::cerr << trace_selected_link_list(client) << " = " << trace_selected_table(client)
                                           << "->get_object(" << row_key << ").get_linklist_ptr(" << col_key << ");\n";
                             }
-                            client.selected_link_list = std::move(link_list);
                             size_t num_links = link_list->size();
+                            client.selected_link_list = std::move(link_list);
                             get_link_list_level_modify_actions(num_links, actions);
                         }
                     }

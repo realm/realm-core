@@ -714,14 +714,10 @@ public:
 
     // Overriding members of ServerHistory::Context
     std::mt19937_64& server_history_get_random() noexcept override final;
-    sync::Transformer& get_transformer() override final;
-    util::Buffer<char>& get_transform_buffer() override final;
 
 private:
     ServerImpl& m_server;
     std::mt19937_64 m_random;
-    const std::unique_ptr<Transformer> m_transformer;
-    util::Buffer<char> m_transform_buffer;
     ServerFileAccessCache m_file_access_cache;
 
     util::Mutex m_mutex;
@@ -976,8 +972,6 @@ public:
 
     // Overriding member functions in _impl::ServerHistory::Context
     std::mt19937_64& server_history_get_random() noexcept override final;
-    Transformer& get_transformer() noexcept override final;
-    util::Buffer<char>& get_transform_buffer() noexcept override final;
 
 private:
     Server::Config m_config;
@@ -1014,8 +1008,6 @@ private:
     ServerProtocol m_server_protocol;
     compression::CompressMemoryArena m_compress_memory_arena;
     MiscBuffers m_misc_buffers;
-    std::unique_ptr<Transformer> m_transformer;
-    util::Buffer<char> m_transform_buffer;
     int_fast64_t m_current_server_session_ident;
     Optional<network::DeadlineTimer> m_connection_reaper_timer;
     bool m_allow_load_balancing = false;
@@ -1407,7 +1399,7 @@ private:
     void handle_pong_output_buffer();
 
     void initiate_write_error(ProtocolError, session_ident_type);
-    void handle_write_error();
+    void handle_write_error(std::error_code ec);
 
     void do_initiate_soft_close(ProtocolError, session_ident_type);
     void read_error(std::error_code);
@@ -3756,7 +3748,6 @@ void ServerFile::finalize_work_stage_2()
 Worker::Worker(ServerImpl& server)
     : logger{"Worker: ", server.logger_ptr} // Throws
     , m_server{server}
-    , m_transformer{make_transformer()} // Throws
     , m_file_access_cache{server.get_config().max_open_files, logger, *this, server.get_config().encryption_key}
 {
     util::seed_prng_nondeterministically(m_random); // Throws
@@ -3776,17 +3767,6 @@ std::mt19937_64& Worker::server_history_get_random() noexcept
     return m_random;
 }
 
-
-sync::Transformer& Worker::get_transformer()
-{
-    return *m_transformer;
-}
-
-
-util::Buffer<char>& Worker::get_transform_buffer()
-{
-    return m_transform_buffer;
-}
 
 void Worker::run()
 {
@@ -3822,7 +3802,7 @@ void Worker::stop() noexcept
 
 
 ServerImpl::ServerImpl(const std::string& root_dir, util::Optional<sync::PKey> pkey, Server::Config config)
-    : logger_ptr{config.logger ? std::move(config.logger) : std::make_shared<util::StderrLogger>()}
+    : logger_ptr{config.logger ? std::move(config.logger) : Logger::get_default_logger()}
     , logger{*logger_ptr}
     , m_config{std::move(config)}
     , m_max_upload_backlog{determine_max_upload_backlog(config)}
@@ -3913,8 +3893,6 @@ void ServerImpl::start()
     logger.info("Connection soft close timeout: %1 ms", m_config.soft_close_timeout);      // Throws
     logger.debug("Authorization header name: %1", m_config.authorization_header_name);     // Throws
 
-    m_transformer = make_transformer(); // Throws
-
     m_realm_names = _impl::find_realm_files(m_root_dir); // Throws
 
     initiate_connection_reaper_timer(m_config.connection_reaper_interval); // Throws
@@ -3982,18 +3960,6 @@ void ServerImpl::dec_byte_size_for_pending_downstream_changesets(std::size_t byt
 std::mt19937_64& ServerImpl::server_history_get_random() noexcept
 {
     return get_random();
-}
-
-
-Transformer& ServerImpl::get_transformer() noexcept
-{
-    return *m_transformer;
-}
-
-
-util::Buffer<char>& ServerImpl::get_transform_buffer() noexcept
-{
-    return m_transform_buffer;
 }
 
 
@@ -4587,8 +4553,10 @@ void SyncConnection::send_next_message()
 
 void SyncConnection::initiate_write_output_buffer()
 {
-    auto handler = [this]() {
-        handle_write_output_buffer();
+    auto handler = [this](std::error_code ec, size_t) {
+        if (!ec) {
+            handle_write_output_buffer();
+        }
     };
 
     m_websocket.async_write_binary(m_output_buffer.data(), m_output_buffer.size(),
@@ -4599,8 +4567,10 @@ void SyncConnection::initiate_write_output_buffer()
 
 void SyncConnection::initiate_pong_output_buffer()
 {
-    auto handler = [this]() {
-        handle_pong_output_buffer();
+    auto handler = [this](std::error_code ec, size_t) {
+        if (!ec) {
+            handle_pong_output_buffer();
+        }
     };
 
     REALM_ASSERT(!m_is_sending);
@@ -4669,20 +4639,19 @@ void SyncConnection::initiate_write_error(ProtocolError error_code, session_iden
     get_server_protocol().make_error_message(protocol_version, out, error_code, message, message_size, try_again,
                                              session_ident); // Throws
 
-    auto handler = [this]() {
-        handle_write_error(); // Throws
+    auto handler = [this](std::error_code ec, size_t) {
+        handle_write_error(ec); // Throws
     };
     m_websocket.async_write_binary(out.data(), out.size(), std::move(handler));
     m_is_sending = true;
 }
 
 
-void SyncConnection::handle_write_error()
+void SyncConnection::handle_write_error(std::error_code ec)
 {
     m_is_sending = false;
     REALM_ASSERT(m_is_closing);
     if (!m_ssl_stream) {
-        std::error_code ec;
         m_socket->shutdown(network::Socket::shutdown_send, ec);
         if (ec && ec != make_basic_system_error_code(ENOTCONN))
             throw std::system_error(ec);

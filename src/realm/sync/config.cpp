@@ -20,7 +20,7 @@
 #include <realm/sync/client.hpp>
 #include <realm/sync/protocol.hpp>
 #include <realm/sync/network/network.hpp>
-#include <realm/object-store/util/bson/bson.hpp>
+#include <realm/util/bson/bson.hpp>
 
 #include <ostream>
 

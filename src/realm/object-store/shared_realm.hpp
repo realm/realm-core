@@ -20,6 +20,7 @@
 #define REALM_REALM_HPP
 
 #include <realm/object-store/schema.hpp>
+#include <realm/object-store/class.hpp>
 
 #include <realm/util/optional.hpp>
 #include <realm/util/functional.hpp>
@@ -238,6 +239,9 @@ public:
     {
         return m_schema;
     }
+    bool is_empty();
+    Class get_class(StringData object_type);
+    std::vector<Class> get_classes();
     uint64_t schema_version() const noexcept
     {
         return m_schema_version;
@@ -488,6 +492,12 @@ public:
         static std::shared_ptr<DB>& get_db(Realm& realm);
         static void begin_read(Realm&, VersionID);
     };
+
+    KeyPathArray create_key_path_array(StringData table_name, const std::vector<std::string>& key_paths);
+    KeyPathArray create_key_path_array(TableKey table_key, size_t num_key_paths, const char* all_key_paths[]);
+#ifdef REALM_DEBUG
+    void print_key_path_array(const KeyPathArray&);
+#endif
 
 private:
     struct MakeSharedTag {

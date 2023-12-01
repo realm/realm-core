@@ -575,6 +575,24 @@ TEST(File_GetUniqueID)
     uid4_1 = uid4_2;
     CHECK_NOT(uid4_1 < uid4_2);
     CHECK_NOT(uid4_2 < uid4_1);
+
+    file1_1.resize(0);
+    file2_1.resize(0);
+    file2_1.resize(1);
+    file1_1.resize(1);
+    if (!test_util::test_dir_is_exfat()) {
+        CHECK(uid1_1 == file1_1.get_unique_id());
+        CHECK(uid2_1 == file2_1.get_unique_id());
+    }
+    else {
+        // fat32/exfat could reuse or reassign uid after truncate
+        // there is not much to guarantee about the values of uids
+        auto u1 = file1_1.get_unique_id();
+        auto u2 = file2_1.get_unique_id();
+        CHECK(u1 != u2);
+        auto u1_2 = file1_2.get_unique_id();
+        CHECK(u1 == u1_2);
+    }
 }
 
 TEST(File_Temp)

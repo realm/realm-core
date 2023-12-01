@@ -684,7 +684,7 @@ ObjKey Obj::get_backlink(const Table& origin, ColKey origin_col_key, size_t back
     return get_backlink(backlink_col_key, backlink_ndx);
 }
 
-TableView Obj::get_backlink_view(TableRef src_table, ColKey src_col_key)
+TableView Obj::get_backlink_view(TableRef src_table, ColKey src_col_key) const
 {
     TableView tv(src_table, src_col_key, *this);
     tv.do_sync();

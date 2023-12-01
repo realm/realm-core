@@ -289,7 +289,7 @@ struct ProtocolErrorInfo {
     bool client_reset_recovery_is_disabled = false;
     std::optional<bool> should_client_reset;
     std::optional<std::string> log_url;
-    version_type compensating_write_server_version = 0;
+    std::optional<version_type> compensating_write_server_version;
     version_type compensating_write_rejected_client_version = 0;
     std::vector<CompensatingWriteErrorInfo> compensating_writes;
     std::optional<ResumptionDelayInfo> resumption_delay_interval;

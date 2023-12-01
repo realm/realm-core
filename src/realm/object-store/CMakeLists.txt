@@ -6,6 +6,7 @@ set(SOURCES
     dictionary.cpp
     index_set.cpp
     list.cpp
+    class.cpp
     object.cpp
     object_changeset.cpp
     object_schema.cpp
@@ -45,6 +46,7 @@ set(HEADERS
     index_set.hpp
     keypath_helpers.hpp
     list.hpp
+    class.hpp
     object.hpp
     object_accessor.hpp
     object_changeset.hpp
@@ -108,14 +110,7 @@ if(REALM_ENABLE_SYNC)
         sync/impl/sync_client.hpp
         sync/impl/sync_file.hpp
         sync/impl/sync_metadata.hpp
-        sync/impl/network_reachability.hpp
-
-        util/bson/bson.hpp
-        util/bson/min_key.hpp
-        util/bson/max_key.hpp
-        util/bson/regular_expression.hpp
-        util/bson/indexed_map.hpp
-        util/bson/mongo_timestamp.hpp)
+        sync/impl/network_reachability.hpp)
 
     list(APPEND SOURCES
         sync/app.cpp
@@ -131,9 +126,7 @@ if(REALM_ENABLE_SYNC)
         sync/mongo_database.cpp
         sync/push_client.cpp
         sync/impl/sync_file.cpp
-        sync/impl/sync_metadata.cpp
-        util/bson/bson.cpp
-        util/bson/regular_expression.cpp)
+        sync/impl/sync_metadata.cpp)
     if(APPLE)
         list(APPEND HEADERS
             sync/impl/apple/network_reachability_observer.hpp

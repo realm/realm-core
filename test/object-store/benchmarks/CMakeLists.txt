@@ -10,7 +10,6 @@ set(SOURCES
     object.cpp
     results.cpp
 
-    ../../util/crypt_key.cpp
     ../util/event_loop.cpp
     ../util/test_file.cpp
     ../util/test_utils.cpp
@@ -36,19 +35,16 @@ target_include_directories(object-store-benchmarks PRIVATE
 
 if(REALM_ENABLE_SYNC)
     target_link_libraries(object-store-benchmarks SyncServer)
-    enable_stdfilesystem(object-store-benchmarks)
 endif()
-
-target_link_libraries(object-store-benchmarks ObjectStore Catch2::Catch2)
-set_target_properties(object-store-benchmarks PROPERTIES
-      EXCLUDE_FROM_ALL 1
-      EXCLUDE_FROM_DEFAULT_BUILD 1)
+enable_stdfilesystem(object-store-benchmarks)
+target_link_libraries(object-store-benchmarks ObjectStore TestUtil Catch2::Catch2)
 
 add_dependencies(benchmarks object-store-benchmarks)
 
 # on Apple platforms we use the built-in CFRunLoop
 # everywhere else it's libuv, except UWP where it doesn't build
-if(NOT APPLE AND NOT WINDOWS_STORE)
-    target_include_directories(object-store-benchmarks PRIVATE ${libuv_include_dir})
+if(NOT APPLE AND NOT WINDOWS_STORE AND NOT EMSCRIPTEN AND NOT ANDROID)
+    # libuv_target is defined in the parent CMakeLists.txt file
     target_link_libraries(object-store-benchmarks ${libuv_target})
+    target_compile_definitions(object-store-benchmarks PRIVATE TEST_SCHEDULER_UV=1)
 endif()

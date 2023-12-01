@@ -71,6 +71,7 @@ public:
     {
     }
     bool match(size_t index, Mixed) noexcept final;
+    bool match(size_t index) noexcept final;
 
 private:
     T& m_keys;
@@ -84,6 +85,7 @@ public:
     {
     }
     bool match(size_t index, Mixed) noexcept final;
+    bool match(size_t index) noexcept final;
 };
 
 class Array : public Node, public ArrayParent {

@@ -82,7 +82,6 @@ public:
 class ClientHistory final : public _impl::History, public TransformHistory {
 public:
     using version_type = sync::version_type;
-    using RemoteChangeset = Transformer::RemoteChangeset;
 
     struct UploadChangeset {
         timestamp_type origin_timestamp;
@@ -91,15 +90,6 @@ public:
         ChunkedBinaryData changeset;
         std::unique_ptr<char[]> buffer;
     };
-
-    class SyncTransactReporter {
-    public:
-        virtual void report_sync_transact(VersionID old_version, VersionID new_version) = 0;
-
-    protected:
-        ~SyncTransactReporter() = default;
-    };
-
 
     /// set_client_reset_adjustments() is used by client reset to adjust the
     /// content of the history compartment. The shared group associated with
@@ -161,6 +151,9 @@ public:
     /// reestablish the connection between the client file and the server file
     /// when engaging in future synchronization sessions.
     void set_client_file_ident(SaltedFileIdent client_file_ident, bool fix_up_object_ids);
+
+    /// Gets the client file ident set with `set_client_file_ident`, or `{0, 0}` if it has never been set.
+    SaltedFileIdent get_client_file_ident(const Transaction& tr) const;
 
     /// Stores the synchronization progress in the associated Realm file in a
     /// way that makes it available via get_status() during future
@@ -245,16 +238,11 @@ public:
     /// the server changesets after they were transformed.
     /// Note: In FLX, the transaction is left in reading state when bootstrap ends.
     /// In all other cases, the transaction is left in reading state when the function returns.
-    ///
-    /// \param transact_reporter An optional callback which will be called with the
-    /// version immediately processing the sync transaction and that of the sync
-    /// transaction.
     void integrate_server_changesets(
         const SyncProgress& progress, const std::uint_fast64_t* downloadable_bytes,
         util::Span<const RemoteChangeset> changesets, VersionInfo& new_version, DownloadBatchState download_type,
         util::Logger&, const TransactionRef& transact,
-        util::UniqueFunction<void(const TransactionRef&, util::Span<Changeset>)> run_in_write_tr = nullptr,
-        SyncTransactReporter* transact_reporter = nullptr);
+        util::UniqueFunction<void(const TransactionRef&, util::Span<Changeset>)> run_in_write_tr = nullptr);
 
     static void get_upload_download_bytes(DB*, std::uint_fast64_t&, std::uint_fast64_t&, std::uint_fast64_t&,
                                           std::uint_fast64_t&, std::uint_fast64_t&);
@@ -286,10 +274,6 @@ private:
 
     ClientReplication& m_replication;
     DB* m_db = nullptr;
-
-    // FIXME: All history objects belonging to a particular client object
-    // (sync::Client) should use a single shared transformer object.
-    std::unique_ptr<Transformer> m_transformer;
 
     /// The version on which the first changeset in the continuous transactions
     /// history is based, or if that history is empty, the version associated
@@ -427,7 +411,6 @@ private:
     void trim_sync_history();
     void do_trim_sync_history(std::size_t n);
     void clamp_sync_version_range(version_type& begin, version_type& end) const noexcept;
-    Transformer& get_transformer();
     void fix_up_client_file_ident_in_stored_changesets(Transaction&, file_ident_type);
     void record_current_schema_version();
     static void record_current_schema_version(Array& schema_versions, version_type snapshot_version);
@@ -548,13 +531,6 @@ inline void ClientHistory::clamp_sync_version_range(version_type& begin, version
         if (end < m_sync_history_base_version)
             end = m_sync_history_base_version;
     }
-}
-
-inline auto ClientHistory::get_transformer() -> Transformer&
-{
-    if (!m_transformer)
-        m_transformer = make_transformer(); // Throws
-    return *m_transformer;
 }
 
 
