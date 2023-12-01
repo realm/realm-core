@@ -542,9 +542,11 @@ public:
             REALM_ASSERT(false && "Illegal header encoding for chosen kind of header");
         }
         auto hw = (uint32_t*)header;
-        hw[1] = (uint32_t)((bits_pr_elemA << 26) | (bits_pr_elemB << 20) | (num_elemsA << 10) | num_elemsB);
-        hb[2] = (hb[2] & 0b11110000) | (flags << 4); // flags
-        hb[2] = (hb[2] & 0b11110000) | 3;            // flex
+        REALM_ASSERT(bits_pr_elemA > 0);
+        REALM_ASSERT(bits_pr_elemB > 0);
+        hw[1] =
+            (uint32_t)(((bits_pr_elemA - 1) << 26) | ((bits_pr_elemB - 1) << 20) | (num_elemsA << 10) | num_elemsB);
+        hb[2] = (flags << 4) | 3; // flags | flex
         hb[3] = kind;
     }
 

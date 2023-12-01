@@ -220,21 +220,26 @@ public:
         uint64_t result = first_word >> in_word_position;
         // note: above shifts in zeroes above the bitfield
         if (in_word_position + field_size > 64) {
+            // if we're here, in_word_position > 0
             auto first_word_size = 64 - in_word_position;
             auto second_word = first_word_ptr[1];
             result |= second_word << first_word_size;
             // note: above shifts in zeroes below the bits we want
         }
         // discard any bits above the field we want
-        result &= (1ULL << field_size) - 1;
+        if (field_size < 64)
+            result &= (1ULL << field_size) - 1;
         return result;
     }
     void set_value(uint64_t value) const
     {
         auto in_word_position = field_position & 0x3F;
         auto first_word = first_word_ptr[0];
-        size_t mask = (1ULL << field_size) - 1;
-        value &= mask;
+        size_t mask = -1;
+        if (field_size < 64) {
+            mask = (1ULL << field_size) - 1;
+            value &= mask;
+        }
         // zero out field in first word:
         auto first_word_mask = ~(mask << in_word_position);
         first_word &= first_word_mask;
@@ -245,6 +250,7 @@ public:
             // bitfield crosses word boundary.
             // discard the lowest bits of value (it has been written to the first word)
             auto bits_written_to_first_word = 64 - in_word_position;
+            // bit_written_to_first_word must be lower than 64, so shifts based on it are well defined
             value >>= bits_written_to_first_word;
             auto second_word_mask = mask >> bits_written_to_first_word;
             auto second_word = first_word_ptr[1];
