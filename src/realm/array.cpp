@@ -730,7 +730,7 @@ bool Array::decode_array() const
     if (kind == 'B') {
         auto encoding = get_encoding((uint64_t*)header);
         if (encoding == NodeHeader::Encoding::Flex) {
-            return m_encode.decode(*this);
+            return m_encode.decode((Array&)*this);
         }
     }
     return false;

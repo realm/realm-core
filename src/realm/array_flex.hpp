@@ -32,7 +32,7 @@ public:
     explicit ArrayFlex() = default;
     virtual ~ArrayFlex() = default;
     bool encode(const Array&, Array&) const final override;
-    bool decode(const Array&) const final override;
+    bool decode(Array&) const final override;
     bool is_encoded(const Array&) const final override;
     size_t size(const Array&) const final override;
     int64_t get(const Array&, size_t) const final override;
@@ -50,7 +50,7 @@ private:
     void copy_into_encoded_array(Array&, std::vector<int64_t>&, std::vector<size_t>&) const;
     // decode array methods
     std::vector<int64_t> fetch_values_from_encoded_array(const Array&, size_t, size_t, size_t, size_t) const;
-    void restore_array(const Array&, const std::vector<int64_t>&) const;
+    void restore_array(Array&, const std::vector<int64_t>&) const;
 };
 } // namespace realm
 #endif // REALM_ARRAY_COMPRESS_HPP

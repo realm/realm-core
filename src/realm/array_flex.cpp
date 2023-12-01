@@ -47,7 +47,7 @@ bool ArrayFlex::encode(const Array& origin, Array& encoded) const
     return false;
 }
 
-bool ArrayFlex::decode(const Array& arr) const
+bool ArrayFlex::decode(Array& arr) const
 {
     using Encoding = NodeHeader::Encoding;
     REALM_ASSERT(arr.is_attached());
@@ -279,7 +279,7 @@ std::vector<int64_t> ArrayFlex::fetch_values_from_encoded_array(const Array& arr
     return values;
 }
 
-void ArrayFlex::restore_array(const Array& arr, const std::vector<int64_t>& values) const
+void ArrayFlex::restore_array(Array& arr, const std::vector<int64_t>& values) const
 {
     // do the reverse of compressing the array
     REALM_ASSERT(arr.is_attached());
@@ -293,16 +293,17 @@ void ArrayFlex::restore_array(const Array& arr, const std::vector<int64_t>& valu
     auto byte_size = NodeHeader::calc_size<Encoding::WTypBits>(size, width);
     REALM_ASSERT(byte_size % 8 == 0); // 8 bytes aligned value
     Allocator& allocator = arr.get_alloc();
-    Array& tmp = (Array&)arr; // TODO: this is temporary... it requires a static method in Array.
-    tmp.destroy();
+    // Array& tmp = (Array&)arr; // TODO: this is temporary... it requires a static method in Array.
+    arr.destroy();
     auto mem = allocator.alloc(byte_size);
     auto header = (uint64_t*)mem.get_addr();
     NodeHeader::init_header(header, 'A', Encoding::WTypBits, flags, 0, 0);
     NodeHeader::set_capacity_in_header(byte_size, (char*)header);
-    tmp.init_from_mem(mem);
+    arr.init_from_mem(mem);
+    arr.update_parent();
     size_t i = 0;
     for (const auto& v : values)
-        tmp.insert(i++, v);
+        arr.insert(i++, v);
     REALM_ASSERT(arr.get_width() != 0);
     REALM_ASSERT(arr.get_width() % 8 == 0 && arr.get_width() != 0);
     REALM_ASSERT(arr.size() == values.size());
