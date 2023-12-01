@@ -489,6 +489,9 @@ void File::open_internal(const std::string& path, AccessMode a, CreateMode c, in
         case access_ReadWrite:
             flags2 = O_RDWR;
             break;
+        case access_None:
+            REALM_ASSERT(a != access_None);
+            break;
     }
     switch (c) {
         case create_Auto:
@@ -628,7 +631,7 @@ size_t File::read(char* data, size_t size)
         uint64_t pos_original = File::get_file_pos(m_fd);
         REALM_ASSERT(!int_cast_has_overflow<size_t>(pos_original));
         size_t pos = size_t(pos_original);
-        Map<char> read_map(*this, access_ReadOnly, static_cast<size_t>(pos + size));
+        Map<char> read_map("enc rd", *this, access_ReadOnly, static_cast<size_t>(pos + size));
         realm::util::encryption_read_barrier(read_map, pos, size);
         memcpy(data, read_map.get_addr() + pos, size);
         uint64_t cur = File::get_file_pos(m_fd);
@@ -697,7 +700,7 @@ void File::write(const char* data, size_t size)
         uint64_t pos_original = get_file_pos(m_fd);
         REALM_ASSERT(!int_cast_has_overflow<size_t>(pos_original));
         size_t pos = size_t(pos_original);
-        Map<char> write_map(*this, access_ReadWrite, static_cast<size_t>(pos + size));
+        Map<char> write_map("enc wr", *this, access_ReadWrite, static_cast<size_t>(pos + size));
         realm::util::encryption_read_barrier(write_map, pos, size);
         memcpy(write_map.get_addr() + pos, data, size);
         realm::util::encryption_write_barrier(write_map, pos, size);
@@ -1313,12 +1316,13 @@ void File::rw_unlock() noexcept
 #endif // REALM_FILELOCK_EMULATION
 }
 
-void* File::map(AccessMode a, size_t size, int /*map_flags*/, size_t offset) const
+void* File::map(const char* cause, AccessMode a, size_t size, int /*map_flags*/, size_t offset) const
 {
-    return realm::util::mmap({m_fd, m_path, a, m_encryption_key.get()}, size, offset);
+    return realm::util::mmap({m_fd, m_path, cause, a, m_encryption_key.get()}, size, offset);
 }
 
-void* File::map_fixed(AccessMode a, void* address, size_t size, int /* map_flags */, size_t offset) const
+void* File::map_fixed(const char* cause, AccessMode a, void* address, size_t size, int /* map_flags */,
+                      size_t offset) const
 {
     if (m_encryption_key.get()) {
         // encryption enabled - this is not supported - see explanation in alloc_slab.cpp
@@ -1331,54 +1335,22 @@ void* File::map_fixed(AccessMode a, void* address, size_t size, int /* map_flags
     return nullptr;
 #else
     // unencrypted - mmap part of already reserved space
-    return realm::util::mmap_fixed(m_fd, address, size, a, offset, m_encryption_key.get());
+    return realm::util::mmap_fixed({m_fd, m_path, cause, a, m_encryption_key.get()}, address, size, offset);
 #endif
 }
 
-void* File::map_reserve(AccessMode a, size_t size, size_t offset) const
+void* File::map_reserve(const char* cause, AccessMode a, size_t size, size_t offset) const
 {
     static_cast<void>(a); // FIXME: Consider removing this argument
-    return realm::util::mmap_reserve(m_fd, size, offset);
+    return realm::util::mmap_reserve({m_fd, m_path, cause, access_None, nullptr}, size, offset);
 }
 
 #if REALM_ENABLE_ENCRYPTION
-void* File::map(AccessMode a, size_t size, EncryptedFileMapping*& mapping, int /*map_flags*/, size_t offset) const
+void* File::map(const char* cause, AccessMode a, size_t size, EncryptedFileMapping*& mapping, int /*map_flags*/,
+                size_t offset) const
 {
-    return realm::util::mmap({m_fd, m_path, a, m_encryption_key.get()}, size, offset, mapping);
+    return realm::util::mmap({m_fd, m_path, cause, a, m_encryption_key.get()}, size, offset, mapping);
 }
-
-void* File::map_fixed(AccessMode a, void* address, size_t size, EncryptedFileMapping* mapping, int /* map_flags */,
-                      size_t offset) const
-{
-    if (m_encryption_key.get()) {
-        // encryption enabled - we shouldn't be here, all memory was allocated by reserve
-        REALM_ASSERT_RELEASE(false);
-    }
-#ifndef _WIN32
-    // no encryption. On Unixes, map relevant part of reserved virtual address range
-    return realm::util::mmap_fixed(m_fd, address, size, a, offset, nullptr, mapping);
-#else
-    // no encryption - unsupported on windows
-    REALM_ASSERT(false);
-    return nullptr;
-#endif
-}
-
-void* File::map_reserve(AccessMode a, size_t size, size_t offset, EncryptedFileMapping*& mapping) const
-{
-    if (m_encryption_key.get()) {
-        // encrypted file - just mmap it, the encryption layer handles if the mapping extends beyond eof
-        return realm::util::mmap({m_fd, m_path, a, m_encryption_key.get()}, size, offset, mapping);
-    }
-#ifndef _WIN32
-    // not encrypted, do a proper reservation on Unixes'
-    return realm::util::mmap_reserve({m_fd, m_path, a, nullptr}, size, offset, mapping);
-#else
-    // on windows, this is a no-op
-    return nullptr;
-#endif
-}
-
 #endif // REALM_ENABLE_ENCRYPTION
 
 void File::unmap(void* addr, size_t size) noexcept
@@ -1387,10 +1359,11 @@ void File::unmap(void* addr, size_t size) noexcept
 }
 
 
-void* File::remap(void* old_addr, size_t old_size, AccessMode a, size_t new_size, int /*map_flags*/,
-                  size_t file_offset) const
+void* File::remap(const char* cause, void* old_addr, size_t old_size, AccessMode a, size_t new_size,
+                  int /*map_flags*/, size_t file_offset) const
 {
-    return realm::util::mremap({m_fd, m_path, a, m_encryption_key.get()}, file_offset, old_addr, old_size, new_size);
+    return realm::util::mremap({m_fd, m_path, cause, a, m_encryption_key.get()}, file_offset, old_addr, old_size,
+                               new_size);
 }
 
 
@@ -1722,21 +1695,22 @@ const char* File::get_encryption_key() const
     return m_encryption_key.get();
 }
 
-void File::MapBase::map(const File& f, AccessMode a, size_t size, int map_flags, size_t offset,
+void File::MapBase::map(const char* cause, const File& f, AccessMode a, size_t size, int map_flags, size_t offset,
                         util::WriteObserver* observer)
 {
     REALM_ASSERT(!m_addr);
 #if REALM_ENABLE_ENCRYPTION
-    m_addr = f.map(a, size, m_encrypted_mapping, map_flags, offset);
+    m_addr = f.map(cause, a, size, m_encrypted_mapping, map_flags, offset);
     if (observer && m_encrypted_mapping) {
         m_encrypted_mapping->set_observer(observer);
     }
 #else
-    m_addr = f.map(a, size, map_flags, offset);
+    m_addr = f.map(cause, a, size, map_flags, offset);
     static_cast<void>(observer);
 #endif
     m_size = m_reservation_size = size;
     m_fd = f.m_fd;
+    m_path = f.m_path;
     m_offset = offset;
     m_access_mode = a;
 }
@@ -1753,20 +1727,20 @@ void File::MapBase::unmap() noexcept
         util::remove_encrypted_mapping(m_addr, m_size);
     }
 #endif
-    ::munmap(m_addr, m_reservation_size);
+    realm::util::munmap(m_addr, m_reservation_size);
     m_addr = nullptr;
     m_size = 0;
     m_reservation_size = 0;
 }
 
-void File::MapBase::remap(const File& f, AccessMode a, size_t size, int map_flags)
+void File::MapBase::remap(const char* cause, const File& f, AccessMode a, size_t size, int map_flags)
 {
     REALM_ASSERT(m_addr);
-    m_addr = f.remap(m_addr, m_size, a, size, map_flags);
+    m_addr = f.remap(cause, m_addr, m_size, a, size, map_flags);
     m_size = m_reservation_size = size;
 }
 
-bool File::MapBase::try_reserve(const File& file, AccessMode a, size_t size, size_t offset,
+bool File::MapBase::try_reserve(const char* cause, const File& file, AccessMode a, size_t size, size_t offset,
                                 util::WriteObserver* observer)
 {
 #ifdef _WIN32
@@ -1774,19 +1748,22 @@ bool File::MapBase::try_reserve(const File& file, AccessMode a, size_t size, siz
     // unsupported for now
     return false;
 #else
-    void* addr = ::mmap(0, size, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-    if (addr == MAP_FAILED)
+    try {
+        m_addr = realm::util::mmap_reserve({-1, file.m_path, cause, access_None, nullptr}, size, 0);
+    }
+    catch (...) {
         return false;
-    m_addr = addr;
+    }
     REALM_ASSERT(m_size == 0);
     m_access_mode = a;
     m_reservation_size = size;
     m_fd = file.get_descriptor();
     m_offset = offset;
+    m_path = file.m_path;
 #if REALM_ENABLE_ENCRYPTION
     if (file.m_encryption_key) {
         m_encrypted_mapping =
-            util::reserve_mapping(addr, {m_fd, file.get_path(), a, file.m_encryption_key.get()}, offset);
+            util::reserve_mapping(m_addr, {m_fd, file.get_path(), cause, a, file.m_encryption_key.get()}, offset);
         if (observer) {
             m_encrypted_mapping->set_observer(observer);
         }
@@ -1798,7 +1775,7 @@ bool File::MapBase::try_reserve(const File& file, AccessMode a, size_t size, siz
     return true;
 }
 
-bool File::MapBase::try_extend_to(size_t size) noexcept
+bool File::MapBase::try_extend_to(const char* cause, size_t size) noexcept
 {
     if (size > m_reservation_size) {
         return false;
@@ -1810,8 +1787,14 @@ bool File::MapBase::try_extend_to(size_t size) noexcept
     size_t extension_start_offset = m_offset + m_size;
 #if REALM_ENABLE_ENCRYPTION
     if (m_encrypted_mapping) {
-        void* got_addr = ::mmap(extension_start_addr, extension_size, PROT_READ | PROT_WRITE,
-                                MAP_ANON | MAP_PRIVATE | MAP_FIXED, -1, 0);
+        void* got_addr;
+        try {
+            got_addr = util::mmap_fixed({-1, "Encryption", cause, access_ReadWrite, nullptr}, extension_start_addr,
+                                        extension_size, 0);
+        }
+        catch (...) {
+            return false;
+        }
         if (got_addr == MAP_FAILED)
             return false;
         REALM_ASSERT(got_addr == extension_start_addr);
@@ -1821,8 +1804,8 @@ bool File::MapBase::try_extend_to(size_t size) noexcept
     }
 #endif
     try {
-        void* got_addr = util::mmap_fixed(m_fd, extension_start_addr, extension_size, m_access_mode,
-                                          extension_start_offset, nullptr);
+        void* got_addr = util::mmap_fixed({m_fd, m_path, cause, m_access_mode, nullptr}, extension_start_addr,
+                                          extension_size, extension_start_offset);
         if (got_addr == extension_start_addr) {
             m_size = size;
             return true;

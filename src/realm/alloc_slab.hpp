@@ -358,11 +358,6 @@ public:
     /// Returns total amount of slab for all slab allocators
     static size_t get_total_slab_size() noexcept;
 
-    /// Hooks used to keep the encryption layer informed of the start and stop
-    /// of transactions.
-    void note_reader_start(const void* reader_id);
-    void note_reader_end(const void* reader_id) noexcept;
-
     void verify() const override;
 #ifdef REALM_DEBUG
     void enable_debug(bool enable)
@@ -646,7 +641,6 @@ private:
     uint64_t m_youngest_live_version = 1;
     std::mutex m_mapping_mutex;
     util::File m_file;
-    util::SharedFileInfo* m_realm_file_info = nullptr;
     // vectors where old mappings, are held from deletion to ensure translations are
     // kept open and ref->ptr translations work for other threads..
     std::vector<OldMapping> m_old_mappings;

@@ -34,18 +34,18 @@ namespace util {
 struct FileAttributes {
     FileDesc fd;
     std::string path;
+    const char* cause;
     File::AccessMode access;
     const char* encryption_key = nullptr;
 };
 
 void* mmap(const FileAttributes& file, size_t size, size_t offset);
-void* mmap_fixed(FileDesc fd, void* address_request, size_t size, File::AccessMode access, size_t offset,
-                 const char* enc_key);
-void* mmap_reserve(FileDesc fd, size_t size, size_t offset);
+void* mmap_fixed(const FileAttributes& file, void* address_request, size_t size, size_t offset);
+void* mmap_reserve(const FileAttributes& fd, size_t size, size_t offset);
 void munmap(void* addr, size_t size);
 void* mremap(const FileAttributes& file, size_t file_offset, void* old_addr, size_t old_size, size_t new_size);
 void msync(FileDesc fd, void* addr, size_t size);
-void* mmap_anon(size_t size);
+void* mmap_anon(size_t size, const char* cause);
 
 // A function which may be given to encryption_read_barrier. If present, the read barrier is a
 // a barrier for a full array. If absent, the read barrier is a barrier only for the address
@@ -54,48 +54,14 @@ void* mmap_anon(size_t size);
 using HeaderToSize = size_t (*)(const char* addr);
 class EncryptedFileMapping;
 
-class PageReclaimGovernor {
-public:
-    // Called by the page reclaimer with the current load (in bytes) and
-    // must return the target load (also in bytes). Returns no_match if no
-    // target can be set
-    static constexpr int64_t no_match = -1;
-    virtual util::UniqueFunction<int64_t()> current_target_getter(size_t load) = 0;
-    virtual void report_target_result(int64_t) = 0;
-};
-
-// Set a page reclaim governor. The governor is an object with a method which will be called periodically
-// and must return a 'target' amount of memory to hold decrypted pages. The page reclaim daemon
-// will then try to release pages to meet the target. The governor is called with the current
-// amount of data used, for the purpose of logging - or possibly for computing the target
-//
-// The governor is called approximately once per second.
-//
-// If no governor is installed, the page reclaim daemon will not start.
-void set_page_reclaim_governor(PageReclaimGovernor* governor);
-
-// Use the default governor. The default governor is used automatically if nothing else is set, so
-// this funciton is mostly useful for tests where changing back to the default could be desirable.
-inline void set_page_reclaim_governor_to_default()
-{
-    set_page_reclaim_governor(nullptr);
-}
-
 // Retrieves the number of in memory decrypted pages, across all open files.
 size_t get_num_decrypted_pages();
 
 #if REALM_ENABLE_ENCRYPTION
 
-void encryption_note_reader_start(SharedFileInfo& info, const void* reader_id);
-void encryption_note_reader_end(SharedFileInfo& info, const void* reader_id) noexcept;
-
-SharedFileInfo* get_file_info_for_file(File& file);
-
 // This variant allows the caller to obtain direct access to the encrypted file mapping
 // for optimization purposes.
 void* mmap(const FileAttributes& file, size_t size, size_t offset, EncryptedFileMapping*& mapping);
-void* mmap_fixed(FileDesc fd, void* address_request, size_t size, File::AccessMode access, size_t offset,
-                 const char* enc_key, EncryptedFileMapping* mapping);
 
 void* mmap_reserve(const FileAttributes& file, size_t size, size_t offset, EncryptedFileMapping*& mapping);
 
@@ -158,7 +124,6 @@ size_t inline get_num_decrypted_pages()
     return 0;
 }
 
-void inline set_page_reclaim_governor(PageReclaimGovernor*) {}
 void inline encryption_read_barrier(const void*, size_t, EncryptedFileMapping*, HeaderToSize = nullptr) {}
 void inline encryption_read_barrier_for_write(const void*, size_t, EncryptedFileMapping*) {}
 void inline encryption_write_barrier(const void*, size_t) {}

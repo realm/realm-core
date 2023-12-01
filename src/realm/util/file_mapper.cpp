@@ -19,6 +19,9 @@
 #include <realm/util/features.h>
 
 #include <realm/util/file_mapper.hpp>
+#include <realm/util/logger.hpp>
+#include <sstream>
+#include <iomanip>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -27,6 +30,9 @@
 #include <sys/mman.h>
 #include <unistd.h>
 #endif
+
+#include <mutex>
+#include <map>
 
 #include <realm/exceptions.hpp>
 #include <realm/impl/simulated_failure.hpp>
@@ -87,6 +93,170 @@ size_t round_up_to_page_size(size_t size) noexcept
     return (size + page_size() - 1) & ~(page_size() - 1);
 }
 
+// Support for logging memory mappings
+std::mutex mmap_log_mutex;
+struct MMapEntry {
+    enum class Type { Reserved, File, Memory };
+    Type type;
+    size_t offset;
+    char* start;
+    char* end;
+    std::string path;
+    const char* cause;
+};
+
+std::map<void*, MMapEntry> all_mappings;
+static std::string dump_logged_mappings();
+
+static void remove_logged_mapping(char* start, size_t size)
+{
+    REALM_ASSERT(start != (char*)-1);
+    REALM_ASSERT(size != 0);
+    char* end = start + size;
+    auto it = all_mappings.lower_bound(start);
+    // previous entry may overlap, so must be included in scan:
+    if (it != all_mappings.begin()) {
+        --it;
+    }
+    // scan for and adjust/remove entries which overlaps range:
+    while (it != all_mappings.end() && it->second.start < end) {
+        // handle case where the range "punches a hole" in existing entry
+        if (it->second.start < start && end < it->second.end) {
+            // collect info for part after hole
+            size_t offset = 0;
+            if (it->second.type == MMapEntry::Type::File) {
+                offset = it->second.offset + end - it->second.start;
+            }
+            REALM_ASSERT((offset % 4096) == 0);
+            REALM_ASSERT(((size_t)end % 4096) == 0);
+            // reduce size of entry to part before hole
+            auto old_end = it->second.end;
+            it->second.end = start;
+            // create new entry for part after hole
+            all_mappings.emplace(end,
+                                 MMapEntry{it->second.type, offset, end, old_end, it->second.path, it->second.cause});
+            // aaaaand we're done
+            return;
+        }
+        if (start <= it->second.start && it->second.end <= end) {
+            // new range completely covers entry so it must die
+            it = all_mappings.erase(it);
+            continue;
+        }
+        // no overlap
+        if (it->second.end <= start) {
+            it++;
+            continue;
+        }
+        // for the rest we have start < it->second.end && it->second.start < end
+        // partial overlap
+        if (it->second.start < start) {
+            // range overlaps back part of entry
+            it->second.end = start;
+            ++it;
+            continue;
+        }
+        if (it->second.end > end) {
+            // range overlaps front part of entry.
+            REALM_ASSERT(it->second.start >= start);
+            auto entry = it->second;
+            all_mappings.erase(it);
+            if (entry.type == MMapEntry::Type::File) {
+                entry.offset += end - entry.start;
+                REALM_ASSERT((entry.offset % 4096) == 0);
+            }
+            entry.start = end;
+            all_mappings[end] = entry;
+            // this must have been the last entry, so we're done
+            return;
+        }
+        it++;
+    }
+}
+static void add_logged_mapping(MMapEntry::Type type, size_t offset, char* start, char* end, const std::string path,
+                               const char* cause)
+{
+    REALM_ASSERT(start != (char*)-1);
+    REALM_ASSERT(end != start);
+    REALM_ASSERT((offset % 4096) == 0);
+    auto it = all_mappings.lower_bound(start);
+    if (it != all_mappings.begin()) {
+        --it;
+    }
+    while (it != all_mappings.end() && it->second.start < end) {
+        if (it->second.end == start && it->second.type == type && it->second.path == path &&
+            it->second.offset + (size_t)(it->second.end - it->second.start) == offset) {
+            // merge into back part of existing entry
+            it->second.end = end;
+            // if this lines up with next entry, merge that too
+            auto next_it = it;
+            next_it++;
+            if (next_it != all_mappings.end() && end == next_it->second.start && type == next_it->second.type &&
+                path == next_it->second.path && next_it->second.offset == offset + (size_t)(end - start)) {
+                it->second.end = next_it->second.end;
+                all_mappings.erase(next_it);
+            }
+            return;
+        }
+        if (it->second.start == end && it->second.type == type && it->second.path == path &&
+            it->second.offset == offset + (size_t)(end - start)) {
+            auto entry = it->second;
+            entry.offset += start - entry.start;
+            entry.start = start;
+            all_mappings.erase(it);
+            all_mappings[start] = entry;
+            return;
+        }
+        ++it;
+    }
+    MMapEntry entry{type, offset, start, end, path, cause};
+    all_mappings[start] = entry;
+}
+static void add_logged_file_mapping(size_t offset, char* start, size_t size, const std::string& path,
+                                    const char* cause)
+{
+    // establishing a new mapping may transparently remove old ones
+    remove_logged_mapping(start, size);
+    // not the little new
+    add_logged_mapping(MMapEntry::Type::File, offset, start, start + size, path, cause);
+}
+
+static void add_logged_priv_mapping(char* start, size_t size, const char* cause)
+{
+    // establishing a new mapping may transparently remove old ones
+    remove_logged_mapping(start, size);
+    // not the little new
+    add_logged_mapping(MMapEntry::Type::Memory, 0, start, start + size, "", cause);
+}
+static void add_logged_reserved_mapping(char* start, size_t size, const std::string& path, const char* cause)
+{
+    // establishing a new mapping may transparently remove old ones
+    remove_logged_mapping(start, size);
+    // not the little new
+    add_logged_mapping(MMapEntry::Type::Reserved, 0, start, start + size, path, cause);
+}
+static std::string dump_logged_mappings()
+{
+    std::stringstream stream;
+    std::string message = "\nMappings at point of failure:\n";
+    stream << message;
+    for (auto& e : all_mappings) {
+        stream << "    " << std::hex << (size_t)e.second.start << " - " << (size_t)e.second.end << "    "
+               << std::setw(10) << e.second.end - e.second.start << "    " << std::setw(10) << std::left
+               << e.second.cause << std::right;
+        if (e.second.type == MMapEntry::Type::File)
+            stream << "    F-- " << std::setw(12) << e.second.offset << " in File     " << e.second.path << std::endl;
+        else if (e.second.type == MMapEntry::Type::Reserved)
+            stream << "    FR-                          " << e.second.path << std::endl;
+        else
+            stream << "    --M" << std::endl;
+    }
+    message = stream.str();
+    auto logger = Logger::get_default_logger();
+    logger->fatal(message.data());
+    return message;
+}
+// end support for logging memory mappings
 
 #if REALM_ENABLE_ENCRYPTION
 
@@ -114,216 +284,13 @@ util::Mutex& mapping_mutex = *(new util::Mutex);
 namespace {
 std::vector<mapping_and_addr>& mappings_by_addr = *new std::vector<mapping_and_addr>;
 std::vector<mappings_for_file>& mappings_by_file = *new std::vector<mappings_for_file>;
-static unsigned int file_reclaim_index = 0;
 static std::atomic<size_t> num_decrypted_pages(0); // this is for statistical purposes
-static std::atomic<size_t> reclaimer_target(0);    // do.
-static std::atomic<size_t> reclaimer_workload(0);  // do.
-// helpers
 
-int64_t fetch_value_in_file(const std::string& fname, const char* scan_pattern)
-{
-    std::ifstream file(fname);
-    if (file) {
-        std::stringstream buffer;
-        buffer << file.rdbuf();
-
-        std::string s = buffer.str();
-        std::smatch m;
-        std::regex e(scan_pattern);
-
-        if (std::regex_search(s, m, e)) {
-            std::string ibuf = m[1];
-            return strtol(ibuf.c_str(), nullptr, 10);
-        }
-    }
-    return PageReclaimGovernor::no_match;
-}
-
-
-/* Default reclaim governor
- *
- */
-
-class DefaultGovernor : public PageReclaimGovernor {
-public:
-    static int64_t pick_lowest_valid(int64_t a, int64_t b)
-    {
-        if (a == PageReclaimGovernor::no_match)
-            return b;
-        if (b == PageReclaimGovernor::no_match)
-            return a;
-        return std::min(a, b);
-    }
-
-    static int64_t pick_if_valid(int64_t source, int64_t target)
-    {
-        if (source == PageReclaimGovernor::no_match)
-            return PageReclaimGovernor::no_match;
-        return target;
-    }
-
-    static int64_t get_target_from_system(const std::string& cfg_file_name)
-    {
-        int64_t target;
-        auto local_spec = fetch_value_in_file(cfg_file_name, "target ([[:digit:]]+)");
-        if (local_spec != no_match) { // overrides everything!
-            target = local_spec;
-        }
-        else {
-            // no local spec, try to deduce something reasonable from platform info
-            auto from_proc = fetch_value_in_file("/proc/meminfo", "MemTotal:[[:space:]]+([[:digit:]]+) kB") * 1024;
-            auto from_cgroup = fetch_value_in_file("/sys/fs/cgroup/memory/memory.limit_in_bytes", "^([[:digit:]]+)");
-            auto cache_use = fetch_value_in_file("/sys/fs/cgroup/memory/memory.stat", "cache ([[:digit:]]+)");
-            target = pick_if_valid(from_proc, from_proc / 4);
-            target = pick_lowest_valid(target, pick_if_valid(from_cgroup, from_cgroup / 4));
-            target = pick_lowest_valid(target, pick_if_valid(cache_use, cache_use));
-        }
-        return target;
-    }
-
-    util::UniqueFunction<int64_t()> current_target_getter(size_t load) override
-    {
-        static_cast<void>(load);
-        if (m_refresh_count > 0) {
-            --m_refresh_count;
-            return [target = m_target] {
-                return target;
-            };
-        }
-        m_refresh_count = 10;
-
-        return [file_name = m_cfg_file_name] {
-            return get_target_from_system(file_name);
-        };
-    }
-
-    void report_target_result(int64_t target) override
-    {
-        m_target = target;
-    }
-
-    DefaultGovernor()
-    {
-        auto cfg_name = getenv("REALM_PAGE_GOVERNOR_CFG");
-        if (cfg_name) {
-            m_cfg_file_name = cfg_name;
-        }
-    }
-
-private:
-    std::string m_cfg_file_name;
-    int64_t m_target = 0;
-    int m_refresh_count = 0;
-};
-
-static DefaultGovernor default_governor;
-static PageReclaimGovernor* governor = &default_governor;
-
-void reclaim_pages();
-
-#if !REALM_PLATFORM_APPLE
-static std::atomic<bool> reclaimer_shutdown(false);
-static std::unique_ptr<std::thread> reclaimer_thread;
-
-static void ensure_reclaimer_thread_runs()
-{
-    if (reclaimer_thread == nullptr) {
-        reclaimer_thread = std::make_unique<std::thread>([] {
-            while (!reclaimer_shutdown) {
-                reclaim_pages();
-                millisleep(1000);
-            }
-        });
-    }
-}
-
-struct ReclaimerThreadStopper {
-    ~ReclaimerThreadStopper()
-    {
-        if (reclaimer_thread) {
-            reclaimer_shutdown = true;
-            reclaimer_thread->join();
-        }
-    }
-} reclaimer_thread_stopper;
-#else // REALM_PLATFORM_APPLE
-static dispatch_source_t reclaimer_timer;
-static dispatch_queue_t reclaimer_queue;
-
-static void ensure_reclaimer_thread_runs()
-{
-    if (!reclaimer_timer) {
-        if (__builtin_available(iOS 10, macOS 12, tvOS 10, watchOS 3, *)) {
-            reclaimer_queue = dispatch_queue_create_with_target("io.realm.page-reclaimer", DISPATCH_QUEUE_SERIAL,
-                                                                dispatch_get_global_queue(QOS_CLASS_BACKGROUND, 0));
-        }
-        else {
-            reclaimer_queue = dispatch_queue_create("io.realm.page-reclaimer", DISPATCH_QUEUE_SERIAL);
-        }
-        reclaimer_timer = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, reclaimer_queue);
-        dispatch_source_set_timer(reclaimer_timer, DISPATCH_TIME_NOW, NSEC_PER_SEC, NSEC_PER_SEC);
-        dispatch_source_set_event_handler(reclaimer_timer, ^{
-            reclaim_pages();
-        });
-        dispatch_resume(reclaimer_timer);
-    }
-}
-
-struct ReclaimerThreadStopper {
-    ~ReclaimerThreadStopper()
-    {
-        if (reclaimer_timer) {
-            dispatch_source_cancel(reclaimer_timer);
-            // Block until any currently-running timer tasks are done
-            dispatch_sync(reclaimer_queue, ^{
-                          });
-            dispatch_release(reclaimer_timer);
-            dispatch_release(reclaimer_queue);
-        }
-    }
-} reclaimer_thread_stopper;
-#endif
 } // anonymous namespace
-
-void set_page_reclaim_governor(PageReclaimGovernor* new_governor)
-{
-    UniqueLock lock(mapping_mutex);
-    governor = new_governor ? new_governor : &default_governor;
-    ensure_reclaimer_thread_runs();
-}
 
 size_t get_num_decrypted_pages()
 {
     return num_decrypted_pages.load();
-}
-
-void encryption_note_reader_start(SharedFileInfo& info, const void* reader_id)
-{
-    UniqueLock lock(mapping_mutex);
-    ensure_reclaimer_thread_runs();
-    auto j = std::find_if(info.readers.begin(), info.readers.end(), [=](auto& reader) {
-        return reader.reader_ID == reader_id;
-    });
-    if (j == info.readers.end()) {
-        ReaderInfo i = {reader_id, info.current_version};
-        info.readers.push_back(i);
-    }
-    else {
-        j->version = info.current_version;
-    }
-    ++info.current_version;
-}
-
-void encryption_note_reader_end(SharedFileInfo& info, const void* reader_id) noexcept
-{
-    UniqueLock lock(mapping_mutex);
-    for (auto j = info.readers.begin(); j != info.readers.end(); ++j)
-        if (j->reader_ID == reader_id) {
-            // move last over
-            *j = info.readers.back();
-            info.readers.pop_back();
-            return;
-        }
 }
 
 void encryption_mark_pages_for_IV_check(EncryptedFileMapping* mapping)
@@ -333,138 +300,6 @@ void encryption_mark_pages_for_IV_check(EncryptedFileMapping* mapping)
 }
 
 namespace {
-size_t collect_total_workload() // must be called under lock
-{
-    size_t total = 0;
-    for (auto i = mappings_by_file.begin(); i != mappings_by_file.end(); ++i) {
-        SharedFileInfo& info = *i->info;
-        info.num_decrypted_pages = 0;
-        for (auto it = info.mappings.begin(); it != info.mappings.end(); ++it) {
-            info.num_decrypted_pages += (*it)->collect_decryption_count();
-        }
-        total += info.num_decrypted_pages;
-    }
-    return total;
-}
-
-/* Compute the amount of work allowed in an attempt to reclaim pages.
- * please refer to EncryptedFileMapping::reclaim_untouched() for more details.
- *
- * The function starts slowly when the load is 0.5 of target, then turns
- * up the volume as the load nears 1.0 - where it sets a work limit of 10%.
- * Since the work is expressed (roughly) in terms of pages released, this means
- * that about 10 runs has to take place to reclaim all pages possible - though
- * if successful the load will rapidly decrease, turning down the work limit.
- */
-
-struct work_limit_desc {
-    float base;
-    float effort;
-};
-const std::vector<work_limit_desc> control_table = {{0.5f, 0.001f},  {0.75f, 0.002f}, {0.8f, 0.003f},
-                                                    {0.85f, 0.005f}, {0.9f, 0.01f},   {0.95f, 0.03f},
-                                                    {1.0f, 0.1f},    {1.5f, 0.2f},    {2.0f, 0.3f}};
-
-size_t get_work_limit(size_t decrypted_pages, size_t target)
-{
-    if (target == 0)
-        target = 1;
-    float load = 1.0f * decrypted_pages / target;
-    float akku = 0.0f;
-    for (const auto& e : control_table) {
-        if (load <= e.base)
-            break;
-        akku += (load - e.base) * e.effort;
-    }
-    size_t work_limit = size_t(target * akku);
-    return work_limit;
-}
-
-/* Find the oldest version that is still of interest to somebody */
-uint64_t get_oldest_version(SharedFileInfo& info) // must be called under lock
-{
-    auto oldest_version = info.current_version;
-    for (const auto& e : info.readers) {
-        if (e.version < oldest_version) {
-            oldest_version = e.version;
-        }
-    }
-    return oldest_version;
-}
-
-// Reclaim pages for ONE file, limited by a given work limit.
-void reclaim_pages_for_file(SharedFileInfo& info, size_t& work_limit)
-{
-    uint64_t oldest_version = get_oldest_version(info);
-    if (info.last_scanned_version < oldest_version || info.mappings.empty()) {
-        // locate the mapping matching the progress index. No such mapping may
-        // exist, and if so, we'll update the index to the next mapping
-        for (auto& e : info.mappings) {
-            auto start_index = e->get_start_index();
-            if (info.progress_index < start_index) {
-                info.progress_index = start_index;
-            }
-            if (info.progress_index <= e->get_end_index()) {
-                e->reclaim_untouched(info.progress_index, work_limit);
-                if (work_limit == 0)
-                    return;
-            }
-        }
-        // if we get here, all mappings have been considered
-        info.progress_index = 0;
-        info.last_scanned_version = info.current_version;
-        ++info.current_version;
-    }
-}
-
-// Reclaim pages from all files, limited by a work limit that is derived
-// from a target for the amount of dirty (decrypted) pages. The target is
-// set by the governor function.
-void reclaim_pages()
-{
-    size_t load;
-    util::UniqueFunction<int64_t()> runnable;
-    {
-        UniqueLock lock(mapping_mutex);
-        load = collect_total_workload();
-        num_decrypted_pages = load;
-        runnable = governor->current_target_getter(load * page_size());
-    }
-    // callback to governor defined function without mutex held
-    int64_t target = PageReclaimGovernor::no_match;
-    if (runnable) {
-        target = runnable();
-    }
-    {
-        UniqueLock lock(mapping_mutex);
-        reclaimer_workload = 0;
-        reclaimer_target = size_t(target / page_size());
-        // Putting the target back into the govenor object will allow the govenor
-        // to return a getter producing this value again next time it is called
-        governor->report_target_result(target);
-
-        if (target == PageReclaimGovernor::no_match) // temporarily disabled by governor returning no_match
-            return;
-
-        if (mappings_by_file.size() == 0)
-            return;
-
-        size_t work_limit = get_work_limit(load, reclaimer_target);
-        reclaimer_workload = work_limit;
-        if (file_reclaim_index >= mappings_by_file.size())
-            file_reclaim_index = 0;
-
-        while (work_limit > 0) {
-            SharedFileInfo& info = *mappings_by_file[file_reclaim_index].info;
-            reclaim_pages_for_file(info, work_limit);
-            if (work_limit > 0) { // consider next file:
-                ++file_reclaim_index;
-                if (file_reclaim_index >= mappings_by_file.size())
-                    return;
-            }
-        }
-    }
-}
 
 
 mapping_and_addr* find_mapping_for_addr(void* addr, size_t size)
@@ -479,29 +314,6 @@ mapping_and_addr* find_mapping_for_addr(void* addr, size_t size)
     return 0;
 }
 } // anonymous namespace
-
-SharedFileInfo* get_file_info_for_file(File& file)
-{
-    LockGuard lock(mapping_mutex);
-#ifndef _WIN32
-    File::UniqueID id = file.get_unique_id();
-#endif
-    std::vector<mappings_for_file>::iterator it;
-    for (it = mappings_by_file.begin(); it != mappings_by_file.end(); ++it) {
-#ifdef _WIN32
-        auto fd = file.get_descriptor();
-        if (File::is_same_file_static(it->handle, fd))
-            break;
-#else
-        if (it->inode == id.inode && it->device == id.device)
-            break;
-#endif
-    }
-    if (it == mappings_by_file.end())
-        return nullptr;
-    else
-        return it->info.get();
-}
 
 
 namespace {
@@ -622,7 +434,7 @@ void* mmap(const FileAttributes& file, size_t size, size_t offset, EncryptedFile
     _impl::SimulatedFailure::trigger_mmap(size);
     if (file.encryption_key) {
         size = round_up_to_page_size(size);
-        void* addr = mmap_anon(size);
+        void* addr = mmap_anon(size, file.cause);
         mapping = add_mapping(addr, size, file, offset);
         return addr;
     }
@@ -656,7 +468,7 @@ void remove_encrypted_mapping(void* addr, size_t size)
 void* mmap_reserve(const FileAttributes& file, size_t reservation_size, size_t offset_in_file,
                    EncryptedFileMapping*& mapping)
 {
-    auto addr = mmap_reserve(file.fd, reservation_size, offset_in_file);
+    auto addr = mmap_reserve(file, reservation_size, offset_in_file);
     if (file.encryption_key) {
         REALM_ASSERT(reservation_size == round_up_to_page_size(reservation_size));
         // we create a mapping for the entire reserved area. This causes full initialization of some fairly
@@ -669,31 +481,11 @@ void* mmap_reserve(const FileAttributes& file, size_t reservation_size, size_t o
     return addr;
 }
 
-void* mmap_fixed(FileDesc fd, void* address_request, size_t size, File::AccessMode access, size_t offset,
-                 const char* enc_key, EncryptedFileMapping* encrypted_mapping)
-{
-    REALM_ASSERT((enc_key == nullptr) ==
-                 (encrypted_mapping == nullptr)); // Mapping must already have been set if encryption is used
-    if (encrypted_mapping) {
-// Since the encryption layer must be able to WRITE into the memory area,
-// we have to map it read/write regardless of the request.
-// FIXME: Make this work for windows!
-#ifdef _WIN32
-        return nullptr;
-#else
-        return ::mmap(address_request, size, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE | MAP_FIXED, -1, 0);
-#endif
-    }
-    else {
-        return mmap_fixed(fd, address_request, size, access, offset, enc_key);
-    }
-}
-
-
 #endif // REALM_ENABLE_ENCRYPTION
 
-void* mmap_anon(size_t size)
+void* mmap_anon(size_t size, const char* cause)
 {
+    std::unique_lock lock(mmap_log_mutex);
 #ifdef _WIN32
     HANDLE hMapFile;
     LPCTSTR pBuf;
@@ -712,57 +504,76 @@ void* mmap_anon(size_t size)
     }
 
     CloseHandle(hMapFile);
+    add_logged_priv_mapping((char*)pBuf, size, cause);
     return (void*)pBuf;
 #else
     void* addr = ::mmap(nullptr, size, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0);
+    // optionally use this to trigger a dump
+    // if ((std::rand() % 100) == 42)
+    //    dump_logged_mappings();
     if (addr == MAP_FAILED) {
+        auto dump = dump_logged_mappings();
         int err = errno; // Eliminate any risk of clobbering
         if (is_mmap_memory_error(err)) {
-            throw AddressSpaceExhausted(get_errno_msg("mmap() failed: ", err) + " size: " + util::to_string(size));
+            throw AddressSpaceExhausted(get_errno_msg("mmap() failed: ", err) + " size: " + util::to_string(size) +
+                                        dump);
         }
         throw std::system_error(err, std::system_category(),
-                                std::string("mmap() failed (size: ") + util::to_string(size) + ", offset is 0)");
+                                std::string("mmap() failed (size: ") + util::to_string(size) + ", offset is 0)" +
+                                    dump);
     }
+    add_logged_priv_mapping((char*)addr, size, cause);
     return addr;
 #endif
 }
 
-void* mmap_fixed(FileDesc fd, void* address_request, size_t size, File::AccessMode access, size_t offset,
-                 const char* enc_key)
+void* mmap_fixed(const FileAttributes& file, void* address_request, size_t size, size_t offset)
 {
     _impl::SimulatedFailure::trigger_mmap(size);
-    static_cast<void>(enc_key); // FIXME: Consider removing this parameter
+    static_cast<void>(file.encryption_key); // FIXME: Consider removing this parameter
 #ifdef _WIN32
     REALM_ASSERT(false);
     return nullptr; // silence warning
 #else
+    std::unique_lock lock(mmap_log_mutex);
     auto prot = PROT_READ;
-    if (access == File::access_ReadWrite)
+    if (file.access == File::access_ReadWrite)
         prot |= PROT_WRITE;
-    auto addr = ::mmap(address_request, size, prot, MAP_SHARED | MAP_FIXED, fd, offset);
+    auto flags = (file.fd == -1) ? (MAP_FIXED | MAP_PRIVATE | MAP_ANON) : (MAP_SHARED | MAP_FIXED);
+    auto addr = ::mmap(address_request, size, prot, flags, file.fd, offset);
     if (addr != MAP_FAILED && addr != address_request) {
+        auto dump = dump_logged_mappings();
         throw std::runtime_error(get_errno_msg("mmap() failed: ", errno) +
-                                 ", when mapping an already reserved memory area");
+                                 ", when mapping an already reserved memory area" + dump);
+    }
+    if (addr != MAP_FAILED) {
+        if (file.fd == -1)
+            add_logged_priv_mapping((char*)addr, size, file.cause);
+        else
+            add_logged_file_mapping(offset, (char*)addr, size, file.path, file.cause);
     }
     return addr;
 #endif
 }
 
-void* mmap_reserve(FileDesc fd, size_t reservation_size, size_t offset_in_file)
+void* mmap_reserve(const FileAttributes& file, size_t reservation_size, size_t offset_in_file)
 {
     // The other mmap operations take an fd as a parameter, so we do too.
     // We're not using it for anything currently, but this may change.
     // Similarly for offset_in_file.
-    static_cast<void>(fd);
+    static_cast<void>(file);
     static_cast<void>(offset_in_file);
 #ifdef _WIN32
     REALM_ASSERT(false); // unsupported on windows
     return nullptr;
 #else
+    std::unique_lock lock(mmap_log_mutex);
     auto addr = ::mmap(0, reservation_size, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     if (addr == MAP_FAILED) {
-        throw std::runtime_error(get_errno_msg("mmap() failed: ", errno));
+        auto dump = dump_logged_mappings();
+        throw std::runtime_error(get_errno_msg("mmap() failed: ", errno) + dump);
     }
+    add_logged_reserved_mapping((char*)addr, reservation_size, file.path, file.cause);
     return addr;
 #endif
 }
@@ -774,7 +585,7 @@ void* mmap(const FileAttributes& file, size_t size, size_t offset)
 #if REALM_ENABLE_ENCRYPTION
     if (file.encryption_key) {
         size = round_up_to_page_size(size);
-        void* addr = mmap_anon(size);
+        void* addr = mmap_anon(size, file.cause);
         add_mapping(addr, size, file, offset);
         return addr;
     }
@@ -783,29 +594,36 @@ void* mmap(const FileAttributes& file, size_t size, size_t offset)
     REALM_ASSERT(!file.encryption_key);
 #endif
     {
-
+        std::unique_lock lock(mmap_log_mutex);
 #ifndef _WIN32
-        int prot = PROT_READ;
+        int prot;
         switch (file.access) {
             case File::access_ReadWrite:
-                prot |= PROT_WRITE;
+                prot = PROT_READ | PROT_WRITE;
                 break;
             case File::access_ReadOnly:
+                prot = PROT_READ;
+                break;
+            case File::access_None:
+            default:
+                prot = PROT_NONE;
                 break;
         }
 
         void* addr = ::mmap(nullptr, size, prot, MAP_SHARED, file.fd, offset);
-        if (addr != MAP_FAILED)
+        if (addr != MAP_FAILED) {
+            add_logged_file_mapping(offset, (char*)addr, size, file.path, file.cause);
             return addr;
-
+        }
+        auto dump = dump_logged_mappings();
         int err = errno; // Eliminate any risk of clobbering
         if (is_mmap_memory_error(err)) {
             throw AddressSpaceExhausted(get_errno_msg("mmap() failed: ", err) + " size: " + util::to_string(size) +
-                                        " offset: " + util::to_string(offset));
+                                        " offset: " + util::to_string(offset) + dump);
         }
 
         throw SystemError(err, std::string("mmap() failed (size: ") + util::to_string(size) +
-                                   ", offset: " + util::to_string(offset));
+                                   ", offset: " + util::to_string(offset) + dump);
 
 #else
         // FIXME: Is there anything that we must do on Windows to honor map_NoSync?
@@ -839,6 +657,7 @@ void* mmap(const FileAttributes& file, size_t size, size_t offset)
             throw AddressSpaceExhausted(get_errno_msg("MapViewOfFileFromApp() failed: ", GetLastError()) +
                                         " size: " + util::to_string(_size) + " offset: " + util::to_string(offset));
 
+        add_logged_file_mapping(offset, (char*)addr, size, file.path, file.cause);
         return addr;
 #endif
     }
@@ -846,37 +665,41 @@ void* mmap(const FileAttributes& file, size_t size, size_t offset)
 
 void munmap(void* addr, size_t size)
 {
+    size = round_up_to_page_size(size);
 #if REALM_ENABLE_ENCRYPTION
     remove_mapping(addr, size);
 #endif
-
+    std::unique_lock lock(mmap_log_mutex);
 #ifdef _WIN32
     if (!UnmapViewOfFile(addr))
         throw std::system_error(GetLastError(), std::system_category(), "UnmapViewOfFile() failed");
 
+    remove_logged_mapping((char*)addr, size);
 #else
     if (::munmap(addr, size) != 0) {
         int err = errno;
         throw std::system_error(err, std::system_category(), "munmap() failed");
     }
+    remove_logged_mapping((char*)addr, size);
 #endif
 }
 
 void* mremap(const FileAttributes& file, size_t file_offset, void* old_addr, size_t old_size, size_t new_size)
 {
+    size_t rounded_old_size = round_up_to_page_size(old_size);
+    size_t rounded_new_size = round_up_to_page_size(new_size);
 #if REALM_ENABLE_ENCRYPTION
     if (file.encryption_key) {
         LockGuard lock(mapping_mutex);
-        size_t rounded_old_size = round_up_to_page_size(old_size);
         if (mapping_and_addr* m = find_mapping_for_addr(old_addr, rounded_old_size)) {
-            size_t rounded_new_size = round_up_to_page_size(new_size);
             if (rounded_old_size == rounded_new_size)
                 return old_addr;
 
-            void* new_addr = mmap_anon(rounded_new_size);
+            void* new_addr = mmap_anon(rounded_new_size, file.cause);
             m->mapping->set(new_addr, rounded_new_size, file_offset);
             m->addr = new_addr;
             m->size = rounded_new_size;
+            std::unique_lock lock(mmap_log_mutex);
 #ifdef _WIN32
             if (!UnmapViewOfFile(old_addr))
                 throw std::system_error(GetLastError(), std::system_category(), "UnmapViewOfFile() failed");
@@ -886,6 +709,7 @@ void* mremap(const FileAttributes& file, size_t file_offset, void* old_addr, siz
                 throw std::system_error(err, std::system_category(), "munmap() failed");
             }
 #endif
+            remove_logged_mapping((char*)old_addr, rounded_old_size);
             return new_addr;
         }
         // If we are using encryption, we must have used mmap and the mapping
@@ -898,9 +722,12 @@ void* mremap(const FileAttributes& file, size_t file_offset, void* old_addr, siz
 
 #ifdef _GNU_SOURCE
     {
-        void* new_addr = ::mremap(old_addr, old_size, new_size, MREMAP_MAYMOVE);
-        if (new_addr != MAP_FAILED)
+        void* new_addr = ::mremap(old_addr, rounded_old_size, rounded_new_size, MREMAP_MAYMOVE);
+        if (new_addr != MAP_FAILED) {
+            remove_logged_mapping((char*)old_addr, rounded_old_size);
+            add_logged_priv_mapping((char*)new_addr, rounded_new_size, file.cause);
             return new_addr;
+        }
         int err = errno; // Eliminate any risk of clobbering
         // Do not throw here if mremap is declared as "not supported" by the
         // platform Eg. When compiling with GNU libc on OSX, iOS.
@@ -917,17 +744,19 @@ void* mremap(const FileAttributes& file, size_t file_offset, void* old_addr, siz
     }
 #endif
 
-    void* new_addr = mmap(file, new_size, file_offset);
+    void* new_addr = mmap(file, rounded_new_size, file_offset);
+    std::unique_lock lock(mmap_log_mutex);
 
 #ifdef _WIN32
     if (!UnmapViewOfFile(old_addr))
         throw std::system_error(GetLastError(), std::system_category(), "UnmapViewOfFile() failed");
 #else
-    if (::munmap(old_addr, old_size) != 0) {
+    if (::munmap(old_addr, rounded_old_size) != 0) {
         int err = errno;
         throw std::system_error(err, std::system_category(), "munmap() failed");
     }
 #endif
+    remove_logged_mapping((char*)old_addr, old_size);
 
     return new_addr;
 }

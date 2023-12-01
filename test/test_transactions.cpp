@@ -161,7 +161,7 @@ TEST_IF(Transactions_LargeUpgrade, TEST_DURATION > 0)
     sg->close();
     {
         util::File f(path, util::File::mode_Update);
-        util::File::Map<Header> headerMap(f, util::File::access_ReadWrite);
+        util::File::Map<Header> headerMap("", f, util::File::access_ReadWrite);
         auto* header = headerMap.get_addr();
         auto file_format_version = Group::get_current_file_format_version();
         // at least one of the versions in the header must be the current version.
