@@ -564,6 +564,31 @@ TEST_CASE("app: error handling integration test", "[sync][flx][baas]") {
         REQUIRE(r->sync_session()->state() == SyncSession::State::Inactive);
     }
 
+    SECTION("log out user action") {
+        auto error_future = install_error_handler(config);
+        auto r = Realm::get_shared_realm(config);
+        wait_for_download(*r);
+        nlohmann::json error_body = {{"tryAgain", false},
+                                     {"message", "fake error"},
+                                     {"shouldClientReset", false},
+                                     {"isRecoveryModeDisabled", false},
+                                     {"action", "LogOutUser"}};
+        nlohmann::json test_command = {{"command", "ECHO_ERROR"},
+                                       {"args", nlohmann::json{{"errorCode", sync::ProtocolError::user_mismatch},
+                                                               {"errorBody", error_body}}}};
+        auto test_cmd_res =
+            wait_for_future(SyncSession::OnlyForTesting::send_test_command(*r->sync_session(), test_command.dump()))
+                .get();
+        REQUIRE(test_cmd_res == "{}");
+        auto error = wait_for_future(std::move(error_future)).get();
+        REQUIRE(error.status == ErrorCodes::SyncUserMismatch);
+        REQUIRE(error.server_requests_action == sync::ProtocolErrorInfo::Action::LogOutUser);
+        REQUIRE(!error.is_client_reset_requested());
+        REQUIRE(error.is_fatal);
+        REQUIRE(r->sync_session()->state() == SyncSession::State::Inactive);
+        REQUIRE(!r->sync_session()->user()->is_logged_in());
+    }
+
     SECTION("teardown") {
         harness.reset();
     }
