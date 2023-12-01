@@ -752,6 +752,7 @@ void SyncSession::handle_error(sync::SessionErrorInfo error)
             }
             break;
         case NextStateAfterError::inactive: {
+            m_session->mark_unresumable();
             become_inactive(std::move(lock), sync_error.status);
             break;
         }

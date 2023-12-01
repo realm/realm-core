@@ -127,6 +127,8 @@ public:
 
     std::string get_appservices_connection_id();
 
+    void mark_unresumable();
+
 private:
     ClientImpl& m_client;
     DBRef m_db;
@@ -1711,7 +1713,6 @@ void SessionWrapper::on_suspended(const SessionErrorInfo& error_info)
 {
     REALM_ASSERT(!m_finalized);
     m_suspended = true;
-    m_resumable = !error_info.is_fatal;
     if (m_connection_state_change_listener) {
         m_connection_state_change_listener(ConnectionState::disconnected, error_info); // Throws
     }
@@ -1865,6 +1866,11 @@ std::string SessionWrapper::get_appservices_connection_id()
     });
 
     return pf.future.get();
+}
+
+void SessionWrapper::mark_unresumable()
+{
+    m_resumable = false;
 }
 
 // ################ ClientImpl::Connection ################
@@ -2111,6 +2117,11 @@ util::Future<std::string> Session::send_test_command(std::string body)
 std::string Session::get_appservices_connection_id()
 {
     return m_impl->get_appservices_connection_id();
+}
+
+void Session::mark_unresumable()
+{
+    m_impl->mark_unresumable();
 }
 
 std::ostream& operator<<(std::ostream& os, ProxyConfig::Type proxyType)
