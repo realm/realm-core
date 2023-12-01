@@ -1048,7 +1048,6 @@ void ClientHistory::fix_up_client_file_ident_in_stored_changesets(Transaction& g
 
     Group::TableNameBuffer buffer;
     auto get_table_for_class = [&](StringData class_name) -> ConstTableRef {
-        REALM_ASSERT(class_name.size() < Group::max_table_name_length - 6);
         return group.get_table(Group::class_name_to_table_name(class_name, buffer));
     };
 

@@ -7,6 +7,7 @@
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Update existing std exceptions thrown by the Sync Client to use Realm exceptions. ([#6255](https://github.com/realm/realm-core/issues/6255), since v10.2.0)
+* Having a class name of length 57 would make client reset crash ([#7176](https://github.com/realm/realm-core/issues/7176), since v10.0.0)
 
 ### Breaking changes
 * Update existing std exceptions thrown by the Sync Client to use Realm exceptions. ([PR #7141](https://github.com/realm/realm-core/pull/7141/files))
