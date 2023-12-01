@@ -573,9 +573,9 @@ TEST_CASE("app: error handling integration test", "[sync][flx][baas]") {
                                      {"shouldClientReset", false},
                                      {"isRecoveryModeDisabled", false},
                                      {"action", "LogOutUser"}};
-        nlohmann::json test_command = {{"command", "ECHO_ERROR"},
-                                       {"args", nlohmann::json{{"errorCode", sync::ProtocolError::user_mismatch},
-                                                               {"errorBody", error_body}}}};
+        nlohmann::json test_command = {
+            {"command", "ECHO_ERROR"},
+            {"args", nlohmann::json{{"errorCode", sync::ProtocolError::user_mismatch}, {"errorBody", error_body}}}};
         auto test_cmd_res =
             wait_for_future(SyncSession::OnlyForTesting::send_test_command(*r->sync_session(), test_command.dump()))
                 .get();
