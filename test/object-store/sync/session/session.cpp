@@ -371,7 +371,8 @@ TEST_CASE("sync: error handling", "[sync][session]") {
         CHECK_THAT(error->status.reason(), Catch::Matchers::StartsWith("Failed to connect to sync: Host not found"));
     }
 
-#ifndef SWIFT_PACKAGE // requires test resource files
+    // requires test resource files and a server implementation
+#if !(defined(SWIFT_PACKAGE) || REALM_MOBILE)
     SECTION("reports TLS error as handshake failed") {
         TestSyncManager ssl_sync_manager({}, {StartImmediately{true}, EnableSSL{true}});
         auto app = ssl_sync_manager.app();
@@ -393,7 +394,7 @@ TEST_CASE("sync: error handling", "[sync][session]") {
                    Catch::Matchers::StartsWith("TLS handshake failed: OpenSSL error: certificate verify failed"));
 #endif
     }
-#endif
+#endif // !defined(SWIFT_PACKAGE) && !REALM_MOBILE
 
     using ProtocolError = realm::sync::ProtocolError;
     using ProtocolErrorInfo = realm::sync::ProtocolErrorInfo;

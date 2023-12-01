@@ -17,7 +17,7 @@
 -----------
 
 ### Internals
-* None.
+* Added a CombinedTests target that runs tests from object-store, sync, and core together. ([PR #6964](https://github.com/realm/realm-core/pull/6964))
 
 ----------------------------------------------
 
