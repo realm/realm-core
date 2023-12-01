@@ -26,9 +26,8 @@
 
 namespace realm {
 
-class ArrayEncode;
-
 // Pre-definitions
+class ArrayEncode;
 class GroupWriter;
 namespace _impl {
 class ArrayWriterBase;
@@ -555,7 +554,7 @@ private:
 
     // encode/decode this array
     bool encode_array(Array&) const;
-    bool decode_array() const;
+    static bool decode_array(Array& arr);
 
 public:
     bool is_encoded() const;

@@ -32,7 +32,7 @@ public:
     explicit ArrayFlex() = default;
     virtual ~ArrayFlex() = default;
     bool encode(const Array&, Array&) const final override;
-    bool decode(Array&) const final override;
+    bool decode(Array&) final override;
     bool is_encoded(const Array&) const final override;
     size_t size(const Array&) const final override;
     int64_t get(const Array&, size_t) const final override;

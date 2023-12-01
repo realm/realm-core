@@ -31,7 +31,7 @@ public:
     explicit ArrayEncode() = default;
     virtual ~ArrayEncode() = default;
     virtual bool encode(const Array&, Array&) const = 0;
-    virtual bool decode(Array&) const = 0;
+    virtual bool decode(Array&) = 0;
     virtual bool is_encoded(const Array&) const = 0;
     virtual size_t size(const Array&) const = 0;
     virtual int64_t get(const Array&, size_t) const = 0;

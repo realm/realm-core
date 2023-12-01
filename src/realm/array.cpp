@@ -191,10 +191,8 @@ using namespace realm::util;
 
 void QueryStateBase::dyncast() {}
 static ArrayFlex s_array_flex;
-
 Array::Array(Allocator& allocator) noexcept
     : Node(allocator)
-    // TODO: this needs to become a sort of factory in order to support multiple encodings
     , m_encode(s_array_flex)
 {
 }
@@ -202,7 +200,6 @@ Array::Array(Allocator& allocator) noexcept
 template <size_t w>
 int64_t Array::get(size_t ndx) const noexcept
 {
-    // TODO this can be a static method, in which we pass the array and the encode implementation ref.
     if (is_encoded())
         return m_encode.get(*this, ndx);
 
@@ -260,8 +257,7 @@ void Array::init_from_mem(MemRef mem) noexcept
 {
     char* header = mem.get_addr();
     auto kind = get_kind((uint64_t*)header);
-    // be sure that the node is either A or B
-    // REALM_ASSERT(kind == 'A' || kind == 'B');
+    REALM_ASSERT(kind == 'A' || kind == 'B');
     if (kind == 'B') {
         // the only encoding supported at the moment
         auto encoding = get_encoding((uint64_t*)header);
@@ -271,8 +267,9 @@ void Array::init_from_mem(MemRef mem) noexcept
         m_data = get_data_from_header(header);
         m_size = NodeHeader::get_arrayB_num_elements<Encoding::Flex>((uint64_t*)header);
     }
-    else
+    else {
         header = Node::init_from_mem(mem);
+    }
     // Parse header
     m_is_inner_bptree_node = get_is_inner_bptree_node_from_header(header);
     m_has_refs = get_hasrefs_from_header(header);
@@ -350,7 +347,10 @@ size_t Array::get_byte_size() const noexcept
     auto kind = get_kind((uint64_t*)header);
     REALM_ASSERT(kind == 'A' || kind == 'B');
     auto num_bytes = get_byte_size_from_header(header);
-    REALM_ASSERT_7(m_alloc.is_read_only(m_ref), ==, true, ||, num_bytes, <=, get_capacity_from_header(header));
+    auto read_only = m_alloc.is_read_only(m_ref) == true;
+    auto bytes_ok = num_bytes <= get_capacity_from_header(header);
+    REALM_ASSERT(read_only || bytes_ok);
+    // REALM_ASSERT_7(m_alloc.is_read_only(m_ref), ==, true, ||, num_bytes, <=, get_capacity_from_header(header));
     return num_bytes;
 }
 
@@ -370,9 +370,7 @@ ref_type Array::write(_impl::ArrayWriterBase& out, bool deep, bool only_if_modif
             encoded_array.destroy();
             return ref;
         }
-        else {
-            return do_write_shallow(out); // Throws
-        }
+        return do_write_shallow(out); // Throws
     }
 
     return do_write_deep(out, only_if_modified, compress_in_flight); // Throws
@@ -619,13 +617,13 @@ void Array::insert(size_t ndx, int_fast64_t value)
 
 void Array::copy_on_write()
 {
-    decode_array();
+    decode_array(*this);
     Node::copy_on_write();
 }
 
 void Array::copy_on_write(size_t min_size)
 {
-    decode_array();
+    decode_array(*this);
     Node::copy_on_write(min_size);
 }
 
@@ -722,15 +720,17 @@ bool Array::encode_array(Array& arr) const
     return false;
 }
 
-bool Array::decode_array() const
+bool Array::decode_array(Array& arr)
 {
-    const auto header = get_header();
-    auto kind = get_kind((uint64_t*)header);
+    const auto header = arr.get_header();
+
+    auto kind = NodeHeader::get_kind((uint64_t*)header);
     // if it is encoded and it is in flex format decode all
     if (kind == 'B') {
-        auto encoding = get_encoding((uint64_t*)header);
+        auto encoding = NodeHeader::get_encoding((uint64_t*)header);
         if (encoding == NodeHeader::Encoding::Flex) {
-            return m_encode.decode((Array&)*this);
+            auto& array_encoder = arr.m_encode;
+            return array_encoder.decode(arr);
         }
     }
     return false;
@@ -748,7 +748,7 @@ bool Array::try_encode(Array& arr) const
 
 bool Array::try_decode()
 {
-    return decode_array();
+    return decode_array(*this);
 }
 
 namespace {
@@ -839,7 +839,8 @@ size_t find_zero(uint64_t v)
 
 int64_t Array::sum(size_t start, size_t end) const
 {
-    decode_array();
+    // this is tmp cast, since we haven't implemented yet the logic for compressed arrays
+    decode_array((Array&)*this);
     REALM_TEMPEX(return sum, m_width, (start, end));
 }
 
@@ -1462,7 +1463,6 @@ void Array::get_chunk<0>(size_t ndx, int64_t res[8]) const noexcept
 template <size_t width>
 void Array::set(size_t ndx, int64_t value)
 {
-    decode_array();
     set_direct<width>(m_data, ndx, value);
 }
 
@@ -1570,20 +1570,20 @@ void Array::verify() const
 
 size_t Array::lower_bound_int(int64_t value) const noexcept
 {
-    decode_array();
+    decode_array((Array&)*this);
     REALM_TEMPEX(return lower_bound, m_width, (m_data, m_size, value));
 }
 
 size_t Array::upper_bound_int(int64_t value) const noexcept
 {
-    decode_array();
+    decode_array((Array&)*this);
     REALM_TEMPEX(return upper_bound, m_width, (m_data, m_size, value));
 }
 
 
 size_t Array::find_first(int64_t value, size_t start, size_t end) const
 {
-    decode_array();
+    decode_array((Array&)*this);
     return find_first<Equal>(value, start, end);
 }
 

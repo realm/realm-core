@@ -47,9 +47,8 @@ bool ArrayFlex::encode(const Array& origin, Array& encoded) const
     return false;
 }
 
-bool ArrayFlex::decode(Array& arr) const
+bool ArrayFlex::decode(Array& arr)
 {
-    using Encoding = NodeHeader::Encoding;
     REALM_ASSERT(arr.is_attached());
     size_t value_width, index_width, value_size, index_size;
     if (get_encode_info(arr, value_width, index_width, value_size, index_size)) {
@@ -293,7 +292,6 @@ void ArrayFlex::restore_array(Array& arr, const std::vector<int64_t>& values) co
     auto byte_size = NodeHeader::calc_size<Encoding::WTypBits>(size, width);
     REALM_ASSERT(byte_size % 8 == 0); // 8 bytes aligned value
     Allocator& allocator = arr.get_alloc();
-    // Array& tmp = (Array&)arr; // TODO: this is temporary... it requires a static method in Array.
     arr.destroy();
     auto mem = allocator.alloc(byte_size);
     auto header = (uint64_t*)mem.get_addr();
