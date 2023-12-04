@@ -414,6 +414,7 @@ void File::open_internal(const std::string& path, AccessMode a, CreateMode c, in
 {
     REALM_ASSERT_RELEASE(!is_attached());
     m_path = path; // for error reporting and debugging
+    m_cached_unique_id = {};
 
 #ifdef _WIN32 // Windows version
 
@@ -1613,10 +1614,21 @@ FileDesc File::dup_file_desc(FileDesc fd)
     return fd_duped;
 }
 
-File::UniqueID File::get_unique_id() const
+File::UniqueID File::get_unique_id()
 {
     REALM_ASSERT_RELEASE(is_attached());
-    return File::get_unique_id(m_fd, m_path);
+    File::UniqueID uid = File::get_unique_id(m_fd, m_path);
+    if (!m_cached_unique_id) {
+        m_cached_unique_id = std::make_optional(uid);
+    }
+    if (m_cached_unique_id != uid) {
+        throw FileAccessError(ErrorCodes::FileOperationFailed,
+                              util::format("The unique id of this Realm file has changed unexpectedly, this could be "
+                                           "due to modifications by an external process '%1'",
+                                           m_path),
+                              m_path);
+    }
+    return uid;
 }
 
 FileDesc File::get_descriptor() const
@@ -1645,11 +1657,11 @@ std::optional<File::UniqueID> File::get_unique_id(const std::string& path)
     struct stat statbuf;
     if (::stat(path.c_str(), &statbuf) == 0) {
         if (statbuf.st_size == 0) {
-            // On exFAT systems the inode and device are not populated
-            // until the file has been allocated some space. This has led
-            // to bugs where a unique id returned here was reused by different
-            // files. Returning `none` here assumes that the caller knows this
-            // and will create non-empty files.
+            // On exFAT systems the inode and device are not populated correctly until the file
+            // has been allocated some space. The uid can also be reassigned if the file is
+            // truncated to zero. This has led to bugs where a unique id returned here was
+            // reused by different files. The following check ensures that this is not
+            // happening anywhere else in future code.
             return none;
         }
         return File::UniqueID(statbuf.st_dev, statbuf.st_ino);
@@ -1677,16 +1689,18 @@ File::UniqueID File::get_unique_id(FileDesc file, const std::string& debug_path)
     REALM_ASSERT(file >= 0);
     struct stat statbuf;
     if (::fstat(file, &statbuf) == 0) {
-        // On exFAT systems the inode and device are not populated
-        // until the file has been allocated some space. This has led
-        // to bugs where a unique id returned here was reused by different
-        // files. The following check ensures that this is not happening
-        // anywhere else in future code.
+        // On exFAT systems the inode and device are not populated correctly until the file
+        // has been allocated some space. The uid can also be reassigned if the file is
+        // truncated to zero. This has led to bugs where a unique id returned here was
+        // reused by different files. The following check ensures that this is not
+        // happening anywhere else in future code.
         if (statbuf.st_size == 0) {
-            throw FileAccessError(ErrorCodes::FileOperationFailed,
-                                  "Attempt to get unique id on an empty file. This could be due to an external "
-                                  "process modifying Realm files.",
-                                  debug_path);
+            throw FileAccessError(
+                ErrorCodes::FileOperationFailed,
+                util::format("Attempt to get unique id on an empty file. This could be due to an external "
+                             "process modifying Realm files. '%1'",
+                             debug_path),
+                debug_path);
         }
         return UniqueID(statbuf.st_dev, statbuf.st_ino);
     }

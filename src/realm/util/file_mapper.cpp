@@ -531,8 +531,9 @@ EncryptedFileMapping* add_mapping(void* addr, size_t size, const FileAttributes&
     }
     catch (...) {
         if (it->info->mappings.empty()) {
-            File::close_static(it->info->fd);
+            FileDesc fd_to_close = it->info->fd;
             mappings_by_file.erase(it);
+            File::close_static(fd_to_close); // Throws
         }
         throw;
     }
@@ -550,8 +551,9 @@ void remove_mapping(void* addr, size_t size)
 
     for (std::vector<mappings_for_file>::iterator it = mappings_by_file.begin(); it != mappings_by_file.end(); ++it) {
         if (it->info->mappings.empty()) {
-            File::close_static(it->info->fd);
+            FileDesc fd_to_close = it->info->fd;
             mappings_by_file.erase(it);
+            File::close_static(fd_to_close); // Throws
             break;
         }
     }

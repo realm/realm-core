@@ -607,7 +607,7 @@ public:
     };
     // Return the unique id for the current opened file descriptor.
     // Same UniqueID means they are the same file.
-    UniqueID get_unique_id() const;
+    UniqueID get_unique_id(); // Throws
     // Return the file descriptor for the file
     FileDesc get_descriptor() const;
     // Return the path of the open file, or an empty string if
@@ -646,6 +646,7 @@ private:
 #endif
     std::unique_ptr<const char[]> m_encryption_key = nullptr;
     std::string m_path;
+    std::optional<UniqueID> m_cached_unique_id;
 
     bool lock(bool exclusive, bool non_blocking);
     bool rw_lock(bool exclusive, bool non_blocking);
