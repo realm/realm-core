@@ -87,8 +87,7 @@ private:
     void init_from_mem(MemRef mem) noexcept
     {
         Array::init_from_mem(mem);
-        if (!is_encoded())
-            set_width(get_width_from_header(get_header()));
+        set_width(get_width_from_header(get_header()));
     }
 
     void adjust(size_t ndx, int64_t diff)
@@ -100,8 +99,7 @@ private:
 
     void alloc(size_t init_size, size_t new_width)
     {
-        //decode_array(*this);
-        Node::alloc(init_size, new_width);
+        Array::alloc(init_size, new_width);
         set_width(uint8_t(new_width));
     }
 

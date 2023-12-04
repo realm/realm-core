@@ -257,7 +257,7 @@ void Array::init_from_mem(MemRef mem) noexcept
 {
     char* header = mem.get_addr();
     auto kind = get_kind((uint64_t*)header);
-    REALM_ASSERT(kind == 'A' || kind == 'B');
+    // REALM_ASSERT(kind == 'A' || kind == 'B');
     if (kind == 'B') {
         // the only encoding supported at the moment
         auto encoding = get_encoding((uint64_t*)header);
@@ -1591,7 +1591,7 @@ size_t Array::find_first(int64_t value, size_t start, size_t end) const
 int_fast64_t Array::get(const char* header, size_t ndx) noexcept
 {
     // this is going to break for compressed arrays
-
+    REALM_ASSERT(get_kind((uint64_t*)header) == 'A');
     const char* data = get_data_from_header(header);
     uint_least8_t width = get_width_from_header(header);
     return get_direct(data, width, ndx);
@@ -1600,8 +1600,8 @@ int_fast64_t Array::get(const char* header, size_t ndx) noexcept
 
 std::pair<int64_t, int64_t> Array::get_two(const char* header, size_t ndx) noexcept
 {
-    // this is going to break for compressed arrays
-
+    // we need to decompress for now!!! TODO: fix this.
+    REALM_ASSERT(get_kind((uint64_t*)header) == 'A');
     const char* data = get_data_from_header(header);
     uint_least8_t width = get_width_from_header(header);
     std::pair<int64_t, int64_t> p = ::get_two(data, width, ndx);

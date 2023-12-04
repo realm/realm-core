@@ -174,7 +174,7 @@ public:
     // handles all header formats
     static WidthType get_wtype_from_header(const char* header) noexcept
     {
-        //During copy on write the header is not initialised.
+        // During copy on write the header is not initialised.
         REALM_ASSERT(get_kind((uint64_t*)header) != 'B');
         typedef unsigned char uchar;
         const uchar* h = reinterpret_cast<const uchar*>(header);

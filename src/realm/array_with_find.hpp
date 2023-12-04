@@ -341,6 +341,10 @@ template <class cond, size_t bitwidth, class Callback>
 bool ArrayWithFind::find_optimized(int64_t value, size_t start, size_t end, size_t baseindex, QueryStateBase* state,
                                    Callback callback) const
 {
+
+    if (m_array.is_encoded())
+        m_array.decode_array((Array&)m_array);
+
     REALM_ASSERT_DEBUG(start <= m_array.m_size && (end <= m_array.m_size || end == size_t(-1)) && start <= end);
 
     size_t start2 = start;

@@ -107,8 +107,6 @@ public:
     {
         REALM_ASSERT_DEBUG(ref);
         char* header = m_alloc.translate(ref);
-        auto kind = get_kind((uint64_t*)header);
-        REALM_ASSERT(kind == 'A' || kind == 'B');
         init_from_mem(MemRef(header, ref, m_alloc));
     }
 
@@ -197,6 +195,10 @@ public:
 
     void alloc(size_t init_size, size_t new_width)
     {
+        // Node::alloc is the one that triggers copy on write, but it does it a node level
+        //  in order to be sure that we able to allocated a new array based on the current one
+        //  we need to decode the current array.
+        decode_array(*this);
         REALM_ASSERT_3(m_width, ==, get_width_from_header(get_header()));
         REALM_ASSERT_3(m_size, ==, get_size_from_header(get_header()));
         Node::alloc(init_size, new_width);
@@ -691,6 +693,11 @@ inline void Array::get_chunk(size_t ndx, int64_t res[8]) const noexcept
 template <size_t w>
 int64_t Array::get_universal(const char* data, size_t ndx) const
 {
+    // encoded array
+    if (is_encoded()) {
+        return Array::get(ndx);
+    }
+
     if (w == 0) {
         return 0;
     }

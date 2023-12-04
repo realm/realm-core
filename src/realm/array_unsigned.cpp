@@ -45,7 +45,9 @@ inline uint8_t ArrayUnsigned::bit_width(uint64_t value)
 
 inline void ArrayUnsigned::_set(size_t ndx, uint8_t width, uint64_t value)
 {
-    if (width == 8) {
+    if (is_encoded())
+        Array::set(ndx, value);
+    else if (width == 8) {
         reinterpret_cast<uint8_t*>(m_data)[ndx] = uint8_t(value);
     }
     else if (width == 16) {
@@ -94,8 +96,8 @@ void ArrayUnsigned::update_from_parent() noexcept
 
 size_t ArrayUnsigned::lower_bound(uint64_t value) const noexcept
 {
-//    if (is_encoded())
-//        Array::decode_array((Array&)*this);
+    //    if (is_encoded())
+    //        Array::decode_array((Array&)*this);
 
     if (m_width == 8) {
         uint8_t* arr = reinterpret_cast<uint8_t*>(m_data);
