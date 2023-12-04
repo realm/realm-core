@@ -1,8 +1,7 @@
 # NEXT RELEASE
 
 ### Enhancements
-* <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
-* None.
+* [C API] Exposed `realm_app_create_cached` and `realm_app_get_cached` in the C API. (Issue [#7181](https://github.com/realm/realm-core/issues/7181))
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)

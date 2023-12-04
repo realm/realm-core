@@ -253,6 +253,24 @@ RLM_API realm_app_t* realm_app_create(const realm_app_config_t* app_config,
     });
 }
 
+RLM_API realm_app_t* realm_app_create_cached(const realm_app_config_t* app_config,
+                                             const realm_sync_client_config_t* sync_client_config)
+{
+    return wrap_err([&] {
+        return new realm_app_t(App::get_shared_app(*app_config, *sync_client_config));
+    });
+}
+
+RLM_API realm_app_t* realm_app_get_cached(const char* app_id, const char* base_url)
+{
+    if (auto app =
+            App::get_cached_app(std::string(app_id), base_url ? util::some<std::string>(base_url) : util::none)) {
+        return new realm_app_t(app);
+    }
+
+    return nullptr;
+}
+
 RLM_API void realm_clear_cached_apps(void) noexcept
 {
     App::clear_cached_apps();

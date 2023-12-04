@@ -2914,6 +2914,20 @@ RLM_API const char* realm_app_credentials_serialize_as_json(realm_app_credential
 RLM_API realm_app_t* realm_app_create(const realm_app_config_t*, const realm_sync_client_config_t*);
 
 /**
+ * Create cached realm_app_t* instance given a valid realm configuration and sync client configuration.
+ *
+ * @return A non-null pointer if no error occurred.
+ */
+RLM_API realm_app_t* realm_app_create_cached(const realm_app_config_t*, const realm_sync_client_config_t*);
+
+/**
+ * Get a cached realm_app_t* instance given an app id.
+ *
+ * @return A non-null pointer if no error occurred.
+ */
+RLM_API realm_app_t* realm_app_get_cached(const char* app_id, const char* base_url);
+
+/**
  * Clear all the cached @a realm_app_t* instances in the process.
  *
  * @a realm_app_t* instances will need to be disposed with realm_release()
