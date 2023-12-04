@@ -838,9 +838,11 @@ void SubscriptionStore::update_state(int64_t version, State new_state, std::opti
     switch (new_state) {
         case State::Error:
             if (old_state == State::Complete) {
-                throw RuntimeError(
-                    ErrorCodes::SyncProtocolInvariantFailed,
-                    util::format("Received error '%1' for already-completed query version %2", *error_str, version));
+                throw RuntimeError(ErrorCodes::SyncProtocolInvariantFailed,
+                                   util::format("Received error '%1' for already-completed query version %2. This "
+                                                "may be due to a queryable field being removed in the server-side "
+                                                "configuration making the previous subscription set no longer valid.",
+                                                *error_str, version));
             }
             break;
 
