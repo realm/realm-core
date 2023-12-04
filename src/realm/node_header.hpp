@@ -174,8 +174,8 @@ public:
     // handles all header formats
     static WidthType get_wtype_from_header(const char* header) noexcept
     {
-        // char kind = (char)get_kind((uint64_t*)header);
-        // REALM_ASSERT(kind == 'A');
+        //During copy on write the header is not initialised.
+        REALM_ASSERT(get_kind((uint64_t*)header) != 'B');
         typedef unsigned char uchar;
         const uchar* h = reinterpret_cast<const uchar*>(header);
         int h4 = h[4];
@@ -208,21 +208,8 @@ public:
 
     // Helper functions for old layouts only:
     // Handling width and sizes:
-    static uint_least8_t get_width_from_header(const char* header) noexcept
-    {
-        // REALM_ASSERT(get_kind((uint64_t*)header == 'A');
-        typedef unsigned char uchar;
-        const uchar* h = reinterpret_cast<const uchar*>(header);
-        return uint_least8_t((1 << (int(h[4]) & 0x07)) >> 1);
-    }
-
-    static size_t get_size_from_header(const char* header) noexcept
-    {
-        // REALM_ASSERT(get_kind((uint64_t*)header) == 'A');
-        typedef unsigned char uchar;
-        const uchar* h = reinterpret_cast<const uchar*>(header);
-        return (size_t(h[5]) << 16) + (size_t(h[6]) << 8) + h[7];
-    }
+    static uint_least8_t get_width_from_header(const char* header) noexcept;
+    static size_t get_size_from_header(const char* header) noexcept;
 
     static void set_width_in_header(size_t value, char* header) noexcept
     {
@@ -508,7 +495,6 @@ public:
                 REALM_ASSERT(false && "Illegal header encoding for chosen kind of header");
             }
         }
-        hb[3] = kind;
     }
     static void init_header(uint64_t* header, uint8_t kind, Encoding enc, uint8_t flags, size_t bits_pr_elemA,
                             size_t bits_pr_elemB, size_t num_elems)
@@ -618,7 +604,6 @@ public:
         }
     }
 };
-
 
 template <>
 void inline NodeHeader::set_element_size<NodeHeader::Encoding::Packed>(uint64_t* header, size_t bits_per_element)
@@ -1028,6 +1013,33 @@ size_t inline NodeHeader::get_byte_size_from_header(const char* header) noexcept
     return calc_byte_size(wtype, size, width);
 }
 
+// During copy on write we allocate an unitialised chunk of memory, which won't have A in his kind.
+// However only A arrays can go through copy on write, because we decopress before.
+uint_least8_t inline NodeHeader::get_width_from_header(const char* header) noexcept
+{
+    auto kind = get_kind((uint64_t*)header);
+    if (kind == 'B') {
+        // this is not 100% correct, width does not have the same importance for compressed arrays
+        auto width = get_elementA_size<Encoding::Flex>((uint64_t*)header);
+        return static_cast<uint_least8_t>(align_bits_to8(width));
+    }
+    // must be A type.
+    typedef unsigned char uchar;
+    const uchar* h = reinterpret_cast<const uchar*>(header);
+    return uint_least8_t((1 << (int(h[4]) & 0x07)) >> 1);
+}
+
+size_t inline NodeHeader::get_size_from_header(const char* header) noexcept
+{
+    auto kind = get_kind((uint64_t*)header);
+    if (kind == 'B') {
+        auto size = NodeHeader::get_arrayB_num_elements<Encoding::Flex>((uint64_t*)header);
+        return size;
+    }
+    typedef unsigned char uchar;
+    const uchar* h = reinterpret_cast<const uchar*>(header);
+    return (size_t(h[5]) << 16) + (size_t(h[6]) << 8) + h[7];
+}
 
 } // namespace realm
 
