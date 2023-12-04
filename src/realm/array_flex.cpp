@@ -306,7 +306,28 @@ void ArrayFlex::restore_array(Array& arr, const std::vector<int64_t>& values) co
     size_t i = 0;
     for (const auto& v : values)
         arr.insert(i++, v);
-    REALM_ASSERT(arr.get_width());
-    REALM_ASSERT(arr.get_width() % 8 == 0);
+    size_t w = arr.get_width();
+    REALM_ASSERT(w == 1 || w == 2 || w == 4 || w == 8 || w == 16 || w == 32 || w == 64);
     REALM_ASSERT(arr.size() == values.size());
+}
+
+size_t ArrayFlex::find_first(const Array& arr, int64_t value) const
+{
+    REALM_ASSERT(arr.is_attached());
+    size_t value_width, index_width, value_size, index_size;
+    if (get_encode_info(arr, value_width, index_width, value_size, index_size)) {
+        auto data = (uint64_t*)NodeHeader::get_data_from_header(arr.get_header());
+        const auto offset = value_size * value_width;
+        bf_iterator index_iterator{data, offset, index_width, index_width, 0};
+        for (size_t i = 0; i < index_size; ++i) {
+            const auto index = index_iterator.get_value();
+            bf_iterator it_value{data, index * value_width, value_width, value_width, 0};
+            const auto arr_value = it_value.get_value();
+            const auto ivalue = sign_extend_field(value_width, arr_value);
+            if (ivalue == value)
+                return i;
+            ++index_iterator;
+        }
+    }
+    return realm::not_found;
 }

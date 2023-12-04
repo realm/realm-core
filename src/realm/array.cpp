@@ -847,6 +847,8 @@ int64_t Array::sum(size_t start, size_t end) const
 template <size_t w>
 int64_t Array::sum(size_t start, size_t end) const
 {
+    decode_array((Array&)*this);
+
     if (end == size_t(-1))
         end = m_size;
     REALM_ASSERT_EX(end <= m_size && start <= end, start, end, m_size);
@@ -1583,7 +1585,8 @@ size_t Array::upper_bound_int(int64_t value) const noexcept
 
 size_t Array::find_first(int64_t value, size_t start, size_t end) const
 {
-    decode_array((Array&)*this);
+    if (is_encoded())
+        return m_encode.find_first(*this, value);
     return find_first<Equal>(value, start, end);
 }
 
@@ -1591,6 +1594,7 @@ size_t Array::find_first(int64_t value, size_t start, size_t end) const
 int_fast64_t Array::get(const char* header, size_t ndx) noexcept
 {
     // this is going to break for compressed arrays
+    // TODO this is static method, the wee need to implement get based on a compressed array.
     REALM_ASSERT(get_kind((uint64_t*)header) == 'A');
     const char* data = get_data_from_header(header);
     uint_least8_t width = get_width_from_header(header);

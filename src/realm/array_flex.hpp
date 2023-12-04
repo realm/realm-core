@@ -36,6 +36,7 @@ public:
     bool is_encoded(const Array&) const final override;
     size_t size(const Array&) const final override;
     int64_t get(const Array&, size_t) const final override;
+    size_t find_first(const Array&, int64_t value) const final override;
 
 private:
     // read info about the encoded array from header

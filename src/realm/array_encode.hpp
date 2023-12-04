@@ -35,6 +35,7 @@ public:
     virtual bool is_encoded(const Array&) const = 0;
     virtual size_t size(const Array&) const = 0;
     virtual int64_t get(const Array&, size_t) const = 0;
+    virtual size_t find_first(const Array&, int64_t value) const = 0;
 };
 
 } // namespace realm

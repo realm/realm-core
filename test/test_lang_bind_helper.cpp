@@ -3012,6 +3012,7 @@ void multiple_trackers_reader_thread(TestContext& test_context, DBRef db)
     const auto wait_start = std::chrono::steady_clock::now();
     std::chrono::seconds max_wait_seconds = std::chrono::seconds(1050);
     while (tc->size() == 0) {
+        // this goes through the table and asserts that sizes, in case of compression it fails.
         auto count = tb->begin()->get<int64_t>(b_col);
         tv.sync_if_needed();
         CHECK_EQUAL(tv.size(), count);

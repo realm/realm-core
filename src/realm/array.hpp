@@ -198,9 +198,9 @@ public:
         // Node::alloc is the one that triggers copy on write, but it does it a node level
         //  in order to be sure that we able to allocated a new array based on the current one
         //  we need to decode the current array.
-        decode_array(*this);
         REALM_ASSERT_3(m_width, ==, get_width_from_header(get_header()));
         REALM_ASSERT_3(m_size, ==, get_size_from_header(get_header()));
+        decode_array(*this);
         Node::alloc(init_size, new_width);
         update_width_cache_from_header();
     }
@@ -693,25 +693,23 @@ inline void Array::get_chunk(size_t ndx, int64_t res[8]) const noexcept
 template <size_t w>
 int64_t Array::get_universal(const char* data, size_t ndx) const
 {
-    // encoded array
-    if (is_encoded()) {
-        return Array::get(ndx);
-    }
-
     if (w == 0) {
         return 0;
     }
     else if (w == 1) {
         size_t offset = ndx >> 3;
-        return (data[offset] >> (ndx & 7)) & 0x01;
+        auto d = data[offset];
+        return (d >> (ndx & 7)) & 0x01;
     }
     else if (w == 2) {
         size_t offset = ndx >> 2;
-        return (data[offset] >> ((ndx & 3) << 1)) & 0x03;
+        auto d = data[offset];
+        return (d >> ((ndx & 3) << 1)) & 0x03;
     }
     else if (w == 4) {
         size_t offset = ndx >> 1;
-        return (data[offset] >> ((ndx & 1) << 2)) & 0x0F;
+        auto d = data[offset];
+        return (d >> ((ndx & 1) << 2)) & 0x0F;
     }
     else if (w == 8) {
         return *reinterpret_cast<const signed char*>(data + ndx);

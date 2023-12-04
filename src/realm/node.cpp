@@ -132,6 +132,8 @@ void Node::alloc(size_t init_size, size_t new_width)
         MemRef mem_ref = m_alloc.realloc_(m_ref, header, orig_capacity_bytes, new_capacity_bytes); // Throws
 
         header = mem_ref.get_addr();
+        // here the header is not going to be init.
+        // set_kind((uint64_t*)header, 'A');
         set_capacity_in_header(new_capacity_bytes, header);
 
         // Update this accessor and its ancestors
@@ -142,7 +144,8 @@ void Node::alloc(size_t init_size, size_t new_width)
         update_parent(); // Throws
     }
 
-    // Update header
+    // this is likely going to fail if header is not A
+    //  Update header
     if (new_width != orig_width) {
         set_width_in_header(int(new_width), header);
     }
