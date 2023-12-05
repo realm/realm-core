@@ -51,7 +51,7 @@ bool ArrayFlex::decode(Array& arr)
 {
     REALM_ASSERT(arr.is_attached());
     size_t value_width, index_width, value_size, index_size;
-    if (get_encode_info(arr, value_width, index_width, value_size, index_size)) {
+    if (get_encode_info(arr.get_header(), value_width, index_width, value_size, index_size)) {
         auto values = fetch_values_from_encoded_array(arr, value_width, index_width, value_size, index_size);
         REALM_ASSERT(values.size() == index_size);
         restore_array(arr, values);
@@ -83,7 +83,7 @@ int64_t ArrayFlex::get(const Array& arr, size_t ndx) const
 {
     REALM_ASSERT(arr.is_attached());
     size_t value_width, index_width, value_size, index_size;
-    if (get_encode_info(arr, value_width, index_width, value_size, index_size)) {
+    if (get_encode_info(arr.get_header(), value_width, index_width, value_size, index_size)) {
 
         if (ndx >= index_size)
             return realm::not_found;
@@ -246,17 +246,16 @@ void ArrayFlex::setup_array_in_flex_format(const Array& origin, Array& arr, std:
     REALM_ASSERT(arr.get_encoding(header) == Encoding::Flex);
 }
 
-bool ArrayFlex::get_encode_info(const Array& arr, size_t& value_width, size_t& index_width, size_t& value_size,
-                                size_t& index_size) const
+bool inline ArrayFlex::get_encode_info(const char* header, size_t& value_width, size_t& index_width,
+                                       size_t& value_size, size_t& index_size)
 {
-    REALM_ASSERT(arr.is_attached());
     using Encoding = NodeHeader::Encoding;
-    auto header = (uint64_t*)arr.get_header();
-    if (NodeHeader::get_kind(header) == 'B' && NodeHeader::get_encoding(header) == Encoding::Flex) {
-        value_size = NodeHeader::get_arrayA_num_elements<Encoding::Flex>(header);
-        index_size = NodeHeader::get_arrayB_num_elements<Encoding::Flex>(header);
-        value_width = NodeHeader::get_elementA_size<Encoding::Flex>(header);
-        index_width = NodeHeader::get_elementB_size<Encoding::Flex>(header);
+    auto h = (uint64_t*)header;
+    if (NodeHeader::get_kind(h) == 'B' && NodeHeader::get_encoding(h) == Encoding::Flex) {
+        value_size = NodeHeader::get_arrayA_num_elements<Encoding::Flex>(h);
+        index_size = NodeHeader::get_arrayB_num_elements<Encoding::Flex>(h);
+        value_width = NodeHeader::get_elementA_size<Encoding::Flex>(h);
+        index_width = NodeHeader::get_elementB_size<Encoding::Flex>(h);
         return true;
     }
     return false;
@@ -315,7 +314,7 @@ size_t ArrayFlex::find_first(const Array& arr, int64_t value) const
 {
     REALM_ASSERT(arr.is_attached());
     size_t value_width, index_width, value_size, index_size;
-    if (get_encode_info(arr, value_width, index_width, value_size, index_size)) {
+    if (get_encode_info(arr.get_header(), value_width, index_width, value_size, index_size)) {
         auto data = (uint64_t*)NodeHeader::get_data_from_header(arr.get_header());
         const auto offset = value_size * value_width;
         bf_iterator index_iterator{data, offset, index_width, index_width, 0};
@@ -328,6 +327,27 @@ size_t ArrayFlex::find_first(const Array& arr, int64_t value) const
                 return i;
             ++index_iterator;
         }
+    }
+    return realm::not_found;
+}
+
+int64_t ArrayFlex::get(const char* header, size_t ndx)
+{
+    using Encoding = NodeHeader::Encoding;
+    REALM_ASSERT(NodeHeader::get_kind((uint64_t*)header) == 'B');
+    REALM_ASSERT(NodeHeader::get_encoding((uint64_t*)header) == Encoding::Flex);
+    size_t value_width, index_width, value_size, index_size;
+    if (get_encode_info(header, value_width, index_width, value_size, index_size)) {
+        if (ndx >= index_size)
+            return realm::not_found;
+        auto data = (uint64_t*)NodeHeader::get_data_from_header(header);
+        const auto offset = value_size * value_width;
+        bf_iterator index_iterator{data, offset + (ndx * index_width), index_width, index_width, 0};
+        auto index_value = index_iterator.get_value();
+        bf_iterator it_value{data, index_value * value_width, value_width, value_width, 0};
+        const auto arr_value = it_value.get_value();
+        const auto ivalue = sign_extend_field(value_width, arr_value);
+        return ivalue;
     }
     return realm::not_found;
 }

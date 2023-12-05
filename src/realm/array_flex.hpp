@@ -37,11 +37,12 @@ public:
     size_t size(const Array&) const final override;
     int64_t get(const Array&, size_t) const final override;
     size_t find_first(const Array&, int64_t value) const final override;
+    static int64_t get(const char* header, size_t ndx);
 
 private:
     // read info about the encoded array from header
-    bool get_encode_info(const Array&, size_t& value_width, size_t& index_width, size_t& value_size,
-                         size_t& index_size) const;
+    static bool get_encode_info(const char* header, size_t& value_width, size_t& index_width, size_t& value_size,
+                                size_t& index_size);
     // encode array methods
     bool try_encode(const Array&, Array&, std::vector<int64_t>&, std::vector<size_t>&) const;
     void arrange_data_in_flex_format(const Array&, std::vector<int64_t>&, std::vector<size_t>&) const;

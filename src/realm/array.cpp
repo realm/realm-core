@@ -1595,7 +1595,10 @@ int_fast64_t Array::get(const char* header, size_t ndx) noexcept
 {
     // this is going to break for compressed arrays
     // TODO this is static method, the wee need to implement get based on a compressed array.
-    REALM_ASSERT(get_kind((uint64_t*)header) == 'A');
+    if (NodeHeader::get_kind((uint64_t*)header) == 'B') {
+        REALM_ASSERT(NodeHeader::get_encoding((uint64_t*)header) == NodeHeader::Encoding::Flex);
+        return ArrayFlex::get(header, ndx);
+    }
     const char* data = get_data_from_header(header);
     uint_least8_t width = get_width_from_header(header);
     return get_direct(data, width, ndx);
