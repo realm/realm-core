@@ -70,7 +70,8 @@ inline timestamp_type generate_changeset_timestamp()
     // 1970-01-01T00:00:00Z and 2015-01-01T00:00:00Z not counting leap seconds.
     std::uint_fast64_t offset_in_millis = 1420070400000ULL;
     if (millis_since_epoch < offset_in_millis) {
-        throw RuntimeError(ErrorCodes::SyncLocalClockBehind, "Local clock cannot lag behind 2015-01-01T00:00:00Z");
+        throw RuntimeError(ErrorCodes::SyncLocalClockBeforeEpoch,
+                           "Local clock cannot lag behind 2015-01-01T00:00:00Z");
     }
     return timestamp_type(millis_since_epoch - offset_in_millis);
 }
