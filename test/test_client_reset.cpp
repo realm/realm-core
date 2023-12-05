@@ -854,6 +854,7 @@ void mark_as_synchronized(DB& db)
     progress.upload.last_integrated_server_version = current_version;
     sync::VersionInfo info_out;
     history.set_sync_progress(progress, nullptr, info_out);
+    history.set_client_file_ident({1, 0}, false);
 }
 
 void expect_reset(unit_test::TestContext& test_context, DB& target, DB& fresh, ClientResyncMode mode,
@@ -1474,6 +1475,169 @@ TEST(ClientReset_Recover_RecoverableChangesOnListsAfterUnrecoverableAreNotDuplic
     auto repl = static_cast<ClientReplication*>(db->get_replication());
     auto changes = repl->get_history().get_local_changes(rt->get_version());
     CHECK_EQUAL(changes.size(), 1);
+}
+
+// Apply uploaded changes in src to dst as if they had been exchanged by sync
+void apply_changes(DB& src, DB& dst)
+{
+    auto& src_history = static_cast<ClientReplication*>(src.get_replication())->get_history();
+    auto& dst_history = static_cast<ClientReplication*>(dst.get_replication())->get_history();
+
+    version_type dst_client_version;
+    SaltedFileIdent dst_file_ident;
+    SyncProgress dst_progress;
+    dst_history.get_status(dst_client_version, dst_file_ident, dst_progress);
+
+    std::vector<util::AppendBuffer<char>> decompressed_changesets;
+    std::vector<RemoteChangeset> remote_changesets;
+    auto local_changes = src_history.get_local_changes(src.get_version_of_latest_snapshot());
+    for (auto& change : local_changes) {
+        decompressed_changesets.emplace_back();
+        auto& buffer = decompressed_changesets.back();
+        ChunkedBinaryInputStream is{change.changeset};
+        util::compression::decompress_nonportable(is, buffer);
+
+        // Arbitrary non-zero file ident
+        file_ident_type file_ident = 2;
+        // Treat src's changesets as being "after" dst's
+        uint_fast64_t timestamp = -1;
+        remote_changesets.emplace_back(change.version, dst_progress.upload.last_integrated_server_version,
+                                       BinaryData(buffer.data(), buffer.size()), timestamp, file_ident);
+    }
+
+    dst_progress.download.server_version += remote_changesets.size();
+    dst_progress.latest_server_version.version += remote_changesets.size();
+
+    util::NullLogger logger;
+    VersionInfo new_version;
+    dst_history.integrate_server_changesets(dst_progress, nullptr, remote_changesets, new_version,
+                                            DownloadBatchState::SteadyState, logger, dst.start_read());
+}
+
+TEST(ClientReset_Recover_ReciprocalListChanges)
+{
+    SHARED_GROUP_TEST_PATH(path_1);
+    SHARED_GROUP_TEST_PATH(path_2);
+    auto [db, db_fresh] = prepare_db(path_1, path_2, [&](Transaction& tr) {
+        auto table = tr.add_table_with_primary_key("class_table", type_Int, "pk");
+        auto col = table->add_column_list(type_Int, "list");
+        auto list = table->create_object_with_primary_key(0).get_list<Int>(col);
+        for (int i = 0; i < 5; ++i) {
+            list.add(i * 10);
+        }
+    });
+
+    {
+        auto wt = db->start_write();
+        auto list = wt->get_table("class_table")->begin()->get_list<Int>("list");
+        for (int i = 0; i < 5; ++i) {
+            list.insert(i * 2 + 1, i * 10 + 1);
+        }
+        // list is now [0, 1, 10, 11, 20, 21, 30, 31, 40, 41]
+        wt->commit();
+    }
+
+    {
+        auto wt = db_fresh->start_write();
+        auto list = wt->get_table("class_table")->begin()->get_list<Int>("list");
+        for (int i = 0; i < 5; ++i) {
+            list.insert(i * 2 + 1, i * 10 + 2);
+        }
+        // list is now [0, 2, 10, 12, 20, 22, 30, 32, 40, 42]
+        wt->commit();
+    }
+
+    // Apply the changes in db_fresh to db as if it was a changeset downloaded
+    // from the server. This creates reciprocal history for the unuploaded
+    // changeset in db.
+    // list is now [0, 1, 2, 10, 11, 12, 20, 21, 22, 30, 31, 32, 40, 41, 42]
+    apply_changes(*db_fresh, *db);
+
+    // The local realm is fully up-to-date with the server, so this client reset
+    // shouldn't modify the group. However, if it reapplied the original changesets
+    // and not the reciprocal history, it'd result in the list being
+    // [0, 1, 2, 11, 10, 21, 12, 31, 20, 41, 22, 30, 32, 40, 42]
+    expect_reset(test_context, *db, *db_fresh, ClientResyncMode::Recover, nullptr);
+
+    auto rt = db->start_read();
+    auto list = rt->get_table("class_table")->begin()->get_list<Int>("list");
+    CHECK_OR_RETURN(list.size() == 15);
+    for (int i = 0; i < 5; ++i) {
+        CHECK_EQUAL(list[i * 3], i * 10);
+        CHECK_EQUAL(list[i * 3 + 1], i * 10 + 1);
+        CHECK_EQUAL(list[i * 3 + 2], i * 10 + 2);
+    }
+}
+
+TEST(ClientReset_Recover_UpdatesReciprocalHistory)
+{
+    SHARED_GROUP_TEST_PATH(path_1);
+    SHARED_GROUP_TEST_PATH(path_2);
+    SHARED_GROUP_TEST_PATH(path_3);
+
+    auto [db, db_fresh] = prepare_db(path_1, path_2, [&](Transaction& tr) {
+        auto table = tr.add_table_with_primary_key("class_table", type_Int, "pk");
+        auto col = table->add_column_list(type_Int, "list");
+        table->create_object_with_primary_key(0).get_list<Int>(col).add(0);
+    });
+
+    { // local online write that doesn't get uploaded
+        auto wt = db->start_write();
+        // This instruction is merged with the add in the remote write,
+        // generating reciprocal history. It is then discarded when replaying
+        // onto the fresh realm in the client reset as the object will no longer
+        // exist at that point
+        wt->get_table("class_table")->begin()->get_list<Int>("list").add(1);
+        // An instruction that won't get discarded when replaying to ensure
+        // the changeset remains non-empty
+        wt->get_table("class_table")->create_object_with_primary_key(1);
+        wt->commit();
+    }
+
+    { // remote write which gets sent to the client in a DOWNLOAD
+        auto wt = db_fresh->start_write();
+        wt->get_table("class_table")->begin()->get_list<Int>("list").add(2);
+        wt->commit();
+    }
+
+    // db now has a changeset waiting to be uploaded with both a changeset
+    // and reciprocal transform
+    apply_changes(*db_fresh, *db);
+
+    { // Freshly downloaded client reset realm doesn't have the object
+        auto wt = db_fresh->start_write();
+        wt->get_table("class_table")->begin()->remove();
+        wt->commit();
+    }
+
+    // Make a copy as client reset will delete the fresh realm
+    mark_as_synchronized(*db_fresh);
+    db_fresh->write_copy(path_3, nullptr);
+
+    // client reset will discard the recovered array insertion as the object
+    // doesn't exist, but keep the object creation
+    expect_reset(test_context, *db, *db_fresh, ClientResyncMode::Recover, nullptr);
+
+    // Recreate the object and add a different value to the list
+    {
+        db_fresh = DB::create(make_client_replication(), path_3);
+        auto wt = db_fresh->start_write();
+        wt->get_table("class_table")->create_object_with_primary_key(0).get_list<Int>("list").add(3);
+        wt->commit();
+    }
+
+    // If the client failed to discard the old reciprocal transform when performing
+    // the client reset this'll merge the ArrayInsert with the discarded ArrayInsert,
+    // and then throw an exception because prior_size is now incorrect
+    apply_changes(*db_fresh, *db);
+
+    // Sanity check the end state
+    auto rt = db->start_read();
+    auto table = rt->get_table("class_table");
+    CHECK_OR_RETURN(table->size() == 2);
+    auto list = table->get_object(1).get_list<Int>("list");
+    CHECK_OR_RETURN(list.size() == 1);
+    CHECK_EQUAL(list.get(0), 3);
 }
 
 } // unnamed namespace

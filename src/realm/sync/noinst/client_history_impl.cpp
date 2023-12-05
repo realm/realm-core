@@ -84,6 +84,7 @@ void ClientHistory::set_client_reset_adjustments(
             util::compression::allocate_and_compress_nonportable(arena, changeset, compressed);
             m_arrays->changesets.set(i, BinaryData{compressed.data(), compressed.size()}); // Throws
             m_arrays->remote_versions.set(i, server_version.version);
+            m_arrays->reciprocal_transforms.set(i, BinaryData());
             logger.debug("Updating %1: client_version(%2) changeset_size(%3) server_version(%4)", i, version,
                          compressed.size(), server_version.version);
         }
@@ -147,7 +148,11 @@ std::vector<ClientHistory::LocalChange> ClientHistory::get_local_changes(version
         std::int_fast64_t origin_file_ident = m_arrays->origin_file_idents.get(ndx);
         bool not_from_server = (origin_file_ident == 0);
         if (not_from_server) {
-            if (auto changeset = m_arrays->changesets.get(ndx); changeset.size()) {
+            bool compressed = false;
+            // find_sync_history_entry() returns 0 to indicate not found and
+            // otherwise adds 1 to the version, and then get_reciprocal_transform()
+            // subtracts 1 from the version
+            if (auto changeset = get_reciprocal_transform(version + 1, compressed); changeset.size()) {
                 changesets.push_back({version, changeset});
             }
         }
@@ -543,7 +548,7 @@ size_t ClientHistory::transform_and_apply_server_changesets(util::Span<Changeset
     REALM_ASSERT(transact->get_transact_stage() == DB::transact_Writing);
 
     if (!m_replication.apply_server_changes()) {
-        std::for_each(changesets_to_integrate.begin(), changesets_to_integrate.end(), [&](const Changeset c) {
+        std::for_each(changesets_to_integrate.begin(), changesets_to_integrate.end(), [&](const Changeset& c) {
             downloaded_bytes += c.original_changeset_size;
         });
         // Skip over all changesets if they don't need to be transformed and applied.
