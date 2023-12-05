@@ -15,7 +15,7 @@
   - All pending subscriptions were marked as Superseded and then recreating, resulting in anything waiting for subscriptions to complete firing early.
   ([PR #7161](https://github.com/realm/realm-core/pull/7161), since v12.3.0).
 * If the very first open of a flexible sync Realm triggered a client reset, the configuration had an initial subscriptions callback, both before and after reset callbacks, and the initial subscription callback began a read transaction without ending it (which is normally going to be the case), opening the frozen Realm for the after reset callback would trigger a BadVersion exception ([PR #7161](https://github.com/realm/realm-core/pull/7161), since v12.3.0).
-
+* Changesets have wrong timestamps if the local clock lags behind 2015-01-01T00:00:00Z. The sync client now throws an exception if that happens. ([PR #7180](https://github.com/realm/realm-core/pull/7180))
 
 ### Breaking changes
 * Update existing std exceptions thrown by the Sync Client to use Realm exceptions. ([PR #7141](https://github.com/realm/realm-core/pull/7141/files))
