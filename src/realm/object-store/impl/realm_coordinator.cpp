@@ -389,8 +389,10 @@ void RealmCoordinator::do_get_realm(RealmConfig&& config, std::shared_ptr<Realm>
         if (!first_time_open)
             first_time_open = db_created;
         if (subscription_version == 0 || (first_time_open && rerun_on_open)) {
-            // if the tasks is cancelled, the subscription may or may not be run.
+            bool was_in_read = realm->is_in_read_transaction();
             subscription_function(realm);
+            if (!was_in_read)
+                realm->invalidate();
         }
     }
 #endif
