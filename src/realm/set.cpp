@@ -248,13 +248,11 @@ void SetBase::assign_symmetric_difference(It1 first, It2 last)
 }
 
 template <>
-void CollectionBaseImpl<SetBase>::to_json(std::ostream& out, size_t, JSONOutputMode output_mode,
+void CollectionBaseImpl<SetBase>::to_json(std::ostream& out, JSONOutputMode output_mode,
                                           util::FunctionRef<void(const Mixed&)> fn) const
 {
-    int closing = 0;
     if (output_mode == output_mode_xjson_plus) {
         out << "{ \"$set\": ";
-        closing++;
     }
 
     out << "[";
@@ -263,7 +261,7 @@ void CollectionBaseImpl<SetBase>::to_json(std::ostream& out, size_t, JSONOutputM
         if (i > 0)
             out << ",";
         Mixed val = get_any(i);
-        if (val.is_type(type_TypedLink)) {
+        if (val.is_type(type_Link, type_TypedLink)) {
             fn(val);
         }
         else {
@@ -271,8 +269,9 @@ void CollectionBaseImpl<SetBase>::to_json(std::ostream& out, size_t, JSONOutputM
         }
     }
     out << "]";
-    while (closing--)
+    if (output_mode == output_mode_xjson_plus) {
         out << "}";
+    }
 }
 
 bool SetBase::do_init_from_parent(ref_type ref, bool allow_create) const
@@ -512,12 +511,8 @@ void LnkSet::remove_all_target_rows()
     }
 }
 
-void LnkSet::to_json(std::ostream& out, size_t link_depth, JSONOutputMode output_mode,
-                     util::FunctionRef<void(const Mixed&)> fn) const
+void LnkSet::to_json(std::ostream& out, JSONOutputMode, util::FunctionRef<void(const Mixed&)> fn) const
 {
-    auto [open_str, close_str] = get_open_close_strings(link_depth, output_mode);
-
-    out << open_str;
     out << "[";
 
     auto sz = m_set.size();
@@ -529,7 +524,6 @@ void LnkSet::to_json(std::ostream& out, size_t link_depth, JSONOutputMode output
     }
 
     out << "]";
-    out << close_str;
 }
 
 

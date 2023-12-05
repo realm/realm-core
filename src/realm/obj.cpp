@@ -1106,13 +1106,13 @@ void Obj::add_index(Path& path, const Index& index) const
 std::string Obj::to_string() const
 {
     std::ostringstream ostr;
-    to_json(ostr, 0, {});
+    to_json(ostr);
     return ostr.str();
 }
 
 std::ostream& operator<<(std::ostream& ostr, const Obj& obj)
 {
-    obj.to_json(ostr, -1, {});
+    obj.to_json(ostr);
     return ostr;
 }
 

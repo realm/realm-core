@@ -632,9 +632,8 @@ public:
     LinkChain backlink(const Table& origin, ColKey origin_col_key) const;
 
     // Conversion
-    void schema_to_json(std::ostream& out, const std::map<std::string, std::string>& renames) const;
-    void to_json(std::ostream& out, size_t link_depth, const std::map<std::string, std::string>& renames,
-                 JSONOutputMode output_mode = output_mode_json) const;
+    void schema_to_json(std::ostream& out) const;
+    void to_json(std::ostream& out, JSONOutputMode output_mode = output_mode_json) const;
 
     /// \brief Compare two tables for equality.
     ///

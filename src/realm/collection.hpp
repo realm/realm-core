@@ -80,7 +80,7 @@ public:
     {
         return size() == 0;
     }
-    virtual void to_json(std::ostream&, size_t, JSONOutputMode, util::FunctionRef<void(const Mixed&)>) const {}
+    virtual void to_json(std::ostream&, JSONOutputMode, util::FunctionRef<void(const Mixed&)>) const {}
     /// Get collection type (set, list, dictionary)
     virtual CollectionType get_collection_type() const noexcept = 0;
 
@@ -258,7 +258,6 @@ protected:
     CollectionBase& operator=(CollectionBase&&) noexcept = default;
 
     void validate_index(const char* msg, size_t index, size_t size) const;
-    std::pair<std::string, std::string> get_open_close_strings(size_t link_depth, JSONOutputMode output_mode) const;
 };
 
 inline std::string_view collection_type_name(CollectionType col_type, bool uppercase = false)
@@ -567,7 +566,7 @@ public:
         m_content_version = 0;
     }
 
-    void to_json(std::ostream&, size_t, JSONOutputMode, util::FunctionRef<void(const Mixed&)>) const override;
+    void to_json(std::ostream&, JSONOutputMode, util::FunctionRef<void(const Mixed&)>) const override;
 
     using Interface::get_owner_key;
     using Interface::get_table;

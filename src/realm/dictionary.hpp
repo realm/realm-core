@@ -219,7 +219,7 @@ public:
     void set_collection_ref(Index, ref_type ref, CollectionType) override;
     StableIndex build_index(Mixed key) const;
 
-    void to_json(std::ostream&, size_t, JSONOutputMode, util::FunctionRef<void(const Mixed&)>) const override;
+    void to_json(std::ostream&, JSONOutputMode, util::FunctionRef<void(const Mixed&)>) const override;
 
 private:
     template <typename T, typename Op>

@@ -1119,17 +1119,17 @@ void Dictionary::migrate()
 }
 
 template <>
-void CollectionBaseImpl<DictionaryBase>::to_json(std::ostream&, size_t, JSONOutputMode,
+void CollectionBaseImpl<DictionaryBase>::to_json(std::ostream&, JSONOutputMode,
                                                  util::FunctionRef<void(const Mixed&)>) const
 {
 }
 
-void Dictionary::to_json(std::ostream& out, size_t link_depth, JSONOutputMode output_mode,
+void Dictionary::to_json(std::ostream& out, JSONOutputMode output_mode,
                          util::FunctionRef<void(const Mixed&)> fn) const
 {
-    auto [open_str, close_str] = get_open_close_strings(link_depth, output_mode);
-
-    out << open_str;
+    if (output_mode == output_mode_xjson_plus) {
+        out << "{ \"$dictionary\": ";
+    }
     out << "{";
 
     auto sz = size();
@@ -1144,12 +1144,12 @@ void Dictionary::to_json(std::ostream& out, size_t link_depth, JSONOutputMode ou
         else if (val.is_type(type_Dictionary)) {
             DummyParent parent(this->get_table(), val.get_ref());
             Dictionary dict(parent, 0);
-            dict.to_json(out, link_depth, output_mode, fn);
+            dict.to_json(out, output_mode, fn);
         }
         else if (val.is_type(type_List)) {
             DummyParent parent(this->get_table(), val.get_ref());
             Lst<Mixed> list(parent, 0);
-            list.to_json(out, link_depth, output_mode, fn);
+            list.to_json(out, output_mode, fn);
         }
         else {
             val.to_json(out, output_mode);
@@ -1157,7 +1157,9 @@ void Dictionary::to_json(std::ostream& out, size_t link_depth, JSONOutputMode ou
     }
 
     out << "}";
-    out << close_str;
+    if (output_mode == output_mode_xjson_plus) {
+        out << "}";
+    }
 }
 
 ref_type Dictionary::get_collection_ref(Index index, CollectionType type) const

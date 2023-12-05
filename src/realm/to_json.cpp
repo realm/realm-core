@@ -25,14 +25,9 @@
 
 namespace realm {
 
-void Group::schema_to_json(std::ostream& out, std::map<std::string, std::string>* opt_renames) const
+void Group::schema_to_json(std::ostream& out) const
 {
     check_attached();
-
-    std::map<std::string, std::string> renames;
-    if (opt_renames) {
-        renames = *opt_renames;
-    }
 
     out << "[" << std::endl;
 
@@ -42,7 +37,7 @@ void Group::schema_to_json(std::ostream& out, std::map<std::string, std::string>
         auto key = keys[i];
         ConstTableRef table = get_table(key);
 
-        table->schema_to_json(out, renames);
+        table->schema_to_json(out);
         if (i < sz - 1)
             out << ",";
         out << std::endl;
@@ -51,34 +46,23 @@ void Group::schema_to_json(std::ostream& out, std::map<std::string, std::string>
     out << "]" << std::endl;
 }
 
-void Group::to_json(std::ostream& out, size_t link_depth, std::map<std::string, std::string>* opt_renames,
-                    JSONOutputMode output_mode) const
+void Group::to_json(std::ostream& out, JSONOutputMode output_mode) const
 {
     check_attached();
-
-    std::map<std::string, std::string> renames;
-    if (opt_renames) {
-        renames = *opt_renames;
-    }
-
     out << "{" << std::endl;
 
     auto keys = get_table_keys();
     bool first = true;
     for (size_t i = 0; i < keys.size(); ++i) {
         auto key = keys[i];
-        StringData name = get_table_name(key);
-        if (renames[name] != "")
-            name = renames[name];
-
         ConstTableRef table = get_table(key);
 
         if (!table->is_embedded()) {
             if (!first)
                 out << ",";
-            out << "\"" << name << "\"";
+            out << "\"" << table->get_class_name() << "\"";
             out << ":";
-            table->to_json(out, link_depth, renames, output_mode);
+            table->to_json(out, output_mode);
             out << std::endl;
             first = false;
         }
@@ -87,8 +71,7 @@ void Group::to_json(std::ostream& out, size_t link_depth, std::map<std::string, 
     out << "}" << std::endl;
 }
 
-void Table::to_json(std::ostream& out, size_t link_depth, const std::map<std::string, std::string>& renames,
-                    JSONOutputMode output_mode) const
+void Table::to_json(std::ostream& out, JSONOutputMode output_mode) const
 {
     // Represent table as list of objects
     out << "[";
@@ -101,7 +84,7 @@ void Table::to_json(std::ostream& out, size_t link_depth, const std::map<std::st
         else {
             out << ",";
         }
-        obj.to_json(out, link_depth, renames, output_mode);
+        obj.to_json(out, output_mode);
     }
 
     out << "]";
@@ -241,31 +224,22 @@ Obj& Obj::set_json(ColKey col_key, StringData json)
     return *this;
 }
 
-void Obj::to_json(std::ostream& out, size_t link_depth, const std::map<std::string, std::string>& renames,
-                  std::vector<ObjLink>& followed, JSONOutputMode output_mode) const
+void Obj::to_json(std::ostream& out, JSONOutputMode output_mode) const
 {
-    followed.push_back(get_link());
-    size_t new_depth = link_depth == not_found ? not_found : link_depth - 1;
-    StringData name = "_key";
     bool prefixComma = false;
-    if (renames.count(name))
-        name = renames.at(name);
     out << "{";
-    if (output_mode == output_mode_json) {
+    if (!m_table->get_primary_key_column() && !m_table->is_embedded()) {
         prefixComma = true;
-        out << "\"" << name << "\":" << this->m_key.value;
+        out << "\"_key\":" << this->m_key.value;
     }
 
     auto col_keys = m_table->get_column_keys();
     for (auto ck : col_keys) {
-        name = m_table->get_column_name(ck);
         auto type = ck.get_type();
-        if (renames.count(name))
-            name = renames.at(name);
 
         if (prefixComma)
             out << ",";
-        out << "\"" << name << "\":";
+        out << "\"" << m_table->get_column_name(ck) << "\":";
         prefixComma = true;
 
         TableRef target_table;
@@ -279,86 +253,60 @@ void Obj::to_json(std::ostream& out, size_t link_depth, const std::map<std::stri
             REALM_ASSERT(val.is_type(type_Link, type_TypedLink));
             TableRef tt = target_table;
             auto obj_key = val.get<ObjKey>();
-            std::string table_info;
-            std::string table_info_close;
+
+            auto out_obj_key = [&] {
+                if (pk_col_key) {
+                    tt->get_primary_key(obj_key).to_json(out, output_mode);
+                }
+                else {
+                    out << obj_key.value;
+                }
+            };
             if (!tt) {
                 // It must be a typed link
                 tt = m_table->get_parent_group()->get_table(val.get_link().get_table_key());
                 pk_col_key = tt->get_primary_key_column();
-                if (output_mode == output_mode_xjson_plus) {
-                    table_info = std::string("{ \"$link\": ");
-                    table_info_close = " }";
-                }
+                out << "{ \"$link\": {";
 
-                table_info += std::string("{ \"table\": \"") + std::string(tt->get_name()) + "\", \"key\": ";
-                table_info_close += " }";
-            }
-            if (pk_col_key && output_mode != output_mode_json) {
-                out << table_info;
-                tt->get_primary_key(obj_key).to_json(out, output_mode_xjson);
-                out << table_info_close;
+                out << "\"table\": \"" << tt->get_class_name() << "\", \"key\": ";
+                out_obj_key();
+                out << " }}";
             }
             else {
-                ObjLink link(tt->get_key(), obj_key);
-                if (obj_key.is_unresolved()) {
-                    out << "null";
-                    return;
-                }
-                if (!tt->is_embedded()) {
-                    if (link_depth == 0) {
-                        out << table_info << obj_key.value << table_info_close;
-                        return;
+                if (tt->is_embedded()) {
+                    if (output_mode == output_mode_xjson_plus) {
+                        out << "{ \"$embedded\": ";
                     }
-                    if ((link_depth == realm::npos &&
-                         std::find(followed.begin(), followed.end(), link) != followed.end())) {
-                        // We have detected a cycle in links
-                        out << "{ \"table\": \"" << tt->get_name() << "\", \"key\": " << obj_key.value << " }";
-                        return;
+                    tt->get_object(obj_key).to_json(out, output_mode);
+                    if (output_mode == output_mode_xjson_plus) {
+                        out << "}";
                     }
                 }
-
-                tt->get_object(obj_key).to_json(out, new_depth, renames, followed, output_mode);
+                else {
+                    out_obj_key();
+                }
             }
         };
 
         if (ck.is_collection()) {
             auto collection = get_collection_ptr(ck);
-            collection->to_json(out, link_depth, output_mode, print_link);
+            collection->to_json(out, output_mode, print_link);
         }
         else {
             auto val = get_any(ck);
             if (!val.is_null()) {
-                if (type == col_type_Link) {
-                    std::string close_string;
-                    bool is_embedded = target_table->is_embedded();
-                    bool link_depth_reached = !is_embedded && (link_depth == 0);
-
-                    if (output_mode == output_mode_xjson_plus) {
-                        out << "{ " << (is_embedded ? "\"$embedded" : "\"$link") << "\": ";
-                        close_string += "}";
-                    }
-                    if ((link_depth_reached && output_mode == output_mode_json) ||
-                        output_mode == output_mode_xjson_plus) {
-                        out << "{ \"table\": \"" << target_table->get_name() << "\", "
-                            << (is_embedded ? "\"value" : "\"key") << "\": ";
-                        close_string += "}";
-                    }
-
-                    print_link(val);
-                    out << close_string;
-                }
-                else if (val.is_type(type_TypedLink)) {
+                if (val.is_type(type_Link, type_TypedLink)) {
                     print_link(val);
                 }
                 else if (val.is_type(type_Dictionary)) {
                     DummyParent parent(m_table, val.get_ref());
                     Dictionary dict(parent, 0);
-                    dict.to_json(out, link_depth, output_mode, print_link);
+                    dict.to_json(out, output_mode, print_link);
                 }
                 else if (val.is_type(type_List)) {
                     DummyParent parent(m_table, val.get_ref());
                     Lst<Mixed> list(parent, 0);
-                    list.to_json(out, link_depth, output_mode, print_link);
+                    list.to_json(out, output_mode, print_link);
                 }
                 else {
                     val.to_json(out, output_mode);
@@ -370,7 +318,6 @@ void Obj::to_json(std::ostream& out, size_t link_depth, const std::map<std::stri
         }
     }
     out << "}";
-    followed.pop_back();
 }
 
 namespace {

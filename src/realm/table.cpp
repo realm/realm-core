@@ -1982,12 +1982,10 @@ void Table::update_from_parent() noexcept
     m_alloc.bump_storage_version();
 }
 
-void Table::schema_to_json(std::ostream& out, const std::map<std::string, std::string>& renames) const
+void Table::schema_to_json(std::ostream& out) const
 {
     out << "{";
     auto name = get_name();
-    if (renames.count(name))
-        name = renames.at(name);
     out << "\"name\":\"" << name << "\"";
     if (this->m_primary_key_col) {
         out << ",";
@@ -2001,15 +1999,11 @@ void Table::schema_to_json(std::ostream& out, const std::map<std::string, std::s
         auto col_key = col_keys[i];
         name = get_column_name(col_key);
         auto type = col_key.get_type();
-        if (renames.count(name))
-            name = renames.at(name);
         out << "{";
         out << "\"name\":\"" << name << "\"";
         if (this->is_link_type(type)) {
             out << ",\"type\":\"object\"";
             name = this->get_opposite_table(col_key)->get_name();
-            if (renames.count(name))
-                name = renames.at(name);
             out << ",\"objectType\":\"" << name << "\"";
         }
         else {
