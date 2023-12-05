@@ -127,7 +127,7 @@ void Lst<T>::distinct(std::vector<size_t>& indices, util::Optional<bool> sort_or
 /********************************** LstBase *********************************/
 
 template <>
-void CollectionBaseImpl<LstBase>::to_json(std::ostream& out, size_t, JSONOutputMode output_mode,
+void CollectionBaseImpl<LstBase>::to_json(std::ostream& out, JSONOutputMode output_mode,
                                           util::FunctionRef<void(const Mixed&)> fn) const
 {
     auto sz = size();
@@ -723,12 +723,9 @@ util::Optional<Mixed> Lst<Mixed>::avg(size_t* return_cnt) const
     return AverageHelper<Mixed>::not_found(return_cnt);
 }
 
-void Lst<Mixed>::to_json(std::ostream& out, size_t link_depth, JSONOutputMode output_mode,
+void Lst<Mixed>::to_json(std::ostream& out, JSONOutputMode output_mode,
                          util::FunctionRef<void(const Mixed&)> fn) const
 {
-    auto [open_str, close_str] = get_open_close_strings(link_depth, output_mode);
-
-    out << open_str;
     out << "[";
 
     auto sz = size();
@@ -742,12 +739,12 @@ void Lst<Mixed>::to_json(std::ostream& out, size_t link_depth, JSONOutputMode ou
         else if (val.is_type(type_Dictionary)) {
             DummyParent parent(this->get_table(), val.get_ref());
             Dictionary dict(parent, i);
-            dict.to_json(out, link_depth, output_mode, fn);
+            dict.to_json(out, output_mode, fn);
         }
         else if (val.is_type(type_List)) {
             DummyParent parent(this->get_table(), val.get_ref());
             Lst<Mixed> list(parent, i);
-            list.to_json(out, link_depth, output_mode, fn);
+            list.to_json(out, output_mode, fn);
         }
         else {
             val.to_json(out, output_mode);
@@ -755,7 +752,6 @@ void Lst<Mixed>::to_json(std::ostream& out, size_t link_depth, JSONOutputMode ou
     }
 
     out << "]";
-    out << close_str;
 }
 
 ref_type Lst<Mixed>::get_collection_ref(Index index, CollectionType type) const
@@ -955,12 +951,8 @@ void LnkLst::remove_all_target_rows()
     }
 }
 
-void LnkLst::to_json(std::ostream& out, size_t link_depth, JSONOutputMode output_mode,
-                     util::FunctionRef<void(const Mixed&)> fn) const
+void LnkLst::to_json(std::ostream& out, JSONOutputMode, util::FunctionRef<void(const Mixed&)> fn) const
 {
-    auto [open_str, close_str] = get_open_close_strings(link_depth, output_mode);
-
-    out << open_str;
     out << "[";
 
     auto sz = m_list.size();
@@ -972,7 +964,6 @@ void LnkLst::to_json(std::ostream& out, size_t link_depth, JSONOutputMode output
     }
 
     out << "]";
-    out << close_str;
 }
 
 void LnkLst::replace_link(ObjKey old_val, ObjKey new_val)

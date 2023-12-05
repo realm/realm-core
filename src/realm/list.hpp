@@ -503,7 +503,7 @@ public:
     bool check_collection_ref(Index, CollectionType) const noexcept override;
     void set_collection_ref(Index, ref_type ref, CollectionType) override;
 
-    void to_json(std::ostream&, size_t, JSONOutputMode, util::FunctionRef<void(const Mixed&)>) const override;
+    void to_json(std::ostream&, JSONOutputMode, util::FunctionRef<void(const Mixed&)>) const override;
 
 private:
     // `do_` methods here perform the action after preconditions have been
@@ -781,8 +781,8 @@ public:
         m_list.set_owner(std::move(parent), index);
     }
 
-    void to_json(std::ostream&, size_t, JSONOutputMode, util::FunctionRef<void(const Mixed&)>) const override;
     void replace_link(ObjKey old_link, ObjKey new_link);
+    void to_json(std::ostream&, JSONOutputMode, util::FunctionRef<void(const Mixed&)>) const override;
 
 private:
     friend class TableView;

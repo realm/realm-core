@@ -18,7 +18,7 @@
 -----------
 
 ### Internals
-* None.
+* to_json API changed according to https://docs.google.com/document/d/1YtJN0sC89LMb4UVcPKFIfwC0Hsi9Vj7sIEP2vHQzVcY/edit?usp=sharing. Links to not embedded objects will never be followed.
 
 ----------------------------------------------
 

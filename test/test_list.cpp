@@ -703,7 +703,7 @@ TEST(List_Nested_InMixed)
     tr->verify();
     {
         std::stringstream ss;
-        tr->to_json(ss, 0, nullptr, JSONOutputMode::output_mode_xjson_plus);
+        tr->to_json(ss, JSONOutputMode::output_mode_xjson_plus);
         auto j = nlohmann::json::parse(ss.str());
     }
     // std::cout << std::setw(2) << j << std::endl;
@@ -761,7 +761,7 @@ TEST(List_Nested_InMixed)
     dict2->insert("Date", Timestamp(std::chrono::system_clock::now()));
     {
         std::stringstream ss;
-        tr->to_json(ss, 0, nullptr, JSONOutputMode::output_mode_xjson_plus);
+        tr->to_json(ss, JSONOutputMode::output_mode_xjson_plus);
         auto j = nlohmann::json::parse(ss.str());
         // std::cout << std::setw(2) << j << std::endl;
     }

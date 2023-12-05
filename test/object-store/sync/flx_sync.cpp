@@ -787,7 +787,7 @@ TEST_CASE("flx: client reset", "[sync][flx][client reset][baas]") {
                 local_realm->refresh();
                 auto table = local_realm->read_group().get_table("class_TopLevel");
                 if (table->size() != 1) {
-                    table->to_json(std::cout, 1, {});
+                    table->to_json(std::cout);
                 }
                 REQUIRE(table->size() == 1);
                 auto mut_sub = latest_subs.make_mutable_copy();
