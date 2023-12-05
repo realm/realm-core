@@ -2921,11 +2921,12 @@ RLM_API realm_app_t* realm_app_create(const realm_app_config_t*, const realm_syn
 RLM_API realm_app_t* realm_app_create_cached(const realm_app_config_t*, const realm_sync_client_config_t*);
 
 /**
- * Get a cached realm_app_t* instance given an app id.
+ * Get a cached realm_app_t* instance given an app id. out_app may be null if the app with this id hasn't been
+ * previously cached by calling realm_app_create_cached.
  *
- * @return A non-null pointer if no error occurred.
+ * @return true if no error occurred.
  */
-RLM_API realm_app_t* realm_app_get_cached(const char* app_id, const char* base_url);
+RLM_API bool realm_app_get_cached(const char* app_id, const char* base_url, realm_app_t** out_app);
 
 /**
  * Clear all the cached @a realm_app_t* instances in the process.
