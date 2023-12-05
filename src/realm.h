@@ -3882,7 +3882,7 @@ RLM_API void realm_sync_session_handle_error_for_testing(const realm_sync_sessio
  * In case of exception thrown in user code callbacks, this api will allow the sdk to store the user code exception
  * and retrieve a it later via realm_get_last_error.
  * Most importantly the SDK is responsible to handle the memory pointed by user_code_error.
- * @param user_code_error pointer representing whatever object the SDK treats as exception/error.
+ * @param usercode_error pointer representing whatever object the SDK treats as exception/error.
  */
 RLM_API void realm_register_user_code_callback_error(realm_userdata_t usercode_error) RLM_API_NOEXCEPT;
 

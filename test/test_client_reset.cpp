@@ -858,10 +858,12 @@ void expect_reset(unit_test::TestContext& test_context, DB& target, DB& fresh, C
 {
     auto db_version = target.get_version_of_latest_snapshot();
     auto fresh_path = fresh.get_path();
+    bool failed_in_callback = false;
     bool did_reset = _impl::client_reset::perform_client_reset(
         *test_context.logger, target, fresh, mode, nullptr, nullptr, {100, 200}, nullptr, [](int64_t) {},
-        allow_recovery);
+        allow_recovery, failed_in_callback);
     CHECK(did_reset);
+    CHECK_NOT(failed_in_callback);
 
     // Should have closed and deleted the fresh realm
     CHECK_NOT(fresh.is_attached());
@@ -887,9 +889,12 @@ void expect_reset(unit_test::TestContext& test_context, DB& target, DB& fresh, C
 {
     auto db_version = target.get_version_of_latest_snapshot();
     auto fresh_path = fresh.get_path();
+    bool failed_in_callback = false;
     bool did_reset = _impl::client_reset::perform_client_reset(
-        *test_context.logger, target, fresh, mode, nullptr, nullptr, {100, 200}, sub_store, [](int64_t) {}, true);
+        *test_context.logger, target, fresh, mode, nullptr, nullptr, {100, 200}, sub_store, [](int64_t) {}, true,
+        failed_in_callback);
     CHECK(did_reset);
+    CHECK_NOT(failed_in_callback);
 
     // Should have closed and deleted the fresh realm
     CHECK_NOT(fresh.is_attached());
@@ -938,10 +943,12 @@ TEST(ClientReset_UninitializedFile)
     auto db_empty = DB::create(make_client_replication(), path_3);
     // Should not perform a client reset because the target file has never been
     // written to
+    bool failed_in_callback = false;
     bool did_reset = _impl::client_reset::perform_client_reset(
         *test_context.logger, *db_empty, *db_fresh, ClientResyncMode::Recover, nullptr, nullptr, {100, 200}, nullptr,
-        [](int64_t) {}, true);
+        [](int64_t) {}, true, failed_in_callback);
     CHECK_NOT(did_reset);
+    CHECK_NOT(failed_in_callback);
 
     // Should still have closed and deleted the fresh realm
     CHECK_NOT(db_fresh->is_attached());
@@ -1102,11 +1109,13 @@ TEST(ClientReset_Recover_RecoveryDisabled)
     auto dbs = prepare_db(path_1, path_2, [](Transaction& tr) {
         tr.add_table_with_primary_key("class_table", type_Int, "pk");
     });
+    bool failed_in_callback = false;
     CHECK_THROW((_impl::client_reset::perform_client_reset(
                     *test_context.logger, *dbs.first, *dbs.second, ClientResyncMode::Recover, nullptr, nullptr,
-                    {100, 200}, nullptr, [](int64_t) {}, false)),
+                    {100, 200}, nullptr, [](int64_t) {}, false, failed_in_callback)),
                 _impl::client_reset::ClientResetFailed);
     CHECK_NOT(_impl::client_reset::has_pending_reset(*dbs.first->start_read()));
+    CHECK_NOT(failed_in_callback);
 }
 
 TEST(ClientReset_Recover_ModificationsOnDeletedObject)
