@@ -110,14 +110,14 @@ RuntimeError::RuntimeError(Status&& status)
 }
 RuntimeError::~RuntimeError() noexcept = default;
 
-UserCodeCallbackError::UserCodeCallbackError(ErrorCodes::Error code, std::string_view msg, void* usercode_error)
+UserCodeCallbackError::UserCodeCallbackError(ErrorCodes::Error code, std::string_view msg, void* user_code_error)
     : RuntimeError(code, msg)
-    , usercode_error(usercode_error)
+    , user_code_error(user_code_error)
 {
 }
-UserCodeCallbackError::UserCodeCallbackError(Status&& status, void* usercode_error)
+UserCodeCallbackError::UserCodeCallbackError(Status&& status, void* user_code_error)
     : RuntimeError(std::move(status))
-    , usercode_error(usercode_error)
+    , user_code_error(user_code_error)
 {
 }
 UserCodeCallbackError::~UserCodeCallbackError() noexcept = default;

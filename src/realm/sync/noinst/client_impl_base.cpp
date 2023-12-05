@@ -2196,7 +2196,7 @@ void Session::send_test_command_message()
     enlist_to_send();
 }
 
-bool Session::client_reset_if_needed()
+bool Session::client_reset_if_needed(bool& user_code_error)
 {
     // Regardless of what happens, once we return from this function we will
     // no longer be in the middle of a client reset
@@ -2216,7 +2216,7 @@ bool Session::client_reset_if_needed()
         logger, *get_db(), *client_reset_config->fresh_copy, client_reset_config->mode,
         std::move(client_reset_config->notify_before_client_reset),
         std::move(client_reset_config->notify_after_client_reset), m_client_file_ident, get_flx_subscription_store(),
-        on_flx_version_complete, client_reset_config->recovery_is_allowed);
+        on_flx_version_complete, client_reset_config->recovery_is_allowed, user_code_error);
     if (!did_reset) {
         return false;
     }
@@ -2294,23 +2294,21 @@ Status Session::receive_ident_message(SaltedFileIdent client_file_ident)
     // and if not, we do it here
     bool did_client_reset = false;
 
-    auto on_session_error = [this](const auto& e, void* error_code = nullptr) {
+    auto on_session_error = [this](const auto& e, bool user_code_error) {
         auto err_msg = util::format("A fatal error occurred during client reset: '%1'", e.what());
-        SessionErrorInfo err_info(Status{ErrorCodes::AutoClientResetFailed, err_msg}, IsFatal{true}, error_code);
+        SessionErrorInfo err_info(Status{ErrorCodes::AutoClientResetFailed, err_msg}, IsFatal{true});
+        err_info.user_code_error = user_code_error;
         logger.error(err_msg.c_str());
         suspend(err_info);
         return Status::OK();
     };
 
+    bool user_code_error = false;
     try {
-        did_client_reset = client_reset_if_needed();
-    }
-    catch (const UserCodeCallbackError& e) {
-        // pass opaque ptr back to SDKs in case of failure in the client reset callbacks
-        return on_session_error(e, e.usercode_error);
+        did_client_reset = client_reset_if_needed(user_code_error);
     }
     catch (const std::exception& e) {
-        return on_session_error(e);
+        return on_session_error(e, user_code_error);
     }
     if (!did_client_reset) {
         get_history().set_client_file_ident(client_file_ident,

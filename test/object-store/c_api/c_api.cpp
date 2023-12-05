@@ -1245,8 +1245,8 @@ TEST_CASE("C API - schema", "[c_api]") {
             CHECK(realm_get_last_error(&_err));
             CHECK(_err.error == RLM_ERR_CALLBACK);
             CHECK(std::string{_err.message} == "User-provided callback failed");
-            REQUIRE(_err.usercode_error); // this is the error registered inside the callback
-            auto ex = (MyExceptionWrapper*)_err.usercode_error;
+            REQUIRE(_err.user_code_error); // this is the error registered inside the callback
+            auto ex = (MyExceptionWrapper*)_err.user_code_error;
             try {
                 std::rethrow_exception(ex->m_ptr);
             }
@@ -5458,7 +5458,7 @@ TEST_CASE("C API - client reset", "[sync][pbs][c_api][client reset][baas]") {
                 std::exception_ptr m_ptr{nullptr};
             };
 
-            static std::vector<void*> usercode_errors;
+            static std::vector<void*> user_code_errors;
             realm_sync_config_set_error_handler(
                 local_sync_config,
                 [](realm_userdata_t, realm_sync_session_t*, const realm_sync_error_t sync_error) {
@@ -5474,7 +5474,7 @@ TEST_CASE("C API - client reset", "[sync][pbs][c_api][client reset][baas]") {
                     ResetRealmFiles::instance().reset_realm(sync_error.c_original_file_path_key);
                     error_handler_counter.fetch_add(1);
                     baas_client_stop.store(true);
-                    usercode_errors.push_back(sync_error.usercode_error);
+                    user_code_errors.push_back(sync_error.user_code_error);
                 },
                 nullptr, nullptr);
 
@@ -5508,10 +5508,10 @@ TEST_CASE("C API - client reset", "[sync][pbs][c_api][client reset][baas]") {
                     "Test error in callback before client reset",
                 };
                 size_t i = 0;
-                REQUIRE(usercode_errors.size() == 1);
-                for (const auto& usercode_error : usercode_errors) {
-                    REQUIRE(usercode_error);
-                    auto ex = (MyExceptionWrapper*)usercode_error;
+                REQUIRE(user_code_errors.size() == 1);
+                for (const auto& user_code_error : user_code_errors) {
+                    REQUIRE(user_code_error);
+                    auto ex = (MyExceptionWrapper*)user_code_error;
                     REQUIRE(ex != nullptr);
                     try {
                         std::rethrow_exception(ex->m_ptr);
@@ -5523,7 +5523,7 @@ TEST_CASE("C API - client reset", "[sync][pbs][c_api][client reset][baas]") {
                 }
             }
             SECTION("After reset exception") {
-                usercode_errors.clear();
+                user_code_errors.clear();
                 realm_sync_config_set_before_client_reset_handler(
                     local_sync_config,
                     [](realm_userdata_t, realm_t*) -> bool {
@@ -5559,10 +5559,10 @@ TEST_CASE("C API - client reset", "[sync][pbs][c_api][client reset][baas]") {
                     "Test error in callback after client reset",
                 };
                 size_t i = 0;
-                REQUIRE(usercode_errors.size() == 1);
-                for (const auto& usercode_error : usercode_errors) {
-                    REQUIRE(usercode_error);
-                    auto ex = (MyExceptionWrapper*)usercode_error;
+                REQUIRE(user_code_errors.size() == 1);
+                for (const auto& user_code_error : user_code_errors) {
+                    REQUIRE(user_code_error);
+                    auto ex = (MyExceptionWrapper*)user_code_error;
                     REQUIRE(ex != nullptr);
                     try {
                         std::rethrow_exception(ex->m_ptr);

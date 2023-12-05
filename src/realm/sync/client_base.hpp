@@ -219,6 +219,7 @@ struct ClientConfig {
     bool fix_up_object_ids = false;
 };
 
+
 /// \brief Information about an error causing a session to be temporarily
 /// disconnected from the server.
 ///
@@ -258,16 +259,14 @@ struct SessionErrorInfo : public ProtocolErrorInfo {
     {
     }
 
-    SessionErrorInfo(Status status, IsFatal is_fatal, void* error_user_code_callback = nullptr)
+    SessionErrorInfo(Status status, IsFatal is_fatal)
         : ProtocolErrorInfo(0, {}, is_fatal)
         , status(std::move(status))
-        , error_user_code_callback(error_user_code_callback) // propagate the error generated in the user code
-                                                             // callback like in other callbacks
     {
     }
 
     Status status;
-    void* error_user_code_callback = nullptr;
+    bool user_code_error = false;
 };
 
 enum class ConnectionState { disconnected, connecting, connected };

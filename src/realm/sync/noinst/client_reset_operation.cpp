@@ -54,7 +54,8 @@ bool is_fresh_path(const std::string& path)
 bool perform_client_reset(util::Logger& logger, DB& db, DB& fresh_db, ClientResyncMode mode,
                           CallbackBeforeType notify_before, CallbackAfterType notify_after,
                           sync::SaltedFileIdent new_file_ident, sync::SubscriptionStore* sub_store,
-                          util::FunctionRef<void(int64_t)> on_flx_version, bool recovery_is_allowed)
+                          util::FunctionRef<void(int64_t)> on_flx_version, bool recovery_is_allowed,
+                          bool& user_code_error)
 {
     REALM_ASSERT(mode != ClientResyncMode::Manual);
     logger.debug("Possibly beginning client reset operation: realm_path = %1, mode = %2, recovery_allowed = %3",
@@ -84,8 +85,18 @@ bool perform_client_reset(util::Logger& logger, DB& db, DB& fresh_db, ClientResy
         logger.debug("Local Realm file has never been written to, so skipping client reset.");
         return false;
     }
+    VersionID frozen_before_state_version = latest_version;
+    if (notify_before) {
+        try {
+            frozen_before_state_version = notify_before();
+        }
+        catch (const std::exception& e) {
+            // the user code has failed. Setup a flag.
+            user_code_error = true;
+            throw e;
+        }
+    }
 
-    VersionID frozen_before_state_version = notify_before ? notify_before() : latest_version;
 
     // If m_notify_after is set, pin the previous state to keep it around.
     TransactionRef previous_state;
@@ -98,7 +109,14 @@ bool perform_client_reset(util::Logger& logger, DB& db, DB& fresh_db, ClientResy
                                             on_flx_version); // throws
 
     if (notify_after) {
-        notify_after(previous_state->get_version_of_current_transaction(), did_recover_out);
+        try {
+            notify_after(previous_state->get_version_of_current_transaction(), did_recover_out);
+        }
+        catch (const std::exception& e) {
+            // the user code has failed. Setup a flag.
+            user_code_error = true;
+            throw e;
+        }
     }
 
     return true;

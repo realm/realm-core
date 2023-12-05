@@ -992,7 +992,7 @@ private:
     // Processes any pending FLX bootstraps, if one exists. Otherwise this is a noop.
     void process_pending_flx_bootstrap();
 
-    bool client_reset_if_needed();
+    bool client_reset_if_needed(bool& user_code_error);
     void handle_pending_client_reset_acknowledgement();
 
     void update_subscription_version_info();
