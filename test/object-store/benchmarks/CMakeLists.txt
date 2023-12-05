@@ -43,7 +43,7 @@ add_dependencies(benchmarks object-store-benchmarks)
 
 # on Apple platforms we use the built-in CFRunLoop
 # everywhere else it's libuv, except UWP where it doesn't build
-if(NOT APPLE AND NOT WINDOWS_STORE AND NOT EMSCRIPTEN)
+if(NOT APPLE AND NOT WINDOWS_STORE AND NOT EMSCRIPTEN AND NOT ANDROID)
     # libuv_target is defined in the parent CMakeLists.txt file
     target_link_libraries(object-store-benchmarks ${libuv_target})
     target_compile_definitions(object-store-benchmarks PRIVATE TEST_SCHEDULER_UV=1)
