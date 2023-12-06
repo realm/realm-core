@@ -32,8 +32,6 @@
 
 #include <realm/sync/noinst/client_history_impl.hpp>
 
-#include <realm/util/future.hpp>
-
 #include <catch2/catch_all.hpp>
 
 #include <any>
@@ -73,20 +71,12 @@ void create_schema(const AppSession& app_session, std::shared_ptr<SyncUser> user
 
 std::pair<SharedRealm, std::exception_ptr> async_open_realm(const Realm::Config& config)
 {
-    std::mutex mutex;
-    ThreadSafeReference realm_ref;
+    SharedRealm realm;
     std::exception_ptr error;
-    auto task = Realm::get_synchronized_realm(config);
-    task->start([&](ThreadSafeReference&& ref, std::exception_ptr e) {
-        std::lock_guard lock(mutex);
-        realm_ref = std::move(ref);
+    async_open_realm(config, [&](ThreadSafeReference&& ref, std::exception_ptr e) {
+        realm = e ? nullptr : Realm::get_shared_realm(std::move(ref));
         error = e;
     });
-    util::EventLoop::main().run_until([&] {
-        std::lock_guard lock(mutex);
-        return realm_ref || error;
-    });
-    auto realm = error ? nullptr : Realm::get_shared_realm(std::move(realm_ref));
     return std::pair(realm, error);
 }
 
@@ -230,11 +220,11 @@ void check_realm_schema(SharedRealm& realm, const std::vector<ObjectSchema>& tar
 
 } // namespace
 
-TEST_CASE("Sync schema migrations don't not work with sync open", "[sync][flx][flx schema migration][baas]") {
+TEST_CASE("Sync schema migrations don't work with sync open", "[sync][flx][flx schema migration][baas]") {
     auto schema_v0 = get_schema_v0();
     FLXSyncTestHarness harness("flx_sync_schema_migration",
                                {schema_v0, {"queryable_str_field", "queryable_int_field"}});
-    SyncTestFile config(harness.app()->current_user(), harness.schema(), SyncConfig::FLXSyncEnabled{});
+    auto config = harness.make_test_file();
 
     // First open the realm at schema version 0.
     {
@@ -294,7 +284,7 @@ TEST_CASE("Cannot migrate schema to unknown version", "[sync][flx][flx schema mi
     auto schema_v0 = get_schema_v0();
     FLXSyncTestHarness harness("flx_sync_schema_migration",
                                {schema_v0, {"queryable_str_field", "queryable_int_field"}});
-    SyncTestFile config(harness.app()->current_user(), harness.schema(), SyncConfig::FLXSyncEnabled{});
+    auto config = harness.make_test_file();
 
     const AppSession& app_session = harness.session().app_session();
     auto schema_v1 = get_schema_v1();
@@ -349,6 +339,7 @@ TEST_CASE("Cannot migrate schema to unknown version", "[sync][flx][flx schema mi
     auto [realm, error] = async_open_realm(config);
     REQUIRE_FALSE(realm);
     REQUIRE(error);
+    wait_for_sessions_to_close(harness.session());
 
     // Update schema version to 0 and try again (the version now matches the actual schema).
     config.schema_version = 0;
@@ -357,13 +348,16 @@ TEST_CASE("Cannot migrate schema to unknown version", "[sync][flx][flx schema mi
     REQUIRE(realm);
     REQUIRE_FALSE(error);
     check_realm_schema(realm, schema_v0, 0);
+
+    realm->close();
+    wait_for_sessions_to_close(harness.session());
 }
 
 TEST_CASE("Schema version mismatch between client and server", "[sync][flx][flx schema migration][baas]") {
     auto schema_v0 = get_schema_v0();
     FLXSyncTestHarness harness("flx_sync_schema_migration",
                                {schema_v0, {"queryable_str_field", "queryable_int_field"}});
-    SyncTestFile config(harness.app()->current_user(), harness.schema(), SyncConfig::FLXSyncEnabled{});
+    auto config = harness.make_test_file();
 
     const AppSession& app_session = harness.session().app_session();
     auto schema_v1 = get_schema_v1();
@@ -379,6 +373,11 @@ TEST_CASE("Schema version mismatch between client and server", "[sync][flx][flx 
         auto realm = Realm::get_shared_realm(config);
         subscribe_to_all_and_bootstrap(*realm);
         wait_for_upload(*realm);
+        wait_for_download(*realm);
+
+        realm->sync_session()->force_close();
+        realm->close();
+        wait_for_sessions_to_close(harness.session());
 
         schema_migration_expected = true;
 
@@ -423,13 +422,14 @@ TEST_CASE("Schema version mismatch between client and server", "[sync][flx][flx 
     REQUIRE_FALSE(realm);
     REQUIRE(error);
     REQUIRE(schema_migration_expected == schema_migration_required);
+    wait_for_sessions_to_close(harness.session());
 }
 
 TEST_CASE("Fresh realm does not require schema migration", "[sync][flx][flx schema migration][baas]") {
     auto schema_v0 = get_schema_v0();
     FLXSyncTestHarness harness("flx_sync_schema_migration",
                                {schema_v0, {"queryable_str_field", "queryable_int_field"}});
-    SyncTestFile config(harness.app()->current_user(), harness.schema(), SyncConfig::FLXSyncEnabled{});
+    auto config = harness.make_test_file();
 
     const AppSession& app_session = harness.session().app_session();
     auto schema_v1 = get_schema_v1();
@@ -455,13 +455,15 @@ TEST_CASE("Fresh realm does not require schema migration", "[sync][flx][flx sche
     REQUIRE(realm);
     REQUIRE_FALSE(error);
     check_realm_schema(realm, schema_v1, 1);
+    realm->close();
+    wait_for_sessions_to_close(harness.session());
 }
 
 TEST_CASE("Upgrade schema version (with recovery) then downgrade", "[sync][flx][flx schema migration][baas]") {
     auto schema_v0 = get_schema_v0();
     FLXSyncTestHarness harness("flx_sync_schema_migration",
                                {schema_v0, {"queryable_str_field", "queryable_int_field"}});
-    SyncTestFile config(harness.app()->current_user(), harness.schema(), SyncConfig::FLXSyncEnabled{});
+    auto config = harness.make_test_file();
 
     {
         config.sync_config->subscription_initializer = get_subscription_initializer_callback_for_schema_v0();
@@ -540,6 +542,7 @@ TEST_CASE("Upgrade schema version (with recovery) then downgrade", "[sync][flx][
         auto [realm, error] = async_open_realm(config);
         REQUIRE_FALSE(realm);
         REQUIRE(error);
+        wait_for_sessions_to_close(harness.session());
 
         // Retry migration with subscription initializer callback set.
         config.sync_config->subscription_initializer = get_subscription_initializer_callback_for_schema_v1();
@@ -565,6 +568,9 @@ TEST_CASE("Upgrade schema version (with recovery) then downgrade", "[sync][flx][
 
         wait_for_upload(*realm);
         wait_for_download(*realm);
+
+        realm->close();
+        wait_for_sessions_to_close(harness.session());
     }
 
     // Second schema upgrade.
@@ -583,6 +589,9 @@ TEST_CASE("Upgrade schema version (with recovery) then downgrade", "[sync][flx][
         table = realm->read_group().get_table("class_TopLevel3");
         CHECK(table->size() == 1);
         CHECK(table->get_object_with_primary_key(obj3_id));
+
+        realm->close();
+        wait_for_sessions_to_close(harness.session());
     }
 
     // First schema downgrade.
@@ -601,6 +610,9 @@ TEST_CASE("Upgrade schema version (with recovery) then downgrade", "[sync][flx][
         table = realm->read_group().get_table("class_TopLevel3");
         CHECK(table->size() == 1);
         CHECK(table->get_object_with_primary_key(obj3_id));
+
+        realm->close();
+        wait_for_sessions_to_close(harness.session());
     }
 
     // Second schema downgrade.
@@ -631,6 +643,9 @@ TEST_CASE("Upgrade schema version (with recovery) then downgrade", "[sync][flx][
         realm->refresh();
         CHECK(table3->size() == 1);
         CHECK(table3->get_object_with_primary_key(obj3_id));
+
+        realm->close();
+        wait_for_sessions_to_close(harness.session());
     }
 }
 
@@ -639,7 +654,7 @@ TEST_CASE("An interrupted schema migration can recover on the next session",
     auto schema_v0 = get_schema_v0();
     FLXSyncTestHarness harness("flx_sync_schema_migration",
                                {schema_v0, {"queryable_str_field", "queryable_int_field"}});
-    SyncTestFile config(harness.app()->current_user(), harness.schema(), SyncConfig::FLXSyncEnabled{});
+    auto config = harness.make_test_file();
 
     {
         config.sync_config->subscription_initializer = get_subscription_initializer_callback_for_schema_v0();
@@ -671,7 +686,7 @@ TEST_CASE("An interrupted schema migration can recover on the next session",
             }
 
             CHECK(error_code == sync::ProtocolError::schema_version_changed);
-            // Pause and resume the session the first time the a schema migration is required.
+            // Pause and resume the session the first time a schema migration is required.
             if (++bad_schema_version_count == 1) {
                 session->force_close();
             }
@@ -681,6 +696,7 @@ TEST_CASE("An interrupted schema migration can recover on the next session",
     auto [realm, error] = async_open_realm(config);
     REQUIRE_FALSE(realm);
     REQUIRE(error);
+    wait_for_sessions_to_close(harness.session());
 
     // Retry the migration.
     std::tie(realm, error) = async_open_realm(config);
@@ -688,13 +704,16 @@ TEST_CASE("An interrupted schema migration can recover on the next session",
     REQUIRE_FALSE(error);
     REQUIRE(bad_schema_version_count == 2);
     check_realm_schema(realm, schema_v1, 1);
+
+    realm->close();
+    wait_for_sessions_to_close(harness.session());
 }
 
 TEST_CASE("Migrate to new schema version with a schema subset", "[sync][flx][flx schema migration][baas]") {
     auto schema_v0 = get_schema_v0();
     FLXSyncTestHarness harness("flx_sync_schema_migration",
                                {schema_v0, {"queryable_str_field", "queryable_int_field"}});
-    SyncTestFile config(harness.app()->current_user(), harness.schema(), SyncConfig::FLXSyncEnabled{});
+    auto config = harness.make_test_file();
 
     {
         config.sync_config->subscription_initializer = get_subscription_initializer_callback_for_schema_v0();
@@ -719,13 +738,16 @@ TEST_CASE("Migrate to new schema version with a schema subset", "[sync][flx][flx
     REQUIRE(realm);
     REQUIRE_FALSE(error);
     check_realm_schema(realm, schema_v1, 1);
+
+    realm->close();
+    wait_for_sessions_to_close(harness.session());
 }
 
 TEST_CASE("Client reset during schema migration", "[sync][flx][flx schema migration][baas]") {
     auto schema_v0 = get_schema_v0();
     FLXSyncTestHarness harness("flx_sync_schema_migration",
                                {schema_v0, {"queryable_str_field", "queryable_int_field"}});
-    SyncTestFile config(harness.app()->current_user(), harness.schema(), SyncConfig::FLXSyncEnabled{});
+    auto config = harness.make_test_file();
 
     {
         config.sync_config->subscription_initializer = get_subscription_initializer_callback_for_schema_v0();
@@ -801,6 +823,9 @@ TEST_CASE("Client reset during schema migration", "[sync][flx][flx schema migrat
     CHECK(table->size() == 1);
     table = realm->read_group().get_table("class_TopLevel3");
     CHECK(table->is_empty());
+
+    realm->close();
+    wait_for_sessions_to_close(harness.session());
 }
 
 TEST_CASE("Migrate to new schema version after migration to intermediate version is interrupted",
@@ -808,7 +833,7 @@ TEST_CASE("Migrate to new schema version after migration to intermediate version
     auto schema_v0 = get_schema_v0();
     FLXSyncTestHarness harness("flx_sync_schema_migration",
                                {schema_v0, {"queryable_str_field", "queryable_int_field"}});
-    SyncTestFile config(harness.app()->current_user(), harness.schema(), SyncConfig::FLXSyncEnabled{});
+    auto config = harness.make_test_file();
 
     {
         config.sync_config->subscription_initializer = get_subscription_initializer_callback_for_schema_v0();
@@ -864,6 +889,7 @@ TEST_CASE("Migrate to new schema version after migration to intermediate version
     auto [realm, error] = async_open_realm(config);
     REQUIRE_FALSE(realm);
     REQUIRE(error);
+    wait_for_sessions_to_close(harness.session());
 
     // Migrate to v2.
     config.schema_version = 2;
@@ -879,6 +905,29 @@ TEST_CASE("Migrate to new schema version after migration to intermediate version
     CHECK(table->size() == 1);
     table = realm->read_group().get_table("class_TopLevel3");
     CHECK(table->is_empty());
+
+    realm->close();
+    wait_for_sessions_to_close(harness.session());
+}
+
+TEST_CASE("Send schema version 0 if no schema is used to open the realm", "[sync][flx][flx schema migration][baas]") {
+    auto schema_v0 = get_schema_v0();
+    FLXSyncTestHarness harness("flx_sync_schema_migration",
+                               {schema_v0, {"queryable_str_field", "queryable_int_field"}});
+    auto config = harness.make_test_file();
+
+    const AppSession& app_session = harness.session().app_session();
+    auto schema_v1 = get_schema_v1();
+    create_schema(app_session, harness.app()->current_user(), schema_v1, 1);
+
+    config.schema = {};
+    config.schema_version = -1; // override the schema version set by SyncTestFile constructor
+    auto [realm, error] = async_open_realm(config);
+    REQUIRE(realm);
+    REQUIRE_FALSE(error);
+
+    realm->close();
+    wait_for_sessions_to_close(harness.session());
 }
 
 } // namespace realm::app

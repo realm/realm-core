@@ -4513,14 +4513,14 @@ TEST_CASE("flx sync: Client reset during async open", "[sync][flx][client reset]
 
     auto before_callback_called = util::make_promise_future<void>();
     realm_config.sync_config->notify_before_client_reset = [&](std::shared_ptr<Realm> realm) {
-        CHECK(realm->schema_version() == 1);
+        CHECK(realm->schema_version() == 0);
         before_callback_called.promise.emplace_value();
     };
 
     auto after_callback_called = util::make_promise_future<void>();
     realm_config.sync_config->notify_after_client_reset = [&](std::shared_ptr<Realm> realm, ThreadSafeReference,
                                                               bool) {
-        CHECK(realm->schema_version() == 1);
+        CHECK(realm->schema_version() == 0);
         after_callback_called.promise.emplace_value();
     };
 

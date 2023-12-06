@@ -677,6 +677,9 @@ static nlohmann::json convert_config(AdminAPISession::ServiceConfig config)
         if (config.permissions) {
             payload["permissions"] = *config.permissions;
         }
+        if (config.asymmetric_tables) {
+            payload["asymmetric_tables"] = *config.asymmetric_tables;
+        }
         return payload;
     }
     return nlohmann::json{{"database_name", config.database_name},
@@ -1106,10 +1109,10 @@ AppSession create_app(const AppCreateConfig& config)
                 asymmetric_tables.emplace_back(obj_schema.name);
             }
         }
-        mongo_service_def["config"]["flexible_sync"] = {{"state", "enabled"},
-                                                        {"database_name", config.mongo_dbname},
-                                                        {"queryable_fields_names", queryable_fields},
-                                                        {"asymmetric_tables", asymmetric_tables}};
+        sync_config = nlohmann::json{{"database_name", config.mongo_dbname},
+                                     {"queryable_fields_names", queryable_fields},
+                                     {"asymmetric_tables", asymmetric_tables}};
+        mongo_service_def["config"]["flexible_sync"] = sync_config;
     }
     else {
         sync_config = nlohmann::json{
@@ -1173,14 +1176,19 @@ AppSession create_app(const AppCreateConfig& config)
     bool use_draft = false;
     session.create_schema(app_id, config, use_draft);
 
-    // For PBS, enable sync after schema is created.
-    if (!config.flx_sync_config) {
-        AdminAPISession::ServiceConfig service_config;
-        service_config.mode = AdminAPISession::ServiceConfig::SyncMode::Partitioned;
-        service_config.database_name = sync_config["database_name"];
-        service_config.partition = sync_config["partition"];
-        session.enable_sync(app_id, mongo_service_id, service_config);
+    // Enable sync after schema is created.
+    AdminAPISession::ServiceConfig service_config;
+    service_config.database_name = sync_config["database_name"];
+    if (config.flx_sync_config) {
+        service_config.mode = AdminAPISession::ServiceConfig::SyncMode::Flexible;
+        service_config.queryable_field_names = sync_config["queryable_fields_names"];
+        service_config.asymmetric_tables = sync_config["asymmetric_tables"];
     }
+    else {
+        service_config.mode = AdminAPISession::ServiceConfig::SyncMode::Partitioned;
+        service_config.partition = sync_config["partition"];
+    }
+    session.enable_sync(app_id, mongo_service_id, service_config);
 
     app["sync"]["config"].put_json({{"development_mode_enabled", config.dev_mode_enabled}});
 

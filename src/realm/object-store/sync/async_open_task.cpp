@@ -234,11 +234,18 @@ void AsyncOpenTask::migrate_schema_or_complete(AsyncOpenCallback&& callback,
             }
 
             // Delete the realm file and reopen it.
-            {
+            try {
                 util::CheckedLockGuard lock(m_mutex);
+                auto config = coordinator->get_config();
                 m_session = nullptr;
-                coordinator->delete_and_reopen();
+                coordinator->close();
+                coordinator = nullptr;
+                util::File::remove(config.path);
+                coordinator = _impl::RealmCoordinator::get_coordinator(config);
                 m_session = coordinator->sync_session();
+            }
+            catch (...) {
+                return callback({}, std::current_exception());
             }
 
             self->wait_for_bootstrap_or_complete(std::move(callback), coordinator, status);

@@ -499,9 +499,6 @@ void SyncSession::download_fresh_realm(sync::ProtocolErrorInfo::Action server_re
         // deep copy the sync config so we don't modify the live session's config
         config.sync_config = std::make_shared<SyncConfig>(fresh_config);
         config.sync_config->client_resync_mode = ClientResyncMode::Manual;
-        // Do not run the subscription initializer on fresh realms used in client resets.
-        config.sync_config->rerun_init_subscription_on_open = false;
-        config.sync_config->subscription_initializer = nullptr;
         config.schema_version = m_previous_schema_version.value_or(m_config.schema_version);
         fresh_sync_session = m_sync_manager->get_session(db, config);
         auto& history = static_cast<sync::ClientReplication&>(*db->get_replication());
@@ -855,8 +852,9 @@ static sync::Session::Config::ClientReset make_client_reset_config(const RealmCo
     if (!sync_config->notify_before_client_reset && !sync_config->notify_after_client_reset)
         return config;
 
-    // Do not run the client reset callbacks in case of a sync schema migration.
-    // (opening the realm with the new schema will result in a crash due to breaking changes)
+    // We cannot initialize the local schema in case of a sync schema migration.
+    // Currently, a schema migration involves breaking changes so opening the realm
+    // with the new schema results in a crash.
     if (schema_migration_detected)
         return config;
 

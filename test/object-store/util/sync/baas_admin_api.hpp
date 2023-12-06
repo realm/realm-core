@@ -98,6 +98,7 @@ public:
         util::Optional<nlohmann::json> partition;
         util::Optional<nlohmann::json> queryable_field_names;
         util::Optional<nlohmann::json> permissions;
+        util::Optional<nlohmann::json> asymmetric_tables;
         std::string state;
         bool recovery_is_disabled = false;
         std::string_view sync_service_name()

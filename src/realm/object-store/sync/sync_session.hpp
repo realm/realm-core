@@ -397,8 +397,6 @@ private:
 
     void nonsync_transact_notify(VersionID::version_type) REQUIRES(!m_state_mutex);
 
-    void set_sync_schema_migration_callback(std::function<void()>&&) REQUIRES(!m_state_mutex);
-
     void create_sync_session() REQUIRES(m_state_mutex, !m_config_mutex);
     void did_drop_external_reference()
         REQUIRES(!m_state_mutex, !m_config_mutex, !m_external_reference_mutex, !m_connection_state_mutex);
@@ -432,8 +430,6 @@ private:
     util::Future<std::string> send_test_command(std::string body) REQUIRES(!m_state_mutex);
 
     std::function<TransactionCallback> m_sync_transact_callback GUARDED_BY(m_state_mutex);
-
-    std::function<void()> m_sync_schema_migration_callback GUARDED_BY(m_state_mutex);
 
     template <typename Field>
     auto config(Field f) REQUIRES(!m_config_mutex)

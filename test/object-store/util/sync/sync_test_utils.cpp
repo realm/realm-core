@@ -194,6 +194,15 @@ void subscribe_to_all_and_bootstrap(Realm& realm)
     wait_for_download(realm);
 }
 
+void wait_for_sessions_to_close(const TestAppSession& test_app_session)
+{
+    timed_sleeping_wait_for(
+        [&] {
+            return !test_app_session.app()->sync_manager()->has_existing_sessions();
+        },
+        std::chrono::minutes(5), std::chrono::milliseconds(100));
+}
+
 #if REALM_ENABLE_AUTH_TESTS
 
 static std::string unquote_string(std::string_view possibly_quoted_string)
@@ -287,21 +296,17 @@ void wait_for_advance(Realm& realm)
 void async_open_realm(const Realm::Config& config,
                       util::UniqueFunction<void(ThreadSafeReference&& ref, std::exception_ptr e)> finish)
 {
-    std::mutex mutex;
-    bool did_finish = false;
     auto task = Realm::get_synchronized_realm(config);
     ThreadSafeReference tsr;
     std::exception_ptr err = nullptr;
-    task->start([&](ThreadSafeReference&& ref, std::exception_ptr e) {
-        std::lock_guard lock(mutex);
-        did_finish = true;
+    auto pf = util::make_promise_future<void>();
+    task->start([&tsr, &err, promise = util::CopyablePromiseHolder(std::move(pf.promise))](
+                    ThreadSafeReference&& ref, std::exception_ptr e) mutable {
         tsr = std::move(ref);
         err = e;
+        promise.get_promise().emplace_value();
     });
-    util::EventLoop::main().run_until([&] {
-        std::lock_guard lock(mutex);
-        return did_finish;
-    });
+    pf.future.get();
     task->cancel(); // don't run the above notifier again on this session
     finish(std::move(tsr), err);
 }

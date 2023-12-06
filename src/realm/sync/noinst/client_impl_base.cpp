@@ -1872,7 +1872,9 @@ void Session::send_bind_message()
             bind_json_data["migratedPartition"] = *migrated_partition;
         }
         bind_json_data["sessionReason"] = static_cast<uint64_t>(get_session_reason());
-        bind_json_data["schemaVersion"] = get_schema_version();
+        auto schema_version = get_schema_version();
+        // Send 0 if schema is not versioned.
+        bind_json_data["schemaVersion"] = schema_version != uint64_t(-1) ? schema_version : 0;
         if (logger.would_log(util::Logger::Level::debug)) {
             std::string json_data_dump;
             if (!bind_json_data.empty()) {
