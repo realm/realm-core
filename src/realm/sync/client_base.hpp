@@ -219,7 +219,6 @@ struct ClientConfig {
     bool fix_up_object_ids = false;
 };
 
-
 /// \brief Information about an error causing a session to be temporarily
 /// disconnected from the server.
 ///
@@ -266,7 +265,6 @@ struct SessionErrorInfo : public ProtocolErrorInfo {
     }
 
     Status status;
-    bool user_code_error = false;
 };
 
 enum class ConnectionState { disconnected, connecting, connected };

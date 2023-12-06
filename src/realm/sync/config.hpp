@@ -73,8 +73,6 @@ struct SyncError {
     // If this error resulted from a compensating write, this vector will contain information about each object
     // that caused a compensating write and why the write was illegal.
     std::vector<sync::CompensatingWriteErrorInfo> compensating_writes_info;
-    // track that the user callback provided has failed (useful for fetching the SDK provided exception itself)
-    bool user_code_error = false;
 
     SyncError(Status status, bool is_fatal, std::optional<std::string_view> server_log = std::nullopt,
               std::vector<sync::CompensatingWriteErrorInfo> compensating_writes = {});

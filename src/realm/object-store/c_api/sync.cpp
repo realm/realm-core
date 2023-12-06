@@ -264,11 +264,7 @@ RLM_API void realm_sync_config_set_error_handler(realm_sync_config_t* config, re
         c_error.server_requests_action = static_cast<realm_sync_error_action_e>(error.server_requests_action);
         c_error.c_original_file_path_key = error.c_original_file_path_key;
         c_error.c_recovery_file_path_key = error.c_recovery_file_path_key;
-        c_error.user_code_error = nullptr;
-
-        if (error.user_code_error)
-            c_error.user_code_error = ErrorStorage::get_thread_local()->get_and_clear_user_code_error();
-
+        c_error.user_code_error = ErrorStorage::get_thread_local()->get_and_clear_user_code_error();
 
         std::vector<realm_sync_error_user_info_t> c_user_info;
         c_user_info.reserve(error.user_info.size());

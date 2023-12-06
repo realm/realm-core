@@ -738,7 +738,6 @@ void SyncSession::handle_error(sync::SessionErrorInfo error)
     // `action` is used over `shouldClientReset` and `isRecoveryModeDisabled`.
     sync_error.server_requests_action = error.server_requests_action;
     sync_error.is_unrecognized_by_client = unrecognized_by_client;
-    sync_error.user_code_error = error.user_code_error;
 
     if (delete_file)
         update_error_and_mark_file_for_deletion(sync_error, *delete_file);

@@ -40,8 +40,7 @@ bool is_fresh_path(const std::string& realm_path);
 bool perform_client_reset(util::Logger& logger, DB& target_db, DB& fresh_db, ClientResyncMode mode,
                           CallbackBeforeType notify_before, CallbackAfterType notify_after,
                           sync::SaltedFileIdent new_file_ident, sync::SubscriptionStore*,
-                          util::FunctionRef<void(int64_t)> on_flx_version, bool recovery_is_allowed,
-                          bool& user_code_error);
+                          util::FunctionRef<void(int64_t)> on_flx_version, bool recovery_is_allowed);
 
 } // namespace realm::_impl::client_reset
 
