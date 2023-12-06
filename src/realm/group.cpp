@@ -728,7 +728,6 @@ Table* Group::do_add_table(StringData name, Table::Type table_type, bool do_repl
     return table;
 }
 
-
 Table* Group::create_table_accessor(size_t table_ndx)
 {
     REALM_ASSERT(m_tables.size() == m_table_accessors.size());
