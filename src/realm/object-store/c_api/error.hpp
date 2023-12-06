@@ -46,7 +46,7 @@ public:
     bool get_as_realm_error_t(realm_error_t* out) const noexcept;
     bool clear() noexcept;
 
-    void set_user_code_error(void* usercode_error);
+    void set_user_code_error(void* user_code_error);
     void* get_and_clear_user_code_error();
 
 private:

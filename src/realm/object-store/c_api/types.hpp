@@ -411,6 +411,13 @@ struct realm_dictionary : realm::c_api::WrapC, realm::object_store::Dictionary {
     }
 };
 
+struct realm_key_path_array : realm::c_api::WrapC, realm::KeyPathArray {
+    explicit realm_key_path_array(realm::KeyPathArray kpa)
+        : realm::KeyPathArray(std::move(kpa))
+    {
+    }
+};
+
 struct realm_object_changes : realm::c_api::WrapC, realm::CollectionChangeSet {
     explicit realm_object_changes(realm::CollectionChangeSet changes)
         : realm::CollectionChangeSet(std::move(changes))

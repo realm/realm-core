@@ -16,7 +16,7 @@
  *
  **************************************************************************/
 
-#include <realm/object-store/util/bson/bson.hpp>
+#include <realm/util/bson/bson.hpp>
 #include <realm/util/base64.hpp>
 #include <external/json/json.hpp>
 #include <sstream>

@@ -27,7 +27,6 @@
 
 #include <realm/util/file_mapper.hpp>
 #include <realm/util/memory_stream.hpp>
-#include <realm/util/miscellaneous.hpp>
 #include <realm/util/thread.hpp>
 #include <realm/impl/destroy_guard.hpp>
 #include <realm/utilities.hpp>
@@ -729,7 +728,6 @@ Table* Group::do_add_table(StringData name, Table::Type table_type, bool do_repl
     return table;
 }
 
-
 Table* Group::create_table_accessor(size_t table_ndx)
 {
     REALM_ASSERT(m_tables.size() == m_table_accessors.size());
@@ -967,6 +965,10 @@ void Group::write(File& file, const char* encryption_key, uint_fast64_t version_
     REALM_ASSERT(file.get_size() == 0);
 
     file.set_encryption_key(encryption_key);
+
+    // Force the file system to allocate a node so we get a stable unique id.
+    // See File::get_unique_id(). This is used to distinguish encrypted mappings.
+    file.resize(1);
 
     // The aim is that the buffer size should be at least 1/256 of needed size but less than 64 Mb
     constexpr size_t upper_bound = 64 * 1024 * 1024;
@@ -1727,7 +1729,6 @@ MemStats Group::get_stats()
 
     return mem_stats;
 }
-
 
 void Group::print() const
 {

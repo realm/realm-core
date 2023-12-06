@@ -40,7 +40,7 @@ using namespace realm::util;
 // `experiments/testcase.cpp` and then run `sh build.sh
 // check-testcase` (or one of its friends) from the command line.
 
-
+#if !REALM_MOBILE
 namespace {
 
 network::Endpoint bind_acceptor(network::Acceptor& acceptor)
@@ -1215,3 +1215,5 @@ TEST(Util_Network_SSL_Certificate_Failure)
     thread_1.join();
     thread_2.join();
 }
+
+#endif // !REALM_MOBILE
