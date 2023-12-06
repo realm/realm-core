@@ -306,7 +306,7 @@ void ArrayFlex::restore_array(Array& arr, const std::vector<int64_t>& values) co
     for (const auto& v : values)
         arr.insert(i++, v);
     size_t w = arr.get_width();
-    REALM_ASSERT(w == 1 || w == 2 || w == 4 || w == 8 || w == 16 || w == 32 || w == 64);
+    REALM_ASSERT(w == 0 || w == 1 || w == 2 || w == 4 || w == 8 || w == 16 || w == 32 || w == 64);
     REALM_ASSERT(arr.size() == values.size());
 }
 
