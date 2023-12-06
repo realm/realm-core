@@ -2640,12 +2640,13 @@ TEST(Sync_Permissions)
 
     Session session_valid = fixture.make_bound_session(db_valid, "/valid", g_signed_test_user_token_for_path);
 
-    // Insert some dummy data
-    WriteTransaction wt_valid{db_valid};
-    wt_valid.get_group().add_table_with_primary_key("class_a", type_Int, "id");
-    session_valid.wait_for_upload_complete_or_client_stopped();
+    write_transaction(db_valid, [](WriteTransaction& wt) {
+        wt.get_group().add_table_with_primary_key("class_a", type_Int, "id");
+    });
 
+    auto completed = session_valid.wait_for_upload_complete_or_client_stopped();
     CHECK_NOT(did_see_error_for_valid);
+    CHECK(completed);
 }
 
 
