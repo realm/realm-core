@@ -1370,15 +1370,12 @@ void Array::update_width_cache_from_header() noexcept
     auto header = get_header();
     const auto kind = get_kind(header);
     if (kind == 'B') {
-        // For type B arrays the width should not be that important, since the data is not
-        // organized in any standard format, and we are not going to use it for fetching data.
-        // But this needs to be verified.
-        auto width_a = get_elementA_size<Encoding::Flex>(header);
-        m_width = align_bits_to8(width_a);
-        REALM_ASSERT(m_width % 8 == 0 && m_width != 0);
-        m_lbound = lbound_for_width(m_width);
-        m_ubound = ubound_for_width(m_width);
-        REALM_TEMPEX(m_vtable = &VTableForWidth, m_width, ::vtable);
+        // TODO: verify that this is correct for type B with encoding flex arrays, since width is not really needed
+        // for flex arrays
+        m_width = get_elementA_size<Encoding::Flex>(header);
+        m_lbound = lbound_for_width(align_bits_to8(m_width));
+        m_ubound = ubound_for_width(align_bits_to8(m_width));
+        REALM_TEMPEX(m_vtable = &VTableForWidth, align_bits_to8(m_width), ::vtable);
         m_getter = m_vtable->getter;
     }
     else {

@@ -18,6 +18,7 @@
 
 #include <realm/array_unsigned.hpp>
 #include <realm/array_direct.hpp>
+#include <realm/array_flex.hpp>
 #include <algorithm>
 
 namespace realm {
@@ -178,17 +179,27 @@ size_t ArrayUnsigned::upper_bound(uint64_t value) const noexcept
 
 void ArrayUnsigned::insert(size_t ndx, uint64_t value)
 {
-    // we now support lower widths than 8 bit!   // REALM_ASSERT_DEBUG(m_width >= 8);
     bool do_expand = value > m_ubound;
-    const uint8_t old_width = m_width;
-    const uint8_t new_width = do_expand ? bit_width(value) : m_width;
-    const auto old_size = m_size;
+    uint8_t old_width = m_width;
+    uint8_t new_width = do_expand ? bit_width(value) : m_width;
+    auto old_size = m_size;
+    if (!m_encode.is_encoded(*this)) {
+        // we now support lower widths than 8 bit!   // REALM_ASSERT_DEBUG(m_width >= 8);
+        REALM_ASSERT_DEBUG(!do_expand || new_width > m_width);
+        REALM_ASSERT_DEBUG(ndx <= m_size);
+        // Check if we need to copy before modifying
+        copy_on_write(); // Throws
+    }
+    else {
+        // copy on write first and then expand the array.
+        //  Throws
+        copy_on_write();
+        do_expand = value > m_ubound;
+        uint8_t old_width = m_width;
+        uint8_t new_width = do_expand ? bit_width(value) : m_width;
+        old_size = m_size;
+    }
 
-    REALM_ASSERT_DEBUG(!do_expand || new_width > m_width);
-    REALM_ASSERT_DEBUG(ndx <= m_size);
-
-    // Check if we need to copy before modifying
-    copy_on_write();              // Throws
     alloc(m_size + 1, new_width); // Throws
 
     // Move values above insertion (may expand)
