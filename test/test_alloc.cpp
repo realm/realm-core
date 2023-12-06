@@ -73,7 +73,7 @@ namespace {
 
 void set_capacity(char* header, size_t value)
 {
-    NodeHeader::set_kind((uint64_t*)header, 'A');
+    NodeHeader::set_kind(header, 'A');
     typedef unsigned char uchar;
     uchar* h = reinterpret_cast<uchar*>(header);
     h[0] = uchar((value >> 19) & 0x000000FF);
@@ -84,7 +84,7 @@ void set_capacity(char* header, size_t value)
 
 size_t get_capacity(const char* header)
 {
-    REALM_ASSERT(NodeHeader::get_kind((uint64_t*)header) == 'A');
+    REALM_ASSERT(NodeHeader::get_kind(header) == 'A');
     typedef unsigned char uchar;
     const uchar* h = reinterpret_cast<const uchar*>(header);
     return (size_t(h[0]) << 19) + (size_t(h[1]) << 11) + (h[2] << 3);

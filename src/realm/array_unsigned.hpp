@@ -87,7 +87,7 @@ private:
     void init_from_mem(MemRef mem) noexcept
     {
         Array::init_from_mem(mem);
-        if (get_kind((uint64_t*)get_header()) == 'A') {
+        if (get_kind(get_header()) == 'A') {
             set_width(get_width_from_header(get_header()));
         }
         else {

@@ -33,7 +33,7 @@ MemRef Node::create_node(size_t size, Allocator& alloc, bool context_flag, Type 
     size_t byte_size = std::max(byte_size_0, size_t(initial_capacity));
 
     MemRef mem = alloc.alloc(byte_size); // Throws
-    auto header = (uint64_t*)mem.get_addr();
+    auto header = mem.get_addr();
     Encoding encoding;
     if (width_type == wtype_Bits)
         encoding = Encoding::WTypBits;
@@ -166,7 +166,7 @@ void Node::do_copy_on_write(size_t minimum_size)
 {
     const char* header = get_header_from_data(m_data);
     // only type A arrays should be allowed during copy on write
-    REALM_ASSERT(get_kind((uint64_t*)header) != 'B');
+    REALM_ASSERT(get_kind(header) != 'B');
 
     // Calculate size in bytes
     size_t array_size = calc_byte_size(get_wtype_from_header(header), m_size, get_width_from_header(header));

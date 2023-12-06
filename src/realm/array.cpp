@@ -256,16 +256,16 @@ size_t Array::bit_width(int64_t v)
 void Array::init_from_mem(MemRef mem) noexcept
 {
     char* header = mem.get_addr();
-    auto kind = get_kind((uint64_t*)header);
+    auto kind = get_kind(header);
     // REALM_ASSERT(kind == 'A' || kind == 'B');
     if (kind == 'B') {
         // the only encoding supported at the moment
-        auto encoding = get_encoding((uint64_t*)header);
+        auto encoding = get_encoding(header);
         REALM_ASSERT(encoding == Encoding::Flex);
         char* header = mem.get_addr();
         m_ref = mem.get_ref();
         m_data = get_data_from_header(header);
-        m_size = NodeHeader::get_arrayB_num_elements<Encoding::Flex>((uint64_t*)header);
+        m_size = NodeHeader::get_arrayB_num_elements<Encoding::Flex>(header);
     }
     else {
         header = Node::init_from_mem(mem);
@@ -344,7 +344,7 @@ size_t Array::get_byte_size() const noexcept
 {
     // A and B type array
     const char* header = get_header_from_data(m_data);
-    auto kind = get_kind((uint64_t*)header);
+    auto kind = get_kind(header);
     REALM_ASSERT(kind == 'A' || kind == 'B');
     auto num_bytes = get_byte_size_from_header(header);
     auto read_only = m_alloc.is_read_only(m_ref) == true;
@@ -363,7 +363,7 @@ ref_type Array::write(_impl::ArrayWriterBase& out, bool deep, bool only_if_modif
     if (!deep || !m_has_refs) {
         Array encoded_array{m_alloc};
         if (compress_in_flight && encode_array(encoded_array)) {
-            const auto h = (uint64_t*)encoded_array.get_header();
+            const auto h = encoded_array.get_header();
             REALM_ASSERT(get_kind(h) == 'B');
             REALM_ASSERT(get_encoding(h) == Encoding::Flex);
             auto ref = encoded_array.do_write_shallow(out);
@@ -388,8 +388,7 @@ ref_type Array::write(ref_type ref, Allocator& alloc, _impl::ArrayWriterBase& ou
     if (!array.m_has_refs) {
         Array encoded_array{alloc};
         if (compress_in_flight && array.encode_array(encoded_array)) {
-            const auto header = encoded_array.get_header();
-            const auto h = (uint64_t*)header;
+            const auto h = encoded_array.get_header();
             REALM_ASSERT(get_kind(h) == 'B');
             REALM_ASSERT(get_encoding(h) == Encoding::Flex);
             auto ref = encoded_array.do_write_shallow(out);
@@ -709,9 +708,9 @@ size_t Array::size() const noexcept
 bool Array::encode_array(Array& arr) const
 {
     const auto header = get_header();
-    auto kind = get_kind((uint64_t*)header);
+    auto kind = get_kind(header);
     if (kind == 'A') {
-        auto encoding = get_encoding((uint64_t*)header);
+        auto encoding = get_encoding(header);
         // encode everything that is WtypeBits (all integer arrays included ref arrays)
         if (encoding == NodeHeader::Encoding::WTypBits) {
             return m_encode.encode(*this, arr);
@@ -724,10 +723,10 @@ bool Array::decode_array(Array& arr)
 {
     const auto header = arr.get_header();
 
-    auto kind = NodeHeader::get_kind((uint64_t*)header);
+    auto kind = NodeHeader::get_kind(header);
     // if it is encoded and it is in flex format decode all
     if (kind == 'B') {
-        auto encoding = NodeHeader::get_encoding((uint64_t*)header);
+        auto encoding = NodeHeader::get_encoding(header);
         if (encoding == NodeHeader::Encoding::Flex) {
             auto& array_encoder = arr.m_encode;
             return array_encoder.decode(arr);
@@ -1324,7 +1323,7 @@ MemRef Array::create(Type type, bool context_flag, WidthType width_type, size_t 
     // address of that member
     size_t byte_size = std::max(byte_size_0, initial_capacity + 0);
     MemRef mem = alloc.alloc(byte_size); // Throws
-    auto header = (uint64_t*)mem.get_addr();
+    auto header = mem.get_addr();
 
     init_header(header, 'A', encoding, flags, width, size);
     // init_header(header, is_inner_bptree_node, has_refs, context_flag, width_type, width, size, byte_size);
@@ -1369,12 +1368,12 @@ const typename Array::VTableForWidth<width>::PopulatedVTable Array::VTableForWid
 void Array::update_width_cache_from_header() noexcept
 {
     auto header = get_header();
-    const auto kind = get_kind((uint64_t*)header);
+    const auto kind = get_kind(header);
     if (kind == 'B') {
         // For type B arrays the width should not be that important, since the data is not
         // organized in any standard format, and we are not going to use it for fetching data.
         // But this needs to be verified.
-        auto width_a = get_elementA_size<Encoding::Flex>((uint64_t*)header);
+        auto width_a = get_elementA_size<Encoding::Flex>(header);
         m_width = align_bits_to8(width_a);
         REALM_ASSERT(m_width % 8 == 0 && m_width != 0);
         m_lbound = lbound_for_width(m_width);
@@ -1595,8 +1594,8 @@ int_fast64_t Array::get(const char* header, size_t ndx) noexcept
 {
     // this is going to break for compressed arrays
     // TODO this is static method, the wee need to implement get based on a compressed array.
-    if (NodeHeader::get_kind((uint64_t*)header) == 'B') {
-        REALM_ASSERT(NodeHeader::get_encoding((uint64_t*)header) == NodeHeader::Encoding::Flex);
+    if (NodeHeader::get_kind(header) == 'B') {
+        REALM_ASSERT(NodeHeader::get_encoding(header) == NodeHeader::Encoding::Flex);
         return ArrayFlex::get(header, ndx);
     }
     const char* data = get_data_from_header(header);
