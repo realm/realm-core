@@ -267,7 +267,7 @@ RLM_API bool realm_app_get_cached(const char* app_id, const char* base_url, real
         auto app =
             App::get_cached_app(std::string(app_id), base_url ? util::some<std::string>(base_url) : util::none);
         if (out_app) {
-            out_app = app ? new realm_app_t(app) : nullptr;
+            *out_app = app ? new realm_app_t(app) : nullptr;
         }
 
         return true;
