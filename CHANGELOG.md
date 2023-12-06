@@ -8,6 +8,7 @@
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * `Set::assign_intersection()` on `Set<StringData>`, `Set<BinaryData>`, and `Set<Mixed>` containing string or binary would cause a use-after-free if a set was intersected with itself ([PR #7144](https://github.com/realm/realm-core/pull/7144), since v10.0.0).
 * Set algebra on `Set<StringData>` and `Set<BinaryData>` gave incorrect results when used on platforms where `char` is signed ([#7135](https://github.com/realm/realm-core/issues/7135), since v13.23.3).
+* Allow propagation of user code exceptions happening during client reset callbacks, retrievable via `realm_sync_error_t` in `realm_sync_config_set_error_handler` in the C-API. ([#7098](https://github.com/realm/realm-core/issues/7098), since v11.16.0) 
 
 ### Breaking changes
 * None.
