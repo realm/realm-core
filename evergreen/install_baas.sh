@@ -461,18 +461,24 @@ if [ ! -x "${MONGO_BINARIES_DIR}/bin/mongod" ]; then
 fi
 echo "mongod version: $("${MONGO_BINARIES_DIR}/bin/mongod" --version --quiet | sed 1q)"
 
-if [[ -n "${MONGOSH_DOWNLOAD_URL}" ]]; then
-    if [[ ! -x "${MONGO_BINARIES_DIR}/bin/mongosh" ]]; then
-        echo "Downloading mongosh"
+if [[ ! -x "${MONGO_BINARIES_DIR}/bin/mongosh" ]]; then
+    MONGOSH_DOWNLOAD_FILENAME=$(basename "${MONGOSH_DOWNLOAD_URL}")
+    MONGOSH_DOWNLOAD_EXTENSION="${MONGOSH_DOWNLOAD_FILENAME##*.}"
+    echo "Downloading ${MONGOSH_DOWNLOAD_URL}"
+    if [[ "${MONGOSH_DOWNLOAD_EXTENSION}" == "zip" ]]; then
         ${CURL} -sLS "${MONGOSH_DOWNLOAD_URL}" --output mongosh-binaries.zip
         unzip -jnqq mongosh-binaries.zip '*/bin/*' -d "${MONGO_BINARIES_DIR}/bin/"
         rm mongosh-binaries.zip
+    elif [[ ${MONGOSH_DOWNLOAD_EXTENSION} == "tgz" ]]; then
+        ${CURL} -sLS "${MONGOSH_DOWNLOAD_URL}" --output mongosh-binaries.tgz
+        tar -xzf mongosh-binaries.tgz --strip-components=1 -C "${MONGO_BINARIES_DIR}"
+        rm mongosh-binaries.tgz
+    else
+        echo "Unsupported mongosh format $MONGOSH_DOWNLOAD_EXTENSION"
+        exit 1
     fi
-    MONGOSH="mongosh"
-else
-    # Use the mongo shell provided with mongod
-    MONGOSH="mongo"
 fi
+MONGOSH="mongosh"
 chmod +x "${MONGO_BINARIES_DIR}/bin"/*
 echo "${MONGOSH} version: $("${MONGO_BINARIES_DIR}/bin/${MONGOSH}" --version)"
 
