@@ -1607,12 +1607,12 @@ int_fast64_t Array::get(const char* header, size_t ndx) noexcept
 
 std::pair<int64_t, int64_t> Array::get_two(const char* header, size_t ndx) noexcept
 {
-    // we need to decompress for now!!! TODO: fix this.
-    REALM_ASSERT(get_kind((uint64_t*)header) == 'A');
-    const char* data = get_data_from_header(header);
-    uint_least8_t width = get_width_from_header(header);
-    std::pair<int64_t, int64_t> p = ::get_two(data, width, ndx);
-    return std::make_pair(p.first, p.second);
+    // TODO: Optimize!
+    // const char* data = get_data_from_header(header);
+    // uint_least8_t width = get_width_from_header(header);
+    // std::pair<int64_t, int64_t> p = ::get_two(data, width, ndx);
+    // return std::make_pair(p.first, p.second);
+    return std::make_pair(get(header, ndx), get(header, ndx + 1));
 }
 
 bool QueryStateCount::match(size_t, Mixed) noexcept

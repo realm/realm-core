@@ -178,7 +178,7 @@ size_t ArrayUnsigned::upper_bound(uint64_t value) const noexcept
 
 void ArrayUnsigned::insert(size_t ndx, uint64_t value)
 {
-    REALM_ASSERT_DEBUG(m_width >= 8);
+    // we now support lower widths than 8 bit!   // REALM_ASSERT_DEBUG(m_width >= 8);
     bool do_expand = value > m_ubound;
     const uint8_t old_width = m_width;
     const uint8_t new_width = do_expand ? bit_width(value) : m_width;

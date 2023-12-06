@@ -87,7 +87,13 @@ private:
     void init_from_mem(MemRef mem) noexcept
     {
         Array::init_from_mem(mem);
-        set_width(get_width_from_header(get_header()));
+        if (get_kind((uint64_t*)get_header()) == 'A') {
+            set_width(get_width_from_header(get_header()));
+        }
+        else {
+            // we can't really use m_bound/l_bound as a criteria for COW'ing with the new formats
+            m_ubound = m_lbound = 0;
+        }
     }
 
     void adjust(size_t ndx, int64_t diff)
