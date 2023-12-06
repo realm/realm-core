@@ -68,7 +68,7 @@ function setup_baas_dependencies() {
             if [[ "$(uname -m)" == "arm64" ]]; then
                 export GOARCH=arm64
                 MONGODB_DOWNLOAD_URL="https://downloads.mongodb.com/osx/mongodb-macos-arm64-enterprise-7.0.3.tgz"
-                MONGOSH_DOWNLOAD_URL="https://downloads.mongodb.com/compass/mongosh-1.5.0-darwin-arm64.zip"
+                MONGOSH_DOWNLOAD_URL="https://downloads.mongodb.com/compass/mongosh-2.1.1-darwin-arm64.zip"
                 # <-- Remove after enabling constants.sh
                 STITCH_SUPPORT_LIB_URL="https://stitch-artifacts.s3.amazonaws.com/stitch-support/macos-arm64/stitch-support-6.1.0-alpha-527-g796351f.tgz"
                 ASSISTED_AGG_URL="https://stitch-artifacts.s3.amazonaws.com/stitch-mongo-libs/stitch_mongo_libs_osx_patch_c5880b9bd6039908a2fd85d1c95f457c36b5d33b_6542b80ae3c331e8d3788186_23_11_01_20_41_47/assisted_agg"
@@ -88,6 +88,7 @@ function setup_baas_dependencies() {
             else
                 export GOARCH=amd64
                 MONGODB_DOWNLOAD_URL="https://downloads.mongodb.com/osx/mongodb-macos-x86_64-enterprise-7.0.3.tgz"
+                MONGOSH_DOWNLOAD_URL="https://downloads.mongodb.com/compass/mongosh-2.1.1-darwin-x64.zip"
                 # <-- Remove after enabling constants.sh
                 STITCH_SUPPORT_LIB_URL="https://stitch-artifacts.s3.amazonaws.com/stitch-support/macos-arm64/stitch-support-4.4.17-rc1-2-g85de0cc.tgz"
                 ASSISTED_AGG_URL="https://stitch-artifacts.s3.amazonaws.com/stitch-mongo-libs/stitch_mongo_libs_osx_patch_c5880b9bd6039908a2fd85d1c95f457c36b5d33b_6542b80ae3c331e8d3788186_23_11_01_20_41_47/assisted_agg"
@@ -113,6 +114,7 @@ function setup_baas_dependencies() {
                 DISTRO_VERSION_MAJOR="$(cut -d. -f1 <<< "${DISTRO_VERSION}")"
             fi
             platform_string="${BAAS_PLATFORM} - ${DISTRO_NAME} ${DISTRO_VERSION}"
+            MONGOSH_DOWNLOAD_URL="https://downloads.mongodb.com/compass/mongosh-2.1.1-linux-x64.tgz"
             case "${DISTRO_NAME}" in
                 ubuntu | linuxmint)
                     MONGODB_DOWNLOAD_URL="http://downloads.10gen.com/linux/mongodb-linux-$(uname -m)-enterprise-ubuntu${DISTRO_VERSION_MAJOR}04-7.0.3.tgz"
