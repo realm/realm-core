@@ -87,7 +87,7 @@ BinaryData InstructionApplier::get_binary(StringBufferRange range) const
 
 TableRef InstructionApplier::table_for_class_name(StringData class_name) const
 {
-    if (class_name.size() >= Group::max_table_name_length - 6)
+    if (class_name.size() > Group::max_class_name_length)
         bad_transaction_log("class name too long");
     Group::TableNameBuffer buffer;
     return m_transaction.get_table(Group::class_name_to_table_name(class_name, buffer));
