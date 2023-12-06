@@ -25,15 +25,15 @@ namespace sync {
 //
 //   3 Support for Mixed, TypeLinks, Set, and Dictionary columns.
 //
-//   4 Error messaging format accepts a flexible JSON field in 'json_error'.
+//   4 Error messaging format accepts a flexible JSON field in JSON_ERROR.
 //     JSONErrorMessage.IsClientReset controls recovery mode.
 //
 //   5 Introduces compensating write errors.
 //
 //   6 Support for asymmetric tables.
 //
-//   7 Client takes the 'action' specified in the 'json_error' messages received
-//     from server. Client sends 'json_error' messages to the server.
+//   7 Client takes the 'action' specified in the JSON_ERROR messages received
+//     from server. Client sends JSON_ERROR messages to the server.
 //
 //   8 Websocket http errors are now sent as websocket close codes
 //     FLX sync BIND message can include JSON data in place of server path string
@@ -47,6 +47,12 @@ namespace sync {
 //   10 Update BIND message to send information to the server about the reason a
 //      synchronization session is used for; add support for server log messages
 //
+//   11 Support for FLX schema migrations
+//      Update BIND message to send information to the server about the schema
+//      version a synchronized realm is opened with
+//      Update JSON_ERROR message to read the previous schema version sent by 
+//      the server
+//
 //  XX Changes:
 //     - TBD
 //
@@ -54,7 +60,7 @@ constexpr int get_current_protocol_version() noexcept
 {
     // Also update the current protocol version test in flx_sync.cpp when
     // updating this value
-    return 10;
+    return 11;
 }
 
 constexpr std::string_view get_pbs_websocket_protocol_prefix() noexcept
