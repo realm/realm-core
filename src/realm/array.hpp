@@ -195,7 +195,7 @@ public:
 
     void alloc(size_t init_size, size_t new_width)
     {
-        // Node::alloc is the one that triggers copy on write, but it does it a node level
+        // Node::alloc is the one that triggers copy on write, but it does it at node level
         //  in order to be sure that we able to allocated a new array based on the current one
         //  we need to decode the current array.
         if (get_kind(get_header()) == 'A') {
@@ -205,8 +205,8 @@ public:
         else if (get_kind(get_header()) == 'B' && get_encoding(get_header()) == Encoding::Flex) {
             REALM_ASSERT(m_width == get_elementA_size<Encoding::Flex>(get_header()));
             REALM_ASSERT(m_size == get_arrayB_num_elements<Encoding::Flex>(get_header()));
+            decode_array(*this);
         }
-        decode_array(*this);
         // We don't want to use Node::alloc here, because we want Node to only know about 'A' header formats.
         Node::alloc(init_size, new_width);
         update_width_cache_from_header();

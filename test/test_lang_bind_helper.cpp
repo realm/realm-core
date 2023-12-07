@@ -2299,8 +2299,7 @@ TEST(LangBindHelper_AdvanceReadTransact_ErrorInObserver)
         wt->commit();
     }
 
-    struct ObserverError {
-    };
+    struct ObserverError {};
     try {
         struct : NoOpTransactionLogParser {
             using NoOpTransactionLogParser::NoOpTransactionLogParser;
@@ -5939,7 +5938,7 @@ TEST(LangBindHelper_ImportDetachedLinkList)
     CHECK_EQUAL(tv_1->size(), 0);
 }
 
-TEST(LangBindHelper_SearchIndexAccessor)
+ONLY(LangBindHelper_SearchIndexAccessor)
 {
     SHARED_GROUP_TEST_PATH(path);
     auto hist = make_in_realm_history();

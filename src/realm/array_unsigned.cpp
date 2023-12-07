@@ -195,8 +195,8 @@ void ArrayUnsigned::insert(size_t ndx, uint64_t value)
         //  Throws
         copy_on_write();
         do_expand = value > m_ubound;
-        uint8_t old_width = m_width;
-        uint8_t new_width = do_expand ? bit_width(value) : m_width;
+        old_width = m_width;
+        new_width = do_expand ? bit_width(value) : m_width;
         old_size = m_size;
     }
 

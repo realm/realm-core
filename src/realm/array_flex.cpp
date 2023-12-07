@@ -54,7 +54,7 @@ bool ArrayFlex::decode(Array& arr)
     if (get_encode_info(arr.get_header(), value_width, index_width, value_size, index_size)) {
         auto values = fetch_values_from_encoded_array(arr, value_width, index_width, value_size, index_size);
         REALM_ASSERT(values.size() == index_size);
-        restore_array(arr, values);
+        restore_array(arr, values); // restore array sets capacity
         return true;
     }
     return false;
@@ -299,7 +299,7 @@ void ArrayFlex::restore_array(Array& arr, const std::vector<int64_t>& values) co
     auto mem = allocator.alloc(byte_size);
     auto header = mem.get_addr();
     NodeHeader::init_header(header, 'A', Encoding::WTypBits, flags, 0, 0);
-    NodeHeader::set_capacity_in_header(byte_size, (char*)header);
+    NodeHeader::set_capacity_in_header(byte_size, header);
     arr.init_from_mem(mem);
     arr.update_parent();
     size_t i = 0;

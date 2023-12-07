@@ -113,7 +113,8 @@ Allocator& Allocator::get_default() noexcept
 // * adding a cross-over mapping. (if the array crosses a mapping boundary)
 // * using an already established cross-over mapping. (ditto)
 // this can proceed concurrently with other calls to translate()
-char* Allocator::translate_less_critical(RefTranslation* ref_translation_ptr, ref_type ref) const noexcept
+char* Allocator::translate_less_critical(RefTranslation* ref_translation_ptr, ref_type ref,
+                                         bool known_in_slab) const noexcept
 {
     size_t idx = get_section_index(ref);
     RefTranslation& txl = ref_translation_ptr[idx];
@@ -122,7 +123,9 @@ char* Allocator::translate_less_critical(RefTranslation* ref_translation_ptr, re
 #if REALM_ENABLE_ENCRYPTION
     realm::util::encryption_read_barrier(addr, NodeHeader::header_size, txl.encrypted_mapping, nullptr);
 #endif
-    auto size = NodeHeader::get_byte_size_from_header(addr);
+    // if we know the translation is inside the slab area, we don't need to check
+    // for anything beyond the header, and we don't need to check if decryption is needed
+    auto size = known_in_slab ? 8 : NodeHeader::get_byte_size_from_header(addr);
     bool crosses_mapping = offset + size > (1 << section_shift);
     // Move the limit on use of the existing primary mapping.
     // Take into account that another thread may attempt to change / have changed it concurrently,

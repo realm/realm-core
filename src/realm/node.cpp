@@ -96,6 +96,9 @@ void Node::alloc(size_t init_size, size_t new_width)
     // This is fine as long as we have decompressed the array from B to A type before!!
 
     REALM_ASSERT(is_attached());
+    char* header = get_header_from_data(m_data);
+    // only type A arrays should be allowed during copy on write
+    REALM_ASSERT(get_kind(header) == 'A');
 
     size_t needed_bytes = calc_byte_len(init_size, new_width);
     // this method is not public and callers must (and currently do) ensure that
@@ -106,7 +109,6 @@ void Node::alloc(size_t init_size, size_t new_width)
         do_copy_on_write(needed_bytes);
 
     REALM_ASSERT(!m_alloc.is_read_only(m_ref));
-    char* header = get_header_from_data(m_data);
     size_t orig_capacity_bytes = get_capacity_from_header(header);
     size_t orig_width = get_width_from_header(header);
 
@@ -166,7 +168,7 @@ void Node::do_copy_on_write(size_t minimum_size)
 {
     const char* header = get_header_from_data(m_data);
     // only type A arrays should be allowed during copy on write
-    REALM_ASSERT(get_kind(header) != 'B');
+    REALM_ASSERT(get_kind(header) == 'A');
 
     // Calculate size in bytes
     size_t array_size = calc_byte_size(get_wtype_from_header(header), m_size, get_width_from_header(header));
@@ -176,10 +178,6 @@ void Node::do_copy_on_write(size_t minimum_size)
     new_size += 64;
 
     // Create new copy of array.
-    // Chicken egg problem, along the way we call SlabAllocator::do_alloc
-    // which tries to translate the ref and calls get_byte_size_from_header,
-    // which triggers an assertion since the header is not yet initialised at
-    // that point
     MemRef mref = m_alloc.alloc(new_size); // Throws
 
     const char* old_begin = header;
