@@ -1215,6 +1215,11 @@ size_t Array::calc_aligned_byte_size(size_t size, int width)
 
 MemRef Array::clone(MemRef mem, Allocator& alloc, Allocator& target_alloc)
 {
+    Array tmp(alloc);
+    tmp.init_from_mem(mem);
+    if(tmp.is_encoded())
+        tmp.decode_array(tmp);
+    
     const char* header = mem.get_addr();
     if (!get_hasrefs_from_header(header)) {
         // This array has no subarrays, so we can make a byte-for-byte
@@ -1342,6 +1347,8 @@ MemRef Array::create(Type type, bool context_flag, WidthType width_type, size_t 
 template <class cond, size_t bitwidth>
 bool Array::find_vtable(int64_t value, size_t start, size_t end, size_t baseindex, QueryStateBase* state) const
 {
+    if(is_encoded())
+        decode_array((Array&)*this);
     return ArrayWithFind(*this).find_optimized<cond, bitwidth>(value, start, end, baseindex, state, nullptr);
 }
 
@@ -1394,6 +1401,9 @@ void Array::update_width_cache_from_header() noexcept
 template <size_t w>
 void Array::get_chunk(size_t ndx, int64_t res[8]) const noexcept
 {
+    if(is_encoded())
+        decode_array((Array&)*this);
+    
     REALM_ASSERT_3(ndx, <, m_size);
     size_t i = 0;
 
@@ -1454,6 +1464,8 @@ void Array::get_chunk(size_t ndx, int64_t res[8]) const noexcept
 template <>
 void Array::get_chunk<0>(size_t ndx, int64_t res[8]) const noexcept
 {
+    if(is_encoded())
+        decode_array((Array&)*this);
     REALM_ASSERT_3(ndx, <, m_size);
     memset(res, 0, sizeof(int64_t) * 8);
 }
@@ -1462,6 +1474,8 @@ void Array::get_chunk<0>(size_t ndx, int64_t res[8]) const noexcept
 template <size_t width>
 void Array::set(size_t ndx, int64_t value)
 {
+    if(is_encoded())
+        decode_array(*this);
     set_direct<width>(m_data, ndx, value);
 }
 
