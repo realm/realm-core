@@ -31,6 +31,7 @@
 
 ### Internals
 * Added a CombinedTests target that runs tests from object-store, sync, and core together. ([PR #6964](https://github.com/realm/realm-core/pull/6964))
+* The version of mongod we test against in evergreen was updated to 7.0.3 ([PR #7187](https://github.com/realm/realm-core/pull/7187)).
 
 ----------------------------------------------
 
