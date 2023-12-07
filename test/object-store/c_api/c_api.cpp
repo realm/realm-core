@@ -529,7 +529,7 @@ TEST_CASE("C API (non-database)", "[c_api]") {
         REQUIRE(c_err.message == status.reason());
         REQUIRE(c_err.categories == RLM_ERR_CAT_RUNTIME);
         REQUIRE(c_err.path == nullptr);
-        REQUIRE(c_err.usercode_error == nullptr);
+        REQUIRE(c_err.user_code_error == nullptr);
     }
 
 #if REALM_ENABLE_SYNC
@@ -1255,8 +1255,8 @@ TEST_CASE("C API - schema", "[c_api]") {
             CHECK(realm_get_last_error(&_err));
             CHECK(_err.error == RLM_ERR_CALLBACK);
             CHECK(std::string{_err.message} == "User-provided callback failed");
-            REQUIRE(_err.usercode_error); // this is the error registered inside the callback
-            auto ex = (MyExceptionWrapper*)_err.usercode_error;
+            REQUIRE(_err.user_code_error); // this is the error registered inside the callback
+            auto ex = (MyExceptionWrapper*)_err.user_code_error;
             try {
                 std::rethrow_exception(ex->m_ptr);
             }
@@ -5531,6 +5531,84 @@ TEST_CASE("C API - client reset", "[sync][pbs][c_api][client reset][baas]") {
             REQUIRE(error_handler_counter.load() == 1);
             REQUIRE(before_client_reset_counter.load() == 1);
             REQUIRE(after_client_reset_counter.load() == 0);
+        }
+
+        SECTION("Simulate failure during client reset with expection in the user code callback") {
+            error_handler_counter.store(0);
+            baas_client_stop.store(false);
+
+            struct ErrorState {
+                uintptr_t target_user_code_data = static_cast<uintptr_t>(random_int());
+                std::optional<uintptr_t> observed_user_code_data;
+            };
+            ErrorState state;
+            realm_sync_config_set_error_handler(
+                local_sync_config,
+                [](realm_userdata_t uncast_state, realm_sync_session_t*, const realm_sync_error_t sync_error) {
+                    REQUIRE(sync_error.c_original_file_path_key);
+                    REQUIRE(sync_error.c_recovery_file_path_key);
+                    REQUIRE(sync_error.is_client_reset_requested);
+                    // Callback in `realm_sync_config_set_before_client_reset_handler` fails, so
+                    // a synthetic error is created with no action.
+                    // Since this is a failure triggered by some exception in the user code
+                    // an opaque ptr should have passed back to this callback in order to let
+                    // the SDK re-throw the excpetion.
+                    REQUIRE(sync_error.server_requests_action == RLM_SYNC_ERROR_ACTION_NO_ACTION);
+                    ResetRealmFiles::instance().reset_realm(sync_error.c_original_file_path_key);
+                    auto state = static_cast<ErrorState*>(uncast_state);
+                    state->observed_user_code_data = reinterpret_cast<uintptr_t>(sync_error.user_code_error);
+                    error_handler_counter.fetch_add(1);
+                    baas_client_stop.store(true);
+                },
+                &state, nullptr);
+
+            SECTION("before reset exception") {
+                realm_sync_config_set_before_client_reset_handler(
+                    local_sync_config,
+                    [](realm_userdata_t uncast_state, realm_t*) -> bool {
+                        auto state = static_cast<ErrorState*>(uncast_state);
+                        realm_register_user_code_callback_error(
+                            reinterpret_cast<void*>(state->target_user_code_data));
+                        return false;
+                    },
+                    &state, nullptr);
+
+                make_reset(local_config, remote_config)
+                    ->on_post_reset([&](SharedRealm) {
+                        util::EventLoop::main().run_until([&] {
+                            return baas_client_stop.load();
+                        });
+                    })
+                    ->run();
+            }
+            SECTION("After reset exception") {
+                realm_sync_config_set_before_client_reset_handler(
+                    local_sync_config,
+                    [](realm_userdata_t, realm_t*) -> bool {
+                        return true;
+                    },
+                    nullptr, nullptr);
+
+                realm_sync_config_set_after_client_reset_handler(
+                    local_sync_config,
+                    [](realm_userdata_t uncast_state, realm_t*, realm_thread_safe_reference_t*, bool) -> bool {
+                        auto state = static_cast<ErrorState*>(uncast_state);
+                        realm_register_user_code_callback_error(
+                            reinterpret_cast<void*>(state->target_user_code_data));
+                        return false;
+                    },
+                    &state, nullptr);
+
+                make_reset(local_config, remote_config)
+                    ->on_post_reset([&](SharedRealm) {
+                        util::EventLoop::main().run_until([&] {
+                            return baas_client_stop.load();
+                        });
+                    })
+                    ->run();
+            }
+            REQUIRE(error_handler_counter.load() == 1);
+            REQUIRE(state.observed_user_code_data == state.target_user_code_data);
         }
     }
 }

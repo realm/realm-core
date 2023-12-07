@@ -224,7 +224,7 @@ typedef struct realm_error {
     const char* message;
     // When error is RLM_ERR_CALLBACK this is an opaque pointer to an SDK-owned error object
     // thrown by user code inside a callback with realm_register_user_code_callback_error(), otherwise null.
-    void* usercode_error;
+    void* user_code_error;
     const char* path;
 } realm_error_t;
 
@@ -3408,6 +3408,7 @@ typedef struct realm_sync_error {
 
     realm_sync_error_compensating_write_info_t* compensating_writes;
     size_t compensating_writes_length;
+    void* user_code_error;
 } realm_sync_error_t;
 
 /**
@@ -3878,7 +3879,7 @@ RLM_API void realm_sync_session_handle_error_for_testing(const realm_sync_sessio
 /**
  * In case of exception thrown in user code callbacks, this api will allow the sdk to store the user code exception
  * and retrieve a it later via realm_get_last_error.
- * Most importantly the SDK is responsible to handle the memory pointed by usercode_error.
+ * Most importantly the SDK is responsible to handle the memory pointed by user_code_error.
  * @param usercode_error pointer representing whatever object the SDK treats as exception/error.
  */
 RLM_API void realm_register_user_code_callback_error(realm_userdata_t usercode_error) RLM_API_NOEXCEPT;
