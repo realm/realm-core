@@ -339,7 +339,7 @@ bool SyncManager::perform_metadata_update(util::FunctionRef<void(SyncMetadataMan
 std::shared_ptr<SyncUser> SyncManager::get_user(const std::string& user_id, const std::string& refresh_token,
                                                 const std::string& access_token, const std::string& device_id)
 {
-    auto user = std::shared_ptr<SyncUser>(nullptr);
+    std::shared_ptr<SyncUser> user;
     {
         util::CheckedLockGuard lock(m_user_mutex);
         auto it = std::find_if(m_users.begin(), m_users.end(), [&](const auto& user) {

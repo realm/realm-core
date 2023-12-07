@@ -7,7 +7,8 @@
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* Fixed several causes of "decryption failed" exceptions that could happen when opening multiple encrypted Realm files in the same process while using Apple/linux and storing the Realms on an exFAT file system. ([#7156](https://github.com/realm/realm-core/issues/7156), since the beginning) 
+* Fixed several causes of "decryption failed" exceptions that could happen when opening multiple encrypted Realm files in the same process while using Apple/linux and storing the Realms on an exFAT file system. ([#7156](https://github.com/realm/realm-core/issues/7156), since the beginning)
+* Fixed deadlock which occurs when accessing the current user from within a callback from the user listener ([#7183](https://github.com/realm/realm-core/issues/7183), since unknown)
 * Update existing std exceptions thrown by the Sync Client to use Realm exceptions. ([#6255](https://github.com/realm/realm-core/issues/6255), since v10.2.0)
 * Having a class name of length 57 would make client reset crash as a limit of 56 was wrongly enforced (57 is the correct limit) ([#7176](https://github.com/realm/realm-core/issues/7176), since v10.0.0)
 * Automatic client reset recovery on flexible sync Realms would apply recovered changes in multiple write transactions, releasing the write lock in between. This had several observable negative effects:
