@@ -130,8 +130,8 @@ struct AccessTokenParser {
                 if (event.type == JSONEvent::null) {
                     m_token.timestamp = 0;
                 }
-                else if (event.type == JSONEvent::number) {
-                    m_token.timestamp = std::int_fast64_t(event.number);
+                else if (event.type == JSONEvent::number_integer) {
+                    m_token.timestamp = event.integer;
                 }
                 else {
                     return JSONError::unexpected_token;
@@ -143,8 +143,8 @@ struct AccessTokenParser {
                 if (event.type == JSONEvent::null) {
                     m_token.expires = 0;
                 }
-                else if (event.type == JSONEvent::number) {
-                    m_token.expires = std::int_fast64_t(event.number);
+                else if (event.type == JSONEvent::number_integer) {
+                    m_token.expires = event.integer;
                 }
                 else {
                     return JSONError::unexpected_token;

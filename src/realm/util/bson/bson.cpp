@@ -19,10 +19,14 @@
 #include <realm/mixed.hpp>
 #include <realm/util/bson/bson.hpp>
 #include <realm/util/base64.hpp>
-#include <external/json/json.hpp>
+#include <realm/util/json_parser.hpp>
+#include <realm/mixed.hpp>
 #include <sstream>
+#include <iostream>
 #include <algorithm>
 #include <charconv>
+#include <stack>
+#include <array>
 
 namespace realm {
 namespace bson {
@@ -1255,135 +1259,101 @@ struct BsonError : public std::runtime_error {
     }
 };
 
-// This implements just enough of the map API to support nlohmann's DOM apis that we use.
-template <typename K, typename V, typename... Ignored>
-struct LinearMap {
-    using key_type = K;
-    using mapped_type = V;
-    using value_type = std::pair<const K, V>;
-    using storage_type = std::vector<value_type>;
-    using iterator = typename storage_type::iterator;
-    using const_iterator = typename storage_type::const_iterator;
-    using key_compare = std::equal_to<K>;
+class Parser {
+public:
+    Parser()
+        : idle(this)
+        , array_insert(this)
+        , accept_key(this)
+        , accept_value(this)
+        , state(&idle)
+    {
+    }
+    Bson parse(util::Span<const char> json);
 
-    auto begin()
-    {
-        return _elems.begin();
-    }
-    auto begin() const
-    {
-        return _elems.begin();
-    }
-    auto end()
-    {
-        return _elems.end();
-    }
-    auto end() const
-    {
-        return _elems.end();
-    }
-    auto size() const
-    {
-        return _elems.size();
-    }
-    auto max_size() const
-    {
-        return _elems.max_size();
-    }
-    auto clear()
-    {
-        return _elems.clear();
-    }
-    V& operator[](const K& k)
-    {
-        // assume this is only used for adding a new element.
-        return _elems.emplace_back(k, V()).second;
-    }
+private:
+    using FancyParser = Bson (*)(const Bson& bson);
+    static std::array<std::pair<std::string_view, FancyParser>, 12> fancy_parsers;
 
-    template <typename... Args>
-    std::pair<iterator, bool> emplace(Args&&... args)
-    {
-        // assume this is only used for adding a new element.
-        _elems.emplace_back(std::forward<Args>(args)...);
-        return {--_elems.end(), true};
-    }
+    struct State {
+        State(Parser* p)
+            : parser(p)
+        {
+        }
+        virtual ~State() {}
+        virtual State* value(Bson)
+        {
+            return nullptr;
+        }
+        virtual State* array_begin();
+        virtual State* object_begin();
+        virtual State* end()
+        {
+            return nullptr;
+        }
+        Parser* parser;
+    };
 
-    iterator erase(iterator)
-    {
-        // This is only used when mutating the DOM which we don't do.
-        REALM_TERMINATE("LinearMap::erase() should never be called");
-    }
+    struct Idle : public State {
+        using State::State;
+        State* value(Bson val) override;
+    };
 
-    storage_type _elems;
+    struct ArrayInsert : public State {
+        using State::State;
+        State* value(Bson val) override;
+        State* end() override;
+    };
+    struct AcceptKey : public State {
+        using State::State;
+        State* value(Bson val) override;
+        State* end() override;
+    };
+    struct AcceptValue : public State {
+        using State::State;
+        State* value(Bson val) override;
+    };
+
+    State* reduce(Bson&& b);
+
+    static constexpr auto parser_comp = [](const std::pair<std::string_view, FancyParser>& lhs,
+                                           const std::pair<std::string_view, FancyParser>& rhs) {
+        return lhs.first < rhs.first;
+    };
+    // TODO do this instead in C++20
+    // static_assert(std::ranges::is_sorted(bson_fancy_parsers, parser_comp));
+#if REALM_DEBUG
+    bool check_sort_on_startup = [] {
+        REALM_ASSERT(std::is_sorted(fancy_parsers.begin(), fancy_parsers.end(), parser_comp));
+        return false;
+    }();
+#endif
+
+    std::vector<std::string> keys;
+    std::stack<bson::Bson> work;
+
+    Idle idle;
+    ArrayInsert array_insert;
+    AcceptKey accept_key;
+    AcceptValue accept_value;
+    State* state;
 };
 
-using Json = nlohmann::basic_json<LinearMap>;
-
-Bson dom_obj_to_bson(const Json& json);
-
-Bson dom_elem_to_bson(const Json& json)
-{
-    switch (json.type()) {
-        case Json::value_t::null:
-            return Bson();
-        case Json::value_t::string:
-            return Bson(json.get<std::string>());
-        case Json::value_t::boolean:
-            return Bson(json.get<bool>());
-        case Json::value_t::binary: {
-            std::vector<char> out;
-            for (auto&& elem : json.get_binary()) {
-                out.push_back(elem);
-            }
-            return Bson(std::move(out));
-        }
-        case Json::value_t::number_integer:
-            return Bson(json.get<int64_t>());
-        case Json::value_t::number_unsigned: {
-            uint64_t val = json.get<uint64_t>();
-            if (val <= uint64_t(std::numeric_limits<int64_t>::max()))
-                return Bson(int64_t(val));
-            return Bson(double(val));
-        }
-        case Json::value_t::number_float:
-            return Bson(json.get<double>());
-        case Json::value_t::object:
-            return dom_obj_to_bson(json);
-        case Json::value_t::array: {
-            BsonArray out;
-            for (auto&& elem : json) {
-                out.append(dom_elem_to_bson(elem));
-            }
-            return Bson(std::move(out));
-        }
-        case Json::value_t::discarded:
-            REALM_TERMINATE("should never see discarded");
-    }
-    REALM_TERMINATE("unknown json value type");
-}
-
-// This works around the deleted rvalue constructor in StringData
-inline StringData tosd(const std::string& s)
-{
-    return s;
-}
-
-// Keep these sorted by key. This is checked so you can't forget.
-using FancyParser = Bson (*)(const Json& json);
-static constexpr std::pair<std::string_view, FancyParser> bson_fancy_parsers[] = {
+std::array<std::pair<std::string_view, Parser::FancyParser>, 12> Parser::fancy_parsers{{
     {"$binary",
-     +[](const Json& json) {
+     +[](const Bson& bson) {
+         auto& document = static_cast<const bson::BsonDocument&>(bson);
          util::Optional<std::vector<char>> base64;
          util::Optional<uint8_t> subType;
-         if (json.size() != 2)
+         if (document.size() != 2)
              throw BsonError("invalid extended json $binary");
-         for (auto&& [k, v] : json.items()) {
+         for (const auto& [k, v] : document) {
              if (k == "base64") {
-                 const std::string& str = v.get<std::string>();
+                 const std::string& str = static_cast<const std::string&>(v);
                  base64.emplace(str.begin(), str.end());
              }
              else if (k == "subType") {
-                 subType = uint8_t(std::stoul(v.get<std::string>(), nullptr, 16));
+                 subType = uint8_t(std::stoul(static_cast<const std::string&>(v), nullptr, 16));
              }
          }
          if (!base64 || !subType)
@@ -1392,6 +1362,7 @@ static constexpr std::pair<std::string_view, FancyParser> bson_fancy_parsers[] =
          util::Optional<std::vector<char>> decoded_chars = util::base64_decode_to_vector(stringData);
          if (!decoded_chars)
              throw BsonError("Invalid base64 in $binary");
+
          if (subType == 0x04) { // UUID
              UUID::UUIDBytes bytes{};
              std::copy_n(decoded_chars->data(), bytes.size(), bytes.begin());
@@ -1402,51 +1373,52 @@ static constexpr std::pair<std::string_view, FancyParser> bson_fancy_parsers[] =
          }
      }},
     {"$date",
-     +[](const Json& json) {
-         int64_t millis_since_epoch = dom_elem_to_bson(json).operator int64_t();
+     +[](const Bson& bson) {
+         int64_t millis_since_epoch = static_cast<int64_t>(bson);
          return Bson(realm::Timestamp(millis_since_epoch / 1000,
                                       (millis_since_epoch % 1000) * 1'000'000)); // ms -> ns
      }},
     {"$maxKey",
-     +[](const Json&) {
+     +[](const Bson&) {
          return Bson(MaxKey());
      }},
     {"$minKey",
-     +[](const Json&) {
+     +[](const Bson&) {
          return Bson(MinKey());
      }},
     {"$numberDecimal",
-     +[](const Json& json) {
-         return Bson(Decimal128(tosd(json.get<std::string>())));
+     +[](const Bson& bson) {
+         return Bson(Decimal128(static_cast<const std::string&>(bson)));
      }},
     {"$numberDouble",
-     +[](const Json& json) {
-         return Bson(std::stod(json.get<std::string>()));
+     +[](const Bson& bson) {
+         return Bson(std::stod(static_cast<const std::string&>(bson)));
      }},
     {"$numberInt",
-     +[](const Json& json) {
-         return Bson(int32_t(std::stoi(json.get<std::string>())));
+     +[](const Bson& bson) {
+         return Bson(int32_t(std::stoi(static_cast<const std::string&>(bson))));
      }},
     {"$numberLong",
-     +[](const Json& json) {
-         return Bson(int64_t(std::stoll(json.get<std::string>())));
+     +[](const Bson& bson) {
+         return Bson(int64_t(std::stoll(static_cast<const std::string&>(bson))));
      }},
     {"$oid",
-     +[](const Json& json) {
-         return Bson(ObjectId(json.get<std::string>().c_str()));
+     +[](const Bson& bson) {
+         return Bson(ObjectId(static_cast<const std::string&>(bson).c_str()));
      }},
     {"$regularExpression",
-     +[](const Json& json) {
+     +[](const Bson& bson) {
+         auto& document = static_cast<const bson::BsonDocument&>(bson);
          util::Optional<std::string> pattern;
          util::Optional<std::string> options;
-         if (json.size() != 2)
+         if (document.size() != 2)
              throw BsonError("invalid extended json $binary");
-         for (auto&& [k, v] : json.items()) {
+         for (const auto& [k, v] : document) {
              if (k == "pattern") {
-                 pattern = v.get<std::string>();
+                 pattern = static_cast<const std::string&>(v);
              }
              else if (k == "options") {
-                 options = v.get<std::string>();
+                 options = static_cast<const std::string&>(v);
              }
          }
          if (!pattern || !options)
@@ -1454,17 +1426,18 @@ static constexpr std::pair<std::string_view, FancyParser> bson_fancy_parsers[] =
          return Bson(RegularExpression(std::move(*pattern), std::move(*options)));
      }},
     {"$timestamp",
-     +[](const Json& json) {
+     +[](const Bson& bson) {
+         auto& document = static_cast<const bson::BsonDocument&>(bson);
          util::Optional<uint32_t> t;
          util::Optional<uint32_t> i;
-         if (json.size() != 2)
+         if (document.size() != 2)
              throw BsonError("invalid extended json $timestamp");
-         for (auto&& [k, v] : json.items()) {
+         for (const auto& [k, v] : document) {
              if (k == "t") {
-                 t = v.get<uint32_t>();
+                 t = uint32_t(static_cast<int64_t>(v));
              }
              else if (k == "i") {
-                 i = v.get<uint32_t>();
+                 i = uint32_t(static_cast<int64_t>(v));
              }
          }
          if (!t || !i)
@@ -1472,66 +1445,178 @@ static constexpr std::pair<std::string_view, FancyParser> bson_fancy_parsers[] =
          return Bson(MongoTimestamp(*t, *i));
      }},
     {"$uuid",
-     +[](const Json& json) {
-         std::string uuid = json.get<std::string>();
+     +[](const Bson& bson) {
+         std::string uuid = static_cast<const std::string&>(bson);
          return Bson(UUID(uuid));
      }},
-};
+}};
 
-constexpr auto parser_comp = [](const std::pair<std::string_view, FancyParser>& lhs,
-                                const std::pair<std::string_view, FancyParser>& rhs) {
-    return lhs.first < rhs.first;
-};
-
-// TODO do this instead in C++20
-// static_assert(std::ranges::is_sorted(bson_fancy_parsers, parser_comp));
-#if REALM_DEBUG
-[[maybe_unused]] bool check_sort_on_startup = [] {
-    REALM_ASSERT(std::is_sorted(std::begin(bson_fancy_parsers), std::end(bson_fancy_parsers), parser_comp));
-    return false;
-}();
-#endif
-
-Bson dom_obj_to_bson(const Json& json)
+Parser::State* Parser::State::array_begin()
 {
-    if (json.size() == 1) {
-        const auto& [key, value] = json.items().begin();
-        if (key[0] == '$') {
-            auto it = std::lower_bound(std::begin(bson_fancy_parsers), std::end(bson_fancy_parsers),
-                                       std::pair<std::string_view, FancyParser>(key, nullptr), parser_comp);
-            if (it != std::end(bson_fancy_parsers) && it->first == key) {
-                return it->second(value);
-            }
-        }
-    }
-    else if (json.size() == 2) {
-        const auto& [key, value] = json.items().begin();
-        if (key[0] == '$') {
-            auto it = std::lower_bound(std::begin(bson_fancy_parsers), std::end(bson_fancy_parsers),
-                                       std::pair<std::string_view, FancyParser>(key, nullptr), parser_comp);
-            if (it != std::end(bson_fancy_parsers) && it->first == key) {
-                return it->second(json);
-            }
-        }
-    }
+    parser->work.emplace(bson::BsonArray());
+    return &parser->array_insert;
+}
 
-    BsonDocument out;
-    for (auto&& [k, v] : json.items()) {
-        out.append(k, dom_elem_to_bson(v));
+Parser::State* Parser::State::object_begin()
+{
+    parser->work.push(bson::BsonDocument());
+    return &parser->accept_key;
+}
+
+Parser::State* Parser::Idle::value(Bson val)
+{
+    parser->work.emplace(std::move(val));
+    return this;
+}
+
+Parser::State* Parser::ArrayInsert::value(Bson val)
+{
+    static_cast<bson::BsonArray&>(parser->work.top()).append(std::move(val));
+    return this;
+}
+
+Parser::State* Parser::ArrayInsert::end()
+{
+    bson::Bson b = std::move(parser->work.top());
+    parser->work.pop();
+    return parser->reduce(std::move(b));
+}
+
+Parser::State* Parser::AcceptKey::value(Bson val)
+{
+    parser->keys.push_back(static_cast<std::string&>(val));
+    return &parser->accept_value;
+}
+
+Parser::State* Parser::AcceptKey::end()
+{
+    // Document done
+    bson::Bson b = std::move(parser->work.top());
+    parser->work.pop();
+    REALM_ASSERT(b.type() == bson::Bson::Type::Document);
+    auto& document = static_cast<bson::BsonDocument&>(b);
+    if (document.size() == 1) {
+        auto first_pair = document.begin();
+        auto key = first_pair->first;
+        if (key[0] == '$') {
+            auto it = std::lower_bound(fancy_parsers.begin(), fancy_parsers.end(),
+                                       std::pair<std::string_view, FancyParser>(key, nullptr), parser_comp);
+            if (it != parser->fancy_parsers.end() && it->first == key) {
+                b = it->second(first_pair->second);
+            }
+        }
     }
-    return out;
+    return parser->reduce(std::move(b));
+}
+
+Parser::State* Parser::AcceptValue::value(Bson val)
+{
+    bson::Bson& top = parser->work.top();
+    static_cast<bson::BsonDocument&>(top).append(parser->keys.back(), std::move(val));
+    parser->keys.pop_back();
+    return &parser->accept_key;
+}
+
+Bson Parser::parse(util::Span<const char> json)
+{
+    using Parser = util::JSONParser;
+    using EventType = Parser::EventType;
+
+    Parser string_parser{json};
+    auto ec = string_parser.parse([&](auto&& event) -> std::error_condition {
+        State* next_state = nullptr;
+
+        switch (event.type) {
+            case EventType::number_integer: {
+                auto i = event.integer;
+                auto i32 = int32_t(i);
+                if (i == i32) {
+                    next_state = state->value(i32);
+                }
+                else {
+                    next_state = state->value(i);
+                }
+                break;
+            }
+            case EventType::number_float:
+                next_state = state->value(event.number);
+                break;
+            case EventType::string: {
+                StringData escaped_string = event.escaped_string_value();
+                std::vector<char> buffer(escaped_string.size());
+                next_state = state->value(std::string(event.unescape_string(buffer.data())));
+                break;
+            }
+            case EventType::boolean:
+                next_state = state->value(event.boolean);
+                break;
+            case EventType::array_begin:
+                next_state = state->array_begin();
+                break;
+            case EventType::array_end:
+                next_state = state->end();
+                break;
+            case EventType::object_begin:
+                next_state = state->object_begin();
+                break;
+            case EventType::object_end:
+                next_state = state->end();
+                break;
+            case EventType::null:
+                next_state = state->value(Bson());
+                break;
+        }
+        if (!next_state) {
+            return Parser::Error::unexpected_token;
+        }
+        state = next_state;
+        return std::error_condition{};
+    });
+    if (ec) {
+        throw std::logic_error(ec.message());
+    }
+    REALM_ASSERT(work.size() == 1);
+    return std::move(work.top());
+}
+
+Parser::State* Parser::reduce(Bson&& b)
+{
+    if (work.empty()) {
+        // we must be done
+        work.emplace(std::move(b));
+        return &idle;
+    }
+    bson::Bson& top = work.top();
+    if (top.type() == bson::Bson::Type::Array) {
+        static_cast<bson::BsonArray&>(top).append(std::move(b));
+        return &array_insert;
+    }
+    if (top.type() == bson::Bson::Type::Document) {
+        static_cast<bson::BsonDocument&>(top).append(keys.back(), std::move(b));
+        keys.pop_back();
+        return &accept_key;
+    }
+    return nullptr;
 }
 
 } // namespace
 
 Bson parse(util::Span<const char> json)
 {
-    return dom_elem_to_bson(Json::parse(json));
+    Parser p;
+    return p.parse(json);
 }
 
 bool accept(util::Span<const char> json) noexcept
 {
-    return Json::accept(json);
+    using Parser = util::JSONParser;
+
+    Parser string_parser{json};
+    auto ec = string_parser.parse([&](auto&&) -> std::error_condition {
+        return std::error_condition{};
+    });
+
+    return !bool(ec);
 }
 
 } // namespace bson

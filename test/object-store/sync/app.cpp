@@ -5124,9 +5124,7 @@ TEST_CASE("app: response error handling", "[sync][app]") {
         CHECK(!error.is_custom_error());
         CHECK(!error.is_service_error());
         CHECK(error.code() == ErrorCodes::MalformedJson);
-        CHECK(error.reason() ==
-              std::string("[json.exception.parse_error.101] parse error at line 1, column 2: syntax error "
-                          "while parsing value - invalid literal; last read: 'th'"));
+        CHECK(error.reason() == std::string("unexpected token"));
         CHECK(error.code_string() == "MalformedJson");
     }
 }

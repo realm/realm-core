@@ -1,7 +1,22 @@
 #include "test.hpp"
 
 #include <realm/util/json_parser.hpp>
+#include <realm/util/bson/bson.hpp>
+#include <realm/mixed.hpp>
 #include <iostream>
+#include <chrono>
+
+// #include <valgrind/callgrind.h>
+
+#ifndef CALLGRIND_START_INSTRUMENTATION
+#define CALLGRIND_START_INSTRUMENTATION
+#endif
+
+#ifndef CALLGRIND_STOP_INSTRUMENTATION
+#define CALLGRIND_STOP_INSTRUMENTATION
+#endif
+
+// valgrind --tool=callgrind --instr-atstart=no realm-tests
 
 using namespace realm;
 using namespace realm::util;
@@ -19,9 +34,10 @@ namespace {
 static const char g_events_test[] =
     "   {\"a\":\"b\",\t\"b\"    :[],\"c\": {\"d\":null,\"e\":123.13,\"f\": -199,\"g\":-2.3e9},\"h\":\"\\u00f8\"}";
 static const JSONParser::EventType g_expected_events[] = {
-    ET::object_begin, ET::string, ET::string,     ET::string, ET::array_begin, ET::array_end, ET::string,
-    ET::object_begin, ET::string, ET::null,       ET::string, ET::number,      ET::string,    ET::number,
-    ET::string,       ET::number, ET::object_end, ET::string, ET::string,      ET::object_end};
+    ET::object_begin, ET::string,       ET::string,       ET::string,         ET::array_begin,
+    ET::array_end,    ET::string,       ET::object_begin, ET::string,         ET::null,
+    ET::string,       ET::number_float, ET::string,       ET::number_integer, ET::string,
+    ET::number_float, ET::object_end,   ET::string,       ET::string,         ET::object_end};
 } // anonymous namespace
 
 
@@ -38,7 +54,7 @@ TEST(JSONParser_Basic)
         get_app_id,
     } state = initial;
     std::vector<char> buffer;
-    util::Optional<double> timestamp;
+    util::Optional<int64_t> timestamp;
     util::Optional<double> expires;
     util::Optional<std::string> app_id;
     std::vector<std::string> access;
@@ -97,8 +113,8 @@ TEST(JSONParser_Basic)
                 break;
             }
             case get_timestamp: {
-                if (event.type == JSONParser::EventType::number) {
-                    timestamp = event.number;
+                if (event.type == JSONParser::EventType::number_integer) {
+                    timestamp = event.integer;
                     state = in_object;
                     break;
                 }
@@ -234,11 +250,20 @@ TEST(JSONParser_PrimitiveDocuments)
 
     std::error_condition ec;
 
+    static const char int_root[] = "123";
+    JSONParser int_parser{int_root};
+    ec = int_parser.parse([&](auto&& event) noexcept {
+        CHECK_EQUAL(event.type, JSONParser::EventType::number_integer);
+        CHECK_EQUAL(event.integer, 123);
+        return std::error_condition{};
+    });
+    CHECK(!ec);
+
     static const char number_root[] = "123.0";
     JSONParser number_parser{number_root};
     ec = number_parser.parse([&](auto&& event) noexcept {
-        CHECK_EQUAL(event.type, JSONParser::EventType::number);
-        CHECK_EQUAL(event.number, 123);
+        CHECK_EQUAL(event.type, JSONParser::EventType::number_float);
+        CHECK_EQUAL(event.number, 123.0);
         return std::error_condition{};
     });
     CHECK(!ec);
@@ -247,8 +272,8 @@ TEST(JSONParser_PrimitiveDocuments)
     JSONParser string_parser{string_root};
     ec = string_parser.parse([&](auto&& event) noexcept {
         CHECK_EQUAL(event.type, JSONParser::EventType::string);
-        char buffer[8] = {0};
-        CHECK_EQUAL(event.unescape_string(buffer), "ø");
+        std::vector<char> buffer(8);
+        CHECK_EQUAL(event.unescape_string(buffer.data()), "ø");
         return std::error_condition{};
     });
     CHECK(!ec);

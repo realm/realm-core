@@ -7,6 +7,7 @@
 #include <cctype>
 
 #include <realm/string_data.hpp>
+#include <realm/util/span.hpp>
 
 namespace realm {
 namespace util {
@@ -21,7 +22,17 @@ class JSONParser {
 public:
     using InputIterator = const char*;
 
-    enum class EventType { number, string, boolean, null, array_begin, array_end, object_begin, object_end };
+    enum class EventType {
+        number_integer,
+        number_float,
+        string,
+        boolean,
+        null,
+        array_begin,
+        array_end,
+        object_begin,
+        object_end
+    };
 
     using Range = StringData;
 
@@ -36,6 +47,7 @@ public:
         union {
             bool boolean;
             double number;
+            int64_t integer;
         };
 
         StringData escaped_string_value() const noexcept;
@@ -55,7 +67,7 @@ public:
 
     enum class Error { unexpected_token = 1, unexpected_end_of_stream = 2 };
 
-    JSONParser(StringData);
+    JSONParser(util::Span<const char>);
 
     /// Parse the input data, and call f repeatedly with an argument of type Event
     /// representing the token that the parser encountered.
@@ -140,9 +152,9 @@ namespace util {
 /// Implementation:
 
 
-inline JSONParser::JSONParser(StringData input)
-    : m_current(input.data())
-    , m_end(input.data() + input.size())
+inline JSONParser::JSONParser(util::Span<const char> json)
+    : m_current(json.data())
+    , m_end(json.data() + json.size())
 {
 }
 
@@ -309,10 +321,21 @@ std::error_condition JSONParser::parse_number(F&& f) noexcept(noexcept(f(std::de
 
     std::copy(m_current, m_current + bytes_to_copy, buffer);
 
+    const char* p = buffer;
+    if (*p == '-')
+        ++p;
+    while (std::isdigit(*p))
+        ++p;
+    bool is_float = *p == '.';
     char* endp = nullptr;
-    Event event{EventType::number};
-    event.number = std::strtod(buffer, &endp);
-
+    Event event{is_float ? EventType::number_float : EventType::number_integer};
+    if (is_float) {
+        // Float
+        event.number = std::strtod(buffer, &endp);
+    }
+    else {
+        event.integer = std::strtoll(buffer, &endp, 10);
+    }
     if (endp == buffer) {
         return Error::unexpected_token;
     }
@@ -485,7 +508,10 @@ template <class OS>
 OS& operator<<(OS& os, JSONParser::EventType type)
 {
     switch (type) {
-        case JSONParser::EventType::number:
+        case JSONParser::EventType::number_integer:
+            os << "integer";
+            return os;
+        case JSONParser::EventType::number_float:
             os << "number";
             return os;
         case JSONParser::EventType::string:
@@ -518,7 +544,9 @@ OS& operator<<(OS& os, const JSONParser::Event& e)
 {
     os << e.type;
     switch (e.type) {
-        case JSONParser::EventType::number:
+        case JSONParser::EventType::number_integer:
+            return os << "(" << e.integer << ")";
+        case JSONParser::EventType::number_float:
             return os << "(" << e.number << ")";
         case JSONParser::EventType::string:
             return os << "(" << e.range << ")";

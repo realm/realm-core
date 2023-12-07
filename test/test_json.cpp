@@ -26,6 +26,7 @@
 #include <ostream>
 #include <sstream>
 #include <chrono>
+#include <iostream>
 
 #include <realm.hpp>
 #include <external/json/json.hpp>
@@ -918,6 +919,147 @@ TEST(Bson_Parse)
     json1.erase(it, json1.end());
 
     CHECK_EQUAL(json1, json);
+    bson_destroy(bson);
+}
+
+TEST(JSONParser_XJson)
+{
+    const char* root = R"([
+  {
+    "empty" : {},
+    "int": {
+      "$numberLong": "0"
+    },
+    "bool": false,
+    "date": {
+      "$date": {
+        "$numberLong": "12345000"
+      }
+    },
+    "float": 1.2345600e+02,
+    "double": {
+      "$numberDouble": "9.8765432099999998e+03"
+    },
+    "string": "tab\tnl\nend",
+    "string_long": "string0 very long string.........",
+    "string_big_blobs": "string0 very long string......... big blobs big blobs big blobs big blobs big blobs big blobs big blobs big blobs big blobs big blobs big blobs big blobs",
+    "string_enum": "enum1",
+    "binary": {
+      "$binary": {
+        "base64": "YmluYXJ5AA==",
+        "subType": "00"
+      }
+    },
+    "oid": {
+      "$oid": "112233445566778899aabbcc"
+    },
+    "decimal": {
+      "$numberDecimal": "1.2345"
+    },
+    "integers": [1,2,3],
+    "strings": ["Adam", "Bernie"],
+    "dictionary": {
+      "a": {
+        "$numberInt": "2"
+      }
+    },
+    "set": [
+      {
+        "$numberInt": "123"
+      }
+    ],
+    "uuid": {
+      "$binary": {
+        "base64": "AAAAAAAAAAAAAAAAAAAAAA==",
+        "subType": "04"
+      }
+    }
+  },
+{
+    "int": {
+      "$numberLong": "-1"
+    },
+    "bool": true,
+    "date": {
+      "$date": {
+        "$numberLong": "12345000"
+      }
+    },
+    "float": {
+      "$numberDouble": "-1.2345600e+02"
+    },
+    "double": {
+      "$numberDouble": "-9.8765432099999998e+03"
+    },
+    "string": "string1",
+    "string_long": "string1 very long string.........",
+    "string_big_blobs": "",
+    "string_enum": "enum2",
+    "binary": {
+      "$binary": {
+        "base64": "YmluYXJ5AA==",
+        "subType": "00"
+      }
+    },
+    "oid": {
+      "$oid": "000000000000000000000000"
+    },
+    "decimal": {
+      "$numberDecimal": "1.2345"
+    },
+    "integers": [
+      {
+        "$numberLong": "-123"
+      }
+    ],
+    "strings": [
+      "sub_-123"
+    ],
+    "dictionary": {
+      "a": {
+        "one" : 1,
+        "two" : 2
+      },
+      "b": {
+        "three" : 3,
+        "four" : 4
+      }
+    },
+    "set": [
+      {
+        "$numberLong": "123"
+      },
+      {
+        "$numberLong": "456"
+      }
+    ],
+    "uuid": {
+      "$binary": {
+        "base64": "AAAAAAAAAAAAAAAAAAAAAA==",
+        "subType": "04"
+      }
+    }
+  }
+    ])";
+
+    bson::Bson b1 = bson::parse({root, strlen(root)});
+    auto data2 = static_cast<bson::BsonArray&>(b1).serialize();
+
+    std::stringstream ss;
+    ss << b1;
+    // std::cout << b1 << std::endl;
+
+    // Create reference
+    auto bson = bson_new_from_json(reinterpret_cast<const uint8_t*>(root), -1, nullptr);
+    auto data1 = bson_get_data(bson);
+    CHECK_EQUAL(bson->len, data2.size());
+    if (!CHECK(memcmp(data1, data2.data(), data2.size()) == 0)) {
+        for (size_t i = 0; i < data2.size(); i++) {
+            if (data1[i] != uint8_t(data2[i])) {
+                std::cout << i << ": " << int(data1[i]) << " != " << int(uint8_t(data2[i])) << std::endl;
+            }
+        }
+    }
     bson_destroy(bson);
 }
 

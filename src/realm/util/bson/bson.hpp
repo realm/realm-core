@@ -128,8 +128,9 @@ public:
 
     explicit operator int64_t() const
     {
-        REALM_ASSERT(m_type == Bson::Type::Int64);
-        return int64_val;
+        if (m_type == Bson::Type::Int64)
+            return int64_val;
+        return int32_t(*this);
     }
 
     explicit operator bool() const
