@@ -8,6 +8,7 @@
 
 #include <realm/string_data.hpp>
 #include <realm/util/span.hpp>
+#include <realm/util/functional.hpp>
 
 namespace realm {
 namespace util {
@@ -64,10 +65,11 @@ public:
         /// possible length of a UTF-8 encoded codepoint.
         StringData unescape_string(char* buffer) const noexcept;
     };
+    using EventHandler = util::UniqueFunction<std::error_condition(const Event&)>;
 
     enum class Error { unexpected_token = 1, unexpected_end_of_stream = 2 };
 
-    JSONParser(util::Span<const char>);
+    JSONParser(EventHandler);
 
     /// Parse the input data, and call f repeatedly with an argument of type Event
     /// representing the token that the parser encountered.
@@ -75,10 +77,7 @@ public:
     /// The stream of events is "flat", which is to say that it is the responsibility
     /// of the function f to keep track of any nested object structures as it deems
     /// appropriate.
-    ///
-    /// This function is guaranteed to never throw, as long as f never throws.
-    template <class F>
-    std::error_condition parse(F&& f) noexcept(noexcept(f(std::declval<Event>())));
+    std::error_condition parse(util::Span<const char>);
 
     class ErrorCategory : public std::error_category {
     public:
@@ -104,25 +103,18 @@ private:
         lf = '\n',
     };
 
-    InputIterator m_current;
-    InputIterator m_end;
+    InputIterator m_current = nullptr;
+    InputIterator m_end = nullptr;
+    EventHandler m_handler;
 
-    template <class F>
-    std::error_condition parse_object(F&& f) noexcept(noexcept(f(std::declval<Event>())));
-    template <class F>
-    std::error_condition parse_pair(F&& f) noexcept(noexcept(f(std::declval<Event>())));
-    template <class F>
-    std::error_condition parse_array(F&& f) noexcept(noexcept(f(std::declval<Event>())));
-    template <class F>
-    std::error_condition parse_number(F&& f) noexcept(noexcept(f(std::declval<Event>())));
-    template <class F>
-    std::error_condition parse_string(F&& f) noexcept(noexcept(f(std::declval<Event>())));
-    template <class F>
-    std::error_condition parse_value(F&& f) noexcept(noexcept(f(std::declval<Event>())));
-    template <class F>
-    std::error_condition parse_boolean(F&& f) noexcept(noexcept(f(std::declval<Event>())));
-    template <class F>
-    std::error_condition parse_null(F&& f) noexcept(noexcept(f(std::declval<Event>())));
+    std::error_condition parse_object();
+    std::error_condition parse_pair();
+    std::error_condition parse_array();
+    std::error_condition parse_number();
+    std::error_condition parse_string();
+    std::error_condition parse_value();
+    std::error_condition parse_boolean();
+    std::error_condition parse_null();
 
     std::error_condition expect_token(char, Range& out_range) noexcept;
     std::error_condition expect_token(Token, Range& out_range) noexcept;
@@ -152,294 +144,16 @@ namespace util {
 /// Implementation:
 
 
-inline JSONParser::JSONParser(util::Span<const char> json)
-    : m_current(json.data())
-    , m_end(json.data() + json.size())
+inline JSONParser::JSONParser(EventHandler f)
+    : m_handler(std::move(f))
 {
 }
 
-template <class F>
-std::error_condition JSONParser::parse(F&& f) noexcept(noexcept(f(std::declval<Event>())))
+inline std::error_condition JSONParser::parse(util::Span<const char> input)
 {
-    return parse_value(f);
-}
-
-template <class F>
-std::error_condition JSONParser::parse_object(F&& f) noexcept(noexcept(f(std::declval<Event>())))
-{
-    Event event{EventType::object_begin};
-    auto ec = expect_token(Token::object_begin, event.range);
-    if (ec)
-        return ec;
-    ec = f(event);
-    if (ec)
-        return ec;
-
-    while (true) {
-        ec = expect_token(Token::object_end, event.range);
-        if (!ec) {
-            // End of object
-            event.type = EventType::object_end;
-            ec = f(event);
-            if (ec)
-                return ec;
-            break;
-        }
-
-        if (ec != Error::unexpected_token)
-            return ec;
-
-        ec = parse_pair(f);
-        if (ec)
-            return ec;
-
-        skip_whitespace();
-
-        Token t;
-        if (peek_token(t)) {
-            if (t == Token::object_end) {
-                // Fine, will terminate on next iteration
-            }
-            else if (t == Token::comma)
-                ++m_current; // OK, because peek_char returned true
-            else
-                return Error::unexpected_token;
-        }
-        else {
-            return Error::unexpected_end_of_stream;
-        }
-    }
-
-    return std::error_condition{};
-}
-
-template <class F>
-std::error_condition JSONParser::parse_pair(F&& f) noexcept(noexcept(f(std::declval<Event>())))
-{
-    skip_whitespace();
-
-    auto ec = parse_string(f);
-    if (ec)
-        return ec;
-
-    skip_whitespace();
-
-    Token t;
-    if (peek_token(t)) {
-        if (t == Token::colon) {
-            ++m_current;
-        }
-        else {
-            return Error::unexpected_token;
-        }
-    }
-
-    return parse_value(f);
-}
-
-template <class F>
-std::error_condition JSONParser::parse_array(F&& f) noexcept(noexcept(f(std::declval<Event>())))
-{
-    Event event{EventType::array_begin};
-    auto ec = expect_token(Token::array_begin, event.range);
-    if (ec)
-        return ec;
-    ec = f(event);
-    if (ec)
-        return ec;
-
-    while (true) {
-        ec = expect_token(Token::array_end, event.range);
-        if (!ec) {
-            // End of array
-            event.type = EventType::array_end;
-            ec = f(event);
-            if (ec)
-                return ec;
-            break;
-        }
-
-        if (ec != Error::unexpected_token)
-            return ec;
-
-        ec = parse_value(f);
-        if (ec)
-            return ec;
-
-        skip_whitespace();
-
-        Token t;
-        if (peek_token(t)) {
-            if (t == Token::array_end) {
-                // Fine, will terminate next iteration.
-            }
-            else if (t == Token::comma)
-                ++m_current; // OK, because peek_char returned true
-            else
-                return Error::unexpected_token;
-        }
-        else {
-            return Error::unexpected_end_of_stream;
-        }
-    }
-
-    return std::error_condition{};
-}
-
-template <class F>
-std::error_condition JSONParser::parse_number(F&& f) noexcept(noexcept(f(std::declval<Event>())))
-{
-    static const size_t buffer_size = 64;
-    char buffer[buffer_size] = {0};
-    size_t bytes_to_copy = std::min<size_t>(m_end - m_current, buffer_size - 1);
-    if (bytes_to_copy == 0)
-        return Error::unexpected_end_of_stream;
-
-    if (std::isspace(*m_current)) {
-        // JSON has a different idea of what constitutes whitespace than isspace(),
-        // but strtod() uses isspace() to skip initial whitespace. We have already
-        // skipped whitespace that JSON considers valid, so if there is any whitespace
-        // at m_current now, it is invalid according to JSON, and so is an error.
-        return Error::unexpected_token;
-    }
-
-    switch (m_current[0]) {
-        case 'N':
-            // strtod() parses "NAN", JSON does not.
-        case 'I':
-            // strtod() parses "INF", JSON does not.
-        case 'p':
-        case 'P':
-            // strtod() may parse exponent notation, JSON does not.
-            return Error::unexpected_token;
-        case '0':
-            if (bytes_to_copy > 2 && (m_current[1] == 'x' || m_current[1] == 'X')) {
-                // strtod() parses hexadecimal, JSON does not.
-                return Error::unexpected_token;
-            }
-    }
-
-    std::copy(m_current, m_current + bytes_to_copy, buffer);
-
-    const char* p = buffer;
-    if (*p == '-')
-        ++p;
-    while (std::isdigit(*p))
-        ++p;
-    bool is_float = *p == '.';
-    char* endp = nullptr;
-    Event event{is_float ? EventType::number_float : EventType::number_integer};
-    if (is_float) {
-        // Float
-        event.number = std::strtod(buffer, &endp);
-    }
-    else {
-        event.integer = std::strtoll(buffer, &endp, 10);
-    }
-    if (endp == buffer) {
-        return Error::unexpected_token;
-    }
-    size_t num_bytes_consumed = endp - buffer;
-    m_current += num_bytes_consumed;
-    return f(event);
-}
-
-template <class F>
-std::error_condition JSONParser::parse_string(F&& f) noexcept(noexcept(f(std::declval<Event>())))
-{
-    InputIterator p = m_current;
-    if (p >= m_end)
-        return Error::unexpected_end_of_stream;
-
-    auto count_num_escapes_backwards = [](const char* p, const char* begin) -> size_t {
-        size_t result = 0;
-        for (; p > begin && *p == Token::escape; ++p)
-            ++result;
-        return result;
-    };
-
-    Token t = static_cast<Token>(*p);
-    InputIterator inner_end;
-    if (t == Token::dquote) {
-        inner_end = m_current;
-        do {
-            inner_end = std::find(inner_end + 1, m_end, Token::dquote);
-            if (inner_end == m_end)
-                return Error::unexpected_end_of_stream;
-        } while (count_num_escapes_backwards(inner_end - 1, m_current) % 2 == 1);
-
-        Event event{EventType::string};
-        event.range = Range(m_current, inner_end - m_current + 1);
-        m_current = inner_end + 1;
-        return f(event);
-    }
-    return Error::unexpected_token;
-}
-
-template <class F>
-std::error_condition JSONParser::parse_boolean(F&& f) noexcept(noexcept(f(std::declval<Event>())))
-{
-    auto first_nonalpha = std::find_if_not(m_current, m_end, [](auto c) {
-        return std::isalpha(c);
-    });
-
-    Event event{EventType::boolean};
-    event.range = Range(m_current, first_nonalpha - m_current);
-    if (event.range == "true") {
-        event.boolean = true;
-        m_current += 4;
-        return f(event);
-    }
-    else if (event.range == "false") {
-        event.boolean = false;
-        m_current += 5;
-        return f(event);
-    }
-
-    return Error::unexpected_token;
-}
-
-template <class F>
-std::error_condition JSONParser::parse_null(F&& f) noexcept(noexcept(f(std::declval<Event>())))
-{
-    auto first_nonalpha = std::find_if_not(m_current, m_end, [](auto c) {
-        return std::isalpha(c);
-    });
-
-    Event event{EventType::null};
-    event.range = Range(m_current, first_nonalpha - m_current);
-    if (event.range == "null") {
-        m_current += 4;
-        return f(event);
-    }
-
-    return Error::unexpected_token;
-}
-
-template <class F>
-std::error_condition JSONParser::parse_value(F&& f) noexcept(noexcept(f(std::declval<Event>())))
-{
-    skip_whitespace();
-
-    if (m_current >= m_end)
-        return Error::unexpected_end_of_stream;
-
-    if (*m_current == Token::object_begin)
-        return parse_object(f);
-
-    if (*m_current == Token::array_begin)
-        return parse_array(f);
-
-    if (*m_current == 't' || *m_current == 'f')
-        return parse_boolean(f);
-
-    if (*m_current == 'n')
-        return parse_null(f);
-
-    if (*m_current == Token::dquote)
-        return parse_string(f);
-
-    return parse_number(f);
+    m_current = input.data();
+    m_end = input.data() + input.size();
+    return parse_value();
 }
 
 inline bool JSONParser::is_whitespace(Token t) noexcept

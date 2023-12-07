@@ -270,9 +270,11 @@ bool AccessToken::parseJWT(StringData signed_token, AccessToken& token, ParseErr
     StringData payload = StringData{payload_vec->data(), payload_vec->size()};
 
     // Parse decoded user token
-    JSONParser parser{payload};
     AccessTokenParser token_parser;
-    auto json_error = parser.parse(token_parser);
+    JSONParser parser([&token_parser](auto&& event) {
+        return token_parser(event);
+    });
+    auto json_error = parser.parse(payload);
 
     if (json_error) {
         error = ParseError::invalid_json;
@@ -343,9 +345,11 @@ bool AccessToken::parse(StringData signed_token, AccessToken& token, ParseError&
     }
 
     // Parse decoded user token
-    JSONParser parser{token_2};
     AccessTokenParser token_parser;
-    auto json_error = parser.parse(token_parser);
+    JSONParser parser([&token_parser](auto&& event) {
+        return token_parser(event);
+    });
+    auto json_error = parser.parse(token_2);
 
     if (json_error) {
         error = ParseError::invalid_json;

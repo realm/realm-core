@@ -1519,59 +1519,57 @@ Parser::State* Parser::AcceptValue::value(Bson val)
 
 Bson Parser::parse(util::Span<const char> json)
 {
-    using Parser = util::JSONParser;
-    using EventType = Parser::EventType;
+    auto ec = util::JSONParser([this](auto&& event) -> std::error_condition {
+                  using EventType = util::JSONParser::EventType;
+                  State* next_state = nullptr;
 
-    Parser string_parser{json};
-    auto ec = string_parser.parse([&](auto&& event) -> std::error_condition {
-        State* next_state = nullptr;
+                  switch (event.type) {
+                      case EventType::number_integer: {
+                          auto i = event.integer;
+                          auto i32 = int32_t(i);
+                          if (i == i32) {
+                              next_state = state->value(i32);
+                          }
+                          else {
+                              next_state = state->value(i);
+                          }
+                          break;
+                      }
+                      case EventType::number_float:
+                          next_state = state->value(event.number);
+                          break;
+                      case EventType::string: {
+                          StringData escaped_string = event.escaped_string_value();
+                          std::vector<char> buffer(escaped_string.size());
+                          next_state = state->value(std::string(event.unescape_string(buffer.data())));
+                          break;
+                      }
+                      case EventType::boolean:
+                          next_state = state->value(event.boolean);
+                          break;
+                      case EventType::array_begin:
+                          next_state = state->array_begin();
+                          break;
+                      case EventType::array_end:
+                          next_state = state->end();
+                          break;
+                      case EventType::object_begin:
+                          next_state = state->object_begin();
+                          break;
+                      case EventType::object_end:
+                          next_state = state->end();
+                          break;
+                      case EventType::null:
+                          next_state = state->value(Bson());
+                          break;
+                  }
+                  if (!next_state) {
+                      return util::JSONParser::Error::unexpected_token;
+                  }
+                  state = next_state;
+                  return std::error_condition{};
+              }).parse(json);
 
-        switch (event.type) {
-            case EventType::number_integer: {
-                auto i = event.integer;
-                auto i32 = int32_t(i);
-                if (i == i32) {
-                    next_state = state->value(i32);
-                }
-                else {
-                    next_state = state->value(i);
-                }
-                break;
-            }
-            case EventType::number_float:
-                next_state = state->value(event.number);
-                break;
-            case EventType::string: {
-                StringData escaped_string = event.escaped_string_value();
-                std::vector<char> buffer(escaped_string.size());
-                next_state = state->value(std::string(event.unescape_string(buffer.data())));
-                break;
-            }
-            case EventType::boolean:
-                next_state = state->value(event.boolean);
-                break;
-            case EventType::array_begin:
-                next_state = state->array_begin();
-                break;
-            case EventType::array_end:
-                next_state = state->end();
-                break;
-            case EventType::object_begin:
-                next_state = state->object_begin();
-                break;
-            case EventType::object_end:
-                next_state = state->end();
-                break;
-            case EventType::null:
-                next_state = state->value(Bson());
-                break;
-        }
-        if (!next_state) {
-            return Parser::Error::unexpected_token;
-        }
-        state = next_state;
-        return std::error_condition{};
-    });
     if (ec) {
         throw std::logic_error(ec.message());
     }
@@ -1611,10 +1609,10 @@ bool accept(util::Span<const char> json) noexcept
 {
     using Parser = util::JSONParser;
 
-    Parser string_parser{json};
-    auto ec = string_parser.parse([&](auto&&) -> std::error_condition {
+    Parser string_parser{[&](auto&&) -> std::error_condition {
         return std::error_condition{};
-    });
+    }};
+    auto ec = string_parser.parse(json);
 
     return !bool(ec);
 }

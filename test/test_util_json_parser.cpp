@@ -43,7 +43,6 @@ static const JSONParser::EventType g_expected_events[] = {
 
 TEST(JSONParser_Basic)
 {
-    JSONParser parser{g_basic_object};
     enum {
         initial,
         in_object,
@@ -65,7 +64,7 @@ TEST(JSONParser_Basic)
         return event.unescape_string(buffer.data());
     };
 
-    auto ec = parser.parse([&](auto&& event) -> std::error_condition {
+    JSONParser parser{[&](auto& event) -> std::error_condition {
         switch (state) {
             case initial: {
                 if (event.type == JSONParser::EventType::object_begin)
@@ -137,8 +136,8 @@ TEST(JSONParser_Basic)
             }
         }
         return std::error_condition{};
-    });
-
+    }};
+    auto ec = parser.parse(g_basic_object);
     CHECK(!ec);
     CHECK_EQUAL(state, in_object);
     CHECK_EQUAL(*timestamp, 1455530614);
@@ -194,53 +193,48 @@ TEST(JSONParser_UnescapeString)
 
 TEST(JSONParser_Events)
 {
-    JSONParser parser{g_events_test};
     size_t i = 0;
-    parser.parse([&](auto&& event) noexcept {
+    JSONParser([&](auto&& event) noexcept {
         if (event.type != g_expected_events[i]) {
             CHECK(event.type == g_expected_events[i]);
             std::cerr << "Event did not match: " << event << " (at " << i << ")\n";
         }
         ++i;
         return std::error_condition{};
-    });
+    }).parse(g_events_test);
     CHECK_EQUAL(i, sizeof(g_expected_events) / sizeof(g_expected_events[0]));
 }
 
 TEST(JSONParser_PropagateError)
 {
-    JSONParser parser{g_events_test};
-    auto ec = parser.parse([&](auto&& event) noexcept {
-        if (event.type == ET::null) {
-            return std::error_condition{std::errc::argument_out_of_domain}; // just anything
-        }
-        return std::error_condition{};
-    });
+    auto ec = JSONParser([&](auto&& event) noexcept {
+                  if (event.type == ET::null) {
+                      return std::error_condition{std::errc::argument_out_of_domain}; // just anything
+                  }
+                  return std::error_condition{};
+              }).parse(g_events_test);
     CHECK(ec);
     CHECK(ec == std::errc::argument_out_of_domain);
 }
 
 TEST(JSONParser_Whitespace)
 {
-    auto dummy_callback = [](auto&&) noexcept {
+    JSONParser invalid_whitespace_parser([](auto&&) noexcept {
         return std::error_condition{};
-    };
+    });
     std::error_condition ec;
 
     static const char initial_whitespace[] = "  \t{}";
-    JSONParser initial_whitespace_parser{initial_whitespace};
-    ec = initial_whitespace_parser.parse(dummy_callback);
+    ec = invalid_whitespace_parser.parse(initial_whitespace);
     CHECK(!ec);
 
     // std::isspace considers \f and \v whitespace, but the JSON standard doesn't.
     static const char invalid_whitespace_f[] = "{\"a\":\f1}";
-    JSONParser invalid_whitespace_f_parser{invalid_whitespace_f};
-    ec = invalid_whitespace_f_parser.parse(dummy_callback);
+    ec = invalid_whitespace_parser.parse(invalid_whitespace_f);
     CHECK(ec == JSONParser::Error::unexpected_token);
 
     static const char invalid_whitespace_v[] = "{\"a\":\v2}";
-    JSONParser invalid_whitepsace_v_parser{invalid_whitespace_v};
-    ec = invalid_whitepsace_v_parser.parse(dummy_callback);
+    ec = invalid_whitespace_parser.parse(invalid_whitespace_v);
     CHECK(ec == JSONParser::Error::unexpected_token);
 }
 
@@ -251,55 +245,49 @@ TEST(JSONParser_PrimitiveDocuments)
     std::error_condition ec;
 
     static const char int_root[] = "123";
-    JSONParser int_parser{int_root};
-    ec = int_parser.parse([&](auto&& event) noexcept {
-        CHECK_EQUAL(event.type, JSONParser::EventType::number_integer);
-        CHECK_EQUAL(event.integer, 123);
-        return std::error_condition{};
-    });
+    ec = JSONParser([&](auto&& event) noexcept {
+             CHECK_EQUAL(event.type, JSONParser::EventType::number_integer);
+             CHECK_EQUAL(event.integer, 123);
+             return std::error_condition{};
+         }).parse(int_root);
     CHECK(!ec);
 
     static const char number_root[] = "123.0";
-    JSONParser number_parser{number_root};
-    ec = number_parser.parse([&](auto&& event) noexcept {
-        CHECK_EQUAL(event.type, JSONParser::EventType::number_float);
-        CHECK_EQUAL(event.number, 123.0);
-        return std::error_condition{};
-    });
+    ec = JSONParser([&](auto&& event) noexcept {
+             CHECK_EQUAL(event.type, JSONParser::EventType::number_float);
+             CHECK_EQUAL(event.number, 123.0);
+             return std::error_condition{};
+         }).parse(number_root);
     CHECK(!ec);
 
     static const char string_root[] = "\"\\u00f8\"";
-    JSONParser string_parser{string_root};
-    ec = string_parser.parse([&](auto&& event) noexcept {
-        CHECK_EQUAL(event.type, JSONParser::EventType::string);
-        std::vector<char> buffer(8);
-        CHECK_EQUAL(event.unescape_string(buffer.data()), "ø");
-        return std::error_condition{};
-    });
+    ec = JSONParser([&](auto&& event) noexcept {
+             CHECK_EQUAL(event.type, JSONParser::EventType::string);
+             std::vector<char> buffer(8);
+             CHECK_EQUAL(event.unescape_string(buffer.data()), "ø");
+             return std::error_condition{};
+         }).parse(string_root);
     CHECK(!ec);
 
     static const char bool_root[] = "false";
-    JSONParser bool_parser{bool_root};
-    ec = bool_parser.parse([&](auto&& event) noexcept {
-        CHECK_EQUAL(event.type, JSONParser::EventType::boolean);
-        CHECK(!event.boolean);
-        return std::error_condition{};
-    });
+    ec = JSONParser([&](auto&& event) noexcept {
+             CHECK_EQUAL(event.type, JSONParser::EventType::boolean);
+             CHECK(!event.boolean);
+             return std::error_condition{};
+         }).parse(bool_root);
     CHECK(!ec);
 
     static const char null_root[] = "null";
-    JSONParser null_parser{null_root};
-    ec = null_parser.parse([&](auto&& event) noexcept {
-        CHECK_EQUAL(event.type, JSONParser::EventType::null);
-        return std::error_condition{};
-    });
+    ec = JSONParser([&](auto&& event) noexcept {
+             CHECK_EQUAL(event.type, JSONParser::EventType::null);
+             return std::error_condition{};
+         }).parse(null_root);
     CHECK(!ec);
 
     static const char invalid_root[] = "blah";
-    JSONParser invalid_parser(invalid_root);
-    ec = invalid_parser.parse([&](auto&&) noexcept {
-        return std::error_condition{};
-    });
+    ec = JSONParser([&](auto&&) noexcept {
+             return std::error_condition{};
+         }).parse(invalid_root);
     CHECK(ec == JSONParser::Error::unexpected_token);
 }
 
@@ -308,29 +296,25 @@ TEST(JSONParser_ArrayDocument)
     std::error_condition ec;
 
     static const char array_root[] = "[]";
-    JSONParser array_parser{array_root};
-    ec = array_parser.parse([](auto&&) noexcept {
-        return std::error_condition{};
-    });
+    ec = JSONParser([](auto&&) noexcept {
+             return std::error_condition{};
+         }).parse(array_root);
     CHECK(!ec);
 
     static const char invalid_array_root[] = "[";
-    JSONParser invalid_array_parser{invalid_array_root};
-    ec = invalid_array_parser.parse([](auto&&) noexcept {
-        return std::error_condition{};
-    });
+    ec = JSONParser([](auto&&) noexcept {
+             return std::error_condition{};
+         }).parse(invalid_array_root);
     CHECK(ec == JSONParser::Error::unexpected_end_of_stream);
 }
 
 TEST(JSONParser_StringTermination)
 {
     static const char string_root[] = "\"\\\\\\\"\"";
-    JSONParser string_parser{string_root};
-    std::error_condition ec;
-    ec = string_parser.parse([&](auto&& event) noexcept {
-        CHECK_EQUAL(event.type, JSONParser::EventType::string);
-        CHECK_EQUAL(event.escaped_string_value(), "\\\\\\\"");
-        return std::error_condition{};
-    });
+    auto ec = JSONParser([&](auto&& event) noexcept {
+                  CHECK_EQUAL(event.type, JSONParser::EventType::string);
+                  CHECK_EQUAL(event.escaped_string_value(), "\\\\\\\"");
+                  return std::error_condition{};
+              }).parse(string_root);
     CHECK(!ec);
 }
