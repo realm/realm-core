@@ -105,8 +105,11 @@ void Node::alloc(size_t init_size, size_t new_width)
     // needed_bytes are never larger than max_array_payload.
     REALM_ASSERT_RELEASE(init_size <= max_array_size);
 
-    if (is_read_only())
+    if (is_read_only()) {
         do_copy_on_write(needed_bytes);
+        // header will have changed:
+        header = get_header_from_data(m_data);
+    }
 
     REALM_ASSERT(!m_alloc.is_read_only(m_ref));
     size_t orig_capacity_bytes = get_capacity_from_header(header);
