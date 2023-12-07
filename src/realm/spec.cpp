@@ -538,8 +538,12 @@ bool Spec::operator==(const Spec& spec) const noexcept
 
 ColKey Spec::get_key(size_t column_ndx) const
 {
-    auto key = ColKey(m_keys.get(column_ndx));
-    REALM_ASSERT(key.get_type().is_valid());
+    auto val = m_keys.get(column_ndx);
+    auto key = ColKey(val);
+    //when type is not valid ... val == -128
+    auto type = key.get_type();
+    //type is 0x20 ObjectId | TypeLink ... in the test we are setting a backlink
+    REALM_ASSERT(type.is_valid());
     return key;
 }
 

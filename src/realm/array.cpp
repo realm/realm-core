@@ -209,8 +209,10 @@ int64_t Array::get(size_t ndx) const noexcept
 
 int64_t Array::get(size_t ndx) const noexcept
 {
-    if (is_encoded())
-        return m_encode.get(*this, ndx);
+    if (is_encoded()) {
+        auto v = m_encode.get(*this, ndx);
+        REALM_ASSERT(v != -128);
+    }
 
     REALM_ASSERT_DEBUG(is_attached());
     REALM_ASSERT_DEBUG_EX(ndx < m_size, ndx, m_size);
@@ -274,8 +276,13 @@ void Array::init_from_mem(MemRef mem) noexcept
     m_is_inner_bptree_node = get_is_inner_bptree_node_from_header(header);
     m_has_refs = get_hasrefs_from_header(header);
     m_context_flag = get_context_flag_from_header(header);
-    // it is unclear how to handle the width limits while compressed.
-    // they will likely need to be set explicitly as part of decompressing
+    
+    // width for B arrays is set based on the value stored in the header,
+    // hower we have lower and upper bound that are used in several places in the code
+    // that do not make sense for B arrays, as well as the width.
+    // In theory decompressing the array when we see a B array before to do any operation
+    // should suffice. But right now we are seeing bad values returned.
+    // Something is not adding up correctly while decompressing.
     update_width_cache_from_header();
 }
 
@@ -1381,9 +1388,10 @@ void Array::update_width_cache_from_header() noexcept
         // TODO: verify that this is correct for type B with encoding flex arrays, since width is not really needed
         // for flex arrays
         m_width = get_elementA_size<Encoding::Flex>(header);
-        m_lbound = lbound_for_width(align_bits_to8(m_width));
-        m_ubound = ubound_for_width(align_bits_to8(m_width));
-        REALM_TEMPEX(m_vtable = &VTableForWidth, align_bits_to8(m_width), ::vtable);
+        auto aligned_width = align_bits_to8(m_width);
+        m_lbound = lbound_for_width(aligned_width);
+        m_ubound = ubound_for_width(aligned_width);
+        REALM_TEMPEX(m_vtable = &VTableForWidth, aligned_width, ::vtable);
         m_getter = m_vtable->getter;
     }
     else {
@@ -1609,8 +1617,6 @@ size_t Array::find_first(int64_t value, size_t start, size_t end) const
 
 int_fast64_t Array::get(const char* header, size_t ndx) noexcept
 {
-    // this is going to break for compressed arrays
-    // TODO this is static method, the wee need to implement get based on a compressed array.
     if (NodeHeader::get_kind(header) == 'B') {
         REALM_ASSERT(NodeHeader::get_encoding(header) == NodeHeader::Encoding::Flex);
         return ArrayFlex::get(header, ndx);

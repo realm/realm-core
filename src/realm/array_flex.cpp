@@ -94,6 +94,7 @@ int64_t ArrayFlex::get(const Array& arr, size_t ndx) const
         bf_iterator it_value{data, 0, value_width, value_width, index};
         const auto v = it_value.get_value();
         const auto sign_v = sign_extend_field(value_width, v);
+        REALM_ASSERT(sign_v != -128);
         return sign_v;
     }
     REALM_UNREACHABLE();
@@ -231,7 +232,6 @@ void ArrayFlex::setup_array_in_flex_format(const Array& origin, Array& arr, std:
     auto byte_size =
         NodeHeader::calc_size<Encoding::Flex>(values.size(), indices.size(), value_bit_width, index_bit_width);
 
-
     Allocator& allocator = arr.get_alloc();
     auto mem = allocator.alloc(byte_size);
     auto header = mem.get_addr();
@@ -298,13 +298,15 @@ void ArrayFlex::restore_array(Array& arr, const std::vector<int64_t>& values) co
     arr.destroy();
     auto mem = allocator.alloc(byte_size);
     auto header = mem.get_addr();
-    NodeHeader::init_header(header, 'A', Encoding::WTypBits, flags, 0, 0);
-    NodeHeader::set_capacity_in_header(byte_size, header);
+    NodeHeader::init_header(header, 'A', Encoding::WTypBits, flags, Node::align_bits_to8(width), values.size());
     arr.init_from_mem(mem);
-    arr.update_parent();
+    NodeHeader::set_capacity_in_header(byte_size, header);
     size_t i = 0;
     for (const auto& v : values)
-        arr.insert(i++, v);
+        arr.set(i++, v);
+        //REALM_ASSERT(v != -128);
+    arr.update_parent();
+        
     size_t w = arr.get_width();
     REALM_ASSERT(w == 0 || w == 1 || w == 2 || w == 4 || w == 8 || w == 16 || w == 32 || w == 64);
     REALM_ASSERT(arr.size() == values.size());
