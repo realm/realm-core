@@ -87,7 +87,7 @@ BinaryData InstructionApplier::get_binary(StringBufferRange range) const
 
 TableRef InstructionApplier::table_for_class_name(StringData class_name) const
 {
-    if (class_name.size() >= Group::max_table_name_length - 6)
+    if (class_name.size() > Group::max_class_name_length)
         bad_transaction_log("class name too long");
     Group::TableNameBuffer buffer;
     return m_transaction.get_table(Group::class_name_to_table_name(class_name, buffer));
@@ -941,11 +941,9 @@ bool InstructionApplier::check_links_exist(const Instruction::Payload& payload)
                                         [&](InternString interned_pk) {
                                             return Mixed{get_string(interned_pk)};
                                         },
-                                        [&](GlobalKey) {
+                                        [&](GlobalKey) -> Mixed {
                                             bad_transaction_log(
                                                 "Unexpected link to embedded object while validating a primary key");
-                                            return Mixed{}; // appease the compiler; visitors must have a single
-                                                            // return type
                                         },
                                         [&](ObjectId pk) {
                                             return Mixed{pk};

@@ -20,12 +20,13 @@ DIRECT_PORT=9098
 LISTEN_PORT=9092
 CONFIG_PORT=8474
 BAAS_PORT=9090
+BAAS_HOST_KEY=
 
 function usage()
 {
-    echo "Usage: setup_baas_host_local.sh [-w PATH] [-u USER] [-b BRANCH] [-v] [-h] [-t] [-d PORT] [-l PORT] [-c PORT] HOST_VARS SSH_KEY"
+    echo "Usage: setup_baas_host_local.sh [-w PATH] [-u USER] [-b BRANCH] [-v] [-h] [-t] [-d PORT] [-l PORT] [-c PORT] [-i SSH_KEY] HOST_VARS"
     echo -e "\tHOST_VARS\tPath to baas host vars script file"
-    echo -e "\tSSH_KEY\t\tPath to baas host private key file"
+    echo -e "\t -i SSH_KEY\t\tPath to baas host private key file"
     echo "Options:"
     echo -e "\t-w PATH\t\tPath to local baas server working directory (default ${BAAS_WORK_PATH})"
     echo -e "\t-u USER\t\tUsername to connect to baas host (default ${BAAS_USER})"
@@ -42,7 +43,7 @@ function usage()
     exit "${1:0}"
 }
 
-while getopts "w:u:b:ta:d:l:c:vh" opt; do
+while getopts "w:u:b:ta:d:l:c:vhi:" opt; do
     case "${opt}" in
         w) BAAS_WORK_PATH="${OPTARG}";;
         u) BAAS_USER="${OPTARG}";;
@@ -51,6 +52,7 @@ while getopts "w:u:b:ta:d:l:c:vh" opt; do
         d) DIRECT_PORT="${OPTARG}";;
         l) LISTEN_PORT="${OPTARG}";;
         c) CONFIG_PORT="${OPTARG}";;
+        i) BAAS_HOST_KEY="${OPTARG}";;
         v) VERBOSE="yes";;
         h) usage 0;;
         *) usage 1;;
@@ -73,16 +75,7 @@ elif [[ ! -f "${BAAS_HOST_VARS}" ]]; then
     usage 1
 fi
 
-if [[ $# -lt 1 ]]; then
-    echo "Error: Baas host private key not provided"
-    usage 1
-fi
-BAAS_HOST_KEY="${1}"; shift;
-
-if [[ -z "${BAAS_HOST_KEY}" ]]; then
-    echo "Error: Baas host private key value was empty"
-    usage 1
-elif [[ ! -f "${BAAS_HOST_KEY}" ]]; then
+if [[ -n "${BAAS_HOST_KEY}" && ! -f "${BAAS_HOST_KEY}" ]]; then
     echo "Error: Baas host private key not found: ${BAAS_HOST_KEY}"
     usage 1
 fi
@@ -185,16 +178,20 @@ fi
 
 SSH_USER="$(printf "%s@%s" "${BAAS_USER}" "${BAAS_HOST_NAME}")"
 
-ssh-agent > ssh_agent_commands.sh
+SSH_OPTIONS=(-o ForwardAgent=yes -o StrictHostKeyChecking=no )
+if [[ -n "${BAAS_HOST_KEY}" ]]; then
+    ssh-agent > ssh_agent_commands.sh
 
-# shellcheck disable=SC1091
-source ssh_agent_commands.sh
+    # shellcheck disable=SC1091
+    source ssh_agent_commands.sh
 
-if [[ -f ~/.ssh/id_rsa ]]; then
-    ssh-add ~/.ssh/id_rsa
+    if [[ -f ~/.ssh/id_rsa  ]]; then
+        ssh-add ~/.ssh/id_rsa
+    fi
+
+    ssh-add "${BAAS_HOST_KEY}"
+    SSH_OPTIONS+=(-o IdentitiesOnly=yes -i "${BAAS_HOST_KEY}")
 fi
-ssh-add "${BAAS_HOST_KEY}"
-SSH_OPTIONS=(-o ForwardAgent=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -i "${BAAS_HOST_KEY}")
 
 echo "running ssh with ${SSH_OPTIONS[*]}"
 

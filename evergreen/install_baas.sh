@@ -67,11 +67,11 @@ function setup_baas_dependencies() {
         Darwin)
             if [[ "$(uname -m)" == "arm64" ]]; then
                 export GOARCH=arm64
-                MONGODB_DOWNLOAD_URL="https://downloads.mongodb.com/osx/mongodb-macos-arm64-enterprise-6.0.0-rc13.tgz"
-                MONGOSH_DOWNLOAD_URL="https://downloads.mongodb.com/compass/mongosh-1.5.0-darwin-arm64.zip"
+                MONGODB_DOWNLOAD_URL="https://downloads.mongodb.com/osx/mongodb-macos-arm64-enterprise-7.0.3.tgz"
+                MONGOSH_DOWNLOAD_URL="https://downloads.mongodb.com/compass/mongosh-2.1.1-darwin-arm64.zip"
                 # <-- Remove after enabling constants.sh
                 STITCH_SUPPORT_LIB_URL="https://stitch-artifacts.s3.amazonaws.com/stitch-support/macos-arm64/stitch-support-6.1.0-alpha-527-g796351f.tgz"
-                ASSISTED_AGG_URL="https://stitch-artifacts.s3.amazonaws.com/stitch-mongo-libs/stitch_mongo_libs_osx_patch_1e7861d9b7462f01ea220fad334f10e00f0f3cca_6513254ad6d80abfffa5fbdc_23_09_26_18_39_06/assisted_agg"
+                ASSISTED_AGG_URL="https://stitch-artifacts.s3.amazonaws.com/stitch-mongo-libs/stitch_mongo_libs_osx_patch_c5880b9bd6039908a2fd85d1c95f457c36b5d33b_6542b80ae3c331e8d3788186_23_11_01_20_41_47/assisted_agg"
                 GOLANG_URL="https://s3.amazonaws.com/static.realm.io/evergreen-assets/go1.21.1.darwin-arm64.tar.gz"
                 # -->
 
@@ -87,10 +87,11 @@ function setup_baas_dependencies() {
                 BAAS_PLATFORM="Darwin_arm64"
             else
                 export GOARCH=amd64
-                MONGODB_DOWNLOAD_URL="https://downloads.mongodb.com/osx/mongodb-macos-x86_64-enterprise-5.0.3.tgz"
+                MONGODB_DOWNLOAD_URL="https://downloads.mongodb.com/osx/mongodb-macos-x86_64-enterprise-7.0.3.tgz"
+                MONGOSH_DOWNLOAD_URL="https://downloads.mongodb.com/compass/mongosh-2.1.1-darwin-x64.zip"
                 # <-- Remove after enabling constants.sh
                 STITCH_SUPPORT_LIB_URL="https://stitch-artifacts.s3.amazonaws.com/stitch-support/macos-arm64/stitch-support-4.4.17-rc1-2-g85de0cc.tgz"
-                ASSISTED_AGG_URL="https://stitch-artifacts.s3.amazonaws.com/stitch-mongo-libs/stitch_mongo_libs_osx_patch_1e7861d9b7462f01ea220fad334f10e00f0f3cca_6513254ad6d80abfffa5fbdc_23_09_26_18_39_06/assisted_agg"
+                ASSISTED_AGG_URL="https://stitch-artifacts.s3.amazonaws.com/stitch-mongo-libs/stitch_mongo_libs_osx_patch_c5880b9bd6039908a2fd85d1c95f457c36b5d33b_6542b80ae3c331e8d3788186_23_11_01_20_41_47/assisted_agg"
                 GOLANG_URL="https://s3.amazonaws.com/static.realm.io/evergreen-assets/go1.21.1.darwin-amd64.tar.gz"
                 # -->
                 BAAS_PLATFORM="Darwin_x86_64"
@@ -113,9 +114,10 @@ function setup_baas_dependencies() {
                 DISTRO_VERSION_MAJOR="$(cut -d. -f1 <<< "${DISTRO_VERSION}")"
             fi
             platform_string="${BAAS_PLATFORM} - ${DISTRO_NAME} ${DISTRO_VERSION}"
+            MONGOSH_DOWNLOAD_URL="https://downloads.mongodb.com/compass/mongosh-2.1.1-linux-x64.tgz"
             case "${DISTRO_NAME}" in
                 ubuntu | linuxmint)
-                    MONGODB_DOWNLOAD_URL="http://downloads.10gen.com/linux/mongodb-linux-$(uname -m)-enterprise-ubuntu${DISTRO_VERSION_MAJOR}04-5.0.3.tgz"
+                    MONGODB_DOWNLOAD_URL="http://downloads.10gen.com/linux/mongodb-linux-$(uname -m)-enterprise-ubuntu${DISTRO_VERSION_MAJOR}04-7.0.3.tgz"
                     # <-- Remove after enabling constants.sh
                     LIBMONGO_URL="https://stitch-artifacts.s3.amazonaws.com/stitch-mongo-libs/stitch_mongo_libs_ubuntu2004_x86_64_patch_1e7861d9b7462f01ea220fad334f10e00f0f3cca_65135b432fbabe741bd24429_23_09_26_22_29_24/libmongo-ubuntu2004-x86_64.so"
                     STITCH_SUPPORT_LIB_URL="https://s3.amazonaws.com/static.realm.io/stitch-support/stitch-support-ubuntu2004-4.4.17-rc1-2-g85de0cc.tgz"
@@ -125,7 +127,7 @@ function setup_baas_dependencies() {
                 rhel)
                     case "${DISTRO_VERSION_MAJOR}" in
                         7)
-                            MONGODB_DOWNLOAD_URL="https://downloads.mongodb.com/linux/mongodb-linux-x86_64-enterprise-rhel70-5.0.3.tgz"
+                            MONGODB_DOWNLOAD_URL="https://downloads.mongodb.com/linux/mongodb-linux-x86_64-enterprise-rhel70-7.0.3.tgz"
                             # <-- Remove after enabling constants.sh
                             LIBMONGO_URL="https://stitch-artifacts.s3.amazonaws.com/stitch-mongo-libs/stitch_mongo_libs_linux_64_patch_1e7861d9b7462f01ea220fad334f10e00f0f3cca_65135b432fbabe741bd24429_23_09_26_22_29_24/libmongo.so"
                             STITCH_SUPPORT_LIB_URL="https://stitch-artifacts.s3.amazonaws.com/stitch-support/linux-x64/stitch-support-4.4.17-rc1-2-g85de0cc.tgz"
@@ -459,18 +461,24 @@ if [ ! -x "${MONGO_BINARIES_DIR}/bin/mongod" ]; then
 fi
 echo "mongod version: $("${MONGO_BINARIES_DIR}/bin/mongod" --version --quiet | sed 1q)"
 
-if [[ -n "${MONGOSH_DOWNLOAD_URL}" ]]; then
-    if [[ ! -x "${MONGO_BINARIES_DIR}/bin/mongosh" ]]; then
-        echo "Downloading mongosh"
+if [[ ! -x "${MONGO_BINARIES_DIR}/bin/mongosh" ]]; then
+    MONGOSH_DOWNLOAD_FILENAME=$(basename "${MONGOSH_DOWNLOAD_URL}")
+    MONGOSH_DOWNLOAD_EXTENSION="${MONGOSH_DOWNLOAD_FILENAME##*.}"
+    echo "Downloading ${MONGOSH_DOWNLOAD_URL}"
+    if [[ "${MONGOSH_DOWNLOAD_EXTENSION}" == "zip" ]]; then
         ${CURL} -sLS "${MONGOSH_DOWNLOAD_URL}" --output mongosh-binaries.zip
         unzip -jnqq mongosh-binaries.zip '*/bin/*' -d "${MONGO_BINARIES_DIR}/bin/"
         rm mongosh-binaries.zip
+    elif [[ ${MONGOSH_DOWNLOAD_EXTENSION} == "tgz" ]]; then
+        ${CURL} -sLS "${MONGOSH_DOWNLOAD_URL}" --output mongosh-binaries.tgz
+        tar -xzf mongosh-binaries.tgz --strip-components=1 -C "${MONGO_BINARIES_DIR}"
+        rm mongosh-binaries.tgz
+    else
+        echo "Unsupported mongosh format $MONGOSH_DOWNLOAD_EXTENSION"
+        exit 1
     fi
-    MONGOSH="mongosh"
-else
-    # Use the mongo shell provided with mongod
-    MONGOSH="mongo"
 fi
+MONGOSH="mongosh"
 chmod +x "${MONGO_BINARIES_DIR}/bin"/*
 echo "${MONGOSH} version: $("${MONGO_BINARIES_DIR}/bin/${MONGOSH}" --version)"
 

@@ -144,6 +144,9 @@ std::unique_ptr<SpawnedProcess> spawn_process(const std::string& test_name, cons
     if (getenv("UNITTEST_ENCRYPT_ALL")) {
         env_vars.push_back("UNITTEST_ENCRYPT_ALL=1");
     }
+    if (getenv("TMPDIR")) {
+        env_vars.push_back(util::format("TMPDIR=%1", getenv("TMPDIR")));
+    }
 
 #if REALM_ANDROID || REALM_IOS
     // posix_spawn() is unavailable on Android, and not permitted on iOS
