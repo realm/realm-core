@@ -5938,7 +5938,7 @@ TEST(LangBindHelper_ImportDetachedLinkList)
     CHECK_EQUAL(tv_1->size(), 0);
 }
 
-ONLY(LangBindHelper_SearchIndexAccessor)
+TEST(LangBindHelper_SearchIndexAccessor)
 {
     SHARED_GROUP_TEST_PATH(path);
     auto hist = make_in_realm_history();

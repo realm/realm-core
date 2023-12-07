@@ -1555,8 +1555,13 @@ void Array::verify() const
 
     REALM_ASSERT(is_attached());
 
-    REALM_ASSERT(m_width == 0 || m_width == 1 || m_width == 2 || m_width == 4 || m_width == 8 || m_width == 16 ||
-                 m_width == 32 || m_width == 64);
+    if (get_kind(get_header()) == 'A') {
+        REALM_ASSERT(m_width == 0 || m_width == 1 || m_width == 2 || m_width == 4 || m_width == 8 || m_width == 16 ||
+                     m_width == 32 || m_width == 64);
+    }
+    else {
+        REALM_ASSERT(m_width <= 64);
+    }
 
     if (!get_parent())
         return;
