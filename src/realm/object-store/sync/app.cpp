@@ -569,6 +569,10 @@ std::vector<std::shared_ptr<SyncUser>> App::all_users() const
 std::string App::get_base_url() const
 {
     std::lock_guard<std::mutex> lock(*m_route_mutex);
+    if (auto metadata = m_sync_manager->app_metadata()) {
+        // If there is app metadata stored, then return that hostname
+        return metadata->hostname;
+    }
     return m_base_url;
 }
 
