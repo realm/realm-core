@@ -82,6 +82,8 @@ struct SyncError {
 
     /// The error indicates a client reset situation.
     bool is_client_reset_requested() const;
+
+    void* user_code_error = nullptr;
 };
 
 using SyncSessionErrorHandler = void(std::shared_ptr<SyncSession>, SyncError);

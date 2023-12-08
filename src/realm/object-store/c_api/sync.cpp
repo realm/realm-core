@@ -264,7 +264,8 @@ RLM_API void realm_sync_config_set_error_handler(realm_sync_config_t* config, re
         c_error.server_requests_action = static_cast<realm_sync_error_action_e>(error.server_requests_action);
         c_error.c_original_file_path_key = error.c_original_file_path_key;
         c_error.c_recovery_file_path_key = error.c_recovery_file_path_key;
-        c_error.user_code_error = ErrorStorage::get_thread_local()->get_and_clear_user_code_error();
+        c_error.user_code_error = error.user_code_error;
+        // ErrorStorage::get_thread_local()->get_and_clear_user_code_error();
 
         std::vector<realm_sync_error_user_info_t> c_user_info;
         c_user_info.reserve(error.user_info.size());
@@ -389,7 +390,7 @@ RLM_API void realm_sync_config_set_before_client_reset_handler(realm_sync_config
     auto cb = [callback, userdata = SharedUserdata(userdata, FreeUserdata(userdata_free))](SharedRealm before_realm) {
         realm_t r1{before_realm};
         if (!callback(userdata.get(), &r1)) {
-            throw CallbackFailed{};
+            throw CallbackFailed{ErrorStorage::get_thread_local()->get_and_clear_user_code_error()};
         }
     };
     config->notify_before_client_reset = std::move(cb);
@@ -405,7 +406,7 @@ RLM_API void realm_sync_config_set_after_client_reset_handler(realm_sync_config_
         realm_t r1{before_realm};
         auto tsr = realm_t::thread_safe_reference(std::move(after_realm));
         if (!callback(userdata.get(), &r1, &tsr, did_recover)) {
-            throw CallbackFailed{};
+            throw CallbackFailed{ErrorStorage::get_thread_local()->get_and_clear_user_code_error()};
         }
     };
     config->notify_after_client_reset = std::move(cb);

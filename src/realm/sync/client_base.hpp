@@ -265,6 +265,7 @@ struct SessionErrorInfo : public ProtocolErrorInfo {
     }
 
     Status status;
+    void* user_code_error = nullptr;
 };
 
 enum class ConnectionState { disconnected, connecting, connected };

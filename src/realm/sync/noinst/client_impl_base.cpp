@@ -2294,6 +2294,14 @@ Status Session::receive_ident_message(SaltedFileIdent client_file_ident)
     try {
         did_client_reset = client_reset_if_needed();
     }
+    catch (const UserCodeCallbackError& e) {
+        auto err_msg = util::format("A fatal error occurred during client reset: '%1'", e.what());
+        logger.error(err_msg.c_str());
+        SessionErrorInfo err_info(Status{ErrorCodes::AutoClientResetFailed, err_msg}, IsFatal{true});
+        err_info.user_code_error = e.user_code_error;
+        suspend(err_info);
+        return Status::OK();
+    }
     catch (const std::exception& e) {
         auto err_msg = util::format("A fatal error occurred during client reset: '%1'", e.what());
         logger.error(err_msg.c_str());

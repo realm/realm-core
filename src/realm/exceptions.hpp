@@ -113,6 +113,15 @@ struct RuntimeError : Exception {
     ~RuntimeError() noexcept override;
 };
 
+struct UserCodeCallbackError : RuntimeError {
+    void* user_code_error = nullptr;
+    UserCodeCallbackError(ErrorCodes::Error code, std::string_view msg)
+        : RuntimeError(code, msg)
+    {
+    }
+    ~UserCodeCallbackError() noexcept override = default;
+};
+
 /// Thrown when creating references that are too large to be contained in our ref_type (size_t)
 struct MaximumFileSizeExceeded : RuntimeError {
     MaximumFileSizeExceeded(std::string_view msg)
