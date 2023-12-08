@@ -1,13 +1,11 @@
-# NEXT RELEASE
+# 13.24.1 Release notes
 
 ### Enhancements
-* <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
 * Automatic client reset recovery now preserves the original division of changesets, rather than combining all unsynchronized changes into a single changeset ([PR #7161](https://github.com/realm/realm-core/pull/7161)).
 * Automatic client reset recovery now does a better job of recovering changes when changesets were downloaded from the server after the unuploaded local changes were committed. If the local Realm happened to be fully up to date with the server prior to the client reset, automatic recovery should now always produce exactly the same state as if no client reset was involved ([PR #7161](https://github.com/realm/realm-core/pull/7161)).
 * [C API] Exposed `realm_app_create_cached` and `realm_app_get_cached` in the C API. (Issue [#7181](https://github.com/realm/realm-core/issues/7181))
 
 ### Fixed
-* <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Fixed several causes of "decryption failed" exceptions that could happen when opening multiple encrypted Realm files in the same process while using Apple/linux and storing the Realms on an exFAT file system. ([#7156](https://github.com/realm/realm-core/issues/7156), since the beginning)
 * Fixed deadlock which occurred when accessing the current user from the `App` from within a callback from the `User` listener ([#7183](https://github.com/realm/realm-core/issues/7183), since v13.21.0)
 * Update existing std exceptions thrown by the Sync Client to use Realm exceptions. ([#6255](https://github.com/realm/realm-core/issues/6255), since v10.2.0)
