@@ -579,7 +579,7 @@ functions:
         # Run the setup_baas_host_local.sh script to configure and run baas on the remote host
         # Add -v to this command for verbose script logging
         ./evergreen/setup_baas_host_local.sh -w ./baas-work-dir -u $BAAS_USER $OPT_BAAS_BRANCH $OPT_BAAS_PROXY \
-            $OPT_BAAS_DIRECT ./baas_host_vars.sh ./.baas_ssh_key 2>&1 | tee install_baas_output.log
+            $OPT_BAAS_DIRECT -i ./.baas_ssh_key ./baas_host_vars.sh 2>&1 | tee install_baas_output.log
 
   "wait for baas to start":
   - command: shell.exec
@@ -596,6 +596,24 @@ functions:
 
         # Don't print out the tail of the log file
         ./evergreen/wait_for_baas.sh -s -w ./baas-work-dir -l ""
+
+        echo "Baas is started!"
+
+  "wait for remote baas to start":
+  - command: shell.exec
+    params:
+      working_dir: realm-core
+      shell: bash
+      script: |-
+        set -o errexit
+        set -o verbose
+
+        if [[ -n "${disable_tests_against_baas|}" ]]; then
+          exit 0
+        fi
+
+        # Don't print out the tail of the log file
+        ./evergreen/wait_for_remote_baas.sh -i ./.baas_ssh_key ./baas_host_vars.sh  ./.baas_ssh_key
 
         echo "Baas is started!"
 
@@ -960,7 +978,7 @@ tasks:
   - func: "compile"
     vars:
       target_to_build: ObjectStoreTests
-  - func: "wait for baas to start"
+  - func: "wait for remote baas to start"
   - func: "run tests"
     vars:
       test_label: objstore-baas
