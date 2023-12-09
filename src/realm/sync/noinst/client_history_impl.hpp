@@ -71,12 +71,18 @@ constexpr int get_client_history_schema_version() noexcept
     return 12;
 }
 
-class IntegrationException : public RuntimeError {
+class IntegrationException : public Exception {
 public:
     IntegrationException(ErrorCodes::Error error, std::string message,
                          ProtocolError error_for_server = ProtocolError::other_session_error)
-        : RuntimeError(error, message)
+        : Exception(error, message)
         , error_for_server(error_for_server)
+    {
+    }
+
+    explicit IntegrationException(Status status)
+        : Exception(std::move(status))
+        , error_for_server(ProtocolError::other_session_error)
     {
     }
 
