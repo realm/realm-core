@@ -289,24 +289,47 @@ void ArrayFlex::restore_array(Array& arr, const std::vector<int64_t>& values) co
     const auto flags = NodeHeader::get_flags(arr.get_header());
     const auto size = values.size();
     const auto [min_value, max_value] = std::minmax_element(values.begin(), values.end());
-    auto width_a = NodeHeader::signed_to_num_bits(*min_value);
-    auto width_b = NodeHeader::signed_to_num_bits(*max_value);
-    auto width = std::max(width_a, width_b);
-    auto byte_size = NodeHeader::calc_size<Encoding::WTypBits>(size, width);
+    const size_t width_min = NodeHeader::signed_to_num_bits(*min_value);
+    const size_t width_max = NodeHeader::signed_to_num_bits(*max_value);
+    auto max_bit = std::max(width_min, width_max);
+    // this is wrong or/and it is not supposed to be used in this context. TODO: check the other places. This might be
+    // the source of all our troubles auto test_align_width = Node::align_bits_to8(max_bit); auto test_align_width_c =
+    // bit_width(max_bit);
+    auto byte_size = NodeHeader::calc_size<Encoding::WTypBits>(size, max_bit);
     REALM_ASSERT(byte_size % 8 == 0); // 8 bytes aligned value
     Allocator& allocator = arr.get_alloc();
-    arr.destroy();
+
+    // calling array destory here, works only because we are not going to use this array header anymore, see comment
+    // in Array::init_from_mem. We can get away with this since we are basically restoring all the basic properties
+    // for the array via Node::init_header(...) But witdh and capacity need particular attention. arr.destroy();
+    auto orginal_header = arr.get_header();
+    auto origanal_ref = arr.get_ref();
+
+    // this is slow. It is just for testing, but this is what it is needed. the ceil for the current bit size.
+    // we need to have std::bit_ceil(v); AKA the next power of 2 closed to max_bit. We have somehow introduced a
+    // regression here. I am impressed that most of the tests are working..
+    // TODO: work a faster way to get this.
+    size_t width = 1;
+    while (width < max_bit)
+        width *= 2;
+    REALM_ASSERT(width >= 0 && width <= 64);
+    REALM_ASSERT(width == 0 || width == 1 || width == 2 || width == 4 || width == 8 || width == 16 || width == 32 ||
+                 width == 64);
+
     auto mem = allocator.alloc(byte_size);
     auto header = mem.get_addr();
-    NodeHeader::init_header(header, 'A', Encoding::WTypBits, flags, Node::align_bits_to8(width), values.size());
+    NodeHeader::init_header(header, 'A', Encoding::WTypBits, flags, width, values.size());
+    // the old array should not be deleted up until this function completes,
+    // but once it finishes running, the ref of the old array is gone, so the memory is leaked.
+    // previous header and ref must be stored temporary and deleted after this point
     arr.init_from_mem(mem);
     NodeHeader::set_capacity_in_header(byte_size, header);
     size_t i = 0;
     for (const auto& v : values)
         arr.set(i++, v);
-        //REALM_ASSERT(v != -128);
     arr.update_parent();
-        
+    allocator.free_(origanal_ref, orginal_header);
+
     size_t w = arr.get_width();
     REALM_ASSERT(w == 0 || w == 1 || w == 2 || w == 4 || w == 8 || w == 16 || w == 32 || w == 64);
     REALM_ASSERT(arr.size() == values.size());

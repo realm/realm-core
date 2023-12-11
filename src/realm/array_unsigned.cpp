@@ -21,6 +21,10 @@
 #include <realm/array_flex.hpp>
 #include <algorithm>
 
+#if REALM_DEBUG
+#include <iostream>
+#endif
+
 namespace realm {
 
 void ArrayUnsigned::set_width(uint8_t width)
@@ -95,10 +99,17 @@ void ArrayUnsigned::update_from_parent() noexcept
     init_from_ref(new_ref);
 }
 
-size_t ArrayUnsigned::lower_bound(uint64_t value) const noexcept
+size_t ArrayUnsigned::lower_bound(uint64_t value, bool decode) const noexcept
 {
-    //    if (is_encoded())
-    //        Array::decode_array((Array&)*this);
+    if (decode && is_encoded()) {
+        Array::decode_array((Array&)*this);
+#if REALM_DEBUG
+        REALM_ASSERT(m_width >= m_lbound);
+        REALM_ASSERT(m_width <= m_ubound);
+        REALM_ASSERT(m_lbound <= m_ubound);
+#endif
+    }
+
 
     if (m_width == 8) {
         uint8_t* arr = reinterpret_cast<uint8_t*>(m_data);
@@ -136,10 +147,16 @@ size_t ArrayUnsigned::lower_bound(uint64_t value) const noexcept
     return pos - arr;
 }
 
-size_t ArrayUnsigned::upper_bound(uint64_t value) const noexcept
+size_t ArrayUnsigned::upper_bound(uint64_t value, bool decode) const noexcept
 {
-    //    if(is_encoded())
-    //        Array::decode_array((Array&)*this);
+    if (decode && is_encoded()) {
+        Array::decode_array((Array&)*this);
+#if REALM_DEBUG
+        REALM_ASSERT(m_width >= m_lbound);
+        REALM_ASSERT(m_width <= m_ubound);
+        REALM_ASSERT(m_lbound <= m_ubound);
+#endif
+    }
 
     if (m_width == 8) {
         uint8_t* arr = reinterpret_cast<uint8_t*>(m_data);
@@ -179,27 +196,31 @@ size_t ArrayUnsigned::upper_bound(uint64_t value) const noexcept
 
 void ArrayUnsigned::insert(size_t ndx, uint64_t value)
 {
-    bool do_expand = value > m_ubound;
-    uint8_t old_width = m_width;
-    uint8_t new_width = do_expand ? bit_width(value) : m_width;
-    auto old_size = m_size;
-    if (!m_encode.is_encoded(*this)) {
-        // we now support lower widths than 8 bit!   // REALM_ASSERT_DEBUG(m_width >= 8);
-        REALM_ASSERT_DEBUG(!do_expand || new_width > m_width);
-        REALM_ASSERT_DEBUG(ndx <= m_size);
-        // Check if we need to copy before modifying
-        copy_on_write(); // Throws
-    }
-    else {
-        // copy on write first and then expand the array.
-        //  Throws
-        copy_on_write();
-        do_expand = value > m_ubound;
-        old_width = m_width;
-        new_width = do_expand ? bit_width(value) : m_width;
-        old_size = m_size;
+    // Array unsigned implements its owm methods for doing insertion (expanding, etc) and many other APIs
+    // we should aim at unifying as much as possible the interface, in order to avoid to scatter the
+    // compression/decompression logic all over the code.
+
+    if (m_encode.is_encoded(*this)) {
+        m_encode.decode(*this);
+#if REALM_DEBUG
+        REALM_ASSERT(m_width >= m_lbound);
+        REALM_ASSERT(m_width <= m_ubound);
+        REALM_ASSERT(m_lbound <= m_ubound);
+#endif
     }
 
+    REALM_ASSERT_DEBUG(m_width >= 8);
+    // this is an error, we will end up expading the array for nothing.. upper bound for unsigned must be usize.
+    bool do_expand = value > (uint64_t)m_ubound;
+    const uint8_t old_width = m_width;
+    const uint8_t new_width = do_expand ? bit_width(value) : m_width;
+    const auto old_size = m_size;
+
+    REALM_ASSERT_DEBUG(!do_expand || new_width > m_width);
+    REALM_ASSERT_DEBUG(ndx <= m_size);
+
+    // Check if we need to copy before modifying
+    copy_on_write();              // Throws
     alloc(m_size + 1, new_width); // Throws
 
     // Move values above insertion (may expand)
@@ -259,8 +280,10 @@ uint64_t ArrayUnsigned::get(size_t index) const
 
 void ArrayUnsigned::set(size_t ndx, uint64_t value)
 {
-    if (is_encoded())
+    if (is_encoded()) {
         decode_array(*this);
+    }
+
     REALM_ASSERT_DEBUG(m_width >= 8);
     copy_on_write(); // Throws
 

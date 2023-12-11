@@ -257,9 +257,14 @@ size_t Array::bit_width(int64_t v)
 
 void Array::init_from_mem(MemRef mem) noexcept
 {
+    // Header is the type of header that has been allocated, in case we are decompressing,
+    // the header is of kind A, which is kind of deceiving the purpose of these checks.
+    // Since we will try to fetch some data from the just initialised header, and never reset
+    // important fields used for type A arrays, like width, lower, upper_bound which are used
+    // for expanding the array, but also query the data.
     char* header = mem.get_addr();
     auto kind = get_kind(header);
-    // REALM_ASSERT(kind == 'A' || kind == 'B');
+    REALM_ASSERT(kind == 'A' || kind == 'B');
     if (kind == 'B') {
         // the only encoding supported at the moment
         auto encoding = get_encoding(header);
@@ -1389,20 +1394,22 @@ void Array::update_width_cache_from_header() noexcept
     auto header = get_header();
     const auto kind = get_kind(header);
     if (kind == 'B') {
-        // TODO: verify that this is correct for type B with encoding flex arrays, since width is not really needed
-        // for flex arrays
-        m_width = get_elementA_size<Encoding::Flex>(header);
-        auto aligned_width = align_bits_to8(m_width);
-        m_lbound = lbound_for_width(aligned_width);
-        m_ubound = ubound_for_width(aligned_width);
-        REALM_TEMPEX(m_vtable = &VTableForWidth, aligned_width, ::vtable);
+        // width should never be used for B array. Expanding the array should happen after decompression
+        // And Array::find along with Array::get should tap into the proper compressed array implementation.
+        m_width = 0;
+        m_lbound = 0;
+        m_ubound = 0;
+        REALM_TEMPEX(m_vtable = &VTableForWidth, 0L, ::vtable);
         m_getter = m_vtable->getter;
     }
     else {
-        auto width = get_width_from_header(get_header());
-        m_lbound = lbound_for_width(width);
-        m_ubound = ubound_for_width(width);
+        int64_t width = get_width_from_header(get_header());
         m_width = width;
+        m_lbound = lbound_for_width(m_width);
+        m_ubound = ubound_for_width(m_width);
+        REALM_ASSERT(m_lbound <= m_ubound);
+        REALM_ASSERT(width >= m_lbound);
+        REALM_ASSERT(width <= m_ubound);
         REALM_TEMPEX(m_vtable = &VTableForWidth, width, ::vtable);
         m_getter = m_vtable->getter;
     }

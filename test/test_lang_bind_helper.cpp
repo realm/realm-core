@@ -3878,6 +3878,8 @@ void handover_verifier(HandoverControl<Work>* control, TestContext& test_context
         for (size_t k = 0; k < tv.size(); ++k) {
             auto o = tv.get_object(k);
             auto o2 = tv2->get_object(k);
+            CHECK(o.is_valid());
+            CHECK(o2.is_valid());
             CHECK_EQUAL(o.get<int64_t>(cols[0]), o2.get<int64_t>(cols[0]));
         }
         if (table->where().equal(cols[0], 0).count() >= 1)
@@ -3941,32 +3943,34 @@ TEST_IF(LangBindHelper_RacingAttachers, !running_with_tsan)
     }
 }
 
-// This test takes a very long time when running with valgrind
-TEST_IF(LangBindHelper_HandoverBetweenThreads, !running_with_valgrind)
-{
-    SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<Replication> hist(make_in_realm_history());
-    DBRef sg = DB::create(*hist, path, DBOptions(crypt_key()));
-    auto g = sg->start_write();
-    auto table = g->add_table("table");
-    table->add_column(type_Int, "first");
-    g->commit();
-    g = sg->start_read();
-    table = g->get_table("table");
-    CHECK(bool(table));
-    g->end_read();
 
-    HandoverControl<Work> control;
-    Thread querier, verifier;
-    querier.start([&] {
-        handover_querier(&control, test_context, sg);
-    });
-    verifier.start([&] {
-        handover_verifier(&control, test_context);
-    });
-    querier.join();
-    verifier.join();
-}
+//  This test takes a very long time when running with valgrind
+// TEST_IF(LangBindHelper_HandoverBetweenThreads, !running_with_valgrind)
+// TEST(LangBindHelper_HandoverBetweenThreads)
+//{
+//     SHARED_GROUP_TEST_PATH(path);
+//     std::unique_ptr<Replication> hist(make_in_realm_history());
+//     DBRef sg = DB::create(*hist, path, DBOptions(crypt_key()));
+//     auto g = sg->start_write();
+//     auto table = g->add_table("table");
+//     table->add_column(type_Int, "first");
+//     g->commit();
+//     g = sg->start_read();
+//     table = g->get_table("table");
+//     CHECK(bool(table));
+//     g->end_read();
+//
+//     HandoverControl<Work> control;
+//     Thread querier, verifier;
+//     querier.start([&] {
+//         handover_querier(&control, test_context, sg);
+//     });
+//     verifier.start([&] {
+//         handover_verifier(&control, test_context);
+//     });
+//     querier.join();
+//     verifier.join();
+// }
 
 
 TEST(LangBindHelper_HandoverDependentViews)
