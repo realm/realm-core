@@ -509,7 +509,7 @@ void wait_for_num_objects_in_atlas(std::shared_ptr<SyncUser> user, const AppSess
 
 void trigger_client_reset(const AppSession& app_session, const SyncSession& sync_session)
 {
-    auto file_ident = SyncSession::OnlyForTesting::get_file_ident(sync_session);
+    auto file_ident = sync_session.get_file_ident();
     REQUIRE(file_ident.ident != 0);
     app_session.admin_api.trigger_client_reset(app_session.server_app_id, file_ident.ident);
 }

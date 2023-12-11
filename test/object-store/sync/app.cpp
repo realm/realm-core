@@ -3432,6 +3432,24 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
                                       "Realm but none was found for type 'Dog'");
         }
     }
+
+    SECTION("get_file_ident") {
+        SyncTestFile config(app, partition, schema);
+        config.sync_config->client_resync_mode = ClientResyncMode::RecoverOrDiscard;
+        auto r = Realm::get_shared_realm(config);
+        wait_for_download(*r);
+
+        auto first_ident = r->sync_session()->get_file_ident();
+        REQUIRE(first_ident.ident != 0);
+        REQUIRE(first_ident.salt != 0);
+
+        reset_utils::trigger_client_reset(session.app_session(), r);
+        r->sync_session()->restart_session();
+        wait_for_download(*r);
+
+        REQUIRE(first_ident.ident != r->sync_session()->get_file_ident().ident);
+        REQUIRE(first_ident.salt != r->sync_session()->get_file_ident().salt);
+    }
 }
 
 TEST_CASE("app: custom user data integration tests", "[sync][app][user][function][baas]") {
