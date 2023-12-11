@@ -259,6 +259,8 @@ uint64_t ArrayUnsigned::get(size_t index) const
 
 void ArrayUnsigned::set(size_t ndx, uint64_t value)
 {
+    if (is_encoded())
+        decode_array(*this);
     REALM_ASSERT_DEBUG(m_width >= 8);
     copy_on_write(); // Throws
 

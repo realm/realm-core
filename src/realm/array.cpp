@@ -574,6 +574,10 @@ size_t Array::blob_size() const noexcept
 void Array::insert(size_t ndx, int_fast64_t value)
 {
     REALM_ASSERT_DEBUG(ndx <= m_size);
+
+    if(is_encoded())
+        decode_array(*this);
+
     const auto old_width = m_width;
     const auto old_size = m_size;
     const Getter old_getter = m_getter; // Save old getter before potential width expansion
