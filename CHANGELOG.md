@@ -17,7 +17,7 @@
 -----------
 
 ### Internals
-* None.
+* Dangling links in a Mixed property will now appear as NULL ([£6980](https://github.com/realm/realm-core/issues/6980))
 
 ----------------------------------------------
 

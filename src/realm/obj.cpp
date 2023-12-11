@@ -320,6 +320,23 @@ T Obj::_get(ColKey::Idx col_ndx) const
     return values.get(m_row_ndx);
 }
 
+Mixed Obj::get_unfiltered_mixed(ColKey::Idx col_ndx) const
+{
+    ArrayMixed values(get_alloc());
+    ref_type ref = to_ref(Array::get(m_mem.get_addr(), col_ndx.val + 1));
+    values.init_from_ref(ref);
+
+    return values.get(m_row_ndx);
+}
+
+template <>
+Mixed Obj::_get<Mixed>(ColKey::Idx col_ndx) const
+{
+    _update_if_needed();
+    Mixed m = get_unfiltered_mixed(col_ndx);
+    return m.is_unresolved_link() ? Mixed{} : m;
+}
+
 template <>
 ObjKey Obj::_get<ObjKey>(ColKey::Idx col_ndx) const
 {
@@ -1286,7 +1303,7 @@ Obj& Obj::set<Mixed>(ColKey col_key, Mixed value, bool is_default)
         throw InvalidArgument(ErrorCodes::TypeMismatch, "Link must be fully qualified");
     }
 
-    Mixed old_value = get<Mixed>(col_key);
+    Mixed old_value = get_unfiltered_mixed(col_ndx);
     ObjLink old_link{};
     ObjLink new_link{};
     if (old_value.is_type(type_TypedLink)) {
@@ -1308,7 +1325,7 @@ Obj& Obj::set<Mixed>(ColKey col_key, Mixed value, bool is_default)
     // The following check on unresolved is just a precaution as it should not
     // be possible to hit that while Mixed is not a supported primary key type.
     if (index && !m_key.is_unresolved()) {
-        index->set<Mixed>(m_key, value);
+        index->set<Mixed>(m_key, value.is_unresolved_link() ? Mixed() : value);
     }
 
     Allocator& alloc = get_alloc();
