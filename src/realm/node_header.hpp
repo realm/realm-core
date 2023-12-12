@@ -1018,17 +1018,18 @@ size_t inline NodeHeader::get_byte_size_from_header(const char* header) noexcept
 uint_least8_t inline NodeHeader::get_width_from_header(const char* header) noexcept
 {
     auto kind = get_kind(header);
+    REALM_ASSERT(kind == 'A' || kind == 'B');
     if (kind == 'B') {
         // NO! We do not just transparently do the following. The call site must handle it.
         REALM_ASSERT(false);
-        // this is not 100% correct, width does not have the same importance for compressed arrays
-        auto width = get_elementA_size<Encoding::Flex>(header);
-        return static_cast<uint_least8_t>(align_bits_to8(width));
     }
-    // must be A type.
-    typedef unsigned char uchar;
-    const uchar* h = reinterpret_cast<const uchar*>(header);
-    return uint_least8_t((1 << (int(h[4]) & 0x07)) >> 1);
+    else if (kind == 'A') {
+        // must be A type.
+        typedef unsigned char uchar;
+        const uchar* h = reinterpret_cast<const uchar*>(header);
+        return uint_least8_t((1 << (int(h[4]) & 0x07)) >> 1);
+    }
+    REALM_UNREACHABLE();
 }
 
 size_t inline NodeHeader::get_size_from_header(const char* header) noexcept

@@ -99,17 +99,18 @@ void ArrayUnsigned::update_from_parent() noexcept
     init_from_ref(new_ref);
 }
 
-size_t ArrayUnsigned::lower_bound(uint64_t value, bool decode) const noexcept
+size_t ArrayUnsigned::lower_bound(uint64_t value) const noexcept
 {
-    if (decode && is_encoded()) {
-        Array::decode_array((Array&)*this);
+    if (is_encoded()) {
+        Array::decode_array((ArrayUnsigned&)*this);
 #if REALM_DEBUG
+        REALM_ASSERT(m_width == 0 || m_width == 1 || m_width == 2 || m_width == 4 || m_width == 8 || m_width == 16 ||
+                     m_width == 32 || m_width == 64);
         REALM_ASSERT(m_width >= m_lbound);
         REALM_ASSERT(m_width <= m_ubound);
         REALM_ASSERT(m_lbound <= m_ubound);
 #endif
     }
-
 
     if (m_width == 8) {
         uint8_t* arr = reinterpret_cast<uint8_t*>(m_data);
@@ -147,11 +148,13 @@ size_t ArrayUnsigned::lower_bound(uint64_t value, bool decode) const noexcept
     return pos - arr;
 }
 
-size_t ArrayUnsigned::upper_bound(uint64_t value, bool decode) const noexcept
+size_t ArrayUnsigned::upper_bound(uint64_t value) const noexcept
 {
-    if (decode && is_encoded()) {
-        Array::decode_array((Array&)*this);
+    if (is_encoded()) {
+        Array::decode_array((ArrayUnsigned&)*this);
 #if REALM_DEBUG
+        REALM_ASSERT(m_width == 0 || m_width == 1 || m_width == 2 || m_width == 4 || m_width == 8 || m_width == 16 ||
+                     m_width == 32 || m_width == 64);
         REALM_ASSERT(m_width >= m_lbound);
         REALM_ASSERT(m_width <= m_ubound);
         REALM_ASSERT(m_lbound <= m_ubound);
@@ -210,7 +213,6 @@ void ArrayUnsigned::insert(size_t ndx, uint64_t value)
     }
 
     REALM_ASSERT_DEBUG(m_width >= 8);
-    // this is an error, we will end up expading the array for nothing.. upper bound for unsigned must be usize.
     bool do_expand = value > (uint64_t)m_ubound;
     const uint8_t old_width = m_width;
     const uint8_t new_width = do_expand ? bit_width(value) : m_width;
