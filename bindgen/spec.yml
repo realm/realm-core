@@ -1079,7 +1079,7 @@ classes:
       get_pair: '(ndx: count_t) const -> std::pair<StringData, Mixed>'
       contains: '(key: StringData) -> bool'
       freeze: '(frozen_realm: SharedRealm const&) const -> Dictionary'
-      add_key_based_notification_callback: '(cb: (changes: DictionaryChangeSet), keyPaths: KeyPathArray) -> NotificationToken'
+      add_key_based_notification_callback: '(cb: (changes: DictionaryChangeSet), keyPaths: util::Optional<KeyPathArray>) -> NotificationToken'
       insert_any: '(key: StringData, value: Mixed) -> std::pair<count_t, bool>'
       insert_embedded: '(key: StringData) -> Obj'
       try_get_any: '(key: StringData) const -> util::Optional<Mixed>'

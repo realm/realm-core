@@ -39,7 +39,7 @@
     "eslint-config-prettier": "^8.5.0",
     "eslint-plugin-prettier": "^4.2.1",
     "mocha": "^10.1.0",
-    "tsx": "^3.12.3"
+    "tsx": "^4.6.2"
   },
   "binary": {
     "napi_versions": [
