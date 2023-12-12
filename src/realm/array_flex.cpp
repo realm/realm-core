@@ -52,7 +52,7 @@ bool ArrayFlex::decode(Array& arr)
     REALM_ASSERT(arr.is_attached());
     size_t value_width, index_width, value_size, index_size;
     if (get_encode_info(arr.get_header(), value_width, index_width, value_size, index_size)) {
-        auto values = fetch_values_from_encoded_array(arr, value_width, index_width, value_size, index_size);
+        auto values = fetch_signed_values_from_encoded_array(arr, value_width, index_width, value_size, index_size);
         REALM_ASSERT(values.size() == index_size);
         restore_array(arr, values); // restore array sets capacity
         return true;
@@ -81,23 +81,10 @@ size_t ArrayFlex::size(const Array& arr) const
 
 int64_t ArrayFlex::get(const Array& arr, size_t ndx) const
 {
-    REALM_ASSERT(arr.is_attached());
-    size_t value_width, index_width, value_size, index_size;
-    if (get_encode_info(arr.get_header(), value_width, index_width, value_size, index_size)) {
-
-        if (ndx >= index_size)
-            return realm::not_found;
-
-        auto data = (uint64_t*)NodeHeader::get_data_from_header(arr.get_header());
-        const auto offset = (value_size * value_width) + (ndx * index_width);
-        const auto index = read_bitfield(data, offset, index_width);
-        bf_iterator it_value{data, 0, value_width, value_width, index};
-        const auto v = it_value.get_value();
-        const auto sign_v = sign_extend_field(value_width, v);
-        REALM_ASSERT(sign_v != -128);
-        return sign_v;
-    }
-    REALM_UNREACHABLE();
+    size_t value_width;
+    auto v = get_unsigned(arr, ndx, value_width);
+    const auto sign_v = sign_extend_field(value_width, v);
+    return sign_v;
 }
 
 bool ArrayFlex::try_encode(const Array& origin, Array& encoded, std::vector<int64_t>& values,
@@ -261,9 +248,9 @@ bool inline ArrayFlex::get_encode_info(const char* header, size_t& value_width, 
     return false;
 }
 
-std::vector<int64_t> ArrayFlex::fetch_values_from_encoded_array(const Array& arr, size_t value_width,
-                                                                size_t index_width, size_t value_size,
-                                                                size_t index_size) const
+std::vector<int64_t> ArrayFlex::fetch_signed_values_from_encoded_array(const Array& arr, size_t value_width,
+                                                                       size_t index_width, size_t value_size,
+                                                                       size_t index_size) const
 {
     std::vector<int64_t> values;
     values.reserve(index_size);
@@ -281,6 +268,25 @@ std::vector<int64_t> ArrayFlex::fetch_values_from_encoded_array(const Array& arr
     return values;
 }
 
+std::vector<uint64_t> ArrayFlex::fetch_unsigned_values_from_encoded_array(const Array& arr, size_t value_width,
+                                                                          size_t index_width, size_t value_size,
+                                                                          size_t index_size) const
+{
+    std::vector<uint64_t> values;
+    values.reserve(index_size);
+    auto data = (uint64_t*)NodeHeader::get_data_from_header(arr.get_header());
+    const auto offset = value_size * value_width;
+    bf_iterator index_iterator{data, offset, index_width, index_width, 0};
+    for (size_t i = 0; i < index_size; ++i) {
+        const auto index = index_iterator.get_value();
+        bf_iterator it_value{data, index * value_width, value_width, value_width, 0};
+        const auto value = it_value.get_value();
+        values.push_back(value);
+        ++index_iterator;
+    }
+    return values;
+}
+
 void ArrayFlex::restore_array(Array& arr, const std::vector<int64_t>& values) const
 {
     // do the reverse of compressing the array
@@ -292,18 +298,16 @@ void ArrayFlex::restore_array(Array& arr, const std::vector<int64_t>& values) co
     const size_t width_min = NodeHeader::signed_to_num_bits(*min_value);
     const size_t width_max = NodeHeader::signed_to_num_bits(*max_value);
     auto max_bit = std::max(width_min, width_max);
-    // this is wrong or/and it is not supposed to be used in this context. TODO: check the other places. This might be
-    // the source of all our troubles auto test_align_width = Node::align_bits_to8(max_bit); auto test_align_width_c =
-    // bit_width(max_bit);
     auto byte_size = NodeHeader::calc_size<Encoding::WTypBits>(size, max_bit);
     REALM_ASSERT(byte_size % 8 == 0); // 8 bytes aligned value
     Allocator& allocator = arr.get_alloc();
 
     // calling array destory here, works only because we are not going to use this array header anymore, see comment
     // in Array::init_from_mem. We can get away with this since we are basically restoring all the basic properties
-    // for the array via Node::init_header(...) But witdh and capacity need particular attention. arr.destroy();
-    auto orginal_header = arr.get_header();
-    auto origanal_ref = arr.get_ref();
+    // for the array via Node::init_header(...) But width and capacity need particular attention.
+    // auto orginal_header = arr.get_header();
+    // auto origanal_ref = arr.get_ref();
+    arr.destroy();
 
     // this is slow. It is just for testing, but this is what it is needed. the ceil for the current bit size.
     // we need to have std::bit_ceil(v); AKA the next power of 2 closed to max_bit. We have somehow introduced a
@@ -316,6 +320,7 @@ void ArrayFlex::restore_array(Array& arr, const std::vector<int64_t>& values) co
     REALM_ASSERT(width == 0 || width == 1 || width == 2 || width == 4 || width == 8 || width == 16 || width == 32 ||
                  width == 64);
 
+
     auto mem = allocator.alloc(byte_size);
     auto header = mem.get_addr();
     NodeHeader::init_header(header, 'A', Encoding::WTypBits, flags, width, values.size());
@@ -324,11 +329,13 @@ void ArrayFlex::restore_array(Array& arr, const std::vector<int64_t>& values) co
     // previous header and ref must be stored temporary and deleted after this point
     arr.init_from_mem(mem);
     NodeHeader::set_capacity_in_header(byte_size, header);
+    arr.update_parent();
+
     size_t i = 0;
     for (const auto& v : values)
         arr.set(i++, v);
-    arr.update_parent();
-    allocator.free_(origanal_ref, orginal_header);
+
+    // allocator.free_(origanal_ref, orginal_header);
 
     size_t w = arr.get_width();
     REALM_ASSERT(w == 0 || w == 1 || w == 2 || w == 4 || w == 8 || w == 16 || w == 32 || w == 64);
@@ -358,10 +365,21 @@ size_t ArrayFlex::find_first(const Array& arr, int64_t value) const
 
 int64_t ArrayFlex::get(const char* header, size_t ndx)
 {
+    size_t value_width = 0;
+    auto val = get_unsigned(header, ndx, value_width);
+    if (val != realm::not_found) {
+        const auto ivalue = sign_extend_field(value_width, val);
+        return ivalue;
+    }
+    return val;
+}
+
+uint64_t ArrayFlex::get_unsigned(const char* header, size_t ndx, size_t& value_width)
+{
     using Encoding = NodeHeader::Encoding;
     REALM_ASSERT(NodeHeader::get_kind(header) == 'B');
     REALM_ASSERT(NodeHeader::get_encoding(header) == Encoding::Flex);
-    size_t value_width, index_width, value_size, index_size;
+    size_t index_width, value_size, index_size;
     if (get_encode_info(header, value_width, index_width, value_size, index_size)) {
         if (ndx >= index_size)
             return realm::not_found;
@@ -371,8 +389,67 @@ int64_t ArrayFlex::get(const char* header, size_t ndx)
         auto index_value = index_iterator.get_value();
         bf_iterator it_value{data, index_value * value_width, value_width, value_width, 0};
         const auto arr_value = it_value.get_value();
-        const auto ivalue = sign_extend_field(value_width, arr_value);
-        return ivalue;
+        return arr_value;
     }
     return realm::not_found;
+}
+
+uint64_t ArrayFlex::get_unsigned(const Array& arr, size_t ndx, size_t& value_width) const
+{
+    REALM_ASSERT(arr.is_attached());
+    REALM_ASSERT(arr.get_kind(arr.get_header()) == 'B');
+    size_t index_width, value_size, index_size;
+    if (get_encode_info(arr.get_header(), value_width, index_width, value_size, index_size)) {
+
+        if (ndx >= index_size)
+            return realm::not_found;
+
+        auto data = (uint64_t*)NodeHeader::get_data_from_header(arr.get_header());
+        const auto offset = (value_size * value_width) + (ndx * index_width);
+        const auto index = read_bitfield(data, offset, index_width);
+        bf_iterator it_value{data, 0, value_width, value_width, index};
+        const auto v = it_value.get_value();
+        return v;
+    }
+    REALM_UNREACHABLE();
+}
+
+size_t ArrayFlex::lower_bound(const Array& arr, uint64_t value) const
+{
+    // TODO: the implementation of this method is quite important and impacts the way the cluster tree is traversed.
+    // TODO: redo the implementation once the tests are passing
+    REALM_ASSERT(arr.is_attached());
+
+    const auto header = arr.get_header();
+    REALM_ASSERT(NodeHeader::get_kind(header) == 'B');
+
+    size_t v_width, i_width, v_size, i_size;
+    if (get_encode_info(header, v_width, i_width, v_size, i_size)) {
+        auto values = fetch_unsigned_values_from_encoded_array(arr, v_width, i_width, v_size, i_size);
+        // I might be wrong, but it seems that UnsignedArray values are kept sorted, so just call lower_bound here
+        // NOTE: this is inefficient, the algorithm is moving from O(lg N) to O(N) with very expensive constant
+        // factors. std::sort(values.begin(), values.end());
+        return std::lower_bound(values.begin(), values.end(), value) - values.begin();
+    }
+    REALM_UNREACHABLE();
+}
+
+size_t ArrayFlex::upper_bound(const Array& arr, uint64_t value) const
+{
+    // TODO: the implementation of this method is quite important and impacts the way the cluster tree is traversed.
+    // TODO: redo the implementation once the tests are passing
+    REALM_ASSERT(arr.is_attached());
+
+    const auto header = arr.get_header();
+    REALM_ASSERT(NodeHeader::get_kind(header) == 'B');
+
+    size_t v_width, i_width, v_size, i_size;
+    if (get_encode_info(header, v_width, i_width, v_size, i_size)) {
+        auto values = fetch_unsigned_values_from_encoded_array(arr, v_width, i_width, v_size, i_size);
+        // I might be wrong, but it seems that UnsignedArray values are kept sorted, so just call lower_bound here
+        // NOTE: this is inefficient, the algorithm is moving from O(lg N) to O(N) with very expensive constant
+        // factors. std::sort(values.begin(), values.end());
+        return std::upper_bound(values.begin(), values.end(), value) - values.begin();
+    }
+    REALM_UNREACHABLE();
 }

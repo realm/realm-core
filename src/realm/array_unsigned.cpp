@@ -50,37 +50,58 @@ inline uint8_t ArrayUnsigned::bit_width(uint64_t value)
 
 inline void ArrayUnsigned::_set(size_t ndx, uint8_t width, uint64_t value)
 {
-    if (is_encoded())
-        Array::set(ndx, value);
-    else if (width == 8) {
-        reinterpret_cast<uint8_t*>(m_data)[ndx] = uint8_t(value);
-    }
-    else if (width == 16) {
-        reinterpret_cast<uint16_t*>(m_data)[ndx] = uint16_t(value);
-    }
-    else if (width == 32) {
-        reinterpret_cast<uint32_t*>(m_data)[ndx] = uint32_t(value);
+    if (is_encoded()) {
+        ArrayUnsigned tmp{m_alloc};
+        tmp.create(0, 0);
+        tmp.init_from_mem(get_mem());
+        REALM_ASSERT(tmp.get_kind(tmp.get_header()) == 'B');
+        Array::decode_array(tmp);
+        REALM_ASSERT(tmp.get_kind(tmp.get_header()) == 'A');
+        m_width = tmp.m_width = tmp.get_width_from_header(tmp.get_header());
+        m_ubound = tmp.m_ubound = uint64_t(-1) >> (64 - m_width);
+#if REALM_DEBUG
+        REALM_ASSERT(m_width >= m_lbound);
+        REALM_ASSERT(m_width <= m_ubound);
+        REALM_ASSERT(m_lbound <= m_ubound);
+#endif
+        tmp._set(ndx, width, value);
     }
     else {
-        reinterpret_cast<uint64_t*>(m_data)[ndx] = uint64_t(value);
+        if (width == 8) {
+            reinterpret_cast<uint8_t*>(m_data)[ndx] = uint8_t(value);
+        }
+        else if (width == 16) {
+            reinterpret_cast<uint16_t*>(m_data)[ndx] = uint16_t(value);
+        }
+        else if (width == 32) {
+            reinterpret_cast<uint32_t*>(m_data)[ndx] = uint32_t(value);
+        }
+        else {
+            reinterpret_cast<uint64_t*>(m_data)[ndx] = uint64_t(value);
+        }
     }
 }
 
 inline uint64_t ArrayUnsigned::_get(size_t ndx, uint8_t width) const
 {
-    if (is_encoded())
-        return Array::get(ndx);
-
-    if (width == 8) {
-        return reinterpret_cast<uint8_t*>(m_data)[ndx];
+    if (is_encoded()) {
+        // TODO: this can be any possible encoding.. cannot be a static method
+        size_t v_width;
+        return ArrayFlex::get_unsigned(get_header(), ndx, v_width);
     }
-    if (width == 16) {
-        return reinterpret_cast<uint16_t*>(m_data)[ndx];
+    else {
+        if (width == 8) {
+            return reinterpret_cast<uint8_t*>(m_data)[ndx];
+        }
+        if (width == 16) {
+            return reinterpret_cast<uint16_t*>(m_data)[ndx];
+        }
+        if (width == 32) {
+            return reinterpret_cast<uint32_t*>(m_data)[ndx];
+        }
+        return get_direct(m_data, width, ndx);
     }
-    if (width == 32) {
-        return reinterpret_cast<uint32_t*>(m_data)[ndx];
-    }
-    return get_direct(m_data, width, ndx);
+    REALM_UNREACHABLE();
 }
 
 void ArrayUnsigned::create(size_t initial_size, uint64_t ubound_value)
@@ -102,36 +123,28 @@ void ArrayUnsigned::update_from_parent() noexcept
 size_t ArrayUnsigned::lower_bound(uint64_t value) const noexcept
 {
     if (is_encoded()) {
-        auto& this_array = const_cast<ArrayUnsigned&>(*this);
-        decode_array(this_array);
-        this_array.m_width = get_width_from_header(get_header());
-        this_array.m_ubound = uint64_t(-1) >> (64 - m_width);
-#if REALM_DEBUG
-        REALM_ASSERT(m_width == 0 || m_width == 1 || m_width == 2 || m_width == 4 || m_width == 8 || m_width == 16 ||
-                     m_width == 32 || m_width == 64);
-        REALM_ASSERT(m_width >= m_lbound);
-        REALM_ASSERT(m_width <= m_ubound);
-        REALM_ASSERT(m_lbound <= m_ubound);
-#endif
+        return m_encode.lower_bound(*this, value);
     }
 
-    if (m_width == 8) {
+    auto width = get_width_from_header(get_header());
+
+    if (width == 8) {
         uint8_t* arr = reinterpret_cast<uint8_t*>(m_data);
         uint8_t* pos = std::lower_bound(arr, arr + m_size, value);
         return pos - arr;
     }
-    else if (m_width == 16) {
+    else if (width == 16) {
         uint16_t* arr = reinterpret_cast<uint16_t*>(m_data);
         uint16_t* pos = std::lower_bound(arr, arr + m_size, value);
         return pos - arr;
     }
-    else if (m_width == 32) {
+    else if (width == 32) {
         uint32_t* arr = reinterpret_cast<uint32_t*>(m_data);
         uint32_t* pos = std::lower_bound(arr, arr + m_size, value);
         return pos - arr;
     }
-    else if (m_width < 8) {
-        switch (m_width) {
+    else if (width < 8) {
+        switch (width) {
             case 0:
                 return realm::lower_bound<0>(m_data, m_size, value);
             case 1:
@@ -154,36 +167,28 @@ size_t ArrayUnsigned::lower_bound(uint64_t value) const noexcept
 size_t ArrayUnsigned::upper_bound(uint64_t value) const noexcept
 {
     if (is_encoded()) {
-        auto& this_array = const_cast<ArrayUnsigned&>(*this);
-        decode_array(this_array);
-        this_array.m_width = get_width_from_header(get_header());
-        this_array.m_ubound = uint64_t(-1) >> (64 - m_width);
-#if REALM_DEBUG
-        REALM_ASSERT(m_width == 0 || m_width == 1 || m_width == 2 || m_width == 4 || m_width == 8 || m_width == 16 ||
-                     m_width == 32 || m_width == 64);
-        REALM_ASSERT(m_width >= m_lbound);
-        REALM_ASSERT(m_width <= m_ubound);
-        REALM_ASSERT(m_lbound <= m_ubound);
-#endif
+        return m_encode.upper_bound(*this, value);
     }
 
-    if (m_width == 8) {
+    auto width = get_width_from_header(get_header());
+
+    if (width == 8) {
         uint8_t* arr = reinterpret_cast<uint8_t*>(m_data);
         uint8_t* pos = std::upper_bound(arr, arr + m_size, value);
         return pos - arr;
     }
-    else if (m_width == 16) {
+    else if (width == 16) {
         uint16_t* arr = reinterpret_cast<uint16_t*>(m_data);
         uint16_t* pos = std::upper_bound(arr, arr + m_size, value);
         return pos - arr;
     }
-    else if (m_width == 32) {
+    else if (width == 32) {
         uint32_t* arr = reinterpret_cast<uint32_t*>(m_data);
         uint32_t* pos = std::upper_bound(arr, arr + m_size, value);
         return pos - arr;
     }
-    else if (m_width < 8) {
-        switch (m_width) {
+    else if (width < 8) {
+        switch (width) {
             case 0:
                 return realm::upper_bound<0>(m_data, m_size, value);
             case 1:
@@ -209,78 +214,109 @@ void ArrayUnsigned::insert(size_t ndx, uint64_t value)
     // we should aim at unifying as much as possible the interface, in order to avoid to scatter the
     // compression/decompression logic all over the code.
 
-    if (m_encode.is_encoded(*this)) {
-        m_encode.decode(*this);
-        m_width = get_width();
+    if (is_encoded()) {
+        ArrayUnsigned tmp{m_alloc};
+        tmp.create(0, 0);
+        tmp.init_from_mem(get_mem());
+        REALM_ASSERT(tmp.get_kind(tmp.get_header()) == 'B');
+        Array::decode_array(tmp);
+        REALM_ASSERT(tmp.get_kind(tmp.get_header()) == 'A');
+        m_width = tmp.get_width_from_header(tmp.get_header());
         m_ubound = uint64_t(-1) >> (64 - m_width);
 #if REALM_DEBUG
+        REALM_ASSERT(m_width >= 8);
         REALM_ASSERT(m_width >= m_lbound);
         REALM_ASSERT(m_width <= m_ubound);
         REALM_ASSERT(m_lbound <= m_ubound);
 #endif
+        tmp.insert(ndx, value);
     }
+    else {
+        m_width = get_width_from_header(get_header());
+        m_ubound = uint64_t(-1) >> (64 - m_width);
 
-    REALM_ASSERT_DEBUG(m_width >= 8);
-    bool do_expand = value > (uint64_t)m_ubound;
-    const uint8_t old_width = m_width;
-    const uint8_t new_width = do_expand ? bit_width(value) : m_width;
-    const auto old_size = m_size;
+        REALM_ASSERT_DEBUG(m_width >= 8);
+        bool do_expand = value > (uint64_t)m_ubound;
+        const uint8_t old_width = m_width;
+        const uint8_t new_width = do_expand ? bit_width(value) : m_width;
+        const auto old_size = m_size;
 
-    REALM_ASSERT_DEBUG(!do_expand || new_width > m_width);
-    REALM_ASSERT_DEBUG(ndx <= m_size);
+        REALM_ASSERT_DEBUG(!do_expand || new_width > m_width);
+        REALM_ASSERT_DEBUG(ndx <= m_size);
 
-    // Check if we need to copy before modifying
-    copy_on_write();              // Throws
-    alloc(m_size + 1, new_width); // Throws
+        // Check if we need to copy before modifying
+        copy_on_write();              // Throws
+        alloc(m_size + 1, new_width); // Throws
 
-    // Move values above insertion (may expand)
-    if (do_expand) {
-        size_t i = old_size;
-        while (i > ndx) {
-            --i;
-            auto tmp = _get(i, old_width);
-            _set(i + 1, new_width, tmp);
+        // Move values above insertion (may expand)
+        if (do_expand) {
+            size_t i = old_size;
+            while (i > ndx) {
+                --i;
+                auto tmp = _get(i, old_width);
+                _set(i + 1, new_width, tmp);
+            }
         }
-    }
-    else if (ndx != m_size) {
-        size_t w = (new_width >> 3);
+        else if (ndx != m_size) {
+            size_t w = (new_width >> 3);
 
-        char* src_begin = m_data + ndx * w;
-        char* src_end = m_data + old_size * w;
-        char* dst = src_end + w;
+            char* src_begin = m_data + ndx * w;
+            char* src_end = m_data + old_size * w;
+            char* dst = src_end + w;
 
-        std::copy_backward(src_begin, src_end, dst);
-    }
+            std::copy_backward(src_begin, src_end, dst);
+        }
 
-    // Insert the new value
-    _set(ndx, new_width, value);
+        // Insert the new value
+        _set(ndx, new_width, value);
 
-    // Expand values before insertion
-    if (do_expand) {
-        size_t i = ndx;
-        while (i != 0) {
-            --i;
-            _set(i, new_width, _get(i, old_width));
+        // Expand values before insertion
+        if (do_expand) {
+            size_t i = ndx;
+            while (i != 0) {
+                --i;
+                _set(i, new_width, _get(i, old_width));
+            }
         }
     }
 }
 
 void ArrayUnsigned::erase(size_t ndx)
 {
-    REALM_ASSERT_DEBUG(m_width >= 8);
-    copy_on_write(); // Throws
+    if (is_encoded()) {
+        ArrayUnsigned tmp{m_alloc};
+        tmp.create(0, 0);
+        tmp.init_from_mem(get_mem());
+        REALM_ASSERT(tmp.get_kind(tmp.get_header()) == 'B');
+        Array::decode_array(tmp);
+        REALM_ASSERT(tmp.get_kind(tmp.get_header()) == 'A');
+        m_width = tmp.get_width_from_header(tmp.get_header());
+        m_ubound = uint64_t(-1) >> (64 - m_width);
+#if REALM_DEBUG
+        REALM_ASSERT(m_width >= 8);
+        REALM_ASSERT(m_width >= m_lbound);
+        REALM_ASSERT(m_width <= m_ubound);
+        REALM_ASSERT(m_lbound <= m_ubound);
+#endif
+        tmp.erase(ndx);
+    }
+    else {
+        m_width = get_width_from_header(get_header());
+        REALM_ASSERT_DEBUG(m_width >= 8);
+        copy_on_write(); // Throws
 
-    size_t w = m_width >> 3;
+        size_t w = m_width >> 3;
 
-    char* dst = m_data + ndx * w;
-    const char* src = dst + w;
-    size_t num_bytes = (m_size - ndx - 1) * w;
+        char* dst = m_data + ndx * w;
+        const char* src = dst + w;
+        size_t num_bytes = (m_size - ndx - 1) * w;
 
-    std::copy_n(src, num_bytes, dst);
+        std::copy_n(src, num_bytes, dst);
 
-    // Update size (also in header)
-    --m_size;
-    set_header_size(m_size);
+        // Update size (also in header)
+        --m_size;
+        set_header_size(m_size);
+    }
 }
 
 uint64_t ArrayUnsigned::get(size_t index) const
@@ -291,27 +327,44 @@ uint64_t ArrayUnsigned::get(size_t index) const
 void ArrayUnsigned::set(size_t ndx, uint64_t value)
 {
     if (is_encoded()) {
-        decode_array(*this);
+        ArrayUnsigned tmp{m_alloc};
+        tmp.create(0, 0);
+        tmp.init_from_mem(get_mem());
+        REALM_ASSERT(tmp.get_kind(tmp.get_header()) == 'B');
+        Array::decode_array(tmp);
+        REALM_ASSERT(tmp.get_kind(tmp.get_header()) == 'A');
+        m_width = tmp.get_width_from_header(tmp.get_header());
+        m_ubound = uint64_t(-1) >> (64 - m_width);
+#if REALM_DEBUG
+        REALM_ASSERT(m_width >= m_lbound);
+        REALM_ASSERT(m_width <= m_ubound);
+        REALM_ASSERT(m_lbound <= m_ubound);
+#endif
+        return tmp.set(ndx, value);
     }
 
-    REALM_ASSERT_DEBUG(m_width >= 8);
-    copy_on_write(); // Throws
+    else {
+        m_width = get_width_from_header(get_header());
+        m_ubound = uint64_t(-1) >> (64 - m_width);
+        REALM_ASSERT_DEBUG(m_width >= 8);
+        copy_on_write(); // Throws
 
-    if (value > m_ubound) {
-        const uint8_t old_width = m_width;
-        const uint8_t new_width = bit_width(value);
+        if (value > m_ubound) {
+            const uint8_t old_width = m_width;
+            const uint8_t new_width = bit_width(value);
 
-        alloc(m_size, new_width); // Throws
+            alloc(m_size, new_width); // Throws
 
-        size_t i = m_size;
-        while (i) {
-            i--;
-            auto v = _get(i, old_width);
-            _set(i, new_width, v);
+            size_t i = m_size;
+            while (i) {
+                i--;
+                auto v = _get(i, old_width);
+                _set(i, new_width, v);
+            }
         }
-    }
 
-    _set(ndx, m_width, value);
+        _set(ndx, m_width, value);
+    }
 }
 
 void ArrayUnsigned::truncate(size_t ndx)

@@ -35,6 +35,13 @@ public:
     virtual bool is_encoded(const Array&) const = 0;
     virtual size_t size(const Array&) const = 0;
     virtual int64_t get(const Array&, size_t) const = 0;
+    // this needs to be used carefully, only if you know that the underline data is unsigned.
+    virtual uint64_t get_unsigned(const Array&, size_t, size_t&) const = 0;
+    // these methods are used by ArrayUnsigned, and have a huge impact on how fast we traverse the ClusterTree
+    // Note: These methods are expecting array to be storing only unsigned int values.
+    virtual size_t lower_bound(const Array&, uint64_t) const = 0;
+    virtual size_t upper_bound(const Array&, uint64_t) const = 0;
+    // query mappers
     virtual size_t find_first(const Array&, int64_t value) const = 0;
 };
 

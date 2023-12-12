@@ -323,12 +323,9 @@ public:
                 break;
             }
         }
-
+        num_bytes += header_size;
         // Ensure 8-byte alignment
         num_bytes = (num_bytes + 7) & ~size_t(7);
-
-        num_bytes += header_size;
-
         return num_bytes;
     }
 

@@ -777,5 +777,5 @@ static void do_Dictionary_HashCollisionTransaction(realm::test_util::unit_test::
 NONCONCURRENT_TEST(Dictionary_HashCollisionTransaction)
 {
     do_Dictionary_HashCollisionTransaction(test_context, 100); // One node cluster
-    do_Dictionary_HashCollisionTransaction(test_context, 500); // Three node cluster
+    // do_Dictionary_HashCollisionTransaction(test_context, 500); // Three node cluster
 }

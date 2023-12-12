@@ -210,8 +210,7 @@ int64_t Array::get(size_t ndx) const noexcept
 int64_t Array::get(size_t ndx) const noexcept
 {
     if (is_encoded()) {
-        auto v = m_encode.get(*this, ndx);
-        REALM_ASSERT(v != -128);
+        return m_encode.get(*this, ndx);
     }
 
     REALM_ASSERT_DEBUG(is_attached());
@@ -1403,14 +1402,15 @@ void Array::update_width_cache_from_header() noexcept
         m_getter = m_vtable->getter;
     }
     else {
-        int64_t width = get_width_from_header(get_header());
+        int64_t width = get_width_from_header(header);
         m_width = width;
+        REALM_ASSERT(m_width == width);
         m_lbound = lbound_for_width(m_width);
         m_ubound = ubound_for_width(m_width);
         REALM_ASSERT(m_lbound <= m_ubound);
         REALM_ASSERT(width >= m_lbound);
         REALM_ASSERT(width <= m_ubound);
-        REALM_TEMPEX(m_vtable = &VTableForWidth, width, ::vtable);
+        REALM_TEMPEX(m_vtable = &VTableForWidth, m_width, ::vtable);
         m_getter = m_vtable->getter;
     }
 }

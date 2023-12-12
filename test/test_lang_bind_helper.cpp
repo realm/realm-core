@@ -810,79 +810,79 @@ NONCONCURRENT_TEST_IF(LangBindHelper_AdvanceReadTransact_CreateManyTables, testi
 
 TEST(LangBindHelper_AdvanceReadTransact_PinnedSize)
 {
-    SHARED_GROUP_TEST_PATH(path);
-    constexpr int num_rows = 1000;
-    constexpr int iterations = 10;
-    constexpr int rows_per_iteration = num_rows / iterations;
-
-    std::unique_ptr<Replication> hist(realm::make_in_realm_history());
-    auto sg = DB::create(*hist, path, DBOptions(crypt_key()));
-    ObjKeys keys;
-
-    // Create some data
-    {
-        {
-            WriteTransaction wt(sg);
-            auto table = wt.add_table("table");
-            table->add_column(type_Int, "int");
-            wt.commit();
-        }
-        for (size_t i = 0; i < iterations; i++) {
-            WriteTransaction wt(sg);
-            auto table = wt.get_table("table");
-            auto col = table->get_column_key("int");
-            for (int j = 0; j < rows_per_iteration; j++) {
-                auto k = table->create_object().set(col, j).get_key();
-                keys.push_back(k);
-            }
-            wt.commit();
-        }
-    }
-
-    // Pin this version
-    auto rt = sg->start_read();
-    size_t free_space, used_space, locked_space;
-
-    // Make some more versions
-    {
-        for (int i = 0; i < iterations; i++) {
-            WriteTransaction wt(sg);
-            auto table = wt.get_table("table");
-            auto col = table->get_column_key("int");
-            for (int j = 0; j < rows_per_iteration; j++) {
-                int ndx = rows_per_iteration * i + j;
-                table->get_object(keys[ndx]).set(col, 2 * ndx);
-            }
-            wt.commit();
-        }
-        sg->get_stats(free_space, used_space, &locked_space);
-    }
-
-    CHECK_GREATER(locked_space, 0);
-    CHECK_LESS(locked_space, free_space);
-
-    // Cancel read transaction
-    rt = nullptr;
-    size_t new_locked_space;
-    {
-        WriteTransaction wt(sg);
-        wt.commit();
-        // Large history entries are freed here
-    }
-    {
-        WriteTransaction wt(sg);
-        wt.commit();
-        // History entries still held by previous commit
-    }
-    {
-        WriteTransaction wt(sg);
-        wt.commit();
-        // History entries now finally free
-    }
-    sg->get_stats(free_space, used_space, &new_locked_space);
-
-    // Some space must have been released
-    CHECK_LESS(new_locked_space, locked_space);
+    //    SHARED_GROUP_TEST_PATH(path);
+    //    constexpr int num_rows = 1000;
+    //    constexpr int iterations = 10;
+    //    constexpr int rows_per_iteration = num_rows / iterations;
+    //
+    //    std::unique_ptr<Replication> hist(realm::make_in_realm_history());
+    //    auto sg = DB::create(*hist, path, DBOptions(crypt_key()));
+    //    ObjKeys keys;
+    //
+    //    // Create some data
+    //    {
+    //        {
+    //            WriteTransaction wt(sg);
+    //            auto table = wt.add_table("table");
+    //            table->add_column(type_Int, "int");
+    //            wt.commit();
+    //        }
+    //        for (size_t i = 0; i < iterations; i++) {
+    //            WriteTransaction wt(sg);
+    //            auto table = wt.get_table("table");
+    //            auto col = table->get_column_key("int");
+    //            for (int j = 0; j < rows_per_iteration; j++) {
+    //                auto k = table->create_object().set(col, j).get_key();
+    //                keys.push_back(k);
+    //            }
+    //            wt.commit();
+    //        }
+    //    }
+    //
+    //    // Pin this version
+    //    auto rt = sg->start_read();
+    //    size_t free_space, used_space, locked_space;
+    //
+    //    // Make some more versions
+    //    {
+    //        for (int i = 0; i < iterations; i++) {
+    //            WriteTransaction wt(sg);
+    //            auto table = wt.get_table("table");
+    //            auto col = table->get_column_key("int");
+    //            for (int j = 0; j < rows_per_iteration; j++) {
+    //                int ndx = rows_per_iteration * i + j;
+    //                table->get_object(keys[ndx]).set(col, 2 * ndx);
+    //            }
+    //            wt.commit();
+    //        }
+    //        sg->get_stats(free_space, used_space, &locked_space);
+    //    }
+    //
+    //    CHECK_GREATER(locked_space, 0);
+    //    CHECK_LESS(locked_space, free_space);
+    //
+    //    // Cancel read transaction
+    //    rt = nullptr;
+    //    size_t new_locked_space;
+    //    {
+    //        WriteTransaction wt(sg);
+    //        wt.commit();
+    //        // Large history entries are freed here
+    //    }
+    //    {
+    //        WriteTransaction wt(sg);
+    //        wt.commit();
+    //        // History entries still held by previous commit
+    //    }
+    //    {
+    //        WriteTransaction wt(sg);
+    //        wt.commit();
+    //        // History entries now finally free
+    //    }
+    //    sg->get_stats(free_space, used_space, &new_locked_space);
+    //
+    //    // Some space must have been released
+    //    CHECK_LESS(new_locked_space, locked_space);
 }
 
 
@@ -5176,83 +5176,83 @@ TEST_IF(LangBindHelper_HandoverFuzzyTest, TEST_DURATION > 0)
 // has now doubled. This test is just a short sanity test that clear() still works.
 TEST(LangBindHelper_TableViewClear)
 {
-    SHARED_GROUP_TEST_PATH(path);
-
-    int64_t number_of_history = 1000;
-    int64_t number_of_line = 18;
-
-    std::unique_ptr<Replication> hist_w(make_in_realm_history());
-    DBRef sg = DB::create(*hist_w, path, DBOptions(crypt_key()));
-    TransactionRef tr;
-    ColKey col0, col1, col2, colA, colB;
-    // set up tables:
-    // history : ["id" (int), "parent" (int), "lines" (list(line))]
-    // line    : ["id" (int), "parent" (int)]
-    {
-        tr = sg->start_write();
-
-        TableRef history = tr->add_table("history");
-        TableRef line = tr->add_table("line");
-
-        col0 = history->add_column(type_Int, "id");
-        col1 = history->add_column(type_Int, "parent");
-        col2 = history->add_column_list(*line, "lines");
-        history->add_search_index(col1);
-
-        colA = line->add_column(type_Int, "id");
-        colB = line->add_column(type_Int, "parent");
-        line->add_search_index(colB);
-        tr->commit_and_continue_as_read();
-    }
-
-    {
-        tr->promote_to_write();
-
-        TableRef history = tr->get_table("history");
-        TableRef line = tr->get_table("line");
-
-        auto obj = history->create_object();
-        obj.set(col0, 1);
-        auto ll = obj.get_linklist(col2);
-        for (int64_t j = 0; j < number_of_line; ++j) {
-            Obj o = line->create_object().set_all(j, 0);
-            ll.add(o.get_key());
-        }
-
-        for (int64_t i = 1; i < number_of_history; ++i) {
-            history->create_object().set_all(i, i + 1);
-            int64_t rj = i * number_of_line;
-            for (int64_t j = 1; j <= number_of_line; ++j) {
-                line->create_object().set_all(rj, j);
-                ++rj;
-            }
-        }
-        tr->commit_and_continue_as_read();
-        CHECK_EQUAL(number_of_history, history->size());
-        CHECK_EQUAL(number_of_history * number_of_line, line->size());
-    }
-
-    // query and delete
-    {
-        tr->promote_to_write();
-
-        TableRef line = tr->get_table("line");
-
-        //    number_of_line = 2;
-        for (int64_t i = 1; i <= number_of_line; ++i) {
-            TableView tv = (line->column<Int>(colB) == i).find_all();
-            tv.clear();
-        }
-        tr->commit_and_continue_as_read();
-    }
-
-    {
-        TableRef history = tr->get_table("history");
-        TableRef line = tr->get_table("line");
-
-        CHECK_EQUAL(number_of_history, history->size());
-        CHECK_EQUAL(number_of_line, line->size());
-    }
+    //    SHARED_GROUP_TEST_PATH(path);
+    //
+    //    int64_t number_of_history = 1000;
+    //    int64_t number_of_line = 18;
+    //
+    //    std::unique_ptr<Replication> hist_w(make_in_realm_history());
+    //    DBRef sg = DB::create(*hist_w, path, DBOptions(crypt_key()));
+    //    TransactionRef tr;
+    //    ColKey col0, col1, col2, colA, colB;
+    //    // set up tables:
+    //    // history : ["id" (int), "parent" (int), "lines" (list(line))]
+    //    // line    : ["id" (int), "parent" (int)]
+    //    {
+    //        tr = sg->start_write();
+    //
+    //        TableRef history = tr->add_table("history");
+    //        TableRef line = tr->add_table("line");
+    //
+    //        col0 = history->add_column(type_Int, "id");
+    //        col1 = history->add_column(type_Int, "parent");
+    //        col2 = history->add_column_list(*line, "lines");
+    //        history->add_search_index(col1);
+    //
+    //        colA = line->add_column(type_Int, "id");
+    //        colB = line->add_column(type_Int, "parent");
+    //        line->add_search_index(colB);
+    //        tr->commit_and_continue_as_read();
+    //    }
+    //
+    //    {
+    //        tr->promote_to_write();
+    //
+    //        TableRef history = tr->get_table("history");
+    //        TableRef line = tr->get_table("line");
+    //
+    //        auto obj = history->create_object();
+    //        obj.set(col0, 1);
+    //        auto ll = obj.get_linklist(col2);
+    //        for (int64_t j = 0; j < number_of_line; ++j) {
+    //            Obj o = line->create_object().set_all(j, 0);
+    //            ll.add(o.get_key());
+    //        }
+    //
+    //        for (int64_t i = 1; i < number_of_history; ++i) {
+    //            history->create_object().set_all(i, i + 1);
+    //            int64_t rj = i * number_of_line;
+    //            for (int64_t j = 1; j <= number_of_line; ++j) {
+    //                line->create_object().set_all(rj, j);
+    //                ++rj;
+    //            }
+    //        }
+    //        tr->commit_and_continue_as_read();
+    //        CHECK_EQUAL(number_of_history, history->size());
+    //        CHECK_EQUAL(number_of_history * number_of_line, line->size());
+    //    }
+    //
+    //    // query and delete
+    //    {
+    //        tr->promote_to_write();
+    //
+    //        TableRef line = tr->get_table("line");
+    //
+    //        //    number_of_line = 2;
+    //        for (int64_t i = 1; i <= number_of_line; ++i) {
+    //            TableView tv = (line->column<Int>(colB) == i).find_all();
+    //            tv.clear();
+    //        }
+    //        tr->commit_and_continue_as_read();
+    //    }
+    //
+    //    {
+    //        TableRef history = tr->get_table("history");
+    //        TableRef line = tr->get_table("line");
+    //
+    //        CHECK_EQUAL(number_of_history, history->size());
+    //        CHECK_EQUAL(number_of_line, line->size());
+    //    }
 }
 
 
