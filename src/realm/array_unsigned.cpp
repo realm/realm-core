@@ -102,7 +102,10 @@ void ArrayUnsigned::update_from_parent() noexcept
 size_t ArrayUnsigned::lower_bound(uint64_t value) const noexcept
 {
     if (is_encoded()) {
-        Array::decode_array((ArrayUnsigned&)*this);
+        auto& this_array = const_cast<ArrayUnsigned&>(*this);
+        decode_array(this_array);
+        this_array.m_width = get_width_from_header(get_header());
+        this_array.m_ubound = uint64_t(-1) >> (64 - m_width);
 #if REALM_DEBUG
         REALM_ASSERT(m_width == 0 || m_width == 1 || m_width == 2 || m_width == 4 || m_width == 8 || m_width == 16 ||
                      m_width == 32 || m_width == 64);
@@ -151,7 +154,10 @@ size_t ArrayUnsigned::lower_bound(uint64_t value) const noexcept
 size_t ArrayUnsigned::upper_bound(uint64_t value) const noexcept
 {
     if (is_encoded()) {
-        Array::decode_array((ArrayUnsigned&)*this);
+        auto& this_array = const_cast<ArrayUnsigned&>(*this);
+        decode_array(this_array);
+        this_array.m_width = get_width_from_header(get_header());
+        this_array.m_ubound = uint64_t(-1) >> (64 - m_width);
 #if REALM_DEBUG
         REALM_ASSERT(m_width == 0 || m_width == 1 || m_width == 2 || m_width == 4 || m_width == 8 || m_width == 16 ||
                      m_width == 32 || m_width == 64);
@@ -205,6 +211,8 @@ void ArrayUnsigned::insert(size_t ndx, uint64_t value)
 
     if (m_encode.is_encoded(*this)) {
         m_encode.decode(*this);
+        m_width = get_width();
+        m_ubound = uint64_t(-1) >> (64 - m_width);
 #if REALM_DEBUG
         REALM_ASSERT(m_width >= m_lbound);
         REALM_ASSERT(m_width <= m_ubound);
