@@ -234,16 +234,6 @@ public:
                 auto session_ident = msg.read_next<session_ident_type>('\n');
                 connection.receive_unbound_message(session_ident); // Throws
             }
-            else if (message_type == "error") {
-                auto error_code = msg.read_next<int>();
-                auto message_size = msg.read_next<size_t>();
-                auto is_fatal = sync::IsFatal{!msg.read_next<bool>()};
-                auto session_ident = msg.read_next<session_ident_type>('\n');
-                auto message = msg.read_sized_data<StringData>(message_size);
-
-                connection.receive_error_message(sync::ProtocolErrorInfo{error_code, message, is_fatal},
-                                                 session_ident); // Throws
-            }
             else if (message_type == "log_message") { // introduced in protocol version 10
                 parse_log_message(connection, msg);
             }
@@ -482,6 +472,7 @@ private:
             {"ApplicationBug", action::ApplicationBug},
             {"Warning", action::Warning},
             {"Transient", action::Transient},
+            {"BackupThenDeleteRealm", action::BackupThenDeleteRealm},
             {"DeleteRealm", action::DeleteRealm},
             {"ClientReset", action::ClientReset},
             {"ClientResetNoRecovery", action::ClientResetNoRecovery},
@@ -614,8 +605,9 @@ public:
 
     void make_mark_message(OutputBuffer&, session_ident_type session_ident, request_ident_type request_ident);
 
-    void make_error_message(int protocol_version, OutputBuffer&, sync::ProtocolError error_code, const char* message,
-                            std::size_t message_size, bool try_again, session_ident_type session_ident);
+    void make_json_error_message(int protocol_version, OutputBuffer&, sync::ProtocolError error_code,
+                                 const char* message, std::size_t message_size, bool try_again,
+                                 session_ident_type session_ident);
 
     void make_pong(OutputBuffer&, milliseconds_type timestamp);
 

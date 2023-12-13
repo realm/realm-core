@@ -105,6 +105,13 @@ static_assert(realm_sync_error_action_e(ProtocolErrorInfo::Action::MigrateToFLX)
               RLM_SYNC_ERROR_ACTION_MIGRATE_TO_FLX);
 static_assert(realm_sync_error_action_e(ProtocolErrorInfo::Action::RevertToPBS) ==
               RLM_SYNC_ERROR_ACTION_REVERT_TO_PBS);
+static_assert(realm_sync_error_action_e(ProtocolErrorInfo::Action::RefreshUser) ==
+              RLM_SYNC_ERROR_ACTION_REFRESH_USER);
+static_assert(realm_sync_error_action_e(ProtocolErrorInfo::Action::RefreshLocation) ==
+              RLM_SYNC_ERROR_ACTION_REFRESH_LOCATION);
+static_assert(realm_sync_error_action_e(ProtocolErrorInfo::Action::LogOutUser) == RLM_SYNC_ERROR_ACTION_LOG_OUT_USER);
+static_assert(realm_sync_error_action_e(ProtocolErrorInfo::Action::BackupThenDeleteRealm) ==
+              RLM_SYNC_ERROR_ACTION_BACKUP_THEN_DELETE_REALM);
 
 static_assert(realm_flx_sync_subscription_set_state_e(SubscriptionSet::State::Pending) ==
               RLM_SYNC_SUBSCRIPTION_PENDING);
@@ -835,12 +842,12 @@ RLM_API void realm_sync_session_wait_for_upload_completion(realm_sync_session_t*
 
 RLM_API void realm_sync_session_handle_error_for_testing(const realm_sync_session_t* session,
                                                          realm_errno_e error_code, const char* error_str,
-                                                         bool is_fatal)
+                                                         bool is_fatal, realm_sync_error_action_e action)
 {
     REALM_ASSERT(session);
     SyncSession::OnlyForTesting::handle_error(
-        *session->get(),
-        sync::SessionErrorInfo{Status{static_cast<ErrorCodes::Error>(error_code), error_str}, !is_fatal});
+        *session->get(), sync::SessionErrorInfo{Status{static_cast<ErrorCodes::Error>(error_code), error_str},
+                                                !is_fatal, static_cast<ProtocolErrorInfo::Action>(action)});
 }
 
 } // namespace realm::c_api

@@ -707,6 +707,13 @@ public:
     /// with the error.
     std::string get_appservices_connection_id();
 
+    /// Marks the session as un-resumable after a fatal error.
+    ///
+    /// This function is not thread-safe and should be called from the connection-state
+    /// listener callback if the Session should not initiate a re-connect/resume after
+    /// a fatal error.
+    void mark_unresumable();
+
 private:
     SessionWrapper* m_impl = nullptr;
 

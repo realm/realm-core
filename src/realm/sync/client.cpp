@@ -127,6 +127,8 @@ public:
 
     std::string get_appservices_connection_id();
 
+    void mark_unresumable();
+
 private:
     ClientImpl& m_client;
     DBRef m_db;
@@ -197,6 +199,7 @@ private:
     bool m_force_closed = false;
 
     bool m_suspended = false;
+    bool m_resumable = true;
 
     // Has the SessionWrapper been finalized?
     bool m_finalized = false;
@@ -993,8 +996,8 @@ SyncClientHookAction SessionImpl::call_debug_hook(const SyncClientHookData& data
     auto action = m_wrapper.m_debug_hook(data);
     switch (action) {
         case realm::SyncClientHookAction::SuspendWithRetryableError: {
-            SessionErrorInfo err_info(Status{ErrorCodes::RuntimeError, "hook requested error"}, IsFatal{false});
-            err_info.server_requests_action = ProtocolErrorInfo::Action::Transient;
+            SessionErrorInfo err_info(Status{ErrorCodes::RuntimeError, "hook requested error"}, IsFatal{false},
+                                      ProtocolErrorInfo::Action::Transient);
 
             auto err_processing_err = receive_error_message(err_info);
             REALM_ASSERT_EX(err_processing_err.is_ok(), err_processing_err);
@@ -1318,6 +1321,11 @@ void SessionWrapper::cancel_reconnect_delay()
         if (REALM_UNLIKELY(!self->m_sess))
             return; // Already finalized
         SessionImpl& sess = *self->m_sess;
+        if (!self->m_resumable) {
+            sess.logger.debug("Cannot resume a session that has received a fatal error");
+            return;
+        }
+
         sess.cancel_resumption_delay(); // Throws
         ClientImpl::Connection& conn = sess.get_connection();
         conn.cancel_reconnect_delay(); // Throws
@@ -1854,6 +1862,11 @@ std::string SessionWrapper::get_appservices_connection_id()
     return pf.future.get();
 }
 
+void SessionWrapper::mark_unresumable()
+{
+    m_resumable = false;
+}
+
 // ################ ClientImpl::Connection ################
 
 ClientImpl::Connection::Connection(ClientImpl& client, connection_ident_type ident, ServerEndpoint endpoint,
@@ -2098,6 +2111,11 @@ util::Future<std::string> Session::send_test_command(std::string body)
 std::string Session::get_appservices_connection_id()
 {
     return m_impl->get_appservices_connection_id();
+}
+
+void Session::mark_unresumable()
+{
+    m_impl->mark_unresumable();
 }
 
 std::ostream& operator<<(std::ostream& os, ProxyConfig::Type proxyType)

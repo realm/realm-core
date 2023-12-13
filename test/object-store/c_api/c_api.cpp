@@ -5495,9 +5495,10 @@ TEST_CASE("C API - client reset", "[sync][pbs][c_api][client reset][baas]") {
                     REQUIRE(sync_error.c_original_file_path_key);
                     REQUIRE(sync_error.c_recovery_file_path_key);
                     REQUIRE(sync_error.is_client_reset_requested);
+                    REQUIRE(sync_error.status.error == RLM_ERR_AUTO_CLIENT_RESET_FAILED);
                     // Callback in `realm_sync_config_set_before_client_reset_handler` fails, so
-                    // a synthetic error is created with no action.
-                    REQUIRE(sync_error.server_requests_action == RLM_SYNC_ERROR_ACTION_NO_ACTION);
+                    // a synthetic error is created that results in the sync session being made inactive.
+                    REQUIRE(sync_error.server_requests_action == RLM_SYNC_ERROR_ACTION_BACKUP_THEN_DELETE_REALM);
                     ResetRealmFiles::instance().reset_realm(sync_error.c_original_file_path_key);
                     error_handler_counter.fetch_add(1);
                     baas_client_stop.store(true);

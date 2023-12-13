@@ -268,6 +268,13 @@ static auto make_error_handler()
     return std::make_pair(std::move(error_future), std::move(fn));
 }
 
+static auto install_error_handler(Realm::Config& config)
+{
+    auto&& [error_future, error_handler] = make_error_handler();
+    config.sync_config->error_handler = std::move(error_handler);
+    return std::move(error_future);
+}
+
 static auto make_client_reset_handler()
 {
     auto [reset_promise, reset_future] = util::make_promise_future<ClientResyncMode>();
@@ -283,11 +290,10 @@ TEST_CASE("app: error handling integration test", "[sync][flx][baas]") {
     static std::optional<FLXSyncTestHarness> harness{"error_handling"};
     create_user_and_log_in(harness->app());
     SyncTestFile config(harness->app()->current_user(), harness->schema(), SyncConfig::FLXSyncEnabled{});
-    auto&& [error_future, error_handler] = make_error_handler();
-    config.sync_config->error_handler = std::move(error_handler);
     config.sync_config->client_resync_mode = ClientResyncMode::Manual;
 
     SECTION("handles unknown errors gracefully") {
+        auto error_future = install_error_handler(config);
         auto r = Realm::get_shared_realm(config);
         wait_for_download(*r);
         nlohmann::json error_body = {
@@ -308,9 +314,99 @@ TEST_CASE("app: error handling integration test", "[sync][flx][baas]") {
         REQUIRE_THAT(error.status.reason(),
                      Catch::Matchers::ContainsSubstring("Unknown sync protocol error code 299"));
         REQUIRE_THAT(error.status.reason(), Catch::Matchers::ContainsSubstring("fake error"));
+
+        // since the client resync mode is manual here we should have ended up in an inactive state.
+        REQUIRE(r->sync_session()->state() == SyncSession::State::Inactive);
+    }
+
+    SECTION("unknown errors that are warnings end up in an active state") {
+        auto error_future = install_error_handler(config);
+        auto r = Realm::get_shared_realm(config);
+        wait_for_download(*r);
+        nlohmann::json error_body = {
+            {"tryAgain", false},          {"message", "fake error"},
+            {"shouldClientReset", false}, {"isRecoveryModeDisabled", false},
+            {"action", "Warning"},
+        };
+        nlohmann::json test_command = {{"command", "ECHO_ERROR"},
+                                       {"args", nlohmann::json{{"errorCode", 299}, {"errorBody", error_body}}}};
+        auto test_cmd_res =
+            wait_for_future(SyncSession::OnlyForTesting::send_test_command(*r->sync_session(), test_command.dump()))
+                .get();
+        REQUIRE(test_cmd_res == "{}");
+        auto error = wait_for_future(std::move(error_future)).get();
+        REQUIRE(error.status == ErrorCodes::UnknownError);
+        REQUIRE(error.server_requests_action == sync::ProtocolErrorInfo::Action::Warning);
+        REQUIRE(error.is_fatal);
+        REQUIRE_THAT(error.status.reason(),
+                     Catch::Matchers::ContainsSubstring("Unknown sync protocol error code 299"));
+        REQUIRE_THAT(error.status.reason(), Catch::Matchers::ContainsSubstring("fake error"));
+
+        REQUIRE(r->sync_session()->state() == SyncSession::State::Active);
+    }
+
+    SECTION("transient errors do not surface to error handler") {
+        std::mutex error_mutex;
+        std::condition_variable error_cv;
+        std::vector<sync::ProtocolErrorInfo> errors;
+        bool error_handler_called = false;
+        config.sync_config->on_sync_client_event_hook = [&](std::weak_ptr<SyncSession>,
+                                                            const SyncClientHookData& data) {
+            if (data.event != SyncClientHookEvent::SessionSuspended) {
+                return SyncClientHookAction::NoAction;
+            }
+
+            std::lock_guard lock{error_mutex};
+            errors.push_back(*data.error_info);
+            error_cv.notify_one();
+            return SyncClientHookAction::NoAction;
+        };
+
+        config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError) {
+            std::lock_guard lock{error_mutex};
+            error_handler_called = true;
+            error_cv.notify_one();
+        };
+
+        auto r = Realm::get_shared_realm(config);
+        wait_for_upload(*r);
+        nlohmann::json error_body = {
+            {"tryAgain", true},           {"message", "transient fake error"},
+            {"shouldClientReset", false}, {"isRecoveryModeDisabled", false},
+            {"action", "Transient"},
+        };
+        nlohmann::json test_command = {
+            {"command", "ECHO_ERROR"},
+            {"args", nlohmann::json{{"errorCode", static_cast<int>(sync::ProtocolError::initial_sync_not_completed)},
+                                    {"errorBody", error_body}}}};
+        auto test_cmd_res =
+            wait_for_future(SyncSession::OnlyForTesting::send_test_command(*r->sync_session(), test_command.dump()))
+                .get();
+        REQUIRE(test_cmd_res == "{}");
+
+        std::unique_lock lock{error_mutex};
+        error_cv.wait(lock, [&] {
+            return error_handler_called || !errors.empty();
+        });
+
+        REQUIRE(!errors.empty());
+        lock.unlock();
+        wait_for_download(*r);
+        lock.lock();
+        REQUIRE(!error_handler_called);
+        const auto error = std::move(errors.back());
+        lock.unlock();
+
+        REQUIRE(!error.is_fatal);
+        REQUIRE(error.server_requests_action == sync::ProtocolErrorInfo::Action::Transient);
+        REQUIRE(error.should_client_reset);
+        REQUIRE(!error.should_client_reset.value());
+        REQUIRE(static_cast<sync::ProtocolError>(error.raw_error_code) ==
+                sync::ProtocolError::initial_sync_not_completed);
     }
 
     SECTION("unknown errors without actions are application bugs") {
+        auto error_future = install_error_handler(config);
         auto r = Realm::get_shared_realm(config);
         wait_for_download(*r);
         nlohmann::json error_body = {
@@ -332,9 +428,69 @@ TEST_CASE("app: error handling integration test", "[sync][flx][baas]") {
         REQUIRE_THAT(error.status.reason(),
                      Catch::Matchers::ContainsSubstring("Unknown sync protocol error code 299"));
         REQUIRE_THAT(error.status.reason(), Catch::Matchers::ContainsSubstring("fake error"));
+        REQUIRE(r->sync_session()->state() == SyncSession::State::Inactive);
     }
 
+    SECTION("cannot resume after fatal error") {
+        enum class BarrierState { WaitingForSuspend, WaitingForResume, Done };
+        std::mutex barrier_mutex;
+        std::condition_variable barrier_cv;
+        BarrierState barrier_state = BarrierState::WaitingForSuspend;
+        config.sync_config->on_sync_client_event_hook = [&](std::weak_ptr<SyncSession>,
+                                                            const SyncClientHookData& data) {
+            if (data.event != SyncClientHookEvent::SessionSuspended || !data.error_info->is_fatal) {
+                return SyncClientHookAction::NoAction;
+            }
+
+            std::unique_lock lock{barrier_mutex};
+            REALM_ASSERT(barrier_state == BarrierState::WaitingForSuspend);
+            barrier_state = BarrierState::WaitingForResume;
+            barrier_cv.notify_one();
+            barrier_cv.wait(lock, [&] {
+                return barrier_state == BarrierState::Done;
+            });
+            return SyncClientHookAction::NoAction;
+        };
+        auto error_future = install_error_handler(config);
+        auto r = Realm::get_shared_realm(config);
+        wait_for_upload(*r);
+        nlohmann::json error_body = {
+            {"tryAgain", false},
+            {"message", "fake error"},
+            {"shouldClientReset", false},
+            {"isRecoveryModeDisabled", false},
+        };
+        nlohmann::json test_command = {{"command", "ECHO_ERROR"},
+                                       {"args", nlohmann::json{{"errorCode", 299}, {"errorBody", error_body}}}};
+        auto test_cmd_res =
+            wait_for_future(SyncSession::OnlyForTesting::send_test_command(*r->sync_session(), test_command.dump()))
+                .get();
+        REQUIRE(test_cmd_res == "{}");
+
+        // Resume the session while the error is being handled but before the session is marked inactive.
+        {
+            std::unique_lock lock{barrier_mutex};
+            barrier_cv.wait(lock, [&] {
+                return barrier_state == BarrierState::WaitingForResume;
+            });
+            r->sync_session()->handle_reconnect();
+            barrier_state = BarrierState::Done;
+            barrier_cv.notify_one();
+        }
+
+        auto error = wait_for_future(std::move(error_future)).get();
+        REQUIRE(error.status == ErrorCodes::UnknownError);
+        REQUIRE(error.server_requests_action == sync::ProtocolErrorInfo::Action::ApplicationBug);
+        REQUIRE(error.is_fatal);
+        REQUIRE_THAT(error.status.reason(),
+                     Catch::Matchers::ContainsSubstring("Unknown sync protocol error code 299"));
+        REQUIRE_THAT(error.status.reason(), Catch::Matchers::ContainsSubstring("fake error"));
+        REQUIRE(r->sync_session()->state() == SyncSession::State::Inactive);
+    }
+
+
     SECTION("handles unknown actions gracefully") {
+        auto error_future = install_error_handler(config);
         auto r = Realm::get_shared_realm(config);
         wait_for_download(*r);
         nlohmann::json error_body = {
@@ -356,10 +512,12 @@ TEST_CASE("app: error handling integration test", "[sync][flx][baas]") {
         REQUIRE(error.is_fatal);
         REQUIRE_THAT(error.status.reason(), !Catch::Matchers::ContainsSubstring("Unknown sync protocol error code"));
         REQUIRE_THAT(error.status.reason(), Catch::Matchers::ContainsSubstring("fake error"));
+        REQUIRE(r->sync_session()->state() == SyncSession::State::Inactive);
     }
 
 
     SECTION("unknown connection-level errors are still errors") {
+        auto error_future = install_error_handler(config);
         auto r = Realm::get_shared_realm(config);
         wait_for_download(*r);
         nlohmann::json error_body = {{"tryAgain", false},
@@ -377,9 +535,11 @@ TEST_CASE("app: error handling integration test", "[sync][flx][baas]") {
         REQUIRE(error.status == ErrorCodes::SyncProtocolInvariantFailed);
         REQUIRE(error.server_requests_action == sync::ProtocolErrorInfo::Action::ProtocolViolation);
         REQUIRE(error.is_fatal);
+        REQUIRE(r->sync_session()->state() == SyncSession::State::Inactive);
     }
 
     SECTION("client reset errors") {
+        auto error_future = install_error_handler(config);
         auto r = Realm::get_shared_realm(config);
         wait_for_download(*r);
         nlohmann::json error_body = {{"tryAgain", false},
@@ -400,6 +560,33 @@ TEST_CASE("app: error handling integration test", "[sync][flx][baas]") {
         REQUIRE(error.server_requests_action == sync::ProtocolErrorInfo::Action::ClientReset);
         REQUIRE(error.is_client_reset_requested());
         REQUIRE(error.is_fatal);
+        // since the client resync mode is manual here we should have ended up in an inactive state.
+        REQUIRE(r->sync_session()->state() == SyncSession::State::Inactive);
+    }
+
+    SECTION("log out user action") {
+        auto error_future = install_error_handler(config);
+        auto r = Realm::get_shared_realm(config);
+        wait_for_download(*r);
+        nlohmann::json error_body = {{"tryAgain", false},
+                                     {"message", "fake error"},
+                                     {"shouldClientReset", false},
+                                     {"isRecoveryModeDisabled", false},
+                                     {"action", "LogOutUser"}};
+        nlohmann::json test_command = {
+            {"command", "ECHO_ERROR"},
+            {"args", nlohmann::json{{"errorCode", sync::ProtocolError::user_mismatch}, {"errorBody", error_body}}}};
+        auto test_cmd_res =
+            wait_for_future(SyncSession::OnlyForTesting::send_test_command(*r->sync_session(), test_command.dump()))
+                .get();
+        REQUIRE(test_cmd_res == "{}");
+        auto error = wait_for_future(std::move(error_future)).get();
+        REQUIRE(error.status == ErrorCodes::SyncUserMismatch);
+        REQUIRE(error.server_requests_action == sync::ProtocolErrorInfo::Action::LogOutUser);
+        REQUIRE(!error.is_client_reset_requested());
+        REQUIRE(error.is_fatal);
+        REQUIRE(r->sync_session()->state() == SyncSession::State::Inactive);
+        REQUIRE(!r->sync_session()->user()->is_logged_in());
     }
 
     SECTION("teardown") {

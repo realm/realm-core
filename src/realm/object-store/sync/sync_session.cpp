@@ -586,7 +586,7 @@ void SyncSession::handle_fresh_realm_downloaded(DBRef db, Status status,
         sync::SessionErrorInfo synthetic(
             Status{ErrorCodes::AutoClientResetFailed,
                    util::format("A fatal error occurred during client reset: '%1'", status.reason())},
-            sync::IsFatal{true});
+            sync::IsFatal{true}, sync::ProtocolErrorInfo::Action::BackupThenDeleteRealm);
         handle_error(synthetic);
         return;
     }
@@ -641,93 +641,85 @@ void SyncSession::handle_error(sync::SessionErrorInfo error)
     auto next_state = error.is_fatal ? NextStateAfterError::error : NextStateAfterError::none;
     util::Optional<ShouldBackup> delete_file;
     bool log_out_user = false;
-    bool unrecognized_by_client = false;
+    bool unrecognized_by_client = error.status == ErrorCodes::UnknownError;
 
-    if (error.status == ErrorCodes::AutoClientResetFailed) {
-        // At this point, automatic recovery has been attempted but it failed.
-        // Fallback to a manual reset and let the user try to handle it.
-        next_state = NextStateAfterError::inactive;
-        delete_file = ShouldBackup::yes;
-    }
-    else if (error.server_requests_action != sync::ProtocolErrorInfo::Action::NoAction) {
-        switch (error.server_requests_action) {
-            case sync::ProtocolErrorInfo::Action::NoAction:
-                REALM_UNREACHABLE(); // This is not sent by the MongoDB server
-            case sync::ProtocolErrorInfo::Action::ApplicationBug:
-                [[fallthrough]];
-            case sync::ProtocolErrorInfo::Action::ProtocolViolation:
-                break;
-            case sync::ProtocolErrorInfo::Action::Warning:
-                break; // not fatal, but should be bubbled up to the user below.
-            case sync::ProtocolErrorInfo::Action::Transient:
-                // Not real errors, don't need to be reported to the binding.
+    switch (error.server_requests_action) {
+        case sync::ProtocolErrorInfo::Action::NoAction:
+            REALM_UNREACHABLE();
+        case sync::ProtocolErrorInfo::Action::ApplicationBug:
+            [[fallthrough]];
+        case sync::ProtocolErrorInfo::Action::ProtocolViolation:
+            next_state = NextStateAfterError::inactive;
+            break;
+        case sync::ProtocolErrorInfo::Action::Warning:
+            break; // not fatal, but should be bubbled up to the user below.
+        case sync::ProtocolErrorInfo::Action::Transient:
+            // Not real errors, don't need to be reported to the binding.
+            return;
+        case sync::ProtocolErrorInfo::Action::BackupThenDeleteRealm:
+            next_state = NextStateAfterError::inactive;
+            delete_file = ShouldBackup::yes;
+            break;
+        case sync::ProtocolErrorInfo::Action::DeleteRealm:
+            next_state = NextStateAfterError::inactive;
+            delete_file = ShouldBackup::no;
+            break;
+        case sync::ProtocolErrorInfo::Action::ClientReset:
+            [[fallthrough]];
+        case sync::ProtocolErrorInfo::Action::ClientResetNoRecovery:
+            switch (config(&SyncConfig::client_resync_mode)) {
+                case ClientResyncMode::Manual:
+                    next_state = NextStateAfterError::inactive;
+                    delete_file = ShouldBackup::yes;
+                    break;
+                case ClientResyncMode::DiscardLocal:
+                    [[fallthrough]];
+                case ClientResyncMode::RecoverOrDiscard:
+                    [[fallthrough]];
+                case ClientResyncMode::Recover:
+                    download_fresh_realm(error.server_requests_action);
+                    return; // do not propgate the error to the user at this point
+            }
+            break;
+        case sync::ProtocolErrorInfo::Action::MigrateToFLX:
+            // Should not receive this error if original sync config is FLX
+            REALM_ASSERT(!m_original_sync_config->flx_sync_requested);
+            REALM_ASSERT(error.migration_query_string && !error.migration_query_string->empty());
+            // Original config was PBS, migrating to FLX
+            m_migration_store->migrate_to_flx(*error.migration_query_string, m_original_sync_config->partition_value);
+            save_sync_config_after_migration_or_rollback();
+            download_fresh_realm(error.server_requests_action);
+            return;
+        case sync::ProtocolErrorInfo::Action::RevertToPBS:
+            // If the client was updated to use FLX natively, but the server was rolled back to PBS,
+            // the server should be sending switch_to_flx_sync; throw exception if this error is not
+            // received.
+            if (m_original_sync_config->flx_sync_requested) {
+                throw LogicError(ErrorCodes::InvalidServerResponse,
+                                 "Received 'RevertToPBS' from server after rollback while client is natively "
+                                 "using FLX - expected 'SwitchToPBS'");
+            }
+            // Original config was PBS, rollback the migration
+            m_migration_store->rollback_to_pbs();
+            save_sync_config_after_migration_or_rollback();
+            download_fresh_realm(error.server_requests_action);
+            return;
+        case sync::ProtocolErrorInfo::Action::RefreshUser:
+            if (auto u = user()) {
+                u->refresh_custom_data(false, handle_refresh(shared_from_this(), false));
                 return;
-            case sync::ProtocolErrorInfo::Action::DeleteRealm:
-                next_state = NextStateAfterError::inactive;
-                delete_file = ShouldBackup::no;
-                break;
-            case sync::ProtocolErrorInfo::Action::ClientReset:
-                [[fallthrough]];
-            case sync::ProtocolErrorInfo::Action::ClientResetNoRecovery:
-                switch (config(&SyncConfig::client_resync_mode)) {
-                    case ClientResyncMode::Manual:
-                        next_state = NextStateAfterError::inactive;
-                        delete_file = ShouldBackup::yes;
-                        break;
-                    case ClientResyncMode::DiscardLocal:
-                        [[fallthrough]];
-                    case ClientResyncMode::RecoverOrDiscard:
-                        [[fallthrough]];
-                    case ClientResyncMode::Recover:
-                        download_fresh_realm(error.server_requests_action);
-                        return; // do not propgate the error to the user at this point
-                }
-                break;
-            case sync::ProtocolErrorInfo::Action::MigrateToFLX:
-                // Should not receive this error if original sync config is FLX
-                REALM_ASSERT(!m_original_sync_config->flx_sync_requested);
-                REALM_ASSERT(error.migration_query_string && !error.migration_query_string->empty());
-                // Original config was PBS, migrating to FLX
-                m_migration_store->migrate_to_flx(*error.migration_query_string,
-                                                  m_original_sync_config->partition_value);
-                save_sync_config_after_migration_or_rollback();
-                download_fresh_realm(error.server_requests_action);
+            }
+            break;
+        case sync::ProtocolErrorInfo::Action::RefreshLocation:
+            if (auto u = user()) {
+                u->refresh_custom_data(true, handle_refresh(shared_from_this(), true));
                 return;
-            case sync::ProtocolErrorInfo::Action::RevertToPBS:
-                // If the client was updated to use FLX natively, but the server was rolled back to PBS,
-                // the server should be sending switch_to_flx_sync; throw exception if this error is not
-                // received.
-                if (m_original_sync_config->flx_sync_requested) {
-                    throw LogicError(ErrorCodes::InvalidServerResponse,
-                                     "Received 'RevertToPBS' from server after rollback while client is natively "
-                                     "using FLX - expected 'SwitchToPBS'");
-                }
-                // Original config was PBS, rollback the migration
-                m_migration_store->rollback_to_pbs();
-                save_sync_config_after_migration_or_rollback();
-                download_fresh_realm(error.server_requests_action);
-                return;
-            case sync::ProtocolErrorInfo::Action::RefreshUser:
-                if (auto u = user()) {
-                    u->refresh_custom_data(false, handle_refresh(shared_from_this(), false));
-                    return;
-                }
-                break;
-            case sync::ProtocolErrorInfo::Action::RefreshLocation:
-                if (auto u = user()) {
-                    u->refresh_custom_data(true, handle_refresh(shared_from_this(), true));
-                    return;
-                }
-                break;
-            case sync::ProtocolErrorInfo::Action::LogOutUser:
-                next_state = NextStateAfterError::inactive;
-                log_out_user = true;
-                break;
-        }
-    }
-    else {
-        // Unrecognized error code.
-        unrecognized_by_client = true;
+            }
+            break;
+        case sync::ProtocolErrorInfo::Action::LogOutUser:
+            next_state = NextStateAfterError::inactive;
+            log_out_user = true;
+            break;
     }
 
     util::CheckedUniqueLock lock(m_state_mutex);
@@ -740,7 +732,7 @@ void SyncSession::handle_error(sync::SessionErrorInfo error)
         update_error_and_mark_file_for_deletion(sync_error, *delete_file);
 
     if (m_state == State::Dying && error.is_fatal) {
-        become_inactive(std::move(lock), error.status);
+        become_inactive(std::move(lock), sync_error.status);
         return;
     }
 
@@ -757,6 +749,7 @@ void SyncSession::handle_error(sync::SessionErrorInfo error)
             }
             break;
         case NextStateAfterError::inactive: {
+            m_session->mark_unresumable();
             become_inactive(std::move(lock), sync_error.status);
             break;
         }

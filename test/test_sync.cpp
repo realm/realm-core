@@ -3963,52 +3963,6 @@ TEST(Sync_CancelReconnectDelay)
             session.wait_for_download_complete_or_client_stopped();
         }
     }
-
-    // After session-level error, and at session-level.
-    {
-        ClientServerFixture fixture{server_dir, test_context, std::move(fixture_config)};
-        fixture.start();
-
-        // Add a session for the purpose of keeping the connection open
-        Session session_x = fixture.make_bound_session(db_x, "/x");
-        session_x.wait_for_download_complete_or_client_stopped();
-
-        BowlOfStonesSemaphore bowl;
-        auto handler = [&](const SessionErrorInfo& info) {
-            if (CHECK_EQUAL(info.status, ErrorCodes::BadSyncPartitionValue))
-                bowl.add_stone();
-        };
-        Session session = fixture.make_session(db, "/..");
-        session.set_error_handler(std::move(handler));
-        session.bind();
-        bowl.get_stone();
-
-        session.cancel_reconnect_delay();
-        bowl.get_stone();
-    }
-
-    // After session-level error, and at client-level.
-    {
-        ClientServerFixture fixture{server_dir, test_context, std::move(fixture_config)};
-        fixture.start();
-
-        // Add a session for the purpose of keeping the connection open
-        Session session_x = fixture.make_bound_session(db_x, "/x");
-        session_x.wait_for_download_complete_or_client_stopped();
-
-        BowlOfStonesSemaphore bowl;
-        auto handler = [&](const SessionErrorInfo& info) {
-            if (CHECK_EQUAL(info.status, ErrorCodes::BadSyncPartitionValue))
-                bowl.add_stone();
-        };
-        Session session = fixture.make_session(db, "/..");
-        session.set_error_handler(std::move(handler));
-        session.bind();
-        bowl.get_stone();
-
-        fixture.cancel_reconnect_delay();
-        bowl.get_stone();
-    }
 }
 
 

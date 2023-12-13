@@ -271,16 +271,17 @@ struct ProtocolErrorInfo {
         RefreshUser,
         RefreshLocation,
         LogOutUser,
+        BackupThenDeleteRealm,
     };
 
     ProtocolErrorInfo() = default;
-    ProtocolErrorInfo(int error_code, const std::string& msg, IsFatal is_fatal)
+    ProtocolErrorInfo(int error_code, const std::string& msg, IsFatal is_fatal, Action error_action)
         : raw_error_code(error_code)
         , message(msg)
         , is_fatal(is_fatal)
         , client_reset_recovery_is_disabled(false)
         , should_client_reset(util::none)
-        , server_requests_action(Action::NoAction)
+        , server_requests_action(error_action)
     {
     }
     int raw_error_code = 0;
@@ -425,6 +426,8 @@ inline std::ostream& operator<<(std::ostream& o, ProtocolErrorInfo::Action actio
             return o << "Warning";
         case ProtocolErrorInfo::Action::Transient:
             return o << "Transient";
+        case ProtocolErrorInfo::Action::BackupThenDeleteRealm:
+            return o << "BackupThenDeleteRealm";
         case ProtocolErrorInfo::Action::DeleteRealm:
             return o << "DeleteRealm";
         case ProtocolErrorInfo::Action::ClientReset:
