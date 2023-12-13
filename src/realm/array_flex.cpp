@@ -87,6 +87,29 @@ int64_t ArrayFlex::get(const Array& arr, size_t ndx) const
     return sign_v;
 }
 
+void ArrayFlex::get_chunk(const Array& arr, size_t ndx, int64_t res[8]) const
+{
+    REALM_ASSERT(arr.is_attached());
+    size_t v_width, ndx_width, v_size, ndx_size;
+    const auto header = arr.get_header();
+    if (get_encode_info(header, v_width, ndx_width, v_size, ndx_size)) {
+        REALM_ASSERT(ndx < ndx_width);
+        auto sz = 8;
+        std::memset(res, 0, sizeof(int64_t) * sz);
+
+        auto supposed_end = ndx + sz;
+        size_t i = ndx;
+        size_t index = 0;
+        for (; i < supposed_end; ++i) {
+            res[index++] = get(arr, i);
+        }
+        for (; index < 8; ++index) {
+            res[index++] = get(arr, i++);
+        }
+    }
+    REALM_UNREACHABLE();
+}
+
 bool ArrayFlex::try_encode(const Array& origin, Array& encoded, std::vector<int64_t>& values,
                            std::vector<size_t>& indices) const
 {
@@ -390,7 +413,7 @@ int64_t ArrayFlex::sum(const Array& arr, size_t start, size_t end) const
         auto values_and_indices = fetch_values_and_indices(arr, v_width, ndx_width, v_size, ndx_size);
         int64_t total_sum = 0;
         for (const auto& [v, ndx] : values_and_indices) {
-            if (ndx >= start && ndx <= end)
+            if (ndx >= start && ndx < end)
                 total_sum += v;
         }
         return total_sum;

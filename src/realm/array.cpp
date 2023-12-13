@@ -1352,6 +1352,51 @@ MemRef Array::create(Type type, bool context_flag, WidthType width_type, size_t 
     return mem;
 }
 
+template <size_t w>
+int64_t Array::get_universal(const char* data, size_t ndx) const
+{
+    if (is_encoded())
+        return m_encode.get(*this, ndx);
+
+    if (w == 0) {
+        return 0;
+    }
+    else if (w == 1) {
+        size_t offset = ndx >> 3;
+        auto d = data[offset];
+        return (d >> (ndx & 7)) & 0x01;
+    }
+    else if (w == 2) {
+        size_t offset = ndx >> 2;
+        auto d = data[offset];
+        return (d >> ((ndx & 3) << 1)) & 0x03;
+    }
+    else if (w == 4) {
+        size_t offset = ndx >> 1;
+        auto d = data[offset];
+        return (d >> ((ndx & 1) << 2)) & 0x0F;
+    }
+    else if (w == 8) {
+        return *reinterpret_cast<const signed char*>(data + ndx);
+    }
+    else if (w == 16) {
+        size_t offset = ndx * 2;
+        return *reinterpret_cast<const int16_t*>(data + offset);
+    }
+    else if (w == 32) {
+        size_t offset = ndx * 4;
+        return *reinterpret_cast<const int32_t*>(data + offset);
+    }
+    else if (w == 64) {
+        size_t offset = ndx * 8;
+        return *reinterpret_cast<const int64_t*>(data + offset);
+    }
+    else {
+        REALM_ASSERT_DEBUG(false);
+        return int64_t(-1);
+    }
+}
+
 // This is the one installed into the m_vtable->finder slots.
 template <class cond, size_t bitwidth>
 bool Array::find_vtable(int64_t value, size_t start, size_t end, size_t baseindex, QueryStateBase* state) const
@@ -1361,7 +1406,6 @@ bool Array::find_vtable(int64_t value, size_t start, size_t end, size_t baseinde
         decode_array((Array&)*this);
     return ArrayWithFind(*this).find_optimized<cond, bitwidth>(value, start, end, baseindex, state, nullptr);
 }
-
 
 template <size_t width>
 struct Array::VTableForWidth {
@@ -1415,73 +1459,72 @@ void Array::update_width_cache_from_header() noexcept
 template <size_t w>
 void Array::get_chunk(size_t ndx, int64_t res[8]) const noexcept
 {
-    // NOT OK
-    if (is_encoded())
-        decode_array((Array&)*this);
-
     REALM_ASSERT_3(ndx, <, m_size);
-    size_t i = 0;
 
-    // if constexpr to avoid producing spurious warnings resulting from
-    // instantiating for too large w
-    if constexpr (w > 0 && w <= 4) {
-        // Calling get<w>() in a loop results in one load per call to get, but
-        // for w < 8 we can do better than that
-        constexpr size_t elements_per_byte = 8 / w;
-
-        // Round m_size down to byte granularity as the trailing bits in the last
-        // byte are uninitialized
-        size_t bytes_available = m_size / elements_per_byte;
-
-        // Round start and end to be byte-aligned. Start is rounded down and
-        // end is rounded up as we may read up to 7 unused bits at each end.
-        size_t start = ndx / elements_per_byte;
-        size_t end = std::min(bytes_available, (ndx + 8 + elements_per_byte - 1) / elements_per_byte);
-
-        if (end > start) {
-            // Loop in reverse order because data is stored in little endian order
-            uint64_t c = 0;
-            for (size_t i = end; i > start; --i) {
-                c <<= 8;
-                c += *reinterpret_cast<const uint8_t*>(m_data + i - 1);
-            }
-            // Trim off leading bits which aren't part of the requested range
-            c >>= (ndx - start * elements_per_byte) * w;
-
-            uint64_t mask = (1ULL << w) - 1ULL;
-            res[0] = (c >> 0 * w) & mask;
-            res[1] = (c >> 1 * w) & mask;
-            res[2] = (c >> 2 * w) & mask;
-            res[3] = (c >> 3 * w) & mask;
-            res[4] = (c >> 4 * w) & mask;
-            res[5] = (c >> 5 * w) & mask;
-            res[6] = (c >> 6 * w) & mask;
-            res[7] = (c >> 7 * w) & mask;
-
-            // Read the last few elements via get<w> if needed
-            i = std::min<size_t>(8, end * elements_per_byte - ndx);
-        }
+    if (is_encoded()) {
+        m_encode.get_chunk(*this, ndx, res);
     }
+    else {
+        size_t i = 0;
 
-    for (; i + ndx < m_size && i < 8; i++)
-        res[i] = get<w>(ndx + i);
-    for (; i < 8; i++)
-        res[i] = 0;
+        // if constexpr to avoid producing spurious warnings resulting from
+        // instantiating for too large w
+        if constexpr (w > 0 && w <= 4) {
+            // Calling get<w>() in a loop results in one load per call to get, but
+            // for w < 8 we can do better than that
+            constexpr size_t elements_per_byte = 8 / w;
+
+            // Round m_size down to byte granularity as the trailing bits in the last
+            // byte are uninitialized
+            size_t bytes_available = m_size / elements_per_byte;
+
+            // Round start and end to be byte-aligned. Start is rounded down and
+            // end is rounded up as we may read up to 7 unused bits at each end.
+            size_t start = ndx / elements_per_byte;
+            size_t end = std::min(bytes_available, (ndx + 8 + elements_per_byte - 1) / elements_per_byte);
+
+            if (end > start) {
+                // Loop in reverse order because data is stored in little endian order
+                uint64_t c = 0;
+                for (size_t i = end; i > start; --i) {
+                    c <<= 8;
+                    c += *reinterpret_cast<const uint8_t*>(m_data + i - 1);
+                }
+                // Trim off leading bits which aren't part of the requested range
+                c >>= (ndx - start * elements_per_byte) * w;
+
+                uint64_t mask = (1ULL << w) - 1ULL;
+                res[0] = (c >> 0 * w) & mask;
+                res[1] = (c >> 1 * w) & mask;
+                res[2] = (c >> 2 * w) & mask;
+                res[3] = (c >> 3 * w) & mask;
+                res[4] = (c >> 4 * w) & mask;
+                res[5] = (c >> 5 * w) & mask;
+                res[6] = (c >> 6 * w) & mask;
+                res[7] = (c >> 7 * w) & mask;
+
+                // Read the last few elements via get<w> if needed
+                i = std::min<size_t>(8, end * elements_per_byte - ndx);
+            }
+        }
+
+        for (; i + ndx < m_size && i < 8; i++)
+            res[i] = get<w>(ndx + i);
+        for (; i < 8; i++)
+            res[i] = 0;
 
 #ifdef REALM_DEBUG
-    for (int j = 0; j + ndx < m_size && j < 8; j++) {
-        int64_t expected = get<w>(ndx + j);
-        REALM_ASSERT(res[j] == expected);
-    }
+        for (int j = 0; j + ndx < m_size && j < 8; j++) {
+            int64_t expected = get<w>(ndx + j);
+            REALM_ASSERT(res[j] == expected);
+        }
 #endif
+    }
 }
 
 template <>
 void Array::get_chunk<0>(size_t ndx, int64_t res[8]) const noexcept
 {
-    // NOT OK
-    if (is_encoded())
-        decode_array((Array&)*this);
     REALM_ASSERT_3(ndx, <, m_size);
     memset(res, 0, sizeof(int64_t) * 8);
 }

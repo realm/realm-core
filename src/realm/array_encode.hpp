@@ -44,6 +44,7 @@ public:
     // query mappers
     virtual size_t find_first(const Array&, int64_t value) const = 0;
     virtual int64_t sum(const Array&, size_t start, size_t end) const = 0;
+    virtual void get_chunk(const Array&, size_t ndx, int64_t res[8]) const = 0;
 };
 
 } // namespace realm

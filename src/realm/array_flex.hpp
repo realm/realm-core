@@ -35,14 +35,17 @@ public:
     bool decode(Array&) final override;
     bool is_encoded(const Array&) const final override;
     size_t size(const Array&) const final override;
-    int64_t get(const Array&, size_t) const final override;
     size_t find_first(const Array&, int64_t value) const final override;
     int64_t sum(const Array&, size_t start, size_t end) const final override;
-    // this is supposed to be used only if the underlying type is uint.
-    uint64_t get_unsigned(const Array&, size_t, size_t&) const final override;
     // these methods are used by ArrayUnsigned, and have a huge impact on how fast we traverse the ClusterTree
     size_t lower_bound(const Array&, uint64_t) const final override;
     size_t upper_bound(const Array&, uint64_t) const final override;
+
+    // getters
+    int64_t get(const Array&, size_t) const final override;
+    void get_chunk(const Array&, size_t ndx, int64_t res[8]) const final override;
+    // this is supposed to be used only if the underlying type is uint.
+    uint64_t get_unsigned(const Array&, size_t, size_t&) const final override;
     // static getters based on header (to be used carefully since they assume a B array).
     static int64_t get(const char* header, size_t ndx);
     static uint64_t get_unsigned(const char* header, size_t ndx, size_t&);
