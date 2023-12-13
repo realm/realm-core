@@ -700,9 +700,9 @@ inline void Array::get_chunk(size_t ndx, int64_t res[8]) const noexcept
 template <size_t w>
 int64_t Array::get_universal(const char* data, size_t ndx) const
 {
-    if(is_encoded())
+    if (is_encoded())
         decode_array((Array&)*this);
-    
+
     if (w == 0) {
         return 0;
     }

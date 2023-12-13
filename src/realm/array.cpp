@@ -280,7 +280,7 @@ void Array::init_from_mem(MemRef mem) noexcept
     m_is_inner_bptree_node = get_is_inner_bptree_node_from_header(header);
     m_has_refs = get_hasrefs_from_header(header);
     m_context_flag = get_context_flag_from_header(header);
-    
+
     // width for B arrays is set based on the value stored in the header,
     // hower we have lower and upper bound that are used in several places in the code
     // that do not make sense for B arrays, as well as the width.
@@ -579,7 +579,7 @@ void Array::insert(size_t ndx, int_fast64_t value)
 {
     REALM_ASSERT_DEBUG(ndx <= m_size);
 
-    if(is_encoded())
+    if (is_encoded())
         decode_array(*this);
 
     const auto old_width = m_width;
@@ -1232,9 +1232,9 @@ MemRef Array::clone(MemRef mem, Allocator& alloc, Allocator& target_alloc)
 {
     Array tmp(alloc);
     tmp.init_from_mem(mem);
-    if(tmp.is_encoded())
+    if (tmp.is_encoded())
         tmp.decode_array(tmp);
-    
+
     const char* header = mem.get_addr();
     if (!get_hasrefs_from_header(header)) {
         // This array has no subarrays, so we can make a byte-for-byte
@@ -1362,7 +1362,7 @@ MemRef Array::create(Type type, bool context_flag, WidthType width_type, size_t 
 template <class cond, size_t bitwidth>
 bool Array::find_vtable(int64_t value, size_t start, size_t end, size_t baseindex, QueryStateBase* state) const
 {
-    if(is_encoded())
+    if (is_encoded())
         decode_array((Array&)*this);
     return ArrayWithFind(*this).find_optimized<cond, bitwidth>(value, start, end, baseindex, state, nullptr);
 }
@@ -1420,9 +1420,9 @@ void Array::update_width_cache_from_header() noexcept
 template <size_t w>
 void Array::get_chunk(size_t ndx, int64_t res[8]) const noexcept
 {
-    if(is_encoded())
+    if (is_encoded())
         decode_array((Array&)*this);
-    
+
     REALM_ASSERT_3(ndx, <, m_size);
     size_t i = 0;
 
@@ -1483,7 +1483,7 @@ void Array::get_chunk(size_t ndx, int64_t res[8]) const noexcept
 template <>
 void Array::get_chunk<0>(size_t ndx, int64_t res[8]) const noexcept
 {
-    if(is_encoded())
+    if (is_encoded())
         decode_array((Array&)*this);
     REALM_ASSERT_3(ndx, <, m_size);
     memset(res, 0, sizeof(int64_t) * 8);
@@ -1493,7 +1493,7 @@ void Array::get_chunk<0>(size_t ndx, int64_t res[8]) const noexcept
 template <size_t width>
 void Array::set(size_t ndx, int64_t value)
 {
-    if(is_encoded())
+    if (is_encoded())
         decode_array(*this);
     set_direct<width>(m_data, ndx, value);
 }
