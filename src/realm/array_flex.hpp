@@ -37,12 +37,13 @@ public:
     size_t size(const Array&) const final override;
     int64_t get(const Array&, size_t) const final override;
     size_t find_first(const Array&, int64_t value) const final override;
+    int64_t sum(const Array&, size_t start, size_t end) const final override;
     // this is supposed to be used only if the underlying type is uint.
     uint64_t get_unsigned(const Array&, size_t, size_t&) const final override;
     // these methods are used by ArrayUnsigned, and have a huge impact on how fast we traverse the ClusterTree
     size_t lower_bound(const Array&, uint64_t) const final override;
     size_t upper_bound(const Array&, uint64_t) const final override;
-
+    // static getters based on header (to be used carefully since they assume a B array).
     static int64_t get(const char* header, size_t ndx);
     static uint64_t get_unsigned(const char* header, size_t ndx, size_t&);
 
@@ -57,11 +58,16 @@ private:
     void setup_array_in_flex_format(const Array&, Array&, std::vector<int64_t>&, std::vector<size_t>&, int,
                                     int) const;
     void copy_into_encoded_array(Array&, std::vector<int64_t>&, std::vector<size_t>&) const;
+
     // decode array methods
     std::vector<int64_t> fetch_signed_values_from_encoded_array(const Array&, size_t, size_t, size_t, size_t) const;
     std::vector<uint64_t> fetch_unsigned_values_from_encoded_array(const Array&, size_t, size_t, size_t,
                                                                    size_t) const;
     void restore_array(Array&, const std::vector<int64_t>&) const;
+
+    // this is not widely used, but fetch_x_values does pretty much the same
+    std::vector<std::pair<int64_t, size_t>> fetch_values_and_indices(const Array&, size_t, size_t, size_t,
+                                                                     size_t) const;
 };
 } // namespace realm
 #endif // REALM_ARRAY_COMPRESS_HPP

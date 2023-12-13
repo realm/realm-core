@@ -287,6 +287,25 @@ std::vector<uint64_t> ArrayFlex::fetch_unsigned_values_from_encoded_array(const 
     return values;
 }
 
+std::vector<std::pair<int64_t, size_t>> ArrayFlex::fetch_values_and_indices(const Array& arr, size_t v_width,
+                                                                            size_t ndx_width, size_t v_size,
+                                                                            size_t ndx_size) const
+{
+    std::vector<std::pair<int64_t, size_t>> values_and_indices;
+    values_and_indices.reserve(ndx_size);
+    auto data = (uint64_t*)NodeHeader::get_data_from_header(arr.get_header());
+    const auto offset = v_size * v_width;
+    bf_iterator index_iterator{data, offset, ndx_width, ndx_width, 0};
+    for (size_t i = 0; i < ndx_size; ++i) {
+        const auto index = index_iterator.get_value();
+        bf_iterator it_value{data, index * v_width, v_width, v_width, 0};
+        const auto value = it_value.get_value();
+        values_and_indices.push_back({value, i});
+        ++index_iterator;
+    }
+    return values_and_indices;
+}
+
 void ArrayFlex::restore_array(Array& arr, const std::vector<int64_t>& values) const
 {
     // do the reverse of compressing the array
@@ -356,11 +375,27 @@ size_t ArrayFlex::find_first(const Array& arr, int64_t value) const
             const auto arr_value = it_value.get_value();
             const auto ivalue = sign_extend_field(value_width, arr_value);
             if (ivalue == value)
-                return i;
+                return i; // we need to pretend that the array was uncompressed, so we can't return index but i
             ++index_iterator;
         }
     }
     return realm::not_found;
+}
+
+int64_t ArrayFlex::sum(const Array& arr, size_t start, size_t end) const
+{
+    REALM_ASSERT(arr.is_attached());
+    size_t v_width, ndx_width, v_size, ndx_size;
+    if (get_encode_info(arr.get_header(), v_width, ndx_width, v_size, ndx_size)) {
+        auto values_and_indices = fetch_values_and_indices(arr, v_width, ndx_width, v_size, ndx_size);
+        int64_t total_sum = 0;
+        for (const auto& [v, ndx] : values_and_indices) {
+            if (ndx >= start && ndx <= end)
+                total_sum += v;
+        }
+        return total_sum;
+    }
+    REALM_UNREACHABLE();
 }
 
 int64_t ArrayFlex::get(const char* header, size_t ndx)

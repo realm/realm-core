@@ -854,19 +854,20 @@ size_t find_zero(uint64_t v)
 
 int64_t Array::sum(size_t start, size_t end) const
 {
-    // this is tmp cast, since we haven't implemented yet the logic for compressed arrays
-    decode_array((Array&)*this);
+    if (is_encoded())
+        return m_encode.sum(*this, start, end);
     REALM_TEMPEX(return sum, m_width, (start, end));
 }
 
 template <size_t w>
 int64_t Array::sum(size_t start, size_t end) const
 {
-    decode_array((Array&)*this);
-
     if (end == size_t(-1))
         end = m_size;
     REALM_ASSERT_EX(end <= m_size && start <= end, start, end, m_size);
+
+    if (is_encoded())
+        return m_encode.sum(*this, start, end);
 
     if (w == 0 || start == end)
         return 0;
@@ -1230,11 +1231,6 @@ size_t Array::calc_aligned_byte_size(size_t size, int width)
 
 MemRef Array::clone(MemRef mem, Allocator& alloc, Allocator& target_alloc)
 {
-    Array tmp(alloc);
-    tmp.init_from_mem(mem);
-    if (tmp.is_encoded())
-        tmp.decode_array(tmp);
-
     const char* header = mem.get_addr();
     if (!get_hasrefs_from_header(header)) {
         // This array has no subarrays, so we can make a byte-for-byte
@@ -1258,8 +1254,6 @@ MemRef Array::clone(MemRef mem, Allocator& alloc, Allocator& target_alloc)
 
         return clone_mem;
     }
-
-    // this can break for integer arrays
 
     // Refs are integers, and integers arrays use wtype_Bits.
     REALM_ASSERT_3(get_wtype_from_header(header), ==, wtype_Bits);
@@ -1362,6 +1356,7 @@ MemRef Array::create(Type type, bool context_flag, WidthType width_type, size_t 
 template <class cond, size_t bitwidth>
 bool Array::find_vtable(int64_t value, size_t start, size_t end, size_t baseindex, QueryStateBase* state) const
 {
+    // NOT OK
     if (is_encoded())
         decode_array((Array&)*this);
     return ArrayWithFind(*this).find_optimized<cond, bitwidth>(value, start, end, baseindex, state, nullptr);
@@ -1420,6 +1415,7 @@ void Array::update_width_cache_from_header() noexcept
 template <size_t w>
 void Array::get_chunk(size_t ndx, int64_t res[8]) const noexcept
 {
+    // NOT OK
     if (is_encoded())
         decode_array((Array&)*this);
 
@@ -1483,6 +1479,7 @@ void Array::get_chunk(size_t ndx, int64_t res[8]) const noexcept
 template <>
 void Array::get_chunk<0>(size_t ndx, int64_t res[8]) const noexcept
 {
+    // NOT OK
     if (is_encoded())
         decode_array((Array&)*this);
     REALM_ASSERT_3(ndx, <, m_size);
@@ -1493,6 +1490,7 @@ void Array::get_chunk<0>(size_t ndx, int64_t res[8]) const noexcept
 template <size_t width>
 void Array::set(size_t ndx, int64_t value)
 {
+    // NOT OK this can be made faster... we don't need to decompress here.
     if (is_encoded())
         decode_array(*this);
     set_direct<width>(m_data, ndx, value);
@@ -1607,12 +1605,14 @@ void Array::verify() const
 
 size_t Array::lower_bound_int(int64_t value) const noexcept
 {
+    // NOT OK
     decode_array((Array&)*this);
     REALM_TEMPEX(return lower_bound, m_width, (m_data, m_size, value));
 }
 
 size_t Array::upper_bound_int(int64_t value) const noexcept
 {
+    // NOT OK
     decode_array((Array&)*this);
     REALM_TEMPEX(return upper_bound, m_width, (m_data, m_size, value));
 }
