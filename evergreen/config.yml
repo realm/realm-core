@@ -1567,6 +1567,34 @@ buildvariants:
   - name: compile_test_and_package
   - name: benchmarks
 
+- name: ubuntu2004-arm64-asan
+  display_name: "Ubuntu 20.04 ARM64 (ASAN)"
+  run_on: ubuntu2004-arm64-large
+  expansions:
+    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-linux-aarch64.tar.gz"
+    cmake_bindir: "./cmake_binaries/bin"
+    python3: "/opt/mongodbtoolchain/v3/bin/python3"
+    use_system_openssl: On
+    fetch_missing_dependencies: On
+    cmake_build_type: RelWithDebInfo
+    enable_asan: On
+  tasks:
+  - name: compile_test
+
+- name: ubuntu2004-arm64-tsan
+  display_name: "Ubuntu 20.04 ARM64 (TSAN)"
+  run_on: ubuntu2004-arm64-large
+  expansions:
+    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-linux-aarch64.tar.gz"
+    cmake_bindir: "./cmake_binaries/bin"
+    python3: "/opt/mongodbtoolchain/v3/bin/python3"
+    use_system_openssl: On
+    fetch_missing_dependencies: On
+    cmake_build_type: RelWithDebInfo
+    enable_tsan: On
+  tasks:
+  - name: compile_test
+
 - name: macos
   display_name: "MacOS 11.0 x86_64"
   run_on: macos-1100
