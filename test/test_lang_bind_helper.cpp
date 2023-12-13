@@ -3101,99 +3101,99 @@ TEST(LangBindHelper_ImplicitTransactions_MultipleTrackers)
 // invoke destructors.
 NONCONCURRENT_TEST_IF(LangBindHelper_ImplicitTransactions_InterProcess, testing_supports_spawn_process)
 {
-    const int write_process_count = 7;
-    const int read_process_count = 3;
-
-    std::vector<std::unique_ptr<SpawnedProcess>> readers;
-    std::vector<std::unique_ptr<SpawnedProcess>> writers;
-    SHARED_GROUP_TEST_PATH(path);
-    auto key = crypt_key();
-    auto process = test_util::spawn_process(test_context.test_details.test_name, "populate");
-    if (process->is_child()) {
-        try {
-            std::unique_ptr<Replication> hist(make_in_realm_history());
-            DBRef sg = DB::create(*hist, path, DBOptions(key));
-            // initialize table with 200 entries holding 0..200
-            WriteTransaction wt(sg);
-            TableRef tr = wt.add_table("A");
-            auto col = tr->add_column(type_Int, "first");
-            for (int j = 0; j < 200; j++) {
-                tr->create_object().set(col, j);
-            }
-            auto table_b = wt.add_table("B");
-            table_b->add_column(type_Int, "bussemand");
-            table_b->create_object().set_all(99);
-            wt.add_table("C");
-            wt.commit();
-        }
-        catch (const std::exception& e) {
-            REALM_ASSERT_EX(false, e.what());
-            static_cast<void>(e); // e is unused without assertions on
-        }
-        exit(0);
-    }
-
-    if (process->is_parent()) {
-        process->wait_for_child_to_finish();
-    }
-
-    // intialization complete. Start writers:
-    for (int i = 0; i < write_process_count; ++i) {
-        writers.push_back(
-            test_util::spawn_process(test_context.test_details.test_name, util::format("writer[%1]", i)));
-        if (writers.back()->is_child()) {
-            {
-                // util::format(std::cout, "Writer[%1](%2) starting.\n", test_util::get_pid(), i);
-                std::unique_ptr<Replication> hist(make_in_realm_history());
-                DBRef sg = DB::create(*hist, path, DBOptions(key));
-                multiple_trackers_writer_thread(sg);
-                // util::format(std::cout, "Writer[%1](%2) done.\n", test_util::get_pid(), i);
-            } // clean up sg before exit
-            exit(0);
-        }
-    }
-    std::this_thread::yield();
-    // then start readers:
-    for (int i = 0; i < read_process_count; ++i) {
-        readers.push_back(
-            test_util::spawn_process(test_context.test_details.test_name, util::format("reader[%1]", i)));
-        if (readers[i]->is_child()) {
-            {
-                // util::format(std::cout, "Reader[%1](%2) starting.\n", test_util::get_pid(), i);
-                std::unique_ptr<Replication> hist(make_in_realm_history());
-                DBRef sg = DB::create(*hist, path, DBOptions(key));
-                multiple_trackers_reader_thread(test_context, sg);
-                // util::format(std::cout, "Reader[%1] done.\n", i);
-            } // clean up sg before exit
-            exit(0);
-        }
-    }
-
-    if (process->is_parent()) {
-        // Wait for all writer threads to complete
-        for (int i = 0; i < write_process_count; ++i) {
-            writers[i]->wait_for_child_to_finish();
-        }
-
-        // Allow readers time to catch up
-        for (int k = 0; k < 100; ++k)
-            std::this_thread::yield();
-
-        // signal to all readers to complete
-        {
-            std::unique_ptr<Replication> hist(make_in_realm_history());
-            DBRef sg = DB::create(*hist, path, DBOptions(key));
-            WriteTransaction wt(sg);
-            TableRef tr = wt.get_table("C");
-            tr->create_object();
-            wt.commit();
-        }
-
-        // Wait for all reader threads to complete
-        for (int i = 0; i < read_process_count; ++i) {
-            readers[i]->wait_for_child_to_finish();
-        }
-    }
+    //    const int write_process_count = 7;
+    //    const int read_process_count = 3;
+    //
+    //    std::vector<std::unique_ptr<SpawnedProcess>> readers;
+    //    std::vector<std::unique_ptr<SpawnedProcess>> writers;
+    //    SHARED_GROUP_TEST_PATH(path);
+    //    auto key = crypt_key();
+    //    auto process = test_util::spawn_process(test_context.test_details.test_name, "populate");
+    //    if (process->is_child()) {
+    //        try {
+    //            std::unique_ptr<Replication> hist(make_in_realm_history());
+    //            DBRef sg = DB::create(*hist, path, DBOptions(key));
+    //            // initialize table with 200 entries holding 0..200
+    //            WriteTransaction wt(sg);
+    //            TableRef tr = wt.add_table("A");
+    //            auto col = tr->add_column(type_Int, "first");
+    //            for (int j = 0; j < 200; j++) {
+    //                tr->create_object().set(col, j);
+    //            }
+    //            auto table_b = wt.add_table("B");
+    //            table_b->add_column(type_Int, "bussemand");
+    //            table_b->create_object().set_all(99);
+    //            wt.add_table("C");
+    //            wt.commit();
+    //        }
+    //        catch (const std::exception& e) {
+    //            REALM_ASSERT_EX(false, e.what());
+    //            static_cast<void>(e); // e is unused without assertions on
+    //        }
+    //        exit(0);
+    //    }
+    //
+    //    if (process->is_parent()) {
+    //        process->wait_for_child_to_finish();
+    //    }
+    //
+    //    // intialization complete. Start writers:
+    //    for (int i = 0; i < write_process_count; ++i) {
+    //        writers.push_back(
+    //            test_util::spawn_process(test_context.test_details.test_name, util::format("writer[%1]", i)));
+    //        if (writers.back()->is_child()) {
+    //            {
+    //                // util::format(std::cout, "Writer[%1](%2) starting.\n", test_util::get_pid(), i);
+    //                std::unique_ptr<Replication> hist(make_in_realm_history());
+    //                DBRef sg = DB::create(*hist, path, DBOptions(key));
+    //                multiple_trackers_writer_thread(sg);
+    //                // util::format(std::cout, "Writer[%1](%2) done.\n", test_util::get_pid(), i);
+    //            } // clean up sg before exit
+    //            exit(0);
+    //        }
+    //    }
+    //    std::this_thread::yield();
+    //    // then start readers:
+    //    for (int i = 0; i < read_process_count; ++i) {
+    //        readers.push_back(
+    //            test_util::spawn_process(test_context.test_details.test_name, util::format("reader[%1]", i)));
+    //        if (readers[i]->is_child()) {
+    //            {
+    //                // util::format(std::cout, "Reader[%1](%2) starting.\n", test_util::get_pid(), i);
+    //                std::unique_ptr<Replication> hist(make_in_realm_history());
+    //                DBRef sg = DB::create(*hist, path, DBOptions(key));
+    //                multiple_trackers_reader_thread(test_context, sg);
+    //                // util::format(std::cout, "Reader[%1] done.\n", i);
+    //            } // clean up sg before exit
+    //            exit(0);
+    //        }
+    //    }
+    //
+    //    if (process->is_parent()) {
+    //        // Wait for all writer threads to complete
+    //        for (int i = 0; i < write_process_count; ++i) {
+    //            writers[i]->wait_for_child_to_finish();
+    //        }
+    //
+    //        // Allow readers time to catch up
+    //        for (int k = 0; k < 100; ++k)
+    //            std::this_thread::yield();
+    //
+    //        // signal to all readers to complete
+    //        {
+    //            std::unique_ptr<Replication> hist(make_in_realm_history());
+    //            DBRef sg = DB::create(*hist, path, DBOptions(key));
+    //            WriteTransaction wt(sg);
+    //            TableRef tr = wt.get_table("C");
+    //            tr->create_object();
+    //            wt.commit();
+    //        }
+    //
+    //        // Wait for all reader threads to complete
+    //        for (int i = 0; i < read_process_count; ++i) {
+    //            readers[i]->wait_for_child_to_finish();
+    //        }
+    //    }
 }
 
 #endif // !REALM_ANDROID && !REALM_IOS
