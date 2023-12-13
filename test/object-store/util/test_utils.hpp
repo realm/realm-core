@@ -29,6 +29,39 @@
 namespace fs = std::filesystem;
 
 namespace realm {
+template <typename E>
+class TestingStateMachine {
+public:
+    explicit TestingStateMachine(E initial_state)
+        : m_cur_state(initial_state)
+    {
+    }
+
+    E transition(E from, E to)
+    {
+        std::lock_guard lock{m_mutex};
+        if (m_cur_state != from) {
+            return m_cur_state;
+        }
+        m_cur_state = to;
+        m_cv.notify_one();
+        return from;
+    }
+
+    void wait_for(E target)
+    {
+        std::unique_lock lock{m_mutex};
+        m_cv.wait(lock, [&] {
+            return m_cur_state == target;
+        });
+    }
+
+private:
+    std::mutex m_mutex;
+    std::condition_variable m_cv;
+    E m_cur_state;
+};
+
 template <typename MessageMatcher>
 class ExceptionMatcher final : public Catch::Matchers::MatcherBase<Exception> {
 public:

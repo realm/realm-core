@@ -287,6 +287,65 @@ TEST_CASE("app: error handling integration test", "[sync][flx][baas]") {
     config.sync_config->error_handler = std::move(error_handler);
     config.sync_config->client_resync_mode = ClientResyncMode::Manual;
 
+    SECTION("cannot resume after fatal error") {
+        enum class BarrierState {
+            WaitingForInitialSuspend,
+            WaitingForInitialResume,
+            WaitingForSecondBind,
+            WaitingForSecondSuspend,
+            WaitingForSecondResume,
+            Done
+        };
+        TestingStateMachine<BarrierState> state(BarrierState::WaitingForInitialSuspend);
+        config.sync_config->on_sync_client_event_hook = [&](std::weak_ptr<SyncSession>,
+                                                            const SyncClientHookData& data) {
+            if (data.event == SyncClientHookEvent::BindMessageSent) {
+                state.transition(BarrierState::WaitingForSecondBind, BarrierState::WaitingForSecondSuspend);
+            }
+            if (data.event != SyncClientHookEvent::SessionSuspended) {
+                return SyncClientHookAction::NoAction;
+            }
+
+            if (state.transition(BarrierState::WaitingForInitialSuspend, BarrierState::WaitingForInitialResume) ==
+                BarrierState::WaitingForInitialSuspend) {
+                state.wait_for(BarrierState::WaitingForSecondBind);
+            }
+            else if (state.transition(BarrierState::WaitingForSecondSuspend, BarrierState::WaitingForSecondResume) ==
+                     BarrierState::WaitingForSecondSuspend) {
+                state.wait_for(BarrierState::Done);
+            }
+            return SyncClientHookAction::NoAction;
+        };
+        auto r = Realm::get_shared_realm(config);
+        wait_for_upload(*r);
+        nlohmann::json error_body = {
+            {"tryAgain", true},           {"message", "fake error"},
+            {"shouldClientReset", false}, {"isRecoveryModeDisabled", false},
+            {"action", "Transient"},      {"backoffIntervalSec", 900},
+            {"backoffMaxDelaySec", 900},  {"backoffMultiplier", 1},
+        };
+        nlohmann::json test_command = {{"command", "ECHO_ERROR"},
+                                       {"args", nlohmann::json{{"errorCode", 229}, {"errorBody", error_body}}}};
+        auto test_cmd_res =
+            wait_for_future(SyncSession::OnlyForTesting::send_test_command(*r->sync_session(), test_command.dump()))
+                .get();
+        REQUIRE(test_cmd_res == "{}");
+
+        state.wait_for(BarrierState::WaitingForInitialResume);
+        r->sync_session()->handle_reconnect();
+        state.transition(BarrierState::WaitingForInitialResume, BarrierState::WaitingForSecondBind);
+        state.wait_for(BarrierState::WaitingForSecondSuspend);
+
+        test_cmd_res =
+            wait_for_future(SyncSession::OnlyForTesting::send_test_command(*r->sync_session(), test_command.dump()))
+                .get();
+        REQUIRE(test_cmd_res == "{}");
+        state.wait_for(BarrierState::WaitingForSecondResume);
+        r->sync_session()->handle_reconnect();
+        state.transition(BarrierState::WaitingForSecondResume, BarrierState::Done);
+        wait_for_download(*r);
+    }
+
     SECTION("handles unknown errors gracefully") {
         auto r = Realm::get_shared_realm(config);
         wait_for_download(*r);
@@ -401,6 +460,7 @@ TEST_CASE("app: error handling integration test", "[sync][flx][baas]") {
         REQUIRE(error.is_client_reset_requested());
         REQUIRE(error.is_fatal);
     }
+
 
     SECTION("teardown") {
         harness.reset();
