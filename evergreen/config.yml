@@ -1736,7 +1736,7 @@ buildvariants:
     cmake_toolchain_file: "./tools/cmake/xcode.toolchain.cmake"
     cmake_generator: Xcode
     max_jobs: $(sysctl -n hw.logicalcpu)
-    xcode_developer_dir: /Applications/Xcode15.1.app/Contents/Developer
+    # xcode_developer_dir: /Applications/Xcode.app/Contents/Developer
     extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=arm64
     cmake_build_type: RelWithDebInfo
     enable_tsan: On
