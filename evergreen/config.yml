@@ -1215,6 +1215,22 @@ task_groups:
   - .test_suite
   - .object_store_test_suite
 
+# compile and run only object store tests: local and remote
+- name: compile_test_object_store
+  max_hosts: 1
+  setup_group_can_fail_task: true
+  setup_group:
+  - func: "fetch source"
+  - func: "fetch binaries"
+  teardown_task:
+  - func: "upload test results"
+  - func: "upload baas artifacts"
+  timeout:
+  - func: "run hang analyzer"
+  tasks:
+  - compile
+  - .object_store_test_suite
+
 # Runs object-store-tests against baas running on remote host and runs
 # the network simulation tests as a separate task for nightly builds
 - name: network_tests
@@ -1696,7 +1712,9 @@ buildvariants:
     cmake_build_type: RelWithDebInfo
     enable_tsan: On
   tasks:
-  - name: compile_test
+  # FIXME: tsan is not stable on arm64, fails often with internal errors
+  # - name: compile_test
+  - name: compile_test_object_store
 
 - name: macos-coverage
   display_name: "MacOS 11 arm64 (Code Coverage)"
