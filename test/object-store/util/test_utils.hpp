@@ -26,6 +26,8 @@
 
 #include <functional>
 #include <filesystem>
+#include <mutex>
+#include <condition_variable>
 namespace fs = std::filesystem;
 
 namespace realm {
