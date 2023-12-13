@@ -3837,27 +3837,27 @@ NONCONCURRENT_TEST(Table_object_random)
     }
 
     {
-        //        WriteTransaction wt(sg);
-        //        auto table = wt.get_table("test");
-        //
-        //        auto t1 = steady_clock::now();
-        //
-        //        for (int i = 0; i < nb_rows; i++) {
-        //            table->remove_object(ObjKey(key_values[i]));
-        // #ifdef REALM_DEBUG
-        //            CHECK_EQUAL(table->size(), nb_rows - i - 1);
-        //            for (int j = i + 1; j < nb_rows; j += nb_rows / 100) {
-        //                Obj o = table->get_object(ObjKey(key_values[j]));
-        //                CHECK_EQUAL(j << 2, o.get<int64_t>(c0));
-        //                CHECK_EQUAL(j << 1, o.get<util::Optional<int64_t>>(c1));
-        //            }
-        // #endif
-        //        }
-        //        auto t2 = steady_clock::now();
-        //        std::cout << "   erase time    : " << duration_cast<nanoseconds>(t2 - t1).count() / nb_rows <<
-        //        "ns/key" << std::endl;
-        //
-        //        wt.commit();
+        WriteTransaction wt(sg);
+        auto table = wt.get_table("test");
+
+        auto t1 = steady_clock::now();
+
+        for (int i = 0; i < nb_rows; i++) {
+            table->remove_object(ObjKey(key_values[i]));
+#ifdef REALM_DEBUG
+            CHECK_EQUAL(table->size(), nb_rows - i - 1);
+            for (int j = i + 1; j < nb_rows; j += nb_rows / 100) {
+                Obj o = table->get_object(ObjKey(key_values[j]));
+                CHECK_EQUAL(j << 2, o.get<int64_t>(c0));
+                CHECK_EQUAL(j << 1, o.get<util::Optional<int64_t>>(c1));
+            }
+#endif
+        }
+        auto t2 = steady_clock::now();
+        std::cout << "   erase time    : " << duration_cast<nanoseconds>(t2 - t1).count() / nb_rows << "ns/key"
+                  << std::endl;
+
+        wt.commit();
     }
 
     CALLGRIND_STOP_INSTRUMENTATION;

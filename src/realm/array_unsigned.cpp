@@ -214,107 +214,88 @@ void ArrayUnsigned::insert(size_t ndx, uint64_t value)
     // we should aim at unifying as much as possible the interface, in order to avoid to scatter the
     // compression/decompression logic all over the code.
 
+    bool requires_copy_on_write = true;
     if (is_encoded()) {
-        ArrayUnsigned tmp{m_alloc};
-        tmp.init_from_mem(get_mem());
-        REALM_ASSERT(tmp.get_kind(tmp.get_header()) == 'B');
-        Array::decode_array(tmp);
-        REALM_ASSERT(tmp.get_kind(tmp.get_header()) == 'A');
-        m_width = tmp.get_width_from_header(tmp.get_header());
-        m_ubound = uint64_t(-1) >> (64 - m_width);
-#if REALM_DEBUG
-        REALM_ASSERT(m_width >= 8);
-        REALM_ASSERT(m_width >= m_lbound);
-        REALM_ASSERT(m_width <= m_ubound);
-        REALM_ASSERT(m_lbound <= m_ubound);
-#endif
-        tmp.insert(ndx, value);
-    }
-    else {
+        copy_on_write();
+        // TODO: this smells like we have some bug when we decompress the array and call init_from_mem.
         m_width = get_width_from_header(get_header());
         m_ubound = uint64_t(-1) >> (64 - m_width);
+        requires_copy_on_write = false;
+    }
 
-        REALM_ASSERT_DEBUG(m_width >= 8);
-        bool do_expand = value > (uint64_t)m_ubound;
-        const uint8_t old_width = m_width;
-        const uint8_t new_width = do_expand ? bit_width(value) : m_width;
-        const auto old_size = m_size;
+    REALM_ASSERT_DEBUG(m_width >= 8);
+    bool do_expand = value > (uint64_t)m_ubound;
+    const uint8_t old_width = m_width;
+    const uint8_t new_width = do_expand ? bit_width(value) : m_width;
+    const auto old_size = m_size;
 
-        REALM_ASSERT_DEBUG(!do_expand || new_width > m_width);
-        REALM_ASSERT_DEBUG(ndx <= m_size);
+    REALM_ASSERT_DEBUG(!do_expand || new_width > m_width);
+    REALM_ASSERT_DEBUG(ndx <= m_size);
 
-        // Check if we need to copy before modifying
+    // Check if we need to copy before modifying
+    if (requires_copy_on_write)
         copy_on_write();              // Throws
-        alloc(m_size + 1, new_width); // Throws
+    alloc(m_size + 1, new_width);     // Throws
 
-        // Move values above insertion (may expand)
-        if (do_expand) {
-            size_t i = old_size;
-            while (i > ndx) {
-                --i;
-                auto tmp = _get(i, old_width);
-                _set(i + 1, new_width, tmp);
-            }
+    // Move values above insertion (may expand)
+    if (do_expand) {
+        size_t i = old_size;
+        while (i > ndx) {
+            --i;
+            auto tmp = _get(i, old_width);
+            _set(i + 1, new_width, tmp);
         }
-        else if (ndx != m_size) {
-            size_t w = (new_width >> 3);
+    }
+    else if (ndx != m_size) {
+        size_t w = (new_width >> 3);
 
-            char* src_begin = m_data + ndx * w;
-            char* src_end = m_data + old_size * w;
-            char* dst = src_end + w;
+        char* src_begin = m_data + ndx * w;
+        char* src_end = m_data + old_size * w;
+        char* dst = src_end + w;
 
-            std::copy_backward(src_begin, src_end, dst);
-        }
+        std::copy_backward(src_begin, src_end, dst);
+    }
 
-        // Insert the new value
-        _set(ndx, new_width, value);
+    // Insert the new value
+    _set(ndx, new_width, value);
 
-        // Expand values before insertion
-        if (do_expand) {
-            size_t i = ndx;
-            while (i != 0) {
-                --i;
-                _set(i, new_width, _get(i, old_width));
-            }
+    // Expand values before insertion
+    if (do_expand) {
+        size_t i = ndx;
+        while (i != 0) {
+            --i;
+            _set(i, new_width, _get(i, old_width));
         }
     }
 }
 
 void ArrayUnsigned::erase(size_t ndx)
 {
+    bool requires_copy_on_write = true;
     if (is_encoded()) {
-        ArrayUnsigned tmp{m_alloc};
-        tmp.init_from_mem(get_mem());
-        REALM_ASSERT(tmp.get_kind(tmp.get_header()) == 'B');
-        Array::decode_array(tmp);
-        REALM_ASSERT(tmp.get_kind(tmp.get_header()) == 'A');
-        m_width = tmp.get_width_from_header(tmp.get_header());
-        m_ubound = uint64_t(-1) >> (64 - m_width);
-#if REALM_DEBUG
-        REALM_ASSERT(m_width >= 8);
-        REALM_ASSERT(m_width >= m_lbound);
-        REALM_ASSERT(m_width <= m_ubound);
-        REALM_ASSERT(m_lbound <= m_ubound);
-#endif
-        tmp.erase(ndx);
-    }
-    else {
+        copy_on_write();
+        // TODO: this smells like we have some bug when we decompress the array and call init_from_mem.
         m_width = get_width_from_header(get_header());
-        REALM_ASSERT_DEBUG(m_width >= 8);
+        m_ubound = uint64_t(-1) >> (64 - m_width);
+        requires_copy_on_write = false;
+    }
+
+    REALM_ASSERT_DEBUG(m_width >= 8);
+
+    if (requires_copy_on_write)
         copy_on_write(); // Throws
 
-        size_t w = m_width >> 3;
+    size_t w = m_width >> 3;
 
-        char* dst = m_data + ndx * w;
-        const char* src = dst + w;
-        size_t num_bytes = (m_size - ndx - 1) * w;
+    char* dst = m_data + ndx * w;
+    const char* src = dst + w;
+    size_t num_bytes = (m_size - ndx - 1) * w;
 
-        std::copy_n(src, num_bytes, dst);
+    std::copy_n(src, num_bytes, dst);
 
-        // Update size (also in header)
-        --m_size;
-        set_header_size(m_size);
-    }
+    // Update size (also in header)
+    --m_size;
+    set_header_size(m_size);
 }
 
 uint64_t ArrayUnsigned::get(size_t index) const

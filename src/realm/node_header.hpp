@@ -1033,9 +1033,15 @@ uint_least8_t inline NodeHeader::get_width_from_header(const char* header) noexc
 size_t inline NodeHeader::get_size_from_header(const char* header) noexcept
 {
     auto kind = get_kind(header);
+    REALM_ASSERT(kind == 'A' || kind == 'B');
     if (kind == 'B') {
         // NO! We do not just transparently do the following. The call site must handle it.
-        REALM_ASSERT(false);
+        // TODO: discuss this, or just call Array::size() instead of tapping into the header!!!
+        // Explanation:
+        // Cluster::node_size_from_header needs this for example, I don't think we can say no only because it is
+        // a B array, at least not if we don't hide things behind Array.
+        // TODO: verify this!!! this could be coming from a missing compression/decompression (unlikely but possible)
+        // REALM_ASSERT(false);
         auto size = NodeHeader::get_arrayB_num_elements<Encoding::Flex>(header);
         return size;
     }
