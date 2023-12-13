@@ -287,7 +287,7 @@ TEST_CASE("app: error handling integration test", "[sync][flx][baas]") {
     config.sync_config->error_handler = std::move(error_handler);
     config.sync_config->client_resync_mode = ClientResyncMode::Manual;
 
-    SECTION("cannot resume after fatal error") {
+    SECTION("Resuming while waiting for session to auto-resume") {
         enum class BarrierState { InitialSuspend, InitialResume, SecondBind, SecondSuspend, SecondResume, Done };
         TestingStateMachine<BarrierState> state(BarrierState::InitialSuspend);
         config.sync_config->on_sync_client_event_hook = [&](std::weak_ptr<SyncSession>,
@@ -319,21 +319,33 @@ TEST_CASE("app: error handling integration test", "[sync][flx][baas]") {
         };
         nlohmann::json test_command = {{"command", "ECHO_ERROR"},
                                        {"args", nlohmann::json{{"errorCode", 229}, {"errorBody", error_body}}}};
+
+        // First we trigger a retryable transient error that should cause the client to try to resume the
+        // session in 5 minutes.
         auto test_cmd_res =
             wait_for_future(SyncSession::OnlyForTesting::send_test_command(*r->sync_session(), test_command.dump()))
                 .get();
         REQUIRE(test_cmd_res == "{}");
 
         state.wait_for(BarrierState::InitialResume);
+
+        // Once we're suspended, immediately tell the sync client to resume the session. This should cancel the
+        // timer that would have auto-resumed the session.
         r->sync_session()->handle_reconnect();
         state.transition(BarrierState::InitialResume, BarrierState::SecondBind);
         state.wait_for(BarrierState::SecondSuspend);
 
+        // Once we're connected again trigger another retryable transient error. Before RCORE-1770 the timer
+        // to auto-resume the session would have still been active here and we would crash when trying to start
+        // a second timer to auto-resume after this error.
         test_cmd_res =
             wait_for_future(SyncSession::OnlyForTesting::send_test_command(*r->sync_session(), test_command.dump()))
                 .get();
         REQUIRE(test_cmd_res == "{}");
         state.wait_for(BarrierState::SecondResume);
+
+        // Finally resume the session again which should cancel the second timer and the session should auto-resume
+        // normally without crashing.
         r->sync_session()->handle_reconnect();
         state.transition(BarrierState::SecondResume, BarrierState::Done);
         wait_for_download(*r);
