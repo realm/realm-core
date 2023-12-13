@@ -1352,51 +1352,6 @@ MemRef Array::create(Type type, bool context_flag, WidthType width_type, size_t 
     return mem;
 }
 
-template <size_t w>
-int64_t Array::get_universal(const char* data, size_t ndx) const
-{
-    if (is_encoded())
-        return m_encode.get(*this, ndx);
-
-    if (w == 0) {
-        return 0;
-    }
-    else if (w == 1) {
-        size_t offset = ndx >> 3;
-        auto d = data[offset];
-        return (d >> (ndx & 7)) & 0x01;
-    }
-    else if (w == 2) {
-        size_t offset = ndx >> 2;
-        auto d = data[offset];
-        return (d >> ((ndx & 3) << 1)) & 0x03;
-    }
-    else if (w == 4) {
-        size_t offset = ndx >> 1;
-        auto d = data[offset];
-        return (d >> ((ndx & 1) << 2)) & 0x0F;
-    }
-    else if (w == 8) {
-        return *reinterpret_cast<const signed char*>(data + ndx);
-    }
-    else if (w == 16) {
-        size_t offset = ndx * 2;
-        return *reinterpret_cast<const int16_t*>(data + offset);
-    }
-    else if (w == 32) {
-        size_t offset = ndx * 4;
-        return *reinterpret_cast<const int32_t*>(data + offset);
-    }
-    else if (w == 64) {
-        size_t offset = ndx * 8;
-        return *reinterpret_cast<const int64_t*>(data + offset);
-    }
-    else {
-        REALM_ASSERT_DEBUG(false);
-        return int64_t(-1);
-    }
-}
-
 // This is the one installed into the m_vtable->finder slots.
 template <class cond, size_t bitwidth>
 bool Array::find_vtable(int64_t value, size_t start, size_t end, size_t baseindex, QueryStateBase* state) const
@@ -1687,14 +1642,15 @@ int_fast64_t Array::get(const char* header, size_t ndx) noexcept
     return get_direct(data, width, ndx);
 }
 
+int_fast64_t Array::get_universal_encoded_array(size_t ndx) const
+{
+    return m_encode.get(*this, ndx);
+}
+
 
 std::pair<int64_t, int64_t> Array::get_two(const char* header, size_t ndx) noexcept
 {
     // TODO: Optimize!
-    // const char* data = get_data_from_header(header);
-    // uint_least8_t width = get_width_from_header(header);
-    // std::pair<int64_t, int64_t> p = ::get_two(data, width, ndx);
-    // return std::make_pair(p.first, p.second);
     return std::make_pair(get(header, ndx), get(header, ndx + 1));
 }
 
