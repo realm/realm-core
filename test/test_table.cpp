@@ -3699,172 +3699,168 @@ NONCONCURRENT_TEST(Table_object_seq_rnd)
 
 NONCONCURRENT_TEST(Table_object_random)
 {
-    // #ifdef PERFORMACE_TESTING
-    //     int nb_rows = 1'000'000;
-    //     int num_runs = 10;
-    // #else
-    //     int nb_rows = 100'000;
-    //     int num_runs = 1;
-    // #endif
-    //     SHARED_GROUP_TEST_PATH(path);
-    //     std::unique_ptr<Replication> hist(make_in_realm_history());
-    //     DBRef sg = DB::create(*hist, path, DBOptions(crypt_key()));
-    //     ColKey c0;
-    //     ColKey c1;
-    //     std::vector<int64_t> key_values;
-    //
-    //     {
-    //         std::set<int64_t> key_set;
-    //         for (int i = 0; i < nb_rows; i++) {
-    //             bool ok = false;
-    //             while (!ok) {
-    //                 auto key_val = test_util::random_int<int64_t>(0, nb_rows * 10);
-    //                 if (key_set.count(key_val) == 0) {
-    //                     key_values.push_back(key_val);
-    //                     key_set.insert(key_val);
-    //                     ok = true;
-    //                 }
-    //             }
-    //         }
-    //     }
-    //
-    //     CALLGRIND_START_INSTRUMENTATION;
-    //
-    //     std::cout << nb_rows << " rows - random" << std::endl;
-    //
-    //     {
-    //         WriteTransaction wt(sg);
-    //         auto table = wt.add_table("test");
-    //
-    //         c0 = table->add_column(type_Int, "int1");
-    //         c1 = table->add_column(type_Int, "int2", true);
-    //
-    //
-    //         auto t1 = steady_clock::now();
-    //
-    //         for (int i = 0; i < nb_rows; i++) {
-    //             table->create_object(ObjKey(key_values[i])).set_all(i << 1, i << 2);
-    //         }
-    //
-    //
-    //         auto t2 = steady_clock::now();
-    //         std::cout << "   insertion time: " << duration_cast<nanoseconds>(t2 - t1).count() / nb_rows << "
-    //         ns/key"
-    //                   << std::endl;
-    //
-    //         CHECK_EQUAL(table->size(), nb_rows);
-    //         wt.commit();
-    //     }
-    //     {
-    //         auto t1 = steady_clock::now();
-    //         sg->compact();
-    //         auto t2 = steady_clock::now();
-    //         std::cout << "  compaction time: " << duration_cast<milliseconds>(t2 - t1).count() << " ms" <<
-    //         std::endl;
-    //     }
-    //
-    //     {
-    //         ReadTransaction rt(sg);
-    //         auto table = rt.get_table("test");
-    //
-    //         auto t1 = steady_clock::now();
-    //
-    //         for (int j = 0; j < num_runs; ++j) {
-    //             for (int i = 0; i < nb_rows; i++) {
-    //                 table->get_object(ObjKey(key_values[i]));
-    //             }
-    //         }
-    //
-    //         auto t2 = steady_clock::now();
-    //
-    //         std::cout << "   lookup obj    : " << duration_cast<nanoseconds>(t2 - t1).count() / nb_rows / num_runs
-    //                   << " ns/key" << std::endl;
-    //     }
-    //
-    //     {
-    //         ReadTransaction rt(sg);
-    //         auto table = rt.get_table("test");
-    //
-    //         auto t1 = steady_clock::now();
-    //
-    //         for (int j = 0; j < num_runs; ++j) {
-    //             for (int i = 0; i < nb_rows; i++) {
-    //                 const Obj o = table->get_object(ObjKey(key_values[i]));
-    //                 CHECK_EQUAL(i << 1, o.get<int64_t>(c0));
-    //             }
-    //         }
-    //
-    //         auto t2 = steady_clock::now();
-    //
-    //         std::cout << "   lookup field  : " << duration_cast<nanoseconds>(t2 - t1).count() / nb_rows / num_runs
-    //                   << " ns/key" << std::endl;
-    //     }
-    //
-    //     {
-    //         ReadTransaction rt(sg);
-    //         auto table = rt.get_table("test");
-    //
-    //         auto t1 = steady_clock::now();
-    //
-    //         for (int j = 0; j < num_runs; ++j) {
-    //             for (int i = 0; i < nb_rows; i++) {
-    //                 const Obj o = table->get_object(ObjKey(key_values[i]));
-    //                 CHECK_EQUAL(i << 1, o.get<int64_t>(c0));
-    //                 CHECK_EQUAL(i << 1, o.get<int64_t>(c0));
-    //             }
-    //         }
-    //
-    //         auto t2 = steady_clock::now();
-    //
-    //         std::cout << "   lookup same   : " << duration_cast<nanoseconds>(t2 - t1).count() / nb_rows / num_runs
-    //                   << " ns/key" << std::endl;
-    //     }
-    //
-    //     {
-    //         WriteTransaction wt(sg);
-    //         auto table = wt.get_table("test");
-    //
-    //         auto t1 = steady_clock::now();
-    //
-    //         for (int i = 0; i < nb_rows; i++) {
-    //             Obj o = table->get_object(ObjKey(key_values[i]));
-    //             o.set(c0, i << 2).set(c1, i << 1);
-    //         }
-    //
-    //         auto t2 = steady_clock::now();
-    //
-    //         std::cout << "   update time   : " << duration_cast<nanoseconds>(t2 - t1).count() / nb_rows << "
-    //         ns/key"
-    //                   << std::endl;
-    //         wt.commit();
-    //     }
-    //
-    //     {
-    //         WriteTransaction wt(sg);
-    //         auto table = wt.get_table("test");
-    //
-    //         auto t1 = steady_clock::now();
-    //
-    //         for (int i = 0; i < nb_rows; i++) {
-    //             table->remove_object(ObjKey(key_values[i]));
-    // #ifdef REALM_DEBUG
-    //             CHECK_EQUAL(table->size(), nb_rows - i - 1);
-    //             for (int j = i + 1; j < nb_rows; j += nb_rows / 100) {
-    //                 Obj o = table->get_object(ObjKey(key_values[j]));
-    //                 CHECK_EQUAL(j << 2, o.get<int64_t>(c0));
-    //                 CHECK_EQUAL(j << 1, o.get<util::Optional<int64_t>>(c1));
-    //             }
-    // #endif
-    //         }
-    //         auto t2 = steady_clock::now();
-    //         std::cout << "   erase time    : " << duration_cast<nanoseconds>(t2 - t1).count() / nb_rows << "
-    //         ns/key"
-    //                   << std::endl;
-    //
-    //         wt.commit();
-    //     }
-    //
-    //     CALLGRIND_STOP_INSTRUMENTATION;
+#ifdef PERFORMACE_TESTING
+    int nb_rows = 1'000'000;
+    int num_runs = 10;
+#else
+    int nb_rows = 100'000;
+    int num_runs = 1;
+#endif
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist(make_in_realm_history());
+    DBRef sg = DB::create(*hist, path, DBOptions(crypt_key()));
+    ColKey c0;
+    ColKey c1;
+    std::vector<int64_t> key_values;
+
+    {
+        std::set<int64_t> key_set;
+        for (int i = 0; i < nb_rows; i++) {
+            bool ok = false;
+            while (!ok) {
+                auto key_val = test_util::random_int<int64_t>(0, nb_rows * 10);
+                if (key_set.count(key_val) == 0) {
+                    key_values.push_back(key_val);
+                    key_set.insert(key_val);
+                    ok = true;
+                }
+            }
+        }
+    }
+
+    CALLGRIND_START_INSTRUMENTATION;
+
+    std::cout << nb_rows << " rows - random" << std::endl;
+
+    {
+        WriteTransaction wt(sg);
+        auto table = wt.add_table("test");
+
+        c0 = table->add_column(type_Int, "int1");
+        c1 = table->add_column(type_Int, "int2", true);
+
+
+        auto t1 = steady_clock::now();
+
+        for (int i = 0; i < nb_rows; i++) {
+            table->create_object(ObjKey(key_values[i])).set_all(i << 1, i << 2);
+        }
+
+
+        auto t2 = steady_clock::now();
+        std::cout << "   insertion time: " << duration_cast<nanoseconds>(t2 - t1).count() / nb_rows << "ns/key"
+                  << std::endl;
+
+        CHECK_EQUAL(table->size(), nb_rows);
+        wt.commit();
+    }
+    {
+        auto t1 = steady_clock::now();
+        sg->compact();
+        auto t2 = steady_clock::now();
+        std::cout << "  compaction time: " << duration_cast<milliseconds>(t2 - t1).count() << " ms" << std::endl;
+    }
+
+    {
+        ReadTransaction rt(sg);
+        auto table = rt.get_table("test");
+
+        auto t1 = steady_clock::now();
+
+        for (int j = 0; j < num_runs; ++j) {
+            for (int i = 0; i < nb_rows; i++) {
+                table->get_object(ObjKey(key_values[i]));
+            }
+        }
+
+        auto t2 = steady_clock::now();
+
+        std::cout << "   lookup obj    : " << duration_cast<nanoseconds>(t2 - t1).count() / nb_rows / num_runs
+                  << " ns/key" << std::endl;
+    }
+
+    {
+        ReadTransaction rt(sg);
+        auto table = rt.get_table("test");
+
+        auto t1 = steady_clock::now();
+
+        for (int j = 0; j < num_runs; ++j) {
+            for (int i = 0; i < nb_rows; i++) {
+                const Obj o = table->get_object(ObjKey(key_values[i]));
+                CHECK_EQUAL(i << 1, o.get<int64_t>(c0));
+            }
+        }
+
+        auto t2 = steady_clock::now();
+
+        std::cout << "   lookup field  : " << duration_cast<nanoseconds>(t2 - t1).count() / nb_rows / num_runs
+                  << " ns/key" << std::endl;
+    }
+
+    {
+        ReadTransaction rt(sg);
+        auto table = rt.get_table("test");
+
+        auto t1 = steady_clock::now();
+
+        for (int j = 0; j < num_runs; ++j) {
+            for (int i = 0; i < nb_rows; i++) {
+                const Obj o = table->get_object(ObjKey(key_values[i]));
+                CHECK_EQUAL(i << 1, o.get<int64_t>(c0));
+                CHECK_EQUAL(i << 1, o.get<int64_t>(c0));
+            }
+        }
+
+        auto t2 = steady_clock::now();
+
+        std::cout << "   lookup same   : " << duration_cast<nanoseconds>(t2 - t1).count() / nb_rows / num_runs
+                  << " ns/key" << std::endl;
+    }
+
+    {
+        WriteTransaction wt(sg);
+        auto table = wt.get_table("test");
+
+        auto t1 = steady_clock::now();
+
+        for (int i = 0; i < nb_rows; i++) {
+            Obj o = table->get_object(ObjKey(key_values[i]));
+            o.set(c0, i << 2).set(c1, i << 1);
+        }
+
+        auto t2 = steady_clock::now();
+
+        std::cout << "   update time   : " << duration_cast<nanoseconds>(t2 - t1).count() / nb_rows << "ns/key"
+                  << std::endl;
+        wt.commit();
+    }
+
+    {
+        //        WriteTransaction wt(sg);
+        //        auto table = wt.get_table("test");
+        //
+        //        auto t1 = steady_clock::now();
+        //
+        //        for (int i = 0; i < nb_rows; i++) {
+        //            table->remove_object(ObjKey(key_values[i]));
+        // #ifdef REALM_DEBUG
+        //            CHECK_EQUAL(table->size(), nb_rows - i - 1);
+        //            for (int j = i + 1; j < nb_rows; j += nb_rows / 100) {
+        //                Obj o = table->get_object(ObjKey(key_values[j]));
+        //                CHECK_EQUAL(j << 2, o.get<int64_t>(c0));
+        //                CHECK_EQUAL(j << 1, o.get<util::Optional<int64_t>>(c1));
+        //            }
+        // #endif
+        //        }
+        //        auto t2 = steady_clock::now();
+        //        std::cout << "   erase time    : " << duration_cast<nanoseconds>(t2 - t1).count() / nb_rows <<
+        //        "ns/key" << std::endl;
+        //
+        //        wt.commit();
+    }
+
+    CALLGRIND_STOP_INSTRUMENTATION;
 }
 
 TEST(Table_CollisionMapping)

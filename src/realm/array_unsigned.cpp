@@ -216,7 +216,6 @@ void ArrayUnsigned::insert(size_t ndx, uint64_t value)
 
     if (is_encoded()) {
         ArrayUnsigned tmp{m_alloc};
-        tmp.create(0, 0);
         tmp.init_from_mem(get_mem());
         REALM_ASSERT(tmp.get_kind(tmp.get_header()) == 'B');
         Array::decode_array(tmp);
@@ -285,7 +284,6 @@ void ArrayUnsigned::erase(size_t ndx)
 {
     if (is_encoded()) {
         ArrayUnsigned tmp{m_alloc};
-        tmp.create(0, 0);
         tmp.init_from_mem(get_mem());
         REALM_ASSERT(tmp.get_kind(tmp.get_header()) == 'B');
         Array::decode_array(tmp);

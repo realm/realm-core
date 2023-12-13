@@ -386,9 +386,9 @@ TEST(UUID_Commit)
 
 // This test has a higher chance of finding node merge issues
 // when using REALM_MAX_BPNODE_SIZE = 4
+// TEST_TYPES(UUID_GrowAndShrink, UUID, util::Optional<UUID>)
 TEST_TYPES(UUID_GrowAndShrink, UUID, util::Optional<UUID>)
 {
-    // This is failing
     //    SHARED_GROUP_TEST_PATH(path);
     //    DBRef db = DB::create(path);
     //    ColKey col;
