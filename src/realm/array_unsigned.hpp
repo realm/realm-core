@@ -119,8 +119,7 @@ private:
 
     void alloc(size_t init_size, size_t new_width)
     {
-        if (is_encoded())
-            decode_array(*this);
+        decode_array(*this);
         Node::alloc(init_size, new_width);
         set_width(uint8_t(new_width));
     }

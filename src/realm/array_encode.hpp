@@ -35,6 +35,7 @@ public:
     virtual bool is_encoded(const Array&) const = 0;
     virtual size_t size(const Array&) const = 0;
     virtual int64_t get(const Array&, size_t) const = 0;
+    virtual void set_direct(const Array&, size_t, int64_t) const = 0;
     // this needs to be used carefully, only if you know that the underline data is unsigned.
     virtual uint64_t get_unsigned(const Array&, size_t, size_t&) const = 0;
     // these methods are used by ArrayUnsigned and Array, and have a huge impact on how fast we traverse the

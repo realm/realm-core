@@ -1488,10 +1488,12 @@ void Array::get_chunk<0>(size_t ndx, int64_t res[8]) const noexcept
 template <size_t width>
 void Array::set(size_t ndx, int64_t value)
 {
-    // NOT OK this can be made faster... we don't need to decompress here.
-    if (is_encoded())
-        decode_array(*this);
-    set_direct<width>(m_data, ndx, value);
+    if (is_encoded()) {
+        m_encode.set_direct(*this, ndx, value);
+    }
+    else {
+        set_direct<width>(m_data, ndx, value);
+    }
 }
 
 #ifdef REALM_DEBUG

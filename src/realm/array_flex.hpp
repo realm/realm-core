@@ -31,10 +31,17 @@ class ArrayFlex : public ArrayEncode {
 public:
     explicit ArrayFlex() = default;
     virtual ~ArrayFlex() = default;
+
+    // compressing/decompressing logic
     bool encode(const Array&, Array&) const final override;
     bool decode(Array&) final override;
     bool is_encoded(const Array&) const final override;
+
+    // misc
     size_t size(const Array&) const final override;
+    void set_direct(const Array&, size_t, int64_t) const final override;
+
+    // basic query support
     size_t find_first(const Array&, int64_t value) const final override;
     int64_t sum(const Array&, size_t start, size_t end) const final override;
 
