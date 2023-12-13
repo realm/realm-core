@@ -1577,7 +1577,7 @@ buildvariants:
     python3: "/opt/mongodbtoolchain/v3/bin/python3"
     use_system_openssl: On
     fetch_missing_dependencies: On
-    cmake_build_type: RelWithDebInfo
+    cmake_build_type: Debug
     enable_asan: On
   tasks:
   - name: compile_test
@@ -1594,7 +1594,7 @@ buildvariants:
     cmake_build_type: RelWithDebInfo
     enable_tsan: On
   tasks:
-  - name: compile_test
+  - name: compile_test_object_store
 
 - name: macos
   display_name: "MacOS 11.0 x86_64"
@@ -1736,7 +1736,7 @@ buildvariants:
     cmake_toolchain_file: "./tools/cmake/xcode.toolchain.cmake"
     cmake_generator: Xcode
     max_jobs: $(sysctl -n hw.logicalcpu)
-    xcode_developer_dir: /Applications/Xcode.app/Contents/Developer
+    xcode_developer_dir: /Applications/Xcode15.1.app/Contents/Developer
     extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=arm64
     cmake_build_type: RelWithDebInfo
     enable_tsan: On
