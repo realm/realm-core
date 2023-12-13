@@ -1563,13 +1563,14 @@ buildvariants:
     python3: "/opt/mongodbtoolchain/v3/bin/python3"
     use_system_openssl: On
     fetch_missing_dependencies: On
+    cmake_build_type: RelWithDebInfo
   tasks:
   - name: compile_test_and_package
   - name: benchmarks
 
-- name: ubuntu2004-arm64-asan
-  display_name: "Ubuntu 20.04 ARM64 (ASAN)"
-  run_on: ubuntu2004-arm64-large
+- name: ubuntu2204-arm64-asan
+  display_name: "Ubuntu 22.04 ARM64 (ASAN)"
+  run_on: ubuntu2204-arm64-large
   expansions:
     cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-linux-aarch64.tar.gz"
     cmake_bindir: "./cmake_binaries/bin"
@@ -1581,9 +1582,9 @@ buildvariants:
   tasks:
   - name: compile_test
 
-- name: ubuntu2004-arm64-tsan
-  display_name: "Ubuntu 20.04 ARM64 (TSAN)"
-  run_on: ubuntu2004-arm64-large
+- name: ubuntu2204-arm64-tsan
+  display_name: "Ubuntu 22.04 ARM64 (TSAN)"
+  run_on: ubuntu2204-arm64-large
   expansions:
     cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-linux-aarch64.tar.gz"
     cmake_bindir: "./cmake_binaries/bin"
@@ -1726,23 +1727,23 @@ buildvariants:
   tasks:
   - name: compile_test
 
-- name: macos-1100-arm64-tsan
-  display_name: "MacOS 11 arm64 (TSAN)"
-  run_on: macos-1100-arm64
+- name: macos-1300-arm64-tsan
+  display_name: "MacOS 13 arm64 (TSAN)"
+  run_on: macos-1300-arm64
   expansions:
     cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-macos-universal.tar.gz"
     cmake_bindir: "./cmake_binaries/CMake.app/Contents/bin"
     cmake_toolchain_file: "./tools/cmake/xcode.toolchain.cmake"
     cmake_generator: Xcode
     max_jobs: $(sysctl -n hw.logicalcpu)
-    xcode_developer_dir: /Applications/Xcode13.1.app/Contents/Developer
+    xcode_developer_dir: /Applications/Xcode.app/Contents/Developer
     extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=arm64
     cmake_build_type: RelWithDebInfo
     enable_tsan: On
   tasks:
   # FIXME: tsan is not stable on arm64, fails often with internal errors
-  # - name: compile_test
-  - name: compile_test_object_store
+  - name: compile_test
+  #- name: compile_test_object_store
 
 - name: macos-coverage
   display_name: "MacOS 11 arm64 (Code Coverage)"
