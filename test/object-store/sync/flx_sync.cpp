@@ -288,30 +288,23 @@ TEST_CASE("app: error handling integration test", "[sync][flx][baas]") {
     config.sync_config->client_resync_mode = ClientResyncMode::Manual;
 
     SECTION("cannot resume after fatal error") {
-        enum class BarrierState {
-            WaitingForInitialSuspend,
-            WaitingForInitialResume,
-            WaitingForSecondBind,
-            WaitingForSecondSuspend,
-            WaitingForSecondResume,
-            Done
-        };
-        TestingStateMachine<BarrierState> state(BarrierState::WaitingForInitialSuspend);
+        enum class BarrierState { InitialSuspend, InitialResume, SecondBind, SecondSuspend, SecondResume, Done };
+        TestingStateMachine<BarrierState> state(BarrierState::InitialSuspend);
         config.sync_config->on_sync_client_event_hook = [&](std::weak_ptr<SyncSession>,
                                                             const SyncClientHookData& data) {
             if (data.event == SyncClientHookEvent::BindMessageSent) {
-                state.transition(BarrierState::WaitingForSecondBind, BarrierState::WaitingForSecondSuspend);
+                state.transition(BarrierState::SecondBind, BarrierState::SecondSuspend);
             }
             if (data.event != SyncClientHookEvent::SessionSuspended) {
                 return SyncClientHookAction::NoAction;
             }
 
-            if (state.transition(BarrierState::WaitingForInitialSuspend, BarrierState::WaitingForInitialResume) ==
-                BarrierState::WaitingForInitialSuspend) {
-                state.wait_for(BarrierState::WaitingForSecondBind);
+            if (state.transition(BarrierState::InitialSuspend, BarrierState::InitialResume) ==
+                BarrierState::InitialSuspend) {
+                state.wait_for(BarrierState::SecondBind);
             }
-            else if (state.transition(BarrierState::WaitingForSecondSuspend, BarrierState::WaitingForSecondResume) ==
-                     BarrierState::WaitingForSecondSuspend) {
+            else if (state.transition(BarrierState::SecondSuspend, BarrierState::SecondResume) ==
+                     BarrierState::SecondSuspend) {
                 state.wait_for(BarrierState::Done);
             }
             return SyncClientHookAction::NoAction;
@@ -331,18 +324,18 @@ TEST_CASE("app: error handling integration test", "[sync][flx][baas]") {
                 .get();
         REQUIRE(test_cmd_res == "{}");
 
-        state.wait_for(BarrierState::WaitingForInitialResume);
+        state.wait_for(BarrierState::InitialResume);
         r->sync_session()->handle_reconnect();
-        state.transition(BarrierState::WaitingForInitialResume, BarrierState::WaitingForSecondBind);
-        state.wait_for(BarrierState::WaitingForSecondSuspend);
+        state.transition(BarrierState::InitialResume, BarrierState::SecondBind);
+        state.wait_for(BarrierState::SecondSuspend);
 
         test_cmd_res =
             wait_for_future(SyncSession::OnlyForTesting::send_test_command(*r->sync_session(), test_command.dump()))
                 .get();
         REQUIRE(test_cmd_res == "{}");
-        state.wait_for(BarrierState::WaitingForSecondResume);
+        state.wait_for(BarrierState::SecondResume);
         r->sync_session()->handle_reconnect();
-        state.transition(BarrierState::WaitingForSecondResume, BarrierState::Done);
+        state.transition(BarrierState::SecondResume, BarrierState::Done);
         wait_for_download(*r);
     }
 
