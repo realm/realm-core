@@ -37,10 +37,14 @@ public:
     virtual int64_t get(const Array&, size_t) const = 0;
     // this needs to be used carefully, only if you know that the underline data is unsigned.
     virtual uint64_t get_unsigned(const Array&, size_t, size_t&) const = 0;
-    // these methods are used by ArrayUnsigned, and have a huge impact on how fast we traverse the ClusterTree
-    // Note: These methods are expecting array to be storing only unsigned int values.
+    // these methods are used by ArrayUnsigned and Array, and have a huge impact on how fast we traverse the
+    // ClusterTree on in general in every place where we use lower and upper bound. Note: These methods are meant to
+    // be used for UnsignedArray only (uint64_t)
     virtual size_t lower_bound(const Array&, uint64_t) const = 0;
     virtual size_t upper_bound(const Array&, uint64_t) const = 0;
+    // Note: These methods are meant for Array (int64_t)
+    virtual size_t lower_bound(const Array&, int64_t) const = 0;
+    virtual size_t upper_bound(const Array&, int64_t) const = 0;
     // query mappers
     virtual size_t find_first(const Array&, int64_t value) const = 0;
     virtual int64_t sum(const Array&, size_t start, size_t end) const = 0;

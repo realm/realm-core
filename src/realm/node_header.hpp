@@ -465,7 +465,7 @@ public:
         auto hb = (uint8_t*)header;
         hb[3] = kind;
         if (kind == 0x41) {
-            uint8_t wtype;
+            uint8_t wtype = 0;
             if (enc == Encoding::WTypBits)
                 wtype = wtype_Bits;
             else if (enc == Encoding::WTypMult)
@@ -474,6 +474,7 @@ public:
                 wtype = wtype_Ignore;
             else
                 REALM_ASSERT(false && "Illegal header encoding for legacy kind of header");
+
             hb[4] = (flags << 5) | (wtype << 3);
             if (enc == Encoding::WTypBits)
                 set_width_in_header(bits_pr_elem, (char*)header);

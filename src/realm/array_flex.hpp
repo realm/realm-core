@@ -37,9 +37,12 @@ public:
     size_t size(const Array&) const final override;
     size_t find_first(const Array&, int64_t value) const final override;
     int64_t sum(const Array&, size_t start, size_t end) const final override;
-    // these methods are used by ArrayUnsigned, and have a huge impact on how fast we traverse the ClusterTree
+
+    // UnsignedArray/Array lower and upper bound for flex arrays. These methods need to be optimized.
     size_t lower_bound(const Array&, uint64_t) const final override;
     size_t upper_bound(const Array&, uint64_t) const final override;
+    size_t lower_bound(const Array&, int64_t) const final override;
+    size_t upper_bound(const Array&, int64_t) const final override;
 
     // getters
     int64_t get(const Array&, size_t) const final override;

@@ -347,9 +347,9 @@ void ArrayFlex::restore_array(Array& arr, const std::vector<int64_t>& values) co
     // calling array destory here, works only because we are not going to use this array header anymore, see comment
     // in Array::init_from_mem. We can get away with this since we are basically restoring all the basic properties
     // for the array via Node::init_header(...) But width and capacity need particular attention.
-    // auto orginal_header = arr.get_header();
-    // auto origanal_ref = arr.get_ref();
-    arr.destroy();
+    auto orginal_header = arr.get_header();
+    auto origanal_ref = arr.get_ref();
+    // arr.destroy();
 
     // this is slow. It is just for testing, but this is what it is needed. the ceil for the current bit size.
     // we need to have std::bit_ceil(v); AKA the next power of 2 closed to max_bit. We have somehow introduced a
@@ -377,7 +377,7 @@ void ArrayFlex::restore_array(Array& arr, const std::vector<int64_t>& values) co
     for (const auto& v : values)
         arr.set(i++, v);
 
-    // allocator.free_(origanal_ref, orginal_header);
+    allocator.free_(origanal_ref, orginal_header);
 
     size_t w = arr.get_width();
     REALM_ASSERT(w == 0 || w == 1 || w == 2 || w == 4 || w == 8 || w == 16 || w == 32 || w == 64);
@@ -507,6 +507,34 @@ size_t ArrayFlex::upper_bound(const Array& arr, uint64_t value) const
         // I might be wrong, but it seems that UnsignedArray values are kept sorted, so just call lower_bound here
         // NOTE: this is inefficient, the algorithm is moving from O(lg N) to O(N) with very expensive constant
         // factors. std::sort(values.begin(), values.end());
+        return std::upper_bound(values.begin(), values.end(), value) - values.begin();
+    }
+    REALM_UNREACHABLE();
+}
+
+size_t ArrayFlex::lower_bound(const Array& arr, int64_t value) const
+{
+    // same comment above applies to this method. Needs optimization
+    REALM_ASSERT(arr.is_attached());
+    const auto header = arr.get_header();
+    REALM_ASSERT(NodeHeader::get_kind(header) == 'B');
+    size_t v_width, i_width, v_size, i_size;
+    if (get_encode_info(header, v_width, i_width, v_size, i_size)) {
+        auto values = fetch_signed_values_from_encoded_array(arr, v_width, i_width, v_size, i_size);
+        return std::lower_bound(values.begin(), values.end(), value) - values.begin();
+    }
+    REALM_UNREACHABLE();
+}
+
+size_t ArrayFlex::upper_bound(const Array& arr, int64_t value) const
+{
+    // same comment above applies to this method. Needs optimization
+    REALM_ASSERT(arr.is_attached());
+    const auto header = arr.get_header();
+    REALM_ASSERT(NodeHeader::get_kind(header) == 'B');
+    size_t v_width, i_width, v_size, i_size;
+    if (get_encode_info(header, v_width, i_width, v_size, i_size)) {
+        auto values = fetch_signed_values_from_encoded_array(arr, v_width, i_width, v_size, i_size);
         return std::upper_bound(values.begin(), values.end(), value) - values.begin();
     }
     REALM_UNREACHABLE();

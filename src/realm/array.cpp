@@ -1648,23 +1648,30 @@ void Array::verify() const
 
 size_t Array::lower_bound_int(int64_t value) const noexcept
 {
-    // NOT OK
-    decode_array((Array&)*this);
+    if (is_encoded()) {
+        // this is O(N) with a lot of computation associated.
+        // It requires some serious optimization.
+        return m_encode.lower_bound(*this, value);
+    }
     REALM_TEMPEX(return lower_bound, m_width, (m_data, m_size, value));
 }
 
 size_t Array::upper_bound_int(int64_t value) const noexcept
 {
-    // NOT OK
-    decode_array((Array&)*this);
+    if (is_encoded()) {
+        // this is O(N) with a lot of computation associated.
+        // It requires some serious optimization.
+        return m_encode.upper_bound(*this, value);
+    }
     REALM_TEMPEX(return upper_bound, m_width, (m_data, m_size, value));
 }
 
 
 size_t Array::find_first(int64_t value, size_t start, size_t end) const
 {
-    if (is_encoded())
+    if (is_encoded()) {
         return m_encode.find_first(*this, value);
+    }
     return find_first<Equal>(value, start, end);
 }
 
