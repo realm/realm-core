@@ -234,8 +234,8 @@ void ArrayUnsigned::insert(size_t ndx, uint64_t value)
 
     // Check if we need to copy before modifying
     if (requires_copy_on_write)
-        copy_on_write();              // Throws
-    alloc(m_size + 1, new_width);     // Throws
+        copy_on_write();          // Throws
+    alloc(m_size + 1, new_width); // Throws
 
     // Move values above insertion (may expand)
     if (do_expand) {

@@ -5473,7 +5473,8 @@ void worker(test_util::unit_test::TestContext& test_context, TransactionRef froz
 
 TEST(Parser_Threads)
 {
-    // This is failing..
+    // TODO: this is failing because of ArrayWithFind does not have a proper handling for
+    //       compressed arrays yet!
     //    SHARED_GROUP_TEST_PATH(path);
     //    std::unique_ptr<Replication> hist(make_in_realm_history());
     //    DBRef db = DB::create(*hist, path);

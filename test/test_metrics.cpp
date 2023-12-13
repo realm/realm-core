@@ -848,6 +848,7 @@ TEST(Metrics_TransactionData)
 
 TEST(Metrics_TransactionVersions)
 {
+    // This test hangs...
     //    SHARED_GROUP_TEST_PATH(path);
     //    std::unique_ptr<Replication> hist(make_in_realm_history());
     //    DBOptions options(crypt_key());
