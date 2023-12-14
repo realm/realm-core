@@ -797,7 +797,7 @@ TEST_CASE("Client reset during schema migration", "[sync][flx][flx schema migrat
         if (error_code == sync::ProtocolError::schema_version_changed) {
             ++schema_version_changed_count;
             if (schema_version_changed_count == 1) {
-                reset_utils::trigger_client_reset(harness.session().app_session());
+                reset_utils::trigger_client_reset(harness.session().app_session(), *session);
             }
         }
 
