@@ -42,6 +42,7 @@ public:
     void set_direct(const Array&, size_t, int64_t) const final override;
 
     // basic query support
+    std::vector<int64_t> find_all(const Array&, int64_t, size_t, size_t) const final override;
     size_t find_first(const Array&, int64_t value) const final override;
     int64_t sum(const Array&, size_t start, size_t end) const final override;
 
@@ -73,9 +74,10 @@ private:
     void copy_into_encoded_array(Array&, std::vector<int64_t>&, std::vector<size_t>&) const;
 
     // decode array methods
-    std::vector<int64_t> fetch_signed_values_from_encoded_array(const Array&, size_t, size_t, size_t, size_t) const;
-    std::vector<uint64_t> fetch_unsigned_values_from_encoded_array(const Array&, size_t, size_t, size_t,
-                                                                   size_t) const;
+    std::vector<int64_t> fetch_signed_values_from_encoded_array(const Array&, size_t, size_t, size_t, size_t,
+                                                                size_t = 0) const;
+    std::vector<uint64_t> fetch_unsigned_values_from_encoded_array(const Array&, size_t, size_t, size_t, size_t,
+                                                                   size_t = 0) const;
     void restore_array(Array&, const std::vector<int64_t>&) const;
 
     // this is not widely used, but fetch_x_values does pretty much the same

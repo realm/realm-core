@@ -39,6 +39,7 @@ Searching: The main finding function is:
 #define REALM_ARRAY_WITH_FIND_HPP
 
 #include <realm/array.hpp>
+#include <realm/array_encode.hpp>
 #include <realm/query_conditions.hpp>
 
 /*
@@ -162,6 +163,9 @@ private:
     template <size_t bitwidth, class Callback>
     bool find_all_will_match(size_t start, size_t end, size_t baseindex, QueryStateBase* state,
                              Callback callback) const;
+
+    template <class Cond, class Callback>
+    bool find_encoded_array(Cond&, int64_t, size_t, size_t, size_t, QueryStateBase*, Callback) const;
 };
 //*************************************************************************************
 // Finding code                                                                       *
@@ -341,10 +345,6 @@ template <class cond, size_t bitwidth, class Callback>
 bool ArrayWithFind::find_optimized(int64_t value, size_t start, size_t end, size_t baseindex, QueryStateBase* state,
                                    Callback callback) const
 {
-    // THIS NEEDA TO BE FIXED FOR B ARRAYS IS LIKELY TO BE BROKEN
-    //    if (m_array.is_encoded())
-    //        m_array.decode_array((Array&)m_array);
-
     REALM_ASSERT_DEBUG(start <= m_array.m_size && (end <= m_array.m_size || end == size_t(-1)) && start <= end);
 
     size_t start2 = start;
@@ -355,6 +355,17 @@ bool ArrayWithFind::find_optimized(int64_t value, size_t start, size_t end, size
 
     if (!(m_array.m_size > start2 && start2 < end))
         return true;
+
+    // Note:
+    //      For encoded arrays, we are going to skip all these and tap directly into a straight find.
+    //      It is unclear at this stage how much performace we are loosing, we will need to
+    //      a) evaluate how ofter the vectorization part of this code is hit in procution
+    //      b) add or run the benchmarks that are testing this part of the code and do some comparison
+    //
+
+    if (m_array.is_encoded()) {
+        return find_encoded_array(c, value, start2, end, baseindex, state, callback);
+    }
 
     constexpr int64_t lbound = Array::lbound_for_width(bitwidth);
     constexpr int64_t ubound = Array::ubound_for_width(bitwidth);
@@ -1070,6 +1081,26 @@ bool ArrayWithFind::compare_relation(int64_t value, size_t start, size_t end, si
                 return false;
         }
         ++start;
+    }
+    return true;
+}
+
+template <class Cond, class Callback>
+bool ArrayWithFind::find_encoded_array(Cond& c, int64_t value, size_t start, size_t end, size_t baseindex,
+                                       QueryStateBase* state, Callback callback) const
+{
+    // this is not optised. just fetch all the values from the array and apply the cond.
+    // it can be optimised later, for example avoid to fetch all the values from the encoded array
+    // and apply the cond predicate, + can we used binary seatch here? Likely yes.
+    ArrayEncode& encode = m_array.m_encode;
+    const auto& values = encode.find_all(m_array, value, start, end);
+    bool ret = false;
+    for (const auto& v : values) {
+        if (c(v, value)) {
+            if (REALM_UNLIKELY(!ret)) // this is false only the fist time, it can be skipped all the other times.
+                ret = true;
+            find_action(start + baseindex, v, state, callback);
+        }
     }
     return true;
 }

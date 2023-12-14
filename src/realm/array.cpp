@@ -361,7 +361,7 @@ size_t Array::get_byte_size() const noexcept
     auto read_only = m_alloc.is_read_only(m_ref) == true;
     auto bytes_ok = num_bytes <= get_capacity_from_header(header);
     REALM_ASSERT(read_only || bytes_ok);
-    // REALM_ASSERT_7(m_alloc.is_read_only(m_ref), ==, true, ||, num_bytes, <=, get_capacity_from_header(header));
+    REALM_ASSERT_7(m_alloc.is_read_only(m_ref), ==, true, ||, num_bytes, <=, get_capacity_from_header(header));
     return num_bytes;
 }
 
@@ -864,6 +864,7 @@ int64_t Array::sum(size_t start, size_t end) const
 {
     if (end == size_t(-1))
         end = m_size;
+
     REALM_ASSERT_EX(end <= m_size && start <= end, start, end, m_size);
 
     if (is_encoded())
@@ -1027,7 +1028,8 @@ int64_t Array::sum(size_t start, size_t end) const
 
 size_t Array::count(int64_t value) const noexcept
 {
-    // This is not used
+    // This is not used anywhere in the code, I believe we can delete this
+    // since the query logic does not use this
     const uint64_t* next = reinterpret_cast<uint64_t*>(m_data);
     size_t value_count = 0;
     const size_t end = m_size;
@@ -1356,9 +1358,6 @@ MemRef Array::create(Type type, bool context_flag, WidthType width_type, size_t 
 template <class cond, size_t bitwidth>
 bool Array::find_vtable(int64_t value, size_t start, size_t end, size_t baseindex, QueryStateBase* state) const
 {
-    // NOT OK
-    if (is_encoded())
-        decode_array((Array&)*this);
     return ArrayWithFind(*this).find_optimized<cond, bitwidth>(value, start, end, baseindex, state, nullptr);
 }
 
@@ -1635,6 +1634,8 @@ size_t Array::find_first(int64_t value, size_t start, size_t end) const
 
 int_fast64_t Array::get(const char* header, size_t ndx) noexcept
 {
+    auto sz = get_size_from_header(header);
+    REALM_ASSERT(ndx < sz);
     if (NodeHeader::get_kind(header) == 'B') {
         REALM_ASSERT(NodeHeader::get_encoding(header) == NodeHeader::Encoding::Flex);
         return ArrayFlex::get(header, ndx);

@@ -285,14 +285,14 @@ bool inline ArrayFlex::get_encode_info(const char* header, size_t& v_width, size
 
 std::vector<int64_t> ArrayFlex::fetch_signed_values_from_encoded_array(const Array& arr, size_t v_width,
                                                                        size_t ndx_width, size_t v_size,
-                                                                       size_t ndx_size) const
+                                                                       size_t ndx_size, size_t ndx_begin) const
 {
     std::vector<int64_t> values;
     values.reserve(ndx_size);
     auto data = (uint64_t*)NodeHeader::get_data_from_header(arr.get_header());
     const auto offset = v_size * v_width;
     bf_iterator index_iterator{data, offset, ndx_width, ndx_width, 0};
-    for (size_t i = 0; i < ndx_size; ++i) {
+    for (size_t i = ndx_begin; i < ndx_size; ++i) {
         const auto index = index_iterator.get_value();
         bf_iterator it_value{data, index * v_width, v_width, v_width, 0};
         const auto value = it_value.get_value();
@@ -305,14 +305,14 @@ std::vector<int64_t> ArrayFlex::fetch_signed_values_from_encoded_array(const Arr
 
 std::vector<uint64_t> ArrayFlex::fetch_unsigned_values_from_encoded_array(const Array& arr, size_t v_width,
                                                                           size_t ndx_width, size_t v_size,
-                                                                          size_t ndx_size) const
+                                                                          size_t ndx_size, size_t ndx_begin) const
 {
     std::vector<uint64_t> values;
     values.reserve(ndx_size);
     auto data = (uint64_t*)NodeHeader::get_data_from_header(arr.get_header());
     const auto offset = v_size * v_width;
     bf_iterator index_iterator{data, offset, ndx_width, ndx_width, 0};
-    for (size_t i = 0; i < ndx_size; ++i) {
+    for (size_t i = ndx_begin; i < ndx_size; ++i) {
         const auto index = index_iterator.get_value();
         bf_iterator it_value{data, index * v_width, v_width, v_width, 0};
         const auto value = it_value.get_value();
@@ -394,6 +394,18 @@ void ArrayFlex::restore_array(Array& arr, const std::vector<int64_t>& values) co
     size_t w = arr.get_width();
     REALM_ASSERT(w == 0 || w == 1 || w == 2 || w == 4 || w == 8 || w == 16 || w == 32 || w == 64);
     REALM_ASSERT(arr.size() == values.size());
+}
+
+std::vector<int64_t> ArrayFlex::find_all(const Array& arr, int64_t, size_t start, size_t end) const
+{
+    REALM_ASSERT(arr.is_attached());
+    size_t v_width, ndx_width, v_size, ndx_size;
+    if (get_encode_info(arr.get_header(), v_width, ndx_width, v_size, ndx_size)) {
+        // TODO optimize this.
+        REALM_ASSERT(start < ndx_size && end <= ndx_size);
+        return fetch_signed_values_from_encoded_array(arr, v_width, ndx_width, v_size, end, start);
+    }
+    REALM_UNREACHABLE();
 }
 
 size_t ArrayFlex::find_first(const Array& arr, int64_t value) const
