@@ -129,6 +129,7 @@ enum class SyncClientHookEvent {
     BootstrapMessageProcessed,
     BootstrapProcessed,
     ErrorMessageReceived,
+    BootstrapBatchAboutToProcess,
 };
 
 enum class SyncClientHookAction {
