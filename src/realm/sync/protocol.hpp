@@ -50,7 +50,7 @@ namespace sync {
 //   11 Support for FLX schema migrations
 //      Update BIND message to send information to the server about the schema
 //      version a synchronized realm is opened with
-//      Update JSON_ERROR message to read the previous schema version sent by 
+//      Update JSON_ERROR message to read the previous schema version sent by
 //      the server
 //
 //  XX Changes:

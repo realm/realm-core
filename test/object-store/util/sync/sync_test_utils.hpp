@@ -145,9 +145,9 @@ TestSyncManager::Config get_config(Transport&& transport)
 
 void subscribe_to_all_and_bootstrap(Realm& realm);
 
-void wait_for_sessions_to_close(const TestAppSession& test_app_session);
-
 #if REALM_ENABLE_AUTH_TESTS
+
+void wait_for_sessions_to_close(const TestAppSession& test_app_session);
 
 #ifdef REALM_MONGODB_ENDPOINT
 std::string get_base_url();
