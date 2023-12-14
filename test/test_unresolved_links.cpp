@@ -397,17 +397,21 @@ TEST(Unresolved_MixedIndexed)
     auto table = group.add_table_with_primary_key("table", type_UUID, "_id", true);
     auto mixed_col = table->add_column(type_Mixed, "mixed", true);
     table->add_search_index(mixed_col);
-
-    UUID pk2;
+    UUID pk2("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
     {
         auto src_obj = table->create_object_with_primary_key(Mixed{});
         auto dst_obj = table->create_object_with_primary_key(pk2);
         CHECK_EQUAL(src_obj.get<Mixed>(mixed_col), Mixed{});
         src_obj.set<Mixed>(mixed_col, Mixed{ObjLink{table->get_key(), dst_obj.get_key()}});
         dst_obj.set<Mixed>(mixed_col, Mixed{ObjLink{table->get_key(), src_obj.get_key()}});
+        auto obj_key = table->query("mixed = null").find();
+        CHECK_NOT(obj_key);
         table->invalidate_object(dst_obj.get_key());
         CHECK_EQUAL(table->size(), 1);
         auto unresolved_obj_key = table->get_objkey_from_primary_key(pk2);
+        // Unresolved links should appear as nulls
+        obj_key = table->query("mixed = null").find();
+        CHECK_EQUAL(obj_key, src_obj.get_key());
         CHECK(unresolved_obj_key.is_unresolved());
     }
 
@@ -420,6 +424,9 @@ TEST(Unresolved_MixedIndexed)
         CHECK(src_obj);
         Mixed expected{ObjLink{table->get_key(), obj_resurrected.get_key()}};
         CHECK_EQUAL(src_obj.get<Mixed>(mixed_col), expected);
+        // Resurrected object does not have a link"
+        auto obj_key = table->query("mixed = null").find();
+        CHECK_EQUAL(obj_key, obj_resurrected.get_key());
     }
 }
 

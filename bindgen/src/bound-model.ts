@@ -73,7 +73,7 @@ abstract class TypeBase {
     while (self.is("Const") || self.is("Ref") || self.is("RRef")) {
       self = self.type;
     }
-    return self;
+    return self as Exclude<Type, Const | Ref | RRef>;
   }
 }
 
