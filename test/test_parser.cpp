@@ -1473,7 +1473,7 @@ TEST(Parser_substitution)
 
     std::any args[] = {Int(2), Double(2.25), String("oe"), realm::null{}, Bool(true), Timestamp(1512130073, 505),
                        bd0,    Float(2.33),  obj_keys[0],  Int(3),        Int(4),     Bool(false)};
-    size_t num_args = 12;
+    size_t num_args = 13;
     verify_query_sub(test_context, t, "age > $0", args, num_args, 2);
     verify_query_sub(test_context, t, "age > $0 || fees == $1", args, num_args, 3);
     verify_query_sub(test_context, t, "name CONTAINS[c] $2", args, num_args, 2);
@@ -3911,10 +3911,13 @@ TEST(Parser_OperatorIN)
                                      ObjKey{},
                                      ObjLink{t->get_key(), people_keys[0]}};
     std::vector<Mixed> empty_list = {};
-    util::Any args[] = {realm::null(), int_list, strings_list, mixed_list, empty_list};
-    size_t num_args = 5;
+    util::Any args[] = {realm::null(),          int_list, strings_list, mixed_list, empty_list, String("customer_id"),
+                        String("fav_item.name")};
+    size_t num_args = 7;
     verify_query_sub(test_context, t, "customer_id IN $1", args, num_args, 3);
+    verify_query_sub(test_context, t, "$P5 IN $1", args, num_args, 3);
     verify_query_sub(test_context, t, "fav_item.name IN $2", args, num_args, 2);
+    verify_query_sub(test_context, t, "$P6 IN $2", args, num_args, 2);
     verify_query_sub(test_context, t, "fav_item.name IN $3", args, num_args, 0);
     verify_query_sub(test_context, t, "fav_item.name IN $4", args, num_args, 0);
     verify_query_sub(test_context, t, "customer_id IN ANY $1", args, num_args, 3);

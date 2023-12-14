@@ -278,12 +278,17 @@ private:
 
 class PathNode : public ParserNode {
 public:
+    struct ArgTag {};
     Path path_elems;
     Path::iterator current_path_elem;
 
     PathNode(const PathElement& first)
     {
         add_element(first);
+    }
+    PathNode(const std::string& arg_str, ArgTag)
+        : arg(arg_str)
+    {
     }
     bool at_end() const
     {
@@ -298,6 +303,7 @@ public:
         return path_elems.back().get_key();
     }
 
+    void resolve_arg(ParserDriver*);
     LinkChain visit(ParserDriver*, util::Optional<ExpressionComparisonType> = util::none);
     void add_element(const PathElement& elem)
     {
@@ -332,6 +338,7 @@ public:
     }
 
 private:
+    std::string arg;
     std::string backlink_str;
     int backlink = 0;
 };
@@ -664,6 +671,7 @@ public:
     }
 
     PathElement get_arg_for_index(const std::string&);
+    std::string get_arg_for_key_path(const std::string& i);
     double get_arg_for_coordinate(const std::string&);
 
     template <class T>
