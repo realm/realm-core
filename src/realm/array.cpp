@@ -736,9 +736,7 @@ bool Array::encode_array(Array& arr) const
 
 bool Array::decode_array(Array& arr)
 {
-    // Decode array must set capacity correctly!
     const auto header = arr.get_header();
-
     auto kind = NodeHeader::get_kind(header);
     // if it is encoded and it is in flex format decode all
     if (kind == 'B') {

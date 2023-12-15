@@ -47,12 +47,7 @@ inline uint8_t ArrayUnsigned::bit_width(uint64_t value)
 inline void ArrayUnsigned::_set(size_t ndx, uint8_t width, uint64_t value)
 {
     if (is_encoded()) {
-        Array::decode_array(*this);
-        set_width(get_width_from_header(get_header()));
-        REALM_ASSERT(get_kind(get_header()) == 'A');
-        REALM_ASSERT(m_width >= m_lbound);
-        REALM_ASSERT(m_width <= m_ubound);
-        REALM_ASSERT(m_lbound <= m_ubound);
+        m_encode.set_direct(*this, ndx, value);
     }
     if (width == 8) {
         reinterpret_cast<uint8_t*>(m_data)[ndx] = uint8_t(value);

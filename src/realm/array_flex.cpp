@@ -370,7 +370,7 @@ void ArrayFlex::restore_array(Array& arr, const std::vector<int64_t>& values) co
     size_t width = 1;
     while (width < max_bit)
         width *= 2;
-    REALM_ASSERT(width >= 0 && width <= 64);
+    REALM_ASSERT(width <= 64);
     REALM_ASSERT(width == 0 || width == 1 || width == 2 || width == 4 || width == 8 || width == 16 || width == 32 ||
                  width == 64);
 
