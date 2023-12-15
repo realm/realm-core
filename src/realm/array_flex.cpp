@@ -487,9 +487,9 @@ uint64_t ArrayFlex::get_unsigned(const Array& arr, size_t ndx, size_t& v_width) 
             return realm::not_found;
 
         auto data = (uint64_t*)NodeHeader::get_data_from_header(arr.get_header());
-        const auto offset = (v_size * v_width) + (ndx * ndx_width);
-        const auto index = read_bitfield(data, offset, ndx_width);
-        bf_iterator it_value{data, 0, v_width, v_width, index};
+        const uint64_t offset = v_size * v_width;
+        bf_iterator it_index{data, offset + (ndx * ndx_width), ndx_width, ndx_size, 0};
+        bf_iterator it_value{data, v_width * it_index.get_value(), v_width, v_width, 0};
         const auto v = it_value.get_value();
         return v;
     }

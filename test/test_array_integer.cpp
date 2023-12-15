@@ -298,9 +298,10 @@ TEST(Test_ArrayInt_compress_data_init_from_mem)
     CHECK(a1.get(5) == 16388);
     CHECK(a1.get(6) == 20);
     CHECK(a1.try_decode());
-    // a1 is now in charge of destroying the memory
+    a.destroy();
     a1.destroy();
     a2.destroy();
+    CHECK_NOT(a.is_attached());
     CHECK_NOT(a1.is_attached());
     CHECK_NOT(a2.is_attached());
 }
