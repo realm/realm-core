@@ -321,7 +321,7 @@ TEST(Alloc_Fuzzy)
     }
 }
 
-#if 0
+
 /*
     This test is disabled because it indirectly makes assumptions about the content of
     uninitialized memory.
@@ -337,7 +337,7 @@ TEST(Alloc_Fuzzy)
 
     Otherwise the test is important and need to be enabled again at some point.
 */
-// NONCONCURRENT_TEST_IF(Alloc_MapFailureRecovery, _impl::SimulatedFailure::is_enabled())
+NONCONCURRENT_TEST_IF(Alloc_MapFailureRecovery, _impl::SimulatedFailure::is_enabled())
 {
     GROUP_TEST_PATH(path);
 
@@ -385,7 +385,7 @@ TEST(Alloc_Fuzzy)
     { // Extendind the first mapping
         const auto initial_baseline = alloc.get_baseline();
         const auto initial_version = alloc.get_mapping_version();
-        const char* initial_translated = alloc.translate(1000);
+        const char* initial_translated = alloc.translate_in_slab(1000);
 
         _impl::SimulatedFailure::prime_mmap([](size_t) {
             return true;
@@ -396,7 +396,7 @@ TEST(Alloc_Fuzzy)
         CHECK_THROW(alloc.update_reader_view(page_size * 2), std::bad_alloc);
         CHECK_EQUAL(initial_baseline, alloc.get_baseline());
         CHECK_EQUAL(initial_version, alloc.get_mapping_version());
-        CHECK_EQUAL(initial_translated, alloc.translate(1000));
+        CHECK_EQUAL(initial_translated, alloc.translate_in_slab(1000));
 
         _impl::SimulatedFailure::prime_mmap(nullptr);
         alloc.get_file().resize(page_size * 2);
@@ -420,7 +420,7 @@ TEST(Alloc_Fuzzy)
     { // Add a new complete section after a complete section
         const auto initial_baseline = alloc.get_baseline();
         const auto initial_version = alloc.get_mapping_version();
-        const char* initial_translated = alloc.translate(1000);
+        const char* initial_translated = alloc.translate_in_slab(1000);
 
         _impl::SimulatedFailure::prime_mmap([](size_t) {
             return true;
@@ -429,14 +429,14 @@ TEST(Alloc_Fuzzy)
         CHECK_THROW(alloc.update_reader_view(section_size * 2), std::bad_alloc);
         CHECK_EQUAL(initial_baseline, alloc.get_baseline());
         CHECK_EQUAL(initial_version, alloc.get_mapping_version());
-        CHECK_EQUAL(initial_translated, alloc.translate(1000));
+        CHECK_EQUAL(initial_translated, alloc.translate_in_slab(1000));
 
         _impl::SimulatedFailure::prime_mmap(nullptr);
         alloc.update_reader_view(section_size * 2);
         CHECK_EQUAL(alloc.get_baseline(), section_size * 2);
-        CHECK_EQUAL(initial_version, alloc.get_mapping_version()); // did not alter an existing mapping
-        CHECK_EQUAL(initial_translated, alloc.translate(1000));    // first section was not remapped
-        CHECK_EQUAL(0, *alloc.translate(section_size * 2 - page_size));
+        CHECK_EQUAL(initial_version, alloc.get_mapping_version());      // did not alter an existing mapping
+        CHECK_EQUAL(initial_translated, alloc.translate_in_slab(1000)); // first section was not remapped
+        CHECK_EQUAL(0, *alloc.translate_in_slab(section_size * 2 - page_size));
 
         alloc.purge_old_mappings(4, 4);
     }
@@ -446,8 +446,8 @@ TEST(Alloc_Fuzzy)
     { // Add complete section and a a partial section after that
         const auto initial_baseline = alloc.get_baseline();
         const auto initial_version = alloc.get_mapping_version();
-        const char* initial_translated_1 = alloc.translate(1000);
-        const char* initial_translated_2 = alloc.translate(section_size + 1000);
+        const char* initial_translated_1 = alloc.translate_in_slab(1000);
+        const char* initial_translated_2 = alloc.translate_in_slab(section_size + 1000);
 
         _impl::SimulatedFailure::prime_mmap([](size_t size) {
             // Let the first allocation succeed and only the second one fail
@@ -457,21 +457,21 @@ TEST(Alloc_Fuzzy)
         CHECK_THROW(alloc.update_reader_view(section_size * 3 + page_size), std::bad_alloc);
         CHECK_EQUAL(initial_baseline, alloc.get_baseline());
         CHECK_EQUAL(initial_version, alloc.get_mapping_version());
-        CHECK_EQUAL(initial_translated_1, alloc.translate(1000));
-        CHECK_EQUAL(initial_translated_2, alloc.translate(section_size + 1000));
+        CHECK_EQUAL(initial_translated_1, alloc.translate_in_slab(1000));
+        CHECK_EQUAL(initial_translated_2, alloc.translate_in_slab(section_size + 1000));
 
         _impl::SimulatedFailure::prime_mmap(nullptr);
         alloc.update_reader_view(section_size * 3 + page_size);
         CHECK_EQUAL(alloc.get_baseline(), section_size * 3 + page_size);
         CHECK_EQUAL(initial_version, alloc.get_mapping_version()); // did not alter an existing mapping
-        CHECK_EQUAL(initial_translated_1, alloc.translate(1000));
-        CHECK_EQUAL(initial_translated_2, alloc.translate(section_size + 1000));
-        CHECK_EQUAL(0, *alloc.translate(section_size * 2 + 1000));
+        CHECK_EQUAL(initial_translated_1, alloc.translate_in_slab(1000));
+        CHECK_EQUAL(initial_translated_2, alloc.translate_in_slab(section_size + 1000));
+        CHECK_EQUAL(0, *alloc.translate_in_slab(section_size * 2 + 1000));
 
         alloc.purge_old_mappings(5, 5);
     }
 }
-#endif
+
 
 // This test reproduces the sporadic issue that was seen for large refs (addresses)
 // on 32-bit iPhone 5 Simulator runs on certain host machines.
