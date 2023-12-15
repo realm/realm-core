@@ -1616,7 +1616,8 @@ TEST(B_Array_creation)
 {
     using Encoding = NodeHeader::Encoding;
     Array array(Allocator::get_default());
-    auto mem = array.get_alloc().alloc(10);
+    auto& allocator = array.get_alloc();
+    auto mem = allocator.alloc(10);
     NodeHeader::init_header(mem.get_addr(), 'B', Encoding::Flex, 14, 1, 1, 1, 1);
     array.init_from_mem(mem);
     auto array_header = array.get_header();
@@ -1634,6 +1635,7 @@ TEST(B_Array_creation)
     CHECK_EQUAL(flags, 11);
     CHECK_EQUAL(array.get_kind(array_header), 'B');
     REALM_ASSERT(array.get_encoding(array_header) == Encoding::Flex);
+    allocator.free_(mem);
 }
 
 TEST(B_Array_encoding)
@@ -1654,6 +1656,8 @@ TEST(B_Array_encoding)
     CHECK_EQUAL(another_array.get_kind(another_header), 'B');
     auto another_encoding = another_array.get_encoding(another_header);
     CHECK(encoding == another_encoding);
+    
+    array.get_alloc().free_(mem);
 }
 
 #endif // TEST_ARRAY
