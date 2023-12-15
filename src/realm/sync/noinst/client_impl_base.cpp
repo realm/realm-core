@@ -1491,6 +1491,9 @@ void Session::cancel_resumption_delay()
         initiate_rebind(); // Throws
 
     m_conn.one_more_active_unsuspended_session(); // Throws
+    if (m_try_again_activation_timer) {
+        m_try_again_activation_timer.reset();
+    }
 
     on_resumed(); // Throws
 }
@@ -1892,6 +1895,8 @@ void Session::send_bind_message()
     m_conn.initiate_write_message(out, this); // Throws
 
     m_bind_message_sent = true;
+    call_debug_hook(SyncClientHookEvent::BindMessageSent, m_progress, m_last_sent_flx_query_version,
+                    DownloadBatchState::SteadyState, 0);
 
     // Ready to send the IDENT message if the file identifier pair is already
     // available.
@@ -2566,6 +2571,7 @@ void Session::suspend(const SessionErrorInfo& info)
     // Notify the application of the suspension of the session if the session is
     // still in the Active state
     if (m_state == Active) {
+        call_debug_hook(SyncClientHookEvent::SessionSuspended, info);
         m_conn.one_less_active_unsuspended_session(); // Throws
         on_suspended(info);                           // Throws
     }
