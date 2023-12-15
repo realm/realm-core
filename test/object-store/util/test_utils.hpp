@@ -39,15 +39,17 @@ public:
     {
     }
 
-    E transition(E from, E to)
+    template <typename Func>
+    void transition_with(Func&& func)
     {
         std::lock_guard lock{m_mutex};
-        if (m_cur_state != from) {
-            return m_cur_state;
+        std::optional<E> new_state = func(m_cur_state);
+        if (!new_state) {
+            return;
         }
-        m_cur_state = to;
+
+        m_cur_state = *new_state;
         m_cv.notify_one();
-        return from;
     }
 
     void wait_for(E target)
