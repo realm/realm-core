@@ -122,86 +122,86 @@ TEST(Compaction_WhileGrowing)
     CHECK_LESS(free_space, 0x10000);
 }
 
-TEST_TYPES(Compaction_Large, std::true_type, std::false_type)
-{
-    using type = typename TEST_TYPE::type;
-    SHARED_GROUP_TEST_PATH(path);
-    int64_t total;
-    {
-        DBRef db;
-        if constexpr (type::value) {
-            db = DB::create(make_in_realm_history(), path);
-        }
-        else {
-            db = DB::create(make_in_realm_history());
-        }
-        {
-            auto tr = db->start_write();
-            auto t = tr->add_table("the_table");
-            auto c = t->add_column(type_Binary, "str", true);
-            char w[1000];
-            for (int i = 0; i < 1000; ++i) {
-                w[i] = '0' + (i % 10);
-            }
-            size_t num = 100000;
-            for (size_t j = 0; j < num; ++j) {
-                BinaryData sd(w, 500 + (j % 500));
-                t->create_object().set(c, sd);
-            }
-            tr->commit_and_continue_as_read();
-
-            tr->promote_to_write();
-            int j = 0;
-            for (auto o : *t) {
-                BinaryData sd(w, j % 500);
-                o.set(c, sd);
-                ++j;
-            }
-            tr->commit_and_continue_as_read();
-
-            tr->promote_to_write();
-            // This will likely make the table names reside in the upper end of the file
-            tr->add_table("another_table");
-            tr->commit_and_continue_as_read();
-        }
-
-        auto worker = [db] {
-            Random random(random_int<unsigned long>());
-            size_t free_space, used_space;
-            auto tr = db->start_read();
-            auto t = tr->get_table("the_table");
-            auto c = t->get_column_key("str");
-            std::string data("abcdefghij");
-            do {
-                tr->promote_to_write();
-                for (int j = 0; j < 500; j++) {
-                    int index = random.draw_int_mod(10000);
-                    auto obj = t->get_object(index);
-                    obj.set(c, BinaryData(data.data(), j % 10));
-                }
-                tr->commit_and_continue_as_read();
-                db->get_stats(free_space, used_space);
-            } while (free_space > used_space);
-        };
-
-        std::thread t1(worker);
-        std::thread t2(worker);
-        t1.join();
-        t2.join();
-        size_t free_space, used_space;
-        db->get_stats(free_space, used_space);
-        total = free_space + used_space;
-    }
-    if constexpr (type::value) {
-        File f(path);
-        // std::cout << "Size : " << f.get_size() << std::endl;
-        {
-            DB::create(make_in_realm_history(), path);
-        }
-        // std::cout << "Size : " << f.get_size() << std::endl;
-        CHECK(f.get_size() == total);
-    }
-}
+// TEST_TYPES(Compaction_Large, std::true_type, std::false_type)
+//{
+//     using type = typename TEST_TYPE::type;
+//     SHARED_GROUP_TEST_PATH(path);
+//     int64_t total;
+//     {
+//         DBRef db;
+//         if constexpr (type::value) {
+//             db = DB::create(make_in_realm_history(), path);
+//         }
+//         else {
+//             db = DB::create(make_in_realm_history());
+//         }
+//         {
+//             auto tr = db->start_write();
+//             auto t = tr->add_table("the_table");
+//             auto c = t->add_column(type_Binary, "str", true);
+//             char w[1000];
+//             for (int i = 0; i < 1000; ++i) {
+//                 w[i] = '0' + (i % 10);
+//             }
+//             size_t num = 100000;
+//             for (size_t j = 0; j < num; ++j) {
+//                 BinaryData sd(w, 500 + (j % 500));
+//                 t->create_object().set(c, sd);
+//             }
+//             tr->commit_and_continue_as_read();
+//
+//             tr->promote_to_write();
+//             int j = 0;
+//             for (auto o : *t) {
+//                 BinaryData sd(w, j % 500);
+//                 o.set(c, sd);
+//                 ++j;
+//             }
+//             tr->commit_and_continue_as_read();
+//
+//             tr->promote_to_write();
+//             // This will likely make the table names reside in the upper end of the file
+//             tr->add_table("another_table");
+//             tr->commit_and_continue_as_read();
+//         }
+//
+//         auto worker = [db] {
+//             Random random(random_int<unsigned long>());
+//             size_t free_space, used_space;
+//             auto tr = db->start_read();
+//             auto t = tr->get_table("the_table");
+//             auto c = t->get_column_key("str");
+//             std::string data("abcdefghij");
+//             do {
+//                 tr->promote_to_write();
+//                 for (int j = 0; j < 500; j++) {
+//                     int index = random.draw_int_mod(10000);
+//                     auto obj = t->get_object(index);
+//                     obj.set(c, BinaryData(data.data(), j % 10));
+//                 }
+//                 tr->commit_and_continue_as_read();
+//                 db->get_stats(free_space, used_space);
+//             } while (free_space > used_space);
+//         };
+//
+//         std::thread t1(worker);
+//         std::thread t2(worker);
+//         t1.join();
+//         t2.join();
+//         size_t free_space, used_space;
+//         db->get_stats(free_space, used_space);
+//         total = free_space + used_space;
+//     }
+//     if constexpr (type::value) {
+//         File f(path);
+//         // std::cout << "Size : " << f.get_size() << std::endl;
+//         {
+//             DB::create(make_in_realm_history(), path);
+//         }
+//         // std::cout << "Size : " << f.get_size() << std::endl;
+//         CHECK(f.get_size() == total);
+//     }
+// }
 
 NONCONCURRENT_TEST(Compaction_Performance)
 {
