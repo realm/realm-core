@@ -47,10 +47,9 @@ inline uint8_t ArrayUnsigned::bit_width(uint64_t value)
 inline void ArrayUnsigned::_set(size_t ndx, uint8_t width, uint64_t value)
 {
     if (is_encoded()) {
-        REALM_ASSERT(get_kind(get_header()) == 'B');
         Array::decode_array(*this);
-        REALM_ASSERT(get_kind(get_header()) == 'A');
         set_width(get_width_from_header(get_header()));
+        REALM_ASSERT(get_kind(get_header()) == 'A');
         REALM_ASSERT(m_width >= m_lbound);
         REALM_ASSERT(m_width <= m_ubound);
         REALM_ASSERT(m_lbound <= m_ubound);
@@ -200,14 +199,13 @@ void ArrayUnsigned::insert(size_t ndx, uint64_t value)
     // Array unsigned implements its owm methods for doing insertion (expanding, etc) and many other APIs
     // we should aim at unifying as much as possible the interface, in order to avoid to scatter the
     // compression/decompression logic all over the code.
-
-    bool requires_copy_on_write = true;
     if (is_encoded()) {
-        copy_on_write();
-        // TODO: this smells like we have some bug when we decompress the array and call init_from_mem.
-        m_width = get_width_from_header(get_header());
-        m_ubound = uint64_t(-1) >> (64 - m_width);
-        requires_copy_on_write = false;
+        decode_array(*this);
+        set_width(get_width_from_header(get_header()));
+        REALM_ASSERT(get_kind(get_header()) == 'A');
+        REALM_ASSERT(m_width >= m_lbound);
+        REALM_ASSERT(m_width <= m_ubound);
+        REALM_ASSERT(m_lbound <= m_ubound);
     }
 
     REALM_ASSERT_DEBUG(m_width >= 8);
@@ -220,8 +218,7 @@ void ArrayUnsigned::insert(size_t ndx, uint64_t value)
     REALM_ASSERT_DEBUG(ndx <= m_size);
 
     // Check if we need to copy before modifying
-    if (requires_copy_on_write)
-        copy_on_write();          // Throws
+    copy_on_write();              // Throws
     alloc(m_size + 1, new_width); // Throws
 
     // Move values above insertion (may expand)
@@ -258,19 +255,18 @@ void ArrayUnsigned::insert(size_t ndx, uint64_t value)
 
 void ArrayUnsigned::erase(size_t ndx)
 {
-    bool requires_copy_on_write = true;
     if (is_encoded()) {
-        copy_on_write();
-        requires_copy_on_write = false;
+        Array::decode_array(*this);
+        set_width(get_width_from_header(get_header()));
+        REALM_ASSERT(get_kind(get_header()) == 'A');
+        REALM_ASSERT(m_width >= m_lbound);
+        REALM_ASSERT(m_width <= m_ubound);
+        REALM_ASSERT(m_lbound <= m_ubound);
     }
 
-    // TODO: this smells like we have some bug when we decompress the array and call init_from_mem.
-    m_width = get_width_from_header(get_header());
-    m_ubound = uint64_t(-1) >> (64 - m_width);
     REALM_ASSERT_DEBUG(m_width >= 8);
 
-    if (requires_copy_on_write)
-        copy_on_write(); // Throws
+    copy_on_write(); // Throws
 
     size_t w = m_width >> 3;
 
@@ -293,14 +289,14 @@ uint64_t ArrayUnsigned::get(size_t index) const
 void ArrayUnsigned::set(size_t ndx, uint64_t value)
 {
     if (is_encoded()) {
-        REALM_ASSERT(get_kind(get_header()) == 'B');
         Array::decode_array(*this);
-        REALM_ASSERT(get_kind(get_header()) == 'A');
         set_width(get_width_from_header(get_header()));
+        REALM_ASSERT(get_kind(get_header()) == 'A');
         REALM_ASSERT(m_width >= m_lbound);
         REALM_ASSERT(m_width <= m_ubound);
         REALM_ASSERT(m_lbound <= m_ubound);
     }
+
     REALM_ASSERT_DEBUG(m_width >= 8);
     copy_on_write(); // Throws
 

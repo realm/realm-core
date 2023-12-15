@@ -27,8 +27,6 @@ namespace realm {
 template <class cond, class Callback>
 bool ArrayInteger::find(value_type value, size_t start, size_t end, QueryStateBase* state, Callback callback) const
 {
-    // TODO: handle compressed arrays, right now compressed arrays cannot be queried, this function is very likely
-    // going to crash
     return ArrayWithFind(*this).find<cond, Callback>(value, start, end, 0, state, callback);
 }
 
