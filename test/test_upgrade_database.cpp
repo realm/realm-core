@@ -164,18 +164,20 @@ TEST(Upgrade_Disabled)
 
 TEST(Upgrade_DatabaseWithUnsupportedOldFileFormat)
 {
-    // Not core 6 ... this causes issues.
-    //    std::string path = test_util::get_test_resource_path() + "test_upgrade_database_1000_1.realm";
-    //    CHECK_OR_RETURN(File::exists(path));
-    //
-    //    SHARED_GROUP_TEST_PATH(temp_copy);
-    //    File::copy(path, temp_copy);
-    //
-    //    // Should fail to upgrade because it's too old
-    //    CHECK_THROW(DB::create(temp_copy), UnsupportedFileFormatVersion);
-    //
-    //    // Verify that we didn't modify the input file
-    //    compare_files(test_context, path, temp_copy);
+#if 0
+    //Not core 6, thus kind is not set. And assetion is triggered.
+    std::string path = test_util::get_test_resource_path() + "test_upgrade_database_1000_1.realm";
+    CHECK_OR_RETURN(File::exists(path));
+    
+    SHARED_GROUP_TEST_PATH(temp_copy);
+    File::copy(path, temp_copy);
+    
+    // Should fail to upgrade because it's too old
+    CHECK_THROW(DB::create(temp_copy), UnsupportedFileFormatVersion);
+    
+    // Verify that we didn't modify the input file
+    compare_files(test_context, path, temp_copy);
+#endif
 }
 
 NONCONCURRENT_TEST(Upgrade_DatabaseWithUnsupportedNewFileFormat)
@@ -485,19 +487,21 @@ TEST_IF(Upgrade_Database_8_9, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZ
 
 TEST(Upgrade_Database_6_10)
 {
-    // Ignore this test for now!!
-    //    std::string path = test_util::get_test_resource_path() + "test_upgrade_database_6.realm";
-    //    CHECK_OR_RETURN(File::exists(path));
-    //
-    //    SHARED_GROUP_TEST_PATH(temp_copy);
-    //
-    //    // Make a copy of the database so that we keep the original file intact and unmodified
-    //    File::copy(path, temp_copy);
-    //    auto hist = make_in_realm_history();
-    //    DBRef sg = DB::create(*hist, temp_copy);
-    //    ReadTransaction rt(sg);
-    //    auto t = rt.get_table("table");
-    //    CHECK(t);
+    // this test is failing because kind is not set to 'A' in the node header.
+#if 0
+    std::string path = test_util::get_test_resource_path() + "test_upgrade_database_6.realm";
+    CHECK_OR_RETURN(File::exists(path));
+    
+    SHARED_GROUP_TEST_PATH(temp_copy);
+    
+    // Make a copy of the database so that we keep the original file intact and unmodified
+    File::copy(path, temp_copy);
+    auto hist = make_in_realm_history();
+    DBRef sg = DB::create(*hist, temp_copy);
+    ReadTransaction rt(sg);
+    auto t = rt.get_table("table");
+    CHECK(t);
+#endif
 }
 
 namespace {

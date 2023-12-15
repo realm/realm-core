@@ -1656,7 +1656,7 @@ TEST(B_Array_encoding)
     CHECK_EQUAL(another_array.get_kind(another_header), 'B');
     auto another_encoding = another_array.get_encoding(another_header);
     CHECK(encoding == another_encoding);
-    
+
     array.get_alloc().free_(mem);
 }
 

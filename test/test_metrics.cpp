@@ -848,66 +848,65 @@ TEST(Metrics_TransactionData)
 
 TEST(Metrics_TransactionVersions)
 {
-    // This test hangs...
-    //    SHARED_GROUP_TEST_PATH(path);
-    //    std::unique_ptr<Replication> hist(make_in_realm_history());
-    //    DBOptions options(crypt_key());
-    //    options.enable_metrics = true;
-    //    DBRef sg = DB::create(*hist, path, options);
-    //    populate(sg);
-    //    const size_t num_writes_while_pinned = 10;
-    //    TableKey tk0;
-    //    TableKey tk1;
-    //    {
-    //        auto rt = sg->start_read();
-    //        auto table_keys = rt->get_table_keys();
-    //        tk0 = table_keys[0];
-    //        tk1 = table_keys[1];
-    //    }
-    //    {
-    //        auto wt = sg->start_write();
-    //        TableRef t0 = wt->get_table(tk0);
-    //        TableRef t1 = wt->get_table(tk1);
-    //        std::vector<ObjKey> keys;
-    //        t0->create_objects(3, keys);
-    //        t1->create_objects(7, keys);
-    //        wt->commit();
-    //    }
-    //    {
-    //        std::unique_ptr<Replication> hist2(make_in_realm_history());
-    //        DBRef sg2 = DB::create(*hist2, path, options);
-    //
-    //        // Pin this version. Note that since this read transaction is against a different shared group
-    //        // it doesn't get tracked in the transaction metrics of the original shared group.
-    //        ReadTransaction rt(sg2);
-    //
-    //        for (size_t i = 0; i < num_writes_while_pinned; ++i) {
-    //            auto wt = sg->start_write();
-    //            TableRef t0 = wt->get_table(tk0);
-    //            t0->create_object();
-    //            wt->commit();
-    //        }
-    //    }
-    //
-    //    std::shared_ptr<Metrics> metrics = sg->get_metrics();
-    //    CHECK(metrics);
-    //
-    //    std::unique_ptr<Metrics::TransactionInfoList> transactions = metrics->take_transactions();
-    //    CHECK(transactions);
-    //    CHECK_EQUAL(metrics->num_transaction_metrics(), 0);
-    //
-    //    CHECK_EQUAL(transactions->size(), 3 + num_writes_while_pinned);
-    //
-    //    CHECK_EQUAL(transactions->at(0).get_num_available_versions(), 2);
-    //    CHECK_EQUAL(transactions->at(1).get_num_available_versions(), 2);
-    //    CHECK_EQUAL(transactions->at(2).get_num_available_versions(), 2);
-    //    CHECK_EQUAL(transactions->at(3).get_num_available_versions(), 2);
-    //
-    //    // from here intermediate versions are reclaimed, leaving us
-    //    // with 3 active versions regardless of the number of commits
-    //    for (size_t i = 1; i < num_writes_while_pinned; ++i) {
-    //        CHECK_EQUAL(transactions->at(3 + i).get_num_available_versions(), 3);
-    //    }
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist(make_in_realm_history());
+    DBOptions options(crypt_key());
+    options.enable_metrics = true;
+    DBRef sg = DB::create(*hist, path, options);
+    populate(sg);
+    const size_t num_writes_while_pinned = 10;
+    TableKey tk0;
+    TableKey tk1;
+    {
+        auto rt = sg->start_read();
+        auto table_keys = rt->get_table_keys();
+        tk0 = table_keys[0];
+        tk1 = table_keys[1];
+    }
+    {
+        auto wt = sg->start_write();
+        TableRef t0 = wt->get_table(tk0);
+        TableRef t1 = wt->get_table(tk1);
+        std::vector<ObjKey> keys;
+        t0->create_objects(3, keys);
+        t1->create_objects(7, keys);
+        wt->commit();
+    }
+    {
+        std::unique_ptr<Replication> hist2(make_in_realm_history());
+        DBRef sg2 = DB::create(*hist2, path, options);
+
+        // Pin this version. Note that since this read transaction is against a different shared group
+        // it doesn't get tracked in the transaction metrics of the original shared group.
+        ReadTransaction rt(sg2);
+
+        for (size_t i = 0; i < num_writes_while_pinned; ++i) {
+            auto wt = sg->start_write();
+            TableRef t0 = wt->get_table(tk0);
+            t0->create_object();
+            wt->commit();
+        }
+    }
+
+    std::shared_ptr<Metrics> metrics = sg->get_metrics();
+    CHECK(metrics);
+
+    std::unique_ptr<Metrics::TransactionInfoList> transactions = metrics->take_transactions();
+    CHECK(transactions);
+    CHECK_EQUAL(metrics->num_transaction_metrics(), 0);
+
+    CHECK_EQUAL(transactions->size(), 3 + num_writes_while_pinned);
+
+    CHECK_EQUAL(transactions->at(0).get_num_available_versions(), 2);
+    CHECK_EQUAL(transactions->at(1).get_num_available_versions(), 2);
+    CHECK_EQUAL(transactions->at(2).get_num_available_versions(), 2);
+    CHECK_EQUAL(transactions->at(3).get_num_available_versions(), 2);
+
+    // from here intermediate versions are reclaimed, leaving us
+    // with 3 active versions regardless of the number of commits
+    for (size_t i = 1; i < num_writes_while_pinned; ++i) {
+        CHECK_EQUAL(transactions->at(3 + i).get_num_available_versions(), 3);
+    }
 }
 
 TEST(Metrics_MaxNumTransactionsIsNotExceeded)
