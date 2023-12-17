@@ -669,7 +669,7 @@ std::shared_ptr<AuditRealmPool> AuditRealmPool::get_pool(std::shared_ptr<SyncUse
                                                          ErrorHandler error_handler) NO_THREAD_SAFETY_ANALYSIS
 {
     struct CachedPool {
-        std::string user_identity;
+        std::string user_id;
         std::string partition_prefix;
         std::string app_id;
         std::weak_ptr<AuditRealmPool> pool;
@@ -685,8 +685,7 @@ std::shared_ptr<AuditRealmPool> AuditRealmPool::get_pool(std::shared_ptr<SyncUse
 
     auto app_id = user->app().lock()->config().app_id;
     auto it = std::find_if(s_pools.begin(), s_pools.end(), [&](auto& pool) {
-        return pool.user_identity == user->identity() && pool.partition_prefix == partition_prefix &&
-               pool.app_id == app_id;
+        return pool.user_id == user->user_id() && pool.partition_prefix == partition_prefix && pool.app_id == app_id;
     });
     if (it != s_pools.end()) {
         if (auto pool = it->pool.lock()) {
@@ -696,7 +695,7 @@ std::shared_ptr<AuditRealmPool> AuditRealmPool::get_pool(std::shared_ptr<SyncUse
 
     auto pool = std::make_shared<AuditRealmPool>(Private(), user, partition_prefix, error_handler, logger, app_id);
     pool->scan_for_realms_to_upload();
-    s_pools.push_back({user->identity(), partition_prefix, app_id, pool});
+    s_pools.push_back({user->user_id(), partition_prefix, app_id, pool});
     return pool;
 }
 

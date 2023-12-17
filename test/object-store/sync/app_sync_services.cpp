@@ -1437,7 +1437,7 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
             auto user = app->current_user();
             REQUIRE(user);
             REQUIRE(app_session.admin_api.verify_access_token(user->access_token(), app_session.server_app_id));
-            app_session.admin_api.disable_user_sessions(app->current_user()->identity(), app_session.server_app_id);
+            app_session.admin_api.disable_user_sessions(app->current_user()->user_id(), app_session.server_app_id);
 
             verify_error_on_sync_with_invalid_refresh_token(user, config);
 
@@ -1446,7 +1446,7 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
             REQUIRE(error.code() == ErrorCodes::UserDisabled);
 
             // admin enables user sessions again which should allow the session to continue
-            app_session.admin_api.enable_user_sessions(user->identity(), app_session.server_app_id);
+            app_session.admin_api.enable_user_sessions(user->user_id(), app_session.server_app_id);
 
             // logging in now works properly
             log_in(app, creds);
@@ -1467,7 +1467,7 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
             SyncTestFile config(app, partition, schema);
             auto user = app->current_user();
             REQUIRE(app_session.admin_api.verify_access_token(user->access_token(), app_session.server_app_id));
-            app_session.admin_api.revoke_user_sessions(user->identity(), app_session.server_app_id);
+            app_session.admin_api.revoke_user_sessions(user->user_id(), app_session.server_app_id);
             // revoking a user session only affects the refresh token, so the access token should still continue to
             // work.
             REQUIRE(app_session.admin_api.verify_access_token(user->access_token(), app_session.server_app_id));
@@ -1500,7 +1500,7 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
             REQUIRE(app->current_user() == anon_user);
             SyncTestFile config(app, partition, schema);
             REQUIRE(app_session.admin_api.verify_access_token(anon_user->access_token(), app_session.server_app_id));
-            app_session.admin_api.revoke_user_sessions(anon_user->identity(), app_session.server_app_id);
+            app_session.admin_api.revoke_user_sessions(anon_user->user_id(), app_session.server_app_id);
             // revoking a user session only affects the refresh token, so the access token should still continue to
             // work.
             REQUIRE(app_session.admin_api.verify_access_token(anon_user->access_token(), app_session.server_app_id));
@@ -1517,19 +1517,19 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
                 REQUIRE(error);
                 REQUIRE(error->reason() ==
                         util::format("Cannot initiate a refresh on user '%1' because the user has been removed",
-                                     anon_user->identity()));
+                                     anon_user->user_id()));
             });
 
             REQUIRE_EXCEPTION(
                 Realm::get_shared_realm(config), ClientUserNotFound,
                 util::format("Cannot start a sync session for user '%1' because this user has been removed.",
-                             anon_user->identity()));
+                             anon_user->user_id()));
         }
 
         SECTION("Opening a Realm with a removed email user results produces an exception") {
             auto creds = create_user_and_log_in(app);
             auto email_user = app->current_user();
-            const std::string user_ident = email_user->identity();
+            const std::string user_id = email_user->user_id();
             REQUIRE(email_user);
             SyncTestFile config(app, partition, schema);
             REQUIRE(email_user->is_logged_in());
@@ -1538,7 +1538,7 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
                 auto r = Realm::get_shared_realm(config);
                 Results dogs = get_dogs(r);
             }
-            app->backing_store()->remove_user(user_ident);
+            app->backing_store()->remove_user(user_id);
             REQUIRE_FALSE(email_user->is_logged_in());
             REQUIRE(email_user->state() == SyncUser::State::Removed);
 
@@ -1546,7 +1546,7 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
             REQUIRE_EXCEPTION(
                 Realm::get_shared_realm(config), ClientUserNotFound,
                 util::format("Cannot start a sync session for user '%1' because this user has been removed.",
-                             user_ident));
+                             user_id));
 
             std::shared_ptr<SyncUser> new_user_instance = log_in(app, creds);
             // the previous instance is still invalid
@@ -1555,7 +1555,7 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
             // but the new instance will work and has the same server issued ident
             REQUIRE(new_user_instance);
             REQUIRE(new_user_instance->is_logged_in());
-            REQUIRE(new_user_instance->identity() == user_ident);
+            REQUIRE(new_user_instance->user_id() == user_id);
             {
                 // sync works again if the same user is logged back in
                 config.sync_config->user = new_user_instance;

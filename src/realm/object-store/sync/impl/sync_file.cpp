@@ -253,21 +253,21 @@ std::string SyncFileManager::get_special_directory(std::string directory_name) c
     return dir_path;
 }
 
-std::string SyncFileManager::user_directory(const std::string& user_identity) const
+std::string SyncFileManager::user_directory(const std::string& user_id) const
 {
-    std::string user_path = get_user_directory_path(user_identity);
+    std::string user_path = get_user_directory_path(user_id);
     util::try_make_dir(user_path);
     return user_path;
 }
 
-void SyncFileManager::remove_user_realms(const std::string& user_identity,
+void SyncFileManager::remove_user_realms(const std::string& user_id,
                                          const std::vector<std::string>& realm_paths) const
 {
     for (auto& path : realm_paths) {
         remove_realm(path);
     }
     // The following is redundant except for apps built before file tracking.
-    std::string user_path = get_user_directory_path(user_identity);
+    std::string user_path = get_user_directory_path(user_id);
     util::try_remove_dir_recursive(user_path);
 }
 
@@ -300,11 +300,10 @@ bool SyncFileManager::copy_realm_file(const std::string& old_path, const std::st
     return true;
 }
 
-bool SyncFileManager::remove_realm(const std::string& user_identity,
-                                   const std::vector<std::string>& legacy_user_identities,
+bool SyncFileManager::remove_realm(const std::string& user_id, const std::vector<std::string>& legacy_user_identities,
                                    const std::string& raw_realm_path, const std::string& partition) const
 {
-    auto existing = get_existing_realm_file_path(user_identity, legacy_user_identities, raw_realm_path, partition);
+    auto existing = get_existing_realm_file_path(user_id, legacy_user_identities, raw_realm_path, partition);
     if (existing) {
         return remove_realm(*existing);
     }
@@ -333,11 +332,11 @@ static bool try_file_remove(const std::string& path) noexcept
 }
 
 util::Optional<std::string>
-SyncFileManager::get_existing_realm_file_path(const std::string& user_identity,
+SyncFileManager::get_existing_realm_file_path(const std::string& user_id,
                                               const std::vector<std::string>& legacy_user_identities,
                                               const std::string& realm_file_name, const std::string& partition) const
 {
-    std::string preferred_name_without_suffix = preferred_realm_path_without_suffix(user_identity, realm_file_name);
+    std::string preferred_name_without_suffix = preferred_realm_path_without_suffix(user_id, realm_file_name);
     if (try_file_exists(preferred_name_without_suffix)) {
         return preferred_name_without_suffix;
     }
@@ -364,7 +363,7 @@ SyncFileManager::get_existing_realm_file_path(const std::string& user_identity,
     // We used to hash the string value of the partition. For compatibility, check that SHA256
     // hash file name exists, and if it does, continue to use it.
     if (!partition.empty()) {
-        std::string hashed_partition_path = legacy_hashed_partition_path(user_identity, partition);
+        std::string hashed_partition_path = legacy_hashed_partition_path(user_id, partition);
         if (try_file_exists(hashed_partition_path)) {
             return hashed_partition_path;
         }
@@ -386,12 +385,11 @@ SyncFileManager::get_existing_realm_file_path(const std::string& user_identity,
     return util::none;
 }
 
-std::string SyncFileManager::realm_file_path(const std::string& user_identity,
+std::string SyncFileManager::realm_file_path(const std::string& user_id,
                                              const std::vector<std::string>& legacy_user_identities,
                                              const std::string& realm_file_name, const std::string& partition) const
 {
-    auto existing_path =
-        get_existing_realm_file_path(user_identity, legacy_user_identities, realm_file_name, partition);
+    auto existing_path = get_existing_realm_file_path(user_id, legacy_user_identities, realm_file_name, partition);
     if (existing_path) {
         return *existing_path;
     }
@@ -399,7 +397,7 @@ std::string SyncFileManager::realm_file_path(const std::string& user_identity,
     // since this appears to be a new file, test the normal location
     // we use a test file with the same name and a suffix of the
     // same length, so we can catch "filename too long" errors on windows
-    std::string preferred_name_without_suffix = preferred_realm_path_without_suffix(user_identity, realm_file_name);
+    std::string preferred_name_without_suffix = preferred_realm_path_without_suffix(user_id, realm_file_name);
     std::string preferred_name_with_suffix = preferred_name_without_suffix + c_realm_file_suffix;
     try {
         std::string test_path = preferred_name_without_suffix + c_realm_file_test_suffix;
@@ -455,12 +453,11 @@ bool SyncFileManager::remove_metadata_realm() const
     }
 }
 
-std::string SyncFileManager::preferred_realm_path_without_suffix(const std::string& user_identity,
+std::string SyncFileManager::preferred_realm_path_without_suffix(const std::string& user_id,
                                                                  const std::string& realm_file_name) const
 {
     auto escaped_file_name = util::validate_and_clean_path(realm_file_name);
-    std::string preferred_name =
-        util::file_path_by_appending_component(user_directory(user_identity), escaped_file_name);
+    std::string preferred_name = util::file_path_by_appending_component(user_directory(user_id), escaped_file_name);
     if (StringData(preferred_name).ends_with(c_realm_file_suffix)) {
         preferred_name = preferred_name.substr(0, preferred_name.size() - strlen(c_realm_file_suffix));
     }
@@ -476,14 +473,14 @@ std::string SyncFileManager::fallback_hashed_realm_file_path(const std::string& 
     return hashed_name;
 }
 
-std::string SyncFileManager::legacy_hashed_partition_path(const std::string& user_identity,
+std::string SyncFileManager::legacy_hashed_partition_path(const std::string& user_id,
                                                           const std::string& partition) const
 {
     std::array<unsigned char, 32> hash;
     util::sha256(partition.data(), partition.size(), hash.data());
     std::string legacy_hashed_file_name = util::hex_dump(hash.data(), hash.size(), "");
     std::string legacy_partition_path = util::file_path_by_appending_component(
-        get_user_directory_path(user_identity), legacy_hashed_file_name + c_realm_file_suffix);
+        get_user_directory_path(user_id), legacy_hashed_file_name + c_realm_file_suffix);
     return legacy_partition_path;
 }
 
@@ -509,9 +506,9 @@ std::string SyncFileManager::legacy_local_identity_path(const std::string& local
     return path;
 }
 
-std::string SyncFileManager::get_user_directory_path(const std::string& user_identity) const
+std::string SyncFileManager::get_user_directory_path(const std::string& user_id) const
 {
-    return file_path_by_appending_component(m_app_path, util::validate_and_clean_path(user_identity),
+    return file_path_by_appending_component(m_app_path, util::validate_and_clean_path(user_id),
                                             util::FilePathType::Directory);
 }
 

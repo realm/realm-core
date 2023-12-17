@@ -134,7 +134,7 @@ TEST_CASE("sync_file: URL manipulation APIs", "[sync][file]") {
 TEST_CASE("sync_file: SyncFileManager APIs", "[sync][file]") {
     TestSyncManager tsm;
 
-    const std::string identity = "abcdefghi";
+    const std::string user_id = "abcdefghi";
     const std::vector<std::string> legacy_identities = {"legacy1", "legacy2"};
     const auto& local_identity = legacy_identities[0];
     const std::string app_id = "test_app_id*$#@!%1";
@@ -148,22 +148,22 @@ TEST_CASE("sync_file: SyncFileManager APIs", "[sync][file]") {
 
     SECTION("Realm path APIs") {
         auto relative_path = "s_" + partition_str;
-        ExpectedRealmPaths expected_paths(manager_base_path.string(), app_id, identity, legacy_identities, partition);
+        ExpectedRealmPaths expected_paths(manager_base_path.string(), app_id, user_id, legacy_identities, partition);
 
         SECTION("getting a Realm path") {
-            auto actual = manager.realm_file_path(identity, legacy_identities, relative_path, partition);
+            auto actual = manager.realm_file_path(user_id, legacy_identities, relative_path, partition);
             REQUIRE(expected_paths.current_preferred_path == actual);
         }
 
         SECTION("deleting a Realm for a valid user") {
-            manager.realm_file_path(identity, legacy_identities, relative_path, partition);
+            manager.realm_file_path(user_id, legacy_identities, relative_path, partition);
             // Create the required files
             REQUIRE(create_dummy_realm(expected_paths.current_preferred_path));
             REQUIRE(File::exists(expected_paths.current_preferred_path));
             REQUIRE(File::exists(expected_paths.current_preferred_path + ".lock"));
             REQUIRE_DIR_EXISTS(expected_paths.current_preferred_path + ".management");
             // Delete the Realm
-            REQUIRE(manager.remove_realm(identity, legacy_identities, relative_path, partition));
+            REQUIRE(manager.remove_realm(user_id, legacy_identities, relative_path, partition));
             // Ensure the files don't exist anymore
             REQUIRE(!File::exists(expected_paths.current_preferred_path));
             REQUIRE(!File::exists(expected_paths.current_preferred_path + ".lock"));
@@ -182,11 +182,11 @@ TEST_CASE("sync_file: SyncFileManager APIs", "[sync][file]") {
             REQUIRE(create_dummy_realm(expected_paths.fallback_hashed_path));
             REQUIRE(File::exists(expected_paths.fallback_hashed_path));
             REQUIRE(!File::exists(expected_paths.current_preferred_path));
-            auto actual = manager.realm_file_path(identity, legacy_identities, relative_path, partition);
+            auto actual = manager.realm_file_path(user_id, legacy_identities, relative_path, partition);
             REQUIRE(actual == expected_paths.fallback_hashed_path);
             REQUIRE(File::exists(expected_paths.fallback_hashed_path));
             REQUIRE(!File::exists(expected_paths.current_preferred_path));
-            manager.remove_user_realms(identity, {expected_paths.fallback_hashed_path});
+            manager.remove_user_realms(user_id, {expected_paths.fallback_hashed_path});
             REQUIRE(!File::exists(expected_paths.fallback_hashed_path));
         }
 
@@ -199,11 +199,11 @@ TEST_CASE("sync_file: SyncFileManager APIs", "[sync][file]") {
             REQUIRE(File::exists(expected_paths.legacy_local_id_path));
             REQUIRE(!File::exists(expected_paths.current_preferred_path));
 
-            auto actual = manager.realm_file_path(identity, legacy_identities, relative_path, partition);
+            auto actual = manager.realm_file_path(user_id, legacy_identities, relative_path, partition);
             REQUIRE(actual == expected_paths.legacy_local_id_path);
             REQUIRE(File::exists(expected_paths.legacy_local_id_path));
             REQUIRE(!File::exists(expected_paths.current_preferred_path));
-            manager.remove_user_realms(identity, {expected_paths.legacy_local_id_path});
+            manager.remove_user_realms(user_id, {expected_paths.legacy_local_id_path});
             REQUIRE(!File::exists(expected_paths.legacy_local_id_path));
         }
 
@@ -212,7 +212,7 @@ TEST_CASE("sync_file: SyncFileManager APIs", "[sync][file]") {
             // a second one with only the second identity
             const std::vector<std::string> legacy_identities_2 = {"legacy2"};
             const auto& local_identity_2 = legacy_identities_2[0];
-            ExpectedRealmPaths expected_paths_2(manager_base_path.string(), app_id, identity, legacy_identities_2,
+            ExpectedRealmPaths expected_paths_2(manager_base_path.string(), app_id, user_id, legacy_identities_2,
                                                 partition);
 
             util::try_make_dir(manager_path.string());
@@ -221,11 +221,11 @@ TEST_CASE("sync_file: SyncFileManager APIs", "[sync][file]") {
 
             // Note: intentionally not legacy_identities_2. We're passing both
             // in and validating that it'll open the second one.
-            auto actual = manager.realm_file_path(identity, legacy_identities, relative_path, partition);
+            auto actual = manager.realm_file_path(user_id, legacy_identities, relative_path, partition);
             REQUIRE(actual == expected_paths_2.legacy_local_id_path);
             REQUIRE(File::exists(expected_paths_2.legacy_local_id_path));
             REQUIRE(!File::exists(expected_paths_2.current_preferred_path));
-            manager.remove_user_realms(identity, {expected_paths_2.legacy_local_id_path});
+            manager.remove_user_realms(user_id, {expected_paths_2.legacy_local_id_path});
             REQUIRE(!File::exists(expected_paths_2.legacy_local_id_path));
         }
 
@@ -238,22 +238,22 @@ TEST_CASE("sync_file: SyncFileManager APIs", "[sync][file]") {
             REQUIRE(create_dummy_realm(expected_paths.legacy_sync_path));
             REQUIRE(File::exists(expected_paths.legacy_sync_path));
             REQUIRE(!File::exists(expected_paths.current_preferred_path));
-            auto actual = manager.realm_file_path(identity, legacy_identities, relative_path, partition);
+            auto actual = manager.realm_file_path(user_id, legacy_identities, relative_path, partition);
             REQUIRE(actual == expected_paths.legacy_sync_path);
             REQUIRE(File::exists(expected_paths.legacy_sync_path));
             REQUIRE(!File::exists(expected_paths.current_preferred_path));
-            manager.remove_user_realms(identity, {expected_paths.legacy_sync_path});
+            manager.remove_user_realms(user_id, {expected_paths.legacy_sync_path});
             REQUIRE(!File::exists(expected_paths.legacy_sync_path));
         }
 
         SECTION("paths have a fallback hashed location if the preferred path is too long") {
             const std::string long_path_name = std::string(500, 'a');
             REQUIRE(long_path_name.length() > 255); // linux name length limit
-            auto actual = manager.realm_file_path(identity, legacy_identities, long_path_name, partition);
+            auto actual = manager.realm_file_path(user_id, legacy_identities, long_path_name, partition);
             REQUIRE(actual.length() < 500);
             REQUIRE(create_dummy_realm(actual));
             REQUIRE(File::exists(actual));
-            manager.remove_user_realms(identity, {actual});
+            manager.remove_user_realms(user_id, {actual});
             REQUIRE(!File::exists(actual));
         }
     }

@@ -106,7 +106,7 @@ static std::shared_ptr<app::App> lock_or_throw(std::weak_ptr<app::App> app)
 SyncUser::SyncUser(Private, std::string_view refresh_token, std::string_view id, std::string_view access_token,
                    std::string_view device_id, std::shared_ptr<app::App> app)
     : m_state(State::LoggedIn)
-    , m_identity(id)
+    , m_user_id(id)
     , m_refresh_token(RealmJWT(refresh_token))
     , m_access_token(RealmJWT(access_token))
     , m_device_id(device_id)
@@ -122,7 +122,7 @@ SyncUser::SyncUser(Private, std::string_view refresh_token, std::string_view id,
 
     lock_or_throw(m_app)->backing_store()->perform_metadata_update(
         [&](const auto& manager) NO_THREAD_SAFETY_ANALYSIS {
-            auto metadata = manager.get_or_make_user_metadata(m_identity);
+            auto metadata = manager.get_or_make_user_metadata(m_user_id);
             metadata->set_state_and_tokens(State::LoggedIn, m_access_token.token, m_refresh_token.token);
             metadata->set_device_id(m_device_id);
             m_legacy_identities = metadata->legacy_identities();
@@ -133,7 +133,7 @@ SyncUser::SyncUser(Private, std::string_view refresh_token, std::string_view id,
 SyncUser::SyncUser(Private, const SyncUserMetadata& data, std::shared_ptr<app::App> app)
     : m_state(data.state())
     , m_legacy_identities(data.legacy_identities())
-    , m_identity(data.identity())
+    , m_user_id(data.user_id())
     , m_refresh_token(RealmJWT(data.refresh_token()))
     , m_access_token(RealmJWT(data.access_token()))
     , m_user_identities(data.identities())
@@ -164,8 +164,7 @@ std::weak_ptr<app::App> SyncUser::app() const
     if (m_state == State::Removed) {
         throw app::AppError(
             ErrorCodes::ClientUserNotFound,
-            util::format("Cannot start a sync session for user '%1' because this user has been removed.",
-                         m_identity));
+            util::format("Cannot start a sync session for user '%1' because this user has been removed.", m_user_id));
     }
     return m_app;
 }
@@ -189,7 +188,7 @@ void SyncUser::log_in(std::string_view access_token, std::string_view refresh_to
         m_refresh_token = RealmJWT(refresh_token);
 
         lock_or_throw(m_app)->backing_store()->perform_metadata_update([&](const auto& manager) {
-            auto metadata = manager.get_or_make_user_metadata(m_identity);
+            auto metadata = manager.get_or_make_user_metadata(m_user_id);
             metadata->set_state_and_tokens(State::LoggedIn, access_token, refresh_token);
         });
     }
@@ -217,7 +216,7 @@ void SyncUser::invalidate()
         m_refresh_token = {};
 
         lock_or_throw(m_app)->backing_store()->perform_metadata_update([&](const auto& manager) {
-            auto metadata = manager.get_or_make_user_metadata(m_identity);
+            auto metadata = manager.get_or_make_user_metadata(m_user_id);
             metadata->set_state_and_tokens(State::Removed, "", "");
         });
     }
@@ -235,7 +234,7 @@ void SyncUser::update_access_token(std::string&& token)
         m_access_token = RealmJWT(std::move(token));
         lock_or_throw(m_app)->backing_store()->perform_metadata_update(
             [&, raw_access_token = m_access_token.token](const auto& manager) {
-                auto metadata = manager.get_or_make_user_metadata(m_identity);
+                auto metadata = manager.get_or_make_user_metadata(m_user_id);
                 metadata->set_access_token(raw_access_token);
             });
     }
@@ -274,14 +273,14 @@ void SyncUser::log_out()
             // Mark the user as 'dead' in the persisted metadata Realm.
             m_state = State::Removed;
             app->backing_store()->perform_metadata_update([&](const auto& manager) {
-                auto metadata = manager.get_or_make_user_metadata(m_identity, false);
+                auto metadata = manager.get_or_make_user_metadata(m_user_id, false);
                 if (metadata)
                     metadata->remove();
             });
         }
         else {
             app->backing_store()->perform_metadata_update([&](const auto& manager) {
-                auto metadata = manager.get_or_make_user_metadata(m_identity);
+                auto metadata = manager.get_or_make_user_metadata(m_user_id);
                 metadata->set_state_and_tokens(State::LoggedOut, "", "");
             });
         }
@@ -372,7 +371,7 @@ void SyncUser::update_user_profile(std::vector<SyncUserIdentity> identities, Syn
 
     lock_or_throw(m_app)->backing_store()->perform_metadata_update(
         [&](const auto& manager) NO_THREAD_SAFETY_ANALYSIS {
-            auto metadata = manager.get_or_make_user_metadata(m_identity);
+            auto metadata = manager.get_or_make_user_metadata(m_user_id);
             metadata->set_identities(m_user_identities);
             metadata->set_user_profile(m_user_profile);
         });
@@ -412,12 +411,12 @@ void SyncUser::refresh_custom_data(bool update_location,
     if (!user) {
         completion_block(app::AppError(
             ErrorCodes::ClientUserNotFound,
-            util::format("Cannot initiate a refresh on user '%1' because the user has been removed", m_identity)));
+            util::format("Cannot initiate a refresh on user '%1' because the user has been removed", m_user_id)));
     }
     else if (!app) {
         completion_block(app::AppError(
             ErrorCodes::ClientAppDeallocated,
-            util::format("Cannot initiate a refresh on user '%1' because the app has been deallocated", m_identity)));
+            util::format("Cannot initiate a refresh on user '%1' because the app has been deallocated", m_user_id)));
     }
     else {
         std::weak_ptr<SyncUser> weak_user = user->weak_from_this();

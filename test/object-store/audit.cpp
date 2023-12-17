@@ -1775,7 +1775,7 @@ TEST_CASE("audit integration tests", "[sync][pbs][audit][baas]") {
         auto audit_user = session.app()->current_user();
         config.audit_config->audit_user = audit_user;
         auto realm = Realm::get_shared_realm(config);
-        session.app()->backing_store()->remove_user(audit_user->identity());
+        session.app()->backing_store()->remove_user(audit_user->user_id());
 
         auto audit = realm->audit_context();
         auto scope = audit->begin_scope("scope");

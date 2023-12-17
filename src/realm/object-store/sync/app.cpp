@@ -647,7 +647,7 @@ void App::get_profile(const std::shared_ptr<SyncUser>& sync_user,
 
                 sync_user->update_user_profile(std::move(identities),
                                                SyncUserProfile(get<BsonDocument>(profile_json, "data")));
-                self->m_app_backing_store->set_current_user(sync_user->identity());
+                self->m_app_backing_store->set_current_user(sync_user->user_id());
                 self->emit_change_to_subscribers(*self);
             }
             catch (const AppError& err) {
@@ -807,7 +807,7 @@ std::shared_ptr<SyncUser> App::switch_user(const std::shared_ptr<SyncUser>& user
         throw AppError(ErrorCodes::ClientUserNotFound, "User does not exist");
     }
 
-    m_app_backing_store->set_current_user(user->identity());
+    m_app_backing_store->set_current_user(user->user_id());
     emit_change_to_subscribers(*this);
     return current_user();
 }
@@ -824,12 +824,12 @@ void App::remove_user(const std::shared_ptr<SyncUser>& user, UniqueFunction<void
     if (user->is_logged_in()) {
         log_out(user, [user, completion = std::move(completion),
                        self = shared_from_this()](const Optional<AppError>& error) {
-            self->m_app_backing_store->remove_user(user->identity());
+            self->m_app_backing_store->remove_user(user->user_id());
             return completion(error);
         });
     }
     else {
-        m_app_backing_store->remove_user(user->identity());
+        m_app_backing_store->remove_user(user->user_id());
         return completion({});
     }
 }
@@ -853,11 +853,11 @@ void App::delete_user(const std::shared_ptr<SyncUser>& user, UniqueFunction<void
     req.url = url_for_path("/auth/delete");
     do_authenticated_request(std::move(req), user,
                              [self = shared_from_this(), completion = std::move(completion),
-                              identitiy = user->identity()](const Response& response) {
+                              user_id = user->user_id()](const Response& response) {
                                  auto error = AppUtils::check_for_errors(response);
                                  if (!error) {
                                      self->emit_change_to_subscribers(*self);
-                                     self->m_app_backing_store->delete_user(identitiy);
+                                     self->m_app_backing_store->delete_user(user_id);
                                  }
                                  completion(error);
                              });

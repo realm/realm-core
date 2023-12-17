@@ -659,9 +659,9 @@ RLM_API char* realm_app_sync_client_get_default_file_path_for_realm(const realm_
     });
 }
 
-RLM_API const char* realm_user_get_identity(const realm_user_t* user) noexcept
+RLM_API const char* realm_user_get_id(const realm_user_t* user) noexcept
 {
-    return (*user)->identity().c_str();
+    return (*user)->user_id().c_str();
 }
 
 RLM_API realm_user_state_e realm_user_get_state(const realm_user_t* user) noexcept

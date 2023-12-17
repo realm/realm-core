@@ -49,54 +49,54 @@ TEST_CASE("sync_metadata: user metadata", "[sync][metadata]") {
     SyncMetadataManager manager(metadata_path, false);
 
     SECTION("can be properly constructed") {
-        const auto identity = "testcase1a";
-        auto user_metadata = manager.get_or_make_user_metadata(identity);
-        REQUIRE(user_metadata->identity() == identity);
+        const auto user_id = "testcase1a";
+        auto user_metadata = manager.get_or_make_user_metadata(user_id);
+        REQUIRE(user_metadata->user_id() == user_id);
         REQUIRE(user_metadata->access_token().empty());
     }
 
     SECTION("properly reflects updating state") {
-        const auto identity = "testcase1b";
+        const auto user_id = "testcase1b";
         const std::string sample_token = "this_is_a_user_token";
-        auto user_metadata = manager.get_or_make_user_metadata(identity);
+        auto user_metadata = manager.get_or_make_user_metadata(user_id);
         user_metadata->set_access_token(sample_token);
-        REQUIRE(user_metadata->identity() == identity);
+        REQUIRE(user_metadata->user_id() == user_id);
         REQUIRE(user_metadata->access_token() == sample_token);
     }
 
     SECTION("can be properly re-retrieved from the same manager") {
-        const auto identity = "testcase1c";
+        const auto user_id = "testcase1c";
         const std::string sample_token = "this_is_a_user_token";
-        auto first = manager.get_or_make_user_metadata(identity);
+        auto first = manager.get_or_make_user_metadata(user_id);
         first->set_access_token(sample_token);
-        // Get a second instance of the user metadata for the same identity.
-        auto second = manager.get_or_make_user_metadata(identity, false);
-        REQUIRE(second->identity() == identity);
+        // Get a second instance of the user metadata for the same user_id.
+        auto second = manager.get_or_make_user_metadata(user_id, false);
+        REQUIRE(second->user_id() == user_id);
         REQUIRE(second->access_token() == sample_token);
     }
 
     SECTION("properly reflects changes across different instances") {
-        const auto identity = "testcase1d";
+        const auto user_id = "testcase1d";
         const std::string sample_token_1 = "this_is_a_user_token";
-        auto first = manager.get_or_make_user_metadata(identity);
-        auto second = manager.get_or_make_user_metadata(identity);
+        auto first = manager.get_or_make_user_metadata(user_id);
+        auto second = manager.get_or_make_user_metadata(user_id);
         first->set_access_token(sample_token_1);
-        REQUIRE(first->identity() == identity);
+        REQUIRE(first->user_id() == user_id);
         REQUIRE(first->access_token() == sample_token_1);
-        REQUIRE(second->identity() == identity);
+        REQUIRE(second->user_id() == user_id);
         REQUIRE(second->access_token() == sample_token_1);
         // Set the state again.
         const std::string sample_token_2 = "this_is_another_user_token";
         second->set_access_token(sample_token_2);
-        REQUIRE(first->identity() == identity);
+        REQUIRE(first->user_id() == user_id);
         REQUIRE(first->access_token() == sample_token_2);
-        REQUIRE(second->identity() == identity);
+        REQUIRE(second->user_id() == user_id);
         REQUIRE(second->access_token() == sample_token_2);
     }
 
     SECTION("can be removed") {
-        const auto identity = "testcase1e";
-        auto user_metadata = manager.get_or_make_user_metadata(identity);
+        const auto user_id = "testcase1e";
+        auto user_metadata = manager.get_or_make_user_metadata(user_id);
         REQUIRE(user_metadata->is_valid());
         user_metadata->remove();
         REQUIRE(!user_metadata->is_valid());
@@ -106,25 +106,25 @@ TEST_CASE("sync_metadata: user metadata", "[sync][metadata]") {
         const std::string sample_token = "this_is_a_user_token";
 
         SECTION("with no prior metadata for the identifier") {
-            const auto identity = "testcase1g1";
-            auto user_metadata = manager.get_or_make_user_metadata(identity, false);
+            const auto user_id = "testcase1g1";
+            auto user_metadata = manager.get_or_make_user_metadata(user_id, false);
             REQUIRE(!user_metadata);
         }
         SECTION("with valid prior metadata for the identifier") {
-            const auto identity = "testcase1g2";
-            auto first = manager.get_or_make_user_metadata(identity);
+            const auto user_id = "testcase1g2";
+            auto first = manager.get_or_make_user_metadata(user_id);
             first->set_access_token(sample_token);
-            auto second = manager.get_or_make_user_metadata(identity, false);
+            auto second = manager.get_or_make_user_metadata(user_id, false);
             REQUIRE(second->is_valid());
-            REQUIRE(second->identity() == identity);
+            REQUIRE(second->user_id() == user_id);
             REQUIRE(second->access_token() == sample_token);
         }
         SECTION("with invalid prior metadata for the identifier") {
-            const auto identity = "testcase1g3";
-            auto first = manager.get_or_make_user_metadata(identity);
+            const auto user_id = "testcase1g3";
+            auto first = manager.get_or_make_user_metadata(user_id);
             first->set_access_token(sample_token);
             first->set_state(SyncUser::State::Removed);
-            auto second = manager.get_or_make_user_metadata(identity, false);
+            auto second = manager.get_or_make_user_metadata(user_id, false);
             REQUIRE(!second);
         }
     }
@@ -140,25 +140,25 @@ TEST_CASE("sync_metadata: user metadata APIs", "[sync][metadata]") {
     const std::string provider_type = "https://realm.example.org";
 
     SECTION("properly list all marked and unmarked users") {
-        const auto identity1 = "testcase2a1";
-        const auto identity2 = "testcase2a3";
-        auto first = manager.get_or_make_user_metadata(identity1);
-        auto second = manager.get_or_make_user_metadata(identity1);
-        auto third = manager.get_or_make_user_metadata(identity2);
+        const auto user_id1 = "testcase2a1";
+        const auto user_id2 = "testcase2a3";
+        auto first = manager.get_or_make_user_metadata(user_id1);
+        auto second = manager.get_or_make_user_metadata(user_id1);
+        auto third = manager.get_or_make_user_metadata(user_id2);
         auto unmarked_users = manager.all_unmarked_users();
         REQUIRE(unmarked_users.size() == 2);
-        REQUIRE(results_contains_user(unmarked_users, identity1));
-        REQUIRE(results_contains_user(unmarked_users, identity2));
+        REQUIRE(results_contains_user(unmarked_users, user_id1));
+        REQUIRE(results_contains_user(unmarked_users, user_id2));
         auto marked_users = manager.all_users_marked_for_removal();
         REQUIRE(marked_users.size() == 0);
         // Now, mark a few users for removal.
         first->set_state(SyncUser::State::Removed);
         unmarked_users = manager.all_unmarked_users();
         REQUIRE(unmarked_users.size() == 1);
-        REQUIRE(results_contains_user(unmarked_users, identity2));
+        REQUIRE(results_contains_user(unmarked_users, user_id2));
         marked_users = manager.all_users_marked_for_removal();
         REQUIRE(marked_users.size() == 1);
-        REQUIRE(results_contains_user(marked_users, identity1));
+        REQUIRE(results_contains_user(marked_users, user_id1));
     }
 }
 
@@ -249,32 +249,32 @@ TEST_CASE("sync_metadata: results", "[sync][metadata]") {
     });
 
     SyncMetadataManager manager(metadata_path, false);
-    const auto identity1 = "testcase3a1";
-    const auto identity2 = "testcase3a3";
+    const auto user_id1 = "testcase3a1";
+    const auto user_id2 = "testcase3a3";
 
     SECTION("properly update as underlying items are added") {
         auto results = manager.all_unmarked_users();
         REQUIRE(results.size() == 0);
         // Add users, one at a time.
-        auto first = manager.get_or_make_user_metadata(identity1);
+        auto first = manager.get_or_make_user_metadata(user_id1);
         REQUIRE(results.size() == 1);
-        REQUIRE(results_contains_user(results, identity1));
-        auto second = manager.get_or_make_user_metadata(identity2);
+        REQUIRE(results_contains_user(results, user_id1));
+        auto second = manager.get_or_make_user_metadata(user_id2);
         REQUIRE(results.size() == 2);
-        REQUIRE(results_contains_user(results, identity2));
+        REQUIRE(results_contains_user(results, user_id2));
     }
 
     SECTION("properly update as underlying items are removed") {
         auto results = manager.all_unmarked_users();
-        auto first = manager.get_or_make_user_metadata(identity1);
-        auto second = manager.get_or_make_user_metadata(identity2);
+        auto first = manager.get_or_make_user_metadata(user_id1);
+        auto second = manager.get_or_make_user_metadata(user_id2);
         REQUIRE(results.size() == 2);
-        REQUIRE(results_contains_user(results, identity1));
-        REQUIRE(results_contains_user(results, identity2));
+        REQUIRE(results_contains_user(results, user_id1));
+        REQUIRE(results_contains_user(results, user_id2));
         // Remove users, one at a time.
         first->remove();
         REQUIRE(results.size() == 1);
-        REQUIRE(!results_contains_user(results, identity1));
+        REQUIRE(!results_contains_user(results, user_id1));
         second->remove();
         REQUIRE(results.size() == 0);
     }
@@ -287,20 +287,20 @@ TEST_CASE("sync_metadata: persistence across metadata manager instances", "[sync
     });
 
     SECTION("works for the basic case") {
-        const auto identity = "testcase4a";
+        const auto user_id = "testcase4a";
         const std::string provider_type = "any-type";
         const std::string sample_token = "this_is_a_user_token";
         SyncMetadataManager first_manager(metadata_path, false);
-        auto first = first_manager.get_or_make_user_metadata(identity);
+        auto first = first_manager.get_or_make_user_metadata(user_id);
         first->set_access_token(sample_token);
-        REQUIRE(first->identity() == identity);
+        REQUIRE(first->user_id() == user_id);
         REQUIRE(first->access_token() == sample_token);
         REQUIRE(first->state() == SyncUser::State::LoggedIn);
         first->set_state(SyncUser::State::LoggedOut);
 
         SyncMetadataManager second_manager(metadata_path, false);
-        auto second = second_manager.get_or_make_user_metadata(identity, false);
-        REQUIRE(second->identity() == identity);
+        auto second = second_manager.get_or_make_user_metadata(user_id, false);
+        REQUIRE(second->user_id() == user_id);
         REQUIRE(second->access_token() == sample_token);
         REQUIRE(second->state() == SyncUser::State::LoggedOut);
     }
@@ -312,7 +312,7 @@ TEST_CASE("sync_metadata: encryption", "[sync][metadata]") {
         util::try_remove_dir_recursive(base_path);
     });
 
-    const auto identity0 = "identity0";
+    const auto user_id0 = "user_id0";
     SECTION("prohibits opening the metadata Realm with different keys") {
         SECTION("different keys") {
             {
@@ -320,9 +320,9 @@ TEST_CASE("sync_metadata: encryption", "[sync][metadata]") {
                 std::vector<char> key0 = make_test_encryption_key(10);
                 SyncMetadataManager manager0(metadata_path, true, key0);
 
-                auto user_metadata0 = manager0.get_or_make_user_metadata(identity0);
+                auto user_metadata0 = manager0.get_or_make_user_metadata(user_id0);
                 REQUIRE(bool(user_metadata0));
-                CHECK(user_metadata0->identity() == identity0);
+                CHECK(user_metadata0->user_id() == user_id0);
                 CHECK(user_metadata0->access_token().empty());
                 CHECK(user_metadata0->is_valid());
             }
@@ -331,14 +331,14 @@ TEST_CASE("sync_metadata: encryption", "[sync][metadata]") {
             std::vector<char> key1 = make_test_encryption_key(11);
             SyncMetadataManager manager1(metadata_path, true, key1);
 
-            auto user_metadata1 = manager1.get_or_make_user_metadata(identity0, false);
+            auto user_metadata1 = manager1.get_or_make_user_metadata(user_id0, false);
             // Expect previous metadata to have been deleted
             CHECK_FALSE(bool(user_metadata1));
 
             // But new metadata can still be created
-            const auto identity1 = "identity1";
-            auto user_metadata2 = manager1.get_or_make_user_metadata(identity1);
-            CHECK(user_metadata2->identity() == identity1);
+            const auto user_id1 = "user_id1";
+            auto user_metadata2 = manager1.get_or_make_user_metadata(user_id1);
+            CHECK(user_metadata2->user_id() == user_id1);
             CHECK(user_metadata2->access_token().empty());
             CHECK(user_metadata2->is_valid());
         }
@@ -347,23 +347,23 @@ TEST_CASE("sync_metadata: encryption", "[sync][metadata]") {
                 // Encrypt metadata realm at path, make metadata
                 SyncMetadataManager manager0(metadata_path, true, make_test_encryption_key(10));
 
-                auto user_metadata0 = manager0.get_or_make_user_metadata(identity0);
+                auto user_metadata0 = manager0.get_or_make_user_metadata(user_id0);
                 REQUIRE(bool(user_metadata0));
-                CHECK(user_metadata0->identity() == identity0);
+                CHECK(user_metadata0->user_id() == user_id0);
                 CHECK(user_metadata0->access_token().empty());
                 CHECK(user_metadata0->is_valid());
             }
             // Metadata realm is closed because only reference to the realm (user_metadata) is now out of scope
             // Open new metadata realm at path with different encryption configuration
             SyncMetadataManager manager1(metadata_path, false);
-            auto user_metadata1 = manager1.get_or_make_user_metadata(identity0, false);
+            auto user_metadata1 = manager1.get_or_make_user_metadata(user_id0, false);
             // Expect previous metadata to have been deleted
             CHECK_FALSE(bool(user_metadata1));
 
             // But new metadata can still be created
-            const auto identity1 = "identity1";
-            auto user_metadata2 = manager1.get_or_make_user_metadata(identity1);
-            CHECK(user_metadata2->identity() == identity1);
+            const auto user_id1 = "user_id1";
+            auto user_metadata2 = manager1.get_or_make_user_metadata(user_id1);
+            CHECK(user_metadata2->user_id() == user_id1);
             CHECK(user_metadata2->access_token().empty());
             CHECK(user_metadata2->is_valid());
         }
@@ -371,18 +371,18 @@ TEST_CASE("sync_metadata: encryption", "[sync][metadata]") {
 
     SECTION("works when enabled") {
         std::vector<char> key = make_test_encryption_key(10);
-        const auto identity = "testcase5a";
+        const auto user_id = "testcase5a";
         SyncMetadataManager manager(metadata_path, true, key);
-        auto user_metadata = manager.get_or_make_user_metadata(identity);
+        auto user_metadata = manager.get_or_make_user_metadata(user_id);
         REQUIRE(bool(user_metadata));
-        CHECK(user_metadata->identity() == identity);
+        CHECK(user_metadata->user_id() == user_id);
         CHECK(user_metadata->access_token().empty());
         CHECK(user_metadata->is_valid());
         // Reopen the metadata file with the same key.
         SyncMetadataManager manager_2(metadata_path, true, key);
-        auto user_metadata_2 = manager_2.get_or_make_user_metadata(identity, false);
+        auto user_metadata_2 = manager_2.get_or_make_user_metadata(user_id, false);
         REQUIRE(bool(user_metadata_2));
-        CHECK(user_metadata_2->identity() == identity);
+        CHECK(user_metadata_2->user_id() == user_id);
         CHECK(user_metadata_2->is_valid());
     }
 
@@ -405,13 +405,13 @@ TEST_CASE("sync_metadata: encryption", "[sync][metadata]") {
         SECTION("automatically generates an encryption key for new files") {
             {
                 SyncMetadataManager manager(metadata_path, true, none);
-                manager.set_current_user_identity(identity0);
+                manager.set_current_user_id(user_id0);
             }
 
             // Should be able to reopen and read data
             {
                 SyncMetadataManager manager(metadata_path, true, none);
-                REQUIRE(manager.get_current_user_identity() == identity0);
+                REQUIRE(manager.get_current_user_id() == user_id0);
             }
 
             // Verify that the file is actually encrypted
@@ -422,11 +422,11 @@ TEST_CASE("sync_metadata: encryption", "[sync][metadata]") {
         SECTION("leaves existing unencrypted files unencrypted") {
             {
                 SyncMetadataManager manager(metadata_path, false, none);
-                manager.set_current_user_identity(identity0);
+                manager.set_current_user_id(user_id0);
             }
             {
                 SyncMetadataManager manager(metadata_path, true, none);
-                REQUIRE(manager.get_current_user_identity() == identity0);
+                REQUIRE(manager.get_current_user_id() == user_id0);
             }
             REQUIRE_NOTHROW(Group(metadata_path));
         }
@@ -434,7 +434,7 @@ TEST_CASE("sync_metadata: encryption", "[sync][metadata]") {
         SECTION("recreates the file if the old encryption key was lost") {
             {
                 SyncMetadataManager manager(metadata_path, true, none);
-                manager.set_current_user_identity(identity0);
+                manager.set_current_user_id(user_id0);
             }
 
             keychain::delete_metadata_realm_encryption_key();
@@ -442,7 +442,7 @@ TEST_CASE("sync_metadata: encryption", "[sync][metadata]") {
             {
                 // File should now be missing the data
                 SyncMetadataManager manager(metadata_path, true, none);
-                REQUIRE(manager.get_current_user_identity() == none);
+                REQUIRE(manager.get_current_user_id() == none);
             }
             // New file should be encrypted
             REQUIRE_EXCEPTION(Group(metadata_path), InvalidDatabase,
@@ -463,7 +463,7 @@ TEST_CASE("sync metadata: can open old metadata realms", "[sync][metadata]") {
     });
 
     const std::string provider_type = "https://realm.example.org";
-    const auto identity = "metadata migration test";
+    const auto user_id = "metadata migration test";
     const std::string sample_token = "metadata migration token";
 
     const auto access_token_1 = encode_fake_jwt("access token 1", 456, 123);
@@ -477,7 +477,7 @@ TEST_CASE("sync metadata: can open old metadata realms", "[sync][metadata]") {
 #if false   // The code to generate the v4 and v5 Realms
         { // Create a metadata Realm with a test user
             SyncMetadataManager manager(metadata_path, false);
-            auto user_metadata = manager.get_or_make_user_metadata(identity, provider_type);
+            auto user_metadata = manager.get_or_make_user_metadata(user_id, provider_type);
             user_metadata->set_access_token(sample_token);
         }
 #elif false // The code to generate the v6 Realm
@@ -536,7 +536,7 @@ TEST_CASE("sync metadata: can open old metadata realms", "[sync][metadata]") {
 #else
         { // Create a metadata Realm with a test user
             SyncMetadataManager manager(metadata_path, false);
-            auto user_metadata = manager.get_or_make_user_metadata(identity);
+            auto user_metadata = manager.get_or_make_user_metadata(user_id);
             user_metadata->set_access_token(sample_token);
         }
 #endif
@@ -568,16 +568,16 @@ TEST_CASE("sync metadata: can open old metadata realms", "[sync][metadata]") {
     SECTION("open schema version 4") {
         File::copy(test_util::get_test_resource_path() + "sync-metadata-v4.realm", metadata_path);
         SyncMetadataManager manager(metadata_path, false);
-        auto user_metadata = manager.get_or_make_user_metadata(identity);
-        REQUIRE(user_metadata->identity() == identity);
+        auto user_metadata = manager.get_or_make_user_metadata(user_id);
+        REQUIRE(user_metadata->user_id() == user_id);
         REQUIRE(user_metadata->access_token() == sample_token);
     }
 
     SECTION("open schema version 5") {
         File::copy(test_util::get_test_resource_path() + "sync-metadata-v5.realm", metadata_path);
         SyncMetadataManager manager(metadata_path, false);
-        auto user_metadata = manager.get_or_make_user_metadata(identity);
-        REQUIRE(user_metadata->identity() == identity);
+        auto user_metadata = manager.get_or_make_user_metadata(user_id);
+        REQUIRE(user_metadata->user_id() == user_id);
         REQUIRE(user_metadata->access_token() == sample_token);
     }
 

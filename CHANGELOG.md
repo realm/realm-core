@@ -11,6 +11,7 @@
 
 ### Breaking changes
 * `App::get_uncached_app(...)` and `App::get_shared_app(...)` have been replaced by `App::get_app(App::CacheMode, ...)`. The App constructor is now enforced to be unusable, use `App::get_app()` instead. ([#7237](https://github.com/realm/realm-core/issues/7237))
+* Rename `SyncUser::identity()` and friends to `SyncUser::user_id()`. `SyncUser` used the word "identity" for two separate concepts and had both `identity()` and `identities()` which did unrelated things.
 
 ### Compatibility
 * Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.

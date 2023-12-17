@@ -52,8 +52,8 @@ public:
 class SyncUserMetadata {
 public:
     struct Schema {
-        // The server-supplied user_id for the user. Unique per App.
-        ColKey identity_col;
+        // The server-supplied user_id for the user. Unique per server instance.
+        ColKey user_id_col;
         // Locally generated UUIDs for the user. These are tracked to be able
         // to open pre-existing Realm files, but are no longer generated or
         // used for anything else.
@@ -75,7 +75,7 @@ public:
     };
 
     // Cannot be set after creation.
-    std::string identity() const;
+    std::string user_id() const;
 
     std::vector<std::string> legacy_identities() const;
     // for testing purposes only
@@ -219,7 +219,7 @@ public:
 
     // Retrieve or create user metadata.
     // Note: if `make_is_absent` is true and the user has been marked for deletion, it will be unmarked.
-    util::Optional<SyncUserMetadata> get_or_make_user_metadata(std::string_view identity,
+    util::Optional<SyncUserMetadata> get_or_make_user_metadata(std::string_view user_id,
                                                                bool make_if_absent = true) const;
 
     // Retrieve file action metadata.
@@ -229,8 +229,8 @@ public:
     void make_file_action_metadata(StringData original_name, StringData partition_key_value, StringData local_uuid,
                                    SyncFileActionMetadata::Action action, StringData new_name = {}) const;
 
-    util::Optional<std::string> get_current_user_identity() const;
-    void set_current_user_identity(std::string_view identity);
+    std::optional<std::string> get_current_user_id() const;
+    void set_current_user_id(std::string_view user_id);
 
     util::Optional<SyncAppMetadata> get_app_metadata();
     /// Set or update the cached app server metadata. The metadata will not be updated if it has already been

@@ -44,7 +44,7 @@ bool results_contains_user(SyncUserMetadataResults& results, const std::string& 
 {
     for (size_t i = 0; i < results.size(); i++) {
         auto this_result = results.get(i);
-        if (this_result.identity() == identity) {
+        if (this_result.user_id() == identity) {
             return true;
         }
     }

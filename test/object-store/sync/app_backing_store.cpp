@@ -51,7 +51,7 @@ struct TestBackingStore final : public app::BackingStore {
         {
             util::CheckedLockGuard guard(m_user_mutex);
             auto it = std::find_if(m_users.begin(), m_users.end(), [&](const auto& user) {
-                return user->identity() == user_id && user->state() != SyncUser::State::Removed;
+                return user->user_id() == user_id && user->state() != SyncUser::State::Removed;
             });
             if (it == m_users.end()) {
                 // No existing user.
@@ -71,7 +71,7 @@ struct TestBackingStore final : public app::BackingStore {
     {
         util::CheckedLockGuard lock(m_user_mutex);
         auto matcher = [user_id](auto& el) {
-            return el->identity() == user_id && el->state() == SyncUser::State::LoggedIn;
+            return el->user_id() == user_id && el->state() == SyncUser::State::LoggedIn;
         };
         auto it = std::find_if(m_users.begin(), m_users.end(), matcher);
         return it == m_users.end() ? nullptr : *it;
@@ -117,19 +117,19 @@ struct TestBackingStore final : public app::BackingStore {
     void set_current_user(std::string_view user_id) override REQUIRES(!m_user_mutex)
     {
         util::CheckedLockGuard lock(m_user_mutex);
-        m_current_user = get_user_for_identity(user_id);
+        m_current_user = get_user_for_id(user_id);
     }
     void remove_user(std::string_view user_id) override REQUIRES(!m_user_mutex)
     {
         util::CheckedLockGuard lock(m_user_mutex);
-        if (auto user = get_user_for_identity(user_id))
+        if (auto user = get_user_for_id(user_id))
             user->invalidate();
     }
     void delete_user(std::string_view user_id) override REQUIRES(!m_user_mutex)
     {
         util::CheckedLockGuard lock(m_user_mutex);
         auto it = std::find_if(m_users.begin(), m_users.end(), [&user_id](auto& user) {
-            return user->identity() == user_id;
+            return user->user_id() == user_id;
         });
         auto user = it == m_users.end() ? nullptr : *it;
 
@@ -141,7 +141,7 @@ struct TestBackingStore final : public app::BackingStore {
         m_users.erase(it);
         user->detach_from_backing_store();
 
-        if (m_current_user && m_current_user->identity() == user->identity())
+        if (m_current_user && m_current_user->user_id() == user->user_id())
             m_current_user = nullptr;
     }
     void reset_for_testing() override REQUIRES(!m_user_mutex)
@@ -177,14 +177,14 @@ struct TestBackingStore final : public app::BackingStore {
             return *partition_value;
         }();
 
-        auto ident = user->identity();
+        auto ident = user->user_id();
         auto app_id = user->app().lock()->config().app_id;
         return util::format("%1/%2/%3/%4", m_file_path_root, app_id, ident, file_name);
     }
     std::string audit_path_root(std::shared_ptr<SyncUser> user, std::string_view app_id,
                                 std::string_view partition_prefix) const override
     {
-        auto ident = user->identity();
+        auto ident = user->user_id();
         return util::format("%1/%2/realm-audit/%3/%4", m_file_path_root, app_id, ident, partition_prefix);
     }
 
@@ -198,10 +198,10 @@ struct TestBackingStore final : public app::BackingStore {
     }
 
 private:
-    std::shared_ptr<SyncUser> get_user_for_identity(std::string_view identity) const noexcept REQUIRES(m_user_mutex)
+    std::shared_ptr<SyncUser> get_user_for_id(std::string_view identity) const noexcept REQUIRES(m_user_mutex)
     {
         auto is_active_user = [identity](auto& el) {
-            return el->identity() == identity;
+            return el->user_id() == identity;
         };
         auto it = std::find_if(m_users.begin(), m_users.end(), is_active_user);
         return it == m_users.end() ? nullptr : *it;
@@ -235,7 +235,7 @@ TEST_CASE("app: custom backing store without sync", "[app][backing store]") {
     auto user2 = log_in(app, creds);
     auto user3 = log_in(app, creds);
     CHECK(user3 == test_store->get_current_user());
-    CHECK(user1 == test_store->get_existing_logged_in_user(user1->identity()));
+    CHECK(user1 == test_store->get_existing_logged_in_user(user1->user_id()));
     REQUIRE(test_store->all_users().size() == 3);
     CHECK(test_store->all_users()[0] == user3);
     CHECK(test_store->all_users()[1] == user2);

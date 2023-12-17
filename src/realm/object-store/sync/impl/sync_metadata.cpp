@@ -41,7 +41,7 @@ static const char* const c_sync_userMetadata = "UserMetadata";
 static const char* const c_sync_identityMetadata = "UserIdentity";
 static const char* const c_sync_app_metadata = "AppMetadata";
 
-static const char* const c_sync_current_user_identity = "current_user_identity";
+static const char* const c_sync_current_user_id = "current_user_identity";
 
 /* User keys */
 static const char* const c_sync_identity = "identity";
@@ -98,9 +98,9 @@ realm::Schema make_schema()
              {c_sync_partition, PropertyType::String},
              {c_sync_identity, PropertyType::String},
          }},
-        {c_sync_current_user_identity,
+        {c_sync_current_user_id,
          {
-             {c_sync_current_user_identity, PropertyType::String},
+             {c_sync_current_user_id, PropertyType::String},
          }},
         {c_sync_app_metadata,
          {
@@ -284,17 +284,17 @@ SyncUserMetadataResults SyncMetadataManager::get_users(bool marked) const
     return SyncUserMetadataResults(Results(realm, std::move(query)), m_user_schema);
 }
 
-util::Optional<std::string> SyncMetadataManager::get_current_user_identity() const
+std::optional<std::string> SyncMetadataManager::get_current_user_id() const
 {
     auto realm = get_realm();
-    TableRef table = ObjectStore::table_for_object_type(realm->read_group(), c_sync_current_user_identity);
+    TableRef table = ObjectStore::table_for_object_type(realm->read_group(), c_sync_current_user_id);
 
     if (!table->is_empty()) {
         auto first = table->begin();
-        return util::Optional<std::string>(first->get<String>(c_sync_current_user_identity));
+        return std::optional<std::string>(first->get<String>(c_sync_current_user_id));
     }
 
-    return util::Optional<std::string>();
+    return std::nullopt;
 }
 
 SyncFileActionMetadataResults SyncMetadataManager::all_pending_actions() const
@@ -304,27 +304,26 @@ SyncFileActionMetadataResults SyncMetadataManager::all_pending_actions() const
     return SyncFileActionMetadataResults(Results(realm, table), m_file_action_schema);
 }
 
-void SyncMetadataManager::set_current_user_identity(std::string_view identity)
+void SyncMetadataManager::set_current_user_id(std::string_view user_id)
 {
     auto realm = get_realm();
 
     realm->begin_transaction();
 
-    TableRef currentUserIdentityTable =
-        ObjectStore::table_for_object_type(realm->read_group(), c_sync_current_user_identity);
+    TableRef table = ObjectStore::table_for_object_type(realm->read_group(), c_sync_current_user_id);
 
-    Obj currentUserIdentityObj;
-    if (currentUserIdentityTable->is_empty())
-        currentUserIdentityObj = currentUserIdentityTable->create_object();
+    Obj current_user_obj;
+    if (table->is_empty())
+        current_user_obj = table->create_object();
     else
-        currentUserIdentityObj = *currentUserIdentityTable->begin();
+        current_user_obj = *table->begin();
 
-    currentUserIdentityObj.set<String>(c_sync_current_user_identity, identity);
+    current_user_obj.set<String>(c_sync_current_user_id, user_id);
 
     realm->commit_transaction();
 }
 
-util::Optional<SyncUserMetadata> SyncMetadataManager::get_or_make_user_metadata(std::string_view identity,
+util::Optional<SyncUserMetadata> SyncMetadataManager::get_or_make_user_metadata(std::string_view user_id,
                                                                                 bool make_if_absent) const
 {
     auto realm = get_realm();
@@ -332,7 +331,7 @@ util::Optional<SyncUserMetadata> SyncMetadataManager::get_or_make_user_metadata(
 
     // Retrieve or create the row for this object.
     TableRef table = ObjectStore::table_for_object_type(realm->read_group(), c_sync_userMetadata);
-    Query query = table->where().equal(schema.identity_col, StringData(identity));
+    Query query = table->where().equal(schema.user_id_col, StringData(user_id));
     Results results(realm, std::move(query));
     REALM_ASSERT_DEBUG(results.size() < 2);
     auto obj = results.first();
@@ -347,23 +346,20 @@ util::Optional<SyncUserMetadata> SyncMetadataManager::get_or_make_user_metadata(
     }
     if (!obj) {
         // Because "making this user" is our last action, set this new user as the current user
-        TableRef currentUserIdentityTable =
-            ObjectStore::table_for_object_type(realm->read_group(), c_sync_current_user_identity);
+        TableRef current_user_table = ObjectStore::table_for_object_type(realm->read_group(), c_sync_current_user_id);
 
-        Obj currentUserIdentityObj;
-        if (currentUserIdentityTable->is_empty())
-            currentUserIdentityObj = currentUserIdentityTable->create_object();
+        Obj current_user_obj;
+        if (current_user_table->is_empty())
+            current_user_obj = current_user_table->create_object();
         else
-            currentUserIdentityObj = *currentUserIdentityTable->begin();
+            current_user_obj = *current_user_table->begin();
+        current_user_obj.set<String>(c_sync_current_user_id, StringData(user_id));
 
-        obj = table->create_object();
-
-        currentUserIdentityObj.set<String>(c_sync_current_user_identity, StringData(identity));
-
-        obj->set(schema.identity_col, StringData(identity));
-        obj->set(schema.state_col, (int64_t)SyncUser::State::LoggedIn);
+        auto obj = table->create_object();
+        obj.set(schema.user_id_col, StringData(user_id));
+        obj.set(schema.state_col, (int64_t)SyncUser::State::LoggedIn);
         realm->commit_transaction();
-        return SyncUserMetadata(schema, std::move(realm), *obj);
+        return SyncUserMetadata(schema, std::move(realm), obj);
     }
 
     // Got an existing user.
@@ -550,11 +546,11 @@ SyncUserMetadata::SyncUserMetadata(Schema schema, SharedRealm realm, const Obj& 
 {
 }
 
-std::string SyncUserMetadata::identity() const
+std::string SyncUserMetadata::user_id() const
 {
     REALM_ASSERT(m_realm);
     m_realm->refresh();
-    return m_obj.get<String>(m_schema.identity_col);
+    return m_obj.get<String>(m_schema.user_id_col);
 }
 
 SyncUser::State SyncUserMetadata::state() const

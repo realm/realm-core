@@ -2040,28 +2040,28 @@ TEST_CASE("app: user_semantics", "[sync][app][user]") {
 
     SECTION("current user is populated") {
         const auto user1 = login_user_anonymous();
-        CHECK(app->current_user()->identity() == user1->identity());
+        CHECK(app->current_user()->user_id() == user1->user_id());
         CHECK(event_processed == 1);
     }
 
     SECTION("current user is updated on login") {
         const auto user1 = login_user_anonymous();
-        CHECK(app->current_user()->identity() == user1->identity());
+        CHECK(app->current_user()->user_id() == user1->user_id());
         const auto user2 = login_user_email_pass();
-        CHECK(app->current_user()->identity() == user2->identity());
-        CHECK(user1->identity() != user2->identity());
+        CHECK(app->current_user()->user_id() == user2->user_id());
+        CHECK(user1->user_id() != user2->user_id());
         CHECK(event_processed == 2);
     }
 
     SECTION("current user is updated to last used user on logout") {
         const auto user1 = login_user_anonymous();
-        CHECK(app->current_user()->identity() == user1->identity());
+        CHECK(app->current_user()->user_id() == user1->user_id());
         CHECK(app->all_users()[0]->state() == SyncUser::State::LoggedIn);
 
         const auto user2 = login_user_email_pass();
         CHECK(app->all_users()[0]->state() == SyncUser::State::LoggedIn);
         CHECK(app->all_users()[1]->state() == SyncUser::State::LoggedIn);
-        CHECK(app->current_user()->identity() == user2->identity());
+        CHECK(app->current_user()->user_id() == user2->user_id());
         CHECK(user1 != user2);
 
         // should reuse existing session
@@ -2076,7 +2076,7 @@ TEST_CASE("app: user_semantics", "[sync][app][user]") {
         app->log_out([](auto) {});
         CHECK(user_events_processed == 1);
 
-        CHECK(app->current_user()->identity() == user2->identity());
+        CHECK(app->current_user()->user_id() == user2->user_id());
 
         CHECK(app->all_users().size() == 1);
         CHECK(app->all_users()[0]->state() == SyncUser::State::LoggedIn);
@@ -2086,14 +2086,14 @@ TEST_CASE("app: user_semantics", "[sync][app][user]") {
 
     SECTION("anon users are removed on logout") {
         const auto user1 = login_user_anonymous();
-        CHECK(app->current_user()->identity() == user1->identity());
+        CHECK(app->current_user()->user_id() == user1->user_id());
         CHECK(app->all_users()[0]->state() == SyncUser::State::LoggedIn);
 
         const auto user2 = login_user_anonymous();
         CHECK(app->all_users()[0]->state() == SyncUser::State::LoggedIn);
         CHECK(app->all_users().size() == 1);
-        CHECK(app->current_user()->identity() == user2->identity());
-        CHECK(user1->identity() == user2->identity());
+        CHECK(app->current_user()->user_id() == user2->user_id());
+        CHECK(user1->user_id() == user2->user_id());
 
         app->log_out([](auto) {});
         CHECK(app->all_users().size() == 0);
@@ -2135,14 +2135,14 @@ TEST_CASE("app: user_semantics", "[sync][app][user]") {
         app->unsubscribe(token);
 
         const auto user1 = login_user_anonymous();
-        CHECK(app->current_user()->identity() == user1->identity());
+        CHECK(app->current_user()->user_id() == user1->user_id());
         CHECK(app->all_users()[0]->state() == SyncUser::State::LoggedIn);
 
         const auto user2 = login_user_anonymous();
         CHECK(app->all_users()[0]->state() == SyncUser::State::LoggedIn);
         CHECK(app->all_users().size() == 1);
-        CHECK(app->current_user()->identity() == user2->identity());
-        CHECK(user1->identity() == user2->identity());
+        CHECK(app->current_user()->user_id() == user2->user_id());
+        CHECK(user1->user_id() == user2->user_id());
 
         app->log_out([](auto) {});
         CHECK(app->all_users().size() == 0);
@@ -2398,7 +2398,7 @@ TEST_CASE("app: link_user", "[sync][app][user]") {
         app->link_user(sync_user, custom_credentials, [&](std::shared_ptr<SyncUser> user, Optional<AppError> error) {
             REQUIRE_FALSE(error);
             REQUIRE(user);
-            CHECK(user->identity() == sync_user->identity());
+            CHECK(user->user_id() == sync_user->user_id());
             processed = true;
         });
         CHECK(processed);

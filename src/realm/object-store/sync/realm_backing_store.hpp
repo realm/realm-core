@@ -85,7 +85,7 @@ struct RealmBackingStore final : public app::BackingStore {
     }
 
 private:
-    std::shared_ptr<SyncUser> get_user_for_identity(std::string_view identity) const noexcept REQUIRES(m_user_mutex);
+    std::shared_ptr<SyncUser> get_user_for_id(std::string_view user_id) const noexcept REQUIRES(m_user_mutex);
     bool run_file_action(SyncFileActionMetadata&) REQUIRES(m_file_system_mutex);
     void initialize() REQUIRES(!m_file_system_mutex, !m_user_mutex);
 

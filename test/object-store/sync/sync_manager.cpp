@@ -43,7 +43,7 @@ bool validate_user_in_vector(std::vector<std::shared_ptr<SyncUser>> vector, cons
                              const std::string& device_id)
 {
     for (auto& user : vector) {
-        if (user->identity() == identity && user->refresh_token() == refresh_token &&
+        if (user->user_id() == identity && user->refresh_token() == refresh_token &&
             user->access_token() == access_token && user->has_device_id() && user->device_id() == device_id) {
             return true;
         }
@@ -66,12 +66,12 @@ TEST_CASE("RealmBackingStore: `path_for_realm` API", "[sync][backing store]") {
     SECTION("should work properly without metadata") {
         TestSyncManager tsm(SyncManager::MetadataMode::NoMetadata);
         auto backing_store = tsm.app()->backing_store();
-        const std::string identity = random_string(10);
-        auto base_path = fs::path{tsm.base_file_path()}.make_preferred() / "mongodb-realm" / "app_id" / identity;
+        const std::string user_id = random_string(10);
+        auto base_path = fs::path{tsm.base_file_path()}.make_preferred() / "mongodb-realm" / "app_id" / user_id;
         const auto expected = base_path / "realms%3A%2F%2Frealm.example.org%2Fa%2Fb%2F%7E%2F123456%2Fxyz.realm";
-        auto user = backing_store->get_user(identity, ENCODE_FAKE_JWT("dummy_token"),
+        auto user = backing_store->get_user(user_id, ENCODE_FAKE_JWT("dummy_token"),
                                             ENCODE_FAKE_JWT("not_a_real_token"), dummy_device_id);
-        REQUIRE(user->identity() == identity);
+        REQUIRE(user->user_id() == user_id);
         SyncConfig config(user, bson::Bson{});
         std::optional<std::string> partition =
             config.flx_sync_requested ? none : std::make_optional(config.partition_value);
@@ -83,12 +83,12 @@ TEST_CASE("RealmBackingStore: `path_for_realm` API", "[sync][backing store]") {
     SECTION("should work properly with metadata") {
         TestSyncManager tsm(SyncManager::MetadataMode::NoEncryption);
         auto backing_store = tsm.app()->backing_store();
-        const std::string identity = random_string(10);
-        auto base_path = fs::path{tsm.base_file_path()}.make_preferred() / "mongodb-realm" / "app_id" / identity;
+        const std::string user_id = random_string(10);
+        auto base_path = fs::path{tsm.base_file_path()}.make_preferred() / "mongodb-realm" / "app_id" / user_id;
         const auto expected = base_path / "realms%3A%2F%2Frealm.example.org%2Fa%2Fb%2F%7E%2F123456%2Fxyz.realm";
-        auto user = backing_store->get_user(identity, ENCODE_FAKE_JWT("dummy_token"),
+        auto user = backing_store->get_user(user_id, ENCODE_FAKE_JWT("dummy_token"),
                                             ENCODE_FAKE_JWT("not_a_real_token"), dummy_device_id);
-        REQUIRE(user->identity() == identity);
+        REQUIRE(user->user_id() == user_id);
         SyncConfig config(user, bson::Bson{});
         std::optional<std::string> partition =
             config.flx_sync_requested ? none : std::make_optional(config.partition_value);
@@ -100,9 +100,9 @@ TEST_CASE("RealmBackingStore: `path_for_realm` API", "[sync][backing store]") {
     SECTION("should produce the expected path for all partition key types") {
         TestSyncManager tsm(SyncManager::MetadataMode::NoMetadata);
         auto backing_store = tsm.app()->backing_store();
-        const std::string identity = random_string(10);
-        auto base_path = fs::path{tsm.base_file_path()}.make_preferred() / "mongodb-realm" / "app_id" / identity;
-        auto user = backing_store->get_user(identity, ENCODE_FAKE_JWT("dummy_token"),
+        const std::string user_id = random_string(10);
+        auto base_path = fs::path{tsm.base_file_path()}.make_preferred() / "mongodb-realm" / "app_id" / user_id;
+        auto user = backing_store->get_user(user_id, ENCODE_FAKE_JWT("dummy_token"),
                                             ENCODE_FAKE_JWT("not_a_real_token"), dummy_device_id);
 
         // Directory should not be created until we get the path
@@ -212,71 +212,71 @@ TEST_CASE("RealmBackingStore: user state management", "[sync][backing store]") {
     const std::string a_token_2 = ENCODE_FAKE_JWT("wobble");
     const std::string a_token_3 = ENCODE_FAKE_JWT("wubble");
 
-    const std::string identity_1 = "user-foo";
-    const std::string identity_2 = "user-bar";
-    const std::string identity_3 = "user-baz";
+    const std::string user_id_1 = "user-foo";
+    const std::string user_id_2 = "user-bar";
+    const std::string user_id_3 = "user-baz";
 
     SECTION("should get all users that are created during run time") {
-        backing_store->get_user(identity_1, r_token_1, a_token_1, dummy_device_id);
-        backing_store->get_user(identity_2, r_token_2, a_token_2, dummy_device_id);
+        backing_store->get_user(user_id_1, r_token_1, a_token_1, dummy_device_id);
+        backing_store->get_user(user_id_2, r_token_2, a_token_2, dummy_device_id);
         auto users = backing_store->all_users();
         REQUIRE(users.size() == 2);
-        CHECK(validate_user_in_vector(users, identity_1, r_token_1, a_token_1, dummy_device_id));
-        CHECK(validate_user_in_vector(users, identity_2, r_token_2, a_token_2, dummy_device_id));
+        CHECK(validate_user_in_vector(users, user_id_1, r_token_1, a_token_1, dummy_device_id));
+        CHECK(validate_user_in_vector(users, user_id_2, r_token_2, a_token_2, dummy_device_id));
     }
 
     SECTION("should be able to distinguish users based solely on user ID") {
-        backing_store->get_user(identity_1, r_token_1, a_token_1, dummy_device_id);
-        backing_store->get_user(identity_2, r_token_1, a_token_1, dummy_device_id);
-        backing_store->get_user(identity_3, r_token_1, a_token_1, dummy_device_id);
-        backing_store->get_user(identity_1, r_token_1, a_token_1, dummy_device_id); // existing
+        backing_store->get_user(user_id_1, r_token_1, a_token_1, dummy_device_id);
+        backing_store->get_user(user_id_2, r_token_1, a_token_1, dummy_device_id);
+        backing_store->get_user(user_id_3, r_token_1, a_token_1, dummy_device_id);
+        backing_store->get_user(user_id_1, r_token_1, a_token_1, dummy_device_id); // existing
         auto users = backing_store->all_users();
         REQUIRE(users.size() == 3);
-        CHECK(validate_user_in_vector(users, identity_1, r_token_1, a_token_1, dummy_device_id));
-        CHECK(validate_user_in_vector(users, identity_2, r_token_1, a_token_1, dummy_device_id));
-        CHECK(validate_user_in_vector(users, identity_3, r_token_1, a_token_1, dummy_device_id));
+        CHECK(validate_user_in_vector(users, user_id_1, r_token_1, a_token_1, dummy_device_id));
+        CHECK(validate_user_in_vector(users, user_id_2, r_token_1, a_token_1, dummy_device_id));
+        CHECK(validate_user_in_vector(users, user_id_3, r_token_1, a_token_1, dummy_device_id));
     }
 
     SECTION("should properly update state in response to users logging in and out") {
         auto r_token_3a = ENCODE_FAKE_JWT("qwerty");
         auto a_token_3a = ENCODE_FAKE_JWT("ytrewq");
 
-        auto u1 = backing_store->get_user(identity_1, r_token_1, a_token_1, dummy_device_id);
-        auto u2 = backing_store->get_user(identity_2, r_token_2, a_token_2, dummy_device_id);
-        auto u3 = backing_store->get_user(identity_3, r_token_3, a_token_3, dummy_device_id);
+        auto u1 = backing_store->get_user(user_id_1, r_token_1, a_token_1, dummy_device_id);
+        auto u2 = backing_store->get_user(user_id_2, r_token_2, a_token_2, dummy_device_id);
+        auto u3 = backing_store->get_user(user_id_3, r_token_3, a_token_3, dummy_device_id);
         auto users = backing_store->all_users();
         REQUIRE(users.size() == 3);
-        CHECK(validate_user_in_vector(users, identity_1, r_token_1, a_token_1, dummy_device_id));
-        CHECK(validate_user_in_vector(users, identity_2, r_token_2, a_token_2, dummy_device_id));
-        CHECK(validate_user_in_vector(users, identity_3, r_token_3, a_token_3, dummy_device_id));
+        CHECK(validate_user_in_vector(users, user_id_1, r_token_1, a_token_1, dummy_device_id));
+        CHECK(validate_user_in_vector(users, user_id_2, r_token_2, a_token_2, dummy_device_id));
+        CHECK(validate_user_in_vector(users, user_id_3, r_token_3, a_token_3, dummy_device_id));
         // Log out users 1 and 3
         u1->log_out();
         u3->log_out();
         users = backing_store->all_users();
         REQUIRE(users.size() == 3);
-        CHECK(validate_user_in_vector(users, identity_2, r_token_2, a_token_2, dummy_device_id));
+        CHECK(validate_user_in_vector(users, user_id_2, r_token_2, a_token_2, dummy_device_id));
         // Log user 3 back in
-        u3 = backing_store->get_user(identity_3, r_token_3a, a_token_3a, dummy_device_id);
+        u3 = backing_store->get_user(user_id_3, r_token_3a, a_token_3a, dummy_device_id);
         users = backing_store->all_users();
         REQUIRE(users.size() == 3);
-        CHECK(validate_user_in_vector(users, identity_2, r_token_2, a_token_2, dummy_device_id));
-        CHECK(validate_user_in_vector(users, identity_3, r_token_3a, a_token_3a, dummy_device_id));
+        CHECK(validate_user_in_vector(users, user_id_2, r_token_2, a_token_2, dummy_device_id));
+        CHECK(validate_user_in_vector(users, user_id_3, r_token_3a, a_token_3a, dummy_device_id));
         // Log user 2 out
         u2->log_out();
         users = backing_store->all_users();
         REQUIRE(users.size() == 3);
-        CHECK(validate_user_in_vector(users, identity_3, r_token_3a, a_token_3a, dummy_device_id));
+        CHECK(validate_user_in_vector(users, user_id_3, r_token_3a, a_token_3a, dummy_device_id));
     }
 
     SECTION("should return current user that was created during run time") {
         auto u_null = backing_store->get_current_user();
         REQUIRE(u_null == nullptr);
 
-        auto u1 = backing_store->get_user(identity_1, r_token_1, a_token_1, dummy_device_id);
+        auto u1 = backing_store->get_user(user_id_1, r_token_1, a_token_1, dummy_device_id);
         auto u_current = backing_store->get_current_user();
         REQUIRE(u_current == u1);
 
-        auto u2 = backing_store->get_user(identity_2, r_token_2, a_token_2, dummy_device_id);
+        auto u2 = backing_store->get_user(user_id_2, r_token_2, a_token_2, dummy_device_id);
         // The current user has switched to return the most recently used: "u2"
         u_current = backing_store->get_current_user();
         REQUIRE(u_current == u2);
@@ -302,19 +302,19 @@ TEST_CASE("RealmBackingStore: persistent user state management", "[sync][backing
     const std::string a_token_3 = ENCODE_FAKE_JWT("wubble");
 
     SECTION("when users are persisted") {
-        const std::string identity_1 = "foo-1";
-        const std::string identity_2 = "bar-1";
-        const std::string identity_3 = "baz-1";
+        const std::string user_id_1 = "foo-1";
+        const std::string user_id_2 = "bar-1";
+        const std::string user_id_3 = "baz-1";
         // First, create a few users and add them to the metadata.
-        auto u1 = manager.get_or_make_user_metadata(identity_1);
+        auto u1 = manager.get_or_make_user_metadata(user_id_1);
         u1->set_access_token(a_token_1);
         u1->set_refresh_token(r_token_1);
         u1->set_device_id(dummy_device_id);
-        auto u2 = manager.get_or_make_user_metadata(identity_2);
+        auto u2 = manager.get_or_make_user_metadata(user_id_2);
         u2->set_access_token(a_token_2);
         u2->set_refresh_token(r_token_2);
         u2->set_device_id(dummy_device_id);
-        auto u3 = manager.get_or_make_user_metadata(identity_3);
+        auto u3 = manager.get_or_make_user_metadata(user_id_3);
         u3->set_access_token(a_token_3);
         u3->set_refresh_token(r_token_3);
         u3->set_device_id(dummy_device_id);
@@ -327,9 +327,9 @@ TEST_CASE("RealmBackingStore: persistent user state management", "[sync][backing
             TestSyncManager tsm(config);
             auto users = tsm.app()->all_users();
             REQUIRE(users.size() == 3);
-            REQUIRE(validate_user_in_vector(users, identity_1, r_token_1, a_token_1, dummy_device_id));
-            REQUIRE(validate_user_in_vector(users, identity_2, r_token_2, a_token_2, dummy_device_id));
-            REQUIRE(validate_user_in_vector(users, identity_3, r_token_3, a_token_3, dummy_device_id));
+            REQUIRE(validate_user_in_vector(users, user_id_1, r_token_1, a_token_1, dummy_device_id));
+            REQUIRE(validate_user_in_vector(users, user_id_2, r_token_2, a_token_2, dummy_device_id));
+            REQUIRE(validate_user_in_vector(users, user_id_3, r_token_3, a_token_3, dummy_device_id));
         }
 
         SECTION("they should not be added to the active users list when metadata is disabled") {
@@ -349,15 +349,15 @@ TEST_CASE("RealmBackingStore: persistent user state management", "[sync][backing
     std::vector<TestPath> paths_under_test;
 
     SECTION("when users are marked") {
-        const std::string identity_1 = "foo-2";
-        const std::string identity_2 = "bar-2";
-        const std::string identity_3 = "baz-2";
+        const std::string user_id_1 = "foo-2";
+        const std::string user_id_2 = "bar-2";
+        const std::string user_id_3 = "baz-2";
 
         // Create the user metadata.
-        auto u1 = manager.get_or_make_user_metadata(identity_1);
-        auto u2 = manager.get_or_make_user_metadata(identity_2);
+        auto u1 = manager.get_or_make_user_metadata(user_id_1);
+        auto u2 = manager.get_or_make_user_metadata(user_id_2);
         // Don't mark this user for deletion.
-        auto u3 = manager.get_or_make_user_metadata(identity_3);
+        auto u3 = manager.get_or_make_user_metadata(user_id_3);
 
         u1->set_legacy_identities({"legacy1"});
         u2->set_legacy_identities({"legacy2"});
@@ -365,7 +365,7 @@ TEST_CASE("RealmBackingStore: persistent user state management", "[sync][backing
 
         {
             auto expected_u1_path = [&](const bson::Bson& partition) {
-                return ExpectedRealmPaths(tsm.base_file_path(), app_id, u1->identity(), u1->legacy_identities(),
+                return ExpectedRealmPaths(tsm.base_file_path(), app_id, u1->user_id(), u1->legacy_identities(),
                                           partition.to_string());
             };
             bson::Bson partition = "partition1";
@@ -398,9 +398,9 @@ TEST_CASE("RealmBackingStore: persistent user state management", "[sync][backing
             auto backing_store = tsm.app()->backing_store();
 
             // Pre-populate the user directories.
-            auto user1 = backing_store->get_user(u1->identity(), r_token_1, a_token_1, dummy_device_id);
-            auto user2 = backing_store->get_user(u2->identity(), r_token_2, a_token_2, dummy_device_id);
-            auto user3 = backing_store->get_user(u3->identity(), r_token_3, a_token_3, dummy_device_id);
+            auto user1 = backing_store->get_user(u1->user_id(), r_token_1, a_token_1, dummy_device_id);
+            auto user2 = backing_store->get_user(u2->user_id(), r_token_2, a_token_2, dummy_device_id);
+            auto user3 = backing_store->get_user(u3->user_id(), r_token_3, a_token_3, dummy_device_id);
             for (auto& dir : dirs_to_create) {
                 try_make_dir(dir);
             }
@@ -430,8 +430,8 @@ TEST_CASE("RealmBackingStore: persistent user state management", "[sync][backing
             for (auto& path : paths) {
                 create_dummy_realm(path);
             }
-            backing_store->remove_user(u1->identity());
-            backing_store->remove_user(u2->identity());
+            backing_store->remove_user(u1->user_id());
+            backing_store->remove_user(u2->user_id());
         }
         for (auto& path : paths) {
             REQUIRE_REALM_EXISTS(path);
@@ -442,7 +442,7 @@ TEST_CASE("RealmBackingStore: persistent user state management", "[sync][backing
             TestSyncManager tsm(config);
             auto users = tsm.app()->all_users();
             REQUIRE(users.size() == 1);
-            REQUIRE(validate_user_in_vector(users, identity_3, r_token_3, a_token_3, dummy_device_id));
+            REQUIRE(validate_user_in_vector(users, user_id_3, r_token_3, a_token_3, dummy_device_id));
             REQUIRE_REALM_DOES_NOT_EXIST(paths[0]);
             REQUIRE_REALM_DOES_NOT_EXIST(paths[1]);
             REQUIRE_REALM_DOES_NOT_EXIST(paths[2]);
@@ -592,15 +592,15 @@ TEST_CASE("sync_manager: file actions", "[sync][sync manager]") {
         }
 
         SECTION("should copy the Realm to the recovery_directory_path") {
-            const std::string identity = "b241922032489d4836ecd0c82d0445f0";
-            const auto realm_base_path = file_manager.realm_file_path(identity, {}, "realmtasks", partition);
+            const std::string user_id = "b241922032489d4836ecd0c82d0445f0";
+            const auto realm_base_path = file_manager.realm_file_path(user_id, {}, "realmtasks", partition);
             std::string recovery_path = util::reserve_unique_file_name(
                 file_manager.recovery_directory_path(), util::create_timestamped_template("recovered_realm"));
             create_dummy_realm(realm_base_path);
             REQUIRE_REALM_EXISTS(realm_base_path);
             REQUIRE(!File::exists(recovery_path));
             // Manually create a file action metadata entry to simulate a client reset.
-            manager.make_file_action_metadata(realm_base_path, realm_url, identity, Action::BackUpThenDeleteRealm,
+            manager.make_file_action_metadata(realm_base_path, realm_url, user_id, Action::BackUpThenDeleteRealm,
                                               recovery_path);
             auto pending_actions = manager.all_pending_actions();
             REQUIRE(pending_actions.size() == 4);

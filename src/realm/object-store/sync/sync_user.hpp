@@ -194,9 +194,10 @@ public:
     /// Returns true if the user's only identity is anonymous.
     bool is_anonymous() const REQUIRES(!m_mutex, !m_tokens_mutex);
 
-    const std::string& identity() const noexcept
+    /// Server-supplied unique id for this user.
+    const std::string& user_id() const noexcept
     {
-        return m_identity;
+        return m_user_id;
     }
 
     const std::vector<std::string>& legacy_identities() const noexcept
@@ -294,7 +295,7 @@ private:
     mutable util::CheckedMutex m_mutex;
 
     // Set by the server. The unique ID of the user account on the Realm Application.
-    const std::string m_identity;
+    const std::string m_user_id;
 
     mutable util::CheckedMutex m_tokens_mutex;
 

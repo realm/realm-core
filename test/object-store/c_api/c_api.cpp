@@ -5780,7 +5780,6 @@ TEST_CASE("C API app: link_user integration w/c_api transport", "[sync][app][c_a
         realm_release(sync_user);
     }
     SECTION("realm_app_get_all_users integration") {
-
         AutoVerifiedEmailCredentials creds;
         realm_user_t* sync_user_1 = nullptr;
         realm_string_t password{creds.password.c_str(), creds.password.length()};
