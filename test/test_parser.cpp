@@ -3915,9 +3915,7 @@ TEST(Parser_OperatorIN)
                         String("fav_item.name")};
     size_t num_args = 7;
     verify_query_sub(test_context, t, "customer_id IN $1", args, num_args, 3);
-    verify_query_sub(test_context, t, "$P5 IN $1", args, num_args, 3);
     verify_query_sub(test_context, t, "fav_item.name IN $2", args, num_args, 2);
-    verify_query_sub(test_context, t, "$P6 IN $2", args, num_args, 2);
     verify_query_sub(test_context, t, "fav_item.name IN $3", args, num_args, 0);
     verify_query_sub(test_context, t, "fav_item.name IN $4", args, num_args, 0);
     verify_query_sub(test_context, t, "customer_id IN ANY $1", args, num_args, 3);
@@ -4050,6 +4048,42 @@ TEST(Parser_OperatorIN)
                    CHECK_EQUAL(e.what(), "The keypath following 'IN' must contain a list. Found '5.5'"));
     CHECK_THROW_EX(verify_query(test_context, t, "5.5 in fav_item.price", 1), query_parser::InvalidQueryArgError,
                    CHECK_EQUAL(e.what(), "The keypath following 'IN' must contain a list. Found 'fav_item.price'"));
+}
+
+TEST(Parser_KeyPathSubstitution)
+{
+    Group g;
+    TableRef persons = g.add_table_with_primary_key("class_Person", type_String, "name");
+    TableRef animals = g.add_table_with_primary_key("class_Animal", type_String, "name");
+    persons->add_column(*animals, "Pet");
+    animals->add_column(type_Int, "Legs");
+
+    auto wanda = animals->create_object_with_primary_key("Wanda").set("Legs", 0);
+    auto kaa = animals->create_object_with_primary_key("Kaa").set("Legs", 0);
+    auto zazu = animals->create_object_with_primary_key("Zazu").set("Legs", 2);
+    auto pluto = animals->create_object_with_primary_key("Pluto").set("Legs", 4);
+
+    persons->create_object_with_primary_key("Adam").set("Pet", wanda.get_key());
+    persons->create_object_with_primary_key("Brian").set("Pet", kaa.get_key());
+    persons->create_object_with_primary_key("Charlie").set("Pet", zazu.get_key());
+    persons->create_object_with_primary_key("David").set("Pet", pluto.get_key());
+    persons->create_object_with_primary_key("Eric");
+
+    std::any args[] = {String("Pet"), String("Pet.Legs"), 25, realm::null(), String("Pet.Weight")};
+
+    size_t num_args = 5;
+    verify_query_sub(test_context, persons, "$K0 != null", args, num_args, 4);
+    verify_query_sub(test_context, persons, "$K0 == null", args, num_args, 1);
+    verify_query_sub(test_context, persons, "$K1 = 0", args, num_args, 2);
+    verify_query_sub(test_context, persons, "$K1 > 0", args, num_args, 2);
+    CHECK_THROW(verify_query_sub(test_context, persons, "$K2 = 0", args, num_args, 2),
+                query_parser::InvalidQueryArgError);
+    CHECK_THROW(verify_query_sub(test_context, persons, "$K3 = 0", args, num_args, 2),
+                query_parser::InvalidQueryArgError);
+    CHECK_THROW(verify_query_sub(test_context, persons, "$K4 = 0", args, num_args, 2),
+                query_parser::InvalidQueryError);
+    CHECK_THROW(verify_query_sub(test_context, persons, "$K5 = 0", args, num_args, 2),
+                query_parser::InvalidQueryArgError);
 }
 
 TEST(Parser_ListVsList)

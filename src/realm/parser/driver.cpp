@@ -1780,14 +1780,15 @@ PathElement ParserDriver::get_arg_for_index(const std::string& i)
 std::string ParserDriver::get_arg_for_key_path(const std::string& i)
 {
     REALM_ASSERT(i[0] == '$');
-    REALM_ASSERT(i[1] == 'P');
+    REALM_ASSERT(i[1] == 'K');
     size_t arg_no = size_t(strtol(i.substr(2).c_str(), nullptr, 10));
     if (m_args.is_argument_null(arg_no) || m_args.is_argument_list(arg_no)) {
-        throw InvalidQueryError("Invalid index parameter");
+        throw InvalidQueryArgError(util::format("Null or list cannot be used for parameter '%1'", i));
     }
     auto type = m_args.type_for_argument(arg_no);
     if (type != type_String) {
-        throw InvalidQueryError("Invalid index type");
+        throw InvalidQueryArgError(util::format("Invalid index type for '%1'. Expected a string, but found type '%2'",
+                                                i, get_data_type_name(type)));
     }
     return m_args.string_for_argument(arg_no);
 }
