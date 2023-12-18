@@ -1,4 +1,4 @@
-# NEXT RELEASE
+# 13.25.0 Release notes
 
 ### Enhancements
 * Exceptions thrown during bootstrap application will now be surfaced to the user via the sync error handler rather than terminating the program with an unhandled exception. ([PR #7197](https://github.com/realm/realm-core/pull/7197)).
@@ -6,9 +6,6 @@
 ### Fixed
 * Exceptions thrown during bootstrap application could crash the sync client with an `!m_sess` assertion if the bootstrap was being applied during sync::Session activation. ([#7196](https://github.com/realm/realm-core/issues/7196), since v12.0.0).
 * If a SyncSession was explicitly resumed via `handle_reconnect()` while it was waiting to auto-resume after a non-fatal error and then another non-fatal error was received, the sync client could crash with a `!m_try_again_activation_timer` assertion. ([#6961](https://github.com/realm/realm-core/issues/6961), since always)
-
-### Breaking changes
-* None.
 
 ### Compatibility
 * Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
