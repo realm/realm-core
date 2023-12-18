@@ -28,11 +28,11 @@ namespace realm::app {
 PushClient::~PushClient() = default;
 
 namespace {
-util::UniqueFunction<void(AppResponse&&)>
+util::UniqueFunction<void(const Response&)>
 wrap_completion(util::UniqueFunction<void(util::Optional<AppError>)>&& completion)
 {
-    return [completion = std::move(completion)](AppResponse&& result) {
-        completion(std::move(result.error));
+    return [completion = std::move(completion)](const Response& response) {
+        completion(AppUtils::check_for_errors(response));
     };
 }
 } // anonymous namespace

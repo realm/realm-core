@@ -27,7 +27,7 @@ namespace realm {
 class SyncUser;
 namespace app {
 struct Request;
-struct AppResponse;
+struct Response;
 
 class AuthRequestClient {
 public:
@@ -36,7 +36,7 @@ public:
     virtual std::string url_for_path(const std::string& path) const = 0;
 
     virtual void do_authenticated_request(Request&&, const std::shared_ptr<SyncUser>& sync_user,
-                                          util::UniqueFunction<void(AppResponse&&)>&&) = 0;
+                                          util::UniqueFunction<void(const Response&)>&&) = 0;
 };
 
 } // namespace app

@@ -375,10 +375,9 @@ public:
         return T(this);
     }
 
-    void call_function(
-        const std::shared_ptr<SyncUser>& user, const std::string& name, std::string_view args_ejson,
-        const util::Optional<std::string>& service_name,
-        util::UniqueFunction<void(util::Optional<std::string_view>, util::Optional<AppError>)>&& completion) final;
+    void call_function(const std::shared_ptr<SyncUser>& user, const std::string& name, std::string_view args_ejson,
+                       const util::Optional<std::string>& service_name,
+                       util::UniqueFunction<void(const std::string*, util::Optional<AppError>)>&& completion) final;
 
     void call_function(
         const std::shared_ptr<SyncUser>& user, const std::string& name, const bson::BsonArray& args_bson,
@@ -477,12 +476,14 @@ private:
 
     /// Checks if an auth failure has taken place and if so it will attempt to refresh the
     /// access token and then perform the orginal request again with the new access token
-    /// @param result The app response containing auth failures or the original response
+    /// @param error The error to check for auth failures
+    /// @param response The original response to pass back should this not be an auth error
     /// @param request The request to perform
     /// @param completion returns the original response in the case it is not an auth error, or if a failure
     /// occurs, if the refresh was a success the newly attempted response will be passed back
-    void handle_auth_failure(AppResponse&& result, Request&& request, const std::shared_ptr<SyncUser>& sync_user,
-                             util::UniqueFunction<void(AppResponse&&)>&& completion);
+    void handle_auth_failure(const AppError& error, const Response& response, Request&& request,
+                             const std::shared_ptr<SyncUser>& sync_user,
+                             util::UniqueFunction<void(const Response&)>&& completion);
 
     std::string url_for_path(const std::string& path) const override;
 
@@ -511,7 +512,7 @@ private:
     /// @param request The original request object that needs to be sent after the update
     /// @param completion The original completion object that will be called with the response to the request
     /// @param new_hostname If provided, the metadata will be requested from this hostname
-    void update_location_and_resend(Request&& request, util::UniqueFunction<void(AppResponse&&)>&& completion,
+    void update_location_and_resend(Request&& request, util::UniqueFunction<void(const Response&)>&& completion,
                                     util::Optional<std::string>&& new_hostname = util::none);
 
     void post(std::string&& route, util::UniqueFunction<void(util::Optional<AppError>)>&& completion,
@@ -521,7 +522,7 @@ private:
     /// @param request The request to be performed
     /// @param completion Returns the response from the server
     /// @param update_location Force the location metadata to be updated prior to sending the request
-    void do_request(Request&& request, util::UniqueFunction<void(AppResponse&&)>&& completion,
+    void do_request(Request&& request, util::UniqueFunction<void(const Response&)>&& completion,
                     bool update_location = false);
 
     /// Process the redirect response received from the last request that was sent to the server
@@ -529,13 +530,13 @@ private:
     /// @param response The response from the send_request_to_server operation
     /// @param completion Returns the response from the server if not a redirect
     void check_for_redirect_response(Request&& request, const Response& response,
-                                     util::UniqueFunction<void(AppResponse&&)>&& completion);
+                                     util::UniqueFunction<void(const Response&)>&& completion);
 
     /// Performs an authenticated request to the Stitch server, using the current authentication state
     /// @param request The request to be performed
     /// @param completion Returns the response from the server
     void do_authenticated_request(Request&& request, const std::shared_ptr<SyncUser>& user,
-                                  util::UniqueFunction<void(AppResponse&&)>&& completion) override;
+                                  util::UniqueFunction<void(const Response&)>&& completion) override;
 
 
     /// Gets the social profile for a `SyncUser`

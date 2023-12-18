@@ -167,5 +167,30 @@ util::Optional<AppError> AppUtils::check_for_errors(const Response& response)
     return {};
 }
 
+Response AppUtils::make_apperror_response(const AppError& error)
+{
+    if (!error.server_error.empty()) {
+        auto body = nlohmann::json();
+        body["error"] = error.reason();
+        body["error_code"] = error.server_error;
+        if (!error.link_to_server_logs.empty()) {
+            body["link"] = error.link_to_server_logs;
+        }
+        return {error.additional_status_code.value_or(0), 0, {{"content-type", "application/json"}}, body.dump()};
+    }
+
+    if (ErrorCodes::error_categories(error.code()).test(ErrorCategory::http_error)) {
+        // The original body from the http response error has been mangled by this point and can't be recovered
+        // A generic message will be generated when the AppError is recreated
+        return {error.additional_status_code.value_or(0), 0, {}, {}};
+    }
+    if (ErrorCodes::error_categories(error.code()).test(ErrorCategory::custom_error)) {
+        return {0, error.additional_status_code.value_or(0), {}, std::string(error.reason())};
+    }
+
+    // For other cases, put the error code in client_error_code field (client error or otherwise)
+    return {error.additional_status_code.value_or(0), 0, {}, std::string(error.reason()), error.code()};
+}
+
 } // namespace app
 } // namespace realm

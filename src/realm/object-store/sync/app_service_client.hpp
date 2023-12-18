@@ -45,10 +45,10 @@ public:
     ///        error is thrown and ejson-encoded reply if successful. The reply string will be a null pointer only in
     ///        the case of error. Using a string* rather than optional<string> to avoid copying a potentially large
     ///        string.
-    virtual void call_function(
-        const std::shared_ptr<SyncUser>& user, const std::string& name, std::string_view args_ejson,
-        const util::Optional<std::string>& service_name,
-        util::UniqueFunction<void(util::Optional<std::string_view>, util::Optional<AppError>)>&& completion) = 0;
+    virtual void
+    call_function(const std::shared_ptr<SyncUser>& user, const std::string& name, std::string_view args_ejson,
+                  const util::Optional<std::string>& service_name,
+                  util::UniqueFunction<void(const std::string*, util::Optional<AppError>)>&& completion) = 0;
 
     /// Calls the Realm Cloud function with the provided name and arguments.
     /// @param user The sync user to perform this request.

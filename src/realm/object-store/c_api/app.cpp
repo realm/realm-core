@@ -613,15 +613,14 @@ RLM_API bool realm_app_call_function(const realm_app_t* app, const realm_user_t*
 {
     return wrap_err([&] {
         auto cb = [callback, userdata = SharedUserdata{userdata, FreeUserdata(userdata_free)}](
-                      util::Optional<std::string_view> reply, util::Optional<AppError> error) {
+                      const std::string* reply, util::Optional<AppError> error) {
             if (error) {
                 realm_app_error_t c_error(to_capi(*error));
-                return callback(userdata.get(), nullptr, 0, &c_error);
+                callback(userdata.get(), nullptr, &c_error);
             }
-            if (!reply) {
-                return callback(userdata.get(), nullptr, 0, nullptr);
+            else {
+                callback(userdata.get(), reply->c_str(), nullptr);
             }
-            callback(userdata.get(), reply->data(), reply->size(), nullptr);
         };
         util::Optional<std::string> service_name_opt =
             service_name ? util::some<std::string>(service_name) : util::none;

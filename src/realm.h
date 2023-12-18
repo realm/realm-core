@@ -2835,7 +2835,7 @@ typedef void (*realm_return_apikey_list_func_t)(realm_userdata_t userdata, realm
                                                 realm_app_error_t*);
 
 typedef void (*realm_return_string_func_t)(realm_userdata_t userdata, const char* serialized_ejson_response,
-                                           size_t count, const realm_app_error_t*);
+                                           const realm_app_error_t*);
 /**
  * Generic completion callback for asynchronous Realm App operations.
  *

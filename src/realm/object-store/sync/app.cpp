@@ -113,14 +113,14 @@ T parse(std::string_view str)
 
 struct UserAPIKeyResponseHandler {
     UniqueFunction<void(App::UserAPIKey&&, Optional<AppError>)> completion;
-    void operator()(AppResponse&& result)
+    void operator()(const Response& response)
     {
-        if (!result.is_ok()) {
-            return completion({}, std::move(result.error));
+        if (auto error = AppUtils::check_for_errors(response)) {
+            return completion({}, std::move(error));
         }
 
         try {
-            auto json = parse<BsonDocument>(result.body());
+            auto json = parse<BsonDocument>(response.body);
             completion(read_user_api_key(json), {});
         }
         catch (AppError& e) {
@@ -164,10 +164,10 @@ HttpHeaders get_request_headers(const std::shared_ptr<SyncUser>& with_user_autho
     return headers;
 }
 
-UniqueFunction<void(AppResponse&&)> handle_default_response(UniqueFunction<void(Optional<AppError>)>&& completion)
+UniqueFunction<void(const Response&)> handle_default_response(UniqueFunction<void(Optional<AppError>)>&& completion)
 {
-    return [completion = std::move(completion)](AppResponse&& result) {
-        completion(std::move(result.error));
+    return [completion = std::move(completion)](const Response& response) {
+        completion(AppUtils::check_for_errors(response));
     };
 }
 
@@ -550,21 +550,19 @@ void App::UserAPIKeyProviderClient::fetch_api_keys(
     req.uses_refresh_token = true;
 
     m_auth_request_client.do_authenticated_request(
-        std::move(req), user, [completion = std::move(completion)](AppResponse&& result) {
-            if (!result.is_ok()) {
-                completion({}, std::move(result.error));
-                return; // early return
+        std::move(req), user, [completion = std::move(completion)](const Response& response) {
+            if (auto error = AppUtils::check_for_errors(response)) {
+                return completion({}, std::move(error));
             }
 
             try {
-                auto json = parse<BsonArray>(result.body());
+                auto json = parse<BsonArray>(response.body);
                 std::vector<UserAPIKey> keys;
                 keys.reserve(json.size());
                 for (auto&& api_key_json : json) {
                     keys.push_back(UserAPIKeyResponseHandler::read_user_api_key(as<BsonDocument>(api_key_json)));
                 }
-                completion(std::move(keys), {});
-                return; // early return
+                return completion(std::move(keys), {});
             }
             catch (AppError& e) {
                 completion({}, std::move(e));
@@ -675,13 +673,13 @@ void App::get_profile(const std::shared_ptr<SyncUser>& sync_user,
 
     do_authenticated_request(
         std::move(req), sync_user,
-        [completion = std::move(completion), self = shared_from_this(), sync_user](AppResponse&& profile_response) {
-            if (!profile_response.is_ok()) {
-                completion(nullptr, std::move(profile_response.error));
+        [completion = std::move(completion), self = shared_from_this(), sync_user](const Response& profile_response) {
+            if (auto error = AppUtils::check_for_errors(profile_response)) {
+                return completion(nullptr, std::move(error));
             }
 
             try {
-                auto profile_json = parse<BsonDocument>(profile_response.body());
+                auto profile_json = parse<BsonDocument>(profile_response.body);
                 auto identities_json = get<BsonArray>(profile_json, "identities");
 
                 std::vector<SyncUserIdentity> identities;
@@ -698,11 +696,10 @@ void App::get_profile(const std::shared_ptr<SyncUser>& sync_user,
                 self->emit_change_to_subscribers(*self);
             }
             catch (const AppError& err) {
-                completion(nullptr, err);
-                return; // early return
+                return completion(nullptr, err);
             }
 
-            completion(sync_user, {});
+            return completion(sync_user, {});
         });
 }
 
@@ -766,17 +763,17 @@ void App::log_in_with_credentials(
     do_request(
         {HttpMethod::post, route, m_request_timeout_ms,
          get_request_headers(linking_user, RequestTokenType::AccessToken), Bson(body).to_string()},
-        [completion = std::move(completion), linking_user, self = shared_from_this()](AppResponse&& result) mutable {
-            if (!result.is_ok()) {
-                self->log_error("App: log_in_with_credentials failed: %1 message: %2", result.status_code(),
-                                result.error->what());
-                completion(nullptr, std::move(result.error));
-                return; // early return
+        [completion = std::move(completion), credentials, linking_user,
+         self = shared_from_this()](const Response& response) mutable {
+            if (auto error = AppUtils::check_for_errors(response)) {
+                self->log_error("App: log_in_with_credentials failed: %1 message: %2", response.http_status_code,
+                                error->what());
+                return completion(nullptr, std::move(error));
             }
 
             std::shared_ptr<realm::SyncUser> sync_user = linking_user;
             try {
-                auto json = parse<BsonDocument>(result.body());
+                auto json = parse<BsonDocument>(response.body);
                 if (linking_user) {
                     linking_user->update_access_token(get<std::string>(json, "access_token"));
                 }
@@ -787,8 +784,7 @@ void App::log_in_with_credentials(
                 }
             }
             catch (const AppError& e) {
-                completion(nullptr, e);
-                return; // early return
+                return completion(nullptr, e);
             }
 
             self->get_profile(sync_user, std::move(completion));
@@ -828,12 +824,14 @@ void App::log_out(const std::shared_ptr<SyncUser>& user, UniqueFunction<void(Opt
         req.url = util::format("%1/auth/session", m_base_route);
     }
 
-    do_request(std::move(req), [self = shared_from_this(), completion = std::move(completion)](AppResponse&& result) {
-        if (result.is_ok()) {
-            self->emit_change_to_subscribers(*self);
-        }
-        completion(std::move(result.error));
-    });
+    do_request(std::move(req),
+               [self = shared_from_this(), completion = std::move(completion)](const Response& response) {
+                   auto error = AppUtils::check_for_errors(response);
+                   if (!error) {
+                       self->emit_change_to_subscribers(*self);
+                   }
+                   completion(error);
+               });
 }
 
 void App::log_out(UniqueFunction<void(Optional<AppError>)>&& completion)
@@ -877,7 +875,7 @@ void App::remove_user(const std::shared_ptr<SyncUser>& user, UniqueFunction<void
         log_out(user, [user, completion = std::move(completion),
                        self = shared_from_this()](const Optional<AppError>& error) {
             self->m_sync_manager->remove_user(user->identity());
-            completion(error);
+            return completion(error);
         });
     }
     else {
@@ -905,12 +903,13 @@ void App::delete_user(const std::shared_ptr<SyncUser>& user, UniqueFunction<void
     req.url = url_for_path("/auth/delete");
     do_authenticated_request(std::move(req), user,
                              [self = shared_from_this(), completion = std::move(completion),
-                              identitiy = user->identity()](AppResponse&& result) {
-                                 if (result.is_ok()) {
+                              identity = user->identity()](const Response& response) {
+                                 auto error = AppUtils::check_for_errors(response);
+                                 if (!error) {
                                      self->emit_change_to_subscribers(*self);
-                                     self->m_sync_manager->delete_user(identitiy);
+                                     self->m_sync_manager->delete_user(identity);
                                  }
-                                 completion(std::move(result.error));
+                                 completion(std::move(error));
                              });
 }
 
@@ -1035,15 +1034,14 @@ void App::request_location(UniqueFunction<void(Optional<AppError>)>&& completion
 
 Optional<AppError> App::update_location(const Response& response, const std::string& base_url)
 {
-    // Use an AppResponse to check for errors in the response
-    AppResponse result(response);
-    if (!result.is_ok()) {
-        return result.error;
+    // Check for errors in the response
+    if (auto error = AppUtils::check_for_errors(response)) {
+        return error;
     }
 
     // Update the location info with the data from the response
     try {
-        auto json = parse<BsonDocument>(result.body());
+        auto json = parse<BsonDocument>(response.body);
         auto hostname = get<std::string>(json, "hostname");
         auto ws_hostname = get<std::string>(json, "ws_hostname");
         auto deployment_model = get<std::string>(json, "deployment_model");
@@ -1064,7 +1062,7 @@ Optional<AppError> App::update_location(const Response& response, const std::str
     return util::none;
 }
 
-void App::update_location_and_resend(Request&& request, UniqueFunction<void(AppResponse&&)>&& completion,
+void App::update_location_and_resend(Request&& request, UniqueFunction<void(const Response& response)>&& completion,
                                      Optional<std::string>&& redir_location)
 {
     // if we do not have metadata yet, we need to initialize it and send the
@@ -1075,8 +1073,7 @@ void App::update_location_and_resend(Request&& request, UniqueFunction<void(AppR
          self = shared_from_this()](Optional<AppError> error) mutable {
             if (error) {
                 // Operation failed, pass it up the chain
-                completion(AppResponse{std::move(*error)});
-                return; // early return
+                return completion(AppUtils::make_apperror_response(*error));
             }
 
             // If the location info was updated, update the original request to point
@@ -1104,7 +1101,8 @@ void App::post(std::string&& route, UniqueFunction<void(Optional<AppError>)>&& c
                handle_default_response(std::move(completion)));
 }
 
-void App::do_request(Request&& request, UniqueFunction<void(AppResponse&&)>&& completion, bool update_location)
+void App::do_request(Request&& request, UniqueFunction<void(const Response& response)>&& completion,
+                     bool update_location)
 {
     // Make sure the timeout value is set to the configured request timeout value
     request.timeout_ms = m_request_timeout_ms;
@@ -1129,19 +1127,18 @@ void App::do_request(Request&& request, UniqueFunction<void(AppResponse&&)>&& co
     // location info has already been received send the request directly
     m_config.transport->send_request_to_server(std::move(request),
                                                [self = shared_from_this(), completion = std::move(completion)](
-                                                   Request&& request, const Response& response) mutable -> void {
+                                                   Request&& request, const Response& response) mutable {
                                                    self->check_for_redirect_response(std::move(request), response,
                                                                                      std::move(completion));
                                                });
 }
 
 void App::check_for_redirect_response(Request&& request, const Response& response,
-                                      UniqueFunction<void(AppResponse&&)>&& completion)
+                                      UniqueFunction<void(const Response& response)>&& completion)
 {
     // If this isn't a redirect response, then we're done
     if (!AppUtils::is_redirect_status_code(response.http_status_code)) {
-        completion(AppResponse{response});
-        return;
+        return completion(response);
     }
 
     // Handle a redirect response when sending the original request - extract the location
@@ -1149,11 +1146,9 @@ void App::check_for_redirect_response(Request&& request, const Response& respons
     auto redir_location = AppUtils::extract_redir_location(response);
     if (!redir_location || redir_location->empty()) {
         // Location not found in the response, pass error response up the chain
-        completion(AppResponse{AppError{ErrorCodes::ClientRedirectError,
-                                        "Redirect response missing location header",
-                                        {},
-                                        response.http_status_code}});
-        return; // early return
+        auto error = AppError(ErrorCodes::ClientRedirectError, "Redirect response missing location header", {},
+                              response.http_status_code);
+        return completion(AppUtils::make_apperror_response(error));
     }
 
     // Request the location info at the new location - once this is complete, the original
@@ -1162,41 +1157,59 @@ void App::check_for_redirect_response(Request&& request, const Response& respons
 }
 
 void App::do_authenticated_request(Request&& request, const std::shared_ptr<SyncUser>& sync_user,
-                                   util::UniqueFunction<void(AppResponse&&)>&& completion)
+                                   util::UniqueFunction<void(const Response& response)>&& completion)
 {
     request.headers = get_request_headers(sync_user, request.uses_refresh_token ? RequestTokenType::RefreshToken
                                                                                 : RequestTokenType::AccessToken);
 
     log_debug("App: do_authenticated_request: %1 %2", httpmethod_to_string(request.method), request.url);
-    Request request_2 = request;
-    do_request(std::move(request), [completion = std::move(completion), request = std::move(request_2), sync_user,
-                                    self = shared_from_this()](AppResponse&& result) mutable {
-        if (!result.is_ok()) {
-            self->handle_auth_failure(std::move(result), std::move(request), sync_user, std::move(completion));
+    auto completion_2 = [completion = std::move(completion), request, sync_user,
+                         self = shared_from_this()](const Response& response) mutable {
+        if (auto error = AppUtils::check_for_errors(response)) {
+            self->handle_auth_failure(std::move(*error), std::move(response), std::move(request), sync_user,
+                                      std::move(completion));
         }
         else {
-            completion(std::move(result));
+            completion(response);
         }
-    });
+    };
+    do_request(std::move(request), std::move(completion_2));
 }
 
-void App::handle_auth_failure(AppResponse&& result, Request&& request, const std::shared_ptr<SyncUser>& sync_user,
-                              util::UniqueFunction<void(AppResponse&&)>&& completion)
+void App::handle_auth_failure(const AppError& error, const Response& response, Request&& request,
+                              const std::shared_ptr<SyncUser>& sync_user,
+                              util::UniqueFunction<void(const Response& response)>&& completion)
 {
     // Only handle auth failures
-    if (result.error->additional_status_code == 401) {
+    if (*error.additional_status_code == 401) {
         if (request.uses_refresh_token) {
             if (sync_user && sync_user->is_logged_in()) {
                 sync_user->log_out();
             }
-            completion(std::move(result));
+            completion(response);
             return;
         }
     }
     else {
-        completion(std::move(result));
+        completion(response);
         return;
     }
+
+    // Otherwise, refresh the access token
+    App::refresh_access_token(sync_user, false,
+                              [self = shared_from_this(), request = std::move(request),
+                               completion = std::move(completion), response = std::move(response),
+                               sync_user](Optional<AppError>&& error) mutable {
+                                  if (!error) {
+                                      // assign the new access_token to the auth header
+                                      request.headers = get_request_headers(sync_user, RequestTokenType::AccessToken);
+                                      self->do_request(std::move(request), std::move(completion));
+                                  }
+                                  else {
+                                      // pass the error back up the chain
+                                      completion(std::move(response));
+                                  }
+                              });
 }
 
 /// MARK: - refresh access token
@@ -1226,22 +1239,20 @@ void App::refresh_access_token(const std::shared_ptr<SyncUser>& sync_user, bool 
     do_request(
         {HttpMethod::post, std::move(route), m_request_timeout_ms,
          get_request_headers(sync_user, RequestTokenType::RefreshToken)},
-        [completion = std::move(completion), sync_user](AppResponse&& result) {
-            if (!result.is_ok()) {
-                completion(std::move(result.error));
-                return; // early return
+        [completion = std::move(completion), sync_user](const Response& response) {
+            if (auto error = AppUtils::check_for_errors(response)) {
+                return completion(std::move(error));
             }
 
             try {
-                auto json = parse<BsonDocument>(result.body());
+                auto json = parse<BsonDocument>(response.body);
                 sync_user->update_access_token(get<std::string>(json, "access_token"));
             }
             catch (AppError& err) {
-                completion(std::move(err));
-                return; // early return
+                return completion(std::move(err));
             }
 
-            completion(util::none);
+            return completion(util::none);
         },
         update_location);
 }
@@ -1254,7 +1265,7 @@ std::string App::function_call_url_path() const
 
 void App::call_function(const std::shared_ptr<SyncUser>& user, const std::string& name, std::string_view args_ejson,
                         const Optional<std::string>& service_name_opt,
-                        UniqueFunction<void(util::Optional<std::string_view>, Optional<AppError>)>&& completion)
+                        UniqueFunction<void(const std::string*, Optional<AppError>)>&& completion)
 {
     auto service_name = service_name_opt ? *service_name_opt : "<none>";
     if (would_log(util::Logger::Level::debug)) {
@@ -1267,14 +1278,13 @@ void App::call_function(const std::shared_ptr<SyncUser>& user, const std::string
     do_authenticated_request(
         Request{HttpMethod::post, function_call_url_path(), m_request_timeout_ms, {}, std::move(args), false}, user,
         [self = shared_from_this(), name = name, service_name = std::move(service_name),
-         completion = std::move(completion)](AppResponse&& result) {
-            if (!result.is_ok()) {
+         completion = std::move(completion)](const Response& response) {
+            if (auto error = AppUtils::check_for_errors(response)) {
                 self->log_error("App: call_function: %1 service_name: %2 -> %3 ERROR: %4", name, service_name,
-                                result.status_code(), result.error->what());
-                completion(util::none, std::move(result.error));
-                return; // early return
+                                response.http_status_code, error->what());
+                return completion(nullptr, error);
             }
-            completion(result.body(), util::none);
+            completion(&response.body, util::none);
         });
 }
 
@@ -1294,11 +1304,12 @@ void App::call_function(const std::shared_ptr<SyncUser>& user, const std::string
 
     call_function(user, name, std::move(args_ejson).str(), service_name,
                   [self = shared_from_this(), name, service_name = std::move(service_name2),
-                   completion = std::move(completion)](util::Optional<std::string_view> response,
-                                                       util::Optional<AppError>&& err) {
+                   completion = std::move(completion)](const std::string* response, util::Optional<AppError>&& err) {
                       if (err) {
-                          completion({}, err);
-                          return;
+                          return completion({}, err);
+                      }
+                      if (response == nullptr) {
+                          return completion({}, AppError{ErrorCodes::AppUnknownError, "Empty response from server"});
                       }
                       util::Optional<Bson> body_as_bson;
                       try {
@@ -1311,8 +1322,7 @@ void App::call_function(const std::shared_ptr<SyncUser>& user, const std::string
                       catch (const std::exception& e) {
                           self->log_error("App: call_function: %1 service_name: %2 - error parsing result: %3", name,
                                           service_name, e.what());
-                          completion(util::none, AppError(ErrorCodes::BadBsonParse, e.what()));
-                          return;
+                          return completion(util::none, AppError(ErrorCodes::BadBsonParse, e.what()));
                       };
                       completion(std::move(body_as_bson), util::none);
                   });
