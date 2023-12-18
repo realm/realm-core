@@ -885,16 +885,18 @@ void SyncSession::create_sync_session()
     }
 
     {
-        std::string sync_route = m_sync_manager->sync_route();
+        // At this point, the sync_route should be valid
+        auto sync_route = m_sync_manager->sync_route();
+        REALM_ASSERT(sync_route);
 
-        if (!m_client.decompose_server_url(sync_route, session_config.protocol_envelope,
+        if (!m_client.decompose_server_url(*sync_route, session_config.protocol_envelope,
                                            session_config.server_address, session_config.server_port,
                                            session_config.service_identifier)) {
-            throw sync::BadServerUrl(sync_route);
+            throw sync::BadServerUrl(*sync_route);
         }
         // FIXME: Java needs the fully resolved URL for proxy support, but we also need it before
         // the session is created. How to resolve this?
-        m_server_url = sync_route;
+        m_server_url = *sync_route;
     }
 
     if (sync_config.authorization_header_name) {
@@ -1061,7 +1063,9 @@ void SyncSession::resume()
 void SyncSession::do_revive(util::CheckedUniqueLock&& lock)
 {
     auto u = user();
-    if (!u || !u->access_token_refresh_required()) {
+    // If the sync manager doesn't have a valid route yet, then request
+    // an updated access token to refresh it.
+    if (m_sync_manager->sync_route() && (!u || !u->access_token_refresh_required())) {
         become_active();
         m_state_mutex.unlock(lock);
         return;

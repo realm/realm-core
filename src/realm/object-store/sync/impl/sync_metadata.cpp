@@ -69,6 +69,7 @@ static const char* const c_sync_app_metadata_deployment_model = "deployment_mode
 static const char* const c_sync_app_metadata_location = "location";
 static const char* const c_sync_app_metadata_hostname = "hostname";
 static const char* const c_sync_app_metadata_ws_hostname = "ws_hostname";
+static const char* const c_sync_app_metadata_base_url = "base_url";
 
 realm::Schema make_schema()
 {
@@ -109,6 +110,7 @@ realm::Schema make_schema()
              {c_sync_app_metadata_location, PropertyType::String},
              {c_sync_app_metadata_hostname, PropertyType::String},
              {c_sync_app_metadata_ws_hostname, PropertyType::String},
+             {c_sync_app_metadata_base_url, PropertyType::String},
          }},
     };
 }
@@ -214,7 +216,7 @@ void migrate_to_v7(std::shared_ptr<Realm> old_realm, std::shared_ptr<Realm> real
 SyncMetadataManager::SyncMetadataManager(std::string path, bool should_encrypt,
                                          util::Optional<std::vector<char>> encryption_key)
 {
-    constexpr uint64_t SCHEMA_VERSION = 7;
+    constexpr uint64_t SCHEMA_VERSION = 8;
 
     if (!REALM_PLATFORM_APPLE && should_encrypt && !encryption_key)
         throw InvalidArgument("Metadata Realm encryption was specified, but no encryption key was provided.");
@@ -257,7 +259,7 @@ SyncMetadataManager::SyncMetadataManager(std::string path, bool should_encrypt,
     m_app_metadata_schema = {
         object_schema->persisted_properties[0].column_key, object_schema->persisted_properties[1].column_key,
         object_schema->persisted_properties[2].column_key, object_schema->persisted_properties[3].column_key,
-        object_schema->persisted_properties[4].column_key};
+        object_schema->persisted_properties[4].column_key, object_schema->persisted_properties[5].column_key};
 }
 
 SyncUserMetadataResults SyncMetadataManager::all_unmarked_users() const
@@ -495,7 +497,8 @@ std::shared_ptr<Realm> SyncMetadataManager::open_realm(bool should_encrypt, bool
 static const auto app_metadata_pk = 1;
 
 bool SyncMetadataManager::set_app_metadata(const std::string& deployment_model, const std::string& location,
-                                           const std::string& hostname, const std::string& ws_hostname)
+                                           const std::string& hostname, const std::string& ws_hostname,
+                                           const std::string& base_url)
 {
     if (m_app_metadata && m_app_metadata->hostname == hostname && m_app_metadata->ws_hostname == ws_hostname &&
         m_app_metadata->deployment_model == deployment_model && m_app_metadata->location == location) {
@@ -517,6 +520,7 @@ bool SyncMetadataManager::set_app_metadata(const std::string& deployment_model, 
     obj.set(schema.location_col, location);
     obj.set(schema.hostname_col, hostname);
     obj.set(schema.ws_hostname_col, ws_hostname);
+    obj.set(schema.base_url_col, base_url);
 
     realm->commit_transaction();
     // App metadata was updated
@@ -535,7 +539,8 @@ util::Optional<SyncAppMetadata> SyncMetadataManager::get_app_metadata()
         auto& schema = m_app_metadata_schema;
         m_app_metadata =
             SyncAppMetadata{obj.get<String>(schema.deployment_model_col), obj.get<String>(schema.location_col),
-                            obj.get<String>(schema.hostname_col), obj.get<String>(schema.ws_hostname_col)};
+                            obj.get<String>(schema.hostname_col), obj.get<String>(schema.ws_hostname_col),
+                            obj.get<String>(schema.base_url_col)};
     }
 
     return m_app_metadata;

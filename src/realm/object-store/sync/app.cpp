@@ -262,10 +262,7 @@ void App::close_all_sync_sessions()
 
 App::App(const Config& config)
     : m_config(std::move(config))
-    , m_base_url(m_config.base_url.value_or(default_base_url))
-    , m_base_route(m_base_url + base_path)
-    , m_app_route(m_base_route + app_path + "/" + m_config.app_id)
-    , m_auth_route(m_app_route + auth_path)
+    , m_location_updated(false) // always request location on app creation
     , m_request_timeout_ms(m_config.default_request_timeout_ms.value_or(default_timeout_ms))
 {
 #ifdef __EMSCRIPTEN__
@@ -275,6 +272,16 @@ App::App(const Config& config)
 #endif
     REALM_ASSERT(m_config.transport);
     REALM_ASSERT(!m_config.device_info.platform.empty());
+
+    // if a base url is provided, then verify it - if it is not, then it will be populated
+    // with the value from metadata or set to default when the App is configured.
+    if (m_config.base_url) {
+        std::string scheme, host, path;
+        if (!AppUtils::split_url(*m_config.base_url, scheme, host, path)) {
+            throw InvalidArgument(
+                util::format("base_url must start with scheme (ex. %1): %2", default_base_url, m_base_url));
+        }
+    }
 
     if (m_config.device_info.platform_version.empty()) {
         throw InvalidArgument("You must specify the Platform Version in App::Config::device_info");
@@ -288,9 +295,6 @@ App::App(const Config& config)
         throw InvalidArgument("You must specify the SDK Version in App::Config::device_info");
     }
 
-    // change the scheme in the base url to ws from http to satisfy the sync client
-    auto sync_route = make_sync_route(m_app_route);
-
     m_sync_manager = std::make_shared<SyncManager>();
 }
 
@@ -298,18 +302,21 @@ App::~App() {}
 
 void App::configure(const SyncClientConfig& sync_client_config)
 {
-    auto sync_route = make_sync_route(m_app_route);
-    m_sync_manager->configure(shared_from_this(), sync_route, sync_client_config);
-    if (auto metadata = m_sync_manager->app_metadata()) {
-        // If there is app metadata stored, then set up the initial hostname/syncroute
-        // using that info - it will be updated upon first request to the server
-        update_hostname(metadata);
-    }
     {
-        std::lock_guard<std::mutex> lock(*m_route_mutex);
-        // Always update the location after the app is configured/re-configured
+        std::unique_lock lock(*m_route_mutex);
+        // Make sure to request the location when the app is configured
         m_location_updated = false;
+
+        auto config_base_url = m_config.base_url;
+        auto metadata = m_sync_manager->app_metadata();
+        lock.unlock();
+        configure_route(metadata, config_base_url);
     }
+
+    // Start with an empty sync route in the sync manager. It will ensure the
+    // location has been updated at least once when the first sync session is
+    // started by requesting a new access token.
+    m_sync_manager->configure(shared_from_this(), util::none, sync_client_config);
 }
 
 bool App::init_logger()
@@ -341,6 +348,16 @@ void App::log_error(const char* message, Params&&... params)
     }
 }
 
+std::string App::get_hostname()
+{
+    if (auto app_metadata = m_sync_manager->app_metadata()) {
+        return app_metadata->hostname;
+    }
+    // If there is no metadata stored, then return the local hostname
+    std::lock_guard<std::mutex> lock(*m_route_mutex);
+    return m_hostname;
+}
+
 std::string App::make_sync_route(const std::string& http_app_route)
 {
     // change the scheme in the base url from http to ws to satisfy the sync client URL
@@ -351,21 +368,52 @@ std::string App::make_sync_route(const std::string& http_app_route)
     return sync_route;
 }
 
-void App::update_hostname(const util::Optional<SyncAppMetadata>& metadata)
+void App::configure_route(const Optional<realm::SyncAppMetadata>& metadata, const Optional<std::string>& new_base_url)
 {
-    // Update url components based on new hostname value from the app metadata
+    // Update url components based on new hostname value from the app metadata when
+    // the app is configured
+
+    // If there is app metadata stored, then set up the initial hostname/syncroute
+    // using that info - it will be updated upon first request to the server
     if (metadata) {
-        update_hostname(metadata->hostname, metadata->ws_hostname);
+        std::string base_url;
+        // If a base_url value is provided (from App config), then use that value
+        if (new_base_url) {
+            base_url = *new_base_url;
+        }
+        // If a base url value is not provided, use either the value stored in
+        // the metadata or the default value
+        else {
+            base_url = !metadata->base_url.empty() ? metadata->base_url : default_base_url;
+        }
+        if (metadata->base_url == base_url) {
+            // If the stored metadata matches the configured base_url, the update route using metadata
+            update_hostname(metadata->hostname, metadata->ws_hostname, base_url);
+        }
+        else {
+            // Otherwise, update route with configured base url value
+            update_hostname(base_url, util::none, base_url);
+        }
+    }
+    // No metadata, initialize route info using provided base_url value or default value
+    else {
+        // Will generate websocket hostname
+        update_hostname(new_base_url.value_or(default_base_url), util::none, new_base_url.value_or(default_base_url));
     }
 }
 
-void App::update_hostname(const std::string& hostname, const Optional<std::string>& ws_hostname)
+void App::update_hostname(const std::string& hostname, const Optional<std::string>& ws_hostname,
+                          const Optional<std::string>& new_base_url)
 {
     // Update url components based on new hostname (and optional websocket hostname) values
     log_debug("App: update_hostname: %1 | %2", hostname, ws_hostname);
     REALM_ASSERT(m_sync_manager);
     std::lock_guard<std::mutex> lock(*m_route_mutex);
-    m_base_route = (hostname.length() > 0 ? hostname : default_base_url) + base_path;
+    if (new_base_url) {
+        m_base_url = *new_base_url;
+    }
+    m_hostname = (hostname.length() > 0 ? hostname : m_base_url);
+    m_base_route = m_hostname + base_path;
     std::string this_app_path = app_path + "/" + m_config.app_id;
     m_app_route = m_base_route + this_app_path;
     m_auth_route = m_app_route + auth_path;
@@ -570,35 +618,44 @@ std::string App::get_base_url() const
 {
     std::lock_guard<std::mutex> lock(*m_route_mutex);
     if (auto metadata = m_sync_manager->app_metadata()) {
-        // If there is app metadata stored, then return that hostname
-        return metadata->hostname;
+        // If there is app metadata stored and a value for base_url, then return that base_url
+        if (!metadata->base_url.empty()) {
+            return metadata->base_url;
+        }
     }
     return m_base_url;
 }
 
-void App::update_base_url(const std::string& base_url, UniqueFunction<void(Optional<AppError>)>&& completion)
+void App::update_base_url(std::string base_url, UniqueFunction<void(Optional<AppError>)>&& completion)
 {
     log_debug("App::update_base_url: %1", base_url);
+    std::string scheme, host, request;
+    // empty base_url is invalid
+    if (base_url.empty()) {
+        return completion(
+            AppError{ErrorCodes::InvalidArgument, "update_base_url: new base URL value cannot be empty"});
+    }
+    // Validate the new base_url
+    if (!AppUtils::split_url(base_url, scheme, host, request)) {
+        return completion(AppError{ErrorCodes::InvalidArgument,
+                                   util::format("update_base_url: Base URL must start with scheme (ex. %1): %2",
+                                                default_base_url, m_base_url)});
+    }
+
+    bool needs_update = base_url != get_base_url();
     {
         std::lock_guard<std::mutex> lock(*m_route_mutex);
-        // empty base_url is invalid
-        if (base_url.empty()) {
-            return completion(
-                AppError{ErrorCodes::InvalidArgument, "update_base_url: new base URL value cannot be empty"});
-        }
-        // If the base_url is the same and the location has already been updated, then we're done
-        else if (base_url == m_base_url && m_location_updated) {
-            return completion(util::none);
-        }
-        m_location_updated = false;
+        // Update the location if the base_url is different or location update is already needed
+        m_location_updated = !needs_update && m_location_updated;
+    }
+    // If the base_url is the same and the location has already been updated, then we're done
+    if (m_location_updated) {
+        completion(util::none);
+        return;
     }
 
     // re-initialize the app location metadata with the new information at the new base URL
-    init_app_metadata(
-        [completion = std::move(completion)](Optional<AppError> error) {
-            completion(std::move(error));
-        },
-        base_url);
+    request_location(std::move(completion), base_url);
 }
 
 void App::get_profile(const std::shared_ptr<SyncUser>& sync_user,
@@ -706,8 +763,7 @@ void App::log_in_with_credentials(
     do_request(
         {HttpMethod::post, route, m_request_timeout_ms,
          get_request_headers(linking_user, RequestTokenType::AccessToken), Bson(body).to_string()},
-        [completion = std::move(completion), credentials, linking_user,
-         self = shared_from_this()](AppResponse&& result) mutable {
+        [completion = std::move(completion), linking_user, self = shared_from_this()](AppResponse&& result) mutable {
             if (!result.is_ok()) {
                 self->log_error("App: log_in_with_credentials failed: %1 message: %2", result.status_code(),
                                 result.error->what());
@@ -901,49 +957,60 @@ std::string App::get_app_route(const Optional<std::string>& hostname) const
     }
 }
 
-void App::init_app_metadata(UniqueFunction<void(Optional<AppError>)>&& completion,
-                            const Optional<std::string> new_hostname, int retry_count)
+void App::request_location(UniqueFunction<void(Optional<AppError>)>&& completion,
+                           Optional<std::string>&& new_hostname, Optional<std::string>&& redir_location,
+                           int redirect_count)
 {
-    std::string route;
+    std::string app_route;
+    std::string base_url;
     {
         std::unique_lock<std::mutex> lock(*m_route_mutex);
         // Skip if the app_metadata/location data has already been initialized and a new hostname is not provided
-        if (!new_hostname && m_location_updated) {
+        if (!new_hostname && !redir_location && m_location_updated) {
             // Release the lock before calling the completion function
             lock.unlock();
-            return completion(util::none); // early return
+            completion(util::none);
+            return; // early return
         }
         else {
-            route = util::format("%1/location", new_hostname ? get_app_route(new_hostname) : get_app_route());
+            base_url = new_hostname ? *new_hostname : m_base_url;
+            // If this is for a redirect after querying new_hostname, then use the redirect location
+            if (redir_location)
+                app_route = get_app_route(redir_location);
+            // If this is querying the new_hostname, then use that location
+            else if (new_hostname)
+                app_route = get_app_route(new_hostname);
+            else
+                app_route = get_app_route();
+            REALM_ASSERT(!app_route.empty());
         }
     }
 
     Request req;
     req.method = HttpMethod::get;
-    req.url = route;
+    req.url = util::format("%1/location", app_route);
     req.timeout_ms = m_request_timeout_ms;
-    req.redirect_count = retry_count;
+    req.redirect_count = redirect_count;
 
-    log_debug("App: request location: %1", route);
+    log_debug("App: request location: %1", req.url);
 
     m_config.transport->send_request_to_server(
-        std::move(req), [self = shared_from_this(), new_base_url = new_hostname,
-                         completion = std::move(completion)](Request&& request, const Response& response) mutable {
+        std::move(req), [self = shared_from_this(), completion = std::move(completion),
+                         base_url = std::move(base_url)](Request&& request, const Response& response) mutable {
             // Check to see if a redirect occurred
             if (AppUtils::is_redirect_status_code(response.http_status_code)) {
                 // Make sure we don't do too many redirects (max_http_redirects (20) is an arbitrary number)
-                // The redirect count is tracked in the original request
                 if (++request.redirect_count >= max_http_redirects) {
                     completion(AppError{ErrorCodes::ClientTooManyRedirects,
                                         util::format("number of redirections exceeded %1", max_http_redirects),
                                         {},
-                                        response.http_status_code}); // early return
+                                        response.http_status_code});
                     return;                                          // early return
                 }
                 // Handle the redirect response when requesting the location - extract the
                 // new location header field and resend the request.
-                auto location = AppUtils::extract_location(response);
-                if (!location || location->empty()) {
+                auto redir_location = AppUtils::extract_redir_location(response);
+                if (!redir_location || redir_location->empty()) {
                     // Location not found in the response, pass error response up the chain
                     completion(AppError{ErrorCodes::ClientRedirectError,
                                         "Redirect response missing location header",
@@ -953,16 +1020,20 @@ void App::init_app_metadata(UniqueFunction<void(Optional<AppError>)>&& completio
                 }
                 // try to request the location info at the new location in the redirect response
                 // retry_count is passed in to track the number of subsequent redirection attempts
-                self->init_app_metadata(std::move(completion), location, request.redirect_count);
+                self->request_location(std::move(completion), std::move(base_url), std::move(redir_location),
+                                       request.redirect_count);
                 return; // early return
             }
-            auto update_response = self->update_location(AppResponse{response}, std::move(new_base_url));
+            // Location request was successful - update the location info
+            auto update_response = self->update_location(response, base_url);
             completion(update_response);
         });
 }
 
-Optional<AppError> App::update_location(AppResponse&& result, Optional<std::string>&& new_base_url)
+Optional<AppError> App::update_location(const Response& response, const std::string& base_url)
 {
+    // Use an AppResponse to check for errors in the response
+    AppResponse result(response);
     if (!result.is_ok()) {
         return result.error;
     }
@@ -974,39 +1045,30 @@ Optional<AppError> App::update_location(AppResponse&& result, Optional<std::stri
         auto ws_hostname = get<std::string>(json, "ws_hostname");
         auto deployment_model = get<std::string>(json, "deployment_model");
         auto location = get<std::string>(json, "location");
-        if (m_sync_manager->perform_metadata_update([&](SyncMetadataManager& manager) {
-                manager.set_app_metadata(deployment_model, location, hostname, ws_hostname);
-            })) {
-            // Update the hostname and sync route using the new app metadata info
-            update_hostname(m_sync_manager->app_metadata());
-        }
-        else {
-            // No metadata in use, update the hostname and sync route directly
-            update_hostname(hostname, ws_hostname);
-        }
+        m_sync_manager->perform_metadata_update([&](SyncMetadataManager& manager) {
+            manager.set_app_metadata(deployment_model, location, hostname, ws_hostname, base_url);
+        });
+        // Update the local hostname and path information
+        update_hostname(hostname, ws_hostname, base_url);
         {
             std::lock_guard<std::mutex> lock(*m_route_mutex);
             m_location_updated = true;
-            // Update the base_url with the new value
-            if (new_base_url) {
-                m_base_url = *new_base_url;
-            }
         }
     }
     catch (const AppError& ex) {
         return ex;
     }
-    return std::nullopt;
+    return util::none;
 }
 
-void App::update_metadata_and_resend(Request&& request, UniqueFunction<void(AppResponse&&)>&& completion,
-                                     const Optional<std::string> new_hostname)
+void App::update_location_and_resend(Request&& request, UniqueFunction<void(AppResponse&&)>&& completion,
+                                     Optional<std::string>&& redir_location)
 {
     // if we do not have metadata yet, we need to initialize it and send the
     // request once that's complete; or if a new_hostname is provided, re-initialize
-    // the metadata with the updated location info
-    init_app_metadata(
-        [completion = std::move(completion), request = std::move(request), base_url = m_base_url,
+    // the metadata with the updated location info first
+    request_location(
+        [completion = std::move(completion), request = std::move(request),
          self = shared_from_this()](Optional<AppError> error) mutable {
             if (error) {
                 // Operation failed, pass it up the chain
@@ -1014,26 +1076,22 @@ void App::update_metadata_and_resend(Request&& request, UniqueFunction<void(AppR
                 return; // early return
             }
 
-            // If the location info was updated (response is empty), update the original request to point
+            // If the location info was updated, update the original request to point
             // to the new location URL.
-            auto app_metadata = self->m_sync_manager->app_metadata();
-            if (app_metadata && request.url.rfind(base_url, 0) != std::string::npos &&
-                app_metadata->hostname != base_url) {
-                request.url.replace(0, base_url.size(), app_metadata->hostname);
-            }
+            std::string scheme, host, path;
+            bool valid = AppUtils::split_url(request.url, scheme, host, path);
+            REALM_ASSERT_EX(valid == true, util::format("Malformed request URL: %1", request.url));
+            request.url = self->get_hostname() + path;
+
             // Retry the original request with the updated url
             self->m_config.transport->send_request_to_server(
                 std::move(request), [self = std::move(self), completion = std::move(completion)](
                                         Request&& request, const Response& response) mutable {
-                    // If a redirect response was received, update the location and then resend
-                    if (AppUtils::is_redirect_status_code(response.http_status_code)) {
-                        self->handle_redirect_response(std::move(request), response, std::move(completion));
-                        return;
-                    }
-                    completion(AppResponse{std::move(response)});
+                    self->check_for_redirect_response(std::move(request), response, std::move(completion));
                 });
         },
-        new_hostname);
+        // The base_url is not changing for this request
+        util::none, std::move(redir_location));
 }
 
 void App::post(std::string&& route, UniqueFunction<void(Optional<AppError>)>&& completion, const BsonDocument& body)
@@ -1060,50 +1118,44 @@ void App::do_request(Request&& request, UniqueFunction<void(AppResponse&&)>&& co
             lock.unlock();
             // Location metadata has not yet been received after the App was created, update the location
             // info and then send the request
-            update_metadata_and_resend(std::move(request), std::move(completion));
+            update_location_and_resend(std::move(request), std::move(completion));
             return; // early return
         }
     }
 
-    // location info has already been received after App was created
-    m_config.transport->send_request_to_server(
-        std::move(request),
-        [self = shared_from_this(), completion = std::move(completion)](Request&& request,
-                                                                        const Response& response) mutable -> void {
-            // If a redirect response was received, update the location and then resend
-            if (AppUtils::is_redirect_status_code(response.http_status_code)) {
-                return self->handle_redirect_response(std::move(request), response, std::move(completion));
-            }
-            completion(AppResponse{response});
-        });
+    // location info has already been received send the request directly
+    m_config.transport->send_request_to_server(std::move(request),
+                                               [self = shared_from_this(), completion = std::move(completion)](
+                                                   Request&& request, const Response& response) mutable -> void {
+                                                   self->check_for_redirect_response(std::move(request), response,
+                                                                                     std::move(completion));
+                                               });
 }
 
-void App::handle_redirect_response(Request&& request, const Response& response,
-                                   UniqueFunction<void(AppResponse&&)>&& completion)
+void App::check_for_redirect_response(Request&& request, const Response& response,
+                                      UniqueFunction<void(AppResponse&&)>&& completion)
 {
-    // Handle a redirect response when sending the original request - extract the location
-    // header field and resend the request.
-    auto location = AppUtils::extract_location(response);
-    if (!location || location->empty()) {
-        // Location not found in the response, pass error response up the chain
-        return completion(AppResponse{AppError{ErrorCodes::ClientRedirectError,
-                                               "Redirect response missing location header",
-                                               {},
-                                               response.http_status_code}}); // early return
+    // If this isn't a redirect response, then we're done
+    if (!AppUtils::is_redirect_status_code(response.http_status_code)) {
+        completion(AppResponse{response});
+        return;
     }
 
-    // Make sure we don't do too many redirects (max_http_redirects (20) is an arbitrary number)
-    // The redirect count is tracked in the original request
-    if (++request.redirect_count >= max_http_redirects) {
-        return completion(AppResponse{AppError{ErrorCodes::ClientTooManyRedirects,
-                                               util::format("number of redirections exceeded %1", max_http_redirects),
-                                               {},
-                                               response.http_status_code}}); // early return
+    // Handle a redirect response when sending the original request - extract the location
+    // header field and resend the request.
+    auto redir_location = AppUtils::extract_redir_location(response);
+    if (!redir_location || redir_location->empty()) {
+        // Location not found in the response, pass error response up the chain
+        completion(AppResponse{AppError{ErrorCodes::ClientRedirectError,
+                                        "Redirect response missing location header",
+                                        {},
+                                        response.http_status_code}});
+        return; // early return
     }
 
     // Request the location info at the new location - once this is complete, the original
     // request will be sent to the new server
-    update_metadata_and_resend(std::move(request), std::move(completion), std::move(location));
+    update_location_and_resend(std::move(request), std::move(completion), std::move(redir_location));
 }
 
 void App::do_authenticated_request(Request&& request, const std::shared_ptr<SyncUser>& sync_user,

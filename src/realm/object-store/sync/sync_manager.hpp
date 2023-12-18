@@ -227,13 +227,14 @@ public:
     // Immediately closes any open sync sessions for this sync manager
     void close_all_sessions() REQUIRES(!m_mutex, !m_session_mutex);
 
+    // Set the sync route - it cannot be cleared once it is set
     void set_sync_route(std::string sync_route) REQUIRES(!m_mutex)
     {
         util::CheckedLockGuard lock(m_mutex);
         m_sync_route = std::move(sync_route);
     }
 
-    const std::string sync_route() const REQUIRES(!m_mutex)
+    const std::optional<std::string> sync_route() const REQUIRES(!m_mutex)
     {
         util::CheckedLockGuard lock(m_mutex);
         return m_sync_route;
@@ -274,7 +275,8 @@ protected:
 private:
     friend class app::App;
 
-    void configure(std::shared_ptr<app::App> app, const std::string& sync_route, const SyncClientConfig& config)
+    void configure(std::shared_ptr<app::App> app, util::Optional<std::string> sync_route,
+                   const SyncClientConfig& config)
         REQUIRES(!m_mutex, !m_file_system_mutex, !m_user_mutex, !m_session_mutex);
 
     // Stop tracking the session for the given path if it is inactive.
@@ -327,7 +329,9 @@ private:
     // Callers of this method should hold the `m_session_mutex` themselves.
     bool do_has_existing_sessions() REQUIRES(m_session_mutex);
 
-    std::string m_sync_route GUARDED_BY(m_mutex);
+    // The sync route URL to connect to the server. This can be initially empty, but should not
+    // be cleared once it has been set to a value, except by `reset_for_testing()`.
+    std::optional<std::string> m_sync_route GUARDED_BY(m_mutex);
 
     std::weak_ptr<app::App> m_app GUARDED_BY(m_mutex);
 };

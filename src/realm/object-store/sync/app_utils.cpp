@@ -45,6 +45,30 @@ AppUtils::find_header(const std::string& key_name, const std::map<std::string, s
     return nullptr;
 }
 
+bool AppUtils::split_url(std::string url, std::string& scheme, std::string& dest, std::string& request)
+{
+    // Find the position of the scheme separator "://"
+    size_t scheme_end_pos = url.find("://");
+    if (scheme_end_pos == std::string::npos) {
+        // Missing scheme separator
+        return false;
+    }
+    scheme = url.substr(0, scheme_end_pos);
+    url.erase(0, scheme_end_pos + 3);
+
+    // Find the first slash "/"
+    size_t host_end_pos = url.find("/");
+    if (host_end_pos == std::string::npos) {
+        // No path/file section
+        dest = url;
+        request = "";
+        return true;
+    }
+    dest = url.substr(0, host_end_pos);
+    request = url.substr(host_end_pos);
+    return true;
+}
+
 bool AppUtils::is_success_status_code(int status_code)
 {
     return status_code == 0 || (status_code < 300 && status_code >= 200);
@@ -63,7 +87,7 @@ bool AppUtils::is_redirect_status_code(int status_code)
     return false;
 }
 
-util::Optional<std::string> AppUtils::extract_location(const Response& response)
+util::Optional<std::string> AppUtils::extract_redir_location(const Response& response)
 {
     // Look for case insensitive redirect "location" in headers
     auto location = AppUtils::find_header("location", response.headers);

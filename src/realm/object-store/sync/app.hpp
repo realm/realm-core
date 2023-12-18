@@ -267,24 +267,25 @@ public:
     static SharedApp get_cached_app(const std::string& app_id,
                                     const std::optional<std::string>& base_url = std::nullopt);
 
-    /// Get the current base URL for the AppServices server used for http requests and sync connections.
-    /// If an update_base_url() operation is currently in progress, this value will not be updated with the
-    /// new value until that operation is complete.
+    /// Get the current base URL for the AppServices server used for http requests and sync
+    /// connections.
+    /// If an update_base_url() operation is currently in progress, this value will not be
+    /// updated with the new value until that operation is complete.
     /// @return String containing the current base url value
     std::string get_base_url() const;
 
-    /// Update the base URL after the app has been created. The location info will be retrieved using the
-    /// provided base URL. If this operation fails, the app will continue to use the original base URL and
-    /// false will be returned. If the operation is successful, the app and sync client will use the new
-    /// location info for future connections.
-    /// IMPORTANT: This function cannot be called if another App operation is in progress and any other
-    ///            App operation cannot be initiated until this operation is complete. Otherwise, the
-    ///            behavior of update_base_url() is undefined. The base URL update can be confirmed by
-    ///            checking the value of get_base_url() against the new base_url value provided.
+    /// Update the base URL after the app has been created. The location info will be retrieved
+    /// using the provided base URL. If this operation fails, the app will continue to use the original base URL and
+    /// false will be returned. If the operation is successful, the app and sync client will use the new location info
+    /// for future connections.
+    /// IMPORTANT: This function cannot be called if another App operation is in progress
+    ///            and any other App operation cannot be initiated until this operation
+    ///            is complete. Otherwise, the behavior of update_base_url() is undefined.
+    ///            The base URL update can be confirmed by checking the value of
+    ///            get_base_url() against the new base_url value provided.
     /// @param base_url The new base URL to use for future app and sync connections.
     /// @param completion A callback block to be invoked once the location update completes.
-    void update_base_url(const std::string& base_url,
-                         util::UniqueFunction<void(util::Optional<AppError>)>&& completion);
+    void update_base_url(std::string base_url, util::UniqueFunction<void(util::Optional<AppError>)>&& completion);
 
     /// Log in a user and asynchronously retrieve a user object.
     /// If the log in completes successfully, the completion block will be called, and a
@@ -325,6 +326,25 @@ public:
     void
     link_user(const std::shared_ptr<SyncUser>& user, const AppCredentials& credentials,
               util::UniqueFunction<void(const std::shared_ptr<SyncUser>&, util::Optional<AppError>)>&& completion);
+
+    /// Refreshes the user credentials without logging the user out locally. This function will use
+    /// the provided credentials to log in again on the server, resulting in new refresh and access
+    /// tokens and the latest profile information from the server will also be retrieved. This cannot
+    /// be used to link the user with a new identity, nor can it be used with Anonymous credentials.
+    /// The user will be logged in if currently logged out and a new user object will be provided to
+    /// the callback.
+    /// On success the user will be returned with updated auth tokens information.
+    /// NOTE: This function is primarily for re-logging in the user without closing the realms when
+    /// switching between cloud and edge servers.
+    ///
+    /// @param user The user which will have the credentials refreshed, the user must be logged in
+    /// @param credentials The `AppCredentials` used to log the user in again.
+    /// @param completion The completion handler to call when the log in operation is complete.
+    ///                   If the operation is  successful, the result will contain the original
+    ///                   `SyncUser` object representing the user.
+    void
+    refresh_user(const std::shared_ptr<SyncUser>& user, const AppCredentials& credentials,
+                 util::UniqueFunction<void(const std::shared_ptr<SyncUser>&, util::Optional<AppError>)>&& completion);
 
     /// Switches the active user with the specified one. The user must
     /// exist in the list of all users who have logged into this application, and
@@ -425,11 +445,13 @@ private:
     // mutable to allow locking for reads in const functions
     // this is a shared pointer to support the App move constructor
     mutable std::shared_ptr<std::mutex> m_route_mutex = std::make_shared<std::mutex>();
-    std::string m_base_url;
+    std::string m_base_url; // Original base URL for server, prior to location request
     std::string m_base_route;
     std::string m_app_route;
     std::string m_auth_route;
     bool m_location_updated = false;
+    // Hostname returned from location request, if metadata is not used
+    std::string m_hostname;
 
     uint64_t m_request_timeout_ms;
     std::shared_ptr<SyncManager> m_sync_manager;
@@ -471,24 +493,26 @@ private:
 
     /// Request the app metadata information from the server if it has not been processed yet. If
     /// a new hostname is provided, the app metadata will be refreshed using the new hostname.
-    /// @param completion The server response if an error was encountered during the update
-    /// @param new_hostname If provided, the metadata will be requested from this hostname
-    /// @param retry_count The current number of redirects that have occurred in a row
-    void init_app_metadata(util::UniqueFunction<void(util::Optional<AppError>)>&& completion,
-                           const util::Optional<std::string> new_hostname = util::none, int retry_count = 0);
+    /// @param completion The callback that will be provided the pass fail response
+    /// @param new_hostname The (Original) new hostname to request the location from
+    /// @param redir_location The location provided by the last redirect response when querying location
+    /// @param redirect_count The current number of redirects that have occurred in a row
+    void request_location(util::UniqueFunction<void(util::Optional<AppError>)>&& completion,
+                          util::Optional<std::string>&& new_hostname = util::none,
+                          util::Optional<std::string>&& redir_location = util::none, int redirect_count = 0);
 
     /// Update the location metadata from the location response
-    /// @param result The app response returned from the location request
-    /// @param new_base_url The URL path used to request the location
+    /// @param response The response returned from the location request
+    /// @param base_url The base URL to use when setting the location metadata
     /// @return std::nullopt if the updated was successful, otherwise an AppError with the error
-    std::optional<AppError> update_location(AppResponse&& result, util::Optional<std::string>&& new_base_url);
+    std::optional<AppError> update_location(const Response& response, const std::string& base_url);
 
     /// Update the app metadata and resend the request with the updated metadata
     /// @param request The original request object that needs to be sent after the update
     /// @param completion The original completion object that will be called with the response to the request
     /// @param new_hostname If provided, the metadata will be requested from this hostname
-    void update_metadata_and_resend(Request&& request, util::UniqueFunction<void(AppResponse&&)>&& completion,
-                                    const util::Optional<std::string> new_hostname = util::none);
+    void update_location_and_resend(Request&& request, util::UniqueFunction<void(AppResponse&&)>&& completion,
+                                    util::Optional<std::string>&& new_hostname = util::none);
 
     void post(std::string&& route, util::UniqueFunction<void(util::Optional<AppError>)>&& completion,
               const bson::BsonDocument& body);
@@ -504,8 +528,8 @@ private:
     /// @param request The request to be performed (in case it needs to be sent again)
     /// @param response The response from the send_request_to_server operation
     /// @param completion Returns the response from the server if not a redirect
-    void handle_redirect_response(Request&& request, const Response& response,
-                                  util::UniqueFunction<void(AppResponse&&)>&& completion);
+    void check_for_redirect_response(Request&& request, const Response& response,
+                                     util::UniqueFunction<void(AppResponse&&)>&& completion);
 
     /// Performs an authenticated request to the Stitch server, using the current authentication state
     /// @param request The request to be performed
@@ -542,9 +566,14 @@ private:
 
     std::string make_sync_route(const std::string& http_app_route);
 
-    void update_hostname(const util::Optional<realm::SyncAppMetadata>& metadata);
+    void configure_route(const util::Optional<realm::SyncAppMetadata>& metadata,
+                         const util::Optional<std::string>& new_base_url = util::none);
 
-    void update_hostname(const std::string& hostname, const util::Optional<std::string>& ws_hostname = util::none);
+    void update_hostname(const std::string& hostname, const util::Optional<std::string>& ws_hostname = util::none,
+                         const util::Optional<std::string>& new_base_url = util::none);
+
+    // Return the current hostname value
+    std::string get_hostname();
 
     bool verify_user_present(const std::shared_ptr<SyncUser>& user) const;
 };

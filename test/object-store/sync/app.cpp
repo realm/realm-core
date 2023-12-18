@@ -2681,7 +2681,8 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
                 REQUIRE(!error);
             });
         REQUIRE(!redir_app->sync_manager()->app_metadata()); // no stored app metadata
-        REQUIRE(redir_app->sync_manager()->sync_route().find(websocket_url) != std::string::npos);
+        REQUIRE(redir_app->sync_manager()->sync_route());
+        REQUIRE(redir_app->sync_manager()->sync_route()->find(websocket_url) != std::string::npos);
 
         // Register another email address and verify location data isn't requested again
         request_count = 0;
@@ -5043,7 +5044,8 @@ TEST_CASE("app: metadata is persisted between sessions", "[sync][app][metadata]"
         app->log_in_with_credentials(AppCredentials::anonymous(), [](auto, auto error) {
             REQUIRE_FALSE(error);
         });
-        REQUIRE(app->sync_manager()->sync_route().rfind(test_ws_hostname, 0) != std::string::npos);
+        REQUIRE(app->sync_manager()->sync_route());
+        REQUIRE(app->sync_manager()->sync_route()->rfind(test_ws_hostname, 0) != std::string::npos);
     }
 
     App::clear_cached_apps();
@@ -5052,7 +5054,8 @@ TEST_CASE("app: metadata is persisted between sessions", "[sync][app][metadata]"
     {
         TestSyncManager sync_manager(config);
         auto app = sync_manager.app();
-        REQUIRE(app->sync_manager()->sync_route().rfind(test_ws_hostname, 0) != std::string::npos);
+        REQUIRE(app->sync_manager()->sync_route());
+        REQUIRE(app->sync_manager()->sync_route()->rfind(test_ws_hostname, 0) != std::string::npos);
         app->call_function("function", {}, [](auto error, auto) {
             REQUIRE_FALSE(error);
         });

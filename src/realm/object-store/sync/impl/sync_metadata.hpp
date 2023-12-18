@@ -40,12 +40,14 @@ public:
         ColKey location_col;
         ColKey hostname_col;
         ColKey ws_hostname_col;
+        ColKey base_url_col;
     };
 
     std::string deployment_model;
     std::string location;
     std::string hostname;
     std::string ws_hostname;
+    std::string base_url;
 };
 
 // A facade for a metadata Realm object representing a sync user.
@@ -241,8 +243,9 @@ public:
     /// @param location The location name where the app server is located
     /// @param hostname The hostname to use for the app server admin api
     /// @param ws_hostname The hostname to use for the app server websocket connections
+    /// @param base_url The base url used to query the location information from the server
     bool set_app_metadata(const std::string& deployment_model, const std::string& location,
-                          const std::string& hostname, const std::string& ws_hostname);
+                          const std::string& hostname, const std::string& ws_hostname, const std::string& base_url);
 
     /// Construct the metadata manager.
     ///

@@ -1149,7 +1149,7 @@ TEST_CASE("Get Realm using Async Open", "[sync][pbs][async open]") {
     // Token refreshing requires that we have app metadata and we can't fetch
     // it normally, so just stick some fake values in
     init_sync_manager.app()->sync_manager()->perform_metadata_update([&](SyncMetadataManager& manager) {
-        manager.set_app_metadata("GLOBAL", "location", "hostname", "ws_hostname");
+        manager.set_app_metadata("GLOBAL", "location", "hostname", "ws_hostname", "base_url");
     });
 
     SECTION("can async open while waiting for a token refresh") {
