@@ -104,7 +104,7 @@ TEST_CASE("app: mixed lists with object links", "[sync][pbs][app][links][baas]")
         Mixed{target_id},
     };
     {
-        TestAppSession test_session(app_session, nullptr, DeleteApp{false});
+        TestAppSession test_session({app_session, nullptr, DeleteApp{false}});
         SyncTestFile config(test_session.app(), partition, schema);
         auto realm = Realm::get_shared_realm(config);
 
@@ -168,7 +168,7 @@ TEST_CASE("app: roundtrip values", "[sync][pbs][app][baas]") {
     Decimal128 large_significand = Decimal128(70) / Decimal128(1.09);
     auto obj_id = ObjectId::gen();
     {
-        TestAppSession test_session(app_session, nullptr, DeleteApp{false});
+        TestAppSession test_session({app_session, nullptr, DeleteApp{false}});
         SyncTestFile config(test_session.app(), partition, schema);
         auto realm = Realm::get_shared_realm(config);
 
@@ -974,8 +974,8 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
         };
 
         auto server_app_config = minimal_app_config("websocket_redirect", schema);
-        TestAppSession test_session(create_app(server_app_config), redir_transport, DeleteApp{true},
-                                    realm::ReconnectMode::normal, redir_provider);
+        TestAppSession test_session({create_app(server_app_config), redir_transport, DeleteApp{true},
+                                     realm::ReconnectMode::normal, redir_provider});
         auto partition = random_string(100);
         auto user1 = test_session.app()->backing_store()->get_current_user();
         SyncTestFile r_config(user1, partition, schema);
@@ -1171,7 +1171,7 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
         }
 
         auto transport = std::make_shared<HookedTransport>();
-        TestAppSession hooked_session(session.app_session(), transport, DeleteApp{false});
+        TestAppSession hooked_session({session.app_session(), transport, DeleteApp{false}});
         auto app = hooked_session.app();
         std::shared_ptr<SyncUser> user = app->backing_store()->get_current_user();
         REQUIRE(user);
@@ -1230,7 +1230,7 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
         }
 
         auto transport = std::make_shared<HookedTransport>();
-        TestAppSession hooked_session(session.app_session(), transport, DeleteApp{false});
+        TestAppSession hooked_session({session.app_session(), transport, DeleteApp{false}});
         auto app = hooked_session.app();
         std::shared_ptr<SyncUser> user = app->backing_store()->get_current_user();
         REQUIRE(user);
@@ -2000,7 +2000,7 @@ TEST_CASE("app: full-text compatible with sync", "[sync][app][baas]") {
     auto server_app_config = minimal_app_config("full_text", schema);
     auto app_session = create_app(server_app_config);
     const auto partition = random_string(100);
-    TestAppSession test_session(app_session, nullptr);
+    TestAppSession test_session({app_session, nullptr});
     SyncTestFile config(test_session.app(), partition, schema);
     SharedRealm realm;
     SECTION("sync open") {
@@ -2288,9 +2288,8 @@ TEST_CASE("app: user logs out while profile is fetched", "[sync][app][user]") {
 
     std::shared_ptr<SyncUser> logged_in_user;
     auto transporter = std::make_shared<transport>(mock_transport_worker, state, logged_in_user);
-
-    TestSyncManager sync_manager(get_config(transporter));
-    auto app = sync_manager.app();
+    OfflineAppSession tas({transporter});
+    auto app = tas.app();
 
     logged_in_user = app->backing_store()->get_user("userid", good_access_token, good_access_token, dummy_device_id);
     auto custom_credentials = AppCredentials::facebook("a_token");

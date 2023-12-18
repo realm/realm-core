@@ -166,6 +166,12 @@ struct AutoVerifiedEmailCredentials : app::AppCredentials {
 
 AutoVerifiedEmailCredentials create_user_and_log_in(app::SharedApp app);
 
+std::shared_ptr<SyncUser> log_in(std::shared_ptr<app::App> app,
+                                 app::AppCredentials credentials = app::AppCredentials::anonymous());
+
+app::AppError failed_log_in(std::shared_ptr<app::App> app,
+                            app::AppCredentials credentials = app::AppCredentials::anonymous());
+
 #endif // REALM_ENABLE_AUTH_TESTS
 
 namespace reset_utils {

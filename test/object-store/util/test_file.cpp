@@ -129,34 +129,96 @@ DBOptions InMemoryTestFile::options() const
     return options;
 }
 
-// MARK: - TestAppSession
-
 #if REALM_ENABLE_AUTH_TESTS
 
-TestAppSession::TestAppSession()
-    : TestAppSession(get_runtime_app_session(), nullptr, DeleteApp{false})
+OfflineAppSession::Config::Config(std::shared_ptr<realm::app::GenericNetworkTransport> t)
+    : transport(t)
 {
 }
 
-TestAppSession::TestAppSession(AppSession session,
+OfflineAppSession::OfflineAppSession(OfflineAppSession::Config config)
+    : m_transport(std::move(config.transport))
+    , m_delete_storage(config.delete_storage)
+{
+    REALM_ASSERT(m_transport);
+    app::App::Config app_config;
+    set_app_config_defaults(app_config, m_transport);
+
+    util::Logger::set_default_level_threshold(realm::util::Logger::Level::TEST_LOGGING_LEVEL);
+
+    if (config.storage_path) {
+        m_base_file_path = *config.storage_path;
+    }
+    else {
+        m_base_file_path = util::make_temp_dir();
+    }
+
+    util::try_make_dir(m_base_file_path);
+    app::BackingStoreConfig bsc;
+    bsc.base_file_path = m_base_file_path;
+    bsc.metadata_mode = app::BackingStoreConfig::MetadataMode::NoEncryption;
+    m_app = app::App::get_app(app::App::CacheMode::Disabled, app_config, bsc);
+}
+
+OfflineAppSession::~OfflineAppSession()
+{
+    if (util::File::exists(m_base_file_path) && m_delete_storage) {
+        try {
+            m_app->backing_store()->reset_for_testing();
+            util::try_remove_dir_recursive(m_base_file_path);
+        }
+        catch (const std::exception& ex) {
+            std::cerr << ex.what() << "\n";
+        }
+        app::App::clear_cached_apps();
+    }
+}
+
+
+// MARK: - TestAppSession
+
+
+TestAppSession::Config::Config()
+    : Config(get_runtime_app_session(), nullptr, DeleteApp{false})
+{
+}
+
+TestAppSession::Config::Config(AppSession session,
                                std::shared_ptr<realm::app::GenericNetworkTransport> custom_transport,
                                DeleteApp delete_app
 #if REALM_ENABLE_SYNC
                                ,
-                               ReconnectMode reconnect_mode,
-                               std::shared_ptr<realm::sync::SyncSocketProvider> custom_socket_provider
+                               ReconnectMode mode, std::shared_ptr<realm::sync::SyncSocketProvider> socket_provider
 #endif // REALM_SYNC
                                )
-    : m_app_session(std::make_unique<AppSession>(session))
-    , m_base_file_path(util::make_temp_dir() + random_string(10))
-    , m_delete_app(delete_app)
-    , m_transport(custom_transport)
+    : app_session(std::make_unique<AppSession>(std::move(session)))
+    , transport(std::move(custom_transport))
+    , delete_when_done(delete_app)
+#if REALM_ENABLE_SYNC
+    , reconnect_mode(std::move(mode))
+    , custom_socket_provider(std::move(socket_provider))
+#endif // REALM_SYNC
+{
+}
+
+TestAppSession::TestAppSession(Config config)
+    : m_app_session(std::move(config.app_session))
+    , m_delete_app(config.delete_when_done)
+    , m_transport(std::move(config.transport))
+    , m_delete_storage(config.delete_storage)
 {
     if (!m_transport)
         m_transport = instance_of<SynchronousTestTransport>;
     auto app_config = get_config(m_transport, *m_app_session);
     util::Logger::set_default_level_threshold(realm::util::Logger::Level::TEST_LOGGING_LEVEL);
     set_app_config_defaults(app_config, m_transport);
+
+    if (config.storage_path) {
+        m_base_file_path = *config.storage_path;
+    }
+    else {
+        m_base_file_path = util::make_temp_dir();
+    }
 
     util::try_make_dir(m_base_file_path);
     app::BackingStoreConfig bsc;
@@ -166,8 +228,8 @@ TestAppSession::TestAppSession(AppSession session,
 #if REALM_ENABLE_SYNC
     SyncClientConfig sc_config;
     sc_config.backing_store_config = bsc;
-    sc_config.reconnect_mode = reconnect_mode;
-    sc_config.socket_provider = custom_socket_provider;
+    sc_config.reconnect_mode = config.reconnect_mode;
+    sc_config.socket_provider = std::move(config.custom_socket_provider);
     // With multiplexing enabled, the linger time controls how long a
     // connection is kept open for reuse. In tests, we want to shut
     // down sync clients immediately.
@@ -193,7 +255,9 @@ TestAppSession::~TestAppSession()
 #else
             m_app->backing_store()->reset_for_testing();
 #endif
-            util::try_remove_dir_recursive(m_base_file_path);
+            if (m_delete_storage) {
+                util::try_remove_dir_recursive(m_base_file_path);
+            }
         }
         catch (const std::exception& ex) {
             std::cerr << ex.what() << "\n";

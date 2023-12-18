@@ -19,6 +19,7 @@
 #include "util/sync/sync_test_utils.hpp"
 
 #include "util/sync/baas_admin_api.hpp"
+#include "util/unit_test_transport.hpp"
 
 #include <realm/object-store/binding_context.hpp>
 #include <realm/object-store/object_store.hpp>
@@ -234,6 +235,35 @@ AutoVerifiedEmailCredentials create_user_and_log_in(app::SharedApp app)
                                      REQUIRE(!error);
                                  });
     return creds;
+}
+
+std::shared_ptr<SyncUser> log_in(std::shared_ptr<app::App> app, app::AppCredentials credentials)
+{
+    if (auto transport = dynamic_cast<UnitTestTransport*>(app->config().transport.get())) {
+        transport->set_provider_type(credentials.provider_as_string());
+    }
+    std::shared_ptr<SyncUser> user;
+    app->log_in_with_credentials(credentials,
+                                 [&](std::shared_ptr<SyncUser> user_arg, std::optional<app::AppError> error) {
+                                     REQUIRE_FALSE(error);
+                                     REQUIRE(user_arg);
+                                     user = std::move(user_arg);
+                                 });
+    REQUIRE(user);
+    return user;
+}
+
+app::AppError failed_log_in(std::shared_ptr<app::App> app, app::AppCredentials credentials)
+{
+    std::optional<app::AppError> err;
+    app->log_in_with_credentials(credentials,
+                                 [&](std::shared_ptr<SyncUser> user, std::optional<app::AppError> error) {
+                                     REQUIRE(error);
+                                     REQUIRE_FALSE(user);
+                                     err = error;
+                                 });
+    REQUIRE(err);
+    return *err;
 }
 
 #endif // REALM_ENABLE_AUTH_TESTS

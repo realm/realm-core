@@ -31,7 +31,6 @@ using namespace realm::util;
 using File = realm::util::File;
 
 static const std::string base_path = util::make_temp_dir() + "realm_objectstore_sync_user/";
-static const std::string dummy_device_id = "123400000000000000000000";
 
 TEST_CASE("sync_user: SyncManager `get_user()` API", "[sync][user]") {
     TestSyncManager init_sync_manager;

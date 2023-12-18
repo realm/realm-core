@@ -47,6 +47,7 @@ if(REALM_ENABLE_AUTH_TESTS)
         util/unit_test_transport.hpp
     )
     list(APPEND SOURCES 
+        sync/app.cpp
 	util/sync/baas_admin_api.cpp
         util/unit_test_transport.cpp
     )
@@ -61,7 +62,7 @@ if(REALM_ENABLE_SYNC)
     )
     list(APPEND SOURCES
         bson.cpp
-        sync/app.cpp
+        sync/app_sync_services.cpp
         sync/client_reset.cpp
         sync/file.cpp
         sync/flx_migration.cpp
@@ -86,7 +87,6 @@ elseif(REALM_APP_SERVICES)
         util/sync/baas_admin_api.hpp
     )
     list(APPEND SOURCES
-        sync/app_services.cpp
         util/sync/sync_test_utils.cpp
     )
 endif()

@@ -36,7 +36,6 @@ using namespace realm::util;
 using File = realm::util::File;
 
 static const auto base_path = fs::path{util::make_temp_dir()}.make_preferred() / "realm_objectstore_sync_manager";
-static const std::string dummy_device_id = "123400000000000000000000";
 
 namespace {
 bool validate_user_in_vector(std::vector<std::shared_ptr<SyncUser>> vector, const std::string& identity,

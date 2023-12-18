@@ -1779,6 +1779,12 @@ TEST_CASE("app: jwt login and metadata tests", "[sync][app][user][metadata][func
 
 #endif // REALM_ENABLE_AUTH_TESTS
 
+static OfflineAppSession::Config
+offline_unit_test_config(std::shared_ptr<app::GenericNetworkTransport> transport = instance_of<UnitTestTransport>)
+{
+    return OfflineAppSession::Config(transport);
+}
+
 TEST_CASE("app: custom error handling", "[sync][app][custom errors]") {
     class CustomErrorTransport : public GenericNetworkTransport {
     public:
@@ -1799,72 +1805,15 @@ TEST_CASE("app: custom error handling", "[sync][app][custom errors]") {
     };
 
     SECTION("custom code and message is sent back") {
-        TestSyncManager::Config config;
-        config.transport = std::make_shared<CustomErrorTransport>(1001, "Boom!");
-        TestSyncManager tsm(config);
-        auto error = failed_log_in(tsm.app());
+        OfflineAppSession session(offline_unit_test_config(std::make_shared<CustomErrorTransport>(1001, "Boom!")));
+        auto error = failed_log_in(session.app());
         CHECK(error.is_custom_error());
         CHECK(*error.additional_status_code == 1001);
         CHECK(error.reason() == "Boom!");
     }
 }
 
-static const std::string profile_0_name = "Ursus americanus Ursus boeckhi";
-static const std::string profile_0_first_name = "Ursus americanus";
-static const std::string profile_0_last_name = "Ursus boeckhi";
-static const std::string profile_0_email = "Ursus ursinus";
-static const std::string profile_0_picture_url = "Ursus malayanus";
-static const std::string profile_0_gender = "Ursus thibetanus";
-static const std::string profile_0_birthday = "Ursus americanus";
-static const std::string profile_0_min_age = "Ursus maritimus";
-static const std::string profile_0_max_age = "Ursus arctos";
-
-static const nlohmann::json profile_0 = {
-    {"name", profile_0_name},         {"first_name", profile_0_first_name},   {"last_name", profile_0_last_name},
-    {"email", profile_0_email},       {"picture_url", profile_0_picture_url}, {"gender", profile_0_gender},
-    {"birthday", profile_0_birthday}, {"min_age", profile_0_min_age},         {"max_age", profile_0_max_age}};
-
-static nlohmann::json user_json(std::string access_token, std::string user_id = random_string(15))
-{
-    return {{"access_token", access_token},
-            {"refresh_token", access_token},
-            {"user_id", user_id},
-            {"device_id", "Panda Bear"}};
-}
-
-static nlohmann::json user_profile_json(std::string user_id = random_string(15),
-                                        std::string identity_0_id = "Ursus arctos isabellinus",
-                                        std::string identity_1_id = "Ursus arctos horribilis",
-                                        std::string provider_type = "anon-user")
-{
-    return {{"user_id", user_id},
-            {"identities",
-             {{{"id", identity_0_id}, {"provider_type", provider_type}},
-              {{"id", identity_1_id}, {"provider_type", "lol_wut"}}}},
-            {"data", profile_0}};
-}
-
 // MARK: - Unit Tests
-
-static TestSyncManager::Config get_config()
-{
-    return get_config(instance_of<UnitTestTransport>);
-}
-
-static const std::string good_access_token =
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9."
-    "eyJleHAiOjE1ODE1MDc3OTYsImlhdCI6MTU4MTUwNTk5NiwiaXNzIjoiNWU0M2RkY2M2MzZlZTEwNmVhYTEyYmRjIiwic3RpdGNoX2RldklkIjoi"
-    "MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwIiwic3RpdGNoX2RvbWFpbklkIjoiNWUxNDk5MTNjOTBiNGFmMGViZTkzNTI3Iiwic3ViIjoiNWU0M2Rk"
-    "Y2M2MzZlZTEwNmVhYTEyYmRhIiwidHlwIjoiYWNjZXNzIn0.0q3y9KpFxEnbmRwahvjWU1v9y1T1s3r2eozu93vMc3s";
-
-static const std::string good_access_token2 =
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9."
-    "eyJleHAiOjE1ODkzMDE3MjAsImlhdCI6MTU4NDExODcyMCwiaXNzIjoiNWU2YmJiYzBhNmI3ZGZkM2UyNTA0OGI3Iiwic3RpdGNoX2RldklkIjoi"
-    "MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwIiwic3RpdGNoX2RvbWFpbklkIjoiNWUxNDk5MTNjOTBiNGFmMGViZTkzNTI3Iiwic3ViIjoiNWU2YmJi"
-    "YzBhNmI3ZGZkM2UyNTA0OGIzIiwidHlwIjoiYWNjZXNzIn0.eSX4QMjIOLbdOYOPzQrD_racwLUk1HGFgxtx2a34k80";
-
-static const std::string bad_access_token = "lolwut";
-static const std::string dummy_device_id = "123400000000000000000000";
 
 TEST_CASE("subscribable unit tests", "[sync][app]") {
     struct Foo : public Subscribable<Foo> {
@@ -1936,18 +1885,18 @@ TEST_CASE("subscribable unit tests", "[sync][app]") {
 }
 
 TEST_CASE("app: login_with_credentials unit_tests", "[sync][app][user]") {
-    auto config = get_config();
+    auto config = offline_unit_test_config();
     static_cast<UnitTestTransport*>(config.transport.get())->set_profile(profile_0);
 
     SECTION("login_anonymous good") {
+        std::string shared_storage_path = util::make_temp_dir();
         UnitTestTransport::access_token = good_access_token;
-        config.base_path = util::make_temp_dir();
-        config.should_teardown_test_directory = false;
+        config.storage_path = shared_storage_path;
+        config.delete_storage = false;
         config.metadata_mode = SyncManager::MetadataMode::NoEncryption;
         {
-            TestSyncManager tsm(config);
-            auto app = tsm.app();
-
+            OfflineAppSession tas(std::move(config));
+            auto app = tas.app();
             auto user = log_in(app);
 
             REQUIRE(user->identities().size() == 1);
@@ -1967,8 +1916,13 @@ TEST_CASE("app: login_with_credentials unit_tests", "[sync][app][user]") {
         App::clear_cached_apps();
         // assert everything is stored properly between runs
         {
-            TestSyncManager tsm(config);
-            auto app = tsm.app();
+            auto config2 = offline_unit_test_config();
+            config2.storage_path = shared_storage_path;
+            config2.delete_storage = true;
+            config2.metadata_mode = SyncManager::MetadataMode::NoEncryption;
+            OfflineAppSession tas(std::move(config2));
+
+            auto app = tas.app();
             REQUIRE(app->all_users().size() == 1);
             auto user = app->all_users()[0];
             REQUIRE(user->identities().size() == 1);
@@ -2002,8 +1956,8 @@ TEST_CASE("app: login_with_credentials unit_tests", "[sync][app][user]") {
         };
 
         config.transport = instance_of<transport>;
-        TestSyncManager tsm(config);
-        auto error = failed_log_in(tsm.app());
+        OfflineAppSession tas(std::move(config));
+        auto error = failed_log_in(tas.app());
         CHECK(error.reason() == std::string("jwt missing parts"));
         CHECK(error.code_string() == "BadToken");
         CHECK(error.is_json_error());
@@ -2012,10 +1966,8 @@ TEST_CASE("app: login_with_credentials unit_tests", "[sync][app][user]") {
 
     SECTION("login_anonynous multiple users") {
         UnitTestTransport::access_token = good_access_token;
-        config.base_path = util::make_temp_dir();
-        config.should_teardown_test_directory = false;
-        TestSyncManager tsm(config);
-        auto app = tsm.app();
+        OfflineAppSession tas(std::move(config));
+        auto app = tas.app();
 
         auto user1 = log_in(app);
         auto user2 = log_in(app, AppCredentials::anonymous(false));
@@ -2024,8 +1976,8 @@ TEST_CASE("app: login_with_credentials unit_tests", "[sync][app][user]") {
 }
 
 TEST_CASE("app: UserAPIKeyProviderClient unit_tests", "[sync][app][user][api key]") {
-    TestSyncManager sync_manager(get_config(), {});
-    auto app = sync_manager.app();
+    OfflineAppSession tas(offline_unit_test_config());
+    auto app = tas.app();
     auto client = app->provider_client<App::UserAPIKeyProviderClient>();
 
     std::shared_ptr<SyncUser> logged_in_user =
@@ -2071,8 +2023,8 @@ TEST_CASE("app: UserAPIKeyProviderClient unit_tests", "[sync][app][user][api key
 
 
 TEST_CASE("app: user_semantics", "[sync][app][user]") {
-    TestSyncManager tsm(get_config(), {});
-    auto app = tsm.app();
+    OfflineAppSession tas(offline_unit_test_config());
+    auto app = tas.app();
 
     const auto login_user_email_pass = [=] {
         return log_in(app, AppCredentials::username_password("bob", "thompson"));
@@ -2223,9 +2175,9 @@ TEST_CASE("app: response error handling", "[sync][app]") {
                                     .dump();
 
     Response response{200, 0, {{"Content-Type", "text/plain"}}, response_body};
+    OfflineAppSession tas(offline_unit_test_config(std::make_shared<ErrorCheckingTransport>(&response)));
 
-    TestSyncManager tsm(get_config(std::make_shared<ErrorCheckingTransport>(&response)));
-    auto app = tsm.app();
+    auto app = tas.app();
 
     SECTION("http 404") {
         response.http_status_code = 404;
@@ -2299,8 +2251,8 @@ TEST_CASE("app: response error handling", "[sync][app]") {
 }
 
 TEST_CASE("app: switch user", "[sync][app][user]") {
-    TestSyncManager tsm(get_config(), {});
-    auto app = tsm.app();
+    OfflineAppSession tas(offline_unit_test_config());
+    auto app = tas.app();
 
     bool processed = false;
 
@@ -2355,8 +2307,8 @@ TEST_CASE("app: switch user", "[sync][app][user]") {
 }
 
 TEST_CASE("app: remove anonymous user", "[sync][app][user]") {
-    TestSyncManager tsm(get_config(), {});
-    auto app = tsm.app();
+    OfflineAppSession tas(offline_unit_test_config());
+    auto app = tas.app();
 
     SECTION("remove user expect success") {
         CHECK(app->backing_store()->all_users().size() == 0);
@@ -2397,8 +2349,8 @@ TEST_CASE("app: remove anonymous user", "[sync][app][user]") {
 }
 
 TEST_CASE("app: remove user with credentials", "[sync][app][user]") {
-    TestSyncManager tsm(get_config(), {});
-    auto app = tsm.app();
+    OfflineAppSession tas(offline_unit_test_config());
+    auto app = tas.app();
 
     SECTION("log in, log out and remove") {
         CHECK(app->backing_store()->all_users().size() == 0);
@@ -2430,8 +2382,8 @@ TEST_CASE("app: remove user with credentials", "[sync][app][user]") {
 }
 
 TEST_CASE("app: link_user", "[sync][app][user]") {
-    TestSyncManager tsm(get_config(), {});
-    auto app = tsm.app();
+    OfflineAppSession tas(offline_unit_test_config());
+    auto app = tas.app();
 
     auto email = util::format("realm_tests_do_autoverify%1@%2.com", random_string(10), random_string(10));
     auto password = random_string(10);
@@ -2574,9 +2526,8 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app][user][token]") {
                 }
             }
         };
-
-        TestSyncManager sync_manager(get_config(instance_of<transport>));
-        auto app = sync_manager.app();
+        OfflineAppSession tas(offline_unit_test_config(instance_of<transport>));
+        auto app = tas.app();
         setup_user(app);
 
         bool processed = false;
@@ -2605,9 +2556,8 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app][user][token]") {
                 }
             }
         };
-
-        TestSyncManager sync_manager(get_config(instance_of<transport>));
-        auto app = sync_manager.app();
+        OfflineAppSession tas(offline_unit_test_config(instance_of<transport>));
+        auto app = tas.app();
         setup_user(app);
 
         bool processed = false;
@@ -2684,22 +2634,18 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app][user][token]") {
                 }
             }
         };
-
-        TestSyncManager sync_manager(get_config(instance_of<transport>));
-        auto app = sync_manager.app();
+        OfflineAppSession tas(offline_unit_test_config(instance_of<transport>));
+        auto app = tas.app();
         setup_user(app);
         REQUIRE(log_in(app));
     }
 }
 
 TEST_CASE("app: make_streaming_request", "[sync][app][streaming]") {
+    constexpr uint64_t timeout_ms = 60000; // this is the default
     UnitTestTransport::access_token = good_access_token;
-
-    constexpr uint64_t timeout_ms = 60000;
-    auto config = get_config();
-    config.app_config.default_request_timeout_ms = timeout_ms;
-    TestSyncManager tsm(config);
-    auto app = tsm.app();
+    OfflineAppSession tas(offline_unit_test_config());
+    auto app = tas.app();
 
     std::shared_ptr<SyncUser> user = log_in(app);
 
@@ -2807,10 +2753,13 @@ TEST_CASE("app: shared instances", "[sync][app]") {
     App::Config base_config;
     set_app_config_defaults(base_config, instance_of<UnitTestTransport>);
 
-    SyncClientConfig sync_config;
-    sync_config.backing_store_config.metadata_mode = app::BackingStoreConfig::MetadataMode::NoMetadata;
-    sync_config.backing_store_config.base_file_path = util::make_temp_dir() + random_string(10);
-    util::try_make_dir(sync_config.backing_store_config.base_file_path);
+    app::BackingStoreConfig bsc;
+    bsc.metadata_mode = app::BackingStoreConfig::MetadataMode::NoMetadata;
+    bsc.base_file_path = util::make_temp_dir();
+    util::try_make_dir(bsc.base_file_path);
+    auto cleanup = util::make_scope_exit([&]() noexcept {
+        realm::util::try_remove_dir_recursive(bsc.base_file_path);
+    });
 
     auto config1 = base_config;
     config1.app_id = "app1";
@@ -2827,10 +2776,10 @@ TEST_CASE("app: shared instances", "[sync][app]") {
     config4.base_url = "http://localhost:9090";
 
     // should all point to same underlying app
-    auto app1_1 = App::get_app(app::App::CacheMode::Enabled, config1, sync_config);
-    auto app1_2 = App::get_app(app::App::CacheMode::Enabled, config1, sync_config);
+    auto app1_1 = App::get_app(app::App::CacheMode::Enabled, config1, bsc);
+    auto app1_2 = App::get_app(app::App::CacheMode::Enabled, config1, bsc);
     auto app1_3 = App::get_cached_app(config1.app_id, config1.base_url);
-    auto app1_4 = App::get_app(app::App::CacheMode::Enabled, config2, sync_config);
+    auto app1_4 = App::get_app(app::App::CacheMode::Enabled, config2, bsc);
     auto app1_5 = App::get_cached_app(config1.app_id);
 
     CHECK(app1_1 == app1_2);
@@ -2839,9 +2788,9 @@ TEST_CASE("app: shared instances", "[sync][app]") {
     CHECK(app1_1 == app1_5);
 
     // config3 and config4 should point to different apps
-    auto app2_1 = App::get_app(app::App::CacheMode::Enabled, config3, sync_config);
+    auto app2_1 = App::get_app(app::App::CacheMode::Enabled, config3, bsc);
     auto app2_2 = App::get_cached_app(config3.app_id, config3.base_url);
-    auto app2_3 = App::get_app(app::App::CacheMode::Enabled, config4, sync_config);
+    auto app2_3 = App::get_app(app::App::CacheMode::Enabled, config4, bsc);
     auto app2_4 = App::get_cached_app(config3.app_id);
     auto app2_5 = App::get_cached_app(config4.app_id, "https://some.different.url");
 

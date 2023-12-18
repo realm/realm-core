@@ -41,8 +41,6 @@
 using namespace realm;
 using namespace realm::util;
 
-static const std::string dummy_device_id = "123400000000000000000000";
-
 static std::shared_ptr<SyncUser> get_user(const std::shared_ptr<app::App>& app)
 {
     return app->backing_store()->get_user("user_id", ENCODE_FAKE_JWT("fake_refresh_token"),

@@ -1676,7 +1676,7 @@ TEST_CASE("audit integration tests", "[sync][pbs][audit][baas]") {
     auto app_create_config = default_app_config();
     app_create_config.schema = schema;
     app_create_config.dev_mode_enabled = false;
-    TestAppSession session = create_app(app_create_config);
+    TestAppSession session(TestAppSession::Config{create_app(app_create_config)});
 
     SyncTestFile config(session.app()->current_user(), bson::Bson("default"));
     config.schema = schema;
@@ -1734,7 +1734,7 @@ TEST_CASE("audit integration tests", "[sync][pbs][audit][baas]") {
         // Create an app which does not include AuditEvent in the schema so that
         // things will break if audit tries to use it
         app_create_config.schema = no_audit_event_schema;
-        TestAppSession session_2 = create_app(app_create_config);
+        TestAppSession session_2(TestAppSession::Config{create_app(app_create_config)});
         SyncTestFile config(session_2.app()->current_user(), bson::Bson("default"));
         config.schema = no_audit_event_schema;
         config.audit_config = std::make_shared<AuditConfig>();
@@ -1793,7 +1793,7 @@ TEST_CASE("audit integration tests", "[sync][pbs][audit][baas]") {
 
     SECTION("AuditEvent missing from server schema") {
         app_create_config.schema = no_audit_event_schema;
-        TestAppSession session_2 = create_app(app_create_config);
+        TestAppSession session_2(TestAppSession::Config{create_app(app_create_config)});
         SyncTestFile config(session_2.app()->current_user(), bson::Bson("default"));
         config.schema = no_audit_event_schema;
         config.audit_config = std::make_shared<AuditConfig>();

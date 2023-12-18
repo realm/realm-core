@@ -1912,20 +1912,21 @@ TEST_CASE("sync: Client reset during async open", "[sync][pbs][client reset][baa
     };
 
     auto realm_task = Realm::get_synchronized_realm(realm_config);
-    auto realm_pf = util::make_promise_future<SharedRealm>();
+    auto realm_pf = util::make_promise_future<ThreadSafeReference>();
     realm_task->start([&](ThreadSafeReference ref, std::exception_ptr ex) {
         try {
             if (ex) {
                 std::rethrow_exception(ex);
             }
-            auto realm = Realm::get_shared_realm(std::move(ref));
-            realm_pf.promise.emplace_value(std::move(realm));
+            realm_pf.promise.emplace_value(std::move(ref));
         }
         catch (...) {
             realm_pf.promise.set_error(exception_to_status());
         }
     });
-    auto realm = realm_pf.future.get();
+    auto realm = Realm::get_shared_realm(std::move(realm_pf.future.get()));
+    REQUIRE(realm);
+    realm->sync_session()->shutdown_and_wait();
     before_callback_called.future.get();
     after_callback_called.future.get();
 }
