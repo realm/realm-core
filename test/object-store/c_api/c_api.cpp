@@ -591,7 +591,7 @@ TEST_CASE("C API (non-database)", "[c_api]") {
         auto credentials = app::AppCredentials::anonymous();
         // Verify the values above are included in the login request
         test_app->log_in_with_credentials(credentials, [&](const std::shared_ptr<realm::SyncUser>&,
-                                                        realm::util::Optional<realm::app::AppError> error) {
+                                                           realm::util::Optional<realm::app::AppError> error) {
             CHECK(!error);
         });
 
