@@ -3951,6 +3951,7 @@ TEST_CASE("app: login_with_credentials unit_tests", "[sync][app][user]") {
         UnitTestTransport::access_token = good_access_token;
         config.base_path = util::make_temp_dir();
         config.should_teardown_test_directory = false;
+        config.metadata_mode = SyncManager::MetadataMode::NoEncryption;
         {
             TestSyncManager tsm(config);
             auto app = tsm.app();
@@ -4962,6 +4963,7 @@ TEST_CASE("app: metadata is persisted between sessions", "[sync][app][metadata]"
     TestSyncManager::Config config = get_config(instance_of<transport>);
     config.base_path = util::make_temp_dir();
     config.should_teardown_test_directory = false;
+    config.metadata_mode = SyncManager::MetadataMode::NoEncryption;
 
     {
         TestSyncManager sync_manager(config, {});
