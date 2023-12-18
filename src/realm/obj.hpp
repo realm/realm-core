@@ -393,6 +393,7 @@ private:
     // Return number of backlinks from a specific backlink column
     size_t get_backlink_cnt(ColKey backlink_col) const;
     ObjKey get_unfiltered_link(ColKey col_key) const;
+    Mixed get_unfiltered_mixed(ColKey::Idx col_ndx) const;
 
     template <class Val>
     Obj& _set(size_t col_ndx, Val v);
