@@ -42,6 +42,11 @@ public:
     static const std::string identity_0_id;
     static const std::string identity_1_id;
 
+    void set_base_url(const std::string& base_url)
+    {
+        m_base_url = base_url;
+    }
+
     void set_provider_type(const std::string& provider_type)
     {
         m_provider_type = provider_type;
@@ -63,6 +68,7 @@ public:
 private:
     std::string m_provider_type;
     uint64_t m_request_timeout = 60000;
+    realm::util::Optional<std::string> m_base_url = realm::util::none;
     nlohmann::json m_user_profile = nlohmann::json::object();
     nlohmann::json m_options;
 

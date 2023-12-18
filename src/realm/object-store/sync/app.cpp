@@ -262,7 +262,10 @@ void App::close_all_sync_sessions()
 
 App::App(const Config& config)
     : m_config(std::move(config))
-    , m_location_updated(false) // always request location on app creation
+    , m_base_url(m_config.base_url.value_or(default_base_url))
+    , m_base_route(m_base_url + base_path)
+    , m_app_route(m_base_route + app_path + "/" + m_config.app_id)
+    , m_auth_route(m_app_route + auth_path)
     , m_request_timeout_ms(m_config.default_request_timeout_ms.value_or(default_timeout_ms))
 {
 #ifdef __EMSCRIPTEN__

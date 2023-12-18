@@ -535,6 +535,7 @@ TEST_CASE("C API (non-database)", "[c_api]") {
 #if REALM_ENABLE_SYNC
     SECTION("realm_app_config_t") {
         const uint64_t request_timeout = 2500;
+        std::string base_url = "https://path/to/app";
         auto transport = std::make_shared<UnitTestTransport>(request_timeout);
         transport->set_expected_options({{"device",
                                           {{"appId", "app_id_123"},
@@ -549,15 +550,15 @@ TEST_CASE("C API (non-database)", "[c_api]") {
                                            {"frameworkVersion", "some_framework_version"},
                                            {"coreVersion", REALM_VERSION_STRING},
                                            {"bundleId", "some_bundle_id"}}}});
-
+        transport->set_base_url(base_url);
         auto http_transport = realm_http_transport(transport);
         auto app_config = cptr(realm_app_config_new("app_id_123", &http_transport));
         CHECK(app_config.get() != nullptr);
         CHECK(app_config->app_id == "app_id_123");
         CHECK(app_config->transport == transport);
 
-        realm_app_config_set_base_url(app_config.get(), "https://path/to/app");
-        CHECK(app_config->base_url == "https://path/to/app");
+        realm_app_config_set_base_url(app_config.get(), base_url.c_str());
+        CHECK(app_config->base_url == base_url);
 
         realm_app_config_set_default_request_timeout(app_config.get(), request_timeout);
         CHECK(app_config->default_request_timeout_ms == request_timeout);
@@ -590,9 +591,11 @@ TEST_CASE("C API (non-database)", "[c_api]") {
         auto credentials = app::AppCredentials::anonymous();
         // Verify the values above are included in the login request
         test_app->log_in_with_credentials(credentials, [&](const std::shared_ptr<realm::SyncUser>&,
-                                                           realm::util::Optional<realm::app::AppError> error) {
+                                                        realm::util::Optional<realm::app::AppError> error) {
             CHECK(!error);
         });
+
+        CHECK(test_app->get_base_url() == base_url);
     }
 #endif // REALM_ENABLE_SYNC
 }

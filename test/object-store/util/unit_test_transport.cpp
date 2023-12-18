@@ -117,6 +117,10 @@ void UnitTestTransport::handle_location(const Request& request,
     CHECK(request.method == HttpMethod::get);
     CHECK(request.timeout_ms == m_request_timeout);
 
+    if (m_base_url) {
+        CHECK(request.url.find(*m_base_url) != std::string::npos);
+    }
+
     std::string response = nlohmann::json({{"deployment_model", "this"},
                                            {"hostname", "field"},
                                            {"ws_hostname", "shouldn't"},
