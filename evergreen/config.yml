@@ -109,6 +109,11 @@ functions:
               set_cmake_var realm_vars REALM_ENABLE_SYNC BOOL On
           fi
 
+          if [-z "${app_services_without_sync|}" ]; then
+              set_cmake_var realm_vars REALM_ENABLE_SYNC BOOL Off
+              set_cmake_var realm_vars REALM_APP_SERVICES BOOL On
+          fi
+
           if [ -n "${use_system_openssl|}" ]; then
               set_cmake_var realm_vars REALM_USE_SYSTEM_OPENSSL BOOL On
           fi
@@ -1334,6 +1339,20 @@ buildvariants:
   - name: lint
     distros:
     - ubuntu2204-small
+  - name: compile_test
+
+- name: ubuntu2204-app-services-without-sync
+  display_name: "Ubuntu 22.04 x86_64 (Clang 16 + App Services without sync)"
+  run_on: ubuntu2204-large
+  expansions:
+    clang_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/clang%2Bllvm-16.0.2-x86_64-linux-gnu-ubuntu-22.04.tar.xz"
+    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.26.3-linux-x86_64.tar.gz"
+    cmake_bindir: "./cmake_binaries/bin"
+    fetch_missing_dependencies: On
+    c_compiler: "./clang_binaries/bin/clang"
+    cxx_compiler: "./clang_binaries/bin/clang++"
+    app_services_without_sync: On
+  tasks:
   - name: compile_test
 
 - name: ubuntu2004-no-session-multiplexing
