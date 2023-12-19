@@ -1009,7 +1009,7 @@ void App::request_location(UniqueFunction<void(Optional<AppError>)>&& completion
                                         util::format("number of redirections exceeded %1", max_http_redirects),
                                         {},
                                         response.http_status_code});
-                    return;                                          // early return
+                    return; // early return
                 }
                 // Handle the redirect response when requesting the location - extract the
                 // new location header field and resend the request.
@@ -1130,12 +1130,11 @@ void App::do_request(Request&& request, UniqueFunction<void(const Response& resp
     }
 
     // location info has already been received send the request directly
-    m_config.transport->send_request_to_server(std::move(request),
-                                               [self = shared_from_this(), completion = std::move(completion)](
-                                                   Request&& request, const Response& response) mutable {
-                                                   self->check_for_redirect_response(std::move(request), response,
-                                                                                     std::move(completion));
-                                               });
+    m_config.transport->send_request_to_server(
+        std::move(request), [self = shared_from_this(), completion = std::move(completion)](
+                                Request&& request, const Response& response) mutable {
+            self->check_for_redirect_response(std::move(request), response, std::move(completion));
+        });
 }
 
 void App::check_for_redirect_response(Request&& request, const Response& response,
