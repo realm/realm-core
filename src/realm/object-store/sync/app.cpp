@@ -378,7 +378,7 @@ void App::configure_route(const Optional<realm::SyncAppMetadata>& metadata, cons
     // the app is configured
 
     // If there is app metadata stored, then set up the initial hostname/syncroute
-    // using that info - it will be updated upon first request to the server
+    // using that info - metadata will be updated during first request to the server
     if (metadata) {
         std::string base_url;
         // If a base_url value is provided (from App config), then use that value
@@ -401,7 +401,6 @@ void App::configure_route(const Optional<realm::SyncAppMetadata>& metadata, cons
     }
     // No metadata, initialize route info using provided base_url value or default value
     else {
-        // Will generate websocket hostname
         update_hostname(new_base_url.value_or(default_base_url), util::none, new_base_url.value_or(default_base_url));
     }
 }
@@ -1161,7 +1160,7 @@ void App::check_for_redirect_response(Request&& request, const Response& respons
 }
 
 void App::do_authenticated_request(Request&& request, const std::shared_ptr<SyncUser>& sync_user,
-                                   util::UniqueFunction<void(const Response& response)>&& completion)
+                                   util::UniqueFunction<void(const Response&)>&& completion)
 {
     request.headers = get_request_headers(sync_user, request.uses_refresh_token ? RequestTokenType::RefreshToken
                                                                                 : RequestTokenType::AccessToken);
@@ -1182,7 +1181,7 @@ void App::do_authenticated_request(Request&& request, const std::shared_ptr<Sync
 
 void App::handle_auth_failure(const AppError& error, const Response& response, Request&& request,
                               const std::shared_ptr<SyncUser>& sync_user,
-                              util::UniqueFunction<void(const Response& response)>&& completion)
+                              util::UniqueFunction<void(const Response&)>&& completion)
 {
     // Only handle auth failures
     if (*error.additional_status_code == 401) {

@@ -20,7 +20,6 @@
 #define APP_UTILS_HPP
 
 #include <realm/util/optional.hpp>
-#include <realm/object-store/sync/generic_network_transport.hpp>
 
 #include <map>
 
