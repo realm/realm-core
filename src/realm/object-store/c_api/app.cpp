@@ -296,10 +296,8 @@ RLM_API bool realm_app_update_base_url(realm_app_t* app, realm_string_t base_url
 
 RLM_API char* realm_app_get_base_url(realm_app_t* app) noexcept
 {
-    return wrap_err([&] {
-        auto url_stg = (*app)->get_base_url();
-        return duplicate_string(url_stg);
-    });
+    auto url_stg = (*app)->get_base_url();
+    return duplicate_string(url_stg);
 }
 
 RLM_API realm_user_t* realm_app_get_current_user(const realm_app_t* app) noexcept
