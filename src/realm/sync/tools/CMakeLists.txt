@@ -23,9 +23,16 @@ set_target_properties(HistCommand PROPERTIES
                       DEBUG_POSTFIX "${CMAKE_DEBUG_POSTFIX}")
 target_link_libraries(HistCommand Sync Storage)
 
+add_executable(ApplyFromLog apply_from_log.cpp)
+set_target_properties(ApplyFromLog PROPERTIES
+                      OUTPUT_NAME "realm-apply-from_log"
+                      DEBUG_POSTFIX "${CMAKE_DEBUG_POSTFIX}")
+target_link_libraries(ApplyFromLog Sync Storage)
+
 install(TARGETS
     HistCommand
     ApplyToStateCommand
+    ApplyFromLog
     InspectorInspectClientRealm
     InspectorPrintChangeset
     COMPONENT runtime
