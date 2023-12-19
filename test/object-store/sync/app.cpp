@@ -5007,10 +5007,10 @@ TEST_CASE("app: app destroyed during token refresh", "[sync][app][user][token]")
 }
 
 TEST_CASE("app: metadata is persisted between sessions", "[sync][app][metadata]") {
-    static const auto test_hostname = "proto://host:1234";
-    static const auto test_ws_hostname = "wsproto://host:1234";
+    const auto orig_hostname = "proto://host:1234";
+    const auto orig_ws_hostname = "wsproto://host:1234";
 
-    struct transport : UnitTestTransport {
+    struct LocalTransport : UnitTestTransport {
         void send_request_to_server(const Request& request,
                                     util::UniqueFunction<void(const Response&)>&& completion) override
         {
@@ -5032,33 +5032,57 @@ TEST_CASE("app: metadata is persisted between sessions", "[sync][app][metadata]"
                 UnitTestTransport::send_request_to_server(request, std::move(completion));
             }
         }
+
+        void set_hostname(std::string hostname, std::string ws_hostname)
+        {
+            test_hostname = hostname;
+            test_ws_hostname = ws_hostname;
+        }
+        std::string test_hostname;
+        std::string test_ws_hostname;
     };
 
-    TestSyncManager::Config config = get_config(instance_of<transport>);
+    auto transport = std::make_shared<LocalTransport>();
+    transport->set_hostname(orig_hostname, orig_ws_hostname);
+
+    TestSyncManager::Config config = get_config(transport);
     config.base_path = util::make_temp_dir();
     config.should_teardown_test_directory = false;
-
     {
         TestSyncManager sync_manager(config, {});
         auto app = sync_manager.app();
+
+        // This is single threaded
         app->log_in_with_credentials(AppCredentials::anonymous(), [](auto, auto error) {
             REQUIRE_FALSE(error);
         });
+        // Sync route is updated during first request
         REQUIRE(app->sync_manager()->sync_route());
-        REQUIRE(app->sync_manager()->sync_route()->rfind(test_ws_hostname, 0) != std::string::npos);
+        REQUIRE(app->sync_manager()->sync_route()->rfind(orig_ws_hostname, 0) != std::string::npos);
     }
 
-    App::clear_cached_apps();
     config.override_sync_route = false;
     config.should_teardown_test_directory = true;
     {
         TestSyncManager sync_manager(config);
         auto app = sync_manager.app();
-        REQUIRE(app->sync_manager()->sync_route());
-        REQUIRE(app->sync_manager()->sync_route()->rfind(test_ws_hostname, 0) != std::string::npos);
+
+        std::string base_url = sync_manager.sync_server().base_url();
+        std::string ws_url = base_url;
+        size_t uri_scheme_start = ws_url.find("http");
+        if (uri_scheme_start == 0)
+            ws_url.replace(uri_scheme_start, 4, "ws");
+
+        transport->set_hostname(base_url, ws_url);
+
+        REQUIRE(!app->sync_manager()->sync_route()); // sync route is null to force location update on sync startup
+
         app->call_function("function", {}, [](auto error, auto) {
             REQUIRE_FALSE(error);
         });
+
+        REQUIRE(app->sync_manager()->sync_route()); // sync route is updated after operation
+        REQUIRE(app->sync_manager()->sync_route()->rfind(ws_url, 0) != std::string::npos);
     }
 }
 

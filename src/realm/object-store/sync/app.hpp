@@ -451,6 +451,7 @@ private:
     bool m_location_updated = false;
     // Hostname returned from location request, if metadata is not used
     std::string m_hostname;
+    std::string m_ws_hostname;
 
     uint64_t m_request_timeout_ms;
     std::shared_ptr<SyncManager> m_sync_manager;
@@ -565,7 +566,7 @@ private:
 
     void configure(const SyncClientConfig& sync_client_config);
 
-    std::string make_sync_route(const std::string& http_app_route);
+    std::string make_sync_route(util::Optional<std::string> ws_hostname = util::none);
 
     void configure_route(const util::Optional<realm::SyncAppMetadata>& metadata,
                          const util::Optional<std::string>& new_base_url = util::none);

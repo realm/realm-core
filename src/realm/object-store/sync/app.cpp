@@ -361,14 +361,15 @@ std::string App::get_hostname()
     return m_hostname;
 }
 
-std::string App::make_sync_route(const std::string& http_app_route)
+std::string App::make_sync_route(Optional<std::string> ws_hostname)
 {
-    // change the scheme in the base url from http to ws to satisfy the sync client URL
-    auto sync_route = http_app_route + sync_path;
-    size_t uri_scheme_start = sync_route.find("http");
-    if (uri_scheme_start == 0)
-        sync_route.replace(uri_scheme_start, 4, "ws");
-    return sync_route;
+    std::string path = base_path + app_path + "/" + m_config.app_id + sync_path;
+    if (ws_hostname) {
+        return *ws_hostname + path;
+    }
+    else {
+        return m_ws_hostname + path;
+    }
 }
 
 void App::configure_route(const Optional<realm::SyncAppMetadata>& metadata, const Optional<std::string>& new_base_url)
@@ -410,21 +411,22 @@ void App::update_hostname(const std::string& hostname, const Optional<std::strin
 {
     // Update url components based on new hostname (and optional websocket hostname) values
     log_debug("App: update_hostname: %1 | %2", hostname, ws_hostname);
-    REALM_ASSERT(m_sync_manager);
     std::lock_guard<std::mutex> lock(*m_route_mutex);
     if (new_base_url) {
         m_base_url = *new_base_url;
     }
     m_hostname = (hostname.length() > 0 ? hostname : m_base_url);
     m_base_route = m_hostname + base_path;
-    std::string this_app_path = app_path + "/" + m_config.app_id;
-    m_app_route = m_base_route + this_app_path;
+    m_app_route = m_base_route + app_path + "/" + m_config.app_id;
     m_auth_route = m_app_route + auth_path;
     if (ws_hostname && ws_hostname->length() > 0) {
-        m_sync_manager->set_sync_route(*ws_hostname + base_path + this_app_path + sync_path);
+        m_ws_hostname = *ws_hostname;
     }
     else {
-        m_sync_manager->set_sync_route(make_sync_route(m_app_route));
+        m_ws_hostname = m_hostname;
+        if (m_ws_hostname.find("http") == 0) {
+            m_ws_hostname.replace(0, 4, "ws");
+        }
     }
 }
 
@@ -1039,6 +1041,8 @@ Optional<AppError> App::update_location(const Response& response, const std::str
         return error;
     }
 
+    REALM_ASSERT(m_sync_manager); // Need a valid sync manager
+
     // Update the location info with the data from the response
     try {
         auto json = parse<BsonDocument>(response.body);
@@ -1054,6 +1058,7 @@ Optional<AppError> App::update_location(const Response& response, const std::str
         {
             std::lock_guard<std::mutex> lock(*m_route_mutex);
             m_location_updated = true;
+            m_sync_manager->set_sync_route(make_sync_route());
         }
     }
     catch (const AppError& ex) {
