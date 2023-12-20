@@ -129,7 +129,50 @@ DBOptions InMemoryTestFile::options() const
     return options;
 }
 
-#if REALM_ENABLE_AUTH_TESTS
+#if REALM_ENABLE_AUTH_TESTS || REALM_ENABLE_SYNC
+
+nlohmann::json user_json(std::string access_token, std::string user_id)
+{
+    return {{"access_token", access_token},
+            {"refresh_token", access_token},
+            {"user_id", user_id},
+            {"device_id", "Panda Bear"}};
+}
+
+nlohmann::json user_profile_json(std::string user_id, std::string identity_0_id, std::string identity_1_id,
+                                 std::string provider_type)
+{
+    return {{"user_id", user_id},
+            {"identities",
+             {{{"id", identity_0_id}, {"provider_type", provider_type}},
+              {{"id", identity_1_id}, {"provider_type", "lol_wut"}}}},
+            {"data", profile_0}};
+}
+
+void set_app_config_defaults(app::App::Config& app_config,
+                             const std::shared_ptr<app::GenericNetworkTransport>& transport)
+{
+    if (!app_config.transport)
+        app_config.transport = transport;
+    if (app_config.device_info.platform_version.empty())
+        app_config.device_info.platform_version = "Object Store Test Platform Version";
+    if (app_config.device_info.sdk_version.empty())
+        app_config.device_info.sdk_version = "SDK Version";
+    if (app_config.device_info.sdk.empty())
+        app_config.device_info.sdk = "SDK Name";
+    if (app_config.device_info.device_name.empty())
+        app_config.device_info.device_name = "Device Name";
+    if (app_config.device_info.device_version.empty())
+        app_config.device_info.device_version = "Device Version";
+    if (app_config.device_info.framework_name.empty())
+        app_config.device_info.framework_name = "Framework Name";
+    if (app_config.device_info.framework_version.empty())
+        app_config.device_info.framework_version = "Framework Version";
+    if (app_config.device_info.bundle_id.empty())
+        app_config.device_info.bundle_id = "Bundle Id";
+    if (app_config.app_id.empty())
+        app_config.app_id = "app_id";
+}
 
 OfflineAppSession::Config::Config(std::shared_ptr<realm::app::GenericNetworkTransport> t)
     : transport(t)
@@ -156,7 +199,7 @@ OfflineAppSession::OfflineAppSession(OfflineAppSession::Config config)
     util::try_make_dir(m_base_file_path);
     app::BackingStoreConfig bsc;
     bsc.base_file_path = m_base_file_path;
-    bsc.metadata_mode = app::BackingStoreConfig::MetadataMode::NoEncryption;
+    bsc.metadata_mode = config.metadata_mode;
     m_app = app::App::get_app(app::App::CacheMode::Disabled, app_config, bsc);
 }
 
@@ -174,7 +217,9 @@ OfflineAppSession::~OfflineAppSession()
     }
 }
 
+#endif // REALM_ENABLE_AUTH_TESTS || REALM_ENABLE_SYNC
 
+#if REALM_ENABLE_AUTH_TESTS
 // MARK: - TestAppSession
 
 
@@ -200,6 +245,8 @@ TestAppSession::Config::Config(AppSession session,
 #endif // REALM_SYNC
 {
 }
+
+TestAppSession::Config::~Config() {}
 
 TestAppSession::TestAppSession(Config config)
     : m_app_session(std::move(config.app_session))
@@ -311,33 +358,7 @@ std::vector<bson::BsonDocument> TestAppSession::get_documents(SyncUser& user, co
     return documents;
 }
 
-void set_app_config_defaults(app::App::Config& app_config,
-                             const std::shared_ptr<app::GenericNetworkTransport>& transport)
-{
-    if (!app_config.transport)
-        app_config.transport = transport;
-    if (app_config.device_info.platform_version.empty())
-        app_config.device_info.platform_version = "Object Store Test Platform Version";
-    if (app_config.device_info.sdk_version.empty())
-        app_config.device_info.sdk_version = "SDK Version";
-    if (app_config.device_info.sdk.empty())
-        app_config.device_info.sdk = "SDK Name";
-    if (app_config.device_info.device_name.empty())
-        app_config.device_info.device_name = "Device Name";
-    if (app_config.device_info.device_version.empty())
-        app_config.device_info.device_version = "Device Version";
-    if (app_config.device_info.framework_name.empty())
-        app_config.device_info.framework_name = "Framework Name";
-    if (app_config.device_info.framework_version.empty())
-        app_config.device_info.framework_version = "Framework Version";
-    if (app_config.device_info.bundle_id.empty())
-        app_config.device_info.bundle_id = "Bundle Id";
-    if (app_config.app_id.empty())
-        app_config.app_id = "app_id";
-}
-
 #endif // REALM_ENABLE_AUTH_TESTS
-
 
 #if REALM_ENABLE_SYNC
 

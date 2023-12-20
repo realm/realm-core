@@ -40,19 +40,6 @@
 
 namespace realm {
 
-std::ostream& operator<<(std::ostream& os, util::Optional<app::AppError> error)
-{
-    if (!error) {
-        os << "(none)";
-    }
-    else {
-        os << "AppError(error_code=" << error->code() << ", server_error=" << error->server_error
-           << ", http_status_code=" << error->additional_status_code.value_or(0) << ", message=\"" << error->reason()
-           << "\", link_to_server_logs=\"" << error->link_to_server_logs << "\")";
-    }
-    return os;
-}
-
 bool results_contains_user(SyncUserMetadataResults& results, const std::string& identity)
 {
     for (size_t i = 0; i < results.size(); i++) {
@@ -178,6 +165,19 @@ ExpectedRealmPaths::ExpectedRealmPaths(const std::string& base_path, const std::
 
 #if REALM_ENABLE_AUTH_TESTS
 
+std::ostream& operator<<(std::ostream& os, util::Optional<app::AppError> error)
+{
+    if (!error) {
+        os << "(none)";
+    }
+    else {
+        os << "AppError(error_code=" << error->code() << ", server_error=" << error->server_error
+           << ", http_status_code=" << error->additional_status_code.value_or(0) << ", message=\"" << error->reason()
+           << "\", link_to_server_logs=\"" << error->link_to_server_logs << "\")";
+    }
+    return os;
+}
+
 static std::string unquote_string(std::string_view possibly_quoted_string)
 {
     if (possibly_quoted_string.size() > 0) {
@@ -212,6 +212,11 @@ std::string get_admin_url()
 #endif
 }
 #endif // REALM_MONGODB_ENDPOINT
+
+#endif // REALM_ENABLE_AUTH_TESTS
+
+
+#if REALM_ENABLE_AUTH_TESTS || REALM_ENABLE_SYNC
 
 AutoVerifiedEmailCredentials::AutoVerifiedEmailCredentials()
 {
@@ -266,7 +271,7 @@ app::AppError failed_log_in(std::shared_ptr<app::App> app, app::AppCredentials c
     return *err;
 }
 
-#endif // REALM_ENABLE_AUTH_TESTS
+#endif // REALM_ENABLE_AUTH_TESTS || REALM_ENABLE_SYNC
 
 #if REALM_ENABLE_SYNC
 

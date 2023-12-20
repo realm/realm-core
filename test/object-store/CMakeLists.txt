@@ -42,13 +42,15 @@ endif()
 
 file(GLOB RESOURCES "*.realm" "../*.pem")
 
-if(REALM_ENABLE_AUTH_TESTS)
+if(REALM_ENABLE_AUTH_TESTS OR REALM_ENABLE_SYNC)
     list(APPEND HEADERS
+        util/sync/baas_admin_api.hpp
         util/unit_test_transport.hpp
     )
     list(APPEND SOURCES 
         sync/app.cpp
-	util/sync/baas_admin_api.cpp
+	    util/sync/baas_admin_api.cpp
+        util/sync/sync_test_utils.cpp
         util/unit_test_transport.cpp
     )
 endif()
@@ -81,14 +83,6 @@ if(REALM_ENABLE_SYNC)
     if(APPLE)
         list(APPEND SOURCES audit.cpp)
     endif()
-
-elseif(REALM_APP_SERVICES)
-    list(APPEND HEADERS
-        util/sync/baas_admin_api.hpp
-    )
-    list(APPEND SOURCES
-        util/sync/sync_test_utils.cpp
-    )
 endif()
 
 set_property(DIRECTORY PROPERTY TEST_RESOURCES "${RESOURCES}")

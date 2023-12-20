@@ -145,18 +145,10 @@ void async_open_realm(const Realm::Config& config,
 
 #endif // REALM_ENABLE_SYNC
 
-#if REALM_ENABLE_AUTH_TESTS
+#if REALM_ENABLE_AUTH_TESTS || REALM_ENABLE_SYNC
 
 template <typename Transport>
 const std::shared_ptr<app::GenericNetworkTransport> instance_of = std::make_shared<Transport>();
-
-std::ostream& operator<<(std::ostream& os, util::Optional<app::AppError> error);
-
-#ifdef REALM_MONGODB_ENDPOINT
-std::string get_base_url();
-std::string get_admin_url();
-
-#endif
 
 struct AutoVerifiedEmailCredentials : app::AppCredentials {
     AutoVerifiedEmailCredentials();
@@ -171,6 +163,18 @@ std::shared_ptr<SyncUser> log_in(std::shared_ptr<app::App> app,
 
 app::AppError failed_log_in(std::shared_ptr<app::App> app,
                             app::AppCredentials credentials = app::AppCredentials::anonymous());
+
+#endif // REALM_ENABLE_AUTH_TESTS || REALM_ENABLE_SYNC
+
+#if REALM_ENABLE_AUTH_TESTS
+
+std::ostream& operator<<(std::ostream& os, util::Optional<app::AppError> error);
+
+#ifdef REALM_MONGODB_ENDPOINT
+std::string get_base_url();
+std::string get_admin_url();
+
+#endif
 
 #endif // REALM_ENABLE_AUTH_TESTS
 

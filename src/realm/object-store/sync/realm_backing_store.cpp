@@ -31,6 +31,14 @@ RealmBackingStore::RealmBackingStore(std::weak_ptr<app::App> parent, app::Backin
 {
 }
 
+RealmBackingStore::~RealmBackingStore()
+{
+    util::CheckedLockGuard lk(m_user_mutex);
+    for (auto& user : m_users) {
+        user->detach_from_backing_store();
+    }
+}
+
 void RealmBackingStore::reset_for_testing()
 {
     {

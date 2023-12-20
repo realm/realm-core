@@ -59,7 +59,7 @@ using util::Optional;
 using namespace std::string_view_literals;
 using namespace std::literals::string_literals;
 
-#if !REALM_ENABLE_AUTH_TESTS || !defined(REALM_MONGODB_ENDPOINT)
+#if REALM_ENABLE_AUTH_TESTS && !defined(REALM_MONGODB_ENDPOINT)
 static_assert(false, "These tests require a MongoDB instance")
 #endif
 
@@ -75,6 +75,8 @@ static_assert(false, "These tests require a MongoDB instance")
 } // namespace realm
 
 // MARK: - Sync Tests
+
+#if REALM_ENABLE_AUTH_TESTS
 
 TEST_CASE("app: mixed lists with object links", "[sync][pbs][app][links][baas]") {
     const std::string valid_pk_name = "_id";
@@ -2044,6 +2046,8 @@ TEST_CASE("app: full-text compatible with sync", "[sync][app][baas]") {
     REQUIRE(world_results.size() == 1);
     REQUIRE(world_results.get<Obj>(0).get_primary_key() == Mixed{obj_id_1});
 }
+
+#endif // REALM_ENABLE_AUTH_TESTS
 
 namespace {
 class AsyncMockNetworkTransport {

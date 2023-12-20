@@ -40,7 +40,7 @@
 
 #endif // REALM_ENABLE_SYNC
 
-#if REALM_ENABLE_AUTH_TESTS
+#if REALM_ENABLE_AUTH_TESTS || REALM_ENABLE_SYNC
 #include <realm/object-store/sync/app.hpp>
 #endif
 
@@ -50,13 +50,12 @@
 
 namespace realm {
 
-#if REALM_ENABLE_AUTH_TESTS
+#if REALM_ENABLE_AUTH_TESTS || REALM_ENABLE_SYNC
 namespace app {
-class App;
 struct GenericNetworkTransport;
 } // namespace app
 struct AppSession;
-#endif // REALM_ENABLE_AUTH_TESTS
+#endif // REALM_ENABLE_AUTH_TESTS || REALM_ENABLE_SYNC
 
 class Schema;
 enum class SyncSessionStopPolicy;
@@ -126,7 +125,7 @@ void on_change_but_no_notify(realm::Realm& realm);
 #endif // TEST_ENABLE_LOGGING
 #endif // TEST_LOGGING_LEVEL
 
-#if REALM_ENABLE_AUTH_TESTS
+#if REALM_ENABLE_AUTH_TESTS || REALM_ENABLE_SYNC
 
 static const std::string profile_0_name = "Ursus americanus Ursus boeckhi";
 static const std::string profile_0_first_name = "Ursus americanus";
@@ -143,25 +142,13 @@ static const nlohmann::json profile_0 = {
     {"email", profile_0_email},       {"picture_url", profile_0_picture_url}, {"gender", profile_0_gender},
     {"birthday", profile_0_birthday}, {"min_age", profile_0_min_age},         {"max_age", profile_0_max_age}};
 
-static nlohmann::json user_json(std::string access_token, std::string user_id = realm::random_string(15))
-{
-    return {{"access_token", access_token},
-            {"refresh_token", access_token},
-            {"user_id", user_id},
-            {"device_id", "Panda Bear"}};
-}
-
-static nlohmann::json user_profile_json(std::string user_id = realm::random_string(15),
-                                        std::string identity_0_id = "Ursus arctos isabellinus",
-                                        std::string identity_1_id = "Ursus arctos horribilis",
-                                        std::string provider_type = "anon-user")
-{
-    return {{"user_id", user_id},
-            {"identities",
-             {{{"id", identity_0_id}, {"provider_type", provider_type}},
-              {{"id", identity_1_id}, {"provider_type", "lol_wut"}}}},
-            {"data", profile_0}};
-}
+nlohmann::json user_json(std::string access_token, std::string user_id = realm::random_string(15));
+nlohmann::json user_profile_json(std::string user_id = realm::random_string(15),
+                                 std::string identity_0_id = "Ursus arctos isabellinus",
+                                 std::string identity_1_id = "Ursus arctos horribilis",
+                                 std::string provider_type = "anon-user");
+void set_app_config_defaults(realm::app::App::Config& app_config,
+                             const std::shared_ptr<realm::app::GenericNetworkTransport>& transport);
 
 static const std::string good_access_token =
     "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9."
@@ -185,6 +172,8 @@ public:
         std::shared_ptr<realm::app::GenericNetworkTransport> transport;
         bool delete_storage = true;
         std::optional<std::string> storage_path;
+        realm::app::RealmBackingStoreConfig::MetadataMode metadata_mode =
+            realm::app::RealmBackingStoreConfig::MetadataMode::NoMetadata;
     };
     OfflineAppSession(Config);
     ~OfflineAppSession();
@@ -209,6 +198,9 @@ private:
     bool m_delete_storage = true;
 };
 
+#endif // REALM_ENABLE_AUTH_TESTS || REALM_ENABLE_SYNC
+
+#if REALM_ENABLE_AUTH_TESTS
 using DeleteApp = realm::util::TaggedBool<struct DeleteAppTag>;
 class TestAppSession {
 public:
@@ -221,6 +213,7 @@ public:
                std::shared_ptr<realm::sync::SyncSocketProvider> socket_provider = nullptr
 #endif // REALM_ENABLE_SYNC
         );
+        ~Config();
         std::unique_ptr<realm::AppSession> app_session;
         std::shared_ptr<realm::app::GenericNetworkTransport> transport;
         DeleteApp delete_when_done;
@@ -266,9 +259,6 @@ private:
     std::shared_ptr<realm::app::GenericNetworkTransport> m_transport;
     bool m_delete_storage = true;
 };
-
-void set_app_config_defaults(realm::app::App::Config& app_config,
-                             const std::shared_ptr<realm::app::GenericNetworkTransport>& transport);
 
 #endif // REALM_ENABLE_AUTH_TESTS
 
@@ -423,4 +413,4 @@ bool wait_for_download(realm::Realm& realm, std::chrono::seconds timeout = std::
 
 #endif // REALM_ENABLE_SYNC
 
-#endif
+#endif // REALM_TEST_UTIL_TEST_FILE_HPP
