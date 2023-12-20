@@ -354,14 +354,13 @@ void ArrayFlex::restore_array(Array& arr, const std::vector<int64_t>& values) co
     auto max_bit = std::max(width_min, width_max);
     auto byte_size = NodeHeader::calc_size<Encoding::WTypBits>(size, max_bit);
     REALM_ASSERT(byte_size % 8 == 0); // 8 bytes aligned value
-    Allocator& allocator = arr.get_alloc();
+    auto& allocator = arr.get_alloc();
 
     // calling array destory here, works only because we are not going to use this array header anymore, see comment
     // in Array::init_from_mem. We can get away with this since we are basically restoring all the basic properties
     // for the array via Node::init_header(...) But width and capacity need particular attention.
     auto orginal_header = arr.get_header();
     auto origanal_ref = arr.get_ref();
-    // arr.destroy();
 
     // this is slow. It is just for testing, but this is what it is needed. the ceil for the current bit size.
     // we need to have std::bit_ceil(v); AKA the next power of 2 closed to max_bit. We have somehow introduced a
@@ -374,16 +373,14 @@ void ArrayFlex::restore_array(Array& arr, const std::vector<int64_t>& values) co
     REALM_ASSERT(width == 0 || width == 1 || width == 2 || width == 4 || width == 8 || width == 16 || width == 32 ||
                  width == 64);
 
-
     auto mem = allocator.alloc(byte_size);
     auto header = mem.get_addr();
     NodeHeader::init_header(header, 'A', Encoding::WTypBits, flags, width, values.size());
+    NodeHeader::set_capacity_in_header(byte_size, header);
     // the old array should not be deleted up until this function completes,
     // but once it finishes running, the ref of the old array is gone, so the memory is leaked.
     // previous header and ref must be stored temporary and deleted after this point
     arr.init_from_mem(mem);
-    NodeHeader::set_capacity_in_header(byte_size, header);
-    arr.update_parent();
 
     size_t i = 0;
     for (const auto& v : values)
@@ -394,6 +391,8 @@ void ArrayFlex::restore_array(Array& arr, const std::vector<int64_t>& values) co
     size_t w = arr.get_width();
     REALM_ASSERT(w == 0 || w == 1 || w == 2 || w == 4 || w == 8 || w == 16 || w == 32 || w == 64);
     REALM_ASSERT(arr.size() == values.size());
+
+    arr.update_parent();
 }
 
 std::vector<int64_t> ArrayFlex::find_all(const Array& arr, int64_t, size_t start, size_t end) const

@@ -715,8 +715,10 @@ void Array::do_ensure_minimum_width(int_fast64_t value)
 
 size_t Array::size() const noexcept
 {
-    if (is_encoded())
-        return m_encode.size(*this);
+    // in case the array is in compressed format. Never read directly
+    // from the header the size, since during compaction the memory can
+    // be reclaimed, while in a write transaction.
+    // For compressed arrays m_size should always be kept updated
     return m_size;
 }
 
