@@ -20,6 +20,7 @@
 #include <realm/sync/transform.hpp>
 
 #include "test.hpp"
+#include "testsettings.hpp"
 #include "util/quote.hpp"
 
 #include "peer.hpp"
@@ -972,7 +973,12 @@ TEST_IF(Transform_Randomized, get_disable_sync_to_disk())
 
     // FIXME: Unfortunately these rounds are terribly slow, presumable due to
     // sync-to-disk. Can we use "in memory" mode too boost them?
-    int num_major_rounds = 100;
+    // also, they are disproportionately slower, espesially in debug and under simulator
+#ifndef REALM_DEBUG
+    int num_major_rounds = TEST_DURATION >= 1 ? 100 : 10;
+#else
+    int num_major_rounds = TEST_DURATION >= 1 ? 32 : 4;
+#endif
     int num_minor_rounds = 1;
 
     Random random(unit_test_random_seed); // Seed from slow global generator
