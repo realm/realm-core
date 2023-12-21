@@ -580,7 +580,7 @@ functions:
         # Run the setup_baas_host_local.sh script to configure and run baas on the remote host
         # Add -v to this command for verbose script logging
         ./evergreen/setup_baas_host_local.sh -w ./baas-work-dir -u $BAAS_USER $OPT_BAAS_BRANCH $OPT_BAAS_PROXY \
-            $OPT_BAAS_DIRECT ./baas_host_vars.sh ./.baas_ssh_key 2>&1 | tee install_baas_output.log
+            $OPT_BAAS_DIRECT -i ./.baas_ssh_key ./baas_host_vars.sh 2>&1 | tee install_baas_output.log
 
   "wait for baas to start":
   - command: shell.exec
@@ -597,6 +597,24 @@ functions:
 
         # Don't print out the tail of the log file
         ./evergreen/wait_for_baas.sh -s -w ./baas-work-dir -l ""
+
+        echo "Baas is started!"
+
+  "wait for remote baas to start":
+  - command: shell.exec
+    params:
+      working_dir: realm-core
+      shell: bash
+      script: |-
+        set -o errexit
+        set -o verbose
+
+        if [[ -n "${disable_tests_against_baas|}" ]]; then
+          exit 0
+        fi
+
+        # Don't print out the tail of the log file
+        ./evergreen/wait_for_remote_baas.sh -i ./.baas_ssh_key ./baas_host_vars.sh  ./.baas_ssh_key
 
         echo "Baas is started!"
 
@@ -958,11 +976,11 @@ tasks:
   commands:
   - func: "launch remote baas"
     vars:
-      baas_branch: e8004ddf10dba21b45581d93fcf1e3d9a1c319ba
+      baas_branch: 300efb0604a88f1f36899bee0f42b34826b9b65f
   - func: "compile"
     vars:
       target_to_build: ObjectStoreTests
-  - func: "wait for baas to start"
+  - func: "wait for remote baas to start"
   - func: "run tests"
     vars:
       test_label: objstore-baas
@@ -982,7 +1000,7 @@ tasks:
   commands:
   - func: "launch remote baas"
     vars:
-      baas_branch: e8004ddf10dba21b45581d93fcf1e3d9a1c319ba
+      baas_branch: 300efb0604a88f1f36899bee0f42b34826b9b65f
       baas_proxy: On
   - func: "compile"
     vars:
@@ -1195,6 +1213,22 @@ task_groups:
   tasks:
   - compile
   - .test_suite
+  - .object_store_test_suite
+
+# compile and run only object store tests: local and remote
+- name: compile_test_object_store
+  max_hosts: 1
+  setup_group_can_fail_task: true
+  setup_group:
+  - func: "fetch source"
+  - func: "fetch binaries"
+  teardown_task:
+  - func: "upload test results"
+  - func: "upload baas artifacts"
+  timeout:
+  - func: "run hang analyzer"
+  tasks:
+  - compile
   - .object_store_test_suite
 
 # Runs object-store-tests against baas running on remote host and runs
@@ -1447,50 +1481,51 @@ buildvariants:
   tasks:
   - name: fuzzer-tests
 
-- name: ubuntu2004-network-nonideal
-  display_name: "Ubuntu 20.04 x86_64 (Utunbu2004 - nonideal transfer)"
-  run_on: ubuntu2004-large
-  expansions:
-    clang_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/clang%2Bllvm-11.0.0-x86_64-linux-gnu-ubuntu-20.04.tar.xz"
-    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-linux-x86_64.tar.gz"
-    cmake_bindir: "./cmake_binaries/bin"
-    fetch_missing_dependencies: On
-    c_compiler: "./clang_binaries/bin/clang"
-    cxx_compiler: "./clang_binaries/bin/clang++"
-    cmake_build_type: RelWithDebInfo
-    run_with_encryption: On
-    baas_admin_port: 9098
-    test_logging_level: debug
-    test_timeout_extra: 60
-    proxy_toxics_file: evergreen/proxy-nonideal-transfer.toxics
-    # RANDOM1: bandwidth-upstream limited to between 10-50 KB/s from the client to the server
-    # RANDOM2: bandwidth-downstream limited to between 10-50 KB/s from the server to the client
-    proxy_toxics_randoms: "10:50|10:50"
-  tasks:
-  - name: network_tests
-
-- name: ubuntu2004-network-faulty
-  display_name: "Ubuntu 20.04 x86_64 (Utunbu2004 - network faults)"
-  run_on: ubuntu2004-large
-  expansions:
-    clang_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/clang%2Bllvm-11.0.0-x86_64-linux-gnu-ubuntu-20.04.tar.xz"
-    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-linux-x86_64.tar.gz"
-    cmake_bindir: "./cmake_binaries/bin"
-    fetch_missing_dependencies: On
-    c_compiler: "./clang_binaries/bin/clang"
-    cxx_compiler: "./clang_binaries/bin/clang++"
-    cmake_build_type: RelWithDebInfo
-    run_with_encryption: On
-    baas_admin_port: 9098
-    test_logging_level: debug
-    proxy_toxics_file: evergreen/proxy-network-faults.toxics
-    # RANDOM1: limit-data-upstream to close connection after between 1000-3000 bytes have been sent
-    # RANDOM2: limit-data-downstream to close connection after between 1000-3000 bytes have been received
-    # RANDOM3: slow-close-upstream to keep connection to server open after 1000-1500 milliseconds after being closed
-    # RANDOM4: reset-peer-upstream after 50-200 seconds to force close the connection to the server
-    proxy_toxics_randoms: "1000:3000|1000:3000|1000:1500|50:200"
-  tasks:
-  - name: network_tests
+# disable these builders since there are constantly failing and not yet ready for nightly builds
+# - name: ubuntu2004-network-nonideal
+#   display_name: "Ubuntu 20.04 x86_64 (Utunbu2004 - nonideal transfer)"
+#   run_on: ubuntu2004-large
+#   expansions:
+#     clang_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/clang%2Bllvm-11.0.0-x86_64-linux-gnu-ubuntu-20.04.tar.xz"
+#     cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-linux-x86_64.tar.gz"
+#     cmake_bindir: "./cmake_binaries/bin"
+#     fetch_missing_dependencies: On
+#     c_compiler: "./clang_binaries/bin/clang"
+#     cxx_compiler: "./clang_binaries/bin/clang++"
+#     cmake_build_type: RelWithDebInfo
+#     run_with_encryption: On
+#     baas_admin_port: 9098
+#     test_logging_level: debug
+#     test_timeout_extra: 60
+#     proxy_toxics_file: evergreen/proxy-nonideal-transfer.toxics
+#     # RANDOM1: bandwidth-upstream limited to between 10-50 KB/s from the client to the server
+#     # RANDOM2: bandwidth-downstream limited to between 10-50 KB/s from the server to the client
+#     proxy_toxics_randoms: "10:50|10:50"
+#   tasks:
+#   - name: network_tests
+#
+# - name: ubuntu2004-network-faulty
+#   display_name: "Ubuntu 20.04 x86_64 (Utunbu2004 - network faults)"
+#   run_on: ubuntu2004-large
+#   expansions:
+#     clang_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/clang%2Bllvm-11.0.0-x86_64-linux-gnu-ubuntu-20.04.tar.xz"
+#     cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-linux-x86_64.tar.gz"
+#     cmake_bindir: "./cmake_binaries/bin"
+#     fetch_missing_dependencies: On
+#     c_compiler: "./clang_binaries/bin/clang"
+#     cxx_compiler: "./clang_binaries/bin/clang++"
+#     cmake_build_type: RelWithDebInfo
+#     run_with_encryption: On
+#     baas_admin_port: 9098
+#     test_logging_level: debug
+#     proxy_toxics_file: evergreen/proxy-network-faults.toxics
+#     # RANDOM1: limit-data-upstream to close connection after between 1000-3000 bytes have been sent
+#     # RANDOM2: limit-data-downstream to close connection after between 1000-3000 bytes have been received
+#     # RANDOM3: slow-close-upstream to keep connection to server open after 1000-1500 milliseconds after being closed
+#     # RANDOM4: reset-peer-upstream after 50-200 seconds to force close the connection to the server
+#     proxy_toxics_randoms: "1000:3000|1000:3000|1000:1500|50:200"
+#   tasks:
+#   - name: network_tests
 
 - name: rhel70
   display_name: "RHEL 7 x86_64"
@@ -1528,9 +1563,24 @@ buildvariants:
     python3: "/opt/mongodbtoolchain/v3/bin/python3"
     use_system_openssl: On
     fetch_missing_dependencies: On
+    cmake_build_type: RelWithDebInfo
   tasks:
   - name: compile_test_and_package
   - name: benchmarks
+
+- name: ubuntu2204-arm64-asan
+  display_name: "Ubuntu 22.04 ARM64 (ASAN)"
+  run_on: ubuntu2204-arm64-large
+  expansions:
+    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-linux-aarch64.tar.gz"
+    cmake_bindir: "./cmake_binaries/bin"
+    python3: "/opt/mongodbtoolchain/v3/bin/python3"
+    use_system_openssl: On
+    fetch_missing_dependencies: On
+    cmake_build_type: Debug
+    enable_asan: On
+  tasks:
+  - name: compile_test
 
 - name: macos
   display_name: "MacOS 11.0 x86_64"
@@ -1677,7 +1727,9 @@ buildvariants:
     cmake_build_type: RelWithDebInfo
     enable_tsan: On
   tasks:
-  - name: compile_test
+  # FIXME: tsan is not stable on arm64, fails often with internal errors
+  # - name: compile_test
+  - name: compile_test_object_store
 
 - name: macos-coverage
   display_name: "MacOS 11 arm64 (Code Coverage)"

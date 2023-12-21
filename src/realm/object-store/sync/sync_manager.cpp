@@ -339,28 +339,31 @@ bool SyncManager::perform_metadata_update(util::FunctionRef<void(SyncMetadataMan
 std::shared_ptr<SyncUser> SyncManager::get_user(const std::string& user_id, const std::string& refresh_token,
                                                 const std::string& access_token, const std::string& device_id)
 {
-    util::CheckedLockGuard lock(m_user_mutex);
-    auto it = std::find_if(m_users.begin(), m_users.end(), [&](const auto& user) {
-        return user->identity() == user_id && user->state() != SyncUser::State::Removed;
-    });
-    if (it == m_users.end()) {
-        // No existing user.
-        auto new_user = std::make_shared<SyncUser>(refresh_token, user_id, access_token, device_id, this);
-        m_users.emplace(m_users.begin(), new_user);
-        {
-            util::CheckedLockGuard lock(m_file_system_mutex);
-            // m_current_user is normally set very indirectly via the metadata manger
-            if (!m_metadata_manager)
-                m_current_user = new_user;
+    std::shared_ptr<SyncUser> user;
+    {
+        util::CheckedLockGuard lock(m_user_mutex);
+        auto it = std::find_if(m_users.begin(), m_users.end(), [&](const auto& user) {
+            return user->identity() == user_id && user->state() != SyncUser::State::Removed;
+        });
+        if (it == m_users.end()) {
+            // No existing user.
+            auto new_user = std::make_shared<SyncUser>(refresh_token, user_id, access_token, device_id, this);
+            m_users.emplace(m_users.begin(), new_user);
+            {
+                util::CheckedLockGuard lock(m_file_system_mutex);
+                // m_current_user is normally set very indirectly via the metadata manger
+                if (!m_metadata_manager)
+                    m_current_user = new_user;
+            }
+            return new_user;
         }
-        return new_user;
-    }
-    else { // LoggedOut => LoggedIn
-        auto user = *it;
+
+        // LoggedOut => LoggedIn
+        user = *it;
         REALM_ASSERT(user->state() != SyncUser::State::Removed);
-        user->log_in(access_token, refresh_token);
-        return user;
     }
+    user->log_in(access_token, refresh_token);
+    return user;
 }
 
 std::vector<std::shared_ptr<SyncUser>> SyncManager::all_users()

@@ -6,7 +6,61 @@
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
+* None.
+
+### Breaking changes
+* None.
+
+### Compatibility
+* Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
+* None.
+
+----------------------------------------------
+
+# 13.25.0 Release notes
+
+### Enhancements
+* Exceptions thrown during bootstrap application will now be surfaced to the user via the sync error handler rather than terminating the program with an unhandled exception. ([PR #7197](https://github.com/realm/realm-core/pull/7197)).
+
+### Fixed
+* Exceptions thrown during bootstrap application could crash the sync client with an `!m_sess` assertion if the bootstrap was being applied during sync::Session activation. ([#7196](https://github.com/realm/realm-core/issues/7196), since v12.0.0).
+* If a SyncSession was explicitly resumed via `handle_reconnect()` while it was waiting to auto-resume after a non-fatal error and then another non-fatal error was received, the sync client could crash with a `!m_try_again_activation_timer` assertion. ([#6961](https://github.com/realm/realm-core/issues/6961), since always)
+
+### Compatibility
+* Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
+* Dangling links in a Mixed property will now appear as NULL ([#6980](https://github.com/realm/realm-core/issues/6980))
+
+----------------------------------------------
+
+# 13.24.1 Release notes
+
+### Enhancements
+* Automatic client reset recovery now preserves the original division of changesets, rather than combining all unsynchronized changes into a single changeset ([PR #7161](https://github.com/realm/realm-core/pull/7161)).
+* Automatic client reset recovery now does a better job of recovering changes when changesets were downloaded from the server after the unuploaded local changes were committed. If the local Realm happened to be fully up to date with the server prior to the client reset, automatic recovery should now always produce exactly the same state as if no client reset was involved ([PR #7161](https://github.com/realm/realm-core/pull/7161)).
+* [C API] Exposed `realm_app_create_cached` and `realm_app_get_cached` in the C API. (Issue [#7181](https://github.com/realm/realm-core/issues/7181))
+
+### Fixed
+* Fixed several causes of "decryption failed" exceptions that could happen when opening multiple encrypted Realm files in the same process while using Apple/linux and storing the Realms on an exFAT file system. ([#7156](https://github.com/realm/realm-core/issues/7156), since the beginning)
+* Fixed deadlock which occurred when accessing the current user from the `App` from within a callback from the `User` listener ([#7183](https://github.com/realm/realm-core/issues/7183), since v13.21.0)
 * Update existing std exceptions thrown by the Sync Client to use Realm exceptions. ([#6255](https://github.com/realm/realm-core/issues/6255), since v10.2.0)
+* Having a class name of length 57 would make client reset crash as a limit of 56 was wrongly enforced (57 is the correct limit) ([#7176](https://github.com/realm/realm-core/issues/7176), since v10.0.0)
+* Automatic client reset recovery on flexible sync Realms would apply recovered changes in multiple write transactions, releasing the write lock in between. This had several observable negative effects:
+  - Other threads reading from the Realm while a client reset was in progress could observe invalid mid-reset state.
+  - Other threads could potentially write in the middle of a client reset, resulting in history diverging from the server.
+  - The change notifications produced by client resets were not minimal and would report that some things changed which actually didn't.
+  - All pending subscriptions were marked as Superseded and then recreating, resulting in anything waiting for subscriptions to complete firing early.
+  ([PR #7161](https://github.com/realm/realm-core/pull/7161), since v12.3.0).
+* If the very first open of a flexible sync Realm triggered a client reset, the configuration had an initial subscriptions callback, both before and after reset callbacks, and the initial subscription callback began a read transaction without ending it (which is normally going to be the case), opening the frozen Realm for the after reset callback would trigger a BadVersion exception ([PR #7161](https://github.com/realm/realm-core/pull/7161), since v12.3.0).
+* Changesets have wrong timestamps if the local clock lags behind 2015-01-01T00:00:00Z. The sync client now throws an exception if that happens. ([PR #7180](https://github.com/realm/realm-core/pull/7180))
+* Allow propagation of user code exceptions happening during client reset callbacks, retrievable via `realm_sync_error_t` in `realm_sync_config_set_error_handler` in the C-API. ([#7098](https://github.com/realm/realm-core/issues/7098), since v11.16.0)
 
 ### Breaking changes
 * Update existing std exceptions thrown by the Sync Client to use Realm exceptions. ([PR #7141](https://github.com/realm/realm-core/pull/7141/files))
@@ -18,6 +72,7 @@
 
 ### Internals
 * Added a CombinedTests target that runs tests from object-store, sync, and core together. ([PR #6964](https://github.com/realm/realm-core/pull/6964))
+* The version of mongod we test against in evergreen was updated to 7.0.3 ([PR #7187](https://github.com/realm/realm-core/pull/7187)).
 
 ----------------------------------------------
 

@@ -15,7 +15,7 @@ namespace realm::c_api {
 ErrorStorage::ErrorStorage(std::exception_ptr ptr) noexcept
     : m_err(none)
     , m_message_buf()
-    , m_usercode_error(nullptr)
+    , m_user_code_error(nullptr)
 {
     assign(std::move(ptr));
 }
@@ -23,7 +23,7 @@ ErrorStorage::ErrorStorage(std::exception_ptr ptr) noexcept
 ErrorStorage::ErrorStorage(const ErrorStorage& other)
     : m_err(other.m_err)
     , m_message_buf(other.m_message_buf)
-    , m_usercode_error(other.m_usercode_error)
+    , m_user_code_error(other.m_user_code_error)
 {
     if (m_err) {
         m_err->message = m_message_buf.c_str();
@@ -34,7 +34,7 @@ ErrorStorage& ErrorStorage::operator=(const ErrorStorage& other)
 {
     m_err = other.m_err;
     m_message_buf = other.m_message_buf;
-    m_usercode_error = other.m_usercode_error;
+    m_user_code_error = other.m_user_code_error;
     if (m_err) {
         m_err->message = m_message_buf.c_str();
     }
@@ -44,7 +44,7 @@ ErrorStorage& ErrorStorage::operator=(const ErrorStorage& other)
 ErrorStorage::ErrorStorage(ErrorStorage&& other)
     : m_err(std::move(other.m_err))
     , m_message_buf(std::move(other.m_message_buf))
-    , m_usercode_error(std::move(other.m_usercode_error))
+    , m_user_code_error(std::move(other.m_user_code_error))
 {
     if (m_err) {
         m_err->message = m_message_buf.c_str();
@@ -56,7 +56,7 @@ ErrorStorage& ErrorStorage::operator=(ErrorStorage&& other)
 {
     m_err = std::move(other.m_err);
     m_message_buf = std::move(other.m_message_buf);
-    m_usercode_error = std::move(other.m_usercode_error);
+    m_user_code_error = std::move(other.m_user_code_error);
     if (m_err) {
         m_err->message = m_message_buf.c_str();
     }
@@ -83,7 +83,7 @@ void ErrorStorage::assign(std::exception_ptr eptr) noexcept
     }
 
     m_err.emplace();
-    m_err->usercode_error = nullptr;
+    m_err->user_code_error = nullptr;
     m_err->path = nullptr;
     auto populate_error = [&](const std::exception& ex, ErrorCodes::Error error_code) {
         m_err->error = realm_errno_e(error_code);
@@ -108,7 +108,7 @@ void ErrorStorage::assign(std::exception_ptr eptr) noexcept
     catch (const Exception& ex) {
         populate_error(ex, ex.code());
         if (ex.code() == ErrorCodes::CallbackFailed) {
-            m_err->usercode_error = static_cast<const CallbackFailed&>(ex).usercode_error;
+            m_err->user_code_error = static_cast<const CallbackFailed&>(ex).user_code_error;
         }
         if (ErrorCodes::error_categories(ex.code()).test(ErrorCategory::file_access)) {
             auto& file_access_error = static_cast<const FileAccessError&>(ex);
@@ -168,15 +168,15 @@ bool ErrorStorage::clear() noexcept
     return ret;
 }
 
-void ErrorStorage::set_usercode_error(void* usercode_error)
+void ErrorStorage::set_user_code_error(void* user_code_error)
 {
-    m_usercode_error = usercode_error;
+    m_user_code_error = user_code_error;
 }
 
-void* ErrorStorage::get_and_clear_usercode_error()
+void* ErrorStorage::get_and_clear_user_code_error()
 {
-    auto ret = m_usercode_error;
-    m_usercode_error = nullptr;
+    auto ret = m_user_code_error;
+    m_user_code_error = nullptr;
     return ret;
 }
 
@@ -247,7 +247,7 @@ RLM_EXPORT bool realm_wrap_exceptions(void (*func)()) noexcept
     });
 }
 
-RLM_API void realm_register_user_code_callback_error(void* usercode_error) noexcept
+RLM_API void realm_register_user_code_callback_error(void* user_code_error) noexcept
 {
-    realm::c_api::ErrorStorage::get_thread_local()->set_usercode_error(usercode_error);
+    realm::c_api::ErrorStorage::get_thread_local()->set_user_code_error(user_code_error);
 }

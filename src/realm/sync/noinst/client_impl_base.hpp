@@ -1412,8 +1412,8 @@ inline void ClientImpl::Session::request_download_completion_notification()
 
     // Since the deactivation process has not been initiated, the UNBIND message
     // cannot have been sent unless an ERROR message was received.
-    REALM_ASSERT(m_suspended || !m_unbind_message_sent);
-    if (m_ident_message_sent && !m_suspended)
+    REALM_ASSERT(m_error_message_received || !m_unbind_message_sent);
+    if (m_ident_message_sent && !m_error_message_received)
         ensure_enlisted_to_send(); // Throws
 }
 
