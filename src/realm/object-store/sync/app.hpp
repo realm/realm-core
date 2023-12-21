@@ -278,11 +278,8 @@ public:
     /// using the provided base URL. If this operation fails, the app will continue to use the original base URL and
     /// false will be returned. If the operation is successful, the app and sync client will use the new location info
     /// for future connections.
-    /// IMPORTANT: This function cannot be called if another App operation is in progress
-    ///            and any other App operation cannot be initiated until this operation
-    ///            is complete. Otherwise, the behavior of update_base_url() is undefined.
-    ///            The base URL update can be confirmed by checking the value of
-    ///            get_base_url() against the new base_url value provided.
+    /// NOTE: If another App operation is started while this function is in progress, that request will use the
+    ///       original base URL location information.
     /// @param base_url The new base URL to use for future app and sync connections.
     /// @param completion A callback block to be invoked once the location update completes.
     void update_base_url(std::string base_url, util::UniqueFunction<void(util::Optional<AppError>)>&& completion);
