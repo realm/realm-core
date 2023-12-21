@@ -4505,7 +4505,7 @@ TEST_CASE("C API - queries", "[c_api]") {
 
             // Invalid number of arguments
             CHECK(!realm_query_parse(realm, class_foo.key, "string == $0", 0, nullptr));
-            CHECK_ERR_CAT(RLM_ERR_INDEX_OUT_OF_BOUNDS, (RLM_ERR_CAT_INVALID_ARG | RLM_ERR_CAT_LOGIC));
+            CHECK_ERR_CAT(RLM_ERR_INVALID_QUERY_ARG, (RLM_ERR_CAT_INVALID_ARG | RLM_ERR_CAT_LOGIC));
         }
 
         SECTION("string in list") {

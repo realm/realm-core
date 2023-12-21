@@ -929,6 +929,7 @@ Query TrueOrFalseNode::visit(ParserDriver* drv)
 
 std::unique_ptr<Subexpr> PropertyNode::visit(ParserDriver* drv, DataType)
 {
+    path->resolve_arg(drv);
     if (path->path_elems.back().is_key() && path->path_elems.back().get_key() == "@links") {
         identifier = "@links";
         // This is a backlink aggregate query
@@ -1610,6 +1611,23 @@ std::unique_ptr<Subexpr> ListNode::visit(ParserDriver* drv, DataType hint)
     return ret;
 }
 
+void PathNode::resolve_arg(ParserDriver* drv)
+{
+    if (arg.size()) {
+        if (path_elems.size()) {
+            throw InvalidQueryError("Key path argument cannot be mixed with other elements");
+        }
+        auto arg_str = drv->get_arg_for_key_path(arg);
+        const char* path = arg_str.data();
+        do {
+            auto p = find_chr(path, '.');
+            StringData elem(path, p - path);
+            add_element(elem);
+            path = p;
+        } while (*path++ == '.');
+    }
+}
+
 LinkChain PathNode::visit(ParserDriver* drv, util::Optional<ExpressionComparisonType> comp_type)
 {
     LinkChain link_chain(drv->m_base_table, comp_type);
@@ -1757,6 +1775,22 @@ PathElement ParserDriver::get_arg_for_index(const std::string& i)
         default:
             throw InvalidQueryError("Invalid index type");
     }
+}
+
+std::string ParserDriver::get_arg_for_key_path(const std::string& i)
+{
+    REALM_ASSERT(i[0] == '$');
+    REALM_ASSERT(i[1] == 'K');
+    size_t arg_no = size_t(strtol(i.substr(2).c_str(), nullptr, 10));
+    if (m_args.is_argument_null(arg_no) || m_args.is_argument_list(arg_no)) {
+        throw InvalidQueryArgError(util::format("Null or list cannot be used for parameter '%1'", i));
+    }
+    auto type = m_args.type_for_argument(arg_no);
+    if (type != type_String) {
+        throw InvalidQueryArgError(util::format("Invalid index type for '%1'. Expected a string, but found type '%2'",
+                                                i, get_data_type_name(type)));
+    }
+    return m_args.string_for_argument(arg_no);
 }
 
 double ParserDriver::get_arg_for_coordinate(const std::string& str)

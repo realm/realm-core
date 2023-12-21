@@ -520,6 +520,7 @@ namespace yy {
       // "link"
       // "typed link"
       // "argument"
+      // "keypath"
       // "beginswith"
       // "endswith"
       // "contains"
@@ -630,28 +631,29 @@ namespace yy {
     TOK_LINK = 295,                // "link"
     TOK_TYPED_LINK = 296,          // "typed link"
     TOK_ARG = 297,                 // "argument"
-    TOK_BEGINSWITH = 298,          // "beginswith"
-    TOK_ENDSWITH = 299,            // "endswith"
-    TOK_CONTAINS = 300,            // "contains"
-    TOK_TEXT = 301,                // "fulltext"
-    TOK_LIKE = 302,                // "like"
-    TOK_BETWEEN = 303,             // "between"
-    TOK_IN = 304,                  // "in"
-    TOK_GEOWITHIN = 305,           // "geowithin"
-    TOK_OBJ = 306,                 // "obj"
-    TOK_SORT = 307,                // "sort"
-    TOK_DISTINCT = 308,            // "distinct"
-    TOK_LIMIT = 309,               // "limit"
-    TOK_BINARY = 310,              // "binary"
-    TOK_ASCENDING = 311,           // "ascending"
-    TOK_DESCENDING = 312,          // "descending"
-    TOK_INDEX_FIRST = 313,         // "FIRST"
-    TOK_INDEX_LAST = 314,          // "LAST"
-    TOK_INDEX_SIZE = 315,          // "SIZE"
-    TOK_SIZE = 316,                // "@size"
-    TOK_TYPE = 317,                // "@type"
-    TOK_KEY_VAL = 318,             // "key or value"
-    TOK_BACKLINK = 319             // "@links"
+    TOK_KP_ARG = 298,              // "keypath"
+    TOK_BEGINSWITH = 299,          // "beginswith"
+    TOK_ENDSWITH = 300,            // "endswith"
+    TOK_CONTAINS = 301,            // "contains"
+    TOK_TEXT = 302,                // "fulltext"
+    TOK_LIKE = 303,                // "like"
+    TOK_BETWEEN = 304,             // "between"
+    TOK_IN = 305,                  // "in"
+    TOK_GEOWITHIN = 306,           // "geowithin"
+    TOK_OBJ = 307,                 // "obj"
+    TOK_SORT = 308,                // "sort"
+    TOK_DISTINCT = 309,            // "distinct"
+    TOK_LIMIT = 310,               // "limit"
+    TOK_BINARY = 311,              // "binary"
+    TOK_ASCENDING = 312,           // "ascending"
+    TOK_DESCENDING = 313,          // "descending"
+    TOK_INDEX_FIRST = 314,         // "FIRST"
+    TOK_INDEX_LAST = 315,          // "LAST"
+    TOK_INDEX_SIZE = 316,          // "SIZE"
+    TOK_SIZE = 317,                // "@size"
+    TOK_TYPE = 318,                // "@type"
+    TOK_KEY_VAL = 319,             // "key or value"
+    TOK_BACKLINK = 320             // "@links"
       };
       /// Backward compatibility alias (Bison 3.6).
       typedef token_kind_type yytokentype;
@@ -668,7 +670,7 @@ namespace yy {
     {
       enum symbol_kind_type
       {
-        YYNTOKENS = 77, ///< Number of tokens.
+        YYNTOKENS = 78, ///< Number of tokens.
         SYM_YYEMPTY = -2,
         SYM_YYEOF = 0,                           // "end of file"
         SYM_YYerror = 1,                         // error
@@ -713,76 +715,77 @@ namespace yy {
         SYM_LINK = 40,                           // "link"
         SYM_TYPED_LINK = 41,                     // "typed link"
         SYM_ARG = 42,                            // "argument"
-        SYM_BEGINSWITH = 43,                     // "beginswith"
-        SYM_ENDSWITH = 44,                       // "endswith"
-        SYM_CONTAINS = 45,                       // "contains"
-        SYM_TEXT = 46,                           // "fulltext"
-        SYM_LIKE = 47,                           // "like"
-        SYM_BETWEEN = 48,                        // "between"
-        SYM_IN = 49,                             // "in"
-        SYM_GEOWITHIN = 50,                      // "geowithin"
-        SYM_OBJ = 51,                            // "obj"
-        SYM_SORT = 52,                           // "sort"
-        SYM_DISTINCT = 53,                       // "distinct"
-        SYM_LIMIT = 54,                          // "limit"
-        SYM_BINARY = 55,                         // "binary"
-        SYM_ASCENDING = 56,                      // "ascending"
-        SYM_DESCENDING = 57,                     // "descending"
-        SYM_INDEX_FIRST = 58,                    // "FIRST"
-        SYM_INDEX_LAST = 59,                     // "LAST"
-        SYM_INDEX_SIZE = 60,                     // "SIZE"
-        SYM_SIZE = 61,                           // "@size"
-        SYM_TYPE = 62,                           // "@type"
-        SYM_KEY_VAL = 63,                        // "key or value"
-        SYM_BACKLINK = 64,                       // "@links"
-        SYM_65_ = 65,                            // '+'
-        SYM_66_ = 66,                            // '-'
-        SYM_67_ = 67,                            // '*'
-        SYM_68_ = 68,                            // '/'
-        SYM_69_ = 69,                            // '('
-        SYM_70_ = 70,                            // ')'
-        SYM_71_ = 71,                            // '.'
-        SYM_72_ = 72,                            // ','
-        SYM_73_ = 73,                            // '['
-        SYM_74_ = 74,                            // ']'
-        SYM_75_ = 75,                            // '{'
-        SYM_76_ = 76,                            // '}'
-        SYM_YYACCEPT = 77,                       // $accept
-        SYM_final = 78,                          // final
-        SYM_query = 79,                          // query
-        SYM_compare = 80,                        // compare
-        SYM_expr = 81,                           // expr
-        SYM_value = 82,                          // value
-        SYM_prop = 83,                           // prop
-        SYM_aggregate = 84,                      // aggregate
-        SYM_simple_prop = 85,                    // simple_prop
-        SYM_subquery = 86,                       // subquery
-        SYM_coordinate = 87,                     // coordinate
-        SYM_geopoint = 88,                       // geopoint
-        SYM_geoloop_content = 89,                // geoloop_content
-        SYM_geoloop = 90,                        // geoloop
-        SYM_geopoly_content = 91,                // geopoly_content
-        SYM_geospatial = 92,                     // geospatial
-        SYM_post_query = 93,                     // post_query
-        SYM_distinct = 94,                       // distinct
-        SYM_distinct_param = 95,                 // distinct_param
-        SYM_sort = 96,                           // sort
-        SYM_sort_param = 97,                     // sort_param
-        SYM_limit = 98,                          // limit
-        SYM_direction = 99,                      // direction
-        SYM_list = 100,                          // list
-        SYM_list_content = 101,                  // list_content
-        SYM_constant = 102,                      // constant
-        SYM_primary_key = 103,                   // primary_key
-        SYM_boolexpr = 104,                      // boolexpr
-        SYM_comp_type = 105,                     // comp_type
-        SYM_post_op = 106,                       // post_op
-        SYM_aggr_op = 107,                       // aggr_op
-        SYM_equality = 108,                      // equality
-        SYM_relational = 109,                    // relational
-        SYM_stringop = 110,                      // stringop
-        SYM_path = 111,                          // path
-        SYM_id = 112                             // id
+        SYM_KP_ARG = 43,                         // "keypath"
+        SYM_BEGINSWITH = 44,                     // "beginswith"
+        SYM_ENDSWITH = 45,                       // "endswith"
+        SYM_CONTAINS = 46,                       // "contains"
+        SYM_TEXT = 47,                           // "fulltext"
+        SYM_LIKE = 48,                           // "like"
+        SYM_BETWEEN = 49,                        // "between"
+        SYM_IN = 50,                             // "in"
+        SYM_GEOWITHIN = 51,                      // "geowithin"
+        SYM_OBJ = 52,                            // "obj"
+        SYM_SORT = 53,                           // "sort"
+        SYM_DISTINCT = 54,                       // "distinct"
+        SYM_LIMIT = 55,                          // "limit"
+        SYM_BINARY = 56,                         // "binary"
+        SYM_ASCENDING = 57,                      // "ascending"
+        SYM_DESCENDING = 58,                     // "descending"
+        SYM_INDEX_FIRST = 59,                    // "FIRST"
+        SYM_INDEX_LAST = 60,                     // "LAST"
+        SYM_INDEX_SIZE = 61,                     // "SIZE"
+        SYM_SIZE = 62,                           // "@size"
+        SYM_TYPE = 63,                           // "@type"
+        SYM_KEY_VAL = 64,                        // "key or value"
+        SYM_BACKLINK = 65,                       // "@links"
+        SYM_66_ = 66,                            // '+'
+        SYM_67_ = 67,                            // '-'
+        SYM_68_ = 68,                            // '*'
+        SYM_69_ = 69,                            // '/'
+        SYM_70_ = 70,                            // '('
+        SYM_71_ = 71,                            // ')'
+        SYM_72_ = 72,                            // '.'
+        SYM_73_ = 73,                            // ','
+        SYM_74_ = 74,                            // '['
+        SYM_75_ = 75,                            // ']'
+        SYM_76_ = 76,                            // '{'
+        SYM_77_ = 77,                            // '}'
+        SYM_YYACCEPT = 78,                       // $accept
+        SYM_final = 79,                          // final
+        SYM_query = 80,                          // query
+        SYM_compare = 81,                        // compare
+        SYM_expr = 82,                           // expr
+        SYM_value = 83,                          // value
+        SYM_prop = 84,                           // prop
+        SYM_aggregate = 85,                      // aggregate
+        SYM_simple_prop = 86,                    // simple_prop
+        SYM_subquery = 87,                       // subquery
+        SYM_coordinate = 88,                     // coordinate
+        SYM_geopoint = 89,                       // geopoint
+        SYM_geoloop_content = 90,                // geoloop_content
+        SYM_geoloop = 91,                        // geoloop
+        SYM_geopoly_content = 92,                // geopoly_content
+        SYM_geospatial = 93,                     // geospatial
+        SYM_post_query = 94,                     // post_query
+        SYM_distinct = 95,                       // distinct
+        SYM_distinct_param = 96,                 // distinct_param
+        SYM_sort = 97,                           // sort
+        SYM_sort_param = 98,                     // sort_param
+        SYM_limit = 99,                          // limit
+        SYM_direction = 100,                     // direction
+        SYM_list = 101,                          // list
+        SYM_list_content = 102,                  // list_content
+        SYM_constant = 103,                      // constant
+        SYM_primary_key = 104,                   // primary_key
+        SYM_boolexpr = 105,                      // boolexpr
+        SYM_comp_type = 106,                     // comp_type
+        SYM_post_op = 107,                       // post_op
+        SYM_aggr_op = 108,                       // aggr_op
+        SYM_equality = 109,                      // equality
+        SYM_relational = 110,                    // relational
+        SYM_stringop = 111,                      // stringop
+        SYM_path = 112,                          // path
+        SYM_id = 113                             // id
       };
     };
 
@@ -921,6 +924,7 @@ namespace yy {
       case symbol_kind::SYM_LINK: // "link"
       case symbol_kind::SYM_TYPED_LINK: // "typed link"
       case symbol_kind::SYM_ARG: // "argument"
+      case symbol_kind::SYM_KP_ARG: // "keypath"
       case symbol_kind::SYM_BEGINSWITH: // "beginswith"
       case symbol_kind::SYM_ENDSWITH: // "endswith"
       case symbol_kind::SYM_CONTAINS: // "contains"
@@ -1344,6 +1348,7 @@ switch (yykind)
       case symbol_kind::SYM_LINK: // "link"
       case symbol_kind::SYM_TYPED_LINK: // "typed link"
       case symbol_kind::SYM_ARG: // "argument"
+      case symbol_kind::SYM_KP_ARG: // "keypath"
       case symbol_kind::SYM_BEGINSWITH: // "beginswith"
       case symbol_kind::SYM_ENDSWITH: // "endswith"
       case symbol_kind::SYM_CONTAINS: // "contains"
@@ -2186,6 +2191,21 @@ switch (yykind)
 #if 201103L <= YY_CPLUSPLUS
       static
       symbol_type
+      make_KP_ARG (std::string v)
+      {
+        return symbol_type (token::TOK_KP_ARG, std::move (v));
+      }
+#else
+      static
+      symbol_type
+      make_KP_ARG (const std::string& v)
+      {
+        return symbol_type (token::TOK_KP_ARG, v);
+      }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+      static
+      symbol_type
       make_BEGINSWITH (std::string v)
       {
         return symbol_type (token::TOK_BEGINSWITH, std::move (v));
@@ -2841,9 +2861,9 @@ switch (yykind)
     /// Constants.
     enum
     {
-      yylast_ = 595,     ///< Last index in yytable_.
+      yylast_ = 633,     ///< Last index in yytable_.
       yynnts_ = 36,  ///< Number of nonterminal symbols.
-      yyfinal_ = 71 ///< Termination state number.
+      yyfinal_ = 72 ///< Termination state number.
     };
 
 
@@ -2867,15 +2887,15 @@ switch (yykind)
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
-      69,    70,    67,    65,    72,    66,    71,    68,     2,     2,
+      70,    71,    68,    66,    73,    67,    72,    69,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
-       2,    73,     2,    74,     2,     2,     2,     2,     2,     2,
+       2,    74,     2,    75,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
-       2,     2,     2,    75,     2,    76,     2,     2,     2,     2,
+       2,     2,     2,    76,     2,    77,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
@@ -2894,10 +2914,11 @@ switch (yykind)
       25,    26,    27,    28,    29,    30,    31,    32,    33,    34,
       35,    36,    37,    38,    39,    40,    41,    42,    43,    44,
       45,    46,    47,    48,    49,    50,    51,    52,    53,    54,
-      55,    56,    57,    58,    59,    60,    61,    62,    63,    64
+      55,    56,    57,    58,    59,    60,    61,    62,    63,    64,
+      65
     };
     // Last valid token kind.
-    const int code_max = 319;
+    const int code_max = 320;
 
     if (t <= 0)
       return symbol_kind::SYM_YYEOF;
@@ -3019,6 +3040,7 @@ switch (yykind)
       case symbol_kind::SYM_LINK: // "link"
       case symbol_kind::SYM_TYPED_LINK: // "typed link"
       case symbol_kind::SYM_ARG: // "argument"
+      case symbol_kind::SYM_KP_ARG: // "keypath"
       case symbol_kind::SYM_BEGINSWITH: // "beginswith"
       case symbol_kind::SYM_ENDSWITH: // "endswith"
       case symbol_kind::SYM_CONTAINS: // "contains"
@@ -3180,6 +3202,7 @@ switch (yykind)
       case symbol_kind::SYM_LINK: // "link"
       case symbol_kind::SYM_TYPED_LINK: // "typed link"
       case symbol_kind::SYM_ARG: // "argument"
+      case symbol_kind::SYM_KP_ARG: // "keypath"
       case symbol_kind::SYM_BEGINSWITH: // "beginswith"
       case symbol_kind::SYM_ENDSWITH: // "endswith"
       case symbol_kind::SYM_CONTAINS: // "contains"

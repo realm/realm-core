@@ -92,6 +92,7 @@ blank   [ \t\r]
 "L"{int}":"{int}            return yy::parser::make_TYPED_LINK (yytext);
 {int}                       return yy::parser::make_NATURAL0 (yytext);
 "$"{int}                    return yy::parser::make_ARG(yytext); 
+"$K"{int}                   return yy::parser::make_KP_ARG(yytext); 
 [+-]?{int}                  return yy::parser::make_NUMBER (yytext);
 "0"[xX]{hex}+               return yy::parser::make_NUMBER (yytext);
 [+-]?{int}{exp}?f?          return yy::parser::make_FLOAT (yytext);

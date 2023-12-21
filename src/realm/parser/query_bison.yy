@@ -108,6 +108,7 @@ using namespace realm::query_parser;
 %token <std::string> LINK "link"
 %token <std::string> TYPED_LINK "typed link"
 %token <std::string> ARG "argument"
+%token <std::string> KP_ARG "keypath"
 %token <std::string> BEGINSWITH "beginswith"
 %token <std::string> ENDSWITH "endswith"
 %token <std::string> CONTAINS "contains"
@@ -369,6 +370,7 @@ stringop
 
 path
     : id                        { $$ = drv.m_parse_nodes.create<PathNode>($1); }
+    | KP_ARG                    { $$ = drv.m_parse_nodes.create<PathNode>($1, PathNode::ArgTag()); }
     | path '.' id               { $1->add_element($3); $$ = $1; }
     | path '[' NATURAL0 ']'     { $1->add_element(size_t(strtoll($3.c_str(), nullptr, 0))); $$ = $1; }
     | path '[' INDEX_FIRST ']'  { $1->add_element(size_t(0)); $$ = $1; }
