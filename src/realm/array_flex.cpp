@@ -88,8 +88,8 @@ void ArrayFlex::set_direct(const Array& arr, size_t ndx, int64_t value) const
         REALM_ASSERT(ndx < ndx_size);
         auto data = (uint64_t*)NodeHeader::get_data_from_header(arr.get_header());
         uint64_t offset = v_size * v_width;
-        bf_iterator it_index{data, offset + (ndx * ndx_width), ndx_width, ndx_size, 0};
-        bf_iterator it_value{data, it_index.get_value() * v_width, v_width, v_width, 0};
+        bf_iterator it_index{data, static_cast<size_t>(offset + (ndx * ndx_width)), ndx_width, ndx_size, 0};
+        bf_iterator it_value{data, static_cast<size_t>(it_index.get_value() * v_width), v_width, v_width, 0};
         it_value.set_value(value);
     }
     REALM_UNREACHABLE();
@@ -161,7 +161,7 @@ void ArrayFlex::copy_into_encoded_array(Array& arr, std::vector<int64_t>& values
     auto v_size = values.size();
     // fill data
     auto data = (uint64_t*)NodeHeader::get_data_from_header(arr.get_header());
-    uint64_t offset = v_size * v_width;
+    auto offset = static_cast<size_t>(v_size * v_width);
     bf_iterator it_value{data, 0, v_width, v_width, 0};
     bf_iterator it_index{data, offset, ndx_width, ndx_width, 0};
     for (size_t i = 0; i < values.size(); ++i) {
@@ -294,7 +294,7 @@ std::vector<int64_t> ArrayFlex::fetch_signed_values_from_encoded_array(const Arr
     bf_iterator index_iterator{data, offset, ndx_width, ndx_width, 0};
     for (size_t i = ndx_begin; i < ndx_size; ++i) {
         const auto index = index_iterator.get_value();
-        bf_iterator it_value{data, index * v_width, v_width, v_width, 0};
+        bf_iterator it_value{data, static_cast<size_t>(index * v_width), v_width, v_width, 0};
         const auto value = it_value.get_value();
         const auto ivalue = sign_extend_field(v_width, value);
         values.push_back(ivalue);
@@ -314,7 +314,7 @@ std::vector<uint64_t> ArrayFlex::fetch_unsigned_values_from_encoded_array(const 
     bf_iterator index_iterator{data, offset, ndx_width, ndx_width, 0};
     for (size_t i = ndx_begin; i < ndx_size; ++i) {
         const auto index = index_iterator.get_value();
-        bf_iterator it_value{data, index * v_width, v_width, v_width, 0};
+        bf_iterator it_value{data, static_cast<size_t>(index * v_width), v_width, v_width, 0};
         const auto value = it_value.get_value();
         values.push_back(value);
         ++index_iterator;
@@ -333,7 +333,7 @@ std::vector<std::pair<int64_t, size_t>> ArrayFlex::fetch_values_and_indices(cons
     bf_iterator index_iterator{data, offset, ndx_width, ndx_width, 0};
     for (size_t i = 0; i < ndx_size; ++i) {
         const auto index = index_iterator.get_value();
-        bf_iterator it_value{data, index * v_width, v_width, v_width, 0};
+        bf_iterator it_value{data, static_cast<size_t>(index * v_width), v_width, v_width, 0};
         const auto value = it_value.get_value();
         values_and_indices.push_back({value, i});
         ++index_iterator;
@@ -386,13 +386,12 @@ void ArrayFlex::restore_array(Array& arr, const std::vector<int64_t>& values) co
     for (const auto& v : values)
         arr.set(i++, v);
 
+    arr.update_parent();
     allocator.free_(origanal_ref, orginal_header);
 
     size_t w = arr.get_width();
     REALM_ASSERT(w == 0 || w == 1 || w == 2 || w == 4 || w == 8 || w == 16 || w == 32 || w == 64);
     REALM_ASSERT(arr.size() == values.size());
-
-    arr.update_parent();
 }
 
 std::vector<int64_t> ArrayFlex::find_all(const Array& arr, int64_t, size_t start, size_t end) const
@@ -417,7 +416,7 @@ size_t ArrayFlex::find_first(const Array& arr, int64_t value) const
         bf_iterator index_iterator{data, offset, ndx_width, ndx_width, 0};
         for (size_t i = 0; i < ndx_size; ++i) {
             const auto index = index_iterator.get_value();
-            bf_iterator it_value{data, index * v_width, v_width, v_width, 0};
+            bf_iterator it_value{data, static_cast<size_t>(index * v_width), v_width, v_width, 0};
             const auto arr_value = it_value.get_value();
             const auto ivalue = sign_extend_field(v_width, arr_value);
             if (ivalue == value)
@@ -466,9 +465,9 @@ uint64_t ArrayFlex::get_unsigned(const char* header, size_t ndx, size_t& v_width
             return realm::not_found;
         auto data = (uint64_t*)NodeHeader::get_data_from_header(header);
         const auto offset = v_size * v_width;
-        bf_iterator index_iterator{data, offset + (ndx * ndx_width), ndx_width, ndx_width, 0};
+        bf_iterator index_iterator{data, static_cast<size_t>(offset + (ndx * ndx_width)), ndx_width, ndx_width, 0};
         auto index_value = index_iterator.get_value();
-        bf_iterator it_value{data, index_value * v_width, v_width, v_width, 0};
+        bf_iterator it_value{data, static_cast<size_t>(index_value * v_width), v_width, v_width, 0};
         const auto arr_value = it_value.get_value();
         return arr_value;
     }
@@ -487,8 +486,8 @@ uint64_t ArrayFlex::get_unsigned(const Array& arr, size_t ndx, size_t& v_width) 
 
         auto data = (uint64_t*)NodeHeader::get_data_from_header(arr.get_header());
         const uint64_t offset = v_size * v_width;
-        bf_iterator it_index{data, offset + (ndx * ndx_width), ndx_width, ndx_size, 0};
-        bf_iterator it_value{data, v_width * it_index.get_value(), v_width, v_width, 0};
+        bf_iterator it_index{data, static_cast<size_t>(offset + (ndx * ndx_width)), ndx_width, ndx_size, 0};
+        bf_iterator it_value{data, static_cast<size_t>(v_width * it_index.get_value()), v_width, v_width, 0};
         const auto v = it_value.get_value();
         return v;
     }
