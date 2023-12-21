@@ -390,12 +390,10 @@ void SyncReplication::rename_column(const Table*, ColKey, StringData)
 
 void SyncReplication::list_set(const CollectionBase& list, size_t ndx, Mixed value)
 {
-    Mixed prior_value = list.get_any(ndx);
-    bool prior_is_unresolved =
-        prior_value.is_type(type_Link, type_TypedLink) && prior_value.get<ObjKey>().is_unresolved();
+    bool prior_is_unresolved = list.get_any(ndx).is_unresolved_link();
 
     // If link is unresolved, it should not be communicated.
-    if (value.is_type(type_Link, type_TypedLink) && value.get<ObjKey>().is_unresolved()) {
+    if (value.is_unresolved_link()) {
         // ... but reported internally as a deletion if prior value was not unresolved
         if (!prior_is_unresolved)
             Replication::list_erase(list, ndx);
@@ -450,7 +448,7 @@ void SyncReplication::list_set(const CollectionBase& list, size_t ndx, Mixed val
 void SyncReplication::list_insert(const CollectionBase& list, size_t ndx, Mixed value, size_t prior_size)
 {
     // If link is unresolved, it should not be communicated.
-    if (!(value.is_type(type_Link, type_TypedLink) && value.get<ObjKey>().is_unresolved())) {
+    if (!value.is_unresolved_link()) {
         Replication::list_insert(list, ndx, value, prior_size);
     }
 
@@ -490,7 +488,7 @@ void SyncReplication::set(const Table* table, ColKey col, ObjKey key, Mixed valu
     }
 
     // If link is unresolved, it should not be communicated.
-    if (value.is_type(type_Link, type_TypedLink) && value.get<ObjKey>().is_unresolved()) {
+    if (value.is_unresolved_link()) {
         return;
     }
 
@@ -553,7 +551,7 @@ void SyncReplication::list_erase(const CollectionBase& list, size_t ndx)
 {
     Mixed prior_value = list.get_any(ndx);
     // If link is unresolved, it should not be communicated.
-    if (!(prior_value.is_type(type_Link, type_TypedLink) && prior_value.get<ObjKey>().is_unresolved())) {
+    if (!prior_value.is_unresolved_link()) {
         Replication::list_erase(list, ndx);
     }
 
@@ -614,7 +612,7 @@ void SyncReplication::set_clear(const CollectionBase& set)
 void SyncReplication::dictionary_update(const CollectionBase& dict, const Mixed& key, const Mixed& value)
 {
     // If link is unresolved, it should not be communicated.
-    if (value.is_type(type_Link, type_TypedLink) && value.get<ObjKey>().is_unresolved()) {
+    if (value.is_unresolved_link()) {
         return;
     }
 

@@ -2,11 +2,12 @@
 
 ### Enhancements
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
-Added change_base_url() function to update the App base URL at runtime. (PR [#7173](https://github.com/realm/realm-core/pull/7173))
+* Added change_base_url() function to update the App base URL at runtime. (PR [#7173](https://github.com/realm/realm-core/pull/7173))
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-Sync Client should use the base_url value provided in App::Config instead of always using stored info after first connection to server. ([#7201](https://github.com/realm/realm-core/issues/7201), since v12.0.0)
+* Bad performance of initial Sync download involving many backlinks ([#7217](https://github.com/realm/realm-core/issues/7217), since v10.0.0)
+* Sync Client should use the base_url value provided in App::Config instead of always using stored info after first connection to server. ([#7201](https://github.com/realm/realm-core/issues/7201), since v12.0.0)
 
 ### Breaking changes
 * None.

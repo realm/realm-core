@@ -25,9 +25,21 @@
 
 #include "test.hpp"
 
+#include <chrono>
+
 using namespace realm;
 using namespace realm::util;
 using namespace realm::test_util;
+
+// #include <valgrind/callgrind.h>
+
+#ifndef CALLGRIND_START_INSTRUMENTATION
+#define CALLGRIND_START_INSTRUMENTATION
+#endif
+
+#ifndef CALLGRIND_STOP_INSTRUMENTATION
+#define CALLGRIND_STOP_INSTRUMENTATION
+#endif
 
 TEST(Unresolved_Basic)
 {
@@ -792,6 +804,71 @@ TEST(Links_ManyObjects)
     link_list.clear();
 
     tr->commit();
+}
+
+TEST(Unresolved_PerformanceLinks)
+{
+    constexpr int nb_objects = 1000;
+    using namespace std::chrono;
+
+    SHARED_GROUP_TEST_PATH(path);
+    auto hist = make_in_realm_history();
+    DBRef db = DB::create(*hist, path);
+
+    auto tr = db->start_write();
+    auto table = tr->add_table_with_primary_key("table", type_Int, "id");
+    auto origin = tr->add_table("origin");
+    auto col = origin->add_column(*table, "link");
+    auto key = table->get_objkey_from_primary_key(1);
+    for (int i = 0; i < nb_objects; i++) {
+        origin->create_object().set(col, key);
+    }
+    tr->commit_and_continue_as_read();
+    tr->promote_to_write();
+    auto t1 = steady_clock::now();
+    table->create_object_with_primary_key(1);
+    auto t2 = steady_clock::now();
+    tr->commit_and_continue_as_read();
+    CHECK(t2 > t1);
+    // std::cout << "Time: " << duration_cast<microseconds>(t2 - t1).count() << " us" << std::endl;
+    tr->promote_to_write();
+    tr->verify();
+}
+
+TEST(Unresolved_PerformanceLinkList)
+{
+    constexpr int nb_objects = 1000;
+    using namespace std::chrono;
+
+    SHARED_GROUP_TEST_PATH(path);
+    auto hist = make_in_realm_history();
+    DBRef db = DB::create(*hist, path);
+
+    auto tr = db->start_write();
+    auto table = tr->add_table_with_primary_key("table", type_Int, "id");
+    auto origin = tr->add_table("origin");
+    auto col = origin->add_column_list(*table, "links");
+    auto key1 = table->get_objkey_from_primary_key(1);
+    auto key2 = table->get_objkey_from_primary_key(2);
+    auto key3 = table->get_objkey_from_primary_key(3);
+    for (int i = 0; i < nb_objects; i++) {
+        auto ll = origin->create_object().get_list<ObjKey>(col);
+        ll.add(key1);
+        ll.add(key2);
+        ll.add(key3);
+    }
+    tr->commit_and_continue_as_read();
+    tr->promote_to_write();
+    auto t1 = steady_clock::now();
+    table->create_object_with_primary_key(1);
+    table->create_object_with_primary_key(2);
+    table->create_object_with_primary_key(3);
+    auto t2 = steady_clock::now();
+    tr->commit_and_continue_as_read();
+    CHECK(t2 > t1);
+    // std::cout << "Time: " << duration_cast<microseconds>(t2 - t1).count() << " us" << std::endl;
+    tr->promote_to_write();
+    tr->verify();
 }
 
 #endif
