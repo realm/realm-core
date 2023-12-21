@@ -33,7 +33,7 @@ MemRef Node::create_node(size_t size, Allocator& alloc, bool context_flag, Type 
     size_t byte_size = std::max(byte_size_0, size_t(initial_capacity));
 
     MemRef mem = alloc.alloc(byte_size); // Throws
-    auto header = (uint64_t*)mem.get_addr();
+    auto header = mem.get_addr();
     Encoding encoding;
     if (width_type == wtype_Bits)
         encoding = Encoding::WTypBits;
@@ -92,18 +92,26 @@ size_t Node::calc_item_count(size_t bytes, size_t width) const noexcept
 
 void Node::alloc(size_t init_size, size_t new_width)
 {
+    // This method is never taking in consideration the possibility of extending a B type array.
+    // This is fine as long as we have decompressed the array from B to A type before!!
+
     REALM_ASSERT(is_attached());
+    char* header = get_header_from_data(m_data);
+    // only type A arrays should be allowed during copy on write
+    REALM_ASSERT(get_kind(header) == 'A');
 
     size_t needed_bytes = calc_byte_len(init_size, new_width);
     // this method is not public and callers must (and currently do) ensure that
     // needed_bytes are never larger than max_array_payload.
     REALM_ASSERT_RELEASE(init_size <= max_array_size);
 
-    if (is_read_only())
+    if (is_read_only()) {
         do_copy_on_write(needed_bytes);
+        // header will have changed:
+        header = get_header_from_data(m_data);
+    }
 
     REALM_ASSERT(!m_alloc.is_read_only(m_ref));
-    char* header = get_header_from_data(m_data);
     size_t orig_capacity_bytes = get_capacity_from_header(header);
     size_t orig_width = get_width_from_header(header);
 
@@ -129,6 +137,8 @@ void Node::alloc(size_t init_size, size_t new_width)
         MemRef mem_ref = m_alloc.realloc_(m_ref, header, orig_capacity_bytes, new_capacity_bytes); // Throws
 
         header = mem_ref.get_addr();
+        // here the header is not going to be init.
+        // set_kind((uint64_t*)header, 'A');
         set_capacity_in_header(new_capacity_bytes, header);
 
         // Update this accessor and its ancestors
@@ -139,7 +149,8 @@ void Node::alloc(size_t init_size, size_t new_width)
         update_parent(); // Throws
     }
 
-    // Update header
+    // this is likely going to fail if header is not A
+    //  Update header
     if (new_width != orig_width) {
         set_width_in_header(int(new_width), header);
     }
@@ -159,9 +170,8 @@ void Node::destroy() noexcept
 void Node::do_copy_on_write(size_t minimum_size)
 {
     const char* header = get_header_from_data(m_data);
-    // only type A arrays are possible during copy on write
-    //    const auto kind = get_kind((uint64_t*)header);
-    //    REALM_ASSERT(kind == 'A');
+    // only type A arrays should be allowed during copy on write
+    REALM_ASSERT(get_kind(header) == 'A');
 
     // Calculate size in bytes
     size_t array_size = calc_byte_size(get_wtype_from_header(header), m_size, get_width_from_header(header));
@@ -171,10 +181,6 @@ void Node::do_copy_on_write(size_t minimum_size)
     new_size += 64;
 
     // Create new copy of array.
-    // Chicken egg problem, along the way we call SlabAllocator::do_alloc
-    // which tries to translate the ref and calls get_byte_size_from_header,
-    // which triggers an assertion since the header is not yet initialised at
-    // that point
     MemRef mref = m_alloc.alloc(new_size); // Throws
 
     const char* old_begin = header;

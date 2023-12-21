@@ -496,8 +496,6 @@ TEST(UUID_ArrayNull_FindFirstNull_StressTest)
     }
 }
 
-
-// NICO: This test is crashing although compression is disabled, something in the header must be wrong!!!!
 TEST_TYPES(UUID_Query, WithIndex, WithoutIndex)
 {
     SHARED_GROUP_TEST_PATH(path);

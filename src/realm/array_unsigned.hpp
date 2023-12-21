@@ -19,16 +19,16 @@
 #ifndef REALM_ARRAY_UNSIGNED_HPP
 #define REALM_ARRAY_UNSIGNED_HPP
 
-#include <realm/node.hpp>
+#include <realm/array.hpp>
 
 namespace realm {
 
 // Array holding unsigned values only
-class ArrayUnsigned : public Node {
+class ArrayUnsigned : public Array {
 
 public:
     ArrayUnsigned(Allocator& allocator)
-        : Node(allocator)
+        : Array(allocator)
     {
     }
 
@@ -81,13 +81,33 @@ public:
     }
 
 private:
-    uint_least8_t m_width = 0; // Size of an element (meaning depend on type of array).
-    uint64_t m_ubound;         // max number that can be stored with current m_width
+    uint_least8_t m_width = 0;
+    uint64_t m_lbound = 0;
+    uint64_t m_ubound = 0; // max is 0xFFFFFFFFFFFFFFFFLL
 
     void init_from_mem(MemRef mem) noexcept
     {
-        Node::init_from_mem(mem);
-        set_width(get_width_from_header(get_header()));
+        Array::init_from_mem(mem);
+        // we could have come here after decompression. So we need to be careful
+        // See comment in Array::init_from_mem.
+        auto kind = get_kind(get_header());
+        if (kind == 'A') {
+            set_width(get_width_from_header(get_header()));
+        }
+        else if (kind == 'B') {
+            auto dst_header = mem.get_addr();
+            if (get_kind(dst_header) == 'A') {
+                // we are a B array turned into A array. We need to set these values..
+                // but lower bound and upper bound will try to call decode again. So we need
+                // to disable it from here, at least during init_from_mem.
+                // TODO: verify if we really need to decode for lower_bound and upper_bound.
+                m_ubound = uint64_t(-1) >> (64 - m_width);
+            }
+        }
+        else {
+            // this shoule never be hit.
+            REALM_UNREACHABLE();
+        }
     }
 
     void adjust(size_t ndx, int64_t diff)

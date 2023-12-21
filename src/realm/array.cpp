@@ -209,8 +209,9 @@ int64_t Array::get(size_t ndx) const noexcept
 
 int64_t Array::get(size_t ndx) const noexcept
 {
-    if (is_encoded())
+    if (is_encoded()) {
         return m_encode.get(*this, ndx);
+    }
 
     REALM_ASSERT_DEBUG(is_attached());
     REALM_ASSERT_DEBUG_EX(ndx < m_size, ndx, m_size);
@@ -255,17 +256,22 @@ size_t Array::bit_width(int64_t v)
 
 void Array::init_from_mem(MemRef mem) noexcept
 {
+    // Header is the type of header that has been allocated, in case we are decompressing,
+    // the header is of kind A, which is kind of deceiving the purpose of these checks.
+    // Since we will try to fetch some data from the just initialised header, and never reset
+    // important fields used for type A arrays, like width, lower, upper_bound which are used
+    // for expanding the array, but also query the data.
     char* header = mem.get_addr();
-    auto kind = get_kind((uint64_t*)header);
+    auto kind = get_kind(header);
     REALM_ASSERT(kind == 'A' || kind == 'B');
     if (kind == 'B') {
         // the only encoding supported at the moment
-        auto encoding = get_encoding((uint64_t*)header);
+        auto encoding = get_encoding(header);
         REALM_ASSERT(encoding == Encoding::Flex);
         char* header = mem.get_addr();
         m_ref = mem.get_ref();
         m_data = get_data_from_header(header);
-        m_size = NodeHeader::get_arrayB_num_elements<Encoding::Flex>((uint64_t*)header);
+        m_size = NodeHeader::get_arrayB_num_elements<Encoding::Flex>(header);
     }
     else {
         header = Node::init_from_mem(mem);
@@ -274,8 +280,13 @@ void Array::init_from_mem(MemRef mem) noexcept
     m_is_inner_bptree_node = get_is_inner_bptree_node_from_header(header);
     m_has_refs = get_hasrefs_from_header(header);
     m_context_flag = get_context_flag_from_header(header);
-    // it is unclear how to handle the width limits while compressed.
-    // they will likely need to be set explicitly as part of decompressing
+
+    // width for B arrays is set based on the value stored in the header,
+    // hower we have lower and upper bound that are used in several places in the code
+    // that do not make sense for B arrays, as well as the width.
+    // In theory decompressing the array when we see a B array before to do any operation
+    // should suffice. But right now we are seeing bad values returned.
+    // Something is not adding up correctly while decompressing.
     update_width_cache_from_header();
 }
 
@@ -344,13 +355,13 @@ size_t Array::get_byte_size() const noexcept
 {
     // A and B type array
     const char* header = get_header_from_data(m_data);
-    auto kind = get_kind((uint64_t*)header);
+    auto kind = get_kind(header);
     REALM_ASSERT(kind == 'A' || kind == 'B');
     auto num_bytes = get_byte_size_from_header(header);
     auto read_only = m_alloc.is_read_only(m_ref) == true;
     auto bytes_ok = num_bytes <= get_capacity_from_header(header);
     REALM_ASSERT(read_only || bytes_ok);
-    // REALM_ASSERT_7(m_alloc.is_read_only(m_ref), ==, true, ||, num_bytes, <=, get_capacity_from_header(header));
+    REALM_ASSERT_7(m_alloc.is_read_only(m_ref), ==, true, ||, num_bytes, <=, get_capacity_from_header(header));
     return num_bytes;
 }
 
@@ -363,7 +374,7 @@ ref_type Array::write(_impl::ArrayWriterBase& out, bool deep, bool only_if_modif
     if (!deep || !m_has_refs) {
         Array encoded_array{m_alloc};
         if (compress_in_flight && encode_array(encoded_array)) {
-            const auto h = (uint64_t*)encoded_array.get_header();
+            const auto h = encoded_array.get_header();
             REALM_ASSERT(get_kind(h) == 'B');
             REALM_ASSERT(get_encoding(h) == Encoding::Flex);
             auto ref = encoded_array.do_write_shallow(out);
@@ -388,8 +399,7 @@ ref_type Array::write(ref_type ref, Allocator& alloc, _impl::ArrayWriterBase& ou
     if (!array.m_has_refs) {
         Array encoded_array{alloc};
         if (compress_in_flight && array.encode_array(encoded_array)) {
-            const auto header = encoded_array.get_header();
-            const auto h = (uint64_t*)header;
+            const auto h = encoded_array.get_header();
             REALM_ASSERT(get_kind(h) == 'B');
             REALM_ASSERT(get_encoding(h) == Encoding::Flex);
             auto ref = encoded_array.do_write_shallow(out);
@@ -568,6 +578,10 @@ size_t Array::blob_size() const noexcept
 void Array::insert(size_t ndx, int_fast64_t value)
 {
     REALM_ASSERT_DEBUG(ndx <= m_size);
+
+    if (is_encoded())
+        decode_array(*this);
+
     const auto old_width = m_width;
     const auto old_size = m_size;
     const Getter old_getter = m_getter; // Save old getter before potential width expansion
@@ -701,17 +715,19 @@ void Array::do_ensure_minimum_width(int_fast64_t value)
 
 size_t Array::size() const noexcept
 {
-    if (is_encoded())
-        return m_encode.size(*this);
+    // in case the array is in compressed format. Never read directly
+    // from the header the size, since during compaction the memory can
+    // be reclaimed, while in a write transaction.
+    // For compressed arrays m_size should always be kept updated
     return m_size;
 }
 
 bool Array::encode_array(Array& arr) const
 {
     const auto header = get_header();
-    auto kind = get_kind((uint64_t*)header);
+    auto kind = get_kind(header);
     if (kind == 'A') {
-        auto encoding = get_encoding((uint64_t*)header);
+        auto encoding = get_encoding(header);
         // encode everything that is WtypeBits (all integer arrays included ref arrays)
         if (encoding == NodeHeader::Encoding::WTypBits) {
             return m_encode.encode(*this, arr);
@@ -723,11 +739,10 @@ bool Array::encode_array(Array& arr) const
 bool Array::decode_array(Array& arr)
 {
     const auto header = arr.get_header();
-
-    auto kind = NodeHeader::get_kind((uint64_t*)header);
+    auto kind = NodeHeader::get_kind(header);
     // if it is encoded and it is in flex format decode all
     if (kind == 'B') {
-        auto encoding = NodeHeader::get_encoding((uint64_t*)header);
+        auto encoding = NodeHeader::get_encoding(header);
         if (encoding == NodeHeader::Encoding::Flex) {
             auto& array_encoder = arr.m_encode;
             return array_encoder.decode(arr);
@@ -753,8 +768,8 @@ bool Array::try_decode()
 
 int64_t Array::sum(size_t start, size_t end) const
 {
-    // this is tmp cast, since we haven't implemented yet the logic for compressed arrays
-    decode_array((Array&)*this);
+    if (is_encoded())
+        return m_encode.sum(*this, start, end);
     REALM_TEMPEX(return sum, m_width, (start, end));
 }
 
@@ -763,7 +778,11 @@ int64_t Array::sum(size_t start, size_t end) const
 {
     if (end == size_t(-1))
         end = m_size;
+
     REALM_ASSERT_EX(end <= m_size && start <= end, start, end, m_size);
+
+    if (is_encoded())
+        return m_encode.sum(*this, start, end);
 
     if (w == 0 || start == end)
         return 0;
@@ -923,7 +942,8 @@ int64_t Array::sum(size_t start, size_t end) const
 
 size_t Array::count(int64_t value) const noexcept
 {
-    // This is not used
+    // This is not used anywhere in the code, I believe we can delete this
+    // since the query logic does not use this
     const uint64_t* next = reinterpret_cast<uint64_t*>(m_data);
     size_t value_count = 0;
     const size_t end = m_size;
@@ -1151,8 +1171,6 @@ MemRef Array::clone(MemRef mem, Allocator& alloc, Allocator& target_alloc)
         return clone_mem;
     }
 
-    // this can break for integer arrays
-
     // Refs are integers, and integers arrays use wtype_Bits.
     REALM_ASSERT_3(get_wtype_from_header(header), ==, wtype_Bits);
 
@@ -1236,7 +1254,7 @@ MemRef Array::create(Type type, bool context_flag, WidthType width_type, size_t 
     // address of that member
     size_t byte_size = std::max(byte_size_0, initial_capacity + 0);
     MemRef mem = alloc.alloc(byte_size); // Throws
-    auto header = (uint64_t*)mem.get_addr();
+    auto header = mem.get_addr();
 
     init_header(header, 'A', encoding, flags, width, size);
     // init_header(header, is_inner_bptree_node, has_refs, context_flag, width_type, width, size, byte_size);
@@ -1256,7 +1274,6 @@ bool Array::find_vtable(int64_t value, size_t start, size_t end, size_t baseinde
 {
     return ArrayWithFind(*this).find_optimized<cond, bitwidth>(value, start, end, baseindex, state);
 }
-
 
 template <size_t width>
 struct Array::VTableForWidth {
@@ -1281,25 +1298,26 @@ const typename Array::VTableForWidth<width>::PopulatedVTable Array::VTableForWid
 void Array::update_width_cache_from_header() noexcept
 {
     auto header = get_header();
-    const auto kind = get_kind((uint64_t*)header);
+    const auto kind = get_kind(header);
     if (kind == 'B') {
-        // For type B arrays the width should not be that important, since the data is not
-        // organized in any standard format, and we are not going to use it for fetching data.
-        // But this needs to be verified.
-        auto width_a = get_elementA_size<Encoding::Flex>((uint64_t*)header);
-        m_width = align_bits_to8(width_a);
-        REALM_ASSERT(m_width % 8 == 0 && m_width != 0);
-        m_lbound = lbound_for_width(m_width);
-        m_ubound = ubound_for_width(m_width);
-        REALM_TEMPEX(m_vtable = &VTableForWidth, m_width, ::vtable);
+        // width should never be used for B array. Expanding the array should happen after decompression
+        // And Array::find along with Array::get should tap into the proper compressed array implementation.
+        m_width = 0;
+        m_lbound = 0;
+        m_ubound = 0;
+        REALM_TEMPEX(m_vtable = &VTableForWidth, 0L, ::vtable);
         m_getter = m_vtable->getter;
     }
     else {
-        auto width = get_width_from_header(get_header());
-        m_lbound = lbound_for_width(width);
-        m_ubound = ubound_for_width(width);
+        int64_t width = get_width_from_header(header);
         m_width = width;
-        REALM_TEMPEX(m_vtable = &VTableForWidth, width, ::vtable);
+        REALM_ASSERT(m_width == width);
+        m_lbound = lbound_for_width(m_width);
+        m_ubound = ubound_for_width(m_width);
+        REALM_ASSERT(m_lbound <= m_ubound);
+        REALM_ASSERT(width >= m_lbound);
+        REALM_ASSERT(width <= m_ubound);
+        REALM_TEMPEX(m_vtable = &VTableForWidth, m_width, ::vtable);
         m_getter = m_vtable->getter;
     }
 }
@@ -1310,60 +1328,66 @@ template <size_t w>
 void Array::get_chunk(size_t ndx, int64_t res[8]) const noexcept
 {
     REALM_ASSERT_3(ndx, <, m_size);
-    size_t i = 0;
 
-    // if constexpr to avoid producing spurious warnings resulting from
-    // instantiating for too large w
-    if constexpr (w > 0 && w <= 4) {
-        // Calling get<w>() in a loop results in one load per call to get, but
-        // for w < 8 we can do better than that
-        constexpr size_t elements_per_byte = 8 / w;
-
-        // Round m_size down to byte granularity as the trailing bits in the last
-        // byte are uninitialized
-        size_t bytes_available = m_size / elements_per_byte;
-
-        // Round start and end to be byte-aligned. Start is rounded down and
-        // end is rounded up as we may read up to 7 unused bits at each end.
-        size_t start = ndx / elements_per_byte;
-        size_t end = std::min(bytes_available, (ndx + 8 + elements_per_byte - 1) / elements_per_byte);
-
-        if (end > start) {
-            // Loop in reverse order because data is stored in little endian order
-            uint64_t c = 0;
-            for (size_t i = end; i > start; --i) {
-                c <<= 8;
-                c += *reinterpret_cast<const uint8_t*>(m_data + i - 1);
-            }
-            // Trim off leading bits which aren't part of the requested range
-            c >>= (ndx - start * elements_per_byte) * w;
-
-            uint64_t mask = (1ULL << w) - 1ULL;
-            res[0] = (c >> 0 * w) & mask;
-            res[1] = (c >> 1 * w) & mask;
-            res[2] = (c >> 2 * w) & mask;
-            res[3] = (c >> 3 * w) & mask;
-            res[4] = (c >> 4 * w) & mask;
-            res[5] = (c >> 5 * w) & mask;
-            res[6] = (c >> 6 * w) & mask;
-            res[7] = (c >> 7 * w) & mask;
-
-            // Read the last few elements via get<w> if needed
-            i = std::min<size_t>(8, end * elements_per_byte - ndx);
-        }
+    if (is_encoded()) {
+        m_encode.get_chunk(*this, ndx, res);
     }
+    else {
+        size_t i = 0;
 
-    for (; i + ndx < m_size && i < 8; i++)
-        res[i] = get<w>(ndx + i);
-    for (; i < 8; i++)
-        res[i] = 0;
+        // if constexpr to avoid producing spurious warnings resulting from
+        // instantiating for too large w
+        if constexpr (w > 0 && w <= 4) {
+            // Calling get<w>() in a loop results in one load per call to get, but
+            // for w < 8 we can do better than that
+            constexpr size_t elements_per_byte = 8 / w;
+
+            // Round m_size down to byte granularity as the trailing bits in the last
+            // byte are uninitialized
+            size_t bytes_available = m_size / elements_per_byte;
+
+            // Round start and end to be byte-aligned. Start is rounded down and
+            // end is rounded up as we may read up to 7 unused bits at each end.
+            size_t start = ndx / elements_per_byte;
+            size_t end = std::min(bytes_available, (ndx + 8 + elements_per_byte - 1) / elements_per_byte);
+
+            if (end > start) {
+                // Loop in reverse order because data is stored in little endian order
+                uint64_t c = 0;
+                for (size_t i = end; i > start; --i) {
+                    c <<= 8;
+                    c += *reinterpret_cast<const uint8_t*>(m_data + i - 1);
+                }
+                // Trim off leading bits which aren't part of the requested range
+                c >>= (ndx - start * elements_per_byte) * w;
+
+                uint64_t mask = (1ULL << w) - 1ULL;
+                res[0] = (c >> 0 * w) & mask;
+                res[1] = (c >> 1 * w) & mask;
+                res[2] = (c >> 2 * w) & mask;
+                res[3] = (c >> 3 * w) & mask;
+                res[4] = (c >> 4 * w) & mask;
+                res[5] = (c >> 5 * w) & mask;
+                res[6] = (c >> 6 * w) & mask;
+                res[7] = (c >> 7 * w) & mask;
+
+                // Read the last few elements via get<w> if needed
+                i = std::min<size_t>(8, end * elements_per_byte - ndx);
+            }
+        }
+
+        for (; i + ndx < m_size && i < 8; i++)
+            res[i] = get<w>(ndx + i);
+        for (; i < 8; i++)
+            res[i] = 0;
 
 #ifdef REALM_DEBUG
-    for (int j = 0; j + ndx < m_size && j < 8; j++) {
-        int64_t expected = get<w>(ndx + j);
-        REALM_ASSERT(res[j] == expected);
-    }
+        for (int j = 0; j + ndx < m_size && j < 8; j++) {
+            int64_t expected = get<w>(ndx + j);
+            REALM_ASSERT(res[j] == expected);
+        }
 #endif
+    }
 }
 
 template <>
@@ -1377,7 +1401,12 @@ void Array::get_chunk<0>(size_t ndx, int64_t res[8]) const noexcept
 template <size_t width>
 void Array::set(size_t ndx, int64_t value)
 {
-    set_direct<width>(m_data, ndx, value);
+    if (is_encoded()) {
+        m_encode.set_direct(*this, ndx, value);
+    }
+    else {
+        set_direct<width>(m_data, ndx, value);
+    }
 }
 
 #ifdef REALM_DEBUG
@@ -1470,8 +1499,13 @@ void Array::verify() const
 
     REALM_ASSERT(is_attached());
 
-    REALM_ASSERT(m_width == 0 || m_width == 1 || m_width == 2 || m_width == 4 || m_width == 8 || m_width == 16 ||
-                 m_width == 32 || m_width == 64);
+    if (get_kind(get_header()) == 'A') {
+        REALM_ASSERT(m_width == 0 || m_width == 1 || m_width == 2 || m_width == 4 || m_width == 8 || m_width == 16 ||
+                     m_width == 32 || m_width == 64);
+    }
+    else {
+        REALM_ASSERT(m_width <= 64);
+    }
 
     if (!get_parent())
         return;
@@ -1484,42 +1518,57 @@ void Array::verify() const
 
 size_t Array::lower_bound_int(int64_t value) const noexcept
 {
-    decode_array((Array&)*this);
+    if (is_encoded()) {
+        // this is O(N) with a lot of computation associated.
+        // It requires some serious optimization.
+        return m_encode.lower_bound(*this, value);
+    }
     REALM_TEMPEX(return lower_bound, m_width, (m_data, m_size, value));
 }
 
 size_t Array::upper_bound_int(int64_t value) const noexcept
 {
-    decode_array((Array&)*this);
+    if (is_encoded()) {
+        // this is O(N) with a lot of computation associated.
+        // It requires some serious optimization.
+        return m_encode.upper_bound(*this, value);
+    }
     REALM_TEMPEX(return upper_bound, m_width, (m_data, m_size, value));
 }
 
 
 size_t Array::find_first(int64_t value, size_t start, size_t end) const
 {
-    decode_array((Array&)*this);
+    if (is_encoded()) {
+        return m_encode.find_first(*this, value);
+    }
     return find_first<Equal>(value, start, end);
 }
 
 
 int_fast64_t Array::get(const char* header, size_t ndx) noexcept
 {
-    // this is going to break for compressed arrays
-
+    auto sz = get_size_from_header(header);
+    REALM_ASSERT(ndx < sz);
+    if (NodeHeader::get_kind(header) == 'B') {
+        REALM_ASSERT(NodeHeader::get_encoding(header) == NodeHeader::Encoding::Flex);
+        return ArrayFlex::get(header, ndx);
+    }
     const char* data = get_data_from_header(header);
     uint_least8_t width = get_width_from_header(header);
     return get_direct(data, width, ndx);
 }
 
+int_fast64_t Array::get_universal_encoded_array(size_t ndx) const
+{
+    return m_encode.get(*this, ndx);
+}
+
 
 std::pair<int64_t, int64_t> Array::get_two(const char* header, size_t ndx) noexcept
 {
-    // this is going to break for compressed arrays
-
-    const char* data = get_data_from_header(header);
-    uint_least8_t width = get_width_from_header(header);
-    std::pair<int64_t, int64_t> p = ::get_two(data, width, ndx);
-    return std::make_pair(p.first, p.second);
+    // TODO: Optimize!
+    return std::make_pair(get(header, ndx), get(header, ndx + 1));
 }
 
 bool QueryStateCount::match(size_t, Mixed) noexcept

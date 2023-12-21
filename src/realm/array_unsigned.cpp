@@ -18,6 +18,7 @@
 
 #include <realm/array_unsigned.hpp>
 #include <realm/array_direct.hpp>
+#include <realm/array_flex.hpp>
 #include <algorithm>
 
 namespace realm {
@@ -45,6 +46,9 @@ inline uint8_t ArrayUnsigned::bit_width(uint64_t value)
 
 inline void ArrayUnsigned::_set(size_t ndx, uint8_t width, uint64_t value)
 {
+    if (is_encoded()) {
+        m_encode.set_direct(*this, ndx, value);
+    }
     if (width == 8) {
         reinterpret_cast<uint8_t*>(m_data)[ndx] = uint8_t(value);
     }
@@ -61,16 +65,24 @@ inline void ArrayUnsigned::_set(size_t ndx, uint8_t width, uint64_t value)
 
 inline uint64_t ArrayUnsigned::_get(size_t ndx, uint8_t width) const
 {
-    if (width == 8) {
-        return reinterpret_cast<uint8_t*>(m_data)[ndx];
+    if (is_encoded()) {
+        // TODO: this can be any possible encoding.. cannot be a static method
+        size_t v_width;
+        return ArrayFlex::get_unsigned(get_header(), ndx, v_width);
     }
-    if (width == 16) {
-        return reinterpret_cast<uint16_t*>(m_data)[ndx];
+    else {
+        if (width == 8) {
+            return reinterpret_cast<uint8_t*>(m_data)[ndx];
+        }
+        if (width == 16) {
+            return reinterpret_cast<uint16_t*>(m_data)[ndx];
+        }
+        if (width == 32) {
+            return reinterpret_cast<uint32_t*>(m_data)[ndx];
+        }
+        return get_direct(m_data, width, ndx);
     }
-    if (width == 32) {
-        return reinterpret_cast<uint32_t*>(m_data)[ndx];
-    }
-    return get_direct(m_data, width, ndx);
+    REALM_UNREACHABLE();
 }
 
 void ArrayUnsigned::create(size_t initial_size, uint64_t ubound_value)
@@ -91,23 +103,29 @@ void ArrayUnsigned::update_from_parent() noexcept
 
 size_t ArrayUnsigned::lower_bound(uint64_t value) const noexcept
 {
-    if (m_width == 8) {
+    if (is_encoded()) {
+        return m_encode.lower_bound(*this, value);
+    }
+
+    auto width = get_width_from_header(get_header());
+
+    if (width == 8) {
         uint8_t* arr = reinterpret_cast<uint8_t*>(m_data);
         uint8_t* pos = std::lower_bound(arr, arr + m_size, value);
         return pos - arr;
     }
-    else if (m_width == 16) {
+    else if (width == 16) {
         uint16_t* arr = reinterpret_cast<uint16_t*>(m_data);
         uint16_t* pos = std::lower_bound(arr, arr + m_size, value);
         return pos - arr;
     }
-    else if (m_width == 32) {
+    else if (width == 32) {
         uint32_t* arr = reinterpret_cast<uint32_t*>(m_data);
         uint32_t* pos = std::lower_bound(arr, arr + m_size, value);
         return pos - arr;
     }
-    else if (m_width < 8) {
-        switch (m_width) {
+    else if (width < 8) {
+        switch (width) {
             case 0:
                 return realm::lower_bound<0>(m_data, m_size, value);
             case 1:
@@ -129,23 +147,29 @@ size_t ArrayUnsigned::lower_bound(uint64_t value) const noexcept
 
 size_t ArrayUnsigned::upper_bound(uint64_t value) const noexcept
 {
-    if (m_width == 8) {
+    if (is_encoded()) {
+        return m_encode.upper_bound(*this, value);
+    }
+
+    auto width = get_width_from_header(get_header());
+
+    if (width == 8) {
         uint8_t* arr = reinterpret_cast<uint8_t*>(m_data);
         uint8_t* pos = std::upper_bound(arr, arr + m_size, value);
         return pos - arr;
     }
-    else if (m_width == 16) {
+    else if (width == 16) {
         uint16_t* arr = reinterpret_cast<uint16_t*>(m_data);
         uint16_t* pos = std::upper_bound(arr, arr + m_size, value);
         return pos - arr;
     }
-    else if (m_width == 32) {
+    else if (width == 32) {
         uint32_t* arr = reinterpret_cast<uint32_t*>(m_data);
         uint32_t* pos = std::upper_bound(arr, arr + m_size, value);
         return pos - arr;
     }
-    else if (m_width < 8) {
-        switch (m_width) {
+    else if (width < 8) {
+        switch (width) {
             case 0:
                 return realm::upper_bound<0>(m_data, m_size, value);
             case 1:
@@ -167,8 +191,20 @@ size_t ArrayUnsigned::upper_bound(uint64_t value) const noexcept
 
 void ArrayUnsigned::insert(size_t ndx, uint64_t value)
 {
+    // Array unsigned implements its owm methods for doing insertion (expanding, etc) and many other APIs
+    // we should aim at unifying as much as possible the interface, in order to avoid to scatter the
+    // compression/decompression logic all over the code.
+    if (is_encoded()) {
+        decode_array(*this);
+        set_width(get_width_from_header(get_header()));
+        REALM_ASSERT(get_kind(get_header()) == 'A');
+        REALM_ASSERT(m_width >= m_lbound);
+        REALM_ASSERT(m_width <= m_ubound);
+        REALM_ASSERT(m_lbound <= m_ubound);
+    }
+
     REALM_ASSERT_DEBUG(m_width >= 8);
-    bool do_expand = value > m_ubound;
+    bool do_expand = value > (uint64_t)m_ubound;
     const uint8_t old_width = m_width;
     const uint8_t new_width = do_expand ? bit_width(value) : m_width;
     const auto old_size = m_size;
@@ -214,7 +250,17 @@ void ArrayUnsigned::insert(size_t ndx, uint64_t value)
 
 void ArrayUnsigned::erase(size_t ndx)
 {
+    if (is_encoded()) {
+        Array::decode_array(*this);
+        set_width(get_width_from_header(get_header()));
+        REALM_ASSERT(get_kind(get_header()) == 'A');
+        REALM_ASSERT(m_width >= m_lbound);
+        REALM_ASSERT(m_width <= m_ubound);
+        REALM_ASSERT(m_lbound <= m_ubound);
+    }
+
     REALM_ASSERT_DEBUG(m_width >= 8);
+
     copy_on_write(); // Throws
 
     size_t w = m_width >> 3;
@@ -237,6 +283,15 @@ uint64_t ArrayUnsigned::get(size_t index) const
 
 void ArrayUnsigned::set(size_t ndx, uint64_t value)
 {
+    if (is_encoded()) {
+        Array::decode_array(*this);
+        set_width(get_width_from_header(get_header()));
+        REALM_ASSERT(get_kind(get_header()) == 'A');
+        REALM_ASSERT(m_width >= m_lbound);
+        REALM_ASSERT(m_width <= m_ubound);
+        REALM_ASSERT(m_lbound <= m_ubound);
+    }
+
     REALM_ASSERT_DEBUG(m_width >= 8);
     copy_on_write(); // Throws
 

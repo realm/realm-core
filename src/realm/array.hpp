@@ -109,10 +109,6 @@ public:
     {
         REALM_ASSERT_DEBUG(ref);
         char* header = m_alloc.translate(ref);
-        // auto kind = get_kind((uint64_t*)header);
-        //        if(kind != 'A' && kind != 'B')
-        //            set_kind((uint64_t*)header, 'A');
-        // REALM_ASSERT(kind == 'A' || kind == 'B');
         init_from_mem(MemRef(header, ref, m_alloc));
     }
 
@@ -201,6 +197,11 @@ public:
 
     void alloc(size_t init_size, size_t new_width)
     {
+        // Node::alloc is the one that triggers copy on write. If we call alloc for a B
+        //       array we have a bug in our machinery, the array should have been decompressed
+        //       way before calling alloc.
+        const auto header = get_header();
+        REALM_ASSERT(get_kind(header) == 'A');
         REALM_ASSERT_3(m_width, ==, get_width_from_header(get_header()));
         REALM_ASSERT_3(m_size, ==, get_size_from_header(get_header()));
         Node::alloc(init_size, new_width);
@@ -554,6 +555,9 @@ private:
     void report_memory_usage_2(MemUsageHandler&) const;
 #endif
 
+    int_fast64_t get_universal_encoded_array(size_t ndx) const;
+
+protected:
     // encode/decode this array
     bool encode_array(Array&) const;
     static bool decode_array(Array& arr);
@@ -692,22 +696,28 @@ inline void Array::get_chunk(size_t ndx, int64_t res[8]) const noexcept
 }
 
 template <size_t w>
-int64_t Array::get_universal(const char* data, size_t ndx) const
+inline int64_t Array::get_universal(const char* data, size_t ndx) const
 {
+    if (is_encoded())
+        return get_universal_encoded_array(ndx);
+
     if (w == 0) {
         return 0;
     }
     else if (w == 1) {
         size_t offset = ndx >> 3;
-        return (data[offset] >> (ndx & 7)) & 0x01;
+        auto d = data[offset];
+        return (d >> (ndx & 7)) & 0x01;
     }
     else if (w == 2) {
         size_t offset = ndx >> 2;
-        return (data[offset] >> ((ndx & 3) << 1)) & 0x03;
+        auto d = data[offset];
+        return (d >> ((ndx & 3) << 1)) & 0x03;
     }
     else if (w == 4) {
         size_t offset = ndx >> 1;
-        return (data[offset] >> ((ndx & 1) << 2)) & 0x0F;
+        auto d = data[offset];
+        return (d >> ((ndx & 1) << 2)) & 0x0F;
     }
     else if (w == 8) {
         return *reinterpret_cast<const signed char*>(data + ndx);
