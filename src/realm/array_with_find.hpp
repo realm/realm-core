@@ -582,14 +582,22 @@ inline bool ArrayWithFind::compare_equality(int64_t value, size_t start, size_t 
                                             QueryStateBase* state) const
 {
     REALM_ASSERT_DEBUG(start <= m_array.m_size && (end <= m_array.m_size || end == size_t(-1)) && start <= end);
+    REALM_ASSERT_DEBUG(width == m_array.m_width);
 
-    size_t ee = round_up(start, 64 / no0(width));
+    // tmp hack. There might be an error with width after decompression
+    // size_t ee = end >= m_array.size() ? m_array.size() : end;
+
+    auto v = 64 / no0(width);
+    size_t ee = round_up(start, v);
     ee = ee > end ? end : ee;
-    for (; start < ee; ++start)
-        if (eq ? (m_array.get<width>(start) == value) : (m_array.get<width>(start) != value)) {
+    for (; start < ee; ++start) {
+        auto v = m_array.get<width>(start);
+        if (eq ? (v == value) : (v != value)) {
             if (!state->match(start + baseindex))
                 return false;
         }
+    }
+
 
     if (start >= end)
         return true;

@@ -1302,11 +1302,11 @@ void Array::update_width_cache_from_header() noexcept
     if (kind == 'B') {
         // width should never be used for B array. Expanding the array should happen after decompression
         // And Array::find along with Array::get should tap into the proper compressed array implementation.
+        REALM_TEMPEX(m_vtable = &VTableForWidth, 0L, ::vtable);
+        m_getter = m_vtable->getter;
         m_width = 0;
         m_lbound = 0;
         m_ubound = 0;
-        REALM_TEMPEX(m_vtable = &VTableForWidth, 0L, ::vtable);
-        m_getter = m_vtable->getter;
     }
     else {
         int64_t width = get_width_from_header(header);

@@ -406,9 +406,8 @@ public:
     template <class cond>
     size_t find_first(int64_t value, size_t start = 0, size_t end = size_t(-1)) const
     {
-        // TODO: find first needs to find the index first and the value later if array is encoded.
         REALM_ASSERT(start <= m_size && (end <= m_size || end == size_t(-1)) && start <= end);
-        // todo, would be nice to avoid this in order to speed up find_first loops
+        // TODO: would be nice to avoid this in order to speed up find_first loops
         QueryStateFindFirst state;
         Finder finder = m_vtable->finder[cond::condition];
         (this->*finder)(value, start, end, 0, &state);
