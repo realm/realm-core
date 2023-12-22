@@ -317,6 +317,9 @@ inline std::ostream& operator<<(std::ostream& os, ObjLink link)
 }
 constexpr ObjKey null_key;
 
+using KeyPath = std::vector<std::pair<TableKey, ColKey>>;
+using KeyPathArray = std::vector<KeyPath>;
+
 namespace util {
 
 inline std::string to_string(ColKey ck)

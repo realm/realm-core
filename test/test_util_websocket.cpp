@@ -363,7 +363,7 @@ TEST(WebSocket_Messages)
     CHECK_EQUAL(config_1.ping_messages.size(), 0);
     CHECK_EQUAL(config_2.ping_messages.size(), 0);
 
-    auto handler_no_op = [=]() {};
+    auto handler_no_op = [=](std::error_code, size_t) {};
     socket_1.async_write_ping("ping example", 12, handler_no_op);
     CHECK_EQUAL(config_1.ping_messages.size(), 0);
     CHECK_EQUAL(config_2.ping_messages.size(), 1);
@@ -422,7 +422,7 @@ TEST(WebSocket_Fragmented_Messages)
     CHECK_EQUAL(config_1.n_handshake_completed, 1);
     CHECK_EQUAL(config_2.n_handshake_completed, 1);
 
-    auto handler_no_op = [=]() {};
+    auto handler_no_op = [=](std::error_code, size_t) {};
 
     socket_1.async_write_frame(false, websocket::Opcode::binary, "abc", 3, handler_no_op);
     CHECK_EQUAL(config_2.binary_messages.size(), 0);
@@ -457,7 +457,7 @@ TEST(WebSocket_Interleaved_Fragmented_Messages)
     CHECK_EQUAL(config_1.n_handshake_completed, 1);
     CHECK_EQUAL(config_2.n_handshake_completed, 1);
 
-    auto handler_no_op = [=]() {};
+    auto handler_no_op = [=](std::error_code, size_t) {};
 
     CHECK_EQUAL(config_2.ping_messages.size(), 0);
     socket_1.async_write_frame(false, websocket::Opcode::binary, "a", 1, handler_no_op);

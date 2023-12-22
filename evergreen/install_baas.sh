@@ -3,7 +3,7 @@
 # and will import a given app into it.
 #
 # Usage:
-# ./evergreen/install_baas.sh -w {path to working directory} [-b git revision of baas] [-v] [-h]
+# ./evergreen/install_baas.sh -w PATH [-b BRANCH] [-v] [-h]
 #
 
 # shellcheck disable=SC1091
@@ -13,105 +13,173 @@ set -o errexit
 set -o pipefail
 set -o functrace
 
-case $(uname -s) in
-    Darwin)
-        if [[ "$(uname -m)" == "arm64" ]]; then
-            export GOARCH=arm64
-            STITCH_SUPPORT_LIB_URL="https://s3.amazonaws.com/static.realm.io/stitch-support/stitch-support-macos-arm64-6.1.0-rc3-8-gb6e0525.tgz"
-            STITCH_ASSISTED_AGG_URL="https://stitch-artifacts.s3.amazonaws.com/stitch-mongo-libs/stitch_mongo_libs_osx_patch_75b3f1896aaa2e344817795c8bfc5cb6b2f2c310_632211a5d1fe0757f8c416fa_22_09_14_17_38_46/assisted_agg"
-            GO_URL="https://s3.amazonaws.com/static.realm.io/evergreen-assets/go1.19.3.darwin-arm64.tar.gz"
-            MONGODB_DOWNLOAD_URL="https://downloads.mongodb.com/osx/mongodb-macos-arm64-enterprise-6.0.0-rc13.tgz"
-            MONGOSH_DOWNLOAD_URL="https://downloads.mongodb.com/compass/mongosh-1.5.0-darwin-arm64.zip"
+# Set up catch function that runs when an error occurs
+trap 'catch $? ${LINENO}' ERR
+trap "exit" INT TERM
 
-            # Go's scheduler is not BIG.little aware, and by default will spawn
-            # threads until they end up getting scheduled on efficiency cores,
-            # which is slower than just not using them. Limiting the threads to
-            # the number of performance cores results in them usually not
-            # running on efficiency cores. Checking the performance core count
-            # wasn't implemented until the first CPU with a performance core
-            # count other than 4 was released, so if it's unavailable it's 4.
-            GOMAXPROCS="$(sysctl -n hw.perflevel0.logicalcpu || echo 4)"
-            export GOMAXPROCS
-        else
-            export GOARCH=amd64
-            STITCH_SUPPORT_LIB_URL="https://s3.amazonaws.com/static.realm.io/stitch-support/stitch-support-macos-4.4.17-rc1-2-g85de0cc.tgz"
-            STITCH_ASSISTED_AGG_URL="https://stitch-artifacts.s3.amazonaws.com/stitch-mongo-libs/stitch_mongo_libs_osx_patch_75b3f1896aaa2e344817795c8bfc5cb6b2f2c310_632211a5d1fe0757f8c416fa_22_09_14_17_38_46/assisted_agg"
-            GO_URL="https://s3.amazonaws.com/static.realm.io/evergreen-assets/go1.19.1.darwin-amd64.tar.gz"
-            MONGODB_DOWNLOAD_URL="https://downloads.mongodb.com/osx/mongodb-macos-x86_64-enterprise-5.0.3.tgz"
-        fi
+function catch()
+{
+    # Usage: catch EXIT_CODE LINE_NUM
+    echo "${BASH_SOURCE[0]}: $2: Error $1 occurred while starting baas"
+}
 
-        NODE_URL="https://s3.amazonaws.com/static.realm.io/evergreen-assets/node-v14.17.0-darwin-x64.tar.gz"
-        JQ_DOWNLOAD_URL="https://s3.amazonaws.com/static.realm.io/evergreen-assets/jq-1.6-darwin-amd64"
-    ;;
-    Linux)
-        GO_URL="https://s3.amazonaws.com/static.realm.io/evergreen-assets/go1.19.1.linux-amd64.tar.gz"
-        JQ_DOWNLOAD_URL="https://s3.amazonaws.com/static.realm.io/evergreen-assets/jq-1.6-linux-amd64"
-        NODE_URL="https://s3.amazonaws.com/static.realm.io/evergreen-assets/node-v14.17.0-linux-x64.tar.gz"
+# Adds a string to $PATH if not already present.
+function pathadd() {
+    if [ -d "${1}" ] && [[ ":${PATH}:" != *":${1}:"* ]]; then
+        PATH="${1}${PATH:+":${PATH}"}"
+        export PATH
+    fi
+}
 
-        # Detect what distro/versionf of Linux we are running on to download the right version of MongoDB to download
-        # /etc/os-release covers debian/ubuntu/suse
-        if [[ -e /etc/os-release ]]; then
-            # Amazon Linux 2 comes back as 'amzn'
-            DISTRO_NAME="$(. /etc/os-release ; echo "${ID}")"
-            DISTRO_VERSION="$(. /etc/os-release ; echo "${VERSION_ID}")"
-            DISTRO_VERSION_MAJOR="$(cut -d. -f1 <<< "${DISTRO_VERSION}" )"
-        elif [[ -e /etc/redhat-release ]]; then
-            # /etc/redhat-release covers RHEL
-            DISTRO_NAME=rhel
-            DISTRO_VERSION="$(lsb_release -s -r)"
-            DISTRO_VERSION_MAJOR="$(cut -d. -f1 <<< "${DISTRO_VERSION}" )"
-        fi
-        case $DISTRO_NAME in
-            ubuntu | linuxmint)
-                MONGODB_DOWNLOAD_URL="http://downloads.10gen.com/linux/mongodb-linux-$(uname -m)-enterprise-ubuntu${DISTRO_VERSION_MAJOR}04-5.0.3.tgz"
-                STITCH_ASSISTED_AGG_LIB_URL="https://stitch-artifacts.s3.amazonaws.com/stitch-mongo-libs/stitch_mongo_libs_ubuntu2004_x86_64_86b48e3cb2a8d5bbf3d18281c9f42c1835bbb83b_22_11_08_03_08_06/libmongo-ubuntu2004-x86_64.so"
-                STITCH_SUPPORT_LIB_URL="https://s3.amazonaws.com/static.realm.io/stitch-support/stitch-support-ubuntu2004-4.4.17-rc1-2-g85de0cc.tgz"
-            ;;
-            rhel)
-                case ${DISTRO_VERSION_MAJOR} in
-                    7)
-                        MONGODB_DOWNLOAD_URL="https://downloads.mongodb.com/linux/mongodb-linux-x86_64-enterprise-rhel70-5.0.3.tgz"
-                        STITCH_ASSISTED_AGG_LIB_URL="https://stitch-artifacts.s3.amazonaws.com/stitch-mongo-libs/stitch_mongo_libs_linux_64_86b48e3cb2a8d5bbf3d18281c9f42c1835bbb83b_22_11_08_03_08_06/libmongo.so"
-                        STITCH_SUPPORT_LIB_URL="https://s3.amazonaws.com/static.realm.io/stitch-support/stitch-support-rhel70-4.4.17-rc1-2-g85de0cc.tgz"
-                    ;;
-                    *)
-                        echo "Unsupported version of RHEL ${DISTRO_VERSION}"
-                        exit 1
-                    ;;
-                esac
-            ;;
-            *)
-                if [[ -z "${MONGODB_DOWNLOAD_URL}" ]]; then
-                    echo "Missing MONGODB_DOWNLOAD_URL env variable to download mongodb from."
-                    exit 1
-                fi
-                if [[ -z "${STITCH_ASSISTED_AGG_LIB_PATH}" ]]; then
-                    echo "Missing STITCH_ASSISTED_AGG_LIB_PATH env variable to find assisted agg libmongo.so"
-                    exit 1
-                fi
-                if [[ -z "${STITCH_SUPPORT_LIB_PATH}" ]]; then
-                    echo "Missing STITCH_SUPPORT_LIB_PATH env variable to find the mongo stitch support library"
-                    exit 1
-                fi
-            ;;
-        esac
-    ;;
-    *)
-        if [[ -z "${MONGODB_DOWNLOAD_URL}" ]]; then
-            echo "Missing MONGODB_DOWNLOAD_URL env variable to download mongodb from."
+function setup_target_dependencies() {
+    target="$(uname -s)"
+    case "${target}" in
+        Darwin)
+            NODE_URL="https://s3.amazonaws.com/static.realm.io/evergreen-assets/node-v14.17.0-darwin-x64.tar.gz"
+            JQ_DOWNLOAD_URL="https://s3.amazonaws.com/static.realm.io/evergreen-assets/jq-1.6-darwin-amd64"
+        ;;
+        Linux)
+            NODE_URL="https://s3.amazonaws.com/static.realm.io/evergreen-assets/node-v14.17.0-linux-x64.tar.gz"
+            JQ_DOWNLOAD_URL="https://s3.amazonaws.com/static.realm.io/evergreen-assets/jq-1.6-linux-amd64"
+        ;;
+        *)
+            echo "Error: unsupported platform ${target}"
             exit 1
-        fi
-        if [[ -z "${STITCH_ASSISTED_AGG_LIB_PATH}" ]]; then
-            echo "Missing STITCH_ASSISTED_AGG_LIB_PATH env variable to find assisted agg libmongo.so"
+        ;;
+    esac
+}
+
+function setup_baas_dependencies() {
+    # <-- Uncomment to enable constants.sh
+    #baas_directory="${1}"
+    #baas_contents_file="${baas_directory}/.evergreen/constants.sh"
+    # -->
+    BAAS_PLATFORM=
+    MONGODB_DOWNLOAD_URL=
+    MONGOSH_DOWNLOAD_URL=
+    GOLANG_URL=
+    STITCH_SUPPORT_LIB_URL=
+    LIBMONGO_URL=
+    ASSISTED_AGG_URL=
+    target="$(uname -s)"
+    platform_string="unknown"
+    case "${target}" in
+        Darwin)
+            if [[ "$(uname -m)" == "arm64" ]]; then
+                export GOARCH=arm64
+                MONGODB_DOWNLOAD_URL="https://downloads.mongodb.com/osx/mongodb-macos-arm64-enterprise-7.0.3.tgz"
+                MONGOSH_DOWNLOAD_URL="https://downloads.mongodb.com/compass/mongosh-2.1.1-darwin-arm64.zip"
+                # <-- Remove after enabling constants.sh
+                STITCH_SUPPORT_LIB_URL="https://stitch-artifacts.s3.amazonaws.com/stitch-support/macos-arm64/stitch-support-6.1.0-alpha-527-g796351f.tgz"
+                ASSISTED_AGG_URL="https://stitch-artifacts.s3.amazonaws.com/stitch-mongo-libs/stitch_mongo_libs_osx_patch_c5880b9bd6039908a2fd85d1c95f457c36b5d33b_6542b80ae3c331e8d3788186_23_11_01_20_41_47/assisted_agg"
+                GOLANG_URL="https://s3.amazonaws.com/static.realm.io/evergreen-assets/go1.21.1.darwin-arm64.tar.gz"
+                # -->
+
+                # Go's scheduler is not BIG.little aware, and by default will spawn
+                # threads until they end up getting scheduled on efficiency cores,
+                # which is slower than just not using them. Limiting the threads to
+                # the number of performance cores results in them usually not
+                # running on efficiency cores. Checking the performance core count
+                # wasn't implemented until the first CPU with a performance core
+                # count other than 4 was released, so if it's unavailable it's 4.
+                GOMAXPROCS="$(sysctl -n hw.perflevel0.logicalcpu || echo 4)"
+                export GOMAXPROCS
+                BAAS_PLATFORM="Darwin_arm64"
+            else
+                export GOARCH=amd64
+                MONGODB_DOWNLOAD_URL="https://downloads.mongodb.com/osx/mongodb-macos-x86_64-enterprise-7.0.3.tgz"
+                MONGOSH_DOWNLOAD_URL="https://downloads.mongodb.com/compass/mongosh-2.1.1-darwin-x64.zip"
+                # <-- Remove after enabling constants.sh
+                STITCH_SUPPORT_LIB_URL="https://stitch-artifacts.s3.amazonaws.com/stitch-support/macos-arm64/stitch-support-4.4.17-rc1-2-g85de0cc.tgz"
+                ASSISTED_AGG_URL="https://stitch-artifacts.s3.amazonaws.com/stitch-mongo-libs/stitch_mongo_libs_osx_patch_c5880b9bd6039908a2fd85d1c95f457c36b5d33b_6542b80ae3c331e8d3788186_23_11_01_20_41_47/assisted_agg"
+                GOLANG_URL="https://s3.amazonaws.com/static.realm.io/evergreen-assets/go1.21.1.darwin-amd64.tar.gz"
+                # -->
+                BAAS_PLATFORM="Darwin_x86_64"
+            fi
+            platform_string="${BAAS_PLATFORM}"
+        ;;
+        Linux)
+            BAAS_PLATFORM="Linux_x86_64"
+            # Detect what distro/version of Linux we are running on to download the right version of MongoDB to download
+            # /etc/os-release covers debian/ubuntu/suse
+            if [[ -e /etc/os-release ]]; then
+                # Amazon Linux 2 comes back as 'amzn'
+                DISTRO_NAME="$(. /etc/os-release ; echo "${ID}")"
+                DISTRO_VERSION="$(. /etc/os-release ; echo "${VERSION_ID}")"
+                DISTRO_VERSION_MAJOR="$(cut -d. -f1 <<< "${DISTRO_VERSION}")"
+            elif [[ -e /etc/redhat-release ]]; then
+                # /etc/redhat-release covers RHEL
+                DISTRO_NAME=rhel
+                DISTRO_VERSION="$(lsb_release -s -r)"
+                DISTRO_VERSION_MAJOR="$(cut -d. -f1 <<< "${DISTRO_VERSION}")"
+            fi
+            platform_string="${BAAS_PLATFORM} - ${DISTRO_NAME} ${DISTRO_VERSION}"
+            MONGOSH_DOWNLOAD_URL="https://downloads.mongodb.com/compass/mongosh-2.1.1-linux-x64.tgz"
+            case "${DISTRO_NAME}" in
+                ubuntu | linuxmint)
+                    MONGODB_DOWNLOAD_URL="http://downloads.10gen.com/linux/mongodb-linux-$(uname -m)-enterprise-ubuntu${DISTRO_VERSION_MAJOR}04-7.0.3.tgz"
+                    # <-- Remove after enabling constants.sh
+                    LIBMONGO_URL="https://stitch-artifacts.s3.amazonaws.com/stitch-mongo-libs/stitch_mongo_libs_ubuntu2004_x86_64_patch_1e7861d9b7462f01ea220fad334f10e00f0f3cca_65135b432fbabe741bd24429_23_09_26_22_29_24/libmongo-ubuntu2004-x86_64.so"
+                    STITCH_SUPPORT_LIB_URL="https://s3.amazonaws.com/static.realm.io/stitch-support/stitch-support-ubuntu2004-4.4.17-rc1-2-g85de0cc.tgz"
+                    GOLANG_URL="https://s3.amazonaws.com/static.realm.io/evergreen-assets/go1.21.1.linux-amd64.tar.gz"
+                    # -->
+                ;;
+                rhel)
+                    case "${DISTRO_VERSION_MAJOR}" in
+                        7)
+                            MONGODB_DOWNLOAD_URL="https://downloads.mongodb.com/linux/mongodb-linux-x86_64-enterprise-rhel70-7.0.3.tgz"
+                            # <-- Remove after enabling constants.sh
+                            LIBMONGO_URL="https://stitch-artifacts.s3.amazonaws.com/stitch-mongo-libs/stitch_mongo_libs_linux_64_patch_1e7861d9b7462f01ea220fad334f10e00f0f3cca_65135b432fbabe741bd24429_23_09_26_22_29_24/libmongo.so"
+                            STITCH_SUPPORT_LIB_URL="https://stitch-artifacts.s3.amazonaws.com/stitch-support/linux-x64/stitch-support-4.4.17-rc1-2-g85de0cc.tgz"
+                            GOLANG_URL="https://s3.amazonaws.com/static.realm.io/evergreen-assets/go1.21.1.linux-amd64.tar.gz"
+                            # -->
+                        ;;
+                        *)
+                            echo "Error: unsupported version of RHEL ${DISTRO_VERSION}"
+                            exit 1
+                        ;;
+                    esac
+                ;;
+                *)
+                    echo "Error: unsupported platform Linux ${DISTRO_NAME}"
+                    exit 1
+                ;;
+            esac
+        ;;
+        *)
+            echo "Error: unsupported platform: ${target}"
             exit 1
-        fi
-        if [[ -z "${STITCH_SUPPORT_LIB_PATH}" ]]; then
-            echo "Missing STITCH_SUPPORT_LIB_PATH env variable to find the mongo stitch support library"
-            exit 1
-        fi
+        ;;
+    esac
+    export BAAS_PLATFORM
+    echo "Platform: ${platform_string}"
+    # shellcheck source=/dev/null
+    # <-- Uncomment to enable constants.sh
+    # source "${baas_contents_file}"
+    # -->
+
+    exit_code=0
+
+    if [[ -z "${GOLANG_URL}" ]]; then
+        echo "Error: go download URL (GOLANG_URL) not defined for this platform"
+        exit_code=1
+    fi
+    if [[ -z "${STITCH_SUPPORT_LIB_URL}" ]]; then
+        echo "Error: baas support library URL (STITCH_SUPPORT_LIB_URL) not defined for this platform"
+        exit_code=1
+    fi
+    if [[ "${target}" == "Linux" && -z "${LIBMONGO_URL}" ]]; then
+        echo "Error: baas assisted agg library URL (LIBMONGO_URL) not defined for this Linux platform"
+        exit_code=1
+    fi
+    if [[ "${target}" == "Darwin" && -z "${ASSISTED_AGG_URL}" ]]; then
+        echo "Error: baas assisted agg library URL (ASSISTED_AGG_URL) not defined for this Mac OS platform"
+        exit_code=1
+    fi
+    if [[ ${exit_code} -eq 1 ]]; then
         exit 1
-    ;;
-esac
+    fi
+}
 
 # Allow path to CURL to be overloaded by an environment variable
 CURL="${CURL:=$LAUNCHER curl}"
@@ -123,7 +191,8 @@ REALPATH="${BASE_PATH}/abspath.sh"
 function usage()
 {
     echo "Usage: install_baas.sh -w PATH [-b BRANCH] [-v] [-h]"
-    echo -e "\t-w PATH\t\tPath to working dir"
+    echo -e "\t-w PATH\t\tPath to working directory"
+    echo "Options:"
     echo -e "\t-b BRANCH\tOptional branch or git spec of baas to checkout/build"
     echo -e "\t-v\t\tEnable verbose script debugging"
     echo -e "\t-h\t\tShow this usage summary and exit"
@@ -139,33 +208,45 @@ while getopts "w:b:vh" opt; do
     case "${opt}" in
         w) WORK_PATH="$($REALPATH "${OPTARG}")";;
         b) BAAS_VERSION="${OPTARG}";;
-        v) VERBOSE="yes"; set -o verbose; set -o xtrace;;
+        v) VERBOSE="yes";;
         h) usage 0;;
         *) usage 1;;
     esac
 done
 
 if [[ -z "${WORK_PATH}" ]]; then
-    echo "Must specify working directory"
+    echo "Error: Baas working directory was empty or not provided"
     usage 1
 fi
 
-# Check the mongodb and baas_server port availability first
-MONGODB_PORT=26000
-BAAS_PORT=9090
-
-MONGODB_PORT_CHECK=$(lsof -P -i:${MONGODB_PORT} | grep "LISTEN" || true)
-if [[ -n "${MONGODB_PORT_CHECK}" ]]; then
-    echo "Error: mongodb port (${MONGODB_PORT}) is already in use"
-    echo -e "${MONGODB_PORT_CHECK}"
+if [[ -z "${AWS_ACCESS_KEY_ID}" || -z "${AWS_SECRET_ACCESS_KEY}" ]]; then
+    echo "Error: AWS_ACCESS_KEY_ID and/or AWS_SECRET_ACCESS_KEY are not set"
     exit 1
 fi
 
-BAAS_PORT_CHECK=$(lsof -P -i:${BAAS_PORT} | grep "LISTEN" || true)
-if [[ -n "${BAAS_PORT_CHECK}" ]]; then
-    echo "Error: baas server port (${BAAS_PORT}) is already in use"
-    echo -e "${BAAS_PORT_CHECK}"
-    exit 1
+function check_port_in_use()
+{
+    # Usage: check_port_in_use PORT PORT_NAME
+    port_num="${1}"
+    port_check=$(lsof -P "-i:${port_num}" | grep "LISTEN" || true)
+    if [[ -n "${port_check}" ]]; then
+        echo "Error: ${2} port (${port_num}) is already in use"
+        echo -e "${port_check}"
+        exit 1
+    fi
+}
+
+# Check the mongodb and baas_server port availability first
+MONGODB_PORT=26000
+check_port_in_use "${MONGODB_PORT}" "mongodb"
+
+BAAS_PORT=9090
+check_port_in_use "${BAAS_PORT}" "baas server"
+
+# Wait to enable verbosity logging, if enabled
+if [[ -n "${VERBOSE}" ]]; then
+    set -o verbose
+    set -o xtrace
 fi
 
 # Create and cd into the working directory
@@ -175,14 +256,6 @@ echo "Work path: ${WORK_PATH}"
 
 # Set up some directory paths
 BAAS_DIR="${WORK_PATH}/baas"
-BAAS_DEPS_DIR="${WORK_PATH}/baas_dep_binaries"
-NODE_BINARIES_DIR="${WORK_PATH}/node_binaries"
-MONGO_BINARIES_DIR="${WORK_PATH}/mongodb-binaries"
-MONGODB_PATH="${WORK_PATH}/mongodb-dbpath"
-
-DYLIB_DIR="${BAAS_DIR}/etc/dylib"
-DYLIB_LIB_DIR="${DYLIB_DIR}/lib"
-TRANSPILER_DIR="${BAAS_DIR}/etc/transpiler"
 
 # Define files for storing state
 BAAS_SERVER_LOG="${WORK_PATH}/baas_server.log"
@@ -190,39 +263,36 @@ BAAS_READY_FILE="${WORK_PATH}/baas_ready"
 BAAS_STOPPED_FILE="${WORK_PATH}/baas_stopped"
 BAAS_PID_FILE="${WORK_PATH}/baas_server.pid"
 MONGOD_PID_FILE="${WORK_PATH}/mongod.pid"
-MONGOD_LOG="${MONGODB_PATH}/mongod.log"
-
-# Delete the mongod working directory if it exists from a previous run
-# Wait to create this directory until just before mongod is started
-if [[ -d "${MONGODB_PATH}" ]]; then
-    rm -rf "${MONGODB_PATH}"
-fi
+GO_ROOT_FILE="${WORK_PATH}/go_root"
 
 # Remove some files from a previous run if they exist
 if [[ -f "${BAAS_SERVER_LOG}" ]]; then
-    rm "${BAAS_SERVER_LOG}"
+    rm -f "${BAAS_SERVER_LOG}"
 fi
 if [[ -f "${BAAS_READY_FILE}" ]]; then
-    rm "${BAAS_READY_FILE}"
+    rm -f "${BAAS_READY_FILE}"
 fi
 if [[ -f "${BAAS_STOPPED_FILE}" ]]; then
-    rm "${BAAS_STOPPED_FILE}"
+    rm -f "${BAAS_STOPPED_FILE}"
 fi
 if [[ -f "${BAAS_PID_FILE}" ]]; then
-    rm "${BAAS_PID_FILE}"
+    rm -f "${BAAS_PID_FILE}"
 fi
 if [[ -f "${MONGOD_PID_FILE}" ]]; then
-    rm "${MONGOD_PID_FILE}"
+    rm -f "${MONGOD_PID_FILE}"
 fi
 
 # Set up the cleanup function that runs at exit and stops mongod and the baas server
-function cleanup()
-{
-    # The baas server is being stopped (or never started), create a 'baas_stopped' file
-    touch "${BAAS_STOPPED_FILE}"
+trap 'on_exit' EXIT
 
-    baas_pid=""
-    mongod_pid=""
+function on_exit()
+{
+    # Usage: on_exit
+    # The baas server is being stopped (or never started), create a 'baas_stopped' file
+    touch "${BAAS_STOPPED_FILE}" || true
+
+    baas_pid=
+    mongod_pid=
     if [[ -f "${BAAS_PID_FILE}" ]]; then
         baas_pid="$(< "${BAAS_PID_FILE}")"
     fi
@@ -233,54 +303,40 @@ function cleanup()
 
     if [[ -n "${baas_pid}" ]]; then
         echo "Stopping baas ${baas_pid}"
-        kill "${baas_pid}"
+        kill "${baas_pid}" || true
         echo "Waiting for baas to stop"
         wait "${baas_pid}"
+        rm -f "${BAAS_PID_FILE}" || true
     fi
 
     if [[ -n "${mongod_pid}" ]]; then
-        echo "Killing mongod ${mongod_pid}"
-        kill "${mongod_pid}"
+        echo "Stopping mongod ${mongod_pid}"
+        kill "${mongod_pid}" || true
         echo "Waiting for processes to exit"
         wait
+        rm -f "${MONGOD_PID_FILE}" || true
     fi
 }
 
-trap "exit" INT TERM ERR
-trap 'cleanup $?' EXIT
+setup_target_dependencies
 
-echo "Installing node and go to build baas and its dependencies"
-
-# Create the <work_path>/node_binaries/ directory
-[[ -d "${NODE_BINARIES_DIR}" ]] || mkdir -p "${NODE_BINARIES_DIR}"
-# Download node if it's not found
-if [[ ! -x "${NODE_BINARIES_DIR}/bin/node" ]]; then
-    pushd "${NODE_BINARIES_DIR}" > /dev/null
-    ${CURL} -LsS "${NODE_URL}" | tar -xz --strip-components=1
-    popd > /dev/null  # node_binaries
-fi
-export PATH="${NODE_BINARIES_DIR}/bin":${PATH}
-echo "Node version: $(node --version)"
-
-# Download go if it's not found and set up the GOROOT for building/running baas
-[[ -x ${WORK_PATH}/go/bin/go ]] || (${CURL} -sL $GO_URL | tar -xz)
-export GOROOT="${WORK_PATH}/go"
-export PATH="${WORK_PATH}/go/bin":${PATH}
-echo "Go version: $(go version)"
+BAAS_DEPS_DIR="${WORK_PATH}/baas_dep_binaries"
 
 # Create the <work_path>/baas_dep_binaries/ directory
 [[ -d "${BAAS_DEPS_DIR}" ]] || mkdir -p "${BAAS_DEPS_DIR}"
-export PATH="${BAAS_DEPS_DIR}":${PATH}
+pathadd "${BAAS_DEPS_DIR}"
 
 # Download jq (used for parsing json files) if it's not found
 if [[ ! -x "${BAAS_DEPS_DIR}/jq" ]]; then
     pushd "${BAAS_DEPS_DIR}" > /dev/null
-    which jq || (${CURL} -LsS "${JQ_DOWNLOAD_URL}" > jq && chmod +x jq)
+    which jq > /dev/null || (${CURL} -LsS "${JQ_DOWNLOAD_URL}" > jq && chmod +x jq)
     popd > /dev/null  # baas_dep_binaries
 fi
+echo "jq version: $(jq --version)"
 
 # Fix incompatible github path that was changed in a BAAS dependency
 git config --global url."git@github.com:".insteadOf "https://github.com/"
+#export GOPRIVATE="github.com/10gen/*"
 
 # If a baas branch or commit version was not provided, retrieve the latest release version
 if [[ -z "${BAAS_VERSION}" ]]; then
@@ -289,7 +345,7 @@ fi
 
 # Clone the baas repo and check out the specified version
 if [[ ! -d "${BAAS_DIR}/.git" ]]; then
-    git clone git@github.com:10gen/baas.git
+    git clone git@github.com:10gen/baas.git "${BAAS_DIR}"
     pushd "${BAAS_DIR}" > /dev/null
 else
     pushd "${BAAS_DIR}" > /dev/null
@@ -301,46 +357,72 @@ git checkout "${BAAS_VERSION}"
 echo "Using baas commit: $(git rev-parse HEAD)"
 popd > /dev/null  # baas
 
+setup_baas_dependencies "${BAAS_DIR}"
+
+echo "Installing node and go to build baas and its dependencies"
+
+NODE_BINARIES_DIR="${WORK_PATH}/node_binaries"
+
+# Create the <work_path>/node_binaries/ directory
+[[ -d "${NODE_BINARIES_DIR}" ]] || mkdir -p "${NODE_BINARIES_DIR}"
+# Download node if it's not found
+if [[ ! -x "${NODE_BINARIES_DIR}/bin/node" ]]; then
+    pushd "${NODE_BINARIES_DIR}" > /dev/null
+    ${CURL} -LsS "${NODE_URL}" | tar -xz --strip-components=1
+    popd > /dev/null  # node_binaries
+fi
+pathadd "${NODE_BINARIES_DIR}/bin"
+echo "Node version: $(node --version)"
+
+export GOROOT="${WORK_PATH}/go"
+
+# Download go if it's not found and set up the GOROOT for building/running baas
+[[ -x "${GOROOT}/bin/go" ]] || (${CURL} -sL "${GOLANG_URL}" | tar -xz)
+pathadd "${GOROOT}/bin"
+# Write the GOROOT to a file after the download completes so the baas proxy
+# can use the same path.
+echo "${GOROOT}" > "${GO_ROOT_FILE}"
+echo "Go version: $(go version)"
+
+DYLIB_DIR="${BAAS_DIR}/etc/dylib"
+DYLIB_LIB_DIR="${DYLIB_DIR}/lib"
+
 # Copy or download and extract the baas support archive if it's not found
 if [[ ! -d "${DYLIB_DIR}" ]]; then
-    if [[ -n "${STITCH_SUPPORT_LIB_PATH}" ]]; then
-        echo "Copying baas support library from ${STITCH_SUPPORT_LIB_PATH}"
-        mkdir -p "${DYLIB_DIR}"
-        cp -rav "${STITCH_SUPPORT_LIB_PATH}"/* "${DYLIB_DIR}"
-    else
-        echo "Downloading baas support library"
-        mkdir -p "${DYLIB_DIR}"
-        pushd "${DYLIB_DIR}" > /dev/null
-        ${CURL} -LsS "${STITCH_SUPPORT_LIB_URL}" | tar -xz --strip-components=1
-        popd > /dev/null  # baas/etc/dylib
-    fi
+    echo "Downloading baas support library"
+    mkdir -p "${DYLIB_DIR}"
+    pushd "${DYLIB_DIR}" > /dev/null
+    ${CURL} -LsS "${STITCH_SUPPORT_LIB_URL}" | tar -xz --strip-components=1
+    popd > /dev/null  # baas/etc/dylib
 fi
+
 export LD_LIBRARY_PATH="${DYLIB_LIB_DIR}"
 export DYLD_LIBRARY_PATH="${DYLIB_LIB_DIR}"
 
+LIBMONGO_DIR="${BAAS_DIR}/etc/libmongo"
+
+# Create the libmongo/ directory
+[[ -d "${LIBMONGO_DIR}" ]] || mkdir -p "${LIBMONGO_DIR}"
+pathadd "${LIBMONGO_DIR}"
+
 # Copy or download the assisted agg library as libmongo.so (for Linux) if it's not found
-LIBMONGO_LIB="${BAAS_DEPS_DIR}/libmongo.so"
-if [[ ! -x "${LIBMONGO_LIB}" ]]; then
-    if [[ -n "${STITCH_ASSISTED_AGG_LIB_PATH}" ]]; then
-        echo "Copying assisted agg library from ${STITCH_ASSISTED_AGG_LIB_PATH}"
-        cp -rav "${STITCH_ASSISTED_AGG_LIB_PATH}" "${LIBMONGO_LIB}"
-        chmod 755 "${LIBMONGO_LIB}"
-    elif [[ -n "${STITCH_ASSISTED_AGG_LIB_URL}" ]]; then
-        echo "Downloading assisted agg library (libmongo.so)"
-        pushd "${BAAS_DEPS_DIR}" > /dev/null
-        ${CURL} -LsS "${STITCH_ASSISTED_AGG_LIB_URL}" > libmongo.so
-        chmod 755 libmongo.so
-        popd > /dev/null  # baas_dep_binaries
-    fi
+LIBMONGO_LIB="${LIBMONGO_DIR}/libmongo.so"
+if [[ ! -x "${LIBMONGO_LIB}" && -n "${LIBMONGO_URL}" ]]; then
+    echo "Downloading assisted agg library (libmongo.so)"
+    pushd "${LIBMONGO_DIR}" > /dev/null
+    ${CURL} -LsS "${LIBMONGO_URL}" > "${LIBMONGO_LIB}"
+    chmod 755 "${LIBMONGO_LIB}"
+    popd > /dev/null  # etc/libmongo
 fi
 
 # Download the assisted agg library as assisted_agg (for MacOS) if it's not found
-if [[ ! -x "${BAAS_DEPS_DIR}/assisted_agg" && -n "${STITCH_ASSISTED_AGG_URL}" ]]; then
+ASSISTED_AGG_LIB="${LIBMONGO_DIR}/assisted_agg"
+if [[ ! -x "${ASSISTED_AGG_LIB}" && -n "${ASSISTED_AGG_URL}" ]]; then
     echo "Downloading assisted agg binary (assisted_agg)"
-    pushd "${BAAS_DEPS_DIR}" > /dev/null
-    ${CURL} -LsS "${STITCH_ASSISTED_AGG_URL}" > assisted_agg
-    chmod 755 assisted_agg
-    popd > /dev/null  # baas_dep_binaries
+    pushd "${LIBMONGO_DIR}" > /dev/null
+    ${CURL} -LsS "${ASSISTED_AGG_URL}" > "${ASSISTED_AGG_LIB}"
+    chmod 755 "${ASSISTED_AGG_LIB}"
+    popd > /dev/null  # etc/libmongo
 fi
 
 # Download yarn if it's not found
@@ -348,13 +430,15 @@ YARN="${WORK_PATH}/yarn/bin/yarn"
 if [[ ! -x "${YARN}" ]]; then
     echo "Getting yarn"
     mkdir -p yarn && pushd yarn > /dev/null
-    ${CURL} -LsS https://yarnpkg.com/latest.tar.gz | tar -xz --strip-components=1
+    ${CURL} -LsS "https://yarnpkg.com/latest.tar.gz" | tar -xz --strip-components=1
     popd > /dev/null  # yarn
     mkdir "${WORK_PATH}/yarn_cache"
 fi
 
 # Use yarn to build the transpiler for the baas server
+TRANSPILER_DIR="${BAAS_DIR}/etc/transpiler"
 BAAS_TRANSPILER="${BAAS_DEPS_DIR}/transpiler"
+
 if [[ ! -x "${BAAS_TRANSPILER}" ]]; then
     echo "Building transpiler"
     pushd "${TRANSPILER_DIR}" > /dev/null
@@ -364,6 +448,8 @@ if [[ ! -x "${BAAS_TRANSPILER}" ]]; then
     ln -s "${TRANSPILER_DIR}/bin/transpiler" "${BAAS_TRANSPILER}"
 fi
 
+MONGO_BINARIES_DIR="${WORK_PATH}/mongodb-binaries"
+
 # Download mongod (daemon) and mongosh (shell) binaries
 if [ ! -x "${MONGO_BINARIES_DIR}/bin/mongod" ]; then
     echo "Downloading mongodb"
@@ -372,24 +458,41 @@ if [ ! -x "${MONGO_BINARIES_DIR}/bin/mongod" ]; then
     tar -xzf mongodb-binaries.tgz
     rm mongodb-binaries.tgz
     mv mongodb* mongodb-binaries
-    chmod +x "${MONGO_BINARIES_DIR}/bin"/*
 fi
+echo "mongod version: $("${MONGO_BINARIES_DIR}/bin/mongod" --version --quiet | sed 1q)"
 
-if [[ -n "${MONGOSH_DOWNLOAD_URL}" ]] && [[ ! -x "${MONGO_BINARIES_DIR}/bin/mongosh" ]]; then
-    echo "Downloading mongosh"
-    ${CURL} -sLS "${MONGOSH_DOWNLOAD_URL}" --output mongosh-binaries.zip
-    unzip -jnqq mongosh-binaries.zip '*/bin/*' -d "${MONGO_BINARIES_DIR}/bin/"
-    rm mongosh-binaries.zip
+if [[ ! -x "${MONGO_BINARIES_DIR}/bin/mongosh" ]]; then
+    MONGOSH_DOWNLOAD_FILENAME=$(basename "${MONGOSH_DOWNLOAD_URL}")
+    MONGOSH_DOWNLOAD_EXTENSION="${MONGOSH_DOWNLOAD_FILENAME##*.}"
+    echo "Downloading ${MONGOSH_DOWNLOAD_URL}"
+    if [[ "${MONGOSH_DOWNLOAD_EXTENSION}" == "zip" ]]; then
+        ${CURL} -sLS "${MONGOSH_DOWNLOAD_URL}" --output mongosh-binaries.zip
+        unzip -jnqq mongosh-binaries.zip '*/bin/*' -d "${MONGO_BINARIES_DIR}/bin/"
+        rm mongosh-binaries.zip
+    elif [[ ${MONGOSH_DOWNLOAD_EXTENSION} == "tgz" ]]; then
+        ${CURL} -sLS "${MONGOSH_DOWNLOAD_URL}" --output mongosh-binaries.tgz
+        tar -xzf mongosh-binaries.tgz --strip-components=1 -C "${MONGO_BINARIES_DIR}"
+        rm mongosh-binaries.tgz
+    else
+        echo "Unsupported mongosh format $MONGOSH_DOWNLOAD_EXTENSION"
+        exit 1
+    fi
 fi
-
-[[ -n "${MONGOSH_DOWNLOAD_URL}" ]] && MONGOSH="mongosh" || MONGOSH="mongo"
-
+MONGOSH="mongosh"
+chmod +x "${MONGO_BINARIES_DIR}/bin"/*
+echo "${MONGOSH} version: $("${MONGO_BINARIES_DIR}/bin/${MONGOSH}" --version)"
 
 # Start mongod on port 26000 and listening on all network interfaces
 echo "Starting mongodb"
 
 # Increase the maximum number of open file descriptors (needed by mongod)
 ulimit -n 32000
+
+MONGODB_PATH="${WORK_PATH}/mongodb-dbpath"
+MONGOD_LOG="${MONGODB_PATH}/mongod.log"
+
+# Delete the mongod working directory if it exists from a previous run
+[[ -d "${MONGODB_PATH}" ]] && rm -rf "${MONGODB_PATH}"
 
 # The mongod working files will be stored in the <work_path>/mongodb_dbpath directory
 mkdir -p "${MONGODB_PATH}"
@@ -403,7 +506,6 @@ mkdir -p "${MONGODB_PATH}"
     --dbpath "${MONGODB_PATH}/" \
     --pidfilepath "${MONGOD_PID_FILE}" &
 
-
 # Wait for mongod to start (up to 40 secs) while attempting to initialize the replica set
 echo "Initializing replica set"
 
@@ -416,11 +518,11 @@ do
     ((++WAIT_COUNTER))
     if [[ -z "$(pgrep mongod)" ]]; then
         secs_spent_waiting=$(($(date -u +'%s') - WAIT_START))
-        echo "Mongodb process has terminated after ${secs_spent_waiting} seconds"
+        echo "Error: mongodb process has terminated after ${secs_spent_waiting} seconds"
         exit 1
     elif [[ ${WAIT_COUNTER} -ge ${RETRY_COUNT} ]]; then
         secs_spent_waiting=$(($(date -u +'%s') - WAIT_START))
-        echo "Timed out after waiting ${secs_spent_waiting} seconds for mongod to start"
+        echo "Error: timed out after waiting ${secs_spent_waiting} seconds for mongod to start"
         exit 1
     fi
 
@@ -453,16 +555,12 @@ echo "Adding fake appid to skip baas server drop optimization"
 # Start the baas server on port *:9090 with the provided config JSON files
 echo "Starting baas app server"
 
+# see config overrides at https://github.com/10gen/baas/blob/master/etc/configs/test_rcore_config.json
 "${WORK_PATH}/baas_server" \
-    --configFile=etc/configs/test_config.json --configFile="${BASE_PATH}/config_overrides.json" > "${BAAS_SERVER_LOG}" 2>&1 &
+    --configFile=etc/configs/test_config.json --configFile=etc/configs/test_rcore_config.json > "${BAAS_SERVER_LOG}" 2>&1 &
 echo $! > "${BAAS_PID_FILE}"
 
-WAIT_BAAS_OPTS=()
-if [[ -n "${VERBOSE}" ]]; then
-    WAIT_BAAS_OPTS=("-v")
-fi
-
-"${BASE_PATH}/wait_for_baas.sh" "${WAIT_BAAS_OPTS[@]}" -w "${WORK_PATH}"
+"${BASE_PATH}/wait_for_baas.sh" -w "${WORK_PATH}"
 
 # Create the admin user and set up the allowed roles
 echo "Adding roles to admin user"
@@ -472,7 +570,7 @@ ${CURL} 'http://localhost:9090/api/admin/v3.0/auth/providers/local-userpass/logi
   --silent \
   --fail \
   --output /dev/null \
-  --data-raw '{"username":"unique_user@domain.com","password":"password"}'
+  --data '{"username":"unique_user@domain.com","password":"password"}'
 
 "${MONGO_BINARIES_DIR}/bin/${MONGOSH}"  --quiet mongodb://localhost:26000/auth "${BASE_PATH}/add_admin_roles.js"
 

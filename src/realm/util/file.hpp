@@ -176,6 +176,7 @@ public:
     /// regardless of whether this instance currently is attached to
     /// an open file.
     void close() noexcept;
+    static void close_static(FileDesc fd); // throws
 
     /// Check whether this File instance is currently attached to an
     /// open file.
@@ -529,7 +530,9 @@ public:
     /// Both instances have to be attached to open files. If they are
     /// not, this function has undefined behavior.
     bool is_same_file(const File&) const;
-    static bool is_same_file_static(FileDesc f1, FileDesc f2);
+    static bool is_same_file_static(FileDesc f1, FileDesc f2, const std::string& path1, const std::string& path2);
+
+    static FileDesc dup_file_desc(FileDesc fd);
 
     /// Resolve the specified path against the specified base directory.
     ///
@@ -604,7 +607,7 @@ public:
     };
     // Return the unique id for the current opened file descriptor.
     // Same UniqueID means they are the same file.
-    UniqueID get_unique_id() const;
+    UniqueID get_unique_id(); // Throws
     // Return the file descriptor for the file
     FileDesc get_descriptor() const;
     // Return the path of the open file, or an empty string if
@@ -612,10 +615,12 @@ public:
     std::string get_path() const;
 
     // Return none if the file doesn't exist. Throws on other errors.
+    // If the file does exist but has a size of zero, the file may be resized
+    // to force the file system to allocate a unique id.
     static std::optional<UniqueID> get_unique_id(const std::string& path);
 
     // Return the unique id for the file descriptor. Throws if the underlying stat operation fails.
-    static UniqueID get_unique_id(FileDesc file);
+    static UniqueID get_unique_id(FileDesc file, const std::string& debug_path);
 
     template <class>
     class Map;
@@ -641,6 +646,7 @@ private:
 #endif
     std::unique_ptr<const char[]> m_encryption_key = nullptr;
     std::string m_path;
+    std::optional<UniqueID> m_cached_unique_id;
 
     bool lock(bool exclusive, bool non_blocking);
     bool rw_lock(bool exclusive, bool non_blocking);

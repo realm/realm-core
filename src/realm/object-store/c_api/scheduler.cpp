@@ -15,6 +15,8 @@ using namespace realm::util;
 
 // LCOV_EXCL_START
 
+struct realm_work_queue : InvocationQueue {};
+
 namespace realm::c_api {
 namespace {
 
@@ -26,7 +28,7 @@ struct CAPIScheduler : Scheduler {
     realm_scheduler_is_same_as_func_t m_is_same_as = nullptr;
     realm_scheduler_can_deliver_notifications_func_t m_can_invoke = nullptr;
 
-    InvocationQueue m_queue;
+    realm_work_queue m_queue;
 
     CAPIScheduler() = default;
     CAPIScheduler(CAPIScheduler&& other)
@@ -48,7 +50,7 @@ struct CAPIScheduler : Scheduler {
     {
         if (m_notify) {
             m_queue.push(std::move(fn));
-            m_notify(m_userdata);
+            m_notify(m_userdata, &m_queue);
         }
     }
 
@@ -141,11 +143,9 @@ realm_scheduler_new(realm_userdata_t userdata, realm_free_userdata_func_t free_f
     });
 }
 
-RLM_API void realm_scheduler_perform_work(realm_scheduler_t* scheduler)
+RLM_API void realm_scheduler_perform_work(realm_work_queue_t* work_queue)
 {
-    if (auto capi_scheduler = dynamic_cast<CAPIScheduler*>(scheduler->get())) {
-        capi_scheduler->m_queue.invoke_all();
-    }
+    work_queue->invoke_all();
 }
 
 RLM_API realm_scheduler_t* realm_scheduler_make_default()

@@ -15,6 +15,7 @@ endif()
 include(GNUInstallDirs)
 include(CheckIncludeFiles)
 include(CheckSymbolExists)
+include(CMakePushCheckState)
 include(Utilities)
 include(SpecialtyBuilds)
 include(GetVersion)
@@ -237,11 +238,19 @@ if(MSVC)
 endif()
 
 if(UNIX)
+    cmake_push_check_state(RESET)
     # Enable access to large file APIs, but don't make them the default.
     add_compile_definitions("_LARGEFILE_SOURCE" "_LARGEFILE64_SOURCE")
     set(CMAKE_REQUIRED_DEFINITIONS "-D_LARGEFILE_SOURCE" "-D_LARGEFILE64_SOURCE")
     # Use readdir64 if available.
     check_symbol_exists(readdir64 "dirent.h" REALM_HAVE_READDIR64)
+    cmake_reset_check_state()
+    set(CMAKE_REQUIRED_DEFINITIONS "-D_POSIX_C_SOURCE=200112L")
+    check_symbol_exists(posix_fallocate "fcntl.h" REALM_HAVE_POSIX_FALLOCATE)
+    if(REALM_HAVE_POSIX_FALLOCATE)
+        add_compile_definitions("_POSIX_C_SOURCE=200112L")
+    endif()
+    cmake_pop_check_state()
 endif()
 
 # Options (passed to CMake)
@@ -254,7 +263,6 @@ if(NOT EMSCRIPTEN)
 endif()
 option(REALM_ENABLE_MEMDEBUG "Add additional memory checks" OFF)
 option(REALM_VALGRIND "Tell the test suite we are running with valgrind" OFF)
-option(REALM_METRICS "Enable various metric tracking" ON)
 option(REALM_SYNC_MULTIPLEXING "Enables/disables sync session multiplexing by default" ON)
 set(REALM_MAX_BPNODE_SIZE "1000" CACHE STRING "Max B+ tree node size.")
 option(REALM_ENABLE_GEOSPATIAL "Enable geospatial types and queries." ON)
@@ -262,6 +270,28 @@ option(REALM_ENABLE_GEOSPATIAL "Enable geospatial types and queries." ON)
 # Find dependencies
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
+
+# Threads library is pthread-compatible
+# Check for these explicitly because older versions of musl define only one or the other
+if(CMAKE_USE_PTHREADS_INIT)
+    check_symbol_exists(pthread_getname_np "pthread.h" REALM_HAVE_PTHREAD_GETNAME)
+    check_symbol_exists(pthread_setname_np "pthread.h" REALM_HAVE_PTHREAD_SETNAME)
+endif()
+
+find_package(Backtrace)
+if(Backtrace_FOUND)
+    add_library(Backtrace::Backtrace INTERFACE IMPORTED)
+    if(Backtrace_LIBRARIES AND NOT CMAKE_GENERATOR STREQUAL Xcode)
+        # Apple platforms always have backtrace. We disregard the `Backtrace_*` variables
+        # because their paths are hardcoded to one SDK within Xcode (e.g. macosx),
+        # whereas we build for several different SDKs and thus we can't use the include path from one in the other.
+        # Otherwise if CMake found that the backtrace facility is provided by an external library and not built-in
+        # we need to configure the interface target with the library include and link path.
+        target_include_directories(Backtrace::Backtrace INTERFACE ${Backtrace_INCLUDE_DIRS})
+        target_link_libraries(Backtrace::Backtrace INTERFACE ${Backtrace_LIBRARIES})
+    endif()
+    set(REALM_HAVE_BACKTRACE ON)
+endif()
 
 if(REALM_ENABLE_SYNC)
     option(REALM_FORCE_OPENSSL "Always use OpenSSL for SSL needs, regardless of target platform." OFF)
@@ -283,10 +313,12 @@ if(REALM_NEEDS_OPENSSL OR REALM_FORCE_OPENSSL)
         include(${OPENSSL_CMAKE_INCLUDE_FILE})
     endif()
 
-    set(OPENSSL_USE_STATIC_LIBS ON)
+    if(NOT DEFINED OPENSSL_USE_STATIC_LIBS)
+        set(OPENSSL_USE_STATIC_LIBS ON)
+    endif()
     find_package(OpenSSL REQUIRED)
     set(REALM_HAVE_OPENSSL ON)
-    string(REGEX MATCH "^([0-9]+)\\.([0-9]+)" OPENSSL_VERSION_MAJOR_MINOR ${OPENSSL_VERSION})
+    string(REGEX MATCH "^([0-9]+)\\.([0-9]+)" OPENSSL_VERSION_MAJOR_MINOR "${OPENSSL_VERSION}")
 elseif(APPLE)
     set(REALM_HAVE_SECURE_TRANSPORT "1")
 endif()
@@ -332,6 +364,7 @@ include_directories(src)
 include_directories(${CMAKE_CURRENT_BINARY_DIR}/src) # For generated files (like config.h)
 
 add_subdirectory(src)
+add_subdirectory(bindgen)
 
 # Install the licence and changelog files
 install(FILES LICENSE CHANGELOG.md DESTINATION "doc/realm" COMPONENT devel)

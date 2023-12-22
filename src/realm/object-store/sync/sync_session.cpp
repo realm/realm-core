@@ -152,12 +152,12 @@ void SyncSession::become_dying(util::CheckedUniqueLock lock)
     m_state_mutex.unlock(lock);
 }
 
-void SyncSession::become_inactive(util::CheckedUniqueLock lock, Status status)
+void SyncSession::become_inactive(util::CheckedUniqueLock lock, Status status, bool cancel_subscription_notifications)
 {
     REALM_ASSERT(m_state != State::Inactive);
     m_state = State::Inactive;
 
-    do_become_inactive(std::move(lock), status);
+    do_become_inactive(std::move(lock), status, cancel_subscription_notifications);
 }
 
 void SyncSession::become_paused(util::CheckedUniqueLock lock)
@@ -172,7 +172,7 @@ void SyncSession::become_paused(util::CheckedUniqueLock lock)
         return;
     }
 
-    do_become_inactive(std::move(lock), Status::OK());
+    do_become_inactive(std::move(lock), Status::OK(), true);
 }
 
 void SyncSession::do_restart_session(util::CheckedUniqueLock)
@@ -198,7 +198,8 @@ void SyncSession::do_restart_session(util::CheckedUniqueLock)
     become_active();
 }
 
-void SyncSession::do_become_inactive(util::CheckedUniqueLock lock, Status status)
+void SyncSession::do_become_inactive(util::CheckedUniqueLock lock, Status status,
+                                     bool cancel_subscription_notifications)
 {
     // Manually set the disconnected state. Sync would also do this, but
     // since the underlying SyncSession object already have been destroyed,
@@ -216,6 +217,7 @@ void SyncSession::do_become_inactive(util::CheckedUniqueLock lock, Status status
         m_sync_manager->unregister_session(m_db->get_path());
     }
 
+    auto subscription_store = m_flx_subscription_store;
     m_state_mutex.unlock(lock);
 
     // Send notifications after releasing the lock to prevent deadlocks in the callback.
@@ -225,6 +227,10 @@ void SyncSession::do_become_inactive(util::CheckedUniqueLock lock, Status status
 
     if (status.is_ok())
         status = Status(ErrorCodes::OperationAborted, "Sync session became inactive");
+
+    if (subscription_store && cancel_subscription_notifications) {
+        subscription_store->notify_all_state_change_notifications(status);
+    }
 
     // Inform any queued-up completion handlers that they were cancelled.
     for (auto& [id, callback] : waits)
@@ -454,7 +460,7 @@ void SyncSession::download_fresh_realm(sync::ProtocolErrorInfo::Action server_re
         options.encryption_key = encryption_key.data();
 
     DBRef db;
-    auto fresh_path = ClientResetOperation::get_fresh_path_for(m_db->get_path());
+    auto fresh_path = client_reset::get_fresh_path_for(m_db->get_path());
     try {
         // We want to attempt to use a pre-existing file to reduce the chance of
         // downloading the first part of the file only to then delete it over
@@ -504,49 +510,45 @@ void SyncSession::download_fresh_realm(sync::ProtocolErrorInfo::Action server_re
         auto fresh_sub = fresh_sub_store->get_latest();
         // The local realm uses flexible sync as well so copy the active subscription set to the fresh realm.
         if (auto local_subs_store = m_flx_subscription_store) {
-            sync::SubscriptionSet active = local_subs_store->get_active();
             auto fresh_mut_sub = fresh_sub.make_mutable_copy();
-            fresh_mut_sub.import(active);
+            fresh_mut_sub.import(local_subs_store->get_active());
             fresh_sub = fresh_mut_sub.commit();
         }
-        fresh_sub.get_state_change_notification(sync::SubscriptionSet::State::Complete)
-            .then([=, weak_self = weak_from_this()](sync::SubscriptionSet::State state) {
+
+        auto self = shared_from_this();
+        using SubscriptionState = sync::SubscriptionSet::State;
+        fresh_sub.get_state_change_notification(SubscriptionState::Complete)
+            .then([=](SubscriptionState) -> util::Future<sync::SubscriptionSet> {
                 if (server_requests_action != sync::ProtocolErrorInfo::Action::MigrateToFLX) {
-                    return util::Future<sync::SubscriptionSet::State>::make_ready(state);
+                    return fresh_sub;
                 }
-                auto strong_self = weak_self.lock();
-                if (!strong_self || !strong_self->m_migration_store->is_migration_in_progress()) {
-                    return util::Future<sync::SubscriptionSet::State>::make_ready(state);
+                if (!self->m_migration_store->is_migration_in_progress()) {
+                    return fresh_sub;
                 }
 
                 // fresh_sync_session is using a new realm file that doesn't have the migration_store info
                 // so the query string from the local migration store will need to be provided
-                auto query_string = strong_self->m_migration_store->get_query_string();
+                auto query_string = self->m_migration_store->get_query_string();
                 REALM_ASSERT(query_string);
                 // Create subscriptions in the fresh realm based on the schema instructions received in the bootstrap
                 // message.
                 fresh_sync_session->m_migration_store->create_subscriptions(*fresh_sub_store, *query_string);
-                auto latest_subs = fresh_sub_store->get_latest();
-                {
-                    util::CheckedLockGuard lock(strong_self->m_state_mutex);
-                    // Save a copy of the subscriptions so we add them to the local realm once the
-                    // subscription store is created.
-                    strong_self->m_active_subscriptions_after_migration = latest_subs;
-                }
-
-                return latest_subs.get_state_change_notification(sync::SubscriptionSet::State::Complete);
+                return fresh_sub_store->get_latest()
+                    .get_state_change_notification(SubscriptionState::Complete)
+                    .then([=](SubscriptionState) {
+                        return fresh_sub_store->get_latest();
+                    });
             })
-            .get_async([=, weak_self = weak_from_this()](StatusWith<sync::SubscriptionSet::State> s) {
+            .get_async([=](StatusWith<sync::SubscriptionSet>&& subs) {
                 // Keep the sync session alive while it's downloading, but then close
                 // it immediately
                 fresh_sync_session->force_close();
-                if (auto strong_self = weak_self.lock()) {
-                    if (s.is_ok()) {
-                        strong_self->handle_fresh_realm_downloaded(db, Status::OK(), server_requests_action);
-                    }
-                    else {
-                        strong_self->handle_fresh_realm_downloaded(nullptr, s.get_status(), server_requests_action);
-                    }
+                if (subs.is_ok()) {
+                    self->handle_fresh_realm_downloaded(db, Status::OK(), server_requests_action,
+                                                        std::move(subs.get_value()));
+                }
+                else {
+                    self->handle_fresh_realm_downloaded(nullptr, subs.get_status(), server_requests_action);
                 }
             });
     }
@@ -564,7 +566,8 @@ void SyncSession::download_fresh_realm(sync::ProtocolErrorInfo::Action server_re
 }
 
 void SyncSession::handle_fresh_realm_downloaded(DBRef db, Status status,
-                                                sync::ProtocolErrorInfo::Action server_requests_action)
+                                                sync::ProtocolErrorInfo::Action server_requests_action,
+                                                std::optional<sync::SubscriptionSet> new_subs)
 {
     util::CheckedUniqueLock lock(m_state_mutex);
     if (m_state != State::Active) {
@@ -610,14 +613,16 @@ void SyncSession::handle_fresh_realm_downloaded(DBRef db, Status status,
             else
                 m_completion_callbacks.merge(std::move(callbacks));
         });
-        become_inactive(std::move(lock)); // unlocks the lock
+        // Do not cancel the notifications on subscriptions.
+        bool cancel_subscription_notifications = false;
+        become_inactive(std::move(lock), Status::OK(), cancel_subscription_notifications); // unlocks the lock
 
         // Once the session is inactive, update sync config and subscription store after migration.
         if (server_requests_action == sync::ProtocolErrorInfo::Action::MigrateToFLX ||
             server_requests_action == sync::ProtocolErrorInfo::Action::RevertToPBS) {
             apply_sync_config_after_migration_or_rollback();
             auto flx_sync_requested = config(&SyncConfig::flx_sync_requested);
-            update_subscription_store(flx_sync_requested);
+            update_subscription_store(flx_sync_requested, std::move(new_subs));
         }
     }
     revive_if_needed();
@@ -651,7 +656,6 @@ void SyncSession::handle_error(sync::SessionErrorInfo error)
             case sync::ProtocolErrorInfo::Action::ApplicationBug:
                 [[fallthrough]];
             case sync::ProtocolErrorInfo::Action::ProtocolViolation:
-                next_state = NextStateAfterError::inactive;
                 break;
             case sync::ProtocolErrorInfo::Action::Warning:
                 break; // not fatal, but should be bubbled up to the user below.
@@ -772,17 +776,16 @@ void SyncSession::handle_error(sync::SessionErrorInfo error)
     }
 }
 
-void SyncSession::cancel_pending_waits(util::CheckedUniqueLock lock, Status error,
-                                       std::optional<Status> subs_notify_error)
+void SyncSession::cancel_pending_waits(util::CheckedUniqueLock lock, Status error)
 {
     CompletionCallbacks callbacks;
     std::swap(callbacks, m_completion_callbacks);
 
     // Inform any waiters on pending subscription states that they were cancelled
-    if (subs_notify_error && m_flx_subscription_store) {
+    if (m_flx_subscription_store) {
         auto subscription_store = m_flx_subscription_store;
         m_state_mutex.unlock(lock);
-        subscription_store->notify_all_state_change_notifications(*subs_notify_error);
+        subscription_store->notify_all_state_change_notifications(error);
     }
     else {
         m_state_mutex.unlock(lock);
@@ -837,12 +840,13 @@ static sync::Session::Config::ClientReset make_client_reset_config(const RealmCo
         // to the user here. Note that the schema changes made here will be considered
         // an "offline write" to be recovered if this is recovery mode.
         auto before = Realm::get_shared_realm(config);
-        before->read_group();
         if (auto& notify_before = config.sync_config->notify_before_client_reset) {
             notify_before(config.sync_config->freeze_before_reset_realm ? before->freeze() : before);
         }
-        // Note that if the SDK requested a live Realm this may be a different
-        // version than what we had before calling the callback.
+        // Note that if the SDK wrote to the Realm (hopefully by requesting a
+        // live instance and not opening a secondary one), this may be a
+        // different version than what we had before calling the callback.
+        before->refresh();
         return before->read_transaction_version();
     };
 
@@ -870,9 +874,8 @@ void SyncSession::create_sync_session()
     session_config.proxy_config = sync_config.proxy_config;
     session_config.simulate_integration_error = sync_config.simulate_integration_error;
     session_config.flx_bootstrap_batch_size_bytes = sync_config.flx_bootstrap_batch_size_bytes;
-    session_config.session_reason = ClientResetOperation::is_fresh_path(m_config.path)
-                                        ? sync::SessionReason::ClientReset
-                                        : sync::SessionReason::Sync;
+    session_config.session_reason =
+        client_reset::is_fresh_path(m_config.path) ? sync::SessionReason::ClientReset : sync::SessionReason::Sync;
 
     if (sync_config.on_sync_client_event_hook) {
         session_config.on_sync_client_event_hook = [hook = sync_config.on_sync_client_event_hook,
@@ -913,19 +916,6 @@ void SyncSession::create_sync_session()
     m_session = m_client.make_session(m_db, m_flx_subscription_store, m_migration_store, std::move(session_config));
 
     std::weak_ptr<SyncSession> weak_self = weak_from_this();
-
-    // Configure the sync transaction callback.
-    auto wrapped_callback = [weak_self](VersionID old_version, VersionID new_version) {
-        std::function<TransactionCallback> callback;
-        if (auto self = weak_self.lock()) {
-            util::CheckedLockGuard l(self->m_state_mutex);
-            callback = self->m_sync_transact_callback;
-        }
-        if (callback) {
-            callback(old_version, new_version);
-        }
-    };
-    m_session->set_sync_transact_callback(std::move(wrapped_callback));
 
     // Set up the wrapped progress handler callback
     m_session->set_progress_handler([weak_self](uint_fast64_t downloaded, uint_fast64_t downloadable,
@@ -972,12 +962,6 @@ void SyncSession::create_sync_session()
                 self->handle_error(std::move(*error));
             }
         });
-}
-
-void SyncSession::set_sync_transact_callback(std::function<sync::Session::SyncTransactCallback>&& callback)
-{
-    util::CheckedLockGuard l(m_state_mutex);
-    m_sync_transact_callback = std::move(callback);
 }
 
 void SyncSession::nonsync_transact_notify(sync::version_type version)
@@ -1334,7 +1318,7 @@ void SyncSession::save_sync_config_after_migration_or_rollback()
     m_migrated_sync_config = m_migration_store->convert_sync_config(m_original_sync_config);
 }
 
-void SyncSession::update_subscription_store(bool flx_sync_requested)
+void SyncSession::update_subscription_store(bool flx_sync_requested, std::optional<sync::SubscriptionSet> new_subs)
 {
     util::CheckedUniqueLock lock(m_state_mutex);
 
@@ -1364,11 +1348,15 @@ void SyncSession::update_subscription_store(bool flx_sync_requested)
     create_subscription_store();
 
     std::weak_ptr<sync::SubscriptionStore> weak_sub_mgr(m_flx_subscription_store);
-    lock.unlock();
 
     // If migrated to FLX, create subscriptions in the local realm to cover the existing data.
     // This needs to be done before setting the write validator to avoid NoSubscriptionForWrite errors.
-    make_active_subscription_set();
+    if (new_subs) {
+        auto active_mut_sub = m_flx_subscription_store->get_active().make_mutable_copy();
+        active_mut_sub.import(std::move(*new_subs));
+        active_mut_sub.set_state(sync::SubscriptionSet::State::Complete);
+        active_mut_sub.commit();
+    }
 
     auto tr = m_db->start_write();
     set_write_validator_factory(weak_sub_mgr);
@@ -1383,16 +1371,7 @@ void SyncSession::create_subscription_store()
     // remain valid afterwards for the life of the SyncSession, but m_flx_subscription_store
     // will be reset when rolling back to PBS after a client FLX migration
     if (!m_subscription_store_base) {
-        m_subscription_store_base = sync::SubscriptionStore::create(m_db, [this](int64_t new_version) {
-            util::CheckedLockGuard lk(m_state_mutex);
-            if (m_state != State::Active && m_state != State::WaitingForAccessToken) {
-                return;
-            }
-            // There may be no session yet (i.e., waiting to refresh the access token).
-            if (m_session) {
-                m_session->on_new_flx_sync_subscription(new_version);
-            }
-        });
+        m_subscription_store_base = sync::SubscriptionStore::create(m_db);
     }
 
     // m_subscription_store_base is always around for the life of SyncSession, but the
@@ -1623,22 +1602,4 @@ util::Future<std::string> SyncSession::send_test_command(std::string body)
     }
 
     return m_session->send_test_command(std::move(body));
-}
-
-void SyncSession::make_active_subscription_set()
-{
-    util::CheckedUniqueLock lock(m_state_mutex);
-
-    if (!m_active_subscriptions_after_migration)
-        return;
-
-    REALM_ASSERT(m_flx_subscription_store);
-
-    // Create subscription set from the subscriptions used to download the fresh realm after migration.
-    auto active_mut_sub = m_flx_subscription_store->get_active().make_mutable_copy();
-    active_mut_sub.import(*m_active_subscriptions_after_migration);
-    active_mut_sub.update_state(sync::SubscriptionSet::State::Complete);
-    active_mut_sub.commit();
-
-    m_active_subscriptions_after_migration.reset();
 }

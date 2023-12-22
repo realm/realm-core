@@ -40,13 +40,13 @@ struct VersionInfo {
     SaltedVersion sync_version = {0, 0};
 };
 
-timestamp_type generate_changeset_timestamp() noexcept;
+timestamp_type generate_changeset_timestamp();
 
 // FIXME: in C++17, switch to using std::timespec in place of last two
 // arguments.
 void map_changeset_timestamp(timestamp_type, std::time_t& seconds_since_epoch, long& nanoseconds) noexcept;
 
-inline timestamp_type generate_changeset_timestamp() noexcept
+inline timestamp_type generate_changeset_timestamp()
 {
     namespace chrono = std::chrono;
     // Unfortunately, C++11 does not specify what the epoch is for
@@ -69,6 +69,10 @@ inline timestamp_type generate_changeset_timestamp() noexcept
     // `offset_in_millis` is the number of milliseconds between
     // 1970-01-01T00:00:00Z and 2015-01-01T00:00:00Z not counting leap seconds.
     std::uint_fast64_t offset_in_millis = 1420070400000ULL;
+    if (millis_since_epoch < offset_in_millis) {
+        throw RuntimeError(ErrorCodes::SyncLocalClockBeforeEpoch,
+                           "Local clock cannot lag behind 2015-01-01T00:00:00Z");
+    }
     return timestamp_type(millis_since_epoch - offset_in_millis);
 }
 

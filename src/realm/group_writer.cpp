@@ -28,13 +28,10 @@
 #include <realm/disable_sync_to_disk.hpp>
 #include <realm/impl/destroy_guard.hpp>
 #include <realm/impl/simulated_failure.hpp>
-#include <realm/metrics/metric_timer.hpp>
-#include <realm/util/miscellaneous.hpp>
 #include <realm/util/safe_int_ops.hpp>
 
 using namespace realm;
 using namespace realm::util;
-using namespace realm::metrics;
 
 namespace realm {
 class InMemoryWriter : public _impl::ArrayWriterBase {
@@ -647,10 +644,6 @@ void GroupWriter::prepare_evacuation()
 
 ref_type GroupWriter::write_group()
 {
-#if REALM_METRICS
-    std::unique_ptr<MetricTimer> fsync_timer = Metrics::report_write_time(m_group);
-#endif // REALM_METRICS
-
     ALLOC_DBG_COUT("Commit nr " << m_current_version << "   ( from " << m_oldest_reachable_version << " )"
                                 << std::endl);
 
@@ -1408,10 +1401,6 @@ void GroupCommitter::commit(ref_type new_top_ref)
     // When running the test suite, device synchronization is disabled
     bool disable_sync = get_disable_sync_to_disk() || m_durability == Durability::Unsafe;
     file_header.m_top_ref[slot_selector] = new_top_ref;
-
-#if REALM_METRICS
-    std::unique_ptr<MetricTimer> fsync_timer = Metrics::report_fsync_time(m_group);
-#endif // REALM_METRICS
 
     // Make sure that that all data relating to the new snapshot is written to
     // stable storage before flipping the slot selector

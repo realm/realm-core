@@ -24,6 +24,7 @@
 #include <realm/object-store/object_schema.hpp>
 #include <realm/object-store/object_store.hpp>
 #include <realm/object-store/schema.hpp>
+#include <realm/object-store/class.hpp>
 #include <realm/object-store/sectioned_results.hpp>
 
 #include <realm/set.hpp>
@@ -54,6 +55,12 @@ Results::Results(SharedRealm r, Query q, DescriptorOrdering o)
     , m_mutex(m_realm && m_realm->is_frozen())
 {
 }
+
+Results::Results(const Class& cls)
+    : Results(cls.get_realm(), cls.get_table())
+{
+}
+
 
 Results::Results(SharedRealm r, ConstTableRef table)
     : m_realm(std::move(r))
@@ -968,6 +975,16 @@ Results Results::distinct(std::vector<std::string> const& keypaths) const
     for (auto& keypath : keypaths)
         column_keys.push_back(parse_keypath(keypath, m_realm->schema(), &get_object_schema()));
     return distinct({std::move(column_keys)});
+}
+
+Results Results::filter_by_method(std::function<bool(const Obj&)>&& predicate) const
+{
+    DescriptorOrdering new_order = m_descriptor_ordering;
+    new_order.append_filter(FilterDescriptor(std::move(predicate)));
+    util::CheckedUniqueLock lock(m_mutex);
+    if (m_mode == Mode::Collection)
+        return Results(m_realm, m_collection, std::move(new_order));
+    return Results(m_realm, do_get_query(), std::move(new_order));
 }
 
 SectionedResults Results::sectioned_results(SectionedResults::SectionKeyFunc&& section_key_func) REQUIRES(m_mutex)

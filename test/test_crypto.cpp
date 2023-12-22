@@ -7,6 +7,9 @@
 using namespace realm;
 using namespace realm::sync;
 
+// testing sync server features on mobile is not supported
+#if !REALM_MOBILE
+
 static const char test_crypto_pubkey[] = "test_pubkey.pem";
 
 static const StringData test_crypto_pubkey_data = "-----BEGIN PUBLIC KEY-----\n"
@@ -73,6 +76,7 @@ TEST(Crypto_Verify_WithKeyFromBuffer)
     BinaryData sig{test_signature, sizeof test_signature - 1};
     CHECK(key.verify(msg, sig));
 }
+#endif // REALM_MOBILE
 
 TEST(Crypto_SHA1)
 {

@@ -33,56 +33,33 @@ const char* root_certs[] = {
 #include <realm/sync/noinst/root_certs.hpp>
 };
 
-bool verify_certificate_from_root_cert(const char* root_cert, X509* server_cert)
-{
-    bool verified = false;
-    BIO* bio;
-    X509* x509;
-    EVP_PKEY* pkey;
-
-    bio = BIO_new_mem_buf(const_cast<char*>(root_cert), -1);
-    if (!bio)
-        goto out;
-
-    x509 = PEM_read_bio_X509(bio, nullptr, nullptr, nullptr);
-    if (!x509)
-        goto free_bio;
-
-    pkey = X509_get_pubkey(x509);
-    if (!pkey)
-        goto free_x509;
-
-    verified = (X509_verify(server_cert, pkey) == 1);
-
-    EVP_PKEY_free(pkey);
-free_x509:
-    X509_free(x509);
-free_bio:
-    BIO_free(bio);
-out:
-    return verified;
-}
-
-bool verify_certificate_from_root_certs(X509* server_cert, util::Logger* logger)
+void populate_cert_store_with_included_certs(X509_STORE* store, std::error_code& ec)
 {
     std::size_t num_certs = sizeof(root_certs) / sizeof(root_certs[0]);
 
-    if (logger)
-        logger->info("Verifying server SSL certificate using %1 root certificates", num_certs);
-
     for (std::size_t i = 0; i < num_certs; ++i) {
-        const char* root_cert = root_certs[i];
-        bool verified = verify_certificate_from_root_cert(root_cert, server_cert);
-        if (verified) {
-            if (logger)
-                logger->debug("Server SSL certificate verified using root certificate(%1):\n%2", i, root_cert);
-            return true;
+        ERR_clear_error();
+        BIO* bio = BIO_new_mem_buf(const_cast<char*>(root_certs[i]), -1);
+        if (REALM_UNLIKELY(!bio)) {
+            ec = std::error_code(int(ERR_get_error()), openssl_error_category);
+            return;
+        }
+
+        ERR_clear_error();
+        X509* cert = PEM_read_bio_X509_AUX(bio, nullptr, nullptr, nullptr);
+        BIO_free(bio);
+        if (REALM_UNLIKELY(!cert)) {
+            ec = std::error_code(int(ERR_get_error()), openssl_error_category);
+            return;
+        }
+
+        ERR_clear_error();
+        int ret = X509_STORE_add_cert(store, cert);
+        X509_free(cert);
+        if (REALM_UNLIKELY(ret != 1)) {
+            ec = std::error_code(int(ERR_get_error()), openssl_error_category);
         }
     }
-
-    if (logger)
-        logger->error("The server certificate was not signed by any root certificate");
-    return false;
 }
 
 #endif // REALM_INCLUDE_CERTS
@@ -371,7 +348,15 @@ void Context::ssl_use_verify_file(const std::string& path, std::error_code& ec)
     ec = std::error_code();
 }
 
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L && !defined(LIBRESSL_VERSION_NUMBER)
+#if REALM_INCLUDE_CERTS
+void Context::ssl_use_included_certificate_roots(std::error_code& ec)
+{
+    X509_STORE* store = SSL_CTX_get_cert_store(m_ssl_ctx);
+    populate_cert_store_with_included_certs(store, ec);
+}
+#endif
+
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L && !defined(LIBRESSL_VERSION_NUMBER) && !defined(OPENSSL_IS_BORINGSSL)
 class Stream::BioMethod {
 public:
     BIO_METHOD* bio_method;
@@ -602,9 +587,12 @@ void Stream::ssl_set_host_name(const std::string& host_name, std::error_code& ec
     {
         X509_VERIFY_PARAM* param = SSL_get0_param(m_ssl);
         X509_VERIFY_PARAM_set_hostflags(param, X509_CHECK_FLAG_NO_PARTIAL_WILDCARDS);
-        auto ret = X509_VERIFY_PARAM_set1_host(param, host_name.c_str(), 0);
+        auto ret = X509_VERIFY_PARAM_set1_host(param, host_name.c_str(), host_name.size());
         if (ret == 0) {
-            ec = std::error_code(int(ERR_get_error()), openssl_error_category);
+            int sys_error = int(ERR_get_error());
+            // BoringSSL can return 0 here without actually pushing on the error stack
+            REALM_ASSERT_DEBUG(sys_error != 0);
+            ec = std::error_code(sys_error, openssl_error_category);
             return;
         }
     }
@@ -624,60 +612,6 @@ void Stream::ssl_use_verify_callback(const std::function<SSLVerifyCallback>& cal
 #ifndef _WIN32
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wold-style-cast"
-#endif
-
-#if REALM_INCLUDE_CERTS
-void Stream::ssl_use_included_certificates(std::error_code&)
-{
-    REALM_ASSERT(!m_ssl_verify_callback);
-
-    SSL_set_verify(m_ssl, SSL_VERIFY_PEER, &Stream::verify_callback_using_root_certs);
-}
-
-int Stream::verify_callback_using_root_certs(int preverify_ok, X509_STORE_CTX* ctx)
-{
-    if (preverify_ok)
-        return 1;
-
-    X509* server_cert = X509_STORE_CTX_get_current_cert(ctx);
-
-    SSL* ssl = static_cast<SSL*>(X509_STORE_CTX_get_ex_data(ctx, SSL_get_ex_data_X509_STORE_CTX_idx()));
-    Stream* stream = static_cast<Stream*>(SSL_get_ex_data(ssl, 0));
-    REALM_ASSERT(stream);
-
-    util::Logger* logger = stream->logger;
-
-    const std::string& host_name = stream->m_host_name;
-    port_type server_port = stream->m_server_port;
-
-    if (logger && logger->would_log(util::Logger::Level::debug)) {
-        BIO* bio = BIO_new(BIO_s_mem());
-        if (bio) {
-            int ret = PEM_write_bio_X509(bio, server_cert);
-            if (ret) {
-                BUF_MEM* buffer;
-                BIO_get_mem_ptr(bio, &buffer);
-
-                const char* pem_data = buffer->data;
-                std::size_t pem_size = buffer->length;
-
-                logger->debug("Verifying server SSL certificate using root certificates, "
-                              "host name = %1, server port = %2, certificate =\n%3",
-                              host_name, server_port, StringData{pem_data, pem_size});
-            }
-            BIO_free(bio);
-        }
-    }
-
-    bool valid = verify_certificate_from_root_certs(server_cert, logger);
-    if (!valid && logger) {
-        logger->error("server SSL certificate rejected using root certificates, "
-                      "host name = %1, server port = %2",
-                      host_name, server_port);
-    }
-
-    return int(valid);
-}
 #endif
 
 int Stream::verify_callback_using_delegate(int preverify_ok, X509_STORE_CTX* ctx) noexcept
@@ -836,6 +770,11 @@ long Stream::bio_ctrl(BIO*, int cmd, long, void*) noexcept
         case BIO_CTRL_FLUSH:
             // Ignoring in alignment with `crypto/bio/bss_sock.c` of OpenSSL.
             return 1;
+#if OPENSSL_VERSION_NUMBER >= 0x30000000L
+        case BIO_CTRL_GET_KTLS_SEND:
+        case BIO_CTRL_GET_KTLS_RECV:
+            return 0;
+#endif
         default:
             REALM_ASSERT_EX(false, "Got BIO_ctrl with unknown command %d", cmd);
     }

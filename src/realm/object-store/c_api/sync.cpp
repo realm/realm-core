@@ -264,6 +264,7 @@ RLM_API void realm_sync_config_set_error_handler(realm_sync_config_t* config, re
         c_error.server_requests_action = static_cast<realm_sync_error_action_e>(error.server_requests_action);
         c_error.c_original_file_path_key = error.c_original_file_path_key;
         c_error.c_recovery_file_path_key = error.c_recovery_file_path_key;
+        c_error.user_code_error = ErrorStorage::get_thread_local()->get_and_clear_user_code_error();
 
         std::vector<realm_sync_error_user_info_t> c_user_info;
         c_user_info.reserve(error.user_info.size());
@@ -388,7 +389,7 @@ RLM_API void realm_sync_config_set_before_client_reset_handler(realm_sync_config
     auto cb = [callback, userdata = SharedUserdata(userdata, FreeUserdata(userdata_free))](SharedRealm before_realm) {
         realm_t r1{before_realm};
         if (!callback(userdata.get(), &r1)) {
-            throw CallbackFailed();
+            throw CallbackFailed{};
         }
     };
     config->notify_before_client_reset = std::move(cb);
@@ -404,7 +405,7 @@ RLM_API void realm_sync_config_set_after_client_reset_handler(realm_sync_config_
         realm_t r1{before_realm};
         auto tsr = realm_t::thread_safe_reference(std::move(after_realm));
         if (!callback(userdata.get(), &r1, &tsr, did_recover)) {
-            throw CallbackFailed();
+            throw CallbackFailed{};
         }
     };
     config->notify_after_client_reset = std::move(cb);
@@ -609,13 +610,7 @@ RLM_API bool realm_sync_subscription_set_erase_by_id(realm_flx_sync_mutable_subs
     REALM_ASSERT(subscription_set != nullptr && id != nullptr);
     *erased = false;
     return wrap_err([&] {
-        auto it = std::find_if(subscription_set->begin(), subscription_set->end(), [id](const Subscription& sub) {
-            return from_capi(*id) == sub.id;
-        });
-        if (it != subscription_set->end()) {
-            subscription_set->erase(it);
-            *erased = true;
-        }
+        *erased = subscription_set->erase_by_id(from_capi(*id));
         return true;
     });
 }
@@ -651,6 +646,18 @@ RLM_API bool realm_sync_subscription_set_erase_by_results(realm_flx_sync_mutable
     return wrap_err([&]() {
         auto realm_query = add_ordering_to_realm_query(results->get_query(), results->get_ordering());
         *erased = subscription_set->erase(realm_query);
+        return true;
+    });
+}
+
+RLM_API bool
+realm_sync_subscription_set_erase_by_class_name(realm_flx_sync_mutable_subscription_set_t* subscription_set,
+                                                const char* object_class_name, bool* erased)
+{
+    REALM_ASSERT(subscription_set != nullptr && object_class_name != nullptr);
+    *erased = false;
+    return wrap_err([&]() {
+        *erased = subscription_set->erase_by_class_name(object_class_name);
         return true;
     });
 }

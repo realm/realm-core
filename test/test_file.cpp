@@ -575,6 +575,31 @@ TEST(File_GetUniqueID)
     uid4_1 = uid4_2;
     CHECK_NOT(uid4_1 < uid4_2);
     CHECK_NOT(uid4_2 < uid4_1);
+
+    file1_1.resize(0);
+    file2_1.resize(0);
+    file2_1.resize(1);
+    file1_1.resize(1);
+    if (!test_util::test_dir_is_exfat()) {
+        CHECK(uid1_1 == file1_1.get_unique_id());
+        CHECK(uid2_1 == file2_1.get_unique_id());
+    }
+    else {
+        std::string message = "The unique id of this Realm file has changed unexpectedly, this could be due to "
+                              "modifications by an external process";
+        std::string expected_1 = util::format("%1 '%2'", message, file1_1.get_path());
+        std::string expected_2 = util::format("%1 '%2'", message, file2_1.get_path());
+        // fat32/exfat could reuse or reassign uid after truncate
+        // there is not much to guarantee about the values of uids
+        // Our File class should detect this situation and throw an error.
+        // Once a Realm has been opened it should never be truncated to 0 so this is not expected
+        // to ever be thrown in normal Realm usage.
+        // One example of where this has caused problems is that the encryption layer stores
+        // encrypted mappings by a file's unique id. If the ids are not actually unique, then
+        // writes from one Realm may get placed into another Realm's mapping.
+        CHECK_THROW_EX(file1_1.get_unique_id(), FileAccessError, e.what() == expected_1);
+        CHECK_THROW_EX(file2_1.get_unique_id(), FileAccessError, e.what() == expected_2);
+    }
 }
 
 TEST(File_Temp)

@@ -285,9 +285,7 @@ private:
 
     static Mixed unresolved_to_null(Mixed value) noexcept
     {
-        if (value.is_type(type_TypedLink) && value.is_unresolved_link())
-            return Mixed{};
-        return value;
+        return value.is_unresolved_link() ? Mixed{} : value;
     }
     T do_get(size_t ndx, const char* msg) const;
 };
@@ -488,6 +486,8 @@ public:
     {
         return m_list.get_tree();
     }
+
+    void replace_link(ObjKey old_link, ObjKey new_link);
 
 private:
     friend class TableView;

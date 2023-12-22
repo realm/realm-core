@@ -57,10 +57,6 @@ class TableView;
 class Timestamp;
 class Transaction;
 
-namespace metrics {
-class QueryInfo;
-}
-
 struct QueryGroup {
     enum class State {
         Default,
@@ -379,7 +375,6 @@ private:
     friend class TableView;
     friend class SubQueryCount;
     friend class PrimitiveListCount;
-    friend class metrics::QueryInfo;
     template <class>
     friend class AggregateHelper;
 

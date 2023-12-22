@@ -2,37 +2,34 @@
 #ifndef REALM_NOINST_CLIENT_IMPL_BASE_HPP
 #define REALM_NOINST_CLIENT_IMPL_BASE_HPP
 
-#include <cstdint>
-#include <utility>
-#include <functional>
-#include <deque>
-#include <map>
-#include <string>
-#include <random>
-#include <list>
+#include <realm/sync/client_base.hpp>
 
 #include <realm/binary_data.hpp>
-#include <realm/util/optional.hpp>
-#include <realm/util/buffer_stream.hpp>
-#include <realm/util/logger.hpp>
-#include <realm/util/tagged_bool.hpp>
-#include <realm/sync/network/network_ssl.hpp>
+#include <realm/sync/history.hpp>
 #include <realm/sync/network/default_socket.hpp>
-#include <realm/util/span.hpp>
+#include <realm/sync/network/network_ssl.hpp>
 #include <realm/sync/noinst/client_history_impl.hpp>
-#include <realm/sync/noinst/client_reset_operation.hpp>
+#include <realm/sync/noinst/migration_store.hpp>
 #include <realm/sync/noinst/migration_store.hpp>
 #include <realm/sync/noinst/protocol_codec.hpp>
-#include <realm/sync/client_base.hpp>
-#include <realm/sync/history.hpp>
 #include <realm/sync/protocol.hpp>
 #include <realm/sync/subscriptions.hpp>
 #include <realm/sync/trigger.hpp>
-#include <realm/sync/noinst/migration_store.hpp>
+#include <realm/util/buffer_stream.hpp>
+#include <realm/util/logger.hpp>
+#include <realm/util/optional.hpp>
+#include <realm/util/span.hpp>
 
+#include <cstdint>
+#include <deque>
+#include <functional>
+#include <list>
+#include <map>
+#include <random>
+#include <string>
+#include <utility>
 
-namespace realm {
-namespace sync {
+namespace realm::sync {
 
 // (protocol, address, port, session_multiplex_ident)
 //
@@ -162,7 +159,6 @@ public:
     using port_type = network::Endpoint::port_type;
     using OutputBuffer = util::ResettableExpandableBufferOutputStream;
     using ClientProtocol = _impl::ClientProtocol;
-    using ClientResetOperation = _impl::ClientResetOperation;
     using RandomEngine = std::mt19937_64;
 
     /// Per-server endpoint information used to determine reconnect delays.
@@ -426,7 +422,7 @@ public:
     ///
     /// Prior to being activated, no messages will be sent or received on behalf
     /// of this session, and the associated Realm file will not be accessed,
-    /// i.e., Session::access_realm() will not be called.
+    /// i.e., `Session::get_db()` will not be called.
     ///
     /// If activation is successful, the connection keeps the session alive
     /// until the application calls initiated_session_deactivation() or until
@@ -449,7 +445,7 @@ public:
     /// initiate_session_deactivation().
     ///
     /// After the initiation of the deactivation process, the associated Realm
-    /// file will no longer be accessed, i.e., access_realm() will not be called
+    /// file will no longer be accessed, i.e., `get_db()` will not be called
     /// again, and a previously returned reference will also not be accessed
     /// again.
     ///
@@ -836,9 +832,6 @@ public:
     /// of the normal sync process. This can happen during client reset.
     void on_flx_sync_version_complete(int64_t version);
 
-    /// \brief Callback for when a new subscription set has been created for FLX sync.
-    void on_new_flx_subscription_set(int64_t new_version);
-
     /// If this session is currently suspended, resume it immediately.
     ///
     /// It is an error to call this function before activation of the session,
@@ -847,12 +840,8 @@ public:
 
     /// To be used in connection with implementations of
     /// initiate_integrate_changesets().
-    ///
-    /// This function is thread-safe, but if called from a thread other than the
-    /// event loop thread of the associated client object, the specified history
-    /// accessor must **not** be the one made available by access_realm().
-    void integrate_changesets(ClientReplication&, const SyncProgress&, std::uint_fast64_t downloadable_bytes,
-                              const ReceivedChangesets&, VersionInfo&, DownloadBatchState last_in_batch);
+    void integrate_changesets(const SyncProgress&, std::uint_fast64_t downloadable_bytes, const ReceivedChangesets&,
+                              VersionInfo&, DownloadBatchState last_in_batch);
 
     /// To be used in connection with implementations of
     /// initiate_integrate_changesets().
@@ -885,8 +874,6 @@ public:
     util::Future<std::string> send_test_command(std::string body);
 
 private:
-    using SyncTransactReporter = ClientHistory::SyncTransactReporter;
-
     struct PendingTestCommand {
         request_ident_type id;
         std::string body;
@@ -905,19 +892,11 @@ private:
     const std::string& get_virt_path() const noexcept;
 
     const std::string& get_realm_path() const noexcept;
-    DBRef get_db() const noexcept;
-    SyncTransactReporter* get_transact_reporter() noexcept;
 
-    /// The implementation need only ensure that the returned reference stays valid
-    /// until the next invocation of access_realm() on one of the session
-    /// objects associated with the same client object.
-    ///
-    /// This function is always called by the event loop thread of the
-    /// associated client object.
-    ///
-    /// This function is guaranteed to not be called before activation, and also
-    /// not after initiation of deactivation.
-    ClientReplication& access_realm();
+    // Can only be called if the session is active or being activated
+    DBRef get_db() const noexcept;
+    ClientReplication& get_repl() const noexcept;
+    ClientHistory& get_history() const noexcept;
 
     // client_reset_config() returns the config for client
     // reset. If it returns none, ordinary sync is used. If it returns a
@@ -940,10 +919,6 @@ private:
     /// progress has been persisted, this function must provide for
     /// on_changesets_integrated() to be called without unnecessary delay,
     /// although never after initiation of session deactivation.
-    ///
-    /// The integration of the specified changesets must happen by means of an
-    /// invocation of integrate_changesets(), but not necessarily using the
-    /// history accessor made available by access_realm().
     ///
     /// The implementation is allowed, but not obliged to aggregate changesets
     /// from multiple invocations of initiate_integrate_changesets() and pass
@@ -1017,7 +992,10 @@ private:
     // Processes any pending FLX bootstraps, if one exists. Otherwise this is a noop.
     void process_pending_flx_bootstrap();
 
+    bool client_reset_if_needed();
     void handle_pending_client_reset_acknowledgement();
+
+    void update_subscription_version_info();
 
     void gather_pending_compensating_writes(util::Span<Changeset> changesets, std::vector<ProtocolErrorInfo>* out);
 
@@ -1074,8 +1052,8 @@ private:
     // `ident == 0` means unassigned.
     SaltedFileIdent m_client_file_ident = {0, 0};
 
-    // m_client_reset_operation stores state for the lifetime of a client reset
-    std::unique_ptr<ClientResetOperation> m_client_reset_operation;
+    // True while this session is in the process of performing a client reset.
+    bool m_performing_client_reset = false;
 
     // The latest sync progress reported by the server via a DOWNLOAD
     // message. See struct SyncProgress for a description. The values stored in
@@ -1090,30 +1068,18 @@ private:
     SyncProgress m_progress;
 
     // In general, the local version produced by the last changeset in the local
-    // history. The uploading process will never advance beyond this point. The
-    // changeset that produced this version may, or may not contain changes of
-    // local origin.
+    // history. The changeset that produced this version may, or may not
+    // contain changes of local origin.
     //
     // It is set to the current version of the local Realm at session activation
     // time (although always zero for the initial empty Realm
-    // state). Thereafter, it is generally updated when the application calls
-    // recognize_sync_version() and when changesets are received from the server
-    // and integrated locally.
+    // state). Thereafter, it is updated when the application calls
+    // recognize_sync_version(), when changesets are received from the server
+    // and integrated locally, and when the uploading process discovers newer
+    // versions.
     //
     // INVARIANT: m_progress.upload.client_version <= m_last_version_available
     version_type m_last_version_available = 0;
-
-    // The target version for the upload process. When the upload cursor
-    // (`m_upload_progress`) reaches `m_upload_target_version`, uploading stops.
-    //
-    // In general, `m_upload_target_version` follows `m_last_version_available`
-    // as it is increased, but in some cases, `m_upload_target_version` will be
-    // kept fixed for a while in order to constrain the uploading process.
-    //
-    // Is set equal to `m_last_version_available` at session activation time.
-    //
-    // INVARIANT: m_upload_target_version <= m_last_version_available
-    version_type m_upload_target_version = 0;
 
     // In general, this is the position in the history reached while scanning
     // for changesets to be uploaded.
@@ -1121,10 +1087,9 @@ private:
     // Set to `m_progress.upload` at session activation time and whenever the
     // connection to the server is lost. When the connection is established, the
     // scanning for changesets to be uploaded then progresses from there towards
-    // `m_upload_target_version`.
+    // `m_last_version_available`.
     //
     // INVARIANT: m_progress.upload.client_version <= m_upload_progress.client_version
-    // INVARIANT: m_upload_progress.client_version <= m_upload_target_version
     UploadCursor m_upload_progress = {0, 0};
 
     // Set to `m_progress.upload.client_version` at session activation time and
@@ -1447,8 +1412,8 @@ inline void ClientImpl::Session::request_download_completion_notification()
 
     // Since the deactivation process has not been initiated, the UNBIND message
     // cannot have been sent unless an ERROR message was received.
-    REALM_ASSERT(m_suspended || !m_unbind_message_sent);
-    if (m_ident_message_sent && !m_suspended)
+    REALM_ASSERT(m_error_message_received || !m_unbind_message_sent);
+    if (m_ident_message_sent && !m_error_message_received)
         ensure_enlisted_to_send(); // Throws
 }
 
@@ -1475,7 +1440,6 @@ inline bool ClientImpl::Session::do_recognize_sync_version(version_type version)
 {
     if (REALM_LIKELY(version > m_last_version_available)) {
         m_last_version_available = version;
-        m_upload_target_version = version;
         return true;
     }
     return false;
@@ -1635,7 +1599,6 @@ inline void ClientImpl::Session::enlist_to_send()
     m_conn.enlist_to_send(this); // Throws
 }
 
-} // namespace sync
-} // namespace realm
+} // namespace realm::sync
 
 #endif // REALM_NOINST_CLIENT_IMPL_BASE_HPP

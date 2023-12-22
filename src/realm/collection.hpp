@@ -124,6 +124,22 @@ public:
         return get_table()->get_column_name(get_col_key());
     }
 
+    bool operator==(const CollectionBase& other) const noexcept
+    {
+        return get_table() == other.get_table() && get_owner_key() == other.get_owner_key() &&
+               get_col_key() == other.get_col_key();
+    }
+
+    bool operator!=(const CollectionBase& other) const noexcept
+    {
+        return !(*this == other);
+    }
+
+    // These are shadowed by typed versions in subclasses
+    using value_type = Mixed;
+    CollectionIterator<CollectionBase> begin() const;
+    CollectionIterator<CollectionBase> end() const;
+
 protected:
     friend class Transaction;
     CollectionBase() noexcept = default;
@@ -368,17 +384,6 @@ public:
     using Interface::get_table;
     using Interface::get_target_table;
 
-    bool operator==(const CollectionBaseImpl& other) const noexcept
-    {
-        return get_table() == other.get_table() && get_owner_key() == other.get_owner_key() &&
-               get_col_key() == other.get_col_key();
-    }
-
-    bool operator!=(const CollectionBaseImpl& other) const noexcept
-    {
-        return !(*this == other);
-    }
-
 protected:
     Obj m_obj;
     ColKey m_col_key;
@@ -596,6 +601,11 @@ protected:
         return _impl::real2virtual(m_unresolved, ndx);
     }
 
+    bool real_is_unresolved(size_t ndx) const noexcept
+    {
+        return std::find(m_unresolved.begin(), m_unresolved.end(), ndx) != m_unresolved.end();
+    }
+
     /// Rebuild the list of tombstones if there is a possibility that it has
     /// changed.
     ///
@@ -679,7 +689,12 @@ struct CollectionIterator {
 
     pointer operator->() const
     {
-        m_val = m_list->get(m_ndx);
+        if constexpr (std::is_same_v<L, CollectionBase>) {
+            m_val = m_list->get_any(m_ndx);
+        }
+        else {
+            m_val = m_list->get(m_ndx);
+        }
         return &m_val;
     }
 
@@ -764,6 +779,16 @@ private:
     const L* m_list;
     size_t m_ndx = size_t(-1);
 };
+
+
+inline CollectionIterator<CollectionBase> CollectionBase::begin() const
+{
+    return CollectionIterator<CollectionBase>(this, 0);
+}
+inline CollectionIterator<CollectionBase> CollectionBase::end() const
+{
+    return CollectionIterator<CollectionBase>(this, size());
+}
 
 namespace _impl {
 size_t get_collection_size_from_ref(ref_type, Allocator& alloc);

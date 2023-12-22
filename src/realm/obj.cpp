@@ -320,6 +320,23 @@ T Obj::_get(ColKey::Idx col_ndx) const
     return values.get(m_row_ndx);
 }
 
+Mixed Obj::get_unfiltered_mixed(ColKey::Idx col_ndx) const
+{
+    ArrayMixed values(get_alloc());
+    ref_type ref = to_ref(Array::get(m_mem.get_addr(), col_ndx.val + 1));
+    values.init_from_ref(ref);
+
+    return values.get(m_row_ndx);
+}
+
+template <>
+Mixed Obj::_get<Mixed>(ColKey::Idx col_ndx) const
+{
+    _update_if_needed();
+    Mixed m = get_unfiltered_mixed(col_ndx);
+    return m.is_unresolved_link() ? Mixed{} : m;
+}
+
 template <>
 ObjKey Obj::_get<ObjKey>(ColKey::Idx col_ndx) const
 {
@@ -684,7 +701,7 @@ ObjKey Obj::get_backlink(const Table& origin, ColKey origin_col_key, size_t back
     return get_backlink(backlink_col_key, backlink_ndx);
 }
 
-TableView Obj::get_backlink_view(TableRef src_table, ColKey src_col_key)
+TableView Obj::get_backlink_view(TableRef src_table, ColKey src_col_key) const
 {
     TableView tv(src_table, src_col_key, *this);
     tv.do_sync();
@@ -1286,7 +1303,7 @@ Obj& Obj::set<Mixed>(ColKey col_key, Mixed value, bool is_default)
         throw InvalidArgument(ErrorCodes::TypeMismatch, "Link must be fully qualified");
     }
 
-    Mixed old_value = get<Mixed>(col_key);
+    Mixed old_value = get_unfiltered_mixed(col_ndx);
     ObjLink old_link{};
     ObjLink new_link{};
     if (old_value.is_type(type_TypedLink)) {
@@ -1308,7 +1325,7 @@ Obj& Obj::set<Mixed>(ColKey col_key, Mixed value, bool is_default)
     // The following check on unresolved is just a precaution as it should not
     // be possible to hit that while Mixed is not a supported primary key type.
     if (index && !m_key.is_unresolved()) {
-        index->set<Mixed>(m_key, value);
+        index->set<Mixed>(m_key, value.is_unresolved_link() ? Mixed() : value);
     }
 
     Allocator& alloc = get_alloc();
@@ -2219,7 +2236,7 @@ LinkCollectionPtr Obj::get_linkcollection_ptr(ColKey col_key) const
     return {};
 }
 
-void Obj::assign_pk_and_backlinks(const Obj& other)
+void Obj::assign_pk_and_backlinks(Obj& other)
 {
     struct LinkReplacer : LinkTranslator {
         LinkReplacer(Obj origin, ColKey origin_col_key, const Obj& dest_orig, const Obj& dest_replace)
@@ -2230,11 +2247,8 @@ void Obj::assign_pk_and_backlinks(const Obj& other)
         }
         void on_list_of_links(LnkLst&) final
         {
-            // using Lst<ObjKey> for direct access without hiding unresolved keys
-            auto list = m_origin_obj.get_list<ObjKey>(m_origin_col_key);
-            auto n = list.find_first(m_dest_orig.get_key());
-            REALM_ASSERT(n != realm::npos);
-            list.set(n, m_dest_replace.get_key());
+            auto linklist = m_origin_obj.get_linklist(m_origin_col_key);
+            linklist.replace_link(m_dest_orig.get_key(), m_dest_replace.get_key());
         }
         void on_list_of_mixed(Lst<Mixed>& list) final
         {
@@ -2276,7 +2290,12 @@ void Obj::assign_pk_and_backlinks(const Obj& other)
         void on_link_property(ColKey col) final
         {
             REALM_ASSERT(!m_origin_obj.get<ObjKey>(col) || m_origin_obj.get<ObjKey>(col) == m_dest_orig.get_key());
-            m_origin_obj.set(col, m_dest_replace.get_key());
+            // Handle links as plain integers. Backlinks has been taken care of.
+            // Be careful here - links are stored as value + 1 so that null link (-1) will be 0
+            auto new_key = m_dest_replace.get_key();
+            m_origin_obj.set_int(col, new_key.value + 1);
+            if (Replication* repl = m_origin_obj.get_replication())
+                repl->set(m_origin_obj.get_table().unchecked_ptr(), col, m_origin_obj.get_key(), new_key);
         }
         void on_mixed_property(ColKey col) final
         {
@@ -2308,9 +2327,19 @@ void Obj::assign_pk_and_backlinks(const Obj& other)
             // Object has been deleted - we are done
             return IteratorControl::Stop;
         }
+
         auto t = m_table->get_opposite_table(col);
         auto c = m_table->get_opposite_column(col);
         auto backlinks = other.get_all_backlinks(col);
+
+        if ((!c.is_collection() && c.get_type() == col_type_Link) || c.get_type() == col_type_LinkList) {
+            // Transfer the backlinks from tombstone to live object
+            REALM_ASSERT(_get<int64_t>(col.get_index()) == 0);
+            auto other_val = other._get<int64_t>(col.get_index());
+            set_int(col, other_val);
+            other.set_int(col, 0);
+        }
+
         for (auto bl : backlinks) {
             auto linking_obj = t->get_object(bl);
             LinkReplacer replacer{linking_obj, c, other, *this};

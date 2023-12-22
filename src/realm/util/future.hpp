@@ -844,7 +844,7 @@ public:
         }
     }
 
-    /*
+    /**
      * Callbacks passed to on_completion() are always called with a StatusWith<T> when the input future completes.
      */
     template <typename Func>
