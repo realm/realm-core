@@ -868,10 +868,8 @@ TEST(Unresolved_PerformanceLinkList)
     CHECK(t2 > t1);
     // std::cout << "Time: " << duration_cast<microseconds>(t2 - t1).count() << " us" << std::endl;
     tr->promote_to_write();
-
-    // THIS IS CAUSING HAVOC... todo investigate!!!
-    // ArrayWithFind is failing for a type A array, we need to understand why!!! it should be equivalent to the old
-    // code tr->verify();
+    // THIS IS CAUSING HAVOC... todo investigate, apparently it is for a type A array!!!
+    // tr->verify();
 }
 
 #endif

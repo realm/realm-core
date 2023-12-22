@@ -49,7 +49,7 @@ inline void ArrayUnsigned::_set(size_t ndx, uint8_t width, uint64_t value)
     if (is_encoded()) {
         m_encode.set_direct(*this, ndx, value);
     }
-    if (width == 8) {
+    else if (width == 8) {
         reinterpret_cast<uint8_t*>(m_data)[ndx] = uint8_t(value);
     }
     else if (width == 16) {

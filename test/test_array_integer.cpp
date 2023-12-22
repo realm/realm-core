@@ -112,11 +112,12 @@ TEST(Test_ArrayInt_encode_decode_needed)
     CHECK(a.get(3) == 10);
     CHECK(a.get(4) == 15);
     CHECK(a1.is_encoded());
-    CHECK(a1.get(0) == 10);
-    CHECK(a1.get(1) == 5);
-    CHECK(a1.get(2) == 5);
-    CHECK(a1.get(3) == 10);
-    CHECK(a1.get(4) == 15);
+    auto v = a1.get(0);
+    CHECK(v == a.get(0));
+    CHECK(a1.get(1) == a.get(1));
+    CHECK(a1.get(2) == a.get(2));
+    CHECK(a1.get(3) == a.get(3));
+    CHECK(a1.get(4) == a.get(4));
     a.destroy();
     a1.destroy();
 }

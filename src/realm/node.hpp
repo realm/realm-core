@@ -216,17 +216,17 @@ public:
     void destroy() noexcept;
 
     /// Shorthand for `destroy(MemRef(ref, alloc), alloc)`.
-    //    static void destroy(ref_type ref, Allocator& alloc) noexcept
-    //    {
-    //        destroy(MemRef(ref, alloc), alloc);
-    //    }
-    //
-    //    /// Destroy only the specified array node, not its children. See also
-    //    /// destroy_deep(MemRef, Allocator&).
-    //    static void destroy(MemRef mem, Allocator& alloc) noexcept
-    //    {
-    //        alloc.free_(mem);
-    //    }
+    static void destroy(ref_type ref, Allocator& alloc) noexcept
+    {
+        destroy(MemRef(ref, alloc), alloc);
+    }
+
+    /// Destroy only the specified array node, not its children. See also
+    /// destroy_deep(MemRef, Allocator&).
+    static void destroy(MemRef mem, Allocator& alloc) noexcept
+    {
+        alloc.free_(mem);
+    }
 
 
     /// Setting a new parent affects ownership of the attached array node, if

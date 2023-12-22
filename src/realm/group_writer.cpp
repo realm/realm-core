@@ -711,9 +711,7 @@ ref_type GroupWriter::write_group()
             top.set_as_ref(Group::s_evacuation_point_ndx, ref);
         }
         else if (ref) {
-            Array destroy_array(m_alloc);
-            destroy_array.init_from_ref(ref);
-            destroy_array.destroy();
+            Array::destroy(ref_type(ref), m_alloc);
             top.set(Group::s_evacuation_point_ndx, 0);
         }
     }

@@ -206,7 +206,7 @@ inline void ArrayIntNull::set_null(size_t ndx)
 
 inline ArrayIntNull::value_type ArrayIntNull::get(size_t ndx) const noexcept
 {
-    int64_t value = Array::get(ndx + 1); //
+    int64_t value = Array::get(ndx + 1);
     if (value == null_value()) {
         return util::none;
     }

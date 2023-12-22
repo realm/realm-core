@@ -311,18 +311,16 @@ TEST_CASE("notifications: async delivery", "[notifications]") {
         }
 
         SECTION("Notify of object additions done in long reclaimed versions") {
-            //            r->notify();
-            //            REQUIRE(notification_calls == 2);
-            //            REQUIRE(saved_changes.insertions.count() == 1);
-            //            for (int j = 0; j < 100; ++j) {
-            //                make_remote_object_addition();
-            //            }
-            //            coordinator->on_change();
-            //            r->notify();
-            //            REQUIRE(notification_calls == 3);
-            //            this fails with 105 instead of 100, need to check insertions.count() and
-            //            and what it is doing
-            //            REQUIRE(saved_changes.insertions.count() == 100); //this fails with 105..
+            r->notify();
+            REQUIRE(notification_calls == 2);
+            REQUIRE(saved_changes.insertions.count() == 1);
+            for (int j = 0; j < 100; ++j) {
+                make_remote_object_addition();
+            }
+            coordinator->on_change();
+            r->notify();
+            REQUIRE(notification_calls == 3);
+            // REQUIRE(saved_changes.insertions.count() == 100); //this fails with 105..
         }
     }
 
