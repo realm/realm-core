@@ -440,6 +440,27 @@ void LnkLst::remove_all_target_rows()
     }
 }
 
+void LnkLst::replace_link(ObjKey old_val, ObjKey new_val)
+{
+    update_if_needed();
+    auto tree = m_list.m_tree.get();
+    auto n = tree->find_first(old_val);
+    REALM_ASSERT(n != realm::npos);
+    if (Replication* repl = get_obj().get_replication()) {
+        repl->list_set(m_list, n, new_val);
+    }
+    tree->set(n, new_val);
+    m_list.bump_content_version();
+    if (new_val.is_unresolved()) {
+        if (!old_val.is_unresolved()) {
+            tree->set_context_flag(true);
+        }
+    }
+    else {
+        _impl::check_for_last_unresolved(tree);
+    }
+}
+
 // Force instantiation:
 template class Lst<ObjKey>;
 template class Lst<Mixed>;

@@ -487,6 +487,8 @@ public:
         return m_list.get_tree();
     }
 
+    void replace_link(ObjKey old_link, ObjKey new_link);
+
 private:
     friend class TableView;
     friend class Query;
