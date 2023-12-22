@@ -389,8 +389,10 @@ void RealmCoordinator::do_get_realm(RealmConfig&& config, std::shared_ptr<Realm>
         if (!first_time_open)
             first_time_open = db_created;
         if (subscription_version == 0 || (first_time_open && rerun_on_open)) {
-            // if the tasks is cancelled, the subscription may or may not be run.
+            bool was_in_read = realm->is_in_read_transaction();
             subscription_function(realm);
+            if (!was_in_read)
+                realm->invalidate();
         }
     }
 #endif
@@ -533,7 +535,8 @@ void RealmCoordinator::init_external_helpers()
     // happens on background threads, so to avoid needing locking on every access
     // we have to wire things up in a specific order.
 #if REALM_ENABLE_SYNC
-    // We may have reused an existing sync session that outlived its original RealmCoordinator
+    // We may have reused an existing sync session that outlived its original
+    // RealmCoordinator. If not, we need to create a new one now.
     if (m_config.sync_config && !m_sync_session)
         m_sync_session = m_config.sync_config->user->sync_manager()->get_session(m_db, m_config);
 #endif
@@ -548,18 +551,7 @@ void RealmCoordinator::init_external_helpers()
                                   ex.code().value());
         }
     }
-
-#if REALM_ENABLE_SYNC
-    if (m_sync_session) {
-        std::weak_ptr<RealmCoordinator> weak_self = shared_from_this();
-        SyncSession::Internal::set_sync_transact_callback(*m_sync_session, [weak_self](VersionID, VersionID) {
-            if (auto self = weak_self.lock()) {
-                if (self->m_notifier)
-                    self->m_notifier->notify_others();
-            }
-        });
-    }
-#endif
+    m_db->add_commit_listener(this);
 }
 
 void RealmCoordinator::close()
@@ -649,11 +641,17 @@ RealmCoordinator::~RealmCoordinator()
             }
         }
     }
-    // Waits for the worker thread to join
-    m_notifier = nullptr;
 
-    // Ensure the notifiers aren't holding on to Transactions after we destroy
-    // the History object the DB depends on
+    if (m_db) {
+        m_db->remove_commit_listener(this);
+    }
+
+    // Waits for the worker thread to join
+    m_notifier.reset();
+
+    // If there's any active NotificationTokens they'll keep the notifiers alive,
+    // so tell the notifiers to release their Transactions so that the DB can
+    // be closed immediately.
     // No locking needed here because the worker thread is gone
     for (auto& notifier : m_new_notifiers)
         notifier->release_data();
@@ -789,16 +787,6 @@ void RealmCoordinator::commit_write(Realm& realm, bool commit_to_disk)
         }
     }
 
-#if REALM_ENABLE_SYNC
-    // Realm could be closed in did_change. So send sync notification first before did_change.
-    if (m_sync_session) {
-        SyncSession::Internal::nonsync_transact_notify(*m_sync_session, new_version.version);
-    }
-#endif
-    if (m_notifier) {
-        m_notifier->notify_others();
-    }
-
     if (realm.m_binding_context) {
         realm.m_binding_context->did_change({}, {});
     }
@@ -865,6 +853,13 @@ void RealmCoordinator::clean_up_dead_notifiers()
         m_notifier_skip_version.reset();
     }
     swap_remove(m_new_notifiers);
+}
+
+void RealmCoordinator::on_commit(DB::version_type)
+{
+    if (m_notifier) {
+        m_notifier->notify_others();
+    }
 }
 
 void RealmCoordinator::on_change()

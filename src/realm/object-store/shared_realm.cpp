@@ -50,6 +50,9 @@
 #include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/history.hpp>
 #endif
+#ifdef REALM_DEBUG
+#include <iostream>
+#endif
 
 #include <thread>
 
@@ -351,6 +354,31 @@ Schema Realm::get_full_schema()
     if (!got_cached || version != transaction().get_version_of_current_transaction().version)
         return ObjectStore::schema_from_group(read_group());
     return actual_schema;
+}
+
+bool Realm::is_empty()
+{
+    return ObjectStore::is_empty(read_group());
+}
+
+Class Realm::get_class(StringData object_type)
+{
+    auto it = m_schema.find(object_type);
+    if (it == m_schema.end()) {
+        throw LogicError(ErrorCodes::NoSuchTable, util::format("No type '%1'", object_type));
+    }
+    return {shared_from_this(), &*it};
+}
+
+std::vector<Class> Realm::get_classes()
+{
+    std::vector<Class> ret;
+    ret.reserve(m_schema.size());
+    auto r = shared_from_this();
+    for (auto& os : m_schema) {
+        ret.emplace_back(r, &os);
+    }
+    return ret;
 }
 
 void Realm::set_schema_subset(Schema schema)
@@ -1395,3 +1423,230 @@ AuditInterface* Realm::audit_context() const noexcept
 {
     return m_coordinator ? m_coordinator->audit_context() : nullptr;
 }
+
+namespace {
+
+/*********************************** PropId **********************************/
+
+// The KeyPathResolver will build up a tree of these objects starting with the
+// first property. If a wildcard specifier is part of the path, one object can
+// have several children.
+struct PropId {
+    PropId(TableKey tk, ColKey ck, const Property* prop, const ObjectSchema* os, bool b)
+        : table_key(tk)
+        , col_key(ck)
+        , origin_prop(prop)
+        , target_schema(os)
+        , mandatory(b)
+    {
+    }
+    void expand(KeyPath& key_path, KeyPathArray& key_path_array) const;
+
+    TableKey table_key;
+    ColKey col_key;
+    const Property* origin_prop;
+    const ObjectSchema* target_schema;
+    std::vector<PropId> children;
+    bool mandatory;
+};
+
+// This function will create one KeyPath entry in key_path_array for every
+// branch in the tree,
+void PropId::expand(KeyPath& key_path, KeyPathArray& key_path_array) const
+{
+    key_path.emplace_back(table_key, col_key);
+    if (children.empty()) {
+        key_path_array.push_back(key_path);
+    }
+    else {
+        for (auto& child : children) {
+            child.expand(key_path, key_path_array);
+        }
+    }
+    key_path.pop_back();
+}
+
+/****************************** KeyPathResolver ******************************/
+
+class KeyPathResolver {
+public:
+    KeyPathResolver(Group& g, const Schema& schema)
+        : m_group(g)
+        , m_schema(schema)
+    {
+    }
+
+    void resolve(const ObjectSchema* object_schema, const char* path)
+    {
+        m_full_path = path;
+        if (!_resolve(m_root_props, object_schema, path, true)) {
+            throw InvalidArgument(util::format("'%1' does not resolve in any valid key paths.", m_full_path));
+        }
+    }
+
+    void expand(KeyPathArray& key_path_array) const
+    {
+        for (auto& elem : m_root_props) {
+            KeyPath key_path;
+            key_path.reserve(4);
+            elem.expand(key_path, key_path_array);
+        }
+    }
+
+private:
+    std::pair<ColKey, const ObjectSchema*> get_col_key(const Property* prop);
+    bool _resolve(std::vector<PropId>& props, const ObjectSchema* object_schema, const char* path, bool mandatory);
+    bool _resolve(PropId& current, const char* path);
+
+    Group& m_group;
+    const char* m_full_path = nullptr;
+    const Schema& m_schema;
+    std::vector<PropId> m_root_props;
+};
+
+// Get the column key for a specific Property. In case the property is representing a backlink
+// we need to look up the backlink column based on the forward link properties.
+std::pair<ColKey, const ObjectSchema*> KeyPathResolver::get_col_key(const Property* prop)
+{
+    ColKey col_key = prop->column_key;
+    const ObjectSchema* target_schema = nullptr;
+    if (prop->type == PropertyType::Object || prop->type == PropertyType::LinkingObjects) {
+        auto found_schema = m_schema.find(prop->object_type);
+        if (found_schema != m_schema.end()) {
+            target_schema = &*found_schema;
+            if (prop->type == PropertyType::LinkingObjects) {
+                auto origin_prop = target_schema->property_for_name(prop->link_origin_property_name);
+                auto origin_table = ObjectStore::table_for_object_type(m_group, target_schema->name);
+                col_key = origin_table->get_opposite_column(origin_prop->column_key);
+            }
+        }
+    }
+    return {col_key, target_schema};
+}
+
+// This function will add one or more PropId objects to the props array. This array can either be the root
+// array in the KeyPathResolver or it can be the 'children' array in one PropId.
+bool KeyPathResolver::_resolve(std::vector<PropId>& props, const ObjectSchema* object_schema, const char* path,
+                               bool mandatory)
+{
+    if (*path == '*') {
+        path++;
+        // Add all properties
+        props.reserve(object_schema->persisted_properties.size() + object_schema->computed_properties.size());
+        for (auto& p : object_schema->persisted_properties) {
+            auto [col_key, target_schema] = get_col_key(&p);
+            props.emplace_back(object_schema->table_key, col_key, &p, target_schema, false);
+        }
+        for (const auto& p : object_schema->computed_properties) {
+            auto [col_key, target_schema] = get_col_key(&p);
+            props.emplace_back(object_schema->table_key, col_key, &p, target_schema, false);
+        }
+    }
+    else {
+        auto p = find_chr(path, '.');
+        StringData property(path, p - path);
+        path = p;
+        auto prop = object_schema->property_for_public_name(property);
+        if (prop) {
+            auto [col_key, target_schema] = get_col_key(prop);
+            props.emplace_back(object_schema->table_key, col_key, prop, target_schema, true);
+        }
+        else {
+            if (mandatory) {
+                throw InvalidArgument(util::format("Property '%1' in KeyPath '%2' is not a valid property in %3.",
+                                                   property, m_full_path, object_schema->name));
+            }
+            else {
+                return false;
+            }
+        }
+    }
+
+    if (*path++ == '.') {
+        auto it = props.begin();
+        while (it != props.end()) {
+            if (_resolve(*it, path)) {
+                ++it;
+            }
+            else {
+                it = props.erase(it);
+            }
+        }
+    }
+    return props.size();
+}
+
+bool KeyPathResolver::_resolve(PropId& current, const char* path)
+{
+    auto object_schema = current.target_schema;
+    if (!object_schema) {
+        if (current.mandatory) {
+            throw InvalidArgument(
+                util::format("Property '%1' in KeyPath '%2' is not a collection of objects or an object "
+                             "reference, so it cannot be used as an intermediate keypath element.",
+                             current.origin_prop->public_name, m_full_path));
+        }
+        // Check if the rest of the path is stars. If not, we should exclude this property
+        do {
+            auto p = find_chr(path, '.');
+            StringData property(path, p - path);
+            path = p;
+            if (property != "*") {
+                return false;
+            }
+        } while (*path++ == '.');
+        return true;
+    }
+    // Target schema exists - proceed
+    return _resolve(current.children, object_schema, path, current.mandatory);
+}
+
+} // namespace
+
+KeyPathArray Realm::create_key_path_array(StringData table_name, const std::vector<std::string>& key_paths)
+{
+    std::vector<const char*> vec;
+    vec.reserve(key_paths.size());
+    for (auto& kp : key_paths) {
+        vec.push_back(kp.c_str());
+    }
+    return create_key_path_array(m_schema.find(table_name)->table_key, vec.size(), &vec.front());
+}
+
+KeyPathArray Realm::create_key_path_array(TableKey table_key, size_t num_key_paths, const char** all_key_paths)
+{
+    auto object_schema = m_schema.find(table_key);
+    REALM_ASSERT(object_schema != m_schema.end());
+    KeyPathArray resolved_key_path_array;
+    for (size_t n = 0; n < num_key_paths; n++) {
+        KeyPathResolver resolver(read_group(), m_schema);
+        // Build property tree
+        resolver.resolve(&*object_schema, all_key_paths[n]);
+        // Expand tree into separate lines
+        resolver.expand(resolved_key_path_array);
+    }
+    return resolved_key_path_array;
+}
+
+#ifdef REALM_DEBUG
+void Realm::print_key_path_array(const KeyPathArray& kpa)
+{
+    auto& g = read_group();
+    for (auto& kp : kpa) {
+        for (auto [tk, ck] : kp) {
+            auto table = g.get_table(tk);
+            std::cout << '{' << table->get_name() << ':';
+            if (ck.get_type() == col_type_BackLink) {
+                auto col_key = table->get_opposite_column(ck);
+                table = table->get_opposite_table(ck);
+                std::cout << '{' << table->get_name() << ':' << table->get_column_name(col_key) << "}->";
+            }
+            else {
+                std::cout << table->get_column_name(ck);
+            }
+            std::cout << '}';
+        }
+        std::cout << std::endl;
+    }
+}
+#endif

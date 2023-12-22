@@ -330,9 +330,8 @@ RLM_API realm_results_t* realm_get_backlinks(realm_object_t* object, realm_class
     return wrap_err([&]() {
         object->verify_attached();
         auto realm = object->realm();
-        auto source_table = realm->read_group().get_table(TableKey{source_table_key});
-        auto backlink_view = object->get_obj().get_backlink_view(source_table, ColKey{property_key});
-        return new realm_results_t{Results{realm, backlink_view}};
+        return new realm_results_t{
+            Results{realm, object->get_obj(), TableKey{source_table_key}, ColKey{property_key}}};
     });
 }
 

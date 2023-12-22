@@ -24,7 +24,6 @@
 #include <realm/handover_defs.hpp>
 #include <realm/impl/changeset_input_stream.hpp>
 #include <realm/impl/transact_log.hpp>
-#include <realm/metrics/metrics.hpp>
 #include <realm/replication.hpp>
 #include <realm/util/checked_mutex.hpp>
 #include <realm/util/features.h>
@@ -391,10 +390,6 @@ public:
     /// On the importing side, the top-level accessor being created during
     /// import takes ownership of all other accessors (if any) being created as
     /// part of the import.
-    std::shared_ptr<metrics::Metrics> get_metrics()
-    {
-        return m_metrics;
-    }
 
     // Try to grab an exclusive lock of the given realm path's lock file. If the lock
     // can be acquired, the callback will be executed with the lock and then return true.
@@ -443,6 +438,14 @@ public:
     /// Returns true if there are threads waiting to acquire the write lock, false otherwise.
     /// To be used only when already holding the lock.
     bool other_writers_waiting_for_lock() const;
+
+    struct CommitListener {
+        virtual ~CommitListener() = default;
+        virtual void on_commit(version_type new_version) = 0;
+    };
+
+    void add_commit_listener(CommitListener*);
+    void remove_commit_listener(CommitListener*);
 
 protected:
     explicit DB(const DBOptions& options);
@@ -507,9 +510,10 @@ private:
     util::InterprocessCondVar m_new_commit_available;
     util::InterprocessCondVar m_pick_next_writer;
     std::function<void(int, int)> m_upgrade_callback;
-    std::shared_ptr<metrics::Metrics> m_metrics;
     std::unique_ptr<AsyncCommitHelper> m_commit_helper;
     std::shared_ptr<util::Logger> m_logger;
+    std::mutex m_commit_listener_mutex;
+    std::vector<CommitListener*> m_commit_listeners;
     bool m_is_sync_agent = false;
     // Id for this DB to be used in logging. We will just use some bits from the pointer.
     // The path cannot be used as this would not allow us to distinguish between two DBs opening

@@ -1,0 +1,27 @@
+name: Bindgen Unit Tests
+
+on:
+  pull_request:
+    paths:
+      # Source code
+      - "bindgen/**"
+      # No need to run when updating documentation
+      - "!**.md"
+      # Run this on updates to the workflow
+      - ".github/workflows/bindgen-unit-tests.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit-tests:
+    name: Run Bindgen Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 20
+      - run: npm ci
+      - run: npm test

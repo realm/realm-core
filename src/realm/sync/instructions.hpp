@@ -734,8 +734,8 @@ struct Instruction {
     const Instruction& at(size_t) const noexcept;
 
 private:
-    template <class>
-    struct Visitor;
+    template <class V, class F>
+    static decltype(auto) visit(F&& lambda, V&& instr);
 };
 
 inline const char* get_type_name(Instruction::Type type)
@@ -934,47 +934,17 @@ Instruction::Instruction(T instr)
     static_assert(!std::is_same_v<T, Vector>);
 }
 
-template <class F>
-struct Instruction::Visitor {
-    F lambda; // reference type
-    Visitor(F lambda)
-        : lambda(lambda)
-    {
-    }
-
-    template <class T>
-    decltype(auto) operator()(T& instr)
-    {
-        return lambda(instr);
-    }
-
-    template <class T>
-    decltype(auto) operator()(const T& instr)
-    {
-        return lambda(instr);
-    }
-
-    auto operator()(const Instruction::Vector&) -> decltype(lambda(std::declval<const Instruction::Update&>()))
-    {
-        REALM_TERMINATE("visiting instruction vector");
-    }
-    auto operator()(Instruction::Vector&) -> decltype(lambda(std::declval<Instruction::Update&>()))
-    {
-        REALM_TERMINATE("visiting instruction vector");
-    }
-};
-
-template <class F>
-inline decltype(auto) Instruction::visit(F&& lambda)
+template <class V, class F>
+inline decltype(auto) Instruction::visit(F&& lambda, V&& instr)
 {
     // Cannot use std::visit, because it does not pass lvalue references to the visitor.
-    if (mpark::holds_alternative<Vector>(m_instr)) {
+    if (mpark::holds_alternative<Vector>(instr)) {
         REALM_TERMINATE("visiting instruction vector");
     }
 #define REALM_VISIT_VARIANT(X)                                                                                       \
-    else if (mpark::holds_alternative<Instruction::X>(m_instr))                                                      \
+    else if (auto ptr = mpark::get_if<Instruction::X>(&instr))                                                       \
     {                                                                                                                \
-        return lambda(mpark::get<Instruction::X>(m_instr));                                                          \
+        return lambda(*ptr);                                                                                         \
     }
     REALM_FOR_EACH_INSTRUCTION_TYPE(REALM_VISIT_VARIANT)
 #undef REALM_VISIT_VARIANT
@@ -985,23 +955,15 @@ inline decltype(auto) Instruction::visit(F&& lambda)
 }
 
 template <class F>
+inline decltype(auto) Instruction::visit(F&& lambda)
+{
+    return visit(std::forward<F>(lambda), m_instr);
+}
+
+template <class F>
 inline decltype(auto) Instruction::visit(F&& lambda) const
 {
-    // Cannot use std::visit, because it does not pass lvalue references to the visitor.
-    if (mpark::holds_alternative<Vector>(m_instr)) {
-        REALM_TERMINATE("visiting instruction vector");
-    }
-#define REALM_VISIT_VARIANT(X)                                                                                       \
-    else if (mpark::holds_alternative<Instruction::X>(m_instr))                                                      \
-    {                                                                                                                \
-        return lambda(mpark::get<Instruction::X>(m_instr));                                                          \
-    }
-    REALM_FOR_EACH_INSTRUCTION_TYPE(REALM_VISIT_VARIANT)
-#undef REALM_VISIT_VARIANT
-    else
-    {
-        REALM_TERMINATE("Unhandled instruction variant entry");
-    }
+    return visit(std::forward<F>(lambda), m_instr);
 }
 
 inline Instruction::Type Instruction::type() const noexcept

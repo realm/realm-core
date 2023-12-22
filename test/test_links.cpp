@@ -1610,6 +1610,7 @@ TEST(Unresolved_Mixed_links)
 
     auto source_table = g.add_table_with_primary_key("source", type_Int, "source_id");
     auto dest_table = g.add_table_with_primary_key("dest", type_Int, "dest_id");
+    auto mixed_col = source_table->add_column(type_Mixed, "mixed");
     auto list_mixed_col = source_table->add_column_list(type_Mixed, "list of mixed");
     auto set_of_mixed_col = source_table->add_column_set(type_Mixed, "set of mixed");
 
@@ -1619,8 +1620,10 @@ TEST(Unresolved_Mixed_links)
     Lst<Mixed> list_mixed = source_obj.get_list<Mixed>(list_mixed_col);
     Set<Mixed> set_mixed = source_obj.get_set<Mixed>(set_of_mixed_col);
 
-    list_mixed.add(ObjLink{dest_table->get_key(), dest_obj.get_key()});
-    set_mixed.insert(ObjLink{dest_table->get_key(), dest_obj.get_key()});
+    ObjLink link{dest_table->get_key(), dest_obj.get_key()};
+    source_obj.set(mixed_col, Mixed(link));
+    list_mixed.add(link);
+    set_mixed.insert(link);
 
     size_t expected_size = 1;
     CHECK_EQUAL(list_mixed.size(), expected_size);
@@ -1631,19 +1634,19 @@ TEST(Unresolved_Mixed_links)
     // difference between list/set of links and lst/set of Mixed, size returns the whole list of links also the
     // null/unresolved ones
     expected_size = 1;
-    CHECK_EQUAL(list_mixed.size(), expected_size);
-    CHECK_EQUAL(set_mixed.size(), expected_size);
 
-    if (list_mixed.size()) {
+    if (CHECK_EQUAL(list_mixed.size(), expected_size)) {
         auto link = list_mixed.get(0);
         CHECK(link.is_null());
     }
-    if (set_mixed.size()) {
+    if (CHECK_EQUAL(set_mixed.size(), expected_size)) {
         auto link = set_mixed.get(0);
         // set do not hide unresolved links
         CHECK(!link.is_null());
         CHECK(link.is_unresolved_link());
     }
+    auto m = source_obj.get<Mixed>(mixed_col);
+    CHECK(m.is_null());
 }
 
 // TODO: add tests here

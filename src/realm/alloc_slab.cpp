@@ -37,7 +37,6 @@
 
 #include <realm/util/errno.hpp>
 #include <realm/util/encrypted_file_mapping.hpp>
-#include <realm/util/miscellaneous.hpp>
 #include <realm/util/terminate.hpp>
 #include <realm/util/thread.hpp>
 #include <realm/util/scope_exit.hpp>
@@ -828,12 +827,19 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg, util::Writ
         if (REALM_UNLIKELY(cfg.read_only))
             throw InvalidDatabase("Read-only access to empty Realm file", path);
 
+        size_t initial_size = page_size(); // m_initial_section_size;
+        // exFAT does not allocate a unique id for the file until it is non-empty. It must be
+        // valid at this point because File::get_unique_id() is used to distinguish
+        // mappings_for_file in the encryption layer. So the prealloc() is required before
+        // interacting with the encryption layer in File::write().
+        // Pre-alloc initial space
+        m_file.prealloc(initial_size);     // Throws
+        // seek() back to the start of the file in preparation for writing the header
+        // This sequence of File operations is protected from races by
+        // DB::m_controlmutex, so we know we are the only ones operating on the file
+        m_file.seek(0);
         const char* data = reinterpret_cast<const char*>(&empty_file_header);
         m_file.write(data, sizeof empty_file_header); // Throws
-
-        // Pre-alloc initial space
-        size_t initial_size = page_size(); // m_initial_section_size;
-        m_file.prealloc(initial_size);     // Throws
 
         bool disable_sync = get_disable_sync_to_disk() || cfg.disable_sync;
         if (!disable_sync)

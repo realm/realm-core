@@ -25,9 +25,21 @@
 
 #include "test.hpp"
 
+#include <chrono>
+
 using namespace realm;
 using namespace realm::util;
 using namespace realm::test_util;
+
+// #include <valgrind/callgrind.h>
+
+#ifndef CALLGRIND_START_INSTRUMENTATION
+#define CALLGRIND_START_INSTRUMENTATION
+#endif
+
+#ifndef CALLGRIND_STOP_INSTRUMENTATION
+#define CALLGRIND_STOP_INSTRUMENTATION
+#endif
 
 TEST(Unresolved_Basic)
 {
@@ -262,6 +274,20 @@ TEST(Unresolved_LinkList)
 
 TEST(Unresolved_LinkSet)
 {
+    auto check_sorted = [&](LnkSet& set, std::vector<Obj> expected) {
+        std::vector<size_t> indices;
+        set.sort(indices);
+        CHECK_EQUAL(indices.size(), expected.size());
+        for (size_t i = 0; i < indices.size(); ++i) {
+            CHECK_EQUAL(set.get(indices[i]), expected[i].get_key());
+        }
+        indices.clear();
+        set.distinct(indices);
+        CHECK_EQUAL(indices.size(), expected.size());
+        for (size_t i = 0; i < indices.size(); ++i) {
+            CHECK_EQUAL(set.get(indices[i]), expected[i].get_key());
+        }
+    };
     Group g;
 
     auto cars = g.add_table_with_primary_key("Car", type_String, "model");
@@ -285,14 +311,17 @@ TEST(Unresolved_LinkSet)
 
     CHECK_EQUAL(stock1.size(), 4);
     CHECK_EQUAL(stock2.size(), 4);
+    check_sorted(stock1, {skoda, tesla, volvo, bmw});
     tesla.invalidate();
     CHECK_EQUAL(stock1.size(), 3);
     CHECK_EQUAL(stock2.size(), 3);
+    check_sorted(stock1, {skoda, volvo, bmw});
 
     stock1.insert(mercedes.get_key());
     // If REALM_MAX_BPNODE_SIZE is 4, we test that context flag is copied over when replacing root
     CHECK_EQUAL(stock1.size(), 4);
     CHECK_EQUAL(stock2.size(), 4);
+    check_sorted(stock1, {skoda, volvo, bmw, mercedes});
 
     LnkSet stock_copy{stock1};
     CHECK_EQUAL(stock_copy.get(3), mercedes.get_key());
@@ -380,17 +409,21 @@ TEST(Unresolved_MixedIndexed)
     auto table = group.add_table_with_primary_key("table", type_UUID, "_id", true);
     auto mixed_col = table->add_column(type_Mixed, "mixed", true);
     table->add_search_index(mixed_col);
-
-    UUID pk2;
+    UUID pk2("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
     {
         auto src_obj = table->create_object_with_primary_key(Mixed{});
         auto dst_obj = table->create_object_with_primary_key(pk2);
         CHECK_EQUAL(src_obj.get<Mixed>(mixed_col), Mixed{});
         src_obj.set<Mixed>(mixed_col, Mixed{ObjLink{table->get_key(), dst_obj.get_key()}});
         dst_obj.set<Mixed>(mixed_col, Mixed{ObjLink{table->get_key(), src_obj.get_key()}});
+        auto obj_key = table->query("mixed = null").find();
+        CHECK_NOT(obj_key);
         table->invalidate_object(dst_obj.get_key());
         CHECK_EQUAL(table->size(), 1);
         auto unresolved_obj_key = table->get_objkey_from_primary_key(pk2);
+        // Unresolved links should appear as nulls
+        obj_key = table->query("mixed = null").find();
+        CHECK_EQUAL(obj_key, src_obj.get_key());
         CHECK(unresolved_obj_key.is_unresolved());
     }
 
@@ -403,6 +436,9 @@ TEST(Unresolved_MixedIndexed)
         CHECK(src_obj);
         Mixed expected{ObjLink{table->get_key(), obj_resurrected.get_key()}};
         CHECK_EQUAL(src_obj.get<Mixed>(mixed_col), expected);
+        // Resurrected object does not have a link"
+        auto obj_key = table->query("mixed = null").find();
+        CHECK_EQUAL(obj_key, obj_resurrected.get_key());
     }
 }
 
@@ -768,6 +804,71 @@ TEST(Links_ManyObjects)
     link_list.clear();
 
     tr->commit();
+}
+
+TEST(Unresolved_PerformanceLinks)
+{
+    constexpr int nb_objects = 1000;
+    using namespace std::chrono;
+
+    SHARED_GROUP_TEST_PATH(path);
+    auto hist = make_in_realm_history();
+    DBRef db = DB::create(*hist, path);
+
+    auto tr = db->start_write();
+    auto table = tr->add_table_with_primary_key("table", type_Int, "id");
+    auto origin = tr->add_table("origin");
+    auto col = origin->add_column(*table, "link");
+    auto key = table->get_objkey_from_primary_key(1);
+    for (int i = 0; i < nb_objects; i++) {
+        origin->create_object().set(col, key);
+    }
+    tr->commit_and_continue_as_read();
+    tr->promote_to_write();
+    auto t1 = steady_clock::now();
+    table->create_object_with_primary_key(1);
+    auto t2 = steady_clock::now();
+    tr->commit_and_continue_as_read();
+    CHECK(t2 > t1);
+    // std::cout << "Time: " << duration_cast<microseconds>(t2 - t1).count() << " us" << std::endl;
+    tr->promote_to_write();
+    tr->verify();
+}
+
+TEST(Unresolved_PerformanceLinkList)
+{
+    constexpr int nb_objects = 1000;
+    using namespace std::chrono;
+
+    SHARED_GROUP_TEST_PATH(path);
+    auto hist = make_in_realm_history();
+    DBRef db = DB::create(*hist, path);
+
+    auto tr = db->start_write();
+    auto table = tr->add_table_with_primary_key("table", type_Int, "id");
+    auto origin = tr->add_table("origin");
+    auto col = origin->add_column_list(*table, "links");
+    auto key1 = table->get_objkey_from_primary_key(1);
+    auto key2 = table->get_objkey_from_primary_key(2);
+    auto key3 = table->get_objkey_from_primary_key(3);
+    for (int i = 0; i < nb_objects; i++) {
+        auto ll = origin->create_object().get_list<ObjKey>(col);
+        ll.add(key1);
+        ll.add(key2);
+        ll.add(key3);
+    }
+    tr->commit_and_continue_as_read();
+    tr->promote_to_write();
+    auto t1 = steady_clock::now();
+    table->create_object_with_primary_key(1);
+    table->create_object_with_primary_key(2);
+    table->create_object_with_primary_key(3);
+    auto t2 = steady_clock::now();
+    tr->commit_and_continue_as_read();
+    CHECK(t2 > t1);
+    // std::cout << "Time: " << duration_cast<microseconds>(t2 - t1).count() << " us" << std::endl;
+    tr->promote_to_write();
+    tr->verify();
 }
 
 #endif

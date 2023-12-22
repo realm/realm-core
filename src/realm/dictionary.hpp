@@ -144,7 +144,7 @@ private:
     friend class CollectionColumnAggregate;
     friend class DictionaryLinkValues;
     friend class Cluster;
-    friend void Obj::assign_pk_and_backlinks(const Obj& other);
+    friend void Obj::assign_pk_and_backlinks(Obj& other);
 
     mutable std::unique_ptr<Array> m_dictionary_top;
     mutable std::unique_ptr<BPlusTreeBase> m_keys;

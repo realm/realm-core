@@ -1,18 +1,19 @@
-#include <string>
-#include <thread>
-
-#include <realm/util/random.hpp>
 #include <realm/db.hpp>
 #include <realm/list.hpp>
-#include <realm/table_view.hpp>
-
 #include <realm/object_converter.hpp>
 #include <realm/sync/noinst/client_reset.hpp>
+#include <realm/sync/noinst/client_reset_operation.hpp>
+#include <realm/sync/subscriptions.hpp>
+#include <realm/table_view.hpp>
+#include <realm/util/random.hpp>
 
 #include "test.hpp"
 #include "sync_fixtures.hpp"
 #include "util/semaphore.hpp"
 #include "util/compare_groups.hpp"
+
+#include <string>
+#include <thread>
 
 using namespace realm;
 using namespace realm::sync;
@@ -65,6 +66,7 @@ TEST(ClientReset_TransferGroupWithDanglingLinks)
     _impl::client_reset::transfer_group(*rt, *wt, *test_context.logger, allow_schema_additions);
 }
 
+#if !REALM_MOBILE
 TEST(ClientReset_NoLocalChanges)
 {
     TEST_DIR(dir_1);                // The original server dir.
@@ -72,7 +74,7 @@ TEST(ClientReset_NoLocalChanges)
     SHARED_GROUP_TEST_PATH(path_1); // The writer.
     SHARED_GROUP_TEST_PATH(path_2); // The resetting client.
 
-    auto& logger = *(test_context.logger);
+    auto& logger = *test_context.logger;
 
     const std::string server_path = "/data";
 
@@ -90,7 +92,7 @@ TEST(ClientReset_NoLocalChanges)
         WriteTransaction wt{sg};
         TableRef table = wt.get_group().add_table_with_primary_key("class_table", type_Int, "int_pk");
         table->create_object_with_primary_key(int64_t(123));
-        session.nonsync_transact_notify(wt.commit());
+        wt.commit();
         session.wait_for_upload_complete_or_client_stopped();
     }
 
@@ -118,7 +120,7 @@ TEST(ClientReset_NoLocalChanges)
         WriteTransaction wt{sg};
         TableRef table = wt.get_table("class_table");
         table->create_object_with_primary_key(int64_t(456));
-        session.nonsync_transact_notify(wt.commit());
+        wt.commit();
         session.wait_for_upload_complete_or_client_stopped();
 
         Session session_2 = fixture.make_session(path_2, server_path);
@@ -182,16 +184,6 @@ TEST(ClientReset_NoLocalChanges)
             ConstTableRef table = group.get_table("class_table");
             CHECK_EQUAL(table->size(), 2);
 
-            bool sync_transact_callback_called = false;
-            auto sync_transact_callback = [&](VersionID old_version, VersionID new_version) {
-                logger.debug("sync_transact_callback, old_version.version = %1, "
-                             "old_version.index = %2, new_version.version = %3, "
-                             "new_version.index = %4",
-                             old_version.version, old_version.index, new_version.version, new_version.index);
-                CHECK_LESS(old_version.version, new_version.version);
-                sync_transact_callback_called = true;
-            };
-
             Session::Config session_config;
             {
                 Session::Config::ClientReset client_reset_config;
@@ -200,10 +192,8 @@ TEST(ClientReset_NoLocalChanges)
                 session_config.client_reset_config = std::move(client_reset_config);
             }
             Session session = fixture.make_session(sg, server_path, std::move(session_config));
-            session.set_sync_transact_callback(std::move(sync_transact_callback));
             session.bind();
             session.wait_for_download_complete_or_client_stopped();
-            CHECK(sync_transact_callback_called);
         }
     }
 
@@ -231,25 +221,24 @@ TEST(ClientReset_InitialLocalChanges)
     ClientServerFixture fixture(dir, test_context);
     fixture.start();
 
-    Session session_1 = fixture.make_session(path_1, server_path);
+    DBRef db_1 = DB::create(make_client_replication(), path_1);
+    DBRef db_2 = DB::create(make_client_replication(), path_2);
+
+    Session session_1 = fixture.make_session(db_1, server_path);
     session_1.bind();
 
     // First we make a changeset and upload it
     {
-        DBRef sg = DB::create(make_client_replication(), path_1);
-
-        WriteTransaction wt{sg};
+        WriteTransaction wt{db_1};
         TableRef table = wt.get_group().add_table_with_primary_key("class_table", type_Int, "int");
         table->create_object_with_primary_key(int64_t(123));
-        session_1.nonsync_transact_notify(wt.commit());
+        wt.commit();
     }
     session_1.wait_for_upload_complete_or_client_stopped();
 
     // The local changes.
     {
-        DBRef sg = DB::create(make_client_replication(), path_2);
-
-        WriteTransaction wt{sg};
+        WriteTransaction wt{db_2};
         TableRef table = wt.get_group().add_table_with_primary_key("class_table", type_Int, "int");
         table->create_object_with_primary_key(int64_t(456));
         wt.commit();
@@ -272,7 +261,7 @@ TEST(ClientReset_InitialLocalChanges)
         client_reset_config.fresh_copy = std::move(sg_fresh);
         session_config_2.client_reset_config = std::move(client_reset_config);
     }
-    Session session_2 = fixture.make_session(path_2, server_path, std::move(session_config_2));
+    Session session_2 = fixture.make_session(db_2, server_path, std::move(session_config_2));
     session_2.bind();
     session_2.wait_for_upload_complete_or_client_stopped();
     session_2.wait_for_download_complete_or_client_stopped();
@@ -281,12 +270,9 @@ TEST(ClientReset_InitialLocalChanges)
 
     // Check the content in path_2. There should be two rows now.
     {
-        DBRef sg_1 = DB::create(make_client_replication(), path_1);
-        DBRef sg_2 = DB::create(make_client_replication(), path_2);
-
-        ReadTransaction rt_1(sg_1);
-        ReadTransaction rt_2(sg_2);
-        CHECK(compare_groups(rt_1, rt_2));
+        ReadTransaction rt_1(db_1);
+        ReadTransaction rt_2(db_2);
+        CHECK(compare_groups(rt_1, rt_2, *test_context.logger));
 
         const Group& group = rt_2.get_group();
         ConstTableRef table = group.get_table("class_table");
@@ -300,21 +286,17 @@ TEST(ClientReset_InitialLocalChanges)
 
     // Make more changes in path_1.
     {
-        DBRef sg = DB::create(make_client_replication(), path_1);
-
-        WriteTransaction wt{sg};
+        WriteTransaction wt{db_1};
         TableRef table = wt.get_table("class_table");
         table->create_object_with_primary_key(int64_t(1000));
-        session_1.nonsync_transact_notify(wt.commit());
+        wt.commit();
     }
     // Make more changes in path_2.
     {
-        DBRef sg = DB::create(make_client_replication(), path_2);
-
-        WriteTransaction wt{sg};
+        WriteTransaction wt{db_2};
         TableRef table = wt.get_table("class_table");
         table->create_object_with_primary_key(int64_t(2000));
-        session_2.nonsync_transact_notify(wt.commit());
+        wt.commit();
     }
     session_1.wait_for_upload_complete_or_client_stopped();
     session_2.wait_for_upload_complete_or_client_stopped();
@@ -322,12 +304,9 @@ TEST(ClientReset_InitialLocalChanges)
     session_2.wait_for_download_complete_or_client_stopped();
 
     {
-        DBRef sg_1 = DB::create(make_client_replication(), path_1);
-        DBRef sg_2 = DB::create(make_client_replication(), path_2);
-
-        ReadTransaction rt_1(sg_1);
-        ReadTransaction rt_2(sg_2);
-        CHECK(compare_groups(rt_1, rt_2));
+        ReadTransaction rt_1(db_1);
+        ReadTransaction rt_2(db_2);
+        CHECK(compare_groups(rt_1, rt_2, *test_context.logger));
     }
 }
 
@@ -356,7 +335,7 @@ TEST_TYPES(ClientReset_LocalChangesWhenOffline, std::true_type, std::false_type)
         WriteTransaction wt{sg};
         TableRef table = ((Transaction&)wt).add_table_with_primary_key("class_table", type_Int, "_id");
         table->create_object_with_primary_key(123);
-        session_1.nonsync_transact_notify(wt.commit());
+        wt.commit();
         session_1.wait_for_upload_complete_or_client_stopped();
         session_1.wait_for_download_complete_or_client_stopped();
     }
@@ -441,7 +420,7 @@ TEST(ClientReset_ThreeClients)
     SHARED_GROUP_TEST_PATH(path_2);
     SHARED_GROUP_TEST_PATH(path_3);
 
-    auto& logger = *(test_context.logger);
+    auto& logger = *test_context.logger;
 
     const std::string server_path = "/data";
 
@@ -709,9 +688,9 @@ TEST(ClientReset_ThreeClients)
         ReadTransaction rt_1(sg_1);
         ReadTransaction rt_2(sg_2);
         ReadTransaction rt_3(sg_3);
-        CHECK(compare_groups(rt_1, rt_2));
-        CHECK(compare_groups(rt_1, rt_3));
-        CHECK(compare_groups(rt_2, rt_3));
+        CHECK(compare_groups(rt_1, rt_2, *test_context.logger));
+        CHECK(compare_groups(rt_1, rt_3, *test_context.logger));
+        CHECK(compare_groups(rt_2, rt_3, *test_context.logger));
     }
 }
 
@@ -793,8 +772,9 @@ TEST(ClientReset_DoNotRecoverSchema)
         CHECK(!compare_groups(rt_1, rt_2));
 
         const Group& group = rt_1.get_group();
-        CHECK_EQUAL(group.size(), 1);
+        CHECK_EQUAL(group.size(), 2);
         CHECK(group.get_table("class_table1"));
+        CHECK(group.get_table("client_reset_metadata"));
         CHECK_NOT(group.get_table("class_table2"));
         const Group& group2 = rt_2.get_group();
         CHECK_EQUAL(group2.size(), 1);
@@ -859,6 +839,805 @@ TEST(ClientReset_PinnedVersion)
         Session session = fixture.make_bound_session(sg, server_path_1, std::move(session_config));
         session.wait_for_download_complete_or_client_stopped();
     }
+}
+#endif // !REALM_MOBILE
+
+void mark_as_synchronized(DB& db)
+{
+    auto& history = static_cast<ClientReplication*>(db.get_replication())->get_history();
+    sync::version_type current_version;
+    sync::SaltedFileIdent file_ident;
+    sync::SyncProgress progress;
+    history.get_status(current_version, file_ident, progress);
+    progress.download.last_integrated_client_version = current_version;
+    progress.upload.client_version = current_version;
+    progress.upload.last_integrated_server_version = current_version;
+    sync::VersionInfo info_out;
+    history.set_sync_progress(progress, nullptr, info_out);
+    history.set_client_file_ident({1, 0}, false);
+}
+
+void expect_reset(unit_test::TestContext& test_context, DB& target, DB& fresh, ClientResyncMode mode,
+                  bool allow_recovery = true)
+{
+    auto db_version = target.get_version_of_latest_snapshot();
+    auto fresh_path = fresh.get_path();
+    bool did_reset = _impl::client_reset::perform_client_reset(
+        *test_context.logger, target, fresh, mode, nullptr, nullptr, {100, 200}, nullptr, [](int64_t) {},
+        allow_recovery);
+    CHECK(did_reset);
+
+    // Should have closed and deleted the fresh realm
+    CHECK_NOT(fresh.is_attached());
+    CHECK_NOT(util::File::exists(fresh_path));
+
+    // Should have performed exactly two writes on the target DB: one to track
+    // that we're attempting recovery, and one with the actual reset
+    CHECK_EQUAL(target.get_version_of_latest_snapshot(), db_version + 2);
+
+    // Should have set the client file ident
+    CHECK_EQUAL(target.start_read()->get_sync_file_id(), 100);
+
+    // Client resets aren't marked as complete until the server has acknowledged
+    // sync completion to avoid reset cycles
+    {
+        auto wt = target.start_write();
+        _impl::client_reset::remove_pending_client_resets(*wt);
+        wt->commit();
+    }
+}
+
+void expect_reset(unit_test::TestContext& test_context, DB& target, DB& fresh, ClientResyncMode mode,
+                  SubscriptionStore* sub_store)
+{
+    auto db_version = target.get_version_of_latest_snapshot();
+    auto fresh_path = fresh.get_path();
+    bool did_reset = _impl::client_reset::perform_client_reset(
+        *test_context.logger, target, fresh, mode, nullptr, nullptr, {100, 200}, sub_store, [](int64_t) {}, true);
+    CHECK(did_reset);
+
+    // Should have closed and deleted the fresh realm
+    CHECK_NOT(fresh.is_attached());
+    CHECK_NOT(util::File::exists(fresh_path));
+
+    // Should have performed exactly two writes on the target DB: one to track
+    // that we're attempting recovery, and one with the actual reset
+    CHECK_EQUAL(target.get_version_of_latest_snapshot(), db_version + 2);
+
+    // Should have set the client file ident
+    CHECK_EQUAL(target.start_read()->get_sync_file_id(), 100);
+
+    // Client resets aren't marked as complete until the server has acknowledged
+    // sync completion to avoid reset cycles
+    {
+        auto wt = target.start_write();
+        _impl::client_reset::remove_pending_client_resets(*wt);
+        wt->commit();
+    }
+}
+
+std::pair<DBRef, DBRef> prepare_db(const std::string& path, const std::string& copy_path,
+                                   util::FunctionRef<void(Transaction&)> fn)
+{
+    DBRef db = DB::create(make_client_replication(), path);
+    {
+        auto wt = db->start_write();
+        fn(*wt);
+        wt->commit();
+    }
+    mark_as_synchronized(*db);
+    db->write_copy(copy_path, nullptr);
+    auto db_2 = DB::create(make_client_replication(), copy_path);
+    return {db, db_2};
+}
+
+TEST(ClientReset_UninitializedFile)
+{
+    SHARED_GROUP_TEST_PATH(path_1);
+    SHARED_GROUP_TEST_PATH(path_2);
+    SHARED_GROUP_TEST_PATH(path_3);
+
+    auto [db, db_fresh] = prepare_db(path_1, path_2, [](Transaction& tr) {
+        tr.add_table_with_primary_key("class_table", type_Int, "pk");
+    });
+
+    auto db_empty = DB::create(make_client_replication(), path_3);
+    // Should not perform a client reset because the target file has never been
+    // written to
+    bool did_reset = _impl::client_reset::perform_client_reset(
+        *test_context.logger, *db_empty, *db_fresh, ClientResyncMode::Recover, nullptr, nullptr, {100, 200}, nullptr,
+        [](int64_t) {}, true);
+    CHECK_NOT(did_reset);
+
+    // Should still have closed and deleted the fresh realm
+    CHECK_NOT(db_fresh->is_attached());
+    CHECK_NOT(util::File::exists(path_2));
+}
+
+TEST(ClientReset_NoChanges)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    SHARED_GROUP_TEST_PATH(path_fresh);
+    SHARED_GROUP_TEST_PATH(path_backup);
+
+    DBRef db = DB::create(make_client_replication(), path);
+    {
+        auto wt = db->start_write();
+        auto table = wt->add_table_with_primary_key("class_table", type_Int, "pk");
+        table->create_object_with_primary_key(1);
+        table->create_object_with_primary_key(2);
+        table->create_object_with_primary_key(3);
+        wt->commit();
+    }
+    mark_as_synchronized(*db);
+
+    // Write a copy of the pre-reset state to compare against
+    db->write_copy(path_backup, nullptr);
+    DBOptions options;
+    options.is_immutable = true;
+    auto backup_db = DB::create(path_backup, true, options);
+
+    const ClientResyncMode modes[] = {ClientResyncMode::Recover, ClientResyncMode::DiscardLocal,
+                                      ClientResyncMode::RecoverOrDiscard};
+    for (auto mode : modes) {
+        // Perform a reset with a fresh Realm that exactly matches the current
+        // one, which shouldn't result in any changes regardless of mode
+        db->write_copy(path_fresh, nullptr);
+        expect_reset(test_context, *db, *DB::create(make_client_replication(), path_fresh), mode);
+
+        // End state should exactly match the pre-reset state
+        CHECK_OR_RETURN(compare_groups(*db->start_read(), *backup_db->start_read()));
+    }
+}
+
+TEST(ClientReset_SimpleNonconflictingChanges)
+{
+    const std::pair<ClientResyncMode, bool> modes[] = {
+        {ClientResyncMode::Recover, true},
+        {ClientResyncMode::RecoverOrDiscard, true},
+        {ClientResyncMode::RecoverOrDiscard, false},
+        {ClientResyncMode::DiscardLocal, false},
+    };
+    for (auto [mode, allow_recovery] : modes) {
+        SHARED_GROUP_TEST_PATH(path_1);
+        SHARED_GROUP_TEST_PATH(path_2);
+
+        auto [db, db_fresh] = prepare_db(path_1, path_2, [](Transaction& tr) {
+            auto table = tr.add_table_with_primary_key("class_table", type_Int, "pk");
+            table->create_object_with_primary_key(1);
+            table->create_object_with_primary_key(2);
+            table->create_object_with_primary_key(3);
+        });
+
+        for (int i = 0; i < 5; ++i) {
+            auto wt = db->start_write();
+            auto table = wt->get_table("class_table");
+            table->create_object_with_primary_key(4 + i);
+            wt->commit();
+        }
+
+        {
+            auto wt = db_fresh->start_write();
+            auto table = wt->get_table("class_table");
+            for (int i = 0; i < 5; ++i) {
+                table->create_object_with_primary_key(10 + i);
+            }
+            wt->commit();
+        }
+
+        expect_reset(test_context, *db, *db_fresh, mode, allow_recovery);
+
+        if (allow_recovery) {
+            // Should have both the objects created locally and from the reset realm
+            auto tr = db->start_read();
+            auto table = tr->get_table("class_table");
+            CHECK_EQUAL(table->size(), 13);
+        }
+        else {
+            // Should only have the objects from the fresh realm
+            auto tr = db->start_read();
+            auto table = tr->get_table("class_table");
+            CHECK_EQUAL(table->size(), 8);
+            CHECK(table->get_object_with_primary_key(10));
+            CHECK_NOT(table->get_object_with_primary_key(4));
+        }
+    }
+}
+
+TEST(ClientReset_SimpleConflictingWrites)
+{
+    const std::pair<ClientResyncMode, bool> modes[] = {
+        {ClientResyncMode::Recover, true},
+        {ClientResyncMode::RecoverOrDiscard, true},
+        {ClientResyncMode::RecoverOrDiscard, false},
+        {ClientResyncMode::DiscardLocal, false},
+    };
+    for (auto [mode, allow_recovery] : modes) {
+        SHARED_GROUP_TEST_PATH(path_1);
+        SHARED_GROUP_TEST_PATH(path_2);
+
+        auto [db, db_fresh] = prepare_db(path_1, path_2, [](Transaction& tr) {
+            auto table = tr.add_table_with_primary_key("class_table", type_Int, "pk");
+            table->add_column(type_Int, "value");
+            table->create_object_with_primary_key(1).set_all(1);
+            table->create_object_with_primary_key(2).set_all(2);
+            table->create_object_with_primary_key(3).set_all(3);
+        });
+
+        {
+            auto wt = db->start_write();
+            auto table = wt->get_table("class_table");
+            for (auto&& obj : *table) {
+                obj.set_all(obj.get<int64_t>("value") + 10);
+            }
+            wt->commit();
+        }
+
+        {
+            auto wt = db_fresh->start_write();
+            auto table = wt->get_table("class_table");
+            for (auto&& obj : *table) {
+                obj.set_all(0);
+            }
+            wt->commit();
+        }
+
+        expect_reset(test_context, *db, *db_fresh, mode, allow_recovery);
+
+        auto tr = db->start_read();
+        auto table = tr->get_table("class_table");
+        CHECK_EQUAL(table->size(), 3);
+        if (allow_recovery) {
+            CHECK_EQUAL(table->get_object_with_primary_key(1).get<int64_t>("value"), 11);
+            CHECK_EQUAL(table->get_object_with_primary_key(2).get<int64_t>("value"), 12);
+            CHECK_EQUAL(table->get_object_with_primary_key(3).get<int64_t>("value"), 13);
+        }
+        else {
+            CHECK_EQUAL(table->get_object_with_primary_key(1).get<int64_t>("value"), 0);
+            CHECK_EQUAL(table->get_object_with_primary_key(2).get<int64_t>("value"), 0);
+            CHECK_EQUAL(table->get_object_with_primary_key(3).get<int64_t>("value"), 0);
+        }
+    }
+}
+
+TEST(ClientReset_Recover_RecoveryDisabled)
+{
+    SHARED_GROUP_TEST_PATH(path_1);
+    SHARED_GROUP_TEST_PATH(path_2);
+
+    auto dbs = prepare_db(path_1, path_2, [](Transaction& tr) {
+        tr.add_table_with_primary_key("class_table", type_Int, "pk");
+    });
+    CHECK_THROW((_impl::client_reset::perform_client_reset(
+                    *test_context.logger, *dbs.first, *dbs.second, ClientResyncMode::Recover, nullptr, nullptr,
+                    {100, 200}, nullptr, [](int64_t) {}, false)),
+                _impl::client_reset::ClientResetFailed);
+    CHECK_NOT(_impl::client_reset::has_pending_reset(*dbs.first->start_read()));
+}
+
+TEST(ClientReset_Recover_ModificationsOnDeletedObject)
+{
+    SHARED_GROUP_TEST_PATH(path_1);
+    SHARED_GROUP_TEST_PATH(path_2);
+
+    ColKey col;
+    auto [db, db_fresh] = prepare_db(path_1, path_2, [&](Transaction& tr) {
+        auto table = tr.add_table_with_primary_key("class_table", type_Int, "pk");
+        col = table->add_column(type_Int, "value");
+        table->create_object_with_primary_key(1).set_all(1);
+        table->create_object_with_primary_key(2).set_all(2);
+        table->create_object_with_primary_key(3).set_all(3);
+    });
+
+    {
+        auto wt = db->start_write();
+        auto table = wt->get_table("class_table");
+        table->get_object(0).set<int64_t>(col, 11);
+        table->get_object(1).add_int(col, 10);
+        table->get_object(2).set<int64_t>(col, 13);
+        wt->commit();
+    }
+    {
+        auto wt = db_fresh->start_write();
+        auto table = wt->get_table("class_table");
+        table->get_object(0).remove();
+        table->get_object(0).remove();
+        wt->commit();
+    }
+
+    expect_reset(test_context, *db, *db_fresh, ClientResyncMode::Recover);
+
+    auto tr = db->start_read();
+    auto table = tr->get_table("class_table");
+    CHECK_EQUAL(table->size(), 1);
+    CHECK_EQUAL(table->get_object_with_primary_key(3).get<int64_t>("value"), 13);
+}
+
+SubscriptionSet add_subscription(SubscriptionStore& sub_store, const std::string& name, const Query& q,
+                                 std::optional<SubscriptionSet::State> state = std::nullopt)
+{
+    auto mut = sub_store.get_latest().make_mutable_copy();
+    mut.insert_or_assign(name, q);
+    if (state) {
+        mut.set_state(*state);
+    }
+    return mut.commit();
+}
+
+TEST(ClientReset_DiscardLocal_DiscardsPendingSubscriptions)
+{
+    SHARED_GROUP_TEST_PATH(path_1);
+    SHARED_GROUP_TEST_PATH(path_2);
+    auto [db, db_fresh] = prepare_db(path_1, path_2, [&](Transaction& tr) {
+        tr.add_table_with_primary_key("class_table", type_Int, "pk");
+    });
+
+    auto tr = db->start_read();
+    Query query = tr->get_table("class_table")->where();
+    auto sub_store = SubscriptionStore::create(db);
+    add_subscription(*sub_store, "complete", query, SubscriptionSet::State::Complete);
+
+    std::vector<SubscriptionSet> pending_sets;
+    std::vector<util::Future<SubscriptionSet::State>> futures;
+    for (int i = 0; i < 3; ++i) {
+        auto set = add_subscription(*sub_store, util::format("pending %1", i), query);
+        futures.push_back(set.get_state_change_notification(SubscriptionSet::State::Complete));
+        pending_sets.push_back(std::move(set));
+    }
+
+    expect_reset(test_context, *db, *db_fresh, ClientResyncMode::DiscardLocal, sub_store.get());
+
+    CHECK(sub_store->get_pending_subscriptions().empty());
+    auto subs = sub_store->get_latest();
+    CHECK_EQUAL(subs.state(), SubscriptionSet::State::Complete);
+    CHECK_EQUAL(subs.size(), 1);
+    CHECK_EQUAL(subs.at(0).name, "complete");
+
+    for (auto& fut : futures) {
+        CHECK_EQUAL(fut.get(), SubscriptionSet::State::Superseded);
+    }
+    for (auto& set : pending_sets) {
+        CHECK_EQUAL(set.state(), SubscriptionSet::State::Pending);
+        set.refresh();
+        CHECK_EQUAL(set.state(), SubscriptionSet::State::Superseded);
+    }
+}
+
+TEST_TYPES(ClientReset_DiscardLocal_MakesAwaitingMarkActiveSubscriptionsComplete,
+           std::integral_constant<ClientResyncMode, ClientResyncMode::DiscardLocal>,
+           std::integral_constant<ClientResyncMode, ClientResyncMode::Recover>)
+{
+    SHARED_GROUP_TEST_PATH(path_1);
+    SHARED_GROUP_TEST_PATH(path_2);
+    auto [db, db_fresh] = prepare_db(path_1, path_2, [&](Transaction& tr) {
+        tr.add_table_with_primary_key("class_table", type_Int, "pk");
+    });
+
+    auto tr = db->start_read();
+    Query query = tr->get_table("class_table")->where();
+    auto sub_store = SubscriptionStore::create(db);
+    auto set = add_subscription(*sub_store, "complete", query, SubscriptionSet::State::AwaitingMark);
+    auto future = set.get_state_change_notification(SubscriptionSet::State::Complete);
+
+    expect_reset(test_context, *db, *db_fresh, TEST_TYPE::value, sub_store.get());
+
+    CHECK_EQUAL(future.get(), SubscriptionSet::State::Complete);
+    CHECK_EQUAL(set.state(), SubscriptionSet::State::AwaitingMark);
+    set.refresh();
+    CHECK_EQUAL(set.state(), SubscriptionSet::State::Complete);
+}
+
+TEST(ClientReset_Recover_DoesNotCompletePendingSubscriptions)
+{
+    SHARED_GROUP_TEST_PATH(path_1);
+    SHARED_GROUP_TEST_PATH(path_2);
+    auto [db, db_fresh] = prepare_db(path_1, path_2, [&](Transaction& tr) {
+        tr.add_table_with_primary_key("class_table", type_Int, "pk");
+    });
+
+    auto tr = db->start_read();
+    auto sub_store = SubscriptionStore::create(db);
+    auto query = tr->get_table("class_table")->where();
+
+    add_subscription(*sub_store, "complete", query, SubscriptionSet::State::Complete);
+
+    std::vector<util::Future<SubscriptionSet::State>> futures;
+    for (int i = 0; i < 3; ++i) {
+        auto subs = add_subscription(*sub_store, util::format("pending %1", i), query);
+        futures.push_back(subs.get_state_change_notification(SubscriptionSet::State::Complete));
+    }
+
+    expect_reset(test_context, *db, *db_fresh, ClientResyncMode::Recover, sub_store.get());
+
+    for (auto& fut : futures) {
+        CHECK_NOT(fut.is_ready());
+    }
+
+    auto pending = sub_store->get_pending_subscriptions();
+    CHECK_EQUAL(pending.size(), 3);
+    for (int i = 0; i < 3; ++i) {
+        CHECK_EQUAL(pending[i].size(), i + 2);
+        CHECK_EQUAL(std::prev(pending[i].end())->name, util::format("pending %1", i));
+    }
+}
+
+TEST(ClientReset_Recover_UpdatesRemoteServerVersions)
+{
+    SHARED_GROUP_TEST_PATH(path_1);
+    SHARED_GROUP_TEST_PATH(path_2);
+    auto [db, db_fresh] = prepare_db(path_1, path_2, [&](Transaction& tr) {
+        tr.add_table_with_primary_key("class_table", type_Int, "pk");
+    });
+
+    // Create local unsynchronized changes
+    for (int i = 0; i < 5; ++i) {
+        auto wt = db->start_write();
+        auto table = wt->get_table("class_table");
+        table->create_object_with_primary_key(i);
+        wt->commit();
+    }
+
+    // Change the last seen server version for the freshly download DB
+    {
+        sync::SyncProgress progress;
+        // Set to a valid but incorrect client version which should not be
+        // copied over by client reset
+        auto client_version = db_fresh->get_version_of_latest_snapshot() - 1;
+        progress.download.last_integrated_client_version = client_version;
+        progress.upload.client_version = client_version;
+
+        // Server versions are opaque increasing values, so they can be whatever.
+        // Set to known values that we can verify are used
+        progress.latest_server_version.version = 123;
+        progress.latest_server_version.salt = 456;
+        progress.download.server_version = 123;
+        progress.upload.last_integrated_server_version = 789;
+
+        sync::VersionInfo info_out;
+        auto& history = static_cast<ClientReplication*>(db_fresh->get_replication())->get_history();
+        history.set_sync_progress(progress, nullptr, info_out);
+    }
+
+    expect_reset(test_context, *db, *db_fresh, ClientResyncMode::Recover, nullptr);
+
+    auto& history = static_cast<ClientReplication*>(db->get_replication())->get_history();
+    history.ensure_updated(db->get_version_of_latest_snapshot());
+
+    version_type current_client_version;
+    SaltedFileIdent file_ident;
+    SyncProgress sync_progress;
+    history.get_status(current_client_version, file_ident, sync_progress);
+
+    CHECK_EQUAL(file_ident.ident, 100);
+    CHECK_EQUAL(file_ident.salt, 200);
+    CHECK_EQUAL(sync_progress.upload.client_version, 0);
+    CHECK_EQUAL(sync_progress.download.last_integrated_client_version, 0);
+    CHECK_EQUAL(sync_progress.upload.last_integrated_server_version, 123);
+    CHECK_EQUAL(sync_progress.download.server_version, 123);
+
+    std::vector<ClientHistory::UploadChangeset> uploadable_changesets;
+    version_type locked_server_version;
+    history.find_uploadable_changesets(sync_progress.upload, db->get_version_of_latest_snapshot(),
+                                       uploadable_changesets, locked_server_version);
+
+    CHECK_EQUAL(uploadable_changesets.size(), 5);
+    for (auto& uc : uploadable_changesets) {
+        CHECK_EQUAL(uc.progress.last_integrated_server_version, 123);
+    }
+}
+
+TEST(ClientReset_Recover_UploadableBytes)
+{
+    SHARED_GROUP_TEST_PATH(path_1);
+    SHARED_GROUP_TEST_PATH(path_2);
+    auto [db, db_fresh] = prepare_db(path_1, path_2, [&](Transaction& tr) {
+        tr.add_table_with_primary_key("class_table", type_Int, "pk");
+    });
+
+    // Create local unsynchronized changes
+    for (int i = 0; i < 5; ++i) {
+        auto wt = db->start_write();
+        auto table = wt->get_table("class_table");
+        table->create_object_with_primary_key(i);
+        wt->commit();
+    }
+
+    // Create some of the same objects in the fresh realm so that the post-reset
+    // uploadable_bytes should be different from pre-reset (but still not zero)
+    {
+        auto wt = db_fresh->start_write();
+        auto table = wt->get_table("class_table");
+        for (int i = 0; i < 3; ++i) {
+            table->create_object_with_primary_key(i);
+        }
+        wt->commit();
+    }
+
+    auto& history = static_cast<ClientReplication*>(db->get_replication())->get_history();
+    uint_fast64_t unused, pre_reset_uploadable_bytes;
+    history.get_upload_download_bytes(db.get(), unused, unused, unused, pre_reset_uploadable_bytes, unused);
+    CHECK_GREATER(pre_reset_uploadable_bytes, 0);
+
+    expect_reset(test_context, *db, *db_fresh, ClientResyncMode::Recover, nullptr);
+
+    uint_fast64_t post_reset_uploadable_bytes;
+    history.get_upload_download_bytes(db.get(), unused, unused, unused, post_reset_uploadable_bytes, unused);
+    CHECK_GREATER(post_reset_uploadable_bytes, 0);
+    CHECK_GREATER(pre_reset_uploadable_bytes, post_reset_uploadable_bytes);
+}
+
+TEST(ClientReset_Recover_ListsAreOnlyCopiedOnce)
+{
+    SHARED_GROUP_TEST_PATH(path_1);
+    SHARED_GROUP_TEST_PATH(path_2);
+    auto [db, db_fresh] = prepare_db(path_1, path_2, [&](Transaction& tr) {
+        auto table = tr.add_table_with_primary_key("class_table", type_Int, "pk");
+        auto col = table->add_column_list(type_Int, "list");
+        auto list = table->create_object_with_primary_key(0).get_list<Int>(col);
+        list.add(0);
+        list.add(1);
+        list.add(2);
+    });
+
+    // Perform some conflicting list writes which aren't recoverable and require
+    // a copy
+    { // modify local
+        auto wt = db->start_write();
+        auto list = wt->get_table("class_table")->begin()->get_list<Int>("list");
+        list.remove(0);
+        list.add(4);
+        wt->commit_and_continue_writing();
+        list.remove(0);
+        list.add(5);
+        wt->commit_and_continue_writing();
+        list.remove(0);
+        list.add(6);
+        wt->commit();
+    }
+    { // modify remote
+        auto wt = db_fresh->start_write();
+        auto list = wt->get_table("class_table")->begin()->get_list<Int>("list");
+        list.clear();
+        list.add(7);
+        list.add(8);
+        list.add(9);
+        wt->commit();
+    }
+
+    expect_reset(test_context, *db, *db_fresh, ClientResyncMode::Recover, nullptr);
+
+    // List should match the pre-reset local state
+    auto rt = db->start_read();
+    auto list = rt->get_table("class_table")->begin()->get_list<Int>("list");
+    CHECK_EQUAL(list.size(), 3);
+    CHECK_EQUAL(list.get(0), 4);
+    CHECK_EQUAL(list.get(1), 5);
+    CHECK_EQUAL(list.get(2), 6);
+
+    // The second and third changeset should now be empty and so excluded from
+    // get_local_changes()
+    auto repl = static_cast<ClientReplication*>(db->get_replication());
+    auto changes = repl->get_history().get_local_changes(rt->get_version());
+    CHECK_EQUAL(changes.size(), 1);
+}
+
+TEST(ClientReset_Recover_RecoverableChangesOnListsAfterUnrecoverableAreNotDuplicated)
+{
+    SHARED_GROUP_TEST_PATH(path_1);
+    SHARED_GROUP_TEST_PATH(path_2);
+    auto [db, db_fresh] = prepare_db(path_1, path_2, [&](Transaction& tr) {
+        auto table = tr.add_table_with_primary_key("class_table", type_Int, "pk");
+        auto col = table->add_column_list(type_Int, "list");
+        auto list = table->create_object_with_primary_key(0).get_list<Int>(col);
+        list.add(0);
+        list.add(1);
+    });
+
+    auto sub_store = SubscriptionStore::create(db);
+    add_subscription(*sub_store, "complete", db->start_read()->get_table("class_table")->where(),
+                     SubscriptionSet::State::Complete);
+
+    { // offline modify local
+        auto wt = db->start_write();
+        auto list = wt->get_table("class_table")->begin()->get_list<Int>("list");
+        // triggers a copy since it's unrecoverable
+        list.remove(0);
+        list.add(4);
+        wt->commit_and_continue_as_read();
+
+        // Pending subscription in between the two writes makes this recovered
+        // in a second write, which shouldn't actually do anything as the new
+        // element was already added by the copy
+        add_subscription(*sub_store, "pending 1", wt->get_table("class_table")->where());
+        wt->promote_to_write();
+        list.add(5);
+        wt->commit();
+    }
+    { // remote modification that should be discarded
+        auto wt = db_fresh->start_write();
+        auto list = wt->get_table("class_table")->begin()->get_list<Int>("list");
+        list.clear();
+        list.add(8);
+        wt->commit();
+    }
+
+    expect_reset(test_context, *db, *db_fresh, ClientResyncMode::Recover, sub_store.get());
+
+    // List should match the pre-reset local state
+    auto rt = db->start_read();
+    auto list = rt->get_table("class_table")->begin()->get_list<Int>("list");
+    CHECK_EQUAL(list.size(), 3);
+    CHECK_EQUAL(list.get(0), 1);
+    CHECK_EQUAL(list.get(1), 4);
+    CHECK_EQUAL(list.get(2), 5);
+
+    // The second changeset should now be empty and so excluded from get_local_changes()
+    auto repl = static_cast<ClientReplication*>(db->get_replication());
+    auto changes = repl->get_history().get_local_changes(rt->get_version());
+    CHECK_EQUAL(changes.size(), 1);
+}
+
+// Apply uploaded changes in src to dst as if they had been exchanged by sync
+void apply_changes(DB& src, DB& dst)
+{
+    auto& src_history = static_cast<ClientReplication*>(src.get_replication())->get_history();
+    auto& dst_history = static_cast<ClientReplication*>(dst.get_replication())->get_history();
+
+    version_type dst_client_version;
+    SaltedFileIdent dst_file_ident;
+    SyncProgress dst_progress;
+    dst_history.get_status(dst_client_version, dst_file_ident, dst_progress);
+
+    std::vector<util::AppendBuffer<char>> decompressed_changesets;
+    std::vector<RemoteChangeset> remote_changesets;
+    auto local_changes = src_history.get_local_changes(src.get_version_of_latest_snapshot());
+    for (auto& change : local_changes) {
+        decompressed_changesets.emplace_back();
+        auto& buffer = decompressed_changesets.back();
+        ChunkedBinaryInputStream is{change.changeset};
+        util::compression::decompress_nonportable(is, buffer);
+
+        // Arbitrary non-zero file ident
+        file_ident_type file_ident = 2;
+        // Treat src's changesets as being "after" dst's
+        uint_fast64_t timestamp = -1;
+        remote_changesets.emplace_back(change.version, dst_progress.upload.last_integrated_server_version,
+                                       BinaryData(buffer.data(), buffer.size()), timestamp, file_ident);
+    }
+
+    dst_progress.download.server_version += remote_changesets.size();
+    dst_progress.latest_server_version.version += remote_changesets.size();
+
+    util::NullLogger logger;
+    VersionInfo new_version;
+    dst_history.integrate_server_changesets(dst_progress, nullptr, remote_changesets, new_version,
+                                            DownloadBatchState::SteadyState, logger, dst.start_read());
+}
+
+TEST(ClientReset_Recover_ReciprocalListChanges)
+{
+    SHARED_GROUP_TEST_PATH(path_1);
+    SHARED_GROUP_TEST_PATH(path_2);
+    auto [db, db_fresh] = prepare_db(path_1, path_2, [&](Transaction& tr) {
+        auto table = tr.add_table_with_primary_key("class_table", type_Int, "pk");
+        auto col = table->add_column_list(type_Int, "list");
+        auto list = table->create_object_with_primary_key(0).get_list<Int>(col);
+        for (int i = 0; i < 5; ++i) {
+            list.add(i * 10);
+        }
+    });
+
+    {
+        auto wt = db->start_write();
+        auto list = wt->get_table("class_table")->begin()->get_list<Int>("list");
+        for (int i = 0; i < 5; ++i) {
+            list.insert(i * 2 + 1, i * 10 + 1);
+        }
+        // list is now [0, 1, 10, 11, 20, 21, 30, 31, 40, 41]
+        wt->commit();
+    }
+
+    {
+        auto wt = db_fresh->start_write();
+        auto list = wt->get_table("class_table")->begin()->get_list<Int>("list");
+        for (int i = 0; i < 5; ++i) {
+            list.insert(i * 2 + 1, i * 10 + 2);
+        }
+        // list is now [0, 2, 10, 12, 20, 22, 30, 32, 40, 42]
+        wt->commit();
+    }
+
+    // Apply the changes in db_fresh to db as if it was a changeset downloaded
+    // from the server. This creates reciprocal history for the unuploaded
+    // changeset in db.
+    // list is now [0, 1, 2, 10, 11, 12, 20, 21, 22, 30, 31, 32, 40, 41, 42]
+    apply_changes(*db_fresh, *db);
+
+    // The local realm is fully up-to-date with the server, so this client reset
+    // shouldn't modify the group. However, if it reapplied the original changesets
+    // and not the reciprocal history, it'd result in the list being
+    // [0, 1, 2, 11, 10, 21, 12, 31, 20, 41, 22, 30, 32, 40, 42]
+    expect_reset(test_context, *db, *db_fresh, ClientResyncMode::Recover, nullptr);
+
+    auto rt = db->start_read();
+    auto list = rt->get_table("class_table")->begin()->get_list<Int>("list");
+    CHECK_OR_RETURN(list.size() == 15);
+    for (int i = 0; i < 5; ++i) {
+        CHECK_EQUAL(list[i * 3], i * 10);
+        CHECK_EQUAL(list[i * 3 + 1], i * 10 + 1);
+        CHECK_EQUAL(list[i * 3 + 2], i * 10 + 2);
+    }
+}
+
+TEST(ClientReset_Recover_UpdatesReciprocalHistory)
+{
+    SHARED_GROUP_TEST_PATH(path_1);
+    SHARED_GROUP_TEST_PATH(path_2);
+    SHARED_GROUP_TEST_PATH(path_3);
+
+    auto [db, db_fresh] = prepare_db(path_1, path_2, [&](Transaction& tr) {
+        auto table = tr.add_table_with_primary_key("class_table", type_Int, "pk");
+        auto col = table->add_column_list(type_Int, "list");
+        table->create_object_with_primary_key(0).get_list<Int>(col).add(0);
+    });
+
+    { // local online write that doesn't get uploaded
+        auto wt = db->start_write();
+        // This instruction is merged with the add in the remote write,
+        // generating reciprocal history. It is then discarded when replaying
+        // onto the fresh realm in the client reset as the object will no longer
+        // exist at that point
+        wt->get_table("class_table")->begin()->get_list<Int>("list").add(1);
+        // An instruction that won't get discarded when replaying to ensure
+        // the changeset remains non-empty
+        wt->get_table("class_table")->create_object_with_primary_key(1);
+        wt->commit();
+    }
+
+    { // remote write which gets sent to the client in a DOWNLOAD
+        auto wt = db_fresh->start_write();
+        wt->get_table("class_table")->begin()->get_list<Int>("list").add(2);
+        wt->commit();
+    }
+
+    // db now has a changeset waiting to be uploaded with both a changeset
+    // and reciprocal transform
+    apply_changes(*db_fresh, *db);
+
+    { // Freshly downloaded client reset realm doesn't have the object
+        auto wt = db_fresh->start_write();
+        wt->get_table("class_table")->begin()->remove();
+        wt->commit();
+    }
+
+    // Make a copy as client reset will delete the fresh realm
+    mark_as_synchronized(*db_fresh);
+    db_fresh->write_copy(path_3, nullptr);
+
+    // client reset will discard the recovered array insertion as the object
+    // doesn't exist, but keep the object creation
+    expect_reset(test_context, *db, *db_fresh, ClientResyncMode::Recover, nullptr);
+
+    // Recreate the object and add a different value to the list
+    {
+        db_fresh = DB::create(make_client_replication(), path_3);
+        auto wt = db_fresh->start_write();
+        wt->get_table("class_table")->create_object_with_primary_key(0).get_list<Int>("list").add(3);
+        wt->commit();
+    }
+
+    // If the client failed to discard the old reciprocal transform when performing
+    // the client reset this'll merge the ArrayInsert with the discarded ArrayInsert,
+    // and then throw an exception because prior_size is now incorrect
+    apply_changes(*db_fresh, *db);
+
+    // Sanity check the end state
+    auto rt = db->start_read();
+    auto table = rt->get_table("class_table");
+    CHECK_OR_RETURN(table->size() == 2);
+    auto list = table->get_object(1).get_list<Int>("list");
+    CHECK_OR_RETURN(list.size() == 1);
+    CHECK_EQUAL(list.get(0), 3);
 }
 
 } // unnamed namespace

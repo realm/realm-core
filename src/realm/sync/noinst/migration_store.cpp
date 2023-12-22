@@ -83,7 +83,8 @@ bool MigrationStore::load_data(bool read_only)
     // Load the metadata schema unless it was just created
     if (!m_migration_table) {
         if (*schema_version != c_schema_version) {
-            throw std::runtime_error("Invalid schema version for flexible sync migration store metadata");
+            throw RuntimeError(ErrorCodes::UnsupportedFileFormatVersion,
+                               "Invalid schema version for flexible sync migration store metadata");
         }
         load_sync_metadata_schema(tr, &internal_tables);
     }
@@ -304,7 +305,7 @@ Subscription MigrationStore::make_subscription(const std::string& object_class_n
     return Subscription{subscription_name, object_class_name, rql_query_string};
 }
 
-void MigrationStore::create_subscriptions(const SubscriptionStore& subs_store)
+void MigrationStore::create_subscriptions(SubscriptionStore& subs_store)
 {
     std::unique_lock lock{m_mutex};
     if (m_state != MigrationState::Migrated) {
@@ -315,7 +316,7 @@ void MigrationStore::create_subscriptions(const SubscriptionStore& subs_store)
     create_subscriptions(subs_store, *m_query_string);
 }
 
-void MigrationStore::create_subscriptions(const SubscriptionStore& subs_store, const std::string& rql_query_string)
+void MigrationStore::create_subscriptions(SubscriptionStore& subs_store, const std::string& rql_query_string)
 {
     if (rql_query_string.empty()) {
         return;
@@ -354,7 +355,7 @@ void MigrationStore::create_subscriptions(const SubscriptionStore& subs_store, c
     mut_sub.commit();
 }
 
-void MigrationStore::create_sentinel_subscription_set(const SubscriptionStore& subs_store)
+void MigrationStore::create_sentinel_subscription_set(SubscriptionStore& subs_store)
 {
     std::lock_guard lock{m_mutex};
     if (m_state != MigrationState::Migrated) {

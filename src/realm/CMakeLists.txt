@@ -101,6 +101,8 @@ set(UTIL_SOURCES
     util/random.cpp
     util/resource_limits.cpp
     util/uri.cpp
+    util/bson/bson.cpp
+    util/bson/regular_expression.cpp
 )
 
 set(REALM_INSTALL_HEADERS
@@ -208,6 +210,12 @@ set(REALM_INSTALL_HEADERS
     util/base64.hpp
     util/basic_system_errors.hpp
     util/bind_ptr.hpp
+    util/bson/bson.hpp
+    util/bson/indexed_map.hpp
+    util/bson/max_key.hpp
+    util/bson/min_key.hpp
+    util/bson/mongo_timestamp.hpp
+    util/bson/regular_expression.hpp
     util/buffer.hpp
     util/buffer_stream.hpp
     util/cf_ptr.hpp
@@ -232,7 +240,6 @@ set(REALM_INSTALL_HEADERS
     util/memory_stream.hpp
     util/misc_errors.hpp
     util/misc_ext_errors.hpp
-    util/miscellaneous.hpp
     util/optional.hpp
     util/overload.hpp
     util/platform_info.hpp
@@ -249,11 +256,6 @@ set(REALM_INSTALL_HEADERS
     util/to_string.hpp
     util/type_traits.hpp
     util/uri.hpp
-
-    metrics/metrics.hpp
-    metrics/metric_timer.hpp
-    metrics/query_info.hpp
-    metrics/transaction_info.hpp
 ) # REALM_INSTALL_HEADERS
 
 set(REALM_NOINST_HEADERS
@@ -278,12 +280,6 @@ set(REALM_NOINST_HEADERS
     util/timestamp_logger.hpp
     util/value_reset_guard.hpp
 ) # REALM_NOINST_HEADERS
-
-list(APPEND REALM_SOURCES
-    metrics/metrics.cpp
-    metrics/metric_timer.cpp
-    metrics/query_info.cpp
-    metrics/transaction_info.cpp)
 
 if(NOT MSVC)
     list(APPEND REALM_SOURCES util/interprocess_mutex.cpp)
@@ -317,7 +313,6 @@ set_target_properties(Storage PROPERTIES
     OUTPUT_NAME "realm"
 )
 
-target_compile_options(Storage PUBLIC ${REALM_SANITIZER_FLAGS})
 if(REALM_USE_FAST_LINKER)
     target_link_options(Storage PUBLIC ${REALM_USE_FAST_LINKER})
 endif()
@@ -326,9 +321,12 @@ target_compile_definitions(Storage PUBLIC
   $<$<CONFIG:Debug>:REALM_DEBUG=1>
 )
 
-if(NOT MSVC)
+if (REALM_SANITIZER_FLAGS)
     target_compile_options(Storage PUBLIC ${REALM_SANITIZER_FLAGS})
-    target_link_options(Storage PUBLIC ${REALM_SANITIZER_FLAGS})
+
+    if (REALM_SANITIZER_LINK_FLAGS)
+        target_link_options(Storage PUBLIC ${REALM_SANITIZER_LINK_FLAGS})
+    endif()
 endif()
 
 target_include_directories(Storage INTERFACE
@@ -368,6 +366,10 @@ elseif(APPLE)
 endif()
 
 target_link_libraries(Storage INTERFACE Threads::Threads)
+
+if(TARGET Backtrace::Backtrace)
+    target_link_libraries(Storage PUBLIC Backtrace::Backtrace)
+endif()
 
 if(REALM_ENABLE_ENCRYPTION AND UNIX AND NOT APPLE AND REALM_HAVE_OPENSSL)
     target_link_libraries(Storage PUBLIC OpenSSL::Crypto)

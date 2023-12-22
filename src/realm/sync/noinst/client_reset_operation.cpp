@@ -16,14 +16,15 @@
  *
  **************************************************************************/
 
-#include <realm/transaction.hpp>
+#include <realm/sync/noinst/client_reset_operation.hpp>
+
 #include <realm/sync/history.hpp>
 #include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/noinst/client_reset.hpp>
-#include <realm/sync/noinst/client_reset_operation.hpp>
+#include <realm/transaction.hpp>
 #include <realm/util/scope_exit.hpp>
 
-namespace realm::_impl {
+namespace realm::_impl::client_reset {
 
 namespace {
 
@@ -31,24 +32,7 @@ constexpr static std::string_view c_fresh_suffix(".fresh");
 
 } // namespace
 
-ClientResetOperation::ClientResetOperation(util::Logger& logger, DBRef db, DBRef db_fresh, ClientResyncMode mode,
-                                           CallbackBeforeType notify_before, CallbackAfterType notify_after,
-                                           bool recovery_is_allowed)
-    : m_logger{logger}
-    , m_db{db}
-    , m_db_fresh(std::move(db_fresh))
-    , m_mode(mode)
-    , m_notify_before(std::move(notify_before))
-    , m_notify_after(std::move(notify_after))
-    , m_recovery_is_allowed(recovery_is_allowed)
-{
-    REALM_ASSERT(m_db);
-    REALM_ASSERT_RELEASE(m_mode != ClientResyncMode::Manual);
-    m_logger.debug("Create ClientResetOperation, realm_path = %1, mode = %2, recovery_allowed = %3", m_db->get_path(),
-                   m_mode, m_recovery_is_allowed);
-}
-
-std::string ClientResetOperation::get_fresh_path_for(const std::string& path)
+std::string get_fresh_path_for(const std::string& path)
 {
     const size_t suffix_len = c_fresh_suffix.size();
     REALM_ASSERT(path.length());
@@ -57,7 +41,7 @@ std::string ClientResetOperation::get_fresh_path_for(const std::string& path)
     return path + c_fresh_suffix.data();
 }
 
-bool ClientResetOperation::is_fresh_path(const std::string& path)
+bool is_fresh_path(const std::string& path)
 {
     const size_t suffix_len = c_fresh_suffix.size();
     REALM_ASSERT(path.length());
@@ -67,83 +51,55 @@ bool ClientResetOperation::is_fresh_path(const std::string& path)
     return path.substr(path.size() - suffix_len, suffix_len) == c_fresh_suffix;
 }
 
-bool ClientResetOperation::finalize(sync::SaltedFileIdent salted_file_ident, sync::SubscriptionStore* sub_store,
-                                    util::UniqueFunction<void(int64_t)> on_flx_version_complete)
+bool perform_client_reset(util::Logger& logger, DB& db, DB& fresh_db, ClientResyncMode mode,
+                          CallbackBeforeType notify_before, CallbackAfterType notify_after,
+                          sync::SaltedFileIdent new_file_ident, sync::SubscriptionStore* sub_store,
+                          util::FunctionRef<void(int64_t)> on_flx_version, bool recovery_is_allowed)
 {
-    m_salted_file_ident = salted_file_ident;
+    REALM_ASSERT(mode != ClientResyncMode::Manual);
+    logger.debug("Possibly beginning client reset operation: realm_path = %1, mode = %2, recovery_allowed = %3",
+                 db.get_path(), mode, recovery_is_allowed);
+
+    auto always_try_clean_up = util::make_scope_exit([&]() noexcept {
+        std::string path_to_clean = fresh_db.get_path();
+        try {
+            fresh_db.close();
+            constexpr bool delete_lockfile = true;
+            DB::delete_files(path_to_clean, nullptr, delete_lockfile);
+        }
+        catch (const std::exception& err) {
+            logger.warn("In ClientResetOperation::finalize, the fresh copy '%1' could not be cleaned up due to "
+                        "an exception: '%2'",
+                        path_to_clean, err.what());
+            // ignored, this is just a best effort
+        }
+    });
+
     // only do the reset if there is data to reset
     // if there is nothing in this Realm, then there is nothing to reset and
     // sync should be able to continue as normal
-    auto latest_version = m_db->get_version_id_of_latest_snapshot();
-
-    bool local_realm_exists = latest_version.version != 0;
-    m_logger.debug("ClientResetOperation::finalize, realm_path = %1, local_realm_exists = %2, mode = %3",
-                   m_db->get_path(), local_realm_exists, m_mode);
+    auto latest_version = db.get_version_id_of_latest_snapshot();
+    bool local_realm_exists = latest_version.version > 1;
     if (!local_realm_exists) {
+        logger.debug("Local Realm file has never been written to, so skipping client reset.");
         return false;
     }
 
-    REALM_ASSERT_EX(m_db_fresh, m_db->get_path(), m_mode);
-
-    client_reset::LocalVersionIDs local_version_ids;
-    auto always_try_clean_up = util::make_scope_exit([&]() noexcept {
-        clean_up_state();
-    });
-
-    VersionID frozen_before_state_version = m_notify_before ? m_notify_before() : latest_version;
+    VersionID frozen_before_state_version = notify_before ? notify_before() : latest_version;
 
     // If m_notify_after is set, pin the previous state to keep it around.
     TransactionRef previous_state;
-    if (m_notify_after) {
-        previous_state = m_db->start_frozen(frozen_before_state_version);
+    if (notify_after) {
+        previous_state = db.start_frozen(frozen_before_state_version);
     }
-    bool did_recover_out = false;
-    local_version_ids = client_reset::perform_client_reset_diff(
-        m_db, m_db_fresh, m_salted_file_ident, m_logger, m_mode, m_recovery_is_allowed, &did_recover_out, sub_store,
-        std::move(on_flx_version_complete)); // throws
+    bool did_recover = client_reset::perform_client_reset_diff(
+        db, fresh_db, new_file_ident, logger, mode, recovery_is_allowed, sub_store, on_flx_version); // throws
 
-    if (m_notify_after) {
-        m_notify_after(previous_state->get_version_of_current_transaction(), did_recover_out);
+    if (notify_after) {
+        notify_after(previous_state->get_version_of_current_transaction(), did_recover);
     }
-
-    m_client_reset_old_version = local_version_ids.old_version;
-    m_client_reset_new_version = local_version_ids.new_version;
 
     return true;
 }
 
-void ClientResetOperation::clean_up_state() noexcept
-{
-    if (m_db_fresh) {
-        std::string path_to_clean = m_db_fresh->get_path();
-        try {
-            // In order to obtain the lock and delete the realm, we first have to close
-            // the Realm. This requires that we are the only remaining ref holder, and
-            // this is expected. Releasing the last ref should release the hold on the
-            // lock file and allow us to clean up.
-            long use_count = m_db_fresh.use_count();
-            REALM_ASSERT_DEBUG_EX(use_count == 1, use_count, path_to_clean);
-            m_db_fresh.reset();
-            // clean up the fresh Realm
-            // we don't mind leaving the fresh lock file around because trying to delete it
-            // here could cause a race if there are multiple resets ongoing
-            bool did_lock = DB::call_with_lock(path_to_clean, [&](const std::string& path) {
-                constexpr bool delete_lockfile = false;
-                DB::delete_files(path, nullptr, delete_lockfile);
-            });
-            if (!did_lock) {
-                m_logger.warn("In ClientResetOperation::finalize, the fresh copy '%1' could not be cleaned up. "
-                              "There were %2 refs remaining.",
-                              path_to_clean, use_count);
-            }
-        }
-        catch (const std::exception& err) {
-            m_logger.warn("In ClientResetOperation::finalize, the fresh copy '%1' could not be cleaned up due to "
-                          "an exception: '%2'",
-                          path_to_clean, err.what());
-            // ignored, this is just a best effort
-        }
-    }
-}
-
-} // namespace realm::_impl
+} // namespace realm::_impl::client_reset

@@ -47,6 +47,7 @@ using namespace realm::test_util;
 
 namespace {
 
+#if !REALM_MOBILE
 TEST(Sync_HistoryMigration)
 {
     // Set to true to produce new versions of client and server-side files in
@@ -202,7 +203,7 @@ TEST(Sync_HistoryMigration)
         DBRef sg_2 = DB::create(sync::make_client_replication(), client_path_2);
         ReadTransaction rt_1{sg_1};
         ReadTransaction rt_2{sg_2};
-        return compare_groups(rt_1, rt_2, *(test_context.logger));
+        return compare_groups(rt_1, rt_2, *test_context.logger);
     };
 
     auto compare_client_and_server_files = [&](const std::string& client_path, const std::string& server_path) {
@@ -212,7 +213,7 @@ TEST(Sync_HistoryMigration)
         DBRef sg_2 = DB::create(history_2, server_path);
         ReadTransaction rt_1{sg_1};
         ReadTransaction rt_2{sg_2};
-        return compare_groups(rt_1, rt_2, *(test_context.logger));
+        return compare_groups(rt_1, rt_2, *test_context.logger);
     };
 
     std::string resources_dir = get_test_resource_path();
@@ -438,6 +439,8 @@ TEST(Sync_HistoryMigration)
 
     CHECK_NOT(produce_new_files); // Should not be enabled under normal circumstances
 }
+
+#endif // !REALM_MOBILE
 
 TEST(Sync_HistoryCompression)
 {

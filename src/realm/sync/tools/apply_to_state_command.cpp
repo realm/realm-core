@@ -42,7 +42,7 @@ struct DownloadMessage {
     int64_t query_version;
 
     Buffer<char> uncompressed_body_buffer;
-    std::vector<realm::sync::Transformer::RemoteChangeset> changesets;
+    std::vector<realm::sync::RemoteChangeset> changesets;
 
     static DownloadMessage parse(HeaderLineParser& msg, Logger& logger, bool is_flx_sync);
 };
@@ -135,7 +135,7 @@ DownloadMessage DownloadMessage::parse(HeaderLineParser& msg, Logger& logger, bo
 
     HeaderLineParser body(body_str);
     while (!body.at_end()) {
-        realm::sync::Transformer::RemoteChangeset cur_changeset;
+        realm::sync::RemoteChangeset cur_changeset;
         cur_changeset.remote_version = body.read_next<sync::version_type>();
         cur_changeset.last_integrated_local_version = body.read_next<sync::version_type>();
         cur_changeset.origin_timestamp = body.read_next<sync::timestamp_type>();

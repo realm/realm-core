@@ -29,7 +29,7 @@ void ArrayWithFind::find_all(IntegerColumn* result, int64_t value, size_t col_of
         end = m_array.m_size;
 
     QueryStateFindAll state(*result);
-    REALM_TEMPEX2(find_optimized, Equal, m_array.m_width, (value, begin, end, col_offset, &state, nullptr));
+    REALM_TEMPEX2(find_optimized, Equal, m_array.m_width, (value, begin, end, col_offset, &state));
 
     return;
 }
@@ -39,22 +39,22 @@ bool ArrayWithFind::find(int cond, int64_t value, size_t start, size_t end, size
                          QueryStateBase* state) const
 {
     if (cond == cond_Equal) {
-        return find<Equal>(value, start, end, baseindex, state, nullptr);
+        return find<Equal>(value, start, end, baseindex, state);
     }
     if (cond == cond_NotEqual) {
-        return find<NotEqual>(value, start, end, baseindex, state, nullptr);
+        return find<NotEqual>(value, start, end, baseindex, state);
     }
     if (cond == cond_Greater) {
-        return find<Greater>(value, start, end, baseindex, state, nullptr);
+        return find<Greater>(value, start, end, baseindex, state);
     }
     if (cond == cond_Less) {
-        return find<Less>(value, start, end, baseindex, state, nullptr);
+        return find<Less>(value, start, end, baseindex, state);
     }
     if (cond == cond_None) {
-        return find<None>(value, start, end, baseindex, state, nullptr);
+        return find<None>(value, start, end, baseindex, state);
     }
     else if (cond == cond_LeftNotNull) {
-        return find<NotNull>(value, start, end, baseindex, state, nullptr);
+        return find<NotNull>(value, start, end, baseindex, state);
     }
     REALM_ASSERT_DEBUG(false);
     return false;

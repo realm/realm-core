@@ -73,9 +73,6 @@ class TableFriend;
 namespace util {
 class Logger;
 }
-namespace metrics {
-class QueryInfo;
-}
 namespace query_parser {
 class Arguments;
 class KeyPathMapping;
@@ -294,7 +291,7 @@ public:
     /// Does the key refer to an object within the table?
     bool is_valid(ObjKey key) const noexcept
     {
-        return m_clusters.is_valid(key);
+        return key && m_clusters.is_valid(key);
     }
     GlobalKey get_object_id(ObjKey key) const;
     Obj get_object(ObjKey key) const
@@ -338,6 +335,8 @@ public:
     // - turns the object into a tombstone if links exist
     // - otherwise works just as remove_object()
     ObjKey invalidate_object(ObjKey key);
+    // Remove several objects
+    void batch_erase_objects(std::vector<ObjKey>& keys);
     Obj try_get_tombstone(ObjKey key) const
     {
         REALM_ASSERT(key.is_unresolved());
@@ -384,6 +383,8 @@ public:
     // Used by upgrade
     void set_sequence_number(uint64_t seq);
     void set_collision_map(ref_type ref);
+    // Used for testing purposes.
+    void set_col_key_sequence_number(uint64_t seq);
 
     // Get the key of this table directly, without needing a Table accessor.
     static TableKey get_key_direct(Allocator& alloc, ref_type top_ref);
@@ -851,7 +852,6 @@ private:
 
     friend class _impl::TableFriend;
     friend class Query;
-    friend class metrics::QueryInfo;
     template <class>
     friend class SimpleQuerySupport;
     friend class TableView;
@@ -905,10 +905,10 @@ public:
 
 private:
     friend class ColKeys;
-    const Table* m_table;
+    ConstTableRef m_table;
     size_t m_pos;
 
-    ColKeyIterator(const Table* t, size_t p)
+    ColKeyIterator(const ConstTableRef& t, size_t p)
         : m_table(t)
         , m_pos(p)
     {
@@ -917,8 +917,8 @@ private:
 
 class ColKeys {
 public:
-    ColKeys(const Table* t)
-        : m_table(t)
+    ColKeys(ConstTableRef&& t)
+        : m_table(std::move(t))
     {
     }
 
@@ -949,7 +949,7 @@ public:
     }
 
 private:
-    const Table* m_table;
+    ConstTableRef m_table;
 };
 
 // Class used to collect a chain of links when building up a Query following links.
@@ -1081,7 +1081,7 @@ private:
 
 inline ColKeys Table::get_column_keys() const
 {
-    return ColKeys(this);
+    return ColKeys(ConstTableRef(this, m_alloc.get_instance_version()));
 }
 
 inline uint_fast64_t Table::get_content_version() const noexcept
@@ -1359,6 +1359,10 @@ public:
         table.remove_recursive(rows); // Throws
     }
 
+    static void batch_erase_objects(Table& table, std::vector<ObjKey>& keys)
+    {
+        table.batch_erase_objects(keys); // Throws
+    }
     static void batch_erase_rows(Table& table, const KeyColumn& keys)
     {
         table.batch_erase_rows(keys); // Throws

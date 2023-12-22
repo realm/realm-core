@@ -27,7 +27,6 @@
 
 #include <realm/util/file_mapper.hpp>
 #include <realm/util/memory_stream.hpp>
-#include <realm/util/miscellaneous.hpp>
 #include <realm/util/thread.hpp>
 #include <realm/impl/destroy_guard.hpp>
 #include <realm/utilities.hpp>
@@ -76,7 +75,6 @@ Group::Group(const std::string& file_path, const char* encryption_key)
     , m_top(m_alloc)
     , m_tables(m_alloc)
     , m_table_names(m_alloc)
-    , m_total_rows(0)
 {
     init_array_parents();
 
@@ -99,7 +97,6 @@ Group::Group(BinaryData buffer, bool take_ownership)
     , m_top(m_alloc)
     , m_tables(m_alloc)
     , m_table_names(m_alloc)
-    , m_total_rows(0)
 {
     REALM_ASSERT(buffer.data());
 
@@ -118,7 +115,6 @@ Group::Group(SlabAlloc* alloc) noexcept
     m_top(m_alloc)
     , m_tables(m_alloc)
     , m_table_names(m_alloc)
-    , m_total_rows(0)
 {
     init_array_parents();
 }
@@ -560,9 +556,6 @@ void Group::attach(ref_type top_ref, bool writable, bool create_group_when_missi
     while (m_table_accessors.size() < sz) {
         m_table_accessors.emplace_back();
     }
-#if REALM_METRICS
-    update_num_objects();
-#endif // REALM_METRICS
 }
 
 
@@ -576,23 +569,6 @@ void Group::detach() noexcept
     m_top.detach();
 
     m_attached = false;
-}
-
-void Group::update_num_objects()
-{
-#if REALM_METRICS
-    if (m_metrics) {
-        // This is quite invasive and completely defeats the lazy loading mechanism
-        // where table accessors are only instantiated on demand, because they are all created here.
-
-        m_total_rows = 0;
-        auto keys = get_table_keys();
-        for (auto key : keys) {
-            ConstTableRef t = get_table(key);
-            m_total_rows += t->size();
-        }
-    }
-#endif // REALM_METRICS
 }
 
 void Group::attach_shared(ref_type new_top_ref, size_t new_file_size, bool writable, VersionID version)
@@ -751,7 +727,6 @@ Table* Group::do_add_table(StringData name, Table::Type table_type, bool do_repl
 
     return table;
 }
-
 
 Table* Group::create_table_accessor(size_t table_ndx)
 {
@@ -990,6 +965,10 @@ void Group::write(File& file, const char* encryption_key, uint_fast64_t version_
     REALM_ASSERT(file.get_size() == 0);
 
     file.set_encryption_key(encryption_key);
+
+    // Force the file system to allocate a node so we get a stable unique id.
+    // See File::get_unique_id(). This is used to distinguish encrypted mappings.
+    file.resize(1);
 
     // The aim is that the buffer size should be at least 1/256 of needed size but less than 64 Mb
     constexpr size_t upper_bound = 64 * 1024 * 1024;
@@ -1750,7 +1729,6 @@ MemStats Group::get_stats()
 
     return mem_stats;
 }
-
 
 void Group::print() const
 {

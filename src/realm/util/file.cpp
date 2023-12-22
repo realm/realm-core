@@ -414,6 +414,7 @@ void File::open_internal(const std::string& path, AccessMode a, CreateMode c, in
 {
     REALM_ASSERT_RELEASE(!is_attached());
     m_path = path; // for error reporting and debugging
+    m_cached_unique_id = {};
 
 #ifdef _WIN32 // Windows version
 
@@ -569,6 +570,32 @@ void File::close() noexcept
     REALM_ASSERT_RELEASE(r == 0);
     m_fd = -1;
 
+#endif
+}
+
+void File::close_static(FileDesc fd)
+{
+#ifdef _WIN32
+    if (!fd)
+        return;
+
+    if (!CloseHandle(fd))
+        throw std::system_error(GetLastError(), std::system_category(),
+                                "CloseHandle() failed from File::close_static()");
+#else
+    if (fd < 0)
+        return;
+
+    int ret = -1;
+    do {
+        ret = ::close(fd);
+    } while (ret == -1 && errno == EINTR);
+
+    if (ret != 0) {
+        int err = errno; // Eliminate any risk of clobbering
+        if (err == EBADF || err == EIO)
+            throw SystemError(err, "File::close_static() failed");
+    }
 #endif
 }
 
@@ -880,7 +907,7 @@ void File::prealloc(size_t size)
 #endif
     };
 
-#if defined(_POSIX_C_SOURCE) && _POSIX_C_SOURCE >= 200112L // POSIX.1-2001 version
+#if REALM_HAVE_POSIX_FALLOCATE
     // Mostly Linux only
     if (!prealloc_if_supported(0, new_size)) {
         consume_space_interlocked();
@@ -954,7 +981,7 @@ void File::prealloc(size_t size)
 #error Please check if/how your OS supports file preallocation
 #endif
 
-#endif // !(_POSIX_C_SOURCE >= 200112L)
+#endif // REALM_HAVE_POSIX_FALLOCATE
 }
 
 
@@ -962,7 +989,7 @@ bool File::prealloc_if_supported(SizeType offset, size_t size)
 {
     REALM_ASSERT_RELEASE(is_attached());
 
-#if defined(_POSIX_C_SOURCE) && _POSIX_C_SOURCE >= 200112L // POSIX.1-2001 version
+#if REALM_HAVE_POSIX_FALLOCATE
 
     REALM_ASSERT_RELEASE(is_prealloc_supported());
 
@@ -1015,7 +1042,7 @@ bool File::prealloc_if_supported(SizeType offset, size_t size)
 
 bool File::is_prealloc_supported()
 {
-#if defined(_POSIX_C_SOURCE) && _POSIX_C_SOURCE >= 200112L // POSIX.1-2001 version
+#if REALM_HAVE_POSIX_FALLOCATE
     return true;
 #else
     return false;
@@ -1558,22 +1585,50 @@ bool File::compare(const std::string& path_1, const std::string& path_2)
     return true;
 }
 
-bool File::is_same_file_static(FileDesc f1, FileDesc f2)
+bool File::is_same_file_static(FileDesc f1, FileDesc f2, const std::string& path1, const std::string& path2)
 {
-    return get_unique_id(f1) == get_unique_id(f2);
+    return get_unique_id(f1, path1) == get_unique_id(f2, path2);
 }
 
 bool File::is_same_file(const File& f) const
 {
     REALM_ASSERT_RELEASE(is_attached());
     REALM_ASSERT_RELEASE(f.is_attached());
-    return is_same_file_static(m_fd, f.m_fd);
+    return is_same_file_static(m_fd, f.m_fd, m_path, f.m_path);
 }
 
-File::UniqueID File::get_unique_id() const
+FileDesc File::dup_file_desc(FileDesc fd)
+{
+    FileDesc fd_duped;
+#ifdef _WIN32
+    if (!DuplicateHandle(GetCurrentProcess(), fd, GetCurrentProcess(), &fd_duped, 0, FALSE, DUPLICATE_SAME_ACCESS))
+        throw std::system_error(GetLastError(), std::system_category(), "DuplicateHandle() failed");
+#else
+    fd_duped = dup(fd);
+
+    if (fd_duped == -1) {
+        int err = errno; // Eliminate any risk of clobbering
+        throw std::system_error(err, std::system_category(), "dup() failed");
+    }
+#endif // conditonal on _WIN32
+    return fd_duped;
+}
+
+File::UniqueID File::get_unique_id()
 {
     REALM_ASSERT_RELEASE(is_attached());
-    return File::get_unique_id(m_fd);
+    File::UniqueID uid = File::get_unique_id(m_fd, m_path);
+    if (!m_cached_unique_id) {
+        m_cached_unique_id = std::make_optional(uid);
+    }
+    if (m_cached_unique_id != uid) {
+        throw FileAccessError(ErrorCodes::FileOperationFailed,
+                              util::format("The unique id of this Realm file has changed unexpectedly, this could be "
+                                           "due to modifications by an external process '%1'",
+                                           m_path),
+                              m_path);
+    }
+    return uid;
 }
 
 FileDesc File::get_descriptor() const
@@ -1597,27 +1652,36 @@ std::optional<File::UniqueID> File::get_unique_id(const std::string& path)
         throw SystemError(GetLastError(), "CreateFileW failed");
     }
 
-    return get_unique_id(fileHandle);
+    return get_unique_id(fileHandle, path);
 #else // POSIX version
     struct stat statbuf;
     if (::stat(path.c_str(), &statbuf) == 0) {
+        if (statbuf.st_size == 0) {
+            // On exFAT systems the inode and device are not populated correctly until the file
+            // has been allocated some space. The uid can also be reassigned if the file is
+            // truncated to zero. This has led to bugs where a unique id returned here was
+            // reused by different files. The following check ensures that this is not
+            // happening anywhere else in future code.
+            return none;
+        }
         return File::UniqueID(statbuf.st_dev, statbuf.st_ino);
     }
     int err = errno; // Eliminate any risk of clobbering
     // File doesn't exist
     if (err == ENOENT)
         return none;
-    throw SystemError(err, format_errno("fstat() failed: %1", err));
+    throw SystemError(err, format_errno("fstat() failed: %1 for '%2'", err, path));
 #endif
 }
 
-File::UniqueID File::get_unique_id(FileDesc file)
+File::UniqueID File::get_unique_id(FileDesc file, const std::string& debug_path)
 {
 #ifdef _WIN32 // Windows version
     REALM_ASSERT(file != nullptr);
     File::UniqueID ret;
     if (GetFileInformationByHandleEx(file, FileIdInfo, &ret.id_info, sizeof(ret.id_info)) == 0) {
-        throw std::system_error(GetLastError(), std::system_category(), "GetFileInformationByHandleEx() failed");
+        throw std::system_error(GetLastError(), std::system_category(),
+                                util::format("GetFileInformationByHandleEx() failed for '%1'", debug_path));
     }
 
     return ret;
@@ -1625,9 +1689,22 @@ File::UniqueID File::get_unique_id(FileDesc file)
     REALM_ASSERT(file >= 0);
     struct stat statbuf;
     if (::fstat(file, &statbuf) == 0) {
+        // On exFAT systems the inode and device are not populated correctly until the file
+        // has been allocated some space. The uid can also be reassigned if the file is
+        // truncated to zero. This has led to bugs where a unique id returned here was
+        // reused by different files. The following check ensures that this is not
+        // happening anywhere else in future code.
+        if (statbuf.st_size == 0) {
+            throw FileAccessError(
+                ErrorCodes::FileOperationFailed,
+                util::format("Attempt to get unique id on an empty file. This could be due to an external "
+                             "process modifying Realm files. '%1'",
+                             debug_path),
+                debug_path);
+        }
         return UniqueID(statbuf.st_dev, statbuf.st_ino);
     }
-    throw std::system_error(errno, std::system_category(), "fstat() failed");
+    throw std::system_error(errno, std::system_category(), util::format("fstat() failed for '%1'", debug_path));
 #endif
 }
 

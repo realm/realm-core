@@ -597,6 +597,44 @@ struct BenchmarkMixedCaseInsensitiveEqual : public BenchmarkWithType<Type> {
     }
 };
 
+template <typename Type>
+struct BenchmarkRangeForType : public BenchmarkWithType<Type> {
+    using Base = BenchmarkWithType<Type>;
+    using underlying_type = typename Type::underlying_type;
+    BenchmarkRangeForType<Type>()
+        : BenchmarkWithType<Type>()
+    {
+        BenchmarkWithType<Type>::set_name_with_prefix("QueryRange");
+    }
+
+    void before_all(DBRef group) override
+    {
+        BenchmarkWithType<Type>::before_all(group);
+        std::sort(this->needles.begin(), this->needles.end());
+    }
+
+    void operator()(DBRef) override
+    {
+        for (size_t i = 1; i < Base::needles.size(); i++) {
+            if constexpr (std::is_same_v<underlying_type, Mixed>) {
+                TableView results = Base::m_table->where()
+                                        .greater(Base::m_col, Base::needles[i - 1])
+                                        .less(Base::m_col, Base::needles[i])
+                                        .find_all();
+                static_cast<void>(results);
+            }
+            else {
+                TableView results = Base::m_table->where()
+                                        .greater(Base::m_col, Base::needles[i - 1].template get<underlying_type>())
+                                        .less(Base::m_col, Base::needles[i].template get<underlying_type>())
+                                        .find_all();
+                static_cast<void>(results);
+            }
+        }
+    }
+};
+
+
 struct BenchmarkWithTimestamps : Benchmark {
     std::multiset<Timestamp> values;
     Timestamp needle;
@@ -1117,6 +1155,24 @@ struct BenchmarkQueryChainedOrInts : BenchmarkWithIntsTable {
     }
 };
 
+struct BenchmarkQueryChainedOrIntsCount : BenchmarkQueryChainedOrInts {
+    const char* name() const
+    {
+        return "QueryChainedOrIntsCount";
+    }
+
+    void operator()(DBRef)
+    {
+        ConstTableRef table = m_table;
+        Query query = table->where();
+        for (size_t i = 0; i < values_to_query.size(); ++i) {
+            query.Or().equal(m_col, values_to_query[i]);
+        }
+        size_t matches = query.count();
+        REALM_ASSERT_EX(matches == num_queried_matches, matches, num_queried_matches, values_to_query.size());
+    }
+};
+
 struct BenchmarkQueryChainedOrIntsIndexed : BenchmarkQueryChainedOrInts {
     const char* name() const
     {
@@ -1163,6 +1219,52 @@ struct BenchmarkQueryIntEqualityIndexed : BenchmarkQueryIntEquality {
         TableRef t = tr.get_table(name());
         t->add_search_index(m_col);
         tr.commit();
+    }
+};
+
+struct BenchmarkForeignAggAvg : BenchmarkWithIntsTable {
+    ColKey m_double_col;
+    Random m_rand;
+    const size_t num_queried_matches = 1000;
+    const size_t num_rows = BASE_SIZE;
+    std::vector<int64_t> values_to_query;
+
+    const char* name() const
+    {
+        return "QueryWithForeignAggAvg";
+    }
+
+    void before_all(DBRef group)
+    {
+        BenchmarkWithIntsTable::before_all(group);
+        WriteTransaction tr(group);
+        TableRef t = tr.get_table(name());
+        m_double_col = t->add_column(type_Double, "double_col");
+        std::vector<ObjKey> keys;
+        t->create_objects(num_rows, keys);
+        REALM_ASSERT(num_rows > num_queried_matches);
+        Random r;
+        size_t i = 0;
+        for (auto e : *t) {
+            e.set<Int>(m_col, i).set<Double>(m_double_col, double(i));
+            ++i;
+        }
+        for (i = 0; i < num_queried_matches; ++i) {
+            size_t ndx_to_match = (num_rows / num_queried_matches) * i;
+            values_to_query.push_back(t->get_object(ndx_to_match).get<Int>(m_col));
+        }
+        tr.commit();
+    }
+
+    void operator()(DBRef)
+    {
+        ConstTableRef table = m_table;
+        for (size_t i = 0; i < 50; ++i) {
+            auto result = table->where()
+                              .not_equal(m_col, values_to_query[m_rand.draw_int<size_t>(0, values_to_query.size())])
+                              .avg(m_double_col);
+            REALM_ASSERT(result);
+        }
     }
 };
 
@@ -1253,6 +1355,38 @@ struct BenchmarkQueryChainedOrStrings : BenchmarkWithStringsTableForIn {
             query.Or().equal(m_col, StringData(values_to_query[i]));
         }
         TableView results = query.find_all();
+        REALM_ASSERT_EX(results.size() == num_queried_matches, results.size(), num_queried_matches,
+                        values_to_query.size());
+        static_cast<void>(results);
+    }
+};
+
+struct BenchmarkQueryChainedOrStringsPredicate : BenchmarkWithStringsTableForIn {
+    std::set<std::string> uniq;
+
+    void before_all(DBRef group)
+    {
+        create_table(group, false);
+        uniq = std::set<std::string>(values_to_query.begin(), values_to_query.end());
+    }
+};
+
+struct BenchmarkQueryChainedOrStringsViewFilterPredicate : BenchmarkQueryChainedOrStringsPredicate {
+    const char* name() const
+    {
+        return "QueryChainedOrStringsViewFilterPredicate";
+    }
+
+    void operator()(DBRef)
+    {
+        ConstTableRef table = m_table;
+
+        auto predicate = [this](const Obj& obj) {
+            return uniq.find(obj.get<String>(m_col)) != uniq.end();
+        };
+
+        TableView results = table->where().find_all();
+        results.filter(FilterDescriptor(predicate));
         REALM_ASSERT_EX(results.size() == num_queried_matches, results.size(), num_queried_matches,
                         values_to_query.size());
         static_cast<void>(results);
@@ -2340,12 +2474,15 @@ int benchmark_common_tasks_main()
     BENCH(BenchmarkQueryInsensitiveStringIndexed);
     BENCH(BenchmarkQueryChainedOrStrings<false>);
     BENCH(BenchmarkQueryChainedOrStrings<true>);
+    BENCH(BenchmarkQueryChainedOrStringsViewFilterPredicate);
     BENCH(BenchmarkQueryNotChainedOrStrings<false>);
     BENCH(BenchmarkQueryNotChainedOrStrings<true>);
     BENCH(BenchmarkQueryChainedOrInts);
     BENCH(BenchmarkQueryChainedOrIntsIndexed);
+    BENCH(BenchmarkQueryChainedOrIntsCount);
     BENCH(BenchmarkQueryIntEquality);
     BENCH(BenchmarkQueryIntEqualityIndexed);
+    BENCH(BenchmarkForeignAggAvg);
     BENCH(BenchmarkIntVsDoubleColumns);
     BENCH(BenchmarkQueryStringOverLinks);
     BENCH(BenchmarkSubQuery);
@@ -2363,6 +2500,8 @@ int benchmark_common_tasks_main()
     BENCH(BenchmarkMixedCaseInsensitiveEqual<Indexed<Mixed>>);
     BENCH(BenchmarkMixedCaseInsensitiveEqual<Prop<String>>);
     BENCH(BenchmarkMixedCaseInsensitiveEqual<Indexed<String>>);
+
+    BENCH(BenchmarkRangeForType<Prop<Int>>);
 
     BENCH(BenchmarkQueryTimestampGreaterOverLinks);
     BENCH(BenchmarkQueryTimestampGreater);

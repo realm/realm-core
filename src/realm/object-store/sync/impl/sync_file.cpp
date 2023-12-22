@@ -61,7 +61,7 @@ uint8_t value_of_hex_digit(char hex_digit)
         return 10 + hex_digit - 'a';
     }
     else {
-        throw std::invalid_argument("Cannot get the value of a character that isn't a hex digit.");
+        throw LogicError(ErrorCodes::InvalidArgument, "Cannot get the value of a character that isn't a hex digit.");
     }
 }
 
@@ -82,7 +82,8 @@ bool character_is_unreserved(char character)
 char decoded_char_for(const std::string& percent_encoding, size_t index)
 {
     if (index + 2 >= percent_encoding.length()) {
-        throw std::invalid_argument("Malformed string: not enough characters after '%' before end of string.");
+        throw LogicError(ErrorCodes::InvalidArgument,
+                         "Malformed string: not enough characters after '%' before end of string.");
     }
     REALM_ASSERT(percent_encoding[index] == '%');
     return (16 * value_of_hex_digit(percent_encoding[index + 1])) + value_of_hex_digit(percent_encoding[index + 2]);
@@ -126,7 +127,8 @@ std::string make_raw_string(const std::string& percent_encoded_string)
         else {
             // No need to decode. +1.
             if (!character_is_unreserved(current)) {
-                throw std::invalid_argument("Input string is invalid: contains reserved characters.");
+                throw LogicError(ErrorCodes::InvalidArgument,
+                                 "Input string is invalid: contains reserved characters.");
             }
             buffer.push_back(current);
             idx++;
@@ -207,7 +209,9 @@ std::string reserve_unique_file_name(const std::string& path, const std::string&
     int fd = mkstemp(&path_buffer[0]);
     if (fd < 0) {
         int err = errno;
-        throw std::system_error(err, std::system_category());
+        throw RuntimeError(ErrorCodes::FileOperationFailed,
+                           util::format("Failed to make temporary path: %1 (%2)",
+                                        std::system_error(err, std::system_category()).what(), err));
     }
     // Remove the file so we can use the name for our own file.
 #ifdef _WIN32
@@ -225,7 +229,8 @@ static std::string validate_and_clean_path(const std::string& path)
     REALM_ASSERT(path.length() > 0);
     std::string escaped_path = util::make_percent_encoded_string(path);
     if (filename_is_reserved(escaped_path))
-        throw std::invalid_argument(
+        throw LogicError(
+            ErrorCodes::InvalidArgument,
             util::format("A path can't have an identifier reserved by the filesystem: '%1'", escaped_path));
     return escaped_path;
 }
@@ -332,18 +337,18 @@ SyncFileManager::get_existing_realm_file_path(const std::string& user_identity,
                                               const std::vector<std::string>& legacy_user_identities,
                                               const std::string& realm_file_name, const std::string& partition) const
 {
-    std::string preferred_name = preferred_realm_path_without_suffix(user_identity, realm_file_name);
-    if (try_file_exists(preferred_name)) {
-        return preferred_name;
+    std::string preferred_name_without_suffix = preferred_realm_path_without_suffix(user_identity, realm_file_name);
+    if (try_file_exists(preferred_name_without_suffix)) {
+        return preferred_name_without_suffix;
     }
 
-    std::string preferred_name_with_suffix = preferred_name + c_realm_file_suffix;
+    std::string preferred_name_with_suffix = preferred_name_without_suffix + c_realm_file_suffix;
     if (try_file_exists(preferred_name_with_suffix)) {
         return preferred_name_with_suffix;
     }
 
     // Shorten the Realm path to just `<rootDir>/<hashedAbsolutePath>.realm`
-    std::string hashed_name = fallback_hashed_realm_file_path(preferred_name);
+    std::string hashed_name = fallback_hashed_realm_file_path(preferred_name_without_suffix);
     std::string hashed_path = hashed_name + c_realm_file_suffix;
     if (try_file_exists(hashed_path)) {
         // detected that the hashed fallback has been used previously
@@ -393,11 +398,11 @@ std::string SyncFileManager::realm_file_path(const std::string& user_identity,
 
     // since this appears to be a new file, test the normal location
     // we use a test file with the same name and a suffix of the
-    // same length so we can catch "filename too long" errors on windows
-    std::string preferred_name = preferred_realm_path_without_suffix(user_identity, realm_file_name);
-    std::string preferred_name_with_suffix = preferred_name + c_realm_file_suffix;
+    // same length, so we can catch "filename too long" errors on windows
+    std::string preferred_name_without_suffix = preferred_realm_path_without_suffix(user_identity, realm_file_name);
+    std::string preferred_name_with_suffix = preferred_name_without_suffix + c_realm_file_suffix;
     try {
-        std::string test_path = preferred_name + c_realm_file_test_suffix;
+        std::string test_path = preferred_name_without_suffix + c_realm_file_test_suffix;
         auto defer = util::make_scope_exit([test_path]() noexcept {
             try_file_remove(test_path);
         });
@@ -406,7 +411,7 @@ std::string SyncFileManager::realm_file_path(const std::string& user_identity,
     }
     catch (const FileAccessError&) {
         // the preferred test failed, test the hashed path
-        std::string hashed_name = fallback_hashed_realm_file_path(preferred_name);
+        std::string hashed_name = fallback_hashed_realm_file_path(preferred_name_without_suffix);
         std::string hashed_path = hashed_name + c_realm_file_suffix;
         try {
             std::string test_hashed_path = hashed_name + c_realm_file_test_suffix;
@@ -419,10 +424,10 @@ std::string SyncFileManager::realm_file_path(const std::string& user_identity,
         }
         catch (const FileAccessError& e_hashed) {
             // hashed test path also failed, give up and report error to user.
-            throw std::logic_error(util::format("A valid realm path cannot be created for the "
-                                                "Realm identity '%1' at neither '%2' nor '%3'. %4",
-                                                realm_file_name, preferred_name_with_suffix, hashed_path,
-                                                e_hashed.what()));
+            throw LogicError(ErrorCodes::InvalidArgument,
+                             util::format("A valid realm path cannot be created for the "
+                                          "Realm identity '%1' at neither '%2' nor '%3'. %4",
+                                          realm_file_name, preferred_name_with_suffix, hashed_path, e_hashed.what()));
         }
     }
 
@@ -456,6 +461,9 @@ std::string SyncFileManager::preferred_realm_path_without_suffix(const std::stri
     auto escaped_file_name = util::validate_and_clean_path(realm_file_name);
     std::string preferred_name =
         util::file_path_by_appending_component(user_directory(user_identity), escaped_file_name);
+    if (StringData(preferred_name).ends_with(c_realm_file_suffix)) {
+        preferred_name = preferred_name.substr(0, preferred_name.size() - strlen(c_realm_file_suffix));
+    }
     return preferred_name;
 }
 

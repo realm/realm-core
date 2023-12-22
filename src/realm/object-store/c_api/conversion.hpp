@@ -487,7 +487,7 @@ static inline realm_version_id_t to_capi(const VersionID& v)
 
 static inline realm_error_t to_capi(const Status& s)
 {
-    realm_error_t err;
+    realm_error_t err = {};
     err.error = static_cast<realm_errno_e>(s.code());
     err.categories = static_cast<realm_error_category_e>(ErrorCodes::error_categories(s.code()).value());
     err.message = s.reason().c_str();

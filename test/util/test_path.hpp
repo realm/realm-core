@@ -22,6 +22,7 @@
 #include <string>
 #include <memory>
 
+#include <realm/string_data.hpp>
 #include <realm/util/features.h>
 
 #define TEST_PATH_HELPER(class_name, var_name, suffix)                                                               \
@@ -101,6 +102,10 @@ public:
     {
         return m_path;
     }
+    operator StringData() const
+    {
+        return m_path;
+    }
     const char* c_str() const noexcept
     {
         return m_path.c_str();
@@ -120,15 +125,26 @@ protected:
 /// directory, then removes the directory.
 class TestDirGuard {
 public:
-    TestDirGuard(const std::string& path);
+    TestDirGuard(const std::string& path, bool init_clean = true);
     ~TestDirGuard() noexcept;
     operator std::string() const
+    {
+        return m_path;
+    }
+    operator StringData() const
     {
         return m_path;
     }
     const char* c_str() const
     {
         return m_path.c_str();
+    }
+
+    bool do_remove = true;
+
+    void clean_dir()
+    {
+        clean_dir(m_path);
     }
 
 private:

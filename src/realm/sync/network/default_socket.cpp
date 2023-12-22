@@ -4,6 +4,7 @@
 #include <realm/sync/network/network.hpp>
 #include <realm/sync/network/network_ssl.hpp>
 #include <realm/sync/network/websocket.hpp>
+#include <realm/util/basic_system_errors.hpp>
 #include <realm/util/random.hpp>
 #include <realm/util/scope_exit.hpp>
 
@@ -31,11 +32,14 @@ public:
         initiate_resolve();
     }
 
+    virtual ~DefaultWebSocketImpl() = default;
+
     void async_write_binary(util::Span<const char> data, SyncSocketProvider::FunctionHandler&& handler) override
     {
-        m_websocket.async_write_binary(data.data(), data.size(), [handler = std::move(handler)]() {
-            handler(Status::OK());
-        });
+        m_websocket.async_write_binary(data.data(), data.size(),
+                                       [write_handler = std::move(handler)](std::error_code ec, size_t) {
+                                           write_handler(DefaultWebSocketImpl::get_status_from_util_error(ec));
+                                       });
     }
 
     std::string_view get_appservices_request_id() const noexcept override
@@ -167,6 +171,33 @@ private:
         return m_observer->websocket_binary_message_received(util::Span<const char>(ptr, size));
     }
 
+    static Status get_status_from_util_error(std::error_code ec)
+    {
+        if (!ec) {
+            return Status::OK();
+        }
+        switch (ec.value()) {
+            case util::error::operation_aborted:
+                return {ErrorCodes::Error::OperationAborted, "Write operation cancelled"};
+            case util::error::address_family_not_supported:
+                [[fallthrough]];
+            case util::error::invalid_argument:
+                return {ErrorCodes::Error::InvalidArgument, ec.message()};
+            case util::error::no_memory:
+                return {ErrorCodes::Error::OutOfMemory, ec.message()};
+            case util::error::connection_aborted:
+                [[fallthrough]];
+            case util::error::connection_reset:
+                [[fallthrough]];
+            case util::error::broken_pipe:
+                [[fallthrough]];
+            case util::error::resource_unavailable_try_again:
+                return {ErrorCodes::Error::ConnectionClosed, ec.message()};
+            default:
+                return {ErrorCodes::Error::UnknownError, ec.message()};
+        }
+    }
+
     void initiate_resolve();
     void handle_resolve(std::error_code, network::Endpoint::List);
     void initiate_tcp_connect(network::Endpoint::List, std::size_t);
@@ -202,7 +233,6 @@ private:
     websocket::Socket m_websocket;
     util::Optional<HTTPClient<DefaultWebSocketImpl>> m_proxy_client;
 };
-
 
 void DefaultWebSocketImpl::async_read(char* buffer, std::size_t size, ReadCompletionHandler handler)
 {
@@ -381,6 +411,12 @@ void DefaultWebSocketImpl::initiate_ssl_handshake()
             }
             else if (!m_endpoint.ssl_verify_callback) {
                 m_ssl_context->use_default_verify(); // Throws
+#if REALM_INCLUDE_CERTS
+                // On platforms like Windows or Android where OpenSSL is not normally found
+                // `use_default_verify()` won't actually be able to load any default certificates.
+                // That's why we bundle a set of trusted certificates ourselves.
+                m_ssl_context->use_included_certificate_roots(); // Throws
+#endif
             }
         }
     }
@@ -394,13 +430,6 @@ void DefaultWebSocketImpl::initiate_ssl_handshake()
         if (!m_endpoint.ssl_trust_certificate_path) {
             if (m_endpoint.ssl_verify_callback) {
                 m_ssl_stream->use_verify_callback(m_endpoint.ssl_verify_callback);
-            }
-            else {
-                // The included certificates are used if neither the trust
-                // certificate nor the callback function is set.
-#if REALM_INCLUDE_CERTS
-                m_ssl_stream->use_included_certificates(); // Throws
-#endif
             }
         }
     }

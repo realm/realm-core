@@ -84,7 +84,7 @@ public:
     {
     }
 
-    nlohmann::json property_to_jsonschema(const Property& prop, const IncludePropCond& include_prop);
+    nlohmann::json property_to_jsonschema(const Property& prop);
     nlohmann::json object_schema_to_jsonschema(const ObjectSchema& obj_schema, const IncludePropCond& include_prop,
                                                bool clear_path = false);
     nlohmann::json object_schema_to_baas_schema(const ObjectSchema& obj_schema, IncludePropCond include_prop);
@@ -111,7 +111,7 @@ nlohmann::json BaasRuleBuilder::object_schema_to_jsonschema(const ObjectSchema& 
         if (clear_path) {
             m_current_path.clear();
         }
-        properties.emplace(prop.name, property_to_jsonschema(prop, include_prop));
+        properties.emplace(prop.name, property_to_jsonschema(prop));
         if (!is_nullable(prop.type) && !is_collection(prop.type)) {
             required.push_back(prop.name);
         }
@@ -124,7 +124,7 @@ nlohmann::json BaasRuleBuilder::object_schema_to_jsonschema(const ObjectSchema& 
     };
 }
 
-nlohmann::json BaasRuleBuilder::property_to_jsonschema(const Property& prop, const IncludePropCond& include_prop)
+nlohmann::json BaasRuleBuilder::property_to_jsonschema(const Property& prop)
 {
     nlohmann::json type_output;
 
@@ -138,7 +138,13 @@ nlohmann::json BaasRuleBuilder::property_to_jsonschema(const Property& prop, con
                 m_current_path.push_back("[]");
             }
 
-            type_output = object_schema_to_jsonschema(*target_obj, include_prop);
+            // embedded objects are normally not allowed to be queryable,
+            // except if it is a GeoJSON type, and in that case the server
+            // needs to know if it conforms to the expected schema shape.
+            IncludePropCond always = [](const Property&) -> bool {
+                return true;
+            };
+            type_output = object_schema_to_jsonschema(*target_obj, always);
             type_output.emplace("bsonType", "object");
         }
         else {
@@ -186,7 +192,7 @@ nlohmann::json BaasRuleBuilder::object_schema_to_baas_schema(const ObjectSchema&
     auto schema_json = object_schema_to_jsonschema(obj_schema, include_prop, true);
     auto& prop_sub_obj = schema_json["properties"];
     if (!prop_sub_obj.contains(m_partition_key.name) && !m_is_flx_sync) {
-        prop_sub_obj.emplace(m_partition_key.name, property_to_jsonschema(m_partition_key, include_prop));
+        prop_sub_obj.emplace(m_partition_key.name, property_to_jsonschema(m_partition_key));
         if (!is_nullable(m_partition_key.type)) {
             schema_json["required"].push_back(m_partition_key.name);
         }
@@ -406,8 +412,7 @@ app::Response AdminAPIEndpoint::post(std::string body) const
 nlohmann::json AdminAPIEndpoint::post_json(nlohmann::json body) const
 {
     auto resp = post(body.dump());
-    REALM_ASSERT_EX(resp.http_status_code >= 200 && resp.http_status_code < 300,
-                    util::format("url: %1 request: %2, reply: %3", m_url, body.dump(), resp.body));
+    REALM_ASSERT_EX(resp.http_status_code >= 200 && resp.http_status_code < 300, m_url, body.dump(), resp.body);
     return nlohmann::json::parse(resp.body.empty() ? "{}" : resp.body);
 }
 
@@ -445,17 +450,20 @@ nlohmann::json AdminAPIEndpoint::patch_json(nlohmann::json body) const
     return nlohmann::json::parse(resp.body.empty() ? "{}" : resp.body);
 }
 
-AdminAPISession AdminAPISession::login(const std::string& base_url, const std::string& username,
-                                       const std::string& password)
+AdminAPISession AdminAPISession::login(const AppCreateConfig& config)
 {
+    std::string admin_url = config.admin_url;
     nlohmann::json login_req_body{
         {"provider", "userpass"},
-        {"username", username},
-        {"password", password},
+        {"username", config.admin_username},
+        {"password", config.admin_password},
     };
+    if (config.logger) {
+        config.logger->trace("Logging into baas admin api: %1", admin_url);
+    }
     app::Request auth_req{
         app::HttpMethod::post,
-        util::format("%1/api/admin/v3.0/auth/providers/local-userpass/login", base_url),
+        util::format("%1/api/admin/v3.0/auth/providers/local-userpass/login", admin_url),
         60000, // 1 minute timeout
         {
             {"Content-Type", "application/json;charset=utf-8"},
@@ -469,12 +477,12 @@ AdminAPISession AdminAPISession::login(const std::string& base_url, const std::s
 
     std::string access_token = login_resp_body["access_token"];
 
-    AdminAPIEndpoint user_profile(util::format("%1/api/admin/v3.0/auth/profile", base_url), access_token);
+    AdminAPIEndpoint user_profile(util::format("%1/api/admin/v3.0/auth/profile", admin_url), access_token);
     auto profile_resp = user_profile.get_json();
 
     std::string group_id = profile_resp["roles"][0]["group_id"];
 
-    return AdminAPISession(std::move(base_url), std::move(access_token), std::move(group_id));
+    return AdminAPISession(std::move(admin_url), std::move(access_token), std::move(group_id));
 }
 
 void AdminAPISession::revoke_user_sessions(const std::string& user_id, const std::string& app_id) const
@@ -754,10 +762,36 @@ AdminAPIEndpoint AdminAPISession::apps(APIFamily family) const
     REALM_UNREACHABLE();
 }
 
-AppCreateConfig default_app_config(const std::string& base_url)
+realm::Schema get_default_schema()
+{
+    const auto dog_schema =
+        ObjectSchema("Dog", {realm::Property("_id", PropertyType::ObjectId | PropertyType::Nullable, true),
+                             realm::Property("breed", PropertyType::String | PropertyType::Nullable),
+                             realm::Property("name", PropertyType::String),
+                             realm::Property("realm_id", PropertyType::String | PropertyType::Nullable)});
+    const auto cat_schema =
+        ObjectSchema("Cat", {realm::Property("_id", PropertyType::String | PropertyType::Nullable, true),
+                             realm::Property("breed", PropertyType::String | PropertyType::Nullable),
+                             realm::Property("name", PropertyType::String),
+                             realm::Property("realm_id", PropertyType::String | PropertyType::Nullable)});
+    const auto person_schema =
+        ObjectSchema("Person", {realm::Property("_id", PropertyType::ObjectId | PropertyType::Nullable, true),
+                                realm::Property("age", PropertyType::Int),
+                                realm::Property("dogs", PropertyType::Object | PropertyType::Array, "Dog"),
+                                realm::Property("firstName", PropertyType::String),
+                                realm::Property("lastName", PropertyType::String),
+                                realm::Property("realm_id", PropertyType::String | PropertyType::Nullable)});
+    return realm::Schema({dog_schema, cat_schema, person_schema});
+}
+
+AppCreateConfig default_app_config()
 {
     ObjectId id = ObjectId::gen();
     std::string db_name = util::format("test_data_%1", id.to_string());
+    std::string app_url = get_base_url();
+    std::string admin_url = get_admin_url();
+    REALM_ASSERT(!app_url.empty());
+    REALM_ASSERT(!admin_url.empty());
 
     std::string update_user_data_func = util::format(R"(
         exports = async function(data) {
@@ -816,25 +850,6 @@ AppCreateConfig default_app_config(const std::string& base_url)
         {"resetFunc", reset_func, false},
     };
 
-    const auto dog_schema =
-        ObjectSchema("Dog", {realm::Property("_id", PropertyType::ObjectId | PropertyType::Nullable, true),
-                             realm::Property("breed", PropertyType::String | PropertyType::Nullable),
-                             realm::Property("name", PropertyType::String),
-                             realm::Property("realm_id", PropertyType::String | PropertyType::Nullable)});
-    const auto cat_schema =
-        ObjectSchema("Cat", {realm::Property("_id", PropertyType::String | PropertyType::Nullable, true),
-                             realm::Property("breed", PropertyType::String | PropertyType::Nullable),
-                             realm::Property("name", PropertyType::String),
-                             realm::Property("realm_id", PropertyType::String | PropertyType::Nullable)});
-    const auto person_schema =
-        ObjectSchema("Person", {realm::Property("_id", PropertyType::ObjectId | PropertyType::Nullable, true),
-                                realm::Property("age", PropertyType::Int),
-                                realm::Property("dogs", PropertyType::Object | PropertyType::Array, "Dog"),
-                                realm::Property("firstName", PropertyType::String),
-                                realm::Property("lastName", PropertyType::String),
-                                realm::Property("realm_id", PropertyType::String | PropertyType::Nullable)});
-    realm::Schema default_schema({dog_schema, cat_schema, person_schema});
-
     Property partition_key("realm_id", PropertyType::String | PropertyType::Nullable);
 
     AppCreateConfig::UserPassAuthConfig user_pass_config{
@@ -849,27 +864,36 @@ AppCreateConfig default_app_config(const std::string& base_url)
         true,
     };
 
-    return AppCreateConfig{"test",
-                           base_url,
-                           "unique_user@domain.com",
-                           "password",
-                           "mongodb://localhost:26000",
-                           db_name,
-                           std::move(default_schema),
-                           std::move(partition_key),
-                           true,       // dev_mode_enabled
-                           util::none, // Default to no FLX sync config
-                           std::move(funcs),
-                           std::move(user_pass_config),
-                           std::string{"authFunc"},
-                           true,  // enable_api_key_auth
-                           true,  // enable_anonymous_auth
-                           true}; // enable_custom_token_auth
+    return AppCreateConfig{
+        "test",
+        std::move(app_url),
+        std::move(admin_url), // BAAS Admin API URL may be different
+        "unique_user@domain.com",
+        "password",
+        get_mongodb_server(),
+        db_name,
+        get_default_schema(),
+        std::move(partition_key),
+        false,                              // Dev mode disabled
+        util::none,                         // Default to no FLX sync config
+        std::move(funcs),                   // Add default functions
+        std::move(user_pass_config),        // enable basic user/pass auth
+        std::string{"authFunc"},            // custom auth function
+        true,                               // enable_api_key_auth
+        true,                               // enable_anonymous_auth
+        true,                               // enable_custom_token_auth
+        {},                                 // no service roles on the default rule
+        util::Logger::get_default_logger(), // provide the logger to the admin api
+    };
 }
 
-AppCreateConfig minimal_app_config(const std::string& base_url, const std::string& name, const Schema& schema)
+AppCreateConfig minimal_app_config(const std::string& name, const Schema& schema)
 {
     Property partition_key("realm_id", PropertyType::String | PropertyType::Nullable);
+    std::string app_url = get_base_url();
+    std::string admin_url = get_admin_url();
+    REALM_ASSERT(!app_url.empty());
+    REALM_ASSERT(!admin_url.empty());
 
     AppCreateConfig::UserPassAuthConfig user_pass_config{
         true,  "Confirm", "", "http://example.com/confirmEmail", "", "Reset", "http://exmaple.com/resetPassword",
@@ -879,27 +903,30 @@ AppCreateConfig minimal_app_config(const std::string& base_url, const std::strin
     ObjectId id = ObjectId::gen();
     return AppCreateConfig{
         name,
-        base_url,
+        std::move(app_url),
+        std::move(admin_url), // BAAS Admin API URL may be different
         "unique_user@domain.com",
         "password",
-        "mongodb://localhost:26000",
+        get_mongodb_server(),
         util::format("test_data_%1_%2", name, id.to_string()),
         schema,
         std::move(partition_key),
-        true,                        // dev_mode_enabled
-        util::none,                  // no FLX sync config
-        {},                          // no functions
-        std::move(user_pass_config), // enable basic user/pass auth
-        util::none,                  // disable custom auth
-        true,                        // enable api key auth
-        true,                        // enable anonymous auth
-        {},                          // no service roles on the default rule
+        false,                              // Dev mode disabled
+        util::none,                         // no FLX sync config
+        {},                                 // no functions
+        std::move(user_pass_config),        // enable basic user/pass auth
+        util::none,                         // disable custom auth
+        true,                               // enable api key auth
+        true,                               // enable anonymous auth
+        false,                              // enable_custom_token_auth
+        {},                                 // no service roles on the default rule
+        util::Logger::get_default_logger(), // provide the logger to the admin api
     };
 }
 
 AppSession create_app(const AppCreateConfig& config)
 {
-    auto session = AdminAPISession::login(config.base_url, config.admin_username, config.admin_password);
+    auto session = AdminAPISession::login(config);
     auto create_app_resp = session.apps().post_json(nlohmann::json{{"name", config.app_name}});
     std::string app_id = create_app_resp["_id"];
     std::string client_app_id = create_app_resp["client_app_id"];
@@ -1046,7 +1073,7 @@ AppSession create_app(const AppCreateConfig& config)
 
     // Create the schemas in two passes: first populate just the primary key and
     // partition key, then add the rest of the properties. This ensures that the
-    // targest of links exist before adding the links.
+    // targets of links exist before adding the links.
     std::vector<std::pair<std::string, const ObjectSchema*>> object_schema_to_create;
     BaasRuleBuilder rule_builder(config.schema, config.partition_key, mongo_service_name, config.mongo_dbname,
                                  static_cast<bool>(config.flx_sync_config));
@@ -1150,23 +1177,36 @@ AppSession create_app(const AppCreateConfig& config)
         {"version", 1},
     });
 
+    // Wait for initial sync to complete, as connecting while this is happening
+    // causes various problems
+    bool any_sync_types = std::any_of(config.schema.begin(), config.schema.end(), [](auto& object_schema) {
+        return object_schema.table_type == ObjectSchema::ObjectType::TopLevel;
+    });
+    if (any_sync_types) {
+        timed_sleeping_wait_for([&] {
+            return session.is_initial_sync_complete(app_id);
+        });
+    }
+
     return {client_app_id, app_id, session, config};
 }
 
-AppSession get_runtime_app_session(std::string base_url)
+AppSession get_runtime_app_session()
 {
     static const AppSession cached_app_session = [&] {
-        auto cached_app_session = create_app(default_app_config(base_url));
+        auto cached_app_session = create_app(default_app_config());
         return cached_app_session;
     }();
     return cached_app_session;
 }
 
+std::string get_mongodb_server()
+{
+    return "mongodb://localhost:26000";
+}
 
 #ifdef REALM_MONGODB_ENDPOINT
 TEST_CASE("app: baas admin api", "[sync][app][admin api][baas]") {
-    std::string base_url = REALM_QUOTE(REALM_MONGODB_ENDPOINT);
-    base_url.erase(std::remove(base_url.begin(), base_url.end(), '"'), base_url.end());
     SECTION("embedded objects") {
         Schema schema{{"top",
                        {{"_id", PropertyType::String, true},
@@ -1175,7 +1215,7 @@ TEST_CASE("app: baas admin api", "[sync][app][admin api][baas]") {
                        ObjectSchema::ObjectType::Embedded,
                        {{"coordinates", PropertyType::Double | PropertyType::Array}}}};
 
-        auto test_app_config = minimal_app_config(base_url, "test", schema);
+        auto test_app_config = minimal_app_config("test", schema);
         create_app(test_app_config);
     }
 
@@ -1189,7 +1229,7 @@ TEST_CASE("app: baas admin api", "[sync][app][admin api][baas]") {
              {{"c_link", PropertyType::Object | PropertyType::Nullable, "c"}}},
             {"c", {{"_id", PropertyType::String, true}, {"d_str", PropertyType::String}}},
         };
-        auto test_app_config = minimal_app_config(base_url, "test", schema);
+        auto test_app_config = minimal_app_config("test", schema);
         create_app(test_app_config);
     }
 
@@ -1198,7 +1238,7 @@ TEST_CASE("app: baas admin api", "[sync][app][admin api][baas]") {
             {"a", {{"_id", PropertyType::String, true}, {"b_dict", PropertyType::Dictionary | PropertyType::String}}},
         };
 
-        auto test_app_config = minimal_app_config(base_url, "test", schema);
+        auto test_app_config = minimal_app_config("test", schema);
         create_app(test_app_config);
     }
 
@@ -1207,7 +1247,7 @@ TEST_CASE("app: baas admin api", "[sync][app][admin api][baas]") {
             {"a", {{"_id", PropertyType::String, true}, {"b_dict", PropertyType::Set | PropertyType::String}}},
         };
 
-        auto test_app_config = minimal_app_config(base_url, "test", schema);
+        auto test_app_config = minimal_app_config("test", schema);
         create_app(test_app_config);
     }
 }

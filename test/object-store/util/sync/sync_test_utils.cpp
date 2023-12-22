@@ -16,9 +16,9 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include <util/sync/sync_test_utils.hpp>
+#include "util/sync/sync_test_utils.hpp"
 
-#include <util/sync/baas_admin_api.hpp>
+#include "util/sync/baas_admin_api.hpp"
 
 #include <realm/object-store/binding_context.hpp>
 #include <realm/object-store/object_store.hpp>
@@ -76,9 +76,11 @@ bool results_contains_original_name(SyncFileActionMetadataResults& results, cons
 bool ReturnsTrueWithinTimeLimit::match(util::FunctionRef<bool()> condition) const
 {
     const auto wait_start = std::chrono::steady_clock::now();
+    const auto delay = TEST_TIMEOUT_EXTRA > 0 ? m_max_ms + std::chrono::seconds(TEST_TIMEOUT_EXTRA) : m_max_ms;
     bool predicate_returned_true = false;
     util::EventLoop::main().run_until([&] {
-        if (std::chrono::steady_clock::now() - wait_start > m_max_ms) {
+        if (std::chrono::steady_clock::now() - wait_start > delay) {
+            util::format("ReturnsTrueWithinTimeLimit exceeded %1 ms", delay.count());
             return true;
         }
         auto ret = condition();
@@ -94,9 +96,10 @@ bool ReturnsTrueWithinTimeLimit::match(util::FunctionRef<bool()> condition) cons
 void timed_wait_for(util::FunctionRef<bool()> condition, std::chrono::milliseconds max_ms)
 {
     const auto wait_start = std::chrono::steady_clock::now();
+    const auto delay = TEST_TIMEOUT_EXTRA > 0 ? max_ms + std::chrono::seconds(TEST_TIMEOUT_EXTRA) : max_ms;
     util::EventLoop::main().run_until([&] {
-        if (std::chrono::steady_clock::now() - wait_start > max_ms) {
-            throw std::runtime_error(util::format("timed_wait_for exceeded %1 ms", max_ms.count()));
+        if (std::chrono::steady_clock::now() - wait_start > delay) {
+            throw std::runtime_error(util::format("timed_wait_for exceeded %1 ms", delay.count()));
         }
         return condition();
     });
@@ -106,9 +109,10 @@ void timed_sleeping_wait_for(util::FunctionRef<bool()> condition, std::chrono::m
                              std::chrono::milliseconds sleep_ms)
 {
     const auto wait_start = std::chrono::steady_clock::now();
+    const auto delay = TEST_TIMEOUT_EXTRA > 0 ? max_ms + std::chrono::seconds(TEST_TIMEOUT_EXTRA) : max_ms;
     while (!condition()) {
-        if (std::chrono::steady_clock::now() - wait_start > max_ms) {
-            throw std::runtime_error(util::format("timed_sleeping_wait_for exceeded %1 ms", max_ms.count()));
+        if (std::chrono::steady_clock::now() - wait_start > delay) {
+            throw std::runtime_error(util::format("timed_sleeping_wait_for exceeded %1 ms", delay.count()));
         }
         std::this_thread::sleep_for(sleep_ms);
     }
@@ -173,20 +177,57 @@ ExpectedRealmPaths::ExpectedRealmPaths(const std::string& base_path, const std::
 
 #if REALM_ENABLE_SYNC
 
+void subscribe_to_all_and_bootstrap(Realm& realm)
+{
+    auto mut_subs = realm.get_latest_subscription_set().make_mutable_copy();
+    auto& group = realm.read_group();
+    for (auto key : group.get_table_keys()) {
+        if (group.table_is_public(key)) {
+            auto table = group.get_table(key);
+            if (table->get_table_type() == Table::Type::TopLevel) {
+                mut_subs.insert_or_assign(table->where());
+            }
+        }
+    }
+    auto subs = std::move(mut_subs).commit();
+    subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
+    wait_for_download(realm);
+}
+
 #if REALM_ENABLE_AUTH_TESTS
+
+static std::string unquote_string(std::string_view possibly_quoted_string)
+{
+    if (possibly_quoted_string.size() > 0) {
+        auto check_char = possibly_quoted_string.front();
+        if (check_char == '"' || check_char == '\'') {
+            possibly_quoted_string.remove_prefix(1);
+        }
+    }
+    if (possibly_quoted_string.size() > 0) {
+        auto check_char = possibly_quoted_string.back();
+        if (check_char == '"' || check_char == '\'') {
+            possibly_quoted_string.remove_suffix(1);
+        }
+    }
+    return std::string{possibly_quoted_string};
+}
 
 #ifdef REALM_MONGODB_ENDPOINT
 std::string get_base_url()
 {
     // allows configuration with or without quotes
-    std::string base_url = REALM_QUOTE(REALM_MONGODB_ENDPOINT);
-    if (base_url.size() > 0 && base_url[0] == '"') {
-        base_url.erase(0, 1);
-    }
-    if (base_url.size() > 0 && base_url[base_url.size() - 1] == '"') {
-        base_url.erase(base_url.size() - 1);
-    }
-    return base_url;
+    return unquote_string(REALM_QUOTE(REALM_MONGODB_ENDPOINT));
+}
+
+std::string get_admin_url()
+{
+#ifdef REALM_ADMIN_ENDPOINT
+    // allows configuration with or without quotes
+    return unquote_string(REALM_QUOTE(REALM_ADMIN_ENDPOINT));
+#else
+    return get_base_url();
+#endif
 }
 #endif // REALM_MONGODB_ENDPOINT
 
@@ -249,16 +290,20 @@ void async_open_realm(const Realm::Config& config,
     std::mutex mutex;
     bool did_finish = false;
     auto task = Realm::get_synchronized_realm(config);
-    task->start([&, callback = std::move(finish)](ThreadSafeReference&& ref, std::exception_ptr e) {
-        callback(std::move(ref), e);
+    ThreadSafeReference tsr;
+    std::exception_ptr err = nullptr;
+    task->start([&](ThreadSafeReference&& ref, std::exception_ptr e) {
         std::lock_guard lock(mutex);
         did_finish = true;
+        tsr = std::move(ref);
+        err = e;
     });
     util::EventLoop::main().run_until([&] {
         std::lock_guard lock(mutex);
         return did_finish;
     });
     task->cancel(); // don't run the above notifier again on this session
+    finish(std::move(tsr), err);
 }
 
 #endif // REALM_ENABLE_AUTH_TESTS
@@ -382,11 +427,12 @@ struct FakeLocalClientReset : public TestClientReset {
             sync::SaltedFileIdent fake_ident{1, 123456789};
             auto local_db = TestHelper::get_db(local_realm);
             auto remote_db = TestHelper::get_db(remote_realm);
-            util::StderrLogger logger(realm::util::Logger::Level::TEST_LOGGING_LEVEL);
+            auto logger = util::Logger::get_default_logger();
+
             using _impl::client_reset::perform_client_reset_diff;
             constexpr bool recovery_is_allowed = true;
-            perform_client_reset_diff(local_db, remote_db, fake_ident, logger, m_mode, recovery_is_allowed, nullptr,
-                                      nullptr, nullptr);
+            perform_client_reset_diff(*local_db, *remote_db, fake_ident, *logger, m_mode, recovery_is_allowed,
+                                      nullptr, [](int64_t) {});
 
             remote_realm->close();
             if (m_on_post_reset) {
@@ -461,39 +507,16 @@ void wait_for_num_objects_in_atlas(std::shared_ptr<SyncUser> user, const AppSess
         std::chrono::minutes(15), std::chrono::milliseconds(500));
 }
 
-void trigger_client_reset(const AppSession& app_session)
+void trigger_client_reset(const AppSession& app_session, const SyncSession& sync_session)
 {
-    // cause a client reset by restarting the sync service
-    // this causes the server's sync history to be resynthesized
-    auto baas_sync_service = app_session.admin_api.get_sync_service(app_session.server_app_id);
-    auto baas_sync_config = app_session.admin_api.get_config(app_session.server_app_id, baas_sync_service);
-
-    REQUIRE(app_session.admin_api.is_sync_enabled(app_session.server_app_id));
-    app_session.admin_api.disable_sync(app_session.server_app_id, baas_sync_service.id, baas_sync_config);
-    timed_sleeping_wait_for([&] {
-        return app_session.admin_api.is_sync_terminated(app_session.server_app_id);
-    });
-    app_session.admin_api.enable_sync(app_session.server_app_id, baas_sync_service.id, baas_sync_config);
-    REQUIRE(app_session.admin_api.is_sync_enabled(app_session.server_app_id));
-    if (app_session.config.dev_mode_enabled) { // dev mode is not sticky across a reset
-        app_session.admin_api.set_development_mode_to(app_session.server_app_id, true);
-    }
-
-    // In FLX sync, the server won't let you connect until the initial sync is complete. With PBS tho, we need
-    // to make sure we've actually copied all the data from atlas into the realm history before we do any of
-    // our remote changes.
-    if (!app_session.config.flx_sync_config) {
-        timed_sleeping_wait_for([&] {
-            return app_session.admin_api.is_initial_sync_complete(app_session.server_app_id);
-        });
-    }
+    auto file_ident = SyncSession::OnlyForTesting::get_file_ident(sync_session);
+    REQUIRE(file_ident.ident != 0);
+    app_session.admin_api.trigger_client_reset(app_session.server_app_id, file_ident.ident);
 }
 
 void trigger_client_reset(const AppSession& app_session, const SharedRealm& realm)
 {
-    auto file_ident = SyncSession::OnlyForTesting::get_file_ident(*realm->sync_session());
-    REQUIRE(file_ident.ident != 0);
-    app_session.admin_api.trigger_client_reset(app_session.server_app_id, file_ident.ident);
+    trigger_client_reset(app_session, *realm->sync_session());
 }
 
 struct BaasClientReset : public TestClientReset {
@@ -502,6 +525,13 @@ struct BaasClientReset : public TestClientReset {
         : TestClientReset(local_config, remote_config)
         , m_test_app_session(test_app_session)
     {
+    }
+
+    TestClientReset* set_development_mode(bool enable) override
+    {
+        const AppSession& app_session = m_test_app_session.app_session();
+        app_session.admin_api.set_development_mode_to(app_session.server_app_id, enable);
+        return this;
     }
 
     void run() override
@@ -627,6 +657,13 @@ struct BaasFLXClientReset : public TestClientReset {
         REALM_ASSERT(m_local_config.sync_config->flx_sync_requested);
         REALM_ASSERT(m_remote_config.sync_config->flx_sync_requested);
         REALM_ASSERT(m_local_config.schema->find(c_object_schema_name) != m_local_config.schema->end());
+    }
+
+    TestClientReset* set_development_mode(bool enable) override
+    {
+        const AppSession& app_session = m_test_app_session.app_session();
+        app_session.admin_api.set_development_mode_to(app_session.server_app_id, enable);
+        return this;
     }
 
     void run() override
@@ -802,6 +839,10 @@ TestClientReset* TestClientReset::on_post_local_changes(Callback&& post_local)
 TestClientReset* TestClientReset::on_post_reset(Callback&& post_reset)
 {
     m_on_post_reset = std::move(post_reset);
+    return this;
+}
+TestClientReset* TestClientReset::set_development_mode(bool)
+{
     return this;
 }
 
