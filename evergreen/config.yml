@@ -335,7 +335,7 @@ functions:
       remote_file: 'realm-core-stable/${branch_name}/${task_id}/${execution}/baas_server.log'
       bucket: mciuploads
       permissions: public-read
-      content_type: text/text
+      content_type: text/plain
       display_name: baas server logs
       optional: true
   - command: s3.put
@@ -346,7 +346,7 @@ functions:
       remote_file: 'realm-core-stable/${branch_name}/${task_id}/${execution}/install_baas_output.log'
       bucket: mciuploads
       permissions: public-read
-      content_type: text/text
+      content_type: text/plain
       display_name: install baas output
       optional: true
   - command: s3.put
@@ -357,7 +357,7 @@ functions:
       remote_file: 'realm-core-stable/${branch_name}/${task_id}/${execution}/mongod.log'
       bucket: mciuploads
       permissions: public-read
-      content_type: text/text
+      content_type: text/plain
       display_name: mongod logs
       optional: true
   - command: s3.put
@@ -368,7 +368,7 @@ functions:
       remote_file: 'realm-core-stable/${branch_name}/${task_id}/${execution}/baas_proxy.log'
       bucket: mciuploads
       permissions: public-read
-      content_type: text/text
+      content_type: text/plain
       display_name: baas proxy logs
       optional: true
 
@@ -391,7 +391,7 @@ functions:
       remote_file: '${project}/${branch_name}/${task_id}/${execution}/realm-fuzzer-crash.txt'
       bucket: mciuploads
       permissions: public-read
-      content_type: text/text
+      content_type: text/plain
       display_name: Fuzzer crash report
       optional: true
 
@@ -879,7 +879,7 @@ tasks:
       remote_file: '${project}/${branch_name}/${task_id}/${execution}/bloaty-results-'
       bucket: mciuploads
       permissions: public-read
-      content_type: text/text
+      content_type: text/plain
       display_name: bloaty-results
   - command: s3.put
     params:
