@@ -378,7 +378,7 @@ TEST(HTTPParser_ParseHeaderLine)
     }
 }
 
-template<typename Socket>
+template <typename Socket>
 struct ChunkedEncodingHTTPParser : public HTTPParser<Socket> {
     StringData key;
     StringData value;
@@ -410,7 +410,8 @@ struct ChunkedEncodingHTTPParser : public HTTPParser<Socket> {
         error = ec;
     }
 
-    void modify_buffer(const std::string& str) {
+    void modify_buffer(const std::string& str)
+    {
         // +1 to append null termination
         this->m_read_buffer.reset(static_cast<char*>(std::calloc(str.size() + 1, sizeof(char))));
         for (size_t i = 0; i < str.size() + 1; i++) {
@@ -425,13 +426,13 @@ struct MockedSocket : network::Socket {
     {
     }
 
-    MockedSocket(network::Service& service, const network::StreamProtocol& protocol,
-                   native_handle_type native_handle)
+    MockedSocket(network::Service& service, const network::StreamProtocol& protocol, native_handle_type native_handle)
         : network::Socket(service, protocol, native_handle)
     {
     }
 
-    void shift_left(char* str, size_t x) {
+    void shift_left(char* str, size_t x)
+    {
         if (str == nullptr || x == 0) {
             return;
         }
@@ -439,12 +440,14 @@ struct MockedSocket : network::Socket {
         size_t length = strlen(str);
         if (x >= length) {
             str[0] = '\0';
-        } else {
+        }
+        else {
             memmove(str, str + x, length - x + 1);
         }
     }
 
-    int index_of_char(const char* str, char target) {
+    int index_of_char(const char* str, char target)
+    {
         if (str == nullptr) {
             return -1;
         }
@@ -468,7 +471,6 @@ struct MockedSocket : network::Socket {
         m_prev_index = index_of;
         m_run_count++;
         handler(std::error_code(), index_of);
-
     }
 
     template <class H>
@@ -499,12 +501,14 @@ TEST(HTTPParser_ChunkedEncoding)
     };
 
     // Single line
-    CHECK(parser_with_body("1e\r\nI am posting this information.\r\n0\r\n\r\n\0") == "I am posting this information.");
+    CHECK(parser_with_body("1e\r\nI am posting this information.\r\n0\r\n\r\n\0") ==
+          "I am posting this information.");
     // Multiline
-    CHECK(parser_with_body("1E\r\nI am posting this information.\r\n15\r\nThis is another line.\r\n0\r\n\r\n\0")
-          == "I am posting this information.This is another line.");
+    CHECK(parser_with_body("1E\r\nI am posting this information.\r\n15\r\nThis is another line.\r\n0\r\n\r\n\0") ==
+          "I am posting this information.This is another line.");
     // Multiline with CRLR
-    CHECK(parser_with_body("7\r\nMongoDB\r\n8\r\n Realm i\r\nB\r\nn \r\nchunks.\r\n0\r\n\r\n") == "MongoDB Realm in \r\nchunks.");
+    CHECK(parser_with_body("7\r\nMongoDB\r\n8\r\n Realm i\r\nB\r\nn \r\nchunks.\r\n0\r\n\r\n") ==
+          "MongoDB Realm in \r\nchunks.");
     // Empty
     CHECK(parser_with_body("0\r\n\r\n0\r\n\r\n\0") == "");
 }

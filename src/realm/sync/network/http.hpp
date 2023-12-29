@@ -45,8 +45,7 @@ std::error_code make_error_code(HTTPParserError);
 
 namespace std {
 template <>
-struct is_error_code_enum<realm::sync::HTTPParserError> : std::true_type {
-};
+struct is_error_code_enum<realm::sync::HTTPParserError> : std::true_type {};
 } // namespace std
 
 namespace realm::sync {
@@ -310,7 +309,8 @@ struct HTTPParser : protected HTTPParserBase {
         m_socket.async_read_until(m_read_buffer.get(), max_header_line_length, '\n', std::move(handler));
     }
 
-    inline uint32_t hex_to_int(const std::string &hex) throw() {
+    inline uint32_t hex_to_int(const std::string& hex) throw()
+    {
         uint32_t dec;
         std::stringstream ss;
         ss << std::hex << hex;
@@ -338,7 +338,8 @@ struct HTTPParser : protected HTTPParserBase {
                 on_complete(ec);
             };
             m_socket.async_read(m_read_buffer.get(), *m_found_content_length, std::move(handler));
-        } else if (m_has_chunked_encoding) {
+        }
+        else if (m_has_chunked_encoding) {
             auto content_length_handler = [this](std::error_code ec, size_t chunk_start_index) {
                 if (ec == util::error::operation_aborted) {
                     on_complete(ec);
@@ -362,12 +363,15 @@ struct HTTPParser : protected HTTPParserBase {
                     *m_chunked_encoding_ss << chunk_data;
                     read_body();
                 };
-                m_socket.async_read(m_read_buffer.get(), content_length + 2, std::move(handler)); // +2 to account for \r\n
+                m_socket.async_read(m_read_buffer.get(), content_length + 2,
+                                    std::move(handler)); // +2 to account for \r\n
             };
 
             // First get the content-length
-            m_socket.async_read_until(m_read_buffer.get(), 8, '\n', content_length_handler); // buffer of 8 is enough to read hex value
-        } else {
+            m_socket.async_read_until(m_read_buffer.get(), 8, '\n',
+                                      content_length_handler); // buffer of 8 is enough to read hex value
+        }
+        else {
             // No body, just finish.
             on_complete();
         }
