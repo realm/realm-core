@@ -19,7 +19,6 @@
 #ifndef REALM_BSON_HPP
 #define REALM_BSON_HPP
 
-#include <realm/util/bson/indexed_map.hpp>
 #include <realm/util/bson/regular_expression.hpp>
 #include <realm/util/bson/min_key.hpp>
 #include <realm/util/bson/max_key.hpp>
@@ -41,30 +40,33 @@ class BsonArray;
 
 class Bson {
 public:
-    enum class Type {
-        Null,
-        Int32,
-        Int64,
-        Bool,
-        Double,
-        String,
-        Binary,
-        Timestamp,
-        Datetime,
-        ObjectId,
-        Decimal128,
-        RegularExpression,
-        MaxKey,
-        MinKey,
-        Document,
-        Array,
-        Uuid
+    enum class Type : uint8_t {
+        Null = 0xa,
+        Int32 = 0x10,
+        Int64 = 0x12,
+        Bool = 0x08,
+        Double = 0x01,
+        String = 0x02,
+        Binary = 0x05,
+        Timestamp = 0x11,
+        Datetime = 0x09,
+        ObjectId = 0x07,
+        Decimal128 = 0x13,
+        RegularExpression = 0x0b,
+        MaxKey = 0xff,
+        MinKey = 0x7f,
+        Document = 0x03,
+        Array = 0x04,
+        Uuid = 0x14
     };
 
     Bson() noexcept
         : m_type(Type::Null)
     {
     }
+
+    Bson(Bson&& v) noexcept;
+    Bson(const Bson& v);
 
     Bson(util::None) noexcept
         : Bson()
@@ -84,7 +86,8 @@ public:
     Bson(realm::UUID) noexcept;
 
     Bson(const RegularExpression&) noexcept;
-    Bson(const std::vector<char>&) noexcept;
+    Bson(std::vector<char>&&) noexcept;
+    Bson(const char* begin, const char* end) noexcept;
     Bson(const std::string&) noexcept;
     Bson(const BsonDocument&) noexcept;
     Bson(const BsonArray&) noexcept;
@@ -105,10 +108,11 @@ public:
 
     ~Bson() noexcept;
 
-    Bson(Bson&& v) noexcept;
-    Bson(const Bson& v);
     Bson& operator=(Bson&& v) noexcept;
     Bson& operator=(const Bson& v);
+
+    uint32_t size() const;
+    void append_to(uint8_t*) const;
 
     explicit operator util::None() const
     {
@@ -162,6 +166,12 @@ public:
     {
         REALM_ASSERT(m_type == Bson::Type::Binary);
         return binary_val;
+    }
+
+    explicit operator BinaryData() const
+    {
+        REALM_ASSERT(m_type == Bson::Type::Binary);
+        return {binary_val.data(), binary_val.size()};
     }
 
     explicit operator MongoTimestamp() const
@@ -229,7 +239,6 @@ public:
         REALM_ASSERT(m_type == Bson::Type::Array);
         return *array_val;
     }
-
     explicit operator realm::UUID() const
     {
         REALM_ASSERT(m_type == Bson::Type::Uuid);
@@ -272,35 +281,220 @@ private:
     };
 };
 
-class BsonDocument : private IndexedMap<Bson> {
+class BsonDocument {
 public:
-    using iterator = IndexedMap<Bson>::iterator;
-    using IndexedMap<Bson>::begin;
-    using IndexedMap<Bson>::end;
+    using entry = std::pair<std::string_view, Bson>;
 
-    BsonDocument() {}
-    BsonDocument(BsonDocument&& other)
-        : IndexedMap<Bson>(std::move(other))
+    struct iterator {
+        iterator(const BsonDocument* p, uint32_t n)
+            : m_doc(p)
+            , m_ndx(n)
+        {
+        }
+        bool operator==(const iterator& other)
+        {
+            return m_ndx == other.m_ndx;
+        }
+        bool operator!=(const iterator& other)
+        {
+            return m_ndx != other.m_ndx;
+        }
+        const entry& operator*()
+        {
+            return *operator->();
+        }
+
+        const entry* operator->();
+        iterator& operator++();
+
+    private:
+        const BsonDocument* m_doc;
+        uint32_t m_ndx;
+        entry m_value; /* Internal value for various state. */
+    };
+
+    BsonDocument()
+    {
+        init();
+    }
+    BsonDocument(BsonDocument&&);
+    BsonDocument(const BsonDocument&);
+    BsonDocument(std::initializer_list<entry> entries);
+    BsonDocument(const uint8_t* buf);
+    ~BsonDocument();
+
+    BsonDocument& operator=(const BsonDocument&);
+
+    uint32_t length() const
+    {
+        return len;
+    }
+    uint32_t size() const;
+    bool empty() const
+    {
+        return size() == 0;
+    }
+    BinaryData serialize() const
+    {
+        return {reinterpret_cast<const char*>(get_data()), len};
+    }
+
+    void append(std::string_view, const Bson&);
+    BsonDocument append_array(std::string_view key)
+    {
+        return append_bson(key, Bson::Type::Array);
+    }
+    BsonDocument append_document(std::string_view key)
+    {
+        return append_bson(key, Bson::Type::Document);
+    }
+    void append_to(uint8_t* p)
+    {
+        memcpy(p, get_data(), len);
+    }
+
+    Bson operator[](std::string_view k) const
+    {
+        return at(k);
+    }
+    Bson at(std::string_view k) const;
+    std::optional<Bson> find(std::string_view key) const;
+
+    bool operator==(const BsonDocument&) const;
+
+    iterator begin() const
+    {
+        return {this, 0};
+    }
+    iterator end() const
+    {
+        return {this, size()};
+    }
+
+
+private:
+    friend class BsonArray;
+    static constexpr size_t BSON_INLINE_DATA_SIZE = 120;
+    enum Flags : uint32_t {
+        BSON_FLAG_NONE = 0,
+        BSON_FLAG_INLINE = (1 << 0),
+        BSON_FLAG_STATIC = (1 << 1),
+        BSON_FLAG_RDONLY = (1 << 2),
+        BSON_FLAG_CHILD = (1 << 3),
+        BSON_FLAG_IN_CHILD = (1 << 4),
+        BSON_FLAG_NO_FREE = (1 << 5),
+    };
+
+    uint32_t flags = BSON_FLAG_INLINE;
+    uint32_t len = 0;
+    struct ImplAlloc {
+        BsonDocument* parent; // parent bson if a child
+        uint32_t depth;       // Subdocument depth.
+        uint8_t** buf;        // pointer to buffer pointer
+        size_t* buflen;       // pointer to buffer length
+        size_t offset;        // our offset inside *buf
+        uint8_t* alloc;       // buffer that we own.
+        size_t alloclen;      // length of buffer that we own.
+    };
+    union {
+        uint8_t data[BSON_INLINE_DATA_SIZE];
+        ImplAlloc impl_alloc;
+    };
+    std::vector<uint32_t> entries;
+
+    const uint8_t* get_data() const
+    {
+        return const_cast<BsonDocument*>(this)->get_data();
+    }
+
+    uint8_t* get_data()
+    {
+        if ((flags & BSON_FLAG_INLINE)) {
+            return data;
+        }
+        else {
+            return *impl_alloc.buf + impl_alloc.offset;
+        }
+    }
+    void grow(uint32_t size)
+    {
+        REALM_ASSERT((flags & BSON_FLAG_RDONLY) == 0);
+        if (flags & BSON_FLAG_INLINE) {
+            inline_grow(size);
+        }
+        else {
+            alloc_grow(size);
+        }
+    }
+    void init();
+    void inline_grow(uint32_t size);
+    void alloc_grow(uint32_t size);
+    BsonDocument append_bson(std::string_view, Bson::Type);
+    void encode_length()
+    {
+        *reinterpret_cast<uint32_t*>(get_data()) = len;
+    }
+    const uint8_t* next(const uint8_t* data, uint32_t len);
+    Bson get_value(Bson::Type type, const uint8_t* data) const;
+};
+
+class BsonArray {
+public:
+    using entry = Bson;
+    struct iterator {
+        iterator(BsonDocument::iterator it)
+            : m_it(it)
+        {
+        }
+        bool operator!=(const iterator& other)
+        {
+            return m_it != other.m_it;
+        }
+        const entry& operator*()
+        {
+            return m_it->second;
+        }
+        iterator& operator++()
+        {
+            ++m_it;
+            return *this;
+        }
+
+    private:
+        BsonDocument::iterator m_it;
+    };
+
+    BsonArray() {}
+    BsonArray(BsonArray&& arr)
+        : m_doc(std::move(arr.m_doc))
     {
     }
-    BsonDocument(const BsonDocument& other)
-        : IndexedMap<Bson>(other)
+    BsonArray(BsonDocument&& doc)
+        : m_doc(std::move(doc))
     {
     }
-    BsonDocument(std::initializer_list<entry> entries)
-        : IndexedMap<Bson>(entries)
+    BsonArray(const BsonArray& arr)
+        : m_doc(arr.m_doc)
+    {
+    }
+    BsonArray(std::initializer_list<entry> entries)
+    {
+        for (auto& e : entries) {
+            append(e);
+        }
+    }
+    BsonArray(const uint8_t* buf)
+        : m_doc(buf)
     {
     }
 
-    BsonDocument& operator=(const BsonDocument& rhs)
+    uint32_t length() const
     {
-        this->IndexedMap<Bson>::operator=(rhs);
-        return *this;
+        return m_doc.length();
     }
-
-    uint32_t size() const
+    size_t size() const
     {
-        return uint32_t(IndexedMap<Bson>::size());
+        return m_doc.size();
     }
 
     bool empty() const
@@ -308,64 +502,33 @@ public:
         return size() == 0;
     }
 
-    void append(const std::string& key, const Bson& val)
+    BinaryData serialize() const
     {
-        IndexedMap<Bson>::operator[](key) = val;
+        return m_doc.serialize();
     }
 
-    Bson operator[](const std::string& k) const
+    Bson operator[](size_t) const;
+
+    void append(const Bson&);
+    BsonDocument append_document();
+    void append_to(uint8_t* p)
     {
-        return at(k);
+        m_doc.append_to(p);
     }
 
-    Bson at(const std::string& k) const
+    bool operator==(const BsonArray&) const;
+    iterator begin() const
     {
-        return IndexedMap<Bson>::at(k);
+        return iterator(m_doc.begin());
+    }
+    iterator end() const
+    {
+        return iterator(m_doc.end());
     }
 
-    std::optional<Bson> find(const std::string& key) const
-    {
-        auto& raw = entries();
-        if (auto it = raw.find(key); it != raw.end()) {
-            return it->second;
-        }
-        return {};
-    }
-
-    bool operator==(const BsonDocument& other) const
-    {
-        return static_cast<const IndexedMap<Bson>*>(this)->entries() == other.entries();
-    }
-};
-
-class BsonArray : private std::vector<Bson> {
-public:
-    using entry = Bson;
-    using vector<Bson>::begin;
-    using vector<Bson>::end;
-    using vector<Bson>::size;
-    using vector<Bson>::empty;
-
-    BsonArray() {}
-    BsonArray(std::initializer_list<entry> entries)
-        : std::vector<Bson>(entries)
-    {
-    }
-
-    Bson operator[](size_t n) const
-    {
-        return std::vector<Bson>::operator[](n);
-    }
-
-    void append(const Bson& val)
-    {
-        std::vector<Bson>::push_back(val);
-    }
-
-    bool operator==(const BsonArray& other) const
-    {
-        return *static_cast<const std::vector<Bson>*>(this) == other;
-    }
+private:
+    friend class BsonDocument;
+    BsonDocument m_doc;
 };
 
 inline Bson::Bson(int32_t v) noexcept
@@ -409,10 +572,16 @@ inline Bson::Bson(const RegularExpression& v) noexcept
     new (&regex_val) RegularExpression(v);
 }
 
-inline Bson::Bson(const std::vector<char>& v) noexcept
+inline Bson::Bson(std::vector<char>&& v) noexcept
 {
     m_type = Bson::Type::Binary;
-    new (&binary_val) std::vector<char>(v);
+    new (&binary_val) std::vector<char>(std::move(v));
+}
+
+inline Bson::Bson(const char* begin, const char* end) noexcept
+{
+    m_type = Bson::Type::Binary;
+    new (&binary_val) std::vector<char>(begin, end);
 }
 
 inline Bson::Bson(const std::string& v) noexcept

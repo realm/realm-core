@@ -22,7 +22,7 @@
 namespace realm {
 namespace bson {
 
-RegularExpression::RegularExpression(const std::string pattern, const std::string& options)
+RegularExpression::RegularExpression(const std::string& pattern, const std::string& options)
     : m_pattern(pattern)
     , m_options(std::accumulate(options.begin(), options.end(), RegularExpression::Option::None,
                                 [](RegularExpression::Option a, char b) {
@@ -31,13 +31,13 @@ RegularExpression::RegularExpression(const std::string pattern, const std::strin
 {
 }
 
-RegularExpression::RegularExpression(const std::string pattern, Option options)
+RegularExpression::RegularExpression(const std::string& pattern, Option options)
     : m_pattern(pattern)
     , m_options(options)
 {
 }
 
-const std::string RegularExpression::pattern() const
+const std::string& RegularExpression::pattern() const
 {
     return m_pattern;
 }
@@ -52,10 +52,14 @@ constexpr RegularExpression::Option RegularExpression::option_char_to_option(con
     switch (option) {
         case 'i':
             return Option::IgnoreCase;
+        case 'l':
+            return Option::Locale;
         case 'm':
             return Option::Multiline;
         case 's':
             return Option::Dotall;
+        case 'u':
+            return Option::Unicode;
         case 'x':
             return Option::Extended;
         default:
@@ -63,20 +67,25 @@ constexpr RegularExpression::Option RegularExpression::option_char_to_option(con
     }
 }
 
-std::ostream& operator<<(std::ostream& out, const RegularExpression::Option& option)
+std::string RegularExpression::options_str() const
 {
+    std::string ret;
     using Option = RegularExpression::Option;
 
-    if ((option & Option::IgnoreCase) != Option::None)
-        out << 'i';
-    if ((option & Option::Multiline) != Option::None)
-        out << 'm';
-    if ((option & Option::Dotall) != Option::None)
-        out << 's';
-    if ((option & Option::Extended) != Option::None)
-        out << 'x';
+    if ((m_options & Option::IgnoreCase) != Option::None)
+        ret += 'i';
+    if ((m_options & Option::Locale) != Option::None)
+        ret += 'l';
+    if ((m_options & Option::Multiline) != Option::None)
+        ret += 'm';
+    if ((m_options & Option::Dotall) != Option::None)
+        ret += 's';
+    if ((m_options & Option::Unicode) != Option::None)
+        ret += 'u';
+    if ((m_options & Option::Extended) != Option::None)
+        ret += 'x';
 
-    return out;
+    return ret;
 }
 
 } // namespace bson

@@ -25,6 +25,7 @@ namespace realm {
 namespace bson {
 
 struct MongoTimestamp {
+    MongoTimestamp() = default;
     MongoTimestamp(uint32_t seconds, uint32_t increment)
         : seconds(seconds)
         , increment(increment)
@@ -41,8 +42,8 @@ struct MongoTimestamp {
         return !(lhs == rhs);
     }
 
-    uint32_t seconds;
-    uint32_t increment;
+    uint32_t seconds = 0;
+    uint32_t increment = 0;
 };
 
 } // namespace bson

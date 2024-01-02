@@ -24,6 +24,7 @@
 #include <realm/table.hpp>
 #include <realm/query_value.hpp>
 #include <realm/util/serializer.hpp>
+#include <realm/util/bson/bson.hpp>
 
 namespace realm {
 namespace {
@@ -159,6 +160,69 @@ int compare_long_to_double(int64_t lhs, double rhs)
     return compare_generic(lhs, int64_t(rhs));
 }
 } // anonymous namespace
+
+Mixed::Mixed(const bson::Bson& value)
+{
+    m_type = 0;
+    switch (value.type()) {
+        case bson::Bson::Type::Null:
+            break;
+        case bson::Bson::Type::Int32:
+            m_type = int(type_Int) + 1;
+            int_val = int32_t(value);
+            break;
+        case bson::Bson::Type::Int64:
+            m_type = int(type_Int) + 1;
+            int_val = int64_t(value);
+            break;
+        case bson::Bson::Type::Bool:
+            m_type = int(type_Bool) + 1;
+            bool_val = bool(value);
+            break;
+        case bson::Bson::Type::Double:
+            m_type = int(type_Double) + 1;
+            double_val = Double(value);
+            break;
+        case bson::Bson::Type::String: {
+            m_type = int(type_String) + 1;
+            const std::string& str(value);
+            string_val = str;
+            break;
+        }
+        case bson::Bson::Type::Binary: {
+            m_type = int(type_Binary) + 1;
+            const std::vector<char>& bin_data(value);
+            binary_val = BinaryData(bin_data.data(), bin_data.size());
+            break;
+        }
+        case bson::Bson::Type::Datetime:
+            m_type = int(type_Timestamp) + 1;
+            date_val = Timestamp(value);
+            break;
+        case bson::Bson::Type::ObjectId:
+            m_type = int(type_ObjectId) + 1;
+            id_val = ObjectId(value);
+            break;
+        case bson::Bson::Type::Decimal128:
+            m_type = int(type_Decimal) + 1;
+            decimal_val = Decimal128(value);
+            break;
+        case bson::Bson::Type::Uuid:
+            m_type = int(type_UUID) + 1;
+            uuid_val = UUID(value);
+            break;
+        case bson::Bson::Type::Document:
+            m_type = int(CollectionType::Dictionary) + 1;
+            int_val = 0;
+            break;
+        case bson::Bson::Type::Array:
+            m_type = int(CollectionType::List) + 1;
+            int_val = 0;
+            break;
+        default:
+            throw Exception(ErrorCodes::Error::MalformedJson, "Unsupported Bson Type");
+    }
+}
 
 Mixed::Mixed(const Obj& obj) noexcept
     : Mixed(ObjLink(obj.get_table()->get_key(), obj.get_key()))
@@ -803,6 +867,39 @@ std::string Mixed::to_string(size_t max_size) const noexcept
         ostr << *this;
     }
     return ostr.str();
+}
+
+bson::Bson Mixed::to_bson() const noexcept
+{
+    if (!is_null()) {
+        switch (get_type()) {
+            case type_Int:
+                return bson::Bson(int_val);
+            case type_Bool:
+                return bson::Bson(bool_val);
+            case type_Float:
+                return bson::Bson(float_val);
+            case type_Double:
+                return bson::Bson(double_val);
+            case type_String:
+                return bson::Bson(string_val);
+            case type_Binary:
+                return bson::Bson(binary_val.data(), binary_val.data() + binary_val.size());
+            case type_Timestamp:
+                return bson::Bson(date_val);
+            case type_Decimal:
+                return bson::Bson(decimal_val);
+            case type_ObjectId:
+                return bson::Bson(id_val);
+            case type_UUID:
+                return bson::Bson(uuid_val);
+            case type_TypedLink:
+            case type_Link:
+            case type_Mixed:
+                break;
+        }
+    }
+    return bson::Bson();
 }
 
 void Mixed::use_buffer(std::string& buf) noexcept

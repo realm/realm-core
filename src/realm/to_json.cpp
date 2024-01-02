@@ -327,24 +327,32 @@ const char encoding[] = "\"nrtf\\b";
 template <class T>
 inline void out_floats(std::ostream& out, T value)
 {
-    std::streamsize old = out.precision();
-    out.precision(std::numeric_limits<T>::digits10 + 1);
-    out << std::scientific << value;
-    out.precision(old);
+    if (std::isnan(value)) {
+        out << "NaN";
+    }
+    else {
+        std::streamsize old = out.precision(std::numeric_limits<T>::max_digits10);
+        out << value;
+        out.precision(old);
+    }
 }
 
-void out_string(std::ostream& out, std::string str)
+void out_string(std::ostream& out, std::string_view str)
 {
-    size_t p = str.find_first_of(to_be_escaped);
-    while (p != std::string::npos) {
-        char c = str[p];
-        auto found = strchr(to_be_escaped, c);
-        REALM_ASSERT(found);
-        out << str.substr(0, p) << '\\' << encoding[found - to_be_escaped];
-        str = str.substr(p + 1);
-        p = str.find_first_of(to_be_escaped);
+    for (auto c : str) {
+        if (auto found = memchr(to_be_escaped, c, sizeof(to_be_escaped) - 1)) {
+            out << '\\' << encoding[reinterpret_cast<const char*>(found) - to_be_escaped];
+        }
+        else if (unsigned(c) < 0x20) {
+            // Other control characters
+            char buffer[5];
+            sprintf(buffer, "%04x", int(c));
+            out << "\\u" << buffer;
+        }
+        else {
+            out << c;
+        }
     }
-    out << str;
 }
 
 void out_binary(std::ostream& out, BinaryData bin)
@@ -380,7 +388,7 @@ void Mixed::to_xjson(std::ostream& out) const noexcept
             break;
         case type_String: {
             out << "\"";
-            out_string(out, string_val);
+            out_string(out, std::string_view(string_val));
             out << "\"";
             break;
         }
@@ -471,7 +479,7 @@ void Mixed::to_json(std::ostream& out, JSONOutputMode output_mode) const noexcep
                     break;
                 case type_String: {
                     out << "\"";
-                    out_string(out, string_val);
+                    out_string(out, std::string_view(string_val));
                     out << "\"";
                     break;
                 }

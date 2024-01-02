@@ -177,7 +177,7 @@ void sort_events(std::vector<AuditEvent>& events)
 static std::vector<AuditEvent> get_audit_events_from_baas(TestAppSession& session, SyncUser& user,
                                                           size_t expected_count)
 {
-    static const std::set<std::string> nonmetadata_fields = {"activity", "event", "data", "realm_id"};
+    static const std::set<std::string_view> nonmetadata_fields = {"activity", "event", "data", "realm_id"};
 
     auto documents = session.get_documents(user, "AuditEvent", expected_count);
     std::vector<AuditEvent> events;
@@ -194,7 +194,7 @@ static std::vector<AuditEvent> get_audit_events_from_baas(TestAppSession& sessio
         }
         for (auto [key, value] : doc) {
             if (value.type() == bson::Bson::Type::String && !nonmetadata_fields.count(key))
-                event.metadata.insert({key, static_cast<std::string>(value)});
+                event.metadata.insert({std::string(key), static_cast<std::string>(value)});
         }
         events.push_back(event);
     }

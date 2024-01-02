@@ -24,11 +24,13 @@
 #include <string>
 #include <fstream>
 #include <ostream>
+#include <sstream>
 #include <chrono>
 
 #include <realm.hpp>
 #include <external/json/json.hpp>
 #include <external/bson/bson.h>
+#include <realm/util/bson/bson.hpp>
 
 #include "util/misc.hpp"
 
@@ -786,13 +788,20 @@ TEST(Json_Timestamp)
     */
 }
 
+/*
+ * This test can be used to study the implementation of libbson
+ */
+#if 0
 TEST(Bson_bson)
 {
     bson_t bs[1];
     bson_t child[1];
+    bson_iter_t iter;
+    bson_iter_t child_iter;
+
     bson_init(bs);
     BSON_APPEND_ARRAY_BEGIN(bs, "Hello", child);
-    BSON_APPEND_UTF8(child, "0", "awesome");
+    BSON_APPEND_UTF8(child, "0", "awesome!");
     BSON_APPEND_DOUBLE(child, "1", 5.125);
     BSON_APPEND_INT32(child, "2", 1986);
     bson_append_array_end(bs, child);
@@ -800,12 +809,116 @@ TEST(Bson_bson)
     BSON_APPEND_UTF8(child, "0", "pink");
     bson_append_array_end(bs, child);
 
+    if (bson_iter_init(&iter, bs)) {
+        while (bson_iter_next(&iter)) {
+            std::cout << "Found element key: " << bson_iter_key(&iter) << std::endl;
+            bson_iter_value(&iter);
+            if (BSON_ITER_HOLDS_ARRAY(&iter) && bson_iter_recurse(&iter, &child_iter)) {
+                while (bson_iter_next(&child_iter)) {
+                    std::cout << "   Found sub-key: " << bson_iter_key(&child_iter) << std::endl;
+                    auto value = bson_iter_value(&child_iter);
+                };
+            }
+        }
+    }
     size_t len;
     char* str = bson_as_canonical_extended_json(bs, &len);
-    // std::cout << str << std::endl;
+    std::cout << str << std::endl;
     CHECK(strstr(str, "awesome") != nullptr);
+
+    auto data1 = bson_get_data(bs);
+    auto data2 = bson_get_data(child);
+
+    auto new_bson = bson_new_from_data(data1, bs->len);
+
     bson_free(str);
     bson_destroy(bs);
+    bson_destroy(new_bson);
+}
+#endif
+
+TEST(Bson_Parse)
+{
+    Table t;
+    auto col_id = t.add_column(type_UUID, "id");
+    auto col_id2 = t.add_column(type_ObjectId, "id2");
+    auto col_name = t.add_column(type_String, "name");
+    auto col_address = t.add_column_dictionary(type_Mixed, "address");
+    auto col_bin = t.add_column(type_Binary, "bin");
+    auto col_time = t.add_column(type_Timestamp, "time");
+    auto col_price = t.add_column(type_Decimal, "price");
+    auto col_sold = t.add_column(type_Bool, "sold");
+    auto col_weight = t.add_column(type_Double, "weight");
+    auto col_any = t.add_column(type_Mixed, "any");
+
+    auto o = t.create_object();
+    o.set(col_id, UUID("3b241101-e2bb-4255-8caf-4136c566a961"));
+    o.set(col_id2, ObjectId::gen());
+    o.set(col_name, "Anders And");
+    o.set(col_bin, BinaryData("123456", 6));
+    int64_t millisecs =
+        std::chrono::duration_cast<milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+    Timestamp now(millisecs / 1000, (millisecs % 1000) * 1000000);
+    o.set(col_time, now);
+    o.set(col_price, Decimal128("17.95"));
+    o.set(col_sold, true);
+    o.set(col_weight, 13.125);
+    auto dict = o.get_dictionary(col_address);
+    dict.insert("Street", "Paradisæblevej");
+    dict.insert("Number", 111);
+    dict.insert("City", "Andeby");
+    o.set_collection(col_any, CollectionType::List);
+    auto l = o.get_list<Mixed>(col_any);
+    l.add(1);
+    l.add(2);
+    l.add(3);
+
+    std::string json;
+    {
+        std::ostringstream ss;
+        o.to_json(ss, output_mode_xjson);
+        json = ss.str();
+    }
+    // std::cout << json << std::endl;
+
+    bson::Bson bson1 = bson::parse({json.c_str(), json.size()});
+    auto doc = static_cast<bson::BsonDocument>(bson1);
+    auto bin = doc["bin"];
+    auto bin_data = static_cast<BinaryData>(bin);
+    CHECK_EQUAL(bin_data.size(), 6);
+    CHECK_EQUAL(doc["time"], now);
+    auto data2 = doc.serialize();
+
+    // Create reference
+    auto bson = bson_new_from_json((const uint8_t*)json.c_str(), -1, nullptr);
+    auto data1 = bson_get_data(bson);
+    // size_t len;
+    // std::cout << bson_as_canonical_extended_json (bson, &len) << std::endl;
+
+    CHECK_EQUAL(bson->len, data2.size());
+    if (!CHECK(memcmp(data1, data2.data(), data2.size()) == 0)) {
+        for (size_t i = 0; i < data2.size(); i++) {
+            if (data1[i] != uint8_t(data2[i])) {
+                std::cout << i << ": " << int(data1[i]) << " != " << int(uint8_t(data2[i])) << std::endl;
+            }
+        }
+    }
+
+    bson::BsonDocument bson2(reinterpret_cast<const uint8_t*>(data2.data()));
+    std::string json1;
+    {
+        std::ostringstream ss;
+        ss << bson2;
+        json1 = ss.str();
+    }
+    // Remove spaces
+    auto it = std::remove(json.begin(), json.end(), ' ');
+    json.erase(it, json.end());
+    it = std::remove(json1.begin(), json1.end(), ' ');
+    json1.erase(it, json1.end());
+
+    CHECK_EQUAL(json1, json);
+    bson_destroy(bson);
 }
 
 } // anonymous namespace

@@ -46,6 +46,9 @@ enum JSONOutputMode {
     output_mode_xjson_plus, // extended json as described in the spec with additional modifier used for sync
 };
 using ref_type = size_t;
+namespace bson {
+class Bson;
+}
 
 /// This class represents a polymorphic Realm value.
 ///
@@ -158,7 +161,7 @@ public:
 #if REALM_ENABLE_GEOSPATIAL
     Mixed(Geospatial*) noexcept;
 #endif
-
+    Mixed(const bson::Bson&);
     // These are shortcuts for Mixed(StringData(c_str)), and are
     // needed to avoid unwanted implicit conversion of char* to bool.
     Mixed(char* c_str) noexcept
@@ -170,6 +173,10 @@ public:
     {
     }
     Mixed(const std::string& s) noexcept
+        : Mixed(StringData(s))
+    {
+    }
+    Mixed(std::string_view s) noexcept
         : Mixed(StringData(s))
     {
     }
@@ -269,6 +276,7 @@ public:
     void use_buffer(std::string& buf) noexcept;
 
     void to_json(std::ostream& out, JSONOutputMode output_mode) const noexcept;
+    bson::Bson to_bson() const noexcept;
 
 protected:
     friend std::ostream& operator<<(std::ostream& out, const Mixed& m);

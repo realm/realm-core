@@ -10,10 +10,10 @@
       }
     },
     "float": {
-      "$numberDouble": "1.2345600e+02"
+      "$numberDouble": "123.456001"
     },
     "double": {
-      "$numberDouble": "9.8765432099999998e+03"
+      "$numberDouble": "9876.5432099999998"
     },
     "string": "string0",
     "string_long": "string0 very long string.........",
@@ -61,10 +61,10 @@
       }
     },
     "float": {
-      "$numberDouble": "-1.2345600e+02"
+      "$numberDouble": "-123.456001"
     },
     "double": {
-      "$numberDouble": "-9.8765432099999998e+03"
+      "$numberDouble": "-9876.5432099999998"
     },
     "string": "string1",
     "string_long": "string1 very long string.........",
@@ -118,10 +118,10 @@
       }
     },
     "float": {
-      "$numberDouble": "1.2345600e+02"
+      "$numberDouble": "123.456001"
     },
     "double": {
-      "$numberDouble": "9.8765432099999998e+03"
+      "$numberDouble": "9876.5432099999998"
     },
     "string": "string2",
     "string_long": "string2 very long string.........",
@@ -179,10 +179,10 @@
       }
     },
     "float": {
-      "$numberDouble": "-1.2345600e+02"
+      "$numberDouble": "-123.456001"
     },
     "double": {
-      "$numberDouble": "-9.8765432099999998e+03"
+      "$numberDouble": "-9876.5432099999998"
     },
     "string": "string3",
     "string_long": "string3 very long string.........",
@@ -244,10 +244,10 @@
       }
     },
     "float": {
-      "$numberDouble": "1.2345600e+02"
+      "$numberDouble": "123.456001"
     },
     "double": {
-      "$numberDouble": "9.8765432099999998e+03"
+      "$numberDouble": "9876.5432099999998"
     },
     "string": "string4",
     "string_long": "string4 very long string.........",
@@ -313,10 +313,10 @@
       }
     },
     "float": {
-      "$numberDouble": "-1.2345600e+02"
+      "$numberDouble": "-123.456001"
     },
     "double": {
-      "$numberDouble": "-9.8765432099999998e+03"
+      "$numberDouble": "-9876.5432099999998"
     },
     "string": "string5",
     "string_long": "string5 very long string.........",
@@ -364,10 +364,10 @@
       }
     },
     "float": {
-      "$numberDouble": "1.2345600e+02"
+      "$numberDouble": "123.456001"
     },
     "double": {
-      "$numberDouble": "9.8765432099999998e+03"
+      "$numberDouble": "9876.5432099999998"
     },
     "string": "string6",
     "string_long": "string6 very long string.........",
@@ -421,10 +421,10 @@
       }
     },
     "float": {
-      "$numberDouble": "-1.2345600e+02"
+      "$numberDouble": "-123.456001"
     },
     "double": {
-      "$numberDouble": "-9.8765432099999998e+03"
+      "$numberDouble": "-9876.5432099999998"
     },
     "string": "string7",
     "string_long": "string7 very long string.........",
@@ -482,10 +482,10 @@
       }
     },
     "float": {
-      "$numberDouble": "1.2345600e+02"
+      "$numberDouble": "123.456001"
     },
     "double": {
-      "$numberDouble": "9.8765432099999998e+03"
+      "$numberDouble": "9876.5432099999998"
     },
     "string": "string8",
     "string_long": "string8 very long string.........",
@@ -547,10 +547,10 @@
       }
     },
     "float": {
-      "$numberDouble": "-1.2345600e+02"
+      "$numberDouble": "-123.456001"
     },
     "double": {
-      "$numberDouble": "-9.8765432099999998e+03"
+      "$numberDouble": "-9876.5432099999998"
     },
     "string": "string9",
     "string_long": "string9 very long string.........",
@@ -616,10 +616,10 @@
       }
     },
     "float": {
-      "$numberDouble": "1.2345600e+02"
+      "$numberDouble": "123.456001"
     },
     "double": {
-      "$numberDouble": "9.8765432099999998e+03"
+      "$numberDouble": "9876.5432099999998"
     },
     "string": "string10",
     "string_long": "string10 very long string.........",
@@ -667,10 +667,10 @@
       }
     },
     "float": {
-      "$numberDouble": "-1.2345600e+02"
+      "$numberDouble": "-123.456001"
     },
     "double": {
-      "$numberDouble": "-9.8765432099999998e+03"
+      "$numberDouble": "-9876.5432099999998"
     },
     "string": "string11",
     "string_long": "string11 very long string.........",
@@ -724,10 +724,10 @@
       }
     },
     "float": {
-      "$numberDouble": "1.2345600e+02"
+      "$numberDouble": "123.456001"
     },
     "double": {
-      "$numberDouble": "9.8765432099999998e+03"
+      "$numberDouble": "9876.5432099999998"
     },
     "string": "string12",
     "string_long": "string12 very long string.........",
@@ -785,10 +785,10 @@
       }
     },
     "float": {
-      "$numberDouble": "-1.2345600e+02"
+      "$numberDouble": "-123.456001"
     },
     "double": {
-      "$numberDouble": "-9.8765432099999998e+03"
+      "$numberDouble": "-9876.5432099999998"
     },
     "string": "string13",
     "string_long": "string13 very long string.........",
@@ -850,10 +850,10 @@
       }
     },
     "float": {
-      "$numberDouble": "1.2345600e+02"
+      "$numberDouble": "123.456001"
     },
     "double": {
-      "$numberDouble": "9.8765432099999998e+03"
+      "$numberDouble": "9876.5432099999998"
     },
     "string": "string14",
     "string_long": "string14 very long string.........",

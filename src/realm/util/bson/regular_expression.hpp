@@ -29,7 +29,7 @@ namespace bson {
 /// Provides regular expression capabilities for pattern matching strings in queries.
 /// MongoDB uses Perl compatible regular expressions (i.e. "PCRE") version 8.42 with UTF-8 support.
 struct RegularExpression {
-    enum class Option { None, IgnoreCase = 1, Multiline = 2, Dotall = 4, Extended = 8 };
+    enum class Option { None, IgnoreCase = 1, Multiline = 2, Dotall = 4, Extended = 8, Locale = 32, Unicode = 64 };
 
     RegularExpression()
         : m_pattern("")
@@ -37,21 +37,21 @@ struct RegularExpression {
     {
     }
 
-    RegularExpression(const std::string pattern, const std::string& options);
+    RegularExpression(const std::string& pattern, const std::string& options);
 
-    RegularExpression(const std::string pattern, Option options);
+    RegularExpression(const std::string& pattern, Option options);
 
     RegularExpression(const RegularExpression&) = default;
     RegularExpression(RegularExpression&&) = default;
     RegularExpression& operator=(const RegularExpression& regex) = default;
 
-    const std::string pattern() const;
+    const std::string& pattern() const;
     Option options() const;
+    std::string options_str() const;
 
 private:
     static constexpr Option option_char_to_option(const char option);
 
-    friend std::ostream& operator<<(std::ostream& out, const Option& o);
     std::string m_pattern;
     Option m_options;
 };
