@@ -168,6 +168,12 @@ enums:
       Collection: 896 # Array | Set | Dictionary
       Flags: 960 # Nullable | Collection
 
+  CollectionType:
+    values:
+      List: 19
+      Set: 20
+      Dictionary: 21
+
   TableType:
     cppName: ObjectSchema::ObjectType
     values:
@@ -768,6 +774,7 @@ classes:
         - '(column: ColKey, value: Mixed)'
         - sig: '(column: ColKey, value: Mixed, is_default: bool)'
           suffix: with_default
+      set_collection: '(column: ColKey, type: CollectionType) -> Obj'
       get_linked_object: '(column: ColKey) const -> Nullable<Obj>'
       to_string: () const -> std::string
       get_backlink_count: '() const -> count_t'
@@ -1030,8 +1037,10 @@ classes:
       delete_all: '()'
       insert_any: '(list_ndx: count_t, value: Mixed)'
       insert_embedded: '(ndx: count_t) -> Obj'
+      # insert_collection: '(<arg name>: const PathElement&, dict_or_list: CollectionType)'
       set_any: '(list_ndx: count_t, value: Mixed)'
       set_embedded: '(list_ndx: count_t) -> Obj'
+      # set_collection: '(path_element: const PathElement&, dict_or_list: CollectionType)'
       filter: '(q: Query) const -> Results'
       freeze: '(frozen_realm: SharedRealm const&) const -> List'
 
@@ -1113,6 +1122,7 @@ classes:
       add_key_based_notification_callback: '(cb: (changes: DictionaryChangeSet), keyPaths: std::optional<KeyPathArray>) -> NotificationToken'
       insert_any: '(key: StringData, value: Mixed) -> std::pair<count_t, bool>'
       insert_embedded: '(key: StringData) -> Obj'
+      # insert_collection: '(<arg name>: const PathElement&, dict_or_list: CollectionType)'
       try_get_any: '(key: StringData) const -> std::optional<Mixed>'
       remove_all: '()'
       try_erase: '(key: StringData) -> bool'
