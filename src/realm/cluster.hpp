@@ -124,7 +124,10 @@ public:
     }
     int64_t get_key_value(size_t ndx) const
     {
-        return m_keys.get(ndx);
+        // BUG here: this is an unsigned array, if the array is compressed the value returned is not signed, so
+        // effectively, if the key is for example -3, the value returned here will be 11... (1) => sign bit (011) => 5
+        auto v = (int64_t)m_keys.get(ndx);
+        return v;
     }
 
     const Table* get_owning_table() const noexcept;
@@ -215,7 +218,9 @@ protected:
 
         uint64_t get(size_t ndx) const
         {
-            return (m_data != nullptr) ? ArrayUnsigned::get(ndx) : uint64_t(ndx);
+            if (is_attached())
+                return ArrayUnsigned::get(ndx);
+            return uint64_t(ndx);
         }
     };
 

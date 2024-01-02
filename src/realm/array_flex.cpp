@@ -166,8 +166,7 @@ void ArrayFlex::copy_into_encoded_array(Array& arr, std::vector<int64_t>& values
     bf_iterator it_index{data, offset, ndx_width, ndx_width, 0};
     for (size_t i = 0; i < values.size(); ++i) {
         it_value.set_value(values[i]);
-        auto v2 = it_value.get_value();
-        auto v = sign_extend_field(v_width, v2);
+        auto v = sign_extend_field(v_width, it_value.get_value());
         REALM_ASSERT_3(v, ==, values[i]);
         ++it_value;
     }

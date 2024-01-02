@@ -806,35 +806,6 @@ TEST(Links_ManyObjects)
     tr->commit();
 }
 
-TEST(Unresolved_PerformanceLinks)
-{
-    constexpr int nb_objects = 1000;
-    using namespace std::chrono;
-
-    SHARED_GROUP_TEST_PATH(path);
-    auto hist = make_in_realm_history();
-    DBRef db = DB::create(*hist, path);
-
-    auto tr = db->start_write();
-    auto table = tr->add_table_with_primary_key("table", type_Int, "id");
-    auto origin = tr->add_table("origin");
-    auto col = origin->add_column(*table, "link");
-    auto key = table->get_objkey_from_primary_key(1);
-    for (int i = 0; i < nb_objects; i++) {
-        origin->create_object().set(col, key);
-    }
-    tr->commit_and_continue_as_read();
-    tr->promote_to_write();
-    auto t1 = steady_clock::now();
-    table->create_object_with_primary_key(1);
-    auto t2 = steady_clock::now();
-    tr->commit_and_continue_as_read();
-    CHECK(t2 > t1);
-    // std::cout << "Time: " << duration_cast<microseconds>(t2 - t1).count() << " us" << std::endl;
-    tr->promote_to_write();
-    tr->verify();
-}
-
 TEST(Unresolved_PerformanceLinkList)
 {
     constexpr int nb_objects = 1000;
@@ -857,7 +828,10 @@ TEST(Unresolved_PerformanceLinkList)
         ll.add(key2);
         ll.add(key3);
     }
+    // ok
+    // tr->verify();
     tr->commit_and_continue_as_read();
+    // compresses
     tr->promote_to_write();
     auto t1 = steady_clock::now();
     table->create_object_with_primary_key(1);
@@ -868,7 +842,7 @@ TEST(Unresolved_PerformanceLinkList)
     CHECK(t2 > t1);
     // std::cout << "Time: " << duration_cast<microseconds>(t2 - t1).count() << " us" << std::endl;
     tr->promote_to_write();
-    // THIS IS CAUSING HAVOC... todo investigate, apparently it is for a type A array!!!
+    // fails
     // tr->verify();
 }
 

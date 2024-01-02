@@ -1018,7 +1018,7 @@ bool ArrayWithFind::find_encoded_array(Cond& c, int64_t value, size_t start, siz
             state->match(start + baseindex, v);
         }
     }
-    return true;
+    return ret;
 }
 
 //*************************************************************************************
