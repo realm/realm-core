@@ -218,12 +218,14 @@ enums:
       - USERNAME_PASSWORD
       - FUNCTION
       - API_KEY
+
   MetadataMode:
     cppName: SyncClientConfig::MetadataMode
     values:
       - NoEncryption
       - Encryption
       - NoMetadata
+
   LoggerLevel:
     cppName: util::Logger::Level
     values:
@@ -236,6 +238,7 @@ enums:
       - error
       - fatal
       - off
+
   HttpMethod:
     cppName: app::HttpMethod
     values:
@@ -244,11 +247,13 @@ enums:
       - patch
       - put
       - del
+
   SyncSessionStopPolicy:
     values:
       - Immediately
       - LiveIndefinitely
       - AfterChangesUploaded
+
   SyncSessionState:
     cppName: SyncSession::State
     values:
@@ -256,12 +261,14 @@ enums:
       - Dying
       - Inactive
       - WaitingForAccessToken
+
   SyncSessionConnectionState:
     cppName: SyncSession::ConnectionState
     values:
       - Disconnected
       - Connecting
       - Connected
+
   SyncErrorAction:
     cppName: sync::ProtocolErrorInfo::Action
     values:
@@ -273,17 +280,20 @@ enums:
       - DeleteRealm
       - ClientReset
       - ClientResetNoRecovery
+
   ProgressDirection:
     cppName: SyncSession::ProgressDirection
     values:
       - upload
       - download
+
   SyncUserState:
     cppName: SyncUser::State
     values:
       - LoggedOut
       - LoggedIn
       - Removed
+
   SyncSubscriptionSetState:
     cppName: sync::SubscriptionSet::State
     values:
@@ -294,12 +304,14 @@ enums:
       - Error
       - Superseded
       - AwaitingMark
+
   WatchStreamState:
     cppName: app::WatchStream::State
     values:
       - NEED_DATA
       - HAVE_EVENT
       - HAVE_ERROR
+
   ProxyType:
     cppName: SyncConfig::ProxyConfig::Type
     values:
