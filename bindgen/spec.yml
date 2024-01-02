@@ -708,6 +708,7 @@ classes:
       # TODO: Consider making preverify_ok a bool.
       make_ssl_verify_callback: '(callback: (server_address: const std::string&, server_port: int, pem_data: std::string_view, preverify_ok: int, depth: int) off_thread -> bool) -> SSLVerifyCallback'
       needs_file_format_upgrade: '(config: const RealmConfig&) -> bool'
+      get_mixed_type: '(obj: const Obj&, col_key: ColKey) -> DataType'
 
   LogCategoryRef:
     cppName: util::LogCategoryRef
