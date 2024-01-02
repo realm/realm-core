@@ -965,8 +965,11 @@ TEST_CASE("app: call function", "[sync][app][function][baas]") {
     TestAppSession session;
     auto app = session.app();
 
-    bson::BsonArray toSum(5);
-    std::iota(toSum.begin(), toSum.end(), static_cast<int64_t>(1));
+    bson::BsonArray toSum;
+    for (int64_t i : {1, 2, 3, 4, 5}) {
+        toSum.append(i);
+    }
+
     const auto checkFn = [](Optional<int64_t>&& sum, Optional<AppError>&& error) {
         REQUIRE(!error);
         CHECK(*sum == 15);
@@ -1099,7 +1102,7 @@ TEST_CASE("app: remote mongo client", "[sync][app][mongo][baas]") {
             CHECK(static_cast<std::string>(*object_id) == cat_id_string);
         });
 
-        person_document["dogs"] = bson::BsonArray({dog_object_id, dog2_object_id, dog3_object_id});
+        person_document.append("dogs", bson::BsonArray({dog_object_id, dog2_object_id, dog3_object_id}));
         person_collection.insert_one(person_document, [&](Optional<bson::Bson> object_id, Optional<AppError> error) {
             REQUIRE_FALSE(error);
             CHECK((*object_id).to_string() != "");
@@ -1129,7 +1132,7 @@ TEST_CASE("app: remote mongo client", "[sync][app][mongo][baas]") {
             REQUIRE_FALSE(error);
         });
 
-        dog_collection.insert_many(documents, [&](std::vector<bson::Bson> inserted_docs, Optional<AppError> error) {
+        dog_collection.insert_many(documents, [&](bson::BsonArray inserted_docs, Optional<AppError> error) {
             REQUIRE_FALSE(error);
             CHECK(inserted_docs.size() == 3);
             CHECK(inserted_docs[0].type() == bson::Bson::Type::ObjectId);
@@ -1180,7 +1183,7 @@ TEST_CASE("app: remote mongo client", "[sync][app][mongo][baas]") {
             dog2_object_id = static_cast<ObjectId>(*object_id);
         });
 
-        person_document["dogs"] = bson::BsonArray({dog_object_id, dog2_object_id});
+        person_document.append("dogs", bson::BsonArray({dog_object_id, dog2_object_id}));
         person_collection.insert_one(person_document, [&](Optional<bson::Bson> object_id, Optional<AppError> error) {
             REQUIRE_FALSE(error);
             CHECK((*object_id).to_string() != "");
@@ -1301,7 +1304,7 @@ TEST_CASE("app: remote mongo client", "[sync][app][mongo][baas]") {
             dog2_object_id = static_cast<ObjectId>(*object_id);
         });
 
-        person_document["dogs"] = bson::BsonArray({dog_object_id, dog2_object_id});
+        person_document.append("dogs", bson::BsonArray({dog_object_id, dog2_object_id}));
         person_collection.insert_one(person_document, [&](Optional<bson::Bson> object_id, Optional<AppError> error) {
             REQUIRE_FALSE(error);
             CHECK((*object_id).to_string() != "");
@@ -1480,9 +1483,9 @@ TEST_CASE("app: remote mongo client", "[sync][app][mongo][baas]") {
                                            REQUIRE(upserted_id == cat_id_string);
                                        });
 
-        person_document["dogs"] = bson::BsonArray();
+        person_document.append("dogs", bson::BsonArray());
         bson::BsonDocument person_document_copy = bson::BsonDocument(person_document);
-        person_document_copy["dogs"] = bson::BsonArray({dog_object_id});
+        person_document_copy.append("dogs", bson::BsonArray({dog_object_id}));
         person_collection.update_one(person_document, person_document, true,
                                      [&](MongoCollection::UpdateResult, Optional<AppError> error) {
                                          REQUIRE_FALSE(error);
@@ -1554,8 +1557,8 @@ TEST_CASE("app: remote mongo client", "[sync][app][mongo][baas]") {
                                                 CHECK(static_cast<std::string>(name) == "fido");
                                             });
 
-        person_document["dogs"] = bson::BsonArray({dog_object_id});
-        person_document2["dogs"] = bson::BsonArray({dog_object_id});
+        person_document.append("dogs", bson::BsonArray({dog_object_id}));
+        person_document2.append("dogs", bson::BsonArray({dog_object_id}));
         person_collection.insert_one(person_document, [&](Optional<bson::Bson> object_id, Optional<AppError> error) {
             REQUIRE_FALSE(error);
             CHECK((*object_id).to_string() != "");
@@ -1609,9 +1612,11 @@ TEST_CASE("app: remote mongo client", "[sync][app][mongo][baas]") {
         bool processed = false;
 
         bson::BsonArray documents;
-        documents.assign(3, dog_document);
+        documents.append(dog_document);
+        documents.append(dog_document);
+        documents.append(dog_document);
 
-        dog_collection.insert_many(documents, [&](std::vector<bson::Bson> inserted_docs, Optional<AppError> error) {
+        dog_collection.insert_many(documents, [&](bson::BsonArray inserted_docs, Optional<AppError> error) {
             REQUIRE_FALSE(error);
             CHECK(inserted_docs.size() == 3);
         });

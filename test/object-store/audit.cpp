@@ -182,18 +182,17 @@ static std::vector<AuditEvent> get_audit_events_from_baas(TestAppSession& sessio
     auto documents = session.get_documents(user, "AuditEvent", expected_count);
     std::vector<AuditEvent> events;
     events.reserve(documents.size());
-    for (auto document : documents) {
-        auto doc = document.entries();
+    for (auto doc : documents) {
         AuditEvent event;
         event.activity = static_cast<std::string>(doc["activity"]);
         event.timestamp = static_cast<Timestamp>(doc["timestamp"]);
-        if (auto it = doc.find("event"); it != doc.end() && it->second != bson::Bson()) {
-            event.event = static_cast<std::string>(it->second);
+        if (auto it = doc.find("event"); it != doc.end() && (*it).second != bson::Bson()) {
+            event.event = static_cast<std::string>((*it).second);
         }
-        if (auto it = doc.find("data"); it != doc.end() && it->second != bson::Bson()) {
-            event.data = json::parse(static_cast<std::string>(it->second));
+        if (auto it = doc.find("data"); it != doc.end() && (*it).second != bson::Bson()) {
+            event.data = json::parse(static_cast<std::string>((*it).second));
         }
-        for (auto& [key, value] : doc) {
+        for (auto [key, value] : doc) {
             if (value.type() == bson::Bson::Type::String && !nonmetadata_fields.count(key))
                 event.metadata.insert({key, static_cast<std::string>(value)});
         }

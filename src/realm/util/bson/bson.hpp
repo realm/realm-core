@@ -35,6 +35,9 @@
 namespace realm {
 namespace bson {
 
+class BsonDocument;
+class BsonArray;
+
 class Bson {
 public:
     enum class Type {
@@ -82,11 +85,11 @@ public:
     Bson(const RegularExpression&) noexcept;
     Bson(const std::vector<char>&) noexcept;
     Bson(const std::string&) noexcept;
-    Bson(const IndexedMap<Bson>&) noexcept;
-    Bson(const std::vector<Bson>&) noexcept;
+    Bson(const BsonDocument&) noexcept;
+    Bson(const BsonArray&) noexcept;
     Bson(std::string&&) noexcept;
-    Bson(IndexedMap<Bson>&&) noexcept;
-    Bson(std::vector<Bson>&&) noexcept;
+    Bson(BsonDocument&&) noexcept;
+    Bson(BsonArray&&) noexcept;
 
     // These are shortcuts for Bson(StringData(c_str)), and are
     // needed to avoid unwanted implicit conversion of char* to bool.
@@ -202,25 +205,25 @@ public:
         return max_key_val;
     }
 
-    explicit operator IndexedMap<Bson>&() noexcept
+    explicit operator BsonDocument&() noexcept
     {
         REALM_ASSERT(m_type == Bson::Type::Document);
         return *document_val;
     }
 
-    explicit operator const IndexedMap<Bson>&() const noexcept
+    explicit operator const BsonDocument&() const noexcept
     {
         REALM_ASSERT(m_type == Bson::Type::Document);
         return *document_val;
     }
 
-    explicit operator std::vector<Bson>&() noexcept
+    explicit operator BsonArray&() noexcept
     {
         REALM_ASSERT(m_type == Bson::Type::Array);
         return *array_val;
     }
 
-    explicit operator const std::vector<Bson>&() const noexcept
+    explicit operator const BsonArray&() const noexcept
     {
         REALM_ASSERT(m_type == Bson::Type::Array);
         return *array_val;
@@ -263,9 +266,101 @@ private:
         RegularExpression regex_val;
         std::string string_val;
         std::vector<char> binary_val;
-        std::unique_ptr<IndexedMap<Bson>> document_val;
-        std::unique_ptr<std::vector<Bson>> array_val;
+        std::unique_ptr<BsonDocument> document_val;
+        std::unique_ptr<BsonArray> array_val;
     };
+};
+
+class BsonDocument : private IndexedMap<Bson> {
+public:
+    using iterator = IndexedMap<Bson>::iterator;
+    using IndexedMap<Bson>::begin;
+    using IndexedMap<Bson>::end;
+
+    BsonDocument() {}
+    BsonDocument(BsonDocument&& other)
+        : IndexedMap<Bson>(std::move(other))
+    {
+    }
+    BsonDocument(const BsonDocument& other)
+        : IndexedMap<Bson>(other)
+    {
+    }
+    BsonDocument(std::initializer_list<entry> entries)
+        : IndexedMap<Bson>(entries)
+    {
+    }
+
+    BsonDocument& operator=(const BsonDocument& rhs)
+    {
+        this->IndexedMap<Bson>::operator=(rhs);
+        return *this;
+    }
+
+    uint32_t size() const
+    {
+        return uint32_t(IndexedMap<Bson>::size());
+    }
+
+    bool empty() const
+    {
+        return size() == 0;
+    }
+
+    void append(const std::string& key, const Bson& val)
+    {
+        IndexedMap<Bson>::operator[](key) = val;
+    }
+
+    Bson operator[](const std::string& k) const
+    {
+        return at(k);
+    }
+
+    Bson at(const std::string& k) const
+    {
+        return IndexedMap<Bson>::at(k);
+    }
+
+    iterator find(const std::string& k) const
+    {
+        return IndexedMap<Bson>::find(k);
+    }
+
+    bool operator==(const BsonDocument& other) const
+    {
+        return static_cast<const IndexedMap<Bson>*>(this)->entries() == other.entries();
+    }
+};
+
+class BsonArray : private std::vector<Bson> {
+public:
+    using entry = Bson;
+    using vector<Bson>::begin;
+    using vector<Bson>::end;
+    using vector<Bson>::size;
+    using vector<Bson>::empty;
+
+    BsonArray() {}
+    BsonArray(std::initializer_list<entry> entries)
+        : std::vector<Bson>(entries)
+    {
+    }
+
+    Bson operator[](size_t n) const
+    {
+        return std::vector<Bson>::operator[](n);
+    }
+
+    void append(const Bson& val)
+    {
+        std::vector<Bson>::push_back(val);
+    }
+
+    bool operator==(const BsonArray& other) const
+    {
+        return *static_cast<const std::vector<Bson>*>(this) == other;
+    }
 };
 
 inline Bson::Bson(int32_t v) noexcept
@@ -351,27 +446,27 @@ inline Bson::Bson(ObjectId v) noexcept
     oid_val = v;
 }
 
-inline Bson::Bson(const IndexedMap<Bson>& v) noexcept
+inline Bson::Bson(const BsonDocument& v) noexcept
     : m_type(Bson::Type::Document)
-    , document_val(new IndexedMap<Bson>(v))
+    , document_val(new BsonDocument(v))
 {
 }
 
-inline Bson::Bson(const std::vector<Bson>& v) noexcept
+inline Bson::Bson(const BsonArray& v) noexcept
     : m_type(Bson::Type::Array)
-    , array_val(new std::vector<Bson>(std::move(v)))
+    , array_val(new BsonArray(v))
 {
 }
 
-inline Bson::Bson(IndexedMap<Bson>&& v) noexcept
+inline Bson::Bson(BsonDocument&& v) noexcept
     : m_type(Bson::Type::Document)
-    , document_val(new IndexedMap<Bson>(std::move(v)))
+    , document_val(new BsonDocument(std::move(v)))
 {
 }
 
-inline Bson::Bson(std::vector<Bson>&& v) noexcept
+inline Bson::Bson(BsonArray&& v) noexcept
     : m_type(Bson::Type::Array)
-    , array_val(new std::vector<Bson>(std::move(v)))
+    , array_val(new BsonArray(std::move(v)))
 {
 }
 
@@ -383,9 +478,6 @@ inline Bson::Bson(realm::UUID v) noexcept
 
 template <typename T>
 bool holds_alternative(const Bson& bson);
-
-using BsonDocument = IndexedMap<Bson>;
-using BsonArray = std::vector<Bson>;
 
 std::ostream& operator<<(std::ostream& out, const Bson& b);
 

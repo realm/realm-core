@@ -32,10 +32,10 @@ using ResponseHandler = MongoCollection::ResponseHandler<T>;
 namespace {
 
 template <typename T>
-util::Optional<T> get(const std::unordered_map<std::string, Bson>& map, const char* key)
+util::Optional<T> get(const BsonDocument& map, const char* key)
 {
     if (auto it = map.find(key); it != map.end()) {
-        return static_cast<T>(it->second);
+        return static_cast<T>((*it).second);
     }
     return util::none;
 }
@@ -45,7 +45,7 @@ ResponseHandler<util::Optional<Bson>> get_delete_count_handler(ResponseHandler<u
     return [completion = std::move(completion)](util::Optional<Bson>&& value, util::Optional<AppError>&& error) {
         if (value && !error) {
             try {
-                auto& document = static_cast<const BsonDocument&>(*value).entries();
+                auto& document = static_cast<const BsonDocument&>(*value);
                 return completion(get<int32_t>(document, "deletedCount").value_or(0), std::move(error));
             }
             catch (const std::exception& e) {
@@ -65,7 +65,7 @@ ResponseHandler<util::Optional<Bson>> get_update_handler(ResponseHandler<MongoCo
         }
 
         try {
-            auto& document = static_cast<const BsonDocument&>(*value).entries();
+            auto& document = static_cast<const BsonDocument&>(*value);
             return completion(MongoCollection::UpdateResult{get<int32_t>(document, "matchedCount").value_or(0),
                                                             get<int32_t>(document, "modifiedCount").value_or(0),
                                                             get<Bson>(document, "upsertedId")},
@@ -184,7 +184,7 @@ void MongoCollection::count(const BsonDocument& filter_bson, ResponseHandler<uin
     count(filter_bson, 0, std::move(completion));
 }
 
-void MongoCollection::insert_many(const BsonArray& documents, ResponseHandler<std::vector<Bson>>&& completion)
+void MongoCollection::insert_many(const BsonArray& documents, ResponseHandler<BsonArray>&& completion)
 {
     insert_many_bson(documents, [completion = std::move(completion)](util::Optional<Bson>&& value,
                                                                      util::Optional<AppError>&& error) {
@@ -192,7 +192,7 @@ void MongoCollection::insert_many(const BsonArray& documents, ResponseHandler<st
             return completion({}, std::move(error));
         }
 
-        auto& bson = static_cast<const BsonDocument&>(*value).entries();
+        auto& bson = static_cast<const BsonDocument&>(*value);
         return completion(get<BsonArray>(bson, "insertedIds").value_or(BsonArray()), std::move(error));
     });
 }
@@ -279,15 +279,15 @@ void MongoCollection::call_function(const char* name, const bson::BsonDocument& 
 static void set_options(BsonDocument& base_args, const MongoCollection::FindOptions& options)
 {
     if (options.limit) {
-        base_args["limit"] = *options.limit;
+        base_args.append("limit", *options.limit);
     }
 
     if (options.projection_bson) {
-        base_args["project"] = *options.projection_bson;
+        base_args.append("project", *options.projection_bson);
     }
 
     if (options.sort_bson) {
-        base_args["sort"] = *options.sort_bson;
+        base_args.append("sort", *options.sort_bson);
     }
 }
 
@@ -295,7 +295,7 @@ void MongoCollection::find_bson(const BsonDocument& filter_bson, const FindOptio
                                 ResponseHandler<util::Optional<Bson>>&& completion)
 try {
     auto base_args = m_base_operation_args;
-    base_args["query"] = filter_bson;
+    base_args.append("query", filter_bson);
     set_options(base_args, options);
 
     call_function("find", base_args, std::move(completion));
@@ -308,7 +308,7 @@ void MongoCollection::find_one_bson(const BsonDocument& filter_bson, const FindO
                                     ResponseHandler<util::Optional<Bson>>&& completion)
 try {
     auto base_args = m_base_operation_args;
-    base_args["query"] = filter_bson;
+    base_args.append("query", filter_bson);
     set_options(base_args, options);
     call_function("findOne", base_args, std::move(completion));
 }
@@ -320,14 +320,14 @@ void MongoCollection::insert_one_bson(const BsonDocument& value_bson,
                                       ResponseHandler<util::Optional<Bson>>&& completion)
 {
     auto base_args = m_base_operation_args;
-    base_args["document"] = value_bson;
+    base_args.append("document", value_bson);
     call_function("insertOne", base_args, std::move(completion));
 }
 
 void MongoCollection::aggregate_bson(const BsonArray& pipline, ResponseHandler<util::Optional<Bson>>&& completion)
 {
     auto base_args = m_base_operation_args;
-    base_args["pipeline"] = pipline;
+    base_args.append("pipeline", pipline);
     call_function("aggregate", base_args, std::move(completion));
 }
 
@@ -335,9 +335,9 @@ void MongoCollection::count_bson(const BsonDocument& filter_bson, int64_t limit,
                                  ResponseHandler<util::Optional<Bson>>&& completion)
 {
     auto base_args = m_base_operation_args;
-    base_args["query"] = filter_bson;
+    base_args.append("query", filter_bson);
     if (limit != 0) {
-        base_args["limit"] = limit;
+        base_args.append("limit", limit);
     }
     call_function("count", base_args, std::move(completion));
 }
@@ -345,7 +345,7 @@ void MongoCollection::count_bson(const BsonDocument& filter_bson, int64_t limit,
 void MongoCollection::insert_many_bson(const BsonArray& documents, ResponseHandler<util::Optional<Bson>>&& completion)
 {
     auto base_args = m_base_operation_args;
-    base_args["documents"] = documents;
+    base_args.append("documents", documents);
     call_function("insertMany", base_args, std::move(completion));
 }
 
@@ -353,7 +353,7 @@ void MongoCollection::delete_one_bson(const BsonDocument& filter_bson,
                                       ResponseHandler<util::Optional<Bson>>&& completion)
 {
     auto base_args = m_base_operation_args;
-    base_args["query"] = filter_bson;
+    base_args.append("query", filter_bson);
     call_function("deleteOne", base_args, std::move(completion));
 }
 
@@ -361,7 +361,7 @@ void MongoCollection::delete_many_bson(const BsonDocument& filter_bson,
                                        ResponseHandler<util::Optional<Bson>>&& completion)
 {
     auto base_args = m_base_operation_args;
-    base_args["query"] = filter_bson;
+    base_args.append("query", filter_bson);
     call_function("deleteMany", base_args, std::move(completion));
 }
 
@@ -369,9 +369,9 @@ void MongoCollection::update_one_bson(const BsonDocument& filter_bson, const Bso
                                       ResponseHandler<util::Optional<Bson>>&& completion)
 {
     auto base_args = m_base_operation_args;
-    base_args["query"] = filter_bson;
-    base_args["update"] = update_bson;
-    base_args["upsert"] = upsert;
+    base_args.append("query", filter_bson);
+    base_args.append("update", update_bson);
+    base_args.append("upsert", upsert);
     call_function("updateOne", base_args, std::move(completion));
 }
 
@@ -379,9 +379,9 @@ void MongoCollection::update_many_bson(const BsonDocument& filter_bson, const Bs
                                        ResponseHandler<util::Optional<Bson>>&& completion)
 {
     auto base_args = m_base_operation_args;
-    base_args["query"] = filter_bson;
-    base_args["update"] = update_bson;
-    base_args["upsert"] = upsert;
+    base_args.append("query", filter_bson);
+    base_args.append("update", update_bson);
+    base_args.append("upsert", upsert);
     call_function("updateMany", base_args, std::move(completion));
 }
 
@@ -390,8 +390,8 @@ void MongoCollection::find_one_and_update_bson(const BsonDocument& filter_bson, 
                                                ResponseHandler<util::Optional<Bson>>&& completion)
 {
     auto base_args = m_base_operation_args;
-    base_args["filter"] = filter_bson;
-    base_args["update"] = update_bson;
+    base_args.append("filter", filter_bson);
+    base_args.append("update", update_bson);
     options.set_bson(base_args);
     call_function("findOneAndUpdate", base_args, std::move(completion));
 }
@@ -401,8 +401,8 @@ void MongoCollection::find_one_and_replace_bson(const BsonDocument& filter_bson,
                                                 ResponseHandler<util::Optional<Bson>>&& completion)
 {
     auto base_args = m_base_operation_args;
-    base_args["filter"] = filter_bson;
-    base_args["update"] = replacement_bson;
+    base_args.append("filter", filter_bson);
+    base_args.append("update", replacement_bson);
     options.set_bson(base_args);
     call_function("findOneAndReplace", base_args, std::move(completion));
 }
@@ -412,7 +412,7 @@ void MongoCollection::find_one_and_delete_bson(const BsonDocument& filter_bson,
                                                ResponseHandler<util::Optional<Bson>>&& completion)
 {
     auto base_args = m_base_operation_args;
-    base_args["filter"] = filter_bson;
+    base_args.append("filter", filter_bson);
     options.set_bson(base_args);
     call_function("findOneAndDelete", base_args, std::move(completion));
 }
@@ -568,8 +568,8 @@ void WatchStream::feed_sse(ServerSentEvent sse)
             if (parsed.type() != Bson::Type::Document)
                 return;
             auto& obj = static_cast<BsonDocument&>(parsed);
-            auto& code = obj.at("error_code");
-            auto& msg = obj.at("error");
+            auto code = obj.at("error_code");
+            auto msg = obj.at("error");
             if (code.type() != Bson::Type::String)
                 return;
             if (msg.type() != Bson::Type::String)
@@ -577,7 +577,7 @@ void WatchStream::feed_sse(ServerSentEvent sse)
             auto error_code = ErrorCodes::from_string(static_cast<const std::string&>(code));
             if (error_code == ErrorCodes::UnknownError)
                 error_code = ErrorCodes::AppUnknownError;
-            m_error = std::make_unique<AppError>(error_code, std::move(static_cast<std::string&>(msg)));
+            m_error = std::make_unique<AppError>(error_code, std::move(static_cast<const std::string&>(msg)));
         }
         catch (...) {
             return; // Use the default state.
