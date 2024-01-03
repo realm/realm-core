@@ -432,10 +432,13 @@ public:
     // reloads an app (#5411).
     static void close_all_sync_sessions();
 
-private:
-    friend class Internal;
-    friend class OnlyForTesting;
+    // Return the base url path used for HTTP AppServices requests
+    std::string get_hostname();
 
+    // Return the base url path used for Sync Session Websocket requests
+    std::string get_ws_hostname();
+
+private:
     Config m_config;
 
     // mutable to allow locking for reads in const functions
@@ -570,9 +573,6 @@ private:
 
     void update_hostname(const std::string& hostname, const util::Optional<std::string>& ws_hostname = util::none,
                          const util::Optional<std::string>& new_base_url = util::none);
-
-    // Return the current hostname value
-    std::string get_hostname();
 
     bool verify_user_present(const std::shared_ptr<SyncUser>& user) const;
 };

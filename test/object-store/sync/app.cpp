@@ -39,6 +39,7 @@
 #include <realm/util/base64.hpp>
 #include <realm/util/overload.hpp>
 #include <realm/util/platform_info.hpp>
+#include <realm/util/future.hpp>
 #include <realm/util/uri.hpp>
 
 #include <catch2/catch_all.hpp>
@@ -2192,6 +2193,50 @@ TEST_CASE("app: make distributable client file", "[sync][pbs][app][baas]") {
     }
 }
 
+struct HookedSocketProvider : public sync::websocket::DefaultSocketProvider {
+    HookedSocketProvider(const std::shared_ptr<util::Logger>& logger, const std::string user_agent,
+                         AutoStart auto_start = AutoStart{true})
+        : DefaultSocketProvider(logger, user_agent, nullptr, auto_start)
+    {
+    }
+
+    std::unique_ptr<sync::WebSocketInterface> connect(std::unique_ptr<sync::WebSocketObserver> observer,
+                                                      sync::WebSocketEndpoint&& endpoint) override
+    {
+        using WebSocketError = sync::websocket::WebSocketError;
+
+        int status_code = 101;
+        bool was_clean = true;
+        WebSocketError ws_error = WebSocketError::websocket_ok;
+        std::string body;
+
+        sync::WebSocketEndpoint ep{std::move(endpoint)};
+        if (endpoint_verify_func) {
+            endpoint_verify_func(ep);
+        }
+
+        if (force_failure_func && force_failure_func(was_clean, ws_error, body)) {
+            observer->websocket_error_handler();
+            observer->websocket_closed_handler(was_clean, ws_error, body);
+            return nullptr;
+        }
+
+        bool use_simulated_response = websocket_connect_func && websocket_connect_func(status_code, body);
+        auto websocket = DefaultSocketProvider::connect(std::move(observer), std::move(ep));
+        if (use_simulated_response) {
+            auto default_websocket = static_cast<sync::websocket::DefaultWebSocket*>(websocket.get());
+            if (default_websocket)
+                default_websocket->force_handshake_response_for_testing(status_code, body);
+        }
+        return websocket;
+    }
+
+    std::function<void(sync::WebSocketEndpoint& endpoint)> endpoint_verify_func;
+    std::function<bool(bool& was_clean, sync::websocket::WebSocketError& error_code, std::string& message)>
+        force_failure_func;
+    std::function<bool(int&, std::string&)> websocket_connect_func;
+};
+
 TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
     auto logger = util::Logger::get_default_logger();
 
@@ -2316,32 +2361,6 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
         std::function<void(const Request&)> request_hook;
         // Optional Response object to return immediately instead of communicating with the server
         std::optional<Response> simulated_response;
-    };
-
-    struct HookedSocketProvider : public sync::websocket::DefaultSocketProvider {
-        HookedSocketProvider(const std::shared_ptr<util::Logger>& logger, const std::string user_agent,
-                             AutoStart auto_start = AutoStart{true})
-            : DefaultSocketProvider(logger, user_agent, nullptr, auto_start)
-        {
-        }
-
-        std::unique_ptr<sync::WebSocketInterface> connect(std::unique_ptr<sync::WebSocketObserver> observer,
-                                                          sync::WebSocketEndpoint&& endpoint) override
-        {
-            int status_code = 101;
-            std::string body;
-            bool use_simulated_response = websocket_connect_func && websocket_connect_func(status_code, body);
-
-            auto websocket = DefaultSocketProvider::connect(std::move(observer), std::move(endpoint));
-            if (use_simulated_response) {
-                auto default_websocket = static_cast<sync::websocket::DefaultWebSocket*>(websocket.get());
-                if (default_websocket)
-                    default_websocket->force_handshake_response_for_testing(status_code, body);
-            }
-            return websocket;
-        }
-
-        std::function<bool(int&, std::string&)> websocket_connect_func;
     };
 
     {
@@ -2485,82 +2504,7 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
                     REQUIRE(!error);
                 });
         }
-        SECTION("Test Update BaseURL") {
-            int request_count = 0;
-            // redirect URL is localhost or 127.0.0.1 depending on what the initial value is
-            std::string original_host = "localhost:9090";
-            std::string redirect_scheme = "http://";
-            std::string websocket_scheme = "ws://";
-            std::string redirect_host = "127.0.0.1:9090";
-            std::string redirect_url = "http://127.0.0.1:9090";
-            std::string websocket_url = "ws://127.0.0.1:9090";
-            redir_transport->request_hook = [&](const Request& request) {
-                logger->trace("Received request[%1]: %2", request_count, request.url);
-                if (request_count == 0) {
-                    // First request should be to location
-                    REQUIRE(request.url.find("/location") != std::string::npos);
-                    if (request.url.find("https://") != std::string::npos) {
-                        redirect_scheme = "https://";
-                        websocket_scheme = "wss://";
-                    }
-                    // using local baas
-                    if (request.url.find("127.0.0.1:9090") != std::string::npos) {
-                        redirect_host = "localhost:9090";
-                        original_host = "127.0.0.1:9090";
-                    }
-                    // using baas docker - can't test redirect
-                    else if (request.url.find("mongodb-realm:9090") != std::string::npos) {
-                        redirect_host = "mongodb-realm:9090";
-                        original_host = "mongodb-realm:9090";
-                    }
 
-                    redirect_url = redirect_scheme + redirect_host;
-                    websocket_url = websocket_scheme + redirect_host;
-                    logger->trace("redirect_url (%1): %2 / %3", request_count, redirect_url, websocket_url);
-                    request_count++;
-                }
-                else if (request.url.find("/location") != std::string::npos) {
-                    REQUIRE(request.url.find(redirect_host) != std::string::npos);
-                    // app hostname will be updated via the metadata info
-                    redir_transport->simulated_response = {
-                        static_cast<int>(sync::HTTPStatus::Ok),
-                        0,
-                        {{"Content-Type", "application/json"}},
-                        util::format(
-                            "{\"deployment_model\":\"GLOBAL\",\"location\":\"US-VA\",\"hostname\":\"%1\",\"ws_"
-                            "hostname\":\"%2\"}",
-                            redirect_url, websocket_url)};
-                    request_count++;
-                }
-                else if (request_count > 2) {
-                    // Make sure future requests are using the updated URL
-                    REQUIRE(request.url.find(redirect_url) != std::string::npos);
-                }
-            };
-
-            // This will be successful after a couple of retries due to the redirect response
-            auto&& [email_promise, email_future] = util::make_promise_future<util::Optional<app::AppError>>();
-            redir_app->provider_client<app::App::UsernamePasswordProviderClient>().register_email(
-                creds.email, creds.password,
-                [promise = util::CopyablePromiseHolder<util::Optional<app::AppError>>(std::move(email_promise))](
-                    util::Optional<app::AppError> error) mutable {
-                    REQUIRE(!error);
-                    promise.get_promise().emplace_value(std::move(error));
-                });
-            auto result_1 = wait_for_future(std::move(email_future)).get();
-            REQUIRE(!result_1);
-            REQUIRE(redir_app->get_base_url() == get_base_url());
-            auto&& [update_promise, update_future] = util::make_promise_future<util::Optional<app::AppError>>();
-            redir_app->update_base_url(redirect_url,
-                                       [promise = util::CopyablePromiseHolder<util::Optional<app::AppError>>(
-                                            std::move(update_promise))](util::Optional<app::AppError> error) mutable {
-                                           REQUIRE(!error);
-                                           promise.get_promise().emplace_value(std::move(error));
-                                       });
-            auto result_2 = wait_for_future(std::move(update_future)).get();
-            REQUIRE(!result_2);
-            REQUIRE(redir_app->get_base_url() == redirect_url);
-        }
         SECTION("Test too many redirects") {
             int request_count = 0;
             redir_transport->request_hook = [&](const Request& request) {
@@ -3509,6 +3453,521 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
     }
 }
 
+static const std::string profile_0_name = "Ursus americanus Ursus boeckhi";
+static const std::string profile_0_first_name = "Ursus americanus";
+static const std::string profile_0_last_name = "Ursus boeckhi";
+static const std::string profile_0_email = "Ursus ursinus";
+static const std::string profile_0_picture_url = "Ursus malayanus";
+static const std::string profile_0_gender = "Ursus thibetanus";
+static const std::string profile_0_birthday = "Ursus americanus";
+static const std::string profile_0_min_age = "Ursus maritimus";
+static const std::string profile_0_max_age = "Ursus arctos";
+
+static const nlohmann::json profile_0 = {
+    {"name", profile_0_name},         {"first_name", profile_0_first_name},   {"last_name", profile_0_last_name},
+    {"email", profile_0_email},       {"picture_url", profile_0_picture_url}, {"gender", profile_0_gender},
+    {"birthday", profile_0_birthday}, {"min_age", profile_0_min_age},         {"max_age", profile_0_max_age}};
+
+static nlohmann::json user_json(std::string access_token, std::string user_id = random_string(15))
+{
+    return {{"access_token", access_token},
+            {"refresh_token", access_token},
+            {"user_id", user_id},
+            {"device_id", "Panda Bear"}};
+}
+
+static nlohmann::json user_profile_json(std::string user_id = random_string(15),
+                                        std::string identity_0_id = "Ursus arctos isabellinus",
+                                        std::string identity_1_id = "Ursus arctos horribilis",
+                                        std::string provider_type = "anon-user")
+{
+    return {{"user_id", user_id},
+            {"identities",
+             {{{"id", identity_0_id}, {"provider_type", provider_type}},
+              {{"id", identity_1_id}, {"provider_type", "lol_wut"}}}},
+            {"data", profile_0}};
+}
+
+static const std::string good_access_token =
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9."
+    "eyJleHAiOjE1ODE1MDc3OTYsImlhdCI6MTU4MTUwNTk5NiwiaXNzIjoiNWU0M2RkY2M2MzZlZTEwNmVhYTEyYmRjIiwic3RpdGNoX2RldklkIjoi"
+    "MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwIiwic3RpdGNoX2RvbWFpbklkIjoiNWUxNDk5MTNjOTBiNGFmMGViZTkzNTI3Iiwic3ViIjoiNWU0M2Rk"
+    "Y2M2MzZlZTEwNmVhYTEyYmRhIiwidHlwIjoiYWNjZXNzIn0.0q3y9KpFxEnbmRwahvjWU1v9y1T1s3r2eozu93vMc3s";
+
+static const std::string good_access_token2 =
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9."
+    "eyJleHAiOjE1ODkzMDE3MjAsImlhdCI6MTU4NDExODcyMCwiaXNzIjoiNWU2YmJiYzBhNmI3ZGZkM2UyNTA0OGI3Iiwic3RpdGNoX2RldklkIjoi"
+    "MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwIiwic3RpdGNoX2RvbWFpbklkIjoiNWUxNDk5MTNjOTBiNGFmMGViZTkzNTI3Iiwic3ViIjoiNWU2YmJi"
+    "YzBhNmI3ZGZkM2UyNTA0OGIzIiwidHlwIjoiYWNjZXNzIn0.eSX4QMjIOLbdOYOPzQrD_racwLUk1HGFgxtx2a34k80";
+
+// Simple re-armable promise future holder for callbacks
+struct PromiseFutureHolder {
+    void arm()
+    {
+        auto pf = util::make_promise_future<void>();
+        promise = std::make_unique<util::CopyablePromiseHolder<void>>(std::move(pf.promise));
+        future = std::move(pf.future);
+    }
+
+    void complete(Status& status)
+    {
+        if (promise) {
+            if (status.is_ok()) {
+                promise->get_promise().emplace_value();
+            }
+            else {
+                promise->get_promise().set_error(status);
+            }
+        }
+    }
+
+    Status wait()
+    {
+        REALM_ASSERT(promise);
+        Status result = future.get_no_throw();
+        promise.reset();
+        return result;
+    }
+
+private:
+    util::Future<void> future;
+    std::unique_ptr<util::CopyablePromiseHolder<void>> promise;
+};
+
+
+TEST_CASE("app: base_url", "[sync][app][base_url]") {
+
+    struct BaseUrlTransport : GenericNetworkTransport {
+        std::string expected_url;
+        std::optional<std::string> redirect_url;
+        bool location_requested = false;
+        bool location_returns_error = false;
+
+        void reset(std::string expect_url, std::optional<std::string> redir_url = std::nullopt)
+        {
+            expected_url = expect_url;
+            redirect_url = redir_url;
+            location_requested = false;
+            location_returns_error = false;
+        }
+
+        void send_request_to_server(const Request& request,
+                                    util::UniqueFunction<void(const Response&)>&& completion) override
+        {
+            if (request.url.find("/login") != std::string::npos) {
+                CHECK(request.url.find(expected_url) != std::string::npos);
+                completion({200, 0, {}, user_json(good_access_token).dump()});
+            }
+            else if (request.url.find("/profile") != std::string::npos) {
+                CHECK(request.url.find(expected_url) != std::string::npos);
+                completion({200, 0, {}, user_profile_json().dump()});
+            }
+            else if (request.url.find("/session") != std::string::npos && request.method == HttpMethod::post) {
+                nlohmann::json json{{"access_token", good_access_token}};
+                CHECK(request.url.find(expected_url) != std::string::npos);
+                completion({200, 0, {}, json.dump()});
+            }
+            else if (request.url.find("/location") != std::string::npos) {
+                CHECK(request.method == HttpMethod::get);
+                CHECK(request.url.find(expected_url) != std::string::npos);
+                location_requested = true;
+                if (location_returns_error) {
+                    completion(app::Response{static_cast<int>(sync::HTTPStatus::NotFound), 0, {}, "404 not found"});
+                    return;
+                }
+                if (redirect_url) {
+                    // Update the expected url to be the redirect url
+                    expected_url = *redirect_url;
+                    redirect_url.reset();
+
+                    completion(app::Response{static_cast<int>(sync::HTTPStatus::PermanentRedirect),
+                                             0,
+                                             {{"location", expected_url}},
+                                             "308 permanent redirect"});
+                    return;
+                }
+                auto ws_url = expected_url;
+                ws_url.replace(0, 4, "ws");
+                completion(
+                    app::Response{static_cast<int>(sync::HTTPStatus::Ok),
+                                  0,
+                                  {},
+                                  util::format("{\"deployment_model\":\"GLOBAL\",\"location\":\"US-VA\",\"hostname\":"
+                                               "\"%1\",\"ws_hostname\":\"%2\"}",
+                                               expected_url, ws_url)});
+            }
+        }
+    };
+
+    std::unique_ptr<realm::AppSession> app_session;
+    std::string base_file_path = util::make_temp_dir() + random_string(10);
+    auto redir_transport = std::make_shared<BaseUrlTransport>();
+    AutoVerifiedEmailCredentials creds;
+    util::Logger::set_default_level_threshold(realm::util::Logger::Level::TEST_LOGGING_LEVEL);
+    auto logger = util::Logger::get_default_logger();
+
+    App::Config app_config = {"fake-app-id"};
+    set_app_config_defaults(app_config, redir_transport);
+
+    util::try_make_dir(base_file_path);
+    SyncClientConfig sc_config;
+    sc_config.base_file_path = base_file_path;
+    sc_config.metadata_mode = realm::SyncManager::MetadataMode::NoEncryption;
+    sc_config.logger_factory = [](util::Logger::Level) {
+        return util::Logger::get_default_logger();
+    };
+
+    auto do_login = [&](std::shared_ptr<app::App> app) {
+        CHECK(app);
+        app->log_in_with_credentials(realm::app::AppCredentials::username_password(creds.email, creds.password),
+                                     [](std::shared_ptr<realm::SyncUser> user, util::Optional<app::AppError> error) {
+                                         REQUIRE(user);
+                                         REQUIRE(!error);
+                                     });
+    };
+
+    SECTION("Test app config baseurl") {
+        bool use_metadata = GENERATE(true, false);
+        sc_config.metadata_mode =
+            use_metadata ? SyncManager::MetadataMode::NoEncryption : SyncManager::MetadataMode::NoMetadata;
+        if (use_metadata) {
+            logger->info("Test app config baseurl: using metadata");
+        }
+        else {
+            logger->info("Test app config baseurl: not using metadata");
+        }
+        {
+            redir_transport->reset("https://realm.mongodb.com");
+
+            // First time through, base_url is empty; https://realm.mongodb.com is expected
+            auto app = app::App::get_uncached_app(app_config, sc_config);
+            // Location is not requested until first app services request
+            CHECK(!redir_transport->location_requested);
+            // Initial hostname and ws hostname use base url, but aren't used until location is updated
+            CHECK(app->get_hostname() == "https://realm.mongodb.com");
+            CHECK(app->get_ws_hostname() == "wss://realm.mongodb.com");
+
+            do_login(app);
+            CHECK(redir_transport->location_requested);
+            CHECK(app->get_base_url() == "https://realm.mongodb.com");
+            CHECK(app->get_hostname() == "https://realm.mongodb.com");
+            CHECK(app->get_ws_hostname() == "wss://realm.mongodb.com");
+            auto metadata = app->sync_manager()->app_metadata();
+            if (use_metadata) {
+                CHECK(metadata);
+                CHECK(metadata->hostname == "https://realm.mongodb.com");
+                CHECK(metadata->ws_hostname == "wss://realm.mongodb.com");
+            }
+            else {
+                CHECK(!metadata);
+            }
+        }
+        {
+            // Second time through, base_url is set to https://alternate.mongodb.com is expected
+            app_config.base_url = "https://alternate.mongodb.com";
+            redir_transport->reset("https://alternate.mongodb.com");
+
+            auto app = app::App::get_uncached_app(app_config, sc_config);
+            // Location is not requested until first app services request
+            CHECK(!redir_transport->location_requested);
+            // Initial hostname and ws hostname use base url, but aren't used until location is updated
+            CHECK(app->get_hostname() == "https://alternate.mongodb.com");
+            CHECK(app->get_ws_hostname() == "wss://alternate.mongodb.com");
+
+            do_login(app);
+            CHECK(redir_transport->location_requested);
+            CHECK(app->get_base_url() == "https://alternate.mongodb.com");
+            CHECK(app->get_hostname() == "https://alternate.mongodb.com");
+            CHECK(app->get_ws_hostname() == "wss://alternate.mongodb.com");
+            auto metadata = app->sync_manager()->app_metadata();
+            if (use_metadata) {
+                CHECK(metadata);
+                CHECK(metadata->hostname == "https://alternate.mongodb.com");
+                CHECK(metadata->ws_hostname == "wss://alternate.mongodb.com");
+            }
+            else {
+                CHECK(!metadata);
+            }
+        }
+        {
+            // Third time through, base_url is not set, expect https://alternate.mongodb.com, if using metadata
+            app_config.base_url = util::none;
+            std::string expected_url = use_metadata ? "https://alternate.mongodb.com" : "https://realm.mongodb.com";
+            std::string expected_wsurl = use_metadata ? "wss://alternate.mongodb.com" : "wss://realm.mongodb.com";
+            redir_transport->reset(expected_url);
+
+            auto app = app::App::get_uncached_app(app_config, sc_config);
+            // Location is not requested until first app services request
+            CHECK(!redir_transport->location_requested);
+            // Initial hostname and ws hostname use base url, but aren't used until location is updated
+            CHECK(app->get_hostname() == expected_url);
+            CHECK(app->get_ws_hostname() == expected_wsurl);
+
+            do_login(app);
+            CHECK(redir_transport->location_requested);
+            CHECK(app->get_base_url() == expected_url);
+            CHECK(app->get_hostname() == expected_url);
+            CHECK(app->get_ws_hostname() == expected_wsurl);
+            auto metadata = app->sync_manager()->app_metadata();
+            if (use_metadata) {
+                CHECK(metadata);
+                CHECK(metadata->hostname == expected_url);
+                CHECK(metadata->ws_hostname == expected_wsurl);
+            }
+            else {
+                CHECK(!metadata);
+            }
+        }
+        {
+            // Fourth time through, base_url is set to https://some-other.mongodb.com, with a redirect
+            app_config.base_url = "https://some-other.mongodb.com";
+            redir_transport->reset("https://some-other.mongodb.com", "http://redirect.mongodb.com");
+
+            auto app = app::App::get_uncached_app(app_config, sc_config);
+            // Location is not requested until first app services request
+            CHECK(!redir_transport->location_requested);
+            // Initial hostname and ws hostname use base url, but aren't used until location is updated
+            CHECK(app->get_hostname() == "https://some-other.mongodb.com");
+            CHECK(app->get_ws_hostname() == "wss://some-other.mongodb.com");
+
+            do_login(app);
+            CHECK(redir_transport->location_requested);
+            // Base URL is still set to the original value
+            CHECK(app->get_base_url() == "https://some-other.mongodb.com");
+            // Hostname and ws hostname use the redirect URL values
+            CHECK(app->get_hostname() == "http://redirect.mongodb.com");
+            CHECK(app->get_ws_hostname() == "ws://redirect.mongodb.com");
+            auto metadata = app->sync_manager()->app_metadata();
+            if (use_metadata) {
+                CHECK(metadata);
+                // Hostname and ws hostname use the redirect URL values
+                CHECK(metadata->hostname == "http://redirect.mongodb.com");
+                CHECK(metadata->ws_hostname == "ws://redirect.mongodb.com");
+            }
+            else {
+                CHECK(!metadata);
+            }
+        }
+    }
+
+    SECTION("Test update_baseurl") {
+        {
+            app_config.base_url = "https://alternate.mongodb.com";
+            redir_transport->reset("https://alternate.mongodb.com");
+
+            auto app = app::App::get_uncached_app(app_config, sc_config);
+            // Location is not requested until first app services request
+            CHECK(!redir_transport->location_requested);
+
+            do_login(app);
+            CHECK(redir_transport->location_requested);
+            CHECK(app->get_base_url() == "https://alternate.mongodb.com");
+            CHECK(app->get_hostname() == "https://alternate.mongodb.com");
+            CHECK(app->get_ws_hostname() == "wss://alternate.mongodb.com");
+
+            redir_transport->reset("http://some-other.mongodb.com");
+            app->update_base_url("http://some-other.mongodb.com", [](util::Optional<app::AppError> error) {
+                CHECK(!error);
+            });
+            CHECK(redir_transport->location_requested);
+            CHECK(app->get_base_url() == "http://some-other.mongodb.com");
+            CHECK(app->get_hostname() == "http://some-other.mongodb.com");
+            CHECK(app->get_ws_hostname() == "ws://some-other.mongodb.com");
+            auto metadata = app->sync_manager()->app_metadata();
+            CHECK(metadata->hostname == "http://some-other.mongodb.com");
+            CHECK(metadata->ws_hostname == "ws://some-other.mongodb.com");
+            // Expected URL is still "http://some-other.mongodb.com"
+            do_login(app);
+        }
+    }
+
+    SECTION("Test update_baseurl with redirect") {
+        {
+            app_config.base_url = "https://alternate.mongodb.com";
+            redir_transport->reset("https://alternate.mongodb.com");
+
+            auto app = app::App::get_uncached_app(app_config, sc_config);
+            // Location is not requested until first app services request
+            CHECK(!redir_transport->location_requested);
+
+            do_login(app);
+            CHECK(redir_transport->location_requested);
+            CHECK(app->get_base_url() == "https://alternate.mongodb.com");
+            CHECK(app->get_hostname() == "https://alternate.mongodb.com");
+            CHECK(app->get_ws_hostname() == "wss://alternate.mongodb.com");
+
+            redir_transport->reset("http://some-other.mongodb.com", "https://redirect.mongodb.com");
+
+            app->update_base_url("http://some-other.mongodb.com", [](util::Optional<app::AppError> error) {
+                CHECK(!error);
+            });
+            CHECK(redir_transport->location_requested);
+            CHECK(app->get_base_url() == "http://some-other.mongodb.com");
+            CHECK(app->get_hostname() == "https://redirect.mongodb.com");
+            CHECK(app->get_ws_hostname() == "wss://redirect.mongodb.com");
+            auto metadata = app->sync_manager()->app_metadata();
+            // Hostname and ws hostname use the redirect URL values
+            CHECK(metadata->hostname == "https://redirect.mongodb.com");
+            CHECK(metadata->ws_hostname == "wss://redirect.mongodb.com");
+            // Expected URL is still "https://redirect.mongodb.com" after redirect
+            do_login(app);
+        }
+    }
+
+    SECTION("Test update_baseurl returns error") {
+        {
+            app_config.base_url = "http://alternate.mongodb.com";
+            redir_transport->reset("http://alternate.mongodb.com");
+
+            auto app = app::App::get_uncached_app(app_config, sc_config);
+            // Location is not requested until first app services request
+            CHECK(!redir_transport->location_requested);
+
+            do_login(app);
+            CHECK(redir_transport->location_requested);
+            CHECK(app->get_base_url() == "http://alternate.mongodb.com");
+            CHECK(app->get_hostname() == "http://alternate.mongodb.com");
+            CHECK(app->get_ws_hostname() == "ws://alternate.mongodb.com");
+
+            redir_transport->reset("https://some-other.mongodb.com");
+            redir_transport->location_returns_error = true;
+
+            app->update_base_url("https://some-other.mongodb.com", [](util::Optional<app::AppError> error) {
+                CHECK(error);
+            });
+            CHECK(redir_transport->location_requested);
+            CHECK(app->get_base_url() == "http://alternate.mongodb.com");
+            CHECK(app->get_hostname() == "http://alternate.mongodb.com");
+            CHECK(app->get_ws_hostname() == "ws://alternate.mongodb.com");
+        }
+    }
+
+    // Verify new sync session updates location after app created with cached user
+    SECTION("Verify new sync session updates location") {
+        bool use_ssl = GENERATE(true, false);
+        std::string expected_host = "redirect.mongodb.com";
+        int expected_port = 8081;
+        std::string init_url = util::format("http%1://alternate.mongodb.com", use_ssl ? "s" : "");
+        std::string init_wsurl = util::format("ws%1://alternate.mongodb.com", use_ssl ? "s" : "");
+        std::string redir_url = util::format("http%1://%2:%3", use_ssl ? "s" : "", expected_host, expected_port);
+        std::string redir_wsurl = util::format("ws%1://%2:%3", use_ssl ? "s" : "", expected_host, expected_port);
+
+        auto socket_provider = std::make_shared<HookedSocketProvider>(logger, "some user agent");
+        socket_provider->endpoint_verify_func = [&use_ssl, &expected_host,
+                                                 &expected_port](sync::WebSocketEndpoint& ep) {
+            CHECK(ep.address == expected_host);
+            CHECK(ep.port == expected_port);
+            CHECK(ep.is_ssl == use_ssl);
+        };
+        socket_provider->force_failure_func = [](bool& was_clean, sync::websocket::WebSocketError& error_code,
+                                                 std::string& message) {
+            was_clean = false;
+            error_code = sync::websocket::WebSocketError::websocket_connection_failed;
+            message = "404 not found";
+            return true;
+        };
+
+        sc_config.socket_provider = socket_provider;
+
+        app_config.base_url = init_url;
+
+        // Log in to get a cached user
+        {
+            redir_transport->reset(init_url);
+
+            auto app = app::App::get_uncached_app(app_config, sc_config);
+            // At this point, the sync route is not set
+            CHECK(!app->sync_manager()->sync_route());
+
+            do_login(app);
+            CHECK(redir_transport->location_requested);
+            CHECK(app->get_base_url() == init_url);
+            CHECK(app->get_hostname() == init_url);
+            CHECK(app->get_ws_hostname() == init_wsurl);
+            CHECK(app->sync_manager()->sync_route());
+            CHECK(app->sync_manager()->sync_route()->find(init_wsurl) != std::string::npos);
+        }
+        // Recreate the app using the cached user and start a sync session, which will is set to fail on connect
+        SECTION("Sync Session fails on connect") {
+            redir_transport->reset(init_url, redir_url);
+
+            auto app = app::App::get_uncached_app(app_config, sc_config);
+            // At this point, the sync route is not set
+            CHECK(!app->sync_manager()->sync_route());
+
+            PromiseFutureHolder pf_holder;
+            pf_holder.arm();
+            RealmConfig r_config;
+            r_config.path = sc_config.base_file_path + "/fakerealm.realm";
+            r_config.sync_config = std::make_shared<SyncConfig>(app->current_user(), SyncConfig::FLXSyncEnabled{});
+            r_config.sync_config->error_handler = [&pf_holder](std::shared_ptr<SyncSession>,
+                                                               SyncError error) mutable {
+                // Expect an error due to 404 response when creating websocket
+                CHECK(!error.status.is_ok());
+                pf_holder.complete(error.status);
+            };
+            auto realm = Realm::get_shared_realm(r_config);
+            auto result = pf_holder.wait(); // Wait for failure on websocket connect
+            logger->info("Error: %1 (%2) : %3", result.code_string(), result.code(), result.reason());
+            CHECK(!result.is_ok());
+            CHECK(redir_transport->location_requested);
+            CHECK(app->get_base_url() == init_url);
+            CHECK(app->get_hostname() == redir_url);
+            CHECK(app->get_ws_hostname() == redir_wsurl);
+            CHECK(app->sync_manager()->sync_route());
+            CHECK(app->sync_manager()->sync_route()->find(redir_wsurl) != std::string::npos);
+        }
+        // Recreate the app using the cached user and start a sync session, which will fail during location update
+        SECTION("Location update fails prior to sync session connect") {
+            redir_transport->reset(init_url, redir_url);
+            redir_transport->location_returns_error = true;
+
+            auto app = app::App::get_uncached_app(app_config, sc_config);
+            // At this point, the sync route is not set
+            CHECK(!app->sync_manager()->sync_route());
+
+            auto [sync_promise, sync_future] = util::make_promise_future<void>();
+            PromiseFutureHolder pf_holder;
+            pf_holder.arm();
+            RealmConfig r_config;
+            r_config.path = sc_config.base_file_path + "/fakerealm.realm";
+            r_config.sync_config = std::make_shared<SyncConfig>(app->current_user(), SyncConfig::FLXSyncEnabled{});
+            r_config.sync_config->error_handler = [&pf_holder](std::shared_ptr<SyncSession>,
+                                                               SyncError error) mutable {
+                // Expect an error due to location failed or 404 response when creating websocket
+                CHECK(!error.status.is_ok());
+                pf_holder.complete(error.status);
+            };
+            auto realm = Realm::get_shared_realm(r_config);
+            auto result = pf_holder.wait(); // Wait for failure on websocket connect
+            logger->info("Error: %1 (%2) : %3", result.code_string(), result.code(), result.reason());
+            CHECK(!result.is_ok());
+            CHECK(redir_transport->location_requested);
+            CHECK(app->get_base_url() == init_url);
+            CHECK(app->get_hostname() == init_url);
+            CHECK(app->get_ws_hostname() == init_wsurl);
+            CHECK(!app->sync_manager()->sync_route());
+
+            // Location request will pass this time, try to reconnect
+            // expecting 404 when websocket connects
+            pf_holder.arm(); // re-arm promise future holder
+            redir_transport->reset(init_url, redir_url);
+            auto session = app->sync_manager()->get_existing_session(r_config.path);
+            CHECK(session);
+            session->resume();
+            result = pf_holder.wait(); // Wait for failure on websocket connect
+            logger->info("Error: %1 (%2) : %3", result.code_string(), result.code(), result.reason());
+            CHECK(!result.is_ok());
+            CHECK(redir_transport->location_requested);
+            CHECK(app->get_base_url() == init_url);
+            CHECK(app->get_hostname() == redir_url);
+            CHECK(app->get_ws_hostname() == redir_wsurl);
+            CHECK(app->sync_manager()->sync_route());
+            CHECK(app->sync_manager()->sync_route()->find(redir_wsurl) != std::string::npos);
+        }
+    }
+}
+
 TEST_CASE("app: custom user data integration tests", "[sync][app][user][function][baas]") {
     TestAppSession session;
     auto app = session.app();
@@ -3892,59 +4351,12 @@ TEST_CASE("app: custom error handling", "[sync][app][custom errors]") {
     }
 }
 
-static const std::string profile_0_name = "Ursus americanus Ursus boeckhi";
-static const std::string profile_0_first_name = "Ursus americanus";
-static const std::string profile_0_last_name = "Ursus boeckhi";
-static const std::string profile_0_email = "Ursus ursinus";
-static const std::string profile_0_picture_url = "Ursus malayanus";
-static const std::string profile_0_gender = "Ursus thibetanus";
-static const std::string profile_0_birthday = "Ursus americanus";
-static const std::string profile_0_min_age = "Ursus maritimus";
-static const std::string profile_0_max_age = "Ursus arctos";
-
-static const nlohmann::json profile_0 = {
-    {"name", profile_0_name},         {"first_name", profile_0_first_name},   {"last_name", profile_0_last_name},
-    {"email", profile_0_email},       {"picture_url", profile_0_picture_url}, {"gender", profile_0_gender},
-    {"birthday", profile_0_birthday}, {"min_age", profile_0_min_age},         {"max_age", profile_0_max_age}};
-
-static nlohmann::json user_json(std::string access_token, std::string user_id = random_string(15))
-{
-    return {{"access_token", access_token},
-            {"refresh_token", access_token},
-            {"user_id", user_id},
-            {"device_id", "Panda Bear"}};
-}
-
-static nlohmann::json user_profile_json(std::string user_id = random_string(15),
-                                        std::string identity_0_id = "Ursus arctos isabellinus",
-                                        std::string identity_1_id = "Ursus arctos horribilis",
-                                        std::string provider_type = "anon-user")
-{
-    return {{"user_id", user_id},
-            {"identities",
-             {{{"id", identity_0_id}, {"provider_type", provider_type}},
-              {{"id", identity_1_id}, {"provider_type", "lol_wut"}}}},
-            {"data", profile_0}};
-}
-
 // MARK: - Unit Tests
 
 static TestSyncManager::Config get_config()
 {
     return get_config(instance_of<UnitTestTransport>);
 }
-
-static const std::string good_access_token =
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9."
-    "eyJleHAiOjE1ODE1MDc3OTYsImlhdCI6MTU4MTUwNTk5NiwiaXNzIjoiNWU0M2RkY2M2MzZlZTEwNmVhYTEyYmRjIiwic3RpdGNoX2RldklkIjoi"
-    "MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwIiwic3RpdGNoX2RvbWFpbklkIjoiNWUxNDk5MTNjOTBiNGFmMGViZTkzNTI3Iiwic3ViIjoiNWU0M2Rk"
-    "Y2M2MzZlZTEwNmVhYTEyYmRhIiwidHlwIjoiYWNjZXNzIn0.0q3y9KpFxEnbmRwahvjWU1v9y1T1s3r2eozu93vMc3s";
-
-static const std::string good_access_token2 =
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9."
-    "eyJleHAiOjE1ODkzMDE3MjAsImlhdCI6MTU4NDExODcyMCwiaXNzIjoiNWU2YmJiYzBhNmI3ZGZkM2UyNTA0OGI3Iiwic3RpdGNoX2RldklkIjoi"
-    "MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwIiwic3RpdGNoX2RvbWFpbklkIjoiNWUxNDk5MTNjOTBiNGFmMGViZTkzNTI3Iiwic3ViIjoiNWU2YmJi"
-    "YzBhNmI3ZGZkM2UyNTA0OGIzIiwidHlwIjoiYWNjZXNzIn0.eSX4QMjIOLbdOYOPzQrD_racwLUk1HGFgxtx2a34k80";
 
 static const std::string bad_access_token = "lolwut";
 static const std::string dummy_device_id = "123400000000000000000000";

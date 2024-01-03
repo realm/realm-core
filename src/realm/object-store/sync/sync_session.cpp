@@ -109,6 +109,13 @@ void SyncSession::become_active()
     // when entering from the Dying state the session will still be bound
     if (!m_session) {
         create_sync_session();
+        // If the session failed to be created (e.g. location was not successfully updated),
+        // then revert back to the inactive state - the error was already passed to the provided
+        // error handler or an exception was thrown
+        if (!m_session) {
+            m_state = State::Inactive;
+            return;
+        }
         m_session->bind();
     }
 
@@ -887,7 +894,19 @@ void SyncSession::create_sync_session()
     {
         // At this point, the sync_route should be valid
         auto sync_route = m_sync_manager->sync_route();
-        REALM_ASSERT(sync_route);
+        // If sync_route is not valid, it means the location update failed - pass the error up via the registered
+        // error handler
+        if (!sync_route) {
+            Status result{ErrorCodes::LocationUpdateFailed, "Failed to update location prior to sync session start"};
+            if (m_config.sync_config->error_handler) {
+                m_config.sync_config->error_handler(shared_from_this(), SyncError{result, true});
+            }
+            else {
+                // Or throw a runtime exception if no error handler is registered
+                throw RuntimeError{std::move(result)};
+            }
+            return;
+        }
 
         if (!m_client.decompose_server_url(*sync_route, session_config.protocol_envelope,
                                            session_config.server_address, session_config.server_port,

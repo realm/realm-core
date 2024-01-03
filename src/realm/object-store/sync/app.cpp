@@ -261,7 +261,7 @@ void App::close_all_sync_sessions()
 }
 
 App::App(const Config& config)
-    : m_config(std::move(config))
+    : m_config(config)
     , m_base_url(m_config.base_url.value_or(default_base_url))
     , m_base_route(m_base_url + base_path)
     , m_app_route(m_base_route + app_path + "/" + m_config.app_id)
@@ -305,6 +305,11 @@ App::~App() {}
 
 void App::configure(const SyncClientConfig& sync_client_config)
 {
+    // Start with an empty sync route in the sync manager. It will ensure the
+    // location has been updated at least once when the first sync session is
+    // started by requesting a new access token.
+    m_sync_manager->configure(shared_from_this(), util::none, sync_client_config);
+
     {
         std::unique_lock lock(*m_route_mutex);
         // Make sure to request the location when the app is configured
@@ -315,11 +320,6 @@ void App::configure(const SyncClientConfig& sync_client_config)
         lock.unlock();
         configure_route(metadata, config_base_url);
     }
-
-    // Start with an empty sync route in the sync manager. It will ensure the
-    // location has been updated at least once when the first sync session is
-    // started by requesting a new access token.
-    m_sync_manager->configure(shared_from_this(), util::none, sync_client_config);
 }
 
 bool App::init_logger()
@@ -353,13 +353,16 @@ void App::log_error(const char* message, Params&&... params)
 
 std::string App::get_hostname()
 {
-    if (auto app_metadata = m_sync_manager->app_metadata()) {
-        return app_metadata->hostname;
-    }
-    // If there is no metadata stored, then return the local hostname
     std::lock_guard<std::mutex> lock(*m_route_mutex);
     return m_hostname;
 }
+
+std::string App::get_ws_hostname()
+{
+    std::lock_guard<std::mutex> lock(*m_route_mutex);
+    return m_ws_hostname;
+}
+
 
 std::string App::make_sync_route(Optional<std::string> ws_hostname)
 {
@@ -409,7 +412,8 @@ void App::update_hostname(const std::string& hostname, const Optional<std::strin
                           const Optional<std::string>& new_base_url)
 {
     // Update url components based on new hostname (and optional websocket hostname) values
-    log_debug("App: update_hostname: %1 | %2", hostname, ws_hostname);
+    log_debug("App: update_hostname: %1%2%3", hostname, ws_hostname ? util::format(" | %1", *ws_hostname) : "",
+              new_base_url ? util::format(" | base URL: %1", *new_base_url) : "");
     std::lock_guard<std::mutex> lock(*m_route_mutex);
     if (new_base_url) {
         m_base_url = *new_base_url;
@@ -1029,6 +1033,13 @@ void App::request_location(UniqueFunction<void(Optional<AppError>)>&& completion
             }
             // Location request was successful - update the location info
             auto update_response = self->update_location(response, base_url);
+            if (update_response) {
+                self->log_error("App: request location failed (%1%2) - keeping original location information",
+                                update_response->code_string(),
+                                update_response->additional_status_code
+                                    ? util::format(" %1", *update_response->additional_status_code)
+                                    : "");
+            }
             completion(update_response);
         });
 }
