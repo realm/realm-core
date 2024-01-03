@@ -782,6 +782,7 @@ public:
     }
 
     void to_json(std::ostream&, size_t, JSONOutputMode, util::FunctionRef<void(const Mixed&)>) const override;
+    void replace_link(ObjKey old_link, ObjKey new_link);
 
 private:
     friend class TableView;

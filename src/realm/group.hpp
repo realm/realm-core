@@ -47,6 +47,8 @@ class GroupFriend;
 /// A group is a collection of named tables.
 ///
 class Group : public ArrayParent {
+    static constexpr StringData g_class_name_prefix = "class_";
+
 public:
     /// Construct a free-standing group. This group instance will be
     /// in the attached state, but neither associated with a file, nor
@@ -272,7 +274,8 @@ public:
     ///
     //@{
 
-    static const size_t max_table_name_length = 63;
+    static constexpr size_t max_table_name_length = 63;
+    static constexpr size_t max_class_name_length = max_table_name_length - g_class_name_prefix.size();
 
     bool has_table(StringData name) const noexcept;
     TableKey find_table(StringData name) const noexcept;
@@ -293,6 +296,7 @@ public:
     using TableNameBuffer = std::array<char, max_table_name_length>;
     static StringData class_name_to_table_name(StringData class_name, TableNameBuffer& buffer)
     {
+        REALM_ASSERT(class_name.size() <= max_class_name_length);
         char* p = std::copy_n(g_class_name_prefix.data(), g_class_name_prefix.size(), buffer.data());
         size_t len = std::min(class_name.size(), buffer.size() - g_class_name_prefix.size());
         std::copy_n(class_name.data(), len, p);
@@ -535,8 +539,6 @@ protected:
     }
 
 private:
-    static constexpr StringData g_class_name_prefix = "class_";
-
     // nullptr, if we're sharing an allocator provided during initialization
     std::unique_ptr<SlabAlloc> m_local_alloc;
     // in-use allocator. If local, then equal to m_local_alloc.

@@ -407,7 +407,9 @@ void ChangesetEncoder::append_value(Decimal128 id)
 auto ChangesetEncoder::release() noexcept -> Buffer
 {
     m_intern_strings_rev.clear();
-    return std::move(m_buffer);
+    Buffer buffer;
+    std::swap(buffer, m_buffer);
+    return buffer;
 }
 
 void ChangesetEncoder::reset() noexcept

@@ -78,18 +78,9 @@ void track_reset(Transaction& wt, ClientResyncMode mode);
 // If the fresh path is provided, the local Realm is changed such that its state is equal
 // to the fresh Realm. Then the local Realm will have its client file ident set to
 // 'client_file_ident'
-//
-// The function returns the old version and the new version of the local Realm to
-// be used to report the sync transaction to the user.
-struct LocalVersionIDs {
-    realm::VersionID old_version;
-    realm::VersionID new_version;
-};
-
-LocalVersionIDs perform_client_reset_diff(DB& db, DB& db_remote, sync::SaltedFileIdent client_file_ident,
-                                          util::Logger& logger, ClientResyncMode mode, bool recovery_is_allowed,
-                                          bool* did_recover_out, sync::SubscriptionStore* sub_store,
-                                          util::FunctionRef<void(int64_t)> on_flx_version_complete);
+bool perform_client_reset_diff(DB& db, DB& db_remote, sync::SaltedFileIdent client_file_ident, util::Logger& logger,
+                               ClientResyncMode mode, bool recovery_is_allowed, sync::SubscriptionStore* sub_store,
+                               util::FunctionRef<void(int64_t)> on_flx_version_complete);
 
 } // namespace _impl::client_reset
 } // namespace realm

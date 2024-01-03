@@ -112,7 +112,7 @@ TEST_CASE("sync_user: update state and tokens", "[sync][user]") {
     user->invalidate();
 }
 
-TEST_CASE("sync_user: SyncManager `get_existing_logged_in_user()` API", "[sync][user]") {
+TEST_CASE("sync_user: SyncManager get_existing_logged_in_user() API", "[sync][user]") {
     TestSyncManager init_sync_manager(SyncManager::MetadataMode::NoMetadata);
     auto sync_manager = init_sync_manager.app()->sync_manager();
     const std::string identity = "sync_test_identity";
@@ -122,6 +122,24 @@ TEST_CASE("sync_user: SyncManager `get_existing_logged_in_user()` API", "[sync][
     SECTION("properly returns a null pointer when called for a non-existent user") {
         std::shared_ptr<SyncUser> user = sync_manager->get_existing_logged_in_user(identity);
         REQUIRE(!user);
+    }
+
+    SECTION("can get logged-in user from notification") {
+        auto first = sync_manager->get_user(identity, refresh_token, access_token, dummy_device_id);
+        REQUIRE(first->identity() == identity);
+        REQUIRE(first->state() == SyncUser::State::LoggedIn);
+        REQUIRE(first->device_id() == dummy_device_id);
+        bool notification_fired = false;
+        auto sub_token = first->subscribe([&](const SyncUser& user) {
+            auto current_user = sync_manager->get_current_user();
+            REQUIRE(current_user->identity() == identity);
+            REQUIRE(current_user->identity() == user.identity());
+            notification_fired = true;
+        });
+
+        auto second = sync_manager->get_user(identity, refresh_token, access_token, dummy_device_id);
+        second->unsubscribe(sub_token);
+        REQUIRE(notification_fired);
     }
 
     SECTION("properly returns an existing logged-in user") {

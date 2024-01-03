@@ -39,7 +39,7 @@
 
 using namespace realm::util;
 
-#if REALM_PLATFORM_APPLE || (defined(__linux__) && !REALM_ANDROID)
+#if REALM_HAVE_BACKTRACE
 static const size_t g_backtrace_depth = 128;
 #endif
 static const char* g_backtrace_error = "<error calculating backtrace>";

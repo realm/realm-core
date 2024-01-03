@@ -19,11 +19,15 @@
 #ifndef REALM_NOINST_CLIENT_HISTORY_IMPL_HPP
 #define REALM_NOINST_CLIENT_HISTORY_IMPL_HPP
 
-#include "realm/util/functional.hpp"
-#include <realm/util/optional.hpp>
+#include <realm/array_integer.hpp>
 #include <realm/sync/client_base.hpp>
 #include <realm/sync/history.hpp>
-#include <realm/array_integer.hpp>
+#include <realm/util/functional.hpp>
+#include <realm/util/optional.hpp>
+
+namespace realm::_impl::client_reset {
+struct RecoveredChange;
+}
 
 namespace realm::sync {
 
@@ -67,12 +71,18 @@ constexpr int get_client_history_schema_version() noexcept
     return 12;
 }
 
-class IntegrationException : public RuntimeError {
+class IntegrationException : public Exception {
 public:
     IntegrationException(ErrorCodes::Error error, std::string message,
                          ProtocolError error_for_server = ProtocolError::other_session_error)
-        : RuntimeError(error, message)
+        : Exception(error, message)
         , error_for_server(error_for_server)
+    {
+    }
+
+    explicit IntegrationException(Status status)
+        : Exception(std::move(status))
+        , error_for_server(ProtocolError::other_session_error)
     {
     }
 
@@ -92,11 +102,12 @@ public:
     };
 
     /// set_client_reset_adjustments() is used by client reset to adjust the
-    /// content of the history compartment. The shared group associated with
+    /// content of the history compartment. The DB associated with
     /// this history object must be in a write transaction when this function
     /// is called.
-    void set_client_reset_adjustments(version_type current_version, SaltedFileIdent client_file_ident,
-                                      SaltedVersion server_version, BinaryData uploadable_changeset);
+    void set_client_reset_adjustments(util::Logger& logger, version_type current_version,
+                                      SaltedFileIdent client_file_ident, SaltedVersion server_version,
+                                      const std::vector<_impl::client_reset::RecoveredChange>&);
 
     struct LocalChange {
         version_type version;
@@ -151,9 +162,6 @@ public:
     /// reestablish the connection between the client file and the server file
     /// when engaging in future synchronization sessions.
     void set_client_file_ident(SaltedFileIdent client_file_ident, bool fix_up_object_ids);
-
-    /// Gets the client file ident set with `set_client_file_ident`, or `{0, 0}` if it has never been set.
-    SaltedFileIdent get_client_file_ident(const Transaction& tr) const;
 
     /// Stores the synchronization progress in the associated Realm file in a
     /// way that makes it available via get_status() during future
@@ -257,11 +265,6 @@ public: // Stuff in this section is only used by CLI tools.
     /// of local origin. This should only be used for testing and defaults to calling
     /// generate_changeset_timestamp().
     void set_local_origin_timestamp_source(util::UniqueFunction<timestamp_type()> source_fn);
-
-public: // Stuff in this section is only used by tests.
-    // virtual void set_client_file_ident_in_wt() sets the client file ident.
-    // The history must be in a write transaction with version 'current_version'.
-    void set_client_file_ident_in_wt(version_type current_version, SaltedFileIdent client_file_ident);
 
 private:
     friend class ClientReplication;
@@ -373,8 +376,7 @@ private:
     // This field is guarded by the DB's write lock and should only be accessed
     // while that is held.
     mutable bool m_applying_server_changeset = false;
-
-    util::Optional<BinaryData> m_client_reset_changeset;
+    bool m_applying_client_reset = false;
 
     // Cache of s_progress_download_server_version_iip and
     // s_progress_download_client_version_iip slots of history compartment root

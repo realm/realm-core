@@ -3,7 +3,7 @@ add_custom_target(benchmarks)
 add_subdirectory(object-store)
 
 # AFL and LIBFUZZER not yet supported by Windows
-if(NOT CMAKE_SYSTEM_NAME MATCHES "^Windows" AND NOT EMSCRIPTEN)
+if(NOT CMAKE_SYSTEM_NAME MATCHES "^Windows" AND NOT EMSCRIPTEN AND NOT ANDROID)
     add_subdirectory(fuzzy)
     add_subdirectory(realm-fuzzer)
 endif()
@@ -23,7 +23,6 @@ set(CORE_TEST_SOURCES
     test_lang_bind_helper.cpp
     test_parser.cpp
 
-    test_all.cpp
     test_alloc.cpp
     test_array.cpp
     test_array_blob.cpp
@@ -127,8 +126,6 @@ set_source_files_properties(test_query_geo.cpp PROPERTIES
     COMPILE_FLAGS "$<$<CXX_COMPILER_ID:GNU>: -Wno-unknown-pragmas>"
 )
 
-# FIXME: Benchmarks
-
 if (MSVC)
     append_source_file_compile_options(
         FILES test_parser.cpp test_table.cpp test_query.cpp test_query_big.cpp
@@ -137,12 +134,17 @@ if (MSVC)
 endif()
 
 # Resources required for running the tests
-file(GLOB REQUIRED_TEST_FILES RELATIVE ${CMAKE_CURRENT_BINARY_DIR}
+file(GLOB REQUIRED_TEST_FILES
      "*.json"
      "*.realm"
      "expect_string.txt")
 
-add_executable(CoreTests main.cpp ${CORE_TESTS} ${REQUIRED_TEST_FILES} ${REALM_TEST_HEADERS})
+add_library(CoreTestLib OBJECT ${CORE_TESTS} ${REQUIRED_TEST_FILES} ${REALM_TEST_HEADERS})
+enable_stdfilesystem(CoreTestLib)
+target_link_libraries(CoreTestLib QueryParser)
+
+add_executable(CoreTests main.cpp test_all.cpp ${REQUIRED_TEST_FILES})
+target_link_libraries(CoreTests CoreTestLib TestUtil)
 set_target_resources(CoreTests "${REQUIRED_TEST_FILES}")
 set_target_properties(CoreTests PROPERTIES
     OUTPUT_NAME "realm-tests"
@@ -168,7 +170,6 @@ if(WINDOWS_STORE)
     set_property(SOURCE ${UWP_ASSETS} PROPERTY VS_DEPLOYMENT_LOCATION "Assets")
 endif()
 
-target_link_libraries(CoreTests TestUtil QueryParser)
 enable_stdfilesystem(CoreTests)
 
 if(UNIX AND NOT APPLE)
@@ -180,9 +181,9 @@ target_include_directories(CoreTests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
 
 add_bundled_test(CoreTests)
 
+# SyncTests
 if(REALM_ENABLE_SYNC)
     set(SYNC_TESTS
-        test_all.cpp
         test_array_sync.cpp
         test_changeset_encoding.cpp
         test_client_reset.cpp
@@ -211,7 +212,7 @@ if(REALM_ENABLE_SYNC)
         test_util_websocket.cpp
     )
 
-    set(TEST_HEADERS
+    set(SYNC_TEST_HEADERS
         test.hpp
         test_all.hpp
         fuzz_tester.hpp
@@ -219,19 +220,7 @@ if(REALM_ENABLE_SYNC)
         sync_fixtures.hpp
     )
 
-    set(TEST_CLIENT_SOURCES
-        client/main.cpp
-        client/peer.cpp
-    )
-
-    set(TEST_CLIENT_HEADERS
-        client/metrics.hpp
-        client/peer.hpp
-        client/object_observer.hpp
-        client/statistics.hpp
-    )
-
-    file(GLOB TEST_RESOURCES RELATIVE ${CMAKE_CURRENT_BINARY_DIR}
+    file(GLOB SYNC_TEST_RESOURCES
         *.json *.pem
         ../certificate-authority/certs/*
         ../certificate-authority/root-ca/*.pem
@@ -244,12 +233,15 @@ if(REALM_ENABLE_SYNC)
         list(APPEND SYNC_TESTS test.manifest)
     endif()
 
-    add_executable(SyncTests main.cpp ${SYNC_TESTS} ${TEST_HEADERS} ${TEST_RESOURCES})
+    add_library(SyncTestLib OBJECT ${SYNC_TESTS} ${SYNC_TEST_HEADERS} ${SYNC_TEST_RESOURCES})
+    enable_stdfilesystem(SyncTestLib)
+    target_link_libraries(SyncTestLib Sync SyncServer Storage)
+
+    add_executable(SyncTests main.cpp test_all.cpp ${SYNC_TEST_RESOURCES})
     set_target_properties(SyncTests PROPERTIES OUTPUT_NAME "realm-sync-tests")
-    set_target_resources(SyncTests "${TEST_RESOURCES}")
+    set_target_resources(SyncTests "${SYNC_TEST_RESOURCES}")
     enable_stdfilesystem(SyncTests)
-    # Sync lib is included with SyncServer
-    target_link_libraries(SyncTests TestUtil SyncServer)
+    target_link_libraries(SyncTests SyncTestLib TestUtil)
     add_bundled_test(SyncTests)
 
     if(UNIX AND NOT APPLE)
@@ -257,3 +249,33 @@ if(REALM_ENABLE_SYNC)
         target_link_libraries(SyncTests "-rdynamic")
     endif()
 endif()
+
+# CombinedTests
+get_directory_property(OS_TEST_RESOURCES DIRECTORY object-store TEST_RESOURCES)
+set(COMBINED_RESOURCES "${REQUIRED_TEST_FILES};${SYNC_TEST_RESOURCES};${OS_TEST_RESOURCES}")
+
+add_executable(CombinedTests combined_tests.cpp test_all.cpp ${COMBINED_RESOURCES})
+set_target_resources(CombinedTests "${COMBINED_RESOURCES}")
+set_target_properties(CombinedTests PROPERTIES
+    OUTPUT_NAME "realm-combined-tests"
+    VS_WINDOWS_TARGET_PLATFORM_MIN_VERSION 10.0.17134.0
+)
+target_include_directories(CombinedTests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}" "object-store")
+
+if(WINDOWS_STORE)
+    target_sources(CombinedTests PRIVATE ${UWP_SOURCES})
+endif()
+
+if(REALM_ENABLE_SYNC)
+    target_link_libraries(CombinedTests ObjectStoreTestLib CoreTestLib SyncTestLib TestUtil)
+else()
+    target_link_libraries(CombinedTests ObjectStoreTestLib CoreTestLib TestUtil)
+endif()
+
+enable_stdfilesystem(CombinedTests)
+
+if(UNIX AND NOT APPLE)
+    # This enables symbols in backtraces
+    target_link_libraries(CombinedTests "-rdynamic")
+endif()
+

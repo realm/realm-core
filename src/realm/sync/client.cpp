@@ -853,6 +853,9 @@ bool SessionImpl::process_flx_bootstrap_message(const SyncProgress& progress, Do
     catch (const IntegrationException& e) {
         on_integration_failure(e);
     }
+    catch (...) {
+        on_integration_failure(IntegrationException(exception_to_status()));
+    }
 
     return true;
 }
@@ -905,6 +908,9 @@ void SessionImpl::process_pending_flx_bootstrap()
         if (simulate_integration_error) {
             throw IntegrationException(ErrorCodes::BadChangeset, "simulated failure", ProtocolError::bad_changeset);
         }
+
+        call_debug_hook(SyncClientHookEvent::BootstrapBatchAboutToProcess, *pending_batch.progress, query_version,
+                        batch_state, pending_batch.changesets.size());
 
         history.integrate_server_changesets(
             *pending_batch.progress, &downloadable_bytes, pending_batch.changesets, new_version, batch_state, logger,
@@ -1176,9 +1182,7 @@ bool SessionWrapper::has_flx_subscription_store() const
 void SessionWrapper::on_flx_sync_error(int64_t version, std::string_view err_msg)
 {
     REALM_ASSERT(!m_finalized);
-    auto mut_subs = get_flx_subscription_store()->get_mutable_by_version(version);
-    mut_subs.update_state(SubscriptionSet::State::Error, err_msg);
-    mut_subs.commit();
+    get_flx_subscription_store()->update_state(version, SubscriptionSet::State::Error, err_msg);
 }
 
 void SessionWrapper::on_flx_sync_version_complete(int64_t version)
@@ -1227,9 +1231,7 @@ void SessionWrapper::on_flx_sync_progress(int64_t new_version, DownloadBatchStat
             break;
     }
 
-    auto mut_subs = get_flx_subscription_store()->get_mutable_by_version(new_version);
-    mut_subs.update_state(new_state);
-    mut_subs.commit();
+    get_flx_subscription_store()->update_state(new_version, new_state);
 }
 
 SubscriptionStore* SessionWrapper::get_flx_subscription_store()
@@ -1533,6 +1535,10 @@ void SessionWrapper::actualize(ServerEndpoint endpoint)
         if (was_created)
             m_client.remove_connection(conn);
 
+        // finalize_before_actualization() expects m_sess to be nullptr, but it's possible that we
+        // reached its assignment above before throwing. Unset it here so we get a clean unhandled
+        // exception failure instead of a REALM_ASSERT in finalize_before_actualization().
+        m_sess = nullptr;
         finalize_before_actualization();
         throw;
     }
@@ -1687,9 +1693,7 @@ void SessionWrapper::on_download_completion()
     if (m_flx_subscription_store && m_flx_pending_mark_version != SubscriptionSet::EmptyVersion) {
         m_sess->logger.debug("Marking query version %1 as complete after receiving MARK message",
                              m_flx_pending_mark_version);
-        auto mutable_subs = m_flx_subscription_store->get_mutable_by_version(m_flx_pending_mark_version);
-        mutable_subs.update_state(SubscriptionSet::State::Complete);
-        mutable_subs.commit();
+        m_flx_subscription_store->update_state(m_flx_pending_mark_version, SubscriptionSet::State::Complete);
         m_flx_pending_mark_version = SubscriptionSet::EmptyVersion;
     }
 

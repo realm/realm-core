@@ -128,7 +128,7 @@ TEST(Sync_SubscriptionStoreStateUpdates)
         CHECK(inserted);
         CHECK_NOT(it == out.end());
 
-        out.update_state(SubscriptionSet::State::Complete);
+        out.set_state(SubscriptionSet::State::Complete);
         out.commit();
     }
 
@@ -165,21 +165,18 @@ TEST(Sync_SubscriptionStoreStateUpdates)
     }
 
     // Mark the version 2 set as complete.
-    {
-        auto latest_mutable = store->get_mutable_by_version(2);
-        latest_mutable.update_state(SubscriptionSet::State::Complete);
-        latest_mutable.commit();
-    }
+    store->update_state(2, SubscriptionSet::State::Complete);
 
-    // There should now only be one set, version 2, that is complete. Trying to get version 1 should throw an error.
+    // There should now only be one set, version 2, that is complete. Trying to
+    // get version 1 should report that it was superseded
     {
         auto active = store->get_active();
         auto latest = store->get_latest();
         CHECK(active.version() == latest.version());
         CHECK(active.state() == SubscriptionSet::State::Complete);
 
-        // By marking version 2 as complete version 1 will get superceded and removed.
-        CHECK_THROW(store->get_mutable_by_version(1), KeyNotFound);
+        // By marking version 2 as complete version 1 will get superseded and removed.
+        CHECK_EQUAL(store->get_by_version(1).state(), SubscriptionSet::State::Superseded);
     }
 
     {
@@ -305,15 +302,13 @@ TEST(Sync_SubscriptionStoreNotifications)
     CHECK_EQUAL(notification_futures[0].get(), SubscriptionSet::State::Pending);
 
     // This should also return immediately with a ready future because the subset is in the correct state.
-    CHECK_EQUAL(store->get_mutable_by_version(1).get_state_change_notification(SubscriptionSet::State::Pending).get(),
+    CHECK_EQUAL(store->get_by_version(1).get_state_change_notification(SubscriptionSet::State::Pending).get(),
                 SubscriptionSet::State::Pending);
 
     // This should not be ready yet because we haven't updated its state.
     CHECK_NOT(notification_futures[1].is_ready());
 
-    sub_set = store->get_mutable_by_version(2);
-    sub_set.update_state(SubscriptionSet::State::Bootstrapping);
-    std::move(sub_set).commit();
+    store->update_state(2, SubscriptionSet::State::Bootstrapping);
 
     // Now we should be able to get the future result because we updated the state.
     CHECK_EQUAL(notification_futures[1].get(), SubscriptionSet::State::Bootstrapping);
@@ -322,9 +317,7 @@ TEST(Sync_SubscriptionStoreNotifications)
     CHECK_NOT(notification_futures[2].is_ready());
 
     // Update the state to complete - skipping the bootstrapping phase entirely.
-    sub_set = store->get_mutable_by_version(3);
-    sub_set.update_state(SubscriptionSet::State::Complete);
-    sub_set.commit();
+    store->update_state(3, SubscriptionSet::State::Complete);
 
     // Now we should be able to get the future result because we updated the state and skipped the bootstrapping
     // phase.
@@ -334,10 +327,7 @@ TEST(Sync_SubscriptionStoreNotifications)
     std::string error_msg = "foo bar bizz buzz. i'm an error string for this test!";
     CHECK_NOT(notification_futures[3].is_ready());
     auto old_sub_set = store->get_by_version(4);
-    sub_set = store->get_mutable_by_version(4);
-    sub_set.update_state(SubscriptionSet::State::Bootstrapping);
-    sub_set.update_state(SubscriptionSet::State::Error, std::string_view(error_msg));
-    sub_set.commit();
+    store->update_state(4, SubscriptionSet::State::Error, std::string_view(error_msg));
 
     CHECK_EQUAL(old_sub_set.state(), SubscriptionSet::State::Pending);
     CHECK(old_sub_set.error_str().is_null());
@@ -365,14 +355,12 @@ TEST(Sync_SubscriptionStoreNotifications)
 
     old_sub_set = store->get_by_version(5);
 
-    sub_set = store->get_mutable_by_version(6);
-    sub_set.update_state(SubscriptionSet::State::Complete);
-    sub_set.commit();
+    store->update_state(6, SubscriptionSet::State::Complete);
 
     CHECK_EQUAL(notification_futures[4].get(), SubscriptionSet::State::Superseded);
     CHECK_EQUAL(notification_futures[5].get(), SubscriptionSet::State::Complete);
 
-    // Also check that new requests for the superceded sub set get filled immediately.
+    // Also check that new requests for the superseded sub set get filled immediately.
     CHECK_EQUAL(old_sub_set.get_state_change_notification(SubscriptionSet::State::Complete).get(),
                 SubscriptionSet::State::Superseded);
     old_sub_set.refresh();
@@ -389,11 +377,7 @@ TEST(Sync_SubscriptionStoreNotifications)
     auto mut_set = store->get_latest().make_mutable_copy();
     auto waitable_set = mut_set.commit();
 
-    {
-        mut_set = store->get_mutable_by_version(waitable_set.version());
-        mut_set.update_state(SubscriptionSet::State::Complete);
-        mut_set.commit();
-    }
+    store->update_state(waitable_set.version(), SubscriptionSet::State::Complete);
 
     auto fut = waitable_set.get_state_change_notification(SubscriptionSet::State::Complete);
     CHECK(fut.is_ready());
@@ -412,7 +396,7 @@ TEST(Sync_SubscriptionStoreRefreshSubscriptionSetInvalid)
     store.reset();
 
     // Throws since the SubscriptionStore is gone.
-    CHECK_THROW(latest->refresh(), std::logic_error);
+    CHECK_THROW(latest->refresh(), RuntimeError);
 }
 
 TEST(Sync_SubscriptionStoreInternalSchemaMigration)
@@ -469,13 +453,8 @@ TEST(Sync_SubscriptionStoreNextPendingVersion)
     sub_set = mut_sub_set.commit();
     auto pending_set = sub_set.version();
 
-    mut_sub_set = store->get_mutable_by_version(complete_set);
-    mut_sub_set.update_state(SubscriptionSet::State::Complete);
-    mut_sub_set.commit();
-
-    mut_sub_set = store->get_mutable_by_version(bootstrapping_set);
-    mut_sub_set.update_state(SubscriptionSet::State::Bootstrapping);
-    mut_sub_set.commit();
+    store->update_state(complete_set, SubscriptionSet::State::Complete);
+    store->update_state(bootstrapping_set, SubscriptionSet::State::Bootstrapping);
 
     auto pending_version = store->get_next_pending_version(0);
     CHECK(pending_version);
@@ -946,7 +925,7 @@ TEST(Sync_MutableSubscriptionSetOperations)
         // This is an empty subscription set.
         auto out2 = store->get_active().make_mutable_copy();
         out2.insert_or_assign("c sub", query_c);
-        out2.import(subs);
+        out2.import(std::move(subs));
         // "c sub" is erased when 'import' is used.
         CHECK_EQUAL(out2.size(), 2);
         // insert "c sub" again.
