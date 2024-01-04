@@ -507,7 +507,7 @@ TEST(HTTPParser_ChunkedEncoding)
     CHECK(parser_with_body("1E\r\nI am posting this information.\r\n15\r\nThis is another line.\r\n0\r\n\r\n\0") ==
           "I am posting this information.This is another line.");
     // Multiline with CRLR
-    CHECK(parser_with_body("7\r\nMongoDB\r\n8\r\n Realm i\r\nB\r\nn \r\nchunks.\r\n0\r\n\r\n") ==
+    CHECK(parser_with_body("7\r\nMongoDB\r\n8\r\n Realm i\r\nB\r\nn \r\nchunks.\r\n0\r\n\r\n\0") ==
           "MongoDB Realm in \r\nchunks.");
     // Empty
     CHECK(parser_with_body("0\r\n\r\n0\r\n\r\n\0") == "");

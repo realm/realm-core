@@ -345,10 +345,9 @@ struct HTTPParser : protected HTTPParserBase {
                     on_complete(ec);
                     return;
                 }
-                auto hex = hex_to_int(StringData(m_read_buffer.get(), chunk_start_index - 2));
                 auto content_length = hex_to_int(StringData(m_read_buffer.get(), chunk_start_index - 2));
 
-                if (hex == 0) {
+                if (content_length == 0) {
                     on_body(m_chunked_encoding_ss->str());
                     on_complete(ec);
                     return;
