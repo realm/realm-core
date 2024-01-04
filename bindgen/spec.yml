@@ -426,6 +426,7 @@ records:
       automatically_handle_backlinks_in_migrations:
         type: bool
         default: false
+      logger: 'Nullable<SharedLogger>'
 
   UserIdentity:
     cppName: SyncUserIdentity
@@ -572,6 +573,9 @@ records:
         default: ""
       timeouts:
         type: SyncClientTimeouts
+        default: {}
+      logger:
+        type: SharedLogger
         default: {}
 
   SyncError:

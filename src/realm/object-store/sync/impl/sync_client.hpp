@@ -41,8 +41,7 @@ namespace realm {
 namespace _impl {
 
 struct SyncClient {
-    SyncClient(const std::shared_ptr<util::Logger>& logger, SyncClientConfig const& config,
-               std::weak_ptr<const SyncManager> weak_sync_manager)
+    SyncClient(SyncClientConfig const& config, std::weak_ptr<const SyncManager> weak_sync_manager)
         : m_socket_provider([&]() -> std::shared_ptr<sync::SyncSocketProvider> {
             if (config.socket_provider) {
                 return config.socket_provider;
@@ -53,12 +52,12 @@ struct SyncClient {
             auto user_agent = util::format("RealmSync/%1 (%2) %3 %4", REALM_VERSION_STRING, util::get_platform_info(),
                                            config.user_agent_binding_info, config.user_agent_application_info);
             return std::make_shared<sync::websocket::DefaultSocketProvider>(
-                logger, std::move(user_agent), config.default_socket_provider_thread_observer);
+                config.logger, std::move(user_agent), config.default_socket_provider_thread_observer);
 #endif
         }())
         , m_client([&] {
             sync::Client::Config c;
-            c.logger = logger;
+            c.logger = config.logger;
             c.socket_provider = m_socket_provider;
             c.reconnect_mode = config.reconnect_mode;
             c.one_connection_per_session = !config.multiplex_sessions;
@@ -77,8 +76,7 @@ struct SyncClient {
 
             return c;
         }())
-        , m_logger_ptr(logger)
-        , m_logger(*m_logger_ptr)
+        , m_logger(*config.logger)
 #if NETWORK_REACHABILITY_AVAILABLE
         , m_reachability_observer(none, [weak_sync_manager](const NetworkReachabilityStatus status) {
             if (status != NotReachable) {
@@ -137,7 +135,6 @@ struct SyncClient {
 private:
     std::shared_ptr<sync::SyncSocketProvider> m_socket_provider;
     sync::Client m_client;
-    std::shared_ptr<util::Logger> m_logger_ptr;
     util::Logger& m_logger;
 #if NETWORK_REACHABILITY_AVAILABLE
     NetworkReachabilityObserver m_reachability_observer;
