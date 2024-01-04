@@ -214,22 +214,26 @@ static std::string unquote_string(std::string_view possibly_quoted_string)
 }
 
 #ifdef REALM_MONGODB_ENDPOINT
-std::string get_base_url()
+std::string get_compile_time_base_url()
 {
     // allows configuration with or without quotes
     return unquote_string(REALM_QUOTE(REALM_MONGODB_ENDPOINT));
 }
-
-std::string get_admin_url()
+#else
+std::string get_compile_time_base_url()
+{
+    return {};
+}
+#endif
+std::string get_compile_time_admin_url()
 {
 #ifdef REALM_ADMIN_ENDPOINT
     // allows configuration with or without quotes
     return unquote_string(REALM_QUOTE(REALM_ADMIN_ENDPOINT));
 #else
-    return get_base_url();
+    return {};
 #endif
 }
-#endif // REALM_MONGODB_ENDPOINT
 
 AutoVerifiedEmailCredentials::AutoVerifiedEmailCredentials()
 {
@@ -552,9 +556,11 @@ struct BaasClientReset : public TestClientReset {
         //
         // So just don't try to do anything until initial sync is done and we're sure the server is in a stable
         // state.
-        timed_sleeping_wait_for([&] {
-            return app_session.admin_api.is_initial_sync_complete(app_session.server_app_id);
-        });
+        timed_sleeping_wait_for(
+            [&] {
+                return app_session.admin_api.is_initial_sync_complete(app_session.server_app_id);
+            },
+            std::chrono::seconds(30), std::chrono::seconds(1));
 
         auto realm = Realm::get_shared_realm(m_local_config);
         auto session = sync_manager->get_existing_session(realm->config().path);

@@ -148,8 +148,8 @@ void subscribe_to_all_and_bootstrap(Realm& realm);
 #if REALM_ENABLE_AUTH_TESTS
 
 #ifdef REALM_MONGODB_ENDPOINT
-std::string get_base_url();
-std::string get_admin_url();
+std::string get_compile_time_base_url();
+std::string get_compile_time_admin_url();
 
 #endif
 

@@ -283,6 +283,8 @@ private:
 AppSession get_runtime_app_session();
 
 std::string get_mongodb_server();
+std::string get_base_url();
+std::string get_admin_url();
 
 template <typename Factory>
 inline app::App::Config get_config(Factory factory, const AppSession& app_session)

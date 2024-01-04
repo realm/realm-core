@@ -268,6 +268,15 @@ size_t curl_header_cb(char* buffer, size_t size, size_t nitems, std::map<std::st
     return nitems * size;
 }
 
+std::string_view getenv_sv(const char* name) noexcept
+{
+    if (auto ptr = ::getenv(name); ptr != nullptr) {
+        return std::string_view(ptr);
+    }
+
+    return {};
+}
+
 } // namespace
 
 app::Response do_http_request(const app::Request& request)
@@ -326,7 +335,11 @@ app::Response do_http_request(const app::Request& request)
     curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, curl_header_cb);
     curl_easy_setopt(curl, CURLOPT_HEADERDATA, &response_headers);
 
+    auto start_time = std::chrono::steady_clock::now();
     auto response_code = curl_easy_perform(curl);
+    auto total_time = std::chrono::steady_clock::now() - start_time;
+    util::format(std::cerr, "Baas API %1 request to %2 took %3\n", app::httpmethod_to_string(request.method),
+                 request.url, std::chrono::duration_cast<std::chrono::milliseconds>(total_time));
     if (response_code != CURLE_OK) {
         fprintf(stderr, "curl_easy_perform() failed when sending request to '%s' with body '%s': %s\n",
                 request.url.c_str(), request.body.c_str(), curl_easy_strerror(response_code));
@@ -340,6 +353,193 @@ app::Response do_http_request(const app::Request& request)
         std::move(response),
     };
 }
+
+class Baasaas {
+public:
+    enum class StartMode { Default, GitHash, Branch };
+    explicit Baasaas(std::string api_key, StartMode mode, std::string ref_spec)
+        : m_api_key(std::move(api_key))
+    {
+        auto logger = util::Logger::get_default_logger();
+        std::string url_path = "startContainer";
+        if (mode == StartMode::GitHash) {
+            url_path = util::format("startContainer?githash=%1", ref_spec);
+            logger->info("Starting baasaas container with githash of %1", ref_spec);
+        }
+        else if (mode == StartMode::Branch) {
+            url_path = util::format("startContainer?branch=%1", ref_spec);
+            logger->info("Starting baasaas container on branch %1", ref_spec);
+        }
+        else {
+            logger->info("Starting baasaas container");
+        }
+
+        auto resp = do_request(std::move(url_path), app::HttpMethod::post);
+        m_container_id = resp["id"].get<std::string>();
+        logger->info("Baasaas container started with id \"%1\"", m_container_id);
+    }
+    Baasaas(const Baasaas&) = delete;
+    Baasaas(Baasaas&&) = delete;
+    Baasaas& operator=(const Baasaas&) = delete;
+    Baasaas& operator=(Baasaas&&) = delete;
+
+    ~Baasaas()
+    {
+        stop();
+    }
+
+    void poll()
+    {
+        if (!m_http_endpoint.empty() || m_container_id.empty()) {
+            return;
+        }
+
+        auto logger = util::Logger::get_default_logger();
+        auto poll_start_at = std::chrono::system_clock::now();
+        std::string http_endpoint;
+        std::string mongo_endpoint;
+        bool logged = false;
+        while (std::chrono::system_clock::now() - poll_start_at < std::chrono::minutes(2) &&
+               m_http_endpoint.empty()) {
+            if (http_endpoint.empty()) {
+                auto status_obj =
+                    do_request(util::format("containerStatus?id=%1", m_container_id), app::HttpMethod::get);
+                if (!status_obj["httpUrl"].is_null()) {
+                    http_endpoint = status_obj["httpUrl"].get<std::string>();
+                    mongo_endpoint = status_obj["mongoUrl"].get<std::string>();
+                }
+            }
+            else {
+                app::Request baas_req;
+                baas_req.url = util::format("%1/api/private/v1.0/version", http_endpoint);
+                baas_req.method = app::HttpMethod::get;
+                baas_req.headers.insert_or_assign("Content-Type", "application/json");
+                auto baas_resp = do_http_request(baas_req);
+                if (baas_resp.http_status_code >= 200 && baas_resp.http_status_code < 300) {
+                    m_http_endpoint = http_endpoint;
+                    m_mongo_endpoint = mongo_endpoint;
+                    break;
+                }
+            }
+
+            if (!logged) {
+                logger->info("Waiting for baasaas container \"%1\" to be ready", m_container_id);
+                logged = true;
+            }
+            std::this_thread::sleep_for(std::chrono::seconds(3));
+        }
+
+        if (m_http_endpoint.empty()) {
+            throw std::runtime_error(
+                util::format("Failed to launch baasaas container %1 within 2 minutes", m_container_id));
+        }
+    }
+
+    void stop()
+    {
+        auto container_id = std::move(m_container_id);
+        if (container_id.empty()) {
+            return;
+        }
+
+        auto logger = util::Logger::get_default_logger();
+        logger->info("Stopping baasaas container with id \"%1\"", container_id);
+        do_request(util::format("stopContainer?id=%1", container_id), app::HttpMethod::post);
+    }
+
+    const std::string& http_endpoint()
+    {
+        poll();
+        return m_http_endpoint;
+    }
+
+    const std::string& mongo_endpoint()
+    {
+        poll();
+        return m_mongo_endpoint;
+    }
+
+private:
+    nlohmann::json do_request(std::string api_path, app::HttpMethod method)
+    {
+        app::Request request;
+        request.url = util::format(
+            "https://us-east-1.aws.data.mongodb-api.com/app/baas-container-service-autzb/endpoint/%1", api_path);
+        request.method = method;
+        request.headers.insert_or_assign("apiKey", m_api_key);
+        request.headers.insert_or_assign("Content-Type", "application/json");
+        auto response = do_http_request(request);
+        REALM_ASSERT_EX(response.http_status_code >= 200 && response.http_status_code < 300,
+                        util::format("Baasaas api response code: %1 Response body: %2", response.http_status_code,
+                                     response.body));
+        return nlohmann::json::parse(response.body);
+    }
+
+    std::string m_api_key;
+    std::string m_container_id;
+    std::string m_http_endpoint;
+    std::string m_mongo_endpoint;
+};
+
+class BaasaasLauncher : public Catch::EventListenerBase {
+public:
+    static std::optional<Baasaas>& get_baasaas_holder()
+    {
+        static std::optional<Baasaas> global_baasaas = std::nullopt;
+        return global_baasaas;
+    }
+
+    using Catch::EventListenerBase::EventListenerBase;
+
+    void testRunStarting(Catch::TestRunInfo const&) override
+    {
+        std::string_view api_key(getenv_sv("BAASAAS_API_KEY"));
+        if (api_key.empty()) {
+            return;
+        }
+
+        // Allow overriding the baas base url at runtime via an environment variable, even if BAASAAS_API_KEY
+        // is also specified.
+        if (!getenv_sv("BAAS_BASE_URL").empty()) {
+            return;
+        }
+
+        std::string_view ref_spec(getenv_sv("BAASAAS_REF_SPEC"));
+        std::string_view mode_spec(getenv_sv("BAASAAS_START_MODE"));
+        Baasaas::StartMode mode = Baasaas::StartMode::Default;
+        if (mode_spec == "branch") {
+            if (ref_spec.empty()) {
+                throw std::runtime_error("Expected branch name in BAASAAS_REF_SPEC env variable, but it was empty");
+            }
+            mode = Baasaas::StartMode::Branch;
+        }
+        else if (mode_spec == "githash") {
+            if (ref_spec.empty()) {
+                throw std::runtime_error("Expected git hash in BAASAAS_REF_SPEC env variable, but it was empty");
+            }
+            mode = Baasaas::StartMode::GitHash;
+        }
+        else {
+            if (!mode_spec.empty()) {
+                throw std::runtime_error("Excepted BAASAAS_START_MODE to be \"githash\" or \"branch\"");
+            }
+            ref_spec = {};
+        }
+
+        auto& baasaas_holder = get_baasaas_holder();
+        REALM_ASSERT(!baasaas_holder);
+        baasaas_holder.emplace(std::string{api_key}, mode, std::string{ref_spec});
+    }
+
+    void testRunEnded(Catch::TestRunStats const&) override
+    {
+        if (auto& baasaas_holder = get_baasaas_holder(); baasaas_holder.has_value()) {
+            baasaas_holder->stop();
+        }
+    }
+};
+
+CATCH_REGISTER_LISTENER(BaasaasLauncher)
 
 AdminAPIEndpoint AdminAPIEndpoint::operator[](StringData name) const
 {
@@ -581,7 +781,7 @@ AdminAPISession::Service AdminAPISession::get_sync_service(const std::string& ap
 
 void AdminAPISession::trigger_client_reset(const std::string& app_id, int64_t file_ident) const
 {
-    auto endpoint = apps(APIFamily::Private)[app_id]["sync"]["force_reset"];
+    auto endpoint = apps(APIFamily::Admin)[app_id]["sync"]["force_reset"];
     endpoint.put_json(nlohmann::json{{"file_ident", file_ident}});
 }
 
@@ -783,6 +983,43 @@ realm::Schema get_default_schema()
                                 realm::Property("realm_id", PropertyType::String | PropertyType::Nullable)});
     return realm::Schema({dog_schema, cat_schema, person_schema});
 }
+
+std::string get_base_url()
+{
+    if (auto baas_url = getenv_sv("BAAS_BASE_URL"); !baas_url.empty()) {
+        return std::string{baas_url};
+    }
+    if (auto& baasaas_holder = BaasaasLauncher::get_baasaas_holder(); baasaas_holder.has_value()) {
+        return baasaas_holder->http_endpoint();
+    }
+
+    return get_compile_time_base_url();
+}
+
+std::string get_admin_url()
+{
+    if (auto baas_admin_url = getenv_sv("BAAS_ADMIN_URL"); !baas_admin_url.empty()) {
+        return std::string{baas_admin_url};
+    }
+    if (auto compile_url = get_compile_time_admin_url(); !compile_url.empty()) {
+        return compile_url;
+    }
+
+    return get_base_url();
+}
+
+std::string get_mongodb_server()
+{
+    if (auto baas_url = getenv_sv("BAAS_MONGO_URL"); !baas_url.empty()) {
+        return std::string{baas_url};
+    }
+
+    if (auto& baasaas_holder = BaasaasLauncher::get_baasaas_holder(); baasaas_holder.has_value()) {
+        return baasaas_holder->mongo_endpoint();
+    }
+    return "mongodb://localhost:26000";
+}
+
 
 AppCreateConfig default_app_config()
 {
@@ -1183,9 +1420,11 @@ AppSession create_app(const AppCreateConfig& config)
         return object_schema.table_type == ObjectSchema::ObjectType::TopLevel;
     });
     if (any_sync_types) {
-        timed_sleeping_wait_for([&] {
-            return session.is_initial_sync_complete(app_id);
-        });
+        timed_sleeping_wait_for(
+            [&] {
+                return session.is_initial_sync_complete(app_id);
+            },
+            std::chrono::seconds(30), std::chrono::seconds(1));
     }
 
     return {client_app_id, app_id, session, config};
@@ -1200,10 +1439,6 @@ AppSession get_runtime_app_session()
     return cached_app_session;
 }
 
-std::string get_mongodb_server()
-{
-    return "mongodb://localhost:26000";
-}
 
 #ifdef REALM_MONGODB_ENDPOINT
 TEST_CASE("app: baas admin api", "[sync][app][admin api][baas]") {
