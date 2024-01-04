@@ -17,7 +17,7 @@
 -----------
 
 ### Internals
-* None.
+* Add support for chunked transfer encoding when using `HTTPParser`.
 
 ----------------------------------------------
 
