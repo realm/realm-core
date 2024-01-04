@@ -495,6 +495,9 @@ ONLY(Array_Unsigned)
     CHECK_EQUAL(c.get(0), (uint64_t)-1);
     CHECK_EQUAL(c.get(1), (uint64_t)-2);
     c.try_encode(c);
+    CHECK(c.is_encoded());
+    CHECK_EQUAL(c.get(0), (uint64_t)-1);
+    CHECK_EQUAL(c.get(1), (uint64_t)-2);
     c.try_decode();
     // these will fail
     CHECK_EQUAL(c.get(0), (uint64_t)-1);

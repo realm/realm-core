@@ -20,6 +20,7 @@
 #include <realm/node_header.hpp>
 #include <realm/array_direct.hpp>
 #include <realm/array.hpp>
+#include <realm/array_unsigned.hpp>
 
 #include <vector>
 #include <algorithm>
@@ -37,7 +38,41 @@ bool ArrayFlex::encode(const Array& origin, Array& encoded) const
     const auto sz = origin.size();
     std::vector<int64_t> values;
     std::vector<size_t> indices;
-    if (!is_encoded(origin) && try_encode(origin, encoded, values, indices)) {
+    // we need to use the specific getter for array
+    std::vector<int64_t> origin_values;
+    for (size_t i = 0; i < sz; ++i) {
+        origin_values.push_back(origin.get(i));
+    }
+    if (!is_encoded(origin) && try_encode(origin, encoded, origin_values, values, indices)) {
+        REALM_ASSERT(!values.empty());
+        REALM_ASSERT(!indices.empty());
+        REALM_ASSERT(indices.size() == sz);
+        copy_into_encoded_array(encoded, values, indices);
+        return true;
+    }
+    return false;
+}
+
+bool ArrayFlex::encode_unsigned(const ArrayUnsigned& origin, ArrayUnsigned& encoded) const
+{
+    REALM_ASSERT(origin.is_attached());
+    if (origin.is_encoded())
+        return;
+
+    const auto sz = origin.size();
+
+    if (sz <= 1)
+        return false;
+
+    // we need to use the specific getter for array unsigned
+    std::vector<int64_t> origin_values;
+    for (size_t i = 0; i < sz; ++i) {
+        origin_values.push_back(origin.get(i));
+    }
+
+    std::vector<int64_t> values;
+    std::vector<size_t> indices;
+    if (!is_encoded(origin) && try_encode(origin, encoded, origin_values, values, indices)) {
         REALM_ASSERT(!values.empty());
         REALM_ASSERT(!indices.empty());
         REALM_ASSERT(indices.size() == sz);
@@ -126,8 +161,8 @@ void ArrayFlex::get_chunk(const Array& arr, size_t ndx, int64_t res[8]) const
     REALM_UNREACHABLE();
 }
 
-bool ArrayFlex::try_encode(const Array& origin, Array& encoded, std::vector<int64_t>& values,
-                           std::vector<size_t>& indices) const
+bool ArrayFlex::try_encode(const Array& origin, Array& encoded, const std::vector<int64_t>& origin_values,
+                           std::vector<int64_t>& values, std::vector<size_t>& indices) const
 {
     const auto sz = origin.size();
 
@@ -135,7 +170,7 @@ bool ArrayFlex::try_encode(const Array& origin, Array& encoded, std::vector<int6
         return false;
 
     // put data in flex format, essentially arrays of values + arrays of indices
-    arrange_data_in_flex_format(origin, values, indices);
+    arrange_data_in_flex_format(origin, origin_values, values, indices);
 
     // check if makes sense to move forward and replace the current array's data with an encoded version of it
     int v_width = 0;
@@ -143,7 +178,8 @@ bool ArrayFlex::try_encode(const Array& origin, Array& encoded, std::vector<int6
     if (check_gain(origin, values, indices, v_width, ndx_width)) {
 #if REALM_DEBUG
         for (size_t i = 0; i < sz; ++i)
-            REALM_ASSERT(origin.get(i) == values[indices[i]]);
+            REALM_ASSERT(origin_values[i] == values[indices[i]]);
+            // REALM_ASSERT(origin.get(i) == values[indices[i]]);
 #endif
         setup_array_in_flex_format(origin, encoded, values, indices, v_width, ndx_width);
         return true;
@@ -183,8 +219,8 @@ void ArrayFlex::copy_into_encoded_array(Array& arr, std::vector<int64_t>& values
     REALM_ASSERT(arr.get_encoding(header) == Encoding::Flex);
 }
 
-void ArrayFlex::arrange_data_in_flex_format(const Array& arr, std::vector<int64_t>& values,
-                                            std::vector<size_t>& indices) const
+void ArrayFlex::arrange_data_in_flex_format(const Array& arr, const std::vector<int64_t>& inputs,
+                                            std::vector<int64_t>& values, std::vector<size_t>& indices) const
 {
     // Implements the main logic for supporting the encondig Flex protocol.
     // Flex enconding works keeping 2 arrays, one for storing the values and, the other one for storing the indices of
@@ -206,8 +242,10 @@ void ArrayFlex::arrange_data_in_flex_format(const Array& arr, std::vector<int64_
     indices.reserve(sz);
 
     for (size_t i = 0; i < sz; ++i) {
-        auto item = arr.get(i);
-        values.push_back(item);
+        auto item = inputs[i];
+        values.push_back(inputs[i]);
+        // uint64_t item = arr.get(i);
+        // values.push_back(item);
         REALM_ASSERT_3(values.back(), ==, item);
     }
 
@@ -216,13 +254,17 @@ void ArrayFlex::arrange_data_in_flex_format(const Array& arr, std::vector<int64_
     values.erase(last, values.end());
 
     for (size_t i = 0; i < arr.size(); ++i) {
-        auto pos = std::lower_bound(values.begin(), values.end(), arr.get(i));
+        // auto item = arr.get(i);
+        auto item = inputs[i];
+        auto pos = std::lower_bound(values.begin(), values.end(), item);
         indices.push_back(std::distance(values.begin(), pos));
-        REALM_ASSERT(values[indices[i]] == arr.get(i));
+        // REALM_ASSERT(values[indices[i]] == arr.get(i));
+        REALM_ASSERT(values[indices[i]] == item);
     }
 
     for (size_t i = 0; i < sz; ++i) {
-        auto old_value = arr.get(i);
+        auto old_value = inputs[i];
+        // auto old_value = arr.get(i);
         auto new_value = values[indices[i]];
         REALM_ASSERT_3(new_value, ==, old_value);
     }
@@ -241,7 +283,7 @@ bool ArrayFlex::check_gain(const Array& arr, std::vector<int64_t>& values, std::
     // we should consider Encoding::Packed as well here.
     const auto uncompressed_size = arr.get_byte_size();
     auto byte_size = NodeHeader::calc_size<Encoding::Flex>(values.size(), indices.size(), v_width, ndx_width);
-    return byte_size < uncompressed_size;
+    return true; // byte_size <= uncompressed_size;
 }
 
 void ArrayFlex::setup_array_in_flex_format(const Array& origin, Array& arr, std::vector<int64_t>& values,
@@ -485,8 +527,11 @@ uint64_t ArrayFlex::get_unsigned(const Array& arr, size_t ndx, size_t& v_width) 
 
         auto data = (uint64_t*)NodeHeader::get_data_from_header(arr.get_header());
         const uint64_t offset = v_size * v_width;
-        bf_iterator it_index{data, static_cast<size_t>(offset + (ndx * ndx_width)), ndx_width, ndx_size, 0};
-        bf_iterator it_value{data, static_cast<size_t>(v_width * it_index.get_value()), v_width, v_width, 0};
+        const auto ndx_pos = static_cast<size_t>(offset + (ndx * ndx_width));
+        bf_iterator it_index{data, ndx_pos, ndx_width, ndx_size, 0};
+        auto index_value = it_index.get_value();
+        const auto val_pos = static_cast<size_t>(v_width * it_index.get_value());
+        bf_iterator it_value{data, val_pos, v_width, v_width, 0};
         const auto v = it_value.get_value();
         return v;
     }

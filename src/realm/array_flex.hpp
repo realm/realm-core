@@ -34,6 +34,7 @@ public:
 
     // compressing/decompressing logic
     bool encode(const Array&, Array&) const final override;
+    bool encode_unsigned(const ArrayUnsigned&, ArrayUnsigned&) const final override;
     bool decode(Array&) final override;
     bool is_encoded(const Array&) const final override;
 
@@ -66,8 +67,10 @@ private:
     static bool get_encode_info(const char* header, size_t& value_width, size_t& index_width, size_t& value_size,
                                 size_t& index_size);
     // encode array methods
-    bool try_encode(const Array&, Array&, std::vector<int64_t>&, std::vector<size_t>&) const;
-    void arrange_data_in_flex_format(const Array&, std::vector<int64_t>&, std::vector<size_t>&) const;
+    bool try_encode(const Array&, Array&, const std::vector<int64_t>&, std::vector<int64_t>&,
+                    std::vector<size_t>&) const;
+    void arrange_data_in_flex_format(const Array&, const std::vector<int64_t>&, std::vector<int64_t>&,
+                                     std::vector<size_t>&) const;
     bool check_gain(const Array&, std::vector<int64_t>&, std::vector<size_t>&, int&, int&) const;
     void setup_array_in_flex_format(const Array&, Array&, std::vector<int64_t>&, std::vector<size_t>&, int,
                                     int) const;

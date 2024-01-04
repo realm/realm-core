@@ -80,6 +80,9 @@ public:
         return m_width;
     }
 
+    bool try_encode(ArrayUnsigned&) const;
+    bool encode_array(ArrayUnsigned&) const;
+
 private:
     uint_least8_t m_width = 0;
     uint64_t m_lbound = 0;

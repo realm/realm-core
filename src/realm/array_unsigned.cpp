@@ -66,10 +66,8 @@ inline void ArrayUnsigned::_set(size_t ndx, uint8_t width, uint64_t value)
 inline uint64_t ArrayUnsigned::_get(size_t ndx, uint8_t width) const
 {
     if (is_encoded()) {
-        // TODO: this can be any possible encoding.. cannot be a static method
         size_t v_width;
-        return ArrayFlex::get(get_header(), ndx);
-        // return ArrayFlex::get_unsigned(get_header(), ndx, v_width);
+        return m_encode.get_unsigned(*this, ndx, v_width);
     }
     else {
         if (width == 8) {
@@ -325,5 +323,25 @@ void ArrayUnsigned::truncate(size_t ndx)
         set_width_in_header(8, get_header());
     }
 }
+
+bool ArrayUnsigned::try_encode(ArrayUnsigned& arr) const
+{
+    return encode_array(arr);
+}
+
+bool ArrayUnsigned::encode_array(ArrayUnsigned& arr) const
+{
+    const auto header = get_header();
+    auto kind = get_kind(header);
+    if (kind == 'A') {
+        auto encoding = get_encoding(header);
+        // encode everything that is WtypeBits (all integer arrays included ref arrays)
+        if (encoding == NodeHeader::Encoding::WTypBits) {
+            return m_encode.encode_unsigned(*this, arr);
+        }
+    }
+    return false;
+}
+
 
 } // namespace realm
