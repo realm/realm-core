@@ -484,11 +484,23 @@ TEST(Array_General)
 }
 
 
-TEST(Array_Unsigned)
+ONLY(Array_Unsigned)
 {
     ArrayUnsigned c(Allocator::get_default());
     c.create(0, 0);
 
+    c.add(-1);
+    c.add(-2);
+    // these are good
+    CHECK_EQUAL(c.get(0), (uint64_t)-1);
+    CHECK_EQUAL(c.get(1), (uint64_t)-2);
+    c.try_encode(c);
+    c.try_decode();
+    // these will fail
+    CHECK_EQUAL(c.get(0), (uint64_t)-1);
+    CHECK_EQUAL(c.get(1), (uint64_t)-2);
+    c.destroy();
+    c.create(0, 0);
     // TEST(Array_Add0)
 
     c.add(0);
