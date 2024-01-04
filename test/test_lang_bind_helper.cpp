@@ -127,17 +127,24 @@ TEST(Transactions_Frozen)
         frozen_workers[j].join();
 }
 
-
 TEST(Transactions_ConcurrentFrozenTableGetByName)
 {
+#if REALM_VALGRIND
+    // This test is slow under valgrind. Additionally, there is
+    // a --max-threads config of 5000 for all (concurrent) tests
+    constexpr int num_threads = 100;
+#else
+    constexpr int num_threads = 1000;
+#endif
+    constexpr int num_tables = 3 * num_threads;
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist_w(make_in_realm_history());
     DBRef db = DB::create(*hist_w, path);
     TransactionRef frozen;
-    std::string table_names[3000];
+    std::string table_names[num_tables];
     {
         auto wt = db->start_write();
-        for (int j = 0; j < 3000; ++j) {
+        for (int j = 0; j < num_tables; ++j) {
             std::string name = "Table" + to_string(j);
             table_names[j] = name;
             wt->add_table(name);
@@ -151,11 +158,11 @@ TEST(Transactions_ConcurrentFrozenTableGetByName)
             frozen->get_table(table_names[j]);
         }
     };
-    std::thread threads[1000];
-    for (int j = 0; j < 1000; ++j) {
-        threads[j] = std::thread(runner, j * 2, j * 2 + 1000);
+    std::thread threads[num_threads];
+    for (int j = 0; j < num_threads; ++j) {
+        threads[j] = std::thread(runner, j * 2, j * 2 + num_threads);
     }
-    for (int j = 0; j < 1000; ++j)
+    for (int j = 0; j < num_threads; ++j)
         threads[j].join();
 }
 
@@ -216,14 +223,22 @@ TEST(Transactions_ReclaimFrozen)
 
 TEST(Transactions_ConcurrentFrozenTableGetByKey)
 {
+#if REALM_VALGRIND
+    // This test is slow under valgrind. Additionally, there is
+    // a --max-threads config of 5000 for all (concurrent) tests
+    constexpr int num_threads = 100;
+#else
+    constexpr int num_threads = 1000;
+#endif
+    constexpr int num_tables = 3 * num_threads;
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist_w(make_in_realm_history());
     DBRef db = DB::create(*hist_w, path);
     TransactionRef frozen;
-    TableKey table_keys[3000];
+    TableKey table_keys[num_tables];
     {
         auto wt = db->start_write();
-        for (int j = 0; j < 3000; ++j) {
+        for (int j = 0; j < num_tables; ++j) {
             std::string name = "Table" + to_string(j);
             auto table = wt->add_table(name);
             table_keys[j] = table->get_key();
@@ -238,11 +253,11 @@ TEST(Transactions_ConcurrentFrozenTableGetByKey)
             CHECK(table->get_key() == table_keys[j]);
         }
     };
-    std::thread threads[1000];
-    for (int j = 0; j < 1000; ++j) {
-        threads[j] = std::thread(runner, j * 2, j * 2 + 1000);
+    std::thread threads[num_threads];
+    for (int j = 0; j < num_threads; ++j) {
+        threads[j] = std::thread(runner, j * 2, j * 2 + num_threads);
     }
-    for (int j = 0; j < 1000; ++j)
+    for (int j = 0; j < num_threads; ++j)
         threads[j].join();
 }
 
