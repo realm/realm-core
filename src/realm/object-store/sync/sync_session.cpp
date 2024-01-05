@@ -892,10 +892,11 @@ void SyncSession::create_sync_session()
     }
 
     {
-        // At this point, the sync_route should be valid
+        // At this point, the sync_route should be valid, since the location should have been updated by
+        // an AppServices http request or by updating the access token before starting the sync session.
         auto sync_route = m_sync_manager->sync_route();
-        // If sync_route is not valid, it means the location update failed - pass the error up via the registered
-        // error handler
+        // If sync_route is not valid at this point, it means the location update failed - pass the error up via
+        // the registered error handler
         if (!sync_route) {
             Status result{ErrorCodes::LocationUpdateFailed, "Failed to update location prior to sync session start"};
             if (m_config.sync_config->error_handler) {
@@ -1082,14 +1083,17 @@ void SyncSession::resume()
 void SyncSession::do_revive(util::CheckedUniqueLock&& lock)
 {
     auto u = user();
-    // If the sync manager doesn't have a valid route yet, then request
-    // an updated access token to refresh it.
+    // If the sync manager has a valid route and the user and it's access token
+    // are valid, then revive the session.
     if (m_sync_manager->sync_route() && (!u || !u->access_token_refresh_required())) {
         become_active();
         m_state_mutex.unlock(lock);
         return;
     }
 
+    // Otherwise, either the access token has expired or the location info hasn't
+    // been requested since the app was started - request a new access token to
+    // refresh both.
     become_waiting_for_access_token();
     // Release the lock for SDKs with a single threaded
     // networking implementation such as our test suite

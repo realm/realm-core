@@ -20,6 +20,7 @@
 #define APP_UTILS_HPP
 
 #include <realm/util/optional.hpp>
+#include <realm/error_codes.hpp>
 
 #include <map>
 
@@ -29,14 +30,22 @@ struct Response;
 
 class AppUtils {
 public:
-    static util::Optional<AppError> check_for_errors(const Response& response);
+    struct UrlComponents {
+        std::string scheme;
+        std::string server;
+        std::string request;
+    };
+
+    static std::optional<AppError> check_for_errors(const Response& response);
     static Response make_apperror_response(const AppError& error);
+    static Response make_clienterror_response(ErrorCodes::Error code, const std::string_view message,
+                                              std::optional<int> http_status);
     static const std::pair<const std::string, std::string>*
     find_header(const std::string& key_name, const std::map<std::string, std::string>& search_map);
-    static bool split_url(std::string url, std::string& scheme, std::string& dest, std::string& request);
+    static std::optional<AppUtils::UrlComponents> split_url(std::string url);
     static bool is_success_status_code(int status_code);
     static bool is_redirect_status_code(int status_code);
-    static util::Optional<std::string> extract_redir_location(const Response& response);
+    static std::optional<std::string> extract_redir_location(const Response& response);
 };
 
 } // namespace realm::app

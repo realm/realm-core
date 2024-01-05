@@ -433,25 +433,40 @@ public:
     static void close_all_sync_sessions();
 
     // Return the base url path used for HTTP AppServices requests
-    std::string get_hostname();
+    std::string get_host_url();
 
     // Return the base url path used for Sync Session Websocket requests
-    std::string get_ws_hostname();
+    std::string get_ws_host_url();
 
 private:
+    // Local copy of app config
     Config m_config;
 
-    // mutable to allow locking for reads in const functions
-    // this is a shared pointer to support the App move constructor
+    // A shared pointer to support the App move constructor and mutable
+    // to allow locking for reads in const functions
     mutable std::shared_ptr<std::mutex> m_route_mutex = std::make_shared<std::mutex>();
-    std::string m_base_url; // Original base URL for server, prior to location request
+
+    // The following variables hold the different paths to Atlas, depending on the
+    // request being performed
+    // Base hostname from config.base_url or update_base_url() for querying location info
+    // (e.g. "https://realm.mongodb.com")
+    std::string m_base_url;
+    // Baseline URL for AppServices and Device Sync requests
+    // (e.g. "https://us-east-1.aws.realm.mongodb.com/api/client/v2.0" or
+    // "wss://ws.us-east-1.aws.realm.mongodb.com/api/client/v2.0")
     std::string m_base_route;
+    // URL for app-based AppServices and Device Sync requests using config.app_id
+    // (e.g. "https://us-east-1.aws.realm.mongodb.com/api/client/v2.0/app/<app_id>"
+    // or "wss://ws.us-east-1.aws.realm.mongodb.com/api/client/v2.0/app/<app_id>")
     std::string m_app_route;
+    // URL for app-based AppServices authentication requests (e.g. email/password)
+    // (e.g. "https://us-east-1.aws.realm.mongodb.com/api/client/v2.0/app/<app_id>/auth")
     std::string m_auth_route;
-    bool m_location_updated = false;
-    // Hostname returned from location request, if metadata is not used
-    std::string m_hostname;
-    std::string m_ws_hostname;
+    // If false, the location info will be updated upon the next AppServices request
+    bool m_location_updated;
+    // Storage for the location info returned by the base URL location endpoint
+    std::string m_host_url;    // Base hostname for AppServices HTTP requests
+    std::string m_ws_host_url; // Base hostname for Device Sync websocket requests
 
     uint64_t m_request_timeout_ms;
     std::shared_ptr<SyncManager> m_sync_manager;
@@ -500,8 +515,8 @@ private:
     /// @param redir_location The location provided by the last redirect response when querying location
     /// @param redirect_count The current number of redirects that have occurred in a row
     void request_location(util::UniqueFunction<void(util::Optional<AppError>)>&& completion,
-                          util::Optional<std::string>&& new_hostname = util::none,
-                          util::Optional<std::string>&& redir_location = util::none, int redirect_count = 0);
+                          std::optional<std::string>&& new_hostname = std::nullopt,
+                          std::optional<std::string>&& redir_location = std::nullopt, int redirect_count = 0);
 
     /// Update the location metadata from the location response
     /// @param response The response returned from the location request
@@ -566,13 +581,15 @@ private:
 
     void configure(const SyncClientConfig& sync_client_config);
 
-    std::string make_sync_route(util::Optional<std::string> ws_hostname = util::none);
+    // Requires locking m_route_mutex before calling
+    std::string make_sync_route(util::Optional<std::string> ws_host_url = util::none);
 
-    void configure_route(const util::Optional<realm::SyncAppMetadata>& metadata,
-                         const util::Optional<std::string>& new_base_url = util::none);
+    // Requires locking m_route_mutex before calling
+    void configure_route(const std::string& host_url, const std::optional<std::string>& ws_host_url = std::nullopt);
 
-    void update_hostname(const std::string& hostname, const util::Optional<std::string>& ws_hostname = util::none,
-                         const util::Optional<std::string>& new_base_url = util::none);
+    // Requires locking m_route_mutex before calling
+    void update_hostname(const std::string& host_url, const std::optional<std::string>& ws_host_url = std::nullopt,
+                         const std::optional<std::string>& new_base_url = std::nullopt);
 
     bool verify_user_present(const std::shared_ptr<SyncUser>& user) const;
 };

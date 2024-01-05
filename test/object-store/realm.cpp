@@ -1146,12 +1146,6 @@ TEST_CASE("Get Realm using Async Open", "[sync][pbs][async open]") {
     util::base64_encode(unencoded_body.data(), unencoded_body.size(), &encoded_body[0], encoded_body.size());
     auto invalid_token = "." + encoded_body + ".";
 
-    // Token refreshing requires that we have app metadata and we can't fetch
-    // it normally, so just stick some fake values in
-    init_sync_manager.app()->sync_manager()->perform_metadata_update([&](SyncMetadataManager& manager) {
-        manager.set_app_metadata("GLOBAL", "location", "hostname", "ws_hostname", "base_url");
-    });
-
     SECTION("can async open while waiting for a token refresh") {
         SyncTestFile config(init_sync_manager.app(), "realm");
         auto valid_token = config.sync_config->user->access_token();

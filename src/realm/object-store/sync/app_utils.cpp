@@ -45,28 +45,28 @@ AppUtils::find_header(const std::string& key_name, const std::map<std::string, s
     return nullptr;
 }
 
-bool AppUtils::split_url(std::string url, std::string& scheme, std::string& dest, std::string& request)
+std::optional<AppUtils::UrlComponents> AppUtils::split_url(std::string url)
 {
+    UrlComponents comp;
     // Find the position of the scheme separator "://"
     size_t scheme_end_pos = url.find("://");
     if (scheme_end_pos == std::string::npos) {
         // Missing scheme separator
-        return false;
+        return std::nullopt;
     }
-    scheme = url.substr(0, scheme_end_pos);
+    comp.scheme = url.substr(0, scheme_end_pos);
     url.erase(0, scheme_end_pos + 3);
 
     // Find the first slash "/"
     size_t host_end_pos = url.find("/");
     if (host_end_pos == std::string::npos) {
         // No path/file section
-        dest = url;
-        request = "";
-        return true;
+        comp.server = url;
+        return std::move(comp);
     }
-    dest = url.substr(0, host_end_pos);
-    request = url.substr(host_end_pos);
-    return true;
+    comp.server = url.substr(0, host_end_pos);
+    comp.request = url.substr(host_end_pos);
+    return std::move(comp);
 }
 
 bool AppUtils::is_success_status_code(int status_code)
@@ -87,7 +87,7 @@ bool AppUtils::is_redirect_status_code(int status_code)
     return false;
 }
 
-util::Optional<std::string> AppUtils::extract_redir_location(const Response& response)
+std::optional<std::string> AppUtils::extract_redir_location(const Response& response)
 {
     // Look for case insensitive redirect "location" in headers
     auto location = AppUtils::find_header("location", response.headers);
@@ -108,7 +108,7 @@ util::Optional<std::string> AppUtils::extract_redir_location(const Response& res
     return std::string(new_url);
 }
 
-util::Optional<AppError> AppUtils::check_for_errors(const Response& response)
+std::optional<AppError> AppUtils::check_for_errors(const Response& response)
 {
     std::string error_msg;
     bool http_status_code_is_fatal = !AppUtils::is_success_status_code(response.http_status_code);
@@ -164,15 +164,18 @@ util::Optional<AppError> AppUtils::check_for_errors(const Response& response)
         return AppError(ErrorCodes::HTTPError, error_msg, {}, response.http_status_code);
     }
 
-    return {};
+    return std::nullopt;
 }
 
+// Convert an AppError object into a Response object
 Response AppUtils::make_apperror_response(const AppError& error)
 {
-    if (!error.server_error.empty()) {
+    if (!error.server_error.empty() || error.code() == ErrorCodes::AppUnknownError) {
         auto body = nlohmann::json();
         body["error"] = error.reason();
-        body["error_code"] = error.server_error;
+        if (!error.server_error.empty()) {
+            body["error_code"] = error.server_error;
+        }
         if (!error.link_to_server_logs.empty()) {
             body["link"] = error.link_to_server_logs;
         }
@@ -180,9 +183,19 @@ Response AppUtils::make_apperror_response(const AppError& error)
     }
 
     if (ErrorCodes::error_categories(error.code()).test(ErrorCategory::http_error)) {
-        // The original body from the http response error has been mangled by this point and can't be recovered
-        // A generic message will be generated when the AppError is recreated
-        return {error.additional_status_code.value_or(0), 0, {}, {}};
+        std::string message;
+        // Try to extract the original body from the reason code
+        static const char* match = "http error code considered fatal: ";
+        if (auto pos = error.reason().find(match); pos != std::string::npos) {
+            message = error.reason().substr(pos + std::char_traits<char>::length(match));
+            // Remove the text added by AppError
+            pos = message.find_last_of(".");
+            if (pos != std::string::npos) {
+                message.erase(pos);
+            }
+        }
+        // Otherwise, body was originally empty
+        return {error.additional_status_code.value_or(0), 0, {}, message};
     }
     if (ErrorCodes::error_categories(error.code()).test(ErrorCategory::custom_error)) {
         return {0, error.additional_status_code.value_or(0), {}, std::string(error.reason())};
@@ -190,6 +203,13 @@ Response AppUtils::make_apperror_response(const AppError& error)
 
     // For other cases, put the error code in client_error_code field (client error or otherwise)
     return {error.additional_status_code.value_or(0), 0, {}, std::string(error.reason()), error.code()};
+}
+
+// Create a Response object with the given client error, message and optional http status code
+Response AppUtils::make_clienterror_response(ErrorCodes::Error code, const std::string_view message,
+                                             std::optional<int> http_status)
+{
+    return Response{http_status ? *http_status : 0, 0, {}, std::string(message), code};
 }
 
 } // namespace app

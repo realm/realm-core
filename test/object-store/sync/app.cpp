@@ -183,9 +183,62 @@ TEST_CASE("app: verify app error codes", "[sync][app][local]") {
         };
     };
 
-    // Success response
+    auto validate_json_body = [](std::string body, std::optional<std::string_view> error_code,
+                                 std::optional<std::string_view> error = "some error",
+                                 std::optional<std::string_view> logs_link = "http://dummy-link/") -> bool {
+        if (body.empty()) {
+            return false;
+        }
+        try {
+            auto json_body = nlohmann::json::parse(body);
+            // If provided, check the error_code value against the 'error_code' value in the json body
+            auto code = json_body.find("error_code");
+            if (error_code && !error_code->empty()) {
+                if (code == json_body.end() || code->get<std::string>() != *error_code) {
+                    return false;
+                }
+            }
+            // If not provided, it's an error if the value is included in the json body
+            else if (code != json_body.end()) {
+                return false;
+            }
+            // If provided, check the message value against the 'error' value in the json body
+            auto message = json_body.find("error");
+            if (error && !error->empty()) {
+                if (message == json_body.end() || message->get<std::string>() != *error) {
+                    return false;
+                }
+            }
+            // If not provided, it's an error if the value is included in the json body
+            else if (message != json_body.end()) {
+                return false;
+            }
+            // If provided, check the logs_link value against the 'link' value in the json body
+            auto link = json_body.find("link");
+            if (logs_link && !logs_link->empty()) {
+                if (link == json_body.end() || link->get<std::string>() != *logs_link) {
+                    return false;
+                }
+            }
+            // If not provided, it's an error if the value is included in the json body
+            else if (link != json_body.end()) {
+                return false;
+            }
+        }
+        catch (nlohmann::json::exception ex) {
+            // It's also a failure if parsing the json body throws an exception
+            return false;
+        }
+        return true;
+    };
+
+    // Success responses
     app::Response response = {200, 0, {}, ""};
     auto app_error = AppUtils::check_for_errors(response);
+    REQUIRE(!app_error);
+
+    response = {0, 0, {}, ""};
+    app_error = AppUtils::check_for_errors(response);
     REQUIRE(!app_error);
 
     // Empty error code
@@ -199,6 +252,17 @@ TEST_CASE("app: verify app error codes", "[sync][app][local]") {
     REQUIRE(app_error->link_to_server_logs == "http://dummy-link/");
     REQUIRE(*app_error->additional_status_code == 500);
 
+    // Re-compose back into a Response
+    auto err_response = AppUtils::make_apperror_response(*app_error);
+    REQUIRE(err_response.http_status_code == 500);
+    REQUIRE(!err_response.body.empty());
+    REQUIRE(validate_json_body(err_response.body, ""));
+    REQUIRE(!err_response.client_error_code);
+    REQUIRE(err_response.custom_status_code == 0);
+    auto ct = AppUtils::find_header("content-type", err_response.headers);
+    REQUIRE(ct);
+    REQUIRE(ct->second == "application/json");
+
     // Missing error code
     response = make_http_error(std::nullopt);
     app_error = AppUtils::check_for_errors(response);
@@ -209,6 +273,61 @@ TEST_CASE("app: verify app error codes", "[sync][app][local]") {
     REQUIRE(app_error->reason() == "some error");
     REQUIRE(app_error->link_to_server_logs == "http://dummy-link/");
     REQUIRE(*app_error->additional_status_code == 500);
+
+    // Re-compose back into a Response
+    err_response = AppUtils::make_apperror_response(*app_error);
+    REQUIRE(err_response.http_status_code == 500);
+    REQUIRE(!err_response.body.empty());
+    REQUIRE(validate_json_body(err_response.body, std::nullopt));
+    REQUIRE(!err_response.client_error_code);
+    REQUIRE(err_response.custom_status_code == 0);
+    ct = AppUtils::find_header("content-type", err_response.headers);
+    REQUIRE(ct);
+    REQUIRE(ct->second == "application/json");
+
+    // Missing error message
+    response = make_http_error("InvalidParameter", 404, std::nullopt);
+    app_error = AppUtils::check_for_errors(response);
+    REQUIRE(app_error);
+    REQUIRE(app_error->code() == ErrorCodes::InvalidParameter);
+    REQUIRE(app_error->code_string() == "InvalidParameter");
+    REQUIRE(app_error->server_error == "InvalidParameter");
+    REQUIRE(app_error->reason() == "no error message");
+    REQUIRE(app_error->link_to_server_logs == "http://dummy-link/");
+    REQUIRE(*app_error->additional_status_code == 404);
+
+    // Re-compose back into a Response
+    err_response = AppUtils::make_apperror_response(*app_error);
+    REQUIRE(err_response.http_status_code == 404);
+    REQUIRE(!err_response.body.empty());
+    REQUIRE(validate_json_body(err_response.body, "InvalidParameter", "no error message"));
+    REQUIRE(!err_response.client_error_code);
+    REQUIRE(err_response.custom_status_code == 0);
+    ct = AppUtils::find_header("content-type", err_response.headers);
+    REQUIRE(ct);
+    REQUIRE(ct->second == "application/json");
+
+    // Missing logs link
+    response = make_http_error("InvalidParameter", 403, "some error occurred", std::nullopt);
+    app_error = AppUtils::check_for_errors(response);
+    REQUIRE(app_error);
+    REQUIRE(app_error->code() == ErrorCodes::InvalidParameter);
+    REQUIRE(app_error->code_string() == "InvalidParameter");
+    REQUIRE(app_error->server_error == "InvalidParameter");
+    REQUIRE(app_error->reason() == "some error occurred");
+    REQUIRE(app_error->link_to_server_logs == "");
+    REQUIRE(*app_error->additional_status_code == 403);
+
+    // Re-compose back into a Response
+    err_response = AppUtils::make_apperror_response(*app_error);
+    REQUIRE(err_response.http_status_code == 403);
+    REQUIRE(!err_response.body.empty());
+    REQUIRE(validate_json_body(err_response.body, "InvalidParameter", "some error occurred", std::nullopt));
+    REQUIRE(!err_response.client_error_code);
+    REQUIRE(err_response.custom_status_code == 0);
+    ct = AppUtils::find_header("content-type", err_response.headers);
+    REQUIRE(ct);
+    REQUIRE(ct->second == "application/json");
 
     // Missing error code and error message with success http status
     response = make_http_error(std::nullopt, 200, std::nullopt);
@@ -234,6 +353,17 @@ TEST_CASE("app: verify app error codes", "[sync][app][local]") {
             REQUIRE(app_error->link_to_server_logs == "http://dummy-link/");
             REQUIRE(app_error->additional_status_code);
             REQUIRE(*app_error->additional_status_code == 500);
+
+            // Re-compose back into a Response
+            err_response = AppUtils::make_apperror_response(*app_error);
+            REQUIRE(err_response.http_status_code == 500);
+            REQUIRE(!err_response.body.empty());
+            REQUIRE(validate_json_body(err_response.body, name));
+            REQUIRE(!err_response.client_error_code);
+            REQUIRE(err_response.custom_status_code == 0);
+            ct = AppUtils::find_header("content-type", err_response.headers);
+            REQUIRE(ct);
+            REQUIRE(ct->second == "application/json");
         }
     }
 
@@ -247,6 +377,17 @@ TEST_CASE("app: verify app error codes", "[sync][app][local]") {
     REQUIRE(app_error->link_to_server_logs == "http://dummy-link/");
     REQUIRE(app_error->additional_status_code);
     REQUIRE(*app_error->additional_status_code == 404);
+
+    // Re-compose back into a Response
+    err_response = AppUtils::make_apperror_response(*app_error);
+    REQUIRE(err_response.http_status_code == 404);
+    REQUIRE(!err_response.body.empty());
+    REQUIRE(validate_json_body(err_response.body, "AppErrorMissing"));
+    REQUIRE(!err_response.client_error_code);
+    REQUIRE(err_response.custom_status_code == 0);
+    ct = AppUtils::find_header("content-type", err_response.headers);
+    REQUIRE(ct);
+    REQUIRE(ct->second == "application/json");
 
     // HTTPError with different status values
     for (auto [status, message] : http_status_codes) {
@@ -269,6 +410,14 @@ TEST_CASE("app: verify app error codes", "[sync][app][local]") {
         REQUIRE(app_error->link_to_server_logs.empty());
         REQUIRE(app_error->additional_status_code);
         REQUIRE(*app_error->additional_status_code == status);
+
+        // Recompose back into a Response
+        err_response = AppUtils::make_apperror_response(*app_error);
+        REQUIRE(err_response.http_status_code == status);
+        REQUIRE(err_response.body == "some http error");
+        REQUIRE(!err_response.client_error_code);
+        REQUIRE(err_response.custom_status_code == 0);
+        REQUIRE(err_response.headers.empty());
     }
 
     // Missing error code and error message with fatal http status
@@ -288,6 +437,39 @@ TEST_CASE("app: verify app error codes", "[sync][app][local]") {
     REQUIRE(app_error->additional_status_code);
     REQUIRE(*app_error->additional_status_code == 501);
 
+    // Re-compose back into a Response
+    err_response = AppUtils::make_apperror_response(*app_error);
+    REQUIRE(err_response.http_status_code == 501);
+    REQUIRE(err_response.body.empty());
+    REQUIRE(!err_response.client_error_code);
+    REQUIRE(err_response.custom_status_code == 0);
+    REQUIRE(err_response.headers.empty());
+
+    // Missing error code and error message contains period with redirect http status
+    response = {
+        308,
+        0,
+        {},
+        "some http error. ocurred",
+    };
+    app_error = AppUtils::check_for_errors(response);
+    REQUIRE(app_error);
+    REQUIRE(app_error->code() == ErrorCodes::HTTPError);
+    REQUIRE(app_error->code_string() == "HTTPError");
+    REQUIRE(app_error->server_error.empty());
+    REQUIRE(app_error->reason() == "http error code considered fatal: some http error. ocurred. Redirection: 308");
+    REQUIRE(app_error->link_to_server_logs.empty());
+    REQUIRE(app_error->additional_status_code);
+    REQUIRE(*app_error->additional_status_code == 308);
+
+    // Re-compose back into a Response
+    err_response = AppUtils::make_apperror_response(*app_error);
+    REQUIRE(err_response.http_status_code == 308);
+    REQUIRE(err_response.body == "some http error. ocurred");
+    REQUIRE(!err_response.client_error_code);
+    REQUIRE(err_response.custom_status_code == 0);
+    REQUIRE(err_response.headers.empty());
+
     // Valid client error code, with body, but no json
     app::Response client_response = {
         501,
@@ -306,11 +488,29 @@ TEST_CASE("app: verify app error codes", "[sync][app][local]") {
     REQUIRE(app_error->additional_status_code);
     REQUIRE(*app_error->additional_status_code == 501);
 
+    // Re-compose back into a Response
+    err_response = AppUtils::make_apperror_response(*app_error);
+    REQUIRE(err_response.http_status_code == 501);
+    REQUIRE(err_response.body == "Some error occurred");
+    REQUIRE(err_response.client_error_code);
+    REQUIRE(err_response.client_error_code == ErrorCodes::BadBsonParse);
+    REQUIRE(err_response.custom_status_code == 0);
+    REQUIRE(err_response.headers.empty());
+
     // Same response with client error code, but no body
     client_response.body = "";
     app_error = AppUtils::check_for_errors(client_response);
     REQUIRE(app_error);
     REQUIRE(app_error->reason() == "client error code value considered fatal");
+
+    // Re-compose back into a Response
+    err_response = AppUtils::make_apperror_response(*app_error);
+    REQUIRE(err_response.http_status_code == 501);
+    REQUIRE(err_response.body == "client error code value considered fatal");
+    REQUIRE(err_response.client_error_code);
+    REQUIRE(err_response.client_error_code == ErrorCodes::BadBsonParse);
+    REQUIRE(err_response.custom_status_code == 0);
+    REQUIRE(err_response.headers.empty());
 
     // Valid custom status code, with body, but no json
     app::Response custom_response = {501,
@@ -327,11 +527,27 @@ TEST_CASE("app: verify app error codes", "[sync][app][local]") {
     REQUIRE(app_error->additional_status_code);
     REQUIRE(*app_error->additional_status_code == 4999);
 
+    // Re-compose back into a Response
+    err_response = AppUtils::make_apperror_response(*app_error);
+    REQUIRE(err_response.http_status_code == 0);
+    REQUIRE(err_response.body == "Some custom error occurred");
+    REQUIRE(!err_response.client_error_code);
+    REQUIRE(err_response.custom_status_code == 4999);
+    REQUIRE(err_response.headers.empty());
+
     // Same response with custom status code, but no body
     custom_response.body = "";
     app_error = AppUtils::check_for_errors(custom_response);
     REQUIRE(app_error);
     REQUIRE(app_error->reason() == "non-zero custom status code considered fatal");
+
+    // Re-compose back into a Response
+    err_response = AppUtils::make_apperror_response(*app_error);
+    REQUIRE(err_response.http_status_code == 0);
+    REQUIRE(err_response.body == "non-zero custom status code considered fatal");
+    REQUIRE(!err_response.client_error_code);
+    REQUIRE(err_response.custom_status_code == 4999);
+    REQUIRE(err_response.headers.empty());
 }
 
 // MARK: - Login with Credentials Tests
@@ -2476,22 +2692,15 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
                 else if (request_count == 4) {
                     logger->trace("request.url (%1): %2", request_count, request.url);
                     REQUIRE(request.url.find(redirect_scheme + original_host) != std::string::npos);
-                    // Let the init_app_metadata request go through
+                    // Let the location request go through
                     redir_transport->simulated_response.reset();
                     request_count++;
                 }
                 else if (request_count == 5) {
-                    // This is the original request after the init app metadata
+                    // This is the original request after the location has been updated
                     logger->trace("request.url (%1): %2", request_count, request.url);
-                    auto sync_manager = redir_app->sync_manager();
-                    REQUIRE(sync_manager);
-                    auto app_metadata = sync_manager->app_metadata();
-                    REQUIRE(app_metadata);
-                    logger->trace("Deployment model: %1", app_metadata->deployment_model);
-                    logger->trace("Location: %1", app_metadata->location);
-                    logger->trace("Hostname: %1", app_metadata->hostname);
-                    logger->trace("WS Hostname: %1", app_metadata->ws_hostname);
-                    REQUIRE(app_metadata->hostname.find(original_host) != std::string::npos);
+                    // App metadata is no longer being used, query the host_url from app
+                    REQUIRE(redir_app->get_host_url().find(original_host) != std::string::npos);
                     REQUIRE(request.url.find(redirect_scheme + original_host) != std::string::npos);
                     redir_transport->simulated_response.reset();
                     request_count++;
@@ -2624,7 +2833,6 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
             creds.email, creds.password, [&](util::Optional<app::AppError> error) {
                 REQUIRE(!error);
             });
-        REQUIRE(!redir_app->sync_manager()->app_metadata()); // no stored app metadata
         REQUIRE(redir_app->sync_manager()->sync_route());
         REQUIRE(redir_app->sync_manager()->sync_route()->find(websocket_url) != std::string::npos);
 
@@ -3627,15 +3835,7 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
     };
 
     SECTION("Test app config baseurl") {
-        bool use_metadata = GENERATE(true, false);
-        sc_config.metadata_mode =
-            use_metadata ? SyncManager::MetadataMode::NoEncryption : SyncManager::MetadataMode::NoMetadata;
-        if (use_metadata) {
-            logger->info("Test app config baseurl: using metadata");
-        }
-        else {
-            logger->info("Test app config baseurl: not using metadata");
-        }
+        // Metadata mode doesn't matter, since App isn't using it anymore
         {
             redir_transport->reset("https://realm.mongodb.com");
 
@@ -3644,23 +3844,14 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
             // Location is not requested until first app services request
             CHECK(!redir_transport->location_requested);
             // Initial hostname and ws hostname use base url, but aren't used until location is updated
-            CHECK(app->get_hostname() == "https://realm.mongodb.com");
-            CHECK(app->get_ws_hostname() == "wss://realm.mongodb.com");
+            CHECK(app->get_host_url() == "https://realm.mongodb.com");
+            CHECK(app->get_ws_host_url() == "wss://realm.mongodb.com");
 
             do_login(app);
             CHECK(redir_transport->location_requested);
             CHECK(app->get_base_url() == "https://realm.mongodb.com");
-            CHECK(app->get_hostname() == "https://realm.mongodb.com");
-            CHECK(app->get_ws_hostname() == "wss://realm.mongodb.com");
-            auto metadata = app->sync_manager()->app_metadata();
-            if (use_metadata) {
-                CHECK(metadata);
-                CHECK(metadata->hostname == "https://realm.mongodb.com");
-                CHECK(metadata->ws_hostname == "wss://realm.mongodb.com");
-            }
-            else {
-                CHECK(!metadata);
-            }
+            CHECK(app->get_host_url() == "https://realm.mongodb.com");
+            CHECK(app->get_ws_host_url() == "wss://realm.mongodb.com");
         }
         {
             // Second time through, base_url is set to https://alternate.mongodb.com is expected
@@ -3671,52 +3862,35 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
             // Location is not requested until first app services request
             CHECK(!redir_transport->location_requested);
             // Initial hostname and ws hostname use base url, but aren't used until location is updated
-            CHECK(app->get_hostname() == "https://alternate.mongodb.com");
-            CHECK(app->get_ws_hostname() == "wss://alternate.mongodb.com");
+            CHECK(app->get_host_url() == "https://alternate.mongodb.com");
+            CHECK(app->get_ws_host_url() == "wss://alternate.mongodb.com");
 
             do_login(app);
             CHECK(redir_transport->location_requested);
             CHECK(app->get_base_url() == "https://alternate.mongodb.com");
-            CHECK(app->get_hostname() == "https://alternate.mongodb.com");
-            CHECK(app->get_ws_hostname() == "wss://alternate.mongodb.com");
-            auto metadata = app->sync_manager()->app_metadata();
-            if (use_metadata) {
-                CHECK(metadata);
-                CHECK(metadata->hostname == "https://alternate.mongodb.com");
-                CHECK(metadata->ws_hostname == "wss://alternate.mongodb.com");
-            }
-            else {
-                CHECK(!metadata);
-            }
+            CHECK(app->get_host_url() == "https://alternate.mongodb.com");
+            CHECK(app->get_ws_host_url() == "wss://alternate.mongodb.com");
         }
         {
-            // Third time through, base_url is not set, expect https://alternate.mongodb.com, if using metadata
+            // Third time through, base_url is not set, expect https://realm.mongodb.com, since metadata
+            // is no longer used
             app_config.base_url = util::none;
-            std::string expected_url = use_metadata ? "https://alternate.mongodb.com" : "https://realm.mongodb.com";
-            std::string expected_wsurl = use_metadata ? "wss://alternate.mongodb.com" : "wss://realm.mongodb.com";
+            std::string expected_url = "https://realm.mongodb.com";
+            std::string expected_wsurl = "wss://realm.mongodb.com";
             redir_transport->reset(expected_url);
 
             auto app = app::App::get_uncached_app(app_config, sc_config);
             // Location is not requested until first app services request
             CHECK(!redir_transport->location_requested);
             // Initial hostname and ws hostname use base url, but aren't used until location is updated
-            CHECK(app->get_hostname() == expected_url);
-            CHECK(app->get_ws_hostname() == expected_wsurl);
+            CHECK(app->get_host_url() == expected_url);
+            CHECK(app->get_ws_host_url() == expected_wsurl);
 
             do_login(app);
             CHECK(redir_transport->location_requested);
             CHECK(app->get_base_url() == expected_url);
-            CHECK(app->get_hostname() == expected_url);
-            CHECK(app->get_ws_hostname() == expected_wsurl);
-            auto metadata = app->sync_manager()->app_metadata();
-            if (use_metadata) {
-                CHECK(metadata);
-                CHECK(metadata->hostname == expected_url);
-                CHECK(metadata->ws_hostname == expected_wsurl);
-            }
-            else {
-                CHECK(!metadata);
-            }
+            CHECK(app->get_host_url() == expected_url);
+            CHECK(app->get_ws_host_url() == expected_wsurl);
         }
         {
             // Fourth time through, base_url is set to https://some-other.mongodb.com, with a redirect
@@ -3727,26 +3901,16 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
             // Location is not requested until first app services request
             CHECK(!redir_transport->location_requested);
             // Initial hostname and ws hostname use base url, but aren't used until location is updated
-            CHECK(app->get_hostname() == "https://some-other.mongodb.com");
-            CHECK(app->get_ws_hostname() == "wss://some-other.mongodb.com");
+            CHECK(app->get_host_url() == "https://some-other.mongodb.com");
+            CHECK(app->get_ws_host_url() == "wss://some-other.mongodb.com");
 
             do_login(app);
             CHECK(redir_transport->location_requested);
             // Base URL is still set to the original value
             CHECK(app->get_base_url() == "https://some-other.mongodb.com");
             // Hostname and ws hostname use the redirect URL values
-            CHECK(app->get_hostname() == "http://redirect.mongodb.com");
-            CHECK(app->get_ws_hostname() == "ws://redirect.mongodb.com");
-            auto metadata = app->sync_manager()->app_metadata();
-            if (use_metadata) {
-                CHECK(metadata);
-                // Hostname and ws hostname use the redirect URL values
-                CHECK(metadata->hostname == "http://redirect.mongodb.com");
-                CHECK(metadata->ws_hostname == "ws://redirect.mongodb.com");
-            }
-            else {
-                CHECK(!metadata);
-            }
+            CHECK(app->get_host_url() == "http://redirect.mongodb.com");
+            CHECK(app->get_ws_host_url() == "ws://redirect.mongodb.com");
         }
     }
 
@@ -3762,8 +3926,8 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
             do_login(app);
             CHECK(redir_transport->location_requested);
             CHECK(app->get_base_url() == "https://alternate.mongodb.com");
-            CHECK(app->get_hostname() == "https://alternate.mongodb.com");
-            CHECK(app->get_ws_hostname() == "wss://alternate.mongodb.com");
+            CHECK(app->get_host_url() == "https://alternate.mongodb.com");
+            CHECK(app->get_ws_host_url() == "wss://alternate.mongodb.com");
 
             redir_transport->reset("http://some-other.mongodb.com");
             app->update_base_url("http://some-other.mongodb.com", [](util::Optional<app::AppError> error) {
@@ -3771,11 +3935,8 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
             });
             CHECK(redir_transport->location_requested);
             CHECK(app->get_base_url() == "http://some-other.mongodb.com");
-            CHECK(app->get_hostname() == "http://some-other.mongodb.com");
-            CHECK(app->get_ws_hostname() == "ws://some-other.mongodb.com");
-            auto metadata = app->sync_manager()->app_metadata();
-            CHECK(metadata->hostname == "http://some-other.mongodb.com");
-            CHECK(metadata->ws_hostname == "ws://some-other.mongodb.com");
+            CHECK(app->get_host_url() == "http://some-other.mongodb.com");
+            CHECK(app->get_ws_host_url() == "ws://some-other.mongodb.com");
             // Expected URL is still "http://some-other.mongodb.com"
             do_login(app);
         }
@@ -3793,8 +3954,8 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
             do_login(app);
             CHECK(redir_transport->location_requested);
             CHECK(app->get_base_url() == "https://alternate.mongodb.com");
-            CHECK(app->get_hostname() == "https://alternate.mongodb.com");
-            CHECK(app->get_ws_hostname() == "wss://alternate.mongodb.com");
+            CHECK(app->get_host_url() == "https://alternate.mongodb.com");
+            CHECK(app->get_ws_host_url() == "wss://alternate.mongodb.com");
 
             redir_transport->reset("http://some-other.mongodb.com", "https://redirect.mongodb.com");
 
@@ -3803,12 +3964,8 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
             });
             CHECK(redir_transport->location_requested);
             CHECK(app->get_base_url() == "http://some-other.mongodb.com");
-            CHECK(app->get_hostname() == "https://redirect.mongodb.com");
-            CHECK(app->get_ws_hostname() == "wss://redirect.mongodb.com");
-            auto metadata = app->sync_manager()->app_metadata();
-            // Hostname and ws hostname use the redirect URL values
-            CHECK(metadata->hostname == "https://redirect.mongodb.com");
-            CHECK(metadata->ws_hostname == "wss://redirect.mongodb.com");
+            CHECK(app->get_host_url() == "https://redirect.mongodb.com");
+            CHECK(app->get_ws_host_url() == "wss://redirect.mongodb.com");
             // Expected URL is still "https://redirect.mongodb.com" after redirect
             do_login(app);
         }
@@ -3826,8 +3983,8 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
             do_login(app);
             CHECK(redir_transport->location_requested);
             CHECK(app->get_base_url() == "http://alternate.mongodb.com");
-            CHECK(app->get_hostname() == "http://alternate.mongodb.com");
-            CHECK(app->get_ws_hostname() == "ws://alternate.mongodb.com");
+            CHECK(app->get_host_url() == "http://alternate.mongodb.com");
+            CHECK(app->get_ws_host_url() == "ws://alternate.mongodb.com");
 
             redir_transport->reset("https://some-other.mongodb.com");
             redir_transport->location_returns_error = true;
@@ -3837,8 +3994,8 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
             });
             CHECK(redir_transport->location_requested);
             CHECK(app->get_base_url() == "http://alternate.mongodb.com");
-            CHECK(app->get_hostname() == "http://alternate.mongodb.com");
-            CHECK(app->get_ws_hostname() == "ws://alternate.mongodb.com");
+            CHECK(app->get_host_url() == "http://alternate.mongodb.com");
+            CHECK(app->get_ws_host_url() == "ws://alternate.mongodb.com");
         }
     }
 
@@ -3882,8 +4039,8 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
             do_login(app);
             CHECK(redir_transport->location_requested);
             CHECK(app->get_base_url() == init_url);
-            CHECK(app->get_hostname() == init_url);
-            CHECK(app->get_ws_hostname() == init_wsurl);
+            CHECK(app->get_host_url() == init_url);
+            CHECK(app->get_ws_host_url() == init_wsurl);
             CHECK(app->sync_manager()->sync_route());
             CHECK(app->sync_manager()->sync_route()->find(init_wsurl) != std::string::npos);
         }
@@ -3912,8 +4069,8 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
             CHECK(!result.is_ok());
             CHECK(redir_transport->location_requested);
             CHECK(app->get_base_url() == init_url);
-            CHECK(app->get_hostname() == redir_url);
-            CHECK(app->get_ws_hostname() == redir_wsurl);
+            CHECK(app->get_host_url() == redir_url);
+            CHECK(app->get_ws_host_url() == redir_wsurl);
             CHECK(app->sync_manager()->sync_route());
             CHECK(app->sync_manager()->sync_route()->find(redir_wsurl) != std::string::npos);
         }
@@ -3944,8 +4101,9 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
             CHECK(!result.is_ok());
             CHECK(redir_transport->location_requested);
             CHECK(app->get_base_url() == init_url);
-            CHECK(app->get_hostname() == init_url);
-            CHECK(app->get_ws_hostname() == init_wsurl);
+            // Location was never updated
+            CHECK(app->get_host_url() == init_url);
+            CHECK(app->get_ws_host_url() == init_wsurl);
             CHECK(!app->sync_manager()->sync_route());
 
             // Location request will pass this time, try to reconnect
@@ -3960,8 +4118,8 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
             CHECK(!result.is_ok());
             CHECK(redir_transport->location_requested);
             CHECK(app->get_base_url() == init_url);
-            CHECK(app->get_hostname() == redir_url);
-            CHECK(app->get_ws_hostname() == redir_wsurl);
+            CHECK(app->get_host_url() == redir_url);
+            CHECK(app->get_ws_host_url() == redir_wsurl);
             CHECK(app->sync_manager()->sync_route());
             CHECK(app->sync_manager()->sync_route()->find(redir_wsurl) != std::string::npos);
         }
@@ -4700,8 +4858,19 @@ struct ErrorCheckingTransport : public GenericNetworkTransport {
         : m_response(r)
     {
     }
-    void send_request_to_server(const Request&, util::UniqueFunction<void(const Response&)>&& completion) override
+    void send_request_to_server(const Request& request,
+                                util::UniqueFunction<void(const Response&)>&& completion) override
     {
+        // Make sure to return a valid location response
+        if (request.url.find("/location") != std::string::npos) {
+            completion(Response{200,
+                                0,
+                                {{"content-type", "application/json"}},
+                                "{\"deployment_model\":\"GLOBAL\",\"location\":\"US-VA\",\"hostname\":"
+                                "\"http://somewhere.mongodb.com\",\"ws_hostname\":\"ws://somewhere.mongodb.com\"}"});
+            return;
+        }
+
         completion(Response(*m_response));
     }
 
@@ -5511,7 +5680,7 @@ TEST_CASE("app: make_streaming_request", "[sync][app][streaming]") {
 
     using Headers = decltype(Request().headers);
 
-    const auto url_prefix = "field/api/client/v2.0/app/app_id/functions/call?baas_request="sv;
+    const auto url_prefix = "https://somewhere.mongodb.com/api/client/v2.0/app/app_id/functions/call?baas_request="sv;
     const auto get_request_args = [&](const Request& req) {
         REQUIRE(req.url.substr(0, url_prefix.size()) == url_prefix);
         auto args = req.url.substr(url_prefix.size());

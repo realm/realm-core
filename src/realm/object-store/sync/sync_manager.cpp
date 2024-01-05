@@ -45,7 +45,7 @@ SyncClientTimeouts::SyncClientTimeouts()
 
 SyncManager::SyncManager() = default;
 
-void SyncManager::configure(std::shared_ptr<app::App> app, util::Optional<std::string> sync_route,
+void SyncManager::configure(std::shared_ptr<app::App> app, std::optional<std::string> sync_route,
                             const SyncClientConfig& config)
 {
     std::vector<std::shared_ptr<SyncUser>> users_to_add;
