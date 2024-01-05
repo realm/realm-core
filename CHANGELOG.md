@@ -9,7 +9,7 @@
 * None.
 
 ### Breaking changes
-* None.
+* App::get_shared_app now verifies that the SyncClientConfig is the same for constructed apps on subsequent calls, and throws InvalidArgument exception if parameters changed.
 
 ### Compatibility
 * Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
