@@ -34,7 +34,6 @@ public:
 
     // compressing/decompressing logic
     bool encode(const Array&, Array&) const final override;
-    bool encode_unsigned(const ArrayUnsigned&, ArrayUnsigned&) const final override;
     bool decode(Array&) final override;
     bool is_encoded(const Array&) const final override;
 
@@ -45,6 +44,8 @@ public:
     // basic query support
     std::vector<int64_t> find_all(const Array&, int64_t, size_t, size_t) const final override;
     size_t find_first(const Array&, int64_t value) const final override;
+    size_t find_first(const Array&, uint64_t value) const final override;
+
     int64_t sum(const Array&, size_t start, size_t end) const final override;
 
     // UnsignedArray/Array lower and upper bound for flex arrays. These methods need to be optimized.
@@ -86,6 +87,9 @@ private:
     // this is not widely used, but fetch_x_values does pretty much the same
     std::vector<std::pair<int64_t, size_t>> fetch_values_and_indices(const Array&, size_t, size_t, size_t,
                                                                      size_t) const;
+
+    static int bit_for_signed_values(int64_t, int64_t);
+    // static int bit_for_unsigned_values(int64_t, int64_t);
 };
 } // namespace realm
 #endif // REALM_ARRAY_COMPRESS_HPP

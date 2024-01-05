@@ -66,8 +66,8 @@ inline void ArrayUnsigned::_set(size_t ndx, uint8_t width, uint64_t value)
 inline uint64_t ArrayUnsigned::_get(size_t ndx, uint8_t width) const
 {
     if (is_encoded()) {
-        size_t v_width;
-        return m_encode.get_unsigned(*this, ndx, v_width);
+        auto sv = m_encode.get(*this, ndx);
+        return (uint64_t)sv;
     }
     else {
         if (width == 8) {
@@ -252,7 +252,7 @@ void ArrayUnsigned::insert(size_t ndx, uint64_t value)
 void ArrayUnsigned::erase(size_t ndx)
 {
     if (is_encoded()) {
-        Array::decode_array(*this);
+        decode_array(*this);
         set_width(get_width_from_header(get_header()));
         REALM_ASSERT(get_kind(get_header()) == 'A');
         REALM_ASSERT(m_width >= m_lbound);
@@ -285,7 +285,7 @@ uint64_t ArrayUnsigned::get(size_t index) const
 void ArrayUnsigned::set(size_t ndx, uint64_t value)
 {
     if (is_encoded()) {
-        Array::decode_array(*this);
+        decode_array(*this);
         set_width(get_width_from_header(get_header()));
         REALM_ASSERT(get_kind(get_header()) == 'A');
         REALM_ASSERT(m_width >= m_lbound);
@@ -324,24 +324,12 @@ void ArrayUnsigned::truncate(size_t ndx)
     }
 }
 
-bool ArrayUnsigned::try_encode(ArrayUnsigned& arr) const
+size_t ArrayUnsigned::find_first(int64_t value, size_t start, size_t end) const
 {
-    return encode_array(arr);
-}
-
-bool ArrayUnsigned::encode_array(ArrayUnsigned& arr) const
-{
-    const auto header = get_header();
-    auto kind = get_kind(header);
-    if (kind == 'A') {
-        auto encoding = get_encoding(header);
-        // encode everything that is WtypeBits (all integer arrays included ref arrays)
-        if (encoding == NodeHeader::Encoding::WTypBits) {
-            return m_encode.encode_unsigned(*this, arr);
-        }
+    if (is_encoded()) {
+        m_encode.find_first(*this, (uint64_t)value);
     }
-    return false;
+    return Array::find_first(value, start, end);
 }
-
 
 } // namespace realm

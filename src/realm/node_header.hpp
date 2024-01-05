@@ -202,9 +202,8 @@ public:
         if (value >= 0)
             return 1 + unsigned_to_num_bits(value);
         else {
-            return unsigned_to_num_bits((uint64_t)value);
+            return 1 + unsigned_to_num_bits(~value);
         }
-        // return 64 - (unsigned_to_num_bits(~value)); // <-- is this correct????
     }
 
 

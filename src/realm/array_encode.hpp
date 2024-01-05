@@ -32,7 +32,6 @@ public:
     explicit ArrayEncode() = default;
     virtual ~ArrayEncode() = default;
     virtual bool encode(const Array&, Array&) const = 0;
-    virtual bool encode_unsigned(const ArrayUnsigned&, ArrayUnsigned&) const = 0;
     virtual bool decode(Array&) = 0;
     virtual bool is_encoded(const Array&) const = 0;
     virtual size_t size(const Array&) const = 0;
@@ -52,6 +51,7 @@ public:
     // TODO: find all should accept a predicate and fetch only the values that are matching
     virtual std::vector<int64_t> find_all(const Array&, int64_t, size_t, size_t) const = 0;
     virtual size_t find_first(const Array&, int64_t value) const = 0;
+    virtual size_t find_first(const Array&, uint64_t value) const = 0;
     virtual int64_t sum(const Array&, size_t start, size_t end) const = 0;
     virtual void get_chunk(const Array&, size_t ndx, int64_t res[8]) const = 0;
 };

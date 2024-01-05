@@ -129,7 +129,7 @@ void ArrayIntNull::avoid_null_collision(int64_t value)
     // if the array is compressed, Array::set is called before copy on write will be happening.
     // So we need to decompress here.
     if (get_kind(get_header()) == 'B') {
-        Array::decode_array(*this);
+        decode_array(*this);
     }
 
     if (m_width == 64) {

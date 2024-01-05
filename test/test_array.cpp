@@ -484,7 +484,7 @@ TEST(Array_General)
 }
 
 
-ONLY(Array_Unsigned)
+TEST(Array_Unsigned) // this is not OK since the number of bits allocated are not fine for an unsigned array.
 {
     ArrayUnsigned c(Allocator::get_default());
     c.create(0, 0);

@@ -80,8 +80,7 @@ public:
         return m_width;
     }
 
-    bool try_encode(ArrayUnsigned&) const;
-    bool encode_array(ArrayUnsigned&) const;
+    size_t find_first(int64_t value, size_t start, size_t end) const;
 
 private:
     uint_least8_t m_width = 0;
@@ -91,8 +90,6 @@ private:
     void init_from_mem(MemRef mem) noexcept
     {
         Array::init_from_mem(mem);
-        // we could have come here after decompression. So we need to be careful
-        // See comment in Array::init_from_mem.
         auto kind = get_kind(get_header());
         if (kind == 'A') {
             set_width(get_width_from_header(get_header()));
@@ -100,10 +97,6 @@ private:
         else if (kind == 'B') {
             auto dst_header = mem.get_addr();
             if (get_kind(dst_header) == 'A') {
-                // we are a B array turned into A array. We need to set these values..
-                // but lower bound and upper bound will try to call decode again. So we need
-                // to disable it from here, at least during init_from_mem.
-                // TODO: verify if we really need to decode for lower_bound and upper_bound.
                 m_ubound = uint64_t(-1) >> (64 - m_width);
             }
         }

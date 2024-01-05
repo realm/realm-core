@@ -32,46 +32,30 @@
 
 using namespace realm;
 
+int ArrayFlex::bit_for_signed_values(int64_t min, int64_t max)
+{
+    return std::max(NodeHeader::signed_to_num_bits(min), Node::signed_to_num_bits(max));
+}
+
+// int ArrayFlex::bit_for_unsigned_values(int64_t min, int64_t max)
+//{
+//     return std::max(NodeHeader::unsigned_to_num_bits((uint64_t)min),
+//     NodeHeader::unsigned_to_num_bits((uint64_t)max));
+// }
+
 bool ArrayFlex::encode(const Array& origin, Array& encoded) const
 {
     REALM_ASSERT(origin.is_attached());
     const auto sz = origin.size();
     std::vector<int64_t> values;
     std::vector<size_t> indices;
-    // we need to use the specific getter for array
+    ///
+    // this should not be needed.
     std::vector<int64_t> origin_values;
-    for (size_t i = 0; i < sz; ++i) {
+    origin_values.reserve(sz);
+    for (size_t i = 0; i < sz; ++i)
         origin_values.push_back(origin.get(i));
-    }
-    if (!is_encoded(origin) && try_encode(origin, encoded, origin_values, values, indices)) {
-        REALM_ASSERT(!values.empty());
-        REALM_ASSERT(!indices.empty());
-        REALM_ASSERT(indices.size() == sz);
-        copy_into_encoded_array(encoded, values, indices);
-        return true;
-    }
-    return false;
-}
-
-bool ArrayFlex::encode_unsigned(const ArrayUnsigned& origin, ArrayUnsigned& encoded) const
-{
-    REALM_ASSERT(origin.is_attached());
-    if (origin.is_encoded())
-        return;
-
-    const auto sz = origin.size();
-
-    if (sz <= 1)
-        return false;
-
-    // we need to use the specific getter for array unsigned
-    std::vector<int64_t> origin_values;
-    for (size_t i = 0; i < sz; ++i) {
-        origin_values.push_back(origin.get(i));
-    }
-
-    std::vector<int64_t> values;
-    std::vector<size_t> indices;
+    ///
     if (!is_encoded(origin) && try_encode(origin, encoded, origin_values, values, indices)) {
         REALM_ASSERT(!values.empty());
         REALM_ASSERT(!indices.empty());
@@ -276,14 +260,15 @@ bool ArrayFlex::check_gain(const Array& arr, std::vector<int64_t>& values, std::
     using Encoding = NodeHeader::Encoding;
     const auto [min_value, max_value] = std::minmax_element(values.begin(), values.end());
     const auto index = *std::max_element(indices.begin(), indices.end());
-    v_width = std::max(Node::signed_to_num_bits(*min_value), Node::signed_to_num_bits(*max_value));
+    v_width = ArrayFlex::bit_for_signed_values(*min_value, *max_value);
     ndx_width = index == 0 ? 1 : Node::unsigned_to_num_bits(index);
     REALM_ASSERT(v_width > 0);
     REALM_ASSERT(ndx_width > 0);
     // we should consider Encoding::Packed as well here.
     const auto uncompressed_size = arr.get_byte_size();
     auto byte_size = NodeHeader::calc_size<Encoding::Flex>(values.size(), indices.size(), v_width, ndx_width);
-    return true; // byte_size <= uncompressed_size;
+    // return true;
+    return byte_size <= uncompressed_size;
 }
 
 void ArrayFlex::setup_array_in_flex_format(const Array& origin, Array& arr, std::vector<int64_t>& values,
@@ -390,9 +375,7 @@ void ArrayFlex::restore_array(Array& arr, const std::vector<int64_t>& values) co
     const auto flags = NodeHeader::get_flags(arr.get_header());
     const auto size = values.size();
     const auto [min_value, max_value] = std::minmax_element(values.begin(), values.end());
-    const size_t width_min = NodeHeader::signed_to_num_bits(*min_value);
-    const size_t width_max = NodeHeader::signed_to_num_bits(*max_value);
-    auto max_bit = std::max(width_min, width_max);
+    auto max_bit = ArrayFlex::bit_for_signed_values(*min_value, *max_value);
     auto byte_size = NodeHeader::calc_size<Encoding::WTypBits>(size, max_bit);
     REALM_ASSERT(byte_size % 8 == 0); // 8 bytes aligned value
     auto& allocator = arr.get_alloc();
@@ -468,6 +451,26 @@ size_t ArrayFlex::find_first(const Array& arr, int64_t value) const
     return realm::not_found;
 }
 
+size_t ArrayFlex::find_first(const Array& arr, uint64_t value) const
+{
+    size_t v_width, ndx_width, v_size, ndx_size;
+    if (get_encode_info(arr.get_header(), v_width, ndx_width, v_size, ndx_size)) {
+        auto data = (uint64_t*)NodeHeader::get_data_from_header(arr.get_header());
+        const auto offset = v_size * v_width;
+        bf_iterator index_iterator{data, offset, ndx_width, ndx_width, 0};
+        for (size_t i = 0; i < ndx_size; ++i) {
+            const auto index = index_iterator.get_value();
+            bf_iterator it_value{data, static_cast<size_t>(index * v_width), v_width, v_width, 0};
+            const auto arr_value = it_value.get_value();
+            if (arr_value == value)
+                return i; // we need to pretend that the array was uncompressed, so we can't return index but i
+            ++index_iterator;
+        }
+    }
+    return realm::not_found;
+}
+
+
 int64_t ArrayFlex::sum(const Array& arr, size_t start, size_t end) const
 {
     REALM_ASSERT(arr.is_attached());
@@ -530,7 +533,7 @@ uint64_t ArrayFlex::get_unsigned(const Array& arr, size_t ndx, size_t& v_width) 
         const auto ndx_pos = static_cast<size_t>(offset + (ndx * ndx_width));
         bf_iterator it_index{data, ndx_pos, ndx_width, ndx_size, 0};
         auto index_value = it_index.get_value();
-        const auto val_pos = static_cast<size_t>(v_width * it_index.get_value());
+        const auto val_pos = static_cast<size_t>(v_width * index_value);
         bf_iterator it_value{data, val_pos, v_width, v_width, 0};
         const auto v = it_value.get_value();
         return v;
