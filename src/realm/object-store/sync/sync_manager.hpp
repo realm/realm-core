@@ -227,9 +227,15 @@ public:
     // Immediately closes any open sync sessions for this sync manager
     void close_all_sessions() REQUIRES(!m_mutex, !m_session_mutex);
 
-    // Set the sync route - it is not allowed to be cleared once set
+    // Used by App to update the sync route any time the location info has been refreshed.
+    // m_sync_route starts out as unset when the SyncManager is created or configured.
+    // It will be updated to a valid value upon the first App AppServices HTTP request or
+    // the access token will be refreshed (forcing a location update) when a SyncSession
+    // is activated and it is still unset. This value is not allowed to be reset to
+    // nullopt once it has a valid value.
     void set_sync_route(std::string sync_route) REQUIRES(!m_mutex)
     {
+        REALM_ASSERT(!sync_route.empty());
         util::CheckedLockGuard lock(m_mutex);
         m_sync_route = std::move(sync_route);
     }

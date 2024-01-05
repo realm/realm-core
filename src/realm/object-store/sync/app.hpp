@@ -276,12 +276,12 @@ public:
 
     /// Update the base URL after the app has been created. The location info will be retrieved
     /// using the provided base URL. If this operation fails, the app will continue to use the original base URL and
-    /// false will be returned. If the operation is successful, the app and sync client will use the new location info
-    /// for future connections.
+    /// the error will be provided to the completion callback. If the operation is successful, the app and sync
+    /// client will use the new location info for future connections.
     /// NOTE: If another App operation is started while this function is in progress, that request will use the
     ///       original base URL location information.
-    /// @param base_url The new base URL to use for future app and sync connections, or the default base_url if not
-    /// set.
+    /// @param base_url The new base URL to use for future AppServices requests and sync websocket connections. If
+    ///                 not set, the default Device Sync base_url will be used.
     /// @param completion A callback block to be invoked once the location update completes.
     void update_base_url(std::optional<std::string> base_url,
                          util::UniqueFunction<void(util::Optional<AppError>)>&& completion);
@@ -325,25 +325,6 @@ public:
     void
     link_user(const std::shared_ptr<SyncUser>& user, const AppCredentials& credentials,
               util::UniqueFunction<void(const std::shared_ptr<SyncUser>&, util::Optional<AppError>)>&& completion);
-
-    /// Refreshes the user credentials without logging the user out locally. This function will use
-    /// the provided credentials to log in again on the server, resulting in new refresh and access
-    /// tokens and the latest profile information from the server will also be retrieved. This cannot
-    /// be used to link the user with a new identity, nor can it be used with Anonymous credentials.
-    /// The user will be logged in if currently logged out and a new user object will be provided to
-    /// the callback.
-    /// On success the user will be returned with updated auth tokens information.
-    /// NOTE: This function is primarily for re-logging in the user without closing the realms when
-    /// switching between cloud and edge servers.
-    ///
-    /// @param user The user which will have the credentials refreshed, the user must be logged in
-    /// @param credentials The `AppCredentials` used to log the user in again.
-    /// @param completion The completion handler to call when the log in operation is complete.
-    ///                   If the operation is  successful, the result will contain the original
-    ///                   `SyncUser` object representing the user.
-    void
-    refresh_user(const std::shared_ptr<SyncUser>& user, const AppCredentials& credentials,
-                 util::UniqueFunction<void(const std::shared_ptr<SyncUser>&, util::Optional<AppError>)>&& completion);
 
     /// Switches the active user with the specified one. The user must
     /// exist in the list of all users who have logged into this application, and

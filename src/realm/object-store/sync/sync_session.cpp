@@ -109,13 +109,6 @@ void SyncSession::become_active()
     // when entering from the Dying state the session will still be bound
     if (!m_session) {
         create_sync_session();
-        // If the session failed to be created (e.g. location was not successfully updated),
-        // then revert back to the inactive state - the error was already passed to the provided
-        // error handler or an exception was thrown
-        if (!m_session) {
-            m_state = State::Inactive;
-            return;
-        }
         m_session->bind();
     }
 
@@ -250,6 +243,23 @@ void SyncSession::become_waiting_for_access_token()
     m_state = State::WaitingForAccessToken;
 }
 
+void SyncSession::handle_location_update_failed(Status status)
+{
+    // TODO: ideally this would write to the logs as well in case users didn't set up their error handler.
+    {
+        util::CheckedUniqueLock lock(m_state_mutex);
+        // Should only be called while waiting to update the access token
+        REALM_ASSERT(m_state == State::WaitingForAccessToken);
+        // Close the session, since there's nothing more to do at this point, it can be resumed
+        // after resolving the location update failure
+        become_inactive(std::move(lock), status);
+    }
+    if (auto error_handler = config(&SyncConfig::error_handler)) {
+        auto user_facing_error = SyncError({ErrorCodes::SyncConnectFailed, status.reason()}, true);
+        error_handler(shared_from_this(), std::move(user_facing_error));
+    }
+}
+
 void SyncSession::handle_bad_auth(const std::shared_ptr<SyncUser>& user, Status status)
 {
     // TODO: ideally this would write to the logs as well in case users didn't set up their error handler.
@@ -306,6 +316,17 @@ SyncSession::handle_refresh(const std::shared_ptr<SyncSession>& session, bool re
         else if (error) {
             if (error->code() == ErrorCodes::ClientAppDeallocated) {
                 return; // this response came in after the app shut down, ignore it
+            }
+            else if (!session->get_sync_route()) {
+                // If the sync route is empty at this point, it means the forced location update
+                // failed while trying to start a sync session with a cached user and no other
+                // AppServices HTTP requests have been performed since the App was created.
+                // Since a valid websocket host url is not available, fail the SyncSession start
+                // and pass the error to the user.
+                // This function will not log out the user, since it is not known at this point
+                // whether or not the user is valid.
+                session->handle_location_update_failed(
+                    {error->code(), util::format("Unable to reach the server: %1", error->reason())});
             }
             else if (ErrorCodes::error_categories(error->code()).test(ErrorCategory::client_error)) {
                 // any other client errors other than app_deallocated are considered fatal because
@@ -895,19 +916,7 @@ void SyncSession::create_sync_session()
         // At this point, the sync_route should be valid, since the location should have been updated by
         // an AppServices http request or by updating the access token before starting the sync session.
         auto sync_route = m_sync_manager->sync_route();
-        // If sync_route is not valid at this point, it means the location update failed - pass the error up via
-        // the registered error handler
-        if (!sync_route) {
-            Status result{ErrorCodes::SyncConnectFailed, "Failed to update location prior to sync session start"};
-            if (m_config.sync_config->error_handler) {
-                m_config.sync_config->error_handler(shared_from_this(), SyncError{result, true});
-            }
-            else {
-                // Or throw a runtime exception if no error handler is registered
-                throw RuntimeError{std::move(result)};
-            }
-            return;
-        }
+        REALM_ASSERT_EX(sync_route && !sync_route->empty(), "Location was not updated prior to sync session start");
 
         if (!m_client.decompose_server_url(*sync_route, session_config.protocol_envelope,
                                            session_config.server_address, session_config.server_port,
@@ -1299,6 +1308,15 @@ std::string SyncSession::get_appservices_connection_id() const
         return {};
     }
     return m_session->get_appservices_connection_id();
+}
+
+std::optional<std::string> SyncSession::get_sync_route() const
+{
+    util::CheckedLockGuard lk(m_state_mutex);
+    if (!m_sync_manager) {
+        return std::nullopt;
+    }
+    return m_sync_manager->sync_route();
 }
 
 void SyncSession::update_configuration(SyncConfig new_config)

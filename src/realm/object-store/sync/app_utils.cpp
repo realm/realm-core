@@ -55,12 +55,16 @@ std::optional<AppUtils::UrlComponents> AppUtils::split_url(std::string url)
         return std::nullopt;
     }
     comp.scheme = url.substr(0, scheme_end_pos);
-    url.erase(0, scheme_end_pos + 3);
+    url.erase(0, scheme_end_pos + std::char_traits<char>::length("://"));
 
     // Find the first slash "/"
     size_t host_end_pos = url.find("/");
+    // No server provided
+    if (url.empty() || host_end_pos == 0) {
+        return std::nullopt;
+    }
     if (host_end_pos == std::string::npos) {
-        // No path/file section
+        // No path/query/components section
         comp.server = url;
         return std::move(comp);
     }
@@ -87,25 +91,17 @@ bool AppUtils::is_redirect_status_code(int status_code)
     return false;
 }
 
-std::optional<std::string> AppUtils::extract_redir_location(const Response& response)
+std::optional<std::string> AppUtils::extract_redir_location(const std::map<std::string, std::string>& headers)
 {
     // Look for case insensitive redirect "location" in headers
-    auto location = AppUtils::find_header("location", response.headers);
-    if (!location || location->second.empty()) {
-        // Location not found in the response, return empty
-        return std::nullopt;
+    auto location = AppUtils::find_header("location", headers);
+    if (location && !location->second.empty()) {
+        if (AppUtils::split_url(location->second)) {
+            // If the location is valid, return it wholesale (e.g., it could include a path for API proxies)
+            return location->second;
+        }
     }
-
-    // Update the metadata from the new location after trimming the url (limit to `scheme://host[:port]`)
-    std::string_view new_url = location->second;
-    // Find the end of the scheme/protocol part (e.g. 'https://', 'http://')
-    auto scheme_end = new_url.find("://");
-    scheme_end = scheme_end != std::string_view::npos ? scheme_end + std::char_traits<char>::length("://") : 0;
-    // Trim off any trailing path/anchor/query string after the host/port
-    if (auto split = new_url.find_first_of("/#?", scheme_end); split != std::string_view::npos) {
-        new_url.remove_suffix(new_url.size() - split);
-    }
-    return std::string(new_url);
+    return std::nullopt;
 }
 
 std::optional<AppError> AppUtils::check_for_errors(const Response& response)

@@ -31,10 +31,13 @@ struct Response;
 class AppUtils {
 public:
     struct UrlComponents {
-        std::string scheme;
-        std::string server;
-        std::string request;
+        std::string scheme;  // The scheme from the URL (e.g. https)
+        std::string server;  // The complete server info ([userinfo@] hostname [:port])
+        std::string request; // Everything after server info (path, query, parameters, etc.)
     };
+    // Split the URL into scheme, server and request parts
+    // returns nullopt if missing `://` or server info is empty
+    static std::optional<AppUtils::UrlComponents> split_url(std::string url);
 
     static std::optional<AppError> check_for_errors(const Response& response);
     static Response make_apperror_response(const AppError& error);
@@ -42,10 +45,9 @@ public:
                                               std::optional<int> http_status);
     static const std::pair<const std::string, std::string>*
     find_header(const std::string& key_name, const std::map<std::string, std::string>& search_map);
-    static std::optional<AppUtils::UrlComponents> split_url(std::string url);
     static bool is_success_status_code(int status_code);
     static bool is_redirect_status_code(int status_code);
-    static std::optional<std::string> extract_redir_location(const Response& response);
+    static std::optional<std::string> extract_redir_location(const std::map<std::string, std::string>& headers);
 };
 
 } // namespace realm::app

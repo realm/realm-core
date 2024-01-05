@@ -68,6 +68,9 @@ public:
     void wait_for(E target)
     {
         std::unique_lock lock{m_mutex};
+        if (m_cur_state == target) {
+            return; // already at state
+        }
         m_cv.wait(lock, [&] {
             return m_cur_state == target;
         });

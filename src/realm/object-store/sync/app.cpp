@@ -965,7 +965,7 @@ void App::request_location(UniqueFunction<void(std::optional<AppError>)>&& compl
                 }
                 // Handle the redirect response when requesting the location - extract the
                 // new location header field and resend the request.
-                auto redir_location = AppUtils::extract_redir_location(response);
+                auto redir_location = AppUtils::extract_redir_location(response.headers);
                 if (!redir_location || redir_location->empty()) {
                     // Location not found in the response, pass error response up the chain
                     completion(AppError{ErrorCodes::ClientRedirectError,
@@ -1113,7 +1113,7 @@ void App::check_for_redirect_response(Request&& request, const Response& respons
 
     // Handle a redirect response when sending the original request - extract the location
     // header field and resend the request.
-    auto redir_location = AppUtils::extract_redir_location(response);
+    auto redir_location = AppUtils::extract_redir_location(response.headers);
     if (!redir_location || redir_location->empty()) {
         // Location not found in the response, pass error response up the chain
         return completion(AppUtils::make_clienterror_response(

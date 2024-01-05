@@ -550,6 +550,130 @@ TEST_CASE("app: verify app error codes", "[sync][app][local]") {
     REQUIRE(err_response.headers.empty());
 }
 
+// MARK: - Verify generic app utils helper functions
+TEST_CASE("app: verify app utils helpers", "[sync][app][local]") {
+    SECTION("split_url") {
+        auto verify_good_url = [](std::string scheme, std::string server, std::string request) {
+            std::string url = util::format("%1://%2%3", scheme, server, request);
+            auto comp = AppUtils::split_url(url);
+            REQUIRE(comp);
+            REQUIRE(comp->scheme == scheme);
+            REQUIRE(comp->server == server);
+            REQUIRE(comp->request == request);
+        };
+
+        verify_good_url("https", "some.host.com", "/path/to/use?some_query=do-something#fragment");
+        verify_good_url("wss", "localhost:9090", "");
+        verify_good_url("scheme", "user:pass@host.com", "/");
+        verify_good_url("mqtt", "host", "/some/path:that?is@not*really(valid)");
+
+        // Verify bad urls
+        auto comp = AppUtils::split_url("localhost/path");
+        REQUIRE(!comp);
+        comp = AppUtils::split_url("http:localhost/path");
+        REQUIRE(!comp);
+        comp = AppUtils::split_url("http:/localhost/path");
+        REQUIRE(!comp);
+        comp = AppUtils::split_url("http:///localhost/path");
+        REQUIRE(!comp);
+        comp = AppUtils::split_url("");
+        REQUIRE(!comp);
+    }
+
+    SECTION("find_header") {
+        std::map<std::string, std::string> headers1 = {{"header1", "header1-value"},
+                                                       {"HEADER2", "header2-value"},
+                                                       {"HeAdEr3", "header3-value"},
+                                                       {"header@4", "header4-value"}};
+
+        std::map<std::string, std::string> headers2 = {
+            {"", "no-key-value"},
+            {"header1", "header1-value"},
+        };
+
+        CHECK(AppUtils::find_header("", headers1) == nullptr);
+        CHECK(AppUtils::find_header("header", headers1) == nullptr);
+        CHECK(AppUtils::find_header("header*4", headers1) == nullptr);
+        CHECK(AppUtils::find_header("header5", headers1) == nullptr);
+        auto value = AppUtils::find_header("header1", headers1);
+        CHECK(value != nullptr);
+        CHECK(value->first == "header1");
+        CHECK(value->second == "header1-value");
+        value = AppUtils::find_header("HEADER1", headers1);
+        CHECK(value != nullptr);
+        CHECK(value->first == "header1");
+        CHECK(value->second == "header1-value");
+        value = AppUtils::find_header("header2", headers1);
+        CHECK(value != nullptr);
+        CHECK(value->first == "HEADER2");
+        CHECK(value->second == "header2-value");
+        value = AppUtils::find_header("hEaDeR2", headers1);
+        CHECK(value != nullptr);
+        CHECK(value->first == "HEADER2");
+        CHECK(value->second == "header2-value");
+        value = AppUtils::find_header("HEADER3", headers1);
+        CHECK(value != nullptr);
+        CHECK(value->first == "HeAdEr3");
+        CHECK(value->second == "header3-value");
+        value = AppUtils::find_header("header3", headers1);
+        CHECK(value != nullptr);
+        CHECK(value->first == "HeAdEr3");
+        CHECK(value->second == "header3-value");
+        value = AppUtils::find_header("HEADER@4", headers1);
+        CHECK(value != nullptr);
+        CHECK(value->first == "header@4");
+        CHECK(value->second == "header4-value");
+        value = AppUtils::find_header("", headers2);
+        CHECK(value != nullptr);
+        CHECK(value->first == "");
+        CHECK(value->second == "no-key-value");
+        value = AppUtils::find_header("HeAdEr1", headers2);
+        CHECK(value != nullptr);
+        CHECK(value->first == "header1");
+        CHECK(value->second == "header1-value");
+    }
+
+    SECTION("is_success_status_code") {
+        CHECK(AppUtils::is_success_status_code(0));
+        for (int code = 200; code < 300; code++) {
+            CHECK(AppUtils::is_success_status_code(code));
+        }
+        CHECK(!AppUtils::is_success_status_code(1));
+        CHECK(!AppUtils::is_success_status_code(199));
+        CHECK(!AppUtils::is_success_status_code(300));
+        CHECK(!AppUtils::is_success_status_code(99999));
+    }
+
+    SECTION("is_redirect_status_code") {
+        // Only MovedPermanently(301) and PermanentRedirect(308) return true
+        CHECK(AppUtils::is_redirect_status_code(301));
+        CHECK(AppUtils::is_redirect_status_code(308));
+        CHECK(!AppUtils::is_redirect_status_code(0));
+        CHECK(!AppUtils::is_redirect_status_code(200));
+        CHECK(!AppUtils::is_redirect_status_code(300));
+        CHECK(!AppUtils::is_redirect_status_code(403));
+        CHECK(!AppUtils::is_redirect_status_code(99999));
+    }
+
+    SECTION("extract_redir_location") {
+        auto comp = AppUtils::extract_redir_location({{"location", "http://redirect.host"}});
+        CHECK(comp);
+        CHECK(*comp == "http://redirect.host");
+        comp = AppUtils::extract_redir_location({{"LoCaTiOn", "http://redirect.host/"}});
+        CHECK(comp);
+        CHECK(*comp == "http://redirect.host/");
+        comp = AppUtils::extract_redir_location({{"LOCATION", "http://redirect.host/includes/path"}});
+        CHECK(comp);
+        CHECK(*comp == "http://redirect.host/includes/path");
+        comp = AppUtils::extract_redir_location({{"some-location", "http://redirect.host"}});
+        CHECK(!comp);
+        comp = AppUtils::extract_redir_location({{"location", ""}});
+        CHECK(!comp);
+        comp = AppUtils::extract_redir_location({{"location", "bad-server-url"}});
+        CHECK(!comp);
+    }
+}
+
 // MARK: - Login with Credentials Tests
 
 TEST_CASE("app: login_with_credentials integration", "[sync][app][user][baas]") {
@@ -4024,8 +4148,8 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
         }
         // Recreate the app using the cached user and start a sync session, which will is set to fail on connect
         SECTION("Sync Session fails on connect") {
-            enum TestState { start, session_started };
-            TestingStateMachine<TestState> state(start);
+            enum class TestState { start, session_started };
+            TestingStateMachine<TestState> state(TestState::start);
 
             redir_transport->reset(init_url, redir_url);
 
@@ -4062,8 +4186,8 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
         }
         // Recreate the app using the cached user and start a sync session, which will fail during location update
         SECTION("Location update fails prior to sync session connect") {
-            enum TestState { start, location_failed, waiting_for_session, session_started };
-            TestingStateMachine<TestState> state(start);
+            enum class TestState { start, location_failed, waiting_for_session, session_started };
+            TestingStateMachine<TestState> state(TestState::start);
 
             redir_transport->reset(init_url, redir_url);
             redir_transport->location_returns_error = true;
