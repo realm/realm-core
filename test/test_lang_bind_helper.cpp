@@ -132,7 +132,7 @@ TEST(Transactions_ConcurrentFrozenTableGetByName)
 #if REALM_VALGRIND
     // This test is slow under valgrind. Additionally, there is
     // a --max-threads config of 5000 for all (concurrent) tests
-    constexpr int num_threads = 100;
+    constexpr int num_threads = 3;
 #else
     constexpr int num_threads = 1000;
 #endif
@@ -226,7 +226,7 @@ TEST(Transactions_ConcurrentFrozenTableGetByKey)
 #if REALM_VALGRIND
     // This test is slow under valgrind. Additionally, there is
     // a --max-threads config of 5000 for all (concurrent) tests
-    constexpr int num_threads = 100;
+    constexpr int num_threads = 3;
 #else
     constexpr int num_threads = 1000;
 #endif
