@@ -280,9 +280,11 @@ public:
     /// for future connections.
     /// NOTE: If another App operation is started while this function is in progress, that request will use the
     ///       original base URL location information.
-    /// @param base_url The new base URL to use for future app and sync connections.
+    /// @param base_url The new base URL to use for future app and sync connections, or the default base_url if not
+    /// set.
     /// @param completion A callback block to be invoked once the location update completes.
-    void update_base_url(std::string base_url, util::UniqueFunction<void(util::Optional<AppError>)>&& completion);
+    void update_base_url(std::optional<std::string> base_url,
+                         util::UniqueFunction<void(util::Optional<AppError>)>&& completion);
 
     /// Log in a user and asynchronously retrieve a user object.
     /// If the log in completes successfully, the completion block will be called, and a

@@ -248,7 +248,6 @@ public:
         UserpassTokenInvalid = RLM_ERR_USERPASS_TOKEN_INVALID,
         InvalidServerResponse = RLM_ERR_INVALID_SERVER_RESPONSE,
         AppServerError = RLM_ERR_APP_SERVER_ERROR,
-        LocationUpdateFailed = RLM_ERR_LOCATION_UPDATE_FAILED,
 
         CallbackFailed = RLM_ERR_CALLBACK,
         UnknownError = RLM_ERR_UNKNOWN,

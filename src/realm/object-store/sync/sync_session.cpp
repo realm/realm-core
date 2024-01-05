@@ -898,7 +898,7 @@ void SyncSession::create_sync_session()
         // If sync_route is not valid at this point, it means the location update failed - pass the error up via
         // the registered error handler
         if (!sync_route) {
-            Status result{ErrorCodes::LocationUpdateFailed, "Failed to update location prior to sync session start"};
+            Status result{ErrorCodes::SyncConnectFailed, "Failed to update location prior to sync session start"};
             if (m_config.sync_config->error_handler) {
                 m_config.sync_config->error_handler(shared_from_this(), SyncError{result, true});
             }
@@ -914,8 +914,7 @@ void SyncSession::create_sync_session()
                                            session_config.service_identifier)) {
             throw sync::BadServerUrl(*sync_route);
         }
-        // FIXME: Java needs the fully resolved URL for proxy support, but we also need it before
-        // the session is created. How to resolve this?
+
         m_server_url = *sync_route;
     }
 

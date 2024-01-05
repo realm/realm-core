@@ -3708,41 +3708,6 @@ static const std::string good_access_token2 =
     "MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwIiwic3RpdGNoX2RvbWFpbklkIjoiNWUxNDk5MTNjOTBiNGFmMGViZTkzNTI3Iiwic3ViIjoiNWU2YmJi"
     "YzBhNmI3ZGZkM2UyNTA0OGIzIiwidHlwIjoiYWNjZXNzIn0.eSX4QMjIOLbdOYOPzQrD_racwLUk1HGFgxtx2a34k80";
 
-// Simple re-armable promise future holder for callbacks
-struct PromiseFutureHolder {
-    void arm()
-    {
-        auto pf = util::make_promise_future<void>();
-        promise = std::make_unique<util::CopyablePromiseHolder<void>>(std::move(pf.promise));
-        future = std::move(pf.future);
-    }
-
-    void complete(Status& status)
-    {
-        if (promise) {
-            if (status.is_ok()) {
-                promise->get_promise().emplace_value();
-            }
-            else {
-                promise->get_promise().set_error(status);
-            }
-        }
-    }
-
-    Status wait()
-    {
-        REALM_ASSERT(promise);
-        Status result = future.get_no_throw();
-        promise.reset();
-        return result;
-    }
-
-private:
-    util::Future<void> future;
-    std::unique_ptr<util::CopyablePromiseHolder<void>> promise;
-};
-
-
 TEST_CASE("app: base_url", "[sync][app][base_url]") {
 
     struct BaseUrlTransport : GenericNetworkTransport {
@@ -3939,6 +3904,19 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
             CHECK(app->get_ws_host_url() == "ws://some-other.mongodb.com");
             // Expected URL is still "http://some-other.mongodb.com"
             do_login(app);
+
+            redir_transport->reset("https://realm.mongodb.com");
+
+            // Revert the base URL to the default URL value
+            app->update_base_url(std::nullopt, [](util::Optional<app::AppError> error) {
+                CHECK(!error);
+            });
+            CHECK(redir_transport->location_requested);
+            CHECK(app->get_base_url() == "https://realm.mongodb.com");
+            CHECK(app->get_host_url() == "https://realm.mongodb.com");
+            CHECK(app->get_ws_host_url() == "wss://realm.mongodb.com");
+            // Expected URL is still ""https://realm.mongodb.com""
+            do_login(app);
         }
     }
 
@@ -4046,27 +4024,35 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
         }
         // Recreate the app using the cached user and start a sync session, which will is set to fail on connect
         SECTION("Sync Session fails on connect") {
+            enum TestState { start, session_started };
+            TestingStateMachine<TestState> state(start);
+
             redir_transport->reset(init_url, redir_url);
 
             auto app = app::App::get_uncached_app(app_config, sc_config);
             // At this point, the sync route is not set
             CHECK(!app->sync_manager()->sync_route());
 
-            PromiseFutureHolder pf_holder;
-            pf_holder.arm();
             RealmConfig r_config;
             r_config.path = sc_config.base_file_path + "/fakerealm.realm";
             r_config.sync_config = std::make_shared<SyncConfig>(app->current_user(), SyncConfig::FLXSyncEnabled{});
-            r_config.sync_config->error_handler = [&pf_holder](std::shared_ptr<SyncSession>,
-                                                               SyncError error) mutable {
+            r_config.sync_config->error_handler = [&state, &logger](std::shared_ptr<SyncSession>,
+                                                                    SyncError error) mutable {
                 // Expect an error due to 404 response when creating websocket
-                CHECK(!error.status.is_ok());
-                pf_holder.complete(error.status);
+                state.transition_with([&error, &logger](TestState cur_state) -> std::optional<TestState> {
+                    if (cur_state == TestState::start) {
+                        // The session will start, but the connection is rejected on purpose
+                        logger->debug("Expected error: %1: %2", error.status.code_string(), error.status.reason());
+                        CHECK(!error.status.is_ok());
+                        CHECK(error.status.code() == ErrorCodes::SyncConnectFailed);
+                        return TestState::session_started;
+                    }
+                    return std::nullopt;
+                });
             };
             auto realm = Realm::get_shared_realm(r_config);
-            auto result = pf_holder.wait(); // Wait for failure on websocket connect
-            logger->info("Error: %1 (%2) : %3", result.code_string(), result.code(), result.reason());
-            CHECK(!result.is_ok());
+            state.wait_for(TestState::session_started);
+
             CHECK(redir_transport->location_requested);
             CHECK(app->get_base_url() == init_url);
             CHECK(app->get_host_url() == redir_url);
@@ -4076,6 +4062,9 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
         }
         // Recreate the app using the cached user and start a sync session, which will fail during location update
         SECTION("Location update fails prior to sync session connect") {
+            enum TestState { start, location_failed, waiting_for_session, session_started };
+            TestingStateMachine<TestState> state(start);
+
             redir_transport->reset(init_url, redir_url);
             redir_transport->location_returns_error = true;
 
@@ -4083,22 +4072,32 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
             // At this point, the sync route is not set
             CHECK(!app->sync_manager()->sync_route());
 
-            auto [sync_promise, sync_future] = util::make_promise_future<void>();
-            PromiseFutureHolder pf_holder;
-            pf_holder.arm();
             RealmConfig r_config;
             r_config.path = sc_config.base_file_path + "/fakerealm.realm";
             r_config.sync_config = std::make_shared<SyncConfig>(app->current_user(), SyncConfig::FLXSyncEnabled{});
-            r_config.sync_config->error_handler = [&pf_holder](std::shared_ptr<SyncSession>,
-                                                               SyncError error) mutable {
+            r_config.sync_config->error_handler = [&state, &logger](std::shared_ptr<SyncSession>,
+                                                                    SyncError error) mutable {
                 // Expect an error due to location failed or 404 response when creating websocket
-                CHECK(!error.status.is_ok());
-                pf_holder.complete(error.status);
+                state.transition_with([&error, &logger](TestState cur_state) -> std::optional<TestState> {
+                    if (cur_state == TestState::start || cur_state == TestState::waiting_for_session) {
+                        logger->debug("Expected error: %1: %2", error.status.code_string(), error.status.reason());
+                        CHECK(!error.status.is_ok());
+                        CHECK(error.status.code() == ErrorCodes::SyncConnectFailed);
+                    }
+                    if (cur_state == TestState::start) {
+                        // The first time through, the location update fails
+                        return TestState::location_failed;
+                    }
+                    else if (cur_state == TestState::waiting_for_session) {
+                        // The second time through, the session start, but the connection is rejected on purpose
+                        return TestState::session_started;
+                    }
+                    return std::nullopt;
+                });
             };
             auto realm = Realm::get_shared_realm(r_config);
-            auto result = pf_holder.wait(); // Wait for failure on websocket connect
-            logger->info("Error: %1 (%2) : %3", result.code_string(), result.code(), result.reason());
-            CHECK(!result.is_ok());
+            state.wait_for(TestState::location_failed);
+
             CHECK(redir_transport->location_requested);
             CHECK(app->get_base_url() == init_url);
             // Location was never updated
@@ -4108,14 +4107,13 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
 
             // Location request will pass this time, try to reconnect
             // expecting 404 when websocket connects
-            pf_holder.arm(); // re-arm promise future holder
             redir_transport->reset(init_url, redir_url);
+            state.advance_to(TestState::waiting_for_session);
             auto session = app->sync_manager()->get_existing_session(r_config.path);
             CHECK(session);
             session->resume();
-            result = pf_holder.wait(); // Wait for failure on websocket connect
-            logger->info("Error: %1 (%2) : %3", result.code_string(), result.code(), result.reason());
-            CHECK(!result.is_ok());
+            state.wait_for(TestState::session_started);
+
             CHECK(redir_transport->location_requested);
             CHECK(app->get_base_url() == init_url);
             CHECK(app->get_host_url() == redir_url);
@@ -5435,38 +5433,9 @@ private:
 TEST_CASE("app: app destroyed during token refresh", "[sync][app][user][token]") {
     AsyncMockNetworkTransport mock_transport_worker;
     enum class TestState { unknown, location, login, profile_1, profile_2, refresh_1, refresh_2, refresh_3 };
-    struct TestStateBundle {
-        void advance_to(TestState new_state)
-        {
-            std::lock_guard<std::mutex> lk(mutex);
-            state = new_state;
-            cond.notify_one();
-        }
-
-        TestState get() const
-        {
-            std::lock_guard<std::mutex> lk(mutex);
-            return state;
-        }
-
-        void wait_for(TestState new_state)
-        {
-            std::unique_lock lk(mutex);
-            bool failed = !cond.wait_for(lk, std::chrono::seconds(5), [&] {
-                return state == new_state;
-            });
-            if (failed) {
-                throw std::runtime_error("wait timed out");
-            }
-        }
-
-        mutable std::mutex mutex;
-        std::condition_variable cond;
-
-        TestState state = TestState::unknown;
-    } state;
+    TestingStateMachine<TestState> state(TestState::unknown);
     struct transport : public GenericNetworkTransport {
-        transport(AsyncMockNetworkTransport& worker, TestStateBundle& state)
+        transport(AsyncMockNetworkTransport& worker, TestingStateMachine<TestState>& state)
             : mock_transport_worker(worker)
             , state(state)
         {
@@ -5528,7 +5497,7 @@ TEST_CASE("app: app destroyed during token refresh", "[sync][app][user][token]")
         }
 
         AsyncMockNetworkTransport& mock_transport_worker;
-        TestStateBundle& state;
+        TestingStateMachine<TestState>& state;
     };
     TestSyncManager sync_manager(get_config(std::make_shared<transport>(mock_transport_worker, state)));
     auto app = sync_manager.app();

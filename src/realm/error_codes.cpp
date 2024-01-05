@@ -111,14 +111,9 @@ ErrorCategory ErrorCodes::error_categories(Error code)
         case WrongTransactionState:
             return ErrorCategory().set(ErrorCategory::logic_error);
 
-        case InvalidArgument:
-            return ErrorCategory()
-                .set(ErrorCategory::invalid_argument)
-                .set(ErrorCategory::app_error)
-                .set(ErrorCategory::logic_error);
-
         case BadServerUrl:
         case IllegalCombination:
+        case InvalidArgument:
         case InvalidDictionaryKey:
         case InvalidDictionaryValue:
         case InvalidEncryptionKey:
@@ -213,7 +208,6 @@ ErrorCategory ErrorCodes::error_categories(Error code)
         case InvalidParameter:
         case InvalidPassword:
         case InvalidSession:
-        case LocationUpdateFailed:
         case MaintenanceInProgress:
         case MissingAuthReq:
         case MissingParameter:
@@ -339,7 +333,6 @@ static const MapElem string_to_error_code[] = {
     {"KeyAlreadyUsed", ErrorCodes::KeyAlreadyUsed},
     {"KeyNotFound", ErrorCodes::KeyNotFound},
     {"LimitExceeded", ErrorCodes::LimitExceeded},
-    {"LocationUpdateFailed", ErrorCodes::LocationUpdateFailed},
     {"LogicError", ErrorCodes::LogicError},
     {"MaintenanceInProgress", ErrorCodes::MaintenanceInProgress},
     {"MalformedJson", ErrorCodes::MalformedJson},

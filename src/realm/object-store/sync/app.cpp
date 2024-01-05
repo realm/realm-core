@@ -358,13 +358,7 @@ std::string App::get_ws_host_url()
 
 std::string App::make_sync_route(Optional<std::string> ws_host_url)
 {
-    std::string path = base_path + app_path + "/" + m_config.app_id + sync_path;
-    if (ws_host_url) {
-        return *ws_host_url + path;
-    }
-    else {
-        return m_ws_host_url + path;
-    }
+    return ws_host_url.value_or(m_ws_host_url) + base_path + app_path + "/" + m_config.app_id + sync_path;
 }
 
 void App::configure_route(const std::string& host_url, const std::optional<std::string>& ws_host_url)
@@ -600,23 +594,25 @@ std::string App::get_base_url() const
     return m_base_url;
 }
 
-void App::update_base_url(std::string base_url, UniqueFunction<void(Optional<AppError>)>&& completion)
+void App::update_base_url(std::optional<std::string> base_url, UniqueFunction<void(Optional<AppError>)>&& completion)
 {
-    log_debug("App::update_base_url: %1", base_url);
-    // empty base_url is invalid
-    if (base_url.empty()) {
-        return completion(
-            AppError{ErrorCodes::InvalidArgument, "update_base_url: new base URL value cannot be empty"});
+    std::string new_base_url = base_url.value_or(default_base_url);
+
+    log_debug("App::update_base_url: %1", new_base_url);
+
+    if (new_base_url.empty()) {
+        throw InvalidArgument("update_base_url: new base URL value cannot be empty");
     }
+
     // Validate the new base_url
-    if (!AppUtils::split_url(base_url)) {
-        throw sync::BadServerUrl(base_url);
+    if (!AppUtils::split_url(new_base_url)) {
+        throw sync::BadServerUrl(new_base_url);
     }
 
     {
         std::lock_guard<std::mutex> lock(*m_route_mutex);
         // Update the location if the base_url is different or a location update is already needed
-        m_location_updated = (base_url == m_base_url) && m_location_updated;
+        m_location_updated = (new_base_url == m_base_url) && m_location_updated;
     }
     // If the new base_url is the same as the current base_url and the location has already been updated,
     // then we're done
@@ -626,7 +622,7 @@ void App::update_base_url(std::string base_url, UniqueFunction<void(Optional<App
     }
 
     // Otherwise, request the location information at the new base URL
-    request_location(std::move(completion), base_url);
+    request_location(std::move(completion), new_base_url);
 }
 
 void App::get_profile(const std::shared_ptr<SyncUser>& sync_user,
@@ -987,11 +983,11 @@ void App::request_location(UniqueFunction<void(std::optional<AppError>)>&& compl
             // Location request was successful - update the location info
             auto update_response = self->update_location(response, base_url);
             if (update_response) {
-                self->log_error("App: request location failed (%1%2) - keeping original location information",
-                                update_response->code_string(),
+                self->log_error("App: request location failed (%1%2): %3", update_response->code_string(),
                                 update_response->additional_status_code
                                     ? util::format(" %1", *update_response->additional_status_code)
-                                    : "");
+                                    : "",
+                                update_response->reason());
             }
             completion(update_response);
         });
