@@ -1769,9 +1769,10 @@ TEST_CASE("flx: query on non-queryable field results in query error message", "[
         CHECK(!status.is_ok());
         std::string reason = status.get_status().reason();
         // Depending on the version of baas used, it may return 'Invalid query:' or
-        // 'Client provided query with bad syntax:'
+        // 'Client provided query with bad syntax:' or 'Unsupported query for table'
         if ((reason.find("Invalid query:") == std::string::npos &&
-             reason.find("Client provided query with bad syntax:") == std::string::npos) ||
+             reason.find("Client provided query with bad syntax:") == std::string::npos
+             && reason.find("Unsupported query for table") == std::string::npos) ||
             reason.find("\"TopLevel\": key \"non_queryable_field\" is not a queryable field") == std::string::npos) {
             FAIL(reason);
         }
