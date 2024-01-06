@@ -2359,7 +2359,7 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
         sc_config.metadata_mode = realm::SyncManager::MetadataMode::NoEncryption;
 
         // initialize app and sync client
-        auto redir_app = app::App::get_uncached_app(app_config, sc_config);
+        auto redir_app = app::App::get_app(app::App::CacheMode::Disabled, app_config, sc_config);
 
         SECTION("Test invalid redirect response") {
             int request_count = 0;
@@ -2547,7 +2547,7 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
         sc_config.metadata_mode = realm::SyncManager::MetadataMode::NoMetadata;
 
         // initialize app and sync client
-        auto redir_app = app::App::get_uncached_app(app_config, sc_config);
+        auto redir_app = app::App::get_app(app::App::CacheMode::Disabled, app_config, sc_config);
 
         int request_count = 0;
         // redirect URL is localhost or 127.0.0.1 depending on what the initial value is
@@ -5309,10 +5309,10 @@ TEST_CASE("app: shared instances", "[sync][app]") {
     config4.base_url = "http://localhost:9090";
 
     // should all point to same underlying app
-    auto app1_1 = App::get_shared_app(config1, sync_config);
-    auto app1_2 = App::get_shared_app(config1, sync_config);
+    auto app1_1 = App::get_app(app::App::CacheMode::Enabled, config1, sync_config);
+    auto app1_2 = App::get_app(app::App::CacheMode::Enabled, config1, sync_config);
     auto app1_3 = App::get_cached_app(config1.app_id, config1.base_url);
-    auto app1_4 = App::get_shared_app(config2, sync_config);
+    auto app1_4 = App::get_app(app::App::CacheMode::Enabled, config2, sync_config);
     auto app1_5 = App::get_cached_app(config1.app_id);
 
     CHECK(app1_1 == app1_2);
@@ -5321,9 +5321,9 @@ TEST_CASE("app: shared instances", "[sync][app]") {
     CHECK(app1_1 == app1_5);
 
     // config3 and config4 should point to different apps
-    auto app2_1 = App::get_shared_app(config3, sync_config);
+    auto app2_1 = App::get_app(app::App::CacheMode::Enabled, config3, sync_config);
     auto app2_2 = App::get_cached_app(config3.app_id, config3.base_url);
-    auto app2_3 = App::get_shared_app(config4, sync_config);
+    auto app2_3 = App::get_app(app::App::CacheMode::Enabled, config4, sync_config);
     auto app2_4 = App::get_cached_app(config3.app_id);
     auto app2_5 = App::get_cached_app(config4.app_id, "https://some.different.url");
 

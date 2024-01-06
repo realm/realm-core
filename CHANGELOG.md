@@ -9,7 +9,7 @@
 * None.
 
 ### Breaking changes
-* None.
+* `App::get_uncached_app(...)` and `App::get_shared_app(...)` have been replaced by `App::get_app(App::CacheMode, ...)`. The App constructor is now enforced to be unusable, use `App::get_app()` instead. ([#7237](https://github.com/realm/realm-core/issues/7237))
 
 ### Compatibility
 * Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
