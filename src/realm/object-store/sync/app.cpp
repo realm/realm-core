@@ -218,13 +218,13 @@ SharedApp App::get_app(CacheMode mode, const Config& config,
         std::lock_guard<std::mutex> lock(s_apps_mutex);
         auto& app = s_apps_cache[config.app_id][config.base_url.value_or(std::string(s_default_base_url))];
         if (!app) {
-            app = std::make_shared<App>(private_construction_only(0), config);
+            app = std::make_shared<App>(PrivateConstructionOnly(), config);
             app->configure(sync_client_config);
         }
         return app;
     }
     REALM_ASSERT(mode == CacheMode::Disabled);
-    auto app = std::make_shared<App>(private_construction_only(0), config);
+    auto app = std::make_shared<App>(PrivateConstructionOnly(), config);
     app->configure(sync_client_config);
     return app;
 }
@@ -260,7 +260,7 @@ void App::close_all_sync_sessions()
     }
 }
 
-App::App(private_construction_only, const Config& config)
+App::App(PrivateConstructionOnly, const Config& config)
     : m_config(std::move(config))
     , m_request_timeout_ms(m_config.default_request_timeout_ms.value_or(s_default_timeout_ms))
 {

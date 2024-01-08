@@ -249,7 +249,7 @@ RLM_API realm_app_t* realm_app_create(const realm_app_config_t* app_config,
                                       const realm_sync_client_config_t* sync_client_config)
 {
     return wrap_err([&] {
-        return new realm_app_t(App::get_app(app::App::CacheMode::Enabled, *app_config, *sync_client_config));
+        return new realm_app_t(App::get_app(app::App::CacheMode::Disabled, *app_config, *sync_client_config));
     });
 }
 
