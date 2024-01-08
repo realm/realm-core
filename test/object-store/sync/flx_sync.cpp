@@ -4688,6 +4688,33 @@ TEST_CASE("flx: fatal errors and session becoming inactive cancel pending waits"
     check_status(state);
 }
 
+TEST_CASE("flx: pause and resume bootstrapping at query version 0", "[sync][flx][baas]") {
+    FLXSyncTestHarness harness("flx_pause_resume_bootstrap");
+    SyncTestFile triggered_config(harness.app()->current_user(), harness.schema(), SyncConfig::FLXSyncEnabled{});
+    auto [interrupted_promise, interrupted] = util::make_promise_future<void>();
+    int download_message_received_count = 0;
+    triggered_config.sync_config->on_sync_client_event_hook =
+        [promise = util::CopyablePromiseHolder(std::move(interrupted_promise)), &download_message_received_count](
+            std::weak_ptr<SyncSession> weak_sess, const SyncClientHookData& data) mutable {
+            auto sess = weak_sess.lock();
+            if (!sess || data.event != SyncClientHookEvent::DownloadMessageReceived) {
+                return SyncClientHookAction::NoAction;
+            }
+
+            if (download_message_received_count == 0) {
+                sess->pause();
+                sess->resume();
+            }
+            else {
+                promise.get_promise().emplace_value();
+            }
+            ++download_message_received_count;
+            return SyncClientHookAction::NoAction;
+        };
+    auto realm = Realm::get_shared_realm(triggered_config);
+    interrupted.get();
+}
+
 } // namespace realm::app
 
 #endif // REALM_ENABLE_AUTH_TESTS
