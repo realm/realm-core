@@ -598,22 +598,12 @@ std::string SubscriptionSet::to_ext_json() const
     return output_json.dump();
 }
 
-namespace {
-class SubscriptionStoreInit : public SubscriptionStore {
-public:
-    explicit SubscriptionStoreInit(DBRef db)
-        : SubscriptionStore(std::move(db))
-    {
-    }
-};
-} // namespace
-
 SubscriptionStoreRef SubscriptionStore::create(DBRef db)
 {
-    return std::make_shared<SubscriptionStoreInit>(std::move(db));
+    return std::make_shared<SubscriptionStore>(Private(), std::move(db));
 }
 
-SubscriptionStore::SubscriptionStore(DBRef db)
+SubscriptionStore::SubscriptionStore(Private, DBRef db)
     : m_db(std::move(db))
 {
     std::vector<SyncMetadataTable> internal_tables{

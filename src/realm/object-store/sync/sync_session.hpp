@@ -103,6 +103,9 @@ private:
 } // namespace _impl
 
 class SyncSession : public std::enable_shared_from_this<SyncSession> {
+    struct Private {
+    };
+
 public:
     enum class State {
         Active,
@@ -124,6 +127,10 @@ public:
     using ProgressNotifierCallback = _impl::SyncProgressNotifier::ProgressNotifierCallback;
     using ProgressDirection = _impl::SyncProgressNotifier::NotifierType;
 
+    explicit SyncSession(Private, _impl::SyncClient&, std::shared_ptr<DB>, const RealmConfig&,
+                         SyncManager* sync_manager);
+    SyncSession(const SyncSession&) = delete;
+    SyncSession& operator=(const SyncSession&) = delete;
     ~SyncSession();
     State state() const REQUIRES(!m_state_mutex);
     ConnectionState connection_state() const REQUIRES(!m_connection_state_mutex);
@@ -345,15 +352,8 @@ private:
     static std::shared_ptr<SyncSession> create(_impl::SyncClient& client, std::shared_ptr<DB> db,
                                                const RealmConfig& config, SyncManager* sync_manager)
     {
-        struct MakeSharedEnabler : public SyncSession {
-            MakeSharedEnabler(_impl::SyncClient& client, std::shared_ptr<DB> db, const RealmConfig& config,
-                              SyncManager* sync_manager)
-                : SyncSession(client, std::move(db), config, sync_manager)
-            {
-            }
-        };
         REALM_ASSERT(config.sync_config);
-        return std::make_shared<MakeSharedEnabler>(client, std::move(db), config, std::move(sync_manager));
+        return std::make_shared<SyncSession>(Private(), client, std::move(db), config, std::move(sync_manager));
     }
     // }
 
@@ -361,8 +361,6 @@ private:
 
     static util::UniqueFunction<void(util::Optional<app::AppError>)>
     handle_refresh(const std::shared_ptr<SyncSession>&, bool);
-
-    SyncSession(_impl::SyncClient&, std::shared_ptr<DB>, const RealmConfig&, SyncManager* sync_manager);
 
     // Initialize or tear down the subscription store based on whether or not flx_sync_requested is true
     void update_subscription_store(bool flx_sync_requested, std::optional<sync::SubscriptionSet> new_subs)

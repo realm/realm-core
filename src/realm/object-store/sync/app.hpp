@@ -57,8 +57,7 @@ class App : public std::enable_shared_from_this<App>,
             public AppServiceClient,
             public Subscribable<App> {
 
-    struct PrivateConstructionOnly {
-        explicit PrivateConstructionOnly() {}
+    struct Private {
     };
 
 public:
@@ -95,7 +94,7 @@ public:
 
     // `enable_shared_from_this` is unsafe with public constructors;
     // use `App::get_app()` instead
-    explicit App(PrivateConstructionOnly, const Config& config);
+    explicit App(Private, const Config& config);
     App(App&&) noexcept = delete;
     App& operator=(App&&) noexcept = delete;
     ~App();

@@ -84,7 +84,7 @@ SyncUserIdentity::SyncUserIdentity(const std::string& id, const std::string& pro
 SyncUserContextFactory SyncUser::s_binding_context_factory;
 std::mutex SyncUser::s_binding_context_factory_mutex;
 
-SyncUser::SyncUser(const std::string& refresh_token, const std::string& id, const std::string& access_token,
+SyncUser::SyncUser(Private, const std::string& refresh_token, const std::string& id, const std::string& access_token,
                    const std::string& device_id, SyncManager* sync_manager)
     : m_state(State::LoggedIn)
     , m_identity(id)
@@ -110,7 +110,7 @@ SyncUser::SyncUser(const std::string& refresh_token, const std::string& id, cons
     });
 }
 
-SyncUser::SyncUser(const SyncUserMetadata& data, SyncManager* sync_manager)
+SyncUser::SyncUser(Private, const SyncUserMetadata& data, SyncManager* sync_manager)
     : m_state(data.state())
     , m_legacy_identities(data.legacy_identities())
     , m_identity(data.identity())

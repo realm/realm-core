@@ -37,12 +37,17 @@ class RealmCoordinator;
 // Class used to wrap the intent of opening a new Realm or fully synchronize it before returning it to the user
 // Timeouts are not handled by this class but must be handled by each binding.
 class AsyncOpenTask : public std::enable_shared_from_this<AsyncOpenTask> {
+    struct Private {
+    };
+
 public:
     using AsyncOpenCallback = util::UniqueFunction<void(ThreadSafeReference, std::exception_ptr)>;
     using SubscriptionCallback = util::UniqueFunction<void(std::shared_ptr<Realm>)>;
 
-    AsyncOpenTask(std::shared_ptr<_impl::RealmCoordinator> coordinator, std::shared_ptr<realm::SyncSession> session,
-                  bool db_open_for_the_first_time);
+    explicit AsyncOpenTask(Private, std::shared_ptr<_impl::RealmCoordinator> coordinator,
+                           std::shared_ptr<realm::SyncSession> session, bool db_open_for_the_first_time);
+    AsyncOpenTask(const AsyncOpenTask&) = delete;
+    AsyncOpenTask& operator=(const AsyncOpenTask&) = delete;
     // Starts downloading the Realm. The callback will be triggered either when the download completes
     // or an error is encountered.
     //
@@ -58,6 +63,8 @@ public:
     void unregister_download_progress_notifier(uint64_t token) REQUIRES(!m_mutex);
 
 private:
+    friend _impl::RealmCoordinator;
+
     void async_open_complete(AsyncOpenCallback&&, std::shared_ptr<_impl::RealmCoordinator>, Status)
         REQUIRES(!m_mutex);
     void attach_to_subscription_initializer(AsyncOpenCallback&&, std::shared_ptr<_impl::RealmCoordinator>, bool)

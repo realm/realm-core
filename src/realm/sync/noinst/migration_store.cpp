@@ -16,22 +16,14 @@ constexpr static std::string_view
     c_flx_migration_sentinel_subscription_set_version("sentinel_subscription_set_version");
 constexpr static std::string_view c_flx_subscription_name_prefix("flx_migrated_");
 
-class MigrationStoreInit : public MigrationStore {
-public:
-    explicit MigrationStoreInit(DBRef db)
-        : MigrationStore(std::move(db))
-    {
-    }
-};
-
 } // namespace
 
 MigrationStoreRef MigrationStore::create(DBRef db)
 {
-    return std::make_shared<MigrationStoreInit>(std::move(db));
+    return std::make_shared<MigrationStore>(Private(), std::move(db));
 }
 
-MigrationStore::MigrationStore(DBRef db)
+MigrationStore::MigrationStore(Private, DBRef db)
     : m_db(std::move(db))
     , m_state(MigrationState::NotMigrated)
 {

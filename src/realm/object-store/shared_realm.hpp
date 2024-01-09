@@ -185,6 +185,9 @@ struct RealmConfig {
 };
 
 class Realm : public std::enable_shared_from_this<Realm> {
+    struct Private {
+    };
+
 public:
     using Config = RealmConfig;
 
@@ -433,6 +436,8 @@ public:
 
     bool has_pending_async_work() const;
 
+    explicit Realm(Config config, util::Optional<VersionID> version,
+                   std::shared_ptr<_impl::RealmCoordinator> coordinator, Private);
     Realm(const Realm&) = delete;
     Realm& operator=(const Realm&) = delete;
     Realm(Realm&&) = delete;
@@ -450,8 +455,7 @@ public:
     static SharedRealm make_shared_realm(Config config, util::Optional<VersionID> version,
                                          std::shared_ptr<_impl::RealmCoordinator> coordinator)
     {
-        return std::make_shared<Realm>(std::move(config), std::move(version), std::move(coordinator),
-                                       MakeSharedTag{});
+        return std::make_shared<Realm>(std::move(config), std::move(version), std::move(coordinator), Private());
     }
 
     // Expose some internal functionality which isn't intended to be used directly
@@ -500,9 +504,6 @@ public:
 #endif
 
 private:
-    struct MakeSharedTag {
-    };
-
     std::shared_ptr<_impl::RealmCoordinator> m_coordinator;
 
     Config m_config;
@@ -581,10 +582,6 @@ private:
 
 public:
     std::unique_ptr<BindingContext> m_binding_context;
-
-    // `enable_shared_from_this` is unsafe with public constructors; use `make_shared_realm` instead
-    Realm(Config config, util::Optional<VersionID> version, std::shared_ptr<_impl::RealmCoordinator> coordinator,
-          MakeSharedTag);
 };
 
 } // namespace realm
