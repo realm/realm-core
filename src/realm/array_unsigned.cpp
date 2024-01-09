@@ -262,7 +262,8 @@ void ArrayUnsigned::erase(size_t ndx)
         REALM_ASSERT(m_lbound <= m_ubound);
     }
 
-    REALM_ASSERT_DEBUG(m_width >= 8);
+    //compression is going to go in this case, tmp commented.
+    //REALM_ASSERT_DEBUG(m_width >= 8);
 
     copy_on_write(); // Throws
 

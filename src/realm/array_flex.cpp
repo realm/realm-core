@@ -226,6 +226,8 @@ void ArrayFlex::arrange_data_in_flex_format(const Array& arr, std::vector<int64_
         auto new_value = values[indices[i]];
         REALM_ASSERT_3(new_value, ==, old_value);
     }
+    
+    REALM_ASSERT(indices.size() == sz);
 }
 
 bool ArrayFlex::check_gain(const Array& arr, std::vector<int64_t>& values, std::vector<size_t>& indices, int& v_width,
@@ -380,14 +382,13 @@ void ArrayFlex::restore_array(Array& arr, const std::vector<int64_t>& values) co
     // but once it finishes running, the ref of the old array is gone, so the memory is leaked.
     // previous header and ref must be stored temporary and deleted after this point
     arr.init_from_mem(mem);
-
-    size_t i = 0;
-    for (const auto& v : values)
-        arr.set(i++, v);
-
+    bf_iterator it ((uint64_t*)arr.m_data, 0, width, width, 0);
+    for(auto v : values) {
+        it.set_value(sign_extend_field(width, v));
+        ++it;
+    }
     arr.update_parent();
     allocator.free_(origanal_ref, orginal_header);
-
     size_t w = arr.get_width();
     REALM_ASSERT(w == 0 || w == 1 || w == 2 || w == 4 || w == 8 || w == 16 || w == 32 || w == 64);
     REALM_ASSERT(arr.size() == values.size());
@@ -485,7 +486,7 @@ uint64_t ArrayFlex::get_unsigned(const Array& arr, size_t ndx, size_t& v_width) 
 
         auto data = (uint64_t*)NodeHeader::get_data_from_header(arr.get_header());
         const uint64_t offset = v_size * v_width;
-        bf_iterator it_index{data, static_cast<size_t>(offset + (ndx * ndx_width)), ndx_width, ndx_size, 0};
+        bf_iterator it_index{data, static_cast<size_t>(offset + (ndx * ndx_width)), ndx_width, ndx_width, 0};
         bf_iterator it_value{data, static_cast<size_t>(v_width * it_index.get_value()), v_width, v_width, 0};
         const auto v = it_value.get_value();
         return v;
