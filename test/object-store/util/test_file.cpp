@@ -354,7 +354,7 @@ TestAppSession::TestAppSession(AppSession session,
     // down sync clients immediately.
     sc_config.timeouts.connection_linger_time = 0;
 
-    m_app = app::App::get_uncached_app(app_config, sc_config);
+    m_app = app::App::get_app(app::App::CacheMode::Disabled, app_config, sc_config);
 
     // initialize sync client
     m_app->sync_manager()->get_sync_client();
@@ -438,7 +438,7 @@ TestSyncManager::TestSyncManager(const Config& config, const SyncServer::Config&
     sc_config.base_file_path = m_base_file_path;
     sc_config.metadata_mode = config.metadata_mode;
 
-    m_app = app::App::get_uncached_app(app_config, sc_config);
+    m_app = app::App::get_app(app::App::CacheMode::Disabled, app_config, sc_config);
     if (config.override_sync_route) {
         m_app->sync_manager()->set_sync_route(m_sync_server.base_url() + "/realm-sync");
     }
