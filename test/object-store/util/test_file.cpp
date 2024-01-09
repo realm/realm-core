@@ -496,7 +496,7 @@ static Status wait_for_session(Realm& realm, void (SyncSession::*fn)(util::Uniqu
                                std::chrono::seconds timeout)
 {
     auto shared_state = std::make_shared<WaitForSessionState>();
-    auto app = realm.config().sync_config->user->backing_store()->app().lock();
+    auto app = realm.config().sync_config->user->app().lock();
     REALM_ASSERT(app);
     auto session = app->sync_manager()->get_existing_session(realm.config().path);
     auto delay = TEST_TIMEOUT_EXTRA > 0 ? timeout + std::chrono::seconds(TEST_TIMEOUT_EXTRA) : timeout;

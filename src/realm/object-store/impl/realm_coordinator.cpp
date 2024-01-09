@@ -436,7 +436,7 @@ bool RealmCoordinator::open_db()
         // If we previously opened this Realm, we may have a lingering sync
         // session which outlived its RealmCoordinator. If that happens we
         // want to reuse it instead of creating a new DB.
-        if (auto app = m_config.sync_config->user->backing_store()->app().lock()) {
+        if (auto app = m_config.sync_config->user->app().lock()) {
             m_sync_session = app->sync_manager()->get_existing_session(m_config.path);
         }
         if (m_sync_session) {
@@ -541,8 +541,12 @@ void RealmCoordinator::init_external_helpers()
     // We may have reused an existing sync session that outlived its original
     // RealmCoordinator. If not, we need to create a new one now.
     if (m_config.sync_config && !m_sync_session) {
-        if (auto app = m_config.sync_config->user->backing_store()->app().lock()) {
+        if (auto app = m_config.sync_config->user->app().lock()) {
             m_sync_session = app->sync_manager()->get_session(m_db, m_config);
+        }
+        else {
+            throw LogicError(ErrorCodes::ClientAppDeallocated,
+                             "Cannot start a sync session for a user which has outlived its backing App.");
         }
     }
 #endif

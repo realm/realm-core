@@ -64,7 +64,7 @@ TEST_CASE("SyncSession: management by SyncUser", "[sync][session]") {
         });
 
         // Check the sessions on the SyncUser.
-        REQUIRE(app->sync_manager()->get_all_sessions_for(user).size() == 2);
+        REQUIRE(app->sync_manager()->get_all_sessions_for(*user).size() == 2);
         auto s1 = app->sync_manager()->get_existing_session(session1->path());
         REQUIRE(s1 == session1);
         auto s2 = app->sync_manager()->get_existing_session(session2->path());
@@ -85,7 +85,7 @@ TEST_CASE("SyncSession: management by SyncUser", "[sync][session]") {
         EventLoop::main().run_until([&] {
             return sessions_are_inactive(*session1, *session2);
         });
-        auto all_sessions = app->sync_manager()->get_all_sessions_for(user);
+        auto all_sessions = app->sync_manager()->get_all_sessions_for(*user);
         REQUIRE(all_sessions.size() == 2);
         CHECK(all_sessions[0]->state() == SyncSession::State::Inactive);
         CHECK(all_sessions[1]->state() == SyncSession::State::Inactive);
@@ -102,7 +102,7 @@ TEST_CASE("SyncSession: management by SyncUser", "[sync][session]") {
         REQUIRE(session1->state() == SyncSession::State::Inactive);
         REQUIRE(session2->state() == SyncSession::State::Inactive);
         {
-            auto all_sessions = app->sync_manager()->get_all_sessions_for(user);
+            auto all_sessions = app->sync_manager()->get_all_sessions_for(*user);
             REQUIRE(all_sessions.size() == 2);
             CHECK(all_sessions[0]->state() == SyncSession::State::Inactive);
             CHECK(all_sessions[1]->state() == SyncSession::State::Inactive);
@@ -113,7 +113,7 @@ TEST_CASE("SyncSession: management by SyncUser", "[sync][session]") {
             return sessions_are_active(*session1, *session2);
         });
         {
-            auto all_sessions = app->sync_manager()->get_all_sessions_for(user);
+            auto all_sessions = app->sync_manager()->get_all_sessions_for(*user);
             REQUIRE(all_sessions.size() == 2);
             CHECK(all_sessions[0]->state() == SyncSession::State::Active);
             CHECK(all_sessions[1]->state() == SyncSession::State::Active);
@@ -128,7 +128,7 @@ TEST_CASE("SyncSession: management by SyncUser", "[sync][session]") {
         EventLoop::main().run_until([&] {
             return sessions_are_active(*session1, *session2);
         });
-        REQUIRE(app->sync_manager()->get_all_sessions_for(user).size() == 2);
+        REQUIRE(app->sync_manager()->get_all_sessions_for(*user).size() == 2);
         // Log the user out.
         user->log_out();
         REQUIRE(user->state() == SyncUser::State::LoggedOut);
@@ -137,7 +137,7 @@ TEST_CASE("SyncSession: management by SyncUser", "[sync][session]") {
         REQUIRE(session1->state() == SyncSession::State::Inactive);
         REQUIRE(session2->state() == SyncSession::State::Inactive);
         {
-            auto all_sessions = app->sync_manager()->get_all_sessions_for(user);
+            auto all_sessions = app->sync_manager()->get_all_sessions_for(*user);
             REQUIRE(all_sessions.size() == 2);
             CHECK(all_sessions[0]->state() == SyncSession::State::Inactive);
             CHECK(all_sessions[1]->state() == SyncSession::State::Inactive);
@@ -148,7 +148,7 @@ TEST_CASE("SyncSession: management by SyncUser", "[sync][session]") {
             return sessions_are_active(*session1, *session2);
         });
         {
-            auto all_sessions = app->sync_manager()->get_all_sessions_for(user);
+            auto all_sessions = app->sync_manager()->get_all_sessions_for(*user);
             REQUIRE(all_sessions.size() == 2);
             CHECK(all_sessions[0]->state() == SyncSession::State::Active);
             CHECK(all_sessions[1]->state() == SyncSession::State::Active);

@@ -35,6 +35,7 @@
 
 namespace realm {
 namespace app {
+class App;
 struct AppError;
 class BackingStore;
 class MongoClient;
@@ -220,7 +221,9 @@ public:
     // Optionally set a context factory. If so, must be set before any sessions are created.
     static void set_binding_context_factory(SyncUserContextFactory factory);
 
-    std::shared_ptr<app::BackingStore> backing_store() const REQUIRES(!m_mutex);
+    // Get the app instance that this user belongs to.
+    // This may not lock() if this SyncUser has become detached.
+    std::weak_ptr<app::App> app() const REQUIRES(!m_mutex);
 
     /// Retrieves a general-purpose service client for the Realm Cloud service
     /// @param service_name The name of the cluster
@@ -233,8 +236,8 @@ public:
 
     // Don't use this directly; use the `SyncManager` APIs. Public for use with `make_shared`.
     SyncUser(Private, const std::string& refresh_token, const std::string& id, const std::string& access_token,
-             const std::string& device_id, std::shared_ptr<app::BackingStore> backing_store);
-    SyncUser(Private, const SyncUserMetadata& data, std::shared_ptr<app::BackingStore> backing_store);
+             const std::string& device_id, std::shared_ptr<app::App> app);
+    SyncUser(Private, const SyncUserMetadata& data, std::shared_ptr<app::App> app);
     SyncUser(const SyncUser&) = delete;
     SyncUser& operator=(const SyncUser&) = delete;
 
@@ -309,7 +312,7 @@ private:
 
     const std::string m_device_id;
 
-    std::weak_ptr<app::BackingStore> m_backing_store;
+    std::weak_ptr<app::App> m_app;
 
     std::atomic<int> m_seconds_to_adjust_time_for_testing = 0;
 };

@@ -1189,7 +1189,7 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
         transport->request_hook = [&](const Request&) {
             auto user = app->current_user();
             REQUIRE(user);
-            for (auto& session : app->sync_manager()->get_all_sessions_for(user)) {
+            for (auto& session : app->sync_manager()->get_all_sessions_for(*user)) {
                 // Prior to the fix for #4941, this callback would be called from an infinite loop, always in the
                 // WaitingForAccessToken state.
                 if (session->state() == SyncSession::State::WaitingForAccessToken) {
@@ -1248,7 +1248,7 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
             transport->request_hook = [&](const Request&) {
                 auto user = app->current_user();
                 REQUIRE(user);
-                for (auto& session : app->sync_manager()->get_all_sessions_for(user)) {
+                for (auto& session : app->sync_manager()->get_all_sessions_for(*user)) {
                     if (session->state() == SyncSession::State::WaitingForAccessToken) {
                         REQUIRE(!seen_waiting_for_access_token);
                         seen_waiting_for_access_token = true;

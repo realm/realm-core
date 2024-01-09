@@ -120,12 +120,6 @@ public:
     // Get the app metadata for the active app.
     virtual std::optional<SyncAppMetadata> app_metadata() const = 0;
 
-    // A pointer back to the parent App that this backing store supports.
-    std::weak_ptr<App> app() const
-    {
-        return m_parent_app;
-    }
-
     // Access to the config that was used to create this instance.
     const BackingStoreConfig& config() const
     {

@@ -216,12 +216,12 @@ std::vector<std::shared_ptr<SyncSession>> SyncManager::get_all_sessions() const
     return sessions;
 }
 
-std::vector<std::shared_ptr<SyncSession>> SyncManager::get_all_sessions_for(std::shared_ptr<SyncUser> user) const
+std::vector<std::shared_ptr<SyncSession>> SyncManager::get_all_sessions_for(const SyncUser& user) const
 {
     util::CheckedLockGuard lock(m_session_mutex);
     std::vector<std::shared_ptr<SyncSession>> sessions;
     for (auto& [_, session] : m_sessions) {
-        if (session->user() == user) {
+        if (session->user().get() == &user) {
             if (auto external_reference = session->existing_external_reference())
                 sessions.push_back(std::move(external_reference));
         }
@@ -275,14 +275,7 @@ std::shared_ptr<SyncSession> SyncManager::get_session(std::shared_ptr<DB> db, co
 
     // Create the external reference immediately to ensure that the session will become
     // inactive if an exception is thrown in the following code.
-    auto external_reference = shared_session->external_reference();
-    // unlocking m_session_mutex here prevents a deadlock for synchronous network
-    // transports such as the unit test suite, in the case where the log in request is
-    // denied by the server: Active -> WaitingForAccessToken -> handle_refresh(401
-    // error) -> user.log_out() -> unregister_session (locks m_session_mutex again)
-    lock.unlock();
-
-    return external_reference;
+    return shared_session->external_reference();
 }
 
 bool SyncManager::has_existing_sessions()

@@ -411,7 +411,7 @@ void SyncSession::detach_from_sync_manager()
 
 void SyncSession::update_error_and_mark_file_for_deletion(SyncError& error, ShouldBackup should_backup)
 {
-    auto backing_store = user()->backing_store();
+    auto backing_store = user()->app().lock()->backing_store();
     util::CheckedLockGuard config_lock(m_config_mutex);
     // Add a SyncFileActionMetadata marking the Realm as needing to be deleted.
     std::string recovery_path;

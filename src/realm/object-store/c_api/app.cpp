@@ -635,7 +635,7 @@ RLM_API char* realm_app_sync_client_get_default_file_path_for_realm(const realm_
             config->flx_sync_requested ? none : std::make_optional(config->partition_value);
 
         std::string file_path =
-            config->user->backing_store()->path_for_realm(config->user, std::move(filename), partition);
+            config->user->app().lock()->backing_store()->path_for_realm(config->user, std::move(filename), partition);
         return duplicate_string(file_path);
     });
 }
@@ -724,7 +724,7 @@ RLM_API realm_app_t* realm_user_get_app(const realm_user_t* user) noexcept
 {
     REALM_ASSERT(user);
     try {
-        if (auto shared_app = (*user)->backing_store()->app().lock()) {
+        if (auto shared_app = (*user)->app().lock()) {
             return new realm_app_t(shared_app);
         }
     }

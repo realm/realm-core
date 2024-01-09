@@ -2632,7 +2632,7 @@ TEST_CASE("flx: commit subscription while refreshing the access token", "[sync][
     transport->request_hook = [&](const Request&) {
         auto user = app->current_user();
         REQUIRE(user);
-        for (auto& session : app->sync_manager()->get_all_sessions_for(user)) {
+        for (auto& session : app->sync_manager()->get_all_sessions_for(*user)) {
             if (session->state() == SyncSession::State::WaitingForAccessToken) {
                 REQUIRE(!seen_waiting_for_access_token);
                 seen_waiting_for_access_token = true;
