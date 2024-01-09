@@ -295,6 +295,17 @@ protected:
     void do_log(Level, const std::string&) override {}
 };
 
+// Calls a function when logging
+class CallbackLogger final : public Logger {
+public:
+    using LogCallback = std::function<void(Level, const std::string& message)>;
+    CallbackLogger(const LogCallback& callback, Level level = Logger::get_default_level_threshold());
+
+private:
+    void do_log(Level level, const std::string& message);
+    LogCallback m_callback;
+};
+
 
 // Implementation
 
@@ -497,6 +508,18 @@ inline LocalThresholdLogger::LocalThresholdLogger(const std::shared_ptr<Logger>&
 {
     // Verify the passed in shared ptr is not null
     REALM_ASSERT(m_chained_logger);
+}
+
+inline CallbackLogger::CallbackLogger(const LogCallback& callback, Level level)
+    : Logger(level)
+    , m_callback(callback)
+{
+    REALM_ASSERT(m_callback);
+}
+
+inline void CallbackLogger::do_log(Level level, const std::string& message)
+{
+    m_callback(level, message);
 }
 
 // Intended to be used to get a somewhat smaller number derived from 'this' pointer

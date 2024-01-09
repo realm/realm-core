@@ -74,10 +74,7 @@ struct SyncClientConfig {
     std::string base_file_path;
     MetadataMode metadata_mode = MetadataMode::Encryption;
     util::Optional<std::vector<char>> custom_encryption_key;
-
-    using LoggerFactory = std::function<std::shared_ptr<util::Logger>(util::Logger::Level)>;
-    LoggerFactory logger_factory;
-    util::Logger::Level log_level = util::Logger::Level::info;
+    std::shared_ptr<util::Logger> logger = util::Logger::get_default_logger();
     ReconnectMode reconnect_mode = ReconnectMode::normal; // For internal sync-client testing only!
 #if REALM_DISABLE_SYNC_MULTIPLEXING
     bool multiplex_sessions = false;
@@ -133,7 +130,6 @@ public:
     // created (when the first Session is created) or an App operation is
     // performed (e.g. log in).
     void set_log_level(util::Logger::Level) noexcept REQUIRES(!m_mutex);
-    void set_logger_factory(SyncClientConfig::LoggerFactory) REQUIRES(!m_mutex);
 
     // Sets the application level user agent string.
     // This should have the format specified here:
@@ -295,9 +291,6 @@ private:
     bool run_file_action(SyncFileActionMetadata&) REQUIRES(m_file_system_mutex);
     void init_metadata(SyncClientConfig config, const std::string& app_id);
 
-    // internally create a new logger - used by configure() and set_logger_factory()
-    void do_make_logger() REQUIRES(m_mutex);
-
     // Protects m_users
     mutable util::CheckedMutex m_user_mutex;
 
@@ -308,7 +301,6 @@ private:
     mutable std::unique_ptr<_impl::SyncClient> m_sync_client GUARDED_BY(m_mutex);
 
     SyncClientConfig m_config GUARDED_BY(m_mutex);
-    mutable std::shared_ptr<util::Logger> m_logger_ptr GUARDED_BY(m_mutex);
 
     // Protects m_file_manager and m_metadata_manager
     mutable util::CheckedMutex m_file_system_mutex;

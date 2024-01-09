@@ -24,6 +24,7 @@
 
 #include <realm/util/optional.hpp>
 #include <realm/util/functional.hpp>
+#include <realm/util/logger.hpp>
 #include <realm/binary_data.hpp>
 #include <realm/transaction.hpp>
 #include <realm/version_id.hpp>
@@ -182,6 +183,8 @@ struct RealmConfig {
     // everything can be done deterministically on one thread, and
     // speeds up tests that don't need notifications.
     bool automatic_change_notifications = true;
+
+    std::shared_ptr<util::Logger> logger = util::Logger::get_default_logger();
 };
 
 class Realm : public std::enable_shared_from_this<Realm> {
@@ -500,8 +503,7 @@ public:
 #endif
 
 private:
-    struct MakeSharedTag {
-    };
+    struct MakeSharedTag {};
 
     std::shared_ptr<_impl::RealmCoordinator> m_coordinator;
 
