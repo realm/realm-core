@@ -246,7 +246,7 @@ TEST_CASE("app: upgrade from local to synced realm", "[sync][pbs][app][upgrade][
     auto server_app_config = minimal_app_config("upgrade_from_local", schema);
     TestAppSession test_session(create_app(server_app_config));
     auto partition = random_string(100);
-    auto user1 = test_session.app()->backing_store()->get_current_user();
+    auto user1 = test_session.app()->current_user();
     SyncTestFile config1(user1, partition, schema);
 
     auto r1 = Realm::get_shared_realm(config1);
@@ -266,7 +266,7 @@ TEST_CASE("app: upgrade from local to synced realm", "[sync][pbs][app][upgrade][
 
     /* Copy local realm data over in a synced one*/
     create_user_and_log_in(test_session.app());
-    auto user2 = test_session.app()->backing_store()->get_current_user();
+    auto user2 = test_session.app()->current_user();
     REQUIRE(user1 != user2);
 
     SyncTestFile config2(user1, partition, schema);
@@ -596,7 +596,7 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
 
         {
             create_user_and_log_in(app);
-            auto user = app->backing_store()->get_current_user();
+            auto user = app->current_user();
             // set a bad access token. this will trigger a refresh when the sync session opens
             user->update_access_token(encode_fake_jwt("fake_access_token"));
 
@@ -979,7 +979,7 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
         TestAppSession test_session({create_app(server_app_config), redir_transport, DeleteApp{true},
                                      realm::ReconnectMode::normal, redir_provider});
         auto partition = random_string(100);
-        auto user1 = test_session.app()->backing_store()->get_current_user();
+        auto user1 = test_session.app()->current_user();
         SyncTestFile r_config(user1, partition, schema);
         // Override the default
         r_config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
@@ -1175,7 +1175,7 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
         auto transport = std::make_shared<HookedTransport>();
         TestAppSession hooked_session({session.app_session(), transport, DeleteApp{false}});
         auto app = hooked_session.app();
-        std::shared_ptr<SyncUser> user = app->backing_store()->get_current_user();
+        std::shared_ptr<SyncUser> user = app->current_user();
         REQUIRE(user);
         REQUIRE(!user->access_token_refresh_required());
         // Make the SyncUser behave as if the client clock is 31 minutes fast, so the token looks expired locally
@@ -1211,7 +1211,7 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
     SECTION("Expired Tokens") {
         sync::AccessToken token;
         {
-            std::shared_ptr<SyncUser> user = app->backing_store()->get_current_user();
+            std::shared_ptr<SyncUser> user = app->current_user();
             SyncTestFile config(app, partition, schema);
             auto r = Realm::get_shared_realm(config);
 
@@ -1234,7 +1234,7 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
         auto transport = std::make_shared<HookedTransport>();
         TestAppSession hooked_session({session.app_session(), transport, DeleteApp{false}});
         auto app = hooked_session.app();
-        std::shared_ptr<SyncUser> user = app->backing_store()->get_current_user();
+        std::shared_ptr<SyncUser> user = app->current_user();
         REQUIRE(user);
         REQUIRE(!user->access_token_refresh_required());
         // Set a bad access token, with an expired time. This will trigger a refresh initiated by the client.
@@ -1267,7 +1267,7 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
         SECTION("User is logged out if the refresh request is denied") {
             REQUIRE(user->is_logged_in());
             transport->response_hook = [&](const Request& request, const Response& response) {
-                auto user = app->backing_store()->get_current_user();
+                auto user = app->current_user();
                 REQUIRE(user);
                 // simulate the server denying the refresh
                 if (request.url.find("/session") != std::string::npos) {
@@ -1428,7 +1428,7 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
         SECTION("Disabled user results in a sync error") {
             auto creds = create_user_and_log_in(app);
             SyncTestFile config(app, partition, schema);
-            auto user = app->backing_store()->get_current_user();
+            auto user = app->current_user();
             REQUIRE(user);
             REQUIRE(app_session.admin_api.verify_access_token(user->access_token(), app_session.server_app_id));
             app_session.admin_api.disable_user_sessions(app->current_user()->identity(), app_session.server_app_id);
@@ -1446,7 +1446,7 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
             log_in(app, creds);
 
             // still referencing the same user
-            REQUIRE(user == app->backing_store()->get_current_user());
+            REQUIRE(user == app->current_user());
             REQUIRE(user->is_logged_in());
 
             {
@@ -1472,7 +1472,7 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
             log_in(app, creds);
 
             // still referencing the same user and now the user is logged in
-            REQUIRE(user == app->backing_store()->get_current_user());
+            REQUIRE(user == app->current_user());
             REQUIRE(user->is_logged_in());
 
             // new requests for an access token succeed again

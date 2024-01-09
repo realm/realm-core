@@ -304,10 +304,10 @@ TEST_CASE("app: login_with_credentials integration", "[sync][app][user][baas]") 
         int subscribe_processed = 0;
         auto token = app->subscribe([&subscribe_processed](auto& app) {
             if (!subscribe_processed) {
-                REQUIRE(app.backing_store()->get_current_user());
+                REQUIRE(app.current_user());
             }
             else {
-                REQUIRE_FALSE(app.backing_store()->get_current_user());
+                REQUIRE_FALSE(app.current_user());
             }
             subscribe_processed++;
         });
@@ -475,9 +475,9 @@ TEST_CASE("app: UsernamePasswordProviderClient integration", "[sync][app][user][
     }
 
     SECTION("log in, remove, log in") {
-        app->remove_user(app->backing_store()->get_current_user(), [](auto) {});
-        CHECK(app->backing_store()->all_users().size() == 0);
-        CHECK(app->backing_store()->get_current_user() == nullptr);
+        app->remove_user(app->current_user(), [](auto) {});
+        CHECK(app->all_users().size() == 0);
+        CHECK(app->current_user() == nullptr);
 
         auto user = log_in(app, AppCredentials::username_password(email, password));
         CHECK(user->user_profile().email() == email);
@@ -490,20 +490,20 @@ TEST_CASE("app: UsernamePasswordProviderClient integration", "[sync][app][user][
 
         log_in(app, AppCredentials::username_password(email, password));
         CHECK(user->state() == SyncUser::State::Removed);
-        CHECK(app->backing_store()->get_current_user() != user);
-        user = app->backing_store()->get_current_user();
+        CHECK(app->current_user() != user);
+        user = app->current_user();
         CHECK(user->user_profile().email() == email);
         CHECK(user->state() == SyncUser::State::LoggedIn);
 
         app->remove_user(user, [&](Optional<AppError> error) {
             REQUIRE(!error);
-            CHECK(app->backing_store()->all_users().size() == 0);
+            CHECK(app->all_users().size() == 0);
             processed = true;
         });
 
         CHECK(user->state() == SyncUser::State::Removed);
         CHECK(processed);
-        CHECK(app->backing_store()->all_users().size() == 0);
+        CHECK(app->all_users().size() == 0);
     }
 }
 
@@ -518,7 +518,7 @@ TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app][api key][baa
     App::UserAPIKey api_key;
 
     SECTION("api-key") {
-        std::shared_ptr<SyncUser> logged_in_user = app->backing_store()->get_current_user();
+        std::shared_ptr<SyncUser> logged_in_user = app->current_user();
         auto api_key_name = util::format("%1", random_string(15));
         client.create_api_key(api_key_name, logged_in_user,
                               [&](App::UserAPIKey user_api_key, Optional<AppError> error) {
@@ -644,9 +644,9 @@ TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app][api key][baa
     }
 
     SECTION("api-key against the wrong user") {
-        std::shared_ptr<SyncUser> first_user = app->backing_store()->get_current_user();
+        std::shared_ptr<SyncUser> first_user = app->current_user();
         create_user_and_log_in(app);
-        std::shared_ptr<SyncUser> second_user = app->backing_store()->get_current_user();
+        std::shared_ptr<SyncUser> second_user = app->current_user();
         REQUIRE(first_user != second_user);
         auto api_key_name = util::format("%1", random_string(15));
         App::UserAPIKey api_key;
@@ -841,39 +841,38 @@ TEST_CASE("app: Linking user identities", "[sync][app][user][baas]") {
 TEST_CASE("app: delete anonymous user integration", "[sync][app][user][baas]") {
     TestAppSession session;
     auto app = session.app();
-    auto backing_store = app->backing_store();
 
     SECTION("delete user expect success") {
-        CHECK(backing_store->all_users().size() == 1);
+        CHECK(app->all_users().size() == 1);
 
         // Log in user 1
-        auto user_a = backing_store->get_current_user();
+        auto user_a = app->current_user();
         CHECK(user_a->state() == SyncUser::State::LoggedIn);
         app->delete_user(user_a, [&](Optional<app::AppError> error) {
             REQUIRE_FALSE(error);
             // a logged out anon user will be marked as Removed, not LoggedOut
             CHECK(user_a->state() == SyncUser::State::Removed);
         });
-        CHECK(backing_store->all_users().empty());
-        CHECK(backing_store->get_current_user() == nullptr);
+        CHECK(app->all_users().empty());
+        CHECK(app->current_user() == nullptr);
 
         app->delete_user(user_a, [&](Optional<app::AppError> error) {
             CHECK(error->reason() == "User must be logged in to be deleted.");
-            CHECK(backing_store->all_users().size() == 0);
+            CHECK(app->all_users().size() == 0);
         });
 
         // Log in user 2
         auto user_b = log_in(app);
-        CHECK(backing_store->get_current_user() == user_b);
+        CHECK(app->current_user() == user_b);
         CHECK(user_b->state() == SyncUser::State::LoggedIn);
-        CHECK(backing_store->all_users().size() == 1);
+        CHECK(app->all_users().size() == 1);
 
         app->delete_user(user_b, [&](Optional<app::AppError> error) {
             REQUIRE_FALSE(error);
-            CHECK(backing_store->all_users().size() == 0);
+            CHECK(app->all_users().size() == 0);
         });
 
-        CHECK(backing_store->get_current_user() == nullptr);
+        CHECK(app->current_user() == nullptr);
 
         // check both handles are no longer valid
         CHECK(user_a->state() == SyncUser::State::Removed);
@@ -884,39 +883,38 @@ TEST_CASE("app: delete anonymous user integration", "[sync][app][user][baas]") {
 TEST_CASE("app: delete user with credentials integration", "[sync][app][user][baas]") {
     TestAppSession session;
     auto app = session.app();
-    auto backing_store = app->backing_store();
-    app->remove_user(backing_store->get_current_user(), [](auto) {});
+    app->remove_user(app->current_user(), [](auto) {});
 
     SECTION("log in and delete") {
-        CHECK(backing_store->all_users().size() == 0);
-        CHECK(backing_store->get_current_user() == nullptr);
+        CHECK(app->all_users().size() == 0);
+        CHECK(app->current_user() == nullptr);
 
         auto credentials = create_user_and_log_in(app);
-        auto user = backing_store->get_current_user();
+        auto user = app->current_user();
 
-        CHECK(backing_store->get_current_user() == user);
+        CHECK(app->current_user() == user);
         CHECK(user->state() == SyncUser::State::LoggedIn);
         app->delete_user(user, [&](Optional<app::AppError> error) {
             REQUIRE_FALSE(error);
-            CHECK(app->backing_store()->all_users().size() == 0);
+            CHECK(app->all_users().size() == 0);
         });
         CHECK(user->state() == SyncUser::State::Removed);
-        CHECK(backing_store->get_current_user() == nullptr);
+        CHECK(app->current_user() == nullptr);
 
         app->log_in_with_credentials(credentials, [](std::shared_ptr<SyncUser> user, util::Optional<AppError> error) {
             CHECK(!user);
             REQUIRE(error);
             REQUIRE(error->code() == ErrorCodes::InvalidPassword);
         });
-        CHECK(backing_store->get_current_user() == nullptr);
+        CHECK(app->current_user() == nullptr);
 
-        CHECK(backing_store->all_users().size() == 0);
+        CHECK(app->all_users().size() == 0);
         app->delete_user(user, [](Optional<app::AppError> err) {
             CHECK(err->code() > 0);
         });
 
-        CHECK(backing_store->get_current_user() == nullptr);
-        CHECK(backing_store->all_users().size() == 0);
+        CHECK(app->current_user() == nullptr);
+        CHECK(app->all_users().size() == 0);
         CHECK(user->state() == SyncUser::State::Removed);
     }
 }
@@ -934,7 +932,7 @@ TEST_CASE("app: call function", "[sync][app][function][baas]") {
         CHECK(*sum == 15);
     };
     app->call_function<int64_t>("sumFunc", toSum, checkFn);
-    app->call_function<int64_t>(app->backing_store()->get_current_user(), "sumFunc", toSum, checkFn);
+    app->call_function<int64_t>(app->current_user(), "sumFunc", toSum, checkFn);
 }
 
 // MARK: - Remote Mongo Client Tests
@@ -943,7 +941,7 @@ TEST_CASE("app: remote mongo client", "[sync][app][mongo][baas]") {
     TestAppSession session;
     auto app = session.app();
 
-    auto remote_client = app->backing_store()->get_current_user()->mongo_client("BackingDB");
+    auto remote_client = app->current_user()->mongo_client("BackingDB");
     auto app_session = get_runtime_app_session();
     auto db = remote_client.db(app_session.config.mongo_dbname);
     auto dog_collection = db["Dog"];
@@ -1611,7 +1609,7 @@ TEST_CASE("app: remote mongo client", "[sync][app][mongo][baas]") {
 TEST_CASE("app: push notifications", "[sync][app][notifications][baas]") {
     TestAppSession session;
     auto app = session.app();
-    std::shared_ptr<SyncUser> sync_user = app->backing_store()->get_current_user();
+    std::shared_ptr<SyncUser> sync_user = app->current_user();
 
     SECTION("register") {
         bool processed;
@@ -1693,10 +1691,10 @@ TEST_CASE("app: push notifications", "[sync][app][notifications][baas]") {
 TEST_CASE("app: token refresh", "[sync][app][token][baas]") {
     TestAppSession session;
     auto app = session.app();
-    std::shared_ptr<SyncUser> sync_user = app->backing_store()->get_current_user();
+    std::shared_ptr<SyncUser> sync_user = app->current_user();
     sync_user->update_access_token(ENCODE_FAKE_JWT("fake_access_token"));
 
-    auto remote_client = app->backing_store()->get_current_user()->mongo_client("BackingDB");
+    auto remote_client = app->current_user()->mongo_client("BackingDB");
     auto app_session = get_runtime_app_session();
     auto db = remote_client.db(app_session.config.mongo_dbname);
     auto dog_collection = db["Dog"];
@@ -2257,52 +2255,52 @@ TEST_CASE("app: switch user", "[sync][app][user]") {
     bool processed = false;
 
     SECTION("switch user expect success") {
-        CHECK(app->backing_store()->all_users().size() == 0);
+        CHECK(app->all_users().size() == 0);
 
         // Log in user 1
         auto user_a = log_in(app, AppCredentials::username_password("test@10gen.com", "password"));
-        CHECK(app->backing_store()->get_current_user() == user_a);
+        CHECK(app->current_user() == user_a);
 
         // Log in user 2
         auto user_b = log_in(app, AppCredentials::username_password("test2@10gen.com", "password"));
-        CHECK(app->backing_store()->get_current_user() == user_b);
+        CHECK(app->current_user() == user_b);
 
-        CHECK(app->backing_store()->all_users().size() == 2);
+        CHECK(app->all_users().size() == 2);
 
         auto user1 = app->switch_user(user_a);
         CHECK(user1 == user_a);
 
-        CHECK(app->backing_store()->get_current_user() == user_a);
+        CHECK(app->current_user() == user_a);
 
         auto user2 = app->switch_user(user_b);
         CHECK(user2 == user_b);
 
-        CHECK(app->backing_store()->get_current_user() == user_b);
+        CHECK(app->current_user() == user_b);
         processed = true;
         CHECK(processed);
     }
 
     SECTION("cannot switch to a logged out but not removed user") {
-        CHECK(app->backing_store()->all_users().size() == 0);
+        CHECK(app->all_users().size() == 0);
 
         // Log in user 1
         auto user_a = log_in(app, AppCredentials::username_password("test@10gen.com", "password"));
-        CHECK(app->backing_store()->get_current_user() == user_a);
+        CHECK(app->current_user() == user_a);
 
         app->log_out([&](Optional<AppError> error) {
             REQUIRE_FALSE(error);
         });
 
-        CHECK(app->backing_store()->get_current_user() == nullptr);
+        CHECK(app->current_user() == nullptr);
         CHECK(user_a->state() == SyncUser::State::LoggedOut);
 
         // Log in user 2
         auto user_b = log_in(app, AppCredentials::username_password("test2@10gen.com", "password"));
-        CHECK(app->backing_store()->get_current_user() == user_b);
-        CHECK(app->backing_store()->all_users().size() == 2);
+        CHECK(app->current_user() == user_b);
+        CHECK(app->all_users().size() == 2);
 
         REQUIRE_THROWS_AS(app->switch_user(user_a), AppError);
-        CHECK(app->backing_store()->get_current_user() == user_b);
+        CHECK(app->current_user() == user_b);
     }
 }
 
@@ -2311,7 +2309,7 @@ TEST_CASE("app: remove anonymous user", "[sync][app][user]") {
     auto app = tas.app();
 
     SECTION("remove user expect success") {
-        CHECK(app->backing_store()->all_users().size() == 0);
+        CHECK(app->all_users().size() == 0);
 
         // Log in user 1
         auto user_a = log_in(app);
@@ -2322,25 +2320,25 @@ TEST_CASE("app: remove anonymous user", "[sync][app][user]") {
             // a logged out anon user will be marked as Removed, not LoggedOut
             CHECK(user_a->state() == SyncUser::State::Removed);
         });
-        CHECK(app->backing_store()->all_users().empty());
+        CHECK(app->all_users().empty());
 
         app->remove_user(user_a, [&](Optional<AppError> error) {
             CHECK(error->reason() == "User has already been removed");
-            CHECK(app->backing_store()->all_users().size() == 0);
+            CHECK(app->all_users().size() == 0);
         });
 
         // Log in user 2
         auto user_b = log_in(app);
-        CHECK(app->backing_store()->get_current_user() == user_b);
+        CHECK(app->current_user() == user_b);
         CHECK(user_b->state() == SyncUser::State::LoggedIn);
-        CHECK(app->backing_store()->all_users().size() == 1);
+        CHECK(app->all_users().size() == 1);
 
         app->remove_user(user_b, [&](Optional<AppError> error) {
             REQUIRE_FALSE(error);
-            CHECK(app->backing_store()->all_users().size() == 0);
+            CHECK(app->all_users().size() == 0);
         });
 
-        CHECK(app->backing_store()->get_current_user() == nullptr);
+        CHECK(app->current_user() == nullptr);
 
         // check both handles are no longer valid
         CHECK(user_a->state() == SyncUser::State::Removed);
@@ -2353,8 +2351,8 @@ TEST_CASE("app: remove user with credentials", "[sync][app][user]") {
     auto app = tas.app();
 
     SECTION("log in, log out and remove") {
-        CHECK(app->backing_store()->all_users().size() == 0);
-        CHECK(app->backing_store()->get_current_user() == nullptr);
+        CHECK(app->all_users().size() == 0);
+        CHECK(app->current_user() == nullptr);
 
         auto user = log_in(app, AppCredentials::username_password("email", "pass"));
 
@@ -2369,14 +2367,14 @@ TEST_CASE("app: remove user with credentials", "[sync][app][user]") {
         app->remove_user(user, [&](Optional<AppError> error) {
             REQUIRE_FALSE(error);
         });
-        CHECK(app->backing_store()->all_users().size() == 0);
+        CHECK(app->all_users().size() == 0);
 
         Optional<AppError> error;
         app->remove_user(user, [&](Optional<AppError> err) {
             error = err;
         });
         CHECK(error->code() > 0);
-        CHECK(app->backing_store()->all_users().size() == 0);
+        CHECK(app->all_users().size() == 0);
         CHECK(user->state() == SyncUser::State::Removed);
     }
 }
@@ -2503,7 +2501,7 @@ TEST_CASE("app: auth providers", "[sync][app][user]") {
 
 TEST_CASE("app: refresh access token unit tests", "[sync][app][user][token]") {
     auto setup_user = [](std::shared_ptr<App> app) {
-        if (app->backing_store()->get_current_user()) {
+        if (app->current_user()) {
             return;
         }
         app->backing_store()->get_user("a_user_id", good_access_token, good_access_token, dummy_device_id);
@@ -2531,7 +2529,7 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app][user][token]") {
         setup_user(app);
 
         bool processed = false;
-        app->refresh_custom_data(app->backing_store()->get_current_user(), [&](const Optional<AppError>& error) {
+        app->refresh_custom_data(app->current_user(), [&](const Optional<AppError>& error) {
             REQUIRE_FALSE(error);
             CHECK(session_route_hit);
             processed = true;
@@ -2561,7 +2559,7 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app][user][token]") {
         setup_user(app);
 
         bool processed = false;
-        app->refresh_custom_data(app->backing_store()->get_current_user(), [&](const Optional<AppError>& error) {
+        app->refresh_custom_data(app->current_user(), [&](const Optional<AppError>& error) {
             CHECK(error->reason() == "jwt missing parts");
             CHECK(error->code() == ErrorCodes::BadToken);
             CHECK(session_route_hit);

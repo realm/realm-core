@@ -325,7 +325,7 @@ TEST_CASE("RealmBackingStore: persistent user state management", "[sync][backing
         SECTION("they should be added to the active users list when metadata is enabled") {
             config.metadata_mode = SyncManager::MetadataMode::NoEncryption;
             TestSyncManager tsm(config);
-            auto users = tsm.app()->backing_store()->all_users();
+            auto users = tsm.app()->all_users();
             REQUIRE(users.size() == 3);
             REQUIRE(validate_user_in_vector(users, identity_1, r_token_1, a_token_1, dummy_device_id));
             REQUIRE(validate_user_in_vector(users, identity_2, r_token_2, a_token_2, dummy_device_id));
@@ -335,7 +335,7 @@ TEST_CASE("RealmBackingStore: persistent user state management", "[sync][backing
         SECTION("they should not be added to the active users list when metadata is disabled") {
             config.metadata_mode = SyncManager::MetadataMode::NoMetadata;
             TestSyncManager tsm(config);
-            auto users = tsm.app()->backing_store()->all_users();
+            auto users = tsm.app()->all_users();
             REQUIRE(users.size() == 0);
         }
     }
@@ -440,7 +440,7 @@ TEST_CASE("RealmBackingStore: persistent user state management", "[sync][backing
         config.should_teardown_test_directory = false;
         SECTION("they should be cleaned up if metadata is enabled") {
             TestSyncManager tsm(config);
-            auto users = tsm.app()->backing_store()->all_users();
+            auto users = tsm.app()->all_users();
             REQUIRE(users.size() == 1);
             REQUIRE(validate_user_in_vector(users, identity_3, r_token_3, a_token_3, dummy_device_id));
             REQUIRE_REALM_DOES_NOT_EXIST(paths[0]);
@@ -458,7 +458,7 @@ TEST_CASE("RealmBackingStore: persistent user state management", "[sync][backing
             config.should_teardown_test_directory = true;
             config.metadata_mode = SyncManager::MetadataMode::NoMetadata;
             TestSyncManager tsm(config);
-            auto users = tsm.app()->backing_store()->all_users();
+            auto users = tsm.app()->all_users();
             for (auto& path : paths) {
                 REQUIRE_REALM_EXISTS(path);
             }
