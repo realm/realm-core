@@ -5,8 +5,7 @@
 * None.
 
 ### Fixed
-* <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Application may crash with `incoming_changesets.size() != 0` when a download message is mistaken for a bootstrap message (PR [#7238](https://github.com/realm/realm-core/pull/7238), since v11.8.0)
 
 ### Breaking changes
 * None.
