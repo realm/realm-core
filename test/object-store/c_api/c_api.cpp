@@ -210,7 +210,6 @@ bool rlm_val_eq(realm_value_t lhs, realm_value_t rhs)
     switch (lhs.type) {
         case RLM_TYPE_NULL:
         case RLM_TYPE_LIST:
-        case RLM_TYPE_SET:
         case RLM_TYPE_DICTIONARY:
             return true;
         case RLM_TYPE_INT:

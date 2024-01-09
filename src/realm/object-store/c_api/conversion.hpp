@@ -146,8 +146,6 @@ static inline Mixed from_capi(realm_value_t val)
             return Mixed{UUID{from_capi(val.uuid)}};
         case RLM_TYPE_LIST:
             return Mixed{0, CollectionType::List};
-        case RLM_TYPE_SET:
-            return Mixed{0, CollectionType::Set};
         case RLM_TYPE_DICTIONARY:
             return Mixed{0, CollectionType::Dictionary};
     }
@@ -230,9 +228,6 @@ static inline realm_value_t to_capi(Mixed value)
             default:
                 if (type == type_List) {
                     val.type = RLM_TYPE_LIST;
-                }
-                else if (type == type_Set) {
-                    val.type = RLM_TYPE_SET;
                 }
                 else if (type == type_Dictionary) {
                     val.type = RLM_TYPE_DICTIONARY;

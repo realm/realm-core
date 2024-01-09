@@ -132,7 +132,6 @@ typedef enum realm_value_type {
     RLM_TYPE_LINK,
     RLM_TYPE_UUID,
     RLM_TYPE_LIST,
-    RLM_TYPE_SET,
     RLM_TYPE_DICTIONARY,
 } realm_value_type_e;
 
