@@ -4692,27 +4692,31 @@ TEST_CASE("flx: pause and resume bootstrapping at query version 0", "[sync][flx]
     FLXSyncTestHarness harness("flx_pause_resume_bootstrap");
     SyncTestFile triggered_config(harness.app()->current_user(), harness.schema(), SyncConfig::FLXSyncEnabled{});
     auto [interrupted_promise, interrupted] = util::make_promise_future<void>();
-    int download_message_received_count = 0;
+    int download_message_integrated_count = 0;
     triggered_config.sync_config->on_sync_client_event_hook =
-        [promise = util::CopyablePromiseHolder(std::move(interrupted_promise)), &download_message_received_count](
+        [promise = util::CopyablePromiseHolder(std::move(interrupted_promise)), &download_message_integrated_count](
             std::weak_ptr<SyncSession> weak_sess, const SyncClientHookData& data) mutable {
             auto sess = weak_sess.lock();
-            if (!sess || data.event != SyncClientHookEvent::DownloadMessageReceived) {
+            if (!sess || data.event != SyncClientHookEvent::DownloadMessageIntegrated) {
                 return SyncClientHookAction::NoAction;
             }
 
-            if (download_message_received_count == 0) {
+            // Pause and resume the first session after the bootstrap message is integrated.
+            if (download_message_integrated_count == 0) {
                 sess->pause();
                 sess->resume();
             }
+            // Complete the test when the second session integrates the empty download
+            // message it receives.
             else {
                 promise.get_promise().emplace_value();
             }
-            ++download_message_received_count;
+            ++download_message_integrated_count;
             return SyncClientHookAction::NoAction;
         };
     auto realm = Realm::get_shared_realm(triggered_config);
     interrupted.get();
+    CHECK(download_message_integrated_count == 2);
 }
 
 } // namespace realm::app
