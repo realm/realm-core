@@ -47,6 +47,29 @@
 namespace realm::js {
 namespace {
 
+// Enum mirroring the DataType::Type, but also includes the
+// non-primitives needed for comparison in the JS SDK.
+enum class MixedDataType {
+    JSNull = -1,
+    Int = (int)DataType::Type::Int,
+    Bool = (int)DataType::Type::Bool,
+    String = (int)DataType::Type::String,
+    Binary = (int)DataType::Type::Binary,
+    Mixed = (int)DataType::Type::Mixed,
+    Timestamp = (int)DataType::Type::Timestamp,
+    Float = (int)DataType::Type::Float,
+    Double = (int)DataType::Type::Double,
+    Decimal = (int)DataType::Type::Decimal,
+    Link = (int)DataType::Type::Link,
+    ObjectId = (int)DataType::Type::ObjectId,
+    TypedLink = (int)DataType::Type::TypedLink,
+    UUID = (int)DataType::Type::UUID,
+    List = (int)type_List,
+    Set = (int)type_Set,
+    Dictionary = (int)type_Dictionary,
+    Geospatial = (int)type_Geospatial,
+};
+
 // These types are exposed to JS in the spec.
 // TODO look into moving some of this to realm-core
 struct Helpers {
@@ -285,8 +308,11 @@ struct Helpers {
         return config.needs_file_format_upgrade();
     }
 
-    static DataType get_mixed_type(const Obj& obj, ColKey col_key) {
-        return obj.get_any(col_key).get_type();
+    static MixedDataType get_mixed_type(const Obj& obj, ColKey col_key) {
+        if (obj.is_null(col_key)) {
+            return MixedDataType::JSNull;
+        }
+        return static_cast<MixedDataType>(obj.get_any(col_key).get_type().m_type);
     }
 };
 

@@ -181,14 +181,6 @@ enums:
       Embedded: 1
       TopLevelAsymmetric: 0x2
 
-  ClientResetMode:
-    cppName: ClientResyncMode
-    values:
-      - Manual
-      - DiscardLocal
-      - Recover
-      - RecoverOrDiscard
-
   DataType:
     cppName: DataType::Type
     values:
@@ -206,11 +198,28 @@ enums:
       TypedLink: 16
       UUID: 17
 
-  AppCacheMode:
-    cppName: app::App::CacheMode
+  # Mirrors the DataType::Type, but also includes the non-primitives
+  # needed for comparison in the JS SDK (see `realm_helpers.h`).
+  MixedDataType:
     values:
-      - Enabled
-      - Disabled
+      JSNull: -1
+      Int: 0
+      Bool: 1
+      String: 2
+      Binary: 4
+      Mixed: 6
+      Timestamp: 8
+      Float: 9
+      Double: 10
+      Decimal: 11
+      Link: 12
+      ObjectId: 15
+      TypedLink: 16
+      UUID: 17
+      List: 19
+      Set: 20
+      Dictionary: 21
+      Geospatial: 22
 
   AuthProvider:
     cppName: app::AuthProvider
@@ -224,6 +233,20 @@ enums:
       - USERNAME_PASSWORD
       - FUNCTION
       - API_KEY
+
+  AppCacheMode:
+    cppName: app::App::CacheMode
+    values:
+      - Enabled
+      - Disabled
+
+  ClientResetMode:
+    cppName: ClientResyncMode
+    values:
+      - Manual
+      - DiscardLocal
+      - Recover
+      - RecoverOrDiscard
 
   MetadataMode:
     cppName: SyncClientConfig::MetadataMode
@@ -708,7 +731,7 @@ classes:
       # TODO: Consider making preverify_ok a bool.
       make_ssl_verify_callback: '(callback: (server_address: const std::string&, server_port: int, pem_data: std::string_view, preverify_ok: int, depth: int) off_thread -> bool) -> SSLVerifyCallback'
       needs_file_format_upgrade: '(config: const RealmConfig&) -> bool'
-      get_mixed_type: '(obj: const Obj&, col_key: ColKey) -> DataType'
+      get_mixed_type: '(obj: const Obj&, col_key: ColKey) -> MixedDataType'
 
   LogCategoryRef:
     cppName: util::LogCategoryRef
