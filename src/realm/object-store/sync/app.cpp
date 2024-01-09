@@ -211,6 +211,9 @@ App::Config::DeviceInfo::DeviceInfo(std::string a_platform_version, std::string 
     bundle_id = a_bundle_id;
 }
 
+// NO_THREAD_SAFETY_ANALYSIS because clang generates a false positive.
+// "Calling function configure requires negative capability '!app->m_route_mutex'"
+// But 'app' is an object just created in this static method so it is not possible to annotate this in the header.
 SharedApp App::get_app(CacheMode mode, const Config& config,
                        const SyncClientConfig& sync_client_config) NO_THREAD_SAFETY_ANALYSIS
 {
