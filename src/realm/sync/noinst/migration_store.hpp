@@ -34,8 +34,7 @@ using MigrationStoreRef = std::shared_ptr<MigrationStore>;
 
 // A MigrationStore manages the PBS -> FLX migration metadata table.
 class MigrationStore : public std::enable_shared_from_this<MigrationStore> {
-    struct Private {
-    };
+    struct Private {};
 
 public:
     explicit MigrationStore(Private, DBRef db);

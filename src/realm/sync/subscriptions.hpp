@@ -294,8 +294,7 @@ using SubscriptionStoreRef = std::shared_ptr<SubscriptionStore>;
 
 // A SubscriptionStore manages the FLX metadata tables, SubscriptionSets and Subscriptions.
 class SubscriptionStore : public std::enable_shared_from_this<SubscriptionStore> {
-    struct Private {
-    };
+    struct Private {};
 
 public:
     static SubscriptionStoreRef create(DBRef db);

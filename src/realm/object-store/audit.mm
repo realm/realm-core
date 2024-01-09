@@ -615,8 +615,7 @@ private:
 // when the current one grows too large and ensuring that all of the Realms are
 // uploaded to the server.
 class AuditRealmPool : public std::enable_shared_from_this<AuditRealmPool> {
-    struct Private {
-    };
+    struct Private {};
 
 public:
     using ErrorHandler = std::function<void(SyncError)>;

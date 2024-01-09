@@ -185,8 +185,7 @@ struct RealmConfig {
 };
 
 class Realm : public std::enable_shared_from_this<Realm> {
-    struct Private {
-    };
+    struct Private {};
 
 public:
     using Config = RealmConfig;

@@ -42,8 +42,7 @@ class WeakRealmNotifier;
 // RealmCoordinator manages the weak cache of Realm instances and communication
 // between per-thread Realm instances for a given file
 class RealmCoordinator : public std::enable_shared_from_this<RealmCoordinator>, DB::CommitListener {
-    struct Private {
-    };
+    struct Private {};
 
 public:
     // Get the coordinator for the given path, creating it if neccesary

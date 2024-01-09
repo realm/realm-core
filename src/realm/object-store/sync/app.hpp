@@ -57,8 +57,7 @@ class App : public std::enable_shared_from_this<App>,
             public AppServiceClient,
             public Subscribable<App> {
 
-    struct Private {
-    };
+    struct Private {};
 
 public:
     struct Config {

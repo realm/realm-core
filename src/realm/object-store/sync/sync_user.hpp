@@ -172,8 +172,7 @@ struct SyncUserIdentity {
 // are associated with it.
 class SyncUser : public std::enable_shared_from_this<SyncUser>, public Subscribable<SyncUser> {
     friend class SyncSession;
-    struct Private {
-    };
+    struct Private {};
 
 public:
     enum class State {

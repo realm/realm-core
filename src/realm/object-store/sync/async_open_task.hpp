@@ -37,8 +37,7 @@ class RealmCoordinator;
 // Class used to wrap the intent of opening a new Realm or fully synchronize it before returning it to the user
 // Timeouts are not handled by this class but must be handled by each binding.
 class AsyncOpenTask : public std::enable_shared_from_this<AsyncOpenTask> {
-    struct Private {
-    };
+    struct Private {};
 
 public:
     using AsyncOpenCallback = util::UniqueFunction<void(ThreadSafeReference, std::exception_ptr)>;

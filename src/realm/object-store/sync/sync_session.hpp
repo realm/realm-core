@@ -103,8 +103,7 @@ private:
 } // namespace _impl
 
 class SyncSession : public std::enable_shared_from_this<SyncSession> {
-    struct Private {
-    };
+    struct Private {};
 
 public:
     enum class State {

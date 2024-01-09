@@ -120,8 +120,7 @@ using DBRef = std::shared_ptr<DB>;
 
 class DB : public std::enable_shared_from_this<DB> {
     struct ReadLockInfo;
-    struct Private {
-    };
+    struct Private {};
 
 public:
     // Create a DB and associate it with a file. DB Objects can only be associated with one file,
