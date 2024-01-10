@@ -384,7 +384,7 @@ void ArrayFlex::restore_array(Array& arr, const std::vector<int64_t>& values) co
     arr.init_from_mem(mem);
     bf_iterator it ((uint64_t*)arr.m_data, 0, width, width, 0);
     for(auto v : values) {
-        it.set_value(sign_extend_field(width, v));
+        it.set_value(v);
         ++it;
     }
     arr.update_parent();
