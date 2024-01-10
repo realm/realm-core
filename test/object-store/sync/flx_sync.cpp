@@ -4692,15 +4692,17 @@ TEST_CASE("flx: pause and resume bootstrapping at query version 0", "[sync][flx]
     FLXSyncTestHarness harness("flx_pause_resume_bootstrap");
     SyncTestFile triggered_config(harness.app()->current_user(), harness.schema(), SyncConfig::FLXSyncEnabled{});
     auto [interrupted_promise, interrupted] = util::make_promise_future<void>();
+    std::mutex download_message_mutex;
     int download_message_integrated_count = 0;
     triggered_config.sync_config->on_sync_client_event_hook =
-        [promise = util::CopyablePromiseHolder(std::move(interrupted_promise)), &download_message_integrated_count](
-            std::weak_ptr<SyncSession> weak_sess, const SyncClientHookData& data) mutable {
+        [promise = util::CopyablePromiseHolder(std::move(interrupted_promise)), &download_message_integrated_count,
+         &download_message_mutex](std::weak_ptr<SyncSession> weak_sess, const SyncClientHookData& data) mutable {
             auto sess = weak_sess.lock();
             if (!sess || data.event != SyncClientHookEvent::DownloadMessageIntegrated) {
                 return SyncClientHookAction::NoAction;
             }
 
+            std::lock_guard<std::mutex> lk(download_message_mutex);
             // Pause and resume the first session after the bootstrap message is integrated.
             if (download_message_integrated_count == 0) {
                 sess->pause();
@@ -4716,6 +4718,7 @@ TEST_CASE("flx: pause and resume bootstrapping at query version 0", "[sync][flx]
         };
     auto realm = Realm::get_shared_realm(triggered_config);
     interrupted.get();
+    std::lock_guard<std::mutex> lk(download_message_mutex);
     CHECK(download_message_integrated_count == 2);
 }
 
