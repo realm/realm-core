@@ -517,6 +517,8 @@ public:
     }
 #endif
 
+    void typed_print(std::string prefix) const;
+
 protected:
     static constexpr size_t s_table_name_ndx = 0;
     static constexpr size_t s_table_refs_ndx = 1;
@@ -1119,6 +1121,10 @@ public:
     virtual ref_type write_names(_impl::OutputStream&) = 0;
     virtual ref_type write_tables(_impl::OutputStream&) = 0;
     virtual HistoryInfo write_history(_impl::OutputStream&) = 0;
+    void typed_print(std::string prefix)
+    {
+        m_group->typed_print(prefix);
+    }
     virtual ~TableWriter() noexcept {}
 
     void set_group(const Group* g)

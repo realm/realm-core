@@ -120,6 +120,12 @@ public:
 
     void dump_objects(int64_t key_offset, std::string lead) const override;
 
+    virtual void typed_print(std::string prefix) const override
+    {
+        std::cout << "ClusterNodeInner as ";
+        Array::typed_print(prefix);
+    }
+
 private:
     static constexpr size_t s_key_ref_index = 0;
     static constexpr size_t s_sub_tree_depth_index = 1;

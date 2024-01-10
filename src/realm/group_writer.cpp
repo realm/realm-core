@@ -662,7 +662,7 @@ ref_type GroupWriter::write_group()
     // commit), as that would lead to clobbering of the previous database
     // version.
     bool deep = true, only_if_modified = true;
-    bool compress = true;
+    bool compress = false; // true;
     std::unique_ptr<InMemoryWriter> in_memory_writer;
     _impl::ArrayWriterBase* writer = this;
     if (m_alloc.is_in_memory()) {

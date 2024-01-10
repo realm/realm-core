@@ -80,9 +80,9 @@ public:
     // This structure is used to bring information back to the upper nodes when
     // inserting new objects or finding existing ones.
     struct State {
-        int64_t split_key; // When a node is split, this variable holds the value of the
-                           // first key in the new node. (Relative to the key offset)
-        MemRef mem;        // MemRef to the Cluster holding the new/found object
+        int64_t split_key;          // When a node is split, this variable holds the value of the
+                                    // first key in the new node. (Relative to the key offset)
+        MemRef mem;                 // MemRef to the Cluster holding the new/found object
         size_t index = realm::npos; // The index within the Cluster at which the object is stored.
 
         operator bool() const
@@ -113,9 +113,7 @@ public:
     {
         m_keys.set_parent(this, 0);
     }
-    virtual ~ClusterNode()
-    {
-    }
+    virtual ~ClusterNode() {}
     void init_from_parent()
     {
         ref_type ref = get_ref_from_parent();
@@ -201,6 +199,11 @@ public:
     uint64_t get_offset() const
     {
         return m_offset;
+    }
+    virtual void typed_print(std::string prefix) const
+    {
+        std::cout << "ClusterNode as ";
+        Array::typed_print(prefix);
     }
 
 protected:
@@ -354,6 +357,6 @@ private:
     void verify(ref_type ref, size_t index, util::Optional<size_t>& sz) const;
 };
 
-}
+} // namespace realm
 
 #endif /* SRC_REALM_CLUSTER_HPP_ */

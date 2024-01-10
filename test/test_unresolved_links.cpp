@@ -843,7 +843,7 @@ TEST(Unresolved_PerformanceLinkList)
     // std::cout << "Time: " << duration_cast<microseconds>(t2 - t1).count() << " us" << std::endl;
     tr->promote_to_write();
     // fails
-    // tr->verify();
+    tr->verify();
 }
 
 #endif

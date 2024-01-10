@@ -469,6 +469,8 @@ public:
     /// log2. Posssible results {0, 1, 2, 4, 8, 16, 32, 64}
     static size_t bit_width(int64_t value);
 
+    void typed_print(std::string prefix) const;
+
 protected:
     friend class NodeTree;
     void copy_on_write();

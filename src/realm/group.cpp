@@ -905,18 +905,63 @@ void Group::validate(ObjLink link) const
     }
 }
 
+void Group::typed_print(std::string prefix) const
+{
+    std::cout << "Group top array" << std::endl;
+    for (unsigned j = 0; j < m_top.size(); ++j) {
+        auto pref = prefix + "  " + to_string(j) + ":\t";
+        RefOrTagged rot = m_top.get_as_ref_or_tagged(j);
+        if (rot.is_ref() && rot.get_as_ref()) {
+            if (j == 1) {
+                // Tables
+                std::cout << pref << "All Tables" << std::endl;
+                {
+                    auto prefix = pref;
+                    Array a(m_alloc);
+                    a.init_from_ref(rot.get_as_ref());
+                    REALM_ASSERT(a.has_refs());
+                    for (unsigned j = 0; j < a.size(); ++j) {
+                        auto pref = prefix + "  " + to_string(j) + ":\t";
+                        RefOrTagged rot = a.get_as_ref_or_tagged(j);
+                        if (rot.get_as_int() == 0)
+                            continue;
+                        auto table_accessor = do_get_table(j);
+                        REALM_ASSERT(table_accessor);
+                        table_accessor->typed_print(pref, rot.get_as_ref());
+                        // Array table(m_alloc);
+                        // table.init_from_ref(rot.get_as_ref());
+                        // std::cout << pref << "Table as ";
+                        // table.typed_print(pref);
+                    }
+                }
+            }
+            else {
+                Array a(m_alloc);
+                a.init_from_ref(rot.get_as_ref());
+                std::cout << pref;
+                a.typed_print(pref);
+            }
+        }
+        else {
+            std::cout << pref << rot.get_as_int() << std::endl;
+        }
+    }
+    std::cout << "}" << std::endl;
+}
+
+
 ref_type Group::DefaultTableWriter::write_names(_impl::OutputStream& out)
 {
-    bool deep = true;              // Deep
-    bool only_if_modified = false; // Always
-    bool compress = true;
+    bool deep = true;                                                           // Deep
+    bool only_if_modified = false;                                              // Always
+    bool compress = false;                                                      // true;
     return m_group->m_table_names.write(out, deep, only_if_modified, compress); // Throws
 }
 ref_type Group::DefaultTableWriter::write_tables(_impl::OutputStream& out)
 {
-    bool deep = true;              // Deep
-    bool only_if_modified = false; // Always
-    bool compress = true;
+    bool deep = true;                                                      // Deep
+    bool only_if_modified = false;                                         // Always
+    bool compress = false;                                                 // true;
     return m_group->m_tables.write(out, deep, only_if_modified, compress); // Throws
 }
 
@@ -924,7 +969,7 @@ auto Group::DefaultTableWriter::write_history(_impl::OutputStream& out) -> Histo
 {
     bool deep = true;              // Deep
     bool only_if_modified = false; // Always
-    bool compress = true;
+    bool compress = false;         // true;
     ref_type history_ref = _impl::GroupFriend::get_history_ref(*m_group);
     HistoryInfo info;
     if (history_ref) {
@@ -1042,6 +1087,7 @@ void Group::write(std::ostream& out, int file_format_version, TableWriter& table
         REALM_ASSERT(version_number == 0 || version_number == 1);
     }
     else {
+        table_writer.typed_print("");
         // Because we need to include the total logical file size in the
         // top-array, we have to start by writing everything except the
         // top-array, and then finally compute and write a correct version of

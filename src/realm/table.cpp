@@ -4030,3 +4030,26 @@ ColKey Table::find_opposite_column(ColKey col_key) const
     }
     return ColKey();
 }
+
+void Table::typed_print(std::string prefix, ref_type ref) const
+{
+    // top ref is not accessible
+    // REALM_ASSERT(ref == ...);
+    std::cout << prefix << "Table with key = " << m_key << " {" << std::endl;
+    for (unsigned j = 0; j < m_top.size(); ++j) {
+        auto pref = prefix + "  " + to_string(j) + ":\t";
+        auto rot = m_top.get_as_ref_or_tagged(j);
+        if (rot.is_ref() && rot.get_as_ref()) {
+            if (j == 2) {
+                m_clusters.typed_print(pref);
+            }
+            else {
+                Array a(m_alloc);
+                a.init_from_ref(rot.get_as_ref());
+                std::cout << pref;
+                a.typed_print(pref);
+            }
+        }
+    }
+    std::cout << prefix << "}" << std::endl;
+}

@@ -190,6 +190,17 @@ public:
     }
     void verify() const;
 
+    void typed_print(std::string prefix) const
+    {
+        if (m_root) {
+            std::cout << prefix << "ClusterTree as ";
+            m_root->typed_print(prefix);
+        }
+        else {
+            std::cout << "Emtpy ClusterTree" << std::endl;
+        }
+    }
+
 protected:
     friend class Obj;
     friend class Cluster;
