@@ -590,9 +590,9 @@ TEST_CASE("C API (non-database)", "[c_api]") {
         auto guard = util::make_scope_exit([&temp_dir]() noexcept {
             util::try_remove_dir_recursive(temp_dir);
         });
-        app::BackingStoreConfig backing_config;
+        app::RealmBackingStoreConfig backing_config;
         backing_config.base_file_path = temp_dir;
-        backing_config.metadata_mode = app::BackingStoreConfig::MetadataMode::NoMetadata;
+        backing_config.metadata_mode = app::RealmBackingStoreConfig::MetadataMode::NoMetadata;
         auto test_app = app::App::get_app(app::App::CacheMode::Enabled, *app_config, backing_config);
         auto credentials = app::AppCredentials::anonymous();
         // Verify the values above are included in the login request

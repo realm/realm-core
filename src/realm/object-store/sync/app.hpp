@@ -25,6 +25,7 @@
 #include <realm/object-store/sync/auth_request_client.hpp>
 #include <realm/object-store/sync/generic_network_transport.hpp>
 #include <realm/object-store/sync/push_client.hpp>
+#include <realm/object-store/sync/realm_backing_store.hpp>
 #include <realm/object-store/sync/subscribable.hpp>
 
 #include <realm/object_id.hpp>
@@ -268,7 +269,7 @@ public:
 #endif // REALM_ENABLE_SYNC
     /// Get a shared pointer to a configured App instance. Sync is disabled, but the internal Realm backing store is
     /// enabled.
-    static SharedApp get_app(CacheMode mode, const Config& config, const BackingStoreConfig& store_config);
+    static SharedApp get_app(CacheMode mode, const Config& config, const RealmBackingStoreConfig& store_config);
 
     /// Return a cached app instance if one was previously generated for the `app_id`+`base_url` combo using
     /// `App::get_app()`.
@@ -557,7 +558,7 @@ private:
 #if REALM_ENABLE_SYNC
     void configure(const SyncClientConfig& sync_client_config) REQUIRES(!m_route_mutex);
 #endif // REALM_ENABLE_SYNC
-    void configure(const BackingStoreConfig& store_config) REQUIRES(!m_route_mutex);
+    void configure(const RealmBackingStoreConfig& storage_config) REQUIRES(!m_route_mutex);
 
     static std::string make_sync_route(const std::string& http_app_route);
     void update_hostname(const util::Optional<realm::SyncAppMetadata>& metadata) REQUIRES(!m_route_mutex);

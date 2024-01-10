@@ -304,7 +304,7 @@ SyncFileActionMetadataResults SyncMetadataManager::all_pending_actions() const
     return SyncFileActionMetadataResults(Results(realm, table), m_file_action_schema);
 }
 
-void SyncMetadataManager::set_current_user_identity(const std::string& identity)
+void SyncMetadataManager::set_current_user_identity(std::string_view identity)
 {
     auto realm = get_realm();
 
@@ -324,7 +324,7 @@ void SyncMetadataManager::set_current_user_identity(const std::string& identity)
     realm->commit_transaction();
 }
 
-util::Optional<SyncUserMetadata> SyncMetadataManager::get_or_make_user_metadata(const std::string& identity,
+util::Optional<SyncUserMetadata> SyncMetadataManager::get_or_make_user_metadata(std::string_view identity,
                                                                                 bool make_if_absent) const
 {
     auto realm = get_realm();
@@ -358,9 +358,9 @@ util::Optional<SyncUserMetadata> SyncMetadataManager::get_or_make_user_metadata(
 
         obj = table->create_object();
 
-        currentUserIdentityObj.set<String>(c_sync_current_user_identity, identity);
+        currentUserIdentityObj.set<String>(c_sync_current_user_identity, StringData(identity));
 
-        obj->set(schema.identity_col, identity);
+        obj->set(schema.identity_col, StringData(identity));
         obj->set(schema.state_col, (int64_t)SyncUser::State::LoggedIn);
         realm->commit_transaction();
         return SyncUserMetadata(schema, std::move(realm), *obj);
@@ -629,14 +629,14 @@ SyncUserProfile SyncUserMetadata::profile() const
     return SyncUserProfile(static_cast<bson::BsonDocument>(bson::parse(std::string_view(result))));
 }
 
-void SyncUserMetadata::set_refresh_token(const std::string& refresh_token)
+void SyncUserMetadata::set_refresh_token(std::string_view refresh_token)
 {
     if (m_invalid)
         return;
 
     REALM_ASSERT_DEBUG(m_realm);
     m_realm->begin_transaction();
-    m_obj.set<String>(m_schema.refresh_token_col, refresh_token);
+    m_obj.set<String>(m_schema.refresh_token_col, StringData(refresh_token));
     m_realm->commit_transaction();
 }
 
@@ -651,8 +651,8 @@ void SyncUserMetadata::set_state(SyncUser::State state)
     m_realm->commit_transaction();
 }
 
-void SyncUserMetadata::set_state_and_tokens(SyncUser::State state, const std::string& access_token,
-                                            const std::string& refresh_token)
+void SyncUserMetadata::set_state_and_tokens(SyncUser::State state, std::string_view access_token,
+                                            std::string_view refresh_token)
 {
     if (m_invalid)
         return;
@@ -660,8 +660,8 @@ void SyncUserMetadata::set_state_and_tokens(SyncUser::State state, const std::st
     REALM_ASSERT_DEBUG(m_realm);
     m_realm->begin_transaction();
     m_obj.set(m_schema.state_col, static_cast<int64_t>(state));
-    m_obj.set(m_schema.access_token_col, access_token);
-    m_obj.set(m_schema.refresh_token_col, refresh_token);
+    m_obj.set(m_schema.access_token_col, StringData(access_token));
+    m_obj.set(m_schema.refresh_token_col, StringData(refresh_token));
     m_realm->commit_transaction();
 }
 
@@ -688,25 +688,25 @@ void SyncUserMetadata::set_identities(std::vector<SyncUserIdentity> identities)
     m_realm->commit_transaction();
 }
 
-void SyncUserMetadata::set_access_token(const std::string& user_token)
+void SyncUserMetadata::set_access_token(std::string_view user_token)
 {
     if (m_invalid)
         return;
 
     REALM_ASSERT_DEBUG(m_realm);
     m_realm->begin_transaction();
-    m_obj.set(m_schema.access_token_col, user_token);
+    m_obj.set(m_schema.access_token_col, StringData(user_token));
     m_realm->commit_transaction();
 }
 
-void SyncUserMetadata::set_device_id(const std::string& device_id)
+void SyncUserMetadata::set_device_id(std::string_view device_id)
 {
     if (m_invalid)
         return;
 
     REALM_ASSERT_DEBUG(m_realm);
     m_realm->begin_transaction();
-    m_obj.set(m_schema.device_id_col, device_id);
+    m_obj.set(m_schema.device_id_col, StringData(device_id));
     m_realm->commit_transaction();
 }
 
@@ -744,7 +744,7 @@ std::vector<std::string> SyncUserMetadata::realm_file_paths() const
     return std::vector<std::string>(paths.begin(), paths.end());
 }
 
-void SyncUserMetadata::add_realm_file_path(const std::string& path)
+void SyncUserMetadata::add_realm_file_path(std::string_view path)
 {
     if (m_invalid)
         return;
@@ -752,7 +752,7 @@ void SyncUserMetadata::add_realm_file_path(const std::string& path)
     REALM_ASSERT_DEBUG(m_realm);
     m_realm->begin_transaction();
     Set<StringData> paths = m_obj.get_set<StringData>(m_schema.realm_file_paths_col);
-    paths.insert(path);
+    paths.insert(StringData(path));
     m_realm->commit_transaction();
 }
 

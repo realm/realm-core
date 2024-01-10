@@ -707,16 +707,7 @@ AuditRealmPool::AuditRealmPool(Private, std::shared_ptr<SyncUser> user, std::str
     , m_partition_prefix(partition_prefix)
     , m_error_handler(error_handler)
     , m_path_root([&] {
-        // FIXME: use backing_store()->path_for_realm(...)
-        auto base_file_path = m_user->app().lock()->backing_store()->config().base_file_path;
-#ifdef _WIN32 // Move to File?
-        const char separator[] = "\\";
-#else
-        const char separator[] = "/";
-#endif
-        // "$root/realm-audit/$appId/$userId/$partitonPrefix/"
-        return util::format("%2%1realm-audit%1%3%1%4%1%5%1", separator, base_file_path, app_id, m_user->identity(),
-                            partition_prefix);
+        return m_user->app().lock()->backing_store()->audit_path_root(m_user, app_id, partition_prefix);
     }())
     , m_logger(logger)
 {

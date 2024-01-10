@@ -236,7 +236,7 @@ SharedApp App::get_app(CacheMode mode, const Config& config,
 #endif // REALM_ENABLE_SYNC
 
 SharedApp App::get_app(CacheMode mode, const Config& config,
-                       const BackingStoreConfig& store_config) NO_THREAD_SAFETY_ANALYSIS
+                       const RealmBackingStoreConfig& store_config) NO_THREAD_SAFETY_ANALYSIS
 {
     if (mode == CacheMode::Enabled) {
         std::lock_guard<std::mutex> lock(s_apps_mutex);
@@ -293,7 +293,7 @@ void App::configure(const SyncClientConfig& sync_client_config)
     }
     m_sync_manager = std::make_shared<SyncManager>();
     m_sync_manager->configure(shared_from_this(), sync_route, sync_client_config);
-    configure(sync_client_config.backing_store_config);
+    configure(sync_client_config.storage_config);
 }
 
 #endif
@@ -326,9 +326,9 @@ App::App(Private, const Config& config)
 
 App::~App() {}
 
-void App::configure(const BackingStoreConfig& store_config)
+void App::configure(const RealmBackingStoreConfig& storage_config)
 {
-    m_app_backing_store = std::make_shared<RealmBackingStore>(shared_from_this(), store_config);
+    m_app_backing_store = std::make_shared<RealmBackingStore>(shared_from_this(), storage_config);
     m_app_backing_store->initialize(); // separate from construction so that shared_from_this() works
 
     if (auto metadata = m_app_backing_store->app_metadata()) {

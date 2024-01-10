@@ -65,6 +65,8 @@ struct RealmJWT {
     // Custom user data embedded in the encoded token.
     util::Optional<bson::BsonDocument> user_data;
 
+    explicit RealmJWT(std::string_view token);
+    explicit RealmJWT(StringData token);
     explicit RealmJWT(const std::string& token);
     RealmJWT() = default;
 
@@ -235,15 +237,14 @@ public:
     // or expose them in the public API.
 
     // Don't use this directly; use the `SyncManager` APIs. Public for use with `make_shared`.
-    SyncUser(Private, const std::string& refresh_token, const std::string& id, const std::string& access_token,
-             const std::string& device_id, std::shared_ptr<app::App> app);
+    SyncUser(Private, std::string_view refresh_token, std::string_view id, std::string_view access_token,
+             std::string_view device_id, std::shared_ptr<app::App> app);
     SyncUser(Private, const SyncUserMetadata& data, std::shared_ptr<app::App> app);
     SyncUser(const SyncUser&) = delete;
     SyncUser& operator=(const SyncUser&) = delete;
 
     // Atomically set the user to be logged in and update both tokens.
-    void log_in(const std::string& access_token, const std::string& refresh_token)
-        REQUIRES(!m_mutex, !m_tokens_mutex);
+    void log_in(std::string_view access_token, std::string_view refresh_token) REQUIRES(!m_mutex, !m_tokens_mutex);
 
     // Atomically set the user to be removed and remove tokens.
     void invalidate() REQUIRES(!m_mutex, !m_tokens_mutex);

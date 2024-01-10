@@ -22,7 +22,6 @@
 #include <realm/object-store/sync/app_backing_store.hpp>
 
 #include <realm/util/checked_mutex.hpp>
-#include <realm/object-store/sync/impl/sync_file.hpp>
 #include <memory>
 
 namespace realm {
@@ -36,23 +35,36 @@ class SyncAppMetadata;
 namespace realm::app {
 class App;
 
+struct RealmBackingStoreConfig {
+    enum class MetadataMode {
+        NoEncryption, // Enable metadata, but disable encryption.
+        Encryption,   // Enable metadata, and use encryption (automatic if possible).
+        NoMetadata,   // Disable metadata.
+    };
+
+    std::string base_file_path;
+    MetadataMode metadata_mode = MetadataMode::Encryption;
+    std::optional<std::vector<char>> custom_encryption_key;
+};
+
 struct RealmBackingStore final : public app::BackingStore, public std::enable_shared_from_this<RealmBackingStore> {
-    RealmBackingStore(std::weak_ptr<app::App> parent, app::BackingStoreConfig config);
+
+    RealmBackingStore(std::weak_ptr<app::App> parent, RealmBackingStoreConfig config);
     virtual ~RealmBackingStore();
-    std::shared_ptr<SyncUser> get_user(const std::string& user_id, const std::string& refresh_token,
-                                       const std::string& access_token, const std::string& device_id) override
+    std::shared_ptr<SyncUser> get_user(std::string_view user_id, std::string_view refresh_token,
+                                       std::string_view access_token, std::string_view device_id) override
         REQUIRES(!m_user_mutex, !m_file_system_mutex);
-    std::shared_ptr<SyncUser> get_existing_logged_in_user(const std::string& user_id) const override
+    std::shared_ptr<SyncUser> get_existing_logged_in_user(std::string_view user_id) const override
         REQUIRES(!m_user_mutex);
     std::vector<std::shared_ptr<SyncUser>> all_users() override REQUIRES(!m_user_mutex);
     std::shared_ptr<SyncUser> get_current_user() const override REQUIRES(!m_user_mutex, !m_file_system_mutex);
     void log_out_user(const SyncUser& user) override REQUIRES(!m_user_mutex, !m_file_system_mutex);
-    void set_current_user(const std::string& user_id) override REQUIRES(!m_user_mutex, !m_file_system_mutex);
-    void remove_user(const std::string& user_id) override REQUIRES(!m_user_mutex, !m_file_system_mutex);
-    void delete_user(const std::string& user_id) override REQUIRES(!m_user_mutex, !m_file_system_mutex);
+    void set_current_user(std::string_view user_id) override REQUIRES(!m_user_mutex, !m_file_system_mutex);
+    void remove_user(std::string_view user_id) override REQUIRES(!m_user_mutex, !m_file_system_mutex);
+    void delete_user(std::string_view user_id) override REQUIRES(!m_user_mutex, !m_file_system_mutex);
     void reset_for_testing() override REQUIRES(!m_user_mutex, !m_file_system_mutex);
     void initialize() override REQUIRES(!m_file_system_mutex, !m_user_mutex);
-    bool immediately_run_file_actions(const std::string& realm_path) override REQUIRES(!m_file_system_mutex);
+    bool immediately_run_file_actions(std::string_view realm_path) override REQUIRES(!m_file_system_mutex);
     bool perform_metadata_update(util::FunctionRef<void(SyncMetadataManager&)> update_function) const override
         REQUIRES(!m_file_system_mutex);
 
@@ -60,14 +72,24 @@ struct RealmBackingStore final : public app::BackingStore, public std::enable_sh
                                std::optional<std::string> partition_value = none) const override
         REQUIRES(!m_file_system_mutex);
 
+    std::string audit_path_root(std::shared_ptr<SyncUser> user, std::string_view app_id,
+                                std::string_view partition_prefix) const override;
+
     std::string recovery_directory_path(std::optional<std::string> const& custom_dir_name = none) const override
         REQUIRES(!m_file_system_mutex);
     std::optional<SyncAppMetadata> app_metadata() const override REQUIRES(!m_file_system_mutex);
 
+    // Access to the config that was used to create this instance.
+    const RealmBackingStoreConfig& config() const
+    {
+        return m_config;
+    }
+
 private:
-    std::shared_ptr<SyncUser> get_user_for_identity(std::string const& identity) const noexcept
-        REQUIRES(m_user_mutex);
+    std::shared_ptr<SyncUser> get_user_for_identity(std::string_view identity) const noexcept REQUIRES(m_user_mutex);
     bool run_file_action(SyncFileActionMetadata&) REQUIRES(m_file_system_mutex);
+
+    const RealmBackingStoreConfig m_config;
 
     // Protects m_users
     mutable util::CheckedMutex m_user_mutex;

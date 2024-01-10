@@ -20,7 +20,7 @@
 #define REALM_OS_SYNC_MANAGER_HPP
 
 #include <realm/object-store/shared_realm.hpp>
-#include <realm/object-store/sync/app_backing_store.hpp>
+#include <realm/object-store/sync/realm_backing_store.hpp>
 
 #include <realm/util/checked_mutex.hpp>
 #include <realm/util/logger.hpp>
@@ -62,7 +62,7 @@ struct SyncClientTimeouts {
 };
 
 struct SyncClientConfig {
-    app::BackingStoreConfig backing_store_config;
+    app::RealmBackingStoreConfig storage_config;
     using LoggerFactory = std::function<std::shared_ptr<util::Logger>(util::Logger::Level)>;
     LoggerFactory logger_factory;
     util::Logger::Level log_level = util::Logger::Level::info;
@@ -99,7 +99,7 @@ class SyncManager : public std::enable_shared_from_this<SyncManager> {
     friend class ::TestAppSession;
 
 public:
-    using MetadataMode = app::BackingStoreConfig::MetadataMode;
+    using MetadataMode = app::RealmBackingStoreConfig::MetadataMode;
 
     // Enables/disables using a single connection for all sync sessions for each host/port/user rather
     // than one per session.

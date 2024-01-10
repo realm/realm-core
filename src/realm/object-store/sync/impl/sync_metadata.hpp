@@ -84,23 +84,22 @@ public:
     std::vector<realm::SyncUserIdentity> identities() const;
     void set_identities(std::vector<SyncUserIdentity>);
 
-    void set_state_and_tokens(SyncUser::State state, const std::string& access_token,
-                              const std::string& refresh_token);
+    void set_state_and_tokens(SyncUser::State state, std::string_view access_token, std::string_view refresh_token);
 
     std::string refresh_token() const;
-    void set_refresh_token(const std::string& token);
+    void set_refresh_token(std::string_view token);
 
     std::string access_token() const;
-    void set_access_token(const std::string& token);
+    void set_access_token(std::string_view token);
 
     std::string device_id() const;
-    void set_device_id(const std::string&);
+    void set_device_id(std::string_view);
 
     SyncUserProfile profile() const;
     void set_user_profile(const SyncUserProfile&);
 
     std::vector<std::string> realm_file_paths() const;
-    void add_realm_file_path(const std::string& path);
+    void add_realm_file_path(std::string_view path);
 
     void set_state(SyncUser::State);
 
@@ -220,7 +219,7 @@ public:
 
     // Retrieve or create user metadata.
     // Note: if `make_is_absent` is true and the user has been marked for deletion, it will be unmarked.
-    util::Optional<SyncUserMetadata> get_or_make_user_metadata(const std::string& identity,
+    util::Optional<SyncUserMetadata> get_or_make_user_metadata(std::string_view identity,
                                                                bool make_if_absent = true) const;
 
     // Retrieve file action metadata.
@@ -231,7 +230,7 @@ public:
                                    SyncFileActionMetadata::Action action, StringData new_name = {}) const;
 
     util::Optional<std::string> get_current_user_identity() const;
-    void set_current_user_identity(const std::string& identity);
+    void set_current_user_identity(std::string_view identity);
 
     util::Optional<SyncAppMetadata> get_app_metadata();
     /// Set or update the cached app server metadata. The metadata will not be updated if it has already been

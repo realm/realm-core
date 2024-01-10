@@ -672,8 +672,8 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
 
         util::try_make_dir(base_file_path);
         SyncClientConfig sc_config;
-        sc_config.backing_store_config.base_file_path = base_file_path;
-        sc_config.backing_store_config.metadata_mode = realm::app::BackingStoreConfig::MetadataMode::NoEncryption;
+        sc_config.storage_config.base_file_path = base_file_path;
+        sc_config.storage_config.metadata_mode = realm::app::RealmBackingStoreConfig::MetadataMode::NoEncryption;
 
         // initialize app and sync client
         auto redir_app = app::App::get_app(app::App::CacheMode::Disabled, app_config, sc_config);
@@ -860,8 +860,8 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
 
         util::try_make_dir(base_file_path);
         SyncClientConfig sc_config;
-        sc_config.backing_store_config.base_file_path = base_file_path;
-        sc_config.backing_store_config.metadata_mode = realm::app::BackingStoreConfig::MetadataMode::NoMetadata;
+        sc_config.storage_config.base_file_path = base_file_path;
+        sc_config.storage_config.metadata_mode = realm::app::RealmBackingStoreConfig::MetadataMode::NoMetadata;
 
         // initialize app and sync client
         auto redir_app = app::App::get_app(app::App::CacheMode::Disabled, app_config, sc_config);

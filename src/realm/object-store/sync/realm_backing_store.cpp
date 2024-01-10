@@ -26,8 +26,9 @@
 using namespace realm;
 using namespace realm::app;
 
-RealmBackingStore::RealmBackingStore(std::weak_ptr<app::App> parent, app::BackingStoreConfig config)
-    : app::BackingStore(parent, config)
+RealmBackingStore::RealmBackingStore(std::weak_ptr<app::App> parent, RealmBackingStoreConfig config)
+    : app::BackingStore(parent)
+    , m_config(config)
 {
 }
 
@@ -81,11 +82,11 @@ void RealmBackingStore::initialize()
         }
 
         // Set up the metadata manager, and perform initial loading/purging work.
-        if (m_metadata_manager || m_config.metadata_mode == app::BackingStoreConfig::MetadataMode::NoMetadata) {
+        if (m_metadata_manager || m_config.metadata_mode == app::RealmBackingStoreConfig::MetadataMode::NoMetadata) {
             return;
         }
 
-        bool encrypt = m_config.metadata_mode == app::BackingStoreConfig::MetadataMode::Encryption;
+        bool encrypt = m_config.metadata_mode == app::RealmBackingStoreConfig::MetadataMode::Encryption;
         m_metadata_manager = std::make_unique<SyncMetadataManager>(m_file_manager->metadata_path(), encrypt,
                                                                    m_config.custom_encryption_key);
 
@@ -143,7 +144,7 @@ void RealmBackingStore::initialize()
     }
 }
 
-bool RealmBackingStore::immediately_run_file_actions(const std::string& realm_path)
+bool RealmBackingStore::immediately_run_file_actions(std::string_view realm_path)
 {
     util::CheckedLockGuard lock(m_file_system_mutex);
     if (!m_metadata_manager) {
@@ -200,8 +201,8 @@ bool RealmBackingStore::perform_metadata_update(util::FunctionRef<void(SyncMetad
     return true;
 }
 
-std::shared_ptr<SyncUser> RealmBackingStore::get_user(const std::string& user_id, const std::string& refresh_token,
-                                                      const std::string& access_token, const std::string& device_id)
+std::shared_ptr<SyncUser> RealmBackingStore::get_user(std::string_view user_id, std::string_view refresh_token,
+                                                      std::string_view access_token, std::string_view device_id)
 {
     std::shared_ptr<SyncUser> user;
     {
@@ -246,7 +247,7 @@ std::vector<std::shared_ptr<SyncUser>> RealmBackingStore::all_users()
     return m_users;
 }
 
-std::shared_ptr<SyncUser> RealmBackingStore::get_user_for_identity(std::string const& identity) const noexcept
+std::shared_ptr<SyncUser> RealmBackingStore::get_user_for_identity(std::string_view identity) const noexcept
 {
     auto is_active_user = [identity](auto& el) {
         return el->identity() == identity;
@@ -301,7 +302,7 @@ void RealmBackingStore::log_out_user(const SyncUser& user)
     }
 }
 
-void RealmBackingStore::set_current_user(const std::string& user_id)
+void RealmBackingStore::set_current_user(std::string_view user_id)
 {
     util::CheckedLockGuard lock(m_user_mutex);
 
@@ -311,14 +312,14 @@ void RealmBackingStore::set_current_user(const std::string& user_id)
         m_metadata_manager->set_current_user_identity(user_id);
 }
 
-void RealmBackingStore::remove_user(const std::string& user_id)
+void RealmBackingStore::remove_user(std::string_view user_id)
 {
     util::CheckedLockGuard lock(m_user_mutex);
     if (auto user = get_user_for_identity(user_id))
         user->invalidate();
 }
 
-void RealmBackingStore::delete_user(const std::string& user_id)
+void RealmBackingStore::delete_user(std::string_view user_id)
 {
     util::CheckedLockGuard lock(m_user_mutex);
     // Avoid iterating over m_users twice by not calling `get_user_for_identity`.
@@ -353,7 +354,7 @@ void RealmBackingStore::delete_user(const std::string& user_id)
     }
 }
 
-std::shared_ptr<SyncUser> RealmBackingStore::get_existing_logged_in_user(const std::string& user_id) const
+std::shared_ptr<SyncUser> RealmBackingStore::get_existing_logged_in_user(std::string_view user_id) const
 {
     util::CheckedLockGuard lock(m_user_mutex);
     auto user = get_user_for_identity(user_id);
@@ -367,7 +368,7 @@ struct UnsupportedBsonPartition : public std::logic_error {
     }
 };
 
-static std::string string_from_partition(const std::string& partition)
+static std::string string_from_partition(std::string_view partition)
 {
     bson::Bson partition_value = bson::parse(partition);
     switch (partition_value.type()) {
@@ -420,6 +421,22 @@ std::string RealmBackingStore::path_for_realm(std::shared_ptr<SyncUser> user,
         metadata->add_realm_file_path(path);
     });
     return path;
+}
+
+std::string RealmBackingStore::audit_path_root(std::shared_ptr<SyncUser> user, std::string_view app_id,
+                                               std::string_view partition_prefix) const
+{
+    REALM_ASSERT(user);
+
+#ifdef _WIN32 // Move to File?
+    const char separator[] = "\\";
+#else
+    const char separator[] = "/";
+#endif
+
+    // "$root/realm-audit/$appId/$userId/$partitonPrefix/"
+    return util::format("%2%1realm-audit%1%3%1%4%1%5%1", separator, m_config.base_file_path, app_id, user->identity(),
+                        partition_prefix);
 }
 
 std::string RealmBackingStore::recovery_directory_path(util::Optional<std::string> const& custom_dir_name) const

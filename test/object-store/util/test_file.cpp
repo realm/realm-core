@@ -197,7 +197,7 @@ OfflineAppSession::OfflineAppSession(OfflineAppSession::Config config)
     }
 
     util::try_make_dir(m_base_file_path);
-    app::BackingStoreConfig bsc;
+    app::RealmBackingStoreConfig bsc;
     bsc.base_file_path = m_base_file_path;
     bsc.metadata_mode = config.metadata_mode;
     m_app = app::App::get_app(app::App::CacheMode::Disabled, app_config, bsc);
@@ -268,13 +268,13 @@ TestAppSession::TestAppSession(Config config)
     }
 
     util::try_make_dir(m_base_file_path);
-    app::BackingStoreConfig bsc;
+    app::RealmBackingStoreConfig bsc;
     bsc.base_file_path = m_base_file_path;
-    bsc.metadata_mode = app::BackingStoreConfig::MetadataMode::NoEncryption;
+    bsc.metadata_mode = app::RealmBackingStoreConfig::MetadataMode::NoEncryption;
 
 #if REALM_ENABLE_SYNC
     SyncClientConfig sc_config;
-    sc_config.backing_store_config = bsc;
+    sc_config.storage_config = bsc;
     sc_config.reconnect_mode = config.reconnect_mode;
     sc_config.socket_provider = std::move(config.custom_socket_provider);
     // With multiplexing enabled, the linger time controls how long a
@@ -544,8 +544,8 @@ TestSyncManager::TestSyncManager(const Config& config, const SyncServer::Config&
     SyncClientConfig sc_config;
     m_base_file_path = config.base_path.empty() ? util::make_temp_dir() + random_string(10) : config.base_path;
     util::try_make_dir(m_base_file_path);
-    sc_config.backing_store_config.base_file_path = m_base_file_path;
-    sc_config.backing_store_config.metadata_mode = config.metadata_mode;
+    sc_config.storage_config.base_file_path = m_base_file_path;
+    sc_config.storage_config.metadata_mode = config.metadata_mode;
 
     m_app = app::App::get_app(app::App::CacheMode::Disabled, app_config, sc_config);
     if (config.override_sync_route) {

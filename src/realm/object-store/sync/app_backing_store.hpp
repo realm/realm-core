@@ -36,32 +36,19 @@ namespace app {
 
 class App;
 
-struct BackingStoreConfig {
-    enum class MetadataMode {
-        NoEncryption, // Enable metadata, but disable encryption.
-        Encryption,   // Enable metadata, and use encryption (automatic if possible).
-        NoMetadata,   // Disable metadata.
-    };
-
-    std::string base_file_path;
-    MetadataMode metadata_mode = MetadataMode::Encryption;
-    std::optional<std::vector<char>> custom_encryption_key;
-};
-
 class BackingStore {
 public:
-    BackingStore(std::weak_ptr<app::App> parent, BackingStoreConfig config)
-        : m_config(config)
-        , m_parent_app(parent)
+    BackingStore(std::weak_ptr<app::App> parent)
+        : m_parent_app(parent)
     {
     }
     // Get a sync user for a given identity, or create one if none exists yet, and set its token.
     // If a logged-out user exists, it will marked as logged back in.
-    virtual std::shared_ptr<SyncUser> get_user(const std::string& user_id, const std::string& refresh_token,
-                                               const std::string& access_token, const std::string& device_id) = 0;
+    virtual std::shared_ptr<SyncUser> get_user(std::string_view user_id, std::string_view refresh_token,
+                                               std::string_view access_token, std::string_view device_id) = 0;
 
     // Get an existing user for a given identifier, if one exists and is logged in.
-    virtual std::shared_ptr<SyncUser> get_existing_logged_in_user(const std::string& user_id) const = 0;
+    virtual std::shared_ptr<SyncUser> get_existing_logged_in_user(std::string_view user_id) const = 0;
 
     // Get all the users that are logged in and not errored out.
     virtual std::vector<std::shared_ptr<SyncUser>> all_users() = 0;
@@ -73,13 +60,13 @@ public:
     virtual void log_out_user(const SyncUser& user) = 0;
 
     // Sets the currently active user.
-    virtual void set_current_user(const std::string& user_id) = 0;
+    virtual void set_current_user(std::string_view user_id) = 0;
 
     // Removes a user
-    virtual void remove_user(const std::string& user_id) = 0;
+    virtual void remove_user(std::string_view user_id) = 0;
 
     // Permanently deletes a user.
-    virtual void delete_user(const std::string& user_id) = 0;
+    virtual void delete_user(std::string_view user_id) = 0;
 
     // Destroy all users persisted state and mark oustanding User instances as Removed
     // clean up persisted state.
@@ -95,7 +82,7 @@ public:
     // Returns whether or not a file action was successfully executed for the specified Realm.
     // Preconditions: all references to the Realm at the given path must have already been invalidated.
     // The metadata and file management subsystems must also have already been configured.
-    virtual bool immediately_run_file_actions(const std::string& original_name) = 0;
+    virtual bool immediately_run_file_actions(std::string_view original_name) = 0;
 
     // If the metadata manager is configured, perform an update. Returns `true` if the code was run.
     virtual bool perform_metadata_update(util::FunctionRef<void(SyncMetadataManager&)> update_function) const = 0;
@@ -112,7 +99,10 @@ public:
                                        std::optional<std::string> custom_file_name = std::nullopt,
                                        std::optional<std::string> partition_value = std::nullopt) const = 0;
 
-    // FIXME: see if this can be removed
+    // Get the base path where audit Realms will be stored. This path may need to be created.
+    virtual std::string audit_path_root(std::shared_ptr<SyncUser> user, std::string_view app_id,
+                                        std::string_view partition_prefix) const = 0;
+
     // Get the path of the recovery directory for backed-up or recovered Realms.
     virtual std::string
     recovery_directory_path(std::optional<std::string> const& custom_dir_name = std::nullopt) const = 0;
@@ -120,14 +110,7 @@ public:
     // Get the app metadata for the active app.
     virtual std::optional<SyncAppMetadata> app_metadata() const = 0;
 
-    // Access to the config that was used to create this instance.
-    const BackingStoreConfig& config() const
-    {
-        return m_config;
-    }
-
 protected:
-    const BackingStoreConfig m_config;
     std::weak_ptr<app::App> m_parent_app;
 };
 

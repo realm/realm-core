@@ -2751,8 +2751,8 @@ TEST_CASE("app: shared instances", "[sync][app]") {
     App::Config base_config;
     set_app_config_defaults(base_config, instance_of<UnitTestTransport>);
 
-    app::BackingStoreConfig bsc;
-    bsc.metadata_mode = app::BackingStoreConfig::MetadataMode::NoMetadata;
+    app::RealmBackingStoreConfig bsc;
+    bsc.metadata_mode = app::RealmBackingStoreConfig::MetadataMode::NoMetadata;
     bsc.base_file_path = util::make_temp_dir();
     util::try_make_dir(bsc.base_file_path);
     auto cleanup = util::make_scope_exit([&]() noexcept {

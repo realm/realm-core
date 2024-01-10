@@ -59,7 +59,7 @@ static std::vector<std::string> split_token(const std::string& jwt)
     return parts;
 }
 
-RealmJWT::RealmJWT(const std::string& token)
+RealmJWT::RealmJWT(std::string_view token)
     : token(token)
 {
     auto parts = split_token(this->token);
@@ -74,6 +74,17 @@ RealmJWT::RealmJWT(const std::string& token)
         this->user_data = static_cast<bson::BsonDocument>(json["user_data"]);
     }
 }
+
+RealmJWT::RealmJWT(StringData token)
+    : RealmJWT(std::string_view(token))
+{
+}
+
+RealmJWT::RealmJWT(const std::string& token)
+    : RealmJWT(std::string_view(token))
+{
+}
+
 
 SyncUserIdentity::SyncUserIdentity(const std::string& id, const std::string& provider_type)
     : id(id)
@@ -92,8 +103,8 @@ static std::shared_ptr<app::App> lock_or_throw(std::weak_ptr<app::App> app)
     throw RuntimeError(ErrorCodes::RuntimeError, "Invalid operation on user which has become detached.");
 }
 
-SyncUser::SyncUser(Private, const std::string& refresh_token, const std::string& id, const std::string& access_token,
-                   const std::string& device_id, std::shared_ptr<app::App> app)
+SyncUser::SyncUser(Private, std::string_view refresh_token, std::string_view id, std::string_view access_token,
+                   std::string_view device_id, std::shared_ptr<app::App> app)
     : m_state(State::LoggedIn)
     , m_identity(id)
     , m_refresh_token(RealmJWT(refresh_token))
@@ -166,7 +177,7 @@ void SyncUser::detach_from_backing_store()
     m_app.reset();
 }
 
-void SyncUser::log_in(const std::string& access_token, const std::string& refresh_token)
+void SyncUser::log_in(std::string_view access_token, std::string_view refresh_token)
 {
     REALM_ASSERT(!access_token.empty());
     REALM_ASSERT(!refresh_token.empty());
