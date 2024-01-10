@@ -48,23 +48,21 @@ namespace realm {
 class BacklinkColumn;
 template <class>
 class BacklinkCount;
-class ColKeys;
+class TableView;
+class Group;
+class SortDescriptor;
+class TableView;
 template <class>
 class Columns;
-class DictionaryLinkValues;
-struct GlobalKey;
-class Group;
-class LinkChain;
-class SearchIndex;
-class SortDescriptor;
-class StringIndex;
-class Subexpr;
 template <class>
 class SubQuery;
-class TableView;
+class ColKeys;
+struct GlobalKey;
+class LinkChain;
+class Subexpr;
+class StringIndex;
 
-struct Link {
-};
+struct Link {};
 typedef Link BackLink;
 
 
@@ -691,6 +689,8 @@ public:
         Replication* const* m_repl;
     };
 
+    void typed_print(std::string prefix, ref_type ref) const;
+
 private:
     enum LifeCycleCookie {
         cookie_created = 0x1234,
@@ -727,13 +727,13 @@ private:
     {
         m_alloc.refresh_ref_translation();
     }
-    Spec m_spec;                                    // 1st slot in m_top
-    ClusterTree m_clusters;                         // 3rd slot in m_top
-    std::unique_ptr<ClusterTree> m_tombstones;      // 13th slot in m_top
-    TableKey m_key;                                 // 4th slot in m_top
-    Array m_index_refs;                             // 5th slot in m_top
-    Array m_opposite_table;                         // 7th slot in m_top
-    Array m_opposite_column;                        // 8th slot in m_top
+    Spec m_spec;                               // 1st slot in m_top
+    ClusterTree m_clusters;                    // 3rd slot in m_top
+    std::unique_ptr<ClusterTree> m_tombstones; // 13th slot in m_top
+    TableKey m_key;                            // 4th slot in m_top
+    Array m_index_refs;                        // 5th slot in m_top
+    Array m_opposite_table;                    // 7th slot in m_top
+    Array m_opposite_column;                   // 8th slot in m_top
     std::vector<std::unique_ptr<SearchIndex>> m_index_accessors;
     ColKey m_primary_key_col;
     Replication* const* m_repl;

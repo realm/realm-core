@@ -459,6 +459,8 @@ public:
     Array& operator=(const Array&) = delete; // not allowed
     Array(const Array&) = delete;            // not allowed
 
+    void typed_print(std::string prefix) const;
+
 protected:
     // This returns the minimum value ("lower bound") of the representable values
     // for the given bit width. Valid widths are 0, 1, 2, 4, 8, 16, 32, and 64.

@@ -1371,3 +1371,43 @@ bool QueryStateFindAll<IntegerColumn>::match(size_t index) noexcept
 
     return (m_limit > m_match_count);
 }
+
+void Array::typed_print(std::string prefix) const
+{
+    std::cout << "Generic Array @ " << m_ref;
+    if (!is_attached()) {
+        std::cout << " Unattached";
+        return;
+    }
+    if (size() == 0) {
+        std::cout << " Empty" << std::endl;
+        return;
+    }
+    std::cout << " size = " << size() << " {";
+    if (has_refs()) {
+        std::cout << std::endl;
+        for (unsigned n = 0; n < size(); ++n) {
+            auto pref = prefix + "  " + to_string(n) + ":\t";
+            RefOrTagged rot = get_as_ref_or_tagged(n);
+            if (rot.is_ref() && rot.get_as_ref()) {
+                Array a(m_alloc);
+                a.init_from_ref(rot.get_as_ref());
+                std::cout << pref;
+                a.typed_print(pref);
+            }
+            else {
+                std::cout << pref << rot.get_as_int() << std::endl;
+            }
+        }
+        std::cout << prefix << "}" << std::endl;
+    }
+    else {
+        std::cout << " Just a generic leaf }" << std::endl;
+        /*
+        for (unsigned n = 0; n < size(); ++n) {
+            auto pref = prefix + to_string(n) + ":\t";
+            std::cout << pref << get(n) << std::endl;
+        }
+        */
+    }
+}

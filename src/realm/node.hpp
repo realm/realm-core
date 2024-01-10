@@ -22,6 +22,8 @@
 #include <realm/node_header.hpp>
 #include <realm/alloc.hpp>
 
+#include <iostream>
+
 namespace realm {
 
 class Mixed;
@@ -259,6 +261,11 @@ public:
         else {
             m_missing_parent_update = true;
         }
+    }
+
+    void typed_print(int) const
+    {
+        std::cout << "Generic Node ERROR\n";
     }
 
 protected:
