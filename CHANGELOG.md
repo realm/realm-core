@@ -1,8 +1,7 @@
 # NEXT RELEASE
 
 ### Enhancements
-* <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
-* None.
+* Add support for Sync Schema Migrations. Schema versioning is introduced for synchronized realms, so a client app can open a realm at any existing version. If required, the schema is upgraded or downgraded seamlessly. (PR [#7239](https://github.com/realm/realm-core/pull/7239))
 
 ### Fixed
 * Handle `EOPNOTSUPP` when using `posix_fallocate()` and fallback to manually consume space. This should enable android users to open a Realm on restrictive filesystems. ([realm-js #6349](https://github.com/realm/realm-js/issues/6349), more prevalent since v13.23.3 with the change to `REALM_HAVE_POSIX_FALLOCATE` but it was also an issue in some platforms before this)
@@ -18,6 +17,10 @@
 
 ### Internals
 * Add support for chunked transfer encoding when using `HTTPParser`.
+* Bump the sync protocol to v11. The new protocol version comes with the following changes:
+  - JSON_ERROR server message contains the previous schema version
+  - Flexible sync BIND client message contains the current schema version
+* Add BAAS admin API to create new schema versions (drafts can be used to deploy all changes at once)
 
 ----------------------------------------------
 
@@ -137,7 +140,6 @@
 * Add baas-network-tests nightly task for testing sync client operation with non-ideal network conditions. ([PR #6852](https://github.com/realm/realm-core/pull/6852))
 * Added non-ideal network conditions and network fault tests to the evergreen nightly test runs. ([PR #7063](https://github.com/realm/realm-core/pull/7063))
 * Updated baas tests to run with dev mode disabled by default. ([PR #6852](https://github.com/realm/realm-core/pull/6852))
-* Add schema version to flexible sync client BIND message. ([#6840](https://github.com/realm/realm-core/issues/6840))
 
 ----------------------------------------------
 
