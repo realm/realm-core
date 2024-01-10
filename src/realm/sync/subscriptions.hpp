@@ -241,6 +241,7 @@ public:
     // The inserted subscription will have an empty name - to update this Subscription's query, the caller
     // will have
     std::pair<iterator, bool> insert_or_assign(const Query& query);
+    std::pair<iterator, bool> insert_or_assign(std::string table_name, std::string query_str);
 
     void import(SubscriptionSet&&);
 

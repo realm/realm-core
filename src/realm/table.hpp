@@ -506,6 +506,8 @@ public:
     // table is unchanged.
     ColKey set_nullability(ColKey col_key, bool nullable, bool throw_on_null);
 
+    ColKey convert_column_to_mixed(ColKey col_key);
+
     // Iterate through (subset of) columns. The supplied function may abort iteration
     // by returning 'IteratorControl::Stop' (early out).
     template <typename Func>

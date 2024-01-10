@@ -406,6 +406,15 @@ std::pair<SubscriptionSet::iterator, bool> MutableSubscriptionSet::insert_or_ass
     return insert_or_assign_impl(it, util::none, std::move(table_name), std::move(query_str));
 }
 
+std::pair<SubscriptionSet::iterator, bool> MutableSubscriptionSet::insert_or_assign(std::string table_name, std::string query_str)
+{
+    auto it = std::find_if(begin(), end(), [&](const Subscription& sub) {
+        return (!sub.name && sub.object_class_name == table_name && sub.query_string == query_str);
+    });
+
+    return insert_or_assign_impl(it, util::none, std::move(table_name), std::move(query_str));
+}
+
 void MutableSubscriptionSet::import(SubscriptionSet&& src_subs)
 {
     check_is_mutable();

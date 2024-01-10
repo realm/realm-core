@@ -111,47 +111,8 @@ struct TemporarySwapOut {
     T backup;
 };
 
-void InstructionApplier::operator()(const Instruction::AddTable& instr)
+void InstructionApplier::operator()(const Instruction::AddTable&)
 {
-    auto table_name = get_table_name(instr);
-
-    // Temporarily swap out the last object key so it doesn't get included in error messages
-    TemporarySwapOut<decltype(m_last_object_key)> last_object_key_guard(m_last_object_key);
-
-    auto add_table = util::overload{
-        [&](const Instruction::AddTable::TopLevelTable& spec) {
-            auto table_type = (spec.is_asymmetric ? Table::Type::TopLevelAsymmetric : Table::Type::TopLevel);
-            if (spec.pk_type == Instruction::Payload::Type::GlobalKey) {
-                m_transaction.get_or_add_table(table_name, table_type);
-            }
-            else {
-                if (!is_valid_key_type(spec.pk_type)) {
-                    bad_transaction_log("Invalid primary key type '%1' while adding table '%2'", int8_t(spec.pk_type),
-                                        table_name);
-                }
-                DataType pk_type = get_data_type(spec.pk_type);
-                StringData pk_field = get_string(spec.pk_field);
-                bool nullable = spec.pk_nullable;
-
-                if (!m_transaction.get_or_add_table_with_primary_key(table_name, pk_type, pk_field, nullable,
-                                                                     table_type)) {
-                    bad_transaction_log("AddTable: The existing table '%1' has different properties", table_name);
-                }
-            }
-        },
-        [&](const Instruction::AddTable::EmbeddedTable&) {
-            if (TableRef table = m_transaction.get_table(table_name)) {
-                if (!table->is_embedded()) {
-                    bad_transaction_log("AddTable: The existing table '%1' is not embedded", table_name);
-                }
-            }
-            else {
-                m_transaction.add_table(table_name, Table::Type::Embedded);
-            }
-        },
-    };
-
-    mpark::visit(std::move(add_table), instr.type);
 }
 
 void InstructionApplier::operator()(const Instruction::EraseTable& instr)
@@ -171,35 +132,44 @@ void InstructionApplier::operator()(const Instruction::EraseTable& instr)
 void InstructionApplier::operator()(const Instruction::CreateObject& instr)
 {
     auto table = get_table(instr);
-    ColKey pk_col = table->get_primary_key_column();
+    ColKey pk_col = table ? table->get_primary_key_column() : ColKey{};
     m_last_object_key = instr.object;
 
     mpark::visit(
         util::overload{
             [&](mpark::monostate) {
-                if (!pk_col) {
+                if (!table) {
+                    table = m_transaction.add_table_with_primary_key(get_table_name(instr), type_ObjectId, "_id", true);
+                }
+                else if (!pk_col) {
                     bad_transaction_log("CreateObject(NULL) on table without a primary key");
                 }
                 if (!table->is_nullable(pk_col)) {
-                    bad_transaction_log("CreateObject(NULL) on a table with a non-nullable primary key");
+                    table->set_nullability(pk_col, true, false);
                 }
                 m_last_object = table->create_object_with_primary_key(util::none);
             },
             [&](int64_t pk) {
-                if (!pk_col) {
+                if (!table) {
+                    table = m_transaction.add_table_with_primary_key(get_table_name(instr), type_Int, "_id");
+                }
+                else if (!pk_col) {
                     bad_transaction_log("CreateObject(Int) on table without a primary key");
                 }
-                if (table->get_column_type(pk_col) != type_Int) {
+                if (table->get_column_type(table->get_primary_key_column()) != type_Int) {
                     bad_transaction_log("CreateObject(Int) on a table with primary key type %1",
                                         table->get_column_type(pk_col));
                 }
                 m_last_object = table->create_object_with_primary_key(pk);
             },
             [&](InternString pk) {
-                if (!pk_col) {
+                if (!table) {
+                    table = m_transaction.add_table_with_primary_key(get_table_name(instr), type_String, "_id");
+                }
+                else if (!pk_col) {
                     bad_transaction_log("CreateObject(String) on table without a primary key");
                 }
-                if (table->get_column_type(pk_col) != type_String) {
+                if (table->get_column_type(table->get_primary_key_column()) != type_String) {
                     bad_transaction_log("CreateObject(String) on a table with primary key type %1",
                                         table->get_column_type(pk_col));
                 }
@@ -207,20 +177,26 @@ void InstructionApplier::operator()(const Instruction::CreateObject& instr)
                 m_last_object = table->create_object_with_primary_key(str);
             },
             [&](const ObjectId& id) {
-                if (!pk_col) {
+                if (!table) {
+                    table = m_transaction.add_table_with_primary_key(get_table_name(instr), type_ObjectId, "_id");
+                }
+                else if (!pk_col) {
                     bad_transaction_log("CreateObject(ObjectId) on table without a primary key");
                 }
-                if (table->get_column_type(pk_col) != type_ObjectId) {
+                if (table->get_column_type(table->get_primary_key_column()) != type_ObjectId) {
                     bad_transaction_log("CreateObject(ObjectId) on a table with primary key type %1",
                                         table->get_column_type(pk_col));
                 }
                 m_last_object = table->create_object_with_primary_key(id);
             },
             [&](const UUID& id) {
-                if (!pk_col) {
+                if (!table) {
+                    table = m_transaction.add_table_with_primary_key(get_table_name(instr), type_UUID, "_id");
+                }
+                else if (!pk_col) {
                     bad_transaction_log("CreateObject(UUID) on table without a primary key");
                 }
-                if (table->get_column_type(pk_col) != type_UUID) {
+                if (table->get_column_type(table->get_primary_key_column()) != type_UUID) {
                     bad_transaction_log("CreateObject(UUID) on a table with primary key type %1",
                                         table->get_column_type(pk_col));
                 }
@@ -238,6 +214,9 @@ void InstructionApplier::operator()(const Instruction::CreateObject& instr)
 
 void InstructionApplier::operator()(const Instruction::EraseObject& instr)
 {
+    if (auto table = get_table(instr); !table) {
+        return;
+    }
     // FIXME: Log actions.
     // Note: EraseObject is idempotent.
     if (auto obj = get_top_object(instr, "EraseObject")) {
@@ -318,6 +297,43 @@ void InstructionApplier::operator()(const Instruction::Update& instr)
             , m_instr(instr)
         {
         }
+        ResolveResult on_missing_property(Table& table, StringData field_name) override
+        {
+            // We should have seen an ArrayInsert before an Update if this were an array
+            if (m_instr.is_array_update()) {
+                return ResolveResult::DidNotResolve;
+            }
+            switch (m_instr.value.type) {
+                case instr::Payload::Type::Dictionary:
+                    if (m_instr.value.type == instr::Payload::Type::Link) {
+                        auto target_table = m_applier->get_or_create_table_for_link_target(m_instr.value);
+                        table.add_column_dictionary(*target_table, field_name);
+                    } else {
+                        table.add_column_dictionary(get_data_type(m_instr.value.type), field_name, true);
+                    }
+                    break;
+                case instr::Payload::Type::ObjectValue: {
+                    auto new_table_name = util::format("%1_%2", table.get_name(), field_name);
+                    auto embedded_table = table.get_parent_group()->add_table(new_table_name, Table::Type::Embedded);
+                    table.add_column(*embedded_table, field_name);
+                    break;
+                }
+                case instr::Payload::Type::Erased:
+                    on_error(util::format("%1: Cannot create a new column for '%2' in '%3' for an Erased sentinel",
+                                          instruction_name(), field_name, table.get_name()));
+                    return ResolveResult::DidNotResolve;
+                default:
+                    if (m_instr.value.type == Instruction::Payload::Type::Link) {
+                        auto target_table = m_applier->get_or_create_table_for_link_target(m_instr.value);
+                        table.add_column(*target_table, field_name);
+                    } else {
+                        table.add_column(get_data_type(m_instr.value.type), field_name);
+                    }
+                    break;
+            }
+
+            return ResolveResult::Success;
+        }
         void on_property(Obj& obj, ColKey col) override
         {
             // Update of object field.
@@ -355,8 +371,7 @@ void InstructionApplier::operator()(const Instruction::Update& instr)
                             obj.set_null(col, m_instr.is_default);
                         }
                         else {
-                            m_applier->bad_transaction_log("Update: NULL in non-nullable field '%2.%1'", field_name,
-                                                           table_name);
+                            table->set_nullability(col, true, false);
                         }
                     }
                     else if (data_type == type_Mixed || mixed_ptr->get_type() == data_type) {
@@ -388,7 +403,7 @@ void InstructionApplier::operator()(const Instruction::Update& instr)
 
             m_applier->visit_payload(m_instr.value, visitor);
         }
-        Status on_list_index(LstBase& list, uint32_t index) override
+        ResolveResult on_list_index(LstBase& list, uint32_t index) override
         {
             // Update of list element.
 
@@ -468,9 +483,9 @@ void InstructionApplier::operator()(const Instruction::Update& instr)
             };
 
             m_applier->visit_payload(m_instr.value, visitor);
-            return Status::Pending;
+            return ResolveResult::Pending;
         }
-        Status on_dictionary_key(Dictionary& dict, Mixed key) override
+        ResolveResult on_dictionary_key(Dictionary& dict, Mixed key) override
         {
             // Update (insert) of dictionary element.
 
@@ -506,7 +521,7 @@ void InstructionApplier::operator()(const Instruction::Update& instr)
             };
 
             m_applier->visit_payload(m_instr.value, visitor);
-            return Status::Pending;
+            return ResolveResult::Pending;
         }
 
     private:
@@ -547,114 +562,8 @@ void InstructionApplier::operator()(const Instruction::AddInteger& instr)
     resolver.resolve();
 }
 
-void InstructionApplier::operator()(const Instruction::AddColumn& instr)
+void InstructionApplier::operator()(const Instruction::AddColumn&)
 {
-    using Type = Instruction::Payload::Type;
-    using CollectionType = Instruction::AddColumn::CollectionType;
-
-    // Temporarily swap out the last object key so it doesn't get included in error messages
-    TemporarySwapOut<decltype(m_last_object_key)> last_object_key_guard(m_last_object_key);
-
-    auto table = get_table(instr, "AddColumn");
-    auto col_name = get_string(instr.field);
-
-    if (ColKey existing_key = table->get_column_key(col_name)) {
-        DataType new_type = get_data_type(instr.type);
-        ColumnType existing_type = existing_key.get_type();
-        if (existing_type != ColumnType(new_type)) {
-            bad_transaction_log("AddColumn: Schema mismatch for existing column in '%1.%2' (expected %3, got %4)",
-                                table->get_name(), col_name, existing_type, new_type);
-        }
-        bool existing_is_list = existing_key.is_list();
-        if ((instr.collection_type == CollectionType::List) != existing_is_list) {
-            bad_transaction_log(
-                "AddColumn: Schema mismatch for existing column in '%1.%2' (existing is%3 a list, the other is%4)",
-                table->get_name(), col_name, existing_is_list ? "" : " not", existing_is_list ? " not" : "");
-        }
-        bool existing_is_set = existing_key.is_set();
-        if ((instr.collection_type == CollectionType::Set) != existing_is_set) {
-            bad_transaction_log(
-                "AddColumn: Schema mismatch for existing column in '%1.%2' (existing is%3 a set, the other is%4)",
-                table->get_name(), col_name, existing_is_set ? "" : " not", existing_is_set ? " not" : "");
-        }
-        bool existing_is_dict = existing_key.is_dictionary();
-        if ((instr.collection_type == CollectionType::Dictionary) != existing_is_dict) {
-            bad_transaction_log("AddColumn: Schema mismatch for existing column in '%1.%2' (existing is%3 a "
-                                "dictionary, the other is%4)",
-                                table->get_name(), col_name, existing_is_dict ? "" : " not",
-                                existing_is_dict ? " not" : "");
-        }
-        if (new_type == type_Link) {
-            Group::TableNameBuffer buffer;
-            auto target_table_name = Group::class_name_to_table_name(get_string(instr.link_target_table), buffer);
-            if (target_table_name != table->get_link_target(existing_key)->get_name()) {
-                bad_transaction_log("AddColumn: Schema mismatch for existing column in '%1.%2' (link targets differ)",
-                                    table->get_name(), col_name);
-            }
-        }
-        return;
-    }
-
-    if (instr.collection_type == CollectionType::Dictionary && instr.key_type != Type::String) {
-        bad_transaction_log("AddColumn '%1.%3' adding dictionary column with non-string keys", table->get_name(),
-                            col_name);
-    }
-
-    if (instr.type != Type::Link) {
-        DataType type = get_data_type(instr.type);
-        switch (instr.collection_type) {
-            case CollectionType::Single: {
-                table->add_column(type, col_name, instr.nullable);
-                break;
-            }
-            case CollectionType::List: {
-                table->add_column_list(type, col_name, instr.nullable);
-                break;
-            }
-            case CollectionType::Dictionary: {
-                DataType key_type = get_data_type(instr.key_type);
-                table->add_column_dictionary(type, col_name, instr.nullable, key_type);
-                break;
-            }
-            case CollectionType::Set: {
-                table->add_column_set(type, col_name, instr.nullable);
-                break;
-            }
-        }
-    }
-    else {
-        Group::TableNameBuffer buffer;
-        auto target_table_name = get_string(instr.link_target_table);
-        if (target_table_name.size() != 0) {
-            TableRef target = m_transaction.get_table(Group::class_name_to_table_name(target_table_name, buffer));
-            if (!target) {
-                bad_transaction_log("AddColumn(Link) '%1.%2' to table '%3' which doesn't exist", table->get_name(),
-                                    col_name, target_table_name);
-            }
-            if (instr.collection_type == CollectionType::List) {
-                table->add_column_list(*target, col_name);
-            }
-            else if (instr.collection_type == CollectionType::Set) {
-                table->add_column_set(*target, col_name);
-            }
-            else if (instr.collection_type == CollectionType::Dictionary) {
-                table->add_column_dictionary(*target, col_name);
-            }
-            else {
-                REALM_ASSERT(instr.collection_type == CollectionType::Single);
-                table->add_column(*target, col_name);
-            }
-        }
-        else {
-            if (instr.collection_type == CollectionType::List) {
-                table->add_column_list(type_TypedLink, col_name);
-            }
-            else {
-                REALM_ASSERT(instr.collection_type == CollectionType::Single);
-                table->add_column(type_TypedLink, col_name);
-            }
-        }
-    }
 }
 
 void InstructionApplier::operator()(const Instruction::EraseColumn& instr)
@@ -681,7 +590,39 @@ void InstructionApplier::operator()(const Instruction::ArrayInsert& instr)
             , m_instr(instr)
         {
         }
-        Status on_list_index(LstBase& list, uint32_t index) override
+        ResolveResult on_missing_property(Table& table, StringData field_name) override
+        {
+            switch (m_instr.value.type) {
+                case instr::Payload::Type::Dictionary:
+                    on_error(util::format("Cannot create lists of dictionaries right now :-("));
+                    return ResolveResult::DidNotResolve;
+                case instr::Payload::Type::ObjectValue: {
+                    auto new_table_name = util::format("%1_%2", table.get_name(), field_name);
+                    auto embedded_table = table.get_parent_group()->add_table(new_table_name, Table::Type::Embedded);
+                    table.add_column_list(*embedded_table, field_name);
+                    break;
+                }
+                case instr::Payload::Type::Erased:
+                    on_error(util::format("%1: Cannot create a new column for '%2' in '%3' for an Erased sentinel",
+                                          instruction_name(), field_name, table.get_name()));
+                    return ResolveResult::DidNotResolve;
+                case instr::Payload::Type::Link: {
+                    auto target_table = m_applier->get_or_create_table_for_link_target(m_instr.value);
+                    if (!target_table) {
+                        on_error(util::format("Could not get target table for link on %1", instruction_name()));
+                        return ResolveResult::DidNotResolve;
+                    }
+                    table.add_column_list(*target_table, field_name);
+                    break;
+                                                 }
+                default:
+                    table.add_column_list(type_Mixed, field_name);
+                    break;
+            }
+
+            return ResolveResult::Success;
+        }
+        ResolveResult on_list_index(LstBase& list, uint32_t index) override
         {
             auto data_type = list.get_data_type();
             auto table = list.get_table();
@@ -800,7 +741,7 @@ void InstructionApplier::operator()(const Instruction::ArrayInsert& instr)
             };
 
             m_applier->visit_payload(m_instr.value, inserter);
-            return Status::Pending;
+            return ResolveResult::Pending;
         }
 
     private:
@@ -817,7 +758,7 @@ void InstructionApplier::operator()(const Instruction::ArrayMove& instr)
             , m_instr(instr)
         {
         }
-        Status on_list_index(LstBase& list, uint32_t index) override
+        ResolveResult on_list_index(LstBase& list, uint32_t index) override
         {
             if (index >= list.size()) {
                 m_applier->bad_transaction_log("ArrayMove from out of bounds (%1 >= %2)", m_instr.index(),
@@ -835,7 +776,7 @@ void InstructionApplier::operator()(const Instruction::ArrayMove& instr)
                                                list.size(), m_instr.prior_size);
             }
             list.move(index, m_instr.ndx_2);
-            return Status::Pending;
+            return ResolveResult::Pending;
         }
 
     private:
@@ -852,7 +793,7 @@ void InstructionApplier::operator()(const Instruction::ArrayErase& instr)
             , m_instr(instr)
         {
         }
-        Status on_list_index(LstBase& list, uint32_t index) override
+        ResolveResult on_list_index(LstBase& list, uint32_t index) override
         {
             if (index >= m_instr.prior_size) {
                 m_applier->bad_transaction_log("ArrayErase: Invalid index (index = %1, prior_size = %2)", index,
@@ -866,7 +807,7 @@ void InstructionApplier::operator()(const Instruction::ArrayErase& instr)
                                                list.size(), m_instr.prior_size);
             }
             list.remove(index, index + 1);
-            return Status::Pending;
+            return ResolveResult::Pending;
         }
 
     private:
@@ -882,17 +823,9 @@ void InstructionApplier::operator()(const Instruction::Clear& instr)
             : PathResolver(applier, instr, "Clear")
         {
         }
-        void on_list(LstBase& list) override
+        ResolveResult on_missing_property(Table&, StringData) override
         {
-            list.clear();
-        }
-        void on_dictionary(Dictionary& dict) override
-        {
-            dict.clear();
-        }
-        void on_set(SetBase& set) override
-        {
-            set.clear();
+            return ResolveResult::Stop;
         }
         void on_property(Obj& obj, ColKey col_key) override
         {
@@ -931,9 +864,9 @@ bool InstructionApplier::allows_null_links(const Instruction::PathInstruction& i
             , m_allows_nulls(false)
         {
         }
-        Status on_list_index(LstBase&, uint32_t) override
+        ResolveResult on_list_index(LstBase&, uint32_t) override
         {
-            return Status::Pending;
+            return ResolveResult::Pending;
         }
         void on_list(LstBase&) override {}
         void on_set(SetBase&) override {}
@@ -941,10 +874,10 @@ bool InstructionApplier::allows_null_links(const Instruction::PathInstruction& i
         {
             m_allows_nulls = true;
         }
-        Status on_dictionary_key(Dictionary&, Mixed) override
+        ResolveResult on_dictionary_key(Dictionary&, Mixed) override
         {
             m_allows_nulls = true;
-            return Status::Pending;
+            return ResolveResult::Pending;
         }
         void on_property(Obj&, ColKey) override
         {
@@ -970,48 +903,76 @@ std::string InstructionApplier::to_string(const Instruction::PathInstruction& in
     return ss.str();
 }
 
+TableRef InstructionApplier::get_or_create_table_for_link_target(const Instruction::Payload& payload)
+{
+    using Type = Instruction::Payload::Type;
+    if (payload.type != Type::Link) {
+        return {};
+    }
+    StringData class_name = get_string(payload.data.link.target_table);
+    Group::TableNameBuffer buffer;
+    StringData target_table_name = Group::class_name_to_table_name(class_name, buffer);
+    TableRef target_table = m_transaction.get_table(target_table_name);
+    if (target_table) {
+        return target_table;
+    }
+    auto linked_pk_type = mpark::visit(
+        util::overload{[&](mpark::monostate) {
+                           return type_ObjectId; // the link exists and the pk is null
+                       },
+                       [&](int64_t) {
+                           return type_Int;
+                       },
+                       [&](InternString) {
+                           return type_String;
+                       },
+                       [&](GlobalKey) -> DataType {
+                           bad_transaction_log("Unexpected link to embedded object while validating a primary key");
+                       },
+                       [&](ObjectId) {
+                           return type_ObjectId;
+                       },
+                       [&](UUID) {
+                           return type_UUID;
+                       }},
+        payload.data.link.target);
+
+    return m_transaction.add_table_with_primary_key(target_table_name, linked_pk_type, "_id", true);
+}
+
 bool InstructionApplier::check_links_exist(const Instruction::Payload& payload)
 {
-    bool valid_payload = true;
     using Type = Instruction::Payload::Type;
-    if (payload.type == Type::Link) {
-        StringData class_name = get_string(payload.data.link.target_table);
-        Group::TableNameBuffer buffer;
-        StringData target_table_name = Group::class_name_to_table_name(class_name, buffer);
-        TableRef target_table = m_transaction.get_table(target_table_name);
-        if (!target_table) {
-            bad_transaction_log("Link with invalid target table '%1'", target_table_name);
-        }
-        if (target_table->is_embedded()) {
-            bad_transaction_log("Link to embedded table '%1'", target_table_name);
-        }
-        Mixed linked_pk =
-            mpark::visit(util::overload{[&](mpark::monostate) {
-                                            return Mixed{}; // the link exists and the pk is null
-                                        },
-                                        [&](int64_t pk) {
-                                            return Mixed{pk};
-                                        },
-                                        [&](InternString interned_pk) {
-                                            return Mixed{get_string(interned_pk)};
-                                        },
-                                        [&](GlobalKey) -> Mixed {
-                                            bad_transaction_log(
-                                                "Unexpected link to embedded object while validating a primary key");
-                                        },
-                                        [&](ObjectId pk) {
-                                            return Mixed{pk};
-                                        },
-                                        [&](UUID pk) {
-                                            return Mixed{pk};
-                                        }},
-                         payload.data.link.target);
-
-        if (!target_table->find_primary_key(linked_pk)) {
-            valid_payload = false;
-        }
+    if (payload.type != Type::Link) {
+        return true;
     }
-    return valid_payload;
+    auto target_table = get_or_create_table_for_link_target(payload);
+    auto linked_pk_val = mpark::visit(
+        util::overload{[&](mpark::monostate) {
+                           return Mixed{}; // the link exists and the pk is null
+                       },
+                       [&](int64_t pk) {
+                           return Mixed{pk};
+                       },
+                       [&](InternString interned_pk) {
+                           return Mixed{get_string(interned_pk)};
+                       },
+                       [&](GlobalKey) -> Mixed {
+                           bad_transaction_log("Unexpected link to embedded object while validating a primary key");
+                       },
+                       [&](ObjectId pk) {
+                           return Mixed{pk};
+                       },
+                       [&](UUID pk) {
+                           return Mixed{pk};
+                       }},
+        payload.data.link.target);
+
+    if (target_table->is_embedded()) {
+        bad_transaction_log("Link to embedded table '%1'", target_table->get_class_name());
+    }
+
+    return !target_table->find_primary_key(linked_pk_val).is_unresolved();
 }
 
 void InstructionApplier::operator()(const Instruction::SetInsert& instr)
@@ -1029,6 +990,39 @@ void InstructionApplier::operator()(const Instruction::SetInsert& instr)
             auto set = obj.get_set<Mixed>(col);
             on_set(set);
         }
+        ResolveResult on_missing_property(Table& table, StringData field_name) override
+        {
+            switch (m_instr.value.type) {
+                case instr::Payload::Type::Dictionary:
+                    on_error(util::format("Cannot create lists of dictionaries right now :-("));
+                    return ResolveResult::DidNotResolve;
+                case instr::Payload::Type::ObjectValue: {
+                    auto new_table_name = util::format("%1_%2", table.get_name(), field_name);
+                    auto embedded_table = table.get_parent_group()->add_table(new_table_name, Table::Type::Embedded);
+                    table.add_column_set(*embedded_table, field_name);
+                    break;
+                }
+                case instr::Payload::Type::Erased:
+                    on_error(util::format("%1: Cannot create a new column for '%2' in '%3' for an Erased sentinel",
+                                          instruction_name(), field_name, table.get_name()));
+                    return ResolveResult::DidNotResolve;
+                case instr::Payload::Type::Link: {
+                    auto target_table = m_applier->get_or_create_table_for_link_target(m_instr.value);
+                    if (!target_table) {
+                        on_error(util::format("Could not get target table for link on %1", instruction_name()));
+                        return ResolveResult::DidNotResolve;
+                    }
+                    table.add_column_set(*target_table, field_name);
+                    break;
+                                                 }
+                default:
+                    table.add_column_set(type_Mixed, field_name);
+                    break;
+            }
+
+            return ResolveResult::Success;
+        }
+
         void on_set(SetBase& set) override
         {
             auto col = set.get_col_key();
@@ -1222,7 +1216,7 @@ TableRef InstructionApplier::get_table(const Instruction::TableInstruction& inst
         auto table_name = get_table_name(instr, name);
         TableRef table = m_transaction.get_table(table_name);
         if (!table) {
-            bad_transaction_log("%1: Table '%2' does not exist", name, table_name);
+            return {};
         }
         m_last_table = table;
         m_last_table_name = instr.table;
@@ -1244,6 +1238,9 @@ util::Optional<Obj> InstructionApplier::get_top_object(const Instruction::Object
     }
     else {
         TableRef table = get_table(instr, name);
+        if (!table) {
+            return util::none;
+        }
         ObjKey key = get_object_key(*table, instr.object, name);
         if (!key) {
             return util::none;
@@ -1296,6 +1293,13 @@ InstructionApplier::PathResolver::~PathResolver()
     on_finish();
 }
 
+InstructionApplier::PathResolver::ResolveResult
+InstructionApplier::PathResolver::on_missing_property(Table& table, StringData field_name)
+{
+    m_applier->bad_transaction_log(util::format("Missing property %1 on table %2", field_name, table.get_name()));
+    return ResolveResult::DidNotResolve;
+}
+
 void InstructionApplier::PathResolver::on_property(Obj&, ColKey)
 {
     m_applier->bad_transaction_log(util::format("Invalid path for %1 (object, column)", m_instr_name));
@@ -1306,10 +1310,10 @@ void InstructionApplier::PathResolver::on_list(LstBase&)
     m_applier->bad_transaction_log(util::format("Invalid path for %1 (list)", m_instr_name));
 }
 
-InstructionApplier::PathResolver::Status InstructionApplier::PathResolver::on_list_index(LstBase&, uint32_t)
+InstructionApplier::PathResolver::ResolveResult InstructionApplier::PathResolver::on_list_index(LstBase&, uint32_t)
 {
     m_applier->bad_transaction_log(util::format("Invalid path for %1 (list, index)", m_instr_name));
-    return Status::DidNotResolve;
+    return ResolveResult::DidNotResolve;
 }
 
 void InstructionApplier::PathResolver::on_dictionary(Dictionary&)
@@ -1317,10 +1321,11 @@ void InstructionApplier::PathResolver::on_dictionary(Dictionary&)
     m_applier->bad_transaction_log(util::format("Invalid path for %1 (dictionary, key)", m_instr_name));
 }
 
-InstructionApplier::PathResolver::Status InstructionApplier::PathResolver::on_dictionary_key(Dictionary&, Mixed)
+InstructionApplier::PathResolver::ResolveResult InstructionApplier::PathResolver::on_dictionary_key(Dictionary&,
+                                                                                                    Mixed)
 {
     m_applier->bad_transaction_log(util::format("Invalid path for %1 (dictionary, key)", m_instr_name));
-    return Status::DidNotResolve;
+    return ResolveResult::DidNotResolve;
 }
 
 void InstructionApplier::PathResolver::on_set(SetBase&)
@@ -1340,22 +1345,22 @@ void InstructionApplier::PathResolver::on_column_advance(ColKey col)
 
 void InstructionApplier::PathResolver::on_dict_key_advance(StringData) {}
 
-InstructionApplier::PathResolver::Status InstructionApplier::PathResolver::on_list_index_advance(uint32_t)
+InstructionApplier::PathResolver::ResolveResult InstructionApplier::PathResolver::on_list_index_advance(uint32_t)
 {
-    return Status::Pending;
+    return ResolveResult::Pending;
 }
 
-InstructionApplier::PathResolver::Status InstructionApplier::PathResolver::on_null_link_advance(StringData,
-                                                                                                StringData)
+InstructionApplier::PathResolver::ResolveResult InstructionApplier::PathResolver::on_null_link_advance(StringData,
+                                                                                                       StringData)
 {
-    return Status::Pending;
+    return ResolveResult::Pending;
 }
 
-InstructionApplier::PathResolver::Status InstructionApplier::PathResolver::on_begin(const util::Optional<Obj>&)
+InstructionApplier::PathResolver::ResolveResult InstructionApplier::PathResolver::on_begin(const util::Optional<Obj>&)
 {
     m_applier->m_current_path = m_path_instr.path;
     m_applier->m_last_field_name = m_path_instr.field;
-    return Status::Pending;
+    return ResolveResult::Pending;
 }
 
 void InstructionApplier::PathResolver::on_finish()
@@ -1370,11 +1375,11 @@ StringData InstructionApplier::PathResolver::get_string(InternString interned)
     return m_applier->get_string(interned);
 }
 
-InstructionApplier::PathResolver::Status InstructionApplier::PathResolver::resolve()
+InstructionApplier::PathResolver::ResolveResult InstructionApplier::PathResolver::resolve()
 {
     util::Optional<Obj> obj = m_applier->get_top_object(m_path_instr, m_instr_name);
-    Status begin_status = on_begin(obj);
-    if (begin_status != Status::Pending) {
+    ResolveResult begin_status = on_begin(obj);
+    if (begin_status != ResolveResult::Pending) {
         return begin_status;
     }
     if (!obj) {
@@ -1385,19 +1390,36 @@ InstructionApplier::PathResolver::Status InstructionApplier::PathResolver::resol
 
     m_it_begin = m_path_instr.path.begin();
     m_it_end = m_path_instr.path.end();
-    Status status = resolve_field(*obj, m_path_instr.field);
-    return status == Status::Pending ? Status::Success : status;
+    ResolveResult status = resolve_field(*obj, m_path_instr.field);
+    return status == ResolveResult::Pending ? ResolveResult::Success : status;
 }
 
-InstructionApplier::PathResolver::Status InstructionApplier::PathResolver::resolve_field(Obj& obj, InternString field)
+InstructionApplier::PathResolver::ResolveResult InstructionApplier::PathResolver::resolve_field(Obj& obj,
+                                                                                                InternString field)
 {
     auto field_name = get_string(field);
     ColKey col = obj.get_table()->get_column_key(field_name);
     if (!col) {
-        on_error(util::format("%1: No such field: '%2' in class '%3'", m_instr_name, field_name,
-                              obj.get_table()->get_name()));
-        return Status::DidNotResolve;
+ //       if (m_it_begin != m_it_end) {
+ //           on_error(util::format("%1: Missing intermediate field '%2' in class '%3'", m_instr_name, field_name,
+ //                                 obj.get_table()->get_name()));
+ //           return ResolveResult::DidNotResolve;
+ //       }
+        auto res = on_missing_property(*obj.get_table(), field_name);
+
+        // If the field being missing is okay, then stop and pretend everything worked.
+        if (res == ResolveResult::Stop) {
+            return ResolveResult::Pending;
+        }
+        if (res == ResolveResult::DidNotResolve) {
+            on_error(util::format("%1: No such field: '%2' in class '%3'", m_instr_name, field_name,
+                                  obj.get_table()->get_name()));
+            return ResolveResult::DidNotResolve;
+        }
+        REALM_ASSERT(res == ResolveResult::Success);
+        col = obj.get_table()->get_column_key(field_name);
     }
+
     on_column_advance(col);
 
     if (m_it_begin == m_it_end) {
@@ -1423,7 +1445,7 @@ InstructionApplier::PathResolver::Status InstructionApplier::PathResolver::resol
         else {
             on_property(obj, col);
         }
-        return Status::Pending;
+        return ResolveResult::Pending;
     }
 
     if (col.is_list()) {
@@ -1470,9 +1492,9 @@ InstructionApplier::PathResolver::Status InstructionApplier::PathResolver::resol
                                   field_name, obj.get_table()->get_name()));
         }
         else if (obj.is_null(col)) {
-            Status null_status =
+            ResolveResult null_status =
                 on_null_link_advance(obj.get_table()->get_name(), obj.get_table()->get_column_name(col));
-            if (null_status != Status::Pending) {
+            if (null_status != ResolveResult::Pending) {
                 return null_status;
             }
             on_error(util::format("%1: Reference through NULL embedded link in field '%2' in class '%3'",
@@ -1491,11 +1513,11 @@ InstructionApplier::PathResolver::Status InstructionApplier::PathResolver::resol
         on_error(util::format("%1: Resolving path through unstructured field '%3.%2' of type %4", m_instr_name,
                               field_name, obj.get_table()->get_name(), col.get_type()));
     }
-    return Status::DidNotResolve;
+    return ResolveResult::DidNotResolve;
 }
 
-InstructionApplier::PathResolver::Status InstructionApplier::PathResolver::resolve_list_element(LstBase& list,
-                                                                                                uint32_t index)
+InstructionApplier::PathResolver::ResolveResult InstructionApplier::PathResolver::resolve_list_element(LstBase& list,
+                                                                                                       uint32_t index)
 {
     if (m_it_begin == m_it_end) {
         return on_list_index(list, index);
@@ -1509,11 +1531,11 @@ InstructionApplier::PathResolver::Status InstructionApplier::PathResolver::resol
         if (!target->is_embedded()) {
             on_error(util::format("%1: Reference through non-embedded link at '%3.%2[%4]'", m_instr_name, field_name,
                                   list.get_table()->get_name(), index));
-            return Status::DidNotResolve;
+            return ResolveResult::DidNotResolve;
         }
 
-        Status list_status = on_list_index_advance(index);
-        if (list_status != Status::Pending) {
+        ResolveResult list_status = on_list_index_advance(index);
+        if (list_status != ResolveResult::Pending) {
             return list_status;
         }
 
@@ -1557,10 +1579,10 @@ InstructionApplier::PathResolver::Status InstructionApplier::PathResolver::resol
             "%1: Resolving path through unstructured list element on '%3.%2', which is a list of type '%4'",
             m_instr_name, field_name, list.get_table()->get_name(), col.get_type()));
     }
-    return Status::DidNotResolve;
+    return ResolveResult::DidNotResolve;
 }
 
-InstructionApplier::PathResolver::Status
+InstructionApplier::PathResolver::ResolveResult
 InstructionApplier::PathResolver::resolve_dictionary_element(Dictionary& dict, InternString key)
 {
     StringData string_key = get_string(key);
@@ -1579,13 +1601,13 @@ InstructionApplier::PathResolver::resolve_dictionary_element(Dictionary& dict, I
         if (!target->is_embedded()) {
             on_error(util::format("%1: Reference through non-embedded link at '%3.%2[%4]'", m_instr_name, field_name,
                                   table->get_name(), string_key));
-            return Status::DidNotResolve;
+            return ResolveResult::DidNotResolve;
         }
 
         auto embedded_object = dict.get_object(string_key);
         if (!embedded_object) {
-            Status null_link_status = on_null_link_advance(table->get_name(), string_key);
-            if (null_link_status != Status::Pending) {
+            ResolveResult null_link_status = on_null_link_advance(table->get_name(), string_key);
+            if (null_link_status != ResolveResult::Pending) {
                 return null_link_status;
             }
             on_error(util::format("%1: Unmatched key through dictionary at '%3.%2[%4]'", m_instr_name, field_name,
@@ -1619,7 +1641,7 @@ InstructionApplier::PathResolver::resolve_dictionary_element(Dictionary& dict, I
             util::format("%1: Resolving path through non link element on '%3.%2', which is a dictionary of type '%4'",
                          m_instr_name, field_name, table->get_name(), col.get_type()));
     }
-    return Status::DidNotResolve;
+    return ResolveResult::DidNotResolve;
 }
 
 

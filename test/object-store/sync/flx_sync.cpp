@@ -134,6 +134,102 @@ std::vector<ObjectId> fill_large_array_schema(FLXSyncTestHarness& harness)
 
 } // namespace
 
+TEST_CASE("flx: no schema", "[sync][flx][baas]") {
+    const Schema crazy_schema{
+        {"TopLevel",
+         {
+             {"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+             {"queryable_int_field", PropertyType::Int | PropertyType::Nullable},
+             {"list_of_strings", PropertyType::Array | PropertyType::String},
+             {"list_of_embedded_objects", PropertyType::Array | PropertyType::Object, "TopLevel_embedded_obj"},
+             {"list_of_links", PropertyType::Array | PropertyType::Object, "OtherTopLevel"},
+             {"single_link", PropertyType::Object | PropertyType::Nullable, "OtherTopLevel"},
+         }},
+        {"TopLevel_embedded_obj",
+         ObjectSchema::ObjectType::Embedded,
+         {
+             {"str_field", PropertyType::String | PropertyType::Nullable},
+         }},
+        {"OtherTopLevel",
+         {
+             {"_id", PropertyType::String, Property::IsPrimary{true}},
+             {"queryable_int_field", PropertyType::Int | PropertyType::Nullable},
+         }},
+    };
+    FLXSyncTestHarness harness("basic_flx_connect", {crazy_schema, {"queryable_int_field"}});
+
+    auto foo_obj_id = "hello1"s;
+    auto bar_obj_id = "hello2"s;
+    auto baz_obj_id = "hello3"s;
+    auto bizz_obj_id = ObjectId::gen();
+    auto buzz_obj_id = ObjectId::gen();
+    harness.load_initial_data([&](SharedRealm realm) {
+        CppContext c(realm);
+        auto oo1 =
+            Object::create(c, realm, "OtherTopLevel",
+                           std::any(AnyDict{{"_id", foo_obj_id}, {"queryable_int_field", static_cast<int64_t>(1)}}));
+        auto oo2 =
+            Object::create(c, realm, "OtherTopLevel",
+                           std::any(AnyDict{{"_id", bar_obj_id}, {"queryable_int_field", static_cast<int64_t>(2)}}));
+        auto oo3 =
+            Object::create(c, realm, "OtherTopLevel",
+                           std::any(AnyDict{{"_id", baz_obj_id}, {"queryable_int_field", static_cast<int64_t>(3)}}));
+
+        Object::create(
+            c, realm, "TopLevel",
+            std::any(AnyDict{{"_id", bizz_obj_id},
+                             {"queryable_int_field", static_cast<int64_t>(10)},
+                             {"list_of_strings", AnyVector{"im string 1"s, "im string 2"s}},
+                             {"list_of_embedded_objects", AnyVector{AnyDict{{"str_field", "im embedded string 1"s},
+                                                                            {"str_field", "im embedded string 2"s}}}},
+                             {"list_of_links", AnyVector{oo1.get_obj(), oo3.get_obj()}}}));
+        Object::create(
+            c, realm, "TopLevel",
+            std::any(AnyDict{{"_id", buzz_obj_id},
+                             {"queryable_int_field", static_cast<int64_t>(20)},
+                             {"list_of_strings", AnyVector{"im string 3"s, "im string 4"s}},
+                             {"list_of_embedded_objects", AnyVector{AnyDict{{"str_field", "im embedded string 3"s},
+                                                                            {"str_field", "im embedded string 4"s}}}},
+                             {"list_of_links", AnyVector{oo2.get_obj()}},
+                             {"single_link", oo1.get_obj()}}));
+    });
+
+    auto test_config = harness.make_test_file();
+    test_config.schema = std::nullopt;
+    auto realm = Realm::get_shared_realm(test_config);
+
+    realm->read_group().to_json(std::cerr);
+    {
+        auto new_subs = realm->get_latest_subscription_set().make_mutable_copy();
+        new_subs.insert_or_assign("TopLevel", "queryable_int_field > 0");
+        auto subs = new_subs.commit();
+        subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
+    }
+
+    wait_for_advance(*realm);
+    realm->read_group().to_json(std::cerr);
+
+    {
+        auto new_subs = realm->get_latest_subscription_set().make_mutable_copy();
+        new_subs.insert_or_assign("OtherTopLevel", "queryable_int_field > 0");
+        auto subs = new_subs.commit();
+        subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
+    }
+
+    wait_for_advance(*realm);
+    auto table = realm->read_group().get_table("class_TopLevel");
+    Query query_foo(table);
+
+    realm->read_group().to_json(std::cerr);
+    {
+        Results results(realm, table);
+        CHECK(results.size() == 2);
+        auto obj = results.get<Obj>(0);
+        CHECK(obj.is_valid());
+        CHECK(obj.get<ObjectId>("_id") == bizz_obj_id);
+    }
+}
+
 TEST_CASE("flx: connect to FLX-enabled app", "[sync][flx][baas]") {
     FLXSyncTestHarness harness("basic_flx_connect");
 

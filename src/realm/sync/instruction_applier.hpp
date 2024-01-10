@@ -69,29 +69,33 @@ protected:
 
     Transaction& m_transaction;
 
+    DataType get_data_type_for_payload(const Instruction::Payload& payload);
+    TableRef get_or_create_table_for_link_target(const Instruction::Payload& payload);
+
     bool check_links_exist(const Instruction::Payload& payload);
     bool allows_null_links(const Instruction::PathInstruction& instr, const std::string_view& instr_name);
     std::string to_string(const Instruction::PathInstruction& instr) const;
 
     struct PathResolver {
-        enum class Status { Pending, Success, DidNotResolve };
+        enum class ResolveResult { Pending, Success, DidNotResolve, Stop };
         PathResolver(InstructionApplier* applier, const Instruction::PathInstruction& instr,
                      const std::string_view& instr_name);
         virtual ~PathResolver();
-        virtual Status resolve();
+        virtual ResolveResult resolve();
 
+        virtual ResolveResult on_missing_property(Table&, StringData);
         virtual void on_property(Obj&, ColKey);
         virtual void on_list(LstBase&);
-        [[nodiscard]] virtual Status on_list_index(LstBase&, uint32_t);
+        [[nodiscard]] virtual ResolveResult on_list_index(LstBase&, uint32_t);
         virtual void on_dictionary(Dictionary&);
-        [[nodiscard]] virtual Status on_dictionary_key(Dictionary&, Mixed);
+        [[nodiscard]] virtual ResolveResult on_dictionary_key(Dictionary&, Mixed);
         virtual void on_set(SetBase&);
         virtual void on_error(const std::string&);
         virtual void on_column_advance(ColKey);
         virtual void on_dict_key_advance(StringData);
-        [[nodiscard]] virtual Status on_list_index_advance(uint32_t);
-        [[nodiscard]] virtual Status on_null_link_advance(StringData, StringData);
-        [[nodiscard]] virtual Status on_begin(const util::Optional<Obj>& obj);
+        [[nodiscard]] virtual ResolveResult on_list_index_advance(uint32_t);
+        [[nodiscard]] virtual ResolveResult on_null_link_advance(StringData, StringData);
+        [[nodiscard]] virtual ResolveResult on_begin(const util::Optional<Obj>& obj);
         virtual void on_finish();
         virtual StringData get_string(InternString);
         const std::string_view& instruction_name() const noexcept
@@ -100,9 +104,9 @@ protected:
         }
 
     protected:
-        [[nodiscard]] Status resolve_field(Obj& obj, InternString field);
-        [[nodiscard]] Status resolve_list_element(LstBase& list, uint32_t index);
-        [[nodiscard]] Status resolve_dictionary_element(Dictionary& dict, InternString key);
+        [[nodiscard]] ResolveResult resolve_field(Obj& obj, InternString field);
+        [[nodiscard]] ResolveResult resolve_list_element(LstBase& list, uint32_t index);
+        [[nodiscard]] ResolveResult resolve_dictionary_element(Dictionary& dict, InternString key);
 
         InstructionApplier* m_applier;
         const Instruction::PathInstruction& m_path_instr;

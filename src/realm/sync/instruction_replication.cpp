@@ -193,7 +193,7 @@ Instruction::Payload::Type SyncReplication::get_payload_type(DataType type) cons
 void SyncReplication::add_class(TableKey tk, StringData name, Table::Type table_type)
 {
     Replication::add_class(tk, name, table_type);
-
+/*
     bool is_class = m_transaction->table_is_public(tk);
 
     if (is_class && !m_short_circuit) {
@@ -215,13 +215,14 @@ void SyncReplication::add_class(TableKey tk, StringData name, Table::Type table_
         }
         emit(instr);
     }
+    */
 }
 
 void SyncReplication::add_class_with_primary_key(TableKey tk, StringData name, DataType pk_type, StringData pk_field,
                                                  bool nullable, Table::Type table_type)
 {
     Replication::add_class_with_primary_key(tk, name, pk_type, pk_field, nullable, table_type);
-
+/*
     bool is_class = m_transaction->table_is_public(tk);
 
     if (is_class && !m_short_circuit) {
@@ -235,7 +236,7 @@ void SyncReplication::add_class_with_primary_key(TableKey tk, StringData name, D
         }
         instr.type = std::move(spec);
         emit(instr);
-    }
+    }*/
 }
 
 void SyncReplication::create_object(const Table* table, GlobalKey oid)
@@ -313,6 +314,9 @@ void SyncReplication::create_object_with_primary_key(const Table* table, ObjKey 
 void SyncReplication::erase_class(TableKey table_key, StringData table_name, size_t num_tables)
 {
     Replication::erase_class(table_key, table_name, num_tables);
+/*
+    StringData table_name = m_transaction->get_table_name(table_key);
+>>>>>>> theirs
 
     bool is_class = m_transaction->table_is_public(table_key);
 
@@ -323,6 +327,7 @@ void SyncReplication::erase_class(TableKey table_key, StringData table_name, siz
     }
 
     m_last_table = nullptr;
+    */
 }
 
 void SyncReplication::rename_class(TableKey, StringData)
@@ -334,6 +339,7 @@ void SyncReplication::insert_column(const Table* table, ColKey col_key, DataType
                                     Table* target_table)
 {
     Replication::insert_column(table, col_key, type, name, target_table);
+    /*
     using CollectionType = Instruction::AddColumn::CollectionType;
 
     if (select_table(*table)) {
@@ -373,12 +379,13 @@ void SyncReplication::insert_column(const Table* table, ColKey col_key, DataType
         }
         emit(instr);
     }
+    */
 }
 
 void SyncReplication::erase_column(const Table* table, ColKey col_ndx)
 {
     Replication::erase_column(table, col_ndx);
-
+/*
     if (select_table(*table)) {
         // Not allowed to remove PK/OID columns!
         REALM_ASSERT(col_ndx != table->get_primary_key_column());
@@ -387,6 +394,7 @@ void SyncReplication::erase_column(const Table* table, ColKey col_ndx)
         instr.field = m_encoder.intern_string(table->get_column_name(col_ndx));
         emit(instr);
     }
+    */
 }
 
 void SyncReplication::rename_column(const Table*, ColKey, StringData)
