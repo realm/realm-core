@@ -6,7 +6,7 @@
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* \[C-API] Fixed the return type of `realm_set_list` and `realm_set_dictionary` to be the newly inserted collection, similarly to the behavior of `list/dictionary_insert_collection`.
 
 ### Breaking changes
 * None.
