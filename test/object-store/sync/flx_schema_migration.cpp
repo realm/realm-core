@@ -57,7 +57,7 @@ void create_schema(const AppSession& app_session, std::shared_ptr<SyncUser> user
     timed_sleeping_wait_for(
         [&] {
             bson::BsonDocument filter_doc{{"app_id", ObjectId(app_session.server_app_id)},
-                                          {"versionMajor", target_schema_version}};
+                                          {"version_major", target_schema_version}};
             bool found = false;
             settings.find_one(filter_doc,
                               [&](util::Optional<bson::BsonDocument> document, util::Optional<app::AppError> error) {
