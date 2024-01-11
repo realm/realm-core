@@ -520,15 +520,16 @@ void Array::move(Array& dst, size_t ndx)
     truncate(ndx);
 }
 
-void Array::set(size_t ndx, int64_t value)
+void Array::set(size_t ndx, int64_t value, bool no_cow)
 {
     REALM_ASSERT_3(ndx, <, m_size);
     if ((this->*(m_vtable->getter))(ndx) == value)
         return;
 
-    // Check if we need to copy before modifying
-    copy_on_write(); // Throws
-
+    if (!no_cow) {
+        // Check if we need to copy before modifying
+        copy_on_write(); // Throws
+    }
     // Grow the array if needed to store this value
     ensure_minimum_width(value); // Throws
 
@@ -1407,7 +1408,7 @@ void Array::set(size_t ndx, int64_t value)
         m_encode.set_direct(*this, ndx, value);
     }
     else {
-        set_direct<width>(m_data, ndx, value);
+        realm::set_direct<width>(m_data, ndx, value);
     }
 }
 

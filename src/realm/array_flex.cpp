@@ -383,15 +383,17 @@ void ArrayFlex::restore_array(Array& arr, const std::vector<int64_t>& values) co
     // but once it finishes running, the ref of the old array is gone, so the memory is leaked.
     // previous header and ref must be stored temporary and deleted after this point
     arr.init_from_mem(mem);
-    bf_iterator it((uint64_t*)arr.m_data, 0, width, width, 0);
-    for (auto v : values) {
-        auto val = sign_extend_field(width, v);
-        it.set_value(val);
-        ++it;
-    }
-    //    size_t i = 0;
-    //    for (auto v : values)
-    //        arr.set(i++, v);
+
+    // TODO:
+    // using the iterator here should be doable!. Essentially we want to skip COW and write straight into the array.
+    // The real problem is that we compute the width and runtime, whereas the width is expected to be known at compile
+    // time.
+    //  in case of decompression this is not case.. but ... this needs to go
+    //  Also doing COW here has serious performance penalties, since we are basically copying the whole array N times.
+    //  For now we skip COW, passing the third boolean flag.
+    size_t i = 0;
+    for (auto v : values)
+        arr.set(i++, v, true);
 
     arr.update_parent();
     allocator.free_(origanal_ref, orginal_header);
