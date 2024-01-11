@@ -222,12 +222,6 @@ def doCheckInDocker(Map options = [:]) {
         REALM_ENABLE_ENCRYPTION: options.enableEncryption ? 'ON' : 'OFF',
         REALM_ENABLE_SYNC: options.enableSync ? 'ON' : 'OFF',
     ]
-    if (options.enableSync) {
-        cmakeOptions << [
-            REALM_ENABLE_AUTH_TESTS: 'ON',
-            REALM_MONGODB_ENDPOINT: 'http://mongodb-realm:9090',
-        ]
-    }
     if (longRunningTests) {
         cmakeOptions << [
             CMAKE_CXX_FLAGS: '"-DTEST_DURATION=1"',
