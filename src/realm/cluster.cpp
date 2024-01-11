@@ -1531,4 +1531,40 @@ void Cluster::remove_backlinks(const Table* origin_table, ObjKey origin_key, Col
     }
 }
 
+void Cluster::typed_print(std::string prefix, std::vector<ColKey>& col_keys) const
+{
+    REALM_ASSERT(!get_is_inner_bptree_node_from_header(get_header()));
+    std::cout << "Cluster of size " << size() << " " << header_to_string(get_header()) << std::endl;
+    for (unsigned j = 0; j < size(); ++j) {
+        RefOrTagged rot = get_as_ref_or_tagged(j);
+        auto pref = prefix + "  " + std::to_string(j) + ":\t";
+        if (rot.is_ref() && rot.get_as_ref()) {
+            if (j == 0) {
+                std::cout << pref << "Keys as ArrayUnsigned as ";
+                Array a(m_alloc);
+                a.init_from_ref(rot.get_as_ref());
+                a.typed_print(pref);
+            }
+            else {
+                auto col_key = col_keys[j - 1];
+                auto col_type = col_key.get_type();
+                auto col_attr = col_key.get_attrs();
+                std::string attr_string;
+                if (col_attr.test(col_attr_Dictionary))
+                    attr_string = "Dict:";
+                if (col_attr.test(col_attr_List))
+                    attr_string = "List:";
+                if (col_attr.test(col_attr_Set))
+                    attr_string = "Set:";
+                if (col_attr.test(col_attr_Nullable))
+                    attr_string += "Null:";
+                std::cout << pref << "Column[" << attr_string << col_type << "] as ";
+                Array a(m_alloc);
+                a.init_from_ref(rot.get_as_ref());
+                a.typed_print(pref);
+            }
+        }
+    }
+}
+
 } // namespace realm

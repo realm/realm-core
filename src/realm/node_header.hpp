@@ -25,12 +25,17 @@
 namespace realm {
 
 // The header holds metadata for all allocations. It is 8 bytes.
-// A field in byte 5 indicates the type of the allocation.
+// byte 3 indicates the type of the allocation.
 //
-// Up to and including Core v 13, this field would always hold values 0,1 or 2.
+// Up to and including Core v 13, byte 3 would always hold a value of 0x41 'A'
 // when stored in the file. This value now indicates that the chunk of memory
 // must be interpreted according to the methods in NodeHeader.
 //
+// If byte 3 has a value different from 0x41, it describes not just
+// its low level encoding, but the exact C++ type used to access it.
+// This allows us to create an accessor of the correct type to
+// access any chunk of memory.
+
 const size_t max_array_size = 0x00ffffffL;            // Maximum number of elements in an array
 const size_t max_array_payload_aligned = 0x07ffffc0L; // Maximum number of bytes that the payload of an array can be
 // Even though the encoding supports arrays with size up to max_array_payload_aligned,
@@ -361,6 +366,32 @@ public:
     //         For Flex: w + size is 6 bits for element width, 10 bits for number of elements
     //
     static std::string enc_to_string(Encoding enc)
+    {
+        switch (enc) {
+            case Encoding::WTypMult:
+                return "Mult";
+            case Encoding::WTypIgn:
+                return "Ign";
+            case Encoding::WTypBits:
+                return "Bits";
+            case Encoding::Packed:
+                return "Pack";
+            case Encoding::AofP:
+                return "AofP";
+            case Encoding::PofA:
+                return "PofA";
+            case Encoding::Flex:
+                return "Flex";
+            default:
+                return "Err";
+        }
+    }
+    static std::string header_to_string(const char* header)
+    {
+        std::string retval = "{" + std::to_string(get_kind(header)) + ":" + enc_to_string(get_encoding(header)) + "}";
+        return retval;
+    }
+
     {
         switch (enc) {
             case Encoding::WTypMult:

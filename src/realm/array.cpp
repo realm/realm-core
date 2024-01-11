@@ -1374,7 +1374,7 @@ bool QueryStateFindAll<IntegerColumn>::match(size_t index) noexcept
 
 void Array::typed_print(std::string prefix) const
 {
-    std::cout << "Generic Array @ " << m_ref;
+    std::cout << "Generic Array " << header_to_string(get_header()) << " @ " << m_ref;
     if (!is_attached()) {
         std::cout << " Unattached";
         return;
@@ -1395,14 +1395,14 @@ void Array::typed_print(std::string prefix) const
                 std::cout << pref;
                 a.typed_print(pref);
             }
-            else {
+            else if (rot.is_tagged()) {
                 std::cout << pref << rot.get_as_int() << std::endl;
             }
         }
         std::cout << prefix << "}" << std::endl;
     }
     else {
-        std::cout << " Just a generic leaf }" << std::endl;
+        std::cout << " Leaf of unknown type }" << std::endl;
         /*
         for (unsigned n = 0; n < size(); ++n) {
             auto pref = prefix + to_string(n) + ":\t";

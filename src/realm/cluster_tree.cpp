@@ -53,6 +53,10 @@ namespace realm {
 class ClusterNodeInner : public ClusterNode {
 public:
     ClusterNodeInner(Allocator& allocator, const ClusterTree& tree_top);
+    ClusterNodeInner(Allocator& allocator)
+        : ClusterNode(allocator)
+    {
+    }
     ~ClusterNodeInner() override;
 
     void create(int sub_tree_depth);
@@ -120,9 +124,40 @@ public:
 
     void dump_objects(int64_t key_offset, std::string lead) const override;
 
-    virtual void typed_print(std::string prefix) const override
+    virtual void typed_print(std::string prefix, std::vector<ColKey>& col_keys) const override
     {
-        std::cout << "ClusterNodeInner as ";
+        REALM_ASSERT(get_is_inner_bptree_node_from_header(get_header()));
+        REALM_ASSERT(has_refs());
+        std::cout << "ClusterNodeInner " << header_to_string(get_header()) << std::endl;
+        for (unsigned j = 0; j < size(); ++j) {
+            RefOrTagged rot = get_as_ref_or_tagged(j);
+            auto pref = prefix + "  " + std::to_string(j) + ":\t";
+            if (rot.is_ref() && rot.get_as_ref()) {
+                if (j == 0) {
+                    std::cout << pref << "Keys as ArrayUnsigned as ";
+                    Array a(m_alloc);
+                    a.init_from_ref(rot.get_as_ref());
+                    a.typed_print(pref);
+                }
+                else {
+                    auto header = m_alloc.translate(rot.get_as_ref());
+                    MemRef m(header, rot.get_as_ref(), m_alloc);
+                    if (get_is_inner_bptree_node_from_header(header)) {
+                        ClusterNodeInner a(m_alloc);
+                        a.init(m);
+                        std::cout << pref;
+                        a.typed_print(pref, col_keys);
+                    }
+                    else {
+                        Cluster a(m_alloc);
+                        a.init(m);
+                        std::cout << pref;
+                        a.typed_print(pref, col_keys);
+                    }
+                }
+            }
+            // just ignore entries, which are not refs.
+        }
         Array::typed_print(prefix);
     }
 
