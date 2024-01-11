@@ -4720,6 +4720,9 @@ TEST_CASE("flx: pause and resume bootstrapping at query version 0", "[sync][flx]
     interrupted.get();
     std::lock_guard<std::mutex> lk(download_message_mutex);
     CHECK(download_message_integrated_count == 2);
+    auto active_sub_set = realm->sync_session()->get_flx_subscription_store()->get_active();
+    REQUIRE(active_sub_set.version() == 0);
+    REQUIRE(active_sub_set.state() == sync::SubscriptionSet::State::Complete);
 }
 
 } // namespace realm::app
