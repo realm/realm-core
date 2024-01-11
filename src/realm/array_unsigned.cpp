@@ -66,10 +66,8 @@ inline void ArrayUnsigned::_set(size_t ndx, uint8_t width, uint64_t value)
 inline uint64_t ArrayUnsigned::_get(size_t ndx, uint8_t width) const
 {
     if (is_encoded()) {
-        // TODO: this can be any possible encoding.. cannot be a static method
         size_t v_width;
-        return ArrayFlex::get(get_header(), ndx);
-        // return ArrayFlex::get_unsigned(get_header(), ndx, v_width);
+        return ArrayFlex::get_unsigned(get_header(), ndx, v_width);
     }
     else {
         if (width == 8) {
@@ -105,9 +103,7 @@ void ArrayUnsigned::update_from_parent() noexcept
 size_t ArrayUnsigned::lower_bound(uint64_t value) const noexcept
 {
     if (is_encoded()) {
-        // BUG lower bound and upper bound are treating negative values like they were unsigned!!!
-        //  The code around ObjKeys and array unsigned does is a bit fishy here!!.
-        return m_encode.lower_bound(*this, (int64_t)value);
+        return m_encode.lower_bound(*this, value);
     }
 
     auto width = get_width_from_header(get_header());
@@ -151,7 +147,7 @@ size_t ArrayUnsigned::lower_bound(uint64_t value) const noexcept
 size_t ArrayUnsigned::upper_bound(uint64_t value) const noexcept
 {
     if (is_encoded()) {
-        return m_encode.upper_bound(*this, (int64_t)value);
+        return m_encode.upper_bound(*this, value);
     }
 
     auto width = get_width_from_header(get_header());

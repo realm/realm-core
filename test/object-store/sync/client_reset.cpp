@@ -2954,46 +2954,46 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[sync][pbs][client rese
             {dest_pk_3, 6}, 2);
     }
     SECTION("local has unresolved links") {
-//        test_reset->setup([&](SharedRealm realm) {
-//            populate_initial_state(realm);
-//
-//            auto invalidate_object = [&](SharedRealm realm, std::string_view table_name, Mixed pk) {
-//                TableRef table = get_table(*realm, table_name);
-//                Obj obj = table->get_object_with_primary_key(pk);
-//                REALM_ASSERT(obj.is_valid());
-//                if (realm->config().path == config.path) {
-//                    // the local realm does an invalidation
-//                    table->invalidate_object(obj.get_key());
-//                }
-//                else {
-//                    // the remote realm has deleted it
-//                    table->remove_object(obj.get_key());
-//                }
-//            };
-//
-//            invalidate_object(realm, "dest", dest_pk_1);
-//        });
-//
-//        SECTION("remote adds a link") {
-//            reset_collection({}, {Add{dest_pk_4}}, {dest_pk_2, dest_pk_3, dest_pk_4}, 1);
-//        }
-//        SECTION("remote removes a link") {
-//            reset_collection({}, {Remove{dest_pk_2}}, {dest_pk_3}, 1);
-//        }
-//        SECTION("remote deletes a dest object that local links to") {
-//            reset_collection({Add{dest_pk_4}}, {RemoveObject{"dest", dest_pk_4}}, {dest_pk_2, dest_pk_3}, 2);
-//        }
-//        SECTION("remote deletes a different dest object") {
-//            reset_collection({Add{dest_pk_4}}, {RemoveObject{"dest", dest_pk_2}}, {dest_pk_3, dest_pk_4}, 2);
-//        }
-//        SECTION("local adds two new links and remote deletes a different dest object") {
-//            reset_collection({Add{dest_pk_4}, Add{dest_pk_5}}, {RemoveObject{"dest", dest_pk_2}},
-//                             {dest_pk_3, dest_pk_4, dest_pk_5}, 2);
-//        }
-//        SECTION("remote deletes an object, then removes and adds to the list") {
-//            reset_collection({}, {RemoveObject{"dest", dest_pk_2}, Remove{dest_pk_3}, Add{dest_pk_4}}, {dest_pk_4},
-//                             2);
-//        }
+        test_reset->setup([&](SharedRealm realm) {
+            populate_initial_state(realm);
+
+            auto invalidate_object = [&](SharedRealm realm, std::string_view table_name, Mixed pk) {
+                TableRef table = get_table(*realm, table_name);
+                Obj obj = table->get_object_with_primary_key(pk);
+                REALM_ASSERT(obj.is_valid());
+                if (realm->config().path == config.path) {
+                    // the local realm does an invalidation
+                    table->invalidate_object(obj.get_key());
+                }
+                else {
+                    // the remote realm has deleted it
+                    table->remove_object(obj.get_key());
+                }
+            };
+
+            invalidate_object(realm, "dest", dest_pk_1);
+        });
+
+        SECTION("remote adds a link") {
+            reset_collection({}, {Add{dest_pk_4}}, {dest_pk_2, dest_pk_3, dest_pk_4}, 1);
+        }
+        SECTION("remote removes a link") {
+            reset_collection({}, {Remove{dest_pk_2}}, {dest_pk_3}, 1);
+        }
+        SECTION("remote deletes a dest object that local links to") {
+            reset_collection({Add{dest_pk_4}}, {RemoveObject{"dest", dest_pk_4}}, {dest_pk_2, dest_pk_3}, 2);
+        }
+        SECTION("remote deletes a different dest object") {
+            reset_collection({Add{dest_pk_4}}, {RemoveObject{"dest", dest_pk_2}}, {dest_pk_3, dest_pk_4}, 2);
+        }
+        SECTION("local adds two new links and remote deletes a different dest object") {
+            reset_collection({Add{dest_pk_4}, Add{dest_pk_5}}, {RemoveObject{"dest", dest_pk_2}},
+                             {dest_pk_3, dest_pk_4, dest_pk_5}, 2);
+        }
+        SECTION("remote deletes an object, then removes and adds to the list") {
+            reset_collection({}, {RemoveObject{"dest", dest_pk_2}, Remove{dest_pk_3}, Add{dest_pk_4}}, {dest_pk_4},
+                             2);
+        }
     }
 
     if (test_mode == ClientResyncMode::Recover) {

@@ -385,9 +385,13 @@ void ArrayFlex::restore_array(Array& arr, const std::vector<int64_t>& values) co
     arr.init_from_mem(mem);
     bf_iterator it((uint64_t*)arr.m_data, 0, width, width, 0);
     for (auto v : values) {
-        it.set_value(v);
+        auto val = sign_extend_field(width, v);
+        it.set_value(val);
         ++it;
     }
+    //    size_t i = 0;
+    //    for (auto v : values)
+    //        arr.set(i++, v);
 
     arr.update_parent();
     allocator.free_(origanal_ref, orginal_header);
