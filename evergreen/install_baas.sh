@@ -219,6 +219,31 @@ if [[ -z "${WORK_PATH}" ]]; then
     usage 1
 fi
 
+function get_var_from_file()
+{
+    # Usage: get_var_from_file VAR FILE
+    upper=$(echo "${1}" | tr 'a-z' 'A-Z')
+    lower=$(echo "${1}" | tr 'A-Z' 'a-z')
+    regex="^(${upper}|${lower})[ ]*=[ ]*(.*)[ ]*"
+    while read p; do
+        if [[ $p =~ $regex ]]
+        then
+            value="${BASH_REMATCH[2]}" # results are in this variable, use the second regex group
+            export ${1}=${value}
+            break
+        fi
+    done < "${2}"
+}
+
+if [[ -z "${AWS_ACCESS_KEY_ID}" || -z "${AWS_SECRET_ACCESS_KEY}" ]]; then
+    # try to read them from the usual place on disk
+    creds_file=~/.aws/credentials
+    if test -f ${creds_file}; then
+        get_var_from_file AWS_ACCESS_KEY_ID ${creds_file}
+        get_var_from_file AWS_SECRET_ACCESS_KEY ${creds_file}
+    fi
+fi
+
 if [[ -z "${AWS_ACCESS_KEY_ID}" || -z "${AWS_SECRET_ACCESS_KEY}" ]]; then
     echo "Error: AWS_ACCESS_KEY_ID and/or AWS_SECRET_ACCESS_KEY are not set"
     exit 1
@@ -340,7 +365,7 @@ git config --global url."git@github.com:".insteadOf "https://github.com/"
 
 # If a baas branch or commit version was not provided, retrieve the latest release version
 if [[ -z "${BAAS_VERSION}" ]]; then
-    BAAS_VERSION=$(${CURL} -LsS "https://realm.mongodb.com/api/private/v1.0/version" | jq -r '.backend.git_hash')
+    get_var_from_file BAAS_VERSION "${BASE_PATH}/../dependencies.list"
 fi
 
 # Clone the baas repo and check out the specified version
