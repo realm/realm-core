@@ -55,6 +55,7 @@ bool ArrayFlex::decode(Array& arr)
         auto values = fetch_signed_values_from_encoded_array(arr, v_width, ndx_width, v_size, ndx_size);
         REALM_ASSERT(values.size() == ndx_size);
         restore_array(arr, values); // restore array sets capacity
+        REALM_ASSERT(arr.size() == values.size());
         return true;
     }
     return false;
@@ -226,7 +227,7 @@ void ArrayFlex::arrange_data_in_flex_format(const Array& arr, std::vector<int64_
         auto new_value = values[indices[i]];
         REALM_ASSERT_3(new_value, ==, old_value);
     }
-    
+
     REALM_ASSERT(indices.size() == sz);
 }
 
@@ -382,11 +383,12 @@ void ArrayFlex::restore_array(Array& arr, const std::vector<int64_t>& values) co
     // but once it finishes running, the ref of the old array is gone, so the memory is leaked.
     // previous header and ref must be stored temporary and deleted after this point
     arr.init_from_mem(mem);
-    bf_iterator it ((uint64_t*)arr.m_data, 0, width, width, 0);
-    for(auto v : values) {
+    bf_iterator it((uint64_t*)arr.m_data, 0, width, width, 0);
+    for (auto v : values) {
         it.set_value(v);
         ++it;
     }
+
     arr.update_parent();
     allocator.free_(origanal_ref, orginal_header);
     size_t w = arr.get_width();

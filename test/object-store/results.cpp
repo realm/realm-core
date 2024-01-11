@@ -101,7 +101,6 @@ struct TestContext : CppContext {
     }
 };
 
-
 TEST_CASE("notifications: async delivery", "[notifications]") {
     _impl::RealmCoordinator::assert_no_open_realms();
     TestFile config;
@@ -320,7 +319,7 @@ TEST_CASE("notifications: async delivery", "[notifications]") {
             coordinator->on_change();
             r->notify();
             REQUIRE(notification_calls == 3);
-            // REQUIRE(saved_changes.insertions.count() == 100); //this fails with 105..
+            REQUIRE(saved_changes.insertions.count() == 100);
         }
     }
 

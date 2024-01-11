@@ -377,6 +377,11 @@ ref_type Array::write(_impl::ArrayWriterBase& out, bool deep, bool only_if_modif
             const auto h = encoded_array.get_header();
             REALM_ASSERT(get_kind(h) == 'B');
             REALM_ASSERT(get_encoding(h) == Encoding::Flex);
+            REALM_ASSERT(size() == encoded_array.size());
+#ifdef REALM_DEBUG
+            for (size_t i = 0; i < encoded_array.size(); ++i)
+                REALM_ASSERT(get(i) == encoded_array.get(i));
+#endif
             auto ref = encoded_array.do_write_shallow(out);
             encoded_array.destroy();
             return ref;
@@ -395,6 +400,7 @@ ref_type Array::write(ref_type ref, Allocator& alloc, _impl::ArrayWriterBase& ou
 
     Array array(alloc);
     array.init_from_ref(ref);
+    REALM_ASSERT(array.is_attached());
 
     if (!array.m_has_refs) {
         Array encoded_array{alloc};
@@ -402,6 +408,11 @@ ref_type Array::write(ref_type ref, Allocator& alloc, _impl::ArrayWriterBase& ou
             const auto h = encoded_array.get_header();
             REALM_ASSERT(get_kind(h) == 'B');
             REALM_ASSERT(get_encoding(h) == Encoding::Flex);
+            REALM_ASSERT(array.size() == encoded_array.size());
+#ifdef REALM_DEBUG
+            for (size_t i = 0; i < encoded_array.size(); ++i)
+                REALM_ASSERT(array.get(i) == encoded_array.get(i));
+#endif
             auto ref = encoded_array.do_write_shallow(out);
             encoded_array.destroy();
             return ref;
@@ -419,11 +430,11 @@ ref_type Array::do_write_shallow(_impl::ArrayWriterBase& out) const
     // here we might want to compress the array and write down.
     const char* header = get_header_from_data(m_data);
     size_t byte_size = get_byte_size();
-    const auto is_encode = is_encoded();
+    const auto encoded = is_encoded();
     uint32_t dummy_checksum =
-        is_encode ? 0x42424242UL : 0x41414141UL; // A/B (A for normal arrays, B for compressed arrays)
+        encoded ? 0x42424242UL : 0x41414141UL; // A/B (A for normal arrays, B for compressed arrays)
     uint32_t dummy_checksum_bytes =
-        is_encode ? 2 : 4; // AAAA / BB (only 2 bytes for B arrays, since B arrays use more header space)
+        encoded ? 2 : 4; // AAAA / BB (only 2 bytes for B arrays, since B arrays use more header space)
     ref_type new_ref = out.write_array(header, byte_size, dummy_checksum, dummy_checksum_bytes); // Throws
     REALM_ASSERT_3(new_ref % 8, ==, 0);                                                          // 8-byte alignment
     return new_ref;
@@ -432,14 +443,6 @@ ref_type Array::do_write_shallow(_impl::ArrayWriterBase& out) const
 
 ref_type Array::do_write_deep(_impl::ArrayWriterBase& out, bool only_if_modified, bool compress) const
 {
-    // This is recursively expanding each array and writing it down to disk...
-    // We need to verify if for encoded arrays we need to do anything special.
-
-    // This machinery is problematic, since we constuct a new array for following refs that
-    // eventually will get us to the actual array that can be compressed.
-    // The encoded type for this array has nothing to do with what the eventual encoding type
-    // will be. Moreover we have lost the information about whether we need compression or not for the leaf array.
-
     // Temp array for updated refs
     Array new_array(Allocator::get_default());
     Type type = m_is_inner_bptree_node ? type_InnerBptreeNode : type_HasRefs;
@@ -458,7 +461,6 @@ ref_type Array::do_write_deep(_impl::ArrayWriterBase& out, bool only_if_modified
         }
         new_array.add(value); // Throws
     }
-
     return new_array.do_write_shallow(out); // Throws
 }
 
@@ -1614,7 +1616,6 @@ bool QueryStateFindAll<std::vector<ObjKey>>::match(size_t index) noexcept
     ++m_match_count;
     int64_t key_value = (m_key_values ? m_key_values->get(index) : index) + m_key_offset;
     m_keys.push_back(ObjKey(key_value));
-
     return (m_limit > m_match_count);
 }
 

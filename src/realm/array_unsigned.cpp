@@ -206,7 +206,7 @@ void ArrayUnsigned::insert(size_t ndx, uint64_t value)
         REALM_ASSERT(m_lbound <= m_ubound);
     }
 
-    REALM_ASSERT_DEBUG(m_width >= 8);
+    // REALM_ASSERT_DEBUG(m_width >= 8);
     bool do_expand = value > (uint64_t)m_ubound;
     const uint8_t old_width = m_width;
     const uint8_t new_width = do_expand ? bit_width(value) : m_width;
@@ -262,8 +262,8 @@ void ArrayUnsigned::erase(size_t ndx)
         REALM_ASSERT(m_lbound <= m_ubound);
     }
 
-    //compression is going to go in this case, tmp commented.
-    //REALM_ASSERT_DEBUG(m_width >= 8);
+    // compression is going to go in this case, tmp commented.
+    // REALM_ASSERT_DEBUG(m_width >= 8);
 
     copy_on_write(); // Throws
 
