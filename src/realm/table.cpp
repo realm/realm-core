@@ -4045,7 +4045,7 @@ void Table::typed_print(std::string prefix, ref_type ref) const
                 m_spec.typed_print(pref);
             }
             else if (j == 2) {
-                m_clusters.typed_print(pref, m_leaf_ndx2colkey);
+                m_clusters.typed_print(pref, *this);
             }
             else {
                 Array a(m_alloc);

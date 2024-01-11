@@ -1541,7 +1541,7 @@ void Cluster::remove_backlinks(ObjKey origin_key, ColKey origin_col_key, const s
     }
 }
 
-void Cluster::typed_print(std::string prefix, std::vector<ColKey>& col_keys) const
+void Cluster::typed_print(std::string prefix, const Table& table) const
 {
     REALM_ASSERT(!get_is_inner_bptree_node_from_header(get_header()));
     std::cout << "Cluster of size " << size() << " " << header_to_string(get_header()) << std::endl;
@@ -1556,7 +1556,7 @@ void Cluster::typed_print(std::string prefix, std::vector<ColKey>& col_keys) con
                 a.typed_print(pref);
             }
             else {
-                auto col_key = col_keys[j - 1];
+                auto col_key = table.m_leaf_ndx2colkey[j - 1];
                 auto col_type = col_key.get_type();
                 auto col_attr = col_key.get_attrs();
                 std::string attr_string;

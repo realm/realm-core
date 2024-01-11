@@ -648,6 +648,7 @@ ref_type GroupWriter::write_group()
 {
     ALLOC_DBG_COUT("Commit nr " << m_current_version << "   ( from " << m_oldest_reachable_version << " )"
                                 << std::endl);
+    m_group.typed_print("");
 
     read_in_freelist();
     // Now, 'm_size_map' holds all free elements candidate for recycling

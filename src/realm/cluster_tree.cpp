@@ -124,7 +124,7 @@ public:
 
     void dump_objects(int64_t key_offset, std::string lead) const override;
 
-    virtual void typed_print(std::string prefix, std::vector<ColKey>& col_keys) const override
+    virtual void typed_print(std::string prefix, const Table& table) const override
     {
         REALM_ASSERT(get_is_inner_bptree_node_from_header(get_header()));
         REALM_ASSERT(has_refs());
@@ -146,13 +146,13 @@ public:
                         ClusterNodeInner a(m_alloc);
                         a.init(m);
                         std::cout << pref;
-                        a.typed_print(pref, col_keys);
+                        a.typed_print(pref, table);
                     }
                     else {
                         Cluster a(m_alloc);
                         a.init(m);
                         std::cout << pref;
-                        a.typed_print(pref, col_keys);
+                        a.typed_print(pref, table);
                     }
                 }
             }

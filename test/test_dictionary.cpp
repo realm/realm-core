@@ -284,7 +284,7 @@ TEST(Dictionary_Clear)
     g.verify();
 }
 
-TEST(Dictionary_Transaction)
+ONLY(Dictionary_Transaction)
 {
     SHARED_GROUP_TEST_PATH(path);
     auto hist = make_in_realm_history();

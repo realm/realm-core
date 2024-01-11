@@ -206,9 +206,9 @@ public:
     {
         return m_offset;
     }
-    virtual void typed_print(std::string prefix, std::vector<ColKey>& col_keys) const
+    virtual void typed_print(std::string prefix, const Table& table) const
     {
-        static_cast<void>(col_keys);
+        static_cast<void>(table);
         std::cout << "ClusterNode as ";
         Array::typed_print(prefix);
     }
@@ -332,7 +332,7 @@ public:
 
     void verify() const;
     void dump_objects(int64_t key_offset, std::string lead) const override;
-    virtual void typed_print(std::string prefix, std::vector<ColKey>& col_keys) const override;
+    virtual void typed_print(std::string prefix, const Table& table) const override;
 
 private:
     friend class ClusterTree;

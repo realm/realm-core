@@ -190,11 +190,11 @@ public:
     }
     void verify() const;
 
-    void typed_print(std::string prefix, std::vector<ColKey> col_keys) const
+    void typed_print(std::string prefix, const Table& table) const
     {
         if (m_root) {
             std::cout << prefix << "ClusterTree as ";
-            m_root->typed_print(prefix, col_keys);
+            m_root->typed_print(prefix, table);
         }
         else {
             std::cout << "Emtpy ClusterTree" << std::endl;
