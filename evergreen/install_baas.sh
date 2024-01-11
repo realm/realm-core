@@ -363,9 +363,22 @@ echo "jq version: $(jq --version)"
 git config --global url."git@github.com:".insteadOf "https://github.com/"
 #export GOPRIVATE="github.com/10gen/*"
 
-# If a baas branch or commit version was not provided, retrieve the latest release version
+# If a baas branch or commit version was not provided use the one locked in our dependencies
 if [[ -z "${BAAS_VERSION}" ]]; then
-    get_var_from_file BAAS_VERSION "${BASE_PATH}/../dependencies.list"
+    if [[ -f "${BASE_PATH}/../dependencies.list" ]]; then
+        # if this was run locally then check up a directory
+        get_var_from_file BAAS_VERSION "${BASE_PATH}/../dependencies.list"
+    elif [[ -f "${BASE_PATH}/dependencies.list" ]]; then
+        # if this is run from an evergreen remote host
+        # then the dependencies.list file has been copied over
+        get_var_from_file BAAS_VERSION "${BASE_PATH}/dependencies.list"
+    fi
+fi
+
+# if we couldn't find it and it wasn't manually provided fail
+if [[ -z "${BAAS_VERSION}" ]]; then
+    echo "BAAS_VERSION was not provided and couldn't be discovered"
+    exit 1
 fi
 
 # Clone the baas repo and check out the specified version
