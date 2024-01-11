@@ -113,6 +113,12 @@ public:
     {
         m_keys.set_parent(this, 0);
     }
+    ClusterNode(Allocator& allocator) // partial initialization for read-only traversal
+        : Array(allocator)
+        , m_tree_top(*(const ClusterTree*)nullptr)
+        , m_keys(allocator)
+    {
+    }
     virtual ~ClusterNode() {}
     void init_from_parent()
     {
@@ -200,8 +206,9 @@ public:
     {
         return m_offset;
     }
-    virtual void typed_print(std::string prefix) const
+    virtual void typed_print(std::string prefix, std::vector<ColKey>& col_keys) const
     {
+        static_cast<void>(col_keys);
         std::cout << "ClusterNode as ";
         Array::typed_print(prefix);
     }
@@ -236,6 +243,10 @@ class Cluster : public ClusterNode {
 public:
     Cluster(uint64_t offset, Allocator& allocator, const ClusterTree& tree_top)
         : ClusterNode(offset, allocator, tree_top)
+    {
+    }
+    Cluster(Allocator& allocator)
+        : ClusterNode(allocator)
     {
     }
     ~Cluster() override;
@@ -321,6 +332,7 @@ public:
 
     void verify() const;
     void dump_objects(int64_t key_offset, std::string lead) const override;
+    virtual void typed_print(std::string prefix, std::vector<ColKey>& col_keys) const override;
 
 private:
     friend class ClusterTree;

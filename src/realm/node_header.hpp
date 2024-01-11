@@ -458,6 +458,33 @@ public:
     //         Ane = A num elements, Bne = B num elements,
     //         lots = flags, wtype and width for old formats
     //
+    static std::string enc_to_string(Encoding enc)
+    {
+        switch (enc) {
+            case Encoding::WTypMult:
+                return "Mult";
+            case Encoding::WTypIgn:
+                return "Ign";
+            case Encoding::WTypBits:
+                return "Bits";
+            case Encoding::Packed:
+                return "Pack";
+            case Encoding::AofP:
+                return "AofP";
+            case Encoding::PofA:
+                return "PofA";
+            case Encoding::Flex:
+                return "Flex";
+            default:
+                return "Err";
+        }
+    }
+    static std::string header_to_string(const char* header)
+    {
+        std::string retval = "{" + std::to_string(get_kind(header)) + ":" + enc_to_string(get_encoding(header)) + "}";
+        return retval;
+    }
+
     static void init_header(char* header, uint8_t kind, Encoding enc, uint8_t flags, size_t bits_pr_elem,
                             size_t num_elems)
     {
