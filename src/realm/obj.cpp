@@ -1999,6 +1999,10 @@ Obj& Obj::set_collection(ColKey col_key, CollectionType type)
             list.remove_backlinks(state);
         }
 
+        if (SearchIndex* index = m_table->get_search_index(col_key)) {
+            index->set(m_key, new_val);
+        }
+
         Allocator& alloc = _get_alloc();
         alloc.bump_content_version();
 

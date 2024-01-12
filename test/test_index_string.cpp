@@ -1836,6 +1836,25 @@ TEST(StringIndex_MixedNonEmptyTable)
     table->add_search_index(col);
 }
 
+TEST(StringIndex_MixedWithNestedCollections)
+{
+    Group g;
+    auto table = g.add_table("foo");
+    auto col = table->add_column(type_Mixed, "value");
+    table->add_search_index(col);
+    table->create_object().set(col, Mixed("apple"));
+    auto obj = table->create_object();
+    obj.set(col, Mixed("banana"));
+
+    auto q = table->query("value = 'banana'");
+
+    CHECK_EQUAL(q.count(), 1);
+    obj.set_collection(col, CollectionType::Dictionary);
+    CHECK_EQUAL(q.count(), 0);
+    obj.set(col, Mixed("banana"));
+    CHECK_EQUAL(q.count(), 1);
+}
+
 TEST(StringIndex_MixedEqualBitPattern)
 {
     Group g;

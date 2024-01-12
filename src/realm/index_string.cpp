@@ -1956,14 +1956,6 @@ IntegerColumn::const_iterator SortedListComparator::find_end_of_unsorted(const M
 }
 
 // LCOV_EXCL_START ignore debug functions
-
-#ifdef REALM_DEBUG
-void StringIndex::print() const
-{
-    dump_node_structure(*m_array, std::cout, 0);
-}
-#endif // REALM_DEBUG
-
 void StringIndex::verify() const
 {
 #ifdef REALM_DEBUG
@@ -2053,15 +2045,13 @@ void StringIndex::verify_entries(const ClusterColumn& column) const
 
 namespace {
 
-namespace {
-
 bool is_chars(uint64_t val)
 {
     if (val == 0)
         return true;
     if (is_chars(val >> 8)) {
         char c = val & 0xFF;
-        if (!c || std::isalpha(c)) {
+        if (!c || std::isprint(c)) {
             return true;
         }
     }
@@ -2088,8 +2078,6 @@ void out_hex(std::ostream& out, uint64_t val)
         out << int(val);
     }
 }
-
-} // namespace
 
 } // namespace
 
@@ -2165,14 +2153,9 @@ void StringIndex::dump_node_structure(const Array& node, std::ostream& out, int 
     }
 }
 
-void StringIndex::dump_node_structure() const
+void StringIndex::print() const
 {
-    do_dump_node_structure(std::cout, 0);
-}
-
-void StringIndex::do_dump_node_structure(std::ostream& out, int level) const
-{
-    dump_node_structure(*m_array, out, level);
+    dump_node_structure(*m_array, std::cout, 0);
 }
 
 #endif // LCOV_EXCL_STOP ignore debug functions
