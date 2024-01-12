@@ -280,13 +280,7 @@ void Array::init_from_mem(MemRef mem) noexcept
     m_is_inner_bptree_node = get_is_inner_bptree_node_from_header(header);
     m_has_refs = get_hasrefs_from_header(header);
     m_context_flag = get_context_flag_from_header(header);
-
-    // width for B arrays is set based on the value stored in the header,
-    // hower we have lower and upper bound that are used in several places in the code
-    // that do not make sense for B arrays, as well as the width.
-    // In theory decompressing the array when we see a B array before to do any operation
-    // should suffice. But right now we are seeing bad values returned.
-    // Something is not adding up correctly while decompressing.
+    // update width (for B arrays we need to reset all, since there is no concept of width)
     update_width_cache_from_header();
 }
 
@@ -529,9 +523,9 @@ void Array::set(size_t ndx, int64_t value, bool no_cow)
     if (!no_cow) {
         // Check if we need to copy before modifying
         copy_on_write(); // Throws
+        // Grow the array if needed to store this value
+        ensure_minimum_width(value); // Throws
     }
-    // Grow the array if needed to store this value
-    ensure_minimum_width(value); // Throws
 
     // Set the value
     (this->*(m_vtable->setter))(ndx, value);

@@ -351,54 +351,32 @@ void ArrayFlex::restore_array(Array& arr, const std::vector<int64_t>& values) co
     const auto flags = NodeHeader::get_flags(arr.get_header());
     const auto size = values.size();
     const auto [min_value, max_value] = std::minmax_element(values.begin(), values.end());
-    const size_t width_min = NodeHeader::signed_to_num_bits(*min_value);
-    const size_t width_max = NodeHeader::signed_to_num_bits(*max_value);
-    auto max_bit = std::max(width_min, width_max);
-    auto byte_size = NodeHeader::calc_size<Encoding::WTypBits>(size, max_bit);
-    REALM_ASSERT(byte_size % 8 == 0); // 8 bytes aligned value
+
+    // calling arr.destroy() is fine, as long as we don't use the memory anymore.
+    arr.destroy();
     auto& allocator = arr.get_alloc();
 
-    // calling array destory here, works only because we are not going to use this array header anymore, see comment
-    // in Array::init_from_mem. We can get away with this since we are basically restoring all the basic properties
-    // for the array via Node::init_header(...) But width and capacity need particular attention.
-    auto orginal_header = arr.get_header();
-    auto origanal_ref = arr.get_ref();
-
-    // this is slow. It is just for testing, but this is what it is needed. the ceil for the current bit size.
-    // we need to have std::bit_ceil(v); AKA the next power of 2 closed to max_bit. We have somehow introduced a
-    // regression here. I am impressed that most of the tests are working..
-    // TODO: work a faster way to get this.
-    size_t width = 1;
-    while (width < max_bit)
-        width *= 2;
-    REALM_ASSERT(width <= 64);
+    auto width = std::max(Array::bit_width(*min_value), Array::bit_width(*max_value));
     REALM_ASSERT(width == 0 || width == 1 || width == 2 || width == 4 || width == 8 || width == 16 || width == 32 ||
                  width == 64);
+
+    auto byte_size = NodeHeader::calc_size<Encoding::WTypBits>(size, width);
+    REALM_ASSERT(byte_size % 8 == 0); // 8 bytes aligned value
 
     auto mem = allocator.alloc(byte_size);
     auto header = mem.get_addr();
     NodeHeader::init_header(header, 'A', Encoding::WTypBits, flags, width, values.size());
     NodeHeader::set_capacity_in_header(byte_size, header);
-    // the old array should not be deleted up until this function completes,
-    // but once it finishes running, the ref of the old array is gone, so the memory is leaked.
-    // previous header and ref must be stored temporary and deleted after this point
     arr.init_from_mem(mem);
+    arr.update_parent();
 
-    // TODO:
-    // using the iterator here should be doable!. Essentially we want to skip COW and write straight into the array.
-    // The real problem is that we compute the width and runtime, whereas the width is expected to be known at compile
-    // time.
-    //  in case of decompression this is not case.. but ... this needs to go
-    //  Also doing COW here has serious performance penalties, since we are basically copying the whole array N times.
-    //  For now we skip COW, passing the third boolean flag.
+    // TODO: avoid doing COW copying directly the bytes into the array. Now we avoid COW and call the vtable setter
+    // (should be as fast as calling Array::set, but it can be done faster)
     size_t i = 0;
     for (auto v : values)
         arr.set(i++, v, true);
 
-    arr.update_parent();
-    allocator.free_(origanal_ref, orginal_header);
-    size_t w = arr.get_width();
-    REALM_ASSERT(w == 0 || w == 1 || w == 2 || w == 4 || w == 8 || w == 16 || w == 32 || w == 64);
+    REALM_ASSERT(width == arr.get_width());
     REALM_ASSERT(arr.size() == values.size());
 }
 
