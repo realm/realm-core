@@ -269,7 +269,7 @@ public:
             REALM_ASSERT((value & 0x7) == 0);
             // this could be a problem, it assumes that the last 3 less significant bits are 0.
             // For flex arrays this could not be true if we were to set capacity lower than 128
-            ((uint16_t*)header)[0] = value >> 3;
+            ((uint16_t*)header)[0] = static_cast<uint16_t>(value >> 3);
         }
     }
 
@@ -486,8 +486,8 @@ public:
             if (enc == Encoding::Packed) {
                 hb[2] = flags << 4;
                 auto hh = (uint16_t*)header;
-                hh[2] = bits_pr_elem;
-                hh[3] = num_elems;
+                hh[2] = static_cast<uint16_t>(bits_pr_elem);
+                hh[3] = static_cast<uint16_t>(num_elems);
             }
             else {
                 REALM_ASSERT(false && "Illegal header encoding for chosen kind of header");
@@ -509,11 +509,11 @@ public:
         }
         else
             REALM_ASSERT(false && "Illegal header encoding for chosen kind of header");
-        hb[4] = bits_pr_elemA;
-        hb[5] = bits_pr_elemB;
+        hb[4] = static_cast<uint8_t>(bits_pr_elemA);
+        hb[5] = static_cast<uint8_t>(bits_pr_elemB);
         auto hh = (uint16_t*)header;
-        hh[3] = num_elems;
-        hb[3] = kind;
+        hh[3] = static_cast<uint16_t>(num_elems);
+        hb[3] = static_cast<uint16_t>(kind);
     }
     static void init_header(char* header, uint8_t kind, Encoding enc, uint8_t flags, size_t bits_pr_elemA,
                             size_t bits_pr_elemB, size_t num_elemsA, size_t num_elemsB)
@@ -609,7 +609,7 @@ void inline NodeHeader::set_element_size<NodeHeader::Encoding::Packed>(char* hea
     REALM_ASSERT(get_kind(header) != 'A');
     REALM_ASSERT(get_encoding(header) == Encoding::Packed);
     REALM_ASSERT(bits_per_element <= 64);
-    ((uint16_t*)header)[2] = bits_per_element;
+    ((uint16_t*)header)[2] = static_cast<uint16_t>(bits_per_element);
 }
 template <>
 void inline NodeHeader::set_element_size<NodeHeader::Encoding::WTypBits>(char* header, size_t bits_per_element)
@@ -666,7 +666,7 @@ inline void NodeHeader::set_elementA_size<NodeHeader::Encoding::AofP>(char* head
     REALM_ASSERT(get_kind(header) != 'A');
     REALM_ASSERT(get_encoding(header) == Encoding::AofP);
     REALM_ASSERT(bits_per_element <= 64);
-    ((uint8_t*)header)[4] = bits_per_element;
+    ((uint8_t*)header)[4] = static_cast<uint8_t>(bits_per_element);
 }
 template <>
 inline void NodeHeader::set_elementA_size<NodeHeader::Encoding::PofA>(char* header, size_t bits_per_element)
@@ -674,7 +674,7 @@ inline void NodeHeader::set_elementA_size<NodeHeader::Encoding::PofA>(char* head
     REALM_ASSERT(get_kind(header) != 'A');
     REALM_ASSERT(get_encoding(header) == Encoding::PofA);
     REALM_ASSERT(bits_per_element <= 64);
-    ((uint8_t*)header)[4] = bits_per_element;
+    ((uint8_t*)header)[4] = static_cast<uint8_t>(bits_per_element);
 }
 template <>
 inline void NodeHeader::set_elementA_size<NodeHeader::Encoding::Flex>(char* header, size_t bits_per_element)
@@ -698,7 +698,7 @@ inline void NodeHeader::set_elementB_size<NodeHeader::Encoding::AofP>(char* head
     REALM_ASSERT(get_kind(header) != 'A');
     REALM_ASSERT(get_encoding(header) == Encoding::AofP);
     REALM_ASSERT(bits_per_element <= 64);
-    ((uint8_t*)header)[5] = bits_per_element;
+    ((uint8_t*)header)[5] = static_cast<uint8_t>(bits_per_element);
 }
 template <>
 inline void NodeHeader::set_elementB_size<NodeHeader::Encoding::PofA>(char* header, size_t bits_per_element)
@@ -706,7 +706,7 @@ inline void NodeHeader::set_elementB_size<NodeHeader::Encoding::PofA>(char* head
     REALM_ASSERT(get_kind(header) != 'A');
     REALM_ASSERT(get_encoding(header) == Encoding::PofA);
     REALM_ASSERT(bits_per_element <= 64);
-    ((uint8_t*)header)[5] = bits_per_element;
+    ((uint8_t*)header)[5] = static_cast<uint8_t>(bits_per_element);
 }
 template <>
 inline void NodeHeader::set_elementB_size<NodeHeader::Encoding::Flex>(char* header, size_t bits_per_element)
@@ -797,7 +797,7 @@ inline void NodeHeader::set_num_elements<NodeHeader::Encoding::Packed>(char* hea
     REALM_ASSERT(get_kind(header) != 'A');
     REALM_ASSERT(get_encoding(header) == Encoding::Packed);
     REALM_ASSERT(num_elements < 0x10000);
-    ((uint16_t*)header)[3] = num_elements;
+    ((uint16_t*)header)[3] = static_cast<uint16_t>(num_elements);
 }
 template <>
 inline void NodeHeader::set_num_elements<NodeHeader::Encoding::WTypBits>(char* header, size_t num_elements)
@@ -829,7 +829,7 @@ inline void NodeHeader::set_num_elements<NodeHeader::Encoding::AofP>(char* heade
     REALM_ASSERT(get_kind(header) != 'A');
     REALM_ASSERT(get_encoding(header) == Encoding::AofP);
     REALM_ASSERT(num_elements < 0x10000);
-    ((uint16_t*)header)[3] = num_elements;
+    ((uint16_t*)header)[3] = static_cast<uint16_t>(num_elements);
 }
 template <>
 inline void NodeHeader::set_num_elements<NodeHeader::Encoding::PofA>(char* header, size_t num_elements)
@@ -837,7 +837,7 @@ inline void NodeHeader::set_num_elements<NodeHeader::Encoding::PofA>(char* heade
     REALM_ASSERT(get_kind(header) != 'A');
     REALM_ASSERT(get_encoding(header) == Encoding::PofA);
     REALM_ASSERT(num_elements < 0x10000);
-    ((uint16_t*)header)[3] = num_elements;
+    ((uint16_t*)header)[3] = static_cast<uint16_t>(num_elements);
 }
 
 
@@ -935,7 +935,7 @@ inline size_t NodeHeader::calc_size<NodeHeader::Encoding::Packed>(size_t num_ele
 template <>
 inline size_t NodeHeader::calc_size<NodeHeader::Encoding::WTypBits>(size_t num_elements, size_t element_size)
 {
-    return calc_byte_size(wtype_Bits, num_elements, element_size);
+    return calc_byte_size(wtype_Bits, num_elements, static_cast<uint_least8_t>(element_size));
     // return NodeHeader::header_size + align_bits_to8(num_elements * element_size);
 }
 template <>
@@ -975,8 +975,7 @@ size_t inline NodeHeader::get_byte_size_from_header(const char* header) noexcept
 {
     auto h = header;
     auto kind = get_kind(h);
-    // this is required for making tests ok TODO: fix this!
-    // REALM_ASSERT(kind == 'A' || kind == 'B');
+    REALM_ASSERT(kind == 'A' || kind == 'B');
     if (kind == 'B') {
         auto encoding = get_encoding(h);
         REALM_ASSERT(encoding == NodeHeader::Encoding::Flex); // this is the only encoding supported right now.
@@ -1002,13 +1001,13 @@ size_t inline NodeHeader::get_byte_size_from_header(const char* header) noexcept
                 REALM_ASSERT(false && "unknown encoding");
         }
     }
-    /*(kind == 'A')*/
+    REALM_ASSERT(kind == 'A');
     WidthType wtype = get_wtype_from_header(header);
     size_t width;
     size_t size;
     width = get_width_from_header(header);
     size = get_size_from_header(header);
-    return calc_byte_size(wtype, size, width);
+    return calc_byte_size(wtype, size, static_cast<uint_least8_t>(width));
 }
 
 // During copy on write we allocate an unitialised chunk of memory, which won't have A in his kind.
