@@ -44,7 +44,7 @@ struct Fixture {
         sync::parse_changeset(stream, result);
 
         WriteTransaction wt{sg_2};
-        InstructionApplier applier{wt};
+        InstructionApplier applier{wt, test_context.logger.get()};
         applier.apply(result);
         wt.commit();
     }

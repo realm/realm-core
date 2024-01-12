@@ -178,7 +178,7 @@ private:
                          const std::string_view& instr_name);
         void on_property(Obj&, ColKey) override;
         void on_list(LstBase&) override;
-        ResolveResult on_list_index(LstBase&, uint32_t) override;
+        ResolveResult on_list_index(LstBasePtr&, uint32_t) override;
         void on_dictionary(Dictionary&) override;
         ResolveResult on_dictionary_key(Dictionary&, Mixed) override;
         void on_set(SetBase&) override;
@@ -524,7 +524,7 @@ std::string ListPath::path_to_string(Transaction& remote, const InterningBuffer&
 RecoverLocalChangesetsHandler::RecoverLocalChangesetsHandler(Transaction& dest_wt,
                                                              Transaction& frozen_pre_local_state,
                                                              util::Logger& logger)
-    : InstructionApplier(dest_wt)
+    : InstructionApplier(dest_wt, &logger)
     , m_frozen_pre_local_state{frozen_pre_local_state}
     , m_logger{logger}
     , m_replication{dest_wt.get_replication()}
@@ -767,7 +767,7 @@ void RecoverLocalChangesetsHandler::RecoveryResolver::on_list(LstBase&)
 }
 
 RecoverLocalChangesetsHandler::RecoveryResolver::ResolveResult
-RecoverLocalChangesetsHandler::RecoveryResolver::on_list_index(LstBase&, uint32_t)
+RecoverLocalChangesetsHandler::RecoveryResolver::on_list_index(LstBasePtr&, uint32_t)
 {
     m_recovery_applier->handle_error(util::format("Invalid path for %1 (list, index)", m_instr_name));
     return ResolveResult::DidNotResolve;
@@ -932,12 +932,12 @@ void RecoverLocalChangesetsHandler::operator()(const Instruction::Update& instr)
             }
             return ResolveResult::Pending;
         }
-        ResolveResult on_list_index(LstBase& list, uint32_t index) override
+        ResolveResult on_list_index(LstBasePtr& list, uint32_t index) override
         {
             util::Optional<ListTracker::CrossListIndex> cross_index;
             cross_index = m_recovery_applier->m_lists.at(m_list_path).update(index);
             if (cross_index) {
-                m_instr.prior_size = static_cast<uint32_t>(list.size());
+                m_instr.prior_size = static_cast<uint32_t>(list->size());
                 m_instr.path.back() = cross_index->remote;
             }
             else {
@@ -1048,10 +1048,10 @@ void RecoverLocalChangesetsHandler::operator()(const Instruction::ArrayInsert& i
             , m_instr(instr)
         {
         }
-        ResolveResult on_list_index(LstBase& list, uint32_t index) override
+        ResolveResult on_list_index(LstBasePtr& list, uint32_t index) override
         {
             REALM_ASSERT(index != uint32_t(-1));
-            size_t list_size = list.size();
+            size_t list_size = list->size();
             auto cross_index = m_recovery_applier->m_lists.at(m_list_path).insert(index, list_size);
             if (cross_index) {
                 m_instr.path.back() = cross_index->remote;
@@ -1084,10 +1084,10 @@ void RecoverLocalChangesetsHandler::operator()(const Instruction::ArrayMove& ins
             , m_instr(instr)
         {
         }
-        ResolveResult on_list_index(LstBase& list, uint32_t index) override
+        ResolveResult on_list_index(LstBasePtr& list, uint32_t index) override
         {
             REALM_ASSERT(index != uint32_t(-1));
-            size_t lst_size = list.size();
+            size_t lst_size = list->size();
             uint32_t translated_from, translated_to;
             bool allowed_to_move =
                 m_recovery_applier->m_lists.at(m_list_path)
@@ -1118,13 +1118,13 @@ void RecoverLocalChangesetsHandler::operator()(const Instruction::ArrayErase& in
             , m_instr(instr)
         {
         }
-        ResolveResult on_list_index(LstBase& list, uint32_t index) override
+        ResolveResult on_list_index(LstBasePtr& list, uint32_t index) override
         {
             uint32_t translated_index;
             bool allowed_to_delete =
                 m_recovery_applier->m_lists.at(m_list_path).remove(static_cast<uint32_t>(index), translated_index);
             if (allowed_to_delete) {
-                m_instr.prior_size = static_cast<uint32_t>(list.size());
+                m_instr.prior_size = static_cast<uint32_t>(list->size());
                 m_instr.path.back() = translated_index;
                 return ResolveResult::Pending;
             }

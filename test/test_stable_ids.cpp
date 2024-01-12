@@ -212,7 +212,7 @@ TEST(StableIDs_ChangesGlobalObjectIdWhenPeerIdReceived)
         DBRef sg_2 = DB::create(*history_2, test_dir_2);
 
         WriteTransaction wt{sg_2};
-        InstructionApplier applier{wt};
+        InstructionApplier applier{wt, test_context.logger.get()};
         applier.apply(result);
         wt.commit();
 

@@ -566,6 +566,12 @@ private:
     /// Changes type unconditionally. Called only from Group::do_get_or_add_table()
     void do_set_table_type(Type table_type);
 
+    void copy_column_to_mixed(ColKey from, ColKey to);
+    template <class F>
+    void copy_column_to_mixed_simple(ColKey from, ColKey to);
+    template <class F>
+    void copy_column_to_mixed_list(ColKey from, ColKey to);
+
 public:
     // mapping between index used in leaf nodes (leaf_ndx) and index used in spec (spec_ndx)
     // as well as the full column key. A leaf_ndx can be obtained directly from the column key

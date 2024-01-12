@@ -33,7 +33,7 @@ namespace sync {
 struct Changeset;
 
 struct InstructionApplier {
-    explicit InstructionApplier(Transaction&) noexcept;
+    explicit InstructionApplier(Transaction&, util::Logger* logger = nullptr) noexcept;
 
     /// Throws BadChangesetError if application fails due to a problem with the
     /// changeset.
@@ -86,7 +86,7 @@ protected:
         virtual ResolveResult on_missing_property(Table&, StringData);
         virtual void on_property(Obj&, ColKey);
         virtual void on_list(LstBase&);
-        [[nodiscard]] virtual ResolveResult on_list_index(LstBase&, uint32_t);
+        [[nodiscard]] virtual ResolveResult on_list_index(LstBasePtr&, uint32_t);
         virtual void on_dictionary(Dictionary&);
         [[nodiscard]] virtual ResolveResult on_dictionary_key(Dictionary&, Mixed);
         virtual void on_set(SetBase&);
@@ -105,7 +105,7 @@ protected:
 
     protected:
         [[nodiscard]] ResolveResult resolve_field(Obj& obj, InternString field);
-        [[nodiscard]] ResolveResult resolve_list_element(LstBase& list, uint32_t index);
+        [[nodiscard]] ResolveResult resolve_list_element(LstBasePtr& list, uint32_t index);
         [[nodiscard]] ResolveResult resolve_dictionary_element(Dictionary& dict, InternString key);
 
         InstructionApplier* m_applier;
@@ -118,6 +118,7 @@ protected:
 
 private:
     const Changeset* m_log = nullptr;
+    util::Logger* m_logger = nullptr;
 
     Group::TableNameBuffer m_table_name_buffer;
     InternString m_last_table_name;
@@ -146,8 +147,9 @@ private:
 
 // Implementation
 
-inline InstructionApplier::InstructionApplier(Transaction& group) noexcept
+inline InstructionApplier::InstructionApplier(Transaction& group, util::Logger* logger) noexcept
     : m_transaction(group)
+    , m_logger(logger)
 {
 }
 

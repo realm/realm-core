@@ -276,6 +276,7 @@ void wait_for_advance(Realm& realm)
         }
     };
 
+    realm.read_group();
     bool done = false;
     realm.m_binding_context = std::make_unique<Context>(realm, done);
     timed_wait_for([&] {

@@ -581,7 +581,7 @@ size_t ClientHistory::transform_and_apply_server_changesets(util::Span<Changeset
         constexpr std::size_t commit_byte_size_limit = 102400; // 100 KB
 
         auto changeset_applier = [&](const Changeset* transformed_changeset) -> bool {
-            InstructionApplier applier{*transact};
+            InstructionApplier applier{*transact, &logger};
             {
                 TempShortCircuitReplication tscr{m_replication};
                 applier.apply(*transformed_changeset); // Throws

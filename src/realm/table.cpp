@@ -35,6 +35,7 @@
 #include <realm/table_view.hpp>
 #include <realm/util/features.h>
 #include <realm/util/serializer.hpp>
+#include <realm/util/scope_exit.hpp>
 
 #include <stdexcept>
 
@@ -3251,6 +3252,231 @@ ColKey Table::set_nullability(ColKey col_key, bool nullable, bool throw_on_null)
 
     erase_root_column(col_key);
     m_spec.rename_column(colkey2spec_ndx(new_col), column_name);
+
+    if (index_type != IndexType::None)
+        do_add_search_index(new_col, index_type);
+
+    return new_col;
+}
+
+
+template <class F>
+void Table::copy_column_to_mixed_simple(ColKey key_from, ColKey key_to)
+{
+    Allocator& allocator = this->get_alloc();
+    bool from_nullability = is_nullable(key_from);
+    auto func = [&](Cluster* cluster) {
+        size_t sz = cluster->node_size();
+
+        typename ColumnTypeTraits<F>::cluster_leaf_type from_arr(allocator);
+        typename ColumnTypeTraits<Mixed>::cluster_leaf_type to_arr(allocator);
+        cluster->init_leaf(key_from, &from_arr);
+        cluster->init_leaf(key_to, &to_arr);
+
+        for (size_t i = 0; i < sz; i++) {
+            to_arr.set(i, (from_nullability && from_arr.is_null(i)) ? Mixed{} : Mixed(from_arr.get(i)));
+        }
+    };
+
+    m_clusters.update(func);
+}
+
+template <class F>
+void Table::copy_column_to_mixed_list(ColKey key_from, ColKey key_to)
+{
+    Allocator& allocator = this->get_alloc();
+    bool from_nullability = is_nullable(key_from);
+    auto func = [&](Cluster* cluster) {
+        size_t sz = cluster->node_size();
+
+        ArrayInteger from_arr(allocator);
+        ArrayInteger to_arr(allocator);
+        cluster->init_leaf(key_from, &from_arr);
+        cluster->init_leaf(key_to, &to_arr);
+
+        for (size_t i = 0; i < sz; i++) {
+            ref_type ref_from = to_ref(from_arr.get(i));
+            ref_type ref_to = to_ref(to_arr.get(i));
+            REALM_ASSERT(!ref_to);
+
+            if (ref_from) {
+                BPlusTree<F> from_list(allocator);
+                BPlusTree<Mixed> to_list(allocator);
+                from_list.init_from_ref(ref_from);
+                to_list.create();
+                size_t n = from_list.size();
+                for (size_t j = 0; j < n; j++) {
+                    auto v = from_list.get(j);
+                    if (!from_nullability || aggregate_operations::valid_for_agg(v)) {
+                        to_list.add(remove_optional(v));
+                    }
+                    else {
+                        to_list.add(ColumnTypeTraits<Mixed>::cluster_leaf_type::default_value(false));
+                    }
+                }
+                to_arr.set(i, from_ref(to_list.get_ref()));
+            }
+        }
+    };
+
+    m_clusters.update(func);
+}
+
+void Table::copy_column_to_mixed(ColKey from, ColKey to)
+{
+    realm::DataType type_id = get_column_type(from);
+    bool _is_list = is_list(from);
+    if (_is_list) {
+        switch (type_id) {
+            case type_Int:
+                if (is_nullable(from)) {
+                    copy_column_to_mixed_list<Optional<int64_t>>(from, to);
+                }
+                else {
+                    copy_column_to_mixed_list<int64_t>(from, to);
+                }
+                break;
+            case type_Float:
+                copy_column_to_mixed_list<float>(from, to);
+                break;
+            case type_Double:
+                copy_column_to_mixed_list<double>(from, to);
+                break;
+            case type_Bool:
+                copy_column_to_mixed_list<Optional<bool>>(from, to);
+                break;
+            case type_String:
+                copy_column_to_mixed_list<StringData>(from, to);
+                break;
+            case type_Binary:
+                copy_column_to_mixed_list<BinaryData>(from, to);
+                break;
+            case type_Timestamp:
+                copy_column_to_mixed_list<Timestamp>(from, to);
+                break;
+            case type_ObjectId:
+                if (is_nullable(from)) {
+                    copy_column_to_mixed_list<Optional<ObjectId>>(from, to);
+                }
+                else {
+                    copy_column_to_mixed_list<ObjectId>(from, to);
+                }
+                break;
+            case type_Decimal:
+                copy_column_to_mixed_list<Decimal128>(from, to);
+                break;
+            case type_UUID:
+                if (is_nullable(from)) {
+                    copy_column_to_mixed_list<Optional<UUID>>(from, to);
+                }
+                else {
+                    copy_column_to_mixed_list<UUID>(from, to);
+                }
+                break;
+            case type_Link:
+                copy_column_to_mixed_list<ObjKey>(from, to);
+                break;
+            case type_TypedLink:
+                copy_column_to_mixed_list<ObjLink>(from, to);
+            case type_Mixed:
+                // These types are no longer supported at all
+                REALM_UNREACHABLE();
+                break;
+        }
+    }
+    else {
+        switch (type_id) {
+            case type_Int:
+                if (is_nullable(from)) {
+                    copy_column_to_mixed_simple<Optional<int64_t>>(from, to);
+                }
+                else {
+                    copy_column_to_mixed_simple<int64_t>(from, to);
+                }
+                break;
+            case type_Float:
+                copy_column_to_mixed_simple<float>(from, to);
+                break;
+            case type_Double:
+                copy_column_to_mixed_simple<double>(from, to);
+                break;
+            case type_Bool:
+                copy_column_to_mixed_simple<Optional<bool>>(from, to);
+                break;
+            case type_String:
+                copy_column_to_mixed_simple<StringData>(from, to);
+                break;
+            case type_Binary:
+                copy_column_to_mixed_simple<BinaryData>(from, to);
+                break;
+            case type_Timestamp:
+                copy_column_to_mixed_simple<Timestamp>(from, to);
+                break;
+            case type_ObjectId:
+                if (is_nullable(from)) {
+                    copy_column_to_mixed_simple<Optional<ObjectId>>(from, to);
+                }
+                else {
+                    copy_column_to_mixed_simple<ObjectId>(from, to);
+                }
+                break;
+            case type_Decimal:
+                copy_column_to_mixed_simple<Decimal128>(from, to);
+                break;
+            case type_UUID:
+                if (is_nullable(from)) {
+                    copy_column_to_mixed_simple<Optional<UUID>>(from, to);
+                }
+                else {
+                    copy_column_to_mixed_simple<UUID>(from, to);
+                }
+                break;
+            case type_Link:
+                copy_column_to_mixed_simple<ObjKey>(from, to);
+                break;
+            case type_TypedLink:
+                copy_column_to_mixed_simple<ObjLink>(from, to);
+            case type_Mixed:
+                // These types are no longer supported at all
+                REALM_UNREACHABLE();
+                break;
+        }
+    }
+}
+
+ColKey Table::convert_column_to_mixed(ColKey col_key)
+{
+    check_column(col_key);
+    if (col_key.get_type() == col_type_Mixed) {
+        return col_key;
+    }
+
+    if (col_key.is_dictionary()) {
+        throw RuntimeError(ErrorCodes::InvalidArgument, "Cannot convert a dictionary to mixed");
+    }
+
+    auto index_type = search_index_type(col_key);
+    std::string column_name(get_column_name(col_key));
+    auto attr = col_key.get_attrs();
+    bool is_pk_col = (col_key == m_primary_key_col);
+
+    ColKey new_col = generate_col_key(col_type_Mixed, attr);
+    do_insert_root_column(new_col, col_type_Mixed, "__temporary");
+    bool done = false;
+    auto new_col_guard = util::make_scope_exit([&]() noexcept {
+        if (!done) {
+            remove_column(new_col);
+        }
+    });
+
+    copy_column_to_mixed(col_key, new_col);
+    if (is_pk_col) {
+        do_set_primary_key_column(new_col);
+    }
+
+    erase_root_column(col_key);
+    m_spec.rename_column(colkey2spec_ndx(new_col), column_name);
+    done = true;
 
     if (index_type != IndexType::None)
         do_add_search_index(new_col, index_type);

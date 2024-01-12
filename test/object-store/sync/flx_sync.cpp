@@ -140,7 +140,8 @@ TEST_CASE("flx: no schema", "[sync][flx][baas]") {
          {
              {"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
              {"queryable_int_field", PropertyType::Int | PropertyType::Nullable},
-             {"list_of_strings", PropertyType::Array | PropertyType::String},
+             {"list_of_mixed", PropertyType::Array | PropertyType::Mixed | PropertyType::Nullable},
+             {"mixed", PropertyType::Mixed | PropertyType::Nullable},
              {"list_of_embedded_objects", PropertyType::Array | PropertyType::Object, "TopLevel_embedded_obj"},
              {"list_of_links", PropertyType::Array | PropertyType::Object, "OtherTopLevel"},
              {"single_link", PropertyType::Object | PropertyType::Nullable, "OtherTopLevel"},
@@ -179,7 +180,8 @@ TEST_CASE("flx: no schema", "[sync][flx][baas]") {
             c, realm, "TopLevel",
             std::any(AnyDict{{"_id", bizz_obj_id},
                              {"queryable_int_field", static_cast<int64_t>(10)},
-                             {"list_of_strings", AnyVector{"im string 1"s, "im string 2"s}},
+                             {"list_of_mixed", AnyVector{int64_t(512), "im string 2.5"s}},
+                             {"mixed", ObjectId::gen()},
                              {"list_of_embedded_objects", AnyVector{AnyDict{{"str_field", "im embedded string 1"s},
                                                                             {"str_field", "im embedded string 2"s}}}},
                              {"list_of_links", AnyVector{oo1.get_obj(), oo3.get_obj()}}}));
@@ -187,46 +189,97 @@ TEST_CASE("flx: no schema", "[sync][flx][baas]") {
             c, realm, "TopLevel",
             std::any(AnyDict{{"_id", buzz_obj_id},
                              {"queryable_int_field", static_cast<int64_t>(20)},
-                             {"list_of_strings", AnyVector{"im string 3"s, "im string 4"s}},
+                             {"list_of_mixed", AnyVector{double(2.5)}},
+                             {"mixed", "string"s},
                              {"list_of_embedded_objects", AnyVector{AnyDict{{"str_field", "im embedded string 3"s},
                                                                             {"str_field", "im embedded string 4"s}}}},
                              {"list_of_links", AnyVector{oo2.get_obj()}},
                              {"single_link", oo1.get_obj()}}));
     });
 
-    auto test_config = harness.make_test_file();
-    test_config.schema = std::nullopt;
-    auto realm = Realm::get_shared_realm(test_config);
+    auto test_config_1 = harness.make_test_file();
+    test_config_1.schema = std::nullopt;
+    auto realm_1 = Realm::get_shared_realm(test_config_1);
 
-    realm->read_group().to_json(std::cerr);
+    auto test_config_2 = harness.make_test_file();
+    test_config_2.schema = std::nullopt;
+    auto realm_2 = Realm::get_shared_realm(test_config_2);
+
     {
-        auto new_subs = realm->get_latest_subscription_set().make_mutable_copy();
+        auto new_subs = realm_1->get_latest_subscription_set().make_mutable_copy();
+        new_subs.insert_or_assign("TopLevel", "queryable_int_field = 10");
+        auto subs = new_subs.commit();
+        subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
+    }
+
+    {
+        auto new_subs = realm_2->get_latest_subscription_set().make_mutable_copy();
+        new_subs.insert_or_assign("TopLevel", "queryable_int_field = 20");
+        auto subs = new_subs.commit();
+        subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
+    }
+
+    auto table_1 = realm_1->read_group().get_table("class_TopLevel");
+    auto table_2 = realm_2->read_group().get_table("class_TopLevel");
+
+    REQUIRE(table_1);
+    REQUIRE(table_2);
+    {
+        auto col_key_mixed_field_1 = table_1->get_column_key("mixed");
+        REQUIRE(col_key_mixed_field_1);
+        REQUIRE(col_key_mixed_field_1.get_type() == col_type_ObjectId);
+
+        auto list_of_mixed_field_1 = table_1->get_column_key("list_of_mixed");
+        REQUIRE(list_of_mixed_field_1);
+        REQUIRE(list_of_mixed_field_1.is_list());
+        REQUIRE(list_of_mixed_field_1.get_type() == col_type_Mixed);
+
+        auto col_key_mixed_field_2 = table_2->get_column_key("mixed");
+        REQUIRE(col_key_mixed_field_2);
+        REQUIRE(col_key_mixed_field_2.get_type() == col_type_String);
+
+        auto list_of_mixed_field_2 = table_2->get_column_key("list_of_mixed");
+        REQUIRE(list_of_mixed_field_2);
+        REQUIRE(list_of_mixed_field_2.is_list());
+        REQUIRE(list_of_mixed_field_2.get_type() == col_type_Double);
+    }
+
+    {
+        auto new_subs = realm_1->get_latest_subscription_set().make_mutable_copy();
+        new_subs.clear();
         new_subs.insert_or_assign("TopLevel", "queryable_int_field > 0");
         auto subs = new_subs.commit();
         subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
     }
 
-    wait_for_advance(*realm);
-    realm->read_group().to_json(std::cerr);
-
     {
-        auto new_subs = realm->get_latest_subscription_set().make_mutable_copy();
-        new_subs.insert_or_assign("OtherTopLevel", "queryable_int_field > 0");
+        auto new_subs = realm_2->get_latest_subscription_set().make_mutable_copy();
+        new_subs.clear();
+        new_subs.insert_or_assign("TopLevel", "queryable_int_field > 0");
         auto subs = new_subs.commit();
         subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
     }
 
-    wait_for_advance(*realm);
-    auto table = realm->read_group().get_table("class_TopLevel");
-    Query query_foo(table);
+    wait_for_advance(*realm_2);
 
-    realm->read_group().to_json(std::cerr);
     {
-        Results results(realm, table);
-        CHECK(results.size() == 2);
-        auto obj = results.get<Obj>(0);
-        CHECK(obj.is_valid());
-        CHECK(obj.get<ObjectId>("_id") == bizz_obj_id);
+        auto col_key_mixed_field_1 = table_1->get_column_key("mixed");
+        REQUIRE(col_key_mixed_field_1);
+        REQUIRE(col_key_mixed_field_1.get_type() == col_type_Mixed);
+
+        auto col_key_mixed_field_2 = table_2->get_column_key("mixed");
+        REQUIRE(col_key_mixed_field_2);
+        REQUIRE(col_key_mixed_field_2.get_type() == col_type_Mixed);
+
+        auto list_of_mixed_field_1 = table_1->get_column_key("list_of_mixed");
+        REQUIRE(list_of_mixed_field_1);
+        REQUIRE(list_of_mixed_field_1.is_list());
+        REQUIRE(list_of_mixed_field_1.get_type() == col_type_Mixed);
+
+        auto list_of_mixed_field_2 = table_2->get_column_key("list_of_mixed");
+        REQUIRE(list_of_mixed_field_2);
+        REQUIRE(list_of_mixed_field_2.is_list());
+        REQUIRE(list_of_mixed_field_2.get_type() == col_type_Mixed);
     }
 }
 
