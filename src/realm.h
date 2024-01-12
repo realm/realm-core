@@ -1686,8 +1686,8 @@ RLM_API realm_object_t* realm_set_embedded(realm_object_t*, realm_property_key_t
  * Create a collection in a given Mixed property.
  *
  */
-RLM_API bool realm_set_list(realm_object_t*, realm_property_key_t);
-RLM_API bool realm_set_dictionary(realm_object_t*, realm_property_key_t);
+RLM_API realm_list_t* realm_set_list(realm_object_t*, realm_property_key_t);
+RLM_API realm_dictionary_t* realm_set_dictionary(realm_object_t*, realm_property_key_t);
 
 /** Return the object linked by the given property
  *

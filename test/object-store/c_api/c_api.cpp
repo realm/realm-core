@@ -5128,7 +5128,8 @@ TEST_CASE("C API: nested collections", "[c_api]") {
 
     SECTION("results of mixed") {
         SECTION("dictionary") {
-            REQUIRE(realm_set_dictionary(obj1.get(), foo_any_col_key));
+            auto parent_dict = cptr_checked(realm_set_dictionary(obj1.get(), foo_any_col_key));
+            REQUIRE(parent_dict);
             realm_value_t value;
             realm_get_value(obj1.get(), foo_any_col_key, &value);
             REQUIRE(value.type == RLM_TYPE_DICTIONARY);
@@ -5154,7 +5155,8 @@ TEST_CASE("C API: nested collections", "[c_api]") {
             REQUIRE(result_dictionary->size() == ndict->size());
         }
         SECTION("list") {
-            REQUIRE(realm_set_list(obj1.get(), foo_any_col_key));
+            auto parent_list = cptr_checked(realm_set_list(obj1.get(), foo_any_col_key));
+            REQUIRE(parent_list);
             realm_value_t value;
             realm_get_value(obj1.get(), foo_any_col_key, &value);
             REQUIRE(value.type == RLM_TYPE_LIST);
@@ -5190,7 +5192,8 @@ TEST_CASE("C API: nested collections", "[c_api]") {
             realm_dictionary_t* dict;
         } user_data;
 
-        REQUIRE(realm_set_dictionary(obj1.get(), foo_any_col_key));
+        auto parent_dict = cptr_checked(realm_set_dictionary(obj1.get(), foo_any_col_key));
+        REQUIRE(parent_dict);
         realm_value_t value;
         realm_get_value(obj1.get(), foo_any_col_key, &value);
         REQUIRE(value.type == RLM_TYPE_DICTIONARY);
@@ -5247,7 +5250,8 @@ TEST_CASE("C API: nested collections", "[c_api]") {
             realm_list_t* list;
         } user_data;
 
-        REQUIRE(realm_set_list(obj1.get(), foo_any_col_key));
+        auto parent_list = cptr_checked(realm_set_list(obj1.get(), foo_any_col_key));
+        REQUIRE(parent_list);
         realm_value_t value;
         realm_get_value(obj1.get(), foo_any_col_key, &value);
         REQUIRE(value.type == RLM_TYPE_LIST);
@@ -5295,7 +5299,8 @@ TEST_CASE("C API: nested collections", "[c_api]") {
     }
 
     SECTION("set list for collection in mixed, verify that previous reference is invalid") {
-        REQUIRE(realm_set_list(obj1.get(), foo_any_col_key));
+        auto parent_list = cptr_checked(realm_set_list(obj1.get(), foo_any_col_key));
+        REQUIRE(parent_list);
         realm_value_t value;
         realm_get_value(obj1.get(), foo_any_col_key, &value);
         REQUIRE(value.type == RLM_TYPE_LIST);
@@ -5352,7 +5357,8 @@ TEST_CASE("C API: nested collections", "[c_api]") {
     }
 
     SECTION("freeze list") {
-        REQUIRE(realm_set_dictionary(obj1.get(), foo_any_col_key));
+        auto parent_dict = cptr_checked(realm_set_dictionary(obj1.get(), foo_any_col_key));
+        REQUIRE(parent_dict);
         auto dict = cptr_checked(realm_get_dictionary(obj1.get(), foo_any_col_key));
         auto list = cptr_checked(realm_dictionary_insert_list(dict.get(), rlm_str_val("List")));
         realm_list_insert(list.get(), 0, rlm_str_val("Hello"));

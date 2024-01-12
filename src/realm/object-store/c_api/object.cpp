@@ -354,21 +354,29 @@ RLM_API realm_object_t* realm_set_embedded(realm_object_t* obj, realm_property_k
     });
 }
 
-RLM_API bool realm_set_list(realm_object_t* obj, realm_property_key_t col)
+RLM_API realm_list_t* realm_set_list(realm_object_t* object, realm_property_key_t col)
 {
     return wrap_err([&]() {
-        obj->verify_attached();
-        obj->get_obj().set_collection(ColKey(col), CollectionType::List);
-        return true;
+        object->verify_attached();
+
+        auto& obj = object->get_obj();
+        auto col_key = ColKey(col);
+
+        obj.set_collection(col_key, CollectionType::List);
+        return new realm_list_t{List{object->get_realm(), std::move(obj), col_key}};
     });
 }
 
-RLM_API bool realm_set_dictionary(realm_object_t* obj, realm_property_key_t col)
+RLM_API realm_dictionary_t* realm_set_dictionary(realm_object_t* object, realm_property_key_t col)
 {
     return wrap_err([&]() {
-        obj->verify_attached();
-        obj->get_obj().set_collection(ColKey(col), CollectionType::Dictionary);
-        return true;
+        object->verify_attached();
+
+        auto& obj = object->get_obj();
+        auto col_key = ColKey(col);
+
+        obj.set_collection(col_key, CollectionType::Dictionary);
+        return new realm_dictionary_t{object_store::Dictionary{object->get_realm(), obj, col_key}};
     });
 }
 
