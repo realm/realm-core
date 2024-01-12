@@ -78,7 +78,7 @@ private:
 } // namespace
 
 Realm::Realm(Config config, util::Optional<VersionID> version, std::shared_ptr<_impl::RealmCoordinator> coordinator,
-             MakeSharedTag)
+             Private)
     : m_config(std::move(config))
     , m_frozen_version(version)
     , m_scheduler(m_config.scheduler)
@@ -494,7 +494,7 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
             config.schema = util::none;
             // Don't go through the normal codepath for opening a Realm because
             // we're using a mismatched config
-            auto old_realm = std::make_shared<Realm>(std::move(config), none, m_coordinator, MakeSharedTag{});
+            auto old_realm = std::make_shared<Realm>(std::move(config), none, m_coordinator, Private());
             // block autorefresh for the old realm
             old_realm->m_auto_refresh = false;
             migration_function(old_realm, shared_from_this(), m_schema);

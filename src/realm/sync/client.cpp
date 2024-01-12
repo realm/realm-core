@@ -1149,8 +1149,6 @@ SessionWrapper::SessionWrapper(ClientImpl& client, DBRef db, std::shared_ptr<Sub
     if (m_client_reset_config) {
         m_session_reason = SessionReason::ClientReset;
     }
-
-    update_subscription_version_info();
 }
 
 SessionWrapper::~SessionWrapper() noexcept
@@ -1542,6 +1540,10 @@ void SessionWrapper::actualize(ServerEndpoint endpoint)
         finalize_before_actualization();
         throw;
     }
+
+    // Initialize the variables relying on the bootstrap store from the event loop to guarantee that a previous
+    // session cannot change the state of the bootstrap store at the same time.
+    update_subscription_version_info();
 
     m_actualized = true;
     if (was_created)

@@ -4688,6 +4688,43 @@ TEST_CASE("flx: fatal errors and session becoming inactive cancel pending waits"
     check_status(state);
 }
 
+TEST_CASE("flx: pause and resume bootstrapping at query version 0", "[sync][flx][baas]") {
+    FLXSyncTestHarness harness("flx_pause_resume_bootstrap");
+    SyncTestFile triggered_config(harness.app()->current_user(), harness.schema(), SyncConfig::FLXSyncEnabled{});
+    auto [interrupted_promise, interrupted] = util::make_promise_future<void>();
+    std::mutex download_message_mutex;
+    int download_message_integrated_count = 0;
+    triggered_config.sync_config->on_sync_client_event_hook =
+        [promise = util::CopyablePromiseHolder(std::move(interrupted_promise)), &download_message_integrated_count,
+         &download_message_mutex](std::weak_ptr<SyncSession> weak_sess, const SyncClientHookData& data) mutable {
+            auto sess = weak_sess.lock();
+            if (!sess || data.event != SyncClientHookEvent::DownloadMessageIntegrated) {
+                return SyncClientHookAction::NoAction;
+            }
+
+            std::lock_guard<std::mutex> lk(download_message_mutex);
+            // Pause and resume the first session after the bootstrap message is integrated.
+            if (download_message_integrated_count == 0) {
+                sess->pause();
+                sess->resume();
+            }
+            // Complete the test when the second session integrates the empty download
+            // message it receives.
+            else {
+                promise.get_promise().emplace_value();
+            }
+            ++download_message_integrated_count;
+            return SyncClientHookAction::NoAction;
+        };
+    auto realm = Realm::get_shared_realm(triggered_config);
+    interrupted.get();
+    std::lock_guard<std::mutex> lk(download_message_mutex);
+    CHECK(download_message_integrated_count == 2);
+    auto active_sub_set = realm->sync_session()->get_flx_subscription_store()->get_active();
+    REQUIRE(active_sub_set.version() == 0);
+    REQUIRE(active_sub_set.state() == sync::SubscriptionSet::State::Complete);
+}
+
 } // namespace realm::app
 
 #endif // REALM_ENABLE_AUTH_TESTS
