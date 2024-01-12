@@ -1549,6 +1549,7 @@ int_fast64_t Array::get(const char* header, size_t ndx) noexcept
     REALM_ASSERT(ndx < sz);
     if (NodeHeader::get_kind(header) == 'B') {
         REALM_ASSERT(NodeHeader::get_encoding(header) == NodeHeader::Encoding::Flex);
+        // this is likely triggering some failures when negative values (tombstones or null) are fetched
         return ArrayFlex::get(header, ndx);
     }
     const char* data = get_data_from_header(header);
@@ -1558,7 +1559,9 @@ int_fast64_t Array::get(const char* header, size_t ndx) noexcept
 
 int_fast64_t Array::get_universal_encoded_array(size_t ndx) const
 {
-    return m_encode.get(*this, ndx);
+    size_t v_width;
+    return m_encode.get_unsigned(*this, ndx, v_width);
+    // return m_encode.get(*this, ndx);
 }
 
 

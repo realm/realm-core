@@ -103,7 +103,7 @@ void ArrayUnsigned::update_from_parent() noexcept
 size_t ArrayUnsigned::lower_bound(uint64_t value) const noexcept
 {
     if (is_encoded()) {
-        return m_encode.lower_bound(*this, value);
+        return m_encode.lower_bound(*this, (int64_t)value);
     }
 
     auto width = get_width_from_header(get_header());
@@ -147,7 +147,7 @@ size_t ArrayUnsigned::lower_bound(uint64_t value) const noexcept
 size_t ArrayUnsigned::upper_bound(uint64_t value) const noexcept
 {
     if (is_encoded()) {
-        return m_encode.upper_bound(*this, value);
+        return m_encode.upper_bound(*this, (int64_t)value);
     }
 
     auto width = get_width_from_header(get_header());
