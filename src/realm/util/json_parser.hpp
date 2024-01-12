@@ -55,15 +55,7 @@ public:
 
         /// Unescape the string value into \a buffer.
         /// The type of this event must be EventType::string.
-        ///
-        /// \param buffer is a pointer to a buffer big enough to hold the
-        /// unescaped string value. The unescaped string is guaranteed to be
-        /// shorter than the escaped string, so escaped_string_value().size() can
-        /// be used as an upper bound. Unicode sequences of the form "\uXXXX"
-        /// will be converted to UTF-8 sequences. Note that the escaped form of
-        /// a unicode point takes exactly 6 bytes, which is also the maximum
-        /// possible length of a UTF-8 encoded codepoint.
-        StringData unescape_string(char* buffer) const noexcept;
+        std::vector<char> unescape_string() const noexcept;
     };
     using EventHandler = util::UniqueFunction<std::error_condition(const Event&)>;
 

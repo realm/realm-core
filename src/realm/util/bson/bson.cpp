@@ -1539,9 +1539,8 @@ Bson Parser::parse(util::Span<const char> json)
                           next_state = state->value(event.number);
                           break;
                       case EventType::string: {
-                          StringData escaped_string = event.escaped_string_value();
-                          std::vector<char> buffer(escaped_string.size());
-                          next_state = state->value(std::string(event.unescape_string(buffer.data())));
+                          auto buffer = event.unescape_string();
+                          next_state = state->value(std::string(buffer.data(), buffer.size()));
                           break;
                       }
                       case EventType::boolean:

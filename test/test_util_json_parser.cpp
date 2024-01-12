@@ -60,8 +60,8 @@ TEST(JSONParser_Basic)
 
     auto read_string_into_buffer = [&](const JSONParser::Event& event) -> StringData {
         CHECK(event.type == JSONParser::EventType::string);
-        buffer.resize(std::max(buffer.size(), event.escaped_string_value().size()));
-        return event.unescape_string(buffer.data());
+        buffer = event.unescape_string();
+        return StringData(buffer.data(), buffer.size());
     };
 
     JSONParser parser{[&](auto& event) -> std::error_condition {
@@ -152,10 +152,8 @@ TEST(JSONParser_UnescapeString)
 {
     JSONParser::Event event(JSONParser::EventType::string);
     event.range = "\"Hello,\\\\ World.\\n8\\u00b0C\\u00F8\""; // includes surrounding double quotes
-    std::vector<char> buffer;
-    buffer.resize(event.escaped_string_value().size(), '\0');
-    StringData unescaped = event.unescape_string(buffer.data());
-    CHECK_EQUAL(unescaped, "Hello,\\ World.\n8°Cø");
+    std::vector<char> buffer = event.unescape_string();
+    CHECK_EQUAL(StringData(buffer.data(), buffer.size()), "Hello,\\ World.\n8°Cø");
 
     static const char* escaped[] = {
         "\"\\u0abg\"",        // invalid sequence
@@ -174,8 +172,8 @@ TEST(JSONParser_UnescapeString)
 
     for (size_t i = 0; i != sizeof(escaped) / sizeof(escaped[0]); ++i) {
         event.range = escaped[i];
-        unescaped = event.unescape_string(buffer.data());
-        CHECK_EQUAL(unescaped, expected[i]);
+        auto buf = event.unescape_string();
+        CHECK_EQUAL(StringData(buf.data(), buf.size()), expected[i]);
     }
 
     static const char* invalid_surrogate_pairs[] = {
@@ -186,8 +184,8 @@ TEST(JSONParser_UnescapeString)
     for (size_t i = 0; i < sizeof(invalid_surrogate_pairs) / sizeof(invalid_surrogate_pairs[0]); ++i) {
         const char* str = invalid_surrogate_pairs[i];
         event.range = str;
-        unescaped = event.unescape_string(buffer.data());
-        CHECK_EQUAL(unescaped, StringData(str + 1, strlen(str) - 2));
+        auto buf = event.unescape_string();
+        CHECK_EQUAL(StringData(buf.data(), buf.size()), StringData(str + 1, strlen(str) - 2));
     }
 }
 
@@ -263,8 +261,8 @@ TEST(JSONParser_PrimitiveDocuments)
     static const char string_root[] = "\"\\u00f8\"";
     ec = JSONParser([&](auto&& event) noexcept {
              CHECK_EQUAL(event.type, JSONParser::EventType::string);
-             std::vector<char> buffer(8);
-             CHECK_EQUAL(event.unescape_string(buffer.data()), "ø");
+             auto buffer = event.unescape_string();
+             CHECK_EQUAL(StringData(buffer.data(), buffer.size()), "ø");
              return std::error_condition{};
          }).parse(string_root);
     CHECK(!ec);

@@ -17,34 +17,38 @@ int hexdigit_to_int(int digit) noexcept
 
 // p must be a pointer to at least 6 chars.
 // Returns number of UTF-8 bytes.
-size_t convert_utf32_to_utf8(unsigned int utf32, char* p) noexcept
+void convert_utf32_to_utf8(unsigned int utf32, std::vector<char>& buffer) noexcept
 {
     REALM_ASSERT_EX(utf32 <= 0x7fffffff, utf32);
+    static const uint8_t limits[] = {0x3f, 0x1f, 0x0f};
 
-    size_t n;
+    struct out_utf8 {
+        out_utf8(std::vector<char>& buffer)
+            : buf(buffer)
+        {
+        }
+        void operator()(unsigned int utf32)
+        {
+            if (i < 3 && utf32 > limits[i]) {
+                ++i;
+                (*this)(utf32 >> 6);
+                buf.push_back(0x80 | (utf32 & 0x3f));
+            }
+            else {
+                buf.push_back((0xf0 << (3 - i)) | utf32);
+            }
+        }
+        std::vector<char>& buf;
+        int i = 0;
+    };
+
     if (utf32 <= 0x7f) {
-        p[0] = static_cast<char>(utf32);
-        return 1;
+        // Ascii
+        buffer.push_back(utf32);
     }
-    else if (utf32 <= 0x07ff)
-        n = 2;
-    else if (utf32 <= 0xffff)
-        n = 3;
-    else if (utf32 <= 0x1fffff)
-        n = 4;
-    else if (utf32 <= 0x3ffffff)
-        n = 5;
-    else
-        n = 6;
-
-    unsigned int x = utf32;
-    for (size_t i = 1; i < n; ++i) {
-        p[n - i] = 0x80 | (x & 0x3f);
-        x >>= 6;
+    else {
+        out_utf8{buffer}(utf32);
     }
-    p[0] = (0xfc << (6 - n)) | x;
-
-    return n;
 }
 
 } // anonymous namespace
@@ -342,118 +346,118 @@ std::error_condition make_error_condition(JSONParser::Error e)
     return std::error_condition{static_cast<int>(e), JSONParser::error_category};
 }
 
-StringData JSONParser::Event::unescape_string(char* buffer) const noexcept
+std::vector<char> JSONParser::Event::unescape_string() const noexcept
 {
+    std::vector<char> buffer;
     REALM_ASSERT_EX(type == EventType::string, static_cast<int>(type));
-    size_t i, o;
-    bool escape = false;
+    const char* i = range.data() + 1;
+    const char* end = i + range.size() - 2;
+    buffer.reserve(end - i);
+    while (i < end) {
+        auto j = std::find(i, end, '\\');
+        buffer.insert(buffer.end(), i, j);
+        if (j == end) {
+            // No more escapes
+            break;
+        }
+        // skip '\'
+        i = j + 1;
+        if (i == end) {
+            // end of string
+            break;
+        }
+        char c = *i++;
+        switch (c) {
+            case '"':
+                buffer.push_back('"');
+                break;
+            case '\\':
+                buffer.push_back('\\');
+                break;
+            case '/':
+                buffer.push_back('/');
+                break;
+            case 'b':
+                buffer.push_back('\b');
+                break;
+            case 'f':
+                buffer.push_back('\f');
+                break;
+            case 'n':
+                buffer.push_back('\n');
+                break;
+            case 'r':
+                buffer.push_back('\r');
+                break;
+            case 't':
+                buffer.push_back('\t');
+                break;
+            case 'u': {
+                if (i + 4 <= end) {
+                    const char* u = i;
+                    if (std::all_of(u, u + 4, [](char d) {
+                            return std::isxdigit(d);
+                        })) {
+                        unsigned int utf16_codepoint = 0;
+                        for (size_t x = 0; x < 4; ++x) {
+                            utf16_codepoint *= 16;
+                            utf16_codepoint += hexdigit_to_int(*u++);
+                        }
 
-    StringData escaped_string = escaped_string_value();
-    for (i = 0, o = 0; i < escaped_string.size(); ++i) {
-        char c = escaped_string[i];
-        if (escape) {
-            switch (c) {
-                case '"':
-                    buffer[o++] = '"';
-                    break;
-                case '\\':
-                    buffer[o++] = '\\';
-                    break;
-                case '/':
-                    buffer[o++] = '/';
-                    break;
-                case 'b':
-                    buffer[o++] = '\b';
-                    break;
-                case 'f':
-                    buffer[o++] = '\f';
-                    break;
-                case 'n':
-                    buffer[o++] = '\n';
-                    break;
-                case 'r':
-                    buffer[o++] = '\r';
-                    break;
-                case 't':
-                    buffer[o++] = '\t';
-                    break;
-                case 'u': {
-                    if (i + 4 < escaped_string.size()) {
-                        const char* u = escaped_string.data() + i + 1;
-                        if (std::all_of(u, u + 4, [](char d) {
-                                return std::isxdigit(d);
-                            })) {
-                            unsigned int utf16_codepoint = 0;
-                            for (size_t x = 0; x < 4; ++x) {
-                                utf16_codepoint *= 16;
-                                utf16_codepoint += hexdigit_to_int(u[x]);
-                            }
-
-                            if (utf16_codepoint >= 0xd800 && utf16_codepoint <= 0xdbff) {
-                                // Surrogate UTF-16
-                                unsigned int utf32_codepoint = (utf16_codepoint & 0x3ff) << 10;
-                                u = escaped_string.data() + i + 5;
-                                if (i + 10 < escaped_string.size() && u[0] == '\\' && u[1] == 'u') {
-                                    u += 2;
-                                    if (std::all_of(u, u + 4, [](char d) {
-                                            return std::isxdigit(d);
-                                        })) {
-                                        unsigned int utf16_codepoint_2 = 0;
-                                        for (size_t x = 0; x < 4; ++x) {
-                                            utf16_codepoint_2 *= 16;
-                                            utf16_codepoint_2 += hexdigit_to_int(u[x]);
-                                        }
-                                        if (utf16_codepoint_2 >= 0xdc00 && utf16_codepoint_2 <= 0xdfff) {
-                                            utf32_codepoint |= utf16_codepoint_2 & 0x3ff;
-                                            i += 10;
-                                            o += convert_utf32_to_utf8(utf32_codepoint, &buffer[o]);
-                                            break;
-                                        }
-                                        else {
-                                            // High surrogate not followed by a low surrogate, invalid UTF-16.
-                                        }
+                        if (utf16_codepoint >= 0xd800 && utf16_codepoint <= 0xdbff) {
+                            // Surrogate UTF-16
+                            unsigned int utf32_codepoint = (utf16_codepoint & 0x3ff) << 10;
+                            if (u + 6 <= end && u[0] == '\\' && u[1] == 'u') {
+                                u += 2;
+                                if (std::all_of(u, u + 4, [](char d) {
+                                        return std::isxdigit(d);
+                                    })) {
+                                    unsigned int utf16_codepoint_2 = 0;
+                                    for (size_t x = 0; x < 4; ++x) {
+                                        utf16_codepoint_2 *= 16;
+                                        utf16_codepoint_2 += hexdigit_to_int(*u++);
+                                    }
+                                    if (utf16_codepoint_2 >= 0xdc00 && utf16_codepoint_2 <= 0xdfff) {
+                                        utf32_codepoint |= utf16_codepoint_2 & 0x3ff;
+                                        i = u;
+                                        convert_utf32_to_utf8(utf32_codepoint, buffer);
+                                        break;
                                     }
                                     else {
-                                        // High surrogate followed by invalid UTF-16 sequence, invalid UTF-16.
+                                        // High surrogate not followed by a low surrogate, invalid UTF-16.
                                     }
                                 }
                                 else {
-                                    // High surrogate followed by non-UTF16 sequence, invalid UTF-16.
+                                    // High surrogate followed by invalid UTF-16 sequence, invalid UTF-16.
                                 }
                             }
-                            else if (utf16_codepoint >= 0xdc00 && utf16_codepoint <= 0xdfff) {
-                                // Low surrogate without high surrogate, invalid UTF-16.
-                            }
                             else {
-                                i += 4;
-                                o += convert_utf32_to_utf8(utf16_codepoint, &buffer[o]);
-                                break;
+                                // High surrogate followed by non-UTF16 sequence, invalid UTF-16.
                             }
                         }
+                        else if (utf16_codepoint >= 0xdc00 && utf16_codepoint <= 0xdfff) {
+                            // Low surrogate without high surrogate, invalid UTF-16.
+                        }
+                        else {
+                            i = u;
+                            convert_utf32_to_utf8(utf16_codepoint, buffer);
+                            break;
+                        }
                     }
-                    // Invalid Unicode hex sequence, so don't unescape.
-                    buffer[o++] = '\\';
-                    buffer[o++] = 'u';
-                    break;
                 }
-                default: {
-                    buffer[o++] = '\\';
-                    buffer[o++] = c;
-                    break;
-                }
+                // Invalid Unicode hex sequence, so don't unescape.
+                buffer.push_back('\\');
+                buffer.push_back('u');
+                break;
             }
-            escape = false;
-        }
-        else {
-            if (c == '\\') {
-                escape = true;
-            }
-            else {
-                buffer[o++] = c;
+            default: {
+                buffer.push_back('\\');
+                buffer.push_back(c);
+                break;
             }
         }
     }
-    return StringData(buffer, o);
+    return buffer;
 }
 
 } // namespace util
