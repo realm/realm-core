@@ -658,7 +658,8 @@ StringData Mixed::get_index_data(std::array<char, 16>& buffer) const noexcept
     if (is_null()) {
         return {};
     }
-    switch (get_type()) {
+    auto type = get_type();
+    switch (type) {
         case type_Int: {
             int64_t i = get_int();
             const char* c = reinterpret_cast<const char*>(&i);
@@ -739,6 +740,14 @@ StringData Mixed::get_index_data(std::array<char, 16>& buffer) const noexcept
         }
         case type_Mixed:
         case type_Link:
+            break;
+        default:
+            if (type == type_Dictionary) {
+                return "__Dictionary__";
+            }
+            if (type == type_List) {
+                return "__List__";
+            }
             break;
     }
     REALM_ASSERT_RELEASE(false && "Index not supported for this column type");

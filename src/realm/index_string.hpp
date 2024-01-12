@@ -166,8 +166,6 @@ public:
 #ifdef REALM_DEBUG
     template <class T>
     void verify_entries(const ClusterColumn& column) const;
-    void dump_node_structure() const;
-    void do_dump_node_structure(std::ostream&, int) const;
     void print() const final;
 #endif
 

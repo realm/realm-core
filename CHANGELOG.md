@@ -6,7 +6,7 @@
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Fixed crash when adding a collection to an indexed Mixed property ([#7246](https://github.com/realm/realm-core/issues/7246), since 14.0.0-beta.0)
 
 ### Breaking changes
 * None.
