@@ -1569,9 +1569,36 @@ void Cluster::typed_print(std::string prefix, const Table& table) const
                 if (col_attr.test(col_attr_Nullable))
                     attr_string += "Null:";
                 std::cout << pref << "Column[" << attr_string << col_type << "] as ";
-                Array a(m_alloc);
-                a.init_from_ref(rot.get_as_ref());
-                a.typed_print(pref);
+                // special cases for the types we want to compress
+                if (col_attr.test(col_attr_List) || col_attr.test(col_attr_Set)) {
+                    // That is a single bplustree
+                    // propagation of nullable missing here?
+                    // handling of mixed missing here?
+                    bptree_typed_print(pref, m_alloc, rot.get_as_ref(), col_type);
+                }
+                if (col_attr.test(col_attr_Dictionary)) {
+                    Array dict_top(m_alloc);
+                    dict_top.init_from_ref(rot.get_as_ref());
+                    std::cout << "{" << std::endl;
+                    auto ref0 = dict_top.get_as_ref(0);
+                    if (ref0) {
+                        auto p = pref + "  0:\t";
+                        std::cout << p;
+                        bptree_typed_print(p, m_alloc, ref0, col_type);
+                    }
+                    auto ref1 = dict_top.get_as_ref(1);
+                    if (ref1) {
+                        auto p = pref + "  1:\t";
+                        std::cout << p;
+                        bptree_typed_print(p, m_alloc, dict_top.get_as_ref(1), col_type);
+                    }
+                }
+                else {
+                    // handle all other cases as generic arrays
+                    Array a(m_alloc);
+                    a.init_from_ref(rot.get_as_ref());
+                    a.typed_print(pref);
+                }
             }
         }
     }

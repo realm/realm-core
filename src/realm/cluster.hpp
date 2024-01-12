@@ -115,7 +115,7 @@ public:
     }
     ClusterNode(Allocator& allocator) // partial initialization for read-only traversal
         : Array(allocator)
-        , m_tree_top(*(const ClusterTree*)nullptr)
+        , m_tree_top(*(const ClusterTree*)nullptr) // <--- NOT the way to do it
         , m_keys(allocator)
     {
     }
