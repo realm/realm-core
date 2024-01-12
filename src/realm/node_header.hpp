@@ -194,7 +194,7 @@ public:
 
     static int unsigned_to_num_bits(uint64_t value)
     {
-        return 1 + log2(value);
+        return 1 + log2(static_cast<size_t>(value));
     }
 
     static int signed_to_num_bits(int64_t value)
