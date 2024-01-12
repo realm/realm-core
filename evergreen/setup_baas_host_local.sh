@@ -225,7 +225,8 @@ scp "${SSH_OPTIONS[@]}" -o ConnectTimeout=60 "${BAAS_HOST_VARS}" "${SSH_USER}:${
 # This ensures the remote host the latest copy, esp when running evergreen patches
 # dependencies.list contains the BAAS_VERSION to use
 echo "Transferring evergreen scripts to ${SSH_USER}:${FILE_DEST_DIR}"
-scp -r "${SSH_OPTIONS[@]}" -o ConnectTimeout=60 "${EVERGREEN_PATH}/" dependencies.list "${SSH_USER}:${FILE_DEST_DIR}/"
+cp "${EVERGREEN_PATH}/../dependencies.list" "${EVERGREEN_PATH}/"
+scp -r "${SSH_OPTIONS[@]}" -o ConnectTimeout=60 "${EVERGREEN_PATH}/" "${SSH_USER}:${FILE_DEST_DIR}/"
 
 BAAS_TUNNELS=()
 SETUP_OPTIONS=()

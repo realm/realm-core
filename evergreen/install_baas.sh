@@ -365,13 +365,21 @@ git config --global url."git@github.com:".insteadOf "https://github.com/"
 
 # If a baas branch or commit version was not provided use the one locked in our dependencies
 if [[ -z "${BAAS_VERSION}" ]]; then
-    if [[ -f "${BASE_PATH}/../dependencies.list" ]]; then
+    dep_file="dependencies.list"
+    test_path1="${BASE_PATH}/../${dep_file}"
+    test_path2="${BASE_PATH}/${dep_file}"
+    if [[ -f "${test_path1}" ]]; then
         # if this was run locally then check up a directory
-        get_var_from_file BAAS_VERSION "${BASE_PATH}/../dependencies.list"
-    elif [[ -f "${BASE_PATH}/dependencies.list" ]]; then
+        get_var_from_file BAAS_VERSION "${test_path1}"
+    elif [[ -f "${test_path2}" ]]; then
         # if this is run from an evergreen remote host
         # then the dependencies.list file has been copied over
-        get_var_from_file BAAS_VERSION "${BASE_PATH}/dependencies.list"
+        get_var_from_file BAAS_VERSION "${test_path2}"
+    else
+        echo "could not find '${test_path1}' or '${test_path2}'"
+        ls "${BASE_PATH}/.."
+        echo ""
+        ls "${BASE_PATH}"
     fi
 fi
 
