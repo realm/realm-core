@@ -176,7 +176,6 @@ struct SyncUserIdentity {
 // are associated with it.
 class SyncUser : public std::enable_shared_from_this<SyncUser>, public Subscribable<SyncUser> {
     friend class SyncSession;
-    struct Private {};
 
 public:
     enum class State {
@@ -232,14 +231,14 @@ public:
     app::MongoClient mongo_client(const std::string& service_name) REQUIRES(!m_mutex);
 
     // ------------------------------------------------------------------------
-    // All of the following are called by `SyncManager` and are public only for
+    // All of the following are called by `RealmBackingStore` and are public only for
     // testing purposes. SDKs should not call these directly in non-test code
     // or expose them in the public API.
 
-    // Don't use this directly; use the `SyncManager` APIs. Public for use with `make_shared`.
-    SyncUser(Private, std::string_view refresh_token, std::string_view id, std::string_view access_token,
+    // Don't use this directly; use the `BackingStore` APIs. Public for use with `make_shared`.
+    SyncUser(std::string_view refresh_token, std::string_view id, std::string_view access_token,
              std::string_view device_id, std::shared_ptr<app::App> app);
-    SyncUser(Private, const SyncUserMetadata& data, std::shared_ptr<app::App> app);
+    SyncUser(const SyncUserMetadata& data, std::shared_ptr<app::App> app);
     SyncUser(const SyncUser&) = delete;
     SyncUser& operator=(const SyncUser&) = delete;
 

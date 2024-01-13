@@ -65,6 +65,7 @@ if(REALM_ENABLE_SYNC)
     list(APPEND SOURCES
         bson.cpp
         sync/app_sync_services.cpp
+        sync/app_backing_store.cpp
         sync/client_reset.cpp
         sync/file.cpp
         sync/flx_migration.cpp

@@ -62,7 +62,6 @@ struct SyncClientTimeouts {
 };
 
 struct SyncClientConfig {
-    app::RealmBackingStoreConfig storage_config;
     using LoggerFactory = std::function<std::shared_ptr<util::Logger>(util::Logger::Level)>;
     LoggerFactory logger_factory;
     util::Logger::Level log_level = util::Logger::Level::info;

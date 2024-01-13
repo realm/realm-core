@@ -210,7 +210,8 @@ public:
 #if REALM_ENABLE_SYNC
                ,
                realm::ReconnectMode mode = realm::ReconnectMode::normal,
-               std::shared_ptr<realm::sync::SyncSocketProvider> socket_provider = nullptr
+               std::shared_ptr<realm::sync::SyncSocketProvider> socket_provider = nullptr,
+               std::shared_ptr<realm::app::BackingStore> store = nullptr
 #endif // REALM_ENABLE_SYNC
         );
         ~Config();
@@ -223,6 +224,7 @@ public:
         realm::ReconnectMode reconnect_mode = realm::ReconnectMode::normal;
         std::shared_ptr<realm::sync::SyncSocketProvider> custom_socket_provider = nullptr;
 #endif // REALM_SYNC
+        std::shared_ptr<realm::app::BackingStore> backing_store;
     };
     TestAppSession(Config config = {});
     ~TestAppSession();

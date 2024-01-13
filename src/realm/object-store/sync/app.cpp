@@ -216,40 +216,44 @@ App::Config::DeviceInfo::DeviceInfo(std::string a_platform_version, std::string 
 // "Calling function configure requires negative capability '!app->m_route_mutex'"
 // But 'app' is an object just created in this static method so it is not possible to annotate this in the header.
 #if REALM_ENABLE_SYNC
+SharedApp App::get_app(CacheMode mode, const Config& config, const SyncClientConfig& sync_client_config,
+                       std::shared_ptr<BackingStore> store) NO_THREAD_SAFETY_ANALYSIS
+{
+    return do_get_app(mode, config, [&sync_client_config, &store](SharedApp app) {
+        std::string sync_route;
+        {
+            util::CheckedLockGuard guard(app->m_route_mutex);
+            sync_route = make_sync_route(app->m_app_route);
+        }
+        app->m_sync_manager = std::make_shared<SyncManager>();
+        app->m_sync_manager->configure(app, sync_route, sync_client_config);
+        app->configure_backing_store(store);
+    });
+}
+#endif // REALM_ENABLE_SYNC
+
 SharedApp App::get_app(CacheMode mode, const Config& config,
-                       const SyncClientConfig& sync_client_config) NO_THREAD_SAFETY_ANALYSIS
+                       std::shared_ptr<BackingStore> store) NO_THREAD_SAFETY_ANALYSIS
+{
+    return do_get_app(mode, config, [&store](SharedApp app) {
+        app->configure_backing_store(store);
+    });
+}
+
+SharedApp App::do_get_app(CacheMode mode, const Config& config, std::function<void(SharedApp)> do_config)
 {
     if (mode == CacheMode::Enabled) {
         std::lock_guard<std::mutex> lock(s_apps_mutex);
         auto& app = s_apps_cache[config.app_id][config.base_url.value_or(std::string(s_default_base_url))];
         if (!app) {
             app = std::make_shared<App>(Private(), config);
-            app->configure(sync_client_config);
+            do_config(app);
         }
         return app;
     }
     REALM_ASSERT(mode == CacheMode::Disabled);
     auto app = std::make_shared<App>(Private(), config);
-    app->configure(sync_client_config);
-    return app;
-}
-#endif // REALM_ENABLE_SYNC
-
-SharedApp App::get_app(CacheMode mode, const Config& config,
-                       const RealmBackingStoreConfig& store_config) NO_THREAD_SAFETY_ANALYSIS
-{
-    if (mode == CacheMode::Enabled) {
-        std::lock_guard<std::mutex> lock(s_apps_mutex);
-        auto& app = s_apps_cache[config.app_id][config.base_url.value_or(std::string(s_default_base_url))];
-        if (!app) {
-            app = std::make_shared<App>(PrivateConstructionOnly(), config);
-            app->configure(store_config);
-        }
-        return app;
-    }
-    REALM_ASSERT(mode == CacheMode::Disabled);
-    auto app = std::make_shared<App>(PrivateConstructionOnly(), config);
-    app->configure(store_config);
+    do_config(app);
     return app;
 }
 
@@ -283,20 +287,7 @@ void App::close_all_sync_sessions()
         }
     }
 }
-
-void App::configure(const SyncClientConfig& sync_client_config)
-{
-    std::string sync_route;
-    {
-        util::CheckedLockGuard guard(m_route_mutex);
-        sync_route = make_sync_route(m_app_route);
-    }
-    m_sync_manager = std::make_shared<SyncManager>();
-    m_sync_manager->configure(shared_from_this(), sync_route, sync_client_config);
-    configure(sync_client_config.storage_config);
-}
-
-#endif
+#endif // REALM_ENABLE_SYNC
 
 App::App(Private, const Config& config)
     : m_config(std::move(config))
@@ -326,10 +317,12 @@ App::App(Private, const Config& config)
 
 App::~App() {}
 
-void App::configure(const RealmBackingStoreConfig& storage_config)
+void App::configure_backing_store(std::shared_ptr<BackingStore> store)
 {
-    m_app_backing_store = std::make_shared<RealmBackingStore>(shared_from_this(), storage_config);
-    m_app_backing_store->initialize(); // separate from construction so that shared_from_this() works
+    REALM_ASSERT(store);
+    m_app_backing_store = store;
+    // separate from construction so that shared_from_this() works
+    m_app_backing_store->initialize(shared_from_this());
 
     if (auto metadata = m_app_backing_store->app_metadata()) {
         // If there is app metadata stored, then set up the initial hostname/syncroute

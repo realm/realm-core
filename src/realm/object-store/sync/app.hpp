@@ -264,12 +264,17 @@ public:
         Disabled // Bypass the app cache; return a new app instance.
     };
 #if REALM_ENABLE_SYNC
-    /// Get a shared pointer to a configured App instance. Sync is fully enabled.
-    static SharedApp get_app(CacheMode mode, const Config& config, const SyncClientConfig& sync_client_config);
+    /// Get a shared pointer to a configured App instance. Sync is fully enabled and the external backing store
+    /// provided is used. The App instance returned will extend the lifetime of the backing store. If you want the
+    /// default storage engine, use a RealmBackingStore instance.
+    static SharedApp get_app(CacheMode mode, const Config& config, const SyncClientConfig& sync_client_config,
+                             std::shared_ptr<BackingStore> store);
 #endif // REALM_ENABLE_SYNC
-    /// Get a shared pointer to a configured App instance. Sync is disabled, but the internal Realm backing store is
-    /// enabled.
-    static SharedApp get_app(CacheMode mode, const Config& config, const RealmBackingStoreConfig& store_config);
+
+    /// Get a shared pointer to a configured  App instance. Sync is disabled, and the external backing store provided
+    /// is used. The App instance returned will extend the lifetime of the backing store; the shared pointer count is
+    /// incremented here.
+    static SharedApp get_app(CacheMode mode, const Config& config, std::shared_ptr<BackingStore> store);
 
     /// Return a cached app instance if one was previously generated for the `app_id`+`base_url` combo using
     /// `App::get_app()`.
@@ -555,10 +560,9 @@ private:
 
     std::string function_call_url_path() const REQUIRES(!m_route_mutex);
 
-#if REALM_ENABLE_SYNC
-    void configure(const SyncClientConfig& sync_client_config) REQUIRES(!m_route_mutex);
-#endif // REALM_ENABLE_SYNC
-    void configure(const RealmBackingStoreConfig& storage_config) REQUIRES(!m_route_mutex);
+    static SharedApp do_get_app(CacheMode mode, const Config& config, std::function<void(SharedApp)> do_config);
+
+    void configure_backing_store(std::shared_ptr<BackingStore> store) REQUIRES(!m_route_mutex);
 
     static std::string make_sync_route(const std::string& http_app_route);
     void update_hostname(const util::Optional<realm::SyncAppMetadata>& metadata) REQUIRES(!m_route_mutex);

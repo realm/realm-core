@@ -49,7 +49,7 @@ struct RealmBackingStoreConfig {
 
 struct RealmBackingStore final : public app::BackingStore, public std::enable_shared_from_this<RealmBackingStore> {
 
-    RealmBackingStore(std::weak_ptr<app::App> parent, RealmBackingStoreConfig config);
+    RealmBackingStore(RealmBackingStoreConfig config);
     virtual ~RealmBackingStore();
     std::shared_ptr<SyncUser> get_user(std::string_view user_id, std::string_view refresh_token,
                                        std::string_view access_token, std::string_view device_id) override
@@ -63,7 +63,7 @@ struct RealmBackingStore final : public app::BackingStore, public std::enable_sh
     void remove_user(std::string_view user_id) override REQUIRES(!m_user_mutex, !m_file_system_mutex);
     void delete_user(std::string_view user_id) override REQUIRES(!m_user_mutex, !m_file_system_mutex);
     void reset_for_testing() override REQUIRES(!m_user_mutex, !m_file_system_mutex);
-    void initialize() override REQUIRES(!m_file_system_mutex, !m_user_mutex);
+    void initialize(std::weak_ptr<app::App> parent) override REQUIRES(!m_file_system_mutex, !m_user_mutex);
     bool immediately_run_file_actions(std::string_view realm_path) override REQUIRES(!m_file_system_mutex);
     bool perform_metadata_update(util::FunctionRef<void(SyncMetadataManager&)> update_function) const override
         REQUIRES(!m_file_system_mutex);

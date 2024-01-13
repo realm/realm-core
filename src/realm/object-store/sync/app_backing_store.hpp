@@ -38,10 +38,6 @@ class App;
 
 class BackingStore {
 public:
-    BackingStore(std::weak_ptr<app::App> parent)
-        : m_parent_app(parent)
-    {
-    }
     // Get a sync user for a given identity, or create one if none exists yet, and set its token.
     // If a logged-out user exists, it will marked as logged back in.
     virtual std::shared_ptr<SyncUser> get_user(std::string_view user_id, std::string_view refresh_token,
@@ -74,7 +70,10 @@ public:
 
     // Called on start up after construction.
     // The benefit being that `shared_from_this()` will work here.
-    virtual void initialize() = 0;
+    virtual void initialize(std::weak_ptr<app::App> parent)
+    {
+        m_parent_app = parent;
+    }
 
     // FIXME: this is an implementation detail leak and doesn't belong in this API
     // FIXME: consider abstracting it to something called `on_manual_client_reset()`

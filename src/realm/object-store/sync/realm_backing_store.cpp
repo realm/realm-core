@@ -26,8 +26,8 @@
 using namespace realm;
 using namespace realm::app;
 
-RealmBackingStore::RealmBackingStore(std::weak_ptr<app::App> parent, RealmBackingStoreConfig config)
-    : app::BackingStore(parent)
+RealmBackingStore::RealmBackingStore(RealmBackingStoreConfig config)
+    : app::BackingStore()
     , m_config(config)
 {
 }
@@ -65,21 +65,18 @@ void RealmBackingStore::reset_for_testing()
     }
 }
 
-void RealmBackingStore::initialize()
+void RealmBackingStore::initialize(std::weak_ptr<app::App> parent)
 {
+    BackingStore::initialize(parent);
     std::vector<std::shared_ptr<SyncUser>> users_to_add;
     {
         util::CheckedLockGuard lock(m_file_system_mutex);
+        // The RealmBackingStore is not designed to be used
+        // across multiple App instances.
+        REALM_ASSERT_RELEASE(!m_file_manager);
         // Set up the file manager.
-        if (m_file_manager) {
-            // Changing the base path for tests requires calling reset_for_testing()
-            // first, and otherwise isn't supported
-            REALM_ASSERT(m_file_manager->base_path() == m_config.base_file_path);
-        }
-        else {
-            m_file_manager =
-                std::make_unique<SyncFileManager>(m_config.base_file_path, m_parent_app.lock()->config().app_id);
-        }
+        m_file_manager =
+            std::make_unique<SyncFileManager>(m_config.base_file_path, m_parent_app.lock()->config().app_id);
 
         // Set up the metadata manager, and perform initial loading/purging work.
         if (m_metadata_manager || m_config.metadata_mode == app::RealmBackingStoreConfig::MetadataMode::NoMetadata) {
@@ -113,8 +110,7 @@ void RealmBackingStore::initialize()
             auto refresh_token = user_data.refresh_token();
             auto access_token = user_data.access_token();
             if (!refresh_token.empty() && !access_token.empty()) {
-                users_to_add.push_back(
-                    std::make_shared<SyncUser>(SyncUser::Private(), user_data, m_parent_app.lock()));
+                users_to_add.push_back(std::make_shared<SyncUser>(user_data, m_parent_app.lock()));
             }
         }
 
@@ -212,8 +208,8 @@ std::shared_ptr<SyncUser> RealmBackingStore::get_user(std::string_view user_id, 
         });
         if (it == m_users.end()) {
             // No existing user.
-            auto new_user = std::make_shared<SyncUser>(SyncUser::Private(), refresh_token, user_id, access_token,
-                                                       device_id, m_parent_app.lock());
+            auto new_user =
+                std::make_shared<SyncUser>(refresh_token, user_id, access_token, device_id, m_parent_app.lock());
             m_users.emplace(m_users.begin(), new_user);
             {
                 util::CheckedLockGuard lock(m_file_system_mutex);

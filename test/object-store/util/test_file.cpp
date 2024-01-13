@@ -200,7 +200,8 @@ OfflineAppSession::OfflineAppSession(OfflineAppSession::Config config)
     app::RealmBackingStoreConfig bsc;
     bsc.base_file_path = m_base_file_path;
     bsc.metadata_mode = config.metadata_mode;
-    m_app = app::App::get_app(app::App::CacheMode::Disabled, app_config, bsc);
+    auto store = std::make_shared<app::RealmBackingStore>(bsc);
+    m_app = app::App::get_app(app::App::CacheMode::Disabled, app_config, store);
 }
 
 OfflineAppSession::~OfflineAppSession()
@@ -230,18 +231,18 @@ TestAppSession::Config::Config()
 
 TestAppSession::Config::Config(AppSession session,
                                std::shared_ptr<realm::app::GenericNetworkTransport> custom_transport,
-                               DeleteApp delete_app
+                               DeleteApp delete_app,
 #if REALM_ENABLE_SYNC
-                               ,
-                               ReconnectMode mode, std::shared_ptr<realm::sync::SyncSocketProvider> socket_provider
+                               ReconnectMode mode, std::shared_ptr<realm::sync::SyncSocketProvider> socket_provider,
 #endif // REALM_SYNC
-                               )
+                               std::shared_ptr<app::BackingStore> store)
     : app_session(std::make_unique<AppSession>(std::move(session)))
     , transport(std::move(custom_transport))
     , delete_when_done(delete_app)
 #if REALM_ENABLE_SYNC
     , reconnect_mode(std::move(mode))
     , custom_socket_provider(std::move(socket_provider))
+    , backing_store(store)
 #endif // REALM_SYNC
 {
 }
@@ -268,13 +269,14 @@ TestAppSession::TestAppSession(Config config)
     }
 
     util::try_make_dir(m_base_file_path);
-    app::RealmBackingStoreConfig bsc;
-    bsc.base_file_path = m_base_file_path;
-    bsc.metadata_mode = app::RealmBackingStoreConfig::MetadataMode::NoEncryption;
-
+    if (!config.backing_store) {
+        app::RealmBackingStoreConfig bsc;
+        bsc.base_file_path = m_base_file_path;
+        bsc.metadata_mode = app::RealmBackingStoreConfig::MetadataMode::NoEncryption;
+        config.backing_store = std::make_shared<app::RealmBackingStore>(bsc);
+    }
 #if REALM_ENABLE_SYNC
     SyncClientConfig sc_config;
-    sc_config.storage_config = bsc;
     sc_config.reconnect_mode = config.reconnect_mode;
     sc_config.socket_provider = std::move(config.custom_socket_provider);
     // With multiplexing enabled, the linger time controls how long a
@@ -282,12 +284,12 @@ TestAppSession::TestAppSession(Config config)
     // down sync clients immediately.
     sc_config.timeouts.connection_linger_time = 0;
 
-    m_app = app::App::get_app(app::App::CacheMode::Disabled, app_config, sc_config);
+    m_app = app::App::get_app(app::App::CacheMode::Disabled, app_config, sc_config, config.backing_store);
 
     // initialize sync client
     m_app->sync_manager()->get_sync_client();
 #else
-    m_app = app::App::get_app(app::App::CacheMode::Disabled, app_config, bsc);
+    m_app = app::App::get_app(app::App::CacheMode::Disabled, app_config, config.backing_store);
 #endif // REALM_SYNC
 
     create_user_and_log_in(m_app);
@@ -541,13 +543,13 @@ TestSyncManager::TestSyncManager(const Config& config, const SyncServer::Config&
     set_app_config_defaults(app_config, transport);
     util::Logger::set_default_level_threshold(config.log_level);
 
-    SyncClientConfig sc_config;
     m_base_file_path = config.base_path.empty() ? util::make_temp_dir() + random_string(10) : config.base_path;
     util::try_make_dir(m_base_file_path);
-    sc_config.storage_config.base_file_path = m_base_file_path;
-    sc_config.storage_config.metadata_mode = config.metadata_mode;
-
-    m_app = app::App::get_app(app::App::CacheMode::Disabled, app_config, sc_config);
+    app::RealmBackingStoreConfig bsc;
+    bsc.base_file_path = m_base_file_path;
+    bsc.metadata_mode = config.metadata_mode;
+    auto store = std::make_shared<app::RealmBackingStore>(bsc);
+    m_app = app::App::get_app(app::App::CacheMode::Disabled, app_config, SyncClientConfig{}, store);
     if (config.override_sync_route) {
         m_app->sync_manager()->set_sync_route(m_sync_server.base_url() + "/realm-sync");
     }

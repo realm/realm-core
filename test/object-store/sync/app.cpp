@@ -2758,6 +2758,9 @@ TEST_CASE("app: shared instances", "[sync][app]") {
     auto cleanup = util::make_scope_exit([&]() noexcept {
         realm::util::try_remove_dir_recursive(bsc.base_file_path);
     });
+    auto get_store = [&bsc]() -> std::shared_ptr<RealmBackingStore> {
+        return std::make_shared<RealmBackingStore>(bsc);
+    };
 
     auto config1 = base_config;
     config1.app_id = "app1";
@@ -2774,10 +2777,10 @@ TEST_CASE("app: shared instances", "[sync][app]") {
     config4.base_url = "http://localhost:9090";
 
     // should all point to same underlying app
-    auto app1_1 = App::get_app(app::App::CacheMode::Enabled, config1, bsc);
-    auto app1_2 = App::get_app(app::App::CacheMode::Enabled, config1, bsc);
+    auto app1_1 = App::get_app(app::App::CacheMode::Enabled, config1, get_store());
+    auto app1_2 = App::get_app(app::App::CacheMode::Enabled, config1, get_store());
     auto app1_3 = App::get_cached_app(config1.app_id, config1.base_url);
-    auto app1_4 = App::get_app(app::App::CacheMode::Enabled, config2, bsc);
+    auto app1_4 = App::get_app(app::App::CacheMode::Enabled, config2, get_store());
     auto app1_5 = App::get_cached_app(config1.app_id);
 
     CHECK(app1_1 == app1_2);
@@ -2786,9 +2789,9 @@ TEST_CASE("app: shared instances", "[sync][app]") {
     CHECK(app1_1 == app1_5);
 
     // config3 and config4 should point to different apps
-    auto app2_1 = App::get_app(app::App::CacheMode::Enabled, config3, bsc);
+    auto app2_1 = App::get_app(app::App::CacheMode::Enabled, config3, get_store());
     auto app2_2 = App::get_cached_app(config3.app_id, config3.base_url);
-    auto app2_3 = App::get_app(app::App::CacheMode::Enabled, config4, bsc);
+    auto app2_3 = App::get_app(app::App::CacheMode::Enabled, config4, get_store());
     auto app2_4 = App::get_cached_app(config3.app_id);
     auto app2_5 = App::get_cached_app(config4.app_id, "https://some.different.url");
 

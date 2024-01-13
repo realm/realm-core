@@ -103,7 +103,7 @@ static std::shared_ptr<app::App> lock_or_throw(std::weak_ptr<app::App> app)
     throw RuntimeError(ErrorCodes::RuntimeError, "Invalid operation on user which has become detached.");
 }
 
-SyncUser::SyncUser(Private, std::string_view refresh_token, std::string_view id, std::string_view access_token,
+SyncUser::SyncUser(std::string_view refresh_token, std::string_view id, std::string_view access_token,
                    std::string_view device_id, std::shared_ptr<app::App> app)
     : m_state(State::LoggedIn)
     , m_identity(id)
@@ -130,7 +130,7 @@ SyncUser::SyncUser(Private, std::string_view refresh_token, std::string_view id,
         });
 }
 
-SyncUser::SyncUser(Private, const SyncUserMetadata& data, std::shared_ptr<app::App> app)
+SyncUser::SyncUser(const SyncUserMetadata& data, std::shared_ptr<app::App> app)
     : m_state(data.state())
     , m_legacy_identities(data.legacy_identities())
     , m_identity(data.identity())

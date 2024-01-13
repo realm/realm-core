@@ -590,14 +590,27 @@ TEST_CASE("C API (non-database)", "[c_api]") {
         auto guard = util::make_scope_exit([&temp_dir]() noexcept {
             util::try_remove_dir_recursive(temp_dir);
         });
-        app::RealmBackingStoreConfig backing_config;
-        backing_config.base_file_path = temp_dir;
-        backing_config.metadata_mode = app::RealmBackingStoreConfig::MetadataMode::NoMetadata;
-        auto test_app = app::App::get_app(app::App::CacheMode::Enabled, *app_config, backing_config);
+        auto store_config = cptr(realm_backing_store_config_new());
+        CHECK(store_config.get());
+        realm_backing_store_config_set_base_file_path(store_config.get(), temp_dir.c_str());
+        CHECK(store_config->base_file_path == temp_dir);
+        realm_backing_store_config_set_metadata_mode(
+            store_config.get(), realm_backing_store_metadata_mode::RLM_BACKING_STORE_METADATA_MODE_DISABLED);
+        CHECK(store_config->metadata_mode == app::RealmBackingStoreConfig::MetadataMode::NoMetadata);
+
+        auto backing_store = cptr(realm_backing_store_create(store_config.get()));
+        CHECK(backing_store.get());
+        CHECK((*backing_store)->config().base_file_path == temp_dir);
+        CHECK((*backing_store)->config().metadata_mode == app::RealmBackingStoreConfig::MetadataMode::NoMetadata);
+
+        auto test_app = cptr(realm_app_create_no_sync(realm_app_cache_mode::RLM_APP_CACHE_MODE_ENABLED,
+                                                      app_config.get(), backing_store.get()));
+
+        //        auto test_app = app::App::get_app(app::App::CacheMode::Enabled, *app_config, *backing_store);
         auto credentials = app::AppCredentials::anonymous();
         // Verify the values above are included in the login request
-        test_app->log_in_with_credentials(credentials, [&](const std::shared_ptr<realm::SyncUser>&,
-                                                           realm::util::Optional<realm::app::AppError> error) {
+        (*test_app)->log_in_with_credentials(credentials, [&](const std::shared_ptr<realm::SyncUser>&,
+                                                              realm::util::Optional<realm::app::AppError> error) {
             CHECK(!error);
         });
     }

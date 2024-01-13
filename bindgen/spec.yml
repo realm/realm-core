@@ -78,6 +78,7 @@ templates: # value tells you how many arguments it takes ('*' means any number)
   std::unordered_map: 2
   std::map: 2
   util::UniqueFunction: 1
+  util::FunctionRef: 1
   std::function: 1
   AsyncCallback: 1 # same as UniqueFunction, but guaranteed to be called exactly once.
                    # Recommended to convert to Future/Promise/Task in bound language.
@@ -221,7 +222,7 @@ enums:
       - FUNCTION
       - API_KEY
   MetadataMode:
-    cppName: SyncClientConfig::MetadataMode
+    cppName: app::RealmBackingStoreConfig::MetadataMode
     values:
       - NoEncryption
       - Encryption
@@ -537,6 +538,15 @@ records:
       before_notify: 'Nullable<util::UniqueFunction<(r: SharedRealm)>>'
       schema_did_change: 'Nullable<util::UniqueFunction<(r: SharedRealm)>>' # new schema available as r.schema
 
+  RealmBackingStoreConfig:
+    cppName: app::RealmBackingStoreConfig
+    fields:
+      base_file_path: std::string
+      metadata_mode:
+        type: MetadataMode
+        default: MetadataMode::Encryption
+      custom_encryption_key: util::Optional<EncryptionKey>
+
   SyncClientTimeouts:
     fields:
       connect_timeout:
@@ -557,11 +567,6 @@ records:
 
   SyncClientConfig:
     fields:
-      base_file_path: std::string
-      metadata_mode:
-        type: MetadataMode
-        default: MetadataMode::Encryption
-      custom_encryption_key: util::Optional<EncryptionKey>
       logger_factory: Nullable<LoggerFactory>
       log_level:
         type: LoggerLevel
@@ -651,6 +656,7 @@ opaqueTypes:
   - Schema
   - Group
   - AuditInterface
+  - SyncMetadataManager
 
 classes:
   #SchemaChange: {}
@@ -1170,6 +1176,42 @@ classes:
   AppSubscriptionToken:
     cppName: app::App::Token
 
+  AppMetadata:
+    cppName: SyncAppMetadata
+    properties:
+      deployment_model: std::string
+      location: std::string
+      hostname: std::string
+      ws_hostname: std::string
+
+  BackingStore:
+    cppName: app::BackingStore
+    sharedPtrWrapped: SharedBackingStore
+    methods:
+      get_user: '(user_id: std::string_view, refresh_token: std::string_view, access_token: std::string_view, device_id: std::string_view) -> SharedSyncUser'
+      get_existing_logged_in_user: '(user_id: std::string_view) -> SharedSyncUser'
+      all_users: '() -> std::vector<SharedSyncUser>'
+      get_current_user: '() -> SharedSyncUser'
+      log_out_user: '(user: SyncUser) -> void'
+      set_current_user: '(user_id: std::string_view) -> void'
+      remove_user: '(user_id: std::string_view) -> void'
+      delete_user: '(user_id: std::string_view) -> void'
+      reset_for_testing: '() -> void'
+      initialize: '(parent: std::weak_ptr<App>) -> void'
+      immediately_run_file_actions: '(original_name: std::string_view) -> bool'
+      perform_metadata_update: '(update_function: util::FunctionRef<void(SyncMetadataManager&)>) -> bool'
+      path_for_realm: '(user: SharedSyncUser, custom_file_name: std::optional<std::string>, partition_value: std::optional<std::string>) -> std::string'
+      audit_path_root: '(user: SharedSyncUser, app_id: std::string_view, partition_prefix: std::string_view) -> std::string'
+      recovery_directory_path: '(custom_dir_name: std::optional<std::string>) -> std::string'
+      app_metadata: '() -> std::optional<AppMetadata>'
+
+  RealmBackingStore:
+    cppName: app::RealmBackingStore
+    base: BackingStore
+    sharedPtrWrapped: SharedRealmBackingStore
+    properties:
+      config: const RealmBackingStoreConfig&
+
   App:
     cppName: app::App
     sharedPtrWrapped: SharedApp
@@ -1180,7 +1222,8 @@ classes:
       sync_manager: SharedSyncManager
       subscribers_count: count_t
     staticMethods:
-      get_app: '(mode: AppCacheMode, config: AppConfig, sync_client_config: SyncClientConfig) -> SharedApp'
+      get_app: '(mode: AppCacheMode, config: AppConfig, sync_client_config: SyncClientConfig, store: SharedBackingStore) -> SharedApp'
+      get_app: '(mode: AppCacheMode, config: AppConfig, store: SharedBackingStore) -> SharedApp'
       get_cached_app: '(app_id: const std::string&) -> SharedApp'
       clear_cached_apps: ()
       close_all_sync_sessions: ()
