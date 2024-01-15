@@ -203,9 +203,12 @@ public:
     {
         return m_offset;
     }
-    virtual void typed_print(std::string prefix, std::vector<ColKey>& col_keys) const
+    virtual ref_type typed_write(ref_type ref, _impl::ArrayWriterBase& out, const Table& table, bool deep,
+                                 bool only_modified, bool compress) const = 0;
+
+    virtual void typed_print(std::string prefix, const Table& table) const
     {
-        static_cast<void>(col_keys);
+        static_cast<void>(table);
         std::cout << "ClusterNode as ";
         Array::typed_print(prefix);
     }
@@ -327,8 +330,8 @@ public:
 
     void verify() const;
     void dump_objects(int64_t key_offset, std::string lead) const override;
-    virtual void typed_print(std::string prefix, std::vector<ColKey>& col_keys) const override;
-    static void remove_backlinks(const Table* origin_table, ObjKey origin_key, ColKey col,
+    virtual ref_type typed_write(ref_type ref, _impl::ArrayWriterBase& out, const Table& table, bool deep,
+                                 bool only_modified, bool compress) const override;
                                  const std::vector<ObjKey>& keys, CascadeState& state);
     static void remove_backlinks(const Table* origin_table, ObjKey origin_key, ColKey col,
                                  const std::vector<ObjLink>& links, CascadeState& state);

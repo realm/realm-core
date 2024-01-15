@@ -928,6 +928,42 @@ void Group::validate(ObjLink link) const
     }
 }
 
+ref_type Group::typed_write_tables(_impl::ArrayWriterBase& out, bool deep, bool only_modified, bool compress) const
+{
+    ref_type ref = m_top.get_as_ref(1);
+    Array a(m_alloc);
+    a.init_from_ref(ref);
+    REALM_ASSERT(a.has_refs());
+    Array dest(Allocator::get_default());
+    dest.create(NodeHeader::type_HasRefs, false, a.size());
+    for (unsigned j = 0; j < a.size(); ++j) {
+        RefOrTagged rot = a.get_as_ref_or_tagged(j);
+        if (rot.is_tagged()) {
+            dest.set(j, rot);
+        }
+        else {
+            auto table = do_get_table(j);
+            REALM_ASSERT(table);
+            dest.set_as_ref(j, table->typed_write(rot.get_as_ref(), out, deep, only_modified, compress));
+        }
+    }
+    return dest.write(out, false, only_modified, false);
+}
+void Group::table_typed_print(std::string prefix, ref_type ref) const
+{
+    Array a(m_alloc);
+    a.init_from_ref(ref);
+    REALM_ASSERT(a.has_refs());
+    for (unsigned j = 0; j < a.size(); ++j) {
+        auto pref = prefix + "  " + to_string(j) + ":\t";
+        RefOrTagged rot = a.get_as_ref_or_tagged(j);
+        if (rot.get_as_int() == 0)
+            continue;
+        auto table_accessor = do_get_table(j);
+        REALM_ASSERT(table_accessor);
+        table_accessor->typed_print(pref, rot.get_as_ref());
+    }
+}
 void Group::typed_print(std::string prefix) const
 {
     std::cout << "Group top array" << std::endl;
@@ -938,25 +974,7 @@ void Group::typed_print(std::string prefix) const
             if (j == 1) {
                 // Tables
                 std::cout << pref << "All Tables" << std::endl;
-                {
-                    auto prefix = pref;
-                    Array a(m_alloc);
-                    a.init_from_ref(rot.get_as_ref());
-                    REALM_ASSERT(a.has_refs());
-                    for (unsigned j = 0; j < a.size(); ++j) {
-                        auto pref = prefix + "  " + to_string(j) + ":\t";
-                        RefOrTagged rot = a.get_as_ref_or_tagged(j);
-                        if (rot.get_as_int() == 0)
-                            continue;
-                        auto table_accessor = do_get_table(j);
-                        REALM_ASSERT(table_accessor);
-                        table_accessor->typed_print(pref, rot.get_as_ref());
-                        // Array table(m_alloc);
-                        // table.init_from_ref(rot.get_as_ref());
-                        // std::cout << pref << "Table as ";
-                        // table.typed_print(pref);
-                    }
-                }
+                table_typed_print(pref, rot.get_as_ref());
             }
             else {
                 Array a(m_alloc);
@@ -982,10 +1000,11 @@ ref_type Group::DefaultTableWriter::write_names(_impl::OutputStream& out)
 }
 ref_type Group::DefaultTableWriter::write_tables(_impl::OutputStream& out)
 {
-    bool deep = true;                                                      // Deep
-    bool only_if_modified = false;                                         // Always
-    bool compress = false;                                                 // true;
-    return m_group->m_tables.write(out, deep, only_if_modified, compress); // Throws
+    bool deep = true;              // Deep
+    bool only_if_modified = false; // Always
+    bool compress = false;         // true;
+    // return m_group->m_tables.write(out, deep, only_if_modified, compress); // Throws
+    return m_group->typed_write_tables(out, deep, only_if_modified, compress);
 }
 
 auto Group::DefaultTableWriter::write_history(_impl::OutputStream& out) -> HistoryInfo
