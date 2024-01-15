@@ -1491,6 +1491,9 @@ void Session::cancel_resumption_delay()
         initiate_rebind(); // Throws
 
     m_conn.one_more_active_unsuspended_session(); // Throws
+    if (m_try_again_activation_timer) {
+        m_try_again_activation_timer.reset();
+    }
 
     on_resumed(); // Throws
 }
@@ -1581,9 +1584,10 @@ void Session::on_integration_failure(const IntegrationException& error)
 
     m_client_error = util::make_optional<IntegrationException>(error);
     m_error_to_send = true;
-
+    SessionErrorInfo error_info{error.to_status(), IsFatal{false}};
+    error_info.server_requests_action = ProtocolErrorInfo::Action::Warning;
     // Surface the error to the user otherwise is lost.
-    on_connection_state_changed(m_conn.get_state(), SessionErrorInfo{error.to_status(), IsFatal{false}});
+    on_connection_state_changed(m_conn.get_state(), std::move(error_info));
 
     // Since the deactivation process has not been initiated, the UNBIND
     // message cannot have been sent unless an ERROR message was received.
@@ -1684,10 +1688,10 @@ void Session::activate()
         process_pending_flx_bootstrap();
     }
     catch (const IntegrationException& error) {
-        logger.error("Error integrating bootstrap changesets: %1", error.what());
-        m_suspended = true;
-        m_conn.one_less_active_unsuspended_session(); // Throws
-        on_suspended(SessionErrorInfo{Status{error.code(), error.what()}, IsFatal{true}});
+        on_integration_failure(error);
+    }
+    catch (...) {
+        on_integration_failure(IntegrationException(exception_to_status()));
     }
 
     if (has_pending_client_reset) {
@@ -1891,6 +1895,8 @@ void Session::send_bind_message()
     m_conn.initiate_write_message(out, this); // Throws
 
     m_bind_message_sent = true;
+    call_debug_hook(SyncClientHookEvent::BindMessageSent, m_progress, m_last_sent_flx_query_version,
+                    DownloadBatchState::SteadyState, 0);
 
     // Ready to send the IDENT message if the file identifier pair is already
     // available.
@@ -2565,6 +2571,7 @@ void Session::suspend(const SessionErrorInfo& info)
     // Notify the application of the suspension of the session if the session is
     // still in the Active state
     if (m_state == Active) {
+        call_debug_hook(SyncClientHookEvent::SessionSuspended, info);
         m_conn.one_less_active_unsuspended_session(); // Throws
         on_suspended(info);                           // Throws
     }

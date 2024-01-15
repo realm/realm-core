@@ -853,6 +853,9 @@ bool SessionImpl::process_flx_bootstrap_message(const SyncProgress& progress, Do
     catch (const IntegrationException& e) {
         on_integration_failure(e);
     }
+    catch (...) {
+        on_integration_failure(IntegrationException(exception_to_status()));
+    }
 
     return true;
 }
@@ -905,6 +908,9 @@ void SessionImpl::process_pending_flx_bootstrap()
         if (simulate_integration_error) {
             throw IntegrationException(ErrorCodes::BadChangeset, "simulated failure", ProtocolError::bad_changeset);
         }
+
+        call_debug_hook(SyncClientHookEvent::BootstrapBatchAboutToProcess, *pending_batch.progress, query_version,
+                        batch_state, pending_batch.changesets.size());
 
         history.integrate_server_changesets(
             *pending_batch.progress, &downloadable_bytes, pending_batch.changesets, new_version, batch_state, logger,
@@ -1143,8 +1149,6 @@ SessionWrapper::SessionWrapper(ClientImpl& client, DBRef db, std::shared_ptr<Sub
     if (m_client_reset_config) {
         m_session_reason = SessionReason::ClientReset;
     }
-
-    update_subscription_version_info();
 }
 
 SessionWrapper::~SessionWrapper() noexcept
@@ -1529,9 +1533,17 @@ void SessionWrapper::actualize(ServerEndpoint endpoint)
         if (was_created)
             m_client.remove_connection(conn);
 
+        // finalize_before_actualization() expects m_sess to be nullptr, but it's possible that we
+        // reached its assignment above before throwing. Unset it here so we get a clean unhandled
+        // exception failure instead of a REALM_ASSERT in finalize_before_actualization().
+        m_sess = nullptr;
         finalize_before_actualization();
         throw;
     }
+
+    // Initialize the variables relying on the bootstrap store from the event loop to guarantee that a previous
+    // session cannot change the state of the bootstrap store at the same time.
+    update_subscription_version_info();
 
     m_actualized = true;
     if (was_created)

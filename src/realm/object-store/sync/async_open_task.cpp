@@ -26,7 +26,7 @@
 
 namespace realm {
 
-AsyncOpenTask::AsyncOpenTask(std::shared_ptr<_impl::RealmCoordinator> coordinator,
+AsyncOpenTask::AsyncOpenTask(Private, std::shared_ptr<_impl::RealmCoordinator> coordinator,
                              std::shared_ptr<realm::SyncSession> session, bool db_first_open)
     : m_coordinator(coordinator)
     , m_session(session)
