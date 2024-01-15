@@ -438,6 +438,9 @@ void Lst<Mixed>::insert(size_t ndx, Mixed value)
     ensure_created();
     auto sz = size();
     CollectionBase::validate_index("insert()", ndx, sz + 1);
+    if (value.is_type(type_TypedLink)) {
+        get_table()->get_parent_group()->validate(value.get_link());
+    }
     if (Replication* repl = Base::get_replication()) {
         repl->list_insert(*this, ndx, value, sz);
     }

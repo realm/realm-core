@@ -827,14 +827,19 @@ TEST(List_NestedCollection_Links)
     SHARED_GROUP_TEST_PATH(path);
     DBRef db = DB::create(make_in_realm_history(), path);
     auto tr = db->start_write();
+    auto embedded = tr->add_table("embedded", Table::Type::Embedded);
     auto target = tr->add_table("target");
     auto origin = tr->add_table("origin");
     auto list_col = origin->add_column_list(type_Mixed, "any_list");
     auto any_col = origin->add_column(type_Mixed, "any");
+    auto embedded_col = origin->add_column(*embedded, "sub");
 
     Obj target_obj1 = target->create_object();
     Obj target_obj2 = target->create_object();
     Obj target_obj3 = target->create_object();
+    Obj parent = origin->create_object();
+    parent.create_and_set_linked_object(embedded_col);
+    auto child_obj = parent.get_linked_object(embedded_col);
     tr->commit_and_continue_as_read();
 
     Obj o;
@@ -847,6 +852,7 @@ TEST(List_NestedCollection_Links)
         tr->promote_to_write();
         o = origin->create_object();
         list = o.get_list_ptr<Mixed>(list_col);
+        CHECK_THROW_ANY(list->add(child_obj.get_link()));
         list->insert_collection(0, CollectionType::Dictionary);
         list->insert_collection(1, CollectionType::Dictionary);
 
@@ -858,12 +864,14 @@ TEST(List_NestedCollection_Links)
         auto dict1 = list->get_dictionary(1);
         dict1->insert_collection("Hello", CollectionType::List);
         list1 = dict1->get_list("Hello");
+        CHECK_THROW_ANY(list1->add(child_obj.get_link()));
         list1->add(target_obj1.get_link());
 
         // Create link from a collection nested in a Mixed property
         o.set_collection(any_col, CollectionType::Dictionary);
         dict_any = o.get_dictionary(any_col);
         dict_any.insert("Godbye", target_obj1.get_link());
+        CHECK_THROW_ANY(dict_any.insert("Wrong", child_obj.get_link()));
 
         // Create link from a list nested in a collection nested in a Mixed property
         dict_any.insert_collection("List", CollectionType::List);
