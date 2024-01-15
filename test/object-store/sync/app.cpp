@@ -539,7 +539,6 @@ TEST_CASE("app: verify app error codes", "[sync][app][local]") {
     err_response = AppUtils::make_apperror_response(*app_error);
     REQUIRE(err_response.http_status_code == 501);
     REQUIRE(err_response.body == "Some error occurred");
-    REQUIRE(err_response.client_error_code);
     REQUIRE(err_response.client_error_code == ErrorCodes::BadBsonParse);
     REQUIRE(err_response.custom_status_code == 0);
     REQUIRE(err_response.headers.empty());
@@ -554,7 +553,6 @@ TEST_CASE("app: verify app error codes", "[sync][app][local]") {
     err_response = AppUtils::make_apperror_response(*app_error);
     REQUIRE(err_response.http_status_code == 501);
     REQUIRE(err_response.body == "client error code value considered fatal");
-    REQUIRE(err_response.client_error_code);
     REQUIRE(err_response.client_error_code == ErrorCodes::BadBsonParse);
     REQUIRE(err_response.custom_status_code == 0);
     REQUIRE(err_response.headers.empty());
@@ -704,14 +702,11 @@ TEST_CASE("app: verify app utils helpers", "[sync][app][local]") {
 
     SECTION("extract_redir_location") {
         auto comp = AppUtils::extract_redir_location({{"location", "http://redirect.host"}});
-        CHECK(comp);
-        CHECK(*comp == "http://redirect.host");
+        CHECK(comp == "http://redirect.host");
         comp = AppUtils::extract_redir_location({{"LoCaTiOn", "http://redirect.host/"}});
-        CHECK(comp);
-        CHECK(*comp == "http://redirect.host/");
+        CHECK(comp == "http://redirect.host/");
         comp = AppUtils::extract_redir_location({{"LOCATION", "http://redirect.host/includes/path"}});
-        CHECK(comp);
-        CHECK(*comp == "http://redirect.host/includes/path");
+        CHECK(comp == "http://redirect.host/includes/path");
         comp = AppUtils::extract_redir_location({{"some-location", "http://redirect.host"}});
         CHECK(!comp);
         comp = AppUtils::extract_redir_location({{"location", ""}});

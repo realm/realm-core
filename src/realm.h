@@ -2943,7 +2943,8 @@ RLM_API realm_user_t* realm_app_get_current_user(const realm_app_t*) RLM_API_NOE
  * Update the URL used to communicate with the Realm server. This function will update the location
  * information used for http and websocket requests to the server. Once this operation has completed,
  * the new base_url value returned by realm_app_get_base_url() will match the base_url value provided
- * to this function.
+ * to this function. Any App requests performed while the base URl update is currently in progress
+ * will continue to use the original base URL value.
  *
  * @param app ptr to realm_app
  * @param base_url The new base URL value to set as the Realm server URL.
@@ -2953,6 +2954,22 @@ RLM_API realm_user_t* realm_app_get_current_user(const realm_app_t*) RLM_API_NOE
 RLM_API bool realm_app_update_base_url(realm_app_t* app, realm_string_t base_url,
                                        realm_app_void_completion_func_t callback, realm_userdata_t userdata,
                                        realm_free_userdata_func_t userdata_free);
+
+/**
+ * Update the URL used to communicate with the Realm server to the default value (same as if a base_url
+ * value was not provided in AppConfig). This function will update the location information used for http
+ * and websocket requests to the server. Once this operation has completed, the new base_url value
+ * returned by realm_app_get_base_url() will match the base_url value provided to this function. Any App
+ * requests performed while the base URl update is currently in progress will continue to use the
+ * original base URL value.
+ *
+ * @param app ptr to realm_app
+ * @param callback invoked once operation has completed
+ * @return True if no error has been recorded, False otherwise
+ */
+RLM_API bool realm_app_set_default_base_url(realm_app_t* app, realm_app_void_completion_func_t callback,
+                                            realm_userdata_t userdata,
+                                            realm_free_userdata_func_t userdata_free);
 
 /**
  * Return the current base URL value used by the app. If the realm_app_update_base_url() is called, this

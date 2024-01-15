@@ -557,6 +557,7 @@ TEST_CASE("C API (non-database)", "[c_api]") {
         CHECK(app_config->app_id == "app_id_123");
         CHECK(app_config->transport == transport);
 
+        CHECK(!app_config->base_url);
         realm_app_config_set_base_url(app_config.get(), base_url.c_str());
         CHECK(app_config->base_url == base_url);
 
