@@ -1541,6 +1541,40 @@ void Cluster::remove_backlinks(ObjKey origin_key, ColKey origin_col_key, const s
     }
 }
 
+ref_type Cluster::typed_write(ref_type ref, _impl::ArrayWriterBase& out, const Table& table, bool deep,
+                              bool only_modified, bool compress) const
+{
+    REALM_ASSERT(!get_is_inner_bptree_node_from_header(get_header()));
+    Array a(Allocator::get_default());
+    a.create(type_HasRefs, false, size());
+    for (unsigned j = 0; j < size(); ++j) {
+        RefOrTagged rot = get_as_ref_or_tagged(j);
+        if (rot.is_ref() && rot.get_as_ref()) {
+            Array aa(m_alloc);
+            aa.init_from_ref(rot.get_as_ref());
+            if (j == 0) {
+                // Keys  (ArrayUnsigned me thinks)
+                a.set_as_ref(j, aa.write(out, deep, only_modified, false));
+            }
+            else {
+                // Columns
+                auto col_key = table.m_leaf_ndx2colkey[j - 1];
+                auto col_type = col_key.get_type();
+                auto col_attr = col_key.get_attrs();
+                if (!col_attr.test(col_attr_Collection) && col_type == col_type_Int) {
+                    // we may compress integer leafs (but are not doing it yet)
+                    a.set_as_ref(j, aa.write(out, deep, only_modified, false));
+                }
+                else {
+                    // just recurse into anything else without compressing
+                    a.set_as_ref(j, aa.write(out, deep, only_modified, false));
+                }
+            }
+        }
+    }
+    return a.write(out, false, only_modified, false);
+}
+
 void Cluster::typed_print(std::string prefix, const Table& table) const
 {
     REALM_ASSERT(!get_is_inner_bptree_node_from_header(get_header()));

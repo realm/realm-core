@@ -4031,9 +4031,40 @@ ColKey Table::find_opposite_column(ColKey col_key) const
     return ColKey();
 }
 
+ref_type Table::typed_write(ref_type ref, _impl::ArrayWriterBase& out, bool deep, bool only_modified,
+                            bool compress) const
+{
+    // ignore ref, just use Tables own accessors
+    static_cast<void>(ref);
+    Array dest(Allocator::get_default());
+    dest.create(NodeHeader::type_HasRefs, false, m_top.size());
+    for (unsigned j = 0; j < m_top.size(); ++j) {
+        RefOrTagged rot = m_top.get_as_ref_or_tagged(j);
+        if (rot.is_tagged() || (rot.is_ref() && rot.get_as_ref() == 0)) {
+            dest.set(j, rot);
+        }
+        else {
+            ref_type new_ref;
+            if (j == 2) {
+                // only do type driven write for clustertree
+                new_ref = m_clusters.typed_write(rot.get_as_ref(), out, *this, deep, only_modified, compress);
+            }
+            else {
+                // rest is handled using untyped approach
+                Array a(m_alloc);
+                a.init_from_ref(rot.get_as_ref());
+                new_ref = a.write(out, deep, only_modified, false);
+            }
+            dest.set_as_ref(j, new_ref);
+        }
+    }
+    return dest.write(out, false, only_modified, false);
+}
+
 void Table::typed_print(std::string prefix, ref_type ref) const
 {
-    // top ref is not accessible
+    // top ref is not accessible, so we can't validate ref?
+    static_cast<void>(ref);
     // REALM_ASSERT(ref == m_top...);
     std::cout << prefix << "Table with key = " << m_key << " " << NodeHeader::header_to_string(m_top.get_header())
               << " {" << std::endl;

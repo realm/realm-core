@@ -663,7 +663,7 @@ ref_type GroupWriter::write_group()
     // commit), as that would lead to clobbering of the previous database
     // version.
     bool deep = true, only_if_modified = true;
-    bool compress = false; // true;
+    bool compress = true; // true;
     std::unique_ptr<InMemoryWriter> in_memory_writer;
     _impl::ArrayWriterBase* writer = this;
     if (m_alloc.is_in_memory()) {
@@ -671,7 +671,8 @@ ref_type GroupWriter::write_group()
         writer = in_memory_writer.get();
     }
     ref_type names_ref = m_group.m_table_names.write(*writer, deep, only_if_modified, compress); // Throws
-    ref_type tables_ref = m_group.m_tables.write(*writer, deep, only_if_modified, compress);     // Throws
+    ref_type tables_ref = m_group.typed_write_tables(*writer, deep, only_if_modified, compress);
+    // ref_type tables_ref = m_group.m_tables.write(*writer, deep, only_if_modified, compress);     // Throws
 
     int_fast64_t value_1 = from_ref(names_ref);
     int_fast64_t value_2 = from_ref(tables_ref);

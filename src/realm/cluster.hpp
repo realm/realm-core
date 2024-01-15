@@ -206,6 +206,9 @@ public:
     {
         return m_offset;
     }
+    virtual ref_type typed_write(ref_type ref, _impl::ArrayWriterBase& out, const Table& table, bool deep,
+                                 bool only_modified, bool compress) const = 0;
+
     virtual void typed_print(std::string prefix, const Table& table) const
     {
         static_cast<void>(table);
@@ -332,6 +335,8 @@ public:
 
     void verify() const;
     void dump_objects(int64_t key_offset, std::string lead) const override;
+    virtual ref_type typed_write(ref_type ref, _impl::ArrayWriterBase& out, const Table& table, bool deep,
+                                 bool only_modified, bool compress) const override;
     virtual void typed_print(std::string prefix, const Table& table) const override;
 
 private:

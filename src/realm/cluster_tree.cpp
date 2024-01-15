@@ -124,6 +124,44 @@ public:
 
     void dump_objects(int64_t key_offset, std::string lead) const override;
 
+    virtual ref_type typed_write(ref_type ref, _impl::ArrayWriterBase& out, const Table& table, bool deep,
+                                 bool only_modified, bool compress) const override
+    {
+        REALM_ASSERT(get_is_inner_bptree_node_from_header(get_header()));
+        REALM_ASSERT(has_refs());
+        Array a(Allocator::get_default());
+        a.create(type_InnerBptreeNode, false, size());
+        for (unsigned j = 0; j < size(); ++j) {
+            RefOrTagged rot = get_as_ref_or_tagged(j);
+            if (rot.is_ref() && rot.get_as_ref()) {
+                if (j == 0) {
+                    // keys (ArrayUnsigned, me thinks)
+                    Array b(m_alloc);
+                    b.init_from_ref(rot.get_as_ref());
+                    a.set_as_ref(j, b.write(out, deep, only_modified, false));
+                }
+                else {
+                    auto header = m_alloc.translate(rot.get_as_ref());
+                    MemRef m(header, rot.get_as_ref(), m_alloc);
+                    if (get_is_inner_bptree_node_from_header(header)) {
+                        ClusterNodeInner aa(m_alloc);
+                        aa.init(m);
+                        a.set_as_ref(j, aa.typed_write(rot.get_as_ref(), out, table, deep, only_modified, compress));
+                    }
+                    else {
+                        Cluster aa(m_alloc);
+                        aa.init(m);
+                        a.set_as_ref(j, aa.typed_write(rot.get_as_ref(), out, table, deep, only_modified, compress));
+                    }
+                }
+            }
+            else { // not a ref, just copy value over
+                a.set(j, rot);
+            }
+        }
+        return a.write(out, false, only_modified, false);
+    }
+
     virtual void typed_print(std::string prefix, const Table& table) const override
     {
         REALM_ASSERT(get_is_inner_bptree_node_from_header(get_header()));
