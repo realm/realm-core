@@ -5,11 +5,11 @@
 * None.
 
 ### Fixed
-* <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* Bad performance of initial Sync download involving many backlinks ([#7217](https://github.com/realm/realm-core/issues/7217), since v10.0.0)
+* Handle `EOPNOTSUPP` when using `posix_fallocate()` and fallback to manually consume space. This should enable android users to open a Realm on restrictive filesystems. ([realm-js #6349](https://github.com/realm/realm-js/issues/6349), more prevalent since v13.23.3 with the change to `REALM_HAVE_POSIX_FALLOCATE` but it was also an issue in some platforms before this)
+* Application may crash with `incoming_changesets.size() != 0` when a download message is mistaken for a bootstrap message (PR [#7238](https://github.com/realm/realm-core/pull/7238), since v11.8.0)
 
 ### Breaking changes
-* None.
+* `App::get_uncached_app(...)` and `App::get_shared_app(...)` have been replaced by `App::get_app(App::CacheMode, ...)`. The App constructor is now enforced to be unusable, use `App::get_app()` instead. ([#7237](https://github.com/realm/realm-core/issues/7237))
 
 ### Compatibility
 * Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
@@ -17,7 +17,17 @@
 -----------
 
 ### Internals
-* None.
+* Add support for chunked transfer encoding when using `HTTPParser`.
+
+----------------------------------------------
+
+# 13.25.1 Release notes
+
+### Fixed
+* Bad performance of initial Sync download involving many backlinks ([#7217](https://github.com/realm/realm-core/issues/7217), since v10.0.0)
+
+### Compatibility
+* Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
 
 ----------------------------------------------
 

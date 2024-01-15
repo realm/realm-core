@@ -172,6 +172,7 @@ struct SyncUserIdentity {
 // are associated with it.
 class SyncUser : public std::enable_shared_from_this<SyncUser>, public Subscribable<SyncUser> {
     friend class SyncSession;
+    struct Private {};
 
 public:
     enum class State {
@@ -238,10 +239,11 @@ public:
     // testing purposes. SDKs should not call these directly in non-test code
     // or expose them in the public API.
 
-    // Don't use this directly; use the `SyncManager` APIs. Public for use with `make_shared`.
-    SyncUser(const std::string& refresh_token, const std::string& id, const std::string& access_token,
-             const std::string& device_id, SyncManager* sync_manager);
-    SyncUser(const SyncUserMetadata& data, SyncManager* sync_manager);
+    explicit SyncUser(Private, const std::string& refresh_token, const std::string& id,
+                      const std::string& access_token, const std::string& device_id, SyncManager* sync_manager);
+    explicit SyncUser(Private, const SyncUserMetadata& data, SyncManager* sync_manager);
+    SyncUser(const SyncUser&) = delete;
+    SyncUser& operator=(const SyncUser&) = delete;
 
     // Atomically set the user to be logged in and update both tokens.
     void log_in(const std::string& access_token, const std::string& refresh_token)
