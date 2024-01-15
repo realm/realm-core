@@ -5,6 +5,7 @@
 * None.
 
 ### Fixed
+* Handle `EOPNOTSUPP` when using `posix_fallocate()` and fallback to manually consume space. This should enable android users to open a Realm on restrictive filesystems. ([realm-js #6349](https://github.com/realm/realm-js/issues/6349), more prevalent since v13.23.3 with the change to `REALM_HAVE_POSIX_FALLOCATE` but it was also an issue in some platforms before this)
 * Application may crash with `incoming_changesets.size() != 0` when a download message is mistaken for a bootstrap message (PR [#7238](https://github.com/realm/realm-core/pull/7238), since v11.8.0)
 
 ### Breaking changes
