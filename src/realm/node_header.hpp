@@ -941,7 +941,7 @@ inline size_t NodeHeader::calc_size<NodeHeader::Encoding::WTypBits>(size_t num_e
 template <>
 inline size_t NodeHeader::calc_size<NodeHeader::Encoding::WTypMult>(size_t num_elements, size_t element_size)
 {
-    return calc_byte_size(wtype_Multiply, num_elements, element_size);
+    return calc_byte_size(wtype_Multiply, num_elements, static_cast<uint_least8_t>(element_size));
 }
 
 
