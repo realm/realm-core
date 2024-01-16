@@ -5294,6 +5294,9 @@ TEST(Parser_NestedMixedDictionaryList)
     verify_query(test_context, persons, "properties[*][0].legs  == 4", 1); // Lady the cat
     verify_query(test_context, persons, "properties[*][*].legs  == 0", 1); // carl the snake
     verify_query(test_context, persons, "properties[*][*][*] > 10", 2);    // carl the snake and martin the guitar
+    verify_query(test_context, persons, "properties.@keys == 'instruments'", 2);
+    verify_query(test_context, persons, "properties.@keys == 'pets'", 2);
+    verify_query(test_context, persons, "properties.@keys == 'tickets'", 1);
 }
 
 TEST(Parser_NestedDictionaryDeep)

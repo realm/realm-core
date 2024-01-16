@@ -156,6 +156,7 @@ void Collection::get_any(QueryCtrlBlock& ctrl, Mixed val, size_t index)
                 start = keys.find_first(StringData(pe.get_key()));
                 if (start == realm::not_found) {
                     if (pe.get_key() == "@keys") {
+                        ctrl.from_list = true;
                         keys.for_all([&](const auto& k) {
                             ctrl.matches.insert(k);
                         });
