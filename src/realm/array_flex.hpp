@@ -45,9 +45,7 @@ public:
     size_t find_first(const Array&, int64_t value) const final override;
     int64_t sum(const Array&, size_t start, size_t end) const final override;
 
-    // UnsignedArray/Array lower and upper bound for flex arrays. These methods need to be optimized.
-    size_t lower_bound(const Array&, uint64_t) const final override;
-    size_t upper_bound(const Array&, uint64_t) const final override;
+    // Array lower and upper bound for flex arrays. These methods need to be optimized.
     size_t lower_bound(const Array&, int64_t) const final override;
     size_t upper_bound(const Array&, int64_t) const final override;
 

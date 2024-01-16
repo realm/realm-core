@@ -1558,8 +1558,7 @@ int_fast64_t Array::get(const char* header, size_t ndx) noexcept
 int_fast64_t Array::get_universal_encoded_array(size_t ndx) const
 {
     size_t v_width;
-    return m_encode.get_unsigned(*this, ndx, v_width);
-    // return m_encode.get(*this, ndx);
+    return m_encode.get(*this, ndx);
 }
 
 

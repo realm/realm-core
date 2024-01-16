@@ -31,6 +31,102 @@
 
 using namespace realm;
 
+namespace impl {
+
+inline int64_t fetch_value(uint64_t* data, size_t ndx, size_t offset, size_t ndx_width, size_t v_width)
+{
+    const auto pos = realm::read_bitfield(data, offset + (ndx * ndx_width), ndx_width);
+    const auto unsigned_val = realm::read_bitfield(data, v_width * pos, v_width);
+    return sign_extend_field(v_width, unsigned_val);
+}
+
+inline size_t lower_bound(uint64_t* data, int64_t key, size_t v_width, size_t ndx_width, size_t v_size,
+                          size_t ndx_size)
+{
+    const auto offset = v_width * v_size;
+    auto cnt = ndx_size;
+    size_t step;
+    size_t ndx = 0;
+    size_t p = 0;
+    while (cnt > 0) {
+        ndx = p;
+        step = cnt / 2;
+        ndx += step;
+        const auto v = fetch_value(data, ndx, offset, ndx_width, v_width);
+        if ((v < key)) {
+            p = ++ndx;
+            cnt -= step + 1;
+        }
+        else {
+            cnt = step;
+        }
+    }
+    return p;
+}
+
+inline size_t upper_bound(uint64_t* data, int64_t key, size_t v_width, size_t ndx_width, size_t v_size,
+                          size_t ndx_size)
+{
+    const auto offset = v_width * v_size;
+    auto cnt = ndx_size;
+    size_t step;
+    size_t ndx = 0;
+    size_t p = 0;
+    while (cnt > 0) {
+        ndx = p;
+        step = cnt / 2;
+        ndx += step;
+        const auto v = fetch_value(data, ndx, offset, ndx_width, v_width);
+        if (!(key < v)) {
+            p = ++ndx;
+            cnt -= step + 1;
+        }
+        else {
+            cnt = step;
+        }
+    }
+    return p;
+}
+
+inline size_t find_linear(uint64_t* data, int64_t key, size_t v_width, size_t ndx_width, size_t v_size,
+                          size_t ndx_size)
+{
+    const auto offset = v_size * v_width;
+    bf_iterator index_iterator{data, offset, ndx_width, ndx_width, 0};
+    for (size_t i = 0; i < ndx_size; ++i) {
+        const auto index = index_iterator.get_value();
+        bf_iterator it_value{data, static_cast<size_t>(index * v_width), v_width, v_width, 0};
+        const auto v = sign_extend_field(v_width, it_value.get_value());
+        if (v == key)
+            return i; // we need to pretend that the array was uncompressed, so we can't return index but i
+        ++index_iterator;
+    }
+    return realm::not_found;
+}
+
+inline size_t find_binary(uint64_t* data, int64_t key, size_t v_width, size_t ndx_width, size_t v_size,
+                          size_t ndx_size)
+{
+    size_t lo = 0;
+    size_t hi = ndx_size;
+    const auto ndx_offset = v_size * v_width;
+    while (lo <= hi) {
+        size_t mid = lo + (hi - lo) / 2;
+        const auto ndx = realm::read_bitfield(data, ndx_offset + (mid * ndx_width), ndx_width);
+        const auto unsigned_val = realm::read_bitfield(data, v_width * ndx, v_width);
+        const auto v = sign_extend_field(v_width, unsigned_val);
+        if (v == key)
+            return ndx;
+        else if (key < v)
+            hi = mid - 1;
+        else
+            lo = mid + 1;
+    }
+    return realm::not_found;
+}
+
+} // namespace impl
+
 bool ArrayFlex::encode(const Array& origin, Array& encoded) const
 {
     REALM_ASSERT(origin.is_attached());
@@ -55,7 +151,6 @@ bool ArrayFlex::decode(Array& arr)
         auto values = fetch_signed_values_from_encoded_array(arr, v_width, ndx_width, v_size, ndx_size);
         REALM_ASSERT(values.size() == ndx_size);
         restore_array(arr, values); // restore array sets capacity
-        REALM_ASSERT(arr.size() == values.size());
         return true;
     }
     return false;
@@ -344,20 +439,16 @@ void ArrayFlex::restore_array(Array& arr, const std::vector<int64_t>& values) co
 
 size_t ArrayFlex::find_first(const Array& arr, int64_t value) const
 {
+    static constexpr auto MAX_SZ_LINEAR_FIND = 15;
     REALM_ASSERT(arr.is_attached());
     size_t v_width, ndx_width, v_size, ndx_size;
     if (get_encode_info(arr.get_header(), v_width, ndx_width, v_size, ndx_size)) {
         auto data = (uint64_t*)NodeHeader::get_data_from_header(arr.get_header());
-        const auto offset = v_size * v_width;
-        bf_iterator index_iterator{data, offset, ndx_width, ndx_width, 0};
-        for (size_t i = 0; i < ndx_size; ++i) {
-            const auto index = index_iterator.get_value();
-            bf_iterator it_value{data, static_cast<size_t>(index * v_width), v_width, v_width, 0};
-            const auto arr_value = it_value.get_value();
-            const auto ivalue = sign_extend_field(v_width, arr_value);
-            if (ivalue == value)
-                return i; // we need to pretend that the array was uncompressed, so we can't return index but i
-            ++index_iterator;
+        if (ndx_size <= MAX_SZ_LINEAR_FIND) {
+            return impl::find_linear(data, value, v_width, ndx_width, v_size, ndx_size);
+        }
+        else {
+            return impl::find_binary(data, value, v_width, ndx_width, v_size, ndx_size);
         }
     }
     return realm::not_found;
@@ -374,7 +465,8 @@ int64_t ArrayFlex::sum(const Array& arr, size_t start, size_t end) const
         bf_iterator index_iterator{data, offset, ndx_width, ndx_width, 0};
         for (size_t i = 0; i < ndx_size; ++i) {
             if (i >= start && i <= end) {
-                total_sum += read_bitfield(data, index_iterator.get_value() * v_width, v_width);
+                const auto pos = static_cast<size_t>(index_iterator.get_value() * v_width);
+                total_sum += read_bitfield(data, pos, v_width);
             }
         }
         return total_sum;
@@ -433,90 +525,15 @@ uint64_t ArrayFlex::get_unsigned(const Array& arr, size_t ndx, size_t& v_width) 
     REALM_UNREACHABLE();
 }
 
-namespace impl {
-
-template <typename T>
-inline size_t lower_bound(uint64_t* data, size_t width, size_t sz, const T& key)
-{
-    auto cnt = sz;
-    size_t step;
-    size_t ndx = 0;
-    size_t p = 0;
-    while (cnt > 0) {
-        ndx = p;
-        step = cnt / 2;
-        ndx += step;
-        const auto& v = realm::read_bitfield(data, ndx * width, width);
-        if ((v < key)) {
-            p = ++ndx;
-            cnt -= step + 1;
-        }
-        else {
-            cnt = step;
-        }
-    }
-    return p;
-}
-
-template <typename T>
-inline size_t upper_bound(uint64_t* data, size_t width, size_t sz, const T& key)
-{
-    auto cnt = sz;
-    size_t step;
-    size_t ndx = 0;
-    size_t p = 0;
-    while (cnt > 0) {
-        ndx = p;
-        step = cnt / 2;
-        ndx += step;
-        const auto& v = realm::read_bitfield(data, ndx * width, width);
-        if (!(key < v)) {
-            p = ++ndx;
-            cnt -= step + 1;
-        }
-        else {
-            cnt = step;
-        }
-    }
-    return p;
-}
-} // namespace impl
-
-size_t ArrayFlex::lower_bound(const Array& arr, uint64_t value) const
-{
-    REALM_ASSERT(arr.is_attached());
-    const auto header = arr.get_header();
-    REALM_ASSERT(NodeHeader::get_kind(header) == 'B');
-    size_t v_width, i_width, v_size, i_size;
-    if (get_encode_info(header, v_width, i_width, v_size, i_size)) {
-        const auto data = (uint64_t*)NodeHeader::get_data_from_header(arr.get_header());
-        return impl::lower_bound(data, v_width, v_size, value);
-    }
-    REALM_UNREACHABLE();
-}
-
-size_t ArrayFlex::upper_bound(const Array& arr, uint64_t value) const
-{
-    REALM_ASSERT(arr.is_attached());
-    const auto header = arr.get_header();
-    REALM_ASSERT(NodeHeader::get_kind(header) == 'B');
-    size_t v_width, i_width, v_size, i_size;
-    if (get_encode_info(header, v_width, i_width, v_size, i_size)) {
-        const auto data = (uint64_t*)NodeHeader::get_data_from_header(arr.get_header());
-        return impl::upper_bound(data, v_width, v_size, value);
-    }
-    REALM_UNREACHABLE();
-}
-
 size_t ArrayFlex::lower_bound(const Array& arr, int64_t value) const
 {
     REALM_ASSERT(arr.is_attached());
     const auto header = arr.get_header();
     REALM_ASSERT(NodeHeader::get_kind(header) == 'B');
-    size_t v_width, i_width, v_size, i_size;
-    if (get_encode_info(header, v_width, i_width, v_size, i_size)) {
+    size_t v_width, ndx_width, v_size, ndx_size;
+    if (get_encode_info(header, v_width, ndx_width, v_size, ndx_size)) {
         const auto data = (uint64_t*)NodeHeader::get_data_from_header(arr.get_header());
-        return impl::lower_bound(data, v_width, v_size, (uint64_t)value);
+        return impl::lower_bound(data, value, v_width, ndx_width, v_size, ndx_size);
     }
     REALM_UNREACHABLE();
 }
@@ -526,10 +543,10 @@ size_t ArrayFlex::upper_bound(const Array& arr, int64_t value) const
     REALM_ASSERT(arr.is_attached());
     const auto header = arr.get_header();
     REALM_ASSERT(NodeHeader::get_kind(header) == 'B');
-    size_t v_width, i_width, v_size, i_size;
-    if (get_encode_info(header, v_width, i_width, v_size, i_size)) {
+    size_t v_width, ndx_width, v_size, ndx_size;
+    if (get_encode_info(header, v_width, ndx_width, v_size, ndx_size)) {
         const auto data = (uint64_t*)NodeHeader::get_data_from_header(arr.get_header());
-        return impl::upper_bound(data, v_width, v_size, (uint64_t)value);
+        return impl::upper_bound(data, value, v_width, ndx_width, v_size, ndx_size);
     }
     REALM_UNREACHABLE();
 }
