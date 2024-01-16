@@ -493,7 +493,7 @@ private:
 
     /// Request the app metadata information from the server if it has not been processed yet. If
     /// a new hostname is provided, the app metadata will be refreshed using the new hostname.
-    /// @param completion The callback that will be provided the pass fail response
+    /// @param completion The callback that will be called with the error on failure or empty on success
     /// @param new_hostname The (Original) new hostname to request the location from
     /// @param redir_location The location provided by the last redirect response when querying location
     /// @param redirect_count The current number of redirects that have occurred in a row

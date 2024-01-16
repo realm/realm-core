@@ -295,8 +295,7 @@ RLM_API bool realm_app_update_base_url(realm_app_t* app, realm_string_t base_url
 }
 
 RLM_API bool realm_app_set_default_base_url(realm_app_t* app, realm_app_void_completion_func_t callback,
-                                            realm_userdata_t userdata,
-                                            realm_free_userdata_func_t userdata_free)
+                                            realm_userdata_t userdata, realm_free_userdata_func_t userdata_free)
 {
     return wrap_err([&] {
         (*app)->update_base_url(std::nullopt, make_callback(callback, userdata, userdata_free));

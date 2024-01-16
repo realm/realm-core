@@ -609,14 +609,16 @@ void App::update_base_url(std::optional<std::string> base_url, UniqueFunction<vo
         throw sync::BadServerUrl(new_base_url);
     }
 
+    bool update_not_needed;
     {
         std::lock_guard<std::mutex> lock(*m_route_mutex);
         // Update the location if the base_url is different or a location update is already needed
         m_location_updated = (new_base_url == m_base_url) && m_location_updated;
+        update_not_needed = m_location_updated;
     }
     // If the new base_url is the same as the current base_url and the location has already been updated,
     // then we're done
-    if (m_location_updated) {
+    if (update_not_needed) {
         completion(util::none);
         return;
     }
@@ -928,18 +930,16 @@ void App::request_location(UniqueFunction<void(std::optional<AppError>)>&& compl
             completion(util::none);
             return; // early return
         }
-        else {
-            base_url = new_hostname ? *new_hostname : m_base_url;
-            // If this is for a redirect after querying new_hostname, then use the redirect location
-            if (redir_location)
-                app_route = get_app_route(redir_location);
-            // If this is querying the new_hostname, then use that location
-            else if (new_hostname)
-                app_route = get_app_route(new_hostname);
-            else
-                app_route = get_app_route();
-            REALM_ASSERT(!app_route.empty());
-        }
+        base_url = new_hostname ? *new_hostname : m_base_url;
+        // If this is for a redirect after querying new_hostname, then use the redirect location
+        if (redir_location)
+            app_route = get_app_route(redir_location);
+        // If this is querying the new_hostname, then use that location
+        else if (new_hostname)
+            app_route = get_app_route(new_hostname);
+        else
+            app_route = get_app_route();
+        REALM_ASSERT(!app_route.empty());
     }
 
     Request req;
