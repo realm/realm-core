@@ -294,9 +294,12 @@ using SubscriptionStoreRef = std::shared_ptr<SubscriptionStore>;
 
 // A SubscriptionStore manages the FLX metadata tables, SubscriptionSets and Subscriptions.
 class SubscriptionStore : public std::enable_shared_from_this<SubscriptionStore> {
+    struct Private {};
+
 public:
     static SubscriptionStoreRef create(DBRef db);
 
+    explicit SubscriptionStore(Private, DBRef db);
     SubscriptionStore(const SubscriptionStore&) = delete;
     SubscriptionStore& operator=(const SubscriptionStore&) = delete;
 
@@ -363,9 +366,6 @@ public:
     // Recreate the active subscription set, marking any newer pending ones as
     // superseded. This is a no-op if there are no pending subscription sets.
     int64_t set_active_as_latest(Transaction& wt) REQUIRES(!m_pending_notifications_mutex);
-
-protected:
-    explicit SubscriptionStore(DBRef db);
 
 private:
     using State = SubscriptionSet::State;

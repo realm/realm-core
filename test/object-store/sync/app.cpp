@@ -2760,7 +2760,7 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
         sc_config.metadata_mode = realm::SyncManager::MetadataMode::NoEncryption;
 
         // initialize app and sync client
-        auto redir_app = app::App::get_uncached_app(app_config, sc_config);
+        auto redir_app = app::App::get_app(app::App::CacheMode::Disabled, app_config, sc_config);
 
         SECTION("Test invalid redirect response") {
             int request_count = 0;
@@ -2940,7 +2940,7 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
         sc_config.metadata_mode = realm::SyncManager::MetadataMode::NoMetadata;
 
         // initialize app and sync client
-        auto redir_app = app::App::get_uncached_app(app_config, sc_config);
+        auto redir_app = app::App::get_app(app::App::CacheMode::Disabled, app_config, sc_config);
 
         int request_count = 0;
         // redirect URL is localhost or 127.0.0.1 depending on what the initial value is
@@ -3924,7 +3924,7 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
             redir_transport->reset("https://realm.mongodb.com");
 
             // First time through, base_url is empty; https://realm.mongodb.com is expected
-            auto app = app::App::get_uncached_app(app_config, sc_config);
+            auto app = app::App::get_app(app::App::CacheMode::Disabled, app_config, sc_config);
             // Location is not requested until first app services request
             CHECK(!redir_transport->location_requested);
             // Initial hostname and ws hostname use base url, but aren't used until location is updated
@@ -3942,7 +3942,7 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
             app_config.base_url = "https://alternate.mongodb.com";
             redir_transport->reset("https://alternate.mongodb.com");
 
-            auto app = app::App::get_uncached_app(app_config, sc_config);
+            auto app = app::App::get_app(app::App::CacheMode::Disabled, app_config, sc_config);
             // Location is not requested until first app services request
             CHECK(!redir_transport->location_requested);
             // Initial hostname and ws hostname use base url, but aren't used until location is updated
@@ -3963,7 +3963,7 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
             std::string expected_wsurl = "wss://realm.mongodb.com";
             redir_transport->reset(expected_url);
 
-            auto app = app::App::get_uncached_app(app_config, sc_config);
+            auto app = app::App::get_app(app::App::CacheMode::Disabled, app_config, sc_config);
             // Location is not requested until first app services request
             CHECK(!redir_transport->location_requested);
             // Initial hostname and ws hostname use base url, but aren't used until location is updated
@@ -3981,7 +3981,7 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
             app_config.base_url = "https://some-other.mongodb.com";
             redir_transport->reset("https://some-other.mongodb.com", "http://redirect.mongodb.com");
 
-            auto app = app::App::get_uncached_app(app_config, sc_config);
+            auto app = app::App::get_app(app::App::CacheMode::Disabled, app_config, sc_config);
             // Location is not requested until first app services request
             CHECK(!redir_transport->location_requested);
             // Initial hostname and ws hostname use base url, but aren't used until location is updated
@@ -4003,7 +4003,7 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
             app_config.base_url = "https://alternate.mongodb.com";
             redir_transport->reset("https://alternate.mongodb.com");
 
-            auto app = app::App::get_uncached_app(app_config, sc_config);
+            auto app = app::App::get_app(app::App::CacheMode::Disabled, app_config, sc_config);
             // Location is not requested until first app services request
             CHECK(!redir_transport->location_requested);
 
@@ -4044,7 +4044,7 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
             app_config.base_url = "https://alternate.mongodb.com";
             redir_transport->reset("https://alternate.mongodb.com");
 
-            auto app = app::App::get_uncached_app(app_config, sc_config);
+            auto app = app::App::get_app(app::App::CacheMode::Disabled, app_config, sc_config);
             // Location is not requested until first app services request
             CHECK(!redir_transport->location_requested);
 
@@ -4073,7 +4073,7 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
             app_config.base_url = "http://alternate.mongodb.com";
             redir_transport->reset("http://alternate.mongodb.com");
 
-            auto app = app::App::get_uncached_app(app_config, sc_config);
+            auto app = app::App::get_app(app::App::CacheMode::Disabled, app_config, sc_config);
             // Location is not requested until first app services request
             CHECK(!redir_transport->location_requested);
 
@@ -4129,7 +4129,7 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
         {
             redir_transport->reset(init_url);
 
-            auto app = app::App::get_uncached_app(app_config, sc_config);
+            auto app = app::App::get_app(app::App::CacheMode::Disabled, app_config, sc_config);
             // At this point, the sync route is not set
             CHECK(!app->sync_manager()->sync_route());
 
@@ -4148,7 +4148,7 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
 
             redir_transport->reset(init_url, redir_url);
 
-            auto app = app::App::get_uncached_app(app_config, sc_config);
+            auto app = app::App::get_app(app::App::CacheMode::Disabled, app_config, sc_config);
             // At this point, the sync route is not set
             CHECK(!app->sync_manager()->sync_route());
 
@@ -4187,7 +4187,7 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
             redir_transport->reset(init_url, redir_url);
             redir_transport->location_returns_error = true;
 
-            auto app = app::App::get_uncached_app(app_config, sc_config);
+            auto app = app::App::get_app(app::App::CacheMode::Disabled, app_config, sc_config);
             // At this point, the sync route is not set
             CHECK(!app->sync_manager()->sync_route());
 
@@ -4713,6 +4713,7 @@ TEST_CASE("app: login_with_credentials unit_tests", "[sync][app][user]") {
         UnitTestTransport::access_token = good_access_token;
         config.base_path = util::make_temp_dir();
         config.should_teardown_test_directory = false;
+        config.metadata_mode = SyncManager::MetadataMode::NoEncryption;
         {
             TestSyncManager tsm(config);
             auto app = tsm.app();
@@ -5717,6 +5718,8 @@ TEST_CASE("app: metadata is persisted between sessions", "[sync][app][metadata]"
     TestSyncManager::Config config = get_config(transport);
     config.base_path = util::make_temp_dir();
     config.should_teardown_test_directory = false;
+    config.metadata_mode = SyncManager::MetadataMode::NoEncryption;
+
     {
         TestSyncManager sync_manager(config, {});
         auto app = sync_manager.app();
@@ -6079,10 +6082,10 @@ TEST_CASE("app: shared instances", "[sync][app]") {
     config4.base_url = "http://localhost:9090";
 
     // should all point to same underlying app
-    auto app1_1 = App::get_shared_app(config1, sync_config);
-    auto app1_2 = App::get_shared_app(config1, sync_config);
+    auto app1_1 = App::get_app(app::App::CacheMode::Enabled, config1, sync_config);
+    auto app1_2 = App::get_app(app::App::CacheMode::Enabled, config1, sync_config);
     auto app1_3 = App::get_cached_app(config1.app_id, config1.base_url);
-    auto app1_4 = App::get_shared_app(config2, sync_config);
+    auto app1_4 = App::get_app(app::App::CacheMode::Enabled, config2, sync_config);
     auto app1_5 = App::get_cached_app(config1.app_id);
 
     CHECK(app1_1 == app1_2);
@@ -6091,9 +6094,9 @@ TEST_CASE("app: shared instances", "[sync][app]") {
     CHECK(app1_1 == app1_5);
 
     // config3 and config4 should point to different apps
-    auto app2_1 = App::get_shared_app(config3, sync_config);
+    auto app2_1 = App::get_app(app::App::CacheMode::Enabled, config3, sync_config);
     auto app2_2 = App::get_cached_app(config3.app_id, config3.base_url);
-    auto app2_3 = App::get_shared_app(config4, sync_config);
+    auto app2_3 = App::get_app(app::App::CacheMode::Enabled, config4, sync_config);
     auto app2_4 = App::get_cached_app(config3.app_id);
     auto app2_5 = App::get_cached_app(config4.app_id, "https://some.different.url");
 

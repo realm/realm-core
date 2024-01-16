@@ -588,7 +588,15 @@ TEST_CASE("C API (non-database)", "[c_api]") {
         realm_app_config_set_bundle_id(app_config.get(), "some_bundle_id");
         CHECK(app_config->device_info.bundle_id == "some_bundle_id");
 
-        auto test_app = std::make_shared<app::App>(*app_config);
+        std::string temp_dir = util::make_temp_dir();
+        auto guard = util::make_scope_exit([&temp_dir]() noexcept {
+            util::try_remove_dir_recursive(temp_dir);
+        });
+        SyncClientConfig sync_client_config;
+        sync_client_config.base_file_path = temp_dir;
+        sync_client_config.metadata_mode = SyncClientConfig::MetadataMode::NoMetadata;
+
+        auto test_app = app::App::get_app(app::App::CacheMode::Disabled, *app_config, sync_client_config);
         auto credentials = app::AppCredentials::anonymous();
         // Verify the values above are included in the login request
         test_app->log_in_with_credentials(credentials, [&](const std::shared_ptr<realm::SyncUser>&,

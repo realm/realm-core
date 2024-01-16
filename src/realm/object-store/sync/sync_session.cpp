@@ -386,7 +386,7 @@ SyncSession::handle_refresh(const std::shared_ptr<SyncSession>& session, bool re
     };
 }
 
-SyncSession::SyncSession(SyncClient& client, std::shared_ptr<DB> db, const RealmConfig& config,
+SyncSession::SyncSession(Private, SyncClient& client, std::shared_ptr<DB> db, const RealmConfig& config,
                          SyncManager* sync_manager)
     : m_config{config}
     , m_db{std::move(db)}

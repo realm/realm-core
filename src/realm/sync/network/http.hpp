@@ -19,6 +19,7 @@
 #pragma once
 
 #include <cstdint>
+#include <cstdlib>
 #include <type_traits>
 #include <map>
 #include <system_error>
@@ -309,15 +310,6 @@ struct HTTPParser : protected HTTPParserBase {
         m_socket.async_read_until(m_read_buffer.get(), max_header_line_length, '\n', std::move(handler));
     }
 
-    inline uint32_t hex_to_int(const std::string& hex) throw()
-    {
-        uint32_t dec;
-        std::stringstream ss;
-        ss << std::hex << hex;
-        ss >> dec;
-        return dec;
-    }
-
     void read_body()
     {
         if (m_found_content_length) {
@@ -333,7 +325,7 @@ struct HTTPParser : protected HTTPParserBase {
                     return;
                 }
                 if (!ec) {
-                    on_body(StringData(m_read_buffer.get(), n));
+                    on_body(std::string_view(m_read_buffer.get(), n));
                 }
                 on_complete(ec);
             };
@@ -345,7 +337,9 @@ struct HTTPParser : protected HTTPParserBase {
                     on_complete(ec);
                     return;
                 }
-                auto content_length = hex_to_int(StringData(m_read_buffer.get(), chunk_start_index - 2));
+
+                auto content_length =
+                    std::strtoul(std::string(m_read_buffer.get(), chunk_start_index - 2).c_str(), nullptr, 16);
 
                 if (content_length == 0) {
                     on_body(m_chunked_encoding_ss->str());
@@ -358,7 +352,7 @@ struct HTTPParser : protected HTTPParserBase {
                         on_complete(ec);
                         return;
                     }
-                    auto chunk_data = StringData(m_read_buffer.get(), n - 2); // -2 to strip \r\n
+                    auto chunk_data = std::string_view(m_read_buffer.get(), n - 2); // -2 to strip \r\n
                     *m_chunked_encoding_ss << chunk_data;
                     read_body();
                 };
