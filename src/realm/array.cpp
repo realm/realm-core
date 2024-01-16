@@ -514,19 +514,16 @@ void Array::move(Array& dst, size_t ndx)
     truncate(ndx);
 }
 
-void Array::set(size_t ndx, int64_t value, bool no_cow)
+void Array::set(size_t ndx, int64_t value)
 {
     REALM_ASSERT_3(ndx, <, m_size);
     if ((this->*(m_vtable->getter))(ndx) == value)
         return;
 
-    if (!no_cow) {
-        // Check if we need to copy before modifying
-        copy_on_write(); // Throws
-        // Grow the array if needed to store this value
-        ensure_minimum_width(value); // Throws
-    }
-
+    // Check if we need to copy before modifying
+    copy_on_write(); // Throws
+    // Grow the array if needed to store this value
+    ensure_minimum_width(value); // Throws
     // Set the value
     (this->*(m_vtable->setter))(ndx, value);
 }
@@ -1558,7 +1555,7 @@ int_fast64_t Array::get(const char* header, size_t ndx) noexcept
 int_fast64_t Array::get_universal_encoded_array(size_t ndx) const
 {
     size_t v_width;
-    return m_encode.get(*this, ndx);
+    return m_encode.get_unsigned(*this, ndx, v_width);
 }
 
 

@@ -168,7 +168,7 @@ public:
     /// ensure_minimum_width(value)) and get_alloc().is_read_only(get_ref())
     /// returns false (noexcept:array-set). Note that for a value of zero, the
     /// first criterion is trivially satisfied.
-    void set(size_t ndx, int64_t value, bool no_cow = false); // TODO this needs to go.
+    void set(size_t ndx, int64_t value);
 
     void set_as_ref(size_t ndx, ref_type ref);
 

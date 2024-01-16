@@ -42,6 +42,8 @@ public:
     // ClusterTree on in general in every place where we use lower and upper bound.
     virtual size_t lower_bound(const Array&, int64_t) const = 0;
     virtual size_t upper_bound(const Array&, int64_t) const = 0;
+    virtual size_t lower_bound(const Array&, uint64_t) const = 0;
+    virtual size_t upper_bound(const Array&, uint64_t) const = 0;
     // query mappers
     // TODO: find all should accept a predicate and fetch only the values that are matching
     virtual size_t find_first(const Array&, int64_t value) const = 0;

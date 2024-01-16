@@ -48,6 +48,8 @@ public:
     // Array lower and upper bound for flex arrays. These methods need to be optimized.
     size_t lower_bound(const Array&, int64_t) const final override;
     size_t upper_bound(const Array&, int64_t) const final override;
+    size_t lower_bound(const Array&, uint64_t) const final override;
+    size_t upper_bound(const Array&, uint64_t) const final override;
 
     // getters
     int64_t get(const Array&, size_t) const final override;

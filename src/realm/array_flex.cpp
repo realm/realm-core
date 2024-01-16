@@ -33,14 +33,16 @@ using namespace realm;
 
 namespace impl {
 
-inline int64_t fetch_value(uint64_t* data, size_t ndx, size_t offset, size_t ndx_width, size_t v_width)
+template <typename T>
+inline T fetch_value(uint64_t* data, size_t ndx, size_t offset, size_t ndx_width, size_t v_width)
 {
     const auto pos = realm::read_bitfield(data, offset + (ndx * ndx_width), ndx_width);
     const auto unsigned_val = realm::read_bitfield(data, v_width * pos, v_width);
-    return sign_extend_field(v_width, unsigned_val);
+    return std::is_same_v<T, int64_t> ? sign_extend_field(v_width, unsigned_val) : unsigned_val;
 }
 
-inline size_t lower_bound(uint64_t* data, int64_t key, size_t v_width, size_t ndx_width, size_t v_size,
+template <typename T>
+inline size_t lower_bound(uint64_t* data, const T& key, size_t v_width, size_t ndx_width, size_t v_size,
                           size_t ndx_size)
 {
     const auto offset = v_width * v_size;
@@ -52,7 +54,7 @@ inline size_t lower_bound(uint64_t* data, int64_t key, size_t v_width, size_t nd
         ndx = p;
         step = cnt / 2;
         ndx += step;
-        const auto v = fetch_value(data, ndx, offset, ndx_width, v_width);
+        const auto v = fetch_value<T>(data, ndx, offset, ndx_width, v_width);
         if ((v < key)) {
             p = ++ndx;
             cnt -= step + 1;
@@ -64,7 +66,8 @@ inline size_t lower_bound(uint64_t* data, int64_t key, size_t v_width, size_t nd
     return p;
 }
 
-inline size_t upper_bound(uint64_t* data, int64_t key, size_t v_width, size_t ndx_width, size_t v_size,
+template <typename T>
+inline size_t upper_bound(uint64_t* data, const T key, size_t v_width, size_t ndx_width, size_t v_size,
                           size_t ndx_size)
 {
     const auto offset = v_width * v_size;
@@ -76,7 +79,7 @@ inline size_t upper_bound(uint64_t* data, int64_t key, size_t v_width, size_t nd
         ndx = p;
         step = cnt / 2;
         ndx += step;
-        const auto v = fetch_value(data, ndx, offset, ndx_width, v_width);
+        const auto v = fetch_value<T>(data, ndx, offset, ndx_width, v_width);
         if (!(key < v)) {
             p = ++ndx;
             cnt -= step + 1;
@@ -426,13 +429,29 @@ void ArrayFlex::restore_array(Array& arr, const std::vector<int64_t>& values) co
     NodeHeader::set_capacity_in_header(byte_size, header);
     arr.init_from_mem(mem);
     arr.update_parent();
-
-    // TODO: avoid doing COW copying directly the bytes into the array. Now we avoid COW and call the vtable setter
-    // (should be as fast as calling Array::set, but it can be done faster)
-    size_t i = 0;
-    for (auto v : values)
-        arr.set(i++, v, true);
-
+    // copy straight into the array all the data, we don't need COW here.
+    auto dst = arr.get_data_from_header(arr.get_header());
+    for (size_t i = 0; i < values.size(); ++i) {
+        const auto& v = values[i];
+        if (width == 0)
+            realm::set_direct<0>(dst, i, v);
+        else if (width == 1)
+            realm::set_direct<1>(dst, i, v);
+        else if (width == 2)
+            realm::set_direct<2>(dst, i, v);
+        else if (width == 4)
+            realm::set_direct<4>(dst, i, v);
+        else if (width == 8)
+            realm::set_direct<8>(dst, i, v);
+        else if (width == 16)
+            realm::set_direct<16>(dst, i, v);
+        else if (width == 32)
+            realm::set_direct<32>(dst, i, v);
+        else if (width == 64)
+            realm::set_direct<64>(dst, i, v);
+        else
+            REALM_UNREACHABLE();
+    }
     REALM_ASSERT(width == arr.get_width());
     REALM_ASSERT(arr.size() == values.size());
 }
@@ -447,9 +466,7 @@ size_t ArrayFlex::find_first(const Array& arr, int64_t value) const
         if (ndx_size <= MAX_SZ_LINEAR_FIND) {
             return impl::find_linear(data, value, v_width, ndx_width, v_size, ndx_size);
         }
-        else {
-            return impl::find_binary(data, value, v_width, ndx_width, v_size, ndx_size);
-        }
+        return impl::find_binary(data, value, v_width, ndx_width, v_size, ndx_size);
     }
     return realm::not_found;
 }
@@ -539,6 +556,32 @@ size_t ArrayFlex::lower_bound(const Array& arr, int64_t value) const
 }
 
 size_t ArrayFlex::upper_bound(const Array& arr, int64_t value) const
+{
+    REALM_ASSERT(arr.is_attached());
+    const auto header = arr.get_header();
+    REALM_ASSERT(NodeHeader::get_kind(header) == 'B');
+    size_t v_width, ndx_width, v_size, ndx_size;
+    if (get_encode_info(header, v_width, ndx_width, v_size, ndx_size)) {
+        const auto data = (uint64_t*)NodeHeader::get_data_from_header(arr.get_header());
+        return impl::upper_bound(data, value, v_width, ndx_width, v_size, ndx_size);
+    }
+    REALM_UNREACHABLE();
+}
+
+size_t ArrayFlex::lower_bound(const Array& arr, uint64_t value) const
+{
+    REALM_ASSERT(arr.is_attached());
+    const auto header = arr.get_header();
+    REALM_ASSERT(NodeHeader::get_kind(header) == 'B');
+    size_t v_width, ndx_width, v_size, ndx_size;
+    if (get_encode_info(header, v_width, ndx_width, v_size, ndx_size)) {
+        const auto data = (uint64_t*)NodeHeader::get_data_from_header(arr.get_header());
+        return impl::lower_bound(data, value, v_width, ndx_width, v_size, ndx_size);
+    }
+    REALM_UNREACHABLE();
+}
+
+size_t ArrayFlex::upper_bound(const Array& arr, uint64_t value) const
 {
     REALM_ASSERT(arr.is_attached());
     const auto header = arr.get_header();
