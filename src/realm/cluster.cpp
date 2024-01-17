@@ -1561,7 +1561,7 @@ ref_type Cluster::typed_write(ref_type ref, _impl::ArrayWriterBase& out, const T
                 auto col_attr = col_key.get_attrs();
                 if (!col_attr.test(col_attr_Collection) && col_type == col_type_Int) {
                     // we may compress integer leafs (but are not doing it yet)
-                    a.set_as_ref(j, aa.write(out, deep, only_modified, false));
+                    a.set_as_ref(j, aa.write(out, deep, only_modified, compress));
                 }
                 else {
                     // just recurse into anything else without compressing
