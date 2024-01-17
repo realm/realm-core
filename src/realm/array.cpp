@@ -280,13 +280,7 @@ void Array::init_from_mem(MemRef mem) noexcept
     m_is_inner_bptree_node = get_is_inner_bptree_node_from_header(header);
     m_has_refs = get_hasrefs_from_header(header);
     m_context_flag = get_context_flag_from_header(header);
-
-    // width for B arrays is set based on the value stored in the header,
-    // hower we have lower and upper bound that are used in several places in the code
-    // that do not make sense for B arrays, as well as the width.
-    // In theory decompressing the array when we see a B array before to do any operation
-    // should suffice. But right now we are seeing bad values returned.
-    // Something is not adding up correctly while decompressing.
+    // update width (for B arrays we need to reset all, since there is no concept of width)
     update_width_cache_from_header();
 }
 
@@ -377,6 +371,11 @@ ref_type Array::write(_impl::ArrayWriterBase& out, bool deep, bool only_if_modif
             const auto h = encoded_array.get_header();
             REALM_ASSERT(get_kind(h) == 'B');
             REALM_ASSERT(get_encoding(h) == Encoding::Flex);
+            REALM_ASSERT(size() == encoded_array.size());
+#ifdef REALM_DEBUG
+            for (size_t i = 0; i < encoded_array.size(); ++i)
+                REALM_ASSERT(get(i) == encoded_array.get(i));
+#endif
             auto ref = encoded_array.do_write_shallow(out);
             encoded_array.destroy();
             return ref;
@@ -395,6 +394,7 @@ ref_type Array::write(ref_type ref, Allocator& alloc, _impl::ArrayWriterBase& ou
 
     Array array(alloc);
     array.init_from_ref(ref);
+    REALM_ASSERT(array.is_attached());
 
     if (!array.m_has_refs) {
         Array encoded_array{alloc};
@@ -402,6 +402,11 @@ ref_type Array::write(ref_type ref, Allocator& alloc, _impl::ArrayWriterBase& ou
             const auto h = encoded_array.get_header();
             REALM_ASSERT(get_kind(h) == 'B');
             REALM_ASSERT(get_encoding(h) == Encoding::Flex);
+            REALM_ASSERT(array.size() == encoded_array.size());
+#ifdef REALM_DEBUG
+            for (size_t i = 0; i < encoded_array.size(); ++i)
+                REALM_ASSERT(array.get(i) == encoded_array.get(i));
+#endif
             auto ref = encoded_array.do_write_shallow(out);
             encoded_array.destroy();
             return ref;
@@ -419,11 +424,11 @@ ref_type Array::do_write_shallow(_impl::ArrayWriterBase& out) const
     // here we might want to compress the array and write down.
     const char* header = get_header_from_data(m_data);
     size_t byte_size = get_byte_size();
-    const auto is_encode = is_encoded();
+    const auto encoded = is_encoded();
     uint32_t dummy_checksum =
-        is_encode ? 0x42424242UL : 0x41414141UL; // A/B (A for normal arrays, B for compressed arrays)
+        encoded ? 0x42424242UL : 0x41414141UL; // A/B (A for normal arrays, B for compressed arrays)
     uint32_t dummy_checksum_bytes =
-        is_encode ? 2 : 4; // AAAA / BB (only 2 bytes for B arrays, since B arrays use more header space)
+        encoded ? 2 : 4; // AAAA / BB (only 2 bytes for B arrays, since B arrays use more header space)
     ref_type new_ref = out.write_array(header, byte_size, dummy_checksum, dummy_checksum_bytes); // Throws
     REALM_ASSERT_3(new_ref % 8, ==, 0);                                                          // 8-byte alignment
     return new_ref;
@@ -432,14 +437,6 @@ ref_type Array::do_write_shallow(_impl::ArrayWriterBase& out) const
 
 ref_type Array::do_write_deep(_impl::ArrayWriterBase& out, bool only_if_modified, bool compress) const
 {
-    // This is recursively expanding each array and writing it down to disk...
-    // We need to verify if for encoded arrays we need to do anything special.
-
-    // This machinery is problematic, since we constuct a new array for following refs that
-    // eventually will get us to the actual array that can be compressed.
-    // The encoded type for this array has nothing to do with what the eventual encoding type
-    // will be. Moreover we have lost the information about whether we need compression or not for the leaf array.
-
     // Temp array for updated refs
     Array new_array(Allocator::get_default());
     Type type = m_is_inner_bptree_node ? type_InnerBptreeNode : type_HasRefs;
@@ -458,7 +455,6 @@ ref_type Array::do_write_deep(_impl::ArrayWriterBase& out, bool only_if_modified
         }
         new_array.add(value); // Throws
     }
-
     return new_array.do_write_shallow(out); // Throws
 }
 
@@ -526,10 +522,8 @@ void Array::set(size_t ndx, int64_t value)
 
     // Check if we need to copy before modifying
     copy_on_write(); // Throws
-
     // Grow the array if needed to store this value
     ensure_minimum_width(value); // Throws
-
     // Set the value
     (this->*(m_vtable->setter))(ndx, value);
 }
@@ -1309,14 +1303,12 @@ void Array::update_width_cache_from_header() noexcept
         m_ubound = 0;
     }
     else {
-        int64_t width = get_width_from_header(header);
-        m_width = width;
-        REALM_ASSERT(m_width == width);
+        m_width = get_width_from_header(header);
         m_lbound = lbound_for_width(m_width);
         m_ubound = ubound_for_width(m_width);
         REALM_ASSERT(m_lbound <= m_ubound);
-        REALM_ASSERT(width >= m_lbound);
-        REALM_ASSERT(width <= m_ubound);
+        REALM_ASSERT(m_width >= m_lbound);
+        REALM_ASSERT(m_width <= m_ubound);
         REALM_TEMPEX(m_vtable = &VTableForWidth, m_width, ::vtable);
         m_getter = m_vtable->getter;
     }
@@ -1405,7 +1397,7 @@ void Array::set(size_t ndx, int64_t value)
         m_encode.set_direct(*this, ndx, value);
     }
     else {
-        set_direct<width>(m_data, ndx, value);
+        realm::set_direct<width>(m_data, ndx, value);
     }
 }
 
@@ -1552,6 +1544,7 @@ int_fast64_t Array::get(const char* header, size_t ndx) noexcept
     REALM_ASSERT(ndx < sz);
     if (NodeHeader::get_kind(header) == 'B') {
         REALM_ASSERT(NodeHeader::get_encoding(header) == NodeHeader::Encoding::Flex);
+        // this is likely triggering some failures when negative values (tombstones or null) are fetched
         return ArrayFlex::get(header, ndx);
     }
     const char* data = get_data_from_header(header);
@@ -1561,7 +1554,8 @@ int_fast64_t Array::get(const char* header, size_t ndx) noexcept
 
 int_fast64_t Array::get_universal_encoded_array(size_t ndx) const
 {
-    return m_encode.get(*this, ndx);
+    size_t v_width;
+    return m_encode.get_unsigned(*this, ndx, v_width);
 }
 
 
@@ -1614,7 +1608,6 @@ bool QueryStateFindAll<std::vector<ObjKey>>::match(size_t index) noexcept
     ++m_match_count;
     int64_t key_value = (m_key_values ? m_key_values->get(index) : index) + m_key_offset;
     m_keys.push_back(ObjKey(key_value));
-
     return (m_limit > m_match_count);
 }
 

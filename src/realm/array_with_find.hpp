@@ -166,7 +166,7 @@ private:
     bool find_all_will_match(size_t start, size_t end, size_t baseindex, QueryStateBase* state) const;
 
     template <class Cond>
-    bool find_encoded_array(Cond&, int64_t, size_t, size_t, size_t, QueryStateBase*) const;
+    bool find_encoded_array(int64_t, size_t, size_t, size_t, QueryStateBase*) const;
 };
 //*************************************************************************************
 // Finding code                                                                       *
@@ -320,7 +320,7 @@ bool ArrayWithFind::find_optimized(int64_t value, size_t start, size_t end, size
     //
 
     if (m_array.is_encoded()) {
-        return find_encoded_array(c, value, start2, end, baseindex, state);
+        return find_encoded_array<cond>(value, start2, end, baseindex, state);
     }
 
     constexpr int64_t lbound = Array::lbound_for_width(bitwidth);
@@ -584,9 +584,6 @@ inline bool ArrayWithFind::compare_equality(int64_t value, size_t start, size_t 
     REALM_ASSERT_DEBUG(start <= m_array.m_size && (end <= m_array.m_size || end == size_t(-1)) && start <= end);
     REALM_ASSERT_DEBUG(width == m_array.m_width);
 
-    // tmp hack. There might be an error with width after decompression
-    // size_t ee = end >= m_array.size() ? m_array.size() : end;
-
     auto v = 64 / no0(width);
     size_t ee = round_up(start, v);
     ee = ee > end ? end : ee;
@@ -597,7 +594,6 @@ inline bool ArrayWithFind::compare_equality(int64_t value, size_t start, size_t 
                 return false;
         }
     }
-
 
     if (start >= end)
         return true;
@@ -1002,23 +998,39 @@ bool ArrayWithFind::compare_relation(int64_t value, size_t start, size_t end, si
 }
 
 template <class Cond>
-bool ArrayWithFind::find_encoded_array(Cond& c, int64_t value, size_t start, size_t end, size_t baseindex,
+bool ArrayWithFind::find_encoded_array(int64_t value, size_t start, size_t end, size_t baseindex,
                                        QueryStateBase* state) const
 {
-    // this is not optised. just fetch all the values from the array and apply the cond.
-    // it can be optimised later, for example avoid to fetch all the values from the encoded array
+    // this is not optimized. just fetch all the values from the array and apply the cond.
+    // it can be optimized later, for example avoid to fetch all the values from the encoded array
     // and apply the cond predicate, + can we used binary seatch here? Likely yes.
     ArrayEncode& encode = m_array.m_encode;
-    const auto& values = encode.find_all(m_array, value, start, end);
-    bool ret = false;
-    for (const auto& v : values) {
-        if (c(v, value)) {
-            if (REALM_UNLIKELY(!ret)) // this is false only the fist time, it can be skipped all the other times.
-                ret = true;
-            state->match(start + baseindex, v);
+
+    if constexpr (std::is_same<Cond, Equal>::value || std::is_same<Cond, NotEqual>::value) {
+        const auto eq = std::is_same<Cond, Equal>::value;
+        while (start < end) {
+            auto v = encode.get(m_array, start);
+            if (eq ? (v == value) : (v != value)) {
+                if (!state->match(start + baseindex))
+                    return false;
+            }
+            start++;
         }
+        return true;
     }
-    return ret;
+    else {
+        const auto gt = std::is_same<Cond, Greater>::value;
+        while (start < end) {
+            auto v = encode.get(m_array, start);
+            if (gt ? (v > value) : (v < value)) {
+                if (!state->match(start + baseindex))
+                    return false;
+            }
+            ++start;
+        }
+        return true;
+    }
+    return false;
 }
 
 //*************************************************************************************

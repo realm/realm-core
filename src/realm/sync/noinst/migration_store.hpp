@@ -34,7 +34,10 @@ using MigrationStoreRef = std::shared_ptr<MigrationStore>;
 
 // A MigrationStore manages the PBS -> FLX migration metadata table.
 class MigrationStore : public std::enable_shared_from_this<MigrationStore> {
+    struct Private {};
+
 public:
+    explicit MigrationStore(Private, DBRef db);
     MigrationStore(const MigrationStore&) = delete;
     MigrationStore& operator=(const MigrationStore&) = delete;
 
@@ -88,8 +91,6 @@ public:
     std::optional<int64_t> get_sentinel_subscription_set_version();
 
 protected:
-    explicit MigrationStore(DBRef db);
-
     // Read the data from the database - returns true if successful
     // Will return false if read_only is set and the metadata schema
     // versions info is not already set.

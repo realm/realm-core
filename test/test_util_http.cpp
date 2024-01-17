@@ -377,3 +377,138 @@ TEST(HTTPParser_ParseHeaderLine)
         }
     }
 }
+
+template <typename Socket>
+struct ChunkedEncodingHTTPParser : public HTTPParser<Socket> {
+    StringData key;
+    StringData value;
+    std::string body;
+    std::error_code error;
+
+    ChunkedEncodingHTTPParser(Socket& socket, const std::shared_ptr<util::Logger>& logger_ptr)
+        : HTTPParser<Socket>{socket, logger_ptr}
+    {
+        this->m_has_chunked_encoding = true;
+        this->m_chunked_encoding_ss.emplace(std::stringstream());
+    }
+
+    std::error_code on_first_line(StringData) override
+    {
+        return std::error_code{};
+    }
+    void on_header(StringData k, StringData v) override
+    {
+        key = k;
+        value = v;
+    }
+    void on_body(StringData b) override
+    {
+        body = b;
+    }
+    void on_complete(std::error_code ec) override
+    {
+        error = ec;
+    }
+
+    void modify_buffer(const std::string& str)
+    {
+        // +1 to append null termination
+        this->m_read_buffer.reset(static_cast<char*>(std::calloc(str.size() + 1, sizeof(char))));
+        for (size_t i = 0; i < str.size() + 1; i++) {
+            this->m_read_buffer.get()[i] = str[i];
+        }
+    }
+};
+
+struct MockedSocket : network::Socket {
+    MockedSocket(network::Service& service)
+        : network::Socket(service)
+    {
+    }
+
+    MockedSocket(network::Service& service, const network::StreamProtocol& protocol, native_handle_type native_handle)
+        : network::Socket(service, protocol, native_handle)
+    {
+    }
+
+    void shift_left(char* str, size_t x)
+    {
+        if (str == nullptr || x == 0) {
+            return;
+        }
+
+        size_t length = strlen(str);
+        if (x >= length) {
+            str[0] = '\0';
+        }
+        else {
+            memmove(str, str + x, length - x + 1);
+        }
+    }
+
+    int index_of_char(const char* str, char target)
+    {
+        if (str == nullptr) {
+            return -1;
+        }
+
+        for (int i = 0; str[i] != '\0'; ++i) {
+            if (str[i] == target) {
+                return i;
+            }
+        }
+
+        return -1;
+    }
+
+    template <class H>
+    void async_read_until(char* buffer, std::size_t, char delim, H handler)
+    {
+        if (m_run_count > 0) {
+            shift_left(buffer, m_prev_index);
+        }
+        size_t index_of = index_of_char(buffer, delim) + 1;
+        m_prev_index = index_of;
+        m_run_count++;
+        handler(std::error_code(), index_of);
+    }
+
+    template <class H>
+    void async_read(char* buffer, std::size_t length, H handler)
+    {
+        if (m_run_count > 0) {
+            shift_left(buffer, m_prev_index);
+        }
+        m_prev_index = length;
+        handler(std::error_code(), length);
+    }
+
+private:
+    size_t m_run_count = 0;
+    size_t m_prev_index = 0;
+};
+
+TEST(HTTPParser_ChunkedEncoding)
+{
+    network::Service server;
+
+    auto parser_with_body = [this, &server](const std::string& input) {
+        MockedSocket socket(server);
+        auto parser = ChunkedEncodingHTTPParser<MockedSocket>(socket, test_context.logger);
+        parser.modify_buffer(input);
+        parser.read_body();
+        return parser.body;
+    };
+
+    // Single line
+    CHECK(parser_with_body("1e\r\nI am posting this information.\r\n0\r\n\r\n\0") ==
+          "I am posting this information.");
+    // Multiline
+    CHECK(parser_with_body("1E\r\nI am posting this information.\r\n15\r\nThis is another line.\r\n0\r\n\r\n\0") ==
+          "I am posting this information.This is another line.");
+    // Multiline with CRLR
+    CHECK(parser_with_body("7\r\nMongoDB\r\n8\r\n Realm i\r\nB\r\nn \r\nchunks.\r\n0\r\n\r\n\0") ==
+          "MongoDB Realm in \r\nchunks.");
+    // Empty
+    CHECK(parser_with_body("0\r\n\r\n0\r\n\r\n\0") == "");
+}

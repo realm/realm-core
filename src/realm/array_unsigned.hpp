@@ -95,12 +95,8 @@ private:
             set_width(get_width_from_header(get_header()));
         }
         else if (kind == 'B') {
-            auto dst_header = mem.get_addr();
+            const auto dst_header = mem.get_addr();
             if (get_kind(dst_header) == 'A') {
-                // we are a B array turned into A array. We need to set these values..
-                // but lower bound and upper bound will try to call decode again. So we need
-                // to disable it from here, at least during init_from_mem.
-                // TODO: verify if we really need to decode for lower_bound and upper_bound.
                 m_ubound = uint64_t(-1) >> (64 - m_width);
             }
         }

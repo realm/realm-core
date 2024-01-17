@@ -222,12 +222,6 @@ def doCheckInDocker(Map options = [:]) {
         REALM_ENABLE_ENCRYPTION: options.enableEncryption ? 'ON' : 'OFF',
         REALM_ENABLE_SYNC: options.enableSync ? 'ON' : 'OFF',
     ]
-    if (options.enableSync) {
-        cmakeOptions << [
-            REALM_ENABLE_AUTH_TESTS: 'ON',
-            REALM_MONGODB_ENDPOINT: 'http://mongodb-realm:9090',
-        ]
-    }
     if (longRunningTests) {
         cmakeOptions << [
             CMAKE_CXX_FLAGS: '"-DTEST_DURATION=1"',
@@ -275,38 +269,28 @@ def doCheckInDocker(Map options = [:]) {
                 }
             }
 
-            if (options.enableSync) {
-                // stitch images are auto-published every day to our CI
-                // see https://github.com/realm/ci/tree/master/realm/docker/mongodb-realm
-                // we refrain from using "latest" here to optimise docker pull cost due to a new image being built every day
-                // if there's really a new feature you need from the latest stitch, upgrade this manually
-                withRealmCloud(version: dependencies.MDBREALM_TEST_SERVER_TAG) { networkName ->
-                    buildSteps("--network=${networkName}")
-                }
+            buildSteps()
 
-                if (options.dumpChangesetTransform) {
-                    buildEnv.inside {
-                        dir('build-dir/test') {
-                            withEnv([
-                                'UNITTEST_PROGRESS=1',
-                                'UNITTEST_FILTER=Array_Example Transform_* EmbeddedObjects_*',
-                                'UNITTEST_DUMP_TRANSFORM=changeset_dump',
-                            ]) {
-                                sh '''
-                                    ./realm-sync-tests
-                                    tar -zcvf changeset_dump.tgz changeset_dump
-                                '''
-                            }
-                            withAWS(credentials: 'stitch-sync-s3', region: 'us-east-1') {
-                                retry(20) {
-                                    s3Upload file: 'changeset_dump.tgz', bucket: 'realm-test-artifacts', acl: 'PublicRead', path: "sync-transform-corpuses/${gitSha}/"
-                                }
+            if (options.dumpChangesetTransform) {
+                buildEnv.inside {
+                    dir('build-dir/test') {
+                        withEnv([
+                            'UNITTEST_PROGRESS=1',
+                            'UNITTEST_FILTER=Array_Example Transform_* EmbeddedObjects_*',
+                            'UNITTEST_DUMP_TRANSFORM=changeset_dump',
+                        ]) {
+                            sh '''
+                                ./realm-sync-tests
+                                tar -zcvf changeset_dump.tgz changeset_dump
+                            '''
+                        }
+                        withAWS(credentials: 'stitch-sync-s3', region: 'us-east-1') {
+                            retry(20) {
+                                s3Upload file: 'changeset_dump.tgz', bucket: 'realm-test-artifacts', acl: 'PublicRead', path: "sync-transform-corpuses/${gitSha}/"
                             }
                         }
                     }
                 }
-            } else {
-                buildSteps()
             }
         }
     }

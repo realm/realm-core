@@ -42,15 +42,14 @@ public:
     void set_direct(const Array&, size_t, int64_t) const final override;
 
     // basic query support
-    std::vector<int64_t> find_all(const Array&, int64_t, size_t, size_t) const final override;
     size_t find_first(const Array&, int64_t value) const final override;
     int64_t sum(const Array&, size_t start, size_t end) const final override;
 
-    // UnsignedArray/Array lower and upper bound for flex arrays. These methods need to be optimized.
-    size_t lower_bound(const Array&, uint64_t) const final override;
-    size_t upper_bound(const Array&, uint64_t) const final override;
+    // Array lower and upper bound for flex arrays. These methods need to be optimized.
     size_t lower_bound(const Array&, int64_t) const final override;
     size_t upper_bound(const Array&, int64_t) const final override;
+    size_t lower_bound(const Array&, uint64_t) const final override;
+    size_t upper_bound(const Array&, uint64_t) const final override;
 
     // getters
     int64_t get(const Array&, size_t) const final override;
@@ -76,13 +75,7 @@ private:
     // decode array methods
     std::vector<int64_t> fetch_signed_values_from_encoded_array(const Array&, size_t, size_t, size_t, size_t,
                                                                 size_t = 0) const;
-    std::vector<uint64_t> fetch_unsigned_values_from_encoded_array(const Array&, size_t, size_t, size_t, size_t,
-                                                                   size_t = 0) const;
     void restore_array(Array&, const std::vector<int64_t>&) const;
-
-    // this is not widely used, but fetch_x_values does pretty much the same
-    std::vector<std::pair<int64_t, size_t>> fetch_values_and_indices(const Array&, size_t, size_t, size_t,
-                                                                     size_t) const;
 };
 } // namespace realm
 #endif // REALM_ARRAY_COMPRESS_HPP

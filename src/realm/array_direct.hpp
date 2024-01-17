@@ -207,8 +207,8 @@ class bf_iterator {
 public:
     bf_iterator(uint64_t* data_area, size_t initial_offset, size_t field_size, size_t step_size, size_t index)
         : data_area(data_area)
-        , field_size(field_size)
-        , step_size(step_size)
+        , field_size(static_cast<uint8_t>(field_size))
+        , step_size(static_cast<uint8_t>(step_size))
     {
         field_position = initial_offset + index * step_size;
         first_word_ptr = data_area + (field_position >> 6);
@@ -237,7 +237,7 @@ public:
         auto first_word = first_word_ptr[0];
         size_t mask = -1;
         if (field_size < 64) {
-            mask = (1ULL << field_size) - 1;
+            mask = static_cast<size_t>((1ULL << field_size) - 1);
             value &= mask;
         }
         // zero out field in first word:
