@@ -1534,12 +1534,20 @@ void Cluster::remove_backlinks(const Table* origin_table, ObjKey origin_key, Col
 ref_type Cluster::typed_write(ref_type ref, _impl::ArrayWriterBase& out, const Table& table, bool deep,
                               bool only_modified, bool compress) const
 {
+    REALM_ASSERT(ref == get_mem().get_ref());
+    if (only_modified && m_alloc.is_read_only(ref))
+        return ref;
     REALM_ASSERT(!get_is_inner_bptree_node_from_header(get_header()));
+    REALM_ASSERT(!get_context_flag_from_header(get_header()));
     Array a(Allocator::get_default());
     a.create(type_HasRefs, false, size());
     for (unsigned j = 0; j < size(); ++j) {
         RefOrTagged rot = get_as_ref_or_tagged(j);
         if (rot.is_ref() && rot.get_as_ref()) {
+            if (only_modified && m_alloc.is_read_only(rot.get_as_ref())) {
+                a.set(j, rot);
+                continue;
+            }
             Array aa(m_alloc);
             aa.init_from_ref(rot.get_as_ref());
             if (j == 0) {
@@ -1560,6 +1568,9 @@ ref_type Cluster::typed_write(ref_type ref, _impl::ArrayWriterBase& out, const T
                     a.set_as_ref(j, aa.write(out, deep, only_modified, false));
                 }
             }
+        }
+        else {
+            a.set(j, rot);
         }
     }
     return a.write(out, false, only_modified, false);
@@ -1600,15 +1611,22 @@ void Cluster::typed_print(std::string prefix, const Table& table) const
                     // handling of mixed missing here?
                     bptree_typed_print(pref, m_alloc, rot.get_as_ref(), col_type);
                 }
-                if (col_attr.test(col_attr_Dictionary)) {
+                else if (col_attr.test(col_attr_Dictionary)) {
                     Array dict_top(m_alloc);
                     dict_top.init_from_ref(rot.get_as_ref());
+                    if (dict_top.size() == 0) {
+                        std::cout << "{ empty }" << std::endl;
+                        continue;
+                    }
                     std::cout << "{" << std::endl;
                     auto ref0 = dict_top.get_as_ref(0);
                     if (ref0) {
                         auto p = pref + "  0:\t";
                         std::cout << p;
                         bptree_typed_print(p, m_alloc, ref0, col_type);
+                    }
+                    if (dict_top.size() == 1) {
+                        continue; // is this really possible? or should all dicts have both trees?
                     }
                     auto ref1 = dict_top.get_as_ref(1);
                     if (ref1) {

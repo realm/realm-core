@@ -3340,8 +3340,10 @@ ColKey Table::find_opposite_column(ColKey col_key) const
 ref_type Table::typed_write(ref_type ref, _impl::ArrayWriterBase& out, bool deep, bool only_modified,
                             bool compress) const
 {
-    // ignore ref, just use Tables own accessors
-    static_cast<void>(ref);
+    REALM_ASSERT(ref == m_top.get_mem().get_ref());
+    if (only_modified && m_alloc.is_read_only(ref))
+        return ref;
+    // ignore ref from here, just use Tables own accessors
     Array dest(Allocator::get_default());
     dest.create(NodeHeader::type_HasRefs, false, m_top.size());
     for (unsigned j = 0; j < m_top.size(); ++j) {
@@ -3369,9 +3371,7 @@ ref_type Table::typed_write(ref_type ref, _impl::ArrayWriterBase& out, bool deep
 
 void Table::typed_print(std::string prefix, ref_type ref) const
 {
-    // top ref is not accessible, so we can't validate ref?
-    static_cast<void>(ref);
-    // REALM_ASSERT(ref == m_top...);
+    REALM_ASSERT(ref == m_top.get_mem().get_ref());
     std::cout << prefix << "Table with key = " << m_key << " " << NodeHeader::header_to_string(m_top.get_header())
               << " {" << std::endl;
     for (unsigned j = 0; j < m_top.size(); ++j) {
