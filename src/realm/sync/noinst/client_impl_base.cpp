@@ -1671,7 +1671,7 @@ void Session::activate()
     m_download_progress = m_progress.download;
     REALM_ASSERT_3(m_last_version_available, >=, m_progress.upload.client_version);
 
-    logger.debug("last_version_available  = %1", m_last_version_available);           // Throws
+    logger.debug("last_version_available  = %1", m_last_version_available);                    // Throws
     logger.debug("progress_download_server_version = %1", m_progress.download.server_version); // Throws
     logger.debug("progress_download_client_version = %1",
                  m_progress.download.last_integrated_client_version);                                      // Throws
@@ -1754,6 +1754,9 @@ void Session::send_message()
     REALM_ASSERT_EX(m_state == Active || m_state == Deactivating, m_state);
     REALM_ASSERT(m_enlisted_to_send);
     m_enlisted_to_send = false;
+    if (m_error_to_send && m_bind_message_sent && have_client_file_ident())
+        return send_json_error_message(); // Throws
+
     if (m_state == Deactivating || m_error_message_received || m_suspended) {
         // Deactivation has been initiated. If the UNBIND message has not been
         // sent yet, there is no point in sending it. Instead, we can let the
@@ -1777,6 +1780,11 @@ void Session::send_message()
     if (!m_bind_message_sent)
         return send_bind_message(); // Throws
 
+    // Stop sending upload, mark and query messages when the client detects an error.
+    if (m_client_error) {
+        return;
+    }
+
     if (!m_ident_message_sent) {
         if (have_client_file_ident())
             send_ident_message(); // Throws
@@ -1791,13 +1799,6 @@ void Session::send_message()
         return send_test_command_message();
     }
 
-    if (m_error_to_send)
-        return send_json_error_message(); // Throws
-
-    // Stop sending upload, mark and query messages when the client detects an error.
-    if (m_client_error) {
-        return;
-    }
 
     if (m_target_download_mark > m_last_download_mark_sent)
         return send_mark_message(); // Throws
@@ -1943,7 +1944,8 @@ void Session::send_ident_message()
     m_conn.initiate_write_message(out, this); // Throws
 
     m_ident_message_sent = true;
-
+    call_debug_hook(SyncClientHookEvent::IdentMessageSent, m_progress, m_last_sent_flx_query_version,
+                    DownloadBatchState::SteadyState, 0);
     // Other messages may be waiting to be sent
     enlist_to_send(); // Throws
 }
@@ -2153,8 +2155,9 @@ void Session::send_unbind_message()
 
 void Session::send_json_error_message()
 {
-    REALM_ASSERT_EX(m_state == Active, m_state);
-    REALM_ASSERT(m_ident_message_sent);
+    REALM_ASSERT_EX(m_state == Active || m_state == Deactivating, m_state);
+    REALM_ASSERT(m_bind_message_sent);
+    REALM_ASSERT(have_client_file_ident());
     REALM_ASSERT(!m_unbind_message_sent);
     REALM_ASSERT(m_error_to_send);
     REALM_ASSERT(m_client_error);
@@ -2162,19 +2165,22 @@ void Session::send_json_error_message()
     ClientProtocol& protocol = m_conn.get_client_protocol();
     OutputBuffer& out = m_conn.get_output_buffer();
     session_ident_type session_ident = get_ident();
-    auto protocol_error = m_client_error->error_for_server;
+    auto protocol_error = static_cast<int>(m_client_error->error_for_server);
 
     auto message = util::format("%1", m_client_error->to_status());
-    logger.info("Sending: ERROR \"%1\" (error_code=%2, session_ident=%3)", message, static_cast<int>(protocol_error),
+    logger.info("Sending: ERROR \"%1\" (error_code=%2, session_ident=%3)", message, protocol_error,
                 session_ident); // Throws
 
     nlohmann::json error_body_json;
     error_body_json["message"] = std::move(message);
-    protocol.make_json_error_message(out, session_ident, static_cast<int>(protocol_error),
+    protocol.make_json_error_message(out, session_ident, protocol_error,
                                      error_body_json.dump()); // Throws
     m_conn.initiate_write_message(out, this);                 // Throws
-
     m_error_to_send = false;
+
+    call_debug_hook(SyncClientHookEvent::ClientErrorMessageSent,
+                    ProtocolErrorInfo(protocol_error, message, IsFatal{false}));
+
     enlist_to_send(); // Throws
 }
 
