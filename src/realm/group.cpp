@@ -468,6 +468,19 @@ void Group::remap_and_update_refs(ref_type new_top_ref, size_t new_file_size, bo
     update_refs(new_top_ref);
 }
 
+void Group::update_table_accessors()
+{
+    for (unsigned j = 0; j < m_table_accessors.size(); ++j) {
+        Table* table = m_table_accessors[j];
+        // this should be filtered further as an optimization
+        if (table) {
+            table->refresh_allocator_wrapper();
+            table->update_from_parent();
+        }
+    }
+}
+
+
 void Group::validate_top_array(const Array& arr, const SlabAlloc& alloc, std::optional<size_t> read_lock_file_size,
                                std::optional<uint_fast64_t> read_lock_version)
 {
@@ -908,6 +921,8 @@ void Group::validate(ObjLink link) const
 ref_type Group::typed_write_tables(_impl::ArrayWriterBase& out, bool deep, bool only_modified, bool compress) const
 {
     ref_type ref = m_top.get_as_ref(1);
+    if (only_modified && m_alloc.is_read_only(ref))
+        return ref;
     Array a(m_alloc);
     a.init_from_ref(ref);
     REALM_ASSERT(a.has_refs());
@@ -928,13 +943,14 @@ ref_type Group::typed_write_tables(_impl::ArrayWriterBase& out, bool deep, bool 
 }
 void Group::table_typed_print(std::string prefix, ref_type ref) const
 {
+    REALM_ASSERT(m_top.get_as_ref(1) == ref);
     Array a(m_alloc);
     a.init_from_ref(ref);
     REALM_ASSERT(a.has_refs());
     for (unsigned j = 0; j < a.size(); ++j) {
         auto pref = prefix + "  " + to_string(j) + ":\t";
         RefOrTagged rot = a.get_as_ref_or_tagged(j);
-        if (rot.get_as_int() == 0)
+        if (rot.is_tagged() || rot.get_as_ref() == 0)
             continue;
         auto table_accessor = do_get_table(j);
         REALM_ASSERT(table_accessor);
@@ -1106,7 +1122,7 @@ void Group::write(std::ostream& out, int file_format_version, TableWriter& table
         REALM_ASSERT(version_number == 0 || version_number == 1);
     }
     else {
-        table_writer.typed_print("");
+        // table_writer.typed_print("");
         // Because we need to include the total logical file size in the
         // top-array, we have to start by writing everything except the
         // top-array, and then finally compute and write a correct version of

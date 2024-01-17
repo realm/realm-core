@@ -640,7 +640,7 @@ private:
     void reset_free_space_tracking();
 
     void remap_and_update_refs(ref_type new_top_ref, size_t new_file_size, bool writable);
-
+    void update_table_accessors();
     /// Recursively update refs stored in all cached array
     /// accessors. This includes cached array accessors in any
     /// currently attached table accessors. This ensures that the

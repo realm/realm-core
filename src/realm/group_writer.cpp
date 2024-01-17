@@ -648,7 +648,7 @@ ref_type GroupWriter::write_group()
 {
     ALLOC_DBG_COUT("Commit nr " << m_current_version << "   ( from " << m_oldest_reachable_version << " )"
                                 << std::endl);
-    m_group.typed_print("");
+    // m_group.typed_print("");
 
     read_in_freelist();
     // Now, 'm_size_map' holds all free elements candidate for recycling
@@ -672,7 +672,7 @@ ref_type GroupWriter::write_group()
     }
     ref_type names_ref = m_group.m_table_names.write(*writer, deep, only_if_modified, compress); // Throws
     ref_type tables_ref = m_group.typed_write_tables(*writer, deep, only_if_modified, compress);
-    // ref_type tables_ref = m_group.m_tables.write(*writer, deep, only_if_modified, compress);     // Throws
+    // ref_type tables_ref = m_group.m_tables.write(*writer, deep, only_if_modified, compress); // Throws
 
     int_fast64_t value_1 = from_ref(names_ref);
     int_fast64_t value_2 = from_ref(tables_ref);

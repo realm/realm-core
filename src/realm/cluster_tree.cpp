@@ -127,13 +127,22 @@ public:
     virtual ref_type typed_write(ref_type ref, _impl::ArrayWriterBase& out, const Table& table, bool deep,
                                  bool only_modified, bool compress) const override
     {
+        REALM_ASSERT(ref == get_mem().get_ref());
+        if (only_modified && m_alloc.is_read_only(ref)) {
+            return ref;
+        }
         REALM_ASSERT(get_is_inner_bptree_node_from_header(get_header()));
+        REALM_ASSERT(!get_context_flag_from_header(get_header()));
         REALM_ASSERT(has_refs());
         Array a(Allocator::get_default());
         a.create(type_InnerBptreeNode, false, size());
         for (unsigned j = 0; j < size(); ++j) {
             RefOrTagged rot = get_as_ref_or_tagged(j);
             if (rot.is_ref() && rot.get_as_ref()) {
+                if (only_modified && m_alloc.is_read_only(rot.get_as_ref())) {
+                    a.set(j, rot);
+                    continue;
+                }
                 if (j == 0) {
                     // keys (ArrayUnsigned, me thinks)
                     Array b(m_alloc);
