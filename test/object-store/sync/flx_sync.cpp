@@ -3562,33 +3562,36 @@ TEST_CASE("flx: send client error", "[sync][flx][baas]") {
     // An integration error is simulated while bootstrapping.
     // This results in the client sending an error message to the server.
     SyncTestFile config(harness.app()->current_user(), harness.schema(), SyncConfig::FLXSyncEnabled{});
-    auto mutate_subscriptions = [&](SharedRealm realm) {
-        auto table = realm->read_group().get_table("class_TopLevel");
-        auto new_query = realm->get_latest_subscription_set().make_mutable_copy();
-        new_query.insert_or_assign(Query(table));
-        new_query.commit();
-    };
-
     SECTION("immediately close session after bad changeset") {
-        auto [error_promise, error_future] = util::make_promise_future<void>();
-        config.sync_config->on_sync_client_event_hook =
-            [promise = util::CopyablePromiseHolder(std::move(error_promise))](
-                std::weak_ptr<SyncSession> weak_sess, const SyncClientHookData& data) mutable {
-                if (data.event != SyncClientHookEvent::BootstrapBatchAboutToProcess) {
-                    return SyncClientHookAction::NoAction;
-                }
+        enum class State { Initial, AboutToThrow, RealmDestroyed, Thrown };
+        TestingStateMachine<State> state(State::Initial);
+        config.sync_config->on_sync_client_event_hook = [&](std::weak_ptr<SyncSession>,
+                                                            const SyncClientHookData& data) mutable {
+            if (data.event != SyncClientHookEvent::BootstrapBatchAboutToProcess) {
+                return SyncClientHookAction::NoAction;
+            }
 
-                auto sess = weak_sess.lock();
-                sess->pause();
+            state.transition_with([&](State cur_state) -> std::optional<State> {
+                REQUIRE(cur_state == State::Initial);
+                return State::AboutToThrow;
+            });
+            state.wait_for(State::RealmDestroyed);
+            state.transition_with([&](State cur_state) -> std::optional<State> {
+                REQUIRE(cur_state == State::RealmDestroyed);
+                return State::Thrown;
+            });
+            throw sync::IntegrationException(ErrorCodes::BadChangeset, "simulated failure");
+        };
 
-                promise.get_promise().emplace_value();
-                throw sync::IntegrationException(ErrorCodes::BadChangeset, "simulated failure");
-            };
-
-        auto realm = Realm::get_shared_realm(config);
-        mutate_subscriptions(realm);
-
-        error_future.get();
+        {
+            auto realm = Realm::get_shared_realm(config);
+            state.wait_for(State::AboutToThrow);
+        }
+        state.transition_with([&](State cur_state) -> std::optional<State> {
+            REQUIRE(cur_state == State::AboutToThrow);
+            return State::RealmDestroyed;
+        });
+        state.wait_for(State::Thrown);
     }
 
     SECTION("check for client reset error") {
@@ -3613,7 +3616,6 @@ TEST_CASE("flx: send client error", "[sync][flx][baas]") {
         config.sync_config->error_handler = err_handler;
 
         auto realm = Realm::get_shared_realm(config);
-        mutate_subscriptions(realm);
 
         auto err = error_future.get();
         CHECK(error_count == 2);
