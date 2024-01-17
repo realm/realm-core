@@ -2665,7 +2665,7 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][boot
                                           SyncConfig::FLXSyncEnabled{});
     interrupted_realm_config.cache = false;
 
-    auto check_interrupted_state = [&] {
+    auto check_interrupted_state = [&](bool bootstrap_fully_received) {
         _impl::RealmCoordinator::assert_no_open_realms();
         DBOptions options;
         options.encryption_key = test_util::crypt_key();
@@ -2675,7 +2675,7 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][boot
         REQUIRE(bootstrap_store.has_pending());
         auto pending_batch = bootstrap_store.peek_pending(1024 * 1024 * 16);
         REQUIRE(pending_batch.query_version == 1);
-        REQUIRE(pending_batch.progress);
+        REQUIRE(pending_batch.progress.has_value() == bootstrap_fully_received);
         {
             auto tr = realm->start_read();
             auto top_level = tr->get_table("class_TopLevel");
@@ -2741,7 +2741,7 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][boot
             realm->close();
         }
 
-        check_interrupted_state();
+        check_interrupted_state(true);
         enum class State {
             Interrupted,
             ExceptionThrown,
@@ -2879,7 +2879,7 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][boot
             realm->close();
         }
 
-        check_interrupted_state();
+        check_interrupted_state(true);
 
         auto realm = Realm::get_shared_realm(interrupted_realm_config);
         auto table = realm->read_group().get_table("class_TopLevel");
@@ -2940,7 +2940,7 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][boot
             realm->close();
         }
 
-        check_interrupted_state();
+        check_interrupted_state(false);
 
         // Now we'll open a different realm and make some changes that would leave orphan objects on the client
         // if the bootstrap batches weren't being cached until lastInBatch were true.
@@ -2999,7 +2999,7 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][boot
             realm->close();
         }
 
-        check_interrupted_state();
+        check_interrupted_state(true);
 
         // Now we'll open a different realm and make some changes that would leave orphan objects on the client
         // if the bootstrap batches weren't being cached until lastInBatch were true.
