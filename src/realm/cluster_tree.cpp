@@ -53,10 +53,6 @@ namespace realm {
 class ClusterNodeInner : public ClusterNode {
 public:
     ClusterNodeInner(Allocator& allocator, const ClusterTree& tree_top);
-    ClusterNodeInner(Allocator& allocator)
-        : ClusterNode(allocator)
-    {
-    }
     ~ClusterNodeInner() override;
 
     void create(int sub_tree_depth);
@@ -153,12 +149,12 @@ public:
                     auto header = m_alloc.translate(rot.get_as_ref());
                     MemRef m(header, rot.get_as_ref(), m_alloc);
                     if (get_is_inner_bptree_node_from_header(header)) {
-                        ClusterNodeInner aa(m_alloc);
+                        ClusterNodeInner aa(m_alloc, m_tree_top);
                         aa.init(m);
                         a.set_as_ref(j, aa.typed_write(rot.get_as_ref(), out, table, deep, only_modified, compress));
                     }
                     else {
-                        Cluster aa(m_alloc);
+                        Cluster aa(j, m_alloc, m_tree_top);
                         aa.init(m);
                         a.set_as_ref(j, aa.typed_write(rot.get_as_ref(), out, table, deep, only_modified, compress));
                     }
@@ -190,13 +186,13 @@ public:
                     auto header = m_alloc.translate(rot.get_as_ref());
                     MemRef m(header, rot.get_as_ref(), m_alloc);
                     if (get_is_inner_bptree_node_from_header(header)) {
-                        ClusterNodeInner a(m_alloc);
+                        ClusterNodeInner a(m_alloc, m_tree_top);
                         a.init(m);
                         std::cout << pref;
                         a.typed_print(pref, table);
                     }
                     else {
-                        Cluster a(m_alloc);
+                        Cluster a(j, m_alloc, m_tree_top);
                         a.init(m);
                         std::cout << pref;
                         a.typed_print(pref, table);
