@@ -544,8 +544,7 @@ ColKey Spec::get_key(size_t column_ndx) const
     // when type is not valid ... val == -128
     auto type = key.get_type();
     // type is 0x20 ObjectId | TypeLink ... in the test we are setting a backlink
-    if (!type.is_valid())
-        REALM_ASSERT(m_keys.is_encoded());
+    // if (!type.is_valid())
     REALM_ASSERT(type.is_valid());
     return key;
 }

@@ -273,8 +273,6 @@ public:
         else {
             REALM_ASSERT(value < (65536 << 3));
             REALM_ASSERT((value & 0x7) == 0);
-            // this could be a problem, it assumes that the last 3 less significant bits are 0.
-            // For flex arrays this could not be true if we were to set capacity lower than 128
             ((uint16_t*)header)[0] = static_cast<uint16_t>(value >> 3);
         }
     }
