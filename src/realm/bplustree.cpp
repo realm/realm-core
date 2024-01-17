@@ -267,6 +267,7 @@ void BPlusTreeInner::bptree_access(size_t n, AccessFunc func)
     }
     else {
         auto elems_per_child = get_elems_per_child();
+        REALM_ASSERT(elems_per_child != 0);
         child_ndx = n / elems_per_child;
         child_offset = child_ndx * elems_per_child;
     }

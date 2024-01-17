@@ -914,7 +914,8 @@ inline MemRef Array::create_empty_array(Type type, bool context_flag, Allocator&
 
 inline MemRef Array::create_array(Type type, bool context_flag, size_t size, int_fast64_t value, Allocator& alloc)
 {
-    return create(type, context_flag, wtype_Bits, size, value, alloc); // Throws
+    // mark the array ready for compression
+    return create(type, context_flag, wtype_Bits_Can_Compress, size, value, alloc); // Throws
 }
 
 inline size_t Array::get_max_byte_size(size_t num_elems) noexcept

@@ -37,6 +37,8 @@ MemRef Node::create_node(size_t size, Allocator& alloc, bool context_flag, Type 
     Encoding encoding;
     if (width_type == wtype_Bits)
         encoding = Encoding::WTypBits;
+    else if (width_type == wtype_Bits_Can_Compress)
+        encoding = Encoding::WTypBits_Compress;
     else if (width_type == wtype_Multiply)
         encoding = Encoding::WTypMult;
     else if (width_type == wtype_Ignore)
@@ -53,7 +55,7 @@ MemRef Node::create_node(size_t size, Allocator& alloc, bool context_flag, Type 
         flags |= (uint8_t)Flags::Context;
     // width must be passed to init_header in bits, but for wtype_Multiply and wtype_Ignore
     // it is provided by the caller of this function in bytes, so convert to bits
-    if (width_type != wtype_Bits)
+    if (width_type != wtype_Bits && width_type != wtype_Bits_Can_Compress)
         width = width * 8;
 
     init_header(header, 'A', encoding, flags, width, size);
@@ -66,7 +68,9 @@ MemRef Node::create_node(size_t size, Allocator& alloc, bool context_flag, Type 
 
 size_t Node::calc_byte_len(size_t num_items, size_t width) const
 {
-    REALM_ASSERT_3(get_wtype_from_header(get_header_from_data(m_data)), ==, wtype_Bits);
+    auto wtype = get_wtype_from_header(get_header_from_data(m_data));
+    REALM_ASSERT_7(wtype, ==, wtype_Bits, ||, wtype, ==, wtype_Bits_Can_Compress);
+    // REALM_ASSERT_3(wtype, ==, wtype_Bits);
 
     // FIXME: Consider calling `calc_aligned_byte_size(size)`
     // instead. Note however, that calc_byte_len() is supposed to return

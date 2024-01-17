@@ -924,7 +924,7 @@ auto Group::DefaultTableWriter::write_history(_impl::OutputStream& out) -> Histo
 {
     bool deep = true;              // Deep
     bool only_if_modified = false; // Always
-    bool compress = true;
+    bool compress = false;
     ref_type history_ref = _impl::GroupFriend::get_history_ref(*m_group);
     HistoryInfo info;
     if (history_ref) {

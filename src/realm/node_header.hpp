@@ -67,6 +67,12 @@ public:
         wtype_Bits = 0,     // width indicates how many bits every element occupies
         wtype_Multiply = 1, // width indicates how many bytes every element occupies
         wtype_Ignore = 2,   // each element is 1 byte
+
+        // This is a temporary solution that allows us, to differentiate between
+        // unsigned and signed arrays. We want to compress only signed arrays
+        // since they contain the actual data. Unsigned arrays are only used
+        // for bpnodes and keys.
+        wtype_Bits_Can_Compress = 3 // thi is a temporary hack in order
     };
     // Accessing flags.
     enum class Flags { // bit positions in flags "byte", used for masking
@@ -303,7 +309,8 @@ public:
         }
         size_t num_bytes = 0;
         switch (wtype) {
-            case wtype_Bits: {
+            case wtype_Bits:
+            case wtype_Bits_Can_Compress: {
                 // Current assumption is that size is at most 2^24 and that width is at most 64.
                 // In that case the following will never overflow. (Assuming that size_t is at least 32 bits)
                 REALM_ASSERT_3(size, <, 0x1000000);
@@ -353,7 +360,7 @@ public:
     //
     // This approach also allows for zero overhead selection between the different
     // header encodings.
-    enum class Encoding { Packed, AofP, PofA, Flex, WTypBits, WTypMult, WTypIgn };
+    enum class Encoding { Packed, AofP, PofA, Flex, WTypBits, WTypBits_Compress, WTypMult, WTypIgn };
     static Encoding get_encoding(const char* header)
     {
         const auto kind = get_kind(header);
@@ -362,6 +369,8 @@ public:
             switch (get_wtype_from_header((const char*)header)) {
                 case wtype_Bits:
                     return Encoding::WTypBits;
+                case wtype_Bits_Can_Compress:
+                    return Encoding::WTypBits_Compress;
                 case wtype_Multiply:
                     return Encoding::WTypMult;
                 case wtype_Ignore:
@@ -422,6 +431,11 @@ public:
                 set_wtype_in_header(wtype_Bits, (char*)header);
                 break;
             }
+            case Encoding::WTypBits_Compress: {
+                REALM_ASSERT(get_kind(header) == 0x41);
+                set_wtype_in_header(wtype_Bits_Can_Compress, (char*)header);
+                break;
+            }
             case Encoding::WTypMult: {
                 REALM_ASSERT(get_kind(header) == 0x41);
                 set_wtype_in_header(wtype_Multiply, (char*)header);
@@ -468,6 +482,8 @@ public:
             uint8_t wtype = 0;
             if (enc == Encoding::WTypBits)
                 wtype = wtype_Bits;
+            else if (enc == Encoding::WTypBits_Compress)
+                wtype = wtype_Bits_Can_Compress;
             else if (enc == Encoding::WTypMult)
                 wtype = wtype_Multiply;
             else if (enc == Encoding::WTypIgn)
@@ -476,7 +492,7 @@ public:
                 REALM_ASSERT(false && "Illegal header encoding for legacy kind of header");
 
             hb[4] = (flags << 5) | (wtype << 3);
-            if (enc == Encoding::WTypBits)
+            if (enc == Encoding::WTypBits || enc == Encoding::WTypBits_Compress)
                 set_width_in_header(bits_pr_elem, (char*)header);
             else
                 set_width_in_header(bits_pr_elem >> 3, (char*)header);

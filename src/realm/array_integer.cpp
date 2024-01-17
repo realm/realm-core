@@ -48,7 +48,8 @@ Mixed ArrayIntNull::get_any(size_t ndx) const
 MemRef ArrayIntNull::create_array(Type type, bool context_flag, size_t size, Allocator& alloc)
 {
     // Create an array with null value as the first element
-    return Array::create(type, context_flag, wtype_Bits, size + 1, 0, alloc); // Throws
+    // return Array::create(type, context_flag, wtype_Bits, size + 1, 0, alloc); // Throws
+    return Array::create(type, context_flag, wtype_Bits_Can_Compress, size + 1, 0, alloc); // Throws
 }
 
 

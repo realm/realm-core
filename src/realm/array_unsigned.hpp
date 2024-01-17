@@ -87,10 +87,12 @@ private:
 
     void init_from_mem(MemRef mem) noexcept
     {
+
         Array::init_from_mem(mem);
         // we could have come here after decompression. So we need to be careful
         // See comment in Array::init_from_mem.
         auto kind = get_kind(get_header());
+        REALM_ASSERT(kind != 'B');
         if (kind == 'A') {
             set_width(get_width_from_header(get_header()));
         }

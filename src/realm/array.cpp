@@ -256,16 +256,12 @@ size_t Array::bit_width(int64_t v)
 
 void Array::init_from_mem(MemRef mem) noexcept
 {
-    // Header is the type of header that has been allocated, in case we are decompressing,
-    // the header is of kind A, which is kind of deceiving the purpose of these checks.
-    // Since we will try to fetch some data from the just initialised header, and never reset
-    // important fields used for type A arrays, like width, lower, upper_bound which are used
-    // for expanding the array, but also query the data.
+    // differentiate among normal A type arrays and B arrays (in compressed format)
     char* header = mem.get_addr();
     auto kind = get_kind(header);
     REALM_ASSERT(kind == 'A' || kind == 'B');
     if (kind == 'B') {
-        // the only encoding supported at the moment
+        // the only encoding supported at the moment. TODO: extend this
         auto encoding = get_encoding(header);
         REALM_ASSERT(encoding == Encoding::Flex);
         char* header = mem.get_addr();
@@ -280,7 +276,6 @@ void Array::init_from_mem(MemRef mem) noexcept
     m_is_inner_bptree_node = get_is_inner_bptree_node_from_header(header);
     m_has_refs = get_hasrefs_from_header(header);
     m_context_flag = get_context_flag_from_header(header);
-    // update width (for B arrays we need to reset all, since there is no concept of width)
     update_width_cache_from_header();
 }
 
@@ -367,7 +362,9 @@ ref_type Array::write(_impl::ArrayWriterBase& out, bool deep, bool only_if_modif
 
     if (!deep || !m_has_refs) {
         Array encoded_array{m_alloc};
-        if (compress_in_flight && encode_array(encoded_array)) {
+        bool is_compressed = get_kind(get_header()) == 'B';
+        bool can_compress = is_compressed ? false : get_wtype_from_header(get_header()) == wtype_Bits_Can_Compress;
+        if (compress_in_flight && can_compress && encode_array(encoded_array)) {
             const auto h = encoded_array.get_header();
             REALM_ASSERT(get_kind(h) == 'B');
             REALM_ASSERT(get_encoding(h) == Encoding::Flex);
@@ -398,7 +395,10 @@ ref_type Array::write(ref_type ref, Allocator& alloc, _impl::ArrayWriterBase& ou
 
     if (!array.m_has_refs) {
         Array encoded_array{alloc};
-        if (compress_in_flight && array.encode_array(encoded_array)) {
+        bool is_compressed = get_kind(array.get_header()) == 'B';
+        bool can_compress =
+            is_compressed ? false : get_wtype_from_header(array.get_header()) == wtype_Bits_Can_Compress;
+        if (compress_in_flight && can_compress && array.encode_array(encoded_array)) {
             const auto h = encoded_array.get_header();
             REALM_ASSERT(get_kind(h) == 'B');
             REALM_ASSERT(get_encoding(h) == Encoding::Flex);
@@ -723,7 +723,7 @@ bool Array::encode_array(Array& arr) const
     if (kind == 'A') {
         auto encoding = get_encoding(header);
         // encode everything that is WtypeBits (all integer arrays included ref arrays)
-        if (encoding == NodeHeader::Encoding::WTypBits) {
+        if (encoding == NodeHeader::Encoding::WTypBits_Compress) {
             return m_encode.encode(*this, arr);
         }
     }
@@ -1166,7 +1166,9 @@ MemRef Array::clone(MemRef mem, Allocator& alloc, Allocator& target_alloc)
     }
 
     // Refs are integers, and integers arrays use wtype_Bits.
-    REALM_ASSERT_3(get_wtype_from_header(header), ==, wtype_Bits);
+    // REALM_ASSERT_3(get_wtype_from_header(header), ==, wtype_Bits);
+    auto wtype = get_wtype_from_header(header);
+    REALM_ASSERT(wtype == wtype_Bits || wtype == wtype_Bits_Can_Compress);
 
     Array array{alloc};
     array.init_from_mem(mem);
@@ -1207,13 +1209,17 @@ MemRef Array::clone(MemRef mem, Allocator& alloc, Allocator& target_alloc)
 MemRef Array::create(Type type, bool context_flag, WidthType width_type, size_t size, int_fast64_t value,
                      Allocator& alloc)
 {
-    REALM_ASSERT_7(value, ==, 0, ||, width_type, ==, wtype_Bits);
+    // REALM_ASSERT_7(value, ==, 0, ||, width_type, ==, wtype_Bits);
+    // REALM_ASSERT_3(value, ==, 0);
+    REALM_ASSERT_11(value, ==, 0, ||, width_type, ==, wtype_Bits, ||, width_type, ==, wtype_Bits_Can_Compress);
     REALM_ASSERT_7(size, ==, 0, ||, width_type, !=, wtype_Ignore);
 
     uint8_t flags = 0;
     Encoding encoding;
     if (width_type == wtype_Bits)
         encoding = Encoding::WTypBits;
+    else if (width_type == wtype_Bits_Can_Compress)
+        encoding = Encoding::WTypBits_Compress;
     else if (width_type == wtype_Multiply)
         encoding = Encoding::WTypMult;
     else if (width_type == wtype_Ignore)
@@ -1554,8 +1560,8 @@ int_fast64_t Array::get(const char* header, size_t ndx) noexcept
 
 int_fast64_t Array::get_universal_encoded_array(size_t ndx) const
 {
-    size_t v_width;
-    return m_encode.get_unsigned(*this, ndx, v_width);
+    // size_t v_width;
+    return m_encode.get(*this, ndx); //, v_width);
 }
 
 

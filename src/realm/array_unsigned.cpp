@@ -194,6 +194,7 @@ void ArrayUnsigned::insert(size_t ndx, uint64_t value)
     // we should aim at unifying as much as possible the interface, in order to avoid to scatter the
     // compression/decompression logic all over the code.
     if (is_encoded()) {
+        REALM_UNREACHABLE();
         decode_array(*this);
         set_width(get_width_from_header(get_header()));
         REALM_ASSERT(get_kind(get_header()) == 'A');
@@ -250,6 +251,7 @@ void ArrayUnsigned::insert(size_t ndx, uint64_t value)
 void ArrayUnsigned::erase(size_t ndx)
 {
     if (is_encoded()) {
+        REALM_UNREACHABLE();
         Array::decode_array(*this);
         set_width(get_width_from_header(get_header()));
         REALM_ASSERT(get_kind(get_header()) == 'A');
@@ -284,6 +286,7 @@ uint64_t ArrayUnsigned::get(size_t index) const
 void ArrayUnsigned::set(size_t ndx, uint64_t value)
 {
     if (is_encoded()) {
+        REALM_UNREACHABLE();
         Array::decode_array(*this);
         set_width(get_width_from_header(get_header()));
         REALM_ASSERT(get_kind(get_header()) == 'A');

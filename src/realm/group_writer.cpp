@@ -835,8 +835,8 @@ ref_type GroupWriter::write_group()
     size_t free_positions_size = m_free_positions.get_byte_size();
     size_t free_sizes_size = m_free_lengths.get_byte_size();
     size_t free_versions_size = m_free_versions.get_byte_size();
-    REALM_ASSERT(Array::get_wtype_from_header(Array::get_header_from_data(m_free_versions.m_data)) ==
-                 Array::wtype_Bits);
+    auto wtype = Array::get_wtype_from_header(Array::get_header_from_data(m_free_versions.m_data));
+    REALM_ASSERT(wtype == Array::wtype_Bits || wtype == Array::wtype_Bits_Can_Compress);
 
     // Calculate write positions
     ref_type reserve_ref = to_ref(reserve_pos);

@@ -420,12 +420,13 @@ void ArrayFlex::restore_array(Array& arr, const std::vector<int64_t>& values) co
     REALM_ASSERT(width == 0 || width == 1 || width == 2 || width == 4 || width == 8 || width == 16 || width == 32 ||
                  width == 64);
 
-    auto byte_size = NodeHeader::calc_size<Encoding::WTypBits>(size, width);
+    auto byte_size = NodeHeader::calc_size<Encoding::WTypBits>(size, width); // WTypBits_Compress behaves like
+                                                                             // WTypBits
     REALM_ASSERT(byte_size % 8 == 0); // 8 bytes aligned value
 
     auto mem = allocator.alloc(byte_size);
     auto header = mem.get_addr();
-    NodeHeader::init_header(header, 'A', Encoding::WTypBits, flags, width, values.size());
+    NodeHeader::init_header(header, 'A', Encoding::WTypBits_Compress, flags, width, values.size());
     NodeHeader::set_capacity_in_header(byte_size, header);
     arr.init_from_mem(mem);
     arr.update_parent();

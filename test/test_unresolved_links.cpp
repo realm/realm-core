@@ -829,7 +829,6 @@ TEST(Unresolved_PerformanceLinkList)
         ll.add(key3);
     }
     tr->commit_and_continue_as_read();
-    // compresses
     tr->promote_to_write();
     auto t1 = steady_clock::now();
     table->create_object_with_primary_key(1);
@@ -840,8 +839,7 @@ TEST(Unresolved_PerformanceLinkList)
     CHECK(t2 > t1);
     // std::cout << "Time: " << duration_cast<microseconds>(t2 - t1).count() << " us" << std::endl;
     tr->promote_to_write();
-    // fails in compressed format because of unsigned/signed interpretation.
-    // tr->verify();
+    tr->verify();
 }
 
 #endif
