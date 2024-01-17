@@ -1019,13 +1019,13 @@ SyncClientHookAction SessionImpl::call_debug_hook(SyncClientHookEvent event, con
                                                   int64_t query_version, DownloadBatchState batch_state,
                                                   size_t num_changesets)
 {
-    if (REALM_LIKELY(!m_wrapper.m_debug_hook)) {
-        return SyncClientHookAction::NoAction;
-    }
     if (REALM_UNLIKELY(m_state != State::Active)) {
         return SyncClientHookAction::NoAction;
     }
 
+    if (REALM_LIKELY(!m_wrapper.m_debug_hook)) {
+        return SyncClientHookAction::NoAction;
+    }
     SyncClientHookData data;
     data.event = event;
     data.batch_state = batch_state;
@@ -1038,12 +1038,14 @@ SyncClientHookAction SessionImpl::call_debug_hook(SyncClientHookEvent event, con
 
 SyncClientHookAction SessionImpl::call_debug_hook(SyncClientHookEvent event, const ProtocolErrorInfo& error_info)
 {
-    if (REALM_LIKELY(!m_wrapper.m_debug_hook)) {
-        return SyncClientHookAction::NoAction;
-    }
     if (REALM_UNLIKELY(m_state != State::Active)) {
         return SyncClientHookAction::NoAction;
     }
+
+    if (REALM_LIKELY(!m_wrapper.m_debug_hook)) {
+        return SyncClientHookAction::NoAction;
+    }
+
 
     SyncClientHookData data;
     data.event = event;
