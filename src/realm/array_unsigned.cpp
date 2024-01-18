@@ -46,10 +46,8 @@ inline uint8_t ArrayUnsigned::bit_width(uint64_t value)
 
 inline void ArrayUnsigned::_set(size_t ndx, uint8_t width, uint64_t value)
 {
-    if (is_encoded()) {
-        m_encode.set_direct(*this, ndx, value);
-    }
-    else if (width == 8) {
+    REALM_ASSERT(!is_encoded());
+    if (width == 8) {
         reinterpret_cast<uint8_t*>(m_data)[ndx] = uint8_t(value);
     }
     else if (width == 16) {
@@ -65,22 +63,17 @@ inline void ArrayUnsigned::_set(size_t ndx, uint8_t width, uint64_t value)
 
 inline uint64_t ArrayUnsigned::_get(size_t ndx, uint8_t width) const
 {
-    if (is_encoded()) {
-        size_t v_width;
-        return ArrayFlex::get_unsigned(get_header(), ndx, v_width);
+    REALM_ASSERT(!is_encoded());
+    if (width == 8) {
+        return reinterpret_cast<uint8_t*>(m_data)[ndx];
     }
-    else {
-        if (width == 8) {
-            return reinterpret_cast<uint8_t*>(m_data)[ndx];
-        }
-        if (width == 16) {
-            return reinterpret_cast<uint16_t*>(m_data)[ndx];
-        }
-        if (width == 32) {
-            return reinterpret_cast<uint32_t*>(m_data)[ndx];
-        }
-        return get_direct(m_data, width, ndx);
+    if (width == 16) {
+        return reinterpret_cast<uint16_t*>(m_data)[ndx];
     }
+    if (width == 32) {
+        return reinterpret_cast<uint32_t*>(m_data)[ndx];
+    }
+    return get_direct(m_data, width, ndx);
     REALM_UNREACHABLE();
 }
 
@@ -102,9 +95,7 @@ void ArrayUnsigned::update_from_parent() noexcept
 
 size_t ArrayUnsigned::lower_bound(uint64_t value) const noexcept
 {
-    if (is_encoded()) {
-        return m_encode.lower_bound(*this, (int64_t)value);
-    }
+    REALM_ASSERT(!is_encoded());
 
     auto width = get_width_from_header(get_header());
 
@@ -146,9 +137,7 @@ size_t ArrayUnsigned::lower_bound(uint64_t value) const noexcept
 
 size_t ArrayUnsigned::upper_bound(uint64_t value) const noexcept
 {
-    if (is_encoded()) {
-        return m_encode.upper_bound(*this, (int64_t)value);
-    }
+    REALM_ASSERT(!is_encoded());
 
     auto width = get_width_from_header(get_header());
 
@@ -190,19 +179,9 @@ size_t ArrayUnsigned::upper_bound(uint64_t value) const noexcept
 
 void ArrayUnsigned::insert(size_t ndx, uint64_t value)
 {
-    // Array unsigned implements its owm methods for doing insertion (expanding, etc) and many other APIs
-    // we should aim at unifying as much as possible the interface, in order to avoid to scatter the
-    // compression/decompression logic all over the code.
-    if (is_encoded()) {
-        decode_array(*this);
-        set_width(get_width_from_header(get_header()));
-        REALM_ASSERT(get_kind(get_header()) == 'A');
-        REALM_ASSERT(m_width >= m_lbound);
-        REALM_ASSERT(m_width <= m_ubound);
-        REALM_ASSERT(m_lbound <= m_ubound);
-    }
+    REALM_ASSERT(!is_encoded());
+    REALM_ASSERT_DEBUG(m_width >= 8);
 
-    // REALM_ASSERT_DEBUG(m_width >= 8);
     bool do_expand = value > (uint64_t)m_ubound;
     const uint8_t old_width = m_width;
     const uint8_t new_width = do_expand ? bit_width(value) : m_width;
@@ -249,17 +228,8 @@ void ArrayUnsigned::insert(size_t ndx, uint64_t value)
 
 void ArrayUnsigned::erase(size_t ndx)
 {
-    if (is_encoded()) {
-        Array::decode_array(*this);
-        set_width(get_width_from_header(get_header()));
-        REALM_ASSERT(get_kind(get_header()) == 'A');
-        REALM_ASSERT(m_width >= m_lbound);
-        REALM_ASSERT(m_width <= m_ubound);
-        REALM_ASSERT(m_lbound <= m_ubound);
-    }
-
-    // compression is going to go in this case, tmp commented.
-    // REALM_ASSERT_DEBUG(m_width >= 8);
+    REALM_ASSERT(!is_encoded());
+    REALM_ASSERT_DEBUG(m_width >= 8);
 
     copy_on_write(); // Throws
 
@@ -283,15 +253,7 @@ uint64_t ArrayUnsigned::get(size_t index) const
 
 void ArrayUnsigned::set(size_t ndx, uint64_t value)
 {
-    if (is_encoded()) {
-        Array::decode_array(*this);
-        set_width(get_width_from_header(get_header()));
-        REALM_ASSERT(get_kind(get_header()) == 'A');
-        REALM_ASSERT(m_width >= m_lbound);
-        REALM_ASSERT(m_width <= m_ubound);
-        REALM_ASSERT(m_lbound <= m_ubound);
-    }
-
+    REALM_ASSERT(!is_encoded());
     REALM_ASSERT_DEBUG(m_width >= 8);
     copy_on_write(); // Throws
 

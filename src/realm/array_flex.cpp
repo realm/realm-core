@@ -58,7 +58,7 @@ void copy_back(char* data, size_t w, size_t ndx, int64_t v)
 template <typename T>
 inline T fetch_value(uint64_t* data, size_t ndx, size_t offset, size_t ndx_width, size_t v_width)
 {
-    const auto pos = realm::read_bitfield(data, offset + (ndx * ndx_width), ndx_width);
+    const auto pos = static_cast<size_t>(realm::read_bitfield(data, offset + (ndx * ndx_width), ndx_width));
     const auto unsigned_val = realm::read_bitfield(data, v_width * pos, v_width);
     return std::is_same_v<T, int64_t> ? sign_extend_field(v_width, unsigned_val) : unsigned_val;
 }
@@ -137,7 +137,7 @@ inline size_t find_binary(uint64_t* data, int64_t key, size_t v_width, size_t nd
     const auto ndx_offset = v_size * v_width;
     while (lo <= hi) {
         size_t mid = lo + (hi - lo) / 2;
-        const auto ndx = realm::read_bitfield(data, ndx_offset + (mid * ndx_width), ndx_width);
+        const auto ndx = static_cast<size_t>(realm::read_bitfield(data, ndx_offset + (mid * ndx_width), ndx_width));
         const auto unsigned_val = realm::read_bitfield(data, v_width * ndx, v_width);
         const auto v = sign_extend_field(v_width, unsigned_val);
         if (v == key)
@@ -438,12 +438,17 @@ void ArrayFlex::restore_array(Array& arr, const std::vector<int64_t>& values) co
     arr.destroy();
     auto& allocator = arr.get_alloc();
 
-    auto width = std::max(Array::bit_width(*min_value), Array::bit_width(*max_value));
+    auto signed_bit_width = std::max(Array::signed_to_num_bits(*min_value), Array::signed_to_num_bits(*max_value));
+    auto byte_size = NodeHeader::calc_size<Encoding::WTypBits>(size, signed_bit_width);
+    REALM_ASSERT(byte_size % 8 == 0); // 8 bytes aligned value
+
+    // This should be equivalent to Array::bit_width(n);
+    size_t width = 1;
+    while (width < signed_bit_width)
+        width *= 2;
+
     REALM_ASSERT(width == 0 || width == 1 || width == 2 || width == 4 || width == 8 || width == 16 || width == 32 ||
                  width == 64);
-
-    auto byte_size = NodeHeader::calc_size<Encoding::WTypBits>(size, width);
-    REALM_ASSERT(byte_size % 8 == 0); // 8 bytes aligned value
 
     auto mem = allocator.alloc(byte_size);
     auto header = mem.get_addr();

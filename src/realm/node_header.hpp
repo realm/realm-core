@@ -192,12 +192,12 @@ public:
         h[4] = h4;
     }
 
-    static int unsigned_to_num_bits(uint64_t value)
+    static size_t unsigned_to_num_bits(uint64_t value)
     {
         return 1 + log2(static_cast<size_t>(value));
     }
 
-    static int signed_to_num_bits(int64_t value)
+    static size_t signed_to_num_bits(int64_t value)
     {
         if (value >= 0)
             return 1 + unsigned_to_num_bits(value);
