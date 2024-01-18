@@ -11,6 +11,23 @@
 
 ### Breaking changes
 * `App::get_uncached_app(...)` and `App::get_shared_app(...)` have been replaced by `App::get_app(App::CacheMode, ...)`. The App constructor is now enforced to be unusable, use `App::get_app()` instead. ([#7237](https://github.com/realm/realm-core/issues/7237))
+* Management of SyncUser state has been moved from SyncManager to a new `app::BackingStore` interface. This allows SDKs to bring their own persistence management which is a step towards enabling sync in web. Core can now be built for app services and without sync enabled which allows access to MongoDB features on restrictive platforms. In practice, SDKs should expect the following changes to adapt to this version:
+  - `app::App::get_app()` now requires a backing store factory, where SDKs can bring their own implementations of a `BackingStore` if they wish.
+  - If the previous behaviour is desired simply use the `RealmBackingStore` like this:
+    ```
+      SyncClientConfig sync_config; // set this as before
+      app::RealmBackingStoreConfig bsc;
+      bsc.base_file_path = my_path; // moved from SyncClientConfig::base_file_path
+      bsc.metadata_mode = my_mode;  // moved from SyncClientConfig::metadata_mode
+      auto factory = [bsc](app::SharedApp app) {
+        return std::make_shared<app::RealmBackingStore>(app, bsc);
+      };
+      auto my_app = app::App::get_app(app::App::CacheMode::Disabled, app_config, SyncClientConfig{}, factory);
+    ```
+  - A version of `App::get_app()` is provided that doesn't take a sync config for cases where only AppServices are required.
+  - `SyncUser::all_sessions()` is removed and replaced by `SyncManager::get_all_sessions_for(std::shared_ptr<SyncUser>)`
+  - `SyncUser::session_for_on_disk_path()` is removed and replaced by `SyncManager::get_existing_session()`
+  - Many methods from `SyncManager` have moved to the `BackingStore` interface which is accessible through `App::backing_store()`
 
 ### Compatibility
 * Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.

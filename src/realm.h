@@ -2928,6 +2928,7 @@ typedef realm_backing_store_t* (*realm_backing_store_factory_func_t)(realm_userd
 
 /**
  * Create realm_app_t* instance given a valid realm configuration and sync client configuration.
+ * If the factory is invoked, the underlying shared_ptr will be tied to the lifetime of the app instance.
  *
  * @return A non-null pointer if no error occurred.
  */
@@ -2937,6 +2938,7 @@ RLM_API realm_app_t* realm_app_create_sync(realm_app_cache_mode_e, const realm_a
 
 /**
  * Create cached realm_app_t* instance given a valid realm configuration and sync client configuration.
+ * If the factory is invoked, the underlying shared_ptr will be tied to the lifetime of the app instance.
  *
  * @return A non-null pointer if no error occurred.
  */

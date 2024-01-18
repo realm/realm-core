@@ -272,8 +272,12 @@ RLM_API realm_app_t* realm_app_create_no_sync(realm_app_cache_mode_e mode, const
                                               realm_userdata_t user_data)
 {
     auto factory = [&store_factory, &user_data](SharedApp app) {
+        // acquire the underlying shared_ptr and free the C wrapper class
         realm_app_t app_t(app);
-        return *store_factory(user_data, &app_t);
+        realm_backing_store_t* c_store = store_factory(user_data, &app_t);
+        std::shared_ptr<BackingStore> store = *c_store;
+        delete c_store;
+        return store;
     };
     return wrap_err([&] {
         return new realm_app_t(App::get_app(app::App::CacheMode(mode), *app_config, factory));
