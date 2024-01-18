@@ -1457,7 +1457,7 @@ inline bool ClientImpl::Session::unbind_process_complete() const noexcept
 
 inline void ClientImpl::Session::connection_established(bool fast_reconnect)
 {
-    REALM_ASSERT(m_state == Active);
+    REALM_ASSERT(m_state == Active || (m_state == Deactivating && m_error_to_send));
 
     if (!fast_reconnect && !get_client().m_disable_upload_activation_delay) {
         // Disallow immediate activation of the upload process, even if download
@@ -1503,6 +1503,12 @@ inline void ClientImpl::Session::message_sent()
 
     // No message will be sent after the UNBIND message
     REALM_ASSERT(!m_unbind_message_send_complete);
+
+    if (m_state == Deactivating && m_client_error && !m_bind_message_sent) {
+        REALM_ASSERT(m_client_error);
+        complete_deactivation();
+        return;
+    }
 
     if (m_unbind_message_sent) {
         REALM_ASSERT(!m_enlisted_to_send);

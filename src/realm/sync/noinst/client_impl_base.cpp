@@ -350,10 +350,6 @@ void Connection::initiate_session_deactivation(Session* sess)
     if (sess->m_state == Session::Deactivated) {
         finish_session_deactivation(sess);
     }
-    if (REALM_UNLIKELY(--m_num_active_sessions == 0)) {
-        if (m_activated && m_state == ConnectionState::disconnected)
-            m_on_idle->trigger();
-    }
 }
 
 
@@ -403,6 +399,11 @@ void ClientImpl::Connection::finish_session_deactivation(Session* sess)
     auto ident = sess->m_ident;
     m_sessions.erase(ident);
     m_session_history.erase(ident);
+
+    if (REALM_UNLIKELY(--m_num_active_sessions == 0)) {
+        if (m_activated && m_state == ConnectionState::disconnected)
+            m_on_idle->trigger();
+    }
 }
 
 void Connection::force_close()
@@ -424,18 +425,11 @@ void Connection::force_close()
         m_disconnect_delay_in_progress = false;
     }
 
-    // We must copy any session pointers we want to close to a vector because force_closing
-    // the session may remove it from m_sessions and invalidate the iterator uses to loop
-    // through the map. By copying to a separate vector we ensure our iterators remain valid.
-    std::vector<Session*> to_close;
-    for (auto& session_pair : m_sessions) {
-        if (session_pair.second->m_state == Session::State::Active) {
-            to_close.push_back(session_pair.second.get());
+    for (auto it = m_sessions.begin(); it != m_sessions.end();) {
+        auto cur_sess_it = it++;
+        if (cur_sess_it->second->m_state == Session::Active) {
+            cur_sess_it->second->force_close();
         }
-    }
-
-    for (auto& sess : to_close) {
-        sess->force_close();
     }
 
     logger.debug("Force closed idle connection");
@@ -832,9 +826,9 @@ void Connection::handle_connection_established()
             fast_reconnect = true;
     }
 
-    for (auto& p : m_sessions) {
-        Session& sess = *p.second;
-        sess.connection_established(fast_reconnect); // Throws
+    for (auto it = m_sessions.begin(); it != m_sessions.end();) {
+        auto cur_sess_it = it++;
+        cur_sess_it->second->connection_established(fast_reconnect);
     }
 
     report_connection_state_change(ConnectionState::connected); // Throws
@@ -1174,8 +1168,11 @@ void Connection::disconnect(const SessionErrorInfo& info)
             auto j = i++;
             Session& sess = *j->second;
             sess.connection_lost(); // Throws
-            if (sess.m_state == Session::Unactivated || sess.m_state == Session::Deactivated)
+            if (sess.m_state == Session::Unactivated || sess.m_state == Session::Deactivated) {
                 m_sessions.erase(j);
+                REALM_ASSERT(m_num_active_sessions);
+                --m_num_active_sessions;
+            }
         }
     }
 
@@ -1592,7 +1589,7 @@ void Session::on_integration_failure(const IntegrationException& error)
     // Since the deactivation process has not been initiated, the UNBIND
     // message cannot have been sent unless an ERROR message was received.
     REALM_ASSERT(m_suspended || m_error_message_received || !m_unbind_message_sent);
-    if (m_ident_message_sent && !m_error_message_received && !m_suspended) {
+    if (m_bind_message_sent && !m_error_message_received && !m_suspended) {
         ensure_enlisted_to_send(); // Throws
     }
 }
@@ -1710,9 +1707,6 @@ void Session::initiate_deactivation()
 
     m_state = Deactivating;
 
-    if (!m_suspended)
-        m_conn.one_less_active_unsuspended_session(); // Throws
-
     if (m_enlisted_to_send) {
         REALM_ASSERT(!unbind_process_complete());
         return;
@@ -1721,14 +1715,17 @@ void Session::initiate_deactivation()
     // Deactivate immediately if the BIND message has not yet been sent and the
     // session is not enlisted to send, or if the unbinding process has already
     // completed.
-    if (!m_bind_message_sent || unbind_process_complete()) {
+    if ((!m_bind_message_sent || unbind_process_complete()) && !m_error_to_send) {
         complete_deactivation(); // Throws
         // Life cycle state is now Deactivated
         return;
     }
 
-    // Ready to send the UNBIND message, if it has not already been sent
-    if (!m_unbind_message_sent) {
+    // Ready to send the UNBIND message, if it has not already been sent, unless we've
+    // never sent the BIND message but still have an error message to send. In that case
+    // when the connection becomes connected we'll send the error message and immediately
+    // complete de-activation.
+    if (!m_unbind_message_sent && m_bind_message_sent) {
         enlist_to_send(); // Throws
         return;
     }
@@ -1739,8 +1736,9 @@ void Session::complete_deactivation()
 {
     REALM_ASSERT_EX(m_state == Deactivating, m_state);
     m_state = Deactivated;
-
-    logger.debug("Deactivation completed"); // Throws
+    if (!m_suspended)
+        m_conn.one_less_active_unsuspended_session(); // Throws
+    logger.debug("Deactivation completed");           // Throws
 }
 
 
@@ -1754,10 +1752,13 @@ void Session::send_message()
     REALM_ASSERT_EX(m_state == Active || m_state == Deactivating, m_state);
     REALM_ASSERT(m_enlisted_to_send);
     m_enlisted_to_send = false;
-    if (m_error_to_send && m_bind_message_sent && have_client_file_ident())
-        return send_json_error_message(); // Throws
 
-    if (m_state == Deactivating || m_error_message_received || m_suspended) {
+    if (m_error_to_send) {
+        send_json_error_message(); // Throws
+        return;
+    }
+
+    if ((m_state == Deactivating || m_error_message_received || m_suspended) && !m_error_to_send) {
         // Deactivation has been initiated. If the UNBIND message has not been
         // sent yet, there is no point in sending it. Instead, we can let the
         // deactivation process complete.
@@ -1779,6 +1780,7 @@ void Session::send_message()
 
     if (!m_bind_message_sent)
         return send_bind_message(); // Throws
+
 
     // Stop sending upload, mark and query messages when the client detects an error.
     if (m_client_error) {
@@ -2156,8 +2158,6 @@ void Session::send_unbind_message()
 void Session::send_json_error_message()
 {
     REALM_ASSERT_EX(m_state == Active || m_state == Deactivating, m_state);
-    REALM_ASSERT(m_bind_message_sent);
-    REALM_ASSERT(have_client_file_ident());
     REALM_ASSERT(!m_unbind_message_sent);
     REALM_ASSERT(m_error_to_send);
     REALM_ASSERT(m_client_error);
@@ -2181,7 +2181,11 @@ void Session::send_json_error_message()
     call_debug_hook(SyncClientHookEvent::ClientErrorMessageSent,
                     ProtocolErrorInfo(protocol_error, message, IsFatal{false}));
 
-    enlist_to_send(); // Throws
+    // If we are not active then enlisting to send will crash - we're likely the last
+    // message to get sent for this session.
+    if (m_state == Active) {
+        enlist_to_send(); // Throws
+    }
 }
 
 

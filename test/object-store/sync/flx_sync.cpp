@@ -2760,16 +2760,13 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][boot
         };
 
         interrupted_realm_config.sync_config->on_sync_client_event_hook =
-            [&, download_message_received = false, bind_message_sent = false,
+            [&, download_message_received = false,
              ident_message_sent = false](std::weak_ptr<SyncSession>, const SyncClientHookData& data) mutable {
                 if (data.event == SyncClientHookEvent::DownloadMessageReceived) {
                     download_message_received = true;
                 }
                 else if (data.event == SyncClientHookEvent::IdentMessageSent) {
                     ident_message_sent = true;
-                }
-                else if (data.event == SyncClientHookEvent::BindMessageSent) {
-                    bind_message_sent = true;
                 }
                 else if (data.event == SyncClientHookEvent::BootstrapBatchAboutToProcess) {
                     REQUIRE(!ident_message_sent);
@@ -2786,7 +2783,6 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][boot
                     }
                 }
                 else if (data.event == SyncClientHookEvent::ClientErrorMessageSent) {
-                    REQUIRE(bind_message_sent);
                     REQUIRE(!ident_message_sent);
                     state.transition_with([&](State cur_state) -> std::optional<State> {
                         REQUIRE(cur_state == State::ClientErrorPropagatedToHandler);
