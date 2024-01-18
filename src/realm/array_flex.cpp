@@ -33,6 +33,28 @@ using namespace realm;
 
 namespace impl {
 
+void copy_back(char* data, size_t w, size_t ndx, int64_t v)
+{
+    if (w == 0)
+        realm::set_direct<0>(data, ndx, v);
+    else if (w == 1)
+        realm::set_direct<1>(data, ndx, v);
+    else if (w == 2)
+        realm::set_direct<2>(data, ndx, v);
+    else if (w == 4)
+        realm::set_direct<4>(data, ndx, v);
+    else if (w == 8)
+        realm::set_direct<8>(data, ndx, v);
+    else if (w == 16)
+        realm::set_direct<16>(data, ndx, v);
+    else if (w == 32)
+        realm::set_direct<32>(data, ndx, v);
+    else if (w == 64)
+        realm::set_direct<64>(data, ndx, v);
+    else
+        REALM_UNREACHABLE();
+}
+
 template <typename T>
 inline T fetch_value(uint64_t* data, size_t ndx, size_t offset, size_t ndx_width, size_t v_width)
 {
@@ -429,29 +451,13 @@ void ArrayFlex::restore_array(Array& arr, const std::vector<int64_t>& values) co
     NodeHeader::set_capacity_in_header(byte_size, header);
     arr.init_from_mem(mem);
     arr.update_parent();
+
     // copy straight into the array all the data, we don't need COW here.
-    auto dst = arr.get_data_from_header(arr.get_header());
-    for (size_t i = 0; i < values.size(); ++i) {
-        const auto& v = values[i];
-        if (width == 0)
-            realm::set_direct<0>(dst, i, v);
-        else if (width == 1)
-            realm::set_direct<1>(dst, i, v);
-        else if (width == 2)
-            realm::set_direct<2>(dst, i, v);
-        else if (width == 4)
-            realm::set_direct<4>(dst, i, v);
-        else if (width == 8)
-            realm::set_direct<8>(dst, i, v);
-        else if (width == 16)
-            realm::set_direct<16>(dst, i, v);
-        else if (width == 32)
-            realm::set_direct<32>(dst, i, v);
-        else if (width == 64)
-            realm::set_direct<64>(dst, i, v);
-        else
-            REALM_UNREACHABLE();
-    }
+    auto data = arr.get_data_from_header(arr.get_header());
+    size_t ndx = 0;
+    for (const auto& v : values)
+        impl::copy_back(data, width, ndx++, v);
+
     REALM_ASSERT(width == arr.get_width());
     REALM_ASSERT(arr.size() == values.size());
 }
