@@ -130,41 +130,45 @@ public:
         REALM_ASSERT(get_is_inner_bptree_node_from_header(get_header()));
         REALM_ASSERT(!get_context_flag_from_header(get_header()));
         REALM_ASSERT(has_refs());
-        Array a(Allocator::get_default());
-        a.create(type_InnerBptreeNode, false, size());
+        Array dest(Allocator::get_default());
+        dest.create(type_InnerBptreeNode, false, size());
         for (unsigned j = 0; j < size(); ++j) {
             RefOrTagged rot = get_as_ref_or_tagged(j);
             if (rot.is_ref() && rot.get_as_ref()) {
                 if (only_modified && m_alloc.is_read_only(rot.get_as_ref())) {
-                    a.set(j, rot);
+                    dest.set(j, rot);
                     continue;
                 }
                 if (j == 0) {
                     // keys (ArrayUnsigned, me thinks)
-                    Array b(m_alloc);
-                    b.init_from_ref(rot.get_as_ref());
-                    a.set_as_ref(j, b.write(out, deep, only_modified, false));
+                    Array array_unsigned(m_alloc);
+                    array_unsigned.init_from_ref(rot.get_as_ref());
+                    dest.set_as_ref(j, array_unsigned.write(out, deep, only_modified, false));
                 }
                 else {
                     auto header = m_alloc.translate(rot.get_as_ref());
                     MemRef m(header, rot.get_as_ref(), m_alloc);
                     if (get_is_inner_bptree_node_from_header(header)) {
-                        ClusterNodeInner aa(m_alloc, m_tree_top);
-                        aa.init(m);
-                        a.set_as_ref(j, aa.typed_write(rot.get_as_ref(), out, table, deep, only_modified, compress));
+                        ClusterNodeInner inner_node(m_alloc, m_tree_top);
+                        inner_node.init(m);
+                        dest.set_as_ref(
+                            j, inner_node.typed_write(rot.get_as_ref(), out, table, deep, only_modified, compress));
                     }
                     else {
-                        Cluster aa(j, m_alloc, m_tree_top);
-                        aa.init(m);
-                        a.set_as_ref(j, aa.typed_write(rot.get_as_ref(), out, table, deep, only_modified, compress));
+                        Cluster cluster(j, m_alloc, m_tree_top);
+                        cluster.init(m);
+                        dest.set_as_ref(
+                            j, cluster.typed_write(rot.get_as_ref(), out, table, deep, only_modified, compress));
                     }
                 }
             }
             else { // not a ref, just copy value over
-                a.set(j, rot);
+                dest.set(j, rot);
             }
         }
-        return a.write(out, false, only_modified, false);
+        auto written_ref = dest.write(out, false, only_modified, false);
+        dest.destroy();
+        return written_ref;
     }
 
     virtual void typed_print(std::string prefix, const Table& table) const override

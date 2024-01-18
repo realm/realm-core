@@ -1549,20 +1549,20 @@ ref_type Cluster::typed_write(ref_type ref, _impl::ArrayWriterBase& out, const T
         return ref;
     REALM_ASSERT(!get_is_inner_bptree_node_from_header(get_header()));
     REALM_ASSERT(!get_context_flag_from_header(get_header()));
-    Array a(Allocator::get_default());
-    a.create(type_HasRefs, false, size());
+    Array dest(Allocator::get_default());
+    dest.create(type_HasRefs, false, size());
     for (unsigned j = 0; j < size(); ++j) {
         RefOrTagged rot = get_as_ref_or_tagged(j);
         if (rot.is_ref() && rot.get_as_ref()) {
             if (only_modified && m_alloc.is_read_only(rot.get_as_ref())) {
-                a.set(j, rot);
+                dest.set(j, rot);
                 continue;
             }
-            Array aa(m_alloc);
-            aa.init_from_ref(rot.get_as_ref());
+            Array a(m_alloc);
+            a.init_from_ref(rot.get_as_ref());
             if (j == 0) {
                 // Keys  (ArrayUnsigned me thinks)
-                a.set_as_ref(j, aa.write(out, deep, only_modified, false));
+                dest.set_as_ref(j, a.write(out, deep, only_modified, false));
             }
             else {
                 // Columns
@@ -1571,19 +1571,21 @@ ref_type Cluster::typed_write(ref_type ref, _impl::ArrayWriterBase& out, const T
                 auto col_attr = col_key.get_attrs();
                 if (!col_attr.test(col_attr_Collection) && col_type == col_type_Int) {
                     // we may compress integer leafs (but are not doing it yet)
-                    a.set_as_ref(j, aa.write(out, deep, only_modified, compress));
+                    dest.set_as_ref(j, a.write(out, deep, only_modified, compress));
                 }
                 else {
                     // just recurse into anything else without compressing
-                    a.set_as_ref(j, aa.write(out, deep, only_modified, false));
+                    dest.set_as_ref(j, a.write(out, deep, only_modified, false));
                 }
             }
         }
         else {
-            a.set(j, rot);
+            dest.set(j, rot);
         }
     }
-    return a.write(out, false, only_modified, false);
+    auto written_ref = dest.write(out, false, only_modified, false);
+    dest.destroy();
+    return written_ref;
 }
 
 void Cluster::typed_print(std::string prefix, const Table& table) const

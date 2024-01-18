@@ -939,7 +939,9 @@ ref_type Group::typed_write_tables(_impl::ArrayWriterBase& out, bool deep, bool 
             dest.set_as_ref(j, table->typed_write(rot.get_as_ref(), out, deep, only_modified, compress));
         }
     }
-    return dest.write(out, false, only_modified, false);
+    ref = dest.write(out, false, only_modified, false);
+    dest.destroy();
+    return ref;
 }
 void Group::table_typed_print(std::string prefix, ref_type ref) const
 {
