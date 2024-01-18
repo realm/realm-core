@@ -19,6 +19,7 @@
 
 ### Internals
 * Add support for chunked transfer encoding when using `HTTPParser`.
+* Refactored version resolution for the `build-apple-device.sh` script. ([#7263](https://github.com/realm/realm-core/pull/7263))
 
 ----------------------------------------------
 
