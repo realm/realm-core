@@ -3366,7 +3366,9 @@ ref_type Table::typed_write(ref_type ref, _impl::ArrayWriterBase& out, bool deep
             dest.set_as_ref(j, new_ref);
         }
     }
-    return dest.write(out, false, only_modified, false);
+    ref = dest.write(out, false, only_modified, false);
+    dest.destroy();
+    return ref;
 }
 
 void Table::typed_print(std::string prefix, ref_type ref) const
