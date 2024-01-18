@@ -2801,14 +2801,14 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][boot
                 state.wait_for(State::ClientErrorPropagatedToHandler);
             }
             else {
-                state.wait_for(State::ExceptionThrown);
+                state.wait_for(State::ClientErrorMessageSentToServer);
             }
         }
 
         std::vector<std::string> server_errors;
         timed_sleeping_wait_for([&] {
-            server_errors =
-                harness.session().app_session().admin_api.get_errors(harness.session().app_session().server_app_id);
+            server_errors = harness.session().app_session().admin_api.get_errors(
+                harness.session().app_session().server_app_id, "SYNC_ERROR");
             return !server_errors.empty();
         });
 
@@ -2893,8 +2893,8 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][boot
 
         std::vector<std::string> server_errors;
         timed_sleeping_wait_for([&] {
-            server_errors =
-                harness.session().app_session().admin_api.get_errors(harness.session().app_session().server_app_id);
+            server_errors = harness.session().app_session().admin_api.get_errors(
+                harness.session().app_session().server_app_id, "SYNC_ERROR");
             return !server_errors.empty();
         });
         REQUIRE_THAT(server_errors, VectorElemMatches(Catch::Matchers::ContainsSubstring(error_status.reason())));
@@ -3266,7 +3266,7 @@ TEST_CASE("flx: data ingest", "[sync][flx][data ingest][baas]") {
             std::vector<std::string> server_errors;
             timed_sleeping_wait_for([&] {
                 server_errors = harness->session().app_session().admin_api.get_errors(
-                    harness->session().app_session().server_app_id);
+                    harness->session().app_session().server_app_id, "SYNC_ERROR");
                 return !server_errors.empty();
             });
             REQUIRE_THAT(server_errors, VectorElemMatches(Catch::Matchers::ContainsSubstring(
@@ -3560,10 +3560,17 @@ TEST_CASE("flx: send client error", "[sync][flx][baas]") {
     // This results in the client sending an error message to the server.
     SyncTestFile config(harness.app()->current_user(), harness.schema(), SyncConfig::FLXSyncEnabled{});
     SECTION("immediately close session after bad changeset") {
-        enum class State { Initial, AboutToThrow, RealmDestroyed, Thrown };
+        enum class State { Initial, AboutToThrow, RealmDestroyed, Thrown, ClientErrorMessageSent };
         TestingStateMachine<State> state(State::Initial);
         config.sync_config->on_sync_client_event_hook = [&](std::weak_ptr<SyncSession>,
                                                             const SyncClientHookData& data) mutable {
+            if (data.event == SyncClientHookEvent::ClientErrorMessageSent) {
+                state.transition_with([&](State cur_state) -> std::optional<State> {
+                    REQUIRE(cur_state == State::Thrown);
+                    return State::ClientErrorMessageSent;
+                });
+                return SyncClientHookAction::NoAction;
+            }
             if (data.event != SyncClientHookEvent::BootstrapBatchAboutToProcess) {
                 return SyncClientHookAction::NoAction;
             }
@@ -3588,7 +3595,7 @@ TEST_CASE("flx: send client error", "[sync][flx][baas]") {
             REQUIRE(cur_state == State::AboutToThrow);
             return State::RealmDestroyed;
         });
-        state.wait_for(State::Thrown);
+        state.wait_for(State::ClientErrorMessageSent);
     }
 
     SECTION("check for client reset error") {
@@ -3620,8 +3627,8 @@ TEST_CASE("flx: send client error", "[sync][flx][baas]") {
 
     std::vector<std::string> server_errors;
     timed_sleeping_wait_for([&] {
-        server_errors =
-            harness.session().app_session().admin_api.get_errors(harness.session().app_session().server_app_id);
+        server_errors = harness.session().app_session().admin_api.get_errors(
+            harness.session().app_session().server_app_id, "SYNC_ERROR");
         return !server_errors.empty();
     });
     REQUIRE_THAT(server_errors, VectorElemMatches(Catch::Matchers::ContainsSubstring(

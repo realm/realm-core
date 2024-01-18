@@ -866,7 +866,8 @@ public:
     /// The specified transaction reporter (via the config object) is guaranteed
     /// to not be called before activation, and also not after initiation of
     /// deactivation.
-    Session(SessionWrapper&, ClientImpl::Connection&);
+    Session(SessionWrapper&, ClientImpl::Connection&, session_ident_type,
+            std::function<SyncClientHookAction(SyncClientHookData data)>);
     ~Session();
 
     void force_close();
@@ -1138,12 +1139,13 @@ private:
 
     SessionWrapper& m_wrapper;
 
+    std::function<SyncClientHookAction(SyncClientHookData data)> m_debug_hook;
+    bool m_in_debug_hook = false;
+
     request_ident_type m_last_pending_test_command_ident = 0;
     std::list<PendingTestCommand> m_pending_test_commands;
 
     static std::string make_logger_prefix(session_ident_type);
-
-    Session(SessionWrapper& wrapper, Connection&, session_ident_type);
 
     bool do_recognize_sync_version(version_type) noexcept;
 
@@ -1420,12 +1422,8 @@ inline void ClientImpl::Session::request_download_completion_notification()
         ensure_enlisted_to_send(); // Throws
 }
 
-inline ClientImpl::Session::Session(SessionWrapper& wrapper, Connection& conn)
-    : Session{wrapper, conn, conn.get_client().get_next_session_ident()} // Throws
-{
-}
-
-inline ClientImpl::Session::Session(SessionWrapper& wrapper, Connection& conn, session_ident_type ident)
+inline ClientImpl::Session::Session(SessionWrapper& wrapper, Connection& conn, session_ident_type ident,
+                                    std::function<SyncClientHookAction(SyncClientHookData data)> debug_hook)
     : logger_ptr{std::make_shared<util::PrefixLogger>(make_logger_prefix(ident), conn.logger_ptr)} // Throws
     , logger{*logger_ptr}
     , m_conn{conn}
@@ -1434,6 +1432,7 @@ inline ClientImpl::Session::Session(SessionWrapper& wrapper, Connection& conn, s
     , m_is_flx_sync_session(conn.is_flx_sync_connection())
     , m_fix_up_object_ids(get_client().m_fix_up_object_ids)
     , m_wrapper{wrapper}
+    , m_debug_hook(std::move(debug_hook))
 {
     if (get_client().m_disable_upload_activation_delay)
         m_allow_upload = true;
