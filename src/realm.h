@@ -2918,7 +2918,13 @@ RLM_API const char* realm_app_credentials_serialize_as_json(realm_app_credential
  *
  * @return A non-null pointer if no error occurred.
  */
-RLM_API realm_backing_store_t* realm_backing_store_create(const realm_backing_store_config_t*);
+RLM_API realm_backing_store_t* realm_backing_store_create(const realm_app_t*, const realm_backing_store_config_t*);
+
+/**
+ * A factory that will return a backing store instance. It should be constructed with the app instance provided.
+ */
+typedef realm_backing_store_t* (*realm_backing_store_factory_func_t)(realm_userdata_t userdata,
+                                                                     const realm_app_t* app);
 
 /**
  * Create realm_app_t* instance given a valid realm configuration and sync client configuration.
@@ -2926,7 +2932,8 @@ RLM_API realm_backing_store_t* realm_backing_store_create(const realm_backing_st
  * @return A non-null pointer if no error occurred.
  */
 RLM_API realm_app_t* realm_app_create_sync(realm_app_cache_mode_e, const realm_app_config_t*,
-                                           const realm_sync_client_config_t*, const realm_backing_store_t*);
+                                           const realm_sync_client_config_t*, realm_backing_store_factory_func_t,
+                                           realm_userdata_t);
 
 /**
  * Create cached realm_app_t* instance given a valid realm configuration and sync client configuration.
@@ -2934,7 +2941,7 @@ RLM_API realm_app_t* realm_app_create_sync(realm_app_cache_mode_e, const realm_a
  * @return A non-null pointer if no error occurred.
  */
 RLM_API realm_app_t* realm_app_create_no_sync(realm_app_cache_mode_e, const realm_app_config_t*,
-                                              const realm_backing_store_t*);
+                                              realm_backing_store_factory_func_t, realm_userdata_t);
 
 /**
  * Get a cached realm_app_t* instance given an app id. out_app may be null if the app with this id hasn't been

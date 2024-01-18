@@ -30,10 +30,10 @@ using namespace realm;
 using namespace realm::app;
 using namespace std::string_literals;
 
-struct TestBackingStore final : public app::BackingStore, public std::enable_shared_from_this<TestBackingStore> {
+struct TestBackingStore final : public app::BackingStore {
 
-    TestBackingStore()
-        : app::BackingStore()
+    TestBackingStore(std::weak_ptr<app::App> parent)
+        : app::BackingStore(parent)
         , m_file_path_root(util::make_temp_dir())
     {
     }
@@ -55,8 +55,8 @@ struct TestBackingStore final : public app::BackingStore, public std::enable_sha
             });
             if (it == m_users.end()) {
                 // No existing user.
-                auto new_user =
-                    std::make_shared<SyncUser>(refresh_token, user_id, access_token, device_id, m_parent_app.lock());
+                auto new_user = app::BackingStore::make_user(refresh_token, user_id, access_token, device_id,
+                                                             m_parent_app.lock());
                 m_users.emplace(m_users.begin(), new_user);
                 m_current_user = new_user;
                 return new_user;
@@ -218,8 +218,15 @@ private:
 TEST_CASE("app: custom backing store without sync", "[app][backing store]") {
     App::Config config;
     set_app_config_defaults(config, instance_of<UnitTestTransport>);
-    auto test_store = std::make_shared<TestBackingStore>();
-    auto app = App::get_app(app::App::CacheMode::Enabled, config, test_store);
+    std::shared_ptr<TestBackingStore> test_store;
+    size_t stores_created = 0;
+    auto factory = [&test_store, &stores_created](SharedApp app) {
+        test_store = std::make_shared<TestBackingStore>(app);
+        ++stores_created;
+        return test_store;
+    };
+    auto app = App::get_app(app::App::CacheMode::Enabled, config, factory);
+    REQUIRE(test_store);
     constexpr bool reuse_anon = false;
     auto creds = app::AppCredentials::anonymous(reuse_anon);
     CHECK(test_store->all_users().size() == 0);
@@ -249,15 +256,17 @@ TEST_CASE("app: custom backing store without sync", "[app][backing store]") {
     CHECK(test_store->get_current_user() == nullptr);
     CHECK(test_store->all_users().size() == 0);
     App::clear_cached_apps();
+    REQUIRE(stores_created == 1);
 }
 
 #if REALM_ENABLE_AUTH_TESTS
 
 TEST_CASE("app: custom backing store with sync", "[app][sync][backing store][baas][flx]") {
-    auto test_store = std::make_shared<TestBackingStore>();
     FLXSyncTestHarness::Config harness_config("flx_custom_backing_store",
                                               FLXSyncTestHarness::default_server_schema());
-    harness_config.store = test_store;
+    harness_config.factory = [](SharedApp app) {
+        return std::make_shared<TestBackingStore>(app);
+    };
     FLXSyncTestHarness harness(std::move(harness_config));
 
     auto foo_obj_id = ObjectId::gen();

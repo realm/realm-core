@@ -594,19 +594,25 @@ TEST_CASE("C API (non-database)", "[c_api]") {
         CHECK(store_config.get());
         realm_backing_store_config_set_base_file_path(store_config.get(), temp_dir.c_str());
         CHECK(store_config->base_file_path == temp_dir);
+
         realm_backing_store_config_set_metadata_mode(
             store_config.get(), realm_backing_store_metadata_mode::RLM_BACKING_STORE_METADATA_MODE_DISABLED);
         CHECK(store_config->metadata_mode == app::RealmBackingStoreConfig::MetadataMode::NoMetadata);
 
-        auto backing_store = cptr(realm_backing_store_create(store_config.get()));
-        CHECK(backing_store.get());
-        CHECK((*backing_store)->config().base_file_path == temp_dir);
-        CHECK((*backing_store)->config().metadata_mode == app::RealmBackingStoreConfig::MetadataMode::NoMetadata);
+        auto factory = [](realm_userdata_t data, const realm_app_t* app) -> realm_backing_store_t* {
+            realm_backing_store_config_t* config = static_cast<realm_backing_store_config_t*>(data);
+            REQUIRE(config);
+            auto backing_store = realm_backing_store_create(app, config);
+            REQUIRE(backing_store);
+            CHECK((*backing_store)->config().metadata_mode == app::RealmBackingStoreConfig::MetadataMode::NoMetadata);
+            CHECK((*backing_store)->config().base_file_path == config->base_file_path);
+            return backing_store;
+        };
 
-        auto test_app = cptr(realm_app_create_no_sync(realm_app_cache_mode::RLM_APP_CACHE_MODE_ENABLED,
-                                                      app_config.get(), backing_store.get()));
-
-        //        auto test_app = app::App::get_app(app::App::CacheMode::Enabled, *app_config, *backing_store);
+        auto test_app =
+            cptr(realm_app_create_no_sync(realm_app_cache_mode::RLM_APP_CACHE_MODE_ENABLED, app_config.get(), factory,
+                                          (realm_userdata_t)store_config.get()));
+        REQUIRE(test_app);
         auto credentials = app::AppCredentials::anonymous();
         // Verify the values above are included in the login request
         (*test_app)->log_in_with_credentials(credentials, [&](const std::shared_ptr<realm::SyncUser>&,
@@ -5817,6 +5823,7 @@ TEST_CASE("C API app: link_user integration w/c_api transport", "[sync][app][c_a
                 CHECK(error);
                 CHECK(count == 0);
             };
+
             // Should fail with 403
             auto res =
                 realm_app_user_apikey_provider_client_fetch_apikeys(&app, sync_user_1, callback, nullptr, nullptr);

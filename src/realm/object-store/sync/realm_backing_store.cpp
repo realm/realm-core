@@ -26,10 +26,11 @@
 using namespace realm;
 using namespace realm::app;
 
-RealmBackingStore::RealmBackingStore(RealmBackingStoreConfig config)
-    : app::BackingStore()
+RealmBackingStore::RealmBackingStore(std::weak_ptr<app::App> parent, RealmBackingStoreConfig config)
+    : app::BackingStore(parent)
     , m_config(config)
 {
+    initialize();
 }
 
 RealmBackingStore::~RealmBackingStore()
@@ -65,9 +66,8 @@ void RealmBackingStore::reset_for_testing()
     }
 }
 
-void RealmBackingStore::initialize(std::weak_ptr<app::App> parent)
+void RealmBackingStore::initialize()
 {
-    BackingStore::initialize(parent);
     std::vector<std::shared_ptr<SyncUser>> users_to_add;
     {
         util::CheckedLockGuard lock(m_file_system_mutex);
@@ -110,7 +110,7 @@ void RealmBackingStore::initialize(std::weak_ptr<app::App> parent)
             auto refresh_token = user_data.refresh_token();
             auto access_token = user_data.access_token();
             if (!refresh_token.empty() && !access_token.empty()) {
-                users_to_add.push_back(std::make_shared<SyncUser>(user_data, m_parent_app.lock()));
+                users_to_add.push_back(BackingStore::make_user(user_data, m_parent_app.lock()));
             }
         }
 
@@ -209,7 +209,7 @@ std::shared_ptr<SyncUser> RealmBackingStore::get_user(std::string_view user_id, 
         if (it == m_users.end()) {
             // No existing user.
             auto new_user =
-                std::make_shared<SyncUser>(refresh_token, user_id, access_token, device_id, m_parent_app.lock());
+                BackingStore::make_user(refresh_token, user_id, access_token, device_id, m_parent_app.lock());
             m_users.emplace(m_users.begin(), new_user);
             {
                 util::CheckedLockGuard lock(m_file_system_mutex);

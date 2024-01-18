@@ -263,18 +263,18 @@ public:
         Enabled, // Return a cached app instance if one was previously generated for `config`'s app_id+base_url combo,
         Disabled // Bypass the app cache; return a new app instance.
     };
+    using StoreFactory = util::FunctionRef<std::shared_ptr<BackingStore>(SharedApp)>;
 #if REALM_ENABLE_SYNC
     /// Get a shared pointer to a configured App instance. Sync is fully enabled and the external backing store
-    /// provided is used. The App instance returned will extend the lifetime of the backing store. If you want the
-    /// default storage engine, use a RealmBackingStore instance.
+    /// factory provided is used to create a store if the cache is not used. If you want the
+    /// default storage engine, construct a RealmBackingStore instance in the factory.
     static SharedApp get_app(CacheMode mode, const Config& config, const SyncClientConfig& sync_client_config,
-                             std::shared_ptr<BackingStore> store);
+                             StoreFactory store_factory);
 #endif // REALM_ENABLE_SYNC
 
-    /// Get a shared pointer to a configured  App instance. Sync is disabled, and the external backing store provided
-    /// is used. The App instance returned will extend the lifetime of the backing store; the shared pointer count is
-    /// incremented here.
-    static SharedApp get_app(CacheMode mode, const Config& config, std::shared_ptr<BackingStore> store);
+    /// Get a shared pointer to a configured  App instance. Sync is disabled, and the external backing store factory
+    /// provided is used to create a store if the cache is not used.
+    static SharedApp get_app(CacheMode mode, const Config& config, StoreFactory store_factory);
 
     /// Return a cached app instance if one was previously generated for the `app_id`+`base_url` combo using
     /// `App::get_app()`.
@@ -560,7 +560,7 @@ private:
 
     std::string function_call_url_path() const REQUIRES(!m_route_mutex);
 
-    static SharedApp do_get_app(CacheMode mode, const Config& config, std::function<void(SharedApp)> do_config);
+    static SharedApp do_get_app(CacheMode mode, const Config& config, util::FunctionRef<void(SharedApp)> do_config);
 
     void configure_backing_store(std::shared_ptr<BackingStore> store) REQUIRES(!m_route_mutex);
 

@@ -192,7 +192,7 @@ public:
     // Return the cached logger
     const std::shared_ptr<util::Logger>& get_logger() const REQUIRES(!m_mutex);
 
-    SyncManager();
+    SyncManager(std::shared_ptr<app::App> app, const SyncClientConfig& config);
     SyncManager(const SyncManager&) = delete;
     SyncManager& operator=(const SyncManager&) = delete;
 
@@ -211,9 +211,6 @@ protected:
 
 private:
     friend class app::App;
-
-    void configure(std::shared_ptr<app::App> app, std::string sync_route, const SyncClientConfig& config)
-        REQUIRES(!m_mutex, !m_session_mutex);
 
     // Stop tracking the session for the given path if it is inactive.
     // No-op if the session is either still active or in the active sessions list

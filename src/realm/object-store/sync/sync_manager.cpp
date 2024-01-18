@@ -41,25 +41,20 @@ SyncClientTimeouts::SyncClientTimeouts()
 {
 }
 
-SyncManager::SyncManager() = default;
-
-void SyncManager::configure(std::shared_ptr<app::App> app, std::string sync_route, const SyncClientConfig& config)
+SyncManager::SyncManager(std::shared_ptr<app::App> app, const SyncClientConfig& config)
 {
-    {
-        // Locking the mutex here ensures that it is released before locking m_user_mutex
-        util::CheckedLockGuard lock(m_mutex);
-        REALM_ASSERT(app);
-        m_app = app;
-        m_sync_route = sync_route;
-        m_config = std::move(config);
-        if (m_sync_client)
-            return;
+    REALM_ASSERT(app);
+    m_app = app;
+    m_sync_route = "";
+    m_config = std::move(config);
+    if (m_sync_client)
+        return;
 
-        // create a new logger - if the logger_factory is updated later, a new
-        // logger will be created at that time.
-        do_make_logger();
-    }
+    // create a new logger - if the logger_factory is updated later, a new
+    // logger will be created at that time.
+    do_make_logger();
 }
+
 void SyncManager::reset_for_testing()
 {
     {

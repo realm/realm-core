@@ -24,6 +24,7 @@
 #include <string>
 #include <vector>
 
+#include <realm/object-store/sync/sync_user.hpp>
 #include <realm/util/function_ref.hpp>
 
 namespace realm {
@@ -38,6 +39,10 @@ class App;
 
 class BackingStore {
 public:
+    BackingStore(std::weak_ptr<app::App> parent)
+        : m_parent_app(parent)
+    {
+    }
     // Get a sync user for a given identity, or create one if none exists yet, and set its token.
     // If a logged-out user exists, it will marked as logged back in.
     virtual std::shared_ptr<SyncUser> get_user(std::string_view user_id, std::string_view refresh_token,
@@ -67,13 +72,6 @@ public:
     // Destroy all users persisted state and mark oustanding User instances as Removed
     // clean up persisted state.
     virtual void reset_for_testing() = 0;
-
-    // Called on start up after construction.
-    // The benefit being that `shared_from_this()` will work here.
-    virtual void initialize(std::weak_ptr<app::App> parent)
-    {
-        m_parent_app = parent;
-    }
 
     // FIXME: this is an implementation detail leak and doesn't belong in this API
     // FIXME: consider abstracting it to something called `on_manual_client_reset()`
@@ -110,6 +108,20 @@ public:
     virtual std::optional<SyncAppMetadata> app_metadata() const = 0;
 
 protected:
+    // these methods allow only derived backing stores to construct SyncUsers
+    // because SyncUser has a private constructor but BackingStore is a friend class
+    std::shared_ptr<SyncUser> make_user(std::string_view refresh_token, std::string_view id,
+                                        std::string_view access_token, std::string_view device_id,
+                                        std::shared_ptr<app::App> app) const
+    {
+        return std::make_shared<SyncUser>(SyncUser::Private{}, refresh_token, id, access_token, device_id,
+                                          std::move(app));
+    }
+    std::shared_ptr<SyncUser> make_user(const SyncUserMetadata& data, std::shared_ptr<app::App> app) const
+    {
+        return std::make_shared<SyncUser>(SyncUser::Private{}, data, std::move(app));
+    }
+
     std::weak_ptr<app::App> m_parent_app;
 };
 

@@ -175,7 +175,8 @@ struct SyncUserIdentity {
 // A `SyncUser` represents a single user account. Each user manages the sessions that
 // are associated with it.
 class SyncUser : public std::enable_shared_from_this<SyncUser>, public Subscribable<SyncUser> {
-    friend class SyncSession;
+    friend class app::BackingStore; // only this is expected to construct a SyncUser
+    struct Private {};
 
 public:
     enum class State {
@@ -236,9 +237,9 @@ public:
     // or expose them in the public API.
 
     // Don't use this directly; use the `BackingStore` APIs. Public for use with `make_shared`.
-    SyncUser(std::string_view refresh_token, std::string_view id, std::string_view access_token,
+    SyncUser(Private, std::string_view refresh_token, std::string_view id, std::string_view access_token,
              std::string_view device_id, std::shared_ptr<app::App> app);
-    SyncUser(const SyncUserMetadata& data, std::shared_ptr<app::App> app);
+    SyncUser(Private, const SyncUserMetadata& data, std::shared_ptr<app::App> app);
     SyncUser(const SyncUser&) = delete;
     SyncUser& operator=(const SyncUser&) = delete;
 
@@ -281,8 +282,6 @@ private:
     static std::mutex s_binding_context_factory_mutex;
 
     bool do_is_anonymous() const REQUIRES(m_mutex);
-
-    std::vector<std::shared_ptr<SyncSession>> revive_sessions() REQUIRES(!m_mutex);
 
     State m_state GUARDED_BY(m_mutex);
 

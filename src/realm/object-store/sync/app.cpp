@@ -217,30 +217,28 @@ App::Config::DeviceInfo::DeviceInfo(std::string a_platform_version, std::string 
 // But 'app' is an object just created in this static method so it is not possible to annotate this in the header.
 #if REALM_ENABLE_SYNC
 SharedApp App::get_app(CacheMode mode, const Config& config, const SyncClientConfig& sync_client_config,
-                       std::shared_ptr<BackingStore> store) NO_THREAD_SAFETY_ANALYSIS
+                       StoreFactory store_factory) NO_THREAD_SAFETY_ANALYSIS
 {
-    return do_get_app(mode, config, [&sync_client_config, &store](SharedApp app) {
+    return do_get_app(mode, config, [&sync_client_config, &store_factory](SharedApp app) {
         std::string sync_route;
         {
             util::CheckedLockGuard guard(app->m_route_mutex);
             sync_route = make_sync_route(app->m_app_route);
         }
-        app->m_sync_manager = std::make_shared<SyncManager>();
-        app->m_sync_manager->configure(app, sync_route, sync_client_config);
-        app->configure_backing_store(store);
+        app->m_sync_manager = std::make_shared<SyncManager>(app, sync_client_config);
+        app->configure_backing_store(store_factory(app));
     });
 }
 #endif // REALM_ENABLE_SYNC
 
-SharedApp App::get_app(CacheMode mode, const Config& config,
-                       std::shared_ptr<BackingStore> store) NO_THREAD_SAFETY_ANALYSIS
+SharedApp App::get_app(CacheMode mode, const Config& config, StoreFactory store_factory) NO_THREAD_SAFETY_ANALYSIS
 {
-    return do_get_app(mode, config, [&store](SharedApp app) {
-        app->configure_backing_store(store);
+    return do_get_app(mode, config, [&store_factory](SharedApp app) {
+        app->configure_backing_store(store_factory(app));
     });
 }
 
-SharedApp App::do_get_app(CacheMode mode, const Config& config, std::function<void(SharedApp)> do_config)
+SharedApp App::do_get_app(CacheMode mode, const Config& config, util::FunctionRef<void(SharedApp)> do_config)
 {
     if (mode == CacheMode::Enabled) {
         std::lock_guard<std::mutex> lock(s_apps_mutex);
@@ -321,8 +319,6 @@ void App::configure_backing_store(std::shared_ptr<BackingStore> store)
 {
     REALM_ASSERT(store);
     m_app_backing_store = store;
-    // separate from construction so that shared_from_this() works
-    m_app_backing_store->initialize(shared_from_this());
 
     if (auto metadata = m_app_backing_store->app_metadata()) {
         // If there is app metadata stored, then set up the initial hostname/syncroute

@@ -103,7 +103,7 @@ static std::shared_ptr<app::App> lock_or_throw(std::weak_ptr<app::App> app)
     throw RuntimeError(ErrorCodes::RuntimeError, "Invalid operation on user which has become detached.");
 }
 
-SyncUser::SyncUser(std::string_view refresh_token, std::string_view id, std::string_view access_token,
+SyncUser::SyncUser(Private, std::string_view refresh_token, std::string_view id, std::string_view access_token,
                    std::string_view device_id, std::shared_ptr<app::App> app)
     : m_state(State::LoggedIn)
     , m_identity(id)
@@ -130,7 +130,7 @@ SyncUser::SyncUser(std::string_view refresh_token, std::string_view id, std::str
         });
 }
 
-SyncUser::SyncUser(const SyncUserMetadata& data, std::shared_ptr<app::App> app)
+SyncUser::SyncUser(Private, const SyncUserMetadata& data, std::shared_ptr<app::App> app)
     : m_state(data.state())
     , m_legacy_identities(data.legacy_identities())
     , m_identity(data.identity())
@@ -194,12 +194,13 @@ void SyncUser::log_in(std::string_view access_token, std::string_view refresh_to
         });
     }
 #if REALM_ENABLE_SYNC
-    std::vector<std::shared_ptr<SyncSession>> sessions_to_revive = revive_sessions();
-    // (Re)activate all pending sessions.
+    // (Re)activate all sessions associated with this user.
     // Note that we do this after releasing the lock, since the session may
     // need to access protected User state in the process of binding itself.
-    for (auto& session : sessions_to_revive) {
-        session->revive_if_needed();
+    if (auto manager = lock_or_throw(m_app)->sync_manager()) {
+        for (auto session : manager->get_all_sessions_for(*this)) {
+            session->revive_if_needed();
+        }
     }
 #endif
 
@@ -221,19 +222,6 @@ void SyncUser::invalidate()
         });
     }
     emit_change_to_subscribers(*this);
-}
-
-std::vector<std::shared_ptr<SyncSession>> SyncUser::revive_sessions()
-{
-    std::vector<std::shared_ptr<SyncSession>> sessions_to_revive;
-#if REALM_ENABLE_SYNC
-    if (auto manager = lock_or_throw(m_app)->sync_manager()) {
-        for (auto session : manager->get_all_sessions_for(*this)) {
-            sessions_to_revive.push_back(session);
-        }
-    }
-#endif
-    return sessions_to_revive;
 }
 
 void SyncUser::update_access_token(std::string&& token)
@@ -299,8 +287,7 @@ void SyncUser::log_out()
         }
     }
 #if REALM_ENABLE_SYNC
-    // Move all active sessions into the waiting sessions pool. If the user is
-    // logged back in, they will automatically be reactivated.
+    // Close all sessions that belong to this user
     if (auto sync_manager = app->sync_manager()) {
         for (auto session : sync_manager->get_all_sessions_for(*this)) {
             session->force_close();

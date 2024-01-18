@@ -245,27 +245,38 @@ RLM_API const char* realm_app_credentials_serialize_as_json(realm_app_credential
     });
 }
 
-RLM_API realm_backing_store_t* realm_backing_store_create(const realm_backing_store_config_t* config)
+RLM_API realm_backing_store_t* realm_backing_store_create(const realm_app_t* app,
+                                                          const realm_backing_store_config_t* config)
 {
     return wrap_err([&] {
-        return new realm_backing_store_t(std::make_shared<app::RealmBackingStore>(*config));
+        return new realm_backing_store_t(std::make_shared<app::RealmBackingStore>(*app, *config));
     });
 }
 
 RLM_API realm_app_t* realm_app_create_sync(realm_app_cache_mode_e mode, const realm_app_config_t* app_config,
                                            const realm_sync_client_config_t* sync_client_config,
-                                           const realm_backing_store_t* store)
+                                           realm_backing_store_factory_func_t store_factory,
+                                           realm_userdata_t user_data)
 {
+    auto factory = [&store_factory, &user_data](SharedApp app) {
+        realm_app_t app_t(app);
+        return *store_factory(user_data, &app_t);
+    };
     return wrap_err([&] {
-        return new realm_app_t(App::get_app(app::App::CacheMode(mode), *app_config, *sync_client_config, *store));
+        return new realm_app_t(App::get_app(app::App::CacheMode(mode), *app_config, *sync_client_config, factory));
     });
 }
 
 RLM_API realm_app_t* realm_app_create_no_sync(realm_app_cache_mode_e mode, const realm_app_config_t* app_config,
-                                              const realm_backing_store_t* store)
+                                              realm_backing_store_factory_func_t store_factory,
+                                              realm_userdata_t user_data)
 {
+    auto factory = [&store_factory, &user_data](SharedApp app) {
+        realm_app_t app_t(app);
+        return *store_factory(user_data, &app_t);
+    };
     return wrap_err([&] {
-        return new realm_app_t(App::get_app(app::App::CacheMode(mode), *app_config, *store));
+        return new realm_app_t(App::get_app(app::App::CacheMode(mode), *app_config, factory));
     });
 }
 

@@ -675,9 +675,11 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
         RealmBackingStoreConfig bsc;
         bsc.base_file_path = base_file_path;
         bsc.metadata_mode = realm::app::RealmBackingStoreConfig::MetadataMode::NoEncryption;
-        auto store = std::make_shared<RealmBackingStore>(bsc);
+        auto factory = [bsc](app::SharedApp app) {
+            return std::make_shared<RealmBackingStore>(app, bsc);
+        };
         // initialize app and sync client
-        auto redir_app = app::App::get_app(app::App::CacheMode::Disabled, app_config, sc_config, store);
+        auto redir_app = app::App::get_app(app::App::CacheMode::Disabled, app_config, sc_config, factory);
 
         SECTION("Test invalid redirect response") {
             int request_count = 0;
@@ -864,9 +866,11 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
         RealmBackingStoreConfig bsc;
         bsc.base_file_path = base_file_path;
         bsc.metadata_mode = realm::app::RealmBackingStoreConfig::MetadataMode::NoMetadata;
-        auto store = std::make_shared<RealmBackingStore>(bsc);
+        auto factory = [&bsc](SharedApp app) {
+            return std::make_shared<RealmBackingStore>(app, bsc);
+        };
         // initialize app and sync client
-        auto redir_app = app::App::get_app(app::App::CacheMode::Disabled, app_config, sc_config, store);
+        auto redir_app = app::App::get_app(app::App::CacheMode::Disabled, app_config, sc_config, factory);
 
         int request_count = 0;
         // redirect URL is localhost or 127.0.0.1 depending on what the initial value is

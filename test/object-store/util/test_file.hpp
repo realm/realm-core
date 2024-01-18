@@ -206,14 +206,12 @@ class TestAppSession {
 public:
     struct Config {
         Config();
-        Config(realm::AppSession, std::shared_ptr<realm::app::GenericNetworkTransport> = nullptr, DeleteApp = true
+        Config(realm::AppSession, std::shared_ptr<realm::app::GenericNetworkTransport> = nullptr, DeleteApp = true,
 #if REALM_ENABLE_SYNC
-               ,
                realm::ReconnectMode mode = realm::ReconnectMode::normal,
                std::shared_ptr<realm::sync::SyncSocketProvider> socket_provider = nullptr,
-               std::shared_ptr<realm::app::BackingStore> store = nullptr
 #endif // REALM_ENABLE_SYNC
-        );
+               std::optional<realm::app::App::StoreFactory> store = std::nullopt);
         ~Config();
         std::unique_ptr<realm::AppSession> app_session;
         std::shared_ptr<realm::app::GenericNetworkTransport> transport;
@@ -224,7 +222,7 @@ public:
         realm::ReconnectMode reconnect_mode = realm::ReconnectMode::normal;
         std::shared_ptr<realm::sync::SyncSocketProvider> custom_socket_provider = nullptr;
 #endif // REALM_SYNC
-        std::shared_ptr<realm::app::BackingStore> backing_store;
+        std::optional<realm::app::App::StoreFactory> store_factory;
     };
     TestAppSession(Config config = {});
     ~TestAppSession();

@@ -2758,8 +2758,10 @@ TEST_CASE("app: shared instances", "[sync][app]") {
     auto cleanup = util::make_scope_exit([&]() noexcept {
         realm::util::try_remove_dir_recursive(bsc.base_file_path);
     });
-    auto get_store = [&bsc]() -> std::shared_ptr<RealmBackingStore> {
-        return std::make_shared<RealmBackingStore>(bsc);
+    size_t stores_created = 0;
+    auto factory = [&stores_created, &bsc](SharedApp app) -> std::shared_ptr<RealmBackingStore> {
+        ++stores_created;
+        return std::make_shared<RealmBackingStore>(app, bsc);
     };
 
     auto config1 = base_config;
@@ -2777,10 +2779,10 @@ TEST_CASE("app: shared instances", "[sync][app]") {
     config4.base_url = "http://localhost:9090";
 
     // should all point to same underlying app
-    auto app1_1 = App::get_app(app::App::CacheMode::Enabled, config1, get_store());
-    auto app1_2 = App::get_app(app::App::CacheMode::Enabled, config1, get_store());
+    auto app1_1 = App::get_app(app::App::CacheMode::Enabled, config1, factory);
+    auto app1_2 = App::get_app(app::App::CacheMode::Enabled, config1, factory);
     auto app1_3 = App::get_cached_app(config1.app_id, config1.base_url);
-    auto app1_4 = App::get_app(app::App::CacheMode::Enabled, config2, get_store());
+    auto app1_4 = App::get_app(app::App::CacheMode::Enabled, config2, factory);
     auto app1_5 = App::get_cached_app(config1.app_id);
 
     CHECK(app1_1 == app1_2);
@@ -2789,9 +2791,9 @@ TEST_CASE("app: shared instances", "[sync][app]") {
     CHECK(app1_1 == app1_5);
 
     // config3 and config4 should point to different apps
-    auto app2_1 = App::get_app(app::App::CacheMode::Enabled, config3, get_store());
+    auto app2_1 = App::get_app(app::App::CacheMode::Enabled, config3, factory);
     auto app2_2 = App::get_cached_app(config3.app_id, config3.base_url);
-    auto app2_3 = App::get_app(app::App::CacheMode::Enabled, config4, get_store());
+    auto app2_3 = App::get_app(app::App::CacheMode::Enabled, config4, factory);
     auto app2_4 = App::get_cached_app(config3.app_id);
     auto app2_5 = App::get_cached_app(config4.app_id, "https://some.different.url");
 
@@ -2803,4 +2805,5 @@ TEST_CASE("app: shared instances", "[sync][app]") {
     CHECK(app1_1 != app2_1);
     CHECK(app1_1 != app2_3);
     CHECK(app1_1 != app2_4);
+    CHECK(stores_created == 3);
 }
