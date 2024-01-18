@@ -1040,6 +1040,8 @@ private:
     bool m_error_message_received;       // Session specific ERROR message received
     bool m_unbound_message_received;     // UNBOUND message received
     bool m_error_to_send;
+    bool m_error_message_sent;
+    bool m_error_message_send_complete;
 
     // True when there is a new FLX sync query we need to send to the server.
     util::Optional<SubscriptionStore::PendingSubscription> m_pending_flx_sub_set;
@@ -1159,6 +1161,7 @@ private:
     // session is in the Active state, and the unbinding process has completed
     // (unbind_process_complete()).
     bool unbind_process_complete() const noexcept;
+    bool pending_client_error() const noexcept;
 
     void activate();
     void initiate_deactivation();
@@ -1455,6 +1458,11 @@ inline bool ClientImpl::Session::unbind_process_complete() const noexcept
     return (m_unbind_message_send_complete && (m_error_message_received || m_unbound_message_received));
 }
 
+inline bool ClientImpl::Session::pending_client_error() const noexcept
+{
+    return m_error_to_send || (m_error_message_sent && !m_error_message_send_complete);
+}
+
 inline void ClientImpl::Session::connection_established(bool fast_reconnect)
 {
     REALM_ASSERT(m_state == Active || (m_state == Deactivating && m_error_to_send));
@@ -1504,10 +1512,12 @@ inline void ClientImpl::Session::message_sent()
     // No message will be sent after the UNBIND message
     REALM_ASSERT(!m_unbind_message_send_complete);
 
-    if (m_state == Deactivating && m_client_error && !m_bind_message_sent) {
-        REALM_ASSERT(m_client_error);
-        complete_deactivation();
-        return;
+    if (m_error_message_sent) {
+        m_error_message_send_complete = true;
+        if (m_state == Deactivating && !m_bind_message_sent) {
+            complete_deactivation();
+            return;
+        }
     }
 
     if (m_unbind_message_sent) {
@@ -1556,6 +1566,9 @@ inline void ClientImpl::Session::reset_protocol_state() noexcept
     m_enlisted_to_send                    = false;
     m_bind_message_sent                   = false;
     m_error_to_send                       = false;
+    m_error_message_sent                  = false;
+    m_error_message_send_complete         = false;
+
     m_ident_message_sent = false;
     m_unbind_message_sent = false;
     m_unbind_message_send_complete = false;

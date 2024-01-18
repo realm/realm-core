@@ -962,9 +962,6 @@ void SessionImpl::on_flx_sync_progress(int64_t version, DownloadBatchState batch
 
 SubscriptionStore* SessionImpl::get_flx_subscription_store()
 {
-    if (m_state != State::Active) {
-        return nullptr;
-    }
     // Should never be called if session is not active
     REALM_ASSERT_EX(m_state == State::Active, m_state);
     return m_wrapper.get_flx_subscription_store();
@@ -972,9 +969,6 @@ SubscriptionStore* SessionImpl::get_flx_subscription_store()
 
 MigrationStore* SessionImpl::get_migration_store()
 {
-    if (m_state != State::Active) {
-        return nullptr;
-    }
     // Should never be called if session is not active
     REALM_ASSERT_EX(m_state == State::Active, m_state);
     return m_wrapper.get_migration_store();

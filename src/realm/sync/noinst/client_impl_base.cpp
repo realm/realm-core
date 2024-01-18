@@ -1715,7 +1715,7 @@ void Session::initiate_deactivation()
     // Deactivate immediately if the BIND message has not yet been sent and the
     // session is not enlisted to send, or if the unbinding process has already
     // completed.
-    if ((!m_bind_message_sent || unbind_process_complete()) && !m_error_to_send) {
+    if ((!m_bind_message_sent || unbind_process_complete()) && !pending_client_error()) {
         complete_deactivation(); // Throws
         // Life cycle state is now Deactivated
         return;
@@ -1758,11 +1758,11 @@ void Session::send_message()
         return;
     }
 
-    if ((m_state == Deactivating || m_error_message_received || m_suspended) && !m_error_to_send) {
+    if (m_state == Deactivating || m_error_message_received || m_suspended) {
         // Deactivation has been initiated. If the UNBIND message has not been
         // sent yet, there is no point in sending it. Instead, we can let the
         // deactivation process complete.
-        if (!m_bind_message_sent) {
+        if (!m_bind_message_sent && !pending_client_error()) {
             return complete_deactivation(); // Throws
             // Life cycle state is now Deactivated
         }
@@ -1783,7 +1783,7 @@ void Session::send_message()
 
 
     // Stop sending upload, mark and query messages when the client detects an error.
-    if (m_client_error) {
+    if (m_error_message_sent) {
         return;
     }
 
@@ -2162,12 +2162,13 @@ void Session::send_json_error_message()
     REALM_ASSERT(m_error_to_send);
     REALM_ASSERT(m_client_error);
 
+    auto client_error = std::move(m_client_error);
     ClientProtocol& protocol = m_conn.get_client_protocol();
     OutputBuffer& out = m_conn.get_output_buffer();
     session_ident_type session_ident = get_ident();
-    auto protocol_error = static_cast<int>(m_client_error->error_for_server);
+    auto protocol_error = static_cast<int>(client_error->error_for_server);
 
-    auto message = util::format("%1", m_client_error->to_status());
+    auto message = util::format("%1", client_error->to_status());
     logger.info("Sending: ERROR \"%1\" (error_code=%2, session_ident=%3)", message, protocol_error,
                 session_ident); // Throws
 
@@ -2177,13 +2178,12 @@ void Session::send_json_error_message()
                                      error_body_json.dump()); // Throws
     m_conn.initiate_write_message(out, this);                 // Throws
     m_error_to_send = false;
+    m_error_message_sent = true;
 
     call_debug_hook(SyncClientHookEvent::ClientErrorMessageSent,
                     ProtocolErrorInfo(protocol_error, message, IsFatal{false}));
 
-    // If we are not active then enlisting to send will crash - we're likely the last
-    // message to get sent for this session.
-    if (m_state == Active) {
+    if (m_state == Active && m_bind_message_sent) {
         enlist_to_send(); // Throws
     }
 }
@@ -2356,7 +2356,7 @@ Status Session::receive_download_message(const SyncProgress& progress, std::uint
 
     // Ignore download messages when the client detects an error. This is to prevent transforming the same bad
     // changeset over and over again.
-    if (m_client_error) {
+    if (m_error_message_sent) {
         logger.debug("Ignoring download message because the client detected an integration error");
         return Status::OK();
     }
