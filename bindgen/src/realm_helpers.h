@@ -312,7 +312,7 @@ struct Helpers {
         if (obj.is_null(col_key)) {
             return MixedDataType::JSNull;
         }
-        return static_cast<MixedDataType>(obj.get_any(col_key).get_type().m_type);
+        return MixedDataType(int(obj.get_any(col_key).get_type()));
     }
 };
 
