@@ -985,9 +985,6 @@ void SessionImpl::on_flx_sync_version_complete(int64_t version)
 
 SyncClientHookAction SessionImpl::call_debug_hook(const SyncClientHookData& data)
 {
-    // Should never be called if session is not active
-    REALM_ASSERT_EX(m_state == State::Active, m_state);
-
     // Make sure we don't call the debug hook recursively.
     if (m_in_debug_hook) {
         return SyncClientHookAction::NoAction;
