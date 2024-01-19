@@ -18,7 +18,8 @@
 
 #include <realm/object-store/impl/list_notifier.hpp>
 
-#include <realm/object-store/list.hpp>
+#include <realm/list.hpp>
+#include <realm/dictionary.hpp>
 
 #include <realm/transaction.hpp>
 #include <realm/util/scope_exit.hpp>
@@ -72,8 +73,14 @@ bool ListNotifier::do_add_required_change_info(TransactionChangeInfo& info)
     if (!m_list || !m_list->is_attached())
         return false; // origin row was deleted after the notification was added
 
-    info.collections.push_back(
-        {m_list->get_table()->get_key(), m_list->get_owner_key(), m_list->get_stable_path(), &m_change});
+    // We need to have the collections with the shortest paths first
+    StablePath this_path = m_list->get_stable_path();
+    auto it = std::lower_bound(info.collections.begin(), info.collections.end(), this_path.size(),
+                               [](const CollectionChangeInfo& info, size_t sz) {
+                                   return info.path.size() < sz;
+                               });
+    info.collections.insert(
+        it, {m_list->get_table()->get_key(), m_list->get_owner_key(), std::move(this_path), &m_change});
 
     m_info = &info;
 
@@ -132,6 +139,17 @@ void ListNotifier::run()
                 continue;
             if (object_did_change(m_list->get_any(move.to).get<ObjKey>()))
                 m_change.modifications.add(move.to);
+        }
+    }
+
+    if (m_change.paths.size()) {
+        if (auto coll = dynamic_cast<CollectionParent*>(m_list.get())) {
+            for (auto& p : m_change.paths) {
+                // Report changes in substructure as modifications on this list
+                auto ndx = coll->find_index(p[0]);
+                if (ndx != realm::not_found)
+                    m_change.modifications.add(ndx); // OK to insert same index again
+            }
         }
     }
 }

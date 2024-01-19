@@ -69,66 +69,6 @@ enum class UpdateStatus {
     NoChange,
 };
 
-/*
- * In order to detect stale collection objects (objects referring to entities that have
- * been deleted from the DB), we need a structure that both holds a somewhat unique salt
- * and possibly an index of the relevant column. The salt is generated when the collection
- * is assigned to the property and stored alongside the ref of the collection. The stored
- * salt is regenerated/cleared when a new value is assigned to the property/collection
- * element.
- */
-class StableIndex {
-public:
-    StableIndex()
-    {
-        value.raw = 0;
-    }
-    StableIndex(ColKey col_key, int64_t salt)
-    {
-        value.col_index = col_key.get_index().val;
-        value.is_collection = col_key.is_collection();
-        value.is_column = true;
-        value.salt = int32_t(salt);
-    }
-    StableIndex(int64_t salt)
-    {
-        value.raw = 0;
-        value.salt = int32_t(salt);
-    }
-    int64_t get_salt() const
-    {
-        return value.salt;
-    }
-    ColKey::Idx get_index() const noexcept
-    {
-        return {unsigned(value.col_index)};
-    }
-    bool is_collection() const noexcept
-    {
-        return value.is_collection;
-    }
-
-    bool operator==(const StableIndex& other) const noexcept
-    {
-        return value.is_column ? value.col_index == other.value.col_index : value.salt == other.value.salt;
-    }
-
-private:
-    union {
-        struct {
-            bool is_column;
-            bool is_collection;
-            int16_t col_index;
-            int32_t salt;
-        };
-        int64_t raw;
-    } value;
-};
-
-static_assert(sizeof(StableIndex) == 8);
-
-using StablePath = std::vector<StableIndex>;
-
 class CollectionParent : public std::enable_shared_from_this<CollectionParent> {
 public:
     using Index = StableIndex;

@@ -117,6 +117,7 @@ TEST_CASE("nested dictionary in mixed", "[dictionary]") {
                 list.add(Mixed{6});
             });
             REQUIRE_INDICES(change.insertions, 0, 1);
+            REQUIRE_INDICES(change_dictionary.modifications, 1);
         }
 
         SECTION("adding list before") {
@@ -147,6 +148,7 @@ TEST_CASE("nested dictionary in mixed", "[dictionary]") {
                 dict_mixed.insert("list", 42);
             });
             REQUIRE_INDICES(change.deletions, 0, 1);
+            REQUIRE_INDICES(change_dictionary.modifications, 1);
             REQUIRE(change.collection_root_was_deleted);
         }
         SECTION("erase containing dictionary") {
