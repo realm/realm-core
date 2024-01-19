@@ -2745,21 +2745,21 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][boot
         enum class State {
             Interrupted,
             ExceptionThrown,
+            ClientErrorPropagatedToHandler,
+            RealmDestroyed,
             ClientErrorMessageSentToServer,
-            ClientErrorPropagatedToHandler
         };
         TestingStateMachine<State> state(State::Interrupted);
 
         std::optional<SyncError> propagated_error;
         interrupted_realm_config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
             propagated_error = std::move(error);
-            state.transition_with([&](State cur_state) -> std::optional<State> {
+            state.transition_with([&](State cur_state) {
                 REQUIRE(cur_state == State::ExceptionThrown);
                 return State::ClientErrorPropagatedToHandler;
             });
         };
 
-        auto wait_for_client_error = GENERATE(true, false);
         interrupted_realm_config.sync_config->on_sync_client_event_hook =
             [&, download_message_received = false,
              ident_message_sent = false](std::weak_ptr<SyncSession>, const SyncClientHookData& data) mutable {
@@ -2772,7 +2772,7 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][boot
                 else if (data.event == SyncClientHookEvent::BootstrapBatchAboutToProcess) {
                     REQUIRE(!ident_message_sent);
                     REQUIRE(!download_message_received);
-                    state.transition_with([&](State cur_state) -> std::optional<State> {
+                    state.transition_with([&](State cur_state) {
                         REQUIRE(cur_state == State::Interrupted);
                         return State::ExceptionThrown;
                     });
@@ -2785,9 +2785,9 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][boot
                 }
                 else if (data.event == SyncClientHookEvent::ClientErrorMessageSent) {
                     REQUIRE(!ident_message_sent);
-                    state.transition_with([&](State cur_state) -> std::optional<State> {
-                        REQUIRE((cur_state == State::ClientErrorPropagatedToHandler ||
-                                 cur_state == State::ExceptionThrown));
+                    state.wait_for(State::RealmDestroyed);
+                    state.transition_with([&](State cur_state) {
+                        REQUIRE(cur_state == State::RealmDestroyed);
                         return State::ClientErrorMessageSentToServer;
                     });
                 }
@@ -2797,13 +2797,14 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][boot
 
         {
             auto realm = Realm::get_shared_realm(interrupted_realm_config);
-            if (wait_for_client_error) {
-                state.wait_for(State::ClientErrorPropagatedToHandler);
-            }
-            else {
-                state.wait_for(State::ClientErrorMessageSentToServer);
-            }
+            state.wait_for(State::ClientErrorPropagatedToHandler);
         }
+
+        state.transition_with([&](State cur_state) {
+            REQUIRE(cur_state == State::ClientErrorPropagatedToHandler);
+            return State::RealmDestroyed;
+        });
+        state.wait_for(State::ClientErrorMessageSentToServer);
 
         std::vector<std::string> server_errors;
         timed_sleeping_wait_for([&] {
@@ -2821,14 +2822,11 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][boot
                     return std::make_pair(ErrorCodes::BadChangeset, "simulated failure");
             }
         }();
-        if (wait_for_client_error) {
-            REQUIRE(propagated_error);
-            REQUIRE(!propagated_error->is_fatal);
-            REQUIRE(propagated_error->server_requests_action == sync::ProtocolErrorInfo::Action::Warning);
-            REQUIRE(propagated_error->status == expected_error.first);
-            REQUIRE_THAT(propagated_error->status.reason(),
-                         Catch::Matchers::ContainsSubstring(expected_error.second));
-        }
+        REQUIRE(propagated_error);
+        REQUIRE(!propagated_error->is_fatal);
+        REQUIRE(propagated_error->server_requests_action == sync::ProtocolErrorInfo::Action::Warning);
+        REQUIRE(propagated_error->status == expected_error.first);
+        REQUIRE_THAT(propagated_error->status.reason(), Catch::Matchers::ContainsSubstring(expected_error.second));
 
         REQUIRE_THAT(server_errors, VectorElemMatches(Catch::Matchers::ContainsSubstring(expected_error.second)));
     }
@@ -3568,7 +3566,7 @@ TEST_CASE("flx: send client error", "[sync][flx][baas]") {
         config.sync_config->on_sync_client_event_hook = [&](std::weak_ptr<SyncSession>,
                                                             const SyncClientHookData& data) mutable {
             if (data.event == SyncClientHookEvent::ClientErrorMessageSent) {
-                state.transition_with([&](State cur_state) -> std::optional<State> {
+                state.transition_with([&](State cur_state) {
                     REQUIRE(cur_state == State::Thrown);
                     return State::ClientErrorMessageSent;
                 });
@@ -3578,12 +3576,12 @@ TEST_CASE("flx: send client error", "[sync][flx][baas]") {
                 return SyncClientHookAction::NoAction;
             }
 
-            state.transition_with([&](State cur_state) -> std::optional<State> {
+            state.transition_with([&](State cur_state) {
                 REQUIRE(cur_state == State::Initial);
                 return State::AboutToThrow;
             });
             state.wait_for(State::RealmDestroyed);
-            state.transition_with([&](State cur_state) -> std::optional<State> {
+            state.transition_with([&](State cur_state) {
                 REQUIRE(cur_state == State::RealmDestroyed);
                 return State::Thrown;
             });
@@ -3594,7 +3592,7 @@ TEST_CASE("flx: send client error", "[sync][flx][baas]") {
             auto realm = Realm::get_shared_realm(config);
             state.wait_for(State::AboutToThrow);
         }
-        state.transition_with([&](State cur_state) -> std::optional<State> {
+        state.transition_with([&](State cur_state) {
             REQUIRE(cur_state == State::AboutToThrow);
             return State::RealmDestroyed;
         });
