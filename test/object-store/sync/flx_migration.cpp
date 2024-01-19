@@ -501,83 +501,109 @@ TEST_CASE("An interrupted migration or rollback can recover on the next session"
 
     // Migrate to FLX
     trigger_server_migration(session.app_session(), MigrateToFLX, logger_ptr);
+    enum class State { Initial, FirstError, InClientReset, Resumed, SecondError };
+    TestingStateMachine<State> state(State::Initial);
 
-    auto error_event_hook = [&config](sync::ProtocolError error, int& error_count) {
-        return [&config, &error_count, error](std::weak_ptr<SyncSession> weak_session,
-                                              const SyncClientHookData& data) mutable {
-            if (data.event != SyncClientHookEvent::ErrorMessageReceived) {
-                return SyncClientHookAction::NoAction;
-            }
+    auto error_event_hook = [&config, &state](sync::ProtocolError error) {
+        return [&config, &state, error](std::weak_ptr<SyncSession> weak_session,
+                                        const SyncClientHookData& data) mutable {
             auto session = weak_session.lock();
             REQUIRE(session);
 
+            if (data.event == SyncClientHookEvent::BindMessageSent &&
+                session->path() == _impl::client_reset::get_fresh_path_for(config.path)) {
+                bool wait_for_resume = false;
+                state.transition_with([&](State cur_state) -> std::optional<State> {
+                    if (cur_state == State::FirstError) {
+                        wait_for_resume = true;
+                        return State::InClientReset;
+                    }
+                    return std::nullopt;
+                });
+                if (wait_for_resume) {
+                    state.wait_for(State::Resumed);
+                }
+            }
+
+            if (data.event != SyncClientHookEvent::ErrorMessageReceived) {
+                return SyncClientHookAction::NoAction;
+            }
             if (session->path() != config.path) {
                 return SyncClientHookAction::NoAction;
             }
 
             auto error_code = sync::ProtocolError(data.error_info->raw_error_code);
-
             if (error_code == sync::ProtocolError::initial_sync_not_completed) {
                 return SyncClientHookAction::NoAction;
             }
 
             REQUIRE(error_code == error);
-            ++error_count;
+            state.transition_with([&](State cur_state) -> std::optional<State> {
+                switch (cur_state) {
+                    case State::Initial:
+                        return State::FirstError;
+                    case State::Resumed:
+                        return State::SecondError;
+                    default:
+                        FAIL(util::format("Unxpected state %1", static_cast<int>(cur_state)));
+                }
+                return std::nullopt;
+            });
             return SyncClientHookAction::NoAction;
         };
     };
 
     // Session is interrupted before the migration is completed.
     {
-        auto error_count = 0;
-        config.sync_config->on_sync_client_event_hook =
-            error_event_hook(sync::ProtocolError::migrate_to_flx, error_count);
+        config.sync_config->on_sync_client_event_hook = error_event_hook(sync::ProtocolError::migrate_to_flx);
         auto realm = Realm::get_shared_realm(config);
 
-        timed_wait_for([&] {
-            return util::File::exists(_impl::client_reset::get_fresh_path_for(config.path));
-        });
+        state.wait_for(State::InClientReset);
 
         // Pause then resume the session. This triggers the server to send a new client reset request.
         realm->sync_session()->pause();
         realm->sync_session()->resume();
+        state.transition_with([&](State cur_state) {
+            REQUIRE(cur_state == State::InClientReset);
+            return State::Resumed;
+        });
 
+        state.wait_for(State::SecondError);
         REQUIRE(!wait_for_upload(*realm));
         REQUIRE(!wait_for_download(*realm));
 
         auto table = realm->read_group().get_table("class_Object");
         CHECK(table->size() == 5);
-
-        // Client reset is requested twice.
-        REQUIRE(error_count == 2);
     }
 
+    state.transition_with([](State) {
+        return State::Initial;
+    });
     //  Roll back to PBS
     trigger_server_migration(session.app_session(), RollbackToPBS, logger_ptr);
 
+
     // Session is interrupted before the rollback is completed.
     {
-        auto error_count = 0;
-        config.sync_config->on_sync_client_event_hook =
-            error_event_hook(sync::ProtocolError::revert_to_pbs, error_count);
+        config.sync_config->on_sync_client_event_hook = error_event_hook(sync::ProtocolError::revert_to_pbs);
         auto realm = Realm::get_shared_realm(config);
 
-        timed_wait_for([&] {
-            return util::File::exists(_impl::client_reset::get_fresh_path_for(config.path));
-        });
+        state.wait_for(State::InClientReset);
 
         // Pause then resume the session. This triggers the server to send a new client reset request.
         realm->sync_session()->pause();
         realm->sync_session()->resume();
+        state.transition_with([&](State cur_state) {
+            REQUIRE(cur_state == State::InClientReset);
+            return State::Resumed;
+        });
 
+        state.wait_for(State::SecondError);
         REQUIRE(!wait_for_upload(*realm));
         REQUIRE(!wait_for_download(*realm));
 
         auto table = realm->read_group().get_table("class_Object");
         CHECK(table->size() == 5);
-
-        // Client reset is requested twice.
-        REQUIRE(error_count == 2);
     }
 }
 
