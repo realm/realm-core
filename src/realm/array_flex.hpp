@@ -44,32 +44,30 @@ public:
     // basic query support
     size_t find_first(const Array&, int64_t value) const final override;
     int64_t sum(const Array&, size_t start, size_t end) const final override;
-
-    // Array lower and upper bound for flex arrays. These methods need to be optimized.
+    // Array lower and upper bound for flex arrays.
     size_t lower_bound(const Array&, int64_t) const final override;
     size_t upper_bound(const Array&, int64_t) const final override;
-    size_t lower_bound(const Array&, uint64_t) const final override;
-    size_t upper_bound(const Array&, uint64_t) const final override;
 
     // getters
     int64_t get(const Array&, size_t) const final override;
+    uint64_t get_unsigned(const Array&, size_t) const final override;
     void get_chunk(const Array&, size_t ndx, int64_t res[8]) const final override;
-    // this is supposed to be used only if the underlying type is uint.
-    uint64_t get_unsigned(const Array&, size_t, size_t&) const final override;
-    // static getters based on header (to be used carefully since they assume a B array).
+    // static getters based on header (to be used carefully since they assume the array is a B array).
     static int64_t get(const char* header, size_t ndx);
-    static uint64_t get_unsigned(const char* header, size_t ndx, size_t&);
 
 private:
+    uint64_t _get_unsigned(const Array&, size_t, size_t&) const;
+    static uint64_t _get_unsigned(const char*, size_t, size_t&);
+
     // read info about the encoded array from header
     static bool get_encode_info(const char* header, size_t& value_width, size_t& index_width, size_t& value_size,
                                 size_t& index_size);
     // encode array methods
     bool try_encode(const Array&, Array&, std::vector<int64_t>&, std::vector<size_t>&) const;
     void arrange_data_in_flex_format(const Array&, std::vector<int64_t>&, std::vector<size_t>&) const;
-    bool check_gain(const Array&, std::vector<int64_t>&, std::vector<size_t>&, int&, int&) const;
-    void setup_array_in_flex_format(const Array&, Array&, std::vector<int64_t>&, std::vector<size_t>&, int,
-                                    int) const;
+    bool check_gain(const Array&, std::vector<int64_t>&, std::vector<size_t>&, size_t&, size_t&) const;
+    void setup_array_in_flex_format(const Array&, Array&, std::vector<int64_t>&, std::vector<size_t>&, size_t,
+                                    size_t) const;
     void copy_into_encoded_array(Array&, std::vector<int64_t>&, std::vector<size_t>&) const;
 
     // decode array methods

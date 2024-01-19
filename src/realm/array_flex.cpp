@@ -33,7 +33,7 @@ using namespace realm;
 
 namespace impl {
 
-void copy_back(char* data, size_t w, size_t ndx, int64_t v)
+static void copy_back(char* data, size_t w, size_t ndx, int64_t v)
 {
     if (w == 0)
         realm::set_direct<0>(data, ndx, v);
@@ -123,7 +123,7 @@ inline size_t find_linear(uint64_t* data, int64_t key, size_t v_width, size_t nd
         bf_iterator it_value{data, static_cast<size_t>(index * v_width), v_width, v_width, 0};
         const auto v = sign_extend_field(v_width, it_value.get_value());
         if (v == key)
-            return i; // we need to pretend that the array was uncompressed, so we can't return index but i
+            return i;
         ++index_iterator;
     }
     return realm::not_found;
@@ -219,7 +219,7 @@ void ArrayFlex::set_direct(const Array& arr, size_t ndx, int64_t value) const
 int64_t ArrayFlex::get(const Array& arr, size_t ndx) const
 {
     size_t v_width;
-    auto v = get_unsigned(arr, ndx, v_width);
+    auto v = _get_unsigned(arr, ndx, v_width);
     const auto sign_v = sign_extend_field(v_width, v);
     return sign_v;
 }
@@ -259,8 +259,8 @@ bool ArrayFlex::try_encode(const Array& origin, Array& encoded, std::vector<int6
     arrange_data_in_flex_format(origin, values, indices);
 
     // check if makes sense to move forward and replace the current array's data with an encoded version of it
-    int v_width = 0;
-    int ndx_width = 0;
+    size_t v_width = 0;
+    size_t ndx_width = 0;
     if (check_gain(origin, values, indices, v_width, ndx_width)) {
 #if REALM_DEBUG
         for (size_t i = 0; i < sz; ++i)
@@ -351,8 +351,8 @@ void ArrayFlex::arrange_data_in_flex_format(const Array& arr, std::vector<int64_
     REALM_ASSERT(indices.size() == sz);
 }
 
-bool ArrayFlex::check_gain(const Array& arr, std::vector<int64_t>& values, std::vector<size_t>& indices, int& v_width,
-                           int& ndx_width) const
+bool ArrayFlex::check_gain(const Array& arr, std::vector<int64_t>& values, std::vector<size_t>& indices,
+                           size_t& v_width, size_t& ndx_width) const
 {
     using Encoding = NodeHeader::Encoding;
     const auto [min_value, max_value] = std::minmax_element(values.begin(), values.end());
@@ -368,13 +368,11 @@ bool ArrayFlex::check_gain(const Array& arr, std::vector<int64_t>& values, std::
 }
 
 void ArrayFlex::setup_array_in_flex_format(const Array& origin, Array& arr, std::vector<int64_t>& values,
-                                           std::vector<size_t>& indices, int v_width, int ndx_width) const
+                                           std::vector<size_t>& indices, size_t v_width, size_t ndx_width) const
 {
     using Encoding = NodeHeader::Encoding;
-
     // I'm assuming that flags are taken from the owning Array.
     uint8_t flags = NodeHeader::get_flags(origin.get_header());
-
     auto byte_size = NodeHeader::calc_size<Encoding::Flex>(values.size(), indices.size(), v_width, ndx_width);
 
     Allocator& allocator = arr.get_alloc();
@@ -388,6 +386,29 @@ void ArrayFlex::setup_array_in_flex_format(const Array& origin, Array& arr, std:
     REALM_ASSERT(arr.m_ref == mem.get_ref());
     REALM_ASSERT(arr.get_kind(header) == 'B');
     REALM_ASSERT(arr.get_encoding(header) == Encoding::Flex);
+}
+
+uint64_t ArrayFlex::_get_unsigned(const Array& arr, size_t ndx, size_t& v_width) const
+{
+    REALM_ASSERT(arr.is_attached());
+    REALM_ASSERT(arr.get_kind(arr.get_header()) == 'B');
+    return _get_unsigned(arr.get_header(), ndx, v_width);
+}
+
+uint64_t ArrayFlex::_get_unsigned(const char* header, size_t ndx, size_t& v_width)
+{
+    size_t ndx_width, v_size, ndx_size;
+    if (get_encode_info(header, v_width, ndx_width, v_size, ndx_size)) {
+        if (ndx >= ndx_size)
+            return realm::not_found;
+        auto data = (uint64_t*)NodeHeader::get_data_from_header(header);
+        const uint64_t offset = v_size * v_width;
+        bf_iterator it_index{data, static_cast<size_t>(offset + (ndx * ndx_width)), ndx_width, ndx_width, 0};
+        bf_iterator it_value{data, static_cast<size_t>(v_width * it_index.get_value()), v_width, v_width, 0};
+        const auto v = it_value.get_value();
+        return v;
+    }
+    REALM_UNREACHABLE();
 }
 
 bool inline ArrayFlex::get_encode_info(const char* header, size_t& v_width, size_t& ndx_width, size_t& v_size,
@@ -505,7 +526,7 @@ int64_t ArrayFlex::sum(const Array& arr, size_t start, size_t end) const
 int64_t ArrayFlex::get(const char* header, size_t ndx)
 {
     size_t v_width = 0;
-    auto val = get_unsigned(header, ndx, v_width);
+    auto val = _get_unsigned(header, ndx, v_width);
     if (val != realm::not_found) {
         const auto ivalue = sign_extend_field(v_width, val);
         return ivalue;
@@ -513,44 +534,10 @@ int64_t ArrayFlex::get(const char* header, size_t ndx)
     return val;
 }
 
-uint64_t ArrayFlex::get_unsigned(const char* header, size_t ndx, size_t& v_width)
+uint64_t ArrayFlex::get_unsigned(const Array& arr, size_t ndx) const
 {
-    using Encoding = NodeHeader::Encoding;
-    REALM_ASSERT(NodeHeader::get_kind(header) == 'B');
-    REALM_ASSERT(NodeHeader::get_encoding(header) == Encoding::Flex);
-    size_t ndx_width, v_size, ndx_size;
-    if (get_encode_info(header, v_width, ndx_width, v_size, ndx_size)) {
-        if (ndx >= ndx_size)
-            return realm::not_found;
-        auto data = (uint64_t*)NodeHeader::get_data_from_header(header);
-        const auto offset = v_size * v_width;
-        bf_iterator index_iterator{data, static_cast<size_t>(offset + (ndx * ndx_width)), ndx_width, ndx_width, 0};
-        auto index_value = index_iterator.get_value();
-        bf_iterator it_value{data, static_cast<size_t>(index_value * v_width), v_width, v_width, 0};
-        const auto arr_value = it_value.get_value();
-        return arr_value;
-    }
-    return realm::not_found;
-}
-
-uint64_t ArrayFlex::get_unsigned(const Array& arr, size_t ndx, size_t& v_width) const
-{
-    REALM_ASSERT(arr.is_attached());
-    REALM_ASSERT(arr.get_kind(arr.get_header()) == 'B');
-    size_t ndx_width, v_size, ndx_size;
-    if (get_encode_info(arr.get_header(), v_width, ndx_width, v_size, ndx_size)) {
-
-        if (ndx >= ndx_size)
-            return realm::not_found;
-
-        auto data = (uint64_t*)NodeHeader::get_data_from_header(arr.get_header());
-        const uint64_t offset = v_size * v_width;
-        bf_iterator it_index{data, static_cast<size_t>(offset + (ndx * ndx_width)), ndx_width, ndx_width, 0};
-        bf_iterator it_value{data, static_cast<size_t>(v_width * it_index.get_value()), v_width, v_width, 0};
-        const auto v = it_value.get_value();
-        return v;
-    }
-    REALM_UNREACHABLE();
+    size_t v_width;
+    return _get_unsigned(arr, ndx, v_width);
 }
 
 size_t ArrayFlex::lower_bound(const Array& arr, int64_t value) const
@@ -567,32 +554,6 @@ size_t ArrayFlex::lower_bound(const Array& arr, int64_t value) const
 }
 
 size_t ArrayFlex::upper_bound(const Array& arr, int64_t value) const
-{
-    REALM_ASSERT(arr.is_attached());
-    const auto header = arr.get_header();
-    REALM_ASSERT(NodeHeader::get_kind(header) == 'B');
-    size_t v_width, ndx_width, v_size, ndx_size;
-    if (get_encode_info(header, v_width, ndx_width, v_size, ndx_size)) {
-        const auto data = (uint64_t*)NodeHeader::get_data_from_header(arr.get_header());
-        return impl::upper_bound(data, value, v_width, ndx_width, v_size, ndx_size);
-    }
-    REALM_UNREACHABLE();
-}
-
-size_t ArrayFlex::lower_bound(const Array& arr, uint64_t value) const
-{
-    REALM_ASSERT(arr.is_attached());
-    const auto header = arr.get_header();
-    REALM_ASSERT(NodeHeader::get_kind(header) == 'B');
-    size_t v_width, ndx_width, v_size, ndx_size;
-    if (get_encode_info(header, v_width, ndx_width, v_size, ndx_size)) {
-        const auto data = (uint64_t*)NodeHeader::get_data_from_header(arr.get_header());
-        return impl::lower_bound(data, value, v_width, ndx_width, v_size, ndx_size);
-    }
-    REALM_UNREACHABLE();
-}
-
-size_t ArrayFlex::upper_bound(const Array& arr, uint64_t value) const
 {
     REALM_ASSERT(arr.is_attached());
     const auto header = arr.get_header();

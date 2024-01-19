@@ -1506,30 +1506,23 @@ void Array::verify() const
 
 size_t Array::lower_bound_int(int64_t value) const noexcept
 {
-    if (is_encoded()) {
-        // this is O(N) with a lot of computation associated.
-        // It requires some serious optimization.
+    if (is_encoded())
         return m_encode.lower_bound(*this, value);
-    }
     REALM_TEMPEX(return lower_bound, m_width, (m_data, m_size, value));
 }
 
 size_t Array::upper_bound_int(int64_t value) const noexcept
 {
-    if (is_encoded()) {
-        // this is O(N) with a lot of computation associated.
-        // It requires some serious optimization.
+    if (is_encoded())
         return m_encode.upper_bound(*this, value);
-    }
     REALM_TEMPEX(return upper_bound, m_width, (m_data, m_size, value));
 }
 
 
 size_t Array::find_first(int64_t value, size_t start, size_t end) const
 {
-    if (is_encoded()) {
+    if (is_encoded())
         return m_encode.find_first(*this, value);
-    }
     return find_first<Equal>(value, start, end);
 }
 
@@ -1540,7 +1533,6 @@ int_fast64_t Array::get(const char* header, size_t ndx) noexcept
     REALM_ASSERT(ndx < sz);
     if (NodeHeader::get_kind(header) == 'B') {
         REALM_ASSERT(NodeHeader::get_encoding(header) == NodeHeader::Encoding::Flex);
-        // this is likely triggering some failures when negative values (tombstones or null) are fetched
         return ArrayFlex::get(header, ndx);
     }
     const char* data = get_data_from_header(header);
@@ -1550,10 +1542,8 @@ int_fast64_t Array::get(const char* header, size_t ndx) noexcept
 
 int_fast64_t Array::get_universal_encoded_array(size_t ndx) const
 {
-    size_t v_width;
-    return m_encode.get_unsigned(*this, ndx, v_width);
+    return m_encode.get_unsigned(*this, ndx);
 }
-
 
 std::pair<int64_t, int64_t> Array::get_two(const char* header, size_t ndx) noexcept
 {

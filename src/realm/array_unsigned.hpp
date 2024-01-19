@@ -82,7 +82,6 @@ public:
 
 private:
     uint_least8_t m_width = 0;
-    uint64_t m_lbound = 0;
     uint64_t m_ubound = 0; // max is 0xFFFFFFFFFFFFFFFFLL
 
     void init_from_mem(MemRef mem) noexcept
