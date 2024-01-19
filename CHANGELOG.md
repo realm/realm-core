@@ -10,6 +10,7 @@
 * \[C-API] Fixed the return type of `realm_set_list` and `realm_set_dictionary` to be the newly inserted collection, similarly to the behavior of `list/dictionary_insert_collection` (PR [#7247](https://github.com/realm/realm-core/pull/7247), since 14.0.0-beta.0)
 * Throw an exception when trying to insert an embedded object into a list of Mixed ([#7254](https://github.com/realm/realm-core/issues/7254), since 14.0.0-beta.0)
 * Queries on dictionaries in Mixed with @keys did not return correct result ([#7255](https://github.com/realm/realm-core/issues/7255), since 14.0.0-beta.0)
+* Changes to inner collections will not be reported by notifier on owning collection ([#7270](https://github.com/realm/realm-core/issues/7270), since 14.0.0-beta.0)
 
 ### Breaking changes
 * None.

@@ -333,7 +333,6 @@ class TransactLogObserver : public TransactLogValidationMixin {
     _impl::TransactionChangeInfo& m_info;
     _impl::CollectionChangeBuilder* m_active_collection = nullptr;
     ObjectChangeSet* m_active_table = nullptr;
-    Path m_path;
 
 public:
     TransactLogObserver(_impl::TransactionChangeInfo& info)
@@ -371,9 +370,16 @@ public:
         auto table = current_table();
         for (auto& c : m_info.collections) {
 
-            if (c.table_key == table && c.obj_key == obj && c.path == path) {
-                m_active_collection = c.changes;
-                return true;
+            if (c.table_key == table && c.obj_key == obj && c.path.is_prefix_of(path)) {
+                if (c.path.size() != path.size()) {
+                    StablePath sub_path;
+                    sub_path.insert(sub_path.begin(), path.begin() + c.path.size(), path.end());
+                    c.changes->paths.insert(std::move(sub_path));
+                }
+                else {
+                    m_active_collection = c.changes;
+                    return true;
+                }
             }
         }
         m_active_collection = nullptr;

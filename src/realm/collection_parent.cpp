@@ -62,6 +62,20 @@ std::ostream& operator<<(std::ostream& ostr, const Path& path)
     return ostr;
 }
 
+bool StablePath::is_prefix_of(const StablePath& other) const noexcept
+{
+    if (size() > other.size())
+        return false;
+
+    auto it = other.begin();
+    for (auto& p : *this) {
+        if (!(p == *it))
+            return false;
+        ++it;
+    }
+    return true;
+}
+
 /***************************** CollectionParent ******************************/
 
 CollectionParent::~CollectionParent() {}

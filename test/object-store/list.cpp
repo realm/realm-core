@@ -1306,6 +1306,10 @@ TEST_CASE("nested List") {
     top_list.insert_collection(3, CollectionType::List);
     top_list.insert_collection(4, CollectionType::List);
     auto l0 = obj.get_list_ptr<Mixed>(Path{"any", 1});
+    l0->insert_collection(0, CollectionType::Dictionary);
+    auto d = l0->get_dictionary(0);
+    d->insert_collection("list", CollectionType::List);
+    d->get_list("list")->add(Mixed(5));
     auto l1 = obj.get_list_ptr<Mixed>(Path{"any", 3});
 
     r->commit_transaction();
@@ -1347,7 +1351,54 @@ TEST_CASE("nested List") {
             write([&] {
                 lst0.add(Mixed(8));
             });
-            REQUIRE_INDICES(change.insertions, 0);
+            REQUIRE_INDICES(change.insertions, 1);
+            REQUIRE(!change.collection_was_cleared);
+        }
+
+        SECTION("inserting in sub structure sends a change notifications") {
+            auto token = require_change();
+            write([&] {
+                lst0.get_dictionary(0).get_list("list").add(Mixed(42));
+            });
+            REQUIRE_INDICES(change.modifications, 0);
+            REQUIRE(!change.collection_was_cleared);
+        }
+
+        SECTION("modifying in sub structure sends a change notifications") {
+            auto token = require_change();
+            write([&] {
+                lst0.get_dictionary(0).get_list("list").set(0, Mixed(42));
+            });
+            REQUIRE_INDICES(change.modifications, 0);
+            REQUIRE(!change.collection_was_cleared);
+        }
+
+        SECTION("clearing in sub structure sends a change notifications") {
+            auto token = require_change();
+            write([&] {
+                lst0.get_dictionary(0).get_list("list").remove_all();
+            });
+            REQUIRE_INDICES(change.modifications, 0);
+            REQUIRE(!change.collection_was_cleared);
+        }
+
+        SECTION("deleting sub structure sends a change notifications") {
+            auto token = require_change();
+            write([&] {
+                lst0.get_dictionary(0).erase("list");
+            });
+            REQUIRE_INDICES(change.modifications, 0);
+            REQUIRE(!change.collection_was_cleared);
+        }
+
+        SECTION("creating and modifying sub structure results in insert change only") {
+            auto token = require_change();
+            write([&] {
+                lst0.insert_collection(1, CollectionType::Dictionary);
+                lst0.get_dictionary(1).insert("Value", Mixed(42));
+            });
+            REQUIRE_INDICES(change.insertions, 1);
+            REQUIRE(change.modifications.empty());
             REQUIRE(!change.collection_was_cleared);
         }
 
@@ -1364,7 +1415,7 @@ TEST_CASE("nested List") {
                 obj.get_collection_ptr(col_any)->insert_collection(0, CollectionType::List);
                 lst0.add(Mixed(8));
             });
-            REQUIRE_INDICES(change.insertions, 0);
+            REQUIRE_INDICES(change.insertions, 1);
             REQUIRE(!change.collection_was_cleared);
         }
 
@@ -1381,7 +1432,7 @@ TEST_CASE("nested List") {
             write([&] {
                 lst0.add(Mixed(8));
             });
-            REQUIRE_INDICES(change.insertions, 0);
+            REQUIRE_INDICES(change.insertions, 1);
             REQUIRE(!change.collection_was_cleared);
         }
         SECTION("remove item from collection") {
@@ -1389,22 +1440,22 @@ TEST_CASE("nested List") {
             write([&] {
                 lst0.add(Mixed(8));
             });
-            REQUIRE_INDICES(change.insertions, 0);
+            REQUIRE_INDICES(change.insertions, 1);
             write([&] {
-                lst0.remove(0);
+                lst0.remove(1);
             });
-            REQUIRE_INDICES(change.deletions, 0);
+            REQUIRE_INDICES(change.deletions, 1);
         }
         SECTION("erase from containing list") {
             auto token = require_change();
             write([&] {
                 lst0.add(Mixed(8));
             });
-            REQUIRE_INDICES(change.insertions, 0);
+            REQUIRE_INDICES(change.insertions, 1);
             write([&] {
                 top_list.set(1, 42);
             });
-            REQUIRE_INDICES(change.deletions, 0);
+            REQUIRE_INDICES(change.deletions, 0, 1);
             REQUIRE(change.collection_root_was_deleted);
         }
         SECTION("remove containing object") {
@@ -1412,11 +1463,11 @@ TEST_CASE("nested List") {
             write([&] {
                 lst0.add(Mixed(8));
             });
-            REQUIRE_INDICES(change.insertions, 0);
+            REQUIRE_INDICES(change.insertions, 1);
             write([&] {
                 obj.remove();
             });
-            REQUIRE_INDICES(change.deletions, 0);
+            REQUIRE_INDICES(change.deletions, 0, 1);
             REQUIRE(change.collection_root_was_deleted);
         }
     }
