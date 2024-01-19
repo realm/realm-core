@@ -296,17 +296,21 @@ void wait_for_advance(Realm& realm)
 void async_open_realm(const Realm::Config& config,
                       util::UniqueFunction<void(ThreadSafeReference&& ref, std::exception_ptr e)> finish)
 {
+    std::mutex mutex;
+    bool did_finish = false;
     auto task = Realm::get_synchronized_realm(config);
     ThreadSafeReference tsr;
     std::exception_ptr err = nullptr;
-    auto pf = util::make_promise_future<void>();
-    task->start([&tsr, &err, promise = util::CopyablePromiseHolder(std::move(pf.promise))](
-                    ThreadSafeReference&& ref, std::exception_ptr e) mutable {
+    task->start([&](ThreadSafeReference&& ref, std::exception_ptr e) {
+        std::lock_guard lock(mutex);
+        did_finish = true;
         tsr = std::move(ref);
         err = e;
-        promise.get_promise().emplace_value();
     });
-    pf.future.get();
+    util::EventLoop::main().run_until([&] {
+        std::lock_guard lock(mutex);
+        return did_finish;
+    });
     task->cancel(); // don't run the above notifier again on this session
     finish(std::move(tsr), err);
 }

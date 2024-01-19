@@ -1,7 +1,7 @@
 # NEXT RELEASE
 
 ### Enhancements
-* Add support for Sync Schema Migrations. Schema versioning is introduced for synchronized realms, so a client app can open a realm at any existing version. If required, the schema is upgraded or downgraded seamlessly. (PR [#7239](https://github.com/realm/realm-core/pull/7239))
+* Add support for Sync Schema Migrations for flexible sync Realms. Schema versioning is introduced for synchronized realms, so a client app can open a realm at any existing version. If required, the schema is upgraded or downgraded seamlessly. (PR [#7239](https://github.com/realm/realm-core/pull/7239))
 
 ### Fixed
 * Handle `EOPNOTSUPP` when using `posix_fallocate()` and fallback to manually consume space. This should enable android users to open a Realm on restrictive filesystems. ([realm-js #6349](https://github.com/realm/realm-js/issues/6349), more prevalent since v13.23.3 with the change to `REALM_HAVE_POSIX_FALLOCATE` but it was also an issue in some platforms before this)
@@ -9,6 +9,7 @@
 
 ### Breaking changes
 * `App::get_uncached_app(...)` and `App::get_shared_app(...)` have been replaced by `App::get_app(App::CacheMode, ...)`. The App constructor is now enforced to be unusable, use `App::get_app()` instead. ([#7237](https://github.com/realm/realm-core/issues/7237))
+* Schema version in the Realm config is now used for Sync Schema Migrations. If you set it to a non-zero value before and don’t intend to migrate your schema, you need to reset the version to zero. (PR [#7239](https://github.com/realm/realm-core/pull/7239))
 
 ### Compatibility
 * Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.

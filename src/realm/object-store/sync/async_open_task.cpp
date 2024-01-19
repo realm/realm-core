@@ -125,7 +125,8 @@ void AsyncOpenTask::attach_to_subscription_initializer(AsyncOpenCallback&& callb
         shared_realm = coordinator->get_realm(nullptr, m_db_first_open);
     }
     catch (...) {
-        return callback({}, std::current_exception());
+        async_open_complete(std::move(callback), coordinator, exception_to_status());
+        return;
     }
     const auto init_subscription = shared_realm->get_latest_subscription_set();
     const auto sub_state = init_subscription.state();
@@ -203,7 +204,7 @@ void AsyncOpenTask::migrate_schema_or_complete(AsyncOpenCallback&& callback,
 
     // Migrate the schema.
     //  * First upload the changes at the old schema version
-    //  * Then delete the realm, reopen it, and bootstrap at new schema version
+    //  * Then, delete the realm, reopen it, and bootstrap at new schema version
     // The lifetime of the task is extended until bootstrap completes.
     std::shared_ptr<AsyncOpenTask> self(shared_from_this());
     session->wait_for_upload_completion([callback = std::move(callback), coordinator, session, self,
@@ -245,7 +246,8 @@ void AsyncOpenTask::migrate_schema_or_complete(AsyncOpenCallback&& callback,
                 m_session = coordinator->sync_session();
             }
             catch (...) {
-                return callback({}, std::current_exception());
+                async_open_complete(std::move(callback), coordinator, exception_to_status());
+                return;
             }
 
             self->wait_for_bootstrap_or_complete(std::move(callback), coordinator, status);
