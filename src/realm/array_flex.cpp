@@ -274,6 +274,12 @@ bool ArrayFlex::try_encode(const Array& origin, Array& encoded, std::vector<int6
 
 void ArrayFlex::copy_into_encoded_array(Array& arr, std::vector<int64_t>& values, std::vector<size_t>& indices) const
 {
+    // #if REALM_DEBUG
+    //     std::stringstream stream;
+    //     for (const auto& v : values)
+    //         stream << v << " ";
+    //     std::cout << "Compressing " << stream.str() << std::endl;
+    // #endif
     REALM_ASSERT(arr.is_attached());
     using Encoding = NodeHeader::Encoding;
     auto header = arr.get_header();
@@ -448,14 +454,23 @@ std::vector<int64_t> ArrayFlex::fetch_signed_values_from_encoded_array(const Arr
 
 void ArrayFlex::restore_array(Array& arr, const std::vector<int64_t>& values) const
 {
-    // do the reverse of compressing the array
+    // #ifdef REALM_DEBUG
+    //     std::stringstream stream;
+    //     for (const auto& v : values)
+    //         stream << v << " ";
+    //     std::cout << "Decompressing " << stream.str() << std::endl;
+    ////    for(const auto& v : values)
+    ////        REALM_ASSERT(v >= 0);
+    // #endif
+    //  do the reverse of compressing the array
     REALM_ASSERT(arr.is_attached());
     using Encoding = NodeHeader::Encoding;
     const auto flags = NodeHeader::get_flags(arr.get_header());
     const auto size = values.size();
     const auto [min_value, max_value] = std::minmax_element(values.begin(), values.end());
 
-    // calling arr.destroy() is fine, as long as we don't use the memory anymore.
+    // calling arr.destroy() is fine, as long as we don't use the memory deleted anymore.
+    // Decompressing can only be happening within a write transactions, thus this invariant should hold.
     arr.destroy();
     auto& allocator = arr.get_alloc();
 
@@ -463,11 +478,7 @@ void ArrayFlex::restore_array(Array& arr, const std::vector<int64_t>& values) co
     auto byte_size = NodeHeader::calc_size<Encoding::WTypBits>(size, signed_bit_width);
     REALM_ASSERT(byte_size % 8 == 0); // 8 bytes aligned value
 
-    // This should be equivalent to Array::bit_width(n);
-    size_t width = 1;
-    while (width < signed_bit_width)
-        width *= 2;
-
+    auto width = std::max(Array::bit_width(*min_value), Array::bit_width(*max_value));
     REALM_ASSERT(width == 0 || width == 1 || width == 2 || width == 4 || width == 8 || width == 16 || width == 32 ||
                  width == 64);
 
@@ -525,7 +536,7 @@ int64_t ArrayFlex::sum(const Array& arr, size_t start, size_t end) const
 
 int64_t ArrayFlex::get(const char* header, size_t ndx)
 {
-    size_t v_width = 0;
+    size_t v_width;
     auto val = _get_unsigned(header, ndx, v_width);
     if (val != realm::not_found) {
         const auto ivalue = sign_extend_field(v_width, val);

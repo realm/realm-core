@@ -1542,7 +1542,7 @@ int_fast64_t Array::get(const char* header, size_t ndx) noexcept
 
 int_fast64_t Array::get_universal_encoded_array(size_t ndx) const
 {
-    return m_encode.get_unsigned(*this, ndx);
+    return m_encode.get(*this, ndx);
 }
 
 std::pair<int64_t, int64_t> Array::get_two(const char* header, size_t ndx) noexcept
