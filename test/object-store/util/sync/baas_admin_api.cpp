@@ -557,14 +557,15 @@ std::vector<AdminAPISession::Service> AdminAPISession::get_services(const std::s
 
 
 std::vector<std::string> AdminAPISession::get_errors(const std::string& app_id,
-                                                     std::optional<std::string> error_type) const
+                                                     std::vector<std::pair<std::string, std::string>> filters) const
 {
     auto endpoint = apps()[app_id]["logs"];
-    auto req = std::vector<std::pair<std::string, std::string>>{{"errors_only", "true"}};
-    if (error_type) {
-        req.push_back({"type", *error_type});
+    if (!std::any_of(filters.begin(), filters.end(), [](auto& pair) {
+            return pair.first == "errors_only";
+        })) {
+        filters.push_back({"errors_only", "true"});
     }
-    auto response = endpoint.get_json(std::move(req));
+    auto response = endpoint.get_json(std::move(filters));
     std::vector<std::string> errors;
     const auto& logs = response["logs"];
     std::transform(logs.begin(), logs.end(), std::back_inserter(errors), [](const auto& err) {
