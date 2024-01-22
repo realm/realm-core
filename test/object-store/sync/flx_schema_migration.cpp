@@ -218,11 +218,15 @@ ObjectSchema sort_schema_properties(const ObjectSchema& schema)
 }
 
 // Check realm's schema and target_schema match.
-void check_realm_schema(SharedRealm& realm, const std::vector<ObjectSchema>& target_schema,
+void check_realm_schema(const std::string& path, const std::vector<ObjectSchema>& target_schema,
                         uint64_t target_schema_version)
 {
-    auto realm_schema = ObjectStore::schema_from_group(realm->read_group());
-    CHECK(realm->schema_version() == target_schema_version);
+    DBOptions options;
+    options.encryption_key = test_util::crypt_key();
+    auto db = DB::create(sync::make_client_replication(), path, options);
+    auto realm_schema = ObjectStore::schema_from_group(*db->start_read());
+    auto realm_schema_version = ObjectStore::get_schema_version(*db->start_read());
+    CHECK(realm_schema_version == target_schema_version);
     CHECK(realm_schema.size() == target_schema.size());
 
     for (auto& object : target_schema) {
@@ -257,6 +261,7 @@ TEST_CASE("Sync schema migrations don't work with sync open", "[sync][flx][flx s
         auto realm = Realm::get_shared_realm(config);
         subscribe_to_all_and_bootstrap(*realm);
         wait_for_upload(*realm);
+        check_realm_schema(config.path, schema_v0, 0);
     }
 
     const AppSession& app_session = harness.session().app_session();
@@ -273,6 +278,7 @@ TEST_CASE("Sync schema migrations don't work with sync open", "[sync][flx][flx s
         create_schema(app_session, harness.app()->current_user(), *config.schema, config.schema_version);
 
         REQUIRE_THROWS_AS(Realm::get_shared_realm(config), InvalidAdditiveSchemaChangeException);
+        check_realm_schema(config.path, schema_v0, 0);
     }
 
     SECTION("Breaking change detected by server") {
@@ -301,6 +307,7 @@ TEST_CASE("Sync schema migrations don't work with sync open", "[sync][flx][flx s
         auto table = realm->read_group().get_table("class_TopLevel2");
         // Migration did not succeed because table 'TopLevel2' still exists (but there is no error).
         CHECK(table);
+        check_realm_schema(config.path, schema_v0, 1);
     }
 }
 
@@ -313,7 +320,13 @@ TEST_CASE("Cannot migrate schema to unknown version", "[sync][flx][flx schema mi
     const AppSession& app_session = harness.session().app_session();
     auto schema_v1 = get_schema_v1();
 
+    uint64_t target_schema_version = 0;
+    std::vector<ObjectSchema> target_schema;
+
     SECTION("Fresh realm") {
+        target_schema_version = -1;
+        target_schema = {};
+
         SECTION("No schema versions") {
         }
 
@@ -323,6 +336,8 @@ TEST_CASE("Cannot migrate schema to unknown version", "[sync][flx][flx schema mi
     }
 
     SECTION("Existing realm") {
+        auto schema_version = GENERATE(0, 42);
+
         // First open the realm at schema version 0.
         {
             auto realm = Realm::get_shared_realm(config);
@@ -330,10 +345,21 @@ TEST_CASE("Cannot migrate schema to unknown version", "[sync][flx][flx schema mi
             wait_for_upload(*realm);
         }
 
-        SECTION("No schema versions") {
+        // Then set the right schema version.
+        DBOptions options;
+        options.encryption_key = test_util::crypt_key();
+        auto db = DB::create(sync::make_client_replication(), config.path, options);
+        auto tr = db->start_write();
+        ObjectStore::set_schema_version(*tr, schema_version);
+        tr->commit();
+
+        target_schema_version = schema_version;
+        target_schema = schema_v0;
+
+        SECTION(util::format("No schema versions | Realm schema: %1", schema_version)) {
         }
 
-        SECTION("Schema versions") {
+        SECTION(util::format("Schema versions | Realm schema: %1", schema_version)) {
             create_schema(app_session, harness.app()->current_user(), schema_v1, 1);
         }
     }
@@ -348,7 +374,9 @@ TEST_CASE("Cannot migrate schema to unknown version", "[sync][flx][flx schema mi
         auto [realm, error] = async_open_realm(config);
         REQUIRE_FALSE(realm);
         REQUIRE(error);
+        REQUIRE_THROWS_CONTAINING(std::rethrow_exception(error), "Client provided invalid schema version");
         error_future.get();
+        check_realm_schema(config.path, target_schema, target_schema_version);
     }
 
     // Update schema version to 0 and try again (the version now matches the actual schema).
@@ -357,7 +385,7 @@ TEST_CASE("Cannot migrate schema to unknown version", "[sync][flx][flx schema mi
     auto [realm, error] = async_open_realm(config);
     REQUIRE(realm);
     REQUIRE_FALSE(error);
-    check_realm_schema(realm, schema_v0, 0);
+    check_realm_schema(config.path, schema_v0, 0);
 }
 
 TEST_CASE("Schema version mismatch between client and server", "[sync][flx][flx schema migration][baas]") {
@@ -376,6 +404,7 @@ TEST_CASE("Schema version mismatch between client and server", "[sync][flx][flx 
         wait_for_upload(*realm);
 
         realm->sync_session()->shutdown_and_wait();
+        check_realm_schema(config.path, schema_v0, 0);
     }
     _impl::RealmCoordinator::assert_no_open_realms();
 
@@ -415,7 +444,10 @@ TEST_CASE("Schema version mismatch between client and server", "[sync][flx][flx 
     auto [realm, error] = async_open_realm(config);
     REQUIRE_FALSE(realm);
     REQUIRE(error);
+    REQUIRE_THROWS_CONTAINING(std::rethrow_exception(error),
+                              "Synchronization no longer possible for client-side file");
     REQUIRE(schema_migration_required);
+    check_realm_schema(config.path, schema_v0, 1);
     wait_for_sessions_to_close(harness.session());
 }
 
@@ -445,7 +477,7 @@ TEST_CASE("Fresh realm does not require schema migration", "[sync][flx][flx sche
     auto [realm, error] = async_open_realm(config);
     REQUIRE(realm);
     REQUIRE_FALSE(error);
-    check_realm_schema(realm, schema_v1, 1);
+    check_realm_schema(config.path, schema_v1, 1);
 }
 
 TEST_CASE("Upgrade schema version (with recovery) then downgrade", "[sync][flx][flx schema migration][baas]") {
@@ -459,7 +491,7 @@ TEST_CASE("Upgrade schema version (with recovery) then downgrade", "[sync][flx][
         auto realm = Realm::get_shared_realm(config);
         wait_for_download(*realm);
         wait_for_upload(*realm);
-        check_realm_schema(realm, schema_v0, 0);
+        check_realm_schema(config.path, schema_v0, 0);
 
         realm->sync_session()->pause();
 
@@ -530,7 +562,7 @@ TEST_CASE("Upgrade schema version (with recovery) then downgrade", "[sync][flx][
         auto [realm, error] = async_open_realm(config);
         REQUIRE(realm);
         REQUIRE_FALSE(error);
-        check_realm_schema(realm, schema_v1, 1);
+        check_realm_schema(config.path, schema_v1, 1);
 
         auto table = realm->read_group().get_table("class_TopLevel");
         CHECK(table->size() == 3);
@@ -560,7 +592,7 @@ TEST_CASE("Upgrade schema version (with recovery) then downgrade", "[sync][flx][
         auto [realm, error] = async_open_realm(config);
         REQUIRE(realm);
         REQUIRE_FALSE(error);
-        check_realm_schema(realm, schema_v2, 2);
+        check_realm_schema(config.path, schema_v2, 2);
 
         auto table = realm->read_group().get_table("class_TopLevel");
         CHECK(table->size() == 4);
@@ -578,7 +610,7 @@ TEST_CASE("Upgrade schema version (with recovery) then downgrade", "[sync][flx][
         auto [realm, error] = async_open_realm(config);
         REQUIRE(realm);
         REQUIRE_FALSE(error);
-        check_realm_schema(realm, schema_v1, 1);
+        check_realm_schema(config.path, schema_v1, 1);
 
         auto table = realm->read_group().get_table("class_TopLevel");
         CHECK(table->size() == 4);
@@ -596,7 +628,7 @@ TEST_CASE("Upgrade schema version (with recovery) then downgrade", "[sync][flx][
         auto [realm, error] = async_open_realm(config);
         REQUIRE(realm);
         REQUIRE_FALSE(error);
-        check_realm_schema(realm, schema_v0, 0);
+        check_realm_schema(config.path, schema_v0, 0);
 
         auto table = realm->read_group().get_table("class_TopLevel");
         CHECK(table->size() == 4);
@@ -630,7 +662,7 @@ TEST_CASE("An interrupted schema migration can recover on the next session",
         auto realm = Realm::get_shared_realm(config);
         wait_for_download(*realm);
         wait_for_upload(*realm);
-        check_realm_schema(realm, schema_v0, 0);
+        check_realm_schema(config.path, schema_v0, 0);
     }
     _impl::RealmCoordinator::assert_no_open_realms();
 
@@ -672,6 +704,7 @@ TEST_CASE("An interrupted schema migration can recover on the next session",
         });
         future.get();
         task.reset();
+        check_realm_schema(config.path, schema_v0, 0);
     }
 
     // Retry the migration.
@@ -679,7 +712,7 @@ TEST_CASE("An interrupted schema migration can recover on the next session",
     REQUIRE(realm);
     REQUIRE_FALSE(error);
     REQUIRE(schema_version_changed_count == 2);
-    check_realm_schema(realm, schema_v1, 1);
+    check_realm_schema(config.path, schema_v1, 1);
 }
 
 TEST_CASE("Migrate to new schema version with a schema subset", "[sync][flx][flx schema migration][baas]") {
@@ -693,7 +726,7 @@ TEST_CASE("Migrate to new schema version with a schema subset", "[sync][flx][flx
         auto realm = Realm::get_shared_realm(config);
         wait_for_download(*realm);
         wait_for_upload(*realm);
-        check_realm_schema(realm, schema_v0, 0);
+        check_realm_schema(config.path, schema_v0, 0);
     }
 
     const AppSession& app_session = harness.session().app_session();
@@ -710,7 +743,7 @@ TEST_CASE("Migrate to new schema version with a schema subset", "[sync][flx][flx
     auto [realm, error] = async_open_realm(config);
     REQUIRE(realm);
     REQUIRE_FALSE(error);
-    check_realm_schema(realm, schema_v1, 1);
+    check_realm_schema(config.path, schema_v1, 1);
 }
 
 TEST_CASE("Client reset during schema migration", "[sync][flx][flx schema migration][baas]") {
@@ -724,7 +757,7 @@ TEST_CASE("Client reset during schema migration", "[sync][flx][flx schema migrat
         auto realm = Realm::get_shared_realm(config);
         wait_for_download(*realm);
         wait_for_upload(*realm);
-        check_realm_schema(realm, schema_v0, 0);
+        check_realm_schema(config.path, schema_v0, 0);
 
         realm->sync_session()->pause();
 
@@ -793,7 +826,7 @@ TEST_CASE("Client reset during schema migration", "[sync][flx][flx schema migrat
     REQUIRE_FALSE(error);
     REQUIRE(before_reset_count == 0);
     REQUIRE(after_reset_count == 0);
-    check_realm_schema(realm, schema_v1, 1);
+    check_realm_schema(config.path, schema_v1, 1);
 
     auto table = realm->read_group().get_table("class_TopLevel");
     CHECK(table->size() == 1);
@@ -813,7 +846,7 @@ TEST_CASE("Migrate to new schema version after migration to intermediate version
         auto realm = Realm::get_shared_realm(config);
         wait_for_download(*realm);
         wait_for_upload(*realm);
-        check_realm_schema(realm, schema_v0, 0);
+        check_realm_schema(config.path, schema_v0, 0);
 
         realm->sync_session()->pause();
 
@@ -872,6 +905,7 @@ TEST_CASE("Migrate to new schema version after migration to intermediate version
         });
         future.get();
         task.reset();
+        check_realm_schema(config.path, schema_v0, 0);
     }
 
     // Migrate to v2.
@@ -882,7 +916,7 @@ TEST_CASE("Migrate to new schema version after migration to intermediate version
     REQUIRE(realm);
     REQUIRE_FALSE(error);
     REQUIRE(schema_version_changed_count == 2);
-    check_realm_schema(realm, schema_v2, 2);
+    check_realm_schema(config.path, schema_v2, 2);
 
     auto table = realm->read_group().get_table("class_TopLevel");
     CHECK(table->size() == 1);
@@ -890,7 +924,8 @@ TEST_CASE("Migrate to new schema version after migration to intermediate version
     CHECK(table->is_empty());
 }
 
-TEST_CASE("Send schema version 0 if no schema is used to open the realm", "[sync][flx][flx schema migration][baas]") {
+TEST_CASE("Send schema version zero if no schema is used to open the realm",
+          "[sync][flx][flx schema migration][baas]") {
     auto schema_v0 = get_schema_v0();
     FLXSyncTestHarness harness("flx_sync_schema_migration",
                                {schema_v0, {"queryable_str_field", "queryable_int_field"}});
@@ -905,6 +940,48 @@ TEST_CASE("Send schema version 0 if no schema is used to open the realm", "[sync
     auto [realm, error] = async_open_realm(config);
     REQUIRE(realm);
     REQUIRE_FALSE(error);
+    // The schema is received from the server, but it is unversioned.
+    check_realm_schema(config.path, schema_v0, -1);
+}
+
+TEST_CASE("Allow resetting the schema version to zero after bad schema version error",
+          "[sync][flx][flx schema migration][baas]") {
+    auto schema_v0 = get_schema_v0();
+    FLXSyncTestHarness harness("flx_sync_schema_migration",
+                               {schema_v0, {"queryable_str_field", "queryable_int_field"}});
+    auto config = harness.make_test_file();
+    config.schema_version = 42;
+
+    SECTION("Fresh realm") {
+    }
+
+    SECTION("Existing realm") {
+        DBOptions options;
+        options.encryption_key = test_util::crypt_key();
+        auto db = DB::create(sync::make_client_replication(), config.path, options);
+        auto tr = db->start_write();
+        ObjectStore::set_schema_version(*tr, config.schema_version);
+        tr->commit();
+        auto schema_version = ObjectStore::get_schema_version(*db->start_read());
+        CHECK(schema_version == 42);
+    }
+
+    {
+        auto&& [error_future, err_handler] = make_error_handler();
+        config.sync_config->error_handler = err_handler;
+        auto realm = Realm::get_shared_realm(config);
+        auto error = error_future.get();
+        REQUIRE(error.status == ErrorCodes::SyncSchemaMigrationError);
+        REQUIRE_THAT(error.status.reason(),
+                     Catch::Matchers::ContainsSubstring("Client provided invalid schema version"));
+        check_realm_schema(config.path, schema_v0, 42);
+    }
+
+    config.schema_version = 0;
+    config.sync_config->error_handler = nullptr;
+    auto realm = Realm::get_shared_realm(config);
+    wait_for_download(*realm);
+    check_realm_schema(config.path, schema_v0, 0);
 }
 
 } // namespace realm::app
