@@ -601,10 +601,10 @@ TEST_CASE("app: verify app utils helpers", "[sync][app][local]") {
         auto verify_good_url = [](std::string scheme, std::string server, std::string request) {
             std::string url = util::format("%1://%2%3", scheme, server, request);
             auto comp = AppUtils::split_url(url);
-            REQUIRE(comp);
-            REQUIRE(comp->scheme == scheme);
-            REQUIRE(comp->server == server);
-            REQUIRE(comp->request == request);
+            REQUIRE(comp.is_ok());
+            REQUIRE(comp.get_value().scheme == scheme);
+            REQUIRE(comp.get_value().server == server);
+            REQUIRE(comp.get_value().request == request);
         };
 
         verify_good_url("https", "some.host.com", "/path/to/use?some_query=do-something#fragment");
@@ -614,15 +614,17 @@ TEST_CASE("app: verify app utils helpers", "[sync][app][local]") {
 
         // Verify bad urls
         auto comp = AppUtils::split_url("localhost/path");
-        REQUIRE(!comp);
+        REQUIRE(!comp.is_ok());
         comp = AppUtils::split_url("http:localhost/path");
-        REQUIRE(!comp);
+        REQUIRE(!comp.is_ok());
         comp = AppUtils::split_url("http:/localhost/path");
-        REQUIRE(!comp);
+        REQUIRE(!comp.is_ok());
+        comp = AppUtils::split_url("https://");
+        REQUIRE(!comp.is_ok());
         comp = AppUtils::split_url("http:///localhost/path");
-        REQUIRE(!comp);
+        REQUIRE(!comp.is_ok());
         comp = AppUtils::split_url("");
-        REQUIRE(!comp);
+        REQUIRE(!comp.is_ok());
     }
 
     SECTION("find_header") {
@@ -701,15 +703,22 @@ TEST_CASE("app: verify app utils helpers", "[sync][app][local]") {
     }
 
     SECTION("extract_redir_location") {
-        auto comp = AppUtils::extract_redir_location({{"location", "http://redirect.host"}});
+        auto comp = AppUtils::extract_redir_location(
+            {{"Content-Type", "application/json"}, {"Location", "http://redirect.host"}});
+        CHECK(comp == "http://redirect.host");
+        comp = AppUtils::extract_redir_location({{"location", "http://redirect.host"}});
         CHECK(comp == "http://redirect.host");
         comp = AppUtils::extract_redir_location({{"LoCaTiOn", "http://redirect.host/"}});
         CHECK(comp == "http://redirect.host/");
         comp = AppUtils::extract_redir_location({{"LOCATION", "http://redirect.host/includes/path"}});
         CHECK(comp == "http://redirect.host/includes/path");
+        comp = AppUtils::extract_redir_location({{"Content-Type", "application/json"}});
+        CHECK(!comp);
         comp = AppUtils::extract_redir_location({{"some-location", "http://redirect.host"}});
         CHECK(!comp);
         comp = AppUtils::extract_redir_location({{"location", ""}});
+        CHECK(!comp);
+        comp = AppUtils::extract_redir_location({});
         CHECK(!comp);
         comp = AppUtils::extract_redir_location({{"location", "bad-server-url"}});
         CHECK(!comp);
@@ -3938,22 +3947,22 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
             CHECK(app->get_ws_host_url() == "wss://realm.mongodb.com");
         }
         {
-            // Second time through, base_url is set to https://alternate.mongodb.com is expected
-            app_config.base_url = "https://alternate.mongodb.com";
-            redir_transport->reset("https://alternate.mongodb.com");
+            // Second time through, base_url is set to https://alternate.someurl.fake is expected
+            app_config.base_url = "https://alternate.someurl.fake";
+            redir_transport->reset("https://alternate.someurl.fake");
 
             auto app = app::App::get_app(app::App::CacheMode::Disabled, app_config, sc_config);
             // Location is not requested until first app services request
             CHECK(!redir_transport->location_requested);
             // Initial hostname and ws hostname use base url, but aren't used until location is updated
-            CHECK(app->get_host_url() == "https://alternate.mongodb.com");
-            CHECK(app->get_ws_host_url() == "wss://alternate.mongodb.com");
+            CHECK(app->get_host_url() == "https://alternate.someurl.fake");
+            CHECK(app->get_ws_host_url() == "wss://alternate.someurl.fake");
 
             do_login(app);
             CHECK(redir_transport->location_requested);
-            CHECK(app->get_base_url() == "https://alternate.mongodb.com");
-            CHECK(app->get_host_url() == "https://alternate.mongodb.com");
-            CHECK(app->get_ws_host_url() == "wss://alternate.mongodb.com");
+            CHECK(app->get_base_url() == "https://alternate.someurl.fake");
+            CHECK(app->get_host_url() == "https://alternate.someurl.fake");
+            CHECK(app->get_ws_host_url() == "wss://alternate.someurl.fake");
         }
         {
             // Third time through, base_url is not set, expect https://realm.mongodb.com, since metadata
@@ -3977,31 +3986,31 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
             CHECK(app->get_ws_host_url() == expected_wsurl);
         }
         {
-            // Fourth time through, base_url is set to https://some-other.mongodb.com, with a redirect
-            app_config.base_url = "https://some-other.mongodb.com";
-            redir_transport->reset("https://some-other.mongodb.com", "http://redirect.mongodb.com");
+            // Fourth time through, base_url is set to https://some-other.someurl.fake, with a redirect
+            app_config.base_url = "https://some-other.someurl.fake";
+            redir_transport->reset("https://some-other.someurl.fake", "http://redirect.someurl.fake");
 
             auto app = app::App::get_app(app::App::CacheMode::Disabled, app_config, sc_config);
             // Location is not requested until first app services request
             CHECK(!redir_transport->location_requested);
             // Initial hostname and ws hostname use base url, but aren't used until location is updated
-            CHECK(app->get_host_url() == "https://some-other.mongodb.com");
-            CHECK(app->get_ws_host_url() == "wss://some-other.mongodb.com");
+            CHECK(app->get_host_url() == "https://some-other.someurl.fake");
+            CHECK(app->get_ws_host_url() == "wss://some-other.someurl.fake");
 
             do_login(app);
             CHECK(redir_transport->location_requested);
             // Base URL is still set to the original value
-            CHECK(app->get_base_url() == "https://some-other.mongodb.com");
+            CHECK(app->get_base_url() == "https://some-other.someurl.fake");
             // Hostname and ws hostname use the redirect URL values
-            CHECK(app->get_host_url() == "http://redirect.mongodb.com");
-            CHECK(app->get_ws_host_url() == "ws://redirect.mongodb.com");
+            CHECK(app->get_host_url() == "http://redirect.someurl.fake");
+            CHECK(app->get_ws_host_url() == "ws://redirect.someurl.fake");
         }
     }
 
     SECTION("Test update_baseurl") {
         {
-            app_config.base_url = "https://alternate.mongodb.com";
-            redir_transport->reset("https://alternate.mongodb.com");
+            app_config.base_url = "https://alternate.someurl.fake";
+            redir_transport->reset("https://alternate.someurl.fake");
 
             auto app = app::App::get_app(app::App::CacheMode::Disabled, app_config, sc_config);
             // Location is not requested until first app services request
@@ -4009,24 +4018,13 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
 
             do_login(app);
             CHECK(redir_transport->location_requested);
-            CHECK(app->get_base_url() == "https://alternate.mongodb.com");
-            CHECK(app->get_host_url() == "https://alternate.mongodb.com");
-            CHECK(app->get_ws_host_url() == "wss://alternate.mongodb.com");
-
-            redir_transport->reset("http://some-other.mongodb.com");
-            app->update_base_url("http://some-other.mongodb.com", [](util::Optional<app::AppError> error) {
-                CHECK(!error);
-            });
-            CHECK(redir_transport->location_requested);
-            CHECK(app->get_base_url() == "http://some-other.mongodb.com");
-            CHECK(app->get_host_url() == "http://some-other.mongodb.com");
-            CHECK(app->get_ws_host_url() == "ws://some-other.mongodb.com");
-            // Expected URL is still "http://some-other.mongodb.com"
-            do_login(app);
+            CHECK(app->get_base_url() == "https://alternate.someurl.fake");
+            CHECK(app->get_host_url() == "https://alternate.someurl.fake");
+            CHECK(app->get_ws_host_url() == "wss://alternate.someurl.fake");
 
             redir_transport->reset("https://realm.mongodb.com");
 
-            // Revert the base URL to the default URL value
+            // Revert the base URL to the default URL value using std::nullopt
             app->update_base_url(std::nullopt, [](util::Optional<app::AppError> error) {
                 CHECK(!error);
             });
@@ -4034,15 +4032,39 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
             CHECK(app->get_base_url() == "https://realm.mongodb.com");
             CHECK(app->get_host_url() == "https://realm.mongodb.com");
             CHECK(app->get_ws_host_url() == "wss://realm.mongodb.com");
-            // Expected URL is still ""https://realm.mongodb.com""
+            // Expected URL is still "https://realm.mongodb.com"
+            do_login(app);
+
+            redir_transport->reset("http://some-other.url.fake");
+            app->update_base_url("http://some-other.url.fake", [](util::Optional<app::AppError> error) {
+                CHECK(!error);
+            });
+            CHECK(redir_transport->location_requested);
+            CHECK(app->get_base_url() == "http://some-other.url.fake");
+            CHECK(app->get_host_url() == "http://some-other.url.fake");
+            CHECK(app->get_ws_host_url() == "ws://some-other.url.fake");
+            // Expected URL is still "http://some-other.url.fake"
+            do_login(app);
+
+            redir_transport->reset("https://realm.mongodb.com");
+
+            // Revert the base URL to the default URL value using the empty string
+            app->update_base_url("", [](util::Optional<app::AppError> error) {
+                CHECK(!error);
+            });
+            CHECK(redir_transport->location_requested);
+            CHECK(app->get_base_url() == "https://realm.mongodb.com");
+            CHECK(app->get_host_url() == "https://realm.mongodb.com");
+            CHECK(app->get_ws_host_url() == "wss://realm.mongodb.com");
+            // Expected URL is still "https://realm.mongodb.com"
             do_login(app);
         }
     }
 
     SECTION("Test update_baseurl with redirect") {
         {
-            app_config.base_url = "https://alternate.mongodb.com";
-            redir_transport->reset("https://alternate.mongodb.com");
+            app_config.base_url = "https://alternate.someurl.fake";
+            redir_transport->reset("https://alternate.someurl.fake");
 
             auto app = app::App::get_app(app::App::CacheMode::Disabled, app_config, sc_config);
             // Location is not requested until first app services request
@@ -4050,28 +4072,28 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
 
             do_login(app);
             CHECK(redir_transport->location_requested);
-            CHECK(app->get_base_url() == "https://alternate.mongodb.com");
-            CHECK(app->get_host_url() == "https://alternate.mongodb.com");
-            CHECK(app->get_ws_host_url() == "wss://alternate.mongodb.com");
+            CHECK(app->get_base_url() == "https://alternate.someurl.fake");
+            CHECK(app->get_host_url() == "https://alternate.someurl.fake");
+            CHECK(app->get_ws_host_url() == "wss://alternate.someurl.fake");
 
-            redir_transport->reset("http://some-other.mongodb.com", "https://redirect.mongodb.com");
+            redir_transport->reset("http://some-other.someurl.fake", "https://redirect.otherurl.fake");
 
-            app->update_base_url("http://some-other.mongodb.com", [](util::Optional<app::AppError> error) {
+            app->update_base_url("http://some-other.someurl.fake", [](util::Optional<app::AppError> error) {
                 CHECK(!error);
             });
             CHECK(redir_transport->location_requested);
-            CHECK(app->get_base_url() == "http://some-other.mongodb.com");
-            CHECK(app->get_host_url() == "https://redirect.mongodb.com");
-            CHECK(app->get_ws_host_url() == "wss://redirect.mongodb.com");
-            // Expected URL is still "https://redirect.mongodb.com" after redirect
+            CHECK(app->get_base_url() == "http://some-other.someurl.fake");
+            CHECK(app->get_host_url() == "https://redirect.otherurl.fake");
+            CHECK(app->get_ws_host_url() == "wss://redirect.otherurl.fake");
+            // Expected URL is still "https://redirect.otherurl.fake" after redirect
             do_login(app);
         }
     }
 
     SECTION("Test update_baseurl returns error") {
         {
-            app_config.base_url = "http://alternate.mongodb.com";
-            redir_transport->reset("http://alternate.mongodb.com");
+            app_config.base_url = "http://alternate.someurl.fake";
+            redir_transport->reset("http://alternate.someurl.fake");
 
             auto app = app::App::get_app(app::App::CacheMode::Disabled, app_config, sc_config);
             // Location is not requested until first app services request
@@ -4079,30 +4101,31 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
 
             do_login(app);
             CHECK(redir_transport->location_requested);
-            CHECK(app->get_base_url() == "http://alternate.mongodb.com");
-            CHECK(app->get_host_url() == "http://alternate.mongodb.com");
-            CHECK(app->get_ws_host_url() == "ws://alternate.mongodb.com");
+            CHECK(app->get_base_url() == "http://alternate.someurl.fake");
+            CHECK(app->get_host_url() == "http://alternate.someurl.fake");
+            CHECK(app->get_ws_host_url() == "ws://alternate.someurl.fake");
 
-            redir_transport->reset("https://some-other.mongodb.com");
+            redir_transport->reset("https://some-other.someurl.fake");
             redir_transport->location_returns_error = true;
 
-            app->update_base_url("https://some-other.mongodb.com", [](util::Optional<app::AppError> error) {
+            app->update_base_url("https://some-other.someurl.fake", [](util::Optional<app::AppError> error) {
                 CHECK(error);
             });
             CHECK(redir_transport->location_requested);
-            CHECK(app->get_base_url() == "http://alternate.mongodb.com");
-            CHECK(app->get_host_url() == "http://alternate.mongodb.com");
-            CHECK(app->get_ws_host_url() == "ws://alternate.mongodb.com");
+            // Verify original url values are still being used
+            CHECK(app->get_base_url() == "http://alternate.someurl.fake");
+            CHECK(app->get_host_url() == "http://alternate.someurl.fake");
+            CHECK(app->get_ws_host_url() == "ws://alternate.someurl.fake");
         }
     }
 
     // Verify new sync session updates location after app created with cached user
     SECTION("Verify new sync session updates location") {
         bool use_ssl = GENERATE(true, false);
-        std::string expected_host = "redirect.mongodb.com";
+        std::string expected_host = "redirect.someurl.fake";
         int expected_port = 8081;
-        std::string init_url = util::format("http%1://alternate.mongodb.com", use_ssl ? "s" : "");
-        std::string init_wsurl = util::format("ws%1://alternate.mongodb.com", use_ssl ? "s" : "");
+        std::string init_url = util::format("http%1://alternate.someurl.fake", use_ssl ? "s" : "");
+        std::string init_wsurl = util::format("ws%1://alternate.someurl.fake", use_ssl ? "s" : "");
         std::string redir_url = util::format("http%1://%2:%3", use_ssl ? "s" : "", expected_host, expected_port);
         std::string redir_wsurl = util::format("ws%1://%2:%3", use_ssl ? "s" : "", expected_host, expected_port);
 
@@ -4161,7 +4184,7 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
                 state.transition_with([&error, &logger](TestState cur_state) -> std::optional<TestState> {
                     if (cur_state == TestState::start) {
                         // The session will start, but the connection is rejected on purpose
-                        logger->debug("Expected error: %1: %2", error.status.code_string(), error.status.reason());
+                        logger->debug("Expected error: %1", error.status);
                         CHECK(!error.status.is_ok());
                         CHECK(error.status.code() == ErrorCodes::SyncConnectFailed);
                         return TestState::session_started;
@@ -4227,7 +4250,7 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
             // Location request will pass this time, try to reconnect
             // expecting 404 when websocket connects
             redir_transport->reset(init_url, redir_url);
-            state.advance_to(TestState::waiting_for_session);
+            state.transition_to(TestState::waiting_for_session);
             auto session = app->sync_manager()->get_existing_session(r_config.path);
             CHECK(session);
             session->resume();
@@ -4985,7 +5008,7 @@ struct ErrorCheckingTransport : public GenericNetworkTransport {
                                 0,
                                 {{"content-type", "application/json"}},
                                 "{\"deployment_model\":\"GLOBAL\",\"location\":\"US-VA\",\"hostname\":"
-                                "\"http://somewhere.mongodb.com\",\"ws_hostname\":\"ws://somewhere.mongodb.com\"}"});
+                                "\"http://some.fake.url\",\"ws_hostname\":\"ws://some.fake.url\"}"});
             return;
         }
 
@@ -5566,7 +5589,7 @@ TEST_CASE("app: app destroyed during token refresh", "[sync][app][user][token]")
         {
             if (request.url.find("/login") != std::string::npos) {
                 CHECK(state.get() == TestState::location);
-                state.advance_to(TestState::login);
+                state.transition_to(TestState::login);
                 mock_transport_worker.add_work_item(
                     Response{200, 0, {}, user_json(encode_fake_jwt("access token 1")).dump()}, std::move(completion));
             }
@@ -5575,29 +5598,29 @@ TEST_CASE("app: app destroyed during token refresh", "[sync][app][user][token]")
                 auto cur_state = state.get();
                 CHECK((cur_state == TestState::refresh_1 || cur_state == TestState::login));
                 if (cur_state == TestState::refresh_1) {
-                    state.advance_to(TestState::profile_2);
+                    state.transition_to(TestState::profile_2);
                     mock_transport_worker.add_work_item(Response{200, 0, {}, user_profile_json().dump()},
                                                         std::move(completion));
                 }
                 else if (cur_state == TestState::login) {
-                    state.advance_to(TestState::profile_1);
+                    state.transition_to(TestState::profile_1);
                     mock_transport_worker.add_work_item(Response{401, 0, {}}, std::move(completion));
                 }
             }
             else if (request.url.find("/session") != std::string::npos && request.method == HttpMethod::post) {
                 if (state.get() == TestState::profile_1) {
-                    state.advance_to(TestState::refresh_1);
+                    state.transition_to(TestState::refresh_1);
                     nlohmann::json json{{"access_token", encode_fake_jwt("access token 1")}};
                     mock_transport_worker.add_work_item(Response{200, 0, {}, json.dump()}, std::move(completion));
                 }
                 else if (state.get() == TestState::profile_2) {
-                    state.advance_to(TestState::refresh_2);
+                    state.transition_to(TestState::refresh_2);
                     mock_transport_worker.add_work_item(Response{200, 0, {}, "{\"error\":\"too bad, buddy!\"}"},
                                                         std::move(completion));
                 }
                 else {
                     CHECK(state.get() == TestState::refresh_2);
-                    state.advance_to(TestState::refresh_3);
+                    state.transition_to(TestState::refresh_3);
                     nlohmann::json json{{"access_token", encode_fake_jwt("access token 2")}};
                     mock_transport_worker.add_work_item(Response{200, 0, {}, json.dump()}, std::move(completion));
                 }
@@ -5605,7 +5628,7 @@ TEST_CASE("app: app destroyed during token refresh", "[sync][app][user][token]")
             else if (request.url.find("/location") != std::string::npos) {
                 CHECK(request.method == HttpMethod::get);
                 CHECK(state.get() == TestState::unknown);
-                state.advance_to(TestState::location);
+                state.transition_to(TestState::location);
                 mock_transport_worker.add_work_item(
                     Response{200,
                              0,
@@ -5873,35 +5896,9 @@ TEST_CASE("app: sync_user_profile unit tests", "[sync][app][user]") {
 TEST_CASE("app: app cannot get deallocated during log in", "[sync][app]") {
     AsyncMockNetworkTransport mock_transport_worker;
     enum class TestState { unknown, location, login, app_deallocated, profile };
-    struct TestStateBundle {
-        void advance_to(TestState new_state)
-        {
-            std::lock_guard<std::mutex> lk(mutex);
-            state = new_state;
-            cond.notify_one();
-        }
-
-        TestState get() const
-        {
-            std::lock_guard<std::mutex> lk(mutex);
-            return state;
-        }
-
-        void wait_for(TestState new_state)
-        {
-            std::unique_lock<std::mutex> lk(mutex);
-            cond.wait(lk, [&] {
-                return state == new_state;
-            });
-        }
-
-        mutable std::mutex mutex;
-        std::condition_variable cond;
-
-        TestState state = TestState::unknown;
-    } state;
+    TestingStateMachine<TestState> state(TestState::unknown);
     struct transport : public GenericNetworkTransport {
-        transport(AsyncMockNetworkTransport& worker, TestStateBundle& state)
+        transport(AsyncMockNetworkTransport& worker, TestingStateMachine<TestState>& state)
             : mock_transport_worker(worker)
             , state(state)
         {
@@ -5910,20 +5907,20 @@ TEST_CASE("app: app cannot get deallocated during log in", "[sync][app]") {
         void send_request_to_server(const Request& request, util::UniqueFunction<void(const Response&)>&& completion) override
         {
             if (request.url.find("/login") != std::string::npos) {
-                state.advance_to(TestState::login);
+                state.transition_to(TestState::login);
                 state.wait_for(TestState::app_deallocated);
                 mock_transport_worker.add_work_item(
                     Response{200, 0, {}, user_json(encode_fake_jwt("access token")).dump()},
                     std::move(completion));
             }
             else if (request.url.find("/profile") != std::string::npos) {
-                state.advance_to(TestState::profile);
+                state.transition_to(TestState::profile);
                 mock_transport_worker.add_work_item(Response{200, 0, {}, user_profile_json().dump()},
                                                     std::move(completion));
             }
             else if (request.url.find("/location") != std::string::npos) {
                 CHECK(request.method == HttpMethod::get);
-                state.advance_to(TestState::location);
+                state.transition_to(TestState::location);
                 mock_transport_worker.add_work_item(
                     Response{200,
                              0,
@@ -5935,7 +5932,7 @@ TEST_CASE("app: app cannot get deallocated during log in", "[sync][app]") {
         }
 
         AsyncMockNetworkTransport& mock_transport_worker;
-        TestStateBundle& state;
+        TestingStateMachine<TestState>& state;
     };
 
     auto [cur_user_promise, cur_user_future] = util::make_promise_future<std::shared_ptr<SyncUser>>();
@@ -5954,7 +5951,7 @@ TEST_CASE("app: app cannot get deallocated during log in", "[sync][app]") {
     }
 
     // At this point the test does not hold any reference to `app`.
-    state.advance_to(TestState::app_deallocated);
+    state.transition_to(TestState::app_deallocated);
     auto cur_user = std::move(cur_user_future).get();
     CHECK(cur_user);
 
@@ -5965,35 +5962,9 @@ TEST_CASE("app: app cannot get deallocated during log in", "[sync][app]") {
 TEST_CASE("app: user logs out while profile is fetched", "[sync][app][user]") {
     AsyncMockNetworkTransport mock_transport_worker;
     enum class TestState { unknown, location, login, profile };
-    struct TestStateBundle {
-        void advance_to(TestState new_state)
-        {
-            std::lock_guard<std::mutex> lk(mutex);
-            state = new_state;
-            cond.notify_one();
-        }
-
-        TestState get() const
-        {
-            std::lock_guard<std::mutex> lk(mutex);
-            return state;
-        }
-
-        void wait_for(TestState new_state)
-        {
-            std::unique_lock<std::mutex> lk(mutex);
-            cond.wait(lk, [&] {
-                return state == new_state;
-            });
-        }
-
-        mutable std::mutex mutex;
-        std::condition_variable cond;
-
-        TestState state = TestState::unknown;
-    } state;
+    TestingStateMachine<TestState> state(TestState::unknown);
     struct transport : public GenericNetworkTransport {
-        transport(AsyncMockNetworkTransport& worker, TestStateBundle& state,
+        transport(AsyncMockNetworkTransport& worker, TestingStateMachine<TestState>& state,
                   std::shared_ptr<SyncUser>& logged_in_user)
             : mock_transport_worker(worker)
             , state(state)
@@ -6005,19 +5976,19 @@ TEST_CASE("app: user logs out while profile is fetched", "[sync][app][user]") {
                                     util::UniqueFunction<void(const Response&)>&& completion) override
         {
             if (request.url.find("/login") != std::string::npos) {
-                state.advance_to(TestState::login);
+                state.transition_to(TestState::login);
                 mock_transport_worker.add_work_item(
                     Response{200, 0, {}, user_json(encode_fake_jwt("access token")).dump()}, std::move(completion));
             }
             else if (request.url.find("/profile") != std::string::npos) {
                 logged_in_user->log_out();
-                state.advance_to(TestState::profile);
+                state.transition_to(TestState::profile);
                 mock_transport_worker.add_work_item(Response{200, 0, {}, user_profile_json().dump()},
                                                     std::move(completion));
             }
             else if (request.url.find("/location") != std::string::npos) {
                 CHECK(request.method == HttpMethod::get);
-                state.advance_to(TestState::location);
+                state.transition_to(TestState::location);
                 mock_transport_worker.add_work_item(
                     Response{200,
                              0,
@@ -6029,7 +6000,7 @@ TEST_CASE("app: user logs out while profile is fetched", "[sync][app][user]") {
         }
 
         AsyncMockNetworkTransport& mock_transport_worker;
-        TestStateBundle& state;
+        TestingStateMachine<TestState>& state;
         std::shared_ptr<SyncUser>& logged_in_user;
     };
 

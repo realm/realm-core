@@ -278,8 +278,8 @@ App::App(Private, const Config& config)
 
     // if a base url is provided, then verify the value
     if (m_config.base_url) {
-        if (!AppUtils::split_url(*m_config.base_url)) {
-            throw sync::BadServerUrl(*m_config.base_url);
+        if (auto comp = AppUtils::split_url(*m_config.base_url); !comp.is_ok()) {
+            throw Exception(comp.get_status());
         }
     }
     // Setup a baseline set of routes using the provided or default base url
@@ -616,15 +616,18 @@ void App::update_base_url(std::optional<std::string> base_url, UniqueFunction<vo
 {
     std::string new_base_url = base_url.value_or(std::string(s_default_base_url));
 
-    log_debug("App::update_base_url: %1", new_base_url);
-
     if (new_base_url.empty()) {
-        throw InvalidArgument("update_base_url: new base URL value cannot be empty");
+        // Treat an empty string the same as requesting the default base url
+        new_base_url = s_default_base_url;
+        log_debug("App::update_base_url: empty => %1", new_base_url);
+    }
+    else {
+        log_debug("App::update_base_url: %1", new_base_url);
     }
 
     // Validate the new base_url
-    if (!AppUtils::split_url(new_base_url)) {
-        throw sync::BadServerUrl(new_base_url);
+    if (auto comp = AppUtils::split_url(new_base_url); !comp.is_ok()) {
+        throw Exception(comp.get_status());
     }
 
     bool update_not_needed;
@@ -984,7 +987,7 @@ void App::request_location(UniqueFunction<void(std::optional<AppError>)>&& compl
                 // Handle the redirect response when requesting the location - extract the
                 // new location header field and resend the request.
                 auto redir_location = AppUtils::extract_redir_location(response.headers);
-                if (!redir_location || redir_location->empty()) {
+                if (!redir_location) {
                     // Location not found in the response, pass error response up the chain
                     completion(AppError{ErrorCodes::ClientRedirectError,
                                         "Redirect response missing location header",
@@ -1062,11 +1065,11 @@ void App::update_location_and_resend(Request&& request, UniqueFunction<void(cons
 
             // If the location info was updated, update the original request to point
             // to the new location URL.
-            auto components = AppUtils::split_url(request.url);
-            if (!components) {
-                throw sync::BadServerUrl(request.url);
+            auto comp = AppUtils::split_url(request.url);
+            if (!comp.is_ok()) {
+                throw Exception(comp.get_status());
             }
-            request.url = self->get_host_url() + components->request;
+            request.url = self->get_host_url() + comp.get_value().request;
 
             // Retry the original request with the updated url
             self->m_config.transport->send_request_to_server(
@@ -1093,8 +1096,8 @@ void App::do_request(Request&& request, UniqueFunction<void(const Response& resp
     request.timeout_ms = m_request_timeout_ms;
 
     // Verify the request URL to make sure it is valid
-    if (!AppUtils::split_url(request.url)) {
-        throw sync::BadServerUrl(request.url);
+    if (auto comp = AppUtils::split_url(request.url); !comp.is_ok()) {
+        throw Exception(comp.get_status());
     }
 
     // Refresh the location info when app is created or when requested (e.g. after a websocket redirect)
@@ -1132,7 +1135,7 @@ void App::check_for_redirect_response(Request&& request, const Response& respons
     // Handle a redirect response when sending the original request - extract the location
     // header field and resend the request.
     auto redir_location = AppUtils::extract_redir_location(response.headers);
-    if (!redir_location || redir_location->empty()) {
+    if (!redir_location) {
         // Location not found in the response, pass error response up the chain
         return completion(AppUtils::make_clienterror_response(
             ErrorCodes::ClientRedirectError, "Redirect response missing location header", response.http_status_code));
@@ -1289,7 +1292,7 @@ void App::call_function(const std::shared_ptr<SyncUser>& user, const std::string
                       if (err) {
                           return completion({}, err);
                       }
-                      if (response == nullptr) {
+                      if (!response) {
                           return completion({}, AppError{ErrorCodes::AppUnknownError, "Empty response from server"});
                       }
                       util::Optional<Bson> body_as_bson;

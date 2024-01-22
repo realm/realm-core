@@ -45,32 +45,32 @@ AppUtils::find_header(const std::string& key_name, const std::map<std::string, s
     return nullptr;
 }
 
-std::optional<AppUtils::UrlComponents> AppUtils::split_url(std::string url)
+StatusWith<AppUtils::UrlComponents> AppUtils::split_url(std::string url)
 {
     UrlComponents comp;
     // Find the position of the scheme separator "://"
     size_t scheme_end_pos = url.find("://");
     if (scheme_end_pos == std::string::npos) {
         // Missing scheme separator
-        return std::nullopt;
+        return {ErrorCodes::BadServerUrl, util::format("URL missing scheme separator '://': %1", url)};
     }
     comp.scheme = url.substr(0, scheme_end_pos);
     url.erase(0, scheme_end_pos + std::char_traits<char>::length("://"));
 
     // Find the first slash "/"
     size_t host_end_pos = url.find("/");
-    // No server provided
     if (url.empty() || host_end_pos == 0) {
-        return std::nullopt;
+        // No server provided
+        return {ErrorCodes::BadServerUrl, util::format("URL missing server: %1", url)};
     }
     if (host_end_pos == std::string::npos) {
         // No path/query/components section
         comp.server = url;
-        return std::move(comp);
+        return comp;
     }
     comp.server = url.substr(0, host_end_pos);
     comp.request = url.substr(host_end_pos);
-    return std::move(comp);
+    return comp;
 }
 
 bool AppUtils::is_success_status_code(int status_code)
@@ -81,12 +81,10 @@ bool AppUtils::is_success_status_code(int status_code)
 bool AppUtils::is_redirect_status_code(int status_code)
 {
     using namespace realm::sync;
-    if (!AppUtils::is_success_status_code(status_code)) {
-        // If the response contains a redirection, then return true
-        auto code = HTTPStatus(status_code);
-        if (code == HTTPStatus::MovedPermanently || code == HTTPStatus::PermanentRedirect) {
-            return true;
-        }
+    // If the response contains a redirection, then return true
+    if (auto code = HTTPStatus(status_code);
+        code == HTTPStatus::MovedPermanently || code == HTTPStatus::PermanentRedirect) {
+        return true;
     }
     return false;
 }
@@ -95,11 +93,9 @@ std::optional<std::string> AppUtils::extract_redir_location(const std::map<std::
 {
     // Look for case insensitive redirect "location" in headers
     auto location = AppUtils::find_header("location", headers);
-    if (location && !location->second.empty()) {
-        if (AppUtils::split_url(location->second)) {
-            // If the location is valid, return it wholesale (e.g., it could include a path for API proxies)
-            return location->second;
-        }
+    if (location && !location->second.empty() && AppUtils::split_url(location->second).is_ok()) {
+        // If the location is valid, return it wholesale (e.g., it could include a path for API proxies)
+        return location->second;
     }
     return std::nullopt;
 }

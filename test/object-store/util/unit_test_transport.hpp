@@ -45,6 +45,12 @@ public:
     void set_base_url(const std::string& base_url)
     {
         m_base_url = base_url;
+        m_location_called = false;
+    }
+
+    bool get_location_called() const
+    {
+        return m_location_called;
     }
 
     void set_provider_type(const std::string& provider_type)
@@ -69,6 +75,7 @@ private:
     std::string m_provider_type;
     uint64_t m_request_timeout = 60000;
     realm::util::Optional<std::string> m_base_url = realm::util::none;
+    bool m_location_called = false;
     nlohmann::json m_user_profile = nlohmann::json::object();
     nlohmann::json m_options;
 

@@ -119,12 +119,13 @@ void UnitTestTransport::handle_location(const Request& request,
 
     if (m_base_url) {
         CHECK(request.url.find(*m_base_url) != std::string::npos);
+        m_location_called = true;
     }
 
     // The actual values don't matter
     std::string response = nlohmann::json({{"deployment_model", "DOESN'T"},
-                                           {"hostname", "https://somewhere.mongodb.com"},
-                                           {"ws_hostname", "wss://ws.somewhere.mongodb.com"},
+                                           {"hostname", "https://some.fake.url"},
+                                           {"ws_hostname", "wss://ws.some.fake.url"},
                                            {"location", "MATTER"}})
                                .dump();
 

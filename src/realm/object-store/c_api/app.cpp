@@ -284,21 +284,16 @@ RLM_API const char* realm_app_get_app_id(const realm_app_t* app) noexcept
     return (*app)->config().app_id.c_str();
 }
 
-RLM_API bool realm_app_update_base_url(realm_app_t* app, realm_string_t base_url,
+RLM_API bool realm_app_update_base_url(realm_app_t* app, const char* base_url,
                                        realm_app_void_completion_func_t callback, realm_userdata_t userdata,
                                        realm_free_userdata_func_t userdata_free)
 {
+    std::optional<std::string> new_base_url;
+    if (base_url) {
+        new_base_url = base_url;
+    }
     return wrap_err([&] {
-        (*app)->update_base_url(from_capi(base_url), make_callback(callback, userdata, userdata_free));
-        return true;
-    });
-}
-
-RLM_API bool realm_app_set_default_base_url(realm_app_t* app, realm_app_void_completion_func_t callback,
-                                            realm_userdata_t userdata, realm_free_userdata_func_t userdata_free)
-{
-    return wrap_err([&] {
-        (*app)->update_base_url(std::nullopt, make_callback(callback, userdata, userdata_free));
+        (*app)->update_base_url(new_base_url, make_callback(callback, userdata, userdata_free));
         return true;
     });
 }

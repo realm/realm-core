@@ -281,7 +281,7 @@ public:
     /// NOTE: If another App operation is started while this function is in progress, that request will use the
     ///       original base URL location information.
     /// @param base_url The new base URL to use for future AppServices requests and sync websocket connections. If
-    ///                 not set, the default Device Sync base_url will be used.
+    ///                 not set or an empty string, the default Device Sync base_url will be used.
     /// @param completion A callback block to be invoked once the location update completes.
     void update_base_url(std::optional<std::string> base_url,
                          util::UniqueFunction<void(util::Optional<AppError>)>&& completion) REQUIRES(!m_route_mutex);
@@ -437,8 +437,7 @@ private:
     // Local copy of app config
     Config m_config;
 
-    // A shared pointer to support the App move constructor and mutable
-    // to allow locking for reads in const functions
+    // mutable to allow locking for reads in const functions
     mutable util::CheckedMutex m_route_mutex;
 
     // The following variables hold the different paths to Atlas, depending on the

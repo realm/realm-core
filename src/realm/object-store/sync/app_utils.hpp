@@ -21,6 +21,7 @@
 
 #include <realm/util/optional.hpp>
 #include <realm/error_codes.hpp>
+#include <realm/status_with.hpp>
 
 #include <map>
 
@@ -37,7 +38,7 @@ public:
     };
     // Split the URL into scheme, server and request parts
     // returns nullopt if missing `://` or server info is empty
-    static std::optional<AppUtils::UrlComponents> split_url(std::string url);
+    static StatusWith<AppUtils::UrlComponents> split_url(std::string url);
 
     static std::optional<AppError> check_for_errors(const Response& response);
     static Response make_apperror_response(const AppError& error);

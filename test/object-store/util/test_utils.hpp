@@ -45,7 +45,7 @@ public:
         return m_cur_state;
     }
 
-    void advance_to(E new_state)
+    void transition_to(E new_state)
     {
         std::lock_guard lock{m_mutex};
         m_cur_state = new_state;
@@ -68,9 +68,6 @@ public:
     void wait_for(E target)
     {
         std::unique_lock lock{m_mutex};
-        if (m_cur_state == target) {
-            return; // already at state
-        }
         m_cv.wait(lock, [&] {
             return m_cur_state == target;
         });

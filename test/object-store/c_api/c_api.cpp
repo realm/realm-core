@@ -536,6 +536,8 @@ TEST_CASE("C API (non-database)", "[c_api]") {
     SECTION("realm_app_config_t") {
         const uint64_t request_timeout = 2500;
         std::string base_url = "https://path/to/app";
+        std::string base_url2 = "https://some/other/path";
+        std::string default_base_url = "https://realm.mongodb.com";
         auto transport = std::make_shared<UnitTestTransport>(request_timeout);
         transport->set_expected_options({{"device",
                                           {{"appId", "app_id_123"},
@@ -592,19 +594,94 @@ TEST_CASE("C API (non-database)", "[c_api]") {
         auto guard = util::make_scope_exit([&temp_dir]() noexcept {
             util::try_remove_dir_recursive(temp_dir);
         });
-        SyncClientConfig sync_client_config;
-        sync_client_config.base_file_path = temp_dir;
-        sync_client_config.metadata_mode = SyncClientConfig::MetadataMode::NoMetadata;
+        auto sync_client_config = cptr(realm_sync_client_config_new());
+        realm_sync_client_config_set_base_file_path(sync_client_config.get(), temp_dir.c_str());
+        realm_sync_client_config_set_metadata_mode(sync_client_config.get(), RLM_SYNC_CLIENT_METADATA_MODE_DISABLED);
 
-        auto test_app = app::App::get_app(app::App::CacheMode::Disabled, *app_config, sync_client_config);
-        auto credentials = app::AppCredentials::anonymous();
+        auto test_app = cptr(realm_app_create(app_config.get(), sync_client_config.get()));
+        realm_user_t* sync_user;
+        void* user_data = reinterpret_cast<void*>(&sync_user);
+        auto user_data_free = [](realm_userdata_t) {};
+
         // Verify the values above are included in the login request
-        test_app->log_in_with_credentials(credentials, [&](const std::shared_ptr<realm::SyncUser>&,
-                                                           realm::util::Optional<realm::app::AppError> error) {
-            CHECK(!error);
-        });
+        auto credentials = cptr(realm_app_credentials_new_anonymous(true));
+        realm_app_log_in_with_credentials(
+            test_app.get(), credentials.get(),
+            [](realm_userdata_t userdata, realm_user_t* user, const realm_app_error_t* error) {
+                CHECK(!error);
+                CHECK(user);
+                auto sync_user = reinterpret_cast<realm_user_t**>(userdata);
+                *sync_user = user;
+            },
+            user_data, user_data_free);
 
-        CHECK(test_app->get_base_url() == base_url);
+        CHECK(transport->get_location_called());
+        auto app_base_url = realm_app_get_base_url(test_app.get());
+        CHECK(app_base_url == base_url);
+        realm_free(app_base_url);
+
+        // Reset to the default base url using nullptr
+        transport->set_base_url(default_base_url);
+        realm_app_update_base_url(
+            test_app.get(), nullptr,
+            [](realm_userdata_t, const realm_app_error_t* error) {
+                CHECK(!error);
+            },
+            user_data, user_data_free);
+
+        realm_app_refresh_custom_data(
+            test_app.get(), sync_user,
+            [](realm_userdata_t, const realm_app_error_t* error) {
+                CHECK(!error);
+            },
+            user_data, user_data_free);
+
+        CHECK(transport->get_location_called());
+        app_base_url = realm_app_get_base_url(test_app.get());
+        CHECK(app_base_url == default_base_url);
+        realm_free(app_base_url);
+
+        // Set to some other base url
+        transport->set_base_url(base_url2);
+        realm_app_update_base_url(
+            test_app.get(), base_url2.c_str(),
+            [](realm_userdata_t, const realm_app_error_t* error) {
+                CHECK(!error);
+            },
+            user_data, user_data_free);
+
+        realm_app_refresh_custom_data(
+            test_app.get(), sync_user,
+            [](realm_userdata_t, const realm_app_error_t* error) {
+                CHECK(!error);
+            },
+            user_data, user_data_free);
+
+        CHECK(transport->get_location_called());
+        app_base_url = realm_app_get_base_url(test_app.get());
+        CHECK(app_base_url == base_url2);
+        realm_free(app_base_url);
+
+        // Reset to default base url using empty string
+        transport->set_base_url(default_base_url);
+        realm_app_update_base_url(
+            test_app.get(), "",
+            [](realm_userdata_t, const realm_app_error_t* error) {
+                CHECK(!error);
+            },
+            user_data, user_data_free);
+
+        realm_app_refresh_custom_data(
+            test_app.get(), sync_user,
+            [](realm_userdata_t, const realm_app_error_t* error) {
+                CHECK(!error);
+            },
+            user_data, user_data_free);
+
+        CHECK(transport->get_location_called());
+        app_base_url = realm_app_get_base_url(test_app.get());
+        CHECK(app_base_url == default_base_url);
+        realm_free(app_base_url);
     }
 #endif // REALM_ENABLE_SYNC
 }
