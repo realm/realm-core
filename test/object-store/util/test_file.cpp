@@ -94,7 +94,7 @@ TestFile::~TestFile()
 {
     if (!m_persist) {
         try {
-            util::Logger::get_default_logger()->detail("~TestFile() removing '%1' and '%2'", path, m_temp_dir);
+            util::Logger::get_default_logger()->debug("~TestFile() removing '%1' and '%2'", path, m_temp_dir);
             util::File::try_remove(path);
             util::try_remove_dir_recursive(m_temp_dir);
         }
@@ -181,7 +181,7 @@ SyncTestFile::SyncTestFile(std::shared_ptr<realm::SyncUser> user, realm::Schema 
                      error.status, session->path());
         abort();
     };
-    schema_version = 1;
+    schema_version = 0;
     schema = _schema;
     schema_mode = SchemaMode::AdditiveExplicit;
 }
@@ -279,7 +279,7 @@ static Status wait_for_session(Realm& realm, void (SyncSession::*fn)(util::Uniqu
         return shared_state->complete == true;
     });
     if (!completed) {
-        throw std::runtime_error(util::format("wait_for_session() exceeded %1 ms", delay.count()));
+        throw std::runtime_error(util::format("wait_for_session() exceeded %1 s", delay.count()));
     }
     return shared_state->status;
 }

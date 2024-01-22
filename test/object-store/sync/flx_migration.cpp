@@ -275,6 +275,7 @@ TEST_CASE("Test client migration and rollback", "[sync][flx][flx migration][baas
     TestAppSession session(create_app(server_app_config));
     SyncTestFile config(session.app(), partition, server_app_config.schema);
     config.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
+    config.schema_version = 0;
 
     // Fill some objects
     auto objects = fill_test_data(config, partition); // 5 objects starting at 1
@@ -329,6 +330,7 @@ TEST_CASE("Test client migration and rollback with recovery", "[sync][flx][flx m
     TestAppSession session(create_app(server_app_config));
     SyncTestFile config(session.app(), partition, server_app_config.schema);
     config.sync_config->client_resync_mode = ClientResyncMode::Recover;
+    config.schema_version = 0;
 
     // Fill some objects
     auto objects = fill_test_data(config); // 5 objects starting at 1 with no partition value set
@@ -484,6 +486,7 @@ TEST_CASE("An interrupted migration or rollback can recover on the next session"
     TestAppSession session(create_app(server_app_config));
     SyncTestFile config(session.app(), partition, server_app_config.schema);
     config.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
+    config.schema_version = 0;
 
     // Fill some objects
     auto objects = fill_test_data(config, partition);
@@ -594,6 +597,7 @@ TEST_CASE("Update to native FLX after migration", "[sync][flx][flx migration][ba
     TestAppSession session(create_app(server_app_config));
     SyncTestFile config(session.app(), partition, server_app_config.schema);
     config.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
+    config.schema_version = 0;
 
     // Fill some objects
     auto objects = fill_test_data(config, partition); // 5 objects starting at 1
@@ -714,6 +718,7 @@ TEST_CASE("New table is synced after migration", "[sync][flx][flx migration][baa
     TestAppSession session(create_app(server_app_config));
     SyncTestFile config(session.app(), partition, server_app_config.schema);
     config.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
+    config.schema_version = 0;
 
     // Fill some objects
     auto objects = fill_test_data(config, partition); // 5 objects starting at 1
@@ -839,6 +844,7 @@ TEST_CASE("Async open + client reset", "[sync][flx][flx migration][baas]") {
         REQUIRE(table_after);
         ++num_after_reset_notifications;
     };
+    config->schema_version = 0;
 
     ObjectSchema locally_added("LocallyAdded", {{"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
                                                 {"string_field", PropertyType::String | PropertyType::Nullable},

@@ -60,6 +60,7 @@ if(REALM_ENABLE_SYNC)
         sync/client_reset.cpp
         sync/file.cpp
         sync/flx_migration.cpp
+        sync/flx_schema_migration.cpp
         sync/flx_sync.cpp
         sync/metadata.cpp
         sync/migration_store_test.cpp
