@@ -1779,6 +1779,10 @@ void SessionWrapper::report_progress(bool only_if_new_uploadable_data)
     if (!m_progress_handler)
         return;
 
+    // Ignore progress messages from before we first receive a DOWNLOAD message
+    if (!m_reliable_download_progress)
+        return;
+
     std::uint_fast64_t downloaded_bytes = 0;
     std::uint_fast64_t downloadable_bytes = 0;
     std::uint_fast64_t uploaded_bytes = 0;
@@ -1801,16 +1805,10 @@ void SessionWrapper::report_progress(bool only_if_new_uploadable_data)
 
     m_sess->logger.debug("Progress handler called, downloaded = %1, "
                          "downloadable(total) = %2, uploaded = %3, "
-                         "uploadable = %4, reliable_download_progress = %5, "
-                         "snapshot version = %6",
-                         downloaded_bytes, total_bytes, uploaded_bytes, uploadable_bytes,
-                         m_reliable_download_progress, snapshot_version);
+                         "uploadable = %4, snapshot version = %5",
+                         downloaded_bytes, total_bytes, uploaded_bytes, uploadable_bytes, snapshot_version);
 
-    // FIXME: Why is this boolean status communicated to the application as
-    // a 64-bit integer? Also, the name `progress_version` is confusing.
-    std::uint_fast64_t progress_version = (m_reliable_download_progress ? 1 : 0);
-    m_progress_handler(downloaded_bytes, total_bytes, uploaded_bytes, uploadable_bytes, progress_version,
-                       snapshot_version);
+    m_progress_handler(downloaded_bytes, total_bytes, uploaded_bytes, uploadable_bytes, snapshot_version);
 }
 
 util::Future<std::string> SessionWrapper::send_test_command(std::string body)

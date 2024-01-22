@@ -858,9 +858,9 @@ void SyncSession::cancel_pending_waits(util::CheckedUniqueLock lock, Status erro
 }
 
 void SyncSession::handle_progress_update(uint64_t downloaded, uint64_t downloadable, uint64_t uploaded,
-                                         uint64_t uploadable, uint64_t download_version, uint64_t snapshot_version)
+                                         uint64_t uploadable, uint64_t snapshot_version)
 {
-    m_progress_notifier.update(downloaded, downloadable, uploaded, uploadable, download_version, snapshot_version);
+    m_progress_notifier.update(downloaded, downloadable, uploaded, uploadable, snapshot_version);
 }
 
 static sync::Session::Config::ClientReset make_client_reset_config(const RealmConfig& base_config,
@@ -993,10 +993,9 @@ void SyncSession::create_sync_session()
     // Set up the wrapped progress handler callback
     m_session->set_progress_handler([weak_self](uint_fast64_t downloaded, uint_fast64_t downloadable,
                                                 uint_fast64_t uploaded, uint_fast64_t uploadable,
-                                                uint_fast64_t progress_version, uint_fast64_t snapshot_version) {
+                                                uint_fast64_t snapshot_version) {
         if (auto self = weak_self.lock()) {
-            self->handle_progress_update(downloaded, downloadable, uploaded, uploadable, progress_version,
-                                         snapshot_version);
+            self->handle_progress_update(downloaded, downloadable, uploaded, uploadable, snapshot_version);
         }
     });
 
@@ -1576,11 +1575,8 @@ void SyncProgressNotifier::unregister_callback(uint64_t token)
 }
 
 void SyncProgressNotifier::update(uint64_t downloaded, uint64_t downloadable, uint64_t uploaded, uint64_t uploadable,
-                                  uint64_t download_version, uint64_t snapshot_version)
+                                  uint64_t snapshot_version)
 {
-    // Ignore progress messages from before we first receive a DOWNLOAD message
-    if (download_version == 0)
-        return;
 
     std::vector<util::UniqueFunction<void()>> invocations;
     {
