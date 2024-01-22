@@ -387,6 +387,8 @@ private:
     void handle_error(sync::SessionErrorInfo) REQUIRES(!m_state_mutex, !m_config_mutex, !m_connection_state_mutex);
     void handle_bad_auth(const std::shared_ptr<SyncUser>& user, Status status)
         REQUIRES(!m_state_mutex, !m_config_mutex);
+    void handle_location_update_failed(Status status)
+        REQUIRES(!m_state_mutex, !m_config_mutex, !m_connection_state_mutex);
     // If sub_notify_error is set (including Status::OK()), then the pending subscription waiters will
     // also be called with the sub_notify_error status value.
     void cancel_pending_waits(util::CheckedUniqueLock, Status) RELEASE(m_state_mutex);
@@ -426,6 +428,7 @@ private:
 
     sync::SaltedFileIdent get_file_ident() const;
     std::string get_appservices_connection_id() const REQUIRES(!m_state_mutex);
+    std::optional<std::string> get_sync_route() const REQUIRES(!m_state_mutex);
 
     util::Future<std::string> send_test_command(std::string body) REQUIRES(!m_state_mutex);
 

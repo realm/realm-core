@@ -106,9 +106,6 @@ private:
 };
 
 
-class BadServerUrl; // Exception
-
-
 /// \brief Client-side representation of a Realm file synchronization session.
 ///
 /// A synchronization session deals with precisely one local Realm file. To
@@ -718,14 +715,6 @@ private:
 std::ostream& operator<<(std::ostream& os, SyncConfig::ProxyConfig::Type);
 
 // Implementation
-
-class BadServerUrl : public Exception {
-public:
-    BadServerUrl(std::string_view url)
-        : Exception(ErrorCodes::BadServerUrl, util::format("Unable to parse server URL '%1'", url))
-    {
-    }
-};
 
 inline Session::Session(Session&& sess) noexcept
     : m_impl{sess.m_impl}
