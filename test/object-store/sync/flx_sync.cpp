@@ -3057,25 +3057,25 @@ static void check_document(const std::vector<bson::BsonDocument>& documents, Obj
                            std::initializer_list<std::pair<const char*, bson::Bson>> fields)
 {
     auto it = std::find_if(documents.begin(), documents.end(), [&](auto&& doc) {
-        auto it = doc.find("_id");
-        REQUIRE(it != doc.end());
-        return (*it).second == id;
+        auto val = doc.find("_id");
+        REQUIRE(val);
+        return *val == id;
     });
     REQUIRE(it != documents.end());
     auto& doc = *it;
     for (auto& [name, expected_value] : fields) {
-        auto it = doc.find(name);
-        REQUIRE(it != doc.end());
+        auto val = doc.find(name);
+        REQUIRE(val);
 
         // bson documents are ordered  but Realm dictionaries aren't, so the
         // document might validly be in a different order than we expected and
         // we need to do a comparison that doesn't check order.
         if (expected_value.type() == bson::Bson::Type::Document) {
-            REQUIRE(static_cast<const bson::BsonDocument&>((*it).second) ==
+            REQUIRE(static_cast<const bson::BsonDocument&>(*val) ==
                     static_cast<const bson::BsonDocument&>(expected_value));
         }
         else {
-            REQUIRE((*it).second == expected_value);
+            REQUIRE(*val == expected_value);
         }
     }
 }

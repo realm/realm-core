@@ -140,11 +140,10 @@ private:
 
     util::Optional<std::string> get_field(const char* name) const
     {
-        auto it = m_data.find(name);
-        if (it == m_data.end()) {
-            return util::none;
+        if (auto val = m_data.find(name)) {
+            return static_cast<std::string>((*val));
         }
-        return static_cast<std::string>((*it).second);
+        return util::none;
     }
 };
 

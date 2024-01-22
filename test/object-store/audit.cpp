@@ -186,11 +186,11 @@ static std::vector<AuditEvent> get_audit_events_from_baas(TestAppSession& sessio
         AuditEvent event;
         event.activity = static_cast<std::string>(doc["activity"]);
         event.timestamp = static_cast<Timestamp>(doc["timestamp"]);
-        if (auto it = doc.find("event"); it != doc.end() && (*it).second != bson::Bson()) {
-            event.event = static_cast<std::string>((*it).second);
+        if (auto val = doc.find("event"); bool(val) && *val != bson::Bson()) {
+            event.event = static_cast<std::string>(*val);
         }
-        if (auto it = doc.find("data"); it != doc.end() && (*it).second != bson::Bson()) {
-            event.data = json::parse(static_cast<std::string>((*it).second));
+        if (auto val = doc.find("data"); bool(val) && *val != bson::Bson()) {
+            event.data = json::parse(static_cast<std::string>(*val));
         }
         for (auto [key, value] : doc) {
             if (value.type() == bson::Bson::Type::String && !nonmetadata_fields.count(key))

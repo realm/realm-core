@@ -65,8 +65,8 @@ T as(const Bson& bson)
 template <typename T>
 T get(const BsonDocument& doc, const std::string& key)
 {
-    if (auto it = doc.find(key); it != doc.end()) {
-        return as<T>((*it).second);
+    if (auto val = doc.find(key)) {
+        return as<T>(*val);
     }
     throw_json_error(ErrorCodes::MissingJsonKey, key);
     return {};
@@ -75,8 +75,8 @@ T get(const BsonDocument& doc, const std::string& key)
 template <typename T>
 void read_field(const BsonDocument& data, const std::string& key, T& value)
 {
-    if (auto it = data.find(key); it != data.end()) {
-        value = as<T>((*it).second);
+    if (auto val = data.find(key)) {
+        value = as<T>(*val);
     }
     else {
         throw_json_error(ErrorCodes::MissingJsonKey, key);
@@ -92,8 +92,8 @@ void read_field(const BsonDocument& data, const std::string& key, ObjectId& valu
 template <typename T>
 void read_field(const BsonDocument& data, const std::string& key, Optional<T>& value)
 {
-    if (auto it = data.find(key); it != data.end()) {
-        value = as<T>((*it).second);
+    if (auto val = data.find(key)) {
+        value = as<T>(*val);
     }
 }
 

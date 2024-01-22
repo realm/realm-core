@@ -1471,7 +1471,7 @@ TEST_CASE("app: remote mongo client", "[sync][app][mongo][baas]") {
                                        [&](Optional<bson::Bson> bson, Optional<AppError> error) {
                                            REQUIRE_FALSE(error);
                                            auto document = static_cast<bson::BsonDocument>(*bson);
-                                           auto foundUpsertedId = document.find("upsertedId") != document.end();
+                                           auto foundUpsertedId = document.find("upsertedId");
                                            REQUIRE(!foundUpsertedId);
                                        });
 

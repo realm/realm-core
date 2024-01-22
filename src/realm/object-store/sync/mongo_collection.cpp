@@ -34,8 +34,8 @@ namespace {
 template <typename T>
 util::Optional<T> get(const BsonDocument& map, const char* key)
 {
-    if (auto it = map.find(key); it != map.end()) {
-        return static_cast<T>((*it).second);
+    if (auto val = map.find(key)) {
+        return static_cast<T>((*val));
     }
     return util::none;
 }

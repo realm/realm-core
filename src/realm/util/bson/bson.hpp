@@ -322,9 +322,13 @@ public:
         return IndexedMap<Bson>::at(k);
     }
 
-    iterator find(const std::string& k) const
+    std::optional<Bson> find(const std::string& key) const
     {
-        return IndexedMap<Bson>::find(k);
+        auto& raw = entries();
+        if (auto it = raw.find(key); it != raw.end()) {
+            return it->second;
+        }
+        return {};
     }
 
     bool operator==(const BsonDocument& other) const

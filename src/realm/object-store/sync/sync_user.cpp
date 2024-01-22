@@ -70,8 +70,8 @@ RealmJWT::RealmJWT(const std::string& token)
     this->expires_at = static_cast<int64_t>(json["exp"]);
     this->issued_at = static_cast<int64_t>(json["iat"]);
 
-    if (json.find("user_data") != json.end()) {
-        this->user_data = static_cast<bson::BsonDocument>(json["user_data"]);
+    if (auto value = json.find("user_data")) {
+        this->user_data = static_cast<bson::BsonDocument>(*value);
     }
 }
 
