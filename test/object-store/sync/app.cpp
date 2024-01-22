@@ -5794,7 +5794,7 @@ TEST_CASE("app: make_streaming_request", "[sync][app][streaming]") {
 
     using Headers = decltype(Request().headers);
 
-    const auto url_prefix = "https://somewhere.mongodb.com/api/client/v2.0/app/app_id/functions/call?baas_request="sv;
+    const auto url_prefix = "https://some.fake.url/api/client/v2.0/app/app_id/functions/call?baas_request="sv;
     const auto get_request_args = [&](const Request& req) {
         REQUIRE(req.url.substr(0, url_prefix.size()) == url_prefix);
         auto args = req.url.substr(url_prefix.size());
