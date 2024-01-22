@@ -3011,7 +3011,7 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
                 REQUIRE(!error);
             });
         REQUIRE(redir_app->sync_manager()->sync_route());
-        REQUIRE(redir_app->sync_manager()->sync_route()->find(websocket_url) != std::string::npos);
+        REQUIRE(redir_app->sync_manager()->sync_route()->find(original_ws_host) != std::string::npos);
 
         // Register another email address and verify location data isn't requested again
         request_count = 0;
