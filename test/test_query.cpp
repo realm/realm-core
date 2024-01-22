@@ -500,16 +500,6 @@ TEST(Query_NextGen_StringConditions)
     cnt = table2->column<String>(col_str3).like(realm::null(), false).count();
     CHECK_EQUAL(cnt, 1);
 
-    auto print_result = [](std::vector<StringData>& results) -> std::string {
-        std::string print;
-        for (auto s : results) {
-            print += print.empty() ? "{" : ", ";
-            print += util::serializer::print_value(s);
-        }
-        print += print.empty() ? "{}" : "}";
-        return print;
-    };
-
     auto check_results = [&](Query q, std::vector<StringData>&& matches) {
         TableView view = q.find_all();
         std::sort(matches.begin(), matches.end());
@@ -518,24 +508,20 @@ TEST(Query_NextGen_StringConditions)
             actual.push_back(view.get_object(i).get<StringData>(col_str3));
         }
         std::sort(actual.begin(), actual.end());
-        bool all_matches = true;
-        if (actual.size() == matches.size()) {
-            for (size_t i = 0; i < matches.size(); ++i) {
-                if (actual[i] != matches[i]) {
-                    all_matches = false;
-                    break;
-                }
-            }
+        if (!CHECK_EQUAL(actual, matches)) {
+            util::format(std::cout, "failed query '%1'\n", q.get_description());
         }
-        else {
-            all_matches = false;
+        TableView parsed_results = table2->query(q.get_description()).find_all();
+        std::vector<StringData> parsed_matches;
+        for (size_t i = 0; i < parsed_results.size(); ++i) {
+            parsed_matches.push_back(parsed_results.get_object(i).get<StringData>(col_str3));
         }
-        CHECK(all_matches);
-        if (!all_matches) {
-            util::format(std::cout, "mismatch results of '%1': expected: %2 actual: %3\n", q.get_description(),
-                         print_result(matches), print_result(actual));
+        std::sort(parsed_matches.begin(), parsed_matches.end());
+        if (!CHECK_EQUAL(parsed_matches, matches)) {
+            util::format(std::cout, "failed parsed query '%1'\n", q.get_description());
         }
     };
+
     // greater
     check_results((table2->column<String>(col_str3) > StringData("")), {"foo", "bar", "!"});
     check_results((table2->column<String>(col_str3) > StringData("b")), {"foo", "bar"});
