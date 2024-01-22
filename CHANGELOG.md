@@ -11,6 +11,7 @@
 
 ### Breaking changes
 * `App::get_uncached_app(...)` and `App::get_shared_app(...)` have been replaced by `App::get_app(App::CacheMode, ...)`. The App constructor is now enforced to be unusable, use `App::get_app()` instead. ([#7237](https://github.com/realm/realm-core/issues/7237))
+* The schema version field in the Realm config had no use for the flexible sync Realms previously. It is now being used for the upcoming Sync Schema Migrations feature. If it was set to a value other than zero, the application will start receiving an error from the server. Data synchronization will be stopped until the Realm is opened with schema version zero. (PR [#7239](https://github.com/realm/realm-core/pull/7239))
 
 ### Compatibility
 * Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
@@ -19,6 +20,10 @@
 
 ### Internals
 * Add support for chunked transfer encoding when using `HTTPParser`.
+* Bump the sync protocol to v11. The new protocol version comes with the following changes:
+  - JSON_ERROR server message contains the previous schema version
+  - Flexible sync BIND client message contains the current schema version
+* Add BAAS admin API to create new schema versions (drafts can be used to deploy all changes at once)
 
 ----------------------------------------------
 

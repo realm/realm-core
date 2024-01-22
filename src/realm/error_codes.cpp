@@ -62,6 +62,7 @@ ErrorCategory ErrorCodes::error_categories(Error code)
         case SyncUserMismatch:
         case SyncWriteNotAllowed:
         case SyncLocalClockBeforeEpoch:
+        case SyncSchemaMigrationError:
             return ErrorCategory().set(ErrorCategory::runtime_error).set(ErrorCategory::sync_error);
 
         case SyncConnectFailed:

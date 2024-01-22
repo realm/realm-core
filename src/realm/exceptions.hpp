@@ -306,6 +306,14 @@ struct MigrationFailed : LogicError {
     ~MigrationFailed() noexcept override;
 };
 
+struct SyncSchemaMigrationFailed : LogicError {
+    SyncSchemaMigrationFailed(std::string_view msg)
+        : LogicError(ErrorCodes::SyncSchemaMigrationError, msg)
+    {
+    }
+    ~SyncSchemaMigrationFailed() noexcept override;
+};
+
 struct ObjectAlreadyExists : RuntimeError {
     template <class T, class U>
     ObjectAlreadyExists(const U& object_type, T pk_val)
