@@ -16,9 +16,9 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "util/sync/sync_test_utils.hpp"
+#include <util/sync/sync_test_utils.hpp>
 
-#include "util/sync/baas_admin_api.hpp"
+#include <util/sync/baas_admin_api.hpp>
 
 #include <realm/object-store/binding_context.hpp>
 #include <realm/object-store/object_store.hpp>
@@ -195,6 +195,15 @@ void subscribe_to_all_and_bootstrap(Realm& realm)
 }
 
 #if REALM_ENABLE_AUTH_TESTS
+
+void wait_for_sessions_to_close(const TestAppSession& test_app_session)
+{
+    timed_sleeping_wait_for(
+        [&]() -> bool {
+            return !test_app_session.app()->sync_manager()->has_existing_sessions();
+        },
+        std::chrono::minutes(5), std::chrono::milliseconds(100));
+}
 
 static std::string unquote_string(std::string_view possibly_quoted_string)
 {

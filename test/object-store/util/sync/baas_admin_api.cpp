@@ -549,10 +549,10 @@ AdminAPIEndpoint AdminAPIEndpoint::operator[](StringData name) const
 app::Response AdminAPIEndpoint::do_request(app::Request request) const
 {
     if (request.url.find('?') == std::string::npos) {
-        request.url = util::format("%1?bypass_service_change=DestructiveSyncProtocolVersionIncrease", request.url);
+        request.url = util::format("%1?bypass_service_change=SyncSchemaVersionIncrease", request.url);
     }
     else {
-        request.url = util::format("%1&bypass_service_change=DestructiveSyncProtocolVersionIncrease", request.url);
+        request.url = util::format("%1&bypass_service_change=SyncSchemaVersionIncrease", request.url);
     }
     request.headers["Content-Type"] = "application/json;charset=utf-8";
     request.headers["Accept"] = "application/json";
@@ -792,6 +792,79 @@ void AdminAPISession::migrate_to_flx(const std::string& app_id, const std::strin
     endpoint.put_json(nlohmann::json{{"serviceId", service_id}, {"action", migrate_to_flx ? "start" : "rollback"}});
 }
 
+// Each breaking change bumps the schema version, so you can create a new version for each breaking change if
+// 'use_draft' is false. Set 'use_draft' to true if you want all changes to the schema to be deployed at once
+// resulting in only one schema version.
+void AdminAPISession::create_schema(const std::string& app_id, const AppCreateConfig& config, bool use_draft) const
+{
+    static const std::string mongo_service_name = "BackingDB";
+
+    auto drafts = apps()[app_id]["drafts"];
+    std::string draft_id;
+    if (use_draft) {
+        auto draft_create_resp = drafts.post_json({});
+        draft_id = draft_create_resp["_id"];
+    }
+
+    auto schemas = apps()[app_id]["schemas"];
+    auto current_schema = schemas.get_json();
+    auto target_schema = config.schema;
+
+    std::unordered_map<std::string, std::string> current_schema_tables;
+    for (const auto& schema : current_schema) {
+        current_schema_tables[schema["metadata"]["collection"]] = schema["_id"];
+    }
+
+    // Add new tables
+
+    auto pk_and_queryable_only = [&](const Property& prop) {
+        if (config.flx_sync_config) {
+            const auto& queryable_fields = config.flx_sync_config->queryable_fields;
+
+            if (std::find(queryable_fields.begin(), queryable_fields.end(), prop.name) != queryable_fields.end()) {
+                return true;
+            }
+        }
+        return prop.name == "_id" || prop.name == config.partition_key.name;
+    };
+
+    // Create the schemas in two passes: first populate just the primary key and
+    // partition key, then add the rest of the properties. This ensures that the
+    // targets of links exist before adding the links.
+    std::vector<std::pair<std::string, const ObjectSchema*>> object_schema_to_create;
+    BaasRuleBuilder rule_builder(target_schema, config.partition_key, mongo_service_name, config.mongo_dbname,
+                                 static_cast<bool>(config.flx_sync_config));
+    for (const auto& obj_schema : target_schema) {
+        auto it = current_schema_tables.find(obj_schema.name);
+        if (it != current_schema_tables.end()) {
+            object_schema_to_create.push_back({it->second, &obj_schema});
+            continue;
+        }
+
+        auto schema_to_create = rule_builder.object_schema_to_baas_schema(obj_schema, pk_and_queryable_only);
+        auto schema_create_resp = schemas.post_json(schema_to_create);
+        object_schema_to_create.push_back({schema_create_resp["_id"], &obj_schema});
+    }
+
+    // Update existing tables (including the ones just created)
+    for (const auto& [id, obj_schema] : object_schema_to_create) {
+        auto schema_to_create = rule_builder.object_schema_to_baas_schema(*obj_schema, nullptr);
+        schema_to_create["_id"] = id;
+        schemas[id].put_json(schema_to_create);
+    }
+
+    // Delete removed tables
+    for (const auto& table : current_schema_tables) {
+        if (target_schema.find(table.first) == target_schema.end()) {
+            schemas[table.second].del();
+        }
+    }
+
+    if (use_draft) {
+        drafts[draft_id]["deployment"].post_json({});
+    }
+}
+
 static nlohmann::json convert_config(AdminAPISession::ServiceConfig config)
 {
     if (config.mode == AdminAPISession::ServiceConfig::SyncMode::Flexible) {
@@ -803,6 +876,9 @@ static nlohmann::json convert_config(AdminAPISession::ServiceConfig config)
         }
         if (config.permissions) {
             payload["permissions"] = *config.permissions;
+        }
+        if (config.asymmetric_tables) {
+            payload["asymmetric_tables"] = *config.asymmetric_tables;
         }
         return payload;
     }
@@ -1270,10 +1346,10 @@ AppSession create_app(const AppCreateConfig& config)
                 asymmetric_tables.emplace_back(obj_schema.name);
             }
         }
-        mongo_service_def["config"]["flexible_sync"] = {{"state", "enabled"},
-                                                        {"database_name", config.mongo_dbname},
-                                                        {"queryable_fields_names", queryable_fields},
-                                                        {"asymmetric_tables", asymmetric_tables}};
+        sync_config = nlohmann::json{{"database_name", config.mongo_dbname},
+                                     {"queryable_fields_names", queryable_fields},
+                                     {"asymmetric_tables", asymmetric_tables}};
+        mongo_service_def["config"]["flexible_sync"] = sync_config;
     }
     else {
         sync_config = nlohmann::json{
@@ -1295,30 +1371,6 @@ AppSession create_app(const AppCreateConfig& config)
 
     auto create_mongo_service_resp = services.post_json(std::move(mongo_service_def));
     std::string mongo_service_id = create_mongo_service_resp["_id"];
-    auto schemas = app["schemas"];
-
-    auto pk_and_queryable_only = [&](const Property& prop) {
-        if (config.flx_sync_config) {
-            const auto& queryable_fields = config.flx_sync_config->queryable_fields;
-
-            if (std::find(queryable_fields.begin(), queryable_fields.end(), prop.name) != queryable_fields.end()) {
-                return true;
-            }
-        }
-        return prop.name == "_id" || prop.name == config.partition_key.name;
-    };
-
-    // Create the schemas in two passes: first populate just the primary key and
-    // partition key, then add the rest of the properties. This ensures that the
-    // targets of links exist before adding the links.
-    std::vector<std::pair<std::string, const ObjectSchema*>> object_schema_to_create;
-    BaasRuleBuilder rule_builder(config.schema, config.partition_key, mongo_service_name, config.mongo_dbname,
-                                 static_cast<bool>(config.flx_sync_config));
-    for (const auto& obj_schema : config.schema) {
-        auto schema_to_create = rule_builder.object_schema_to_baas_schema(obj_schema, pk_and_queryable_only);
-        auto schema_create_resp = schemas.post_json(schema_to_create);
-        object_schema_to_create.push_back({schema_create_resp["_id"], &obj_schema});
-    }
 
     auto default_rule = services[mongo_service_id]["default_rule"];
     auto service_roles = nlohmann::json::array();
@@ -1357,20 +1409,23 @@ AppSession create_app(const AppCreateConfig& config)
 
     default_rule.post_json({{"roles", service_roles}});
 
-    for (const auto& [id, obj_schema] : object_schema_to_create) {
-        auto schema_to_create = rule_builder.object_schema_to_baas_schema(*obj_schema, nullptr);
-        schema_to_create["_id"] = id;
-        schemas[id].put_json(schema_to_create);
-    }
+    // No need for a draft because there are no breaking changes in the initial schema when the app is created.
+    bool use_draft = false;
+    session.create_schema(app_id, config, use_draft);
 
-    // For PBS, enable sync after schema is created.
-    if (!config.flx_sync_config) {
-        AdminAPISession::ServiceConfig service_config;
-        service_config.mode = AdminAPISession::ServiceConfig::SyncMode::Partitioned;
-        service_config.database_name = sync_config["database_name"];
-        service_config.partition = sync_config["partition"];
-        session.enable_sync(app_id, mongo_service_id, service_config);
+    // Enable sync after schema is created.
+    AdminAPISession::ServiceConfig service_config;
+    service_config.database_name = sync_config["database_name"];
+    if (config.flx_sync_config) {
+        service_config.mode = AdminAPISession::ServiceConfig::SyncMode::Flexible;
+        service_config.queryable_field_names = sync_config["queryable_fields_names"];
+        service_config.asymmetric_tables = sync_config["asymmetric_tables"];
     }
+    else {
+        service_config.mode = AdminAPISession::ServiceConfig::SyncMode::Partitioned;
+        service_config.partition = sync_config["partition"];
+    }
+    session.enable_sync(app_id, mongo_service_id, service_config);
 
     app["sync"]["config"].put_json({{"development_mode_enabled", config.dev_mode_enabled}});
 

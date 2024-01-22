@@ -83,6 +83,7 @@ public:
     void delete_app(const std::string& app_id) const;
     void trigger_client_reset(const std::string& app_id, int64_t file_ident) const;
     void migrate_to_flx(const std::string& app_id, const std::string& service_id, bool migrate_to_flx) const;
+    void create_schema(const std::string& app_id, const AppCreateConfig& config, bool use_draft = true) const;
 
     struct Service {
         std::string id;
@@ -97,6 +98,7 @@ public:
         util::Optional<nlohmann::json> partition;
         util::Optional<nlohmann::json> queryable_field_names;
         util::Optional<nlohmann::json> permissions;
+        util::Optional<nlohmann::json> asymmetric_tables;
         std::string state;
         bool recovery_is_disabled = false;
         std::string_view sync_service_name()

@@ -45,7 +45,7 @@ SyncClientTimeouts::SyncClientTimeouts()
 
 SyncManager::SyncManager() = default;
 
-void SyncManager::configure(std::shared_ptr<app::App> app, const std::string& sync_route,
+void SyncManager::configure(std::shared_ptr<app::App> app, std::optional<std::string> sync_route,
                             const SyncClientConfig& config)
 {
     std::vector<std::shared_ptr<SyncUser>> users_to_add;
@@ -107,7 +107,7 @@ void SyncManager::configure(std::shared_ptr<app::App> app, const std::string& sy
                 auto refresh_token = user_data.refresh_token();
                 auto access_token = user_data.access_token();
                 if (!refresh_token.empty() && !access_token.empty()) {
-                    users_to_add.push_back(std::make_shared<SyncUser>(user_data, this));
+                    users_to_add.push_back(std::make_shared<SyncUser>(SyncUser::Private(), user_data, this));
                 }
             }
 
@@ -250,7 +250,7 @@ void SyncManager::reset_for_testing()
         // Reset even more state.
         m_config = {};
         m_logger_ptr.reset();
-        m_sync_route = "";
+        m_sync_route.reset();
     }
 
     {
@@ -347,7 +347,8 @@ std::shared_ptr<SyncUser> SyncManager::get_user(const std::string& user_id, cons
         });
         if (it == m_users.end()) {
             // No existing user.
-            auto new_user = std::make_shared<SyncUser>(refresh_token, user_id, access_token, device_id, this);
+            auto new_user = std::make_shared<SyncUser>(SyncUser::Private(), refresh_token, user_id, access_token,
+                                                       device_id, this);
             m_users.emplace(m_users.begin(), new_user);
             {
                 util::CheckedLockGuard lock(m_file_system_mutex);

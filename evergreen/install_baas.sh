@@ -219,6 +219,31 @@ if [[ -z "${WORK_PATH}" ]]; then
     usage 1
 fi
 
+function get_var_from_file()
+{
+    # Usage: get_var_from_file VAR FILE
+    upper=$(echo "${1}" | tr 'a-z' 'A-Z')
+    lower=$(echo "${1}" | tr 'A-Z' 'a-z')
+    regex="^(${upper}|${lower})[ ]*=[ ]*(.*)[ ]*"
+    while read p; do
+        if [[ $p =~ $regex ]]
+        then
+            value="${BASH_REMATCH[2]}" # results are in this variable, use the second regex group
+            export ${1}=${value}
+            break
+        fi
+    done < "${2}"
+}
+
+if [[ -z "${AWS_ACCESS_KEY_ID}" || -z "${AWS_SECRET_ACCESS_KEY}" ]]; then
+    # try to read them from the usual place on disk
+    creds_file=~/.aws/credentials
+    if test -f ${creds_file}; then
+        get_var_from_file AWS_ACCESS_KEY_ID ${creds_file}
+        get_var_from_file AWS_SECRET_ACCESS_KEY ${creds_file}
+    fi
+fi
+
 if [[ -z "${AWS_ACCESS_KEY_ID}" || -z "${AWS_SECRET_ACCESS_KEY}" ]]; then
     echo "Error: AWS_ACCESS_KEY_ID and/or AWS_SECRET_ACCESS_KEY are not set"
     exit 1
@@ -338,9 +363,30 @@ echo "jq version: $(jq --version)"
 git config --global url."git@github.com:".insteadOf "https://github.com/"
 #export GOPRIVATE="github.com/10gen/*"
 
-# If a baas branch or commit version was not provided, retrieve the latest release version
+# If a baas branch or commit version was not provided use the one locked in our dependencies
 if [[ -z "${BAAS_VERSION}" ]]; then
-    BAAS_VERSION=$(${CURL} -LsS "https://realm.mongodb.com/api/private/v1.0/version" | jq -r '.backend.git_hash')
+    dep_file="dependencies.list"
+    test_path1="${BASE_PATH}/../${dep_file}"
+    test_path2="${BASE_PATH}/${dep_file}"
+    if [[ -f "${test_path1}" ]]; then
+        # if this was run locally then check up a directory
+        get_var_from_file BAAS_VERSION "${test_path1}"
+    elif [[ -f "${test_path2}" ]]; then
+        # if this is run from an evergreen remote host
+        # then the dependencies.list file has been copied over
+        get_var_from_file BAAS_VERSION "${test_path2}"
+    else
+        echo "could not find '${test_path1}' or '${test_path2}'"
+        ls "${BASE_PATH}/.."
+        echo ""
+        ls "${BASE_PATH}"
+    fi
+fi
+
+# if we couldn't find it and it wasn't manually provided fail
+if [[ -z "${BAAS_VERSION}" ]]; then
+    echo "BAAS_VERSION was not provided and couldn't be discovered"
+    exit 1
 fi
 
 # Clone the baas repo and check out the specified version

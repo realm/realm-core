@@ -39,6 +39,19 @@ public:
     {
     }
 
+    E get()
+    {
+        std::lock_guard lock{m_mutex};
+        return m_cur_state;
+    }
+
+    void transition_to(E new_state)
+    {
+        std::lock_guard lock{m_mutex};
+        m_cur_state = new_state;
+        m_cv.notify_one();
+    }
+
     template <typename Func>
     void transition_with(Func&& func)
     {

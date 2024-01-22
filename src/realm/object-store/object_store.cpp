@@ -850,19 +850,20 @@ static void apply_post_migration_changes(Group& group, std::vector<SchemaChange>
 void ObjectStore::apply_schema_changes(Transaction& group, uint64_t schema_version, Schema& target_schema,
                                        uint64_t target_schema_version, SchemaMode mode,
                                        std::vector<SchemaChange> const& changes, bool handle_automatically_backlinks,
-                                       std::function<void()> migration_function)
+                                       std::function<void()> migration_function,
+                                       bool set_schema_version_on_version_decrease)
 {
     create_metadata_tables(group);
 
     if (mode == SchemaMode::AdditiveDiscovered || mode == SchemaMode::AdditiveExplicit) {
-        bool target_schema_is_newer =
-            (schema_version < target_schema_version || schema_version == ObjectStore::NotVersioned);
+        bool set_schema = (schema_version < target_schema_version || schema_version == ObjectStore::NotVersioned ||
+                           set_schema_version_on_version_decrease);
 
         // With sync v2.x, indexes are no longer synced, so there's no reason to avoid creating them.
         bool update_indexes = true;
         apply_additive_changes(group, changes, update_indexes);
 
-        if (target_schema_is_newer)
+        if (set_schema)
             set_schema_version(group, target_schema_version);
 
         set_schema_keys(group, target_schema);

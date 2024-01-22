@@ -1010,7 +1010,7 @@ bool File::prealloc_if_supported(SizeType offset, size_t size)
         return true;
     }
 
-    if (status == EINVAL || status == EPERM) {
+    if (status == EINVAL || status == EPERM || status == EOPNOTSUPP) {
         return false; // Retry with non-atomic version
     }
 
