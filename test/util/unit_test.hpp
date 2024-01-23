@@ -768,7 +768,9 @@ struct SetPrecision<T, true> {
 };
 
 template <typename T>
-constexpr static bool realm_serializable_types = is_any_v<T, StringData, BinaryData, Timestamp, ObjectId, std::optional<ObjectId>, ObjKey, ObjLink, UUID, std::optional<UUID>, bool, float, std::optional<float>, double, std::optional<double>, realm::null>;
+constexpr static bool realm_serializable_types =
+    is_any_v<T, StringData, BinaryData, Timestamp, ObjectId, std::optional<ObjectId>, ObjKey, ObjLink, UUID,
+             std::optional<UUID>, bool, float, std::optional<float>, double, std::optional<double>, realm::null>;
 
 template <class T>
 void to_string(const T& value, std::string& str)

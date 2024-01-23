@@ -1577,7 +1577,7 @@ public:
             StringData t = get_string(s);
 
             if constexpr (case_sensitive_comparison) {
-                // case insensitive not implemented for these comparisons
+                // case insensitive not implemented for: >, >=, <, <=
                 if (cond(t, m_string_value))
                     return s;
             }
