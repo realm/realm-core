@@ -228,7 +228,7 @@ void Obj::to_json(std::ostream& out, JSONOutputMode output_mode) const
 {
     bool prefixComma = false;
     out << "{";
-    if (!m_table->get_primary_key_column() && !m_table->is_embedded()) {
+    if (output_mode == output_mode_json && !m_table->get_primary_key_column() && !m_table->is_embedded()) {
         prefixComma = true;
         out << "\"_key\":" << this->m_key.value;
     }
