@@ -269,12 +269,15 @@ int main(int argc, const char** argv)
     }
     auto realm_path = realm_arg.as<std::string>();
 
-    std::string encryption_key;
+    std::optional<util::File::EncryptionKeyType> encryption_key;
     if (encryption_key_arg) {
-        encryption_key = load_file(encryption_key_arg.as<std::string>());
+        std::array<uint8_t, 64> encryption_key_2;
+        std::string key_file_contents = load_file(encryption_key_arg.as<std::string>());
+        std::copy_n(key_file_contents.data(), encryption_key_2.size(), encryption_key_2.begin());
+        encryption_key = util::File::EncryptionKeyType(encryption_key_2);
     }
 
-    realm::DBOptions db_opts(encryption_key.empty() ? nullptr : encryption_key.c_str());
+    realm::DBOptions db_opts(encryption_key);
     realm::sync::ClientReplication repl{};
     auto local_db = realm::DB::create(repl, realm_path, db_opts);
     auto& history = repl.get_history();
