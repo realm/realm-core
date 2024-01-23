@@ -447,7 +447,7 @@ void SyncSession::download_fresh_realm(sync::ProtocolErrorInfo::Action server_re
         }
     }
 
-    std::vector<char> encryption_key;
+    std::optional<util::File::EncryptionKeyType> encryption_key;
     {
         util::CheckedLockGuard lock(m_config_mutex);
         encryption_key = m_config.encryption_key;
@@ -456,8 +456,7 @@ void SyncSession::download_fresh_realm(sync::ProtocolErrorInfo::Action server_re
     DBOptions options;
     options.allow_file_format_upgrade = false;
     options.enable_async_writes = false;
-    if (!encryption_key.empty())
-        options.encryption_key = encryption_key.data();
+    options.encryption_key = std::move(encryption_key);
 
     DBRef db;
     auto fresh_path = client_reset::get_fresh_path_for(m_db->get_path());

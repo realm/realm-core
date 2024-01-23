@@ -302,10 +302,10 @@ TEST(File_SetEncryptionKey)
 {
     TEST_PATH(path);
     File f(path, File::mode_Write);
-    const char key[64] = {0};
+    std::array<uint8_t, 64> key = {0};
 
 #if REALM_ENABLE_ENCRYPTION
-    f.set_encryption_key(key); // should not throw
+    f.set_encryption_key(File::EncryptionKeyType(key)); // should not throw
 #else
     CHECK_THROW_EX(f.set_encryption_key(key), Exception, (e.code() == ErrorCodes::NotSupported));
 #endif

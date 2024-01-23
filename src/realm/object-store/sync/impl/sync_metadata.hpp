@@ -250,7 +250,7 @@ public:
     /// the object store handle generating and persisting an encryption key for the metadata database. Otherwise, an
     /// exception will be thrown.
     SyncMetadataManager(std::string path, bool should_encrypt,
-                        util::Optional<std::vector<char>> encryption_key = none);
+                        const std::optional<util::File::EncryptionKeyType>& encryption_key = std::nullopt);
 
 private:
     SyncUserMetadataResults get_users(bool marked) const;

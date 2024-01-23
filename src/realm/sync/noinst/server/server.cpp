@@ -2107,7 +2107,7 @@ public:
         return m_connection;
     }
 
-    const Optional<std::array<char, 64>>& get_encryption_key()
+    const std::optional<util::File::EncryptionKeyType>& get_encryption_key()
     {
         return m_connection.get_server().get_config().encryption_key;
     }

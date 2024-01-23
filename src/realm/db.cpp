@@ -1581,7 +1581,7 @@ void DB::create_new_history(std::unique_ptr<Replication> repl)
 // Unmapping (during close()) while transactions are live, is not considered an error. There
 // is a potential race between unmapping during close() and any operation carried out by a live
 // transaction. The user must ensure that this race never happens if she uses DB::close().
-bool DB::compact(bool bump_version_number, util::Optional<const char*> output_encryption_key)
+bool DB::compact(bool bump_version_number, const std::optional<util::File::EncryptionKeyType>& output_encryption_key)
     NO_THREAD_SAFETY_ANALYSIS // this would work except for a known limitation: "No alias analysis" where clang cannot
                               // tell that tr->db->m_mutex is the same thing as m_mutex
 {
@@ -1598,7 +1598,8 @@ bool DB::compact(bool bump_version_number, util::Optional<const char*> output_en
     }
     auto info = m_info;
     Durability dura = Durability(info->durability);
-    const char* write_key = bool(output_encryption_key) ? *output_encryption_key : get_encryption_key();
+    std::optional<util::File::EncryptionKeyType> write_key =
+        output_encryption_key ? output_encryption_key : get_encryption_key();
     {
         std::unique_lock<InterprocessMutex> lock(m_controlmutex); // Throws
         auto t1 = std::chrono::steady_clock::now();
@@ -1689,7 +1690,7 @@ bool DB::compact(bool bump_version_number, util::Optional<const char*> output_en
     return true;
 }
 
-void DB::write_copy(StringData path, const char* output_encryption_key)
+void DB::write_copy(StringData path, const std::optional<util::File::EncryptionKeyType>& output_encryption_key)
 {
     auto tr = start_read();
     if (auto hist = tr->get_history()) {

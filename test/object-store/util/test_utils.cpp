@@ -100,14 +100,13 @@ void reset_test_directory(const std::string& base_path)
     util::make_dir(base_path);
 }
 
-std::vector<char> make_test_encryption_key(const char start)
+util::File::EncryptionKeyType make_test_encryption_key(const char start)
 {
-    std::vector<char> vector;
-    vector.reserve(64);
+    std::array<uint8_t, 64> ret;
     for (int i = 0; i < 64; i++) {
-        vector.emplace_back((start + i) % 128);
+        ret[i] = (start + i) % 128;
     }
-    return vector;
+    return util::File::EncryptionKeyType(ret);
 }
 
 // FIXME: Catch2 limitation on old compilers (currently our android CI)

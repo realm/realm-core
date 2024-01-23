@@ -133,7 +133,7 @@ TEST(Replication_GroupWriteWithoutHistory)
     {
         ReadTransaction rt(sg_1);
         // Export file with history
-        rt.get_group().write(out2, nullptr, 1);
+        rt.get_group().write(out2, std::nullopt, 1);
     }
 
     {
@@ -185,7 +185,7 @@ TEST(Replication_WriteWithoutHistory)
 
     {
         ReadTransaction rt(sg);
-        rt.get_group().write(path_2, nullptr, rt.get_version(), false);
+        rt.get_group().write(path_2, std::nullopt, rt.get_version(), false);
     }
     // Make sure the realm can be opened without history
     DBRef sg_2 = DB::create(path_2);

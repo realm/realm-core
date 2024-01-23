@@ -28,6 +28,7 @@
 
 #include <realm/util/file.hpp>
 #include <realm/util/flat_map.hpp>
+#include <realm/util/sensitive_buffer.hpp>
 
 namespace realm::util {
 class WriteObserver {
@@ -67,7 +68,7 @@ enum class IVRefreshState { UpToDate, RequiresRefresh };
 
 class AESCryptor {
 public:
-    AESCryptor(const uint8_t* key);
+    AESCryptor(const File::EncryptionKeyType& key);
     ~AESCryptor() noexcept;
 
     void set_file_size(off_t new_size);
@@ -78,7 +79,7 @@ public:
     util::FlatMap<size_t, IVRefreshState> refresh_ivs(FileDesc fd, off_t data_pos, size_t page_ndx_in_file_expected,
                                                       size_t end_page_ndx_in_file);
 
-    void check_key(const uint8_t* key);
+    void check_key(const File::EncryptionKeyType& key);
 
 private:
     enum EncryptionMode {
@@ -105,8 +106,8 @@ private:
     EVP_CIPHER_CTX* m_ctx;
 #endif
 
-    std::array<uint8_t, 32> m_aesKey;
-    std::array<uint8_t, 32> m_hmacKey;
+    util::SensitiveBuffer<std::array<uint8_t, 32>> m_aesKey;
+    util::SensitiveBuffer<std::array<uint8_t, 32>> m_hmacKey;
     std::vector<iv_table> m_iv_buffer;
     std::unique_ptr<char[]> m_rw_buffer;
     std::unique_ptr<char[]> m_dst_buffer;
@@ -134,7 +135,7 @@ struct SharedFileInfo {
     size_t progress_index = 0;
     std::vector<ReaderInfo> readers;
 
-    SharedFileInfo(const uint8_t* key);
+    SharedFileInfo(const File::EncryptionKeyType& key);
 };
 } // namespace realm::util
 

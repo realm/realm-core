@@ -139,12 +139,6 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
     }
 
     SECTION("should validate that the config is sensible") {
-        SECTION("bad encryption key") {
-            config.encryption_key = std::vector<char>(2, 0);
-            REQUIRE_EXCEPTION(Realm::get_shared_realm(config), InvalidEncryptionKey,
-                              "Encryption key must be 64 bytes.");
-        }
-
         SECTION("schema without schema version") {
             config.schema_version = ObjectStore::NotVersioned;
             REQUIRE_EXCEPTION(Realm::get_shared_realm(config), IllegalCombination,
@@ -201,7 +195,7 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
     }
 
     SECTION("should reject mismatched config") {
-        config.encryption_key.clear(); // may be set already when encrypting all
+        config.encryption_key.reset(); // may be set already when encrypting all
 
         SECTION("schema version") {
             auto realm = Realm::get_shared_realm(config);
@@ -296,7 +290,7 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
         Realm::get_shared_realm(config);
 
         {
-            Group g(config.path, config.encryption_key.data());
+            Group g(config.path, config.encryption_key);
             auto table = ObjectStore::table_for_object_type(g, "object");
             REQUIRE(table);
             REQUIRE(table->get_column_count() == 1);
@@ -674,7 +668,7 @@ TEST_CASE("SharedRealm: schema_subset_mode") {
     config.schema_mode = SchemaMode::AdditiveExplicit;
     config.schema_version = 1;
     config.schema_subset_mode = SchemaSubsetMode::Complete;
-    config.encryption_key.clear();
+    config.encryption_key.reset();
 
     // Use a DB directly to simulate changes made by another process
     auto db = DB::create(make_in_realm_history(), config.path);
@@ -1051,7 +1045,7 @@ TEST_CASE("Get Realm using Async Open", "[sync][pbs][async open]") {
         }
 
         DBOptions options;
-        options.encryption_key = config.encryption_key.data();
+        options.encryption_key = config.encryption_key;
         auto db = DB::create(sync::make_client_replication(), config.path, options);
         auto write = db->start_write(); // block sync from writing until we cancel
 
@@ -1655,7 +1649,7 @@ TEST_CASE("SharedRealm: async writes") {
             bool persisted = false;
             SECTION("before write lock is acquired") {
                 DBOptions options;
-                options.encryption_key = config.encryption_key.data();
+                options.encryption_key = config.encryption_key;
                 // Acquire the write lock with a different DB instance so that we'll
                 // be stuck in the Requesting stage
                 realm::test_util::BowlOfStonesSemaphore sema;
@@ -2303,8 +2297,7 @@ TEST_CASE("SharedRealm: async writes") {
         for (size_t i = 0; i < 41; ++i) {
             realm->async_begin_transaction([&, i, realm] {
                 // The top ref in the Realm file should only be updated once every 20 commits
-                CHECK(Group(config.path, config.encryption_key.data()).get_table("class_object")->size() ==
-                      (i / 20) * 20);
+                CHECK(Group(config.path, config.encryption_key).get_table("class_object")->size() == (i / 20) * 20);
 
                 table->create_object();
                 realm->async_commit_transaction(
@@ -2324,8 +2317,7 @@ TEST_CASE("SharedRealm: async writes") {
         for (size_t i = 0; i < 41; ++i) {
             realm->async_begin_transaction([&, i, realm] {
                 // The top ref in the Realm file should only be updated once every 6 commits
-                CHECK(Group(config.path, config.encryption_key.data()).get_table("class_object")->size() ==
-                      (i / 6) * 6);
+                CHECK(Group(config.path, config.encryption_key).get_table("class_object")->size() == (i / 6) * 6);
 
                 table->create_object();
                 realm->async_commit_transaction(
@@ -2407,7 +2399,7 @@ TEST_CASE("SharedRealm: async writes") {
         // Wait for the background thread to hold the write lock (without letting
         // the event loop run so that the scheduled task isn't run)
         DBOptions options;
-        options.encryption_key = config.encryption_key.data();
+        options.encryption_key = config.encryption_key;
         auto db = DB::create(make_in_realm_history(), config.path, options);
         while (db->start_write(true))
             millisleep(1);
@@ -3115,7 +3107,7 @@ TEST_CASE("ShareRealm: in-memory mode from buffer") {
                           "Specifying both memory buffer and path is invalid");
 
         config3.path = "";
-        config3.encryption_key = std::vector<char>(64, 'a');
+        config3.encryption_key = util::File::EncryptionKeyType({'a'});
         REQUIRE_EXCEPTION(Realm::get_shared_realm(config3), IllegalCombination,
                           "Memory buffers do not support encryption");
     }

@@ -109,7 +109,7 @@ public:
     ///
     /// \param file File system path to a Realm database file.
     ///
-    /// \param encryption_key 32-byte key used to encrypt and decrypt
+    /// \param encryption_key 64-byte key used to encrypt and decrypt
     /// the database file, or nullptr to disable encryption.
     ///
     /// \throw FileAccessError If the file could not be
@@ -117,7 +117,8 @@ public:
     /// types that are derived from FileAccessError, the
     /// derived exception type is thrown. Note that InvalidDatabase is
     /// among these derived exception types.
-    explicit Group(const std::string& file, const char* encryption_key = nullptr);
+    explicit Group(const std::string& file,
+                   const std::optional<util::File::EncryptionKeyType>& encryption_key = std::nullopt);
 
     /// Attach this Group instance to the specified memory buffer.
     ///
@@ -350,7 +351,7 @@ public:
     ///
     /// \param path A filesystem path to the file you want to write to.
     ///
-    /// \param encryption_key 32-byte key used to encrypt the database file,
+    /// \param encryption_key 64-byte key used to encrypt the database file,
     /// or nullptr to disable encryption.
     ///
     /// \param version If different from 0, the new file will be a full fledged
@@ -364,8 +365,9 @@ public:
     /// types that are derived from FileAccessError, the
     /// derived exception type is thrown. In particular,
     /// util::File::Exists will be thrown if the file exists already.
-    void write(const std::string& path, const char* encryption_key = nullptr, uint64_t version = 0,
-               bool write_history = true) const;
+    void write(const std::string& path,
+               const std::optional<util::File::EncryptionKeyType>& encryption_key = std::nullopt,
+               uint64_t version = 0, bool write_history = true) const;
 
     /// Write this database to a memory buffer.
     ///
@@ -673,7 +675,8 @@ private:
 
     void mark_all_table_accessors() noexcept;
 
-    void write(util::File& file, const char* encryption_key, uint_fast64_t version_number, TableWriter& writer) const;
+    void write(util::File& file, const std::optional<util::File::EncryptionKeyType>& encryption_key,
+               uint_fast64_t version_number, TableWriter& writer) const;
     void write(std::ostream&, bool pad, uint_fast64_t version_numer, TableWriter& writer) const;
 
     /// Memory mappings must have been updated to reflect any growth in filesize before

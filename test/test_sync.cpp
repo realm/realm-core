@@ -5575,7 +5575,7 @@ TEST(Sync_ServerSideEncryption)
     std::string server_path;
     {
         ClientServerFixture::Config config;
-        config.server_encryption_key = crypt_key_2(always_encrypt);
+        config.server_encryption_key = crypt_key(always_encrypt);
         ClientServerFixture fixture(server_dir, test_context, std::move(config));
         fixture.start();
 
@@ -5585,7 +5585,7 @@ TEST(Sync_ServerSideEncryption)
         server_path = fixture.map_virtual_to_real_path("/test");
     }
 
-    const char* encryption_key = crypt_key(always_encrypt);
+    std::optional<File::EncryptionKeyType> encryption_key = crypt_key(always_encrypt);
     Group group{server_path, encryption_key};
     CHECK(group.has_table("class_Test"));
 }
@@ -6339,13 +6339,13 @@ TEST(Sync_BundledRealmFile)
     });
 
     // We cannot write out file if changes are not synced to server
-    CHECK_THROW_ANY(db->write_copy(path.c_str(), nullptr));
+    CHECK_THROW_ANY(db->write_copy(path.c_str(), std::nullopt));
 
     session.wait_for_upload_complete_or_client_stopped();
     session.wait_for_download_complete_or_client_stopped();
 
     // Now we can
-    db->write_copy(path.c_str(), nullptr);
+    db->write_copy(path.c_str(), std::nullopt);
 }
 
 TEST(Sync_UpgradeToClientHistory)

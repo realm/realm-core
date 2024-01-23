@@ -20,6 +20,7 @@
 
 #include <realm/util/cf_ptr.hpp>
 #include <realm/util/optional.hpp>
+#include <realm/util/file.hpp>
 
 #include <Security/Security.h>
 
@@ -73,7 +74,7 @@ CFPtr<CFMutableDictionaryRef> build_search_dictionary(CFStringRef account, CFStr
 }
 
 /// Get the encryption key for a given service, returning true if it either exists or the keychain is not usable.
-bool get_key(CFStringRef account, CFStringRef service, util::Optional<std::vector<char>>& result)
+std::optional<util::File::EncryptionKeyType> get_key(CFStringRef account, CFStringRef service)
 {
     auto search_dictionary = build_search_dictionary(account, service, none);
     CFDataRef retained_key_data;
@@ -82,34 +83,33 @@ bool get_key(CFStringRef account, CFStringRef service, util::Optional<std::vecto
             // Key was previously stored. Extract it.
             CFPtr<CFDataRef> key_data = adoptCF(retained_key_data);
             if (key_size != CFDataGetLength(key_data.get()))
-                return false;
+                return std::nullopt;
 
-            auto key_bytes = reinterpret_cast<const char*>(CFDataGetBytePtr(key_data.get()));
-            result.emplace(key_bytes, key_bytes + key_size);
-            return true;
+            auto& key_bytes = *reinterpret_cast<const std::array<uint8_t, 64>*>(CFDataGetBytePtr(key_data.get()));
+            return util::File::EncryptionKeyType(key_bytes);
         }
         case errSecItemNotFound:
-            return false;
+            return std::nullopt;
         case errSecUserCanceled:
             // Keychain is locked, and user did not enter the password to unlock it.
         case errSecInvalidKeychain:
             // The keychain is corrupted and cannot be used.
         case errSecInteractionNotAllowed:
             // We asked for it to not prompt the user and a prompt was needed
-            return true;
+            return util::File::EncryptionKeyType();
         default:
             throw keychain_access_exception(status);
     }
 }
 
-void set_key(util::Optional<std::vector<char>>& key, CFStringRef account, CFStringRef service)
+void set_key(std::optional<util::File::EncryptionKeyType>& key, CFStringRef account, CFStringRef service)
 {
     if (!key)
         return;
 
     auto search_dictionary = build_search_dictionary(account, service, none);
     CFDictionaryAddValue(search_dictionary.get(), kSecAttrAccessible, kSecAttrAccessibleAfterFirstUnlock);
-    auto key_data = adoptCF(CFDataCreate(nullptr, reinterpret_cast<const UInt8*>(key->data()), key_size));
+    auto key_data = adoptCF(CFDataCreate(nullptr, key->data().data(), key_size));
     if (!key_data)
         throw std::bad_alloc();
 
@@ -125,7 +125,7 @@ void set_key(util::Optional<std::vector<char>>& key, CFStringRef account, CFStri
         case errSecInteractionNotAllowed:
         case errSecInvalidKeychain:
             // We were unable to save the key for "expected" reasons, so proceed unencrypted
-            key = none;
+            key = std::nullopt;
             return;
         default:
             // Unexpected keychain failure happened
@@ -158,20 +158,21 @@ CFPtr<CFStringRef> get_service_name(bool& have_bundle_id)
 
 namespace realm::keychain {
 
-util::Optional<std::vector<char>> get_existing_metadata_realm_key()
+std::optional<util::File::EncryptionKeyType> get_existing_metadata_realm_key()
 {
     bool have_bundle_id = false;
     CFPtr<CFStringRef> service = get_service_name(have_bundle_id);
 
     // Try retrieving the existing key.
-    util::Optional<std::vector<char>> key;
-    if (get_key(s_account, service.get(), key)) {
+    auto key = get_key(s_account, service.get());
+    if (key) {
         return key;
     }
 
     if (have_bundle_id) {
         // See if there's a key stored using the legacy shared keychain item.
-        if (get_key(s_account, s_legacy_service, key)) {
+        key = get_key(s_account, s_legacy_service);
+        if (key) {
             // If so, copy it to the per-app keychain item before returning it.
             set_key(key, s_account, service.get());
             return key;
@@ -180,14 +181,15 @@ util::Optional<std::vector<char>> get_existing_metadata_realm_key()
     return util::none;
 }
 
-util::Optional<std::vector<char>> create_new_metadata_realm_key()
+std::optional<util::File::EncryptionKeyType> create_new_metadata_realm_key()
 {
     bool have_bundle_id = false;
     CFPtr<CFStringRef> service = get_service_name(have_bundle_id);
 
-    util::Optional<std::vector<char>> key;
-    key.emplace(key_size);
-    arc4random_buf(key->data(), key_size);
+    std::array<uint8_t, 64> key_buffer;
+    arc4random_buf(key_buffer.data(), key_size);
+
+    std::optional<util::File::EncryptionKeyType> key(util::File::EncryptionKeyType(std::move(key_buffer)));
     set_key(key, s_account, service.get());
     return key;
 }

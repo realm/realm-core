@@ -231,7 +231,7 @@ private:
 TEST_CASE("Transaction log parsing: schema change validation") {
     TestFile config;
     config.in_memory = true;
-    config.encryption_key = std::vector<char>();
+    config.encryption_key.reset();
     config.automatic_change_notifications = false;
     config.schema_mode = SchemaMode::AdditiveExplicit;
     auto r = Realm::get_shared_realm(config);

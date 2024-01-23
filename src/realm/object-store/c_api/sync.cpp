@@ -151,7 +151,9 @@ RLM_API void realm_sync_client_config_set_metadata_mode(realm_sync_client_config
 RLM_API void realm_sync_client_config_set_metadata_encryption_key(realm_sync_client_config_t* config,
                                                                   const uint8_t key[64]) noexcept
 {
-    config->custom_encryption_key = std::vector<char>(key, key + 64);
+    std::array<uint8_t, 64> raw_key;
+    std::copy_n(key, raw_key.size(), raw_key.begin());
+    config->custom_encryption_key.emplace(raw_key);
 }
 
 RLM_API void realm_sync_client_config_set_reconnect_mode(realm_sync_client_config_t* config,

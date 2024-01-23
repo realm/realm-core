@@ -871,7 +871,7 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg, util::Writ
             footer = reinterpret_cast<const StreamingFooter*>(map_footer.get_addr() + footer_offset);
         }
 
-        top_ref = validate_header(header, footer, size, path, cfg.encryption_key != nullptr); // Throws
+        top_ref = validate_header(header, footer, size, path, cfg.encryption_key.has_value()); // Throws
         m_attach_mode = cfg.is_shared ? attach_SharedFile : attach_UnsharedFile;
         m_data = map_header.get_addr(); // <-- needed below
 

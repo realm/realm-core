@@ -926,7 +926,7 @@ std::pair<DBRef, DBRef> prepare_db(const std::string& path, const std::string& c
         wt->commit();
     }
     mark_as_synchronized(*db);
-    db->write_copy(copy_path, nullptr);
+    db->write_copy(copy_path, std::nullopt);
     auto db_2 = DB::create(make_client_replication(), copy_path);
     return {db, db_2};
 }
@@ -972,7 +972,7 @@ TEST(ClientReset_NoChanges)
     mark_as_synchronized(*db);
 
     // Write a copy of the pre-reset state to compare against
-    db->write_copy(path_backup, nullptr);
+    db->write_copy(path_backup, std::nullopt);
     DBOptions options;
     options.is_immutable = true;
     auto backup_db = DB::create(path_backup, true, options);
@@ -982,7 +982,7 @@ TEST(ClientReset_NoChanges)
     for (auto mode : modes) {
         // Perform a reset with a fresh Realm that exactly matches the current
         // one, which shouldn't result in any changes regardless of mode
-        db->write_copy(path_fresh, nullptr);
+        db->write_copy(path_fresh, std::nullopt);
         expect_reset(test_context, *db, *DB::create(make_client_replication(), path_fresh), mode);
 
         // End state should exactly match the pre-reset state
@@ -1612,7 +1612,7 @@ TEST(ClientReset_Recover_UpdatesReciprocalHistory)
 
     // Make a copy as client reset will delete the fresh realm
     mark_as_synchronized(*db_fresh);
-    db_fresh->write_copy(path_3, nullptr);
+    db_fresh->write_copy(path_3, std::nullopt);
 
     // client reset will discard the recovered array insertion as the object
     // doesn't exist, but keep the object creation

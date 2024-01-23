@@ -317,7 +317,7 @@ TEST_CASE("sync_metadata: encryption", "[sync][metadata]") {
         SECTION("different keys") {
             {
                 // Open metadata realm, make metadata
-                std::vector<char> key0 = make_test_encryption_key(10);
+                File::EncryptionKeyType key0(make_test_encryption_key(10));
                 SyncMetadataManager manager0(metadata_path, true, key0);
 
                 auto user_metadata0 = manager0.get_or_make_user_metadata(identity0);
@@ -328,7 +328,7 @@ TEST_CASE("sync_metadata: encryption", "[sync][metadata]") {
             }
             // Metadata realm is closed because only reference to the realm (user_metadata) is now out of scope
             // Open new metadata realm at path with different key
-            std::vector<char> key1 = make_test_encryption_key(11);
+            File::EncryptionKeyType key1(make_test_encryption_key(11));
             SyncMetadataManager manager1(metadata_path, true, key1);
 
             auto user_metadata1 = manager1.get_or_make_user_metadata(identity0, false);
@@ -370,7 +370,7 @@ TEST_CASE("sync_metadata: encryption", "[sync][metadata]") {
     }
 
     SECTION("works when enabled") {
-        std::vector<char> key = make_test_encryption_key(10);
+        File::EncryptionKeyType key(make_test_encryption_key(10));
         const auto identity = "testcase5a";
         SyncMetadataManager manager(metadata_path, true, key);
         auto user_metadata = manager.get_or_make_user_metadata(identity);

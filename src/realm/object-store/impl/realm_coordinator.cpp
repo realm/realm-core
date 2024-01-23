@@ -88,8 +88,6 @@ std::shared_ptr<RealmCoordinator> RealmCoordinator::get_existing_coordinator(Str
 
 void RealmCoordinator::set_config(const Realm::Config& config)
 {
-    if (config.encryption_key.data() && config.encryption_key.size() != 64)
-        throw InvalidEncryptionKey();
     if (config.schema_mode == SchemaMode::Immutable && config.sync_config)
         throw InvalidArgument(ErrorCodes::IllegalCombination,
                               "Synchronized Realms cannot be opened in immutable mode");
@@ -119,9 +117,9 @@ void RealmCoordinator::set_config(const Realm::Config& config)
             "In-memory realms initialized from memory buffers can only be opened in read-only mode");
     if (!config.realm_data.is_null() && !config.path.empty())
         throw InvalidArgument(ErrorCodes::IllegalCombination, "Specifying both memory buffer and path is invalid");
-    if (!config.realm_data.is_null() && !config.encryption_key.empty())
+    if (!config.realm_data.is_null() && config.encryption_key)
         throw InvalidArgument(ErrorCodes::IllegalCombination, "Memory buffers do not support encryption");
-    if (config.in_memory && !config.encryption_key.empty()) {
+    if (config.in_memory && config.encryption_key) {
         throw InvalidArgument(ErrorCodes::IllegalCombination, "Encryption is not supported for in-memory realms");
     }
     // ResetFile also won't use the migration function, but specifying one is
@@ -155,7 +153,8 @@ void RealmCoordinator::set_config(const Realm::Config& config)
                 ErrorCodes::MismatchedConfig,
                 util::format("Realm at path '%1' already opened with different inMemory settings.", config.path));
         }
-        if (m_config.encryption_key != config.encryption_key) {
+        if (m_config.encryption_key.has_value() != config.encryption_key.has_value() ||
+            m_config.encryption_key->data() != config.encryption_key->data()) {
             throw LogicError(
                 ErrorCodes::MismatchedConfig,
                 util::format("Realm at path '%1' already opened with a different encryption key.", config.path));
@@ -477,7 +476,7 @@ bool RealmCoordinator::open_db()
         if (!m_config.fifo_files_fallback_path.empty()) {
             options.temp_dir = util::normalize_dir(m_config.fifo_files_fallback_path);
         }
-        options.encryption_key = m_config.encryption_key.data();
+        options.encryption_key = m_config.encryption_key;
         options.allow_file_format_upgrade = !m_config.disable_format_upgrade && !schema_mode_reset_file;
         if (history) {
             options.backup_at_file_format_change = m_config.backup_at_file_format_change;
@@ -1242,7 +1241,7 @@ bool RealmCoordinator::compact()
     return m_db->compact();
 }
 
-void RealmCoordinator::write_copy(StringData path, const char* key)
+void RealmCoordinator::write_copy(StringData path, const std::optional<util::File::EncryptionKeyType>& key)
 {
     m_db->write_copy(path, key);
 }

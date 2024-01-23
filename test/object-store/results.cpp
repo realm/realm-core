@@ -106,7 +106,7 @@ TEST_CASE("notifications: async delivery", "[notifications]") {
     _impl::RealmCoordinator::assert_no_open_realms();
     TestFile config;
     config.in_memory = true;
-    config.encryption_key = std::vector<char>();
+    config.encryption_key.reset();
     config.automatic_change_notifications = false;
 
     auto r = Realm::get_shared_realm(config);

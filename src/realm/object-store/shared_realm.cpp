@@ -1172,30 +1172,23 @@ void Realm::convert(const Config& config, bool merge_into_existing)
         return;
     }
 
-    if (config.encryption_key.size() && config.encryption_key.size() != 64) {
-        throw InvalidEncryptionKey();
-    }
-
     auto& tr = transaction();
     auto repl = tr.get_replication();
     bool src_is_sync = repl && repl->get_history_type() == Replication::hist_SyncClient;
     bool dst_is_sync = config.sync_config || config.force_sync_history;
 
     if (dst_is_sync) {
-        m_coordinator->write_copy(config.path, config.encryption_key.data());
+        m_coordinator->write_copy(config.path, config.encryption_key);
         if (!src_is_sync) {
 #if REALM_ENABLE_SYNC
-            DBOptions options;
-            if (config.encryption_key.size()) {
-                options.encryption_key = config.encryption_key.data();
-            }
+            DBOptions options(config.encryption_key);
             auto db = DB::create(make_in_realm_history(), config.path, options);
             db->create_new_history(sync::make_client_replication());
 #endif
         }
     }
     else {
-        tr.write(config.path, config.encryption_key.data());
+        tr.write(config.path, config.encryption_key);
     }
 }
 

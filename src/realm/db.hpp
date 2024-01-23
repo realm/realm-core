@@ -196,7 +196,7 @@ public:
         return m_db_path;
     }
 
-    const char* get_encryption_key() const noexcept
+    const std::optional<util::File::EncryptionKeyType>& get_encryption_key() const noexcept
     {
         return m_alloc.m_file.get_encryption_key();
     }
@@ -330,10 +330,12 @@ public:
     /// the file to the new 64 byte key.
     ///
     /// WARNING: Compact() is not thread-safe with respect to a concurrent close()
-    bool compact(bool bump_version_number = false, util::Optional<const char*> output_encryption_key = util::none)
+    bool compact(bool bump_version_number = false,
+                 const std::optional<util::File::EncryptionKeyType>& output_encryption_key = std::nullopt)
         REQUIRES(!m_mutex);
 
-    void write_copy(StringData path, const char* output_encryption_key) REQUIRES(!m_mutex);
+    void write_copy(StringData path, const std::optional<util::File::EncryptionKeyType>& output_encryption_key)
+        REQUIRES(!m_mutex);
 
 #ifdef REALM_DEBUG
     void test_ringbuf();

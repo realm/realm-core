@@ -1881,7 +1881,7 @@ TEST(Group_WriteEmpty)
     }
     File::remove(path_2);
     {
-        Group group(path_1, 0);
+        Group group(path_1);
         group.write(path_2);
     }
 }

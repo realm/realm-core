@@ -30,7 +30,7 @@ public:
     /// cache object before the first invocation of Slot::access() on an
     /// associated file file slot.
     ServerFileAccessCache(long max_open_files, util::Logger&, ServerHistory::Context&,
-                          util::Optional<std::array<char, 64>> encryption_key);
+                          std::optional<util::File::EncryptionKeyType> encryption_key);
 
     ~ServerFileAccessCache() noexcept;
 
@@ -48,7 +48,7 @@ private:
     long m_num_open_files = 0;
 
     const long m_max_open_files;
-    const util::Optional<std::array<char, 64>> m_encryption_key;
+    const std::optional<util::File::EncryptionKeyType> m_encryption_key;
     // The ServerFileAccessCache is tied to the lifetime of the Server, so no shared_ptr needed
     util::Logger& m_logger;
     ServerHistory::Context& m_history_context;
@@ -131,7 +131,7 @@ private:
 
 inline ServerFileAccessCache::ServerFileAccessCache(long max_open_files, util::Logger& logger,
                                                     ServerHistory::Context& history_context,
-                                                    util::Optional<std::array<char, 64>> encryption_key)
+                                                    std::optional<util::File::EncryptionKeyType> encryption_key)
     : m_max_open_files{max_open_files}
     , m_encryption_key{encryption_key}
     , m_logger{logger}
@@ -224,9 +224,7 @@ inline void ServerFileAccessCache::Slot::close() noexcept
 
 inline DBOptions ServerFileAccessCache::Slot::make_shared_group_options() const noexcept
 {
-    DBOptions options;
-    if (m_cache.m_encryption_key)
-        options.encryption_key = m_cache.m_encryption_key->data();
+    DBOptions options(m_cache.m_encryption_key);
     if (m_disable_sync_to_disk)
         options.durability = DBOptions::Durability::Unsafe;
     return options;

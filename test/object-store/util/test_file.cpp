@@ -71,9 +71,7 @@ TestFile::TestFile()
     m_temp_dir = util::make_temp_dir();
     path = (fs::path(m_temp_dir) / "realm.XXXXXX").string();
     util::Logger::set_default_level_threshold(realm::util::Logger::Level::TEST_LOGGING_LEVEL);
-    if (const char* crypt_key = test_util::crypt_key()) {
-        encryption_key = std::vector<char>(crypt_key, crypt_key + 64);
-    }
+    encryption_key = test_util::crypt_key();
     int fd = mkstemp(path.data());
     if (fd < 0) {
         int err = errno;
@@ -116,7 +114,7 @@ InMemoryTestFile::InMemoryTestFile()
 {
     in_memory = true;
     schema_version = 0;
-    encryption_key = std::vector<char>();
+    encryption_key.reset();
 }
 
 DBOptions InMemoryTestFile::options() const

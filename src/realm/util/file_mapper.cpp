@@ -507,10 +507,12 @@ EncryptedFileMapping* add_mapping(void* addr, size_t size, const FileAttributes&
     // Get the potential memory allocation out of the way so that mappings_by_addr.push_back can't throw
     mappings_by_addr.reserve(mappings_by_addr.size() + 1);
 
+    REALM_ASSERT(file.encryption_key.has_value());
+
     if (it == mappings_by_file.end()) {
         mappings_by_file.reserve(mappings_by_file.size() + 1);
         mappings_for_file f;
-        f.info = std::make_shared<SharedFileInfo>(reinterpret_cast<const uint8_t*>(file.encryption_key));
+        f.info = std::make_shared<SharedFileInfo>(file.encryption_key.value());
         f.info->fd = File::dup_file_desc(file.fd);
         f.file_unique_id = fuid;
 
@@ -518,7 +520,7 @@ EncryptedFileMapping* add_mapping(void* addr, size_t size, const FileAttributes&
         it = mappings_by_file.end() - 1;
     }
     else {
-        it->info->cryptor.check_key(reinterpret_cast<const uint8_t*>(file.encryption_key));
+        it->info->cryptor.check_key(file.encryption_key.value());
     }
 
     try {
@@ -613,9 +615,9 @@ void* mmap_reserve(const FileAttributes& file, size_t reservation_size, size_t o
 }
 
 void* mmap_fixed(FileDesc fd, void* address_request, size_t size, File::AccessMode access, size_t offset,
-                 const char* enc_key, EncryptedFileMapping* encrypted_mapping)
+                 const std::optional<File::EncryptionKeyType>& enc_key, EncryptedFileMapping* encrypted_mapping)
 {
-    REALM_ASSERT((enc_key == nullptr) ==
+    REALM_ASSERT(!enc_key.has_value() ==
                  (encrypted_mapping == nullptr)); // Mapping must already have been set if encryption is used
     if (encrypted_mapping) {
 // Since the encryption layer must be able to WRITE into the memory area,
@@ -671,7 +673,7 @@ void* mmap_anon(size_t size)
 }
 
 void* mmap_fixed(FileDesc fd, void* address_request, size_t size, File::AccessMode access, size_t offset,
-                 const char* enc_key)
+                 const std::optional<File::EncryptionKeyType>& enc_key)
 {
     _impl::SimulatedFailure::trigger_mmap(size);
     static_cast<void>(enc_key); // FIXME: Consider removing this parameter

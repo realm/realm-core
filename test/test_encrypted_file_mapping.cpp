@@ -57,11 +57,13 @@
 
 #if REALM_ENABLE_ENCRYPTION
 
+#include "util/crypt_key.hpp"
+
 using namespace realm::util;
 using realm::FileDesc;
 
 namespace {
-const uint8_t test_key[] = "1234567890123456789012345678901123456789012345678901234567890123";
+static File::EncryptionKeyType test_key = *realm::test_util::crypt_key(true);
 }
 
 TEST(EncryptedFile_CryptorBasic)
