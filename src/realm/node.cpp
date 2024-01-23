@@ -34,7 +34,7 @@ MemRef Node::create_node(size_t size, Allocator& alloc, bool context_flag, Type 
 
     MemRef mem = alloc.alloc(byte_size); // Throws
     auto header = mem.get_addr();
-    Encoding encoding;
+    Encoding encoding = Encoding::WTypBits;
     if (width_type == wtype_Bits)
         encoding = Encoding::WTypBits;
     else if (width_type == wtype_Multiply)
@@ -57,9 +57,6 @@ MemRef Node::create_node(size_t size, Allocator& alloc, bool context_flag, Type 
         width = width * 8;
 
     init_header(header, 'A', encoding, flags, width, size);
-
-    // init_header(header, type == type_InnerBptreeNode, type != type_Normal, context_flag, width_type, width, size,
-    //             byte_size);
     set_capacity_in_header(byte_size, mem.get_addr());
     return mem;
 }

@@ -569,9 +569,7 @@ void Array::insert(size_t ndx, int_fast64_t value)
 {
     REALM_ASSERT_DEBUG(ndx <= m_size);
 
-    if (is_encoded())
-        decode_array(*this);
-
+    decode_array(*this);
     const auto old_width = m_width;
     const auto old_size = m_size;
     const Getter old_getter = m_getter; // Save old getter before potential width expansion
@@ -1207,7 +1205,7 @@ MemRef Array::create(Type type, bool context_flag, WidthType width_type, size_t 
     REALM_ASSERT_7(size, ==, 0, ||, width_type, !=, wtype_Ignore);
 
     uint8_t flags = 0;
-    Encoding encoding;
+    Encoding encoding = Encoding::WTypBits;
     if (width_type == wtype_Bits)
         encoding = Encoding::WTypBits;
     else if (width_type == wtype_Multiply)
@@ -1218,18 +1216,15 @@ MemRef Array::create(Type type, bool context_flag, WidthType width_type, size_t 
         REALM_ASSERT(false && "Wrong width type for encoding");
     }
 
-    // bool is_inner_bptree_node = false, has_refs = false;
     switch (type) {
         case type_Normal:
             break;
         case type_InnerBptreeNode:
             flags |= (uint8_t)Flags::HasRefs | (uint8_t)Flags::InnerBPTree;
-            // is_inner_bptree_node = true;
-            // has_refs = true;
+
             break;
         case type_HasRefs:
             flags |= (uint8_t)Flags::HasRefs;
-            // has_refs = true;
             break;
     }
     if (context_flag)
@@ -1247,7 +1242,6 @@ MemRef Array::create(Type type, bool context_flag, WidthType width_type, size_t 
     auto header = mem.get_addr();
 
     init_header(header, 'A', encoding, flags, width, size);
-    // init_header(header, is_inner_bptree_node, has_refs, context_flag, width_type, width, size, byte_size);
     set_capacity_in_header(byte_size, mem.get_addr());
     if (value != 0) {
         char* data = get_data_from_header(mem.get_addr());
