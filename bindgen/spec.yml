@@ -1207,7 +1207,7 @@ classes:
       unsubscribe: '(token: AppSubscriptionToken)'
       call_function: '(user: const SharedSyncUser&, name: std::string, args: EJsonArray, service_name: util::Optional<std::string>, cb: AsyncCallback<(result: Nullable<const EJson*>, err: util::Optional<AppError>)>)'
       make_streaming_request: '(user: SharedSyncUser, name: std::string, args: bson::BsonArray, service_name: util::Optional<std::string>) -> Request'
-      update_base_url: '(base_url: std::optional<std::string>, cb: AsyncCallback<(err: util::Optional<AppError>)>&&)'
+      update_base_url: '(base_url: util::Optional<std::string>, cb: AsyncCallback<(err: util::Optional<AppError>)>&&)'
       get_base_url: '() const -> std::string'
 
   WatchStream:
