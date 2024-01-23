@@ -5585,7 +5585,7 @@ TEST(Sync_ServerSideEncryption)
         server_path = fixture.map_virtual_to_real_path("/test");
     }
 
-    std::optional<File::EncryptionKeyType> encryption_key = crypt_key(always_encrypt);
+    auto encryption_key = crypt_key(always_encrypt);
     Group group{server_path, encryption_key};
     CHECK(group.has_table("class_Test"));
 }

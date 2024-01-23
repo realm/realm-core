@@ -521,7 +521,8 @@ private:
 
 class RealmFile {
 public:
-    RealmFile(const std::string& file_path, const char* encryption_key, uint64_t top_ref = 0);
+    RealmFile(const std::string& file_path, const std::optional<realm::util::File::EncryptionKeyType>& encryption_key,
+              uint64_t top_ref = 0);
     // Walk the file and check that it consists of valid nodes
     void node_scan();
     void schema_info();
@@ -776,7 +777,8 @@ std::vector<FreeListEntry> Group::get_free_list() const
     return list;
 }
 
-RealmFile::RealmFile(const std::string& file_path, const char* encryption_key, uint64_t top_ref)
+RealmFile::RealmFile(const std::string& file_path,
+                     const std::optional<realm::util::File::EncryptionKeyType>& encryption_key, uint64_t top_ref)
 {
     realm::SlabAlloc::Config config;
     config.encryption_key = encryption_key;
@@ -1080,13 +1082,11 @@ int main(int argc, const char* argv[])
             bool node_scan = false;
             bool changes = false;
             uint64_t alternate_top = 0;
-            const char* key_ptr = nullptr;
-            char key[64];
+            std::array<uint8_t, 64> key;
             for (int curr_arg = 1; curr_arg < argc; curr_arg++) {
                 if (strcmp(argv[curr_arg], "--keyfile") == 0) {
                     std::ifstream key_file(argv[curr_arg + 1]);
-                    key_file.read(key, sizeof(key));
-                    key_ptr = key;
+                    key_file.read(reinterpret_cast<char*>(key.data()), key.size());
                     curr_arg++;
                 }
                 else if (strcmp(argv[curr_arg], "--hexkey") == 0) {
@@ -1098,7 +1098,6 @@ int main(int argc, const char* argv[])
                     for (int idx = 0; idx < 64; ++idx) {
                         key[idx] = hex_to_bin(chars[idx * 2], chars[idx * 2 + 1]);
                     }
-                    key_ptr = key;
                 }
                 else if (strcmp(argv[curr_arg], "--top") == 0) {
                     char* end;
@@ -1132,7 +1131,7 @@ int main(int argc, const char* argv[])
                 }
                 else {
                     std::cout << "File name: " << argv[curr_arg] << std::endl;
-                    RealmFile rf(argv[curr_arg], key_ptr, alternate_top);
+                    RealmFile rf(argv[curr_arg], realm::util::File::EncryptionKeyType(key), alternate_top);
                     if (free_list_info) {
                         rf.free_list_info();
                     }

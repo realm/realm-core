@@ -23,9 +23,8 @@
 #else
 #define __STDC_WANT_LIB_EXT1__ 1
 
-#include <sys/mman.h>
-#include <strings.h>
 #include <string.h>
+#include <sys/mman.h>
 #endif
 
 #include "sensitive_buffer.hpp"
@@ -100,7 +99,11 @@ SensitiveBufferBase::~SensitiveBufferBase()
     if (!m_buffer)
         return;
 
+#if defined(__STDC_LIB_EXT1__) || __APPLE__
     memset_s(m_buffer, m_size, 0, m_size);
+#else
+#warning "Platforms lacks memset_s"
+#endif
 
 #if defined(MADV_DONTDUMP) && defined(MADV_DODUMP)
     madvise(m_buffer, m_size, MADV_DODUMP);
