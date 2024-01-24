@@ -4729,6 +4729,7 @@ TEST(Parser_Mixed)
     verify_query(test_context, table, "mixed endswith \"4\"", 5); // 4, 24, 44, 64, 84
     verify_query(test_context, table, "mixed endswith bin(\"4\")", 0);
     verify_query(test_context, table, "mixed endswith bin(\"Binary\")", 1);
+    verify_query(test_context, table, "mixed.@size > 7", 22);
     verify_query(test_context, table, "mixed == oid(" + id.to_string() + ")", 1);
 
     std::string str_value = "4";
@@ -5297,6 +5298,8 @@ TEST(Parser_NestedMixedDictionaryList)
     verify_query(test_context, persons, "properties.@keys == 'instruments'", 2);
     verify_query(test_context, persons, "properties.@keys == 'pets'", 2);
     verify_query(test_context, persons, "properties.@keys == 'tickets'", 1);
+    verify_query(test_context, persons, "properties.@size == 3", 1);
+    verify_query(test_context, persons, "properties.instruments.@size == 2", 1);
 }
 
 TEST(Parser_NestedDictionaryDeep)
