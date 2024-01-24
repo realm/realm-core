@@ -132,7 +132,7 @@ SensitiveBufferBase::SensitiveBufferBase(const SensitiveBufferBase& other)
     std::memcpy(m_buffer, other.m_buffer, m_size);
 }
 
-SensitiveBufferBase::SensitiveBufferBase(SensitiveBufferBase&& other)
+SensitiveBufferBase::SensitiveBufferBase(SensitiveBufferBase&& other) noexcept
     : m_size(other.m_size)
 {
     std::swap(m_buffer, other.m_buffer);

@@ -40,7 +40,8 @@ public:
 
     virtual ~SensitiveBufferBase();
 
-    bool operator==(const SensitiveBufferBase& rhs) const {
+    bool operator==(const SensitiveBufferBase& rhs) const
+    {
         if (this == &rhs)
             return true;
 
@@ -52,18 +53,19 @@ public:
 
         if (m_buffer == nullptr || rhs.m_buffer == nullptr)
             return false;
-        
+
         return std::memcmp(m_buffer, rhs.m_buffer, m_size) == 0;
     }
 
-    bool operator!=(const SensitiveBufferBase& rhs) const {
+    bool operator!=(const SensitiveBufferBase& rhs) const
+    {
         return !operator==(rhs);
     }
 
 protected:
     SensitiveBufferBase(size_t buffer_size);
     SensitiveBufferBase(const SensitiveBufferBase& other);
-    SensitiveBufferBase(SensitiveBufferBase&& other);
+    SensitiveBufferBase(SensitiveBufferBase&& other) noexcept;
 
     template <typename Func>
     void with_unprotected_buffer(Func f) const
@@ -134,11 +136,13 @@ public:
         return *this;
     }
 
-    bool operator==(const SensitiveBuffer<T>& rhs) const {
+    bool operator==(const SensitiveBuffer<T>& rhs) const
+    {
         return SensitiveBufferBase::operator==(rhs);
     }
 
-    bool operator!=(const SensitiveBuffer<T>& rhs) const {
+    bool operator!=(const SensitiveBuffer<T>& rhs) const
+    {
         return SensitiveBufferBase::operator!=(rhs);
     }
 
