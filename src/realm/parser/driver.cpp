@@ -1081,6 +1081,9 @@ std::unique_ptr<Subexpr> PostOpNode::visit(ParserDriver*, Subexpr* subexpr)
         if (auto s = dynamic_cast<Columns<BinaryData>*>(subexpr)) {
             return s->size().clone();
         }
+        if (auto s = dynamic_cast<Columns<Mixed>*>(subexpr)) {
+            return s->size().clone();
+        }
     }
     else if (op_type == PostOpNode::TYPE) {
         if (auto s = dynamic_cast<Columns<Mixed>*>(subexpr)) {

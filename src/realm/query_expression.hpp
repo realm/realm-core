@@ -769,7 +769,7 @@ template <class oper>
 class Operator;
 template <class oper, class TLeft = Subexpr>
 class UnaryOperator;
-template <class oper, class TLeft = Subexpr>
+template <class oper>
 class SizeOperator;
 template <class oper>
 class TypeOfValueOperator;
@@ -2519,10 +2519,10 @@ private:
 };
 #endif
 
-template <class T, class TExpr>
+template <class T>
 class SizeOperator : public Subexpr2<Int> {
 public:
-    SizeOperator(std::unique_ptr<TExpr> left)
+    SizeOperator(std::unique_ptr<Subexpr> left)
         : m_expr(std::move(left))
     {
     }
@@ -2565,6 +2565,27 @@ public:
                 // This is the size of a list
                 destination.set(i, elem);
             }
+            else if constexpr (std::is_same_v<T, Mixed>) {
+                if (elem.is_null()) {
+                    destination.set_null(i);
+                }
+                else if (elem.is_type(type_String)) {
+                    destination.set(i, int64_t(elem.get_string().size()));
+                }
+                else if (elem.is_type(type_List)) {
+                    DummyParent parent(m_expr->get_base_table().cast_away_const(), elem.get_ref());
+                    Lst<Mixed> list(parent, 0);
+                    destination.set(i, int64_t(list.size()));
+                }
+                else if (elem.is_type(type_Dictionary)) {
+                    DummyParent parent(m_expr->get_base_table().cast_away_const(), elem.get_ref());
+                    Dictionary dict(parent, 0);
+                    destination.set(i, int64_t(dict.size()));
+                }
+                else if (elem.is_type(type_Binary)) {
+                    destination.set(i, int64_t(elem.get_binary().size()));
+                }
+            }
             else {
                 if (!elem) {
                     destination.set_null(i);
@@ -2590,7 +2611,7 @@ public:
     }
 
 private:
-    std::unique_ptr<TExpr> m_expr;
+    std::unique_ptr<Subexpr> m_expr;
 };
 
 template <class T>
