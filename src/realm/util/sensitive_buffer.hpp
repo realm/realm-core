@@ -22,6 +22,8 @@
 #include <type_traits>
 #include <utility>
 
+#include <realm/util/assert.hpp>
+
 namespace realm::util {
 struct SensitiveBufferBase {
 public:
@@ -98,7 +100,7 @@ public:
     SensitiveBuffer<T>& operator=(const SensitiveBuffer<T>& other)
     {
         if (this != &other) {
-            REALM_ASSERT(engaged() == true);
+            REALM_ASSERT(engaged());
             with_unprotected_buffer([&other](void* buffer) {
                 *(reinterpret_cast<T*>(buffer)) = other.data();
             });

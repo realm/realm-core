@@ -79,14 +79,14 @@ int main(int argc, const char* argv[])
 {
     if (argc > 1) {
         try {
-            const char* key_ptr = nullptr;
-            char key[64];
+            std::optional<realm::util::File::EncryptionKeyType> key;
             double threshold = 0; // by default don't convert, just compact
             for (int curr_arg = 1; curr_arg < argc; curr_arg++) {
                 if (strcmp(argv[curr_arg], "--key") == 0) {
                     std::ifstream key_file(argv[curr_arg + 1]);
-                    key_file.read(key, sizeof(key));
-                    key_ptr = key;
+                    std::array<uint8_t, 64> key_buffer;
+                    key_file.read(reinterpret_cast<char*>(key_buffer.data()), key_buffer.size());
+                    key = realm::util::File::EncryptionKeyType(key_buffer);
                     curr_arg++;
                 }
                 else if (strcmp(argv[curr_arg], "--threshold") == 0) {
@@ -98,10 +98,8 @@ int main(int argc, const char* argv[])
                     auto start = std::chrono::steady_clock::now();
                     realm::Realm::Config config;
                     config.path = argv[curr_arg];
-                    if (key_ptr) {
-                        config.encryption_key.resize(64);
-                        memcpy(&config.encryption_key[0], &key_ptr[0], 64);
-                    }
+                    config.encryption_key = key;
+
                     realm::SharedRealm realm;
                     try {
                         realm = realm::Realm::get_shared_realm(config);
