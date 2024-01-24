@@ -25,15 +25,15 @@ namespace sync {
 //
 //   3 Support for Mixed, TypeLinks, Set, and Dictionary columns.
 //
-//   4 Error messaging format accepts a flexible JSON field in 'json_error'.
+//   4 Error messaging format accepts a flexible JSON field in JSON_ERROR.
 //     JSONErrorMessage.IsClientReset controls recovery mode.
 //
 //   5 Introduces compensating write errors.
 //
 //   6 Support for asymmetric tables.
 //
-//   7 Client takes the 'action' specified in the 'json_error' messages received
-//     from server. Client sends 'json_error' messages to the server.
+//   7 Client takes the 'action' specified in the JSON_ERROR messages received
+//     from server. Client sends JSON_ERROR messages to the server.
 //
 //   8 Websocket http errors are now sent as websocket close codes
 //     FLX sync BIND message can include JSON data in place of server path string
@@ -47,6 +47,12 @@ namespace sync {
 //   10 Update BIND message to send information to the server about the reason a
 //      synchronization session is used for; add support for server log messages
 //
+//   11 Support for FLX schema migrations
+//      Update BIND message to send information to the server about the schema
+//      version a synchronized realm is opened with
+//      Update JSON_ERROR message to read the previous schema version sent by
+//      the server
+//
 //  XX Changes:
 //     - TBD
 //
@@ -54,7 +60,7 @@ constexpr int get_current_protocol_version() noexcept
 {
     // Also update the current protocol version test in flx_sync.cpp when
     // updating this value
-    return 10;
+    return 11;
 }
 
 constexpr std::string_view get_pbs_websocket_protocol_prefix() noexcept
@@ -271,6 +277,7 @@ struct ProtocolErrorInfo {
         RefreshUser,
         RefreshLocation,
         LogOutUser,
+        MigrateSchema,
     };
 
     ProtocolErrorInfo() = default;
@@ -295,6 +302,7 @@ struct ProtocolErrorInfo {
     std::optional<ResumptionDelayInfo> resumption_delay_interval;
     Action server_requests_action;
     std::optional<std::string> migration_query_string;
+    std::optional<uint64_t> previous_schema_version;
 };
 
 
@@ -364,6 +372,8 @@ enum class ProtocolError {
     migrate_to_flx               = RLM_SYNC_ERR_SESSION_MIGRATE_TO_FLX,             // Server migrated from PBS to FLX - migrate client to FLX (BIND)
     bad_progress                 = RLM_SYNC_ERR_SESSION_BAD_PROGRESS,               // Bad progress information (ERROR)
     revert_to_pbs                = RLM_SYNC_ERR_SESSION_REVERT_TO_PBS,              // Server rolled back to PBS after FLX migration - revert FLX client migration (BIND)
+    bad_schema_version           = RLM_SYNC_ERR_SESSION_BAD_SCHEMA_VERSION,         // Client tried to open a session with an invalid schema version (BIND)
+    schema_version_changed       = RLM_SYNC_ERR_SESSION_SCHEMA_VERSION_CHANGED,     // Client opened a session with a new valid schema version - migrate client to use new schema version (BIND)
 
     // clang-format on
 };
@@ -441,6 +451,8 @@ inline std::ostream& operator<<(std::ostream& o, ProtocolErrorInfo::Action actio
             return o << "RefreshLocation";
         case ProtocolErrorInfo::Action::LogOutUser:
             return o << "LogOutUser";
+        case ProtocolErrorInfo::Action::MigrateSchema:
+            return o << "MigrateSchema";
     }
     return o << "Invalid error action: " << int64_t(action);
 }

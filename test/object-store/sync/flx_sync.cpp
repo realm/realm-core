@@ -2503,7 +2503,7 @@ TEST_CASE("flx: writes work without waiting for sync", "[sync][flx][baas]") {
 TEST_CASE("flx: verify websocket protocol number and prefixes", "[sync][protocol]") {
     // Update the expected value whenever the protocol version is updated - this ensures
     // that the current protocol version does not change unexpectedly.
-    REQUIRE(10 == sync::get_current_protocol_version());
+    REQUIRE(11 == sync::get_current_protocol_version());
     // This was updated in Protocol V8 to use '#' instead of '/' to support the Web SDK
     REQUIRE("com.mongodb.realm-sync#" == sync::get_pbs_websocket_protocol_prefix());
     REQUIRE("com.mongodb.realm-query-sync#" == sync::get_flx_websocket_protocol_prefix());
@@ -4513,14 +4513,14 @@ TEST_CASE("flx sync: Client reset during async open", "[sync][flx][client reset]
 
     auto before_callback_called = util::make_promise_future<void>();
     realm_config.sync_config->notify_before_client_reset = [&](std::shared_ptr<Realm> realm) {
-        CHECK(realm->schema_version() == 1);
+        CHECK(realm->schema_version() == 0);
         before_callback_called.promise.emplace_value();
     };
 
     auto after_callback_called = util::make_promise_future<void>();
     realm_config.sync_config->notify_after_client_reset = [&](std::shared_ptr<Realm> realm, ThreadSafeReference,
                                                               bool) {
-        CHECK(realm->schema_version() == 1);
+        CHECK(realm->schema_version() == 0);
         after_callback_called.promise.emplace_value();
     };
 

@@ -63,7 +63,9 @@ const char* httpmethod_to_string(HttpMethod method)
 
 AppError::AppError(ErrorCodes::Error ec, std::string message, std::string link,
                    std::optional<int> additional_error_code, std::optional<std::string> server_err)
-    : Exception(ec, ec == ErrorCodes::HTTPError ? http_message(message, *additional_error_code) : message)
+    : Exception(ec, ec == ErrorCodes::HTTPError && additional_error_code
+                        ? http_message(message, *additional_error_code)
+                        : message)
     , additional_status_code(additional_error_code)
     , link_to_server_logs(link)
     , server_error(server_err ? *server_err : "")

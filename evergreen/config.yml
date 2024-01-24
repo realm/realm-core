@@ -225,6 +225,8 @@ functions:
 
           if [[ -n "${verbose_test_output}" ]]; then
               TEST_FLAGS="$TEST_FLAGS -VV"
+              export UNITTEST_THREADS=1
+              export UNITTEST_LOG_LEVEL="${test_logging_level|debug}"
           else
               TEST_FLAGS="$TEST_FLAGS -V"
           fi
@@ -259,9 +261,6 @@ functions:
               rm "$UNITTEST_EVERGREEN_TEST_RESULTS"
           fi
           export UNITTEST_PROGRESS=1
-          if [[ -n "${report_test_progress|}" ]]; then
-              export UNITTEST_PROGRESS="${report_test_progress|}"
-          fi
 
           if [[ -n "${run_with_encryption}" ]]; then
               export UNITTEST_ENCRYPT_ALL=1
@@ -904,7 +903,6 @@ tasks:
   - func: "run tests"
     vars:
       test_filter: CoreTests
-      report_test_progress: On
 
 - name: core-tests
   tags: [ "test_suite", "for_pull_requests" ]
