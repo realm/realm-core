@@ -732,6 +732,7 @@ classes:
       make_ssl_verify_callback: '(callback: (server_address: const std::string&, server_port: int, pem_data: std::string_view, preverify_ok: int, depth: int) off_thread -> bool) -> SSLVerifyCallback'
       needs_file_format_upgrade: '(config: const RealmConfig&) -> bool'
       get_mixed_type: '(obj: const Obj&, col_key: ColKey) -> MixedDataType'
+      get_mixed_element_type: '(results: Results, index: count_t) -> MixedDataType'
 
   LogCategoryRef:
     cppName: util::LogCategoryRef
@@ -897,6 +898,7 @@ classes:
           suffix: 'obj'
       get_any: '(index: count_t) -> Mixed'
       get_dictionary_element: '(index: count_t) -> std::pair<StringData, Mixed>'
+      get_list: '(index: count_t) -> List'
       filter: '(query: Query&&) const -> Results'
       sort:
         - '(order: SortDescriptor&&) const -> Results'

@@ -312,8 +312,21 @@ struct Helpers {
         if (obj.is_null(col_key)) {
             return MixedDataType::JSNull;
         }
-        return MixedDataType(int(obj.get_any(col_key).get_type()));
+        return to_mixed_data_type(obj.get_any(col_key).get_type());
     }
+
+    static MixedDataType get_mixed_element_type(Results results, size_t index) {
+        Mixed value = results.get_any(index);
+        if (value.is_null()) {
+            return MixedDataType::JSNull;
+        }
+        return to_mixed_data_type(value.get_type());
+    }
+
+    private:
+        static MixedDataType to_mixed_data_type(DataType from_type) {
+            return MixedDataType(int(from_type));
+        }
 };
 
 struct ObjectChangeSet {
