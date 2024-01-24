@@ -80,7 +80,14 @@ SensitiveBufferBase::SensitiveBufferBase(size_t size)
 
     int ret;
     ret = mlock(m_buffer, m_size);
+#if REALM_LINUX
+    // mlock failing with ENOMEM under linux implies we're over RLIMIT_MEMLOCK,
+    // which happens inside a container. ignore for now.
+    int err = errno;
+    REALM_ASSERT_RELEASE_EX((ret == 0 || err == ENOMEM) && "mlock()", err);
+#endif
     REALM_ASSERT_RELEASE_EX(ret == 0 && "mlock()", errno);
+
 
 #if defined(MADV_DONTDUMP)
     // Linux kernel 3.4+ respects MADV_DONTDUMP, ignore return value on older

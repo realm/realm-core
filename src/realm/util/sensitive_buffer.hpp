@@ -19,6 +19,7 @@
 #pragma once
 
 #include <cstddef>
+#include <cstring>
 #include <type_traits>
 #include <utility>
 
@@ -27,17 +28,39 @@
 namespace realm::util {
 struct SensitiveBufferBase {
 public:
+    bool engaged() const
+    {
+        return m_buffer != nullptr;
+    }
+
+    size_t size() const
+    {
+        return m_size;
+    }
+
     virtual ~SensitiveBufferBase();
+
+    bool operator==(const SensitiveBufferBase& rhs) const {
+        if (m_size != rhs.m_size)
+            return false;
+
+        if (m_buffer == rhs.m_buffer)
+            return true;
+
+        if (m_buffer == nullptr || rhs.m_buffer == nullptr)
+            return false;
+        
+        return std::memcmp(m_buffer, rhs.m_buffer, m_size) == 0;
+    }
+
+    bool operator!=(const SensitiveBufferBase& rhs) const {
+        return !operator==(rhs);
+    }
 
 protected:
     SensitiveBufferBase(size_t buffer_size);
     SensitiveBufferBase(const SensitiveBufferBase& other);
     SensitiveBufferBase(SensitiveBufferBase&& other);
-
-    bool engaged() const
-    {
-        return m_buffer != nullptr;
-    }
 
     template <typename Func>
     void with_unprotected_buffer(Func f) const
@@ -53,7 +76,7 @@ protected:
 
 private:
     const size_t m_size;
-    void* m_buffer;
+    void* m_buffer = nullptr;
 
     void protect() const;
     void unprotect() const;
@@ -106,6 +129,14 @@ public:
             });
         }
         return *this;
+    }
+
+    bool operator==(const SensitiveBuffer<T>& rhs) const {
+        return SensitiveBufferBase::operator==(rhs);
+    }
+
+    bool operator!=(const SensitiveBuffer<T>& rhs) const {
+        return SensitiveBufferBase::operator!=(rhs);
     }
 
     T data() const

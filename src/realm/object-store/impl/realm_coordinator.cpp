@@ -153,8 +153,7 @@ void RealmCoordinator::set_config(const Realm::Config& config)
                 ErrorCodes::MismatchedConfig,
                 util::format("Realm at path '%1' already opened with different inMemory settings.", config.path));
         }
-        if (m_config.encryption_key.has_value() != config.encryption_key.has_value() ||
-            m_config.encryption_key->data() != config.encryption_key->data()) {
+        if (m_config.encryption_key != config.encryption_key) {
             throw LogicError(
                 ErrorCodes::MismatchedConfig,
                 util::format("Realm at path '%1' already opened with a different encryption key.", config.path));
