@@ -1054,6 +1054,7 @@ classes:
     methods:
       get: '(ndx: count_t) const -> Obj'
       get_list: '(path_elem: int) -> List'
+      get_dictionary: '(path_elem: int) -> Dictionary'
       move: '(source_ndx: count_t, dest_ndx: count_t)'
       remove: '(ndx: count_t)'
       remove_all: '()'
@@ -1142,11 +1143,14 @@ classes:
         - sig: '(key: StringData) const -> Obj'
           cppName: get<Obj> # TODO can't distinguish null from missing
       get_pair: '(ndx: count_t) const -> std::pair<StringData, Mixed>'
+      get_list: '(path_elem: std::string) -> List'
+      get_dictionary: '(path_elem: std::string) -> Dictionary'
       contains: '(key: StringData) -> bool'
       freeze: '(frozen_realm: SharedRealm const&) const -> Dictionary'
       add_key_based_notification_callback: '(cb: (changes: DictionaryChangeSet), keyPaths: std::optional<KeyPathArray>) -> NotificationToken'
       insert_any: '(key: StringData, value: Mixed) -> std::pair<count_t, bool>'
       insert_embedded: '(key: StringData) -> Obj'
+      insert_collection: '(path_elem: std::string, dict_or_list: CollectionType)'
       try_get_any: '(key: StringData) const -> std::optional<Mixed>'
       remove_all: '()'
       try_erase: '(key: StringData) -> bool'
