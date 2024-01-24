@@ -17,6 +17,7 @@
  **************************************************************************/
 
 #include <realm/util/features.h>
+#include <cstring>
 
 #include "crypt_key.hpp"
 

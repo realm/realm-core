@@ -38,10 +38,10 @@ void FuzzConfigurator::setup_realm_config()
     m_config.scheduler = realm::util::Scheduler::make_dummy();
     if (m_use_encryption) {
         const char* key = m_fuzzer.get_encryption_key();
-        const char* i = key;
-        while (*i != '\0') {
-            m_config.encryption_key.push_back(*i);
-            i++;
+        if (key) {
+            std::array<uint8_t, 64> key_buffer;
+            std::copy_n(key, key_buffer.size(), key_buffer.begin());
+            m_config.encryption_key = realm::util::File::EncryptionKeyType(key);
         }
     }
 }
@@ -104,7 +104,7 @@ void FuzzConfigurator::print_cnf()
     m_log << "// REALM_MAX_BPNODE_SIZE is " << REALM_MAX_BPNODE_SIZE << "\n";
     m_log << "// ----------------------------------------------------------------------\n";
     const auto& printable_key =
-        !m_use_encryption ? "nullptr" : std::string("\"") + m_config.encryption_key.data() + "\"";
+        !m_use_encryption ? "nullptr" : std::string("\"") + m_fuzzer.get_encryption_key() + "\"";
     m_log << "// const char* key = " << printable_key << ";\n";
     m_log << "\n";
 }

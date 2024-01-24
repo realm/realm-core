@@ -41,14 +41,10 @@ SensitiveBufferBase::SensitiveBufferBase(size_t size)
 
     BOOL ret = VirtualLock(m_buffer, m_size);
     REALM_ASSERT_RELEASE_EX(ret != 0 && "VirtualLock()", GetLastError());
-
-    protect();
 }
 
 SensitiveBufferBase::~SensitiveBufferBase()
 {
-    std::lock_guard<std::mutex> lock(m_protect_mutex);
-
     if (!m_buffer)
         return;
 
@@ -94,8 +90,6 @@ SensitiveBufferBase::SensitiveBufferBase(size_t size)
 
 SensitiveBufferBase::~SensitiveBufferBase()
 {
-    std::lock_guard<std::mutex> lock(m_protect_mutex);
-
     if (!m_buffer)
         return;
 
@@ -123,3 +117,17 @@ void SensitiveBufferBase::protect() const {}
 
 void SensitiveBufferBase::unprotect() const {}
 #endif
+
+SensitiveBufferBase::SensitiveBufferBase(const SensitiveBufferBase& other)
+    : SensitiveBufferBase(other.m_size)
+{
+    other.with_unprotected_buffer([this](void* buffer) {
+        memcpy(m_buffer, buffer, m_size);
+    });
+}
+
+SensitiveBufferBase::SensitiveBufferBase(SensitiveBufferBase&& other)
+    : m_size(other.m_size)
+{
+    std::swap(m_buffer, other.m_buffer);
+}
