@@ -128,9 +128,7 @@ void SensitiveBufferBase::unprotect() const {}
 SensitiveBufferBase::SensitiveBufferBase(const SensitiveBufferBase& other)
     : SensitiveBufferBase(other.m_size)
 {
-    other.with_unprotected_buffer([this](void* buffer) {
-        memcpy(m_buffer, buffer, m_size);
-    });
+    memcpy(m_buffer, other.m_buffer, m_size);
 }
 
 SensitiveBufferBase::SensitiveBufferBase(SensitiveBufferBase&& other)
