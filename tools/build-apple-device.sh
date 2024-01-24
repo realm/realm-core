@@ -12,7 +12,6 @@ if [[ -n "${DEVELOPER_DIR}" && ! -d "${DEVELOPER_DIR}" ]]; then
 fi
 
 SCRIPT="$(basename "${BASH_SOURCE[0]}")"
-VERSION="$(git describe)"
 
 function usage {
     echo "Usage: ${SCRIPT} -p <platform> [-c <configuration>] [-v <version>] [-f <cmake-flags>]"
@@ -37,8 +36,8 @@ while getopts ":p:c:v:f:" opt; do
     case "${opt}" in
         p) platform="${OPTARG}";;
         c) buildType="${OPTARG}";;
-        v) VERSION="${OPTARG}";;
-        f) CMAKE_FLAGS=${OPTARG};;
+        f) CMAKE_FLAGS="${CMAKE_FLAGS} ${OPTARG}";;
+        v) CMAKE_FLAGS="${CMAKE_FLAGS} -DREALM_VERSION=${OPTARG}";;
         *) usage;;
     esac
 done
@@ -61,7 +60,6 @@ mkdir -p build-xcode-platforms
 cd build-xcode-platforms
 cmake \
     -D CMAKE_TOOLCHAIN_FILE="../tools/cmake/xcode.toolchain.cmake" \
-    -D REALM_VERSION="${VERSION}" \
     -D REALM_BUILD_LIB_ONLY=ON \
     -D CPACK_PACKAGE_DIRECTORY=.. \
     -D CMAKE_XCODE_ATTRIBUTE_SDKROOT="$sdkroot" \

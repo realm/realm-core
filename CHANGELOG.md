@@ -17,7 +17,7 @@
 -----------
 
 ### Internals
-* None
+* Refactored version resolution for the `build-apple-device.sh` script. ([#7263](https://github.com/realm/realm-core/pull/7263))
 
 ----------------------------------------------
 
@@ -46,7 +46,7 @@
 * Bump the sync protocol to v11. The new protocol version comes with the following changes:
   - JSON_ERROR server message contains the previous schema version
   - Flexible sync BIND client message contains the current schema version
-* Add BAAS admin API to create new schema versions (drafts can be used to deploy all changes at once)
+* Add BAAS admin API to create new schema versions (drafts can be used to deploy all changes at once
 
 ----------------------------------------------
 
