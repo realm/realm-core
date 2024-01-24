@@ -55,13 +55,17 @@ static const std::vector<std::pair<std::string, TypeOfValue::Attribute>> attribu
     {"double", TypeOfValue::Double},
     {"decimal128", TypeOfValue::Decimal128},
     {"decimal", TypeOfValue::Decimal128},
-    {"object", TypeOfValue::ObjectLink},
+    {"objectlink", TypeOfValue::ObjectLink},
     {"link", TypeOfValue::ObjectLink},
     {"objectid", TypeOfValue::ObjectId},
     {"uuid", TypeOfValue::UUID},
     {"guid", TypeOfValue::UUID},
     {"numeric", TypeOfValue::Numeric},
-    {"bindata", TypeOfValue::Binary}};
+    {"bindata", TypeOfValue::Binary},
+    {"object", TypeOfValue::Object},
+    {"array", TypeOfValue::Array},
+    {"collection", TypeOfValue::Collection},
+};
 
 TypeOfValue::Attribute get_single_from(std::string str)
 {
@@ -112,6 +116,14 @@ TypeOfValue::Attribute attribute_from(DataType type)
             return TypeOfValue::Attribute::ObjectLink;
         case DataType::Type::UUID:
             return TypeOfValue::Attribute::UUID;
+        default:
+            if (type == type_Dictionary) {
+                return TypeOfValue::Attribute::Object;
+            }
+            if (type == type_List) {
+                return TypeOfValue::Attribute::Array;
+            }
+            break;
     }
     throw query_parser::InvalidQueryArgError(
         util::format("Invalid value '%1' cannot be converted to 'TypeOfValue'", type));

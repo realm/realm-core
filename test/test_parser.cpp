@@ -4812,6 +4812,7 @@ TEST(Parser_TypeOfValue)
     }
     std::string bin_data("String2Binary");
     table->get_object(15).set(col_any, Mixed());
+    table->get_object(17).set_collection(col_any, CollectionType::Dictionary);
     table->get_object(75).set(col_any, Mixed(75.));
     table->get_object(28).set(col_any, Mixed(BinaryData(bin_data)));
     nb_strings--;
@@ -4837,7 +4838,7 @@ TEST(Parser_TypeOfValue)
             ++it;
         }
     }
-    size_t nb_ints = 71;
+    size_t nb_ints = 70;
     verify_query(test_context, table, "mixed.@type == 'string'", nb_strings);
     verify_query(test_context, table, "mixed.@type == 'double'", 2);
     verify_query(test_context, table, "mixed.@type == 'float'", 0);
@@ -4861,7 +4862,7 @@ TEST(Parser_TypeOfValue)
     verify_query(test_context, table, "mixed.@type == 'char'", nb_ints);
     verify_query(test_context, table, "mixed.@type == 'timestamp'", 0);
     verify_query(test_context, table, "mixed.@type == 'datetimeoffset'", 0);
-    verify_query(test_context, table, "mixed.@type == 'object'", 0);
+    verify_query(test_context, table, "mixed.@type == 'object'", 1);
 
     verify_query(test_context, table,
                  "mixed.@type == 'binary' || mixed.@type == 'DECIMAL' || mixed.@type == 'Double'", 4);
@@ -5284,6 +5285,10 @@ TEST(Parser_NestedMixedDictionaryList)
         snake->insert("age", 20);
     }
 
+    Obj george = persons->create_object_with_primary_key("George");
+    george.set(col_self, george.get_key());
+    george.set_collection(col, CollectionType::List);
+
     auto q = persons->column<Mixed>(col).path({"instruments", 0, "strings"}) == 6;
     CHECK_EQUAL(q.count(), 1);
 
@@ -5300,6 +5305,9 @@ TEST(Parser_NestedMixedDictionaryList)
     verify_query(test_context, persons, "properties.@keys == 'tickets'", 1);
     verify_query(test_context, persons, "properties.@size == 3", 1);
     verify_query(test_context, persons, "properties.instruments.@size == 2", 1);
+    verify_query(test_context, persons, "properties.@type == 'object'", 2);
+    verify_query(test_context, persons, "properties.@type == 'array'", 1);
+    verify_query(test_context, persons, "properties.@type == 'collection'", 3);
 }
 
 TEST(Parser_NestedDictionaryDeep)
