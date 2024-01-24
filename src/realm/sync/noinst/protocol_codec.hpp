@@ -376,10 +376,21 @@ public:
         }
     }
 
+    struct DownloadInfoExtra {
+        std::optional<int64_t> query_version;
+        std::optional<bool> last_in_batch;
+        union {
+            uint64_t downloadable_bytes = 0;
+            double progress_estimate;
+        };
+    };
+
 private:
     template <typename Connection>
     void parse_download_message(Connection& connection, HeaderLineParser& msg)
     {
+        bool is_flx = connection.is_flx_sync_connection();
+
         util::Logger& logger = connection.logger;
         auto report_error = [&](ErrorCodes::Error code, const auto fmt, auto&&... args) {
             auto msg = util::format(fmt, std::forward<decltype(args)>(args)...);
@@ -395,11 +406,26 @@ private:
         progress.latest_server_version.salt = msg.read_next<salt_type>();
         progress.upload.client_version = msg.read_next<version_type>();
         progress.upload.last_integrated_server_version = msg.read_next<version_type>();
-        auto query_version = connection.is_flx_sync_connection() ? msg.read_next<int64_t>() : 0;
 
-        // If this is a PBS connection, then every download message is its own complete batch.
-        auto last_in_batch = connection.is_flx_sync_connection() ? msg.read_next<bool>() : true;
-        auto downloadable_bytes = msg.read_next<int64_t>();
+        DownloadInfoExtra info;
+        if (is_flx) {
+            info.query_version = msg.read_next<int64_t>();
+            if (info.query_version < 0)
+                return report_error(ErrorCodes::SyncProtocolInvariantFailed, "Bad query version", info.query_version);
+
+            info.last_in_batch = msg.read_next<bool>();
+
+            auto sv = msg.read_next<std::string_view>();
+            try {
+                info.progress_estimate = std::stod(std::string(sv));
+            }
+            catch (const std::exception& err) {
+                return report_error(ErrorCodes::SyncProtocolInvariantFailed, "Bad progress value: %1", err.what());
+            }
+        }
+        else
+            info.downloadable_bytes = msg.read_next<int64_t>();
+
         auto is_body_compressed = msg.read_next<bool>();
         auto uncompressed_body_size = msg.read_next<size_t>();
         auto compressed_body_size = msg.read_next<size_t>('\n');
@@ -428,7 +454,7 @@ private:
                      "compressed_body_size=%3, uncompressed_body_size=%4",
                      session_ident, is_body_compressed, compressed_body_size, uncompressed_body_size);
 
-        ReceivedChangesets received_changesets;
+        ReceivedChangesets changesets;
 
         // Loop through the body and find the changesets.
         while (!msg.at_end()) {
@@ -475,13 +501,10 @@ private:
             }
 
             cur_changeset.data = changeset_data;
-            received_changesets.push_back(std::move(cur_changeset)); // Throws
+            changesets.push_back(std::move(cur_changeset)); // Throws
         }
 
-        auto batch_state =
-            last_in_batch ? sync::DownloadBatchState::LastInBatch : sync::DownloadBatchState::MoreToCome;
-        connection.receive_download_message(session_ident, progress, downloadable_bytes, query_version, batch_state,
-                                            received_changesets); // Throws
+        connection.receive_download_message(session_ident, progress, info, changesets); // Throws
     }
 
     static sync::ProtocolErrorInfo::Action string_to_action(const std::string& action_string)

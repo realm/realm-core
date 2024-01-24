@@ -396,7 +396,7 @@ void Connection::cancel_reconnect_delay()
     // soon as there are any sessions that are both active and unsuspended.
 }
 
-void ClientImpl::Connection::finish_session_deactivation(Session* sess)
+void Connection::finish_session_deactivation(Session* sess)
 {
     REALM_ASSERT(sess->m_state == Session::Deactivated);
     auto ident = sess->m_ident;
@@ -1352,18 +1352,14 @@ void Connection::receive_ident_message(session_ident_type session_ident, SaltedF
 }
 
 void Connection::receive_download_message(session_ident_type session_ident, const SyncProgress& progress,
-                                          std::uint_fast64_t downloadable_bytes, int64_t query_version,
-                                          DownloadBatchState batch_state,
-                                          const ReceivedChangesets& received_changesets)
+                                          const DownloadSyncProgressInfo& info, const ReceivedChangesets& changesets)
 {
     Session* sess = find_and_validate_session(session_ident, "DOWNLOAD");
     if (REALM_UNLIKELY(!sess)) {
         return;
     }
 
-    if (auto status = sess->receive_download_message(progress, downloadable_bytes, batch_state, query_version,
-                                                     received_changesets);
-        !status.is_ok()) {
+    if (auto status = sess->receive_download_message(progress, info, changesets); !status.is_ok()) {
         close_due_to_protocol_error(std::move(status));
     }
 }
@@ -2322,29 +2318,44 @@ Status Session::receive_ident_message(SaltedFileIdent client_file_ident)
     return Status::OK();       // Success
 }
 
-Status Session::receive_download_message(const SyncProgress& progress, std::uint_fast64_t downloadable_bytes,
-                                         DownloadBatchState batch_state, int64_t query_version,
+Status Session::receive_download_message(const SyncProgress& progress, const DownloadInfoExtra& info,
                                          const ReceivedChangesets& received_changesets)
 {
-    REALM_ASSERT_EX(query_version >= 0, query_version);
     // Ignore the message if the deactivation process has been initiated,
     // because in that case, the associated Realm and SessionWrapper must
     // not be accessed any longer.
     if (m_state != Active)
         return Status::OK();
 
-    if (is_steady_state_download_message(batch_state, query_version)) {
-        batch_state = DownloadBatchState::SteadyState;
-    }
+    bool is_flx = m_conn.is_flx_sync_connection();
+    int64_t query_version = is_flx ? info.query_version.value() : 0;
 
-    logger.debug("Received: DOWNLOAD(download_server_version=%1, download_client_version=%2, "
-                 "latest_server_version=%3, latest_server_version_salt=%4, "
-                 "upload_client_version=%5, upload_server_version=%6, downloadable_bytes=%7, "
-                 "last_in_batch=%8, query_version=%9, num_changesets=%10, ...)",
-                 progress.download.server_version, progress.download.last_integrated_client_version,
-                 progress.latest_server_version.version, progress.latest_server_version.salt,
-                 progress.upload.client_version, progress.upload.last_integrated_server_version, downloadable_bytes,
-                 batch_state != DownloadBatchState::MoreToCome, query_version, received_changesets.size()); // Throws
+    // If this is a PBS connection, then every download message is its own complete batch.
+    bool last_in_batch = is_flx ? info.last_in_batch.value() : true;
+    auto batch_state = last_in_batch ? sync::DownloadBatchState::LastInBatch : sync::DownloadBatchState::MoreToCome;
+    if (is_steady_state_download_message(batch_state, query_version))
+        batch_state = DownloadBatchState::SteadyState;
+
+    if (is_flx) {
+        logger.debug("Received: DOWNLOAD(download_server_version=%1, download_client_version=%2, "
+                     "latest_server_version=%3, latest_server_version_salt=%4, "
+                     "upload_client_version=%5, upload_server_version=%6, progress_estimate=%7, "
+                     "last_in_batch=%8, query_version=%9, num_changesets=%10, ...)",
+                     progress.download.server_version, progress.download.last_integrated_client_version,
+                     progress.latest_server_version.version, progress.latest_server_version.salt,
+                     progress.upload.client_version, progress.upload.last_integrated_server_version,
+                     info.progress_estimate, last_in_batch, query_version, received_changesets.size()); // Throws
+    }
+    else {
+        logger.debug("Received: DOWNLOAD(download_server_version=%1, download_client_version=%2, "
+                     "latest_server_version=%3, latest_server_version_salt=%4, "
+                     "upload_client_version=%5, upload_server_version=%6, "
+                     "downloadable_bytes=%7, num_changesets=%8, ...)",
+                     progress.download.server_version, progress.download.last_integrated_client_version,
+                     progress.latest_server_version.version, progress.latest_server_version.salt,
+                     progress.upload.client_version, progress.upload.last_integrated_server_version,
+                     info.downloadable_bytes, received_changesets.size()); // Throws
+    }
 
     // Ignore download messages when the client detects an error. This is to prevent transforming the same bad
     // changeset over and over again.
@@ -2413,6 +2424,7 @@ Status Session::receive_download_message(const SyncProgress& progress, std::uint
         return Status::OK();
     }
 
+    uint64_t downloadable_bytes = is_flx ? 0 : info.downloadable_bytes;
     initiate_integrate_changesets(downloadable_bytes, batch_state, progress, received_changesets); // Throws
 
     hook_action = call_debug_hook(SyncClientHookEvent::DownloadMessageIntegrated, progress, query_version,
@@ -2651,7 +2663,7 @@ void Session::clear_resumption_delay_state()
     }
 }
 
-Status ClientImpl::Session::check_received_sync_progress(const SyncProgress& progress) noexcept
+Status Session::check_received_sync_progress(const SyncProgress& progress) noexcept
 {
     const SyncProgress& a = m_progress;
     const SyncProgress& b = progress;
