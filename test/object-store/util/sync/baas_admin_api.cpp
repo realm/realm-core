@@ -338,8 +338,17 @@ app::Response do_http_request(const app::Request& request)
     auto start_time = std::chrono::steady_clock::now();
     auto response_code = curl_easy_perform(curl);
     auto total_time = std::chrono::steady_clock::now() - start_time;
-    util::format(std::cerr, "Baas API %1 request to %2 took %3\n", app::httpmethod_to_string(request.method),
-                 request.url, std::chrono::duration_cast<std::chrono::milliseconds>(total_time));
+
+    std::string coid = [&] {
+        auto coid_header = response_headers.find("X-Appservices-Request-Id");
+        if (coid_header == response_headers.end()) {
+            return std::string{};
+        }
+        return util::format("BaaS Coid: \"%1\"", coid_header->second);
+    }();
+
+    util::format(std::cerr, "Baas API %1 request to %2 took %3 %4\n", app::httpmethod_to_string(request.method),
+                 request.url, std::chrono::duration_cast<std::chrono::milliseconds>(total_time), coid);
     if (response_code != CURLE_OK) {
         fprintf(stderr, "curl_easy_perform() failed when sending request to '%s' with body '%s': %s\n",
                 request.url.c_str(), request.body.c_str(), curl_easy_strerror(response_code));
