@@ -85,8 +85,9 @@ SensitiveBufferBase::SensitiveBufferBase(size_t size)
     // which happens inside a container. ignore for now.
     int err = errno;
     REALM_ASSERT_RELEASE_EX((ret == 0 || err == ENOMEM) && "mlock()", err);
-#endif
+#else
     REALM_ASSERT_RELEASE_EX(ret == 0 && "mlock()", errno);
+#endif
 
 
 #if defined(MADV_DONTDUMP)
@@ -128,7 +129,7 @@ void SensitiveBufferBase::unprotect() const {}
 SensitiveBufferBase::SensitiveBufferBase(const SensitiveBufferBase& other)
     : SensitiveBufferBase(other.m_size)
 {
-    memcpy(m_buffer, other.m_buffer, m_size);
+    std::memcpy(m_buffer, other.m_buffer, m_size);
 }
 
 SensitiveBufferBase::SensitiveBufferBase(SensitiveBufferBase&& other)

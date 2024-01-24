@@ -41,6 +41,9 @@ public:
     virtual ~SensitiveBufferBase();
 
     bool operator==(const SensitiveBufferBase& rhs) const {
+        if (this == &rhs)
+            return true;
+
         if (m_size != rhs.m_size)
             return false;
 
