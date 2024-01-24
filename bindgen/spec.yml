@@ -1053,6 +1053,7 @@ classes:
       make: '(r: SharedRealm, parent: const Obj&, col: ColKey)'
     methods:
       get: '(ndx: count_t) const -> Obj'
+      get_list: '(path_elem: int) -> List'
       move: '(source_ndx: count_t, dest_ndx: count_t)'
       remove: '(ndx: count_t)'
       remove_all: '()'
@@ -1061,10 +1062,10 @@ classes:
       delete_all: '()'
       insert_any: '(list_ndx: count_t, value: Mixed)'
       insert_embedded: '(ndx: count_t) -> Obj'
-      # insert_collection: '(<arg name>: const PathElement&, dict_or_list: CollectionType)'
+      insert_collection: '(path_elem: int, dict_or_list: CollectionType)'
       set_any: '(list_ndx: count_t, value: Mixed)'
       set_embedded: '(list_ndx: count_t) -> Obj'
-      # set_collection: '(path_element: const PathElement&, dict_or_list: CollectionType)'
+      set_collection: '(path_element: int, dict_or_list: CollectionType)'
       filter: '(q: Query) const -> Results'
       freeze: '(frozen_realm: SharedRealm const&) const -> List'
 
@@ -1146,7 +1147,6 @@ classes:
       add_key_based_notification_callback: '(cb: (changes: DictionaryChangeSet), keyPaths: std::optional<KeyPathArray>) -> NotificationToken'
       insert_any: '(key: StringData, value: Mixed) -> std::pair<count_t, bool>'
       insert_embedded: '(key: StringData) -> Obj'
-      # insert_collection: '(<arg name>: const PathElement&, dict_or_list: CollectionType)'
       try_get_any: '(key: StringData) const -> std::optional<Mixed>'
       remove_all: '()'
       try_erase: '(key: StringData) -> bool'
