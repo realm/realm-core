@@ -98,7 +98,7 @@ public:
     SensitiveBuffer<T>& operator=(const SensitiveBuffer<T>& other)
     {
         if (this != &other) {
-            REALM_ASSERT(engaged());
+            REALM_ASSERT(engaged() == true);
             with_unprotected_buffer([&other](void* buffer) {
                 *(reinterpret_cast<T*>(buffer)) = other.data();
             });
