@@ -18,6 +18,7 @@
 
 ### Internals
 * Refactored version resolution for the `build-apple-device.sh` script. ([#7263](https://github.com/realm/realm-core/pull/7263))
+* Remove SyncUser::binding_context() and related things, which were not actually used by any SDKs.
 
 ----------------------------------------------
 

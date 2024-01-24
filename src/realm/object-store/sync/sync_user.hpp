@@ -42,15 +42,6 @@ class SyncManager;
 class SyncSession;
 class SyncUserMetadata;
 
-// A superclass that bindings can inherit from in order to store information
-// upon a `SyncUser` object.
-class SyncUserContext {
-public:
-    virtual ~SyncUserContext() = default;
-};
-
-using SyncUserContextFactory = util::UniqueFunction<std::shared_ptr<SyncUserContext>()>;
-
 // A struct that decodes a given JWT.
 struct RealmJWT {
     // The token being decoded from.
@@ -220,14 +211,6 @@ public:
     // Custom user data embedded in the access token.
     util::Optional<bson::BsonDocument> custom_data() const REQUIRES(!m_tokens_mutex);
 
-    std::shared_ptr<SyncUserContext> binding_context() const
-    {
-        return m_binding_context.load();
-    }
-
-    // Optionally set a context factory. If so, must be set before any sessions are created.
-    static void set_binding_context_factory(SyncUserContextFactory factory);
-
     std::shared_ptr<SyncManager> sync_manager() const REQUIRES(!m_mutex);
 
     /// Retrieves a general-purpose service client for the Realm Cloud service
@@ -288,16 +271,11 @@ protected:
     void detach_from_sync_manager() REQUIRES(!m_mutex);
 
 private:
-    static SyncUserContextFactory s_binding_context_factory;
-    static std::mutex s_binding_context_factory_mutex;
-
     bool do_is_anonymous() const REQUIRES(m_mutex);
 
     std::vector<std::shared_ptr<SyncSession>> revive_sessions() REQUIRES(m_mutex);
 
     State m_state GUARDED_BY(m_mutex);
-
-    util::AtomicSharedPtr<SyncUserContext> m_binding_context;
 
     // UUIDs which used to be used to generate local Realm file paths. Now only
     // used to locate existing files.

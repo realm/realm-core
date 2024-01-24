@@ -81,9 +81,6 @@ SyncUserIdentity::SyncUserIdentity(const std::string& id, const std::string& pro
 {
 }
 
-SyncUserContextFactory SyncUser::s_binding_context_factory;
-std::mutex SyncUser::s_binding_context_factory_mutex;
-
 SyncUser::SyncUser(Private, const std::string& refresh_token, const std::string& id, const std::string& access_token,
                    const std::string& device_id, SyncManager* sync_manager)
     : m_state(State::LoggedIn)
@@ -94,12 +91,6 @@ SyncUser::SyncUser(Private, const std::string& refresh_token, const std::string&
     , m_sync_manager(sync_manager)
 {
     REALM_ASSERT(!access_token.empty() && !refresh_token.empty());
-    {
-        std::lock_guard lock(s_binding_context_factory_mutex);
-        if (s_binding_context_factory) {
-            m_binding_context = s_binding_context_factory();
-        }
-    }
 
     m_sync_manager->perform_metadata_update([&](const auto& manager) NO_THREAD_SAFETY_ANALYSIS {
         auto metadata = manager.get_or_make_user_metadata(m_identity);
@@ -128,13 +119,6 @@ SyncUser::SyncUser(Private, const SyncUserMetadata& data, SyncManager* sync_mana
         m_state = State::LoggedOut;
         m_refresh_token = {};
         m_access_token = {};
-    }
-
-    {
-        std::lock_guard lock(s_binding_context_factory_mutex);
-        if (s_binding_context_factory) {
-            m_binding_context = s_binding_context_factory();
-        }
     }
 }
 
@@ -429,12 +413,6 @@ app::MongoClient SyncUser::mongo_client(const std::string& service_name)
     util::CheckedLockGuard lk(m_mutex);
     REALM_ASSERT(m_state == SyncUser::State::LoggedIn);
     return app::MongoClient(shared_from_this(), m_sync_manager->app().lock(), service_name);
-}
-
-void SyncUser::set_binding_context_factory(SyncUserContextFactory factory)
-{
-    std::lock_guard<std::mutex> lock(s_binding_context_factory_mutex);
-    s_binding_context_factory = std::move(factory);
 }
 
 void SyncUser::refresh_custom_data(util::UniqueFunction<void(util::Optional<app::AppError>)> completion_block)
