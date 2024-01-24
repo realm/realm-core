@@ -2244,7 +2244,7 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
         {
             SyncTestFile config(app, partition, schema);
             config.in_memory = true;
-            config.encryption_key = std::vector<char>();
+            config.encryption_key.reset();
 
             REQUIRE(config.options().durability == DBOptions::Durability::MemOnly);
             auto r = Realm::get_shared_realm(config);
@@ -2258,7 +2258,7 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
             create_user_and_log_in(app);
             SyncTestFile config(app, partition, schema);
             config.in_memory = true;
-            config.encryption_key = std::vector<char>();
+            config.encryption_key.reset();
             auto r = Realm::get_shared_realm(config);
             Results dogs = get_dogs(r);
             REQUIRE(dogs.size() == 1);
