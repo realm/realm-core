@@ -225,6 +225,8 @@ functions:
 
           if [[ -n "${verbose_test_output}" ]]; then
               TEST_FLAGS="$TEST_FLAGS -VV"
+              export UNITTEST_THREADS=1
+              export UNITTEST_LOG_LEVEL="${test_logging_level|debug}"
           else
               TEST_FLAGS="$TEST_FLAGS -V"
           fi
@@ -259,9 +261,6 @@ functions:
               rm "$UNITTEST_EVERGREEN_TEST_RESULTS"
           fi
           export UNITTEST_PROGRESS=1
-          if [[ -n "${report_test_progress|}" ]]; then
-              export UNITTEST_PROGRESS="${report_test_progress|}"
-          fi
 
           if [[ -n "${run_with_encryption}" ]]; then
               export UNITTEST_ENCRYPT_ALL=1
@@ -790,7 +789,7 @@ tasks:
       script: |-
         export UNITTEST_PROGRESS=1
         export UNITTEST_THREADS=1
-        valgrind --tool=memcheck --leak-check=full --undef-value-errors=yes --track-origins=yes --child-silent-after-fork=no --trace-children=yes --suppressions=$(pwd)/../../test/valgrind.suppress --error-exitcode=1 ./RelWithDebInfo/realm-tests
+        valgrind --tool=memcheck --leak-check=full --undef-value-errors=yes --track-origins=yes --child-silent-after-fork=no --trace-children=yes --suppressions=$(pwd)/../../test/valgrind.suppress --error-exitcode=1 --max-threads=5000 ./RelWithDebInfo/realm-tests
 
 - name: bloaty
   exec_timeout_secs: 1800
@@ -904,7 +903,6 @@ tasks:
   - func: "run tests"
     vars:
       test_filter: CoreTests
-      report_test_progress: On
 
 - name: core-tests
   tags: [ "test_suite", "for_pull_requests" ]
@@ -975,8 +973,6 @@ tasks:
   exec_timeout_secs: 3600
   commands:
   - func: "launch remote baas"
-    vars:
-      baas_branch: 300efb0604a88f1f36899bee0f42b34826b9b65f
   - func: "compile"
     vars:
       target_to_build: ObjectStoreTests
@@ -1000,7 +996,6 @@ tasks:
   commands:
   - func: "launch remote baas"
     vars:
-      baas_branch: 300efb0604a88f1f36899bee0f42b34826b9b65f
       baas_proxy: On
   - func: "compile"
     vars:
@@ -1567,6 +1562,20 @@ buildvariants:
   tasks:
   - name: compile_test_and_package
   - name: benchmarks
+
+# use a small runner to exercise timing sensitive bugs
+- name: ubuntu2204-arm64-small
+  display_name: "Ubuntu 22.04 ARM64 Small"
+  run_on: ubuntu2204-arm64-small
+  expansions:
+    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-linux-aarch64.tar.gz"
+    cmake_bindir: "./cmake_binaries/bin"
+    python3: "/opt/mongodbtoolchain/v3/bin/python3"
+    use_system_openssl: On
+    fetch_missing_dependencies: On
+    cmake_build_type: RelWithDebInfo
+  tasks:
+  - name: compile_test_and_package
 
 - name: ubuntu2204-arm64-asan
   display_name: "Ubuntu 22.04 ARM64 (ASAN)"

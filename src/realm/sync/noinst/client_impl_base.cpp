@@ -8,6 +8,7 @@
 #include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/noinst/compact_changesets.hpp>
 #include <realm/sync/noinst/client_reset_operation.hpp>
+#include <realm/sync/noinst/sync_schema_migration.hpp>
 #include <realm/sync/protocol.hpp>
 #include <realm/util/assert.hpp>
 #include <realm/util/basic_system_errors.hpp>
@@ -205,10 +206,8 @@ ClientImpl::ClientImpl(ClientConfig config)
     REALM_ASSERT_EX(m_socket_provider, "Must provide socket provider in sync Client config");
 
     if (m_one_connection_per_session) {
-        // FIXME: Re-enable this warning when the load balancer is able to handle
-        // multiplexing.
-        //        logger.warn("Testing/debugging feature 'one connection per session' enabled - "
-        //            "never do this in production");
+        logger.warn("Testing/debugging feature 'one connection per session' enabled - "
+                    "never do this in production");
     }
 
     if (config.disable_upload_activation_delay) {
@@ -1874,6 +1873,9 @@ void Session::send_bind_message()
             bind_json_data["migratedPartition"] = *migrated_partition;
         }
         bind_json_data["sessionReason"] = static_cast<uint64_t>(get_session_reason());
+        auto schema_version = get_schema_version();
+        // Send 0 if schema is not versioned.
+        bind_json_data["schemaVersion"] = schema_version != uint64_t(-1) ? schema_version : 0;
         if (logger.would_log(util::Logger::Level::debug)) {
             std::string json_data_dump;
             if (!bind_json_data.empty()) {
@@ -2541,6 +2543,19 @@ Status Session::receive_error_message(const ProtocolErrorInfo& info)
             REALM_ASSERT(info.compensating_write_server_version.has_value());
             m_pending_compensating_write_errors.push_back(info);
         }
+        return Status::OK();
+    }
+
+    if (protocol_error == ProtocolError::schema_version_changed) {
+        // Enable upload immediately if the session is still active.
+        if (m_state == Active) {
+            auto wt = get_db()->start_write();
+            _impl::sync_schema_migration::track_sync_schema_migration(*wt, *info.previous_schema_version);
+            wt->commit();
+            // Notify SyncSession a schema migration is required.
+            on_connection_state_changed(m_conn.get_state(), SessionErrorInfo{info});
+        }
+        // Keep the session active to upload any unsynced changes.
         return Status::OK();
     }
 

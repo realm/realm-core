@@ -1,11 +1,17 @@
 file(STRINGS "${RealmCore_SOURCE_DIR}/dependencies.list" DEPENDENCIES)
-message("Dependencies: ${DEPENDENCIES}")
+set(VALID_DEPENDENCIES "")
 foreach(LINE IN LISTS DEPENDENCIES)
     string(REGEX MATCHALL "([^=]+)" KEY_VALUE ${LINE})
-    list(GET KEY_VALUE 0 KEY)
-    list(GET KEY_VALUE 1 VALUE)
-    set(DEP_${KEY} ${VALUE})
+    list(LENGTH KEY_VALUE MATCH_SIZE)
+    if (MATCH_SIZE GREATER_EQUAL 2)
+        list(GET KEY_VALUE 0 KEY)
+        list(GET KEY_VALUE 1 VALUE)
+        set(DEP_${KEY} ${VALUE})
+	set(VALID_DEPENDENCIES "${VALID_DEPENDENCIES} ${LINE}")
+    endif()
 endforeach()
+
+message("Dependencies: ${VALID_DEPENDENCIES}")
 
 #check version format
 string(REGEX MATCH "^[0-9]+\.[0-9]+\.[0-9]+$" CONFIG_VERSION ${DEP_VERSION})

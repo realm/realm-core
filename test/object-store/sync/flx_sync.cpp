@@ -2503,7 +2503,7 @@ TEST_CASE("flx: writes work without waiting for sync", "[sync][flx][baas]") {
 TEST_CASE("flx: verify websocket protocol number and prefixes", "[sync][protocol]") {
     // Update the expected value whenever the protocol version is updated - this ensures
     // that the current protocol version does not change unexpectedly.
-    REQUIRE(10 == sync::get_current_protocol_version());
+    REQUIRE(11 == sync::get_current_protocol_version());
     // This was updated in Protocol V8 to use '#' instead of '/' to support the Web SDK
     REQUIRE("com.mongodb.realm-sync#" == sync::get_pbs_websocket_protocol_prefix());
     REQUIRE("com.mongodb.realm-query-sync#" == sync::get_flx_websocket_protocol_prefix());
@@ -4513,14 +4513,14 @@ TEST_CASE("flx sync: Client reset during async open", "[sync][flx][client reset]
 
     auto before_callback_called = util::make_promise_future<void>();
     realm_config.sync_config->notify_before_client_reset = [&](std::shared_ptr<Realm> realm) {
-        CHECK(realm->schema_version() == 1);
+        CHECK(realm->schema_version() == 0);
         before_callback_called.promise.emplace_value();
     };
 
     auto after_callback_called = util::make_promise_future<void>();
     realm_config.sync_config->notify_after_client_reset = [&](std::shared_ptr<Realm> realm, ThreadSafeReference,
                                                               bool) {
-        CHECK(realm->schema_version() == 1);
+        CHECK(realm->schema_version() == 0);
         after_callback_called.promise.emplace_value();
     };
 
@@ -4686,6 +4686,43 @@ TEST_CASE("flx: fatal errors and session becoming inactive cancel pending waits"
     error_occurred.get();
     state = subs_future.get_no_throw();
     check_status(state);
+}
+
+TEST_CASE("flx: pause and resume bootstrapping at query version 0", "[sync][flx][baas]") {
+    FLXSyncTestHarness harness("flx_pause_resume_bootstrap");
+    SyncTestFile triggered_config(harness.app()->current_user(), harness.schema(), SyncConfig::FLXSyncEnabled{});
+    auto [interrupted_promise, interrupted] = util::make_promise_future<void>();
+    std::mutex download_message_mutex;
+    int download_message_integrated_count = 0;
+    triggered_config.sync_config->on_sync_client_event_hook =
+        [promise = util::CopyablePromiseHolder(std::move(interrupted_promise)), &download_message_integrated_count,
+         &download_message_mutex](std::weak_ptr<SyncSession> weak_sess, const SyncClientHookData& data) mutable {
+            auto sess = weak_sess.lock();
+            if (!sess || data.event != SyncClientHookEvent::DownloadMessageIntegrated) {
+                return SyncClientHookAction::NoAction;
+            }
+
+            std::lock_guard<std::mutex> lk(download_message_mutex);
+            // Pause and resume the first session after the bootstrap message is integrated.
+            if (download_message_integrated_count == 0) {
+                sess->pause();
+                sess->resume();
+            }
+            // Complete the test when the second session integrates the empty download
+            // message it receives.
+            else {
+                promise.get_promise().emplace_value();
+            }
+            ++download_message_integrated_count;
+            return SyncClientHookAction::NoAction;
+        };
+    auto realm = Realm::get_shared_realm(triggered_config);
+    interrupted.get();
+    std::lock_guard<std::mutex> lk(download_message_mutex);
+    CHECK(download_message_integrated_count == 2);
+    auto active_sub_set = realm->sync_session()->get_flx_subscription_store()->get_active();
+    REQUIRE(active_sub_set.version() == 0);
+    REQUIRE(active_sub_set.state() == sync::SubscriptionSet::State::Complete);
 }
 
 } // namespace realm::app

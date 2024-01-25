@@ -178,6 +178,11 @@ bool HTTPParserBase::parse_header_line(size_t len)
         }
     }
 
+    if ((key == "Transfer-Encoding" || key == "transfer-encoding") && (value == "Chunked" || value == "chunked")) {
+        m_has_chunked_encoding = true;
+        m_chunked_encoding_ss.emplace(std::stringstream());
+    }
+
     this->on_header(key, value);
     return true;
 }
@@ -195,6 +200,8 @@ util::Optional<HTTPMethod> HTTPParserBase::parse_method_string(StringData method
         return HTTPMethod::Post;
     if (method == "PUT")
         return HTTPMethod::Put;
+    if (method == "PATCH")
+        return HTTPMethod::Patch;
     if (method == "DELETE")
         return HTTPMethod::Delete;
     if (method == "TRACE")
@@ -287,6 +294,8 @@ std::ostream& operator<<(std::ostream& os, HTTPMethod method)
             return os << "POST";
         case HTTPMethod::Put:
             return os << "PUT";
+        case HTTPMethod::Patch:
+            return os << "PATCH";
         case HTTPMethod::Delete:
             return os << "DELETE";
         case HTTPMethod::Trace:

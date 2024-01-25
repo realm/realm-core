@@ -230,6 +230,8 @@ public:
 
     void cancel_reconnect_delay();
     bool wait_for_session_terminations_or_client_stopped();
+    // Async version of wait_for_session_terminations_or_client_stopped().
+    util::Future<void> notify_session_terminated();
     void voluntary_disconnect_all_connections();
 
 private:
@@ -907,6 +909,9 @@ private:
     // Get the reason a synchronization session is used for (regular sync or client reset)
     // - Client reset state means the session is going to be used to download a fresh realm.
     SessionReason get_session_reason() noexcept;
+
+    /// Returns the schema version the synchronization session connects with to the server.
+    uint64_t get_schema_version() noexcept;
 
     /// \brief Initiate the integration of downloaded changesets.
     ///

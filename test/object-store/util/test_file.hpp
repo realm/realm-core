@@ -233,7 +233,7 @@ public:
         Config();
         realm::app::App::Config app_config;
         std::string base_path;
-        realm::SyncManager::MetadataMode metadata_mode = realm::SyncManager::MetadataMode::NoEncryption;
+        realm::SyncManager::MetadataMode metadata_mode = realm::SyncManager::MetadataMode::NoMetadata;
         bool should_teardown_test_directory = true;
         bool override_sync_route = true;
         std::shared_ptr<realm::app::GenericNetworkTransport> transport;

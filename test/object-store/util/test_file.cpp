@@ -144,7 +144,7 @@ TestFile::~TestFile()
 {
     if (!m_persist) {
         try {
-            util::Logger::get_default_logger()->detail("~TestFile() removing '%1' and '%2'", path, m_temp_dir);
+            util::Logger::get_default_logger()->debug("~TestFile() removing '%1' and '%2'", path, m_temp_dir);
             util::File::try_remove(path);
             util::try_remove_dir_recursive(m_temp_dir);
         }
@@ -232,7 +232,7 @@ SyncTestFile::SyncTestFile(std::shared_ptr<realm::SyncUser> user, realm::Schema 
                      error.status, session->path());
         abort();
     };
-    schema_version = 1;
+    schema_version = 0;
     schema = _schema;
     schema_mode = SchemaMode::AdditiveExplicit;
 }
@@ -324,7 +324,7 @@ static Status wait_for_session(Realm& realm, void (SyncSession::*fn)(util::Uniqu
         return shared_state->complete == true;
     });
     if (!completed) {
-        throw std::runtime_error(util::format("wait_for_session() exceeded %1 ms", delay.count()));
+        throw std::runtime_error(util::format("wait_for_session() exceeded %1 s", delay.count()));
     }
     return shared_state->status;
 }
@@ -399,7 +399,7 @@ TestAppSession::TestAppSession(AppSession session,
     // down sync clients immediately.
     sc_config.timeouts.connection_linger_time = 0;
 
-    m_app = app::App::get_uncached_app(app_config, sc_config);
+    m_app = app::App::get_app(app::App::CacheMode::Disabled, app_config, sc_config);
 
     // initialize sync client
     m_app->sync_manager()->get_sync_client();
@@ -487,7 +487,7 @@ TestSyncManager::TestSyncManager(const Config& config, const SyncServer::Config&
     sc_config.base_file_path = m_base_file_path;
     sc_config.metadata_mode = config.metadata_mode;
 
-    m_app = app::App::get_uncached_app(app_config, sc_config);
+    m_app = app::App::get_app(app::App::CacheMode::Disabled, app_config, sc_config);
     if (config.override_sync_route) {
         m_app->sync_manager()->set_sync_route(m_sync_server.base_url() + "/realm-sync");
     }

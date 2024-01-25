@@ -2775,7 +2775,7 @@ void DB::async_request_write_mutex(TransactionRef& tr, util::UniqueFunction<void
     });
 }
 
-inline DB::DB(const DBOptions& options)
+inline DB::DB(Private, const DBOptions& options)
     : m_upgrade_callback(std::move(options.upgrade_callback))
     , m_log_id(util::gen_log_id(this))
 {
@@ -2784,26 +2784,16 @@ inline DB::DB(const DBOptions& options)
     }
 }
 
-namespace {
-class DBInit : public DB {
-public:
-    explicit DBInit(const DBOptions& options)
-        : DB(options)
-    {
-    }
-};
-} // namespace
-
 DBRef DB::create(const std::string& file, bool no_create, const DBOptions& options) NO_THREAD_SAFETY_ANALYSIS
 {
-    DBRef retval = std::make_shared<DBInit>(options);
+    DBRef retval = std::make_shared<DB>(Private(), options);
     retval->open(file, no_create, options);
     return retval;
 }
 
 DBRef DB::create(Replication& repl, const std::string& file, const DBOptions& options) NO_THREAD_SAFETY_ANALYSIS
 {
-    DBRef retval = std::make_shared<DBInit>(options);
+    DBRef retval = std::make_shared<DB>(Private(), options);
     retval->open(repl, file, options);
     return retval;
 }
@@ -2812,7 +2802,7 @@ DBRef DB::create(std::unique_ptr<Replication> repl, const std::string& file,
                  const DBOptions& options) NO_THREAD_SAFETY_ANALYSIS
 {
     REALM_ASSERT(repl);
-    DBRef retval = std::make_shared<DBInit>(options);
+    DBRef retval = std::make_shared<DB>(Private(), options);
     retval->m_history = std::move(repl);
     retval->open(*retval->m_history, file, options);
     return retval;
@@ -2821,7 +2811,7 @@ DBRef DB::create(std::unique_ptr<Replication> repl, const std::string& file,
 DBRef DB::create(std::unique_ptr<Replication> repl, const DBOptions& options) NO_THREAD_SAFETY_ANALYSIS
 {
     REALM_ASSERT(repl);
-    DBRef retval = std::make_shared<DBInit>(options);
+    DBRef retval = std::make_shared<DB>(Private(), options);
     retval->m_history = std::move(repl);
     retval->open(*retval->m_history, options);
     return retval;
@@ -2839,7 +2829,7 @@ DBRef DB::create(BinaryData buffer, bool take_ownership) NO_THREAD_SAFETY_ANALYS
 {
     DBOptions options;
     options.is_immutable = true;
-    DBRef retval = std::make_shared<DBInit>(options);
+    DBRef retval = std::make_shared<DB>(Private(), options);
     retval->open(buffer, take_ownership);
     return retval;
 }

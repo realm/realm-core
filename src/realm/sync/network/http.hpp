@@ -19,11 +19,13 @@
 #pragma once
 
 #include <cstdint>
+#include <cstdlib>
 #include <type_traits>
 #include <map>
 #include <system_error>
 #include <iosfwd>
 #include <locale>
+#include <sstream>
 
 #include <realm/util/optional.hpp>
 #include <realm/util/basic_system_errors.hpp>
@@ -44,8 +46,7 @@ std::error_code make_error_code(HTTPParserError);
 
 namespace std {
 template <>
-struct is_error_code_enum<realm::sync::HTTPParserError> : std::true_type {
-};
+struct is_error_code_enum<realm::sync::HTTPParserError> : std::true_type {};
 } // namespace std
 
 namespace realm::sync {
@@ -124,6 +125,7 @@ enum class HTTPMethod {
     Head,
     Post,
     Put,
+    Patch,
     Delete,
     Trace,
     Connect,
@@ -218,6 +220,8 @@ struct HTTPParserBase {
     std::string m_write_buffer;
     std::unique_ptr<char[], CallocDeleter> m_read_buffer;
     util::Optional<size_t> m_found_content_length;
+    bool m_has_chunked_encoding = false;
+    std::optional<std::stringstream> m_chunked_encoding_ss;
     static const size_t read_buffer_size = 8192;
     static const size_t max_header_line_length = read_buffer_size;
 
@@ -321,11 +325,44 @@ struct HTTPParser : protected HTTPParserBase {
                     return;
                 }
                 if (!ec) {
-                    on_body(StringData(m_read_buffer.get(), n));
+                    on_body(std::string_view(m_read_buffer.get(), n));
                 }
                 on_complete(ec);
             };
             m_socket.async_read(m_read_buffer.get(), *m_found_content_length, std::move(handler));
+        }
+        else if (m_has_chunked_encoding) {
+            auto content_length_handler = [this](std::error_code ec, size_t chunk_start_index) {
+                if (ec == util::error::operation_aborted) {
+                    on_complete(ec);
+                    return;
+                }
+
+                auto content_length =
+                    std::strtoul(std::string(m_read_buffer.get(), chunk_start_index - 2).c_str(), nullptr, 16);
+
+                if (content_length == 0) {
+                    on_body(m_chunked_encoding_ss->str());
+                    on_complete(ec);
+                    return;
+                }
+
+                auto handler = [this](std::error_code ec, size_t n) {
+                    if (ec == util::error::operation_aborted) {
+                        on_complete(ec);
+                        return;
+                    }
+                    auto chunk_data = std::string_view(m_read_buffer.get(), n - 2); // -2 to strip \r\n
+                    *m_chunked_encoding_ss << chunk_data;
+                    read_body();
+                };
+                m_socket.async_read(m_read_buffer.get(), content_length + 2,
+                                    std::move(handler)); // +2 to account for \r\n
+            };
+
+            // First get the content-length
+            m_socket.async_read_until(m_read_buffer.get(), 8, '\n',
+                                      content_length_handler); // buffer of 8 is enough to read hex value
         }
         else {
             // No body, just finish.

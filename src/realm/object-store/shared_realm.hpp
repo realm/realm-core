@@ -185,6 +185,8 @@ struct RealmConfig {
 };
 
 class Realm : public std::enable_shared_from_this<Realm> {
+    struct Private {};
+
 public:
     using Config = RealmConfig;
 
@@ -365,7 +367,7 @@ public:
      * will be thrown instead.
      *
      * If the destination file does not exist, the action performed depends on
-     * the type of the source and destimation files. If the destination
+     * the type of the source and destination files. If the destination
      * configuration is a non-sync local Realm configuration, a compacted copy
      * of the current Transaction's data (which includes uncommitted changes if
      * applicable!) is written in streaming form, with no history.
@@ -433,6 +435,8 @@ public:
 
     bool has_pending_async_work() const;
 
+    explicit Realm(Config config, util::Optional<VersionID> version,
+                   std::shared_ptr<_impl::RealmCoordinator> coordinator, Private);
     Realm(const Realm&) = delete;
     Realm& operator=(const Realm&) = delete;
     Realm(Realm&&) = delete;
@@ -450,8 +454,7 @@ public:
     static SharedRealm make_shared_realm(Config config, util::Optional<VersionID> version,
                                          std::shared_ptr<_impl::RealmCoordinator> coordinator)
     {
-        return std::make_shared<Realm>(std::move(config), std::move(version), std::move(coordinator),
-                                       MakeSharedTag{});
+        return std::make_shared<Realm>(std::move(config), std::move(version), std::move(coordinator), Private());
     }
 
     // Expose some internal functionality which isn't intended to be used directly
@@ -500,9 +503,6 @@ public:
 #endif
 
 private:
-    struct MakeSharedTag {
-    };
-
     std::shared_ptr<_impl::RealmCoordinator> m_coordinator;
 
     Config m_config;
@@ -556,6 +556,7 @@ private:
     void set_schema(Schema const& reference, Schema schema);
     bool reset_file(Schema& schema, std::vector<SchemaChange>& changes_required);
     bool schema_change_needs_write_transaction(Schema& schema, std::vector<SchemaChange>& changes, uint64_t version);
+    void verify_schema_version_not_decreasing(uint64_t version);
     Schema get_full_schema();
 
     // Ensure that m_schema and m_schema_version match that of the current
@@ -581,10 +582,6 @@ private:
 
 public:
     std::unique_ptr<BindingContext> m_binding_context;
-
-    // `enable_shared_from_this` is unsafe with public constructors; use `make_shared_realm` instead
-    Realm(Config config, util::Optional<VersionID> version, std::shared_ptr<_impl::RealmCoordinator> coordinator,
-          MakeSharedTag);
 };
 
 } // namespace realm

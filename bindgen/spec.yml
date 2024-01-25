@@ -202,6 +202,12 @@ enums:
       TypedLink: 16
       UUID: 17
 
+  AppCacheMode:
+    cppName: app::App::CacheMode
+    values:
+      - Enabled
+      - Disabled
+
   AuthProvider:
     cppName: app::AuthProvider
     values:
@@ -1177,14 +1183,12 @@ classes:
     sharedPtrWrapped: SharedApp
     properties:
       config: const AppConfig&
-      base_url: const std::string&
       current_user: Nullable<SharedSyncUser>
       all_users: std::vector<SharedSyncUser>
       sync_manager: SharedSyncManager
       subscribers_count: count_t
     staticMethods:
-      get_shared_app: '(config: AppConfig, sync_client_config: SyncClientConfig) -> SharedApp'
-      get_uncached_app: '(config: AppConfig, sync_client_config: SyncClientConfig) -> SharedApp'
+      get_app: '(mode: AppCacheMode, config: AppConfig, sync_client_config: SyncClientConfig) -> SharedApp'
       get_cached_app: '(app_id: const std::string&) -> SharedApp'
       clear_cached_apps: ()
       close_all_sync_sessions: ()
@@ -1211,6 +1215,8 @@ classes:
       unsubscribe: '(token: AppSubscriptionToken)'
       call_function: '(user: const SharedSyncUser&, name: std::string, args: EJsonArray, service_name: util::Optional<std::string>, cb: AsyncCallback<(result: Nullable<const EJson*>, err: util::Optional<AppError>)>)'
       make_streaming_request: '(user: SharedSyncUser, name: std::string, args: bson::BsonArray, service_name: util::Optional<std::string>) -> Request'
+      update_base_url: '(base_url: std::optional<std::string>, cb: AsyncCallback<(err: util::Optional<AppError>)>&&)'
+      get_base_url: '() const -> std::string'
 
   WatchStream:
     cppName: app::WatchStream
