@@ -4729,7 +4729,7 @@ TEST(Parser_Mixed)
     verify_query(test_context, table, "mixed endswith \"4\"", 5); // 4, 24, 44, 64, 84
     verify_query(test_context, table, "mixed endswith bin(\"4\")", 0);
     verify_query(test_context, table, "mixed endswith bin(\"Binary\")", 1);
-    verify_query(test_context, table, "mixed.@size > 7", 21);
+    verify_query(test_context, table, "mixed.@size > 7", 22);
     verify_query(test_context, table, "mixed == oid(" + id.to_string() + ")", 1);
 
     std::string str_value = "4";
