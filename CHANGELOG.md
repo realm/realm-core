@@ -6,6 +6,11 @@
 ### Compatibility
 * Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
 
+-----------
+
+### Internals
+* (bindgen) Upgrading `@commander-js/extra-typings` and adds a missing peer dependency on `commander`.
+
 ----------------------------------------------
 
 # 13.25.0 Release notes
