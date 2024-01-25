@@ -22,8 +22,6 @@ namespace util {
 /// up the engine state.
 ///
 /// Thread-safe.
-///
-/// FIXME: Move this to core repo, as it is generally useful.
 template <class Engine, size_t state_size = Engine::state_size>
 void seed_prng_nondeterministically(Engine&);
 

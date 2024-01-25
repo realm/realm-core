@@ -210,8 +210,6 @@ RLM_API void realm_collection_changes_get_num_changes(const realm_collection_cha
                                                       bool* out_collection_was_cleared,
                                                       bool* out_collection_was_deleted)
 {
-    // FIXME: This has O(n) performance, which seems ridiculous.
-
     if (out_num_deletions)
         *out_num_deletions = changes->deletions.count();
     if (out_num_insertions)

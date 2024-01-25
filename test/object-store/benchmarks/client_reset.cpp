@@ -22,11 +22,11 @@
 #include <util/test_utils.hpp>
 #include <util/sync/sync_test_utils.hpp>
 
+#include <realm/list.hpp>
 #include <realm/object-store/object_schema.hpp>
 #include <realm/object-store/object_store.hpp>
 #include <realm/object-store/property.hpp>
 #include <realm/object-store/schema.hpp>
-
 #include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/noinst/client_reset.hpp>
 #include <realm/sync/noinst/client_reset_recovery.hpp>

@@ -79,7 +79,7 @@ std::optional<AppError> AppUtils::check_for_errors(const Response& response)
 
     try {
         auto ct = find_header("content-type", response.headers);
-        if (ct && ct->second == "application/json") {
+        if (ct && ct->second == "application/json" && !response.body.empty()) {
             auto body = nlohmann::json::parse(response.body);
             auto message = body.find("error");
             auto link = body.find("link");

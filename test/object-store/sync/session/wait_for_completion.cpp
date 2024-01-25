@@ -72,8 +72,7 @@ TEST_CASE("SyncSession: wait_for_download_completion() API", "[sync][pbs][sessio
         spin_runloop();
         REQUIRE(handler_called == false);
         // Log the user back in
-        user = sync_manager->get_user(user->identity(), ENCODE_FAKE_JWT("not_a_real_token"),
-                                      ENCODE_FAKE_JWT("not_a_real_token"), "");
+        user->log_in();
         EventLoop::main().run_until([&] {
             return sessions_are_active(*session);
         });
@@ -111,10 +110,7 @@ TEST_CASE("SyncSession: wait_for_upload_completion() API", "[sync][pbs][session]
     if (!EventLoop::has_implementation())
         return;
 
-    TestSyncManager::Config config;
-    config.should_teardown_test_directory = false;
-    SyncServer::Config server_config = {false};
-    TestSyncManager tsm(config, server_config);
+    TestSyncManager tsm({}, {false});
     auto& server = tsm.sync_server();
     auto sync_manager = tsm.sync_manager();
     std::atomic<bool> handler_called(false);
@@ -154,8 +150,7 @@ TEST_CASE("SyncSession: wait_for_upload_completion() API", "[sync][pbs][session]
         spin_runloop();
         REQUIRE(handler_called == false);
         // Log the user back in
-        user = sync_manager->get_user(user->identity(), ENCODE_FAKE_JWT("not_a_real_token"),
-                                      ENCODE_FAKE_JWT("not_a_real_token"), "");
+        user->log_in();
         EventLoop::main().run_until([&] {
             return sessions_are_active(*session);
         });
