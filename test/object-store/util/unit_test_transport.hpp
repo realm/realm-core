@@ -36,8 +36,6 @@ public:
     {
     }
 
-    static std::string access_token;
-
     static const std::string api_key;
     static const std::string api_key_id;
     static const std::string api_key_name;

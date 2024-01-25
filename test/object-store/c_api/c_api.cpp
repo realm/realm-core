@@ -594,11 +594,10 @@ TEST_CASE("C API (non-database)", "[c_api]") {
         CHECK(app_config->device_info.bundle_id == "some_bundle_id");
 
         test_util::TestDirGuard temp_dir(util::make_temp_dir());
-        auto sync_client_config = cptr(realm_sync_client_config_new());
-        realm_sync_client_config_set_base_file_path(sync_client_config.get(), temp_dir.c_str());
-        realm_sync_client_config_set_metadata_mode(sync_client_config.get(), RLM_SYNC_CLIENT_METADATA_MODE_DISABLED);
+        realm_app_config_set_base_file_path(app_config.get(), temp_dir.c_str());
+        realm_app_config_set_metadata_mode(app_config.get(), RLM_SYNC_CLIENT_METADATA_MODE_DISABLED);
 
-        auto test_app = cptr(realm_app_create(app_config.get(), sync_client_config.get()));
+        auto test_app = cptr(realm_app_create(app_config.get()));
         realm_user_t* sync_user;
         auto user_data_free = [](realm_userdata_t) {};
 
@@ -5583,7 +5582,7 @@ TEST_CASE("C API - async_open", "[sync][pbs][c_api]") {
     SECTION("can open synced Realms that don't already exist") {
         realm_config_t* config = realm_config_new();
         config->schema = Schema{object_schema};
-        realm_user user(test_config.sync_config->user);
+        realm_user user(init_sync_manager.fake_user());
         realm_sync_config_t* sync_config = realm_sync_config_new(&user, "default");
         realm_sync_config_set_initial_subscription_handler(sync_config, task_init_subscription, false, nullptr,
                                                            nullptr);
@@ -5615,32 +5614,28 @@ TEST_CASE("C API - async_open", "[sync][pbs][c_api]") {
 
     SECTION("cancels download and reports an error on auth error") {
         auto expired_token = encode_fake_jwt("", 123, 456);
-
-        struct Transport : UnitTestTransport {
-            void send_request_to_server(
-                const realm::app::Request& req,
-                realm::util::UniqueFunction<void(const realm::app::Response&)>&& completion) override
+        struct User : TestUser {
+            using TestUser::TestUser;
+            void request_access_token(CompletionHandler&& completion) override
             {
-                if (req.url.find("/auth/session") != std::string::npos) {
-                    completion(app::Response{403});
-                }
-                else {
-                    UnitTestTransport::send_request_to_server(req, std::move(completion));
-                }
+                completion(app::AppError(ErrorCodes::HTTPError, "403 error", "", 403));
+            }
+            bool access_token_refresh_required() const override
+            {
+                return true;
             }
         };
-        OfflineAppSession::Config oas_config;
-        oas_config.transport = std::make_shared<Transport>();
-        OfflineAppSession oas(oas_config);
-        SyncTestFile test_config(oas, "realm");
-        test_config.sync_config->user->log_in(expired_token, expired_token);
+        auto user = std::make_shared<User>("realm", init_sync_manager.sync_manager());
+        user->m_access_token = expired_token;
+        user->m_refresh_token = expired_token;
 
         realm_config_t* config = realm_config_new();
         config->schema = Schema{object_schema};
-        realm_user user(test_config.sync_config->user);
-        realm_sync_config_t* sync_config = realm_sync_config_new(&user, "realm");
+        realm_user c_user(user);
+        realm_sync_config_t* sync_config = realm_sync_config_new(&c_user, "realm");
         realm_sync_config_set_initial_subscription_handler(sync_config, task_init_subscription, false, nullptr,
                                                            nullptr);
+
         realm_config_set_path(config, test_config.path.c_str());
         realm_config_set_schema_version(config, 1);
         Userdata userdata;
@@ -5656,8 +5651,7 @@ TEST_CASE("C API - async_open", "[sync][pbs][c_api]") {
         REQUIRE(userdata.called);
         REQUIRE(!userdata.realm_ref);
         REQUIRE(userdata.error.error == RLM_ERR_AUTH_ERROR);
-        REQUIRE(userdata.error_message ==
-                "Unable to refresh the user access token: http error code considered fatal. Client Error: 403");
+        REQUIRE(userdata.error_message == "Unable to refresh the user access token: 403 error. Client Error: 403");
         realm_release(task);
         realm_release(config);
         realm_release(sync_config);
@@ -6164,8 +6158,7 @@ TEST_CASE("C API app: link_user integration w/c_api transport", "[sync][app][c_a
         CHECK(realm_equals(sync_user_1, current_user));
         realm_release(current_user);
 
-        realm_user_t* sync_user_2;
-        realm_app_switch_user(&app, sync_user_1, &sync_user_2);
+        realm_app_switch_user(&app, sync_user_1);
         size_t out_n = 0;
 
         realm_app_get_all_users(&app, nullptr, 0, &out_n);
@@ -6180,7 +6173,6 @@ TEST_CASE("C API app: link_user integration w/c_api transport", "[sync][app][c_a
         for (size_t i = 0; i < out_n; ++i)
             realm_release(out_users[i]);
         realm_release(sync_user_1);
-        realm_release(sync_user_2);
     }
     SECTION("realm_app_user_apikey_provider_client_fetch_apikeys") {
         SECTION("Failure") {

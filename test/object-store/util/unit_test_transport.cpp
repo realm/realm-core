@@ -30,7 +30,7 @@
 using namespace realm;
 using namespace realm::app;
 
-std::string UnitTestTransport::access_token = encode_fake_jwt("fake access token");
+static const std::string access_token = encode_fake_jwt("fake access token");
 const std::string UnitTestTransport::api_key = "lVRPQVYBJSIbGos2ZZn0mGaIq1SIOsGaZ5lrcp8bxlR5jg4OGuGwQq1GkektNQ3i";
 const std::string UnitTestTransport::api_key_id = "5e5e6f0abe4ae2a2c2c2d329";
 const std::string UnitTestTransport::api_key_name = "some_api_key_name";
