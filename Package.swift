@@ -3,7 +3,7 @@
 import PackageDescription
 import Foundation
 
-let versionStr = "13.25.1"
+let versionStr = "13.26.0"
 let versionPieces = versionStr.split(separator: "-")
 let versionCompontents = versionPieces[0].split(separator: ".")
 let versionExtra = versionPieces.count > 1 ? versionPieces[1] : ""
@@ -121,6 +121,7 @@ let notSyncServerSources: [String] = [
     "realm/sync/noinst/pending_bootstrap_store.cpp",
     "realm/sync/noinst/protocol_codec.cpp",
     "realm/sync/noinst/sync_metadata_schema.cpp",
+    "realm/sync/noinst/sync_schema_migration.cpp",
     "realm/sync/object_id.cpp",
     "realm/sync/protocol.cpp",
     "realm/sync/subscriptions.cpp",

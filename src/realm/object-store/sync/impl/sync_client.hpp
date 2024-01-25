@@ -132,6 +132,12 @@ struct SyncClient {
         m_client.wait_for_session_terminations_or_client_stopped();
     }
 
+    // Async version of wait_for_session_terminations().
+    util::Future<void> notify_session_terminated()
+    {
+        return m_client.notify_session_terminated();
+    }
+
     ~SyncClient() {}
 
 private:

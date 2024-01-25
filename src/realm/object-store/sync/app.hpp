@@ -267,6 +267,25 @@ public:
     static SharedApp get_cached_app(const std::string& app_id,
                                     const std::optional<std::string>& base_url = std::nullopt);
 
+    /// Get the current base URL for the AppServices server used for http requests and sync
+    /// connections.
+    /// If an update_base_url() operation is currently in progress, this value will not be
+    /// updated with the new value until that operation is complete.
+    /// @return String containing the current base url value
+    std::string get_base_url() const REQUIRES(!m_route_mutex);
+
+    /// Update the base URL after the app has been created. The location info will be retrieved
+    /// using the provided base URL. If this operation fails, the app will continue to use the original base URL and
+    /// the error will be provided to the completion callback. If the operation is successful, the app and sync
+    /// client will use the new location info for future connections.
+    /// NOTE: If another App operation is started while this function is in progress, that request will use the
+    ///       original base URL location information.
+    /// @param base_url The new base URL to use for future AppServices requests and sync websocket connections. If
+    ///                 not set or an empty string, the default Device Sync base_url will be used.
+    /// @param completion A callback block to be invoked once the location update completes.
+    void update_base_url(std::optional<std::string> base_url,
+                         util::UniqueFunction<void(util::Optional<AppError>)>&& completion) REQUIRES(!m_route_mutex);
+
     /// Log in a user and asynchronously retrieve a user object.
     /// If the log in completes successfully, the completion block will be called, and a
     /// `SyncUser` representing the logged-in user will be passed to it. This user object
@@ -408,20 +427,42 @@ public:
     // reloads an app (#5411).
     static void close_all_sync_sessions();
 
-private:
-    friend class Internal;
-    friend class OnlyForTesting;
+    // Return the base url path used for HTTP AppServices requests
+    std::string get_host_url() REQUIRES(!m_route_mutex);
 
+    // Return the base url path used for Sync Session Websocket requests
+    std::string get_ws_host_url() REQUIRES(!m_route_mutex);
+
+private:
+    // Local copy of app config
     Config m_config;
 
     // mutable to allow locking for reads in const functions
-    // this is a shared pointer to support the App move constructor
     mutable util::CheckedMutex m_route_mutex;
+
+    // The following variables hold the different paths to Atlas, depending on the
+    // request being performed
+    // Base hostname from config.base_url or update_base_url() for querying location info
+    // (e.g. "https://realm.mongodb.com")
     std::string m_base_url GUARDED_BY(m_route_mutex);
+    // Baseline URL for AppServices and Device Sync requests
+    // (e.g. "https://us-east-1.aws.realm.mongodb.com/api/client/v2.0" or
+    // "wss://ws.us-east-1.aws.realm.mongodb.com/api/client/v2.0")
     std::string m_base_route GUARDED_BY(m_route_mutex);
+    // URL for app-based AppServices and Device Sync requests using config.app_id
+    // (e.g. "https://us-east-1.aws.realm.mongodb.com/api/client/v2.0/app/<app_id>"
+    // or "wss://ws.us-east-1.aws.realm.mongodb.com/api/client/v2.0/app/<app_id>")
     std::string m_app_route GUARDED_BY(m_route_mutex);
+    // URL for app-based AppServices authentication requests (e.g. email/password)
+    // (e.g. "https://us-east-1.aws.realm.mongodb.com/api/client/v2.0/app/<app_id>/auth")
     std::string m_auth_route GUARDED_BY(m_route_mutex);
-    bool m_location_updated GUARDED_BY(m_route_mutex) = false;
+    // If false, the location info will be updated upon the next AppServices request
+    bool m_location_updated GUARDED_BY(m_route_mutex);
+    // Storage for the location info returned by the base URL location endpoint
+    // Base hostname for AppServices HTTP requests
+    std::string m_host_url GUARDED_BY(m_route_mutex);
+    // Base hostname for Device Sync websocket requests
+    std::string m_ws_host_url GUARDED_BY(m_route_mutex);
 
     uint64_t m_request_timeout_ms;
     std::shared_ptr<SyncManager> m_sync_manager;
@@ -454,7 +495,7 @@ private:
     /// @param completion returns the original response in the case it is not an auth error, or if a failure
     /// occurs, if the refresh was a success the newly attempted response will be passed back
     void handle_auth_failure(const AppError& error, const Response& response, Request&& request,
-                             const std::shared_ptr<SyncUser>& user,
+                             const std::shared_ptr<SyncUser>& sync_user,
                              util::UniqueFunction<void(const Response&)>&& completion) REQUIRES(!m_route_mutex);
 
     std::string url_for_path(const std::string& path) const override REQUIRES(!m_route_mutex);
@@ -462,23 +503,32 @@ private:
     /// Return the app route for this App instance, or creates a new app route string if
     /// a new hostname is provided
     /// @param hostname The hostname to generate a new app route
-    std::string get_app_route(const util::Optional<std::string>& hostname = util::none) const
-        REQUIRES(!m_route_mutex);
+    std::string get_app_route(const util::Optional<std::string>& hostname = util::none) const REQUIRES(m_route_mutex);
 
     /// Request the app metadata information from the server if it has not been processed yet. If
     /// a new hostname is provided, the app metadata will be refreshed using the new hostname.
-    /// @param completion The server response if an error was encountered during the update
-    /// @param new_hostname If provided, the metadata will be requested from this hostname
-    void init_app_metadata(util::UniqueFunction<void(const util::Optional<Response>&)>&& completion,
-                           const util::Optional<std::string>& new_hostname = util::none) REQUIRES(!m_route_mutex);
+    /// @param completion The callback that will be called with the error on failure or empty on success
+    /// @param new_hostname The (Original) new hostname to request the location from
+    /// @param redir_location The location provided by the last redirect response when querying location
+    /// @param redirect_count The current number of redirects that have occurred in a row
+    void request_location(util::UniqueFunction<void(util::Optional<AppError>)>&& completion,
+                          std::optional<std::string>&& new_hostname = std::nullopt,
+                          std::optional<std::string>&& redir_location = std::nullopt, int redirect_count = 0)
+        REQUIRES(!m_route_mutex);
+
+    /// Update the location metadata from the location response
+    /// @param response The response returned from the location request
+    /// @param base_url The base URL to use when setting the location metadata
+    /// @return std::nullopt if the updated was successful, otherwise an AppError with the error
+    std::optional<AppError> update_location(const Response& response, const std::string& base_url)
+        REQUIRES(!m_route_mutex);
 
     /// Update the app metadata and resend the request with the updated metadata
     /// @param request The original request object that needs to be sent after the update
     /// @param completion The original completion object that will be called with the response to the request
     /// @param new_hostname If provided, the metadata will be requested from this hostname
-    void update_metadata_and_resend(Request&& request, util::UniqueFunction<void(const Response&)>&& completion,
-                                    const util::Optional<std::string>& new_hostname = util::none)
-        REQUIRES(!m_route_mutex);
+    void update_location_and_resend(Request&& request, util::UniqueFunction<void(const Response&)>&& completion,
+                                    util::Optional<std::string>&& new_hostname = util::none) REQUIRES(!m_route_mutex);
 
     void post(std::string&& route, util::UniqueFunction<void(util::Optional<AppError>)>&& completion,
               const bson::BsonDocument& body) REQUIRES(!m_route_mutex);
@@ -490,20 +540,13 @@ private:
     void do_request(Request&& request, util::UniqueFunction<void(const Response&)>&& completion,
                     bool update_location = false) REQUIRES(!m_route_mutex);
 
-    /// Check to see if hte response is a redirect and handle, otherwise pass the response to compleetion
-    /// @param request The request to be performed (in case it needs to be sent again)
-    /// @param response The response from the send_request_to_server operation
-    /// @param completion Returns the response from the server if not a redirect
-    void handle_possible_redirect_response(Request&& request, const Response& response,
-                                           util::UniqueFunction<void(const Response&)>&& completion)
-        REQUIRES(!m_route_mutex);
-
     /// Process the redirect response received from the last request that was sent to the server
     /// @param request The request to be performed (in case it needs to be sent again)
     /// @param response The response from the send_request_to_server operation
     /// @param completion Returns the response from the server if not a redirect
-    void handle_redirect_response(Request&& request, const Response& response,
-                                  util::UniqueFunction<void(const Response&)>&& completion) REQUIRES(!m_route_mutex);
+    void check_for_redirect_response(Request&& request, const Response& response,
+                                     util::UniqueFunction<void(const Response&)>&& completion)
+        REQUIRES(!m_route_mutex);
 
     /// Performs an authenticated request to the Stitch server, using the current authentication state
     /// @param request The request to be performed
@@ -541,10 +584,16 @@ private:
 
     void configure(const SyncClientConfig& sync_client_config) REQUIRES(!m_route_mutex);
 
-    static std::string make_sync_route(const std::string& http_app_route);
-    void update_hostname(const util::Optional<realm::SyncAppMetadata>& metadata) REQUIRES(!m_route_mutex);
-    void update_hostname(const std::string& hostname, const util::Optional<std::string>& ws_hostname = util::none)
-        REQUIRES(!m_route_mutex);
+    // Requires locking m_route_mutex before calling
+    std::string make_sync_route(util::Optional<std::string> ws_host_url = util::none) REQUIRES(m_route_mutex);
+
+    // Requires locking m_route_mutex before calling
+    void configure_route(const std::string& host_url, const std::optional<std::string>& ws_host_url = std::nullopt)
+        REQUIRES(m_route_mutex);
+
+    // Requires locking m_route_mutex before calling
+    void update_hostname(const std::string& host_url, const std::optional<std::string>& ws_host_url = std::nullopt,
+                         const std::optional<std::string>& new_base_url = std::nullopt) REQUIRES(m_route_mutex);
     std::string auth_route() REQUIRES(!m_route_mutex);
     std::string base_url() REQUIRES(!m_route_mutex);
 

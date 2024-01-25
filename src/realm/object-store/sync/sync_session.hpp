@@ -26,6 +26,7 @@
 #include <realm/sync/subscriptions.hpp>
 
 #include <realm/util/checked_mutex.hpp>
+#include <realm/util/future.hpp>
 #include <realm/util/optional.hpp>
 #include <realm/version_id.hpp>
 
@@ -120,7 +121,6 @@ public:
         Connected,
     };
 
-    using StateChangeCallback = void(State old_state, State new_state);
     using ConnectionStateChangeCallback = void(ConnectionState old_state, ConnectionState new_state);
     using TransactionCallback = void(VersionID old_version, VersionID new_version);
     using ProgressNotifierCallback = _impl::SyncProgressNotifier::ProgressNotifierCallback;
@@ -273,10 +273,14 @@ public:
     // Return an existing external reference to this session, if one exists. Otherwise, returns `nullptr`.
     std::shared_ptr<SyncSession> existing_external_reference() REQUIRES(!m_external_reference_mutex);
 
+    struct OnlyForTesting;
+
     // Expose some internal functionality to other parts of the ObjectStore
     // without making it public to everyone
     class Internal {
         friend class _impl::RealmCoordinator;
+        friend struct OnlyForTesting;
+        friend class AsyncOpenTask;
 
         static void nonsync_transact_notify(SyncSession& session, VersionID::version_type version)
         {
@@ -287,6 +291,8 @@ public:
         {
             return session.m_db;
         }
+
+        static util::Future<void> pause_async(SyncSession& session);
     };
 
     // Expose some internal functionality to testing code.
@@ -320,6 +326,8 @@ public:
         {
             return session.get_subscription_store_base();
         }
+
+        static util::Future<void> pause_async(SyncSession& session);
     };
 
 private:
@@ -379,6 +387,8 @@ private:
     void handle_error(sync::SessionErrorInfo) REQUIRES(!m_state_mutex, !m_config_mutex, !m_connection_state_mutex);
     void handle_bad_auth(const std::shared_ptr<SyncUser>& user, Status status)
         REQUIRES(!m_state_mutex, !m_config_mutex);
+    void handle_location_update_failed(Status status)
+        REQUIRES(!m_state_mutex, !m_config_mutex, !m_connection_state_mutex);
     // If sub_notify_error is set (including Status::OK()), then the pending subscription waiters will
     // also be called with the sub_notify_error status value.
     void cancel_pending_waits(util::CheckedUniqueLock, Status) RELEASE(m_state_mutex);
@@ -418,6 +428,7 @@ private:
 
     sync::SaltedFileIdent get_file_ident() const;
     std::string get_appservices_connection_id() const REQUIRES(!m_state_mutex);
+    std::optional<std::string> get_sync_route() const REQUIRES(!m_state_mutex);
 
     util::Future<std::string> send_test_command(std::string body) REQUIRES(!m_state_mutex);
 
@@ -484,6 +495,9 @@ private:
     mutable util::CheckedMutex m_external_reference_mutex;
     class ExternalReference;
     std::weak_ptr<ExternalReference> m_external_reference GUARDED_BY(m_external_reference_mutex);
+
+    // Set if ProtocolError::schema_version_changed error is received from the server.
+    std::optional<uint64_t> m_previous_schema_version GUARDED_BY(m_state_mutex);
 };
 
 } // namespace realm
