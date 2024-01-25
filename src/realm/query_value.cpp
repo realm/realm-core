@@ -63,7 +63,9 @@ static const std::vector<std::pair<std::string, TypeOfValue::Attribute>> attribu
     {"numeric", TypeOfValue::Numeric},
     {"bindata", TypeOfValue::Binary},
     {"object", TypeOfValue::Object},
+    {"dictionary", TypeOfValue::Object},
     {"array", TypeOfValue::Array},
+    {"list", TypeOfValue::Array},
     {"collection", TypeOfValue::Collection},
 };
 
