@@ -26,9 +26,9 @@
 #include <string>
 
 namespace realm {
-class SyncUser;
 namespace app {
 class AuthRequestClient;
+class User;
 struct AppError;
 
 class PushClient {
@@ -53,7 +53,7 @@ public:
     /// @param registration_token GCM registration token for the device.
     /// @param sync_user The sync user requesting push registration.
     /// @param completion An error will be returned should something go wrong.
-    void register_device(const std::string& registration_token, const std::shared_ptr<SyncUser>& sync_user,
+    void register_device(const std::string& registration_token, const std::shared_ptr<User>& sync_user,
                          util::UniqueFunction<void(util::Optional<AppError>)>&& completion);
 
 
@@ -61,7 +61,7 @@ public:
     /// as it is linked to the user in MongoDB Realm Cloud.
     /// @param sync_user The sync user requesting push degistration.
     /// @param completion An error will be returned should something go wrong.
-    void deregister_device(const std::shared_ptr<SyncUser>& sync_user,
+    void deregister_device(const std::shared_ptr<User>& sync_user,
                            util::UniqueFunction<void(util::Optional<AppError>)>&& completion);
 
 private:

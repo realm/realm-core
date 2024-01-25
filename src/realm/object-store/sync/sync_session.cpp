@@ -23,7 +23,7 @@
 #include <realm/object-store/sync/app.hpp>
 #include <realm/object-store/sync/impl/sync_client.hpp>
 #include <realm/object-store/sync/impl/sync_file.hpp>
-#include <realm/object-store/sync/impl/sync_metadata.hpp>
+#include <realm/object-store/sync/impl/app_metadata.hpp>
 #include <realm/object-store/sync/sync_manager.hpp>
 #include <realm/object-store/sync/sync_user.hpp>
 #include <realm/object-store/util/scheduler.hpp>
@@ -256,7 +256,7 @@ void SyncSession::handle_bad_auth(const std::shared_ptr<SyncUser>& user, Status 
         cancel_pending_waits(std::move(lock), status);
     }
     if (user) {
-        user->log_out();
+        user->request_log_out();
     }
 
     if (auto error_handler = config(&SyncConfig::error_handler)) {
@@ -302,10 +302,7 @@ SyncSession::handle_refresh(const std::shared_ptr<SyncSession>& session, bool re
             session->cancel_pending_waits(std::move(lock), refresh_error);
         }
         else if (error) {
-            if (error->code() == ErrorCodes::ClientAppDeallocated) {
-                return; // this response came in after the app shut down, ignore it
-            }
-            else if (ErrorCodes::error_categories(error->code()).test(ErrorCategory::client_error)) {
+            if (ErrorCodes::error_categories(error->code()).test(ErrorCategory::client_error)) {
                 // any other client errors other than app_deallocated are considered fatal because
                 // there was a problem locally before even sending the request to the server
                 // eg. ClientErrorCode::user_not_found, ClientErrorCode::user_not_logged_in,
@@ -400,13 +397,6 @@ SyncSession::SyncSession(Private, SyncClient& client, std::shared_ptr<DB> db, co
     }
 }
 
-std::shared_ptr<SyncManager> SyncSession::sync_manager() const
-{
-    util::CheckedLockGuard lk(m_state_mutex);
-    REALM_ASSERT(m_sync_manager);
-    return m_sync_manager->shared_from_this();
-}
-
 void SyncSession::detach_from_sync_manager()
 {
     shutdown_and_wait();
@@ -418,21 +408,15 @@ void SyncSession::update_error_and_mark_file_for_deletion(SyncError& error, Shou
 {
     util::CheckedLockGuard config_lock(m_config_mutex);
     // Add a SyncFileActionMetadata marking the Realm as needing to be deleted.
-    std::string recovery_path;
     auto original_path = path();
     error.user_info[SyncError::c_original_file_path_key] = original_path;
+    using Action = SyncFileAction;
+    auto action = should_backup == ShouldBackup::yes ? Action::BackUpThenDeleteRealm : Action::DeleteRealm;
+    std::string recovery_path = m_config.sync_config->user->create_file_action(
+        action, original_path, m_config.sync_config->recovery_directory);
     if (should_backup == ShouldBackup::yes) {
-        recovery_path = util::reserve_unique_file_name(
-            m_sync_manager->recovery_directory_path(m_config.sync_config->recovery_directory),
-            util::create_timestamped_template("recovered_realm"));
         error.user_info[SyncError::c_recovery_file_path_key] = recovery_path;
     }
-    using Action = SyncFileActionMetadata::Action;
-    auto action = should_backup == ShouldBackup::yes ? Action::BackUpThenDeleteRealm : Action::DeleteRealm;
-    m_sync_manager->perform_metadata_update([action, original_path = std::move(original_path),
-                                             recovery_path = std::move(recovery_path)](const auto& manager) {
-        manager.make_file_action_metadata(original_path, action, recovery_path);
-    });
 }
 
 void SyncSession::download_fresh_realm(sync::ProtocolErrorInfo::Action server_requests_action)
@@ -490,23 +474,24 @@ void SyncSession::download_fresh_realm(sync::ProtocolErrorInfo::Action server_re
     if (m_state != State::Active) {
         return;
     }
-    std::shared_ptr<SyncSession> fresh_sync_session;
+    RealmConfig fresh_config;
     {
         util::CheckedLockGuard config_lock(m_config_mutex);
-        RealmConfig config = m_config;
-        config.path = fresh_path;
+        fresh_config = m_config;
+        fresh_config.path = fresh_path;
         // in case of migrations use the migrated config
-        auto fresh_config = m_migrated_sync_config ? *m_migrated_sync_config : *m_config.sync_config;
+        auto fresh_sync_config = m_migrated_sync_config ? *m_migrated_sync_config : *m_config.sync_config;
         // deep copy the sync config so we don't modify the live session's config
-        config.sync_config = std::make_shared<SyncConfig>(fresh_config);
-        config.sync_config->client_resync_mode = ClientResyncMode::Manual;
-        config.schema_version = m_previous_schema_version.value_or(m_config.schema_version);
-        fresh_sync_session = m_sync_manager->get_session(db, config);
-        auto& history = static_cast<sync::ClientReplication&>(*db->get_replication());
-        // the fresh Realm may apply writes to this db after it has outlived its sync session
-        // the writes are used to generate a changeset for recovery, but are never committed
-        history.set_write_validator_factory({});
+        fresh_config.sync_config = std::make_shared<SyncConfig>(fresh_sync_config);
+        fresh_config.sync_config->client_resync_mode = ClientResyncMode::Manual;
+        fresh_config.schema_version = m_previous_schema_version.value_or(m_config.schema_version);
     }
+
+    auto fresh_sync_session = m_sync_manager->get_session(db, fresh_config);
+    auto& history = static_cast<sync::ClientReplication&>(*db->get_replication());
+    // the fresh Realm may apply writes to this db after it has outlived its sync session
+    // the writes are used to generate a changeset for recovery, but are never committed
+    history.set_write_validator_factory({});
 
     fresh_sync_session->assert_mutex_unlocked();
     // The fresh realm uses flexible sync.
@@ -737,16 +722,14 @@ void SyncSession::handle_error(sync::SessionErrorInfo error)
                 return;
             case sync::ProtocolErrorInfo::Action::RefreshUser:
                 if (auto u = user()) {
-                    u->refresh_custom_data(false, handle_refresh(shared_from_this(), false));
-                    return;
+                    u->request_access_token(handle_refresh(shared_from_this(), false));
                 }
-                break;
+                return;
             case sync::ProtocolErrorInfo::Action::RefreshLocation:
                 if (auto u = user()) {
-                    u->refresh_custom_data(true, handle_refresh(shared_from_this(), true));
-                    return;
+                    u->request_refresh_location(handle_refresh(shared_from_this(), true));
                 }
-                break;
+                return;
             case sync::ProtocolErrorInfo::Action::LogOutUser:
                 next_state = NextStateAfterError::inactive;
                 log_out_user = true;
@@ -802,7 +785,7 @@ void SyncSession::handle_error(sync::SessionErrorInfo error)
 
     if (log_out_user) {
         if (auto u = user())
-            u->log_out();
+            u->request_log_out();
     }
 
     if (auto error_handler = config(&SyncConfig::error_handler)) {
@@ -909,7 +892,7 @@ void SyncSession::create_sync_session()
 
     sync::Session::Config session_config;
     session_config.signed_user_token = sync_config.user->access_token();
-    session_config.user_id = sync_config.user->identity();
+    session_config.user_id = sync_config.user->user_id();
     session_config.realm_identifier = sync_config.partition_value;
     session_config.verify_servers_ssl_certificate = sync_config.client_validate_ssl;
     session_config.ssl_trust_certificate_path = sync_config.ssl_trust_certificate_path;
@@ -1207,23 +1190,30 @@ void SyncSession::shutdown_and_wait()
     m_client.wait_for_session_terminations();
 }
 
-void SyncSession::update_access_token(const std::string& signed_token)
+void SyncSession::update_access_token(std::string_view signed_token)
 {
     util::CheckedUniqueLock lock(m_state_mutex);
-    // We don't expect there to be a session when waiting for access token, but if there is, refresh its token.
-    // If not, the latest token will be seeded from SyncUser::access_token() on session creation.
-    if (m_session) {
-        m_session->refresh(signed_token);
-    }
-    if (m_state == State::WaitingForAccessToken) {
-        become_active();
+    switch (m_state) {
+        case State::Active:
+            m_session->refresh(signed_token);
+            break;
+        case State::WaitingForAccessToken:
+            become_active();
+            break;
+        case State::Paused:
+            // token will be pulled from user when the session is unpaused
+            return;
+        case State::Dying:
+        case State::Inactive:
+            do_revive(std::move(lock));
+            break;
     }
 }
 
 void SyncSession::initiate_access_token_refresh()
 {
     if (auto session_user = user()) {
-        session_user->refresh_custom_data(handle_refresh(shared_from_this(), false));
+        session_user->request_access_token(handle_refresh(shared_from_this(), false));
     }
 }
 

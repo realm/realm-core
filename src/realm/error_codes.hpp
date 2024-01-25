@@ -184,7 +184,7 @@ public:
 
         ClientUserNotFound = RLM_ERR_CLIENT_USER_NOT_FOUND,
         ClientUserNotLoggedIn = RLM_ERR_CLIENT_USER_NOT_LOGGED_IN,
-        ClientAppDeallocated = RLM_ERR_CLIENT_APP_DEALLOCATED,
+        ClientUserAlreadyNamed = RLM_ERR_CLIENT_USER_ALREADY_NAMED,
         ClientRedirectError = RLM_ERR_CLIENT_REDIRECT_ERROR,
         ClientTooManyRedirects = RLM_ERR_CLIENT_TOO_MANY_REDIRECTS,
 

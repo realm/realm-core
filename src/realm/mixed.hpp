@@ -173,6 +173,10 @@ public:
         : Mixed(StringData(s))
     {
     }
+    Mixed(std::string_view s) noexcept
+        : Mixed(StringData(s))
+    {
+    }
 
     Mixed(ref_type ref, CollectionType collection_type) noexcept
         : m_type(int(collection_type) + 1)

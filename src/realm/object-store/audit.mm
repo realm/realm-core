@@ -622,20 +622,15 @@ public:
 
     // Get a pool for the given sync user. Pools are cached internally to avoid
     // creating duplicate ones.
-    static std::shared_ptr<AuditRealmPool> get_pool(std::shared_ptr<SyncUser> user,
-                                                    std::string const& partition_prefix,
-                                                    const std::shared_ptr<util::Logger>& logger,
-                                                    ErrorHandler error_handler);
+    static std::shared_ptr<AuditRealmPool> get_pool(std::shared_ptr<SyncUser> user, const AuditConfig& config,
+                                                    const std::shared_ptr<util::Logger>& logger);
 
     // Write to a pooled Realm. The Transaction should not be retained outside
     // of the callback.
     void write(util::FunctionRef<void(Transaction&)> func) REQUIRES(!m_mutex);
 
-    explicit AuditRealmPool(Private, std::shared_ptr<SyncUser> user, std::string const& partition_prefix,
-                            ErrorHandler error_handler, const std::shared_ptr<util::Logger>& logger,
-                            std::string_view app_id);
-    AuditRealmPool(const AuditRealmPool&) = delete;
-    AuditRealmPool& operator=(const AuditRealmPool&) = delete;
+    explicit AuditRealmPool(Private, std::shared_ptr<SyncUser> user, const AuditConfig& config,
+                            const std::shared_ptr<util::Logger>& logger);
 
     // Block the calling thread until all pooled Realms have been fully uploaded,
     // including ones which do not currently have sync sessions. For testing
@@ -663,13 +658,12 @@ private:
     std::string prefixed_partition(std::string const& partition);
 };
 
-std::shared_ptr<AuditRealmPool> AuditRealmPool::get_pool(std::shared_ptr<SyncUser> user,
-                                                         std::string const& partition_prefix,
-                                                         const std::shared_ptr<util::Logger>& logger,
-                                                         ErrorHandler error_handler) NO_THREAD_SAFETY_ANALYSIS
+std::shared_ptr<AuditRealmPool>
+AuditRealmPool::get_pool(std::shared_ptr<SyncUser> user, const AuditConfig& config,
+                         const std::shared_ptr<util::Logger>& logger) NO_THREAD_SAFETY_ANALYSIS
 {
     struct CachedPool {
-        std::string user_identity;
+        std::string user_id;
         std::string partition_prefix;
         std::string app_id;
         std::weak_ptr<AuditRealmPool> pool;
@@ -683,9 +677,9 @@ std::shared_ptr<AuditRealmPool> AuditRealmPool::get_pool(std::shared_ptr<SyncUse
                                  }),
                   s_pools.end());
 
-    auto app_id = user->sync_manager()->app_id();
+    auto app_id = user->app_id();
     auto it = std::find_if(s_pools.begin(), s_pools.end(), [&](auto& pool) {
-        return pool.user_identity == user->identity() && pool.partition_prefix == partition_prefix &&
+        return pool.user_id == user->user_id() && pool.partition_prefix == config.partition_value_prefix &&
                pool.app_id == app_id;
     });
     if (it != s_pools.end()) {
@@ -694,28 +688,26 @@ std::shared_ptr<AuditRealmPool> AuditRealmPool::get_pool(std::shared_ptr<SyncUse
         }
     }
 
-    auto pool = std::make_shared<AuditRealmPool>(Private(), user, partition_prefix, error_handler, logger, app_id);
+    auto pool = std::make_shared<AuditRealmPool>(Private(), user, config, logger);
     pool->scan_for_realms_to_upload();
-    s_pools.push_back({user->identity(), partition_prefix, app_id, pool});
+    s_pools.push_back({user->user_id(), config.partition_value_prefix, app_id, pool});
     return pool;
 }
 
-AuditRealmPool::AuditRealmPool(Private, std::shared_ptr<SyncUser> user, std::string const& partition_prefix,
-                               ErrorHandler error_handler, const std::shared_ptr<util::Logger>& logger,
-                               std::string_view app_id)
+AuditRealmPool::AuditRealmPool(Private, std::shared_ptr<SyncUser> user, const AuditConfig& config,
+                               const std::shared_ptr<util::Logger>& logger)
     : m_user(user)
-    , m_partition_prefix(partition_prefix)
-    , m_error_handler(error_handler)
+    , m_partition_prefix(config.partition_value_prefix)
+    , m_error_handler(config.sync_error_handler)
     , m_path_root([&] {
-        auto base_file_path = m_user->sync_manager()->config().base_file_path;
 #ifdef _WIN32 // Move to File?
         const char separator[] = "\\";
 #else
         const char separator[] = "/";
 #endif
         // "$root/realm-audit/$appId/$userId/$partitonPrefix/"
-        return util::format("%2%1realm-audit%1%3%1%4%1%5%1", separator, base_file_path, app_id, m_user->identity(),
-                            partition_prefix);
+        return util::format("%2%1realm-audit%1%3%1%4%1%5%1", separator, config.base_file_path, m_user->app_id(),
+                            m_user->user_id(), config.partition_value_prefix);
     }())
     , m_logger(logger)
 {
@@ -1015,8 +1007,7 @@ AuditContext::AuditContext(std::shared_ptr<DB> source_db, RealmConfig const& par
     if (!m_serializer)
         m_serializer = std::make_shared<AuditObjectSerializer>();
 
-    m_realm_pool = AuditRealmPool::get_pool(audit_user, audit_config.partition_value_prefix, m_logger,
-                                            audit_config.sync_error_handler);
+    m_realm_pool = AuditRealmPool::get_pool(audit_user, audit_config, m_logger);
 }
 
 void AuditContext::update_metadata(std::vector<std::pair<std::string, std::string>> new_metadata)

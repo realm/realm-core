@@ -27,10 +27,10 @@
 #include <vector>
 
 namespace realm {
-class SyncUser;
 
 namespace app {
 class AppServiceClient;
+class User;
 struct AppError;
 
 class MongoCollection {
@@ -346,7 +346,7 @@ public:
 private:
     friend class MongoDatabase;
 
-    MongoCollection(const std::string& name, const std::string& database_name, const std::shared_ptr<SyncUser>& user,
+    MongoCollection(const std::string& name, const std::string& database_name, const std::shared_ptr<User>& user,
                     const std::shared_ptr<AppServiceClient>& service, const std::string& service_name);
 
     void call_function(const char* name, const bson::BsonDocument& arg,
@@ -361,7 +361,7 @@ private:
     /// Returns a document of database name and collection name
     bson::BsonDocument m_base_operation_args;
 
-    std::shared_ptr<SyncUser> m_user;
+    std::shared_ptr<User> m_user;
 
     std::shared_ptr<AppServiceClient> m_service;
 

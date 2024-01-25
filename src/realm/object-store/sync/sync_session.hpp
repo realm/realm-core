@@ -96,9 +96,7 @@ private:
     // Will be `none` until we've received the initial notification from sync.  Note that this
     // happens only once ever during the lifetime of a given `SyncSession`, since these values are
     // expected to semi-monotonically increase, and a lower-bounds estimate is still useful in the
-    // event more up-to-date information isn't yet available.  FIXME: If we support transparent
-    // client reset in the future, we might need to reset the progress state variables if the Realm
-    // is rolled back.
+    // event more up-to-date information isn't yet available.
     util::Optional<Progress> m_current_progress;
 
     std::unordered_map<uint64_t, NotifierPackage> m_packages;
@@ -235,7 +233,7 @@ public:
 
     // The access token needs to periodically be refreshed and this is how to
     // let the sync session know to update it's internal copy.
-    void update_access_token(const std::string& signed_token) REQUIRES(!m_state_mutex, !m_config_mutex);
+    void update_access_token(std::string_view signed_token) REQUIRES(!m_state_mutex, !m_config_mutex);
 
     // Request an updated access token from this session's sync user.
     void initiate_access_token_refresh() REQUIRES(!m_config_mutex);
@@ -387,11 +385,9 @@ private:
                                                const RealmConfig& config, SyncManager* sync_manager)
     {
         REALM_ASSERT(config.sync_config);
-        return std::make_shared<SyncSession>(Private(), client, std::move(db), config, std::move(sync_manager));
+        return std::make_shared<SyncSession>(Private(), client, std::move(db), config, sync_manager);
     }
     // }
-
-    std::shared_ptr<SyncManager> sync_manager() const REQUIRES(!m_state_mutex);
 
     static util::UniqueFunction<void(util::Optional<app::AppError>)>
     handle_refresh(const std::shared_ptr<SyncSession>&, bool);
