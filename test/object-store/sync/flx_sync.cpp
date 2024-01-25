@@ -785,6 +785,7 @@ TEST_CASE("flx: client reset", "[sync][flx][client reset][baas]") {
                 subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
                 // make sure that the subscription for "foo" survived the reset
                 size_t count_of_foo = count_queries_with_str(subs, util::format("\"%1\"", str_field_value));
+                subs.refresh();
                 REQUIRE(subs.state() == sync::SubscriptionSet::State::Complete);
                 REQUIRE(count_of_foo == 1);
                 local_realm->refresh();
