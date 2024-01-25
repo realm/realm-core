@@ -279,9 +279,7 @@ void Array::init_from_mem(MemRef mem) noexcept
     // for expanding the array, but also query the data.
     char* header = mem.get_addr();
     auto kind = get_kind(header);
-#ifdef REALM_DEBUG
-    REALM_ASSERT(kind == 'A' || kind == 'B');
-#endif
+    REALM_ASSERT_DEBUG(kind == 'A' || kind == 'B');
     if (kind == 'B') {
 #ifdef REALM_DEBUG
         // the only encoding supported at the moment

@@ -186,6 +186,7 @@ public:
     void get_chunk(size_t ndx, int64_t res[8]) const noexcept;
 
     ref_type get_as_ref(size_t ndx) const noexcept;
+    ref_type get_as_ref_not_encoded(size_t ndx) const noexcept;
 
     RefOrTagged get_as_ref_or_tagged(size_t ndx) const noexcept;
     void set(size_t ndx, RefOrTagged);
@@ -758,6 +759,15 @@ inline ref_type Array::get_as_ref(size_t ndx) const noexcept
     REALM_ASSERT_DEBUG_EX(m_has_refs, m_ref, ndx, m_size);
     int64_t v = get(ndx);
     return to_ref(v);
+}
+
+inline ref_type Array::get_as_ref_not_encoded(size_t ndx) const noexcept
+{
+    REALM_ASSERT_DEBUG(is_attached());
+    REALM_ASSERT_DEBUG_EX(m_has_refs, m_ref, ndx, m_size);
+    REALM_ASSERT_DEBUG(is_attached());
+    REALM_ASSERT_DEBUG_EX(ndx < m_size, ndx, m_size);
+    return (this->*m_getter)(ndx);
 }
 
 inline RefOrTagged Array::get_as_ref_or_tagged(size_t ndx) const noexcept
