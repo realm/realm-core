@@ -4812,6 +4812,8 @@ TEST(Parser_TypeOfValue)
     }
     std::string bin_data("String2Binary");
     table->get_object(15).set(col_any, Mixed());
+    table->get_object(17).set_collection(col_any, CollectionType::Dictionary);
+    table->get_object(19).set<Mixed>(col_any, table->begin()->get_link());
     table->get_object(75).set(col_any, Mixed(75.));
     table->get_object(28).set(col_any, Mixed(BinaryData(bin_data)));
     nb_strings--;
@@ -4837,7 +4839,8 @@ TEST(Parser_TypeOfValue)
             ++it;
         }
     }
-    size_t nb_ints = 71;
+    size_t nb_ints = 69;
+    size_t nb_numerics = nb_ints + 3;
     verify_query(test_context, table, "mixed.@type == 'string'", nb_strings);
     verify_query(test_context, table, "mixed.@type == 'double'", 2);
     verify_query(test_context, table, "mixed.@type == 'float'", 0);
@@ -4861,16 +4864,18 @@ TEST(Parser_TypeOfValue)
     verify_query(test_context, table, "mixed.@type == 'char'", nb_ints);
     verify_query(test_context, table, "mixed.@type == 'timestamp'", 0);
     verify_query(test_context, table, "mixed.@type == 'datetimeoffset'", 0);
-    verify_query(test_context, table, "mixed.@type == 'object'", 0);
+    verify_query(test_context, table, "mixed.@type == 'object'", 1);
+    verify_query(test_context, table, "mixed.@type == 'objectlink'", 1);
 
     verify_query(test_context, table,
                  "mixed.@type == 'binary' || mixed.@type == 'DECIMAL' || mixed.@type == 'Double'", 4);
     verify_query(test_context, table, "mixed.@type == 'null'", 1);
-    verify_query(test_context, table, "mixed.@type == 'numeric'", table->size() - nb_strings - 2);
-    verify_query(
-        test_context, table,
-        "mixed.@type == 'numeric' || mixed.@type == 'string' || mixed.@type == 'binary' || mixed.@type == 'null'",
-        table->size());
+    verify_query(test_context, table, "mixed.@type == 'numeric'", nb_numerics);
+    verify_query(test_context, table,
+                 "mixed.@type == 'numeric' || mixed.@type == 'string' || mixed.@type == 'objectlink' || mixed.@type "
+                 "== 'binary' || mixed.@type == "
+                 "'object' || mixed.@type == 'null'",
+                 table->size());
     verify_query(test_context, table, "mixed.@type == mixed.@type", table->size());
     verify_query(test_context, origin, "link.mixed.@type == 'numeric' || link.mixed.@type == 'string'",
                  origin->size());
@@ -4878,9 +4883,9 @@ TEST(Parser_TypeOfValue)
                  origin->size());
     verify_query(test_context, origin, "ANY links.mixed.@type IN ANY {'numeric', 'string'}", origin->size());
 
-    verify_query(test_context, table, "mixed.@type == int.@type", table->size() - nb_strings - 5);
+    verify_query(test_context, table, "mixed.@type == int.@type", nb_ints);
     verify_query(test_context, origin, "link.@type == link.mixed.@type", 0);
-    verify_query(test_context, origin, "links.@type == links.mixed.@type", 0);
+    verify_query(test_context, origin, "links.@type == links.mixed.@type", 1); // Object 19
 
     verify_query(test_context, table, "mixed > 50", int_over_50);
     verify_query(test_context, table, "mixed > 50 && mixed.@type == 'double'", 1);
@@ -4934,10 +4939,11 @@ TEST(Parser_TypeOfValue)
     CHECK_THROW_EX(verify_query(test_context, table, "int.@type == 'int'", 1), query_parser::InvalidQueryError,
                    std::string(e.what()).find("Comparison between two constants is not supported") !=
                        std::string::npos);
-    CHECK_THROW_EX(verify_query(test_context, origin, "link.@type == 'object'", 1), query_parser::InvalidQueryError,
-                   CHECK(std::string(e.what()).find(
-                             "Comparison between two constants is not supported ('\"object\"' and '\"object\"')") !=
-                         std::string::npos));
+    CHECK_THROW_EX(
+        verify_query(test_context, origin, "link.@type == 'objectlink'", 1), query_parser::InvalidQueryError,
+        CHECK(std::string(e.what()).find(
+                  "Comparison between two constants is not supported ('\"objectlink\"' and '\"objectlink\"')") !=
+              std::string::npos));
     CHECK_THROW_EX(verify_query(test_context, table, "mixed.@type =[c] 'string'", 1), query_parser::InvalidQueryError,
                    CHECK_EQUAL(std::string(e.what()), "Unsupported comparison operator '=[c]' against type '@type', "
                                                       "right side must be a string or binary type"));
@@ -5284,6 +5290,10 @@ TEST(Parser_NestedMixedDictionaryList)
         snake->insert("age", 20);
     }
 
+    Obj george = persons->create_object_with_primary_key("George");
+    george.set(col_self, george.get_key());
+    george.set_collection(col, CollectionType::List);
+
     auto q = persons->column<Mixed>(col).path({"instruments", 0, "strings"}) == 6;
     CHECK_EQUAL(q.count(), 1);
 
@@ -5300,6 +5310,9 @@ TEST(Parser_NestedMixedDictionaryList)
     verify_query(test_context, persons, "properties.@keys == 'tickets'", 1);
     verify_query(test_context, persons, "properties.@size == 3", 1);
     verify_query(test_context, persons, "properties.instruments.@size == 2", 1);
+    verify_query(test_context, persons, "properties.@type == 'object'", 2);
+    verify_query(test_context, persons, "properties.@type == 'array'", 1);
+    verify_query(test_context, persons, "properties.@type == 'collection'", 3);
 }
 
 TEST(Parser_NestedDictionaryDeep)
