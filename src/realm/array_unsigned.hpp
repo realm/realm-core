@@ -86,23 +86,8 @@ private:
 
     void init_from_mem(MemRef mem) noexcept
     {
-        Array::init_from_mem(mem);
-        // we could have come here after decompression. So we need to be careful
-        // See comment in Array::init_from_mem.
-        auto kind = get_kind(get_header());
-        if (kind == 'A') {
-            set_width(get_width_from_header(get_header()));
-        }
-        else if (kind == 'B') {
-            const auto dst_header = mem.get_addr();
-            if (get_kind(dst_header) == 'A') {
-                m_ubound = uint64_t(-1) >> (64 - m_width);
-            }
-        }
-        else {
-            // this shoule never be hit.
-            REALM_UNREACHABLE();
-        }
+        auto header = Node::init_from_mem(mem);
+        set_width(get_width_from_header(header));
     }
 
     void adjust(size_t ndx, int64_t diff)

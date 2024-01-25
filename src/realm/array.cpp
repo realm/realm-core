@@ -249,6 +249,26 @@ size_t Array::bit_width(int64_t v)
     return uint64_t(v) >> 31 ? 64 : uint64_t(v) >> 15 ? 32 : uint64_t(v) >> 7 ? 16 : 8;
 }
 
+template <size_t width>
+struct Array::VTableForWidth {
+    struct PopulatedVTable : Array::VTable {
+        PopulatedVTable()
+        {
+            getter = &Array::get<width>;
+            setter = &Array::set<width>;
+            chunk_getter = &Array::get_chunk<width>;
+            finder[cond_Equal] = &Array::find_vtable<Equal, width>;
+            finder[cond_NotEqual] = &Array::find_vtable<NotEqual, width>;
+            finder[cond_Greater] = &Array::find_vtable<Greater, width>;
+            finder[cond_Less] = &Array::find_vtable<Less, width>;
+        }
+    };
+    static const PopulatedVTable vtable;
+};
+
+template <size_t width>
+const typename Array::VTableForWidth<width>::PopulatedVTable Array::VTableForWidth<width>::vtable;
+
 
 void Array::init_from_mem(MemRef mem) noexcept
 {
@@ -259,25 +279,32 @@ void Array::init_from_mem(MemRef mem) noexcept
     // for expanding the array, but also query the data.
     char* header = mem.get_addr();
     auto kind = get_kind(header);
+#ifdef REALM_DEBUG
     REALM_ASSERT(kind == 'A' || kind == 'B');
+#endif
     if (kind == 'B') {
+#ifdef REALM_DEBUG
         // the only encoding supported at the moment
         auto encoding = get_encoding(header);
         REALM_ASSERT(encoding == Encoding::Flex);
+#endif
         char* header = mem.get_addr();
         m_ref = mem.get_ref();
         m_data = get_data_from_header(header);
         m_size = NodeHeader::get_arrayB_num_elements<Encoding::Flex>(header);
+        m_width = m_lbound = m_ubound = 0;
+        m_is_inner_bptree_node = m_has_refs = false;
+        m_context_flag = get_context_flag_from_header(header);
+        REALM_TEMPEX(m_vtable = &VTableForWidth, m_width, ::vtable);
+        m_getter = m_vtable->getter;
     }
     else {
         header = Node::init_from_mem(mem);
+        m_is_inner_bptree_node = get_is_inner_bptree_node_from_header(header);
+        m_has_refs = get_hasrefs_from_header(header);
+        m_context_flag = get_context_flag_from_header(header);
+        update_width_cache_from_header();
     }
-    // Parse header
-    m_is_inner_bptree_node = get_is_inner_bptree_node_from_header(header);
-    m_has_refs = get_hasrefs_from_header(header);
-    m_context_flag = get_context_flag_from_header(header);
-    // update width (for B arrays we need to reset all, since there is no concept of width)
-    update_width_cache_from_header();
 }
 
 MemRef Array::get_mem() const noexcept
@@ -1259,49 +1286,18 @@ bool Array::find_vtable(int64_t value, size_t start, size_t end, size_t baseinde
     return ArrayWithFind(*this).find_optimized<cond, bitwidth>(value, start, end, baseindex, state);
 }
 
-template <size_t width>
-struct Array::VTableForWidth {
-    struct PopulatedVTable : Array::VTable {
-        PopulatedVTable()
-        {
-            getter = &Array::get<width>;
-            setter = &Array::set<width>;
-            chunk_getter = &Array::get_chunk<width>;
-            finder[cond_Equal] = &Array::find_vtable<Equal, width>;
-            finder[cond_NotEqual] = &Array::find_vtable<NotEqual, width>;
-            finder[cond_Greater] = &Array::find_vtable<Greater, width>;
-            finder[cond_Less] = &Array::find_vtable<Less, width>;
-        }
-    };
-    static const PopulatedVTable vtable;
-};
-
-template <size_t width>
-const typename Array::VTableForWidth<width>::PopulatedVTable Array::VTableForWidth<width>::vtable;
-
 void Array::update_width_cache_from_header() noexcept
 {
-    auto header = get_header();
-    const auto kind = get_kind(header);
-    if (kind == 'B') {
-        // width should never be used for B array. Expanding the array should happen after decompression
-        // And Array::find along with Array::get should tap into the proper compressed array implementation.
-        REALM_TEMPEX(m_vtable = &VTableForWidth, 0L, ::vtable);
-        m_getter = m_vtable->getter;
-        m_width = 0;
-        m_lbound = 0;
-        m_ubound = 0;
-    }
-    else {
-        m_width = get_width_from_header(header);
-        m_lbound = lbound_for_width(m_width);
-        m_ubound = ubound_for_width(m_width);
-        REALM_ASSERT(m_lbound <= m_ubound);
-        REALM_ASSERT(m_width >= m_lbound);
-        REALM_ASSERT(m_width <= m_ubound);
-        REALM_TEMPEX(m_vtable = &VTableForWidth, m_width, ::vtable);
-        m_getter = m_vtable->getter;
-    }
+    m_width = get_width_from_header(get_header());
+    m_lbound = lbound_for_width(m_width);
+    m_ubound = ubound_for_width(m_width);
+#ifdef REALM_DEBUG
+    REALM_ASSERT(m_lbound <= m_ubound);
+    REALM_ASSERT(m_width >= m_lbound);
+    REALM_ASSERT(m_width <= m_ubound);
+#endif
+    REALM_TEMPEX(m_vtable = &VTableForWidth, m_width, ::vtable);
+    m_getter = m_vtable->getter;
 }
 
 // This method reads 8 concecutive values into res[8], starting from index 'ndx'. It's allowed for the 8 values to

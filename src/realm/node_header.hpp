@@ -209,6 +209,7 @@ public:
     // Helper functions for old layouts only:
     // Handling width and sizes:
     static uint_least8_t get_width_from_header(const char* header) noexcept;
+
     static size_t get_size_from_header(const char* header) noexcept;
 
     static void set_width_in_header(size_t value, char* header) noexcept
@@ -1028,7 +1029,7 @@ size_t inline NodeHeader::get_byte_size_from_header(const char* header) noexcept
                 REALM_ASSERT(false && "unknown encoding");
         }
     }
-    REALM_ASSERT(kind == 'A');
+    // must be A
     WidthType wtype = get_wtype_from_header(header);
     size_t width;
     size_t size;
@@ -1037,40 +1038,30 @@ size_t inline NodeHeader::get_byte_size_from_header(const char* header) noexcept
     return calc_byte_size(wtype, size, static_cast<uint_least8_t>(width));
 }
 
-// During copy on write we allocate an unitialised chunk of memory, which won't have A in his kind.
-// However only A arrays can go through copy on write, because we decopress before.
 uint_least8_t inline NodeHeader::get_width_from_header(const char* header) noexcept
 {
+#ifdef REALM_DEBUG
     auto kind = get_kind(header);
     REALM_ASSERT(kind == 'A' || kind == 'B');
-    if (kind == 'B') {
-        // NO! We do not just transparently do the following. The call site must handle it.
+    if (kind == 'B')
         REALM_ASSERT(false);
-    }
-    else if (kind == 'A') {
-        // must be A type.
-        typedef unsigned char uchar;
-        const uchar* h = reinterpret_cast<const uchar*>(header);
-        return uint_least8_t((1 << (int(h[4]) & 0x07)) >> 1);
-    }
-    REALM_UNREACHABLE();
+#endif
+    // must be A type.
+    typedef unsigned char uchar;
+    const uchar* h = reinterpret_cast<const uchar*>(header);
+    return uint_least8_t((1 << (int(h[4]) & 0x07)) >> 1);
 }
 
 size_t inline NodeHeader::get_size_from_header(const char* header) noexcept
 {
+#ifdef REALM_DEBUG
     auto kind = get_kind(header);
     REALM_ASSERT(kind == 'A' || kind == 'B');
     if (kind == 'B') {
-        // NO! We do not just transparently do the following. The call site must handle it.
-        // TODO: discuss this, or just call Array::size() instead of tapping into the header!!!
-        // Explanation:
-        // Cluster::node_size_from_header needs this for example, I don't think we can say no only because it is
-        // a B array, at least not if we don't hide things behind Array.
-        // TODO: verify this!!! this could be coming from a missing compression/decompression (unlikely but possible)
-        // REALM_ASSERT(false);
-        auto size = NodeHeader::get_arrayB_num_elements<Encoding::Flex>(header);
-        return size;
+        REALM_ASSERT(false);
     }
+#endif
+    // must be A type.
     typedef unsigned char uchar;
     const uchar* h = reinterpret_cast<const uchar*>(header);
     return (size_t(h[5]) << 16) + (size_t(h[6]) << 8) + h[7];

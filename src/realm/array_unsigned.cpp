@@ -95,8 +95,6 @@ void ArrayUnsigned::update_from_parent() noexcept
 
 size_t ArrayUnsigned::lower_bound(uint64_t value) const noexcept
 {
-    REALM_ASSERT(!is_encoded());
-
     auto width = get_width_from_header(get_header());
 
     if (width == 8) {
@@ -137,8 +135,6 @@ size_t ArrayUnsigned::lower_bound(uint64_t value) const noexcept
 
 size_t ArrayUnsigned::upper_bound(uint64_t value) const noexcept
 {
-    REALM_ASSERT(!is_encoded());
-
     auto width = get_width_from_header(get_header());
 
     if (width == 8) {
