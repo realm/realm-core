@@ -69,11 +69,13 @@ static const std::vector<std::pair<std::string, TypeOfValue::Attribute>> attribu
     {"collection", TypeOfValue::Collection},
 };
 
-TypeOfValue::Attribute get_single_from(std::string str)
+TypeOfValue::Attribute get_single_from(std::string_view str)
 {
-    std::transform(str.begin(), str.end(), str.begin(), toLowerAscii);
+    std::string lower_str;
+    lower_str.resize(str.size());
+    std::transform(str.begin(), str.end(), lower_str.begin(), toLowerAscii);
     auto it = std::find_if(attribute_map.begin(), attribute_map.end(), [&](const auto& attr_pair) {
-        return attr_pair.first == str;
+        return attr_pair.first == lower_str;
     });
     if (it == attribute_map.end()) {
         std::string all_keys =
@@ -143,7 +145,7 @@ TypeOfValue::TypeOfValue(int64_t attributes)
     }
 }
 
-TypeOfValue::TypeOfValue(const std::string& attribute_tags)
+TypeOfValue::TypeOfValue(std::string_view attribute_tags)
 {
     m_attributes = get_single_from(attribute_tags);
 }

@@ -197,11 +197,13 @@ public:
     std::unique_ptr<ConstantMixedList> copy_list_of_args(std::vector<Mixed>&);
     std::unique_ptr<Subexpr> copy_arg(ParserDriver*, DataType, size_t, DataType, std::string&);
     std::unique_ptr<Subexpr> visit(ParserDriver*, DataType) override;
+    Mixed get_value();
     util::Optional<ExpressionComparisonType> m_comp_type;
     std::string target_table;
 
 private:
-    void decode_b64(util::FunctionRef<void(StringData)>);
+    std::string decode_buffer;
+    void decode_b64();
 };
 
 class GeospatialNode : public ValueNode {

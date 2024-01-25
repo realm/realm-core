@@ -4839,8 +4839,10 @@ TEST(Parser_TypeOfValue)
             ++it;
         }
     }
+
     size_t nb_ints = 69;
     size_t nb_numerics = nb_ints + 3;
+
     verify_query(test_context, table, "mixed.@type == 'string'", nb_strings);
     verify_query(test_context, table, "mixed.@type == 'double'", 2);
     verify_query(test_context, table, "mixed.@type == 'float'", 0);
@@ -4864,8 +4866,12 @@ TEST(Parser_TypeOfValue)
     verify_query(test_context, table, "mixed.@type == 'char'", nb_ints);
     verify_query(test_context, table, "mixed.@type == 'timestamp'", 0);
     verify_query(test_context, table, "mixed.@type == 'datetimeoffset'", 0);
-    verify_query(test_context, table, "mixed.@type == 'object'", 1);
     verify_query(test_context, table, "mixed.@type == 'objectlink'", 1);
+    verify_query(test_context, table, "mixed.@type == 'object'", 1);
+
+    std::any args[] = {StringData("object")};
+    size_t num_args = 1;
+    verify_query_sub(test_context, table, "mixed.@type == $0", args, num_args, 1);
 
     verify_query(test_context, table,
                  "mixed.@type == 'binary' || mixed.@type == 'DECIMAL' || mixed.@type == 'Double'", 4);

@@ -47,7 +47,7 @@ public:
         Collection = Array + Object
     };
     explicit TypeOfValue(int64_t attributes);
-    explicit TypeOfValue(const std::string& attribute_tags);
+    explicit TypeOfValue(std::string_view attribute_tags);
     explicit TypeOfValue(const class Mixed& value);
     explicit TypeOfValue(const ColKey& col_key);
     explicit TypeOfValue(const DataType& data_type);
