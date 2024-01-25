@@ -324,15 +324,19 @@ public:
     /// The name of the temporary file is formed by appending
     /// ".tmp_compaction_space" to the name of the database
     ///
-    /// If the output_encryption_key is `none` then the file's existing key will
-    /// be used (if any). If the output_encryption_key is nullptr, the resulting
+    /// If the output_encryption_key is none, the resulting
     /// file will be unencrypted. Any other value will change the encryption of
     /// the file to the new 64 byte key.
     ///
     /// WARNING: Compact() is not thread-safe with respect to a concurrent close()
-    bool compact(bool bump_version_number = false,
-                 const std::optional<util::File::EncryptionKeyType>& output_encryption_key = std::nullopt)
+    bool compact(bool bump_version_number, const std::optional<util::File::EncryptionKeyType>& output_encryption_key)
         REQUIRES(!m_mutex);
+
+    // Like above, but always uses the encryption key the file was created with
+    bool compact(bool bump_version_number = false) REQUIRES(!m_mutex)
+    {
+        return compact(bump_version_number, get_encryption_key());
+    }
 
     void write_copy(StringData path, const std::optional<util::File::EncryptionKeyType>& output_encryption_key)
         REQUIRES(!m_mutex);

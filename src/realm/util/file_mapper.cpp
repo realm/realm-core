@@ -512,7 +512,7 @@ EncryptedFileMapping* add_mapping(void* addr, size_t size, const FileAttributes&
     if (it == mappings_by_file.end()) {
         mappings_by_file.reserve(mappings_by_file.size() + 1);
         mappings_for_file f;
-        f.info = std::make_shared<SharedFileInfo>(file.encryption_key.value());
+        f.info = std::make_shared<SharedFileInfo>(*file.encryption_key);
         f.info->fd = File::dup_file_desc(file.fd);
         f.file_unique_id = fuid;
 
@@ -520,7 +520,7 @@ EncryptedFileMapping* add_mapping(void* addr, size_t size, const FileAttributes&
         it = mappings_by_file.end() - 1;
     }
     else {
-        it->info->cryptor.check_key(file.encryption_key.value());
+        it->info->cryptor.check_key(*file.encryption_key);
     }
 
     try {

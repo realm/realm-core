@@ -1598,8 +1598,6 @@ bool DB::compact(bool bump_version_number, const std::optional<util::File::Encry
     }
     auto info = m_info;
     Durability dura = Durability(info->durability);
-    std::optional<util::File::EncryptionKeyType> write_key =
-        output_encryption_key ? output_encryption_key : get_encryption_key();
     {
         std::unique_lock<InterprocessMutex> lock(m_controlmutex); // Throws
         auto t1 = std::chrono::steady_clock::now();
@@ -1635,7 +1633,7 @@ bool DB::compact(bool bump_version_number, const std::optional<util::File::Encry
             file.open(tmp_path, File::access_ReadWrite, File::create_Must, 0);
             int incr = bump_version_number ? 1 : 0;
             Group::DefaultTableWriter writer;
-            tr->write(file, write_key, info->latest_version_number + incr, writer); // Throws
+            tr->write(file, output_encryption_key, info->latest_version_number + incr, writer); // Throws
             // Data needs to be flushed to the disk before renaming.
             bool disable_sync = get_disable_sync_to_disk();
             if (!disable_sync && dura != Durability::Unsafe)
@@ -1668,7 +1666,7 @@ bool DB::compact(bool bump_version_number, const std::optional<util::File::Encry
         cfg.skip_validate = false;
         cfg.no_create = true;
         cfg.clear_file = false;
-        cfg.encryption_key = write_key;
+        cfg.encryption_key = output_encryption_key;
         ref_type top_ref;
         top_ref = m_alloc.attach_file(m_db_path, cfg, m_marker_observer.get());
         m_alloc.convert_from_streaming_form(top_ref);
