@@ -944,6 +944,20 @@ AdminAPISession::ServiceConfig AdminAPISession::set_disable_recovery_to(const st
     return sync_config;
 }
 
+std::vector<AdminAPISession::SchemaVersionInfo> AdminAPISession::get_schema_versions(const std::string& app_id) const
+{
+    std::vector<AdminAPISession::SchemaVersionInfo> ret;
+    auto endpoint = apps()[app_id]["sync"]["schemas"]["versions"];
+    auto res = endpoint.get_json();
+    for (auto&& version : res["versions"].get<std::vector<nlohmann::json>>()) {
+        SchemaVersionInfo info;
+        info.version_major = version["version_major"];
+        ret.push_back(std::move(info));
+    }
+
+    return ret;
+}
+
 AdminAPISession::ServiceConfig AdminAPISession::get_config(const std::string& app_id,
                                                            const AdminAPISession::Service& service) const
 {
