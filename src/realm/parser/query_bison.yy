@@ -17,7 +17,7 @@
   using realm::GeoPoint;
   namespace realm::query_parser {
     class ParserDriver;
-    class ConstantNode;
+    class StringConstantNode;
     class GeospatialNode;
     class ListNode;
     class PostOpNode;
@@ -62,7 +62,7 @@
 %define parse.error verbose
 
 %code {
-#include <realm/parser/driver.hpp>
+#include <realm/parser/query_ast.hpp>
 #include <realm/table.hpp>
 using namespace realm;
 using namespace realm::query_parser;
@@ -141,7 +141,7 @@ using namespace realm::query_parser;
 %type  <CompareType> equality relational stringop
 %type  <int> aggr_op
 %type  <double> coordinate
-%type  <ConstantNode*> constant primary_key
+%type  <StringConstantNode*> constant primary_key
 %type  <GeospatialNode*> geospatial geoloop geoloop_content geopoly_content
 // std::optional<GeoPoint> is necessary because GeoPoint has deleted its default constructor
 // but bison must push a default value to the stack, even though it will be overwritten by a real value
@@ -310,18 +310,18 @@ list_content
 
 constant
     : primary_key               { $$ = $1; }
-    | INFINITY                  { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::INFINITY_VAL, $1); }
-    | NAN                       { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::NAN_VAL, $1); }
-    | BASE64                    { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::BASE64, $1); }
-    | FLOAT                     { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::FLOAT, $1); }
-    | TIMESTAMP                 { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::TIMESTAMP, $1); }
-    | LINK                      { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::LINK, $1); }
-    | TYPED_LINK                { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::TYPED_LINK, $1); }
-    | TRUE                      { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::TRUE, ""); }
-    | FALSE                     { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::FALSE, ""); }
-    | NULL_VAL                  { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::NULL_VAL, ""); }
-    | ARG                       { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::ARG, $1); }
-    | comp_type ARG             { $$ = drv.m_parse_nodes.create<ConstantNode>(ExpressionComparisonType($1), $2); }
+    | INFINITY                  { $$ = drv.m_parse_nodes.create<StringConstantNode>(StringConstantNode::INFINITY_VAL, $1); }
+    | NAN                       { $$ = drv.m_parse_nodes.create<StringConstantNode>(StringConstantNode::NAN_VAL, $1); }
+    | BASE64                    { $$ = drv.m_parse_nodes.create<StringConstantNode>(StringConstantNode::BASE64, $1); }
+    | FLOAT                     { $$ = drv.m_parse_nodes.create<StringConstantNode>(StringConstantNode::FLOAT, $1); }
+    | TIMESTAMP                 { $$ = drv.m_parse_nodes.create<StringConstantNode>(StringConstantNode::TIMESTAMP, $1); }
+    | LINK                      { $$ = drv.m_parse_nodes.create<StringConstantNode>(StringConstantNode::LINK, $1); }
+    | TYPED_LINK                { $$ = drv.m_parse_nodes.create<StringConstantNode>(StringConstantNode::TYPED_LINK, $1); }
+    | TRUE                      { $$ = drv.m_parse_nodes.create<StringConstantNode>(StringConstantNode::TRUE, ""); }
+    | FALSE                     { $$ = drv.m_parse_nodes.create<StringConstantNode>(StringConstantNode::FALSE, ""); }
+    | NULL_VAL                  { $$ = drv.m_parse_nodes.create<StringConstantNode>(StringConstantNode::NULL_VAL, ""); }
+    | ARG                       { $$ = drv.m_parse_nodes.create<StringConstantNode>(StringConstantNode::ARG, $1); }
+    | comp_type ARG             { $$ = drv.m_parse_nodes.create<StringConstantNode>(ExpressionComparisonType($1), $2); }
     | OBJ '(' STRING ',' primary_key ')'
                                 { 
                                     auto tmp = $5;
@@ -330,11 +330,11 @@ constant
                                 }
 
 primary_key
-    : NATURAL0                  { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::NUMBER, $1); }
-    | NUMBER                    { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::NUMBER, $1); }
-    | STRING                    { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::STRING, $1); }
-    | UUID                      { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::UUID_T, $1); }
-    | OID                       { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::OID, $1); }
+    : NATURAL0                  { $$ = drv.m_parse_nodes.create<StringConstantNode>(StringConstantNode::NUMBER, $1); }
+    | NUMBER                    { $$ = drv.m_parse_nodes.create<StringConstantNode>(StringConstantNode::NUMBER, $1); }
+    | STRING                    { $$ = drv.m_parse_nodes.create<StringConstantNode>(StringConstantNode::STRING, $1); }
+    | UUID                      { $$ = drv.m_parse_nodes.create<StringConstantNode>(StringConstantNode::UUID_T, $1); }
+    | OID                       { $$ = drv.m_parse_nodes.create<StringConstantNode>(StringConstantNode::OID, $1); }
 
 boolexpr
     : "truepredicate"           { $$ = drv.m_parse_nodes.create<TrueOrFalseNode>(true); }

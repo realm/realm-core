@@ -31,7 +31,8 @@ if(NOT REALM_CORE_SUBMODULE_BUILD)
 endif()
 
 set(REALM_PARSER_SOURCES
-    driver.cpp
+    query_ast.cpp
+    query_bson.cpp
     keypath_mapping.cpp
 ) # REALM_PARSER_SOURCES
 
@@ -41,7 +42,7 @@ set(REALM_PARSER_GENERATED
 ) # REALM_PARSER_SOURCES
 
 set(REALM_PARSER_HEADERS
-    driver.hpp
+    query_ast.hpp
     keypath_mapping.hpp
     query_parser.hpp
     generated/query_bison.hpp

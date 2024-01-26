@@ -55,7 +55,7 @@
   using realm::GeoPoint;
   namespace realm::query_parser {
     class ParserDriver;
-    class ConstantNode;
+    class StringConstantNode;
     class GeospatialNode;
     class ListNode;
     class PostOpNode;
@@ -454,49 +454,49 @@ namespace yy {
       // stringop
       char dummy2[sizeof (CompareType)];
 
-      // constant
-      // primary_key
-      char dummy3[sizeof (ConstantNode*)];
-
       // distinct
       // distinct_param
       // sort
       // sort_param
       // limit
-      char dummy4[sizeof (DescriptorNode*)];
+      char dummy3[sizeof (DescriptorNode*)];
 
       // post_query
-      char dummy5[sizeof (DescriptorOrderingNode*)];
+      char dummy4[sizeof (DescriptorOrderingNode*)];
 
       // expr
-      char dummy6[sizeof (ExpressionNode*)];
+      char dummy5[sizeof (ExpressionNode*)];
 
       // geoloop_content
       // geoloop
       // geopoly_content
       // geospatial
-      char dummy7[sizeof (GeospatialNode*)];
+      char dummy6[sizeof (GeospatialNode*)];
 
       // list
       // list_content
-      char dummy8[sizeof (ListNode*)];
+      char dummy7[sizeof (ListNode*)];
 
       // path_elem
-      char dummy9[sizeof (PathElem)];
+      char dummy8[sizeof (PathElem)];
 
       // path
-      char dummy10[sizeof (PathNode*)];
+      char dummy9[sizeof (PathNode*)];
 
       // post_op
-      char dummy11[sizeof (PostOpNode*)];
+      char dummy10[sizeof (PostOpNode*)];
 
       // prop
       // simple_prop
-      char dummy12[sizeof (PropertyNode*)];
+      char dummy11[sizeof (PropertyNode*)];
 
       // query
       // compare
-      char dummy13[sizeof (QueryNode*)];
+      char dummy12[sizeof (QueryNode*)];
+
+      // constant
+      // primary_key
+      char dummy13[sizeof (StringConstantNode*)];
 
       // subquery
       char dummy14[sizeof (SubqueryNode*)];
@@ -829,11 +829,6 @@ namespace yy {
         value.move< CompareType > (std::move (that.value));
         break;
 
-      case symbol_kind::SYM_constant: // constant
-      case symbol_kind::SYM_primary_key: // primary_key
-        value.move< ConstantNode* > (std::move (that.value));
-        break;
-
       case symbol_kind::SYM_distinct: // distinct
       case symbol_kind::SYM_distinct_param: // distinct_param
       case symbol_kind::SYM_sort: // sort
@@ -882,6 +877,11 @@ namespace yy {
       case symbol_kind::SYM_query: // query
       case symbol_kind::SYM_compare: // compare
         value.move< QueryNode* > (std::move (that.value));
+        break;
+
+      case symbol_kind::SYM_constant: // constant
+      case symbol_kind::SYM_primary_key: // primary_key
+        value.move< StringConstantNode* > (std::move (that.value));
         break;
 
       case symbol_kind::SYM_subquery: // subquery
@@ -988,18 +988,6 @@ namespace yy {
       {}
 #else
       basic_symbol (typename Base::kind_type t, const CompareType& v)
-        : Base (t)
-        , value (v)
-      {}
-#endif
-
-#if 201103L <= YY_CPLUSPLUS
-      basic_symbol (typename Base::kind_type t, ConstantNode*&& v)
-        : Base (t)
-        , value (std::move (v))
-      {}
-#else
-      basic_symbol (typename Base::kind_type t, const ConstantNode*& v)
         : Base (t)
         , value (v)
       {}
@@ -1120,6 +1108,18 @@ namespace yy {
       {}
 #else
       basic_symbol (typename Base::kind_type t, const QueryNode*& v)
+        : Base (t)
+        , value (v)
+      {}
+#endif
+
+#if 201103L <= YY_CPLUSPLUS
+      basic_symbol (typename Base::kind_type t, StringConstantNode*&& v)
+        : Base (t)
+        , value (std::move (v))
+      {}
+#else
+      basic_symbol (typename Base::kind_type t, const StringConstantNode*& v)
         : Base (t)
         , value (v)
       {}
@@ -1263,11 +1263,6 @@ switch (yykind)
         value.template destroy< CompareType > ();
         break;
 
-      case symbol_kind::SYM_constant: // constant
-      case symbol_kind::SYM_primary_key: // primary_key
-        value.template destroy< ConstantNode* > ();
-        break;
-
       case symbol_kind::SYM_distinct: // distinct
       case symbol_kind::SYM_distinct_param: // distinct_param
       case symbol_kind::SYM_sort: // sort
@@ -1316,6 +1311,11 @@ switch (yykind)
       case symbol_kind::SYM_query: // query
       case symbol_kind::SYM_compare: // compare
         value.template destroy< QueryNode* > ();
+        break;
+
+      case symbol_kind::SYM_constant: // constant
+      case symbol_kind::SYM_primary_key: // primary_key
+        value.template destroy< StringConstantNode* > ();
         break;
 
       case symbol_kind::SYM_subquery: // subquery
@@ -2877,11 +2877,6 @@ switch (yykind)
         value.copy< CompareType > (YY_MOVE (that.value));
         break;
 
-      case symbol_kind::SYM_constant: // constant
-      case symbol_kind::SYM_primary_key: // primary_key
-        value.copy< ConstantNode* > (YY_MOVE (that.value));
-        break;
-
       case symbol_kind::SYM_distinct: // distinct
       case symbol_kind::SYM_distinct_param: // distinct_param
       case symbol_kind::SYM_sort: // sort
@@ -2930,6 +2925,11 @@ switch (yykind)
       case symbol_kind::SYM_query: // query
       case symbol_kind::SYM_compare: // compare
         value.copy< QueryNode* > (YY_MOVE (that.value));
+        break;
+
+      case symbol_kind::SYM_constant: // constant
+      case symbol_kind::SYM_primary_key: // primary_key
+        value.copy< StringConstantNode* > (YY_MOVE (that.value));
         break;
 
       case symbol_kind::SYM_subquery: // subquery
@@ -3037,11 +3037,6 @@ switch (yykind)
         value.move< CompareType > (YY_MOVE (s.value));
         break;
 
-      case symbol_kind::SYM_constant: // constant
-      case symbol_kind::SYM_primary_key: // primary_key
-        value.move< ConstantNode* > (YY_MOVE (s.value));
-        break;
-
       case symbol_kind::SYM_distinct: // distinct
       case symbol_kind::SYM_distinct_param: // distinct_param
       case symbol_kind::SYM_sort: // sort
@@ -3090,6 +3085,11 @@ switch (yykind)
       case symbol_kind::SYM_query: // query
       case symbol_kind::SYM_compare: // compare
         value.move< QueryNode* > (YY_MOVE (s.value));
+        break;
+
+      case symbol_kind::SYM_constant: // constant
+      case symbol_kind::SYM_primary_key: // primary_key
+        value.move< StringConstantNode* > (YY_MOVE (s.value));
         break;
 
       case symbol_kind::SYM_subquery: // subquery

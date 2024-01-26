@@ -1195,7 +1195,7 @@ static const flex_int16_t yy_rule_linenum[68] =
 # include <cstdlib>
 # include <cstring> // strerror
 # include <string>
-# include "realm/parser/driver.hpp"
+# include "realm/parser/query_ast.hpp"
 #define YY_NO_UNISTD_H 1
 #define YY_NO_INPUT 1
 
