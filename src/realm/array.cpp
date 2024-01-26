@@ -207,12 +207,8 @@ int64_t Array::get(size_t ndx) const noexcept
     return get_universal<w>(m_data, ndx);
 }
 
-int64_t Array::get(size_t ndx) const noexcept
+int64_t Array::get_not_encoded(size_t ndx) const noexcept
 {
-    if (is_encoded()) {
-        return m_encode.get(*this, ndx);
-    }
-
     REALM_ASSERT_DEBUG(is_attached());
     REALM_ASSERT_DEBUG_EX(ndx < m_size, ndx, m_size);
     return (this->*m_getter)(ndx);
@@ -232,6 +228,11 @@ int64_t Array::get(size_t ndx) const noexcept
         else
             return (this->*(m_vtable->getter))(ndx);
     */
+}
+
+int64_t Array::get(size_t ndx) const noexcept
+{
+    return is_encoded() ? m_encode.get(*this, ndx) : get_not_encoded(ndx);
 }
 
 size_t Array::bit_width(int64_t v)

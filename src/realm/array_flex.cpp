@@ -186,8 +186,8 @@ bool ArrayFlex::is_encoded(const Array& arr) const
     // We are calling this when the header is not yet initiliased!
     using Encoding = NodeHeader::Encoding;
     REALM_ASSERT(arr.is_attached());
-    auto header = arr.get_header();
-    auto kind = Node::get_kind(header);
+    const auto header = arr.get_header();
+    const auto kind = Node::get_kind(header);
     return kind == 'B' && Node::get_encoding(header) == Encoding::Flex;
 }
 
@@ -195,7 +195,7 @@ size_t ArrayFlex::size(const Array& arr) const
 {
     REALM_ASSERT(arr.is_attached());
     using Encoding = NodeHeader::Encoding;
-    auto header = arr.get_header();
+    const auto header = arr.get_header();
     REALM_ASSERT(NodeHeader::get_kind(header) == 'B' && NodeHeader::get_encoding(header) == Encoding::Flex);
     return NodeHeader::get_arrayB_num_elements<NodeHeader::Encoding::Flex>(header);
 }
@@ -519,15 +519,15 @@ int64_t ArrayFlex::sum(const Array& arr, size_t start, size_t end) const
     REALM_ASSERT(arr.is_attached());
     size_t v_width, ndx_width, v_size, ndx_size;
     if (get_encode_info(arr.get_header(), v_width, ndx_width, v_size, ndx_size)) {
+        REALM_ASSERT_DEBUG(ndx_size >= start && ndx_size <= end);
+        const auto data = (uint64_t*)NodeHeader::get_data_from_header(arr.get_header());
+        const auto offset = v_size * v_width + (start * ndx_width);
+        bf_iterator index_iterator{data, offset , ndx_width, ndx_width, 0};
         int64_t total_sum = 0;
-        auto data = (uint64_t*)NodeHeader::get_data_from_header(arr.get_header());
-        const auto offset = v_size * v_width;
-        bf_iterator index_iterator{data, offset, ndx_width, ndx_width, 0};
-        for (size_t i = 0; i < ndx_size; ++i) {
-            if (i >= start && i <= end) {
-                const auto pos = static_cast<size_t>(index_iterator.get_value() * v_width);
-                total_sum += read_bitfield(data, pos, v_width);
-            }
+        for (size_t i = start; i < end; ++i) {
+            const auto pos = static_cast<size_t>(index_iterator.get_value() * v_width);
+            total_sum += *(data+pos);
+            ++index_iterator;
         }
         return total_sum;
     }

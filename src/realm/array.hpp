@@ -176,6 +176,7 @@ public:
     void set(size_t ndx, int64_t value);
 
     int64_t get(size_t ndx) const noexcept;
+    int64_t get_not_encoded(size_t ndx) const noexcept;
 
     template <size_t w>
     int64_t get(size_t ndx) const noexcept;
@@ -189,6 +190,7 @@ public:
     ref_type get_as_ref_not_encoded(size_t ndx) const noexcept;
 
     RefOrTagged get_as_ref_or_tagged(size_t ndx) const noexcept;
+    RefOrTagged get_as_ref_or_tagged_not_encoded(size_t ndx) const noexcept;
     void set(size_t ndx, RefOrTagged);
     void add(RefOrTagged);
     void ensure_minimum_width(RefOrTagged);
@@ -765,15 +767,20 @@ inline ref_type Array::get_as_ref_not_encoded(size_t ndx) const noexcept
 {
     REALM_ASSERT_DEBUG(is_attached());
     REALM_ASSERT_DEBUG_EX(m_has_refs, m_ref, ndx, m_size);
-    REALM_ASSERT_DEBUG(is_attached());
-    REALM_ASSERT_DEBUG_EX(ndx < m_size, ndx, m_size);
-    return (this->*m_getter)(ndx);
+    int64_t v = get_not_encoded(ndx);
+    return to_ref(v);
 }
 
 inline RefOrTagged Array::get_as_ref_or_tagged(size_t ndx) const noexcept
 {
     REALM_ASSERT(has_refs());
     return RefOrTagged(get(ndx));
+}
+
+inline RefOrTagged Array::get_as_ref_or_tagged_not_encoded(size_t ndx) const noexcept
+{
+    REALM_ASSERT(has_refs());
+    return RefOrTagged(get_not_encoded(ndx));
 }
 
 inline void Array::set(size_t ndx, RefOrTagged ref_or_tagged)

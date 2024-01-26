@@ -206,7 +206,7 @@ void Cluster::create()
 void Cluster::init(MemRef mem)
 {
     Array::init_from_mem(mem);
-    auto rot = Array::get_as_ref_or_tagged(0);
+    auto rot = Array::get_as_ref_or_tagged_not_encoded(0);
     if (rot.is_tagged()) {
         m_keys.detach();
     }
