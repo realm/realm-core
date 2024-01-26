@@ -191,18 +191,17 @@ public:
     }
     void add_table(std::string table_name)
     {
-        target_table = table_name.substr(1, table_name.size() - 2);
+        m_target_table = table_name.substr(1, table_name.size() - 2);
     }
 
     std::unique_ptr<ConstantMixedList> copy_list_of_args(std::vector<Mixed>&);
-    std::unique_ptr<Subexpr> copy_arg(ParserDriver*, DataType, size_t, DataType, std::string&);
     std::unique_ptr<Subexpr> visit(ParserDriver*, DataType) override;
     Mixed get_value();
-    util::Optional<ExpressionComparisonType> m_comp_type;
-    std::string target_table;
 
 private:
-    std::string decode_buffer;
+    std::string m_decode_buffer;
+    std::optional<ExpressionComparisonType> m_comp_type;
+    std::optional<std::string> m_target_table;
     void decode_b64();
 };
 

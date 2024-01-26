@@ -4713,27 +4713,27 @@ TEST_CASE("C API - queries", "[c_api]") {
 
             SECTION("type mismatch") {
                 CHECK(!realm_query_parse(realm, class_foo.key, "int == $2", num_args, arg_list));
-                CHECK_ERR(RLM_ERR_INVALID_QUERY);
+                CHECK_ERR(RLM_ERR_INVALID_QUERY_ARG);
                 CHECK(!realm_query_parse(realm, class_foo.key, "bool == $2", num_args, arg_list));
-                CHECK_ERR(RLM_ERR_INVALID_QUERY);
+                CHECK_ERR(RLM_ERR_INVALID_QUERY_ARG);
                 CHECK(!realm_query_parse(realm, class_foo.key, "string == $7", num_args, arg_list));
-                CHECK_ERR(RLM_ERR_INVALID_QUERY);
+                CHECK_ERR(RLM_ERR_INVALID_QUERY_ARG);
                 CHECK(!realm_query_parse(realm, class_foo.key, "timestamp == $2", num_args, arg_list));
-                CHECK_ERR(RLM_ERR_INVALID_QUERY);
+                CHECK_ERR(RLM_ERR_INVALID_QUERY_ARG);
                 CHECK(!realm_query_parse(realm, class_foo.key, "double == $2", num_args, arg_list));
-                CHECK_ERR(RLM_ERR_INVALID_QUERY);
+                CHECK_ERR(RLM_ERR_INVALID_QUERY_ARG);
                 CHECK(!realm_query_parse(realm, class_foo.key, "float == $2", num_args, arg_list));
-                CHECK_ERR(RLM_ERR_INVALID_QUERY);
+                CHECK_ERR(RLM_ERR_INVALID_QUERY_ARG);
                 CHECK(!realm_query_parse(realm, class_foo.key, "binary == $0", num_args, arg_list));
-                CHECK_ERR(RLM_ERR_INVALID_QUERY);
+                CHECK_ERR(RLM_ERR_INVALID_QUERY_ARG);
                 CHECK(!realm_query_parse(realm, class_foo.key, "decimal == $2", num_args, arg_list));
-                CHECK_ERR(RLM_ERR_INVALID_QUERY);
+                CHECK_ERR(RLM_ERR_INVALID_QUERY_ARG);
                 CHECK(!realm_query_parse(realm, class_foo.key, "object_id == $2", num_args, arg_list));
-                CHECK_ERR(RLM_ERR_INVALID_QUERY);
+                CHECK_ERR(RLM_ERR_INVALID_QUERY_ARG);
                 CHECK(!realm_query_parse(realm, class_foo.key, "uuid == $2", num_args, arg_list));
-                CHECK_ERR(RLM_ERR_INVALID_QUERY);
+                CHECK_ERR(RLM_ERR_INVALID_QUERY_ARG);
                 CHECK(!realm_query_parse(realm, class_foo.key, "link == $2", num_args, arg_list));
-                CHECK_ERR(RLM_ERR_INVALID_QUERY);
+                CHECK_ERR(RLM_ERR_INVALID_QUERY_ARG);
             }
         }
 

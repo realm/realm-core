@@ -5114,8 +5114,13 @@ TEST(Parser_DictionaryObjects)
     q = persons->link(col_friend).link(col_dict).column<Int>(col_age) > 4;
     CHECK_EQUAL(q.count(), 1);
 
+
+    std::any args[] = {StringData("pluto")};
+    size_t num_args = 1;
+
     verify_query(test_context, persons, "pets.@values.age > 4", 2);
     verify_query(test_context, persons, "pets.@values == obj('dog', 'pluto')", 2);
+    verify_query_sub(test_context, persons, "pets.@values == obj('dog', $0)", args, num_args, 2);
     verify_query(test_context, persons, "pets.@values != obj('dog', 'pluto')", 2);
     verify_query(test_context, persons, "pets.@values == ANY { obj('dog', 'lady'), obj('dog', 'astro') }", 2);
     verify_query(test_context, persons, "pets.@values == ANY { obj('dog', 'astro'), NULL }", 2);
