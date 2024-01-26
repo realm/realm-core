@@ -187,7 +187,9 @@ public:
     bool operator>=(const CircularBuffer<U>&) const noexcept(noexcept(std::declval<T>() < std::declval<U>()));
 
 private:
-    using Strut = typename std::aligned_storage<sizeof(T), alignof(T)>::type;
+    struct Strut {
+        alignas(T) std::byte data[sizeof(T)];
+    };
     std::unique_ptr<Strut[]> m_memory_owner;
 
     // Index of first element in allocated memory chunk.
