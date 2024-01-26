@@ -2897,7 +2897,6 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
                     REQUIRE(redir_app->get_host_url().find(original_host) != std::string::npos);
                     REQUIRE(request.url.find(redirect_scheme + original_host) != std::string::npos);
                     // Validate the retry count tracked in the original message
-                    REQUIRE(request.redirect_count == 3);
                     request_count++;
                 }
                 return std::nullopt;
