@@ -500,6 +500,59 @@ TEST(Query_NextGen_StringConditions)
     cnt = table2->column<String>(col_str3).like(realm::null(), false).count();
     CHECK_EQUAL(cnt, 1);
 
+    auto check_results = [&](Query q, std::vector<StringData>&& matches) {
+        TableView view = q.find_all();
+        std::sort(matches.begin(), matches.end());
+        std::vector<StringData> actual;
+        for (size_t i = 0; i < view.size(); ++i) {
+            actual.push_back(view.get_object(i).get<StringData>(col_str3));
+        }
+        std::sort(actual.begin(), actual.end());
+        if (!CHECK_EQUAL(actual, matches)) {
+            util::format(std::cout, "failed query '%1'\n", q.get_description());
+        }
+        TableView parsed_results = table2->query(q.get_description()).find_all();
+        std::vector<StringData> parsed_matches;
+        for (size_t i = 0; i < parsed_results.size(); ++i) {
+            parsed_matches.push_back(parsed_results.get_object(i).get<StringData>(col_str3));
+        }
+        std::sort(parsed_matches.begin(), parsed_matches.end());
+        if (!CHECK_EQUAL(parsed_matches, matches)) {
+            util::format(std::cout, "failed parsed query '%1'\n", q.get_description());
+        }
+    };
+
+    // greater
+    check_results((table2->column<String>(col_str3) > StringData("")), {"foo", "bar", "!"});
+    check_results((table2->column<String>(col_str3) > StringData("b")), {"foo", "bar"});
+    check_results((table2->column<String>(col_str3) > StringData("bar")), {"foo"});
+    check_results((table2->column<String>(col_str3) > StringData("barrr")), {"foo"});
+    check_results((table2->column<String>(col_str3) > StringData("bb")), {"foo"});
+    check_results((table2->column<String>(col_str3) > StringData("z")), {});
+
+    // less
+    check_results((table2->column<String>(col_str3) < StringData("")), {StringData()});
+    check_results((table2->column<String>(col_str3) < StringData("b")), {"", "!", StringData()});
+    check_results((table2->column<String>(col_str3) < StringData("bar")), {"", "!", StringData()});
+    check_results((table2->column<String>(col_str3) < StringData("barrr")), {"bar", "", "!", StringData()});
+    check_results((table2->column<String>(col_str3) < StringData("z")), {"foo", "bar", "", "!", StringData()});
+    check_results((table2->column<String>(col_str3) < StringData("f")), {"bar", "", "!", StringData()});
+    check_results((table2->column<String>(col_str3) < StringData("fp")), {"foo", "bar", "", "!", StringData()});
+
+    // greater equal
+    check_results((table2->column<String>(col_str3) >= StringData("")), {"foo", "bar", "!", ""});
+    check_results((table2->column<String>(col_str3) >= StringData("b")), {"foo", "bar"});
+    check_results((table2->column<String>(col_str3) >= StringData("bar")), {"foo", "bar"});
+    check_results((table2->column<String>(col_str3) >= StringData("barrrr")), {"foo"});
+    check_results((table2->column<String>(col_str3) >= StringData("z")), {});
+
+    // less equal
+    check_results((table2->column<String>(col_str3) <= StringData("")), {StringData(), ""});
+    check_results((table2->column<String>(col_str3) <= StringData("b")), {"", "!", StringData()});
+    check_results((table2->column<String>(col_str3) <= StringData("bar")), {"bar", "", "!", StringData()});
+    check_results((table2->column<String>(col_str3) <= StringData("barrrr")), {"bar", "", "!", StringData()});
+    check_results((table2->column<String>(col_str3) <= StringData("z")), {"foo", "bar", "", "!", StringData()});
+
     TableRef table3 = group.add_table(StringData("table3"));
     auto col_link1 = table3->add_column(*table2, "link1");
 
