@@ -19,6 +19,20 @@ endif()
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_dependency(Threads)
 
+if(@REALM_HAVE_BACKTRACE@)
+    find_dependency(Backtrace)
+    add_library(Backtrace::Backtrace INTERFACE IMPORTED)
+    if(Backtrace_LIBRARIES)
+        # Apple platforms always have backtrace. We disregard the `Backtrace_*` variables
+        # because their paths are hardcoded to one SDK within Xcode (e.g. macosx),
+        # whereas we build for several different SDKs and thus we can't use the include path from one in the other.
+        # Otherwise if CMake found that the backtrace facility is provided by an external library and not built-in
+        # we need to configure the interface target with the library include and link path.
+        target_include_directories(Backtrace::Backtrace INTERFACE ${Backtrace_INCLUDE_DIRS})
+        target_link_libraries(Backtrace::Backtrace INTERFACE ${Backtrace_LIBRARIES})
+    endif()
+endif()
+
 # Use Zlib for Sync, but allow integrators to override it
 # Don't use find_library(ZLIB) on Apple platforms - it hardcodes the path per platform,
 # so for an iOS build it'll use the path from the Device plaform, which is an error on Simulator.

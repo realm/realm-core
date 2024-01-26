@@ -223,7 +223,9 @@ if(MSVC)
         set(CMAKE_EXE_LINKER_FLAGS_DEBUG     "${CMAKE_EXE_LINKER_FLAGS_DEBUG} /INCREMENTAL:NO /OPT:NOREF /OPT:NOICF")
         set(CMAKE_SHARED_LINKER_FLAGS_DEBUG  "${CMAKE_SHARED_LINKER_FLAGS_DEBUG} /INCREMENTAL:NO /OPT:NOREF /OPT:NOICF")
     else()
-        set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+        if(NOT DEFINED CMAKE_MSVC_RUNTIME_LIBRARY)
+            set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+        endif()
         string(REGEX REPLACE "/RTC(su|[1su])" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
     endif()
 
@@ -369,6 +371,39 @@ add_subdirectory(bindgen)
 # Install the licence and changelog files
 install(FILES LICENSE CHANGELOG.md DESTINATION "doc/realm" COMPONENT devel)
 
+# Make the project importable from the build directory
+set(REALM_EXPORTED_TARGETS
+        Storage
+        QueryParser
+        ObjectStore
+        RealmFFI
+        RealmFFIStatic
+        )
+if(REALM_ENABLE_SYNC)
+    list(APPEND REALM_EXPORTED_TARGETS Sync)
+endif()
+export(TARGETS ${REALM_EXPORTED_TARGETS} NAMESPACE Realm:: FILE RealmTargets.cmake)
+configure_file(tools/cmake/RealmConfig.cmake.in ${CMAKE_CURRENT_BINARY_DIR}/RealmConfig.cmake @ONLY)
+configure_file(tools/cmake/AcquireRealmDependency.cmake ${CMAKE_CURRENT_BINARY_DIR}/AcquireRealmDependency.cmake @ONLY)
+
+# Make the project importable from the install directory
+install(EXPORT realm
+        NAMESPACE Realm::
+        FILE RealmTargets.cmake
+        DESTINATION share/cmake/Realm
+        COMPONENT devel
+        )
+
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/RealmConfig.cmake
+        DESTINATION share/cmake/Realm
+        COMPONENT devel
+        )
+
+install(FILES tools/cmake/AcquireRealmDependency.cmake
+        DESTINATION share/cmake/Realm
+        COMPONENT devel
+        )
+
 # Only prepare test/install/package targets if we're not a submodule
 if(REALM_CORE_SUBMODULE_BUILD)
     return()
@@ -399,39 +434,6 @@ add_subdirectory(test ${REALM_EXCLUDE_TESTS})
 if (REALM_BUILD_TEST_CLIENT)
     add_subdirectory(test/client)
 endif()
-
-# Make the project importable from the build directory
-set(REALM_EXPORTED_TARGETS
-    Storage
-    QueryParser
-    ObjectStore
-    RealmFFI
-    RealmFFIStatic
-)
-if(REALM_ENABLE_SYNC)
-    list(APPEND REALM_EXPORTED_TARGETS Sync)
-endif()
-export(TARGETS ${REALM_EXPORTED_TARGETS} NAMESPACE Realm:: FILE RealmTargets.cmake)
-configure_file(tools/cmake/RealmConfig.cmake.in ${CMAKE_CURRENT_BINARY_DIR}/RealmConfig.cmake @ONLY)
-configure_file(tools/cmake/AcquireRealmDependency.cmake ${CMAKE_CURRENT_BINARY_DIR}/AcquireRealmDependency.cmake @ONLY)
-
-# Make the project importable from the install directory
-install(EXPORT realm
-        NAMESPACE Realm::
-        FILE RealmTargets.cmake
-        DESTINATION lib/cmake/Realm
-        COMPONENT devel
-)
-
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/RealmConfig.cmake
-        DESTINATION lib/cmake/Realm
-        COMPONENT devel
-)
-
-install(FILES tools/cmake/AcquireRealmDependency.cmake
-        DESTINATION lib/cmake/Realm
-        COMPONENT devel
-)
 
 # CPack
 set(CPACK_GENERATOR "TGZ")
