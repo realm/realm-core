@@ -98,9 +98,9 @@ AppCredentials::AppCredentials(AuthProvider provider,
     : m_provider(provider)
     , m_payload(std::make_unique<bson::BsonDocument>())
 {
-    (*m_payload)[kAppProviderKey] = provider_type_from_enum(provider);
+    m_payload->append(kAppProviderKey, provider_type_from_enum(provider));
     for (auto& [key, value] : values) {
-        (*m_payload)[key] = std::move(value);
+        m_payload->append(key, std::move(value));
     }
 }
 

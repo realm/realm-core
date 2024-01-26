@@ -451,17 +451,16 @@ std::vector<bson::BsonDocument> TestAppSession::get_documents(SyncUser& user, co
         std::chrono::minutes(5));
 
     std::vector<bson::BsonDocument> documents;
-    collection.find({}, {},
-                    [&](util::Optional<std::vector<bson::Bson>>&& result, util::Optional<app::AppError> error) {
-                        REQUIRE(result);
-                        REQUIRE(!error);
-                        REQUIRE(result->size() == expected_count);
-                        documents.reserve(result->size());
-                        for (auto&& bson : *result) {
-                            REQUIRE(bson.type() == bson::Bson::Type::Document);
-                            documents.push_back(std::move(static_cast<bson::BsonDocument&>(bson)));
-                        }
-                    });
+    collection.find({}, {}, [&](util::Optional<bson::BsonArray>&& result, util::Optional<app::AppError> error) {
+        REQUIRE(result);
+        REQUIRE(!error);
+        REQUIRE(result->size() == expected_count);
+        documents.reserve(result->size());
+        for (auto&& bson : *result) {
+            REQUIRE(bson.type() == bson::Bson::Type::Document);
+            documents.push_back(std::move(static_cast<const bson::BsonDocument&>(bson)));
+        }
+    });
     return documents;
 }
 #endif // REALM_ENABLE_AUTH_TESTS

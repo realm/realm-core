@@ -74,19 +74,19 @@ public:
         void set_bson(bson::BsonDocument& bson) const
         {
             if (upsert) {
-                bson["upsert"] = true;
+                bson.append("upsert", true);
             }
 
             if (return_new_document) {
-                bson["returnNewDocument"] = true;
+                bson.append("returnNewDocument", true);
             }
 
             if (projection_bson) {
-                bson["projection"] = *projection_bson;
+                bson.append("projection", *projection_bson);
             }
 
             if (sort_bson) {
-                bson["sort"] = *sort_bson;
+                bson.append("sort", *sort_bson);
             }
         }
     };
@@ -169,7 +169,7 @@ public:
     /// they will be generated.
     /// @param documents  The `Document` values in a bson array to insert.
     /// @param completion The result of the insert, returns an array inserted document ids in order
-    void insert_many(const bson::BsonArray& documents, ResponseHandler<std::vector<bson::Bson>>&& completion);
+    void insert_many(const bson::BsonArray& documents, ResponseHandler<bson::BsonArray>&& completion);
 
     /// Deletes a single matching document from the collection.
     /// @param filter_bson A `Document` as bson that should match the query.
