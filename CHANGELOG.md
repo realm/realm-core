@@ -18,6 +18,8 @@
 
 ### Internals
 * Expressions in `CHECK()` macros are printed to better; strings are quoted and null strings are printed as NULL instead of no output.
+* Refactored version resolution for the `build-apple-device.sh` script. ([#7263](https://github.com/realm/realm-core/pull/7263))
+* Remove SyncUser::binding_context() and related things, which were not actually used by any SDKs.
 
 ----------------------------------------------
 
@@ -46,7 +48,7 @@
 * Bump the sync protocol to v11. The new protocol version comes with the following changes:
   - JSON_ERROR server message contains the previous schema version
   - Flexible sync BIND client message contains the current schema version
-* Add BAAS admin API to create new schema versions (drafts can be used to deploy all changes at once)
+* Add BAAS admin API to create new schema versions (drafts can be used to deploy all changes at once
 
 ----------------------------------------------
 
@@ -57,6 +59,11 @@
 
 ### Compatibility
 * Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
+* (bindgen) Upgrading `@commander-js/extra-typings` and adds a missing peer dependency on `commander`.
 
 ----------------------------------------------
 
