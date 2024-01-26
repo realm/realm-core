@@ -133,6 +133,8 @@ public:
     {
         return m_count;
     }
+    virtual Mixed mixed_for_argument(size_t argument_index);
+
 protected:
     void verify_ndx(size_t ndx) const
     {

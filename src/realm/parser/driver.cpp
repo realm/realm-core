@@ -162,6 +162,16 @@ inline T string_to(const std::string& s)
     return value;
 }
 
+template <>
+inline Decimal128 string_to<Decimal128>(const std::string& s)
+{
+    Decimal128 value(s);
+    if (value.is_nan()) {
+        throw InvalidQueryArgError(util::format("Cannot convert '%1' to a %2", s, get_type_name<Decimal128>()));
+    }
+    return value;
+}
+
 class MixedArguments : public query_parser::Arguments {
 public:
     using Arg = mpark::variant<Mixed, std::vector<Mixed>>;
@@ -261,13 +271,12 @@ public:
         static_assert(std::is_same_v<mpark::variant_alternative_t<1, Arg>, std::vector<Mixed>>);
         return m_args[n].index() == 1;
     }
-    DataType type_for_argument(size_t n)
+    DataType type_for_argument(size_t n) final
     {
         return mixed_for_argument(n).get_type();
     }
 
-private:
-    const Mixed& mixed_for_argument(size_t n)
+    Mixed mixed_for_argument(size_t n) final
     {
         Arguments::verify_ndx(n);
         if (is_argument_list(n)) {
@@ -278,6 +287,7 @@ private:
         return mpark::get<Mixed>(m_args[n]);
     }
 
+private:
     const std::vector<Arg> m_args;
 };
 
@@ -1192,138 +1202,42 @@ std::unique_ptr<Subexpr> AggrNode::aggregate(Subexpr* subexpr)
     return agg;
 }
 
-void ConstantNode::decode_b64(util::FunctionRef<void(StringData)> callback)
+void ConstantNode::decode_b64()
 {
     const size_t encoded_size = text.size() - 5;
     size_t buffer_size = util::base64_decoded_size(encoded_size);
-    std::string decode_buffer(buffer_size, char(0));
+    m_decode_buffer.resize(buffer_size);
     StringData window(text.c_str() + 4, encoded_size);
-    util::Optional<size_t> decoded_size = util::base64_decode(window, decode_buffer.data(), buffer_size);
+    util::Optional<size_t> decoded_size = util::base64_decode(window, m_decode_buffer.data(), buffer_size);
     if (!decoded_size) {
         throw SyntaxError("Invalid base64 value");
     }
     REALM_ASSERT_DEBUG_EX(*decoded_size <= encoded_size, *decoded_size, encoded_size);
-    decode_buffer.resize(*decoded_size); // truncate
-    callback(StringData(decode_buffer.data(), decode_buffer.size()));
+    m_decode_buffer.resize(*decoded_size); // truncate
 }
 
-std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
+Mixed ConstantNode::get_value()
 {
-    std::unique_ptr<Subexpr> ret;
-    std::string explain_value_message = text;
-    if (target_table.length()) {
-        const Group* g = drv->m_base_table->get_parent_group();
-        TableKey table_key;
-        ObjKey obj_key;
-        auto table = g->get_table(target_table);
-        if (!table) {
-            // Perhaps class prefix is missing
-            Group::TableNameBuffer buffer;
-            table = g->get_table(Group::class_name_to_table_name(target_table, buffer));
-        }
-        if (!table) {
-            throw InvalidQueryError(util::format("Unknown object type '%1'", target_table));
-        }
-        table_key = table->get_key();
-        target_table = "";
-        auto pk_val_node = visit(drv, hint); // call recursively
-        auto pk_val = pk_val_node->get_mixed();
-        obj_key = table->find_primary_key(pk_val);
-        return std::make_unique<Value<ObjLink>>(ObjLink(table_key, ObjKey(obj_key)));
-    }
     switch (type) {
-        case Type::NUMBER: {
-            if (hint == type_Decimal) {
-                ret = std::make_unique<Value<Decimal128>>(Decimal128(text));
+        case Type::NUMBER:
+            return int64_t(strtoll(text.c_str(), nullptr, 0));
+        case Type::FLOAT:
+            if (text[text.size() - 1] == 'f') {
+                return strtof(text.c_str(), nullptr);
             }
-            else {
-                ret = std::make_unique<Value<int64_t>>(strtoll(text.c_str(), nullptr, 0));
-            }
-            break;
-        }
-        case Type::FLOAT: {
-            if (hint == type_Float || text[text.size() - 1] == 'f') {
-                ret = std::make_unique<Value<float>>(strtof(text.c_str(), nullptr));
-            }
-            else if (hint == type_Decimal) {
-                ret = std::make_unique<Value<Decimal128>>(Decimal128(text));
-            }
-            else {
-                ret = std::make_unique<Value<double>>(strtod(text.c_str(), nullptr));
-            }
-            break;
-        }
+            return strtod(text.c_str(), nullptr);
         case Type::INFINITY_VAL: {
             bool negative = text[0] == '-';
-            switch (hint) {
-                case type_Float: {
-                    auto inf = std::numeric_limits<float>::infinity();
-                    ret = std::make_unique<Value<float>>(negative ? -inf : inf);
-                    break;
-                }
-                case type_Double: {
-                    auto inf = std::numeric_limits<double>::infinity();
-                    ret = std::make_unique<Value<double>>(negative ? -inf : inf);
-                    break;
-                }
-                case type_Decimal:
-                    ret = std::make_unique<Value<Decimal128>>(Decimal128(text));
-                    break;
-                default:
-                    throw InvalidQueryError(util::format("Infinity not supported for %1", get_data_type_name(hint)));
-                    break;
-            }
-            break;
+            constexpr auto inf = std::numeric_limits<double>::infinity();
+            return negative ? -inf : inf;
         }
-        case Type::NAN_VAL: {
-            switch (hint) {
-                case type_Float:
-                    ret = std::make_unique<Value<float>>(type_punning<float>(0x7fc00000));
-                    break;
-                case type_Double:
-                    ret = std::make_unique<Value<double>>(type_punning<double>(0x7ff8000000000000));
-                    break;
-                case type_Decimal:
-                    ret = std::make_unique<Value<Decimal128>>(Decimal128::nan("0"));
-                    break;
-                default:
-                    REALM_UNREACHABLE();
-                    break;
-            }
-            break;
-        }
-        case Type::STRING: {
-            std::string str = text.substr(1, text.size() - 2);
-            switch (hint) {
-                case type_Int:
-                    ret = std::make_unique<Value<int64_t>>(string_to<int64_t>(str));
-                    break;
-                case type_Float:
-                    ret = std::make_unique<Value<float>>(string_to<float>(str));
-                    break;
-                case type_Double:
-                    ret = std::make_unique<Value<double>>(string_to<double>(str));
-                    break;
-                case type_Decimal:
-                    ret = std::make_unique<Value<Decimal128>>(Decimal128(str.c_str()));
-                    break;
-                default:
-                    if (hint == type_TypeOfValue) {
-                        ret = std::make_unique<Value<TypeOfValue>>(TypeOfValue(str));
-                    }
-                    else {
-                        ret = std::make_unique<ConstantStringValue>(str);
-                    }
-                    break;
-            }
-            break;
-        }
-        case Type::STRING_BASE64: {
-            decode_b64([&](StringData decoded) {
-                ret = std::make_unique<ConstantStringValue>(decoded);
-            });
-            break;
-        }
+        case Type::NAN_VAL:
+            return type_punning<double>(0x7ff8000000000000);
+        case Type::STRING:
+            return StringData(text.data() + 1, text.size() - 2);
+        case Type::STRING_BASE64:
+            decode_b64();
+            return StringData(m_decode_buffer.data(), m_decode_buffer.size());
         case Type::TIMESTAMP: {
             auto s = text;
             int64_t seconds;
@@ -1362,76 +1276,204 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
                     nanoseconds *= -1;
                 }
             }
-            ret = std::make_unique<Value<Timestamp>>(get_timestamp_if_valid(seconds, nanoseconds));
-            break;
+            return get_timestamp_if_valid(seconds, nanoseconds);
         }
         case Type::UUID_T:
-            ret = std::make_unique<Value<UUID>>(UUID(text.substr(5, text.size() - 6)));
-            break;
+            return UUID(text.substr(5, text.size() - 6));
         case Type::OID:
-            ret = std::make_unique<Value<ObjectId>>(ObjectId(text.substr(4, text.size() - 5).c_str()));
-            break;
-        case Type::LINK: {
-            ret =
-                std::make_unique<Value<ObjKey>>(ObjKey(strtol(text.substr(1, text.size() - 1).c_str(), nullptr, 0)));
-            break;
-        }
+            return ObjectId(text.substr(4, text.size() - 5).c_str());
+        case Type::LINK:
+            return ObjKey(strtol(text.substr(1, text.size() - 1).c_str(), nullptr, 0));
         case Type::TYPED_LINK: {
             size_t colon_pos = text.find(":");
             auto table_key_val = uint32_t(strtol(text.substr(1, colon_pos - 1).c_str(), nullptr, 0));
             auto obj_key_val = strtol(text.substr(colon_pos + 1).c_str(), nullptr, 0);
-            ret = std::make_unique<Value<ObjLink>>(ObjLink(TableKey(table_key_val), ObjKey(obj_key_val)));
-            break;
+            return ObjLink(TableKey(table_key_val), ObjKey(obj_key_val));
         }
         case Type::NULL_VAL:
-            if (hint == type_String) {
-                ret = std::make_unique<ConstantStringValue>(StringData()); // Null string
-            }
-            else if (hint == type_Binary) {
-                ret = std::make_unique<Value<Binary>>(BinaryData()); // Null string
-            }
-            else {
-                ret = std::make_unique<Value<null>>(realm::null());
-            }
-            break;
+            return {};
         case Type::TRUE:
-            ret = std::make_unique<Value<Bool>>(true);
-            break;
+            return {true};
         case Type::FALSE:
-            ret = std::make_unique<Value<Bool>>(false);
+            return {false};
+        case Type::ARG:
             break;
-        case Type::ARG: {
-            size_t arg_no = size_t(strtol(text.substr(1).c_str(), nullptr, 10));
-            if (m_comp_type && !drv->m_args.is_argument_list(arg_no)) {
-                throw InvalidQueryError(util::format(
-                    "ANY/ALL/NONE are only allowed on arguments which contain a list but '%1' is not a list.",
-                    explain_value_message));
-            }
-            if (drv->m_args.is_argument_null(arg_no)) {
-                explain_value_message = util::format("argument '%1' which is NULL", explain_value_message);
-                ret = std::make_unique<Value<null>>(realm::null());
-            }
-            else if (drv->m_args.is_argument_list(arg_no)) {
-                std::vector<Mixed> mixed_list = drv->m_args.list_for_argument(arg_no);
-                ret = copy_list_of_args(mixed_list);
-            }
-            else {
-                auto type = drv->m_args.type_for_argument(arg_no);
-                explain_value_message =
-                    util::format("argument %1 of type '%2'", explain_value_message, get_data_type_name(type));
-                ret = copy_arg(drv, type, arg_no, hint, explain_value_message);
-            }
-            break;
-        }
         case BINARY_STR: {
-            std::string str = text.substr(1, text.size() - 2);
-            ret = std::make_unique<ConstantBinaryValue>(BinaryData(str.data(), str.size()));
-            break;
+            return BinaryData(text.data() + 1, text.size() - 2);
         }
         case BINARY_BASE64:
-            decode_b64([&](StringData decoded) {
-                ret = std::make_unique<ConstantBinaryValue>(BinaryData(decoded.data(), decoded.size()));
-            });
+            decode_b64();
+            return BinaryData(m_decode_buffer.data(), m_decode_buffer.size());
+    }
+    return {};
+}
+
+std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
+{
+    std::unique_ptr<Subexpr> ret;
+    std::string explain_value_message = text;
+    Mixed value;
+
+    if (type == Type::ARG) {
+        size_t arg_no = size_t(strtol(text.substr(1).c_str(), nullptr, 10));
+        if (m_comp_type && !drv->m_args.is_argument_list(arg_no)) {
+            throw InvalidQueryError(util::format(
+                "ANY/ALL/NONE are only allowed on arguments which contain a list but '%1' is not a list.",
+                explain_value_message));
+        }
+        if (drv->m_args.is_argument_list(arg_no)) {
+            std::vector<Mixed> mixed_list = drv->m_args.list_for_argument(arg_no);
+            return copy_list_of_args(mixed_list);
+        }
+        if (drv->m_args.is_argument_null(arg_no)) {
+            explain_value_message = util::format("argument '%1' which is NULL", explain_value_message);
+        }
+        else {
+            value = drv->m_args.mixed_for_argument(arg_no);
+            if (value.is_null()) {
+                explain_value_message = util::format("argument %1 of type null", explain_value_message);
+            }
+            else if (value.is_type(type_TypedLink)) {
+                explain_value_message =
+                    util::format("%1 which links to %2", explain_value_message,
+                                 print_pretty_objlink(value.get<ObjLink>(), drv->m_base_table->get_parent_group()));
+            }
+            else {
+                explain_value_message = util::format("argument %1 with value '%2'", explain_value_message, value);
+                if (!(m_target_table || Mixed::data_types_are_comparable(value.get_type(), hint) ||
+                      Mixed::is_numeric(hint) || (value.is_type(type_String) && hint == type_TypeOfValue))) {
+                    throw InvalidQueryArgError(
+                        util::format("Cannot compare %1 to a %2", explain_value_message, get_data_type_name(hint)));
+                }
+            }
+        }
+    }
+    else {
+        value = get_value();
+    }
+
+    if (m_target_table) {
+        // There is a table name set. This must be an ObjLink
+        const Group* g = drv->m_base_table->get_parent_group();
+        auto table = g->get_table(m_target_table);
+        if (!table) {
+            // Perhaps class prefix is missing
+            Group::TableNameBuffer buffer;
+            table = g->get_table(Group::class_name_to_table_name(m_target_table, buffer));
+        }
+        if (!table) {
+            throw InvalidQueryError(util::format("Unknown object type '%1'", m_target_table));
+        }
+        auto obj_key = table->find_primary_key(value);
+        value = ObjLink(table->get_key(), ObjKey(obj_key));
+    }
+
+    if (value.is_null()) {
+        if (hint == type_String) {
+            return std::make_unique<ConstantStringValue>(StringData()); // Null string
+        }
+        else if (hint == type_Binary) {
+            return std::make_unique<Value<Binary>>(BinaryData()); // Null string
+        }
+        else {
+            return std::make_unique<Value<null>>(realm::null());
+        }
+    }
+
+    switch (value.get_type()) {
+        case type_Int: {
+            if (hint == type_Decimal) {
+                ret = std::make_unique<Value<Decimal128>>(Decimal128(value.get_int()));
+            }
+            else {
+                ret = std::make_unique<Value<int64_t>>(value.get_int());
+            }
+            break;
+        }
+        case type_Float: {
+            ret = std::make_unique<Value<float>>(value.get_float());
+            break;
+        }
+        case type_Decimal:
+            ret = std::make_unique<Value<Decimal128>>(value.get_decimal());
+            break;
+        case type_Double: {
+            auto double_val = value.get_double();
+            if (std::isinf(double_val) && (!Mixed::is_numeric(hint) || hint == type_Int)) {
+                throw InvalidQueryError(util::format("Infinity not supported for %1", get_data_type_name(hint)));
+            }
+
+            switch (hint) {
+                case type_Float:
+                    ret = std::make_unique<Value<float>>(float(double_val));
+                    break;
+                case type_Decimal:
+                    ret = std::make_unique<Value<Decimal128>>(Decimal128(text));
+                    break;
+                case type_Int: {
+                    int64_t int_val = int64_t(double_val);
+                    // Only return an integer if it precisely represents val
+                    if (double(int_val) == double_val) {
+                        ret = std::make_unique<Value<int64_t>>(int_val);
+                        break;
+                    }
+                    [[fallthrough]];
+                }
+                default:
+                    ret = std::make_unique<Value<double>>(double_val);
+                    break;
+            }
+            break;
+        }
+        case type_String: {
+            StringData str = value.get_string();
+            switch (hint) {
+                case type_Int:
+                    ret = std::make_unique<Value<int64_t>>(string_to<int64_t>(str));
+                    break;
+                case type_Float:
+                    ret = std::make_unique<Value<float>>(string_to<float>(str));
+                    break;
+                case type_Double:
+                    ret = std::make_unique<Value<double>>(string_to<double>(str));
+                    break;
+                case type_Decimal:
+                    ret = std::make_unique<Value<Decimal128>>(string_to<Decimal128>(str));
+                    break;
+                default:
+                    if (hint == type_TypeOfValue) {
+                        TypeOfValue type_of_value(std::string_view(str.data(), str.size()));
+                        ret = std::make_unique<Value<TypeOfValue>>(type_of_value);
+                    }
+                    else {
+                        ret = std::make_unique<ConstantStringValue>(str);
+                    }
+                    break;
+            }
+            break;
+        }
+        case type_Timestamp:
+            ret = std::make_unique<Value<Timestamp>>(value.get_timestamp());
+            break;
+        case type_UUID:
+            ret = std::make_unique<Value<UUID>>(value.get_uuid());
+            break;
+        case type_ObjectId:
+            ret = std::make_unique<Value<ObjectId>>(value.get_object_id());
+            break;
+        case type_Link:
+            ret = std::make_unique<Value<ObjKey>>(value.get<ObjKey>());
+            break;
+        case type_TypedLink:
+            ret = std::make_unique<Value<ObjLink>>(value.get<ObjLink>());
+            break;
+        case type_Bool:
+            ret = std::make_unique<Value<Bool>>(value.get_bool());
+            break;
+        case type_Binary:
+            ret = std::make_unique<ConstantBinaryValue>(value.get_binary());
+            break;
+        case type_Mixed:
             break;
     }
     if (!ret) {
@@ -1455,77 +1497,47 @@ std::unique_ptr<ConstantMixedList> ConstantNode::copy_list_of_args(std::vector<M
     return args_in_list;
 }
 
-std::unique_ptr<Subexpr> ConstantNode::copy_arg(ParserDriver* drv, DataType type, size_t arg_no, DataType hint,
-                                                std::string& err)
+Mixed Arguments::mixed_for_argument(size_t arg_no)
 {
-    switch (type) {
+    switch (type_for_argument(arg_no)) {
         case type_Int:
-            return std::make_unique<Value<int64_t>>(drv->m_args.long_for_argument(arg_no));
+            return int64_t(long_for_argument(arg_no));
         case type_String:
-            return std::make_unique<ConstantStringValue>(drv->m_args.string_for_argument(arg_no));
+            return string_for_argument(arg_no);
         case type_Binary:
-            return std::make_unique<ConstantBinaryValue>(drv->m_args.binary_for_argument(arg_no));
+            return binary_for_argument(arg_no);
         case type_Bool:
-            return std::make_unique<Value<Bool>>(drv->m_args.bool_for_argument(arg_no));
+            return bool_for_argument(arg_no);
         case type_Float:
-            return std::make_unique<Value<float>>(drv->m_args.float_for_argument(arg_no));
-        case type_Double: {
-            // In realm-js all number type arguments are returned as double. If we don't cast to the
-            // expected type, we would in many cases miss the option to use the optimized query node
-            // instead of the general Compare class.
-            double val = drv->m_args.double_for_argument(arg_no);
-            switch (hint) {
-                case type_Int:
-                case type_Bool: {
-                    int64_t int_val = int64_t(val);
-                    // Only return an integer if it precisely represents val
-                    if (double(int_val) == val)
-                        return std::make_unique<Value<int64_t>>(int_val);
-                    else
-                        return std::make_unique<Value<double>>(val);
-                }
-                case type_Float:
-                    return std::make_unique<Value<float>>(float(val));
-                default:
-                    return std::make_unique<Value<double>>(val);
-            }
-            break;
-        }
-        case type_Timestamp: {
+            return float_for_argument(arg_no);
+        case type_Double:
+            return double_for_argument(arg_no);
+        case type_Timestamp:
             try {
-                return std::make_unique<Value<Timestamp>>(drv->m_args.timestamp_for_argument(arg_no));
+                return timestamp_for_argument(arg_no);
             }
             catch (const std::exception&) {
-                return std::make_unique<Value<ObjectId>>(drv->m_args.objectid_for_argument(arg_no));
             }
-        }
-        case type_ObjectId: {
+            return objectid_for_argument(arg_no);
+        case type_ObjectId:
             try {
-                return std::make_unique<Value<ObjectId>>(drv->m_args.objectid_for_argument(arg_no));
+                return objectid_for_argument(arg_no);
             }
             catch (const std::exception&) {
-                return std::make_unique<Value<Timestamp>>(drv->m_args.timestamp_for_argument(arg_no));
             }
-            break;
-        }
+            return timestamp_for_argument(arg_no);
         case type_Decimal:
-            return std::make_unique<Value<Decimal128>>(drv->m_args.decimal128_for_argument(arg_no));
+            return decimal128_for_argument(arg_no);
         case type_UUID:
-            return std::make_unique<Value<UUID>>(drv->m_args.uuid_for_argument(arg_no));
+            return uuid_for_argument(arg_no);
         case type_Link:
-            return std::make_unique<Value<ObjKey>>(drv->m_args.object_index_for_argument(arg_no));
+            return object_index_for_argument(arg_no);
         case type_TypedLink:
-            if (hint == type_Mixed || hint == type_Link || hint == type_TypedLink) {
-                return std::make_unique<Value<ObjLink>>(drv->m_args.objlink_for_argument(arg_no));
-            }
-            err = util::format("%1 which links to %2", err,
-                               print_pretty_objlink(drv->m_args.objlink_for_argument(arg_no),
-                                                    drv->m_base_table->get_parent_group()));
-            break;
+            return objlink_for_argument(arg_no);
         default:
             break;
     }
-    return nullptr;
+    return {};
 }
 
 #if REALM_ENABLE_GEOSPATIAL

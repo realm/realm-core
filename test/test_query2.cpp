@@ -5847,11 +5847,11 @@ TEST(Query_TypeOfValue)
         }
     }
 
-    auto tv = (table->column<Mixed>(col_any).type_of_value() == TypeOfValue(std::string("string"))).find_all();
+    auto tv = (table->column<Mixed>(col_any).type_of_value() == TypeOfValue(std::string_view("string"))).find_all();
     CHECK_EQUAL(tv.size(), nb_strings);
-    tv = (table->column<Mixed>(col_any).type_of_value() == TypeOfValue(std::string("double"))).find_all();
+    tv = (table->column<Mixed>(col_any).type_of_value() == TypeOfValue(std::string_view("double"))).find_all();
     CHECK_EQUAL(tv.size(), 2);
-    tv = (table->column<Mixed>(col_any).type_of_value() == TypeOfValue(std::string("Decimal128"))).find_all();
+    tv = (table->column<Mixed>(col_any).type_of_value() == TypeOfValue(std::string_view("Decimal128"))).find_all();
     CHECK_EQUAL(tv.size(), 1);
     tv = (table->column<Mixed>(col_any).type_of_value() == TypeOfValue(BinaryData(bin_data))).find_all();
     CHECK_EQUAL(tv.size(), 1);
