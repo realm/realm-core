@@ -279,14 +279,11 @@ void Array::init_from_mem(MemRef mem) noexcept
     // important fields used for type A arrays, like width, lower, upper_bound which are used
     // for expanding the array, but also query the data.
     char* header = mem.get_addr();
-    auto kind = get_kind(header);
-    REALM_ASSERT_DEBUG(kind == 'A' || kind == 'B');
-    if (kind == 'B') {
-#ifdef REALM_DEBUG
-        // the only encoding supported at the moment
-        auto encoding = get_encoding(header);
-        REALM_ASSERT(encoding == Encoding::Flex);
-#endif
+    m_kind = NodeHeader::get_kind(header);
+    m_encoding = NodeHeader::get_encoding(header);
+    REALM_ASSERT_DEBUG(m_kind == 'A' || m_kind == 'B');
+    if (m_kind == 'B') {
+        REALM_ASSERT_DEBUG(m_encoding == Encoding::Flex);
         char* header = mem.get_addr();
         m_ref = mem.get_ref();
         m_data = get_data_from_header(header);
@@ -370,9 +367,8 @@ void Array::destroy_children(size_t offset) noexcept
 size_t Array::get_byte_size() const noexcept
 {
     // A and B type array
-    const char* header = get_header_from_data(m_data);
-    auto kind = get_kind(header);
-    REALM_ASSERT(kind == 'A' || kind == 'B');
+    REALM_ASSERT(m_kind == 'A' || m_kind == 'B');
+    const auto header = get_header();
     auto num_bytes = get_byte_size_from_header(header);
     auto read_only = m_alloc.is_read_only(m_ref) == true;
     auto bytes_ok = num_bytes <= get_capacity_from_header(header);
@@ -390,13 +386,12 @@ ref_type Array::write(_impl::ArrayWriterBase& out, bool deep, bool only_if_modif
     if (!deep || !m_has_refs) {
         Array encoded_array{m_alloc};
         if (compress_in_flight && encode_array(encoded_array)) {
-            const auto h = encoded_array.get_header();
-            REALM_ASSERT(get_kind(h) == 'B');
-            REALM_ASSERT(get_encoding(h) == Encoding::Flex);
-            REALM_ASSERT(size() == encoded_array.size());
+            REALM_ASSERT_DEBUG(encoded_array.m_kind == 'B');
+            REALM_ASSERT_DEBUG(encoded_array.m_encoding == Encoding::Flex);
+            REALM_ASSERT_DEBUG(size() == encoded_array.size());
 #ifdef REALM_DEBUG
             for (size_t i = 0; i < encoded_array.size(); ++i)
-                REALM_ASSERT(get(i) == encoded_array.get(i));
+                REALM_ASSERT_DEBUG(get(i) == encoded_array.get(i));
 #endif
             auto ref = encoded_array.do_write_shallow(out);
             encoded_array.destroy();
@@ -416,18 +411,17 @@ ref_type Array::write(ref_type ref, Allocator& alloc, _impl::ArrayWriterBase& ou
 
     Array array(alloc);
     array.init_from_ref(ref);
-    REALM_ASSERT(array.is_attached());
+    REALM_ASSERT_DEBUG(array.is_attached());
 
     if (!array.m_has_refs) {
         Array encoded_array{alloc};
         if (compress_in_flight && array.encode_array(encoded_array)) {
-            const auto h = encoded_array.get_header();
-            REALM_ASSERT(get_kind(h) == 'B');
-            REALM_ASSERT(get_encoding(h) == Encoding::Flex);
-            REALM_ASSERT(array.size() == encoded_array.size());
+            REALM_ASSERT_DEBUG(encoded_array.m_kind == 'B');
+            REALM_ASSERT(encoded_array.m_encoding == Encoding::Flex);
+            REALM_ASSERT_DEBUG(array.size() == encoded_array.size());
 #ifdef REALM_DEBUG
             for (size_t i = 0; i < encoded_array.size(); ++i)
-                REALM_ASSERT(array.get(i) == encoded_array.get(i));
+                REALM_ASSERT_DEBUG(array.get(i) == encoded_array.get(i));
 #endif
             auto ref = encoded_array.do_write_shallow(out);
             encoded_array.destroy();
@@ -738,36 +732,44 @@ size_t Array::size() const noexcept
 
 bool Array::encode_array(Array& arr) const
 {
-    const auto header = get_header();
-    auto kind = get_kind(header);
-    if (kind == 'A') {
-        auto encoding = get_encoding(header);
-        // encode everything that is WtypeBits (all integer arrays included ref arrays)
-        if (encoding == NodeHeader::Encoding::WTypBits) {
-            return m_encode.encode(*this, arr);
-        }
+    //    const auto header = get_header();
+    //    auto kind = get_kind(header);
+    if (!is_encoded() && m_encoding == NodeHeader::Encoding::WTypBits) {
+        return m_encode.encode(*this, arr);
+        //        auto encoding = get_encoding(header);
+        //        // encode everything that is WtypeBits (all integer arrays included ref arrays)
+        //        if (encoding == NodeHeader::Encoding::WTypBits) {
+        //            return m_encode.encode(*this, arr);
+        //        }
     }
     return false;
 }
 
-bool Array::decode_array(Array& arr)
+bool Array::decode_array(Array& arr) const
 {
-    const auto header = arr.get_header();
-    auto kind = NodeHeader::get_kind(header);
-    // if it is encoded and it is in flex format decode all
-    if (kind == 'B') {
-        auto encoding = NodeHeader::get_encoding(header);
-        if (encoding == NodeHeader::Encoding::Flex) {
-            auto& array_encoder = arr.m_encode;
-            return array_encoder.decode(arr);
-        }
+    if (is_encoded()) {
+        auto& array_encoder = arr.m_encode;
+        return array_encoder.decode(arr);
     }
     return false;
+
+    //    const auto header = arr.get_header();
+    //    auto kind = NodeHeader::get_kind(header);
+    //    // if it is encoded and it is in flex format decode all
+    //    if (kind == 'B') {
+    //        auto encoding = NodeHeader::get_encoding(header);
+    //        if (encoding == NodeHeader::Encoding::Flex) {
+    //            auto& array_encoder = arr.m_encode;
+    //            return array_encoder.decode(arr);
+    //        }
+    //    }
+    //    return false;
 }
 
 bool Array::is_encoded() const
 {
-    return m_encode.is_encoded(*this);
+    return m_kind == 'B'; // encoding not checked for now
+    // return m_encode.is_encoded(*this);
 }
 
 bool Array::try_encode(Array& arr) const

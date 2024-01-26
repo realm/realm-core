@@ -551,6 +551,8 @@ protected:
     bool m_context_flag;         // Meaning depends on context.
 
     ArrayEncode& m_encode;
+    uint8_t m_kind;
+    NodeHeader::Encoding m_encoding;
 
 private:
     ref_type do_write_shallow(_impl::ArrayWriterBase&) const;
@@ -565,7 +567,7 @@ private:
 protected:
     // encode/decode this array
     bool encode_array(Array&) const;
-    static bool decode_array(Array& arr);
+    bool decode_array(Array& arr) const;
 
 public:
     bool is_encoded() const;
