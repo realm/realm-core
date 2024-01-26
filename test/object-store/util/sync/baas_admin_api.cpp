@@ -365,7 +365,7 @@ app::Response do_http_request(const app::Request& request)
 
 class Baasaas {
 public:
-    enum class StartMode { Default, GitHash, Branch };
+    enum class StartMode { Default, GitHash, Branch, PatchId };
     explicit Baasaas(std::string api_key, StartMode mode, std::string ref_spec)
         : m_api_key(std::move(api_key))
     {
@@ -378,6 +378,10 @@ public:
         else if (mode == StartMode::Branch) {
             url_path = util::format("startContainer?branch=%1", ref_spec);
             logger->info("Starting baasaas container on branch %1", ref_spec);
+        }
+        else if (mode == StartMode::PatchId) {
+            url_path = util::format("startContainer?patchId=%1", ref_spec);
+            logger->info("Starting baasaas container for patch id %1", ref_spec);
         }
         else {
             logger->info("Starting baasaas container");
@@ -528,9 +532,15 @@ public:
             }
             mode = Baasaas::StartMode::GitHash;
         }
+        else if (mode_spec == "patchid") {
+            if (ref_spec.empty()) {
+                throw std::runtime_error("Expected patch id in BAASAAS_REF_SPEC env variable, but it was empty");
+            }
+            mode = Baasaas::StartMode::PatchId;
+        }
         else {
             if (!mode_spec.empty()) {
-                throw std::runtime_error("Excepted BAASAAS_START_MODE to be \"githash\" or \"branch\"");
+                throw std::runtime_error("Excepted BAASAAS_START_MODE to be \"githash\", \"patchid\", or \"branch\"");
             }
             ref_spec = {};
         }
