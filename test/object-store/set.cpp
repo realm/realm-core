@@ -20,6 +20,8 @@
 #include <realm/util/any.hpp>
 #include <realm/version.hpp>
 
+#include <numeric>
+
 using namespace realm;
 using namespace realm::util;
 namespace cf = realm::collection_fixtures;
