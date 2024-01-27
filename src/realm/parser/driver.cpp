@@ -680,7 +680,7 @@ Query RelationalNode::visit(ParserDriver* drv)
             case type_Bool:
                 break;
             case type_String:
-                break;
+                return drv->simple_query(op, col_key, right->get_mixed().get_string());
             case type_Binary:
                 break;
             case type_Timestamp:

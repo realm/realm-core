@@ -2,11 +2,34 @@
 
 ### Enhancements
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
+* Allow the query builder to construct >, >=, <, <= queries for string constants. This is a case sensitive lexicographical comparison. Improved performance of RQL (parsed) queries on a non-linked string property using: >, >=, <, <=, operators and fixed behaviour that a null string should be evaulated as less than everything, previously nulls were not matched. ([#3939](https://github.com/realm/realm-core/issues/3939), this is a prerequisite for https://github.com/realm/realm-swift/issues/8008).
+
+### Fixed
+* <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
+* None.
+ 
+### Breaking changes
+* None.
+
+### Compatibility
+* Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
+* Expressions in `CHECK()` macros are printed to better; strings are quoted and null strings are printed as NULL instead of no output.
+* Refactored version resolution for the `build-apple-device.sh` script. ([#7263](https://github.com/realm/realm-core/pull/7263))
+* Remove SyncUser::binding_context() and related things, which were not actually used by any SDKs.
+
+----------------------------------------------
+
+# 13.26.0 Release notes
+
+### Enhancements
 * Added change_base_url() function to update the App base URL at runtime. (PR [#7173](https://github.com/realm/realm-core/pull/7173))
 * Sync Client should use the base_url value provided in App::Config instead of always using stored info after first connection to server. ([#7201](https://github.com/realm/realm-core/issues/7201))
 
 ### Fixed
-* <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Handle `EOPNOTSUPP` when using `posix_fallocate()` and fallback to manually consume space. This should enable android users to open a Realm on restrictive filesystems. ([realm-js #6349](https://github.com/realm/realm-js/issues/6349), more prevalent since v13.23.3 with the change to `REALM_HAVE_POSIX_FALLOCATE` but it was also an issue in some platforms before this)
 * Application may crash with `incoming_changesets.size() != 0` when a download message is mistaken for a bootstrap message. This can happen if the synchronization session is paused and resumed at a specific time. (PR [#7238](https://github.com/realm/realm-core/pull/7238), since v11.8.0)
 * Fixed errors complaining about missing symbols such as `__atomic_is_lock_free` on ARMv7 Linux. (PR [#7257](https://github.com/realm/realm-core/pull/7257))
@@ -25,7 +48,7 @@
 * Bump the sync protocol to v11. The new protocol version comes with the following changes:
   - JSON_ERROR server message contains the previous schema version
   - Flexible sync BIND client message contains the current schema version
-* Add BAAS admin API to create new schema versions (drafts can be used to deploy all changes at once)
+* Add BAAS admin API to create new schema versions (drafts can be used to deploy all changes at once
 
 ----------------------------------------------
 
@@ -36,6 +59,11 @@
 
 ### Compatibility
 * Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
+* (bindgen) Upgrading `@commander-js/extra-typings` and adds a missing peer dependency on `commander`.
 
 ----------------------------------------------
 
