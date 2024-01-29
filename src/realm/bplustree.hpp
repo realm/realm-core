@@ -686,6 +686,8 @@ ColumnAverageType<T> bptree_average(const BPlusTree<T>& tree, size_t* return_cnt
     return avg;
 }
 
+ref_type bptree_typed_write(ref_type ref, _impl::ArrayWriterBase& out, Allocator& alloc, ColumnType col_type,
+                            bool deep, bool only_modified, bool compress);
 void bptree_typed_print(std::string prefix, Allocator& alloc, ref_type root, ColumnType col_type);
 
 } // namespace realm

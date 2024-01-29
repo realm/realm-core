@@ -831,6 +831,48 @@ std::unique_ptr<BPlusTreeNode> BPlusTreeBase::create_root_from_ref(ref_type ref)
     }
 }
 
+// this should only be called column_type which we can safely compress.
+ref_type realm::bptree_typed_write(ref_type ref, _impl::ArrayWriterBase& out, Allocator& alloc, ColumnType col_type,
+                                   bool deep, bool only_modified, bool compress)
+{
+    if (only_modified && alloc.is_read_only(ref))
+        return ref;
+    char* header = alloc.translate(ref);
+    Array a(alloc);
+    a.init_from_ref(ref);
+    if (NodeHeader::get_is_inner_bptree_node_from_header(header)) {
+        Array dest(Allocator::get_default());
+        dest.create(NodeHeader::type_HasRefs, false, a.size());
+        REALM_ASSERT(a.has_refs());
+        for (unsigned j = 0; j < a.size(); ++j) {
+            RefOrTagged rot = a.get_as_ref_or_tagged(j);
+            if (rot.is_ref() && rot.get_as_ref()) {
+                if (j == 0) {
+                    // keys (ArrayUnsigned me thinks)
+                    Array a(alloc);
+                    a.init_from_ref(rot.get_as_ref());
+                    dest.set_as_ref(j, a.write(out, deep, only_modified, false));
+                }
+                else {
+                    dest.set_as_ref(
+                        j, bptree_typed_write(rot.get_as_ref(), out, alloc, col_type, deep, only_modified, compress));
+                }
+            }
+            else
+                dest.set(j, rot);
+        }
+        auto written_ref = dest.write(out, false, only_modified, false);
+        dest.destroy();
+        return written_ref;
+    }
+    else {
+        if (a.has_refs())
+            return a.write(out, deep, only_modified, false); // unknown substructure, don't compress
+        else
+            return a.write(out, false, only_modified, compress); // leaf array - do compress
+    }
+}
+
 void realm::bptree_typed_print(std::string prefix, Allocator& alloc, ref_type root, ColumnType col_type)
 {
     char* header = alloc.translate(root);
