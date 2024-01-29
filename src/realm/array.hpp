@@ -529,6 +529,8 @@ protected:
     };
     template <size_t w>
     struct VTableForWidth;
+    template <size_t w>
+    struct VTableForEncodedArray;
 
     // This is the one installed into the m_vtable->finder slots.
     template <class cond, size_t bitwidth>
@@ -571,6 +573,8 @@ protected:
 
     int64_t get_encoded(size_t ndx) const noexcept;
     int64_t get_not_encoded(size_t ndx) const noexcept;
+    void set_encoded(size_t ndx, int64_t);
+    void get_chunk_encoded(size_t, int64_t[8]) const noexcept;
 
 
 public:
@@ -740,7 +744,7 @@ inline int64_t Array::get_universal(const char* data, size_t ndx) const
         return (d >> (ndx & 7)) & 0x01;
     }
     else if (w == 0) {
-        return is_encoded() ? get_universal_encoded_array(ndx) : 0;
+        return 0;
     }
     else {
         REALM_ASSERT_DEBUG(false);
