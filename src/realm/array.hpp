@@ -705,41 +705,38 @@ inline void Array::get_chunk(size_t ndx, int64_t res[8]) const noexcept
 template <size_t w>
 inline int64_t Array::get_universal(const char* data, size_t ndx) const
 {
-    if (is_encoded())
-        return get_universal_encoded_array(ndx);
-
-    if (w == 0) {
-        return 0;
+    if (w == 64) {
+        size_t offset = ndx * 8;
+        return *reinterpret_cast<const int64_t*>(data + offset);
     }
-    else if (w == 1) {
-        size_t offset = ndx >> 3;
-        auto d = data[offset];
-        return (d >> (ndx & 7)) & 0x01;
+    else if (w == 32) {
+        size_t offset = ndx * 4;
+        return *reinterpret_cast<const int32_t*>(data + offset);
     }
-    else if (w == 2) {
-        size_t offset = ndx >> 2;
-        auto d = data[offset];
-        return (d >> ((ndx & 3) << 1)) & 0x03;
+    else if (w == 16) {
+        size_t offset = ndx * 2;
+        return *reinterpret_cast<const int16_t*>(data + offset);
+    }
+    else if (w == 8) {
+        return *reinterpret_cast<const signed char*>(data + ndx);
     }
     else if (w == 4) {
         size_t offset = ndx >> 1;
         auto d = data[offset];
         return (d >> ((ndx & 1) << 2)) & 0x0F;
     }
-    else if (w == 8) {
-        return *reinterpret_cast<const signed char*>(data + ndx);
+    else if (w == 2) {
+        size_t offset = ndx >> 2;
+        auto d = data[offset];
+        return (d >> ((ndx & 3) << 1)) & 0x03;
     }
-    else if (w == 16) {
-        size_t offset = ndx * 2;
-        return *reinterpret_cast<const int16_t*>(data + offset);
+    else if (w == 1) {
+        size_t offset = ndx >> 3;
+        auto d = data[offset];
+        return (d >> (ndx & 7)) & 0x01;
     }
-    else if (w == 32) {
-        size_t offset = ndx * 4;
-        return *reinterpret_cast<const int32_t*>(data + offset);
-    }
-    else if (w == 64) {
-        size_t offset = ndx * 8;
-        return *reinterpret_cast<const int64_t*>(data + offset);
+    else if (w == 0) {
+        return is_encoded() ? get_universal_encoded_array(ndx) : 0;
     }
     else {
         REALM_ASSERT_DEBUG(false);

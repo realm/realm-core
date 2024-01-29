@@ -200,9 +200,6 @@ Array::Array(Allocator& allocator) noexcept
 template <size_t w>
 int64_t Array::get(size_t ndx) const noexcept
 {
-    if (is_encoded())
-        return m_encode.get(*this, ndx);
-
     REALM_ASSERT_DEBUG(is_attached());
     return get_universal<w>(m_data, ndx);
 }

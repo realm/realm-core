@@ -1042,7 +1042,7 @@ uint_least8_t inline NodeHeader::get_width_from_header(const char* header) noexc
 {
 #ifdef REALM_DEBUG
     auto kind = get_kind(header);
-    REALM_ASSERT(kind == 'A' || kind == 'B');
+    REALM_ASSERT_DEBUG(kind == 'A' || kind == 'B');
     if (kind == 'B')
         REALM_ASSERT(false);
 #endif
