@@ -1569,7 +1569,8 @@ ref_type Cluster::typed_write(ref_type ref, _impl::ArrayWriterBase& out, const T
                 auto col_key = table.m_leaf_ndx2colkey[j - 1];
                 auto col_type = col_key.get_type();
                 auto col_attr = col_key.get_attrs();
-                if (!col_attr.test(col_attr_Collection) && col_type == col_type_Int) {
+                if (!col_attr.test(col_attr_Collection) &&
+                    (col_type == col_type_Int || col_type == col_type_Link || col_type == col_type_BackLink)) {
                     // we may compress integer leafs (but are not doing it yet)
                     dest.set_as_ref(j, a.write(out, deep, only_modified, compress));
                 }
