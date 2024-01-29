@@ -229,7 +229,7 @@ int64_t Array::get_not_encoded(size_t ndx) const noexcept
 
 int64_t Array::get(size_t ndx) const noexcept
 {
-    return is_encoded() ? m_encode.get(*this, ndx) : get_not_encoded(ndx);
+    return get_not_encoded(ndx);
 }
 
 size_t Array::bit_width(int64_t v)
@@ -289,7 +289,7 @@ void Array::init_from_mem(MemRef mem) noexcept
         m_is_inner_bptree_node = m_has_refs = false;
         m_context_flag = get_context_flag_from_header(header);
         REALM_TEMPEX(m_vtable = &VTableForWidth, m_width, ::vtable);
-        m_getter = m_vtable->getter;
+        m_getter = &Array::get_encoded; // m_vtable->getter;
     }
     else {
         header = Node::init_from_mem(mem);
@@ -729,15 +729,8 @@ size_t Array::size() const noexcept
 
 bool Array::encode_array(Array& arr) const
 {
-    //    const auto header = get_header();
-    //    auto kind = get_kind(header);
     if (!is_encoded() && m_encoding == NodeHeader::Encoding::WTypBits) {
         return m_encode.encode(*this, arr);
-        //        auto encoding = get_encoding(header);
-        //        // encode everything that is WtypeBits (all integer arrays included ref arrays)
-        //        if (encoding == NodeHeader::Encoding::WTypBits) {
-        //            return m_encode.encode(*this, arr);
-        //        }
     }
     return false;
 }
@@ -749,24 +742,11 @@ bool Array::decode_array(Array& arr) const
         return array_encoder.decode(arr);
     }
     return false;
-
-    //    const auto header = arr.get_header();
-    //    auto kind = NodeHeader::get_kind(header);
-    //    // if it is encoded and it is in flex format decode all
-    //    if (kind == 'B') {
-    //        auto encoding = NodeHeader::get_encoding(header);
-    //        if (encoding == NodeHeader::Encoding::Flex) {
-    //            auto& array_encoder = arr.m_encode;
-    //            return array_encoder.decode(arr);
-    //        }
-    //    }
-    //    return false;
 }
 
 bool Array::is_encoded() const
 {
     return m_kind == 'B'; // encoding not checked for now
-    // return m_encode.is_encoded(*this);
 }
 
 bool Array::try_encode(Array& arr) const
@@ -777,6 +757,11 @@ bool Array::try_encode(Array& arr) const
 bool Array::try_decode()
 {
     return decode_array(*this);
+}
+
+int64_t Array::get_encoded(size_t ndx) const noexcept
+{
+    return m_encode.get(*this, ndx);
 }
 
 int64_t Array::sum(size_t start, size_t end) const

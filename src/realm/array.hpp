@@ -176,7 +176,6 @@ public:
     void set(size_t ndx, int64_t value);
 
     int64_t get(size_t ndx) const noexcept;
-    int64_t get_not_encoded(size_t ndx) const noexcept;
 
     template <size_t w>
     int64_t get(size_t ndx) const noexcept;
@@ -568,6 +567,11 @@ protected:
     // encode/decode this array
     bool encode_array(Array&) const;
     bool decode_array(Array& arr) const;
+
+
+    int64_t get_encoded(size_t ndx) const noexcept;
+    int64_t get_not_encoded(size_t ndx) const noexcept;
+
 
 public:
     bool is_encoded() const;
