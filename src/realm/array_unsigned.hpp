@@ -24,11 +24,11 @@
 namespace realm {
 
 // Array holding unsigned values only
-class ArrayUnsigned : public Array {
+class ArrayUnsigned : public Node {
 
 public:
     ArrayUnsigned(Allocator& allocator)
-        : Array(allocator)
+        : Node(allocator)
     {
     }
 

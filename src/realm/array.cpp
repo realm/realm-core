@@ -1517,12 +1517,12 @@ size_t Array::find_first(int64_t value, size_t start, size_t end) const
 
 int_fast64_t Array::get(const char* header, size_t ndx) noexcept
 {
-    auto sz = get_size_from_header(header);
-    REALM_ASSERT(ndx < sz);
     if (NodeHeader::get_kind(header) == 'B') {
-        REALM_ASSERT(NodeHeader::get_encoding(header) == NodeHeader::Encoding::Flex);
+        REALM_ASSERT_DEBUG(NodeHeader::get_encoding(header) == NodeHeader::Encoding::Flex);
         return ArrayFlex::get(header, ndx);
     }
+    auto sz = get_size_from_header(header);
+    REALM_ASSERT(ndx < sz);
     const char* data = get_data_from_header(header);
     uint_least8_t width = get_width_from_header(header);
     return get_direct(data, width, ndx);

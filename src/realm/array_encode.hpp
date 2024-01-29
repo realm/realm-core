@@ -32,11 +32,9 @@ public:
     virtual ~ArrayEncode() = default;
     virtual bool encode(const Array&, Array&) const = 0;
     virtual bool decode(Array&) = 0;
-    virtual bool is_encoded(const Array&) const = 0;
     virtual size_t size(const Array&) const = 0;
     virtual int64_t get(const Array&, size_t) const = 0;
     virtual void set_direct(const Array&, size_t, int64_t) const = 0;
-    virtual uint64_t get_unsigned(const Array&, size_t) const = 0;
     // lower/upper bound for signed arrays
     virtual size_t lower_bound(const Array&, int64_t) const = 0;
     virtual size_t upper_bound(const Array&, int64_t) const = 0;
