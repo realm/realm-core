@@ -615,6 +615,9 @@ TEST_CASE("C API (non-database)", "[c_api]") {
             },
             &sync_user, user_data_free);
 
+        auto user_state = [](realm_userdata_t, realm_user_state_e) {};
+        realm_user_state_change_register_callback(sync_user, user_state, nullptr, user_data_free);
+
         auto check_base_url = [&](std::string expected) {
             CHECK(transport->get_location_called());
             auto app_base_url = realm_app_get_base_url(test_app.get());

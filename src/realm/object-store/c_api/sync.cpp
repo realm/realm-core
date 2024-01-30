@@ -40,6 +40,11 @@ realm_sync_session_connection_state_notification_token::~realm_sync_session_conn
     session->unregister_connection_change_callback(token);
 }
 
+realm_user_subscription_token::~realm_user_subscription_token()
+{
+    user->unsubscribe({user.get(), token});
+}
+
 namespace realm::c_api {
 
 static_assert(realm_sync_client_metadata_mode_e(SyncClientConfig::MetadataMode::NoEncryption) ==
