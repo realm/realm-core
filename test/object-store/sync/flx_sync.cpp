@@ -4544,6 +4544,118 @@ TEST_CASE("flx sync: Client reset during async open", "[sync][flx][client reset]
     REQUIRE(subscription_invoked.load());
 }
 
+// Test for issue #6839, where async wait for download then async wait for subscription state after
+// commiting a new subscription was leading to a garbage reason value in the status provided to the
+// subscription complete callback.
+TEST_CASE("flx sync: no garbage data if wait for download prior to wait subs complete", "[sync][flx][baas]") {
+    auto logger = util::Logger::get_default_logger();
+    FLXSyncTestHarness harness("flx_wait_for_download");
+
+    harness.load_initial_data([&](SharedRealm realm) {
+        CppContext c(realm);
+        const char* strings[] = {"foo", "bar", "baz", "goo", "gah"};
+        for (int i = 0; i < 25; ++i) {
+            auto id = ObjectId::gen();
+            auto obj =
+                Object::create(c, realm, "TopLevel",
+                               std::any(AnyDict{{"_id", id},
+                                                {"queryable_str_field", std::string(util::format("queryable-%1", i))},
+                                                {"queryable_int_field", static_cast<int64_t>(i * 5)},
+                                                {"non_queryable_field", std::string(strings[i % 5])}}));
+        }
+    });
+
+    SyncTestFile wait_realm_config(harness.app()->current_user(), harness.schema(), SyncConfig::FLXSyncEnabled{});
+    wait_realm_config.cache = false;
+
+    auto check_status = [](const Status& status) {
+        REQUIRE(!status.is_ok());
+        std::string_view reason = status.reason();
+        // Depending on the version of baas used, it may return 'Invalid query:' or
+        // 'Client provided query with bad syntax:'
+        if ((reason.find("Invalid query:") == std::string_view::npos &&
+             reason.find("Client provided query with bad syntax:") == std::string_view::npos) ||
+            reason.find("\"TopLevel\": key \"non_queryable_field\" is not a queryable field") ==
+                std::string_view::npos) {
+            FAIL(reason);
+        }
+    };
+
+    Realm::Config config = wait_realm_config;
+    auto pf = util::make_promise_future<void>();
+    auto realm = Realm::get_shared_realm(config);
+    auto mut_subs = realm->get_latest_subscription_set().make_mutable_copy();
+    auto good_query = GENERATE(true, false);
+    if (good_query) {
+        auto table = realm->read_group().get_table("class_TopLevel");
+        mut_subs.insert_or_assign(Query(table));
+    }
+    else {
+        auto table = realm->read_group().get_table("class_TopLevel");
+        auto queryable_field = table->get_column_key("non_queryable_field");
+        mut_subs.insert_or_assign(Query(table).equal(queryable_field, "bar"));
+    }
+    SECTION("synchronous wait") {
+        auto new_sub = mut_subs.commit();
+        REQUIRE(!wait_for_download(*realm));
+        auto result = new_sub.get_state_change_notification(sync::SubscriptionSet::State::Complete).get_no_throw();
+        if (good_query) {
+            if (!result.is_ok()) {
+                logger->error("Subscription state change error: %1", result.get_status());
+            }
+            REQUIRE(result.is_ok());
+        }
+        else {
+            logger->info("Expected subscription state change error: %1", result.get_status());
+            REQUIRE(!result.is_ok());
+            check_status(result.get_status());
+        }
+    }
+    SECTION("asynchronous wait") {
+        auto table = realm->read_group().get_table("class_TopLevel");
+        mut_subs.insert_or_assign(Query(table));
+        auto pf_download = util::make_promise_future<void>();
+        auto pf_subs = util::make_promise_future<void>();
+        auto new_sub = mut_subs.commit();
+        realm->sync_session()->wait_for_download_completion(
+            [&logger,
+             promise = util::CopyablePromiseHolder<void>(std::move(pf_download.promise))](Status status) mutable {
+                if (!status.is_ok()) {
+                    logger->error("Wait for download complete error (async): %1", status);
+                    promise.get_promise().set_error(status);
+                }
+                else {
+                    promise.get_promise().emplace_value();
+                }
+            });
+        new_sub.get_state_change_notification(sync::SubscriptionSet::State::Complete)
+            .get_async([&logger, promise = util::CopyablePromiseHolder<void>(std::move(pf_subs.promise))](
+                           StatusWith<sync::SubscriptionSet::State> result) mutable {
+                if (!result.is_ok()) {
+                    logger->error("Subscription state change error (async): %1", result.get_status());
+                    promise.get_promise().set_error(result.get_status());
+                }
+                else {
+                    promise.get_promise().emplace_value();
+                }
+            });
+        auto download_result = pf_download.future.get_no_throw();
+        REQUIRE(download_result.is_ok());
+        auto subs_result = pf_subs.future.get_no_throw();
+        if (good_query) {
+            if (!subs_result.is_ok()) {
+                logger->error("Subscription state change error: %1", subs_result);
+            }
+            REQUIRE(subs_result.is_ok());
+        }
+        else {
+            logger->info("Expected subscription state change error: %1", subs_result);
+            REQUIRE(!subs_result.is_ok());
+            check_status(subs_result);
+        }
+    }
+}
+
 // Test that resending pending subscription sets does not cause any inconsistencies in the progress cursors.
 TEST_CASE("flx sync: resend pending subscriptions when reconnecting", "[sync][flx][baas]") {
     FLXSyncTestHarness harness("flx_pending_subscriptions", {g_large_array_schema, {"queryable_int_field"}});
