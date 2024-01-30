@@ -11,8 +11,9 @@ if(@REALM_HAVE_OPENSSL@)
 
         include(${OPENSSL_CMAKE_INCLUDE_FILE})
     endif()
-
-    set(OPENSSL_USE_STATIC_LIBS ON)
+    if(NOT DEFINED OPENSSL_USE_STATIC_LIBS)
+        set(OPENSSL_USE_STATIC_LIBS ON)
+    endif()
     find_dependency(OpenSSL @OPENSSL_VERSION@)
 endif()
 
