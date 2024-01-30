@@ -26,6 +26,7 @@
 #include <realm/array_key.hpp>
 #include <realm/impl/array_writer.hpp>
 #include <realm/array_flex.hpp>
+#include <realm/array_packed.hpp>
 
 #include <array>
 #include <cstring> // std::memcpy
@@ -190,10 +191,13 @@ using namespace realm;
 using namespace realm::util;
 
 void QueryStateBase::dyncast() {}
+// TODO is not nice.. we can even have a dummy encoder that does nothing
+//      the encoder should be set only during encoding (commit) and during init_from_mem
 static ArrayFlex s_array_flex;
+static ArrayPacked s_array_packed;
 Array::Array(Allocator& allocator) noexcept
     : Node(allocator)
-    , m_encode(s_array_flex)
+    , m_encode(&s_array_flex)
 {
 }
 
@@ -305,10 +309,12 @@ void Array::init_from_mem(MemRef mem) noexcept
         char* header = mem.get_addr();
         m_ref = mem.get_ref();
         m_data = get_data_from_header(header);
-        m_size = NodeHeader::get_arrayB_num_elements<Encoding::Flex>(header);
+        m_size = ArrayEncode::size(header);
+        m_encode = ArrayEncode::is_packed(header) ? (ArrayEncode*)(&s_array_packed) : (ArrayEncode*)&s_array_flex;
         m_width = m_lbound = m_ubound = 0;
         m_is_inner_bptree_node = m_has_refs = false;
         m_context_flag = get_context_flag_from_header(header);
+
         // REALM_TEMPEX(m_vtable = &PopulatedVTableEncoded, m_width, ::vtable);
         REALM_TEMPEX(m_vtable = &VTableForEncodedArray, m_width, ::vtable);
         m_getter = m_vtable->getter;
@@ -752,23 +758,22 @@ size_t Array::size() const noexcept
 bool Array::encode_array(Array& arr) const
 {
     if (!is_encoded() && m_encoding == NodeHeader::Encoding::WTypBits) {
-        return m_encode.encode(*this, arr);
+        return ArrayEncode::encode(*this, arr);
     }
     return false;
 }
 
 bool Array::decode_array(Array& arr) const
 {
-    if (is_encoded()) {
-        auto& array_encoder = arr.m_encode;
-        return array_encoder.decode(arr);
-    }
-    return false;
+    return arr.is_encoded() ? arr.m_encode->decode(arr) : false;
 }
 
 bool Array::is_encoded() const
 {
-    return m_kind == 'B'; // encoding not checked for now
+    // encoding not checked. It is not strictly needed
+    REALM_ASSERT_DEBUG(m_kind == 'B' &&
+                       (m_encoding == NodeHeader::Encoding::Flex || m_encoding == NodeHeader::Encoding::Packed));
+    return m_kind == 'B';
 }
 
 bool Array::try_encode(Array& arr) const
@@ -783,18 +788,18 @@ bool Array::try_decode()
 
 int64_t Array::get_encoded(size_t ndx) const noexcept
 {
-    return m_encode.get(*this, ndx);
+    return m_encode->get(*this, ndx);
 }
 
 void Array::set_encoded(size_t ndx, int64_t val)
 {
-    m_encode.set_direct(*this, ndx, val);
+    m_encode->set_direct(*this, ndx, val);
 }
 
 int64_t Array::sum(size_t start, size_t end) const
 {
     if (is_encoded())
-        return m_encode.sum(*this, start, end);
+        return m_encode->sum(*this, start, end);
     REALM_TEMPEX(return sum, m_width, (start, end));
 }
 
@@ -806,10 +811,10 @@ int64_t Array::sum(size_t start, size_t end) const
 
     REALM_ASSERT_EX(end <= m_size && start <= end, start, end, m_size);
 
-    if (is_encoded())
-        return m_encode.sum(*this, start, end);
+    if (w == 0)
+        return is_encoded() ? m_encode->sum(*this, start, end) : 0;
 
-    if (w == 0 || start == end)
+    if (start == end)
         return 0;
 
     int64_t s = 0;
@@ -1374,7 +1379,7 @@ void Array::get_chunk(size_t ndx, int64_t res[8]) const noexcept
 
 void Array::get_chunk_encoded(size_t ndx, int64_t res[8]) const noexcept
 {
-    m_encode.get_chunk(*this, ndx, res);
+    m_encode->get_chunk(*this, ndx, res);
 }
 
 template <>
@@ -1501,14 +1506,14 @@ void Array::verify() const
 size_t Array::lower_bound_int(int64_t value) const noexcept
 {
     if (is_encoded())
-        return m_encode.lower_bound(*this, value);
+        return m_encode->lower_bound(*this, value);
     REALM_TEMPEX(return lower_bound, m_width, (m_data, m_size, value));
 }
 
 size_t Array::upper_bound_int(int64_t value) const noexcept
 {
     if (is_encoded())
-        return m_encode.upper_bound(*this, value);
+        return m_encode->upper_bound(*this, value);
     REALM_TEMPEX(return upper_bound, m_width, (m_data, m_size, value));
 }
 
@@ -1516,7 +1521,7 @@ size_t Array::upper_bound_int(int64_t value) const noexcept
 size_t Array::find_first(int64_t value, size_t start, size_t end) const
 {
     if (is_encoded())
-        return m_encode.find_first(*this, value);
+        return m_encode->find_first(*this, value);
     return find_first<Equal>(value, start, end);
 }
 
@@ -1524,19 +1529,13 @@ size_t Array::find_first(int64_t value, size_t start, size_t end) const
 int_fast64_t Array::get(const char* header, size_t ndx) noexcept
 {
     if (NodeHeader::get_kind(header) == 'B') {
-        REALM_ASSERT_DEBUG(NodeHeader::get_encoding(header) == NodeHeader::Encoding::Flex);
-        return ArrayFlex::get(header, ndx);
+        return ArrayEncode::get(header, ndx);
     }
     auto sz = get_size_from_header(header);
     REALM_ASSERT(ndx < sz);
     const char* data = get_data_from_header(header);
     uint_least8_t width = get_width_from_header(header);
     return get_direct(data, width, ndx);
-}
-
-int_fast64_t Array::get_universal_encoded_array(size_t ndx) const
-{
-    return m_encode.get(*this, ndx);
 }
 
 std::pair<int64_t, int64_t> Array::get_two(const char* header, size_t ndx) noexcept

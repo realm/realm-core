@@ -1004,7 +1004,7 @@ bool ArrayWithFind::find_encoded_array(int64_t value, size_t start, size_t end, 
     // this is not optimized. just fetch all the values from the array and apply the cond.
     // it can be optimized later, for example avoid to fetch all the values from the encoded array
     // and apply the cond predicate, + can we used binary seatch here? Likely yes.
-    ArrayEncode& encode = m_array.m_encode;
+    auto& encode = *m_array.m_encode;
 
     if constexpr (std::is_same<Cond, Equal>::value || std::is_same<Cond, NotEqual>::value) {
         const auto eq = std::is_same<Cond, Equal>::value;
