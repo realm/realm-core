@@ -4645,33 +4645,36 @@ TEST_CASE("flx sync: no garbage data if wait for download prior to wait subs com
     auto mut_subs = realm->get_latest_subscription_set().make_mutable_copy();
     auto good_query = GENERATE(true, false);
     if (good_query) {
+        // In the good case, create a valid subscription query
         auto table = realm->read_group().get_table("class_TopLevel");
         mut_subs.insert_or_assign(Query(table));
     }
     else {
+        // in the bad case, try to query against a non-queryable field
         auto table = realm->read_group().get_table("class_TopLevel");
         auto queryable_field = table->get_column_key("non_queryable_field");
         mut_subs.insert_or_assign(Query(table).equal(queryable_field, "bar"));
     }
     SECTION("synchronous wait") {
         auto new_sub = mut_subs.commit();
+        // Wait for download should always be successful (e.g. return false)
         REQUIRE(!wait_for_download(*realm));
         auto result = new_sub.get_state_change_notification(sync::SubscriptionSet::State::Complete).get_no_throw();
         if (good_query) {
+            // Good case - verify success was returned
             if (!result.is_ok()) {
                 logger->error("Subscription state change error: %1", result.get_status());
             }
             REQUIRE(result.is_ok());
         }
         else {
+            // Bad case - verify error occurred
             logger->info("Expected subscription state change error: %1", result.get_status());
             REQUIRE(!result.is_ok());
             check_status(result.get_status());
         }
     }
     SECTION("asynchronous wait") {
-        auto table = realm->read_group().get_table("class_TopLevel");
-        mut_subs.insert_or_assign(Query(table));
         auto pf_download = util::make_promise_future<void>();
         auto pf_subs = util::make_promise_future<void>();
         auto new_sub = mut_subs.commit();
@@ -4698,16 +4701,15 @@ TEST_CASE("flx sync: no garbage data if wait for download prior to wait subs com
                 }
             });
         auto download_result = pf_download.future.get_no_throw();
+        // Wait for download should always be successful (e.g. return no error)
         REQUIRE(download_result.is_ok());
         auto subs_result = pf_subs.future.get_no_throw();
         if (good_query) {
-            if (!subs_result.is_ok()) {
-                logger->error("Subscription state change error: %1", subs_result);
-            }
+            // Good case - verify success
             REQUIRE(subs_result.is_ok());
         }
         else {
-            logger->info("Expected subscription state change error: %1", subs_result);
+            // Bad case - verify error occurred
             REQUIRE(!subs_result.is_ok());
             check_status(subs_result);
         }
