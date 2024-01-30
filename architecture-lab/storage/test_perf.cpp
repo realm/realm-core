@@ -397,44 +397,43 @@ public:
 #endif
 
 // controls
-#define USE_UNALIGNED 1
+#define USE_UNALIGNED 0
 #define USE_INTERPOLATION 0
 #define USE_LOCAL_DIR 1
-#define USE_SPARSE 1
+#define USE_SPARSE 0
 #define USE_BASE_OFFSET 0 // defunct
-#define USE_EMPTY_IMPROVEMENT 1
+#define USE_EMPTY_IMPROVEMENT 0
 
 int unsigned_bits_needed(uint64_t val)
 {
 #if USE_UNALIGNED
-    /* This is with unaligned accesses */
-    if (val >> 48)
-        return 64;
-    if (val >> 32)
-        return 48;
-    if (val >> 24)
-        return 32;
-    if (val >> 16)
-        return 24;
-    if (val >> 12)
-        return 16;
-    if (val >> 8)
-        return 12;
-    if (val >> 6)
-        return 8;
-    if (val >> 5)
-        return 6;
-    if (val >> 4)
-        return 5;
-    if (val >> 3)
-        return 4;
-    if (val >> 2)
-        return 3;
-    if (val >> 1)
-        return 2;
-    if (val)
-        return 1;
-    return 0;
+    int retval = 1;
+    if (val >> 32) {
+        retval += 32;
+        val >>= 32;
+    }
+    if (val >> 16) {
+        retval += 16;
+        val >>= 16;
+    }
+    if (val >> 8) {
+        retval += 8;
+        val >>= 8;
+    }
+    if (val >> 4) {
+        retval += 4;
+        val >>= 4;
+    }
+    if (val >> 2) {
+        retval += 2;
+        val >>= 2;
+    }
+    if (val >> 1) {
+        retval += 1;
+        val >>= 1;
+    }
+    if (retval > 64) retval = 64;
+    return retval;
 #else
     // This is with our current aligned accesses
 
@@ -534,7 +533,6 @@ struct leaf_compression_analyzer {
         EncType enc_type = EncType::Array;
 
         // with special case where everything is 0, encoded as ref == 0
-
         if (default_value == 0 && non_default_values == 0) {
             leaf_cost = 8 + (USE_EMPTY_IMPROVEMENT ? 0 : 8);
             enc_type = EncType::Empty;
@@ -1008,7 +1006,8 @@ int main(int argc, char* argv[])
         uint64_t from_size = 0;
         uint64_t dict_size = 0;
         uint64_t symbol_size = 0;
-        uint64_t ref_size = 0;
+        uint64_t ref_string_size = 0;
+        uint64_t ref_int_size = 0;
         uint64_t compressed_size = 0;
         uint64_t dict_entries = 0;
         std::cout << "String compression results:" << std::endl;
@@ -1029,7 +1028,7 @@ int main(int argc, char* argv[])
                           << " bytes + " << std::setw(9) << col_symbol_size << " for symboltable \tInterned into "
                           << std::setw(11) << col_dict_entries << " unique values stored in " << std::setw(11)
                           << col_dict_size << " bytes" << std::endl;
-                compressors[i].reset();
+                // compressors[i].reset();
                 dict_size += col_dict_size;
                 dict_entries += col_dict_entries;
                 symbol_size += col_symbol_size;
@@ -1037,10 +1036,30 @@ int main(int argc, char* argv[])
                 compressed_size += col_compressed * 2;
             }
         }
-        std::cout << "Leaf compression results:" << std::endl;
+        std::cout << "Leaf compression results (String IDs):" << std::endl;
         for (int i = 0; i < max_fields; ++i) {
+            if (compressors[i]) {
+                auto col_ref_size = leaf_analyzers[i].total_bytes;
+                ref_string_size += col_ref_size;
+                uint64_t total_arrays = 0;
+                for (int t = EncType::Array; t <= EncType::Offst; t++) {
+                    total_arrays += leaf_analyzers[i].type_counts[t];
+                }
+                std::cout << "Field " << std::right << std::setw(3) << i << " leafs compressed to " << std::setw(11)
+                          << col_ref_size << " (";
+                for (int t = EncType::Array; t <= EncType::Offst; t++) {
+                    std::cout << EncName[t] << ": " << std::right << std::setw(3)
+                              << leaf_analyzers[i].type_counts[t] * 100 / total_arrays << " %  ";
+                }
+                std::cout << ")" << std::endl;
+            }
+        }
+        std::cout << "Leaf compression results (Integers):" << std::endl;
+        for (int i = 0; i < max_fields; ++i) {
+            if (compressors[i])
+                continue;
             auto col_ref_size = leaf_analyzers[i].total_bytes;
-            ref_size += col_ref_size;
+            ref_int_size += col_ref_size;
             uint64_t total_arrays = 0;
             for (int t = EncType::Array; t <= EncType::Offst; t++) {
                 total_arrays += leaf_analyzers[i].type_counts[t];
@@ -1053,6 +1072,7 @@ int main(int argc, char* argv[])
             }
             std::cout << ")" << std::endl;
         }
+        for (int i = 0; i < max_fields; ++i) compressors[i].reset();
         uint64_t cluster_tree_overhead = 4 * num_line;
         std::cout << std::endl
                   << std::right << "Summary:" << std::endl
@@ -1062,10 +1082,11 @@ int main(int argc, char* argv[])
                   << " for symbol tables." << std::endl
                   << " - String interning:    " << std::setw(11) << compressed_size << " -> " << std::setw(11)
                   << dict_size << " bytes for dictionaries with " << dict_entries << " unique values" << std::endl
-                  << " - Leaf size:           " << std::setw(11) << ref_size << std::endl
+                  << " - Leaf size (strings): " << std::setw(11) << ref_string_size << std::endl
+                  << " - Leaf size (ints):    " << std::setw(11) << ref_int_size << std::endl
                   << " - ClusterTree overhead:" << std::setw(11) << cluster_tree_overhead << std::endl
                   << "------------------------" << std::endl;
-        auto total = ref_size + dict_size + symbol_size + cluster_tree_overhead;
+        auto total = ref_int_size + ref_string_size + dict_size + symbol_size + cluster_tree_overhead;
         std::cout << "Size estimate: " << std::right << std::setw(11) << total << "   (data compressed to "
                   << 1000 * total / size << " pml of original size)" << std::endl;
 
