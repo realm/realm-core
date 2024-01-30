@@ -82,6 +82,7 @@ typedef struct realm_config realm_config_t;
 typedef struct realm_app_config realm_app_config_t;
 typedef struct realm_sync_client_config realm_sync_client_config_t;
 typedef struct realm_sync_config realm_sync_config_t;
+typedef struct realm_backing_store_config realm_backing_store_config_t;
 typedef bool (*realm_migration_func_t)(realm_userdata_t userdata, realm_t* old_realm, realm_t* new_realm,
                                        const realm_schema_t* schema);
 typedef bool (*realm_data_initialization_func_t)(realm_userdata_t userdata, realm_t* realm);
@@ -2770,6 +2771,7 @@ RLM_API void realm_http_transport_complete_request(void* request_context, const 
 typedef struct realm_app realm_app_t;
 typedef struct realm_app_credentials realm_app_credentials_t;
 typedef struct realm_user realm_user_t;
+typedef struct realm_backing_store realm_backing_store_t;
 
 typedef enum realm_user_state {
     RLM_USER_STATE_LOGGED_OUT,
@@ -2788,6 +2790,11 @@ typedef enum realm_auth_provider {
     RLM_AUTH_PROVIDER_FUNCTION,
     RLM_AUTH_PROVIDER_API_KEY,
 } realm_auth_provider_e;
+
+typedef enum realm_app_cache_mode {
+    RLM_APP_CACHE_MODE_ENABLED,
+    RLM_APP_CACHE_MODE_DISABLED,
+} realm_app_cache_mode_e;
 
 typedef struct realm_app_user_apikey {
     realm_object_id_t id;
@@ -2907,18 +2914,27 @@ RLM_API void realm_app_config_set_bundle_id(realm_app_config_t* config, const ch
 RLM_API const char* realm_app_credentials_serialize_as_json(realm_app_credentials_t*) RLM_API_NOEXCEPT;
 
 /**
- * Create realm_app_t* instance given a valid realm configuration and sync client configuration.
+ * Create realm_backing_store_t* instance given a valid configuration.
  *
  * @return A non-null pointer if no error occurred.
  */
-RLM_API realm_app_t* realm_app_create(const realm_app_config_t*, const realm_sync_client_config_t*);
+RLM_API realm_backing_store_t* realm_backing_store_create(const realm_app_t*, const realm_backing_store_config_t*);
 
 /**
- * Create cached realm_app_t* instance given a valid realm configuration and sync client configuration.
+ * A factory that will return a backing store instance. It should be constructed with the app instance provided.
+ */
+typedef realm_backing_store_t* (*realm_backing_store_factory_func_t)(realm_userdata_t userdata,
+                                                                     const realm_app_t* app);
+
+/**
+ * Create realm_app_t* instance given a valid realm configuration and sync client configuration.
+ * If the factory is invoked, the underlying shared_ptr will be tied to the lifetime of the app instance.
  *
  * @return A non-null pointer if no error occurred.
  */
-RLM_API realm_app_t* realm_app_create_cached(const realm_app_config_t*, const realm_sync_client_config_t*);
+RLM_API realm_app_t* realm_app_create(realm_app_cache_mode_e, const realm_app_config_t*,
+                                      const realm_sync_client_config_t*, realm_backing_store_factory_func_t,
+                                      realm_userdata_t);
 
 /**
  * Get a cached realm_app_t* instance given an app id. out_app may be null if the app with this id hasn't been
@@ -3365,11 +3381,11 @@ RLM_API realm_app_t* realm_user_get_app(const realm_user_t*) RLM_API_NOEXCEPT;
 
 
 /* Sync */
-typedef enum realm_sync_client_metadata_mode {
-    RLM_SYNC_CLIENT_METADATA_MODE_PLAINTEXT,
-    RLM_SYNC_CLIENT_METADATA_MODE_ENCRYPTED,
-    RLM_SYNC_CLIENT_METADATA_MODE_DISABLED,
-} realm_sync_client_metadata_mode_e;
+typedef enum realm_backing_store_metadata_mode {
+    RLM_BACKING_STORE_METADATA_MODE_PLAINTEXT,
+    RLM_BACKING_STORE_METADATA_MODE_ENCRYPTED,
+    RLM_BACKING_STORE_METADATA_MODE_DISABLED,
+} realm_backing_store_metadata_mode_e;
 
 typedef enum realm_sync_client_reconnect_mode {
     RLM_SYNC_CLIENT_RECONNECT_MODE_NORMAL,
@@ -3521,12 +3537,14 @@ typedef void (*realm_async_open_task_completion_func_t)(realm_userdata_t userdat
 // callback runs.
 typedef void (*realm_async_open_task_init_subscription_func_t)(realm_t* realm, realm_userdata_t userdata);
 
+RLM_API realm_backing_store_config_t* realm_backing_store_config_new(void) RLM_API_NOEXCEPT;
+RLM_API void realm_backing_store_config_set_base_file_path(realm_backing_store_config_t*,
+                                                           const char*) RLM_API_NOEXCEPT;
+RLM_API void realm_backing_store_config_set_metadata_mode(realm_backing_store_config_t*,
+                                                          realm_backing_store_metadata_mode_e) RLM_API_NOEXCEPT;
+RLM_API void realm_backing_store_config_set_metadata_encryption_key(realm_backing_store_config_t*,
+                                                                    const uint8_t[64]) RLM_API_NOEXCEPT;
 RLM_API realm_sync_client_config_t* realm_sync_client_config_new(void) RLM_API_NOEXCEPT;
-RLM_API void realm_sync_client_config_set_base_file_path(realm_sync_client_config_t*, const char*) RLM_API_NOEXCEPT;
-RLM_API void realm_sync_client_config_set_metadata_mode(realm_sync_client_config_t*,
-                                                        realm_sync_client_metadata_mode_e) RLM_API_NOEXCEPT;
-RLM_API void realm_sync_client_config_set_metadata_encryption_key(realm_sync_client_config_t*,
-                                                                  const uint8_t[64]) RLM_API_NOEXCEPT;
 RLM_API void realm_sync_client_config_set_reconnect_mode(realm_sync_client_config_t*,
                                                          realm_sync_client_reconnect_mode_e) RLM_API_NOEXCEPT;
 RLM_API void realm_sync_client_config_set_multiplex_sessions(realm_sync_client_config_t*, bool) RLM_API_NOEXCEPT;

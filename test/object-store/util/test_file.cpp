@@ -39,7 +39,7 @@
 #include <realm/object-store/sync/sync_session.hpp>
 #include <realm/object-store/sync/sync_user.hpp>
 #include <realm/object-store/schema.hpp>
-#endif
+#endif // REALM_ENABLE_SYNC
 
 #include <cstdlib>
 #include <iostream>
@@ -134,7 +134,7 @@ static const std::string fake_device_id = "123400000000000000000000";
 
 static std::shared_ptr<SyncUser> get_fake_user(app::App& app, const std::string& user_name)
 {
-    return app.sync_manager()->get_user(user_name, fake_refresh_token, fake_access_token, fake_device_id);
+    return app.backing_store()->get_user(user_name, fake_refresh_token, fake_access_token, fake_device_id);
 }
 
 SyncTestFile::SyncTestFile(std::shared_ptr<app::App> app, std::string name, std::string user_name)
@@ -262,9 +262,11 @@ static Status wait_for_session(Realm& realm, void (SyncSession::*fn)(util::Uniqu
                                std::chrono::seconds timeout)
 {
     auto shared_state = std::make_shared<WaitForSessionState>();
-    auto& session = *realm.config().sync_config->user->session_for_on_disk_path(realm.config().path);
+    auto app = realm.config().sync_config->user->app().lock();
+    REALM_ASSERT(app);
+    auto session = app->sync_manager()->get_existing_session(realm.config().path);
     auto delay = TEST_TIMEOUT_EXTRA > 0 ? timeout + std::chrono::seconds(TEST_TIMEOUT_EXTRA) : timeout;
-    (session.*fn)([weak_state = std::weak_ptr<WaitForSessionState>(shared_state)](Status s) {
+    ((*session).*fn)([weak_state = std::weak_ptr<WaitForSessionState>(shared_state)](Status s) {
         auto shared_state = weak_state.lock();
         if (!shared_state) {
             return;
@@ -323,19 +325,32 @@ void set_app_config_defaults(app::App::Config& app_config,
 
 #if REALM_ENABLE_AUTH_TESTS
 
-TestAppSession::TestAppSession()
-    : TestAppSession(get_runtime_app_session(), nullptr, DeleteApp{false})
+TestAppSession::Config::Config()
+    : Config(get_runtime_app_session(), nullptr, DeleteApp{false})
 {
 }
 
-TestAppSession::TestAppSession(AppSession session,
+TestAppSession::Config::Config(AppSession session,
                                std::shared_ptr<realm::app::GenericNetworkTransport> custom_transport,
-                               DeleteApp delete_app, ReconnectMode reconnect_mode,
-                               std::shared_ptr<realm::sync::SyncSocketProvider> custom_socket_provider)
-    : m_app_session(std::make_unique<AppSession>(session))
-    , m_base_file_path(util::make_temp_dir() + random_string(10))
-    , m_delete_app(delete_app)
-    , m_transport(custom_transport)
+                               DeleteApp delete_app, ReconnectMode mode,
+                               std::shared_ptr<realm::sync::SyncSocketProvider> socket_provider,
+                               std::optional<app::App::StoreFactory> store)
+    : app_session(std::make_unique<AppSession>(std::move(session)))
+    , transport(std::move(custom_transport))
+    , delete_when_done(delete_app)
+    , reconnect_mode(std::move(mode))
+    , custom_socket_provider(std::move(socket_provider))
+    , store_factory(store)
+{
+}
+
+TestAppSession::Config::~Config() {}
+
+TestAppSession::TestAppSession(Config config)
+    : m_app_session(std::move(config.app_session))
+    , m_delete_app(config.delete_when_done)
+    , m_transport(std::move(config.transport))
+    , m_delete_storage(config.delete_storage)
 {
     if (!m_transport)
         m_transport = instance_of<SynchronousTestTransport>;
@@ -343,21 +358,37 @@ TestAppSession::TestAppSession(AppSession session,
     util::Logger::set_default_level_threshold(realm::util::Logger::Level::TEST_LOGGING_LEVEL);
     set_app_config_defaults(app_config, m_transport);
 
+    if (config.storage_path) {
+        m_base_file_path = *config.storage_path;
+    }
+    else {
+        m_base_file_path = util::make_temp_dir();
+    }
+
     util::try_make_dir(m_base_file_path);
+    auto default_factory = [path = m_base_file_path](realm::app::SharedApp app) {
+        app::RealmBackingStoreConfig bsc;
+        bsc.base_file_path = path;
+        bsc.metadata_mode = app::RealmBackingStoreConfig::MetadataMode::NoEncryption;
+        return std::make_shared<app::RealmBackingStore>(app, bsc);
+    };
+
+    if (!config.store_factory) {
+        config.store_factory = std::move(default_factory);
+    }
     SyncClientConfig sc_config;
-    sc_config.base_file_path = m_base_file_path;
-    sc_config.metadata_mode = realm::SyncManager::MetadataMode::NoEncryption;
-    sc_config.reconnect_mode = reconnect_mode;
-    sc_config.socket_provider = custom_socket_provider;
+    sc_config.reconnect_mode = config.reconnect_mode;
+    sc_config.socket_provider = std::move(config.custom_socket_provider);
     // With multiplexing enabled, the linger time controls how long a
     // connection is kept open for reuse. In tests, we want to shut
     // down sync clients immediately.
     sc_config.timeouts.connection_linger_time = 0;
 
-    m_app = app::App::get_app(app::App::CacheMode::Disabled, app_config, sc_config);
+    m_app = app::App::get_app(app::App::CacheMode::Disabled, app_config, sc_config, *config.store_factory);
 
     // initialize sync client
     m_app->sync_manager()->get_sync_client();
+
     create_user_and_log_in(m_app);
 }
 
@@ -366,7 +397,9 @@ TestAppSession::~TestAppSession()
     if (util::File::exists(m_base_file_path)) {
         try {
             m_app->sync_manager()->reset_for_testing();
-            util::try_remove_dir_recursive(m_base_file_path);
+            if (m_delete_storage) {
+                util::try_remove_dir_recursive(m_base_file_path);
+            }
         }
         catch (const std::exception& ex) {
             std::cerr << ex.what() << "\n";
@@ -419,6 +452,7 @@ std::vector<bson::BsonDocument> TestAppSession::get_documents(SyncUser& user, co
                     });
     return documents;
 }
+
 #endif // REALM_ENABLE_AUTH_TESTS
 
 // MARK: - TestSyncManager
@@ -432,13 +466,15 @@ TestSyncManager::TestSyncManager(const Config& config, const SyncServer::Config&
     set_app_config_defaults(app_config, transport);
     util::Logger::set_default_level_threshold(config.log_level);
 
-    SyncClientConfig sc_config;
     m_base_file_path = config.base_path.empty() ? util::make_temp_dir() + random_string(10) : config.base_path;
     util::try_make_dir(m_base_file_path);
-    sc_config.base_file_path = m_base_file_path;
-    sc_config.metadata_mode = config.metadata_mode;
-
-    m_app = app::App::get_app(app::App::CacheMode::Disabled, app_config, sc_config);
+    app::RealmBackingStoreConfig bsc;
+    bsc.base_file_path = m_base_file_path;
+    bsc.metadata_mode = config.metadata_mode;
+    auto factory = [bsc](app::SharedApp app) {
+        return std::make_shared<app::RealmBackingStore>(app, bsc);
+    };
+    m_app = app::App::get_app(app::App::CacheMode::Disabled, app_config, SyncClientConfig{}, factory);
     if (config.override_sync_route) {
         m_app->sync_manager()->set_sync_route(m_sync_server.base_url() + "/realm-sync");
     }

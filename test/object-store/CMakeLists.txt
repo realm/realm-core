@@ -46,6 +46,7 @@ if(REALM_ENABLE_AUTH_TESTS)
     list(APPEND SOURCES util/sync/baas_admin_api.cpp)
 endif()
 
+
 if(REALM_ENABLE_SYNC)
     list(APPEND HEADERS
         util/sync/baas_admin_api.hpp
@@ -57,6 +58,7 @@ if(REALM_ENABLE_SYNC)
     list(APPEND SOURCES
         bson.cpp
         sync/app.cpp
+        sync/app_backing_store.cpp
         sync/client_reset.cpp
         sync/file.cpp
         sync/flx_migration.cpp

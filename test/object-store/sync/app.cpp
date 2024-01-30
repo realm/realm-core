@@ -908,8 +908,8 @@ TEST_CASE("app: UsernamePasswordProviderClient integration", "[sync][app][user][
 
     SECTION("log in, remove, log in") {
         app->remove_user(app->current_user(), [](auto) {});
-        CHECK(app->sync_manager()->all_users().size() == 0);
-        CHECK(app->sync_manager()->get_current_user() == nullptr);
+        CHECK(app->all_users().size() == 0);
+        CHECK(app->current_user() == nullptr);
 
         auto user = log_in(app, AppCredentials::username_password(email, password));
         CHECK(user->user_profile().email() == email);
@@ -929,7 +929,7 @@ TEST_CASE("app: UsernamePasswordProviderClient integration", "[sync][app][user][
 
         app->remove_user(user, [&](Optional<AppError> error) {
             REQUIRE(!error);
-            CHECK(app->sync_manager()->all_users().size() == 0);
+            CHECK(app->all_users().size() == 0);
             processed = true;
         });
 
@@ -1275,7 +1275,7 @@ TEST_CASE("app: delete anonymous user integration", "[sync][app][user][baas]") {
     auto app = session.app();
 
     SECTION("delete user expect success") {
-        CHECK(app->sync_manager()->all_users().size() == 1);
+        CHECK(app->all_users().size() == 1);
 
         // Log in user 1
         auto user_a = app->current_user();
@@ -1285,26 +1285,26 @@ TEST_CASE("app: delete anonymous user integration", "[sync][app][user][baas]") {
             // a logged out anon user will be marked as Removed, not LoggedOut
             CHECK(user_a->state() == SyncUser::State::Removed);
         });
-        CHECK(app->sync_manager()->all_users().empty());
-        CHECK(app->sync_manager()->get_current_user() == nullptr);
+        CHECK(app->all_users().empty());
+        CHECK(app->current_user() == nullptr);
 
         app->delete_user(user_a, [&](Optional<app::AppError> error) {
             CHECK(error->reason() == "User must be logged in to be deleted.");
-            CHECK(app->sync_manager()->all_users().size() == 0);
+            CHECK(app->all_users().size() == 0);
         });
 
         // Log in user 2
         auto user_b = log_in(app);
-        CHECK(app->sync_manager()->get_current_user() == user_b);
+        CHECK(app->current_user() == user_b);
         CHECK(user_b->state() == SyncUser::State::LoggedIn);
-        CHECK(app->sync_manager()->all_users().size() == 1);
+        CHECK(app->all_users().size() == 1);
 
         app->delete_user(user_b, [&](Optional<app::AppError> error) {
             REQUIRE_FALSE(error);
-            CHECK(app->sync_manager()->all_users().size() == 0);
+            CHECK(app->all_users().size() == 0);
         });
 
-        CHECK(app->sync_manager()->get_current_user() == nullptr);
+        CHECK(app->current_user() == nullptr);
 
         // check both handles are no longer valid
         CHECK(user_a->state() == SyncUser::State::Removed);
@@ -1318,35 +1318,35 @@ TEST_CASE("app: delete user with credentials integration", "[sync][app][user][ba
     app->remove_user(app->current_user(), [](auto) {});
 
     SECTION("log in and delete") {
-        CHECK(app->sync_manager()->all_users().size() == 0);
-        CHECK(app->sync_manager()->get_current_user() == nullptr);
+        CHECK(app->all_users().size() == 0);
+        CHECK(app->current_user() == nullptr);
 
         auto credentials = create_user_and_log_in(app);
         auto user = app->current_user();
 
-        CHECK(app->sync_manager()->get_current_user() == user);
+        CHECK(app->current_user() == user);
         CHECK(user->state() == SyncUser::State::LoggedIn);
         app->delete_user(user, [&](Optional<app::AppError> error) {
             REQUIRE_FALSE(error);
-            CHECK(app->sync_manager()->all_users().size() == 0);
+            CHECK(app->all_users().size() == 0);
         });
         CHECK(user->state() == SyncUser::State::Removed);
-        CHECK(app->sync_manager()->get_current_user() == nullptr);
+        CHECK(app->current_user() == nullptr);
 
         app->log_in_with_credentials(credentials, [](std::shared_ptr<SyncUser> user, util::Optional<AppError> error) {
             CHECK(!user);
             REQUIRE(error);
             REQUIRE(error->code() == ErrorCodes::InvalidPassword);
         });
-        CHECK(app->sync_manager()->get_current_user() == nullptr);
+        CHECK(app->current_user() == nullptr);
 
-        CHECK(app->sync_manager()->all_users().size() == 0);
+        CHECK(app->all_users().size() == 0);
         app->delete_user(user, [](Optional<app::AppError> err) {
             CHECK(err->code() > 0);
         });
 
-        CHECK(app->sync_manager()->get_current_user() == nullptr);
-        CHECK(app->sync_manager()->all_users().size() == 0);
+        CHECK(app->current_user() == nullptr);
+        CHECK(app->all_users().size() == 0);
         CHECK(user->state() == SyncUser::State::Removed);
     }
 }
@@ -1364,7 +1364,7 @@ TEST_CASE("app: call function", "[sync][app][function][baas]") {
         CHECK(*sum == 15);
     };
     app->call_function<int64_t>("sumFunc", toSum, checkFn);
-    app->call_function<int64_t>(app->sync_manager()->get_current_user(), "sumFunc", toSum, checkFn);
+    app->call_function<int64_t>(app->current_user(), "sumFunc", toSum, checkFn);
 }
 
 // MARK: - Remote Mongo Client Tests
@@ -2181,7 +2181,7 @@ TEST_CASE("app: mixed lists with object links", "[sync][pbs][app][links][baas]")
         Mixed{target_id},
     };
     {
-        TestAppSession test_session(app_session, nullptr, DeleteApp{false});
+        TestAppSession test_session({app_session, nullptr, DeleteApp{false}});
         SyncTestFile config(test_session.app(), partition, schema);
         auto realm = Realm::get_shared_realm(config);
 
@@ -2245,7 +2245,7 @@ TEST_CASE("app: roundtrip values", "[sync][pbs][app][baas]") {
     Decimal128 large_significand = Decimal128(70) / Decimal128(1.09);
     auto obj_id = ObjectId::gen();
     {
-        TestAppSession test_session(app_session, nullptr, DeleteApp{false});
+        TestAppSession test_session({app_session, nullptr, DeleteApp{false}});
         SyncTestFile config(test_session.app(), partition, schema);
         auto realm = Realm::get_shared_realm(config);
 
@@ -2765,11 +2765,14 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
 
         util::try_make_dir(base_file_path);
         SyncClientConfig sc_config;
-        sc_config.base_file_path = base_file_path;
-        sc_config.metadata_mode = realm::SyncManager::MetadataMode::NoEncryption;
-
+        RealmBackingStoreConfig bsc;
+        bsc.base_file_path = base_file_path;
+        bsc.metadata_mode = realm::app::RealmBackingStoreConfig::MetadataMode::NoEncryption;
+        auto factory = [bsc](app::SharedApp app) {
+            return std::make_shared<RealmBackingStore>(app, bsc);
+        };
         // initialize app and sync client
-        auto redir_app = app::App::get_app(app::App::CacheMode::Disabled, app_config, sc_config);
+        auto redir_app = app::App::get_app(app::App::CacheMode::Disabled, app_config, sc_config, factory);
 
         SECTION("Test invalid redirect response") {
             int request_count = 0;
@@ -2945,11 +2948,14 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
 
         util::try_make_dir(base_file_path);
         SyncClientConfig sc_config;
-        sc_config.base_file_path = base_file_path;
-        sc_config.metadata_mode = realm::SyncManager::MetadataMode::NoMetadata;
-
+        RealmBackingStoreConfig bsc;
+        bsc.base_file_path = base_file_path;
+        bsc.metadata_mode = realm::app::RealmBackingStoreConfig::MetadataMode::NoMetadata;
+        auto factory = [bsc](app::SharedApp app) {
+            return std::make_shared<RealmBackingStore>(app, bsc);
+        };
         // initialize app and sync client
-        auto redir_app = app::App::get_app(app::App::CacheMode::Disabled, app_config, sc_config);
+        auto redir_app = app::App::get_app(app::App::CacheMode::Disabled, app_config, sc_config, factory);
 
         int request_count = 0;
         // redirect URL is localhost or 127.0.0.1 depending on what the initial value is
@@ -3061,8 +3067,8 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
         };
 
         auto server_app_config = minimal_app_config("websocket_redirect", schema);
-        TestAppSession test_session(create_app(server_app_config), redir_transport, DeleteApp{true},
-                                    realm::ReconnectMode::normal, redir_provider);
+        TestAppSession test_session({create_app(server_app_config), redir_transport, DeleteApp{true},
+                                     realm::ReconnectMode::normal, redir_provider});
         auto partition = random_string(100);
         auto user1 = test_session.app()->current_user();
         SyncTestFile r_config(user1, partition, schema);
@@ -3258,7 +3264,7 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
         }
 
         auto transport = std::make_shared<HookedTransport>();
-        TestAppSession hooked_session(session.app_session(), transport, DeleteApp{false});
+        TestAppSession hooked_session({session.app_session(), transport, DeleteApp{false}});
         auto app = hooked_session.app();
         std::shared_ptr<SyncUser> user = app->current_user();
         REQUIRE(user);
@@ -3274,7 +3280,7 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
         transport->request_hook = [&](const Request&) {
             auto user = app->current_user();
             REQUIRE(user);
-            for (auto& session : user->all_sessions()) {
+            for (auto& session : app->sync_manager()->get_all_sessions_for(*user)) {
                 // Prior to the fix for #4941, this callback would be called from an infinite loop, always in the
                 // WaitingForAccessToken state.
                 if (session->state() == SyncSession::State::WaitingForAccessToken) {
@@ -3317,7 +3323,7 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
         }
 
         auto transport = std::make_shared<HookedTransport>();
-        TestAppSession hooked_session(session.app_session(), transport, DeleteApp{false});
+        TestAppSession hooked_session({session.app_session(), transport, DeleteApp{false}});
         auto app = hooked_session.app();
         std::shared_ptr<SyncUser> user = app->current_user();
         REQUIRE(user);
@@ -3333,7 +3339,7 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
             transport->request_hook = [&](const Request&) {
                 auto user = app->current_user();
                 REQUIRE(user);
-                for (auto& session : user->all_sessions()) {
+                for (auto& session : app->sync_manager()->get_all_sessions_for(*user)) {
                     if (session->state() == SyncSession::State::WaitingForAccessToken) {
                         REQUIRE(!seen_waiting_for_access_token);
                         seen_waiting_for_access_token = true;
@@ -3482,7 +3488,7 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
             auto transport = static_cast<SynchronousTestTransport*>(session.transport());
             transport->block(); // don't let the token refresh happen until we're ready for it
             auto r = Realm::get_shared_realm(config);
-            auto session = user->session_for_on_disk_path(config.path);
+            auto session = app->sync_manager()->get_existing_session(config.path);
             REQUIRE(user->is_logged_in());
             REQUIRE(!sync_error.is_ready());
             {
@@ -3617,7 +3623,7 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
                 auto r = Realm::get_shared_realm(config);
                 Results dogs = get_dogs(r);
             }
-            app->sync_manager()->remove_user(user_ident);
+            app->backing_store()->remove_user(user_ident);
             REQUIRE_FALSE(email_user->is_logged_in());
             REQUIRE(email_user->state() == SyncUser::State::Removed);
 
@@ -3802,7 +3808,7 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
                 error_did_occur.store(true);
             };
             auto r = Realm::get_shared_realm(config);
-            auto session = app->current_user()->session_for_on_disk_path(r->config().path);
+            auto session = app->sync_manager()->get_existing_session(r->config().path);
             timed_wait_for([&] {
                 return error_did_occur.load();
             });
@@ -3901,7 +3907,6 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
     };
 
     std::unique_ptr<realm::AppSession> app_session;
-    std::string base_file_path = util::make_temp_dir() + random_string(10);
     auto redir_transport = std::make_shared<BaseUrlTransport>();
     AutoVerifiedEmailCredentials creds;
     util::Logger::set_default_level_threshold(realm::util::Logger::Level::TEST_LOGGING_LEVEL);
@@ -3910,12 +3915,19 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
     App::Config app_config = {"fake-app-id"};
     set_app_config_defaults(app_config, redir_transport);
 
-    util::try_make_dir(base_file_path);
     SyncClientConfig sc_config;
-    sc_config.base_file_path = base_file_path;
-    sc_config.metadata_mode = realm::SyncManager::MetadataMode::NoEncryption;
     sc_config.logger_factory = [](util::Logger::Level) {
         return util::Logger::get_default_logger();
+    };
+    app::RealmBackingStoreConfig bsc;
+    bsc.metadata_mode = app::RealmBackingStoreConfig::MetadataMode::NoEncryption;
+    bsc.base_file_path = util::make_temp_dir();
+    util::try_make_dir(bsc.base_file_path);
+    auto cleanup = util::make_scope_exit([&]() noexcept {
+        realm::util::try_remove_dir_recursive(bsc.base_file_path);
+    });
+    auto factory = [&bsc](SharedApp app) -> std::shared_ptr<RealmBackingStore> {
+        return std::make_shared<RealmBackingStore>(app, bsc);
     };
 
     auto do_login = [&](std::shared_ptr<app::App> app) {
@@ -3933,7 +3945,7 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
             redir_transport->reset("https://realm.mongodb.com");
 
             // First time through, base_url is empty; https://realm.mongodb.com is expected
-            auto app = app::App::get_app(app::App::CacheMode::Disabled, app_config, sc_config);
+            auto app = app::App::get_app(app::App::CacheMode::Disabled, app_config, sc_config, factory);
             // Location is not requested until first app services request
             CHECK(!redir_transport->location_requested);
             // Initial hostname and ws hostname use base url, but aren't used until location is updated
@@ -3951,7 +3963,7 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
             app_config.base_url = "https://alternate.someurl.fake";
             redir_transport->reset("https://alternate.someurl.fake");
 
-            auto app = app::App::get_app(app::App::CacheMode::Disabled, app_config, sc_config);
+            auto app = app::App::get_app(app::App::CacheMode::Disabled, app_config, sc_config, factory);
             // Location is not requested until first app services request
             CHECK(!redir_transport->location_requested);
             // Initial hostname and ws hostname use base url, but aren't used until location is updated
@@ -3972,7 +3984,7 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
             std::string expected_wsurl = "wss://realm.mongodb.com";
             redir_transport->reset(expected_url);
 
-            auto app = app::App::get_app(app::App::CacheMode::Disabled, app_config, sc_config);
+            auto app = app::App::get_app(app::App::CacheMode::Disabled, app_config, sc_config, factory);
             // Location is not requested until first app services request
             CHECK(!redir_transport->location_requested);
             // Initial hostname and ws hostname use base url, but aren't used until location is updated
@@ -3990,7 +4002,7 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
             app_config.base_url = "https://some-other.someurl.fake";
             redir_transport->reset("https://some-other.someurl.fake", "http://redirect.someurl.fake");
 
-            auto app = app::App::get_app(app::App::CacheMode::Disabled, app_config, sc_config);
+            auto app = app::App::get_app(app::App::CacheMode::Disabled, app_config, sc_config, factory);
             // Location is not requested until first app services request
             CHECK(!redir_transport->location_requested);
             // Initial hostname and ws hostname use base url, but aren't used until location is updated
@@ -4012,7 +4024,7 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
             app_config.base_url = "https://alternate.someurl.fake";
             redir_transport->reset("https://alternate.someurl.fake");
 
-            auto app = app::App::get_app(app::App::CacheMode::Disabled, app_config, sc_config);
+            auto app = app::App::get_app(app::App::CacheMode::Disabled, app_config, sc_config, factory);
             // Location is not requested until first app services request
             CHECK(!redir_transport->location_requested);
 
@@ -4066,7 +4078,7 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
             app_config.base_url = "https://alternate.someurl.fake";
             redir_transport->reset("https://alternate.someurl.fake");
 
-            auto app = app::App::get_app(app::App::CacheMode::Disabled, app_config, sc_config);
+            auto app = app::App::get_app(app::App::CacheMode::Disabled, app_config, sc_config, factory);
             // Location is not requested until first app services request
             CHECK(!redir_transport->location_requested);
 
@@ -4095,7 +4107,7 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
             app_config.base_url = "http://alternate.someurl.fake";
             redir_transport->reset("http://alternate.someurl.fake");
 
-            auto app = app::App::get_app(app::App::CacheMode::Disabled, app_config, sc_config);
+            auto app = app::App::get_app(app::App::CacheMode::Disabled, app_config, sc_config, factory);
             // Location is not requested until first app services request
             CHECK(!redir_transport->location_requested);
 
@@ -4152,7 +4164,7 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
         {
             redir_transport->reset(init_url);
 
-            auto app = app::App::get_app(app::App::CacheMode::Disabled, app_config, sc_config);
+            auto app = app::App::get_app(app::App::CacheMode::Disabled, app_config, sc_config, factory);
             // At this point, the sync route is not set
             CHECK(!app->sync_manager()->sync_route());
 
@@ -4171,12 +4183,12 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
 
             redir_transport->reset(init_url, redir_url);
 
-            auto app = app::App::get_app(app::App::CacheMode::Disabled, app_config, sc_config);
+            auto app = app::App::get_app(app::App::CacheMode::Disabled, app_config, sc_config, factory);
             // At this point, the sync route is not set
             CHECK(!app->sync_manager()->sync_route());
 
             RealmConfig r_config;
-            r_config.path = sc_config.base_file_path + "/fakerealm.realm";
+            r_config.path = bsc.base_file_path + "/fakerealm.realm";
             r_config.sync_config = std::make_shared<SyncConfig>(app->current_user(), SyncConfig::FLXSyncEnabled{});
             r_config.sync_config->error_handler = [&state, &logger](std::shared_ptr<SyncSession>,
                                                                     SyncError error) mutable {
@@ -4210,12 +4222,12 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
             redir_transport->reset(init_url, redir_url);
             redir_transport->location_returns_error = true;
 
-            auto app = app::App::get_app(app::App::CacheMode::Disabled, app_config, sc_config);
+            auto app = app::App::get_app(app::App::CacheMode::Disabled, app_config, sc_config, factory);
             // At this point, the sync route is not set
             CHECK(!app->sync_manager()->sync_route());
 
             RealmConfig r_config;
-            r_config.path = sc_config.base_file_path + "/fakerealm.realm";
+            r_config.path = bsc.base_file_path + "/fakerealm.realm";
             r_config.sync_config = std::make_shared<SyncConfig>(app->current_user(), SyncConfig::FLXSyncEnabled{});
             r_config.sync_config->error_handler = [&state, &logger](std::shared_ptr<SyncSession>,
                                                                     SyncError error) mutable {
@@ -4572,7 +4584,7 @@ TEST_CASE("app: full-text compatible with sync", "[sync][app][baas]") {
     auto server_app_config = minimal_app_config("full_text", schema);
     auto app_session = create_app(server_app_config);
     const auto partition = random_string(100);
-    TestAppSession test_session(app_session, nullptr);
+    TestAppSession test_session({app_session, nullptr});
     SyncTestFile config(test_session.app(), partition, schema);
     SharedRealm realm;
     SECTION("sync open") {
@@ -4618,6 +4630,7 @@ TEST_CASE("app: full-text compatible with sync", "[sync][app][baas]") {
 }
 
 #endif // REALM_ENABLE_AUTH_TESTS
+
 
 TEST_CASE("app: custom error handling", "[sync][app][custom errors]") {
     class CustomErrorTransport : public GenericNetworkTransport {
@@ -4733,14 +4746,14 @@ TEST_CASE("app: login_with_credentials unit_tests", "[sync][app][user]") {
     static_cast<UnitTestTransport*>(config.transport.get())->set_profile(profile_0);
 
     SECTION("login_anonymous good") {
+        std::string shared_storage_path = util::make_temp_dir();
         UnitTestTransport::access_token = good_access_token;
-        config.base_path = util::make_temp_dir();
+        config.base_path = shared_storage_path;
         config.should_teardown_test_directory = false;
         config.metadata_mode = SyncManager::MetadataMode::NoEncryption;
         {
             TestSyncManager tsm(config);
             auto app = tsm.app();
-
             auto user = log_in(app);
 
             REQUIRE(user->identities().size() == 1);
@@ -4806,7 +4819,7 @@ TEST_CASE("app: login_with_credentials unit_tests", "[sync][app][user]") {
     SECTION("login_anonynous multiple users") {
         UnitTestTransport::access_token = good_access_token;
         config.base_path = util::make_temp_dir();
-        config.should_teardown_test_directory = false;
+        config.should_teardown_test_directory = true;
         TestSyncManager tsm(config);
         auto app = tsm.app();
 
@@ -4822,7 +4835,7 @@ TEST_CASE("app: UserAPIKeyProviderClient unit_tests", "[sync][app][user][api key
     auto client = app->provider_client<App::UserAPIKeyProviderClient>();
 
     std::shared_ptr<SyncUser> logged_in_user =
-        app->sync_manager()->get_user("userid", good_access_token, good_access_token, dummy_device_id);
+        app->backing_store()->get_user("userid", good_access_token, good_access_token, dummy_device_id);
     bool processed = false;
     ObjectId obj_id(UnitTestTransport::api_key_id.c_str());
 
@@ -5027,7 +5040,6 @@ TEST_CASE("app: response error handling", "[sync][app]") {
                                     .dump();
 
     Response response{200, 0, {{"Content-Type", "text/plain"}}, response_body};
-
     TestSyncManager tsm(get_config(std::make_shared<ErrorCheckingTransport>(&response)));
     auto app = tsm.app();
 
@@ -5109,52 +5121,52 @@ TEST_CASE("app: switch user", "[sync][app][user]") {
     bool processed = false;
 
     SECTION("switch user expect success") {
-        CHECK(app->sync_manager()->all_users().size() == 0);
+        CHECK(app->all_users().size() == 0);
 
         // Log in user 1
         auto user_a = log_in(app, AppCredentials::username_password("test@10gen.com", "password"));
-        CHECK(app->sync_manager()->get_current_user() == user_a);
+        CHECK(app->current_user() == user_a);
 
         // Log in user 2
         auto user_b = log_in(app, AppCredentials::username_password("test2@10gen.com", "password"));
-        CHECK(app->sync_manager()->get_current_user() == user_b);
+        CHECK(app->current_user() == user_b);
 
-        CHECK(app->sync_manager()->all_users().size() == 2);
+        CHECK(app->all_users().size() == 2);
 
         auto user1 = app->switch_user(user_a);
         CHECK(user1 == user_a);
 
-        CHECK(app->sync_manager()->get_current_user() == user_a);
+        CHECK(app->current_user() == user_a);
 
         auto user2 = app->switch_user(user_b);
         CHECK(user2 == user_b);
 
-        CHECK(app->sync_manager()->get_current_user() == user_b);
+        CHECK(app->current_user() == user_b);
         processed = true;
         CHECK(processed);
     }
 
     SECTION("cannot switch to a logged out but not removed user") {
-        CHECK(app->sync_manager()->all_users().size() == 0);
+        CHECK(app->all_users().size() == 0);
 
         // Log in user 1
         auto user_a = log_in(app, AppCredentials::username_password("test@10gen.com", "password"));
-        CHECK(app->sync_manager()->get_current_user() == user_a);
+        CHECK(app->current_user() == user_a);
 
         app->log_out([&](Optional<AppError> error) {
             REQUIRE_FALSE(error);
         });
 
-        CHECK(app->sync_manager()->get_current_user() == nullptr);
+        CHECK(app->current_user() == nullptr);
         CHECK(user_a->state() == SyncUser::State::LoggedOut);
 
         // Log in user 2
         auto user_b = log_in(app, AppCredentials::username_password("test2@10gen.com", "password"));
-        CHECK(app->sync_manager()->get_current_user() == user_b);
-        CHECK(app->sync_manager()->all_users().size() == 2);
+        CHECK(app->current_user() == user_b);
+        CHECK(app->all_users().size() == 2);
 
         REQUIRE_THROWS_AS(app->switch_user(user_a), AppError);
-        CHECK(app->sync_manager()->get_current_user() == user_b);
+        CHECK(app->current_user() == user_b);
     }
 }
 
@@ -5163,7 +5175,7 @@ TEST_CASE("app: remove anonymous user", "[sync][app][user]") {
     auto app = tsm.app();
 
     SECTION("remove user expect success") {
-        CHECK(app->sync_manager()->all_users().size() == 0);
+        CHECK(app->all_users().size() == 0);
 
         // Log in user 1
         auto user_a = log_in(app);
@@ -5174,25 +5186,25 @@ TEST_CASE("app: remove anonymous user", "[sync][app][user]") {
             // a logged out anon user will be marked as Removed, not LoggedOut
             CHECK(user_a->state() == SyncUser::State::Removed);
         });
-        CHECK(app->sync_manager()->all_users().empty());
+        CHECK(app->all_users().empty());
 
         app->remove_user(user_a, [&](Optional<AppError> error) {
             CHECK(error->reason() == "User has already been removed");
-            CHECK(app->sync_manager()->all_users().size() == 0);
+            CHECK(app->all_users().size() == 0);
         });
 
         // Log in user 2
         auto user_b = log_in(app);
-        CHECK(app->sync_manager()->get_current_user() == user_b);
+        CHECK(app->current_user() == user_b);
         CHECK(user_b->state() == SyncUser::State::LoggedIn);
-        CHECK(app->sync_manager()->all_users().size() == 1);
+        CHECK(app->all_users().size() == 1);
 
         app->remove_user(user_b, [&](Optional<AppError> error) {
             REQUIRE_FALSE(error);
-            CHECK(app->sync_manager()->all_users().size() == 0);
+            CHECK(app->all_users().size() == 0);
         });
 
-        CHECK(app->sync_manager()->get_current_user() == nullptr);
+        CHECK(app->current_user() == nullptr);
 
         // check both handles are no longer valid
         CHECK(user_a->state() == SyncUser::State::Removed);
@@ -5205,8 +5217,8 @@ TEST_CASE("app: remove user with credentials", "[sync][app][user]") {
     auto app = tsm.app();
 
     SECTION("log in, log out and remove") {
-        CHECK(app->sync_manager()->all_users().size() == 0);
-        CHECK(app->sync_manager()->get_current_user() == nullptr);
+        CHECK(app->all_users().size() == 0);
+        CHECK(app->current_user() == nullptr);
 
         auto user = log_in(app, AppCredentials::username_password("email", "pass"));
 
@@ -5221,14 +5233,14 @@ TEST_CASE("app: remove user with credentials", "[sync][app][user]") {
         app->remove_user(user, [&](Optional<AppError> error) {
             REQUIRE_FALSE(error);
         });
-        CHECK(app->sync_manager()->all_users().size() == 0);
+        CHECK(app->all_users().size() == 0);
 
         Optional<AppError> error;
         app->remove_user(user, [&](Optional<AppError> err) {
             error = err;
         });
         CHECK(error->code() > 0);
-        CHECK(app->sync_manager()->all_users().size() == 0);
+        CHECK(app->all_users().size() == 0);
         CHECK(user->state() == SyncUser::State::Removed);
     }
 }
@@ -5355,10 +5367,10 @@ TEST_CASE("app: auth providers", "[sync][app][user]") {
 
 TEST_CASE("app: refresh access token unit tests", "[sync][app][user][token]") {
     auto setup_user = [](std::shared_ptr<App> app) {
-        if (app->sync_manager()->get_current_user()) {
+        if (app->current_user()) {
             return;
         }
-        app->sync_manager()->get_user("a_user_id", good_access_token, good_access_token, dummy_device_id);
+        app->backing_store()->get_user("a_user_id", good_access_token, good_access_token, dummy_device_id);
     };
 
     SECTION("refresh custom data happy path") {
@@ -5378,13 +5390,12 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app][user][token]") {
                 }
             }
         };
-
         TestSyncManager sync_manager(get_config(instance_of<transport>));
         auto app = sync_manager.app();
         setup_user(app);
 
         bool processed = false;
-        app->refresh_custom_data(app->sync_manager()->get_current_user(), [&](const Optional<AppError>& error) {
+        app->refresh_custom_data(app->current_user(), [&](const Optional<AppError>& error) {
             REQUIRE_FALSE(error);
             CHECK(session_route_hit);
             processed = true;
@@ -5409,13 +5420,12 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app][user][token]") {
                 }
             }
         };
-
         TestSyncManager sync_manager(get_config(instance_of<transport>));
         auto app = sync_manager.app();
         setup_user(app);
 
         bool processed = false;
-        app->refresh_custom_data(app->sync_manager()->get_current_user(), [&](const Optional<AppError>& error) {
+        app->refresh_custom_data(app->current_user(), [&](const Optional<AppError>& error) {
             CHECK(error->reason() == "jwt missing parts");
             CHECK(error->code() == ErrorCodes::BadToken);
             CHECK(session_route_hit);
@@ -5488,7 +5498,6 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app][user][token]") {
                 }
             }
         };
-
         TestSyncManager sync_manager(get_config(instance_of<transport>));
         auto app = sync_manager.app();
         setup_user(app);
@@ -5783,8 +5792,7 @@ TEST_CASE("app: metadata is persisted between sessions", "[sync][app][metadata]"
 
 TEST_CASE("app: make_streaming_request", "[sync][app][streaming]") {
     UnitTestTransport::access_token = good_access_token;
-
-    constexpr uint64_t timeout_ms = 60000;
+    constexpr uint64_t timeout_ms = 60000; // this is the default
     auto config = get_config();
     config.app_config.default_request_timeout_ms = timeout_ms;
     TestSyncManager tsm(config);
@@ -6006,11 +6014,10 @@ TEST_CASE("app: user logs out while profile is fetched", "[sync][app][user]") {
 
     std::shared_ptr<SyncUser> logged_in_user;
     auto transporter = std::make_shared<transport>(mock_transport_worker, state, logged_in_user);
-
     TestSyncManager sync_manager(get_config(transporter));
     auto app = sync_manager.app();
 
-    logged_in_user = app->sync_manager()->get_user("userid", good_access_token, good_access_token, dummy_device_id);
+    logged_in_user = app->backing_store()->get_user("userid", good_access_token, good_access_token, dummy_device_id);
     auto custom_credentials = AppCredentials::facebook("a_token");
     auto [cur_user_promise, cur_user_future] = util::make_promise_future<std::shared_ptr<SyncUser>>();
 
@@ -6032,11 +6039,19 @@ TEST_CASE("app: user logs out while profile is fetched", "[sync][app][user]") {
 TEST_CASE("app: shared instances", "[sync][app]") {
     App::Config base_config;
     set_app_config_defaults(base_config, instance_of<UnitTestTransport>);
-
     SyncClientConfig sync_config;
-    sync_config.metadata_mode = SyncClientConfig::MetadataMode::NoMetadata;
-    sync_config.base_file_path = util::make_temp_dir() + random_string(10);
-    util::try_make_dir(sync_config.base_file_path);
+    app::RealmBackingStoreConfig bsc;
+    bsc.metadata_mode = app::RealmBackingStoreConfig::MetadataMode::NoMetadata;
+    bsc.base_file_path = util::make_temp_dir();
+    util::try_make_dir(bsc.base_file_path);
+    auto cleanup = util::make_scope_exit([&]() noexcept {
+        realm::util::try_remove_dir_recursive(bsc.base_file_path);
+    });
+    size_t stores_created = 0;
+    auto factory = [&stores_created, &bsc](SharedApp app) -> std::shared_ptr<RealmBackingStore> {
+        ++stores_created;
+        return std::make_shared<RealmBackingStore>(app, bsc);
+    };
 
     auto config1 = base_config;
     config1.app_id = "app1";
@@ -6053,10 +6068,10 @@ TEST_CASE("app: shared instances", "[sync][app]") {
     config4.base_url = "http://localhost:9090";
 
     // should all point to same underlying app
-    auto app1_1 = App::get_app(app::App::CacheMode::Enabled, config1, sync_config);
-    auto app1_2 = App::get_app(app::App::CacheMode::Enabled, config1, sync_config);
+    auto app1_1 = App::get_app(app::App::CacheMode::Enabled, config1, sync_config, factory);
+    auto app1_2 = App::get_app(app::App::CacheMode::Enabled, config1, sync_config, factory);
     auto app1_3 = App::get_cached_app(config1.app_id, config1.base_url);
-    auto app1_4 = App::get_app(app::App::CacheMode::Enabled, config2, sync_config);
+    auto app1_4 = App::get_app(app::App::CacheMode::Enabled, config2, sync_config, factory);
     auto app1_5 = App::get_cached_app(config1.app_id);
 
     CHECK(app1_1 == app1_2);
@@ -6065,9 +6080,9 @@ TEST_CASE("app: shared instances", "[sync][app]") {
     CHECK(app1_1 == app1_5);
 
     // config3 and config4 should point to different apps
-    auto app2_1 = App::get_app(app::App::CacheMode::Enabled, config3, sync_config);
+    auto app2_1 = App::get_app(app::App::CacheMode::Enabled, config3, sync_config, factory);
     auto app2_2 = App::get_cached_app(config3.app_id, config3.base_url);
-    auto app2_3 = App::get_app(app::App::CacheMode::Enabled, config4, sync_config);
+    auto app2_3 = App::get_app(app::App::CacheMode::Enabled, config4, sync_config, factory);
     auto app2_4 = App::get_cached_app(config3.app_id);
     auto app2_5 = App::get_cached_app(config4.app_id, "https://some.different.url");
 
@@ -6079,4 +6094,5 @@ TEST_CASE("app: shared instances", "[sync][app]") {
     CHECK(app1_1 != app2_1);
     CHECK(app1_1 != app2_3);
     CHECK(app1_1 != app2_4);
+    CHECK(stores_created == 3);
 }

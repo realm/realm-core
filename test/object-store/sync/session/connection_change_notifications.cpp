@@ -53,8 +53,8 @@ TEST_CASE("sync: Connection state changes", "[sync][session][connection change]"
     config.base_path = base_path;
     TestSyncManager init_sync_manager(config);
     auto app = init_sync_manager.app();
-    auto user = app->sync_manager()->get_user("user", ENCODE_FAKE_JWT("not_a_real_token"),
-                                              ENCODE_FAKE_JWT("also_not_a_real_token"), dummy_device_id);
+    auto user = app->backing_store()->get_user("user", ENCODE_FAKE_JWT("not_a_real_token"),
+                                               ENCODE_FAKE_JWT("also_not_a_real_token"), dummy_device_id);
 
     SECTION("register connection change listener") {
         auto session = sync_session(

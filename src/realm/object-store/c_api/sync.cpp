@@ -42,12 +42,15 @@ realm_sync_session_connection_state_notification_token::~realm_sync_session_conn
 
 namespace realm::c_api {
 
-static_assert(realm_sync_client_metadata_mode_e(SyncClientConfig::MetadataMode::NoEncryption) ==
-              RLM_SYNC_CLIENT_METADATA_MODE_PLAINTEXT);
-static_assert(realm_sync_client_metadata_mode_e(SyncClientConfig::MetadataMode::Encryption) ==
-              RLM_SYNC_CLIENT_METADATA_MODE_ENCRYPTED);
-static_assert(realm_sync_client_metadata_mode_e(SyncClientConfig::MetadataMode::NoMetadata) ==
-              RLM_SYNC_CLIENT_METADATA_MODE_DISABLED);
+static_assert(realm_backing_store_metadata_mode_e(app::RealmBackingStoreConfig::MetadataMode::NoEncryption) ==
+              RLM_BACKING_STORE_METADATA_MODE_PLAINTEXT);
+static_assert(realm_backing_store_metadata_mode_e(app::RealmBackingStoreConfig::MetadataMode::Encryption) ==
+              RLM_BACKING_STORE_METADATA_MODE_ENCRYPTED);
+static_assert(realm_backing_store_metadata_mode_e(app::RealmBackingStoreConfig::MetadataMode::NoMetadata) ==
+              RLM_BACKING_STORE_METADATA_MODE_DISABLED);
+
+static_assert(realm_app_cache_mode_e(app::App::CacheMode::Enabled) == RLM_APP_CACHE_MODE_ENABLED);
+static_assert(realm_app_cache_mode_e(app::App::CacheMode::Disabled) == RLM_APP_CACHE_MODE_DISABLED);
 
 static_assert(realm_sync_client_reconnect_mode_e(ReconnectMode::normal) == RLM_SYNC_CLIENT_RECONNECT_MODE_NORMAL);
 static_assert(realm_sync_client_reconnect_mode_e(ReconnectMode::testing) == RLM_SYNC_CLIENT_RECONNECT_MODE_TESTING);
@@ -131,27 +134,32 @@ static Query add_ordering_to_realm_query(Query realm_query, const DescriptorOrde
     return realm_query;
 }
 
-RLM_API realm_sync_client_config_t* realm_sync_client_config_new(void) noexcept
+RLM_API realm_backing_store_config_t* realm_backing_store_config_new(void) noexcept
 {
-    return new realm_sync_client_config_t;
+    return new realm_backing_store_config_t;
 }
 
-RLM_API void realm_sync_client_config_set_base_file_path(realm_sync_client_config_t* config,
-                                                         const char* path) noexcept
+RLM_API void realm_backing_store_config_set_base_file_path(realm_backing_store_config_t* config,
+                                                           const char* path) noexcept
 {
     config->base_file_path = path;
 }
 
-RLM_API void realm_sync_client_config_set_metadata_mode(realm_sync_client_config_t* config,
-                                                        realm_sync_client_metadata_mode_e mode) noexcept
+RLM_API void realm_backing_store_config_set_metadata_mode(realm_backing_store_config_t* config,
+                                                          realm_backing_store_metadata_mode_e mode) noexcept
 {
-    config->metadata_mode = SyncClientConfig::MetadataMode(mode);
+    config->metadata_mode = app::RealmBackingStoreConfig::MetadataMode(mode);
 }
 
-RLM_API void realm_sync_client_config_set_metadata_encryption_key(realm_sync_client_config_t* config,
-                                                                  const uint8_t key[64]) noexcept
+RLM_API void realm_backing_store_config_set_metadata_encryption_key(realm_backing_store_config_t* config,
+                                                                    const uint8_t key[64]) noexcept
 {
     config->custom_encryption_key = std::vector<char>(key, key + 64);
+}
+
+RLM_API realm_sync_client_config_t* realm_sync_client_config_new(void) noexcept
+{
+    return new realm_sync_client_config_t;
 }
 
 RLM_API void realm_sync_client_config_set_reconnect_mode(realm_sync_client_config_t* config,
@@ -763,7 +771,7 @@ RLM_API bool realm_sync_immediately_run_file_actions(realm_app_t* realm_app, con
                                                      bool* did_run) noexcept
 {
     return wrap_err([&]() {
-        *did_run = (*realm_app)->sync_manager()->immediately_run_file_actions(sync_path);
+        *did_run = (*realm_app)->backing_store()->immediately_run_file_actions(sync_path);
         return true;
     });
 }

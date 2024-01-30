@@ -25,6 +25,9 @@
 #include <realm/util/logger.hpp>
 #include <realm/util/optional.hpp>
 
+#include <external/json/json.hpp>
+
+#include <memory>
 #include <thread>
 
 #if REALM_ENABLE_SYNC
@@ -43,7 +46,9 @@
 #endif
 
 namespace realm {
+
 struct AppSession;
+
 class Schema;
 enum class SyncSessionStopPolicy;
 struct DBOptions;
@@ -188,10 +193,23 @@ struct SyncTestFile : TestFile {
 using DeleteApp = realm::util::TaggedBool<struct DeleteAppTag>;
 class TestAppSession {
 public:
-    TestAppSession();
-    TestAppSession(realm::AppSession, std::shared_ptr<realm::app::GenericNetworkTransport> = nullptr,
-                   DeleteApp = true, realm::ReconnectMode reconnect_mode = realm::ReconnectMode::normal,
-                   std::shared_ptr<realm::sync::SyncSocketProvider> custom_socket_provider = nullptr);
+    struct Config {
+        Config();
+        Config(realm::AppSession, std::shared_ptr<realm::app::GenericNetworkTransport> = nullptr, DeleteApp = true,
+               realm::ReconnectMode mode = realm::ReconnectMode::normal,
+               std::shared_ptr<realm::sync::SyncSocketProvider> socket_provider = nullptr,
+               std::optional<realm::app::App::StoreFactory> store = std::nullopt);
+        ~Config();
+        std::unique_ptr<realm::AppSession> app_session;
+        std::shared_ptr<realm::app::GenericNetworkTransport> transport;
+        DeleteApp delete_when_done;
+        bool delete_storage = true;
+        std::optional<std::string> storage_path;
+        realm::ReconnectMode reconnect_mode = realm::ReconnectMode::normal;
+        std::shared_ptr<realm::sync::SyncSocketProvider> custom_socket_provider = nullptr;
+        std::optional<realm::app::App::StoreFactory> store_factory;
+    };
+    TestAppSession(Config config = {});
     ~TestAppSession();
 
     std::shared_ptr<realm::app::App> app() const noexcept
@@ -206,6 +224,14 @@ public:
     {
         return m_transport.get();
     }
+    std::shared_ptr<realm::SyncManager> sync_manager() const noexcept
+    {
+        return m_app->sync_manager();
+    }
+    std::shared_ptr<realm::app::BackingStore> const& backing_store() const noexcept
+    {
+        return m_app->backing_store();
+    }
 
     std::vector<realm::bson::BsonDocument> get_documents(realm::SyncUser& user, const std::string& object_type,
                                                          size_t expected_count) const;
@@ -216,8 +242,9 @@ private:
     std::string m_base_file_path;
     bool m_delete_app = true;
     std::shared_ptr<realm::app::GenericNetworkTransport> m_transport;
+    bool m_delete_storage = true;
 };
-#endif
+#endif // REALM_ENABLE_AUTH_TESTS
 
 class TestSyncManager {
 public:
@@ -240,6 +267,10 @@ public:
     std::shared_ptr<realm::app::App> app() const noexcept
     {
         return m_app;
+    }
+    std::shared_ptr<realm::SyncManager> sync_manager() const
+    {
+        return m_app->sync_manager();
     }
     std::string base_file_path() const
     {
@@ -297,4 +328,4 @@ void set_app_config_defaults(realm::app::App::Config& app_config,
 
 #endif // REALM_ENABLE_SYNC
 
-#endif
+#endif // REALM_TEST_UTIL_TEST_FILE_HPP
