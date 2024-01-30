@@ -332,8 +332,11 @@ endif()
 # Emscripten does provide Zlib, but it doesn't work with find_package and is handled specially
 if(NOT APPLE AND NOT EMSCRIPTEN AND NOT TARGET ZLIB::ZLIB)
     if(WIN32 OR (CMAKE_SYSTEM_NAME STREQUAL "Linux" AND REALM_LINUX_TOOLCHAIN))
-        realm_acquire_dependency(zlib ${DEP_ZLIB_VERSION} ZLIB_CMAKE_INCLUDE_FILE)
-        include(${ZLIB_CMAKE_INCLUDE_FILE})
+        find_package(ZLIB)
+        if (NOT ZLIB_FOUND)
+            realm_acquire_dependency(zlib ${DEP_ZLIB_VERSION} ZLIB_CMAKE_INCLUDE_FILE)
+            include(${ZLIB_CMAKE_INCLUDE_FILE})
+        endif()
     elseif(ANDROID)
         # On Android FindZLIB chooses the static libz over the dynamic one, but this leads to issues
         # (see https://github.com/android/ndk/issues/1179)
