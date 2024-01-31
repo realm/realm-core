@@ -302,8 +302,7 @@ void ClusterNodeInner::init(MemRef mem)
 {
     Array::init_from_mem(mem);
     m_keys.set_parent(this, s_key_ref_index);
-    // ref_type ref = Array::get_as_ref(s_key_ref_index);
-    ref_type ref = Array::get_as_ref_not_encoded(s_key_ref_index);
+    ref_type ref = Array::get_as_ref(s_key_ref_index);
     if (ref) {
         m_keys.init_from_ref(ref);
     }

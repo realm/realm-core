@@ -186,10 +186,8 @@ public:
     void get_chunk(size_t ndx, int64_t res[8]) const noexcept;
 
     ref_type get_as_ref(size_t ndx) const noexcept;
-    ref_type get_as_ref_not_encoded(size_t ndx) const noexcept;
-
     RefOrTagged get_as_ref_or_tagged(size_t ndx) const noexcept;
-    RefOrTagged get_as_ref_or_tagged_not_encoded(size_t ndx) const noexcept;
+
     void set(size_t ndx, RefOrTagged);
     void add(RefOrTagged);
     void ensure_minimum_width(RefOrTagged);
@@ -551,7 +549,7 @@ protected:
     bool m_has_refs;             // Elements whose first bit is zero are refs to subarrays.
     bool m_context_flag;         // Meaning depends on context.
 
-    ArrayEncode& m_encode;
+    ArrayEncode* m_encode;
     uint8_t m_kind;
     NodeHeader::Encoding m_encoding;
 
@@ -563,16 +561,14 @@ private:
     void report_memory_usage_2(MemUsageHandler&) const;
 #endif
 
-    int_fast64_t get_universal_encoded_array(size_t ndx) const;
-
 protected:
     // encode/decode this array
     bool encode_array(Array&) const;
     bool decode_array(Array& arr) const;
 
-
+    // these are used to directly set the vtable dispatcher in Array and spare us a bunch
+    // of CPU cycles in order to check if the array is in compressed format
     int64_t get_encoded(size_t ndx) const noexcept;
-    int64_t get_not_encoded(size_t ndx) const noexcept;
     void set_encoded(size_t ndx, int64_t);
     void get_chunk_encoded(size_t, int64_t[8]) const noexcept;
 
@@ -588,6 +584,8 @@ private:
     friend class GroupWriter;
     friend class ArrayWithFind;
     friend class ArrayFlex;
+    friend class ArrayPacked;
+    friend class ArrayEncode;
 };
 
 // Implementation:
@@ -770,24 +768,10 @@ inline ref_type Array::get_as_ref(size_t ndx) const noexcept
     return to_ref(v);
 }
 
-inline ref_type Array::get_as_ref_not_encoded(size_t ndx) const noexcept
-{
-    REALM_ASSERT_DEBUG(is_attached());
-    REALM_ASSERT_DEBUG_EX(m_has_refs, m_ref, ndx, m_size);
-    int64_t v = get_not_encoded(ndx);
-    return to_ref(v);
-}
-
 inline RefOrTagged Array::get_as_ref_or_tagged(size_t ndx) const noexcept
 {
     REALM_ASSERT(has_refs());
     return RefOrTagged(get(ndx));
-}
-
-inline RefOrTagged Array::get_as_ref_or_tagged_not_encoded(size_t ndx) const noexcept
-{
-    REALM_ASSERT(has_refs());
-    return RefOrTagged(get_not_encoded(ndx));
 }
 
 inline void Array::set(size_t ndx, RefOrTagged ref_or_tagged)

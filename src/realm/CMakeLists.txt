@@ -15,9 +15,11 @@ set(REALM_SOURCES
     array_encode.cpp
     array_fixed_bytes.cpp
     array_flex.cpp
+    array_packed.cpp
     array_integer.cpp
     array_key.cpp
     array_mixed.cpp
+    array_packed.cpp
     array_unsigned.cpp
     array_string.cpp
     array_string_short.cpp
@@ -130,6 +132,7 @@ set(REALM_INSTALL_HEADERS
     array_key.hpp
     array_list.hpp
     array_mixed.hpp
+    array_packed.hpp
     array_ref.hpp
     array_string.hpp
     array_string_short.hpp

@@ -1003,10 +1003,11 @@ size_t inline NodeHeader::get_byte_size_from_header(const char* header) noexcept
 {
     auto h = header;
     auto kind = get_kind(h);
-    REALM_ASSERT(kind == 'A' || kind == 'B');
+    REALM_ASSERT_DEBUG(kind == 'A' || kind == 'B');
     if (kind == 'B') {
         auto encoding = get_encoding(h);
-        REALM_ASSERT(encoding == NodeHeader::Encoding::Flex); // this is the only encoding supported right now.
+        REALM_ASSERT_DEBUG(encoding == NodeHeader::Encoding::Flex || encoding == Encoding::Packed ||
+                           encoding == Encoding::AofP || encoding == Encoding::PofA);
         switch (encoding) {
             case Encoding::Packed:
                 return NodeHeader::header_size + align_bits_to8(get_num_elements<NodeHeader::Encoding::Packed>(h) *
@@ -1054,13 +1055,21 @@ uint_least8_t inline NodeHeader::get_width_from_header(const char* header) noexc
 
 size_t inline NodeHeader::get_size_from_header(const char* header) noexcept
 {
-#ifdef REALM_DEBUG
-    auto kind = get_kind(header);
-    REALM_ASSERT(kind == 'A' || kind == 'B');
+    using Encoding = NodeHeader::Encoding;
+    const auto kind = get_kind(header);
+    REALM_ASSERT_DEBUG(kind == 'A' || kind == 'B');
+
     if (kind == 'B') {
-        REALM_ASSERT(false);
+        const auto encoding = get_encoding(header);
+        if (encoding == Encoding::Flex) {
+            return get_elementB_size<Encoding::Flex>(header);
+        }
+        else if (encoding == Encoding::Packed) {
+            return get_num_elements<Encoding::Packed>(header);
+        }
+        REALM_UNREACHABLE(); // other encodings are not supported.
     }
-#endif
+
     // must be A type.
     typedef unsigned char uchar;
     const uchar* h = reinterpret_cast<const uchar*>(header);

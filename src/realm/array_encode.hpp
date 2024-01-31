@@ -16,8 +16,8 @@
  *
  **************************************************************************/
 
-#ifndef REALM_ARRAY_COMPRESS_HPP
-#define REALM_ARRAY_COMPRESS_HPP
+#ifndef REALM_ARRAY_ENCODE_HPP
+#define REALM_ARRAY_ENCODE_HPP
 
 #include <realm/alloc.hpp>
 
@@ -28,21 +28,31 @@ namespace realm {
 class Array;
 class ArrayEncode {
 public:
+    // TODO move all of this in some other class that only dispatches
+    static bool encode(const Array&, Array&);
+    static int64_t get(const char*, size_t);
+    static size_t size(const char*);
+    static bool is_packed(const char*);
+    static void set_direct(char* data, size_t w, size_t ndx, int64_t v);
+
+    // this is the interface that every encoding array must adhere to
+    // Generic interface for an encoding Array.
     explicit ArrayEncode() = default;
     virtual ~ArrayEncode() = default;
-    virtual bool encode(const Array&, Array&) const = 0;
+    // encode/decode arrays (encoding happens during the Array::write machinery, decoding happens during COW and
+    // before to allocate) virtual bool encode(const Array&, Array&) const = 0;
     virtual bool decode(Array&) = 0;
-    virtual size_t size(const Array&) const = 0;
+    // getting and setting values in encoded arrays
     virtual int64_t get(const Array&, size_t) const = 0;
+    virtual void get_chunk(const Array&, size_t ndx, int64_t res[8]) const = 0;
     virtual void set_direct(const Array&, size_t, int64_t) const = 0;
-    // lower/upper bound for signed arrays
+    // lower/upper bound for encoded arrays
     virtual size_t lower_bound(const Array&, int64_t) const = 0;
     virtual size_t upper_bound(const Array&, int64_t) const = 0;
-    // query mappers
+    // query interface
     virtual size_t find_first(const Array&, int64_t value) const = 0;
     virtual int64_t sum(const Array&, size_t start, size_t end) const = 0;
-    virtual void get_chunk(const Array&, size_t ndx, int64_t res[8]) const = 0;
 };
 
 } // namespace realm
-#endif // REALM_ARRAY_COMPRESS_HPP
+#endif // REALM_ARRAY_ENCODE_HPP

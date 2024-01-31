@@ -1,6 +1,6 @@
 /*************************************************************************
  *
- * Copyright 2023 Realm Inc.
+ * Copyright 2024 Realm Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,24 +16,24 @@
  *
  **************************************************************************/
 
-#ifndef REALM_ARRAY_FLEX_HPP
-#define REALM_ARRAY_FLEX_HPP
+#ifndef REALM_ARRAY_PACKED_HPP
+#define REALM_ARRAY_PACKED_HPP
 
 #include <realm/array_encode.hpp>
 
 namespace realm {
+
 //
-// Compress array in Flex format
+// Compress array in Packed format
 // Decompress array in WTypeBits formats
 //
 class Array;
-class ArrayFlex : public ArrayEncode {
+class ArrayPacked : public ArrayEncode {
 public:
-    explicit ArrayFlex() = default;
-    virtual ~ArrayFlex() = default;
+    explicit ArrayPacked() = default;
+    virtual ~ArrayPacked() = default;
 
-    static bool encode(const Array&, Array&, size_t, const std::vector<int64_t>&, const std::vector<size_t>&, size_t,
-                       size_t);
+    static bool encode(const Array&, Array&, size_t, size_t);
 
     // compressing/decompressing logic
     // bool encode(const Array&, Array&) const final override;
@@ -59,15 +59,16 @@ public:
     static int64_t get(const char*, size_t);
 
 private:
-    // decode array methods
-    std::vector<int64_t> fetch_signed_values_from_encoded_array(const Array&, size_t, size_t, size_t, size_t) const;
+    // read info about the encoded array from header
+    static bool get_encode_info(const Array&, size_t&, size_t&);
+    static void setup_array_packed_format(const Array&, Array&, size_t, size_t);
+    static void copy_into_packed_array(const Array&, Array&);
+
+    std::vector<int64_t> fetch_signed_values_from_packed_array(const Array&, size_t, size_t) const;
     void restore_array(Array&, const std::vector<int64_t>&) const;
-
-
-    static bool get_encode_info(const Array&, size_t&, size_t&, size_t&, size_t&);
-    static void setup_array_flex_format(const Array&, Array&, size_t, const std::vector<int64_t>&,
-                                        const std::vector<size_t>&, size_t, size_t);
-    static void copy_into_flex_array(Array&, const std::vector<int64_t>&, const std::vector<size_t>&);
 };
+
+
 } // namespace realm
-#endif // REALM_ARRAY_COMPRESS_HPP
+
+#endif // REALM_ARRAY_PACKED_HPP
