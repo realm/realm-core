@@ -132,6 +132,7 @@ TEST(Test_ArrayInt_negative_nums)
     a.add(1000000);
     CHECK_NOT(a.is_encoded());
     CHECK(a.try_encode(a1));
+    a1.destroy();
     CHECK(a.get(0) == -1000000);
     CHECK(a.get(1) == 0);
     CHECK(a.get(2) == 1000000);

@@ -1574,7 +1574,7 @@ ref_type Cluster::typed_write(ref_type ref, _impl::ArrayWriterBase& out, const T
                         // we may compress integer leafs
                         dest.set_as_ref(j, a.write(out, deep, only_modified, compress));
                     }
-                    else if (col_attr.test(col_attr_List) | col_attr.test(col_attr_Set)) {
+                    else if (col_attr.test(col_attr_List) || col_attr.test(col_attr_Set)) {
                         // collections which are single bptrees
                         dest.set_as_ref(j, bptree_typed_write(rot.get_as_ref(), out, m_alloc, col_type, deep,
                                                               only_modified, compress));

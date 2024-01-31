@@ -359,38 +359,31 @@ std::vector<int64_t> ArrayFlex::fetch_signed_values_from_encoded_array(const Arr
 void ArrayFlex::restore_array(Array& arr, const std::vector<int64_t>& values) const
 {
     //  do the reverse of compressing the array
+    REALM_ASSERT_DEBUG(!values.empty());
     REALM_ASSERT_DEBUG(arr.is_attached());
     using Encoding = NodeHeader::Encoding;
     const auto flags = NodeHeader::get_flags(arr.get_header());
     const auto size = values.size();
-    const auto [min_value, max_value] = std::minmax_element(values.begin(), values.end());
-
+    const auto [min_v, max_v] = std::minmax_element(values.begin(), values.end());
+    auto width = std::max(Array::bit_width(*min_v), Array::bit_width(*max_v));
+    REALM_ASSERT_DEBUG(width == 0 || width == 1 || width == 2 || width == 4 || width == 8 || width == 16 ||
+                       width == 32 || width == 64);
+    auto byte_size = NodeHeader::calc_size<Encoding::WTypBits>(size, width);
+    REALM_ASSERT_DEBUG(byte_size % 8 == 0); // 8 bytes aligned value
+    auto& allocator = arr.get_alloc();
     // calling arr.destroy() is fine, as long as we don't use the memory deleted anymore.
     // Decompressing can only be happening within a write transactions, thus this invariant should hold.
     arr.destroy();
-    auto& allocator = arr.get_alloc();
-
-    auto signed_bit_width = std::max(Array::signed_to_num_bits(*min_value), Array::signed_to_num_bits(*max_value));
-    auto byte_size = NodeHeader::calc_size<Encoding::WTypBits>(size, signed_bit_width);
-    REALM_ASSERT_DEBUG(byte_size % 8 == 0); // 8 bytes aligned value
-
-    auto width = std::max(Array::bit_width(*min_value), Array::bit_width(*max_value));
-    REALM_ASSERT_DEBUG(width == 0 || width == 1 || width == 2 || width == 4 || width == 8 || width == 16 ||
-                       width == 32 || width == 64);
-
     auto mem = allocator.alloc(byte_size);
     auto header = mem.get_addr();
     NodeHeader::init_header(header, 'A', Encoding::WTypBits, flags, width, values.size());
     NodeHeader::set_capacity_in_header(byte_size, header);
-    arr.init_from_mem(mem);
-    arr.update_parent();
-
-    // copy straight into the array all the data, we don't need COW here.
-    auto data = arr.get_data_from_header(arr.get_header());
+    auto data = NodeHeader::get_data_from_header(header);
     size_t ndx = 0;
     for (const auto& v : values)
         ArrayEncode::set_direct(data, width, ndx++, v);
-
+    arr.init_from_mem(mem);
+    arr.update_parent();
     REALM_ASSERT_DEBUG(width == arr.get_width());
     REALM_ASSERT_DEBUG(arr.size() == values.size());
 }
