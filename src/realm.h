@@ -3501,8 +3501,7 @@ typedef void (*realm_user_changed_callback_t)(realm_userdata_t userdata, realm_u
 typedef struct realm_async_open_task_progress_notification_token realm_async_open_task_progress_notification_token_t;
 typedef struct realm_sync_session_connection_state_notification_token
     realm_sync_session_connection_state_notification_token_t;
-typedef struct realm_user_subscription_token
-    realm_user_subscription_token_t;
+typedef struct realm_user_subscription_token realm_user_subscription_token_t;
 
 /**
  * Callback function invoked by the async open task once the realm is open and fully synchronized.
@@ -3900,11 +3899,10 @@ RLM_API realm_sync_session_connection_state_notification_token_t* realm_sync_ses
     realm_userdata_t userdata, realm_free_userdata_func_t userdata_free) RLM_API_NOEXCEPT;
 
 
-//register callback for tracking user status.
+// register callback for tracking user status.
 RLM_API realm_user_subscription_token_t*
-realm_user_state_change_register_callback(
-    realm_user_t*, realm_user_changed_callback_t, realm_userdata_t userdata,
-    realm_free_userdata_func_t userdata_free);
+realm_user_state_change_register_callback(realm_user_t*, realm_user_changed_callback_t, realm_userdata_t userdata,
+                                          realm_free_userdata_func_t userdata_free);
 
 /**
  * Register a callback that will be invoked when all pending downloads have completed.
