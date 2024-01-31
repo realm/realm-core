@@ -32,10 +32,10 @@ abstract class TypeBase {
     return this.kind === kind;
   }
 
-  isOptional(): this is Template & { name: "util::Optional" };
+  isOptional(): this is Template & { name: "std::optional" };
   isOptional(type: string): boolean;
   isOptional(type?: string): boolean {
-    return this.isTemplate("util::Optional") && (!type || ("name" in this.args[0] && this.args[0].name === type));
+    return this.isTemplate("std::optional") && (!type || ("name" in this.args[0] && this.args[0].name === type));
   }
 
   isNullable(): this is Template & { name: "Nullable" };
