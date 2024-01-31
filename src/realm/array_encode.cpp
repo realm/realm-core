@@ -112,8 +112,7 @@ inline size_t compute_flex_size(std::vector<int64_t>& values, std::vector<size_t
 {
     using Encoding = NodeHeader::Encoding;
     const auto [min_value, max_value] = std::minmax_element(values.begin(), values.end());
-    const auto index = *std::max_element(indices.begin(), indices.end());
-    ndx_width = index == 0 ? 1 : Node::unsigned_to_num_bits(index);
+    ndx_width = NodeHeader::unsigned_to_num_bits(values.size());
     v_width = std::max(Node::signed_to_num_bits(*min_value), Node::signed_to_num_bits(*max_value));
     REALM_ASSERT_DEBUG(v_width > 0);
     REALM_ASSERT_DEBUG(ndx_width > 0);
