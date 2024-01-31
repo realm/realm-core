@@ -4657,10 +4657,12 @@ TEST_CASE("flx sync: no garbage data if wait for download prior to wait subs com
         auto queryable_field = table->get_column_key("non_queryable_field");
         mut_subs.insert_or_assign(Query(table).equal(queryable_field, "bar"));
     }
+    // Commit the new subscription to start a change of query
+    auto new_sub = mut_subs.commit();
+    // Wait for download is actually waiting for the subscription to be applied
+    REQUIRE(!wait_for_download(*realm));
+
     SECTION("synchronous wait") {
-        auto new_sub = mut_subs.commit();
-        // Wait for download is actually waiting for the subscription to be applied
-        REQUIRE(!wait_for_download(*realm));
         // After subscription is complete or fails during wait for download, this function completes
         // without blocking
         auto result = new_sub.get_state_change_notification(sync::SubscriptionSet::State::Complete).get_no_throw();
@@ -4679,9 +4681,6 @@ TEST_CASE("flx sync: no garbage data if wait for download prior to wait subs com
         }
     }
     SECTION("asynchronous wait") {
-        auto new_sub = mut_subs.commit();
-        // Wait for download is actually waiting for the subscription to be applied
-        REQUIRE(!wait_for_download(*realm));
         auto pf_subs = util::make_promise_future<void>();
         // After subscription is complete or fails during wait for download, this function completes
         // immediately
