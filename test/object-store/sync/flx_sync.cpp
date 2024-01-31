@@ -4635,13 +4635,15 @@ TEST_CASE("flx sync: no garbage data if wait for download prior to wait subs com
              reason.find("Client provided query with bad syntax:") == std::string_view::npos) ||
             reason.find("\"TopLevel\": key \"non_queryable_field\" is not a queryable field") ==
                 std::string_view::npos) {
-            FAIL(reason);
+            FAIL(util::format("Subscription error did not match: '%1'", reason));
         }
     };
 
     Realm::Config config = wait_realm_config;
     auto pf = util::make_promise_future<void>();
     auto realm = Realm::get_shared_realm(config);
+    // Wait for steady state before committing the new subscription
+    REQUIRE(!wait_for_download(*realm));
     auto mut_subs = realm->get_latest_subscription_set().make_mutable_copy();
     auto good_query = GENERATE(true, false);
     if (good_query) {
@@ -4657,8 +4659,10 @@ TEST_CASE("flx sync: no garbage data if wait for download prior to wait subs com
     }
     SECTION("synchronous wait") {
         auto new_sub = mut_subs.commit();
-        // Wait for download should always be successful (e.g. return false)
+        // Wait for download is actually waiting for the subscription to be applied
         REQUIRE(!wait_for_download(*realm));
+        // After subscription is complete or fails during wait for download, this function completes
+        // without blocking
         auto result = new_sub.get_state_change_notification(sync::SubscriptionSet::State::Complete).get_no_throw();
         if (good_query) {
             // Good case - verify success was returned
@@ -4675,20 +4679,12 @@ TEST_CASE("flx sync: no garbage data if wait for download prior to wait subs com
         }
     }
     SECTION("asynchronous wait") {
-        auto pf_download = util::make_promise_future<void>();
-        auto pf_subs = util::make_promise_future<void>();
         auto new_sub = mut_subs.commit();
-        realm->sync_session()->wait_for_download_completion(
-            [&logger,
-             promise = util::CopyablePromiseHolder<void>(std::move(pf_download.promise))](Status status) mutable {
-                if (!status.is_ok()) {
-                    logger->error("Wait for download complete error (async): %1", status);
-                    promise.get_promise().set_error(status);
-                }
-                else {
-                    promise.get_promise().emplace_value();
-                }
-            });
+        // Wait for download is actually waiting for the subscription to be applied
+        REQUIRE(!wait_for_download(*realm));
+        auto pf_subs = util::make_promise_future<void>();
+        // After subscription is complete or fails during wait for download, this function completes
+        // immediately
         new_sub.get_state_change_notification(sync::SubscriptionSet::State::Complete)
             .get_async([&logger, promise = util::CopyablePromiseHolder<void>(std::move(pf_subs.promise))](
                            StatusWith<sync::SubscriptionSet::State> result) mutable {
@@ -4700,9 +4696,6 @@ TEST_CASE("flx sync: no garbage data if wait for download prior to wait subs com
                     promise.get_promise().emplace_value();
                 }
             });
-        auto download_result = pf_download.future.get_no_throw();
-        // Wait for download should always be successful (e.g. return no error)
-        REQUIRE(download_result.is_ok());
         auto subs_result = pf_subs.future.get_no_throw();
         if (good_query) {
             // Good case - verify success
