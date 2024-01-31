@@ -488,7 +488,7 @@ int64_t ArrayFlex::sum(const Array& arr, size_t start, size_t end) const
         REALM_ASSERT_DEBUG(ndx_size >= start && ndx_size <= end);
         const auto data = (uint64_t*)NodeHeader::get_data_from_header(arr.get_header());
         const auto offset = v_size * v_width + (start * ndx_width);
-        bf_iterator index_iterator{data, offset , ndx_width, ndx_width, 0};
+        bf_iterator index_iterator{data, offset, ndx_width, ndx_width, 0};
         int64_t total_sum = 0;
         for (size_t i = start; i < end; ++i) {
             const auto offset = static_cast<size_t>(index_iterator.get_value() * v_width);
