@@ -329,10 +329,10 @@ void ArrayPacked::restore_array(Array& arr, const std::vector<int64_t>& values) 
     REALM_ASSERT_DEBUG(width == 0 || width == 1 || width == 2 || width == 4 || width == 8 || width == 16 ||
                        width == 32 || width == 64);
     auto byte_size = NodeHeader::calc_size<Encoding::WTypBits>(size, width);
+    byte_size += 64;
     REALM_ASSERT_DEBUG(byte_size % 8 == 0); // 8 bytes aligned value
     auto& allocator = arr.get_alloc();
-    // calling arr.destroy() is fine, as long as we don't use the memory deleted anymore.
-    // Decompressing can only be happening within a write transactions, thus this invariant should hold.
+    //the old memory must be deleted, this is equivalent of doing another copy on write
     arr.destroy();
     auto mem = allocator.alloc(byte_size);
     auto header = mem.get_addr();

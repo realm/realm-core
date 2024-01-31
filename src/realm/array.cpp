@@ -305,13 +305,12 @@ void Array::init_from_mem(MemRef mem) noexcept
         m_ref = mem.get_ref();
         m_data = get_data_from_header(header);
         m_size = ArrayEncode::size(header);
+        //BAD!!!!
         m_encode = ArrayEncode::is_packed(header) ? (ArrayEncode*)(&s_array_packed) : (ArrayEncode*)&s_array_flex;
         m_width = m_lbound = m_ubound = 0;
         m_is_inner_bptree_node = get_is_inner_bptree_node_from_header(header);
         m_has_refs = get_hasrefs_from_header(header);
         m_context_flag = get_context_flag_from_header(header);
-
-        // REALM_TEMPEX(m_vtable = &PopulatedVTableEncoded, m_width, ::vtable);
         REALM_TEMPEX(m_vtable = &VTableForEncodedArray, m_width, ::vtable);
         m_getter = m_vtable->getter;
     }
