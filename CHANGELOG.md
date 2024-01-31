@@ -2,6 +2,7 @@
 
 ### Enhancements
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
+* Add support in the C API for receiving a notification when sync user status changes. ([#7302](https://github.com/realm/realm-core/pull/7302))
 * Allow the query builder to construct >, >=, <, <= queries for string constants. This is a case sensitive lexicographical comparison. Improved performance of RQL (parsed) queries on a non-linked string property using: >, >=, <, <=, operators and fixed behaviour that a null string should be evaulated as less than everything, previously nulls were not matched. ([#3939](https://github.com/realm/realm-core/issues/3939), this is a prerequisite for https://github.com/realm/realm-swift/issues/8008).
 
 ### Fixed
