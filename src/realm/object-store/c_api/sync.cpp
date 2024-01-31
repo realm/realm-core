@@ -42,7 +42,7 @@ realm_sync_session_connection_state_notification_token::~realm_sync_session_conn
 
 realm_user_subscription_token::~realm_user_subscription_token()
 {
-    user->unsubscribe({user.get(), token});
+    user->unsubscribe(token);
 }
 
 namespace realm::c_api {

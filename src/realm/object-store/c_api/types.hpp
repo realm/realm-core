@@ -571,14 +571,15 @@ struct realm_results : realm::c_api::WrapC, realm::Results {
 #if REALM_ENABLE_SYNC
 
 struct realm_user_subscription_token : realm::c_api::WrapC {
-    realm_user_subscription_token(std::shared_ptr<realm::SyncUser> user, uint64_t token)
+    using Token = realm::Subscribable<realm::SyncUser>::Token;
+    realm_user_subscription_token(std::shared_ptr<realm::SyncUser> user, Token&& token)
         : user(user)
-        , token(token)
+        , token(std::move(token))
     {
     }
     ~realm_user_subscription_token();
     std::shared_ptr<realm::SyncUser> user;
-    uint64_t token;
+    Token token;
 };
 
 struct realm_async_open_task_progress_notification_token : realm::c_api::WrapC {

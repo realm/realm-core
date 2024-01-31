@@ -761,7 +761,7 @@ realm_user_state_change_register_callback(realm_user_t* user, realm_user_changed
             callback(userdata.get(), realm_user_state_e(sync_user.state()));
         };
         auto token = (*user)->subscribe(std::move(cb));
-        return new realm_user_subscription_token_t{*user, token.value()};
+        return new realm_user_subscription_token_t{*user, std::move(token)};
     });
 }
 
