@@ -33,7 +33,7 @@ public:
     explicit ArrayPacked() = default;
     virtual ~ArrayPacked() = default;
 
-    static bool encode(const Array&, Array&, size_t, std::vector<int64_t>, size_t);
+    static bool encode(const Array&, Array&, size_t, size_t);
 
     // compressing/decompressing logic
     // bool encode(const Array&, Array&) const final override;
@@ -61,8 +61,8 @@ public:
 private:
     // read info about the encoded array from header
     static bool get_encode_info(const Array&, size_t&, size_t&);
-    static void setup_array_packed_format(const Array&, Array&, size_t, std::vector<int64_t>&, size_t);
-    static void copy_into_packed_array(Array&, const std::vector<int64_t>&);
+    static void setup_array_packed_format(const Array&, Array&, size_t, size_t);
+    static void copy_into_packed_array(const Array&, Array&);
 
     std::vector<int64_t> fetch_signed_values_from_packed_array(const Array&, size_t, size_t) const;
     void restore_array(Array&, const std::vector<int64_t>&) const;

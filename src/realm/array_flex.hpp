@@ -32,7 +32,8 @@ public:
     explicit ArrayFlex() = default;
     virtual ~ArrayFlex() = default;
 
-    static bool encode(const Array&, Array&, size_t, std::vector<int64_t>&, std::vector<size_t>&, size_t, size_t);
+    static bool encode(const Array&, Array&, size_t, const std::vector<int64_t>&, const std::vector<size_t>&, size_t,
+                       size_t);
 
     // compressing/decompressing logic
     // bool encode(const Array&, Array&) const final override;
@@ -64,9 +65,9 @@ private:
 
 
     static bool get_encode_info(const Array&, size_t&, size_t&, size_t&, size_t&);
-    static void setup_array_flex_format(const Array&, Array&, size_t, std::vector<int64_t>&, std::vector<size_t>&,
-                                        size_t, size_t);
-    static void copy_into_flex_array(Array&, std::vector<int64_t>&, std::vector<size_t>&);
+    static void setup_array_flex_format(const Array&, Array&, size_t, const std::vector<int64_t>&,
+                                        const std::vector<size_t>&, size_t, size_t);
+    static void copy_into_flex_array(Array&, const std::vector<int64_t>&, const std::vector<size_t>&);
 };
 } // namespace realm
 #endif // REALM_ARRAY_COMPRESS_HPP

@@ -81,12 +81,6 @@ inline void arrange_data_in_flex_format(const Array& arr, std::vector<int64_t>& 
 
     std::sort(values.begin(), values.end());
     auto last = std::unique(values.begin(), values.end());
-
-    // if there are no duplicates,
-    // flex is not the best option, but Packed can still be valuable
-    if (last == values.end())
-        return;
-
     values.erase(last, values.end());
 
     for (size_t i = 0; i < arr.size(); ++i) {
@@ -104,13 +98,13 @@ inline void arrange_data_in_flex_format(const Array& arr, std::vector<int64_t>& 
     REALM_ASSERT_DEBUG(indices.size() == sz);
 }
 
-inline size_t compute_packed_size(std::vector<int64_t>& values, size_t& v_width)
+inline size_t compute_packed_size(std::vector<int64_t>& values, size_t sz, size_t& v_width)
 {
     using Encoding = NodeHeader::Encoding;
     const auto [min_value, max_value] = std::minmax_element(values.begin(), values.end());
     v_width = std::max(Node::signed_to_num_bits(*min_value), Node::signed_to_num_bits(*max_value));
     REALM_ASSERT_DEBUG(v_width > 0);
-    return NodeHeader::calc_size<Encoding::Packed>(values.size(), v_width);
+    return NodeHeader::calc_size<Encoding::Packed>(sz, v_width);
 }
 
 inline size_t compute_flex_size(std::vector<int64_t>& values, std::vector<size_t>& indices, size_t& v_width,
@@ -132,15 +126,19 @@ bool ArrayEncode::encode(const Array& origin, Array& dst)
     std::vector<int64_t> values;
     std::vector<size_t> indices;
     arrange_data_in_flex_format(origin, values, indices);
-    size_t v_width, ndx_width;
-    const auto packed_size = compute_packed_size(values, v_width);
-    const auto flex_size = compute_flex_size(values, indices, v_width, ndx_width);
-    const auto uncompressed_size = origin.get_byte_size();
-    const auto compressed_size = std::min(packed_size, flex_size);
-    if (compressed_size < uncompressed_size) {
-        return compressed_size == packed_size
-                   ? ArrayPacked::encode(origin, dst, compressed_size, values, v_width)
-                   : ArrayFlex::encode(origin, dst, compressed_size, values, indices, v_width, ndx_width);
+
+    if (!values.empty()) {
+        size_t v_width, ndx_width;
+        const auto uncompressed_size = origin.get_byte_size();
+        const auto packed_size = compute_packed_size(values, origin.size(), v_width);
+        if (!indices.empty()) {
+            const auto flex_size = compute_flex_size(values, indices, v_width, ndx_width);
+            if (flex_size < uncompressed_size && packed_size > flex_size) {
+                return ArrayFlex::encode(origin, dst, flex_size, values, indices, v_width, ndx_width);
+            }
+        }
+        if (packed_size < uncompressed_size)
+            return ArrayPacked::encode(origin, dst, packed_size, v_width);
     }
     return false;
 }
@@ -148,8 +146,8 @@ bool ArrayEncode::encode(const Array& origin, Array& dst)
 size_t ArrayEncode::size(const char* h)
 {
     using Encoding = NodeHeader::Encoding;
-    return is_packed(h) ? NodeHeader::get_arrayB_num_elements<Encoding::Flex>(h)
-                        : NodeHeader::get_num_elements<Encoding::Packed>(h);
+    return is_packed(h) ? NodeHeader::get_num_elements<Encoding::Packed>(h)
+                        : NodeHeader::get_arrayB_num_elements<Encoding::Flex>(h);
 }
 
 int64_t ArrayEncode::get(const char* header, size_t ndx)

@@ -569,7 +569,6 @@ protected:
     // these are used to directly set the vtable dispatcher in Array and spare us a bunch
     // of CPU cycles in order to check if the array is in compressed format
     int64_t get_encoded(size_t ndx) const noexcept;
-    int64_t get_not_encoded(size_t ndx) const noexcept;
     void set_encoded(size_t ndx, int64_t);
     void get_chunk_encoded(size_t, int64_t[8]) const noexcept;
 

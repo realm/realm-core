@@ -208,7 +208,7 @@ int64_t Array::get(size_t ndx) const noexcept
     return get_universal<w>(m_data, ndx);
 }
 
-int64_t Array::get_not_encoded(size_t ndx) const noexcept
+int64_t Array::get(size_t ndx) const noexcept
 {
     REALM_ASSERT_DEBUG(is_attached());
     REALM_ASSERT_DEBUG_EX(ndx < m_size, ndx, m_size);
@@ -229,11 +229,6 @@ int64_t Array::get_not_encoded(size_t ndx) const noexcept
         else
             return (this->*(m_vtable->getter))(ndx);
     */
-}
-
-int64_t Array::get(size_t ndx) const noexcept
-{
-    return get_not_encoded(ndx);
 }
 
 size_t Array::bit_width(int64_t v)
@@ -305,7 +300,7 @@ void Array::init_from_mem(MemRef mem) noexcept
     m_encoding = NodeHeader::get_encoding(header);
     REALM_ASSERT_DEBUG(m_kind == 'A' || m_kind == 'B');
     if (m_kind == 'B') {
-        REALM_ASSERT_DEBUG(m_encoding == Encoding::Flex);
+        REALM_ASSERT_DEBUG(m_encoding == Encoding::Flex || m_encoding == Encoding::Packed);
         char* header = mem.get_addr();
         m_ref = mem.get_ref();
         m_data = get_data_from_header(header);
@@ -412,7 +407,9 @@ ref_type Array::write(_impl::ArrayWriterBase& out, bool deep, bool only_if_modif
         Array encoded_array{m_alloc};
         if (compress_in_flight && encode_array(encoded_array)) {
             REALM_ASSERT_DEBUG(encoded_array.m_kind == 'B');
-            REALM_ASSERT_DEBUG(encoded_array.m_encoding == Encoding::Flex);
+            REALM_ASSERT_DEBUG(
+                encoded_array.m_encoding == Encoding::Flex || encoded_array.m_encoding == Encoding::Packed ||
+                encoded_array.m_encoding == Encoding::AofP || encoded_array.m_encoding == Encoding::PofA);
             REALM_ASSERT_DEBUG(size() == encoded_array.size());
 #ifdef REALM_DEBUG
             for (size_t i = 0; i < encoded_array.size(); ++i)
@@ -442,11 +439,14 @@ ref_type Array::write(ref_type ref, Allocator& alloc, _impl::ArrayWriterBase& ou
         Array encoded_array{alloc};
         if (compress_in_flight && array.encode_array(encoded_array)) {
             REALM_ASSERT_DEBUG(encoded_array.m_kind == 'B');
-            REALM_ASSERT(encoded_array.m_encoding == Encoding::Flex);
+            REALM_ASSERT_DEBUG(
+                encoded_array.m_encoding == Encoding::Flex || encoded_array.m_encoding == Encoding::Packed ||
+                encoded_array.m_encoding == Encoding::AofP || encoded_array.m_encoding == Encoding::PofA);
             REALM_ASSERT_DEBUG(array.size() == encoded_array.size());
 #ifdef REALM_DEBUG
-            for (size_t i = 0; i < encoded_array.size(); ++i)
+            for (size_t i = 0; i < encoded_array.size(); ++i) {
                 REALM_ASSERT_DEBUG(array.get(i) == encoded_array.get(i));
+            }
 #endif
             auto ref = encoded_array.do_write_shallow(out);
             encoded_array.destroy();
@@ -770,9 +770,10 @@ bool Array::decode_array(Array& arr) const
 
 bool Array::is_encoded() const
 {
-    // encoding not checked. It is not strictly needed
-    REALM_ASSERT_DEBUG(m_kind == 'B' &&
-                       (m_encoding == NodeHeader::Encoding::Flex || m_encoding == NodeHeader::Encoding::Packed));
+#ifdef REALM_DEBUG
+    if (m_kind == 'B')
+        REALM_ASSERT_DEBUG((m_encoding == NodeHeader::Encoding::Flex || m_encoding == NodeHeader::Encoding::Packed));
+#endif
     return m_kind == 'B';
 }
 

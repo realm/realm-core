@@ -131,8 +131,8 @@ inline size_t find_binary(uint64_t* data, int64_t key, size_t v_width, size_t nd
 } // namespace impl
 
 
-bool ArrayFlex::encode(const Array& origin, Array& arr, size_t bytes, std::vector<int64_t>& values,
-                       std::vector<size_t>& indices, size_t v_width, size_t ndx_width)
+bool ArrayFlex::encode(const Array& origin, Array& arr, size_t bytes, const std::vector<int64_t>& values,
+                       const std::vector<size_t>& indices, size_t v_width, size_t ndx_width)
 {
     setup_array_flex_format(origin, arr, bytes, values, indices, v_width, ndx_width);
     copy_into_flex_array(arr, values, indices);
@@ -140,8 +140,8 @@ bool ArrayFlex::encode(const Array& origin, Array& arr, size_t bytes, std::vecto
 }
 
 void ArrayFlex::setup_array_flex_format(const Array& origin, Array& arr, size_t byte_size,
-                                        std::vector<int64_t>& values, std::vector<size_t>& indices, size_t v_width,
-                                        size_t ndx_width)
+                                        const std::vector<int64_t>& values, const std::vector<size_t>& indices,
+                                        size_t v_width, size_t ndx_width)
 {
     using Encoding = NodeHeader::Encoding;
     uint8_t flags = NodeHeader::get_flags(origin.get_header()); // take flags from origi array
@@ -153,10 +153,11 @@ void ArrayFlex::setup_array_flex_format(const Array& origin, Array& arr, size_t 
     arr.init_from_mem(mem);
     REALM_ASSERT_DEBUG(arr.m_ref == mem.get_ref());
     REALM_ASSERT_DEBUG(NodeHeader::get_kind(header) == 'B');
-    REALM_ASSERT_DEBUG(NodeHeader::get_encoding(header) == Encoding::Packed);
+    REALM_ASSERT_DEBUG(NodeHeader::get_encoding(header) == Encoding::Flex);
 }
 
-void ArrayFlex::copy_into_flex_array(Array& arr, std::vector<int64_t>& values, std::vector<size_t>& indices)
+void ArrayFlex::copy_into_flex_array(Array& arr, const std::vector<int64_t>& values,
+                                     const std::vector<size_t>& indices)
 {
     REALM_ASSERT_DEBUG(arr.is_attached());
     using Encoding = NodeHeader::Encoding;

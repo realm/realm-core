@@ -117,23 +117,24 @@ inline size_t find_binary(uint64_t* data, int64_t key, size_t v_width, size_t v_
 
 } // namespace impl
 
-bool ArrayPacked::encode(const Array& origin, Array& dst, size_t byte_size, std::vector<int64_t> values,
-                         size_t v_width)
+// do not use values here, the values are computed to be used in flex format,
+// thus all the duplicates are gone, but packed can still be better than flex.
+// TODO: fix this
+bool ArrayPacked::encode(const Array& origin, Array& dst, size_t byte_size, size_t v_width)
 {
-    setup_array_packed_format(origin, dst, byte_size, values, v_width);
-    copy_into_packed_array(dst, values);
+    setup_array_packed_format(origin, dst, byte_size, v_width);
+    copy_into_packed_array(origin, dst);
     return true;
 }
 
-void ArrayPacked::setup_array_packed_format(const Array& origin, Array& arr, size_t byte_size,
-                                            std::vector<int64_t>& values, size_t v_width)
+void ArrayPacked::setup_array_packed_format(const Array& origin, Array& arr, size_t byte_size, size_t v_width)
 {
     using Encoding = NodeHeader::Encoding;
     uint8_t flags = NodeHeader::get_flags(origin.get_header()); // take flags from origi array
     Allocator& allocator = arr.get_alloc();
     auto mem = allocator.alloc(byte_size);
     auto header = mem.get_addr();
-    NodeHeader::init_header(header, 'B', Encoding::Packed, flags, v_width, values.size());
+    NodeHeader::init_header(header, 'B', Encoding::Packed, flags, v_width, origin.size());
     NodeHeader::set_capacity_in_header(byte_size, (char*)header);
     arr.init_from_mem(mem);
     REALM_ASSERT_DEBUG(arr.m_ref == mem.get_ref());
@@ -141,20 +142,20 @@ void ArrayPacked::setup_array_packed_format(const Array& origin, Array& arr, siz
     REALM_ASSERT_DEBUG(NodeHeader::get_encoding(header) == Encoding::Packed);
 }
 
-void ArrayPacked::copy_into_packed_array(Array& arr, const std::vector<int64_t>& values)
+void ArrayPacked::copy_into_packed_array(const Array& origin, Array& arr)
 {
     REALM_ASSERT_DEBUG(arr.is_attached());
     using Encoding = NodeHeader::Encoding;
     auto header = arr.get_header();
     auto v_width = NodeHeader::get_element_size<Encoding::Packed>(header);
-    auto v_size = values.size();
+    auto v_size = origin.size();
     REALM_ASSERT_DEBUG(v_size == NodeHeader::get_num_elements<Encoding::Packed>(header));
     auto data = (uint64_t*)NodeHeader::get_data_from_header(arr.get_header());
     bf_iterator it_value{data, 0, v_width, v_width, 0};
-    for (size_t i = 0; i < values.size(); ++i) {
-        it_value.set_value(values[i]);
+    for (size_t i = 0; i < v_size; ++i) {
+        it_value.set_value(origin.get(i));
         auto v = sign_extend_field(v_width, it_value.get_value());
-        REALM_ASSERT_DEBUG(v == values[i]);
+        REALM_ASSERT_DEBUG(v == origin.get(i));
         ++it_value;
     }
     REALM_ASSERT_DEBUG(arr.get_kind(header) == 'B');
@@ -199,7 +200,7 @@ int64_t ArrayPacked::get(const char* h, size_t ndx)
     using Encoding = NodeHeader::Encoding;
     REALM_ASSERT_DEBUG(NodeHeader::get_kind(h) == 'B');
     REALM_ASSERT_DEBUG(NodeHeader::get_encoding(h) == NodeHeader::Encoding::Packed);
-    const auto v_size = NodeHeader::get_element_size<Encoding::Packed>(h);
+    const auto v_size = NodeHeader::get_num_elements<Encoding::Packed>(h);
     const auto v_width = NodeHeader::get_element_size<Encoding::Packed>(h);
     if (ndx >= v_size)
         return realm::not_found;
