@@ -831,7 +831,7 @@ std::unique_ptr<BPlusTreeNode> BPlusTreeBase::create_root_from_ref(ref_type ref)
     }
 }
 
-// this should only be called column_type which we can safely compress.
+// this should only be called for a column_type which we can safely compress.
 ref_type realm::bptree_typed_write(ref_type ref, _impl::ArrayWriterBase& out, Allocator& alloc, ColumnType col_type,
                                    bool deep, bool only_modified, bool compress)
 {
@@ -866,10 +866,13 @@ ref_type realm::bptree_typed_write(ref_type ref, _impl::ArrayWriterBase& out, Al
         return written_ref;
     }
     else {
-        if (a.has_refs())
+        if (a.has_refs()) {
+            // this should be extended to handle Mixed....
             return a.write(out, deep, only_modified, false); // unknown substructure, don't compress
-        else
+        }
+        else {
             return a.write(out, false, only_modified, compress); // leaf array - do compress
+        }
     }
 }
 

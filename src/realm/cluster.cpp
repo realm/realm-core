@@ -1561,13 +1561,32 @@ ref_type Cluster::typed_write(ref_type ref, _impl::ArrayWriterBase& out, const T
                 auto col_attr = col_key.get_attrs();
                 if (col_type == col_type_Int || col_type == col_type_Link || col_type == col_type_BackLink) {
                     if (!col_attr.test(col_attr_Collection)) {
-                        // we may compress integer leafs (but are not doing it yet)
+                        // we may compress integer leafs
                         dest.set_as_ref(j, a.write(out, deep, only_modified, compress));
                     }
-                    else if (col_attr.test(col_attr_List)) {
+                    else if (col_attr.test(col_attr_List) | col_attr.test(col_attr_Set)) {
+                        // collections which are single bptrees
                         dest.set_as_ref(j, bptree_typed_write(rot.get_as_ref(), out, m_alloc, col_type, deep,
                                                               only_modified, compress));
                     }
+                    /*
+                    else if (col_attr.test(col_attr_Dictionary)) {
+                        // we might want to move this into Dict ?
+                        Array new_temp(Allocator::get_default());
+                        new_temp.create(type_HasRefs, false, a.size());
+                        if (a.size()) {
+                            REALM_ASSERT(a.size() == 2);
+                            auto rot_subtree = a.get_as_ref(0);
+                            new_temp.set_as_ref(0, bptree_typed_write(rot_subtree, out, m_alloc, col_type, deep,
+                                                                      only_modified, compress));
+                            rot_subtree = a.get_as_ref(1);
+                            new_temp.set_as_ref(1, bptree_typed_write(rot_subtree, out, m_alloc, col_type, deep,
+                                                                      only_modified, compress));
+                        }
+                        dest.set_as_ref(j, new_temp.write(out, deep, only_modified, false));
+                        new_temp.destroy();
+                    }
+                    */
                     else {
                         // just recurse into anything else without compressing
                         dest.set_as_ref(j, a.write(out, deep, only_modified, false));
