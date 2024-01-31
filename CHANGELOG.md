@@ -19,6 +19,7 @@
 * Expressions in `CHECK()` macros are printed to better; strings are quoted and null strings are printed as NULL instead of no output.
 * Refactored version resolution for the `build-apple-device.sh` script. ([#7263](https://github.com/realm/realm-core/pull/7263))
 * Remove SyncUser::binding_context() and related things, which were not actually used by any SDKs.
+* (bindgen) Upgrade `eslint-config-prettier` & `eslint-plugin-prettier` and add a missing peer dependency on `prettier`.
 
 ----------------------------------------------
 
