@@ -119,7 +119,7 @@ inline size_t find_binary(uint64_t* data, int64_t key, size_t v_width, size_t nd
         const auto unsigned_val = realm::read_bitfield(data, v_width * ndx, v_width);
         const auto v = sign_extend_field(v_width, unsigned_val);
         if (v == key)
-            return mid;
+            return ndx;
         else if (key < v)
             hi = mid - 1;
         else
@@ -224,7 +224,6 @@ int64_t ArrayFlex::get(const Array& arr, size_t ndx) const
     return ArrayFlex::get(arr.get_header(), ndx);
 }
 
-static size_t flex_index = 0;
 int64_t ArrayFlex::get(const char* h, size_t ndx)
 {
     using Encoding = NodeHeader::Encoding;
@@ -241,7 +240,6 @@ int64_t ArrayFlex::get(const char* h, size_t ndx)
     const bf_iterator it_index{data, static_cast<size_t>(offset + (ndx * ndx_width)), ndx_width, ndx_width, 0};
     const bf_iterator it_value{data, static_cast<size_t>(v_width * it_index.get_value()), v_width, v_width, 0};
     auto v = sign_extend_field(v_width, it_value.get_value());
-    // std::cout << ++flex_index << ") ArrayFlex::get(" << ndx << ") = " << v << std::endl;
     return v;
 }
 
@@ -375,19 +373,21 @@ void ArrayFlex::restore_array(Array& arr, const std::vector<int64_t>& values) co
     byte_size += 64;
     REALM_ASSERT_DEBUG(byte_size % 8 == 0); // 8 bytes aligned value
     auto& allocator = arr.get_alloc();
-    // calling arr.destroy() is fine, as long as we don't use the memory deleted anymore.
-    // Decompressing can only be happening within a write transactions, thus this invariant should hold.
-    arr.destroy();
+    auto old_ref = arr.get_ref();
+    auto old_h = arr.get_header();
+
     auto mem = allocator.alloc(byte_size);
     auto header = mem.get_addr();
     NodeHeader::init_header(header, 'A', Encoding::WTypBits, flags, width, values.size());
     NodeHeader::set_capacity_in_header(byte_size, header);
-    auto data = NodeHeader::get_data_from_header(header);
+    arr.init_from_mem(mem);
+    auto data = arr.m_data;
     size_t ndx = 0;
     for (const auto& v : values)
         ArrayEncode::set_direct(data, width, ndx++, v);
-    arr.init_from_mem(mem);
+
     arr.update_parent();
     REALM_ASSERT_DEBUG(width == arr.get_width());
     REALM_ASSERT_DEBUG(arr.size() == values.size());
+    allocator.free_(old_ref, old_h);
 }

@@ -405,7 +405,7 @@ ref_type Array::write(_impl::ArrayWriterBase& out, bool deep, bool only_if_modif
 
     if (!deep || !m_has_refs) {
         Array encoded_array{m_alloc};
-        if (compress_in_flight && encode_array(encoded_array)) {
+        if (compress_in_flight && size() != 0 && encode_array(encoded_array)) {
             REALM_ASSERT_DEBUG(encoded_array.m_kind == 'B');
             REALM_ASSERT_DEBUG(
                 encoded_array.m_encoding == Encoding::Flex || encoded_array.m_encoding == Encoding::Packed ||
@@ -437,7 +437,7 @@ ref_type Array::write(ref_type ref, Allocator& alloc, _impl::ArrayWriterBase& ou
 
     if (!array.m_has_refs) {
         Array encoded_array{alloc};
-        if (compress_in_flight && array.encode_array(encoded_array)) {
+        if (compress_in_flight && array.size() != 0 && array.encode_array(encoded_array)) {
             REALM_ASSERT_DEBUG(encoded_array.m_kind == 'B');
             REALM_ASSERT_DEBUG(
                 encoded_array.m_encoding == Encoding::Flex || encoded_array.m_encoding == Encoding::Packed ||
@@ -664,14 +664,14 @@ void Array::insert(size_t ndx, int_fast64_t value)
 
 void Array::copy_on_write()
 {
-    decode_array(*this);
-    Node::copy_on_write();
+    if (is_read_only() && !decode_array(*this))
+        Node::copy_on_write();
 }
 
 void Array::copy_on_write(size_t min_size)
 {
-    decode_array(*this);
-    Node::copy_on_write(min_size);
+    if (is_read_only() && !decode_array(*this))
+        Node::copy_on_write(min_size);
 }
 
 void Array::truncate(size_t new_size)
@@ -1521,8 +1521,8 @@ size_t Array::upper_bound_int(int64_t value) const noexcept
 
 size_t Array::find_first(int64_t value, size_t start, size_t end) const
 {
-    if (is_encoded())
-        return m_encode->find_first(*this, value);
+    //    if (is_encoded())
+    //        return m_encode->find_first(*this, value);
     return find_first<Equal>(value, start, end);
 }
 
