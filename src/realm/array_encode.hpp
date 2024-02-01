@@ -46,11 +46,7 @@ public:
     virtual int64_t get(const Array&, size_t) const = 0;
     virtual void get_chunk(const Array&, size_t ndx, int64_t res[8]) const = 0;
     virtual void set_direct(const Array&, size_t, int64_t) const = 0;
-    // lower/upper bound for encoded arrays
-    virtual size_t lower_bound(const Array&, int64_t) const = 0;
-    virtual size_t upper_bound(const Array&, int64_t) const = 0;
     // query interface
-    virtual size_t find_first(const Array&, int64_t value) const = 0;
     virtual int64_t sum(const Array&, size_t start, size_t end) const = 0;
 };
 

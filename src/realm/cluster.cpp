@@ -1569,9 +1569,6 @@ ref_type Cluster::typed_write(ref_type ref, _impl::ArrayWriterBase& out, const T
                 auto col_key = table.m_leaf_ndx2colkey[j - 1];
                 auto col_type = col_key.get_type();
                 auto col_attr = col_key.get_attrs();
-                // TODO: links are disabled because there is a problem with them, likely their representation is wrong
-                // or it
-                //       does not match with the use we do of negative numbers for representing expired links
                 if (col_type == col_type_Int || col_type == col_type_Link || col_type == col_type_BackLink) {
                     if (!col_attr.test(col_attr_Collection)) {
                         // we may compress integer leafs

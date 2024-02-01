@@ -31,92 +31,6 @@
 
 using namespace realm;
 
-namespace impl {
-
-template <typename T>
-inline T fetch_value(uint64_t* data, size_t ndx, size_t v_width)
-{
-    const auto unsigned_val = realm::read_bitfield(data, v_width * ndx, v_width);
-    return std::is_same_v<T, int64_t> ? sign_extend_field(v_width, unsigned_val) : unsigned_val;
-}
-
-template <typename T>
-inline size_t lower_bound(uint64_t* data, const T& key, size_t v_width, size_t v_size)
-{
-    auto cnt = v_size;
-    size_t step;
-    size_t ndx = 0;
-    size_t p = 0;
-    while (cnt > 0) {
-        ndx = p;
-        step = cnt / 2;
-        ndx += step;
-        const auto v = fetch_value<T>(data, ndx, v_width);
-        if ((v < key)) {
-            p = ++ndx;
-            cnt -= step + 1;
-        }
-        else {
-            cnt = step;
-        }
-    }
-    return p;
-}
-
-template <typename T>
-inline size_t upper_bound(uint64_t* data, const T key, size_t v_width, size_t v_size)
-{
-    auto cnt = v_size;
-    size_t step;
-    size_t ndx = 0;
-    size_t p = 0;
-    while (cnt > 0) {
-        ndx = p;
-        step = cnt / 2;
-        ndx += step;
-        const auto v = fetch_value<T>(data, ndx, v_width);
-        if (!(key < v)) {
-            p = ++ndx;
-            cnt -= step + 1;
-        }
-        else {
-            cnt = step;
-        }
-    }
-    return p;
-}
-
-inline size_t find_linear(uint64_t* data, int64_t key, size_t v_width, size_t v_size)
-{
-    for (size_t i = 0; i < v_size; ++i) {
-        bf_iterator it_value{data, static_cast<size_t>(i * v_width), v_width, v_width, 0};
-        const auto v = sign_extend_field(v_width, it_value.get_value());
-        if (v == key)
-            return i;
-    }
-    return realm::not_found;
-}
-
-inline size_t find_binary(uint64_t* data, int64_t key, size_t v_width, size_t v_size)
-{
-    size_t lo = 0;
-    size_t hi = v_size;
-    while (lo <= hi) {
-        size_t mid = lo + (hi - lo) / 2;
-        const auto unsigned_val = realm::read_bitfield(data, v_width * mid, v_width);
-        const auto v = sign_extend_field(v_width, unsigned_val);
-        if (v == key)
-            return mid;
-        else if (key < v)
-            hi = mid - 1;
-        else
-            lo = mid + 1;
-    }
-    return realm::not_found;
-}
-
-} // namespace impl
-
 // do not use values here, the values are computed to be used in flex format,
 // thus all the duplicates are gone, but packed can still be better than flex.
 // TODO: fix this
@@ -232,21 +146,6 @@ void ArrayPacked::get_chunk(const Array& arr, size_t ndx, int64_t res[8]) const
     REALM_UNREACHABLE();
 }
 
-size_t ArrayPacked::find_first(const Array& arr, int64_t value) const
-{
-    static constexpr auto MAX_SZ_LINEAR_FIND = 15;
-    REALM_ASSERT_DEBUG(arr.is_attached());
-    size_t v_width, v_size;
-    if (get_encode_info(arr, v_width, v_size)) {
-        auto data = (uint64_t*)NodeHeader::get_data_from_header(arr.get_header());
-        if (v_size <= MAX_SZ_LINEAR_FIND) {
-            return impl::find_linear(data, value, v_width, v_size);
-        }
-        return impl::find_binary(data, value, v_width, v_size);
-    }
-    return realm::not_found;
-}
-
 int64_t ArrayPacked::sum(const Array& arr, size_t start, size_t end) const
 {
     REALM_ASSERT_DEBUG(arr.is_attached());
@@ -263,29 +162,6 @@ int64_t ArrayPacked::sum(const Array& arr, size_t start, size_t end) const
     }
     REALM_UNREACHABLE();
 }
-
-size_t ArrayPacked::lower_bound(const Array& arr, int64_t value) const
-{
-    REALM_ASSERT_DEBUG(arr.is_attached());
-    size_t v_width, v_size;
-    if (get_encode_info(arr, v_width, v_size)) {
-        const auto data = (uint64_t*)NodeHeader::get_data_from_header(arr.get_header());
-        return impl::lower_bound(data, value, v_width, v_size);
-    }
-    REALM_UNREACHABLE();
-}
-
-size_t ArrayPacked::upper_bound(const Array& arr, int64_t value) const
-{
-    REALM_ASSERT_DEBUG(arr.is_attached());
-    size_t v_width, v_size;
-    if (get_encode_info(arr, v_width, v_size)) {
-        const auto data = (uint64_t*)NodeHeader::get_data_from_header(arr.get_header());
-        return impl::upper_bound(data, value, v_width, v_size);
-    }
-    REALM_UNREACHABLE();
-}
-
 
 bool inline ArrayPacked::get_encode_info(const Array& arr, size_t& v_width, size_t& v_size)
 {

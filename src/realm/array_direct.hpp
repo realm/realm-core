@@ -348,6 +348,12 @@ inline std::pair<int64_t, int64_t> get_two(const char* data, size_t width, size_
     REALM_TEMPEX(return get_two, width, (data, ndx));
 }
 
+namespace impl {
+
+// Lower and Upper bound are mainly used in the B+tree implementation,
+// but also for indexing, we can exploit these functions when the array
+// is encoded, just providing a way for fetching the data.
+// In this case the width is going to be ignored.
 
 // Lower/upper bound in sorted sequence
 // ------------------------------------
@@ -370,8 +376,8 @@ inline std::pair<int64_t, int64_t> get_two(const char* data, size_t width, size_
 //
 // We currently use binary search. See for example
 // http://www.tbray.org/ongoing/When/200x/2003/03/22/Binary.
-template <int width>
-inline size_t lower_bound(const char* data, size_t size, int64_t value) noexcept
+template <int width, typename F>
+inline size_t lower_bound(const char* data, size_t size, int64_t value, F data_fetcher = &get_direct<width>) noexcept
 {
     // The binary search used here is carefully optimized. Key trick is to use a single
     // loop controlling variable (size) instead of high/low pair, and to keep updates
@@ -392,7 +398,7 @@ inline size_t lower_bound(const char* data, size_t size, int64_t value) noexcept
         size_t other_half = size - half;
         size_t probe = low + half;
         size_t other_low = low + other_half;
-        int64_t v = get_direct<width>(data, probe);
+        int64_t v = data_fetcher(data, probe); // get_direct<width>(data, probe);
         size = half;
         low = (v < value) ? other_low : low;
 
@@ -401,7 +407,7 @@ inline size_t lower_bound(const char* data, size_t size, int64_t value) noexcept
         other_half = size - half;
         probe = low + half;
         other_low = low + other_half;
-        v = get_direct<width>(data, probe);
+        v = data_fetcher(data, probe); // get_direct<width>(data, probe);
         size = half;
         low = (v < value) ? other_low : low;
 
@@ -410,7 +416,7 @@ inline size_t lower_bound(const char* data, size_t size, int64_t value) noexcept
         other_half = size - half;
         probe = low + half;
         other_low = low + other_half;
-        v = get_direct<width>(data, probe);
+        v = data_fetcher(data, probe); // get_direct<width>(data, probe);
         size = half;
         low = (v < value) ? other_low : low;
     }
@@ -443,7 +449,7 @@ inline size_t lower_bound(const char* data, size_t size, int64_t value) noexcept
         size_t other_half = size - half;
         size_t probe = low + half;
         size_t other_low = low + other_half;
-        int64_t v = get_direct<width>(data, probe);
+        int64_t v = data_fetcher(data, probe); // get_direct<width>(data, probe);
         size = half;
         // for max performance, the line below should compile into a conditional
         // move instruction. Not all compilers do this. To maximize chance
@@ -456,8 +462,8 @@ inline size_t lower_bound(const char* data, size_t size, int64_t value) noexcept
 }
 
 // See lower_bound()
-template <int width>
-inline size_t upper_bound(const char* data, size_t size, int64_t value) noexcept
+template <int width, typename F>
+inline size_t upper_bound(const char* data, size_t size, int64_t value, F data_fetcher = &get_direct<width>) noexcept
 {
     size_t low = 0;
     while (size >= 8) {
@@ -465,7 +471,7 @@ inline size_t upper_bound(const char* data, size_t size, int64_t value) noexcept
         size_t other_half = size - half;
         size_t probe = low + half;
         size_t other_low = low + other_half;
-        int64_t v = get_direct<width>(data, probe);
+        int64_t v = data_fetcher(data, probe); // get_direct<width>(data, probe);
         size = half;
         low = (value >= v) ? other_low : low;
 
@@ -473,7 +479,7 @@ inline size_t upper_bound(const char* data, size_t size, int64_t value) noexcept
         other_half = size - half;
         probe = low + half;
         other_low = low + other_half;
-        v = get_direct<width>(data, probe);
+        v = data_fetcher(data, probe); // get_direct<width>(data, probe);
         size = half;
         low = (value >= v) ? other_low : low;
 
@@ -481,7 +487,7 @@ inline size_t upper_bound(const char* data, size_t size, int64_t value) noexcept
         other_half = size - half;
         probe = low + half;
         other_low = low + other_half;
-        v = get_direct<width>(data, probe);
+        v = data_fetcher(data, probe); // get_direct<width>(data, probe);
         size = half;
         low = (value >= v) ? other_low : low;
     }
@@ -491,13 +497,41 @@ inline size_t upper_bound(const char* data, size_t size, int64_t value) noexcept
         size_t other_half = size - half;
         size_t probe = low + half;
         size_t other_low = low + other_half;
-        int64_t v = get_direct<width>(data, probe);
+        int64_t v = data_fetcher(data, probe); // get_direct<width>(data, probe);
         size = half;
         low = (value >= v) ? other_low : low;
     };
 
     return low;
 }
+} // namespace impl
+
+
+template <int width>
+inline size_t lower_bound(const char* data, size_t size, int64_t value) noexcept
+{
+    return impl::lower_bound<width>(data, size, value, &get_direct<width>);
+}
+
+template <int width>
+inline size_t upper_bound(const char* data, size_t size, int64_t value) noexcept
+{
+    return impl::upper_bound<width>(data, size, value, &get_direct<width>);
+}
+
+template <typename F>
+inline size_t lower_bound(const char* data, size_t size, int64_t value, F f) noexcept
+{
+    return impl::lower_bound<0>(data, size, value, f);
+}
+
+template <typename F>
+inline size_t upper_bound(const char* data, size_t size, int64_t value, F f) noexcept
+{
+    return impl::upper_bound<0>(data, size, value, f);
+}
+
+
 } // namespace realm
 
 #endif /* ARRAY_TPL_HPP_ */
