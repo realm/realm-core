@@ -1549,7 +1549,7 @@ ref_type Cluster::typed_write(ref_type ref, _impl::ArrayWriterBase& out, const T
         return ref;
     REALM_ASSERT(!get_is_inner_bptree_node_from_header(get_header()));
     REALM_ASSERT(!get_context_flag_from_header(get_header()));
-    Array written_cluster(Allocator::get_default());
+    Array written_cluster(m_alloc);
     written_cluster.create(type_HasRefs, false, size());
     for (size_t j = 0; j < size(); ++j) {
         RefOrTagged leaf_rot = get_as_ref_or_tagged(j);
@@ -1576,16 +1576,32 @@ ref_type Cluster::typed_write(ref_type ref, _impl::ArrayWriterBase& out, const T
             auto col_type = col_key.get_type();
             auto col_attr = col_key.get_attrs();
             bool compressible =
-                col_type == col_type_Int /* ||  col_type == col_type_Link || col_type == col_type_BackLink */;
+                col_type == col_type_Int || col_type == col_type_Link || col_type == col_type_BackLink;
             // First handle true leafs (not collections)
             if (!col_attr.test(col_attr_Collection)) {
+                // this may include mixed (which is not a true leaf, but if so it won´t be compressible, so all good)
                 written_cluster.set_as_ref(j, leaf.write(out, deep, only_modified, compress && compressible));
                 continue;
             }
-            // collections!
-            Array written_leaf(Allocator::get_default());
-            written_leaf.create(type_HasRefs, false, leaf.size());
+            // catch all
+            // written_cluster.set_as_ref(j, leaf.write(out, deep, only_modified, false));
+            // continue;
 
+            // DISABLED
+
+            //  collections!
+            REALM_ASSERT(leaf.has_refs());
+            auto wtype = leaf.get_wtype_from_header(leaf.get_header());
+            REALM_ASSERT(wtype == wtype_Bits);
+            Array written_leaf(m_alloc);
+            // written_leaf.create(type_HasRefs, false, wtype, leaf.size(), Allocator::get_default());
+            written_leaf.create(type_HasRefs, false, leaf.size());
+            for (size_t i = 0; i < leaf.size(); ++i) {
+                written_leaf.set(i, leaf.get_as_ref_or_tagged(i));
+            }
+            written_cluster.set_as_ref(j, written_leaf.write(out, deep, only_modified, false));
+            written_leaf.destroy();
+#if 0
             if (col_attr.test(col_attr_List) || col_attr.test(col_attr_Set)) {
                 // These collections are single bptrees - each entry in leaf may be a bptree
                 for (size_t i = 0; i < leaf.size(); ++i) {
@@ -1616,7 +1632,7 @@ ref_type Cluster::typed_write(ref_type ref, _impl::ArrayWriterBase& out, const T
                     // got a subtree to handle: (which must be a dict, as indicated by column type)
                     Array dict_top(m_alloc);
                     dict_top.init_from_ref(dict_rot.get_as_ref());
-                    REALM_ASSERT(dict_top.size() == 0 || dict_top.size() == 2);
+                    REALM_ASSERT(dict_top.size() == 2);
                     Array written_dict_top(Allocator::get_default());
                     written_dict_top.create(type_HasRefs, false, dict_top.size());
                     if (dict_top.size() == 2) {
@@ -1632,8 +1648,10 @@ ref_type Cluster::typed_write(ref_type ref, _impl::ArrayWriterBase& out, const T
                     written_dict_top.destroy();
                 }
             }
-            written_cluster.set_as_ref(j, written_leaf.write(out, false, only_modified, false));
-            written_leaf.destroy();
+            else {
+                REALM_ASSERT(false);
+            }
+#endif
         }
     }
     auto written_ref = written_cluster.write(out, false, only_modified, false);
