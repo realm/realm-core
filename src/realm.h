@@ -3903,8 +3903,9 @@ RLM_API realm_sync_session_connection_state_notification_token_t* realm_sync_ses
  * @return a notification token object. Dispose it to stop receiving notifications.
  */
 RLM_API realm_sync_user_subscription_token_t*
-realm_sync_user_on_state_change_register_callback(realm_user_t*, realm_sync_on_user_state_changed_t, realm_userdata_t userdata,
-                                          realm_free_userdata_func_t userdata_free);
+realm_sync_user_on_state_change_register_callback(realm_user_t*, realm_sync_on_user_state_changed_t,
+                                                  realm_userdata_t userdata,
+                                                  realm_free_userdata_func_t userdata_free);
 
 /**
  * Register a callback that will be invoked when all pending downloads have completed.
