@@ -50,6 +50,7 @@ namespace {
 // Enum mirroring the DataType::Type, but also includes the
 // non-primitives needed for comparison in the JS SDK.
 enum class MixedDataType {
+    JSUndefined = -2,
     JSNull = -1,
     Int = int(DataType::Type::Int),
     Bool = int(DataType::Type::Bool),
@@ -321,6 +322,17 @@ struct Helpers {
             return MixedDataType::JSNull;
         }
         return to_mixed_data_type(value.get_type());
+    }
+
+    static MixedDataType get_mixed_element_type(object_store::Dictionary dictionary, std::string key) {
+        std::optional<Mixed> value = dictionary.try_get_any(key);
+        if (!value) {
+            return MixedDataType::JSUndefined;
+        }
+        if (value->is_null()) {
+            return MixedDataType::JSNull;
+        }
+        return to_mixed_data_type(value->get_type());
     }
 
     private:
