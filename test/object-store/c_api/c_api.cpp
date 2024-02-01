@@ -615,6 +615,12 @@ TEST_CASE("C API (non-database)", "[c_api]") {
             },
             &sync_user, user_data_free);
 
+        auto user_state = [](realm_userdata_t, realm_user_state_e state) {
+            CHECK(state == RLM_USER_STATE_LOGGED_IN);
+        };
+        auto token =
+            realm_sync_user_on_state_change_register_callback(sync_user, user_state, nullptr, user_data_free);
+
         auto check_base_url = [&](std::string expected) {
             CHECK(transport->get_location_called());
             auto app_base_url = realm_app_get_base_url(test_app.get());
@@ -653,6 +659,7 @@ TEST_CASE("C API (non-database)", "[c_api]") {
         update_and_check_base_url("", default_base_url);
 
         realm_release(sync_user);
+        realm_release(token);
     }
 #endif // REALM_ENABLE_SYNC
 }

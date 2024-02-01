@@ -750,6 +750,21 @@ RLM_API realm_app_t* realm_user_get_app(const realm_user_t* user) noexcept
     return nullptr;
 }
 
+
+RLM_API realm_sync_user_subscription_token_t*
+realm_sync_user_on_state_change_register_callback(realm_user_t* user, realm_sync_on_user_state_changed_t callback,
+                                                  realm_userdata_t userdata, realm_free_userdata_func_t userdata_free)
+{
+    return wrap_err([&] {
+        auto cb = [callback,
+                   userdata = SharedUserdata{userdata, FreeUserdata(userdata_free)}](const SyncUser& sync_user) {
+            callback(userdata.get(), realm_user_state_e(sync_user.state()));
+        };
+        auto token = (*user)->subscribe(std::move(cb));
+        return new realm_sync_user_subscription_token_t{*user, std::move(token)};
+    });
+}
+
 template <typename T>
 inline util::Optional<T> convert_to_optional(T data)
 {
