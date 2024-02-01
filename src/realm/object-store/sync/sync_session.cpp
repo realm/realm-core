@@ -858,9 +858,11 @@ void SyncSession::cancel_pending_waits(util::CheckedUniqueLock lock, Status erro
 }
 
 void SyncSession::handle_progress_update(uint64_t downloaded, uint64_t downloadable, uint64_t uploaded,
-                                         uint64_t uploadable, uint64_t snapshot_version)
+                                         uint64_t uploadable, uint64_t snapshot_version, double download_estimate,
+                                         double upload_estimate)
 {
-    m_progress_notifier.update(downloaded, downloadable, uploaded, uploadable, snapshot_version);
+    m_progress_notifier.update(downloaded, downloadable, uploaded, uploadable, snapshot_version, download_estimate,
+                               upload_estimate);
 }
 
 static sync::Session::Config::ClientReset make_client_reset_config(const RealmConfig& base_config,
@@ -993,9 +995,11 @@ void SyncSession::create_sync_session()
     // Set up the wrapped progress handler callback
     m_session->set_progress_handler([weak_self](uint_fast64_t downloaded, uint_fast64_t downloadable,
                                                 uint_fast64_t uploaded, uint_fast64_t uploadable,
-                                                uint_fast64_t snapshot_version) {
+                                                uint_fast64_t snapshot_version, double download_estimate,
+                                                double upload_estimate) {
         if (auto self = weak_self.lock()) {
-            self->handle_progress_update(downloaded, downloadable, uploaded, uploadable, snapshot_version);
+            self->handle_progress_update(downloaded, downloadable, uploaded, uploadable, snapshot_version,
+                                         download_estimate, upload_estimate);
         }
     });
 
@@ -1575,13 +1579,11 @@ void SyncProgressNotifier::unregister_callback(uint64_t token)
 }
 
 void SyncProgressNotifier::update(uint64_t downloaded, uint64_t downloadable, uint64_t uploaded, uint64_t uploadable,
-                                  uint64_t snapshot_version)
+                                  uint64_t snapshot_version, double download_estimate, double upload_estimate)
 {
-
     std::vector<util::UniqueFunction<void()>> invocations;
     {
         std::lock_guard<std::mutex> lock(m_mutex);
-        double upload_estimate = double(uploaded) / uploadable, download_estimate = double(downloaded) / downloadable;
         m_current_progress = Progress{uploadable,      downloadable,      uploaded,        downloaded,
                                       upload_estimate, download_estimate, snapshot_version};
 
@@ -1607,8 +1609,7 @@ SyncProgressNotifier::NotifierPackage::create_invocation(Progress const& current
 {
     uint64_t transferred = is_download ? current_progress.downloaded : current_progress.uploaded;
     uint64_t transferrable = is_download ? current_progress.downloadable : current_progress.uploadable;
-    double progress_estimate =
-        is_streaming ? 1.0 : (is_download ? current_progress.dowload_estimate : current_progress.upload_estimate);
+    double progress_estimate = is_download ? current_progress.dowload_estimate : current_progress.upload_estimate;
     if (!is_streaming) {
         // If the sync client has not yet processed all of the local
         // transactions then the uploadable data is incorrect and we should

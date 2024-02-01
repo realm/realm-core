@@ -2375,7 +2375,9 @@ Status Session::receive_download_message(const SyncProgress& progress, const Dow
 
     version_type server_version = m_progress.download.server_version;
     version_type last_integrated_client_version = m_progress.download.last_integrated_client_version;
+    uint64_t changesets_size = 0;
     for (const RemoteChangeset& changeset : received_changesets) {
+        changesets_size += changeset.original_changeset_size;
         // Check that per-changeset server version is strictly increasing, except in FLX sync where the server
         // version must be increasing, but can stay the same during bootstraps.
         bool good_server_version = m_is_flx_sync_session ? (changeset.remote_version >= server_version)
@@ -2419,7 +2421,13 @@ Status Session::receive_download_message(const SyncProgress& progress, const Dow
     }
     REALM_ASSERT_EX(hook_action == SyncClientHookAction::NoAction, hook_action);
 
+    if (is_flx && changesets_size > 0)
+        update_download_estimate(info.progress_estimate);
+
     if (process_flx_bootstrap_message(progress, batch_state, query_version, received_changesets)) {
+        if (changesets_size > 0 && batch_state != DownloadBatchState::LastInBatch)
+            notify_download_progress(changesets_size);
+
         clear_resumption_delay_state();
         return Status::OK();
     }

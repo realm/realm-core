@@ -1207,6 +1207,9 @@ private:
 
     bool is_steady_state_download_message(DownloadBatchState batch_state, int64_t query_version);
 
+    void update_download_estimate(double download_estimate);
+    void notify_download_progress(const std::optional<uint64_t>& transient_changesets_size = {});
+
     friend class Connection;
 };
 

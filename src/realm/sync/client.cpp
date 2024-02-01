@@ -209,6 +209,9 @@ private:
     // the download progress is likely completely out of date.
     bool m_reliable_download_progress = false;
 
+    std::optional<double> m_download_estimate;
+    std::optional<uint64_t> m_transient_downloaded_bytes;
+
     // Set to point to an activated session object during actualization of the
     // session wrapper. Set to null during finalization of the session
     // wrapper. Both modifications are guaranteed to be performed by the event
@@ -768,7 +771,7 @@ void SessionImpl::initiate_integrate_changesets(std::uint_fast64_t downloadable_
     catch (const IntegrationException& e) {
         on_integration_failure(e);
     }
-    m_wrapper.on_sync_progress(); // Throws
+    notify_download_progress(); // Throws
 }
 
 
@@ -961,7 +964,8 @@ void SessionImpl::process_pending_flx_bootstrap()
     on_changesets_integrated(new_version.realm_version, progress);
 
     REALM_ASSERT_3(query_version, !=, -1);
-    m_wrapper.on_sync_progress();
+    update_download_estimate(1.0);
+    notify_download_progress(); // Throws
     on_flx_sync_progress(query_version, DownloadBatchState::LastInBatch);
 
     auto action = call_debug_hook(SyncClientHookEvent::BootstrapProcessed, progress, query_version,
@@ -1100,6 +1104,28 @@ bool SessionImpl::is_steady_state_download_message(DownloadBatchState batch_stat
     }
 
     return false;
+}
+
+void SessionImpl::update_download_estimate(double download_estimate)
+{
+    if (m_state == State::Active) {
+        m_wrapper.m_download_estimate = download_estimate;
+    }
+}
+
+void SessionImpl::notify_download_progress(const std::optional<uint64_t>& transient_changesets_size)
+{
+    if (m_state == State::Active) {
+        if (transient_changesets_size) {
+            m_wrapper.m_transient_downloaded_bytes =
+                m_wrapper.m_transient_downloaded_bytes.value_or(0) + transient_changesets_size.value();
+        }
+        else {
+            m_wrapper.m_transient_downloaded_bytes.reset();
+        }
+
+        m_wrapper.on_sync_progress(); // Throws
+    }
 }
 
 util::Future<std::string> SessionImpl::send_test_command(std::string body)
@@ -1733,6 +1759,8 @@ void SessionWrapper::on_download_completion()
         m_reached_download_mark = m_staged_download_mark;
         m_client.m_wait_or_client_stopped_cond.notify_all();
     }
+
+    m_download_estimate.reset();
 }
 
 
@@ -1801,14 +1829,28 @@ void SessionWrapper::report_progress(bool only_if_new_uploadable_data)
     // uploadable_bytes is uploaded + remaining to upload, while downloadable_bytes
     // is only the remaining to download. This is confusing, so make them use
     // the same units.
-    std::uint_fast64_t total_bytes = downloaded_bytes + downloadable_bytes;
+    downloadable_bytes += downloaded_bytes;
 
     m_sess->logger.debug("Progress handler called, downloaded = %1, "
-                         "downloadable(total) = %2, uploaded = %3, "
+                         "downloadable = %2, uploaded = %3, "
                          "uploadable = %4, snapshot version = %5",
-                         downloaded_bytes, total_bytes, uploaded_bytes, uploadable_bytes, snapshot_version);
+                         downloaded_bytes, downloadable_bytes, uploaded_bytes, uploadable_bytes, snapshot_version);
 
-    m_progress_handler(downloaded_bytes, total_bytes, uploaded_bytes, uploadable_bytes, snapshot_version);
+    // FIXME take into account first initial reported value in this batch
+    double upload_estimate = uploadable_bytes > 0 ? (uploaded_bytes / double(uploadable_bytes)) : 1;
+    double download_estimate = downloadable_bytes > 0 ? (downloaded_bytes / double(downloadable_bytes)) : 1;
+
+    if (m_download_estimate) {
+        download_estimate = m_download_estimate.value();
+        if (m_transient_downloaded_bytes)
+            downloaded_bytes += m_transient_downloaded_bytes.value();
+
+        // FIXME add some estimate to this
+        downloadable_bytes = downloaded_bytes;
+    }
+
+    m_progress_handler(downloaded_bytes, downloadable_bytes, uploaded_bytes, uploadable_bytes, snapshot_version,
+                       download_estimate, upload_estimate);
 }
 
 util::Future<std::string> SessionWrapper::send_test_command(std::string body)
