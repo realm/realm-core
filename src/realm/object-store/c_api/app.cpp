@@ -751,8 +751,8 @@ RLM_API realm_app_t* realm_user_get_app(const realm_user_t* user) noexcept
 }
 
 
-RLM_API realm_user_subscription_token_t*
-realm_user_state_change_register_callback(realm_user_t* user, realm_user_changed_callback_t callback,
+RLM_API realm_sync_user_subscription_token_t*
+realm_sync_user_on_state_change_register_callback(realm_user_t* user, realm_sync_on_user_state_changed_t callback,
                                           realm_userdata_t userdata, realm_free_userdata_func_t userdata_free)
 {
     return wrap_err([&] {
@@ -761,7 +761,7 @@ realm_user_state_change_register_callback(realm_user_t* user, realm_user_changed
             callback(userdata.get(), realm_user_state_e(sync_user.state()));
         };
         auto token = (*user)->subscribe(std::move(cb));
-        return new realm_user_subscription_token_t{*user, std::move(token)};
+        return new realm_sync_user_subscription_token_t{*user, std::move(token)};
     });
 }
 

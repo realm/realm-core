@@ -40,7 +40,7 @@ realm_sync_session_connection_state_notification_token::~realm_sync_session_conn
     session->unregister_connection_change_callback(token);
 }
 
-realm_user_subscription_token::~realm_user_subscription_token()
+realm_sync_user_subscription_token::~realm_sync_user_subscription_token()
 {
     user->unsubscribe(token);
 }

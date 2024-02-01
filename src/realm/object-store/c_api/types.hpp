@@ -570,14 +570,14 @@ struct realm_results : realm::c_api::WrapC, realm::Results {
 
 #if REALM_ENABLE_SYNC
 
-struct realm_user_subscription_token : realm::c_api::WrapC {
+struct realm_sync_user_subscription_token : realm::c_api::WrapC {
     using Token = realm::Subscribable<realm::SyncUser>::Token;
-    realm_user_subscription_token(std::shared_ptr<realm::SyncUser> user, Token&& token)
+    realm_sync_user_subscription_token(std::shared_ptr<realm::SyncUser> user, Token&& token)
         : user(user)
         , token(std::move(token))
     {
     }
-    ~realm_user_subscription_token();
+    ~realm_sync_user_subscription_token();
     std::shared_ptr<realm::SyncUser> user;
     Token token;
 };
