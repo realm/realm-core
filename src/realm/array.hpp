@@ -412,8 +412,7 @@ public:
         QueryStateFindFirst state;
         Finder finder = m_vtable->finder[cond::condition];
         (this->*finder)(value, start, end, 0, &state);
-
-        return static_cast<size_t>(state.m_state);
+        return state.m_state;
     }
 
     /// Get the specified element without the cost of constructing an

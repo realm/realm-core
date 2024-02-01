@@ -195,7 +195,6 @@ int64_t ArrayPacked::get(const Array& arr, size_t ndx) const
     return ArrayPacked::get(arr.get_header(), ndx);
 }
 
-static size_t packed_index = 0;
 int64_t ArrayPacked::get(const char* h, size_t ndx)
 {
     using Encoding = NodeHeader::Encoding;
@@ -208,7 +207,6 @@ int64_t ArrayPacked::get(const char* h, size_t ndx)
     const auto data = (uint64_t*)NodeHeader::get_data_from_header(h);
     const bf_iterator it_value{data, static_cast<size_t>(v_width * ndx), v_width, v_width, 0};
     auto v = sign_extend_field(v_width, it_value.get_value());
-    // std::cout << ++packed_index << ") ArrayPacked::get(" << ndx << ") = " << v << std::endl;
     return v;
 }
 
@@ -334,9 +332,10 @@ void ArrayPacked::restore_array(Array& arr, const std::vector<int64_t>& values) 
     auto byte_size = NodeHeader::calc_size<Encoding::WTypBits>(size, width);
     byte_size += 64;
     REALM_ASSERT_DEBUG(byte_size % 8 == 0); // 8 bytes aligned value
+    auto old_ref = arr.get_ref();
+    auto old_header = arr.get_header();
+
     auto& allocator = arr.get_alloc();
-    //the old memory must be deleted, this is equivalent of doing another copy on write
-    arr.destroy();
     auto mem = allocator.alloc(byte_size);
     auto header = mem.get_addr();
     NodeHeader::init_header(header, 'A', Encoding::WTypBits, flags, width, values.size());
@@ -349,4 +348,5 @@ void ArrayPacked::restore_array(Array& arr, const std::vector<int64_t>& values) 
     arr.update_parent();
     REALM_ASSERT_DEBUG(width == arr.get_width());
     REALM_ASSERT_DEBUG(arr.size() == values.size());
+    allocator.free_(old_ref, old_header);
 }

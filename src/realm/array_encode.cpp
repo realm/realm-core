@@ -66,10 +66,7 @@ inline void arrange_data_in_flex_format(const Array& arr, std::vector<int64_t>& 
     //  The algorithm is O(n lg n) for now, but we could use an efficient hash table and try to boost perf.
 
     const auto sz = arr.size();
-
-    if (sz <= 1)
-        return;
-
+    REALM_ASSERT_DEBUG(sz > 0);
     values.reserve(sz);
     indices.reserve(sz);
 
@@ -123,6 +120,8 @@ inline size_t compute_flex_size(std::vector<int64_t>& values, std::vector<size_t
 bool ArrayEncode::encode(const Array& origin, Array& dst)
 {
     // check what makes more sense, Packed, Flex or just keep array as it is.
+    // return false;
+
     std::vector<int64_t> values;
     std::vector<size_t> indices;
     arrange_data_in_flex_format(origin, values, indices);
