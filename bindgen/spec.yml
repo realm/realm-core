@@ -70,7 +70,7 @@ typeAliases:
   ErrorCodes::Error: int32_t
 
 templates: # value tells you how many arguments it takes ('*' means any number)
-  util::Optional: 1
+  std::optional: 1
   std::vector: 1
   std::shared_ptr: 1
   std::pair: 2
@@ -180,7 +180,7 @@ enums:
     cppName: ClientResyncMode
     values:
       - Manual
-      - DiscardLocal 
+      - DiscardLocal
       - Recover
       - RecoverOrDiscard
 
@@ -375,7 +375,7 @@ records:
     fields:
       longitude: double
       latitude: double
-      altitude: 
+      altitude:
         type: double
         default: std::numeric_limits<double>::quiet_NaN()
 
@@ -392,7 +392,7 @@ records:
   GeoPolygon:
     fields:
       points: std::vector<std::vector<GeoPoint>>
-      
+
   RealmConfig:
     fields:
       path: std::string
@@ -409,7 +409,7 @@ records:
       in_memory:
         type: bool
         default: false
-      schema: util::Optional<std::vector<ObjectSchema>>
+      schema: std::optional<std::vector<ObjectSchema>>
       schema_version:
         type: SchemaVersion
         default: -1
@@ -447,7 +447,7 @@ records:
       id:
         type: ObjectId
       key:
-        type: util::Optional<std::string>
+        type: std::optional<std::string>
       name:
         type: std::string
       disabled:
@@ -473,31 +473,31 @@ records:
         type: bool
         default: false
       error_handler: 'Nullable<std::function<(session: SharedSyncSession, error: SyncError) off_thread -> void>>'
-      custom_http_headers: 
+      custom_http_headers:
         type: 'std::map<std::string, std::string>'
         default: {}
       client_validate_ssl:
         type: bool
         default: true
-      ssl_trust_certificate_path: util::Optional<std::string>
+      ssl_trust_certificate_path: std::optional<std::string>
       ssl_verify_callback: Nullable<SSLVerifyCallback>
       client_resync_mode:
-        type: ClientResetMode 
+        type: ClientResetMode
         default: ClientResyncMode::Manual;
       notify_before_client_reset: 'Nullable<std::function<(before_frozen: SharedRealm) off_thread -> void>>'
       notify_after_client_reset: 'Nullable<std::function<(before_frozen: SharedRealm, after: ThreadSafeReference, did_recover: bool) off_thread -> void>>'
       cancel_waits_on_nonfatal_error:
         type: bool
         default: false
-      proxy_config: util::Optional<SyncProxyConfig>
-        
+      proxy_config: std::optional<SyncProxyConfig>
+
   SyncSubscription:
     cppName: sync::Subscription
     fields:
       id: ObjectId
       created_at: Timestamp
       updated_at: Timestamp
-      name: util::Optional<std::string>
+      name: std::optional<std::string>
       object_class_name: std::string
       query_string: std::string
 
@@ -561,7 +561,7 @@ records:
       metadata_mode:
         type: MetadataMode
         default: MetadataMode::Encryption
-      custom_encryption_key: util::Optional<EncryptionKey>
+      custom_encryption_key: std::optional<EncryptionKey>
       logger_factory: Nullable<LoggerFactory>
       log_level:
         type: LoggerLevel
@@ -636,8 +636,8 @@ records:
     fields:
       app_id: std::string
       transport: SharedGenericNetworkTransport
-      base_url: util::Optional<std::string>
-      default_request_timeout_ms: util::Optional<uint64_t>
+      base_url: std::optional<std::string>
+      default_request_timeout_ms: std::optional<uint64_t>
       device_info: DeviceInfo
 
   CompensatingWriteErrorInfo:
@@ -857,13 +857,13 @@ classes:
       limit: '(max_count: count_t) const -> Results'
       snapshot: '() const -> Results'
       freeze: '(frozen_realm: SharedRealm) const -> Results'
-      max: '(column: ColKey) -> util::Optional<Mixed>'
-      min: '(column: ColKey) -> util::Optional<Mixed>'
-      average: '(column: ColKey) -> util::Optional<Mixed>'
-      sum: '(column: ColKey) -> util::Optional<Mixed>'
+      max: '(column: ColKey) -> std::optional<Mixed>'
+      min: '(column: ColKey) -> std::optional<Mixed>'
+      average: '(column: ColKey) -> std::optional<Mixed>'
+      sum: '(column: ColKey) -> std::optional<Mixed>'
       clear: ()
 
-      add_notification_callback: '(cb: (changes: const CollectionChangeSet&), keyPaths: util::Optional<KeyPathArray>) -> NotificationToken'
+      add_notification_callback: '(cb: (changes: const CollectionChangeSet&), keyPaths: std::optional<KeyPathArray>) -> NotificationToken'
 
   Realm:
     sharedPtrWrapped: SharedRealm
@@ -877,7 +877,7 @@ classes:
         # - suffix: from_reference_with_sched
         #   sig: '(thread: ThreadSafeReference, scheduler: SharedScheduler) -> SharedRealm'
       get_synchronized_realm: '(config: RealmConfig) -> SharedAsyncOpenTask'
-      #make_shared_realm: '(config: Realm::Config, version: util::Optional<VersionID>, coordinator: std::shared_ptr<_impl::RealmCoordinator>) -> SharedRealm'
+      #make_shared_realm: '(config: Realm::Config, version: std::optional<VersionID>, coordinator: std::shared_ptr<_impl::RealmCoordinator>) -> SharedRealm'
       get_schema_version: '(config: const RealmConfig&) const -> SchemaVersion'
 
     properties:
@@ -891,7 +891,7 @@ classes:
 
       get_number_of_versions: uint64_t
       read_transaction_version: VersionID
-      current_transaction_version: util::Optional<VersionID>
+      current_transaction_version: std::optional<VersionID>
 
       auto_refresh: bool
 
@@ -934,7 +934,7 @@ classes:
         - () const
         - suffix: maybe_throw
           sig: '(throw_on_error: bool) const'
-      
+
       create_key_path_array: '(table_name: StringData, key_paths: const std::vector<std::string>&) -> KeyPathArray'
 
       close: ()
@@ -951,7 +951,7 @@ classes:
     constructors:
       make: '(realm: SharedRealm, obj: Obj)'
     methods:
-      add_callback: '(cb: (changes: ObjectChangeSet), keyPaths: util::Optional<KeyPathArray>) -> uint64_t'
+      add_callback: '(cb: (changes: ObjectChangeSet), keyPaths: std::optional<KeyPathArray>) -> uint64_t'
       remove_callback: '(token: uint64_t)'
 
   NotificationToken:
@@ -997,7 +997,7 @@ classes:
         - '(order: SortDescriptor) const -> Results'
         - sig: '(keyPaths: std::vector<std::pair<std::string, bool>> const&) const -> Results'
           suffix: 'by_name'
-      add_notification_callback: '(cb: (changes: const CollectionChangeSet&), keyPaths: util::Optional<KeyPathArray>) -> NotificationToken'
+      add_notification_callback: '(cb: (changes: const CollectionChangeSet&), keyPaths: std::optional<KeyPathArray>) -> NotificationToken'
 
   List:
     base: Collection
@@ -1019,16 +1019,16 @@ classes:
       freeze: '(frozen_realm: SharedRealm const&) const -> List'
 
       max:
-        - '() const -> util::Optional<Mixed>'
-        - sig: '(column: ColKey) const -> util::Optional<Mixed>'
+        - '() const -> std::optional<Mixed>'
+        - sig: '(column: ColKey) const -> std::optional<Mixed>'
           suffix: of
       min:
-        - '() const -> util::Optional<Mixed>'
-        - sig: '(column: ColKey) const -> util::Optional<Mixed>'
+        - '() const -> std::optional<Mixed>'
+        - sig: '(column: ColKey) const -> std::optional<Mixed>'
           suffix: of
       average:
-        - '() const -> util::Optional<Mixed>'
-        - sig: '(column: ColKey) const -> util::Optional<Mixed>'
+        - '() const -> std::optional<Mixed>'
+        - sig: '(column: ColKey) const -> std::optional<Mixed>'
           suffix: of
       sum:
         - '() const -> Mixed'
@@ -1061,16 +1061,16 @@ classes:
       # assign_symmetric_difference: '(rhs: const Collection&) -> void'
 
       max:
-        - '() const -> util::Optional<Mixed>'
-        - sig: '(column: ColKey) const -> util::Optional<Mixed>'
+        - '() const -> std::optional<Mixed>'
+        - sig: '(column: ColKey) const -> std::optional<Mixed>'
           suffix: of
       min:
-        - '() const -> util::Optional<Mixed>'
-        - sig: '(column: ColKey) const -> util::Optional<Mixed>'
+        - '() const -> std::optional<Mixed>'
+        - sig: '(column: ColKey) const -> std::optional<Mixed>'
           suffix: of
       average:
-        - '() const -> util::Optional<Mixed>'
-        - sig: '(column: ColKey) const -> util::Optional<Mixed>'
+        - '() const -> std::optional<Mixed>'
+        - sig: '(column: ColKey) const -> std::optional<Mixed>'
           suffix: of
       sum:
         - '() const -> Mixed'
@@ -1093,10 +1093,10 @@ classes:
       get_pair: '(ndx: count_t) const -> std::pair<StringData, Mixed>'
       contains: '(key: StringData) -> bool'
       freeze: '(frozen_realm: SharedRealm const&) const -> Dictionary'
-      add_key_based_notification_callback: '(cb: (changes: DictionaryChangeSet), keyPaths: util::Optional<KeyPathArray>) -> NotificationToken'
+      add_key_based_notification_callback: '(cb: (changes: DictionaryChangeSet), keyPaths: std::optional<KeyPathArray>) -> NotificationToken'
       insert_any: '(key: StringData, value: Mixed) -> std::pair<count_t, bool>'
       insert_embedded: '(key: StringData) -> Obj'
-      try_get_any: '(key: StringData) const -> util::Optional<Mixed>'
+      try_get_any: '(key: StringData) const -> std::optional<Mixed>'
       remove_all: '()'
       try_erase: '(key: StringData) -> bool'
 
@@ -1148,9 +1148,9 @@ classes:
       refresh_token: std::string
       device_id: std::string
       has_device_id: bool
-      user_profile: UserProfile 
+      user_profile: UserProfile
       identities: std::vector<UserIdentity>
-      custom_data: util::Optional<bson::BsonDocument>
+      custom_data: std::optional<bson::BsonDocument>
       sync_manager: SharedSyncManager
       state: SyncUserState
       subscribers_count: count_t
@@ -1164,16 +1164,16 @@ classes:
   UserProfile:
     cppName: SyncUserProfile
     methods:
-      name: '() -> util::Optional<std::string>'
-      email: '() -> util::Optional<std::string>'
-      picture_url: '() -> util::Optional<std::string>'
-      first_name: '() -> util::Optional<std::string>'
-      last_name: '() -> util::Optional<std::string>'
-      gender: '() -> util::Optional<std::string>'
-      birthday: '() -> util::Optional<std::string>'
-      min_age: '() -> util::Optional<std::string>'
-      max_age: '() -> util::Optional<std::string>'
-      data: '() -> bson::BsonDocument'  
+      name: '() -> std::optional<std::string>'
+      email: '() -> std::optional<std::string>'
+      picture_url: '() -> std::optional<std::string>'
+      first_name: '() -> std::optional<std::string>'
+      last_name: '() -> std::optional<std::string>'
+      gender: '() -> std::optional<std::string>'
+      birthday: '() -> std::optional<std::string>'
+      min_age: '() -> std::optional<std::string>'
+      max_age: '() -> std::optional<std::string>'
+      data: '() -> bson::BsonDocument'
 
   AppSubscriptionToken:
     cppName: app::App::Token
@@ -1194,16 +1194,16 @@ classes:
       close_all_sync_sessions: ()
 
     methods:
-      log_in_with_credentials: '(credentials: AppCredentials, cb: AsyncCallback<(user: const Nullable<SharedSyncUser>&, err: util::Optional<AppError>)>&&)'
+      log_in_with_credentials: '(credentials: AppCredentials, cb: AsyncCallback<(user: const Nullable<SharedSyncUser>&, err: std::optional<AppError>)>&&)'
       log_out:
-        - '(cb: AsyncCallback<(err: util::Optional<AppError>)>&&)'
-        - sig: '(user: SharedSyncUser, cb: AsyncCallback<(err: util::Optional<AppError>)>&&)'
+        - '(cb: AsyncCallback<(err: std::optional<AppError>)>&&)'
+        - sig: '(user: SharedSyncUser, cb: AsyncCallback<(err: std::optional<AppError>)>&&)'
           suffix: user
-      refresh_custom_data: '(user: SharedSyncUser, cb: AsyncCallback<(err: util::Optional<AppError>)>&&)'
-      link_user: '(user: SharedSyncUser, credentials: const AppCredentials&, cb: AsyncCallback<(user: const Nullable<SharedSyncUser>&, err: util::Optional<AppError>)>&&)'
+      refresh_custom_data: '(user: SharedSyncUser, cb: AsyncCallback<(err: std::optional<AppError>)>&&)'
+      link_user: '(user: SharedSyncUser, credentials: const AppCredentials&, cb: AsyncCallback<(user: const Nullable<SharedSyncUser>&, err: std::optional<AppError>)>&&)'
       switch_user: '(user: SharedSyncUser)'
-      remove_user: '(user: SharedSyncUser, cb: AsyncCallback<(err: util::Optional<AppError>)>&&)'
-      delete_user: '(user: SharedSyncUser, cb: AsyncCallback<(err: util::Optional<AppError>)>&&)'
+      remove_user: '(user: SharedSyncUser, cb: AsyncCallback<(err: std::optional<AppError>)>&&)'
+      delete_user: '(user: SharedSyncUser, cb: AsyncCallback<(err: std::optional<AppError>)>&&)'
       usernamePasswordProviderClient:
         - sig: () -> UsernamePasswordProviderClient
           cppName: provider_client<app::App::UsernamePasswordProviderClient>
@@ -1213,9 +1213,9 @@ classes:
       push_notification_client: '(service_name: const std::string&) -> PushClient'
       subscribe: '(observer: (app: IgnoreArgument<const App&>)) -> AppSubscriptionToken'
       unsubscribe: '(token: AppSubscriptionToken)'
-      call_function: '(user: const SharedSyncUser&, name: std::string, args: EJsonArray, service_name: util::Optional<std::string>, cb: AsyncCallback<(result: Nullable<const EJson*>, err: util::Optional<AppError>)>)'
-      make_streaming_request: '(user: SharedSyncUser, name: std::string, args: bson::BsonArray, service_name: util::Optional<std::string>) -> Request'
-      update_base_url: '(base_url: std::optional<std::string>, cb: AsyncCallback<(err: util::Optional<AppError>)>&&)'
+      call_function: '(user: const SharedSyncUser&, name: std::string, args: EJsonArray, service_name: std::optional<std::string>, cb: AsyncCallback<(result: Nullable<const EJson*>, err: std::optional<AppError>)>)'
+      make_streaming_request: '(user: SharedSyncUser, name: std::string, args: bson::BsonArray, service_name: std::optional<std::string>) -> Request'
+      update_base_url: '(base_url: std::optional<std::string>, cb: AsyncCallback<(err: std::optional<AppError>)>&&)'
       get_base_url: '() const -> std::string'
 
   WatchStream:
@@ -1231,29 +1231,29 @@ classes:
   PushClient:
     cppName: app::PushClient
     methods:
-      register_device: '(registration_token: const std::string&, sync_user: const SharedSyncUser&, completion: AsyncCallback<(err: util::Optional<AppError>)>&&)'
-      deregister_device: '(sync_user: const SharedSyncUser&, completion: AsyncCallback<(err: util::Optional<AppError>)>&&)'
+      register_device: '(registration_token: const std::string&, sync_user: const SharedSyncUser&, completion: AsyncCallback<(err: std::optional<AppError>)>&&)'
+      deregister_device: '(sync_user: const SharedSyncUser&, completion: AsyncCallback<(err: std::optional<AppError>)>&&)'
 
   UsernamePasswordProviderClient:
     cppName: app::App::UsernamePasswordProviderClient
     methods:
-      register_email: '(email: const std::string&, password: const std::string&, completion: AsyncCallback<(err: util::Optional<AppError>)>&&)'
-      retry_custom_confirmation: '(email: const std::string&, completion: AsyncCallback<(err: util::Optional<AppError>)>&&)'
-      confirm_user: '(token: const std::string&, token_id: const std::string&, completion: AsyncCallback<(err: util::Optional<AppError>)>&&)'
-      resend_confirmation_email: '(email: const std::string&, completion: AsyncCallback<(err: util::Optional<AppError>)>&&)'
-      reset_password: '(password: const std::string&, token: const std::string&, token_id: const std::string&, completion: AsyncCallback<(err: util::Optional<AppError>)>&&)'
-      send_reset_password_email: '(email: const std::string&, completion: AsyncCallback<(err: util::Optional<AppError>)>&&)'
-      call_reset_password_function: '(email: const std::string&, password: const std::string&, args: const bson::BsonArray&, completion: AsyncCallback<(err: util::Optional<AppError>)>&&)'
+      register_email: '(email: const std::string&, password: const std::string&, completion: AsyncCallback<(err: std::optional<AppError>)>&&)'
+      retry_custom_confirmation: '(email: const std::string&, completion: AsyncCallback<(err: std::optional<AppError>)>&&)'
+      confirm_user: '(token: const std::string&, token_id: const std::string&, completion: AsyncCallback<(err: std::optional<AppError>)>&&)'
+      resend_confirmation_email: '(email: const std::string&, completion: AsyncCallback<(err: std::optional<AppError>)>&&)'
+      reset_password: '(password: const std::string&, token: const std::string&, token_id: const std::string&, completion: AsyncCallback<(err: std::optional<AppError>)>&&)'
+      send_reset_password_email: '(email: const std::string&, completion: AsyncCallback<(err: std::optional<AppError>)>&&)'
+      call_reset_password_function: '(email: const std::string&, password: const std::string&, args: const bson::BsonArray&, completion: AsyncCallback<(err: std::optional<AppError>)>&&)'
 
   UserAPIKeyProviderClient:
     cppName: app::App::UserAPIKeyProviderClient
     methods:
-      create_api_key: '(name: const std::string&, user: SharedSyncUser, completion: AsyncCallback<(apiKey: UserAPIKey&&, err: util::Optional<AppError>)>&&)'
-      fetch_api_key: '(id: ObjectId&, user: const SharedSyncUser, completion: AsyncCallback<(apiKey: UserAPIKey&&, err: util::Optional<AppError>)>&&)'
-      fetch_api_keys: '(user: const SharedSyncUser, completion: AsyncCallback<(apiKeys: std::vector<UserAPIKey>&&, err: util::Optional<AppError>)>&&)'
-      delete_api_key: '(id: ObjectId&, user: const SharedSyncUser, completion: AsyncCallback<(err: util::Optional<AppError>)>&&)'
-      enable_api_key: '(id: ObjectId&, user: const SharedSyncUser, completion: AsyncCallback<(err: util::Optional<AppError>)>&&)'
-      disable_api_key: '(id: ObjectId&, user: const SharedSyncUser, completion: AsyncCallback<(err: util::Optional<AppError>)>&&)'
+      create_api_key: '(name: const std::string&, user: SharedSyncUser, completion: AsyncCallback<(apiKey: UserAPIKey&&, err: std::optional<AppError>)>&&)'
+      fetch_api_key: '(id: ObjectId&, user: const SharedSyncUser, completion: AsyncCallback<(apiKey: UserAPIKey&&, err: std::optional<AppError>)>&&)'
+      fetch_api_keys: '(user: const SharedSyncUser, completion: AsyncCallback<(apiKeys: std::vector<UserAPIKey>&&, err: std::optional<AppError>)>&&)'
+      delete_api_key: '(id: ObjectId&, user: const SharedSyncUser, completion: AsyncCallback<(err: std::optional<AppError>)>&&)'
+      enable_api_key: '(id: ObjectId&, user: const SharedSyncUser, completion: AsyncCallback<(err: std::optional<AppError>)>&&)'
+      disable_api_key: '(id: ObjectId&, user: const SharedSyncUser, completion: AsyncCallback<(err: std::optional<AppError>)>&&)'
 
   # See Helpers::make_loger_factory to construct one.
   # Using an opaque class here rather than exposing the factory to avoid having to
@@ -1278,7 +1278,7 @@ classes:
       set_timeouts: '(timeouts: SyncClientTimeouts)'
       reconnect: ()
       wait_for_sessions_to_terminate: ()
-      path_for_realm: '(config: SyncConfig, custom_file_name: util::Optional<std::string>) -> StringData'
+      path_for_realm: '(config: SyncConfig, custom_file_name: std::optional<std::string>) -> StringData'
       get_existing_active_session: '(path: const std::string&) -> SharedSyncSession'
 
   ThreadSafeReference: {}
@@ -1298,7 +1298,7 @@ classes:
       path: std::string
       user: SharedSyncUser
       config: SyncConfig
-      full_realm_url: util::Optional<std::string>
+      full_realm_url: std::optional<std::string>
     methods:
       wait_for_upload_completion: '(callback: AsyncCallback<(err: Status) off_thread>)'
       wait_for_download_completion: '(callback: AsyncCallback<(err: Status) off_thread>)'
@@ -1327,7 +1327,7 @@ classes:
       size: count_t
     methods:
       make_mutable_copy: () const -> MutableSyncSubscriptionSet
-      get_state_change_notification: '(notify_when: SyncSubscriptionSetState, callback: AsyncCallback<(new_state: util::Optional<SyncSubscriptionSetState>, err: util::Optional<Status>) off_thread>) const'
+      get_state_change_notification: '(notify_when: SyncSubscriptionSetState, callback: AsyncCallback<(new_state: std::optional<SyncSubscriptionSetState>, err: std::optional<Status>) off_thread>) const'
       at: '(index: count_t) const -> const SyncSubscription&'
       find:
         - sig: '(name: StringData) const -> Nullable<const SyncSubscription*>'

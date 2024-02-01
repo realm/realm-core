@@ -1475,6 +1475,7 @@ public:
 
     StringNodeBase(StringData v, ColKey column)
         : m_value(v.is_null() ? util::none : util::make_optional(std::string(v)))
+        , m_string_value(m_value)
     {
         m_condition_column_key = column;
         m_dT = 10.0;
@@ -1510,6 +1511,7 @@ public:
     StringNodeBase(const StringNodeBase& from)
         : ParentNode(from)
         , m_value(from.m_value)
+        , m_string_value(m_value)
         , m_is_string_enum(from.m_is_string_enum)
     {
     }
@@ -1517,17 +1519,14 @@ public:
     std::string describe(util::serializer::SerialisationState& state) const override
     {
         REALM_ASSERT(m_condition_column_key);
-        StringData sd;
-        if (bool(StringNodeBase::m_value)) {
-            sd = StringData(*StringNodeBase::m_value);
-        }
         return state.describe_column(ParentNode::m_table, m_condition_column_key) + " " + describe_condition() + " " +
-               util::serializer::print_value(sd);
+               util::serializer::print_value(m_string_value);
     }
 
 protected:
     std::optional<std::string> m_value;
     std::optional<ArrayString> m_leaf;
+    StringData m_string_value;
 
     bool m_is_string_enum = false;
 
@@ -1545,9 +1544,14 @@ protected:
 template <class TConditionFunction>
 class StringNode : public StringNodeBase {
 public:
+    constexpr static bool case_sensitive_comparison =
+        is_any_v<TConditionFunction, Greater, GreaterEqual, Less, LessEqual>;
     StringNode(StringData v, ColKey column)
         : StringNodeBase(v, column)
     {
+        if constexpr (case_sensitive_comparison) {
+            return;
+        }
         auto upper = case_map(v, true);
         auto lower = case_map(v, false);
         if (!upper || !lower) {
@@ -1572,8 +1576,15 @@ public:
         for (size_t s = start; s < end; ++s) {
             StringData t = get_string(s);
 
-            if (cond(StringData(m_value), m_ucase.c_str(), m_lcase.c_str(), t))
-                return s;
+            if constexpr (case_sensitive_comparison) {
+                // case insensitive not implemented for: >, >=, <, <=
+                if (cond(t, m_string_value))
+                    return s;
+            }
+            else {
+                if (cond(m_string_value, m_ucase.c_str(), m_lcase.c_str(), t))
+                    return s;
+            }
         }
         return not_found;
     }
@@ -1638,7 +1649,7 @@ public:
         for (size_t s = start; s < end; ++s) {
             StringData t = get_string(s);
 
-            if (cond(StringData(m_value), m_charmap, t))
+            if (cond(m_string_value, m_charmap, t))
                 return s;
         }
         return not_found;
@@ -1719,7 +1730,7 @@ public:
             if (!bool(m_value)) {
                 return s;
             }
-            if (cond(StringData(m_value), m_ucase.c_str(), m_lcase.c_str(), m_charmap, t))
+            if (cond(m_string_value, m_ucase.c_str(), m_lcase.c_str(), m_charmap, t))
                 return s;
         }
         return not_found;

@@ -34,6 +34,7 @@
 #include <realm/util/features.h>
 #include <realm/util/logger.hpp>
 #include <realm/util/safe_int_ops.hpp>
+#include <realm/util/serializer.hpp>
 
 
 #define TEST(name) TEST_IF(name, true)
@@ -751,7 +752,6 @@ inline bool definitely_less(long double a, long double b, long double epsilon)
     return b - a > std::max(std::abs(a), std::abs(b)) * epsilon;
 }
 
-
 template <class T, bool is_float>
 struct SetPrecision {
     static void exec(std::ostream&)
@@ -767,14 +767,23 @@ struct SetPrecision<T, true> {
     }
 };
 
+template <typename T>
+constexpr static bool realm_serializable_types =
+    is_any_v<T, StringData, BinaryData, Timestamp, ObjectId, std::optional<ObjectId>, ObjKey, ObjLink, UUID,
+             std::optional<UUID>, bool, float, std::optional<float>, double, std::optional<double>, realm::null>;
+
 template <class T>
 void to_string(const T& value, std::string& str)
 {
-    // FIXME: Put string values in quotes, and escape non-printables as well as '"' and '\\'.
-    std::ostringstream out;
-    SetPrecision<T, std::is_floating_point<T>::value>::exec(out);
-    out << value;
-    str = out.str();
+    if constexpr (realm_serializable_types<T>) {
+        str = util::serializer::print_value(value);
+    }
+    else {
+        std::ostringstream out;
+        SetPrecision<T, std::is_floating_point<T>::value>::exec(out);
+        out << value;
+        str = out.str();
+    }
 }
 
 template <class T>
@@ -789,7 +798,12 @@ void to_string(const std::vector<T>& value, std::string& str)
         if (!first) {
             out << ", ";
         }
-        out << v;
+        if constexpr (realm_serializable_types<T>) {
+            out << util::serializer::print_value(v);
+        }
+        else {
+            out << v;
+        }
         first = false;
     }
     out << "}";
@@ -799,13 +813,16 @@ void to_string(const std::vector<T>& value, std::string& str)
 template <class T>
 void to_string(const std::optional<T>& value, std::string& str)
 {
-    // FIXME: Put string values in quotes, and escape non-printables as well as '"' and '\\'.
-    std::ostringstream out;
-    SetPrecision<T, std::is_floating_point<T>::value>::exec(out);
-    util::stream_possible_optional(out, value);
-    str = out.str();
+    if constexpr (realm_serializable_types<T>) {
+        str = util::serializer::print_value(value);
+    }
+    else {
+        std::ostringstream out;
+        SetPrecision<T, std::is_floating_point<T>::value>::exec(out);
+        util::stream_possible_optional(out, value);
+        str = out.str();
+    }
 }
-
 
 inline bool TestContext::check_cond(bool cond, const char* file, long line, const char* macro_name,
                                     const char* cond_text)
