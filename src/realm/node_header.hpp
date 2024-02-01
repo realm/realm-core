@@ -22,6 +22,10 @@
 #include <realm/util/assert.hpp>
 #include <realm/utilities.hpp>
 
+#ifdef REALM_DEBUG
+#include <iostream>
+#endif
+
 namespace realm {
 
 // The header holds metadata for all allocations. It is 8 bytes.
@@ -1062,9 +1066,13 @@ size_t inline NodeHeader::get_size_from_header(const char* header) noexcept
     if (kind == 'B') {
         const auto encoding = get_encoding(header);
         if (encoding == Encoding::Flex) {
-            return get_elementB_size<Encoding::Flex>(header);
+            // auto sz = get_elementB_size<Encoding::Flex>(header);
+            // std::cout << "ArrayFlex::size() = " << sz << std::endl;
+            return get_arrayB_num_elements<Encoding::Flex>(header);
         }
         else if (encoding == Encoding::Packed) {
+            // auto sz = get_num_elements<Encoding::Packed>(header);
+            // std::cout << "ArrayPacked::size() = " << sz << std::endl;
             return get_num_elements<Encoding::Packed>(header);
         }
         REALM_UNREACHABLE(); // other encodings are not supported.

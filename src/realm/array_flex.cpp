@@ -119,7 +119,7 @@ inline size_t find_binary(uint64_t* data, int64_t key, size_t v_width, size_t nd
         const auto unsigned_val = realm::read_bitfield(data, v_width * ndx, v_width);
         const auto v = sign_extend_field(v_width, unsigned_val);
         if (v == key)
-            return ndx;
+            return mid;
         else if (key < v)
             hi = mid - 1;
         else
@@ -224,6 +224,7 @@ int64_t ArrayFlex::get(const Array& arr, size_t ndx) const
     return ArrayFlex::get(arr.get_header(), ndx);
 }
 
+static size_t flex_index = 0;
 int64_t ArrayFlex::get(const char* h, size_t ndx)
 {
     using Encoding = NodeHeader::Encoding;
@@ -239,7 +240,9 @@ int64_t ArrayFlex::get(const char* h, size_t ndx)
     const uint64_t offset = v_size * v_width;
     const bf_iterator it_index{data, static_cast<size_t>(offset + (ndx * ndx_width)), ndx_width, ndx_width, 0};
     const bf_iterator it_value{data, static_cast<size_t>(v_width * it_index.get_value()), v_width, v_width, 0};
-    return sign_extend_field(v_width, it_value.get_value());
+    auto v = sign_extend_field(v_width, it_value.get_value());
+    // std::cout << ++flex_index << ") ArrayFlex::get(" << ndx << ") = " << v << std::endl;
+    return v;
 }
 
 void ArrayFlex::get_chunk(const Array& arr, size_t ndx, int64_t res[8]) const

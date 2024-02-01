@@ -89,12 +89,13 @@ inline void arrange_data_in_flex_format(const Array& arr, std::vector<int64_t>& 
         REALM_ASSERT_DEBUG(values[indices[i]] == arr.get(i));
     }
 
+#if REALM_DEBUG
     for (size_t i = 0; i < sz; ++i) {
         auto old_value = arr.get(i);
         auto new_value = values[indices[i]];
         REALM_ASSERT_DEBUG(new_value == old_value);
     }
-
+#endif
     REALM_ASSERT_DEBUG(indices.size() == sz);
 }
 
@@ -125,21 +126,27 @@ bool ArrayEncode::encode(const Array& origin, Array& dst)
     std::vector<int64_t> values;
     std::vector<size_t> indices;
     arrange_data_in_flex_format(origin, values, indices);
-
     if (!values.empty()) {
         size_t v_width, ndx_width;
-        const auto uncompressed_size = origin.get_byte_size();
-        const auto packed_size = compute_packed_size(values, origin.size(), v_width);
-        if (!indices.empty()) {
-            const auto flex_size = compute_flex_size(values, indices, v_width, ndx_width);
-            if (flex_size < uncompressed_size && packed_size > flex_size) {
-                return ArrayFlex::encode(origin, dst, flex_size, values, indices, v_width, ndx_width);
-            }
-        }
-        if (packed_size < uncompressed_size)
-            return ArrayPacked::encode(origin, dst, packed_size, v_width);
+        // const auto packed_size = compute_packed_size(values, origin.size(), v_width);
+        // return ArrayPacked::encode(origin, dst, packed_size, v_width);
+        const auto flex_size = compute_flex_size(values, indices, v_width, ndx_width);
+        return ArrayFlex::encode(origin, dst, flex_size, values, indices, v_width, ndx_width);
     }
     return false;
+
+    //    if (!values.empty()) {
+    //        size_t v_width, ndx_width;
+    //        const auto uncompressed_size = origin.get_byte_size();
+    //        const auto packed_size = compute_packed_size(values, origin.size(), v_width);
+    //        const auto flex_size = compute_flex_size(values, indices, v_width, ndx_width);
+    //        if (flex_size < packed_size && flex_size < uncompressed_size) {
+    //            return ArrayFlex::encode(origin, dst, flex_size, values, indices, v_width, ndx_width);
+    //        }
+    //        else if (packed_size < uncompressed_size)
+    //            return ArrayPacked::encode(origin, dst, packed_size, v_width);
+    //    }
+    //    return false;
 }
 
 size_t ArrayEncode::size(const char* h)
