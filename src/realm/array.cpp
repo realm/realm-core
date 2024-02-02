@@ -1514,8 +1514,7 @@ size_t Array::upper_bound_int(int64_t value) const noexcept
 
 size_t Array::find_first(int64_t value, size_t start, size_t end) const
 {
-    if (is_encoded())
-        return ArrayEncode::find_first(*this, value, start, end);
+    // if (is_encoded()) return ArrayEncode::find_first(*this, value, start, end);
     return find_first<Equal>(value, start, end);
 }
 

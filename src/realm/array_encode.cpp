@@ -29,11 +29,13 @@ using namespace realm;
 static ArrayFlex s_flex;
 static ArrayPacked s_packed;
 
-size_t ArrayEncode::find_first(const Array& arr, int64_t value, size_t start, size_t end)
+size_t ArrayEncode::find_first(const Array& arr, int64_t value, size_t start, size_t end,
+                               bool (*cmp)(int64_t, int64_t))
 {
-    return is_packed(arr.get_header()) ? ArrayPacked::find_first(arr, value, start, end)
-                                       : ArrayFlex::find_first(arr, value, start, end);
+    return is_packed(arr.get_header()) ? ArrayPacked::find_first(arr, value, start, end, cmp)
+                                       : ArrayFlex::find_first(arr, value, start, end, cmp);
 }
+
 
 void ArrayEncode::set_direct(char* data, size_t w, size_t ndx, int64_t v)
 {
@@ -125,21 +127,22 @@ inline size_t compute_flex_size(std::vector<int64_t>& values, std::vector<size_t
 
 bool ArrayEncode::encode(const Array& origin, Array& dst)
 {
-    //   For testing, compacts all the interger leaves we encounter.
-    //    if (!values.empty()) {
-    //        size_t v_width, ndx_width;
-    //        // const auto packed_size = compute_packed_size(values, origin.size(), v_width);
-    //        // return ArrayPacked::encode(origin, dst, packed_size, v_width);
-    //        const auto flex_size = compute_flex_size(values, indices, v_width, ndx_width);
-    //        return ArrayFlex::encode(origin, dst, flex_size, values, indices, v_width, ndx_width);
-    //    }
-    //    return false;
-
-    // check what makes more sense, Packed, Flex or just keep array as it is.
-    // return false;
     std::vector<int64_t> values;
     std::vector<size_t> indices;
     arrange_data_in_flex_format(origin, values, indices);
+    // For testing, compacts all the interger leaves we encounter.
+    //        if (!values.empty()) {
+    //            size_t v_width, ndx_width;
+    //            const auto packed_size = compute_packed_size(values, origin.size(), v_width);
+    //            return ArrayPacked::encode(origin, dst, packed_size, v_width);
+    //            //const auto flex_size = compute_flex_size(values, indices, v_width, ndx_width);
+    //            //return ArrayFlex::encode(origin, dst, flex_size, values, indices, v_width, ndx_width);
+    //        }
+    //        return false;
+
+    // check what makes more sense, Packed, Flex or just keep array as it is.
+    // return false;
+
     if (!values.empty()) {
         size_t v_width, ndx_width;
         const auto uncompressed_size = origin.get_byte_size();

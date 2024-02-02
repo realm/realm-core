@@ -3547,7 +3547,7 @@ NONCONCURRENT_TEST(Table_object_search)
 
 NONCONCURRENT_TEST(Table_object_sequential)
 {
-#ifdef PERFORMANCE_TESTING
+#if !defined(REALM_DEBUG) && defined(PERFORMANCE_TESTING)
     int nb_rows = 10'000'000;
     int num_runs = 1;
 #else
@@ -3697,7 +3697,7 @@ NONCONCURRENT_TEST(Table_object_sequential)
 
 NONCONCURRENT_TEST(Table_object_seq_rnd)
 {
-#ifdef PERFORMANCE_TESTING
+#if !defined(REALM_DEBUG) && defined(PERFORMANCE_TESTING)
     size_t rows = 1'000'000;
     int runs = 100; // runs for building scenario
 #else
@@ -3740,7 +3740,7 @@ NONCONCURRENT_TEST(Table_object_seq_rnd)
     }
     // scenario established!
     int nb_rows = int(key_values.size());
-#ifdef PERFORMANCE_TESTING
+#if !defined(REALM_DEBUG) && defined(PERFORMANCE_TESTING)
     int num_runs = 10; // runs for timing access
 #else
     int num_runs = 1; // runs for timing access
@@ -3812,7 +3812,7 @@ NONCONCURRENT_TEST(Table_object_seq_rnd)
 
 NONCONCURRENT_TEST(Table_object_random)
 {
-#ifdef PERFORMANCE_TESTING
+#if !defined(REALM_DEBUG) && defined(PERFORMANCE_TESTING)
     int nb_rows = 1'000'000;
     int num_runs = 10;
 #else

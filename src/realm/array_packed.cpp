@@ -31,26 +31,36 @@
 
 using namespace realm;
 
-size_t ArrayPacked::find_first(const Array& arr, int64_t key, size_t start, size_t end)
+size_t ArrayPacked::find_first(const Array& arr, int64_t key, size_t start, size_t end, bool (*cmp)(int64_t, int64_t))
 {
     size_t v_width, v_size;
     get_encode_info(arr, v_width, v_size);
-    size_t lo = start;
-    size_t hi = std::min(v_size, end);
-    while (lo <= hi) {
-        size_t mid = lo + (hi - lo) / 2;
-        const auto unsigned_val = realm::read_bitfield((uint64_t*)arr.m_data, v_width * mid, v_width);
-        const auto v = sign_extend_field(v_width, unsigned_val);
-        if (v == key)
-            return mid;
-        else if (key < v)
-            hi = mid - 1;
-        else
-            lo = mid + 1;
+    auto data = (uint64_t*)arr.m_data;
+    if (v_size <= 30) {
+        for (size_t i = start; i < end; ++i) {
+            const bf_iterator it_value{data, static_cast<size_t>(v_width * i), v_width, v_width, 0};
+            auto v = sign_extend_field(v_width, it_value.get_value());
+            if (cmp(v, key))
+                return i;
+        }
+    }
+    else {
+        int lo = (int)start;
+        int hi = (int)end;
+        while (lo <= hi) {
+            int mid = lo + (hi - lo) / 2;
+            const bf_iterator it_value{data, static_cast<size_t>(v_width * mid), v_width, v_width, 0};
+            auto v = sign_extend_field(v_width, it_value.get_value());
+            if (cmp(v, key))
+                return mid;
+            else if (key < v)
+                hi = mid - 1;
+            else
+                lo = mid + 1;
+        }
     }
     return realm::not_found;
 }
-
 // do not use values here, the values are computed to be used in flex format,
 // thus all the duplicates are gone, but packed can still be better than flex.
 // TODO: fix this

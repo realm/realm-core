@@ -35,8 +35,8 @@ public:
     static size_t size(const char*);
     static bool is_packed(const char*);
     static void set_direct(char* data, size_t w, size_t ndx, int64_t v);
-    static size_t find_first(const Array&, int64_t, size_t start, size_t end);
 
+    static size_t find_first(const Array&, int64_t, size_t start, size_t end, bool (*)(int64_t, int64_t));
 
     // this is the interface that every encoding array must adhere to
     // Generic interface for an encoding Array.

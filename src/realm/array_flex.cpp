@@ -130,25 +130,40 @@ namespace impl {
 
 } // namespace impl
 
-size_t ArrayFlex::find_first(const Array& arr, int64_t key, size_t start, size_t end)
+size_t ArrayFlex::find_first(const Array& arr, int64_t key, size_t start, size_t end, bool (*cmp)(int64_t, int64_t))
 {
     size_t v_width, v_size, ndx_width, ndx_size;
     get_encode_info(arr, v_width, v_size, ndx_width, ndx_size);
-    size_t lo = start;
-    size_t hi = std::min(ndx_size, end);
-    const auto ndx_offset = v_size * v_width;
-    while (lo <= hi) {
-        size_t mid = lo + (hi - lo) / 2;
-        auto data = (uint64_t*)arr.m_data;
-        const auto ndx = static_cast<size_t>(realm::read_bitfield(data, ndx_offset + (mid * ndx_width), ndx_width));
-        const auto unsigned_val = realm::read_bitfield(data, v_width * ndx, v_width);
-        const auto v = sign_extend_field(v_width, unsigned_val);
-        if (v == key)
-            return ndx;
-        else if (key < v)
-            hi = mid - 1;
-        else
-            lo = mid + 1;
+
+    if (ndx_size <= 15) {
+        const auto ndx_offset = v_size * v_width;
+        for (size_t i = 0; i < ndx_size; ++i) {
+            auto data = (uint64_t*)arr.m_data;
+            const auto ndx = static_cast<size_t>(realm::read_bitfield(data, ndx_offset + (i * ndx_width), ndx_width));
+            const auto unsigned_val = realm::read_bitfield(data, v_width * ndx, v_width);
+            const auto v = sign_extend_field(v_width, unsigned_val);
+            if (cmp(v, key))
+                return ndx;
+        }
+    }
+    else {
+        size_t lo = start;
+        size_t hi = std::min(ndx_size, end);
+        const auto ndx_offset = v_size * v_width;
+        while (lo <= hi) {
+            size_t mid = lo + (hi - lo) / 2;
+            auto data = (uint64_t*)arr.m_data;
+            const auto ndx =
+                static_cast<size_t>(realm::read_bitfield(data, ndx_offset + (mid * ndx_width), ndx_width));
+            const auto unsigned_val = realm::read_bitfield(data, v_width * ndx, v_width);
+            const auto v = sign_extend_field(v_width, unsigned_val);
+            if (cmp(v, key))
+                return ndx;
+            else if (key < v)
+                hi = mid - 1;
+            else
+                lo = mid + 1;
+        }
     }
     return realm::not_found;
 }

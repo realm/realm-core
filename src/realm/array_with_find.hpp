@@ -1001,34 +1001,33 @@ template <class Cond>
 bool ArrayWithFind::find_encoded_array(int64_t value, size_t start, size_t end, size_t baseindex,
                                        QueryStateBase* state) const
 {
-    // TODO: we are sure at this stage that the array is sorted. so we could use binary search at this point.
-    auto& encode = *m_array.m_encode;
-
-    if constexpr (std::is_same<Cond, Equal>::value || std::is_same<Cond, NotEqual>::value) {
-        const auto eq = std::is_same_v<Cond, Equal>;
-        while (start < end) {
-            auto v = encode.get(m_array, start);
-            if (eq ? (v == value) : (v != value)) {
-                if (!state->match(start + baseindex))
-                    return false;
-            }
-            ++start;
-        }
-        return true;
+    bool (*cmp)(int64_t, int64_t) = nullptr;
+    if constexpr (std::is_same_v<Cond, Equal>)
+        cmp = [](int64_t v, int64_t value) {
+            return v == value;
+        };
+    else if constexpr (std::is_same_v<Cond, NotEqual>)
+        cmp = [](int64_t v, int64_t value) {
+            return v != value;
+        };
+    else if constexpr (std::is_same_v<Cond, Greater>)
+        cmp = [](int64_t v, int64_t value) {
+            return v > value;
+        };
+    else if constexpr (std::is_same_v<Cond, Less>)
+        cmp = [](int64_t v, int64_t value) {
+            return v < value;
+        };
+    REALM_ASSERT_DEBUG(cmp != nullptr);
+    // this can be optimized doing lower/upper bound, we don't need to go through the whole array
+    const auto h = m_array.get_header();
+    while (start < end) {
+        auto v = ArrayEncode::get(h, start);
+        if (cmp(v, value) && !state->match(start + baseindex))
+            return false;
+        ++start;
     }
-    else {
-        const auto gt = std::is_same_v<Cond, Greater>;
-        while (start < end) {
-            auto v = encode.get(m_array, start);
-            if (gt ? (v > value) : (v < value)) {
-                if (!state->match(start + baseindex))
-                    return false;
-            }
-            ++start;
-        }
-        return true;
-    }
-    return false;
+    return true;
 }
 
 //*************************************************************************************
