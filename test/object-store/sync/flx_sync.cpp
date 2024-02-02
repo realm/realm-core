@@ -1831,7 +1831,7 @@ TEST_CASE("flx: query on non-queryable field results in query error message", "[
         if ((reason.find("Invalid query:") == std::string::npos &&
              reason.find("Client provided query with bad syntax:") == std::string::npos) ||
             reason.find("\"TopLevel\": key \"non_queryable_field\" is not a queryable field") == std::string::npos) {
-            FAIL(reason);
+            FAIL(util::format("Error reason did not match expected: `%1`", reason));
         }
     };
 
@@ -1879,6 +1879,27 @@ TEST_CASE("flx: query on non-queryable field results in query error message", "[
 
             CHECK(realm->get_active_subscription_set().version() == 0);
             CHECK(realm->get_latest_subscription_set().version() == 2);
+        });
+    }
+
+    // Test for issue #6839, where wait for download after committing a new subscription and then
+    // wait for the subscription complete notification was leading to a garbage reason value in the
+    // status provided to the subscription complete callback.
+    SECTION("Download during bad query") {
+        harness->do_with_new_realm([&](SharedRealm realm) {
+            // Wait for steady state before committing the new subscription
+            REQUIRE(!wait_for_download(*realm));
+
+            auto subs = create_subscription(realm, "class_TopLevel", "non_queryable_field", [](auto q, auto c) {
+                return q.equal(c, "bar");
+            });
+            // Wait for download is actually waiting for the subscription to be applied after it was committed
+            REQUIRE(!wait_for_download(*realm));
+            // After subscription is complete or fails during wait for download, this function completes
+            // without blocking
+            auto result = subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get_no_throw();
+            // Verify error occurred
+            check_status(result);
         });
     }
 
