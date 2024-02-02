@@ -130,7 +130,7 @@ public:
         REALM_ASSERT(get_is_inner_bptree_node_from_header(get_header()));
         REALM_ASSERT(!get_context_flag_from_header(get_header()));
         REALM_ASSERT(has_refs());
-        Array dest(Allocator::get_default());
+        Array dest(m_alloc);
         dest.create(type_InnerBptreeNode, false, size());
         for (unsigned j = 0; j < size(); ++j) {
             RefOrTagged rot = get_as_ref_or_tagged(j);

@@ -305,7 +305,7 @@ void Array::init_from_mem(MemRef mem) noexcept
         m_ref = mem.get_ref();
         m_data = get_data_from_header(header);
         m_size = ArrayEncode::size(header);
-        //BAD!!!!
+        // BAD!!!!
         m_encode = ArrayEncode::is_packed(header) ? (ArrayEncode*)(&s_array_packed) : (ArrayEncode*)&s_array_flex;
         m_width = m_lbound = m_ubound = 0;
         m_is_inner_bptree_node = get_is_inner_bptree_node_from_header(header);
@@ -400,10 +400,15 @@ size_t Array::get_byte_size() const noexcept
 ref_type Array::write(_impl::ArrayWriterBase& out, bool deep, bool only_if_modified, bool compress_in_flight) const
 {
     REALM_ASSERT(is_attached());
+    // The default allocator cannot be trusted wrt is_read_only():
+    REALM_ASSERT(!only_if_modified || &m_alloc != &Allocator::get_default());
     if (only_if_modified && m_alloc.is_read_only(m_ref))
         return m_ref;
 
     if (!deep || !m_has_refs) {
+        // however - creating an array using ANYTHING BUT the default allocator during commit is also wrong....
+        // it only works by accident, because the whole slab area is reinitialized after commit.
+        // We should have: Array encoded_array{Allocator::get_default()};
         Array encoded_array{m_alloc};
         if (compress_in_flight && size() != 0 && encode_array(encoded_array)) {
             REALM_ASSERT_DEBUG(encoded_array.m_kind == 'B');

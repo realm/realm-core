@@ -1549,7 +1549,7 @@ ref_type Cluster::typed_write(ref_type ref, _impl::ArrayWriterBase& out, const T
         return ref;
     REALM_ASSERT(!get_is_inner_bptree_node_from_header(get_header()));
     REALM_ASSERT(!get_context_flag_from_header(get_header()));
-    Array written_cluster(m_alloc);
+    Array written_cluster(Allocator::get_default());
     written_cluster.create(type_HasRefs, false, size());
     for (size_t j = 0; j < size(); ++j) {
         RefOrTagged leaf_rot = get_as_ref_or_tagged(j);
@@ -1593,14 +1593,24 @@ ref_type Cluster::typed_write(ref_type ref, _impl::ArrayWriterBase& out, const T
             REALM_ASSERT(leaf.has_refs());
             auto wtype = leaf.get_wtype_from_header(leaf.get_header());
             REALM_ASSERT(wtype == wtype_Bits);
-            Array written_leaf(m_alloc);
+#if 0
+            Array written_leaf(Allocator::get_default());
             // written_leaf.create(type_HasRefs, false, wtype, leaf.size(), Allocator::get_default());
             written_leaf.create(type_HasRefs, false, leaf.size());
             for (size_t i = 0; i < leaf.size(); ++i) {
-                written_leaf.set(i, leaf.get_as_ref_or_tagged(i));
+                auto rot_leaf = leaf.get_as_ref_or_tagged(i);
+                if (rot_leaf.is_ref() && rot_leaf.get_as_ref()) {
+                    written_leaf.set(i, Array::write(rot_leaf.get_as_ref(), m_alloc, out, only_modified, false));
+                }
+                else {
+                    written_leaf.set(i, leaf.get_as_ref_or_tagged(i));
+                }
             }
-            written_cluster.set_as_ref(j, written_leaf.write(out, deep, only_modified, false));
+            written_cluster.set_as_ref(j, written_leaf.write(out, false, false, false));
             written_leaf.destroy();
+#else
+            written_cluster.set_as_ref(j, leaf.write(out, deep, only_modified, false));
+#endif
 #if 0
             if (col_attr.test(col_attr_List) || col_attr.test(col_attr_Set)) {
                 // These collections are single bptrees - each entry in leaf may be a bptree
@@ -1654,7 +1664,7 @@ ref_type Cluster::typed_write(ref_type ref, _impl::ArrayWriterBase& out, const T
 #endif
         }
     }
-    auto written_ref = written_cluster.write(out, false, only_modified, false);
+    auto written_ref = written_cluster.write(out, false, false, false);
     written_cluster.destroy();
     return written_ref;
 }

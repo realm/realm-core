@@ -939,7 +939,7 @@ ref_type Group::typed_write_tables(_impl::ArrayWriterBase& out, bool deep, bool 
             dest.set_as_ref(j, table->typed_write(rot.get_as_ref(), out, deep, only_modified, compress));
         }
     }
-    ref = dest.write(out, false, only_modified, false);
+    ref = dest.write(out, false, false, false);
     dest.destroy();
     return ref;
 }
@@ -1401,6 +1401,7 @@ private:
 void Group::update_allocator_wrappers(bool writable)
 {
     m_is_writable = writable;
+    m_alloc.set_read_only(!writable);
     for (size_t i = 0; i < m_table_accessors.size(); ++i) {
         auto table_accessor = m_table_accessors[i];
         if (table_accessor) {
