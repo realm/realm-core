@@ -276,6 +276,11 @@ void Array::destroy_children(size_t offset) noexcept
     }
 }
 
+// The default allocator cannot be trusted wrt is_read_only():
+REALM_ASSERT(!only_if_modified || &m_alloc != &Allocator::get_default());
+// however - creating an array using ANYTHING BUT the default allocator during commit is also wrong....
+// it only works by accident, because the whole slab area is reinitialized after commit.
+// We should have: Array encoded_array{Allocator::get_default()};
 
 ref_type Array::do_write_shallow(_impl::ArrayWriterBase& out) const
 {

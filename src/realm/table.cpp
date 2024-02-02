@@ -3366,7 +3366,7 @@ ref_type Table::typed_write(ref_type ref, _impl::ArrayWriterBase& out, bool deep
             dest.set_as_ref(j, new_ref);
         }
     }
-    ref = dest.write(out, false, only_modified, false);
+    ref = dest.write(out, false, false, false);
     dest.destroy();
     return ref;
 }
