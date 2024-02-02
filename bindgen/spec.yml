@@ -200,6 +200,12 @@ enums:
       TypedLink: 16
       UUID: 17
 
+  AppCacheMode:
+    cppName: app::App::CacheMode
+    values:
+      - Enabled
+      - Disabled
+
   AuthProvider:
     cppName: app::AuthProvider
     values:
