@@ -125,7 +125,6 @@ mixedInfo:
       type: ObjKey
   unusedDataTypes:
     - Mixed
-    - LinkList
   extraCtors:
     - Obj
     - Geospatial
@@ -180,7 +179,7 @@ enums:
     cppName: ClientResyncMode
     values:
       - Manual
-      - DiscardLocal 
+      - DiscardLocal
       - Recover
       - RecoverOrDiscard
 
@@ -197,7 +196,6 @@ enums:
       Double: 10
       Decimal: 11
       Link: 12
-      LinkList: 13
       ObjectId: 15
       TypedLink: 16
       UUID: 17
@@ -369,7 +367,7 @@ records:
     fields:
       longitude: double
       latitude: double
-      altitude: 
+      altitude:
         type: double
         default: std::numeric_limits<double>::quiet_NaN()
 
@@ -386,7 +384,7 @@ records:
   GeoPolygon:
     fields:
       points: std::vector<std::vector<GeoPoint>>
-      
+
   RealmConfig:
     fields:
       path: std::string
@@ -467,7 +465,7 @@ records:
         type: bool
         default: false
       error_handler: 'Nullable<std::function<(session: SharedSyncSession, error: SyncError) off_thread -> void>>'
-      custom_http_headers: 
+      custom_http_headers:
         type: 'std::map<std::string, std::string>'
         default: {}
       client_validate_ssl:
@@ -476,7 +474,7 @@ records:
       ssl_trust_certificate_path: util::Optional<std::string>
       ssl_verify_callback: Nullable<SSLVerifyCallback>
       client_resync_mode:
-        type: ClientResetMode 
+        type: ClientResetMode
         default: ClientResyncMode::Manual;
       notify_before_client_reset: 'Nullable<std::function<(before_frozen: SharedRealm) off_thread -> void>>'
       notify_after_client_reset: 'Nullable<std::function<(before_frozen: SharedRealm, after: ThreadSafeReference, did_recover: bool) off_thread -> void>>'
@@ -484,7 +482,7 @@ records:
         type: bool
         default: false
       proxy_config: util::Optional<SyncProxyConfig>
-        
+
   SyncSubscription:
     cppName: sync::Subscription
     fields:
@@ -928,7 +926,7 @@ classes:
         - () const
         - suffix: maybe_throw
           sig: '(throw_on_error: bool) const'
-      
+
       create_key_path_array: '(table_name: StringData, key_paths: const std::vector<std::string>&) -> KeyPathArray'
 
       close: ()
@@ -1142,7 +1140,7 @@ classes:
       refresh_token: std::string
       device_id: std::string
       has_device_id: bool
-      user_profile: UserProfile 
+      user_profile: UserProfile
       identities: std::vector<UserIdentity>
       custom_data: util::Optional<bson::BsonDocument>
       sync_manager: SharedSyncManager
@@ -1167,7 +1165,7 @@ classes:
       birthday: '() -> util::Optional<std::string>'
       min_age: '() -> util::Optional<std::string>'
       max_age: '() -> util::Optional<std::string>'
-      data: '() -> bson::BsonDocument'  
+      data: '() -> bson::BsonDocument'
 
   AppSubscriptionToken:
     cppName: app::App::Token
