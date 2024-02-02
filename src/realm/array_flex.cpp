@@ -130,12 +130,12 @@ namespace impl {
 
 } // namespace impl
 
-size_t ArrayFlex::find_binary(const Array& arr, int64_t key)
+size_t ArrayFlex::find_first(const Array& arr, int64_t key, size_t start, size_t end)
 {
     size_t v_width, v_size, ndx_width, ndx_size;
     get_encode_info(arr, v_width, v_size, ndx_width, ndx_size);
-    size_t lo = 0;
-    size_t hi = ndx_size;
+    size_t lo = start;
+    size_t hi = std::min(ndx_size, end);
     const auto ndx_offset = v_size * v_width;
     while (lo <= hi) {
         size_t mid = lo + (hi - lo) / 2;

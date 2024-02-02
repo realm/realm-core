@@ -377,9 +377,8 @@ namespace impl {
 //
 // We currently use binary search. See for example
 // http://www.tbray.org/ongoing/When/200x/2003/03/22/Binary.
-template <int width, typename Cmp = std::less<int64_t>>
-inline size_t lower_bound(const char* data, size_t start, size_t end, int64_t value,
-                          Cmp cmp = std::less<int64_t>()) noexcept
+template <int width>
+inline size_t lower_bound(const char* data, size_t start, size_t end, int64_t value) noexcept
 {
     // The binary search used here is carefully optimized. Key trick is to use a single
     // loop controlling variable (size) instead of high/low pair, and to keep updates
@@ -413,8 +412,7 @@ inline size_t lower_bound(const char* data, size_t start, size_t end, int64_t va
         size_t other_low = low + other_half;
         int64_t v = fetcher(data, probe);
         size = half;
-        low = cmp(v, value) ? other_low : low;
-        // low = (v < value) ? other_low : low;
+        low = (v < value) ? other_low : low;
 
         // (Y)
         half = size / 2;
@@ -423,8 +421,7 @@ inline size_t lower_bound(const char* data, size_t start, size_t end, int64_t va
         other_low = low + other_half;
         v = fetcher(data, probe);
         size = half;
-        low = cmp(v, value) ? other_low : low;
-        // low = (v < value) ? other_low : low;
+        low = (v < value) ? other_low : low;
 
         // (Z)
         half = size / 2;
@@ -433,8 +430,7 @@ inline size_t lower_bound(const char* data, size_t start, size_t end, int64_t va
         other_low = low + other_half;
         v = fetcher(data, probe);
         size = half;
-        low = cmp(v, value) ? other_low : low;
-        // low = (v < value) ? other_low : low;
+        low = (v < value) ? other_low : low;
     }
     while (size > 0) {
         // (A)
@@ -471,17 +467,15 @@ inline size_t lower_bound(const char* data, size_t start, size_t end, int64_t va
         // move instruction. Not all compilers do this. To maximize chance
         // of succes, no computation should be done in the branches of the
         // conditional.
-        low = cmp(v, value) ? other_low : low;
-        // low = (v < value) ? other_low : low;
+        low = (v < value) ? other_low : low;
     };
 
     return low;
 }
 
 // See lower_bound()
-template <int width, typename Cmp = std::greater_equal<int64_t>>
-inline size_t upper_bound(const char* data, size_t start, size_t end, int64_t value,
-                          Cmp cmp = std::greater_equal<int64_t>()) noexcept
+template <int width>
+inline size_t upper_bound(const char* data, size_t start, size_t end, int64_t value) noexcept
 {
     REALM_ASSERT_DEBUG(end >= start);
 
@@ -501,8 +495,7 @@ inline size_t upper_bound(const char* data, size_t start, size_t end, int64_t va
         size_t other_low = low + other_half;
         int64_t v = fetcher(data, probe);
         size = half;
-        low = cmp(value, v) ? other_low : low;
-        // low = (value >= v) ? other_low : low;
+        low = (value >= v) ? other_low : low;
 
         half = size / 2;
         other_half = size - half;
@@ -510,8 +503,7 @@ inline size_t upper_bound(const char* data, size_t start, size_t end, int64_t va
         other_low = low + other_half;
         v = fetcher(data, probe);
         size = half;
-        low = cmp(value, v) ? other_low : low;
-        // low = (value >= v) ? other_low : low;
+        low = (value >= v) ? other_low : low;
 
         half = size / 2;
         other_half = size - half;
@@ -519,8 +511,7 @@ inline size_t upper_bound(const char* data, size_t start, size_t end, int64_t va
         other_low = low + other_half;
         v = fetcher(data, probe);
         size = half;
-        low = cmp(value, v) ? other_low : low;
-        // low = (value >= v) ? other_low : low;
+        low = (value >= v) ? other_low : low;
     }
 
     while (size > 0) {
@@ -530,8 +521,7 @@ inline size_t upper_bound(const char* data, size_t start, size_t end, int64_t va
         size_t other_low = low + other_half;
         int64_t v = fetcher(data, probe);
         size = half;
-        low = cmp(value, v) ? other_low : low;
-        // low = (value >= v) ? other_low : low;
+        low = (value >= v) ? other_low : low;
     };
 
     return low;
@@ -551,17 +541,17 @@ inline size_t upper_bound(const char* data, size_t size, int64_t value) noexcept
     return impl::upper_bound<width>(data, 0, size, value);
 }
 
-template <typename Cmp = std::less<int64_t>>
-inline size_t lower_bound(const char* data, size_t start, size_t end, int64_t value, Cmp cmp = {}) noexcept
-{
-    return impl::lower_bound<0>(data, start, end, value, cmp);
-}
-
-template <typename Cmp = std::greater_equal<int64_t>>
-inline size_t upper_bound(const char* data, size_t start, size_t end, int64_t value, Cmp cmp = {}) noexcept
-{
-    return impl::upper_bound<0>(data, start, end, value, cmp);
-}
+// template <typename Cmp = std::less<int64_t>>
+// inline size_t lower_bound(const char* data, size_t start, size_t end, int64_t value, Cmp cmp = {}) noexcept
+//{
+//     return impl::lower_bound<0>(data, start, end, value, cmp);
+// }
+//
+// template <typename Cmp = std::greater_equal<int64_t>>
+// inline size_t upper_bound(const char* data, size_t start, size_t end, int64_t value, Cmp cmp = {}) noexcept
+//{
+//     return impl::upper_bound<0>(data, start, end, value, cmp);
+// }
 
 
 } // namespace realm

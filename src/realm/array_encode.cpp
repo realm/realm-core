@@ -29,9 +29,10 @@ using namespace realm;
 static ArrayFlex s_flex;
 static ArrayPacked s_packed;
 
-size_t ArrayEncode::find(const Array& arr, int64_t value)
+size_t ArrayEncode::find_first(const Array& arr, int64_t value, size_t start, size_t end)
 {
-    return is_packed(arr.get_header()) ? ArrayPacked::find(arr, value) : ArrayFlex::find(arr, value);
+    return is_packed(arr.get_header()) ? ArrayPacked::find_first(arr, value, start, end)
+                                       : ArrayFlex::find_first(arr, value, start, end);
 }
 
 void ArrayEncode::set_direct(char* data, size_t w, size_t ndx, int64_t v)

@@ -31,12 +31,12 @@
 
 using namespace realm;
 
-size_t ArrayPacked::find_binary(const Array& arr, int64_t key)
+size_t ArrayPacked::find_first(const Array& arr, int64_t key, size_t start, size_t end)
 {
     size_t v_width, v_size;
     get_encode_info(arr, v_width, v_size);
-    size_t lo = 0;
-    size_t hi = v_size;
+    size_t lo = start;
+    size_t hi = std::min(v_size, end);
     while (lo <= hi) {
         size_t mid = lo + (hi - lo) / 2;
         const auto unsigned_val = realm::read_bitfield((uint64_t*)arr.m_data, v_width * mid, v_width);

@@ -52,7 +52,7 @@ public:
     // static getters based on header (to be used carefully since they assume the array is a B array).
     static int64_t get(const char*, size_t);
 
-    static size_t find_binary(const Array&, int64_t);
+    static size_t find_first(const Array&, int64_t, size_t, size_t);
 
 private:
     // decode array methods
