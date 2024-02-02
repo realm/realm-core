@@ -1181,8 +1181,7 @@ classes:
       sync_manager: SharedSyncManager
       subscribers_count: count_t
     staticMethods:
-      get_shared_app: '(config: AppConfig, sync_client_config: SyncClientConfig) -> SharedApp'
-      get_uncached_app: '(config: AppConfig, sync_client_config: SyncClientConfig) -> SharedApp'
+      get_app: '(mode: AppCacheMode, config: AppConfig, sync_client_config: SyncClientConfig) -> SharedApp'
       get_cached_app: '(app_id: const std::string&) -> SharedApp'
       clear_cached_apps: ()
       close_all_sync_sessions: ()
