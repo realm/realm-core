@@ -52,6 +52,8 @@ public:
     // static getters based on header (to be used carefully since they assume the array is a B array).
     static int64_t get(const char*, size_t);
 
+    static size_t find_binary(const Array&, int64_t);
+
 private:
     // read info about the encoded array from header
     static bool get_encode_info(const Array&, size_t&, size_t&);

@@ -22,6 +22,7 @@
 #include <cstring>
 #include <realm/utilities.hpp>
 #include <realm/alloc.hpp>
+#include <realm/array_encode.hpp>
 
 // clang-format off
 /* wid == 16/32 likely when accessing offsets in B tree */
@@ -376,8 +377,9 @@ namespace impl {
 //
 // We currently use binary search. See for example
 // http://www.tbray.org/ongoing/When/200x/2003/03/22/Binary.
-template <int width, typename F>
-inline size_t lower_bound(const char* data, size_t size, int64_t value, F data_fetcher = &get_direct<width>) noexcept
+template <int width, typename Cmp = std::less<int64_t>>
+inline size_t lower_bound(const char* data, size_t start, size_t end, int64_t value,
+                          Cmp cmp = std::less<int64_t>()) noexcept
 {
     // The binary search used here is carefully optimized. Key trick is to use a single
     // loop controlling variable (size) instead of high/low pair, and to keep updates
@@ -387,7 +389,18 @@ inline size_t lower_bound(const char* data, size_t size, int64_t value, F data_f
     // might be slightly faster if we used branches instead. The loop unrolling yields
     // a final 5-20% speedup depending on circumstances.
 
-    size_t low = 0;
+    // size_t low = 0;
+    REALM_ASSERT_DEBUG(end >= start);
+    size_t size = end - start;
+    // size_t low = 0;
+    size_t low = start;
+
+
+    const auto h = NodeHeader::get_header_from_data((char*)data);
+    const auto is_encoded = NodeHeader::get_kind(h) == 'B';
+    const auto fetcher = [is_encoded](auto data, size_t ndx) {
+        return is_encoded ? ArrayEncode::get(data, ndx) : get_direct<width>(data, ndx);
+    };
 
     while (size >= 8) {
         // The following code (at X, Y and Z) is 3 times manually unrolled instances of (A) below.
@@ -398,27 +411,30 @@ inline size_t lower_bound(const char* data, size_t size, int64_t value, F data_f
         size_t other_half = size - half;
         size_t probe = low + half;
         size_t other_low = low + other_half;
-        int64_t v = data_fetcher(data, probe); // get_direct<width>(data, probe);
+        int64_t v = fetcher(data, probe);
         size = half;
-        low = (v < value) ? other_low : low;
+        low = cmp(v, value) ? other_low : low;
+        // low = (v < value) ? other_low : low;
 
         // (Y)
         half = size / 2;
         other_half = size - half;
         probe = low + half;
         other_low = low + other_half;
-        v = data_fetcher(data, probe); // get_direct<width>(data, probe);
+        v = fetcher(data, probe);
         size = half;
-        low = (v < value) ? other_low : low;
+        low = cmp(v, value) ? other_low : low;
+        // low = (v < value) ? other_low : low;
 
         // (Z)
         half = size / 2;
         other_half = size - half;
         probe = low + half;
         other_low = low + other_half;
-        v = data_fetcher(data, probe); // get_direct<width>(data, probe);
+        v = fetcher(data, probe);
         size = half;
-        low = (v < value) ? other_low : low;
+        low = cmp(v, value) ? other_low : low;
+        // low = (v < value) ? other_low : low;
     }
     while (size > 0) {
         // (A)
@@ -449,47 +465,62 @@ inline size_t lower_bound(const char* data, size_t size, int64_t value, F data_f
         size_t other_half = size - half;
         size_t probe = low + half;
         size_t other_low = low + other_half;
-        int64_t v = data_fetcher(data, probe); // get_direct<width>(data, probe);
+        int64_t v = fetcher(data, probe); // get_direct<width>(data, probe);
         size = half;
         // for max performance, the line below should compile into a conditional
         // move instruction. Not all compilers do this. To maximize chance
         // of succes, no computation should be done in the branches of the
         // conditional.
-        low = (v < value) ? other_low : low;
+        low = cmp(v, value) ? other_low : low;
+        // low = (v < value) ? other_low : low;
     };
 
     return low;
 }
 
 // See lower_bound()
-template <int width, typename F>
-inline size_t upper_bound(const char* data, size_t size, int64_t value, F data_fetcher = &get_direct<width>) noexcept
+template <int width, typename Cmp = std::greater_equal<int64_t>>
+inline size_t upper_bound(const char* data, size_t start, size_t end, int64_t value,
+                          Cmp cmp = std::greater_equal<int64_t>()) noexcept
 {
-    size_t low = 0;
+    REALM_ASSERT_DEBUG(end >= start);
+
+    const auto h = NodeHeader::get_header_from_data((char*)data);
+    const auto is_encoded = NodeHeader::get_kind(h) == 'B';
+    const auto fetcher = [is_encoded](auto data, size_t ndx) {
+        return is_encoded ? ArrayEncode::get(data, ndx) : get_direct<width>(data, ndx);
+    };
+
+    size_t size = end - start;
+    // size_t low = 0;
+    size_t low = start;
     while (size >= 8) {
         size_t half = size / 2;
         size_t other_half = size - half;
         size_t probe = low + half;
         size_t other_low = low + other_half;
-        int64_t v = data_fetcher(data, probe); // get_direct<width>(data, probe);
+        int64_t v = fetcher(data, probe);
         size = half;
-        low = (value >= v) ? other_low : low;
+        low = cmp(value, v) ? other_low : low;
+        // low = (value >= v) ? other_low : low;
 
         half = size / 2;
         other_half = size - half;
         probe = low + half;
         other_low = low + other_half;
-        v = data_fetcher(data, probe); // get_direct<width>(data, probe);
+        v = fetcher(data, probe);
         size = half;
-        low = (value >= v) ? other_low : low;
+        low = cmp(value, v) ? other_low : low;
+        // low = (value >= v) ? other_low : low;
 
         half = size / 2;
         other_half = size - half;
         probe = low + half;
         other_low = low + other_half;
-        v = data_fetcher(data, probe); // get_direct<width>(data, probe);
+        v = fetcher(data, probe);
         size = half;
-        low = (value >= v) ? other_low : low;
+        low = cmp(value, v) ? other_low : low;
+        // low = (value >= v) ? other_low : low;
     }
 
     while (size > 0) {
@@ -497,9 +528,10 @@ inline size_t upper_bound(const char* data, size_t size, int64_t value, F data_f
         size_t other_half = size - half;
         size_t probe = low + half;
         size_t other_low = low + other_half;
-        int64_t v = data_fetcher(data, probe); // get_direct<width>(data, probe);
+        int64_t v = fetcher(data, probe);
         size = half;
-        low = (value >= v) ? other_low : low;
+        low = cmp(value, v) ? other_low : low;
+        // low = (value >= v) ? other_low : low;
     };
 
     return low;
@@ -510,25 +542,25 @@ inline size_t upper_bound(const char* data, size_t size, int64_t value, F data_f
 template <int width>
 inline size_t lower_bound(const char* data, size_t size, int64_t value) noexcept
 {
-    return impl::lower_bound<width>(data, size, value, &get_direct<width>);
+    return impl::lower_bound<width>(data, 0, size, value);
 }
 
 template <int width>
 inline size_t upper_bound(const char* data, size_t size, int64_t value) noexcept
 {
-    return impl::upper_bound<width>(data, size, value, &get_direct<width>);
+    return impl::upper_bound<width>(data, 0, size, value);
 }
 
-template <typename F>
-inline size_t lower_bound(const char* data, size_t size, int64_t value, F f) noexcept
+template <typename Cmp = std::less<int64_t>>
+inline size_t lower_bound(const char* data, size_t start, size_t end, int64_t value, Cmp cmp = {}) noexcept
 {
-    return impl::lower_bound<0>(data, size, value, f);
+    return impl::lower_bound<0>(data, start, end, value, cmp);
 }
 
-template <typename F>
-inline size_t upper_bound(const char* data, size_t size, int64_t value, F f) noexcept
+template <typename Cmp = std::greater_equal<int64_t>>
+inline size_t upper_bound(const char* data, size_t start, size_t end, int64_t value, Cmp cmp = {}) noexcept
 {
-    return impl::upper_bound<0>(data, size, value, f);
+    return impl::upper_bound<0>(data, start, end, value, cmp);
 }
 
 

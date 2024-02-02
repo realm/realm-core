@@ -52,6 +52,8 @@ public:
     // static getters based on header (to be used carefully since they assume the array is a B array).
     static int64_t get(const char*, size_t);
 
+    static size_t find_binary(const Array&, int64_t);
+
 private:
     // decode array methods
     std::vector<int64_t> fetch_signed_values_from_encoded_array(const Array&, size_t, size_t, size_t, size_t) const;

@@ -130,6 +130,29 @@ namespace impl {
 
 } // namespace impl
 
+size_t ArrayFlex::find_binary(const Array& arr, int64_t key)
+{
+    size_t v_width, v_size, ndx_width, ndx_size;
+    get_encode_info(arr, v_width, v_size, ndx_width, ndx_size);
+    size_t lo = 0;
+    size_t hi = ndx_size;
+    const auto ndx_offset = v_size * v_width;
+    while (lo <= hi) {
+        size_t mid = lo + (hi - lo) / 2;
+        auto data = (uint64_t*)arr.m_data;
+        const auto ndx = static_cast<size_t>(realm::read_bitfield(data, ndx_offset + (mid * ndx_width), ndx_width));
+        const auto unsigned_val = realm::read_bitfield(data, v_width * ndx, v_width);
+        const auto v = sign_extend_field(v_width, unsigned_val);
+        if (v == key)
+            return ndx;
+        else if (key < v)
+            hi = mid - 1;
+        else
+            lo = mid + 1;
+    }
+    return realm::not_found;
+}
+
 
 bool ArrayFlex::encode(const Array& origin, Array& arr, size_t bytes, const std::vector<int64_t>& values,
                        const std::vector<size_t>& indices, size_t v_width, size_t ndx_width)

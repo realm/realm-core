@@ -31,6 +31,26 @@
 
 using namespace realm;
 
+size_t ArrayPacked::find_binary(const Array& arr, int64_t key)
+{
+    size_t v_width, v_size;
+    get_encode_info(arr, v_width, v_size);
+    size_t lo = 0;
+    size_t hi = v_size;
+    while (lo <= hi) {
+        size_t mid = lo + (hi - lo) / 2;
+        const auto unsigned_val = realm::read_bitfield((uint64_t*)arr.m_data, v_width * mid, v_width);
+        const auto v = sign_extend_field(v_width, unsigned_val);
+        if (v == key)
+            return mid;
+        else if (key < v)
+            hi = mid - 1;
+        else
+            lo = mid + 1;
+    }
+    return realm::not_found;
+}
+
 // do not use values here, the values are computed to be used in flex format,
 // thus all the duplicates are gone, but packed can still be better than flex.
 // TODO: fix this

@@ -46,7 +46,7 @@ using namespace std::chrono;
 #include "test_types_helper.hpp"
 
 // #include <valgrind/callgrind.h>
-#define PERFORMACE_TESTING
+#define PERFORMANCE_TESTING
 
 using namespace realm;
 using namespace realm::util;
@@ -3434,7 +3434,7 @@ NONCONCURRENT_TEST(Table_QuickSort2)
 
 NONCONCURRENT_TEST(Table_object_sequential)
 {
-#ifdef PERFORMACE_TESTING
+#ifdef PERFORMANCE_TESTING
     int nb_rows = 10'000'000;
     int num_runs = 1;
 #else
@@ -3584,7 +3584,7 @@ NONCONCURRENT_TEST(Table_object_sequential)
 
 NONCONCURRENT_TEST(Table_object_seq_rnd)
 {
-#ifdef PERFORMACE_TESTING
+#ifdef PERFORMANCE_TESTING
     size_t rows = 1'000'000;
     int runs = 100; // runs for building scenario
 #else
@@ -3627,7 +3627,7 @@ NONCONCURRENT_TEST(Table_object_seq_rnd)
     }
     // scenario established!
     int nb_rows = int(key_values.size());
-#ifdef PERFORMACE_TESTING
+#ifdef PERFORMANCE_TESTING
     int num_runs = 10; // runs for timing access
 #else
     int num_runs = 1; // runs for timing access
@@ -3699,7 +3699,7 @@ NONCONCURRENT_TEST(Table_object_seq_rnd)
 
 NONCONCURRENT_TEST(Table_object_random)
 {
-#ifdef PERFORMACE_TESTING
+#ifdef PERFORMANCE_TESTING
     int nb_rows = 1'000'000;
     int num_runs = 10;
 #else

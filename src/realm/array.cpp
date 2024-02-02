@@ -1504,23 +1504,11 @@ void Array::verify() const
 
 size_t Array::lower_bound_int(int64_t value) const noexcept
 {
-    if (is_encoded()) {
-        auto f = [](const char* data, size_t ndx) -> int64_t {
-            return ArrayEncode::get(get_header_from_data((char*)data), ndx); // do!!!
-        };
-        return lower_bound(m_data, m_size, value, f);
-    }
     REALM_TEMPEX(return lower_bound, m_width, (m_data, m_size, value));
 }
 
 size_t Array::upper_bound_int(int64_t value) const noexcept
 {
-    if (is_encoded()) {
-        auto f = [](const char* data, size_t ndx) -> int64_t {
-            return ArrayEncode::get(get_header_from_data((char*)data), ndx); // do!!!!
-        };
-        return upper_bound(m_data, m_size, value, f);
-    }
     REALM_TEMPEX(return upper_bound, m_width, (m_data, m_size, value));
 }
 

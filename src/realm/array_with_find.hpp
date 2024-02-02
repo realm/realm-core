@@ -314,7 +314,7 @@ bool ArrayWithFind::find_optimized(int64_t value, size_t start, size_t end, size
 
     // Note:
     //      For encoded arrays, we are going to skip all these and tap directly into a straight find.
-    //      It is unclear at this stage how much performace we are loosing, we will need to
+    //      It is unclear at this stage how much performance we are loosing, we will need to
     //      a) evaluate how ofter the vectorization part of this code is hit in procution
     //      b) add or run the benchmarks that are testing this part of the code and do some comparison
     //
@@ -1001,25 +1001,23 @@ template <class Cond>
 bool ArrayWithFind::find_encoded_array(int64_t value, size_t start, size_t end, size_t baseindex,
                                        QueryStateBase* state) const
 {
-    // this is not optimized. just fetch all the values from the array and apply the cond.
-    // it can be optimized later, for example avoid to fetch all the values from the encoded array
-    // and apply the cond predicate, + can we used binary seatch here? Likely yes.
+    // TODO: we are sure at this stage that the array is sorted. so we could use binary search at this point.
     auto& encode = *m_array.m_encode;
 
     if constexpr (std::is_same<Cond, Equal>::value || std::is_same<Cond, NotEqual>::value) {
-        const auto eq = std::is_same<Cond, Equal>::value;
+        const auto eq = std::is_same_v<Cond, Equal>;
         while (start < end) {
             auto v = encode.get(m_array, start);
             if (eq ? (v == value) : (v != value)) {
                 if (!state->match(start + baseindex))
                     return false;
             }
-            start++;
+            ++start;
         }
         return true;
     }
     else {
-        const auto gt = std::is_same<Cond, Greater>::value;
+        const auto gt = std::is_same_v<Cond, Greater>;
         while (start < end) {
             auto v = encode.get(m_array, start);
             if (gt ? (v > value) : (v < value)) {
