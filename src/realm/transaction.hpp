@@ -411,7 +411,7 @@ inline bool Transaction::promote_to_write(O* observer, bool nonblocking)
         db->m_logger->log(util::LogCategory::transaction, util::Logger::Level::trace,
                           "Tr %1: Promote to write: %2 -> %3", m_log_id, old_version, m_read_lock.m_version);
     }
-
+    update_allocator_wrappers(true);
     set_transact_stage(DB::transact_Writing);
     return true;
 }

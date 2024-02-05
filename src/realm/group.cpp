@@ -1360,7 +1360,11 @@ private:
 void Group::update_allocator_wrappers(bool writable)
 {
     m_is_writable = writable;
-    m_alloc.set_read_only(!writable);
+    // This is tempting:
+    // m_alloc.set_read_only(!writable);
+    // - but m_alloc may refer to the "global" allocator in the DB object.
+    // Setting it here would cause different transactions to raze for
+    // changing the shared allocator setting. This is somewhat of a mess.
     for (size_t i = 0; i < m_table_accessors.size(); ++i) {
         auto table_accessor = m_table_accessors[i];
         if (table_accessor) {

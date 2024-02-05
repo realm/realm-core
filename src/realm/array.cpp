@@ -276,11 +276,88 @@ void Array::destroy_children(size_t offset) noexcept
     }
 }
 
-// The default allocator cannot be trusted wrt is_read_only():
-REALM_ASSERT(!only_if_modified || &m_alloc != &Allocator::get_default());
-// however - creating an array using ANYTHING BUT the default allocator during commit is also wrong....
-// it only works by accident, because the whole slab area is reinitialized after commit.
-// We should have: Array encoded_array{Allocator::get_default()};
+size_t Array::get_byte_size() const noexcept
+{
+    // A and B type array
+    REALM_ASSERT(m_kind == 'A' || m_kind == 'B');
+    const auto header = get_header();
+    auto num_bytes = get_byte_size_from_header(header);
+    auto read_only = m_alloc.is_read_only(m_ref) == true;
+    auto bytes_ok = num_bytes <= get_capacity_from_header(header);
+    REALM_ASSERT(read_only || bytes_ok);
+    REALM_ASSERT_7(m_alloc.is_read_only(m_ref), ==, true, ||, num_bytes, <=, get_capacity_from_header(header));
+    return num_bytes;
+}
+
+ref_type Array::write(_impl::ArrayWriterBase& out, bool deep, bool only_if_modified, bool compress_in_flight) const
+{
+    REALM_ASSERT(is_attached());
+    // The default allocator cannot be trusted wrt is_read_only():
+    REALM_ASSERT(!only_if_modified || &m_alloc != &Allocator::get_default());
+    if (only_if_modified && m_alloc.is_read_only(m_ref))
+        return m_ref;
+
+    if (!deep || !m_has_refs) {
+        // however - creating an array using ANYTHING BUT the default allocator during commit is also wrong....
+        // it only works by accident, because the whole slab area is reinitialized after commit.
+        // We should have: Array encoded_array{Allocator::get_default()};
+        Array encoded_array{Allocator::get_default()};
+        if (compress_in_flight && size() != 0 && encode_array(encoded_array)) {
+            REALM_ASSERT_DEBUG(encoded_array.m_kind == 'B');
+            REALM_ASSERT_DEBUG(
+                encoded_array.m_encoding == Encoding::Flex || encoded_array.m_encoding == Encoding::Packed ||
+                encoded_array.m_encoding == Encoding::AofP || encoded_array.m_encoding == Encoding::PofA);
+            REALM_ASSERT_DEBUG(size() == encoded_array.size());
+#ifdef REALM_DEBUG
+            for (size_t i = 0; i < encoded_array.size(); ++i)
+                REALM_ASSERT_DEBUG(get(i) == encoded_array.get(i));
+#endif
+            auto ref = encoded_array.do_write_shallow(out);
+            encoded_array.destroy();
+            return ref;
+        }
+        return do_write_shallow(out); // Throws
+    }
+
+    return do_write_deep(out, only_if_modified, compress_in_flight); // Throws
+}
+
+ref_type Array::write(ref_type ref, Allocator& alloc, _impl::ArrayWriterBase& out, bool only_if_modified,
+                      bool compress_in_flight)
+{
+    // The default allocator cannot be trusted wrt is_read_only():
+    REALM_ASSERT(!only_if_modified || &alloc != &Allocator::get_default());
+    if (only_if_modified && alloc.is_read_only(ref))
+        return ref;
+
+    Array array(alloc);
+    array.init_from_ref(ref);
+    REALM_ASSERT_DEBUG(array.is_attached());
+
+    if (!array.m_has_refs) {
+        Array encoded_array{Allocator::get_default()};
+        if (compress_in_flight && array.size() != 0 && array.encode_array(encoded_array)) {
+            REALM_ASSERT_DEBUG(encoded_array.m_kind == 'B');
+            REALM_ASSERT_DEBUG(
+                encoded_array.m_encoding == Encoding::Flex || encoded_array.m_encoding == Encoding::Packed ||
+                encoded_array.m_encoding == Encoding::AofP || encoded_array.m_encoding == Encoding::PofA);
+            REALM_ASSERT_DEBUG(array.size() == encoded_array.size());
+#ifdef REALM_DEBUG
+            for (size_t i = 0; i < encoded_array.size(); ++i) {
+                REALM_ASSERT_DEBUG(array.get(i) == encoded_array.get(i));
+            }
+#endif
+            auto ref = encoded_array.do_write_shallow(out);
+            encoded_array.destroy();
+            return ref;
+        }
+        else {
+            return array.do_write_shallow(out); // Throws
+        }
+    }
+    return array.do_write_deep(out, only_if_modified, compress_in_flight); // Throws
+}
+
 
 ref_type Array::do_write_shallow(_impl::ArrayWriterBase& out) const
 {
@@ -294,7 +371,7 @@ ref_type Array::do_write_shallow(_impl::ArrayWriterBase& out) const
 }
 
 
-ref_type Array::do_write_deep(_impl::ArrayWriterBase& out, bool only_if_modified) const
+ref_type Array::do_write_deep(_impl::ArrayWriterBase& out, bool only_if_modified, bool compress) const
 {
     // Temp array for updated refs
     Array new_array(Allocator::get_default());

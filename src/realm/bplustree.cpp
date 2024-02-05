@@ -838,40 +838,40 @@ ref_type realm::bptree_typed_write(ref_type ref, _impl::ArrayWriterBase& out, Al
     if (only_modified && alloc.is_read_only(ref))
         return ref;
     char* header = alloc.translate(ref);
-    Array a(alloc);
-    a.init_from_ref(ref);
+    Array node(alloc);
+    node.init_from_ref(ref);
     if (NodeHeader::get_is_inner_bptree_node_from_header(header)) {
-        Array dest(Allocator::get_default());
-        dest.create(NodeHeader::type_HasRefs, false, a.size());
-        REALM_ASSERT(a.has_refs());
-        for (unsigned j = 0; j < a.size(); ++j) {
-            RefOrTagged rot = a.get_as_ref_or_tagged(j);
+        REALM_ASSERT(node.has_refs());
+        Array written_node(Allocator::get_default());
+        written_node.create(NodeHeader::type_InnerBptreeNode, false, node.size());
+        for (unsigned j = 0; j < node.size(); ++j) {
+            RefOrTagged rot = node.get_as_ref_or_tagged(j);
             if (rot.is_ref() && rot.get_as_ref()) {
                 if (j == 0) {
                     // keys (ArrayUnsigned me thinks)
                     Array a(alloc);
                     a.init_from_ref(rot.get_as_ref());
-                    dest.set_as_ref(j, a.write(out, deep, only_modified, false));
+                    written_node.set_as_ref(j, a.write(out, deep, only_modified, false));
                 }
                 else {
-                    dest.set_as_ref(
+                    written_node.set_as_ref(
                         j, bptree_typed_write(rot.get_as_ref(), out, alloc, col_type, deep, only_modified, compress));
                 }
             }
             else
-                dest.set(j, rot);
+                written_node.set(j, rot);
         }
-        auto written_ref = dest.write(out, false, only_modified, false);
-        dest.destroy();
+        auto written_ref = written_node.write(out, false, false, false);
+        written_node.destroy();
         return written_ref;
     }
     else {
-        if (a.has_refs()) {
+        if (node.has_refs()) {
             // this should be extended to handle Mixed....
-            return a.write(out, deep, only_modified, false); // unknown substructure, don't compress
+            return node.write(out, deep, only_modified, false); // unknown substructure, don't compress
         }
         else {
-            return a.write(out, false, only_modified, compress); // leaf array - do compress
+            return node.write(out, false, only_modified, compress); // leaf array - do compress
         }
     }
 }
