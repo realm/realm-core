@@ -1312,11 +1312,9 @@ void Array::update_width_cache_from_header() noexcept
     m_width = get_width_from_header(get_header());
     m_lbound = lbound_for_width(m_width);
     m_ubound = ubound_for_width(m_width);
-#ifdef REALM_DEBUG
-    REALM_ASSERT(m_lbound <= m_ubound);
-    REALM_ASSERT(m_width >= m_lbound);
-    REALM_ASSERT(m_width <= m_ubound);
-#endif
+    REALM_ASSERT_DEBUG(m_lbound <= m_ubound);
+    REALM_ASSERT_DEBUG(m_width >= m_lbound);
+    REALM_ASSERT_DEBUG(m_width <= m_ubound);
     REALM_TEMPEX(m_vtable = &VTableForWidth, m_width, ::vtable);
     m_getter = m_vtable->getter;
 }
@@ -1511,26 +1509,19 @@ void Array::verify() const
 
 size_t Array::lower_bound_int(int64_t value) const noexcept
 {
-    if (is_encoded())
-        return m_encode->lower_bound(*this, value);
     REALM_TEMPEX(return lower_bound, m_width, (m_data, m_size, value));
 }
 
 size_t Array::upper_bound_int(int64_t value) const noexcept
 {
-    if (is_encoded())
-        return m_encode->upper_bound(*this, value);
     REALM_TEMPEX(return upper_bound, m_width, (m_data, m_size, value));
 }
 
-
 size_t Array::find_first(int64_t value, size_t start, size_t end) const
 {
-    //    if (is_encoded())
-    //        return m_encode->find_first(*this, value);
+    // if (is_encoded()) return ArrayEncode::find_first(*this, value, start, end);
     return find_first<Equal>(value, start, end);
 }
-
 
 int_fast64_t Array::get(const char* header, size_t ndx) noexcept
 {
@@ -1546,7 +1537,6 @@ int_fast64_t Array::get(const char* header, size_t ndx) noexcept
 
 std::pair<int64_t, int64_t> Array::get_two(const char* header, size_t ndx) noexcept
 {
-    // TODO: Optimize!
     return std::make_pair(get(header, ndx), get(header, ndx + 1));
 }
 

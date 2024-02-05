@@ -31,9 +31,12 @@ public:
     // TODO move all of this in some other class that only dispatches
     static bool encode(const Array&, Array&);
     static int64_t get(const char*, size_t);
+    static int64_t find_first(const char*, size_t);
     static size_t size(const char*);
     static bool is_packed(const char*);
     static void set_direct(char* data, size_t w, size_t ndx, int64_t v);
+
+    static size_t find_first(const Array&, int64_t, size_t start, size_t end, bool (*)(int64_t, int64_t));
 
     // this is the interface that every encoding array must adhere to
     // Generic interface for an encoding Array.
@@ -46,11 +49,7 @@ public:
     virtual int64_t get(const Array&, size_t) const = 0;
     virtual void get_chunk(const Array&, size_t ndx, int64_t res[8]) const = 0;
     virtual void set_direct(const Array&, size_t, int64_t) const = 0;
-    // lower/upper bound for encoded arrays
-    virtual size_t lower_bound(const Array&, int64_t) const = 0;
-    virtual size_t upper_bound(const Array&, int64_t) const = 0;
     // query interface
-    virtual size_t find_first(const Array&, int64_t value) const = 0;
     virtual int64_t sum(const Array&, size_t start, size_t end) const = 0;
 };
 

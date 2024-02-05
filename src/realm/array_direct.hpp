@@ -22,6 +22,7 @@
 #include <cstring>
 #include <realm/utilities.hpp>
 #include <realm/alloc.hpp>
+#include <realm/array_encode.hpp>
 
 // clang-format off
 /* wid == 16/32 likely when accessing offsets in B tree */
@@ -348,6 +349,12 @@ inline std::pair<int64_t, int64_t> get_two(const char* data, size_t width, size_
     REALM_TEMPEX(return get_two, width, (data, ndx));
 }
 
+namespace impl {
+
+// Lower and Upper bound are mainly used in the B+tree implementation,
+// but also for indexing, we can exploit these functions when the array
+// is encoded, just providing a way for fetching the data.
+// In this case the width is going to be ignored.
 
 // Lower/upper bound in sorted sequence
 // ------------------------------------
@@ -371,7 +378,7 @@ inline std::pair<int64_t, int64_t> get_two(const char* data, size_t width, size_
 // We currently use binary search. See for example
 // http://www.tbray.org/ongoing/When/200x/2003/03/22/Binary.
 template <int width>
-inline size_t lower_bound(const char* data, size_t size, int64_t value) noexcept
+inline size_t lower_bound(const char* data, size_t start, size_t end, int64_t value) noexcept
 {
     // The binary search used here is carefully optimized. Key trick is to use a single
     // loop controlling variable (size) instead of high/low pair, and to keep updates
@@ -381,7 +388,18 @@ inline size_t lower_bound(const char* data, size_t size, int64_t value) noexcept
     // might be slightly faster if we used branches instead. The loop unrolling yields
     // a final 5-20% speedup depending on circumstances.
 
-    size_t low = 0;
+    // size_t low = 0;
+    REALM_ASSERT_DEBUG(end >= start);
+    size_t size = end - start;
+    // size_t low = 0;
+    size_t low = start;
+
+
+    const auto h = NodeHeader::get_header_from_data((char*)data);
+    const auto is_encoded = NodeHeader::get_kind(h) == 'B';
+    const auto fetcher = [is_encoded](auto data, size_t ndx) {
+        return is_encoded ? ArrayEncode::get(data, ndx) : get_direct<width>(data, ndx);
+    };
 
     while (size >= 8) {
         // The following code (at X, Y and Z) is 3 times manually unrolled instances of (A) below.
@@ -392,7 +410,7 @@ inline size_t lower_bound(const char* data, size_t size, int64_t value) noexcept
         size_t other_half = size - half;
         size_t probe = low + half;
         size_t other_low = low + other_half;
-        int64_t v = get_direct<width>(data, probe);
+        int64_t v = fetcher(data, probe);
         size = half;
         low = (v < value) ? other_low : low;
 
@@ -401,7 +419,7 @@ inline size_t lower_bound(const char* data, size_t size, int64_t value) noexcept
         other_half = size - half;
         probe = low + half;
         other_low = low + other_half;
-        v = get_direct<width>(data, probe);
+        v = fetcher(data, probe);
         size = half;
         low = (v < value) ? other_low : low;
 
@@ -410,7 +428,7 @@ inline size_t lower_bound(const char* data, size_t size, int64_t value) noexcept
         other_half = size - half;
         probe = low + half;
         other_low = low + other_half;
-        v = get_direct<width>(data, probe);
+        v = fetcher(data, probe);
         size = half;
         low = (v < value) ? other_low : low;
     }
@@ -443,7 +461,7 @@ inline size_t lower_bound(const char* data, size_t size, int64_t value) noexcept
         size_t other_half = size - half;
         size_t probe = low + half;
         size_t other_low = low + other_half;
-        int64_t v = get_direct<width>(data, probe);
+        int64_t v = fetcher(data, probe); // get_direct<width>(data, probe);
         size = half;
         // for max performance, the line below should compile into a conditional
         // move instruction. Not all compilers do this. To maximize chance
@@ -457,15 +475,25 @@ inline size_t lower_bound(const char* data, size_t size, int64_t value) noexcept
 
 // See lower_bound()
 template <int width>
-inline size_t upper_bound(const char* data, size_t size, int64_t value) noexcept
+inline size_t upper_bound(const char* data, size_t start, size_t end, int64_t value) noexcept
 {
-    size_t low = 0;
+    REALM_ASSERT_DEBUG(end >= start);
+
+    const auto h = NodeHeader::get_header_from_data((char*)data);
+    const auto is_encoded = NodeHeader::get_kind(h) == 'B';
+    const auto fetcher = [is_encoded](auto data, size_t ndx) {
+        return is_encoded ? ArrayEncode::get(data, ndx) : get_direct<width>(data, ndx);
+    };
+
+    size_t size = end - start;
+    // size_t low = 0;
+    size_t low = start;
     while (size >= 8) {
         size_t half = size / 2;
         size_t other_half = size - half;
         size_t probe = low + half;
         size_t other_low = low + other_half;
-        int64_t v = get_direct<width>(data, probe);
+        int64_t v = fetcher(data, probe);
         size = half;
         low = (value >= v) ? other_low : low;
 
@@ -473,7 +501,7 @@ inline size_t upper_bound(const char* data, size_t size, int64_t value) noexcept
         other_half = size - half;
         probe = low + half;
         other_low = low + other_half;
-        v = get_direct<width>(data, probe);
+        v = fetcher(data, probe);
         size = half;
         low = (value >= v) ? other_low : low;
 
@@ -481,7 +509,7 @@ inline size_t upper_bound(const char* data, size_t size, int64_t value) noexcept
         other_half = size - half;
         probe = low + half;
         other_low = low + other_half;
-        v = get_direct<width>(data, probe);
+        v = fetcher(data, probe);
         size = half;
         low = (value >= v) ? other_low : low;
     }
@@ -491,13 +519,41 @@ inline size_t upper_bound(const char* data, size_t size, int64_t value) noexcept
         size_t other_half = size - half;
         size_t probe = low + half;
         size_t other_low = low + other_half;
-        int64_t v = get_direct<width>(data, probe);
+        int64_t v = fetcher(data, probe);
         size = half;
         low = (value >= v) ? other_low : low;
     };
 
     return low;
 }
+} // namespace impl
+
+
+template <int width>
+inline size_t lower_bound(const char* data, size_t size, int64_t value) noexcept
+{
+    return impl::lower_bound<width>(data, 0, size, value);
+}
+
+template <int width>
+inline size_t upper_bound(const char* data, size_t size, int64_t value) noexcept
+{
+    return impl::upper_bound<width>(data, 0, size, value);
+}
+
+// template <typename Cmp = std::less<int64_t>>
+// inline size_t lower_bound(const char* data, size_t start, size_t end, int64_t value, Cmp cmp = {}) noexcept
+//{
+//     return impl::lower_bound<0>(data, start, end, value, cmp);
+// }
+//
+// template <typename Cmp = std::greater_equal<int64_t>>
+// inline size_t upper_bound(const char* data, size_t start, size_t end, int64_t value, Cmp cmp = {}) noexcept
+//{
+//     return impl::upper_bound<0>(data, start, end, value, cmp);
+// }
+
+
 } // namespace realm
 
 #endif /* ARRAY_TPL_HPP_ */

@@ -40,13 +40,7 @@ public:
     bool decode(Array&) final override;
 
     // basic query support
-    size_t find_first(const Array&, int64_t value) const final override;
     int64_t sum(const Array&, size_t start, size_t end) const final override;
-
-    // Array lower and upper bound for flex arrays (StringIndex uses this, we should disable the compression for
-    // indices).
-    size_t lower_bound(const Array&, int64_t) const final override;
-    size_t upper_bound(const Array&, int64_t) const final override;
 
     // setters
     void set_direct(const Array&, size_t, int64_t) const final override;
@@ -57,6 +51,8 @@ public:
 
     // static getters based on header (to be used carefully since they assume the array is a B array).
     static int64_t get(const char*, size_t);
+
+    static size_t find_first(const Array&, int64_t, size_t, size_t, bool (*)(int64_t, int64_t));
 
 private:
     // read info about the encoded array from header
