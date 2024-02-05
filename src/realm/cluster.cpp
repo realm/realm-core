@@ -1593,32 +1593,17 @@ ref_type Cluster::typed_write(ref_type ref, _impl::ArrayWriterBase& out, const T
             REALM_ASSERT(leaf.has_refs());
             auto wtype = leaf.get_wtype_from_header(leaf.get_header());
             REALM_ASSERT(wtype == wtype_Bits);
-#if 0
             Array written_leaf(Allocator::get_default());
             // written_leaf.create(type_HasRefs, false, wtype, leaf.size(), Allocator::get_default());
             written_leaf.create(type_HasRefs, false, leaf.size());
-            for (size_t i = 0; i < leaf.size(); ++i) {
-                auto rot_leaf = leaf.get_as_ref_or_tagged(i);
-                if (rot_leaf.is_ref() && rot_leaf.get_as_ref()) {
-                    written_leaf.set(i, Array::write(rot_leaf.get_as_ref(), m_alloc, out, only_modified, false));
-                }
-                else {
-                    written_leaf.set(i, leaf.get_as_ref_or_tagged(i));
-                }
-            }
-            written_cluster.set_as_ref(j, written_leaf.write(out, false, false, false));
-            written_leaf.destroy();
-#else
-            written_cluster.set_as_ref(j, leaf.write(out, deep, only_modified, false));
-#endif
-#if 0
             if (col_attr.test(col_attr_List) || col_attr.test(col_attr_Set)) {
                 // These collections are single bptrees - each entry in leaf may be a bptree
                 for (size_t i = 0; i < leaf.size(); ++i) {
                     auto bptree_rot = leaf.get_as_ref_or_tagged(i);
-                    if (bptree_rot.is_ref() && bptree_rot.get_as_ref())
+                    if (bptree_rot.is_ref() && bptree_rot.get_as_ref()) {
                         written_leaf.set_as_ref(i, bptree_typed_write(bptree_rot.get_as_ref(), out, m_alloc, col_type,
                                                                       deep, only_modified, compress && compressible));
+                    }
                     else
                         written_leaf.set(i, bptree_rot);
                 }
@@ -1654,14 +1639,15 @@ ref_type Cluster::typed_write(ref_type ref, _impl::ArrayWriterBase& out, const T
                         written_dict_top.set_as_ref(1, bptree_typed_write(bptree_rot, out, m_alloc, col_type, deep,
                                                                           only_modified, compress && compressible));
                     }
-                    written_leaf.set_as_ref(i, written_dict_top.write(out, false, only_modified, false));
+                    written_leaf.set_as_ref(i, written_dict_top.write(out, false, false, false));
                     written_dict_top.destroy();
                 }
             }
             else {
                 REALM_ASSERT(false);
             }
-#endif
+            written_cluster.set_as_ref(j, written_leaf.write(out, false, false, false));
+            written_leaf.destroy();
         }
     }
     auto written_ref = written_cluster.write(out, false, false, false);

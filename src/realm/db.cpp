@@ -2695,7 +2695,7 @@ TransactionRef DB::start_write(bool nonblocking)
         end_write_on_correct_thread();
         throw;
     }
-
+    tr->update_allocator_wrappers(true);
     return tr;
 }
 

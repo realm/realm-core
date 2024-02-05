@@ -130,20 +130,20 @@ public:
         REALM_ASSERT(get_is_inner_bptree_node_from_header(get_header()));
         REALM_ASSERT(!get_context_flag_from_header(get_header()));
         REALM_ASSERT(has_refs());
-        Array dest(m_alloc);
-        dest.create(type_InnerBptreeNode, false, size());
+        Array written_node(Allocator::get_default());
+        written_node.create(type_InnerBptreeNode, false, size());
         for (unsigned j = 0; j < size(); ++j) {
             RefOrTagged rot = get_as_ref_or_tagged(j);
             if (rot.is_ref() && rot.get_as_ref()) {
                 if (only_modified && m_alloc.is_read_only(rot.get_as_ref())) {
-                    dest.set(j, rot);
+                    written_node.set(j, rot);
                     continue;
                 }
                 if (j == 0) {
                     // keys (ArrayUnsigned, me thinks)
                     Array array_unsigned(m_alloc);
                     array_unsigned.init_from_ref(rot.get_as_ref());
-                    dest.set_as_ref(j, array_unsigned.write(out, deep, only_modified, false));
+                    written_node.set_as_ref(j, array_unsigned.write(out, deep, only_modified, false));
                 }
                 else {
                     auto header = m_alloc.translate(rot.get_as_ref());
@@ -151,23 +151,23 @@ public:
                     if (get_is_inner_bptree_node_from_header(header)) {
                         ClusterNodeInner inner_node(m_alloc, m_tree_top);
                         inner_node.init(m);
-                        dest.set_as_ref(
+                        written_node.set_as_ref(
                             j, inner_node.typed_write(rot.get_as_ref(), out, table, deep, only_modified, compress));
                     }
                     else {
                         Cluster cluster(j, m_alloc, m_tree_top);
                         cluster.init(m);
-                        dest.set_as_ref(
+                        written_node.set_as_ref(
                             j, cluster.typed_write(rot.get_as_ref(), out, table, deep, only_modified, compress));
                     }
                 }
             }
             else { // not a ref, just copy value over
-                dest.set(j, rot);
+                written_node.set(j, rot);
             }
         }
-        auto written_ref = dest.write(out, false, only_modified, false);
-        dest.destroy();
+        auto written_ref = written_node.write(out, false, false, false);
+        written_node.destroy();
         return written_ref;
     }
 

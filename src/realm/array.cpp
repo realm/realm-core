@@ -409,7 +409,7 @@ ref_type Array::write(_impl::ArrayWriterBase& out, bool deep, bool only_if_modif
         // however - creating an array using ANYTHING BUT the default allocator during commit is also wrong....
         // it only works by accident, because the whole slab area is reinitialized after commit.
         // We should have: Array encoded_array{Allocator::get_default()};
-        Array encoded_array{m_alloc};
+        Array encoded_array{Allocator::get_default()};
         if (compress_in_flight && size() != 0 && encode_array(encoded_array)) {
             REALM_ASSERT_DEBUG(encoded_array.m_kind == 'B');
             REALM_ASSERT_DEBUG(
@@ -433,6 +433,8 @@ ref_type Array::write(_impl::ArrayWriterBase& out, bool deep, bool only_if_modif
 ref_type Array::write(ref_type ref, Allocator& alloc, _impl::ArrayWriterBase& out, bool only_if_modified,
                       bool compress_in_flight)
 {
+    // The default allocator cannot be trusted wrt is_read_only():
+    REALM_ASSERT(!only_if_modified || &alloc != &Allocator::get_default());
     if (only_if_modified && alloc.is_read_only(ref))
         return ref;
 
@@ -441,7 +443,7 @@ ref_type Array::write(ref_type ref, Allocator& alloc, _impl::ArrayWriterBase& ou
     REALM_ASSERT_DEBUG(array.is_attached());
 
     if (!array.m_has_refs) {
-        Array encoded_array{alloc};
+        Array encoded_array{Allocator::get_default()};
         if (compress_in_flight && array.size() != 0 && array.encode_array(encoded_array)) {
             REALM_ASSERT_DEBUG(encoded_array.m_kind == 'B');
             REALM_ASSERT_DEBUG(
