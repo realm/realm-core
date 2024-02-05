@@ -742,7 +742,7 @@ Query StringOpsNode::visit(ParserDriver* drv)
 
     verify_only_string_types(right_type, string_for_op(op));
 
-    if (prop && !prop->links_exist() && right->has_single_value() &&
+    if (prop && !prop->links_exist() && !prop->has_path() && right->has_single_value() &&
         (left_type == right_type || left_type == type_Mixed)) {
         auto col_key = prop->column_key();
         if (right_type == type_String) {

@@ -5309,9 +5309,11 @@ TEST(Parser_NestedMixedDictionaryList)
     CHECK_EQUAL(q.count(), 1);
 
     verify_query(test_context, persons, "properties.instruments[0].strings == 6", 1);
+    verify_query(test_context, persons, "properties.instruments[0].strings > 5", 1);
     verify_query(test_context, persons, "properties.instruments[*].strings == 6", 2);
     verify_query(test_context, persons, "properties.instruments[LAST].strings == 6", 1);
     verify_query(test_context, persons, "properties.instruments[*].@keys  == 'color'", 1);
+    verify_query(test_context, persons, "properties.instruments[*].brand  BEGINSWITH 'gi'", 2);
     verify_query(test_context, persons, "properties[*][0].legs  == 2", 1); // Pipper the bird
     verify_query(test_context, persons, "properties[*][0].legs  == 4", 1); // Lady the cat
     verify_query(test_context, persons, "properties[*][*].legs  == 0", 1); // carl the snake
