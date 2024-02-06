@@ -1563,7 +1563,7 @@ ref_type Cluster::typed_write(ref_type ref, _impl::ArrayWriterBase& out, const T
             written_cluster.set(j, leaf_rot);
             continue;
         }
-        // from here: this leaf exists and needs to be written
+        // from here: this leaf exists and needs to be written.
         Array leaf(m_alloc);
         leaf.init_from_ref(leaf_rot.get_as_ref());
         if (j == 0) {
@@ -1577,24 +1577,22 @@ ref_type Cluster::typed_write(ref_type ref, _impl::ArrayWriterBase& out, const T
             auto col_attr = col_key.get_attrs();
             bool compressible =
                 col_type == col_type_Int || col_type == col_type_Link || col_type == col_type_BackLink;
-            // First handle true leafs (not collections)
-            if (!col_attr.test(col_attr_Collection)) {
-                // this may include mixed (which is not a true leaf, but if so it won´t be compressible, so all good)
+            // First handle true leafs (not collections or complex leafs)
+            if (!leaf.has_refs()) {
+                REALM_ASSERT(col_type != col_type_Mixed && col_type != col_type_Timestamp);
                 written_cluster.set_as_ref(j, leaf.write(out, deep, only_modified, compress && compressible));
                 continue;
             }
-            // catch all
-            // written_cluster.set_as_ref(j, leaf.write(out, deep, only_modified, false));
-            // continue;
-
-            // DISABLED
-
-            //  collections!
+            // Next handle complex leafs (nested arrays), which we don't compress
+            if (!col_attr.test(col_attr_Collection) && col_type != col_type_Timestamp && col_type != col_type_Mixed) {
+                written_cluster.set_as_ref(j, leaf.write(out, deep, only_modified, false));
+                continue;
+            }
+            // collections or complex type which we want to compress!
             REALM_ASSERT(leaf.has_refs());
             auto wtype = leaf.get_wtype_from_header(leaf.get_header());
             REALM_ASSERT(wtype == wtype_Bits);
             Array written_leaf(Allocator::get_default());
-            // written_leaf.create(type_HasRefs, false, wtype, leaf.size(), Allocator::get_default());
             written_leaf.create(type_HasRefs, false, leaf.size());
             if (col_attr.test(col_attr_List) || col_attr.test(col_attr_Set)) {
                 // These collections are single bptrees - each entry in leaf may be a bptree
@@ -1641,6 +1639,28 @@ ref_type Cluster::typed_write(ref_type ref, _impl::ArrayWriterBase& out, const T
                     }
                     written_leaf.set_as_ref(i, written_dict_top.write(out, false, false, false));
                     written_dict_top.destroy();
+                }
+            }
+            else if (col_type == col_type_Timestamp) {
+                REALM_ASSERT(leaf.size() == 2);
+                auto rot0 = leaf.get_as_ref_or_tagged(0);
+                auto rot1 = leaf.get_as_ref_or_tagged(1);
+                REALM_ASSERT(rot0.is_ref() && rot0.get_as_ref());
+                REALM_ASSERT(rot1.is_ref() && rot1.get_as_ref());
+                written_leaf.set_as_ref(0, Array::write(rot0.get_as_ref(), m_alloc, out, only_modified, true));
+                written_leaf.set_as_ref(1, Array::write(rot1.get_as_ref(), m_alloc, out, only_modified, true));
+            }
+            else if (col_type == col_type_Mixed) {
+                // for now, just copy over leaf (not compressing mixed yet)
+                for (size_t i = 0; i < leaf.size(); ++i) {
+                    auto rot = leaf.get_as_ref_or_tagged(i);
+                    if (rot.is_ref() && rot.get_as_ref()) {
+                        written_leaf.set_as_ref(i,
+                                                Array::write(rot.get_as_ref(), m_alloc, out, only_modified, false));
+                    }
+                    else {
+                        written_leaf.set(i, rot);
+                    }
                 }
             }
             else {
