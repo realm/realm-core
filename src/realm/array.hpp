@@ -548,7 +548,6 @@ protected:
     bool m_has_refs;             // Elements whose first bit is zero are refs to subarrays.
     bool m_context_flag;         // Meaning depends on context.
 
-    ArrayEncode* m_encode;
     uint8_t m_kind;
     NodeHeader::Encoding m_encoding;
 

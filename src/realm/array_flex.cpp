@@ -31,146 +31,8 @@
 
 using namespace realm;
 
-namespace impl {
-
-// for fun
-// template <typename T>
-// inline T fetch_value(uint64_t* data, size_t ndx, size_t offset, size_t ndx_width, size_t v_width)
-//{
-//     const auto pos = static_cast<size_t>(realm::read_bitfield(data, offset + (ndx * ndx_width), ndx_width));
-//     const auto unsigned_val = realm::read_bitfield(data, v_width * pos, v_width);
-//     return std::is_same_v<T, int64_t> ? sign_extend_field(v_width, unsigned_val) : unsigned_val;
-// }
-//
-// template <typename T>
-// inline size_t lower_bound(uint64_t* data, const T& key, size_t v_width, size_t ndx_width, size_t v_size,
-//                           size_t ndx_size)
-//{
-//     const auto offset = v_width * v_size;
-//     auto cnt = ndx_size;
-//     size_t step;
-//     size_t ndx = 0;
-//     size_t p = 0;
-//     while (cnt > 0) {
-//         ndx = p;
-//         step = cnt / 2;
-//         ndx += step;
-//         const auto v = fetch_value<T>(data, ndx, offset, ndx_width, v_width);
-//         if ((v < key)) {
-//             p = ++ndx;
-//             cnt -= step + 1;
-//         }
-//         else {
-//             cnt = step;
-//         }
-//     }
-//     return p;
-// }
-//
-// template <typename T>
-// inline size_t upper_bound(uint64_t* data, const T key, size_t v_width, size_t ndx_width, size_t v_size,
-//                           size_t ndx_size)
-//{
-//     const auto offset = v_width * v_size;
-//     auto cnt = ndx_size;
-//     size_t step;
-//     size_t ndx = 0;
-//     size_t p = 0;
-//     while (cnt > 0) {
-//         ndx = p;
-//         step = cnt / 2;
-//         ndx += step;
-//         const auto v = fetch_value<T>(data, ndx, offset, ndx_width, v_width);
-//         if (!(key < v)) {
-//             p = ++ndx;
-//             cnt -= step + 1;
-//         }
-//         else {
-//             cnt = step;
-//         }
-//     }
-//     return p;
-// }
-
-// inline size_t find_linear(uint64_t* data, int64_t key, size_t v_width, size_t ndx_width, size_t v_size,
-//                           size_t ndx_size)
-//{
-//     const auto offset = v_size * v_width;
-//     bf_iterator index_iterator{data, offset, ndx_width, ndx_width, 0};
-//     for (size_t i = 0; i < ndx_size; ++i) {
-//         const auto index = index_iterator.get_value();
-//         bf_iterator it_value{data, static_cast<size_t>(index * v_width), v_width, v_width, 0};
-//         const auto v = sign_extend_field(v_width, it_value.get_value());
-//         if (v == key)
-//             return i;
-//         ++index_iterator;
-//     }
-//     return realm::not_found;
-// }
-//
-// inline size_t find_binary(uint64_t* data, int64_t key, size_t v_width, size_t ndx_width, size_t v_size,
-//                           size_t ndx_size)
-//{
-//     size_t lo = 0;
-//     size_t hi = ndx_size;
-//     const auto ndx_offset = v_size * v_width;
-//     while (lo <= hi) {
-//         size_t mid = lo + (hi - lo) / 2;
-//         const auto ndx = static_cast<size_t>(realm::read_bitfield(data, ndx_offset + (mid * ndx_width),
-//         ndx_width)); const auto unsigned_val = realm::read_bitfield(data, v_width * ndx, v_width); const auto v =
-//         sign_extend_field(v_width, unsigned_val); if (v == key)
-//             return ndx;
-//         else if (key < v)
-//             hi = mid - 1;
-//         else
-//             lo = mid + 1;
-//     }
-//     return realm::not_found;
-// }
-
-} // namespace impl
-
-size_t ArrayFlex::find_first(const Array& arr, int64_t key, size_t start, size_t end, bool (*cmp)(int64_t, int64_t))
-{
-    size_t v_width, v_size, ndx_width, ndx_size;
-    get_encode_info(arr, v_width, v_size, ndx_width, ndx_size);
-
-    if (ndx_size <= 15) {
-        const auto ndx_offset = v_size * v_width;
-        for (size_t i = 0; i < ndx_size; ++i) {
-            auto data = (uint64_t*)arr.m_data;
-            const auto ndx = static_cast<size_t>(realm::read_bitfield(data, ndx_offset + (i * ndx_width), ndx_width));
-            const auto unsigned_val = realm::read_bitfield(data, v_width * ndx, v_width);
-            const auto v = sign_extend_field(v_width, unsigned_val);
-            if (cmp(v, key))
-                return ndx;
-        }
-    }
-    else {
-        size_t lo = start;
-        size_t hi = std::min(ndx_size, end);
-        const auto ndx_offset = v_size * v_width;
-        while (lo <= hi) {
-            size_t mid = lo + (hi - lo) / 2;
-            auto data = (uint64_t*)arr.m_data;
-            const auto ndx =
-                static_cast<size_t>(realm::read_bitfield(data, ndx_offset + (mid * ndx_width), ndx_width));
-            const auto unsigned_val = realm::read_bitfield(data, v_width * ndx, v_width);
-            const auto v = sign_extend_field(v_width, unsigned_val);
-            if (cmp(v, key))
-                return ndx;
-            else if (key < v)
-                hi = mid - 1;
-            else
-                lo = mid + 1;
-        }
-    }
-    return realm::not_found;
-}
-
-
 bool ArrayFlex::encode(const Array& origin, Array& arr, size_t bytes, const std::vector<int64_t>& values,
-                       const std::vector<size_t>& indices, size_t v_width, size_t ndx_width)
+                       const std::vector<size_t>& indices, size_t v_width, size_t ndx_width) const
 {
     setup_array_flex_format(origin, arr, bytes, values, indices, v_width, ndx_width);
     copy_into_flex_array(arr, values, indices);
@@ -227,39 +89,16 @@ void ArrayFlex::copy_into_flex_array(Array& arr, const std::vector<int64_t>& val
     REALM_ASSERT_DEBUG(arr.get_encoding(header) == Encoding::Flex);
 }
 
-bool ArrayFlex::decode(Array& arr)
+void ArrayFlex::set_direct(const char* h, size_t ndx, int64_t value) const
 {
-    REALM_ASSERT_DEBUG(arr.is_attached());
     size_t v_width, ndx_width, v_size, ndx_size;
-    if (get_encode_info(arr, v_width, ndx_width, v_size, ndx_size)) {
-        auto values = fetch_signed_values_from_encoded_array(arr, v_width, ndx_width, v_size, ndx_size);
-        REALM_ASSERT_DEBUG(values.size() == ndx_size);
-        restore_array(arr, values); // restore array sets capacity
-        return true;
-    }
-    return false;
-}
-
-void ArrayFlex::set_direct(const Array& arr, size_t ndx, int64_t value) const
-{
-    REALM_ASSERT_DEBUG(arr.is_attached());
-    size_t v_width, ndx_width, v_size, ndx_size;
-    if (get_encode_info(arr, v_width, ndx_width, v_size, ndx_size)) {
-        REALM_ASSERT_DEBUG(ndx < ndx_size);
-        auto data = (uint64_t*)NodeHeader::get_data_from_header(arr.get_header());
-        uint64_t offset = v_size * v_width;
-        bf_iterator it_index{data, static_cast<size_t>(offset + (ndx * ndx_width)), ndx_width, ndx_size, 0};
-        bf_iterator it_value{data, static_cast<size_t>(it_index.get_value() * v_width), v_width, v_width, 0};
-        it_value.set_value(value);
-    }
-    REALM_UNREACHABLE();
-}
-
-int64_t ArrayFlex::get(const Array& arr, size_t ndx) const
-{
-    REALM_ASSERT_DEBUG(arr.is_attached());
-    REALM_ASSERT_DEBUG(arr.is_encoded());
-    return ArrayFlex::get(arr.get_header(), ndx);
+    get_encode_info(h, v_width, ndx_width, v_size, ndx_size);
+    REALM_ASSERT_DEBUG(ndx < ndx_size);
+    auto data = (uint64_t*)NodeHeader::get_data_from_header(h);
+    uint64_t offset = v_size * v_width;
+    bf_iterator it_index{data, static_cast<size_t>(offset + (ndx * ndx_width)), ndx_width, ndx_size, 0};
+    bf_iterator it_value{data, static_cast<size_t>(it_index.get_value() * v_width), v_width, v_width, 0};
+    it_value.set_value(value);
 }
 
 int64_t ArrayFlex::get(const char* h, size_t ndx)
@@ -281,70 +120,63 @@ int64_t ArrayFlex::get(const char* h, size_t ndx)
     return v;
 }
 
-void ArrayFlex::get_chunk(const Array& arr, size_t ndx, int64_t res[8]) const
+void ArrayFlex::get_chunk(const char* h, size_t ndx, int64_t res[8]) const
 {
-    REALM_ASSERT_DEBUG(arr.is_attached());
     size_t v_width, ndx_width, v_size, ndx_size;
-    if (get_encode_info(arr, v_width, ndx_width, v_size, ndx_size)) {
-        REALM_ASSERT_DEBUG(ndx < ndx_width);
-        auto sz = 8;
-        std::memset(res, 0, sizeof(int64_t) * sz);
-
-        auto supposed_end = ndx + sz;
-        size_t i = ndx;
-        size_t index = 0;
-        for (; i < supposed_end; ++i) {
-            res[index++] = get(arr, i);
-        }
-        for (; index < 8; ++index) {
-            res[index++] = get(arr, i++);
-        }
+    get_encode_info(h, v_width, ndx_width, v_size, ndx_size);
+    REALM_ASSERT_DEBUG(ndx < ndx_width);
+    auto sz = 8;
+    std::memset(res, 0, sizeof(int64_t) * sz);
+    auto supposed_end = ndx + sz;
+    size_t i = ndx;
+    size_t index = 0;
+    for (; i < supposed_end; ++i) {
+        res[index++] = get(h, i);
     }
-    REALM_UNREACHABLE();
+    for (; index < 8; ++index) {
+        res[index++] = get(h, i++);
+    }
 }
 
 int64_t ArrayFlex::sum(const Array& arr, size_t start, size_t end) const
 {
     REALM_ASSERT_DEBUG(arr.is_attached());
+    const auto h = arr.get_header();
     size_t v_width, ndx_width, v_size, ndx_size;
-    if (get_encode_info(arr, v_width, ndx_width, v_size, ndx_size)) {
-        REALM_ASSERT_DEBUG(ndx_size >= start && ndx_size <= end);
-        const auto data = (uint64_t*)NodeHeader::get_data_from_header(arr.get_header());
-        const auto offset = v_size * v_width + (start * ndx_width);
-        bf_iterator index_iterator{data, offset, ndx_width, ndx_width, 0};
-        int64_t total_sum = 0;
-        for (size_t i = start; i < end; ++i) {
-            const auto offset = static_cast<size_t>(index_iterator.get_value() * v_width);
-            total_sum += *(data + offset);
-            ++index_iterator;
-        }
-        return total_sum;
+    get_encode_info(h, v_width, ndx_width, v_size, ndx_size);
+    REALM_ASSERT_DEBUG(ndx_size >= start && ndx_size <= end);
+    const auto data = (uint64_t*)NodeHeader::get_data_from_header(arr.get_header());
+    const auto offset = v_size * v_width + (start * ndx_width);
+    bf_iterator index_iterator{data, offset, ndx_width, ndx_width, 0};
+    int64_t total_sum = 0;
+    for (size_t i = start; i < end; ++i) {
+        const auto offset = static_cast<size_t>(index_iterator.get_value() * v_width);
+        total_sum += *(data + offset);
+        ++index_iterator;
     }
-    REALM_UNREACHABLE();
+    return total_sum;
 }
 
-bool inline ArrayFlex::get_encode_info(const Array& arr, size_t& v_width, size_t& ndx_width, size_t& v_size,
+bool inline ArrayFlex::get_encode_info(const char* h, size_t& v_width, size_t& ndx_width, size_t& v_size,
                                        size_t& ndx_size)
 {
+    REALM_ASSERT_DEBUG(is_flex(h));
     using Encoding = NodeHeader::Encoding;
-    if (arr.is_encoded()) {
-        auto h = arr.get_header();
-        v_size = NodeHeader::get_arrayA_num_elements<Encoding::Flex>(h);
-        ndx_size = NodeHeader::get_arrayB_num_elements<Encoding::Flex>(h);
-        v_width = NodeHeader::get_elementA_size<Encoding::Flex>(h);
-        ndx_width = NodeHeader::get_elementB_size<Encoding::Flex>(h);
-        return true;
-    }
-    return false;
+    v_size = NodeHeader::get_arrayA_num_elements<Encoding::Flex>(h);
+    ndx_size = NodeHeader::get_arrayB_num_elements<Encoding::Flex>(h);
+    v_width = NodeHeader::get_elementA_size<Encoding::Flex>(h);
+    ndx_width = NodeHeader::get_elementB_size<Encoding::Flex>(h);
+    return true;
 }
 
-std::vector<int64_t> ArrayFlex::fetch_signed_values_from_encoded_array(const Array& arr, size_t v_width,
-                                                                       size_t ndx_width, size_t v_size,
-                                                                       size_t ndx_size) const
+std::vector<int64_t> ArrayFlex::fetch_signed_values_from_encoded_array(const char* h) const
 {
+    REALM_ASSERT_DEBUG(is_flex(h));
+    std::size_t v_size, ndx_size, v_width, ndx_width;
+    get_encode_info(h, v_width, ndx_width, v_size, ndx_size);
     std::vector<int64_t> values;
     values.reserve(ndx_size);
-    auto data = (uint64_t*)NodeHeader::get_data_from_header(arr.get_header());
+    auto data = (uint64_t*)NodeHeader::get_data_from_header(h);
     const auto offset = v_size * v_width;
     bf_iterator index_iterator{data, offset, ndx_width, ndx_width, 0};
     for (size_t i = 0; i < ndx_size; ++i) {
@@ -358,37 +190,48 @@ std::vector<int64_t> ArrayFlex::fetch_signed_values_from_encoded_array(const Arr
     return values;
 }
 
-void ArrayFlex::restore_array(Array& arr, const std::vector<int64_t>& values) const
+bool ArrayFlex::is_flex(const char* h)
 {
-    //  do the reverse of compressing the array
-    REALM_ASSERT_DEBUG(!values.empty());
-    REALM_ASSERT_DEBUG(arr.is_attached());
-    using Encoding = NodeHeader::Encoding;
-    const auto flags = NodeHeader::get_flags(arr.get_header());
-    const auto size = values.size();
-    const auto [min_v, max_v] = std::minmax_element(values.begin(), values.end());
-    auto width = std::max(Array::bit_width(*min_v), Array::bit_width(*max_v));
-    REALM_ASSERT_DEBUG(width == 0 || width == 1 || width == 2 || width == 4 || width == 8 || width == 16 ||
-                       width == 32 || width == 64);
-    auto byte_size = NodeHeader::calc_size<Encoding::WTypBits>(size, width);
-    byte_size += 64;
-    REALM_ASSERT_DEBUG(byte_size % 8 == 0); // 8 bytes aligned value
-    auto& allocator = arr.get_alloc();
-    auto old_ref = arr.get_ref();
-    auto old_h = arr.get_header();
+    REALM_ASSERT_DEBUG(NodeHeader::get_kind(h) == 'B');
+    return NodeHeader::get_encoding(h) == NodeHeader::Encoding::Flex;
+}
 
-    auto mem = allocator.alloc(byte_size);
-    auto header = mem.get_addr();
-    NodeHeader::init_header(header, 'A', Encoding::WTypBits, flags, width, values.size());
-    NodeHeader::set_capacity_in_header(byte_size, header);
-    arr.init_from_mem(mem);
-    auto data = arr.m_data;
-    size_t ndx = 0;
-    for (const auto& v : values)
-        ArrayEncode::set_direct(data, width, ndx++, v);
+template <typename F>
+size_t ArrayFlex::find_first(const Array& arr, int64_t key, size_t start, size_t end, F cmp)
+{
+    size_t v_width, v_size, ndx_width, ndx_size;
+    const auto h = arr.get_header();
+    get_encode_info(h, v_width, v_size, ndx_width, ndx_size);
 
-    arr.update_parent();
-    REALM_ASSERT_DEBUG(width == arr.get_width());
-    REALM_ASSERT_DEBUG(arr.size() == values.size());
-    allocator.free_(old_ref, old_h);
+    if (ndx_size <= 15) {
+        const auto ndx_offset = v_size * v_width;
+        for (size_t i = 0; i < ndx_size; ++i) {
+            auto data = (uint64_t*)arr.m_data;
+            const auto ndx = static_cast<size_t>(realm::read_bitfield(data, ndx_offset + (i * ndx_width), ndx_width));
+            const auto unsigned_val = realm::read_bitfield(data, v_width * ndx, v_width);
+            const auto v = sign_extend_field(v_width, unsigned_val);
+            if (cmp(v, key))
+                return ndx;
+        }
+    }
+    else {
+        size_t lo = start;
+        size_t hi = std::min(ndx_size, end);
+        const auto ndx_offset = v_size * v_width;
+        while (lo <= hi) {
+            size_t mid = lo + (hi - lo) / 2;
+            auto data = (uint64_t*)arr.m_data;
+            const auto ndx =
+                static_cast<size_t>(realm::read_bitfield(data, ndx_offset + (mid * ndx_width), ndx_width));
+            const auto unsigned_val = realm::read_bitfield(data, v_width * ndx, v_width);
+            const auto v = sign_extend_field(v_width, unsigned_val);
+            if (cmp(v, key))
+                return ndx;
+            else if (key < v)
+                hi = mid - 1;
+            else
+                lo = mid + 1;
+        }
+    }
+    return realm::not_found;
 }

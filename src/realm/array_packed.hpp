@@ -28,40 +28,22 @@ namespace realm {
 // Decompress array in WTypeBits formats
 //
 class Array;
-class ArrayPacked : public ArrayEncode {
+class ArrayPacked {
 public:
-    explicit ArrayPacked() = default;
-    virtual ~ArrayPacked() = default;
-
-    static bool encode(const Array&, Array&, size_t, size_t);
-
-    // compressing/decompressing logic
-    // bool encode(const Array&, Array&) const final override;
-    bool decode(Array&) final override;
-
-    // basic query support
-    int64_t sum(const Array&, size_t start, size_t end) const final override;
-
-    // setters
-    void set_direct(const Array&, size_t, int64_t) const final override;
-
-    // getters
-    int64_t get(const Array&, size_t) const final override;
-    void get_chunk(const Array&, size_t ndx, int64_t res[8]) const final override;
-
-    // static getters based on header (to be used carefully since they assume the array is a B array).
-    static int64_t get(const char*, size_t);
-
-    static size_t find_first(const Array&, int64_t, size_t, size_t, bool (*)(int64_t, int64_t));
+    bool encode(const Array&, Array&, size_t, size_t) const;
+    int64_t sum(const Array&, size_t start, size_t end) const;
+    template <typename F>
+    size_t find_first(const Array&, int64_t, size_t, size_t, F);
+    void set_direct(const char*, size_t, int64_t) const;
+    void get_chunk(const char*, size_t ndx, int64_t res[8]) const;
+    int64_t get(const char*, size_t) const;
+    std::vector<int64_t> fetch_signed_values_from_packed_array(const char*) const;
+    static bool is_packed(const char*);
 
 private:
-    // read info about the encoded array from header
-    static bool get_encode_info(const Array&, size_t&, size_t&);
+    static bool get_encode_info(const char*, size_t&, size_t&);
     static void setup_array_packed_format(const Array&, Array&, size_t, size_t);
     static void copy_into_packed_array(const Array&, Array&);
-
-    std::vector<int64_t> fetch_signed_values_from_packed_array(const Array&, size_t, size_t) const;
-    void restore_array(Array&, const std::vector<int64_t>&) const;
 };
 
 

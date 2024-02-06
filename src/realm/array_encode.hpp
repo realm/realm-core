@@ -19,38 +19,41 @@
 #ifndef REALM_ARRAY_ENCODE_HPP
 #define REALM_ARRAY_ENCODE_HPP
 
-#include <realm/alloc.hpp>
+#include <vector>
 
 namespace realm {
-//
-// This class represents the basic interface that every compressed array must implement.
-//
+
 class Array;
 class ArrayEncode {
 public:
-    // TODO move all of this in some other class that only dispatches
-    static bool encode(const Array&, Array&);
+    // commit => encode, COW/insert => decode
+    bool encode(const Array&, Array&) const;
+    bool decode(Array&) const;
+
+    // init from mem B
+    size_t size(const char*);
+
+    // get/set
+    int64_t get(const Array&, size_t) const;
     static int64_t get(const char*, size_t);
-    static int64_t find_first(const char*, size_t);
-    static size_t size(const char*);
-    static bool is_packed(const char*);
-    static void set_direct(char* data, size_t w, size_t ndx, int64_t v);
+    void get_chunk(const Array&, size_t ndx, int64_t res[8]) const;
+    void set_direct(const Array&, size_t, int64_t) const;
 
-    static size_t find_first(const Array&, int64_t, size_t start, size_t end, bool (*)(int64_t, int64_t));
-
-    // this is the interface that every encoding array must adhere to
-    // Generic interface for an encoding Array.
-    explicit ArrayEncode() = default;
-    virtual ~ArrayEncode() = default;
-    // encode/decode arrays (encoding happens during the Array::write machinery, decoding happens during COW and
-    // before to allocate) virtual bool encode(const Array&, Array&) const = 0;
-    virtual bool decode(Array&) = 0;
-    // getting and setting values in encoded arrays
-    virtual int64_t get(const Array&, size_t) const = 0;
-    virtual void get_chunk(const Array&, size_t ndx, int64_t res[8]) const = 0;
-    virtual void set_direct(const Array&, size_t, int64_t) const = 0;
     // query interface
-    virtual int64_t sum(const Array&, size_t start, size_t end) const = 0;
+    template <typename F>
+    size_t find_first(const Array&, int64_t, size_t, size_t, F) const;
+    int64_t sum(const Array&, size_t start, size_t end) const;
+
+    static bool is_encoded(const char*);
+
+private:
+    inline bool is_packed(const char*) const;
+    inline bool is_flex(const char*) const;
+
+    void copy_direct(char* data, size_t w, size_t ndx, int64_t v) const;
+    size_t flex_encoded_array_size(const std::vector<int64_t>&, const std::vector<size_t>&, size_t&, size_t&) const;
+    size_t packed_encoded_array_size(std::vector<int64_t>&, size_t, size_t&) const;
+    void try_encode(const Array&, std::vector<int64_t>&, std::vector<size_t>&) const;
 };
 
 } // namespace realm

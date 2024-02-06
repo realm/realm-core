@@ -45,6 +45,10 @@
 #endif
 
 
+// generic encoder, for now it is basically only a interger encoder.
+static realm::ArrayEncode s_encode;
+
+
 // Header format (8 bytes):
 // ------------------------
 //
@@ -191,13 +195,9 @@ using namespace realm;
 using namespace realm::util;
 
 void QueryStateBase::dyncast() {}
-// TODO is not nice.. we can even have a dummy encoder that does nothing
-//      the encoder should be set only during encoding (commit) and during init_from_mem
-static ArrayFlex s_array_flex;
-static ArrayPacked s_array_packed;
+
 Array::Array(Allocator& allocator) noexcept
     : Node(allocator)
-    , m_encode(&s_array_flex)
 {
 }
 
@@ -304,9 +304,7 @@ void Array::init_from_mem(MemRef mem) noexcept
         char* header = mem.get_addr();
         m_ref = mem.get_ref();
         m_data = get_data_from_header(header);
-        m_size = ArrayEncode::size(header);
-        // BAD!!!!
-        m_encode = ArrayEncode::is_packed(header) ? (ArrayEncode*)(&s_array_packed) : (ArrayEncode*)&s_array_flex;
+        m_size = s_encode.size(header);
         m_width = m_lbound = m_ubound = 0;
         m_is_inner_bptree_node = get_is_inner_bptree_node_from_header(header);
         m_has_refs = get_hasrefs_from_header(header);
@@ -765,14 +763,14 @@ size_t Array::size() const noexcept
 bool Array::encode_array(Array& arr) const
 {
     if (!is_encoded() && m_encoding == NodeHeader::Encoding::WTypBits) {
-        return ArrayEncode::encode(*this, arr);
+        return s_encode.encode(*this, arr);
     }
     return false;
 }
 
 bool Array::decode_array(Array& arr) const
 {
-    return arr.is_encoded() ? arr.m_encode->decode(arr) : false;
+    return arr.is_encoded() ? s_encode.decode(arr) : false;
 }
 
 bool Array::is_encoded() const
@@ -796,18 +794,18 @@ bool Array::try_decode()
 
 int64_t Array::get_encoded(size_t ndx) const noexcept
 {
-    return m_encode->get(*this, ndx);
+    return s_encode.get(*this, ndx);
 }
 
 void Array::set_encoded(size_t ndx, int64_t val)
 {
-    m_encode->set_direct(*this, ndx, val);
+    s_encode.set_direct(*this, ndx, val);
 }
 
 int64_t Array::sum(size_t start, size_t end) const
 {
     if (is_encoded())
-        return m_encode->sum(*this, start, end);
+        return s_encode.sum(*this, start, end);
     REALM_TEMPEX(return sum, m_width, (start, end));
 }
 
@@ -820,7 +818,7 @@ int64_t Array::sum(size_t start, size_t end) const
     REALM_ASSERT_EX(end <= m_size && start <= end, start, end, m_size);
 
     if (w == 0)
-        return is_encoded() ? m_encode->sum(*this, start, end) : 0;
+        return is_encoded() ? s_encode.sum(*this, start, end) : 0;
 
     if (start == end)
         return 0;
@@ -1385,7 +1383,7 @@ void Array::get_chunk(size_t ndx, int64_t res[8]) const noexcept
 
 void Array::get_chunk_encoded(size_t ndx, int64_t res[8]) const noexcept
 {
-    m_encode->get_chunk(*this, ndx, res);
+    s_encode.get_chunk(*this, ndx, res);
 }
 
 template <>
@@ -1521,15 +1519,14 @@ size_t Array::upper_bound_int(int64_t value) const noexcept
 
 size_t Array::find_first(int64_t value, size_t start, size_t end) const
 {
-    // if (is_encoded()) return ArrayEncode::find_first(*this, value, start, end);
     return find_first<Equal>(value, start, end);
 }
 
 int_fast64_t Array::get(const char* header, size_t ndx) noexcept
 {
-    if (NodeHeader::get_kind(header) == 'B') {
-        return ArrayEncode::get(header, ndx);
-    }
+    if (s_encode.is_encoded(header))
+        return s_encode.get(header, ndx);
+
     auto sz = get_size_from_header(header);
     REALM_ASSERT(ndx < sz);
     const char* data = get_data_from_header(header);
