@@ -449,7 +449,7 @@ util::Future<SubscriptionSet::State> SubscriptionSet::get_state_change_notificat
     }
 
     State cur_state = state();
-    StringData err_str = error_str();
+    std::string err_str = error_str();
 
     // If there have been writes to the database since this SubscriptionSet was created, we need to fetch
     // the updated version from the DB to know the true current state and maybe return a ready future.

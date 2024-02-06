@@ -964,6 +964,30 @@ Query& Query::fulltext(ColKey column_key, StringData value, const LinkMap& link_
     return *this;
 }
 
+Query& Query::greater(ColKey column_key, StringData value)
+{
+    add_condition<Greater>(column_key, value);
+    return *this;
+}
+
+Query& Query::greater_equal(ColKey column_key, StringData value)
+{
+    add_condition<GreaterEqual>(column_key, value);
+    return *this;
+}
+
+Query& Query::less(ColKey column_key, StringData value)
+{
+    add_condition<Less>(column_key, value);
+    return *this;
+}
+
+Query& Query::less_equal(ColKey column_key, StringData value)
+{
+    add_condition<LessEqual>(column_key, value);
+    return *this;
+}
+
 // Aggregates =================================================================================
 
 bool Query::eval_object(const Obj& obj) const

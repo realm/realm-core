@@ -17,6 +17,7 @@
 #include <iostream>
 #include <memory>
 #include <mutex>
+#include <optional>
 
 #include <realm/object-store/keypath_helpers.hpp>
 #include <realm/object-store/results.hpp>

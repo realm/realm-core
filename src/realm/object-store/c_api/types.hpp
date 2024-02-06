@@ -569,6 +569,19 @@ struct realm_results : realm::c_api::WrapC, realm::Results {
 };
 
 #if REALM_ENABLE_SYNC
+
+struct realm_sync_user_subscription_token : realm::c_api::WrapC {
+    using Token = realm::Subscribable<realm::SyncUser>::Token;
+    realm_sync_user_subscription_token(std::shared_ptr<realm::SyncUser> user, Token&& token)
+        : user(user)
+        , token(std::move(token))
+    {
+    }
+    ~realm_sync_user_subscription_token();
+    std::shared_ptr<realm::SyncUser> user;
+    Token token;
+};
+
 struct realm_async_open_task_progress_notification_token : realm::c_api::WrapC {
     realm_async_open_task_progress_notification_token(std::shared_ptr<realm::AsyncOpenTask> task, uint64_t token)
         : task(task)
