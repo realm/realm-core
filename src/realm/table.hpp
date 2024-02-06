@@ -1054,7 +1054,7 @@ public:
         return link(backlink_col_key);
     }
 
-    std::unique_ptr<Subexpr> column(const std::string&);
+    std::unique_ptr<Subexpr> column(const std::string&, bool has_path);
     std::unique_ptr<Subexpr> subquery(Query subquery);
 
     template <class T>
