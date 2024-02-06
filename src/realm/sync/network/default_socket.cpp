@@ -410,7 +410,9 @@ void DefaultWebSocketImpl::initiate_ssl_handshake()
                 m_ssl_context->use_verify_file(*m_endpoint.ssl_trust_certificate_path); // Throws
             }
             else if (!m_endpoint.ssl_verify_callback) {
+#if REALM_USE_SYSTEM_OPENSSL_PATHS
                 m_ssl_context->use_default_verify(); // Throws
+#endif
 #if REALM_INCLUDE_CERTS
                 // On platforms like Windows or Android where OpenSSL is not normally found
                 // `use_default_verify()` won't actually be able to load any default certificates.
