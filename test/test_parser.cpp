@@ -5304,6 +5304,10 @@ TEST(Parser_NestedMixedDictionaryList)
     Obj george = persons->create_object_with_primary_key("George");
     george.set(col_self, george.get_key());
     george.set_collection(col, CollectionType::List);
+    auto list_george = george.get_list<Mixed>(col);
+    list_george.add(1);
+    list_george.add(2);
+    list_george.add(3);
 
     auto q = persons->column<Mixed>(col).path({"instruments", 0, "strings"}) == 6;
     CHECK_EQUAL(q.count(), 1);
@@ -5318,10 +5322,14 @@ TEST(Parser_NestedMixedDictionaryList)
     verify_query(test_context, persons, "properties[*][0].legs  == 4", 1); // Lady the cat
     verify_query(test_context, persons, "properties[*][*].legs  == 0", 1); // carl the snake
     verify_query(test_context, persons, "properties[*][*][*] > 10", 2);    // carl the snake and martin the guitar
+    verify_query(test_context, persons, "properties[*] == {3, 2, 1}", 0);
+    verify_query(test_context, persons, "properties[*] == {1, 2, 3}", 1);
+    verify_query(test_context, persons, "ANY properties[*] == 2", 1);
+    verify_query(test_context, persons, "NONE properties[*] == 2", 2);
     verify_query(test_context, persons, "properties.@keys == 'instruments'", 2);
     verify_query(test_context, persons, "properties.@keys == 'pets'", 2);
     verify_query(test_context, persons, "properties.@keys == 'tickets'", 1);
-    verify_query(test_context, persons, "properties.@size == 3", 1);
+    verify_query(test_context, persons, "properties.@size == 3", 2);
     verify_query(test_context, persons, "properties.instruments.@size == 2", 1);
     verify_query(test_context, persons, "properties.@type == 'object'", 2);
     verify_query(test_context, persons, "properties.@type == 'array'", 1);

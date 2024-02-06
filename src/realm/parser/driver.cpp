@@ -1007,7 +1007,7 @@ std::unique_ptr<Subexpr> PropertyNode::visit(ParserDriver* drv, DataType)
                     // of a list property
                     path->path_elems.pop_back();
                     const std::string& prop = path->path_elems.back().get_key();
-                    std::unique_ptr<Subexpr> subexpr{path->visit(drv, comp_type).column(prop)};
+                    std::unique_ptr<Subexpr> subexpr{path->visit(drv, comp_type).column(prop, false)};
                     if (auto list = dynamic_cast<ColumnListBase*>(subexpr.get())) {
                         if (auto length_expr = list->get_element_length())
                             return length_expr;
@@ -1867,7 +1867,8 @@ auto ParserDriver::cmp(const std::vector<ExpressionNode*>& values) -> std::pair<
 auto ParserDriver::column(LinkChain& link_chain, PathNode* path) -> SubexprPtr
 {
     if (path->at_end()) {
-        // This is a link property. However Columns<Link> does not handle @keys and indexes
+        // This is a link property. We can optimize by usingColumns<Link>.
+        // However Columns<Link> does not handle @keys and indexes
         auto extended_col_key = link_chain.m_link_cols.back();
         if (!extended_col_key.has_index()) {
             return link_chain.create_subexpr<Link>(ColKey(extended_col_key));
@@ -1877,7 +1878,7 @@ auto ParserDriver::column(LinkChain& link_chain, PathNode* path) -> SubexprPtr
         --path->current_path_elem;
     }
     auto identifier = m_mapping.translate(link_chain, path->next_identifier());
-    if (auto col = link_chain.column(identifier)) {
+    if (auto col = link_chain.column(identifier, !path->at_end())) {
         return col;
     }
     throw InvalidQueryError(
@@ -1991,17 +1992,11 @@ Query Table::query(const std::string& query_string, query_parser::Arguments& arg
     return driver.result->visit(&driver).set_ordering(driver.ordering->visit(&driver));
 }
 
-std::unique_ptr<Subexpr> LinkChain::column(const std::string& col)
+std::unique_ptr<Subexpr> LinkChain::column(const std::string& col, bool has_path)
 {
     auto col_key = m_current_table->get_column_key(col);
     if (!col_key) {
         return nullptr;
-    }
-    size_t list_count = 0;
-    for (ColKey link_key : m_link_cols) {
-        if (link_key.is_collection() || link_key.get_type() == col_type_BackLink) {
-            list_count++;
-        }
     }
 
     auto col_type{col_key.get_type()};
@@ -2070,9 +2065,19 @@ std::unique_ptr<Subexpr> LinkChain::column(const std::string& col)
         }
     }
     else {
-        if (m_comparison_type && list_count == 0) {
-            throw InvalidQueryError(util::format("The keypath following '%1' must contain a list",
-                                                 expression_cmp_type_to_str(m_comparison_type)));
+        // Having a path implies a collection
+        if (m_comparison_type && !has_path) {
+            bool has_list = false;
+            for (ColKey link_key : m_link_cols) {
+                if (link_key.is_collection() || link_key.get_type() == col_type_BackLink) {
+                    has_list = true;
+                    break;
+                }
+            }
+            if (!has_list) {
+                throw InvalidQueryError(util::format("The keypath following '%1' must contain a list",
+                                                     expression_cmp_type_to_str(m_comparison_type)));
+            }
         }
 
         switch (col_type) {
