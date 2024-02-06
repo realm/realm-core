@@ -8,7 +8,7 @@
 ### Fixed
 * Uploading the changesets recovered during an automatic client reset recovery may lead to 'Bad server version' errors and a new client reset. ([#7279](https://github.com/realm/realm-core/issues/7279), since v13.24.1)
 * Fixed invalid data in error reason string when registering a subscription change notification after the subscription has already failed. ([#6839](https://github.com/realm/realm-core/issues/6839), since v11.8.0)
-* Fixed crash in fulltest index using prefix search with no matches ([#7309](https://github.com/realm/realm-core/issues/7309), since v13.18.0)
+* Fixed crash in fulltext index using prefix search with no matches ([#7309](https://github.com/realm/realm-core/issues/7309), since v13.18.0)
 
 ### Breaking changes
 * None.
