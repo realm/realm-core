@@ -326,12 +326,14 @@ void Context::ssl_use_private_key_file(const std::string& path, std::error_code&
 
 void Context::ssl_use_default_verify(std::error_code& ec)
 {
+#if REALM_USE_SYSTEM_OPENSSL_PATHS
     ERR_clear_error();
     int ret = SSL_CTX_set_default_verify_paths(m_ssl_ctx);
     if (ret != 1) {
         ec = std::error_code(int(ERR_get_error()), openssl_error_category);
         return;
     }
+#endif
     ec = std::error_code();
 }
 
