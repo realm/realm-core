@@ -19,6 +19,8 @@
 #ifndef REALM_ARRAY_ENCODE_HPP
 #define REALM_ARRAY_ENCODE_HPP
 
+#include <cstdint>
+#include <cstddef>
 #include <vector>
 
 namespace realm {
