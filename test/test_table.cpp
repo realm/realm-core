@@ -3434,7 +3434,7 @@ NONCONCURRENT_TEST(Table_QuickSort2)
 
 NONCONCURRENT_TEST(Table_object_timestamp)
 {
-#ifdef PERFORMACE_TESTING
+#if !defined(REALM_DEBUG) && defined(PERFORMANCE_TESTING)
     int nb_rows = 10'000'000;
     int num_runs = 100;
 #else
@@ -3448,7 +3448,7 @@ NONCONCURRENT_TEST(Table_object_timestamp)
 
     CALLGRIND_START_INSTRUMENTATION;
 
-    std::cout << nb_rows << " rows - sequential" << std::endl;
+    std::cout << nb_rows << " rows - timestamps" << std::endl;
 
     {
         WriteTransaction wt(sg);
@@ -3490,7 +3490,7 @@ NONCONCURRENT_TEST(Table_object_timestamp)
 
 NONCONCURRENT_TEST(Table_object_search)
 {
-#ifdef PERFORMACE_TESTING
+#if !defined(REALM_DEBUG) && defined(PERFORMANCE_TESTING)
     int nb_rows = 10'000'000;
     int num_runs = 100;
 #else
