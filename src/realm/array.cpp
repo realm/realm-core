@@ -201,36 +201,6 @@ Array::Array(Allocator& allocator) noexcept
 {
 }
 
-template <size_t w>
-int64_t Array::get(size_t ndx) const noexcept
-{
-    REALM_ASSERT_DEBUG(is_attached());
-    return get_universal<w>(m_data, ndx);
-}
-
-int64_t Array::get(size_t ndx) const noexcept
-{
-    REALM_ASSERT_DEBUG(is_attached());
-    REALM_ASSERT_DEBUG_EX(ndx < m_size, ndx, m_size);
-    return (this->*m_getter)(ndx);
-
-    // Two ideas that are not efficient but may be worth looking into again:
-    /*
-        // Assume correct width is found early in REALM_TEMPEX, which is the case for B tree offsets that
-        // are probably either 2^16 long. Turns out to be 25% faster if found immediately, but 50-300% slower
-        // if found later
-        REALM_TEMPEX(return get, (ndx));
-    */
-    /*
-        // Slightly slower in both of the if-cases. Also needs an matchcount m_size check too, to avoid
-        // reading beyond array.
-        if (m_width >= 8 && m_size > ndx + 7)
-            return get<64>(ndx >> m_shift) & m_widthmask;
-        else
-            return (this->*(m_vtable->getter))(ndx);
-    */
-}
-
 size_t Array::bit_width(int64_t v)
 {
     // FIXME: Assuming there is a 64-bit CPU reverse bitscan
@@ -702,7 +672,6 @@ void Array::truncate(size_t new_size)
     }
 }
 
-
 void Array::truncate_and_destroy_children(size_t new_size)
 {
     REALM_ASSERT(is_attached());
@@ -731,7 +700,6 @@ void Array::truncate_and_destroy_children(size_t new_size)
     }
 }
 
-
 void Array::do_ensure_minimum_width(int_fast64_t value)
 {
     // Make room for the new value
@@ -754,9 +722,8 @@ void Array::do_ensure_minimum_width(int_fast64_t value)
 size_t Array::size() const noexcept
 {
     // in case the array is in compressed format. Never read directly
-    // from the header the size, since during compaction the memory can
-    // be reclaimed, while in a write transaction.
-    // For compressed arrays m_size should always be kept updated
+    // from the header the size, since it will result very likely in a cache miss.
+    // For compressed arrays m_size should always be kept updated, due to init_from_mem
     return m_size;
 }
 
@@ -1524,7 +1491,7 @@ size_t Array::find_first(int64_t value, size_t start, size_t end) const
 
 int_fast64_t Array::get(const char* header, size_t ndx) noexcept
 {
-    if (s_encode.is_encoded(header))
+    if (NodeHeader::get_kind(header) == 'B')
         return s_encode.get(header, ndx);
 
     auto sz = get_size_from_header(header);

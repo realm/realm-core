@@ -20,6 +20,7 @@
 #define REALM_ARRAY_PACKED_HPP
 
 #include <realm/array_encode.hpp>
+#include <realm/node_header.hpp>
 
 namespace realm {
 
@@ -30,20 +31,22 @@ namespace realm {
 class Array;
 class ArrayPacked {
 public:
-    bool encode(const Array&, Array&, size_t, size_t) const;
+    // encoding/decoding
+    void init_array(char* h, uint8_t flags, size_t v_width, size_t v_size) const;
+    void copy_data(const Array&, Array&) const;
+    std::vector<int64_t> fetch_signed_values_from_encoded_array(const Array&) const;
+    NodeHeader::Encoding get_encoding() const;
+    // get or set
+    static int64_t get(const char*, size_t);
+    void get_chunk(const char* h, size_t ndx, int64_t res[8]) const;
+    void set_direct(const char*, size_t, int64_t) const;
+    // query
     int64_t sum(const Array&, size_t start, size_t end) const;
     template <typename F>
-    size_t find_first(const Array&, int64_t, size_t, size_t, F);
-    void set_direct(const char*, size_t, int64_t) const;
-    void get_chunk(const char*, size_t ndx, int64_t res[8]) const;
-    int64_t get(const char*, size_t) const;
-    std::vector<int64_t> fetch_signed_values_from_packed_array(const char*) const;
-    static bool is_packed(const char*);
+    size_t find_first(const Array&, int64_t, size_t, size_t, F f);
 
 private:
-    static bool get_encode_info(const char*, size_t&, size_t&);
-    static void setup_array_packed_format(const Array&, Array&, size_t, size_t);
-    static void copy_into_packed_array(const Array&, Array&);
+    static void get_encode_info(const char*, size_t&, size_t&);
 };
 
 

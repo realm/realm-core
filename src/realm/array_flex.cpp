@@ -31,62 +31,48 @@
 
 using namespace realm;
 
-bool ArrayFlex::encode(const Array& origin, Array& arr, size_t bytes, const std::vector<int64_t>& values,
-                       const std::vector<size_t>& indices, size_t v_width, size_t ndx_width) const
+NodeHeader::Encoding ArrayFlex::get_encoding() const
 {
-    setup_array_flex_format(origin, arr, bytes, values, indices, v_width, ndx_width);
-    copy_into_flex_array(arr, values, indices);
-    return true;
+    return NodeHeader::Encoding::Flex;
 }
 
-void ArrayFlex::setup_array_flex_format(const Array& origin, Array& arr, size_t byte_size,
-                                        const std::vector<int64_t>& values, const std::vector<size_t>& indices,
-                                        size_t v_width, size_t ndx_width)
+void ArrayFlex::init_array(char* h, uint8_t flags, size_t v_width, size_t ndx_width, size_t v_size,
+                           size_t ndx_size) const
 {
     using Encoding = NodeHeader::Encoding;
-    uint8_t flags = NodeHeader::get_flags(origin.get_header()); // take flags from origi array
-    Allocator& allocator = arr.get_alloc();
-    auto mem = allocator.alloc(byte_size);
-    auto header = mem.get_addr();
-    NodeHeader::init_header(header, 'B', Encoding::Flex, flags, v_width, ndx_width, values.size(), indices.size());
-    NodeHeader::set_capacity_in_header(byte_size, (char*)header);
-    arr.init_from_mem(mem);
-    REALM_ASSERT_DEBUG(arr.m_ref == mem.get_ref());
-    REALM_ASSERT_DEBUG(NodeHeader::get_kind(header) == 'B');
-    REALM_ASSERT_DEBUG(NodeHeader::get_encoding(header) == Encoding::Flex);
+    NodeHeader::init_header(h, 'B', Encoding::Flex, flags, v_width, ndx_width, v_size, ndx_size);
 }
 
-void ArrayFlex::copy_into_flex_array(Array& arr, const std::vector<int64_t>& values,
-                                     const std::vector<size_t>& indices)
+void ArrayFlex::copy_data(const Array& arr, const std::vector<int64_t>& values,
+                          const std::vector<size_t>& indices) const
 {
+    using Encoding = NodeHeader::Encoding;
     REALM_ASSERT_DEBUG(arr.is_attached());
-    using Encoding = NodeHeader::Encoding;
-    auto header = arr.get_header();
-    auto v_width = NodeHeader::get_elementA_size<Encoding::Flex>(header);
-    auto ndx_width = NodeHeader::get_elementB_size<Encoding::Flex>(header);
+    REALM_ASSERT_DEBUG(arr.m_kind == 'B');
+    REALM_ASSERT_DEBUG(arr.m_encoding == Encoding::Flex);
+
+    auto h = arr.get_header();
+    auto v_width = NodeHeader::get_elementA_size<Encoding::Flex>(h);
+    auto ndx_width = NodeHeader::get_elementB_size<Encoding::Flex>(h);
     auto v_size = values.size();
-    // fill data
-    auto data = (uint64_t*)NodeHeader::get_data_from_header(arr.get_header());
+    auto data = (uint64_t*)arr.m_data;
     auto offset = static_cast<size_t>(v_size * v_width);
     bf_iterator it_value{data, 0, v_width, v_width, 0};
     bf_iterator it_index{data, offset, ndx_width, ndx_width, 0};
     for (size_t i = 0; i < values.size(); ++i) {
         it_value.set_value(values[i]);
-        auto v = sign_extend_field(v_width, it_value.get_value());
-        REALM_ASSERT_DEBUG(v == values[i]);
+        REALM_ASSERT_DEBUG(sign_extend_field(v_width, it_value.get_value()) == values[i]);
         ++it_value;
     }
     for (size_t i = 0; i < indices.size(); ++i) {
-        auto v = sign_extend_field(v_width, read_bitfield(data, indices[i] * v_width, v_width));
-        REALM_ASSERT_DEBUG(values[indices[i]] == v);
+        REALM_ASSERT_DEBUG(values[indices[i]] ==
+                           sign_extend_field(v_width, read_bitfield(data, indices[i] * v_width, v_width)));
         it_index.set_value(indices[i]);
         REALM_ASSERT_DEBUG(indices[i] == it_index.get_value());
-        v = sign_extend_field(v_width, read_bitfield(data, indices[i] * v_width, v_width));
-        REALM_ASSERT_DEBUG(values[indices[i]] == v);
+        REALM_ASSERT_DEBUG(values[indices[i]] ==
+                           sign_extend_field(v_width, read_bitfield(data, indices[i] * v_width, v_width)));
         ++it_index;
     }
-    REALM_ASSERT_DEBUG(arr.get_kind(header) == 'B');
-    REALM_ASSERT_DEBUG(arr.get_encoding(header) == Encoding::Flex);
 }
 
 void ArrayFlex::set_direct(const char* h, size_t ndx, int64_t value) const
@@ -138,30 +124,11 @@ void ArrayFlex::get_chunk(const char* h, size_t ndx, int64_t res[8]) const
     }
 }
 
-int64_t ArrayFlex::sum(const Array& arr, size_t start, size_t end) const
-{
-    REALM_ASSERT_DEBUG(arr.is_attached());
-    const auto h = arr.get_header();
-    size_t v_width, ndx_width, v_size, ndx_size;
-    get_encode_info(h, v_width, ndx_width, v_size, ndx_size);
-    REALM_ASSERT_DEBUG(ndx_size >= start && ndx_size <= end);
-    const auto data = (uint64_t*)NodeHeader::get_data_from_header(arr.get_header());
-    const auto offset = v_size * v_width + (start * ndx_width);
-    bf_iterator index_iterator{data, offset, ndx_width, ndx_width, 0};
-    int64_t total_sum = 0;
-    for (size_t i = start; i < end; ++i) {
-        const auto offset = static_cast<size_t>(index_iterator.get_value() * v_width);
-        total_sum += *(data + offset);
-        ++index_iterator;
-    }
-    return total_sum;
-}
-
 bool inline ArrayFlex::get_encode_info(const char* h, size_t& v_width, size_t& ndx_width, size_t& v_size,
                                        size_t& ndx_size)
 {
-    REALM_ASSERT_DEBUG(is_flex(h));
     using Encoding = NodeHeader::Encoding;
+    REALM_ASSERT_DEBUG(NodeHeader::get_encoding(h) == Encoding::Flex);
     v_size = NodeHeader::get_arrayA_num_elements<Encoding::Flex>(h);
     ndx_size = NodeHeader::get_arrayB_num_elements<Encoding::Flex>(h);
     v_width = NodeHeader::get_elementA_size<Encoding::Flex>(h);
@@ -169,14 +136,16 @@ bool inline ArrayFlex::get_encode_info(const char* h, size_t& v_width, size_t& n
     return true;
 }
 
-std::vector<int64_t> ArrayFlex::fetch_signed_values_from_encoded_array(const char* h) const
+std::vector<int64_t> ArrayFlex::fetch_signed_values_from_encoded_array(const Array& arr) const
 {
-    REALM_ASSERT_DEBUG(is_flex(h));
+    REALM_ASSERT_DEBUG(arr.is_attached());
+    REALM_ASSERT_DEBUG(arr.m_encoding == NodeHeader::Encoding::Flex);
+    const auto h = arr.get_header();
     std::size_t v_size, ndx_size, v_width, ndx_width;
     get_encode_info(h, v_width, ndx_width, v_size, ndx_size);
     std::vector<int64_t> values;
     values.reserve(ndx_size);
-    auto data = (uint64_t*)NodeHeader::get_data_from_header(h);
+    auto data = (uint64_t*)arr.m_data;
     const auto offset = v_size * v_width;
     bf_iterator index_iterator{data, offset, ndx_width, ndx_width, 0};
     for (size_t i = 0; i < ndx_size; ++i) {
@@ -190,15 +159,31 @@ std::vector<int64_t> ArrayFlex::fetch_signed_values_from_encoded_array(const cha
     return values;
 }
 
-bool ArrayFlex::is_flex(const char* h)
+int64_t ArrayFlex::sum(const Array& arr, size_t start, size_t end) const
 {
-    REALM_ASSERT_DEBUG(NodeHeader::get_kind(h) == 'B');
-    return NodeHeader::get_encoding(h) == NodeHeader::Encoding::Flex;
+    REALM_ASSERT_DEBUG(arr.is_attached());
+    size_t v_width, ndx_width, v_size, ndx_size;
+    get_encode_info(arr.get_header(), v_width, ndx_width, v_size, ndx_size);
+    REALM_ASSERT_DEBUG(ndx_size >= start && ndx_size <= end);
+    const auto data = (uint64_t*)arr.m_data;
+    ;
+    const auto offset = v_size * v_width + (start * ndx_width);
+    bf_iterator index_iterator{data, offset, ndx_width, ndx_width, 0};
+    int64_t total_sum = 0;
+    for (size_t i = start; i < end; ++i) {
+        const auto offset = static_cast<size_t>(index_iterator.get_value() * v_width);
+        total_sum += *(data + offset);
+        ++index_iterator;
+    }
+    return total_sum;
 }
+
 
 template <typename F>
 size_t ArrayFlex::find_first(const Array& arr, int64_t key, size_t start, size_t end, F cmp)
 {
+    REALM_ASSERT_DEBUG(arr.is_attached());
+
     size_t v_width, v_size, ndx_width, ndx_size;
     const auto h = arr.get_header();
     get_encode_info(h, v_width, v_size, ndx_width, ndx_size);

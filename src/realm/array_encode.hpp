@@ -33,11 +33,11 @@ public:
     bool decode(Array&) const;
 
     // init from mem B
-    size_t size(const char*);
+    size_t size(const char* header);
 
     // get/set
-    int64_t get(const Array&, size_t) const;
     static int64_t get(const char*, size_t);
+    int64_t get(const Array&, size_t) const;
     void get_chunk(const Array&, size_t ndx, int64_t res[8]) const;
     void set_direct(const Array&, size_t, int64_t) const;
 
@@ -46,16 +46,15 @@ public:
     size_t find_first(const Array&, int64_t, size_t, size_t, F) const;
     int64_t sum(const Array&, size_t start, size_t end) const;
 
-    static bool is_encoded(const char*);
-
 private:
-    inline bool is_packed(const char*) const;
-    inline bool is_flex(const char*) const;
+    inline bool is_packed(const Array&) const;
+    inline bool is_flex(const Array&) const;
 
-    void copy_direct(char* data, size_t w, size_t ndx, int64_t v) const;
+    void set(char* data, size_t w, size_t ndx, int64_t v) const;
     size_t flex_encoded_array_size(const std::vector<int64_t>&, const std::vector<size_t>&, size_t&, size_t&) const;
     size_t packed_encoded_array_size(std::vector<int64_t>&, size_t, size_t&) const;
     void try_encode(const Array&, std::vector<int64_t>&, std::vector<size_t>&) const;
+    bool always_encode(const Array&, Array&, bool) const; // for testing
 };
 
 } // namespace realm

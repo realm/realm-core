@@ -175,10 +175,10 @@ public:
     template <size_t w>
     void set(size_t ndx, int64_t value);
 
-    int64_t get(size_t ndx) const noexcept;
+    inline int64_t get(size_t ndx) const noexcept;
 
     template <size_t w>
-    int64_t get(size_t ndx) const noexcept;
+    inline int64_t get(size_t ndx) const noexcept;
 
     void get_chunk(size_t ndx, int64_t res[8]) const noexcept;
 
@@ -588,6 +588,36 @@ private:
 
 // Implementation:
 
+inline int64_t Array::get(size_t ndx) const noexcept
+{
+    REALM_ASSERT_DEBUG(is_attached());
+    REALM_ASSERT_DEBUG_EX(ndx < m_size, ndx, m_size);
+    return (this->*m_getter)(ndx);
+
+    // Two ideas that are not efficient but may be worth looking into again:
+    /*
+        // Assume correct width is found early in REALM_TEMPEX, which is the case for B tree offsets that
+        // are probably either 2^16 long. Turns out to be 25% faster if found immediately, but 50-300% slower
+        // if found later
+        REALM_TEMPEX(return get, (ndx));
+    */
+    /*
+        // Slightly slower in both of the if-cases. Also needs an matchcount m_size check too, to avoid
+        // reading beyond array.
+        if (m_width >= 8 && m_size > ndx + 7)
+            return get<64>(ndx >> m_shift) & m_widthmask;
+        else
+            return (this->*(m_vtable->getter))(ndx);
+    */
+}
+
+
+template <size_t w>
+inline int64_t Array::get(size_t ndx) const noexcept
+{
+    REALM_ASSERT_DEBUG(is_attached());
+    return get_universal<w>(m_data, ndx);
+}
 
 constexpr inline int_fast64_t Array::lbound_for_width(size_t width) noexcept
 {

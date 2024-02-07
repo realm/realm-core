@@ -31,47 +31,52 @@
 
 using namespace realm;
 
-bool ArrayPacked::encode(const Array& origin, Array& dst, size_t byte_size, size_t v_width) const
-{
-    setup_array_packed_format(origin, dst, byte_size, v_width);
-    copy_into_packed_array(origin, dst);
-    return true;
-}
-
-void ArrayPacked::setup_array_packed_format(const Array& origin, Array& arr, size_t byte_size, size_t v_width)
+void ArrayPacked::init_array(char* h, uint8_t flags, size_t v_width, size_t v_size) const
 {
     using Encoding = NodeHeader::Encoding;
-    uint8_t flags = NodeHeader::get_flags(origin.get_header()); // take flags from origi array
-    Allocator& allocator = arr.get_alloc();
-    auto mem = allocator.alloc(byte_size);
-    auto header = mem.get_addr();
-    NodeHeader::init_header(header, 'B', Encoding::Packed, flags, v_width, origin.size());
-    NodeHeader::set_capacity_in_header(byte_size, (char*)header);
-    arr.init_from_mem(mem);
-    REALM_ASSERT_DEBUG(arr.m_ref == mem.get_ref());
-    REALM_ASSERT_DEBUG(NodeHeader::get_kind(header) == 'B');
-    REALM_ASSERT_DEBUG(NodeHeader::get_encoding(header) == Encoding::Packed);
+    NodeHeader::init_header((char*)h, 'B', Encoding::Packed, flags, v_width, v_size);
 }
 
-void ArrayPacked::copy_into_packed_array(const Array& origin, Array& arr)
+void ArrayPacked::copy_data(const Array& origin, Array& arr) const
 {
+    using Encoding = NodeHeader::Encoding;
     REALM_ASSERT_DEBUG(arr.is_attached());
-    using Encoding = NodeHeader::Encoding;
-    auto header = arr.get_header();
-    auto v_width = NodeHeader::get_element_size<Encoding::Packed>(header);
-    auto v_size = origin.size();
-    REALM_ASSERT_DEBUG(v_size == NodeHeader::get_num_elements<Encoding::Packed>(header));
-    auto data = (uint64_t*)NodeHeader::get_data_from_header(arr.get_header());
+    REALM_ASSERT_DEBUG(arr.m_kind == 'B');
+    REALM_ASSERT_DEBUG(arr.m_encoding == Encoding::Packed);
+    const auto h = arr.get_header();
+    size_t v_width, v_size;
+    get_encode_info(h, v_width, v_size);
+    auto data = (uint64_t*)arr.m_data;
     bf_iterator it_value{data, 0, v_width, v_width, 0};
     for (size_t i = 0; i < v_size; ++i) {
         it_value.set_value(origin.get(i));
-        auto v = sign_extend_field(v_width, it_value.get_value());
-        REALM_ASSERT_DEBUG(v == origin.get(i));
+        REALM_ASSERT_DEBUG(sign_extend_field(v_width, it_value.get_value()) == origin.get(i));
         ++it_value;
     }
-    REALM_ASSERT_DEBUG(arr.get_kind(header) == 'B');
-    REALM_ASSERT_DEBUG(arr.get_encoding(header) == Encoding::Packed);
 }
+
+NodeHeader::Encoding ArrayPacked::get_encoding() const
+{
+    return NodeHeader::Encoding::Packed;
+}
+
+std::vector<int64_t> ArrayPacked::fetch_signed_values_from_encoded_array(const Array& arr) const
+{
+    size_t v_width, v_size;
+    get_encode_info(arr.get_header(), v_width, v_size);
+    std::vector<int64_t> values;
+    values.reserve(v_size);
+    auto data = (uint64_t*)arr.m_data;
+    bf_iterator it_value{data, 0, v_width, v_width, 0};
+    for (size_t i = 0; i < v_size; ++i) {
+        const auto value = it_value.get_value();
+        const auto ivalue = sign_extend_field(v_width, value);
+        values.push_back(ivalue);
+        ++it_value;
+    }
+    return values;
+}
+
 
 void ArrayPacked::set_direct(const char* h, size_t ndx, int64_t value) const
 {
@@ -83,7 +88,7 @@ void ArrayPacked::set_direct(const char* h, size_t ndx, int64_t value) const
     it_value.set_value(value);
 }
 
-int64_t ArrayPacked::get(const char* h, size_t ndx) const
+int64_t ArrayPacked::get(const char* h, size_t ndx)
 {
     using Encoding = NodeHeader::Encoding;
     REALM_ASSERT_DEBUG(NodeHeader::get_kind(h) == 'B');
@@ -105,7 +110,6 @@ void ArrayPacked::get_chunk(const char* h, size_t ndx, int64_t res[8]) const
     REALM_ASSERT_DEBUG(ndx < v_size);
     auto sz = 8;
     std::memset(res, 0, sizeof(int64_t) * sz);
-
     auto supposed_end = ndx + sz;
     size_t i = ndx;
     size_t index = 0;
@@ -124,7 +128,7 @@ int64_t ArrayPacked::sum(const Array& arr, size_t start, size_t end) const
     const auto* h = arr.get_header();
     get_encode_info(h, v_width, v_size);
     REALM_ASSERT_DEBUG(v_size >= start && v_size <= end);
-    const auto data = (uint64_t*)NodeHeader::get_data_from_header(h);
+    const auto data = (uint64_t*)arr.m_data;
     int64_t total_sum = 0;
     for (size_t i = start; i < end; ++i) {
         const auto offset = static_cast<size_t>(i * v_width);
@@ -133,37 +137,13 @@ int64_t ArrayPacked::sum(const Array& arr, size_t start, size_t end) const
     return total_sum;
 }
 
-bool inline ArrayPacked::get_encode_info(const char* h, size_t& v_width, size_t& v_size)
+void inline ArrayPacked::get_encode_info(const char* h, size_t& v_width, size_t& v_size)
 {
     using Encoding = NodeHeader::Encoding;
     REALM_ASSERT_DEBUG(NodeHeader::get_kind(h) == 'B');
-    REALM_ASSERT_DEBUG(is_packed(h));
+    REALM_ASSERT_DEBUG(NodeHeader::get_encoding(h) == NodeHeader::Encoding::Packed);
     v_width = NodeHeader::get_element_size<Encoding::Packed>(h);
     v_size = NodeHeader::get_num_elements<Encoding::Packed>(h);
-    return true;
-}
-
-std::vector<int64_t> ArrayPacked::fetch_signed_values_from_packed_array(const char* h) const
-{
-    size_t v_width, v_size;
-    get_encode_info(h, v_width, v_size);
-    std::vector<int64_t> values;
-    values.reserve(v_size);
-    auto data = (uint64_t*)NodeHeader::get_data_from_header(h);
-    bf_iterator it_value{data, 0, v_width, v_width, 0};
-    for (size_t i = 0; i < v_size; ++i) {
-        const auto value = it_value.get_value();
-        const auto ivalue = sign_extend_field(v_width, value);
-        values.push_back(ivalue);
-        ++it_value;
-    }
-    return values;
-}
-
-bool ArrayPacked::is_packed(const char* h)
-{
-    REALM_ASSERT_DEBUG(NodeHeader::get_kind(h) == 'B');
-    return NodeHeader::get_encoding(h) == NodeHeader::Encoding::Packed;
 }
 
 template <typename F>
