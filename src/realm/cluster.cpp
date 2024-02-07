@@ -1575,8 +1575,9 @@ ref_type Cluster::typed_write(ref_type ref, _impl::ArrayWriterBase& out, const T
             auto col_key = table.m_leaf_ndx2colkey[j - 1];
             auto col_type = col_key.get_type();
             auto col_attr = col_key.get_attrs();
-            bool compressible =
-                col_type == col_type_Int || col_type == col_type_Link || col_type == col_type_BackLink;
+            bool compressible = col_type == col_type_Int || col_type == col_type_Link ||
+                                col_type == col_type_BackLink || col_type == col_type_ObjectId ||
+                                col_type == col_type_TypedLink || col_type == col_type_UUID;
             // First handle true leafs (not collections or complex leafs)
             if (!leaf.has_refs()) {
                 REALM_ASSERT(col_type != col_type_Mixed && col_type != col_type_Timestamp);
@@ -1589,6 +1590,10 @@ ref_type Cluster::typed_write(ref_type ref, _impl::ArrayWriterBase& out, const T
                 continue;
             }
             // collections or complex type which we want to compress!
+            // collections needs to be handled first since the column types cover both
+            // leafs and collections (for example: a collection of ints will be of col_type_Int)
+            // but have attribute indicating it is a collection. Handling it as a leaf would be
+            // an error).
             REALM_ASSERT(leaf.has_refs());
             auto wtype = leaf.get_wtype_from_header(leaf.get_header());
             REALM_ASSERT(wtype == wtype_Bits);
