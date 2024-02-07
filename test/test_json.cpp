@@ -804,6 +804,8 @@ TEST(Bson_bson)
     char* str = bson_as_canonical_extended_json(bs, &len);
     // std::cout << str << std::endl;
     CHECK(strstr(str, "awesome") != nullptr);
+    bson_free(str);
+    bson_destroy(bs);
 }
 
 } // anonymous namespace
