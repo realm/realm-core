@@ -84,45 +84,11 @@ void SyncManager::configure(std::shared_ptr<app::App> app, std::optional<std::st
             m_metadata_manager = std::make_unique<SyncMetadataManager>(m_file_manager->metadata_path(), encrypt,
                                                                        m_config.custom_encryption_key);
 
-            REALM_ASSERT(m_metadata_manager);
-
-            // Perform our "on next startup" actions such as deleting Realm files
-            // which we couldn't delete immediately due to them being in use
-            std::vector<SyncFileActionMetadata> completed_actions;
-            SyncFileActionMetadataResults file_actions = m_metadata_manager->all_pending_actions();
-            for (size_t i = 0; i < file_actions.size(); i++) {
-                auto file_action = file_actions.get(i);
-                if (run_file_action(file_action)) {
-                    completed_actions.emplace_back(std::move(file_action));
-                }
-            }
-            for (auto& action : completed_actions) {
-                action.remove();
-            }
+            m_metadata_manager->perform_launch_actions(*m_file_manager);
 
             // Load persisted users into the users map.
             for (auto user : m_metadata_manager->all_logged_in_users()) {
                 users_to_add.push_back(std::make_shared<SyncUser>(SyncUser::Private(), user, this));
-            }
-
-            // Delete any users marked for death.
-            std::vector<SyncUserMetadata> dead_users;
-            SyncUserMetadataResults users_to_remove = m_metadata_manager->all_users_marked_for_removal();
-            dead_users.reserve(users_to_remove.size());
-            for (size_t i = 0; i < users_to_remove.size(); i++) {
-                auto user = users_to_remove.get(i);
-                // FIXME: delete user data in a different way? (This deletes a logged-out user's data as soon as the
-                // app launches again, which might not be how some apps want to treat their data.)
-                try {
-                    m_file_manager->remove_user_realms(user.identity(), user.realm_file_paths());
-                    dead_users.emplace_back(std::move(user));
-                }
-                catch (FileAccessError const&) {
-                    continue;
-                }
-            }
-            for (auto& user : dead_users) {
-                user.remove();
             }
         }
     }
@@ -135,46 +101,8 @@ void SyncManager::configure(std::shared_ptr<app::App> app, std::optional<std::st
 bool SyncManager::immediately_run_file_actions(const std::string& realm_path)
 {
     util::CheckedLockGuard lock(m_file_system_mutex);
-    if (!m_metadata_manager) {
-        return false;
-    }
-    if (auto metadata = m_metadata_manager->get_file_action_metadata(realm_path)) {
-        if (run_file_action(*metadata)) {
-            metadata->remove();
-            return true;
-        }
-    }
-    return false;
-}
-
-// Perform a file action. Returns whether or not the file action can be removed.
-bool SyncManager::run_file_action(SyncFileActionMetadata& md)
-{
-    switch (md.action()) {
-        case SyncFileActionMetadata::Action::DeleteRealm:
-            // Delete all the files for the given Realm.
-            return m_file_manager->remove_realm(md.original_name());
-        case SyncFileActionMetadata::Action::BackUpThenDeleteRealm:
-            // Copy the primary Realm file to the recovery dir, and then delete the Realm.
-            auto new_name = md.new_name();
-            auto original_name = md.original_name();
-            if (!util::File::exists(original_name)) {
-                // The Realm file doesn't exist anymore.
-                return true;
-            }
-            if (new_name && !util::File::exists(*new_name) &&
-                m_file_manager->copy_realm_file(original_name, *new_name)) {
-                // We successfully copied the Realm file to the recovery directory.
-                bool did_remove = m_file_manager->remove_realm(original_name);
-                // if the copy succeeded but not the delete, then running BackupThenDelete
-                // a second time would fail, so change this action to just delete the original file.
-                if (did_remove) {
-                    return true;
-                }
-                md.set_action(SyncFileActionMetadata::Action::DeleteRealm);
-                return false;
-            }
-            return false;
+    if (m_metadata_manager) {
+        return m_metadata_manager->perform_file_actions(*m_file_manager, realm_path);
     }
     return false;
 }

@@ -24,6 +24,7 @@
 #include <realm/object-store/property.hpp>
 #include <realm/object-store/results.hpp>
 #include <realm/object-store/schema.hpp>
+#include <realm/object-store/sync/impl/sync_file.hpp>
 #include <realm/object-store/util/uuid.hpp>
 #include <realm/object-store/util/scheduler.hpp>
 #if REALM_PLATFORM_APPLE
@@ -239,6 +240,72 @@ SyncMetadataManager::SyncMetadataManager(std::string path, bool should_encrypt,
     };
 }
 
+void SyncMetadataManager::perform_launch_actions(SyncFileManager& file_manager) const
+{
+    auto realm = get_realm();
+
+    // Perform our "on next startup" actions such as deleting Realm files
+    // which we couldn't delete immediately due to them being in use
+    auto actions_table = ObjectStore::table_for_object_type(realm->read_group(), c_sync_fileActionMetadata);
+    for (auto file_action : *actions_table) {
+        SyncFileActionMetadata md(m_file_action_schema, realm, file_action);
+        run_file_action(file_manager, md);
+    }
+
+    // Delete any users marked for death.
+    auto users_table = ObjectStore::table_for_object_type(realm->read_group(), c_sync_userMetadata);
+    for (auto user : *users_table) {
+        if (user.get<int64_t>(m_user_schema.state_col) != int64_t(SyncUser::State::Removed))
+            continue;
+        try {
+            SyncUserMetadata data(m_user_schema, realm, user);
+            file_manager.remove_user_realms(data.identity(), data.realm_file_paths());
+            realm->begin_transaction();
+            user.remove();
+            realm->commit_transaction();
+        }
+        catch (FileAccessError const&) {
+            continue;
+        }
+    }
+}
+
+bool SyncMetadataManager::run_file_action(SyncFileManager& file_manager, SyncFileActionMetadata& md) const
+{
+    switch (md.action()) {
+        case SyncFileActionMetadata::Action::DeleteRealm:
+            // Delete all the files for the given Realm.
+            if (file_manager.remove_realm(md.original_name())) {
+                md.remove();
+                return true;
+            }
+            break;
+        case SyncFileActionMetadata::Action::BackUpThenDeleteRealm:
+            // Copy the primary Realm file to the recovery dir, and then delete the Realm.
+            auto new_name = md.new_name();
+            auto original_name = md.original_name();
+            if (!util::File::exists(original_name)) {
+                // The Realm file doesn't exist anymore.
+                md.remove();
+                return false;
+            }
+            if (new_name && !util::File::exists(*new_name) &&
+                file_manager.copy_realm_file(original_name, *new_name)) {
+                // We successfully copied the Realm file to the recovery directory.
+                bool did_remove = file_manager.remove_realm(original_name);
+                // if the copy succeeded but not the delete, then running BackupThenDelete
+                // a second time would fail, so change this action to just delete the original file.
+                if (did_remove) {
+                    md.remove();
+                    return true;
+                }
+                md.set_action(SyncFileActionMetadata::Action::DeleteRealm);
+            }
+            break;
+    }
+    return false;
+}
+
 // Some of our string columns are nullable. They never should actually be
 // null as we store "" rather than null when the value isn't present, but
 // be safe and handle it anyway.
@@ -398,18 +465,9 @@ void SyncMetadataManager::make_file_action_metadata(StringData original_name, St
                                                     StringData local_uuid, SyncFileActionMetadata::Action action,
                                                     StringData new_name) const
 {
-    // This function can't use get_shared_realm() because it's called on a
-    // background thread and that's currently not supported by the libuv
-    // implementation of EventLoopSignal
-    auto coordinator = _impl::RealmCoordinator::get_coordinator(m_metadata_config);
-    auto group_ptr = coordinator->begin_read();
-    auto& group = *group_ptr;
-    REALM_ASSERT(typeid(group) == typeid(Transaction));
-    auto& transaction = static_cast<Transaction&>(group);
-    transaction.promote_to_write();
-
-    // Retrieve or create the row for this object.
-    TableRef table = ObjectStore::table_for_object_type(group, c_sync_fileActionMetadata);
+    auto realm = get_realm();
+    realm->begin_transaction();
+    TableRef table = ObjectStore::table_for_object_type(realm->read_group(), c_sync_fileActionMetadata);
 
     auto& schema = m_file_action_schema;
     Obj obj = table->create_object_with_primary_key(original_name);
@@ -418,7 +476,7 @@ void SyncMetadataManager::make_file_action_metadata(StringData original_name, St
     obj.set(schema.idx_action, static_cast<int64_t>(action));
     obj.set(schema.idx_partition, partition_key_value);
     obj.set(schema.idx_user_identity, local_uuid);
-    transaction.commit();
+    realm->commit_transaction();
 }
 
 util::Optional<SyncFileActionMetadata> SyncMetadataManager::get_file_action_metadata(StringData original_name) const
@@ -431,6 +489,14 @@ util::Optional<SyncFileActionMetadata> SyncMetadataManager::get_file_action_meta
         return none;
 
     return SyncFileActionMetadata(std::move(schema), std::move(realm), table->get_object(row_idx));
+}
+
+bool SyncMetadataManager::perform_file_actions(SyncFileManager& file_manager, StringData path) const
+{
+    if (auto md = get_file_action_metadata(path)) {
+        return run_file_action(file_manager, *md);
+    }
+    return false;
 }
 
 std::shared_ptr<Realm> SyncMetadataManager::get_realm() const
@@ -560,11 +626,6 @@ std::string SyncUserMetadata::device_id() const
     return result.is_null() ? "" : std::string(result);
 }
 
-inline SyncUserIdentity user_identity_from_obj(const Obj& obj)
-{
-    return SyncUserIdentity(obj.get<String>(c_sync_user_id), obj.get<String>(c_sync_provider_type));
-}
-
 std::vector<SyncUserIdentity> SyncUserMetadata::identities() const
 {
     REALM_ASSERT(m_realm);
@@ -574,7 +635,7 @@ std::vector<SyncUserIdentity> SyncUserMetadata::identities() const
     std::vector<SyncUserIdentity> identities;
     for (size_t i = 0; i < linklist.size(); i++) {
         auto obj = linklist.get_object(i);
-        identities.push_back(user_identity_from_obj(obj));
+        identities.emplace_back(obj.get<String>(c_sync_user_id), obj.get<String>(c_sync_provider_type));
     }
 
     return identities;

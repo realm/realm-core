@@ -29,6 +29,7 @@
 #include <string>
 
 namespace realm {
+class SyncFileManager;
 class SyncMetadataManager;
 
 // A facade for a metadata Realm object representing a sync user.
@@ -192,6 +193,9 @@ class SyncMetadataManager {
 public:
     std::vector<SyncUserMetadata> all_logged_in_users() const;
 
+    // Perform all pending file actions and delete any remaining data for removed users.
+    void perform_launch_actions(SyncFileManager& file_manager) const;
+
     // Return a Results object containing all users not marked for removal.
     SyncUserMetadataResults all_unmarked_users() const;
 
@@ -210,6 +214,8 @@ public:
 
     // Retrieve file action metadata.
     util::Optional<SyncFileActionMetadata> get_file_action_metadata(StringData path) const;
+    // Perform any stored file actions for the given path.
+    bool perform_file_actions(SyncFileManager& file_manager, StringData path) const;
 
     // Create file action metadata.
     void make_file_action_metadata(StringData original_name, StringData partition_key_value, StringData local_uuid,
@@ -235,6 +241,8 @@ private:
     std::shared_ptr<Realm> get_realm() const;
     std::shared_ptr<Realm> try_get_realm() const;
     std::shared_ptr<Realm> open_realm(bool should_encrypt, bool caller_supplied_key);
+
+    bool run_file_action(SyncFileManager& file_manager, SyncFileActionMetadata& md) const;
 };
 
 } // namespace realm
