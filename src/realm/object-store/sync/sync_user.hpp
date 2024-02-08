@@ -257,7 +257,7 @@ private:
     // used to locate existing files.
     std::vector<std::string> m_legacy_identities;
 
-    mutable util::CheckedMutex m_mutex;
+    util::CheckedMutex m_mutex;
 
     // Set by the server. The unique ID of the user account on the Realm Application.
     const std::string m_identity;
@@ -269,7 +269,7 @@ private:
     // Waiting sessions are those that should be asked to connect once this user is logged in.
     std::unordered_map<std::string, std::weak_ptr<SyncSession>> m_waiting_sessions;
 
-    mutable util::CheckedMutex m_tokens_mutex;
+    util::CheckedMutex m_tokens_mutex;
 
     // The user's refresh token.
     RealmJWT m_refresh_token GUARDED_BY(m_tokens_mutex);

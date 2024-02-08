@@ -25,7 +25,6 @@
 
 #include <realm/obj.hpp>
 #include <realm/table.hpp>
-#include <realm/util/optional.hpp>
 #include <string>
 
 namespace realm {

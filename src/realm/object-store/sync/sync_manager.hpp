@@ -295,7 +295,7 @@ private:
     std::shared_ptr<SyncUser> get_user_for_identity(std::string const& identity) const noexcept
         REQUIRES(m_user_mutex);
 
-    mutable util::CheckedMutex m_mutex;
+    util::CheckedMutex m_mutex;
 
     void init_metadata(SyncClientConfig config, const std::string& app_id);
 
@@ -303,7 +303,7 @@ private:
     void do_make_logger() REQUIRES(m_mutex);
 
     // Protects m_users
-    mutable util::CheckedMutex m_user_mutex;
+    util::CheckedMutex m_user_mutex;
 
     // A vector of all SyncUser objects.
     std::vector<std::shared_ptr<SyncUser>> m_users GUARDED_BY(m_user_mutex);
@@ -315,12 +315,12 @@ private:
     mutable std::shared_ptr<util::Logger> m_logger_ptr GUARDED_BY(m_mutex);
 
     // Protects m_file_manager and m_metadata_manager
-    mutable util::CheckedMutex m_file_system_mutex;
+    util::CheckedMutex m_file_system_mutex;
     std::unique_ptr<SyncFileManager> m_file_manager GUARDED_BY(m_file_system_mutex);
     std::unique_ptr<SyncMetadataManager> m_metadata_manager GUARDED_BY(m_file_system_mutex);
 
     // Protects m_sessions
-    mutable util::CheckedMutex m_session_mutex;
+    util::CheckedMutex m_session_mutex;
 
     // Map of sessions by path name.
     // Sessions remove themselves from this map by calling `unregister_session` once they're
