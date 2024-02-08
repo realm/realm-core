@@ -148,6 +148,7 @@ cc_defaults {
         "-fPIC",
         "-DREALM_NO_CONFIG",
         "-DREALM_HAVE_OPENSSL=1",
+        "-DREALM_USE_SYSTEM_OPENSSL_PATHS=0",
         "-DREALM_INCLUDE_CERTS=1",
         "-DREALM_ENABLE_ENCRYPTION=1",
         "-DREALM_ENABLE_SYNC=1",
