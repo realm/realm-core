@@ -35,6 +35,17 @@ endif()
 
 target_link_libraries(ClickBench Storage)
 
+add_executable(ClickQuery EXCLUDE_FROM_ALL clickquery.cpp )
+set_target_properties(ClickBench PROPERTIES
+    OUTPUT_NAME "clickquery"
+    DEBUG_POSTFIX ${CMAKE_DEBUG_POSTFIX}
+)
+if (EMSCRIPTEN)
+    set_target_properties(ClickQuery PROPERTIES EXCLUDE_FROM_ALL TRUE)
+endif()
+
+target_link_libraries(ClickQuery Storage)
+
 add_executable(RealmEnumerate realm_enumerate.cpp)
 set_target_properties(RealmEnumerate PROPERTIES
     OUTPUT_NAME "realm-enumerate"
