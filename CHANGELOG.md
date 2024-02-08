@@ -10,7 +10,8 @@
 * Uploading the changesets recovered during an automatic client reset recovery may lead to 'Bad server version' errors and a new client reset. ([#7279](https://github.com/realm/realm-core/issues/7279), since v13.24.1)
 * Fixed invalid data in error reason string when registering a subscription change notification after the subscription has already failed. ([#6839](https://github.com/realm/realm-core/issues/6839), since v11.8.0)
 * Fixed crash in fulltext index using prefix search with no matches ([#7309](https://github.com/realm/realm-core/issues/7309), since v13.18.0)
-
+* Fix compilation and some warnings when building with Xcode 15.3 ([PR #7297](https://github.com/realm/realm-core/pull/7297)).
+ 
 ### Breaking changes
 * None.
 
@@ -25,6 +26,7 @@
 * Remove SyncUser::binding_context() and related things, which were not actually used by any SDKs.
 * (bindgen) Upgrade `eslint-config-prettier` & `eslint-plugin-prettier` and add a missing peer dependency on `prettier`.
 * The minimum CMake version has changed from 3.15 to 3.22.1. ([#6537](https://github.com/realm/realm-core/issues/6537))
+* Update Catch2 to v3.5.2 ([PR #7297](https://github.com/realm/realm-core/pull/7297)).
 
 ----------------------------------------------
 

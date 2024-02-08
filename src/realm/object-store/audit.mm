@@ -484,7 +484,7 @@ public:
         , m_serializer(serializer)
         , m_table(audit_table)
         , m_repl(*m_table.get_parent_group()->get_replication())
-        , m_repl_buffer([=]() -> const util::AppendBuffer<char>& {
+        , m_repl_buffer([this]() -> const util::AppendBuffer<char>& {
             REALM_ASSERT(typeid(m_repl) == typeid(sync::ClientReplication));
             return static_cast<sync::SyncReplication&>(m_repl).get_instruction_encoder().buffer();
         }())

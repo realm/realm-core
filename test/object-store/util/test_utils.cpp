@@ -27,6 +27,7 @@
 #include <external/json/json.hpp>
 
 #include <iostream>
+#include <random>
 #include <sys/stat.h>
 
 #ifndef _WIN32

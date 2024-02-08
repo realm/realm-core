@@ -24,7 +24,7 @@ using namespace realm;
 ArrayBinary::ArrayBinary(Allocator& a)
     : m_alloc(a)
 {
-    m_arr = new (&m_storage.m_small_blobs) ArraySmallBlobs(a);
+    m_arr = new (&m_storage) ArraySmallBlobs(a);
 }
 
 void ArrayBinary::create()
@@ -41,11 +41,11 @@ void ArrayBinary::init_from_mem(MemRef mem) noexcept
 
     m_is_big = Array::get_context_flag_from_header(header);
     if (!m_is_big) {
-        auto arr = new (&m_storage.m_small_blobs) ArraySmallBlobs(m_alloc);
+        auto arr = new (&m_storage) ArraySmallBlobs(m_alloc);
         arr->init_from_mem(mem);
     }
     else {
-        auto arr = new (&m_storage.m_big_blobs) ArrayBigBlobs(m_alloc, true);
+        auto arr = new (&m_storage) ArrayBigBlobs(m_alloc, true);
         arr->init_from_mem(mem);
     }
 
@@ -205,7 +205,7 @@ bool ArrayBinary::upgrade_leaf(size_t value_size)
     auto ndx_in_parent = small_blobs->get_ndx_in_parent();
     small_blobs->destroy();
 
-    auto arr = new (&m_storage.m_big_blobs) ArrayBigBlobs(m_alloc, true);
+    auto arr = new (&m_storage) ArrayBigBlobs(m_alloc, true);
     arr->init_from_mem(big_blobs.get_mem());
     arr->set_parent(parent, ndx_in_parent);
     arr->update_parent(); // Throws
