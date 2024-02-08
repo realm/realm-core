@@ -26,54 +26,7 @@
 #include <realm/object-store/sync/sync_manager.hpp>
 #include <realm/object-store/sync/sync_session.hpp>
 
-#include <realm/util/base64.hpp>
-
 namespace realm {
-
-static std::string base64_decode(const std::string& in)
-{
-    std::string out;
-    out.resize(util::base64_decoded_size(in.size()));
-    util::base64_decode(in, &out[0], out.size());
-    return out;
-}
-
-static std::vector<std::string> split_token(const std::string& jwt)
-{
-    constexpr static char delimiter = '.';
-
-    std::vector<std::string> parts;
-    size_t pos = 0, start_from = 0;
-
-    while ((pos = jwt.find(delimiter, start_from)) != std::string::npos) {
-        parts.push_back(jwt.substr(start_from, pos - start_from));
-        start_from = pos + 1;
-    }
-
-    parts.push_back(jwt.substr(start_from));
-
-    if (parts.size() != 3) {
-        throw app::AppError(ErrorCodes::BadToken, "jwt missing parts");
-    }
-
-    return parts;
-}
-
-RealmJWT::RealmJWT(const std::string& token)
-    : token(token)
-{
-    auto parts = split_token(this->token);
-
-    auto json_str = base64_decode(parts[1]);
-    auto json = static_cast<bson::BsonDocument>(bson::parse(json_str));
-
-    this->expires_at = static_cast<int64_t>(json["exp"]);
-    this->issued_at = static_cast<int64_t>(json["iat"]);
-
-    if (json.find("user_data") != json.end()) {
-        this->user_data = static_cast<bson::BsonDocument>(json["user_data"]);
-    }
-}
 
 SyncUserIdentity::SyncUserIdentity(const std::string& id, const std::string& provider_type)
     : id(id)
