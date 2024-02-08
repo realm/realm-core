@@ -125,7 +125,6 @@ mixedInfo:
       type: ObjKey
   unusedDataTypes:
     - Mixed
-    - LinkList
   extraCtors:
     - Obj
     - Geospatial
@@ -197,7 +196,6 @@ enums:
       Double: 10
       Decimal: 11
       Link: 12
-      LinkList: 13
       ObjectId: 15
       TypedLink: 16
       UUID: 17
