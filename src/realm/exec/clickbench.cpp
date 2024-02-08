@@ -239,11 +239,11 @@ void parse_file(const char* filename)
                 case col_type_String:
                     val.value = strlen(tok) ? Mixed(tok) : Mixed();
                     break;
-/*
-                case col_type_EnumString:
-                    val.value = strlen(tok) ? Mixed(tok) : Mixed();
-                    break;
-*/
+                    /*
+                                    case col_type_EnumString:
+                                        val.value = strlen(tok) ? Mixed(tok) : Mixed();
+                                        break;
+                    */
                 case col_type_Timestamp:
                     val.value = Mixed(get_timestamp(tok));
                     break;
@@ -278,6 +278,8 @@ void import(const char* filename)
     auto t = tr->get_table("Hits");
     auto col_keys = t->get_column_keys();
 
+    std::cout << std::endl << "Reading data into realm" << std::endl;
+    auto time_start = std::chrono::high_resolution_clock::now();
     BufferedValues buf1;
     BufferedValues buf2;
     for (auto& val : buf1.values) {
@@ -301,15 +303,15 @@ void import(const char* filename)
         for (auto& val : buf->values) {
             Obj o = t->create_object(ObjKey(), val);
             // verify
-/*
-            for (auto& e : val) {
-                if (e.col_key.get_type() == col_type_String) {
-                    auto got_string = o.get<StringData>(e.col_key);
-                    auto the_string = e.value.get_string();
-                    REALM_ASSERT(got_string == the_string);
-                }
-            }
-*/
+            /*
+                        for (auto& e : val) {
+                            if (e.col_key.get_type() == col_type_String) {
+                                auto got_string = o.get<StringData>(e.col_key);
+                                auto the_string = e.value.get_string();
+                                REALM_ASSERT(got_string == the_string);
+                            }
+                        }
+            */
         }
         resp.send(buf);
         if (buf_cnt++ > bufs_per_commit) {
@@ -323,12 +325,37 @@ void import(const char* filename)
     tr->commit_and_continue_as_read();
 
     parse_file_thread.join();
-/*
-    std::cout << std::endl;
-    t->dump_interning_stats();
-    std::cout << std::endl;
-    std::cout << t->size() << std::endl;
-*/
+    auto time_end = std::chrono::high_resolution_clock::now();
+    std::cout << "Ingestion complete in "
+              << std::chrono::duration_cast<std::chrono::milliseconds>(time_end - time_start).count() << " msecs"
+              << std::endl;
+    /*
+        std::cout << std::endl;
+        t->dump_interning_stats();
+        std::cout << std::endl;
+        std::cout << t->size() << std::endl;
+    */
+    {
+        std::cout << std::endl << "count of AdvEngineID <> 0" << std::endl;
+        time_start = std::chrono::high_resolution_clock::now();
+        auto k = t->get_column_key("AdvEngineID");
+        auto q = t->where().not_equal(k, 0).count();
+        time_end = std::chrono::high_resolution_clock::now();
+        std::cout << "result = " << q << " in "
+                  << std::chrono::duration_cast<std::chrono::milliseconds>(time_end - time_start).count() << " msecs"
+                  << std::endl;
+    }
+    {
+        std::cout << std::endl << "Max of EventDate" << std::endl;
+        time_start = std::chrono::high_resolution_clock::now();
+        auto k = t->get_column_key("EventDate");
+        auto q = *(t->max(k));
+        // auto q = t->where().not_equal(k, 0).count();
+        time_end = std::chrono::high_resolution_clock::now();
+        std::cout << "result = " << q << " in "
+                  << std::chrono::duration_cast<std::chrono::milliseconds>(time_end - time_start).count() << " msecs"
+                  << std::endl;
+    }
 }
 
 void dump_prop(const char* filename, const char* prop_name)
@@ -345,11 +372,11 @@ void dump_prop(const char* filename, const char* prop_name)
             case col_type_String:
                 std::cout << o.get<String>(col) << std::endl;
                 break;
-/*
-            case col_type_EnumString:
-                REALM_ASSERT(false);
-                break;
-*/
+                /*
+                            case col_type_EnumString:
+                                REALM_ASSERT(false);
+                                break;
+                */
             case col_type_Timestamp:
                 std::cout << o.get<Timestamp>(col) << std::endl;
                 break;
