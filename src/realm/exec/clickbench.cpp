@@ -346,6 +346,25 @@ void import(const char* filename)
                   << std::endl;
     }
     {
+        std::cout << std::endl << "Query result for AdvEngineID <> 0" << std::endl;
+        time_start = std::chrono::high_resolution_clock::now();
+        auto k = t->get_column_key("AdvEngineID");
+        auto q = t->where().not_equal(k, 0).find_all();
+        time_end = std::chrono::high_resolution_clock::now();
+        std::cout << "result with size " << q.size() << " in "
+                  << std::chrono::duration_cast<std::chrono::milliseconds>(time_end - time_start).count() << " msecs"
+                  << std::endl;
+        time_start = std::chrono::high_resolution_clock::now();
+        auto limit = q.size();
+        size_t count = 0;
+        for (size_t i = 0; i < limit; ++i)
+            count += q[i].get<Int>(k);
+        time_end = std::chrono::high_resolution_clock::now();
+        std::cout << "Iterating over result to get count " << count << " in "
+                  << std::chrono::duration_cast<std::chrono::milliseconds>(time_end - time_start).count() << " msecs"
+                  << std::endl;
+    }
+    {
         std::cout << std::endl << "Max of EventDate" << std::endl;
         time_start = std::chrono::high_resolution_clock::now();
         auto k = t->get_column_key("EventDate");
