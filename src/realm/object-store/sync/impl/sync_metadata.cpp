@@ -39,7 +39,6 @@ using namespace realm;
 namespace {
 static const char* const c_sync_userMetadata = "UserMetadata";
 static const char* const c_sync_identityMetadata = "UserIdentity";
-static const char* const c_sync_app_metadata = "AppMetadata";
 
 static const char* const c_sync_current_user_identity = "current_user_identity";
 
@@ -63,12 +62,6 @@ static const char* const c_sync_original_name = "original_name";
 static const char* const c_sync_new_name = "new_name";
 static const char* const c_sync_action = "action";
 static const char* const c_sync_partition = "url";
-
-static const char* const c_sync_app_metadata_id = "id";
-static const char* const c_sync_app_metadata_deployment_model = "deployment_model";
-static const char* const c_sync_app_metadata_location = "location";
-static const char* const c_sync_app_metadata_hostname = "hostname";
-static const char* const c_sync_app_metadata_ws_hostname = "ws_hostname";
 
 realm::Schema make_schema()
 {
@@ -101,14 +94,6 @@ realm::Schema make_schema()
         {c_sync_current_user_identity,
          {
              {c_sync_current_user_identity, PropertyType::String},
-         }},
-        {c_sync_app_metadata,
-         {
-             {c_sync_app_metadata_id, PropertyType::Int, Property::IsPrimary{true}},
-             {c_sync_app_metadata_deployment_model, PropertyType::String},
-             {c_sync_app_metadata_location, PropertyType::String},
-             {c_sync_app_metadata_hostname, PropertyType::String},
-             {c_sync_app_metadata_ws_hostname, PropertyType::String},
          }},
     };
 }
@@ -252,12 +237,6 @@ SyncMetadataManager::SyncMetadataManager(std::string path, bool should_encrypt,
         object_schema->persisted_properties[2].column_key, object_schema->persisted_properties[3].column_key,
         object_schema->persisted_properties[4].column_key,
     };
-
-    object_schema = realm->schema().find(c_sync_app_metadata);
-    m_app_metadata_schema = {
-        object_schema->persisted_properties[0].column_key, object_schema->persisted_properties[1].column_key,
-        object_schema->persisted_properties[2].column_key, object_schema->persisted_properties[3].column_key,
-        object_schema->persisted_properties[4].column_key};
 }
 
 // Some of our string columns are nullable. They never should actually be
@@ -522,56 +501,6 @@ std::shared_ptr<Realm> SyncMetadataManager::open_realm(bool should_encrypt, bool
 #else  // REALM_PLATFORM_APPLE
     REALM_UNREACHABLE();
 #endif // REALM_PLATFORM_APPLE
-}
-
-/// Magic key to fetch app metadata, which there should always only be one of.
-static const auto app_metadata_pk = 1;
-
-bool SyncMetadataManager::set_app_metadata(const std::string& deployment_model, const std::string& location,
-                                           const std::string& hostname, const std::string& ws_hostname)
-{
-    if (m_app_metadata && m_app_metadata->hostname == hostname && m_app_metadata->ws_hostname == ws_hostname &&
-        m_app_metadata->deployment_model == deployment_model && m_app_metadata->location == location) {
-        // App metadata not updated
-        return false;
-    }
-
-    auto realm = get_realm();
-    auto& schema = m_app_metadata_schema;
-
-    // let go of stale cached copy of metadata - it will be refreshed on the next call to get_app_metadata()
-    m_app_metadata = util::none;
-
-    realm->begin_transaction();
-
-    auto table = ObjectStore::table_for_object_type(realm->read_group(), c_sync_app_metadata);
-    auto obj = table->create_object_with_primary_key(app_metadata_pk);
-    obj.set(schema.deployment_model_col, deployment_model);
-    obj.set(schema.location_col, location);
-    obj.set(schema.hostname_col, hostname);
-    obj.set(schema.ws_hostname_col, ws_hostname);
-
-    realm->commit_transaction();
-    // App metadata was updated
-    return true;
-}
-
-util::Optional<SyncAppMetadata> SyncMetadataManager::get_app_metadata()
-{
-    if (!m_app_metadata) {
-        auto realm = get_realm();
-        auto table = ObjectStore::table_for_object_type(realm->read_group(), c_sync_app_metadata);
-        if (!table->size())
-            return util::none;
-
-        auto obj = table->get_object_with_primary_key(app_metadata_pk);
-        auto& schema = m_app_metadata_schema;
-        m_app_metadata =
-            SyncAppMetadata{obj.get<String>(schema.deployment_model_col), obj.get<String>(schema.location_col),
-                            obj.get<String>(schema.hostname_col), obj.get<String>(schema.ws_hostname_col)};
-    }
-
-    return m_app_metadata;
 }
 
 // MARK: - Sync user metadata

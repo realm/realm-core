@@ -44,7 +44,6 @@ class SyncUser;
 class SyncFileManager;
 class SyncMetadataManager;
 class SyncFileActionMetadata;
-class SyncAppMetadata;
 
 namespace _impl {
 struct SyncClient;
@@ -221,8 +220,6 @@ public:
     // calling this method.
     void reset_for_testing() REQUIRES(!m_mutex, !m_file_system_mutex, !m_user_mutex, !m_session_mutex);
 
-    // Get the app metadata for the active app.
-    util::Optional<SyncAppMetadata> app_metadata() const REQUIRES(!m_file_system_mutex);
 
     // Immediately closes any open sync sessions for this sync manager
     void close_all_sessions() REQUIRES(!m_mutex, !m_session_mutex);

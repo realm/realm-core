@@ -743,15 +743,6 @@ std::unique_ptr<SyncClient> SyncManager::create_sync_client() const
     return std::make_unique<SyncClient>(m_logger_ptr, m_config, weak_from_this());
 }
 
-util::Optional<SyncAppMetadata> SyncManager::app_metadata() const
-{
-    util::CheckedLockGuard lock(m_file_system_mutex);
-    if (!m_metadata_manager) {
-        return util::none;
-    }
-    return m_metadata_manager->get_app_metadata();
-}
-
 void SyncManager::close_all_sessions()
 {
     // log_out() will call unregister_session(), which requires m_session_mutex,

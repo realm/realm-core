@@ -39,7 +39,6 @@ class SyncUser;
 class SyncSession;
 class SyncManager;
 struct SyncClientConfig;
-class SyncAppMetadata;
 
 namespace app {
 

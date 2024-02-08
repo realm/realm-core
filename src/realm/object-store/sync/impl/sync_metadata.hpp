@@ -31,23 +31,6 @@
 namespace realm {
 class SyncMetadataManager;
 
-// A facade for a metadata Realm object representing app metadata
-class SyncAppMetadata {
-public:
-    struct Schema {
-        ColKey id_col;
-        ColKey deployment_model_col;
-        ColKey location_col;
-        ColKey hostname_col;
-        ColKey ws_hostname_col;
-    };
-
-    std::string deployment_model;
-    std::string location;
-    std::string hostname;
-    std::string ws_hostname;
-};
-
 // A facade for a metadata Realm object representing a sync user.
 class SyncUserMetadata {
 public:
@@ -235,17 +218,6 @@ public:
     util::Optional<std::string> get_current_user_identity() const;
     void set_current_user_identity(const std::string& identity);
 
-    util::Optional<SyncAppMetadata> get_app_metadata();
-    /// Set or update the cached app server metadata. The metadata will not be updated if it has already been
-    /// set and the provided values are not different than the cached information. Returns true if the metadata
-    /// was updated.
-    /// @param deployment_model The deployment model reported by the app server
-    /// @param location The location name where the app server is located
-    /// @param hostname The hostname to use for the app server admin api
-    /// @param ws_hostname The hostname to use for the app server websocket connections
-    bool set_app_metadata(const std::string& deployment_model, const std::string& location,
-                          const std::string& hostname, const std::string& ws_hostname);
-
     /// Construct the metadata manager.
     ///
     /// If the platform supports it, setting `should_encrypt` to `true` and not specifying an encryption key will make
@@ -259,14 +231,10 @@ private:
     Realm::Config m_metadata_config;
     SyncUserMetadata::Schema m_user_schema;
     SyncFileActionMetadata::Schema m_file_action_schema;
-    SyncAppMetadata::Schema m_app_metadata_schema;
 
     std::shared_ptr<Realm> get_realm() const;
     std::shared_ptr<Realm> try_get_realm() const;
     std::shared_ptr<Realm> open_realm(bool should_encrypt, bool caller_supplied_key);
-
-
-    util::Optional<SyncAppMetadata> m_app_metadata;
 };
 
 } // namespace realm
