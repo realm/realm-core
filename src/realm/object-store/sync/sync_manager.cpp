@@ -101,14 +101,8 @@ void SyncManager::configure(std::shared_ptr<app::App> app, std::optional<std::st
             }
 
             // Load persisted users into the users map.
-            SyncUserMetadataResults users = m_metadata_manager->all_unmarked_users();
-            for (size_t i = 0; i < users.size(); i++) {
-                auto user_data = users.get(i);
-                auto refresh_token = user_data.refresh_token();
-                auto access_token = user_data.access_token();
-                if (!refresh_token.empty() && !access_token.empty()) {
-                    users_to_add.push_back(std::make_shared<SyncUser>(SyncUser::Private(), user_data, this));
-                }
+            for (auto user : m_metadata_manager->all_logged_in_users()) {
+                users_to_add.push_back(std::make_shared<SyncUser>(SyncUser::Private(), user, this));
             }
 
             // Delete any users marked for death.

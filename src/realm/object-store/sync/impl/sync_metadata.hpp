@@ -207,6 +207,8 @@ class SyncMetadataManager {
     friend class SyncFileActionMetadata;
 
 public:
+    std::vector<SyncUserMetadata> all_logged_in_users() const;
+
     // Return a Results object containing all users not marked for removal.
     SyncUserMetadataResults all_unmarked_users() const;
 

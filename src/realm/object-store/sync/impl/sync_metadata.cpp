@@ -260,6 +260,39 @@ SyncMetadataManager::SyncMetadataManager(std::string path, bool should_encrypt,
         object_schema->persisted_properties[4].column_key};
 }
 
+// Some of our string columns are nullable. They never should actually be
+// null as we store "" rather than null when the value isn't present, but
+// be safe and handle it anyway.
+static std::string_view get_string(const Obj& obj, ColKey col)
+{
+    auto str = obj.get<String>(col);
+    return str.is_null() ? "" : std::string_view(str);
+}
+
+static bool is_valid_user(const SyncUserMetadata::Schema& schema, const Obj& obj)
+{
+    // This is overly cautious and merely checking the state should suffice,
+    // but because this is a persisted file that can be modified it's possible
+    // to get invalid combinations of data.
+    return obj && obj.get<int64_t>(schema.state_col) == int64_t(SyncUser::State::LoggedIn) &&
+           RealmJWT::validate(get_string(obj, schema.access_token_col)) &&
+           RealmJWT::validate(get_string(obj, schema.refresh_token_col));
+}
+
+std::vector<SyncUserMetadata> SyncMetadataManager::all_logged_in_users() const
+{
+    auto realm = get_realm();
+    TableRef table = ObjectStore::table_for_object_type(realm->read_group(), c_sync_userMetadata);
+    std::vector<SyncUserMetadata> users;
+    users.reserve(table->size());
+    for (auto obj : *table) {
+        if (is_valid_user(m_user_schema, obj)) {
+            users.emplace_back(m_user_schema, realm, obj);
+        }
+    }
+    return users;
+}
+
 SyncUserMetadataResults SyncMetadataManager::all_unmarked_users() const
 {
     return get_users(false);

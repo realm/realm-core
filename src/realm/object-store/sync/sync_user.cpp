@@ -65,14 +65,7 @@ SyncUser::SyncUser(Private, const SyncUserMetadata& data, SyncManager* sync_mana
     , m_device_id(data.device_id())
     , m_sync_manager(sync_manager)
 {
-    // Check for inconsistent state in the metadata Realm. This shouldn't happen,
-    // but previous versions could sometimes mark a user as logged in with an
-    // empty refresh token.
-    if (m_state == State::LoggedIn && (m_refresh_token.token.empty() || m_access_token.token.empty())) {
-        m_state = State::LoggedOut;
-        m_refresh_token = {};
-        m_access_token = {};
-    }
+    REALM_ASSERT(m_state == State::LoggedIn && !m_access_token.token.empty() && !m_refresh_token.token.empty());
 }
 
 std::shared_ptr<SyncManager> SyncUser::sync_manager() const
