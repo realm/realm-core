@@ -1,3 +1,6 @@
+include(CheckFunctionExists)
+include(CheckStructHasMember)
+
 set(BSON_SRC
   bcon.c
   bson-clock.c
