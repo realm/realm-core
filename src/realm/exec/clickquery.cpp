@@ -12,19 +12,18 @@
 
 using namespace realm;
 
-void import(const char* filename)
+static void import(const char* filename)
 {
     DBOptions options;
     auto db = DB::create(make_in_realm_history(), filename);
     auto tr = db->start_write();
     auto t = tr->get_table("Hits");
-    auto col_keys = t->get_column_keys();
     auto time_start = std::chrono::high_resolution_clock::now();
     auto time_end = time_start;
     {
         std::cout << std::endl << "count of AdvEngineID <> 0" << std::endl;
         time_start = std::chrono::high_resolution_clock::now();
-        size_t q;
+        size_t q = 0;
         for (int i = 0; i < 10; ++i) {
             auto k = t->get_column_key("AdvEngineID");
             q = t->where().not_equal(k, 0).count();
