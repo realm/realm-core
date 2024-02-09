@@ -36,7 +36,7 @@ endif()
 target_link_libraries(ClickBench Storage)
 
 add_executable(ClickQuery EXCLUDE_FROM_ALL clickquery.cpp )
-set_target_properties(ClickBench PROPERTIES
+set_target_properties(ClickQuery PROPERTIES
     OUTPUT_NAME "clickquery"
     DEBUG_POSTFIX ${CMAKE_DEBUG_POSTFIX}
 )
