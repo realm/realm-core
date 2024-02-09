@@ -446,72 +446,54 @@ bool RealmCoordinator::open_db()
 #endif
 
     bool server_synchronization_mode = m_config.sync_config || m_config.force_sync_history;
-    bool schema_mode_reset_file =
-        m_config.schema_mode == SchemaMode::SoftResetFile || m_config.schema_mode == SchemaMode::HardResetFile;
-    try {
-        if (m_config.immutable() && m_config.realm_data) {
-            m_db = DB::create(m_config.realm_data, false);
-            return true;
-        }
-        std::unique_ptr<Replication> history;
-        if (server_synchronization_mode) {
+    if (m_config.immutable() && m_config.realm_data) {
+        m_db = DB::create(m_config.realm_data, false);
+        return true;
+    }
+    std::unique_ptr<Replication> history;
+    if (server_synchronization_mode) {
 #if REALM_ENABLE_SYNC
-            bool apply_server_changes = !m_config.sync_config || m_config.sync_config->apply_server_changes;
-            history = std::make_unique<sync::ClientReplication>(apply_server_changes);
+        bool apply_server_changes = !m_config.sync_config || m_config.sync_config->apply_server_changes;
+        history = std::make_unique<sync::ClientReplication>(apply_server_changes);
 #else
-            REALM_TERMINATE("Realm was not built with sync enabled");
+        REALM_TERMINATE("Realm was not built with sync enabled");
 #endif
-        }
-        else if (!m_config.immutable()) {
-            history = make_in_realm_history();
-        }
+    }
+    else if (!m_config.immutable()) {
+        history = make_in_realm_history();
+    }
 
-        DBOptions options;
+    DBOptions options;
 #ifndef __EMSCRIPTEN__
-        options.enable_async_writes = true;
+    options.enable_async_writes = true;
 #endif
-        options.durability = m_config.in_memory ? DBOptions::Durability::MemOnly : DBOptions::Durability::Full;
-        options.is_immutable = m_config.immutable();
-        options.logger = util::Logger::get_default_logger();
+    options.durability = m_config.in_memory ? DBOptions::Durability::MemOnly : DBOptions::Durability::Full;
+    options.is_immutable = m_config.immutable();
+    options.logger = util::Logger::get_default_logger();
 
-        if (!m_config.fifo_files_fallback_path.empty()) {
-            options.temp_dir = util::normalize_dir(m_config.fifo_files_fallback_path);
-        }
-        options.encryption_key = m_config.encryption_key.data();
-        options.allow_file_format_upgrade = !m_config.disable_format_upgrade && !schema_mode_reset_file;
-        if (history) {
-            options.backup_at_file_format_change = m_config.backup_at_file_format_change;
+    if (!m_config.fifo_files_fallback_path.empty()) {
+        options.temp_dir = util::normalize_dir(m_config.fifo_files_fallback_path);
+    }
+    options.encryption_key = m_config.encryption_key.data();
+    options.allow_file_format_upgrade = !m_config.disable_format_upgrade;
+    if (history) {
+        options.backup_at_file_format_change = m_config.backup_at_file_format_change;
 #ifdef __EMSCRIPTEN__
-            // Force the DB to be created in memory-only mode, ignoring the filesystem path supplied in the config.
-            // This is so we can run an SDK on top without having to solve the browser persistence problem yet,
-            // or teach RealmConfig and SDKs about pure in-memory realms.
-            m_db = DB::create_in_memory(std::move(history), m_config.path, options);
+        // Force the DB to be created in memory-only mode, ignoring the filesystem path supplied in the config.
+        // This is so we can run an SDK on top without having to solve the browser persistence problem yet,
+        // or teach RealmConfig and SDKs about pure in-memory realms.
+        m_db = DB::create_in_memory(std::move(history), m_config.path, options);
 #else
-            if (m_config.path.size()) {
-                m_db = DB::create(std::move(history), m_config.path, options);
-            }
-            else {
-                m_db = DB::create(std::move(history), options);
-            }
-#endif
+        if (m_config.path.size()) {
+            m_db = DB::create(std::move(history), m_config.path, options);
         }
         else {
-            m_db = DB::create(m_config.path, true, options);
+            m_db = DB::create(std::move(history), options);
         }
+#endif
     }
-    catch (realm::FileFormatUpgradeRequired const&) {
-        if (!schema_mode_reset_file) {
-            throw;
-        }
-        util::File::remove(m_config.path);
-        return open_db();
-    }
-    catch (UnsupportedFileFormatVersion const&) {
-        if (!schema_mode_reset_file) {
-            throw;
-        }
-        util::File::remove(m_config.path);
-        return open_db();
+    else {
+        m_db = DB::create(m_config.path, true, options);
     }
 
     if (m_config.should_compact_on_launch_function) {

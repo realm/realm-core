@@ -11,6 +11,7 @@
 * Fixed invalid data in error reason string when registering a subscription change notification after the subscription has already failed. ([#6839](https://github.com/realm/realm-core/issues/6839), since v11.8.0)
 * Fixed crash in fulltext index using prefix search with no matches ([#7309](https://github.com/realm/realm-core/issues/7309), since v13.18.0)
 * Fix compilation and some warnings when building with Xcode 15.3 ([PR #7297](https://github.com/realm/realm-core/pull/7297)).
+* Realm file would be deleted if SoftResetFile or HardResetFile was used and the file needed an upgrade. It will no longer be deleted in that case and just upgraded. ([#7140](https://github.com/realm/realm-core/issues/7140), since long time ago)
  
 ### Breaking changes
 * None.
