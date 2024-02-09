@@ -724,6 +724,19 @@ TEST_TYPES(Parser_Numerics, Prop<Int>, Nullable<Int>, Indexed<Int>, NullableInde
         verify_query_sub(test_context, t, util::format("values == $%1", i), args, 1);
     }
     verify_query(test_context, t, "values == null", nullable ? 1 : 0);
+    verify_query(test_context, t, "values == ANY {-1, 0, 1}", 3);
+    verify_query(test_context, t, "values == NONE {-1, 0, 1}", t->size() - 3);
+    verify_query(test_context, t, "values == NONE {-1, 0}", t->size() - 2);
+    verify_query(test_context, t, "values == NONE {-1}", t->size() - 1);
+    verify_query(test_context, t, "values == NONE {}", t->size());
+    verify_query(test_context, t, "values != ALL {-1, 0, 1}", t->size() - 3);
+    verify_query(test_context, t, "values != ALL {-1, 0}", t->size() - 2);
+    verify_query(test_context, t, "values != ALL {-1}", t->size() - 1);
+    verify_query(test_context, t, "values != ALL {}", t->size());
+    verify_query(test_context, t, "values == ALL {-1, 0, 1}", 0);
+    verify_query(test_context, t, "values == ALL {-1, 0}", 0);
+    verify_query(test_context, t, "values == ALL {-1}", 1);
+    verify_query(test_context, t, "values == ALL {}", t->size());
 }
 
 TEST(Parser_LinksToSameTable)
