@@ -385,8 +385,9 @@ ref_type Array::write(_impl::ArrayWriterBase& out, bool deep, bool only_if_modif
                 encoded_array.m_encoding == Encoding::AofP || encoded_array.m_encoding == Encoding::PofA);
             REALM_ASSERT_DEBUG(size() == encoded_array.size());
 #ifdef REALM_DEBUG
-            for (size_t i = 0; i < encoded_array.size(); ++i)
+            for (size_t i = 0; i < encoded_array.size(); ++i) {
                 REALM_ASSERT_DEBUG(get(i) == encoded_array.get(i));
+            }
 #endif
             auto ref = encoded_array.do_write_shallow(out);
             encoded_array.destroy();

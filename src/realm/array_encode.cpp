@@ -80,31 +80,31 @@ bool ArrayEncode::always_encode(const Array& origin, Array& arr, bool packed) co
 
 bool ArrayEncode::encode(const Array& origin, Array& arr) const
 {
-    // return always_encode(origin, arr, true); //true packed, false flex
+    return always_encode(origin, arr, true); // true packed, false flex
 
-    std::vector<int64_t> values;
-    std::vector<size_t> indices;
-    try_encode(origin, values, indices);
-    if (!values.empty()) {
-        size_t v_width, ndx_width;
-        const auto uncompressed_size = origin.get_byte_size();
-        const auto packed_size = packed_encoded_array_size(values, origin.size(), v_width);
-        const auto flex_size = flex_encoded_array_size(values, indices, v_width, ndx_width);
-
-        if (flex_size < packed_size && flex_size < uncompressed_size) {
-            const uint8_t flags = NodeHeader::get_flags(origin.get_header());
-            encode_array(s_flex, arr, flex_size, flags, v_width, ndx_width, values.size(), indices.size());
-            copy_into_encoded_array(s_flex, arr, values, indices);
-            return true;
-        }
-        else if (packed_size < uncompressed_size) {
-            const uint8_t flags = NodeHeader::get_flags(origin.get_header());
-            encode_array(s_packed, arr, packed_size, flags, v_width, origin.size());
-            copy_into_encoded_array(s_packed, origin, arr);
-            return true;
-        }
-    }
-    return false;
+    //    std::vector<int64_t> values;
+    //    std::vector<size_t> indices;
+    //    try_encode(origin, values, indices);
+    //    if (!values.empty()) {
+    //        size_t v_width, ndx_width;
+    //        const auto uncompressed_size = origin.get_byte_size();
+    //        const auto packed_size = packed_encoded_array_size(values, origin.size(), v_width);
+    //        const auto flex_size = flex_encoded_array_size(values, indices, v_width, ndx_width);
+    //
+    //        if (flex_size < packed_size && flex_size < uncompressed_size) {
+    //            const uint8_t flags = NodeHeader::get_flags(origin.get_header());
+    //            encode_array(s_flex, arr, flex_size, flags, v_width, ndx_width, values.size(), indices.size());
+    //            copy_into_encoded_array(s_flex, arr, values, indices);
+    //            return true;
+    //        }
+    //        else if (packed_size < uncompressed_size) {
+    //            const uint8_t flags = NodeHeader::get_flags(origin.get_header());
+    //            encode_array(s_packed, arr, packed_size, flags, v_width, origin.size());
+    //            copy_into_encoded_array(s_packed, origin, arr);
+    //            return true;
+    //        }
+    //    }
+    //    return false;
 }
 
 bool ArrayEncode::decode(Array& arr) const
@@ -174,7 +174,7 @@ int64_t ArrayEncode::get(const Array& arr, size_t ndx) const
     REALM_ASSERT_DEBUG(arr.is_attached());
     REALM_ASSERT_DEBUG(arr.m_kind == 'B');
     REALM_ASSERT_DEBUG(arr.m_encoding == Encoding::Flex || arr.m_encoding == Encoding::Packed);
-    return is_packed(arr) ? s_packed.get(arr.get_header(), ndx) : s_flex.get(arr.get_header(), ndx);
+    return is_packed(arr) ? s_packed.get(arr, ndx) : s_flex.get(arr, ndx);
 }
 
 int64_t ArrayEncode::get(const char* header, size_t ndx)
@@ -190,15 +190,13 @@ void ArrayEncode::get_chunk(const Array& arr, size_t ndx, int64_t res[8]) const
 {
     REALM_ASSERT_DEBUG(arr.is_attached());
     REALM_ASSERT_DEBUG(arr.m_kind == 'B');
-    return is_packed(arr) ? s_packed.get_chunk(arr.get_header(), ndx, res)
-                          : s_flex.get_chunk(arr.get_header(), ndx, res);
+    return is_packed(arr) ? s_packed.get_chunk(arr, ndx, res) : s_flex.get_chunk(arr, ndx, res);
 }
 
 void ArrayEncode::set_direct(const Array& arr, size_t ndx, int64_t value) const
 {
     REALM_ASSERT_DEBUG(is_packed(arr) || is_flex(arr));
-    is_packed(arr) ? s_packed.set_direct(arr.get_header(), ndx, value)
-                   : s_flex.set_direct(arr.get_header(), ndx, value);
+    is_packed(arr) ? s_packed.set_direct(arr, ndx, value) : s_flex.set_direct(arr, ndx, value);
 }
 
 template <typename F>

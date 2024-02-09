@@ -69,55 +69,80 @@ std::vector<int64_t> ArrayPacked::fetch_signed_values_from_encoded_array(const A
     auto data = (uint64_t*)arr.m_data;
     bf_iterator it_value{data, 0, v_width, v_width, 0};
     for (size_t i = 0; i < v_size; ++i) {
-        const auto value = it_value.get_value();
-        const auto ivalue = sign_extend_field(v_width, value);
-        values.push_back(ivalue);
+        const auto value = get(arr, i);
+        values.push_back(value);
         ++it_value;
     }
     return values;
 }
 
 
-void ArrayPacked::set_direct(const char* h, size_t ndx, int64_t value) const
+void ArrayPacked::set_direct(const Array& arr, size_t ndx, int64_t value) const
 {
     size_t v_width, v_size;
-    get_encode_info(h, v_width, v_size);
+    get_encode_info(arr.get_header(), v_width, v_size);
     REALM_ASSERT_DEBUG(ndx < v_size);
-    auto data = (uint64_t*)NodeHeader::get_data_from_header(h);
+    auto data = (uint64_t*)arr.m_data;
     bf_iterator it_value{data, static_cast<size_t>(ndx * v_width), v_width, v_width, 0};
     it_value.set_value(value);
 }
 
-int64_t ArrayPacked::get(const char* h, size_t ndx)
+int64_t ArrayPacked::get(const Array& arr, size_t ndx) const
 {
-    using Encoding = NodeHeader::Encoding;
-    REALM_ASSERT_DEBUG(NodeHeader::get_kind(h) == 'B');
-    REALM_ASSERT_DEBUG(NodeHeader::get_encoding(h) == NodeHeader::Encoding::Packed);
-    const auto v_size = NodeHeader::get_num_elements<Encoding::Packed>(h);
-    const auto v_width = NodeHeader::get_element_size<Encoding::Packed>(h);
-    if (ndx >= v_size)
-        return realm::not_found;
-    const auto data = (uint64_t*)NodeHeader::get_data_from_header(h);
-    const bf_iterator it_value{data, static_cast<size_t>(v_width * ndx), v_width, v_width, 0};
-    auto v = sign_extend_field(v_width, it_value.get_value());
-    return v;
+    size_t v_width, v_size;
+    get_encode_info(arr.get_header(), v_width, v_size);
+    return do_get((uint64_t*)arr.m_data, ndx, v_width, v_size);
 }
 
-void ArrayPacked::get_chunk(const char* h, size_t ndx, int64_t res[8]) const
+int64_t ArrayPacked::get(const char* h, size_t ndx)
 {
     size_t v_width, v_size;
     get_encode_info(h, v_width, v_size);
+    const auto data_area = (uint64_t*)(NodeHeader::get_data_from_header(h));
+    return do_get(data_area, ndx, v_width, v_size);
+}
+
+int64_t ArrayPacked::do_get(uint64_t* data, size_t ndx, size_t v_width, size_t v_size)
+{
+    if (ndx >= v_size)
+        return realm::not_found;
+
+    bf_iterator it{data, 0, v_width, v_width, ndx};
+    //    auto field_size = v_width;
+    //    auto field_position = ndx * field_size;
+    //    auto first_word_ptr = data_area + (field_position >> 6);
+
+    auto result = it.get_value();
+    //    auto in_word_position = field_position & 0x3F;
+    //    auto first_word = first_word_ptr[0];
+    //    uint64_t result = first_word >> in_word_position;
+    //    if (in_word_position + field_size > 64) {
+    //        auto first_word_size = 64 - in_word_position;
+    //        auto second_word = first_word_ptr[1];
+    //        result |= second_word << first_word_size;
+    //    }
+    //    if (field_size < 64)
+    //        result &= (1ULL << field_size) - 1;
+
+    return sign_extend_field(v_width, result);
+}
+
+void ArrayPacked::get_chunk(const Array& arr, size_t ndx, int64_t res[8]) const
+{
+    size_t v_width, v_size;
+    get_encode_info(arr.get_header(), v_width, v_size);
     REALM_ASSERT_DEBUG(ndx < v_size);
     auto sz = 8;
     std::memset(res, 0, sizeof(int64_t) * sz);
     auto supposed_end = ndx + sz;
     size_t i = ndx;
     size_t index = 0;
+    // this can be done better, in one go, retrieve both!!!
     for (; i < supposed_end; ++i) {
-        res[index++] = get(h, i);
+        res[index++] = get(arr, i);
     }
     for (; index < 8; ++index) {
-        res[index++] = get(h, i++);
+        res[index++] = get(arr, i++);
     }
 }
 
@@ -130,9 +155,11 @@ int64_t ArrayPacked::sum(const Array& arr, size_t start, size_t end) const
     REALM_ASSERT_DEBUG(v_size >= start && v_size <= end);
     const auto data = (uint64_t*)arr.m_data;
     int64_t total_sum = 0;
+    bf_iterator it_value{data, static_cast<size_t>(v_width * start), v_width, v_width, 0};
     for (size_t i = start; i < end; ++i) {
-        const auto offset = static_cast<size_t>(i * v_width);
-        total_sum += *(data + offset);
+        const auto v = sign_extend_field(v_width, it_value.get_value());
+        total_sum += v;
+        ++it_value;
     }
     return total_sum;
 }
@@ -149,12 +176,13 @@ void inline ArrayPacked::get_encode_info(const char* h, size_t& v_width, size_t&
 template <typename F>
 size_t ArrayPacked::find_first(const Array& arr, int64_t key, size_t start, size_t end, F cmp)
 {
+    constexpr auto LIMIT = 100;
     const auto h = arr.get_header();
     size_t v_width, v_size;
     get_encode_info(h, v_width, v_size);
 
     auto data = (uint64_t*)arr.m_data;
-    if (v_size <= 30) {
+    if (v_size <= LIMIT) {
         for (size_t i = start; i < end; ++i) {
             const bf_iterator it_value{data, static_cast<size_t>(v_width * i), v_width, v_width, 0};
             auto v = sign_extend_field(v_width, it_value.get_value());

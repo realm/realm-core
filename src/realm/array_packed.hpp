@@ -37,9 +37,10 @@ public:
     std::vector<int64_t> fetch_signed_values_from_encoded_array(const Array&) const;
     NodeHeader::Encoding get_encoding() const;
     // get or set
+    int64_t get(const Array&, size_t) const;
     static int64_t get(const char*, size_t);
-    void get_chunk(const char* h, size_t ndx, int64_t res[8]) const;
-    void set_direct(const char*, size_t, int64_t) const;
+    void get_chunk(const Array&, size_t ndx, int64_t res[8]) const;
+    void set_direct(const Array&, size_t, int64_t) const;
     // query
     int64_t sum(const Array&, size_t start, size_t end) const;
     template <typename F>
@@ -47,6 +48,7 @@ public:
 
 private:
     static void get_encode_info(const char*, size_t&, size_t&);
+    static int64_t do_get(uint64_t*, size_t, size_t, size_t); // do not expose this!
 };
 
 

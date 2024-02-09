@@ -36,8 +36,8 @@ public:
     size_t size(const char* header);
 
     // get/set
-    static int64_t get(const char*, size_t);
     int64_t get(const Array&, size_t) const;
+    static int64_t get(const char*, size_t);
     void get_chunk(const Array&, size_t ndx, int64_t res[8]) const;
     void set_direct(const Array&, size_t, int64_t) const;
 

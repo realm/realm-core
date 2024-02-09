@@ -75,30 +75,44 @@ void ArrayFlex::copy_data(const Array& arr, const std::vector<int64_t>& values,
     }
 }
 
-void ArrayFlex::set_direct(const char* h, size_t ndx, int64_t value) const
+void ArrayFlex::set_direct(const Array& arr, size_t ndx, int64_t value) const
 {
     size_t v_width, ndx_width, v_size, ndx_size;
-    get_encode_info(h, v_width, ndx_width, v_size, ndx_size);
+    get_encode_info(arr.get_header(), v_width, ndx_width, v_size, ndx_size);
     REALM_ASSERT_DEBUG(ndx < ndx_size);
-    auto data = (uint64_t*)NodeHeader::get_data_from_header(h);
+    auto data = (uint64_t*)arr.m_data;
     uint64_t offset = v_size * v_width;
     bf_iterator it_index{data, static_cast<size_t>(offset + (ndx * ndx_width)), ndx_width, ndx_size, 0};
     bf_iterator it_value{data, static_cast<size_t>(it_index.get_value() * v_width), v_width, v_width, 0};
     it_value.set_value(value);
 }
 
+int64_t ArrayFlex::get(const Array& arr, size_t ndx) const
+{
+    using Encoding = NodeHeader::Encoding;
+    REALM_ASSERT_DEBUG(arr.m_kind == 'B');
+    REALM_ASSERT_DEBUG(arr.m_encoding == Encoding::Flex);
+    size_t v_size, ndx_size, v_width, ndx_width;
+    get_encode_info(arr.get_header(), v_width, ndx_width, v_size, ndx_size);
+    return do_get((uint64_t*)arr.m_data, ndx, v_width, ndx_width, v_size, ndx_size);
+}
+
 int64_t ArrayFlex::get(const char* h, size_t ndx)
 {
     using Encoding = NodeHeader::Encoding;
     REALM_ASSERT_DEBUG(NodeHeader::get_kind(h) == 'B');
-    REALM_ASSERT_DEBUG(NodeHeader::get_encoding(h) == NodeHeader::Encoding::Flex);
-    const auto v_size = NodeHeader::get_arrayA_num_elements<Encoding::Flex>(h);
-    const auto ndx_size = NodeHeader::get_arrayB_num_elements<Encoding::Flex>(h);
-    const auto v_width = NodeHeader::get_elementA_size<Encoding::Flex>(h);
-    const auto ndx_width = NodeHeader::get_elementB_size<Encoding::Flex>(h);
+    REALM_ASSERT_DEBUG(NodeHeader::get_encoding(h) == Encoding::Flex);
+    size_t v_size, ndx_size, v_width, ndx_width;
+    get_encode_info(h, v_width, ndx_width, v_size, ndx_size);
+    const auto data = (uint64_t*)(NodeHeader::get_data_from_header(h));
+    return do_get(data, ndx, v_width, ndx_width, v_size, ndx_size);
+}
+
+int64_t ArrayFlex::do_get(uint64_t* data, size_t ndx, size_t v_width, size_t ndx_width, size_t v_size,
+                          size_t ndx_size)
+{
     if (ndx >= ndx_size)
         return realm::not_found;
-    const auto data = (uint64_t*)NodeHeader::get_data_from_header(h);
     const uint64_t offset = v_size * v_width;
     const bf_iterator it_index{data, static_cast<size_t>(offset + (ndx * ndx_width)), ndx_width, ndx_width, 0};
     const bf_iterator it_value{data, static_cast<size_t>(v_width * it_index.get_value()), v_width, v_width, 0};
@@ -106,10 +120,10 @@ int64_t ArrayFlex::get(const char* h, size_t ndx)
     return v;
 }
 
-void ArrayFlex::get_chunk(const char* h, size_t ndx, int64_t res[8]) const
+void ArrayFlex::get_chunk(const Array& arr, size_t ndx, int64_t res[8]) const
 {
     size_t v_width, ndx_width, v_size, ndx_size;
-    get_encode_info(h, v_width, ndx_width, v_size, ndx_size);
+    get_encode_info(arr.get_header(), v_width, ndx_width, v_size, ndx_size);
     REALM_ASSERT_DEBUG(ndx < ndx_width);
     auto sz = 8;
     std::memset(res, 0, sizeof(int64_t) * sz);
@@ -117,10 +131,10 @@ void ArrayFlex::get_chunk(const char* h, size_t ndx, int64_t res[8]) const
     size_t i = ndx;
     size_t index = 0;
     for (; i < supposed_end; ++i) {
-        res[index++] = get(h, i);
+        res[index++] = get(arr, i);
     }
     for (; index < 8; ++index) {
-        res[index++] = get(h, i++);
+        res[index++] = get(arr, i++);
     }
 }
 
@@ -184,11 +198,13 @@ size_t ArrayFlex::find_first(const Array& arr, int64_t key, size_t start, size_t
 {
     REALM_ASSERT_DEBUG(arr.is_attached());
 
+    constexpr auto LIMIT = 100;
+
     size_t v_width, v_size, ndx_width, ndx_size;
     const auto h = arr.get_header();
     get_encode_info(h, v_width, v_size, ndx_width, ndx_size);
 
-    if (ndx_size <= 15) {
+    if (ndx_size <= LIMIT) {
         const auto ndx_offset = v_size * v_width;
         for (size_t i = 0; i < ndx_size; ++i) {
             auto data = (uint64_t*)arr.m_data;
