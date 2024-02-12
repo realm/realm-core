@@ -1274,7 +1274,7 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
             size_t buffer_size = util::base64_decoded_size(encoded_size);
             std::string decode_buffer(buffer_size, char(0));
             StringData window(text.c_str() + 4, encoded_size);
-            util::Optional<size_t> decoded_size = util::base64_decode(window, decode_buffer.data(), buffer_size);
+            util::Optional<size_t> decoded_size = util::base64_decode(window, decode_buffer);
             if (!decoded_size) {
                 throw SyntaxError("Invalid base64 value");
             }

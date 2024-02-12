@@ -44,7 +44,6 @@ class SyncUser;
 class SyncFileManager;
 class SyncMetadataManager;
 class SyncFileActionMetadata;
-class SyncAppMetadata;
 
 namespace _impl {
 struct SyncClient;
@@ -221,8 +220,6 @@ public:
     // calling this method.
     void reset_for_testing() REQUIRES(!m_mutex, !m_file_system_mutex, !m_user_mutex, !m_session_mutex);
 
-    // Get the app metadata for the active app.
-    util::Optional<SyncAppMetadata> app_metadata() const REQUIRES(!m_file_system_mutex);
 
     // Immediately closes any open sync sessions for this sync manager
     void close_all_sessions() REQUIRES(!m_mutex, !m_session_mutex);
@@ -298,16 +295,15 @@ private:
     std::shared_ptr<SyncUser> get_user_for_identity(std::string const& identity) const noexcept
         REQUIRES(m_user_mutex);
 
-    mutable util::CheckedMutex m_mutex;
+    util::CheckedMutex m_mutex;
 
-    bool run_file_action(SyncFileActionMetadata&) REQUIRES(m_file_system_mutex);
     void init_metadata(SyncClientConfig config, const std::string& app_id);
 
     // internally create a new logger - used by configure() and set_logger_factory()
     void do_make_logger() REQUIRES(m_mutex);
 
     // Protects m_users
-    mutable util::CheckedMutex m_user_mutex;
+    util::CheckedMutex m_user_mutex;
 
     // A vector of all SyncUser objects.
     std::vector<std::shared_ptr<SyncUser>> m_users GUARDED_BY(m_user_mutex);
@@ -319,12 +315,12 @@ private:
     mutable std::shared_ptr<util::Logger> m_logger_ptr GUARDED_BY(m_mutex);
 
     // Protects m_file_manager and m_metadata_manager
-    mutable util::CheckedMutex m_file_system_mutex;
+    util::CheckedMutex m_file_system_mutex;
     std::unique_ptr<SyncFileManager> m_file_manager GUARDED_BY(m_file_system_mutex);
     std::unique_ptr<SyncMetadataManager> m_metadata_manager GUARDED_BY(m_file_system_mutex);
 
     // Protects m_sessions
-    mutable util::CheckedMutex m_session_mutex;
+    util::CheckedMutex m_session_mutex;
 
     // Map of sessions by path name.
     // Sessions remove themselves from this map by calling `unregister_session` once they're

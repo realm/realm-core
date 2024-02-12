@@ -39,7 +39,6 @@ class SyncUser;
 class SyncSession;
 class SyncManager;
 struct SyncClientConfig;
-class SyncAppMetadata;
 
 namespace app {
 
@@ -434,11 +433,9 @@ public:
     std::string get_ws_host_url() REQUIRES(!m_route_mutex);
 
 private:
-    // Local copy of app config
-    Config m_config;
+    const Config m_config;
 
-    // mutable to allow locking for reads in const functions
-    mutable util::CheckedMutex m_route_mutex;
+    util::CheckedMutex m_route_mutex;
 
     // The following variables hold the different paths to Atlas, depending on the
     // request being performed
