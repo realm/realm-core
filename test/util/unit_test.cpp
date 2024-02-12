@@ -409,25 +409,6 @@ private:
     patterns m_include, m_exclude;
 };
 
-
-class IntraTestLogger : public Logger {
-public:
-    IntraTestLogger(Logger& base_logger, Level threshold)
-        : util::Logger(threshold)
-        , m_base_logger(base_logger)
-    {
-    }
-
-    void do_log(Logger::Level level, std::string const& message) override final
-    {
-        Logger::do_log(m_base_logger, level, message); // Throws
-    }
-
-private:
-    Logger& m_base_logger;
-};
-
-
 } // anonymous namespace
 
 
@@ -455,9 +436,10 @@ public:
     int num_ended_threads = 0;
     int last_thread_to_end = -1;
 
-    SharedContextImpl(const TestList& tests, int repetitions, int threads, util::Logger& logger, Reporter& reporter,
-                      bool aof, util::Logger::Level itll)
-        : SharedContext(tests, repetitions, threads, logger)
+    SharedContextImpl(const TestList& tests, int repetitions, int threads,
+                      const std::shared_ptr<util::Logger>& logger_ptr, Reporter& reporter, bool aof,
+                      util::Logger::Level itll)
+        : SharedContext(tests, repetitions, threads, logger_ptr)
         , reporter(reporter)
         , abort_on_failure(aof)
         , intra_test_log_level(itll)
@@ -481,9 +463,10 @@ public:
     std::atomic<long> last_line_seen;
     bool errors_seen;
 
-    ThreadContextImpl(SharedContextImpl& sc, int ti, util::Logger* attached_logger)
-        : ThreadContext(sc, ti, attached_logger ? *attached_logger : sc.report_logger)
-        , intra_test_logger(std::make_shared<IntraTestLogger>(ThreadContext::report_logger, sc.intra_test_log_level))
+    ThreadContextImpl(SharedContextImpl& sc, int ti, const std::shared_ptr<util::Logger>& attached_logger)
+        : ThreadContext(sc, ti, attached_logger ? attached_logger : sc.report_logger_ptr)
+        , intra_test_logger(
+              std::make_shared<LocalThresholdLogger>(ThreadContext::report_logger_ptr, sc.intra_test_log_level))
         , shared_context(sc)
     {
     }
@@ -529,22 +512,21 @@ bool TestList::run(Config config)
     if (config.num_threads < 1)
         throw std::runtime_error("Bad number of threads");
 
-    std::shared_ptr<util::Logger> root_logger;
+    std::shared_ptr<util::Logger> shared_logger;
     if (config.logger) {
-        root_logger = config.logger;
+        shared_logger = config.logger;
     }
     else {
         if (config.log_timestamps) {
             util::TimestampStderrLogger::Config config;
             config.precision = util::TimestampStderrLogger::Precision::milliseconds;
             config.format = "%FT%T";
-            root_logger = std::make_shared<util::TimestampStderrLogger>(std::move(config)); // Throws
+            shared_logger = std::make_shared<util::TimestampStderrLogger>(std::move(config)); // Throws
         }
         else {
-            root_logger = std::make_shared<util::StderrLogger>(); // Throws
+            shared_logger = util::Logger::get_default_logger(); // Throws
         }
     }
-    util::ThreadSafeLogger shared_logger(root_logger);
 
     Reporter fallback_reporter;
     Reporter& reporter = config.reporter ? *config.reporter : fallback_reporter;
@@ -606,7 +588,7 @@ bool TestList::run(Config config)
                                      config.abort_on_failure, config.intra_test_log_level);
     shared_context.concur_tests = std::move(concur_tests);
     shared_context.no_concur_tests = std::move(no_concur_tests);
-    std::vector<std::unique_ptr<util::Logger>> loggers(num_threads);
+    std::vector<std::shared_ptr<util::Logger>> loggers(num_threads);
     if (num_threads != 1 || !config.per_thread_log_path.empty()) {
         std::ostringstream formatter;
         formatter.imbue(std::locale::classic());
@@ -630,21 +612,21 @@ bool TestList::run(Config config)
                 formatter.str(std::string());
                 formatter << a << std::setw(thread_digits) << (i + 1) << b;
                 std::string path = formatter.str();
-                shared_logger.info("Logging to %1", path);
+                shared_logger->info("Logging to %1", path);
                 loggers[i].reset(new util::FileLogger(path));
             }
         }
     }
     Timer timer;
     if (num_threads == 1) {
-        ThreadContextImpl thread_context(shared_context, 0, loggers[0].get());
+        ThreadContextImpl thread_context(shared_context, 0, loggers[0]);
         thread_context.run();
         thread_context.nonconcur_run();
     }
     else {
         std::vector<std::unique_ptr<ThreadContextImpl>> thread_contexts(num_threads);
         for (int i = 0; i < num_threads; ++i)
-            thread_contexts[i].reset(new ThreadContextImpl(shared_context, i, loggers[i].get()));
+            thread_contexts[i].reset(new ThreadContextImpl(shared_context, i, loggers[i]));
 
         // First execute regular (concurrent) tests
         {
@@ -1051,7 +1033,7 @@ void SimpleReporter::fail(const TestContext& context, const char* file, long lin
     if (m_report_progress) {
         m_error_messages.push_back(msg);
     }
-    context.thread_context.report_logger.info(msg.c_str());
+    context.thread_context.report_logger.info("%1", msg.c_str());
 }
 
 void SimpleReporter::thread_end(const ThreadContext& context)
@@ -1078,6 +1060,9 @@ void SimpleReporter::summary(const SharedContext& context, const Summary& result
         for (auto& str : m_error_messages) {
             logger.info(str.c_str());
         }
+    }
+    if (auto ident = getenv("REALM_CHILD_IDENT")) {
+        logger.info("Spawned process with ident '%1' completed.", ident);
     }
     logger.info("Test time: %1", Timer::format(results_summary.elapsed_seconds));
     if (results_summary.num_excluded_tests >= 1) {

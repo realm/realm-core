@@ -236,30 +236,39 @@ inline void InterprocessMutex::set_shared_part(SharedPart& shared_part, const st
     static_cast<void>(shared_part);
 
     free_lock_info();
-
-    m_filename = path + "." + mutex_name + ".mx";
+    if (path.size() == 0) {
+        m_filename = make_temp_file(mutex_name.c_str());
+    }
+    else {
+        m_filename = path + "." + mutex_name + ".mx";
+    }
 
     std::lock_guard<Mutex> guard(*s_mutex);
 
     // Try to get the file uid if the file exists
-    if (File::get_unique_id(m_filename, m_fileuid)) {
+    if (auto uid = File::get_unique_id(m_filename)) {
+        m_fileuid = std::move(*uid);
         auto result = s_info_map->find(m_fileuid);
         if (result != s_info_map->end()) {
             // File exists and the lock info has been created in the map.
             m_lock_info = result->second.lock();
+            REALM_ASSERT_RELEASE(m_lock_info && m_lock_info->m_file.get_path() == m_filename);
             return;
         }
     }
 
     // LockInfo has not been created yet.
     m_lock_info = std::make_shared<LockInfo>();
-    // Always use mod_Write to open file and retreive the uid in case other process
-    // deletes the file.
-    m_lock_info->m_file.open(m_filename, File::mode_Write);
+    // Always open file for write and retreive the uid in case other process
+    // deletes the file. Avoid using just mode_Write (which implies truncate).
+    // On fat32/exfat uid could be reused by OS in a situation when
+    // multiple processes open and truncate the same lock file concurrently.
+    m_lock_info->m_file.open(m_filename, File::mode_Append);
     // exFAT does not allocate a unique id for the file until it's non-empty
     m_lock_info->m_file.resize(1);
     m_fileuid = m_lock_info->m_file.get_unique_id();
 
+    REALM_ASSERT_RELEASE(s_info_map->find(m_fileuid) == s_info_map->end());
     (*s_info_map)[m_fileuid] = m_lock_info;
 #elif defined(_WIN32)
     if (m_handle) {
@@ -326,7 +335,7 @@ inline void InterprocessMutex::lock()
 {
 #if REALM_ROBUST_MUTEX_EMULATION
     std::unique_lock mutex_lock(m_lock_info->m_local_mutex);
-    m_lock_info->m_file.lock_exclusive();
+    m_lock_info->m_file.lock();
     mutex_lock.release();
 #else
 
@@ -347,7 +356,7 @@ inline bool InterprocessMutex::try_lock()
     if (!mutex_lock.owns_lock()) {
         return false;
     }
-    bool success = m_lock_info->m_file.try_lock_exclusive();
+    bool success = m_lock_info->m_file.try_lock();
     if (success) {
         mutex_lock.release();
         return true;

@@ -376,6 +376,7 @@ bool run_tests(const std::shared_ptr<realm::util::Logger>& logger = nullptr)
         if (str && strlen(str) != 0)
             keep_test_files();
     }
+    const bool running_spawned_process = getenv("REALM_SPAWNED");
 
     TestList::Config config;
     config.logger = logger;
@@ -398,13 +399,15 @@ bool run_tests(const std::shared_ptr<realm::util::Logger>& logger = nullptr)
             bool bad = !in || in.get() != std::char_traits<char>::eof() || config.num_threads < 1;
             if (bad)
                 throw std::runtime_error("Bad number of threads");
-            if (config.num_threads > 1)
+            if (config.num_threads > 1 && !running_spawned_process)
                 std::cout << "Number of test threads: " << config.num_threads << "\n\n";
         }
         else {
             config.num_threads = std::thread::hardware_concurrency();
-            std::cout << "Number of test threads: " << config.num_threads << " (default)\n";
-            std::cout << "(Use UNITTEST_THREADS=1 to serialize testing) \n\n";
+            if (!running_spawned_process) {
+                std::cout << "Number of test threads: " << config.num_threads << " (default)\n";
+                std::cout << "(Use UNITTEST_THREADS=1 to serialize testing) \n\n";
+            }
         }
     }
 
@@ -567,9 +570,9 @@ int test_all(const std::shared_ptr<realm::util::Logger>& logger)
     set_always_encrypt();
 
     fix_max_open_files();
-    // fix_test_libexec_path(argv[0]);
 
-    display_build_config();
+    if (!getenv("REALM_SPAWNED"))
+        display_build_config();
 
     long num_open_files = get_num_open_files();
 
@@ -589,8 +592,8 @@ int test_all(const std::shared_ptr<realm::util::Logger>& logger)
     }
 
 #ifdef _MSC_VER
-    // We don't want forked processes (see winfork() to require user interaction).
-    if(!getenv("REALM_FORKED"))
+    // We don't want spawned processes (see spawned_process.hpp to require user interaction).
+    if (!getenv("REALM_SPAWNED"))
         getchar(); // wait for key
 #endif
 

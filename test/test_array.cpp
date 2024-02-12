@@ -95,6 +95,27 @@ void has_zero_byte(TestContext& test_context, int64_t value, size_t reps)
 
 } // anonymous namespace
 
+TEST(Array_Bits)
+{
+    CHECK_EQUAL(NodeHeader::unsigned_to_num_bits(0), 0);
+    CHECK_EQUAL(NodeHeader::unsigned_to_num_bits(1), 1);
+    CHECK_EQUAL(NodeHeader::unsigned_to_num_bits(2), 2);
+    CHECK_EQUAL(NodeHeader::unsigned_to_num_bits(3), 2);
+    CHECK_EQUAL(NodeHeader::unsigned_to_num_bits(4), 3);
+    CHECK_EQUAL(NodeHeader::unsigned_to_num_bits(5), 3);
+    CHECK_EQUAL(NodeHeader::unsigned_to_num_bits(7), 3);
+    CHECK_EQUAL(NodeHeader::unsigned_to_num_bits(8), 4);
+    CHECK_EQUAL(NodeHeader::signed_to_num_bits(0), 1);
+    CHECK_EQUAL(NodeHeader::signed_to_num_bits(1), 2);
+    CHECK_EQUAL(NodeHeader::signed_to_num_bits(-1), 1);
+    CHECK_EQUAL(NodeHeader::signed_to_num_bits(-2), 2);
+    CHECK_EQUAL(NodeHeader::signed_to_num_bits(-3), 3);
+    CHECK_EQUAL(NodeHeader::signed_to_num_bits(-4), 3);
+    CHECK_EQUAL(NodeHeader::signed_to_num_bits(3), 3);
+    CHECK_EQUAL(NodeHeader::signed_to_num_bits(4), 4);
+    CHECK_EQUAL(NodeHeader::signed_to_num_bits(7), 4);
+}
+
 TEST(Array_General)
 {
     Array c(Allocator::get_default());
@@ -1394,60 +1415,6 @@ TEST(Array_NotEqual)
 }
 
 
-TEST(Array_Copy)
-{
-    Array a(Allocator::get_default());
-    a.create(Array::type_Normal);
-
-    a.add(0);
-    a.add(1);
-    a.add(2);
-    a.add(3);
-    a.add(4);
-
-    Array b(Allocator::get_default());
-    b.init_from_mem(a.clone_deep(Allocator::get_default()));
-
-#ifdef REALM_DEBUG
-    b.verify();
-#endif
-
-    CHECK_EQUAL(5, b.size());
-    CHECK_EQUAL(0, b.get(0));
-    CHECK_EQUAL(1, b.get(1));
-    CHECK_EQUAL(2, b.get(2));
-    CHECK_EQUAL(3, b.get(3));
-    CHECK_EQUAL(4, b.get(4));
-
-    // With sub-arrays
-    Array c(Allocator::get_default());
-    c.create(Array::type_HasRefs);
-    c.add(a.get_ref());
-
-    Array d(Allocator::get_default());
-    d.init_from_mem(c.clone_deep(Allocator::get_default()));
-
-#ifdef REALM_DEBUG
-    d.verify();
-#endif
-
-    CHECK(d.has_refs());
-    CHECK_EQUAL(1, d.size());
-
-    Array e(d.get_alloc());
-    e.init_from_ref(to_ref(d.get(0)));
-    CHECK_EQUAL(5, e.size());
-    CHECK_EQUAL(0, e.get(0));
-    CHECK_EQUAL(1, e.get(1));
-    CHECK_EQUAL(2, e.get(2));
-    CHECK_EQUAL(3, e.get(3));
-    CHECK_EQUAL(4, e.get(4));
-
-    b.destroy();
-    c.destroy_deep();
-    d.destroy_deep();
-}
-
 TEST(Array_Large)
 {
     Array c(Allocator::get_default());
@@ -1462,6 +1429,235 @@ TEST(Array_Large)
     CHECK_EQUAL(c.size(), 0x300001);
     CHECK_EQUAL(c.get(0x300000), 0x300000 - 1);
     c.destroy();
+}
+
+TEST(Array_set_type)
+{
+    Array c(Allocator::get_default());
+    c.create(Array::type_Normal);
+
+    c.set_type(Array::type_Normal);
+    CHECK_EQUAL(c.get_type(), Array::type_Normal);
+
+    c.set_type(Array::type_InnerBptreeNode);
+    CHECK_EQUAL(c.get_type(), Array::type_InnerBptreeNode);
+
+    c.set_type(Array::type_HasRefs);
+    CHECK_EQUAL(c.get_type(), Array::type_HasRefs);
+
+    c.destroy();
+}
+
+TEST(Array_get_sum)
+{
+    Array c(Allocator::get_default());
+    c.create(Array::type_Normal);
+
+    // simple sum1
+    for (int i = 0; i < 0x10; i++)
+        c.add(i);
+    CHECK_EQUAL(c.get_sum(), 120);
+    c.clear();
+
+    const auto size = realm::max_array_size / 4;
+
+    // test multiple chunks w=1
+    for (uint64_t i = 0; i < size; ++i)
+        c.add(0x1);
+    CHECK_EQUAL(c.get_sum(), size);
+
+    // test multiple chunks w=2
+    c.clear();
+    for (uint64_t i = 0; i < size; ++i)
+        c.add(0x3);
+    CHECK_EQUAL(c.get_sum(), 0x3 * size);
+
+    // test multiple chunks w=4
+    c.clear();
+    for (uint64_t i = 0; i < size; ++i)
+        c.add(0x13);
+    CHECK_EQUAL(c.get_sum(), 0x13 * size);
+
+    // test multiple chunks w=8
+    c.clear();
+    for (uint64_t i = 0; i < size; ++i)
+        c.add(0x100);
+    CHECK_EQUAL(c.get_sum(), 0x100 * size);
+
+    // test multiple chunks w=16
+    c.clear();
+    for (uint64_t i = 0; i < size; ++i) {
+        c.add(0x10000);
+    }
+    CHECK_EQUAL(c.get_sum(), 0x10000LL * size);
+
+    // test multiple chunks w=32
+    c.clear();
+    for (uint64_t i = 0; i < size; ++i)
+        c.add(0x100000);
+    CHECK_EQUAL(c.get_sum(), 0x100000LL * size);
+
+    // test multiple chunks w=64
+    c.clear();
+    for (uint64_t i = 0; i < size; ++i)
+        c.add(8000000000LL);
+    CHECK_EQUAL(c.get_sum(), (size * 8000000000LL));
+
+    // test generic case
+    c.clear();
+    uint64_t expected = 0;
+    for (uint64_t i = 0; i < 0x30000; ++i) {
+        c.add(i);
+        expected += i;
+    }
+    CHECK_EQUAL(c.get_sum(), expected);
+
+    c.destroy();
+}
+
+// NONCONCURRENT because if run in parallel with other tests which request large amounts of
+// memory, there may be a std::bad_alloc on low memory machines
+NONCONCURRENT_TEST(Array_count)
+{
+    struct TestArray : public Array {
+        explicit TestArray(Allocator& allocator)
+            : Array(allocator)
+        {
+        }
+        size_t count(int64_t v)
+        {
+            return Array::count(v);
+        }
+    };
+
+    TestArray c(Allocator::get_default());
+    c.create(Array::type_Normal);
+    const size_t size = realm::max_array_size;
+
+    // test multiple chunks w=1
+    c.clear();
+    for (uint64_t i = 0; i < size; ++i)
+        c.add(0x1);
+    CHECK_EQUAL(c.count(0x1), size);
+
+    // test multiple chunks w=2
+    c.clear();
+    for (uint64_t i = 0; i < size; ++i)
+        c.add(0x3);
+    CHECK_EQUAL(c.count(0x3), size);
+
+    // test multiple chunks w=4
+    c.clear();
+    for (uint64_t i = 0; i < size; ++i)
+        c.add(0x13);
+    CHECK_EQUAL(c.count(0x13), size);
+
+    // test multiple chunks w=8
+    c.clear();
+    for (uint64_t i = 0; i < size; ++i)
+        c.add(0x100);
+    CHECK_EQUAL(c.count(0x100), size);
+
+    // test multiple chunks w=16
+    c.clear();
+    for (uint64_t i = 0; i < size; ++i)
+        c.add(0x10000);
+    CHECK_EQUAL(c.count(0x10000), size);
+
+    // test w=32 (number of chunks does not matter)
+    c.clear();
+    const size_t size_32_64_bit = 10;
+    for (uint64_t i = 0; i < size_32_64_bit; ++i)
+        c.add(100000);
+    CHECK_EQUAL(c.count(100000), size_32_64_bit);
+
+    // test w=64 (number of chunks does not matter)
+    c.clear();
+    for (uint64_t i = 0; i < size_32_64_bit; ++i)
+        c.add(8000000000LL);
+    CHECK_EQUAL(c.count(8000000000LL), size_32_64_bit);
+
+    c.destroy();
+}
+
+TEST(DirectBitFields)
+{
+    uint64_t a[2];
+    a[0] = a[1] = 0;
+    {
+        bf_iterator it(a, 0, 7, 7, 8);
+        REALM_ASSERT(*it == 0);
+        auto it2(it);
+        ++it2;
+        *it2 = 127 + 128;
+        REALM_ASSERT(*it == 0);
+        ++it;
+        REALM_ASSERT(*it == 127);
+        ++it;
+        REALM_ASSERT(*it == 0);
+    }
+    // reverse polarity
+    a[0] = a[1] = -1ULL;
+    {
+        bf_iterator it(a, 0, 7, 7, 8);
+        REALM_ASSERT(*it == 127);
+        auto it2(it);
+        ++it2;
+        *it2 = 42 + 128;
+        REALM_ASSERT(*it == 127);
+        ++it;
+        REALM_ASSERT(*it == 42);
+        ++it;
+        REALM_ASSERT(*it == 127);
+    }
+}
+
+TEST(B_Array_creation)
+{
+    using Encoding = NodeHeader::Encoding;
+    Array array(Allocator::get_default());
+    auto& allocator = array.get_alloc();
+    auto mem = allocator.alloc(10);
+    NodeHeader::init_header(mem.get_addr(), 'B', Encoding::Flex, 14, 1, 1, 1, 1);
+    array.init_from_mem(mem);
+    auto array_header = array.get_header();
+    CHECK_EQUAL(array.get_kind(array_header), 'B');
+    auto encoding = array.get_encoding(array_header);
+    REALM_ASSERT(encoding == Encoding::Flex); // this is missing << operator in order to be printed in case of error
+    CHECK_EQUAL(array.get_flags(array_header), 14);
+    CHECK_EQUAL(array.get_elementA_size<Encoding::Flex>(array_header), 1);
+    CHECK_EQUAL(array.get_elementB_size<Encoding::Flex>(array_header), 1);
+    CHECK_EQUAL(array.get_arrayA_num_elements<Encoding::Flex>(array_header), 1);
+    CHECK_EQUAL(array.get_arrayB_num_elements<Encoding::Flex>(array_header), 1);
+    // set flags explicitely (this should not change kind and encoding)
+    array.set_flags(array_header, 11);
+    auto flags = array.get_flags(array_header);
+    CHECK_EQUAL(flags, 11);
+    CHECK_EQUAL(array.get_kind(array_header), 'B');
+    REALM_ASSERT(array.get_encoding(array_header) == Encoding::Flex);
+    allocator.free_(mem);
+}
+
+TEST(B_Array_encoding)
+{
+    using Encoding = NodeHeader::Encoding;
+    Array array(Allocator::get_default());
+    auto mem = array.get_alloc().alloc(10);
+    NodeHeader::init_header(mem.get_addr(), 'B', Encoding::Flex, 14, 1, 1, 1, 1);
+    array.init_from_mem(mem);
+    auto array_header = array.get_header();
+    CHECK_EQUAL(array.get_kind(array_header), 'B');
+    auto encoding = array.get_encoding(array_header);
+    CHECK(encoding == Encoding::Flex);
+
+    Array another_array(Allocator::get_default());
+    another_array.init_from_ref(array.get_ref());
+    auto another_header = another_array.get_header();
+    CHECK_EQUAL(another_array.get_kind(another_header), 'B');
+    auto another_encoding = another_array.get_encoding(another_header);
+    CHECK(encoding == another_encoding);
+
+    array.get_alloc().free_(mem);
 }
 
 #endif // TEST_ARRAY

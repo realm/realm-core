@@ -1,12 +1,12 @@
 add_subdirectory(c_api)
 
 set(SOURCES
-    binding_callback_thread_observer.cpp
     collection.cpp
     collection_notifications.cpp
     dictionary.cpp
     index_set.cpp
     list.cpp
+    class.cpp
     object.cpp
     object_changeset.cpp
     object_schema.cpp
@@ -38,7 +38,6 @@ set(SOURCES
 set(HEADERS
     audit.hpp
     audit_serializer.hpp
-    binding_callback_thread_observer.hpp
     binding_context.hpp
     collection.hpp
     collection_notifications.hpp
@@ -47,6 +46,7 @@ set(HEADERS
     index_set.hpp
     keypath_helpers.hpp
     list.hpp
+    class.hpp
     object.hpp
     object_accessor.hpp
     object_changeset.hpp
@@ -110,14 +110,7 @@ if(REALM_ENABLE_SYNC)
         sync/impl/sync_client.hpp
         sync/impl/sync_file.hpp
         sync/impl/sync_metadata.hpp
-        sync/impl/network_reachability.hpp
-
-        util/bson/bson.hpp
-        util/bson/min_key.hpp
-        util/bson/max_key.hpp
-        util/bson/regular_expression.hpp
-        util/bson/indexed_map.hpp
-        util/bson/mongo_timestamp.hpp)
+        sync/impl/network_reachability.hpp)
 
     list(APPEND SOURCES
         sync/app.cpp
@@ -133,9 +126,7 @@ if(REALM_ENABLE_SYNC)
         sync/mongo_database.cpp
         sync/push_client.cpp
         sync/impl/sync_file.cpp
-        sync/impl/sync_metadata.cpp
-        util/bson/bson.cpp
-        util/bson/regular_expression.cpp)
+        sync/impl/sync_metadata.cpp)
     if(APPLE)
         list(APPEND HEADERS
             sync/impl/apple/network_reachability_observer.hpp
@@ -145,6 +136,13 @@ if(REALM_ENABLE_SYNC)
             audit.mm
             sync/impl/apple/network_reachability_observer.cpp
             sync/impl/apple/system_configuration.cpp)
+    elseif(EMSCRIPTEN)
+        list(APPEND HEADERS
+            sync/impl/emscripten/network_transport.hpp
+            sync/impl/emscripten/socket_provider.hpp)
+        list(APPEND SOURCES
+            sync/impl/emscripten/network_transport.cpp
+            sync/impl/emscripten/socket_provider.cpp)
     endif()
 endif()
 
@@ -159,13 +157,20 @@ check_symbol_exists(epoll_create sys/epoll.h REALM_HAVE_EPOLL)
 
 if(APPLE)
     target_sources(ObjectStore PRIVATE impl/apple/external_commit_helper.cpp impl/apple/keychain_helper.cpp)
+    target_link_options(ObjectStore INTERFACE "SHELL:-framework Security")
 elseif(REALM_HAVE_EPOLL)
     target_compile_definitions(ObjectStore PUBLIC REALM_HAVE_EPOLL=1)
     target_sources(ObjectStore PRIVATE impl/epoll/external_commit_helper.cpp)
 elseif(CMAKE_SYSTEM_NAME MATCHES "^Windows")
     target_sources(ObjectStore PRIVATE impl/windows/external_commit_helper.cpp)
+elseif(EMSCRIPTEN)
+    target_sources(ObjectStore PRIVATE impl/emscripten/external_commit_helper.cpp)
 else()
     target_sources(ObjectStore PRIVATE impl/generic/external_commit_helper.cpp)
+endif()
+
+if(REALM_ENABLE_SYNC AND NOT REALM_SYNC_MULTIPLEXING)
+    target_compile_definitions(ObjectStore PUBLIC REALM_DISABLE_SYNC_MULTIPLEXING=1)
 endif()
 
 if(REALM_ENABLE_SYNC OR REALM_ENABLE_SERVER)
@@ -182,6 +187,9 @@ target_link_libraries(ObjectStore PUBLIC Storage QueryParser)
 if(REALM_ENABLE_SYNC)
     target_link_libraries(ObjectStore PUBLIC Sync)
     target_compile_definitions(ObjectStore PUBLIC REALM_ENABLE_SYNC=1)
+    if(EMSCRIPTEN)
+        target_link_options(ObjectStore PUBLIC -sFETCH=1 -sFETCH_SUPPORT_INDEXEDDB=0 -lwebsocket.js)
+    endif()
 endif()
 
 set_target_properties(ObjectStore PROPERTIES OUTPUT_NAME "realm-object-store")

@@ -19,7 +19,7 @@ struct CollectionIterator;
 /// Collections are bound to particular properties of an object. In a
 /// collection's public interface, the implementation must take care to keep the
 /// object consistent with the persisted state, mindful of the fact that the
-/// state may have changed as a consquence of modifications from other instances
+/// state may have changed as a consequence of modifications from other instances
 /// referencing the same persisted state.
 class CollectionBase {
 public:
@@ -119,6 +119,27 @@ public:
         return ndx;
     }
 
+    StringData get_property_name() const
+    {
+        return get_table()->get_column_name(get_col_key());
+    }
+
+    bool operator==(const CollectionBase& other) const noexcept
+    {
+        return get_table() == other.get_table() && get_owner_key() == other.get_owner_key() &&
+               get_col_key() == other.get_col_key();
+    }
+
+    bool operator!=(const CollectionBase& other) const noexcept
+    {
+        return !(*this == other);
+    }
+
+    // These are shadowed by typed versions in subclasses
+    using value_type = Mixed;
+    CollectionIterator<CollectionBase> begin() const;
+    CollectionIterator<CollectionBase> end() const;
+
 protected:
     friend class Transaction;
     CollectionBase() noexcept = default;
@@ -126,14 +147,36 @@ protected:
     CollectionBase(CollectionBase&&) noexcept = default;
     CollectionBase& operator=(const CollectionBase&) noexcept = default;
     CollectionBase& operator=(CollectionBase&&) noexcept = default;
+
+    void validate_index(const char* msg, size_t index, size_t size) const;
 };
+
+inline std::string_view collection_type_name(ColKey col, bool uppercase = false)
+{
+    if (col.is_list())
+        return uppercase ? "List" : "list";
+    if (col.is_set())
+        return uppercase ? "Set" : "set";
+    if (col.is_dictionary())
+        return uppercase ? "Dictionary" : "dictionary";
+    return "";
+}
+
+inline void CollectionBase::validate_index(const char* msg, size_t index, size_t size) const
+{
+    if (index >= size) {
+        throw OutOfBounds(util::format("%1 on %2 '%3.%4'", msg, collection_type_name(get_col_key()),
+                                       get_table()->get_class_name(), get_property_name()),
+                          index, size);
+    }
+}
 
 
 template <class T>
 inline void check_column_type(ColKey col)
 {
     if (col && col.get_type() != ColumnTypeTraits<T>::column_id) {
-        throw LogicError(LogicError::collection_type_mismatch);
+        throw InvalidColumnKey();
     }
 }
 
@@ -141,7 +184,7 @@ template <>
 inline void check_column_type<Int>(ColKey col)
 {
     if (col && (col.get_type() != col_type_Int || col.get_attrs().test(col_attr_Nullable))) {
-        throw LogicError(LogicError::collection_type_mismatch);
+        throw InvalidColumnKey();
     }
 }
 
@@ -149,7 +192,7 @@ template <>
 inline void check_column_type<util::Optional<Int>>(ColKey col)
 {
     if (col && (col.get_type() != col_type_Int || !col.get_attrs().test(col_attr_Nullable))) {
-        throw LogicError(LogicError::collection_type_mismatch);
+        throw InvalidColumnKey();
     }
 }
 
@@ -160,7 +203,7 @@ inline void check_column_type<ObjKey>(ColKey col)
         bool is_link_list = (col.get_type() == col_type_LinkList);
         bool is_link_set = (col.is_set() && col.get_type() == col_type_Link);
         if (!(is_link_list || is_link_set))
-            throw LogicError(LogicError::collection_type_mismatch);
+            throw InvalidArgument(ErrorCodes::TypeMismatch, "Property not a list or set");
     }
 }
 
@@ -299,7 +342,7 @@ struct AverageHelper<T, std::void_t<ColumnSumType<T>>> {
 /// Convenience base class for collections, which implements most of the
 /// relevant interfaces for a collection that is bound to an object accessor and
 /// representable as a BPlusTree<T>.
-template <class Interface, class Derived>
+template <class Interface>
 class CollectionBaseImpl : public Interface, protected ArrayParent {
 public:
     static_assert(std::is_base_of_v<CollectionBase, Interface>);
@@ -364,17 +407,6 @@ protected:
 
     CollectionBaseImpl& operator=(const CollectionBaseImpl& other) = default;
     CollectionBaseImpl& operator=(CollectionBaseImpl&& other) = default;
-
-    bool operator==(const Derived& other) const noexcept
-    {
-        return get_table() == other.get_table() && get_owner_key() == other.get_owner_key() &&
-               get_col_key() == other.get_col_key();
-    }
-
-    bool operator!=(const Derived& other) const noexcept
-    {
-        return !(*this == other);
-    }
 
     /// Refresh the associated `Obj` (if needed), and update the internal
     /// content version number. This is meant to be called from a derived class
@@ -569,6 +601,11 @@ protected:
         return _impl::real2virtual(m_unresolved, ndx);
     }
 
+    bool real_is_unresolved(size_t ndx) const noexcept
+    {
+        return std::find(m_unresolved.begin(), m_unresolved.end(), ndx) != m_unresolved.end();
+    }
+
     /// Rebuild the list of tombstones if there is a possibility that it has
     /// changed.
     ///
@@ -652,7 +689,12 @@ struct CollectionIterator {
 
     pointer operator->() const
     {
-        m_val = m_list->get(m_ndx);
+        if constexpr (std::is_same_v<L, CollectionBase>) {
+            m_val = m_list->get_any(m_ndx);
+        }
+        else {
+            m_val = m_list->get(m_ndx);
+        }
         return &m_val;
     }
 
@@ -737,6 +779,20 @@ private:
     const L* m_list;
     size_t m_ndx = size_t(-1);
 };
+
+
+inline CollectionIterator<CollectionBase> CollectionBase::begin() const
+{
+    return CollectionIterator<CollectionBase>(this, 0);
+}
+inline CollectionIterator<CollectionBase> CollectionBase::end() const
+{
+    return CollectionIterator<CollectionBase>(this, size());
+}
+
+namespace _impl {
+size_t get_collection_size_from_ref(ref_type, Allocator& alloc);
+}
 
 } // namespace realm
 

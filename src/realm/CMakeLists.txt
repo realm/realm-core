@@ -12,10 +12,14 @@ set(REALM_SOURCES
     array_blobs_small.cpp
     array_blobs_big.cpp
     array_decimal128.cpp
+    array_encode.cpp
     array_fixed_bytes.cpp
+    array_flex.cpp
+    array_packed.cpp
     array_integer.cpp
     array_key.cpp
     array_mixed.cpp
+    array_packed.cpp
     array_unsigned.cpp
     array_string.cpp
     array_string_short.cpp
@@ -100,8 +104,9 @@ set(UTIL_SOURCES
     util/misc_ext_errors.cpp
     util/random.cpp
     util/resource_limits.cpp
-    util/substitute.cpp
     util/uri.cpp
+    util/bson/bson.cpp
+    util/bson/regular_expression.cpp
 )
 
 set(REALM_INSTALL_HEADERS
@@ -119,12 +124,15 @@ set(REALM_INSTALL_HEADERS
     array_bool.hpp
     array_decimal128.hpp
     array_direct.hpp
+    array_encode.hpp
     array_fixed_bytes.hpp
+    array_flex.hpp
     array_integer.hpp
     array_integer_tpl.hpp
     array_key.hpp
     array_list.hpp
     array_mixed.hpp
+    array_packed.hpp
     array_ref.hpp
     array_string.hpp
     array_string_short.hpp
@@ -149,6 +157,7 @@ set(REALM_INSTALL_HEADERS
     decimal128.hpp
     dictionary.hpp
     disable_sync_to_disk.hpp
+    error_codes.h
     error_codes.hpp
     exceptions.hpp
     global_key.hpp
@@ -208,9 +217,14 @@ set(REALM_INSTALL_HEADERS
     util/base64.hpp
     util/basic_system_errors.hpp
     util/bind_ptr.hpp
+    util/bson/bson.hpp
+    util/bson/indexed_map.hpp
+    util/bson/max_key.hpp
+    util/bson/min_key.hpp
+    util/bson/mongo_timestamp.hpp
+    util/bson/regular_expression.hpp
     util/buffer.hpp
     util/buffer_stream.hpp
-    util/call_with_tuple.hpp
     util/cf_ptr.hpp
     util/checked_mutex.hpp
     util/compression.hpp
@@ -227,17 +241,17 @@ set(REALM_INSTALL_HEADERS
     util/future.hpp
     util/hex_dump.hpp
     util/input_stream.hpp
-    util/inspect.hpp
     util/interprocess_condvar.hpp
     util/interprocess_mutex.hpp
     util/logger.hpp
     util/memory_stream.hpp
     util/misc_errors.hpp
     util/misc_ext_errors.hpp
-    util/miscellaneous.hpp
     util/optional.hpp
     util/overload.hpp
+    util/platform_info.hpp
     util/priority_queue.hpp
+    util/random.hpp
     util/safe_int_ops.hpp
     util/scope_exit.hpp
     util/serializer.hpp
@@ -247,15 +261,8 @@ set(REALM_INSTALL_HEADERS
     util/terminate.hpp
     util/thread.hpp
     util/to_string.hpp
-    util/type_list.hpp
     util/type_traits.hpp
     util/uri.hpp
-    util/utf8.hpp
-
-    metrics/metrics.hpp
-    metrics/metric_timer.hpp
-    metrics/query_info.hpp
-    metrics/transaction_info.hpp
 ) # REALM_INSTALL_HEADERS
 
 set(REALM_NOINST_HEADERS
@@ -268,16 +275,12 @@ set(REALM_NOINST_HEADERS
     util/demangle.hpp
     util/enum.hpp
     util/from_chars.hpp
-    util/get_file_size.hpp
     util/json_parser.hpp
     util/load_file.hpp
-    util/platform_info.hpp
     util/quote.hpp
-    util/random.hpp
     util/resource_limits.hpp
     util/scratch_allocator.hpp
     util/signal_blocker.hpp
-    util/substitute.hpp
     util/thread_exec_guard.hpp
     util/time.hpp
     util/timestamp_formatter.hpp
@@ -285,14 +288,21 @@ set(REALM_NOINST_HEADERS
     util/value_reset_guard.hpp
 ) # REALM_NOINST_HEADERS
 
-list(APPEND REALM_SOURCES
-    metrics/metrics.cpp
-    metrics/metric_timer.cpp
-    metrics/query_info.cpp
-    metrics/transaction_info.cpp)
-
 if(NOT MSVC)
     list(APPEND REALM_SOURCES util/interprocess_mutex.cpp)
+endif()
+
+if (REALM_ENABLE_GEOSPATIAL)
+    list(APPEND REALM_SOURCES geospatial.cpp)
+    list(APPEND REALM_INSTALL_HEADERS geospatial.hpp)
+
+    set_source_files_properties(geospatial.cpp PROPERTIES
+        INCLUDE_DIRECTORIES "${RealmCore_SOURCE_DIR}/src/external"
+        # the only flag not supported with pragma diagnostic disable in src file by gcc until 13.
+        COMPILE_FLAGS "$<$<CXX_COMPILER_ID:GNU>: -Wno-unknown-pragmas>"
+    )
+
+    list(APPEND REALM_OBJECT_FILES $<TARGET_OBJECTS:s2geometry>)
 endif()
 
 add_library(Storage STATIC
@@ -303,13 +313,13 @@ add_library(Storage STATIC
     ${REALM_OBJECT_FILES}
     $<TARGET_OBJECTS:Bid>
 )
+
 add_library(Realm::Storage ALIAS Storage)
 
 set_target_properties(Storage PROPERTIES
     OUTPUT_NAME "realm"
 )
 
-target_compile_options(Storage PUBLIC ${REALM_SANITIZER_FLAGS})
 if(REALM_USE_FAST_LINKER)
     target_link_options(Storage PUBLIC ${REALM_USE_FAST_LINKER})
 endif()
@@ -318,9 +328,12 @@ target_compile_definitions(Storage PUBLIC
   $<$<CONFIG:Debug>:REALM_DEBUG=1>
 )
 
-if(NOT MSVC)
+if (REALM_SANITIZER_FLAGS)
     target_compile_options(Storage PUBLIC ${REALM_SANITIZER_FLAGS})
-    target_link_options(Storage PUBLIC ${REALM_SANITIZER_FLAGS})
+
+    if (REALM_SANITIZER_LINK_FLAGS)
+        target_link_options(Storage PUBLIC ${REALM_SANITIZER_LINK_FLAGS})
+    endif()
 endif()
 
 target_include_directories(Storage INTERFACE
@@ -329,8 +342,24 @@ target_include_directories(Storage INTERFACE
     $<INSTALL_INTERFACE:include>
 )
 
+# On systems without a built-in SHA-1 implementation (or one provided by a dependency)
+# we need to bundle the public domain implementation.
+if(NOT APPLE AND NOT CMAKE_SYSTEM_NAME MATCHES "^Windows" AND NOT REALM_HAVE_OPENSSL)
+    add_library(sha1 OBJECT ../external/sha-1/sha1.c)
+    target_include_directories(Storage PRIVATE ../external/sha-1)
+    target_sources(Storage PRIVATE $<TARGET_OBJECTS:sha1>)
+endif()
+
+# On systems without a built-in SHA-2 implementation (or one provided by a dependency)
+# we need to bundle the public domain implementation.
+# Note: This is also used on Windows because Windows lacks a native SHA224 hash needed for realm encryption
+if(NOT APPLE AND NOT REALM_HAVE_OPENSSL OR WIN32)
+    add_library(sha2 OBJECT ../external/sha-2/sha224.cpp ../external/sha-2/sha256.cpp)
+    target_include_directories(Storage PRIVATE ../external/sha-2)
+    target_sources(Storage PRIVATE $<TARGET_OBJECTS:sha2>)
+endif()
+
 if(CMAKE_SYSTEM_NAME MATCHES "^Windows")
-    target_sources(Storage PRIVATE $<TARGET_OBJECTS:sha_win32>)
     if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
         target_link_libraries(Storage INTERFACE Version.lib psapi.lib)
     endif()
@@ -341,11 +370,19 @@ elseif(ANDROID)
     target_link_options(Storage INTERFACE LINKER:-gc-sections)
 elseif(APPLE)
     target_link_options(Storage INTERFACE "SHELL:-framework Foundation")
+elseif(LINUX)
+    if(CMAKE_SYSTEM_PROCESSOR MATCHES "^armv7")
+        target_link_libraries(Storage INTERFACE atomic)
+    endif()
 endif()
 
 target_link_libraries(Storage INTERFACE Threads::Threads)
 
-if(UNIX AND NOT APPLE)
+if(TARGET Backtrace::Backtrace)
+    target_link_libraries(Storage PUBLIC Backtrace::Backtrace)
+endif()
+
+if(REALM_ENABLE_ENCRYPTION AND UNIX AND NOT APPLE AND REALM_HAVE_OPENSSL)
     target_link_libraries(Storage PUBLIC OpenSSL::Crypto)
 endif()
 
@@ -354,6 +391,9 @@ if(TARGET ZLIB::ZLIB)
     target_link_libraries(Storage PUBLIC ZLIB::ZLIB)
 elseif(APPLE)
     target_link_options(Storage PUBLIC "-lz")
+elseif(EMSCRIPTEN)
+    target_compile_options(Storage PUBLIC "-sUSE_ZLIB=1")
+    target_link_options(Storage PUBLIC "-sUSE_ZLIB=1")
 else()
     message(FATAL_ERROR "No zlib dependency defined")
 endif()
@@ -386,4 +426,5 @@ if (REALM_ENABLE_SYNC)
 endif()
 if(NOT REALM_BUILD_LIB_ONLY AND NOT WINDOWS_STORE)
     add_subdirectory(exec)
+    set_macos_only(exec)
 endif()

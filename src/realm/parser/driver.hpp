@@ -55,21 +55,38 @@ public:
     }
     void canonicalize() override
     {
-        std::vector<QueryNode*> newChildren;
+        std::vector<LogicalNode*> todo;
+        do_canonicalize(todo);
+        while (todo.size()) {
+            LogicalNode* cur = todo.back();
+            todo.pop_back();
+            cur->do_canonicalize(todo);
+        }
+    }
+
+    void do_canonicalize(std::vector<LogicalNode*>& todo)
+    {
         auto& my_type = typeid(*this);
-        for (auto& child : children) {
-            child->canonicalize();
-            if (typeid(*child) == my_type) {
+        size_t index = 0;
+        while (index < children.size()) {
+            QueryNode* child = *(children.begin() + index);
+            auto& child_type = typeid(*child);
+            if (child_type == my_type) {
                 auto logical_node = static_cast<LogicalNode*>(child);
-                for (auto c : logical_node->children) {
-                    newChildren.push_back(c);
-                }
+                REALM_ASSERT_EX(logical_node->children.size() == 2, logical_node->children.size());
+                children.push_back(logical_node->children[0]);
+                children.push_back(logical_node->children[1]);
+                children.erase(children.begin() + index);
+                continue; // do not ++index because of the delete
+            }
+            else if (auto ln = dynamic_cast<LogicalNode*>(child)) {
+                todo.push_back(ln);
             }
             else {
-                newChildren.push_back(child);
+                child->canonicalize();
             }
+            ++index;
         }
-        children = newChildren;
     }
 
 private:
@@ -148,7 +165,7 @@ public:
         NULL_VAL,
         TRUE,
         FALSE,
-        ARG
+        ARG,
     };
 
     Type type;
@@ -174,9 +191,53 @@ public:
     {
         target_table = table_name.substr(1, table_name.size() - 2);
     }
+
+    std::unique_ptr<ConstantMixedList> copy_list_of_args(std::vector<Mixed>&);
+    std::unique_ptr<Subexpr> copy_arg(ParserDriver*, DataType, size_t, DataType, std::string&);
     std::unique_ptr<Subexpr> visit(ParserDriver*, DataType) override;
     util::Optional<ExpressionComparisonType> m_comp_type;
     std::string target_table;
+};
+
+class GeospatialNode : public ValueNode {
+public:
+    struct Box {};
+    struct Polygon {};
+    struct Loop {};
+    struct Circle {};
+#if REALM_ENABLE_GEOSPATIAL
+    GeospatialNode(Box, GeoPoint& p1, GeoPoint& p2);
+    GeospatialNode(Circle, GeoPoint& p, double radius);
+    GeospatialNode(Polygon, GeoPoint& p);
+    GeospatialNode(Loop, GeoPoint& p);
+    void add_point_to_loop(GeoPoint& p);
+    void add_loop_to_polygon(GeospatialNode*);
+    bool is_constant() final
+    {
+        return true;
+    }
+    std::unique_ptr<Subexpr> visit(ParserDriver*, DataType) override;
+    std::vector<std::vector<GeoPoint>> m_points;
+    Geospatial m_geo;
+#else
+    template <typename... Ts>
+    GeospatialNode(Ts&&...)
+    {
+        throw realm::LogicError(ErrorCodes::NotSupported, "Support for Geospatial queries is not enabled");
+    }
+    template <typename Point>
+    void add_point_to_loop(Point&&)
+    {
+    }
+    template <typename Loop>
+    void add_loop_to_polygon(Loop&&)
+    {
+    }
+    std::unique_ptr<Subexpr> visit(ParserDriver*, DataType) override
+    {
+        return {};
+    }
+#endif
 };
 
 class ListNode : public ValueNode {
@@ -349,29 +410,32 @@ public:
 
 /******************************* Compare Nodes *******************************/
 
-class CompareNode : public QueryNode {
-public:
-    static constexpr int EQUAL = 0;
-    static constexpr int NOT_EQUAL = 1;
-    static constexpr int GREATER = 2;
-    static constexpr int LESS = 3;
-    static constexpr int GREATER_EQUAL = 4;
-    static constexpr int LESS_EQUAL = 5;
-    static constexpr int BEGINSWITH = 6;
-    static constexpr int ENDSWITH = 7;
-    static constexpr int CONTAINS = 8;
-    static constexpr int LIKE = 9;
-    static constexpr int IN = 10;
-    static constexpr int TEXT = 11;
+enum class CompareType : char {
+    EQUAL,
+    NOT_EQUAL,
+    GREATER,
+    LESS,
+    GREATER_EQUAL,
+    LESS_EQUAL,
+    BEGINSWITH,
+    ENDSWITH,
+    CONTAINS,
+    LIKE,
+    IN,
+    TEXT,
 };
+
+std::string_view string_for_op(CompareType op);
+
+class CompareNode : public QueryNode {};
 
 class EqualityNode : public CompareNode {
 public:
     std::vector<ExpressionNode*> values;
-    int op;
+    CompareType op;
     bool case_sensitive = true;
 
-    EqualityNode(ExpressionNode* left, int t, ExpressionNode* right)
+    EqualityNode(ExpressionNode* left, CompareType t, ExpressionNode* right)
         : op(t)
     {
         values.emplace_back(left);
@@ -383,9 +447,9 @@ public:
 class RelationalNode : public CompareNode {
 public:
     std::vector<ExpressionNode*> values;
-    int op;
+    CompareType op;
 
-    RelationalNode(ExpressionNode* left, int t, ExpressionNode* right)
+    RelationalNode(ExpressionNode* left, CompareType t, ExpressionNode* right)
         : op(t)
     {
         values.emplace_back(left);
@@ -410,16 +474,46 @@ public:
 class StringOpsNode : public CompareNode {
 public:
     std::vector<ExpressionNode*> values;
-    int op;
+    CompareType op;
     bool case_sensitive = true;
 
-    StringOpsNode(ValueNode* left, int t, ValueNode* right)
+    StringOpsNode(ValueNode* left, CompareType t, ValueNode* right)
         : op(t)
     {
         values.emplace_back(left);
         values.emplace_back(right);
     }
     Query visit(ParserDriver*) override;
+};
+
+class GeoWithinNode : public CompareNode {
+public:
+#if REALM_ENABLE_GEOSPATIAL
+    PropertyNode* prop;
+    GeospatialNode* geo = nullptr;
+    std::string argument;
+    GeoWithinNode(PropertyNode* left, GeospatialNode* right)
+    {
+        prop = left;
+        geo = right;
+    }
+    GeoWithinNode(PropertyNode* left, std::string arg)
+    {
+        prop = left;
+        argument = arg;
+    }
+    Query visit(ParserDriver*) override;
+#else
+    template <typename... Ts>
+    GeoWithinNode(Ts&&...)
+    {
+        throw realm::LogicError(ErrorCodes::NotSupported, "Support for Geospatial queries is not enabled");
+    }
+    Query visit(ParserDriver*) override
+    {
+        return {};
+    }
+#endif
 };
 
 /******************************** Other Nodes ********************************/
@@ -441,7 +535,7 @@ public:
 class DescriptorNode : public ParserNode {
 public:
     enum Type { SORT, DISTINCT, LIMIT };
-    std::vector<std::vector<std::string>> columns;
+    std::vector<std::vector<PathElem>> columns;
     std::vector<bool> ascending;
     size_t limit = size_t(-1);
     Type type;
@@ -463,9 +557,7 @@ public:
     void add(PathNode* path)
     {
         auto& vec = columns.emplace_back();
-        for (PathElem& e : path->path_elems) {
-            vec.push_back(e.id);
-        }
+        vec = std::move(path->path_elems);
     }
     void add(PathNode* path, bool direction)
     {
@@ -535,14 +627,16 @@ public:
         parse_error = true;
     }
 
-    Mixed get_arg_for_index(std::string);
+    Mixed get_arg_for_index(const std::string&);
+    double get_arg_for_coordinate(const std::string&);
 
     template <class T>
-    Query simple_query(int op, ColKey col_key, T val, bool case_sensitive);
+    Query simple_query(CompareType op, ColKey col_key, T val, bool case_sensitive);
     template <class T>
-    Query simple_query(int op, ColKey col_key, T val);
+    Query simple_query(CompareType op, ColKey col_key, T val);
     std::pair<SubexprPtr, SubexprPtr> cmp(const std::vector<ExpressionNode*>& values);
-    SubexprPtr column(LinkChain&, std::string);
+    SubexprPtr column(LinkChain&, const std::string&);
+    SubexprPtr dictionary_column(LinkChain&, const std::string&);
     void backlink(LinkChain&, const std::string&);
     std::string translate(const LinkChain&, const std::string&);
 
@@ -558,35 +652,39 @@ private:
 };
 
 template <class T>
-Query ParserDriver::simple_query(int op, ColKey col_key, T val, bool case_sensitive)
+Query ParserDriver::simple_query(CompareType op, ColKey col_key, T val, bool case_sensitive)
 {
     switch (op) {
-        case CompareNode::IN:
-        case CompareNode::EQUAL:
+        case CompareType::IN:
+        case CompareType::EQUAL:
             return m_base_table->where().equal(col_key, val, case_sensitive);
-        case CompareNode::NOT_EQUAL:
+        case CompareType::NOT_EQUAL:
             return m_base_table->where().not_equal(col_key, val, case_sensitive);
+        default:
+            break;
     }
     return m_base_table->where();
 }
 
 template <class T>
-Query ParserDriver::simple_query(int op, ColKey col_key, T val)
+Query ParserDriver::simple_query(CompareType op, ColKey col_key, T val)
 {
     switch (op) {
-        case CompareNode::IN:
-        case CompareNode::EQUAL:
+        case CompareType::IN:
+        case CompareType::EQUAL:
             return m_base_table->where().equal(col_key, val);
-        case CompareNode::NOT_EQUAL:
+        case CompareType::NOT_EQUAL:
             return m_base_table->where().not_equal(col_key, val);
-        case CompareNode::GREATER:
+        case CompareType::GREATER:
             return m_base_table->where().greater(col_key, val);
-        case CompareNode::LESS:
+        case CompareType::LESS:
             return m_base_table->where().less(col_key, val);
-        case CompareNode::GREATER_EQUAL:
+        case CompareType::GREATER_EQUAL:
             return m_base_table->where().greater_equal(col_key, val);
-        case CompareNode::LESS_EQUAL:
+        case CompareType::LESS_EQUAL:
             return m_base_table->where().less_equal(col_key, val);
+        default:
+            break;
     }
     return m_base_table->where();
 }

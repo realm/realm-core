@@ -19,6 +19,7 @@
 #ifndef REALM_SCHEMA_HPP
 #define REALM_SCHEMA_HPP
 
+#include <ostream>
 #include <string>
 #include <vector>
 
@@ -114,6 +115,48 @@ enum class SchemaMode : uint8_t {
     Manual
 };
 
+// Options for how to handle the schema when the file has classes and/or
+// properties not in the schema.
+//
+// Most schema modes allow the requested schema to be a subset of the actual
+// schema of the Realm file. By default, any properties or object types not in
+// the requested schema are simply ignored entirely and the Realm's in-memory
+// schema will always exactly match the requested one.
+struct SchemaSubsetMode {
+    // Add additional tables present in the Realm file to the schema. This is
+    // applicable to all schema modes except for Manual and ResetFile.
+    bool include_types : 1;
+
+    // Add additional columns in the tables present in the Realm file to the
+    // object schema for those types. The additional properties are always
+    // added to the end of persisted_properties. This is only applicable to
+    // Additive and ReadOnly schema modes.
+    bool include_properties : 1;
+
+    // The reported schema will always exactly match the requested one.
+    static const SchemaSubsetMode Strict;
+    // Additional object classes present in the Realm file are added to the
+    // requested schema, but all object types present in the requested schema
+    // will always exactly match even if there are additional columns in the
+    // tables.
+    static const SchemaSubsetMode AllClasses;
+    // Additional properties present in the Realm file are added to the
+    // requested schema, but tables not present in the schema are ignored.
+    static const SchemaSubsetMode AllProperties;
+    // Always report the complete schema.
+    static const SchemaSubsetMode Complete;
+
+    friend bool operator==(const SchemaSubsetMode& x, const SchemaSubsetMode& y)
+    {
+        return x.include_types == y.include_types && x.include_properties == y.include_properties;
+    }
+};
+
+inline constexpr SchemaSubsetMode SchemaSubsetMode::Strict = {false, false};
+inline constexpr SchemaSubsetMode SchemaSubsetMode::AllClasses = {true, false};
+inline constexpr SchemaSubsetMode SchemaSubsetMode::AllProperties = {false, true};
+inline constexpr SchemaSubsetMode SchemaSubsetMode::Complete = {true, true};
+
 
 class Schema : private std::vector<ObjectSchema> {
 private:
@@ -151,13 +194,14 @@ public:
     std::vector<SchemaChange> compare(Schema const&, SchemaMode = SchemaMode::Automatic,
                                       bool include_removals = false) const;
 
-    void copy_keys_from(Schema const&, bool is_schema_additive = false);
+    void copy_keys_from(Schema const&, SchemaSubsetMode subset_mode);
 
     friend bool operator==(Schema const&, Schema const&) noexcept;
     friend bool operator!=(Schema const& a, Schema const& b) noexcept
     {
         return !(a == b);
     }
+    friend std::ostream& operator<<(std::ostream&, const Schema&);
 
     using base::begin;
     using base::const_iterator;
@@ -171,8 +215,6 @@ private:
     static void zip_matching(T&& a, U&& b, Func&& func);
     // sort all the classes by name in order to speed up find(StringData name)
     void sort_schema();
-    // append missing properties and update matching properties for schema
-    void update_or_append_properties(ObjectSchema*, const ObjectSchema*, bool);
 };
 
 namespace schema_change {

@@ -47,6 +47,7 @@ using namespace realm::test_util;
 
 namespace {
 
+#if !REALM_MOBILE
 TEST(Sync_HistoryMigration)
 {
     // Set to true to produce new versions of client and server-side files in
@@ -202,7 +203,7 @@ TEST(Sync_HistoryMigration)
         DBRef sg_2 = DB::create(sync::make_client_replication(), client_path_2);
         ReadTransaction rt_1{sg_1};
         ReadTransaction rt_2{sg_2};
-        return compare_groups(rt_1, rt_2, *(test_context.logger));
+        return compare_groups(rt_1, rt_2, *test_context.logger);
     };
 
     auto compare_client_and_server_files = [&](const std::string& client_path, const std::string& server_path) {
@@ -212,7 +213,7 @@ TEST(Sync_HistoryMigration)
         DBRef sg_2 = DB::create(history_2, server_path);
         ReadTransaction rt_1{sg_1};
         ReadTransaction rt_2{sg_2};
-        return compare_groups(rt_1, rt_2, *(test_context.logger));
+        return compare_groups(rt_1, rt_2, *test_context.logger);
     };
 
     std::string resources_dir = get_test_resource_path();
@@ -257,8 +258,8 @@ TEST(Sync_HistoryMigration)
             if (history_schema_version != client_schema_version)
                 throw std::runtime_error{"Bad history schema version for client-side file"};
         }
-        catch (const FileFormatUpgradeRequired&) {
-            // File formats prior to 10 cannot be opened in read-only mode
+        catch (const FileAccessError&) {
+            // File formats prior to 23 cannot be opened in read-only mode
         }
         // History migration is a side-effect of verification
         verify_client_file(client_path);
@@ -278,8 +279,8 @@ TEST(Sync_HistoryMigration)
             if (history_schema_version != server_schema_version)
                 throw std::runtime_error{"Bad history schema version for server-side file"};
         }
-        catch (const FileFormatUpgradeRequired&) {
-            // File formats prior to 10 cannot be opened in read-only mode
+        catch (const FileAccessError&) {
+            // File formats prior to 23 cannot be opened in read-only mode
         }
         // History migration is a side-effect of verification
         verify_server_file(server_path);
@@ -321,6 +322,7 @@ TEST(Sync_HistoryMigration)
 
     auto get_server_path = [&](const std::string& server_dir) {
         fixtures::ClientServerFixture fixture{server_dir, test_context};
+        fixture.start();
         return fixture.map_virtual_to_real_path(virtual_path);
     };
 
@@ -437,6 +439,8 @@ TEST(Sync_HistoryMigration)
 
     CHECK_NOT(produce_new_files); // Should not be enabled under normal circumstances
 }
+
+#endif // !REALM_MOBILE
 
 TEST(Sync_HistoryCompression)
 {

@@ -22,9 +22,12 @@
 #include <realm/node_header.hpp>
 #include <realm/alloc.hpp>
 
+#include <iostream>
+
 namespace realm {
 
 class Mixed;
+class ArrayEncode;
 
 /// Special index value. It has various meanings depending on
 /// context. It is returned by some search functions to indicate 'not
@@ -114,7 +117,7 @@ public:
     {
     }
 
-    virtual ~Node() {}
+    virtual ~Node() noexcept = default;
 
     /**************************** Initializers *******************************/
 
@@ -123,10 +126,10 @@ public:
     char* init_from_mem(MemRef mem) noexcept
     {
         char* header = mem.get_addr();
+        REALM_ASSERT(get_kind(header) == 'A');
         m_ref = mem.get_ref();
         m_data = get_data_from_header(header);
         m_size = get_size_from_header(header);
-
         return header;
     }
 
@@ -212,14 +215,7 @@ public:
     /// children of that array. See non-static destroy_deep() for an
     /// alternative. If this accessor is already in the detached state, this
     /// function has no effect (idempotency).
-    void destroy() noexcept
-    {
-        if (!is_attached())
-            return;
-        char* header = get_header_from_data(m_data);
-        m_alloc.free_(m_ref, header);
-        m_data = nullptr;
-    }
+    void destroy() noexcept;
 
     /// Shorthand for `destroy(MemRef(ref, alloc), alloc)`.
     static void destroy(ref_type ref, Allocator& alloc) noexcept
@@ -266,6 +262,11 @@ public:
         else {
             m_missing_parent_update = true;
         }
+    }
+
+    void typed_print(int) const
+    {
+        std::cout << "Generic Node ERROR\n";
     }
 
 protected:
@@ -333,11 +334,10 @@ protected:
     // Includes array header. Not necessarily 8-byte aligned.
     virtual size_t calc_byte_len(size_t num_items, size_t width) const;
     virtual size_t calc_item_count(size_t bytes, size_t width) const noexcept;
-    static void init_header(char* header, bool is_inner_bptree_node, bool has_refs, bool context_flag,
-                            WidthType width_type, int width, size_t size, size_t capacity) noexcept;
+    // static void init_header(char* header, bool is_inner_bptree_node, bool has_refs, bool context_flag,
+    //                        WidthType width_type, int width, size_t size, size_t capacity) noexcept;
 
 private:
-    friend class NodeTree;
     ArrayParent* m_parent = nullptr;
     size_t m_ndx_in_parent = 0; // Ignored if m_parent is null.
     bool m_missing_parent_update = false;
@@ -357,7 +357,7 @@ public:
     virtual Mixed get_any(size_t ndx) const = 0;
 };
 
-
+/*
 inline void Node::init_header(char* header, bool is_inner_bptree_node, bool has_refs, bool context_flag,
                               WidthType width_type, int width, size_t size, size_t capacity) noexcept
 {
@@ -365,6 +365,7 @@ inline void Node::init_header(char* header, bool is_inner_bptree_node, bool has_
     // bytes, it is important that we put the entire header into a
     // well defined state initially.
     std::fill(header, header + header_size, 0);
+    set_kind((uint64_t*)header, 'A');
     set_is_inner_bptree_node_in_header(is_inner_bptree_node, header);
     set_hasrefs_in_header(has_refs, header);
     set_context_flag_in_header(context_flag, header);
@@ -373,6 +374,7 @@ inline void Node::init_header(char* header, bool is_inner_bptree_node, bool has_
     set_size_in_header(size, header);
     set_capacity_in_header(capacity, header);
 }
+*/
 } // namespace realm
 
 #endif /* REALM_NODE_HPP */

@@ -136,31 +136,37 @@ void Lst<T>::sort(std::vector<size_t>& indices, bool ascending) const
 {
     update_if_needed();
 
-    if constexpr (std::is_same_v<T, Mixed>) {
-        if (ascending) {
-            do_sort(indices, size(), [this](size_t i1, size_t i2) {
-                return get(i1) < get(i2);
-            });
-        }
-        else {
-            do_sort(indices, size(), [this](size_t i1, size_t i2) {
-                return get(i1) > get(i2);
-            });
-        }
+    auto tree = m_tree.get();
+    if (ascending) {
+        do_sort(indices, size(), [tree](size_t i1, size_t i2) {
+            return unresolved_to_null(tree->get(i1)) < unresolved_to_null(tree->get(i2));
+        });
     }
     else {
-        auto tree = m_tree.get();
-        if (ascending) {
-            do_sort(indices, size(), [tree](size_t i1, size_t i2) {
-                return tree->get(i1) < tree->get(i2);
-            });
-        }
-        else {
-            do_sort(indices, size(), [tree](size_t i1, size_t i2) {
-                return tree->get(i1) > tree->get(i2);
-            });
-        }
+        do_sort(indices, size(), [tree](size_t i1, size_t i2) {
+            return unresolved_to_null(tree->get(i1)) > unresolved_to_null(tree->get(i2));
+        });
     }
+}
+
+// std::unique, but leaving the minimum value rather than the first found value
+// for runs of duplicates. This makes distinct stable without relying on a
+// stable sort, which makes it easier to write tests and avoids surprising results
+// where distinct appears to change the order of elements
+template <class Iterator, class Predicate>
+static Iterator min_unique(Iterator first, Iterator last, Predicate pred)
+{
+    if (first == last) {
+        return first;
+    }
+
+    Iterator result = first;
+    while (++first != last) {
+        bool equal = pred(*result, *first);
+        if ((equal && *result > *first) || (!equal && ++result != first))
+            *result = *first;
+    }
+    return ++result;
 }
 
 template <class T>
@@ -168,26 +174,21 @@ void Lst<T>::distinct(std::vector<size_t>& indices, util::Optional<bool> sort_or
 {
     indices.clear();
     sort(indices, sort_order.value_or(true));
-    auto duplicates = indices.end();
+    if (indices.empty()) {
+        return;
+    }
 
-    if constexpr (std::is_same_v<T, Mixed>) {
-        duplicates = std::unique(indices.begin(), indices.end(), [this](size_t i1, size_t i2) noexcept {
-            return get(i1) == get(i2);
-        });
-    }
-    else {
-        auto tree = m_tree.get();
-        duplicates = std::unique(indices.begin(), indices.end(), [tree](size_t i1, size_t i2) noexcept {
-            return tree->get(i1) == tree->get(i2);
-        });
-    }
+    auto tree = m_tree.get();
+    auto duplicates = min_unique(indices.begin(), indices.end(), [tree](size_t i1, size_t i2) noexcept {
+        return unresolved_to_null(tree->get(i1)) == unresolved_to_null(tree->get(i2));
+    });
 
     // Erase the duplicates
     indices.erase(duplicates, indices.end());
 
     if (!sort_order) {
         // Restore original order
-        std::sort(indices.begin(), indices.end(), std::less<size_t>());
+        std::sort(indices.begin(), indices.end());
     }
 }
 
@@ -436,6 +437,27 @@ void LnkLst::remove_all_target_rows()
     if (is_attached()) {
         update_if_needed();
         _impl::TableFriend::batch_erase_rows(*get_target_table(), *m_list.m_tree);
+    }
+}
+
+void LnkLst::replace_link(ObjKey old_val, ObjKey new_val)
+{
+    update_if_needed();
+    auto tree = m_list.m_tree.get();
+    auto n = tree->find_first(old_val);
+    REALM_ASSERT(n != realm::npos);
+    if (Replication* repl = get_obj().get_replication()) {
+        repl->list_set(m_list, n, new_val);
+    }
+    tree->set(n, new_val);
+    m_list.bump_content_version();
+    if (new_val.is_unresolved()) {
+        if (!old_val.is_unresolved()) {
+            tree->set_context_flag(true);
+        }
+    }
+    else {
+        _impl::check_for_last_unresolved(tree);
     }
 }
 

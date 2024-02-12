@@ -64,14 +64,18 @@ TEST(BasicSystemErrors_Category)
 
 TEST(BasicSystemErrors_Messages)
 {
+#if defined(__linux__) && !defined(__GLIBC__)
+    // Linux and not glibc implies Musl, which has its own message
+    const std::string error_message("No error information");
+#else
     const std::string error_message("Unknown error");
+#endif
 
     {
         std::error_code err = make_error_code(error::address_family_not_supported);
+
         CHECK_GREATER(err.message().length(), 0);
-#ifdef _WIN32
-        CHECK_EQUAL(err.message(), error_message);
-#else
+#ifndef _WIN32 // Older versions of the Windows CRT return "Unknown error" for this error instead of an actual message
         CHECK_NOT_EQUAL(err.message(), error_message);
 #endif
     }
@@ -88,9 +92,7 @@ TEST(BasicSystemErrors_Messages)
     {
         std::error_code err = make_error_code(error::operation_aborted);
         CHECK_GREATER(err.message().length(), 0);
-#ifdef _WIN32
-        CHECK_EQUAL(err.message(), error_message);
-#else
+#ifndef _WIN32 // Older versions of the Windows CRT return "Unknown error" for this error instead of an actual message
         CHECK_NOT_EQUAL(err.message(), error_message);
 #endif
     }

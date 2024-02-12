@@ -19,8 +19,10 @@
 #ifndef REALM_ARRAY_DIRECT_HPP
 #define REALM_ARRAY_DIRECT_HPP
 
+#include <cstring>
 #include <realm/utilities.hpp>
 #include <realm/alloc.hpp>
+#include <realm/array_encode.hpp>
 
 // clang-format off
 /* wid == 16/32 likely when accessing offsets in B tree */
@@ -70,11 +72,6 @@
 // clang-format on
 
 namespace realm {
-
-/// Takes a 64-bit value and returns the minimum number of bits needed
-/// to fit the value. For alignment this is rounded up to nearest
-/// log2. Posssible results {0, 1, 2, 4, 8, 16, 32, 64}
-size_t bit_width(int64_t value);
 
 // Direct access methods
 
@@ -188,6 +185,158 @@ inline int64_t get_direct(const char* data, size_t width, size_t ndx) noexcept
     REALM_TEMPEX(return get_direct, width, (data, ndx));
 }
 
+// Read a bit field of up to 64 bits.
+// - Any alignment and size is supported
+// - The start of the 'data' area must be 64 bit aligned in all cases.
+// - For fields of 64-bit or less, the first 64-bit word is filled with the zero-extended
+//   value of the bitfield.
+// iterator useful for scanning arrays faster than by indexing each element
+// supports arrays of pairs by differentiating field size and step size.
+class bf_ref;
+class bf_iterator {
+    uint64_t* data_area;
+    uint64_t* first_word_ptr;
+    size_t field_position;
+    uint8_t field_size;
+    uint8_t step_size; // may be different than field_size if used for arrays of pairs
+
+public:
+    bf_iterator(uint64_t* data_area, size_t initial_offset, size_t field_size, size_t step_size, size_t index)
+        : data_area(data_area)
+        , field_size(static_cast<uint8_t>(field_size))
+        , step_size(static_cast<uint8_t>(step_size))
+    {
+        field_position = initial_offset + index * step_size;
+        first_word_ptr = data_area + (field_position >> 6);
+    }
+    uint64_t get_value() const
+    {
+        auto in_word_position = field_position & 0x3F;
+        auto first_word = first_word_ptr[0];
+        uint64_t result = first_word >> in_word_position;
+        // note: above shifts in zeroes above the bitfield
+        if (in_word_position + field_size > 64) {
+            // if we're here, in_word_position > 0
+            auto first_word_size = 64 - in_word_position;
+            auto second_word = first_word_ptr[1];
+            result |= second_word << first_word_size;
+            // note: above shifts in zeroes below the bits we want
+        }
+        // discard any bits above the field we want
+        if (field_size < 64)
+            result &= (1ULL << field_size) - 1;
+        return result;
+    }
+    void set_value(uint64_t value) const
+    {
+        auto in_word_position = field_position & 0x3F;
+        auto first_word = first_word_ptr[0];
+        size_t mask = -1;
+        if (field_size < 64) {
+            mask = static_cast<size_t>((1ULL << field_size) - 1);
+            value &= mask;
+        }
+        // zero out field in first word:
+        auto first_word_mask = ~(mask << in_word_position);
+        first_word &= first_word_mask;
+        // or in relevant part of value
+        first_word |= value << in_word_position;
+        first_word_ptr[0] = first_word;
+        if (in_word_position + field_size > 64) {
+            // bitfield crosses word boundary.
+            // discard the lowest bits of value (it has been written to the first word)
+            auto bits_written_to_first_word = 64 - in_word_position;
+            // bit_written_to_first_word must be lower than 64, so shifts based on it are well defined
+            value >>= bits_written_to_first_word;
+            auto second_word_mask = mask >> bits_written_to_first_word;
+            auto second_word = first_word_ptr[1];
+            // zero out the field in second word, then or in the (high part of) value
+            second_word &= ~second_word_mask;
+            second_word |= value;
+            first_word_ptr[1] = second_word;
+        }
+    }
+    void operator++()
+    {
+        auto next_field_position = field_position + step_size;
+        if ((next_field_position >> 6) > (field_position >> 6)) {
+            first_word_ptr = data_area + (next_field_position >> 6);
+        }
+        field_position = next_field_position;
+    }
+    // The compiler should be able to generate code matching this
+    // from operator* and the bf_ref declared below:
+    //
+    //    uint64_t operator*() const
+    //    {
+    //        return get_value();
+    //    }
+    bf_ref operator*();
+    friend bool operator<(const bf_iterator&, const bf_iterator&);
+};
+
+
+inline bool operator<(const bf_iterator& a, const bf_iterator& b)
+{
+    REALM_ASSERT(a.data_area == b.data_area);
+    return a.field_position < b.field_position;
+}
+
+
+class bf_ref {
+    bf_iterator it;
+
+public:
+    bf_ref(bf_iterator& it)
+        : it(it)
+    {
+    }
+    operator uint64_t() const
+    {
+        return it.get_value();
+    }
+    uint64_t operator=(uint64_t value)
+    {
+        it.set_value(value);
+        return value;
+    }
+};
+
+inline bf_ref bf_iterator::operator*()
+{
+    return bf_ref(*this);
+}
+
+
+inline uint64_t read_bitfield(uint64_t* data_area, size_t field_position, size_t width)
+{
+    bf_iterator it(data_area, field_position, width, width, 0);
+    return *it;
+}
+
+inline void write_bitfield(uint64_t* data_area, size_t field_position, size_t width, uint64_t value)
+{
+    bf_iterator it(data_area, field_position, width, width, 0);
+    *it = value;
+}
+
+
+inline int64_t sign_extend_field(size_t width, uint64_t value)
+{
+    uint64_t sign_mask = 1ULL << (width - 1);
+    if (value & sign_mask) { // got a negative value
+        uint64_t negative_extension = -sign_mask;
+        value |= negative_extension;
+        return int64_t(value);
+    }
+    else {
+        // zero out anything above the sign bit
+        // (actually, also zero out the sign bit, but it is already known to be zero)
+        uint64_t below_sign_mask = sign_mask - 1;
+        value &= below_sign_mask;
+        return int64_t(value);
+    }
+}
 
 template <int width>
 inline std::pair<int64_t, int64_t> get_two(const char* data, size_t ndx) noexcept
@@ -200,6 +349,12 @@ inline std::pair<int64_t, int64_t> get_two(const char* data, size_t width, size_
     REALM_TEMPEX(return get_two, width, (data, ndx));
 }
 
+namespace impl {
+
+// Lower and Upper bound are mainly used in the B+tree implementation,
+// but also for indexing, we can exploit these functions when the array
+// is encoded, just providing a way for fetching the data.
+// In this case the width is going to be ignored.
 
 // Lower/upper bound in sorted sequence
 // ------------------------------------
@@ -223,7 +378,7 @@ inline std::pair<int64_t, int64_t> get_two(const char* data, size_t width, size_
 // We currently use binary search. See for example
 // http://www.tbray.org/ongoing/When/200x/2003/03/22/Binary.
 template <int width>
-inline size_t lower_bound(const char* data, size_t size, int64_t value) noexcept
+inline size_t lower_bound(const char* data, size_t start, size_t end, int64_t value) noexcept
 {
     // The binary search used here is carefully optimized. Key trick is to use a single
     // loop controlling variable (size) instead of high/low pair, and to keep updates
@@ -233,7 +388,18 @@ inline size_t lower_bound(const char* data, size_t size, int64_t value) noexcept
     // might be slightly faster if we used branches instead. The loop unrolling yields
     // a final 5-20% speedup depending on circumstances.
 
-    size_t low = 0;
+    // size_t low = 0;
+    REALM_ASSERT_DEBUG(end >= start);
+    size_t size = end - start;
+    // size_t low = 0;
+    size_t low = start;
+
+
+    const auto h = NodeHeader::get_header_from_data((char*)data);
+    const auto is_encoded = NodeHeader::get_kind(h) == 'B';
+    const auto fetcher = [is_encoded](auto data, size_t ndx) {
+        return is_encoded ? ArrayEncode::get(data, ndx) : get_direct<width>(data, ndx);
+    };
 
     while (size >= 8) {
         // The following code (at X, Y and Z) is 3 times manually unrolled instances of (A) below.
@@ -244,7 +410,7 @@ inline size_t lower_bound(const char* data, size_t size, int64_t value) noexcept
         size_t other_half = size - half;
         size_t probe = low + half;
         size_t other_low = low + other_half;
-        int64_t v = get_direct<width>(data, probe);
+        int64_t v = fetcher(data, probe);
         size = half;
         low = (v < value) ? other_low : low;
 
@@ -253,7 +419,7 @@ inline size_t lower_bound(const char* data, size_t size, int64_t value) noexcept
         other_half = size - half;
         probe = low + half;
         other_low = low + other_half;
-        v = get_direct<width>(data, probe);
+        v = fetcher(data, probe);
         size = half;
         low = (v < value) ? other_low : low;
 
@@ -262,7 +428,7 @@ inline size_t lower_bound(const char* data, size_t size, int64_t value) noexcept
         other_half = size - half;
         probe = low + half;
         other_low = low + other_half;
-        v = get_direct<width>(data, probe);
+        v = fetcher(data, probe);
         size = half;
         low = (v < value) ? other_low : low;
     }
@@ -295,7 +461,7 @@ inline size_t lower_bound(const char* data, size_t size, int64_t value) noexcept
         size_t other_half = size - half;
         size_t probe = low + half;
         size_t other_low = low + other_half;
-        int64_t v = get_direct<width>(data, probe);
+        int64_t v = fetcher(data, probe); // get_direct<width>(data, probe);
         size = half;
         // for max performance, the line below should compile into a conditional
         // move instruction. Not all compilers do this. To maximize chance
@@ -309,15 +475,25 @@ inline size_t lower_bound(const char* data, size_t size, int64_t value) noexcept
 
 // See lower_bound()
 template <int width>
-inline size_t upper_bound(const char* data, size_t size, int64_t value) noexcept
+inline size_t upper_bound(const char* data, size_t start, size_t end, int64_t value) noexcept
 {
-    size_t low = 0;
+    REALM_ASSERT_DEBUG(end >= start);
+
+    const auto h = NodeHeader::get_header_from_data((char*)data);
+    const auto is_encoded = NodeHeader::get_kind(h) == 'B';
+    const auto fetcher = [is_encoded](auto data, size_t ndx) {
+        return is_encoded ? ArrayEncode::get(data, ndx) : get_direct<width>(data, ndx);
+    };
+
+    size_t size = end - start;
+    // size_t low = 0;
+    size_t low = start;
     while (size >= 8) {
         size_t half = size / 2;
         size_t other_half = size - half;
         size_t probe = low + half;
         size_t other_low = low + other_half;
-        int64_t v = get_direct<width>(data, probe);
+        int64_t v = fetcher(data, probe);
         size = half;
         low = (value >= v) ? other_low : low;
 
@@ -325,7 +501,7 @@ inline size_t upper_bound(const char* data, size_t size, int64_t value) noexcept
         other_half = size - half;
         probe = low + half;
         other_low = low + other_half;
-        v = get_direct<width>(data, probe);
+        v = fetcher(data, probe);
         size = half;
         low = (value >= v) ? other_low : low;
 
@@ -333,7 +509,7 @@ inline size_t upper_bound(const char* data, size_t size, int64_t value) noexcept
         other_half = size - half;
         probe = low + half;
         other_low = low + other_half;
-        v = get_direct<width>(data, probe);
+        v = fetcher(data, probe);
         size = half;
         low = (value >= v) ? other_low : low;
     }
@@ -343,13 +519,41 @@ inline size_t upper_bound(const char* data, size_t size, int64_t value) noexcept
         size_t other_half = size - half;
         size_t probe = low + half;
         size_t other_low = low + other_half;
-        int64_t v = get_direct<width>(data, probe);
+        int64_t v = fetcher(data, probe);
         size = half;
         low = (value >= v) ? other_low : low;
     };
 
     return low;
 }
+} // namespace impl
+
+
+template <int width>
+inline size_t lower_bound(const char* data, size_t size, int64_t value) noexcept
+{
+    return impl::lower_bound<width>(data, 0, size, value);
 }
+
+template <int width>
+inline size_t upper_bound(const char* data, size_t size, int64_t value) noexcept
+{
+    return impl::upper_bound<width>(data, 0, size, value);
+}
+
+// template <typename Cmp = std::less<int64_t>>
+// inline size_t lower_bound(const char* data, size_t start, size_t end, int64_t value, Cmp cmp = {}) noexcept
+//{
+//     return impl::lower_bound<0>(data, start, end, value, cmp);
+// }
+//
+// template <typename Cmp = std::greater_equal<int64_t>>
+// inline size_t upper_bound(const char* data, size_t start, size_t end, int64_t value, Cmp cmp = {}) noexcept
+//{
+//     return impl::upper_bound<0>(data, start, end, value, cmp);
+// }
+
+
+} // namespace realm
 
 #endif /* ARRAY_TPL_HPP_ */

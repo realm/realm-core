@@ -34,6 +34,18 @@ bool operator==(Schema const& a, Schema const& b) noexcept
 {
     return static_cast<Schema::base const&>(a) == static_cast<Schema::base const&>(b);
 }
+
+std::ostream& operator<<(std::ostream& os, const Schema& schema)
+{
+    for (auto& o : schema) {
+        os << o.name << ":\n";
+        for (auto& p : o.persisted_properties) {
+            os << util::format("\t%1<%2>\n", p.name, string_for_property_type(p.type));
+        }
+    }
+    return os;
+}
+
 } // namespace realm
 
 Schema::Schema() noexcept = default;
@@ -108,14 +120,18 @@ namespace {
 struct CheckObjectPath {
     const ObjectSchema& object;              // the schema to check
     std::string path;                        // a printable path for error messaging
-    std::unordered_set<std::string> visited; // the list of object types encountered along this path so far
 };
 
 // a non-recursive search that returns a property path to the first embedded object cycle detected
-std::string do_check(Schema const& schema, const ObjectSchema& start)
+std::string do_check(Schema const& schema, const ObjectSchema& obj)
 {
     std::queue<CheckObjectPath> to_visit;
-    to_visit.push(CheckObjectPath{start, start.name, {start.name}});
+    to_visit.push(CheckObjectPath{obj, obj.name});
+
+    // Keep track of already visited object types within this starting point. Say we have two links
+    // A -> B -> C -> D -> E, and A -> F -> C -> D -> E, we don't need to check C twice to see if it
+    // includes a cycle of A.
+    std::unordered_set<std::string> seen_embedded_object_types;
 
     while (to_visit.size() > 0) {
         auto current = to_visit.front();
@@ -128,13 +144,17 @@ std::string do_check(Schema const& schema, const ObjectSchema& start)
                     // so if we encounter this type of link, no need to check further along this path
                     continue;
                 }
+
+                if (seen_embedded_object_types.find(prop.object_type) != seen_embedded_object_types.end()) {
+                    continue;
+                }
+
                 auto next_path = current.path + "." + prop.name;
-                if (current.visited.find(prop.object_type) != current.visited.end()) {
+                if (prop.object_type == obj.name) {
                     return next_path;
                 }
-                auto visited_copy = current.visited;
-                visited_copy.insert(current.object.name);
-                to_visit.push(CheckObjectPath{*it, next_path, std::move(visited_copy)});
+                to_visit.push(CheckObjectPath{*it, next_path});
+                seen_embedded_object_types.insert(prop.object_type);
             }
         }
         to_visit.pop();
@@ -313,12 +333,10 @@ void Schema::zip_matching(T&& a, U&& b, Func&& func)
             ++j;
         }
     }
-    for (; i < a.size(); ++i) {
+    for (; i < a.size(); ++i)
         func(&a[i], nullptr);
-    }
-    for (; j < b.size(); ++j) {
+    for (; j < b.size(); ++j)
         func(nullptr, &b[j]);
-    }
 }
 
 std::vector<SchemaChange> Schema::compare(Schema const& target_schema, SchemaMode mode,
@@ -343,10 +361,8 @@ std::vector<SchemaChange> Schema::compare(Schema const& target_schema, SchemaMod
 
     // Modify columns
     zip_matching(target_schema, *this, [&](const ObjectSchema* target, const ObjectSchema* existing) {
-        if (target && existing) {
+        if (target && existing)
             ::compare(*existing, *target, changes);
-        }
-
         else if (target && !orphans.count(target->name)) {
             // Target is a new table -- add all properties
             changes.emplace_back(schema_change::AddInitialProperties{target});
@@ -364,35 +380,31 @@ std::vector<SchemaChange> Schema::compare(Schema const& target_schema, SchemaMod
     return changes;
 }
 
-void Schema::copy_keys_from(Schema const& other, bool is_schema_additive)
+void Schema::copy_keys_from(realm::Schema const& other, SchemaSubsetMode subset_mode)
 {
-    std::vector<ObjectSchema> other_classes;
-    zip_matching(*this, other, [&](ObjectSchema const* existing, ObjectSchema const* other) {
-        if (is_schema_additive && !existing && other) {
-            other_classes.push_back(*other);
-        }
+    std::vector<const ObjectSchema*> other_classes;
+    zip_matching(*this, other, [&](ObjectSchema* existing, const ObjectSchema* other) {
+        if (subset_mode.include_types && !existing && other)
+            other_classes.push_back(other);
         if (!existing || !other)
             return;
-        update_or_append_properties(const_cast<ObjectSchema*>(existing), other, is_schema_additive);
+
+        existing->table_key = other->table_key;
+        for (auto& current_prop : other->persisted_properties) {
+            if (auto target_prop = existing->property_for_name(current_prop.name)) {
+                target_prop->column_key = current_prop.column_key;
+            }
+            else if (subset_mode.include_properties) {
+                existing->persisted_properties.push_back(current_prop);
+            }
+        }
     });
 
     if (!other_classes.empty()) {
-        insert(end(), other_classes.begin(), other_classes.end());
+        reserve(size() + other_classes.size());
+        for (auto other : other_classes)
+            push_back(*other);
         sort_schema();
-    }
-}
-
-void Schema::update_or_append_properties(ObjectSchema* existing, const ObjectSchema* other, bool is_schema_additive)
-{
-    existing->table_key = other->table_key;
-    for (auto& current_prop : other->persisted_properties) {
-        auto target_prop = existing->property_for_name(current_prop.name);
-        if (target_prop) {
-            target_prop->column_key = current_prop.column_key;
-        }
-        else if (is_schema_additive) {
-            existing->persisted_properties.push_back(current_prop);
-        }
     }
 }
 

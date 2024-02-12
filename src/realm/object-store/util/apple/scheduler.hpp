@@ -17,6 +17,8 @@
 ////////////////////////////////////////////////////////////////////////////
 
 #include <realm/object-store/util/scheduler.hpp>
+
+#include <realm/exceptions.hpp>
 #include <realm/util/to_string.hpp>
 
 #include <atomic>
@@ -126,6 +128,29 @@ bool RunLoopScheduler::can_invoke() const noexcept
     return false;
 }
 
+class MainRunLoopScheduler : public RunLoopScheduler {
+public:
+    MainRunLoopScheduler()
+        : RunLoopScheduler(CFRunLoopGetMain())
+    {
+    }
+
+    bool is_on_thread() const noexcept override
+    {
+        return pthread_main_np();
+    }
+
+    bool is_same_as(const Scheduler* other) const noexcept override
+    {
+        return typeid(*other) == typeid(MainRunLoopScheduler);
+    }
+
+    bool can_invoke() const noexcept override
+    {
+        return true;
+    }
+};
+
 class DispatchQueueScheduler : public util::Scheduler {
 public:
     DispatchQueueScheduler(dispatch_queue_t queue);
@@ -158,7 +183,7 @@ DispatchQueueScheduler::DispatchQueueScheduler(dispatch_queue_t queue)
             auto msg = util::format(
                 "Invalid queue '%1' (%2): Realms can only be confined to serial queues or the main queue.",
                 dispatch_queue_get_label(queue) ?: "<nil>", class_getName(cls));
-            throw std::logic_error(msg);
+            throw InvalidArgument(msg);
         }
     }
     dispatch_retain(m_queue);

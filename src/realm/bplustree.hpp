@@ -526,20 +526,24 @@ public:
         m_root->bptree_traverse(func);
     }
 
-    void dump_values(std::ostream& o, int level) const
+    template <typename Func>
+    void for_all(Func&& callback) const
     {
-        std::string indent(" ", level * 2);
-
-        auto func = [&o, indent](BPlusTreeNode* node, size_t) {
+        using Ret = std::invoke_result_t<Func, T>;
+        m_root->bptree_traverse([&callback](BPlusTreeNode* node, size_t) {
             LeafNode* leaf = static_cast<LeafNode*>(node);
             size_t sz = leaf->size();
             for (size_t i = 0; i < sz; i++) {
-                o << indent << leaf->get(i) << std::endl;
+                if constexpr (std::is_same_v<Ret, void>) {
+                    callback(leaf->get(i));
+                }
+                else {
+                    if (!callback(leaf->get(i)))
+                        return IteratorControl::Stop;
+                }
             }
             return IteratorControl::AdvanceToNext;
-        };
-
-        m_root->bptree_traverse(func);
+        });
     }
 
 protected:
@@ -669,6 +673,11 @@ ColumnAverageType<T> bptree_average(const BPlusTree<T>& tree, size_t* return_cnt
         *return_cnt = cnt;
     return avg;
 }
+
+ref_type bptree_typed_write(ref_type ref, _impl::ArrayWriterBase& out, Allocator& alloc, ColumnType col_type,
+                            bool deep, bool only_modified, bool compress);
+void bptree_typed_print(std::string prefix, Allocator& alloc, ref_type root, ColumnType col_type);
+
 } // namespace realm
 
 #endif /* REALM_BPLUSTREE_HPP */

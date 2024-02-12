@@ -25,6 +25,8 @@
 #include <realm/array_integer.hpp>
 #include <realm/array_key.hpp>
 #include <realm/impl/array_writer.hpp>
+#include <realm/array_flex.hpp>
+#include <realm/array_packed.hpp>
 
 #include <array>
 #include <cstring> // std::memcpy
@@ -41,6 +43,10 @@
 #include <intrin.h>
 #pragma warning(disable : 4127) // Condition is constant warning
 #endif
+
+
+// generic encoder, for now it is basically only a interger encoder.
+static realm::ArrayEncode s_encode;
 
 
 // Header format (8 bytes):
@@ -190,39 +196,110 @@ using namespace realm::util;
 
 void QueryStateBase::dyncast() {}
 
+Array::Array(Allocator& allocator) noexcept
+    : Node(allocator)
+{
+}
+
 size_t Array::bit_width(int64_t v)
 {
     // FIXME: Assuming there is a 64-bit CPU reverse bitscan
     // instruction and it is fast, then this function could be
     // implemented as a table lookup on the result of the scan
-
     if ((uint64_t(v) >> 4) == 0) {
         static const int8_t bits[] = {0, 1, 2, 2, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4};
         return bits[int8_t(v)];
     }
-
-    // First flip all bits if bit 63 is set (will now always be zero)
     if (v < 0)
         v = ~v;
-
     // Then check if bits 15-31 used (32b), 7-31 used (16b), else (8b)
     return uint64_t(v) >> 31 ? 64 : uint64_t(v) >> 15 ? 32 : uint64_t(v) >> 7 ? 16 : 8;
 }
 
+template <size_t width>
+struct Array::VTableForWidth {
+    struct PopulatedVTable : Array::VTable {
+        PopulatedVTable()
+        {
+            getter = &Array::get<width>;
+            setter = &Array::set<width>;
+            chunk_getter = &Array::get_chunk<width>;
+            finder[cond_Equal] = &Array::find_vtable<Equal, width>;
+            finder[cond_NotEqual] = &Array::find_vtable<NotEqual, width>;
+            finder[cond_Greater] = &Array::find_vtable<Greater, width>;
+            finder[cond_Less] = &Array::find_vtable<Less, width>;
+        }
+    };
+    static const PopulatedVTable vtable;
+};
+
+template <size_t width>
+struct Array::VTableForEncodedArray {
+    struct PopulatedVTableEncoded : Array::VTable {
+        PopulatedVTableEncoded()
+        {
+            getter = &Array::get_encoded;
+            setter = &Array::set_encoded;
+            chunk_getter = &Array::get_chunk_encoded;
+            finder[cond_Equal] = &Array::find_vtable<Equal, 0>;
+            finder[cond_NotEqual] = &Array::find_vtable<NotEqual, 0>;
+            finder[cond_Greater] = &Array::find_vtable<Greater, 0>;
+            finder[cond_Less] = &Array::find_vtable<Less, 0>;
+        }
+    };
+    static const PopulatedVTableEncoded vtable;
+};
+
+template <size_t width>
+const typename Array::VTableForWidth<width>::PopulatedVTable Array::VTableForWidth<width>::vtable;
+
+template <size_t width>
+const typename Array::VTableForEncodedArray<width>::PopulatedVTableEncoded
+    Array::VTableForEncodedArray<width>::vtable;
+
 
 void Array::init_from_mem(MemRef mem) noexcept
 {
-    char* header = Node::init_from_mem(mem);
-    // Parse header
-    m_is_inner_bptree_node = get_is_inner_bptree_node_from_header(header);
-    m_has_refs = get_hasrefs_from_header(header);
-    m_context_flag = get_context_flag_from_header(header);
-    update_width_cache_from_header();
+    // Header is the type of header that has been allocated, in case we are decompressing,
+    // the header is of kind A, which is kind of deceiving the purpose of these checks.
+    // Since we will try to fetch some data from the just initialised header, and never reset
+    // important fields used for type A arrays, like width, lower, upper_bound which are used
+    // for expanding the array, but also query the data.
+    char* header = mem.get_addr();
+    m_kind = NodeHeader::get_kind(header);
+    m_encoding = NodeHeader::get_encoding(header);
+    REALM_ASSERT_DEBUG(m_kind == 'A' || m_kind == 'B');
+    if (m_kind == 'B') {
+        REALM_ASSERT_DEBUG(m_encoding == Encoding::Flex || m_encoding == Encoding::Packed);
+        char* header = mem.get_addr();
+        m_ref = mem.get_ref();
+        m_data = get_data_from_header(header);
+        m_size = s_encode.size(header);
+        m_width = m_lbound = m_ubound = 0;
+        m_is_inner_bptree_node = get_is_inner_bptree_node_from_header(header);
+        m_has_refs = get_hasrefs_from_header(header);
+        m_context_flag = get_context_flag_from_header(header);
+        REALM_TEMPEX(m_vtable = &VTableForEncodedArray, m_width, ::vtable);
+        m_getter = m_vtable->getter;
+    }
+    else {
+        header = Node::init_from_mem(mem);
+        m_is_inner_bptree_node = get_is_inner_bptree_node_from_header(header);
+        m_has_refs = get_hasrefs_from_header(header);
+        m_context_flag = get_context_flag_from_header(header);
+        update_width_cache_from_header();
+    }
+}
+
+MemRef Array::get_mem() const noexcept
+{
+    return MemRef(get_header_from_data(m_data), m_ref, m_alloc);
 }
 
 void Array::update_from_parent() noexcept
 {
-    REALM_ASSERT_DEBUG(is_attached());
+    // checking the parent should have nothhing to do with m_data, decoding while updating the parent may be needed if
+    // I am wrong. REALM_ASSERT_DEBUG(is_attached());
     ArrayParent* parent = get_parent();
     REALM_ASSERT_DEBUG(parent);
     ref_type new_ref = get_ref_from_parent();
@@ -255,7 +332,6 @@ void Array::set_type(Type type)
     set_hasrefs_in_header(init_has_refs, header);
 }
 
-
 void Array::destroy_children(size_t offset) noexcept
 {
     for (size_t i = offset; i != m_size; ++i) {
@@ -276,20 +352,107 @@ void Array::destroy_children(size_t offset) noexcept
     }
 }
 
+size_t Array::get_byte_size() const noexcept
+{
+    // A and B type array
+    REALM_ASSERT(m_kind == 'A' || m_kind == 'B');
+    const auto header = get_header();
+    auto num_bytes = get_byte_size_from_header(header);
+    auto read_only = m_alloc.is_read_only(m_ref) == true;
+    auto bytes_ok = num_bytes <= get_capacity_from_header(header);
+    REALM_ASSERT(read_only || bytes_ok);
+    REALM_ASSERT_7(m_alloc.is_read_only(m_ref), ==, true, ||, num_bytes, <=, get_capacity_from_header(header));
+    return num_bytes;
+}
+
+ref_type Array::write(_impl::ArrayWriterBase& out, bool deep, bool only_if_modified, bool compress_in_flight) const
+{
+    REALM_ASSERT(is_attached());
+    // The default allocator cannot be trusted wrt is_read_only():
+    REALM_ASSERT(!only_if_modified || &m_alloc != &Allocator::get_default());
+    if (only_if_modified && m_alloc.is_read_only(m_ref))
+        return m_ref;
+
+    if (!deep || !m_has_refs) {
+        // however - creating an array using ANYTHING BUT the default allocator during commit is also wrong....
+        // it only works by accident, because the whole slab area is reinitialized after commit.
+        // We should have: Array encoded_array{Allocator::get_default()};
+        Array encoded_array{Allocator::get_default()};
+        if (compress_in_flight && size() != 0 && encode_array(encoded_array)) {
+            REALM_ASSERT_DEBUG(encoded_array.m_kind == 'B');
+            REALM_ASSERT_DEBUG(
+                encoded_array.m_encoding == Encoding::Flex || encoded_array.m_encoding == Encoding::Packed ||
+                encoded_array.m_encoding == Encoding::AofP || encoded_array.m_encoding == Encoding::PofA);
+            REALM_ASSERT_DEBUG(size() == encoded_array.size());
+#ifdef REALM_DEBUG
+            for (size_t i = 0; i < encoded_array.size(); ++i) {
+                REALM_ASSERT_DEBUG(get(i) == encoded_array.get(i));
+            }
+#endif
+            auto ref = encoded_array.do_write_shallow(out);
+            encoded_array.destroy();
+            return ref;
+        }
+        return do_write_shallow(out); // Throws
+    }
+
+    return do_write_deep(out, only_if_modified, compress_in_flight); // Throws
+}
+
+ref_type Array::write(ref_type ref, Allocator& alloc, _impl::ArrayWriterBase& out, bool only_if_modified,
+                      bool compress_in_flight)
+{
+    // The default allocator cannot be trusted wrt is_read_only():
+    REALM_ASSERT(!only_if_modified || &alloc != &Allocator::get_default());
+    if (only_if_modified && alloc.is_read_only(ref))
+        return ref;
+
+    Array array(alloc);
+    array.init_from_ref(ref);
+    REALM_ASSERT_DEBUG(array.is_attached());
+
+    if (!array.m_has_refs) {
+        Array encoded_array{Allocator::get_default()};
+        if (compress_in_flight && array.size() != 0 && array.encode_array(encoded_array)) {
+            REALM_ASSERT_DEBUG(encoded_array.m_kind == 'B');
+            REALM_ASSERT_DEBUG(
+                encoded_array.m_encoding == Encoding::Flex || encoded_array.m_encoding == Encoding::Packed ||
+                encoded_array.m_encoding == Encoding::AofP || encoded_array.m_encoding == Encoding::PofA);
+            REALM_ASSERT_DEBUG(array.size() == encoded_array.size());
+#ifdef REALM_DEBUG
+            for (size_t i = 0; i < encoded_array.size(); ++i) {
+                REALM_ASSERT_DEBUG(array.get(i) == encoded_array.get(i));
+            }
+#endif
+            auto ref = encoded_array.do_write_shallow(out);
+            encoded_array.destroy();
+            return ref;
+        }
+        else {
+            return array.do_write_shallow(out); // Throws
+        }
+    }
+    return array.do_write_deep(out, only_if_modified, compress_in_flight); // Throws
+}
+
 
 ref_type Array::do_write_shallow(_impl::ArrayWriterBase& out) const
 {
-    // Write flat array
+    // here we might want to compress the array and write down.
     const char* header = get_header_from_data(m_data);
     size_t byte_size = get_byte_size();
-    uint32_t dummy_checksum = 0x41414141UL;                                // "AAAA" in ASCII
-    ref_type new_ref = out.write_array(header, byte_size, dummy_checksum); // Throws
-    REALM_ASSERT_3(new_ref % 8, ==, 0);                                    // 8-byte alignment
+    const auto encoded = is_encoded();
+    uint32_t dummy_checksum =
+        encoded ? 0x42424242UL : 0x41414141UL; // A/B (A for normal arrays, B for compressed arrays)
+    uint32_t dummy_checksum_bytes =
+        encoded ? 2 : 4; // AAAA / BB (only 2 bytes for B arrays, since B arrays use more header space)
+    ref_type new_ref = out.write_array(header, byte_size, dummy_checksum, dummy_checksum_bytes); // Throws
+    REALM_ASSERT_3(new_ref % 8, ==, 0);                                                          // 8-byte alignment
     return new_ref;
 }
 
 
-ref_type Array::do_write_deep(_impl::ArrayWriterBase& out, bool only_if_modified) const
+ref_type Array::do_write_deep(_impl::ArrayWriterBase& out, bool only_if_modified, bool compress) const
 {
     // Temp array for updated refs
     Array new_array(Allocator::get_default());
@@ -304,12 +467,11 @@ ref_type Array::do_write_deep(_impl::ArrayWriterBase& out, bool only_if_modified
         bool is_ref = (value != 0 && (value & 1) == 0);
         if (is_ref) {
             ref_type subref = to_ref(value);
-            ref_type new_subref = write(subref, m_alloc, out, only_if_modified); // Throws
+            ref_type new_subref = write(subref, m_alloc, out, only_if_modified, compress); // Throws
             value = from_ref(new_subref);
         }
         new_array.add(value); // Throws
     }
-
     return new_array.do_write_shallow(out); // Throws
 }
 
@@ -321,6 +483,7 @@ void Array::move(size_t begin, size_t end, size_t dest_begin)
     REALM_ASSERT_3(dest_begin, <=, m_size);
     REALM_ASSERT_3(end - begin, <=, m_size - dest_begin);
     REALM_ASSERT(!(dest_begin >= begin && dest_begin < end)); // Required by std::copy
+
 
     // Check if we need to copy before modifying
     copy_on_write(); // Throws
@@ -376,10 +539,8 @@ void Array::set(size_t ndx, int64_t value)
 
     // Check if we need to copy before modifying
     copy_on_write(); // Throws
-
     // Grow the array if needed to store this value
     ensure_minimum_width(value); // Throws
-
     // Set the value
     (this->*(m_vtable->setter))(ndx, value);
 }
@@ -429,6 +590,7 @@ void Array::insert(size_t ndx, int_fast64_t value)
 {
     REALM_ASSERT_DEBUG(ndx <= m_size);
 
+    decode_array(*this);
     const auto old_width = m_width;
     const auto old_size = m_size;
     const Getter old_getter = m_getter; // Save old getter before potential width expansion
@@ -476,6 +638,17 @@ void Array::insert(size_t ndx, int_fast64_t value)
     }
 }
 
+void Array::copy_on_write()
+{
+    if (is_read_only() && !decode_array(*this))
+        Node::copy_on_write();
+}
+
+void Array::copy_on_write(size_t min_size)
+{
+    if (is_read_only() && !decode_array(*this))
+        Node::copy_on_write(min_size);
+}
 
 void Array::truncate(size_t new_size)
 {
@@ -499,7 +672,6 @@ void Array::truncate(size_t new_size)
         update_width_cache_from_header();
     }
 }
-
 
 void Array::truncate_and_destroy_children(size_t new_size)
 {
@@ -529,10 +701,8 @@ void Array::truncate_and_destroy_children(size_t new_size)
     }
 }
 
-
 void Array::do_ensure_minimum_width(int_fast64_t value)
 {
-
     // Make room for the new value
     const size_t width = bit_width(value);
 
@@ -550,107 +720,60 @@ void Array::do_ensure_minimum_width(int_fast64_t value)
     }
 }
 
-void Array::set_all_to_zero()
+size_t Array::size() const noexcept
 {
-    if (m_size == 0 || m_width == 0)
-        return;
-
-    copy_on_write(); // Throws
-
-    set_width_in_header(0, get_header());
-    update_width_cache_from_header();
+    // in case the array is in compressed format. Never read directly
+    // from the header the size, since it will result very likely in a cache miss.
+    // For compressed arrays m_size should always be kept updated, due to init_from_mem
+    return m_size;
 }
 
-
-namespace {
-
-template <size_t width>
-inline int64_t lower_bits()
+bool Array::encode_array(Array& arr) const
 {
-    if (width == 1)
-        return 0xFFFFFFFFFFFFFFFFULL;
-    else if (width == 2)
-        return 0x5555555555555555ULL;
-    else if (width == 4)
-        return 0x1111111111111111ULL;
-    else if (width == 8)
-        return 0x0101010101010101ULL;
-    else if (width == 16)
-        return 0x0001000100010001ULL;
-    else if (width == 32)
-        return 0x0000000100000001ULL;
-    else if (width == 64)
-        return 0x0000000000000001ULL;
-    else {
-        REALM_ASSERT_DEBUG(false);
-        return int64_t(-1);
+    if (!is_encoded() && m_encoding == NodeHeader::Encoding::WTypBits) {
+        return s_encode.encode(*this, arr);
     }
+    return false;
 }
 
-// Return true if 'value' has an element (of bit-width 'width') which is 0
-template <size_t width>
-inline bool has_zero_element(uint64_t value)
+bool Array::decode_array(Array& arr) const
 {
-    uint64_t hasZeroByte;
-    uint64_t lower = lower_bits<width>();
-    uint64_t upper = lower_bits<width>() * 1ULL << (width == 0 ? 0 : (width - 1ULL));
-    hasZeroByte = (value - lower) & ~value & upper;
-    return hasZeroByte != 0;
+    return arr.is_encoded() ? s_encode.decode(arr) : false;
 }
 
-
-// Finds zero element of bit width 'width'
-template <bool eq, size_t width>
-size_t find_zero(uint64_t v)
+bool Array::is_encoded() const
 {
-    size_t start = 0;
-    uint64_t hasZeroByte;
-
-    // Bisection optimization, speeds up small bitwidths with high match frequency. More partions than 2 do NOT pay
-    // off because the work done by test_zero() is wasted for the cases where the value exists in first half, but
-    // useful if it exists in last half. Sweet spot turns out to be the widths and partitions below.
-    if (width <= 8) {
-        hasZeroByte = has_zero_element<width>(v | 0xffffffff00000000ULL);
-        if (eq ? !hasZeroByte : (v & 0x00000000ffffffffULL) == 0) {
-            // 00?? -> increasing
-            start += 64 / no0(width) / 2;
-            if (width <= 4) {
-                hasZeroByte = has_zero_element<width>(v | 0xffff000000000000ULL);
-                if (eq ? !hasZeroByte : (v & 0x0000ffffffffffffULL) == 0) {
-                    // 000?
-                    start += 64 / no0(width) / 4;
-                }
-            }
-        }
-        else {
-            if (width <= 4) {
-                // ??00
-                hasZeroByte = has_zero_element<width>(v | 0xffffffffffff0000ULL);
-                if (eq ? !hasZeroByte : (v & 0x000000000000ffffULL) == 0) {
-                    // 0?00
-                    start += 64 / no0(width) / 4;
-                }
-            }
-        }
-    }
-
-    uint64_t mask =
-        (width == 64
-             ? ~0ULL
-             : ((1ULL << (width == 64 ? 0 : width)) - 1ULL)); // Warning free way of computing (1ULL << width) - 1
-    while (eq == (((v >> (width * start)) & mask) != 0)) {
-        start++;
-    }
-
-    return start;
+#ifdef REALM_DEBUG
+    if (m_kind == 'B')
+        REALM_ASSERT_DEBUG((m_encoding == NodeHeader::Encoding::Flex || m_encoding == NodeHeader::Encoding::Packed));
+#endif
+    return m_kind == 'B';
 }
 
-} // namespace
+bool Array::try_encode(Array& arr) const
+{
+    return encode_array(arr);
+}
 
+bool Array::try_decode()
+{
+    return decode_array(*this);
+}
 
+int64_t Array::get_encoded(size_t ndx) const noexcept
+{
+    return s_encode.get(*this, ndx);
+}
+
+void Array::set_encoded(size_t ndx, int64_t val)
+{
+    s_encode.set_direct(*this, ndx, val);
+}
 
 int64_t Array::sum(size_t start, size_t end) const
 {
+    if (is_encoded())
+        return s_encode.sum(*this, start, end);
     REALM_TEMPEX(return sum, m_width, (start, end));
 }
 
@@ -659,9 +782,13 @@ int64_t Array::sum(size_t start, size_t end) const
 {
     if (end == size_t(-1))
         end = m_size;
+
     REALM_ASSERT_EX(end <= m_size && start <= end, start, end, m_size);
 
-    if (w == 0 || start == end)
+    if (w == 0)
+        return is_encoded() ? s_encode.sum(*this, start, end) : 0;
+
+    if (start == end)
         return 0;
 
     int64_t s = 0;
@@ -686,7 +813,6 @@ int64_t Array::sum(size_t start, size_t end) const
 
         for (size_t t = 0; t < chunks; t++) {
             if (w == 1) {
-
 #if 0
 #if defined(USE_SSE42) && defined(_MSC_VER) && defined(REALM_PTR_64)
                 s += __popcnt64(data[t]);
@@ -702,7 +828,6 @@ int64_t Array::sum(size_t start, size_t end) const
                 s += a;
 #endif
 #endif
-
                 s += fast_popcount64(data[t]);
             }
             else if (w == 2) {
@@ -725,7 +850,6 @@ int64_t Array::sum(size_t start, size_t end) const
 
 #ifdef REALM_COMPILER_SSE
     if (sseavx<42>()) {
-
         // 2000 items summed 500000 times, 8/16/32 bits, miliseconds:
         // Naive, templated get<>: 391 371 374
         // SSE:                     97 148 282
@@ -822,6 +946,8 @@ int64_t Array::sum(size_t start, size_t end) const
 
 size_t Array::count(int64_t value) const noexcept
 {
+    // This is not used anywhere in the code, I believe we can delete this
+    // since the query logic does not use this
     const uint64_t* next = reinterpret_cast<uint64_t*>(m_data);
     size_t value_count = 0;
     const size_t end = m_size;
@@ -1017,7 +1143,7 @@ size_t Array::calc_aligned_byte_size(size_t size, int width)
         byte_size = header_size + size * bytes_per_elem;
     }
     if (overflow)
-        throw util::overflow_error("Byte size overflow");
+        throw std::overflow_error("Byte size overflow");
     REALM_ASSERT_3(byte_size, >, 0);
     size_t aligned_byte_size = ((byte_size - 1) | 7) + 1; // 8-byte alignment
     return aligned_byte_size;
@@ -1094,19 +1220,31 @@ MemRef Array::create(Type type, bool context_flag, WidthType width_type, size_t 
     REALM_ASSERT_7(value, ==, 0, ||, width_type, ==, wtype_Bits);
     REALM_ASSERT_7(size, ==, 0, ||, width_type, !=, wtype_Ignore);
 
-    bool is_inner_bptree_node = false, has_refs = false;
+    uint8_t flags = 0;
+    Encoding encoding = Encoding::WTypBits;
+    if (width_type == wtype_Bits)
+        encoding = Encoding::WTypBits;
+    else if (width_type == wtype_Multiply)
+        encoding = Encoding::WTypMult;
+    else if (width_type == wtype_Ignore)
+        encoding = Encoding::WTypIgn;
+    else {
+        REALM_ASSERT(false && "Wrong width type for encoding");
+    }
+
     switch (type) {
         case type_Normal:
             break;
         case type_InnerBptreeNode:
-            is_inner_bptree_node = true;
-            has_refs = true;
+            flags |= (uint8_t)Flags::HasRefs | (uint8_t)Flags::InnerBPTree;
+
             break;
         case type_HasRefs:
-            has_refs = true;
+            flags |= (uint8_t)Flags::HasRefs;
             break;
     }
-
+    if (context_flag)
+        flags |= (uint8_t)Flags::Context;
     int width = 0;
     size_t byte_size_0 = header_size;
     if (value != 0) {
@@ -1117,12 +1255,12 @@ MemRef Array::create(Type type, bool context_flag, WidthType width_type, size_t 
     // address of that member
     size_t byte_size = std::max(byte_size_0, initial_capacity + 0);
     MemRef mem = alloc.alloc(byte_size); // Throws
-    char* header = mem.get_addr();
+    auto header = mem.get_addr();
 
-    init_header(header, is_inner_bptree_node, has_refs, context_flag, width_type, width, size, byte_size);
-
+    init_header(header, 'A', encoding, flags, width, size);
+    set_capacity_in_header(byte_size, mem.get_addr());
     if (value != 0) {
-        char* data = get_data_from_header(header);
+        char* data = get_data_from_header(mem.get_addr());
         size_t begin = 0, end = size;
         REALM_TEMPEX(fill_direct, width, (data, begin, end, value));
     }
@@ -1134,106 +1272,103 @@ MemRef Array::create(Type type, bool context_flag, WidthType width_type, size_t 
 template <class cond, size_t bitwidth>
 bool Array::find_vtable(int64_t value, size_t start, size_t end, size_t baseindex, QueryStateBase* state) const
 {
-    return ArrayWithFind(*this).find_optimized<cond, bitwidth>(value, start, end, baseindex, state, nullptr);
+    return ArrayWithFind(*this).find_optimized<cond, bitwidth>(value, start, end, baseindex, state);
 }
-
-
-template <size_t width>
-struct Array::VTableForWidth {
-    struct PopulatedVTable : Array::VTable {
-        PopulatedVTable()
-        {
-            getter = &Array::get<width>;
-            setter = &Array::set<width>;
-            chunk_getter = &Array::get_chunk<width>;
-            finder[cond_Equal] = &Array::find_vtable<Equal, width>;
-            finder[cond_NotEqual] = &Array::find_vtable<NotEqual, width>;
-            finder[cond_Greater] = &Array::find_vtable<Greater, width>;
-            finder[cond_Less] = &Array::find_vtable<Less, width>;
-        }
-    };
-    static const PopulatedVTable vtable;
-};
-
-template <size_t width>
-const typename Array::VTableForWidth<width>::PopulatedVTable Array::VTableForWidth<width>::vtable;
 
 void Array::update_width_cache_from_header() noexcept
 {
-    auto width = get_width_from_header(get_header());
-    m_lbound = lbound_for_width(width);
-    m_ubound = ubound_for_width(width);
-
-    m_width = width;
-
-    REALM_TEMPEX(m_vtable = &VTableForWidth, width, ::vtable);
+    m_width = get_width_from_header(get_header());
+    m_lbound = lbound_for_width(m_width);
+    m_ubound = ubound_for_width(m_width);
+    REALM_ASSERT_DEBUG(m_lbound <= m_ubound);
+    REALM_ASSERT_DEBUG(m_width >= m_lbound);
+    REALM_ASSERT_DEBUG(m_width <= m_ubound);
+    REALM_TEMPEX(m_vtable = &VTableForWidth, m_width, ::vtable);
     m_getter = m_vtable->getter;
 }
 
 // This method reads 8 concecutive values into res[8], starting from index 'ndx'. It's allowed for the 8 values to
-// exceed array length; in this case, remainder of res[8] will be left untouched.
+// exceed array length; in this case, remainder of res[8] will be be set to 0.
 template <size_t w>
 void Array::get_chunk(size_t ndx, int64_t res[8]) const noexcept
 {
     REALM_ASSERT_3(ndx, <, m_size);
+    size_t i = 0;
 
-    // To make Valgrind happy. Todo, I *think* it should work without, now, but if it reappears, add memset again.
-    // memset(res, 0, 8*8);
+    // if constexpr to avoid producing spurious warnings resulting from
+    // instantiating for too large w
+    if constexpr (w > 0 && w <= 4) {
+        // Calling get<w>() in a loop results in one load per call to get, but
+        // for w < 8 we can do better than that
+        constexpr size_t elements_per_byte = 8 / w;
 
-    if (REALM_X86_OR_X64_TRUE && (w == 1 || w == 2 || w == 4) && ndx + 32 < m_size) {
-        // This method is *multiple* times faster than performing 8 times get<w>, even if unrolled. Apparently
-        // compilers
-        // can't figure out to optimize it.
-        uint64_t c;
-        size_t bytealign = ndx / (8 / no0(w));
-        if (w == 1) {
-            c = *reinterpret_cast<uint16_t*>(m_data + bytealign);
-            c >>= (ndx - bytealign * 8) * w;
+        // Round m_size down to byte granularity as the trailing bits in the last
+        // byte are uninitialized
+        size_t bytes_available = m_size / elements_per_byte;
+
+        // Round start and end to be byte-aligned. Start is rounded down and
+        // end is rounded up as we may read up to 7 unused bits at each end.
+        size_t start = ndx / elements_per_byte;
+        size_t end = std::min(bytes_available, (ndx + 8 + elements_per_byte - 1) / elements_per_byte);
+
+        if (end > start) {
+            // Loop in reverse order because data is stored in little endian order
+            uint64_t c = 0;
+            for (size_t i = end; i > start; --i) {
+                c <<= 8;
+                c += *reinterpret_cast<const uint8_t*>(m_data + i - 1);
+            }
+            // Trim off leading bits which aren't part of the requested range
+            c >>= (ndx - start * elements_per_byte) * w;
+
+            uint64_t mask = (1ULL << w) - 1ULL;
+            res[0] = (c >> 0 * w) & mask;
+            res[1] = (c >> 1 * w) & mask;
+            res[2] = (c >> 2 * w) & mask;
+            res[3] = (c >> 3 * w) & mask;
+            res[4] = (c >> 4 * w) & mask;
+            res[5] = (c >> 5 * w) & mask;
+            res[6] = (c >> 6 * w) & mask;
+            res[7] = (c >> 7 * w) & mask;
+
+            // Read the last few elements via get<w> if needed
+            i = std::min<size_t>(8, end * elements_per_byte - ndx);
         }
-        else if (w == 2) {
-            c = *reinterpret_cast<uint32_t*>(m_data + bytealign);
-            c >>= (ndx - bytealign * 4) * w;
-        }
-        else if (w == 4) {
-            c = *reinterpret_cast<uint64_t*>(m_data + bytealign);
-            c >>= (ndx - bytealign * 2) * w;
-        }
-        uint64_t mask = (w == 64 ? ~0ULL : ((1ULL << (w == 64 ? 0 : w)) - 1ULL));
-        // The '?' is to avoid warnings about shifting too much
-        res[0] = (c >> 0 * (w > 4 ? 0 : w)) & mask;
-        res[1] = (c >> 1 * (w > 4 ? 0 : w)) & mask;
-        res[2] = (c >> 2 * (w > 4 ? 0 : w)) & mask;
-        res[3] = (c >> 3 * (w > 4 ? 0 : w)) & mask;
-        res[4] = (c >> 4 * (w > 4 ? 0 : w)) & mask;
-        res[5] = (c >> 5 * (w > 4 ? 0 : w)) & mask;
-        res[6] = (c >> 6 * (w > 4 ? 0 : w)) & mask;
-        res[7] = (c >> 7 * (w > 4 ? 0 : w)) & mask;
     }
-    else {
-        size_t i = 0;
-        for (; i + ndx < m_size && i < 8; i++)
-            res[i] = get<w>(ndx + i);
 
-        for (; i < 8; i++)
-            res[i] = 0;
-    }
+    for (; i + ndx < m_size && i < 8; i++)
+        res[i] = get<w>(ndx + i);
+    for (; i < 8; i++)
+        res[i] = 0;
 
 #ifdef REALM_DEBUG
     for (int j = 0; j + ndx < m_size && j < 8; j++) {
         int64_t expected = get<w>(ndx + j);
-        if (res[j] != expected)
-            REALM_ASSERT(false);
+        REALM_ASSERT(res[j] == expected);
     }
 #endif
+}
+
+void Array::get_chunk_encoded(size_t ndx, int64_t res[8]) const noexcept
+{
+    s_encode.get_chunk(*this, ndx, res);
+}
+
+template <>
+void Array::get_chunk<0>(size_t ndx, int64_t res[8]) const noexcept
+{
+    REALM_ASSERT_3(ndx, <, m_size);
+    memset(res, 0, sizeof(int64_t) * 8);
 }
 
 
 template <size_t width>
 void Array::set(size_t ndx, int64_t value)
 {
-    set_direct<width>(m_data, ndx, value);
+    realm::set_direct<width>(m_data, ndx, value);
 }
 
+#ifdef REALM_DEBUG
 namespace {
 
 class MemStatsHandler : public Array::MemUsageHandler {
@@ -1315,14 +1450,21 @@ void Array::report_memory_usage_2(MemUsageHandler& handler) const
         handler.handle(ref, allocated, used); // Throws
     }
 }
+#endif
 
 void Array::verify() const
 {
 #ifdef REALM_DEBUG
+
     REALM_ASSERT(is_attached());
 
-    REALM_ASSERT(m_width == 0 || m_width == 1 || m_width == 2 || m_width == 4 || m_width == 8 || m_width == 16 ||
-                 m_width == 32 || m_width == 64);
+    if (get_kind(get_header()) == 'A') {
+        REALM_ASSERT(m_width == 0 || m_width == 1 || m_width == 2 || m_width == 4 || m_width == 8 || m_width == 16 ||
+                     m_width == 32 || m_width == 64);
+    }
+    else {
+        REALM_ASSERT(m_width <= 64);
+    }
 
     if (!get_parent())
         return;
@@ -1343,30 +1485,35 @@ size_t Array::upper_bound_int(int64_t value) const noexcept
     REALM_TEMPEX(return upper_bound, m_width, (m_data, m_size, value));
 }
 
-
 size_t Array::find_first(int64_t value, size_t start, size_t end) const
 {
     return find_first<Equal>(value, start, end);
 }
 
-
 int_fast64_t Array::get(const char* header, size_t ndx) noexcept
 {
+    if (NodeHeader::get_kind(header) == 'B')
+        return s_encode.get(header, ndx);
+
+    auto sz = get_size_from_header(header);
+    REALM_ASSERT(ndx < sz);
     const char* data = get_data_from_header(header);
     uint_least8_t width = get_width_from_header(header);
     return get_direct(data, width, ndx);
 }
 
-
 std::pair<int64_t, int64_t> Array::get_two(const char* header, size_t ndx) noexcept
 {
-    const char* data = get_data_from_header(header);
-    uint_least8_t width = get_width_from_header(header);
-    std::pair<int64_t, int64_t> p = ::get_two(data, width, ndx);
-    return std::make_pair(p.first, p.second);
+    return std::make_pair(get(header, ndx), get(header, ndx + 1));
 }
 
 bool QueryStateCount::match(size_t, Mixed) noexcept
+{
+    ++m_match_count;
+    return (m_limit > m_match_count);
+}
+
+bool QueryStateCount::match(size_t) noexcept
 {
     ++m_match_count;
     return (m_limit > m_match_count);
@@ -1379,15 +1526,30 @@ bool QueryStateFindFirst::match(size_t index, Mixed) noexcept
     return false;
 }
 
+bool QueryStateFindFirst::match(size_t index) noexcept
+{
+    ++m_match_count;
+    m_state = index;
+    return false;
+}
+
 template <>
-bool QueryStateFindAll<KeyColumn>::match(size_t index, Mixed) noexcept
+bool QueryStateFindAll<std::vector<ObjKey>>::match(size_t index, Mixed) noexcept
 {
     ++m_match_count;
 
-    REALM_ASSERT(m_key_values);
-    int64_t key_value = m_key_values->get(index) + m_key_offset;
-    m_keys.add(ObjKey(key_value));
+    int64_t key_value = (m_key_values ? m_key_values->get(index) : index) + m_key_offset;
+    m_keys.push_back(ObjKey(key_value));
 
+    return (m_limit > m_match_count);
+}
+
+template <>
+bool QueryStateFindAll<std::vector<ObjKey>>::match(size_t index) noexcept
+{
+    ++m_match_count;
+    int64_t key_value = (m_key_values ? m_key_values->get(index) : index) + m_key_offset;
+    m_keys.push_back(ObjKey(key_value));
     return (m_limit > m_match_count);
 }
 
@@ -1398,4 +1560,53 @@ bool QueryStateFindAll<IntegerColumn>::match(size_t index, Mixed) noexcept
     m_keys.add(index);
 
     return (m_limit > m_match_count);
+}
+
+template <>
+bool QueryStateFindAll<IntegerColumn>::match(size_t index) noexcept
+{
+    ++m_match_count;
+    m_keys.add(index);
+
+    return (m_limit > m_match_count);
+}
+
+void Array::typed_print(std::string prefix) const
+{
+    std::cout << "Generic Array " << header_to_string(get_header()) << " @ " << m_ref;
+    if (!is_attached()) {
+        std::cout << " Unattached";
+        return;
+    }
+    if (size() == 0) {
+        std::cout << " Empty" << std::endl;
+        return;
+    }
+    std::cout << " size = " << size() << " {";
+    if (has_refs()) {
+        std::cout << std::endl;
+        for (unsigned n = 0; n < size(); ++n) {
+            auto pref = prefix + "  " + to_string(n) + ":\t";
+            RefOrTagged rot = get_as_ref_or_tagged(n);
+            if (rot.is_ref() && rot.get_as_ref()) {
+                Array a(m_alloc);
+                a.init_from_ref(rot.get_as_ref());
+                std::cout << pref;
+                a.typed_print(pref);
+            }
+            else if (rot.is_tagged()) {
+                std::cout << pref << rot.get_as_int() << std::endl;
+            }
+        }
+        std::cout << prefix << "}" << std::endl;
+    }
+    else {
+        std::cout << " Leaf of unknown type }" << std::endl;
+        /*
+        for (unsigned n = 0; n < size(); ++n) {
+            auto pref = prefix + to_string(n) + ":\t";
+            std::cout << pref << get(n) << std::endl;
+        }
+        */
+    }
 }

@@ -16,17 +16,12 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#ifndef REALM_ENABLE_MONGO_CLIENT_TESTS
-#define REALM_ENABLE_MONGO_CLIENT_TESTS 1
-#endif
-
-#if REALM_ENABLE_MONGO_CLIENT_TESTS
-
 #include <realm/object-store/sync/generic_network_transport.hpp>
 #include <realm/object-store/sync/mongo_collection.hpp>
 
-#include <sstream>
 #include <catch2/catch_all.hpp>
+
+#include <sstream>
 
 namespace realm::app {
 using bson::Bson;
@@ -61,7 +56,7 @@ std::string operator""_nows(const char* str, size_t len)
 }
 } // namespace
 
-TEST_CASE("Validate _nows helper", "[mongo]") {
+TEST_CASE("Validate _nows helper", "[sync][mongo]") {
     // WARNING: if you are debugging this test, be aware that catch can be inconsistent with leading whitespace when
     // printing mulit-line strings. You may want to do your own printing.
 
@@ -87,7 +82,7 @@ TEST_CASE("Validate _nows helper", "[mongo]") {
              mr bob)"_nows == "hello\nmr bob");
 }
 
-TEST_CASE("WatchStream SSE processing", "[mongo]") {
+TEST_CASE("WatchStream SSE processing", "[sync][mongo]") {
     WatchStream ws;
 
     SECTION("successes") {
@@ -151,95 +146,95 @@ TEST_CASE("WatchStream SSE processing", "[mongo]") {
             SECTION("simple") {
                 ws.feed_sse({R"({"error_code": "BadRequest", "error": ":("})", "error"});
                 REQUIRE(ws.state() == WatchStream::HAVE_ERROR);
-                CHECK(ws.error().error_code == make_error_code(ServiceErrorCode::bad_request));
-                CHECK(ws.error().message == ":(");
+                CHECK(ws.error().code() == ErrorCodes::BadRequest);
+                CHECK(ws.error().reason() == ":(");
             }
             SECTION("reading error doesn't consume it") {
                 ws.feed_sse({R"({"error_code": "BadRequest", "error": ":("})", "error"});
                 REQUIRE(ws.state() == WatchStream::HAVE_ERROR);
-                CHECK(ws.error().error_code == make_error_code(ServiceErrorCode::bad_request));
-                CHECK(ws.error().message == ":(");
+                CHECK(ws.error().code() == ErrorCodes::BadRequest);
+                CHECK(ws.error().reason() == ":(");
                 // Above is same as "simple" SECTION.
                 REQUIRE(ws.state() == WatchStream::HAVE_ERROR);
-                CHECK(ws.error().error_code == make_error_code(ServiceErrorCode::bad_request));
-                CHECK(ws.error().message == ":(");
+                CHECK(ws.error().code() == ErrorCodes::BadRequest);
+                CHECK(ws.error().reason() == ":(");
             }
             SECTION("with unknown code") {
                 ws.feed_sse({R"({"error_code": "WhoKnows", "error": ":("})", "error"});
                 REQUIRE(ws.state() == WatchStream::HAVE_ERROR);
-                CHECK(ws.error().error_code == make_error_code(ServiceErrorCode::unknown));
-                CHECK(ws.error().message == ":(");
+                CHECK(ws.error().code() == ErrorCodes::AppUnknownError);
+                CHECK(ws.error().reason() == ":(");
             }
             SECTION("percent encoding") {
                 ws.feed_sse({R"({"error_code": "BadRequest", "error": "100%25 failure"})", "error"});
                 REQUIRE(ws.state() == WatchStream::HAVE_ERROR);
-                CHECK(ws.error().error_code == make_error_code(ServiceErrorCode::bad_request));
-                CHECK(ws.error().message == "100% failure");
+                CHECK(ws.error().code() == ErrorCodes::BadRequest);
+                CHECK(ws.error().reason() == "100% failure");
             }
             SECTION("extra field") {
                 ws.feed_sse({R"({"bonus": "field", "error_code": "BadRequest", "error": ":("})", "error"});
                 REQUIRE(ws.state() == WatchStream::HAVE_ERROR);
-                CHECK(ws.error().error_code == make_error_code(ServiceErrorCode::bad_request));
-                CHECK(ws.error().message == ":(");
+                CHECK(ws.error().code() == ErrorCodes::BadRequest);
+                CHECK(ws.error().reason() == ":(");
             }
         }
         SECTION("malformed server error") {
             SECTION("invalid json") {
                 ws.feed_sse({R"({"no closing: "}")", "error"});
                 REQUIRE(ws.state() == WatchStream::HAVE_ERROR);
-                CHECK(ws.error().error_code == make_error_code(ServiceErrorCode::unknown));
-                CHECK(ws.error().message == R"({"no closing: "}")");
+                CHECK(ws.error().code() == ErrorCodes::AppUnknownError);
+                CHECK(ws.error().reason() == R"({"no closing: "}")");
             }
             SECTION("missing error") {
                 ws.feed_sse({R"({"error_code": "BadRequest"})", "error"});
                 REQUIRE(ws.state() == WatchStream::HAVE_ERROR);
-                CHECK(ws.error().error_code == make_error_code(ServiceErrorCode::unknown));
-                CHECK(ws.error().message == R"({"error_code": "BadRequest"})");
+                CHECK(ws.error().code() == ErrorCodes::AppUnknownError);
+                CHECK(ws.error().reason() == R"({"error_code": "BadRequest"})");
             }
             SECTION("missing error_code") {
                 ws.feed_sse({R"({"error": ":("})", "error"});
                 REQUIRE(ws.state() == WatchStream::HAVE_ERROR);
-                CHECK(ws.error().error_code == make_error_code(ServiceErrorCode::unknown));
-                CHECK(ws.error().message == R"({"error": ":("})");
+                CHECK(ws.error().code() == ErrorCodes::AppUnknownError);
+                CHECK(ws.error().reason() == R"({"error": ":("})");
             }
             SECTION("error wrong type") {
                 ws.feed_sse({R"({"error_code": "BadRequest", "error": 1})", "error"});
                 REQUIRE(ws.state() == WatchStream::HAVE_ERROR);
-                CHECK(ws.error().error_code == make_error_code(ServiceErrorCode::unknown));
-                CHECK(ws.error().message == R"({"error_code": "BadRequest", "error": 1})");
+                CHECK(ws.error().code() == ErrorCodes::AppUnknownError);
+                CHECK(ws.error().reason() == R"({"error_code": "BadRequest", "error": 1})");
             }
             SECTION("error_code wrong type") {
                 ws.feed_sse({R"({"error_code": 1, "error": ":("})", "error"});
                 REQUIRE(ws.state() == WatchStream::HAVE_ERROR);
-                CHECK(ws.error().error_code == make_error_code(ServiceErrorCode::unknown));
-                CHECK(ws.error().message == R"({"error_code": 1, "error": ":("})");
+                CHECK(ws.error().code() == ErrorCodes::AppUnknownError);
+                CHECK(ws.error().reason() == R"({"error_code": 1, "error": ":("})");
             }
             SECTION("not an object") {
                 ws.feed_sse({R"("I'm just a string in the world")", "error"});
                 REQUIRE(ws.state() == WatchStream::HAVE_ERROR);
-                CHECK(ws.error().error_code == make_error_code(ServiceErrorCode::unknown));
-                CHECK(ws.error().message == R"("I'm just a string in the world")");
+                CHECK(ws.error().code() == ErrorCodes::AppUnknownError);
+                CHECK(ws.error().reason() == R"("I'm just a string in the world")");
             }
             SECTION("a lot of percent encoding") {
                 // Note, trailing % is a special case that should be preserved if more is added.
                 ws.feed_sse({R"(%25%26%0A%0D%)", "error"});
                 REQUIRE(ws.state() == WatchStream::HAVE_ERROR);
-                CHECK(ws.error().error_code == make_error_code(ServiceErrorCode::unknown));
-                CHECK(ws.error().message == "%%26\n\r%"); // NOTE: not a raw string so has real CR and LF bytes.
+                CHECK(ws.error().code() == ErrorCodes::AppUnknownError);
+                CHECK(ws.error().reason() == "%%26\n\r%"); // NOTE: not a raw string so has real CR and LF bytes.
             }
         }
         SECTION("malformed ordinary event") {
             SECTION("invalid json") {
                 ws.feed_sse({R"({"no closing: "}")"});
                 REQUIRE(ws.state() == WatchStream::HAVE_ERROR);
-                CHECK(ws.error().error_code == make_error_code(JSONErrorCode::bad_bson_parse));
-                CHECK(ws.error().message == R"(server returned malformed event: {"no closing: "}")");
+                CHECK(ws.error().code() == ErrorCodes::BadBsonParse);
+                CHECK(ws.error().reason() == R"(server returned malformed event: {"no closing: "}")");
             }
             SECTION("not an object") {
                 ws.feed_sse({R"("I'm just a string in the world")"});
                 REQUIRE(ws.state() == WatchStream::HAVE_ERROR);
-                CHECK(ws.error().error_code == make_error_code(JSONErrorCode::bad_bson_parse));
-                CHECK(ws.error().message == R"(server returned malformed event: "I'm just a string in the world")");
+                CHECK(ws.error().code() == ErrorCodes::BadBsonParse);
+                CHECK(ws.error().reason() == R"(server returned malformed event: "I'm just a string in the world")");
             }
         }
     }
@@ -248,7 +243,7 @@ TEST_CASE("WatchStream SSE processing", "[mongo]") {
 // Defining a shorthand so that it is less disruptive to put this after every line.
 #define REQ_ND REQUIRE(ws.state() == WatchStream::NEED_DATA)
 
-TEST_CASE("WatchStream line processing", "[mongo]") {
+TEST_CASE("WatchStream line processing", "[sync][mongo]") {
     WatchStream ws;
 
     SECTION("simple") {
@@ -447,7 +442,7 @@ TEST_CASE("WatchStream line processing", "[mongo]") {
         REQ_ND;
         ws.feed_line(R"()");
         REQUIRE(ws.state() == WatchStream::HAVE_ERROR);
-        CHECK(ws.error().message == "this error\n has three lines\n but only two LFs");
+        CHECK(ws.error().reason() == "this error\n has three lines\n but only two LFs");
     }
     SECTION("new line handling (LF)") {
         // since newlines are ignored in json, this tests using the mal-formed error case
@@ -466,7 +461,7 @@ TEST_CASE("WatchStream line processing", "[mongo]") {
         ws.feed_line(R"()"
                      "\n");
         REQUIRE(ws.state() == WatchStream::HAVE_ERROR);
-        CHECK(ws.error().message == "this error\n has three lines\n but only two LFs");
+        CHECK(ws.error().reason() == "this error\n has three lines\n but only two LFs");
     }
     SECTION("new line handling (CR)") {
         // since newlines are ignored in json, this tests using the mal-formed error case
@@ -485,7 +480,7 @@ TEST_CASE("WatchStream line processing", "[mongo]") {
         ws.feed_line(R"()"
                      "\r");
         REQUIRE(ws.state() == WatchStream::HAVE_ERROR);
-        CHECK(ws.error().message == "this error\n has three lines\n but only two LFs");
+        CHECK(ws.error().reason() == "this error\n has three lines\n but only two LFs");
     }
     SECTION("new line handling (CRLF)") {
         // since newlines are ignored in json, this tests using the mal-formed error case
@@ -504,11 +499,11 @@ TEST_CASE("WatchStream line processing", "[mongo]") {
         ws.feed_line(R"()"
                      "\r\n");
         REQUIRE(ws.state() == WatchStream::HAVE_ERROR);
-        CHECK(ws.error().message == "this error\n has three lines\n but only two LFs");
+        CHECK(ws.error().reason() == "this error\n has three lines\n but only two LFs");
     }
 }
 
-TEST_CASE("WatchStream buffer processing", "[mongo]") {
+TEST_CASE("WatchStream buffer processing", "[sync][mongo]") {
     WatchStream ws;
 
     SECTION("simple") {
@@ -612,6 +607,5 @@ TEST_CASE("WatchStream buffer processing", "[mongo]") {
 #endif
     }
 }
-} // namespace realm::app
 
-#endif
+} // namespace realm::app

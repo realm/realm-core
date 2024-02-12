@@ -14,8 +14,8 @@ namespace {
 // A class for connecting two socket endpoints through a memory buffer.
 class Pipe {
 public:
-    Pipe(util::Logger& logger)
-        : m_logger(logger)
+    Pipe(const std::shared_ptr<util::Logger>& logger_ptr)
+        : m_logger_ptr(logger_ptr)
     {
     }
 
@@ -23,7 +23,7 @@ public:
 
     void async_write(const char* data, size_t size, WriteCompletionHandler handler)
     {
-        m_logger.trace("async_write, size = %1", size);
+        m_logger_ptr->trace("async_write, size = %1", size);
         m_buffer.insert(m_buffer.end(), data, data + size);
         do_read();
         handler(std::error_code{}, size);
@@ -31,7 +31,7 @@ public:
 
     void async_read(char* buffer, size_t size, ReadCompletionHandler handler)
     {
-        m_logger.trace("async_read, size = %1", size);
+        m_logger_ptr->trace("async_read, size = %1", size);
         REALM_ASSERT(!m_reader_waiting);
         m_reader_waiting = true;
         m_plain_async_read = true;
@@ -43,7 +43,7 @@ public:
 
     void async_read_until(char* buffer, size_t size, char delim, ReadCompletionHandler handler)
     {
-        m_logger.trace("async_read_until, size = %1, delim = %2", size, delim);
+        m_logger_ptr->trace("async_read_until, size = %1, delim = %2", size, delim);
         REALM_ASSERT(!m_reader_waiting);
         m_reader_waiting = true;
         m_plain_async_read = false;
@@ -56,7 +56,7 @@ public:
 
 
 private:
-    util::Logger& m_logger;
+    const std::shared_ptr<util::Logger> m_logger_ptr;
     std::vector<char> m_buffer;
 
     bool m_reader_waiting = false;
@@ -71,8 +71,8 @@ private:
 
     void do_read()
     {
-        m_logger.trace("do_read(), m_buffer.size = %1, m_reader_waiting = %2, m_read_size = %3", m_buffer.size(),
-                       m_reader_waiting, m_read_size);
+        m_logger_ptr->trace("do_read(), m_buffer.size = %1, m_reader_waiting = %2, m_read_size = %3", m_buffer.size(),
+                            m_reader_waiting, m_read_size);
         if (!m_reader_waiting)
             return;
 
@@ -92,7 +92,7 @@ private:
 
     void transfer(size_t size)
     {
-        m_logger.trace("transfer()");
+        m_logger_ptr->trace("transfer()");
         std::copy(m_buffer.begin(), m_buffer.begin() + size, m_read_buffer);
         m_buffer.erase(m_buffer.begin(), m_buffer.begin() + size);
         m_reader_waiting = false;
@@ -101,7 +101,7 @@ private:
 
     void delim_not_found()
     {
-        m_logger.trace("delim_not_found");
+        m_logger_ptr->trace("delim_not_found");
         m_reader_waiting = false;
         m_handler(util::MiscExtErrors::delim_not_found, 0);
     }
@@ -109,16 +109,14 @@ private:
 
 class PipeTest {
 public:
-    util::Logger& logger;
     Pipe pipe;
 
     std::string result;
     bool done = false;
     bool error = false;
 
-    PipeTest(util::Logger& logger)
-        : logger(logger)
-        , pipe(logger)
+    PipeTest(const std::shared_ptr<util::Logger>& logger_ptr)
+        : pipe(logger_ptr)
     {
     }
 
@@ -173,20 +171,20 @@ public:
 
     std::vector<std::string> text_messages;
     std::vector<std::string> binary_messages;
-    std::vector<std::pair<std::error_code, std::string>> close_messages;
+    std::vector<std::pair<websocket::WebSocketError, std::string>> close_messages;
     std::vector<std::string> ping_messages;
     std::vector<std::string> pong_messages;
 
-    WSConfig(Pipe& pipe_in, Pipe& pipe_out, util::Logger& logger)
+    WSConfig(Pipe& pipe_in, Pipe& pipe_out, const std::shared_ptr<util::Logger>& logger_ptr)
         : m_pipe_in(pipe_in)
         , m_pipe_out(pipe_out)
-        , m_logger(logger)
+        , m_logger_ptr(logger_ptr)
     {
     }
 
-    util::Logger& websocket_get_logger() noexcept override
+    const std::shared_ptr<util::Logger>& websocket_get_logger() noexcept override
     {
-        return m_logger;
+        return m_logger_ptr;
     }
 
     std::mt19937_64& websocket_get_random() noexcept override
@@ -246,7 +244,8 @@ public:
         return true;
     }
 
-    bool websocket_close_message_received(std::error_code error_code, StringData error_message) override
+    bool websocket_close_message_received(websocket::WebSocketError error_code,
+                                          std::string_view error_message) override
     {
         close_messages.push_back(std::make_pair(error_code, std::string{error_message}));
         return true;
@@ -267,22 +266,22 @@ public:
 
 private:
     Pipe &m_pipe_in, &m_pipe_out;
-    util::Logger& m_logger;
+    const std::shared_ptr<util::Logger> m_logger_ptr;
     std::mt19937_64 m_random;
 };
 
 class Fixture {
 public:
-    util::PrefixLogger m_prefix_logger_1, m_prefix_logger_2, m_prefix_logger_3, m_prefix_logger_4;
+    const std::shared_ptr<util::Logger> m_prefix_logger_1, m_prefix_logger_2, m_prefix_logger_3, m_prefix_logger_4;
     Pipe pipe_1, pipe_2;
     WSConfig config_1, config_2;
     websocket::Socket socket_1, socket_2;
 
-    Fixture(util::Logger& logger)
-        : m_prefix_logger_1("Socket_1: ", logger)
-        , m_prefix_logger_2("Socket_2: ", logger)
-        , m_prefix_logger_3("Pipe_1: ", logger)
-        , m_prefix_logger_4("Pipe_2: ", logger)
+    Fixture(const std::shared_ptr<util::Logger>& logger)
+        : m_prefix_logger_1{std::make_shared<util::PrefixLogger>("Socket_1: ", logger)}
+        , m_prefix_logger_2{std::make_shared<util::PrefixLogger>("Socket_2: ", logger)}
+        , m_prefix_logger_3{std::make_shared<util::PrefixLogger>("Pipe_1: ", logger)}
+        , m_prefix_logger_4{std::make_shared<util::PrefixLogger>("Pipe_2: ", logger)}
         , pipe_1(m_prefix_logger_3)
         , pipe_2(m_prefix_logger_4)
         , config_1(pipe_1, pipe_2, m_prefix_logger_1)
@@ -298,7 +297,7 @@ public:
 TEST(WebSocket_Pipe)
 {
     {
-        PipeTest pipe_test{*(test_context.logger)};
+        PipeTest pipe_test{test_context.logger};
         std::string input_1 = "Hello World";
         pipe_test.write(input_1);
         pipe_test.read_plain(input_1.size());
@@ -345,7 +344,7 @@ TEST(WebSocket_Pipe)
 
 TEST(WebSocket_Messages)
 {
-    Fixture fixt{*(test_context.logger)};
+    Fixture fixt{test_context.logger};
     WSConfig& config_1 = fixt.config_1;
     WSConfig& config_2 = fixt.config_2;
 
@@ -364,7 +363,7 @@ TEST(WebSocket_Messages)
     CHECK_EQUAL(config_1.ping_messages.size(), 0);
     CHECK_EQUAL(config_2.ping_messages.size(), 0);
 
-    auto handler_no_op = [=]() {};
+    auto handler_no_op = [=](std::error_code, size_t) {};
     socket_1.async_write_ping("ping example", 12, handler_no_op);
     CHECK_EQUAL(config_1.ping_messages.size(), 0);
     CHECK_EQUAL(config_2.ping_messages.size(), 1);
@@ -391,7 +390,7 @@ TEST(WebSocket_Messages)
                                "close message",
                                15, handler_no_op);
     CHECK_EQUAL(config_1.close_messages.size(), 1);
-    CHECK_EQUAL(config_1.close_messages[0].first.value(), 1000);
+    CHECK_EQUAL(static_cast<uint16_t>(config_1.close_messages[0].first), 1000);
     CHECK_EQUAL(config_1.close_messages[0].second, "close message");
 
     std::vector<size_t> message_sizes{1, 2, 100, 125, 126, 127, 128, 200, 1000, 65000, 65535, 65536, 100000, 1000000};
@@ -407,7 +406,7 @@ TEST(WebSocket_Messages)
 
 TEST(WebSocket_Fragmented_Messages)
 {
-    Fixture fixt{*(test_context.logger)};
+    Fixture fixt{test_context.logger};
     WSConfig& config_1 = fixt.config_1;
     WSConfig& config_2 = fixt.config_2;
 
@@ -423,7 +422,7 @@ TEST(WebSocket_Fragmented_Messages)
     CHECK_EQUAL(config_1.n_handshake_completed, 1);
     CHECK_EQUAL(config_2.n_handshake_completed, 1);
 
-    auto handler_no_op = [=]() {};
+    auto handler_no_op = [=](std::error_code, size_t) {};
 
     socket_1.async_write_frame(false, websocket::Opcode::binary, "abc", 3, handler_no_op);
     CHECK_EQUAL(config_2.binary_messages.size(), 0);
@@ -442,7 +441,7 @@ TEST(WebSocket_Fragmented_Messages)
 
 TEST(WebSocket_Interleaved_Fragmented_Messages)
 {
-    Fixture fixt{*(test_context.logger)};
+    Fixture fixt{test_context.logger};
     WSConfig& config_1 = fixt.config_1;
     WSConfig& config_2 = fixt.config_2;
 
@@ -458,7 +457,7 @@ TEST(WebSocket_Interleaved_Fragmented_Messages)
     CHECK_EQUAL(config_1.n_handshake_completed, 1);
     CHECK_EQUAL(config_2.n_handshake_completed, 1);
 
-    auto handler_no_op = [=]() {};
+    auto handler_no_op = [=](std::error_code, size_t) {};
 
     CHECK_EQUAL(config_2.ping_messages.size(), 0);
     socket_1.async_write_frame(false, websocket::Opcode::binary, "a", 1, handler_no_op);

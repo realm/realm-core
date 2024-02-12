@@ -17,10 +17,10 @@ using namespace realm::sync;
 namespace {
 
 struct State {
-    util::NoCopyInputStream& m_input;
+    util::InputStream& m_input;
     InstructionHandler& m_handler;
 
-    explicit State(util::NoCopyInputStream& input, InstructionHandler& handler)
+    explicit State(util::InputStream& input, InstructionHandler& handler)
         : m_input(input)
         , m_handler(handler)
     {
@@ -83,7 +83,7 @@ struct State {
 
     BinaryData read_buffer(size_t size);
 
-    REALM_NORETURN void parser_error(const char* complaint); // Throws
+    REALM_NORETURN void parser_error(std::string_view complaint); // Throws
     REALM_NORETURN void parser_error()
     {
         parser_error("Bad input");
@@ -333,11 +333,11 @@ void State::parse_one()
     if (t == InstrTypeInternString) {
         uint32_t index = read_int<uint32_t>();
         if (index != m_intern_strings.size()) {
-            parser_error("Unexpected intern index");
+            parser_error(util::format("Unexpected intern index: %1", index));
         }
         StringData str = read_string();
         if (!m_intern_strings.insert(str).second) {
-            parser_error("Unexpected intern string");
+            parser_error(util::format("Unexpected intern string: %1", str));
         }
         StringBufferRange range = m_handler.add_string_range(str);
         m_handler.set_intern_string(index, range);
@@ -356,7 +356,8 @@ void State::parse_one()
                     spec.pk_field = read_intern_string();
                     spec.pk_type = read_payload_type();
                     if (!is_valid_key_type(spec.pk_type)) {
-                        parser_error("Invalid primary key type in AddTable");
+                        parser_error(util::format("Invalid primary key type in AddTable: %1",
+                                                  static_cast<uint8_t>(spec.pk_type)));
                     }
                     spec.pk_nullable = read_bool();
                     spec.is_asymmetric = (table_type == Table::Type::TopLevelAsymmetric);
@@ -368,7 +369,7 @@ void State::parse_one()
                     break;
                 }
                 default:
-                    parser_error("AddTable: unknown table type");
+                    parser_error(util::format("AddTable: unknown table type: %1", table_type));
             }
             m_handler(instr);
             return;
@@ -498,7 +499,7 @@ void State::parse_one()
         }
     }
 
-    parser_error("unknown instruction");
+    parser_error(util::format("Unknown instruction type: %1", t));
 }
 
 
@@ -663,24 +664,16 @@ BinaryData State::read_buffer(size_t size)
     return BinaryData(m_buffer.data(), size);
 }
 
-void State::parser_error(const char* complaints)
+void State::parser_error(std::string_view complaints)
 {
-    throw BadChangesetError{complaints};
+    throw BadChangesetError{std::string(complaints)};
 }
 
 } // anonymous namespace
 
-namespace realm {
-namespace sync {
+namespace realm::sync {
 
 void parse_changeset(util::InputStream& input, Changeset& out_log)
-{
-    util::Buffer<char> input_buffer{1024};
-    util::NoCopyInputStreamAdaptor in_2{input, input_buffer};
-    return parse_changeset(in_2, out_log);
-}
-
-void parse_changeset(util::NoCopyInputStream& input, Changeset& out_log)
 {
     InstructionBuilder builder{out_log};
     State state{input, builder};
@@ -695,7 +688,7 @@ OwnedMixed parse_base64_encoded_primary_key(std::string_view str)
     if (!bin_encoded) {
         throw BadChangesetError("invalid base64 in base64-encoded primary key");
     }
-    util::SimpleNoCopyInputStream stream(*bin_encoded);
+    util::SimpleInputStream stream(*bin_encoded);
     UnreachableInstructionHandler fake_encoder;
     State state{stream, fake_encoder};
     using Type = Instruction::Payload::Type;
@@ -722,5 +715,4 @@ OwnedMixed parse_base64_encoded_primary_key(std::string_view str)
     }
 }
 
-} // namespace sync
-} // namespace realm
+} // namespace realm::sync

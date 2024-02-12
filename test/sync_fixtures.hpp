@@ -2,18 +2,19 @@
 #include <stdexcept>
 #include <string>
 #include <vector>
-#include <sstream>
 
+#include <realm/impl/simulated_failure.hpp>
+#include <realm/string_data.hpp>
+#include <realm/sync/client.hpp>
+#include <realm/sync/network/default_socket.hpp>
 #include <realm/sync/network/http.hpp>
 #include <realm/sync/network/network.hpp>
-#include <realm/string_data.hpp>
-#include <realm/impl/simulated_failure.hpp>
-#include <realm/sync/noinst/protocol_codec.hpp>
-#include <realm/sync/noinst/server/server_dir.hpp>
 #include <realm/sync/noinst/client_history_impl.hpp>
-#include <realm/version.hpp>
-#include <realm/sync/client.hpp>
+#include <realm/sync/noinst/protocol_codec.hpp>
 #include <realm/sync/noinst/server/server.hpp>
+#include <realm/sync/noinst/server/server_dir.hpp>
+#include <realm/transaction.hpp>
+#include <realm/version.hpp>
 
 #include "test.hpp"
 
@@ -301,10 +302,11 @@ public:
 
     util::PrefixLogger logger;
 
-    HTTPRequestClient(util::Logger& logger, const network::Endpoint& endpoint, const HTTPRequest& request)
-        : logger{"HTTP client: ", logger}
+    HTTPRequestClient(const std::shared_ptr<util::Logger>& logger_ptr, const network::Endpoint& endpoint,
+                      const HTTPRequest& request)
+        : logger{"HTTP client: ", logger_ptr}
         , m_endpoint{endpoint}
-        , m_http_client{*this, logger}
+        , m_http_client{*this, logger_ptr}
         , m_request{request}
     {
     }
@@ -438,7 +440,11 @@ public:
 
         size_t max_download_size = 0x1000000; // 16 MB as in Server::Config
 
+#if REALM_DISABLE_SYNC_MULTIPLEXING
+        bool one_connection_per_session = true;
+#else
         bool one_connection_per_session = false;
+#endif
 
         bool disable_upload_activation_delay = false;
 
@@ -505,7 +511,7 @@ public:
             }
             std::string dir = util::File::resolve(dir_name, server_dir);
             util::try_make_dir(dir);
-            util::Optional<PKey> public_key;
+            std::optional<PKey> public_key;
             if (!config.server_public_key_path.empty())
                 public_key = PKey::load_public(config.server_public_key_path);
             Server::Config config_2;
@@ -533,7 +539,10 @@ public:
         m_clients.resize(num_clients);
         for (int i = 0; i < num_clients; ++i) {
             Client::Config config_2;
-            config_2.user_agent_application_info = "TestFixture/" REALM_VERSION_STRING;
+
+            m_client_socket_providers.push_back(std::make_shared<websocket::DefaultSocketProvider>(
+                m_client_loggers[i], "", nullptr, websocket::DefaultSocketProvider::AutoStart{false}));
+            config_2.socket_provider = m_client_socket_providers.back();
             config_2.logger = m_client_loggers[i];
             config_2.reconnect_mode = ReconnectMode::testing;
             config_2.ping_keepalive_period = config.client_ping_period;
@@ -546,7 +555,6 @@ public:
         }
 
         m_server_threads.resize(num_servers);
-        m_client_threads.resize(num_clients);
 
         m_simulated_server_error_rates.resize(num_servers);
         m_simulated_client_error_rates.resize(num_clients);
@@ -563,9 +571,9 @@ public:
         unit_test::TestContext& test_context = m_test_context;
         stop();
         for (int i = 0; i < m_num_clients; ++i) {
-            if (m_client_threads[i].joinable())
-                CHECK(!m_client_threads[i].join());
+            m_clients[i]->shutdown_and_wait();
         }
+        m_client_socket_providers.clear();
         for (int i = 0; i < m_num_servers; ++i) {
             if (m_server_threads[i].joinable())
                 CHECK(!m_server_threads[i].join());
@@ -573,35 +581,43 @@ public:
         }
     }
 
-    using ErrorHandler = void(std::error_code ec, bool is_fatal, const std::string& detailed_message);
+    using ErrorHandler = void(Status status, bool is_fatal);
 
     // Set an error handler to be used for all sessions of the specified client
     // (\a handler will be copied for each session). Must be called before
     // make_session().
     void set_client_side_error_handler(int client_index, std::function<ErrorHandler> handler)
     {
-        using ErrorInfo = Session::ErrorInfo;
-        auto handler_2 = [handler = std::move(handler)](ConnectionState state, util::Optional<ErrorInfo> error_info) {
+        auto handler_wrapped = [handler = std::move(handler)](ConnectionState state,
+                                                              std::optional<SessionErrorInfo> error_info) {
             if (state != ConnectionState::disconnected)
                 return;
             REALM_ASSERT(error_info);
-            std::error_code ec = error_info->error_code;
-            bool is_fatal = error_info->is_fatal();
-            const std::string& detailed_message = error_info->message;
-            handler(ec, is_fatal, detailed_message);
+            handler(error_info->status, error_info->is_fatal);
         };
-        m_connection_state_change_listeners[client_index] = std::move(handler_2);
+        m_connection_state_change_listeners[client_index] = std::move(handler_wrapped);
     }
 
-    // Must be called before start().
     void set_client_side_error_rate(int client_index, int n, int m)
     {
-        m_simulated_client_error_rates[client_index] = std::make_pair(n, m);
+        REALM_ASSERT(client_index >= 0 && client_index < m_num_clients);
+        auto sim = std::make_pair(n, m);
+        // Save the simulated error rate
+        m_simulated_client_error_rates[client_index] = sim;
+
+        // Post the new simulated error rate
+        using sf = _impl::SimulatedFailure;
+        // Post it onto the event loop to update the event loop thread
+        m_client_socket_providers[client_index]->post([sim = std::move(sim)](Status) {
+            sf::prime_random(sf::sync_client__read_head, sim.first, sim.second,
+                             random_int<uint_fast64_t>()); // Seed from global generator
+        });
     }
 
     // Must be called before start().
     void set_server_side_error_rate(int server_index, int n, int m)
     {
+        REALM_ASSERT(server_index >= 0 && server_index < m_num_servers);
         m_simulated_server_error_rates[server_index] = std::make_pair(n, m);
     }
 
@@ -611,10 +627,16 @@ public:
             m_server_threads[i].start([this, i] {
                 run_server(i);
             });
-        for (int i = 0; i < m_num_clients; ++i)
-            m_client_threads[i].start([this, i] {
-                run_client(i);
-            });
+
+        for (int i = 0; i < m_num_clients; ++i) {
+            m_client_socket_providers[i]->start();
+        }
+    }
+
+    void start_client(int index)
+    {
+        REALM_ASSERT(index >= 0 && index < m_num_clients);
+        m_client_socket_providers[index]->start();
     }
 
     // Use either the methods below or `start()`.
@@ -623,14 +645,6 @@ public:
         REALM_ASSERT(index >= 0 && index < m_num_servers);
         m_server_threads[index].start([this, index] {
             run_server(index);
-        });
-    }
-
-    void start_client(int index)
-    {
-        REALM_ASSERT(index >= 0 && index < m_num_clients);
-        m_client_threads[index].start([this, index] {
-            run_client(index);
         });
     }
 
@@ -647,16 +661,23 @@ public:
     void stop_client(int index)
     {
         REALM_ASSERT(index >= 0 && index < m_num_clients);
-        m_clients[index]->stop();
-        unit_test::TestContext& test_context = m_test_context;
-        if (m_client_threads[index].joinable())
-            CHECK(!m_client_threads[index].join());
+        auto& client = get_client(index);
+        auto sim = m_simulated_client_error_rates[index];
+        if (sim.first != 0) {
+            using sf = _impl::SimulatedFailure;
+            // If we're using a simulated failure, clear it by posting onto the event loop
+            m_client_socket_providers[index]->post([](Status) mutable {
+                sf::unprime(sf::sync_client__read_head); // Clear the sim failure set when started
+            });
+        }
+        // We can't wait for clearing the simulated failure since some tests stop the client early
+        client.shutdown_and_wait();
     }
 
     void stop()
     {
         for (int i = 0; i < m_num_clients; ++i)
-            m_clients[i]->stop();
+            m_clients[i]->shutdown();
         for (int i = 0; i < m_num_servers; ++i)
             m_servers[i]->stop();
     }
@@ -671,25 +692,27 @@ public:
         return *m_servers[server_index];
     }
 
-    Session make_session(int client_index, DBRef db, Session::Config config = {})
+    Session make_session(int client_index, int server_index, DBRef db, std::string realm_identifier,
+                         Session::Config config = {})
     {
         //  *ClientServerFixture uses the service identifier "/realm-sync" to distinguish Sync
         //  connections, while the MongoDB/Stitch-based Sync server does not.
         config.service_identifier = "/realm-sync";
+        config.realm_identifier = std::move(realm_identifier);
+        config.server_port = m_server_ports[server_index];
+        config.server_address = "localhost";
 
-        Session session{*m_clients[client_index], std::move(db), nullptr, std::move(config)};
+        Session session{*m_clients[client_index], std::move(db), nullptr, nullptr, std::move(config)};
         if (m_connection_state_change_listeners[client_index]) {
             session.set_connection_state_change_listener(m_connection_state_change_listeners[client_index]);
         }
         else {
-            using ErrorInfo = Session::ErrorInfo;
-            auto fallback_listener = [this](ConnectionState state, util::Optional<ErrorInfo> error) {
+            auto fallback_listener = [this](ConnectionState state, std::optional<SessionErrorInfo> error) {
                 if (state != ConnectionState::disconnected)
                     return;
                 REALM_ASSERT(error);
                 unit_test::TestContext& test_context = m_test_context;
-                test_context.logger->error("Client disconnect: %1: %2 (is_fatal=%3)", error->error_code,
-                                           error->message, error->is_fatal());
+                test_context.logger->error("Client disconnect: %1 (is_fatal=%2)", error->status, error->is_fatal);
                 bool client_error_occurred = true;
                 CHECK_NOT(client_error_occurred);
                 stop();
@@ -697,16 +720,6 @@ public:
             session.set_connection_state_change_listener(fallback_listener);
         }
         return session;
-    }
-
-    void bind_session(Session& session, int server_index, std::string server_path,
-                      std::string signed_user_token = g_signed_test_user_token,
-                      ProtocolEnvelope protocol = ProtocolEnvelope::realm)
-    {
-        std::string server_address = "localhost";
-        port_type server_port = m_server_ports[server_index];
-        session.bind(std::move(server_address), std::move(server_path), std::move(signed_user_token), server_port,
-                     protocol);
     }
 
     Session make_bound_session(int client_index, DBRef db, int server_index, std::string server_path,
@@ -719,9 +732,10 @@ public:
     Session make_bound_session(int client_index, DBRef db, int server_index, std::string server_path,
                                std::string signed_user_token, Session::Config config = {})
     {
-        Session session = make_session(client_index, std::move(db), std::move(config));
-        bind_session(session, server_index, std::move(server_path), std::move(signed_user_token),
-                     config.protocol_envelope);
+        config.signed_user_token = std::move(signed_user_token);
+        Session session =
+            make_session(client_index, server_index, std::move(db), std::move(server_path), std::move(config));
+        session.bind();
         return session;
     }
 
@@ -795,13 +809,13 @@ private:
     std::vector<std::function<ConnectionStateChangeListener>> m_connection_state_change_listeners;
     std::vector<port_type> m_server_ports;
     std::vector<ThreadWrapper> m_server_threads;
-    std::vector<ThreadWrapper> m_client_threads;
+    std::vector<std::shared_ptr<websocket::DefaultSocketProvider>> m_client_socket_providers;
     std::vector<std::pair<int, int>> m_simulated_server_error_rates;
     std::vector<std::pair<int, int>> m_simulated_client_error_rates;
     std::vector<uint_least64_t> m_allow_server_errors;
     FakeClock m_fake_token_expiration_clock;
 
-    static util::Optional<std::array<char, 64>> make_crypt_key(const std::string& key)
+    static std::optional<std::array<char, 64>> make_crypt_key(const std::string& key)
     {
         if (!key.empty()) {
             if (key.size() != 64)
@@ -833,28 +847,6 @@ private:
             return;
         stop();
         m_server_loggers[i]->error("Exception was throw from server[%1]'s event loop", i + 1);
-    }
-
-    void run_client(int i)
-    {
-        auto do_run_client = [this, i] {
-            auto sim = m_simulated_client_error_rates[i];
-            if (sim.first != 0) {
-                using sf = _impl::SimulatedFailure;
-                sf::RandomPrimeGuard pg(sf::sync_client__read_head, sim.first, sim.second,
-                                        random_int<uint_fast64_t>()); // Seed from global generator
-                m_clients[i]->run();
-            }
-            else {
-                m_clients[i]->run();
-            }
-            m_clients[i]->stop();
-        };
-        unit_test::TestContext& test_context = m_test_context;
-        if (CHECK_NOTHROW(do_run_client()))
-            return;
-        stop();
-        m_server_loggers[i]->error("Exception was throw from client[%1]'s event loop", i + 1);
     }
 };
 
@@ -898,22 +890,16 @@ public:
         return MultiClientServerFixture::get_server(0);
     }
 
-    Session make_session(DBRef db, Session::Config&& config = {})
+    Session make_session(DBRef db, std::string realm_identifier, Session::Config&& config = {})
     {
-        return MultiClientServerFixture::make_session(0, std::move(db), std::move(config));
+        return MultiClientServerFixture::make_session(0, 0, std::move(db), std::move(realm_identifier),
+                                                      std::move(config));
     }
-    Session make_session(std::string const& path, Session::Config&& config = {})
+    Session make_session(std::string const& path, std::string realm_identifier, Session::Config&& config = {})
     {
         auto db = DB::create(make_client_replication(), path);
-        return MultiClientServerFixture::make_session(0, std::move(db), std::move(config));
-    }
-
-    void bind_session(Session& session, std::string server_path,
-                      std::string signed_user_token = g_signed_test_user_token,
-                      ProtocolEnvelope protocol = ProtocolEnvelope::realm)
-    {
-        MultiClientServerFixture::bind_session(session, 0, std::move(server_path), std::move(signed_user_token),
-                                               protocol);
+        return MultiClientServerFixture::make_session(0, 0, std::move(db), std::move(realm_identifier),
+                                                      std::move(config));
     }
 
     Session make_bound_session(DBRef db, std::string server_path = "/test", Session::Config&& config = {})
@@ -1001,25 +987,26 @@ private:
 
 inline RealmFixture::RealmFixture(ClientServerFixture& client_server_fixture, const std::string& real_path,
                                   const std::string& virt_path, Config config)
-    : m_self_ref{std::make_shared<SelfRef>(this)}                            // Throws
-    , m_db{DB::create(make_client_replication(), real_path)}                 // Throws
-    , m_session{client_server_fixture.make_session(m_db, std::move(config))} // Throws
+    : m_self_ref{std::make_shared<SelfRef>(this)}                                       // Throws
+    , m_db{DB::create(make_client_replication(), real_path)}                            // Throws
+    , m_session{client_server_fixture.make_session(m_db, virt_path, std::move(config))} // Throws
 {
     if (config.error_handler)
         setup_error_handler(std::move(config.error_handler));
-    client_server_fixture.bind_session(m_session, virt_path);
+    m_session.bind();
 }
 
 
 inline RealmFixture::RealmFixture(MultiClientServerFixture& client_server_fixture, int client_index, int server_index,
                                   const std::string& real_path, const std::string& virt_path, Config config)
-    : m_self_ref{std::make_shared<SelfRef>(this)}                                          // Throws
-    , m_db{DB::create(make_client_replication(), real_path)}                               // Throws
-    , m_session{client_server_fixture.make_session(client_index, m_db, std::move(config))} // Throws
+    : m_self_ref{std::make_shared<SelfRef>(this)}            // Throws
+    , m_db{DB::create(make_client_replication(), real_path)} // Throws
+    , m_session{client_server_fixture.make_session(client_index, server_index, m_db, virt_path, std::move(config))}
+// Throws
 {
     if (config.error_handler)
         setup_error_handler(std::move(config.error_handler));
-    client_server_fixture.bind_session(m_session, server_index, virt_path);
+    m_session.bind();
 }
 
 inline RealmFixture::~RealmFixture() noexcept
@@ -1085,16 +1072,12 @@ inline void RealmFixture::async_wait_for_download_completion(WaitOperCompletionH
 
 inline void RealmFixture::setup_error_handler(util::UniqueFunction<ErrorHandler> handler)
 {
-    using ErrorInfo = Session::ErrorInfo;
     auto listener = [handler = std::move(handler)](ConnectionState state,
-                                                   const util::Optional<ErrorInfo>& error_info) {
+                                                   const std::optional<SessionErrorInfo>& error_info) {
         if (state != ConnectionState::disconnected)
             return;
         REALM_ASSERT(error_info);
-        std::error_code ec = error_info->error_code;
-        bool is_fatal = error_info->is_fatal();
-        const std::string& detailed_message = error_info->message;
-        handler(ec, is_fatal, detailed_message);
+        handler(error_info->status, error_info->is_fatal);
     };
     m_session.set_connection_state_change_listener(std::move(listener));
 }

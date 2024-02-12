@@ -19,7 +19,7 @@
 #ifndef REALM_ARRAY_UNSIGNED_HPP
 #define REALM_ARRAY_UNSIGNED_HPP
 
-#include <realm/node.hpp>
+#include <realm/array.hpp>
 
 namespace realm {
 
@@ -81,13 +81,13 @@ public:
     }
 
 private:
-    uint_least8_t m_width = 0; // Size of an element (meaning depend on type of array).
-    uint64_t m_ubound;         // max number that can be stored with current m_width
+    uint_least8_t m_width = 0;
+    uint64_t m_ubound = 0; // max is 0xFFFFFFFFFFFFFFFFLL
 
     void init_from_mem(MemRef mem) noexcept
     {
-        Node::init_from_mem(mem);
-        set_width(get_width_from_header(get_header()));
+        auto header = Node::init_from_mem(mem);
+        set_width(get_width_from_header(header));
     }
 
     void adjust(size_t ndx, int64_t diff)
@@ -109,17 +109,6 @@ private:
     void _set(size_t ndx, uint8_t width, uint64_t value);
     uint64_t _get(size_t ndx, uint8_t width) const;
 };
-
-class ClusterKeyArray : public ArrayUnsigned {
-public:
-    using ArrayUnsigned::ArrayUnsigned;
-
-    uint64_t get(size_t ndx) const
-    {
-        return (m_data != nullptr) ? ArrayUnsigned::get(ndx) : uint64_t(ndx);
-    }
-};
-
 
 } // namespace realm
 

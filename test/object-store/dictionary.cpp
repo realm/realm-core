@@ -20,6 +20,7 @@
 
 #include "collection_fixtures.hpp"
 #include "util/test_file.hpp"
+#include "util/test_utils.hpp"
 #include "util/index_helpers.hpp"
 
 #include <realm/object-store/dictionary.hpp>
@@ -31,9 +32,6 @@
 
 #include <realm/object-store/impl/realm_coordinator.hpp>
 #include <realm/object-store/impl/object_accessor_impl.hpp>
-
-#include <realm.hpp>
-#include <realm/query_expression.hpp>
 
 using namespace realm;
 using namespace realm::util;
@@ -77,7 +75,7 @@ TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf
     config.automatic_change_notifications = false;
     config.schema = Schema{
         {"object",
-         {{"value", PropertyType::Dictionary | TestType::property_type()},
+         {{"value", PropertyType::Dictionary | TestType::property_type},
           {"links", PropertyType::Dictionary | PropertyType::Object | PropertyType::Nullable, "target"}}},
         {"target",
          {{"value", PropertyType::Int}, {"self_link", PropertyType::Object | PropertyType::Nullable, "target"}}},
@@ -146,7 +144,7 @@ TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf
     }
 
     SECTION("value type") {
-        REQUIRE(values_as_results.get_type() == TestType::property_type());
+        REQUIRE(values_as_results.get_type() == TestType::property_type);
     }
 
     SECTION("size()") {
@@ -164,16 +162,24 @@ TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf
     SECTION("verify_attached()") {
         object_store::Dictionary unattached;
         REQUIRE_NOTHROW(dict.verify_attached());
-        REQUIRE_THROWS_WITH(unattached.verify_attached(), "Access to invalidated Dictionary object");
+        REQUIRE_EXCEPTION(unattached.verify_attached(), InvalidatedObject,
+                          "Dictionary was never initialized and is invalid.");
+        r->invalidate();
+        REQUIRE_EXCEPTION(dict.verify_attached(), InvalidatedObject,
+                          "Dictionary is no longer valid. Either the parent object was deleted or the containing "
+                          "Realm has been invalidated or closed.");
     }
 
     SECTION("verify_in_transaction()") {
         object_store::Dictionary unattached;
-        REQUIRE_THROWS_AS(unattached.verify_in_transaction(), realm::List::InvalidatedException);
+        REQUIRE_EXCEPTION(unattached.verify_in_transaction(), InvalidatedObject,
+                          "Dictionary was never initialized and is invalid.");
         REQUIRE_NOTHROW(dict.verify_in_transaction());
         r->commit_transaction();
-        REQUIRE_THROWS_AS(dict.verify_in_transaction(), InvalidTransactionException);
-        REQUIRE_THROWS_AS(unattached.verify_in_transaction(), realm::List::InvalidatedException);
+        REQUIRE_EXCEPTION(dict.verify_in_transaction(), WrongTransactionState,
+                          "Cannot modify managed Dictionary outside of a write transaction.");
+        REQUIRE_EXCEPTION(unattached.verify_in_transaction(), InvalidatedObject,
+                          "Dictionary was never initialized and is invalid.");
     }
 
     SECTION("clear()") {
@@ -233,10 +239,12 @@ TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf
             REQUIRE(dict.contains(key));
             dict.erase(key);
             REQUIRE(!dict.contains(key));
-            REQUIRE_THROWS(dict.erase(key));
+            REQUIRE_EXCEPTION(dict.erase(key), KeyNotFound,
+                              util::format("Cannot remove key \"%1\" from dictionary: key not found", key));
         }
         REQUIRE(dict.size() == 0);
-        REQUIRE_THROWS(dict.erase(keys[0]));
+        REQUIRE_EXCEPTION(dict.erase(keys[0]), KeyNotFound,
+                          "Cannot remove key \"key_0\" from dictionary: key not found");
     }
 
     SECTION("try_erase()") {
@@ -285,10 +293,10 @@ TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf
             found_keys.push_back(pair.first);
             found_values.push_back(pair.second);
         }
-        std::sort(begin(keys), end(keys), cf::less());
-        std::sort(begin(mixed_values), end(mixed_values), cf::less());
-        std::sort(begin(found_keys), end(found_keys), cf::less());
-        std::sort(begin(found_values), end(found_values), cf::less());
+        std::sort(begin(keys), end(keys), std::less<>());
+        std::sort(begin(mixed_values), end(mixed_values), std::less<>());
+        std::sort(begin(found_keys), end(found_keys), std::less<>());
+        std::sort(begin(found_values), end(found_values), std::less<>());
         REQUIRE(keys == found_keys);
         REQUIRE(mixed_values == found_values);
     }
@@ -349,7 +357,7 @@ TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf
     SECTION("keys sorted") {
         SECTION("ascending") {
             auto sorted = keys_as_results.sort({{"self", true}});
-            std::sort(begin(keys), end(keys), cf::less());
+            std::sort(begin(keys), end(keys), std::less<>());
             verify_keys_ordered(sorted);
             // check the same but by generic descriptor
             DescriptorOrdering ordering;
@@ -359,7 +367,7 @@ TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf
         }
         SECTION("descending") {
             auto sorted = keys_as_results.sort({{"self", false}});
-            std::sort(begin(keys), end(keys), cf::greater());
+            std::sort(begin(keys), end(keys), std::greater<>());
             verify_keys_ordered(sorted);
             // check the same but by descriptor
             DescriptorOrdering ordering;
@@ -371,12 +379,12 @@ TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf
     SECTION("values sorted") {
         SECTION("ascending") {
             auto sorted = values_as_results.sort({{"self", true}});
-            std::sort(begin(values), end(values), cf::less());
+            std::sort(begin(values), end(values), std::less<>());
             verify_values_ordered(sorted);
         }
         SECTION("descending") {
             auto sorted = values_as_results.sort({{"self", false}});
-            std::sort(begin(values), end(values), cf::greater());
+            std::sort(begin(values), end(values), std::greater<>());
             verify_values_ordered(sorted);
         }
     }
@@ -485,43 +493,67 @@ TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf
     }
 
     SECTION("min()") {
-        if (!TestType::can_minmax()) {
-            REQUIRE_THROWS_AS(values_as_results.min(), Results::UnsupportedColumnTypeException);
-            return;
+        if constexpr (!TestType::can_minmax) {
+            REQUIRE_EXCEPTION(
+                dict.min(), IllegalOperation,
+                util::format("Operation 'min' not supported for %1 dictionary 'object.value'", TestType::name));
+            REQUIRE_EXCEPTION(
+                values_as_results.min(), IllegalOperation,
+                util::format("Operation 'min' not supported for %1 dictionary 'object.value'", TestType::name));
         }
-        REQUIRE(Mixed(TestType::min()) == values_as_results.min());
-        dict.remove_all();
-        REQUIRE(!values_as_results.min());
+        else {
+            REQUIRE(Mixed(TestType::min()) == values_as_results.min());
+            dict.remove_all();
+            REQUIRE(!values_as_results.min());
+        }
     }
 
     SECTION("max()") {
-        if (!TestType::can_minmax()) {
-            REQUIRE_THROWS_AS(values_as_results.max(), Results::UnsupportedColumnTypeException);
-            return;
+        if constexpr (!TestType::can_minmax) {
+            REQUIRE_EXCEPTION(
+                dict.max(), IllegalOperation,
+                util::format("Operation 'max' not supported for %1 dictionary 'object.value'", TestType::name));
+            REQUIRE_EXCEPTION(
+                values_as_results.max(), IllegalOperation,
+                util::format("Operation 'max' not supported for %1 dictionary 'object.value'", TestType::name));
         }
-        REQUIRE(Mixed(TestType::max()) == values_as_results.max());
-        dict.remove_all();
-        REQUIRE(!values_as_results.max());
+        else {
+            REQUIRE(Mixed(TestType::max()) == values_as_results.max());
+            dict.remove_all();
+            REQUIRE(!values_as_results.max());
+        }
     }
 
     SECTION("sum()") {
-        if (!TestType::can_sum()) {
-            REQUIRE_THROWS_AS(values_as_results.sum(), Results::UnsupportedColumnTypeException);
-            return;
+        if constexpr (!TestType::can_sum) {
+            REQUIRE_EXCEPTION(
+                dict.sum(), IllegalOperation,
+                util::format("Operation 'sum' not supported for %1 dictionary 'object.value'", TestType::name));
+            REQUIRE_EXCEPTION(
+                values_as_results.sum(), IllegalOperation,
+                util::format("Operation 'sum' not supported for %1 dictionary 'object.value'", TestType::name));
         }
-        REQUIRE(cf::get<W>(*values_as_results.sum()) == TestType::sum());
-        dict.remove_all();
-        REQUIRE(values_as_results.sum() == 0);
+        else {
+            REQUIRE(cf::get<W>(*values_as_results.sum()) == TestType::sum());
+            dict.remove_all();
+            REQUIRE(values_as_results.sum() == 0);
+        }
     }
 
     SECTION("average()") {
-        if (!TestType::can_average()) {
-            REQUIRE_THROWS_AS(values_as_results.average(), Results::UnsupportedColumnTypeException);
-            return;
+        if constexpr (!TestType::can_average) {
+            REQUIRE_EXCEPTION(
+                dict.average(), IllegalOperation,
+                util::format("Operation 'average' not supported for %1 dictionary 'object.value'", TestType::name));
+            REQUIRE_EXCEPTION(
+                values_as_results.average(), IllegalOperation,
+                util::format("Operation 'average' not supported for %1 dictionary 'object.value'", TestType::name));
         }
-        REQUIRE(cf::get<typename TestType::AvgType>(*values_as_results.average()) == TestType::average());
-        dict.remove_all();
-        REQUIRE(!values_as_results.average());
+        else {
+            REQUIRE(cf::get<typename TestType::AvgType>(*values_as_results.average()) == TestType::average());
+            dict.remove_all();
+            REQUIRE(!values_as_results.average());
+        }
     }
 
     SECTION("handover") {
@@ -531,7 +563,7 @@ TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf
         REQUIRE(dict == dict2);
         ThreadSafeReference ref(values_as_results);
         auto results2 = ref.resolve<Results>(r).sort({{"self", true}});
-        std::sort(begin(values), end(values), cf::less());
+        std::sort(begin(values), end(values), std::less<>());
         for (size_t i = 0; i < values.size(); ++i) {
             REQUIRE(results2.get<T>(i) == values[i]);
         }
@@ -879,10 +911,10 @@ TEST_CASE("embedded dictionary", "[dictionary]") {
         r->begin_transaction();
 
         SECTION("rejects boxed Obj and Object") {
-            REQUIRE_THROWS_AS(dict.insert(ctx, "foo", std::any(target->get_object(5))),
-                              List::InvalidEmbeddedOperationException);
-            REQUIRE_THROWS_AS(dict.insert(ctx, "foo", std::any(Object(r, target->get_object(5)))),
-                              List::InvalidEmbeddedOperationException);
+            REQUIRE_EXCEPTION(dict.insert(ctx, "foo", std::any(target->get_object(5))), IllegalOperation,
+                              "Cannot add an existing managed embedded object to a Dictionary.");
+            REQUIRE_EXCEPTION(dict.insert(ctx, "foo", std::any(Object(r, target->get_object(5)))), IllegalOperation,
+                              "Cannot add an existing managed embedded object to a Dictionary.");
         }
 
         SECTION("creates new object for dictionary") {
@@ -910,7 +942,7 @@ TEMPLATE_TEST_CASE("dictionary of objects", "[dictionary][links]", cf::MixedVal,
     config.automatic_change_notifications = false;
     config.schema = Schema{
         {"object", {{"links", PropertyType::Dictionary | PropertyType::Object | PropertyType::Nullable, "target"}}},
-        {"target", {{"value", TestType::property_type()}}},
+        {"target", {{"value", TestType::property_type}}},
     };
 
     auto r = Realm::get_shared_realm(config);
@@ -940,56 +972,76 @@ TEMPLATE_TEST_CASE("dictionary of objects", "[dictionary][links]", cf::MixedVal,
     r->commit_transaction();
     r->begin_transaction();
     SECTION("min()") {
-        if (!TestType::can_minmax()) {
-            REQUIRE_THROWS_AS(dict.min(col_target_value), Results::UnsupportedColumnTypeException);
-            REQUIRE_THROWS_AS(values_as_results.min(col_target_value), Results::UnsupportedColumnTypeException);
-            return;
+        if constexpr (!TestType::can_minmax) {
+            REQUIRE_EXCEPTION(
+                dict.min(col_target_value), IllegalOperation,
+                util::format("Operation 'min' not supported for %1 property 'target.value'", TestType::name));
+            REQUIRE_EXCEPTION(
+                values_as_results.min(col_target_value), IllegalOperation,
+                util::format("Operation 'min' not supported for %1 property 'target.value'", TestType::name));
         }
-        REQUIRE(Mixed(TestType::min()) == dict.min(col_target_value));
-        REQUIRE(Mixed(TestType::min()) == values_as_results.min(col_target_value));
-        dict.remove_all();
-        REQUIRE(!dict.min(col_target_value));
-        REQUIRE(!values_as_results.min(col_target_value));
+        else {
+            REQUIRE(Mixed(TestType::min()) == dict.min(col_target_value));
+            REQUIRE(Mixed(TestType::min()) == values_as_results.min(col_target_value));
+            dict.remove_all();
+            REQUIRE(!dict.min(col_target_value));
+            REQUIRE(!values_as_results.min(col_target_value));
+        }
     }
 
     SECTION("max()") {
-        if (!TestType::can_minmax()) {
-            REQUIRE_THROWS_AS(dict.max(col_target_value), Results::UnsupportedColumnTypeException);
-            REQUIRE_THROWS_AS(values_as_results.max(col_target_value), Results::UnsupportedColumnTypeException);
-            return;
+        if constexpr (!TestType::can_minmax) {
+            REQUIRE_EXCEPTION(
+                dict.max(col_target_value), IllegalOperation,
+                util::format("Operation 'max' not supported for %1 property 'target.value'", TestType::name));
+            REQUIRE_EXCEPTION(
+                values_as_results.max(col_target_value), IllegalOperation,
+                util::format("Operation 'max' not supported for %1 property 'target.value'", TestType::name));
         }
-        REQUIRE(Mixed(TestType::max()) == dict.max(col_target_value));
-        REQUIRE(Mixed(TestType::max()) == values_as_results.max(col_target_value));
-        dict.remove_all();
-        REQUIRE(!dict.max(col_target_value));
-        REQUIRE(!values_as_results.max(col_target_value));
+        else {
+            REQUIRE(Mixed(TestType::max()) == dict.max(col_target_value));
+            REQUIRE(Mixed(TestType::max()) == values_as_results.max(col_target_value));
+            dict.remove_all();
+            REQUIRE(!dict.max(col_target_value));
+            REQUIRE(!values_as_results.max(col_target_value));
+        }
     }
 
     SECTION("sum()") {
-        if (!TestType::can_sum()) {
-            REQUIRE_THROWS_AS(dict.sum(col_target_value), Results::UnsupportedColumnTypeException);
-            REQUIRE_THROWS_AS(values_as_results.sum(col_target_value), Results::UnsupportedColumnTypeException);
-            return;
+        if constexpr (!TestType::can_sum) {
+            REQUIRE_EXCEPTION(
+                dict.sum(col_target_value), IllegalOperation,
+                util::format("Operation 'sum' not supported for %1 property 'target.value'", TestType::name));
+            REQUIRE_EXCEPTION(
+                values_as_results.sum(col_target_value), IllegalOperation,
+                util::format("Operation 'sum' not supported for %1 property 'target.value'", TestType::name));
         }
-        REQUIRE(cf::get<W>(dict.sum(col_target_value)) == TestType::sum());
-        REQUIRE(cf::get<W>(*values_as_results.sum(col_target_value)) == TestType::sum());
-        dict.remove_all();
-        REQUIRE(dict.sum(col_target_value) == 0);
-        REQUIRE(values_as_results.sum(col_target_value) == 0);
+        else {
+            REQUIRE(cf::get<W>(dict.sum(col_target_value)) == TestType::sum());
+            REQUIRE(cf::get<W>(*values_as_results.sum(col_target_value)) == TestType::sum());
+            dict.remove_all();
+            REQUIRE(dict.sum(col_target_value) == 0);
+            REQUIRE(values_as_results.sum(col_target_value) == 0);
+        }
     }
 
     SECTION("average()") {
-        if (!TestType::can_average()) {
-            REQUIRE_THROWS_AS(dict.average(col_target_value), Results::UnsupportedColumnTypeException);
-            REQUIRE_THROWS_AS(values_as_results.average(col_target_value), Results::UnsupportedColumnTypeException);
-            return;
+        if constexpr (!TestType::can_average) {
+            REQUIRE_EXCEPTION(
+                dict.average(col_target_value), IllegalOperation,
+                util::format("Operation 'average' not supported for %1 property 'target.value'", TestType::name));
+            REQUIRE_EXCEPTION(
+                values_as_results.average(col_target_value), IllegalOperation,
+                util::format("Operation 'average' not supported for %1 property 'target.value'", TestType::name));
         }
-        REQUIRE(cf::get<typename TestType::AvgType>(*dict.average(col_target_value)) == TestType::average());
-        REQUIRE(cf::get<typename TestType::AvgType>(*values_as_results.average(col_target_value)) ==
-                TestType::average());
-        dict.remove_all();
-        REQUIRE(!dict.average(col_target_value));
-        REQUIRE(!values_as_results.average(col_target_value));
+        else {
+            REQUIRE(cf::get<typename TestType::AvgType>(*dict.average(col_target_value)) == TestType::average());
+            REQUIRE(cf::get<typename TestType::AvgType>(*values_as_results.average(col_target_value)) ==
+                    TestType::average());
+            dict.remove_all();
+            REQUIRE(!dict.average(col_target_value));
+            REQUIRE(!values_as_results.average(col_target_value));
+        }
     }
 }
 
@@ -1298,7 +1350,7 @@ TEST_CASE("dictionary snapshot null", "[dictionary]") {
     StringData new_key("foo");
 
     auto target_obj = Object::create(ctx, r, *r->schema().find("target"), Any{AnyDict{{"id", Any{int64_t(42)}}}});
-    dict.insert(new_key, target_obj.obj().get_key());
+    dict.insert(new_key, target_obj.get_obj().get_key());
     r->commit_transaction();
     REQUIRE(values.size() == 1);
     REQUIRE(snapshot.size() == 0);
@@ -1310,20 +1362,20 @@ TEST_CASE("dictionary snapshot null", "[dictionary]") {
     r->commit_transaction();
     REQUIRE(values.size() == 0);
     REQUIRE(snapshot.size() == 1);
-    auto obj_link = ObjLink{target_obj.obj().get_table()->get_key(), target_obj.obj().get_key()};
+    auto obj_link = ObjLink{target_obj.get_obj().get_table()->get_key(), target_obj.get_obj().get_key()};
     REQUIRE(snapshot.get_any(0) == Mixed{obj_link});
 
     // a snapshot retains an entry for a link when the underlying object is deleted
     // but the snapshot link is nullified
     r->begin_transaction();
-    target_obj.obj().remove();
+    target_obj.get_obj().remove();
     r->commit_transaction();
     REQUIRE(values.size() == 0);
     REQUIRE(snapshot.size() == 1);
     REQUIRE(snapshot.get_any(0) == Mixed{});
 }
 
-TEST_CASE("dictionary aggregate", "[dictionary]") {
+TEST_CASE("dictionary aggregate", "[dictionary][aggregate]") {
     InMemoryTestFile config;
     config.schema = Schema{
         {"DictionaryObject",
@@ -1349,7 +1401,7 @@ TEST_CASE("dictionary aggregate", "[dictionary]") {
     REQUIRE(*sum == 16);
 }
 
-TEST_CASE("callback with empty keypatharray") {
+TEST_CASE("callback with empty keypatharray", "[dictionary]") {
     InMemoryTestFile config;
     config.schema = Schema{
         {"object", {{"links", PropertyType::Dictionary | PropertyType::Object | PropertyType::Nullable, "target"}}},
@@ -1428,5 +1480,173 @@ TEST_CASE("callback with empty keypatharray") {
         write([&] {
             dict.get<Obj>(key).set(col_target_value, 2);
         });
+    }
+}
+
+TEST_CASE("dictionary sort by keyPath value", "[dictionary]") {
+    InMemoryTestFile config;
+    config.schema = Schema{
+        {"DictionaryObject",
+         {
+             {"_id", PropertyType::Int, Property::IsPrimary{true}},
+             {"s1", PropertyType::Int},
+             {"intDictionary", PropertyType::Dictionary | PropertyType::Int | PropertyType::Nullable},
+         }},
+    };
+
+    auto r = Realm::get_shared_realm(config);
+    CppContext ctx(r);
+
+    r->begin_transaction();
+
+    auto table = r->read_group().get_table("class_DictionaryObject");
+    auto col_id = table->get_column_key("_id");
+    auto col_s1 = table->get_column_key("s1");
+    auto col_dict = table->get_column_key("intDictionary");
+
+    const ObjectSchema& dict_obj_schema = *r->schema().find("DictionaryObject");
+
+    Object::create(ctx, r, dict_obj_schema,
+                   Any{AnyDict{{"_id", INT64_C(0)},
+                               {"s1", INT64_C(10)},
+                               {"intDictionary", AnyDict{{"a", INT64_C(0)}, {"b", INT64_C(1)}, {"c", INT64_C(2)}}}}});
+
+    Object::create(ctx, r, dict_obj_schema,
+                   Any{AnyDict{{"_id", INT64_C(2)},
+                               {"s1", INT64_C(10)},
+                               {"intDictionary", AnyDict{{"a", INT64_C(3)}, {"b", INT64_C(4)}, {"c", INT64_C(5)}}}}});
+
+    Object::create(ctx, r, dict_obj_schema,
+                   Any{AnyDict{{"_id", INT64_C(3)},
+                               {"s1", INT64_C(20)},
+                               {"intDictionary", AnyDict{{"a", INT64_C(2)}, {"b", INT64_C(6)}, {"c", INT64_C(7)}}}}});
+
+    Results all_values(r, table->where());
+
+    SECTION("sort by dict field 'a' using path ascending") {
+
+        ExtendedColumnKey child_col_a(col_dict, "a");
+
+        auto sorted = all_values.sort(std::vector<std::pair<std::string, bool>>{{"intDictionary[a]", true}});
+        REQUIRE(sorted.size() == 3);
+        REQUIRE(sorted.get(0).get<Int>(col_id) == 0);
+        REQUIRE(sorted.get(1).get<Int>(col_id) == 3);
+        REQUIRE(sorted.get(2).get<Int>(col_id) == 2);
+    }
+
+    SECTION("sort by dict field 'a' using ColKey ascending") {
+
+        ExtendedColumnKey child_col_a(col_dict, "a");
+
+        auto sorted =
+            all_values.sort({std::vector<std::vector<ExtendedColumnKey>>{{child_col_a}}, std::vector<bool>{true}});
+        REQUIRE(sorted.size() == 3);
+        REQUIRE(sorted.get(0).get<Int>(col_id) == 0);
+        REQUIRE(sorted.get(1).get<Int>(col_id) == 3);
+        REQUIRE(sorted.get(2).get<Int>(col_id) == 2);
+    }
+
+    SECTION("sort by dict field 'a' using ColKey descending") {
+        ExtendedColumnKey child_col_a(col_dict, "a");
+
+        auto sorted =
+            all_values.sort({std::vector<std::vector<ExtendedColumnKey>>{{child_col_a}}, std::vector<bool>{false}});
+        REQUIRE(sorted.size() == 3);
+        REQUIRE(sorted.get(0).get<Int>(col_id) == 2);
+        REQUIRE(sorted.get(1).get<Int>(col_id) == 3);
+        REQUIRE(sorted.get(2).get<Int>(col_id) == 0);
+    }
+
+    SECTION("sort by dict using multiple ColKey descending") {
+        ExtendedColumnKey child_col_a(col_dict, "a");
+
+        auto sorted = all_values.sort(
+            {std::vector<std::vector<ExtendedColumnKey>>{{col_s1}, {child_col_a}}, std::vector<bool>{true, false}});
+        REQUIRE(sorted.size() == 3);
+        REQUIRE(sorted.get(0).get<Int>(col_id) == 2);
+        REQUIRE(sorted.get(1).get<Int>(col_id) == 0);
+        REQUIRE(sorted.get(2).get<Int>(col_id) == 3);
+    }
+
+    SECTION("sort by dict using multiple ColKey ascending") {
+        ExtendedColumnKey child_col_a(col_dict, "a");
+
+        auto sorted = all_values.sort(
+            {std::vector<std::vector<ExtendedColumnKey>>{{col_s1}, {child_col_a}}, std::vector<bool>{true, true}});
+        REQUIRE(sorted.size() == 3);
+        REQUIRE(sorted.get(0).get<Int>(col_id) == 0);
+        REQUIRE(sorted.get(1).get<Int>(col_id) == 2);
+        REQUIRE(sorted.get(2).get<Int>(col_id) == 3);
+    }
+
+    r->commit_transaction();
+}
+
+TEST_CASE("dictionary sort by linked object value", "[dictionary]") {
+    InMemoryTestFile config;
+    config.cache = false;
+    config.automatic_change_notifications = false;
+    config.schema = Schema{
+        {"object",
+         {{"value", PropertyType::Dictionary | PropertyType::Object | PropertyType::Nullable, "target"},
+          {"id", PropertyType::Int}}},
+        {"target", {{"value", PropertyType::Int}}},
+    };
+
+    auto r = Realm::get_shared_realm(config);
+
+    auto table = r->read_group().get_table("class_object");
+    auto target = r->read_group().get_table("class_target");
+    ColKey id_value = table->get_column_key("id");
+    ColKey col_value = target->get_column_key("value");
+
+    r->begin_transaction();
+    Obj obj1 = table->create_object().set(id_value, 100);
+    Obj obj2 = table->create_object().set(id_value, 200);
+    Obj target_obj1 = target->create_object().set(col_value, 100);
+    Obj target_obj2 = target->create_object().set(col_value, 200);
+
+    ColKey col = table->get_column_key("value");
+
+    CppContext ctx(r);
+
+    object_store::Dictionary dict1(r, obj1, col);
+    dict1.insert("key_a", Mixed{ObjLink(target->get_key(), target_obj1.get_key())});
+
+    object_store::Dictionary dict2(r, obj2, col);
+    dict2.insert("key_a", Mixed{ObjLink(target->get_key(), target_obj2.get_key())});
+    r->commit_transaction();
+
+    SECTION("sort by dict field 'a' using ColKey ascending") {
+        Results all_values(r, table->where());
+
+        ExtendedColumnKey child_col_a(col, "key_a");
+
+        auto sorted = all_values.sort(
+            {std::vector<std::vector<ExtendedColumnKey>>{{child_col_a, col_value}}, std::vector<bool>{true}});
+        REQUIRE(sorted.size() == 2);
+        REQUIRE(sorted.get(0).get<Int>(id_value) == 100);
+        REQUIRE(sorted.get(1).get<Int>(id_value) == 200);
+    }
+
+    SECTION("sort by dict field 'a' using path") {
+        Results all_values(r, table->where());
+
+        auto sorted = all_values.sort(std::vector<std::pair<std::string, bool>>{{"value[key_a].value", true}});
+        REQUIRE(sorted.size() == 2);
+        REQUIRE(sorted.get(0).get<Int>(id_value) == 100);
+        REQUIRE(sorted.get(1).get<Int>(id_value) == 200);
+    }
+
+    SECTION("sort by dict field 'a' using ColKey descending") {
+        Results all_values(r, table->where());
+
+        ExtendedColumnKey child_col_a(col, "key_a");
+
+        auto sorted = all_values.sort(
+            {std::vector<std::vector<ExtendedColumnKey>>{{child_col_a, col_value}}, std::vector<bool>{false}});
+        REQUIRE(sorted.size() == 2);
+        REQUIRE(sorted.get(0).get<Int>(id_value) == 200);
+        REQUIRE(sorted.get(1).get<Int>(id_value) == 100);
     }
 }

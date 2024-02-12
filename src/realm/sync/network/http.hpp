@@ -19,11 +19,13 @@
 #pragma once
 
 #include <cstdint>
+#include <cstdlib>
 #include <type_traits>
 #include <map>
 #include <system_error>
 #include <iosfwd>
 #include <locale>
+#include <sstream>
 
 #include <realm/util/optional.hpp>
 #include <realm/util/basic_system_errors.hpp>
@@ -44,8 +46,7 @@ std::error_code make_error_code(HTTPParserError);
 
 namespace std {
 template <>
-struct is_error_code_enum<realm::sync::HTTPParserError> : std::true_type {
-};
+struct is_error_code_enum<realm::sync::HTTPParserError> : std::true_type {};
 } // namespace std
 
 namespace realm::sync {
@@ -124,6 +125,7 @@ enum class HTTPMethod {
     Head,
     Post,
     Put,
+    Patch,
     Delete,
     Trace,
     Connect,
@@ -194,8 +196,7 @@ std::ostream& operator<<(std::ostream&, HTTPStatus);
 
 
 struct HTTPParserBase {
-    // An HTTPParserBase is tied to to an HTTPClient or HTTPServer, which are owned
-    // by either a Websocket or ServerImpl class, so no need for a shared_ptr
+    const std::shared_ptr<util::Logger> logger_ptr;
     util::Logger& logger;
 
     // FIXME: Generally useful?
@@ -206,8 +207,9 @@ struct HTTPParserBase {
         }
     };
 
-    HTTPParserBase(util::Logger& logger)
-        : logger{logger}
+    HTTPParserBase(const std::shared_ptr<util::Logger>& logger_ptr)
+        : logger_ptr{logger_ptr}
+        , logger{*logger_ptr}
     {
         // Allocating read buffer with calloc to avoid accidentally spilling
         // data from other sessions in case of a buffer overflow exploit.
@@ -218,6 +220,8 @@ struct HTTPParserBase {
     std::string m_write_buffer;
     std::unique_ptr<char[], CallocDeleter> m_read_buffer;
     util::Optional<size_t> m_found_content_length;
+    bool m_has_chunked_encoding = false;
+    std::optional<std::stringstream> m_chunked_encoding_ss;
     static const size_t read_buffer_size = 8192;
     static const size_t max_header_line_length = read_buffer_size;
 
@@ -255,8 +259,8 @@ struct HTTPParserBase {
 
 template <class Socket>
 struct HTTPParser : protected HTTPParserBase {
-    explicit HTTPParser(Socket& socket, util::Logger& logger)
-        : HTTPParserBase(logger)
+    explicit HTTPParser(Socket& socket, const std::shared_ptr<util::Logger>& logger_ptr)
+        : HTTPParserBase(logger_ptr)
         , m_socket(socket)
     {
     }
@@ -321,11 +325,44 @@ struct HTTPParser : protected HTTPParserBase {
                     return;
                 }
                 if (!ec) {
-                    on_body(StringData(m_read_buffer.get(), n));
+                    on_body(std::string_view(m_read_buffer.get(), n));
                 }
                 on_complete(ec);
             };
             m_socket.async_read(m_read_buffer.get(), *m_found_content_length, std::move(handler));
+        }
+        else if (m_has_chunked_encoding) {
+            auto content_length_handler = [this](std::error_code ec, size_t chunk_start_index) {
+                if (ec == util::error::operation_aborted) {
+                    on_complete(ec);
+                    return;
+                }
+
+                auto content_length =
+                    std::strtoul(std::string(m_read_buffer.get(), chunk_start_index - 2).c_str(), nullptr, 16);
+
+                if (content_length == 0) {
+                    on_body(m_chunked_encoding_ss->str());
+                    on_complete(ec);
+                    return;
+                }
+
+                auto handler = [this](std::error_code ec, size_t n) {
+                    if (ec == util::error::operation_aborted) {
+                        on_complete(ec);
+                        return;
+                    }
+                    auto chunk_data = std::string_view(m_read_buffer.get(), n - 2); // -2 to strip \r\n
+                    *m_chunked_encoding_ss << chunk_data;
+                    read_body();
+                };
+                m_socket.async_read(m_read_buffer.get(), content_length + 2,
+                                    std::move(handler)); // +2 to account for \r\n
+            };
+
+            // First get the content-length
+            m_socket.async_read_until(m_read_buffer.get(), 8, '\n',
+                                      content_length_handler); // buffer of 8 is enough to read hex value
         }
         else {
             // No body, just finish.
@@ -346,8 +383,8 @@ template <class Socket>
 struct HTTPClient : protected HTTPParser<Socket> {
     using Handler = void(HTTPResponse, std::error_code);
 
-    explicit HTTPClient(Socket& socket, util::Logger& logger)
-        : HTTPParser<Socket>(socket, logger)
+    explicit HTTPClient(Socket& socket, const std::shared_ptr<util::Logger>& logger_ptr)
+        : HTTPParser<Socket>(socket, logger_ptr)
     {
     }
 
@@ -370,7 +407,7 @@ struct HTTPClient : protected HTTPParser<Socket> {
     void async_request(const HTTPRequest& request, util::UniqueFunction<Handler> handler)
     {
         if (REALM_UNLIKELY(m_handler)) {
-            throw util::runtime_error("Request already in progress.");
+            throw LogicError(ErrorCodes::LogicError, "Request already in progress.");
         }
         this->set_write_buffer(request);
         m_handler = std::move(handler);
@@ -429,8 +466,8 @@ struct HTTPServer : protected HTTPParser<Socket> {
     using RequestHandler = void(HTTPRequest, std::error_code);
     using RespondHandler = void(std::error_code);
 
-    explicit HTTPServer(Socket& socket, util::Logger& logger)
-        : HTTPParser<Socket>(socket, logger)
+    explicit HTTPServer(Socket& socket, const std::shared_ptr<util::Logger>& logger_ptr)
+        : HTTPParser<Socket>(socket, logger_ptr)
     {
     }
 
@@ -454,7 +491,7 @@ struct HTTPServer : protected HTTPParser<Socket> {
     void async_receive_request(util::UniqueFunction<RequestHandler> handler)
     {
         if (REALM_UNLIKELY(m_request_handler)) {
-            throw util::runtime_error("Response already in progress.");
+            throw LogicError(ErrorCodes::LogicError, "Request already in progress");
         }
         m_request_handler = std::move(handler);
         this->read_first_line();
@@ -474,11 +511,11 @@ struct HTTPServer : protected HTTPParser<Socket> {
     void async_send_response(const HTTPResponse& response, util::UniqueFunction<RespondHandler> handler)
     {
         if (REALM_UNLIKELY(!m_request_handler)) {
-            throw util::runtime_error("No request in progress.");
+            throw LogicError(ErrorCodes::LogicError, "No request in progress");
         }
         if (m_respond_handler) {
             // FIXME: Proper exception type.
-            throw util::runtime_error("Already responding to request");
+            throw LogicError(ErrorCodes::LogicError, "Already responding to request");
         }
         m_respond_handler = std::move(handler);
         this->set_write_buffer(response);

@@ -27,12 +27,12 @@
 namespace realm::_impl {
 class ObjectNotifier : public CollectionNotifier {
 public:
-    ObjectNotifier(std::shared_ptr<Realm> realm, TableKey table_key, ObjKey obj_key);
+    ObjectNotifier(std::shared_ptr<Realm> realm, const Obj&);
 
 private:
     TableRef m_table;
     ObjKey m_obj_key;
-    TransactionChangeInfo* m_info;
+    TransactionChangeInfo* m_info = nullptr;
 
     void run() override REQUIRES(!m_callback_mutex);
     void reattach() override;

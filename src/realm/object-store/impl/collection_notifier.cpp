@@ -127,7 +127,7 @@ bool CollectionNotifier::all_callbacks_filtered() const noexcept
 
 CollectionNotifier::CollectionNotifier(std::shared_ptr<Realm> realm)
     : m_realm(std::move(realm))
-    , m_transaction(m_realm->duplicate())
+    , m_transaction(Realm::Internal::get_transaction_ref(*m_realm))
 {
 }
 
@@ -217,7 +217,10 @@ void CollectionNotifier::suppress_next_notification(uint64_t token)
         std::lock_guard<std::mutex> lock(m_realm_mutex);
         REALM_ASSERT(m_realm);
         m_realm->verify_thread();
-        m_realm->verify_in_write();
+        if (!m_realm->is_in_transaction()) {
+            throw WrongTransactionState("Suppressing the notification from a write transaction must be done from "
+                                        "inside the write transaction.");
+        }
     }
 
     util::CheckedLockGuard lock(m_callback_mutex);
@@ -370,6 +373,19 @@ void CollectionNotifier::for_each_callback(Fn&& fn)
 
     m_callback_index = npos;
 }
+
+void CollectionNotifier::set_initial_transaction(
+    const std::vector<std::shared_ptr<CollectionNotifier>>& other_notifiers)
+{
+    for (auto& other : other_notifiers) {
+        if (version() == other->version()) {
+            attach_to(other->m_transaction);
+            return;
+        }
+    }
+    attach_to(m_transaction->duplicate());
+}
+
 
 void CollectionNotifier::attach_to(std::shared_ptr<Transaction> tr)
 {

@@ -44,6 +44,8 @@ size_t real2virtual(const std::vector<size_t>& vec, size_t ndx) noexcept
 {
     // Subtract the number of tombstones below ndx.
     auto it = std::lower_bound(vec.begin(), vec.end(), ndx);
+    // A tombstone index has no virtual mapping. This is an error.
+    REALM_ASSERT_DEBUG_EX(it == vec.end() || *it != ndx, ndx, vec.size());
     auto n = it - vec.begin();
     return ndx - n;
 }
@@ -84,6 +86,28 @@ void check_for_last_unresolved(BPlusTree<ObjKey>* tree)
         if (no_more_unresolved)
             tree->set_context_flag(false);
     }
+}
+
+size_t get_collection_size_from_ref(ref_type ref, Allocator& alloc)
+{
+    size_t ret = 0;
+    if (ref) {
+        Array arr(alloc);
+        arr.init_from_ref(ref);
+        if (arr.is_inner_bptree_node()) {
+            // This is a BPlusTree
+            ret = size_t(arr.back()) >> 1;
+        }
+        else if (arr.has_refs()) {
+            // This is a dictionary
+            auto key_ref = arr.get_as_ref(0);
+            ret = get_collection_size_from_ref(key_ref, alloc);
+        }
+        else {
+            ret = arr.size();
+        }
+    }
+    return ret;
 }
 
 } // namespace realm::_impl

@@ -41,7 +41,9 @@ class WeakRealmNotifier;
 
 // RealmCoordinator manages the weak cache of Realm instances and communication
 // between per-thread Realm instances for a given file
-class RealmCoordinator : public std::enable_shared_from_this<RealmCoordinator> {
+class RealmCoordinator : public std::enable_shared_from_this<RealmCoordinator>, DB::CommitListener {
+    struct Private {};
+
 public:
     // Get the coordinator for the given path, creating it if neccesary
     static std::shared_ptr<RealmCoordinator> get_coordinator(StringData path);
@@ -58,8 +60,13 @@ public:
     // can be read from any thread.
     std::shared_ptr<Realm> get_realm(Realm::Config config, util::Optional<VersionID> version)
         REQUIRES(!m_realm_mutex, !m_schema_cache_mutex);
-    std::shared_ptr<Realm> get_realm(std::shared_ptr<util::Scheduler> = nullptr)
+    std::shared_ptr<Realm> get_realm(std::shared_ptr<util::Scheduler> = nullptr, bool first_time_open = false)
         REQUIRES(!m_realm_mutex, !m_schema_cache_mutex);
+
+    // Return a frozen copy of the source Realm. May return a cached instance
+    // if the source Realm has caching enabled.
+    std::shared_ptr<Realm> freeze_realm(const Realm& source_realm) REQUIRES(!m_realm_mutex);
+
 #if REALM_ENABLE_SYNC
     // Get a thread-local shared Realm with the given configuration
     // If the Realm is not already present, it will be fully downloaded before being returned.
@@ -148,8 +155,9 @@ public:
     // Verify that there are no Realms open for any paths
     static void assert_no_open_realms() noexcept;
 
-    // Explicit constructor/destructor needed for the unique_ptrs to forward-declared types
-    RealmCoordinator();
+    explicit RealmCoordinator(Private);
+    RealmCoordinator(const RealmCoordinator&) = delete;
+    RealmCoordinator& operator=(const RealmCoordinator&) = delete;
     ~RealmCoordinator();
 
     // Called by Realm's destructor to ensure the cache is cleaned up promptly
@@ -255,15 +263,17 @@ private:
 
     std::shared_ptr<AuditInterface> m_audit_context;
 
-    void open_db() REQUIRES(m_realm_mutex);
+    // returns true the first time the database is opened, false otherwise.
+    bool open_db() REQUIRES(m_realm_mutex);
 
     void set_config(const Realm::Config&) REQUIRES(m_realm_mutex, !m_schema_cache_mutex);
     void init_external_helpers() REQUIRES(m_realm_mutex);
+    void on_commit(DB::version_type) override;
     std::shared_ptr<Realm> do_get_cached_realm(Realm::Config const& config,
                                                std::shared_ptr<util::Scheduler> scheduler = nullptr)
         REQUIRES(m_realm_mutex);
-    void do_get_realm(Realm::Config config, std::shared_ptr<Realm>& realm, util::Optional<VersionID> version,
-                      util::CheckedUniqueLock& realm_lock) REQUIRES(m_realm_mutex);
+    void do_get_realm(Realm::Config&& config, std::shared_ptr<Realm>& realm, util::Optional<VersionID> version,
+                      util::CheckedUniqueLock& realm_lock, bool first_time_open = false) REQUIRES(m_realm_mutex);
     void run_async_notifiers() REQUIRES(!m_notifier_mutex, m_running_notifiers_mutex);
     void clean_up_dead_notifiers() REQUIRES(m_notifier_mutex);
 

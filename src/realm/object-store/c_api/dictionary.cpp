@@ -69,7 +69,7 @@ RLM_API bool realm_dictionary_insert(realm_dictionary_t* dict, realm_value_t key
 {
     return wrap_err([&]() {
         if (key.type != RLM_TYPE_STRING) {
-            throw std::invalid_argument{"Only string keys are supported in dictionaries"};
+            throw InvalidArgument{"Only string keys are supported in dictionaries"};
         }
 
         StringData k{key.string.data, key.string.size};
@@ -90,7 +90,7 @@ RLM_API realm_object_t* realm_dictionary_insert_embedded(realm_dictionary_t* dic
 {
     return wrap_err([&]() {
         if (key.type != RLM_TYPE_STRING) {
-            throw std::invalid_argument{"Only string keys are supported in dictionaries"};
+            throw InvalidArgument{"Only string keys are supported in dictionaries"};
         }
 
         StringData k{key.string.data, key.string.size};
@@ -102,7 +102,7 @@ RLM_API realm_object_t* realm_dictionary_get_linked_object(realm_dictionary_t* d
 {
     return wrap_err([&]() {
         if (key.type != RLM_TYPE_STRING) {
-            throw std::invalid_argument{"Only string keys are supported in dictionaries"};
+            throw InvalidArgument{"Only string keys are supported in dictionaries"};
         }
 
         StringData k{key.string.data, key.string.size};
@@ -126,6 +126,34 @@ RLM_API bool realm_dictionary_erase(realm_dictionary_t* dict, realm_value_t key,
     });
 }
 
+RLM_API bool realm_dictionary_get_keys(realm_dictionary_t* dict, size_t* out_size, realm_results_t** out_keys)
+{
+    return wrap_err([&]() {
+        auto keys = dict->get_keys();
+        *out_size = keys.size();
+        *out_keys = new realm_results_t{keys};
+        return true;
+    });
+}
+
+RLM_API bool realm_dictionary_contains_key(const realm_dictionary_t* dict, realm_value_t key, bool* found)
+{
+    return wrap_err([&]() {
+        StringData k{key.string.data, key.string.size};
+        *found = dict->contains(k);
+        return true;
+    });
+}
+
+RLM_API bool realm_dictionary_contains_value(const realm_dictionary_t* dict, realm_value_t value, size_t* index)
+{
+    return wrap_err([&]() {
+        auto val = from_capi(value);
+        *index = dict->find_any(val);
+        return true;
+    });
+}
+
 RLM_API bool realm_dictionary_clear(realm_dictionary_t* dict)
 {
     return wrap_err([&]() {
@@ -141,7 +169,7 @@ RLM_API realm_dictionary_t* realm_dictionary_from_thread_safe_reference(const re
     return wrap_err([&]() {
         auto stsr = dynamic_cast<realm_dictionary::thread_safe_reference*>(tsr);
         if (!stsr) {
-            throw std::logic_error{"Thread safe reference type mismatch"};
+            throw LogicError{ErrorCodes::IllegalOperation, "Thread safe reference type mismatch"};
         }
 
         auto dict = stsr->resolve<object_store::Dictionary>(*realm);

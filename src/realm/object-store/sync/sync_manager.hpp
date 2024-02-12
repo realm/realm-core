@@ -24,6 +24,7 @@
 #include <realm/util/checked_mutex.hpp>
 #include <realm/util/logger.hpp>
 #include <realm/util/optional.hpp>
+#include <realm/sync/binding_callback_thread_observer.hpp>
 #include <realm/sync/config.hpp>
 #include <realm/sync/socket_provider.hpp>
 
@@ -76,14 +77,21 @@ struct SyncClientConfig {
 
     using LoggerFactory = std::function<std::shared_ptr<util::Logger>(util::Logger::Level)>;
     LoggerFactory logger_factory;
-    // FIXME: Should probably be util::Logger::Level::error
     util::Logger::Level log_level = util::Logger::Level::info;
     ReconnectMode reconnect_mode = ReconnectMode::normal; // For internal sync-client testing only!
+#if REALM_DISABLE_SYNC_MULTIPLEXING
     bool multiplex_sessions = false;
+#else
+    bool multiplex_sessions = true;
+#endif
 
     // The SyncSocket instance used by the Sync Client for event synchronization
     // and creating WebSockets. If not provided the default implementation will be used.
     std::shared_ptr<sync::SyncSocketProvider> socket_provider;
+
+    // Optional thread observer for event loop thread events in the default SyncSocketProvider
+    // implementation. It is not used for custom SyncSocketProvider implementations.
+    std::shared_ptr<BindingCallbackThreadObserver> default_socket_provider_thread_observer;
 
     // {@
     // Optional information about the binding/application that is sent as part of the User-Agent
@@ -111,11 +119,11 @@ public:
     // The metadata and file management subsystems must also have already been configured.
     bool immediately_run_file_actions(const std::string& original_name) REQUIRES(!m_file_system_mutex);
 
-    // Use a single connection for all sync sessions for each host/port rather
+    // Enables/disables using a single connection for all sync sessions for each host/port/user rather
     // than one per session.
     // This must be called before any sync sessions are created, cannot be
     // disabled afterwards, and currently is incompatible with automatic failover.
-    void enable_session_multiplexing() REQUIRES(!m_mutex);
+    void set_session_multiplexing(bool allowed) REQUIRES(!m_mutex);
 
     // Destroys the sync manager, terminates all sessions created by it, and stops its SyncClient.
     ~SyncManager();
@@ -166,14 +174,14 @@ public:
     // makes it possible to guarantee that all sessions have, in fact, been closed.
     void wait_for_sessions_to_terminate() REQUIRES(!m_mutex);
 
-    // If the metadata manager is configured, perform an update. Returns `true` iff the code was run.
+    // If the metadata manager is configured, perform an update. Returns `true` if the code was run.
     bool perform_metadata_update(util::FunctionRef<void(SyncMetadataManager&)> update_function) const
         REQUIRES(!m_file_system_mutex);
 
     // Get a sync user for a given identity, or create one if none exists yet, and set its token.
     // If a logged-out user exists, it will marked as logged back in.
-    std::shared_ptr<SyncUser> get_user(const std::string& id, std::string refresh_token, std::string access_token,
-                                       const std::string provider_type, std::string device_id)
+    std::shared_ptr<SyncUser> get_user(const std::string& user_id, const std::string& refresh_token,
+                                       const std::string& access_token, const std::string& device_id)
         REQUIRES(!m_user_mutex, !m_file_system_mutex);
 
     // Get an existing user for a given identifier, if one exists and is logged in.
@@ -186,7 +194,7 @@ public:
     std::shared_ptr<SyncUser> get_current_user() const REQUIRES(!m_user_mutex, !m_file_system_mutex);
 
     // Log out a given user
-    void log_out_user(const std::string& user_id) REQUIRES(!m_user_mutex, !m_file_system_mutex);
+    void log_out_user(const SyncUser& user) REQUIRES(!m_user_mutex, !m_file_system_mutex);
 
     // Sets the currently active user.
     void set_current_user(const std::string& user_id) REQUIRES(!m_user_mutex, !m_file_system_mutex);
@@ -219,13 +227,20 @@ public:
     // Immediately closes any open sync sessions for this sync manager
     void close_all_sessions() REQUIRES(!m_mutex, !m_session_mutex);
 
+    // Used by App to update the sync route any time the location info has been refreshed.
+    // m_sync_route starts out as unset when the SyncManager is created or configured.
+    // It will be updated to a valid value upon the first App AppServices HTTP request or
+    // the access token will be refreshed (forcing a location update) when a SyncSession
+    // is activated and it is still unset. This value is not allowed to be reset to
+    // nullopt once it has a valid value.
     void set_sync_route(std::string sync_route) REQUIRES(!m_mutex)
     {
+        REALM_ASSERT(!sync_route.empty());
         util::CheckedLockGuard lock(m_mutex);
         m_sync_route = std::move(sync_route);
     }
 
-    const std::string sync_route() const REQUIRES(!m_mutex)
+    const std::optional<std::string> sync_route() const REQUIRES(!m_mutex)
     {
         util::CheckedLockGuard lock(m_mutex);
         return m_sync_route;
@@ -250,6 +265,12 @@ public:
     SyncManager(const SyncManager&) = delete;
     SyncManager& operator=(const SyncManager&) = delete;
 
+    struct OnlyForTesting {
+        friend class TestHelper;
+
+        static void voluntary_disconnect_all_connections(SyncManager&);
+    };
+
 protected:
     friend class SyncUser;
     friend class SyncSesson;
@@ -260,7 +281,8 @@ protected:
 private:
     friend class app::App;
 
-    void configure(std::shared_ptr<app::App> app, const std::string& sync_route, const SyncClientConfig& config)
+    void configure(std::shared_ptr<app::App> app, std::optional<std::string> sync_route,
+                   const SyncClientConfig& config)
         REQUIRES(!m_mutex, !m_file_system_mutex, !m_user_mutex, !m_session_mutex);
 
     // Stop tracking the session for the given path if it is inactive.
@@ -313,7 +335,9 @@ private:
     // Callers of this method should hold the `m_session_mutex` themselves.
     bool do_has_existing_sessions() REQUIRES(m_session_mutex);
 
-    std::string m_sync_route GUARDED_BY(m_mutex);
+    // The sync route URL to connect to the server. This can be initially empty, but should not
+    // be cleared once it has been set to a value, except by `reset_for_testing()`.
+    std::optional<std::string> m_sync_route GUARDED_BY(m_mutex);
 
     std::weak_ptr<app::App> m_app GUARDED_BY(m_mutex);
 };

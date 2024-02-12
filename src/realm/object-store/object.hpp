@@ -97,11 +97,18 @@ public:
     {
         return *m_object_schema;
     }
-    Obj obj() const
+    [[deprecated]] Obj obj() const
     {
         return m_obj;
     }
-
+    const Obj& get_obj() const
+    {
+        return m_obj;
+    }
+    Obj& get_obj()
+    {
+        return m_obj;
+    }
     bool is_valid() const
     {
         return m_obj.is_valid();
@@ -209,35 +216,35 @@ private:
     void validate_property_for_setter(Property const&) const;
 };
 
-struct InvalidatedObjectException : public std::logic_error {
+struct InvalidatedObjectException : public LogicError {
     InvalidatedObjectException(const std::string& object_type);
     const std::string object_type;
 };
 
-struct InvalidPropertyException : public std::logic_error {
+struct InvalidPropertyException : public LogicError {
     InvalidPropertyException(const std::string& object_type, const std::string& property_name);
     const std::string object_type;
     const std::string property_name;
 };
 
-struct MissingPropertyValueException : public std::logic_error {
+struct MissingPropertyValueException : public LogicError {
     MissingPropertyValueException(const std::string& object_type, const std::string& property_name);
     const std::string object_type;
     const std::string property_name;
 };
 
-struct MissingPrimaryKeyException : public std::logic_error {
+struct MissingPrimaryKeyException : public LogicError {
     MissingPrimaryKeyException(const std::string& object_type);
     const std::string object_type;
 };
 
-struct ReadOnlyPropertyException : public std::logic_error {
+struct ReadOnlyPropertyException : public LogicError {
     ReadOnlyPropertyException(const std::string& object_type, const std::string& property_name);
     const std::string object_type;
     const std::string property_name;
 };
 
-struct ModifyPrimaryKeyException : public std::logic_error {
+struct ModifyPrimaryKeyException : public LogicError {
     ModifyPrimaryKeyException(const std::string& object_type, const std::string& property_name);
     const std::string object_type;
     const std::string property_name;

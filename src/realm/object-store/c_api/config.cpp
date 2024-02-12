@@ -31,7 +31,7 @@ RLM_API bool realm_config_set_encryption_key(realm_config_t* config, const uint8
 {
     return wrap_err([=]() {
         if (key_size != 0 && key_size != 64) {
-            throw std::logic_error{"Wrong encryption key size (must be 0 or 64)"};
+            throw InvalidEncryptionKey();
         }
 
         config->encryption_key.clear();
@@ -82,6 +82,16 @@ RLM_API void realm_config_set_schema_mode(realm_config_t* config, realm_schema_m
     config->schema_mode = from_capi(mode);
 }
 
+RLM_API realm_schema_subset_mode_e realm_config_get_schema_subset_mode(const realm_config_t* config)
+{
+    return to_capi(config->schema_subset_mode);
+}
+
+RLM_API void realm_config_set_schema_subset_mode(realm_config_t* config, realm_schema_subset_mode_e subset_mode)
+{
+    config->schema_subset_mode = from_capi(subset_mode);
+}
+
 RLM_API void realm_config_set_migration_function(realm_config_t* config, realm_migration_func_t func,
                                                  realm_userdata_t userdata, realm_free_userdata_func_t callback)
 {
@@ -91,7 +101,7 @@ RLM_API void realm_config_set_migration_function(realm_config_t* config, realm_m
             realm_t r2{new_realm};
             realm_schema_t sch{&schema};
             if (!(func)(userdata, &r1, &r2, &sch)) {
-                throw CallbackFailed{ErrorStorage::get_thread_local()->get_and_clear_usercode_error()};
+                throw CallbackFailed{ErrorStorage::get_thread_local()->get_and_clear_user_code_error()};
             }
         };
         config->migration_function = std::move(migration_func);
@@ -113,7 +123,7 @@ RLM_API void realm_config_set_data_initialization_function(realm_config_t* confi
         auto init_func = [=](SharedRealm realm) {
             realm_t r{realm};
             if (!(func)(userdata, &r)) {
-                throw CallbackFailed{ErrorStorage::get_thread_local()->get_and_clear_usercode_error()};
+                throw CallbackFailed{ErrorStorage::get_thread_local()->get_and_clear_user_code_error()};
             }
         };
         config->initialization_function = std::move(init_func);
@@ -134,8 +144,8 @@ RLM_API void realm_config_set_should_compact_on_launch_function(realm_config_t* 
     if (func) {
         auto should_func = [=](uint64_t total_bytes, uint64_t used_bytes) -> bool {
             auto result = func(userdata, total_bytes, used_bytes);
-            if (auto usercode_error = ErrorStorage::get_thread_local()->get_and_clear_usercode_error())
-                throw CallbackFailed{usercode_error};
+            if (auto user_code_error = ErrorStorage::get_thread_local()->get_and_clear_user_code_error())
+                throw CallbackFailed{user_code_error};
             return result;
         };
         config->should_compact_on_launch_function = std::move(should_func);

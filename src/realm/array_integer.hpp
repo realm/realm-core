@@ -29,16 +29,10 @@ namespace realm {
 class ArrayInteger : public Array, public ArrayPayload {
 public:
     using value_type = int64_t;
-
-    using Array::add;
     using Array::find_first;
-    using Array::get;
-    using Array::insert;
-    using Array::move;
-    using Array::set;
 
     explicit ArrayInteger(Allocator&) noexcept;
-    ~ArrayInteger() noexcept override {}
+    ~ArrayInteger() noexcept override = default;
 
     static value_type default_value(bool)
     {
@@ -68,8 +62,8 @@ public:
     {
         return false;
     }
-    template <class cond, class Callback>
-    bool find(value_type value, size_t start, size_t end, QueryStateBase* state, Callback callback) const;
+    template <class cond>
+    bool find(value_type value, size_t start, size_t end, QueryStateBase* state) const;
 };
 
 class ArrayIntNull : public Array, public ArrayPayload {
@@ -125,8 +119,8 @@ public:
 
     bool find(int cond, value_type value, size_t start, size_t end, QueryStateBase* state) const;
 
-    template <class cond, class Callback>
-    bool find(value_type value, size_t start, size_t end, QueryStateBase* state, Callback callback) const;
+    template <class cond>
+    bool find(value_type value, size_t start, size_t end, QueryStateBase* state) const;
 
     // Wrappers for backwards compatibility and for simple use without
     // setting up state initialization etc
@@ -147,21 +141,13 @@ private:
     void replace_nulls_with(int64_t new_null);
     bool can_use_as_null(int64_t value) const;
 
-    template <class Callback>
-    bool find_impl(int cond, value_type value, size_t start, size_t end, QueryStateBase* state,
-                   Callback callback) const;
-    template <class cond, class Callback>
-    bool find_impl(value_type value, size_t start, size_t end, QueryStateBase* state, Callback callback) const;
+    bool find_impl(int cond, value_type value, size_t start, size_t end, QueryStateBase* state) const;
+    template <class cond>
+    bool find_impl(value_type value, size_t start, size_t end, QueryStateBase* state) const;
 };
 
 
 // Implementation:
-
-inline ArrayInteger::ArrayInteger(Allocator& allocator) noexcept
-    : Array(allocator)
-{
-    m_is_inner_bptree_node = false;
-}
 
 inline ArrayIntNull::ArrayIntNull(Allocator& allocator) noexcept
     : Array(allocator)

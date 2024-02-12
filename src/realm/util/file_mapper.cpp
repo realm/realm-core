@@ -25,7 +25,6 @@
 #else
 #include <cerrno>
 #include <sys/mman.h>
-#include <unistd.h>
 #endif
 
 #include <realm/exceptions.hpp>
@@ -60,11 +59,6 @@
 #include <dispatch/dispatch.h>
 #endif
 
-#if REALM_ANDROID
-#include <linux/unistd.h>
-#include <sys/syscall.h>
-#endif
-
 #endif // enable encryption
 
 namespace {
@@ -92,12 +86,7 @@ size_t round_up_to_page_size(size_t size) noexcept
 
 // A list of all of the active encrypted mappings for a single file
 struct mappings_for_file {
-#ifdef _WIN32
-    HANDLE handle;
-#else
-    dev_t device;
-    ino_t inode;
-#endif
+    File::UniqueID file_unique_id;
     std::shared_ptr<SharedFileInfo> info;
 };
 
@@ -326,6 +315,12 @@ void encryption_note_reader_end(SharedFileInfo& info, const void* reader_id) noe
         }
 }
 
+void encryption_mark_pages_for_IV_check(EncryptedFileMapping* mapping)
+{
+    UniqueLock lock(mapping_mutex);
+    mapping->mark_pages_for_IV_check();
+}
+
 namespace {
 size_t collect_total_workload() // must be called under lock
 {
@@ -477,19 +472,12 @@ mapping_and_addr* find_mapping_for_addr(void* addr, size_t size)
 SharedFileInfo* get_file_info_for_file(File& file)
 {
     LockGuard lock(mapping_mutex);
-#ifndef _WIN32
     File::UniqueID id = file.get_unique_id();
-#endif
     std::vector<mappings_for_file>::iterator it;
     for (it = mappings_by_file.begin(); it != mappings_by_file.end(); ++it) {
-#ifdef _WIN32
-        auto fd = file.get_descriptor();
-        if (File::is_same_file_static(it->handle, fd))
+        if (it->file_unique_id == id) {
             break;
-#else
-        if (it->inode == id.inode && it->device == id.device)
-            break;
-#endif
+        }
     }
     if (it == mappings_by_file.end())
         return nullptr;
@@ -501,30 +489,19 @@ SharedFileInfo* get_file_info_for_file(File& file)
 namespace {
 EncryptedFileMapping* add_mapping(void* addr, size_t size, const FileAttributes& file, size_t file_offset)
 {
-#ifndef _WIN32
-    struct stat st;
-
-    if (fstat(file.fd, &st)) {
-        int err = errno; // Eliminate any risk of clobbering
-        throw std::system_error(err, std::system_category(), "fstat() failed");
-    }
-#endif
-
     size_t fs = to_size_t(File::get_size_static(file.fd));
     if (fs > 0 && fs < page_size())
         throw DecryptionFailed();
 
     LockGuard lock(mapping_mutex);
 
+    File::UniqueID fuid = File::get_unique_id(file.fd, file.path);
+
     std::vector<mappings_for_file>::iterator it;
     for (it = mappings_by_file.begin(); it != mappings_by_file.end(); ++it) {
-#ifdef _WIN32
-        if (File::is_same_file_static(it->handle, file.fd))
+        if (it->file_unique_id == fuid) {
             break;
-#else
-        if (it->inode == st.st_ino && it->device == st.st_dev)
-            break;
-#endif
+        }
     }
 
     // Get the potential memory allocation out of the way so that mappings_by_addr.push_back can't throw
@@ -534,24 +511,8 @@ EncryptedFileMapping* add_mapping(void* addr, size_t size, const FileAttributes&
         mappings_by_file.reserve(mappings_by_file.size() + 1);
         mappings_for_file f;
         f.info = std::make_shared<SharedFileInfo>(reinterpret_cast<const uint8_t*>(file.encryption_key));
-
-        FileDesc fd_duped;
-#ifdef _WIN32
-        if (!DuplicateHandle(GetCurrentProcess(), file.fd, GetCurrentProcess(), &fd_duped, 0, FALSE,
-                             DUPLICATE_SAME_ACCESS))
-            throw std::system_error(GetLastError(), std::system_category(), "DuplicateHandle() failed");
-        f.info->fd = f.handle = fd_duped;
-#else
-        fd_duped = dup(file.fd);
-
-        if (fd_duped == -1) {
-            int err = errno; // Eliminate any risk of clobbering
-            throw std::system_error(err, std::system_category(), "dup() failed");
-        }
-        f.info->fd = fd_duped;
-        f.device = st.st_dev;
-        f.inode = st.st_ino;
-#endif
+        f.info->fd = File::dup_file_desc(file.fd);
+        f.file_unique_id = fuid;
 
         mappings_by_file.push_back(f); // can't throw due to reserve() above
         it = mappings_by_file.end() - 1;
@@ -570,13 +531,9 @@ EncryptedFileMapping* add_mapping(void* addr, size_t size, const FileAttributes&
     }
     catch (...) {
         if (it->info->mappings.empty()) {
-#ifdef _WIN32
-            bool b = CloseHandle(it->info->fd);
-            REALM_ASSERT_RELEASE(b);
-#else
-            ::close(it->info->fd);
-#endif
+            FileDesc fd_to_close = it->info->fd;
             mappings_by_file.erase(it);
+            File::close_static(fd_to_close); // Throws
         }
         throw;
     }
@@ -594,17 +551,9 @@ void remove_mapping(void* addr, size_t size)
 
     for (std::vector<mappings_for_file>::iterator it = mappings_by_file.begin(); it != mappings_by_file.end(); ++it) {
         if (it->info->mappings.empty()) {
-#ifdef _WIN32
-            if (!CloseHandle(it->info->fd))
-                throw std::system_error(GetLastError(), std::system_category(), "CloseHandle() failed");
-#else
-            if (::close(it->info->fd) != 0) {
-                int err = errno;                // Eliminate any risk of clobbering
-                if (err == EBADF || err == EIO) // FIXME: how do we handle EINTR?
-                    throw std::system_error(err, std::system_category(), "close() failed");
-            }
-#endif
+            FileDesc fd_to_close = it->info->fd;
             mappings_by_file.erase(it);
+            File::close_static(fd_to_close); // Throws
             break;
         }
     }
@@ -685,25 +634,6 @@ void* mmap_fixed(FileDesc fd, void* address_request, size_t size, File::AccessMo
 
 
 #endif // REALM_ENABLE_ENCRYPTION
-
-void clear_mappings_before_test_forks()
-{
-#if REALM_ENABLE_ENCRYPTION
-#if !REALM_PLATFORM_APPLE
-    if (reclaimer_thread) {
-        reclaimer_shutdown = true;
-        reclaimer_thread->join();
-        reclaimer_thread = nullptr;
-        reclaimer_shutdown = false;
-    }
-#endif
-    UniqueLock lock(mapping_mutex);
-    mappings_by_addr.clear();
-    mappings_by_file.clear();
-    num_decrypted_pages = 0;
-#endif // REALM_ENABLE_ENCRYPTION
-}
-
 
 void* mmap_anon(size_t size)
 {
@@ -817,9 +747,8 @@ void* mmap(const FileAttributes& file, size_t size, size_t offset)
                                         " offset: " + util::to_string(offset));
         }
 
-        throw std::system_error(err, std::system_category(),
-                                std::string("mmap() failed (size: ") + util::to_string(size) +
-                                    ", offset: " + util::to_string(offset));
+        throw SystemError(err, std::string("mmap() failed (size: ") + util::to_string(size) +
+                                   ", offset: " + util::to_string(offset));
 
 #else
         // FIXME: Is there anything that we must do on Windows to honor map_NoSync?
@@ -843,7 +772,7 @@ void* mmap(const FileAttributes& file, size_t size, size_t offset)
                                         " size: " + util::to_string(size) + " offset: " + util::to_string(offset));
 
         if (int_cast_with_overflow_detect(offset, large_int.QuadPart))
-            throw util::overflow_error("Map offset is too large");
+            throw RuntimeError(ErrorCodes::RangeError, "Map offset is too large");
 
         SIZE_T _size = size;
         void* addr = MapViewOfFileFromApp(map_handle, desired_access, offset, _size);

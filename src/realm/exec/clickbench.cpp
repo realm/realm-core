@@ -37,6 +37,9 @@ private:
     std::condition_variable m_cv;
 };
 
+// remove this when enumerated strings are supported:
+//#define type_EnumString type_String
+
 static void create_table(TransactionRef tr)
 {
     auto t = tr->add_table("Hits");
@@ -273,6 +276,8 @@ void import(const char* filename)
     auto t = tr->get_table("Hits");
     auto col_keys = t->get_column_keys();
 
+    std::cout << std::endl << "Reading data into realm" << std::endl;
+    auto time_start = std::chrono::high_resolution_clock::now();
     BufferedValues buf1;
     BufferedValues buf2;
     for (auto& val : buf1.values) {
@@ -296,33 +301,15 @@ void import(const char* filename)
         for (auto& val : buf->values) {
             Obj o = t->create_object(ObjKey(), val);
             // verify
-            for (auto& e : val) {
-                if (e.col_key.get_type() == col_type_EnumString) {
-                    auto got_string = o.get<StringData>(e.col_key);
-                    auto the_string = e.value.get_string();
-                    REALM_ASSERT(got_string == the_string);
-                    /*
-                    o.set<StringData>(e.col_key, 0);
-                    o.set<StringData>(e.col_key, the_string);
-                    got_string = o.get<StringData>(e.col_key);
-                    REALM_ASSERT(got_string == the_string);
-                    */
-                    /*
-                                        auto q1 = t->where();
-                                        auto q2 = q1.equal(e.col_key, got_string);
-                                        auto q_res = q2.find_all();
-                                        REALM_ASSERT(q_res.size());
-                                        REALM_ASSERT(q_res[q_res.size() - 1].get_key() == o.get_key());
-                                        */
-                    /*
-                    auto q1 = t->where();
-                    auto q2 = q1.contains(e.col_key, got_string);
-                    auto q_res = q2.find_all();
-                    REALM_ASSERT(q_res.size());
-                    REALM_ASSERT(q_res[q_res.size() - 1].get_key() == o.get_key());
-                    */
-                }
-            }
+            /*
+                        for (auto& e : val) {
+                            if (e.col_key.get_type() == col_type_String) {
+                                auto got_string = o.get<StringData>(e.col_key);
+                                auto the_string = e.value.get_string();
+                                REALM_ASSERT(got_string == the_string);
+                            }
+                        }
+            */
         }
         resp.send(buf);
         if (buf_cnt++ > bufs_per_commit) {
@@ -336,6 +323,10 @@ void import(const char* filename)
     tr->commit_and_continue_as_read();
 
     parse_file_thread.join();
+    auto time_end = std::chrono::high_resolution_clock::now();
+    std::cout << "Ingestion complete in "
+              << std::chrono::duration_cast<std::chrono::milliseconds>(time_end - time_start).count() << " msecs"
+              << std::endl;
     std::cout << std::endl;
     t->dump_interning_stats();
     std::cout << std::endl;

@@ -32,6 +32,10 @@
 #include <realm/object-store/util/android/scheduler.hpp>
 #endif
 
+#if defined(__EMSCRIPTEN__)
+#include <realm/object-store/util/emscripten/scheduler.hpp>
+#endif
+
 #include <realm/object-store/util/generic/scheduler.hpp>
 
 namespace realm::util {
@@ -123,6 +127,8 @@ std::shared_ptr<Scheduler> Scheduler::make_platform_default()
     return make_runloop(nullptr);
 #elif REALM_ANDROID
     return make_alooper();
+#elif defined(__EMSCRIPTEN__)
+    return std::make_shared<EmscriptenScheduler>();
 #else
     REALM_TERMINATE("No built-in scheduler implementation for this platform. Register your own with "
                     "Scheduler::set_default_factory()");
@@ -148,7 +154,11 @@ std::shared_ptr<Scheduler> Scheduler::make_dummy()
 #if REALM_PLATFORM_APPLE
 std::shared_ptr<Scheduler> Scheduler::make_runloop(CFRunLoopRef run_loop)
 {
-    return std::make_shared<RunLoopScheduler>(run_loop ?: CFRunLoopGetCurrent());
+    if (!run_loop)
+        run_loop = CFRunLoopGetCurrent();
+    if (run_loop == CFRunLoopGetMain())
+        return std::make_shared<MainRunLoopScheduler>();
+    return std::make_shared<RunLoopScheduler>(run_loop);
 }
 
 std::shared_ptr<Scheduler> Scheduler::make_dispatch(void* queue)

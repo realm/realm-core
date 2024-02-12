@@ -195,9 +195,9 @@ public:
     {
         return ObjKey(get_key_value(ndx) + m_offset);
     }
-    const ClusterKeyArray* get_key_array() const
+    const ArrayUnsigned* get_key_array() const
     {
-        return &m_keys;
+        return m_keys.is_attached() ? &m_keys : nullptr;
     }
     void set_offset(uint64_t offs)
     {
@@ -206,6 +206,15 @@ public:
     uint64_t get_offset() const
     {
         return m_offset;
+    }
+    virtual ref_type typed_write(ref_type ref, _impl::ArrayWriterBase& out, const Table& table, bool deep,
+                                 bool only_modified, bool compress) const = 0;
+
+    virtual void typed_print(std::string prefix, const Table& table) const
+    {
+        static_cast<void>(table);
+        std::cout << "ClusterNode as ";
+        Array::typed_print(prefix);
     }
 
 protected:
@@ -216,6 +225,16 @@ protected:
 #endif
 
     static constexpr size_t cluster_node_size = 1 << node_shift_factor;
+
+    class ClusterKeyArray : public ArrayUnsigned {
+    public:
+        using ArrayUnsigned::ArrayUnsigned;
+
+        uint64_t get(size_t ndx) const
+        {
+            return is_attached() ? ArrayUnsigned::get(ndx) : uint64_t(ndx);
+        }
+    };
 
     const ClusterTree& m_tree_top;
     ClusterKeyArray m_keys;
@@ -307,6 +326,9 @@ public:
 
     void verify() const;
     void dump_objects(int64_t key_offset, std::string lead) const override;
+    virtual ref_type typed_write(ref_type ref, _impl::ArrayWriterBase& out, const Table& table, bool deep,
+                                 bool only_modified, bool compress) const override;
+    virtual void typed_print(std::string prefix, const Table& table) const override;
 
 private:
     friend class ClusterTree;

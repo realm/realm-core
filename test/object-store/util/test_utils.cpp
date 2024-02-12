@@ -16,17 +16,19 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include <realm/object-store/impl/realm_coordinator.hpp>
-#include "test_utils.hpp"
+#include <util/test_utils.hpp>
 
-#include <realm/util/base64.hpp>
-#include <realm/util/file.hpp>
 #include <realm/string_data.hpp>
+#include <realm/object-store/impl/realm_coordinator.hpp>
+#include <realm/util/base64.hpp>
+#include <realm/util/demangle.hpp>
+#include <realm/util/file.hpp>
 
 #include <external/json/json.hpp>
 
 #include <iostream>
 #include <sys/stat.h>
+
 #ifndef _WIN32
 #include <unistd.h>
 #include <sys/types.h>
@@ -39,13 +41,52 @@
 
 namespace realm {
 
-bool create_dummy_realm(std::string path)
+bool ExceptionMatcher<void>::match(Exception const& ex) const
+{
+    return ex.code() == m_code && ex.what() == m_message;
+}
+
+std::string ExceptionMatcher<void>::describe() const
+{
+    return util::format("Exception(%1, \"%2\")", ErrorCodes::error_string(m_code), m_message);
+}
+
+bool OutOfBoundsMatcher::match(OutOfBounds const& ex) const
+{
+    return ex.code() == ErrorCodes::OutOfBounds && ex.index == m_index && ex.size == m_size && ex.what() == m_message;
+}
+
+std::string OutOfBoundsMatcher::describe() const
+{
+    return util::format("OutOfBounds(index=%1, size=%2, \"%3\")", m_index, m_size, m_message);
+}
+
+bool LogicErrorMatcher::match(LogicError const& ex) const
+{
+    return ex.code() == m_code;
+}
+
+std::string LogicErrorMatcher::describe() const
+{
+    return util::format("LogicError(%1)", ErrorCodes::error_string(m_code));
+}
+
+std::ostream& operator<<(std::ostream& os, const Exception& e)
+{
+    os << util::get_type_name(e) << "(" << e.code_string() << ", \"" << e.what() << "\")";
+    return os;
+}
+
+bool create_dummy_realm(std::string path, std::shared_ptr<Realm>* out)
 {
     Realm::Config config;
     config.path = path;
     try {
-        _impl::RealmCoordinator::get_coordinator(path)->get_realm(config, none);
+        auto realm = _impl::RealmCoordinator::get_coordinator(path)->get_realm(config, none);
         REQUIRE_REALM_EXISTS(path);
+        if (out) {
+            *out = std::move(realm);
+        }
         return true;
     }
     catch (std::exception&) {
@@ -89,7 +130,7 @@ std::string encode_fake_jwt(const std::string& in, util::Optional<int64_t> exp, 
     using namespace std::chrono_literals;
     if (!exp) {
         std::chrono::system_clock::time_point now = std::chrono::system_clock::now();
-        exp = std::chrono::system_clock::to_time_t(now + 30min);
+        exp = std::chrono::system_clock::to_time_t(now + 60min);
     }
     if (!iat) {
         std::chrono::system_clock::time_point now = std::chrono::system_clock::now();
@@ -109,6 +150,25 @@ std::string encode_fake_jwt(const std::string& in, util::Optional<int64_t> exp, 
     util::base64_encode(unencoded_body.data(), unencoded_body.size(), &encoded_body[0], encoded_body.size());
     std::string suffix = "Et9HFtf9R3GEMA0IICOfFMVXY7kkTX1wr4qCyhIf58U";
     return encoded_prefix + "." + encoded_body + "." + suffix;
+}
+
+std::string random_string(std::string::size_type length)
+{
+    static auto& chrs = "abcdefghijklmnopqrstuvwxyz"
+                        "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    thread_local static std::mt19937 rg{std::random_device{}()};
+    thread_local static std::uniform_int_distribution<std::string::size_type> pick(0, sizeof(chrs) - 2);
+    std::string s;
+    s.reserve(length);
+    while (length--)
+        s += chrs[pick(rg)];
+    return s;
+}
+
+int64_t random_int()
+{
+    thread_local std::mt19937_64 rng(std::random_device{}());
+    return rng();
 }
 
 static bool file_is_on_exfat(const std::string& path)

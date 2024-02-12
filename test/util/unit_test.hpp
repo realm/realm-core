@@ -34,7 +34,7 @@
 #include <realm/util/features.h>
 #include <realm/util/logger.hpp>
 #include <realm/util/safe_int_ops.hpp>
-#include <realm/util/type_traits.hpp>
+#include <realm/util/serializer.hpp>
 
 
 #define TEST(name) TEST_IF(name, true)
@@ -195,6 +195,13 @@ static const bool running_with_tsan = false;
 static const bool running_with_asan = true;
 #else
 static const bool running_with_asan = false;
+#endif
+
+#if REALM_ANDROID || REALM_IOS
+// android doesn't implement posix_spawn(), iOS doesn't permit starting another process
+constexpr bool testing_supports_spawn_process = false;
+#else
+constexpr bool testing_supports_spawn_process = !running_with_valgrind;
 #endif
 
 //@{
@@ -578,13 +585,14 @@ public:
 
     /// The thread specific logger to be used by custom reporters. See also
     /// SharedContext::report_logger and TestContext::logger.
+    const std::shared_ptr<util::Logger> report_logger_ptr;
     util::Logger& report_logger;
 
     ThreadContext(const ThreadContext&) = delete;
     ThreadContext& operator=(const ThreadContext&) = delete;
 
 protected:
-    ThreadContext(SharedContext&, int thread_index, util::Logger&);
+    ThreadContext(SharedContext&, int thread_index, const std::shared_ptr<util::Logger>&);
 };
 
 
@@ -596,13 +604,14 @@ public:
 
     /// The thread non-specific logger to be used by custom reporters. See also
     /// ThreadContext::report_logger.
+    const std::shared_ptr<util::Logger> report_logger_ptr;
     util::Logger& report_logger;
 
     SharedContext(const SharedContext&) = delete;
     SharedContext& operator=(const SharedContext&) = delete;
 
 protected:
-    SharedContext(const TestList&, int num_recurrences, int num_threads, util::Logger&);
+    SharedContext(const TestList& tl, int nr, int nt, const std::shared_ptr<util::Logger>& rl_ptr);
 };
 
 
@@ -743,7 +752,6 @@ inline bool definitely_less(long double a, long double b, long double epsilon)
     return b - a > std::max(std::abs(a), std::abs(b)) * epsilon;
 }
 
-
 template <class T, bool is_float>
 struct SetPrecision {
     static void exec(std::ostream&)
@@ -759,26 +767,62 @@ struct SetPrecision<T, true> {
     }
 };
 
+template <typename T>
+constexpr static bool realm_serializable_types =
+    is_any_v<T, StringData, BinaryData, Timestamp, ObjectId, std::optional<ObjectId>, ObjKey, ObjLink, UUID,
+             std::optional<UUID>, bool, float, std::optional<float>, double, std::optional<double>, realm::null>;
+
 template <class T>
 void to_string(const T& value, std::string& str)
 {
-    // FIXME: Put string values in quotes, and escape non-printables as well as '"' and '\\'.
+    if constexpr (realm_serializable_types<T>) {
+        str = util::serializer::print_value(value);
+    }
+    else {
+        std::ostringstream out;
+        SetPrecision<T, std::is_floating_point<T>::value>::exec(out);
+        out << value;
+        str = out.str();
+    }
+}
+
+template <class T>
+void to_string(const std::vector<T>& value, std::string& str)
+{
     std::ostringstream out;
     SetPrecision<T, std::is_floating_point<T>::value>::exec(out);
-    out << value;
+
+    out << "{";
+    bool first = true;
+    for (auto& v : value) {
+        if (!first) {
+            out << ", ";
+        }
+        if constexpr (realm_serializable_types<T>) {
+            out << util::serializer::print_value(v);
+        }
+        else {
+            out << v;
+        }
+        first = false;
+    }
+    out << "}";
     str = out.str();
 }
 
 template <class T>
 void to_string(const std::optional<T>& value, std::string& str)
 {
-    // FIXME: Put string values in quotes, and escape non-printables as well as '"' and '\\'.
-    std::ostringstream out;
-    SetPrecision<T, std::is_floating_point<T>::value>::exec(out);
-    util::stream_possible_optional(out, value);
-    str = out.str();
+    if constexpr (realm_serializable_types<T>) {
+        str = util::serializer::print_value(value);
+    }
+    else {
+        std::ostringstream out;
+        SetPrecision<T, std::is_floating_point<T>::value>::exec(out);
+        util::stream_possible_optional(out, value);
+        str = out.str();
+    }
 }
-
 
 inline bool TestContext::check_cond(bool cond, const char* file, long line, const char* macro_name,
                                     const char* cond_text)
@@ -911,18 +955,20 @@ inline bool TestContext::check_definitely_greater(long double a, long double b, 
     return check_inexact_compare(cond, a, b, eps, file, line, "CHECK_DEFINITELY_GREATER", a_text, b_text, eps_text);
 }
 
-inline ThreadContext::ThreadContext(SharedContext& sc, int ti, util::Logger& rl)
+inline ThreadContext::ThreadContext(SharedContext& sc, int ti, const std::shared_ptr<util::Logger>& rl_ptr)
     : shared_context(sc)
     , thread_index(ti)
-    , report_logger(rl)
+    , report_logger_ptr(rl_ptr)
+    , report_logger(*report_logger_ptr)
 {
 }
 
-inline SharedContext::SharedContext(const TestList& tl, int nr, int nt, util::Logger& rl)
+inline SharedContext::SharedContext(const TestList& tl, int nr, int nt, const std::shared_ptr<util::Logger>& rl_ptr)
     : test_list(tl)
     , num_recurrences(nr)
     , num_threads(nt)
-    , report_logger(rl)
+    , report_logger_ptr(rl_ptr)
+    , report_logger(*report_logger_ptr)
 {
 }
 

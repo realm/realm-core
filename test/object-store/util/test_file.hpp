@@ -38,6 +38,9 @@
 
 #endif // REALM_ENABLE_SYNC
 
+#ifndef TEST_TIMEOUT_EXTRA
+#define TEST_TIMEOUT_EXTRA 0
+#endif
 
 namespace realm {
 struct AppSession;
@@ -73,6 +76,9 @@ struct TestFile : realm::Realm::Config {
     TestFile();
     ~TestFile();
 
+    TestFile(const TestFile&) = delete;
+    TestFile& operator=(const TestFile&) = delete;
+
     // The file should outlive the object, ie. should not be deleted in destructor
     void persist()
     {
@@ -86,34 +92,36 @@ private:
     std::string m_temp_dir;
 };
 
-struct InMemoryTestFile : TestFile {
+struct InMemoryTestFile : realm::Realm::Config {
     InMemoryTestFile();
+    realm::DBOptions options() const;
 };
 
 void advance_and_notify(realm::Realm& realm);
 void on_change_but_no_notify(realm::Realm& realm);
 
-#if REALM_ENABLE_SYNC
-
-#ifndef TEST_ENABLE_SYNC_LOGGING
-#define TEST_ENABLE_SYNC_LOGGING 0 // change to 1 to enable trace-level logging
+#ifndef TEST_ENABLE_LOGGING
+#define TEST_ENABLE_LOGGING 0 // change to 1 to enable trace-level logging
 #endif
 
-#ifndef TEST_ENABLE_SYNC_LOGGING_LEVEL
-#if TEST_ENABLE_SYNC_LOGGING
-#define TEST_ENABLE_SYNC_LOGGING_LEVEL all
+#ifndef TEST_LOGGING_LEVEL
+#if TEST_ENABLE_LOGGING
+#define TEST_LOGGING_LEVEL all
 #else
-#define TEST_ENABLE_SYNC_LOGGING_LEVEL off
-#endif // TEST_ENABLE_SYNC_LOGGING
-#endif // TEST_ENABLE_SYNC_LOGGING_LEVEL
+#define TEST_LOGGING_LEVEL off
+#endif // TEST_ENABLE_LOGGING
+#endif // TEST_LOGGING_LEVEL
 
+#if REALM_ENABLE_SYNC
 
 using StartImmediately = realm::util::TaggedBool<class StartImmediatelyTag>;
+using EnableSSL = realm::util::TaggedBool<class EnableSSLTag>;
 
 class SyncServer : private realm::sync::Clock {
 public:
     struct Config {
-        bool start_immediately = true;
+        StartImmediately start_immediately = true;
+        EnableSSL ssl = false;
         std::string local_dir;
     };
 
@@ -169,6 +177,9 @@ struct SyncTestFile : TestFile {
                  std::string user_name = "test");
     SyncTestFile(std::shared_ptr<realm::SyncUser> user, realm::bson::Bson partition,
                  realm::util::Optional<realm::Schema> schema = realm::util::none);
+    SyncTestFile(std::shared_ptr<realm::SyncUser> user, realm::bson::Bson partition,
+                 realm::util::Optional<realm::Schema> schema,
+                 std::function<realm::SyncSessionErrorHandler>&& error_handler);
     SyncTestFile(std::shared_ptr<realm::app::App> app, realm::bson::Bson partition, realm::Schema schema);
     SyncTestFile(std::shared_ptr<realm::SyncUser> user, realm::Schema schema, realm::SyncConfig::FLXSyncEnabled);
 };
@@ -179,7 +190,8 @@ class TestAppSession {
 public:
     TestAppSession();
     TestAppSession(realm::AppSession, std::shared_ptr<realm::app::GenericNetworkTransport> = nullptr,
-                   DeleteApp = true, realm::ReconnectMode reconnect_mode = realm::ReconnectMode::normal);
+                   DeleteApp = true, realm::ReconnectMode reconnect_mode = realm::ReconnectMode::normal,
+                   std::shared_ptr<realm::sync::SyncSocketProvider> custom_socket_provider = nullptr);
     ~TestAppSession();
 
     std::shared_ptr<realm::app::App> app() const noexcept
@@ -194,6 +206,9 @@ public:
     {
         return m_transport.get();
     }
+
+    std::vector<realm::bson::BsonDocument> get_documents(realm::SyncUser& user, const std::string& object_type,
+                                                         size_t expected_count) const;
 
 private:
     std::shared_ptr<realm::app::App> m_app;
@@ -210,11 +225,12 @@ public:
         Config() {}
         realm::app::App::Config app_config;
         std::string base_path;
-        realm::SyncManager::MetadataMode metadata_mode = realm::SyncManager::MetadataMode::NoEncryption;
+        realm::SyncManager::MetadataMode metadata_mode = realm::SyncManager::MetadataMode::NoMetadata;
         bool should_teardown_test_directory = true;
-        realm::util::Logger::Level sync_client_log_level = realm::util::Logger::Level::TEST_ENABLE_SYNC_LOGGING_LEVEL;
+        realm::util::Logger::Level log_level = realm::util::Logger::Level::TEST_LOGGING_LEVEL;
         bool override_sync_route = true;
         std::shared_ptr<realm::app::GenericNetworkTransport> transport;
+        bool start_sync_client = true;
     };
 
     TestSyncManager(realm::SyncManager::MetadataMode mode);
@@ -233,6 +249,8 @@ public:
     {
         return m_sync_server;
     }
+
+    std::shared_ptr<realm::SyncUser> fake_user(const std::string& name = "test");
 
     // Capture the token refresh callback so that we can invoke it later with
     // the desired result
@@ -271,8 +289,8 @@ inline TestSyncManager::TestSyncManager(realm::SyncManager::MetadataMode mode)
 {
 }
 
-std::error_code wait_for_upload(realm::Realm& realm, std::chrono::seconds timeout = std::chrono::seconds(60));
-std::error_code wait_for_download(realm::Realm& realm, std::chrono::seconds timeout = std::chrono::seconds(60));
+bool wait_for_upload(realm::Realm& realm, std::chrono::seconds timeout = std::chrono::seconds(60));
+bool wait_for_download(realm::Realm& realm, std::chrono::seconds timeout = std::chrono::seconds(60));
 
 void set_app_config_defaults(realm::app::App::Config& app_config,
                              const std::shared_ptr<realm::app::GenericNetworkTransport>& transport);

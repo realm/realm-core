@@ -19,6 +19,7 @@
 #include <catch2/catch_all.hpp>
 
 #include "util/test_file.hpp"
+#include "util/test_utils.hpp"
 #include "util/event_loop.hpp"
 #include "util/index_helpers.hpp"
 
@@ -41,7 +42,7 @@
 using namespace realm;
 using util::any_cast;
 
-TEST_CASE("list") {
+TEST_CASE("list", "[list]") {
     InMemoryTestFile config;
     config.cache = false;
     config.automatic_change_notifications = false;
@@ -922,14 +923,14 @@ TEST_CASE("list") {
         results = list.sort({{{col_target_value}}, {false}});
         for (size_t i = 0; i < 10; ++i)
             REQUIRE(results.get(i).get_key() == target_keys[9 - i]);
-        REQUIRE_THROWS_WITH(results.get(10), "Requested index 10 greater than max 9");
+        REQUIRE_EXCEPTION(results.get(10), OutOfBounds, "Requested index 10 calling get() on Results when max is 9");
         REQUIRE(results.get_mode() == Results::Mode::TableView);
 
         // Zero sort columns should leave it in Collection mode
         results = list.sort(SortDescriptor());
         for (size_t i = 0; i < 10; ++i)
             REQUIRE(results.get(i).get_key() == target_keys[i]);
-        REQUIRE_THROWS_WITH(results.get(10), "Requested index 10 greater than max 9");
+        REQUIRE_EXCEPTION(results.get(10), OutOfBounds, "Requested index 10 calling get() on Results when max is 9");
         REQUIRE(results.get_mode() == Results::Mode::Collection);
     }
 
@@ -957,7 +958,8 @@ TEST_CASE("list") {
         SECTION("get()") {
             for (size_t i = 0; i < 5; ++i)
                 REQUIRE(results.get(i).get_key() == target_keys[i * 2]);
-            REQUIRE_THROWS_WITH(results.get(5), "Requested index 5 greater than max 4");
+            REQUIRE_EXCEPTION(results.get(5), OutOfBounds,
+                              "Requested index 5 calling get() on Results when max is 4");
             REQUIRE(results.get_mode() == Results::Mode::TableView);
         }
 
@@ -980,7 +982,8 @@ TEST_CASE("list") {
             results = list.as_results().distinct(DistinctDescriptor());
             for (size_t i = 0; i < 10; ++i)
                 REQUIRE(results.get(i).get_key() == target_keys[i]);
-            REQUIRE_THROWS_WITH(results.get(10), "Requested index 10 greater than max 9");
+            REQUIRE_EXCEPTION(results.get(10), OutOfBounds,
+                              "Requested index 10 calling get() on Results when max is 9");
             REQUIRE(results.get_mode() == Results::Mode::Collection);
         }
     }
@@ -1104,7 +1107,8 @@ TEST_CASE("list") {
         }
 
         SECTION("throws for rows from the wrong table") {
-            REQUIRE_THROWS(list.add(obj));
+            REQUIRE_EXCEPTION(list.add(obj), ObjectTypeMismatch,
+                              "Object of type (origin) does not match List type (target)");
         }
         r->cancel_transaction();
     }
@@ -1120,11 +1124,13 @@ TEST_CASE("list") {
         }
 
         SECTION("throws for rows from the wrong table") {
-            REQUIRE_THROWS(list.insert(0, obj));
+            REQUIRE_EXCEPTION(list.insert(0, obj), ObjectTypeMismatch,
+                              "Object of type (origin) does not match List type (target)");
         }
 
         SECTION("throws for out of bounds insertions") {
-            REQUIRE_THROWS(list.insert(11, target_keys[5]));
+            REQUIRE_EXCEPTION(list.insert(11, target_keys[5]), OutOfBounds,
+                              "Requested index 11 calling insert() on list 'origin.array' when max is 10");
             REQUIRE_NOTHROW(list.insert(10, target_keys[5]));
         }
         r->cancel_transaction();
@@ -1141,11 +1147,13 @@ TEST_CASE("list") {
         }
 
         SECTION("throws for rows from the wrong table") {
-            REQUIRE_THROWS(list.set(0, obj));
+            REQUIRE_EXCEPTION(list.set(0, obj), ObjectTypeMismatch,
+                              "Object of type (origin) does not match List type (target)");
         }
 
         SECTION("throws for out of bounds sets") {
-            REQUIRE_THROWS(list.set(10, target_keys[5]));
+            REQUIRE_EXCEPTION(list.set(10, target_keys[5]), OutOfBounds,
+                              "Requested index 10 calling set() on list 'origin.array' when max is 9");
         }
         r->cancel_transaction();
     }
@@ -1176,8 +1184,10 @@ TEST_CASE("list") {
         }
 
         SECTION("throws for row in wrong table") {
-            REQUIRE_THROWS(list.find(obj));
-            REQUIRE_THROWS(list.as_results().index_of(obj));
+            REQUIRE_EXCEPTION(list.find(obj), ObjectTypeMismatch,
+                              "Object of type (origin) does not match List type (target)");
+            REQUIRE_EXCEPTION(list.as_results().index_of(obj), ObjectTypeMismatch,
+                              "Object of type 'origin' does not match Results type 'target'");
         }
     }
 
@@ -1226,9 +1236,11 @@ TEST_CASE("list") {
         }
 
         SECTION("throws for object in wrong table") {
-            REQUIRE_THROWS(list.add(ctx, std::any(origin->get_object(0))));
+            REQUIRE_EXCEPTION(list.add(ctx, std::any(origin->get_object(0))), ObjectTypeMismatch,
+                              "Object of type (origin) does not match List type (target)");
             realm::Object object(r, *r->schema().find("origin"), origin->get_object(0));
-            REQUIRE_THROWS(list.add(ctx, std::any(object)));
+            REQUIRE_EXCEPTION(list.add(ctx, std::any(object)), ObjectTypeMismatch,
+                              "Object of type (origin) does not match List type (target)");
         }
 
         r->cancel_transaction();
@@ -1253,7 +1265,8 @@ TEST_CASE("list") {
         }
 
         SECTION("throws for object in wrong table") {
-            REQUIRE_THROWS(list.find(ctx, std::any(obj)));
+            REQUIRE_EXCEPTION(list.find(ctx, std::any(obj)), ObjectTypeMismatch,
+                              "Object of type (origin) does not match List type (target)");
         }
     }
 
@@ -1264,11 +1277,11 @@ TEST_CASE("list") {
         Object obj;
         REQUIRE_NOTHROW(obj = util::any_cast<Object&&>(list.get(ctx, 1)));
         REQUIRE(obj.is_valid());
-        REQUIRE(obj.obj().get_key() == target_keys[1]);
+        REQUIRE(obj.get_obj().get_key() == target_keys[1]);
     }
 }
 
-TEST_CASE("embedded List") {
+TEST_CASE("embedded List", "[list]") {
     InMemoryTestFile config;
     config.automatic_change_notifications = false;
     auto r = Realm::get_shared_realm(config);
@@ -1549,9 +1562,12 @@ TEST_CASE("embedded List") {
     SECTION("add(), insert(), and set() to existing object is not allowed") {
         List list(r, *lv);
         r->begin_transaction();
-        REQUIRE_THROWS_AS(list.add(target->get_object(0)), List::InvalidEmbeddedOperationException);
-        REQUIRE_THROWS_AS(list.insert(0, target->get_object(0)), List::InvalidEmbeddedOperationException);
-        REQUIRE_THROWS_AS(list.set(0, target->get_object(0)), List::InvalidEmbeddedOperationException);
+        REQUIRE_EXCEPTION(list.add(target->get_object(0)), IllegalOperation,
+                          "Cannot insert an already managed object into list of embedded objects 'origin.array'");
+        REQUIRE_EXCEPTION(list.insert(0, target->get_object(0)), IllegalOperation,
+                          "Cannot insert an already managed object into list of embedded objects 'origin.array'");
+        REQUIRE_EXCEPTION(list.set(0, target->get_object(0)), IllegalOperation,
+                          "Cannot insert an already managed object into list of embedded objects 'origin.array'");
         r->cancel_transaction();
     }
 
@@ -1576,13 +1592,16 @@ TEST_CASE("embedded List") {
             r->begin_transaction();
             list.remove(1);
             REQUIRE(list.find(obj1) == npos);
-            REQUIRE_THROWS_AS(list.as_results().index_of(obj1), Results::DetatchedAccessorException);
+            REQUIRE_EXCEPTION(list.as_results().index_of(obj1), StaleAccessor,
+                              "Attempting to access an invalid object");
             r->cancel_transaction();
         }
 
         SECTION("throws for row in wrong table") {
-            REQUIRE_THROWS(list.find(obj));
-            REQUIRE_THROWS(list.as_results().index_of(obj));
+            REQUIRE_EXCEPTION(list.find(obj), ObjectTypeMismatch,
+                              "Object of type (origin) does not match List type (target)");
+            REQUIRE_EXCEPTION(list.as_results().index_of(obj), ObjectTypeMismatch,
+                              "Object of type 'origin' does not match Results type 'target'");
         }
     }
 
@@ -1612,10 +1631,10 @@ TEST_CASE("embedded List") {
 
         auto initial_target_size = target->size();
         SECTION("rejects boxed Obj and Object") {
-            REQUIRE_THROWS_AS(list.add(ctx, std::any(target->get_object(5))),
-                              List::InvalidEmbeddedOperationException);
-            REQUIRE_THROWS_AS(list.add(ctx, std::any(Object(r, target->get_object(5)))),
-                              List::InvalidEmbeddedOperationException);
+            REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(list.add(ctx, std::any(target->get_object(5))),
+                                                ErrorCodes::IllegalOperation);
+            REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(list.add(ctx, std::any(Object(r, target->get_object(5)))),
+                                                ErrorCodes::IllegalOperation);
         }
 
         SECTION("creates new object for dictionary") {
@@ -1635,10 +1654,10 @@ TEST_CASE("embedded List") {
 
         auto initial_target_size = target->size();
         SECTION("rejects boxed Obj and Object") {
-            REQUIRE_THROWS_AS(list.set(ctx, 0, std::any(target->get_object(5))),
-                              List::InvalidEmbeddedOperationException);
-            REQUIRE_THROWS_AS(list.set(ctx, 0, std::any(Object(r, target->get_object(5)))),
-                              List::InvalidEmbeddedOperationException);
+            REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(list.set(ctx, 0, std::any(target->get_object(5))),
+                                                ErrorCodes::IllegalOperation);
+            REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(list.set(ctx, 0, std::any(Object(r, target->get_object(5)))),
+                                                ErrorCodes::IllegalOperation);
         }
 
         SECTION("creates new object for update mode All") {
@@ -1683,7 +1702,8 @@ TEST_CASE("embedded List") {
         }
 
         SECTION("throws for object in wrong table") {
-            REQUIRE_THROWS(list.find(ctx, std::any(obj)));
+            REQUIRE_EXCEPTION(list.find(ctx, std::any(obj)), ObjectTypeMismatch,
+                              "Object of type (origin) does not match List type (target)");
         }
     }
 
@@ -1694,12 +1714,12 @@ TEST_CASE("embedded List") {
         Object obj;
         REQUIRE_NOTHROW(obj = util::any_cast<Object&&>(list.get(ctx, 1)));
         REQUIRE(obj.is_valid());
-        REQUIRE(obj.obj().get<int64_t>(col_value) == 1);
+        REQUIRE(obj.get_obj().get<int64_t>(col_value) == 1);
     }
 }
 
 
-TEST_CASE("list of embedded objects") {
+TEST_CASE("list of embedded objects", "[list]") {
     Schema schema{
         {"parent",
          {
@@ -1797,29 +1817,29 @@ TEST_CASE("list of embedded objects") {
     }
 
     SECTION("invalid indices") {
+        realm->begin_transaction();
         // Insertions
-        REQUIRE_THROWS(list.insert_embedded(-1)); // Negative
-        REQUIRE_THROWS(list.insert_embedded(1));  // At index > size()
+        REQUIRE_EXCEPTION(
+            list.insert_embedded(-1), OutOfBounds, // Negative
+            util::format("Requested index %1 calling insert() on list 'parent.array' when max is 0", size_t(-1)));
+        REQUIRE_EXCEPTION(list.insert_embedded(1), OutOfBounds, // At index > size()
+                          "Requested index 1 calling insert() on list 'parent.array' when max is 0");
 
         // Sets
-        REQUIRE_THROWS(list.set_embedded(-1)); // Negative
-        REQUIRE_THROWS(list.set_embedded(0));  // At index == size()
-        REQUIRE_THROWS(list.set_embedded(1));  // At index > size()
+        REQUIRE_EXCEPTION(
+            list.set_embedded(-1), OutOfBounds, // Negative
+            util::format("Requested index %1 calling set() on list 'parent.array' when empty", size_t(-1)));
+        REQUIRE_EXCEPTION(list.set_embedded(0), OutOfBounds, // At index == size()
+                          "Requested index 0 calling set() on list 'parent.array' when empty");
+        REQUIRE_EXCEPTION(list.set_embedded(1), OutOfBounds, // At index > size()
+                          "Requested index 1 calling set() on list 'parent.array' when empty");
+        realm->cancel_transaction();
     }
 }
 
 #if REALM_ENABLE_SYNC
-namespace realm {
-class TestHelper {
-public:
-    static std::shared_ptr<Transaction> transaction(Realm& shared_realm)
-    {
-        return Realm::Internal::get_transaction_ref(shared_realm);
-    }
-};
-} // namespace realm
 
-TEST_CASE("list with unresolved links") {
+TEST_CASE("list with unresolved links", "[list]") {
     TestSyncManager init_sync_manager({}, {false});
     auto& server = init_sync_manager.sync_server();
 

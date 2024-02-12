@@ -20,58 +20,39 @@
 #include <realm/sync/client.hpp>
 #include <realm/sync/protocol.hpp>
 #include <realm/sync/network/network.hpp>
-#include <realm/object-store/util/bson/bson.hpp>
+#include <realm/util/bson/bson.hpp>
 
 #include <ostream>
 
 namespace realm {
+namespace {
 
+constexpr static std::string_view s_middle_part(" Logs: ");
+std::string format_sync_error_message(const Status& status, std::optional<std::string_view> log_url)
+{
+    if (!log_url) {
+        return status.reason();
+    }
+
+    return util::format("%1%2%3", status.reason(), s_middle_part, *log_url);
+}
+
+} // namespace
 // sync defines its own copy of port_type to avoid depending on network.hpp, but they should be the same.
 static_assert(std::is_same_v<sync::port_type, sync::network::Endpoint::port_type>);
 
 using ProtocolError = realm::sync::ProtocolError;
 
-SyncError::SyncError(std::error_code error_code, std::string msg, bool is_fatal,
-                     util::Optional<std::string> serverLog,
+SyncError::SyncError(Status orig_status, bool is_fatal, std::optional<std::string_view> server_log,
                      std::vector<sync::CompensatingWriteErrorInfo> compensating_writes)
-    : error_code(std::move(error_code))
+    : status(orig_status.code(), format_sync_error_message(orig_status, server_log))
     , is_fatal(is_fatal)
-    , message(std::move(msg))
+    , simple_message(std::string_view(status.reason()).substr(0, orig_status.reason().size()))
     , compensating_writes_info(std::move(compensating_writes))
 {
-    if (serverLog) {
-        size_t msg_length = message.size();
-        static constexpr std::string_view middle(" Logs: ");
-        message = util::format("%1%2%3", message, middle, *serverLog);
-        simple_message = std::string_view(message.data(), msg_length);
-        logURL = std::string_view(message.data() + msg_length + middle.size(), serverLog->size());
+    if (server_log) {
+        logURL = std::string_view(status.reason()).substr(simple_message.size() + s_middle_part.size());
     }
-    else {
-        simple_message = message;
-    }
-}
-
-bool SyncError::is_client_error() const
-{
-    return error_code.category() == realm::sync::client_error_category();
-}
-
-/// The error is a protocol error, which may either be connection-level or session-level.
-bool SyncError::is_connection_level_protocol_error() const
-{
-    if (error_code.category() != realm::sync::protocol_error_category()) {
-        return false;
-    }
-    return !realm::sync::is_session_level_error(static_cast<ProtocolError>(error_code.value()));
-}
-
-/// The error is a connection-level protocol error.
-bool SyncError::is_session_level_protocol_error() const
-{
-    if (error_code.category() != realm::sync::protocol_error_category()) {
-        return false;
-    }
-    return realm::sync::is_session_level_error(static_cast<ProtocolError>(error_code.value()));
 }
 
 /// The error indicates a client reset situation.
@@ -81,7 +62,7 @@ bool SyncError::is_client_reset_requested() const
         server_requests_action == sync::ProtocolErrorInfo::Action::ClientResetNoRecovery) {
         return true;
     }
-    if (error_code == make_error_code(sync::Client::Error::auto_client_reset_failure)) {
+    if (status == ErrorCodes::AutoClientResetFailed) {
         return true;
     }
     return false;

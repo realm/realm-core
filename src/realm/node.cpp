@@ -19,6 +19,7 @@
 #include <realm/node.hpp>
 #include <realm/utilities.hpp>
 #include <realm/mixed.hpp>
+#include <realm/array_encode.hpp>
 
 #if REALM_ENABLE_MEMDEBUG
 #include <cstring>
@@ -32,11 +33,31 @@ MemRef Node::create_node(size_t size, Allocator& alloc, bool context_flag, Type 
     size_t byte_size = std::max(byte_size_0, size_t(initial_capacity));
 
     MemRef mem = alloc.alloc(byte_size); // Throws
-    char* header = mem.get_addr();
+    auto header = mem.get_addr();
+    Encoding encoding = Encoding::WTypBits;
+    if (width_type == wtype_Bits)
+        encoding = Encoding::WTypBits;
+    else if (width_type == wtype_Multiply)
+        encoding = Encoding::WTypMult;
+    else if (width_type == wtype_Ignore)
+        encoding = Encoding::WTypIgn;
+    else {
+        REALM_ASSERT(false && "Wrong width type for encoding");
+    }
+    uint8_t flags = 0;
+    if (type == type_InnerBptreeNode)
+        flags |= (uint8_t)Flags::InnerBPTree | (uint8_t)Flags::HasRefs;
+    if (type != type_Normal)
+        flags |= (uint8_t)Flags::HasRefs;
+    if (context_flag)
+        flags |= (uint8_t)Flags::Context;
+    // width must be passed to init_header in bits, but for wtype_Multiply and wtype_Ignore
+    // it is provided by the caller of this function in bytes, so convert to bits
+    if (width_type != wtype_Bits)
+        width = width * 8;
 
-    init_header(header, type == type_InnerBptreeNode, type != type_Normal, context_flag, width_type, width, size,
-                byte_size);
-
+    init_header(header, 'A', encoding, flags, width, size);
+    set_capacity_in_header(byte_size, mem.get_addr());
     return mem;
 }
 
@@ -68,18 +89,26 @@ size_t Node::calc_item_count(size_t bytes, size_t width) const noexcept
 
 void Node::alloc(size_t init_size, size_t new_width)
 {
+    // This method is never taking in consideration the possibility of extending a B type array.
+    // This is fine as long as we have decompressed the array from B to A type before!!
+
     REALM_ASSERT(is_attached());
+    char* header = get_header_from_data(m_data);
+    // only type A arrays should be allowed during copy on write
+    REALM_ASSERT(get_kind(header) == 'A');
 
     size_t needed_bytes = calc_byte_len(init_size, new_width);
     // this method is not public and callers must (and currently do) ensure that
     // needed_bytes are never larger than max_array_payload.
     REALM_ASSERT_RELEASE(init_size <= max_array_size);
 
-    if (is_read_only())
+    if (is_read_only()) {
         do_copy_on_write(needed_bytes);
+        // header will have changed:
+        header = get_header_from_data(m_data);
+    }
 
     REALM_ASSERT(!m_alloc.is_read_only(m_ref));
-    char* header = get_header_from_data(m_data);
     size_t orig_capacity_bytes = get_capacity_from_header(header);
     size_t orig_width = get_width_from_header(header);
 
@@ -105,6 +134,8 @@ void Node::alloc(size_t init_size, size_t new_width)
         MemRef mem_ref = m_alloc.realloc_(m_ref, header, orig_capacity_bytes, new_capacity_bytes); // Throws
 
         header = mem_ref.get_addr();
+        // here the header is not going to be init.
+        // set_kind((uint64_t*)header, 'A');
         set_capacity_in_header(new_capacity_bytes, header);
 
         // Update this accessor and its ancestors
@@ -115,7 +146,8 @@ void Node::alloc(size_t init_size, size_t new_width)
         update_parent(); // Throws
     }
 
-    // Update header
+    // this is likely going to fail if header is not A
+    //  Update header
     if (new_width != orig_width) {
         set_width_in_header(int(new_width), header);
     }
@@ -123,9 +155,20 @@ void Node::alloc(size_t init_size, size_t new_width)
     m_size = init_size;
 }
 
+void Node::destroy() noexcept
+{
+    if (!is_attached())
+        return;
+    char* header = get_header_from_data(m_data);
+    m_alloc.free_(m_ref, header);
+    m_data = nullptr;
+}
+
 void Node::do_copy_on_write(size_t minimum_size)
 {
     const char* header = get_header_from_data(m_data);
+    // only type A arrays should be allowed during copy on write
+    REALM_ASSERT(get_kind(header) == 'A');
 
     // Calculate size in bytes
     size_t array_size = calc_byte_size(get_wtype_from_header(header), m_size, get_width_from_header(header));
@@ -134,8 +177,9 @@ void Node::do_copy_on_write(size_t minimum_size)
     // Plus a bit of matchcount room for expansion
     new_size += 64;
 
-    // Create new copy of array
+    // Create new copy of array.
     MemRef mref = m_alloc.alloc(new_size); // Throws
+
     const char* old_begin = header;
     const char* old_end = header + array_size;
     char* new_begin = mref.get_addr();

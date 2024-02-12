@@ -1,4 +1,5 @@
 #include "realm/db.hpp"
+#include "realm/transaction.hpp"
 #include "realm/sync/history.hpp"
 #include "realm/sync/instruction_applier.hpp"
 #include "realm/sync/impl/clamped_hex_dump.hpp"
@@ -41,7 +42,7 @@ struct DownloadMessage {
     int64_t query_version;
 
     Buffer<char> uncompressed_body_buffer;
-    std::vector<realm::sync::Transformer::RemoteChangeset> changesets;
+    std::vector<realm::sync::RemoteChangeset> changesets;
 
     static DownloadMessage parse(HeaderLineParser& msg, Logger& logger, bool is_flx_sync);
 };
@@ -95,9 +96,16 @@ DownloadMessage DownloadMessage::parse(HeaderLineParser& msg, Logger& logger, bo
     ret.progress.latest_server_version.salt = msg.read_next<sync::salt_type>();
     ret.progress.upload.client_version = msg.read_next<sync::version_type>();
     ret.progress.upload.last_integrated_server_version = msg.read_next<sync::version_type>();
-    ret.query_version = is_flx_sync ? msg.read_next<int64_t>() : 0;
-    auto last_in_batch = is_flx_sync ? msg.read_next<bool>() : true;
-    ret.batch_state = last_in_batch ? sync::DownloadBatchState::LastInBatch : sync::DownloadBatchState::MoreToCome;
+    if (is_flx_sync) {
+        ret.query_version = msg.read_next<int64_t>();
+        auto last_in_batch = msg.read_next<bool>();
+        ret.batch_state =
+            last_in_batch ? sync::DownloadBatchState::LastInBatch : sync::DownloadBatchState::MoreToCome;
+    }
+    else {
+        ret.query_version = 0;
+        ret.batch_state = sync::DownloadBatchState::SteadyState;
+    }
     ret.downloadable_bytes = msg.read_next<int64_t>();
     auto is_body_compressed = msg.read_next<bool>();
     auto uncompressed_body_size = msg.read_next<size_t>();
@@ -127,7 +135,7 @@ DownloadMessage DownloadMessage::parse(HeaderLineParser& msg, Logger& logger, bo
 
     HeaderLineParser body(body_str);
     while (!body.at_end()) {
-        realm::sync::Transformer::RemoteChangeset cur_changeset;
+        realm::sync::RemoteChangeset cur_changeset;
         cur_changeset.remote_version = body.read_next<sync::version_type>();
         cur_changeset.last_integrated_local_version = body.read_next<sync::version_type>();
         cur_changeset.origin_timestamp = body.read_next<sync::timestamp_type>();
@@ -137,7 +145,7 @@ DownloadMessage DownloadMessage::parse(HeaderLineParser& msg, Logger& logger, bo
 
         realm::sync::Changeset parsed_changeset;
         auto changeset_data = body.read_sized_data<BinaryData>(changeset_size);
-        auto changeset_stream = realm::util::SimpleNoCopyInputStream(changeset_data);
+        auto changeset_stream = realm::util::SimpleInputStream(changeset_data);
         realm::sync::parse_changeset(changeset_stream, parsed_changeset);
         logger.trace("found download changeset: serverVersion: %1, clientVersion: %2, origin: %3 %4",
                      cur_changeset.remote_version, cur_changeset.last_integrated_local_version,
@@ -192,7 +200,7 @@ UploadMessage UploadMessage::parse(HeaderLineParser& msg, Logger& logger)
         logger.trace("found upload changeset: %1 %2 %3 %4 %5", cur_changeset.last_integrated_remote_version,
                      cur_changeset.version, cur_changeset.origin_timestamp, cur_changeset.origin_file_ident,
                      changeset_size);
-        realm::util::SimpleNoCopyInputStream changeset_stream(changeset_buffer);
+        realm::util::SimpleInputStream changeset_stream(changeset_buffer);
         try {
             realm::sync::parse_changeset(changeset_stream, cur_changeset);
         }
@@ -286,10 +294,11 @@ int main(int argc, const char** argv)
         mpark::visit(realm::util::overload{
                          [&](const DownloadMessage& download_message) {
                              realm::sync::VersionInfo version_info;
+                             auto transact = bool(flx_sync_arg) ? local_db->start_write() : local_db->start_read();
                              history.integrate_server_changesets(download_message.progress,
                                                                  &download_message.downloadable_bytes,
                                                                  download_message.changesets, version_info,
-                                                                 download_message.batch_state, *logger, nullptr);
+                                                                 download_message.batch_state, *logger, transact);
                          },
                          [&](const UploadMessage& upload_message) {
                              for (const auto& changeset : upload_message.changesets) {

@@ -315,10 +315,10 @@ void Spec::insert_column(size_t column_ndx, ColKey col_key, ColumnType type, Str
     REALM_ASSERT(column_ndx <= m_types.size());
 
     if (REALM_UNLIKELY(name.size() > Table::max_column_name_length)) {
-        throw LogicError(LogicError::column_name_too_long);
+        throw InvalidArgument(ErrorCodes::InvalidName, util::format("Name too long: %1", name));
     }
     if (get_column_index(name) != npos) {
-        throw LogicError(LogicError::column_name_in_use);
+        throw InvalidArgument(ErrorCodes::InvalidName, util::format("Property name in use: %1", name));
     }
 
     if (type != col_type_BackLink) {
@@ -327,7 +327,6 @@ void Spec::insert_column(size_t column_ndx, ColKey col_key, ColumnType type, Str
     }
 
     m_types.insert(column_ndx, int(type)); // Throws
-    // FIXME: So far, attributes are never reported to the replication system
     m_attr.insert(column_ndx, attr); // Throws
     m_keys.insert(column_ndx, col_key.value);
 
@@ -517,8 +516,15 @@ bool Spec::operator==(const Spec& spec) const noexcept
 
 ColKey Spec::get_key(size_t column_ndx) const
 {
-    auto key = ColKey(m_keys.get(column_ndx));
-    REALM_ASSERT(key.get_type().is_valid());
+    auto val = m_keys.get(column_ndx);
+
+    auto key = ColKey(val);
+    // when type is not valid ... val == -128
+    auto type = key.get_type();
+    // type is 0x20 ObjectId | TypeLink ... in the test we are setting a backlink
+    if (!type.is_valid())
+        REALM_ASSERT(m_keys.is_encoded());
+    REALM_ASSERT(type.is_valid());
     return key;
 }
 

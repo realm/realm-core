@@ -61,7 +61,7 @@ inline void check_value_assignable(const SharedRealm& realm, const Table& table,
             return;
         }
         auto& schema = schema_for_table(realm, table.get_key());
-        throw NotNullableException{schema.name, table.get_column_name(col_key)};
+        throw NotNullable{schema.name, table.get_column_name(col_key)};
     }
 
     auto col_type = col_key.get_type();
@@ -117,23 +117,6 @@ inline void set_out_param(T* out_n, T n)
         *out_n = n;
     }
 }
-
-struct FreeUserdata {
-    realm_free_userdata_func_t m_func;
-    FreeUserdata(realm_free_userdata_func_t func = nullptr)
-        : m_func(func)
-    {
-    }
-    void operator()(void* ptr)
-    {
-        if (m_func) {
-            (m_func)(ptr);
-        }
-    }
-};
-
-using UserdataPtr = std::unique_ptr<void, FreeUserdata>;
-using SharedUserdata = std::shared_ptr<void>;
 
 /**
  * Convenience class for managing callbacks.

@@ -45,6 +45,9 @@ const char* const c_versionColumnName = "version";
 
 const char c_object_table_prefix[] = "class_";
 
+const char* const c_development_mode_msg =
+    "If your app is running in development mode, you can delete the realm and restart the app to update your schema.";
+
 void create_metadata_tables(Group& group)
 {
     // The 'metadata' table is simply ignored by Sync
@@ -677,8 +680,9 @@ void ObjectStore::apply_additive_changes(Group& group, std::vector<SchemaChange>
         }
         void operator()(AddIndex op)
         {
-            if (update_indexes)
-                table(op.object).add_search_index(op.property->column_key);
+            if (update_indexes) {
+                add_search_index(table(op.object), *op.property, op.type);
+            }
         }
         void operator()(RemoveIndex op)
         {
@@ -790,8 +794,8 @@ static void apply_post_migration_changes(Group& group, std::vector<SchemaChange>
         {
             if (!initial_schema.empty() &&
                 !initial_schema.find(op.object->name)->property_for_name(op.property->name))
-                throw std::logic_error(
-                    util::format("Renamed property '%1.%2' does not exist.", op.object->name, op.property->name));
+                throw LogicError(ErrorCodes::InvalidProperty, util::format("Renamed property '%1.%2' does not exist.",
+                                                                           op.object->name, op.property->name));
             auto table = table_for_object_schema(group, *op.object);
             table->remove_column(op.property->column_key);
         }
@@ -846,19 +850,20 @@ static void apply_post_migration_changes(Group& group, std::vector<SchemaChange>
 void ObjectStore::apply_schema_changes(Transaction& group, uint64_t schema_version, Schema& target_schema,
                                        uint64_t target_schema_version, SchemaMode mode,
                                        std::vector<SchemaChange> const& changes, bool handle_automatically_backlinks,
-                                       std::function<void()> migration_function)
+                                       std::function<void()> migration_function,
+                                       bool set_schema_version_on_version_decrease)
 {
     create_metadata_tables(group);
 
     if (mode == SchemaMode::AdditiveDiscovered || mode == SchemaMode::AdditiveExplicit) {
-        bool target_schema_is_newer =
-            (schema_version < target_schema_version || schema_version == ObjectStore::NotVersioned);
+        bool set_schema = (schema_version < target_schema_version || schema_version == ObjectStore::NotVersioned ||
+                           set_schema_version_on_version_decrease);
 
         // With sync v2.x, indexes are no longer synced, so there's no reason to avoid creating them.
         bool update_indexes = true;
         apply_additive_changes(group, changes, update_indexes);
 
-        if (target_schema_is_newer)
+        if (set_schema)
             set_schema_version(group, target_schema_version);
 
         set_schema_keys(group, target_schema);
@@ -875,7 +880,6 @@ void ObjectStore::apply_schema_changes(Transaction& group, uint64_t schema_versi
     }
 
     if (mode == SchemaMode::Manual) {
-        set_schema_keys(group, target_schema);
         if (migration_function) {
             migration_function();
         }
@@ -969,18 +973,22 @@ void ObjectStore::rename_property(Group& group, Schema& target_schema, StringDat
 {
     TableRef table = table_for_object_type(group, object_type);
     if (!table) {
-        throw std::logic_error(
+        throw LogicError(
+            ErrorCodes::NoSuchTable,
             util::format("Cannot rename properties for type '%1' because it does not exist.", object_type));
     }
 
     auto target_object_schema = target_schema.find(object_type);
     if (target_object_schema == target_schema.end()) {
-        throw std::logic_error(util::format(
-            "Cannot rename properties for type '%1' because it has been removed from the Realm.", object_type));
+        throw LogicError(
+            ErrorCodes::NoSuchTable,
+            util::format("Cannot rename properties for type '%1' because it has been removed from the Realm.",
+                         object_type));
     }
 
     if (target_object_schema->property_for_name(old_name)) {
-        throw std::logic_error(
+        throw LogicError(
+            ErrorCodes::IllegalOperation,
             util::format("Cannot rename property '%1.%2' to '%3' because the source property still exists.",
                          object_type, old_name, new_name));
     }
@@ -988,7 +996,8 @@ void ObjectStore::rename_property(Group& group, Schema& target_schema, StringDat
     ObjectSchema table_object_schema(group, object_type, table->get_key());
     Property* old_property = table_object_schema.property_for_name(old_name);
     if (!old_property) {
-        throw std::logic_error(
+        throw LogicError(
+            ErrorCodes::InvalidProperty,
             util::format("Cannot rename property '%1.%2' because it does not exist.", object_type, old_name));
     }
 
@@ -1003,13 +1012,15 @@ void ObjectStore::rename_property(Group& group, Schema& target_schema, StringDat
     }
 
     if (old_property->type != new_property->type || old_property->object_type != new_property->object_type) {
-        throw std::logic_error(
+        throw LogicError(
+            ErrorCodes::IllegalOperation,
             util::format("Cannot rename property '%1.%2' to '%3' because it would change from type '%4' to '%5'.",
                          object_type, old_name, new_name, old_property->type_string(), new_property->type_string()));
     }
 
     if (is_nullable(old_property->type) && !is_nullable(new_property->type)) {
-        throw std::logic_error(
+        throw LogicError(
+            ErrorCodes::IllegalOperation,
             util::format("Cannot rename property '%1.%2' to '%3' because it would change from optional to required.",
                          object_type, old_name, new_name));
     }
@@ -1031,9 +1042,10 @@ void ObjectStore::rename_property(Group& group, Schema& target_schema, StringDat
 
 InvalidSchemaVersionException::InvalidSchemaVersionException(uint64_t old_version, uint64_t new_version,
                                                              bool must_exactly_equal)
-    : logic_error(util::format(must_exactly_equal ? "Provided schema version %1 does not equal last set version %2."
-                                                  : "Provided schema version %1 is less than last set version %2.",
-                               new_version, old_version))
+    : LogicError(ErrorCodes::InvalidSchemaVersion,
+                 util::format(must_exactly_equal ? "Provided schema version %1 does not equal last set version %2."
+                                                 : "Provided schema version %1 is less than last set version %2.",
+                              new_version, old_version))
     , m_old_version(old_version)
     , m_new_version(new_version)
 {
@@ -1043,12 +1055,18 @@ static void append_errors(std::string& message, std::vector<ObjectSchemaValidati
 {
     for (auto const& error : errors) {
         message += "\n- ";
-        message += error.what();
+        message += error.m_message;
     }
 }
 
+static void append_line(std::string& message, std::string_view line)
+{
+    message += "\n";
+    message += line;
+}
+
 SchemaValidationException::SchemaValidationException(std::vector<ObjectSchemaValidationException> const& errors)
-    : std::logic_error([&] {
+    : LogicError(ErrorCodes::SchemaValidationFailed, [&] {
         std::string message = "Schema validation failed due to the following errors:";
         append_errors(message, errors);
         return message;
@@ -1057,7 +1075,7 @@ SchemaValidationException::SchemaValidationException(std::vector<ObjectSchemaVal
 }
 
 SchemaMismatchException::SchemaMismatchException(std::vector<ObjectSchemaValidationException> const& errors)
-    : std::logic_error([&] {
+    : LogicError(ErrorCodes::SchemaMismatch, [&] {
         std::string message = "Migration is required due to the following errors:";
         append_errors(message, errors);
         return message;
@@ -1067,7 +1085,7 @@ SchemaMismatchException::SchemaMismatchException(std::vector<ObjectSchemaValidat
 
 InvalidReadOnlySchemaChangeException::InvalidReadOnlySchemaChangeException(
     std::vector<ObjectSchemaValidationException> const& errors)
-    : std::logic_error([&] {
+    : LogicError(ErrorCodes::InvalidSchemaChange, [&] {
         std::string message = "The following changes cannot be made in read-only schema mode:";
         append_errors(message, errors);
         return message;
@@ -1077,9 +1095,10 @@ InvalidReadOnlySchemaChangeException::InvalidReadOnlySchemaChangeException(
 
 InvalidAdditiveSchemaChangeException::InvalidAdditiveSchemaChangeException(
     std::vector<ObjectSchemaValidationException> const& errors)
-    : std::logic_error([&] {
+    : LogicError(ErrorCodes::InvalidSchemaChange, [&] {
         std::string message = "The following changes cannot be made in additive-only schema mode:";
         append_errors(message, errors);
+        append_line(message, c_development_mode_msg);
         return message;
     }())
 {
@@ -1087,11 +1106,10 @@ InvalidAdditiveSchemaChangeException::InvalidAdditiveSchemaChangeException(
 
 InvalidExternalSchemaChangeException::InvalidExternalSchemaChangeException(
     std::vector<ObjectSchemaValidationException> const& errors)
-    : std::logic_error([&] {
-        std::string message = "Unsupported schema changes were made by another client or process. For a "
-                              "synchronized Realm, this may be due to the server reverting schema changes which "
-                              "the local user did not have permission to make.";
+    : LogicError(ErrorCodes::InvalidSchemaChange, [&] {
+        std::string message = "Unsupported schema changes were made by another client or process:";
         append_errors(message, errors);
+        append_line(message, c_development_mode_msg);
         return message;
     }())
 {

@@ -16,28 +16,28 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include <catch2/catch_all.hpp>
+#include <util/test_file.hpp>
+#include <util/test_utils.hpp>
 
-#include "util/test_file.hpp"
-#include "util/test_utils.hpp"
+#include <realm/group.hpp>
+#include <realm/table.hpp>
 
 #include <realm/object-store/object_schema.hpp>
 #include <realm/object-store/object_store.hpp>
 #include <realm/object-store/property.hpp>
 #include <realm/object-store/schema.hpp>
-
 #include <realm/object-store/impl/object_accessor_impl.hpp>
 
-#include <realm/group.hpp>
-#include <realm/table.hpp>
 #include <realm/util/scope_exit.hpp>
+
+#include <catch2/catch_all.hpp>
 
 #ifdef _WIN32
 #include <Windows.h>
 #endif
 
 #if REALM_ENABLE_AUTH_TESTS
-#include "sync/flx_sync_harness.hpp"
+#include <util/sync/flx_sync_harness.hpp>
 #endif // REALM_ENABLE_AUTH_TESTS
 
 using namespace realm;
@@ -45,6 +45,12 @@ using ObjectType = ObjectSchema::ObjectType;
 using util::any_cast;
 
 #define VERIFY_SCHEMA(r, m) verify_schema((r), __LINE__, m)
+
+#define REQUIRE_UPDATE_FAILS(r, schema, msg)                                                                         \
+    REQUIRE_EXCEPTION((r).update_schema(schema), SchemaMismatch, Catch::Matchers::ContainsSubstring(msg));
+
+#define INVALID_SCHEMA_CHANGE(r, schema, msg)                                                                        \
+    REQUIRE_EXCEPTION((r).update_schema(schema), InvalidSchemaChange, Catch::Matchers::ContainsSubstring(msg));
 
 #define REQUIRE_UPDATE_SUCCEEDS(r, s, version)                                                                       \
     do {                                                                                                             \
@@ -71,7 +77,7 @@ using util::any_cast;
 #define REQUIRE_MIGRATION_NEEDED(r, schema1, schema2, msg)                                                           \
     do {                                                                                                             \
         REQUIRE_UPDATE_SUCCEEDS(r, schema1, 0);                                                                      \
-        REQUIRE_THROWS_CONTAINING((r).update_schema(schema2), msg);                                                  \
+        REQUIRE_UPDATE_FAILS(r, schema2, msg);                                                                       \
         REQUIRE((r).schema() == schema1);                                                                            \
         REQUIRE_UPDATE_SUCCEEDS(r, schema2, 1);                                                                      \
     } while (0)
@@ -211,200 +217,7 @@ auto create_objects(Table& table, size_t count)
 }
 } // anonymous namespace
 
-TEST_CASE("migration: Additive mode returns OS schema - Automatic migration") {
-
-    SECTION("Check OS schema returned in additive mode") {
-        InMemoryTestFile config;
-        config.automatic_change_notifications = false;
-        config.schema_mode = SchemaMode::AdditiveExplicit;
-        auto realm = Realm::get_shared_realm(config);
-
-        auto update_schema = [](Realm& r, Schema& s, uint64_t version) {
-            REQUIRE_NOTHROW((r).update_schema(s, version));
-            VERIFY_SCHEMA(r, false);
-            auto schema = (r).schema();
-            for (const auto& other : s) {
-                REQUIRE(schema.find(other.name) != schema.end());
-            }
-        };
-
-        Schema schema1 = {};
-        Schema schema2 = add_table(schema1, {"A", {{"value", PropertyType::Int}}});
-        Schema schema3 = add_table(schema2, {"B", {{"value", PropertyType::Int}}});
-        Schema schema4 = add_table(schema3, {"C", {{"value", PropertyType::Int}}});
-        Schema schema5 = add_table(schema4, {"Z", {{"value", PropertyType::Int}}});
-        update_schema(*realm, schema1, 0);
-        REQUIRE(realm->schema().size() == 0);
-        update_schema(*realm, schema2, 0);
-        REQUIRE(realm->schema().size() == 1);
-        update_schema(*realm, schema3, 0);
-        REQUIRE(realm->schema().size() == 2);
-        update_schema(*realm, schema4, 0);
-        REQUIRE(realm->schema().size() == 3);
-        update_schema(*realm, schema5, 0);
-        REQUIRE(realm->schema().size() == 4);
-
-        // schema size is decremented.
-        // after deletion the schema size is decremented but the just deleted object can still be found.
-        // the object that was just deleted is still there, thus find should return a valid iterator
-        SECTION("delete in reverse order") {
-            auto new_schema = schema5;
-            Schema delete_schema = remove_table(new_schema, "Z");
-            update_schema(*realm, delete_schema, 0);
-            auto schema = realm->schema();
-            REQUIRE(schema.size() == 4);
-            REQUIRE(schema.find("Z") != schema.end());
-            delete_schema = remove_table(schema4, "C");
-            update_schema(*realm, delete_schema, 0);
-            schema = realm->schema();
-            REQUIRE(schema.size() == 4);
-            REQUIRE(schema.find("C") != schema.end());
-            REQUIRE(schema.find("Z") != schema.end());
-            delete_schema = remove_table(schema3, "B");
-            update_schema(*realm, delete_schema, 0);
-            schema = realm->schema();
-            REQUIRE(schema.size() == 4);
-            REQUIRE(schema.find("C") != schema.end());
-            REQUIRE(schema.find("Z") != schema.end());
-            REQUIRE(schema.find("B") != schema.end());
-            delete_schema = remove_table(schema2, "A");
-            update_schema(*realm, delete_schema, 0);
-            schema = realm->schema();
-            REQUIRE(schema.size() == 4);
-            REQUIRE(schema.find("C") != schema.end());
-            REQUIRE(schema.find("Z") != schema.end());
-            REQUIRE(schema.find("A") != schema.end());
-            REQUIRE(schema.find("B") != schema.end());
-        }
-        SECTION("delete 1 element") {
-            auto new_schema = schema5;
-            Schema delete_schema = remove_table(new_schema, "Z");
-            // A B C Z vs A B C ==> Z (other classes)
-            update_schema(*realm, delete_schema, 0);
-            auto schema = realm->schema();
-            REQUIRE(schema.size() == 4);
-            REQUIRE(schema.find("C") != schema.end());
-            REQUIRE(schema.find("Z") != schema.end());
-            REQUIRE(schema.find("A") != schema.end());
-            REQUIRE(schema.find("B") != schema.end());
-            delete_schema = remove_table(new_schema, "C");
-            schema = realm->schema();
-            // A B C vs A B Z => Z
-            update_schema(*realm, delete_schema, 0);
-            schema = realm->schema();
-            REQUIRE(schema.size() == 4);
-            REQUIRE(schema.find("C") != schema.end());
-            REQUIRE(schema.find("Z") != schema.end());
-            REQUIRE(schema.find("A") != schema.end());
-            REQUIRE(schema.find("B") != schema.end());
-            delete_schema = remove_table(new_schema, "B");
-            // A B Z vs A C Z => B
-            update_schema(*realm, delete_schema, 0);
-            schema = realm->schema();
-            REQUIRE(schema.find("C") != schema.end());
-            REQUIRE(schema.find("Z") != schema.end());
-            REQUIRE(schema.find("A") != schema.end());
-            REQUIRE(schema.find("B") != schema.end());
-            delete_schema = remove_table(new_schema, "A");
-            // A B Z vs B C Z => A
-            update_schema(*realm, delete_schema, 0);
-            schema = realm->schema();
-            REQUIRE(schema.size() == 4);
-            REQUIRE(schema.find("C") != schema.end());
-            REQUIRE(schema.find("Z") != schema.end());
-            REQUIRE(schema.find("A") != schema.end());
-            REQUIRE(schema.find("B") != schema.end());
-        }
-        SECTION("delete 2 elements") {
-            auto new_schema = schema5;
-            Schema delete_schema;
-            delete_schema = remove_table(new_schema, "Z");
-            delete_schema = remove_table(delete_schema, "A");
-            // A B C Z vs B C ==> A,Z (other classes)
-            update_schema(*realm, delete_schema, 0);
-            auto schema = realm->schema();
-            REQUIRE(schema.size() == 4);
-            REQUIRE(schema.find("C") != schema.end());
-            REQUIRE(schema.find("Z") != schema.end());
-            REQUIRE(schema.find("A") != schema.end());
-            REQUIRE(schema.find("B") != schema.end());
-        }
-        SECTION("delete 3 elements") {
-            auto new_schema = schema5;
-            Schema delete_schema;
-            delete_schema = remove_table(new_schema, "Z");
-            delete_schema = remove_table(delete_schema, "A");
-            delete_schema = remove_table(delete_schema, "C");
-            // A B C Z vs B  ==> A,C,Z (other classes)
-            update_schema(*realm, delete_schema, 0);
-            auto schema = realm->schema();
-            REQUIRE(schema.size() == 4);
-            REQUIRE(schema.find("C") != schema.end());
-            REQUIRE(schema.find("Z") != schema.end());
-            REQUIRE(schema.find("A") != schema.end());
-            REQUIRE(schema.find("B") != schema.end());
-        }
-        SECTION("delete all elements") {
-            auto new_schema = schema5;
-            Schema delete_schema;
-            delete_schema = remove_table(new_schema, "Z");
-            delete_schema = remove_table(delete_schema, "A");
-            delete_schema = remove_table(delete_schema, "C");
-            delete_schema = remove_table(delete_schema, "B");
-            // A B C Z vs None  ==> A,C,Z,B (other classes)
-            update_schema(*realm, delete_schema, 0);
-            auto schema = realm->schema();
-            REQUIRE(schema.size() == 4);
-            REQUIRE(schema.find("C") != schema.end());
-            REQUIRE(schema.find("Z") != schema.end());
-            REQUIRE(schema.find("A") != schema.end());
-            REQUIRE(schema.find("B") != schema.end());
-        }
-        SECTION("unsorted schema object names") {
-            InMemoryTestFile config;
-            config.automatic_change_notifications = false;
-            config.schema_mode = SchemaMode::AdditiveExplicit;
-            auto realm = Realm::get_shared_realm(config);
-
-            Schema schema1 = {};
-            Schema schema2 = add_table(schema1, {"Z", {{"value", PropertyType::Int}}});
-            Schema schema3 = add_table(schema2, {"B", {{"value", PropertyType::Int}}});
-            Schema schema4 = add_table(schema3, {"A", {{"value", PropertyType::Int}}});
-            Schema schema5 = add_table(schema4, {"C", {{"value", PropertyType::Int}}});
-            update_schema(*realm, schema5, 0);
-
-            Schema delete_schema;
-            delete_schema = remove_table(schema5, "Z");
-            delete_schema = remove_table(delete_schema, "A");
-            // Z B A C vs Z A => B C (others)
-            update_schema(*realm, delete_schema, 0);
-            auto schema = realm->schema();
-            REQUIRE(schema.size() == 4);
-            REQUIRE(schema.find("C") != schema.end());
-            REQUIRE(schema.find("Z") != schema.end());
-            REQUIRE(schema.find("A") != schema.end());
-            REQUIRE(schema.find("B") != schema.end());
-        }
-
-        SECTION("frozen realm schema can be updated if it is a subset of OS schema") {
-            InMemoryTestFile config;
-            config.automatic_change_notifications = false;
-            config.schema_mode = SchemaMode::AdditiveExplicit;
-            auto realm = Realm::get_shared_realm(config);
-            Schema schema1 = {};
-            Schema schema2 = add_table(schema1, {"Z", {{"value", PropertyType::Int}}});
-            Schema schema3 = add_table(schema2, {"B", {{"value", PropertyType::Int}}});
-            Schema schema4 = add_table(schema3, {"A", {{"value", PropertyType::Int}}});
-            update_schema(*realm, schema4, 0);
-            auto frozen_realm = realm->freeze();
-            auto subset_schema = remove_table(schema4, "Z");
-            update_schema(*realm, subset_schema, 0);
-            REQUIRE_NOTHROW(frozen_realm->update_schema(realm->schema()));
-        }
-    }
-}
-
-TEST_CASE("migration: Automatic") {
+TEST_CASE("migration: Automatic", "[migration]") {
     InMemoryTestFile config;
     config.automatic_change_notifications = false;
 
@@ -529,7 +342,7 @@ TEST_CASE("migration: Automatic") {
             schema2.find("object")->computed_properties.emplace_back(new_property);
 
             REQUIRE_UPDATE_SUCCEEDS(*realm, schema1, 0);
-            REQUIRE_THROWS_CONTAINING((*realm).update_schema(schema2), "Property 'object.link' has been removed.");
+            REQUIRE_UPDATE_FAILS(*realm, schema2, "Property 'object.link' has been removed.");
             REQUIRE((*realm).schema() == schema1);
             REQUIRE_MIGRATION_SUCCEEDS(*realm, schema2, 1, [](auto, auto, auto&) {});
         }
@@ -694,8 +507,8 @@ TEST_CASE("migration: Automatic") {
             auto realm = Realm::get_shared_realm(config);
             realm->update_schema({}, 1);
             realm->update_schema({}, 2);
-            REQUIRE_THROWS_CONTAINING(realm->update_schema({}, 0),
-                                      "Provided schema version 0 is less than last set version 2.");
+            REQUIRE_EXCEPTION(realm->update_schema({}, 0), InvalidSchemaVersion,
+                              "Provided schema version 0 is less than last set version 2.");
         }
 
         SECTION("insert duplicate keys for existing PK during migration") {
@@ -728,8 +541,8 @@ TEST_CASE("migration: Automatic") {
             realm->commit_transaction();
 
             schema = set_primary_key(schema, "object", "value");
-            REQUIRE_THROWS_CONTAINING(realm->update_schema(schema, 2, nullptr),
-                                      "Primary key property 'object.value' has duplicate values after migration.");
+            REQUIRE_EXCEPTION(realm->update_schema(schema, 2, nullptr), MigrationFailed,
+                              "Primary key property 'object.value' has duplicate values after migration.");
         }
 
         SECTION("throwing an exception from migration function rolls back all changes") {
@@ -755,27 +568,9 @@ TEST_CASE("migration: Automatic") {
             REQUIRE(realm->schema() == schema1);
         }
 
-        SECTION("changing a table to embedded does not require a migration block") {
-            Schema schema = {
-                {"object", {{"value", PropertyType::Int}}},
-                {"parent",
-                 {
-                     {"link", PropertyType::Object | PropertyType::Nullable, "object"},
-                 }},
-            };
-            auto realm = Realm::get_shared_realm(config);
-            REQUIRE_UPDATE_SUCCEEDS(*realm, schema, 1);
-            REQUIRE_UPDATE_SUCCEEDS(*realm, set_table_type(schema, "object", ObjectType::Embedded), 2);
-        }
-
         SECTION("changing a table to embedded fails if there are any objects in the table and there are no incoming "
                 "links to the object type") {
-            Schema schema = {
-                {"object",
-                 {
-                     {"value", PropertyType::Int},
-                 }},
-            };
+            Schema schema = {{"object", {{"value", PropertyType::Int}}}};
             auto realm = Realm::get_shared_realm(config);
             REQUIRE_UPDATE_SUCCEEDS(*realm, schema, 1);
             auto table = ObjectStore::table_for_object_type(realm->read_group(), "object");
@@ -784,48 +579,18 @@ TEST_CASE("migration: Automatic") {
             realm->commit_transaction();
 
             auto new_schema = set_table_type(schema, "object", ObjectType::Embedded);
-            REQUIRE_THROWS_CONTAINING(realm->update_schema(new_schema, 2),
-                                      "Cannot convert 'object' to embedded: at least one object has no incoming "
-                                      "links and would be deleted.");
-
+            REQUIRE_EXCEPTION(realm->update_schema(new_schema, 2, nullptr), IllegalOperation,
+                              "Cannot convert 'object' to embedded: at least one object has no incoming links and "
+                              "would be deleted.");
             REQUIRE_MIGRATION_SUCCEEDS(*realm, new_schema, 2, [](auto, auto realm, auto&) {
                 ObjectStore::table_for_object_type(realm->read_group(), "object")->clear();
             });
         }
 
-        SECTION("changing table to embedded with zero incoming links fails") {
-            Schema schema = {
-                {"child",
-                 {
-                     {"value", PropertyType::Int},
-                 }},
-                {"parent",
-                 {
-                     {"link", PropertyType::Object | PropertyType::Nullable, "child"},
-                 }},
-            };
-            auto realm = Realm::get_shared_realm(config);
-            REQUIRE_UPDATE_SUCCEEDS(*realm, schema, 1);
-
-            realm->begin_transaction();
-            ObjectStore::table_for_object_type(realm->read_group(), "child")->create_object();
-            realm->commit_transaction();
-
-            REQUIRE_THROWS_WITH(realm->update_schema(set_table_type(schema, "child", ObjectType::Embedded), 2),
-                                "Cannot convert 'child' to embedded: at least one object has no incoming links and "
-                                "would be deleted.");
-        }
-
         SECTION("changing table to embedded with multiple incoming links fails") {
             Schema schema = {
-                {"child",
-                 {
-                     {"value", PropertyType::Int},
-                 }},
-                {"parent",
-                 {
-                     {"link", PropertyType::Object | PropertyType::Nullable, "child"},
-                 }},
+                {"child", {{"value", PropertyType::Int}}},
+                {"parent", {{"link", PropertyType::Object | PropertyType::Nullable, "child"}}},
             };
             auto realm = Realm::get_shared_realm(config);
             REQUIRE_UPDATE_SUCCEEDS(*realm, schema, 1);
@@ -838,21 +603,15 @@ TEST_CASE("migration: Automatic") {
             parent->create_object().set_all(child_obj);
             realm->commit_transaction();
 
-            REQUIRE_THROWS_WITH(
-                realm->update_schema(set_table_type(schema, "child", ObjectType::Embedded), 2),
+            REQUIRE_EXCEPTION(
+                realm->update_schema(set_table_type(schema, "child", ObjectType::Embedded), 2), IllegalOperation,
                 "Cannot convert 'child' to embedded: at least one object has more than one incoming link.");
         }
 
         SECTION("changing table to embedded fails if more links are added inside the migratioon block") {
             Schema schema = {
-                {"child",
-                 {
-                     {"value", PropertyType::Int},
-                 }},
-                {"parent",
-                 {
-                     {"link", PropertyType::Object | PropertyType::Nullable, "child"},
-                 }},
+                {"child", {{"value", PropertyType::Int}}},
+                {"parent", {{"link", PropertyType::Object | PropertyType::Nullable, "child"}}},
             };
             auto realm = Realm::get_shared_realm(config);
             REQUIRE_UPDATE_SUCCEEDS(*realm, schema, 1);
@@ -861,7 +620,7 @@ TEST_CASE("migration: Automatic") {
             ObjectStore::table_for_object_type(realm->read_group(), "child")->create_object();
             realm->commit_transaction();
 
-            REQUIRE_THROWS_WITH(
+            REQUIRE_EXCEPTION(
                 realm->update_schema(set_table_type(schema, "child", ObjectType::Embedded), 2,
                                      [](auto, auto new_realm, auto) {
                                          auto child =
@@ -871,6 +630,7 @@ TEST_CASE("migration: Automatic") {
                                          parent->create_object().set_all(child->get_object(0).get_key());
                                          parent->create_object().set_all(child->get_object(0).get_key());
                                      }),
+                IllegalOperation,
                 "Cannot convert 'child' to embedded: at least one object has more than one incoming link.");
         }
 
@@ -911,21 +671,17 @@ TEST_CASE("migration: Automatic") {
             }
             realm->commit_transaction();
 
-            REQUIRE_THROWS_CONTAINING(
-                realm->update_schema(set_table_type(realm->schema(), "child", ObjectType::Embedded), 2),
-                "Cannot convert 'child' to embedded: there is an incoming link from the Mixed property "
-                "'parent.link', which does not support linking to embedded objects.");
+            REQUIRE_EXCEPTION(realm->update_schema(set_table_type(realm->schema(), "child", ObjectType::Embedded), 2),
+                              IllegalOperation,
+                              "Cannot convert 'child' to embedded: there is an incoming link from the Mixed property "
+                              "'parent.link', which does not support linking to embedded objects.");
         }
     }
 
     SECTION("valid migrations") {
+        Schema schema = {{"object", {{"value", PropertyType::Int}}}};
+
         SECTION("changing all columns does not lose row count") {
-            Schema schema = {
-                {"object",
-                 {
-                     {"value", PropertyType::Int},
-                 }},
-            };
             auto realm = Realm::get_shared_realm(config);
             REQUIRE_UPDATE_SUCCEEDS(*realm, schema, 1);
 
@@ -939,12 +695,6 @@ TEST_CASE("migration: Automatic") {
         }
 
         SECTION("values for required properties are copied when converitng to nullable") {
-            Schema schema = {
-                {"object",
-                 {
-                     {"value", PropertyType::Int},
-                 }},
-            };
             auto realm = Realm::get_shared_realm(config);
             REQUIRE_UPDATE_SUCCEEDS(*realm, schema, 1);
 
@@ -963,14 +713,8 @@ TEST_CASE("migration: Automatic") {
         }
 
         SECTION("values for nullable properties are discarded when converting to required") {
-            Schema schema = {
-                {"object",
-                 {
-                     {"value", PropertyType::Int | PropertyType::Nullable},
-                 }},
-            };
             auto realm = Realm::get_shared_realm(config);
-            REQUIRE_UPDATE_SUCCEEDS(*realm, schema, 1);
+            REQUIRE_UPDATE_SUCCEEDS(*realm, set_optional(schema, "object", "value", true), 1);
 
             realm->begin_transaction();
             auto table = ObjectStore::table_for_object_type(realm->read_group(), "object");
@@ -980,19 +724,13 @@ TEST_CASE("migration: Automatic") {
                 table->get_object(i).set(key, i);
             realm->commit_transaction();
 
-            REQUIRE_UPDATE_SUCCEEDS(*realm, set_optional(schema, "object", "value", false), 2);
+            REQUIRE_UPDATE_SUCCEEDS(*realm, schema, 2);
             key = table->get_column_key("value");
             for (size_t i = 0; i < 10; ++i)
                 REQUIRE(table->get_object(i).get<int64_t>(key) == 0);
         }
 
         SECTION("deleting table removed from the schema deletes it") {
-            Schema schema = {
-                {"object",
-                 {
-                     {"value", PropertyType::Int | PropertyType::Nullable},
-                 }},
-            };
             auto realm = Realm::get_shared_realm(config);
             REQUIRE_UPDATE_SUCCEEDS(*realm, schema, 1);
 
@@ -1003,12 +741,6 @@ TEST_CASE("migration: Automatic") {
         }
 
         SECTION("deleting table still in the schema recreates it with no rows") {
-            Schema schema = {
-                {"object",
-                 {
-                     {"value", PropertyType::Int | PropertyType::Nullable},
-                 }},
-            };
             auto realm = Realm::get_shared_realm(config);
             REQUIRE_UPDATE_SUCCEEDS(*realm, schema, 1);
 
@@ -1025,12 +757,6 @@ TEST_CASE("migration: Automatic") {
         }
 
         SECTION("deleting table which doesn't exist does nothing") {
-            Schema schema = {
-                {"object",
-                 {
-                     {"value", PropertyType::Int | PropertyType::Nullable},
-                 }},
-            };
             auto realm = Realm::get_shared_realm(config);
             REQUIRE_UPDATE_SUCCEEDS(*realm, schema, 1);
 
@@ -1175,9 +901,9 @@ TEST_CASE("migration: Automatic") {
             realm->commit_transaction();
 
             auto embedded_schema = set_table_type(schema, "child", ObjectType::Embedded);
-            REQUIRE_THROWS_WITH(realm->update_schema(embedded_schema, 2),
-                                "Cannot convert 'child' to embedded: there is an incoming link from the Mixed "
-                                "property 'parent.mixed', which does not support linking to embedded objects.");
+            REQUIRE_EXCEPTION(realm->update_schema(embedded_schema, 2), IllegalOperation,
+                              "Cannot convert 'child' to embedded: there is an incoming link from the Mixed "
+                              "property 'parent.mixed', which does not support linking to embedded objects.");
 
             realm->begin_transaction();
             parent_obj.set_any("mixed", Mixed());
@@ -1509,7 +1235,7 @@ TEST_CASE("migration: Automatic") {
                 auto list = util::any_cast<List>(obj.get_property_value<std::any>(ctx, "array"));
                 REQUIRE(list.size() == 1);
 
-                CppContext list_ctx(ctx, obj.obj(), *obj.get_object_schema().property_for_name("array"));
+                CppContext list_ctx(ctx, obj.get_obj(), *obj.get_object_schema().property_for_name("array"));
                 link = util::any_cast<Object>(list.get(list_ctx, 0));
                 REQUIRE(link.is_valid());
                 REQUIRE(util::any_cast<int64_t>(link.get_property_value<std::any>(list_ctx, "value")) == 20);
@@ -1517,8 +1243,8 @@ TEST_CASE("migration: Automatic") {
                 CppContext ctx2(new_realm);
                 obj = Object::get_for_primary_key(ctx, new_realm, "all types", std::any(INT64_C(1)));
                 REQUIRE(obj.is_valid());
-                REQUIRE_THROWS_CONTAINING(obj.get_property_value<std::any>(ctx, "bool"),
-                                          "Property 'all types.bool' does not exist");
+                REQUIRE_EXCEPTION(obj.get_property_value<std::any>(ctx, "bool"), InvalidProperty,
+                                  "Property 'all types.bool' does not exist");
             });
         }
 
@@ -1527,10 +1253,10 @@ TEST_CASE("migration: Automatic") {
                 CppContext ctx(old_realm);
                 Object obj = Object::get_for_primary_key(ctx, old_realm, "all types", std::any(INT64_C(1)));
                 REQUIRE(obj.is_valid());
-                REQUIRE_THROWS_CONTAINING(obj.set_property_value(ctx, "bool", std::any(false)),
-                                          "Cannot modify managed objects outside of a write transaction.");
-                REQUIRE_THROWS_CONTAINING(old_realm->begin_transaction(),
-                                          "Can't perform transactions on read-only Realms.");
+                REQUIRE_EXCEPTION(obj.set_property_value(ctx, "bool", std::any(false)), WrongTransactionState,
+                                  "Cannot modify managed objects outside of a write transaction.");
+                REQUIRE_EXCEPTION(old_realm->begin_transaction(), WrongTransactionState,
+                                  "Can't perform transactions on read-only Realms.");
             });
         }
 
@@ -1542,12 +1268,12 @@ TEST_CASE("migration: Automatic") {
                 CppContext ctx(new_realm);
                 Object obj = Object::get_for_primary_key(ctx, new_realm, "all types", std::any(INT64_C(1)));
                 REQUIRE(obj.is_valid());
-                REQUIRE_THROWS_CONTAINING(obj.get_property_value<std::any>(ctx, "bool"),
-                                          "Property 'all types.bool' does not exist");
-                REQUIRE_THROWS_CONTAINING(obj.get_property_value<std::any>(ctx, "object"),
-                                          "Property 'all types.object' does not exist");
-                REQUIRE_THROWS_CONTAINING(obj.get_property_value<std::any>(ctx, "array"),
-                                          "Property 'all types.array' does not exist");
+                REQUIRE_EXCEPTION(obj.get_property_value<std::any>(ctx, "bool"), InvalidProperty,
+                                  "Property 'all types.bool' does not exist");
+                REQUIRE_EXCEPTION(obj.get_property_value<std::any>(ctx, "object"), InvalidProperty,
+                                  "Property 'all types.object' does not exist");
+                REQUIRE_EXCEPTION(obj.get_property_value<std::any>(ctx, "array"), InvalidProperty,
+                                  "Property 'all types.array' does not exist");
             });
         }
 
@@ -1564,7 +1290,7 @@ TEST_CASE("migration: Automatic") {
                 auto list = util::any_cast<List>(obj.get_property_value<std::any>(ctx, "array"));
                 REQUIRE(list.size() == 1);
 
-                CppContext list_ctx(ctx, obj.obj(), *obj.get_object_schema().property_for_name("array"));
+                CppContext list_ctx(ctx, obj.get_obj(), *obj.get_object_schema().property_for_name("array"));
                 link = util::any_cast<Object>(list.get(list_ctx, 0));
                 REQUIRE(link.is_valid());
                 REQUIRE(util::any_cast<int64_t>(link.get_property_value<std::any>(list_ctx, "value")) == 20);
@@ -1624,11 +1350,11 @@ TEST_CASE("migration: Automatic") {
                 auto linking = util::any_cast<Results>(linked_obj.get_property_value<std::any>(ctx, "origin"));
                 REQUIRE(linking.size() == 1);
 
-                REQUIRE(util::any_cast<Object>(obj.get_property_value<std::any>(ctx, "object")).obj().get_key() ==
-                        linked_obj.obj().get_key());
+                REQUIRE(util::any_cast<Object>(obj.get_property_value<std::any>(ctx, "object")).get_obj().get_key() ==
+                        linked_obj.get_obj().get_key());
                 obj.set_property_value(ctx, "object", std::any(new_obj));
-                REQUIRE(util::any_cast<Object>(obj.get_property_value<std::any>(ctx, "object")).obj().get_key() ==
-                        new_obj.obj().get_key());
+                REQUIRE(util::any_cast<Object>(obj.get_property_value<std::any>(ctx, "object")).get_obj().get_key() ==
+                        new_obj.get_obj().get_key());
 
                 REQUIRE(linking.size() == 0);
             });
@@ -1691,7 +1417,7 @@ TEST_CASE("migration: Automatic") {
                 // shoud not be able to create a new object with the same PK
                 Object::create(ctx, new_realm, "all types", values);
             };
-            REQUIRE_THROWS_AS(realm->update_schema(schema, 2, bad_migration), std::logic_error);
+            REQUIRE_THROWS_AS(realm->update_schema(schema, 2, bad_migration), MigrationFailed);
             REQUIRE(get_table(realm, "all types")->size() == 1);
 
             auto good_migration = [&](auto, auto new_realm, Schema&) {
@@ -2078,7 +1804,7 @@ TEST_CASE("migration: Automatic") {
     }
 }
 
-TEST_CASE("migration: Immutable") {
+TEST_CASE("migration: Immutable", "[migration]") {
     TestFile config;
 
     auto realm_with_schema = [&](Schema schema) {
@@ -2180,7 +1906,7 @@ TEST_CASE("migration: Immutable") {
                      {"value 2", PropertyType::Int},
                  }},
             };
-            REQUIRE_THROWS_CONTAINING(realm->update_schema(schema), "Property 'object.value 2' has been added.");
+            INVALID_SCHEMA_CHANGE(*realm, schema, "Property 'object.value 2' has been added.");
         }
 
         SECTION("bump schema version") {
@@ -2188,13 +1914,13 @@ TEST_CASE("migration: Immutable") {
                 {"object", {{"value", PropertyType::Int}}},
             };
             auto realm = realm_with_schema(schema);
-            REQUIRE_THROWS_CONTAINING(realm->update_schema(schema, 1),
-                                      "Provided schema version 1 does not equal last set version 0.");
+            REQUIRE_EXCEPTION(realm->update_schema(schema, 1), InvalidSchemaVersion,
+                              "Provided schema version 1 does not equal last set version 0.");
         }
     }
 }
 
-TEST_CASE("migration: ReadOnly") {
+TEST_CASE("migration: ReadOnly", "[migration]") {
     TestFile config;
 
     auto realm_with_schema = [&](Schema schema) {
@@ -2291,12 +2017,12 @@ TEST_CASE("migration: ReadOnly") {
                      {"value 2", PropertyType::Int},
                  }},
             };
-            REQUIRE_THROWS_CONTAINING(realm->update_schema(schema), "Property 'object.value 2' has been added.");
+            INVALID_SCHEMA_CHANGE(*realm, schema, "Property 'object.value 2' has been added.");
         }
     }
 }
 
-TEST_CASE("migration: SoftResetFile") {
+TEST_CASE("migration: SoftResetFile", "[migration]") {
     TestFile config;
     config.schema_mode = SchemaMode::SoftResetFile;
 
@@ -2305,30 +2031,15 @@ TEST_CASE("migration: SoftResetFile") {
         {"object 2", {{"value", PropertyType::Int}}},
     };
 
+    auto get_fileid = [&] {
+        auto id = util::File::get_unique_id(config.path);
+        REQUIRE(id);
+        return *id;
+    };
 // To verify that the file has actually be deleted and recreated, on
 // non-Windows we need to hold an open file handle to the old file to force
 // using a new inode, but on Windows we *can't*
-#ifdef _WIN32
-    auto get_fileid = [&] {
-        // this is wrong for non-ascii but it's what core does
-        std::wstring ws(config.path.begin(), config.path.end());
-        HANDLE handle =
-            CreateFile2(ws.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, OPEN_EXISTING, nullptr);
-        REQUIRE(handle != INVALID_HANDLE_VALUE);
-        auto close = util::make_scope_exit([=]() noexcept {
-            CloseHandle(handle);
-        });
-
-        BY_HANDLE_FILE_INFORMATION info{};
-        REQUIRE(GetFileInformationByHandle(handle, &info));
-        return (DWORDLONG)info.nFileIndexHigh + (DWORDLONG)info.nFileIndexLow;
-    };
-#else
-    auto get_fileid = [&] {
-        util::File::UniqueID id;
-        util::File::get_unique_id(config.path, id);
-        return id.inode;
-    };
+#ifndef _WIN32
     util::File holder(config.path, util::File::mode_Write);
 #endif
 
@@ -2385,7 +2096,7 @@ TEST_CASE("migration: SoftResetFile") {
     }
 }
 
-TEST_CASE("migration: HardResetFile") {
+TEST_CASE("migration: HardResetFile", "[migration]") {
     TestFile config;
 
     Schema schema = {
@@ -2393,30 +2104,12 @@ TEST_CASE("migration: HardResetFile") {
         {"object 2", {{"value", PropertyType::Int}}},
     };
 
-// To verify that the file has actually be deleted and recreated, on
-// non-Windows we need to hold an open file handle to the old file to force
-// using a new inode, but on Windows we *can't*
-#ifdef _WIN32
     auto get_fileid = [&] {
-        // this is wrong for non-ascii but it's what core does
-        std::wstring ws(config.path.begin(), config.path.end());
-        HANDLE handle =
-            CreateFile2(ws.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, OPEN_EXISTING, nullptr);
-        REQUIRE(handle != INVALID_HANDLE_VALUE);
-        auto close = util::make_scope_exit([=]() noexcept {
-            CloseHandle(handle);
-        });
-
-        BY_HANDLE_FILE_INFORMATION info{};
-        REQUIRE(GetFileInformationByHandle(handle, &info));
-        return (DWORDLONG)info.nFileIndexHigh + (DWORDLONG)info.nFileIndexLow;
+        auto id = util::File::get_unique_id(config.path);
+        REQUIRE(id);
+        return *id;
     };
-#else
-    auto get_fileid = [&] {
-        util::File::UniqueID id;
-        util::File::get_unique_id(config.path, id);
-        return id.inode;
-    };
+#ifndef _WIN32
     util::File holder(config.path, util::File::mode_Write);
 #endif
 
@@ -2452,7 +2145,7 @@ TEST_CASE("migration: HardResetFile") {
     }
 }
 
-TEST_CASE("migration: Additive") {
+TEST_CASE("migration: Additive", "[migration]") {
     Schema schema = {
         {"object",
          {
@@ -2537,7 +2230,7 @@ TEST_CASE("migration: Additive") {
         REQUIRE_NOTHROW(realm->update_schema(remove_property(schema, "object", "value")));
         REQUIRE(ObjectStore::table_for_object_type(realm->read_group(), "object")->get_column_count() == 2);
         auto const& properties = realm->schema().find("object")->persisted_properties;
-        REQUIRE(properties.size() == 2);
+        REQUIRE(properties.size() == 1);
         auto col_keys = table->get_column_keys();
         REQUIRE(col_keys.size() == 2);
         REQUIRE(properties[0].column_key == col_keys[1]);
@@ -2592,10 +2285,7 @@ TEST_CASE("migration: Additive") {
         }));
     }
 
-    SECTION("add new columns from different SG") {
-        using vec = std::vector<SchemaChange>;
-        using namespace schema_change;
-
+    SECTION("new columns added externally are ignored") {
         auto realm2 = Realm::get_shared_realm(config);
         auto& group = realm2->read_group();
         realm2->begin_transaction();
@@ -2605,19 +2295,17 @@ TEST_CASE("migration: Additive") {
         realm2->commit_transaction();
 
         REQUIRE_NOTHROW(realm->refresh());
-        auto schema_diff = schema.compare(realm->schema());
-        REQUIRE(schema_diff.size() == 1);
-        REQUIRE(schema_diff == vec{(AddProperty{&*schema.find("object"),
-                                                &realm->schema().find("object")->persisted_properties[2]})});
+        REQUIRE(realm->schema() == schema);
         REQUIRE(realm->schema().find("object")->persisted_properties[0].column_key == col_keys[0]);
         REQUIRE(realm->schema().find("object")->persisted_properties[1].column_key == col_keys[1]);
-        REQUIRE(realm->schema().find("object")->persisted_properties[2].column_key == col_keys[2]);
+
+        auto frozen = realm->freeze();
+        REQUIRE(frozen->schema() == schema);
+        REQUIRE(frozen->schema().find("object")->persisted_properties[0].column_key == col_keys[0]);
+        REQUIRE(frozen->schema().find("object")->persisted_properties[1].column_key == col_keys[1]);
     }
 
     SECTION("opening new Realms uses the correct schema after an external change") {
-        using vec = std::vector<SchemaChange>;
-        using namespace schema_change;
-
         auto realm2 = Realm::get_shared_realm(config);
         auto& group = realm2->read_group();
         realm2->begin_transaction();
@@ -2627,35 +2315,65 @@ TEST_CASE("migration: Additive") {
         realm2->commit_transaction();
 
         REQUIRE_NOTHROW(realm->refresh());
-        auto schema_diff = schema.compare(realm->schema());
-        REQUIRE(schema_diff.size() == 1);
-        REQUIRE(schema_diff == vec{(AddProperty{&*schema.find("object"),
-                                                &realm->schema().find("object")->persisted_properties[2]})});
+        REQUIRE(realm->schema() == schema);
         REQUIRE(realm->schema().find("object")->persisted_properties[0].column_key == col_keys[0]);
         REQUIRE(realm->schema().find("object")->persisted_properties[1].column_key == col_keys[1]);
-        REQUIRE(realm->schema().find("object")->persisted_properties[2].column_key == col_keys[2]);
 
         // Gets the schema from the RealmCoordinator
         auto realm3 = Realm::get_shared_realm(config);
         REQUIRE(realm->schema().find("object")->persisted_properties[0].column_key == col_keys[0]);
         REQUIRE(realm->schema().find("object")->persisted_properties[1].column_key == col_keys[1]);
 
+        ColKey k0 = col_keys[0], k1 = col_keys[1];
+
         // Close and re-open the file entirely so that the coordinator is recreated
         realm.reset();
         realm2.reset();
         realm3.reset();
 
-        // In case of additive schemas, changes to an external realm are on purpose
-        // propagated between different realm instances.
         realm = Realm::get_shared_realm(config);
-        schema_diff = schema.compare(realm->schema());
-        REQUIRE(schema_diff.size() == 1);
-        REQUIRE(schema_diff == vec{(AddProperty{&*schema.find("object"),
-                                                &realm->schema().find("object")->persisted_properties[2]})});
-        REQUIRE(realm->schema().find("object")->persisted_properties.size() == 3);
-        REQUIRE(realm->schema().find("object")->persisted_properties[0].column_key == col_keys[0]);
-        REQUIRE(realm->schema().find("object")->persisted_properties[1].column_key == col_keys[1]);
-        REQUIRE(realm->schema().find("object")->persisted_properties[2].column_key == col_keys[2]);
+        REQUIRE(realm->schema() == schema);
+        REQUIRE(realm->schema().find("object")->persisted_properties[0].column_key == k0);
+        REQUIRE(realm->schema().find("object")->persisted_properties[1].column_key == k1);
+    }
+
+    SECTION("obtaining a frozen Realm from before an external schema change") {
+        auto realm2 = Realm::get_shared_realm(config);
+        realm->read_group();
+        realm2->read_group();
+        auto table = ObjectStore::table_for_object_type(realm->read_group(), "object");
+        auto col_keys = table->get_column_keys();
+
+        {
+            auto write_realm = Realm::get_shared_realm(config);
+            write_realm->begin_transaction();
+            auto table = ObjectStore::table_for_object_type(write_realm->read_group(), "object");
+            table->add_column(type_Double, "newcol");
+            write_realm->commit_transaction();
+        }
+
+        // Before refreshing when we haven't seen the new version at all
+        auto frozen = realm->freeze();
+        REQUIRE(frozen->schema() == schema);
+        REQUIRE(frozen->schema().find("object")->persisted_properties[0].column_key == col_keys[0]);
+        REQUIRE(frozen->schema().find("object")->persisted_properties[1].column_key == col_keys[1]);
+        frozen = Realm::get_frozen_realm(config, realm->read_transaction_version());
+        REQUIRE(frozen->schema() == schema);
+        REQUIRE(frozen->schema().find("object")->persisted_properties[0].column_key == col_keys[0]);
+        REQUIRE(frozen->schema().find("object")->persisted_properties[1].column_key == col_keys[1]);
+
+        // Refresh the other instance so that the schema cache is updated, and
+        // then repeat
+        realm2->refresh();
+
+        frozen = realm->freeze();
+        REQUIRE(frozen->schema() == schema);
+        REQUIRE(frozen->schema().find("object")->persisted_properties[0].column_key == col_keys[0]);
+        REQUIRE(frozen->schema().find("object")->persisted_properties[1].column_key == col_keys[1]);
+        frozen = Realm::get_frozen_realm(config, realm->read_transaction_version());
+        REQUIRE(frozen->schema() == schema);
+        REQUIRE(frozen->schema().find("object")->persisted_properties[0].column_key == col_keys[0]);
+        REQUIRE(frozen->schema().find("object")->persisted_properties[1].column_key == col_keys[1]);
     }
 
     SECTION("can have different subsets of columns in different Realm instances") {
@@ -2671,11 +2389,11 @@ TEST_CASE("migration: Additive") {
         auto realm3 = Realm::get_shared_realm(config3);
         REQUIRE(realm->schema().find("object")->persisted_properties.size() == 2);
         REQUIRE(realm2->schema().find("object")->persisted_properties.size() == 3);
-        REQUIRE(realm3->schema().find("object")->persisted_properties.size() == 3);
+        REQUIRE(realm3->schema().find("object")->persisted_properties.size() == 1);
 
         realm->refresh();
         realm2->refresh();
-        REQUIRE(realm->schema().find("object")->persisted_properties.size() == 3);
+        REQUIRE(realm->schema().find("object")->persisted_properties.size() == 2);
         REQUIRE(realm2->schema().find("object")->persisted_properties.size() == 3);
 
         // No schema specified; should see all of them
@@ -2722,7 +2440,7 @@ TEST_CASE("migration: Additive") {
         REQUIRE_THROWS_CONTAINING(
             realm->update_schema(add_property(schema, "object", {"value 3", PropertyType::Float})),
             "Property 'object.value 3' has been changed from 'int' to 'float'.");
-        REQUIRE(realm->schema().find("object")->persisted_properties.size() == 3);
+        REQUIRE(realm->schema().find("object")->persisted_properties.size() == 2);
     }
 
     SECTION("update_schema() does not begin a write transaction when extra columns are present") {
@@ -2754,7 +2472,7 @@ TEST_CASE("migration: Additive") {
     }
 }
 
-TEST_CASE("migration: Manual") {
+TEST_CASE("migration: Manual", "[migration]") {
     TestFile config;
     config.schema_mode = SchemaMode::Manual;
     auto realm = Realm::get_shared_realm(config);
@@ -2777,10 +2495,11 @@ TEST_CASE("migration: Manual") {
 #define REQUIRE_MIGRATION(schema, migration, msg)                                                                    \
     do {                                                                                                             \
         Schema new_schema = (schema);                                                                                \
-        REQUIRE_THROWS_CONTAINING(realm->update_schema(new_schema), msg);                                            \
+        REQUIRE_EXCEPTION(realm->update_schema(new_schema), SchemaMismatch,                                          \
+                          Catch::Matchers::ContainsSubstring(msg));                                                  \
         REQUIRE(realm->schema_version() == 0);                                                                       \
-        REQUIRE_THROWS_CONTAINING(realm->update_schema(new_schema, 1, [](SharedRealm, SharedRealm, Schema&) {}),     \
-                                  msg);                                                                              \
+        REQUIRE_EXCEPTION(realm->update_schema(new_schema, 1, [](SharedRealm, SharedRealm, Schema&) {}),             \
+                          SchemaMismatch, Catch::Matchers::ContainsSubstring(msg));                                  \
         REQUIRE(realm->schema_version() == 0);                                                                       \
         REQUIRE_NOTHROW(realm->update_schema(new_schema, 1, migration));                                             \
         REQUIRE(realm->schema_version() == 1);                                                                       \
@@ -2913,8 +2632,8 @@ TEST_CASE("migration: Manual") {
     SECTION("cannot lower schema version") {
         REQUIRE_NOTHROW(realm->update_schema(schema, 1, [](SharedRealm, SharedRealm, Schema&) {}));
         REQUIRE(realm->schema_version() == 1);
-        REQUIRE_THROWS_CONTAINING(realm->update_schema(schema, 0, [](SharedRealm, SharedRealm, Schema&) {}),
-                                  "Provided schema version 0 is less than last set version 1.");
+        REQUIRE_EXCEPTION(realm->update_schema(schema, 0, [](SharedRealm, SharedRealm, Schema&) {}),
+                          InvalidSchemaVersion, "Provided schema version 0 is less than last set version 1.");
         REQUIRE(realm->schema_version() == 1);
     }
 
@@ -2924,12 +2643,13 @@ TEST_CASE("migration: Manual") {
         auto realm2 = Realm::get_shared_realm(config);
         // will deadlock if it tries to start a write transaction
         REQUIRE_NOTHROW(realm2->update_schema(schema));
-        REQUIRE_THROWS_CONTAINING(realm2->update_schema(remove_property(schema, "object", "value")),
-                                  "Property 'object.value' has been removed.");
+        REQUIRE_UPDATE_FAILS(*realm2, remove_property(schema, "object", "value"),
+                             "Property 'object.value' has been removed.");
     }
 
     SECTION("null migration callback should throw SchemaMismatchException") {
         Schema new_schema = remove_property(schema, "object", "value");
-        REQUIRE_THROWS_AS(realm->update_schema(new_schema, 1, nullptr), SchemaMismatchException);
+        REQUIRE_EXCEPTION(realm->update_schema(new_schema, 1, nullptr), SchemaMismatch,
+                          Catch::Matchers::ContainsSubstring("Property 'object.value' has been removed."));
     }
 }

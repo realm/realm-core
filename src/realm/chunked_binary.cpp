@@ -58,7 +58,7 @@ char ChunkedBinaryData::operator[](size_t index) const
         i -= chunk.size();
     } while (chunk.size() != 0);
 
-    throw util::out_of_range("Offset is out of range");
+    throw RuntimeError(ErrorCodes::RangeError, "Offset is out of range");
 }
 
 std::string ChunkedBinaryData::hex_dump(const char* separator, int min_digits) const

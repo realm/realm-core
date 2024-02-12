@@ -91,7 +91,8 @@ void ArraySmallBlobs::erase(size_t ndx)
     REALM_ASSERT_3(ndx, <, m_offsets.size());
 
     size_t start = ndx ? to_size_t(m_offsets.get(ndx - 1)) : 0;
-    size_t end = to_size_t(m_offsets.get(ndx));
+    auto offset = m_offsets.get(ndx);
+    size_t end = to_size_t(offset);
 
     m_blob.erase(start, end);
     m_offsets.erase(ndx);

@@ -7,9 +7,11 @@ set(SYNC_SOURCES
     noinst/client_reset_operation.cpp
     noinst/client_reset_recovery.cpp
     noinst/compact_changesets.cpp
+    noinst/migration_store.cpp
     noinst/pending_bootstrap_store.cpp
     noinst/protocol_codec.cpp
     noinst/sync_metadata_schema.cpp
+    noinst/sync_schema_migration.cpp
     changeset_encoder.cpp
     changeset_parser.cpp
     changeset.cpp
@@ -35,6 +37,7 @@ set(IMPL_INSTALL_HEADERS
 )
 
 set(SYNC_INSTALL_HEADERS
+    binding_callback_thread_observer.hpp
     config.hpp
     changeset_encoder.hpp
     changeset_parser.hpp
@@ -50,16 +53,20 @@ set(SYNC_INSTALL_HEADERS
     protocol.hpp
     subscriptions.hpp
     transform.hpp
+)
 
+set(SYNC_NETWORK_INSTALL_HEADERS
+    network/default_socket.hpp
     network/http.hpp
+    network/network.hpp
+    network/network_ssl.hpp
+    network/websocket.hpp
+    network/websocket_error.hpp
 )
 
 set(NOINST_HEADERS
     trigger.hpp
-    network/default_socket.hpp
-    network/network.hpp
-    network/network_ssl.hpp
-    network/websocket.hpp
+
     noinst/changeset_index.hpp
     noinst/client_history_impl.hpp
     noinst/client_impl_base.hpp
@@ -68,14 +75,17 @@ set(NOINST_HEADERS
     noinst/client_reset_recovery.hpp
     noinst/compact_changesets.hpp
     noinst/integer_codec.hpp
+    noinst/migration_store.hpp
     noinst/pending_bootstrap_store.hpp
     noinst/protocol_codec.hpp
     noinst/root_certs.hpp
     noinst/sync_metadata_schema.hpp
+    noinst/sync_schema_migration.hpp
 )
 
 set(SYNC_HEADERS ${IMPL_INSTALL_HEADESR}
     ${SYNC_INSTALL_HEADERS}
+    ${SYNC_NETWORK_INSTALL_HEADERS}
     ${NOINST_HEADERS})
 
 add_library(Sync STATIC ${SYNC_SOURCES} ${SYNC_HEADERS})
@@ -85,11 +95,15 @@ set_target_properties(Sync PROPERTIES
     OUTPUT_NAME "realm-sync"
 )
 
+if(NOT REALM_SYNC_MULTIPLEXING)
+    target_compile_definitions(Sync PUBLIC REALM_DISABLE_SYNC_MULTIPLEXING=1)
+endif()
+
 target_link_libraries(Sync PUBLIC Storage)
 
 if(APPLE AND NOT REALM_FORCE_OPENSSL)
     target_link_options(Sync INTERFACE "SHELL:-framework Security")
-else()
+elseif(REALM_HAVE_OPENSSL)
     target_link_libraries(Sync PUBLIC OpenSSL::SSL)
 endif()
 
@@ -118,6 +132,10 @@ install(FILES ${SYNC_INSTALL_HEADERS}
         DESTINATION include/realm/sync
         COMPONENT devel)
 
+install(FILES ${SYNC_NETWORK_INSTALL_HEADERS}
+        DESTINATION include/realm/sync/network
+        COMPONENT devel)
+
 install(FILES ${UTIL_INSTALL_HEADERS}
         DESTINATION include/realm/util
         COMPONENT devel)
@@ -132,6 +150,7 @@ install(FILES ../../external/json/json.hpp
 add_subdirectory(noinst/server)
 
 if(NOT REALM_BUILD_LIB_ONLY AND NOT CMAKE_SYSTEM_NAME MATCHES "^Windows")
-	add_subdirectory(tools)
+    add_subdirectory(tools)
+    set_macos_only(tools)
 endif()
 

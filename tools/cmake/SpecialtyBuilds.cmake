@@ -1,16 +1,21 @@
 if (CMAKE_BUILD_TYPE MATCHES "RelAssert")
     set(REALM_ENABLE_ASSERTIONS ON CACHE BOOL "Build with assertions")
-    set(CMAKE_CXX_FLAGS_RELASSERT ${CMAKE_CXX_FLAGS_RELWITHDEBINFO})
 endif()
 
 if (CMAKE_BUILD_TYPE MATCHES "RelASAN")
     set(REALM_ASAN ON CACHE BOOL "Build with address sanitizer")
-    set(CMAKE_CXX_FLAGS_RELASAN "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} -O1")
 endif()
 
 if (CMAKE_BUILD_TYPE MATCHES "RelTSAN")
     set(REALM_TSAN ON CACHE BOOL "Build with address sanitizer")
-    set(CMAKE_CXX_FLAGS_RELTSAN "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} -O1")
+endif()
+
+if (CMAKE_BUILD_TYPE MATCHES "RelMSAN")
+    set(REALM_MSAN ON CACHE BOOL "Build with memory sanitizer")
+endif()
+
+if (CMAKE_BUILD_TYPE MATCHES "RelUSAN")
+    set(REALM_USAN ON CACHE BOOL "Build with undefined sanitizer")
 endif()
 
 # -------------
@@ -28,6 +33,17 @@ if(REALM_COVERAGE)
         endif()
     endif()
 endif()
+
+option(REALM_LLVM_COVERAGE "Compile with llvm's code coverage support." OFF)
+if (REALM_LLVM_COVERAGE)
+    if(${CMAKE_CXX_COMPILER_ID} MATCHES "Clang")
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fprofile-instr-generate -fcoverage-mapping")
+        set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_LINK_FLAGS} -fprofile-instr-generate -fcoverage-mapping")
+    else()
+        message(FATAL_ERROR "Code coverage is only supported with clang")
+    endif()
+endif()
+
 
 # -------------
 # AFL
@@ -56,7 +72,7 @@ option(REALM_LIBFUZZER "Compile with llvm libfuzzer" OFF)
 if(REALM_LIBFUZZER)
     if(${CMAKE_CXX_COMPILER_ID} MATCHES "Clang")
         # todo: add the undefined sanitizer here after blacklisting false positives
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=fuzzer,address -fsanitize-coverage=trace-pc-guard")
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -fsanitize=fuzzer,address")
     else()
         message(FATAL_ERROR
                 "Compiling for libfuzzer is only supported with clang")
@@ -68,12 +84,20 @@ endif()
 # -------------
 option(REALM_ASAN "Compile with address sanitizer support" OFF)
 if(REALM_ASAN)
-    if(MSVC)
-        message(FATAL_ERROR
-                "The Address Sanitizer is not yet supported on Visual Studio builds")
+    if (MSVC)
+        set(REALM_SANITIZER_FLAGS /fsanitize=address)
+        set(REALM_SANITIZER_LINK_FLAGS /INCREMENTAL:NO)
+
+        if ("${CMAKE_BUILD_TYPE}" STREQUAL "RelASAN")
+            list(APPEND REALM_SANITIZER_FLAGS /Ox /Zi)
+            list(APPEND REALM_SANITIZER_LINK_FLAGS /DEBUG)
+        elseif (NOT "${CMAKE_BUILD_TYPE}" MATCHES ".*Deb.*")
+            # disable warning for better stacktrace for asan
+            # pdbs can be activated with RelWithDebInfo or RelASAN
+            list(APPEND REALM_SANITIZER_FLAGS /wd5072)
+        endif()
     else()
-        list(APPEND REALM_SANITIZER_FLAGS -fsanitize=address)
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O1 -g")
+        set(REALM_SANITIZER_FLAGS -fsanitize=address -fno-sanitize-recover=all -fsanitize-address-use-after-scope -fno-omit-frame-pointer)
     endif()
 endif()
 
@@ -86,13 +110,7 @@ if(REALM_TSAN)
         message(FATAL_ERROR
                 "The Thread Sanitizer is not yet supported on Visual Studio builds")
     else()
-        list(APPEND REALM_SANITIZER_FLAGS -fsanitize=thread)
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2 -g -fPIE")
-        # According to the clang docs, if -fsanitize=thread is specified then compiling
-        # and linking with PIE is turned on automatically.
-        if (CMAKE_COMPILER_IS_GNUXX)
-            set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -pie")
-        endif()
+        set(REALM_SANITIZER_FLAGS -fsanitize=thread -fno-sanitize-recover=all -fno-omit-frame-pointer)
     endif()
 endif()
 
@@ -105,8 +123,7 @@ if(REALM_MSAN)
         message(FATAL_ERROR
                 "The Memory Sanitizer is not yet supported on Visual Studio builds")
     else()
-        list(APPEND REALM_SANITIZER_FLAGS -fsanitize=memory -fsanitize-memory-track-origins)
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-omit-frame-pointer -O2 -g -fPIE -pie")
+        set(REALM_SANITIZER_FLAGS -fsanitize=memory -fsanitize-memory-track-origins -fno-omit-frame-pointer)
     endif()
 endif()
 
@@ -119,7 +136,29 @@ if(REALM_USAN)
         message(FATAL_ERROR
                 "The Undefined Sanitizer is not yet supported on Visual Studio builds")
     else()
-        list(APPEND REALM_SANITIZER_FLAGS -fsanitize=undefined)
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-omit-frame-pointer -O2 -g -fPIE -pie")
+        set(REALM_SANITIZER_FLAGS -fsanitize=undefined -fno-sanitize-recover=all -fno-omit-frame-pointer)
+    endif()
+endif()
+
+if (REALM_SANITIZER_FLAGS)
+    if (NOT MSVC)
+        if ("${CMAKE_BUILD_TYPE}" MATCHES "Rel[ATMU]SAN")
+            list(APPEND REALM_SANITIZER_FLAGS -O1 -g)
+        endif()
+
+        set(REALM_SANITIZER_LINK_FLAGS ${REALM_SANITIZER_FLAGS})
+
+        if (CMAKE_COMPILER_IS_GNUXX) # activated for clang automatically according to docs
+            list(APPEND REALM_SANITIZER_LINK_FLAGS -pie)
+        endif()
+    endif()
+
+    add_compile_options(${REALM_SANITIZER_FLAGS})
+    if (MSVC)
+        add_compile_definitions(_DISABLE_STRING_ANNOTATION _DISABLE_VECTOR_ANNOTATION)
+    endif()
+
+    if (REALM_SANITIZER_LINK_FLAGS)
+        add_link_options(${REALM_SANITIZER_LINK_FLAGS})
     endif()
 endif()

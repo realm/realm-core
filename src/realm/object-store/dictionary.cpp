@@ -223,7 +223,7 @@ Mixed Dictionary::get_any(StringData key)
 
 Mixed Dictionary::get_any(size_t ndx) const
 {
-    verify_valid_row(ndx);
+    verify_attached();
     auto value = dict().get_any(ndx);
     record_audit_read(value);
     return value;
@@ -239,7 +239,7 @@ util::Optional<Mixed> Dictionary::try_get_any(StringData key) const
 
 std::pair<StringData, Mixed> Dictionary::get_pair(size_t ndx) const
 {
-    verify_valid_row(ndx);
+    verify_attached();
     auto pair = dict().get_pair(ndx);
     record_audit_read(pair.second);
     return {pair.first.get_string(), pair.second};
@@ -250,7 +250,7 @@ size_t Dictionary::find_any(Mixed value) const
     return dict().find_any(value);
 }
 
-bool Dictionary::contains(StringData key)
+bool Dictionary::contains(StringData key) const
 {
     return dict().contains(key);
 }
@@ -288,6 +288,7 @@ Dictionary::Iterator Dictionary::end() const
     return dict().end();
 }
 
+namespace {
 class NotificationHandler {
 public:
     NotificationHandler(realm::Dictionary& dict, Dictionary::CBFunc cb)
@@ -334,10 +335,12 @@ private:
     std::unique_ptr<realm::Dictionary> m_prev_dict;
     Dictionary::CBFunc m_cb;
 };
+} // namespace
 
-NotificationToken Dictionary::add_key_based_notification_callback(CBFunc cb, KeyPathArray key_path_array) &
+NotificationToken Dictionary::add_key_based_notification_callback(CBFunc cb,
+                                                                  std::optional<KeyPathArray> key_path_array) &
 {
-    return add_notification_callback(NotificationHandler(dict(), std::move(cb)), key_path_array);
+    return add_notification_callback(NotificationHandler(dict(), std::move(cb)), std::move(key_path_array));
 }
 
 Dictionary Dictionary::freeze(const std::shared_ptr<Realm>& frozen_realm) const

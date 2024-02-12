@@ -130,8 +130,6 @@ public:
 
     /// Check if the object is still alive
     bool is_valid() const noexcept;
-    /// Will throw if object is not valid
-    void check_valid() const;
     /// Delete object from table. Object is invalid afterwards.
     void remove();
     /// Invalidate
@@ -170,7 +168,7 @@ public:
     size_t get_backlink_count() const;
     size_t get_backlink_count(const Table& origin, ColKey origin_col_key) const;
     ObjKey get_backlink(const Table& origin, ColKey origin_col_key, size_t backlink_ndx) const;
-    TableView get_backlink_view(TableRef src_table, ColKey src_col_key);
+    TableView get_backlink_view(TableRef src_table, ColKey src_col_key) const;
 
     // To be used by the query system when a single object should
     // be tested. Will allow a function to be called in the context
@@ -325,7 +323,7 @@ public:
     CollectionBasePtr get_collection_ptr(StringData col_name) const;
     LinkCollectionPtr get_linkcollection_ptr(ColKey col_key) const;
 
-    void assign_pk_and_backlinks(const Obj& other);
+    void assign_pk_and_backlinks(Obj& other);
 
     class Internal {
         friend class _impl::DeepChangeChecker;
@@ -342,11 +340,12 @@ private:
     friend class TableView;
     template <class, class>
     friend class Collection;
-    template <class, class>
+    template <class>
     friend class CollectionBaseImpl;
     template <class>
     friend class Lst;
     friend class LnkLst;
+    friend class LinkCount;
     friend class Dictionary;
     friend class LinkMap;
     template <class>
@@ -394,11 +393,12 @@ private:
     // Return number of backlinks from a specific backlink column
     size_t get_backlink_cnt(ColKey backlink_col) const;
     ObjKey get_unfiltered_link(ColKey col_key) const;
+    Mixed get_unfiltered_mixed(ColKey::Idx col_ndx) const;
 
     template <class Val>
-    Obj& _set(size_t col_ndx, Val v);
+    Obj& _set_all(size_t col_ndx, Val v);
     template <class Head, class... Tail>
-    Obj& _set(size_t col_ndx, Head v, Tail... tail);
+    Obj& _set_all(size_t col_ndx, Head v, Tail... tail);
     ColKey spec_ndx2colkey(size_t col_ndx);
     size_t colkey2spec_ndx(ColKey);
     bool ensure_writeable();
@@ -584,16 +584,16 @@ std::vector<U> Obj::get_list_values(ColKey col_key) const
 }
 
 template <class Val>
-inline Obj& Obj::_set(size_t col_ndx, Val v)
+inline Obj& Obj::_set_all(size_t col_ndx, Val v)
 {
     return set(spec_ndx2colkey(col_ndx), v);
 }
 
 template <class Head, class... Tail>
-inline Obj& Obj::_set(size_t col_ndx, Head v, Tail... tail)
+inline Obj& Obj::_set_all(size_t col_ndx, Head v, Tail... tail)
 {
     set(spec_ndx2colkey(col_ndx), v);
-    return _set(col_ndx + 1, tail...);
+    return _set_all(col_ndx + 1, tail...);
 }
 
 template <class Head, class... Tail>
@@ -607,7 +607,7 @@ inline Obj& Obj::set_all(Head v, Tail... tail)
         start_index = 1;
     }
 
-    return _set(start_index, v, tail...);
+    return _set_all(start_index, v, tail...);
 }
 
 inline bool Obj::update_if_needed() const

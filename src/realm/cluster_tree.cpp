@@ -119,6 +119,94 @@ public:
 
     void dump_objects(int64_t key_offset, std::string lead) const override;
 
+    virtual ref_type typed_write(ref_type ref, _impl::ArrayWriterBase& out, const Table& table, bool deep,
+                                 bool only_modified, bool compress) const override
+    {
+        REALM_ASSERT(ref == get_mem().get_ref());
+        if (only_modified && m_alloc.is_read_only(ref)) {
+            return ref;
+        }
+        REALM_ASSERT(get_is_inner_bptree_node_from_header(get_header()));
+        REALM_ASSERT(!get_context_flag_from_header(get_header()));
+        REALM_ASSERT(has_refs());
+        Array written_node(Allocator::get_default());
+        written_node.create(type_InnerBptreeNode, false, size());
+        for (unsigned j = 0; j < size(); ++j) {
+            RefOrTagged rot = get_as_ref_or_tagged(j);
+            if (rot.is_ref() && rot.get_as_ref()) {
+                if (only_modified && m_alloc.is_read_only(rot.get_as_ref())) {
+                    written_node.set(j, rot);
+                    continue;
+                }
+                if (j == 0) {
+                    // keys (ArrayUnsigned, me thinks)
+                    Array array_unsigned(m_alloc);
+                    array_unsigned.init_from_ref(rot.get_as_ref());
+                    written_node.set_as_ref(j, array_unsigned.write(out, deep, only_modified, false));
+                }
+                else {
+                    auto header = m_alloc.translate(rot.get_as_ref());
+                    MemRef m(header, rot.get_as_ref(), m_alloc);
+                    if (get_is_inner_bptree_node_from_header(header)) {
+                        ClusterNodeInner inner_node(m_alloc, m_tree_top);
+                        inner_node.init(m);
+                        written_node.set_as_ref(
+                            j, inner_node.typed_write(rot.get_as_ref(), out, table, deep, only_modified, compress));
+                    }
+                    else {
+                        Cluster cluster(j, m_alloc, m_tree_top);
+                        cluster.init(m);
+                        written_node.set_as_ref(
+                            j, cluster.typed_write(rot.get_as_ref(), out, table, deep, only_modified, compress));
+                    }
+                }
+            }
+            else { // not a ref, just copy value over
+                written_node.set(j, rot);
+            }
+        }
+        auto written_ref = written_node.write(out, false, false, false);
+        written_node.destroy();
+        return written_ref;
+    }
+
+    virtual void typed_print(std::string prefix, const Table& table) const override
+    {
+        REALM_ASSERT(get_is_inner_bptree_node_from_header(get_header()));
+        REALM_ASSERT(has_refs());
+        std::cout << "ClusterNodeInner " << header_to_string(get_header()) << std::endl;
+        for (unsigned j = 0; j < size(); ++j) {
+            RefOrTagged rot = get_as_ref_or_tagged(j);
+            auto pref = prefix + "  " + std::to_string(j) + ":\t";
+            if (rot.is_ref() && rot.get_as_ref()) {
+                if (j == 0) {
+                    std::cout << pref << "Keys as ArrayUnsigned as ";
+                    Array a(m_alloc);
+                    a.init_from_ref(rot.get_as_ref());
+                    a.typed_print(pref);
+                }
+                else {
+                    auto header = m_alloc.translate(rot.get_as_ref());
+                    MemRef m(header, rot.get_as_ref(), m_alloc);
+                    if (get_is_inner_bptree_node_from_header(header)) {
+                        ClusterNodeInner a(m_alloc, m_tree_top);
+                        a.init(m);
+                        std::cout << pref;
+                        a.typed_print(pref, table);
+                    }
+                    else {
+                        Cluster a(j, m_alloc, m_tree_top);
+                        a.init(m);
+                        std::cout << pref;
+                        a.typed_print(pref, table);
+                    }
+                }
+            }
+            // just ignore entries, which are not refs.
+        }
+        Array::typed_print(prefix);
+    }
+
 private:
     static constexpr size_t s_key_ref_index = 0;
     static constexpr size_t s_sub_tree_depth_index = 1;
@@ -804,31 +892,6 @@ ClusterTree::ClusterTree(Table* owner, Allocator& alloc, size_t top_position_for
 
 ClusterTree::~ClusterTree() {}
 
-size_t ClusterTree::size_from_ref(ref_type ref, Allocator& alloc)
-{
-    size_t ret = 0;
-    if (ref) {
-        Array arr(alloc);
-        arr.init_from_ref(ref);
-        if (arr.is_inner_bptree_node()) {
-            ret = size_t(arr.get(2)) >> 1;
-        }
-        else {
-            int64_t rot = arr.get(0);
-            if (rot & 1) {
-                ret = size_t(rot) >> 1;
-            }
-            else {
-                ref_type key_ref = to_ref(rot);
-                MemRef mem(key_ref, alloc);
-                auto header = mem.get_addr();
-                ret = Node::get_size_from_header(header);
-            }
-        }
-    }
-    return ret;
-}
-
 std::unique_ptr<ClusterNode> ClusterTree::create_root_from_parent(ArrayParent* parent, size_t ndx_in_parent)
 {
     ref_type ref = parent->get_child_ref(ndx_in_parent);
@@ -1015,7 +1078,7 @@ ClusterNode::State ClusterTree::try_get(ObjKey k) const noexcept
 ClusterNode::State ClusterTree::get(size_t ndx, ObjKey& k) const
 {
     if (ndx >= m_size) {
-        throw std::out_of_range("Object was deleted");
+        throw Exception(ErrorCodes::InvalidatedObject, "Object was deleted");
     }
     ClusterNode::State state;
     k = m_root->get(ndx, state);
@@ -1118,7 +1181,7 @@ void ClusterTree::verify() const
 #endif
 }
 
-void ClusterTree::nullify_links(ObjKey obj_key, CascadeState& state)
+void ClusterTree::nullify_incoming_links(ObjKey obj_key, CascadeState& state)
 {
     REALM_ASSERT(state.m_group);
     m_root->nullify_incoming_links(obj_key, state);
@@ -1206,16 +1269,10 @@ void ClusterTree::remove_all_links(CascadeState& state)
                         values.init_from_parent();
 
                         // Iterate through values and insert all link values
-                        values.traverse([&](BPlusTreeNode* node, size_t) {
-                            auto bplustree_leaf = static_cast<BPlusTree<Mixed>::LeafNode*>(node);
-                            auto sz = bplustree_leaf->size();
-                            for (size_t i = 0; i < sz; i++) {
-                                auto mix = bplustree_leaf->get(i);
-                                if (mix.is_type(type_TypedLink)) {
-                                    links.push_back(mix.get<ObjLink>());
-                                }
+                        values.for_all([&](Mixed val) {
+                            if (val.is_type(type_TypedLink)) {
+                                links.push_back(val.get<ObjLink>());
                             }
-                            return IteratorControl::AdvanceToNext;
                         });
 
                         if (links.size() > 0) {
@@ -1326,7 +1383,7 @@ size_t ClusterTree::Iterator::get_position()
 {
     auto ndx = m_tree.get_ndx(m_key);
     if (ndx == realm::npos) {
-        throw std::logic_error("Outdated iterator");
+        throw StaleAccessor("Stale iterator");
     }
     return ndx;
 }
@@ -1351,7 +1408,7 @@ void ClusterTree::Iterator::go(size_t abs_pos)
 {
     size_t sz = m_tree.size();
     if (abs_pos >= sz) {
-        throw std::out_of_range("Index out of range");
+        throw OutOfBounds("go() on Iterator", abs_pos, sz);
     }
 
     m_position = abs_pos;
@@ -1378,7 +1435,7 @@ bool ClusterTree::Iterator::update() const
         ObjKey k = load_leaf(m_key);
         m_leaf_invalid = !k || (k != m_key);
         if (m_leaf_invalid) {
-            throw std::logic_error("Outdated iterator");
+            throw StaleAccessor("Stale iterator");
         }
         return true;
     }

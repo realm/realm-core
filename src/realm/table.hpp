@@ -69,8 +69,8 @@ typedef Link BackLink;
 namespace _impl {
 class TableFriend;
 }
-namespace metrics {
-class QueryInfo;
+namespace util {
+class Logger;
 }
 namespace query_parser {
 class Arguments;
@@ -174,7 +174,7 @@ public:
     void check_column(ColKey col_key) const
     {
         if (REALM_UNLIKELY(!valid_column(col_key)))
-            throw LogicError(LogicError::column_does_not_exist);
+            throw InvalidColumnKey();
     }
     // Change the type of a table. Only allowed to switch to/from TopLevel from/to Embedded.
     void set_table_type(Type new_type, bool handle_backlinks = false);
@@ -290,7 +290,7 @@ public:
     /// Does the key refer to an object within the table?
     bool is_valid(ObjKey key) const noexcept
     {
-        return m_clusters.is_valid(key);
+        return key && m_clusters.is_valid(key);
     }
     GlobalKey get_object_id(ObjKey key) const;
     Obj get_object(ObjKey key) const
@@ -334,11 +334,13 @@ public:
     // - turns the object into a tombstone if links exist
     // - otherwise works just as remove_object()
     ObjKey invalidate_object(ObjKey key);
-    Obj get_tombstone(ObjKey key) const
+    // Remove several objects
+    void batch_erase_objects(std::vector<ObjKey>& keys);
+    Obj try_get_tombstone(ObjKey key) const
     {
         REALM_ASSERT(key.is_unresolved());
         REALM_ASSERT(m_tombstones);
-        return m_tombstones->get(key);
+        return m_tombstones->try_get_obj(key);
     }
 
     void clear();
@@ -380,6 +382,8 @@ public:
     // Used by upgrade
     void set_sequence_number(uint64_t seq);
     void set_collision_map(ref_type ref);
+    // Used for testing purposes.
+    void set_col_key_sequence_number(uint64_t seq);
 
     // Get the key of this table directly, without needing a Table accessor.
     static TableKey get_key_direct(Allocator& alloc, ref_type top_ref);
@@ -519,7 +523,7 @@ private:
     void change_nullability(ColKey from, ColKey to, bool throw_on_null);
     template <class F, class T>
     void change_nullability_list(ColKey from, ColKey to, bool throw_on_null);
-    Obj create_linked_object(GlobalKey = {});
+    Obj create_linked_object();
     // Change the embedded property of a table. If switching to being embedded, the table must
     // not have a primary key and all objects must have exactly 1 backlink.
     void set_embedded(bool embedded, bool handle_backlinks);
@@ -620,14 +624,6 @@ public:
     /// See operator==().
     bool operator!=(const Table& t) const;
 
-    /// Compute the sum of the sizes in number of bytes of all the array nodes
-    /// that currently make up this table. See also
-    /// Group::compute_aggregate_byte_size().
-    ///
-    /// If this table accessor is the detached state, this function returns
-    /// zero.
-    size_t compute_aggregated_byte_size() const noexcept;
-
     // Debug
     void verify() const;
 
@@ -657,6 +653,10 @@ public:
         Table& m_table;
         Replication* const* m_repl;
     };
+
+    ref_type typed_write(ref_type ref, _impl::ArrayWriterBase& out, bool deep, bool only_modified,
+                         bool compress) const;
+    void typed_print(std::string prefix, ref_type ref) const;
 
 private:
     enum LifeCycleCookie {
@@ -819,10 +819,8 @@ private:
     void nullify_links(CascadeState&);
     void remove_recursive(CascadeState&);
 
-    /// Used by query. Follows chain of link columns and returns final target table
-    const Table* get_link_chain_target(const std::vector<ColKey>&) const;
-
     Replication* get_repl() const noexcept;
+    util::Logger* get_logger() const noexcept;
 
     void set_ndx_in_parent(size_t ndx_in_parent) noexcept;
 
@@ -870,7 +868,6 @@ private:
 
     friend class _impl::TableFriend;
     friend class Query;
-    friend class metrics::QueryInfo;
     template <class>
     friend class SimpleQuerySupport;
     friend class TableView;
@@ -924,10 +921,10 @@ public:
 
 private:
     friend class ColKeys;
-    const Table* m_table;
+    ConstTableRef m_table;
     size_t m_pos;
 
-    ColKeyIterator(const Table* t, size_t p)
+    ColKeyIterator(const ConstTableRef& t, size_t p)
         : m_table(t)
         , m_pos(p)
     {
@@ -936,8 +933,8 @@ private:
 
 class ColKeys {
 public:
-    ColKeys(const Table* t)
-        : m_table(t)
+    ColKeys(ConstTableRef&& t)
+        : m_table(std::move(t))
     {
     }
 
@@ -968,7 +965,7 @@ public:
     }
 
 private:
-    const Table* m_table;
+    ConstTableRef m_table;
 };
 
 // Class used to collect a chain of links when building up a Query following links.
@@ -1006,8 +1003,8 @@ public:
     {
         auto ck = m_current_table->get_column_key(col_name);
         if (!ck) {
-            throw std::runtime_error(
-                util::format("'%1' has no property '%2'", m_current_table->get_class_name(), col_name));
+            throw LogicError(ErrorCodes::InvalidProperty,
+                             util::format("'%1' has no property '%2'", m_current_table->get_class_name(), col_name));
         }
         add(ck);
         return *this;
@@ -1033,11 +1030,13 @@ public:
             ct = col_type_Link;
         if constexpr (std::is_same_v<T, Dictionary>) {
             if (!col_key.is_dictionary())
-                throw LogicError(LogicError::type_mismatch);
+                throw LogicError(ErrorCodes::TypeMismatch, "Not a dictionary");
         }
         else {
             if (ct != ColumnTypeTraits<T>::column_id)
-                throw LogicError(LogicError::type_mismatch);
+                throw LogicError(ErrorCodes::TypeMismatch,
+                                 util::format("Expected %1 to be a %2", m_current_table->get_column_name(col_key),
+                                              ColumnTypeTraits<T>::column_id));
         }
 
         if (std::is_same<T, Link>::value || std::is_same<T, LnkLst>::value || std::is_same<T, BackLink>::value) {
@@ -1098,7 +1097,7 @@ private:
 
 inline ColKeys Table::get_column_keys() const
 {
-    return ColKeys(this);
+    return ColKeys(ConstTableRef(this, m_alloc.get_instance_version()));
 }
 
 inline uint_fast64_t Table::get_content_version() const noexcept
@@ -1376,14 +1375,13 @@ public:
         table.remove_recursive(rows); // Throws
     }
 
+    static void batch_erase_objects(Table& table, std::vector<ObjKey>& keys)
+    {
+        table.batch_erase_objects(keys); // Throws
+    }
     static void batch_erase_rows(Table& table, const KeyColumn& keys)
     {
         table.batch_erase_rows(keys); // Throws
-    }
-    // Temporary hack
-    static Obj create_linked_object(Table& table, GlobalKey id)
-    {
-        return table.create_linked_object(id);
     }
     static ObjKey global_to_local_object_id_hashed(const Table& table, GlobalKey global_id)
     {

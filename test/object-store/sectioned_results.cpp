@@ -20,6 +20,7 @@
 
 #include "util/index_helpers.hpp"
 #include "util/test_file.hpp"
+#include "util/test_utils.hpp"
 
 #include <realm/object-store/impl/realm_coordinator.hpp>
 #include <realm/object-store/list.hpp>
@@ -36,11 +37,7 @@ namespace realm::sectioned_results_fixtures {
 template <PropertyType prop_type, typename T>
 struct Base {
     using Type = T;
-
-    static PropertyType property_type()
-    {
-        return prop_type;
-    }
+    constexpr static PropertyType property_type = prop_type;
 };
 
 struct Int : Base<PropertyType::Int, int64_t> {
@@ -68,10 +65,7 @@ struct Int : Base<PropertyType::Int, int64_t> {
         return value.get_int() % 2;
     }
 
-    static size_t expected_size()
-    {
-        return 2;
-    }
+    constexpr static size_t expected_size = 2;
 };
 
 struct Bool : Base<PropertyType::Bool, bool> {
@@ -99,10 +93,7 @@ struct Bool : Base<PropertyType::Bool, bool> {
         return value.get_bool();
     }
 
-    static size_t expected_size()
-    {
-        return 2;
-    }
+    constexpr static size_t expected_size = 2;
 };
 
 struct Float : Base<PropertyType::Float, float> {
@@ -130,10 +121,7 @@ struct Float : Base<PropertyType::Float, float> {
         return (int(value.get_float()) % 2) ? 1.0 : 0.0;
     }
 
-    static size_t expected_size()
-    {
-        return 2;
-    }
+    constexpr static size_t expected_size = 2;
 };
 
 struct Double : Base<PropertyType::Double, double> {
@@ -161,10 +149,7 @@ struct Double : Base<PropertyType::Double, double> {
         return (int(value.get_double()) % 2) ? 1.0 : 0.0;
     }
 
-    static size_t expected_size()
-    {
-        return 2;
-    }
+    constexpr static size_t expected_size = 2;
 };
 
 struct String : Base<PropertyType::String, StringData> {
@@ -196,10 +181,7 @@ struct String : Base<PropertyType::String, StringData> {
         return str.size() > 0 ? str.prefix(1) : str;
     }
 
-    static size_t expected_size()
-    {
-        return 5;
-    }
+    constexpr static size_t expected_size = 5;
 };
 
 struct Binary : Base<PropertyType::Data, BinaryData> {
@@ -230,10 +212,7 @@ struct Binary : Base<PropertyType::Data, BinaryData> {
         return value.get_binary();
     }
 
-    static size_t expected_size()
-    {
-        return 6;
-    }
+    constexpr static size_t expected_size = 6;
 };
 
 struct Date : Base<PropertyType::Date, Timestamp> {
@@ -263,10 +242,7 @@ struct Date : Base<PropertyType::Date, Timestamp> {
         return value.get_timestamp().get_seconds() < 10 ? Timestamp(1, 1) : Timestamp(2, 1);
     }
 
-    static size_t expected_size()
-    {
-        return 2;
-    }
+    constexpr static size_t expected_size = 2;
 };
 
 struct MixedVal : Base<PropertyType::Mixed, realm::Mixed> {
@@ -301,15 +277,8 @@ struct MixedVal : Base<PropertyType::Mixed, realm::Mixed> {
         return Mixed::is_numeric(value.get_type()) ? "Numerics" : "Alphanumeric";
     }
 
-    static PropertyType property_type()
-    {
-        return PropertyType::Mixed | PropertyType::Nullable;
-    }
-
-    static size_t expected_size()
-    {
-        return 3;
-    }
+    constexpr static PropertyType property_type = PropertyType::Mixed | PropertyType::Nullable;
+    constexpr static size_t expected_size = 3;
 };
 
 struct OID : Base<PropertyType::ObjectId, ObjectId> {
@@ -345,10 +314,7 @@ struct OID : Base<PropertyType::ObjectId, ObjectId> {
         return value.get_object_id();
     }
 
-    static size_t expected_size()
-    {
-        return 2;
-    }
+    constexpr static size_t expected_size = 2;
 };
 
 struct UUID : Base<PropertyType::UUID, realm::UUID> {
@@ -388,10 +354,7 @@ struct UUID : Base<PropertyType::UUID, realm::UUID> {
         return value.get_uuid();
     }
 
-    static size_t expected_size()
-    {
-        return 2;
-    }
+    constexpr static size_t expected_size = 2;
 };
 
 struct Decimal : Base<PropertyType::Decimal, Decimal128> {
@@ -425,20 +388,14 @@ struct Decimal : Base<PropertyType::Decimal, Decimal128> {
         return value.get_decimal() < Decimal128("876.54e32") ? Decimal128("1") : Decimal128("0");
     }
 
-    static size_t expected_size()
-    {
-        return 2;
-    }
+    constexpr static size_t expected_size = 2;
 };
 
 template <typename BaseT>
 struct BoxedOptional : BaseT {
     using Type = util::Optional<typename BaseT::Type>;
     using Boxed = Type;
-    static PropertyType property_type()
-    {
-        return BaseT::property_type() | PropertyType::Nullable;
-    }
+    constexpr static PropertyType property_type = BaseT::property_type | PropertyType::Nullable;
     static std::vector<Type> values()
     {
         std::vector<Type> ret;
@@ -448,10 +405,7 @@ struct BoxedOptional : BaseT {
         return ret;
     }
 
-    static size_t expected_size()
-    {
-        return BaseT::expected_size() + 1;
-    }
+    constexpr static size_t expected_size = BaseT::expected_size + 1;
 
     static std::vector<Type> expected_sorted()
     {
@@ -472,11 +426,10 @@ struct BoxedOptional : BaseT {
 
 template <typename BaseT>
 struct UnboxedOptional : BaseT {
-    enum { is_optional = true };
-    static PropertyType property_type()
-    {
-        return BaseT::property_type() | PropertyType::Nullable;
-    }
+    constexpr static bool is_optional = true;
+    constexpr static PropertyType property_type = BaseT::property_type | PropertyType::Nullable;
+    constexpr static size_t expected_size = BaseT::expected_size + 1;
+
     static auto values() -> decltype(BaseT::values())
     {
         auto ret = BaseT::values();
@@ -490,10 +443,6 @@ struct UnboxedOptional : BaseT {
         return ret;
     }
 
-    static size_t expected_size()
-    {
-        return BaseT::expected_size() + 1;
-    }
 
     static auto expected_sorted() -> decltype(BaseT::values())
     {
@@ -517,7 +466,7 @@ struct UnboxedOptional : BaseT {
 };
 } // namespace realm::sectioned_results_fixtures
 
-TEST_CASE("sectioned results", "[sectioned_results]") {
+TEST_CASE("sectioned results", "[sectioned results]") {
     _impl::RealmCoordinator::assert_no_open_realms();
 
     InMemoryTestFile config;
@@ -533,31 +482,20 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
     auto coordinator = _impl::RealmCoordinator::get_coordinator(config.path);
     auto table = r->read_group().get_table("class_object");
     auto name_col = table->get_column_key("name_col");
-    auto int_col = table->get_column_key("int_col");
     auto array_string_col = table->get_column_key("array_string_col");
 
     r->begin_transaction();
-    auto o1 = table->create_object();
-    o1.set(name_col, "banana");
-    o1.set(int_col, 3);
-    auto o2 = table->create_object();
-    o2.set(name_col, "apricot");
-    o2.set(int_col, 2);
-    auto o3 = table->create_object();
-    o3.set(name_col, "apple");
-    o3.set(int_col, 1);
-    auto o4 = table->create_object();
-    o4.set(name_col, "orange");
-    o4.set(int_col, 2);
-    auto o5 = table->create_object();
-    o5.set(name_col, "apples");
-    o5.set(int_col, 3);
+    table->create_object().set_all("banana", 3);
+    table->create_object().set_all("apricot", 2);
+    table->create_object().set_all("apple", 1);
+    table->create_object().set_all("orange", 2);
+    auto o5 = table->create_object().set_all("apples", 3);
     r->commit_transaction();
 
     Results results(r, table);
     auto sorted = results.sort({{"name_col", true}});
     int algo_run_count = 0;
-    auto sectioned_results = sorted.sectioned_results([&algo_run_count](Mixed value, SharedRealm realm) {
+    auto sectioned_results = sorted.sectioned_results([&algo_run_count](Mixed value, const SharedRealm& realm) {
         algo_run_count++;
         auto obj = Object(realm, value.get_link());
         auto v = obj.get_column_value<StringData>("name_col");
@@ -627,7 +565,7 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         REQUIRE(sectioned_results["a"].size() == 3);
         REQUIRE(sectioned_results["b"].size() == 1);
         REQUIRE(sectioned_results["o"].size() == 1);
-        REQUIRE_THROWS(sectioned_results["x"]);
+        REQUIRE_EXCEPTION(sectioned_results["x"], InvalidArgument, "Section key \"x\" not found.");
         REQUIRE(algo_run_count == 5);
     }
 
@@ -644,7 +582,7 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         REQUIRE(sectioned_results["ap"].size() == 3);
         REQUIRE(sectioned_results["ba"].size() == 1);
         REQUIRE(sectioned_results["or"].size() == 1);
-        REQUIRE_THROWS(sectioned_results["a"]);
+        REQUIRE_EXCEPTION(sectioned_results["a"], InvalidArgument, "Section key \"a\" not found.");
         REQUIRE(algo_run_count == 5);
     }
 
@@ -671,7 +609,8 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         auto sr = sorted.sectioned_results([](Mixed value, SharedRealm) {
             return value.get_link();
         });
-        REQUIRE_THROWS(sr.size()); // Trigger calculation
+        REQUIRE_EXCEPTION(sr.size(), InvalidArgument,
+                          "Links are not supported as section keys."); // Trigger calculation
         // Even after sectioning has failed, the sectioned results
         // object should left in a sensible state.
         REQUIRE(sr.is_valid());
@@ -686,9 +625,10 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         // Should throw on `type_TypedLink` being a section key.
         sr = sorted.sectioned_results([&](Mixed value, SharedRealm realm) {
             auto obj = Object(realm, value.get_link());
-            return Mixed(obj.obj().get<ObjLink>(col_typed_link));
+            return Mixed(obj.get_obj().get<ObjLink>(col_typed_link));
         });
-        REQUIRE_THROWS(sr.size()); // Trigger calculation
+        REQUIRE_EXCEPTION(sr.size(), InvalidArgument,
+                          "Links are not supported as section keys."); // Trigger calculation
         REQUIRE(sr.is_valid());
     }
 
@@ -832,22 +772,19 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         advance_and_notify(*r);
         REQUIRE(algo_run_count == 11);
 
-        REQUIRE(changes.sections_to_insert.count() == 3);
-        REQUIRE(changes.sections_to_delete.count() == 0);
+        REQUIRE(changes.sections_to_delete.empty());
         REQUIRE_INDICES(changes.sections_to_insert, 2, 3, 5);
 
-        REQUIRE(changes.insertions.size() == 4);
+        REQUIRE(changes.insertions.size() == 6);
         // Section 0 is 'A'
         REQUIRE_INDICES(changes.insertions[0], 0);
-        REQUIRE(changes.insertions[0].count() == 1);
+        REQUIRE(changes.insertions[1].empty());
         // Section 2 is 'C'
-        REQUIRE(changes.insertions[2].count() == 2);
         REQUIRE_INDICES(changes.insertions[2], 0, 1);
         // Section 3 is 'M'
-        REQUIRE(changes.insertions[3].count() == 1);
         REQUIRE_INDICES(changes.insertions[3], 0);
+        REQUIRE(changes.insertions[4].empty());
         // Section 5 is 'S'
-        REQUIRE(changes.insertions[5].count() == 2);
         REQUIRE_INDICES(changes.insertions[5], 0, 1);
         REQUIRE(changes.modifications.empty());
         REQUIRE(changes.deletions.empty());
@@ -858,10 +795,15 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         o4.set(name_col, "stocksss");
         r->commit_transaction();
         advance_and_notify(*r);
-        REQUIRE(changes.sections_to_insert.count() == 0);
-        REQUIRE(changes.sections_to_delete.count() == 0);
+        REQUIRE(changes.sections_to_insert.empty());
+        REQUIRE(changes.sections_to_delete.empty());
 
-        REQUIRE(changes.modifications.size() == 1);
+        REQUIRE(changes.modifications.size() == 6);
+        REQUIRE(changes.modifications[0].empty());
+        REQUIRE(changes.modifications[1].empty());
+        REQUIRE(changes.modifications[2].empty());
+        REQUIRE(changes.modifications[3].empty());
+        REQUIRE(changes.modifications[4].empty());
         REQUIRE_INDICES(changes.modifications[5], 1);
         REQUIRE(changes.insertions.empty());
         REQUIRE(changes.deletions.empty());
@@ -874,10 +816,12 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         table->remove_object(o3.get_key());
         r->commit_transaction();
         advance_and_notify(*r);
-        REQUIRE(changes.sections_to_insert.count() == 0);
+        REQUIRE(changes.sections_to_insert.empty());
         REQUIRE(changes.sections_to_delete.count() == 1);
 
-        REQUIRE(changes.deletions.size() == 1);
+        REQUIRE(changes.deletions.size() == 3);
+        REQUIRE(changes.deletions[0].empty());
+        REQUIRE(changes.deletions[1].empty());
         REQUIRE_INDICES(changes.deletions[2], 1);
         REQUIRE(changes.insertions.empty());
         REQUIRE(changes.modifications.empty());
@@ -891,15 +835,19 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         o4.set(name_col, "erie");
         r->commit_transaction();
         advance_and_notify(*r);
-        REQUIRE(changes.sections_to_insert.count() == 1);
-        REQUIRE(changes.sections_to_delete.count() == 1);
         REQUIRE_INDICES(changes.sections_to_delete, 4);
         REQUIRE_INDICES(changes.sections_to_insert, 3);
 
-        REQUIRE(changes.deletions.size() == 1);
-        REQUIRE(changes.insertions.size() == 2);
+        REQUIRE(changes.deletions.size() == 4);
+        REQUIRE(changes.insertions.size() == 5);
         REQUIRE(changes.modifications.empty());
+        REQUIRE(changes.deletions[0].empty());
+        REQUIRE(changes.deletions[1].empty());
+        REQUIRE(changes.deletions[2].empty());
         REQUIRE_INDICES(changes.deletions[3], 0);
+        REQUIRE(changes.insertions[0].empty());
+        REQUIRE(changes.insertions[1].empty());
+        REQUIRE(changes.insertions[2].empty());
         REQUIRE_INDICES(changes.insertions[3], 0, 1);
         REQUIRE_INDICES(changes.insertions[4], 0);
         REQUIRE(algo_run_count == 9);
@@ -913,7 +861,6 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         r->commit_transaction();
         advance_and_notify(*r);
         REQUIRE(changes.sections_to_insert.empty());
-        REQUIRE(changes.sections_to_delete.count() == 1);
         REQUIRE_INDICES(changes.sections_to_delete, 3);
 
         REQUIRE(changes.deletions.empty());
@@ -930,7 +877,6 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         advance_and_notify(*r);
         REQUIRE(algo_run_count == 0);
         REQUIRE(changes.sections_to_insert.empty());
-        REQUIRE(changes.sections_to_delete.count() == 4);
         REQUIRE_INDICES(changes.sections_to_delete, 0, 1, 2, 3);
 
         REQUIRE(changes.deletions.empty());
@@ -949,7 +895,6 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         r->commit_transaction();
         advance_and_notify(*r);
         REQUIRE(algo_run_count == 7);
-        REQUIRE(changes.sections_to_insert.count() == 5);
         REQUIRE(changes.sections_to_delete.empty());
         REQUIRE_INDICES(changes.sections_to_insert, 0, 1, 2, 3, 4);
 
@@ -966,7 +911,7 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         r->begin_transaction();
         o1.set(name_col, "banana");
         o2.set(name_col, "melon");
-        o3.set(name_col, "calender");
+        o3.set(name_col, "calendar");
         o4.set(name_col, "apricot");
         o5.set(name_col, "duck"); // stays the same
         o6.set(name_col, "duck");
@@ -974,14 +919,12 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         r->commit_transaction();
         advance_and_notify(*r);
         REQUIRE(algo_run_count == 7);
-        REQUIRE(changes.sections_to_insert.count() == 2);
-        REQUIRE(changes.sections_to_delete.count() == 2);
         REQUIRE_INDICES(changes.sections_to_insert, 2, 4);
         REQUIRE_INDICES(changes.sections_to_delete, 3, 4);
 
         REQUIRE(changes.deletions.size() == 2);
         REQUIRE(changes.insertions.size() == 5);
-        REQUIRE(changes.modifications.size() == 1);
+        REQUIRE(changes.modifications.size() == 3);
         REQUIRE_INDICES(changes.insertions[0], 0, 1);
         REQUIRE_INDICES(changes.insertions[1], 0);
         REQUIRE_INDICES(changes.insertions[2], 0);
@@ -991,6 +934,8 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         REQUIRE_INDICES(changes.deletions[0], 0, 1, 2);
         REQUIRE_INDICES(changes.deletions[1], 0);
 
+        REQUIRE(changes.modifications[0].empty());
+        REQUIRE(changes.modifications[1].empty());
         REQUIRE_INDICES(changes.modifications[2], 0);
 
         algo_run_count = 0;
@@ -1006,21 +951,26 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         advance_and_notify(*r);
         REQUIRE(algo_run_count == 7);
         REQUIRE(changes.sections_to_insert.empty());
-        REQUIRE(changes.sections_to_delete.count() == 1);
         REQUIRE_INDICES(changes.sections_to_delete, 1);
 
-        REQUIRE(changes.deletions.size() == 3);
-        REQUIRE(changes.insertions.size() == 3);
-        REQUIRE(changes.modifications.size() == 1);
+        REQUIRE(changes.deletions.size() == 5);
+        REQUIRE(changes.insertions.size() == 4);
+        REQUIRE(changes.modifications.size() == 4);
 
         REQUIRE_INDICES(changes.insertions[0], 0, 1, 2);
         REQUIRE_INDICES(changes.insertions[1], 0);
+        REQUIRE(changes.insertions[2].empty());
         REQUIRE_INDICES(changes.insertions[3], 0);
 
         REQUIRE_INDICES(changes.deletions[0], 0, 1);
+        REQUIRE(changes.deletions[1].empty());
         REQUIRE_INDICES(changes.deletions[2], 0);
+        REQUIRE(changes.deletions[3].empty());
         REQUIRE_INDICES(changes.deletions[4], 0);
 
+        REQUIRE(changes.modifications[0].empty());
+        REQUIRE(changes.modifications[1].empty());
+        REQUIRE(changes.modifications[2].empty());
         REQUIRE_INDICES(changes.modifications[3], 0, 1);
 
         algo_run_count = 0;
@@ -1035,14 +985,12 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         r->commit_transaction();
         advance_and_notify(*r);
         REQUIRE(algo_run_count == 7);
-        REQUIRE(changes.sections_to_insert.count() == 3);
-        REQUIRE(changes.sections_to_delete.count() == 2);
         REQUIRE_INDICES(changes.sections_to_insert, 2, 3, 4);
         REQUIRE_INDICES(changes.sections_to_delete, 2, 3);
 
         REQUIRE(changes.deletions.size() == 1);
         REQUIRE(changes.insertions.size() == 5);
-        REQUIRE(changes.modifications.size() == 1);
+        REQUIRE(changes.modifications.size() == 2);
 
         REQUIRE_INDICES(changes.insertions[0], 0);
         REQUIRE_INDICES(changes.insertions[1], 1);
@@ -1050,12 +998,13 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         REQUIRE_INDICES(changes.insertions[3], 0, 1);
         REQUIRE_INDICES(changes.insertions[4], 0);
 
+        REQUIRE(changes.modifications[0].empty());
         REQUIRE_INDICES(changes.modifications[1], 0);
 
         REQUIRE_INDICES(changes.deletions[0], 0, 1, 2);
     }
 
-    SECTION("notifications ascending / decsending") {
+    SECTION("notifications ascending / descending") {
         // Ascending
         SectionedResultsChangeSet changes;
         auto token = sectioned_results.add_notification_callback([&](SectionedResultsChangeSet c) {
@@ -1090,17 +1039,16 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         advance_and_notify(*r);
 
         REQUIRE(algo_run_count == 4);
-        REQUIRE(changes.sections_to_insert.count() == 1);
-        REQUIRE(changes.sections_to_delete.count() == 1);
         REQUIRE_INDICES(changes.sections_to_insert, 1);
         REQUIRE_INDICES(changes.sections_to_delete, 0);
 
-        REQUIRE(changes.deletions.size() == 1);
+        REQUIRE(changes.deletions.size() == 2);
         REQUIRE(changes.insertions.size() == 2);
         REQUIRE(changes.modifications.empty());
 
         REQUIRE_INDICES(changes.insertions[0], 0, 1);
         REQUIRE_INDICES(changes.insertions[1], 0, 1);
+        REQUIRE(changes.deletions[0].empty());
         REQUIRE_INDICES(changes.deletions[1], 0, 1);
 
         // Descending
@@ -1140,8 +1088,6 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         advance_and_notify(*r);
 
         REQUIRE(algo_run_count == 4);
-        REQUIRE(changes.sections_to_insert.count() == 1);
-        REQUIRE(changes.sections_to_delete.count() == 1);
         REQUIRE_INDICES(changes.sections_to_insert, 0);
         REQUIRE_INDICES(changes.sections_to_delete, 1);
 
@@ -1155,7 +1101,7 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         REQUIRE_INDICES(changes.modifications[0], 1);
     }
 
-    SECTION("notifications ascending / decsending primitive") {
+    SECTION("notifications ascending / descending primitive") {
         // Ascending
         r->begin_transaction();
         auto o1 = table->create_object();
@@ -1195,17 +1141,16 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         advance_and_notify(*r);
 
         REQUIRE(algo_run_count == 4);
-        REQUIRE(changes.sections_to_insert.count() == 1);
-        REQUIRE(changes.sections_to_delete.count() == 1);
         REQUIRE_INDICES(changes.sections_to_insert, 1);
         REQUIRE_INDICES(changes.sections_to_delete, 0);
 
-        REQUIRE(changes.deletions.size() == 1);
+        REQUIRE(changes.deletions.size() == 2);
         REQUIRE(changes.insertions.size() == 2);
         REQUIRE(changes.modifications.empty());
 
         REQUIRE_INDICES(changes.insertions[0], 0, 1);
         REQUIRE_INDICES(changes.insertions[1], 0, 1);
+        REQUIRE(changes.deletions[0].empty());
         REQUIRE_INDICES(changes.deletions[1], 0, 1);
 
         // Descending
@@ -1245,8 +1190,6 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         advance_and_notify(*r);
 
         REQUIRE(algo_run_count == 4);
-        REQUIRE(changes.sections_to_insert.count() == 1);
-        REQUIRE(changes.sections_to_delete.count() == 1);
         REQUIRE_INDICES(changes.sections_to_insert, 0);
         REQUIRE_INDICES(changes.sections_to_delete, 1);
 
@@ -1294,7 +1237,6 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         REQUIRE(section1_notification_calls == 1);
         REQUIRE(section2_notification_calls == 0);
         REQUIRE(section1_changes.insertions.size() == 1);
-        REQUIRE(section1_changes.insertions[0].count() == 1);
         REQUIRE_INDICES(section1_changes.insertions[0], 0);
         REQUIRE(section1_changes.modifications.empty());
         REQUIRE(section1_changes.deletions.empty());
@@ -1306,8 +1248,8 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         advance_and_notify(*r);
         REQUIRE(section1_notification_calls == 1);
         REQUIRE(section2_notification_calls == 1);
-        REQUIRE(section2_changes.insertions.size() == 1);
-        REQUIRE(section2_changes.insertions[1].count() == 1);
+        REQUIRE(section2_changes.insertions.size() == 2);
+        REQUIRE(section2_changes.insertions[0].empty());
         REQUIRE_INDICES(section2_changes.insertions[1], 1);
         REQUIRE(section2_changes.modifications.empty());
         REQUIRE(section2_changes.deletions.empty());
@@ -1347,7 +1289,8 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         advance_and_notify(*r);
         REQUIRE(section1_notification_calls == 3);
         REQUIRE(section2_notification_calls == 2);
-        REQUIRE(section2_changes.deletions.size() == 1);
+        REQUIRE(section2_changes.deletions.size() == 2);
+        REQUIRE(section2_changes.deletions[0].empty());
         REQUIRE_INDICES(section2_changes.deletions[1], 1);
         REQUIRE(section2_changes.insertions.empty());
         REQUIRE(section2_changes.modifications.empty());
@@ -1571,7 +1514,7 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
     }
 }
 
-TEST_CASE("sectioned results link notification bug", "[sectioned_results]") {
+TEST_CASE("sectioned results link notification bug", "[sectioned results]") {
     _impl::RealmCoordinator::assert_no_open_realms();
 
     InMemoryTestFile config;
@@ -1642,7 +1585,7 @@ TEST_CASE("sectioned results link notification bug", "[sectioned_results]") {
 
 namespace cf = realm::sectioned_results_fixtures;
 
-TEMPLATE_TEST_CASE("sectioned results primitive types", "[sectioned_results]", cf::MixedVal, cf::Int, cf::Bool,
+TEMPLATE_TEST_CASE("sectioned results primitive types", "[sectioned results]", cf::MixedVal, cf::Int, cf::Bool,
                    cf::Float, cf::Double, cf::String, cf::Binary, cf::Date, cf::OID, cf::Decimal, cf::UUID,
                    cf::BoxedOptional<cf::Int>, cf::BoxedOptional<cf::Bool>, cf::BoxedOptional<cf::Float>,
                    cf::BoxedOptional<cf::Double>, cf::BoxedOptional<cf::OID>, cf::BoxedOptional<cf::UUID>,
@@ -1659,7 +1602,7 @@ TEMPLATE_TEST_CASE("sectioned results primitive types", "[sectioned_results]", c
     auto r = Realm::get_shared_realm(config);
     r->update_schema({
         {"object",
-         {{"value_col", TestType::property_type()}, {"array_col", PropertyType::Array | TestType::property_type()}}},
+         {{"value_col", TestType::property_type}, {"array_col", PropertyType::Array | TestType::property_type}}},
     });
 
     auto coordinator = _impl::RealmCoordinator::get_coordinator(config.path);
@@ -1687,7 +1630,7 @@ TEMPLATE_TEST_CASE("sectioned results primitive types", "[sectioned_results]", c
             algo_run_count++;
             return TestType::comparison_value(value);
         });
-        REQUIRE(sectioned_results.size() == TestType::expected_size());
+        REQUIRE(sectioned_results.size() == TestType::expected_size);
         auto size = sectioned_results.size();
         auto results_idx = 0;
         for (size_t section_idx = 0; section_idx < size; section_idx++) {
@@ -1715,7 +1658,7 @@ TEMPLATE_TEST_CASE("sectioned results primitive types", "[sectioned_results]", c
         });
         std::reverse(exp_values_sorted.begin(), exp_values_sorted.end());
         std::reverse(exp_keys.begin(), exp_keys.end());
-        REQUIRE(sectioned_results.size() == TestType::expected_size());
+        REQUIRE(sectioned_results.size() == TestType::expected_size);
         auto size = sectioned_results.size();
         auto results_idx = 0;
         for (size_t section_idx = 0; section_idx < size; section_idx++) {
@@ -1807,7 +1750,8 @@ TEMPLATE_TEST_CASE("sectioned results primitive types", "[sectioned_results]", c
         REQUIRE_INDICES(changes1.sections_to_insert, 0);
         REQUIRE(changes1.sections_to_delete.empty());
 
-        REQUIRE(changes2.insertions.size() == 1);
+        REQUIRE(changes2.insertions.size() == 2);
+        REQUIRE(changes2.insertions[0].empty());
         REQUIRE(!changes2.insertions[1].empty());
         REQUIRE(changes2.deletions.empty());
         REQUIRE(changes2.modifications.empty());
@@ -1824,7 +1768,7 @@ TEMPLATE_TEST_CASE("sectioned results primitive types", "[sectioned_results]", c
         auto frozen_realm = r->freeze();
         auto frozen_sr = sectioned_results.freeze(frozen_realm);
         auto size = frozen_sr.size();
-        REQUIRE(size == TestType::expected_size());
+        REQUIRE(size == TestType::expected_size);
         auto results_idx = 0;
         for (size_t section_idx = 0; section_idx < size; section_idx++) {
             auto section = frozen_sr[section_idx];
@@ -1848,7 +1792,7 @@ TEMPLATE_TEST_CASE("sectioned results primitive types", "[sectioned_results]", c
             return TestType::comparison_value(value);
         });
         auto size = sectioned_results.size();
-        REQUIRE(size == TestType::expected_size());
+        REQUIRE(size == TestType::expected_size);
         auto results_idx = 0;
         for (size_t section_idx = 0; section_idx < size; section_idx++) {
             auto section = sectioned_results[section_idx];

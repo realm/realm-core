@@ -52,6 +52,9 @@ void generate_properties_for_obj(Replication& repl, const Obj& obj, const ColInf
         auto embedded_table = elem.second;
         auto cols_2 = get_col_info(embedded_table);
         auto update_embedded = [&](Mixed val) {
+            if (val.is_null()) {
+                return;
+            }
             REALM_ASSERT(val.is_type(type_Link, type_TypedLink));
             Obj embedded_obj = embedded_table->get_object(val.get<ObjKey>());
             generate_properties_for_obj(repl, embedded_obj, cols_2);
@@ -101,17 +104,28 @@ void generate_properties_for_obj(Replication& repl, const Obj& obj, const ColInf
 
 namespace realm {
 
+std::map<DB::TransactStage, const char*> log_stage = {
+    {DB::TransactStage::transact_Frozen, "frozen"},
+    {DB::TransactStage::transact_Writing, "write"},
+    {DB::TransactStage::transact_Reading, "read"},
+};
+
 Transaction::Transaction(DBRef _db, SlabAlloc* alloc, DB::ReadLockInfo& rli, DB::TransactStage stage)
     : Group(alloc)
     , db(_db)
     , m_read_lock(rli)
+    , m_log_id(util::gen_log_id(this))
 {
     bool writable = stage == DB::transact_Writing;
     m_transact_stage = DB::transact_Ready;
-    set_metrics(db->m_metrics);
     set_transact_stage(stage);
     m_alloc.note_reader_start(this);
-    attach_shared(m_read_lock.m_top_ref, m_read_lock.m_file_size, writable);
+    attach_shared(m_read_lock.m_top_ref, m_read_lock.m_file_size, writable,
+                  VersionID{rli.m_version, rli.m_reader_idx});
+    if (db->m_logger) {
+        db->m_logger->log(util::Logger::Level::trace, "Start %1 %2: %3 ref %4", log_stage[stage], m_log_id,
+                          rli.m_version, m_read_lock.m_top_ref);
+    }
 }
 
 Transaction::~Transaction()
@@ -141,10 +155,10 @@ size_t Transaction::get_commit_size() const
 
 DB::version_type Transaction::commit()
 {
-    if (!is_attached())
-        throw LogicError(LogicError::wrong_transact_state);
+    check_attached();
+
     if (m_transact_stage != DB::transact_Writing)
-        throw LogicError(LogicError::wrong_transact_state);
+        throw WrongTransactionState("Not a write transaction");
 
     REALM_ASSERT(is_attached());
 
@@ -178,7 +192,7 @@ void Transaction::rollback()
         return; // Idempotency
 
     if (m_transact_stage != DB::transact_Writing)
-        throw LogicError(LogicError::wrong_transact_state);
+        throw WrongTransactionState("Not a write transaction");
     db->reset_free_space_tracking();
     if (!holds_write_mutex())
         db->end_write_on_correct_thread();
@@ -191,16 +205,15 @@ void Transaction::end_read()
     if (m_transact_stage == DB::transact_Ready)
         return;
     if (m_transact_stage == DB::transact_Writing)
-        throw LogicError(LogicError::wrong_transact_state);
+        throw WrongTransactionState("Illegal end_read when in write mode");
     do_end_read();
 }
 
 VersionID Transaction::commit_and_continue_as_read(bool commit_to_disk)
 {
-    if (!is_attached())
-        throw LogicError(LogicError::wrong_transact_state);
+    check_attached();
     if (m_transact_stage != DB::transact_Writing)
-        throw LogicError(LogicError::wrong_transact_state);
+        throw WrongTransactionState("Not a write transaction");
 
     flush_accessors_for_commit();
 
@@ -261,30 +274,31 @@ VersionID Transaction::commit_and_continue_as_read(bool commit_to_disk)
             }
         }
 
-        // Remap file if it has grown, and update refs in underlying node structure
+        // Remap file if it has grown, and update refs in underlying node structure.
         remap_and_update_refs(m_read_lock.m_top_ref, m_read_lock.m_file_size, false); // Throws
         return VersionID{version, new_read_lock.m_reader_idx};
     }
-    catch (...) {
+    catch (std::exception& e) {
+        if (db->m_logger) {
+            db->m_logger->log(util::Logger::Level::error, "Tr %1: Commit failed with exception: \"%2\"", m_log_id,
+                              e.what());
+        }
         // In case of failure, further use of the transaction for reading is unsafe
         set_transact_stage(DB::transact_Ready);
         throw;
     }
 }
 
-void Transaction::commit_and_continue_writing()
+VersionID Transaction::commit_and_continue_writing()
 {
-    if (!is_attached())
-        throw LogicError(LogicError::wrong_transact_state);
+    check_attached();
     if (m_transact_stage != DB::transact_Writing)
-        throw LogicError(LogicError::wrong_transact_state);
-
-    REALM_ASSERT(is_attached());
+        throw WrongTransactionState("Not a write transaction");
 
     // before committing, allow any accessors at group level or below to sync
     flush_accessors_for_commit();
 
-    db->do_commit(*this); // Throws
+    DB::version_type version = db->do_commit(*this); // Throws
 
     // We need to set m_read_lock in order for wait_for_change to work.
     // To set it, we grab a readlock on the latest available snapshot
@@ -299,12 +313,13 @@ void Transaction::commit_and_continue_writing()
 
     bool writable = true;
     remap_and_update_refs(m_read_lock.m_top_ref, m_read_lock.m_file_size, writable); // Throws
+    return VersionID{version, lock_after_commit.m_reader_idx};
 }
 
 TransactionRef Transaction::freeze()
 {
     if (m_transact_stage != DB::transact_Reading)
-        throw LogicError(LogicError::wrong_transact_state);
+        throw WrongTransactionState("Can only freeze a read transaction");
     auto version = VersionID(m_read_lock.m_version, m_read_lock.m_reader_idx);
     return db->start_frozen(version);
 }
@@ -312,12 +327,20 @@ TransactionRef Transaction::freeze()
 TransactionRef Transaction::duplicate()
 {
     auto version = VersionID(m_read_lock.m_version, m_read_lock.m_reader_idx);
-    if (m_transact_stage == DB::transact_Reading)
-        return db->start_read(version);
-    if (m_transact_stage == DB::transact_Frozen)
-        return db->start_frozen(version);
-
-    throw LogicError(LogicError::wrong_transact_state);
+    switch (m_transact_stage) {
+        case DB::transact_Ready:
+            throw WrongTransactionState("Cannot duplicate a transaction which does not have a read lock.");
+        case DB::transact_Reading:
+            return db->start_read(version);
+        case DB::transact_Frozen:
+            return db->start_frozen(version);
+        case DB::transact_Writing:
+            if (get_commit_size() != 0)
+                throw WrongTransactionState(
+                    "Can only duplicate a write transaction before any changes have been made.");
+            return db->start_read(version);
+    }
+    REALM_UNREACHABLE();
 }
 
 void Transaction::copy_to(TransactionRef dest) const
@@ -642,13 +665,14 @@ void Transaction::replicate(Transaction* dest, Replication& repl) const
         if (!table->is_embedded()) {
             auto pk_col = table->get_primary_key_column();
             if (!pk_col)
-                throw std::runtime_error(
+                throw RuntimeError(
+                    ErrorCodes::BrokenInvariant,
                     util::format("Class '%1' must have a primary key", Group::table_name_to_class_name(table_name)));
             auto pk_name = table->get_column_name(pk_col);
             if (pk_name != "_id")
-                throw std::runtime_error(
-                    util::format("Primary key of class '%1' must be named '_id'. Current is '%2'",
-                                 Group::table_name_to_class_name(table_name), pk_name));
+                throw RuntimeError(ErrorCodes::BrokenInvariant,
+                                   util::format("Primary key of class '%1' must be named '_id'. Current is '%2'",
+                                                Group::table_name_to_class_name(table_name), pk_name));
             repl.add_class_with_primary_key(tk, table_name, DataType(pk_col.get_type()), pk_name,
                                             pk_col.is_nullable(), table->get_table_type());
         }
@@ -703,7 +727,11 @@ void Transaction::complete_async_commit()
     DB::ReadLockInfo read_lock;
     try {
         read_lock = db->grab_read_lock(DB::ReadLockInfo::Live, VersionID());
-        GroupWriter out(*this);
+        if (db->m_logger) {
+            db->m_logger->log(util::Logger::Level::trace, "Tr %1: Committing ref %2 to disk", m_log_id,
+                              read_lock.m_top_ref);
+        }
+        GroupCommitter out(*this);
         out.commit(read_lock.m_top_ref); // Throws
         // we must release the write mutex before the callback, because the callback
         // is allowed to re-request it.
@@ -713,8 +741,12 @@ void Transaction::complete_async_commit()
             m_oldest_version_not_persisted.reset();
         }
     }
-    catch (...) {
+    catch (const std::exception& e) {
         m_commit_exception = std::current_exception();
+        if (db->m_logger) {
+            db->m_logger->log(util::Logger::Level::error, "Tr %1: Committing to disk failed with exception: \"%2\"",
+                              m_log_id, e.what());
+        }
         m_async_commit_has_failed = true;
         db->release_read_lock(read_lock);
     }
@@ -831,6 +863,9 @@ void Transaction::acquire_write_lock()
 
 void Transaction::do_end_read() noexcept
 {
+    if (db->m_logger)
+        db->m_logger->log(util::Logger::Level::trace, "End transaction %1", m_log_id);
+
     prepare_for_close();
     detach();
 
@@ -892,49 +927,14 @@ void Transaction::initialize_replication()
 
 void Transaction::set_transact_stage(DB::TransactStage stage) noexcept
 {
-#if REALM_METRICS
-    REALM_ASSERT(m_metrics == db->m_metrics);
-    if (m_metrics) { // null if metrics are disabled
-        size_t free_space;
-        size_t used_space;
-        db->get_stats(free_space, used_space);
-        size_t total_size = used_space + free_space;
-
-        size_t num_objects = m_total_rows;
-        size_t num_available_versions = static_cast<size_t>(db->get_number_of_versions());
-        size_t num_decrypted_pages = realm::util::get_num_decrypted_pages();
-
-        if (stage == DB::transact_Reading) {
-            if (m_transact_stage == DB::transact_Writing) {
-                m_metrics->end_write_transaction(total_size, free_space, num_objects, num_available_versions,
-                                                 num_decrypted_pages);
-            }
-            m_metrics->start_read_transaction();
-        }
-        else if (stage == DB::transact_Writing) {
-            if (m_transact_stage == DB::transact_Reading) {
-                m_metrics->end_read_transaction(total_size, free_space, num_objects, num_available_versions,
-                                                num_decrypted_pages);
-            }
-            m_metrics->start_write_transaction();
-        }
-        else if (stage == DB::transact_Ready) {
-            m_metrics->end_read_transaction(total_size, free_space, num_objects, num_available_versions,
-                                            num_decrypted_pages);
-            m_metrics->end_write_transaction(total_size, free_space, num_objects, num_available_versions,
-                                             num_decrypted_pages);
-        }
-    }
-#endif
-
     m_transact_stage = stage;
 }
 
 class NodeTree {
 public:
-    NodeTree(size_t evac_limit, size_t& work_limit)
+    NodeTree(size_t evac_limit, size_t work_limit)
         : m_evac_limit(evac_limit)
-        , m_work_limit(work_limit)
+        , m_work_limit(int64_t(work_limit))
         , m_moved(0)
     {
     }
@@ -954,18 +954,15 @@ public:
     ///                   to point to the node we have just processed
     bool trv(Array& current_node, unsigned level, std::vector<size_t>& progress)
     {
+        if (m_work_limit < 0) {
+            return false;
+        }
         if (current_node.is_read_only()) {
-            auto byte_size = current_node.get_byte_size();
+            size_t byte_size = current_node.get_byte_size();
             if ((current_node.get_ref() + byte_size) > m_evac_limit) {
                 current_node.copy_on_write();
                 m_moved++;
-                if (m_work_limit > byte_size) {
-                    m_work_limit -= byte_size;
-                }
-                else {
-                    m_work_limit = 0;
-                    return false;
-                }
+                m_work_limit -= byte_size;
             }
         }
 
@@ -997,12 +994,12 @@ public:
 
 private:
     size_t m_evac_limit;
-    size_t m_work_limit;
+    int64_t m_work_limit;
     size_t m_moved;
 };
 
 
-void Transaction::cow_outliers(std::vector<size_t>& progress, size_t evac_limit, size_t& work_limit)
+void Transaction::cow_outliers(std::vector<size_t>& progress, size_t evac_limit, size_t work_limit)
 {
     NodeTree node_tree(evac_limit, work_limit);
     if (progress.empty()) {

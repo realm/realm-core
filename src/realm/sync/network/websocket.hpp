@@ -1,6 +1,7 @@
 #pragma once
 
 #include <realm/sync/network/http.hpp>
+#include <realm/sync/network/websocket_error.hpp>
 #include <realm/util/functional.hpp>
 #include <realm/util/logger.hpp>
 
@@ -18,7 +19,7 @@ public:
     virtual ~Config() {}
 
     /// The Socket uses the caller supplied logger for logging.
-    virtual util::Logger& websocket_get_logger() noexcept = 0;
+    virtual const std::shared_ptr<util::Logger>& websocket_get_logger() noexcept = 0;
 
     /// The Socket needs random numbers to satisfy the Websocket protocol.
     /// The caller must supply a random number generator.
@@ -76,7 +77,7 @@ public:
     /// websocket object is destroyed during execution of the function.
     virtual bool websocket_text_message_received(const char* data, size_t size);
     virtual bool websocket_binary_message_received(const char* data, size_t size);
-    virtual bool websocket_close_message_received(std::error_code error_code, StringData message);
+    virtual bool websocket_close_message_received(WebSocketError code, std::string_view message);
     virtual bool websocket_ping_message_received(const char* data, size_t size);
     virtual bool websocket_pong_message_received(const char* data, size_t size);
     //@}
@@ -139,8 +140,7 @@ public:
     /// FIXME: Guarantee no callback reentrance, i.e., that the completion
     /// handler, or the error handler in case an error occurs, is never called
     /// from within the execution of async_write_frame().
-    void async_write_frame(bool fin, Opcode opcode, const char* data, size_t size,
-                           util::UniqueFunction<void()> handler);
+    void async_write_frame(bool fin, Opcode opcode, const char* data, size_t size, WriteCompletionHandler handler);
 
     //@{
     /// Five utility functions used to send whole messages. These five
@@ -153,11 +153,11 @@ public:
     /// from within the execution of async_write_text(), and its friends. This
     /// is already assumed by the client and server implementations of the sync
     /// protocol.
-    void async_write_text(const char* data, size_t size, util::UniqueFunction<void()> handler);
-    void async_write_binary(const char* data, size_t size, util::UniqueFunction<void()> handler);
-    void async_write_close(const char* data, size_t size, util::UniqueFunction<void()> handler);
-    void async_write_ping(const char* data, size_t size, util::UniqueFunction<void()> handler);
-    void async_write_pong(const char* data, size_t size, util::UniqueFunction<void()> handler);
+    void async_write_text(const char* data, size_t size, WriteCompletionHandler handler);
+    void async_write_binary(const char* data, size_t size, WriteCompletionHandler handler);
+    void async_write_close(const char* data, size_t size, WriteCompletionHandler handler);
+    void async_write_ping(const char* data, size_t size, WriteCompletionHandler handler);
+    void async_write_pong(const char* data, size_t size, WriteCompletionHandler handler);
     //@}
 
     /// stop() stops the socket. The socket will stop processing incoming data,
@@ -167,6 +167,10 @@ public:
     /// restarted with initiate_client_handshake() and
     /// initiate_server_handshake().
     void stop() noexcept;
+
+    /// Specifies an alternate status code for the handshake response to simulate
+    /// failures returned from the server.
+    void force_handshake_response_for_testing(int status_code, std::string body = "");
 
 private:
     class Impl;
@@ -186,7 +190,7 @@ util::Optional<std::string> read_sec_websocket_protocol(const HTTPRequest& reque
 util::Optional<HTTPResponse> make_http_response(const HTTPRequest& request, const std::string& sec_websocket_protocol,
                                                 std::error_code& ec);
 
-enum class Error {
+enum class HttpError {
     bad_request_malformed_http,
     bad_request_header_upgrade,
     bad_request_header_connection,
@@ -197,6 +201,7 @@ enum class Error {
     bad_response_200_ok,
     bad_response_3xx_redirection,
     bad_response_301_moved_permanently,
+    bad_response_308_permanent_redirect,
     bad_response_4xx_client_errors,
     bad_response_401_unauthorized,
     bad_response_403_forbidden,
@@ -212,18 +217,16 @@ enum class Error {
     bad_message
 };
 
-const std::error_category& websocket_close_status_category() noexcept;
+const std::error_category& http_error_category() noexcept;
 
-const std::error_category& error_category() noexcept;
-
-std::error_code make_error_code(Error) noexcept;
+std::error_code make_error_code(HttpError) noexcept;
 
 } // namespace realm::sync::websocket
 
 namespace std {
 
 template <>
-struct is_error_code_enum<realm::sync::websocket::Error> {
+struct is_error_code_enum<realm::sync::websocket::HttpError> {
     static const bool value = true;
 };
 

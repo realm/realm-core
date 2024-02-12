@@ -1341,7 +1341,7 @@ TEST(Query_DeepCopyTest)
 
 TEST(Query_StringIndexCrash)
 {
-    // Test for a crash which occured when a query testing for equality on a
+    // Test for a crash which occurred when a query testing for equality on a
     // string index was deep-copied after being run
     Table table;
     auto col = table.add_column(type_String, "s", true);
@@ -4427,8 +4427,8 @@ TEST(Query_ColumnDeletionSimple)
     foo.remove_column(col_int0);
 
     size_t x = 0;
-    CHECK_LOGIC_ERROR(x = q1.count(), LogicError::column_does_not_exist);
-    CHECK_LOGIC_ERROR(tv1.sync_if_needed(), LogicError::column_does_not_exist);
+    CHECK_LOGIC_ERROR(x = q1.count(), ErrorCodes::InvalidProperty);
+    CHECK_LOGIC_ERROR(tv1.sync_if_needed(), ErrorCodes::InvalidProperty);
     CHECK_EQUAL(x, 0);
     CHECK_EQUAL(tv1.size(), 0);
 
@@ -4439,8 +4439,8 @@ TEST(Query_ColumnDeletionSimple)
     CHECK_EQUAL(tv2.size(), 2);
 
     x = 0;
-    CHECK_LOGIC_ERROR(x = q3.count(), LogicError::column_does_not_exist);
-    CHECK_LOGIC_ERROR(tv3.sync_if_needed(), LogicError::column_does_not_exist);
+    CHECK_LOGIC_ERROR(x = q3.count(), ErrorCodes::InvalidProperty);
+    CHECK_LOGIC_ERROR(tv3.sync_if_needed(), ErrorCodes::InvalidProperty);
     CHECK_EQUAL(x, 0);
     CHECK_EQUAL(tv3.size(), 0);
 }
@@ -4490,9 +4490,9 @@ TEST(Query_ColumnDeletionExpression)
 
     foo.remove_column(col_int0);
     size_t x = 0;
-    CHECK_LOGIC_ERROR(x = q.count(), LogicError::column_does_not_exist);
-    CHECK_LOGIC_ERROR(tv.sync_if_needed(), LogicError::column_does_not_exist);
-    CHECK_LOGIC_ERROR(tv1.sync_if_needed(), LogicError::column_does_not_exist);
+    CHECK_LOGIC_ERROR(x = q.count(), ErrorCodes::InvalidProperty);
+    CHECK_LOGIC_ERROR(tv.sync_if_needed(), ErrorCodes::InvalidProperty);
+    CHECK_LOGIC_ERROR(tv1.sync_if_needed(), ErrorCodes::InvalidProperty);
     CHECK_EQUAL(x, 0);
     CHECK_EQUAL(tv.size(), 0);
 
@@ -4504,8 +4504,8 @@ TEST(Query_ColumnDeletionExpression)
     CHECK_EQUAL(tv.size(), 1);
     CHECK_EQUAL(tv1.size(), 1);
     foo.remove_column(col_date3);
-    CHECK_LOGIC_ERROR(tv.sync_if_needed(), LogicError::column_does_not_exist);
-    CHECK_LOGIC_ERROR(tv1.sync_if_needed(), LogicError::column_does_not_exist);
+    CHECK_LOGIC_ERROR(tv.sync_if_needed(), ErrorCodes::InvalidProperty);
+    CHECK_LOGIC_ERROR(tv1.sync_if_needed(), ErrorCodes::InvalidProperty);
 
     // StringNodeBase
     q = foo.column<String>(col_str4) == StringData("Hello, world");
@@ -4515,22 +4515,22 @@ TEST(Query_ColumnDeletionExpression)
     CHECK_EQUAL(tv.size(), 1);
     CHECK_EQUAL(tv1.size(), 4);
     foo.remove_column(col_str4);
-    CHECK_LOGIC_ERROR(tv.sync_if_needed(), LogicError::column_does_not_exist);
-    CHECK_LOGIC_ERROR(tv1.sync_if_needed(), LogicError::column_does_not_exist);
+    CHECK_LOGIC_ERROR(tv.sync_if_needed(), ErrorCodes::InvalidProperty);
+    CHECK_LOGIC_ERROR(tv1.sync_if_needed(), ErrorCodes::InvalidProperty);
 
     // FloatDoubleNode
     q = foo.column<Float>(col_float5) > 0.0f;
     tv = q.find_all();
     CHECK_EQUAL(tv.size(), 2);
     foo.remove_column(col_float5);
-    CHECK_LOGIC_ERROR(tv.sync_if_needed(), LogicError::column_does_not_exist);
+    CHECK_LOGIC_ERROR(tv.sync_if_needed(), ErrorCodes::InvalidProperty);
 
     // BinaryNode
     q = foo.column<Binary>(col_bin6) != BinaryData("Binary", 6);
     tv = q.find_all();
     CHECK_EQUAL(tv.size(), 4);
     foo.remove_column(col_bin6);
-    CHECK_LOGIC_ERROR(tv.sync_if_needed(), LogicError::column_does_not_exist);
+    CHECK_LOGIC_ERROR(tv.sync_if_needed(), ErrorCodes::InvalidProperty);
 }
 
 
@@ -4578,12 +4578,12 @@ TEST(Query_ColumnDeletionLinks)
     CHECK_EQUAL(tv.size(), 1);
     // remove link column, disaster
     bar->remove_column(col_link0);
-    CHECK_LOGIC_ERROR(bar->check_column(col_link0), LogicError::column_does_not_exist);
-    CHECK_LOGIC_ERROR(tv.sync_if_needed(), LogicError::column_does_not_exist);
+    CHECK_LOGIC_ERROR(bar->check_column(col_link0), ErrorCodes::InvalidProperty);
+    CHECK_LOGIC_ERROR(tv.sync_if_needed(), ErrorCodes::InvalidProperty);
     foo->remove_column(col_link1);
-    CHECK_LOGIC_ERROR(foo->check_column(col_link1), LogicError::column_does_not_exist);
-    CHECK_LOGIC_ERROR(q1.count(), LogicError::column_does_not_exist);
-    CHECK_LOGIC_ERROR(q2.count(), LogicError::column_does_not_exist);
+    CHECK_LOGIC_ERROR(foo->check_column(col_link1), ErrorCodes::InvalidProperty);
+    CHECK_LOGIC_ERROR(q1.count(), ErrorCodes::InvalidProperty);
+    CHECK_LOGIC_ERROR(q2.count(), ErrorCodes::InvalidProperty);
 }
 
 
@@ -5430,6 +5430,8 @@ TEST_TYPES(Query_PrimaryKeySearchForNull, Prop<String>, Prop<Int>, Prop<ObjectId
 TEST_TYPES(Query_Mixed, std::true_type, std::false_type)
 {
     bool has_index = TEST_TYPE::value;
+    constexpr bool exact_match = true;
+    constexpr bool insensitive_match = false;
     Group g;
     auto table = g.add_table("Foo");
     auto origin = g.add_table("Origin");
@@ -5517,29 +5519,62 @@ TEST_TYPES(Query_Mixed, std::true_type, std::false_type)
     CHECK_EQUAL(tv.size(), 3);
     tv = table->where().begins_with(col_any, BinaryData("String2", 7)).find_all(); // 20, 24, 28
     CHECK_EQUAL(tv.size(), 3);
+    tv = table->where().begins_with(col_any, Mixed(75.), exact_match).find_all();
+    CHECK_EQUAL(tv.size(), 0);
+    tv = table->where().begins_with(col_any, Mixed(75.), insensitive_match).find_all();
+    CHECK_EQUAL(tv.size(), 0);
 
-    tv = table->where().contains(col_any, StringData("TRIN"), false).find_all();
+    tv = table->where().contains(col_any, StringData("TRIN"), insensitive_match).find_all();
     CHECK_EQUAL(tv.size(), 24);
-    tv = table->where().contains(col_any, Mixed("TRIN"), false).find_all();
+    tv = table->where().contains(col_any, Mixed("TRIN"), insensitive_match).find_all();
     CHECK_EQUAL(tv.size(), 24);
+    tv = table->where().contains(col_any, Mixed("TRIN"), exact_match).find_all();
+    CHECK_EQUAL(tv.size(), 0);
+    tv = table->where().contains(col_any, Mixed(75.), exact_match).find_all();
+    CHECK_EQUAL(tv.size(), 0);
+    tv = table->where().contains(col_any, Mixed(75.), insensitive_match).find_all();
+    CHECK_EQUAL(tv.size(), 0);
 
     tv = table->where().like(col_any, StringData("Strin*")).find_all();
     CHECK_EQUAL(tv.size(), 24);
+    tv = table->where().like(col_any, Mixed(75.), exact_match).find_all();
+    CHECK_EQUAL(tv.size(), 0);
+    tv = table->where().like(col_any, Mixed(75.), insensitive_match).find_all();
+    CHECK_EQUAL(tv.size(), 0);
 
     tv = table->where().ends_with(col_any, StringData("4")).find_all(); // 4, 24, 44, 64, 84
     CHECK_EQUAL(tv.size(), 5);
     char bin[1] = {0x34};
     tv = table->where().ends_with(col_any, BinaryData(bin)).find_all(); // 4, 24, 44, 64, 84
     CHECK_EQUAL(tv.size(), 5);
+    tv = table->where().ends_with(col_any, Mixed(75.), exact_match).find_all();
+    CHECK_EQUAL(tv.size(), 0);
+    tv = table->where().ends_with(col_any, Mixed(75.), insensitive_match).find_all();
+    CHECK_EQUAL(tv.size(), 0);
 
-    tv = table->where().equal(col_any, "String2Binary", true).find_all();
+    tv = table->where().equal(col_any, "String2Binary", exact_match).find_all();
     CHECK_EQUAL(tv.size(), 1);
-
-    tv = table->where().equal(col_any, "string2binary", false).find_all();
+    tv = table->where().equal(col_any, "string2binary", exact_match).find_all();
+    CHECK_EQUAL(tv.size(), 0);
+    tv = table->where().equal(col_any, "string2binary", insensitive_match).find_all();
     CHECK_EQUAL(tv.size(), 1);
-
-    tv = table->where().not_equal(col_any, "string2binary", false).find_all();
+    tv = table->where().not_equal(col_any, "string2binary", insensitive_match).find_all();
     CHECK_EQUAL(tv.size(), 99);
+
+    tv = table->where().equal(col_any, StringData(), insensitive_match).find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    tv = table->where().equal(col_any, StringData(), exact_match).find_all();
+    CHECK_EQUAL(tv.size(), 1);
+
+    tv = table->where().equal(col_any, Mixed(), insensitive_match).find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    tv = table->where().equal(col_any, Mixed(), exact_match).find_all();
+    CHECK_EQUAL(tv.size(), 1);
+
+    tv = table->where().equal(col_any, Mixed(75.), insensitive_match).find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    tv = table->where().equal(col_any, Mixed(75.), exact_match).find_all();
+    CHECK_EQUAL(tv.size(), 1);
 
     tv = (table->column<Mixed>(col_any) == StringData("String48")).find_all();
     CHECK_EQUAL(tv.size(), 1);
@@ -5550,6 +5585,8 @@ TEST_TYPES(Query_Mixed, std::true_type, std::false_type)
 
     tv = (table->column<Mixed>(col_any) == StringData("abcdefgh")).find_all();
     CHECK_EQUAL(tv.size(), 1);
+    tv = (table->column<Mixed>(col_any) == StringData("ABCDEFGH")).find_all();
+    CHECK_EQUAL(tv.size(), 0);
 
     ObjLink link_to_first = table->begin()->get_link();
     tv = (origin->column<Mixed>(col_mixed) == Mixed(link_to_first)).find_all();
@@ -5571,13 +5608,13 @@ TEST_TYPES(Query_Mixed, std::true_type, std::false_type)
     CHECK_EQUAL(tv.size(), 5);
     tv = (origin->link(col_link).column<Mixed>(col_any) > 50).find_all();
     CHECK_EQUAL(tv.size(), 2);
-    tv = (origin->link(col_links).column<Mixed>(col_any).contains("string2bin", false)).find_all();
+    tv = (origin->link(col_links).column<Mixed>(col_any).contains("string2bin", insensitive_match)).find_all();
     CHECK_EQUAL(tv.size(), 1);
-    tv = (origin->link(col_links).column<Mixed>(col_any).like("*ring*", false)).find_all();
+    tv = (origin->link(col_links).column<Mixed>(col_any).like("*ring*", insensitive_match)).find_all();
     CHECK_EQUAL(tv.size(), 10);
-    tv = (origin->link(col_links).column<Mixed>(col_any).begins_with("String", true)).find_all();
+    tv = (origin->link(col_links).column<Mixed>(col_any).begins_with("String", exact_match)).find_all();
     CHECK_EQUAL(tv.size(), 10);
-    tv = (origin->link(col_links).column<Mixed>(col_any).ends_with("g40", true)).find_all();
+    tv = (origin->link(col_links).column<Mixed>(col_any).ends_with("g40", exact_match)).find_all();
     CHECK_EQUAL(tv.size(), 1);
 }
 
@@ -5892,6 +5929,7 @@ TEST(Query_FullText)
     table->create_object().set(col, "Alle elsker John");
     table->create_object().set(col, "Johns ven kender John godt");
     table->create_object().set(col, "Ich wohne in Großarl");
+    table->create_object().set(col, "A short story about a dog running after two cats");
 
     auto tv = table->where().fulltext(col, "object").find_all();
     CHECK_EQUAL(2, tv.size());
@@ -5967,6 +6005,8 @@ TEST(Query_FullText)
     CHECK_EQUAL(2, tv.size());
     tv = table->where().fulltext(col, "Großarl").find_all();
     CHECK_EQUAL(1, tv.size());
+    tv = table->where().fulltext(col, "catssadasdsa").find_all();
+    CHECK_EQUAL(0, tv.size());
 
     table->clear();
     CHECK(table->get_search_index(col)->is_empty());
@@ -6023,6 +6063,23 @@ TEST(Query_FullTextMulti)
         col, "L’archive ouverte pluridisciplinaire HAL, est destinée au dépôt et à la diffusion de documents "
              "scientifiques de niveau recherche, publiés ou non, émanant des établissements d’enseignement et de "
              "recherche français ou étrangers, des laboratoires publics ou privés.");
+    table->create_object().set(col, "object object object object object duplicates");
+    table->create_object().set(col, "one two three");
+    table->create_object().set(col, "three two one");
+    table->create_object().set(col, "two one");
+
+    // object:              0, 1, 2, 4, 6
+    // objects:             0, 1, 3
+    // 'object-oriented':   0, 1
+    // 'table-oriented':    0
+    // oriented:            0, 1
+    // gemstone:            2, 4
+    // data:                3
+    // depot:               5
+    // emanant:             5
+    // database:            0, 1, 2, 4
+    // databases:           0
+    // duplicates:          6
 
     int64_t id = 1000;
     for (auto& o : *table) {
@@ -6030,43 +6087,117 @@ TEST(Query_FullTextMulti)
         ll.add(o.get_key());
     }
 
+    typedef std::vector<int64_t> Keys;
+    auto get_keys = [&](const TableView& tv) -> Keys {
+        std::vector<int64_t> keys(tv.size());
+        for (size_t i = 0; i < tv.size(); ++i)
+            keys[i] = tv.get_key(i).value;
+        return keys;
+    };
+    auto do_fulltext_find = [&](StringData term) -> Keys {
+        return get_keys(table->where().fulltext(col, term).find_all());
+    };
+    auto do_query_find = [&](const TableRef& table, StringData query) -> Keys {
+        return get_keys(table->query(query).find_all());
+    };
+
+    CHECK_THROW_ANY(do_fulltext_find(""));
+
     // search with multiple terms
-    auto tv = table->where().fulltext(col, "object gemstone").find_all();
-    CHECK_EQUAL(2, tv.size());
+    CHECK_EQUAL(do_fulltext_find("ONE THREE"), Keys({7, 8}));
+    CHECK_EQUAL(do_fulltext_find("three one"), Keys({7, 8}));
+    CHECK_EQUAL(do_fulltext_find("1990s"), Keys({2, 4}));
+    CHECK_EQUAL(do_fulltext_find("1990s c++"), Keys({4}));
+    CHECK_EQUAL(do_fulltext_find("object gemstone"), Keys({2, 4}));
 
     // over links
-    tv = origin->link(col_link).column<String>(col).fulltext("object gemstone").find_all();
-    CHECK_EQUAL(2, tv.size());
-
-    tv = origin->query("link.text TEXT 'object gemstone'").find_all();
-    CHECK_EQUAL(2, tv.size());
+    CHECK_EQUAL(do_query_find(origin, "link.text TEXT 'object gemstone'"), Keys({2, 4}));
+    auto tv = origin->link(col_link).column<String>(col).fulltext("object gemstone").find_all();
+    CHECK_EQUAL(get_keys(tv), Keys({2, 4}));
 
     // through LnkLst
     auto obj = tv.get_object(0);
     auto ll = obj.get_linklist(col_link);
     tv = table->where(ll).fulltext(col, "object gemstone").find_all();
-    CHECK_EQUAL(1, tv.size());
+    CHECK_EQUAL(get_keys(tv), Keys({2}));
 
     // Diacritics ignorant
-    tv = table->where().fulltext(col, "depot emanant").find_all();
-    CHECK_EQUAL(1, tv.size());
+    CHECK_EQUAL(do_fulltext_find("depot emanant archive"), Keys({5}));
 
     // search for combination that is not present
-    tv = table->where().fulltext(col, "object data").find_all();
-    CHECK_EQUAL(0, tv.size());
+    CHECK_EQUAL(do_fulltext_find("object data"), Keys());
+
+    // Prefix
+    CHECK_EQUAL(do_fulltext_find("manage*"), Keys({0, 1, 4}));
+    CHECK_EQUAL(do_fulltext_find("manage* virtu*"), Keys({4}));
+
+    // exclude words
+    CHECK_EQUAL(do_fulltext_find("-three one"), Keys({9}));
+    CHECK_EQUAL(do_fulltext_find("one -three"), Keys({9}));
+    CHECK_EQUAL(do_fulltext_find("object -databases"), Keys({1, 2, 4, 6}));
+    CHECK_EQUAL(do_fulltext_find("-databases object -duplicates"), Keys({1, 2, 4}));
+    CHECK_EQUAL(do_fulltext_find("object -objects"), Keys({2, 4, 6}));
+    CHECK_EQUAL(do_fulltext_find("-object objects"), Keys({3}));
+    CHECK_EQUAL(do_fulltext_find("databases -database"), Keys({}));
+    CHECK_EQUAL(do_fulltext_find("-database databases"), Keys({}));
+    CHECK_EQUAL(do_fulltext_find("database -databases"), Keys({1, 2, 4}));
+    CHECK_EQUAL(do_fulltext_find("-databases database"), Keys({1, 2, 4}));
+    CHECK_EQUAL(do_fulltext_find("-database"), Keys({3, 5, 6, 7, 8, 9}));
+    CHECK_EQUAL(do_fulltext_find("-object"), Keys({3, 5, 7, 8, 9}));
+    CHECK_EQUAL(do_fulltext_find("-object -objects"), Keys({5, 7, 8, 9}));
+
+    // Don't include and exclude same token
+    CHECK_THROW_ANY(do_fulltext_find("C# -c++")); // Will both end up as 'c'
+    CHECK_THROW_ANY(do_fulltext_find("-object object"));
+    CHECK_THROW_ANY(do_fulltext_find("object -object"));
+    CHECK_THROW_ANY(do_fulltext_find("objects -object object"));
+    CHECK_THROW_ANY(do_fulltext_find("object -object object"));
+    CHECK_THROW_ANY(do_fulltext_find("database -database"));
 
     // many terms
-    tv = table->where().fulltext(col, "object database management brown").find_all();
-    CHECK_EQUAL(1, tv.size());
+    CHECK_EQUAL(do_fulltext_find("object database management brown"), Keys({1}));
+    CHECK_EQUAL(do_query_find(table, "text TEXT 'object database management brown'"), Keys({1}));
 
-    tv = table->query("text TEXT 'object database management brown'").find_all();
-    CHECK_EQUAL(1, tv.size());
+    // non alphanum characters not allowed inside seach token
+    CHECK_THROW_ANY(do_fulltext_find("object-oriented -database"));
+    CHECK_THROW_ANY(do_fulltext_find("object-oriented -table-oriented"));
 
     while (table->size() > 0) {
         table->begin()->remove();
     }
 
     CHECK(table->get_search_index(col)->is_empty());
+}
+
+TEST(Query_FullTextPrefix)
+{
+    Group g;
+    auto table = g.add_table("table");
+    auto col = table->add_column(type_String, "text");
+    table->add_fulltext_index(col);
+
+    table->create_object().set(col, "Abby Abba Ada Adalee Baylee Bellamy Blaire Adalyn");
+    table->create_object().set(col, "Abigail Abba Barbara Beatrice Bella Blair Blake");
+    table->create_object().set(col, "Adaline Bellamy Blakely");
+
+    // table->get_search_index(col)->do_dump_node_structure(std::cout, 0);
+
+    auto q = table->query("text TEXT 'ab*'");
+    CHECK_EQUAL(q.count(), 2);
+    q = table->query("text TEXT 'ac*'"); // No match shorter than 4
+    CHECK_EQUAL(q.count(), 0);
+    q = table->query("text TEXT 'abbe*'"); // No match excatly four
+    CHECK_EQUAL(q.count(), 0);
+    q = table->query("text TEXT 'abbex*'"); // No match bigger than 4
+    CHECK_EQUAL(q.count(), 0);
+    q = table->query("text TEXT 'Bel*'");
+    CHECK_EQUAL(q.count(), 3);
+    q = table->query("text TEXT 'Blak*'");
+    CHECK_EQUAL(q.count(), 2);
+    q = table->query("text TEXT 'Bellam*'");
+    CHECK_EQUAL(q.count(), 2);
+    q = table->query("text TEXT 'Bel* Abba -Ada'");
+    CHECK_EQUAL(q.count(), 1);
 }
 
 #endif // TEST_QUERY

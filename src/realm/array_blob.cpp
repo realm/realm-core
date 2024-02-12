@@ -142,7 +142,7 @@ ref_type ArrayBlob::replace(size_t begin, size_t end, const char* data, size_t d
         return new_root.blob_replace(begin, end, data, data_size, add_zero_term);
     }
 
-    if (remove_size == add_size && is_read_only() && memcmp(m_data + begin, data, data_size) == 0)
+    if (remove_size == add_size && is_read_only() && (data_size == 0 || memcmp(m_data + begin, data, data_size) == 0))
         return get_ref();
 
     // Reallocate if needed - also updates header

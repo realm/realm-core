@@ -26,6 +26,7 @@
 #include <vector>
 
 #include <realm/alloc_slab.hpp>
+#include <realm/array.hpp>
 #include <realm/group.hpp>
 #include <realm/impl/simulated_failure.hpp>
 #include <realm/util/file.hpp>
@@ -69,17 +70,21 @@ using namespace realm::util;
 
 namespace {
 
+
 void set_capacity(char* header, size_t value)
 {
+    NodeHeader::set_kind(header, 'A');
     typedef unsigned char uchar;
     uchar* h = reinterpret_cast<uchar*>(header);
     h[0] = uchar((value >> 19) & 0x000000FF);
     h[1] = uchar((value >> 11) & 0x000000FF);
     h[2] = uchar((value >> 3) & 0x000000FF);
+    REALM_ASSERT(NodeHeader::get_capacity_from_header(header) == value);
 }
 
 size_t get_capacity(const char* header)
 {
+    REALM_ASSERT(NodeHeader::get_kind(header) == 'A');
     typedef unsigned char uchar;
     const uchar* h = reinterpret_cast<const uchar*>(header);
     return (size_t(h[0]) << 19) + (size_t(h[1]) << 11) + (h[2] << 3);
@@ -286,7 +291,7 @@ TEST(Alloc_Fuzzy)
             set_capacity(r.get_addr(), siz);
 
             // write some data to the allcoated area so that we can verify it later
-            memset(r.get_addr() + 3, static_cast<char>(reinterpret_cast<intptr_t>(r.get_addr())), siz - 3);
+            memset(r.get_addr() + 4, static_cast<char>(reinterpret_cast<intptr_t>(r.get_addr())), siz - 4);
         }
         else if (refs.size() > 0) {
             // free random entry
@@ -302,7 +307,7 @@ TEST(Alloc_Fuzzy)
                 size_t siz = get_capacity(r.get_addr());
 
                 // verify that all the data we wrote during allocation is intact
-                for (size_t c = 3; c < siz; c++) {
+                for (size_t c = 4; c < siz; c++) {
                     if (r.get_addr()[c] != static_cast<char>(reinterpret_cast<intptr_t>(r.get_addr()))) {
                         // faster than using 'CHECK' for each character, which is slow
                         CHECK(false);
@@ -347,17 +352,24 @@ NONCONCURRENT_TEST_IF(Alloc_MapFailureRecovery, _impl::SimulatedFailure::is_enab
 
     { // Verify we can still open the file with the same allocator
         _impl::SimulatedFailure::prime_mmap(nullptr);
-        alloc.attach_file(path, cfg);
+        auto top_ref = alloc.attach_file(path, cfg);
         CHECK(alloc.is_attached());
-        CHECK(alloc.get_baseline() == page_size);
-
+        // file has not (yet) been expanded to match:
+        CHECK(alloc.get_baseline() != page_size);
+        // convert before aligning file size
+        alloc.convert_from_streaming_form(top_ref);
+        // file is expanded:
+        CHECK(alloc.align_filesize_for_mmap(top_ref, cfg));
+        // and consequently needs to be reattached:
+        alloc.detach();
+        alloc.attach_file(path, cfg);
         alloc.init_mapping_management(1);
     }
 
     { // Extendind the first mapping
         const auto initial_baseline = alloc.get_baseline();
         const auto initial_version = alloc.get_mapping_version();
-        const char* initial_translated = alloc.translate(1000);
+        const char* initial_translated = alloc.translate_in_slab(1000);
 
         _impl::SimulatedFailure::prime_mmap([](size_t) {
             return true;
@@ -368,7 +380,7 @@ NONCONCURRENT_TEST_IF(Alloc_MapFailureRecovery, _impl::SimulatedFailure::is_enab
         CHECK_THROW(alloc.update_reader_view(page_size * 2), std::bad_alloc);
         CHECK_EQUAL(initial_baseline, alloc.get_baseline());
         CHECK_EQUAL(initial_version, alloc.get_mapping_version());
-        CHECK_EQUAL(initial_translated, alloc.translate(1000));
+        CHECK_EQUAL(initial_translated, alloc.translate_in_slab(1000));
 
         _impl::SimulatedFailure::prime_mmap(nullptr);
         alloc.get_file().resize(page_size * 2);
@@ -392,7 +404,7 @@ NONCONCURRENT_TEST_IF(Alloc_MapFailureRecovery, _impl::SimulatedFailure::is_enab
     { // Add a new complete section after a complete section
         const auto initial_baseline = alloc.get_baseline();
         const auto initial_version = alloc.get_mapping_version();
-        const char* initial_translated = alloc.translate(1000);
+        const char* initial_translated = alloc.translate_in_slab(1000);
 
         _impl::SimulatedFailure::prime_mmap([](size_t) {
             return true;
@@ -401,14 +413,14 @@ NONCONCURRENT_TEST_IF(Alloc_MapFailureRecovery, _impl::SimulatedFailure::is_enab
         CHECK_THROW(alloc.update_reader_view(section_size * 2), std::bad_alloc);
         CHECK_EQUAL(initial_baseline, alloc.get_baseline());
         CHECK_EQUAL(initial_version, alloc.get_mapping_version());
-        CHECK_EQUAL(initial_translated, alloc.translate(1000));
+        CHECK_EQUAL(initial_translated, alloc.translate_in_slab(1000));
 
         _impl::SimulatedFailure::prime_mmap(nullptr);
         alloc.update_reader_view(section_size * 2);
         CHECK_EQUAL(alloc.get_baseline(), section_size * 2);
-        CHECK_EQUAL(initial_version, alloc.get_mapping_version()); // did not alter an existing mapping
-        CHECK_EQUAL(initial_translated, alloc.translate(1000));    // first section was not remapped
-        CHECK_EQUAL(0, *alloc.translate(section_size * 2 - page_size));
+        CHECK_EQUAL(initial_version, alloc.get_mapping_version());      // did not alter an existing mapping
+        CHECK_EQUAL(initial_translated, alloc.translate_in_slab(1000)); // first section was not remapped
+        CHECK_EQUAL(0, *alloc.translate_in_slab(section_size * 2 - page_size));
 
         alloc.purge_old_mappings(4, 4);
     }
@@ -418,8 +430,8 @@ NONCONCURRENT_TEST_IF(Alloc_MapFailureRecovery, _impl::SimulatedFailure::is_enab
     { // Add complete section and a a partial section after that
         const auto initial_baseline = alloc.get_baseline();
         const auto initial_version = alloc.get_mapping_version();
-        const char* initial_translated_1 = alloc.translate(1000);
-        const char* initial_translated_2 = alloc.translate(section_size + 1000);
+        const char* initial_translated_1 = alloc.translate_in_slab(1000);
+        const char* initial_translated_2 = alloc.translate_in_slab(section_size + 1000);
 
         _impl::SimulatedFailure::prime_mmap([](size_t size) {
             // Let the first allocation succeed and only the second one fail
@@ -429,45 +441,20 @@ NONCONCURRENT_TEST_IF(Alloc_MapFailureRecovery, _impl::SimulatedFailure::is_enab
         CHECK_THROW(alloc.update_reader_view(section_size * 3 + page_size), std::bad_alloc);
         CHECK_EQUAL(initial_baseline, alloc.get_baseline());
         CHECK_EQUAL(initial_version, alloc.get_mapping_version());
-        CHECK_EQUAL(initial_translated_1, alloc.translate(1000));
-        CHECK_EQUAL(initial_translated_2, alloc.translate(section_size + 1000));
+        CHECK_EQUAL(initial_translated_1, alloc.translate_in_slab(1000));
+        CHECK_EQUAL(initial_translated_2, alloc.translate_in_slab(section_size + 1000));
 
         _impl::SimulatedFailure::prime_mmap(nullptr);
         alloc.update_reader_view(section_size * 3 + page_size);
         CHECK_EQUAL(alloc.get_baseline(), section_size * 3 + page_size);
         CHECK_EQUAL(initial_version, alloc.get_mapping_version()); // did not alter an existing mapping
-        CHECK_EQUAL(initial_translated_1, alloc.translate(1000));
-        CHECK_EQUAL(initial_translated_2, alloc.translate(section_size + 1000));
-        CHECK_EQUAL(0, *alloc.translate(section_size * 2 + 1000));
+        CHECK_EQUAL(initial_translated_1, alloc.translate_in_slab(1000));
+        CHECK_EQUAL(initial_translated_2, alloc.translate_in_slab(section_size + 1000));
+        CHECK_EQUAL(0, *alloc.translate_in_slab(section_size * 2 + 1000));
 
         alloc.purge_old_mappings(5, 5);
     }
 }
-
-namespace {
-
-class TestSlabAlloc : public SlabAlloc {
-
-public:
-    size_t test_get_upper_section_boundary(size_t start_pos)
-    {
-        return get_upper_section_boundary(start_pos);
-    }
-    size_t test_get_lower_section_boundary(size_t start_pos)
-    {
-        return get_lower_section_boundary(start_pos);
-    }
-    size_t test_get_section_base(size_t index)
-    {
-        return get_section_base(index);
-    }
-    size_t test_get_section_index(size_t ref)
-    {
-        return get_section_index(ref);
-    }
-};
-
-} // end anonymous namespace
 
 
 // This test reproduces the sporadic issue that was seen for large refs (addresses)

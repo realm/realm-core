@@ -33,14 +33,12 @@ class Table;
 class TableRef;
 class Transaction;
 
-using KeyPath = std::vector<std::pair<TableKey, ColKey>>;
-using KeyPathArray = std::vector<KeyPath>;
 using ref_type = size_t;
 
 namespace _impl {
 class RealmCoordinator;
 
-struct ListChangeInfo {
+struct CollectionChangeInfo {
     TableKey table_key;
     ObjKey obj_key;
     ColKey col_key;
@@ -48,10 +46,9 @@ struct ListChangeInfo {
 };
 
 struct TransactionChangeInfo {
-    std::vector<ListChangeInfo> lists;
+    std::vector<CollectionChangeInfo> collections;
     std::unordered_map<TableKey, ObjectChangeSet> tables;
-    bool track_all;
-    bool schema_changed;
+    bool schema_changed = false;
 };
 
 /**

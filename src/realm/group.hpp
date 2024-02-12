@@ -24,14 +24,13 @@
 #include <optional>
 #include <stdexcept>
 #include <string>
-#include <vector>
+#include <set>
 #include <chrono>
 
 #include <realm/alloc_slab.hpp>
 #include <realm/exceptions.hpp>
 #include <realm/impl/cont_transact_hist.hpp>
 #include <realm/impl/output_stream.hpp>
-#include <realm/metrics/metrics.hpp>
 #include <realm/table.hpp>
 #include <realm/util/features.h>
 #include <realm/util/input_stream.hpp>
@@ -43,13 +42,13 @@ class TableKeys;
 
 namespace _impl {
 class GroupFriend;
-class TransactLogParser;
 } // namespace _impl
-
 
 /// A group is a collection of named tables.
 ///
 class Group : public ArrayParent {
+    static constexpr StringData g_class_name_prefix = "class_";
+
 public:
     /// Construct a free-standing group. This group instance will be
     /// in the attached state, but neither associated with a file, nor
@@ -113,9 +112,9 @@ public:
     /// \param encryption_key 32-byte key used to encrypt and decrypt
     /// the database file, or nullptr to disable encryption.
     ///
-    /// \throw util::File::AccessError If the file could not be
+    /// \throw FileAccessError If the file could not be
     /// opened. If the reason corresponds to one of the exception
-    /// types that are derived from util::File::AccessError, the
+    /// types that are derived from FileAccessError, the
     /// derived exception type is thrown. Note that InvalidDatabase is
     /// among these derived exception types.
     explicit Group(const std::string& file, const char* encryption_key = nullptr);
@@ -275,11 +274,16 @@ public:
     ///
     //@{
 
-    static const size_t max_table_name_length = 63;
+    static constexpr size_t max_table_name_length = 63;
+    static constexpr size_t max_class_name_length = max_table_name_length - g_class_name_prefix.size();
 
     bool has_table(StringData name) const noexcept;
     TableKey find_table(StringData name) const noexcept;
     StringData get_table_name(TableKey key) const;
+    StringData get_class_name(TableKey key) const
+    {
+        return table_name_to_class_name(get_table_name(key));
+    }
     bool table_is_public(TableKey key) const;
     static StringData table_name_to_class_name(StringData table_name)
     {
@@ -292,6 +296,7 @@ public:
     using TableNameBuffer = std::array<char, max_table_name_length>;
     static StringData class_name_to_table_name(StringData class_name, TableNameBuffer& buffer)
     {
+        REALM_ASSERT(class_name.size() <= max_class_name_length);
         char* p = std::copy_n(g_class_name_prefix.data(), g_class_name_prefix.size(), buffer.data());
         size_t len = std::min(class_name.size(), buffer.size() - g_class_name_prefix.size());
         std::copy_n(class_name.data(), len, p);
@@ -323,6 +328,7 @@ public:
     void rename_table(StringData name, StringData new_name, bool require_unique_name = true);
 
     Obj get_object(ObjLink link);
+    Obj try_get_object(ObjLink link) noexcept;
     void validate(ObjLink link) const;
 
     //@}
@@ -353,9 +359,9 @@ public:
     ///
     /// \param write_history Indicates if you want the Sync Client History to
     /// be written to the file (only relevant for synchronized files).
-    /// \throw util::File::AccessError If the file could not be
+    /// \throw FileAccessError If the file could not be
     /// opened. If the reason corresponds to one of the exception
-    /// types that are derived from util::File::AccessError, the
+    /// types that are derived from FileAccessError, the
     /// derived exception type is thrown. In particular,
     /// util::File::Exists will be thrown if the file exists already.
     void write(const std::string& path, const char* encryption_key = nullptr, uint64_t version = 0,
@@ -489,22 +495,6 @@ public:
         return !(*this == g);
     }
 
-    /// Control of what to include when computing memory usage
-    enum SizeAggregateControl {
-        size_of_state = 1,     ///< size of tables, indexes, toplevel array
-        size_of_history = 2,   ///< size of the in-file history compartment
-        size_of_freelists = 4, ///< size of the freelists
-        size_of_all = 7
-    };
-    /// Compute the sum of the sizes in number of bytes of all the array nodes
-    /// that currently make up this group. When this group represents a snapshot
-    /// in a Realm file (such as during a read transaction via a Transaction
-    /// instance), this function computes the footprint of that snapshot within
-    /// the Realm file.
-    ///
-    /// If this group accessor is the detached state, this function returns
-    /// zero.
-    size_t compute_aggregated_byte_size(SizeAggregateControl ctrl = SizeAggregateControl::size_of_all) const noexcept;
     /// Return the size taken up by the current snapshot. This is in contrast to
     /// the number returned by DB::get_stats() which will return the
     /// size of the last snapshot done in that DB. If the snapshots are
@@ -526,6 +516,9 @@ public:
         m_alloc.enable_debug(enable);
     }
 #endif
+    ref_type typed_write_tables(_impl::ArrayWriterBase& out, bool deep, bool only_modified, bool compress) const;
+    void table_typed_print(std::string prefix, ref_type ref) const;
+    void typed_print(std::string prefix) const;
 
 protected:
     static constexpr size_t s_table_name_ndx = 0;
@@ -549,20 +542,6 @@ protected:
     }
 
 private:
-    static constexpr StringData g_class_name_prefix = "class_";
-
-    struct ToDeleteRef {
-        ToDeleteRef(TableKey tk, ObjKey k)
-            : table_key(tk)
-            , obj_key(k)
-            , ttl(std::chrono::steady_clock::now())
-        {
-        }
-        TableKey table_key;
-        ObjKey obj_key;
-        std::chrono::steady_clock::time_point ttl;
-    };
-
     // nullptr, if we're sharing an allocator provided during initialization
     std::unique_ptr<SlabAlloc> m_local_alloc;
     // in-use allocator. If local, then equal to m_local_alloc.
@@ -627,9 +606,7 @@ private:
 
     util::UniqueFunction<void(const CascadeNotification&)> m_notify_handler;
     util::UniqueFunction<void()> m_schema_change_handler;
-    std::shared_ptr<metrics::Metrics> m_metrics;
-    std::vector<ToDeleteRef> m_objects_to_delete;
-    size_t m_total_rows;
+    std::set<TableKey> m_tables_to_clear;
 
     Group(SlabAlloc* alloc) noexcept;
     void init_array_parents() noexcept;
@@ -645,7 +622,8 @@ private:
     /// underlying node structure. If `top_ref` is zero and \a
     /// create_group_when_missing is true, create a new node structure that
     /// represents an empty group, and attach this group accessor to it.
-    void attach(ref_type top_ref, bool writable, bool create_group_when_missing);
+    void attach(ref_type top_ref, bool writable, bool create_group_when_missing, size_t file_size = -1,
+                uint_fast64_t version = -1);
 
     /// Detach this group accessor from the underlying node structure. If this
     /// group accessors is already in the detached state, this function does
@@ -654,7 +632,7 @@ private:
 
     /// \param writable Must be set to true when, and only when attaching for a
     /// write transaction.
-    void attach_shared(ref_type new_top_ref, size_t new_file_size, bool writable);
+    void attach_shared(ref_type new_top_ref, size_t new_file_size, bool writable, VersionID version);
 
     void create_empty_group();
     void remove_table(size_t table_ndx, TableKey key);
@@ -662,7 +640,7 @@ private:
     void reset_free_space_tracking();
 
     void remap_and_update_refs(ref_type new_top_ref, size_t new_file_size, bool writable);
-
+    void update_table_accessors();
     /// Recursively update refs stored in all cached array
     /// accessors. This includes cached array accessors in any
     /// currently attached table accessors. This ensures that the
@@ -701,13 +679,9 @@ private:
     void write(util::File& file, const char* encryption_key, uint_fast64_t version_number, TableWriter& writer) const;
     void write(std::ostream&, bool pad, uint_fast64_t version_numer, TableWriter& writer) const;
 
-    std::shared_ptr<metrics::Metrics> get_metrics() const noexcept;
-    void set_metrics(std::shared_ptr<metrics::Metrics> other) noexcept;
-    void update_num_objects();
-    class TransactAdvancer;
     /// Memory mappings must have been updated to reflect any growth in filesize before
     /// calling advance_transact()
-    void advance_transact(ref_type new_top_ref, util::NoCopyInputStream&, bool writable);
+    void advance_transact(ref_type new_top_ref, util::InputStream*, bool writable);
     void refresh_dirty_accessors();
     void flush_accessors_for_commit();
 
@@ -811,6 +785,10 @@ private:
                                              int& history_type, int& history_schema_version) noexcept;
     static ref_type get_history_ref(const Array& top) noexcept;
     static size_t get_logical_file_size(const Array& top) noexcept;
+    size_t get_logical_file_size() const noexcept
+    {
+        return get_logical_file_size(m_top);
+    }
     void clear_history();
     void set_history_schema_version(int version);
     template <class Accessor>
@@ -819,8 +797,11 @@ private:
     template <class Accessor>
     void prepare_history_parent(Accessor& history_root, int history_type, int history_schema_version,
                                 uint64_t file_ident);
-    static void validate_top_array(const Array& arr, const SlabAlloc& alloc);
+    static void validate_top_array(const Array& arr, const SlabAlloc& alloc,
+                                   std::optional<size_t> read_lock_file_size = util::none,
+                                   std::optional<uint_fast64_t> read_lock_version = util::none);
 
+    Table* get_table_unchecked(TableKey);
     size_t find_table_index(StringData name) const noexcept;
     TableKey ndx2key(size_t ndx) const;
     size_t key2ndx(TableKey key) const;
@@ -832,14 +813,17 @@ private:
         if (m_table_names.find_first(name) != not_found)
             throw TableNameInUse();
     }
+    void check_attached() const
+    {
+        if (!is_attached())
+            throw StaleAccessor("Stale transaction");
+    }
 
     friend class Table;
     friend class GroupWriter;
+    friend class GroupCommitter;
     friend class DB;
     friend class _impl::GroupFriend;
-    friend class _impl::TransactLogParser;
-    friend class metrics::QueryInfo;
-    friend class metrics::Metrics;
     friend class Transaction;
     friend class TableKeyIterator;
     friend class CascadeState;
@@ -955,19 +939,22 @@ inline TableKey Group::find_table(StringData name) const noexcept
     return (ndx != npos) ? ndx2key(ndx) : TableKey{};
 }
 
+inline Table* Group::get_table_unchecked(TableKey key)
+{
+    auto ndx = key2ndx_checked(key);
+    return do_get_table(ndx); // Throws
+}
+
 inline TableRef Group::get_table(TableKey key)
 {
-    if (!is_attached())
-        throw LogicError(LogicError::detached_accessor);
-    auto ndx = key2ndx_checked(key);
-    Table* table = do_get_table(ndx); // Throws
+    check_attached();
+    Table* table = get_table_unchecked(key);
     return TableRef(table, table ? table->m_alloc.get_instance_version() : 0);
 }
 
 inline ConstTableRef Group::get_table(TableKey key) const
 {
-    if (!is_attached())
-        throw LogicError(LogicError::detached_accessor);
+    check_attached();
     auto ndx = key2ndx_checked(key);
     const Table* table = do_get_table(ndx); // Throws
     return ConstTableRef(table, table ? table->m_alloc.get_instance_version() : 0);
@@ -975,24 +962,21 @@ inline ConstTableRef Group::get_table(TableKey key) const
 
 inline TableRef Group::get_table(StringData name)
 {
-    if (!is_attached())
-        throw LogicError(LogicError::detached_accessor);
+    check_attached();
     Table* table = do_get_table(name); // Throws
     return TableRef(table, table ? table->m_alloc.get_instance_version() : 0);
 }
 
 inline ConstTableRef Group::get_table(StringData name) const
 {
-    if (!is_attached())
-        throw LogicError(LogicError::detached_accessor);
+    check_attached();
     const Table* table = do_get_table(name); // Throws
     return ConstTableRef(table, table ? table->m_alloc.get_instance_version() : 0);
 }
 
 inline TableRef Group::add_table(StringData name, Table::Type table_type)
 {
-    if (!is_attached())
-        throw LogicError(LogicError::detached_accessor);
+    check_attached();
     check_table_name_uniqueness(name);
     Table* table = do_add_table(name, table_type); // Throws
     return TableRef(table, table->m_alloc.get_instance_version());
@@ -1001,8 +985,7 @@ inline TableRef Group::add_table(StringData name, Table::Type table_type)
 inline TableRef Group::get_or_add_table(StringData name, Table::Type table_type, bool* was_added)
 {
     REALM_ASSERT(table_type != Table::Type::Embedded);
-    if (!is_attached())
-        throw LogicError(LogicError::detached_accessor);
+    check_attached();
     auto table = do_get_table(name);
     if (was_added)
         *was_added = !table;
@@ -1020,7 +1003,7 @@ inline TableRef Group::get_or_add_table_with_primary_key(StringData name, DataTy
         if (!table->get_primary_key_column() || table->get_column_name(table->get_primary_key_column()) != pk_name ||
             table->is_nullable(table->get_primary_key_column()) != nullable ||
             table->get_table_type() != table_type) {
-            throw std::runtime_error("Inconsistent schema");
+            return {};
         }
         return table;
     }
@@ -1139,6 +1122,10 @@ public:
     virtual ref_type write_names(_impl::OutputStream&) = 0;
     virtual ref_type write_tables(_impl::OutputStream&) = 0;
     virtual HistoryInfo write_history(_impl::OutputStream&) = 0;
+    void typed_print(std::string prefix)
+    {
+        m_group->typed_print(prefix);
+    }
     virtual ~TableWriter() noexcept {}
 
     void set_group(const Group* g)
@@ -1180,16 +1167,6 @@ inline void Group::reset_free_space_tracking()
     // Group, but rather through the proper owner of the allocator, which is the DB object.
     REALM_ASSERT(m_local_alloc);
     m_alloc.reset_free_space_tracking(); // Throws
-}
-
-inline std::shared_ptr<metrics::Metrics> Group::get_metrics() const noexcept
-{
-    return m_metrics;
-}
-
-inline void Group::set_metrics(std::shared_ptr<metrics::Metrics> shared) noexcept
-{
-    m_metrics = shared;
 }
 
 // The purpose of this class is to give internal access to some, but
@@ -1335,7 +1312,9 @@ public:
     {
         // Nullify immediately if we don't need to send cascade notifications
         if (!notification_handler()) {
-            src_table.get_object(origin_key).nullify_link(src_col_key, target_link);
+            if (Obj obj = src_table.try_get_object(origin_key)) {
+                std::move(obj).nullify_link(src_col_key, target_link);
+            }
             return;
         }
 

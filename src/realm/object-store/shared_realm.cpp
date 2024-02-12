@@ -50,6 +50,9 @@
 #include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/history.hpp>
 #endif
+#ifdef REALM_DEBUG
+#include <iostream>
+#endif
 
 #include <thread>
 
@@ -75,12 +78,16 @@ private:
 } // namespace
 
 Realm::Realm(Config config, util::Optional<VersionID> version, std::shared_ptr<_impl::RealmCoordinator> coordinator,
-             MakeSharedTag)
+             Private)
     : m_config(std::move(config))
-    , m_frozen_version(std::move(version))
+    , m_frozen_version(version)
     , m_scheduler(m_config.scheduler)
 {
-    if (!coordinator->get_cached_schema(m_schema, m_schema_version, m_schema_transaction_version)) {
+    if (version) {
+        m_auto_refresh = false;
+        REALM_ASSERT(*version != VersionID());
+    }
+    else if (!coordinator->get_cached_schema(m_schema, m_schema_version, m_schema_transaction_version)) {
         m_transaction = coordinator->begin_read();
         read_schema_from_group_if_needed();
         coordinator->cache_schema(m_schema, m_schema_version, m_schema_transaction_version);
@@ -110,9 +117,8 @@ Group& Realm::read_group()
 Transaction& Realm::transaction()
 {
     verify_open();
-    if (!m_transaction) {
+    if (!m_transaction)
         begin_read(m_frozen_version.value_or(VersionID{}));
-    }
     return *m_transaction;
 }
 
@@ -130,7 +136,8 @@ std::shared_ptr<Transaction> Realm::transaction_ref()
 
 std::shared_ptr<Transaction> Realm::duplicate() const
 {
-    return m_coordinator->begin_read(read_transaction_version(), is_frozen());
+    auto version = read_transaction_version(); // does the validity check first
+    return m_coordinator->begin_read(version, is_frozen());
 }
 
 std::shared_ptr<DB>& Realm::Internal::get_db(Realm& realm)
@@ -160,9 +167,7 @@ SharedRealm Realm::get_shared_realm(Config config)
 SharedRealm Realm::get_frozen_realm(Config config, VersionID version)
 {
     auto coordinator = RealmCoordinator::get_coordinator(config.path);
-    SharedRealm realm = coordinator->get_realm(std::move(config), util::Optional<VersionID>(version));
-    realm->set_auto_refresh(false);
-    return realm;
+    return coordinator->get_realm(std::move(config), version);
 }
 
 SharedRealm Realm::get_shared_realm(ThreadSafeReference ref, std::shared_ptr<util::Scheduler> scheduler)
@@ -189,13 +194,13 @@ std::shared_ptr<AsyncOpenTask> Realm::get_synchronized_realm(Config config)
 
 std::shared_ptr<SyncSession> Realm::sync_session() const
 {
-    return m_coordinator->sync_session();
+    return m_coordinator ? m_coordinator->sync_session() : nullptr;
 }
 
 sync::SubscriptionSet Realm::get_latest_subscription_set()
 {
     if (!m_config.sync_config || !m_config.sync_config->flx_sync_requested) {
-        throw std::runtime_error("Flexible sync is not enabled");
+        throw IllegalOperation("Flexible sync is not enabled");
     }
     // If there is a subscription store, then return the active set
     auto flx_sub_store = m_coordinator->sync_session()->get_flx_subscription_store();
@@ -206,7 +211,7 @@ sync::SubscriptionSet Realm::get_latest_subscription_set()
 sync::SubscriptionSet Realm::get_active_subscription_set()
 {
     if (!m_config.sync_config || !m_config.sync_config->flx_sync_requested) {
-        throw std::runtime_error("Flexible sync is not enabled");
+        throw IllegalOperation("Flexible sync is not enabled");
     }
     // If there is a subscription store, then return the active set
     auto flx_sub_store = m_coordinator->sync_session()->get_flx_subscription_store();
@@ -218,7 +223,7 @@ sync::SubscriptionSet Realm::get_active_subscription_set()
 void Realm::set_schema(Schema const& reference, Schema schema)
 {
     m_dynamic_schema = false;
-    schema.copy_keys_from(reference, m_config.is_schema_additive());
+    schema.copy_keys_from(reference, m_config.schema_subset_mode);
     m_schema = std::move(schema);
     notify_schema_changed();
 }
@@ -230,15 +235,16 @@ void Realm::read_schema_from_group_if_needed()
         if (m_schema.empty()) {
             m_schema_version = ObjectStore::get_schema_version(*m_transaction);
             m_schema = ObjectStore::schema_from_group(*m_transaction);
+            m_schema_transaction_version = m_transaction->get_version_of_current_transaction().version;
         }
         return;
     }
+
     Group& group = read_group();
     auto current_version = transaction().get_version_of_current_transaction().version;
     if (m_schema_transaction_version == current_version)
         return;
 
-    auto previous_transaction_version = m_schema_transaction_version;
     m_schema_transaction_version = current_version;
     m_schema_version = ObjectStore::get_schema_version(group);
     auto schema = ObjectStore::schema_from_group(group);
@@ -249,20 +255,16 @@ void Realm::read_schema_from_group_if_needed()
     if (m_dynamic_schema) {
         if (m_schema == schema) {
             // The structure of the schema hasn't changed. Bring the table column indices up to date.
-            m_schema.copy_keys_from(schema);
+            m_schema.copy_keys_from(schema, SchemaSubsetMode::Strict);
         }
         else {
             // The structure of the schema has changed, so replace our copy of the schema.
             m_schema = std::move(schema);
         }
     }
-    else if (m_config.is_schema_additive() && m_schema_transaction_version < previous_transaction_version) {
-        // no verification of schema changes when opening a past version of the schema
-        m_schema.copy_keys_from(schema, m_config.is_schema_additive());
-    }
     else {
         ObjectStore::verify_valid_external_changes(m_schema.compare(schema, m_config.schema_mode));
-        m_schema.copy_keys_from(schema);
+        m_schema.copy_keys_from(schema, m_config.schema_subset_mode);
     }
     notify_schema_changed();
 }
@@ -291,8 +293,7 @@ bool Realm::schema_change_needs_write_transaction(Schema& schema, std::vector<Sc
 
     switch (m_config.schema_mode) {
         case SchemaMode::Automatic:
-            if (version < m_schema_version && m_schema_version != ObjectStore::NotVersioned)
-                throw InvalidSchemaVersionException(m_schema_version, version, false);
+            verify_schema_version_not_decreasing(version);
             return true;
 
         case SchemaMode::Immutable:
@@ -322,8 +323,7 @@ bool Realm::schema_change_needs_write_transaction(Schema& schema, std::vector<Sc
         }
 
         case SchemaMode::Manual:
-            if (version < m_schema_version && m_schema_version != ObjectStore::NotVersioned)
-                throw InvalidSchemaVersionException(m_schema_version, version, false);
+            verify_schema_version_not_decreasing(version);
             if (version == m_schema_version) {
                 ObjectStore::verify_no_changes_required(changes);
                 REALM_UNREACHABLE(); // changes is non-empty so above line always throws
@@ -333,22 +333,29 @@ bool Realm::schema_change_needs_write_transaction(Schema& schema, std::vector<Sc
     REALM_COMPILER_HINT_UNREACHABLE();
 }
 
+// Schema version is not allowed to decrease for local and pbs realms.
+void Realm::verify_schema_version_not_decreasing(uint64_t version)
+{
+#if REALM_ENABLE_SYNC
+    if (m_config.sync_config && m_config.sync_config->flx_sync_requested)
+        return;
+#endif
+    if (version < m_schema_version && m_schema_version != ObjectStore::NotVersioned)
+        throw InvalidSchemaVersionException(m_schema_version, version, false);
+}
+
 Schema Realm::get_full_schema()
 {
     if (!m_config.immutable())
         do_refresh();
 
     // If the user hasn't specified a schema previously then m_schema is always
-    // the full schema
-    if (m_dynamic_schema) {
+    // the full schema if it's been read
+    if (m_dynamic_schema && !m_schema.empty())
         return m_schema;
-    }
 
     // Otherwise we may have a subset of the file's schema, so we need to get
     // the complete thing to calculate what changes to make
-    if (m_config.immutable())
-        return ObjectStore::schema_from_group(read_group());
-
     Schema actual_schema;
     uint64_t actual_version;
     uint64_t version = -1;
@@ -358,8 +365,35 @@ Schema Realm::get_full_schema()
     return actual_schema;
 }
 
+bool Realm::is_empty()
+{
+    return ObjectStore::is_empty(read_group());
+}
+
+Class Realm::get_class(StringData object_type)
+{
+    auto it = m_schema.find(object_type);
+    if (it == m_schema.end()) {
+        throw LogicError(ErrorCodes::NoSuchTable, util::format("No type '%1'", object_type));
+    }
+    return {shared_from_this(), &*it};
+}
+
+std::vector<Class> Realm::get_classes()
+{
+    std::vector<Class> ret;
+    ret.reserve(m_schema.size());
+    auto r = shared_from_this();
+    for (auto& os : m_schema) {
+        ret.emplace_back(r, &os);
+    }
+    return ret;
+}
+
 void Realm::set_schema_subset(Schema schema)
 {
+    verify_thread();
+    verify_open();
     REALM_ASSERT(m_dynamic_schema);
     REALM_ASSERT(m_schema_version != ObjectStore::NotVersioned);
 
@@ -407,8 +441,20 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
 
     bool was_in_read_transaction = is_in_read_transaction();
     Schema actual_schema = get_full_schema();
-    std::vector<SchemaChange> required_changes = actual_schema.compare(schema, m_config.schema_mode);
 
+    // Frozen Realms never modify the schema on disk and we just need to verify
+    // that the requested schema is compatible with what actually exists on disk
+    // at that frozen version. Tables are allowed to be missing as those can be
+    // represented by empty Results, but tables which exist must have all of the
+    // requested properties with the correct type.
+    if (m_frozen_version) {
+        ObjectStore::verify_compatible_for_immutable_and_readonly(
+            actual_schema.compare(schema, m_config.schema_mode, true));
+        set_schema(actual_schema, std::move(schema));
+        return;
+    }
+
+    std::vector<SchemaChange> required_changes = actual_schema.compare(schema, m_config.schema_mode);
     if (!schema_change_needs_write_transaction(schema, required_changes, version)) {
         if (!was_in_read_transaction)
             m_transaction = nullptr;
@@ -444,16 +490,26 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
         cache_new_schema();
     }
 
+    schema.copy_keys_from(actual_schema, m_config.schema_subset_mode);
+
+    bool save_schema_version_on_version_decrease = false;
+#if REALM_ENABLE_SYNC
+    if (m_config.sync_config && m_config.sync_config->flx_sync_requested)
+        save_schema_version_on_version_decrease = true;
+#endif
+
     uint64_t old_schema_version = m_schema_version;
-    bool is_schema_additive = m_config.is_schema_additive();
-    if (migration_function && !is_schema_additive) {
+    bool additive = m_config.schema_mode == SchemaMode::AdditiveDiscovered ||
+                    m_config.schema_mode == SchemaMode::AdditiveExplicit ||
+                    m_config.schema_mode == SchemaMode::ReadOnly;
+    if (migration_function && !additive) {
         auto wrapper = [&] {
             auto config = m_config;
             config.schema_mode = SchemaMode::ReadOnly;
             config.schema = util::none;
             // Don't go through the normal codepath for opening a Realm because
             // we're using a mismatched config
-            auto old_realm = std::make_shared<Realm>(std::move(config), none, m_coordinator, MakeSharedTag{});
+            auto old_realm = std::make_shared<Realm>(std::move(config), none, m_coordinator, Private());
             // block autorefresh for the old realm
             old_realm->m_auto_refresh = false;
             migration_function(old_realm, shared_from_this(), m_schema);
@@ -471,12 +527,13 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
 
         ObjectStore::apply_schema_changes(transaction(), version, m_schema, m_schema_version, m_config.schema_mode,
                                           required_changes, m_config.automatically_handle_backlinks_in_migrations,
-                                          wrapper);
+                                          wrapper, save_schema_version_on_version_decrease);
     }
     else {
         ObjectStore::apply_schema_changes(transaction(), m_schema_version, schema, version, m_config.schema_mode,
-                                          required_changes, m_config.automatically_handle_backlinks_in_migrations);
-        REALM_ASSERT_DEBUG(is_schema_additive ||
+                                          required_changes, m_config.automatically_handle_backlinks_in_migrations,
+                                          nullptr, save_schema_version_on_version_decrease);
+        REALM_ASSERT_DEBUG(additive ||
                            (required_changes = ObjectStore::schema_from_group(read_group()).compare(schema)).empty());
     }
 
@@ -522,7 +579,7 @@ void Realm::add_schema_change_handler()
             m_schema = *m_new_schema;
         }
         else {
-            m_schema.copy_keys_from(*m_new_schema, m_config.is_schema_additive());
+            m_schema.copy_keys_from(*m_new_schema, m_config.schema_subset_mode);
         }
         notify_schema_changed();
     });
@@ -530,15 +587,17 @@ void Realm::add_schema_change_handler()
 
 void Realm::cache_new_schema()
 {
-    if (!is_closed()) {
-        auto new_version = transaction().get_version_of_current_transaction().version;
-        if (m_new_schema)
-            m_coordinator->cache_schema(std::move(*m_new_schema), m_schema_version, new_version);
-        else
-            m_coordinator->advance_schema_cache(m_schema_transaction_version, new_version);
-        m_schema_transaction_version = new_version;
-        m_new_schema = util::none;
+    if (is_closed()) {
+        return;
     }
+
+    auto new_version = transaction().get_version_of_current_transaction().version;
+    if (m_new_schema)
+        m_coordinator->cache_schema(std::move(*m_new_schema), m_schema_version, new_version);
+    else
+        m_coordinator->advance_schema_cache(m_schema_transaction_version, new_version);
+    m_schema_transaction_version = new_version;
+    m_new_schema = util::none;
 }
 
 void Realm::translate_schema_error()
@@ -562,14 +621,16 @@ void Realm::notify_schema_changed()
 
 static void check_can_create_write_transaction(const Realm* realm)
 {
+    realm->verify_thread();
+    realm->verify_open();
     if (realm->config().immutable() || realm->config().read_only()) {
-        throw InvalidTransactionException("Can't perform transactions on read-only Realms.");
+        throw WrongTransactionState("Can't perform transactions on read-only Realms.");
     }
     if (realm->is_frozen()) {
-        throw InvalidTransactionException("Can't perform transactions on a frozen Realm");
+        throw WrongTransactionState("Can't perform transactions on a frozen Realm");
     }
     if (!realm->is_closed() && realm->get_number_of_versions() > realm->config().max_number_of_active_versions) {
-        throw InvalidTransactionException(
+        throw WrongTransactionState(
             util::format("Number of active versions (%1) in the Realm exceeded the limit of %2",
                          realm->get_number_of_versions(), realm->config().max_number_of_active_versions));
     }
@@ -578,20 +639,20 @@ static void check_can_create_write_transaction(const Realm* realm)
 void Realm::verify_thread() const
 {
     if (m_scheduler && !m_scheduler->is_on_thread())
-        throw IncorrectThreadException();
+        throw LogicError(ErrorCodes::WrongThread, "Realm accessed from incorrect thread.");
 }
 
 void Realm::verify_in_write() const
 {
     if (!is_in_transaction()) {
-        throw InvalidTransactionException("Cannot modify managed objects outside of a write transaction.");
+        throw WrongTransactionState("Cannot modify managed objects outside of a write transaction.");
     }
 }
 
 void Realm::verify_open() const
 {
     if (is_closed()) {
-        throw ClosedRealmException();
+        throw LogicError(ErrorCodes::ClosedRealm, "Cannot access realm that has been closed.");
     }
 }
 
@@ -599,19 +660,25 @@ bool Realm::verify_notifications_available(bool throw_on_error) const
 {
     if (is_frozen()) {
         if (throw_on_error)
-            throw InvalidTransactionException(
-                "Notifications are not available on frozen lists since they do not change.");
+            throw WrongTransactionState(
+                "Notifications are not available on frozen collections since they do not change.");
         return false;
     }
     if (config().immutable()) {
         if (throw_on_error)
-            throw InvalidTransactionException("Cannot create asynchronous query for immutable Realms");
+            throw WrongTransactionState("Cannot create asynchronous query for immutable Realms");
         return false;
     }
-    if (is_in_transaction()) {
-        if (throw_on_error)
-            throw InvalidTransactionException("Cannot create asynchronous query while in a write transaction");
-        return false;
+    if (throw_on_error) {
+        if (m_transaction && m_transaction->get_commit_size() > 0)
+            throw WrongTransactionState(
+                "Cannot create asynchronous query after making changes in a write transaction.");
+    }
+    else {
+        // Don't create implicit notifiers inside write transactions even if
+        // we could as it wouldn't actually be used
+        if (is_in_transaction())
+            return false;
     }
 
     return true;
@@ -666,19 +733,22 @@ util::Optional<DB::version_type> Realm::latest_snapshot_version() const
 
 void Realm::enable_wait_for_change()
 {
+    verify_open();
     m_coordinator->enable_wait_for_change();
 }
 
 bool Realm::wait_for_change()
 {
-    if (m_frozen_version) {
+    verify_open();
+    if (m_frozen_version || m_config.schema_mode == SchemaMode::Immutable) {
         return false;
     }
-    return m_transaction ? m_coordinator->wait_for_change(transaction_ref()) : false;
+    return m_transaction && m_coordinator->wait_for_change(m_transaction);
 }
 
 void Realm::wait_for_change_release()
 {
+    verify_open();
     m_coordinator->wait_for_change_release();
 }
 
@@ -767,6 +837,12 @@ void Realm::run_writes()
         // writes as we can't add commits while in that state
         return;
     }
+    if (is_in_transaction()) {
+        // This is scheduled asynchronously after acquiring the write lock, so
+        // in that time a synchronous transaction may have been started. If so,
+        // we'll be re-invoked when that transaction ends.
+        return;
+    }
 
     CountGuard running_writes(m_is_running_async_writes);
     int run_limit = 20; // max number of commits without full sync to disk
@@ -840,14 +916,12 @@ void Realm::run_writes()
 
 auto Realm::async_begin_transaction(util::UniqueFunction<void()>&& the_write_block, bool notify_only) -> AsyncHandle
 {
-    verify_thread();
     check_can_create_write_transaction(this);
     if (m_is_running_async_commit_completions) {
-        throw InvalidTransactionException(
-            "Can't begin a write transaction from inside a commit completion callback.");
+        throw WrongTransactionState("Can't begin a write transaction from inside a commit completion callback.");
     }
     if (!m_scheduler->can_invoke()) {
-        throw InvalidTransactionException(
+        throw WrongTransactionState(
             "Cannot schedule async transaction. Make sure you are running from inside a run loop.");
     }
     REALM_ASSERT(the_write_block);
@@ -867,13 +941,12 @@ auto Realm::async_begin_transaction(util::UniqueFunction<void()>&& the_write_blo
 auto Realm::async_commit_transaction(util::UniqueFunction<void(std::exception_ptr)>&& completion, bool allow_grouping)
     -> AsyncHandle
 {
-    verify_thread();
+    check_can_create_write_transaction(this);
     if (m_is_running_async_commit_completions) {
-        throw InvalidTransactionException(
-            "Can't commit a write transaction from inside a commit completion callback.");
+        throw WrongTransactionState("Can't commit a write transaction from inside a commit completion callback.");
     }
     if (!is_in_transaction()) {
-        throw InvalidTransactionException("Can't commit a non-existing write transaction");
+        throw WrongTransactionState("Can't commit a non-existing write transaction");
     }
 
     m_transaction->promote_to_async();
@@ -931,6 +1004,7 @@ auto Realm::async_commit_transaction(util::UniqueFunction<void(std::exception_pt
 bool Realm::async_cancel_transaction(AsyncHandle handle)
 {
     verify_thread();
+    verify_open();
     auto compare = [handle](auto& elem) {
         return elem.handle == handle;
     };
@@ -952,11 +1026,10 @@ bool Realm::async_cancel_transaction(AsyncHandle handle)
 
 void Realm::begin_transaction()
 {
-    verify_thread();
     check_can_create_write_transaction(this);
 
     if (is_in_transaction()) {
-        throw InvalidTransactionException("The Realm is already in a write transaction");
+        throw WrongTransactionState("The Realm is already in a write transaction");
     }
 
     // Any of the callbacks to user code below could drop the last remaining
@@ -988,10 +1061,9 @@ void Realm::do_begin_transaction()
 void Realm::commit_transaction()
 {
     check_can_create_write_transaction(this);
-    verify_thread();
 
     if (!is_in_transaction()) {
-        throw InvalidTransactionException("Can't commit a non-existing write transaction");
+        throw WrongTransactionState("Can't commit a non-existing write transaction");
     }
 
     DB::VersionID prev_version = transaction().get_version_of_current_transaction();
@@ -1017,14 +1089,12 @@ void Realm::commit_transaction()
 void Realm::cancel_transaction()
 {
     check_can_create_write_transaction(this);
-    verify_thread();
 
     if (m_is_running_async_commit_completions) {
-        throw InvalidTransactionException(
-            "Can't cancel a write transaction from inside a commit completion callback.");
+        throw WrongTransactionState("Can't cancel a write transaction from inside a commit completion callback.");
     }
     if (!is_in_transaction()) {
-        throw InvalidTransactionException("Can't cancel a non-existing write transaction");
+        throw WrongTransactionState("Can't cancel a non-existing write transaction");
     }
 
     transaction::cancel(transaction(), m_binding_context.get());
@@ -1041,8 +1111,8 @@ void Realm::cancel_transaction()
 
 void Realm::invalidate()
 {
-    verify_open();
     verify_thread();
+    verify_open();
 
     if (m_is_sending_notifications) {
         // This was originally because closing the Realm during notification
@@ -1077,10 +1147,10 @@ bool Realm::compact()
     verify_open();
 
     if (m_config.immutable() || m_config.read_only()) {
-        throw InvalidTransactionException("Can't compact a read-only Realm");
+        throw WrongTransactionState("Can't compact a read-only Realm");
     }
     if (is_in_transaction()) {
-        throw InvalidTransactionException("Can't compact a Realm within a write transaction");
+        throw WrongTransactionState("Can't compact a Realm within a write transaction");
     }
 
     verify_open();
@@ -1091,6 +1161,7 @@ bool Realm::compact()
 void Realm::convert(const Config& config, bool merge_into_existing)
 {
     verify_thread();
+    verify_open();
 
 #if REALM_ENABLE_SYNC
     auto src_is_flx_sync = m_config.sync_config && m_config.sync_config->flx_sync_requested;
@@ -1098,11 +1169,11 @@ void Realm::convert(const Config& config, bool merge_into_existing)
     auto dst_is_pbs_sync = config.sync_config && !config.sync_config->flx_sync_requested;
 
     if (dst_is_flx_sync && !src_is_flx_sync) {
-        throw std::logic_error(
+        throw IllegalOperation(
             "Realm cannot be converted to a flexible sync realm unless flexible sync is already enabled");
     }
     if (dst_is_pbs_sync && src_is_flx_sync) {
-        throw std::logic_error(
+        throw IllegalOperation(
             "Realm cannot be converted from a flexible sync realm to a partition based sync realm");
     }
 
@@ -1118,34 +1189,29 @@ void Realm::convert(const Config& config, bool merge_into_existing)
     }
 
     if (config.encryption_key.size() && config.encryption_key.size() != 64) {
-        throw InvalidEncryptionKeyException();
+        throw InvalidEncryptionKey();
     }
 
-    try {
-        auto& tr = transaction();
-        auto repl = tr.get_replication();
-        bool src_is_sync = repl && repl->get_history_type() == Replication::hist_SyncClient;
-        bool dst_is_sync = config.sync_config || config.force_sync_history;
+    auto& tr = transaction();
+    auto repl = tr.get_replication();
+    bool src_is_sync = repl && repl->get_history_type() == Replication::hist_SyncClient;
+    bool dst_is_sync = config.sync_config || config.force_sync_history;
 
-        if (dst_is_sync) {
-            m_coordinator->write_copy(config.path, config.encryption_key.data());
-            if (!src_is_sync) {
+    if (dst_is_sync) {
+        m_coordinator->write_copy(config.path, config.encryption_key.data());
+        if (!src_is_sync) {
 #if REALM_ENABLE_SYNC
-                DBOptions options;
-                if (config.encryption_key.size()) {
-                    options.encryption_key = config.encryption_key.data();
-                }
-                auto db = DB::create(make_in_realm_history(), config.path, options);
-                db->create_new_history(sync::make_client_replication());
-#endif
+            DBOptions options;
+            if (config.encryption_key.size()) {
+                options.encryption_key = config.encryption_key.data();
             }
-        }
-        else {
-            tr.write(config.path, config.encryption_key.data());
+            auto db = DB::create(make_in_realm_history(), config.path, options);
+            db->create_new_history(sync::make_client_replication());
+#endif
         }
     }
-    catch (...) {
-        _impl::translate_file_exception(config.path);
+    else {
+        tr.write(config.path, config.encryption_key.data());
     }
 }
 
@@ -1230,7 +1296,7 @@ bool Realm::do_refresh()
     }
 
     if (m_config.immutable()) {
-        throw std::logic_error("Can't refresh a read-only Realm.");
+        throw WrongTransactionState("Can't refresh an immutable Realm.");
     }
 
     // can't be any new changes if we're in a write transaction
@@ -1273,7 +1339,7 @@ bool Realm::do_refresh()
 void Realm::set_auto_refresh(bool auto_refresh)
 {
     if (is_frozen() && auto_refresh) {
-        throw std::logic_error("Auto-refresh cannot be enabled for frozen Realms.");
+        throw WrongTransactionState("Auto-refresh cannot be enabled for frozen Realms.");
     }
     m_auto_refresh = auto_refresh;
 }
@@ -1305,18 +1371,24 @@ uint64_t Realm::get_schema_version(const Realm::Config& config)
 bool Realm::is_frozen() const
 {
     bool result = bool(m_frozen_version);
-    REALM_ASSERT_DEBUG((result && m_transaction) ? m_transaction->is_frozen() : true);
+    REALM_ASSERT_DEBUG(!result || !m_transaction || m_transaction->is_frozen());
     return result;
 }
 
 SharedRealm Realm::freeze()
 {
-    auto config = m_config;
-    auto version = read_transaction_version();
-    config.scheduler = util::Scheduler::make_frozen(version);
-    auto frozen_realm = Realm::get_frozen_realm(std::move(config), version);
-    frozen_realm->set_schema(frozen_realm->m_schema, m_schema);
-    return frozen_realm;
+    read_group(); // Freezing requires a read transaction
+    return m_coordinator->freeze_realm(*this);
+}
+
+void Realm::copy_schema_from(const Realm& source)
+{
+    REALM_ASSERT(is_frozen());
+    REALM_ASSERT(m_frozen_version == source.read_transaction_version());
+    m_schema = source.m_schema;
+    m_schema_version = source.m_schema_version;
+    m_schema_transaction_version = m_frozen_version->version;
+    m_dynamic_schema = false;
 }
 
 void Realm::close()
@@ -1338,20 +1410,28 @@ void Realm::close()
 
 void Realm::delete_files(const std::string& realm_file_path, bool* did_delete_realm)
 {
+    bool lock_successful = false;
     try {
-        auto lock_successful = DB::call_with_lock(realm_file_path, [=](auto const& path) {
+        lock_successful = DB::call_with_lock(realm_file_path, [=](auto const& path) {
             DB::delete_files(path, did_delete_realm);
         });
-        if (!lock_successful) {
-            throw DeleteOnOpenRealmException(realm_file_path);
-        }
     }
-    catch (const util::File::NotFound&) {
+    catch (const FileAccessError& e) {
+        if (e.code() != ErrorCodes::FileNotFound) {
+            throw;
+        }
         // Thrown only if the parent directory of the lock file does not exist,
         // which obviously indicates that we didn't need to delete anything
         if (did_delete_realm) {
             *did_delete_realm = false;
         }
+        return;
+    }
+    if (!lock_successful) {
+        throw FileAccessError(
+            ErrorCodes::DeleteOnOpenRealm,
+            util::format("Cannot delete files of an open Realm: '%1' is still in use.", realm_file_path),
+            realm_file_path);
     }
 }
 
@@ -1360,12 +1440,229 @@ AuditInterface* Realm::audit_context() const noexcept
     return m_coordinator ? m_coordinator->audit_context() : nullptr;
 }
 
-MismatchedConfigException::MismatchedConfigException(StringData message, StringData path)
-    : std::logic_error(util::format(message.data(), path))
+namespace {
+
+/*********************************** PropId **********************************/
+
+// The KeyPathResolver will build up a tree of these objects starting with the
+// first property. If a wildcard specifier is part of the path, one object can
+// have several children.
+struct PropId {
+    PropId(TableKey tk, ColKey ck, const Property* prop, const ObjectSchema* os, bool b)
+        : table_key(tk)
+        , col_key(ck)
+        , origin_prop(prop)
+        , target_schema(os)
+        , mandatory(b)
+    {
+    }
+    void expand(KeyPath& key_path, KeyPathArray& key_path_array) const;
+
+    TableKey table_key;
+    ColKey col_key;
+    const Property* origin_prop;
+    const ObjectSchema* target_schema;
+    std::vector<PropId> children;
+    bool mandatory;
+};
+
+// This function will create one KeyPath entry in key_path_array for every
+// branch in the tree,
+void PropId::expand(KeyPath& key_path, KeyPathArray& key_path_array) const
 {
+    key_path.emplace_back(table_key, col_key);
+    if (children.empty()) {
+        key_path_array.push_back(key_path);
+    }
+    else {
+        for (auto& child : children) {
+            child.expand(key_path, key_path_array);
+        }
+    }
+    key_path.pop_back();
 }
 
-MismatchedRealmException::MismatchedRealmException(StringData message)
-    : std::logic_error(message.data())
+/****************************** KeyPathResolver ******************************/
+
+class KeyPathResolver {
+public:
+    KeyPathResolver(Group& g, const Schema& schema)
+        : m_group(g)
+        , m_schema(schema)
+    {
+    }
+
+    void resolve(const ObjectSchema* object_schema, const char* path)
+    {
+        m_full_path = path;
+        if (!_resolve(m_root_props, object_schema, path, true)) {
+            throw InvalidArgument(util::format("'%1' does not resolve in any valid key paths.", m_full_path));
+        }
+    }
+
+    void expand(KeyPathArray& key_path_array) const
+    {
+        for (auto& elem : m_root_props) {
+            KeyPath key_path;
+            key_path.reserve(4);
+            elem.expand(key_path, key_path_array);
+        }
+    }
+
+private:
+    std::pair<ColKey, const ObjectSchema*> get_col_key(const Property* prop);
+    bool _resolve(std::vector<PropId>& props, const ObjectSchema* object_schema, const char* path, bool mandatory);
+    bool _resolve(PropId& current, const char* path);
+
+    Group& m_group;
+    const char* m_full_path = nullptr;
+    const Schema& m_schema;
+    std::vector<PropId> m_root_props;
+};
+
+// Get the column key for a specific Property. In case the property is representing a backlink
+// we need to look up the backlink column based on the forward link properties.
+std::pair<ColKey, const ObjectSchema*> KeyPathResolver::get_col_key(const Property* prop)
 {
+    ColKey col_key = prop->column_key;
+    const ObjectSchema* target_schema = nullptr;
+    if (prop->type == PropertyType::Object || prop->type == PropertyType::LinkingObjects) {
+        auto found_schema = m_schema.find(prop->object_type);
+        if (found_schema != m_schema.end()) {
+            target_schema = &*found_schema;
+            if (prop->type == PropertyType::LinkingObjects) {
+                auto origin_prop = target_schema->property_for_name(prop->link_origin_property_name);
+                auto origin_table = ObjectStore::table_for_object_type(m_group, target_schema->name);
+                col_key = origin_table->get_opposite_column(origin_prop->column_key);
+            }
+        }
+    }
+    return {col_key, target_schema};
 }
+
+// This function will add one or more PropId objects to the props array. This array can either be the root
+// array in the KeyPathResolver or it can be the 'children' array in one PropId.
+bool KeyPathResolver::_resolve(std::vector<PropId>& props, const ObjectSchema* object_schema, const char* path,
+                               bool mandatory)
+{
+    if (*path == '*') {
+        path++;
+        // Add all properties
+        props.reserve(object_schema->persisted_properties.size() + object_schema->computed_properties.size());
+        for (auto& p : object_schema->persisted_properties) {
+            auto [col_key, target_schema] = get_col_key(&p);
+            props.emplace_back(object_schema->table_key, col_key, &p, target_schema, false);
+        }
+        for (const auto& p : object_schema->computed_properties) {
+            auto [col_key, target_schema] = get_col_key(&p);
+            props.emplace_back(object_schema->table_key, col_key, &p, target_schema, false);
+        }
+    }
+    else {
+        auto p = find_chr(path, '.');
+        StringData property(path, p - path);
+        path = p;
+        auto prop = object_schema->property_for_public_name(property);
+        if (prop) {
+            auto [col_key, target_schema] = get_col_key(prop);
+            props.emplace_back(object_schema->table_key, col_key, prop, target_schema, true);
+        }
+        else {
+            if (mandatory) {
+                throw InvalidArgument(util::format("Property '%1' in KeyPath '%2' is not a valid property in %3.",
+                                                   property, m_full_path, object_schema->name));
+            }
+            else {
+                return false;
+            }
+        }
+    }
+
+    if (*path++ == '.') {
+        auto it = props.begin();
+        while (it != props.end()) {
+            if (_resolve(*it, path)) {
+                ++it;
+            }
+            else {
+                it = props.erase(it);
+            }
+        }
+    }
+    return props.size();
+}
+
+bool KeyPathResolver::_resolve(PropId& current, const char* path)
+{
+    auto object_schema = current.target_schema;
+    if (!object_schema) {
+        if (current.mandatory) {
+            throw InvalidArgument(
+                util::format("Property '%1' in KeyPath '%2' is not a collection of objects or an object "
+                             "reference, so it cannot be used as an intermediate keypath element.",
+                             current.origin_prop->public_name, m_full_path));
+        }
+        // Check if the rest of the path is stars. If not, we should exclude this property
+        do {
+            auto p = find_chr(path, '.');
+            StringData property(path, p - path);
+            path = p;
+            if (property != "*") {
+                return false;
+            }
+        } while (*path++ == '.');
+        return true;
+    }
+    // Target schema exists - proceed
+    return _resolve(current.children, object_schema, path, current.mandatory);
+}
+
+} // namespace
+
+KeyPathArray Realm::create_key_path_array(StringData table_name, const std::vector<std::string>& key_paths)
+{
+    std::vector<const char*> vec;
+    vec.reserve(key_paths.size());
+    for (auto& kp : key_paths) {
+        vec.push_back(kp.c_str());
+    }
+    return create_key_path_array(m_schema.find(table_name)->table_key, vec.size(), &vec.front());
+}
+
+KeyPathArray Realm::create_key_path_array(TableKey table_key, size_t num_key_paths, const char** all_key_paths)
+{
+    auto object_schema = m_schema.find(table_key);
+    REALM_ASSERT(object_schema != m_schema.end());
+    KeyPathArray resolved_key_path_array;
+    for (size_t n = 0; n < num_key_paths; n++) {
+        KeyPathResolver resolver(read_group(), m_schema);
+        // Build property tree
+        resolver.resolve(&*object_schema, all_key_paths[n]);
+        // Expand tree into separate lines
+        resolver.expand(resolved_key_path_array);
+    }
+    return resolved_key_path_array;
+}
+
+#ifdef REALM_DEBUG
+void Realm::print_key_path_array(const KeyPathArray& kpa)
+{
+    auto& g = read_group();
+    for (auto& kp : kpa) {
+        for (auto [tk, ck] : kp) {
+            auto table = g.get_table(tk);
+            std::cout << '{' << table->get_name() << ':';
+            if (ck.get_type() == col_type_BackLink) {
+                auto col_key = table->get_opposite_column(ck);
+                table = table->get_opposite_table(ck);
+                std::cout << '{' << table->get_name() << ':' << table->get_column_name(col_key) << "}->";
+            }
+            else {
+                std::cout << table->get_column_name(ck);
+            }
+            std::cout << '}';
+        }
+        std::cout << std::endl;
+    }
+}
+#endif
