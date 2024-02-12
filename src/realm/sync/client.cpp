@@ -127,6 +127,16 @@ public:
 
     std::string get_appservices_connection_id();
 
+protected:
+    friend class ClientImpl;
+
+    // m_initiated is used to check that we aren't trying to update immutable properties like the progress handler or
+    // connection state listener after we've bound the session. We read the variable a bunch in REALM_ASSERTS on the
+    // event loop and on the user's thread, but we only set it once and while we're registering the session wrapper to
+    // be actualized. This function gets called from ClientImpl::register_unactualized_session_wrapper() to
+    // synchronize updating this variable on the main thread with reading the variable on the event loop.
+    void mark_initiated();
+
 private:
     ClientImpl& m_client;
     DBRef m_db;
@@ -309,7 +319,6 @@ SessionWrapperStack::~SessionWrapperStack()
 
 
 // ################ ClientImpl ################
-
 
 ClientImpl::~ClientImpl()
 {
@@ -510,22 +519,25 @@ void ClientImpl::shutdown() noexcept
 
 void ClientImpl::register_unactualized_session_wrapper(SessionWrapper* wrapper, ServerEndpoint endpoint)
 {
+    bool retrigger;
     // Thread safety required.
-
-    std::lock_guard lock{m_mutex};
-    REALM_ASSERT(m_actualize_and_finalize);
-    m_unactualized_session_wrappers.emplace(wrapper, std::move(endpoint)); // Throws
-    bool retrigger = !m_actualize_and_finalize_needed;
-    m_actualize_and_finalize_needed = true;
-    // The conditional triggering needs to happen before releasing the mutex,
-    // because if two threads call register_unactualized_session_wrapper()
-    // roughly concurrently, then only the first one is guaranteed to be asked
-    // to retrigger, but that retriggering must have happened before the other
-    // thread returns from register_unactualized_session_wrapper().
-    //
-    // Note that a similar argument applies when two threads call
-    // register_abandoned_session_wrapper(), and when one thread calls one of
-    // them and another thread call the other.
+    {
+        std::lock_guard lock{m_mutex};
+        REALM_ASSERT(m_actualize_and_finalize);
+        wrapper->mark_initiated();
+        m_unactualized_session_wrappers.emplace(wrapper, std::move(endpoint)); // Throws
+        retrigger = !m_actualize_and_finalize_needed;
+        m_actualize_and_finalize_needed = true;
+        // The conditional triggering needs to happen before releasing the mutex,
+        // because if two threads call register_unactualized_session_wrapper()
+        // roughly concurrently, then only the first one is guaranteed to be asked
+        // to retrigger, but that retriggering must have happened before the other
+        // thread returns from register_unactualized_session_wrapper().
+        //
+        // Note that a similar argument applies when two threads call
+        // register_abandoned_session_wrapper(), and when one thread calls one of
+        // them and another thread call the other.
+    }
     if (retrigger)
         m_actualize_and_finalize->trigger();
 }
@@ -534,26 +546,28 @@ void ClientImpl::register_unactualized_session_wrapper(SessionWrapper* wrapper, 
 void ClientImpl::register_abandoned_session_wrapper(util::bind_ptr<SessionWrapper> wrapper) noexcept
 {
     // Thread safety required.
+    bool retrigger;
+    {
+        std::lock_guard lock{m_mutex};
+        REALM_ASSERT(m_actualize_and_finalize);
 
-    std::lock_guard lock{m_mutex};
-    REALM_ASSERT(m_actualize_and_finalize);
-
-    // If the session wrapper has not yet been actualized (on the event loop
-    // thread), it can be immediately finalized. This ensures that we will
-    // generally not actualize a session wrapper that has already been
-    // abandoned.
-    auto i = m_unactualized_session_wrappers.find(wrapper.get());
-    if (i != m_unactualized_session_wrappers.end()) {
-        m_unactualized_session_wrappers.erase(i);
-        wrapper->finalize_before_actualization();
-        return;
+        // If the session wrapper has not yet been actualized (on the event loop
+        // thread), it can be immediately finalized. This ensures that we will
+        // generally not actualize a session wrapper that has already been
+        // abandoned.
+        auto i = m_unactualized_session_wrappers.find(wrapper.get());
+        if (i != m_unactualized_session_wrappers.end()) {
+            m_unactualized_session_wrappers.erase(i);
+            wrapper->finalize_before_actualization();
+            return;
+        }
+        m_abandoned_session_wrappers.push(std::move(wrapper));
+        retrigger = !m_actualize_and_finalize_needed;
+        m_actualize_and_finalize_needed = true;
+        // The conditional triggering needs to happen before releasing the
+        // mutex. See implementation of register_unactualized_session_wrapper() for
+        // details.
     }
-    m_abandoned_session_wrappers.push(std::move(wrapper));
-    bool retrigger = !m_actualize_and_finalize_needed;
-    m_actualize_and_finalize_needed = true;
-    // The conditional triggering needs to happen before releasing the
-    // mutex. See implementation of register_unactualized_session_wrapper() for
-    // details.
     if (retrigger)
         m_actualize_and_finalize->trigger();
 }
@@ -1279,6 +1293,12 @@ MigrationStore* SessionWrapper::get_migration_store()
     return m_migration_store.get();
 }
 
+inline void SessionWrapper::mark_initiated()
+{
+    REALM_ASSERT(!m_initiated);
+    m_initiated = true;
+}
+
 inline void SessionWrapper::set_progress_handler(util::UniqueFunction<ProgressHandler> handler)
 {
     REALM_ASSERT(!m_initiated);
@@ -1296,10 +1316,8 @@ SessionWrapper::set_connection_state_change_listener(util::UniqueFunction<Connec
 
 void SessionWrapper::initiate()
 {
-    REALM_ASSERT(!m_initiated);
     ServerEndpoint server_endpoint{m_protocol_envelope, m_server_address, m_server_port, m_user_id, m_sync_mode};
     m_client.register_unactualized_session_wrapper(this, std::move(server_endpoint)); // Throws
-    m_initiated = true;
     m_db->add_commit_listener(this);
 }
 
@@ -1527,6 +1545,7 @@ inline void SessionWrapper::abandon(util::bind_ptr<SessionWrapper> wrapper) noex
 // Must be called from event loop thread
 void SessionWrapper::actualize(ServerEndpoint endpoint)
 {
+    REALM_ASSERT_DEBUG(m_initiated);
     REALM_ASSERT(!m_actualized);
     REALM_ASSERT(!m_sess);
     // Cannot be actualized if it's already been finalized or force closed
