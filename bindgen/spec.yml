@@ -650,7 +650,7 @@ records:
   SaltedFileIdent:
     cppName: sync::SaltedFileIdent
     fields:
-      ident: int64_t
+      ident: uint64_t
       salt: int64_t
 
 opaqueTypes:
