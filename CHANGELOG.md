@@ -16,6 +16,7 @@
 * Query with @type does not support filtering on collections ([#7281](https://github.com/realm/realm-core/issues/7281), since 14.0.0-beta.0)
 * Query involving string operations on nested collections would not work ([#7282](https://github.com/realm/realm-core/issues/7282), since 14.0.0-beta.0)
 * Using ANY, ALL or NONE in a query on nested collections would throw an exception ([#7283](https://github.com/realm/realm-core/issues/7283), since 14.0.0-beta.0)
+* Results notifications does not report changes to inner collections ([#7335](https://github.com/realm/realm-core/issues/7335), since 14.0.0-beta.0)
 
 ### Breaking changes
 * If you want to query using @type operation, you must use 'objectlink' to match links to objects. 'object' is reserved for dictionary types.
