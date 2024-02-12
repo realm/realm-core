@@ -776,6 +776,11 @@ RLM_API void realm_config_set_should_compact_on_launch_function(realm_config_t*,
 RLM_API bool realm_config_get_disable_format_upgrade(const realm_config_t*);
 
 /**
+ * True if you can open the file without a file_format_upgrade
+ */
+RLM_API bool realm_config_needs_file_format_upgrade(const realm_config_t*);
+
+/**
  * Disable file format upgrade on open (default: false).
  *
  * If a migration is needed to open the realm file with the provided schema, an

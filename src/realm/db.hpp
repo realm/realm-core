@@ -167,6 +167,8 @@ public:
 
     bool is_attached() const noexcept;
 
+    static bool needs_file_format_upgrade(const std::string& file, const std::vector<char>& encryption_key) noexcept;
+
     Allocator& get_alloc()
     {
         return m_alloc;
