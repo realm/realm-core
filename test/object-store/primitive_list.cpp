@@ -103,13 +103,6 @@ struct StringMaker<Results> {
         return str;
     }
 };
-template <>
-struct StringMaker<util::None> {
-    static std::string convert(util::None)
-    {
-        return "[none]";
-    }
-};
 } // namespace Catch
 
 TEMPLATE_TEST_CASE("primitive list", "[primitives]", cf::MixedVal, cf::Int, cf::Bool, cf::Float, cf::Double,

@@ -122,18 +122,17 @@ public:
 private:
     static constexpr size_t small_string_max_size = 15;  // ArrayStringShort
     static constexpr size_t medium_string_max_size = 63; // ArrayStringLong
-    union Storage {
-        std::aligned_storage<sizeof(ArrayStringShort), alignof(ArrayStringShort)>::type m_string_short;
-        std::aligned_storage<sizeof(ArraySmallBlobs), alignof(ArraySmallBlobs)>::type m_string_long;
-        std::aligned_storage<sizeof(ArrayBigBlobs), alignof(ArrayBigBlobs)>::type m_big_blobs;
-        std::aligned_storage<sizeof(Array), alignof(Array)>::type m_enum;
-    };
+    static constexpr size_t storage_alignment =
+        std::max({alignof(ArrayStringShort), alignof(ArraySmallBlobs), alignof(ArrayBigBlobs), alignof(Array)});
+    static constexpr size_t storage_size =
+        std::max({sizeof(ArrayStringShort), sizeof(ArraySmallBlobs), sizeof(ArrayBigBlobs), sizeof(Array)});
+
     enum class Type { small_strings, medium_strings, big_strings, enum_strings };
 
     Type m_type = Type::small_strings;
 
     Allocator& m_alloc;
-    Storage m_storage;
+    alignas(storage_alignment) std::byte m_storage[storage_size];
     Array* m_arr;
     mutable Spec* m_spec = nullptr;
     mutable size_t m_col_ndx = realm::npos;

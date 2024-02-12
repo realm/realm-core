@@ -582,6 +582,7 @@ TEST_CASE("flx: client reset", "[sync][flx][client reset][baas]") {
     config_remote.path += ".remote";
     const std::string str_field_value = "foo";
     const int64_t local_added_int = 100;
+    const int64_t local_added_int2 = 150;
     const int64_t remote_added_int = 200;
     size_t before_reset_count = 0;
     size_t after_reset_count = 0;
@@ -741,6 +742,63 @@ TEST_CASE("flx: client reset", "[sync][flx][client reset][baas]") {
                 REQUIRE(tv.size() == 2);
                 CHECK(tv.get_object(0).get<Int>(int_col) == local_added_int);
                 CHECK(tv.get_object(1).get<Int>(int_col) == remote_added_int);
+            })
+            ->run();
+    }
+
+    SECTION("Recover: offline writes interleaved with subscriptions and empty writes") {
+        config_local.sync_config->client_resync_mode = ClientResyncMode::Recover;
+        auto&& [reset_future, reset_handler] = make_client_reset_handler();
+        config_local.sync_config->notify_after_client_reset = reset_handler;
+        auto test_reset = reset_utils::make_baas_flx_client_reset(config_local, config_remote, harness.session());
+        test_reset
+            ->make_local_changes([&](SharedRealm local_realm) {
+                // The sequence of events bellow generates five changesets:
+                //  1. create sub1 => empty changeset
+                //  2. create local_added_int object
+                //  3. create empty changeset
+                //  4. create sub2 => empty changeset
+                //  5. create local_added_int2 object
+                //
+                // Before sending 'sub2' to the server, an UPLOAD message is sent first.
+                // The upload message contains changeset 2. (local_added_int) with the cursor
+                // of changeset 3. (empty changeset).
+
+                add_subscription_for_new_object(local_realm, str_field_value, local_added_int);
+                // Commit empty changeset.
+                local_realm->begin_transaction();
+                local_realm->commit_transaction();
+                add_subscription_for_new_object(local_realm, str_field_value, local_added_int2);
+            })
+            ->make_remote_changes([&](SharedRealm remote_realm) {
+                add_subscription_for_new_object(remote_realm, str_field_value, remote_added_int);
+                sync::SubscriptionSet::State actual =
+                    remote_realm->get_latest_subscription_set()
+                        .get_state_change_notification(sync::SubscriptionSet::State::Complete)
+                        .get();
+                REQUIRE(actual == sync::SubscriptionSet::State::Complete);
+            })
+            ->on_post_reset([&, client_reset_future = std::move(reset_future)](SharedRealm local_realm) {
+                ClientResyncMode mode = client_reset_future.get();
+                REQUIRE(mode == ClientResyncMode::Recover);
+                auto subs = local_realm->get_latest_subscription_set();
+                subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
+                // make sure that the subscription for "foo" survived the reset
+                size_t count_of_foo = count_queries_with_str(subs, util::format("\"%1\"", str_field_value));
+                subs.refresh();
+                REQUIRE(subs.state() == sync::SubscriptionSet::State::Complete);
+                REQUIRE(count_of_foo == 1);
+                local_realm->refresh();
+                auto table = local_realm->read_group().get_table("class_TopLevel");
+                auto str_col = table->get_column_key("queryable_str_field");
+                auto int_col = table->get_column_key("queryable_int_field");
+                auto tv = table->where().equal(str_col, StringData(str_field_value)).find_all();
+                tv.sort(int_col);
+                // the objects we created while offline was recovered, and the remote object was downloaded
+                REQUIRE(tv.size() == 3);
+                CHECK(tv.get_object(0).get<Int>(int_col) == local_added_int);
+                CHECK(tv.get_object(1).get<Int>(int_col) == local_added_int2);
+                CHECK(tv.get_object(2).get<Int>(int_col) == remote_added_int);
             })
             ->run();
     }
@@ -1773,7 +1831,7 @@ TEST_CASE("flx: query on non-queryable field results in query error message", "[
         if ((reason.find("Invalid query:") == std::string::npos &&
              reason.find("Client provided query with bad syntax:") == std::string::npos) ||
             reason.find("\"TopLevel\": key \"non_queryable_field\" is not a queryable field") == std::string::npos) {
-            FAIL(reason);
+            FAIL(util::format("Error reason did not match expected: `%1`", reason));
         }
     };
 
@@ -1821,6 +1879,27 @@ TEST_CASE("flx: query on non-queryable field results in query error message", "[
 
             CHECK(realm->get_active_subscription_set().version() == 0);
             CHECK(realm->get_latest_subscription_set().version() == 2);
+        });
+    }
+
+    // Test for issue #6839, where wait for download after committing a new subscription and then
+    // wait for the subscription complete notification was leading to a garbage reason value in the
+    // status provided to the subscription complete callback.
+    SECTION("Download during bad query") {
+        harness->do_with_new_realm([&](SharedRealm realm) {
+            // Wait for steady state before committing the new subscription
+            REQUIRE(!wait_for_download(*realm));
+
+            auto subs = create_subscription(realm, "class_TopLevel", "non_queryable_field", [](auto q, auto c) {
+                return q.equal(c, "bar");
+            });
+            // Wait for download is actually waiting for the subscription to be applied after it was committed
+            REQUIRE(!wait_for_download(*realm));
+            // After subscription is complete or fails during wait for download, this function completes
+            // without blocking
+            auto result = subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get_no_throw();
+            // Verify error occurred
+            check_status(result);
         });
     }
 

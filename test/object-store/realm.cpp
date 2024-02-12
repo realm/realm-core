@@ -1139,17 +1139,12 @@ TEST_CASE("Get Realm using Async Open", "[sync][pbs][async open]") {
         });
     }
 
-    // Create a token which can be parsed as a JWT but is not valid
-    std::string unencoded_body = nlohmann::json({{"exp", 123}, {"iat", 456}}).dump();
-    std::string encoded_body;
-    encoded_body.resize(util::base64_encoded_size(unencoded_body.size()));
-    util::base64_encode(unencoded_body.data(), unencoded_body.size(), &encoded_body[0], encoded_body.size());
-    auto invalid_token = "." + encoded_body + ".";
+    auto expired_token = encode_fake_jwt("", 123, 456);
 
     SECTION("can async open while waiting for a token refresh") {
         SyncTestFile config(init_sync_manager.app(), "realm");
         auto valid_token = config.sync_config->user->access_token();
-        config.sync_config->user->update_access_token(std::move(invalid_token));
+        config.sync_config->user->update_access_token(std::move(expired_token));
 
         std::atomic<bool> called{false};
         auto task = Realm::get_synchronized_realm(config);
@@ -1183,7 +1178,7 @@ TEST_CASE("Get Realm using Async Open", "[sync][pbs][async open]") {
         TestSyncManager tsm(tsm_config);
 
         SyncTestFile config(tsm.app(), "realm");
-        config.sync_config->user->log_in(invalid_token, invalid_token);
+        config.sync_config->user->log_in(expired_token, expired_token);
 
         bool got_error = false;
         config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError) {
