@@ -5293,13 +5293,7 @@ TEST_CASE("C API - async_open", "[sync][pbs][c_api]") {
     }
 
     SECTION("cancels download and reports an error on auth error") {
-        // Create a token which can be parsed as a JWT but is not valid
-        std::string unencoded_body = nlohmann::json({{"exp", 123}, {"iat", 456}}).dump();
-        std::string encoded_body;
-        encoded_body.resize(util::base64_encoded_size(unencoded_body.size()));
-        util::base64_encode(unencoded_body.data(), unencoded_body.size(), &encoded_body[0], encoded_body.size());
-        auto invalid_token = "." + encoded_body + ".";
-
+        auto expired_token = encode_fake_jwt("", 123, 456);
 
         realm_config_t* config = realm_config_new();
         config->schema = Schema{object_schema};
@@ -5307,7 +5301,7 @@ TEST_CASE("C API - async_open", "[sync][pbs][c_api]") {
         realm_sync_config_t* sync_config = realm_sync_config_new(&user, "realm");
         realm_sync_config_set_initial_subscription_handler(sync_config, task_init_subscription, false, nullptr,
                                                            nullptr);
-        sync_config->user->log_in(invalid_token, invalid_token);
+        sync_config->user->log_in(expired_token, expired_token);
 
         realm_config_set_path(config, test_config.path.c_str());
         realm_config_set_schema_version(config, 1);

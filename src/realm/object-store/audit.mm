@@ -1173,6 +1173,14 @@ bool AuditContext::is_scope_valid(uint64_t id)
 void AuditContext::process_scope(AuditContext::Scope& scope) const
 {
     m_logger->info("Events: Processing scope for '%1'", m_source_db->get_path());
+    if (scope.events.empty()) {
+        m_logger->detail("Events: Scope is empty");
+        if (scope.completion)
+            scope.completion(nullptr);
+        m_serializer->scope_complete();
+        return;
+    }
+
     try {
         // Merge single object reads following a query into that query and discard
         // duplicate reads on objects.

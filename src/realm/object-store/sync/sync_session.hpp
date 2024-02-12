@@ -445,8 +445,8 @@ private:
     // Return the subscription_store_base - to be used only for testing
     std::shared_ptr<sync::SubscriptionStore> get_subscription_store_base() REQUIRES(!m_state_mutex);
 
-    mutable util::CheckedMutex m_state_mutex;
-    mutable util::CheckedMutex m_connection_state_mutex;
+    util::CheckedMutex m_state_mutex;
+    util::CheckedMutex m_connection_state_mutex;
 
     State m_state GUARDED_BY(m_state_mutex) = State::Inactive;
 
@@ -456,7 +456,7 @@ private:
     ConnectionState m_connection_state GUARDED_BY(m_connection_state_mutex) = ConnectionState::Disconnected;
     size_t m_death_count GUARDED_BY(m_state_mutex) = 0;
 
-    mutable util::CheckedMutex m_config_mutex;
+    util::CheckedMutex m_config_mutex;
     RealmConfig m_config GUARDED_BY(m_config_mutex);
     const std::shared_ptr<DB> m_db;
     // The subscription store base is lazily created when needed, but never destroyed
@@ -491,7 +491,7 @@ private:
     _impl::SyncProgressNotifier m_progress_notifier;
     ConnectionChangeNotifier m_connection_change_notifier;
 
-    mutable util::CheckedMutex m_external_reference_mutex;
+    util::CheckedMutex m_external_reference_mutex;
     class ExternalReference;
     std::weak_ptr<ExternalReference> m_external_reference GUARDED_BY(m_external_reference_mutex);
 

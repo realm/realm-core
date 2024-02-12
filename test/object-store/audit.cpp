@@ -266,7 +266,7 @@ struct TestClock {
 TEST_CASE("audit object serialization", "[sync][pbs][audit]") {
     TestSyncManager test_session;
     SyncTestFile config(test_session.app(), "parent");
-    config.cache = false;
+    config.automatic_change_notifications = false;
     config.schema_version = 1;
     config.schema = Schema{
         {"object",
@@ -306,6 +306,9 @@ TEST_CASE("audit object serialization", "[sync][pbs][audit]") {
     auto realm = Realm::get_shared_realm(config);
     auto audit = realm->audit_context();
     REQUIRE(audit);
+    auto wait_for_completion = util::make_scope_exit([=]() noexcept {
+        audit->wait_for_completion();
+    });
 
     // We open in proper sync mode to let the audit context initialize from that,
     // but we don't actually want the realm to be synchronizing
@@ -1064,7 +1067,7 @@ TEST_CASE("audit management", "[sync][pbs][audit]") {
 
     TestSyncManager test_session;
     SyncTestFile config(test_session.app(), "parent");
-    config.cache = false;
+    config.automatic_change_notifications = false;
     config.schema_version = 1;
     config.schema = Schema{
         {"object", {{"_id", PropertyType::Int, Property::IsPrimary{true}}, {"value", PropertyType::Int}}},
@@ -1073,6 +1076,10 @@ TEST_CASE("audit management", "[sync][pbs][audit]") {
     auto realm = Realm::get_shared_realm(config);
     auto audit = realm->audit_context();
     REQUIRE(audit);
+    auto wait_for_completion = util::make_scope_exit([=]() noexcept {
+        audit->wait_for_completion();
+    });
+
     auto table = realm->read_group().get_table("class_object");
 
     // We open in proper sync mode to let the audit context initialize from that,
@@ -1081,6 +1088,7 @@ TEST_CASE("audit management", "[sync][pbs][audit]") {
 
     SECTION("config validation") {
         SyncTestFile config(test_session.app(), "parent2");
+        config.automatic_change_notifications = false;
         config.audit_config = std::make_shared<AuditConfig>();
         SECTION("invalid prefix") {
             config.audit_config->partition_value_prefix = "";
@@ -1488,7 +1496,7 @@ TEST_CASE("audit realm sharding", "[sync][pbs][audit]") {
     TestSyncManager test_session{{}, {.start_immediately = false}};
 
     SyncTestFile config(test_session.app(), "parent");
-    config.cache = false;
+    config.automatic_change_notifications = false;
     config.schema_version = 1;
     config.schema = Schema{
         {"object", {{"_id", PropertyType::Int, Property::IsPrimary{true}}, {"value", PropertyType::Int}}},
@@ -1498,6 +1506,7 @@ TEST_CASE("audit realm sharding", "[sync][pbs][audit]") {
     auto realm = Realm::get_shared_realm(config);
     auto audit = realm->audit_context();
     REQUIRE(audit);
+
     auto table = realm->read_group().get_table("class_object");
 
     // We open in proper sync mode to let the audit context initialize from that,
@@ -1679,6 +1688,7 @@ TEST_CASE("audit integration tests", "[sync][pbs][audit][baas]") {
     TestAppSession session = create_app(app_create_config);
 
     SyncTestFile config(session.app()->current_user(), bson::Bson("default"));
+    config.automatic_change_notifications = false;
     config.schema = schema;
     config.audit_config = std::make_shared<AuditConfig>();
     config.audit_config->logger = audit_logger;
