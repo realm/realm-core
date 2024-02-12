@@ -320,6 +320,19 @@ bool ArrayWithFind::find_optimized(int64_t value, size_t start, size_t end, size
     //
 
     if (m_array.is_encoded()) {
+
+        const auto lbound = m_array.m_lbound;
+        const auto ubound = m_array.m_ubound;
+
+        if (!c.can_match(value, lbound, ubound))
+            return true;
+
+        // optimization if all items are guaranteed to match (such as cond == NotEqual && value == 100 && m_ubound ==
+        // 15)
+        if (c.will_match(value, lbound, ubound)) {
+            return find_all_will_match<bitwidth>(start2, end, baseindex, state);
+        }
+
         return find_encoded_array<cond>(value, start2, end, baseindex, state);
     }
 
@@ -1020,9 +1033,9 @@ bool ArrayWithFind::find_encoded_array(int64_t value, size_t start, size_t end, 
         };
     REALM_ASSERT_DEBUG(cmp != nullptr);
     // this can be optimized doing lower/upper bound, we don't need to go through the whole array
-    const auto h = m_array.get_header();
+    // const auto h = m_array.get_header();
     while (start < end) {
-        auto v = ArrayEncode::get(h, start);
+        auto v = m_array.get(start);
         if (cmp(v, value) && !state->match(start + baseindex))
             return false;
         ++start;

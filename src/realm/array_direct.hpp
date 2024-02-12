@@ -541,19 +541,6 @@ inline size_t upper_bound(const char* data, size_t size, int64_t value) noexcept
     return impl::upper_bound<width>(data, 0, size, value);
 }
 
-// template <typename Cmp = std::less<int64_t>>
-// inline size_t lower_bound(const char* data, size_t start, size_t end, int64_t value, Cmp cmp = {}) noexcept
-//{
-//     return impl::lower_bound<0>(data, start, end, value, cmp);
-// }
-//
-// template <typename Cmp = std::greater_equal<int64_t>>
-// inline size_t upper_bound(const char* data, size_t start, size_t end, int64_t value, Cmp cmp = {}) noexcept
-//{
-//     return impl::upper_bound<0>(data, start, end, value, cmp);
-// }
-
-
 } // namespace realm
 
 #endif /* ARRAY_TPL_HPP_ */

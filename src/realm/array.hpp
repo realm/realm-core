@@ -406,9 +406,9 @@ public:
     template <class cond>
     size_t find_first(int64_t value, size_t start = 0, size_t end = size_t(-1)) const
     {
-        REALM_ASSERT(start <= m_size && (end <= m_size || end == size_t(-1)) && start <= end);
-
-        // TODO: would be nice to avoid this in order to speed up find_first loops
+        // REALM_TEMPEX2(return do_find, cond, m_width, (value, start, end));
+        // return do_find<cond>(value, start, end);
+        //  TODO: would be nice to avoid this in order to speed up find_first loops
         QueryStateFindFirst state;
         Finder finder = m_vtable->finder[cond::condition];
         (this->*finder)(value, start, end, 0, &state);
@@ -488,6 +488,9 @@ protected:
     size_t count(int64_t value) const noexcept;
 
 private:
+    template <typename cond, size_t bitwidth>
+    size_t do_find(int64_t value, size_t start, size_t end) const;
+
     void update_width_cache_from_header() noexcept;
 
     void do_ensure_minimum_width(int_fast64_t);
@@ -526,12 +529,14 @@ protected:
     };
     template <size_t w>
     struct VTableForWidth;
-    template <size_t w>
     struct VTableForEncodedArray;
 
     // This is the one installed into the m_vtable->finder slots.
     template <class cond, size_t bitwidth>
     bool find_vtable(int64_t value, size_t start, size_t end, size_t baseindex, QueryStateBase* state) const;
+
+    template <class cond>
+    bool find_encoded(int64_t value, size_t start, size_t end, size_t baseindex, QueryStateBase* state) const;
 
     template <size_t w>
     int64_t get_universal(const char* const data, const size_t ndx) const;
@@ -572,7 +577,7 @@ protected:
 
 
 public:
-    bool is_encoded() const;
+    inline bool is_encoded() const;
     bool try_encode(Array&) const;
     bool try_decode();
 
@@ -587,6 +592,15 @@ private:
 };
 
 // Implementation:
+
+inline bool Array::is_encoded() const
+{
+#ifdef REALM_DEBUG
+    if (m_kind == 'B')
+        REALM_ASSERT_DEBUG((m_encoding == NodeHeader::Encoding::Flex || m_encoding == NodeHeader::Encoding::Packed));
+#endif
+    return m_kind == 'B';
+}
 
 inline int64_t Array::get(size_t ndx) const noexcept
 {

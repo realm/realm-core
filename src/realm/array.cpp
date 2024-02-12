@@ -233,7 +233,6 @@ struct Array::VTableForWidth {
     static const PopulatedVTable vtable;
 };
 
-template <size_t width>
 struct Array::VTableForEncodedArray {
     struct PopulatedVTableEncoded : Array::VTable {
         PopulatedVTableEncoded()
@@ -241,10 +240,10 @@ struct Array::VTableForEncodedArray {
             getter = &Array::get_encoded;
             setter = &Array::set_encoded;
             chunk_getter = &Array::get_chunk_encoded;
-            finder[cond_Equal] = &Array::find_vtable<Equal, 0>;
-            finder[cond_NotEqual] = &Array::find_vtable<NotEqual, 0>;
-            finder[cond_Greater] = &Array::find_vtable<Greater, 0>;
-            finder[cond_Less] = &Array::find_vtable<Less, 0>;
+            finder[cond_Equal] = &Array::find_encoded<Equal>;
+            finder[cond_NotEqual] = &Array::find_encoded<NotEqual>;
+            finder[cond_Greater] = &Array::find_encoded<Greater>;
+            finder[cond_Less] = &Array::find_encoded<Less>;
         }
     };
     static const PopulatedVTableEncoded vtable;
@@ -253,9 +252,7 @@ struct Array::VTableForEncodedArray {
 template <size_t width>
 const typename Array::VTableForWidth<width>::PopulatedVTable Array::VTableForWidth<width>::vtable;
 
-template <size_t width>
-const typename Array::VTableForEncodedArray<width>::PopulatedVTableEncoded
-    Array::VTableForEncodedArray<width>::vtable;
+const typename Array::VTableForEncodedArray::PopulatedVTableEncoded Array::VTableForEncodedArray::vtable;
 
 
 void Array::init_from_mem(MemRef mem) noexcept
@@ -275,11 +272,16 @@ void Array::init_from_mem(MemRef mem) noexcept
         m_ref = mem.get_ref();
         m_data = get_data_from_header(header);
         m_size = s_encode.size(header);
-        m_width = m_lbound = m_ubound = 0;
+        m_width = s_encode.width(header);
+        // the alternative is to generate 64 possible max values.
+        const auto max_v = 1 << m_width;
+        m_lbound = -max_v;
+        m_ubound = max_v - 1;
+
         m_is_inner_bptree_node = get_is_inner_bptree_node_from_header(header);
         m_has_refs = get_hasrefs_from_header(header);
         m_context_flag = get_context_flag_from_header(header);
-        REALM_TEMPEX(m_vtable = &VTableForEncodedArray, m_width, ::vtable);
+        m_vtable = &VTableForEncodedArray::vtable;
         m_getter = m_vtable->getter;
     }
     else {
@@ -741,15 +743,6 @@ bool Array::decode_array(Array& arr) const
     return arr.is_encoded() ? s_encode.decode(arr) : false;
 }
 
-bool Array::is_encoded() const
-{
-#ifdef REALM_DEBUG
-    if (m_kind == 'B')
-        REALM_ASSERT_DEBUG((m_encoding == NodeHeader::Encoding::Flex || m_encoding == NodeHeader::Encoding::Packed));
-#endif
-    return m_kind == 'B';
-}
-
 bool Array::try_encode(Array& arr) const
 {
     return encode_array(arr);
@@ -785,8 +778,8 @@ int64_t Array::sum(size_t start, size_t end) const
 
     REALM_ASSERT_EX(end <= m_size && start <= end, start, end, m_size);
 
-    if (w == 0)
-        return is_encoded() ? s_encode.sum(*this, start, end) : 0;
+    if (is_encoded())
+        return s_encode.sum(*this, start, end);
 
     if (start == end)
         return 0;
@@ -1275,6 +1268,13 @@ bool Array::find_vtable(int64_t value, size_t start, size_t end, size_t baseinde
     return ArrayWithFind(*this).find_optimized<cond, bitwidth>(value, start, end, baseindex, state);
 }
 
+template <class cond>
+bool Array::find_encoded(int64_t value, size_t start, size_t end, size_t baseindex, QueryStateBase* state) const
+{
+    return ArrayWithFind(*this).find_optimized<cond, 0>(value, start, end, baseindex, state);
+    // return s_encode.find_all<cond>(*this, value, start, end, baseindex, state);
+}
+
 void Array::update_width_cache_from_header() noexcept
 {
     m_width = get_width_from_header(get_header());
@@ -1487,6 +1487,8 @@ size_t Array::upper_bound_int(int64_t value) const noexcept
 
 size_t Array::find_first(int64_t value, size_t start, size_t end) const
 {
+    if (is_encoded())
+        return s_encode.find_first<Equal>(*this, value, start, end);
     return find_first<Equal>(value, start, end);
 }
 
@@ -1609,4 +1611,12 @@ void Array::typed_print(std::string prefix) const
         }
         */
     }
+}
+
+template <typename cond, size_t bitwidth>
+size_t Array::do_find(int64_t value, size_t start, size_t end) const
+{
+    QueryStateFindFirst state;
+    ArrayWithFind(*this).find_optimized<cond, bitwidth>(value, start, end, 0, &state);
+    return state.m_state;
 }

@@ -20,6 +20,7 @@
 #include <realm/array.hpp>
 #include <realm/array_flex.hpp>
 #include <realm/array_packed.hpp>
+#include <realm/query_conditions.hpp>
 
 #include <vector>
 #include <algorithm>
@@ -28,6 +29,12 @@ using namespace realm;
 
 static ArrayFlex s_flex;
 static ArrayPacked s_packed;
+
+template size_t ArrayEncode::find_first<Equal>(const Array&, int64_t, size_t, size_t) const;
+template bool ArrayEncode::find_all<Equal>(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*) const;
+template bool ArrayEncode::find_all<NotEqual>(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*) const;
+template bool ArrayEncode::find_all<Greater>(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*) const;
+template bool ArrayEncode::find_all<Less>(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*) const;
 
 template <typename T, typename... Arg>
 inline void encode_array(const T& encoder, Array& arr, size_t byte_size, Arg&&... args)
@@ -80,6 +87,7 @@ bool ArrayEncode::always_encode(const Array& origin, Array& arr, bool packed) co
 
 bool ArrayEncode::encode(const Array& origin, Array& arr) const
 {
+    // return false;
     return always_encode(origin, arr, true); // true packed, false flex
 
     //    std::vector<int64_t> values;
@@ -168,6 +176,16 @@ size_t ArrayEncode::size(const char* h)
                      : NodeHeader::get_arrayB_num_elements<Encoding::Flex>(h);
 }
 
+size_t ArrayEncode::width(const char* h)
+{
+    using Encoding = NodeHeader::Encoding;
+    REALM_ASSERT_DEBUG(NodeHeader::get_encoding(h) == Encoding::Packed ||
+                       NodeHeader::get_encoding(h) == Encoding::Flex);
+    const auto is_packed = NodeHeader::get_encoding(h) == Encoding::Packed;
+    return is_packed ? NodeHeader::get_element_size<Encoding::Packed>(h)
+                     : NodeHeader::get_elementA_size<Encoding::Flex>(h);
+}
+
 int64_t ArrayEncode::get(const Array& arr, size_t ndx) const
 {
     using Encoding = NodeHeader::Encoding;
@@ -199,12 +217,57 @@ void ArrayEncode::set_direct(const Array& arr, size_t ndx, int64_t value) const
     is_packed(arr) ? s_packed.set_direct(arr, ndx, value) : s_flex.set_direct(arr, ndx, value);
 }
 
-template <typename F>
-size_t ArrayEncode::find_first(const Array& arr, int64_t value, size_t start, size_t end, F cmp) const
+template <typename Cond>
+size_t ArrayEncode::find_first(const Array& arr, int64_t value, size_t start, size_t end) const
+{
+    QueryStateFindFirst state;
+    find_all<Cond>(arr, value, start, end, 0, &state);
+    return state.m_state;
+}
+
+template <typename Cond>
+bool ArrayEncode::find_all(const Array& arr, int64_t value, size_t start, size_t end, size_t baseindex,
+                           QueryStateBase* state) const
 {
     REALM_ASSERT_DEBUG(is_packed(arr) || is_flex(arr));
-    return is_packed(arr) ? s_packed.find_first(arr, value, start, end, cmp)
-                          : s_flex.find_first(arr, value, start, end, cmp);
+    REALM_ASSERT_DEBUG(start <= arr.m_size && (end <= arr.m_size || end == size_t(-1)) && start <= end);
+
+    bool (*cmp)(int64_t, int64_t) = nullptr;
+
+    if constexpr (std::is_same_v<Cond, Equal>)
+        cmp = [](int64_t v, int64_t value) {
+            return v == value;
+        };
+
+    else if constexpr (std::is_same_v<Cond, NotEqual>)
+        cmp = [](int64_t v, int64_t value) {
+            return v != value;
+        };
+
+    else if constexpr (std::is_same_v<Cond, Greater>)
+        cmp = [](int64_t v, int64_t value) {
+            return v > value;
+        };
+
+    else if constexpr (std::is_same_v<Cond, Less>)
+        cmp = [](int64_t v, int64_t value) {
+            return v < value;
+        };
+    REALM_ASSERT_DEBUG(cmp != nullptr);
+
+    if (end == realm::npos)
+        end = arr.m_size;
+
+    if (!(arr.m_size > start && start < end))
+        return true;
+
+    while (start < end) {
+        const auto v = arr.get(start);
+        if (cmp(v, value) && !state->match(start + baseindex))
+            return false;
+        start += 1;
+    }
+    return true;
 }
 
 int64_t ArrayEncode::sum(const Array& arr, size_t start, size_t end) const

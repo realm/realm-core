@@ -26,6 +26,7 @@
 namespace realm {
 
 class Array;
+class QueryStateBase;
 class ArrayEncode {
 public:
     // commit => encode, COW/insert => decode
@@ -34,6 +35,7 @@ public:
 
     // init from mem B
     size_t size(const char* header);
+    size_t width(const char* header);
 
     // get/set
     int64_t get(const Array&, size_t) const;
@@ -42,8 +44,11 @@ public:
     void set_direct(const Array&, size_t, int64_t) const;
 
     // query interface
-    template <typename F>
-    size_t find_first(const Array&, int64_t, size_t, size_t, F) const;
+    template <typename Cond>
+    size_t find_first(const Array&, int64_t, size_t, size_t) const;
+    template <typename Cond>
+    bool find_all(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*) const;
+    // sum
     int64_t sum(const Array&, size_t start, size_t end) const;
 
 private:
