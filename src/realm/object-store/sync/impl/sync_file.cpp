@@ -289,10 +289,8 @@ bool SyncFileManager::copy_realm_file(const std::string& old_path, const std::st
 {
     REALM_ASSERT(old_path.length() > 0);
     try {
-        if (File::exists(new_path)) {
-            return false;
-        }
-        File::copy(old_path, new_path);
+        const bool overwrite_existing = false;
+        return File::copy(old_path, new_path, overwrite_existing);
     }
     catch (FileAccessError const&) {
         return false;
