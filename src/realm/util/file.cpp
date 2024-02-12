@@ -16,18 +16,23 @@
  *
  **************************************************************************/
 
-#include <climits>
-#include <limits>
-#include <algorithm>
-#include <vector>
+#include <realm/util/file.hpp>
 
+#include <realm/unicode.hpp>
+#include <realm/util/errno.hpp>
+#include <realm/util/file_mapper.hpp>
+
+#include <algorithm>
 #include <cerrno>
-#include <cstring>
+#include <climits>
 #include <cstddef>
 #include <cstdio>
 #include <cstdlib>
-#include <iostream>
+#include <cstring>
 #include <fcntl.h>
+#include <iostream>
+#include <limits>
+#include <vector>
 
 #ifndef _WIN32
 #include <unistd.h>
@@ -36,13 +41,10 @@
 #include <sys/statvfs.h>
 #endif
 
-#include <realm/exceptions.hpp>
-#include <realm/unicode.hpp>
-#include <realm/util/errno.hpp>
-#include <realm/util/file_mapper.hpp>
-#include <realm/util/safe_int_ops.hpp>
-#include <realm/util/features.h>
-#include <realm/util/file.hpp>
+#if REALM_PLATFORM_APPLE
+#include <sys/attr.h>
+#include <sys/clonefile.h>
+#endif
 
 using namespace realm::util;
 
@@ -1556,6 +1558,16 @@ bool File::copy(const std::string& origin_path, const std::string& target_path, 
                                       : std::filesystem::copy_options::skip_existing;
     return std::filesystem::copy_file(u8path(origin_path), u8path(target_path), options); // Throws
 #else
+#if REALM_PLATFORM_APPLE
+    // Try to use clonefile and fall back to manual copying if it fails
+    if (clonefile(origin_path.c_str(), target_path.c_str(), 0) == 0) {
+        return true;
+    }
+    if (errno == EEXIST && !overwrite_existing) {
+        return false;
+    }
+#endif
+
     File origin_file{origin_path, mode_Read};  // Throws
     File target_file;
     bool did_create = false;
