@@ -116,10 +116,6 @@ public:
         ColKey idx_new_name;
         // An enum describing the action to take.
         ColKey idx_action;
-        // The partition key of the Realm.
-        ColKey idx_partition;
-        // The local UUID of the user to whom the file action applies (despite the internal column name).
-        ColKey idx_user_identity;
     };
 
     enum class Action {
@@ -138,11 +134,7 @@ public:
     // For all other `Action`s, it is ignored.
     util::Optional<std::string> new_name() const;
 
-    // Get the local UUID of the user associated with this file action metadata.
-    std::string user_local_uuid() const;
-
     Action action() const;
-    std::string partition() const;
     void remove();
     void set_action(Action new_action);
 
@@ -217,8 +209,8 @@ public:
     bool perform_file_actions(SyncFileManager& file_manager, StringData path) const;
 
     // Create file action metadata.
-    void make_file_action_metadata(StringData original_name, StringData partition_key_value, StringData local_uuid,
-                                   SyncFileActionMetadata::Action action, StringData new_name = {}) const;
+    void make_file_action_metadata(StringData original_name, SyncFileActionMetadata::Action action,
+                                   StringData new_name = {}) const;
 
     util::Optional<std::string> get_current_user_identity() const;
     void set_current_user_identity(const std::string& identity);

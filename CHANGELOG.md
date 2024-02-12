@@ -36,6 +36,7 @@
 * (bindgen) Upgrade `eslint-config-prettier` & `eslint-plugin-prettier` and add a missing peer dependency on `prettier`.
 * The minimum CMake version has changed from 3.15 to 3.22.1. ([#6537](https://github.com/realm/realm-core/issues/6537))
 * Update Catch2 to v3.5.2 ([PR #7297](https://github.com/realm/realm-core/pull/7297)).
+* The unused `partition` and `user_local_uuid()` fields have been removed from `FileActionMetadata`. ([PR #7341](https://github.com/realm/realm-core/pull/7341)).
 
 ----------------------------------------------
 
