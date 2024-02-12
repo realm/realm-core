@@ -26,9 +26,59 @@
 
 #include <functional>
 #include <filesystem>
+#include <mutex>
+#include <condition_variable>
 namespace fs = std::filesystem;
 
 namespace realm {
+template <typename E>
+class TestingStateMachine {
+public:
+    explicit TestingStateMachine(E initial_state)
+        : m_cur_state(initial_state)
+    {
+    }
+
+    E get()
+    {
+        std::lock_guard lock{m_mutex};
+        return m_cur_state;
+    }
+
+    void transition_to(E new_state)
+    {
+        std::lock_guard lock{m_mutex};
+        m_cur_state = new_state;
+        m_cv.notify_one();
+    }
+
+    template <typename Func>
+    void transition_with(Func&& func)
+    {
+        std::lock_guard lock{m_mutex};
+        std::optional<E> new_state = func(m_cur_state);
+        if (!new_state) {
+            return;
+        }
+
+        m_cur_state = *new_state;
+        m_cv.notify_one();
+    }
+
+    void wait_for(E target)
+    {
+        std::unique_lock lock{m_mutex};
+        m_cv.wait(lock, [&] {
+            return m_cur_state == target;
+        });
+    }
+
+private:
+    std::mutex m_mutex;
+    std::condition_variable m_cv;
+    E m_cur_state;
+};
+
 template <typename MessageMatcher>
 class ExceptionMatcher final : public Catch::Matchers::MatcherBase<Exception> {
 public:

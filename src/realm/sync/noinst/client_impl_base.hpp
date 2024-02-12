@@ -230,6 +230,8 @@ public:
 
     void cancel_reconnect_delay();
     bool wait_for_session_terminations_or_client_stopped();
+    // Async version of wait_for_session_terminations_or_client_stopped().
+    util::Future<void> notify_session_terminated();
     void voluntary_disconnect_all_connections();
 
 private:
@@ -262,17 +264,9 @@ private:
     // the next, which is important because it carries information about a
     // possible reconnect delay applying to the new connection object (server
     // hammering protection).
-    //
-    // Note: Due to a particular load balancing scheme that is currently in use,
-    // every session is forced to open a seperate connection (via abuse of
-    // `m_one_connection_per_session`, which is only intended for testing
-    // purposes). This disables part of the hammering protection scheme built in
-    // to the client.
     struct ServerSlot {
-        explicit ServerSlot(ReconnectInfo reconnect_info)
-            : reconnect_info(std::move(reconnect_info))
-        {
-        }
+        explicit ServerSlot(ReconnectInfo reconnect_info);
+        ~ServerSlot();
 
         ReconnectInfo reconnect_info; // Applies exclusively to `connection`.
         std::unique_ptr<ClientImpl::Connection> connection;
@@ -908,6 +902,9 @@ private:
     // - Client reset state means the session is going to be used to download a fresh realm.
     SessionReason get_session_reason() noexcept;
 
+    /// Returns the schema version the synchronization session connects with to the server.
+    uint64_t get_schema_version() noexcept;
+
     /// \brief Initiate the integration of downloaded changesets.
     ///
     /// This function must provide for the passed changesets (if any) to
@@ -1244,6 +1241,13 @@ inline ConnectionState ClientImpl::Connection::get_state() const noexcept
     return m_state;
 }
 
+inline ClientImpl::ServerSlot::ServerSlot(ReconnectInfo reconnect_info)
+    : reconnect_info(std::move(reconnect_info))
+{
+}
+
+inline ClientImpl::ServerSlot::~ServerSlot() = default;
+
 inline SyncServerMode ClientImpl::Connection::get_sync_server_mode() const noexcept
 {
     return m_server_endpoint.server_mode;
@@ -1412,8 +1416,8 @@ inline void ClientImpl::Session::request_download_completion_notification()
 
     // Since the deactivation process has not been initiated, the UNBIND message
     // cannot have been sent unless an ERROR message was received.
-    REALM_ASSERT(m_suspended || !m_unbind_message_sent);
-    if (m_ident_message_sent && !m_suspended)
+    REALM_ASSERT(m_error_message_received || !m_unbind_message_sent);
+    if (m_ident_message_sent && !m_error_message_received)
         ensure_enlisted_to_send(); // Throws
 }
 

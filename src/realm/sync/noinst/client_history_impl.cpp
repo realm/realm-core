@@ -66,9 +66,9 @@ void ClientHistory::set_client_reset_adjustments(
         do_trim_sync_history(discard_count);
 
         if (logger.would_log(util::Logger::Level::debug)) {
-            logger.debug("Client reset adjustments: trimming %1 history entries and updating %2 of %3 remaining "
-                         "history entries:",
-                         discard_count, recovered_changesets.size(), sync_history_size());
+            logger.debug("Client reset adjustments: trimming %1 history entries and updating the remaining history "
+                         "entries (%2)",
+                         discard_count, sync_history_size());
             for (size_t i = 0, size = m_arrays->changesets.size(); i < size; ++i) {
                 logger.debug("- %1: ident(%2) changeset_size(%3) remote_version(%4)", i,
                              m_arrays->origin_file_idents.get(i), m_arrays->changesets.get(i).size(),
@@ -83,10 +83,15 @@ void ClientHistory::set_client_reset_adjustments(
             auto i = size_t(version - m_sync_history_base_version);
             util::compression::allocate_and_compress_nonportable(arena, changeset, compressed);
             m_arrays->changesets.set(i, BinaryData{compressed.data(), compressed.size()}); // Throws
-            m_arrays->remote_versions.set(i, server_version.version);
             m_arrays->reciprocal_transforms.set(i, BinaryData());
-            logger.debug("Updating %1: client_version(%2) changeset_size(%3) server_version(%4)", i, version,
-                         compressed.size(), server_version.version);
+        }
+        // Server version is updated for *every* entry in the sync history to ensure that server versions don't
+        // decrease.
+        for (size_t i = 0, size = m_arrays->remote_versions.size(); i < size; ++i) {
+            m_arrays->remote_versions.set(i, server_version.version);
+            version_type version = m_sync_history_base_version + i;
+            logger.debug("Updating %1: client_version(%2) changeset_size(%3) server_version(%4)", i, version + 1,
+                         m_arrays->changesets.get(i).size(), server_version.version);
         }
     }
     logger.debug("New uploadable bytes after client reset adjustment: %1", uploadable_bytes);

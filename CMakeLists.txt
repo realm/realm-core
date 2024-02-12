@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.15)
+cmake_minimum_required(VERSION 3.22.1)
 message(STATUS "CMake version: ${CMAKE_VERSION}")
 
 set(CMAKE_BUILD_TYPE Debug CACHE STRING "")
@@ -137,12 +137,6 @@ else()
         add_compile_options(-Wunreachable-code -Wshorten-64-to-32 -Wconditional-uninitialized -Wextra-semi -Wno-nested-anon-types -Wdocumentation -Wthread-safety -Wthread-safety-negative -Wmissing-prototypes)
     endif()
 
-    if(CMAKE_CXX_STANDARD EQUAL 20)
-        # std::is_pod was deprecated in c++20, but is still used by 3rd party json parser.
-        # TODO remove this once we upgrade it.
-        add_cxx_flag_if_supported(-Wno-deprecated-declarations)
-    endif()
-
     # By default GCC warns that it changed how it passes bitfields by value as
     # function arguments on arm64 every time this happens. This warning is just
     # an FYI and not pointing out a problem, so just disable it.
@@ -153,6 +147,10 @@ else()
     # This warning is too agressive. It warns about moves that are not redundant on older
     # compilers that we still support. It is also harmless, unlike pessimizing moves.
     add_cxx_flag_if_supported(-Wno-redundant-move)
+
+    # For backwards compatibility libc++ public headers have some transitive
+    # includes which they don't use. Disabling this improves build times a bit.
+    add_compile_definitions(_LIBCPP_REMOVE_TRANSITIVE_INCLUDES)
 
     # Ninja buffers output so we need to tell the compiler to use colors even though stdout isn't a tty.
     if("${CMAKE_GENERATOR}" STREQUAL "Ninja")
@@ -306,11 +304,14 @@ elseif(REALM_ENABLE_ENCRYPTION AND CMAKE_SYSTEM_NAME MATCHES "Linux|Android")
 endif()
 
 if(REALM_NEEDS_OPENSSL OR REALM_FORCE_OPENSSL)
+    option(REALM_USE_SYSTEM_OPENSSL "Look for an external OpenSSL installation instead of using prebuilt one." OFF)
+    set(_REALM_USE_OPENSSL_DEFAULT_VERIFY_PATHS ON)
     if(NOT REALM_USE_SYSTEM_OPENSSL AND (ANDROID OR WIN32 OR CMAKE_SYSTEM_NAME STREQUAL "Linux"))
         # Use our own prebuilt OpenSSL
         realm_acquire_dependency(openssl ${DEP_OPENSSL_VERSION} OPENSSL_CMAKE_INCLUDE_FILE)
 
         include(${OPENSSL_CMAKE_INCLUDE_FILE})
+        set(_REALM_USE_OPENSSL_DEFAULT_VERIFY_PATHS OFF)
     endif()
 
     if(NOT DEFINED OPENSSL_USE_STATIC_LIBS)
@@ -318,6 +319,7 @@ if(REALM_NEEDS_OPENSSL OR REALM_FORCE_OPENSSL)
     endif()
     find_package(OpenSSL REQUIRED)
     set(REALM_HAVE_OPENSSL ON)
+    option(REALM_USE_SYSTEM_OPENSSL_PATHS "Use the system OpenSSL certificate store (specified by the OPENSSLDIR environment variable) at runtime for TLS handshake." ${_REALM_USE_OPENSSL_DEFAULT_VERIFY_PATHS})
     string(REGEX MATCH "^([0-9]+)\\.([0-9]+)" OPENSSL_VERSION_MAJOR_MINOR "${OPENSSL_VERSION}")
 elseif(APPLE)
     set(REALM_HAVE_SECURE_TRANSPORT "1")

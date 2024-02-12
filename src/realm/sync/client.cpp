@@ -167,6 +167,8 @@ private:
 
     SessionReason m_session_reason;
 
+    const uint64_t m_schema_version;
+
     std::shared_ptr<SubscriptionStore> m_flx_subscription_store;
     int64_t m_flx_active_version = 0;
     int64_t m_flx_last_seen_version = 0;
@@ -451,6 +453,23 @@ bool ClientImpl::wait_for_session_terminations_or_client_stopped()
 }
 
 
+// This relies on the same assumptions and guarantees as wait_for_session_terminations_or_client_stopped().
+util::Future<void> ClientImpl::notify_session_terminated()
+{
+    auto pf = util::make_promise_future<void>();
+    post([promise = std::move(pf.promise)](Status status) mutable {
+        // Includes operation_aborted
+        if (!status.is_ok()) {
+            promise.set_error(status);
+            return;
+        }
+
+        promise.emplace_value();
+    });
+
+    return std::move(pf.future);
+}
+
 void ClientImpl::drain_connections_on_loop()
 {
     post([this](Status status) mutable {
@@ -714,6 +733,13 @@ SessionReason SessionImpl::get_session_reason() noexcept
     return m_wrapper.m_session_reason;
 }
 
+uint64_t SessionImpl::get_schema_version() noexcept
+{
+    // Can only be called if the session is active or being activated
+    REALM_ASSERT_EX(m_state == State::Active || m_state == State::Unactivated, m_state);
+    return m_wrapper.m_schema_version;
+}
+
 void SessionImpl::initiate_integrate_changesets(std::uint_fast64_t downloadable_bytes, DownloadBatchState batch_state,
                                                 const SyncProgress& progress, const ReceivedChangesets& changesets)
 {
@@ -853,6 +879,9 @@ bool SessionImpl::process_flx_bootstrap_message(const SyncProgress& progress, Do
     catch (const IntegrationException& e) {
         on_integration_failure(e);
     }
+    catch (...) {
+        on_integration_failure(IntegrationException(exception_to_status()));
+    }
 
     return true;
 }
@@ -905,6 +934,9 @@ void SessionImpl::process_pending_flx_bootstrap()
         if (simulate_integration_error) {
             throw IntegrationException(ErrorCodes::BadChangeset, "simulated failure", ProtocolError::bad_changeset);
         }
+
+        call_debug_hook(SyncClientHookEvent::BootstrapBatchAboutToProcess, *pending_batch.progress, query_version,
+                        batch_state, pending_batch.changesets.size());
 
         history.integrate_server_changesets(
             *pending_batch.progress, &downloadable_bytes, pending_batch.changesets, new_version, batch_state, logger,
@@ -1094,8 +1126,10 @@ util::Future<std::string> SessionImpl::send_test_command(std::string body)
 
     get_client().post([this, promise = std::move(pf.promise), body = std::move(body)](Status status) mutable {
         // Includes operation_aborted
-        if (!status.is_ok())
+        if (!status.is_ok()) {
             promise.set_error(status);
+            return;
+        }
 
         auto id = ++m_last_pending_test_command_ident;
         m_pending_test_commands.push_back(PendingTestCommand{id, std::move(body), std::move(promise)});
@@ -1134,6 +1168,7 @@ SessionWrapper::SessionWrapper(ClientImpl& client, DBRef db, std::shared_ptr<Sub
     , m_proxy_config{config.proxy_config} // Throws
     , m_debug_hook(std::move(config.on_sync_client_event_hook))
     , m_session_reason(config.session_reason)
+    , m_schema_version(config.schema_version)
     , m_flx_subscription_store(std::move(flx_sub_store))
     , m_migration_store(std::move(migration_store))
 {
@@ -1143,8 +1178,6 @@ SessionWrapper::SessionWrapper(ClientImpl& client, DBRef db, std::shared_ptr<Sub
     if (m_client_reset_config) {
         m_session_reason = SessionReason::ClientReset;
     }
-
-    update_subscription_version_info();
 }
 
 SessionWrapper::~SessionWrapper() noexcept
@@ -1529,9 +1562,17 @@ void SessionWrapper::actualize(ServerEndpoint endpoint)
         if (was_created)
             m_client.remove_connection(conn);
 
+        // finalize_before_actualization() expects m_sess to be nullptr, but it's possible that we
+        // reached its assignment above before throwing. Unset it here so we get a clean unhandled
+        // exception failure instead of a REALM_ASSERT in finalize_before_actualization().
+        m_sess = nullptr;
         finalize_before_actualization();
         throw;
     }
+
+    // Initialize the variables relying on the bootstrap store from the event loop to guarantee that a previous
+    // session cannot change the state of the bootstrap store at the same time.
+    update_subscription_version_info();
 
     m_actualized = true;
     if (was_created)
@@ -2002,9 +2043,13 @@ void Client::voluntary_disconnect_all_connections()
 
 bool Client::wait_for_session_terminations_or_client_stopped()
 {
-    return m_impl.get()->wait_for_session_terminations_or_client_stopped();
+    return m_impl->wait_for_session_terminations_or_client_stopped();
 }
 
+util::Future<void> Client::notify_session_terminated()
+{
+    return m_impl->notify_session_terminated();
+}
 
 bool Client::decompose_server_url(const std::string& url, ProtocolEnvelope& protocol, std::string& address,
                                   port_type& port, std::string& path) const

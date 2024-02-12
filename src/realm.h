@@ -2940,6 +2940,36 @@ RLM_API const char* realm_app_get_app_id(const realm_app_t*) RLM_API_NOEXCEPT;
 RLM_API realm_user_t* realm_app_get_current_user(const realm_app_t*) RLM_API_NOEXCEPT;
 
 /**
+ * Update the URL used to communicate with the Realm server. This function will update the location
+ * information used for http and websocket requests to the server. Once this operation has completed,
+ * the new base_url value returned by realm_app_get_base_url() will match the base_url value provided
+ * to this function. Any App requests performed while the base URl update is currently in progress
+ * will continue to use the original base URL value.
+ *
+ * @param app ptr to realm_app
+ * @param base_url The new base URL value to set as the Realm server URL - a null or empty string will
+ *                 use the default base URL value
+ * @param callback invoked once operation has completed
+ * @return True if no error has been recorded, False otherwise
+ */
+RLM_API bool realm_app_update_base_url(realm_app_t* app, const char* base_url,
+                                       realm_app_void_completion_func_t callback, realm_userdata_t userdata,
+                                       realm_free_userdata_func_t userdata_free);
+
+/**
+ * Return the current base URL value used by the app. If the realm_app_update_base_url() is called, this
+ * value will match the base_url value provided to that function when the update is complete. The value
+ * provided by this function is undefined if the realm_app_update_base_url() operation is in progress,
+ * since it will likely be the base_url value prior to realm_app_update_base_url() being called.
+ *
+ * @param app ptr to realm_app
+ * @return The current base URL string used by the app
+ *
+ * Return value must be manually released with realm_free().
+ */
+RLM_API char* realm_app_get_base_url(realm_app_t* app) RLM_API_NOEXCEPT;
+
+/**
  * Get the list of active users in this @a app.
  * In case of errors this function will return false (errors to be fetched via `realm_get_last_error()`).
  * If data is not copied the function will return true and set  `out_n` with the capacity needed.
@@ -3470,9 +3500,13 @@ typedef enum realm_flx_sync_subscription_set_state {
 typedef void (*realm_sync_on_subscription_state_changed_t)(realm_userdata_t userdata,
                                                            realm_flx_sync_subscription_set_state_e state);
 
+typedef void (*realm_sync_on_user_state_changed_t)(realm_userdata_t userdata, realm_user_state_e s);
+
+
 typedef struct realm_async_open_task_progress_notification_token realm_async_open_task_progress_notification_token_t;
 typedef struct realm_sync_session_connection_state_notification_token
     realm_sync_session_connection_state_notification_token_t;
+typedef struct realm_sync_user_subscription_token realm_sync_user_subscription_token_t;
 
 /**
  * Callback function invoked by the async open task once the realm is open and fully synchronized.
@@ -3875,6 +3909,15 @@ realm_sync_session_register_connection_state_change_callback(
 RLM_API realm_sync_session_connection_state_notification_token_t* realm_sync_session_register_progress_notifier(
     realm_sync_session_t*, realm_sync_progress_func_t, realm_sync_progress_direction_e, bool is_streaming,
     realm_userdata_t userdata, realm_free_userdata_func_t userdata_free) RLM_API_NOEXCEPT;
+
+
+/**
+ * @return a notification token object. Dispose it to stop receiving notifications.
+ */
+RLM_API realm_sync_user_subscription_token_t*
+realm_sync_user_on_state_change_register_callback(realm_user_t*, realm_sync_on_user_state_changed_t,
+                                                  realm_userdata_t userdata,
+                                                  realm_free_userdata_func_t userdata_free);
 
 /**
  * Register a callback that will be invoked when all pending downloads have completed.

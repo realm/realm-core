@@ -1087,7 +1087,7 @@ TEST(Shared_Writes)
 }
 
 #if !REALM_ANDROID // FIXME
-TEST_IF(Shared_ManyReaders, TEST_DURATION > 0)
+TEST(Shared_ManyReaders)
 {
     // This test was written primarily to expose a former bug in
     // SharedGroup::end_read(), where the lock-file was not remapped
@@ -1105,6 +1105,8 @@ TEST_IF(Shared_ManyReaders, TEST_DURATION > 0)
 #if TEST_DURATION < 1
     // Mac OS X 10.8 cannot handle more than 15 due to its default ulimit settings.
     int rounds[] = {3, 5, 7, 9, 11, 13};
+#elif REALM_DEBUG // this test is disproportionately slower in debug
+    int rounds[] = {3, 5, 7, 9, 11, 13, 15, 17, 23};
 #else
     int rounds[] = {3, 5, 11, 15, 17, 23, 27, 31, 47, 59};
 #endif

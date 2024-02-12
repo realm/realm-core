@@ -38,13 +38,6 @@ public:
     Client(Client&&) noexcept;
     ~Client() noexcept;
 
-    /// Run the internal event-loop of the client. At most one thread may
-    /// execute run() at any given time. The call will not return until somebody
-    /// calls stop().
-    void run() noexcept;
-
-    /// See run().
-    ///
     /// Thread-safe.
     void shutdown() noexcept;
 
@@ -100,6 +93,9 @@ public:
     /// by any thread, and by multiple threads concurrently.
     bool wait_for_session_terminations_or_client_stopped();
 
+    /// Async version of wait_for_session_terminations_or_client_stopped().
+    util::Future<void> notify_session_terminated();
+
     /// Returns false if the specified URL is invalid.
     bool decompose_server_url(const std::string& url, ProtocolEnvelope& protocol, std::string& address,
                               port_type& port, std::string& path) const;
@@ -108,9 +104,6 @@ private:
     std::unique_ptr<ClientImpl> m_impl;
     friend class Session;
 };
-
-
-class BadServerUrl; // Exception
 
 
 /// \brief Client-side representation of a Realm file synchronization session.
@@ -353,6 +346,11 @@ public:
         ///
         /// Note: Currently only used in FLX sync.
         SessionReason session_reason = SessionReason::Sync;
+
+        /// Schema version
+        ///
+        /// Note: Currently set only for FLX sync.
+        uint64_t schema_version = -1; // = ObjectStore::NotVersioned
     };
 
     /// \brief Start a new session for the specified client-side Realm.
@@ -717,14 +715,6 @@ private:
 std::ostream& operator<<(std::ostream& os, SyncConfig::ProxyConfig::Type);
 
 // Implementation
-
-class BadServerUrl : public Exception {
-public:
-    BadServerUrl(std::string_view url)
-        : Exception(ErrorCodes::BadServerUrl, util::format("Unable to parse server URL '%1'", url))
-    {
-    }
-};
 
 inline Session::Session(Session&& sess) noexcept
     : m_impl{sess.m_impl}

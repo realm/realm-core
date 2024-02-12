@@ -78,7 +78,7 @@ private:
 } // namespace
 
 Realm::Realm(Config config, util::Optional<VersionID> version, std::shared_ptr<_impl::RealmCoordinator> coordinator,
-             MakeSharedTag)
+             Private)
     : m_config(std::move(config))
     , m_frozen_version(version)
     , m_scheduler(m_config.scheduler)
@@ -293,8 +293,7 @@ bool Realm::schema_change_needs_write_transaction(Schema& schema, std::vector<Sc
 
     switch (m_config.schema_mode) {
         case SchemaMode::Automatic:
-            if (version < m_schema_version && m_schema_version != ObjectStore::NotVersioned)
-                throw InvalidSchemaVersionException(m_schema_version, version, false);
+            verify_schema_version_not_decreasing(version);
             return true;
 
         case SchemaMode::Immutable:
@@ -324,8 +323,7 @@ bool Realm::schema_change_needs_write_transaction(Schema& schema, std::vector<Sc
         }
 
         case SchemaMode::Manual:
-            if (version < m_schema_version && m_schema_version != ObjectStore::NotVersioned)
-                throw InvalidSchemaVersionException(m_schema_version, version, false);
+            verify_schema_version_not_decreasing(version);
             if (version == m_schema_version) {
                 ObjectStore::verify_no_changes_required(changes);
                 REALM_UNREACHABLE(); // changes is non-empty so above line always throws
@@ -333,6 +331,17 @@ bool Realm::schema_change_needs_write_transaction(Schema& schema, std::vector<Sc
             return true;
     }
     REALM_COMPILER_HINT_UNREACHABLE();
+}
+
+// Schema version is not allowed to decrease for local and pbs realms.
+void Realm::verify_schema_version_not_decreasing(uint64_t version)
+{
+#if REALM_ENABLE_SYNC
+    if (m_config.sync_config && m_config.sync_config->flx_sync_requested)
+        return;
+#endif
+    if (version < m_schema_version && m_schema_version != ObjectStore::NotVersioned)
+        throw InvalidSchemaVersionException(m_schema_version, version, false);
 }
 
 Schema Realm::get_full_schema()
@@ -483,6 +492,12 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
 
     schema.copy_keys_from(actual_schema, m_config.schema_subset_mode);
 
+    bool save_schema_version_on_version_decrease = false;
+#if REALM_ENABLE_SYNC
+    if (m_config.sync_config && m_config.sync_config->flx_sync_requested)
+        save_schema_version_on_version_decrease = true;
+#endif
+
     uint64_t old_schema_version = m_schema_version;
     bool additive = m_config.schema_mode == SchemaMode::AdditiveDiscovered ||
                     m_config.schema_mode == SchemaMode::AdditiveExplicit ||
@@ -494,7 +509,7 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
             config.schema = util::none;
             // Don't go through the normal codepath for opening a Realm because
             // we're using a mismatched config
-            auto old_realm = std::make_shared<Realm>(std::move(config), none, m_coordinator, MakeSharedTag{});
+            auto old_realm = std::make_shared<Realm>(std::move(config), none, m_coordinator, Private());
             // block autorefresh for the old realm
             old_realm->m_auto_refresh = false;
             migration_function(old_realm, shared_from_this(), m_schema);
@@ -512,11 +527,12 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
 
         ObjectStore::apply_schema_changes(transaction(), version, m_schema, m_schema_version, m_config.schema_mode,
                                           required_changes, m_config.automatically_handle_backlinks_in_migrations,
-                                          wrapper);
+                                          wrapper, save_schema_version_on_version_decrease);
     }
     else {
         ObjectStore::apply_schema_changes(transaction(), m_schema_version, schema, version, m_config.schema_mode,
-                                          required_changes, m_config.automatically_handle_backlinks_in_migrations);
+                                          required_changes, m_config.automatically_handle_backlinks_in_migrations,
+                                          nullptr, save_schema_version_on_version_decrease);
         REALM_ASSERT_DEBUG(additive ||
                            (required_changes = ObjectStore::schema_from_group(read_group()).compare(schema)).empty());
     }

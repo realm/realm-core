@@ -166,6 +166,7 @@ InvalidTableRef::~InvalidTableRef() noexcept = default;
 SerializationError::~SerializationError() noexcept = default;
 NotImplemented::~NotImplemented() noexcept = default;
 MigrationFailed::~MigrationFailed() noexcept = default;
+SyncSchemaMigrationFailed::~SyncSchemaMigrationFailed() noexcept = default;
 ObjectAlreadyExists::~ObjectAlreadyExists() noexcept = default;
 CrossTableLinkTarget::~CrossTableLinkTarget() noexcept = default;
 SystemError::~SystemError() noexcept = default;

@@ -8,6 +8,7 @@
 #include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/noinst/compact_changesets.hpp>
 #include <realm/sync/noinst/client_reset_operation.hpp>
+#include <realm/sync/noinst/sync_schema_migration.hpp>
 #include <realm/sync/protocol.hpp>
 #include <realm/util/assert.hpp>
 #include <realm/util/basic_system_errors.hpp>
@@ -206,10 +207,8 @@ ClientImpl::ClientImpl(ClientConfig config)
     REALM_ASSERT_EX(m_socket_provider, "Must provide socket provider in sync Client config");
 
     if (m_one_connection_per_session) {
-        // FIXME: Re-enable this warning when the load balancer is able to handle
-        // multiplexing.
-        //        logger.warn("Testing/debugging feature 'one connection per session' enabled - "
-        //            "never do this in production");
+        logger.warn("Testing/debugging feature 'one connection per session' enabled - "
+                    "never do this in production");
     }
 
     if (config.disable_upload_activation_delay) {
@@ -1491,6 +1490,9 @@ void Session::cancel_resumption_delay()
         initiate_rebind(); // Throws
 
     m_conn.one_more_active_unsuspended_session(); // Throws
+    if (m_try_again_activation_timer) {
+        m_try_again_activation_timer.reset();
+    }
 
     on_resumed(); // Throws
 }
@@ -1581,9 +1583,10 @@ void Session::on_integration_failure(const IntegrationException& error)
 
     m_client_error = util::make_optional<IntegrationException>(error);
     m_error_to_send = true;
-
+    SessionErrorInfo error_info{error.to_status(), IsFatal{false}};
+    error_info.server_requests_action = ProtocolErrorInfo::Action::Warning;
     // Surface the error to the user otherwise is lost.
-    on_connection_state_changed(m_conn.get_state(), SessionErrorInfo{error.to_status(), IsFatal{false}});
+    on_connection_state_changed(m_conn.get_state(), std::move(error_info));
 
     // Since the deactivation process has not been initiated, the UNBIND
     // message cannot have been sent unless an ERROR message was received.
@@ -1687,10 +1690,10 @@ void Session::activate()
         process_pending_flx_bootstrap();
     }
     catch (const IntegrationException& error) {
-        logger.error("Error integrating bootstrap changesets: %1", error.what());
-        m_suspended = true;
-        m_conn.one_less_active_unsuspended_session(); // Throws
-        on_suspended(SessionErrorInfo{Status{error.code(), error.what()}, IsFatal{true}});
+        on_integration_failure(error);
+    }
+    catch (...) {
+        on_integration_failure(IntegrationException(exception_to_status()));
     }
 
     if (has_pending_client_reset) {
@@ -1872,6 +1875,9 @@ void Session::send_bind_message()
             bind_json_data["migratedPartition"] = *migrated_partition;
         }
         bind_json_data["sessionReason"] = static_cast<uint64_t>(get_session_reason());
+        auto schema_version = get_schema_version();
+        // Send 0 if schema is not versioned.
+        bind_json_data["schemaVersion"] = schema_version != uint64_t(-1) ? schema_version : 0;
         if (logger.would_log(util::Logger::Level::debug)) {
             std::string json_data_dump;
             if (!bind_json_data.empty()) {
@@ -1894,6 +1900,8 @@ void Session::send_bind_message()
     m_conn.initiate_write_message(out, this); // Throws
 
     m_bind_message_sent = true;
+    call_debug_hook(SyncClientHookEvent::BindMessageSent, m_progress, m_last_sent_flx_query_version,
+                    DownloadBatchState::SteadyState, 0);
 
     // Ready to send the IDENT message if the file identifier pair is already
     // available.
@@ -2539,6 +2547,19 @@ Status Session::receive_error_message(const ProtocolErrorInfo& info)
         return Status::OK();
     }
 
+    if (protocol_error == ProtocolError::schema_version_changed) {
+        // Enable upload immediately if the session is still active.
+        if (m_state == Active) {
+            auto wt = get_db()->start_write();
+            _impl::sync_schema_migration::track_sync_schema_migration(*wt, *info.previous_schema_version);
+            wt->commit();
+            // Notify SyncSession a schema migration is required.
+            on_connection_state_changed(m_conn.get_state(), SessionErrorInfo{info});
+        }
+        // Keep the session active to upload any unsynced changes.
+        return Status::OK();
+    }
+
     m_error_message_received = true;
     suspend(SessionErrorInfo{info, std::move(status)});
     return Status::OK();
@@ -2568,6 +2589,7 @@ void Session::suspend(const SessionErrorInfo& info)
     // Notify the application of the suspension of the session if the session is
     // still in the Active state
     if (m_state == Active) {
+        call_debug_hook(SyncClientHookEvent::SessionSuspended, info);
         m_conn.one_less_active_unsuspended_session(); // Throws
         on_suspended(info);                           // Throws
     }

@@ -379,7 +379,7 @@ void StringNode<Equal>::_search_index_init()
 {
     REALM_ASSERT(bool(m_index_evaluator));
     auto index = ParentNode::m_table.unchecked_ptr()->get_search_index(ParentNode::m_condition_column_key);
-    m_index_evaluator->init(index, StringData(StringNodeBase::m_value));
+    m_index_evaluator->init(index, StringNodeBase::m_string_value);
 }
 
 bool StringNode<Equal>::do_consume_condition(ParentNode& node)
@@ -392,7 +392,7 @@ bool StringNode<Equal>::do_consume_condition(ParentNode& node)
     REALM_ASSERT(m_condition_column_key == other.m_condition_column_key);
     REALM_ASSERT(other.m_needles.empty());
     if (m_needles.empty()) {
-        m_needles.insert(m_value ? StringData(*m_value) : StringData());
+        m_needles.insert(m_string_value);
     }
     if (auto& str = other.m_value) {
         m_needle_storage.push_back(std::make_unique<char[]>(str->size()));
@@ -408,7 +408,7 @@ bool StringNode<Equal>::do_consume_condition(ParentNode& node)
 size_t StringNode<Equal>::_find_first_local(size_t start, size_t end)
 {
     if (m_needles.empty()) {
-        return m_leaf->find_first(m_value, start, end);
+        return m_leaf->find_first(m_string_value, start, end);
     }
     else {
         if (end == npos)
@@ -442,7 +442,7 @@ void StringNode<EqualIns>::_search_index_init()
     auto index = ParentNode::m_table->get_search_index(ParentNode::m_condition_column_key);
     m_index_matches.clear();
     constexpr bool case_insensitive = true;
-    index->find_all(m_index_matches, StringData(StringNodeBase::m_value), case_insensitive);
+    index->find_all(m_index_matches, StringNodeBase::m_string_value, case_insensitive);
     m_index_evaluator->init(&m_index_matches);
 }
 
@@ -452,7 +452,7 @@ size_t StringNode<EqualIns>::_find_first_local(size_t start, size_t end)
     for (size_t s = start; s < end; ++s) {
         StringData t = get_string(s);
 
-        if (cond(StringData(m_value), m_ucase.c_str(), m_lcase.c_str(), t))
+        if (cond(m_string_value, m_ucase.c_str(), m_lcase.c_str(), t))
             return s;
     }
 
@@ -484,7 +484,7 @@ void StringNodeFulltext::_search_index_init()
     auto index = m_link_map->get_target_table()->get_search_index(ParentNode::m_condition_column_key);
     REALM_ASSERT(index && index->is_fulltext_index());
     m_index_matches.clear();
-    index->find_all_fulltext(m_index_matches, StringData(StringNodeBase::m_value));
+    index->find_all_fulltext(m_index_matches, StringNodeBase::m_string_value);
 
     // If links exists, use backlinks to find the original objects
     if (m_link_map->links_exist()) {

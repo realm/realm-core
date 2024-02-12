@@ -484,7 +484,7 @@ public:
         , m_serializer(serializer)
         , m_table(audit_table)
         , m_repl(*m_table.get_parent_group()->get_replication())
-        , m_repl_buffer([=]() -> const util::AppendBuffer<char>& {
+        , m_repl_buffer([this]() -> const util::AppendBuffer<char>& {
             REALM_ASSERT(typeid(m_repl) == typeid(sync::ClientReplication));
             return static_cast<sync::SyncReplication&>(m_repl).get_instruction_encoder().buffer();
         }())
@@ -615,6 +615,8 @@ private:
 // when the current one grows too large and ensuring that all of the Realms are
 // uploaded to the server.
 class AuditRealmPool : public std::enable_shared_from_this<AuditRealmPool> {
+    struct Private {};
+
 public:
     using ErrorHandler = std::function<void(SyncError)>;
 
@@ -629,9 +631,11 @@ public:
     // of the callback.
     void write(util::FunctionRef<void(Transaction&)> func) REQUIRES(!m_mutex);
 
-    // Do not call directly; use get_pool().
-    AuditRealmPool(std::shared_ptr<SyncUser> user, std::string const& partition_prefix, ErrorHandler error_handler,
-                   const std::shared_ptr<util::Logger>& logger, std::string_view app_id);
+    explicit AuditRealmPool(Private, std::shared_ptr<SyncUser> user, std::string const& partition_prefix,
+                            ErrorHandler error_handler, const std::shared_ptr<util::Logger>& logger,
+                            std::string_view app_id);
+    AuditRealmPool(const AuditRealmPool&) = delete;
+    AuditRealmPool& operator=(const AuditRealmPool&) = delete;
 
     // Block the calling thread until all pooled Realms have been fully uploaded,
     // including ones which do not currently have sync sessions. For testing
@@ -690,13 +694,13 @@ std::shared_ptr<AuditRealmPool> AuditRealmPool::get_pool(std::shared_ptr<SyncUse
         }
     }
 
-    auto pool = std::make_shared<AuditRealmPool>(user, partition_prefix, error_handler, logger, app_id);
+    auto pool = std::make_shared<AuditRealmPool>(Private(), user, partition_prefix, error_handler, logger, app_id);
     pool->scan_for_realms_to_upload();
     s_pools.push_back({user->identity(), partition_prefix, app_id, pool});
     return pool;
 }
 
-AuditRealmPool::AuditRealmPool(std::shared_ptr<SyncUser> user, std::string const& partition_prefix,
+AuditRealmPool::AuditRealmPool(Private, std::shared_ptr<SyncUser> user, std::string const& partition_prefix,
                                ErrorHandler error_handler, const std::shared_ptr<util::Logger>& logger,
                                std::string_view app_id)
     : m_user(user)

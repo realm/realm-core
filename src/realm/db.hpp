@@ -120,6 +120,7 @@ using DBRef = std::shared_ptr<DB>;
 
 class DB : public std::enable_shared_from_this<DB> {
     struct ReadLockInfo;
+    struct Private {};
 
 public:
     // Create a DB and associate it with a file. DB Objects can only be associated with one file,
@@ -140,6 +141,7 @@ public:
 
     ~DB() noexcept;
 
+    explicit DB(Private, const DBOptions& options);
     // Disable copying to prevent accessor errors. If you really want another
     // instance, open another DB object on the same file. But you don't.
     DB(const DB&) = delete;
@@ -446,9 +448,6 @@ public:
 
     void add_commit_listener(CommitListener*);
     void remove_commit_listener(CommitListener*);
-
-protected:
-    explicit DB(const DBOptions& options);
 
 private:
     class AsyncCommitHelper;

@@ -39,6 +39,7 @@
 #include <realm/util/base64.hpp>
 #include <realm/util/overload.hpp>
 #include <realm/util/platform_info.hpp>
+#include <realm/util/future.hpp>
 #include <realm/util/uri.hpp>
 
 #include <catch2/catch_all.hpp>
@@ -98,6 +99,53 @@ public:
     }
 };
 } // namespace realm
+
+static const std::string profile_0_name = "Ursus americanus Ursus boeckhi";
+static const std::string profile_0_first_name = "Ursus americanus";
+static const std::string profile_0_last_name = "Ursus boeckhi";
+static const std::string profile_0_email = "Ursus ursinus";
+static const std::string profile_0_picture_url = "Ursus malayanus";
+static const std::string profile_0_gender = "Ursus thibetanus";
+static const std::string profile_0_birthday = "Ursus americanus";
+static const std::string profile_0_min_age = "Ursus maritimus";
+static const std::string profile_0_max_age = "Ursus arctos";
+
+static const nlohmann::json profile_0 = {
+    {"name", profile_0_name},         {"first_name", profile_0_first_name},   {"last_name", profile_0_last_name},
+    {"email", profile_0_email},       {"picture_url", profile_0_picture_url}, {"gender", profile_0_gender},
+    {"birthday", profile_0_birthday}, {"min_age", profile_0_min_age},         {"max_age", profile_0_max_age}};
+
+static nlohmann::json user_json(std::string access_token, std::string user_id = random_string(15))
+{
+    return {{"access_token", access_token},
+            {"refresh_token", access_token},
+            {"user_id", user_id},
+            {"device_id", "Panda Bear"}};
+}
+
+static nlohmann::json user_profile_json(std::string user_id = random_string(15),
+                                        std::string identity_0_id = "Ursus arctos isabellinus",
+                                        std::string identity_1_id = "Ursus arctos horribilis",
+                                        std::string provider_type = "anon-user")
+{
+    return {{"user_id", user_id},
+            {"identities",
+             {{{"id", identity_0_id}, {"provider_type", provider_type}},
+              {{"id", identity_1_id}, {"provider_type", "lol_wut"}}}},
+            {"data", profile_0}};
+}
+
+static const std::string good_access_token =
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9."
+    "eyJleHAiOjE1ODE1MDc3OTYsImlhdCI6MTU4MTUwNTk5NiwiaXNzIjoiNWU0M2RkY2M2MzZlZTEwNmVhYTEyYmRjIiwic3RpdGNoX2RldklkIjoi"
+    "MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwIiwic3RpdGNoX2RvbWFpbklkIjoiNWUxNDk5MTNjOTBiNGFmMGViZTkzNTI3Iiwic3ViIjoiNWU0M2Rk"
+    "Y2M2MzZlZTEwNmVhYTEyYmRhIiwidHlwIjoiYWNjZXNzIn0.0q3y9KpFxEnbmRwahvjWU1v9y1T1s3r2eozu93vMc3s";
+
+static const std::string good_access_token2 =
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9."
+    "eyJleHAiOjE1ODkzMDE3MjAsImlhdCI6MTU4NDExODcyMCwiaXNzIjoiNWU2YmJiYzBhNmI3ZGZkM2UyNTA0OGI3Iiwic3RpdGNoX2RldklkIjoi"
+    "MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwIiwic3RpdGNoX2RvbWFpbklkIjoiNWUxNDk5MTNjOTBiNGFmMGViZTkzNTI3Iiwic3ViIjoiNWU2YmJi"
+    "YzBhNmI3ZGZkM2UyNTA0OGIzIiwidHlwIjoiYWNjZXNzIn0.eSX4QMjIOLbdOYOPzQrD_racwLUk1HGFgxtx2a34k80";
 
 #if REALM_ENABLE_AUTH_TESTS
 
@@ -182,9 +230,62 @@ TEST_CASE("app: verify app error codes", "[sync][app][local]") {
         };
     };
 
-    // Success response
+    auto validate_json_body = [](std::string body, std::optional<std::string_view> error_code,
+                                 std::optional<std::string_view> error = "some error",
+                                 std::optional<std::string_view> logs_link = "http://dummy-link/") -> bool {
+        if (body.empty()) {
+            return false;
+        }
+        try {
+            auto json_body = nlohmann::json::parse(body);
+            // If provided, check the error_code value against the 'error_code' value in the json body
+            auto code = json_body.find("error_code");
+            if (error_code && !error_code->empty()) {
+                if (code == json_body.end() || code->get<std::string>() != *error_code) {
+                    return false;
+                }
+            }
+            // If not provided, it's an error if the value is included in the json body
+            else if (code != json_body.end()) {
+                return false;
+            }
+            // If provided, check the message value against the 'error' value in the json body
+            auto message = json_body.find("error");
+            if (error && !error->empty()) {
+                if (message == json_body.end() || message->get<std::string>() != *error) {
+                    return false;
+                }
+            }
+            // If not provided, it's an error if the value is included in the json body
+            else if (message != json_body.end()) {
+                return false;
+            }
+            // If provided, check the logs_link value against the 'link' value in the json body
+            auto link = json_body.find("link");
+            if (logs_link && !logs_link->empty()) {
+                if (link == json_body.end() || link->get<std::string>() != *logs_link) {
+                    return false;
+                }
+            }
+            // If not provided, it's an error if the value is included in the json body
+            else if (link != json_body.end()) {
+                return false;
+            }
+        }
+        catch (nlohmann::json::exception ex) {
+            // It's also a failure if parsing the json body throws an exception
+            return false;
+        }
+        return true;
+    };
+
+    // Success responses
     app::Response response = {200, 0, {}, ""};
     auto app_error = AppUtils::check_for_errors(response);
+    REQUIRE(!app_error);
+
+    response = {0, 0, {}, ""};
+    app_error = AppUtils::check_for_errors(response);
     REQUIRE(!app_error);
 
     // Empty error code
@@ -198,6 +299,17 @@ TEST_CASE("app: verify app error codes", "[sync][app][local]") {
     REQUIRE(app_error->link_to_server_logs == "http://dummy-link/");
     REQUIRE(*app_error->additional_status_code == 500);
 
+    // Re-compose back into a Response
+    auto err_response = AppUtils::make_apperror_response(*app_error);
+    REQUIRE(err_response.http_status_code == 500);
+    REQUIRE(!err_response.body.empty());
+    REQUIRE(validate_json_body(err_response.body, ""));
+    REQUIRE(!err_response.client_error_code);
+    REQUIRE(err_response.custom_status_code == 0);
+    auto ct = AppUtils::find_header("content-type", err_response.headers);
+    REQUIRE(ct);
+    REQUIRE(ct->second == "application/json");
+
     // Missing error code
     response = make_http_error(std::nullopt);
     app_error = AppUtils::check_for_errors(response);
@@ -208,6 +320,61 @@ TEST_CASE("app: verify app error codes", "[sync][app][local]") {
     REQUIRE(app_error->reason() == "some error");
     REQUIRE(app_error->link_to_server_logs == "http://dummy-link/");
     REQUIRE(*app_error->additional_status_code == 500);
+
+    // Re-compose back into a Response
+    err_response = AppUtils::make_apperror_response(*app_error);
+    REQUIRE(err_response.http_status_code == 500);
+    REQUIRE(!err_response.body.empty());
+    REQUIRE(validate_json_body(err_response.body, std::nullopt));
+    REQUIRE(!err_response.client_error_code);
+    REQUIRE(err_response.custom_status_code == 0);
+    ct = AppUtils::find_header("content-type", err_response.headers);
+    REQUIRE(ct);
+    REQUIRE(ct->second == "application/json");
+
+    // Missing error message
+    response = make_http_error("InvalidParameter", 404, std::nullopt);
+    app_error = AppUtils::check_for_errors(response);
+    REQUIRE(app_error);
+    REQUIRE(app_error->code() == ErrorCodes::InvalidParameter);
+    REQUIRE(app_error->code_string() == "InvalidParameter");
+    REQUIRE(app_error->server_error == "InvalidParameter");
+    REQUIRE(app_error->reason() == "no error message");
+    REQUIRE(app_error->link_to_server_logs == "http://dummy-link/");
+    REQUIRE(*app_error->additional_status_code == 404);
+
+    // Re-compose back into a Response
+    err_response = AppUtils::make_apperror_response(*app_error);
+    REQUIRE(err_response.http_status_code == 404);
+    REQUIRE(!err_response.body.empty());
+    REQUIRE(validate_json_body(err_response.body, "InvalidParameter", "no error message"));
+    REQUIRE(!err_response.client_error_code);
+    REQUIRE(err_response.custom_status_code == 0);
+    ct = AppUtils::find_header("content-type", err_response.headers);
+    REQUIRE(ct);
+    REQUIRE(ct->second == "application/json");
+
+    // Missing logs link
+    response = make_http_error("InvalidParameter", 403, "some error occurred", std::nullopt);
+    app_error = AppUtils::check_for_errors(response);
+    REQUIRE(app_error);
+    REQUIRE(app_error->code() == ErrorCodes::InvalidParameter);
+    REQUIRE(app_error->code_string() == "InvalidParameter");
+    REQUIRE(app_error->server_error == "InvalidParameter");
+    REQUIRE(app_error->reason() == "some error occurred");
+    REQUIRE(app_error->link_to_server_logs == "");
+    REQUIRE(*app_error->additional_status_code == 403);
+
+    // Re-compose back into a Response
+    err_response = AppUtils::make_apperror_response(*app_error);
+    REQUIRE(err_response.http_status_code == 403);
+    REQUIRE(!err_response.body.empty());
+    REQUIRE(validate_json_body(err_response.body, "InvalidParameter", "some error occurred", std::nullopt));
+    REQUIRE(!err_response.client_error_code);
+    REQUIRE(err_response.custom_status_code == 0);
+    ct = AppUtils::find_header("content-type", err_response.headers);
+    REQUIRE(ct);
+    REQUIRE(ct->second == "application/json");
 
     // Missing error code and error message with success http status
     response = make_http_error(std::nullopt, 200, std::nullopt);
@@ -233,6 +400,17 @@ TEST_CASE("app: verify app error codes", "[sync][app][local]") {
             REQUIRE(app_error->link_to_server_logs == "http://dummy-link/");
             REQUIRE(app_error->additional_status_code);
             REQUIRE(*app_error->additional_status_code == 500);
+
+            // Re-compose back into a Response
+            err_response = AppUtils::make_apperror_response(*app_error);
+            REQUIRE(err_response.http_status_code == 500);
+            REQUIRE(!err_response.body.empty());
+            REQUIRE(validate_json_body(err_response.body, name));
+            REQUIRE(!err_response.client_error_code);
+            REQUIRE(err_response.custom_status_code == 0);
+            ct = AppUtils::find_header("content-type", err_response.headers);
+            REQUIRE(ct);
+            REQUIRE(ct->second == "application/json");
         }
     }
 
@@ -246,6 +424,17 @@ TEST_CASE("app: verify app error codes", "[sync][app][local]") {
     REQUIRE(app_error->link_to_server_logs == "http://dummy-link/");
     REQUIRE(app_error->additional_status_code);
     REQUIRE(*app_error->additional_status_code == 404);
+
+    // Re-compose back into a Response
+    err_response = AppUtils::make_apperror_response(*app_error);
+    REQUIRE(err_response.http_status_code == 404);
+    REQUIRE(!err_response.body.empty());
+    REQUIRE(validate_json_body(err_response.body, "AppErrorMissing"));
+    REQUIRE(!err_response.client_error_code);
+    REQUIRE(err_response.custom_status_code == 0);
+    ct = AppUtils::find_header("content-type", err_response.headers);
+    REQUIRE(ct);
+    REQUIRE(ct->second == "application/json");
 
     // HTTPError with different status values
     for (auto [status, message] : http_status_codes) {
@@ -268,6 +457,14 @@ TEST_CASE("app: verify app error codes", "[sync][app][local]") {
         REQUIRE(app_error->link_to_server_logs.empty());
         REQUIRE(app_error->additional_status_code);
         REQUIRE(*app_error->additional_status_code == status);
+
+        // Recompose back into a Response
+        err_response = AppUtils::make_apperror_response(*app_error);
+        REQUIRE(err_response.http_status_code == status);
+        REQUIRE(err_response.body == "some http error");
+        REQUIRE(!err_response.client_error_code);
+        REQUIRE(err_response.custom_status_code == 0);
+        REQUIRE(err_response.headers.empty());
     }
 
     // Missing error code and error message with fatal http status
@@ -287,6 +484,39 @@ TEST_CASE("app: verify app error codes", "[sync][app][local]") {
     REQUIRE(app_error->additional_status_code);
     REQUIRE(*app_error->additional_status_code == 501);
 
+    // Re-compose back into a Response
+    err_response = AppUtils::make_apperror_response(*app_error);
+    REQUIRE(err_response.http_status_code == 501);
+    REQUIRE(err_response.body.empty());
+    REQUIRE(!err_response.client_error_code);
+    REQUIRE(err_response.custom_status_code == 0);
+    REQUIRE(err_response.headers.empty());
+
+    // Missing error code and error message contains period with redirect http status
+    response = {
+        308,
+        0,
+        {},
+        "some http error. ocurred",
+    };
+    app_error = AppUtils::check_for_errors(response);
+    REQUIRE(app_error);
+    REQUIRE(app_error->code() == ErrorCodes::HTTPError);
+    REQUIRE(app_error->code_string() == "HTTPError");
+    REQUIRE(app_error->server_error.empty());
+    REQUIRE(app_error->reason() == "http error code considered fatal: some http error. ocurred. Redirection: 308");
+    REQUIRE(app_error->link_to_server_logs.empty());
+    REQUIRE(app_error->additional_status_code);
+    REQUIRE(*app_error->additional_status_code == 308);
+
+    // Re-compose back into a Response
+    err_response = AppUtils::make_apperror_response(*app_error);
+    REQUIRE(err_response.http_status_code == 308);
+    REQUIRE(err_response.body == "some http error. ocurred");
+    REQUIRE(!err_response.client_error_code);
+    REQUIRE(err_response.custom_status_code == 0);
+    REQUIRE(err_response.headers.empty());
+
     // Valid client error code, with body, but no json
     app::Response client_response = {
         501,
@@ -305,11 +535,27 @@ TEST_CASE("app: verify app error codes", "[sync][app][local]") {
     REQUIRE(app_error->additional_status_code);
     REQUIRE(*app_error->additional_status_code == 501);
 
+    // Re-compose back into a Response
+    err_response = AppUtils::make_apperror_response(*app_error);
+    REQUIRE(err_response.http_status_code == 501);
+    REQUIRE(err_response.body == "Some error occurred");
+    REQUIRE(err_response.client_error_code == ErrorCodes::BadBsonParse);
+    REQUIRE(err_response.custom_status_code == 0);
+    REQUIRE(err_response.headers.empty());
+
     // Same response with client error code, but no body
     client_response.body = "";
     app_error = AppUtils::check_for_errors(client_response);
     REQUIRE(app_error);
     REQUIRE(app_error->reason() == "client error code value considered fatal");
+
+    // Re-compose back into a Response
+    err_response = AppUtils::make_apperror_response(*app_error);
+    REQUIRE(err_response.http_status_code == 501);
+    REQUIRE(err_response.body == "client error code value considered fatal");
+    REQUIRE(err_response.client_error_code == ErrorCodes::BadBsonParse);
+    REQUIRE(err_response.custom_status_code == 0);
+    REQUIRE(err_response.headers.empty());
 
     // Valid custom status code, with body, but no json
     app::Response custom_response = {501,
@@ -326,11 +572,157 @@ TEST_CASE("app: verify app error codes", "[sync][app][local]") {
     REQUIRE(app_error->additional_status_code);
     REQUIRE(*app_error->additional_status_code == 4999);
 
+    // Re-compose back into a Response
+    err_response = AppUtils::make_apperror_response(*app_error);
+    REQUIRE(err_response.http_status_code == 0);
+    REQUIRE(err_response.body == "Some custom error occurred");
+    REQUIRE(!err_response.client_error_code);
+    REQUIRE(err_response.custom_status_code == 4999);
+    REQUIRE(err_response.headers.empty());
+
     // Same response with custom status code, but no body
     custom_response.body = "";
     app_error = AppUtils::check_for_errors(custom_response);
     REQUIRE(app_error);
     REQUIRE(app_error->reason() == "non-zero custom status code considered fatal");
+
+    // Re-compose back into a Response
+    err_response = AppUtils::make_apperror_response(*app_error);
+    REQUIRE(err_response.http_status_code == 0);
+    REQUIRE(err_response.body == "non-zero custom status code considered fatal");
+    REQUIRE(!err_response.client_error_code);
+    REQUIRE(err_response.custom_status_code == 4999);
+    REQUIRE(err_response.headers.empty());
+}
+
+// MARK: - Verify generic app utils helper functions
+TEST_CASE("app: verify app utils helpers", "[sync][app][local]") {
+    SECTION("split_url") {
+        auto verify_good_url = [](std::string scheme, std::string server, std::string request) {
+            std::string url = util::format("%1://%2%3", scheme, server, request);
+            auto comp = AppUtils::split_url(url);
+            REQUIRE(comp.is_ok());
+            REQUIRE(comp.get_value().scheme == scheme);
+            REQUIRE(comp.get_value().server == server);
+            REQUIRE(comp.get_value().request == request);
+        };
+
+        verify_good_url("https", "some.host.com", "/path/to/use?some_query=do-something#fragment");
+        verify_good_url("wss", "localhost:9090", "");
+        verify_good_url("scheme", "user:pass@host.com", "/");
+        verify_good_url("mqtt", "host", "/some/path:that?is@not*really(valid)");
+
+        // Verify bad urls
+        auto comp = AppUtils::split_url("localhost/path");
+        REQUIRE(!comp.is_ok());
+        comp = AppUtils::split_url("http:localhost/path");
+        REQUIRE(!comp.is_ok());
+        comp = AppUtils::split_url("http:/localhost/path");
+        REQUIRE(!comp.is_ok());
+        comp = AppUtils::split_url("https://");
+        REQUIRE(!comp.is_ok());
+        comp = AppUtils::split_url("http:///localhost/path");
+        REQUIRE(!comp.is_ok());
+        comp = AppUtils::split_url("");
+        REQUIRE(!comp.is_ok());
+    }
+
+    SECTION("find_header") {
+        std::map<std::string, std::string> headers1 = {{"header1", "header1-value"},
+                                                       {"HEADER2", "header2-value"},
+                                                       {"HeAdEr3", "header3-value"},
+                                                       {"header@4", "header4-value"}};
+
+        std::map<std::string, std::string> headers2 = {
+            {"", "no-key-value"},
+            {"header1", "header1-value"},
+        };
+
+        CHECK(AppUtils::find_header("", headers1) == nullptr);
+        CHECK(AppUtils::find_header("header", headers1) == nullptr);
+        CHECK(AppUtils::find_header("header*4", headers1) == nullptr);
+        CHECK(AppUtils::find_header("header5", headers1) == nullptr);
+        auto value = AppUtils::find_header("header1", headers1);
+        CHECK(value != nullptr);
+        CHECK(value->first == "header1");
+        CHECK(value->second == "header1-value");
+        value = AppUtils::find_header("HEADER1", headers1);
+        CHECK(value != nullptr);
+        CHECK(value->first == "header1");
+        CHECK(value->second == "header1-value");
+        value = AppUtils::find_header("header2", headers1);
+        CHECK(value != nullptr);
+        CHECK(value->first == "HEADER2");
+        CHECK(value->second == "header2-value");
+        value = AppUtils::find_header("hEaDeR2", headers1);
+        CHECK(value != nullptr);
+        CHECK(value->first == "HEADER2");
+        CHECK(value->second == "header2-value");
+        value = AppUtils::find_header("HEADER3", headers1);
+        CHECK(value != nullptr);
+        CHECK(value->first == "HeAdEr3");
+        CHECK(value->second == "header3-value");
+        value = AppUtils::find_header("header3", headers1);
+        CHECK(value != nullptr);
+        CHECK(value->first == "HeAdEr3");
+        CHECK(value->second == "header3-value");
+        value = AppUtils::find_header("HEADER@4", headers1);
+        CHECK(value != nullptr);
+        CHECK(value->first == "header@4");
+        CHECK(value->second == "header4-value");
+        value = AppUtils::find_header("", headers2);
+        CHECK(value != nullptr);
+        CHECK(value->first == "");
+        CHECK(value->second == "no-key-value");
+        value = AppUtils::find_header("HeAdEr1", headers2);
+        CHECK(value != nullptr);
+        CHECK(value->first == "header1");
+        CHECK(value->second == "header1-value");
+    }
+
+    SECTION("is_success_status_code") {
+        CHECK(AppUtils::is_success_status_code(0));
+        for (int code = 200; code < 300; code++) {
+            CHECK(AppUtils::is_success_status_code(code));
+        }
+        CHECK(!AppUtils::is_success_status_code(1));
+        CHECK(!AppUtils::is_success_status_code(199));
+        CHECK(!AppUtils::is_success_status_code(300));
+        CHECK(!AppUtils::is_success_status_code(99999));
+    }
+
+    SECTION("is_redirect_status_code") {
+        // Only MovedPermanently(301) and PermanentRedirect(308) return true
+        CHECK(AppUtils::is_redirect_status_code(301));
+        CHECK(AppUtils::is_redirect_status_code(308));
+        CHECK(!AppUtils::is_redirect_status_code(0));
+        CHECK(!AppUtils::is_redirect_status_code(200));
+        CHECK(!AppUtils::is_redirect_status_code(300));
+        CHECK(!AppUtils::is_redirect_status_code(403));
+        CHECK(!AppUtils::is_redirect_status_code(99999));
+    }
+
+    SECTION("extract_redir_location") {
+        auto comp = AppUtils::extract_redir_location(
+            {{"Content-Type", "application/json"}, {"Location", "http://redirect.host"}});
+        CHECK(comp == "http://redirect.host");
+        comp = AppUtils::extract_redir_location({{"location", "http://redirect.host"}});
+        CHECK(comp == "http://redirect.host");
+        comp = AppUtils::extract_redir_location({{"LoCaTiOn", "http://redirect.host/"}});
+        CHECK(comp == "http://redirect.host/");
+        comp = AppUtils::extract_redir_location({{"LOCATION", "http://redirect.host/includes/path"}});
+        CHECK(comp == "http://redirect.host/includes/path");
+        comp = AppUtils::extract_redir_location({{"Content-Type", "application/json"}});
+        CHECK(!comp);
+        comp = AppUtils::extract_redir_location({{"some-location", "http://redirect.host"}});
+        CHECK(!comp);
+        comp = AppUtils::extract_redir_location({{"location", ""}});
+        CHECK(!comp);
+        comp = AppUtils::extract_redir_location({});
+        CHECK(!comp);
+        comp = AppUtils::extract_redir_location({{"location", "bad-server-url"}});
+        CHECK(!comp);
+    }
 }
 
 // MARK: - Login with Credentials Tests
@@ -2192,6 +2584,50 @@ TEST_CASE("app: make distributable client file", "[sync][pbs][app][baas]") {
     }
 }
 
+struct HookedSocketProvider : public sync::websocket::DefaultSocketProvider {
+    HookedSocketProvider(const std::shared_ptr<util::Logger>& logger, const std::string user_agent,
+                         AutoStart auto_start = AutoStart{true})
+        : DefaultSocketProvider(logger, user_agent, nullptr, auto_start)
+    {
+    }
+
+    std::unique_ptr<sync::WebSocketInterface> connect(std::unique_ptr<sync::WebSocketObserver> observer,
+                                                      sync::WebSocketEndpoint&& endpoint) override
+    {
+        using WebSocketError = sync::websocket::WebSocketError;
+
+        int status_code = 101;
+        bool was_clean = true;
+        WebSocketError ws_error = WebSocketError::websocket_ok;
+        std::string body;
+
+        sync::WebSocketEndpoint ep{std::move(endpoint)};
+        if (endpoint_verify_func) {
+            endpoint_verify_func(ep);
+        }
+
+        if (force_failure_func && force_failure_func(was_clean, ws_error, body)) {
+            observer->websocket_error_handler();
+            observer->websocket_closed_handler(was_clean, ws_error, body);
+            return nullptr;
+        }
+
+        bool use_simulated_response = websocket_connect_func && websocket_connect_func(status_code, body);
+        auto websocket = DefaultSocketProvider::connect(std::move(observer), std::move(ep));
+        if (use_simulated_response) {
+            auto default_websocket = static_cast<sync::websocket::DefaultWebSocket*>(websocket.get());
+            if (default_websocket)
+                default_websocket->force_handshake_response_for_testing(status_code, body);
+        }
+        return websocket;
+    }
+
+    std::function<void(sync::WebSocketEndpoint& endpoint)> endpoint_verify_func;
+    std::function<bool(bool& was_clean, sync::websocket::WebSocketError& error_code, std::string& message)>
+        force_failure_func;
+    std::function<bool(int&, std::string&)> websocket_connect_func;
+};
+
 TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
     auto logger = util::Logger::get_default_logger();
 
@@ -2318,32 +2754,6 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
         std::optional<Response> simulated_response;
     };
 
-    struct HookedSocketProvider : public sync::websocket::DefaultSocketProvider {
-        HookedSocketProvider(const std::shared_ptr<util::Logger>& logger, const std::string user_agent,
-                             AutoStart auto_start = AutoStart{true})
-            : DefaultSocketProvider(logger, user_agent, nullptr, auto_start)
-        {
-        }
-
-        std::unique_ptr<sync::WebSocketInterface> connect(std::unique_ptr<sync::WebSocketObserver> observer,
-                                                          sync::WebSocketEndpoint&& endpoint) override
-        {
-            int status_code = 101;
-            std::string body;
-            bool use_simulated_response = websocket_connect_func && websocket_connect_func(status_code, body);
-
-            auto websocket = DefaultSocketProvider::connect(std::move(observer), std::move(endpoint));
-            if (use_simulated_response) {
-                auto default_websocket = static_cast<sync::websocket::DefaultWebSocket*>(websocket.get());
-                if (default_websocket)
-                    default_websocket->force_handshake_response_for_testing(status_code, body);
-            }
-            return websocket;
-        }
-
-        std::function<bool(int&, std::string&)> websocket_connect_func;
-    };
-
     {
         std::unique_ptr<realm::AppSession> app_session;
         std::string base_file_path = util::make_temp_dir() + random_string(10);
@@ -2359,7 +2769,7 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
         sc_config.metadata_mode = realm::SyncManager::MetadataMode::NoEncryption;
 
         // initialize app and sync client
-        auto redir_app = app::App::get_uncached_app(app_config, sc_config);
+        auto redir_app = app::App::get_app(app::App::CacheMode::Disabled, app_config, sc_config);
 
         SECTION("Test invalid redirect response") {
             int request_count = 0;
@@ -2457,26 +2867,17 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
                 else if (request_count == 4) {
                     logger->trace("request.url (%1): %2", request_count, request.url);
                     REQUIRE(request.url.find(redirect_scheme + original_host) != std::string::npos);
-                    // Let the init_app_metadata request go through
+                    // Let the location request go through
                     redir_transport->simulated_response.reset();
                     request_count++;
                 }
                 else if (request_count == 5) {
-                    // This is the original request after the init app metadata
+                    // This is the original request after the location has been updated
                     logger->trace("request.url (%1): %2", request_count, request.url);
-                    auto sync_manager = redir_app->sync_manager();
-                    REQUIRE(sync_manager);
-                    auto app_metadata = sync_manager->app_metadata();
-                    REQUIRE(app_metadata);
-                    logger->trace("Deployment model: %1", app_metadata->deployment_model);
-                    logger->trace("Location: %1", app_metadata->location);
-                    logger->trace("Hostname: %1", app_metadata->hostname);
-                    logger->trace("WS Hostname: %1", app_metadata->ws_hostname);
-                    REQUIRE(app_metadata->hostname.find(original_host) != std::string::npos);
+                    // App metadata is no longer being used, query the host_url from app
+                    REQUIRE(redir_app->get_host_url().find(original_host) != std::string::npos);
                     REQUIRE(request.url.find(redirect_scheme + original_host) != std::string::npos);
                     redir_transport->simulated_response.reset();
-                    // Validate the retry count tracked in the original message
-                    REQUIRE(request.redirect_count == 3);
                     request_count++;
                 }
             };
@@ -2487,6 +2888,7 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
                     REQUIRE(!error);
                 });
         }
+
         SECTION("Test too many redirects") {
             int request_count = 0;
             redir_transport->request_hook = [&](const Request& request) {
@@ -2547,7 +2949,7 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
         sc_config.metadata_mode = realm::SyncManager::MetadataMode::NoMetadata;
 
         // initialize app and sync client
-        auto redir_app = app::App::get_uncached_app(app_config, sc_config);
+        auto redir_app = app::App::get_app(app::App::CacheMode::Disabled, app_config, sc_config);
 
         int request_count = 0;
         // redirect URL is localhost or 127.0.0.1 depending on what the initial value is
@@ -2606,8 +3008,8 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
             creds.email, creds.password, [&](util::Optional<app::AppError> error) {
                 REQUIRE(!error);
             });
-        REQUIRE(!redir_app->sync_manager()->app_metadata()); // no stored app metadata
-        REQUIRE(redir_app->sync_manager()->sync_route().find(websocket_url) != std::string::npos);
+        REQUIRE(redir_app->sync_manager()->sync_route());
+        REQUIRE(redir_app->sync_manager()->sync_route()->find(websocket_url) != std::string::npos);
 
         // Register another email address and verify location data isn't requested again
         request_count = 0;
@@ -3452,6 +3854,436 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
     }
 }
 
+TEST_CASE("app: base_url", "[sync][app][base_url]") {
+
+    struct BaseUrlTransport : GenericNetworkTransport {
+        std::string expected_url;
+        std::optional<std::string> redirect_url;
+        bool location_requested = false;
+        bool location_returns_error = false;
+
+        void reset(std::string expect_url, std::optional<std::string> redir_url = std::nullopt)
+        {
+            expected_url = expect_url;
+            redirect_url = redir_url;
+            location_requested = false;
+            location_returns_error = false;
+        }
+
+        void send_request_to_server(const Request& request,
+                                    util::UniqueFunction<void(const Response&)>&& completion) override
+        {
+            if (request.url.find("/login") != std::string::npos) {
+                CHECK(request.url.find(expected_url) != std::string::npos);
+                completion({200, 0, {}, user_json(good_access_token).dump()});
+            }
+            else if (request.url.find("/profile") != std::string::npos) {
+                CHECK(request.url.find(expected_url) != std::string::npos);
+                completion({200, 0, {}, user_profile_json().dump()});
+            }
+            else if (request.url.find("/session") != std::string::npos && request.method == HttpMethod::post) {
+                nlohmann::json json{{"access_token", good_access_token}};
+                CHECK(request.url.find(expected_url) != std::string::npos);
+                completion({200, 0, {}, json.dump()});
+            }
+            else if (request.url.find("/location") != std::string::npos) {
+                CHECK(request.method == HttpMethod::get);
+                CHECK(request.url.find(expected_url) != std::string::npos);
+                location_requested = true;
+                if (location_returns_error) {
+                    completion(app::Response{static_cast<int>(sync::HTTPStatus::NotFound), 0, {}, "404 not found"});
+                    return;
+                }
+                if (redirect_url) {
+                    // Update the expected url to be the redirect url
+                    expected_url = *redirect_url;
+                    redirect_url.reset();
+
+                    completion(app::Response{static_cast<int>(sync::HTTPStatus::PermanentRedirect),
+                                             0,
+                                             {{"location", expected_url}},
+                                             "308 permanent redirect"});
+                    return;
+                }
+                auto ws_url = expected_url;
+                ws_url.replace(0, 4, "ws");
+                completion(
+                    app::Response{static_cast<int>(sync::HTTPStatus::Ok),
+                                  0,
+                                  {},
+                                  util::format("{\"deployment_model\":\"GLOBAL\",\"location\":\"US-VA\",\"hostname\":"
+                                               "\"%1\",\"ws_hostname\":\"%2\"}",
+                                               expected_url, ws_url)});
+            }
+        }
+    };
+
+    std::unique_ptr<realm::AppSession> app_session;
+    std::string base_file_path = util::make_temp_dir() + random_string(10);
+    auto redir_transport = std::make_shared<BaseUrlTransport>();
+    AutoVerifiedEmailCredentials creds;
+    util::Logger::set_default_level_threshold(realm::util::Logger::Level::TEST_LOGGING_LEVEL);
+    auto logger = util::Logger::get_default_logger();
+
+    App::Config app_config = {"fake-app-id"};
+    set_app_config_defaults(app_config, redir_transport);
+
+    util::try_make_dir(base_file_path);
+    SyncClientConfig sc_config;
+    sc_config.base_file_path = base_file_path;
+    sc_config.metadata_mode = realm::SyncManager::MetadataMode::NoEncryption;
+    sc_config.logger_factory = [](util::Logger::Level) {
+        return util::Logger::get_default_logger();
+    };
+
+    auto do_login = [&](std::shared_ptr<app::App> app) {
+        CHECK(app);
+        app->log_in_with_credentials(realm::app::AppCredentials::username_password(creds.email, creds.password),
+                                     [](std::shared_ptr<realm::SyncUser> user, util::Optional<app::AppError> error) {
+                                         REQUIRE(user);
+                                         REQUIRE(!error);
+                                     });
+    };
+
+    SECTION("Test app config baseurl") {
+        // Metadata mode doesn't matter, since App isn't using it anymore
+        {
+            redir_transport->reset("https://realm.mongodb.com");
+
+            // First time through, base_url is empty; https://realm.mongodb.com is expected
+            auto app = app::App::get_app(app::App::CacheMode::Disabled, app_config, sc_config);
+            // Location is not requested until first app services request
+            CHECK(!redir_transport->location_requested);
+            // Initial hostname and ws hostname use base url, but aren't used until location is updated
+            CHECK(app->get_host_url() == "https://realm.mongodb.com");
+            CHECK(app->get_ws_host_url() == "wss://realm.mongodb.com");
+
+            do_login(app);
+            CHECK(redir_transport->location_requested);
+            CHECK(app->get_base_url() == "https://realm.mongodb.com");
+            CHECK(app->get_host_url() == "https://realm.mongodb.com");
+            CHECK(app->get_ws_host_url() == "wss://realm.mongodb.com");
+        }
+        {
+            // Second time through, base_url is set to https://alternate.someurl.fake is expected
+            app_config.base_url = "https://alternate.someurl.fake";
+            redir_transport->reset("https://alternate.someurl.fake");
+
+            auto app = app::App::get_app(app::App::CacheMode::Disabled, app_config, sc_config);
+            // Location is not requested until first app services request
+            CHECK(!redir_transport->location_requested);
+            // Initial hostname and ws hostname use base url, but aren't used until location is updated
+            CHECK(app->get_host_url() == "https://alternate.someurl.fake");
+            CHECK(app->get_ws_host_url() == "wss://alternate.someurl.fake");
+
+            do_login(app);
+            CHECK(redir_transport->location_requested);
+            CHECK(app->get_base_url() == "https://alternate.someurl.fake");
+            CHECK(app->get_host_url() == "https://alternate.someurl.fake");
+            CHECK(app->get_ws_host_url() == "wss://alternate.someurl.fake");
+        }
+        {
+            // Third time through, base_url is not set, expect https://realm.mongodb.com, since metadata
+            // is no longer used
+            app_config.base_url = util::none;
+            std::string expected_url = "https://realm.mongodb.com";
+            std::string expected_wsurl = "wss://realm.mongodb.com";
+            redir_transport->reset(expected_url);
+
+            auto app = app::App::get_app(app::App::CacheMode::Disabled, app_config, sc_config);
+            // Location is not requested until first app services request
+            CHECK(!redir_transport->location_requested);
+            // Initial hostname and ws hostname use base url, but aren't used until location is updated
+            CHECK(app->get_host_url() == expected_url);
+            CHECK(app->get_ws_host_url() == expected_wsurl);
+
+            do_login(app);
+            CHECK(redir_transport->location_requested);
+            CHECK(app->get_base_url() == expected_url);
+            CHECK(app->get_host_url() == expected_url);
+            CHECK(app->get_ws_host_url() == expected_wsurl);
+        }
+        {
+            // Fourth time through, base_url is set to https://some-other.someurl.fake, with a redirect
+            app_config.base_url = "https://some-other.someurl.fake";
+            redir_transport->reset("https://some-other.someurl.fake", "http://redirect.someurl.fake");
+
+            auto app = app::App::get_app(app::App::CacheMode::Disabled, app_config, sc_config);
+            // Location is not requested until first app services request
+            CHECK(!redir_transport->location_requested);
+            // Initial hostname and ws hostname use base url, but aren't used until location is updated
+            CHECK(app->get_host_url() == "https://some-other.someurl.fake");
+            CHECK(app->get_ws_host_url() == "wss://some-other.someurl.fake");
+
+            do_login(app);
+            CHECK(redir_transport->location_requested);
+            // Base URL is still set to the original value
+            CHECK(app->get_base_url() == "https://some-other.someurl.fake");
+            // Hostname and ws hostname use the redirect URL values
+            CHECK(app->get_host_url() == "http://redirect.someurl.fake");
+            CHECK(app->get_ws_host_url() == "ws://redirect.someurl.fake");
+        }
+    }
+
+    SECTION("Test update_baseurl") {
+        {
+            app_config.base_url = "https://alternate.someurl.fake";
+            redir_transport->reset("https://alternate.someurl.fake");
+
+            auto app = app::App::get_app(app::App::CacheMode::Disabled, app_config, sc_config);
+            // Location is not requested until first app services request
+            CHECK(!redir_transport->location_requested);
+
+            do_login(app);
+            CHECK(redir_transport->location_requested);
+            CHECK(app->get_base_url() == "https://alternate.someurl.fake");
+            CHECK(app->get_host_url() == "https://alternate.someurl.fake");
+            CHECK(app->get_ws_host_url() == "wss://alternate.someurl.fake");
+
+            redir_transport->reset("https://realm.mongodb.com");
+
+            // Revert the base URL to the default URL value using std::nullopt
+            app->update_base_url(std::nullopt, [](util::Optional<app::AppError> error) {
+                CHECK(!error);
+            });
+            CHECK(redir_transport->location_requested);
+            CHECK(app->get_base_url() == "https://realm.mongodb.com");
+            CHECK(app->get_host_url() == "https://realm.mongodb.com");
+            CHECK(app->get_ws_host_url() == "wss://realm.mongodb.com");
+            // Expected URL is still "https://realm.mongodb.com"
+            do_login(app);
+
+            redir_transport->reset("http://some-other.url.fake");
+            app->update_base_url("http://some-other.url.fake", [](util::Optional<app::AppError> error) {
+                CHECK(!error);
+            });
+            CHECK(redir_transport->location_requested);
+            CHECK(app->get_base_url() == "http://some-other.url.fake");
+            CHECK(app->get_host_url() == "http://some-other.url.fake");
+            CHECK(app->get_ws_host_url() == "ws://some-other.url.fake");
+            // Expected URL is still "http://some-other.url.fake"
+            do_login(app);
+
+            redir_transport->reset("https://realm.mongodb.com");
+
+            // Revert the base URL to the default URL value using the empty string
+            app->update_base_url("", [](util::Optional<app::AppError> error) {
+                CHECK(!error);
+            });
+            CHECK(redir_transport->location_requested);
+            CHECK(app->get_base_url() == "https://realm.mongodb.com");
+            CHECK(app->get_host_url() == "https://realm.mongodb.com");
+            CHECK(app->get_ws_host_url() == "wss://realm.mongodb.com");
+            // Expected URL is still "https://realm.mongodb.com"
+            do_login(app);
+        }
+    }
+
+    SECTION("Test update_baseurl with redirect") {
+        {
+            app_config.base_url = "https://alternate.someurl.fake";
+            redir_transport->reset("https://alternate.someurl.fake");
+
+            auto app = app::App::get_app(app::App::CacheMode::Disabled, app_config, sc_config);
+            // Location is not requested until first app services request
+            CHECK(!redir_transport->location_requested);
+
+            do_login(app);
+            CHECK(redir_transport->location_requested);
+            CHECK(app->get_base_url() == "https://alternate.someurl.fake");
+            CHECK(app->get_host_url() == "https://alternate.someurl.fake");
+            CHECK(app->get_ws_host_url() == "wss://alternate.someurl.fake");
+
+            redir_transport->reset("http://some-other.someurl.fake", "https://redirect.otherurl.fake");
+
+            app->update_base_url("http://some-other.someurl.fake", [](util::Optional<app::AppError> error) {
+                CHECK(!error);
+            });
+            CHECK(redir_transport->location_requested);
+            CHECK(app->get_base_url() == "http://some-other.someurl.fake");
+            CHECK(app->get_host_url() == "https://redirect.otherurl.fake");
+            CHECK(app->get_ws_host_url() == "wss://redirect.otherurl.fake");
+            // Expected URL is still "https://redirect.otherurl.fake" after redirect
+            do_login(app);
+        }
+    }
+
+    SECTION("Test update_baseurl returns error") {
+        {
+            app_config.base_url = "http://alternate.someurl.fake";
+            redir_transport->reset("http://alternate.someurl.fake");
+
+            auto app = app::App::get_app(app::App::CacheMode::Disabled, app_config, sc_config);
+            // Location is not requested until first app services request
+            CHECK(!redir_transport->location_requested);
+
+            do_login(app);
+            CHECK(redir_transport->location_requested);
+            CHECK(app->get_base_url() == "http://alternate.someurl.fake");
+            CHECK(app->get_host_url() == "http://alternate.someurl.fake");
+            CHECK(app->get_ws_host_url() == "ws://alternate.someurl.fake");
+
+            redir_transport->reset("https://some-other.someurl.fake");
+            redir_transport->location_returns_error = true;
+
+            app->update_base_url("https://some-other.someurl.fake", [](util::Optional<app::AppError> error) {
+                CHECK(error);
+            });
+            CHECK(redir_transport->location_requested);
+            // Verify original url values are still being used
+            CHECK(app->get_base_url() == "http://alternate.someurl.fake");
+            CHECK(app->get_host_url() == "http://alternate.someurl.fake");
+            CHECK(app->get_ws_host_url() == "ws://alternate.someurl.fake");
+        }
+    }
+
+    // Verify new sync session updates location after app created with cached user
+    SECTION("Verify new sync session updates location") {
+        bool use_ssl = GENERATE(true, false);
+        std::string expected_host = "redirect.someurl.fake";
+        int expected_port = 8081;
+        std::string init_url = util::format("http%1://alternate.someurl.fake", use_ssl ? "s" : "");
+        std::string init_wsurl = util::format("ws%1://alternate.someurl.fake", use_ssl ? "s" : "");
+        std::string redir_url = util::format("http%1://%2:%3", use_ssl ? "s" : "", expected_host, expected_port);
+        std::string redir_wsurl = util::format("ws%1://%2:%3", use_ssl ? "s" : "", expected_host, expected_port);
+
+        auto socket_provider = std::make_shared<HookedSocketProvider>(logger, "some user agent");
+        socket_provider->endpoint_verify_func = [&use_ssl, &expected_host,
+                                                 &expected_port](sync::WebSocketEndpoint& ep) {
+            CHECK(ep.address == expected_host);
+            CHECK(ep.port == expected_port);
+            CHECK(ep.is_ssl == use_ssl);
+        };
+        socket_provider->force_failure_func = [](bool& was_clean, sync::websocket::WebSocketError& error_code,
+                                                 std::string& message) {
+            was_clean = false;
+            error_code = sync::websocket::WebSocketError::websocket_connection_failed;
+            message = "404 not found";
+            return true;
+        };
+
+        sc_config.socket_provider = socket_provider;
+
+        app_config.base_url = init_url;
+
+        // Log in to get a cached user
+        {
+            redir_transport->reset(init_url);
+
+            auto app = app::App::get_app(app::App::CacheMode::Disabled, app_config, sc_config);
+            // At this point, the sync route is not set
+            CHECK(!app->sync_manager()->sync_route());
+
+            do_login(app);
+            CHECK(redir_transport->location_requested);
+            CHECK(app->get_base_url() == init_url);
+            CHECK(app->get_host_url() == init_url);
+            CHECK(app->get_ws_host_url() == init_wsurl);
+            CHECK(app->sync_manager()->sync_route());
+            CHECK(app->sync_manager()->sync_route()->find(init_wsurl) != std::string::npos);
+        }
+        // Recreate the app using the cached user and start a sync session, which will is set to fail on connect
+        SECTION("Sync Session fails on connect") {
+            enum class TestState { start, session_started };
+            TestingStateMachine<TestState> state(TestState::start);
+
+            redir_transport->reset(init_url, redir_url);
+
+            auto app = app::App::get_app(app::App::CacheMode::Disabled, app_config, sc_config);
+            // At this point, the sync route is not set
+            CHECK(!app->sync_manager()->sync_route());
+
+            RealmConfig r_config;
+            r_config.path = sc_config.base_file_path + "/fakerealm.realm";
+            r_config.sync_config = std::make_shared<SyncConfig>(app->current_user(), SyncConfig::FLXSyncEnabled{});
+            r_config.sync_config->error_handler = [&state, &logger](std::shared_ptr<SyncSession>,
+                                                                    SyncError error) mutable {
+                // Expect an error due to 404 response when creating websocket
+                state.transition_with([&error, &logger](TestState cur_state) -> std::optional<TestState> {
+                    if (cur_state == TestState::start) {
+                        // The session will start, but the connection is rejected on purpose
+                        logger->debug("Expected error: %1", error.status);
+                        CHECK(!error.status.is_ok());
+                        CHECK(error.status.code() == ErrorCodes::SyncConnectFailed);
+                        return TestState::session_started;
+                    }
+                    return std::nullopt;
+                });
+            };
+            auto realm = Realm::get_shared_realm(r_config);
+            state.wait_for(TestState::session_started);
+
+            CHECK(redir_transport->location_requested);
+            CHECK(app->get_base_url() == init_url);
+            CHECK(app->get_host_url() == redir_url);
+            CHECK(app->get_ws_host_url() == redir_wsurl);
+            CHECK(app->sync_manager()->sync_route());
+            CHECK(app->sync_manager()->sync_route()->find(redir_wsurl) != std::string::npos);
+        }
+        // Recreate the app using the cached user and start a sync session, which will fail during location update
+        SECTION("Location update fails prior to sync session connect") {
+            enum class TestState { start, location_failed, waiting_for_session, session_started };
+            TestingStateMachine<TestState> state(TestState::start);
+
+            redir_transport->reset(init_url, redir_url);
+            redir_transport->location_returns_error = true;
+
+            auto app = app::App::get_app(app::App::CacheMode::Disabled, app_config, sc_config);
+            // At this point, the sync route is not set
+            CHECK(!app->sync_manager()->sync_route());
+
+            RealmConfig r_config;
+            r_config.path = sc_config.base_file_path + "/fakerealm.realm";
+            r_config.sync_config = std::make_shared<SyncConfig>(app->current_user(), SyncConfig::FLXSyncEnabled{});
+            r_config.sync_config->error_handler = [&state, &logger](std::shared_ptr<SyncSession>,
+                                                                    SyncError error) mutable {
+                // Expect an error due to location failed or 404 response when creating websocket
+                state.transition_with([&error, &logger](TestState cur_state) -> std::optional<TestState> {
+                    if (cur_state == TestState::start || cur_state == TestState::waiting_for_session) {
+                        logger->debug("Expected error: %1: %2", error.status.code_string(), error.status.reason());
+                        CHECK(!error.status.is_ok());
+                        CHECK(error.status.code() == ErrorCodes::SyncConnectFailed);
+                    }
+                    if (cur_state == TestState::start) {
+                        // The first time through, the location update fails
+                        return TestState::location_failed;
+                    }
+                    else if (cur_state == TestState::waiting_for_session) {
+                        // The second time through, the session start, but the connection is rejected on purpose
+                        return TestState::session_started;
+                    }
+                    return std::nullopt;
+                });
+            };
+            auto realm = Realm::get_shared_realm(r_config);
+            state.wait_for(TestState::location_failed);
+
+            CHECK(redir_transport->location_requested);
+            CHECK(app->get_base_url() == init_url);
+            // Location was never updated
+            CHECK(app->get_host_url() == init_url);
+            CHECK(app->get_ws_host_url() == init_wsurl);
+            CHECK(!app->sync_manager()->sync_route());
+
+            // Location request will pass this time, try to reconnect
+            // expecting 404 when websocket connects
+            redir_transport->reset(init_url, redir_url);
+            state.transition_to(TestState::waiting_for_session);
+            auto session = app->sync_manager()->get_existing_session(r_config.path);
+            CHECK(session);
+            session->resume();
+            state.wait_for(TestState::session_started);
+
+            CHECK(redir_transport->location_requested);
+            CHECK(app->get_base_url() == init_url);
+            CHECK(app->get_host_url() == redir_url);
+            CHECK(app->get_ws_host_url() == redir_wsurl);
+            CHECK(app->sync_manager()->sync_route());
+            CHECK(app->sync_manager()->sync_route()->find(redir_wsurl) != std::string::npos);
+        }
+    }
+}
+
 TEST_CASE("app: custom user data integration tests", "[sync][app][user][function][baas]") {
     TestAppSession session;
     auto app = session.app();
@@ -3835,59 +4667,12 @@ TEST_CASE("app: custom error handling", "[sync][app][custom errors]") {
     }
 }
 
-static const std::string profile_0_name = "Ursus americanus Ursus boeckhi";
-static const std::string profile_0_first_name = "Ursus americanus";
-static const std::string profile_0_last_name = "Ursus boeckhi";
-static const std::string profile_0_email = "Ursus ursinus";
-static const std::string profile_0_picture_url = "Ursus malayanus";
-static const std::string profile_0_gender = "Ursus thibetanus";
-static const std::string profile_0_birthday = "Ursus americanus";
-static const std::string profile_0_min_age = "Ursus maritimus";
-static const std::string profile_0_max_age = "Ursus arctos";
-
-static const nlohmann::json profile_0 = {
-    {"name", profile_0_name},         {"first_name", profile_0_first_name},   {"last_name", profile_0_last_name},
-    {"email", profile_0_email},       {"picture_url", profile_0_picture_url}, {"gender", profile_0_gender},
-    {"birthday", profile_0_birthday}, {"min_age", profile_0_min_age},         {"max_age", profile_0_max_age}};
-
-static nlohmann::json user_json(std::string access_token, std::string user_id = random_string(15))
-{
-    return {{"access_token", access_token},
-            {"refresh_token", access_token},
-            {"user_id", user_id},
-            {"device_id", "Panda Bear"}};
-}
-
-static nlohmann::json user_profile_json(std::string user_id = random_string(15),
-                                        std::string identity_0_id = "Ursus arctos isabellinus",
-                                        std::string identity_1_id = "Ursus arctos horribilis",
-                                        std::string provider_type = "anon-user")
-{
-    return {{"user_id", user_id},
-            {"identities",
-             {{{"id", identity_0_id}, {"provider_type", provider_type}},
-              {{"id", identity_1_id}, {"provider_type", "lol_wut"}}}},
-            {"data", profile_0}};
-}
-
 // MARK: - Unit Tests
 
 static TestSyncManager::Config get_config()
 {
     return get_config(instance_of<UnitTestTransport>);
 }
-
-static const std::string good_access_token =
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9."
-    "eyJleHAiOjE1ODE1MDc3OTYsImlhdCI6MTU4MTUwNTk5NiwiaXNzIjoiNWU0M2RkY2M2MzZlZTEwNmVhYTEyYmRjIiwic3RpdGNoX2RldklkIjoi"
-    "MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwIiwic3RpdGNoX2RvbWFpbklkIjoiNWUxNDk5MTNjOTBiNGFmMGViZTkzNTI3Iiwic3ViIjoiNWU0M2Rk"
-    "Y2M2MzZlZTEwNmVhYTEyYmRhIiwidHlwIjoiYWNjZXNzIn0.0q3y9KpFxEnbmRwahvjWU1v9y1T1s3r2eozu93vMc3s";
-
-static const std::string good_access_token2 =
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9."
-    "eyJleHAiOjE1ODkzMDE3MjAsImlhdCI6MTU4NDExODcyMCwiaXNzIjoiNWU2YmJiYzBhNmI3ZGZkM2UyNTA0OGI3Iiwic3RpdGNoX2RldklkIjoi"
-    "MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwIiwic3RpdGNoX2RvbWFpbklkIjoiNWUxNDk5MTNjOTBiNGFmMGViZTkzNTI3Iiwic3ViIjoiNWU2YmJi"
-    "YzBhNmI3ZGZkM2UyNTA0OGIzIiwidHlwIjoiYWNjZXNzIn0.eSX4QMjIOLbdOYOPzQrD_racwLUk1HGFgxtx2a34k80";
 
 static const std::string bad_access_token = "lolwut";
 static const std::string dummy_device_id = "123400000000000000000000";
@@ -3969,6 +4754,7 @@ TEST_CASE("app: login_with_credentials unit_tests", "[sync][app][user]") {
         UnitTestTransport::access_token = good_access_token;
         config.base_path = util::make_temp_dir();
         config.should_teardown_test_directory = false;
+        config.metadata_mode = SyncManager::MetadataMode::NoEncryption;
         {
             TestSyncManager tsm(config);
             auto app = tsm.app();
@@ -4231,8 +5017,19 @@ struct ErrorCheckingTransport : public GenericNetworkTransport {
         : m_response(r)
     {
     }
-    void send_request_to_server(const Request&, util::UniqueFunction<void(const Response&)>&& completion) override
+    void send_request_to_server(const Request& request,
+                                util::UniqueFunction<void(const Response&)>&& completion) override
     {
+        // Make sure to return a valid location response
+        if (request.url.find("/location") != std::string::npos) {
+            completion(Response{200,
+                                0,
+                                {{"content-type", "application/json"}},
+                                "{\"deployment_model\":\"GLOBAL\",\"location\":\"US-VA\",\"hostname\":"
+                                "\"http://some.fake.url\",\"ws_hostname\":\"ws://some.fake.url\"}"});
+            return;
+        }
+
         completion(Response(*m_response));
     }
 
@@ -4797,38 +5594,9 @@ private:
 TEST_CASE("app: app destroyed during token refresh", "[sync][app][user][token]") {
     AsyncMockNetworkTransport mock_transport_worker;
     enum class TestState { unknown, location, login, profile_1, profile_2, refresh_1, refresh_2, refresh_3 };
-    struct TestStateBundle {
-        void advance_to(TestState new_state)
-        {
-            std::lock_guard<std::mutex> lk(mutex);
-            state = new_state;
-            cond.notify_one();
-        }
-
-        TestState get() const
-        {
-            std::lock_guard<std::mutex> lk(mutex);
-            return state;
-        }
-
-        void wait_for(TestState new_state)
-        {
-            std::unique_lock lk(mutex);
-            bool failed = !cond.wait_for(lk, std::chrono::seconds(5), [&] {
-                return state == new_state;
-            });
-            if (failed) {
-                throw std::runtime_error("wait timed out");
-            }
-        }
-
-        mutable std::mutex mutex;
-        std::condition_variable cond;
-
-        TestState state = TestState::unknown;
-    } state;
+    TestingStateMachine<TestState> state(TestState::unknown);
     struct transport : public GenericNetworkTransport {
-        transport(AsyncMockNetworkTransport& worker, TestStateBundle& state)
+        transport(AsyncMockNetworkTransport& worker, TestingStateMachine<TestState>& state)
             : mock_transport_worker(worker)
             , state(state)
         {
@@ -4839,7 +5607,7 @@ TEST_CASE("app: app destroyed during token refresh", "[sync][app][user][token]")
         {
             if (request.url.find("/login") != std::string::npos) {
                 CHECK(state.get() == TestState::location);
-                state.advance_to(TestState::login);
+                state.transition_to(TestState::login);
                 mock_transport_worker.add_work_item(
                     Response{200, 0, {}, user_json(encode_fake_jwt("access token 1")).dump()}, std::move(completion));
             }
@@ -4848,29 +5616,29 @@ TEST_CASE("app: app destroyed during token refresh", "[sync][app][user][token]")
                 auto cur_state = state.get();
                 CHECK((cur_state == TestState::refresh_1 || cur_state == TestState::login));
                 if (cur_state == TestState::refresh_1) {
-                    state.advance_to(TestState::profile_2);
+                    state.transition_to(TestState::profile_2);
                     mock_transport_worker.add_work_item(Response{200, 0, {}, user_profile_json().dump()},
                                                         std::move(completion));
                 }
                 else if (cur_state == TestState::login) {
-                    state.advance_to(TestState::profile_1);
+                    state.transition_to(TestState::profile_1);
                     mock_transport_worker.add_work_item(Response{401, 0, {}}, std::move(completion));
                 }
             }
             else if (request.url.find("/session") != std::string::npos && request.method == HttpMethod::post) {
                 if (state.get() == TestState::profile_1) {
-                    state.advance_to(TestState::refresh_1);
+                    state.transition_to(TestState::refresh_1);
                     nlohmann::json json{{"access_token", encode_fake_jwt("access token 1")}};
                     mock_transport_worker.add_work_item(Response{200, 0, {}, json.dump()}, std::move(completion));
                 }
                 else if (state.get() == TestState::profile_2) {
-                    state.advance_to(TestState::refresh_2);
+                    state.transition_to(TestState::refresh_2);
                     mock_transport_worker.add_work_item(Response{200, 0, {}, "{\"error\":\"too bad, buddy!\"}"},
                                                         std::move(completion));
                 }
                 else {
                     CHECK(state.get() == TestState::refresh_2);
-                    state.advance_to(TestState::refresh_3);
+                    state.transition_to(TestState::refresh_3);
                     nlohmann::json json{{"access_token", encode_fake_jwt("access token 2")}};
                     mock_transport_worker.add_work_item(Response{200, 0, {}, json.dump()}, std::move(completion));
                 }
@@ -4878,7 +5646,7 @@ TEST_CASE("app: app destroyed during token refresh", "[sync][app][user][token]")
             else if (request.url.find("/location") != std::string::npos) {
                 CHECK(request.method == HttpMethod::get);
                 CHECK(state.get() == TestState::unknown);
-                state.advance_to(TestState::location);
+                state.transition_to(TestState::location);
                 mock_transport_worker.add_work_item(
                     Response{200,
                              0,
@@ -4890,7 +5658,7 @@ TEST_CASE("app: app destroyed during token refresh", "[sync][app][user][token]")
         }
 
         AsyncMockNetworkTransport& mock_transport_worker;
-        TestStateBundle& state;
+        TestingStateMachine<TestState>& state;
     };
     TestSyncManager sync_manager(get_config(std::make_shared<transport>(mock_transport_worker, state)));
     auto app = sync_manager.app();
@@ -4950,10 +5718,10 @@ TEST_CASE("app: app destroyed during token refresh", "[sync][app][user][token]")
 }
 
 TEST_CASE("app: metadata is persisted between sessions", "[sync][app][metadata]") {
-    static const auto test_hostname = "proto://host:1234";
-    static const auto test_ws_hostname = "wsproto://host:1234";
+    const auto orig_hostname = "proto://host:1234";
+    const auto orig_ws_hostname = "wsproto://host:1234";
 
-    struct transport : UnitTestTransport {
+    struct LocalTransport : UnitTestTransport {
         void send_request_to_server(const Request& request,
                                     util::UniqueFunction<void(const Response&)>&& completion) override
         {
@@ -4975,31 +5743,59 @@ TEST_CASE("app: metadata is persisted between sessions", "[sync][app][metadata]"
                 UnitTestTransport::send_request_to_server(request, std::move(completion));
             }
         }
+
+        void set_hostname(std::string hostname, std::string ws_hostname)
+        {
+            test_hostname = hostname;
+            test_ws_hostname = ws_hostname;
+        }
+        std::string test_hostname;
+        std::string test_ws_hostname;
     };
 
-    TestSyncManager::Config config = get_config(instance_of<transport>);
+    auto transport = std::make_shared<LocalTransport>();
+    transport->set_hostname(orig_hostname, orig_ws_hostname);
+
+    TestSyncManager::Config config = get_config(transport);
     config.base_path = util::make_temp_dir();
     config.should_teardown_test_directory = false;
+    config.metadata_mode = SyncManager::MetadataMode::NoEncryption;
 
     {
         TestSyncManager sync_manager(config, {});
         auto app = sync_manager.app();
+
+        // This is single threaded
         app->log_in_with_credentials(AppCredentials::anonymous(), [](auto, auto error) {
             REQUIRE_FALSE(error);
         });
-        REQUIRE(app->sync_manager()->sync_route().rfind(test_ws_hostname, 0) != std::string::npos);
+        // Sync route is updated during first request
+        REQUIRE(app->sync_manager()->sync_route());
+        REQUIRE(app->sync_manager()->sync_route()->rfind(orig_ws_hostname, 0) != std::string::npos);
     }
 
-    App::clear_cached_apps();
     config.override_sync_route = false;
     config.should_teardown_test_directory = true;
     {
         TestSyncManager sync_manager(config);
         auto app = sync_manager.app();
-        REQUIRE(app->sync_manager()->sync_route().rfind(test_ws_hostname, 0) != std::string::npos);
+
+        std::string base_url = sync_manager.sync_server().base_url();
+        std::string ws_url = base_url;
+        size_t uri_scheme_start = ws_url.find("http");
+        if (uri_scheme_start == 0)
+            ws_url.replace(uri_scheme_start, 4, "ws");
+
+        transport->set_hostname(base_url, ws_url);
+
+        REQUIRE(!app->sync_manager()->sync_route()); // sync route is null to force location update on sync startup
+
         app->call_function("function", {}, [](auto error, auto) {
             REQUIRE_FALSE(error);
         });
+
+        REQUIRE(app->sync_manager()->sync_route()); // sync route is updated after operation
+        REQUIRE(app->sync_manager()->sync_route()->rfind(ws_url, 0) != std::string::npos);
     }
 }
 
@@ -5016,7 +5812,7 @@ TEST_CASE("app: make_streaming_request", "[sync][app][streaming]") {
 
     using Headers = decltype(Request().headers);
 
-    const auto url_prefix = "field/api/client/v2.0/app/app_id/functions/call?baas_request="sv;
+    const auto url_prefix = "https://some.fake.url/api/client/v2.0/app/app_id/functions/call?baas_request="sv;
     const auto get_request_args = [&](const Request& req) {
         REQUIRE(req.url.substr(0, url_prefix.size()) == url_prefix);
         auto args = req.url.substr(url_prefix.size());
@@ -5118,35 +5914,9 @@ TEST_CASE("app: sync_user_profile unit tests", "[sync][app][user]") {
 TEST_CASE("app: app cannot get deallocated during log in", "[sync][app]") {
     AsyncMockNetworkTransport mock_transport_worker;
     enum class TestState { unknown, location, login, app_deallocated, profile };
-    struct TestStateBundle {
-        void advance_to(TestState new_state)
-        {
-            std::lock_guard<std::mutex> lk(mutex);
-            state = new_state;
-            cond.notify_one();
-        }
-
-        TestState get() const
-        {
-            std::lock_guard<std::mutex> lk(mutex);
-            return state;
-        }
-
-        void wait_for(TestState new_state)
-        {
-            std::unique_lock<std::mutex> lk(mutex);
-            cond.wait(lk, [&] {
-                return state == new_state;
-            });
-        }
-
-        mutable std::mutex mutex;
-        std::condition_variable cond;
-
-        TestState state = TestState::unknown;
-    } state;
+    TestingStateMachine<TestState> state(TestState::unknown);
     struct transport : public GenericNetworkTransport {
-        transport(AsyncMockNetworkTransport& worker, TestStateBundle& state)
+        transport(AsyncMockNetworkTransport& worker, TestingStateMachine<TestState>& state)
             : mock_transport_worker(worker)
             , state(state)
         {
@@ -5155,20 +5925,20 @@ TEST_CASE("app: app cannot get deallocated during log in", "[sync][app]") {
         void send_request_to_server(const Request& request, util::UniqueFunction<void(const Response&)>&& completion) override
         {
             if (request.url.find("/login") != std::string::npos) {
-                state.advance_to(TestState::login);
+                state.transition_to(TestState::login);
                 state.wait_for(TestState::app_deallocated);
                 mock_transport_worker.add_work_item(
                     Response{200, 0, {}, user_json(encode_fake_jwt("access token")).dump()},
                     std::move(completion));
             }
             else if (request.url.find("/profile") != std::string::npos) {
-                state.advance_to(TestState::profile);
+                state.transition_to(TestState::profile);
                 mock_transport_worker.add_work_item(Response{200, 0, {}, user_profile_json().dump()},
                                                     std::move(completion));
             }
             else if (request.url.find("/location") != std::string::npos) {
                 CHECK(request.method == HttpMethod::get);
-                state.advance_to(TestState::location);
+                state.transition_to(TestState::location);
                 mock_transport_worker.add_work_item(
                     Response{200,
                              0,
@@ -5180,7 +5950,7 @@ TEST_CASE("app: app cannot get deallocated during log in", "[sync][app]") {
         }
 
         AsyncMockNetworkTransport& mock_transport_worker;
-        TestStateBundle& state;
+        TestingStateMachine<TestState>& state;
     };
 
     auto [cur_user_promise, cur_user_future] = util::make_promise_future<std::shared_ptr<SyncUser>>();
@@ -5199,7 +5969,7 @@ TEST_CASE("app: app cannot get deallocated during log in", "[sync][app]") {
     }
 
     // At this point the test does not hold any reference to `app`.
-    state.advance_to(TestState::app_deallocated);
+    state.transition_to(TestState::app_deallocated);
     auto cur_user = std::move(cur_user_future).get();
     CHECK(cur_user);
 
@@ -5210,35 +5980,9 @@ TEST_CASE("app: app cannot get deallocated during log in", "[sync][app]") {
 TEST_CASE("app: user logs out while profile is fetched", "[sync][app][user]") {
     AsyncMockNetworkTransport mock_transport_worker;
     enum class TestState { unknown, location, login, profile };
-    struct TestStateBundle {
-        void advance_to(TestState new_state)
-        {
-            std::lock_guard<std::mutex> lk(mutex);
-            state = new_state;
-            cond.notify_one();
-        }
-
-        TestState get() const
-        {
-            std::lock_guard<std::mutex> lk(mutex);
-            return state;
-        }
-
-        void wait_for(TestState new_state)
-        {
-            std::unique_lock<std::mutex> lk(mutex);
-            cond.wait(lk, [&] {
-                return state == new_state;
-            });
-        }
-
-        mutable std::mutex mutex;
-        std::condition_variable cond;
-
-        TestState state = TestState::unknown;
-    } state;
+    TestingStateMachine<TestState> state(TestState::unknown);
     struct transport : public GenericNetworkTransport {
-        transport(AsyncMockNetworkTransport& worker, TestStateBundle& state,
+        transport(AsyncMockNetworkTransport& worker, TestingStateMachine<TestState>& state,
                   std::shared_ptr<SyncUser>& logged_in_user)
             : mock_transport_worker(worker)
             , state(state)
@@ -5250,19 +5994,19 @@ TEST_CASE("app: user logs out while profile is fetched", "[sync][app][user]") {
                                     util::UniqueFunction<void(const Response&)>&& completion) override
         {
             if (request.url.find("/login") != std::string::npos) {
-                state.advance_to(TestState::login);
+                state.transition_to(TestState::login);
                 mock_transport_worker.add_work_item(
                     Response{200, 0, {}, user_json(encode_fake_jwt("access token")).dump()}, std::move(completion));
             }
             else if (request.url.find("/profile") != std::string::npos) {
                 logged_in_user->log_out();
-                state.advance_to(TestState::profile);
+                state.transition_to(TestState::profile);
                 mock_transport_worker.add_work_item(Response{200, 0, {}, user_profile_json().dump()},
                                                     std::move(completion));
             }
             else if (request.url.find("/location") != std::string::npos) {
                 CHECK(request.method == HttpMethod::get);
-                state.advance_to(TestState::location);
+                state.transition_to(TestState::location);
                 mock_transport_worker.add_work_item(
                     Response{200,
                              0,
@@ -5274,7 +6018,7 @@ TEST_CASE("app: user logs out while profile is fetched", "[sync][app][user]") {
         }
 
         AsyncMockNetworkTransport& mock_transport_worker;
-        TestStateBundle& state;
+        TestingStateMachine<TestState>& state;
         std::shared_ptr<SyncUser>& logged_in_user;
     };
 
@@ -5327,10 +6071,10 @@ TEST_CASE("app: shared instances", "[sync][app]") {
     config4.base_url = "http://localhost:9090";
 
     // should all point to same underlying app
-    auto app1_1 = App::get_shared_app(config1, sync_config);
-    auto app1_2 = App::get_shared_app(config1, sync_config);
+    auto app1_1 = App::get_app(app::App::CacheMode::Enabled, config1, sync_config);
+    auto app1_2 = App::get_app(app::App::CacheMode::Enabled, config1, sync_config);
     auto app1_3 = App::get_cached_app(config1.app_id, config1.base_url);
-    auto app1_4 = App::get_shared_app(config2, sync_config);
+    auto app1_4 = App::get_app(app::App::CacheMode::Enabled, config2, sync_config);
     auto app1_5 = App::get_cached_app(config1.app_id);
 
     CHECK(app1_1 == app1_2);
@@ -5339,9 +6083,9 @@ TEST_CASE("app: shared instances", "[sync][app]") {
     CHECK(app1_1 == app1_5);
 
     // config3 and config4 should point to different apps
-    auto app2_1 = App::get_shared_app(config3, sync_config);
+    auto app2_1 = App::get_app(app::App::CacheMode::Enabled, config3, sync_config);
     auto app2_2 = App::get_cached_app(config3.app_id, config3.base_url);
-    auto app2_3 = App::get_shared_app(config4, sync_config);
+    auto app2_3 = App::get_app(app::App::CacheMode::Enabled, config4, sync_config);
     auto app2_4 = App::get_cached_app(config3.app_id);
     auto app2_5 = App::get_cached_app(config4.app_id, "https://some.different.url");
 

@@ -33,6 +33,8 @@
 #include <realm/object-store/impl/realm_coordinator.hpp>
 #include <realm/object-store/impl/object_accessor_impl.hpp>
 
+#include <numeric>
+
 using namespace realm;
 using namespace realm::util;
 

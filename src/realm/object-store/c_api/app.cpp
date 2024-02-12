@@ -249,7 +249,7 @@ RLM_API realm_app_t* realm_app_create(const realm_app_config_t* app_config,
                                       const realm_sync_client_config_t* sync_client_config)
 {
     return wrap_err([&] {
-        return new realm_app_t(App::get_uncached_app(*app_config, *sync_client_config));
+        return new realm_app_t(App::get_app(app::App::CacheMode::Disabled, *app_config, *sync_client_config));
     });
 }
 
@@ -257,7 +257,7 @@ RLM_API realm_app_t* realm_app_create_cached(const realm_app_config_t* app_confi
                                              const realm_sync_client_config_t* sync_client_config)
 {
     return wrap_err([&] {
-        return new realm_app_t(App::get_shared_app(*app_config, *sync_client_config));
+        return new realm_app_t(App::get_app(app::App::CacheMode::Enabled, *app_config, *sync_client_config));
     });
 }
 
@@ -282,6 +282,26 @@ RLM_API void realm_clear_cached_apps(void) noexcept
 RLM_API const char* realm_app_get_app_id(const realm_app_t* app) noexcept
 {
     return (*app)->config().app_id.c_str();
+}
+
+RLM_API bool realm_app_update_base_url(realm_app_t* app, const char* base_url,
+                                       realm_app_void_completion_func_t callback, realm_userdata_t userdata,
+                                       realm_free_userdata_func_t userdata_free)
+{
+    std::optional<std::string> new_base_url;
+    if (base_url) {
+        new_base_url = base_url;
+    }
+    return wrap_err([&] {
+        (*app)->update_base_url(new_base_url, make_callback(callback, userdata, userdata_free));
+        return true;
+    });
+}
+
+RLM_API char* realm_app_get_base_url(realm_app_t* app) noexcept
+{
+    auto url_stg = (*app)->get_base_url();
+    return duplicate_string(url_stg);
 }
 
 RLM_API realm_user_t* realm_app_get_current_user(const realm_app_t* app) noexcept
@@ -728,6 +748,21 @@ RLM_API realm_app_t* realm_user_get_app(const realm_user_t* user) noexcept
     catch (const std::exception&) {
     }
     return nullptr;
+}
+
+
+RLM_API realm_sync_user_subscription_token_t*
+realm_sync_user_on_state_change_register_callback(realm_user_t* user, realm_sync_on_user_state_changed_t callback,
+                                                  realm_userdata_t userdata, realm_free_userdata_func_t userdata_free)
+{
+    return wrap_err([&] {
+        auto cb = [callback,
+                   userdata = SharedUserdata{userdata, FreeUserdata(userdata_free)}](const SyncUser& sync_user) {
+            callback(userdata.get(), realm_user_state_e(sync_user.state()));
+        };
+        auto token = (*user)->subscribe(std::move(cb));
+        return new realm_sync_user_subscription_token_t{*user, std::move(token)};
+    });
 }
 
 template <typename T>

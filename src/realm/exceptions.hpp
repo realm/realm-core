@@ -306,6 +306,14 @@ struct MigrationFailed : LogicError {
     ~MigrationFailed() noexcept override;
 };
 
+struct SyncSchemaMigrationFailed : LogicError {
+    SyncSchemaMigrationFailed(std::string_view msg)
+        : LogicError(ErrorCodes::SyncSchemaMigrationError, msg)
+    {
+    }
+    ~SyncSchemaMigrationFailed() noexcept override;
+};
+
 struct ObjectAlreadyExists : RuntimeError {
     template <class T, class U>
     ObjectAlreadyExists(const U& object_type, T pk_val)
@@ -406,6 +414,20 @@ struct InvalidQueryArgError : InvalidArgument {
 };
 
 } // namespace query_parser
+
+namespace sync {
+
+// Exception thrown when the request/websocket URL is malformed
+class BadServerUrl : public Exception {
+public:
+    BadServerUrl(std::string_view url)
+        : Exception(ErrorCodes::BadServerUrl, util::format("Unable to parse server URL '%1'", url))
+    {
+    }
+};
+
+} // namespace sync
+
 } // namespace realm
 
 #endif // REALM_EXCEPTIONS_HPP

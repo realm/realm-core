@@ -2,12 +2,16 @@
 
 ### Enhancements
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
-* None.
+* Add support in the C API for receiving a notification when sync user state changes. ([#7302](https://github.com/realm/realm-core/pull/7302))
+* Allow the query builder to construct >, >=, <, <= queries for string constants. This is a case sensitive lexicographical comparison. Improved performance of RQL (parsed) queries on a non-linked string property using: >, >=, <, <=, operators and fixed behaviour that a null string should be evaulated as less than everything, previously nulls were not matched. ([#3939](https://github.com/realm/realm-core/issues/3939), this is a prerequisite for https://github.com/realm/realm-swift/issues/8008).
+* Updated bundled OpenSSL version to 3.2.0 (PR [#7303](https://github.com/realm/realm-core/pull/7303))
 
 ### Fixed
-* <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
-
+* Uploading the changesets recovered during an automatic client reset recovery may lead to 'Bad server version' errors and a new client reset. ([#7279](https://github.com/realm/realm-core/issues/7279), since v13.24.1)
+* Fixed invalid data in error reason string when registering a subscription change notification after the subscription has already failed. ([#6839](https://github.com/realm/realm-core/issues/6839), since v11.8.0)
+* Fixed crash in fulltext index using prefix search with no matches ([#7309](https://github.com/realm/realm-core/issues/7309), since v13.18.0)
+* Fix compilation and some warnings when building with Xcode 15.3 ([PR #7297](https://github.com/realm/realm-core/pull/7297)).
+ 
 ### Breaking changes
 * None.
 
@@ -17,7 +21,75 @@
 -----------
 
 ### Internals
-* None.
+* Expressions in `CHECK()` macros are printed to better; strings are quoted and null strings are printed as NULL instead of no output.
+* Refactored version resolution for the `build-apple-device.sh` script. ([#7263](https://github.com/realm/realm-core/pull/7263))
+* Remove SyncUser::binding_context() and related things, which were not actually used by any SDKs.
+* (bindgen) Upgrade `eslint-config-prettier` & `eslint-plugin-prettier` and add a missing peer dependency on `prettier`.
+* The minimum CMake version has changed from 3.15 to 3.22.1. ([#6537](https://github.com/realm/realm-core/issues/6537))
+* Update Catch2 to v3.5.2 ([PR #7297](https://github.com/realm/realm-core/pull/7297)).
+
+----------------------------------------------
+
+# 13.26.0 Release notes
+
+### Enhancements
+* Added change_base_url() function to update the App base URL at runtime. (PR [#7173](https://github.com/realm/realm-core/pull/7173))
+* Sync Client should use the base_url value provided in App::Config instead of always using stored info after first connection to server. ([#7201](https://github.com/realm/realm-core/issues/7201))
+
+### Fixed
+* Handle `EOPNOTSUPP` when using `posix_fallocate()` and fallback to manually consume space. This should enable android users to open a Realm on restrictive filesystems. ([realm-js #6349](https://github.com/realm/realm-js/issues/6349), more prevalent since v13.23.3 with the change to `REALM_HAVE_POSIX_FALLOCATE` but it was also an issue in some platforms before this)
+* Application may crash with `incoming_changesets.size() != 0` when a download message is mistaken for a bootstrap message. This can happen if the synchronization session is paused and resumed at a specific time. (PR [#7238](https://github.com/realm/realm-core/pull/7238), since v11.8.0)
+* Fixed errors complaining about missing symbols such as `__atomic_is_lock_free` on ARMv7 Linux. (PR [#7257](https://github.com/realm/realm-core/pull/7257))
+
+### Breaking changes
+* `App::get_uncached_app(...)` and `App::get_shared_app(...)` have been replaced by `App::get_app(App::CacheMode, ...)`. The App constructor is now enforced to be unusable, use `App::get_app()` instead. ([#7237](https://github.com/realm/realm-core/issues/7237))
+* The schema version field in the Realm config had no use for the flexible sync Realms previously. It is now being used for the upcoming Sync Schema Migrations feature. If it was set to a value other than zero, the application will start receiving an error from the server. Data synchronization will be stopped until the Realm is opened with schema version zero. (PR [#7239](https://github.com/realm/realm-core/pull/7239))
+
+### Compatibility
+* Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
+* Add support for chunked transfer encoding when using `HTTPParser`.
+* Bump the sync protocol to v11. The new protocol version comes with the following changes:
+  - JSON_ERROR server message contains the previous schema version
+  - Flexible sync BIND client message contains the current schema version
+* Add BAAS admin API to create new schema versions (drafts can be used to deploy all changes at once
+
+----------------------------------------------
+
+# 13.25.1 Release notes
+
+### Fixed
+* Bad performance of initial Sync download involving many backlinks ([#7217](https://github.com/realm/realm-core/issues/7217), since v10.0.0)
+
+### Compatibility
+* Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
+* (bindgen) Upgrading `@commander-js/extra-typings` and adds a missing peer dependency on `commander`.
+
+----------------------------------------------
+
+# 13.25.0 Release notes
+
+### Enhancements
+* Exceptions thrown during bootstrap application will now be surfaced to the user via the sync error handler rather than terminating the program with an unhandled exception. ([PR #7197](https://github.com/realm/realm-core/pull/7197)).
+
+### Fixed
+* Exceptions thrown during bootstrap application could crash the sync client with an `!m_sess` assertion if the bootstrap was being applied during sync::Session activation. ([#7196](https://github.com/realm/realm-core/issues/7196), since v12.0.0).
+* If a SyncSession was explicitly resumed via `handle_reconnect()` while it was waiting to auto-resume after a non-fatal error and then another non-fatal error was received, the sync client could crash with a `!m_try_again_activation_timer` assertion. ([#6961](https://github.com/realm/realm-core/issues/6961), since always)
+
+### Compatibility
+* Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
+* Dangling links in a Mixed property will now appear as NULL ([#6980](https://github.com/realm/realm-core/issues/6980))
 
 ----------------------------------------------
 

@@ -36,6 +36,7 @@
 #include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/noinst/client_reset_operation.hpp>
 #include <realm/sync/noinst/migration_store.hpp>
+#include <realm/sync/noinst/sync_schema_migration.hpp>
 #include <realm/sync/protocol.hpp>
 
 using namespace realm;
@@ -243,6 +244,23 @@ void SyncSession::become_waiting_for_access_token()
     m_state = State::WaitingForAccessToken;
 }
 
+void SyncSession::handle_location_update_failed(Status status)
+{
+    // TODO: ideally this would write to the logs as well in case users didn't set up their error handler.
+    {
+        util::CheckedUniqueLock lock(m_state_mutex);
+        // Should only be called while waiting to update the access token
+        REALM_ASSERT(m_state == State::WaitingForAccessToken);
+        // Close the session, since there's nothing more to do at this point, it can be resumed
+        // after resolving the location update failure
+        become_inactive(std::move(lock), status);
+    }
+    if (auto error_handler = config(&SyncConfig::error_handler)) {
+        auto user_facing_error = SyncError({ErrorCodes::SyncConnectFailed, status.reason()}, true);
+        error_handler(shared_from_this(), std::move(user_facing_error));
+    }
+}
+
 void SyncSession::handle_bad_auth(const std::shared_ptr<SyncUser>& user, Status status)
 {
     // TODO: ideally this would write to the logs as well in case users didn't set up their error handler.
@@ -299,6 +317,17 @@ SyncSession::handle_refresh(const std::shared_ptr<SyncSession>& session, bool re
         else if (error) {
             if (error->code() == ErrorCodes::ClientAppDeallocated) {
                 return; // this response came in after the app shut down, ignore it
+            }
+            else if (!session->get_sync_route()) {
+                // If the sync route is empty at this point, it means the forced location update
+                // failed while trying to start a sync session with a cached user and no other
+                // AppServices HTTP requests have been performed since the App was created.
+                // Since a valid websocket host url is not available, fail the SyncSession start
+                // and pass the error to the user.
+                // This function will not log out the user, since it is not known at this point
+                // whether or not the user is valid.
+                session->handle_location_update_failed(
+                    {error->code(), util::format("Unable to reach the server: %1", error->reason())});
             }
             else if (ErrorCodes::error_categories(error->code()).test(ErrorCategory::client_error)) {
                 // any other client errors other than app_deallocated are considered fatal because
@@ -358,7 +387,7 @@ SyncSession::handle_refresh(const std::shared_ptr<SyncSession>& session, bool re
     };
 }
 
-SyncSession::SyncSession(SyncClient& client, std::shared_ptr<DB> db, const RealmConfig& config,
+SyncSession::SyncSession(Private, SyncClient& client, std::shared_ptr<DB> db, const RealmConfig& config,
                          SyncManager* sync_manager)
     : m_config{config}
     , m_db{std::move(db)}
@@ -366,6 +395,7 @@ SyncSession::SyncSession(SyncClient& client, std::shared_ptr<DB> db, const Realm
     , m_migration_store{sync::MigrationStore::create(m_db)}
     , m_client(client)
     , m_sync_manager(sync_manager)
+    , m_previous_schema_version(_impl::sync_schema_migration::has_pending_migration(*m_db->start_read()))
 {
     REALM_ASSERT(m_config.sync_config);
     // we don't want the following configs enabled during a client reset
@@ -497,6 +527,7 @@ void SyncSession::download_fresh_realm(sync::ProtocolErrorInfo::Action server_re
         // deep copy the sync config so we don't modify the live session's config
         config.sync_config = std::make_shared<SyncConfig>(fresh_config);
         config.sync_config->client_resync_mode = ClientResyncMode::Manual;
+        config.schema_version = m_previous_schema_version.value_or(m_config.schema_version);
         fresh_sync_session = m_sync_manager->get_session(db, config);
         auto& history = static_cast<sync::ClientReplication&>(*db->get_replication());
         // the fresh Realm may apply writes to this db after it has outlived its sync session
@@ -628,9 +659,32 @@ void SyncSession::handle_fresh_realm_downloaded(DBRef db, Status status,
     revive_if_needed();
 }
 
+util::Future<void> SyncSession::Internal::pause_async(SyncSession& session)
+{
+    {
+        util::CheckedUniqueLock lock(session.m_state_mutex);
+        // Nothing to wait for if the session is already paused or inactive.
+        if (session.m_state == SyncSession::State::Paused || session.m_state == SyncSession::State::Inactive) {
+            return util::Future<void>::make_ready();
+        }
+    }
+    // Transition immediately to `paused` state. Calling this function must guarantee that any
+    // sync::Session object in SyncSession::m_session that existed prior to the time of invocation
+    // must have been destroyed upon return. This allows the caller to follow up with a call to
+    // sync::Client::notify_session_terminated() in order to be notified when the Realm file is closed. This works
+    // so long as this SyncSession object remains in the `paused` state after the invocation of shutdown().
+    session.pause();
+    return session.m_client.notify_session_terminated();
+}
+
 void SyncSession::OnlyForTesting::handle_error(SyncSession& session, sync::SessionErrorInfo&& error)
 {
     session.handle_error(std::move(error));
+}
+
+util::Future<void> SyncSession::OnlyForTesting::pause_async(SyncSession& session)
+{
+    return SyncSession::Internal::pause_async(session);
 }
 
 // This method should only be called from within the error handler callback registered upon the underlying
@@ -656,6 +710,7 @@ void SyncSession::handle_error(sync::SessionErrorInfo error)
             case sync::ProtocolErrorInfo::Action::ApplicationBug:
                 [[fallthrough]];
             case sync::ProtocolErrorInfo::Action::ProtocolViolation:
+                next_state = NextStateAfterError::inactive;
                 break;
             case sync::ProtocolErrorInfo::Action::Warning:
                 break; // not fatal, but should be bubbled up to the user below.
@@ -680,7 +735,7 @@ void SyncSession::handle_error(sync::SessionErrorInfo error)
                         [[fallthrough]];
                     case ClientResyncMode::Recover:
                         download_fresh_realm(error.server_requests_action);
-                        return; // do not propgate the error to the user at this point
+                        return; // do not propagate the error to the user at this point
                 }
                 break;
             case sync::ProtocolErrorInfo::Action::MigrateToFLX:
@@ -723,6 +778,12 @@ void SyncSession::handle_error(sync::SessionErrorInfo error)
                 next_state = NextStateAfterError::inactive;
                 log_out_user = true;
                 break;
+            case sync::ProtocolErrorInfo::Action::MigrateSchema:
+                util::CheckedUniqueLock lock(m_state_mutex);
+                // Should only be received for FLX sync.
+                REALM_ASSERT(m_original_sync_config->flx_sync_requested);
+                m_previous_schema_version = error.previous_schema_version;
+                return; // do not propagate the error to the user at this point
         }
     }
     else {
@@ -804,7 +865,8 @@ void SyncSession::handle_progress_update(uint64_t downloaded, uint64_t downloada
 
 static sync::Session::Config::ClientReset make_client_reset_config(const RealmConfig& base_config,
                                                                    const std::shared_ptr<SyncConfig>& sync_config,
-                                                                   DBRef&& fresh_copy, bool recovery_is_allowed)
+                                                                   DBRef&& fresh_copy, bool recovery_is_allowed,
+                                                                   bool schema_migration_detected)
 {
     REALM_ASSERT(sync_config->client_resync_mode != ClientResyncMode::Manual);
 
@@ -817,6 +879,12 @@ static sync::Session::Config::ClientReset make_client_reset_config(const RealmCo
     // or after callback we need to make sure to initialize the local schema
     // before the client reset happens.
     if (!sync_config->notify_before_client_reset && !sync_config->notify_after_client_reset)
+        return config;
+
+    // We cannot initialize the local schema in case of a sync schema migration.
+    // Currently, a schema migration involves breaking changes so opening the realm
+    // with the new schema results in a crash.
+    if (schema_migration_detected)
         return config;
 
     RealmConfig realm_config = base_config;
@@ -876,6 +944,7 @@ void SyncSession::create_sync_session()
     session_config.flx_bootstrap_batch_size_bytes = sync_config.flx_bootstrap_batch_size_bytes;
     session_config.session_reason =
         client_reset::is_fresh_path(m_config.path) ? sync::SessionReason::ClientReset : sync::SessionReason::Sync;
+    session_config.schema_version = m_config.schema_version;
 
     if (sync_config.on_sync_client_event_hook) {
         session_config.on_sync_client_event_hook = [hook = sync_config.on_sync_client_event_hook,
@@ -885,16 +954,18 @@ void SyncSession::create_sync_session()
     }
 
     {
-        std::string sync_route = m_sync_manager->sync_route();
+        // At this point, the sync_route should be valid, since the location should have been updated by
+        // an AppServices http request or by updating the access token before starting the sync session.
+        auto sync_route = m_sync_manager->sync_route();
+        REALM_ASSERT_EX(sync_route && !sync_route->empty(), "Location was not updated prior to sync session start");
 
-        if (!m_client.decompose_server_url(sync_route, session_config.protocol_envelope,
+        if (!m_client.decompose_server_url(*sync_route, session_config.protocol_envelope,
                                            session_config.server_address, session_config.server_port,
                                            session_config.service_identifier)) {
-            throw sync::BadServerUrl(sync_route);
+            throw sync::BadServerUrl(*sync_route);
         }
-        // FIXME: Java needs the fully resolved URL for proxy support, but we also need it before
-        // the session is created. How to resolve this?
-        m_server_url = sync_route;
+
+        m_server_url = *sync_route;
     }
 
     if (sync_config.authorization_header_name) {
@@ -908,8 +979,10 @@ void SyncSession::create_sync_session()
                                         m_server_requests_action == sync::ProtocolErrorInfo::Action::MigrateToFLX ||
                                         m_server_requests_action == sync::ProtocolErrorInfo::Action::RevertToPBS;
         // Use the original sync config, not the updated one from the migration store
-        session_config.client_reset_config = make_client_reset_config(
-            m_config, m_original_sync_config, std::move(m_client_reset_fresh_copy), allowed_to_recover);
+        session_config.client_reset_config =
+            make_client_reset_config(m_config, m_original_sync_config, std::move(m_client_reset_fresh_copy),
+                                     allowed_to_recover, m_previous_schema_version.has_value());
+        session_config.schema_version = m_previous_schema_version.value_or(m_config.schema_version);
         m_server_requests_action = sync::ProtocolErrorInfo::Action::NoAction;
     }
 
@@ -1061,12 +1134,17 @@ void SyncSession::resume()
 void SyncSession::do_revive(util::CheckedUniqueLock&& lock)
 {
     auto u = user();
-    if (!u || !u->access_token_refresh_required()) {
+    // If the sync manager has a valid route and the user and it's access token
+    // are valid, then revive the session.
+    if (m_sync_manager->sync_route() && (!u || !u->access_token_refresh_required())) {
         become_active();
         m_state_mutex.unlock(lock);
         return;
     }
 
+    // Otherwise, either the access token has expired or the location info hasn't
+    // been requested since the app was started - request a new access token to
+    // refresh both.
     become_waiting_for_access_token();
     // Release the lock for SDKs with a single threaded
     // networking implementation such as our test suite
@@ -1106,7 +1184,7 @@ void SyncSession::close(util::CheckedUniqueLock lock)
             break;
         case State::Paused:
         case State::Inactive: {
-            // We need to register from the sync manager if it still exists so that we don't end up
+            // We need to unregister from the sync manager if it still exists so that we don't end up
             // holding the DBRef open after the session is closed. Otherwise we can end up preventing
             // the user from deleting the realm when it's in the paused/inactive state.
             if (m_sync_manager) {
@@ -1125,7 +1203,7 @@ void SyncSession::close(util::CheckedUniqueLock lock)
 void SyncSession::shutdown_and_wait()
 {
     {
-        // Transition immediately to `inactive` state. Calling this function must gurantee that any
+        // Transition immediately to `inactive` state. Calling this function must guarantee that any
         // sync::Session object in SyncSession::m_session that existed prior to the time of invocation
         // must have been destroyed upon return. This allows the caller to follow up with a call to
         // sync::Client::wait_for_session_terminations_or_client_stopped() in order to wait for the
@@ -1273,6 +1351,15 @@ std::string SyncSession::get_appservices_connection_id() const
         return {};
     }
     return m_session->get_appservices_connection_id();
+}
+
+std::optional<std::string> SyncSession::get_sync_route() const
+{
+    util::CheckedLockGuard lk(m_state_mutex);
+    if (!m_sync_manager) {
+        return std::nullopt;
+    }
+    return m_sync_manager->sync_route();
 }
 
 void SyncSession::update_configuration(SyncConfig new_config)
