@@ -1356,11 +1356,19 @@ TEST_CASE("nested List") {
         }
 
         SECTION("inserting in sub structure sends a change notifications") {
+            // Check that notifications on Results are correct
+            Results res = lst0.as_results();
+            CollectionChangeSet change1;
+            auto token_res = res.add_notification_callback([&](CollectionChangeSet c) {
+                change1 = c;
+            });
+
             auto token = require_change();
             write([&] {
                 lst0.get_dictionary(0).get_list("list").add(Mixed(42));
             });
             REQUIRE_INDICES(change.modifications, 0);
+            REQUIRE_INDICES(change1.modifications, 0);
             REQUIRE(!change.collection_was_cleared);
         }
 
