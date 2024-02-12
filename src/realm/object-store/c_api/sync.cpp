@@ -767,7 +767,7 @@ RLM_API void realm_sync_session_resume(realm_sync_session_t* session) noexcept
 RLM_API void realm_sync_session_get_file_ident(realm_sync_session_t* session, realm_salted_file_ident_t* out) noexcept
 {
     auto file_ident = (*session)->get_file_ident();
-    out->file_ident = file_ident.ident;
+    out->ident = file_ident.ident;
     out->salt = file_ident.salt;
 }
 

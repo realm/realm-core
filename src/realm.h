@@ -3457,7 +3457,7 @@ typedef struct realm_sync_error {
 } realm_sync_error_t;
 
 typedef struct realm_salted_file_ident {
-    uint64_t file_ident;
+    uint64_t ident;
     int64_t salt;
 } realm_salted_file_ident_t;
 
