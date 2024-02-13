@@ -1373,7 +1373,6 @@ void SessionWrapper::async_wait_for(bool upload_completion, bool download_comple
 {
     REALM_ASSERT(upload_completion || download_completion);
     REALM_ASSERT(m_initiated);
-    REALM_ASSERT(!m_abandoned);
 
     util::bind_ptr<SessionWrapper> self{this};
     m_client.post([self = std::move(self), handler = std::move(handler), upload_completion,
