@@ -647,6 +647,12 @@ records:
      reason: std::string
      primary_key: Mixed
 
+  SaltedFileIdent:
+    cppName: sync::SaltedFileIdent
+    fields:
+      ident: uint64_t
+      salt: int64_t
+
 opaqueTypes:
   - Schema
   - Group
@@ -1305,6 +1311,7 @@ classes:
       force_close: ()
       shutdown_and_wait: ()
       update_configuration: '(config: SyncConfig)'
+      get_file_ident: '() -> SaltedFileIdent'
 
   SSLVerifyCallback:
     cppName: std::function<SyncConfig::SSLVerifyCallback>

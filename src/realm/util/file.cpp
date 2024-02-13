@@ -247,9 +247,13 @@ void make_dir_recursive(std::string path)
             path[sep] = 0;
         }
         try_make_dir(path);
-        if (sep < path.size())
+        if (c) {
             path[sep] = c;
-        pos = sep + 1;
+            pos = sep + 1;
+        }
+        else {
+            break;
+        }
     }
 #endif
 }

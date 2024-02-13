@@ -76,7 +76,7 @@ private:
     std::shared_ptr<_impl::RealmCoordinator> m_coordinator GUARDED_BY(m_mutex);
     std::shared_ptr<SyncSession> m_session GUARDED_BY(m_mutex);
     std::vector<uint64_t> m_registered_callbacks GUARDED_BY(m_mutex);
-    mutable util::CheckedMutex m_mutex;
+    util::CheckedMutex m_mutex;
     const bool m_db_first_open;
 };
 

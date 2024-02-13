@@ -2146,7 +2146,7 @@ void DB::enable_wait_for_change()
     m_wait_for_change_enabled = true;
 }
 
-bool DB::needs_file_format_upgrade(const std::string& file, const std::vector<char>& encryption_key) noexcept
+bool DB::needs_file_format_upgrade(const std::string& file, const std::vector<char>& encryption_key)
 {
     SlabAlloc alloc;
     SlabAlloc::Config cfg;
@@ -2158,11 +2158,15 @@ bool DB::needs_file_format_upgrade(const std::string& file, const std::vector<ch
     }
     try {
         alloc.attach_file(file, cfg);
-        auto current_file_format_version = alloc.get_committed_file_format_version();
-        auto target_file_format_version = Group::g_current_file_format_version;
-        return current_file_format_version < target_file_format_version;
+        if (auto current_file_format_version = alloc.get_committed_file_format_version()) {
+            auto target_file_format_version = Group::g_current_file_format_version;
+            return current_file_format_version < target_file_format_version;
+        }
     }
-    catch (...) {
+    catch (const FileAccessError& err) {
+        if (err.code() != ErrorCodes::FileNotFound) {
+            throw;
+        }
     }
     return false;
 }

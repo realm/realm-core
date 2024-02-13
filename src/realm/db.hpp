@@ -167,7 +167,7 @@ public:
 
     bool is_attached() const noexcept;
 
-    static bool needs_file_format_upgrade(const std::string& file, const std::vector<char>& encryption_key) noexcept;
+    static bool needs_file_format_upgrade(const std::string& file, const std::vector<char>& encryption_key);
 
     Allocator& get_alloc()
     {
@@ -484,7 +484,7 @@ private:
     class ReadLockGuard;
 
     // Member variables
-    mutable util::CheckedMutex m_mutex;
+    util::CheckedMutex m_mutex;
     int m_transaction_count GUARDED_BY(m_mutex) = 0;
     SlabAlloc m_alloc;
     std::unique_ptr<Replication> m_history;

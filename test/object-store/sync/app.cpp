@@ -162,16 +162,16 @@ static std::string create_jwt(const std::string& appId)
     payload["my_metadata"]["name"] = "Bar Foo";
     payload["my_metadata"]["occupation"] = "stock analyst";
 
-    std::string headerStr = header.dump();
-    std::string payloadStr = payload.dump();
+    std::string header_str = header.dump();
+    std::string payload_str = payload.dump();
 
     std::string encoded_header;
-    encoded_header.resize(util::base64_encoded_size(headerStr.length()));
-    util::base64_encode(headerStr.data(), headerStr.length(), encoded_header.data(), encoded_header.size());
+    encoded_header.resize(util::base64_encoded_size(header_str.length()));
+    util::base64_encode(header_str, encoded_header);
 
     std::string encoded_payload;
-    encoded_payload.resize(util::base64_encoded_size(payloadStr.length()));
-    util::base64_encode(payloadStr.data(), payloadStr.length(), encoded_payload.data(), encoded_payload.size());
+    encoded_payload.resize(util::base64_encoded_size(payload_str.length()));
+    util::base64_encode(payload_str, encoded_payload);
 
     // Remove padding characters.
     while (encoded_header.back() == '=')
@@ -181,13 +181,14 @@ static std::string create_jwt(const std::string& appId)
 
     std::string jwtPayload = encoded_header + "." + encoded_payload;
 
-    std::array<unsigned char, 32> hmac;
+    std::array<char, 32> hmac;
     unsigned char key[] = "My_very_confidential_secretttttt";
-    util::hmac_sha256(util::unsafe_span_cast<unsigned char>(jwtPayload), hmac, util::Span<uint8_t, 32>(key, 32));
+    util::hmac_sha256(util::unsafe_span_cast<uint8_t>(jwtPayload), util::unsafe_span_cast<uint8_t>(hmac),
+                      util::Span<uint8_t, 32>(key, 32));
 
     std::string signature;
     signature.resize(util::base64_encoded_size(hmac.size()));
-    util::base64_encode(reinterpret_cast<char*>(hmac.data()), hmac.size(), signature.data(), signature.size());
+    util::base64_encode(hmac, signature);
     while (signature.back() == '=')
         signature.pop_back();
     std::replace(signature.begin(), signature.end(), '+', '-');
@@ -3834,6 +3835,24 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
                                       "Realm but none was found for type 'Dog'");
         }
     }
+
+    SECTION("get_file_ident") {
+        SyncTestFile config(app, partition, schema);
+        config.sync_config->client_resync_mode = ClientResyncMode::RecoverOrDiscard;
+        auto r = Realm::get_shared_realm(config);
+        wait_for_download(*r);
+
+        auto first_ident = r->sync_session()->get_file_ident();
+        REQUIRE(first_ident.ident != 0);
+        REQUIRE(first_ident.salt != 0);
+
+        reset_utils::trigger_client_reset(session.app_session(), r);
+        r->sync_session()->restart_session();
+        wait_for_download(*r);
+
+        REQUIRE(first_ident.ident != r->sync_session()->get_file_ident().ident);
+        REQUIRE(first_ident.salt != r->sync_session()->get_file_ident().salt);
+    }
 }
 
 TEST_CASE("app: base_url", "[sync][app][base_url]") {
@@ -4797,7 +4816,7 @@ TEST_CASE("app: login_with_credentials unit_tests", "[sync][app][user]") {
         config.transport = instance_of<transport>;
         TestSyncManager tsm(config);
         auto error = failed_log_in(tsm.app());
-        CHECK(error.reason() == std::string("jwt missing parts"));
+        CHECK(error.reason() == std::string("malformed JWT"));
         CHECK(error.code_string() == "BadToken");
         CHECK(error.is_json_error());
         CHECK(error.code() == ErrorCodes::BadToken);
@@ -5416,7 +5435,7 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app][user][token]") {
 
         bool processed = false;
         app->refresh_custom_data(app->sync_manager()->get_current_user(), [&](const Optional<AppError>& error) {
-            CHECK(error->reason() == "jwt missing parts");
+            CHECK(error->reason() == "malformed JWT");
             CHECK(error->code() == ErrorCodes::BadToken);
             CHECK(session_route_hit);
             processed = true;

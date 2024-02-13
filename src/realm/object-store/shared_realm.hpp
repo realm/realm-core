@@ -138,7 +138,7 @@ struct RealmConfig {
         return schema_mode == SchemaMode::ReadOnly;
     }
 
-    bool needs_file_format_upgrade() const noexcept;
+    bool needs_file_format_upgrade() const;
 
     // If false, always return a new Realm instance, and don't return
     // that Realm instance for other requests for a cached Realm. Useful

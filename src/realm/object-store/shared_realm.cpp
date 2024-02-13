@@ -77,7 +77,7 @@ private:
 };
 } // namespace
 
-bool RealmConfig::needs_file_format_upgrade() const noexcept
+bool RealmConfig::needs_file_format_upgrade() const
 {
     return DB::needs_file_format_upgrade(path, encryption_key);
 }
