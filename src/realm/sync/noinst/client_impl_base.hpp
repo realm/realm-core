@@ -292,7 +292,6 @@ private:
 
     bool m_stopped = false;                       // Protected by `m_mutex`
     bool m_sessions_terminated = false;           // Protected by `m_mutex`
-    bool m_actualize_and_finalize_needed = false; // Protected by `m_mutex`
 
     // The set of session wrappers that are not yet wrapping a session object,
     // and are not yet abandoned (still referenced by the application).
