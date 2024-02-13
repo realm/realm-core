@@ -99,7 +99,7 @@ void ClusterNode::get(ObjKey k, ClusterNode::State& state) const
 MemRef Cluster::create_empty_cluster(Allocator& alloc)
 {
     Array arr(alloc);
-    arr.create(Array::type_HasRefs);      // Throws
+    arr.create(Array::type_HasRefs); // Throws
 
     arr.add(RefOrTagged::make_tagged(0)); // Compact form
     return arr.get_mem();
@@ -1470,7 +1470,7 @@ void Cluster::dump_objects(int64_t key_offset, std::string lead) const
                 }
                 case col_type_String: {
                     ArrayString arr(m_alloc);
-                    set_spec(arr, col.get_index());
+                    // set_spec(arr, col.get_index());
                     ref_type ref = Array::get_as_ref(j);
                     arr.init_from_ref(ref);
                     std::cout << ", " << arr.get(i);
@@ -1655,11 +1655,13 @@ ref_type Cluster::typed_write(ref_type ref, _impl::ArrayWriterBase& out, const T
             auto col_attr = col_key.get_attrs();
             bool compressible = col_type == col_type_Int || col_type == col_type_Link ||
                                 col_type == col_type_BackLink || col_type == col_type_ObjectId ||
-                                col_type == col_type_TypedLink || col_type == col_type_UUID;
+                                col_type == col_type_TypedLink || col_type == col_type_UUID ||
+                                col_type == col_type_EnumString;
+
             // First handle true leafs (not collections or complex leafs)
             if (!leaf.has_refs()) {
                 REALM_ASSERT(col_type != col_type_Mixed && col_type != col_type_Timestamp);
-                written_cluster.set_as_ref(j, leaf.write(out, deep, only_modified, compress && compressible));
+                written_cluster.set_as_ref(j, leaf.write(out, false, false, compress && compressible));
                 continue;
             }
             // Next handle complex leafs (nested arrays), which we don't compress

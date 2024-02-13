@@ -38,7 +38,7 @@ private:
 };
 
 // remove this when enumerated strings are supported:
-//#define type_EnumString type_String
+// #define type_EnumString type_String
 
 static void create_table(TransactionRef tr)
 {
@@ -303,13 +303,13 @@ void import(const char* filename)
             // verify
             /*
                         for (auto& e : val) {
-                            if (e.col_key.get_type() == col_type_String) {
+                            if (e.col_key.get_type() == col_type_EnumString) {
                                 auto got_string = o.get<StringData>(e.col_key);
                                 auto the_string = e.value.get_string();
                                 REALM_ASSERT(got_string == the_string);
                             }
                         }
-            */
+                        */
         }
         resp.send(buf);
         if (buf_cnt++ > bufs_per_commit) {

@@ -1594,11 +1594,13 @@ public:
     }
     StringData get_string(size_t index)
     {
-        auto id = this->m_leaf_ptr->get(index);
+        auto id = this->m_leaf->get(index);
         return m_table.get_enum_string(Base::m_condition_column_key, id);
     }
+#if 0
     size_t find_all_local(size_t start, size_t end) override
     {
+        /*
         while (start < end) {
             start = find_first_local(start, end);
             if (start != not_found) {
@@ -1613,8 +1615,11 @@ public:
                 start++;
             }
         }
+        */
+        Base::m_leaf->template find<TConditionFunction>(m_value, start, end, m_state);
         return end;
     }
+#endif
     virtual std::string describe_condition() const override
     {
         return TConditionFunction::description();

@@ -1727,19 +1727,6 @@ inline void check_range(const BinaryData& val)
 }
 } // namespace
 
-// helper functions for filtering out calls to set_spec()
-template <class T>
-inline void Obj::set_spec(T&, ColKey)
-{
-}
-template <>
-inline void Obj::set_spec<ArrayString>(ArrayString& values, ColKey col_key)
-{
-    size_t spec_ndx = m_table->colkey2spec_ndx(col_key);
-    Spec* spec = const_cast<Spec*>(&get_spec());
-    values.set_spec(spec, spec_ndx);
-}
-
 #if REALM_ENABLE_GEOSPATIAL
 
 template <>

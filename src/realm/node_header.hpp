@@ -327,6 +327,7 @@ public:
             case wtype_Ignore: {
                 num_bytes = size;
                 break;
+            }
             default: {
                 REALM_ASSERT(false);
                 break;
