@@ -39,11 +39,11 @@ void ArrayPacked::init_array(char* h, uint8_t flags, size_t v_width, size_t v_si
 
 void ArrayPacked::copy_data(const Array& origin, Array& arr) const
 {
-    // this can be boosted a little bit, with and size shold be known at this stage.
+    // this can be boosted a little bit, with and size should be known at this stage.
     using Encoding = NodeHeader::Encoding;
     REALM_ASSERT_DEBUG(arr.is_attached());
-    REALM_ASSERT_DEBUG(arr.m_kind == 'B');
-    REALM_ASSERT_DEBUG(arr.m_encoding == Encoding::Packed);
+    REALM_ASSERT_DEBUG(arr.m_encoder.get_kind() == 'B');
+    REALM_ASSERT_DEBUG(arr.m_encoder.get_encoding() == Encoding::Packed);
     const auto h = arr.get_header();
     size_t v_width, v_size;
     get_encode_info(h, v_width, v_size);
@@ -56,38 +56,22 @@ void ArrayPacked::copy_data(const Array& origin, Array& arr) const
     }
 }
 
-NodeHeader::Encoding ArrayPacked::get_encoding() const
-{
-    return NodeHeader::Encoding::Packed;
-}
-
-std::vector<int64_t> ArrayPacked::fetch_signed_values_from_encoded_array(const Array& arr) const
+std::vector<int64_t> ArrayPacked::fetch_all_values(const Array& arr) const
 {
     REALM_ASSERT(arr.is_encoded());
-    // v_width = arr.m_width
     size_t v_size = arr.m_size;
-    // get_encode_info(arr.get_header(), v_width, v_size);
     std::vector<int64_t> values;
     values.reserve(v_size);
-    // auto data = (uint64_t*)arr.m_data;
-    // bf_iterator it_value{data, 0, v_width, v_width, 0};
-    for (size_t i = 0; i < v_size; ++i) {
-        //        const auto value = it_value.get_value();
-        //        values.push_back(sign_extend_field(v_width, value));
-        //        ++it_value;
+    for (size_t i = 0; i < v_size; ++i)
         values.push_back(get(arr, i));
-    }
     return values;
 }
-
 
 void ArrayPacked::set_direct(const Array& arr, size_t ndx, int64_t value) const
 {
     REALM_ASSERT_DEBUG(arr.is_encoded());
-    const auto v_width = arr.m_width;
-    const auto v_size = arr.m_size;
-    //    size_t v_width, v_size;
-    //    get_encode_info(arr.get_header(), v_width, v_size);
+    const auto v_width = arr.m_encoder.m_v_width;
+    const auto v_size = arr.m_encoder.m_v_size;
     REALM_ASSERT_DEBUG(ndx < v_size);
     auto data = (uint64_t*)arr.m_data;
     bf_iterator it_value{data, static_cast<size_t>(ndx * v_width), v_width, v_width, 0};
@@ -98,8 +82,8 @@ int64_t ArrayPacked::get(const Array& arr, size_t ndx) const
 {
     REALM_ASSERT_DEBUG(arr.is_attached());
     REALM_ASSERT_DEBUG(arr.is_encoded());
-    const auto w = arr.m_encode.m_v_width;
-    const auto sz = arr.m_encode.m_v_size;
+    const auto w = arr.m_encoder.m_v_width;
+    const auto sz = arr.m_encoder.m_v_size;
     return do_get((uint64_t*)arr.m_data, ndx, w, sz);
 }
 
@@ -135,8 +119,6 @@ int64_t ArrayPacked::do_get(uint64_t* data, size_t ndx, size_t v_width, size_t v
 
 void ArrayPacked::get_chunk(const Array& arr, size_t ndx, int64_t res[8]) const
 {
-    //    size_t v_width, v_size;
-    //    get_encode_info(arr.get_header(), v_width, v_size);
     const auto v_size = arr.m_size;
     REALM_ASSERT_DEBUG(ndx < v_size);
     auto sz = 8;
@@ -152,24 +134,6 @@ void ArrayPacked::get_chunk(const Array& arr, size_t ndx, int64_t res[8]) const
         res[index++] = get(arr, i++);
     }
 }
-
-// int64_t ArrayPacked::sum(const Array& arr, size_t start, size_t end) const
-//{
-//     REALM_ASSERT_DEBUG(arr.is_attached());
-//     size_t v_width = arr.m_width, v_size = arr.m_size;
-//     //    const auto* h = arr.get_header();
-//     //    get_encode_info(h, v_width, v_size);
-//     REALM_ASSERT_DEBUG(v_size >= start && v_size <= end);
-//     // const auto data = (uint64_t*)arr.m_data;
-//     int64_t total_sum = 0;
-//     // bf_iterator it_value{data, start, v_width, v_width, v_width};
-//     for (size_t i = start; i < end; ++i) {
-//         const auto v = get(arr, i); // sign_extend_field(v_width, it_value.get_value());
-//         total_sum += v;
-//         //++it_value;
-//     }
-//     return total_sum;
-// }
 
 void inline ArrayPacked::get_encode_info(const char* h, size_t& v_width, size_t& v_size)
 {

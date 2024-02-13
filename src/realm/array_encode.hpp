@@ -41,6 +41,16 @@ public:
     size_t size() const;
     size_t width() const;
 
+    inline uint8_t get_kind() const
+    {
+        return m_kind;
+    }
+
+    inline NodeHeader::Encoding get_encoding() const
+    {
+        return m_encoding;
+    }
+
     // get/set
     int64_t get(const Array&, size_t) const;
     int64_t get(const char* data, size_t) const;
@@ -62,12 +72,13 @@ private:
     void set(char* data, size_t w, size_t ndx, int64_t v) const;
     size_t flex_encoded_array_size(const std::vector<int64_t>&, const std::vector<size_t>&, size_t&, size_t&) const;
     size_t packed_encoded_array_size(std::vector<int64_t>&, size_t, size_t&) const;
-    void try_encode(const Array&, std::vector<int64_t>&, std::vector<size_t>&) const;
+
+    void encode_values(const Array&, std::vector<int64_t>&, std::vector<size_t>&) const;
     bool always_encode(const Array&, Array&, bool) const; // for testing
 private:
     using Encoding = NodeHeader::Encoding;
-    uint8_t m_kind;
-    Encoding m_encoding;
+    uint8_t m_kind = 'A';
+    Encoding m_encoding{NodeHeader::Encoding::WTypBits}; // this is not ok .... probably
     size_t m_v_width = 0, m_v_size = 0, m_ndx_width = 0, m_ndx_size = 0;
 
     friend class ArrayPacked;

@@ -416,13 +416,8 @@ public:
     template <class cond>
     size_t find_first(int64_t value, size_t start = 0, size_t end = size_t(-1)) const
     {
-        // REALM_TEMPEX2(return do_find, cond, m_width, (value, start, end));
-        // return do_find<cond>(value, start, end);
-        //  TODO: would be nice to avoid this in order to speed up find_first loops
-        QueryStateFindFirst state;
-        Finder finder = m_vtable->finder[cond::condition];
-        (this->*finder)(value, start, end, 0, &state);
-        return state.m_state;
+        // TODO: this proves that we don't need the VTable. We just need to call the right method
+        return do_find_first<cond>(value, start, end);
     }
 
     /// Get the specified element without the cost of constructing an
@@ -498,9 +493,6 @@ protected:
     size_t count(int64_t value) const noexcept;
 
 private:
-    template <typename cond, size_t bitwidth>
-    size_t do_find(int64_t value, size_t start, size_t end) const;
-
     void update_width_cache_from_header() noexcept;
 
     void do_ensure_minimum_width(int_fast64_t);
@@ -525,6 +517,10 @@ protected:
     void destroy_children(size_t offset = 0) noexcept;
 
 protected:
+    // attempt to remove the vtabler
+    template <typename cond>
+    size_t do_find_first(int64_t value, size_t start, size_t end) const;
+
     // Getters and Setters for adaptive-packed arrays
     typedef int64_t (Array::*Getter)(size_t) const; // Note: getters must not throw
     typedef void (Array::*Setter)(size_t, int64_t);
@@ -560,10 +556,7 @@ protected:
     bool m_has_refs;             // Elements whose first bit is zero are refs to subarrays.
     bool m_context_flag;         // Meaning depends on context.
 
-    ArrayEncode m_encode;
-    uint8_t m_kind;
-    NodeHeader::Encoding m_encoding;
-
+    ArrayEncode m_encoder;
     // encode/decode this array
     bool encode_array(Array&) const;
     bool decode_array(Array& arr) const;
@@ -599,10 +592,11 @@ private:
 inline bool Array::is_encoded() const
 {
 #ifdef REALM_DEBUG
-    if (m_kind == 'B')
-        REALM_ASSERT_DEBUG((m_encoding == NodeHeader::Encoding::Flex || m_encoding == NodeHeader::Encoding::Packed));
+    if (m_encoder.get_kind() == 'B')
+        REALM_ASSERT_DEBUG((m_encoder.get_encoding() == NodeHeader::Encoding::Flex ||
+                            m_encoder.get_encoding() == NodeHeader::Encoding::Packed));
 #endif
-    return m_kind == 'B';
+    return m_encoder.get_kind() == 'B';
 }
 
 inline int64_t Array::get(size_t ndx) const noexcept

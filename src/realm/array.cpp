@@ -257,30 +257,34 @@ void Array::init_from_mem(MemRef mem) noexcept
     // important fields used for type A arrays, like width, lower, upper_bound which are used
     // for expanding the array, but also query the data.
     char* header = mem.get_addr();
-    m_kind = NodeHeader::get_kind(header);
-    m_encoding = NodeHeader::get_encoding(header);
-    REALM_ASSERT_DEBUG(m_kind == 'A' || m_kind == 'B');
-    if (m_kind == 'B') {
-        REALM_ASSERT_DEBUG(m_encoding == Encoding::Flex || m_encoding == Encoding::Packed);
+    const auto kind = NodeHeader::get_kind(header);
+    REALM_ASSERT_DEBUG(kind == 'A' || kind == 'B');
+    // Cache all the header info as long as this array is alive and encoded.
+    m_encoder.init(header);
+    if (kind == 'B') {
+        REALM_ASSERT_DEBUG(NodeHeader::get_encoding(header) == Encoding::Flex ||
+                           NodeHeader::get_encoding(header) == Encoding::Packed);
         char* header = mem.get_addr();
         m_ref = mem.get_ref();
         m_data = get_data_from_header(header);
-        // store the header until the array is not decoded. We want to avoid to read from the header as much as
-        // possible
-        m_encode.init(header);
-        m_size = m_encode.size();
-        m_width = m_encode.width();
-        // the alternative is to generate 64 possible max&min values.
+        // encoder knows which format we are compressed into, width and size are read accordingly with the format of
+        // the header
+        m_size = m_encoder.size();
+        m_width = m_encoder.width();
+        // we need to compute lower and upper bound, these are useful during Array::find and in general in every query
+        // related optimisation.
         const auto max_v = 1 << m_width;
         m_lbound = -max_v;
         m_ubound = max_v - 1;
         m_is_inner_bptree_node = get_is_inner_bptree_node_from_header(header);
         m_has_refs = get_hasrefs_from_header(header);
         m_context_flag = get_context_flag_from_header(header);
+        // TODO: evaluate if we can get rid of this.
         m_vtable = &VTableForEncodedArray::vtable;
         m_getter = m_vtable->getter;
     }
     else {
+        // Old init phase.
         header = Node::init_from_mem(mem);
         m_is_inner_bptree_node = get_is_inner_bptree_node_from_header(header);
         m_has_refs = get_hasrefs_from_header(header);
@@ -352,8 +356,7 @@ void Array::destroy_children(size_t offset) noexcept
 
 size_t Array::get_byte_size() const noexcept
 {
-    // A and B type array
-    REALM_ASSERT(m_kind == 'A' || m_kind == 'B');
+    REALM_ASSERT_DEBUG(m_encoder.get_kind() == 'A' || m_encoder.get_kind() == 'B');
     const auto header = get_header();
     auto num_bytes = get_byte_size_from_header(header);
     auto read_only = m_alloc.is_read_only(m_ref) == true;
@@ -377,12 +380,12 @@ ref_type Array::write(_impl::ArrayWriterBase& out, bool deep, bool only_if_modif
         // We should have: Array encoded_array{Allocator::get_default()};
         Array encoded_array{Allocator::get_default()};
         if (compress_in_flight && size() != 0 && encode_array(encoded_array)) {
-            REALM_ASSERT_DEBUG(encoded_array.m_kind == 'B');
-            REALM_ASSERT_DEBUG(
-                encoded_array.m_encoding == Encoding::Flex || encoded_array.m_encoding == Encoding::Packed ||
-                encoded_array.m_encoding == Encoding::AofP || encoded_array.m_encoding == Encoding::PofA);
-            REALM_ASSERT_DEBUG(size() == encoded_array.size());
+            REALM_ASSERT_DEBUG(encoded_array.m_encoder.get_kind() == 'B');
 #ifdef REALM_DEBUG
+            const auto encoding = encoded_array.m_encoder.get_encoding();
+            REALM_ASSERT_DEBUG(encoding == Encoding::Flex || encoding == Encoding::Packed ||
+                               encoding == Encoding::AofP || encoding == Encoding::PofA);
+            REALM_ASSERT_DEBUG(size() == encoded_array.size());
             for (size_t i = 0; i < encoded_array.size(); ++i) {
                 REALM_ASSERT_DEBUG(get(i) == encoded_array.get(i));
             }
@@ -412,12 +415,12 @@ ref_type Array::write(ref_type ref, Allocator& alloc, _impl::ArrayWriterBase& ou
     if (!array.m_has_refs) {
         Array encoded_array{Allocator::get_default()};
         if (compress_in_flight && array.size() != 0 && array.encode_array(encoded_array)) {
-            REALM_ASSERT_DEBUG(encoded_array.m_kind == 'B');
-            REALM_ASSERT_DEBUG(
-                encoded_array.m_encoding == Encoding::Flex || encoded_array.m_encoding == Encoding::Packed ||
-                encoded_array.m_encoding == Encoding::AofP || encoded_array.m_encoding == Encoding::PofA);
-            REALM_ASSERT_DEBUG(array.size() == encoded_array.size());
+            REALM_ASSERT_DEBUG(encoded_array.m_encoder.get_kind() == 'B');
 #ifdef REALM_DEBUG
+            const auto encoding = encoded_array.m_encoder.get_encoding();
+            REALM_ASSERT_DEBUG(encoding == Encoding::Flex || encoding == Encoding::Packed ||
+                               encoding == Encoding::AofP || encoding == Encoding::PofA);
+            REALM_ASSERT_DEBUG(array.size() == encoded_array.size());
             for (size_t i = 0; i < encoded_array.size(); ++i) {
                 REALM_ASSERT_DEBUG(array.get(i) == encoded_array.get(i));
             }
@@ -728,15 +731,15 @@ size_t Array::size() const noexcept
 
 bool Array::encode_array(Array& arr) const
 {
-    if (!is_encoded() && m_encoding == NodeHeader::Encoding::WTypBits) {
-        return m_encode.encode(*this, arr);
+    if (!is_encoded() && m_encoder.get_encoding() == NodeHeader::Encoding::WTypBits) {
+        return m_encoder.encode(*this, arr);
     }
     return false;
 }
 
 bool Array::decode_array(Array& arr) const
 {
-    return arr.is_encoded() ? m_encode.decode(arr) : false;
+    return arr.is_encoded() ? m_encoder.decode(arr) : false;
 }
 
 bool Array::try_encode(Array& arr) const
@@ -751,18 +754,18 @@ bool Array::try_decode()
 
 int64_t Array::get_encoded(size_t ndx) const noexcept
 {
-    return m_encode.get(*this, ndx);
+    return m_encoder.get(*this, ndx);
 }
 
 void Array::set_encoded(size_t ndx, int64_t val)
 {
-    m_encode.set_direct(*this, ndx, val);
+    m_encoder.set_direct(*this, ndx, val);
 }
 
 int64_t Array::sum(size_t start, size_t end) const
 {
     if (is_encoded())
-        return m_encode.sum(*this, start, end);
+        return m_encoder.sum(*this, start, end);
     REALM_TEMPEX(return sum, m_width, (start, end));
 }
 
@@ -775,7 +778,7 @@ int64_t Array::sum(size_t start, size_t end) const
     REALM_ASSERT_EX(end <= m_size && start <= end, start, end, m_size);
 
     if (is_encoded())
-        return m_encode.sum(*this, start, end);
+        return m_encoder.sum(*this, start, end);
 
     if (start == end)
         return 0;
@@ -1267,8 +1270,7 @@ bool Array::find_vtable(int64_t value, size_t start, size_t end, size_t baseinde
 template <class cond>
 bool Array::find_encoded(int64_t value, size_t start, size_t end, size_t baseindex, QueryStateBase* state) const
 {
-    return ArrayWithFind(*this).find_optimized<cond, 0>(value, start, end, baseindex, state);
-    // return s_encode.find_all<cond>(*this, value, start, end, baseindex, state);
+    return m_encoder.find_all<cond>(*this, value, start, end, baseindex, state);
 }
 
 void Array::update_width_cache_from_header() noexcept
@@ -1347,7 +1349,7 @@ void Array::get_chunk(size_t ndx, int64_t res[8]) const noexcept
 
 void Array::get_chunk_encoded(size_t ndx, int64_t res[8]) const noexcept
 {
-    m_encode.get_chunk(*this, ndx, res);
+    m_encoder.get_chunk(*this, ndx, res);
 }
 
 template <>
@@ -1484,16 +1486,17 @@ size_t Array::upper_bound_int(int64_t value) const noexcept
 size_t Array::find_first(int64_t value, size_t start, size_t end) const
 {
     if (is_encoded())
-        return m_encode.find_first<Equal>(*this, value, start, end);
+        return m_encoder.find_first<Equal>(*this, value, start, end);
+
     return find_first<Equal>(value, start, end);
 }
 
 int_fast64_t Array::get(const char* header, size_t ndx) noexcept
 {
     if (NodeHeader::get_kind(header) == 'B') {
-        ArrayEncode encoder;
+        static ArrayEncode encoder;
         encoder.init(header);
-        return encoder.get(header, ndx);
+        return encoder.get(NodeHeader::get_data_from_header(header), ndx);
     }
 
     auto sz = get_size_from_header(header);
@@ -1612,10 +1615,18 @@ void Array::typed_print(std::string prefix) const
     }
 }
 
-template <typename cond, size_t bitwidth>
-size_t Array::do_find(int64_t value, size_t start, size_t end) const
+template <typename cond>
+size_t Array::do_find_first(int64_t value, size_t start, size_t end) const
 {
+    // QueryStateFindFirst is probably not needed, all we need here is to return the index
+    // Also we could or should add to the array ArrayWithFind, in order to avoid to create a new object every time.
+    // ArrayWithFind is lightweight, but probably it is faster, to just create it once.
     QueryStateFindFirst state;
-    ArrayWithFind(*this).find_optimized<cond, bitwidth>(value, start, end, 0, &state);
+    REALM_TEMPEX2(ArrayWithFind(*this).find_optimized, cond, m_width, (value, start, end, 0, &state));
     return state.m_state;
 }
+
+template size_t Array::do_find_first<NotEqual>(int64_t value, size_t start, size_t end) const;
+template size_t Array::do_find_first<Equal>(int64_t value, size_t start, size_t end) const;
+template size_t Array::do_find_first<Less>(int64_t value, size_t start, size_t end) const;
+template size_t Array::do_find_first<Greater>(int64_t value, size_t start, size_t end) const;

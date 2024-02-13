@@ -162,11 +162,8 @@ public:
 private:
     const Array& m_array;
 
-    template <size_t bitwidth>
+    template <size_t>
     bool find_all_will_match(size_t start, size_t end, size_t baseindex, QueryStateBase* state) const;
-
-    template <class Cond>
-    bool find_encoded_array(int64_t, size_t, size_t, size_t, QueryStateBase*) const;
 };
 //*************************************************************************************
 // Finding code                                                                       *
@@ -301,6 +298,7 @@ template <class cond, size_t bitwidth>
 bool ArrayWithFind::find_optimized(int64_t value, size_t start, size_t end, size_t baseindex,
                                    QueryStateBase* state) const
 {
+    REALM_ASSERT_DEBUG(!m_array.is_encoded());
     REALM_ASSERT_DEBUG(start <= m_array.m_size && (end <= m_array.m_size || end == size_t(-1)) && start <= end);
 
     size_t start2 = start;
@@ -311,30 +309,6 @@ bool ArrayWithFind::find_optimized(int64_t value, size_t start, size_t end, size
 
     if (!(m_array.m_size > start2 && start2 < end))
         return true;
-
-    // Note:
-    //      For encoded arrays, we are going to skip all these and tap directly into a straight find.
-    //      It is unclear at this stage how much performance we are loosing, we will need to
-    //      a) evaluate how ofter the vectorization part of this code is hit in procution
-    //      b) add or run the benchmarks that are testing this part of the code and do some comparison
-    //
-
-    if (m_array.is_encoded()) {
-
-        const auto lbound = m_array.m_lbound;
-        const auto ubound = m_array.m_ubound;
-
-        if (!c.can_match(value, lbound, ubound))
-            return true;
-
-        // optimization if all items are guaranteed to match (such as cond == NotEqual && value == 100 && m_ubound ==
-        // 15)
-        if (c.will_match(value, lbound, ubound)) {
-            return find_all_will_match<bitwidth>(start2, end, baseindex, state);
-        }
-
-        return find_encoded_array<cond>(value, start2, end, baseindex, state);
-    }
 
     constexpr int64_t lbound = Array::lbound_for_width(bitwidth);
     constexpr int64_t ubound = Array::ubound_for_width(bitwidth);
@@ -1005,39 +979,6 @@ bool ArrayWithFind::compare_relation(int64_t value, size_t start, size_t end, si
             if (!state->match(start + baseindex))
                 return false;
         }
-        ++start;
-    }
-    return true;
-}
-
-template <class Cond>
-bool ArrayWithFind::find_encoded_array(int64_t value, size_t start, size_t end, size_t baseindex,
-                                       QueryStateBase* state) const
-{
-    bool (*cmp)(int64_t, int64_t) = nullptr;
-    if constexpr (std::is_same_v<Cond, Equal>)
-        cmp = [](int64_t v, int64_t value) {
-            return v == value;
-        };
-    else if constexpr (std::is_same_v<Cond, NotEqual>)
-        cmp = [](int64_t v, int64_t value) {
-            return v != value;
-        };
-    else if constexpr (std::is_same_v<Cond, Greater>)
-        cmp = [](int64_t v, int64_t value) {
-            return v > value;
-        };
-    else if constexpr (std::is_same_v<Cond, Less>)
-        cmp = [](int64_t v, int64_t value) {
-            return v < value;
-        };
-    REALM_ASSERT_DEBUG(cmp != nullptr);
-    // this can be optimized doing lower/upper bound, we don't need to go through the whole array
-    // const auto h = m_array.get_header();
-    while (start < end) {
-        auto v = m_array.get(start);
-        if (cmp(v, value) && !state->match(start + baseindex))
-            return false;
         ++start;
     }
     return true;

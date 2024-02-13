@@ -396,11 +396,11 @@ inline size_t lower_bound(const char* data, size_t start, size_t end, int64_t va
 
     const auto h = NodeHeader::get_header_from_data((char*)data);
     const auto is_encoded = NodeHeader::get_kind(h) == 'B';
-    ArrayEncode encoder;
+    static ArrayEncode encoder;
     if (is_encoded)
         encoder.init(h);
 
-    const auto fetcher = [is_encoded, &encoder](auto data, size_t ndx) {
+    const auto fetcher = [is_encoded](auto data, size_t ndx) {
         return is_encoded ? encoder.get(data, ndx) : get_direct<width>(data, ndx);
     };
 
@@ -484,10 +484,11 @@ inline size_t upper_bound(const char* data, size_t start, size_t end, int64_t va
 
     const auto h = NodeHeader::get_header_from_data((char*)data);
     const auto is_encoded = NodeHeader::get_kind(h) == 'B';
-    ArrayEncode encoder;
+    static ArrayEncode encoder;
     if (is_encoded)
         encoder.init(h);
-    const auto fetcher = [is_encoded, &encoder](auto data, size_t ndx) {
+
+    const auto fetcher = [is_encoded](auto data, size_t ndx) {
         return is_encoded ? encoder.get(data, ndx) : get_direct<width>(data, ndx);
     };
 
