@@ -96,22 +96,19 @@ void ArrayPacked::set_direct(const Array& arr, size_t ndx, int64_t value) const
 
 int64_t ArrayPacked::get(const Array& arr, size_t ndx) const
 {
-    // size_t v_width, v_size;
-    // get_encode_info(arr.get_header(), v_width, v_size);
+    REALM_ASSERT_DEBUG(arr.is_attached());
     REALM_ASSERT_DEBUG(arr.is_encoded());
-    return do_get((uint64_t*)arr.m_data, ndx, arr.m_width, arr.m_size);
+    const auto w = arr.m_encode.m_v_width;
+    const auto sz = arr.m_encode.m_v_size;
+    return do_get((uint64_t*)arr.m_data, ndx, w, sz);
 }
 
-int64_t ArrayPacked::get(const char* h, size_t ndx)
+int64_t ArrayPacked::get(const char* data, size_t ndx, size_t width, size_t sz) const
 {
-    // this is likely very slow!
-    size_t v_width, v_size;
-    get_encode_info(h, v_width, v_size);
-    const auto data_area = (uint64_t*)(NodeHeader::get_data_from_header(h));
-    return do_get(data_area, ndx, v_width, v_size);
+    return do_get((uint64_t*)data, ndx, width, sz);
 }
 
-int64_t ArrayPacked::do_get(uint64_t* data, size_t ndx, size_t v_width, size_t v_size)
+int64_t ArrayPacked::do_get(uint64_t* data, size_t ndx, size_t v_width, size_t v_size) const
 {
     if (ndx >= v_size)
         return realm::not_found;
@@ -156,23 +153,23 @@ void ArrayPacked::get_chunk(const Array& arr, size_t ndx, int64_t res[8]) const
     }
 }
 
-int64_t ArrayPacked::sum(const Array& arr, size_t start, size_t end) const
-{
-    REALM_ASSERT_DEBUG(arr.is_attached());
-    size_t v_width = arr.m_width, v_size = arr.m_size;
-    //    const auto* h = arr.get_header();
-    //    get_encode_info(h, v_width, v_size);
-    REALM_ASSERT_DEBUG(v_size >= start && v_size <= end);
-    // const auto data = (uint64_t*)arr.m_data;
-    int64_t total_sum = 0;
-    // bf_iterator it_value{data, start, v_width, v_width, v_width};
-    for (size_t i = start; i < end; ++i) {
-        const auto v = get(arr, i); // sign_extend_field(v_width, it_value.get_value());
-        total_sum += v;
-        //++it_value;
-    }
-    return total_sum;
-}
+// int64_t ArrayPacked::sum(const Array& arr, size_t start, size_t end) const
+//{
+//     REALM_ASSERT_DEBUG(arr.is_attached());
+//     size_t v_width = arr.m_width, v_size = arr.m_size;
+//     //    const auto* h = arr.get_header();
+//     //    get_encode_info(h, v_width, v_size);
+//     REALM_ASSERT_DEBUG(v_size >= start && v_size <= end);
+//     // const auto data = (uint64_t*)arr.m_data;
+//     int64_t total_sum = 0;
+//     // bf_iterator it_value{data, start, v_width, v_width, v_width};
+//     for (size_t i = start; i < end; ++i) {
+//         const auto v = get(arr, i); // sign_extend_field(v_width, it_value.get_value());
+//         total_sum += v;
+//         //++it_value;
+//     }
+//     return total_sum;
+// }
 
 void inline ArrayPacked::get_encode_info(const char* h, size_t& v_width, size_t& v_size)
 {

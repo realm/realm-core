@@ -23,11 +23,11 @@
 #include <realm/query_state.hpp>
 #include <realm/column_fwd.hpp>
 #include <realm/array_direct.hpp>
+#include <realm/array_encode.hpp>
 
 namespace realm {
 
 // Pre-definitions
-class ArrayEncode;
 class GroupWriter;
 namespace _impl {
 class ArrayWriterBase;
@@ -362,6 +362,16 @@ public:
     /// (idempotency).
     void destroy_deep() noexcept;
 
+    /// check if the array is encoded (in B format)
+    inline bool is_encoded() const;
+
+    /// used only for testing, encode the array passed as argument
+    bool try_encode(Array&) const;
+
+    /// used only for testing, decode the array, on which this method is invoked. If the array is not encoded, this is
+    /// a NOP
+    bool try_decode();
+
     /// Shorthand for `destroy_deep(MemRef(ref, alloc), alloc)`.
     static void destroy_deep(ref_type ref, Allocator& alloc) noexcept;
 
@@ -535,9 +545,6 @@ protected:
     template <class cond, size_t bitwidth>
     bool find_vtable(int64_t value, size_t start, size_t end, size_t baseindex, QueryStateBase* state) const;
 
-    template <class cond>
-    bool find_encoded(int64_t value, size_t start, size_t end, size_t baseindex, QueryStateBase* state) const;
-
     template <size_t w>
     int64_t get_universal(const char* const data, const size_t ndx) const;
 
@@ -553,8 +560,20 @@ protected:
     bool m_has_refs;             // Elements whose first bit is zero are refs to subarrays.
     bool m_context_flag;         // Meaning depends on context.
 
+    ArrayEncode m_encode;
     uint8_t m_kind;
     NodeHeader::Encoding m_encoding;
+
+    // encode/decode this array
+    bool encode_array(Array&) const;
+    bool decode_array(Array& arr) const;
+    // these are used to directly set the vtable dispatcher in Array and spare us a bunch
+    // of CPU cycles in order to check if the array is in compressed format
+    int64_t get_encoded(size_t ndx) const noexcept;
+    void set_encoded(size_t ndx, int64_t);
+    void get_chunk_encoded(size_t, int64_t[8]) const noexcept;
+    template <class cond>
+    bool find_encoded(int64_t value, size_t start, size_t end, size_t baseindex, QueryStateBase* state) const;
 
 private:
     ref_type do_write_shallow(_impl::ArrayWriterBase&) const;
@@ -564,22 +583,6 @@ private:
     void report_memory_usage_2(MemUsageHandler&) const;
 #endif
 
-protected:
-    // encode/decode this array
-    bool encode_array(Array&) const;
-    bool decode_array(Array& arr) const;
-
-    // these are used to directly set the vtable dispatcher in Array and spare us a bunch
-    // of CPU cycles in order to check if the array is in compressed format
-    int64_t get_encoded(size_t ndx) const noexcept;
-    void set_encoded(size_t ndx, int64_t);
-    void get_chunk_encoded(size_t, int64_t[8]) const noexcept;
-
-
-public:
-    inline bool is_encoded() const;
-    bool try_encode(Array&) const;
-    bool try_decode();
 
 private:
     friend class Allocator;

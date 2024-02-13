@@ -394,11 +394,14 @@ inline size_t lower_bound(const char* data, size_t start, size_t end, int64_t va
     // size_t low = 0;
     size_t low = start;
 
-
     const auto h = NodeHeader::get_header_from_data((char*)data);
     const auto is_encoded = NodeHeader::get_kind(h) == 'B';
-    const auto fetcher = [is_encoded](auto data, size_t ndx) {
-        return is_encoded ? ArrayEncode::get(data, ndx) : get_direct<width>(data, ndx);
+    ArrayEncode encoder;
+    if (is_encoded)
+        encoder.init(h);
+
+    const auto fetcher = [is_encoded, &encoder](auto data, size_t ndx) {
+        return is_encoded ? encoder.get(data, ndx) : get_direct<width>(data, ndx);
     };
 
     while (size >= 8) {
@@ -481,8 +484,11 @@ inline size_t upper_bound(const char* data, size_t start, size_t end, int64_t va
 
     const auto h = NodeHeader::get_header_from_data((char*)data);
     const auto is_encoded = NodeHeader::get_kind(h) == 'B';
-    const auto fetcher = [is_encoded](auto data, size_t ndx) {
-        return is_encoded ? ArrayEncode::get(data, ndx) : get_direct<width>(data, ndx);
+    ArrayEncode encoder;
+    if (is_encoded)
+        encoder.init(h);
+    const auto fetcher = [is_encoded, &encoder](auto data, size_t ndx) {
+        return is_encoded ? encoder.get(data, ndx) : get_direct<width>(data, ndx);
     };
 
     size_t size = end - start;

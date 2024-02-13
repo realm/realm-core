@@ -44,11 +44,6 @@
 #pragma warning(disable : 4127) // Condition is constant warning
 #endif
 
-
-// generic encoder, for now it is basically only a interger encoder.
-static realm::ArrayEncode s_encode;
-
-
 // Header format (8 bytes):
 // ------------------------
 //
@@ -251,7 +246,6 @@ struct Array::VTableForEncodedArray {
 
 template <size_t width>
 const typename Array::VTableForWidth<width>::PopulatedVTable Array::VTableForWidth<width>::vtable;
-
 const typename Array::VTableForEncodedArray::PopulatedVTableEncoded Array::VTableForEncodedArray::vtable;
 
 
@@ -271,13 +265,15 @@ void Array::init_from_mem(MemRef mem) noexcept
         char* header = mem.get_addr();
         m_ref = mem.get_ref();
         m_data = get_data_from_header(header);
-        m_size = s_encode.size(header);
-        m_width = s_encode.width(header);
-        // the alternative is to generate 64 possible max values.
+        // store the header until the array is not decoded. We want to avoid to read from the header as much as
+        // possible
+        m_encode.init(header);
+        m_size = m_encode.size();
+        m_width = m_encode.width();
+        // the alternative is to generate 64 possible max&min values.
         const auto max_v = 1 << m_width;
         m_lbound = -max_v;
         m_ubound = max_v - 1;
-
         m_is_inner_bptree_node = get_is_inner_bptree_node_from_header(header);
         m_has_refs = get_hasrefs_from_header(header);
         m_context_flag = get_context_flag_from_header(header);
@@ -733,14 +729,14 @@ size_t Array::size() const noexcept
 bool Array::encode_array(Array& arr) const
 {
     if (!is_encoded() && m_encoding == NodeHeader::Encoding::WTypBits) {
-        return s_encode.encode(*this, arr);
+        return m_encode.encode(*this, arr);
     }
     return false;
 }
 
 bool Array::decode_array(Array& arr) const
 {
-    return arr.is_encoded() ? s_encode.decode(arr) : false;
+    return arr.is_encoded() ? m_encode.decode(arr) : false;
 }
 
 bool Array::try_encode(Array& arr) const
@@ -755,18 +751,18 @@ bool Array::try_decode()
 
 int64_t Array::get_encoded(size_t ndx) const noexcept
 {
-    return s_encode.get(*this, ndx);
+    return m_encode.get(*this, ndx);
 }
 
 void Array::set_encoded(size_t ndx, int64_t val)
 {
-    s_encode.set_direct(*this, ndx, val);
+    m_encode.set_direct(*this, ndx, val);
 }
 
 int64_t Array::sum(size_t start, size_t end) const
 {
     if (is_encoded())
-        return s_encode.sum(*this, start, end);
+        return m_encode.sum(*this, start, end);
     REALM_TEMPEX(return sum, m_width, (start, end));
 }
 
@@ -779,7 +775,7 @@ int64_t Array::sum(size_t start, size_t end) const
     REALM_ASSERT_EX(end <= m_size && start <= end, start, end, m_size);
 
     if (is_encoded())
-        return s_encode.sum(*this, start, end);
+        return m_encode.sum(*this, start, end);
 
     if (start == end)
         return 0;
@@ -1351,7 +1347,7 @@ void Array::get_chunk(size_t ndx, int64_t res[8]) const noexcept
 
 void Array::get_chunk_encoded(size_t ndx, int64_t res[8]) const noexcept
 {
-    s_encode.get_chunk(*this, ndx, res);
+    m_encode.get_chunk(*this, ndx, res);
 }
 
 template <>
@@ -1488,14 +1484,17 @@ size_t Array::upper_bound_int(int64_t value) const noexcept
 size_t Array::find_first(int64_t value, size_t start, size_t end) const
 {
     if (is_encoded())
-        return s_encode.find_first<Equal>(*this, value, start, end);
+        return m_encode.find_first<Equal>(*this, value, start, end);
     return find_first<Equal>(value, start, end);
 }
 
 int_fast64_t Array::get(const char* header, size_t ndx) noexcept
 {
-    if (NodeHeader::get_kind(header) == 'B')
-        return s_encode.get(header, ndx);
+    if (NodeHeader::get_kind(header) == 'B') {
+        ArrayEncode encoder;
+        encoder.init(header);
+        return encoder.get(header, ndx);
+    }
 
     auto sz = get_size_from_header(header);
     REALM_ASSERT(ndx < sz);
