@@ -1384,7 +1384,6 @@ void SessionWrapper::async_wait_for(bool upload_completion, bool download_comple
             throw Exception(status);
 
         REALM_ASSERT(self->m_actualized);
-        REALM_ASSERT(!self->m_finalized);
         if (REALM_UNLIKELY(!self->m_sess)) {
             // Already finalized
             handler({ErrorCodes::OperationAborted, "Session finalized before callback could run"}); // Throws
@@ -1516,7 +1515,6 @@ void SessionWrapper::refresh(std::string signed_access_token)
             throw Exception(status);
 
         REALM_ASSERT(self->m_actualized);
-        REALM_ASSERT(!self->m_finalized);
         if (REALM_UNLIKELY(!self->m_sess))
             return; // Already finalized
         self->m_signed_access_token = std::move(token);
