@@ -77,6 +77,11 @@ private:
 };
 } // namespace
 
+bool RealmConfig::needs_file_format_upgrade() const
+{
+    return DB::needs_file_format_upgrade(path, encryption_key);
+}
+
 Realm::Realm(Config config, util::Optional<VersionID> version, std::shared_ptr<_impl::RealmCoordinator> coordinator,
              Private)
     : m_config(std::move(config))
