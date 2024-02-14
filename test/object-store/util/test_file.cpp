@@ -70,7 +70,7 @@ TestFile::TestFile()
     disable_sync_to_disk();
     m_temp_dir = util::make_temp_dir();
     path = (fs::path(m_temp_dir) / "realm.XXXXXX").string();
-    util::Logger::set_default_level_threshold(realm::util::Logger::Level::TEST_LOGGING_LEVEL);
+    util::Logger::set_default_level_threshold(TestSyncManager::default_log_level());
     if (const char* crypt_key = test_util::crypt_key()) {
         encryption_key = std::vector<char>(crypt_key, crypt_key + 64);
     }
@@ -340,7 +340,7 @@ TestAppSession::TestAppSession(AppSession session,
     if (!m_transport)
         m_transport = instance_of<SynchronousTestTransport>;
     auto app_config = get_config(m_transport, *m_app_session);
-    util::Logger::set_default_level_threshold(realm::util::Logger::Level::TEST_LOGGING_LEVEL);
+    util::Logger::set_default_level_threshold(TestSyncManager::default_log_level());
     set_app_config_defaults(app_config, m_transport);
 
     util::try_make_dir(m_base_file_path);
@@ -422,6 +422,21 @@ std::vector<bson::BsonDocument> TestAppSession::get_documents(SyncUser& user, co
 #endif // REALM_ENABLE_AUTH_TESTS
 
 // MARK: - TestSyncManager
+
+TestSyncManager::LoggerLevel TestSyncManager::default_log_level()
+{
+#ifndef TEST_LOGGING_LEVEL
+#define TEST_LOGGING_LEVEL off
+#endif
+
+    static LoggerLevel log_level = []() {
+        LoggerLevel level = LoggerLevel::TEST_LOGGING_LEVEL;
+        realm::util::Logger::get_env_log_level_if_set(level);
+        return level;
+    }();
+
+    return log_level;
+}
 
 TestSyncManager::TestSyncManager(const Config& config, const SyncServer::Config& sync_server_config)
     : transport(config.transport ? config.transport : std::make_shared<Transport>(network_callback))

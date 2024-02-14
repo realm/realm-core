@@ -152,20 +152,12 @@ if(REALM_ENABLE_SYNC)
     endif()
 endif()
 
-if(REALM_TEST_LOGGING)
-    target_compile_definitions(ObjectStoreTestLib PRIVATE
-        TEST_ENABLE_LOGGING=1
-    )
-
-    if(REALM_TEST_LOGGING_LEVEL)
-        message(STATUS "Test logging level: ${REALM_TEST_LOGGING_LEVEL}")
-        target_compile_definitions(ObjectStoreTestLib PRIVATE
-            TEST_LOGGING_LEVEL=${REALM_TEST_LOGGING_LEVEL}
-        )
-    else()
-        message(STATUS "Test logging enabled")
-    endif()
+set(REALM_TEST_LOGGING_LEVEL "off" CACHE STRING "Object-store tests logging level")
+if ("${REALM_TEST_LOGGING_LEVEL}" STREQUAL "")
+    set(REALM_TEST_LOGGING_LEVEL "off" CACHE STRING "Object-store tests logging level" FORCE)
 endif()
+message(STATUS "Test logging level: ${REALM_TEST_LOGGING_LEVEL}")
+target_compile_definitions(ObjectStoreTestLib PRIVATE TEST_LOGGING_LEVEL=${REALM_TEST_LOGGING_LEVEL})
 
 # Optional extra time to add to test timeout values
 if(REALM_TEST_TIMEOUT_EXTRA)

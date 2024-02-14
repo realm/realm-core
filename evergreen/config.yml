@@ -136,7 +136,6 @@ functions:
               set_cmake_var realm_vars CMAKE_TOOLCHAIN_FILE PATH "${cmake_toolchain_file}"
           fi
 
-          set_cmake_var realm_vars REALM_TEST_LOGGING BOOL On
           set_cmake_var realm_vars REALM_TEST_LOGGING_LEVEL STRING "${test_logging_level|debug}"
 
           if [[ -n "${test_timeout_extra|}" ]]; then

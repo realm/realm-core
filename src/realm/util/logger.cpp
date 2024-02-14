@@ -20,6 +20,7 @@
 
 #include <iostream>
 #include <mutex>
+#include <sstream>
 
 namespace realm::util {
 
@@ -108,6 +109,20 @@ const std::string_view Logger::level_to_string(Level level) noexcept
     }
     REALM_ASSERT(false);
     return "";
+}
+
+bool Logger::get_env_log_level_if_set(Level& level) noexcept
+{
+    const char* str = getenv("UNITTEST_LOG_LEVEL");
+    if (!str || strlen(str) == 0)
+        return true;
+
+    std::istringstream in(str);
+    in.imbue(std::locale::classic());
+    in.flags(in.flags() & ~std::ios_base::skipws); // Do not accept white space
+    in >> level;
+
+    return in && in.get() == std::char_traits<char>::eof();
 }
 
 void StderrLogger::do_log(Level level, const std::string& message)

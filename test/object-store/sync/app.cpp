@@ -3929,7 +3929,6 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
     std::string base_file_path = util::make_temp_dir() + random_string(10);
     auto redir_transport = std::make_shared<BaseUrlTransport>();
     AutoVerifiedEmailCredentials creds;
-    util::Logger::set_default_level_threshold(realm::util::Logger::Level::TEST_LOGGING_LEVEL);
     auto logger = util::Logger::get_default_logger();
 
     App::Config app_config = {"fake-app-id"};

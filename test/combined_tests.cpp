@@ -30,9 +30,10 @@ int main(int argc, const char* argv[])
         return 1;
     int status = test_all();
     if (status) {
-        std::cerr << "core and sync tests failed: " << status << std::endl;
+        std::cerr << "(!) Core/Sync tests failed: " << status << std::endl;
         return status;
     }
-    std::cout << "core and sync tests passed\n";
+    std::cout << "--------------------------\n"
+              << "(+) Core/Sync tests passed\n\n";
     return run_object_store_tests(argc, argv);
 }

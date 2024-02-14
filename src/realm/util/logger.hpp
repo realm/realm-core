@@ -107,6 +107,7 @@ public:
     static void set_default_level_threshold(Level level) noexcept;
     static Level get_default_level_threshold() noexcept;
     static const std::string_view level_to_string(Level level) noexcept;
+    static bool get_env_log_level_if_set(Level& level) noexcept;
 
 protected:
     // Used by subclasses that link to a base logger
