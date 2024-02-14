@@ -534,6 +534,7 @@ std::unique_ptr<ArrayPayload> TwoColumnsNodeBase::update_cached_leaf_pointers_fo
         case col_type_TypedLink:
         case col_type_BackLink:
         case col_type_LinkList:
+        case col_type_EnumString:
             break;
     };
     REALM_UNREACHABLE();
@@ -617,6 +618,7 @@ size_t size_of_list_from_ref(ref_type ref, Allocator& alloc, ColumnType col_type
         }
         case col_type_Link:
         case col_type_BackLink:
+        case col_type_EnumString:
             break;
     }
     REALM_TERMINATE("Unsupported column type.");

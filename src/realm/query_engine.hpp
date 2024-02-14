@@ -1539,9 +1539,9 @@ protected:
 
 // Conditions for enumerated strings. TODO: Optimizations
 template <class TConditionFunction>
-class EnumStringNode : public IntegerNode<ArrayInteger, TConditionFunction> {
+class EnumStringNode : public IntegerNodeBase<ArrayInteger> {
 public:
-    using Base = IntegerNode<ArrayInteger, TConditionFunction>;
+    using Base = IntegerNodeBase<ArrayInteger>;
     EnumStringNode(const Table& table, StringData v, ColKey column)
         : Base(table.search_enum_string(column, v), column)
         , m_table(table)
@@ -1639,6 +1639,7 @@ protected:
     StringData m_value;
     const Table& m_table;
 };
+#if 0
 template <>
 class EnumStringNode<Equal> : public IntegerNode<ArrayInteger, Equal> {
 public:
@@ -1669,7 +1670,7 @@ public:
         return std::unique_ptr<ParentNode>(new EnumStringNode<Equal>(*this));
     }
 };
-
+#endif
 // Conditions for strings. Note that Equal is specialized later in this file!
 template <class TConditionFunction>
 class StringNode : public StringNodeBase {

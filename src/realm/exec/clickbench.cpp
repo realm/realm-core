@@ -301,15 +301,15 @@ void import(const char* filename)
         for (auto& val : buf->values) {
             Obj o = t->create_object(ObjKey(), val);
             // verify
-            /*
-                        for (auto& e : val) {
-                            if (e.col_key.get_type() == col_type_EnumString) {
-                                auto got_string = o.get<StringData>(e.col_key);
-                                auto the_string = e.value.get_string();
-                                REALM_ASSERT(got_string == the_string);
-                            }
-                        }
-                        */
+#if 0
+            for (auto& e : val) {
+                if (e.col_key.get_type() == col_type_EnumString) {
+                    auto got_string = o.get<StringData>(e.col_key);
+                    auto the_string = e.value.get_string();
+                    REALM_ASSERT(got_string == the_string);
+                }
+            }
+#endif
         }
         resp.send(buf);
         if (buf_cnt++ > bufs_per_commit) {
