@@ -84,6 +84,8 @@ public:
     virtual FullPath get_path() const = 0;
     // Return path from owning object
     virtual Path get_short_path() const = 0;
+    // Return column of owning property
+    virtual ColKey get_col_key() const noexcept = 0;
     // Return path from owning object
     virtual StablePath get_stable_path() const = 0;
     // Add a translation of Index to PathElement

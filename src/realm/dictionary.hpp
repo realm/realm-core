@@ -196,6 +196,11 @@ public:
         return Base::get_short_path();
     }
 
+    ColKey get_col_key() const noexcept override
+    {
+        return Base::get_col_key();
+    }
+
     StablePath get_stable_path() const override
     {
         return Base::get_stable_path();

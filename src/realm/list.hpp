@@ -484,6 +484,11 @@ public:
         return Base::get_stable_path();
     }
 
+    ColKey get_col_key() const noexcept override
+    {
+        return Base::get_col_key();
+    }
+
     void add_index(Path& path, const Index& ndx) const final;
     size_t find_index(const Index& ndx) const final;
 

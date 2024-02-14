@@ -436,13 +436,17 @@ void Dictionary::insert_collection(const PathElement& path_elem, CollectionType 
 
     check_level();
     ensure_created();
-    m_values->ensure_keys();
-    auto [it, inserted] = insert(path_elem.get_key(), Mixed(0, dict_or_list));
-    int64_t key = generate_key(size());
-    while (m_values->find_key(key) != realm::not_found) {
-        key++;
+    Mixed new_val(0, dict_or_list);
+    auto old_val = try_get(path_elem.get_key());
+    if (!old_val || *old_val != new_val) {
+        m_values->ensure_keys();
+        auto [it, inserted] = insert(path_elem.get_key(), new_val);
+        int64_t key = generate_key(size());
+        while (m_values->find_key(key) != realm::not_found) {
+            key++;
+        }
+        m_values->set_key(it.index(), key);
     }
-    m_values->set_key(it.index(), key);
 }
 
 DictionaryPtr Dictionary::get_dictionary(const PathElement& path_elem) const

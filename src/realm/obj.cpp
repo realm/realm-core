@@ -1087,6 +1087,11 @@ Path Obj::get_short_path() const noexcept
     return {};
 }
 
+ColKey Obj::get_col_key() const noexcept
+{
+    return {};
+}
+
 StablePath Obj::get_stable_path() const noexcept
 {
     return {};

@@ -35,6 +35,10 @@ public:
     {
         return {};
     }
+    ColKey get_col_key() const noexcept final
+    {
+        return {};
+    }
     void add_index(Path&, const Index&) const noexcept final {}
     size_t find_index(const Index&) const noexcept final
     {
@@ -478,7 +482,7 @@ public:
     }
 
     // Overriding members of CollectionBase:
-    ColKey get_col_key() const noexcept final
+    ColKey get_col_key() const noexcept override
     {
         return m_col_key;
     }
@@ -618,6 +622,7 @@ protected:
     CollectionBaseImpl(CollectionParent& parent, CollectionParent::Index index) noexcept
         : m_obj_mem(parent.get_object())
         , m_index(index)
+        , m_col_key(parent.get_col_key())
         , m_parent(&parent)
         , m_alloc(&m_obj_mem.get_alloc())
     {
