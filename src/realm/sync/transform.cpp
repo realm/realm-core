@@ -1037,71 +1037,40 @@ struct MergeUtils {
     // NOTE: `is_prefix_of()` should only return true if the left is a strictly
     // shorter path than the right, and the entire left path is the initial
     // sequence of the right.
+    // 'next_element' represents the next element in the right path if the left
+    // path is a prefix of the right path.
 
-    bool is_prefix_of(const Instruction::AddTable& left, const Instruction::TableInstruction& right) const noexcept
-    {
-        return same_table(left, right);
-    }
-
-    bool is_prefix_of(const Instruction::EraseTable& left, const Instruction::TableInstruction& right) const noexcept
-    {
-        return same_table(left, right);
-    }
-
-    bool is_prefix_of(const Instruction::AddColumn&, const Instruction::TableInstruction&) const noexcept
+    bool is_prefix_of(const Instruction::EraseObject&, const Instruction::TableInstruction&) const noexcept
     {
         // Right side is a schema instruction.
         return false;
     }
 
-    bool is_prefix_of(const Instruction::EraseColumn&, const Instruction::TableInstruction&) const noexcept
-    {
-        // Right side is a schema instruction.
-        return false;
-    }
-
-    bool is_prefix_of(const Instruction::AddColumn& left, const Instruction::ObjectInstruction& right) const noexcept
-    {
-        return same_column(left, right);
-    }
-
-    bool is_prefix_of(const Instruction::EraseColumn& left,
-                      const Instruction::ObjectInstruction& right) const noexcept
-    {
-        return same_column(left, right);
-    }
-
-    bool is_prefix_of(const Instruction::ObjectInstruction&, const Instruction::TableInstruction&) const noexcept
-    {
-        // Right side is a schema instruction.
-        return false;
-    }
-
-    bool is_prefix_of(const Instruction::ObjectInstruction& left,
-                      const Instruction::PathInstruction& right) const noexcept
+    bool is_prefix_of(const Instruction::EraseObject& left, const Instruction::PathInstruction& right) const noexcept
     {
         return same_object(left, right);
     }
 
-    bool is_prefix_of(const Instruction::PathInstruction&, const Instruction::TableInstruction&) const noexcept
+    std::optional<Instruction::Path::Element> is_prefix_of(const Instruction::PathInstruction&,
+                                                           const Instruction::TableInstruction&) const noexcept
     {
         // Path instructions can never be full prefixes of table-level instructions. Note that this also covers
         // ObjectInstructions.
-        return false;
+        return std::nullopt;
     }
 
-    bool is_prefix_of(const Instruction::PathInstruction& left,
-                      const Instruction::PathInstruction& right) const noexcept
+    std::optional<Instruction::Path::Element> is_prefix_of(const Instruction::PathInstruction& left,
+                                                           const Instruction::PathInstruction& right) const noexcept
     {
         if (left.path.size() < right.path.size() && same_field(left, right)) {
             for (size_t i = 0; i < left.path.size(); ++i) {
                 if (!same_path_element(left.path[i], right.path[i])) {
-                    return false;
+                    return std::nullopt;
                 }
             }
-            return true;
+            return right.path[left.path.size()];
         }
-        return false;
+        return std::nullopt;
     }
 
     // True if the left side is an instruction that touches a container within
@@ -1382,7 +1351,7 @@ DEFINE_MERGE_NOOP(Instruction::SetErase, Instruction::AddTable);
 
 DEFINE_NESTED_MERGE(Instruction::EraseTable)
 {
-    if (is_prefix_of(outer, inner)) {
+    if (same_table(outer, inner)) {
         inner_side.discard();
     }
 }
@@ -1499,15 +1468,27 @@ DEFINE_NESTED_MERGE(Instruction::Update)
 {
     using Type = Instruction::Payload::Type;
 
-    if (outer.value.type == Type::ObjectValue || outer.value.type == Type::Dictionary) {
-        // Creating an embedded object or a dictionary is an idempotent
-        // operation, and should not eliminate updates to the subtree.
+    if (outer.value.type == Type::ObjectValue) {
+        // Creating an embedded object is an idempotent operation, and should not eliminate updates to the subtree.
         return;
     }
 
     // Setting a value higher up in the hierarchy overwrites any modification to
     // the inner value, regardless of when this happened.
-    if (is_prefix_of(outer, inner)) {
+    if (auto next_element = is_prefix_of(outer, inner); next_element) {
+        // REALM_ASSERT(next_element);
+        //  If this is a collection in mixed, we will allow the inner instruction
+        //  to pass so long as it references the proper type (list or dictionary).
+        if (outer.value.type == Type::List) {
+            if (mpark::holds_alternative<uint32_t>(*next_element)) {
+                return;
+            }
+        }
+        else if (outer.value.type == Type::Dictionary) {
+            if (mpark::holds_alternative<InternString>(*next_element)) {
+                return;
+            }
+        }
         inner_side.discard();
     }
 }
@@ -1537,17 +1518,27 @@ DEFINE_MERGE(Instruction::Update, Instruction::Update)
         }
 
         if (left.value.type != right.value.type) {
-            // Embedded object / dictionary creation should always lose to an
-            // Update(value), because these structures are nested, and we need to
-            // discard any update inside the structure.
-            if (left.value.type == Type::Dictionary || left.value.type == Type::ObjectValue) {
+            // Embedded object creation should always lose to an Update(value),
+            // because these structures are nested, and we need to discard any
+            // update inside the structure.
+            if (left.value.type == Type::ObjectValue) {
                 left_side.discard();
                 return;
             }
-            else if (right.value.type == Type::Dictionary || right.value.type == Type::ObjectValue) {
+            else if (right.value.type == Type::ObjectValue) {
                 right_side.discard();
                 return;
             }
+        }
+
+        // Updates to List or Dictionary are idempotent. If both sides are setting to the same value,
+        // let them both pass through. It is important that the instruction application rules reflect this.
+        // If it is not two lists or dictionaries, then the normal last-writer-wins rules will take effect below.
+        if (left.value.type == Type::List && right.value.type == Type::List) {
+            return;
+        }
+        else if (left.value.type == Type::Dictionary && right.value.type == Type::Dictionary) {
+            return;
         }
 
         // CONFLICT: Two updates of the same element.
@@ -1697,7 +1688,13 @@ DEFINE_MERGE_NOOP(Instruction::SetErase, Instruction::Update);
 
 /// AddInteger rules
 
-DEFINE_NESTED_MERGE_NOOP(Instruction::AddInteger);
+DEFINE_NESTED_MERGE(Instruction::AddInteger)
+{
+    if (is_prefix_of(outer, inner)) {
+        inner_side.discard();
+    }
+}
+
 DEFINE_MERGE_NOOP(Instruction::AddInteger, Instruction::AddInteger);
 DEFINE_MERGE_NOOP(Instruction::AddColumn, Instruction::AddInteger);
 DEFINE_MERGE_NOOP(Instruction::EraseColumn, Instruction::AddInteger);
