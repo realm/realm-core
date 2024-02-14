@@ -19,25 +19,25 @@
 #ifndef REALM_TEST_UTIL_CRYPT_KEY_HPP
 #define REALM_TEST_UTIL_CRYPT_KEY_HPP
 
-#include <string>
+#include <realm/util/file.hpp>
 
 namespace realm {
 namespace test_util {
 
 /// Returns a non-null encryption key if encryption is enabled at compile-time
 /// (REALM_ENABLE_ENCRYPTION), and either \a always is true or global mode
-/// "always encrypt" is enabled. Otherwise it returns null. The global mode
+/// "always encrypt" is enabled. Otherwise it returns none. The global mode
 /// "always encrypt" can be enabled by calling always_encrypt(), but pay
 /// attention to the rules governing its use.
 ///
-/// The returned string, if not null, is null terminated.
-///
 /// This function is thread-safe as long as there are no concurrent invocations
 /// of always_encrypt().
-const char* crypt_key(bool always = false);
+std::optional<util::File::EncryptionKeyType> crypt_key(const char* raw_value, bool always = false);
 
-/// Returns the empty string when, and only when crypt_key() returns null.
-std::string crypt_key_2(bool always = false);
+inline std::optional<util::File::EncryptionKeyType> crypt_key(bool always = false)
+{
+    return crypt_key("1234567890123456789012345678901123456789012345678901234567890123", always);
+}
 
 /// Returns true if global mode "always encrypt" is enabled.
 ///
@@ -50,17 +50,6 @@ bool is_always_encrypt_enabled();
 /// This function is **not** thread-safe. If you call it, be sure to call it
 /// prior to any invocation of crypt_key().
 void enable_always_encrypt();
-
-
-// Implementation
-
-inline std::string crypt_key_2(bool always)
-{
-    if (const char* key = crypt_key(always)) // Throws
-        return {key};
-    return {};
-}
-
 } // namespace test_util
 } // namespace realm
 

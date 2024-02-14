@@ -89,7 +89,10 @@ RLM_API bool realm_convert_with_path(const realm_t* realm, const char* path, rea
         Realm::Config config;
         config.path = path;
         if (encryption_key.data) {
-            config.encryption_key.assign(encryption_key.data, encryption_key.data + encryption_key.size);
+            std::array<uint8_t, 64> raw_key;
+            REALM_ASSERT(raw_key.size() == encryption_key.size);
+            std::copy_n(encryption_key.data, raw_key.size(), raw_key.begin());
+            config.encryption_key.emplace(raw_key);
         }
         (*realm)->convert(config, merge_with_existing);
         return true;

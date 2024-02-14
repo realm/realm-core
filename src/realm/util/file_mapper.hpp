@@ -24,6 +24,7 @@
 #include <realm/util/thread.hpp>
 #include <realm/util/encrypted_file_mapping.hpp>
 #include <realm/util/functional.hpp>
+#include <realm/util/sensitive_buffer.hpp>
 
 #include <unordered_map>
 #include <unordered_set>
@@ -35,12 +36,12 @@ struct FileAttributes {
     FileDesc fd;
     std::string path;
     File::AccessMode access;
-    const char* encryption_key = nullptr;
+    std::optional<File::EncryptionKeyType> encryption_key;
 };
 
 void* mmap(const FileAttributes& file, size_t size, size_t offset);
 void* mmap_fixed(FileDesc fd, void* address_request, size_t size, File::AccessMode access, size_t offset,
-                 const char* enc_key);
+                 const std::optional<File::EncryptionKeyType>& enc_key = std::nullopt);
 void* mmap_reserve(FileDesc fd, size_t size, size_t offset);
 void munmap(void* addr, size_t size);
 void* mremap(const FileAttributes& file, size_t file_offset, void* old_addr, size_t old_size, size_t new_size);
@@ -95,7 +96,7 @@ SharedFileInfo* get_file_info_for_file(File& file);
 // for optimization purposes.
 void* mmap(const FileAttributes& file, size_t size, size_t offset, EncryptedFileMapping*& mapping);
 void* mmap_fixed(FileDesc fd, void* address_request, size_t size, File::AccessMode access, size_t offset,
-                 const char* enc_key, EncryptedFileMapping* mapping);
+                 const std::optional<File::EncryptionKeyType>& enc_key, EncryptedFileMapping* mapping);
 
 void* mmap_reserve(const FileAttributes& file, size_t size, size_t offset, EncryptedFileMapping*& mapping);
 

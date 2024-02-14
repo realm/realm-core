@@ -1090,7 +1090,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
         }
 
         SECTION("should honor encryption key for downloaded Realm") {
-            local_config.encryption_key.resize(64, 'a');
+            local_config.encryption_key = util::File::EncryptionKeyType({'a'});
 
             make_reset(local_config, remote_config)
                 ->on_post_reset([&](SharedRealm realm) {

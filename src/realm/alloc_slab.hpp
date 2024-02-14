@@ -19,6 +19,7 @@
 #ifndef REALM_ALLOC_SLAB_HPP
 #define REALM_ALLOC_SLAB_HPP
 
+#include <array>
 #include <cstdint> // unint8_t etc
 #include <vector>
 #include <map>
@@ -30,6 +31,7 @@
 #include <realm/util/features.h>
 #include <realm/util/file.hpp>
 #include <realm/util/functional.hpp>
+#include <realm/util/sensitive_buffer.hpp>
 #include <realm/util/thread.hpp>
 #include <realm/alloc.hpp>
 #include <realm/disable_sync_to_disk.hpp>
@@ -93,7 +95,7 @@ public:
     /// the header, otherwise it will result in a race condition.
     ///
     /// \var Config::encryption_key
-    /// 32-byte key to use to encrypt and decrypt the backing storage,
+    /// 64-byte key to use to encrypt and decrypt the backing storage,
     /// or nullptr to disable encryption.
     ///
     /// \var Config::session_initiator
@@ -116,7 +118,7 @@ public:
         bool session_initiator = false;
         bool clear_file = false;
         bool disable_sync = false;
-        const char* encryption_key = nullptr;
+        std::optional<util::File::EncryptionKeyType> encryption_key = std::nullopt;
     };
 
     struct Retry {};

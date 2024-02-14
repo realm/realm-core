@@ -4180,7 +4180,7 @@ void do_write_work(std::string path, size_t id, size_t num_rows)
     const size_t payload_length_small = 10;
     const size_t payload_length_large = 5000;   // > 4096 == page_size
     Random random(random_int<unsigned long>()); // Seed from slow global generator
-    const char* key = crypt_key(true);
+    auto key = crypt_key(true);
     for (size_t rep = 0; rep < num_iterations; ++rep) {
         std::unique_ptr<Replication> hist(make_in_realm_history());
         DBRef sg = DB::create(*hist, path, DBOptions(key));
@@ -4206,7 +4206,7 @@ void do_write_work(std::string path, size_t id, size_t num_rows)
 void do_read_verify(std::string path)
 {
     Random random(random_int<unsigned long>()); // Seed from slow global generator
-    const char* key = crypt_key(true);
+    auto key = crypt_key(true);
     while (true) {
         std::unique_ptr<Replication> hist(make_in_realm_history());
         DBRef sg = DB::create(*hist, path, DBOptions(key));
@@ -4252,7 +4252,7 @@ TEST_IF(Thread_AsynchronousIODataConsistency, false)
     const int num_writer_threads = 2;
     const int num_reader_threads = 2;
     const int num_rows = 200; // 2 + REALM_MAX_BPNODE_SIZE;
-    const char* key = crypt_key(true);
+    auto key = crypt_key(true);
     std::unique_ptr<Replication> hist(make_in_realm_history());
     DBRef sg = DB::create(*hist, path, DBOptions(key));
     {
@@ -5700,7 +5700,7 @@ TEST(LangBindHelper_CopyOnWriteOverflow)
 TEST(LangBindHelper_RollbackOptimize)
 {
     SHARED_GROUP_TEST_PATH(path);
-    const char* key = crypt_key();
+    auto key = crypt_key();
     std::unique_ptr<Replication> hist_w(make_in_realm_history());
     DBRef sg_w = DB::create(*hist_w, path, DBOptions(key));
     auto g = sg_w->start_write();
@@ -5722,7 +5722,7 @@ TEST(LangBindHelper_RollbackOptimize)
 TEST(LangBindHelper_BinaryReallocOverMax)
 {
     SHARED_GROUP_TEST_PATH(path);
-    const char* key = crypt_key();
+    auto key = crypt_key();
     std::unique_ptr<Replication> hist_w(make_in_realm_history());
     DBRef sg_w = DB::create(*hist_w, path, DBOptions(key));
     auto g = sg_w->start_write();
@@ -5763,7 +5763,7 @@ TEST(LangBindHelper_OpenAsEncrypted)
         }
     }
     {
-        const char* key = crypt_key(true);
+        auto key = crypt_key(true);
         std::unique_ptr<Replication> hist_encrypt(make_in_realm_history());
         CHECK_THROW(DB::create(*hist_encrypt, path, DBOptions(key)), InvalidDatabase);
     }
@@ -5777,7 +5777,7 @@ TEST(LangBindHelper_OpenAsEncrypted)
 TEST(LangBindHelper_EnumColumnAddZeroRows)
 {
     SHARED_GROUP_TEST_PATH(path);
-    const char* key = nullptr;
+    std::optional<File::EncryptionKeyType> key = std::nullopt;
     std::unique_ptr<Replication> hist(make_in_realm_history());
     DBRef sg = DB::create(*hist, path, DBOptions(key));
     auto g = sg->start_write();

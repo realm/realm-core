@@ -198,7 +198,7 @@ void migrate_to_v7(std::shared_ptr<Realm> old_realm, std::shared_ptr<Realm> real
 // MARK: - Sync metadata manager
 
 SyncMetadataManager::SyncMetadataManager(std::string path, bool should_encrypt,
-                                         util::Optional<std::vector<char>> encryption_key)
+                                         const std::optional<util::File::EncryptionKeyType>& encryption_key)
 {
     constexpr uint64_t SCHEMA_VERSION = 7;
 
@@ -211,8 +211,7 @@ SyncMetadataManager::SyncMetadataManager(std::string path, bool should_encrypt,
     m_metadata_config.schema_version = SCHEMA_VERSION;
     m_metadata_config.schema_mode = SchemaMode::Automatic;
     m_metadata_config.scheduler = util::Scheduler::make_dummy();
-    if (encryption_key)
-        m_metadata_config.encryption_key = std::move(*encryption_key);
+    m_metadata_config.encryption_key = encryption_key;
     m_metadata_config.automatically_handle_backlinks_in_migrations = true;
     m_metadata_config.migration_function = [](std::shared_ptr<Realm> old_realm, std::shared_ptr<Realm> realm,
                                               Schema&) {
@@ -538,7 +537,7 @@ std::shared_ptr<Realm> SyncMetadataManager::open_realm(bool should_encrypt, bool
     // when we have a key but no metadata Realm.
     auto key = keychain::get_existing_metadata_realm_key();
     if (key) {
-        m_metadata_config.encryption_key = *key;
+        m_metadata_config.encryption_key = key;
         if (auto realm = try_get_realm())
             return realm;
     }
@@ -547,7 +546,7 @@ std::shared_ptr<Realm> SyncMetadataManager::open_realm(bool should_encrypt, bool
     // decrypt it, then we might have an unencrypted metadata Realm resulting
     // from a previous run being unable to access the keychain.
     if (util::File::exists(m_metadata_config.path)) {
-        m_metadata_config.encryption_key.clear();
+        m_metadata_config.encryption_key.reset();
         if (auto realm = try_get_realm())
             return realm;
 
@@ -561,8 +560,8 @@ std::shared_ptr<Realm> SyncMetadataManager::open_realm(bool should_encrypt, bool
     // just create an unencrypted Realm file.
     if (!key)
         key = keychain::create_new_metadata_realm_key();
-    if (key)
-        m_metadata_config.encryption_key = std::move(*key);
+
+    m_metadata_config.encryption_key = std::move(key);
     return get_realm();
 #else  // REALM_PLATFORM_APPLE
     REALM_UNREACHABLE();

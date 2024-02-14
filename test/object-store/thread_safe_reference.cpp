@@ -72,7 +72,7 @@ TEST_CASE("thread safe reference") {
     config.automatic_change_notifications = false;
     config.cache = false;
     config.in_memory = true;
-    config.encryption_key = std::vector<char>();
+    config.encryption_key.reset();
     config.schema = schema;
     auto r = Realm::get_shared_realm(config);
 

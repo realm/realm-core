@@ -22,6 +22,8 @@
 #include <functional>
 #include <string>
 #include <realm/backup_restore.hpp>
+#include <realm/util/file.hpp>
+#include <realm/util/sensitive_buffer.hpp>
 
 namespace realm {
 
@@ -34,13 +36,14 @@ struct DBOptions {
         Unsafe // If you use this, you loose ACID property
     };
 
-    explicit DBOptions(Durability level = Durability::Full, const char* key = nullptr)
+    explicit DBOptions(Durability level = Durability::Full,
+                       const std::optional<util::File::EncryptionKeyType>& key = std::nullopt)
         : durability(level)
         , encryption_key(key)
     {
     }
 
-    explicit DBOptions(const char* key)
+    explicit DBOptions(const std::optional<util::File::EncryptionKeyType>& key)
         : encryption_key(key)
     {
     }
@@ -48,9 +51,8 @@ struct DBOptions {
     /// The persistence level of the Realm file. See Durability.
     Durability durability = Durability::Full;
 
-    /// The key to encrypt and decrypt the Realm file with, or nullptr to
-    /// indicate that encryption should not be used.
-    const char* encryption_key;
+    /// The key to encrypt and decrypt the Realm file with.
+    std::optional<util::File::EncryptionKeyType> encryption_key;
 
     /// If \a allow_file_format_upgrade is set to `true`, this function will
     /// automatically upgrade the file format used in the specified Realm file

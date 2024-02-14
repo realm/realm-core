@@ -21,9 +21,11 @@
 
 #include <string>
 #include <memory>
+#include <optional>
 
 #include <realm/string_data.hpp>
 #include <realm/util/features.h>
+#include <realm/util/file.hpp>
 
 #define TEST_PATH_HELPER(class_name, var_name, suffix)                                                               \
     class_name var_name(realm::test_util::get_test_path(test_context.get_test_name(), "." #var_name "." suffix))
@@ -178,7 +180,8 @@ private:
     std::size_t m_counter = 0;
 };
 
-std::shared_ptr<DB> get_test_db(const std::string& path, const char* crypt_key = nullptr);
+std::shared_ptr<DB> get_test_db(const std::string& path,
+                                const std::optional<util::File::EncryptionKeyType>& crypt_key = std::nullopt);
 
 } // namespace test_util
 } // namespace realm

@@ -69,7 +69,7 @@ Group::Group()
 }
 
 
-Group::Group(const std::string& file_path, const char* encryption_key)
+Group::Group(const std::string& file_path, const std::optional<File::EncryptionKeyType>& encryption_key)
     : m_local_alloc(new SlabAlloc) // Throws
     , m_alloc(*m_local_alloc)
     , m_top(m_alloc)
@@ -960,7 +960,8 @@ void Group::write(std::ostream& out, bool pad_for_encryption, uint_fast64_t vers
     write(out, m_file_format_version, writer, no_top_array, pad_for_encryption, version_number); // Throws
 }
 
-void Group::write(File& file, const char* encryption_key, uint_fast64_t version_number, TableWriter& writer) const
+void Group::write(File& file, const std::optional<File::EncryptionKeyType>& encryption_key,
+                  uint_fast64_t version_number, TableWriter& writer) const
 {
     REALM_ASSERT(file.get_size() == 0);
 
@@ -981,13 +982,13 @@ void Group::write(File& file, const char* encryption_key, uint_fast64_t version_
 
     std::ostream out(&streambuf);
     out.exceptions(std::ios_base::failbit | std::ios_base::badbit);
-    write(out, encryption_key != 0, version_number, writer);
+    write(out, encryption_key.has_value(), version_number, writer);
     int sync_status = streambuf.pubsync();
     REALM_ASSERT(sync_status == 0);
 }
 
-void Group::write(const std::string& path, const char* encryption_key, uint64_t version_number,
-                  bool write_history) const
+void Group::write(const std::string& path, const std::optional<File::EncryptionKeyType>& encryption_key,
+                  uint64_t version_number, bool write_history) const
 {
     File file;
     int flags = 0;
