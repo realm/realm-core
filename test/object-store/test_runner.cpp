@@ -138,7 +138,6 @@ public:
     }
     void testCaseStarting(TestCaseInfo const& testCaseInfo) override
     {
-        std::cerr << "Starting test case \"" << testCaseInfo.name << "\"\n";
         m_results.emplace(std::make_pair(testCaseInfo.name, TestResult{}));
         Base::testCaseStarting(testCaseInfo);
     }
@@ -156,7 +155,6 @@ public:
             it->second.status = "fail";
         }
         it->second.end_time = std::chrono::system_clock::now();
-        std::cerr << "Ending test case \"" << testCaseStats.testInfo->name << "\"\n";
         Base::testCaseEnded(testCaseStats);
     }
     void sectionStarting(SectionInfo const& sectionInfo) override
@@ -167,7 +165,6 @@ public:
         else {
             m_pending_name += "::" + sectionInfo.name;
         }
-        std::cerr << "Starting test section \"" << m_pending_name << "\"\n"; 
         m_pending_test = {};
         Base::sectionStarting(sectionInfo);
     }
@@ -182,7 +179,6 @@ public:
             }
             m_pending_test.end_time = std::chrono::system_clock::now();
             m_results.emplace(std::make_pair(m_pending_name, m_pending_test));
-            std::cerr << "Ending test section \"" << m_pending_name << "\"\n";
             m_pending_name = "";
         }
         Base::sectionEnded(sectionStats);
