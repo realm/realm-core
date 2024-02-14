@@ -41,6 +41,7 @@
 #if REALM_ENABLE_SYNC
 #include "util/sync/flx_sync_harness.hpp"
 #include "util/sync/sync_test_utils.hpp"
+#include "util/test_path.hpp"
 #include "util/unit_test_transport.hpp"
 
 #include <realm/object-store/sync/app_utils.hpp>
@@ -590,10 +591,7 @@ TEST_CASE("C API (non-database)", "[c_api]") {
         realm_app_config_set_bundle_id(app_config.get(), "some_bundle_id");
         CHECK(app_config->device_info.bundle_id == "some_bundle_id");
 
-        std::string temp_dir = util::make_temp_dir();
-        auto guard = util::make_scope_exit([&temp_dir]() noexcept {
-            util::try_remove_dir_recursive(temp_dir);
-        });
+        test_util::TestDirGuard temp_dir(util::make_temp_dir());
         auto sync_client_config = cptr(realm_sync_client_config_new());
         realm_sync_client_config_set_base_file_path(sync_client_config.get(), temp_dir.c_str());
         realm_sync_client_config_set_metadata_mode(sync_client_config.get(), RLM_SYNC_CLIENT_METADATA_MODE_DISABLED);

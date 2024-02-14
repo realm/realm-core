@@ -35,7 +35,7 @@ using namespace realm;
 using namespace realm::util;
 using File = realm::util::File;
 
-static const auto base_path = fs::path{util::make_temp_dir()}.make_preferred() / "realm_objectstore_sync_manager";
+static const auto base_path = fs::path{util::make_temp_dir()}.make_preferred() / "realm_objectstore_sync_manager.test-dir";
 static const std::string dummy_device_id = "123400000000000000000000";
 
 namespace {
@@ -462,8 +462,9 @@ TEST_CASE("sync_manager: persistent user state management", "[sync][sync manager
 }
 
 TEST_CASE("sync_manager: file actions", "[sync][sync manager]") {
+    test_util::TestDirGuard guard(base_path.string());
+
     using Action = SyncFileActionMetadata::Action;
-    reset_test_directory(base_path.string());
 
     auto file_manager = SyncFileManager(base_path.string(), "bar_app_id");
     // Open the metadata separately, so we can investigate it ourselves.
