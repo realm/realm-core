@@ -124,6 +124,10 @@ public:
                               ServiceConfig sync_config) const;
     ServiceConfig set_disable_recovery_to(const std::string& app_id, const std::string& service_id,
                                           ServiceConfig sync_config, bool disable) const;
+    struct SchemaVersionInfo {
+        int64_t version_major;
+    };
+    std::vector<SchemaVersionInfo> get_schema_versions(const std::string& app_id) const;
     bool is_sync_enabled(const std::string& app_id) const;
     bool is_sync_terminated(const std::string& app_id) const;
     bool is_initial_sync_complete(const std::string& app_id) const;
