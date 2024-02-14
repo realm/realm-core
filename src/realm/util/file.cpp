@@ -16,18 +16,23 @@
  *
  **************************************************************************/
 
-#include <climits>
-#include <limits>
-#include <algorithm>
-#include <vector>
+#include <realm/util/file.hpp>
 
+#include <realm/unicode.hpp>
+#include <realm/util/errno.hpp>
+#include <realm/util/file_mapper.hpp>
+
+#include <algorithm>
 #include <cerrno>
-#include <cstring>
+#include <climits>
 #include <cstddef>
 #include <cstdio>
 #include <cstdlib>
-#include <iostream>
+#include <cstring>
 #include <fcntl.h>
+#include <iostream>
+#include <limits>
+#include <vector>
 
 #ifndef _WIN32
 #include <unistd.h>
@@ -36,13 +41,10 @@
 #include <sys/statvfs.h>
 #endif
 
-#include <realm/exceptions.hpp>
-#include <realm/unicode.hpp>
-#include <realm/util/errno.hpp>
-#include <realm/util/file_mapper.hpp>
-#include <realm/util/safe_int_ops.hpp>
-#include <realm/util/features.h>
-#include <realm/util/file.hpp>
+#if REALM_PLATFORM_APPLE
+#include <sys/attr.h>
+#include <sys/clonefile.h>
+#endif
 
 using namespace realm::util;
 
@@ -1549,22 +1551,41 @@ void File::move(const std::string& old_path, const std::string& new_path)
 }
 
 
-void File::copy(const std::string& origin_path, const std::string& target_path)
+bool File::copy(const std::string& origin_path, const std::string& target_path, bool overwrite_existing)
 {
 #if REALM_HAVE_STD_FILESYSTEM
-    std::filesystem::copy_file(u8path(origin_path), u8path(target_path),
-                               std::filesystem::copy_options::overwrite_existing); // Throws
+    auto options = overwrite_existing ? std::filesystem::copy_options::overwrite_existing
+                                      : std::filesystem::copy_options::skip_existing;
+    return std::filesystem::copy_file(u8path(origin_path), u8path(target_path), options); // Throws
 #else
+#if REALM_PLATFORM_APPLE
+    // Try to use clonefile and fall back to manual copying if it fails
+    if (clonefile(origin_path.c_str(), target_path.c_str(), 0) == 0) {
+        return true;
+    }
+    if (errno == EEXIST && !overwrite_existing) {
+        return false;
+    }
+#endif
+
     File origin_file{origin_path, mode_Read};  // Throws
-    File target_file{target_path, mode_Write}; // Throws
+    File target_file;
+    bool did_create = false;
+    target_file.open(target_path, did_create); // Throws
+    if (!did_create && !overwrite_existing) {
+        return false;
+    }
+
     size_t buffer_size = 4096;
-    std::unique_ptr<char[]> buffer = std::make_unique<char[]>(buffer_size); // Throws
+    auto buffer = std::make_unique<char[]>(buffer_size); // Throws
     for (;;) {
         size_t n = origin_file.read(buffer.get(), buffer_size); // Throws
         target_file.write(buffer.get(), n);                     // Throws
         if (n < buffer_size)
             break;
     }
+
+    return true;
 #endif
 }
 

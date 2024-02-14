@@ -89,8 +89,8 @@ realm::Schema make_schema()
              {c_sync_original_name, PropertyType::String, Property::IsPrimary{true}},
              {c_sync_new_name, PropertyType::String | PropertyType::Nullable},
              {c_sync_action, PropertyType::Int},
-             {c_sync_partition, PropertyType::String},
-             {c_sync_identity, PropertyType::String},
+             {c_sync_partition, PropertyType::String}, // unused and should be removed in v8
+             {c_sync_identity, PropertyType::String},  // unused and should be removed in v8
          }},
         {c_sync_current_user_identity,
          {
@@ -99,14 +99,14 @@ realm::Schema make_schema()
     };
 }
 
-void migrate_to_v7(std::shared_ptr<Realm> old_realm, std::shared_ptr<Realm> realm)
+void migrate_to_v7(Realm& old_realm, Realm& realm)
 {
     // Before schema version 7 there may have been multiple UserMetadata entries
     // for a single user_id with different provider types, so we need to merge
     // any duplicates together
 
-    TableRef table = ObjectStore::table_for_object_type(realm->read_group(), c_sync_userMetadata);
-    TableRef old_table = ObjectStore::table_for_object_type(old_realm->read_group(), c_sync_userMetadata);
+    TableRef table = ObjectStore::table_for_object_type(realm.read_group(), c_sync_userMetadata);
+    TableRef old_table = ObjectStore::table_for_object_type(old_realm.read_group(), c_sync_userMetadata);
     if (table->is_empty())
         return;
     REALM_ASSERT(table->size() == old_table->size());
@@ -193,6 +193,13 @@ void migrate_to_v7(std::shared_ptr<Realm> old_realm, std::shared_ptr<Realm> real
     }
 }
 
+void migrate_to_v8(Realm&, Realm& realm)
+{
+    if (auto app_metadata_table = realm.read_group().get_table("class_AppMetadata")) {
+        realm.read_group().remove_table(app_metadata_table->get_key());
+    }
+}
+
 } // anonymous namespace
 
 // MARK: - Sync metadata manager
@@ -217,7 +224,11 @@ SyncMetadataManager::SyncMetadataManager(std::string path, bool should_encrypt,
     m_metadata_config.migration_function = [](std::shared_ptr<Realm> old_realm, std::shared_ptr<Realm> realm,
                                               Schema&) {
         if (old_realm->schema_version() < 7) {
-            migrate_to_v7(old_realm, realm);
+            migrate_to_v7(*old_realm, *realm);
+        }
+        // note that the schema version has not yet been bumped to 8
+        if (old_realm->schema_version() < 8) {
+            migrate_to_v8(*old_realm, *realm);
         }
     };
 
@@ -234,9 +245,9 @@ SyncMetadataManager::SyncMetadataManager(std::string path, bool should_encrypt,
 
     object_schema = realm->schema().find(c_sync_fileActionMetadata);
     m_file_action_schema = {
-        object_schema->persisted_properties[0].column_key, object_schema->persisted_properties[1].column_key,
-        object_schema->persisted_properties[2].column_key, object_schema->persisted_properties[3].column_key,
-        object_schema->persisted_properties[4].column_key,
+        object_schema->persisted_properties[0].column_key,
+        object_schema->persisted_properties[1].column_key,
+        object_schema->persisted_properties[2].column_key,
     };
 }
 
@@ -461,8 +472,7 @@ util::Optional<SyncUserMetadata> SyncMetadataManager::get_or_make_user_metadata(
     return SyncUserMetadata(schema, std::move(realm), std::move(*obj));
 }
 
-void SyncMetadataManager::make_file_action_metadata(StringData original_name, StringData partition_key_value,
-                                                    StringData local_uuid, SyncFileActionMetadata::Action action,
+void SyncMetadataManager::make_file_action_metadata(StringData original_name, SyncFileActionMetadata::Action action,
                                                     StringData new_name) const
 {
     auto realm = get_realm();
@@ -474,8 +484,6 @@ void SyncMetadataManager::make_file_action_metadata(StringData original_name, St
 
     obj.set(schema.idx_new_name, new_name);
     obj.set(schema.idx_action, static_cast<int64_t>(action));
-    obj.set(schema.idx_partition, partition_key_value);
-    obj.set(schema.idx_user_identity, local_uuid);
     realm->commit_transaction();
 }
 
@@ -812,25 +820,11 @@ util::Optional<std::string> SyncFileActionMetadata::new_name() const
     return result.is_null() ? util::none : util::make_optional(std::string(result));
 }
 
-std::string SyncFileActionMetadata::user_local_uuid() const
-{
-    REALM_ASSERT(m_realm);
-    m_realm->refresh();
-    return m_obj.get<String>(m_schema.idx_user_identity);
-}
-
 SyncFileActionMetadata::Action SyncFileActionMetadata::action() const
 {
     REALM_ASSERT(m_realm);
     m_realm->refresh();
     return static_cast<SyncFileActionMetadata::Action>(m_obj.get<Int>(m_schema.idx_action));
-}
-
-std::string SyncFileActionMetadata::partition() const
-{
-    REALM_ASSERT(m_realm);
-    m_realm->refresh();
-    return m_obj.get<String>(m_schema.idx_partition);
 }
 
 void SyncFileActionMetadata::remove()

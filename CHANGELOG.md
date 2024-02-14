@@ -8,6 +8,7 @@
 * Added `SyncSession::get_file_ident()` so you can trigger a client reset via the BAAS admin API ([PR #7203](https://github.com/realm/realm-core/pull/7203)).
 * Audit event scopes containing zero events to save no longer open the audit realm unneccesarily ([PR #7332](https://github.com/realm/realm-core/pull/7332)).
 * Added a method to check if a file needs upgrade. ([#7140](https://github.com/realm/realm-core/issues/7140))
+* Use `clonefile()` when possible in `File::copy()` on Apple platforms for faster copying. ([PR #7341](https://github.com/realm/realm-core/pull/7341)).
 
 ### Fixed
 * Fixed queries like `indexed_property == NONE {x}` which mistakenly matched on only x instead of not x. This only applies when an indexed property with equality (==, or IN) matches with `NONE` on a list of one item. If the constant list contained more than one value then it was working correctly. ([realm-js #7862](https://github.com/realm/realm-java/issues/7862), since v12.5.0) 
@@ -18,6 +19,7 @@
 * util::make_dir_recursive() attempted to create a directory named "\0" if the path did not have a trailing slash ([PR #7329](https://github.com/realm/realm-core/pull/7329)).
 * Fixed a crash with `Assertion failed: m_initiated` during sync session startup ([#7074](https://github.com/realm/realm-core/issues/7074), since v10.0.0).
 * Fixed a TSAN violation where the user thread could race to read `m_finalized` with the sync event loop ([#6844](https://github.com/realm/realm-core/issues/6844), since v13.15.1)
+* Fix a minor race condition when backing up Realm files before a client reset which could have lead to overwriting an existing file. ([PR #7341](https://github.com/realm/realm-core/pull/7341)).
  
 ### Breaking changes
 * None.
@@ -34,6 +36,7 @@
 * (bindgen) Upgrade `eslint-config-prettier` & `eslint-plugin-prettier` and add a missing peer dependency on `prettier`.
 * The minimum CMake version has changed from 3.15 to 3.22.1. ([#6537](https://github.com/realm/realm-core/issues/6537))
 * Update Catch2 to v3.5.2 ([PR #7297](https://github.com/realm/realm-core/pull/7297)).
+* The unused `partition` and `user_local_uuid()` fields have been removed from `FileActionMetadata`. ([PR #7341](https://github.com/realm/realm-core/pull/7341)).
 
 ----------------------------------------------
 
