@@ -3083,7 +3083,7 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
         REQUIRE(!wait_for_download(*r));
 
         SECTION("Valid websocket redirect") {
-            auto sync_manager = test_session.app()->sync_manager();
+            auto sync_manager = test_session.sync_manager();
             auto sync_session = sync_manager->get_existing_session(r->config().path);
             sync_session->pause();
 
@@ -3150,7 +3150,7 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
             REQUIRE((server_url && server_url->find(redirect_host) != std::string::npos));
         }
         SECTION("Websocket redirect logs out user") {
-            auto sync_manager = test_session.app()->sync_manager();
+            auto sync_manager = test_session.sync_manager();
             auto sync_session = sync_manager->get_existing_session(r->config().path);
             sync_session->pause();
 
@@ -3204,7 +3204,7 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
             REQUIRE(!user1->is_logged_in());
         }
         SECTION("Too many websocket redirects logs out user") {
-            auto sync_manager = test_session.app()->sync_manager();
+            auto sync_manager = test_session.sync_manager();
             auto sync_session = sync_manager->get_existing_session(r->config().path);
             sync_session->pause();
 
@@ -4846,8 +4846,7 @@ TEST_CASE("app: UserAPIKeyProviderClient unit_tests", "[sync][app][user][api key
     auto app = sync_manager.app();
     auto client = app->provider_client<App::UserAPIKeyProviderClient>();
 
-    std::shared_ptr<SyncUser> logged_in_user =
-        app->sync_manager()->get_user("userid", good_access_token, good_access_token, dummy_device_id);
+    auto logged_in_user = sync_manager.fake_user();
     bool processed = false;
     ObjectId obj_id(UnitTestTransport::api_key_id.c_str());
 
@@ -5379,13 +5378,6 @@ TEST_CASE("app: auth providers", "[sync][app][user]") {
 }
 
 TEST_CASE("app: refresh access token unit tests", "[sync][app][user][token]") {
-    auto setup_user = [](std::shared_ptr<App> app) {
-        if (app->sync_manager()->get_current_user()) {
-            return;
-        }
-        app->sync_manager()->get_user("a_user_id", good_access_token, good_access_token, dummy_device_id);
-    };
-
     SECTION("refresh custom data happy path") {
         static bool session_route_hit = false;
 
@@ -5406,10 +5398,10 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app][user][token]") {
 
         TestSyncManager sync_manager(get_config(instance_of<transport>));
         auto app = sync_manager.app();
-        setup_user(app);
+        auto user = sync_manager.fake_user();
 
         bool processed = false;
-        app->refresh_custom_data(app->sync_manager()->get_current_user(), [&](const Optional<AppError>& error) {
+        app->refresh_custom_data(user, [&](const Optional<AppError>& error) {
             REQUIRE_FALSE(error);
             CHECK(session_route_hit);
             processed = true;
@@ -5437,10 +5429,10 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app][user][token]") {
 
         TestSyncManager sync_manager(get_config(instance_of<transport>));
         auto app = sync_manager.app();
-        setup_user(app);
+        auto user = sync_manager.fake_user();
 
         bool processed = false;
-        app->refresh_custom_data(app->sync_manager()->get_current_user(), [&](const Optional<AppError>& error) {
+        app->refresh_custom_data(user, [&](const Optional<AppError>& error) {
             CHECK(error->reason() == "malformed JWT");
             CHECK(error->code() == ErrorCodes::BadToken);
             CHECK(session_route_hit);
@@ -5515,9 +5507,7 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app][user][token]") {
         };
 
         TestSyncManager sync_manager(get_config(instance_of<transport>));
-        auto app = sync_manager.app();
-        setup_user(app);
-        REQUIRE(log_in(app));
+        REQUIRE(log_in(sync_manager.app()));
     }
 }
 

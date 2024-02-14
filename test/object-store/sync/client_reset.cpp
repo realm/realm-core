@@ -326,7 +326,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
             recovery_path = recovery_path_it->second;
             REQUIRE(util::File::exists(orig_path));
             REQUIRE(!util::File::exists(recovery_path));
-            bool did_reset_files = test_app_session.app()->sync_manager()->immediately_run_file_actions(orig_path);
+            bool did_reset_files = test_app_session.sync_manager()->immediately_run_file_actions(orig_path);
             REQUIRE(did_reset_files);
             REQUIRE(!util::File::exists(orig_path));
             REQUIRE(util::File::exists(recovery_path));
@@ -953,7 +953,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
                 auto realm = Realm::get_shared_realm(temp_config);
                 wait_for_upload(*realm);
 
-                session = test_app_session.app()->sync_manager()->get_existing_session(temp_config.path);
+                session = test_app_session.sync_manager()->get_existing_session(temp_config.path);
                 REQUIRE(session);
             }
             sync::SessionErrorInfo synthetic(Status{ErrorCodes::SyncClientResetRequired, "A fake client reset error"},
@@ -1005,7 +1005,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
                     },
                     std::chrono::seconds(20));
             }
-            auto session = test_app_session.app()->sync_manager()->get_existing_session(local_config.path);
+            auto session = test_app_session.sync_manager()->get_existing_session(local_config.path);
             if (session) {
                 session->shutdown_and_wait();
             }

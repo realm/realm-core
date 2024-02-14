@@ -206,6 +206,10 @@ public:
     {
         return m_transport.get();
     }
+    const std::shared_ptr<realm::SyncManager>& sync_manager() const
+    {
+        return m_app->sync_manager();
+    }
 
     std::vector<realm::bson::BsonDocument> get_documents(realm::SyncUser& user, const std::string& object_type,
                                                          size_t expected_count) const;
@@ -248,6 +252,10 @@ public:
     SyncServer& sync_server()
     {
         return m_sync_server;
+    }
+    const std::shared_ptr<realm::SyncManager>& sync_manager()
+    {
+        return m_app->sync_manager();
     }
 
     std::shared_ptr<realm::SyncUser> fake_user(const std::string& name = "test");
