@@ -116,11 +116,6 @@ struct Request {
 
     /// Indicates if the request uses the refresh token or the access token
     bool uses_refresh_token = false;
-
-    /**
-     * A recursion counter to prevent too many redirects
-     */
-    int redirect_count = 0;
 };
 
 /**
@@ -158,17 +153,6 @@ struct GenericNetworkTransport {
     virtual ~GenericNetworkTransport() = default;
     virtual void send_request_to_server(const Request& request,
                                         util::UniqueFunction<void(const Response&)>&& completion) = 0;
-
-    void send_request_to_server(Request&& request,
-                                util::UniqueFunction<void(Request&&, const Response&)>&& completion)
-    {
-        auto request_ptr = std::make_unique<Request>(std::move(request));
-        const auto& request_ref = *request_ptr;
-        send_request_to_server(request_ref, [request_ptr = std::move(request_ptr),
-                                             completion = std::move(completion)](const Response& response) {
-            completion(std::move(*request_ptr), response);
-        });
-    }
 };
 
 const char* httpmethod_to_string(HttpMethod method);

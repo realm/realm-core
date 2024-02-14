@@ -236,10 +236,10 @@ public:
     // been updated yet).
     void set_sync_route(std::string sync_route, bool verified = true) REQUIRES(!m_mutex);
 
-    std::pair<const std::string, bool> sync_route() REQUIRES(!m_mutex)
+    std::pair<const std::string&, bool> sync_route() REQUIRES(!m_mutex)
     {
         util::CheckedLockGuard lock(m_mutex);
-        return std::make_pair(m_sync_route, m_sync_route_verified);
+        return {m_sync_route, m_sync_route_verified};
     }
 
     std::weak_ptr<app::App> app() const REQUIRES(!m_mutex)

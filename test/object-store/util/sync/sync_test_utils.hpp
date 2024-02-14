@@ -193,8 +193,10 @@ private:
     std::mutex m_mutex;
 };
 
+template <typename BaseTransport = SynchronousTestTransport>
+class HookedTransport : public BaseTransport {
+    static_assert(std::is_base_of_v<app::GenericNetworkTransport, BaseTransport>);
 
-class HookedTransport : public SynchronousTestTransport {
 public:
     void send_request_to_server(const app::Request& request,
                                 util::UniqueFunction<void(const app::Response&)>&& completion) override
@@ -204,7 +206,7 @@ public:
                 return completion(*simulated_response);
             }
         }
-        SynchronousTestTransport::send_request_to_server(request, [&](const app::Response& response) mutable {
+        BaseTransport::send_request_to_server(request, [&](app::Response response) mutable {
             if (response_hook) {
                 response_hook(request, response);
             }
@@ -248,7 +250,7 @@ struct SocketProviderError {
 
 
 struct HookedSocketProvider : public sync::websocket::DefaultSocketProvider {
-    HookedSocketProvider(const std::shared_ptr<util::Logger>& logger, const std::string user_agent,
+    HookedSocketProvider(const std::shared_ptr<util::Logger>& logger, const std::string& user_agent,
                          AutoStart auto_start = AutoStart{true})
         : DefaultSocketProvider(logger, user_agent, nullptr, auto_start)
     {
@@ -263,7 +265,7 @@ struct HookedSocketProvider : public sync::websocket::DefaultSocketProvider {
         }
 
         if (websocket_endpoint_resolver) {
-            endpoint = websocket_endpoint_resolver(std::move(endpoint));
+            websocket_endpoint_resolver(endpoint);
         }
 
         if (websocket_connect_func) {
@@ -286,9 +288,9 @@ struct HookedSocketProvider : public sync::websocket::DefaultSocketProvider {
         return websocket;
     }
 
-    std::function<sync::WebSocketEndpoint(sync::WebSocketEndpoint&&)> websocket_endpoint_resolver;
-    std::function<void(const sync::WebSocketEndpoint&)> endpoint_verify_func;
-    std::function<std::optional<SocketProviderError>()> websocket_connect_func;
+    util::UniqueFunction<void(sync::WebSocketEndpoint&)> websocket_endpoint_resolver;
+    util::UniqueFunction<void(const sync::WebSocketEndpoint&)> endpoint_verify_func;
+    util::UniqueFunction<std::optional<SocketProviderError>()> websocket_connect_func;
 };
 
 #endif // REALM_ENABLE_SYNC

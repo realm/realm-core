@@ -113,6 +113,7 @@ public:
         std::string local_dir;
     };
 
+    SyncServer(const Config& config);
     ~SyncServer();
 
     void start();
@@ -127,6 +128,7 @@ public:
     {
         return m_local_root_dir;
     }
+    int port() const;
 
     template <class R, class P>
     void advance_clock(std::chrono::duration<R, P> duration = std::chrono::seconds(1)) noexcept
@@ -135,8 +137,6 @@ public:
     }
 
 private:
-    friend class TestSyncManager;
-    SyncServer(const Config& config);
     std::string m_local_root_dir;
     std::shared_ptr<realm::util::Logger> m_logger;
     realm::sync::Server m_server;
@@ -276,16 +276,6 @@ public:
         return m_app->sync_manager();
     }
 
-    void close()
-    {
-        close(false);
-    }
-
-    // Re-open the app without deleting the dir contents - if close() has not been called
-    // the App will be closed first before recreating the object.
-    // If log_in is true, user will be logged in again once the App instance is created
-    void reopen(bool log_in);
-
     realm::app::App::Config app_config;
     realm::SyncClientConfig sc_config;
 
@@ -293,9 +283,6 @@ public:
                                                          size_t expected_count) const;
 
 private:
-    // Close the app and, if tear_down, remove the app data and base_file_path directory
-    void close(bool tear_down);
-
     std::shared_ptr<realm::app::App> m_app;
     std::unique_ptr<realm::AppSession> m_app_session;
     std::string m_base_file_path;
