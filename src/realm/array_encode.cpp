@@ -32,6 +32,10 @@ static ArrayFlex s_flex;
 static ArrayPacked s_packed;
 
 template size_t ArrayEncode::find_first<Equal>(const Array&, int64_t, size_t, size_t) const;
+template size_t ArrayEncode::find_first<NotEqual>(const Array&, int64_t, size_t, size_t) const;
+template size_t ArrayEncode::find_first<Greater>(const Array&, int64_t, size_t, size_t) const;
+template size_t ArrayEncode::find_first<Less>(const Array&, int64_t, size_t, size_t) const;
+
 template bool ArrayEncode::find_all<Equal>(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*) const;
 template bool ArrayEncode::find_all<NotEqual>(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*) const;
 template bool ArrayEncode::find_all<Greater>(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*) const;

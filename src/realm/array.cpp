@@ -1483,14 +1483,6 @@ size_t Array::upper_bound_int(int64_t value) const noexcept
     REALM_TEMPEX(return upper_bound, m_width, (m_data, m_size, value));
 }
 
-size_t Array::find_first(int64_t value, size_t start, size_t end) const
-{
-    if (is_encoded())
-        return m_encoder.find_first<Equal>(*this, value, start, end);
-
-    return find_first<Equal>(value, start, end);
-}
-
 int_fast64_t Array::get(const char* header, size_t ndx) noexcept
 {
     if (NodeHeader::get_kind(header) == 'B') {
@@ -1618,6 +1610,9 @@ void Array::typed_print(std::string prefix) const
 template <typename cond>
 size_t Array::do_find_first(int64_t value, size_t start, size_t end) const
 {
+    if (is_encoded())
+        return m_encoder.find_first<cond>(*this, value, start, end);
+
     // QueryStateFindFirst is probably not needed, all we need here is to return the index
     // Also we could or should add to the array ArrayWithFind, in order to avoid to create a new object every time.
     // ArrayWithFind is lightweight, but probably it is faster, to just create it once.
@@ -1625,7 +1620,6 @@ size_t Array::do_find_first(int64_t value, size_t start, size_t end) const
     REALM_TEMPEX2(ArrayWithFind(*this).find_optimized, cond, m_width, (value, start, end, 0, &state));
     return state.m_state;
 }
-
 template size_t Array::do_find_first<NotEqual>(int64_t value, size_t start, size_t end) const;
 template size_t Array::do_find_first<Equal>(int64_t value, size_t start, size_t end) const;
 template size_t Array::do_find_first<Less>(int64_t value, size_t start, size_t end) const;

@@ -21,6 +21,7 @@
 
 #include <realm/node.hpp>
 #include <realm/query_state.hpp>
+#include <realm/query_conditions.hpp>
 #include <realm/column_fwd.hpp>
 #include <realm/array_direct.hpp>
 #include <realm/array_encode.hpp>
@@ -409,14 +410,16 @@ public:
     static ref_type write(ref_type, Allocator&, _impl::ArrayWriterBase&, bool only_if_modified,
                           bool compress_in_flight);
 
-    size_t find_first(int64_t value, size_t begin = 0, size_t end = size_t(-1)) const;
+    inline size_t find_first(int64_t value, size_t begin = 0, size_t end = size_t(-1)) const
+    {
+        return find_first<Equal>(value, begin, end);
+    }
 
     // Wrappers for backwards compatibility and for simple use without
     // setting up state initialization etc
     template <class cond>
     size_t find_first(int64_t value, size_t start = 0, size_t end = size_t(-1)) const
     {
-        // TODO: this proves that we don't need the VTable. We just need to call the right method
         return do_find_first<cond>(value, start, end);
     }
 
