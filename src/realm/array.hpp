@@ -21,13 +21,14 @@
 
 #include <realm/node.hpp>
 #include <realm/query_state.hpp>
+#include <realm/query_conditions.hpp>
 #include <realm/column_fwd.hpp>
 #include <realm/array_direct.hpp>
+#include <realm/array_encode.hpp>
 
 namespace realm {
 
 // Pre-definitions
-class ArrayEncode;
 class GroupWriter;
 namespace _impl {
 class ArrayWriterBase;
@@ -362,6 +363,16 @@ public:
     /// (idempotency).
     void destroy_deep() noexcept;
 
+    /// check if the array is encoded (in B format)
+    inline bool is_encoded() const;
+
+    /// used only for testing, encode the array passed as argument
+    bool try_encode(Array&) const;
+
+    /// used only for testing, decode the array, on which this method is invoked. If the array is not encoded, this is
+    /// a NOP
+    bool try_decode();
+
     /// Shorthand for `destroy_deep(MemRef(ref, alloc), alloc)`.
     static void destroy_deep(ref_type ref, Allocator& alloc) noexcept;
 
@@ -399,21 +410,17 @@ public:
     static ref_type write(ref_type, Allocator&, _impl::ArrayWriterBase&, bool only_if_modified,
                           bool compress_in_flight);
 
-    size_t find_first(int64_t value, size_t begin = 0, size_t end = size_t(-1)) const;
+    inline size_t find_first(int64_t value, size_t begin = 0, size_t end = size_t(-1)) const
+    {
+        return find_first<Equal>(value, begin, end);
+    }
 
     // Wrappers for backwards compatibility and for simple use without
     // setting up state initialization etc
     template <class cond>
     size_t find_first(int64_t value, size_t start = 0, size_t end = size_t(-1)) const
     {
-        REALM_ASSERT(start <= m_size && (end <= m_size || end == size_t(-1)) && start <= end);
-        // todo: fix use of this function, so that below assert cannot happen:
-        REALM_ASSERT_RELEASE(cond::condition >= 0);
-        // TODO: would be nice to avoid this in order to speed up find_first loops
-        QueryStateFindFirst state;
-        Finder finder = m_vtable->finder[cond::condition];
-        (this->*finder)(value, start, end, 0, &state);
-        return state.m_state;
+        return do_find_first<cond>(value, start, end);
     }
 
     /// Get the specified element without the cost of constructing an
@@ -513,6 +520,10 @@ protected:
     void destroy_children(size_t offset = 0) noexcept;
 
 protected:
+    // attempt to remove the vtabler
+    template <typename cond>
+    size_t do_find_first(int64_t value, size_t start, size_t end) const;
+
     // Getters and Setters for adaptive-packed arrays
     typedef int64_t (Array::*Getter)(size_t) const; // Note: getters must not throw
     typedef void (Array::*Setter)(size_t, int64_t);
@@ -527,7 +538,6 @@ protected:
     };
     template <size_t w>
     struct VTableForWidth;
-    template <size_t w>
     struct VTableForEncodedArray;
 
     // This is the one installed into the m_vtable->finder slots.
@@ -549,8 +559,17 @@ protected:
     bool m_has_refs;             // Elements whose first bit is zero are refs to subarrays.
     bool m_context_flag;         // Meaning depends on context.
 
-    uint8_t m_kind;
-    NodeHeader::Encoding m_encoding;
+    ArrayEncode m_encoder;
+    // encode/decode this array
+    bool encode_array(Array&) const;
+    bool decode_array(Array& arr) const;
+    // these are used to directly set the vtable dispatcher in Array and spare us a bunch
+    // of CPU cycles in order to check if the array is in compressed format
+    int64_t get_encoded(size_t ndx) const noexcept;
+    void set_encoded(size_t ndx, int64_t);
+    void get_chunk_encoded(size_t, int64_t[8]) const noexcept;
+    template <class cond>
+    bool find_encoded(int64_t value, size_t start, size_t end, size_t baseindex, QueryStateBase* state) const;
 
 private:
     ref_type do_write_shallow(_impl::ArrayWriterBase&) const;
@@ -560,22 +579,6 @@ private:
     void report_memory_usage_2(MemUsageHandler&) const;
 #endif
 
-protected:
-    // encode/decode this array
-    bool encode_array(Array&) const;
-    bool decode_array(Array& arr) const;
-
-    // these are used to directly set the vtable dispatcher in Array and spare us a bunch
-    // of CPU cycles in order to check if the array is in compressed format
-    int64_t get_encoded(size_t ndx) const noexcept;
-    void set_encoded(size_t ndx, int64_t);
-    void get_chunk_encoded(size_t, int64_t[8]) const noexcept;
-
-
-public:
-    bool is_encoded() const;
-    bool try_encode(Array&) const;
-    bool try_decode();
 
 private:
     friend class Allocator;
@@ -588,6 +591,16 @@ private:
 };
 
 // Implementation:
+
+inline bool Array::is_encoded() const
+{
+#ifdef REALM_DEBUG
+    if (m_encoder.get_kind() == 'B')
+        REALM_ASSERT_DEBUG((m_encoder.get_encoding() == NodeHeader::Encoding::Flex ||
+                            m_encoder.get_encoding() == NodeHeader::Encoding::Packed));
+#endif
+    return m_encoder.get_kind() == 'B';
+}
 
 inline int64_t Array::get(size_t ndx) const noexcept
 {

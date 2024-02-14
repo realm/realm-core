@@ -4001,7 +4001,7 @@ TEST(Table_CollisionMapping)
             char buffer[12];
             for (size_t i = 0; i < num_objects_with_guaranteed_collision; ++i) {
                 const char* in = reinterpret_cast<char*>(&i);
-                size_t len = base64_encode(in, sizeof(i), buffer, sizeof(buffer));
+                size_t len = base64_encode({in, sizeof(i)}, buffer);
 
                 t0->create_object_with_primary_key(StringData{buffer, len});
             }
@@ -4035,7 +4035,7 @@ TEST(Table_CollisionMapping)
             for (size_t i = 0; i < num_objects_with_guaranteed_collision; ++i) {
                 size_t foo = num_objects_with_guaranteed_collision + i;
                 const char* in = reinterpret_cast<char*>(&foo);
-                size_t len = base64_encode(in, sizeof(foo), buffer, sizeof(buffer));
+                size_t len = base64_encode({in, sizeof(foo)}, buffer);
 
                 t0->create_object_with_primary_key(StringData{buffer, len});
             }

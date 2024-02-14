@@ -33,17 +33,12 @@ public:
     // encoding/decoding
     void init_array(char* h, uint8_t flags, size_t v_width, size_t ndx_width, size_t v_size, size_t ndx_size) const;
     void copy_data(const Array&, const std::vector<int64_t>&, const std::vector<size_t>&) const;
-    std::vector<int64_t> fetch_signed_values_from_encoded_array(const Array& h) const;
-    NodeHeader::Encoding get_encoding() const;
-    // getter/seeter
-    static int64_t get(const char*, size_t);
+    std::vector<int64_t> fetch_all_values(const Array& h) const;
+    // getters/setters
     int64_t get(const Array&, size_t) const;
+    int64_t get(const char*, size_t, size_t, size_t, size_t, size_t) const;
     void get_chunk(const Array& h, size_t ndx, int64_t res[8]) const;
     void set_direct(const Array&, size_t, int64_t) const;
-    // query
-    int64_t sum(const Array&, size_t start, size_t end) const;
-    template <typename F>
-    size_t find_first(const Array&, int64_t, size_t, size_t, F f);
 
 private:
     // header inspection

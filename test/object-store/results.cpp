@@ -43,6 +43,8 @@
 #include <realm/object-store/sync/sync_session.hpp>
 #endif
 
+#include <random>
+
 namespace realm {
 class TestHelper {
 public:

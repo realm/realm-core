@@ -67,30 +67,31 @@ TConditionValue:    Type of values in condition column. That is, int64_t, float,
 #define REALM_QUERY_ENGINE_HPP
 
 #include <algorithm>
+#include <array>
 #include <functional>
 #include <sstream>
 #include <string>
-#include <array>
 
+#include <realm/array_backlink.hpp>
 #include <realm/array_basic.hpp>
-#include <realm/array_key.hpp>
-#include <realm/array_string.hpp>
 #include <realm/array_binary.hpp>
-#include <realm/array_timestamp.hpp>
+#include <realm/array_bool.hpp>
 #include <realm/array_decimal128.hpp>
 #include <realm/array_fixed_bytes.hpp>
-#include <realm/array_mixed.hpp>
+#include <realm/array_key.hpp>
 #include <realm/array_list.hpp>
-#include <realm/array_bool.hpp>
-#include <realm/array_backlink.hpp>
-#include <realm/column_type_traits.hpp>
-#include <realm/query_conditions.hpp>
-#include <realm/table.hpp>
+#include <realm/array_mixed.hpp>
+#include <realm/array_string.hpp>
+#include <realm/array_timestamp.hpp>
 #include <realm/column_integer.hpp>
+#include <realm/column_type_traits.hpp>
+#include <realm/index_string.hpp>
+#include <realm/query_conditions.hpp>
+#include <realm/query_expression.hpp>
+#include <realm/table.hpp>
 #include <realm/unicode.hpp>
 #include <realm/util/serializer.hpp>
 #include <realm/utilities.hpp>
-#include <realm/index_string.hpp>
 
 #include <map>
 #include <unordered_set>
@@ -2040,7 +2041,6 @@ private:
 };
 
 
-class LinkMap;
 class StringNodeFulltext : public StringNodeEqualBase {
 public:
     StringNodeFulltext(StringData v, ColKey column, std::unique_ptr<LinkMap> lm = {});

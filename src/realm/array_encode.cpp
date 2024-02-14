@@ -20,6 +20,8 @@
 #include <realm/array.hpp>
 #include <realm/array_flex.hpp>
 #include <realm/array_packed.hpp>
+#include <realm/array_with_find.hpp>
+#include <realm/query_conditions.hpp>
 
 #include <vector>
 #include <algorithm>
@@ -28,6 +30,16 @@ using namespace realm;
 
 static ArrayFlex s_flex;
 static ArrayPacked s_packed;
+
+template size_t ArrayEncode::find_first<Equal>(const Array&, int64_t, size_t, size_t) const;
+template size_t ArrayEncode::find_first<NotEqual>(const Array&, int64_t, size_t, size_t) const;
+template size_t ArrayEncode::find_first<Greater>(const Array&, int64_t, size_t, size_t) const;
+template size_t ArrayEncode::find_first<Less>(const Array&, int64_t, size_t, size_t) const;
+
+template bool ArrayEncode::find_all<Equal>(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*) const;
+template bool ArrayEncode::find_all<NotEqual>(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*) const;
+template bool ArrayEncode::find_all<Greater>(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*) const;
+template bool ArrayEncode::find_all<Less>(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*) const;
 
 template <typename T, typename... Arg>
 inline void encode_array(const T& encoder, Array& arr, size_t byte_size, Arg&&... args)
@@ -39,7 +51,7 @@ inline void encode_array(const T& encoder, Array& arr, size_t byte_size, Arg&&..
     NodeHeader::set_capacity_in_header(byte_size, h);
     arr.init_from_mem(mem);
     REALM_ASSERT_DEBUG(NodeHeader::get_kind(arr.get_header()) == 'B');
-    REALM_ASSERT_DEBUG(NodeHeader::get_encoding(arr.get_header()) == encoder.get_encoding());
+    // REALM_ASSERT_DEBUG(NodeHeader::get_encoding(arr.get_header()) == arr.m_encoder.m_encoding);
 }
 
 template <typename T, typename... Arg>
@@ -51,14 +63,14 @@ inline void copy_into_encoded_array(const T& encoder, Arg&&... args)
 template <typename Encoder>
 std::vector<int64_t> fetch_values(const Encoder& encoder, const Array& arr)
 {
-    return encoder.fetch_signed_values_from_encoded_array(arr);
+    return encoder.fetch_all_values(arr);
 }
 
 bool ArrayEncode::always_encode(const Array& origin, Array& arr, bool packed) const
 {
     std::vector<int64_t> values;
     std::vector<size_t> indices;
-    try_encode(origin, values, indices);
+    encode_values(origin, values, indices);
     if (!values.empty()) {
         size_t v_width, ndx_width;
         const uint8_t flags = NodeHeader::get_flags(origin.get_header());
@@ -69,7 +81,7 @@ bool ArrayEncode::always_encode(const Array& origin, Array& arr, bool packed) co
             copy_into_encoded_array(s_packed, origin, arr);
         }
         else {
-            const size_t flex_size = flex_encoded_array_size(values, indices, v_width, ndx_width);
+            const auto flex_size = flex_encoded_array_size(values, indices, v_width, ndx_width);
             encode_array(s_flex, arr, flex_size, flags, v_width, ndx_width, values.size(), indices.size());
             copy_into_encoded_array(s_flex, arr, values, indices);
         }
@@ -80,38 +92,39 @@ bool ArrayEncode::always_encode(const Array& origin, Array& arr, bool packed) co
 
 bool ArrayEncode::encode(const Array& origin, Array& arr) const
 {
-    return always_encode(origin, arr, false); // true packed, false flex
+   // return false;
+    // return always_encode(origin, arr, false); // true packed, false flex
 
-    //    std::vector<int64_t> values;
-    //    std::vector<size_t> indices;
-    //    try_encode(origin, values, indices);
-    //    if (!values.empty()) {
-    //        size_t v_width, ndx_width;
-    //        const auto uncompressed_size = origin.get_byte_size();
-    //        const auto packed_size = packed_encoded_array_size(values, origin.size(), v_width);
-    //        const auto flex_size = flex_encoded_array_size(values, indices, v_width, ndx_width);
-    //
-    //        if (flex_size < packed_size && flex_size < uncompressed_size) {
-    //            const uint8_t flags = NodeHeader::get_flags(origin.get_header());
-    //            encode_array(s_flex, arr, flex_size, flags, v_width, ndx_width, values.size(), indices.size());
-    //            copy_into_encoded_array(s_flex, arr, values, indices);
-    //            return true;
-    //        }
-    //        else if (packed_size < uncompressed_size) {
-    //            const uint8_t flags = NodeHeader::get_flags(origin.get_header());
-    //            encode_array(s_packed, arr, packed_size, flags, v_width, origin.size());
-    //            copy_into_encoded_array(s_packed, origin, arr);
-    //            return true;
-    //        }
-    //    }
-    //    return false;
+    std::vector<int64_t> values;
+    std::vector<size_t> indices;
+    encode_values(origin, values, indices);
+    if (!values.empty()) {
+        size_t v_width, ndx_width;
+        const auto uncompressed_size = origin.get_byte_size();
+        const auto packed_size = packed_encoded_array_size(values, origin.size(), v_width);
+        const auto flex_size = flex_encoded_array_size(values, indices, v_width, ndx_width);
+
+        if (flex_size < packed_size && flex_size < uncompressed_size) {
+            const uint8_t flags = NodeHeader::get_flags(origin.get_header());
+            encode_array(s_flex, arr, flex_size, flags, v_width, ndx_width, values.size(), indices.size());
+            copy_into_encoded_array(s_flex, arr, values, indices);
+            return true;
+        }
+        else if (packed_size < uncompressed_size) {
+            const uint8_t flags = NodeHeader::get_flags(origin.get_header());
+            encode_array(s_packed, arr, packed_size, flags, v_width, origin.size());
+            copy_into_encoded_array(s_packed, origin, arr);
+            return true;
+        }
+    }
+    return false;
 }
 
 bool ArrayEncode::decode(Array& arr) const
 {
     REALM_ASSERT_DEBUG(arr.is_attached());
     auto values_fetcher = [&arr, this]() {
-        return is_packed(arr) ? fetch_values(s_packed, arr) : fetch_values(s_flex, arr);
+        return is_packed() ? fetch_values(s_packed, arr) : fetch_values(s_flex, arr);
     };
     const auto& values = values_fetcher();
     //  do the reverse of compressing the array
@@ -140,12 +153,11 @@ bool ArrayEncode::decode(Array& arr) const
     NodeHeader::init_header(header, 'A', Encoding::WTypBits, flags, width, values.size());
     NodeHeader::set_capacity_in_header(byte_size, header);
     arr.init_from_mem(mem);
-    auto data = arr.m_data;
     size_t ndx = 0;
     // this is copying the bits straight, without doing any COW.
     // Restoring the array is basically COW.
     for (const auto& v : values)
-        set(data, width, ndx++, v);
+        set(arr.m_data, width, ndx++, v);
 
     // very important: since the ref of the current array has changed, the parent must be informed.
     // Otherwise we will lose the link between parent array and child array.
@@ -158,59 +170,150 @@ bool ArrayEncode::decode(Array& arr) const
     return true;
 }
 
-size_t ArrayEncode::size(const char* h)
+void ArrayEncode::init(const char* h)
 {
     using Encoding = NodeHeader::Encoding;
-    REALM_ASSERT_DEBUG(NodeHeader::get_encoding(h) == Encoding::Packed ||
-                       NodeHeader::get_encoding(h) == Encoding::Flex);
-    const auto is_packed = NodeHeader::get_encoding(h) == Encoding::Packed;
-    return is_packed ? NodeHeader::get_num_elements<Encoding::Packed>(h)
-                     : NodeHeader::get_arrayB_num_elements<Encoding::Flex>(h);
+    m_kind = NodeHeader::get_kind(h);
+    m_encoding = NodeHeader::get_encoding(h);
+    if (m_encoding == Encoding::Packed) {
+        m_v_width = NodeHeader::get_element_size<Encoding::Packed>(h);
+        m_v_size = NodeHeader::get_num_elements<Encoding::Packed>(h);
+    }
+    else if (m_encoding == Encoding::Flex) {
+        m_v_width = NodeHeader::get_elementA_size<Encoding::Flex>(h);
+        m_v_size = NodeHeader::get_arrayA_num_elements<Encoding::Flex>(h);
+        m_ndx_width = NodeHeader::get_elementB_size<Encoding::Flex>(h);
+        m_ndx_size = NodeHeader::get_arrayB_num_elements<Encoding::Flex>(h);
+    }
+}
+
+size_t ArrayEncode::size() const
+{
+    using Encoding = NodeHeader::Encoding;
+    REALM_ASSERT_DEBUG(m_kind == 'B');
+    REALM_ASSERT_DEBUG(m_encoding == Encoding::Packed || m_encoding == Encoding::Flex);
+    return m_encoding == Encoding::Packed ? m_v_size : m_ndx_size;
+}
+
+size_t ArrayEncode::width() const
+{
+    using Encoding = NodeHeader::Encoding;
+    REALM_ASSERT_DEBUG(m_kind == 'B');
+    REALM_ASSERT_DEBUG(m_encoding == Encoding::Packed || m_encoding == Encoding::Flex);
+    return m_v_width;
 }
 
 int64_t ArrayEncode::get(const Array& arr, size_t ndx) const
 {
     using Encoding = NodeHeader::Encoding;
     REALM_ASSERT_DEBUG(arr.is_attached());
-    REALM_ASSERT_DEBUG(arr.m_kind == 'B');
-    REALM_ASSERT_DEBUG(arr.m_encoding == Encoding::Flex || arr.m_encoding == Encoding::Packed);
-    return is_packed(arr) ? s_packed.get(arr, ndx) : s_flex.get(arr, ndx);
+    REALM_ASSERT_DEBUG(m_kind == 'B');
+    REALM_ASSERT_DEBUG(m_encoding == Encoding::Flex || m_encoding == Encoding::Packed);
+    return is_packed() ? s_packed.get(arr, ndx) : s_flex.get(arr, ndx);
 }
 
-int64_t ArrayEncode::get(const char* header, size_t ndx)
+int64_t ArrayEncode::get(const char* data, size_t ndx) const
 {
-    REALM_ASSERT_DEBUG(NodeHeader::get_kind(header) == 'B');
-    REALM_ASSERT_DEBUG(NodeHeader::get_encoding(header) == NodeHeader::Encoding::Flex ||
-                       NodeHeader::get_encoding(header) == NodeHeader::Encoding::Packed);
-    const auto is_packed = NodeHeader::get_encoding(header) == NodeHeader::Encoding::Packed;
-    return is_packed ? s_packed.get(header, ndx) : s_flex.get(header, ndx);
+    using Encoding = NodeHeader::Encoding;
+    REALM_ASSERT_DEBUG(m_kind == 'B');
+    REALM_ASSERT_DEBUG(m_encoding == Encoding::Flex || m_encoding == Encoding::Packed);
+    return m_encoding == Encoding::Packed ? s_packed.get(data, ndx, m_v_width, m_v_size)
+                                          : s_flex.get(data, ndx, m_v_width, m_v_size, m_ndx_width, m_ndx_size);
 }
 
 void ArrayEncode::get_chunk(const Array& arr, size_t ndx, int64_t res[8]) const
 {
     REALM_ASSERT_DEBUG(arr.is_attached());
-    REALM_ASSERT_DEBUG(arr.m_kind == 'B');
-    return is_packed(arr) ? s_packed.get_chunk(arr, ndx, res) : s_flex.get_chunk(arr, ndx, res);
+    return is_packed() ? s_packed.get_chunk(arr, ndx, res) : s_flex.get_chunk(arr, ndx, res);
 }
 
 void ArrayEncode::set_direct(const Array& arr, size_t ndx, int64_t value) const
 {
-    REALM_ASSERT_DEBUG(is_packed(arr) || is_flex(arr));
-    is_packed(arr) ? s_packed.set_direct(arr, ndx, value) : s_flex.set_direct(arr, ndx, value);
+    REALM_ASSERT_DEBUG(is_packed() || is_flex());
+    is_packed() ? s_packed.set_direct(arr, ndx, value) : s_flex.set_direct(arr, ndx, value);
 }
 
-template <typename F>
-size_t ArrayEncode::find_first(const Array& arr, int64_t value, size_t start, size_t end, F cmp) const
+template <typename Cond>
+size_t ArrayEncode::find_first(const Array& arr, int64_t value, size_t start, size_t end) const
 {
-    REALM_ASSERT_DEBUG(is_packed(arr) || is_flex(arr));
-    return is_packed(arr) ? s_packed.find_first(arr, value, start, end, cmp)
-                          : s_flex.find_first(arr, value, start, end, cmp);
+    QueryStateFindFirst state;
+    find_all<Cond>(arr, value, start, end, 0, &state);
+    return state.m_state;
+}
+
+template <typename Cond>
+bool ArrayEncode::find_all(const Array& arr, int64_t value, size_t start, size_t end, size_t baseindex,
+                           QueryStateBase* state) const
+{
+    // TODO: decide if this should belong to array with find or in here.
+    REALM_ASSERT_DEBUG(is_packed() || is_flex());
+    REALM_ASSERT_DEBUG(start <= arr.m_size && (end <= arr.m_size || end == size_t(-1)) && start <= end);
+    Cond c;
+
+    if (end == npos)
+        end = arr.m_size;
+
+    if (!(arr.m_size > start && start < end))
+        return true;
+
+    const auto lbound = arr.m_lbound;
+    const auto ubound = arr.m_ubound;
+
+    if (!c.can_match(value, lbound, ubound))
+        return true;
+
+    // TODO: review this and split it into different method
+    // equal to find_all_match.
+    if (c.will_match(value, lbound, ubound)) {
+        REALM_ASSERT_DEBUG(state->match_count() < state->limit());
+        size_t process = state->limit() - state->match_count();
+        size_t end2 = end - start > process ? start + process : end;
+        for (; start < end2; start++)
+            if (!state->match(start + baseindex))
+                return false;
+        return true;
+    }
+
+    bool (*cmp)(int64_t, int64_t) = nullptr;
+    if constexpr (std::is_same_v<Cond, Equal>)
+        cmp = [](int64_t v, int64_t value) {
+            return v == value;
+        };
+    else if constexpr (std::is_same_v<Cond, NotEqual>)
+        cmp = [](int64_t v, int64_t value) {
+            return v != value;
+        };
+    else if constexpr (std::is_same_v<Cond, Greater>)
+        cmp = [](int64_t v, int64_t value) {
+            return v > value;
+        };
+    else if constexpr (std::is_same_v<Cond, Less>)
+        cmp = [](int64_t v, int64_t value) {
+            return v < value;
+        };
+    REALM_ASSERT_DEBUG(cmp != nullptr);
+    // this can be optimized doing lower/upper bound, we don't need to go through the whole array
+    // const auto h = m_array.get_header();
+    while (start < end) {
+        auto v = arr.get(start);
+        if (cmp(v, value) && !state->match(start + baseindex))
+            return false;
+        ++start;
+    }
+    return true;
 }
 
 int64_t ArrayEncode::sum(const Array& arr, size_t start, size_t end) const
 {
-    REALM_ASSERT_DEBUG(is_packed(arr) || is_flex(arr));
-    return is_packed(arr) ? s_packed.sum(arr, start, end) : s_flex.sum(arr, start, end);
+    REALM_ASSERT_DEBUG(is_packed() || is_flex());
+
+    REALM_ASSERT_DEBUG(arr.m_size >= start && arr.m_size <= end);
+    int64_t total_sum = 0;
+    for (size_t i = start; i < end; ++i) {
+        const auto v = is_packed() ? s_packed.get(arr, i) : s_flex.get(arr, i);
+        total_sum += v;
+    }
+    return total_sum;
 }
 
 void ArrayEncode::set(char* data, size_t w, size_t ndx, int64_t v) const
@@ -235,16 +338,16 @@ void ArrayEncode::set(char* data, size_t w, size_t ndx, int64_t v) const
         REALM_UNREACHABLE();
 }
 
-bool inline ArrayEncode::is_packed(const Array& arr) const
+bool inline ArrayEncode::is_packed() const
 {
-    REALM_ASSERT_DEBUG(arr.m_kind == 'B');
-    return arr.m_encoding == NodeHeader::Encoding::Packed;
+    REALM_ASSERT_DEBUG(m_kind == 'B');
+    return m_encoding == NodeHeader::Encoding::Packed;
 }
 
-bool inline ArrayEncode::is_flex(const Array& arr) const
+bool inline ArrayEncode::is_flex() const
 {
-    REALM_ASSERT_DEBUG(arr.m_kind == 'B');
-    return arr.m_encoding == NodeHeader::Encoding::Flex;
+    REALM_ASSERT_DEBUG(m_kind == 'B');
+    return m_encoding == NodeHeader::Encoding::Flex;
 }
 
 size_t ArrayEncode::flex_encoded_array_size(const std::vector<int64_t>& values, const std::vector<size_t>& indices,
@@ -268,7 +371,7 @@ size_t ArrayEncode::packed_encoded_array_size(std::vector<int64_t>& values, size
     return NodeHeader::calc_size<Encoding::Packed>(sz, v_width);
 }
 
-void ArrayEncode::try_encode(const Array& arr, std::vector<int64_t>& values, std::vector<size_t>& indices) const
+void ArrayEncode::encode_values(const Array& arr, std::vector<int64_t>& values, std::vector<size_t>& indices) const
 {
     // The main idea is to encode the values in flex format. If Packed is better it will chosen by
     // ArrayEncode::encode. The algorithm is O(n lg n), it gives us nice properties, but we could use an efficient

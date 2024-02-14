@@ -27,8 +27,11 @@ namespace realm {
 template <class cond>
 bool ArrayInteger::find(value_type value, size_t start, size_t end, QueryStateBase* state) const
 {
+    if (is_encoded())
+        return find_encoded<cond>(value, start, end, 0, state);
     return ArrayWithFind(*this).find<cond>(value, start, end, 0, state);
 }
+
 
 inline bool ArrayIntNull::find_impl(int cond, value_type value, size_t start, size_t end, QueryStateBase* state) const
 {
@@ -74,7 +77,9 @@ bool ArrayIntNull::find_impl(value_type opt_value, size_t start, size_t end, Que
                 value = *opt_value;
             }
         }
-
+        // if encoded use specialised find
+        if (is_encoded())
+            return find_encoded<cond>(value, start2, end, baseindex2, state);
         // Fall back to plain Array find.
         return ArrayWithFind(*this).find<cond>(value, start2, end2, baseindex2, state);
     }

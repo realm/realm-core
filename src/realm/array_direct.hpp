@@ -394,11 +394,14 @@ inline size_t lower_bound(const char* data, size_t start, size_t end, int64_t va
     // size_t low = 0;
     size_t low = start;
 
-
     const auto h = NodeHeader::get_header_from_data((char*)data);
     const auto is_encoded = NodeHeader::get_kind(h) == 'B';
+    static ArrayEncode encoder;
+    if (is_encoded)
+        encoder.init(h);
+
     const auto fetcher = [is_encoded](auto data, size_t ndx) {
-        return is_encoded ? ArrayEncode::get(data, ndx) : get_direct<width>(data, ndx);
+        return is_encoded ? encoder.get(data, ndx) : get_direct<width>(data, ndx);
     };
 
     while (size >= 8) {
@@ -481,8 +484,12 @@ inline size_t upper_bound(const char* data, size_t start, size_t end, int64_t va
 
     const auto h = NodeHeader::get_header_from_data((char*)data);
     const auto is_encoded = NodeHeader::get_kind(h) == 'B';
+    static ArrayEncode encoder;
+    if (is_encoded)
+        encoder.init(h);
+
     const auto fetcher = [is_encoded](auto data, size_t ndx) {
-        return is_encoded ? ArrayEncode::get(data, ndx) : get_direct<width>(data, ndx);
+        return is_encoded ? encoder.get(data, ndx) : get_direct<width>(data, ndx);
     };
 
     size_t size = end - start;
@@ -540,19 +547,6 @@ inline size_t upper_bound(const char* data, size_t size, int64_t value) noexcept
 {
     return impl::upper_bound<width>(data, 0, size, value);
 }
-
-// template <typename Cmp = std::less<int64_t>>
-// inline size_t lower_bound(const char* data, size_t start, size_t end, int64_t value, Cmp cmp = {}) noexcept
-//{
-//     return impl::lower_bound<0>(data, start, end, value, cmp);
-// }
-//
-// template <typename Cmp = std::greater_equal<int64_t>>
-// inline size_t upper_bound(const char* data, size_t start, size_t end, int64_t value, Cmp cmp = {}) noexcept
-//{
-//     return impl::upper_bound<0>(data, start, end, value, cmp);
-// }
-
 
 } // namespace realm
 
