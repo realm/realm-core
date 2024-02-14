@@ -2218,7 +2218,6 @@ TEST_CASE("flx: interrupted bootstrap restarts/recovers on reconnect", "[sync][f
     std::vector<ObjectId> obj_ids_at_end = fill_large_array_schema(harness);
     SyncTestFile interrupted_realm_config(harness.app()->current_user(), harness.schema(),
                                           SyncConfig::FLXSyncEnabled{});
-    interrupted_realm_config.cache = false;
 
     {
         auto [interrupted_promise, interrupted] = util::make_promise_future<void>();
@@ -2742,7 +2741,6 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][boot
     std::vector<ObjectId> obj_ids_at_end = fill_large_array_schema(harness);
     SyncTestFile interrupted_realm_config(harness.app()->current_user(), harness.schema(),
                                           SyncConfig::FLXSyncEnabled{});
-    interrupted_realm_config.cache = false;
 
     auto check_interrupted_state = [&](const DBRef& realm) {
         auto tr = realm->start_read();
@@ -4053,7 +4051,6 @@ TEST_CASE("flx: compensating write errors get re-sent across sessions", "[sync][
 
     create_user_and_log_in(harness.app());
     SyncTestFile config(harness.app()->current_user(), harness.schema(), SyncConfig::FLXSyncEnabled{});
-    config.cache = false;
 
     {
         auto error_received_pf = util::make_promise_future<void>();
@@ -4630,7 +4627,6 @@ TEST_CASE("flx sync: resend pending subscriptions when reconnecting", "[sync][fl
     std::vector<ObjectId> obj_ids_at_end = fill_large_array_schema(harness);
     SyncTestFile interrupted_realm_config(harness.app()->current_user(), harness.schema(),
                                           SyncConfig::FLXSyncEnabled{});
-    interrupted_realm_config.cache = false;
 
     {
         auto pf = util::make_promise_future<void>();

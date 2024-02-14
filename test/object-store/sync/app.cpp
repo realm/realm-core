@@ -19,6 +19,7 @@
 #include "collection_fixtures.hpp"
 #include "util/sync/baas_admin_api.hpp"
 #include "util/sync/sync_test_utils.hpp"
+#include "util/test_path.hpp"
 #include "util/unit_test_transport.hpp"
 
 #include <realm/object-store/impl/object_accessor_impl.hpp>
@@ -47,7 +48,6 @@
 #include <external/mpark/variant.hpp>
 
 #include <condition_variable>
-#include <future>
 #include <iostream>
 #include <list>
 #include <mutex>
@@ -735,26 +735,24 @@ TEST_CASE("app: login_with_credentials integration", "[sync][app][user][baas]") 
         app->log_out([](auto) {});
 
         int subscribe_processed = 0;
-        auto token = app->subscribe([&subscribe_processed](auto& app) {
-            if (!subscribe_processed) {
-                REQUIRE(app.current_user());
-            }
-            else {
-                REQUIRE_FALSE(app.current_user());
-            }
+
+        auto token = app->subscribe([&subscribe_processed](auto&) {
             subscribe_processed++;
         });
 
+        REQUIRE_FALSE(app->current_user());
         auto user = log_in(app);
         CHECK(!user->device_id().empty());
         CHECK(user->has_device_id());
+        REQUIRE(app->current_user());
+        CHECK(subscribe_processed == 1);
 
         bool processed = false;
         app->log_out([&](auto error) {
             REQUIRE_FALSE(error);
             processed = true;
         });
-
+        REQUIRE_FALSE(app->current_user());
         CHECK(processed);
         CHECK(subscribe_processed == 2);
 
@@ -909,8 +907,8 @@ TEST_CASE("app: UsernamePasswordProviderClient integration", "[sync][app][user][
 
     SECTION("log in, remove, log in") {
         app->remove_user(app->current_user(), [](auto) {});
-        CHECK(app->sync_manager()->all_users().size() == 0);
-        CHECK(app->sync_manager()->get_current_user() == nullptr);
+        CHECK(app->all_users().size() == 0);
+        CHECK(app->current_user() == nullptr);
 
         auto user = log_in(app, AppCredentials::username_password(email, password));
         CHECK(user->user_profile().email() == email);
@@ -930,7 +928,7 @@ TEST_CASE("app: UsernamePasswordProviderClient integration", "[sync][app][user][
 
         app->remove_user(user, [&](Optional<AppError> error) {
             REQUIRE(!error);
-            CHECK(app->sync_manager()->all_users().size() == 0);
+            CHECK(app->all_users().size() == 0);
             processed = true;
         });
 
@@ -1276,7 +1274,7 @@ TEST_CASE("app: delete anonymous user integration", "[sync][app][user][baas]") {
     auto app = session.app();
 
     SECTION("delete user expect success") {
-        CHECK(app->sync_manager()->all_users().size() == 1);
+        CHECK(app->all_users().size() == 1);
 
         // Log in user 1
         auto user_a = app->current_user();
@@ -1286,26 +1284,26 @@ TEST_CASE("app: delete anonymous user integration", "[sync][app][user][baas]") {
             // a logged out anon user will be marked as Removed, not LoggedOut
             CHECK(user_a->state() == SyncUser::State::Removed);
         });
-        CHECK(app->sync_manager()->all_users().empty());
-        CHECK(app->sync_manager()->get_current_user() == nullptr);
+        CHECK(app->all_users().empty());
+        CHECK(app->current_user() == nullptr);
 
         app->delete_user(user_a, [&](Optional<app::AppError> error) {
             CHECK(error->reason() == "User must be logged in to be deleted.");
-            CHECK(app->sync_manager()->all_users().size() == 0);
+            CHECK(app->all_users().size() == 0);
         });
 
         // Log in user 2
         auto user_b = log_in(app);
-        CHECK(app->sync_manager()->get_current_user() == user_b);
+        CHECK(app->current_user() == user_b);
         CHECK(user_b->state() == SyncUser::State::LoggedIn);
-        CHECK(app->sync_manager()->all_users().size() == 1);
+        CHECK(app->all_users().size() == 1);
 
         app->delete_user(user_b, [&](Optional<app::AppError> error) {
             REQUIRE_FALSE(error);
-            CHECK(app->sync_manager()->all_users().size() == 0);
+            CHECK(app->all_users().size() == 0);
         });
 
-        CHECK(app->sync_manager()->get_current_user() == nullptr);
+        CHECK(app->current_user() == nullptr);
 
         // check both handles are no longer valid
         CHECK(user_a->state() == SyncUser::State::Removed);
@@ -1319,35 +1317,35 @@ TEST_CASE("app: delete user with credentials integration", "[sync][app][user][ba
     app->remove_user(app->current_user(), [](auto) {});
 
     SECTION("log in and delete") {
-        CHECK(app->sync_manager()->all_users().size() == 0);
-        CHECK(app->sync_manager()->get_current_user() == nullptr);
+        CHECK(app->all_users().size() == 0);
+        CHECK(app->current_user() == nullptr);
 
         auto credentials = create_user_and_log_in(app);
         auto user = app->current_user();
 
-        CHECK(app->sync_manager()->get_current_user() == user);
+        CHECK(app->current_user() == user);
         CHECK(user->state() == SyncUser::State::LoggedIn);
         app->delete_user(user, [&](Optional<app::AppError> error) {
             REQUIRE_FALSE(error);
-            CHECK(app->sync_manager()->all_users().size() == 0);
+            CHECK(app->all_users().size() == 0);
         });
         CHECK(user->state() == SyncUser::State::Removed);
-        CHECK(app->sync_manager()->get_current_user() == nullptr);
+        CHECK(app->current_user() == nullptr);
 
         app->log_in_with_credentials(credentials, [](std::shared_ptr<SyncUser> user, util::Optional<AppError> error) {
             CHECK(!user);
             REQUIRE(error);
             REQUIRE(error->code() == ErrorCodes::InvalidPassword);
         });
-        CHECK(app->sync_manager()->get_current_user() == nullptr);
+        CHECK(app->current_user() == nullptr);
 
-        CHECK(app->sync_manager()->all_users().size() == 0);
+        CHECK(app->all_users().size() == 0);
         app->delete_user(user, [](Optional<app::AppError> err) {
             CHECK(err->code() > 0);
         });
 
-        CHECK(app->sync_manager()->get_current_user() == nullptr);
-        CHECK(app->sync_manager()->all_users().size() == 0);
+        CHECK(app->current_user() == nullptr);
+        CHECK(app->all_users().size() == 0);
         CHECK(user->state() == SyncUser::State::Removed);
     }
 }
@@ -1365,7 +1363,7 @@ TEST_CASE("app: call function", "[sync][app][function][baas]") {
         CHECK(*sum == 15);
     };
     app->call_function<int64_t>("sumFunc", toSum, checkFn);
-    app->call_function<int64_t>(app->sync_manager()->get_current_user(), "sumFunc", toSum, checkFn);
+    app->call_function<int64_t>(app->current_user(), "sumFunc", toSum, checkFn);
 }
 
 // MARK: - Remote Mongo Client Tests
@@ -2183,7 +2181,7 @@ TEST_CASE("app: mixed lists with object links", "[sync][pbs][app][links][baas]")
     };
     {
         TestAppSession test_session(app_session, nullptr, DeleteApp{false});
-        SyncTestFile config(test_session.app(), partition, schema);
+        SyncTestFile config(test_session.app()->current_user(), partition, schema);
         auto realm = Realm::get_shared_realm(config);
 
         CppContext c(realm);
@@ -2785,16 +2783,14 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
 
     {
         std::unique_ptr<realm::AppSession> app_session;
-        std::string base_file_path = util::make_temp_dir() + random_string(10);
         auto redir_transport = std::make_shared<HookedTransport>();
         AutoVerifiedEmailCredentials creds;
 
         auto app_config = get_config(redir_transport, session.app_session());
         set_app_config_defaults(app_config, redir_transport);
 
-        util::try_make_dir(base_file_path);
         SyncClientConfig sc_config;
-        sc_config.base_file_path = base_file_path;
+        sc_config.base_file_path = util::make_temp_dir();
         sc_config.metadata_mode = realm::SyncManager::MetadataMode::NoEncryption;
 
         // initialize app and sync client
@@ -2955,16 +2951,14 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
     }
     SECTION("Test app redirect with no metadata") {
         std::unique_ptr<realm::AppSession> app_session;
-        std::string base_file_path = util::make_temp_dir() + random_string(10);
         auto redir_transport = std::make_shared<HookedTransport>();
         AutoVerifiedEmailCredentials creds, creds2;
 
         auto app_config = get_config(redir_transport, session.app_session());
         set_app_config_defaults(app_config, redir_transport);
 
-        util::try_make_dir(base_file_path);
         SyncClientConfig sc_config;
-        sc_config.base_file_path = base_file_path;
+        sc_config.base_file_path = util::make_temp_dir();
         sc_config.metadata_mode = realm::SyncManager::MetadataMode::NoMetadata;
 
         // initialize app and sync client
@@ -3495,7 +3489,7 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
             {
                 std::atomic<bool> called{false};
                 session->wait_for_upload_completion([&](Status stat) {
-                    std::lock_guard<std::mutex> lock(mtx);
+                    std::lock_guard lock(mtx);
                     called.store(true);
                     REQUIRE(stat.code() == ErrorCodes::InvalidSession);
                 });
@@ -3503,7 +3497,7 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
                 timed_wait_for([&] {
                     return called.load();
                 });
-                std::lock_guard<std::mutex> lock(mtx);
+                std::lock_guard lock(mtx);
                 REQUIRE(called);
             }
 
@@ -3513,7 +3507,7 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
                          Catch::Matchers::StartsWith("Unable to refresh the user access token"));
 
             // the failed refresh logs out the user
-            std::lock_guard<std::mutex> lock(mtx);
+            std::lock_guard lock(mtx);
             REQUIRE(!user->is_logged_in());
         };
 
@@ -3926,7 +3920,6 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
     };
 
     std::unique_ptr<realm::AppSession> app_session;
-    std::string base_file_path = util::make_temp_dir() + random_string(10);
     auto redir_transport = std::make_shared<BaseUrlTransport>();
     AutoVerifiedEmailCredentials creds;
     util::Logger::set_default_level_threshold(realm::util::Logger::Level::TEST_LOGGING_LEVEL);
@@ -3935,9 +3928,8 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
     App::Config app_config = {"fake-app-id"};
     set_app_config_defaults(app_config, redir_transport);
 
-    util::try_make_dir(base_file_path);
     SyncClientConfig sc_config;
-    sc_config.base_file_path = base_file_path;
+    sc_config.base_file_path = util::make_temp_dir();
     sc_config.metadata_mode = realm::SyncManager::MetadataMode::NoEncryption;
     sc_config.logger_factory = [](util::Logger::Level) {
         return util::Logger::get_default_logger();
@@ -3953,7 +3945,6 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
     };
 
     SECTION("Test app config baseurl") {
-        // Metadata mode doesn't matter, since App isn't using it anymore
         {
             redir_transport->reset("https://realm.mongodb.com");
 
@@ -4664,10 +4655,10 @@ TEST_CASE("app: custom error handling", "[sync][app][custom errors]") {
     };
 
     SECTION("custom code and message is sent back") {
-        TestSyncManager::Config config;
+        OfflineAppSession::Config config;
         config.transport = std::make_shared<CustomErrorTransport>(1001, "Boom!");
-        TestSyncManager tsm(config);
-        auto error = failed_log_in(tsm.app());
+        OfflineAppSession oas(config);
+        auto error = failed_log_in(oas.app());
         CHECK(error.is_custom_error());
         CHECK(*error.additional_status_code == 1001);
         CHECK(error.reason() == "Boom!");
@@ -4675,11 +4666,6 @@ TEST_CASE("app: custom error handling", "[sync][app][custom errors]") {
 }
 
 // MARK: - Unit Tests
-
-static TestSyncManager::Config get_config()
-{
-    return get_config(instance_of<UnitTestTransport>);
-}
 
 static const std::string bad_access_token = "lolwut";
 static const std::string dummy_device_id = "123400000000000000000000";
@@ -4754,17 +4740,17 @@ TEST_CASE("subscribable unit tests", "[sync][app]") {
 }
 
 TEST_CASE("app: login_with_credentials unit_tests", "[sync][app][user]") {
-    auto config = get_config();
+    OfflineAppSession::Config config{std::make_shared<UnitTestTransport>()};
     static_cast<UnitTestTransport*>(config.transport.get())->set_profile(profile_0);
 
     SECTION("login_anonymous good") {
         UnitTestTransport::access_token = good_access_token;
-        config.base_path = util::make_temp_dir();
-        config.should_teardown_test_directory = false;
+        config.delete_storage = false;
         config.metadata_mode = SyncManager::MetadataMode::NoEncryption;
+        config.storage_path = util::make_temp_dir();
         {
-            TestSyncManager tsm(config);
-            auto app = tsm.app();
+            OfflineAppSession oas(config);
+            auto app = oas.app();
 
             auto user = log_in(app);
 
@@ -4785,8 +4771,9 @@ TEST_CASE("app: login_with_credentials unit_tests", "[sync][app][user]") {
         App::clear_cached_apps();
         // assert everything is stored properly between runs
         {
-            TestSyncManager tsm(config);
-            auto app = tsm.app();
+            config.delete_storage = true; // clean up after this session
+            OfflineAppSession oas(config);
+            auto app = oas.app();
             REQUIRE(app->all_users().size() == 1);
             auto user = app->all_users()[0];
             REQUIRE(user->identities().size() == 1);
@@ -4820,8 +4807,8 @@ TEST_CASE("app: login_with_credentials unit_tests", "[sync][app][user]") {
         };
 
         config.transport = instance_of<transport>;
-        TestSyncManager tsm(config);
-        auto error = failed_log_in(tsm.app());
+        OfflineAppSession oas(config);
+        auto error = failed_log_in(oas.app());
         CHECK(error.reason() == std::string("malformed JWT"));
         CHECK(error.code_string() == "BadToken");
         CHECK(error.is_json_error());
@@ -4830,10 +4817,8 @@ TEST_CASE("app: login_with_credentials unit_tests", "[sync][app][user]") {
 
     SECTION("login_anonynous multiple users") {
         UnitTestTransport::access_token = good_access_token;
-        config.base_path = util::make_temp_dir();
-        config.should_teardown_test_directory = false;
-        TestSyncManager tsm(config);
-        auto app = tsm.app();
+        OfflineAppSession oas(config);
+        auto app = oas.app();
 
         auto user1 = log_in(app);
         auto user2 = log_in(app, AppCredentials::anonymous(false));
@@ -4842,11 +4827,10 @@ TEST_CASE("app: login_with_credentials unit_tests", "[sync][app][user]") {
 }
 
 TEST_CASE("app: UserAPIKeyProviderClient unit_tests", "[sync][app][user][api key]") {
-    TestSyncManager sync_manager(get_config(), {});
-    auto app = sync_manager.app();
-    auto client = app->provider_client<App::UserAPIKeyProviderClient>();
+    OfflineAppSession oas({std::make_shared<UnitTestTransport>()});
+    auto client = oas.app()->provider_client<App::UserAPIKeyProviderClient>();
 
-    auto logged_in_user = sync_manager.fake_user();
+    auto logged_in_user = oas.make_user();
     bool processed = false;
     ObjectId obj_id(UnitTestTransport::api_key_id.c_str());
 
@@ -4888,8 +4872,8 @@ TEST_CASE("app: UserAPIKeyProviderClient unit_tests", "[sync][app][user][api key
 
 
 TEST_CASE("app: user_semantics", "[sync][app][user]") {
-    TestSyncManager tsm(get_config(), {});
-    auto app = tsm.app();
+    OfflineAppSession oas(instance_of<UnitTestTransport>);
+    auto app = oas.app();
 
     const auto login_user_email_pass = [=] {
         return log_in(app, AppCredentials::username_password("bob", "thompson"));
@@ -5018,6 +5002,7 @@ TEST_CASE("app: user_semantics", "[sync][app][user]") {
     }
 }
 
+namespace {
 struct ErrorCheckingTransport : public GenericNetworkTransport {
     ErrorCheckingTransport(Response* r)
         : m_response(r)
@@ -5042,6 +5027,7 @@ struct ErrorCheckingTransport : public GenericNetworkTransport {
 private:
     Response* m_response;
 };
+} // namespace
 
 TEST_CASE("app: response error handling", "[sync][app]") {
     std::string response_body = nlohmann::json({{"access_token", good_access_token},
@@ -5052,8 +5038,8 @@ TEST_CASE("app: response error handling", "[sync][app]") {
 
     Response response{200, 0, {{"Content-Type", "text/plain"}}, response_body};
 
-    TestSyncManager tsm(get_config(std::make_shared<ErrorCheckingTransport>(&response)));
-    auto app = tsm.app();
+    OfflineAppSession oas({std::make_shared<ErrorCheckingTransport>(&response)});
+    auto app = oas.app();
 
     SECTION("http 404") {
         response.http_status_code = 404;
@@ -5127,67 +5113,64 @@ TEST_CASE("app: response error handling", "[sync][app]") {
 }
 
 TEST_CASE("app: switch user", "[sync][app][user]") {
-    TestSyncManager tsm(get_config(), {});
-    auto app = tsm.app();
+    OfflineAppSession oas;
+    auto app = oas.app();
 
     bool processed = false;
 
     SECTION("switch user expect success") {
-        CHECK(app->sync_manager()->all_users().size() == 0);
+        CHECK(app->all_users().size() == 0);
 
         // Log in user 1
         auto user_a = log_in(app, AppCredentials::username_password("test@10gen.com", "password"));
-        CHECK(app->sync_manager()->get_current_user() == user_a);
+        CHECK(app->current_user() == user_a);
 
         // Log in user 2
         auto user_b = log_in(app, AppCredentials::username_password("test2@10gen.com", "password"));
-        CHECK(app->sync_manager()->get_current_user() == user_b);
+        CHECK(app->current_user() == user_b);
 
-        CHECK(app->sync_manager()->all_users().size() == 2);
+        CHECK(app->all_users().size() == 2);
 
-        auto user1 = app->switch_user(user_a);
-        CHECK(user1 == user_a);
+        app->switch_user(user_a);
+        CHECK(app->current_user() == user_a);
 
-        CHECK(app->sync_manager()->get_current_user() == user_a);
+        app->switch_user(user_b);
 
-        auto user2 = app->switch_user(user_b);
-        CHECK(user2 == user_b);
-
-        CHECK(app->sync_manager()->get_current_user() == user_b);
+        CHECK(app->current_user() == user_b);
         processed = true;
         CHECK(processed);
     }
 
-    SECTION("cannot switch to a logged out but not removed user") {
-        CHECK(app->sync_manager()->all_users().size() == 0);
+    SECTION("cannot switch to a logged out user") {
+        CHECK(app->all_users().size() == 0);
 
         // Log in user 1
         auto user_a = log_in(app, AppCredentials::username_password("test@10gen.com", "password"));
-        CHECK(app->sync_manager()->get_current_user() == user_a);
+        CHECK(app->current_user() == user_a);
 
         app->log_out([&](Optional<AppError> error) {
             REQUIRE_FALSE(error);
         });
 
-        CHECK(app->sync_manager()->get_current_user() == nullptr);
+        CHECK(app->current_user() == nullptr);
         CHECK(user_a->state() == SyncUser::State::LoggedOut);
 
         // Log in user 2
         auto user_b = log_in(app, AppCredentials::username_password("test2@10gen.com", "password"));
-        CHECK(app->sync_manager()->get_current_user() == user_b);
-        CHECK(app->sync_manager()->all_users().size() == 2);
+        CHECK(app->current_user() == user_b);
+        CHECK(app->all_users().size() == 2);
 
         REQUIRE_THROWS_AS(app->switch_user(user_a), AppError);
-        CHECK(app->sync_manager()->get_current_user() == user_b);
+        CHECK(app->current_user() == user_b);
     }
 }
 
-TEST_CASE("app: remove anonymous user", "[sync][app][user]") {
-    TestSyncManager tsm(get_config(), {});
-    auto app = tsm.app();
+TEST_CASE("app: remove user", "[sync][app][user]") {
+    OfflineAppSession oas;
+    auto app = oas.app();
 
-    SECTION("remove user expect success") {
-        CHECK(app->sync_manager()->all_users().size() == 0);
+    SECTION("remove anonymous user") {
+        CHECK(app->all_users().size() == 0);
 
         // Log in user 1
         auto user_a = log_in(app);
@@ -5198,39 +5181,34 @@ TEST_CASE("app: remove anonymous user", "[sync][app][user]") {
             // a logged out anon user will be marked as Removed, not LoggedOut
             CHECK(user_a->state() == SyncUser::State::Removed);
         });
-        CHECK(app->sync_manager()->all_users().empty());
+        CHECK(app->all_users().empty());
 
         app->remove_user(user_a, [&](Optional<AppError> error) {
             CHECK(error->reason() == "User has already been removed");
-            CHECK(app->sync_manager()->all_users().size() == 0);
+            CHECK(app->all_users().size() == 0);
         });
 
         // Log in user 2
         auto user_b = log_in(app);
-        CHECK(app->sync_manager()->get_current_user() == user_b);
+        CHECK(app->current_user() == user_b);
         CHECK(user_b->state() == SyncUser::State::LoggedIn);
-        CHECK(app->sync_manager()->all_users().size() == 1);
+        CHECK(app->all_users().size() == 1);
 
         app->remove_user(user_b, [&](Optional<AppError> error) {
             REQUIRE_FALSE(error);
-            CHECK(app->sync_manager()->all_users().size() == 0);
+            CHECK(app->all_users().size() == 0);
         });
 
-        CHECK(app->sync_manager()->get_current_user() == nullptr);
+        CHECK(app->current_user() == nullptr);
 
         // check both handles are no longer valid
         CHECK(user_a->state() == SyncUser::State::Removed);
         CHECK(user_b->state() == SyncUser::State::Removed);
     }
-}
 
-TEST_CASE("app: remove user with credentials", "[sync][app][user]") {
-    TestSyncManager tsm(get_config(), {});
-    auto app = tsm.app();
-
-    SECTION("log in, log out and remove") {
-        CHECK(app->sync_manager()->all_users().size() == 0);
-        CHECK(app->sync_manager()->get_current_user() == nullptr);
+    SECTION("remove user with credentials") {
+        CHECK(app->all_users().size() == 0);
+        CHECK(app->current_user() == nullptr);
 
         auto user = log_in(app, AppCredentials::username_password("email", "pass"));
 
@@ -5245,21 +5223,21 @@ TEST_CASE("app: remove user with credentials", "[sync][app][user]") {
         app->remove_user(user, [&](Optional<AppError> error) {
             REQUIRE_FALSE(error);
         });
-        CHECK(app->sync_manager()->all_users().size() == 0);
+        CHECK(app->all_users().size() == 0);
 
         Optional<AppError> error;
         app->remove_user(user, [&](Optional<AppError> err) {
             error = err;
         });
         CHECK(error->code() > 0);
-        CHECK(app->sync_manager()->all_users().size() == 0);
+        CHECK(app->all_users().size() == 0);
         CHECK(user->state() == SyncUser::State::Removed);
     }
 }
 
 TEST_CASE("app: link_user", "[sync][app][user]") {
-    TestSyncManager tsm(get_config(), {});
-    auto app = tsm.app();
+    OfflineAppSession oas;
+    auto app = oas.app();
 
     auto email = util::format("realm_tests_do_autoverify%1@%2.com", random_string(10), random_string(10));
     auto password = random_string(10);
@@ -5395,13 +5373,12 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app][user][token]") {
                 }
             }
         };
-
-        TestSyncManager sync_manager(get_config(instance_of<transport>));
-        auto app = sync_manager.app();
-        auto user = sync_manager.fake_user();
+        OfflineAppSession oas(OfflineAppSession::Config{instance_of<transport>});
+        auto app = oas.app();
+        oas.make_user();
 
         bool processed = false;
-        app->refresh_custom_data(user, [&](const Optional<AppError>& error) {
+        app->refresh_custom_data(app->current_user(), [&](const Optional<AppError>& error) {
             REQUIRE_FALSE(error);
             CHECK(session_route_hit);
             processed = true;
@@ -5427,12 +5404,12 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app][user][token]") {
             }
         };
 
-        TestSyncManager sync_manager(get_config(instance_of<transport>));
-        auto app = sync_manager.app();
-        auto user = sync_manager.fake_user();
+        OfflineAppSession oas(OfflineAppSession::Config{instance_of<transport>});
+        auto app = oas.app();
+        oas.make_user();
 
         bool processed = false;
-        app->refresh_custom_data(user, [&](const Optional<AppError>& error) {
+        app->refresh_custom_data(app->current_user(), [&](const Optional<AppError>& error) {
             CHECK(error->reason() == "malformed JWT");
             CHECK(error->code() == ErrorCodes::BadToken);
             CHECK(session_route_hit);
@@ -5449,53 +5426,42 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app][user][token]") {
          Refresh token - get a new token for the user
          Get profile - get the profile with the new token
          */
-
         struct transport : GenericNetworkTransport {
-            bool login_hit = false;
-            bool get_profile_1_hit = false;
-            bool get_profile_2_hit = false;
-            bool refresh_hit = false;
-
+            enum class TestState { unknown, location, login, profile_1, refresh, profile_2 };
+            TestingStateMachine<TestState> state{TestState::unknown};
             void send_request_to_server(const Request& request,
                                         util::UniqueFunction<void(const Response&)>&& completion) override
             {
                 if (request.url.find("/login") != std::string::npos) {
-                    login_hit = true;
+                    CHECK(state.get() == TestState::location);
+                    state.transition_to(TestState::login);
                     completion({200, 0, {}, user_json(good_access_token).dump()});
                 }
                 else if (request.url.find("/profile") != std::string::npos) {
-                    CHECK(login_hit);
-
                     auto item = AppUtils::find_header("Authorization", request.headers);
                     CHECK(item);
                     auto access_token = item->second;
                     // simulated bad token request
                     if (access_token.find(good_access_token2) != std::string::npos) {
-                        CHECK(login_hit);
-                        CHECK(get_profile_1_hit);
-                        CHECK(refresh_hit);
-
-                        get_profile_2_hit = true;
-
+                        CHECK(state.get() == TestState::refresh);
+                        state.transition_to(TestState::profile_2);
                         completion({200, 0, {}, user_profile_json().dump()});
                     }
                     else if (access_token.find(good_access_token) != std::string::npos) {
-                        CHECK(!get_profile_2_hit);
-                        get_profile_1_hit = true;
-
+                        CHECK(state.get() == TestState::login);
+                        state.transition_to(TestState::profile_1);
                         completion({401, 0, {}});
                     }
                 }
                 else if (request.url.find("/session") != std::string::npos && request.method == HttpMethod::post) {
-                    CHECK(login_hit);
-                    CHECK(get_profile_1_hit);
-                    CHECK(!get_profile_2_hit);
-                    refresh_hit = true;
-
+                    CHECK(state.get() == TestState::profile_1);
+                    state.transition_to(TestState::refresh);
                     nlohmann::json json{{"access_token", good_access_token2}};
                     completion({200, 0, {}, json.dump()});
                 }
                 else if (request.url.find("/location") != std::string::npos) {
+                    CHECK(state.get() == TestState::unknown);
+                    state.transition_to(TestState::location);
                     CHECK(request.method == HttpMethod::get);
                     completion({200,
                                 0,
@@ -5503,11 +5469,15 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app][user][token]") {
                                 "{\"deployment_model\":\"GLOBAL\",\"location\":\"US-VA\",\"hostname\":"
                                 "\"http://localhost:9090\",\"ws_hostname\":\"ws://localhost:9090\"}"});
                 }
+                else {
+                    FAIL("Unexpected request in test code" + request.url);
+                }
             }
         };
 
-        TestSyncManager sync_manager(get_config(instance_of<transport>));
-        REQUIRE(log_in(sync_manager.app()));
+        OfflineAppSession oas(OfflineAppSession::Config{instance_of<transport>});
+        auto app = oas.app();
+        REQUIRE(log_in(app));
     }
 }
 
@@ -5519,39 +5489,42 @@ public:
     {
     }
 
+    ~AsyncMockNetworkTransport()
+    {
+        {
+            std::lock_guard lk(transport_work_mutex);
+            test_complete = true;
+        }
+        transport_work_cond.notify_one();
+        transport_thread.join();
+        REALM_ASSERT(transport_work.empty());
+    }
+
     void add_work_item(Response&& response, util::UniqueFunction<void(const Response&)>&& completion)
     {
-        std::lock_guard<std::mutex> lk(transport_work_mutex);
-        transport_work.push_front(ResponseWorkItem{std::move(response), std::move(completion)});
+        {
+            std::lock_guard lk(transport_work_mutex);
+            transport_work.push_front([response = std::move(response), completion = std::move(completion)] {
+                completion(response);
+            });
+        }
         transport_work_cond.notify_one();
     }
 
     void add_work_item(util::UniqueFunction<void()> cb)
     {
-        std::lock_guard<std::mutex> lk(transport_work_mutex);
-        transport_work.push_front(std::move(cb));
+        {
+            std::lock_guard lk(transport_work_mutex);
+            transport_work.push_front(std::move(cb));
+        }
         transport_work_cond.notify_one();
-    }
-
-    void mark_complete()
-    {
-        std::unique_lock<std::mutex> lk(transport_work_mutex);
-        test_complete = true;
-        transport_work_cond.notify_one();
-        lk.unlock();
-        transport_thread.join();
     }
 
 private:
-    struct ResponseWorkItem {
-        Response response;
-        util::UniqueFunction<void(const Response&)> completion;
-    };
-
     void worker_routine()
     {
-        std::unique_lock<std::mutex> lk(transport_work_mutex);
         for (;;) {
+            std::unique_lock lk(transport_work_mutex);
             transport_work_cond.wait(lk, [&] {
                 return test_complete || !transport_work.empty();
             });
@@ -5561,15 +5534,7 @@ private:
                 transport_work.pop_back();
                 lk.unlock();
 
-                mpark::visit(util::overload{[](ResponseWorkItem& work_item) {
-                                                work_item.completion(std::move(work_item.response));
-                                            },
-                                            [](util::UniqueFunction<void()>& cb) {
-                                                cb();
-                                            }},
-                             work_item);
-
-                lk.lock();
+                work_item();
                 continue;
             }
 
@@ -5582,7 +5547,7 @@ private:
     std::mutex transport_work_mutex;
     std::condition_variable transport_work_cond;
     bool test_complete = false;
-    std::list<mpark::variant<ResponseWorkItem, util::UniqueFunction<void()>>> transport_work;
+    std::list<util::UniqueFunction<void()>> transport_work;
     JoiningThread transport_thread;
 };
 
@@ -5657,8 +5622,8 @@ TEST_CASE("app: app destroyed during token refresh", "[sync][app][user][token]")
         AsyncMockNetworkTransport& mock_transport_worker;
         TestingStateMachine<TestState>& state;
     };
-    TestSyncManager sync_manager(get_config(std::make_shared<transport>(mock_transport_worker, state)));
-    auto app = sync_manager.app();
+    OfflineAppSession oas({std::make_shared<transport>(mock_transport_worker, state)});
+    auto app = oas.app();
 
     {
         auto [cur_user_promise, cur_user_future] = util::make_promise_future<std::shared_ptr<SyncUser>>();
@@ -5710,102 +5675,15 @@ TEST_CASE("app: app destroyed during token refresh", "[sync][app][user][token]")
     timed_wait_for([&] {
         return !app->sync_manager()->has_existing_sessions();
     });
-
-    mock_transport_worker.mark_complete();
-}
-
-TEST_CASE("app: metadata is persisted between sessions", "[sync][app][metadata]") {
-    const auto orig_hostname = "proto://host:1234";
-    const auto orig_ws_hostname = "wsproto://host:1234";
-
-    struct LocalTransport : UnitTestTransport {
-        void send_request_to_server(const Request& request,
-                                    util::UniqueFunction<void(const Response&)>&& completion) override
-        {
-            if (request.url.find("/location") != std::string::npos) {
-                CHECK(request.method == HttpMethod::get);
-                completion({200,
-                            0,
-                            {},
-                            nlohmann::json({{"deployment_model", "LOCAL"},
-                                            {"location", "IE"},
-                                            {"hostname", test_hostname},
-                                            {"ws_hostname", test_ws_hostname}})
-                                .dump()});
-            }
-            else if (request.url.find("functions/call") != std::string::npos) {
-                REQUIRE(request.url.rfind(test_hostname, 0) != std::string::npos);
-            }
-            else {
-                UnitTestTransport::send_request_to_server(request, std::move(completion));
-            }
-        }
-
-        void set_hostname(std::string hostname, std::string ws_hostname)
-        {
-            test_hostname = hostname;
-            test_ws_hostname = ws_hostname;
-        }
-        std::string test_hostname;
-        std::string test_ws_hostname;
-    };
-
-    auto transport = std::make_shared<LocalTransport>();
-    transport->set_hostname(orig_hostname, orig_ws_hostname);
-
-    TestSyncManager::Config config = get_config(transport);
-    config.base_path = util::make_temp_dir();
-    config.should_teardown_test_directory = false;
-    config.metadata_mode = SyncManager::MetadataMode::NoEncryption;
-
-    {
-        TestSyncManager sync_manager(config, {});
-        auto app = sync_manager.app();
-
-        // This is single threaded
-        app->log_in_with_credentials(AppCredentials::anonymous(), [](auto, auto error) {
-            REQUIRE_FALSE(error);
-        });
-        // Sync route is updated during first request
-        REQUIRE(app->sync_manager()->sync_route());
-        REQUIRE(app->sync_manager()->sync_route()->rfind(orig_ws_hostname, 0) != std::string::npos);
-    }
-
-    config.override_sync_route = false;
-    config.should_teardown_test_directory = true;
-    {
-        TestSyncManager sync_manager(config);
-        auto app = sync_manager.app();
-
-        std::string base_url = sync_manager.sync_server().base_url();
-        std::string ws_url = base_url;
-        size_t uri_scheme_start = ws_url.find("http");
-        if (uri_scheme_start == 0)
-            ws_url.replace(uri_scheme_start, 4, "ws");
-
-        transport->set_hostname(base_url, ws_url);
-
-        REQUIRE(!app->sync_manager()->sync_route()); // sync route is null to force location update on sync startup
-
-        app->call_function("function", {}, [](auto error, auto) {
-            REQUIRE_FALSE(error);
-        });
-
-        REQUIRE(app->sync_manager()->sync_route()); // sync route is updated after operation
-        REQUIRE(app->sync_manager()->sync_route()->rfind(ws_url, 0) != std::string::npos);
-    }
 }
 
 TEST_CASE("app: make_streaming_request", "[sync][app][streaming]") {
     UnitTestTransport::access_token = good_access_token;
+    constexpr uint64_t timeout_ms = 60000; // this is the default
+    OfflineAppSession oas({std::make_shared<UnitTestTransport>(timeout_ms)});
+    auto app = oas.app();
 
-    constexpr uint64_t timeout_ms = 60000;
-    auto config = get_config();
-    config.app_config.default_request_timeout_ms = timeout_ms;
-    TestSyncManager tsm(config);
-    auto app = tsm.app();
-
-    std::shared_ptr<SyncUser> user = log_in(app);
+    auto user = log_in(app);
 
     using Headers = decltype(Request().headers);
 
@@ -5907,10 +5785,9 @@ TEST_CASE("app: sync_user_profile unit tests", "[sync][app][user]") {
     }
 }
 
-#if 0
 TEST_CASE("app: app cannot get deallocated during log in", "[sync][app]") {
     AsyncMockNetworkTransport mock_transport_worker;
-    enum class TestState { unknown, location, login, app_deallocated, profile };
+    enum class TestState { unknown, app_released };
     TestingStateMachine<TestState> state(TestState::unknown);
     struct transport : public GenericNetworkTransport {
         transport(AsyncMockNetworkTransport& worker, TestingStateMachine<TestState>& state)
@@ -5922,20 +5799,17 @@ TEST_CASE("app: app cannot get deallocated during log in", "[sync][app]") {
         void send_request_to_server(const Request& request, util::UniqueFunction<void(const Response&)>&& completion) override
         {
             if (request.url.find("/login") != std::string::npos) {
-                state.transition_to(TestState::login);
-                state.wait_for(TestState::app_deallocated);
+                state.wait_for(TestState::app_released);
                 mock_transport_worker.add_work_item(
                     Response{200, 0, {}, user_json(encode_fake_jwt("access token")).dump()},
                     std::move(completion));
             }
             else if (request.url.find("/profile") != std::string::npos) {
-                state.transition_to(TestState::profile);
                 mock_transport_worker.add_work_item(Response{200, 0, {}, user_profile_json().dump()},
                                                     std::move(completion));
             }
             else if (request.url.find("/location") != std::string::npos) {
                 CHECK(request.method == HttpMethod::get);
-                state.transition_to(TestState::location);
                 mock_transport_worker.add_work_item(
                     Response{200,
                              0,
@@ -5954,37 +5828,36 @@ TEST_CASE("app: app cannot get deallocated during log in", "[sync][app]") {
     auto transporter = std::make_shared<transport>(mock_transport_worker, state);
 
     {
-        TestSyncManager sync_manager(get_config(transporter));
-        auto app = sync_manager.app();
-
-        app->log_in_with_credentials(AppCredentials::anonymous(),
-                                     [promise = std::move(cur_user_promise)](std::shared_ptr<SyncUser> user,
-                                                                             util::Optional<AppError> error) mutable {
-                                         REQUIRE_FALSE(error);
-                                         promise.emplace_value(std::move(user));
-                                     });
+        OfflineAppSession oas({transporter});
+        oas.app()->log_in_with_credentials(
+            AppCredentials::anonymous(), [promise = std::move(cur_user_promise)](
+                                             std::shared_ptr<SyncUser> user, util::Optional<AppError> error) mutable {
+                REQUIRE_FALSE(error);
+                promise.emplace_value(std::move(user));
+            });
     }
 
-    // At this point the test does not hold any reference to `app`.
-    state.transition_to(TestState::app_deallocated);
+    // At this point the test does not hold any reference to `app`, but the
+    // app is keeping itself alive
+    state.transition_to(TestState::app_released);
     auto cur_user = std::move(cur_user_future).get();
     CHECK(cur_user);
-
-    mock_transport_worker.mark_complete();
 }
-#endif
 
 TEST_CASE("app: user logs out while profile is fetched", "[sync][app][user]") {
     AsyncMockNetworkTransport mock_transport_worker;
-    enum class TestState { unknown, location, login, profile };
+    enum class TestState { unknown, location, login, logout, create, profile };
     TestingStateMachine<TestState> state(TestState::unknown);
     struct transport : public GenericNetworkTransport {
-        transport(AsyncMockNetworkTransport& worker, TestingStateMachine<TestState>& state,
-                  std::shared_ptr<SyncUser>& logged_in_user)
+        transport(AsyncMockNetworkTransport& worker, TestingStateMachine<TestState>& state)
             : mock_transport_worker(worker)
             , state(state)
-            , logged_in_user(logged_in_user)
         {
+        }
+        void set_app(App* app)
+        {
+            REQUIRE(state.get() == TestState::unknown);
+            m_app = app;
         }
 
         void send_request_to_server(const Request& request,
@@ -5996,7 +5869,10 @@ TEST_CASE("app: user logs out while profile is fetched", "[sync][app][user]") {
                     Response{200, 0, {}, user_json(encode_fake_jwt("access token")).dump()}, std::move(completion));
             }
             else if (request.url.find("/profile") != std::string::npos) {
-                logged_in_user->log_out();
+                REQUIRE(m_app);
+                auto user = m_app->current_user();
+                REQUIRE(user);
+                user->log_out();
                 state.transition_to(TestState::profile);
                 mock_transport_worker.add_work_item(Response{200, 0, {}, user_profile_json().dump()},
                                                     std::move(completion));
@@ -6012,46 +5888,53 @@ TEST_CASE("app: user logs out while profile is fetched", "[sync][app][user]") {
                              "\"http://localhost:9090\",\"ws_hostname\":\"ws://localhost:9090\"}"},
                     std::move(completion));
             }
+            else if (request.url.find("/session") != std::string::npos) {
+                CHECK(request.method == HttpMethod::del);
+                state.transition_to(TestState::logout);
+                mock_transport_worker.add_work_item(Response{200, 0, {}, ""}, std::move(completion));
+            }
+            else {
+                FAIL("Unexpected request in test transport " + request.url);
+            }
         }
 
         AsyncMockNetworkTransport& mock_transport_worker;
         TestingStateMachine<TestState>& state;
-        std::shared_ptr<SyncUser>& logged_in_user;
+        App* m_app;
     };
 
-    std::shared_ptr<SyncUser> logged_in_user;
-    auto transporter = std::make_shared<transport>(mock_transport_worker, state, logged_in_user);
+    auto transporter = std::make_shared<transport>(mock_transport_worker, state);
+    OfflineAppSession oas({transporter});
+    auto app = oas.app();
+    transporter->set_app(app.get());
 
-    TestSyncManager sync_manager(get_config(transporter));
-    auto app = sync_manager.app();
-
-    logged_in_user = app->sync_manager()->get_user("userid", good_access_token, good_access_token, dummy_device_id);
     auto custom_credentials = AppCredentials::facebook("a_token");
     auto [cur_user_promise, cur_user_future] = util::make_promise_future<std::shared_ptr<SyncUser>>();
 
-    app->link_user(logged_in_user, custom_credentials,
-                   [promise = std::move(cur_user_promise)](std::shared_ptr<SyncUser> user,
-                                                           util::Optional<AppError> error) mutable {
-                       REQUIRE_FALSE(error);
-                       promise.emplace_value(std::move(user));
-                   });
+    app->log_in_with_credentials(custom_credentials,
+                                 [promise = std::move(cur_user_promise)](std::shared_ptr<SyncUser> user,
+                                                                         util::Optional<AppError> error) mutable {
+                                     REQUIRE_FALSE(error);
+                                     promise.emplace_value(std::move(user));
+                                 });
 
     auto cur_user = std::move(cur_user_future).get();
     CHECK(state.get() == TestState::profile);
     CHECK(cur_user);
-    CHECK(cur_user == logged_in_user);
-
-    mock_transport_worker.mark_complete();
+    CHECK(cur_user->state() == SyncUser::State::LoggedOut);
+    REQUIRE(app->all_users().size() == 1);
+    CHECK(app->all_users()[0] == cur_user);
 }
 
 TEST_CASE("app: shared instances", "[sync][app]") {
+    test_util::TestDirGuard test_dir(util::make_temp_dir(), false);
+
     App::Config base_config;
     set_app_config_defaults(base_config, instance_of<UnitTestTransport>);
 
     SyncClientConfig sync_config;
     sync_config.metadata_mode = SyncClientConfig::MetadataMode::NoMetadata;
-    sync_config.base_file_path = util::make_temp_dir() + random_string(10);
-    util::try_make_dir(sync_config.base_file_path);
+    sync_config.base_file_path = test_dir;
 
     auto config1 = base_config;
     config1.app_id = "app1";

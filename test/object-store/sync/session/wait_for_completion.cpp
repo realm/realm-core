@@ -137,7 +137,6 @@ TEST_CASE("SyncSession: wait_for_upload_completion() API", "[sync][pbs][session]
 
     SECTION("works properly when called on a logged-out session") {
         server.start();
-        const auto user_id = "user-async-wait-upload-3";
         auto user = tsm.fake_user();
         auto session = sync_session(user, "/user-async-wait-upload-3", [](auto, auto) {});
         EventLoop::main().run_until([&] {

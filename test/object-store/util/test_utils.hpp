@@ -47,21 +47,24 @@ public:
 
     void transition_to(E new_state)
     {
-        std::lock_guard lock{m_mutex};
-        m_cur_state = new_state;
+        {
+            std::lock_guard lock{m_mutex};
+            m_cur_state = new_state;
+        }
         m_cv.notify_one();
     }
 
     template <typename Func>
     void transition_with(Func&& func)
     {
-        std::lock_guard lock{m_mutex};
-        std::optional<E> new_state = func(m_cur_state);
-        if (!new_state) {
-            return;
+        {
+            std::lock_guard lock{m_mutex};
+            std::optional<E> new_state = func(m_cur_state);
+            if (!new_state) {
+                return;
+            }
+            m_cur_state = *new_state;
         }
-
-        m_cur_state = *new_state;
         m_cv.notify_one();
     }
 

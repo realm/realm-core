@@ -180,9 +180,11 @@ TEST_CASE("sync_user: logout", "[sync][user]") {
 }
 
 TEST_CASE("sync_user: user persistence", "[sync][user]") {
-    TestSyncManager tsm(SyncManager::MetadataMode::NoEncryption);
+    TestSyncManager::Config tsm_config;
+    tsm_config.metadata_mode = SyncManager::MetadataMode::NoEncryption;
+    TestSyncManager tsm(tsm_config);
     auto sync_manager = tsm.sync_manager();
-    auto file_manager = SyncFileManager(tsm.base_file_path(), tsm.app()->config().app_id);
+    auto file_manager = SyncFileManager(tsm.base_file_path(), "app_id");
     // Open the metadata separately, so we can investigate it ourselves.
     SyncMetadataManager manager(file_manager.metadata_path(), false);
 

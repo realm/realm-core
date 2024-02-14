@@ -1946,9 +1946,8 @@ TEMPLATE_TEST_CASE("client reset types", "[sync][pbs][client reset]", cf::MixedV
     if (!util::EventLoop::has_implementation())
         return;
 
-    TestSyncManager init_sync_manager;
-    SyncTestFile config(init_sync_manager.app(), "default");
-    config.cache = false;
+    OfflineAppSession oas;
+    SyncTestFile config(oas, "default");
     config.automatic_change_notifications = false;
     ClientResyncMode test_mode = GENERATE(ClientResyncMode::DiscardLocal, ClientResyncMode::Recover);
     CAPTURE(test_mode);
@@ -1967,7 +1966,7 @@ TEMPLATE_TEST_CASE("client reset types", "[sync][pbs][client reset]", cf::MixedV
           {"set", PropertyType::Set | TestType::property_type}}},
     };
 
-    SyncTestFile config2(init_sync_manager.app(), "default");
+    SyncTestFile config2(oas.app()->current_user(), "default");
     config2.schema = config.schema;
 
     Results results;
@@ -2623,16 +2622,15 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[sync][pbs][client rese
          }},
     };
 
-    TestSyncManager init_sync_manager;
-    SyncTestFile config(init_sync_manager.app(), "default");
-    config.cache = false;
+    OfflineAppSession oas;
+    SyncTestFile config(oas, "default");
     config.automatic_change_notifications = false;
     config.schema = schema;
     ClientResyncMode test_mode = GENERATE(ClientResyncMode::DiscardLocal, ClientResyncMode::Recover);
     CAPTURE(test_mode);
     config.sync_config->client_resync_mode = test_mode;
 
-    SyncTestFile config2(init_sync_manager.app(), "default");
+    SyncTestFile config2(oas.app()->current_user(), "default");
     config2.schema = schema;
 
     std::unique_ptr<reset_utils::TestClientReset> test_reset =
@@ -3140,9 +3138,8 @@ TEST_CASE("client reset with embedded object", "[sync][pbs][client reset][embedd
     if (!util::EventLoop::has_implementation())
         return;
 
-    TestSyncManager init_sync_manager;
-    SyncTestFile config(init_sync_manager.app(), "default");
-    config.cache = false;
+    OfflineAppSession oas;
+    SyncTestFile config(oas, "default");
     config.automatic_change_notifications = false;
     ClientResyncMode test_mode = GENERATE(ClientResyncMode::DiscardLocal, ClientResyncMode::Recover);
     CAPTURE(test_mode);
@@ -3488,7 +3485,7 @@ TEST_CASE("client reset with embedded object", "[sync][pbs][client reset][embedd
         }
     };
 
-    SyncTestFile config2(init_sync_manager.app(), "default");
+    SyncTestFile config2(oas.app()->current_user(), "default");
     config2.schema = config.schema;
 
     std::unique_ptr<reset_utils::TestClientReset> test_reset =
@@ -4280,7 +4277,7 @@ TEST_CASE("client reset with embedded object", "[sync][pbs][client reset][embedd
         reset_embedded_object({local}, {remote}, expected_recovered);
     }
     SECTION("server adds embedded object classes") {
-        SyncTestFile config2(init_sync_manager.app(), "default");
+        SyncTestFile config2(oas.app()->current_user(), "default");
         config2.schema = config.schema;
         config.schema = Schema{shared_class};
         test_reset = reset_utils::make_fake_local_client_reset(config, config2);
@@ -4305,7 +4302,7 @@ TEST_CASE("client reset with embedded object", "[sync][pbs][client reset][embedd
             ->run();
     }
     SECTION("client adds embedded object classes") {
-        SyncTestFile config2(init_sync_manager.app(), "default");
+        SyncTestFile config2(oas.app()->current_user(), "default");
         config2.schema = Schema{shared_class};
         test_reset = reset_utils::make_fake_local_client_reset(config, config2);
         TopLevelContent local_content;
