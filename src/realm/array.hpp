@@ -366,6 +366,8 @@ public:
     /// check if the array is encoded (in B format)
     inline bool is_encoded() const;
 
+    inline const ArrayEncode& get_encoder() const;
+
     /// used only for testing, encode the array passed as argument
     bool try_encode(Array&) const;
 
@@ -563,8 +565,6 @@ protected:
     // encode/decode this array
     bool encode_array(Array&) const;
     bool decode_array(Array& arr) const;
-    // these are used to directly set the vtable dispatcher in Array and spare us a bunch
-    // of CPU cycles in order to check if the array is in compressed format
     int64_t get_encoded(size_t ndx) const noexcept;
     void set_encoded(size_t ndx, int64_t);
     void get_chunk_encoded(size_t, int64_t[8]) const noexcept;
@@ -600,6 +600,11 @@ inline bool Array::is_encoded() const
                             m_encoder.get_encoding() == NodeHeader::Encoding::Packed));
 #endif
     return m_encoder.get_kind() == 'B';
+}
+
+inline const ArrayEncode& Array::get_encoder() const
+{
+    return m_encoder;
 }
 
 inline int64_t Array::get(size_t ndx) const noexcept
@@ -754,15 +759,15 @@ template <size_t w>
 inline int64_t Array::get_universal(const char* data, size_t ndx) const
 {
     if (w == 64) {
-        size_t offset = ndx * 8;
+        size_t offset = ndx << 3;
         return *reinterpret_cast<const int64_t*>(data + offset);
     }
     else if (w == 32) {
-        size_t offset = ndx * 4;
+        size_t offset = ndx << 2;
         return *reinterpret_cast<const int32_t*>(data + offset);
     }
     else if (w == 16) {
-        size_t offset = ndx * 2;
+        size_t offset = ndx << 1;
         return *reinterpret_cast<const int16_t*>(data + offset);
     }
     else if (w == 8) {

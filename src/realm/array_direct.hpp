@@ -165,15 +165,15 @@ int64_t get_direct(const char* data, size_t ndx) noexcept
         return *reinterpret_cast<const signed char*>(data + ndx);
     }
     if (w == 16) {
-        size_t offset = ndx * 2;
+        size_t offset = ndx << 1;
         return *reinterpret_cast<const int16_t*>(data + offset);
     }
     if (w == 32) {
-        size_t offset = ndx * 4;
+        size_t offset = ndx << 2;
         return *reinterpret_cast<const int32_t*>(data + offset);
     }
     if (w == 64) {
-        size_t offset = ndx * 8;
+        size_t offset = ndx << 3;
         return *reinterpret_cast<const int64_t*>(data + offset);
     }
     REALM_ASSERT_DEBUG(false);
@@ -209,6 +209,7 @@ public:
         field_position = initial_offset + index * step_size;
         first_word_ptr = data_area + (field_position >> 6);
     }
+
     uint64_t get_value() const
     {
         auto in_word_position = field_position & 0x3F;

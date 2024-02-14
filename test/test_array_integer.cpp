@@ -32,6 +32,20 @@
 using namespace realm;
 using namespace realm::test_util;
 
+TEST(Test_basic_find)
+{
+    ArrayInteger a(Allocator::get_default());
+    ArrayInteger a_encoded(Allocator::get_default());
+    a.create();
+    for (size_t i = 1; i <= 15; ++i)
+        a.add(i);
+    a.try_encode(a_encoded);
+    CHECK(a_encoded.is_encoded());
+    const auto index_original = a.find_first(13);
+    const auto index_encoded = a_encoded.find_first(13);
+    CHECK(index_original == index_encoded);
+}
+
 TEST(Test_ArrayInt_no_encode)
 {
     //    ArrayInteger a(Allocator::get_default());

@@ -65,10 +65,10 @@ public:
     // sum
     int64_t sum(const Array&, size_t start, size_t end) const;
 
-private:
     inline bool is_packed() const;
     inline bool is_flex() const;
 
+private:
     void set(char* data, size_t w, size_t ndx, int64_t v) const;
     size_t flex_encoded_array_size(const std::vector<int64_t>&, const std::vector<size_t>&, size_t&, size_t&) const;
     size_t packed_encoded_array_size(std::vector<int64_t>&, size_t, size_t&) const;

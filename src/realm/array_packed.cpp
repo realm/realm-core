@@ -96,22 +96,6 @@ int64_t ArrayPacked::do_get(uint64_t* data, size_t ndx, size_t v_width, size_t v
 {
     if (ndx >= v_size)
         return realm::not_found;
-
-    //    const auto mask = (1ULL << v_width) - 1;
-    //    const auto offset = ndx * v_width;
-    //    const auto pos = offset >> 6;
-    //    const auto buff = (data + pos);
-    //    uint64_t res = buff[0];
-    //    const auto word_pos = offset % 64;
-    //    res >>= word_pos;
-    //    if (word_pos + v_width > 64) {
-    //        // data among 2 words
-    //        uint64_t rest = buff[1];
-    //        rest <<= 64 - word_pos;
-    //        res |= rest;
-    //    }
-    //    return sign_extend_field(v_width, res & mask);
-
     bf_iterator it{data, 0, v_width, v_width, ndx};
     const auto result = it.get_value();
     return sign_extend_field(v_width, result);
@@ -144,8 +128,64 @@ void inline ArrayPacked::get_encode_info(const char* h, size_t& v_width, size_t&
     v_size = NodeHeader::get_num_elements<Encoding::Packed>(h);
 }
 
+std::vector<int64_t> ArrayPacked::get_all_values(const Array& arr, size_t w, size_t sz, size_t start, size_t end)
+{
+    REALM_ASSERT_DEBUG(arr.is_attached());
+    REALM_ASSERT_DEBUG(arr.is_encoded());
+    REALM_ASSERT_DEBUG(end <= sz);
+    const auto s_bits = w * start;
+    const auto e_bits = w * end;
+    const auto s_bytes = s_bits >> 6;
+    const auto e_bytes = e_bits >> 6;
+    const auto data = (uint64_t*)arr.m_data;
+    const auto start_data = (data + s_bytes);
+    const auto end_data = (data + e_bytes);
+    const auto shift_bits = s_bits & 0x3F;
+    std::vector<uint64_t> raw_values;
+    auto pos_data = start_data;
+    while (pos_data <= end_data) {
+        auto raw_v = *pos_data;
+        if (pos_data == start_data)
+            raw_v >>= shift_bits;
+        raw_values.push_back(raw_v);
+        ++pos_data;
+    }
+    const auto mask = (1ULL << w) - 1;
+    std::vector<int64_t> res;
+    res.reserve(end - start);
+    size_t counter = shift_bits;
+    size_t word_limit = 64;
+    for (size_t i = 0; i < raw_values.size(); ++i) {
+        auto v = raw_values[i];
+        word_limit <<= 1;
+        // std::cout << "NWORD:" << std::bitset<64>(v) << std::endl;
+
+        while (counter < e_bits && counter + w <= word_limit) {
+
+            auto sv = v & mask;
+            if (w < 64)
+                sv = sign_extend_field(w, sv);
+            // std::cout << " W:"<< ++ii << ")"<< std::bitset<64>(v) << " ==> "  << sv << std::endl;
+            res.push_back(sv);
+            v >>= w;
+            counter += w;
+        }
+        if (counter < e_bits) {
+            // we are here only when the value is stored accross 2 64 bit words
+            auto sv = (raw_values[i + 1] << counter) | v;
+            if (w < 64)
+                sv = sign_extend_field(w, sv);
+            counter += w;
+            // std::cout << " B: "<< ++ii << ")"<< std::bitset<64>(sv) << " ==> "  << sv << std::endl;
+            res.push_back(sv);
+            raw_values[i + 1] >>= (counter - 64);
+        }
+    }
+    return res;
+}
+
 // template <typename F>
-// size_t ArrayPacked::find_first(const Array& arr, int64_t key, size_t start, size_t end, F cmp)
+// size_t ArrayPacked::c(const Array& arr, int64_t key, size_t start, size_t end, F cmp)
 //{
 //     constexpr auto LIMIT = 30;
 //     const auto h = arr.get_header();
