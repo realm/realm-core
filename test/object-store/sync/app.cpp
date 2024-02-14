@@ -2735,10 +2735,9 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
                                     util::UniqueFunction<void(const Response&)>&& completion) override
         {
             if (request_hook) {
-                request_hook(request);
-            }
-            if (simulated_response) {
-                return completion(*simulated_response);
+                if (auto simulated_response = request_hook(request)) {
+                    return completion(*simulated_response);
+                }
             }
             SynchronousTestTransport::send_request_to_server(request, [&](const Response& response) mutable {
                 if (response_hook) {
@@ -2750,9 +2749,38 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
         // Optional handler for the request and response before it is returned to completion
         std::function<void(const Request&, const Response&)> response_hook;
         // Optional handler for the request before it is sent to the server
-        std::function<void(const Request&)> request_hook;
-        // Optional Response object to return immediately instead of communicating with the server
-        std::optional<Response> simulated_response;
+        std::function<std::optional<Response>(const Request&)> request_hook;
+    };
+
+    struct HookedSocketProvider : public sync::websocket::DefaultSocketProvider {
+        HookedSocketProvider(const std::shared_ptr<util::Logger>& logger, const std::string user_agent,
+                             AutoStart auto_start = AutoStart{true})
+            : DefaultSocketProvider(logger, user_agent, nullptr, auto_start)
+        {
+        }
+
+        std::unique_ptr<sync::WebSocketInterface> connect(std::unique_ptr<sync::WebSocketObserver> observer,
+                                                          sync::WebSocketEndpoint&& endpoint) override
+        {
+            auto simulated_response = websocket_connect_simulated_response_func
+                                          ? websocket_connect_simulated_response_func()
+                                          : std::nullopt;
+
+            if (websocket_endpoint_resolver) {
+                endpoint = websocket_endpoint_resolver(std::move(endpoint));
+            }
+            std::unique_ptr<sync::WebSocketInterface> websocket =
+                DefaultSocketProvider::connect(std::move(observer), std::move(endpoint));
+            if (simulated_response) {
+                auto default_websocket = static_cast<sync::websocket::DefaultWebSocket*>(websocket.get());
+                if (default_websocket)
+                    default_websocket->force_handshake_response_for_testing(*simulated_response, "");
+            }
+            return websocket;
+        }
+
+        std::function<std::optional<int>()> websocket_connect_simulated_response_func;
+        std::function<sync::WebSocketEndpoint(sync::WebSocketEndpoint&&)> websocket_endpoint_resolver;
     };
 
     {
@@ -2774,19 +2802,19 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
 
         SECTION("Test invalid redirect response") {
             int request_count = 0;
-            redir_transport->request_hook = [&](const Request& request) {
+            redir_transport->request_hook = [&](const Request& request) -> std::optional<Response> {
                 if (request_count == 0) {
                     logger->trace("request.url (%1): %2", request_count, request.url);
-                    redir_transport->simulated_response = {
-                        301, 0, {{"Content-Type", "application/json"}}, "Some body data"};
-                    request_count++;
+                    ++request_count;
+                    return Response{301, 0, {{"Content-Type", "application/json"}}, "Some body data"};
                 }
                 else if (request_count == 1) {
                     logger->trace("request.url (%1): %2", request_count, request.url);
-                    redir_transport->simulated_response = {
+                    return Response{
                         301, 0, {{"Location", ""}, {"Content-Type", "application/json"}}, "Some body data"};
-                    request_count++;
                 }
+
+                return std::nullopt;
             };
 
             // This will fail due to no Location header
@@ -2811,11 +2839,16 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
         SECTION("Test redirect response") {
             int request_count = 0;
             // redirect URL is localhost or 127.0.0.1 depending on what the initial value is
-            std::string original_host = "localhost:9090";
+            const std::string original_url = get_base_url();
+            std::string original_host = original_url.substr(original_url.find("://") + 3);
+            original_host = original_host.substr(0, original_host.find("/"));
+            std::string original_ws_host = util::format("ws://%1", original_host);
             std::string redirect_scheme = "http://";
-            std::string redirect_host = "127.0.0.1:9090";
-            std::string redirect_url = "http://127.0.0.1:9090";
-            redir_transport->request_hook = [&](const Request& request) {
+            std::string websocket_scheme = "ws://";
+            const std::string redirect_host = "fakerealm.example.com:9090";
+            const std::string redirect_url = "http://fakerealm.example.com:9090";
+            const std::string redirect_ws = "ws://fakerealm.example.com:9090";
+            redir_transport->request_hook = [&](const Request& request) -> std::optional<Response> {
                 logger->trace("Received request[%1]: %2", request_count, request.url);
                 if (request_count == 0) {
                     // First request should be to location
@@ -2823,53 +2856,39 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
                     if (request.url.find("https://") != std::string::npos) {
                         redirect_scheme = "https://";
                     }
-                    // using local baas
-                    if (request.url.find("127.0.0.1:9090") != std::string::npos) {
-                        redirect_host = "localhost:9090";
-                        original_host = "127.0.0.1:9090";
-                    }
-                    // using baas docker - can't test redirect
-                    else if (request.url.find("mongodb-realm:9090") != std::string::npos) {
-                        redirect_host = "mongodb-realm:9090";
-                        original_host = "mongodb-realm:9090";
-                    }
-
-                    redirect_url = redirect_scheme + redirect_host;
                     logger->trace("redirect_url (%1): %2", request_count, redirect_url);
                     request_count++;
                 }
                 else if (request_count == 1) {
                     logger->trace("request.url (%1): %2", request_count, request.url);
                     REQUIRE(!request.redirect_count);
-                    redir_transport->simulated_response = {
-                        301,
-                        0,
-                        {{"Location", "http://somehost:9090"}, {"Content-Type", "application/json"}},
-                        "Some body data"};
-                    request_count++;
+                    ++request_count;
+                    return Response{301,
+                                    0,
+                                    {{"Location", "http://somehost:9090"}, {"Content-Type", "application/json"}},
+                                    "Some body data"};
                 }
                 else if (request_count == 2) {
                     logger->trace("request.url (%1): %2", request_count, request.url);
                     REQUIRE(request.url.find("somehost:9090") != std::string::npos);
-                    redir_transport->simulated_response = {
+                    ++request_count;
+                    return Response{
                         308, 0, {{"Location", redirect_url}, {"Content-Type", "application/json"}}, "Some body data"};
-                    request_count++;
                 }
                 else if (request_count == 3) {
                     logger->trace("request.url (%1): %2", request_count, request.url);
                     REQUIRE(request.url.find(redirect_url) != std::string::npos);
-                    redir_transport->simulated_response = {
+                    ++request_count;
+                    return Response{
                         301,
                         0,
                         {{"Location", redirect_scheme + original_host}, {"Content-Type", "application/json"}},
                         "Some body data"};
-                    request_count++;
                 }
                 else if (request_count == 4) {
                     logger->trace("request.url (%1): %2", request_count, request.url);
                     REQUIRE(request.url.find(redirect_scheme + original_host) != std::string::npos);
-                    // Let the location request go through
-                    redir_transport->simulated_response.reset();
+                    // Let the init_app_metadata request go through
                     request_count++;
                 }
                 else if (request_count == 5) {
@@ -2878,9 +2897,10 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
                     // App metadata is no longer being used, query the host_url from app
                     REQUIRE(redir_app->get_host_url().find(original_host) != std::string::npos);
                     REQUIRE(request.url.find(redirect_scheme + original_host) != std::string::npos);
-                    redir_transport->simulated_response.reset();
+                    // Validate the retry count tracked in the original message
                     request_count++;
                 }
+                return std::nullopt;
             };
 
             // This will be successful after a couple of retries due to the redirect response
@@ -2892,15 +2912,14 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
 
         SECTION("Test too many redirects") {
             int request_count = 0;
-            redir_transport->request_hook = [&](const Request& request) {
+            redir_transport->request_hook = [&](const Request& request) -> std::optional<Response> {
                 logger->trace("request.url (%1): %2", request_count, request.url);
                 REQUIRE(request_count <= 21);
-                redir_transport->simulated_response = {
-                    request_count % 2 == 1 ? 308 : 301,
-                    0,
-                    {{"Location", "http://somehost:9090"}, {"Content-Type", "application/json"}},
-                    "Some body data"};
-                request_count++;
+                ++request_count;
+                return Response{request_count % 2 == 1 ? 308 : 301,
+                                0,
+                                {{"Location", "http://somehost:9090"}, {"Content-Type", "application/json"}},
+                                "Some body data"};
             };
 
             redir_app->log_in_with_credentials(
@@ -2914,12 +2933,11 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
                 });
         }
         SECTION("Test server in maintenance") {
-            redir_transport->request_hook = [&](const Request&) {
+            redir_transport->request_hook = [&](const Request&) -> std::optional<Response> {
                 nlohmann::json maintenance_error = {{"error_code", "MaintenanceInProgress"},
                                                     {"error", "This service is currently undergoing maintenance"},
                                                     {"link", "https://link.to/server_logs"}};
-                redir_transport->simulated_response = {
-                    500, 0, {{"Content-Type", "application/json"}}, maintenance_error.dump()};
+                return Response{500, 0, {{"Content-Type", "application/json"}}, maintenance_error.dump()};
             };
 
             redir_app->log_in_with_credentials(
@@ -2953,55 +2971,38 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
         auto redir_app = app::App::get_app(app::App::CacheMode::Disabled, app_config, sc_config);
 
         int request_count = 0;
-        // redirect URL is localhost or 127.0.0.1 depending on what the initial value is
-        std::string original_host = "localhost:9090";
-        std::string original_scheme = "http://";
-        std::string websocket_url = "ws://some-websocket:9090";
-        std::string original_url;
-        redir_transport->request_hook = [&](const Request& request) {
+        const std::string original_url = get_base_url();
+        std::string original_host = original_url.substr(original_url.find("://") + 3);
+        original_host = original_host.substr(0, original_host.find("/"));
+        std::string original_ws_host = util::format("ws://%1", original_host);
+        const std::string redirect_url = "http://fakerealm.example.com:9090";
+        redir_transport->request_hook = [&](const Request& request) -> std::optional<Response> {
             logger->trace("request.url (%1): %2", request_count, request.url);
-            if (request_count == 0) {
+            if (request_count++ == 0) {
                 // First request should be to location
                 REQUIRE(request.url.find("/location") != std::string::npos);
-                if (request.url.find("https://") != std::string::npos) {
-                    original_scheme = "https://";
-                }
-                // using local baas
-                if (request.url.find("127.0.0.1:9090") != std::string::npos) {
-                    original_host = "127.0.0.1:9090";
-                }
-                // using baas docker
-                else if (request.url.find("mongodb-realm:9090") != std::string::npos) {
-                    original_host = "mongodb-realm:9090";
-                }
-                original_url = original_scheme + original_host;
                 logger->trace("original_url (%1): %2", request_count, original_url);
             }
-            else if (request_count == 1) {
+            else if (request_count++ == 1) {
                 REQUIRE(!request.redirect_count);
-                redir_transport->simulated_response = {
-                    308,
-                    0,
-                    {{"Location", "http://somehost:9090"}, {"Content-Type", "application/json"}},
-                    "Some body data"};
+                return Response{
+                    308, 0, {{"Location", redirect_url}, {"Content-Type", "application/json"}}, "Some body data"};
             }
-            else if (request_count == 2) {
-                REQUIRE(request.url.find("http://somehost:9090") != std::string::npos);
+            else if (request_count++ == 2) {
                 REQUIRE(request.url.find("location") != std::string::npos);
                 // app hostname will be updated via the metadata info
-                redir_transport->simulated_response = {
+                return Response{
                     static_cast<int>(sync::HTTPStatus::Ok),
                     0,
                     {{"Content-Type", "application/json"}},
                     util::format("{\"deployment_model\":\"GLOBAL\",\"location\":\"US-VA\",\"hostname\":\"%1\",\"ws_"
                                  "hostname\":\"%2\"}",
-                                 original_url, websocket_url)};
+                                 original_url, original_ws_host)};
             }
             else {
                 REQUIRE(request.url.find(original_url) != std::string::npos);
-                redir_transport->simulated_response.reset();
             }
-            request_count++;
+            return std::nullopt;
         };
 
         // This will be successful after a couple of retries due to the redirect response
@@ -3010,15 +3011,15 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
                 REQUIRE(!error);
             });
         REQUIRE(redir_app->sync_manager()->sync_route());
-        REQUIRE(redir_app->sync_manager()->sync_route()->find(websocket_url) != std::string::npos);
+        REQUIRE(redir_app->sync_manager()->sync_route()->find(original_ws_host) != std::string::npos);
 
         // Register another email address and verify location data isn't requested again
         request_count = 0;
-        redir_transport->request_hook = [&](const Request& request) {
+        redir_transport->request_hook = [&](const Request& request) -> std::optional<Response> {
             logger->trace("request.url (%1): %2", request_count, request.url);
-            redir_transport->simulated_response.reset();
             REQUIRE(request.url.find("location") == std::string::npos);
             request_count++;
+            return std::nullopt;
         };
 
         redir_app->provider_client<app::App::UsernamePasswordProviderClient>().register_email(
@@ -3028,38 +3029,34 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
     }
 
     SECTION("Test websocket redirect with existing session") {
-        std::string original_host = "localhost:9090";
+        std::string configured_app_url = get_base_url();
+        std::string original_host = configured_app_url.substr(configured_app_url.find("://") + 3);
+        original_host = original_host.substr(0, original_host.find("/"));
+        std::string original_address = original_host;
+        uint16_t original_port = 443;
+        if (auto port_pos = original_host.find(":"); port_pos != std::string::npos) {
+            auto original_port_str = original_host.substr(port_pos + 1);
+
+            original_port = strtol(original_port_str.c_str(), nullptr, 10);
+            original_address = original_host.substr(0, port_pos);
+        }
+
         std::string redirect_scheme = "http://";
         std::string websocket_scheme = "ws://";
-        std::string redirect_host = "127.0.0.1:9090";
-        std::string redirect_url = "http://127.0.0.1:9090";
+        const std::string redirect_address = "fakerealm.example.com";
+        const std::string redirect_host = "fakerealm.example.com:9090";
+        const std::string redirect_url = "http://fakerealm.example.com:9090";
 
         auto redir_transport = std::make_shared<HookedTransport>();
         auto redir_provider = std::make_shared<HookedSocketProvider>(logger, "");
+        redir_provider->websocket_endpoint_resolver = [&](sync::WebSocketEndpoint&& ep) {
+            ep.address = original_address;
+            ep.port = original_port;
+            return ep;
+        };
         std::mutex logout_mutex;
         std::condition_variable logout_cv;
         bool logged_out = false;
-
-        // Use the transport to grab the current url so it can be converted
-        redir_transport->request_hook = [&](const Request& request) {
-            if (request.url.find("https://") != std::string::npos) {
-                redirect_scheme = "https://";
-                websocket_scheme = "wss://";
-            }
-            // using local baas
-            if (request.url.find("127.0.0.1:9090") != std::string::npos) {
-                redirect_host = "localhost:9090";
-                original_host = "127.0.0.1:9090";
-            }
-            // using baas docker - can't test redirect
-            else if (request.url.find("mongodb-realm:9090") != std::string::npos) {
-                redirect_host = "mongodb-realm:9090";
-                original_host = "mongodb-realm:9090";
-            }
-
-            redirect_url = redirect_scheme + redirect_host;
-            logger->trace("redirect_url: %1", redirect_url);
-        };
 
         auto server_app_config = minimal_app_config("websocket_redirect", schema);
         TestAppSession test_session(create_app(server_app_config), redir_transport, DeleteApp{true},
@@ -3091,30 +3088,38 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
             sync_session->pause();
 
             int connect_count = 0;
-            redir_provider->websocket_connect_func = [&connect_count](int& status_code, std::string& body) {
+            redir_provider->websocket_connect_simulated_response_func = [&connect_count]() -> std::optional<int> {
                 if (connect_count++ > 0)
-                    return false;
+                    return std::nullopt;
 
-                status_code = static_cast<int>(sync::HTTPStatus::PermanentRedirect);
-                body = "";
-                return true;
+                return static_cast<int>(sync::HTTPStatus::PermanentRedirect);
+            };
+            redir_provider->websocket_endpoint_resolver = [&](sync::WebSocketEndpoint&& ep) {
+                if (connect_count < 2) {
+                    return ep;
+                }
+                REQUIRE(ep.address == redirect_address);
+                ep.address = original_address;
+                ep.port = original_port;
+                return ep;
             };
             int request_count = 0;
-            redir_transport->request_hook = [&](const Request& request) {
+            redir_transport->request_hook = [&](const Request& request) -> std::optional<Response> {
                 logger->trace("request.url (%1): %2", request_count, request.url);
                 if (request_count++ == 0) {
                     // First request should be a location request against the original URL
                     REQUIRE(request.url.find(original_host) != std::string::npos);
                     REQUIRE(request.url.find("/location") != std::string::npos);
                     REQUIRE(request.redirect_count == 0);
-                    redir_transport->simulated_response = {
-                        static_cast<int>(sync::HTTPStatus::PermanentRedirect),
-                        0,
-                        {{"Location", redirect_url}, {"Content-Type", "application/json"}},
-                        "Some body data"};
+                    return Response{static_cast<int>(sync::HTTPStatus::PermanentRedirect),
+                                    0,
+                                    {{"Location", redirect_url}, {"Content-Type", "application/json"}},
+                                    "Some body data"};
                 }
                 else if (request.url.find("/location") != std::string::npos) {
-                    redir_transport->simulated_response = {
+                    REQUIRE(request.url.find(redirect_host) != std::string::npos);
+                    ++request_count;
+                    return Response{
                         static_cast<int>(sync::HTTPStatus::Ok),
                         0,
                         {{"Content-Type", "application/json"}},
@@ -3123,9 +3128,15 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
                             "hostname\":\"%3%1\"}",
                             redirect_host, redirect_scheme, websocket_scheme)};
                 }
-                else {
-                    redir_transport->simulated_response.reset();
+                else if (request.url.find(redirect_host) != std::string::npos) {
+                    auto new_req = request;
+                    new_req.url = util::format("%1%2", configured_app_url, request.url.substr(redirect_url.size()));
+                    logger->trace("Proxying request from %1 to %2", request.url, new_req.url);
+                    auto resp = do_http_request(new_req);
+                    logger->trace("Response: \"%1\"", resp.body);
+                    return resp;
                 }
+                return std::nullopt;
             };
 
             SyncManager::OnlyForTesting::voluntary_disconnect_all_connections(*sync_manager);
@@ -3144,30 +3155,27 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
             sync_session->pause();
 
             int connect_count = 0;
-            redir_provider->websocket_connect_func = [&connect_count](int& status_code, std::string& body) {
+            redir_provider->websocket_connect_simulated_response_func = [&connect_count]() -> std::optional<int> {
                 if (connect_count++ > 0)
-                    return false;
+                    return std::nullopt;
 
-                status_code = static_cast<int>(sync::HTTPStatus::MovedPermanently);
-                body = "";
-                return true;
+                return static_cast<int>(sync::HTTPStatus::MovedPermanently);
             };
             int request_count = 0;
-            redir_transport->request_hook = [&](const Request& request) {
+            redir_transport->request_hook = [&](const Request& request) -> std::optional<Response> {
                 logger->trace("request.url (%1): %2", request_count, request.url);
                 if (request_count++ == 0) {
                     // First request should be a location request against the original URL
                     REQUIRE(request.url.find(original_host) != std::string::npos);
                     REQUIRE(request.url.find("/location") != std::string::npos);
                     REQUIRE(request.redirect_count == 0);
-                    redir_transport->simulated_response = {
-                        static_cast<int>(sync::HTTPStatus::MovedPermanently),
-                        0,
-                        {{"Location", redirect_url}, {"Content-Type", "application/json"}},
-                        "Some body data"};
+                    return Response{static_cast<int>(sync::HTTPStatus::MovedPermanently),
+                                    0,
+                                    {{"Location", redirect_url}, {"Content-Type", "application/json"}},
+                                    "Some body data"};
                 }
                 else if (request.url.find("/location") != std::string::npos) {
-                    redir_transport->simulated_response = {
+                    return Response{
                         static_cast<int>(sync::HTTPStatus::Ok),
                         0,
                         {{"Content-Type", "application/json"}},
@@ -3177,14 +3185,12 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
                             redirect_host, redirect_scheme, websocket_scheme)};
                 }
                 else if (request.url.find("auth/session") != std::string::npos) {
-                    redir_transport->simulated_response = {static_cast<int>(sync::HTTPStatus::Unauthorized),
-                                                           0,
-                                                           {{"Content-Type", "application/json"}},
-                                                           ""};
+                    return Response{static_cast<int>(sync::HTTPStatus::Unauthorized),
+                                    0,
+                                    {{"Content-Type", "application/json"}},
+                                    ""};
                 }
-                else {
-                    redir_transport->simulated_response.reset();
-                }
+                return std::nullopt;
             };
 
             SyncManager::OnlyForTesting::voluntary_disconnect_all_connections(*sync_manager);
@@ -3203,17 +3209,15 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
             sync_session->pause();
 
             int connect_count = 0;
-            redir_provider->websocket_connect_func = [&connect_count](int& status_code, std::string& body) {
+            redir_provider->websocket_connect_simulated_response_func = [&connect_count]() -> std::optional<int> {
                 if (connect_count++ > 0)
-                    return false;
+                    return std::nullopt;
 
-                status_code = static_cast<int>(sync::HTTPStatus::MovedPermanently);
-                body = "";
-                return true;
+                return static_cast<int>(sync::HTTPStatus::MovedPermanently);
             };
             int request_count = 0;
             const int max_http_redirects = 20; // from app.cpp in object-store
-            redir_transport->request_hook = [&](const Request& request) {
+            redir_transport->request_hook = [&](const Request& request) -> std::optional<Response> {
                 logger->trace("request.url (%1): %2", request_count, request.url);
                 if (request_count++ == 0) {
                     // First request should be a location request against the original URL
@@ -3224,16 +3228,15 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
                 if (request.url.find("/location") != std::string::npos) {
                     // Keep returning the redirected response
                     REQUIRE(request.redirect_count < max_http_redirects);
-                    redir_transport->simulated_response = {
-                        static_cast<int>(sync::HTTPStatus::MovedPermanently),
-                        0,
-                        {{"Location", redirect_url}, {"Content-Type", "application/json"}},
-                        "Some body data"};
+                    return Response{static_cast<int>(sync::HTTPStatus::MovedPermanently),
+                                    0,
+                                    {{"Location", redirect_url}, {"Content-Type", "application/json"}},
+                                    "Some body data"};
                 }
                 else {
-                    // should not get any other types of requests during the test - the log out is local
-                    REQUIRE(false);
+                    FAIL("should not get any other types of requests during the test - the log out is local");
                 }
+                return std::nullopt;
             };
 
             SyncManager::OnlyForTesting::voluntary_disconnect_all_connections(*sync_manager);
@@ -3272,7 +3275,7 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
         // This assumes that we make an http request for the new token while
         // already in the WaitingForAccessToken state.
         bool seen_waiting_for_access_token = false;
-        transport->request_hook = [&](const Request&) {
+        transport->request_hook = [&](const Request&) -> std::optional<Response> {
             auto user = app->current_user();
             REQUIRE(user);
             for (auto& session : user->all_sessions()) {
@@ -3283,7 +3286,7 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
                     seen_waiting_for_access_token = true;
                 }
             }
-            return true;
+            return std::nullopt;
         };
         SyncTestFile config(app, partition, schema);
         auto r = Realm::get_shared_realm(config);
@@ -3331,7 +3334,7 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
             // This assumes that we make an http request for the new token while
             // already in the WaitingForAccessToken state.
             bool seen_waiting_for_access_token = false;
-            transport->request_hook = [&](const Request&) {
+            transport->request_hook = [&](const Request&) -> std::optional<Response> {
                 auto user = app->current_user();
                 REQUIRE(user);
                 for (auto& session : user->all_sessions()) {
@@ -3340,6 +3343,7 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
                         seen_waiting_for_access_token = true;
                     }
                 }
+                return std::nullopt;
             };
             SyncTestFile config(app, partition, schema);
             auto r = Realm::get_shared_realm(config);
@@ -3380,8 +3384,9 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
 
         SECTION("User is left logged out if logged out while the refresh is in progress") {
             REQUIRE(user->is_logged_in());
-            transport->request_hook = [&](const Request&) {
+            transport->request_hook = [&](const Request&) -> std::optional<Response> {
                 user->log_out();
+                return std::nullopt;
             };
             SyncTestFile config(app, partition, schema);
             auto r = Realm::get_shared_realm(config);
@@ -3406,10 +3411,11 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
                     response_ref.http_status_code = 500;
                 }
             };
-            transport->request_hook = [&](const Request& request) {
+            transport->request_hook = [&](const Request& request) -> std::optional<Response> {
                 if (!did_receive_valid_token.load() && request.url.find("/session") != std::string::npos) {
                     response_times.push_back(steady_clock::now());
                 }
+                return std::nullopt;
             };
             SyncTestFile config(app, partition, schema);
             auto r = Realm::get_shared_realm(config);
