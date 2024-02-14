@@ -31,15 +31,6 @@ struct Response;
 
 class AppUtils {
 public:
-    struct UrlComponents {
-        std::string scheme;  // The scheme from the URL (e.g. https)
-        std::string server;  // The complete server info ([userinfo@] hostname [:port])
-        std::string request; // Everything after server info (path, query, parameters, etc.)
-    };
-    // Split the URL into scheme, server and request parts
-    // returns nullopt if missing `://` or server info is empty
-    static StatusWith<AppUtils::UrlComponents> split_url(std::string url);
-
     static std::optional<AppError> check_for_errors(const Response& response);
     static Response make_apperror_response(const AppError& error);
     static Response make_clienterror_response(ErrorCodes::Error code, const std::string_view message,

@@ -1,13 +1,15 @@
+#include <realm/util/uri.hpp>
+
+#include <realm/exceptions.hpp>
+#include <realm/util/assert.hpp>
+#include <realm/util/backtrace.hpp>
+
 #include <algorithm>
 #include <utility>
 #include <stdexcept>
 #include <cctype>
 #include <sstream>
 #include <iomanip>
-
-#include <realm/util/assert.hpp>
-#include <realm/util/uri.hpp>
-#include <realm/util/backtrace.hpp>
 
 using namespace realm;
 
@@ -21,7 +23,7 @@ using namespace realm;
 // reg-name    = *( unreserved / pct-encoded / sub-delims )
 
 
-util::Uri::Uri(const std::string& str)
+util::Uri::Uri(std::string_view str)
 {
     const char* b = str.data();
     const char* e = b + str.size();
@@ -63,6 +65,25 @@ util::Uri::Uri(const std::string& str)
     m_frag.assign(b, e); // Throws
 }
 
+util::Uri util::Uri::parse(std::string_view str)
+{
+    Uri uri(str);
+    if (auto status = uri.validate(str); !status.is_ok()) {
+        throw Exception(std::move(status));
+    }
+    return uri;
+}
+
+Status util::Uri::validate(std::string_view original) const
+{
+    if (m_scheme.empty()) {
+        return {ErrorCodes::BadServerUrl, util::format("URL missing scheme: %1", original)};
+    }
+    if (m_auth.empty()) {
+        return {ErrorCodes::BadServerUrl, util::format("URL missing server: %1", original)};
+    }
+    return Status::OK();
+}
 
 void util::Uri::set_scheme(const std::string& val)
 {

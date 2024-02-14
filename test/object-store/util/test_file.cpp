@@ -249,6 +249,11 @@ std::string SyncServer::url_for_realm(StringData realm_name) const
     return util::format("%1/%2", m_url, realm_name);
 }
 
+int SyncServer::port() const
+{
+    return m_server.listen_endpoint().port();
+}
+
 struct WaitForSessionState {
     std::condition_variable cv;
     std::mutex mutex;
@@ -359,54 +364,18 @@ TestAppSession::TestAppSession(AppSession session,
 
 TestAppSession::~TestAppSession()
 {
-    close(true);
+    if (util::File::exists(m_base_file_path)) {
+        try {
+            m_app->sync_manager()->tear_down_for_testing();
+            util::try_remove_dir_recursive(m_base_file_path);
+        }
+        catch (const std::exception& ex) {
+            std::cerr << ex.what() << "\n";
+        }
+        app::App::clear_cached_apps();
+    }
     if (m_delete_app) {
         m_app_session->admin_api.delete_app(m_app_session->server_app_id);
-    }
-}
-
-void TestAppSession::close(bool tear_down)
-{
-    try {
-        if (tear_down) {
-            // If tearing down, make sure there's an app to work with
-            if (!m_app) {
-                reopen(false);
-            }
-            REALM_ASSERT(m_app);
-            // Clean up the app data
-            m_app->sync_manager()->tear_down_for_testing();
-        }
-        else if (m_app) {
-            // Otherwise, make sure all the session are closed
-            m_app->sync_manager()->close_all_sessions();
-        }
-        m_app.reset();
-
-        // If tearing down, clean up the test file directory
-        if (tear_down && !m_base_file_path.empty() && util::File::exists(m_base_file_path)) {
-            util::try_remove_dir_recursive(m_base_file_path);
-            m_base_file_path.clear();
-        }
-    }
-    catch (const std::exception& ex) {
-        std::cerr << "Error tearing down TestAppSession: " << ex.what() << "\n";
-    }
-    // Ensure all cached apps are cleared
-    app::App::clear_cached_apps();
-}
-
-void TestAppSession::reopen(bool log_in)
-{
-    // These are REALM_ASSERTs so the test crashes if this object is in a bad state
-    REALM_ASSERT(!m_base_file_path.empty());
-    REALM_ASSERT(!m_app);
-    m_app = app::App::get_app(app::App::CacheMode::Disabled, app_config, sc_config);
-
-    // initialize sync client
-    m_app->sync_manager()->get_sync_client();
-    if (log_in) {
-        log_in_user(m_app, user_creds);
     }
 }
 

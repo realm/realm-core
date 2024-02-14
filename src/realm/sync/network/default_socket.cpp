@@ -497,18 +497,13 @@ void DefaultWebSocketImpl::initiate_websocket_handshake()
 ///
 
 DefaultSocketProvider::DefaultSocketProvider(const std::shared_ptr<util::Logger>& logger,
-                                             const std::string user_agent,
+                                             const std::string& user_agent,
                                              const std::shared_ptr<BindingCallbackThreadObserver>& observer_ptr,
                                              AutoStart auto_start)
     : m_logger_ptr{std::make_shared<util::CategoryLogger>(util::LogCategory::network, logger)}
     , m_observer_ptr{observer_ptr}
-    , m_service{}
-    , m_random{}
     , m_user_agent{user_agent}
-    , m_mutex{}
     , m_state{State::Stopped}
-    , m_state_cv{}
-    , m_thread{}
 {
     REALM_ASSERT(m_logger_ptr);                     // Make sure the logger is valid
     util::seed_prng_nondeterministically(m_random); // Throws

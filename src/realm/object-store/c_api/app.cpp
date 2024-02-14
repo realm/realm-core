@@ -293,12 +293,8 @@ RLM_API bool realm_app_update_base_url(realm_app_t* app, const char* base_url,
                                        realm_app_void_completion_func_t callback, realm_userdata_t userdata,
                                        realm_free_userdata_func_t userdata_free)
 {
-    std::optional<std::string> new_base_url;
-    if (base_url) {
-        new_base_url = base_url;
-    }
     return wrap_err([&] {
-        (*app)->update_base_url(new_base_url, make_callback(callback, userdata, userdata_free));
+        (*app)->update_base_url(base_url ? base_url : "", make_callback(callback, userdata, userdata_free));
         return true;
     });
 }

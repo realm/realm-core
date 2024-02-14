@@ -263,7 +263,7 @@ struct HookedSocketProvider : public sync::websocket::DefaultSocketProvider {
         }
 
         if (websocket_endpoint_resolver) {
-            endpoint = websocket_endpoint_resolver(std::move(endpoint));
+            websocket_endpoint_resolver(endpoint);
         }
 
         if (websocket_connect_func) {
@@ -286,9 +286,9 @@ struct HookedSocketProvider : public sync::websocket::DefaultSocketProvider {
         return websocket;
     }
 
-    std::function<sync::WebSocketEndpoint(sync::WebSocketEndpoint&&)> websocket_endpoint_resolver;
-    std::function<void(const sync::WebSocketEndpoint&)> endpoint_verify_func;
-    std::function<std::optional<SocketProviderError>()> websocket_connect_func;
+    util::UniqueFunction<void(sync::WebSocketEndpoint&)> websocket_endpoint_resolver;
+    util::UniqueFunction<void(const sync::WebSocketEndpoint&)> endpoint_verify_func;
+    util::UniqueFunction<std::optional<SocketProviderError>()> websocket_connect_func;
 };
 
 #endif // REALM_ENABLE_SYNC
