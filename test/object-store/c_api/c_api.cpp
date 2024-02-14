@@ -629,6 +629,8 @@ TEST_CASE("C API (non-database)", "[c_api]") {
         };
 
         auto update_and_check_base_url = [&](const char* new_base_url, const std::string& expected) {
+            INFO(util::format("new_base_url: %1", new_base_url ? new_base_url : "<null>"));
+
             transport->set_base_url(expected);
             realm_app_update_base_url(
                 test_app.get(), new_base_url,

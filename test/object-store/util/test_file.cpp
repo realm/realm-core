@@ -249,6 +249,11 @@ std::string SyncServer::url_for_realm(StringData realm_name) const
     return util::format("%1/%2", m_url, realm_name);
 }
 
+int SyncServer::port() const
+{
+    return m_server.listen_endpoint().port();
+}
+
 struct WaitForSessionState {
     std::condition_variable cv;
     std::mutex mutex;

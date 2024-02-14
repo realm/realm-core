@@ -275,14 +275,12 @@ App::App(Private, const Config& config)
 
     // if a base url is provided, then verify the value
     if (m_config.base_url) {
-        if (auto comp = AppUtils::split_url(*m_config.base_url); !comp.is_ok()) {
-            throw Exception(comp.get_status());
-        }
+        util::Uri::parse(*m_config.base_url);
     }
     // Setup a baseline set of routes using the provided or default base url
     // These will be updated when the location info is refreshed prior to sending the
     // first AppServices HTTP request.
-    configure_route(m_base_url);
+    configure_route(m_base_url, m_base_url);
 
     if (m_config.device_info.platform_version.empty()) {
         throw InvalidArgument("You must specify the Platform Version in App::Config::device_info");
@@ -375,21 +373,13 @@ std::string App::make_sync_route(Optional<std::string> ws_host_url)
                         s_sync_path);
 }
 
-void App::configure_route(const std::string& host_url, const std::optional<std::string>& ws_host_url)
+void App::configure_route(const std::string& host_url, const std::string& ws_host_url)
 {
-    // We got a new host url, save it
-    m_host_url = (host_url.length() > 0 ? host_url : m_base_url);
+    m_host_url = host_url;
+    m_ws_host_url = ws_host_url;
 
-    // If a valid websocket host url was included, save it
-    if (ws_host_url && ws_host_url->length() > 0) {
-        m_ws_host_url = *ws_host_url;
-    }
-    // Otherwise, convert the host url to a websocket host url (http[s]:// -> ws[s]://)
-    else {
-        m_ws_host_url = m_host_url;
-        if (m_ws_host_url.find("http") == 0) {
-            m_ws_host_url.replace(0, 4, "ws");
-        }
+    if (m_ws_host_url.find("http") == 0) {
+        m_ws_host_url.replace(0, 4, "ws");
     }
 
     // host_url is the url to the server: e.g., https://realm.mongodb.com or https://localhost:9090
@@ -401,19 +391,15 @@ void App::configure_route(const std::string& host_url, const std::optional<std::
     m_auth_route = util::format("%1%2", m_app_route, s_auth_path);
 }
 
-void App::update_hostname(const std::string& host_url, const std::optional<std::string>& ws_host_url,
-                          const std::optional<std::string>& new_base_url)
+void App::update_hostname(const std::string& host_url, const std::string& ws_host_url,
+                          const std::string& new_base_url)
 {
-    // Update url components based on new hostname (and optional websocket hostname) values
-    log_debug("App: update_hostname: %1%2%3", host_url, ws_host_url ? util::format(" | %1", *ws_host_url) : "",
-              new_base_url ? util::format(" | base URL: %1", *new_base_url) : "");
-    // Save the new base url, if provided
-    if (new_base_url) {
-        m_base_url = *new_base_url;
-    }
+    log_debug("App: update_hostname: %1 | %2 | %3", host_url, ws_host_url, new_base_url);
+    m_base_url = new_base_url;
     // If a new host url was returned from the server, use it to configure the routes
     // Otherwise, use the m_base_url value
-    configure_route(host_url.length() > 0 ? host_url : m_base_url, ws_host_url);
+    std::string base_url = host_url.length() > 0 ? host_url : m_base_url;
+    configure_route(base_url, ws_host_url);
 }
 
 // MARK: - Template specializations
@@ -610,10 +596,8 @@ std::string App::get_base_url() const
     return m_base_url;
 }
 
-void App::update_base_url(std::optional<std::string> base_url, UniqueFunction<void(Optional<AppError>)>&& completion)
+void App::update_base_url(std::string_view new_base_url, UniqueFunction<void(Optional<AppError>)>&& completion)
 {
-    std::string new_base_url = base_url.value_or(std::string(s_default_base_url));
-
     if (new_base_url.empty()) {
         // Treat an empty string the same as requesting the default base url
         new_base_url = s_default_base_url;
@@ -624,9 +608,7 @@ void App::update_base_url(std::optional<std::string> base_url, UniqueFunction<vo
     }
 
     // Validate the new base_url
-    if (auto comp = AppUtils::split_url(new_base_url); !comp.is_ok()) {
-        throw Exception(comp.get_status());
-    }
+    util::Uri::parse(new_base_url);
 
     bool update_not_needed;
     {
@@ -643,7 +625,7 @@ void App::update_base_url(std::optional<std::string> base_url, UniqueFunction<vo
     }
 
     // Otherwise, request the location information at the new base URL
-    request_location(std::move(completion), new_base_url);
+    request_location(std::move(completion), std::string(new_base_url));
 }
 
 void App::get_profile(const std::shared_ptr<SyncUser>& sync_user,
@@ -947,9 +929,9 @@ void App::request_location(UniqueFunction<void(std::optional<AppError>)>&& compl
             // Release the lock before calling the completion function
             lock.unlock();
             completion(util::none);
-            return; // early return
+            return;
         }
-        base_url = new_hostname ? *new_hostname : m_base_url;
+        base_url = new_hostname.value_or(m_base_url);
         // If this is for a redirect after querying new_hostname, then use the redirect location
         if (redir_location)
             app_route = get_app_route(redir_location);
@@ -965,22 +947,21 @@ void App::request_location(UniqueFunction<void(std::optional<AppError>)>&& compl
     req.method = HttpMethod::get;
     req.url = util::format("%1/location", app_route);
     req.timeout_ms = m_request_timeout_ms;
-    req.redirect_count = redirect_count;
 
     log_debug("App: request location: %1", req.url);
 
     m_config.transport->send_request_to_server(
-        std::move(req), [self = shared_from_this(), completion = std::move(completion),
-                         base_url = std::move(base_url)](Request&& request, const Response& response) mutable {
+        req, [self = shared_from_this(), completion = std::move(completion), base_url = std::move(base_url),
+              redirect_count](const Response& response) mutable {
             // Check to see if a redirect occurred
             if (AppUtils::is_redirect_status_code(response.http_status_code)) {
                 // Make sure we don't do too many redirects (max_http_redirects (20) is an arbitrary number)
-                if (++request.redirect_count >= s_max_http_redirects) {
+                if (redirect_count >= s_max_http_redirects) {
                     completion(AppError{ErrorCodes::ClientTooManyRedirects,
                                         util::format("number of redirections exceeded %1", s_max_http_redirects),
                                         {},
                                         response.http_status_code});
-                    return; // early return
+                    return;
                 }
                 // Handle the redirect response when requesting the location - extract the
                 // new location header field and resend the request.
@@ -991,14 +972,15 @@ void App::request_location(UniqueFunction<void(std::optional<AppError>)>&& compl
                                         "Redirect response missing location header",
                                         {},
                                         response.http_status_code});
-                    return; // early return
+                    return;
                 }
                 // try to request the location info at the new location in the redirect response
                 // retry_count is passed in to track the number of subsequent redirection attempts
                 self->request_location(std::move(completion), std::move(base_url), std::move(redir_location),
-                                       request.redirect_count);
-                return; // early return
+                                       redirect_count + 1);
+                return;
             }
+
             // Location request was successful - update the location info
             auto update_response = self->update_location(response, base_url);
             if (update_response) {
@@ -1030,16 +1012,19 @@ std::optional<AppError> App::update_location(const Response& response, const std
         auto json = parse<BsonDocument>(response.body);
         auto hostname = get<std::string>(json, "hostname");
         auto ws_hostname = get<std::string>(json, "ws_hostname");
-        auto deployment_model = get<std::string>(json, "deployment_model");
-        auto location = get<std::string>(json, "location");
-        log_debug("App: Location info returned for deployment model: %1(%2)", deployment_model, location);
+        std::optional<std::string> sync_route;
+        read_field(json, "sync_route", sync_route);
+
         {
             util::CheckedLockGuard guard(m_route_mutex);
             // Update the local hostname and path information
             update_hostname(hostname, ws_hostname, base_url);
             m_location_updated = true;
+            if (!sync_route) {
+                sync_route = make_sync_route();
+            }
             // Provide the Device Sync websocket route to the SyncManager
-            m_sync_manager->set_sync_route(make_sync_route());
+            m_sync_manager->set_sync_route(*sync_route);
         }
     }
     catch (const AppError& ex) {
@@ -1063,18 +1048,16 @@ void App::update_location_and_resend(Request&& request, UniqueFunction<void(cons
 
             // If the location info was updated, update the original request to point
             // to the new location URL.
-            auto comp = AppUtils::split_url(request.url);
-            if (!comp.is_ok()) {
-                throw Exception(comp.get_status());
-            }
-            request.url = self->get_host_url() + comp.get_value().request;
+            auto url = util::Uri::parse(request.url);
+            request.url =
+                util::format("%1%2%3%4", self->get_host_url(), url.get_path(), url.get_query(), url.get_frag());
 
             // Retry the original request with the updated url
-            self->m_config.transport->send_request_to_server(
-                std::move(request), [self = std::move(self), completion = std::move(completion)](
-                                        Request&& request, const Response& response) mutable {
-                    self->check_for_redirect_response(std::move(request), response, std::move(completion));
-                });
+            self->m_config.transport->send_request_to_server(request, [self = std::move(self),
+                                                                       completion = std::move(completion),
+                                                                       request](const Response& response) mutable {
+                self->check_for_redirect_response(std::move(request), response, std::move(completion));
+            });
         },
         // The base_url is not changing for this request
         util::none, std::move(redir_location));
@@ -1094,9 +1077,7 @@ void App::do_request(Request&& request, UniqueFunction<void(const Response& resp
     request.timeout_ms = m_request_timeout_ms;
 
     // Verify the request URL to make sure it is valid
-    if (auto comp = AppUtils::split_url(request.url); !comp.is_ok()) {
-        throw Exception(comp.get_status());
-    }
+    util::Uri::parse(request.url);
 
     // Refresh the location info when app is created or when requested (e.g. after a websocket redirect)
     // to ensure the http and websocket URL information is up to date.
@@ -1110,14 +1091,14 @@ void App::do_request(Request&& request, UniqueFunction<void(const Response& resp
             lock.unlock();
             // Location info needs to be requested, update the location info and then send the request
             update_location_and_resend(std::move(request), std::move(completion));
-            return; // early return
+            return;
         }
     }
 
     // If location info has already been updated, then send the request directly
     m_config.transport->send_request_to_server(
-        std::move(request), [self = shared_from_this(), completion = std::move(completion)](
-                                Request&& request, const Response& response) mutable {
+        request,
+        [self = shared_from_this(), completion = std::move(completion), request](const Response& response) mutable {
             self->check_for_redirect_response(std::move(request), response, std::move(completion));
         });
 }

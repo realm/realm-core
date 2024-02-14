@@ -111,6 +111,7 @@ public:
         std::string local_dir;
     };
 
+    SyncServer(const Config& config);
     ~SyncServer();
 
     void start();
@@ -125,6 +126,7 @@ public:
     {
         return m_local_root_dir;
     }
+    int port() const;
 
     template <class R, class P>
     void advance_clock(std::chrono::duration<R, P> duration = std::chrono::seconds(1)) noexcept
@@ -133,8 +135,6 @@ public:
     }
 
 private:
-    friend class TestSyncManager;
-    SyncServer(const Config& config);
     std::string m_local_root_dir;
     std::shared_ptr<realm::util::Logger> m_logger;
     realm::sync::Server m_server;

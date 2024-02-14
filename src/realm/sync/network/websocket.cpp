@@ -588,6 +588,17 @@ public:
 
         m_http_client.reset(new HTTPClient<websocket::Config>(m_config, m_logger_ptr));
         m_frame_reader.reset();
+
+        if (m_test_handshake_response) {
+            HTTPResponse test_response;
+            test_response.status = HTTPStatus(*m_test_handshake_response);
+            test_response.body = std::move(m_test_handshake_response_body);
+            m_test_handshake_response.reset();
+            m_test_handshake_response_body.clear();
+            handle_http_response_received(std::move(test_response)); // Throws
+            return;
+        }
+
         HTTPRequest req;
         req.method = HTTPMethod::Get;
         req.path = std::move(request_uri);
@@ -769,9 +780,6 @@ private:
         int status_code = int(response.status);
         std::error_code ec;
 
-        if (m_test_handshake_response)
-            status_code = *m_test_handshake_response;
-
         if (status_code == 200)
             ec = HttpError::bad_response_200_ok;
         else if (status_code >= 200 && status_code < 300)
@@ -806,10 +814,7 @@ private:
             ec = HttpError::bad_response_unexpected_status_code;
 
         std::string_view body;
-        if (m_test_handshake_response) {
-            body = m_test_handshake_response_body;
-        }
-        else if (response.body) {
+        if (response.body) {
             body = *response.body;
         }
         m_config.websocket_handshake_error_handler(ec, &response.headers, body); // Throws
@@ -862,8 +867,7 @@ private:
         m_logger.debug(util::LogCategory::network, "WebSocket::handle_http_response_received()");
         m_logger.trace(util::LogCategory::network, "HTTP response = %1", response);
 
-        if (response.status != HTTPStatus::SwitchingProtocols ||
-            (m_test_handshake_response && *m_test_handshake_response != 101)) {
+        if (response.status != HTTPStatus::SwitchingProtocols) {
             error_client_response_not_101(response);
             return;
         }

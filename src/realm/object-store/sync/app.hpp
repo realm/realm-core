@@ -280,10 +280,10 @@ public:
     /// NOTE: If another App operation is started while this function is in progress, that request will use the
     ///       original base URL location information.
     /// @param base_url The new base URL to use for future AppServices requests and sync websocket connections. If
-    ///                 not set or an empty string, the default Device Sync base_url will be used.
+    ///                 an empty string, the default Device Sync base_url will be used.
     /// @param completion A callback block to be invoked once the location update completes.
-    void update_base_url(std::optional<std::string> base_url,
-                         util::UniqueFunction<void(util::Optional<AppError>)>&& completion) REQUIRES(!m_route_mutex);
+    void update_base_url(std::string_view base_url, util::UniqueFunction<void(util::Optional<AppError>)>&& completion)
+        REQUIRES(!m_route_mutex);
 
     /// Log in a user and asynchronously retrieve a user object.
     /// If the log in completes successfully, the completion block will be called, and a
@@ -581,16 +581,10 @@ private:
 
     void configure(const SyncClientConfig& sync_client_config) REQUIRES(!m_route_mutex);
 
-    // Requires locking m_route_mutex before calling
     std::string make_sync_route(util::Optional<std::string> ws_host_url = util::none) REQUIRES(m_route_mutex);
-
-    // Requires locking m_route_mutex before calling
-    void configure_route(const std::string& host_url, const std::optional<std::string>& ws_host_url = std::nullopt)
+    void configure_route(const std::string& host_url, const std::string& ws_host_url) REQUIRES(m_route_mutex);
+    void update_hostname(const std::string& host_url, const std::string& ws_host_url, const std::string& new_base_url)
         REQUIRES(m_route_mutex);
-
-    // Requires locking m_route_mutex before calling
-    void update_hostname(const std::string& host_url, const std::optional<std::string>& ws_host_url = std::nullopt,
-                         const std::optional<std::string>& new_base_url = std::nullopt) REQUIRES(m_route_mutex);
     std::string auth_route() REQUIRES(!m_route_mutex);
     std::string base_url() REQUIRES(!m_route_mutex);
 
