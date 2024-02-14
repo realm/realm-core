@@ -149,11 +149,8 @@ void subscribe_to_all_and_bootstrap(Realm& realm);
 
 void wait_for_sessions_to_close(const TestAppSession& test_app_session);
 
-#ifdef REALM_MONGODB_ENDPOINT
 std::string get_compile_time_base_url();
 std::string get_compile_time_admin_url();
-
-#endif
 
 struct AutoVerifiedEmailCredentials : app::AppCredentials {
     AutoVerifiedEmailCredentials();

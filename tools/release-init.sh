@@ -18,7 +18,7 @@ git push -u origin release/${realm_version}
 git checkout -b prepare-$realm_version
 
 # update dependencies.list
-sed -i.bak -e "s/^VERSION.*/VERSION=${realm_version}/" "${project_dir}/dependencies.list"
+sed -i.bak -e "s/^VERSION.*/VERSION: ${realm_version}/" "${project_dir}/dependencies.list"
 rm "${project_dir}/dependencies.list.bak" || exit 1
 
 # update Package.swift

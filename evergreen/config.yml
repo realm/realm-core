@@ -78,7 +78,6 @@ functions:
           if [ -z "${disable_tests_against_baas|}" ]; then
               scheme="http"
               set_cmake_var baas_vars REALM_ENABLE_AUTH_TESTS BOOL On
-              set_cmake_var baas_vars REALM_MONGODB_ENDPOINT STRING "$scheme://localhost:9090"
               if [ -n "${baas_admin_port|}" ]; then
                 set_cmake_var baas_vars REALM_ADMIN_ENDPOINT STRING "$scheme://localhost:${baas_admin_port}"
               fi
@@ -201,12 +200,17 @@ functions:
         file: './realm-core/benchmark_results/results.latest.json'
 
   "run tests":
+    - command: expansions.update
+      params:
+        file: realm-core/dependencies.list
     - command: shell.exec
       params:
         working_dir: realm-core
         shell: bash
         env:
           BAASAAS_API_KEY: "${baasaas_api_key}"
+          BAASAAS_REF_SPEC: "${BAAS_VERSION}"
+          BAASAAS_START_MODE: "githash"
         script: |-
           set -o errexit
           set -o verbose
@@ -235,8 +239,10 @@ functions:
 
           TEST_FLAGS="--no-tests=error $TEST_FLAGS ${test_flags|}"
 
-          if [[ -z "${baas_branch}" ]]; then
+          if [[ -n "${disable_tests_against_baas|}" ]]; then
               unset BAASAAS_API_KEY
+              unset BAASAAS_REF_SPEC
+              unset BAASAAS_START_MODE
           fi
 
           if [[ -n "${llvm_symbolizer}" ]]; then
@@ -971,6 +977,7 @@ tasks:
       test_label: objstore-local
       test_executable_name: "realm-object-store-tests"
       verbose_test_output: true
+      disable_tests_against_baas: true
   - func: "check branch state"
 
 # These are baas object store tests that run against baas running on a remote host
@@ -986,7 +993,6 @@ tasks:
       test_label: objstore-baas
       test_executable_name: "realm-object-store-tests"
       verbose_test_output: true
-      baas_branch: 300efb0604a88f1f36899bee0f42b34826b9b65f
   - func: "check branch state"
 
 - name: baas-network-tests
