@@ -335,6 +335,8 @@ void import(const char* filename)
         std::cout << std::endl;
         std::cout << t->size() << std::endl;
     */
+    tr->close();
+    db->compact();
 }
 
 void dump_prop(const char* filename, const char* prop_name)
