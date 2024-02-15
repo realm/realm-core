@@ -301,7 +301,7 @@ void import(const char* filename)
         for (auto& val : buf->values) {
             Obj o = t->create_object(ObjKey(), val);
             // verify
-#if 0
+#if 1
             for (auto& e : val) {
                 if (e.col_key.get_type() == col_type_EnumString) {
                     auto got_string = o.get<StringData>(e.col_key);
@@ -331,6 +331,8 @@ void import(const char* filename)
     t->dump_interning_stats();
     std::cout << std::endl;
     std::cout << t->size() << std::endl;
+    tr->close();
+    db->compact();
 }
 
 void dump_prop(const char* filename, const char* prop_name)
