@@ -273,9 +273,14 @@ void Array::init_from_mem(MemRef mem) noexcept
         m_width = m_encoder.width();
         // we need to compute lower and upper bound, these are useful during Array::find and in general in every query
         // related optimisation.
-        const auto max_v = 1 << m_width;
-        m_lbound = -max_v;
-        m_ubound = max_v - 1;
+        if (m_width) {
+            const auto max_v = 1ULL << (m_width - 1);
+            m_lbound = -max_v;
+            m_ubound = max_v - 1;
+        }
+        else {
+            m_lbound = m_ubound = 0;
+        }
         m_is_inner_bptree_node = get_is_inner_bptree_node_from_header(header);
         m_has_refs = get_hasrefs_from_header(header);
         m_context_flag = get_context_flag_from_header(header);
