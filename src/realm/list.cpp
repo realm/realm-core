@@ -396,6 +396,7 @@ UpdateStatus Lst<Mixed>::update_if_needed_with_status() const
         case UpdateStatus::Updated: {
             bool attached = init_from_parent(false);
             Base::update_content_version();
+            CollectionParent::m_parent_version++;
             return attached ? UpdateStatus::Updated : UpdateStatus::Detached;
         }
     }

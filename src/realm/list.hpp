@@ -458,6 +458,7 @@ public:
             constexpr bool allow_create = true;
             init_from_parent(allow_create); // Throws
             Base::update_content_version();
+            CollectionParent::m_parent_version++;
         }
     }
 

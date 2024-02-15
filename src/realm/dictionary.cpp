@@ -672,6 +672,7 @@ UpdateStatus Dictionary::update_if_needed_with_status() const
             // the function will return false;
             bool attached = init_from_parent(false);
             Base::update_content_version();
+            CollectionParent::m_parent_version++;
             return attached ? UpdateStatus::Updated : UpdateStatus::Detached;
         }
     }
@@ -685,6 +686,7 @@ void Dictionary::ensure_created()
         // In case of errors, an exception is thrown.
         constexpr bool allow_create = true;
         init_from_parent(allow_create); // Throws
+        CollectionParent::m_parent_version++;
         Base::update_content_version();
     }
 }

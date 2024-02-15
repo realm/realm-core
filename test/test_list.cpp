@@ -693,10 +693,13 @@ TEST(List_Nested_InMixed)
     */
 
     tr->promote_to_write();
-    dict2->insert_collection("List", CollectionType::List);
+    dict->insert_collection("Dict", CollectionType::Dictionary); // Idempotent, but updates dict accessor
+    dict2->insert_collection("List", CollectionType::List);      // dict2 should update
     {
         auto list = dict2->get_list("List");
+        CHECK_EQUAL(dict2->get_col_key(), col_any);
         CHECK(list->is_empty());
+        CHECK_EQUAL(list->get_col_key(), col_any);
         list->add(8);
         list->add(9);
     }
@@ -1060,7 +1063,10 @@ TEST(List_Nested_Replication)
         StablePath expected_path;
     } parser(test_context);
 
+    auto dict2_index = dict->build_index("level1");
     parser.expected_path.push_back(StableIndex());
-    parser.expected_path.push_back(dict->build_index("level1"));
+    parser.expected_path.push_back(dict2_index);
     tr->advance_read(&parser);
+    Dictionary dict3(*dict, dict2_index);
+    CHECK_EQUAL(dict3.get_col_key(), col_any);
 }
