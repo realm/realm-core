@@ -59,7 +59,13 @@ void ArrayPacked::copy_data(const Array& origin, Array& arr) const
 std::vector<int64_t> ArrayPacked::fetch_all_values(const Array& arr) const
 {
     REALM_ASSERT(arr.is_encoded());
-    return get_all_values(arr, arr.m_width, arr.m_size, 0, arr.size());
+    std::vector<int64_t> res;
+    res.reserve(arr.m_size);
+    for (size_t i = 0; i < arr.m_size; ++i) {
+        res.push_back(arr.get(i));
+    }
+    return res;
+    // return get_all_values(arr, arr.m_width, arr.m_size, 0, arr.size());
 }
 
 void ArrayPacked::set_direct(const Array& arr, size_t ndx, int64_t value) const
@@ -123,15 +129,19 @@ void inline ArrayPacked::get_encode_info(const char* h, size_t& v_width, size_t&
     v_size = NodeHeader::get_num_elements<Encoding::Packed>(h);
 }
 
-std::vector<int64_t> ArrayPacked::get_all_values(const Array& arr, size_t w, size_t sz, size_t start,
-                                                 size_t end) const
+template <typename F>
+std::vector<int64_t> ArrayPacked::find_all(const Array& arr, int64_t, size_t start, size_t end, F) const
 {
+    const auto w = arr.m_width;
+    const auto sz = arr.m_size;
+
     REALM_ASSERT_DEBUG(arr.is_attached());
     REALM_ASSERT_DEBUG(arr.is_encoded());
     REALM_ASSERT_DEBUG(end <= sz);
 
+
     // we use the size in bits
-    constexpr size_t word_size = sizeof(int64_t) * 8;
+    constexpr auto word_size = sizeof(int64_t) * 8;
 
     const auto starting_bit = w * start;
     const auto ending_bit = w * end;
@@ -149,11 +159,6 @@ std::vector<int64_t> ArrayPacked::get_all_values(const Array& arr, size_t w, siz
     std::vector<int64_t> res;
     std::vector<uint64_t> raw_values;
 
-    realm::safe_copy_n(start_data, bytes_to_read, std::back_inserter(raw_values));
-
-    if (shift_bits)
-        raw_values[0] >>= shift_bits;
-
     const auto add_value = [&w, &res, &counter](int64_t v, uint64_t& byte, size_t shift) {
         if (w < word_size)
             v = sign_extend_field(w, v);
@@ -161,6 +166,33 @@ std::vector<int64_t> ArrayPacked::get_all_values(const Array& arr, size_t w, siz
         byte >>= shift;
         counter += w;
     };
+
+    //    auto pos = start_data;
+    //    while(pos <= end_data) {
+    //        auto v = *pos;
+    //        if(pos == start_data)
+    //            v >>= shift_bits;
+    //        while (counter < ending_bit && counter + w <= word_limit) {
+    //            const auto sv = v & mask;
+    //            if(!cmp(sv, value))
+    //                return res;
+    //            add_value(sv, sv, w);
+    //        }
+    //        if (counter < ending_bit && counter + w > word_limit) {
+    //            const auto rest = word_limit - counter;
+    //            const auto sv = (*(pos+1) << rest) | v;
+    //            if(!cmp(sv, value))
+    //                return res;
+    //            add_value(sv, sv, w - rest);
+    //        }
+    //        ++pos;
+    //    }
+
+    realm::safe_copy_n(start_data, bytes_to_read, std::back_inserter(raw_values));
+
+    if (shift_bits)
+        raw_values[0] >>= shift_bits;
+
 
     for (size_t i = 0; i < raw_values.size(); ++i) {
         while (counter < ending_bit && counter + w <= word_limit) {
@@ -174,28 +206,12 @@ std::vector<int64_t> ArrayPacked::get_all_values(const Array& arr, size_t w, siz
         }
         word_limit += word_size;
     }
-    REALM_ASSERT_DEBUG(res.size() == (end - start));
-#if REALM_DEBUG
-    //    {
-    //        static std::mutex m;
-    //        std::lock_guard<std::mutex>lk (m);
-    //
-    //        std::cout << start << " == " << end << std::endl;
-    //
-    //        std::cout << "original values: " << std::endl;
-    //        for(size_t i=start; i<end; ++i)
-    //            std::cout << arr.get(i) << ", ";
-    //        std::cout << std::endl;
-    //        std::cout << "compressed values: " << std::endl;
-    //        for(size_t i=0; i<res.size(); ++i)
-    //            std::cout << res[i] << ", ";
-    //        std::cout << std::endl;
+    //    REALM_ASSERT_DEBUG(res.size() == (end - start));
+    // #if REALM_DEBUG
+    //    for (size_t i = 0; i < res.size(); ++i) {
+    //        REALM_ASSERT_DEBUG(arr.get(start++) == res[i]);
     //    }
-
-    for (size_t i = 0; i < res.size(); ++i) {
-        REALM_ASSERT_DEBUG(arr.get(start++) == res[i]);
-    }
-#endif
+    // #endif
     return res;
 }
 

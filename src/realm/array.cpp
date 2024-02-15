@@ -1480,12 +1480,55 @@ void Array::verify() const
 
 size_t Array::lower_bound_int(int64_t value) const noexcept
 {
+    if (is_encoded()) {
+        // not really nice
+        if (m_width == 16)
+            return lower_bound<16, ArrayEncode>(m_data, m_size, value, m_encoder);
+        else if (m_width == 32)
+            return lower_bound<32, ArrayEncode>(m_data, m_size, value, m_encoder);
+        else if (m_width == 64)
+            return lower_bound<64, ArrayEncode>(m_data, m_size, value, m_encoder);
+        else if (m_width == 8)
+            return lower_bound<8, ArrayEncode>(m_data, m_size, value, m_encoder);
+        else if (m_width == 4)
+            return lower_bound<4, ArrayEncode>(m_data, m_size, value, m_encoder);
+        else if (m_width == 2)
+            return lower_bound<2, ArrayEncode>(m_data, m_size, value, m_encoder);
+        else if (m_width == 1)
+            return lower_bound<1, ArrayEncode>(m_data, m_size, value, m_encoder);
+        else if (m_width == 0)
+            return lower_bound<0, ArrayEncode>(m_data, m_size, value, m_encoder);
+        REALM_UNREACHABLE();
+    }
     REALM_TEMPEX(return lower_bound, m_width, (m_data, m_size, value));
 }
 
 size_t Array::upper_bound_int(int64_t value) const noexcept
 {
+    if (is_encoded()) {
+        // not really nice
+        if (m_width == 16)
+            return upper_bound<16, ArrayEncode>(m_data, m_size, value, m_encoder);
+        else if (m_width == 32)
+            return upper_bound<32, ArrayEncode>(m_data, m_size, value, m_encoder);
+        else if (m_width == 64)
+            return upper_bound<64, ArrayEncode>(m_data, m_size, value, m_encoder);
+        else if (m_width == 8)
+            return upper_bound<8, ArrayEncode>(m_data, m_size, value, m_encoder);
+        else if (m_width == 4)
+            return upper_bound<4, ArrayEncode>(m_data, m_size, value, m_encoder);
+        else if (m_width == 2)
+            return upper_bound<2, ArrayEncode>(m_data, m_size, value, m_encoder);
+        else if (m_width == 1)
+            return upper_bound<1, ArrayEncode>(m_data, m_size, value, m_encoder);
+        else if (m_width == 0)
+            return upper_bound<0, ArrayEncode>(m_data, m_size, value, m_encoder);
+        REALM_UNREACHABLE();
+    }
     REALM_TEMPEX(return upper_bound, m_width, (m_data, m_size, value));
+
+    // return upper_bound<16, ArrayEncode>(m_data, m_size, value, m_encoder);
+    // CUSTOM_REALM_TEMPEX2(return upper_bound, m_width, ArrayEncode, (m_data, m_size, value, m_encoder));
 }
 
 int_fast64_t Array::get(const char* header, size_t ndx) noexcept
