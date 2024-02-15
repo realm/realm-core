@@ -44,9 +44,9 @@ void ArrayPacked::copy_data(const Array& origin, Array& arr) const
     REALM_ASSERT_DEBUG(arr.is_attached());
     REALM_ASSERT_DEBUG(arr.m_encoder.get_kind() == 'B');
     REALM_ASSERT_DEBUG(arr.m_encoder.get_encoding() == Encoding::Packed);
-    const auto h = arr.get_header();
-    size_t v_width, v_size;
-    get_encode_info(h, v_width, v_size);
+    // we don't need to access the header, init from mem must have been called
+    const auto v_width = arr.m_width;
+    const auto v_size = arr.m_size;
     auto data = (uint64_t*)arr.m_data;
     bf_iterator it_value{data, 0, v_width, v_width, 0};
     for (size_t i = 0; i < v_size; ++i) {
@@ -59,12 +59,7 @@ void ArrayPacked::copy_data(const Array& origin, Array& arr) const
 std::vector<int64_t> ArrayPacked::fetch_all_values(const Array& arr) const
 {
     REALM_ASSERT(arr.is_encoded());
-    size_t v_size = arr.m_size;
-    std::vector<int64_t> values;
-    values.reserve(v_size);
-    for (size_t i = 0; i < v_size; ++i)
-        values.push_back(get(arr, i));
-    return values;
+    return get_all_values(arr, arr.m_width, arr.m_size, 0, arr.size());
 }
 
 void ArrayPacked::set_direct(const Array& arr, size_t ndx, int64_t value) const
@@ -128,59 +123,79 @@ void inline ArrayPacked::get_encode_info(const char* h, size_t& v_width, size_t&
     v_size = NodeHeader::get_num_elements<Encoding::Packed>(h);
 }
 
-std::vector<int64_t> ArrayPacked::get_all_values(const Array& arr, size_t w, size_t sz, size_t start, size_t end)
+std::vector<int64_t> ArrayPacked::get_all_values(const Array& arr, size_t w, size_t sz, size_t start,
+                                                 size_t end) const
 {
     REALM_ASSERT_DEBUG(arr.is_attached());
     REALM_ASSERT_DEBUG(arr.is_encoded());
     REALM_ASSERT_DEBUG(end <= sz);
-    const auto s_bits = w * start;
-    const auto e_bits = w * end;
-    const auto s_bytes = s_bits >> 6;
-    const auto e_bytes = e_bits >> 6;
+
+    // we use the size in bits
+    constexpr size_t word_size = sizeof(int64_t) * 8;
+
+    const auto starting_bit = w * start;
+    const auto ending_bit = w * end;
+    const auto starting_word = starting_bit / word_size;
+    const auto ending_word = ending_bit / word_size;
     const auto data = (uint64_t*)arr.m_data;
-    const auto start_data = (data + s_bytes);
-    const auto end_data = (data + e_bytes);
-    const auto shift_bits = s_bits & 0x3F;
-    std::vector<uint64_t> raw_values;
-    auto pos_data = start_data;
-    while (pos_data <= end_data) {
-        auto raw_v = *pos_data;
-        if (pos_data == start_data)
-            raw_v >>= shift_bits;
-        raw_values.push_back(raw_v);
-        ++pos_data;
-    }
+    const auto start_data = (data + starting_word);
+    const auto end_data = (data + ending_word);
+    const auto shift_bits = starting_bit & (word_size - 1);
     const auto mask = (1ULL << w) - 1;
+    const auto bytes_to_read = 1 + (end_data - start_data);
+
+    size_t counter = starting_bit;
+    auto word_limit = (starting_word + 1) * word_size;
     std::vector<int64_t> res;
-    res.reserve(end - start);
-    size_t counter = shift_bits;
-    size_t word_limit = 64;
+    std::vector<uint64_t> raw_values;
+
+    realm::safe_copy_n(start_data, bytes_to_read, std::back_inserter(raw_values));
+
+    if (shift_bits)
+        raw_values[0] >>= shift_bits;
+
+    const auto add_value = [&w, &res, &counter](int64_t v, uint64_t& byte, size_t shift) {
+        if (w < word_size)
+            v = sign_extend_field(w, v);
+        res.push_back(v);
+        byte >>= shift;
+        counter += w;
+    };
+
     for (size_t i = 0; i < raw_values.size(); ++i) {
-        auto v = raw_values[i];
-        word_limit <<= 1;
-        // std::cout << "NWORD:" << std::bitset<64>(v) << std::endl;
-
-        while (counter < e_bits && counter + w <= word_limit) {
-
-            auto sv = v & mask;
-            if (w < 64)
-                sv = sign_extend_field(w, sv);
-            // std::cout << " W:"<< ++ii << ")"<< std::bitset<64>(v) << " ==> "  << sv << std::endl;
-            res.push_back(sv);
-            v >>= w;
-            counter += w;
+        while (counter < ending_bit && counter + w <= word_limit) {
+            const auto sv = raw_values[i] & mask;
+            add_value(sv, raw_values[i], w);
         }
-        if (counter < e_bits) {
-            // we are here only when the value is stored accross 2 64 bit words
-            auto sv = (raw_values[i + 1] << counter) | v;
-            if (w < 64)
-                sv = sign_extend_field(w, sv);
-            counter += w;
-            // std::cout << " B: "<< ++ii << ")"<< std::bitset<64>(sv) << " ==> "  << sv << std::endl;
-            res.push_back(sv);
-            raw_values[i + 1] >>= (counter - 64);
+        if (counter < ending_bit && counter + w > word_limit) {
+            const auto rest = word_limit - counter;
+            const auto sv = (raw_values[i + 1] << rest) | raw_values[i];
+            add_value(sv, raw_values[i + 1], w - rest);
         }
+        word_limit += word_size;
     }
+    REALM_ASSERT_DEBUG(res.size() == (end - start));
+#if REALM_DEBUG
+    //    {
+    //        static std::mutex m;
+    //        std::lock_guard<std::mutex>lk (m);
+    //
+    //        std::cout << start << " == " << end << std::endl;
+    //
+    //        std::cout << "original values: " << std::endl;
+    //        for(size_t i=start; i<end; ++i)
+    //            std::cout << arr.get(i) << ", ";
+    //        std::cout << std::endl;
+    //        std::cout << "compressed values: " << std::endl;
+    //        for(size_t i=0; i<res.size(); ++i)
+    //            std::cout << res[i] << ", ";
+    //        std::cout << std::endl;
+    //    }
+
+    for (size_t i = 0; i < res.size(); ++i) {
+        REALM_ASSERT_DEBUG(arr.get(start++) == res[i]);
+    }
+#endif
     return res;
 }
 

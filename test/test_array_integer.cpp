@@ -41,9 +41,56 @@ TEST(Test_basic_find)
         a.add(i);
     a.try_encode(a_encoded);
     CHECK(a_encoded.is_encoded());
-    const auto index_original = a.find_first(13);
-    const auto index_encoded = a_encoded.find_first(13);
-    CHECK(index_original == index_encoded);
+    for (size_t i = 1; i <= 15; ++i)
+        CHECK(a.find_first(i) == a_encoded.find_first(i));
+
+    a_encoded.destroy();
+    a.destroy();
+    a.create();
+    for (size_t i = 1; i <= 15; ++i)
+        a.add(-i);
+    a.try_encode(a_encoded);
+    CHECK(a_encoded.is_encoded());
+    for (size_t i = 1; i <= 15; ++i)
+        CHECK(a.find_first(-i) == a_encoded.find_first(-i));
+    a.destroy();
+    a_encoded.destroy();
+    a.create();
+
+    for (size_t i = 1; i <= 50; ++i)
+        a.add(i);
+    a.try_encode(a_encoded);
+    CHECK(a_encoded.is_encoded());
+    for (size_t i = 1; i <= 50; ++i)
+        CHECK(a.find_first(i) == a_encoded.find_first(i));
+    a.destroy();
+    a_encoded.destroy();
+    a.create();
+    for (size_t i = 1; i <= 50; ++i)
+        a.add(i);
+    for (size_t i = 1; i <= 50; ++i)
+        a.add(-i);
+    a.try_encode(a_encoded);
+    CHECK(a_encoded.is_encoded());
+    for (size_t i = 1; i <= 50; ++i) {
+        CHECK(a.find_first(i) == a_encoded.find_first(i));
+        CHECK(a.find_first(-i) == a_encoded.find_first(-i));
+    }
+    a.destroy();
+    a_encoded.destroy();
+    a.create();
+    for (size_t i = 32512; i <= 32767; ++i)
+        a.add(i);
+    a.try_encode(a_encoded);
+    CHECK(a_encoded.is_encoded());
+    for (size_t i = 32512; i <= 32767; ++i)
+        CHECK(a.find_first(i) == a_encoded.find_first(i));
+
+#if REALM_DEBUG
+    QueryStateFindFirst state;
+    a_encoded.find_encoded<Equal>(32764, 82, 256, 0, &state);
+    CHECK(state.m_state != realm::npos);
+#endif
 }
 
 TEST(Test_ArrayInt_no_encode)

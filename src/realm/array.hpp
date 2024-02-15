@@ -568,6 +568,10 @@ protected:
     int64_t get_encoded(size_t ndx) const noexcept;
     void set_encoded(size_t ndx, int64_t);
     void get_chunk_encoded(size_t, int64_t[8]) const noexcept;
+
+#ifdef REALM_DEBUG
+public: // make it public for testing
+#endif
     template <class cond>
     bool find_encoded(int64_t value, size_t start, size_t end, size_t baseindex, QueryStateBase* state) const;
 

@@ -5427,7 +5427,7 @@ void worker(test_util::unit_test::TestContext& test_context, TransactionRef froz
 
 } // namespace
 
-ONLY(Parser_Threads)
+TEST(Parser_Threads)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history());

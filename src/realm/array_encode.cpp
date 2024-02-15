@@ -278,26 +278,8 @@ inline bool do_find_all(const Array& arr, int64_t value, size_t start, size_t en
     const auto encoder = arr.get_encoder();
     const auto w = encoder.width();
     const auto sz = encoder.size();
+
     const auto& values = s_packed.get_all_values(arr, w, sz, start, end);
-
-    const auto origin_sz = (end - start);
-    REALM_ASSERT_DEBUG(values.size() == origin_sz);
-#if REALM_DEBUG
-    auto s2 = start;
-    for (size_t i = 0; i < values.size(); ++i) {
-        if (values[i] != arr.get(s2)) {
-            auto s3 = start;
-            std::cout << "Size " << for (size_t i = 0; i < values.size(); ++i)
-            {
-                std::cout << values[i] << " ------ " << arr.get(s3) << "\n" << std::flush;
-                s3++;
-            }
-            REALM_UNREACHABLE();
-        }
-        s2++;
-    }
-#endif
-
     for (const auto& v : values) {
         if (cmp(v, value) && !state->match(start + baseindex))
             return false;
