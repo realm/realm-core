@@ -324,19 +324,33 @@ inline void write_bitfield(uint64_t* data_area, size_t field_position, size_t wi
 
 inline int64_t sign_extend_field(size_t width, uint64_t value)
 {
-    uint64_t sign_mask = 1ULL << (width - 1);
-    if (value & sign_mask) { // got a negative value
-        uint64_t negative_extension = -sign_mask;
-        value |= negative_extension;
-        return int64_t(value);
+    // slightly faster ...
+    auto mask = 1ULL << width;
+    if (value & mask) {
+        // negative
+        const size_t sign_bit = 1ULL << 63;
+        uint64_t tmp = value & (mask - 1);
+        tmp |= sign_bit;
+        return (int64_t)tmp;
     }
     else {
-        // zero out anything above the sign bit
-        // (actually, also zero out the sign bit, but it is already known to be zero)
-        uint64_t below_sign_mask = sign_mask - 1;
-        value &= below_sign_mask;
-        return int64_t(value);
+        // positive
+        return (int64_t)(value & (mask - 1));
     }
+
+    //    uint64_t sign_mask = 1ULL << (width - 1);
+    //    if (value & sign_mask) { // got a negative value
+    //        uint64_t negative_extension = -sign_mask;
+    //        value |= negative_extension;
+    //        return int64_t(value);
+    //    }
+    //    else {
+    //        // zero out anything above the sign bit
+    //        // (actually, also zero out the sign bit, but it is already known to be zero)
+    //        uint64_t below_sign_mask = sign_mask - 1;
+    //        value &= below_sign_mask;
+    //        return int64_t(value);
+    //    }
 }
 
 template <int width>
