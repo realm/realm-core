@@ -280,12 +280,11 @@ inline bool do_find_all(const Array& arr, int64_t value, size_t start, size_t en
     //    const auto sz = encoder.size();
 
     // fastest so far but ~8 times slower than master
-    for (;;) {
-        if (start >= end)
-            break;
-        if (cmp(arr.get(start), value) && !state->match(start + baseindex))
+    const auto& encoder = arr.get_encoder();
+    for (; start < end; start++) {
+        const auto v = encoder.get(arr, start);
+        if (cmp(v, value) && !state->match(start + baseindex))
             return false;
-        start++;
     }
     return true;
 
