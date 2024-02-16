@@ -368,7 +368,8 @@ endif()
 target_link_libraries(Storage INTERFACE Threads::Threads)
 
 if(TARGET Backtrace::Backtrace)
-    target_link_libraries(Storage PUBLIC Backtrace::Backtrace)
+    target_include_directories(Storage INTERFACE ${Backtrace_INCLUDE_DIRS})
+    target_link_libraries(Storage INTERFACE ${Backtrace_LIBRARIES})
 endif()
 
 if(REALM_ENABLE_ENCRYPTION AND UNIX AND NOT APPLE AND REALM_HAVE_OPENSSL)
