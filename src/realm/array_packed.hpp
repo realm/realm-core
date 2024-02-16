@@ -35,10 +35,9 @@ public:
     // encoding/decoding
     void init_array(char*, uint8_t, size_t, size_t) const;
     void copy_data(const Array&, Array&) const;
-    std::vector<int64_t> fetch_all_values(const Array&) const;
     // get or set
     int64_t get(const Array&, size_t) const;
-    int64_t get(const char*, size_t, size_t, size_t) const;
+    int64_t get(const char*, size_t, size_t, size_t, size_t) const;
     void get_chunk(const Array&, size_t, int64_t res[8]) const;
     void set_direct(const Array&, size_t, int64_t) const;
 
@@ -46,8 +45,7 @@ public:
     std::vector<int64_t> find_all(const Array&, int64_t, size_t, size_t, F) const;
 
 private:
-    static void get_encode_info(const char*, size_t&, size_t&);
-    int64_t do_get(uint64_t*, size_t, size_t, size_t) const; // do not expose this!
+    int64_t do_get(uint64_t*, size_t, size_t, size_t, size_t) const;
 };
 } // namespace realm
 

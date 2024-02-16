@@ -56,18 +56,6 @@ void ArrayPacked::copy_data(const Array& origin, Array& arr) const
     }
 }
 
-std::vector<int64_t> ArrayPacked::fetch_all_values(const Array& arr) const
-{
-    REALM_ASSERT(arr.is_encoded());
-    std::vector<int64_t> res;
-    res.reserve(arr.m_size);
-    for (size_t i = 0; i < arr.m_size; ++i) {
-        res.push_back(arr.get(i));
-    }
-    return res;
-    // return get_all_values(arr, arr.m_width, arr.m_size, 0, arr.size());
-}
-
 void ArrayPacked::set_direct(const Array& arr, size_t ndx, int64_t value) const
 {
     REALM_ASSERT_DEBUG(arr.is_encoded());
@@ -85,21 +73,22 @@ int64_t ArrayPacked::get(const Array& arr, size_t ndx) const
     REALM_ASSERT_DEBUG(arr.is_encoded());
     const auto w = arr.m_encoder.m_v_width;
     const auto sz = arr.m_encoder.m_v_size;
-    return do_get((uint64_t*)arr.m_data, ndx, w, sz);
+    return do_get((uint64_t*)arr.m_data, ndx, w, sz, arr.get_encoder().width_mask());
 }
 
-int64_t ArrayPacked::get(const char* data, size_t ndx, size_t width, size_t sz) const
+int64_t ArrayPacked::get(const char* data, size_t ndx, size_t width, size_t sz, size_t mask) const
 {
-    return do_get((uint64_t*)data, ndx, width, sz);
+    return do_get((uint64_t*)data, ndx, width, sz, mask);
 }
 
-int64_t ArrayPacked::do_get(uint64_t* data, size_t ndx, size_t v_width, size_t v_size) const
+int64_t ArrayPacked::do_get(uint64_t* data, size_t ndx, size_t v_width, size_t v_size, size_t mask) const
 {
     if (ndx >= v_size)
         return realm::not_found;
     bf_iterator it{data, 0, v_width, v_width, ndx};
-    const auto result = it.get_value();
-    return sign_extend_field(v_width, result);
+    const auto value = it.get_value();
+    return sign_extend_field_by_mask(mask, value);
+    // return sign_extend_field(v_width, value);
 }
 
 void ArrayPacked::get_chunk(const Array& arr, size_t ndx, int64_t res[8]) const
@@ -118,15 +107,6 @@ void ArrayPacked::get_chunk(const Array& arr, size_t ndx, int64_t res[8]) const
     for (; index < 8; ++index) {
         res[index++] = get(arr, i++);
     }
-}
-
-void inline ArrayPacked::get_encode_info(const char* h, size_t& v_width, size_t& v_size)
-{
-    using Encoding = NodeHeader::Encoding;
-    REALM_ASSERT_DEBUG(NodeHeader::get_kind(h) == 'B');
-    REALM_ASSERT_DEBUG(NodeHeader::get_encoding(h) == NodeHeader::Encoding::Packed);
-    v_width = NodeHeader::get_element_size<Encoding::Packed>(h);
-    v_size = NodeHeader::get_num_elements<Encoding::Packed>(h);
 }
 
 template <typename F>

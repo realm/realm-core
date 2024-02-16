@@ -63,7 +63,12 @@ inline void copy_into_encoded_array(const T& encoder, Arg&&... args)
 template <typename Encoder>
 std::vector<int64_t> fetch_values(const Encoder& encoder, const Array& arr)
 {
-    return encoder.fetch_all_values(arr);
+    std::vector<int64_t> res;
+    const auto sz = arr.size();
+    res.reserve(sz);
+    for (size_t i = 0; i < sz; ++i)
+        res.push_back(encoder.get(arr, i));
+    return res;
 }
 
 bool ArrayEncode::always_encode(const Array& origin, Array& arr, bool packed) const
@@ -93,7 +98,7 @@ bool ArrayEncode::always_encode(const Array& origin, Array& arr, bool packed) co
 bool ArrayEncode::encode(const Array& origin, Array& arr) const
 {
     // return false;
-    // return always_encode(origin, arr, true); // true packed, false flex
+    // return always_encode(origin, arr, false); // true packed, false flex
 
     std::vector<int64_t> values;
     std::vector<size_t> indices;
@@ -178,29 +183,15 @@ void ArrayEncode::init(const char* h)
     if (m_encoding == Encoding::Packed) {
         m_v_width = NodeHeader::get_element_size<Encoding::Packed>(h);
         m_v_size = NodeHeader::get_num_elements<Encoding::Packed>(h);
+        m_v_mask = 1UL << (m_v_width - 1);
     }
     else if (m_encoding == Encoding::Flex) {
         m_v_width = NodeHeader::get_elementA_size<Encoding::Flex>(h);
         m_v_size = NodeHeader::get_arrayA_num_elements<Encoding::Flex>(h);
         m_ndx_width = NodeHeader::get_elementB_size<Encoding::Flex>(h);
         m_ndx_size = NodeHeader::get_arrayB_num_elements<Encoding::Flex>(h);
+        m_v_mask = 1UL << (m_v_width - 1);
     }
-}
-
-size_t ArrayEncode::size() const
-{
-    using Encoding = NodeHeader::Encoding;
-    REALM_ASSERT_DEBUG(m_kind == 'B');
-    REALM_ASSERT_DEBUG(m_encoding == Encoding::Packed || m_encoding == Encoding::Flex);
-    return m_encoding == Encoding::Packed ? m_v_size : m_ndx_size;
-}
-
-size_t ArrayEncode::width() const
-{
-    using Encoding = NodeHeader::Encoding;
-    REALM_ASSERT_DEBUG(m_kind == 'B');
-    REALM_ASSERT_DEBUG(m_encoding == Encoding::Packed || m_encoding == Encoding::Flex);
-    return m_v_width;
 }
 
 int64_t ArrayEncode::get(const Array& arr, size_t ndx) const
@@ -217,8 +208,9 @@ int64_t ArrayEncode::get(const char* data, size_t ndx) const
     using Encoding = NodeHeader::Encoding;
     REALM_ASSERT_DEBUG(m_kind == 'B');
     REALM_ASSERT_DEBUG(m_encoding == Encoding::Flex || m_encoding == Encoding::Packed);
-    return m_encoding == Encoding::Packed ? s_packed.get(data, ndx, m_v_width, m_v_size)
-                                          : s_flex.get(data, ndx, m_v_width, m_v_size, m_ndx_width, m_ndx_size);
+    return m_encoding == Encoding::Packed
+               ? s_packed.get(data, ndx, m_v_width, m_v_size, m_v_mask)
+               : s_flex.get(data, ndx, m_v_width, m_v_size, m_ndx_width, m_ndx_size, m_v_mask);
 }
 
 void ArrayEncode::get_chunk(const Array& arr, size_t ndx, int64_t res[8]) const
@@ -275,11 +267,7 @@ inline bool do_find_all(const Array& arr, int64_t value, size_t start, size_t en
         };
     REALM_ASSERT_DEBUG(cmp != nullptr);
 
-    //    const auto encoder = arr.get_encoder();
-    //    const auto w = encoder.width();
-    //    const auto sz = encoder.size();
-
-    // fastest so far but ~8 times slower than master
+    // fastest so far but ~6 times slower than master for not randomized inputs (vals within 1 ... 1000)
     const auto& encoder = arr.get_encoder();
     for (; start < end; start++) {
         const auto v = encoder.get(arr, start);
@@ -287,22 +275,6 @@ inline bool do_find_all(const Array& arr, int64_t value, size_t start, size_t en
             return false;
     }
     return true;
-
-    //   Ideally this is what we should do, lower and upper bound passing the cmp.
-    //    auto s = arr.lower_bound_int(value, cmp);
-    //    auto e = arr.upper_bound_int(value, cmp);
-    //    for(; s<e; s++)
-    //        if( cmp(arr.get(s), value) && !state->match(s+baseindex))
-    //            return false;
-    //    return true;
-
-    // this fetches all the values first, reading the entire set of values,
-    //    const auto& values = s_packed.find_all(arr, value, start, end);
-    //    for(const auto& v : values) {
-    //        if(!state->match(start + baseindex))
-    //            return false;
-    //    }
-    //    return true;
 }
 
 template <typename Cond>

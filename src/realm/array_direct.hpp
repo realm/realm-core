@@ -321,6 +321,17 @@ inline void write_bitfield(uint64_t* data_area, size_t field_position, size_t wi
     *it = value;
 }
 
+inline int64_t sign_extend_field_by_mask(size_t sign_mask, uint64_t value)
+{
+    if (value & sign_mask) { // got a negative value
+        uint64_t negative_extension = -sign_mask;
+        value |= negative_extension;
+        return int64_t(value);
+    }
+    uint64_t below_sign_mask = sign_mask - 1;
+    value &= below_sign_mask;
+    return (int64_t)(value);
+}
 
 inline int64_t sign_extend_field(size_t width, uint64_t value)
 {
@@ -331,7 +342,6 @@ inline int64_t sign_extend_field(size_t width, uint64_t value)
         return int64_t(value);
     }
     else {
-        // zero out anything above the sign bit
         // (actually, also zero out the sign bit, but it is already known to be zero)
         uint64_t below_sign_mask = sign_mask - 1;
         value &= below_sign_mask;

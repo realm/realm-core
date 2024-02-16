@@ -36,14 +36,12 @@ public:
     std::vector<int64_t> fetch_all_values(const Array& h) const;
     // getters/setters
     int64_t get(const Array&, size_t) const;
-    int64_t get(const char*, size_t, size_t, size_t, size_t, size_t) const;
+    int64_t get(const char*, size_t, size_t, size_t, size_t, size_t, size_t) const;
     void get_chunk(const Array& h, size_t ndx, int64_t res[8]) const;
     void set_direct(const Array&, size_t, int64_t) const;
 
 private:
-    // header inspection
-    static bool get_encode_info(const char*, size_t&, size_t&, size_t&, size_t&);
-    static int64_t do_get(uint64_t*, size_t, size_t, size_t, size_t, size_t);
+    static int64_t do_get(uint64_t*, size_t, size_t, size_t, size_t, size_t, size_t);
 };
 } // namespace realm
 #endif // REALM_ARRAY_COMPRESS_HPP

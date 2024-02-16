@@ -38,18 +38,11 @@ public:
     void init(const char* h);
 
     // init from mem B
-    size_t size() const;
-    size_t width() const;
-
-    inline uint8_t get_kind() const
-    {
-        return m_kind;
-    }
-
-    inline NodeHeader::Encoding get_encoding() const
-    {
-        return m_encoding;
-    }
+    inline size_t size() const;
+    inline size_t width() const;
+    inline size_t width_mask() const;
+    inline uint8_t get_kind() const;
+    inline NodeHeader::Encoding get_encoding() const;
 
     // get/set
     int64_t get(const Array&, size_t) const;
@@ -80,10 +73,46 @@ private:
     uint8_t m_kind = 'A';
     Encoding m_encoding{NodeHeader::Encoding::WTypBits}; // this is not ok .... probably
     size_t m_v_width = 0, m_v_size = 0, m_ndx_width = 0, m_ndx_size = 0;
+    size_t m_v_mask = 0;
 
     friend class ArrayPacked;
     friend class ArrayFlex;
 };
+
+
+inline size_t ArrayEncode::size() const
+{
+    using Encoding = NodeHeader::Encoding;
+    REALM_ASSERT_DEBUG(m_kind == 'B');
+    REALM_ASSERT_DEBUG(m_encoding == Encoding::Packed || m_encoding == Encoding::Flex);
+    return m_encoding == Encoding::Packed ? m_v_size : m_ndx_size;
+}
+
+inline size_t ArrayEncode::width() const
+{
+    using Encoding = NodeHeader::Encoding;
+    REALM_ASSERT_DEBUG(m_kind == 'B');
+    REALM_ASSERT_DEBUG(m_encoding == Encoding::Packed || m_encoding == Encoding::Flex);
+    return m_v_width;
+}
+
+inline size_t ArrayEncode::width_mask() const
+{
+    using Encoding = NodeHeader::Encoding;
+    REALM_ASSERT_DEBUG(m_kind == 'B');
+    REALM_ASSERT_DEBUG(m_encoding == Encoding::Packed || m_encoding == Encoding::Flex);
+    return m_v_mask;
+}
+
+inline uint8_t ArrayEncode::get_kind() const
+{
+    return m_kind;
+}
+
+inline NodeHeader::Encoding ArrayEncode::get_encoding() const
+{
+    return m_encoding;
+}
 
 } // namespace realm
 #endif // REALM_ARRAY_ENCODE_HPP
