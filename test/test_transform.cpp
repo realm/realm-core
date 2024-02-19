@@ -2616,4 +2616,162 @@ TEST(Transform_ArrayClearVersusClearRegression)
     server->integrate_next_changeset_from(*client_2);
 }
 
+TEST(Transform_CreateDictionaryVsArrayInsert)
+{
+    auto changeset_dump_dir_gen = get_changeset_dump_dir_generator(test_context);
+    auto server = Peer::create_server(test_context, changeset_dump_dir_gen.get());
+    auto client_1 = Peer::create_client(test_context, 2, changeset_dump_dir_gen.get());
+    auto client_2 = Peer::create_client(test_context, 3, changeset_dump_dir_gen.get());
+
+    // Create baseline
+    client_1->transaction([&](Peer& c) {
+        auto& tr = *c.group;
+        TableRef table = tr.add_table_with_primary_key("class_Table", type_Int, "id");
+        auto col_any = table->add_column(type_Mixed, "any");
+        auto obj = table->create_object_with_primary_key(1);
+        obj.set_collection(col_any, CollectionType::Dictionary);
+        auto dict = obj.get_dictionary_ptr(col_any);
+        dict->insert_collection("A", CollectionType::Dictionary);
+        auto dict2 = dict->get_dictionary("A");
+        dict2->insert_collection("B", CollectionType::List);
+    });
+
+    synchronize(server.get(), {client_1.get(), client_2.get()});
+
+    client_1->history.set_time(1);
+    client_2->history.set_time(2);
+
+    client_1->transaction([](Peer& p) {
+        auto obj = p.table("class_Table")->get_object_with_primary_key(1);
+        auto col_any = p.table("class_Table")->get_column_key("any");
+        auto dict = obj.get_dictionary_ptr({col_any, "A"});
+        dict->insert_collection("B", CollectionType::Dictionary);
+    });
+
+    client_2->transaction([](Peer& p) {
+        auto obj = p.table("class_Table")->get_object_with_primary_key(1);
+        auto col_any = p.table("class_Table")->get_column_key("any");
+        auto list = obj.get_list_ptr<Mixed>({col_any, "A", "B"});
+        list->add(1);
+    });
+
+    synchronize(server.get(), {client_1.get(), client_2.get()});
+
+    ReadTransaction read_server(server->shared_group);
+    ReadTransaction read_client_1(client_1->shared_group);
+    ReadTransaction read_client_2(client_2->shared_group);
+    CHECK(compare_groups(read_server, read_client_1));
+    CHECK(compare_groups(read_server, read_client_2, *test_context.logger));
+    auto table = read_server.get_table("class_Table");
+    auto col_any = table->get_column_key("any");
+    CHECK(table->get_object_with_primary_key(1).get_dictionary_ptr({col_any, "A", "B"})->is_empty());
+}
+
+TEST(Transform_CreateListVsArrayInsert)
+{
+    auto changeset_dump_dir_gen = get_changeset_dump_dir_generator(test_context);
+    auto server = Peer::create_server(test_context, changeset_dump_dir_gen.get());
+    auto client_1 = Peer::create_client(test_context, 2, changeset_dump_dir_gen.get());
+    auto client_2 = Peer::create_client(test_context, 3, changeset_dump_dir_gen.get());
+
+    // Create baseline
+    client_1->transaction([&](Peer& c) {
+        auto& tr = *c.group;
+        TableRef table = tr.add_table_with_primary_key("class_Table", type_Int, "id");
+        auto col_any = table->add_column(type_Mixed, "any");
+        auto obj = table->create_object_with_primary_key(1);
+        obj.set_collection(col_any, CollectionType::Dictionary);
+        auto dict = obj.get_dictionary_ptr(col_any);
+        dict->insert_collection("A", CollectionType::Dictionary);
+        auto dict2 = dict->get_dictionary("A");
+        dict2->insert_collection("B", CollectionType::Dictionary);
+    });
+
+    synchronize(server.get(), {client_1.get(), client_2.get()});
+
+    client_1->history.set_time(1);
+    client_2->history.set_time(2);
+
+    client_1->transaction([](Peer& p) {
+        auto obj = p.table("class_Table")->get_object_with_primary_key(1);
+        auto col_any = p.table("class_Table")->get_column_key("any");
+        auto dict = obj.get_dictionary_ptr({col_any, "A"});
+        dict->insert_collection("B", CollectionType::List);
+    });
+
+    client_2->transaction([](Peer& p) {
+        auto obj = p.table("class_Table")->get_object_with_primary_key(1);
+        auto col_any = p.table("class_Table")->get_column_key("any");
+        auto dict = obj.get_dictionary_ptr({col_any, "A"});
+        dict->insert_collection("B", CollectionType::List);
+        auto list = dict->get_list("B");
+        list->insert_collection(0, CollectionType::Dictionary);
+        auto dict2 = list->get_dictionary(0);
+        dict2->insert("C", "some value");
+    });
+
+    synchronize(server.get(), {client_1.get(), client_2.get()});
+
+    ReadTransaction read_server(server->shared_group);
+    ReadTransaction read_client_1(client_1->shared_group);
+    ReadTransaction read_client_2(client_2->shared_group);
+    CHECK(compare_groups(read_server, read_client_1));
+    CHECK(compare_groups(read_server, read_client_2, *test_context.logger));
+    auto table = read_server.get_table("class_Table");
+    auto col_any = table->get_column_key("any");
+    CHECK_EQUAL(table->get_object_with_primary_key(1).get_dictionary_ptr({col_any, "A", "B", 0})->get("C"),
+                Mixed("some value"));
+}
+
+TEST(Transform_CreateListVsUpdateDictionary)
+{
+    auto changeset_dump_dir_gen = get_changeset_dump_dir_generator(test_context);
+    auto server = Peer::create_server(test_context, changeset_dump_dir_gen.get());
+    auto client_1 = Peer::create_client(test_context, 2, changeset_dump_dir_gen.get());
+    auto client_2 = Peer::create_client(test_context, 3, changeset_dump_dir_gen.get());
+
+    // Create baseline
+    client_1->transaction([&](Peer& c) {
+        auto& tr = *c.group;
+        TableRef table = tr.add_table_with_primary_key("class_Table", type_Int, "id");
+        auto col_any = table->add_column(type_Mixed, "any");
+        auto obj = table->create_object_with_primary_key(1);
+        obj.set_collection(col_any, CollectionType::Dictionary);
+        auto dict = obj.get_dictionary_ptr(col_any);
+        dict->insert_collection("A", CollectionType::Dictionary);
+        auto dict2 = dict->get_dictionary("A");
+        dict2->insert_collection("B", CollectionType::Dictionary);
+    });
+
+    synchronize(server.get(), {client_1.get(), client_2.get()});
+
+    client_1->history.set_time(1);
+    client_2->history.set_time(2);
+
+    client_1->transaction([](Peer& p) {
+        auto obj = p.table("class_Table")->get_object_with_primary_key(1);
+        auto col_any = p.table("class_Table")->get_column_key("any");
+        auto dict = obj.get_dictionary_ptr({col_any, "A"});
+        dict->insert_collection("B", CollectionType::List);
+    });
+
+    client_2->transaction([](Peer& p) {
+        auto obj = p.table("class_Table")->get_object_with_primary_key(1);
+        auto col_any = p.table("class_Table")->get_column_key("any");
+        auto dict = obj.get_dictionary_ptr({col_any, "A", "B"});
+        dict->insert("C", "some value");
+    });
+
+    synchronize(server.get(), {client_1.get(), client_2.get()});
+
+    ReadTransaction read_server(server->shared_group);
+    ReadTransaction read_client_1(client_1->shared_group);
+    ReadTransaction read_client_2(client_2->shared_group);
+    CHECK(compare_groups(read_server, read_client_1));
+    CHECK(compare_groups(read_server, read_client_2, *test_context.logger));
+    auto table = read_server.get_table("class_Table");
+    auto col_any = table->get_column_key("any");
+    CHECK(table->get_object_with_primary_key(1).get_list_ptr<Mixed>({col_any, "A", "B"})->is_empty());
+}
+
 } // unnamed namespace
