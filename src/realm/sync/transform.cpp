@@ -1581,19 +1581,33 @@ DEFINE_MERGE(Instruction::AddInteger, Instruction::Update)
         // RESOLUTION: If the Add was later than the Set, add its value to
         // the payload of the Set instruction. Otherwise, discard it.
 
-        if (!(right.value.type == Instruction::Payload::Type::Int || right.value.is_null())) {
-            bad_merge(right_side, right,
-                      "Merge error: right.value.type == Instruction::Payload::Type::Int || right.value.is_null()");
-        }
-
         bool right_is_default = !right.is_array_update() && right.is_default;
+
+        // Five Cases Here:
+        // 1. AddInteger is after Update and Update is of a non-integer type
+        //     - Discard the AddInteger; AddInteger to a mixed field is a no-op
+        // 2: AddInteger is after the Update and the Update instruction contains an integer payload:
+        //     - We increment the Update instruction payload
+        // 3: AddInteger is after Update and Update is null:
+        //     - No conflict
+        // 4: Update is after AddInteger and Update.default is false
+        //     - Discard the AddInteger
+        // 5: Update is after AddInteger and Update.default is true
+        //     - Treat the Update as if it were before the AddInteger instruction
 
         // Note: AddInteger survives SetDefault, regardless of timestamp.
         if (right_side.timestamp() < left_side.timestamp() || right_is_default) {
             if (right.value.is_null()) {
-                // The AddInteger happened "after" the Set(null). This becomes a
-                // no-op, but if the server later integrates a Set(int) that
+                // The AddInteger happened "after" the Update(null). This becomes a
+                // no-op, but if the server later integrates a Update(int) that
                 // came-before the AddInteger, it will be taken into account again.
+                return;
+            }
+
+            // The AddInteger happened after an Update with a non int type
+            // This must be operating on a mixed field. Discard the AddInteger
+            if (right.value.type != Instruction::Payload::Type::Int) {
+                left_side.discard();
                 return;
             }
 

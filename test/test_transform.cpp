@@ -1805,6 +1805,146 @@ TEST(Transform_AddIntegerSurvivesSetDefault_NoRegularSets)
     });
 }
 
+TEST(Transform_AddIntegerBeforeUpdateString)
+{
+    auto changeset_dump_dir_gen = get_changeset_dump_dir_generator(test_context);
+    auto server = Peer::create_server(test_context, changeset_dump_dir_gen.get());
+    auto client_1 = Peer::create_client(test_context, 2, changeset_dump_dir_gen.get());
+    auto client_2 = Peer::create_client(test_context, 3, changeset_dump_dir_gen.get());
+
+    // Create baseline
+    client_1->transaction([&](Peer& c) {
+        auto& tr = *c.group;
+        TableRef table = tr.add_table_with_primary_key("class_Table", type_Int, "id");
+        auto col_any = table->add_column(type_Mixed, "any");
+        auto obj = table->create_object_with_primary_key(1);
+        obj.set(col_any, Mixed{0});
+    });
+
+    synchronize(server.get(), {client_1.get(), client_2.get()});
+
+    client_1->history.set_time(1);
+    client_2->history.set_time(2);
+
+    client_1->transaction([&](Peer& p) {
+        auto obj = p.table("class_Table")->get_object_with_primary_key(1);
+        auto col_any = p.table("class_Table")->get_column_key("any");
+        obj.add_int(col_any, 42);
+    });
+
+    client_2->transaction([](Peer& p) {
+        auto obj = p.table("class_Table")->get_object_with_primary_key(1);
+        auto col_any = p.table("class_Table")->get_column_key("any");
+        obj.set(col_any, Mixed{"test"});
+    });
+
+    synchronize(server.get(), {client_1.get(), client_2.get()});
+
+    ReadTransaction read_server(server->shared_group);
+    ReadTransaction read_client_1(client_1->shared_group);
+    ReadTransaction read_client_2(client_2->shared_group);
+    CHECK(compare_groups(read_server, read_client_1));
+    CHECK(compare_groups(read_server, read_client_2, *test_context.logger));
+    auto table = read_server.get_table("class_Table");
+    auto col_any = table->get_column_key("any");
+    CHECK_EQUAL(table->get_object_with_primary_key(1).get_any(col_any), "test");
+}
+
+
+TEST(Transform_AddIntegerAfterUpdateString)
+{
+    auto changeset_dump_dir_gen = get_changeset_dump_dir_generator(test_context);
+    auto server = Peer::create_server(test_context, changeset_dump_dir_gen.get());
+    auto client_1 = Peer::create_client(test_context, 2, changeset_dump_dir_gen.get());
+    auto client_2 = Peer::create_client(test_context, 3, changeset_dump_dir_gen.get());
+
+    // Create baseline
+    client_1->transaction([&](Peer& c) {
+        auto& tr = *c.group;
+        TableRef table = tr.add_table_with_primary_key("class_Table", type_Int, "id");
+        auto col_any = table->add_column(type_Mixed, "any");
+        auto obj = table->create_object_with_primary_key(1);
+        obj.set(col_any, Mixed{0});
+    });
+
+    synchronize(server.get(), {client_1.get(), client_2.get()});
+
+    client_2->history.set_time(1);
+    client_1->history.set_time(2);
+
+    client_1->transaction([&](Peer& p) {
+        auto obj = p.table("class_Table")->get_object_with_primary_key(1);
+        auto col_any = p.table("class_Table")->get_column_key("any");
+        obj.add_int(col_any, 42);
+    });
+
+    client_2->transaction([](Peer& p) {
+        auto obj = p.table("class_Table")->get_object_with_primary_key(1);
+        auto col_any = p.table("class_Table")->get_column_key("any");
+        obj.set(col_any, Mixed{"test"});
+    });
+
+    synchronize(server.get(), {client_1.get(), client_2.get()});
+
+    ReadTransaction read_server(server->shared_group);
+    ReadTransaction read_client_1(client_1->shared_group);
+    ReadTransaction read_client_2(client_2->shared_group);
+    CHECK(compare_groups(read_server, read_client_1));
+    CHECK(compare_groups(read_server, read_client_2, *test_context.logger));
+    auto table = read_server.get_table("class_Table");
+    auto col_any = table->get_column_key("any");
+    CHECK_EQUAL(table->get_object_with_primary_key(1).get_any(col_any), "test");
+}
+
+TEST(Transform_AddIntegerVsCreateList)
+{
+    auto changeset_dump_dir_gen = get_changeset_dump_dir_generator(test_context);
+    auto server = Peer::create_server(test_context, changeset_dump_dir_gen.get());
+    auto client_1 = Peer::create_client(test_context, 2, changeset_dump_dir_gen.get());
+    auto client_2 = Peer::create_client(test_context, 3, changeset_dump_dir_gen.get());
+
+    // Create baseline
+    client_1->transaction([&](Peer& c) {
+        auto& tr = *c.group;
+        TableRef table = tr.add_table_with_primary_key("class_Table", type_Int, "id");
+        auto col_any = table->add_column(type_Mixed, "any");
+        auto obj = table->create_object_with_primary_key(1);
+        obj.set(col_any, Mixed{0});
+    });
+
+    synchronize(server.get(), {client_1.get(), client_2.get()});
+
+    client_1->history.set_time(1);
+    client_2->history.set_time(2);
+
+    client_1->transaction([&](Peer& p) {
+        auto obj = p.table("class_Table")->get_object_with_primary_key(1);
+        auto col_any = p.table("class_Table")->get_column_key("any");
+        obj.add_int(col_any, 42);
+    });
+
+    client_2->transaction([](Peer& p) {
+        auto obj = p.table("class_Table")->get_object_with_primary_key(1);
+        auto col_any = p.table("class_Table")->get_column_key("any");
+        obj.set_collection(col_any, CollectionType::List);
+        auto list = obj.get_list_ptr<Mixed>(col_any);
+        list->add(42);
+    });
+
+    synchronize(server.get(), {client_1.get(), client_2.get()});
+
+    ReadTransaction read_server(server->shared_group);
+    ReadTransaction read_client_1(client_1->shared_group);
+    ReadTransaction read_client_2(client_2->shared_group);
+    CHECK(compare_groups(read_server, read_client_1));
+    CHECK(compare_groups(read_server, read_client_2, *test_context.logger));
+    auto table = read_server.get_table("class_Table");
+    auto col_any = table->get_column_key("any");
+    auto list = table->get_object_with_primary_key(1).get_list_ptr<Mixed>(col_any);
+    CHECK_EQUAL(list->size(), 1);
+    CHECK_EQUAL(list->get(0), 42);
+}
+
 TEST(Transform_DanglingLinks)
 {
     auto changeset_dump_dir_gen = get_changeset_dump_dir_generator(test_context);
