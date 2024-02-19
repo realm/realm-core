@@ -29,7 +29,7 @@ import { Template, importTemplate } from "./templates";
 type GenerateOptions = {
   spec: ReadonlyArray<string>;
   optIn?: string;
-  template: Promise<Template>;
+  template: ReadonlyArray<Promise<Template>>;
   output: string;
   debug: boolean;
 };
@@ -78,8 +78,8 @@ const optInOption = program
   .argParser(parseExistingFilePath);
 
 const templateOption = program
-  .createOption("-t, --template <template>", "Path to template source file to apply when generating")
-  .argParser(importTemplate)
+  .createOption("-t, --template <templates...>", "Path to template source file to apply when generating")
+  .argParser((arg, previous: ReadonlyArray<Promise<Template>> = []) => [...previous, importTemplate(arg)])
   .makeOptionMandatory();
 
 const outputOption = program
@@ -108,8 +108,9 @@ program
       if (optInPath) {
         optInSpec = parseOptInSpec(optInPath);
       }
-      generate({ rawSpec, optInSpec, template: await template, outputPath });
-      process.exit(0);
+      for (const t of template) {
+        generate({ rawSpec, optInSpec, template: await t, outputPath });
+      }
     } catch (err) {
       printError(err);
       process.exit(1);
