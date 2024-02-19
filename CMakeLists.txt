@@ -281,19 +281,7 @@ if(CMAKE_USE_PTHREADS_INIT)
 endif()
 
 find_package(Backtrace)
-if(Backtrace_FOUND)
-    add_library(Backtrace::Backtrace INTERFACE IMPORTED)
-    if(Backtrace_LIBRARIES AND NOT CMAKE_GENERATOR STREQUAL Xcode)
-        # Apple platforms always have backtrace. We disregard the `Backtrace_*` variables
-        # because their paths are hardcoded to one SDK within Xcode (e.g. macosx),
-        # whereas we build for several different SDKs and thus we can't use the include path from one in the other.
-        # Otherwise if CMake found that the backtrace facility is provided by an external library and not built-in
-        # we need to configure the interface target with the library include and link path.
-        target_include_directories(Backtrace::Backtrace INTERFACE ${Backtrace_INCLUDE_DIRS})
-        target_link_libraries(Backtrace::Backtrace INTERFACE ${Backtrace_LIBRARIES})
-    endif()
-    set(REALM_HAVE_BACKTRACE ON)
-endif()
+set(REALM_HAVE_BACKTRACE ${Backtrace_FOUND})
 
 if(REALM_ENABLE_SYNC)
     option(REALM_FORCE_OPENSSL "Always use OpenSSL for SSL needs, regardless of target platform." OFF)
