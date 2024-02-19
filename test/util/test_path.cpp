@@ -323,17 +323,11 @@ std::string TestDirNameGenerator::next()
 
 std::shared_ptr<DB> get_test_db(const std::string& path, const char* crypt_key)
 {
-    const char* str = getenv("UNITTEST_LOG_LEVEL");
-    realm::util::Logger::Level core_log_level = realm::util::Logger::Level::off;
-    if (str && strlen(str) != 0) {
-        std::istringstream in(str);
-        in.imbue(std::locale::classic());
-        in.flags(in.flags() & ~std::ios_base::skipws); // Do not accept white space
-        in >> core_log_level;
-    }
+    auto log_level = Logger::Level::off;
+    Logger::get_env_log_level_if_set(log_level);
 
     DBOptions options;
-    options.logger = std::make_shared<util::StderrLogger>(core_log_level);
+    options.logger = std::make_shared<util::StderrLogger>(log_level);
     options.encryption_key = crypt_key;
     return DB::create(make_in_realm_history(), path, options);
 }

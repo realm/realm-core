@@ -273,7 +273,7 @@ TEST_CASE("app: verify app error codes", "[sync][app][local]") {
                 return false;
             }
         }
-        catch (nlohmann::json::exception ex) {
+        catch (const nlohmann::json::exception&) {
             // It's also a failure if parsing the json body throws an exception
             return false;
         }
@@ -3929,7 +3929,6 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
     std::string base_file_path = util::make_temp_dir() + random_string(10);
     auto redir_transport = std::make_shared<BaseUrlTransport>();
     AutoVerifiedEmailCredentials creds;
-    util::Logger::set_default_level_threshold(realm::util::Logger::Level::TEST_LOGGING_LEVEL);
     auto logger = util::Logger::get_default_logger();
 
     App::Config app_config = {"fake-app-id"};
@@ -4148,7 +4147,7 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
     SECTION("Verify new sync session updates location") {
         bool use_ssl = GENERATE(true, false);
         std::string expected_host = "redirect.someurl.fake";
-        int expected_port = 8081;
+        sync::port_type expected_port = 8081;
         std::string init_url = util::format("http%1://alternate.someurl.fake", use_ssl ? "s" : "");
         std::string init_wsurl = util::format("ws%1://alternate.someurl.fake", use_ssl ? "s" : "");
         std::string redir_url = util::format("http%1://%2:%3", use_ssl ? "s" : "", expected_host, expected_port);

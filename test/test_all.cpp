@@ -443,7 +443,8 @@ bool run_tests(const std::shared_ptr<realm::util::Logger>& logger = nullptr)
         reporters.push_back(std::make_unique<CustomReporter>(report_progress));
     }
     if (const char* str = getenv("UNITTEST_XML"); str && strlen(str) != 0) {
-        std::cout << "Configuring jUnit reporter to store test results in " << str << std::endl;
+        if (!running_spawned_process)
+            std::cout << "Configuring jUnit reporter to store test results in " << str << std::endl;
         junit_file.open(str, util::File::mode_Write);
         const char* test_suite_name = getenv("UNITTEST_SUITE_NAME");
         if (!test_suite_name || !strlen(test_suite_name))
@@ -451,11 +452,13 @@ bool run_tests(const std::shared_ptr<realm::util::Logger>& logger = nullptr)
         reporters.push_back(create_junit_reporter(junit_out, test_suite_name));
     }
     else if (const char* str = getenv("UNITTEST_EVERGREEN_TEST_RESULTS"); str && strlen(str) != 0) {
-        std::cout << "Configuring evergreen reporter to store test results in " << str << std::endl;
+        if (!running_spawned_process)
+            std::cout << "Configuring evergreen reporter to store test results in " << str << std::endl;
         reporters.push_back(create_evergreen_reporter(str));
     }
     auto reporter = create_combined_reporter(reporters);
-    config.reporter = reporter.get();
+    if (!running_spawned_process)
+        config.reporter = reporter.get();
 
     // Set up filter
     const char* filter_str = getenv("UNITTEST_FILTER");
@@ -468,18 +471,8 @@ bool run_tests(const std::shared_ptr<realm::util::Logger>& logger = nullptr)
     config.filter = filter.get();
 
     // Set intra test log level threshold
-    {
-        const char* str = getenv("UNITTEST_LOG_LEVEL");
-        if (str && strlen(str) != 0) {
-            std::istringstream in(str);
-            in.imbue(std::locale::classic());
-            in.flags(in.flags() & ~std::ios_base::skipws); // Do not accept white space
-            in >> config.intra_test_log_level;
-            bool bad = !in || in.get() != std::char_traits<char>::eof();
-            if (bad)
-                throw std::runtime_error("Bad intra test log level");
-        }
-    }
+    if (!util::Logger::get_env_log_level_if_set(config.intra_test_log_level))
+        throw std::runtime_error("Bad intra test log level");
 
     // Set up per-thread file logging
     {
@@ -510,10 +503,11 @@ bool run_tests(const std::shared_ptr<realm::util::Logger>& logger = nullptr)
     list.sort(PatternBasedFileOrder(file_order));
     bool success = list.run(config);
 
-    if (test_only)
+    if (test_only && !running_spawned_process)
         std::cout << "\n*** BE AWARE THAT MOST TESTS WERE EXCLUDED DUE TO USING 'ONLY' MACRO ***\n";
 
-    std::cout << "\n";
+    if (!running_spawned_process)
+        std::cout << "\n";
 
     // The iOS Simulator has a separate set of kernel file caches from the parent
     // OS, and if the simulator is deleted immediately after running the tests
