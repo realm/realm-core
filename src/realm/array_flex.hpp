@@ -40,6 +40,13 @@ public:
     void get_chunk(const Array& h, size_t ndx, int64_t res[8]) const;
     void set_direct(const Array&, size_t, int64_t) const;
 
+    template <typename Cond>
+    bool find_all(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*) const
+    {
+        // TODO: implement this
+        return true;
+    }
+
 private:
     static int64_t do_get(uint64_t*, size_t, size_t, size_t, size_t, size_t, size_t);
 };

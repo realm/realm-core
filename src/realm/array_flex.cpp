@@ -46,7 +46,6 @@ void ArrayFlex::copy_data(const Array& arr, const std::vector<int64_t>& values,
     REALM_ASSERT_DEBUG(arr.m_encoder.get_kind() == 'B');
     REALM_ASSERT_DEBUG(arr.m_encoder.get_encoding() == Encoding::Flex);
 
-    auto h = arr.get_header();
     const auto& encoder = arr.get_encoder();
     const auto v_width = encoder.m_v_width;
     const auto ndx_width = encoder.m_ndx_width;

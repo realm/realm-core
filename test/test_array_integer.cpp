@@ -39,7 +39,7 @@ TEST(perf_array_encode_get_vs_array_get)
     using namespace std;
     using namespace std::chrono;
     size_t n_values = 1000;
-    size_t n_runs = 1000;
+    size_t n_runs = 100;
     std::cout << "   N values = " << n_values << std::endl;
     std::cout << "   N runs = " << n_runs << std::endl;
 
@@ -72,9 +72,10 @@ TEST(perf_array_encode_get_vs_array_get)
     CHECK(a_encoded.is_encoded());
     CHECK(a_encoded.size() == a.size());
     t1 = high_resolution_clock::now();
+
     for (size_t j = 0; j < n_runs; ++j) {
         for (size_t i = 0; i < n_values; ++i) {
-            REALM_ASSERT(a_encoded.get(i) == input_array[i]);
+            REALM_ASSERT(a_encoded.get(i) == a.get(i));
         }
     }
     t2 = high_resolution_clock::now();
@@ -115,7 +116,7 @@ TEST(perf_array_encode_get_vs_array_get)
     t1 = high_resolution_clock::now();
     for (size_t j = 0; j < n_runs; ++j) {
         for (size_t i = 0; i < n_values; ++i) {
-            REALM_ASSERT(a_encoded.get(i) == input_array[i]);
+            REALM_ASSERT(a_encoded.get(i) == a.get(i));
         }
     }
     t2 = high_resolution_clock::now();
@@ -130,7 +131,7 @@ ONLY(Test_basic_find)
     using namespace std;
     using namespace std::chrono;
     size_t n_values = 1000;
-    size_t n_runs = 1000;
+    size_t n_runs = 100;
     std::cout << "   N values = " << n_values << std::endl;
     std::cout << "   N runs = " << n_runs << std::endl;
 
@@ -151,6 +152,7 @@ ONLY(Test_basic_find)
     for (size_t j = 0; j < n_runs; ++j) {
         for (size_t i = 0; i < n_values; ++i) {
             auto ndx = a.find_first(i);
+            REALM_ASSERT(ndx != realm::not_found);
             REALM_ASSERT(a.get(ndx) == input_array[ndx]);
         }
     }
@@ -168,7 +170,8 @@ ONLY(Test_basic_find)
     for (size_t j = 0; j < n_runs; ++j) {
         for (size_t i = 0; i < n_values; ++i) {
             auto ndx = a_encoded.find_first(i);
-            REALM_ASSERT(a_encoded.get(ndx) == input_array[i]);
+            REALM_ASSERT(ndx != realm::not_found);
+            REALM_ASSERT(a_encoded.get(ndx) == a.get(ndx));
         }
     }
     t2 = high_resolution_clock::now();
@@ -195,6 +198,7 @@ ONLY(Test_basic_find)
     for (size_t j = 0; j < n_runs; ++j) {
         for (size_t i = 0; i < n_values; ++i) {
             auto ndx = a.find_first(-i);
+            REALM_ASSERT(ndx != realm::not_found);
             REALM_ASSERT(a.get(ndx) == input_array[ndx]);
         }
     }
@@ -212,7 +216,8 @@ ONLY(Test_basic_find)
     for (size_t j = 0; j < n_runs; ++j) {
         for (size_t i = 0; i < n_values; ++i) {
             auto ndx = a_encoded.find_first(-i);
-            REALM_ASSERT(a_encoded.get(ndx) == input_array[i]);
+            REALM_ASSERT(ndx != realm::not_found);
+            REALM_ASSERT(a_encoded.get(ndx) == a.get(ndx));
         }
     }
     t2 = high_resolution_clock::now();

@@ -199,6 +199,7 @@ class bf_iterator {
     size_t field_position;
     uint8_t field_size;
     uint8_t step_size; // may be different than field_size if used for arrays of pairs
+    uint64_t* end_data_area = nullptr; // optional. to be set explicitely for now
 
 public:
     bf_iterator(uint64_t* data_area, size_t initial_offset, size_t field_size, size_t step_size, size_t index)
@@ -208,6 +209,21 @@ public:
     {
         field_position = initial_offset + index * step_size;
         first_word_ptr = data_area + (field_position >> 6);
+    }
+
+    void set_end(uint64_t* end)
+    {
+        end_data_area = end;
+    }
+
+    uint64_t* begin()
+    {
+        return data_area;
+    }
+
+    uint64_t* end()
+    {
+        return end_data_area;
     }
 
     uint64_t get_value() const
@@ -283,7 +299,6 @@ inline bool operator<(const bf_iterator& a, const bf_iterator& b)
     return a.field_position < b.field_position;
 }
 
-
 class bf_ref {
     bf_iterator it;
 
@@ -330,7 +345,7 @@ inline int64_t sign_extend_field_by_mask(size_t sign_mask, uint64_t value)
     }
     uint64_t below_sign_mask = sign_mask - 1;
     value &= below_sign_mask;
-    return (int64_t)(value);
+    return int64_t(value);
 }
 
 inline int64_t sign_extend_field(size_t width, uint64_t value)
@@ -342,6 +357,7 @@ inline int64_t sign_extend_field(size_t width, uint64_t value)
         return int64_t(value);
     }
     else {
+        // zero out anything above the sign bit
         // (actually, also zero out the sign bit, but it is already known to be zero)
         uint64_t below_sign_mask = sign_mask - 1;
         value &= below_sign_mask;
