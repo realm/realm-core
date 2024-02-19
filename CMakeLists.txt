@@ -221,7 +221,9 @@ if(MSVC)
         set(CMAKE_EXE_LINKER_FLAGS_DEBUG     "${CMAKE_EXE_LINKER_FLAGS_DEBUG} /INCREMENTAL:NO /OPT:NOREF /OPT:NOICF")
         set(CMAKE_SHARED_LINKER_FLAGS_DEBUG  "${CMAKE_SHARED_LINKER_FLAGS_DEBUG} /INCREMENTAL:NO /OPT:NOREF /OPT:NOICF")
     else()
-        set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+        if(NOT DEFINED CMAKE_MSVC_RUNTIME_LIBRARY)
+            set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+        endif()
         string(REGEX REPLACE "/RTC(su|[1su])" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
     endif()
 
@@ -277,19 +279,7 @@ if(CMAKE_USE_PTHREADS_INIT)
 endif()
 
 find_package(Backtrace)
-if(Backtrace_FOUND)
-    add_library(Backtrace::Backtrace INTERFACE IMPORTED)
-    if(Backtrace_LIBRARIES AND NOT CMAKE_GENERATOR STREQUAL Xcode)
-        # Apple platforms always have backtrace. We disregard the `Backtrace_*` variables
-        # because their paths are hardcoded to one SDK within Xcode (e.g. macosx),
-        # whereas we build for several different SDKs and thus we can't use the include path from one in the other.
-        # Otherwise if CMake found that the backtrace facility is provided by an external library and not built-in
-        # we need to configure the interface target with the library include and link path.
-        target_include_directories(Backtrace::Backtrace INTERFACE ${Backtrace_INCLUDE_DIRS})
-        target_link_libraries(Backtrace::Backtrace INTERFACE ${Backtrace_LIBRARIES})
-    endif()
-    set(REALM_HAVE_BACKTRACE ON)
-endif()
+set(REALM_HAVE_BACKTRACE ${Backtrace_FOUND})
 
 if(REALM_ENABLE_SYNC)
     option(REALM_FORCE_OPENSSL "Always use OpenSSL for SSL needs, regardless of target platform." OFF)
@@ -314,9 +304,6 @@ if(REALM_NEEDS_OPENSSL OR REALM_FORCE_OPENSSL)
         set(_REALM_USE_OPENSSL_DEFAULT_VERIFY_PATHS OFF)
     endif()
 
-    if(NOT DEFINED OPENSSL_USE_STATIC_LIBS)
-        set(OPENSSL_USE_STATIC_LIBS ON)
-    endif()
     find_package(OpenSSL REQUIRED)
     set(REALM_HAVE_OPENSSL ON)
     option(REALM_USE_SYSTEM_OPENSSL_PATHS "Use the system OpenSSL certificate store (specified by the OPENSSLDIR environment variable) at runtime for TLS handshake." ${_REALM_USE_OPENSSL_DEFAULT_VERIFY_PATHS})
@@ -332,8 +319,11 @@ endif()
 # Emscripten does provide Zlib, but it doesn't work with find_package and is handled specially
 if(NOT APPLE AND NOT EMSCRIPTEN AND NOT TARGET ZLIB::ZLIB)
     if(WIN32 OR (CMAKE_SYSTEM_NAME STREQUAL "Linux" AND REALM_LINUX_TOOLCHAIN))
-        realm_acquire_dependency(zlib ${DEP_ZLIB_VERSION} ZLIB_CMAKE_INCLUDE_FILE)
-        include(${ZLIB_CMAKE_INCLUDE_FILE})
+        find_package(ZLIB)
+        if (NOT ZLIB_FOUND)
+            realm_acquire_dependency(zlib ${DEP_ZLIB_VERSION} ZLIB_CMAKE_INCLUDE_FILE)
+            include(${ZLIB_CMAKE_INCLUDE_FILE})
+        endif()
     elseif(ANDROID)
         # On Android FindZLIB chooses the static libz over the dynamic one, but this leads to issues
         # (see https://github.com/android/ndk/issues/1179)
@@ -371,6 +361,39 @@ add_subdirectory(bindgen)
 # Install the licence and changelog files
 install(FILES LICENSE CHANGELOG.md DESTINATION "doc/realm" COMPONENT devel)
 
+# Make the project importable from the build directory
+set(REALM_EXPORTED_TARGETS
+        Storage
+        QueryParser
+        ObjectStore
+        RealmFFI
+        RealmFFIStatic
+        )
+if(REALM_ENABLE_SYNC)
+    list(APPEND REALM_EXPORTED_TARGETS Sync)
+endif()
+export(TARGETS ${REALM_EXPORTED_TARGETS} NAMESPACE Realm:: FILE RealmTargets.cmake)
+configure_file(tools/cmake/RealmConfig.cmake.in ${CMAKE_CURRENT_BINARY_DIR}/RealmConfig.cmake @ONLY)
+configure_file(tools/cmake/AcquireRealmDependency.cmake ${CMAKE_CURRENT_BINARY_DIR}/AcquireRealmDependency.cmake @ONLY)
+
+# Make the project importable from the install directory
+install(EXPORT realm
+        NAMESPACE Realm::
+        FILE RealmTargets.cmake
+        DESTINATION share/cmake/Realm
+        COMPONENT devel
+        )
+
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/RealmConfig.cmake
+        DESTINATION share/cmake/Realm
+        COMPONENT devel
+        )
+
+install(FILES tools/cmake/AcquireRealmDependency.cmake
+        DESTINATION share/cmake/Realm
+        COMPONENT devel
+        )
+
 # Only prepare test/install/package targets if we're not a submodule
 if(REALM_CORE_SUBMODULE_BUILD)
     return()
@@ -401,39 +424,6 @@ add_subdirectory(test ${REALM_EXCLUDE_TESTS})
 if (REALM_BUILD_TEST_CLIENT)
     add_subdirectory(test/client)
 endif()
-
-# Make the project importable from the build directory
-set(REALM_EXPORTED_TARGETS
-    Storage
-    QueryParser
-    ObjectStore
-    RealmFFI
-    RealmFFIStatic
-)
-if(REALM_ENABLE_SYNC)
-    list(APPEND REALM_EXPORTED_TARGETS Sync)
-endif()
-export(TARGETS ${REALM_EXPORTED_TARGETS} NAMESPACE Realm:: FILE RealmTargets.cmake)
-configure_file(tools/cmake/RealmConfig.cmake.in ${CMAKE_CURRENT_BINARY_DIR}/RealmConfig.cmake @ONLY)
-configure_file(tools/cmake/AcquireRealmDependency.cmake ${CMAKE_CURRENT_BINARY_DIR}/AcquireRealmDependency.cmake @ONLY)
-
-# Make the project importable from the install directory
-install(EXPORT realm
-        NAMESPACE Realm::
-        FILE RealmTargets.cmake
-        DESTINATION lib/cmake/Realm
-        COMPONENT devel
-)
-
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/RealmConfig.cmake
-        DESTINATION lib/cmake/Realm
-        COMPONENT devel
-)
-
-install(FILES tools/cmake/AcquireRealmDependency.cmake
-        DESTINATION lib/cmake/Realm
-        COMPONENT devel
-)
 
 # CPack
 set(CPACK_GENERATOR "TGZ")
