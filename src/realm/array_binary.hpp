@@ -89,16 +89,10 @@ public:
 private:
     static constexpr size_t small_blob_max_size = 64;
 
-    union Storage {
-        std::aligned_storage<sizeof(ArraySmallBlobs), alignof(ArraySmallBlobs)>::type m_small_blobs;
-        std::aligned_storage<sizeof(ArrayBigBlobs), alignof(ArrayBigBlobs)>::type m_big_blobs;
-    };
-
-    bool m_is_big = false;
-
     Allocator& m_alloc;
-    Storage m_storage;
     Array* m_arr;
+    alignas(ArrayBigBlobs) std::byte m_storage[std::max(sizeof(ArraySmallBlobs), sizeof(ArrayBigBlobs))];
+    bool m_is_big = false;
 
     bool upgrade_leaf(size_t value_size);
 };

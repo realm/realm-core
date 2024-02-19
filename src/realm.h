@@ -776,6 +776,11 @@ RLM_API void realm_config_set_should_compact_on_launch_function(realm_config_t*,
 RLM_API bool realm_config_get_disable_format_upgrade(const realm_config_t*);
 
 /**
+ * True if you can open the file without a file_format_upgrade
+ */
+RLM_API bool realm_config_needs_file_format_upgrade(const realm_config_t*);
+
+/**
  * Disable file format upgrade on open (default: false).
  *
  * If a migration is needed to open the realm file with the provided schema, an
@@ -3456,6 +3461,11 @@ typedef struct realm_sync_error {
     void* user_code_error;
 } realm_sync_error_t;
 
+typedef struct realm_salted_file_ident {
+    uint64_t ident;
+    int64_t salt;
+} realm_salted_file_ident_t;
+
 /**
  * Callback function invoked by the sync session once it has uploaded or download
  * all available changesets. See @a realm_sync_session_wait_for_upload and
@@ -3495,9 +3505,13 @@ typedef enum realm_flx_sync_subscription_set_state {
 typedef void (*realm_sync_on_subscription_state_changed_t)(realm_userdata_t userdata,
                                                            realm_flx_sync_subscription_set_state_e state);
 
+typedef void (*realm_sync_on_user_state_changed_t)(realm_userdata_t userdata, realm_user_state_e s);
+
+
 typedef struct realm_async_open_task_progress_notification_token realm_async_open_task_progress_notification_token_t;
 typedef struct realm_sync_session_connection_state_notification_token
     realm_sync_session_connection_state_notification_token_t;
+typedef struct realm_sync_user_subscription_token realm_sync_user_subscription_token_t;
 
 /**
  * Callback function invoked by the async open task once the realm is open and fully synchronized.
@@ -3858,6 +3872,13 @@ RLM_API void realm_sync_session_pause(realm_sync_session_t*) RLM_API_NOEXCEPT;
 RLM_API void realm_sync_session_resume(realm_sync_session_t*) RLM_API_NOEXCEPT;
 
 /**
+ * Gets the file ident/salt currently assigned to the realm by sync. Callers should supply a pointer token
+ * a realm_salted_file_ident_t for this function to fill out.
+ */
+RLM_API void realm_sync_session_get_file_ident(realm_sync_session_t*,
+                                               realm_salted_file_ident_t* out) RLM_API_NOEXCEPT;
+
+/**
  * In case manual reset is needed, run this function in order to reset sync client files.
  * The sync_path is going to passed into realm_sync_error_handler_func_t, if manual reset is needed.
  * This function is supposed to be called inside realm_sync_error_handler_func_t callback, if sync client reset is
@@ -3893,6 +3914,15 @@ realm_sync_session_register_connection_state_change_callback(
 RLM_API realm_sync_session_connection_state_notification_token_t* realm_sync_session_register_progress_notifier(
     realm_sync_session_t*, realm_sync_progress_func_t, realm_sync_progress_direction_e, bool is_streaming,
     realm_userdata_t userdata, realm_free_userdata_func_t userdata_free) RLM_API_NOEXCEPT;
+
+
+/**
+ * @return a notification token object. Dispose it to stop receiving notifications.
+ */
+RLM_API realm_sync_user_subscription_token_t*
+realm_sync_user_on_state_change_register_callback(realm_user_t*, realm_sync_on_user_state_changed_t,
+                                                  realm_userdata_t userdata,
+                                                  realm_free_userdata_func_t userdata_free);
 
 /**
  * Register a callback that will be invoked when all pending downloads have completed.

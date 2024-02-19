@@ -1317,6 +1317,7 @@ TEST_IF(Upgrade_Database_22, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZE
     // Make a copy of the database so that we keep the original file intact and unmodified
     File::copy(path, temp_copy);
     auto hist = make_in_realm_history();
+    CHECK(DB::needs_file_format_upgrade(temp_copy, {}));
     auto sg = DB::create(*hist, temp_copy);
     auto rt = sg->start_read();
 

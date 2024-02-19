@@ -17,6 +17,7 @@
 #include <iostream>
 #include <memory>
 #include <mutex>
+#include <optional>
 
 #include <realm/object-store/keypath_helpers.hpp>
 #include <realm/object-store/results.hpp>
@@ -276,6 +277,11 @@ struct Helpers {
                                                 const char* pem_data, size_t pem_size, int preverify_ok, int depth) {
             return callback(server_address, server_port, std::string_view(pem_data, pem_size), preverify_ok, depth);
         };
+    }
+
+    static bool needs_file_format_upgrade(const RealmConfig& config)
+    {
+        return config.needs_file_format_upgrade();
     }
 };
 

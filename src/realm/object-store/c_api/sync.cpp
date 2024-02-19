@@ -40,6 +40,11 @@ realm_sync_session_connection_state_notification_token::~realm_sync_session_conn
     session->unregister_connection_change_callback(token);
 }
 
+realm_sync_user_subscription_token::~realm_sync_user_subscription_token()
+{
+    user->unsubscribe(token);
+}
+
 namespace realm::c_api {
 
 static_assert(realm_sync_client_metadata_mode_e(SyncClientConfig::MetadataMode::NoEncryption) ==
@@ -757,6 +762,13 @@ RLM_API void realm_sync_session_pause(realm_sync_session_t* session) noexcept
 RLM_API void realm_sync_session_resume(realm_sync_session_t* session) noexcept
 {
     (*session)->resume();
+}
+
+RLM_API void realm_sync_session_get_file_ident(realm_sync_session_t* session, realm_salted_file_ident_t* out) noexcept
+{
+    auto file_ident = (*session)->get_file_ident();
+    out->ident = file_ident.ident;
+    out->salt = file_ident.salt;
 }
 
 RLM_API bool realm_sync_immediately_run_file_actions(realm_app_t* realm_app, const char* sync_path,

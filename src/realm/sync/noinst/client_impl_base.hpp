@@ -264,17 +264,9 @@ private:
     // the next, which is important because it carries information about a
     // possible reconnect delay applying to the new connection object (server
     // hammering protection).
-    //
-    // Note: Due to a particular load balancing scheme that is currently in use,
-    // every session is forced to open a seperate connection (via abuse of
-    // `m_one_connection_per_session`, which is only intended for testing
-    // purposes). This disables part of the hammering protection scheme built in
-    // to the client.
     struct ServerSlot {
-        explicit ServerSlot(ReconnectInfo reconnect_info)
-            : reconnect_info(std::move(reconnect_info))
-        {
-        }
+        explicit ServerSlot(ReconnectInfo reconnect_info);
+        ~ServerSlot();
 
         ReconnectInfo reconnect_info; // Applies exclusively to `connection`.
         std::unique_ptr<ClientImpl::Connection> connection;
@@ -300,7 +292,6 @@ private:
 
     bool m_stopped = false;                       // Protected by `m_mutex`
     bool m_sessions_terminated = false;           // Protected by `m_mutex`
-    bool m_actualize_and_finalize_needed = false; // Protected by `m_mutex`
 
     // The set of session wrappers that are not yet wrapping a session object,
     // and are not yet abandoned (still referenced by the application).
@@ -1248,6 +1239,13 @@ inline ConnectionState ClientImpl::Connection::get_state() const noexcept
 {
     return m_state;
 }
+
+inline ClientImpl::ServerSlot::ServerSlot(ReconnectInfo reconnect_info)
+    : reconnect_info(std::move(reconnect_info))
+{
+}
+
+inline ClientImpl::ServerSlot::~ServerSlot() = default;
 
 inline SyncServerMode ClientImpl::Connection::get_sync_server_mode() const noexcept
 {

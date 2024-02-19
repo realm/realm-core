@@ -35,6 +35,7 @@
 #include <realm/object-store/util/scheduler.hpp>
 
 #include <memory>
+#include <random>
 #include <vector>
 
 using namespace realm;
