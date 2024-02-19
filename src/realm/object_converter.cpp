@@ -327,10 +327,10 @@ void InterRealmValueConverter::copy_value(const Obj& src_obj, Obj& dst_obj, bool
 }
 
 //
-// Handle collections in mixed. A collection can have N nested levels (expect for Sets). And these levels can be
+// Handle collections in mixed. A collection can have N nested levels (except for Sets). And these levels can be
 // nested in arbitrary way (eg a List within a Dictionary or viceversa). In order to try to merge server changes with
-// client changes, the algorithm needs to go throw each single element in the collection, check its type and perform
-// the most appropriate action in order to miminize the number of notificiations triggered.
+// client changes, the algorithm needs to go through each single element in the collection, check its type and perform
+// the most appropriate action in order to miminize the number of notifications triggered.
 //
 void InterRealmValueConverter::handle_list_in_mixed(const Lst<Mixed>& src_list, Lst<Mixed>& dst_list) const
 {
