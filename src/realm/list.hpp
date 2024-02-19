@@ -458,6 +458,7 @@ public:
             constexpr bool allow_create = true;
             init_from_parent(allow_create); // Throws
             Base::update_content_version();
+            CollectionParent::m_parent_version++;
         }
     }
 
@@ -482,6 +483,11 @@ public:
     StablePath get_stable_path() const override
     {
         return Base::get_stable_path();
+    }
+
+    ColKey get_col_key() const noexcept override
+    {
+        return Base::get_col_key();
     }
 
     void add_index(Path& path, const Index& ndx) const final;

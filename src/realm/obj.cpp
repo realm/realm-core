@@ -385,6 +385,7 @@ bool Obj::update() const
     if (changes) {
         m_mem = new_obj.m_mem;
         m_row_ndx = new_obj.m_row_ndx;
+        CollectionParent::m_parent_version++;
     }
     // Always update versions
     m_storage_version = new_obj.m_storage_version;
@@ -422,6 +423,7 @@ UpdateStatus Obj::update_if_needed_with_status() const
         if ((m_mem.get_addr() != state.mem.get_addr()) || (m_row_ndx != state.index)) {
             m_mem = state.mem;
             m_row_ndx = state.index;
+            CollectionParent::m_parent_version++;
             return UpdateStatus::Updated;
         }
     }
@@ -1083,6 +1085,11 @@ std::string Obj::get_id() const
 }
 
 Path Obj::get_short_path() const noexcept
+{
+    return {};
+}
+
+ColKey Obj::get_col_key() const noexcept
 {
     return {};
 }

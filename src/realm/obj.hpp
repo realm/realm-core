@@ -76,6 +76,7 @@ public:
     FullPath get_path() const final;
     std::string get_id() const;
     Path get_short_path() const noexcept final;
+    ColKey get_col_key() const noexcept final;
     StablePath get_stable_path() const noexcept final;
     void add_index(Path& path, const Index& ndx) const final;
     size_t find_index(const Index&) const final

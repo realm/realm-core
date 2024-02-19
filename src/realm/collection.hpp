@@ -35,6 +35,10 @@ public:
     {
         return {};
     }
+    ColKey get_col_key() const noexcept final
+    {
+        return {};
+    }
     void add_index(Path&, const Index&) const noexcept final {}
     size_t find_index(const Index&) const noexcept final
     {
@@ -478,7 +482,7 @@ public:
     }
 
     // Overriding members of CollectionBase:
-    ColKey get_col_key() const noexcept final
+    ColKey get_col_key() const noexcept override
     {
         return m_col_key;
     }
@@ -576,6 +580,7 @@ protected:
     Obj m_obj_mem;
     std::shared_ptr<CollectionParent> m_col_parent;
     CollectionParent::Index m_index;
+    mutable size_t m_my_version = 0;
     ColKey m_col_key;
     bool m_nullable = false;
 
@@ -618,6 +623,7 @@ protected:
     CollectionBaseImpl(CollectionParent& parent, CollectionParent::Index index) noexcept
         : m_obj_mem(parent.get_object())
         , m_index(index)
+        , m_col_key(parent.get_col_key())
         , m_parent(&parent)
         , m_alloc(&m_obj_mem.get_alloc())
     {
@@ -655,8 +661,9 @@ protected:
 
         if (status != UpdateStatus::Detached) {
             auto content_version = m_alloc->get_content_version();
-            if (content_version != m_content_version) {
+            if (content_version != m_content_version || m_my_version != m_parent->m_parent_version) {
                 m_content_version = content_version;
+                m_my_version = m_parent->m_parent_version;
                 status = UpdateStatus::Updated;
             }
         }
@@ -673,8 +680,9 @@ protected:
         bool changed = m_parent->update_if_needed(); // Throws if the object does not exist.
         auto content_version = m_alloc->get_content_version();
 
-        if (changed || content_version != m_content_version) {
+        if (changed || content_version != m_content_version || m_my_version != m_parent->m_parent_version) {
             m_content_version = content_version;
+            m_my_version = m_parent->m_parent_version;
             return true;
         }
         return false;

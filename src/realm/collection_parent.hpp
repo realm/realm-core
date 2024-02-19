@@ -84,6 +84,8 @@ public:
     virtual FullPath get_path() const = 0;
     // Return path from owning object
     virtual Path get_short_path() const = 0;
+    // Return column of owning property
+    virtual ColKey get_col_key() const noexcept = 0;
     // Return path from owning object
     virtual StablePath get_stable_path() const = 0;
     // Add a translation of Index to PathElement
@@ -105,6 +107,7 @@ protected:
     static constexpr size_t s_max_level = 100;
 #endif
     size_t m_level = 0;
+    mutable size_t m_parent_version = 0;
 
     constexpr CollectionParent(size_t level = 0)
         : m_level(level)

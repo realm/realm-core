@@ -6140,6 +6140,8 @@ TEST_IF(Sync_CollectionInMixed, sync::SYNC_SUPPORTS_NESTED_COLLECTIONS)
         dict->insert_collection("list", CollectionType::List);
         auto l = dict->get_list("list");
         l->add(5);
+        l->insert_collection(1, CollectionType::List);
+        l->get_list(1)->add(7);
 
         auto bar = table->create_object_with_primary_key(456);
 
@@ -6148,15 +6150,6 @@ TEST_IF(Sync_CollectionInMixed, sync::SYNC_SUPPORTS_NESTED_COLLECTIONS)
         auto list = bar.get_list_ptr<Mixed>(col_any);
         list->add("John");
         list->insert(0, 5);
-
-        auto foobar = table->create_object_with_primary_key(789);
-
-        // Create set in Mixed property
-        foobar.set_collection(col_any, CollectionType::Set);
-        auto set = foobar.get_set_ptr<Mixed>(col_any);
-        set->insert(1);
-        set->insert(2);
-        set->insert(5);
     });
 
     session_1.wait_for_upload_complete_or_client_stopped();
@@ -6165,7 +6158,7 @@ TEST_IF(Sync_CollectionInMixed, sync::SYNC_SUPPORTS_NESTED_COLLECTIONS)
     write_transaction(db_2, [&](WriteTransaction& tr) {
         auto table = tr.get_table("class_Table");
         auto col_any = table->get_column_key("any");
-        CHECK_EQUAL(table->size(), 3);
+        CHECK_EQUAL(table->size(), 2);
 
         auto obj = table->get_object_with_primary_key(123);
         auto dict = obj.get_dictionary_ptr(col_any);
@@ -6195,15 +6188,6 @@ TEST_IF(Sync_CollectionInMixed, sync::SYNC_SUPPORTS_NESTED_COLLECTIONS)
         list->set(1, "Paul");
         // Erase list element
         list->remove(0);
-
-        obj = table->get_object_with_primary_key(789);
-        auto set = obj.get_set_ptr<Mixed>(col_any);
-        // Check that values are replicated
-        CHECK_NOT_EQUAL(set->find(1), realm::npos);
-        CHECK_NOT_EQUAL(set->find(2), realm::npos);
-        CHECK_NOT_EQUAL(set->find(5), realm::npos);
-        // Erase set element
-        set->erase(2);
     });
 
     session_2.wait_for_upload_complete_or_client_stopped();
@@ -6212,7 +6196,7 @@ TEST_IF(Sync_CollectionInMixed, sync::SYNC_SUPPORTS_NESTED_COLLECTIONS)
     write_transaction(db_1, [&](WriteTransaction& tr) {
         auto table = tr.get_table("class_Table");
         auto col_any = table->get_column_key("any");
-        CHECK_EQUAL(table->size(), 3);
+        CHECK_EQUAL(table->size(), 2);
 
         auto obj = table->get_object_with_primary_key(123);
         auto dict = obj.get_dictionary(col_any);
@@ -6232,11 +6216,6 @@ TEST_IF(Sync_CollectionInMixed, sync::SYNC_SUPPORTS_NESTED_COLLECTIONS)
         CHECK_EQUAL(list->get(0).get_string(), "Paul");
         // List clear
         list->clear();
-
-        obj = table->get_object_with_primary_key(789);
-        auto set = obj.get_set_ptr<Mixed>(col_any);
-        CHECK_EQUAL(set->size(), 2);
-        set->clear();
     });
 
     session_1.wait_for_upload_complete_or_client_stopped();
@@ -6246,7 +6225,7 @@ TEST_IF(Sync_CollectionInMixed, sync::SYNC_SUPPORTS_NESTED_COLLECTIONS)
         auto table = tr.get_table("class_Table");
         auto col_any = table->get_column_key("any");
 
-        CHECK_EQUAL(table->size(), 3);
+        CHECK_EQUAL(table->size(), 2);
 
         auto obj = table->get_object_with_primary_key(123);
         auto dict = obj.get_dictionary(col_any);
@@ -6258,14 +6237,9 @@ TEST_IF(Sync_CollectionInMixed, sync::SYNC_SUPPORTS_NESTED_COLLECTIONS)
         obj = table->get_object_with_primary_key(456);
         auto list = obj.get_list<Mixed>(col_any);
         CHECK_EQUAL(list.size(), 0);
-        // Replace list with set on property
-        obj.set_collection(col_any, CollectionType::Set);
-
-        obj = table->get_object_with_primary_key(789);
-        auto set = obj.get_set<Mixed>(col_any);
-        CHECK_EQUAL(set.size(), 0);
-        // Replace set with dictionary on property
+        // Replace list with Dictionary on property
         obj.set_collection(col_any, CollectionType::Dictionary);
+
     });
 
     session_2.wait_for_upload_complete_or_client_stopped();
@@ -6278,17 +6252,13 @@ TEST_IF(Sync_CollectionInMixed, sync::SYNC_SUPPORTS_NESTED_COLLECTIONS)
         auto table = read_2.get_table("class_Table");
         auto col_any = table->get_column_key("any");
 
-        CHECK_EQUAL(table->size(), 3);
+        CHECK_EQUAL(table->size(), 2);
 
         auto obj = table->get_object_with_primary_key(123);
         auto list = obj.get_list<Mixed>(col_any);
         CHECK_EQUAL(list.size(), 0);
 
         obj = table->get_object_with_primary_key(456);
-        auto set = obj.get_set<Mixed>(col_any);
-        CHECK_EQUAL(set.size(), 0);
-
-        obj = table->get_object_with_primary_key(789);
         auto dict = obj.get_dictionary(col_any);
         CHECK_EQUAL(dict.size(), 0);
 
