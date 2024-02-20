@@ -132,13 +132,18 @@ static const std::string fake_refresh_token = ENCODE_FAKE_JWT("not_a_real_token"
 static const std::string fake_access_token = ENCODE_FAKE_JWT("also_not_real");
 static const std::string fake_device_id = "123400000000000000000000";
 
-static std::shared_ptr<SyncUser> get_fake_user(app::App& app, const std::string& user_name)
+static std::shared_ptr<SyncUser> get_fake_user(SyncManager& sync_manager, const std::string& user_name)
 {
-    return app.sync_manager()->get_user(user_name, fake_refresh_token, fake_access_token, fake_device_id);
+    return sync_manager.get_user(user_name, fake_refresh_token, fake_access_token, fake_device_id);
 }
 
-SyncTestFile::SyncTestFile(std::shared_ptr<app::App> app, std::string name, std::string user_name)
-    : SyncTestFile(get_fake_user(*app, user_name), bson::Bson(name))
+SyncTestFile::SyncTestFile(TestSyncManager& tsm, std::string name, std::string user_name)
+    : SyncTestFile(tsm.fake_user(user_name), bson::Bson(name))
+{
+}
+
+SyncTestFile::SyncTestFile(OfflineAppSession& oas, std::string name)
+    : SyncTestFile(oas.make_user(), bson::Bson(name))
 {
 }
 
@@ -365,7 +370,7 @@ TestAppSession::~TestAppSession()
 {
     if (util::File::exists(m_base_file_path)) {
         try {
-            m_app->sync_manager()->reset_for_testing();
+            m_app->sync_manager()->tear_down_for_testing();
             util::try_remove_dir_recursive(m_base_file_path);
         }
         catch (const std::exception& ex) {
@@ -424,28 +429,19 @@ std::vector<bson::BsonDocument> TestAppSession::get_documents(SyncUser& user, co
 // MARK: - TestSyncManager
 
 TestSyncManager::TestSyncManager(const Config& config, const SyncServer::Config& sync_server_config)
-    : transport(config.transport ? config.transport : std::make_shared<Transport>(network_callback))
-    , m_sync_server(sync_server_config)
+    : m_sync_server(sync_server_config)
+    , m_base_file_path(config.base_path.empty() ? util::make_temp_dir() : config.base_path)
     , m_should_teardown_test_directory(config.should_teardown_test_directory)
 {
-    app::App::Config app_config = config.app_config;
-    set_app_config_defaults(app_config, transport);
-    util::Logger::set_default_level_threshold(config.log_level);
-
-    SyncClientConfig sc_config;
-    m_base_file_path = config.base_path.empty() ? util::make_temp_dir() + random_string(10) : config.base_path;
     util::try_make_dir(m_base_file_path);
+    util::Logger::set_default_level_threshold(config.log_level);
+    SyncClientConfig sc_config;
     sc_config.base_file_path = m_base_file_path;
     sc_config.metadata_mode = config.metadata_mode;
-
-    m_app = app::App::get_app(app::App::CacheMode::Disabled, app_config, sc_config);
-    if (config.override_sync_route) {
-        m_app->sync_manager()->set_sync_route(m_sync_server.base_url() + "/realm-sync");
-    }
+    m_sync_manager = SyncManager::create(nullptr, m_sync_server.base_url() + "/realm-sync", sc_config, "app_id");
 
     if (config.start_sync_client) {
-        // initialize sync client
-        m_app->sync_manager()->get_sync_client();
+        m_sync_manager->get_sync_client();
     }
 }
 
@@ -454,7 +450,7 @@ TestSyncManager::~TestSyncManager()
     if (m_should_teardown_test_directory) {
         if (!m_base_file_path.empty() && util::File::exists(m_base_file_path)) {
             try {
-                m_app->sync_manager()->reset_for_testing();
+                m_sync_manager->tear_down_for_testing();
                 util::try_remove_dir_recursive(m_base_file_path);
             }
             catch (const std::exception& ex) {
@@ -467,7 +463,63 @@ TestSyncManager::~TestSyncManager()
 
 std::shared_ptr<realm::SyncUser> TestSyncManager::fake_user(const std::string& name)
 {
-    return get_fake_user(*m_app, name);
+    return get_fake_user(*m_sync_manager, name);
+}
+
+OfflineAppSession::Config::Config(std::shared_ptr<realm::app::GenericNetworkTransport> t)
+    : transport(t)
+{
+}
+
+OfflineAppSession::OfflineAppSession(OfflineAppSession::Config config)
+    : m_transport(std::move(config.transport))
+    , m_delete_storage(config.delete_storage)
+{
+    REALM_ASSERT(m_transport);
+    if (config.storage_path) {
+        m_base_file_path = *config.storage_path;
+        util::try_make_dir(m_base_file_path);
+    }
+    else {
+        m_base_file_path = util::make_temp_dir();
+    }
+
+    app::App::Config app_config;
+    set_app_config_defaults(app_config, m_transport);
+    if (config.base_url) {
+        app_config.base_url = *config.base_url;
+    }
+    if (config.app_id) {
+        app_config.app_id = *config.app_id;
+    }
+
+    SyncClientConfig sc_config;
+    sc_config.base_file_path = m_base_file_path;
+    sc_config.metadata_mode = config.metadata_mode;
+    sc_config.socket_provider = config.socket_provider;
+
+    util::Logger::set_default_level_threshold(realm::util::Logger::Level::TEST_LOGGING_LEVEL);
+
+    m_app = app::App::get_app(app::App::CacheMode::Disabled, app_config, sc_config);
+}
+
+OfflineAppSession::~OfflineAppSession()
+{
+    if (util::File::exists(m_base_file_path) && m_delete_storage) {
+        try {
+            m_app->sync_manager()->tear_down_for_testing();
+            util::try_remove_dir_recursive(m_base_file_path);
+        }
+        catch (const std::exception& ex) {
+            std::cerr << ex.what() << "\n";
+        }
+        app::App::clear_cached_apps();
+    }
+}
+
+std::shared_ptr<realm::SyncUser> OfflineAppSession::make_user() const
+{
+    return get_fake_user(*m_app->sync_manager(), "test user");
 }
 
 #endif // REALM_ENABLE_SYNC

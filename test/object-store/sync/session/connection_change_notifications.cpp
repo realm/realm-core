@@ -20,41 +20,15 @@
 #include <util/test_utils.hpp>
 #include <util/sync/session_util.hpp>
 
-#include <realm/object-store/feature_checks.hpp>
-#include <realm/object-store/object_schema.hpp>
-#include <realm/object-store/object_store.hpp>
-#include <realm/object-store/property.hpp>
-#include <realm/object-store/schema.hpp>
-
-#include <realm/util/scope_exit.hpp>
-#include <realm/util/time.hpp>
-
-#include <catch2/catch_all.hpp>
-
-#include <atomic>
-#include <chrono>
-#include <fstream>
-#ifndef _WIN32
-#include <unistd.h>
-#endif
-
 using namespace realm;
 using namespace realm::util;
-
-static const std::string dummy_device_id = "123400000000000000000000";
-
-static const std::string base_path = util::make_temp_dir() + "realm_objectstore_sync_connection_state_changes";
 
 TEST_CASE("sync: Connection state changes", "[sync][session][connection change]") {
     if (!EventLoop::has_implementation())
         return;
 
-    TestSyncManager::Config config;
-    config.base_path = base_path;
-    TestSyncManager init_sync_manager(config);
-    auto app = init_sync_manager.app();
-    auto user = app->sync_manager()->get_user("user", ENCODE_FAKE_JWT("not_a_real_token"),
-                                              ENCODE_FAKE_JWT("also_not_a_real_token"), dummy_device_id);
+    TestSyncManager tsm;
+    auto user = tsm.fake_user();
 
     SECTION("register connection change listener") {
         auto session = sync_session(

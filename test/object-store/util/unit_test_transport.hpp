@@ -16,6 +16,9 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
+#ifndef REALM_TEST_UTIL_TRANSPORT_HPP
+#define REALM_TEST_UTIL_TRANSPORT_HPP
+
 #include <realm/object-store/sync/generic_network_transport.hpp>
 
 #include <external/json/json.hpp>
@@ -94,3 +97,5 @@ private:
     void handle_token_refresh(const realm::app::Request& request,
                               realm::util::UniqueFunction<void(const realm::app::Response&)>&& completion);
 };
+
+#endif // REALM_TEST_UTIL_TRANSPORT_HPP
