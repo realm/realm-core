@@ -34,7 +34,7 @@ using namespace realm;
 void ArrayPacked::init_array(char* h, uint8_t flags, size_t v_width, size_t v_size) const
 {
     using Encoding = NodeHeader::Encoding;
-    NodeHeader::init_header((char*)h, 'B', Encoding::Packed, flags, v_width, v_size);
+    NodeHeader::init_header((char*)h, Encoding::Packed, flags, v_width, v_size);
 }
 
 void ArrayPacked::copy_data(const Array& origin, Array& arr) const
@@ -42,7 +42,6 @@ void ArrayPacked::copy_data(const Array& origin, Array& arr) const
     // this can be boosted a little bit, with and size should be known at this stage.
     using Encoding = NodeHeader::Encoding;
     REALM_ASSERT_DEBUG(arr.is_attached());
-    REALM_ASSERT_DEBUG(arr.m_encoder.get_kind() == 'B');
     REALM_ASSERT_DEBUG(arr.m_encoder.get_encoding() == Encoding::Packed);
     // we don't need to access the header, init from mem must have been called
     const auto v_width = arr.m_width;
@@ -51,7 +50,7 @@ void ArrayPacked::copy_data(const Array& origin, Array& arr) const
     bf_iterator it_value{data, 0, v_width, v_width, 0};
     for (size_t i = 0; i < v_size; ++i) {
         it_value.set_value(origin.get(i));
-        REALM_ASSERT_DEBUG(sign_extend_field(v_width, it_value.get_value()) == origin.get(i));
+        REALM_ASSERT_DEBUG(sign_extend_value(v_width, it_value.get_value()) == origin.get(i));
         ++it_value;
     }
 }
@@ -99,7 +98,7 @@ int64_t ArrayPacked::do_get(uint64_t* data, size_t ndx, size_t v_width, size_t v
         return realm::not_found;
     bf_iterator it{data, 0, v_width, v_width, ndx};
     const auto result = it.get_value();
-    return sign_extend_field(v_width, result);
+    return sign_extend_value(v_width, result);
 }
 
 void ArrayPacked::get_chunk(const Array& arr, size_t ndx, int64_t res[8]) const
@@ -123,7 +122,6 @@ void ArrayPacked::get_chunk(const Array& arr, size_t ndx, int64_t res[8]) const
 void inline ArrayPacked::get_encode_info(const char* h, size_t& v_width, size_t& v_size)
 {
     using Encoding = NodeHeader::Encoding;
-    REALM_ASSERT_DEBUG(NodeHeader::get_kind(h) == 'B');
     REALM_ASSERT_DEBUG(NodeHeader::get_encoding(h) == NodeHeader::Encoding::Packed);
     v_width = NodeHeader::get_element_size<Encoding::Packed>(h);
     v_size = NodeHeader::get_num_elements<Encoding::Packed>(h);
@@ -161,7 +159,7 @@ std::vector<int64_t> ArrayPacked::find_all(const Array& arr, int64_t, size_t sta
 
     const auto add_value = [&w, &res, &counter](int64_t v, uint64_t& byte, size_t shift) {
         if (w < word_size)
-            v = sign_extend_field(w, v);
+            v = sign_extend_value(w, v);
         res.push_back(v);
         byte >>= shift;
         counter += w;

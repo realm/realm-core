@@ -41,11 +41,6 @@ public:
     size_t size() const;
     size_t width() const;
 
-    inline uint8_t get_kind() const
-    {
-        return m_kind;
-    }
-
     inline NodeHeader::Encoding get_encoding() const
     {
         return m_encoding;
@@ -77,7 +72,6 @@ private:
     bool always_encode(const Array&, Array&, bool) const; // for testing
 private:
     using Encoding = NodeHeader::Encoding;
-    uint8_t m_kind = 'A';
     Encoding m_encoding{NodeHeader::Encoding::WTypBits}; // this is not ok .... probably
     size_t m_v_width = 0, m_v_size = 0, m_ndx_width = 0, m_ndx_size = 0;
 

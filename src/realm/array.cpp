@@ -257,11 +257,10 @@ void Array::init_from_mem(MemRef mem) noexcept
     // important fields used for type A arrays, like width, lower, upper_bound which are used
     // for expanding the array, but also query the data.
     char* header = mem.get_addr();
-    const auto kind = NodeHeader::get_kind(header);
-    REALM_ASSERT_DEBUG(kind == 'A' || kind == 'B');
+    const auto old_header = !NodeHeader::wtype_is_extended(header);
     // Cache all the header info as long as this array is alive and encoded.
     m_encoder.init(header);
-    if (kind == 'B') {
+    if (!old_header) {
         REALM_ASSERT_DEBUG(NodeHeader::get_encoding(header) == Encoding::Flex ||
                            NodeHeader::get_encoding(header) == Encoding::Packed);
         char* header = mem.get_addr();
@@ -361,11 +360,11 @@ void Array::destroy_children(size_t offset) noexcept
 
 size_t Array::get_byte_size() const noexcept
 {
-    REALM_ASSERT_DEBUG(m_encoder.get_kind() == 'A' || m_encoder.get_kind() == 'B');
     const auto header = get_header();
     auto num_bytes = get_byte_size_from_header(header);
     auto read_only = m_alloc.is_read_only(m_ref) == true;
-    auto bytes_ok = num_bytes <= get_capacity_from_header(header);
+    auto capacity = get_capacity_from_header(header);
+    auto bytes_ok = num_bytes <= capacity;
     REALM_ASSERT(read_only || bytes_ok);
     REALM_ASSERT_7(m_alloc.is_read_only(m_ref), ==, true, ||, num_bytes, <=, get_capacity_from_header(header));
     return num_bytes;
@@ -385,7 +384,6 @@ ref_type Array::write(_impl::ArrayWriterBase& out, bool deep, bool only_if_modif
         // We should have: Array encoded_array{Allocator::get_default()};
         Array encoded_array{Allocator::get_default()};
         if (compress_in_flight && size() != 0 && encode_array(encoded_array)) {
-            REALM_ASSERT_DEBUG(encoded_array.m_encoder.get_kind() == 'B');
 #ifdef REALM_DEBUG
             const auto encoding = encoded_array.m_encoder.get_encoding();
             REALM_ASSERT_DEBUG(encoding == Encoding::Flex || encoding == Encoding::Packed ||
@@ -420,7 +418,6 @@ ref_type Array::write(ref_type ref, Allocator& alloc, _impl::ArrayWriterBase& ou
     if (!array.m_has_refs) {
         Array encoded_array{Allocator::get_default()};
         if (compress_in_flight && array.size() != 0 && array.encode_array(encoded_array)) {
-            REALM_ASSERT_DEBUG(encoded_array.m_encoder.get_kind() == 'B');
 #ifdef REALM_DEBUG
             const auto encoding = encoded_array.m_encoder.get_encoding();
             REALM_ASSERT_DEBUG(encoding == Encoding::Flex || encoding == Encoding::Packed ||
@@ -1254,7 +1251,7 @@ MemRef Array::create(Type type, bool context_flag, WidthType width_type, size_t 
     MemRef mem = alloc.alloc(byte_size); // Throws
     auto header = mem.get_addr();
 
-    init_header(header, 'A', encoding, flags, width, size);
+    init_header(header, encoding, flags, width, size);
     set_capacity_in_header(byte_size, mem.get_addr());
     if (value != 0) {
         char* data = get_data_from_header(mem.get_addr());
@@ -1460,8 +1457,7 @@ void Array::verify() const
 #ifdef REALM_DEBUG
 
     REALM_ASSERT(is_attached());
-
-    if (get_kind(get_header()) == 'A') {
+    if (!wtype_is_extended(get_header())) {
         REALM_ASSERT(m_width == 0 || m_width == 1 || m_width == 2 || m_width == 4 || m_width == 8 || m_width == 16 ||
                      m_width == 32 || m_width == 64);
     }
@@ -1495,7 +1491,7 @@ size_t Array::upper_bound_int(int64_t value) const noexcept
 
 int_fast64_t Array::get(const char* header, size_t ndx) noexcept
 {
-    if (NodeHeader::get_kind(header) == 'B') {
+    if (wtype_is_extended(header)) {
         static ArrayEncode encoder;
         encoder.init(header);
         return encoder.get(NodeHeader::get_data_from_header(header), ndx);

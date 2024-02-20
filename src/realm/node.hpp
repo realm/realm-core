@@ -126,7 +126,7 @@ public:
     char* init_from_mem(MemRef mem) noexcept
     {
         char* header = mem.get_addr();
-        REALM_ASSERT(get_kind(header) == 'A');
+        REALM_ASSERT(!wtype_is_extended(header));
         m_ref = mem.get_ref();
         m_data = get_data_from_header(header);
         m_size = get_size_from_header(header);
@@ -362,24 +362,6 @@ public:
     virtual void set_spec(Spec*, size_t) const {}
 };
 
-/*
-inline void Node::init_header(char* header, bool is_inner_bptree_node, bool has_refs, bool context_flag,
-                              WidthType width_type, int width, size_t size, size_t capacity) noexcept
-{
-    // Note: Since the header layout contains unallocated bit and/or
-    // bytes, it is important that we put the entire header into a
-    // well defined state initially.
-    std::fill(header, header + header_size, 0);
-    set_kind((uint64_t*)header, 'A');
-    set_is_inner_bptree_node_in_header(is_inner_bptree_node, header);
-    set_hasrefs_in_header(has_refs, header);
-    set_context_flag_in_header(context_flag, header);
-    set_wtype_in_header(width_type, header);
-    set_width_in_header(width, header);
-    set_size_in_header(size, header);
-    set_capacity_in_header(capacity, header);
-}
-*/
 } // namespace realm
 
 #endif /* REALM_NODE_HPP */

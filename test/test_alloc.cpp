@@ -73,7 +73,7 @@ namespace {
 
 void set_capacity(char* header, size_t value)
 {
-    NodeHeader::set_kind(header, 'A');
+    NodeHeader::set_wtype_in_header(NodeHeader::wtype_Ignore, header);
     typedef unsigned char uchar;
     uchar* h = reinterpret_cast<uchar*>(header);
     h[0] = uchar((value >> 19) & 0x000000FF);
@@ -84,7 +84,7 @@ void set_capacity(char* header, size_t value)
 
 size_t get_capacity(const char* header)
 {
-    REALM_ASSERT(NodeHeader::get_kind(header) == 'A');
+    REALM_ASSERT(NodeHeader::get_wtype_from_header(header) == NodeHeader::wtype_Ignore);
     typedef unsigned char uchar;
     const uchar* h = reinterpret_cast<const uchar*>(header);
     return (size_t(h[0]) << 19) + (size_t(h[1]) << 11) + (h[2] << 3);
@@ -290,8 +290,11 @@ TEST(Alloc_Fuzzy)
             refs.push_back(r);
             set_capacity(r.get_addr(), siz);
 
-            // write some data to the allcoated area so that we can verify it later
-            memset(r.get_addr() + 4, static_cast<char>(reinterpret_cast<intptr_t>(r.get_addr())), siz - 4);
+            // write some data to the allcoated area so that we can verify it later.
+            // We must keep byte 4 in the header unharmed, since it is needed later by the allocator
+            // to determine the encoding, and hence the size of any released object.
+            // We simply skip the header.
+            memset(r.get_addr() + 8, static_cast<char>(reinterpret_cast<intptr_t>(r.get_addr())), siz - 8);
         }
         else if (refs.size() > 0) {
             // free random entry
@@ -307,7 +310,7 @@ TEST(Alloc_Fuzzy)
                 size_t siz = get_capacity(r.get_addr());
 
                 // verify that all the data we wrote during allocation is intact
-                for (size_t c = 4; c < siz; c++) {
+                for (size_t c = 8; c < siz; c++) {
                     if (r.get_addr()[c] != static_cast<char>(reinterpret_cast<intptr_t>(r.get_addr()))) {
                         // faster than using 'CHECK' for each character, which is slow
                         CHECK(false);
