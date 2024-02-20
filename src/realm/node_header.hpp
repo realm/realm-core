@@ -507,6 +507,18 @@ public:
         auto h = (uint8_t*)header;
         return h[4] >> 5;
     }
+
+    static inline void set_flags2(char* header, uint8_t flags)
+    {
+        REALM_ASSERT(flags <= 7);
+        auto h = (uint8_t*)header;
+        h[4] = (h[4] & 0b11111000) | flags;
+    }
+    static inline uint8_t get_flags2(char* header)
+    {
+        auto h = (uint8_t*)header;
+        return h[4] & 0b0111;
+    }
 };
 
 template <>
