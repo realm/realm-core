@@ -190,9 +190,8 @@ TEST(Transform_Nested_CreateListVsUpdateDictionary)
 
     client_2->transaction([](Peer& p) {
         auto col_any = p.table("class_Table")->get_column_key("any");
-        auto dict =
-            p.table("class_Table")->get_object_with_primary_key(1).get_dictionary_ptr({col_any, "A", 0, "B"});
-       dict->insert("key", 42);
+        auto dict = p.table("class_Table")->get_object_with_primary_key(1).get_dictionary_ptr({col_any, "A", 0, "B"});
+        dict->insert("key", 42);
     });
 
     synchronize(server.get(), {client_1.get(), client_2.get()});
@@ -828,7 +827,7 @@ TEST(Transform_MergeDictionaries)
     });
 
     client_2->transaction([&](Peer& p) {
-       auto obj = p.table("class_Table")->get_object_with_primary_key(1);
+        auto obj = p.table("class_Table")->get_object_with_primary_key(1);
         auto col_any = p.table("class_Table")->get_column_key("any");
         obj.set_collection(col_any, CollectionType::Dictionary);
         auto list = obj.get_dictionary(col_any);
