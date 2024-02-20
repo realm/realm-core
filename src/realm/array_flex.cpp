@@ -55,16 +55,16 @@ void ArrayFlex::copy_data(const Array& arr, const std::vector<int64_t>& values,
     bf_iterator it_index{data, offset, ndx_width, ndx_width, 0};
     for (size_t i = 0; i < values.size(); ++i) {
         it_value.set_value(values[i]);
-        REALM_ASSERT_DEBUG(sign_extend_field(v_width, it_value.get_value()) == values[i]);
+        REALM_ASSERT_DEBUG(sign_extend_value(v_width, it_value.get_value()) == values[i]);
         ++it_value;
     }
     for (size_t i = 0; i < indices.size(); ++i) {
         REALM_ASSERT_DEBUG(values[indices[i]] ==
-                           sign_extend_field(v_width, read_bitfield(data, indices[i] * v_width, v_width)));
+                           sign_extend_value(v_width, read_bitfield(data, indices[i] * v_width, v_width)));
         it_index.set_value(indices[i]);
         REALM_ASSERT_DEBUG(indices[i] == it_index.get_value());
         REALM_ASSERT_DEBUG(values[indices[i]] ==
-                           sign_extend_field(v_width, read_bitfield(data, indices[i] * v_width, v_width)));
+                           sign_extend_value(v_width, read_bitfield(data, indices[i] * v_width, v_width)));
         ++it_index;
     }
 }
@@ -115,7 +115,7 @@ int64_t ArrayFlex::do_get(uint64_t* data, size_t ndx, size_t v_width, size_t ndx
     const uint64_t offset = v_size * v_width;
     const bf_iterator it_index{data, static_cast<size_t>(offset + (ndx * ndx_width)), ndx_width, ndx_width, 0};
     const bf_iterator it_value{data, static_cast<size_t>(v_width * it_index.get_value()), v_width, v_width, 0};
-    auto v = sign_extend_field(v_width, it_value.get_value());
+    auto v = sign_extend_value(v_width, it_value.get_value());
     return v;
 }
 
