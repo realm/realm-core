@@ -233,6 +233,11 @@ private:
     size_t get_prefix_size() const;
     ObjKey get_any_child();
     void do_prefix_insert(IndexKey<ChunkWidth>& key);
+    static inline bool prefix_fits_inline(size_t prefix_size)
+    {
+        return prefix_size <= IndexKey<ChunkWidth>::c_key_chunks_per_prefix;
+    }
+    static void collapse_nodes(std::vector<std::unique_ptr<IndexNode<ChunkWidth>>>& accessors_chain);
 
     InsertResult insert_to_population(IndexKey<ChunkWidth>& key);
     InsertResult do_insert_to_population(uint64_t population_value);
@@ -278,12 +283,7 @@ public:
 private:
     void erase(ObjKey key, const Mixed& new_value);
 
-    RadixTree(const ClusterColumn& target_column, std::unique_ptr<IndexNode<ChunkWidth>> root)
-        : SearchIndex(target_column, root.get())
-        , m_array(std::move(root))
-    {
-        m_array->update_data_source(m_target_column);
-    }
+    RadixTree(const ClusterColumn& target_column, std::unique_ptr<IndexNode<ChunkWidth>> root);
     std::unique_ptr<IndexNode<ChunkWidth>> m_array;
 };
 
