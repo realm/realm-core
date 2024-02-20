@@ -158,6 +158,11 @@ public:
         return WidthType((h4 & 0x18) >> 3);
     }
 
+    static bool wtype_is_extended(const char* header) noexcept
+    {
+        return get_wtype_from_header(header) >= wtype_Extend;
+    }
+
     static void set_wtype_in_header(WidthType value, char* header) noexcept
     {
         typedef unsigned char uchar;
@@ -189,7 +194,7 @@ public:
 
     static void set_width_in_header(size_t value, char* header) noexcept
     {
-        REALM_ASSERT(get_wtype_from_header(header) < wtype_Extend);
+        REALM_ASSERT(!wtype_is_extended(header));
         // Pack width in 3 bits (log2)
         int w = 0;
         while (value) {
@@ -205,7 +210,7 @@ public:
 
     static void set_size_in_header(size_t value, char* header) noexcept
     {
-        REALM_ASSERT(get_wtype_from_header(header) < wtype_Extend);
+        REALM_ASSERT(!wtype_is_extended(header));
         REALM_ASSERT_3(value, <=, max_array_size);
         typedef unsigned char uchar;
         uchar* h = reinterpret_cast<uchar*>(header);
@@ -218,7 +223,7 @@ public:
     // Note: The wtype must have been set prior to calling this function
     static size_t get_capacity_from_header(const char* header) noexcept
     {
-        if (get_wtype_from_header(header) < wtype_Extend) {
+        if (!wtype_is_extended(header)) {
             typedef unsigned char uchar;
             const uchar* h = reinterpret_cast<const uchar*>(header);
             return (size_t(h[0]) << 19) + (size_t(h[1]) << 11) + (h[2] << 3);
@@ -232,7 +237,7 @@ public:
     // Note 2: The wtype must have been set prior to calling this function
     static void set_capacity_in_header(size_t value, char* header) noexcept
     {
-        if (get_wtype_from_header(header) < wtype_Extend) {
+        if (!wtype_is_extended(header)) {
             REALM_ASSERT_3(value, <=, (0xffffff << 3));
             typedef unsigned char uchar;
             uchar* h = reinterpret_cast<uchar*>(header);
@@ -308,9 +313,8 @@ public:
     // ^ First 3 must overlap numerically with corresponding wtype_X enum.
     static Encoding get_encoding(const char* header)
     {
-        auto wtype = get_wtype_from_header((const char*)header);
-        if (wtype < wtype_Extend) {
-            return (Encoding)wtype;
+        if (!wtype_is_extended(header)) {
+            return (Encoding)get_wtype_from_header(header);
         }
         else {
             auto h = (const uint8_t*)header;
@@ -899,7 +903,7 @@ size_t inline NodeHeader::get_byte_size_from_header(const char* header) noexcept
 
 uint_least8_t inline NodeHeader::get_width_from_header(const char* header) noexcept
 {
-    REALM_ASSERT_DEBUG(get_wtype_from_header(header) < wtype_Extend);
+    REALM_ASSERT_DEBUG(!wtype_is_extended(header));
     typedef unsigned char uchar;
     const uchar* h = reinterpret_cast<const uchar*>(header);
     return uint_least8_t((1 << (int(h[4]) & 0x07)) >> 1);
@@ -909,7 +913,7 @@ uint_least8_t inline NodeHeader::get_width_from_header(const char* header) noexc
 size_t inline NodeHeader::get_size_from_header(const char* header) noexcept
 {
     using Encoding = NodeHeader::Encoding;
-    if (get_wtype_from_header(header) == wtype_Extend) {
+    if (wtype_is_extended(header)) {
         const auto encoding = get_encoding(header);
         if (encoding == Encoding::Flex) {
             // auto sz = get_elementB_size<Encoding::Flex>(header);

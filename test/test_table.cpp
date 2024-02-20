@@ -3488,8 +3488,7 @@ NONCONCURRENT_TEST(Table_object_timestamp)
     }
 }
 
-// NONCONCURRENT_TEST(Table_object_search)
-TEST(Table_object_search)
+NONCONCURRENT_TEST(Table_object_search)
 {
 #if !defined(REALM_DEBUG) && defined(PERFORMANCE_TESTING)
     int nb_rows = 10'000'000;

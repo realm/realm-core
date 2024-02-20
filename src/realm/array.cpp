@@ -257,7 +257,7 @@ void Array::init_from_mem(MemRef mem) noexcept
     // important fields used for type A arrays, like width, lower, upper_bound which are used
     // for expanding the array, but also query the data.
     char* header = mem.get_addr();
-    const auto old_header = NodeHeader::get_wtype_from_header(header) < wtype_Extend;
+    const auto old_header = !NodeHeader::wtype_is_extended(header);
     // Cache all the header info as long as this array is alive and encoded.
     m_encoder.init(header);
     if (!old_header) {
@@ -1457,8 +1457,7 @@ void Array::verify() const
 #ifdef REALM_DEBUG
 
     REALM_ASSERT(is_attached());
-
-    if (get_wtype_from_header(get_header()) < wtype_Extend) {
+    if (!wtype_is_extended(get_header())) {
         REALM_ASSERT(m_width == 0 || m_width == 1 || m_width == 2 || m_width == 4 || m_width == 8 || m_width == 16 ||
                      m_width == 32 || m_width == 64);
     }
@@ -1492,7 +1491,7 @@ size_t Array::upper_bound_int(int64_t value) const noexcept
 
 int_fast64_t Array::get(const char* header, size_t ndx) noexcept
 {
-    if (NodeHeader::get_wtype_from_header(header) == wtype_Extend) {
+    if (wtype_is_extended(header)) {
         static ArrayEncode encoder;
         encoder.init(header);
         return encoder.get(NodeHeader::get_data_from_header(header), ndx);

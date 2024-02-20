@@ -50,8 +50,6 @@ inline void encode_array(const T& encoder, Array& arr, size_t byte_size, Arg&&..
     encoder.init_array(h, std::forward<Arg>(args)...);
     NodeHeader::set_capacity_in_header(byte_size, h);
     arr.init_from_mem(mem);
-    // REALM_ASSERT_DEBUG(NodeHeader::get_kind(arr.get_header()) == 'B');
-    // REALM_ASSERT_DEBUG(NodeHeader::get_encoding(arr.get_header()) == arr.m_encoder.m_encoding);
 }
 
 template <typename T, typename... Arg>
