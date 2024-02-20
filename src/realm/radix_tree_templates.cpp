@@ -321,12 +321,12 @@ IndexNode<ChunkWidth>::do_add_direct(ObjKey value, size_t ndx, const IndexKey<Ch
 template <size_t ChunkWidth>
 void IndexNode<ChunkWidth>::insert(ObjKey value, IndexKey<ChunkWidth> key)
 {
-    //    util::format(std::cout, "insert '%1'\n", key.get_mixed());
-    //    auto guard = make_scope_exit([&]() noexcept {
-    //        std::cout << "done insert: \n";
-    //        update_from_parent();
-    //        print();
-    //    });
+    // util::format(std::cout, "insert '%1'\n", key.get_mixed());
+    // auto guard = make_scope_exit([&]() noexcept {
+    //     std::cout << "done insert: \n";
+    //     update_from_parent();
+    //     print();
+    // });
 
     update_from_parent();
 
@@ -370,16 +370,123 @@ void IndexNode<ChunkWidth>::insert(ObjKey value, IndexKey<ChunkWidth> key)
 }
 
 template <size_t ChunkWidth>
+void IndexNode<ChunkWidth>::collapse_nodes(std::vector<std::unique_ptr<IndexNode<ChunkWidth>>>& accessors_chain)
+{
+    auto get_prefix_offset_to_last_node = [&accessors_chain]() -> size_t {
+        size_t offset = 0;
+        for (size_t i = 0; i < accessors_chain.size(); ++i) {
+            // one chunk per level, plus whatever the prefix size is
+            offset += accessors_chain[i]->get_prefix_size() + 1;
+        }
+        return offset;
+    };
+
+    auto get_chunk_value_from_population = [](IndexNode<ChunkWidth>* node) -> uint64_t {
+        uint64_t value = 0;
+        for (size_t i = 0; i < c_num_population_entries; ++i) {
+            uint64_t pop_i = node->get_population(i);
+            if (pop_i != 0) {
+                value += ctz_64(pop_i);
+                break;
+            }
+            value += c_num_bits_per_tagged_int;
+        }
+        return value;
+    };
+
+    REALM_ASSERT(accessors_chain.size());
+    while (accessors_chain.size() > 1) {
+        Allocator& alloc = accessors_chain[0]->get_alloc();
+        ClusterColumn& cluster = accessors_chain[0]->m_cluster;
+
+        IndexNode<ChunkWidth>* last_node = accessors_chain.back().get();
+        size_t ndx_in_parent = last_node->get_ndx_in_parent();
+        if (last_node->is_empty()) {
+            last_node->destroy();
+            accessors_chain.pop_back();
+            accessors_chain.back()->do_remove(ndx_in_parent);
+            continue; // simple deletion of empty node, check next up
+        }
+        const size_t num_elements = last_node->size();
+        const int64_t raw_null_entry = last_node->get(c_ndx_of_null);
+        const bool has_nulls = raw_null_entry != 0;
+        if (num_elements - c_num_metadata_entries == 1 && !has_nulls) {
+            // if the single element is a ref to another node we want to descend
+            // to check if these can be collapsed together.
+            size_t child_ndx = num_elements - 1;
+            RefOrTagged single_item = last_node->get_as_ref_or_tagged(child_ndx);
+            if (single_item.is_ref()) {
+                char* header = alloc.translate(single_item.get_as_ref());
+                if (!Array::get_context_flag_from_header(header)) {
+                    break; // ref to List FIXME: combine some cases of this
+                }
+                IndexNode<ChunkWidth> child(alloc, cluster);
+                child.init_from_ref(single_item.get_as_ref());
+                child.set_parent(last_node, child_ndx);
+                if (child.get(c_ndx_of_null) != 0) {
+                    break; // if the child has nulls then we can't combine the prefix
+                }
+                // this child has no nulls so we can combine these nodes by combining the prefix
+                std::unique_ptr<IndexNode<ChunkWidth>> node_to_collapse = std::move(accessors_chain.back());
+                accessors_chain.pop_back();
+                IndexNode<ChunkWidth>* grandparent_node = accessors_chain.back().get();
+                grandparent_node->set(node_to_collapse->get_ndx_in_parent(), child.get_ref());
+                child.set_parent(grandparent_node, node_to_collapse->get_ndx_in_parent());
+
+                size_t parent_prefix_size = node_to_collapse->get_prefix_size() + 1;
+                size_t child_prefix_size = child.get_prefix_size();
+                const size_t combined_prefix_size = parent_prefix_size + child_prefix_size;
+                IndexKey<ChunkWidth> combined_prefix(0);
+                if (prefix_fits_inline(combined_prefix_size)) {
+                    IndexKey<ChunkWidth> parent_prefix = node_to_collapse->get_prefix();
+                    IndexKey<ChunkWidth> child_prefix = child.get_prefix();
+                    uint64_t child_entry_in_parent = get_chunk_value_from_population(node_to_collapse.get());
+                    uint64_t combined = parent_prefix.get_mixed().template get<Int>();
+                    combined += (child_entry_in_parent << (64 - (ChunkWidth * parent_prefix_size)));
+                    combined +=
+                        uint64_t(child_prefix.get_mixed().template get<Int>()) >> (parent_prefix_size * ChunkWidth);
+                    combined_prefix = IndexKey<ChunkWidth>(int64_t(combined));
+                }
+                else {
+                    const size_t prefix_offset = get_prefix_offset_to_last_node();
+                    ObjKey child_key = node_to_collapse->get_any_child();
+                    combined_prefix = IndexKey<ChunkWidth>(cluster.get_value(child_key));
+                    combined_prefix.set_offset(prefix_offset);
+                }
+                child.set_prefix(combined_prefix, combined_prefix_size);
+                node_to_collapse->destroy();
+                continue; // the grandparent might be eligible for collapse
+            }
+            break; // this node did not qualify for collapse
+        }
+        else if (num_elements - c_num_metadata_entries == 0 && has_nulls) {
+            // combine this null into parent entry
+            accessors_chain.back()->destroy();
+            accessors_chain.pop_back();
+            accessors_chain.back()->set(ndx_in_parent, raw_null_entry);
+            continue;
+        }
+        break; // not empty, and more than one different entry cannot combine
+    }
+    // clean up the last node's prefix if there are no values
+    // nulls don't matter since they come before the prefix
+    if (accessors_chain.size() >= 1 && accessors_chain.back()->Array::size() == c_num_metadata_entries) {
+        IndexKey<ChunkWidth> dummy(Mixed{});
+        accessors_chain.back()->set_prefix(dummy, 0);
+    }
+}
+
+template <size_t ChunkWidth>
 void IndexNode<ChunkWidth>::erase(ObjKey value, IndexKey<ChunkWidth> key)
 {
     update_from_parent();
 
-    //        util::format(std::cout, "erase '%1'\n", key.get_mixed());
-    //        auto guard = make_scope_exit([&]() noexcept {
-    //            std::cout << "done erase: \n";
-    //            update_from_parent();
-    //            print();
-    //        });
+    // util::format(std::cout, "erase '%1'\n", key.get_mixed());
+    // auto guard = make_scope_exit([&]() noexcept {
+    //     std::cout << "done erase: \n";
+    //     update_from_parent();
+    //     print();
+    // });
 
     IndexIterator it = find_first(key);
     std::vector<std::unique_ptr<IndexNode<ChunkWidth>>> accessors_chain = get_accessors_chain(it);
@@ -397,10 +504,21 @@ void IndexNode<ChunkWidth>::erase(ObjKey value, IndexKey<ChunkWidth> key)
         REALM_ASSERT(ndx_in_list != realm::not_found);
         REALM_ASSERT_3(sub.get(ndx_in_list), ==, value.value);
         sub.erase(ndx_in_list);
-        // FIXME: if the list is size one, put the remaining element back inline if possible
-        if (sub.is_empty()) {
+        const size_t sub_size = sub.size();
+        if (sub_size == 0) {
+            // if the list is now empty, remove the list
             sub.destroy();
             accessors_chain.back()->do_remove(it.m_positions.back().position);
+        }
+        else if (sub_size == 1) {
+            uint64_t last_null = uint64_t(sub.get(0));
+            // if the list only has one element left, remove the list and
+            // put the last null entry inline in the parent
+            if (value_can_be_tagged_without_overflow(last_null)) {
+                sub.destroy();
+                accessors_chain.back()->Array::set(it.m_positions.back().position,
+                                                   RefOrTagged::make_tagged(last_null));
+            }
         }
     }
     else {
@@ -408,23 +526,7 @@ void IndexNode<ChunkWidth>::erase(ObjKey value, IndexKey<ChunkWidth> key)
         REALM_ASSERT_3(accessors_chain.back()->size(), >, it.m_positions.back().position);
         accessors_chain.back()->do_remove(it.m_positions.back().position);
     }
-    // FIXME: combine child if parent node has only non-null one entry
-    if (accessors_chain.back()->is_empty()) {
-        while (accessors_chain.size() > 1) {
-            size_t ndx_in_parent = accessors_chain.back()->get_ndx_in_parent();
-            if (!accessors_chain.back()->is_empty()) {
-                break;
-            }
-            accessors_chain.back()->destroy();
-            accessors_chain.pop_back();
-            accessors_chain.back()->do_remove(ndx_in_parent);
-        }
-        // clean up the root if needed
-        if (accessors_chain.size() == 1 && accessors_chain.back()->is_empty()) {
-            IndexKey<ChunkWidth> dummy(Mixed{});
-            accessors_chain.back()->set_prefix(dummy, 0);
-        }
-    }
+    collapse_nodes(accessors_chain);
 }
 
 template <size_t ChunkWidth>
@@ -890,6 +992,7 @@ ObjKey IndexNode<ChunkWidth>::get_any_child()
         REALM_ASSERT(ref_to_explore);
         cur_node.init_from_ref(ref_to_explore);
     }
+    REALM_UNREACHABLE();
     return ObjKey();
 }
 
@@ -913,7 +1016,7 @@ IndexKey<ChunkWidth> IndexNode<ChunkWidth>::get_prefix()
 {
     size_t prefix_size = get_prefix_size();
     RefOrTagged rot_payload = get_as_ref_or_tagged(c_ndx_of_prefix_payload);
-    if (prefix_size <= IndexKey<ChunkWidth>::c_key_chunks_per_prefix) {
+    if (prefix_fits_inline(prefix_size)) {
         REALM_ASSERT(rot_payload.is_tagged());
         return IndexKey<ChunkWidth>(Mixed{int64_t(rot_payload.get_as_int() << 1)});
     }
@@ -935,7 +1038,7 @@ void IndexNode<ChunkWidth>::set_prefix(IndexKey<ChunkWidth>& key, size_t prefix_
         set(c_ndx_of_prefix_payload, RefOrTagged::make_tagged(0));
         return;
     }
-    if (prefix_size <= IndexKey<ChunkWidth>::c_key_chunks_per_prefix) {
+    if (prefix_fits_inline(prefix_size)) {
         // the prefix fits in our cache
         uint64_t packed_prefix = 0;
         for (size_t i = 0; i < prefix_size; ++i) {
@@ -1105,7 +1208,7 @@ void IndexNode<ChunkWidth>::print() const
         std::string prefix_str = "";
         size_t prefix_size = cur_node->get_prefix_size();
         if (prefix_size) {
-            if (prefix_size < IndexKey<ChunkWidth>::c_key_chunks_per_prefix) {
+            if (prefix_fits_inline(prefix_size)) {
                 auto prefix = cur_node->get_prefix();
                 prefix_str = util::format("%1 chunk prefix: '", prefix_size);
                 for (size_t i = 0; i < prefix_size; ++i) {
@@ -1183,6 +1286,14 @@ void IndexNode<ChunkWidth>::print() const
     }
 }
 // LCOV_EXCL_STOP
+
+template <size_t ChunkWidth>
+RadixTree<ChunkWidth>::RadixTree(const ClusterColumn& target_column, std::unique_ptr<IndexNode<ChunkWidth>> root)
+    : SearchIndex(target_column, root.get())
+    , m_array(std::move(root))
+{
+    m_array->update_data_source(m_target_column);
+}
 
 template <size_t ChunkWidth>
 void RadixTree<ChunkWidth>::insert(ObjKey value, const Mixed& key)

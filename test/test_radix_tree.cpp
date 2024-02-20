@@ -136,22 +136,39 @@ TEST_TYPES(RadixTree_BuildIndexString, ChunkOf<8>)
             table.remove_object(table.begin());
         }
         table.remove_search_index(col_key);
-        table.add_search_index(col_key);
         table.verify();
     };
 
+    std::vector<ObjKey> keys_inserted;
     auto verify_values = [&](std::vector<StringData>&& values) {
         verify_removal();
         index = table.get_search_index(col_key);
-        CHECK(index);
+        CHECK(!index);
         for (auto val : values) {
             table.create_object().set_any(col_key, val);
         }
-
+        // bulk insertion
+        table.add_search_index(col_key);
+        index = table.get_search_index(col_key);
+        CHECK(index);
+        // verify find
         for (auto val : values) {
             const ObjKey key = index->find_first(val);
             CHECK(key);
         }
+        // remove in reverse to exercise erase()
+        while (table.size()) {
+            table.remove_object(table.begin() += table.size() - 1);
+        }
+        keys_inserted.clear();
+        // exercise insertion
+        for (auto val : values) {
+            keys_inserted.push_back(table.create_object().set_any(col_key, val).get_key());
+        }
+    };
+
+    auto remove_nth_inserted_item = [&keys_inserted, &table](size_t n) {
+        table.remove_object(keys_inserted[n]);
     };
 
     verify_values({StringData(), "", "", "prefix", "prefix one", "prefix two", "prefix three"});
@@ -172,7 +189,20 @@ TEST_TYPES(RadixTree_BuildIndexString, ChunkOf<8>)
     CHECK_EQUAL(index->count(""), 0);
     CHECK_EQUAL(index->count(StringData()), 0);
     CHECK(index->has_duplicate_values());
+    verify_values({StringData(), "aabc", "aab", "aabcd", "aa"});
+    verify_values({"aa", "aab", "aa", "aa"});
 
+    // check node collapse on erase of specific item
+    // increase the prefix size to check the boundary across inline/lookup prefix modes being combined
+    for (size_t i = 0; i < 10; ++i) {
+        std::string prefix_two = "prefix two";
+        std::string prefix_three = "prefix three";
+        std::string shared_prefix = std::string(i, 'x');
+        prefix_two.insert(8, shared_prefix);
+        prefix_three.insert(8, shared_prefix);
+        verify_values({"prefix", "prefix one", prefix_two, prefix_three});
+        remove_nth_inserted_item(2);
+    }
     verify_removal();
 }
 
