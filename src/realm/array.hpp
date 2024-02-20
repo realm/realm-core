@@ -202,9 +202,8 @@ public:
         //       array we have a bug in our machinery, the array should have been decompressed
         //       way before calling alloc.
         const auto header = get_header();
-        REALM_ASSERT(get_kind(header) == 'A');
-        REALM_ASSERT_3(m_width, ==, get_width_from_header(get_header()));
-        REALM_ASSERT_3(m_size, ==, get_size_from_header(get_header()));
+        REALM_ASSERT_3(m_width, ==, get_width_from_header(header));
+        REALM_ASSERT_3(m_size, ==, get_size_from_header(header));
         Node::alloc(init_size, new_width);
         update_width_cache_from_header();
     }
@@ -598,12 +597,8 @@ private:
 
 inline bool Array::is_encoded() const
 {
-#ifdef REALM_DEBUG
-    if (m_encoder.get_kind() == 'B')
-        REALM_ASSERT_DEBUG((m_encoder.get_encoding() == NodeHeader::Encoding::Flex ||
-                            m_encoder.get_encoding() == NodeHeader::Encoding::Packed));
-#endif
-    return m_encoder.get_kind() == 'B';
+    auto enc = m_encoder.get_encoding();
+    return enc == NodeHeader::Encoding::Flex || enc == NodeHeader::Encoding::Packed;
 }
 
 inline const ArrayEncode& Array::get_encoder() const

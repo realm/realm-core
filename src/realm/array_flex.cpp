@@ -35,7 +35,7 @@ void ArrayFlex::init_array(char* h, uint8_t flags, size_t v_width, size_t ndx_wi
                            size_t ndx_size) const
 {
     using Encoding = NodeHeader::Encoding;
-    NodeHeader::init_header(h, 'B', Encoding::Flex, flags, v_width, ndx_width, v_size, ndx_size);
+    NodeHeader::init_header(h, Encoding::Flex, flags, v_width, ndx_width, v_size, ndx_size);
 }
 
 void ArrayFlex::copy_data(const Array& arr, const std::vector<int64_t>& values,
@@ -43,7 +43,6 @@ void ArrayFlex::copy_data(const Array& arr, const std::vector<int64_t>& values,
 {
     using Encoding = NodeHeader::Encoding;
     REALM_ASSERT_DEBUG(arr.is_attached());
-    REALM_ASSERT_DEBUG(arr.m_encoder.get_kind() == 'B');
     REALM_ASSERT_DEBUG(arr.m_encoder.get_encoding() == Encoding::Flex);
 
     auto h = arr.get_header();

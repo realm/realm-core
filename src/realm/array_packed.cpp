@@ -34,7 +34,7 @@ using namespace realm;
 void ArrayPacked::init_array(char* h, uint8_t flags, size_t v_width, size_t v_size) const
 {
     using Encoding = NodeHeader::Encoding;
-    NodeHeader::init_header((char*)h, 'B', Encoding::Packed, flags, v_width, v_size);
+    NodeHeader::init_header((char*)h, Encoding::Packed, flags, v_width, v_size);
 }
 
 void ArrayPacked::copy_data(const Array& origin, Array& arr) const
@@ -42,7 +42,6 @@ void ArrayPacked::copy_data(const Array& origin, Array& arr) const
     // this can be boosted a little bit, with and size should be known at this stage.
     using Encoding = NodeHeader::Encoding;
     REALM_ASSERT_DEBUG(arr.is_attached());
-    REALM_ASSERT_DEBUG(arr.m_encoder.get_kind() == 'B');
     REALM_ASSERT_DEBUG(arr.m_encoder.get_encoding() == Encoding::Packed);
     // we don't need to access the header, init from mem must have been called
     const auto v_width = arr.m_width;
@@ -123,7 +122,6 @@ void ArrayPacked::get_chunk(const Array& arr, size_t ndx, int64_t res[8]) const
 void inline ArrayPacked::get_encode_info(const char* h, size_t& v_width, size_t& v_size)
 {
     using Encoding = NodeHeader::Encoding;
-    REALM_ASSERT_DEBUG(NodeHeader::get_kind(h) == 'B');
     REALM_ASSERT_DEBUG(NodeHeader::get_encoding(h) == NodeHeader::Encoding::Packed);
     v_width = NodeHeader::get_element_size<Encoding::Packed>(h);
     v_size = NodeHeader::get_num_elements<Encoding::Packed>(h);
