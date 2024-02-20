@@ -16,8 +16,8 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "util/test_file.hpp"
-#include "util/event_loop.hpp"
+#include "../util/test_file.hpp"
+#include "../util/event_loop.hpp"
 
 #include <realm.h>
 
@@ -39,10 +39,10 @@
 #include <fstream>
 
 #if REALM_ENABLE_SYNC
-#include "util/sync/flx_sync_harness.hpp"
-#include "util/sync/sync_test_utils.hpp"
-#include "util/test_path.hpp"
-#include "util/unit_test_transport.hpp"
+#include <util/sync/flx_sync_harness.hpp>
+#include <util/sync/sync_test_utils.hpp>
+#include "../util/test_path.hpp"
+#include "../util/unit_test_transport.hpp"
 
 #include <realm/object-store/sync/app_utils.hpp>
 #include <realm/object-store/sync/sync_user.hpp>

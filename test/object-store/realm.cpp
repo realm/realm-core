@@ -16,10 +16,10 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include <util/event_loop.hpp>
-#include <util/test_file.hpp>
-#include <util/test_utils.hpp>
-#include <../util/semaphore.hpp>
+#include "util/event_loop.hpp"
+#include "util/test_file.hpp"
+#include "util/test_utils.hpp"
+#include "../util/semaphore.hpp"
 
 #include <realm/db.hpp>
 #include <realm/history.hpp>
@@ -48,7 +48,7 @@
 
 #include <realm/object-store/sync/async_open_task.hpp>
 #include <realm/object-store/sync/impl/sync_metadata.hpp>
-
+#include <realm/object-store/sync/sync_session.hpp>
 #include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/subscriptions.hpp>
 #endif
