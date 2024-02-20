@@ -158,7 +158,7 @@ ONLY(Test_basic_find)
     }
     auto t2 = high_resolution_clock::now();
 
-    std::cout << "   Positive values - Array::find(): " << duration_cast<nanoseconds>(t2 - t1).count() << " ns"
+    std::cout << "   Positive values - Array::find(): " << duration_cast<milliseconds>(t2 - t1).count() << " ms"
               << std::endl;
     std::cout << "   Positive values - Array::find(): "
               << (double)duration_cast<nanoseconds>(t2 - t1).count() / n_values / n_runs << " ns/value" << std::endl;
@@ -166,6 +166,14 @@ ONLY(Test_basic_find)
     a.try_encode(a_encoded);
     CHECK(a_encoded.is_encoded());
     CHECK(a_encoded.size() == a.size());
+
+    // verify that both find the same thing
+    for (size_t j = 0; j < n_runs; ++j) {
+        for (size_t i = 0; i < n_values; ++i) {
+            REALM_ASSERT(a.find_first(i) == a_encoded.find_first(i));
+        }
+    }
+
     t1 = high_resolution_clock::now();
     for (size_t j = 0; j < n_runs; ++j) {
         for (size_t i = 0; i < n_values; ++i) {
@@ -175,8 +183,8 @@ ONLY(Test_basic_find)
         }
     }
     t2 = high_resolution_clock::now();
-    std::cout << "   Positive values - ArrayEncode::find_first(): " << duration_cast<nanoseconds>(t2 - t1).count()
-              << " ns" << std::endl;
+    std::cout << "   Positive values - ArrayEncode::find_first(): " << duration_cast<milliseconds>(t2 - t1).count()
+              << " ms" << std::endl;
     std::cout << "   Positive values - ArrayEncode::find_first(): "
               << (double)duration_cast<nanoseconds>(t2 - t1).count() / n_values / n_runs << " ns/value" << std::endl;
 
@@ -193,6 +201,13 @@ ONLY(Test_basic_find)
     std::shuffle(input_array.begin(), input_array.end(), g1);
     for (const auto& v : input_array)
         a.add(v);
+
+    // verify that both find the same thing
+    for (size_t j = 0; j < n_runs; ++j) {
+        for (size_t i = 0; i < n_values; ++i) {
+            REALM_ASSERT(a.find_first(-i) == a_encoded.find_first(-i));
+        }
+    }
 
     t1 = high_resolution_clock::now();
     for (size_t j = 0; j < n_runs; ++j) {

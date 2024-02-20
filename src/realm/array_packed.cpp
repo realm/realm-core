@@ -107,3 +107,79 @@ void ArrayPacked::get_chunk(const Array& arr, size_t ndx, int64_t res[8]) const
         res[index++] = get(arr, i++);
     }
 }
+
+template bool ArrayPacked::find_all<Equal>(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*) const;
+template bool ArrayPacked::find_all<NotEqual>(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*) const;
+template bool ArrayPacked::find_all<Greater>(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*) const;
+template bool ArrayPacked::find_all<Less>(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*) const;
+
+
+template <typename Cond>
+bool ArrayPacked::find_all(const Array& arr, int64_t value, size_t start, size_t end, size_t baseindex,
+                           QueryStateBase* state) const
+{
+    REALM_ASSERT_DEBUG(start <= arr.m_size && (end <= arr.m_size || end == size_t(-1)) && start <= end);
+    Cond c;
+
+    if (end == npos)
+        end = arr.m_size;
+
+    if (!(arr.m_size > start && start < end))
+        return true;
+
+    const auto lbound = arr.m_lbound;
+    const auto ubound = arr.m_ubound;
+
+    // Return immediately if no items in array can match (such as if cond == Greater && value == 100 &&
+    // m_ubound == 15)
+    if (!c.can_match(value, lbound, ubound))
+        return true;
+
+    // optimization if all items are guaranteed to match (such as cond == NotEqual && value == 100 && m_ubound == 15)
+    if (c.will_match(value, lbound, ubound)) {
+        return find_all_match(start, end, baseindex, state);
+    }
+
+    // finder cannot handle this bitwidth
+    REALM_ASSERT_3(arr.m_width, !=, 0);
+
+    auto cmp = [](int64_t v, int64_t value) {
+        if constexpr (std::is_same_v<Cond, Equal>)
+            return v == value;
+        if constexpr (std::is_same_v<Cond, NotEqual>)
+            return v != value;
+        if constexpr (std::is_same_v<Cond, Greater>)
+            return v > value;
+        if constexpr (std::is_same_v<Cond, Less>)
+            return v < value;
+    };
+
+    //~6/7x slower, we need to fo a bitscan before to start this loop when values are less than 32 and 64 bits
+    bf_iterator it((uint64_t*)arr.m_data, 0, arr.m_width, arr.m_width, start);
+    const auto mask = arr.get_encoder().width_mask();
+    for (; start < end; ++start, ++it) {
+        const auto v = sign_extend_field_by_mask(mask, it.get_value());
+        if (cmp(v, value)) {
+            if (!state->match(start + baseindex))
+                return false;
+        }
+    }
+    //  13/14x slower, the cose of accessing the same 64 bits is not small.
+    //    for(;start < end;++start) {
+    //        if(cmp(get(arr, start), value))
+    //            if(!state->match(start+baseindex))
+    //                return false;
+    //    }
+    return true;
+}
+
+bool ArrayPacked::find_all_match(size_t start, size_t end, size_t baseindex, QueryStateBase* state) const
+{
+    REALM_ASSERT_DEBUG(state->match_count() < state->limit());
+    const auto process = state->limit() - state->match_count();
+    const auto end2 = end - start > process ? start + process : end;
+    for (; start < end2; start++)
+        if (!state->match(start + baseindex))
+            return false;
+    return true;
+}
