@@ -444,8 +444,8 @@ public:
         auto hh = (uint16_t*)header;
         REALM_ASSERT(bits_pr_elemA > 0);
         REALM_ASSERT(bits_pr_elemB > 0);
-        REALM_ASSERT(bits_pr_elemA < 64);
-        REALM_ASSERT(bits_pr_elemB < 64);
+        REALM_ASSERT(bits_pr_elemA <= 64);
+        REALM_ASSERT(bits_pr_elemB <= 64);
         REALM_ASSERT(num_elemsA < 1024);
         REALM_ASSERT(num_elemsB < 1024);
         hh[1] = ((bits_pr_elemB - 1) << 10) | num_elemsB;
