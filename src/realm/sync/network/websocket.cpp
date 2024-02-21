@@ -754,7 +754,7 @@ private:
         m_stopped = true;
         m_logger.error(util::LogCategory::network, "WebSocket: Received malformed HTTP response");
         std::error_code ec = HttpError::bad_response_invalid_http;
-        m_config.websocket_handshake_error_handler(ec, nullptr, nullptr); // Throws
+        m_config.websocket_handshake_error_handler(ec, nullptr, {}); // Throws
     }
 
     void error_client_response_not_101(const HTTPResponse& response)
@@ -806,16 +806,13 @@ private:
             ec = HttpError::bad_response_unexpected_status_code;
 
         std::string_view body;
-        std::string_view* body_ptr = nullptr;
         if (m_test_handshake_response) {
             body = m_test_handshake_response_body;
-            body_ptr = &body;
         }
         else if (response.body) {
             body = *response.body;
-            body_ptr = &body;
         }
-        m_config.websocket_handshake_error_handler(ec, &response.headers, body_ptr); // Throws
+        m_config.websocket_handshake_error_handler(ec, &response.headers, body); // Throws
     }
 
     void error_client_response_websocket_headers_invalid(const HTTPResponse& response)
@@ -828,12 +825,10 @@ private:
                        response);
         std::error_code ec = HttpError::bad_response_header_protocol_violation;
         std::string_view body;
-        std::string_view* body_ptr = nullptr;
         if (response.body) {
             body = *response.body;
-            body_ptr = &body;
         }
-        m_config.websocket_handshake_error_handler(ec, &response.headers, body_ptr); // Throws
+        m_config.websocket_handshake_error_handler(ec, &response.headers, {}); // Throws
     }
 
     void error_server_malformed_request()
@@ -841,7 +836,7 @@ private:
         m_stopped = true;
         m_logger.error(util::LogCategory::network, "WebSocket: Received malformed HTTP request");
         std::error_code ec = HttpError::bad_request_malformed_http;
-        m_config.websocket_handshake_error_handler(ec, nullptr, nullptr); // Throws
+        m_config.websocket_handshake_error_handler(ec, nullptr, {}); // Throws
     }
 
     void error_server_request_header_protocol_violation(std::error_code ec, const HTTPRequest& request)
@@ -852,7 +847,7 @@ private:
                        "Websocket: HTTP request has invalid websocket headers."
                        "HTTP request = \n%1",
                        request);
-        m_config.websocket_handshake_error_handler(ec, &request.headers, nullptr); // Throws
+        m_config.websocket_handshake_error_handler(ec, &request.headers, {}); // Throws
     }
 
     void protocol_error(std::error_code ec)
