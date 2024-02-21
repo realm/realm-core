@@ -90,8 +90,7 @@ private:
         constexpr bool was_clean = false;
         websocket_error_and_close_handler(was_clean, WebSocketError::websocket_write_error, ec.message());
     }
-    void websocket_handshake_error_handler(std::error_code ec, const HTTPHeaders*,
-                                           const std::string_view* body) override
+    void websocket_handshake_error_handler(std::error_code ec, const HTTPHeaders*, std::string_view body) override
     {
         WebSocketError error = WebSocketError::websocket_ok;
         bool was_clean = true;
@@ -121,11 +120,11 @@ private:
         else {
             error = WebSocketError::websocket_fatal_error;
             was_clean = false;
-            if (body) {
+            if (!body.empty()) {
                 std::string_view identifier = "REALM_SYNC_PROTOCOL_MISMATCH";
-                auto i = body->find(identifier);
+                auto i = body.find(identifier);
                 if (i != std::string_view::npos) {
-                    std::string_view rest = body->substr(i + identifier.size());
+                    std::string_view rest = body.substr(i + identifier.size());
                     // FIXME: Use std::string_view::begins_with() in C++20.
                     auto begins_with = [](std::string_view string, std::string_view prefix) {
                         return (string.size() >= prefix.size() &&

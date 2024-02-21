@@ -1217,8 +1217,7 @@ public:
         write_error(ec);
     }
 
-    void websocket_handshake_error_handler(std::error_code ec, const HTTPHeaders*,
-                                           const std::string_view*) final override
+    void websocket_handshake_error_handler(std::error_code ec, const HTTPHeaders*, std::string_view) final override
     {
         // WebSocket class has already logged a message for this error
         close_due_to_error(ec); // Throws
