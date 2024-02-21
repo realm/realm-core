@@ -4218,7 +4218,11 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
                 });
             };
             auto realm = Realm::get_shared_realm(r_config);
+            auto session = realm->sync_session();
+            CHECK(session);
+            CHECK(session->state() == SyncSession::State::WaitingForLocation);
             state.wait_for(TestState::session_started);
+            CHECK(session->state() == SyncSession::State::Active);
 
             CHECK(redir_transport->location_requested);
             CHECK(app->get_base_url() == init_url);
@@ -4229,7 +4233,7 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
         }
         // Recreate the app using the cached user and start a sync session, which will fail during location update
         SECTION("Location update fails prior to sync session connect") {
-            enum class TestState { start, location_failed, waiting_for_session, session_started };
+            enum class TestState { start, session_started };
             TestingStateMachine<TestState> state(TestState::start);
 
             redir_transport->reset(init_url, redir_url);
@@ -4244,28 +4248,34 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
             r_config.sync_config = std::make_shared<SyncConfig>(app->current_user(), SyncConfig::FLXSyncEnabled{});
             r_config.sync_config->error_handler = [&state, &logger](std::shared_ptr<SyncSession>,
                                                                     SyncError error) mutable {
-                // Expect an error due to location failed or 404 response when creating websocket
+                // Expect an error due to 404 response when creating websocket
                 state.transition_with([&error, &logger](TestState cur_state) -> std::optional<TestState> {
-                    if (cur_state == TestState::start || cur_state == TestState::waiting_for_session) {
-                        logger->debug("Expected error: %1: %2", error.status.code_string(), error.status.reason());
+                    if (cur_state == TestState::start) {
+                        // The session will start, but the connection is rejected on purpose
+                        logger->debug("Expected error: %1", error.status);
                         CHECK(!error.status.is_ok());
                         CHECK(error.status.code() == ErrorCodes::SyncConnectFailed);
-                    }
-                    if (cur_state == TestState::start) {
-                        // The first time through, the location update fails
-                        return TestState::location_failed;
-                    }
-                    else if (cur_state == TestState::waiting_for_session) {
-                        // The second time through, the session start, but the connection is rejected on purpose
                         return TestState::session_started;
                     }
                     return std::nullopt;
                 });
             };
-            auto realm = Realm::get_shared_realm(r_config);
-            state.wait_for(TestState::location_failed);
 
-            CHECK(redir_transport->location_requested);
+            auto realm = Realm::get_shared_realm(r_config);
+            auto session = realm->sync_session();
+            CHECK(session);
+            CHECK(session->state() == SyncSession::State::WaitingForLocation);
+            session->pause();
+            CHECK(session->state() == SyncSession::State::Paused);
+            session->resume();
+            CHECK(session->state() == SyncSession::State::WaitingForLocation);
+
+            timed_wait_for(
+                [&] {
+                    return redir_transport->location_requested;
+                },
+                std::chrono::seconds(15));
+
             CHECK(app->get_base_url() == init_url);
             // Location was never updated
             CHECK(app->get_host_url() == init_url);
@@ -4275,13 +4285,10 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
             // Location request will pass this time, try to reconnect
             // expecting 404 when websocket connects
             redir_transport->reset(init_url, redir_url);
-            state.transition_to(TestState::waiting_for_session);
-            auto session = app->sync_manager()->get_existing_session(r_config.path);
-            CHECK(session);
-            session->resume();
+            session->handle_reconnect();
             state.wait_for(TestState::session_started);
+            CHECK(session->state() == SyncSession::State::Active);
 
-            CHECK(redir_transport->location_requested);
             CHECK(app->get_base_url() == init_url);
             CHECK(app->get_host_url() == redir_url);
             CHECK(app->get_ws_host_url() == redir_wsurl);

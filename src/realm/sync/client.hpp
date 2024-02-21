@@ -13,6 +13,7 @@
 #include <realm/util/functional.hpp>
 #include <realm/util/future.hpp>
 #include <realm/sync/client_base.hpp>
+#include <realm/sync/socket_provider.hpp>
 
 namespace realm::sync {
 
@@ -99,6 +100,9 @@ public:
     /// Returns false if the specified URL is invalid.
     bool decompose_server_url(const std::string& url, ProtocolEnvelope& protocol, std::string& address,
                               port_type& port, std::string& path) const;
+
+    sync::SyncSocketProvider::SyncTimer create_timer(std::chrono::milliseconds delay,
+                                                     sync::SyncSocketProvider::FunctionHandler&& handler);
 
 private:
     std::unique_ptr<ClientImpl> m_impl;

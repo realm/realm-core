@@ -138,6 +138,12 @@ struct SyncClient {
         return m_client.notify_session_terminated();
     }
 
+    sync::SyncSocketProvider::SyncTimer create_timer(std::chrono::milliseconds delay,
+                                                     sync::SyncSocketProvider::FunctionHandler&& handler)
+    {
+        return m_client.create_timer(delay, std::move(handler));
+    }
+
     ~SyncClient() {}
 
 private:

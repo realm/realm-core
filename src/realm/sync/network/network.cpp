@@ -1423,6 +1423,8 @@ public:
     void add_wait_oper(LendersWaitOperPtr op)
     {
         m_wait_operations.push(std::move(op)); // Throws
+        // wake up the event loop to refresh the wait time
+        io_reactor.interrupt();
     }
 
     void post(PostOperConstr constr, std::size_t size, void* cookie)

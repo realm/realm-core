@@ -426,6 +426,17 @@ public:
     // reloads an app (#5411).
     static void close_all_sync_sessions();
 
+    /// Request the app metadata information from the server if it has not been processed yet. If
+    /// a new hostname is provided, the app metadata will be refreshed using the new hostname.
+    /// @param completion The callback that will be called with the error on failure or empty on success
+    /// @param new_hostname The (Original) new hostname to request the location from
+    /// @param redir_location The location provided by the last redirect response when querying location
+    /// @param redirect_count The current number of redirects that have occurred in a row
+    void request_location(util::UniqueFunction<void(util::Optional<AppError>)>&& completion,
+                          std::optional<std::string>&& new_hostname = std::nullopt,
+                          std::optional<std::string>&& redir_location = std::nullopt, int redirect_count = 0)
+        REQUIRES(!m_route_mutex);
+
     // Return the base url path used for HTTP AppServices requests
     std::string get_host_url() REQUIRES(!m_route_mutex);
 
@@ -501,17 +512,6 @@ private:
     /// a new hostname is provided
     /// @param hostname The hostname to generate a new app route
     std::string get_app_route(const util::Optional<std::string>& hostname = util::none) const REQUIRES(m_route_mutex);
-
-    /// Request the app metadata information from the server if it has not been processed yet. If
-    /// a new hostname is provided, the app metadata will be refreshed using the new hostname.
-    /// @param completion The callback that will be called with the error on failure or empty on success
-    /// @param new_hostname The (Original) new hostname to request the location from
-    /// @param redir_location The location provided by the last redirect response when querying location
-    /// @param redirect_count The current number of redirects that have occurred in a row
-    void request_location(util::UniqueFunction<void(util::Optional<AppError>)>&& completion,
-                          std::optional<std::string>&& new_hostname = std::nullopt,
-                          std::optional<std::string>&& redir_location = std::nullopt, int redirect_count = 0)
-        REQUIRES(!m_route_mutex);
 
     /// Update the location metadata from the location response
     /// @param response The response returned from the location request

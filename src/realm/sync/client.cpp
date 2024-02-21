@@ -2071,6 +2071,12 @@ bool Client::decompose_server_url(const std::string& url, ProtocolEnvelope& prot
     return m_impl->decompose_server_url(url, protocol, address, port, path); // Throws
 }
 
+sync::SyncSocketProvider::SyncTimer Client::create_timer(std::chrono::milliseconds delay,
+                                                         sync::SyncSocketProvider::FunctionHandler&& handler)
+{
+    return m_impl->create_timer(delay, std::move(handler));
+}
+
 
 Session::Session(Client& client, DBRef db, std::shared_ptr<SubscriptionStore> flx_sub_store,
                  std::shared_ptr<MigrationStore> migration_store, Config&& config)

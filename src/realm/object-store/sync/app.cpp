@@ -1035,14 +1035,17 @@ std::optional<AppError> App::update_location(const Response& response, const std
         auto deployment_model = get<std::string>(json, "deployment_model");
         auto location = get<std::string>(json, "location");
         log_debug("App: Location info returned for deployment model: %1(%2)", deployment_model, location);
+        std::string sync_route;
         {
             util::CheckedLockGuard guard(m_route_mutex);
             // Update the local hostname and path information
             update_hostname(hostname, ws_hostname, base_url);
             m_location_updated = true;
             // Provide the Device Sync websocket route to the SyncManager
-            m_sync_manager->set_sync_route(make_sync_route());
+            sync_route = make_sync_route();
         }
+        // Provide the Device Sync websocket route to the SyncManager
+        m_sync_manager->set_sync_route(sync_route);
     }
     catch (const AppError& ex) {
         return ex;

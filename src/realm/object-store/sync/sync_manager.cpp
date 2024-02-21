@@ -55,6 +55,7 @@ void SyncManager::configure(std::shared_ptr<app::App> app, std::optional<std::st
         m_app = app;
         m_sync_route = sync_route;
         m_config = std::move(config);
+        do_reset_update_location();
         if (m_sync_client)
             return;
 
@@ -642,6 +643,12 @@ void SyncManager::unregister_session(const std::string& path)
     // Remove the session from the map while holding the lock, but then defer
     // destroying it until after we unlock the mutex for the reasons noted above.
     auto session = m_sessions.extract(it);
+    if (m_sessions.empty()) {
+        // If there are no more active sessions, then cancel the pending location
+        // request, if there is one
+        util::CheckedLockGuard lk(m_mutex);
+        do_reset_update_location();
+    }
     lock.unlock();
 }
 
@@ -661,14 +668,111 @@ void SyncManager::set_session_multiplexing(bool allowed)
 SyncClient& SyncManager::get_sync_client() const
 {
     util::CheckedLockGuard lock(m_mutex);
+    return do_get_sync_client();
+}
+
+SyncClient& SyncManager::do_get_sync_client() const
+{
     if (!m_sync_client)
-        m_sync_client = create_sync_client(); // Throws
+        m_sync_client = std::make_unique<SyncClient>(m_logger_ptr, m_config, weak_from_this()); // Throws
     return *m_sync_client;
 }
 
-std::unique_ptr<SyncClient> SyncManager::create_sync_client() const
+void SyncManager::set_sync_route(std::string sync_route)
 {
-    return std::make_unique<SyncClient>(m_logger_ptr, m_config, weak_from_this());
+    REALM_ASSERT(!sync_route.empty());
+    {
+        util::CheckedLockGuard lk(m_mutex);
+        m_sync_route = std::move(sync_route);
+    }
+    // Inform the known sessions that the sync route has been updated
+    util::CheckedLockGuard s_lk(m_session_mutex);
+    for (auto& [_, session] : m_sessions) {
+        session->handle_location_updated();
+    }
+}
+
+void SyncManager::start_update_location(bool force_restart)
+{
+    util::CheckedLockGuard lk(m_mutex);
+    // If forcing a restart, cancel the current timer and restart the delay interval
+    if (force_restart) {
+        do_reset_update_location();
+    }
+    // If the location update hasn't been started yet, then start it now
+    if (!m_location_update_timer) {
+        do_update_location();
+    }
+}
+
+void SyncManager::do_reset_update_location()
+{
+    if (m_location_update_timer) {
+        m_location_update_timer->cancel();
+        m_location_update_timer.reset();
+    }
+    m_last_location_update_delay = 0;
+}
+
+void SyncManager::restart_location_update()
+{
+    util::CheckedLockGuard lk(m_mutex);
+    auto timer = std::move(m_location_update_timer);
+    do_update_location();
+}
+
+void SyncManager::do_update_location()
+{
+    constexpr time_t first_delay = 15;
+    constexpr time_t max_location_update_interval = 8 * 60; // 8 minutes
+
+    size_t delay = 1; // For first location update, just delay for 1 second
+
+    // Simple x2 retry delay calculation: 1, 15, 30, 60 ... 8 mins max
+    if (m_last_location_update_delay >= max_location_update_interval) {
+        delay = max_location_update_interval;
+    }
+    else if (m_last_location_update_delay == 1) {
+        delay = first_delay;
+    }
+    else if (m_last_location_update_delay > 0) {
+        delay = m_last_location_update_delay * 2;
+        if (delay > max_location_update_interval) {
+            delay = max_location_update_interval;
+        }
+    }
+    m_last_location_update_delay = delay;
+
+    m_location_update_timer =
+        do_get_sync_client().create_timer(std::chrono::seconds{delay}, [self = weak_from_this()](Status status) {
+            if (status.code() == ErrorCodes::OperationAborted) {
+                return;
+            }
+            // Timer failed (something bad happened)
+            else if (!status.is_ok()) {
+                throw RuntimeError(std::move(status));
+            }
+
+            std::shared_ptr<app::App> app;
+            if (auto mgr = self.lock(); mgr) {
+                app = mgr->app().lock();
+            }
+            if (!app) {
+                return;
+            }
+            // Start an app request to update the location
+            app->request_location([self = std::move(self)](util::Optional<app::AppError> error) {
+                if (!error) {
+                    // if the operation is successful, the updated sync route will be set by set_sync_route(),
+                    // which will restart any SyncSessions waiting for a location update
+                    return;
+                }
+                // Since it's unclear if the errors are fatal or not, just retry the location update
+                if (auto mgr = self.lock(); mgr) {
+                    mgr->restart_location_update();
+                }
+            });
+        });
 }
 
 void SyncManager::close_all_sessions()

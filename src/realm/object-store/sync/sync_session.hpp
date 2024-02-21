@@ -113,6 +113,7 @@ public:
         Inactive,
         WaitingForAccessToken,
         Paused,
+        WaitingForLocation,
     };
 
     enum class ConnectionState {
@@ -362,6 +363,11 @@ private:
         REALM_ASSERT(config.sync_config);
         return std::make_shared<SyncSession>(Private(), client, std::move(db), config, std::move(sync_manager));
     }
+
+    // Called when the sync_route has been updated - does nothing if the SyncSession is not in the
+    // WaitForLocation state, otherwise, it attempts to revive (activate) the session now that the
+    // sync_route has been updated
+    void handle_location_updated() REQUIRES(!m_state_mutex, !m_connection_state_mutex, !m_config_mutex);
     // }
 
     std::shared_ptr<SyncManager> sync_manager() const REQUIRES(!m_state_mutex);
@@ -387,8 +393,6 @@ private:
     void handle_error(sync::SessionErrorInfo) REQUIRES(!m_state_mutex, !m_config_mutex, !m_connection_state_mutex);
     void handle_bad_auth(const std::shared_ptr<SyncUser>& user, Status status)
         REQUIRES(!m_state_mutex, !m_config_mutex);
-    void handle_location_update_failed(Status status)
-        REQUIRES(!m_state_mutex, !m_config_mutex, !m_connection_state_mutex);
     // If sub_notify_error is set (including Status::OK()), then the pending subscription waiters will
     // also be called with the sub_notify_error status value.
     void cancel_pending_waits(util::CheckedUniqueLock, Status) RELEASE(m_state_mutex);
@@ -410,6 +414,7 @@ private:
         REQUIRES(!m_connection_state_mutex);
     void become_paused(util::CheckedUniqueLock) RELEASE(m_state_mutex) REQUIRES(!m_connection_state_mutex);
     void become_waiting_for_access_token() REQUIRES(m_state_mutex);
+    void become_waiting_for_location() REQUIRES(m_state_mutex);
 
     // do restart session restarts the session without freeing any of the waiters
     void do_restart_session(util::CheckedUniqueLock)

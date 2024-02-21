@@ -230,18 +230,20 @@ public:
     // the access token will be refreshed (forcing a location update) when a SyncSession
     // is activated and it is still unset. This value is not allowed to be reset to
     // nullopt once it has a valid value.
-    void set_sync_route(std::string sync_route) REQUIRES(!m_mutex)
-    {
-        REALM_ASSERT(!sync_route.empty());
-        util::CheckedLockGuard lock(m_mutex);
-        m_sync_route = std::move(sync_route);
-    }
+    void set_sync_route(std::string sync_route) REQUIRES(!m_mutex, !m_session_mutex);
 
     const std::optional<std::string> sync_route() const REQUIRES(!m_mutex)
     {
         util::CheckedLockGuard lock(m_mutex);
         return m_sync_route;
     }
+
+    // If the location hasn't been updated when a SyncSession is activated, trigger a
+    // location update and wait for it to complete before activating the session. Once the
+    // location has been updated, any sessions in PendingLocationUpdate will be started.
+    // If force_restart is true, the current retry timer will be canceled and the location
+    // request will be sent immediately.
+    void start_update_location(bool force_restart = false) REQUIRES(!m_mutex);
 
     std::weak_ptr<app::App> app() const REQUIRES(!m_mutex)
     {
@@ -270,7 +272,7 @@ public:
 
 protected:
     friend class SyncUser;
-    friend class SyncSesson;
+    friend class SyncSession;
 
     using std::enable_shared_from_this<SyncManager>::shared_from_this;
     using std::enable_shared_from_this<SyncManager>::weak_from_this;
@@ -285,10 +287,10 @@ private:
     // Stop tracking the session for the given path if it is inactive.
     // No-op if the session is either still active or in the active sessions list
     // due to someone holding a strong reference to it.
-    void unregister_session(const std::string& path) REQUIRES(!m_session_mutex);
+    void unregister_session(const std::string& path) REQUIRES(!m_session_mutex, !m_mutex);
 
     _impl::SyncClient& get_sync_client() const REQUIRES(!m_mutex);
-    std::unique_ptr<_impl::SyncClient> create_sync_client() const REQUIRES(m_mutex);
+    _impl::SyncClient& do_get_sync_client() const REQUIRES(m_mutex);
 
     std::shared_ptr<SyncSession> get_existing_session_locked(const std::string& path) const REQUIRES(m_session_mutex);
 
@@ -336,6 +338,13 @@ private:
     std::optional<std::string> m_sync_route GUARDED_BY(m_mutex);
 
     std::weak_ptr<app::App> m_app GUARDED_BY(m_mutex);
+
+    void do_update_location() REQUIRES(m_mutex); // releases mutex
+    void do_reset_update_location() REQUIRES(m_mutex);
+    void restart_location_update() REQUIRES(!m_mutex);
+
+    sync::SyncSocketProvider::SyncTimer m_location_update_timer GUARDED_BY(m_mutex);
+    time_t m_last_location_update_delay GUARDED_BY(m_mutex) = 0;
 };
 
 } // namespace realm

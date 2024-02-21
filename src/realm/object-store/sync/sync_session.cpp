@@ -49,12 +49,23 @@ constexpr const char SyncError::c_recovery_file_path_key[];
 
 /// STATES:
 ///
+/// WAITING_FOR_LOCATION: the session was activated, but the location has
+/// not been successfully queried since the App was created. This requests
+/// the SyncManager to request the updated location, which will activate
+/// this session once the location info has been successfully retrieved
+/// From: INACTIVE, PAUSED
+/// To:
+///    * ACTIVE: when the location info has been successfully updated
+///    * PAUSED: if the session is paused
+///    * INACTIVE: if asked to log out, or if asked to close
+///
 /// WAITING_FOR_ACCESS_TOKEN: a request has been initiated to ask
 /// for an updated access token and the session is waiting for a response.
 /// From: INACTIVE, DYING
 /// To:
 ///    * ACTIVE: when the SDK successfully refreshes the token
 ///    * INACTIVE: if asked to log out, or if asked to close
+///    * PAUSED: if the session is paused
 ///
 /// ACTIVE: the session is connected to the Sync Server and is actively
 /// transferring data.
@@ -63,6 +74,15 @@ constexpr const char SyncError::c_recovery_file_path_key[];
 ///    * INACTIVE: if asked to log out, or if asked to close and the stop policy
 ///                is Immediate.
 ///    * DYING: if asked to close and the stop policy is AfterChangesUploaded
+///    * PAUSED: if the session is paused
+///
+/// PAUSED: the session has been paused and must be resumed before it will be restared
+/// From: WAITING_FOR_LOCATIION, WAITING_FOR_ACCESS_TOKEN, ACTIVE, INACTIVE, DYING
+/// To:
+///    * ACTIVE: if the session is resumed
+///    * INACTIVE: if asked to log out, or if asked to close
+///    * WAITING_FOR_LOCATION: if the session was resumed but the location info has
+///                            not been successfully updated
 ///
 /// DYING: the session is performing clean-up work in preparation to be destroyed.
 /// From: ACTIVE
@@ -71,6 +91,7 @@ constexpr const char SyncError::c_recovery_file_path_key[];
 ///                revived, or if explicitly asked to log out before the
 ///                clean-up work begins
 ///    * ACTIVE: if the session is revived
+///    * PAUSED: if the session is paused
 ///    * WAITING_FOR_ACCESS_TOKEN: if the session tried to enter ACTIVE,
 ///                                but the token is invalid or expired.
 ///
@@ -78,11 +99,14 @@ constexpr const char SyncError::c_recovery_file_path_key[];
 /// owned by this session is destroyed, and the session is quiescent.
 /// Note that a session briefly enters this state before being destroyed, but
 /// it can also enter this state and stay there if the user has been logged out.
-/// From: initial, ACTIVE, DYING, WAITING_FOR_ACCESS_TOKEN
+/// From: initial, ACTIVE, DYING, WAITING_FOR_ACCESS_TOKEN, WAITING_FOR_LOCATION
 /// To:
 ///    * ACTIVE: if the session is revived
+///    * PAUSED: if the session is paused
 ///    * WAITING_FOR_ACCESS_TOKEN: if the session tried to enter ACTIVE,
 ///                                but the token is invalid or expired.
+///    * WAITING_FOR_LOCATION: if the session tried to enter ACTIVE but the
+///                            location info has not been successfully updated
 
 void SyncSession::become_active()
 {
@@ -244,21 +268,22 @@ void SyncSession::become_waiting_for_access_token()
     m_state = State::WaitingForAccessToken;
 }
 
-void SyncSession::handle_location_update_failed(Status status)
+void SyncSession::become_waiting_for_location()
 {
-    // TODO: ideally this would write to the logs as well in case users didn't set up their error handler.
-    {
-        util::CheckedUniqueLock lock(m_state_mutex);
-        // Should only be called while waiting to update the access token
-        REALM_ASSERT(m_state == State::WaitingForAccessToken);
-        // Close the session, since there's nothing more to do at this point, it can be resumed
-        // after resolving the location update failure
-        become_inactive(std::move(lock), status);
+    REALM_ASSERT(m_state != State::WaitingForLocation);
+    m_state = State::WaitingForLocation;
+    m_sync_manager->start_update_location();
+}
+
+void SyncSession::handle_location_updated()
+{
+    util::CheckedUniqueLock lock(m_state_mutex);
+    // If the state is not waiting for location, bail early
+    if (m_state != State::WaitingForLocation) {
+        return;
     }
-    if (auto error_handler = config(&SyncConfig::error_handler)) {
-        auto user_facing_error = SyncError({ErrorCodes::SyncConnectFailed, status.reason()}, true);
-        error_handler(shared_from_this(), std::move(user_facing_error));
-    }
+    // Otherwise, revive the session with the updated location information
+    do_revive(std::move(lock));
 }
 
 void SyncSession::handle_bad_auth(const std::shared_ptr<SyncUser>& user, Status status)
@@ -317,17 +342,6 @@ SyncSession::handle_refresh(const std::shared_ptr<SyncSession>& session, bool re
         else if (error) {
             if (error->code() == ErrorCodes::ClientAppDeallocated) {
                 return; // this response came in after the app shut down, ignore it
-            }
-            else if (!session->get_sync_route()) {
-                // If the sync route is empty at this point, it means the forced location update
-                // failed while trying to start a sync session with a cached user and no other
-                // AppServices HTTP requests have been performed since the App was created.
-                // Since a valid websocket host url is not available, fail the SyncSession start
-                // and pass the error to the user.
-                // This function will not log out the user, since it is not known at this point
-                // whether or not the user is valid.
-                session->handle_location_update_failed(
-                    {error->code(), util::format("Unable to reach the server: %1", error->reason())});
             }
             else if (ErrorCodes::error_categories(error->code()).test(ErrorCategory::client_error)) {
                 // any other client errors other than app_deallocated are considered fatal because
@@ -1047,6 +1061,7 @@ void SyncSession::nonsync_transact_notify(sync::version_type version)
                 m_session->nonsync_transact_notify(version);
             }
             break;
+        case State::WaitingForLocation:
         case State::Dying:
         case State::Inactive:
         case State::Paused:
@@ -1058,6 +1073,9 @@ void SyncSession::revive_if_needed()
 {
     util::CheckedUniqueLock lock(m_state_mutex);
     switch (m_state) {
+        case State::WaitingForLocation:
+            m_sync_manager->start_update_location(true);
+            break;
         case State::Active:
         case State::WaitingForAccessToken:
         case State::Paused:
@@ -1076,6 +1094,9 @@ void SyncSession::handle_reconnect()
         case State::Active:
             m_session->cancel_reconnect_delay();
             break;
+        case State::WaitingForLocation:
+            m_sync_manager->start_update_location(true);
+            break;
         case State::Dying:
         case State::Inactive:
         case State::WaitingForAccessToken:
@@ -1091,6 +1112,7 @@ void SyncSession::force_close()
         case State::Active:
         case State::Dying:
         case State::WaitingForAccessToken:
+        case State::WaitingForLocation:
             become_inactive(std::move(lock));
             break;
         case State::Inactive:
@@ -1106,6 +1128,7 @@ void SyncSession::pause()
         case State::Active:
         case State::Dying:
         case State::WaitingForAccessToken:
+        case State::WaitingForLocation:
         case State::Inactive:
             become_paused(std::move(lock));
             break;
@@ -1121,6 +1144,9 @@ void SyncSession::resume()
         case State::Active:
         case State::WaitingForAccessToken:
             return;
+        case State::WaitingForLocation:
+            m_sync_manager->start_update_location(true);
+            break;
         case State::Paused:
         case State::Dying:
         case State::Inactive:
@@ -1131,10 +1157,16 @@ void SyncSession::resume()
 
 void SyncSession::do_revive(util::CheckedUniqueLock&& lock)
 {
+    if (!m_sync_manager->sync_route()) {
+        become_waiting_for_location();
+        m_state_mutex.unlock(lock);
+        return;
+    }
+
     auto u = user();
     // If the sync manager has a valid route and the user and it's access token
     // are valid, then revive the session.
-    if (m_sync_manager->sync_route() && (!u || !u->access_token_refresh_required())) {
+    if (!u || !u->access_token_refresh_required()) {
         become_active();
         m_state_mutex.unlock(lock);
         return;
@@ -1181,6 +1213,7 @@ void SyncSession::close(util::CheckedUniqueLock lock)
             m_state_mutex.unlock(lock);
             break;
         case State::Paused:
+        case State::WaitingForLocation:
         case State::Inactive: {
             // We need to unregister from the sync manager if it still exists so that we don't end up
             // holding the DBRef open after the session is closed. Otherwise we can end up preventing
