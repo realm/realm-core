@@ -248,17 +248,17 @@ size_t curl_write_cb(char* ptr, size_t size, size_t nmemb, std::string* response
 size_t curl_header_cb(char* buffer, size_t size, size_t nitems, std::map<std::string, std::string>* response_headers)
 {
     REALM_ASSERT(response_headers);
-    std::string combined(buffer, size * nitems);
+    std::string_view combined(buffer, size * nitems);
     if (auto pos = combined.find(':'); pos != std::string::npos) {
-        std::string key = combined.substr(0, pos);
-        std::string value = combined.substr(pos + 1);
-        while (value.size() > 0 && value[0] == ' ') {
-            value = value.substr(1);
+        std::string_view key = combined.substr(0, pos);
+        std::string_view value = combined.substr(pos + 1);
+        if (auto first_not_space = value.find_first_not_of(' '); first_not_space != std::string::npos) {
+            value = value.substr(first_not_space);
         }
-        while (value.size() > 0 && (value[value.size() - 1] == '\r' || value[value.size() - 1] == '\n')) {
-            value = value.substr(0, value.size() - 1);
+        if (auto last_not_nl = value.find_last_not_of("\r\n"); last_not_nl != std::string::npos) {
+            value = value.substr(0, last_not_nl);
         }
-        response_headers->insert({key, value});
+        response_headers->insert({std::string{key}, std::string{value}});
     }
     else {
         if (combined.size() > 5 && combined.substr(0, 5) != "HTTP/") { // ignore for now HTTP/1.1 ...

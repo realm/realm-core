@@ -205,6 +205,25 @@ void wait_for_sessions_to_close(const TestAppSession& test_app_session)
         std::chrono::minutes(5), std::chrono::milliseconds(100));
 }
 
+#ifdef REALM_MONGODB_ENDPOINT
+static std::string unquote_string(std::string_view possibly_quoted_string)
+{
+    if (possibly_quoted_string.size() > 0) {
+        auto check_char = possibly_quoted_string.front();
+        if (check_char == '"' || check_char == '\'') {
+            possibly_quoted_string.remove_prefix(1);
+        }
+    }
+    if (possibly_quoted_string.size() > 0) {
+        auto check_char = possibly_quoted_string.back();
+        if (check_char == '"' || check_char == '\'') {
+            possibly_quoted_string.remove_suffix(1);
+        }
+    }
+    return std::string{possibly_quoted_string};
+}
+#endif
+
 std::string get_compile_time_base_url()
 {
 #ifdef REALM_MONGODB_ENDPOINT
