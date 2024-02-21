@@ -31,6 +31,11 @@
 
 using namespace realm;
 
+template bool ArrayFlex::find_all<Equal>(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*) const;
+template bool ArrayFlex::find_all<NotEqual>(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*) const;
+template bool ArrayFlex::find_all<Greater>(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*) const;
+template bool ArrayFlex::find_all<Less>(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*) const;
+
 void ArrayFlex::init_array(char* h, uint8_t flags, size_t v_width, size_t ndx_width, size_t v_size,
                            size_t ndx_size) const
 {
@@ -45,15 +50,15 @@ void ArrayFlex::copy_data(const Array& arr, const std::vector<int64_t>& values,
     REALM_ASSERT_DEBUG(arr.is_attached());
     REALM_ASSERT_DEBUG(arr.m_encoder.get_encoding() == Encoding::Flex);
 
-    auto h = arr.get_header();
-    auto v_width = NodeHeader::get_elementA_size<Encoding::Flex>(h);
-    auto ndx_width = NodeHeader::get_elementB_size<Encoding::Flex>(h);
-    auto v_size = values.size();
-    auto data = (uint64_t*)arr.m_data;
-    auto offset = static_cast<size_t>(v_size * v_width);
+    const auto& encoder = arr.get_encoder();
+    const auto v_width = encoder.m_v_width;
+    const auto ndx_width = encoder.m_ndx_width;
+    const auto v_size = values.size();
+    const auto data = (uint64_t*)arr.m_data;
+    const auto offset = static_cast<size_t>(v_size * v_width);
     bf_iterator it_value{data, 0, v_width, v_width, 0};
     bf_iterator it_index{data, offset, ndx_width, ndx_width, 0};
-    for (size_t i = 0; i < values.size(); ++i) {
+    for (size_t i = 0; i < v_size; ++i) {
         it_value.set_value(values[i]);
         REALM_ASSERT_DEBUG(sign_extend_value(v_width, it_value.get_value()) == values[i]);
         ++it_value;
@@ -87,36 +92,30 @@ int64_t ArrayFlex::get(const Array& arr, size_t ndx) const
 {
     REALM_ASSERT_DEBUG(arr.is_attached());
     REALM_ASSERT_DEBUG(arr.is_encoded());
-    const auto v_width = arr.m_encoder.m_v_width;
-    const auto v_size = arr.m_encoder.m_v_size;
-    const auto ndx_width = arr.m_encoder.m_ndx_width;
-    const auto ndx_size = arr.m_encoder.m_ndx_size;
-    return do_get((uint64_t*)arr.m_data, ndx, v_width, ndx_width, v_size, ndx_size);
+    const auto& encoder = arr.m_encoder;
+    const auto v_width = encoder.m_v_width;
+    const auto v_size = encoder.m_v_size;
+    const auto ndx_width = encoder.m_ndx_width;
+    const auto ndx_size = encoder.m_ndx_size;
+    const auto mask = encoder.width_mask();
+    return get(arr.m_data, ndx, v_width, ndx_width, v_size, ndx_size, mask);
 }
 
-int64_t ArrayFlex::get(const char* data, size_t ndx, size_t v_width, size_t v_size, size_t ndx_width,
-                       size_t ndx_size) const
+int64_t ArrayFlex::get(const char* data, size_t ndx, size_t v_width, size_t v_size, size_t ndx_width, size_t ndx_size,
+                       size_t mask) const
 {
-    return do_get((uint64_t*)data, ndx, v_width, v_size, ndx_width, ndx_size);
-    //    using Encoding = NodeHeader::Encoding;
-    //    REALM_ASSERT_DEBUG(NodeHeader::get_kind(h) == 'B');
-    //    REALM_ASSERT_DEBUG(NodeHeader::get_encoding(h) == Encoding::Flex);
-    //    //size_t v_size, ndx_size, v_width, ndx_width;
-    //    //get_encode_info(h, v_width, ndx_width, v_size, ndx_size);
-    //    const auto data = (uint64_t*)(NodeHeader::get_data_from_header(h));
-    //    return do_get(data, ndx, v_width, ndx_width, v_size, ndx_size);
+    return do_get((uint64_t*)data, ndx, v_width, v_size, ndx_width, ndx_size, mask);
 }
 
 int64_t ArrayFlex::do_get(uint64_t* data, size_t ndx, size_t v_width, size_t ndx_width, size_t v_size,
-                          size_t ndx_size)
+                          size_t ndx_size, size_t mask) const
 {
     if (ndx >= ndx_size)
         return realm::not_found;
     const uint64_t offset = v_size * v_width;
     const bf_iterator it_index{data, static_cast<size_t>(offset + (ndx * ndx_width)), ndx_width, ndx_width, 0};
     const bf_iterator it_value{data, static_cast<size_t>(v_width * it_index.get_value()), v_width, v_width, 0};
-    auto v = sign_extend_value(v_width, it_value.get_value());
-    return v;
+    return sign_extend_field_by_mask(mask, it_value.get_value());
 }
 
 void ArrayFlex::get_chunk(const Array& arr, size_t ndx, int64_t res[8]) const
@@ -135,25 +134,90 @@ void ArrayFlex::get_chunk(const Array& arr, size_t ndx, int64_t res[8]) const
     }
 }
 
-bool inline ArrayFlex::get_encode_info(const char* h, size_t& v_width, size_t& ndx_width, size_t& v_size,
-                                       size_t& ndx_size)
+template <typename Cond>
+bool ArrayFlex::find_all(const Array& arr, int64_t value, size_t start, size_t end, size_t baseindex,
+                         QueryStateBase* state) const
 {
-    using Encoding = NodeHeader::Encoding;
-    REALM_ASSERT_DEBUG(NodeHeader::get_encoding(h) == Encoding::Flex);
-    v_size = NodeHeader::get_arrayA_num_elements<Encoding::Flex>(h);
-    ndx_size = NodeHeader::get_arrayB_num_elements<Encoding::Flex>(h);
-    v_width = NodeHeader::get_elementA_size<Encoding::Flex>(h);
-    ndx_width = NodeHeader::get_elementB_size<Encoding::Flex>(h);
+    REALM_ASSERT_DEBUG(start <= arr.m_size && (end <= arr.m_size || end == size_t(-1)) && start <= end);
+    Cond c;
+
+    if (end == npos)
+        end = arr.m_size;
+
+    if (!(arr.m_size > start && start < end))
+        return true;
+
+    const auto lbound = arr.m_lbound;
+    const auto ubound = arr.m_ubound;
+
+    if (!c.can_match(value, lbound, ubound))
+        return true;
+
+    if (c.will_match(value, lbound, ubound)) {
+        return find_all_match(start, end, baseindex, state);
+    }
+
+    REALM_ASSERT_3(arr.m_width, !=, 0);
+
+    const auto& encoder = arr.m_encoder;
+    const auto data = (uint64_t*)arr.m_data;
+    const auto v_width = encoder.m_v_width;
+    const auto v_size = encoder.m_v_size;
+    const auto ndx_width = encoder.m_ndx_width;
+    const auto mask = encoder.width_mask();
+
+    auto cmp = [](int64_t v, int64_t value) {
+        if constexpr (std::is_same_v<Cond, Equal>)
+            return v == value;
+        if constexpr (std::is_same_v<Cond, NotEqual>)
+            return v != value;
+        if constexpr (std::is_same_v<Cond, Greater>)
+            return v > value;
+        if constexpr (std::is_same_v<Cond, Less>)
+            return v < value;
+    };
+
+    const auto offset = v_size * v_width;
+    bf_iterator it_index{data, static_cast<size_t>(offset), ndx_width, ndx_width, start};
+    for (; start < end; ++start, ++it_index) {
+        const auto v = sign_extend_field_by_mask(mask, read_bitfield(data, it_index.get_value() * v_width, v_width));
+        if (cmp(v, value))
+            if (!state->match(start + baseindex))
+                return false;
+    }
     return true;
 }
 
-std::vector<int64_t> ArrayFlex::fetch_all_values(const Array& arr) const
+int64_t ArrayFlex::sum(const Array& arr, size_t start, size_t end) const
 {
-    REALM_ASSERT_DEBUG(arr.is_attached());
-    REALM_ASSERT_DEBUG(arr.m_encoder.get_encoding() == NodeHeader::Encoding::Flex);
-    std::vector<int64_t> values;
-    values.reserve(arr.m_size);
-    for (size_t i = 0; i < arr.m_size; ++i)
-        values.push_back(get(arr, i));
-    return values;
+    const auto& encoder = arr.m_encoder;
+    const auto data = (uint64_t*)arr.m_data;
+    const auto v_width = encoder.m_v_width;
+    const auto v_size = encoder.m_v_size;
+    const auto ndx_width = encoder.m_ndx_width;
+    const auto ndx_size = encoder.m_ndx_size;
+    const auto mask = encoder.width_mask();
+
+    REALM_ASSERT_DEBUG(start < ndx_size && end < ndx_size);
+
+    const auto offset = v_size * v_width;
+    int64_t acc = 0;
+
+    bf_iterator it_index{data, static_cast<size_t>(offset), ndx_width, ndx_width, start};
+    for (; start < end; ++start, ++it_index) {
+        const auto v = read_bitfield(data, it_index.get_value() * v_width, v_width);
+        acc += sign_extend_field_by_mask(mask, v);
+    }
+    return acc;
+}
+
+bool ArrayFlex::find_all_match(size_t start, size_t end, size_t baseindex, QueryStateBase* state) const
+{
+    REALM_ASSERT_DEBUG(state->match_count() < state->limit());
+    const auto process = state->limit() - state->match_count();
+    const auto end2 = end - start > process ? start + process : end;
+    for (; start < end2; start++)
+        if (!state->match(start + baseindex))
+            return false;
+    return true;
 }

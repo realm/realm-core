@@ -290,6 +290,7 @@ REALM_NOINLINE bool ArrayWithFind::find_all_will_match(size_t start2, size_t end
     return true;
 }
 
+
 // This is the main finding function for Array. Other finding functions are just
 // wrappers around this one. Search for 'value' using condition cond (Equal,
 // NotEqual, Less, etc) and call QueryStateBase::match() for each match. Break and

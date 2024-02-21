@@ -31,6 +31,12 @@
 
 using namespace realm;
 
+template bool ArrayPacked::find_all<Equal>(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*) const;
+template bool ArrayPacked::find_all<NotEqual>(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*) const;
+template bool ArrayPacked::find_all<Greater>(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*) const;
+template bool ArrayPacked::find_all<Less>(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*) const;
+
+
 void ArrayPacked::init_array(char* h, uint8_t flags, size_t v_width, size_t v_size) const
 {
     using Encoding = NodeHeader::Encoding;
@@ -55,18 +61,6 @@ void ArrayPacked::copy_data(const Array& origin, Array& arr) const
     }
 }
 
-std::vector<int64_t> ArrayPacked::fetch_all_values(const Array& arr) const
-{
-    REALM_ASSERT(arr.is_encoded());
-    std::vector<int64_t> res;
-    res.reserve(arr.m_size);
-    for (size_t i = 0; i < arr.m_size; ++i) {
-        res.push_back(arr.get(i));
-    }
-    return res;
-    // return get_all_values(arr, arr.m_width, arr.m_size, 0, arr.size());
-}
-
 void ArrayPacked::set_direct(const Array& arr, size_t ndx, int64_t value) const
 {
     REALM_ASSERT_DEBUG(arr.is_encoded());
@@ -84,21 +78,21 @@ int64_t ArrayPacked::get(const Array& arr, size_t ndx) const
     REALM_ASSERT_DEBUG(arr.is_encoded());
     const auto w = arr.m_encoder.m_v_width;
     const auto sz = arr.m_encoder.m_v_size;
-    return do_get((uint64_t*)arr.m_data, ndx, w, sz);
+    return do_get((uint64_t*)arr.m_data, ndx, w, sz, arr.get_encoder().width_mask());
 }
 
-int64_t ArrayPacked::get(const char* data, size_t ndx, size_t width, size_t sz) const
+int64_t ArrayPacked::get(const char* data, size_t ndx, size_t width, size_t sz, size_t mask) const
 {
-    return do_get((uint64_t*)data, ndx, width, sz);
+    return do_get((uint64_t*)data, ndx, width, sz, mask);
 }
 
-int64_t ArrayPacked::do_get(uint64_t* data, size_t ndx, size_t v_width, size_t v_size) const
+int64_t ArrayPacked::do_get(uint64_t* data, size_t ndx, size_t v_width, size_t v_size, size_t mask) const
 {
     if (ndx >= v_size)
         return realm::not_found;
     bf_iterator it{data, 0, v_width, v_width, ndx};
-    const auto result = it.get_value();
-    return sign_extend_value(v_width, result);
+    const auto value = it.get_value();
+    return sign_extend_field_by_mask(mask, value);
 }
 
 void ArrayPacked::get_chunk(const Array& arr, size_t ndx, int64_t res[8]) const
@@ -119,134 +113,72 @@ void ArrayPacked::get_chunk(const Array& arr, size_t ndx, int64_t res[8]) const
     }
 }
 
-void inline ArrayPacked::get_encode_info(const char* h, size_t& v_width, size_t& v_size)
+template <typename Cond>
+bool ArrayPacked::find_all(const Array& arr, int64_t value, size_t start, size_t end, size_t baseindex,
+                           QueryStateBase* state) const
 {
-    using Encoding = NodeHeader::Encoding;
-    REALM_ASSERT_DEBUG(NodeHeader::get_encoding(h) == NodeHeader::Encoding::Packed);
-    v_width = NodeHeader::get_element_size<Encoding::Packed>(h);
-    v_size = NodeHeader::get_num_elements<Encoding::Packed>(h);
-}
+    REALM_ASSERT_DEBUG(start <= arr.m_size && (end <= arr.m_size || end == size_t(-1)) && start <= end);
+    Cond c;
 
-template <typename F>
-std::vector<int64_t> ArrayPacked::find_all(const Array& arr, int64_t, size_t start, size_t end, F) const
-{
-    const auto w = arr.m_width;
-    const auto sz = arr.m_size;
+    if (end == npos)
+        end = arr.m_size;
 
-    REALM_ASSERT_DEBUG(arr.is_attached());
-    REALM_ASSERT_DEBUG(arr.is_encoded());
-    REALM_ASSERT_DEBUG(end <= sz);
+    if (!(arr.m_size > start && start < end))
+        return true;
 
+    const auto lbound = arr.m_lbound;
+    const auto ubound = arr.m_ubound;
 
-    // we use the size in bits
-    constexpr auto word_size = sizeof(int64_t) * 8;
+    if (!c.can_match(value, lbound, ubound))
+        return true;
 
-    const auto starting_bit = w * start;
-    const auto ending_bit = w * end;
-    const auto starting_word = starting_bit / word_size;
-    const auto ending_word = ending_bit / word_size;
-    const auto data = (uint64_t*)arr.m_data;
-    const auto start_data = (data + starting_word);
-    const auto end_data = (data + ending_word);
-    const auto shift_bits = starting_bit & (word_size - 1);
-    const auto mask = (1ULL << w) - 1;
-    const auto bytes_to_read = 1 + (end_data - start_data);
+    if (c.will_match(value, lbound, ubound)) {
+        return find_all_match(start, end, baseindex, state);
+    }
 
-    size_t counter = starting_bit;
-    auto word_limit = (starting_word + 1) * word_size;
-    std::vector<int64_t> res;
-    std::vector<uint64_t> raw_values;
+    REALM_ASSERT_3(arr.m_width, !=, 0);
 
-    const auto add_value = [&w, &res, &counter](int64_t v, uint64_t& byte, size_t shift) {
-        if (w < word_size)
-            v = sign_extend_value(w, v);
-        res.push_back(v);
-        byte >>= shift;
-        counter += w;
+    auto cmp = [](int64_t v, int64_t value) {
+        if constexpr (std::is_same_v<Cond, Equal>)
+            return v == value;
+        if constexpr (std::is_same_v<Cond, NotEqual>)
+            return v != value;
+        if constexpr (std::is_same_v<Cond, Greater>)
+            return v > value;
+        if constexpr (std::is_same_v<Cond, Less>)
+            return v < value;
     };
 
-    //    auto pos = start_data;
-    //    while(pos <= end_data) {
-    //        auto v = *pos;
-    //        if(pos == start_data)
-    //            v >>= shift_bits;
-    //        while (counter < ending_bit && counter + w <= word_limit) {
-    //            const auto sv = v & mask;
-    //            if(!cmp(sv, value))
-    //                return res;
-    //            add_value(sv, sv, w);
-    //        }
-    //        if (counter < ending_bit && counter + w > word_limit) {
-    //            const auto rest = word_limit - counter;
-    //            const auto sv = (*(pos+1) << rest) | v;
-    //            if(!cmp(sv, value))
-    //                return res;
-    //            add_value(sv, sv, w - rest);
-    //        }
-    //        ++pos;
-    //    }
-
-    realm::safe_copy_n(start_data, bytes_to_read, std::back_inserter(raw_values));
-
-    if (shift_bits)
-        raw_values[0] >>= shift_bits;
-
-
-    for (size_t i = 0; i < raw_values.size(); ++i) {
-        while (counter < ending_bit && counter + w <= word_limit) {
-            const auto sv = raw_values[i] & mask;
-            add_value(sv, raw_values[i], w);
+    //~6/7x slower, we need to do a bitscan before to start this loop when values are less than 32 and 64 bits
+    bf_iterator it((uint64_t*)arr.m_data, 0, arr.m_width, arr.m_width, start);
+    const auto mask = arr.get_encoder().width_mask();
+    for (; start < end; ++start, ++it) {
+        const auto v = sign_extend_field_by_mask(mask, it.get_value());
+        if (cmp(v, value)) {
+            if (!state->match(start + baseindex))
+                return false;
         }
-        if (counter < ending_bit && counter + w > word_limit) {
-            const auto rest = word_limit - counter;
-            const auto sv = (raw_values[i + 1] << rest) | raw_values[i];
-            add_value(sv, raw_values[i + 1], w - rest);
-        }
-        word_limit += word_size;
     }
-    //    REALM_ASSERT_DEBUG(res.size() == (end - start));
-    // #if REALM_DEBUG
-    //    for (size_t i = 0; i < res.size(); ++i) {
-    //        REALM_ASSERT_DEBUG(arr.get(start++) == res[i]);
-    //    }
-    // #endif
-    return res;
+    return true;
 }
 
-// template <typename F>
-// size_t ArrayPacked::c(const Array& arr, int64_t key, size_t start, size_t end, F cmp)
-//{
-//     constexpr auto LIMIT = 30;
-//     const auto h = arr.get_header();
-//     size_t v_width, v_size;
-//     get_encode_info(h, v_width, v_size);
-//
-//     // auto data = (uint64_t*)arr.m_data;
-//     if (v_size <= LIMIT) {
-//         for (size_t i = start; i < end; ++i) {
-//             const auto v = get(arr, i);
-//             //            const bf_iterator it_value{data, static_cast<size_t>(v_width * i), v_width, v_width, 0};
-//             //            auto v = sign_extend_field(v_width, it_value.get_value());
-//             if (cmp(v, key))
-//                 return i;
-//         }
-//     }
-//     else {
-//         int lo = (int)start;
-//         int hi = (int)end;
-//         while (lo <= hi) {
-//             int mid = lo + (hi - lo) / 2;
-//             const auto v = get(arr, mid);
-//             //            const bf_iterator it_value{data, static_cast<size_t>(v_width * mid), v_width, v_width,
-//             0};
-//             //            auto v = sign_extend_field(v_width, it_value.get_value());
-//             if (cmp(v, key))
-//                 return mid;
-//             else if (key < v)
-//                 hi = mid - 1;
-//             else
-//                 lo = mid + 1;
-//         }
-//     }
-//     return realm::not_found;
-// }
+bool ArrayPacked::find_all_match(size_t start, size_t end, size_t baseindex, QueryStateBase* state) const
+{
+    REALM_ASSERT_DEBUG(state->match_count() < state->limit());
+    const auto process = state->limit() - state->match_count();
+    const auto end2 = end - start > process ? start + process : end;
+    for (; start < end2; start++)
+        if (!state->match(start + baseindex))
+            return false;
+    return true;
+}
+
+int64_t ArrayPacked::sum(const Array& arr, size_t start, size_t end) const
+{
+    const auto mask = arr.get_encoder().width_mask();
+    int64_t acc = 0;
+    bf_iterator it((uint64_t*)arr.m_data, 0, arr.m_width, arr.m_width, start);
+    for (; start < end; ++start, ++it)
+        acc += sign_extend_field_by_mask(mask, it.get_value());
+    return acc;
+}

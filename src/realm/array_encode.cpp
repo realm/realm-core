@@ -35,7 +35,6 @@ template size_t ArrayEncode::find_first<Equal>(const Array&, int64_t, size_t, si
 template size_t ArrayEncode::find_first<NotEqual>(const Array&, int64_t, size_t, size_t) const;
 template size_t ArrayEncode::find_first<Greater>(const Array&, int64_t, size_t, size_t) const;
 template size_t ArrayEncode::find_first<Less>(const Array&, int64_t, size_t, size_t) const;
-
 template bool ArrayEncode::find_all<Equal>(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*) const;
 template bool ArrayEncode::find_all<NotEqual>(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*) const;
 template bool ArrayEncode::find_all<Greater>(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*) const;
@@ -61,7 +60,12 @@ inline void copy_into_encoded_array(const T& encoder, Arg&&... args)
 template <typename Encoder>
 std::vector<int64_t> fetch_values(const Encoder& encoder, const Array& arr)
 {
-    return encoder.fetch_all_values(arr);
+    std::vector<int64_t> res;
+    const auto sz = arr.size();
+    res.reserve(sz);
+    for (size_t i = 0; i < sz; ++i)
+        res.push_back(encoder.get(arr, i));
+    return res;
 }
 
 bool ArrayEncode::always_encode(const Array& origin, Array& arr, bool packed) const
@@ -175,27 +179,15 @@ void ArrayEncode::init(const char* h)
     if (m_encoding == Encoding::Packed) {
         m_v_width = NodeHeader::get_element_size<Encoding::Packed>(h);
         m_v_size = NodeHeader::get_num_elements<Encoding::Packed>(h);
+        m_v_mask = 1ULL << (m_v_width - 1);
     }
     else if (m_encoding == Encoding::Flex) {
         m_v_width = NodeHeader::get_elementA_size<Encoding::Flex>(h);
         m_v_size = NodeHeader::get_arrayA_num_elements<Encoding::Flex>(h);
         m_ndx_width = NodeHeader::get_elementB_size<Encoding::Flex>(h);
         m_ndx_size = NodeHeader::get_arrayB_num_elements<Encoding::Flex>(h);
+        m_v_mask = 1ULL << (m_v_width - 1);
     }
-}
-
-size_t ArrayEncode::size() const
-{
-    using Encoding = NodeHeader::Encoding;
-    REALM_ASSERT_DEBUG(m_encoding == Encoding::Packed || m_encoding == Encoding::Flex);
-    return m_encoding == Encoding::Packed ? m_v_size : m_ndx_size;
-}
-
-size_t ArrayEncode::width() const
-{
-    using Encoding = NodeHeader::Encoding;
-    REALM_ASSERT_DEBUG(m_encoding == Encoding::Packed || m_encoding == Encoding::Flex);
-    return m_v_width;
 }
 
 int64_t ArrayEncode::get(const Array& arr, size_t ndx) const
@@ -210,8 +202,9 @@ int64_t ArrayEncode::get(const char* data, size_t ndx) const
 {
     using Encoding = NodeHeader::Encoding;
     REALM_ASSERT_DEBUG(m_encoding == Encoding::Flex || m_encoding == Encoding::Packed);
-    return m_encoding == Encoding::Packed ? s_packed.get(data, ndx, m_v_width, m_v_size)
-                                          : s_flex.get(data, ndx, m_v_width, m_v_size, m_ndx_width, m_ndx_size);
+    return m_encoding == Encoding::Packed
+               ? s_packed.get(data, ndx, m_v_width, m_v_size, m_v_mask)
+               : s_flex.get(data, ndx, m_v_width, m_v_size, m_ndx_width, m_ndx_size, m_v_mask);
 }
 
 void ArrayEncode::get_chunk(const Array& arr, size_t ndx, int64_t res[8]) const
@@ -234,108 +227,20 @@ size_t ArrayEncode::find_first(const Array& arr, int64_t value, size_t start, si
     return state.m_state;
 }
 
-inline bool find_all_match(size_t start, size_t end, size_t baseindex, QueryStateBase* state)
-{
-    REALM_ASSERT_DEBUG(state->match_count() < state->limit());
-    const auto process = state->limit() - state->match_count();
-    const auto end2 = end - start > process ? start + process : end;
-    for (; start < end2; start++)
-        if (!state->match(start + baseindex))
-            return false;
-    return true;
-}
-
-template <typename Cond>
-inline bool do_find_all(const Array& arr, int64_t value, size_t start, size_t end, size_t baseindex,
-                        QueryStateBase* state)
-{
-    bool (*cmp)(int64_t, int64_t) = nullptr;
-    if constexpr (std::is_same_v<Cond, Equal>)
-        cmp = [](int64_t v, int64_t value) {
-            return v == value;
-        };
-    else if constexpr (std::is_same_v<Cond, NotEqual>)
-        cmp = [](int64_t v, int64_t value) {
-            return v != value;
-        };
-    else if constexpr (std::is_same_v<Cond, Greater>)
-        cmp = [](int64_t v, int64_t value) {
-            return v > value;
-        };
-    else if constexpr (std::is_same_v<Cond, Less>)
-        cmp = [](int64_t v, int64_t value) {
-            return v < value;
-        };
-    REALM_ASSERT_DEBUG(cmp != nullptr);
-
-    //    const auto encoder = arr.get_encoder();
-    //    const auto w = encoder.width();
-    //    const auto sz = encoder.size();
-
-    // fastest so far but ~8 times slower than master
-    const auto& encoder = arr.get_encoder();
-    for (; start < end; start++) {
-        const auto v = encoder.get(arr, start);
-        if (cmp(v, value) && !state->match(start + baseindex))
-            return false;
-    }
-    return true;
-
-    //   Ideally this is what we should do, lower and upper bound passing the cmp.
-    //    auto s = arr.lower_bound_int(value, cmp);
-    //    auto e = arr.upper_bound_int(value, cmp);
-    //    for(; s<e; s++)
-    //        if( cmp(arr.get(s), value) && !state->match(s+baseindex))
-    //            return false;
-    //    return true;
-
-    // this fetches all the values first, reading the entire set of values,
-    //    const auto& values = s_packed.find_all(arr, value, start, end);
-    //    for(const auto& v : values) {
-    //        if(!state->match(start + baseindex))
-    //            return false;
-    //    }
-    //    return true;
-}
-
 template <typename Cond>
 bool ArrayEncode::find_all(const Array& arr, int64_t value, size_t start, size_t end, size_t baseindex,
                            QueryStateBase* state) const
 {
     REALM_ASSERT_DEBUG(is_packed() || is_flex());
-    REALM_ASSERT_DEBUG(start <= arr.m_size && (end <= arr.m_size || end == size_t(-1)) && start <= end);
-
-    Cond c;
-
-    if (end == npos)
-        end = arr.m_size;
-
-    if (!(arr.m_size > start && start < end))
-        return true;
-
-    const auto lbound = arr.m_lbound;
-    const auto ubound = arr.m_ubound;
-
-    if (!c.can_match(value, lbound, ubound))
-        return true;
-
-    if (c.will_match(value, lbound, ubound))
-        return find_all_match(start, end, baseindex, state);
-
-    return do_find_all<Cond>(arr, value, start, end, baseindex, state);
+    return is_packed() ? s_packed.find_all<Cond>(arr, value, start, end, baseindex, state)
+                       : s_flex.find_all<Cond>(arr, value, start, end, baseindex, state);
 }
 
 int64_t ArrayEncode::sum(const Array& arr, size_t start, size_t end) const
 {
     REALM_ASSERT_DEBUG(is_packed() || is_flex());
     REALM_ASSERT_DEBUG(arr.m_size >= start && arr.m_size <= end);
-
-    int64_t total_sum = 0;
-    for (size_t i = start; i < end; ++i) {
-        const auto v = is_packed() ? s_packed.get(arr, i) : s_flex.get(arr, i);
-        total_sum += v;
-    }
-    return total_sum;
+    return is_packed() ? s_packed.sum(arr, start, end) : s_flex.sum(arr, start, end);
 }
 
 void ArrayEncode::set(char* data, size_t w, size_t ndx, int64_t v) const

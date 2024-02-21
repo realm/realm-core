@@ -483,7 +483,7 @@ TEST_IF(Upgrade_Database_8_9, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZ
 #endif // TEST_READ_UPGRADE_MODE
 }
 
-ONLY(Upgrade_Database_6_10)
+TEST(Upgrade_Database_6_10)
 {
     std::string path = test_util::get_test_resource_path() + "test_upgrade_database_6.realm";
     CHECK_OR_RETURN(File::exists(path));

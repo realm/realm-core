@@ -283,7 +283,6 @@ inline bool operator<(const bf_iterator& a, const bf_iterator& b)
     return a.field_position < b.field_position;
 }
 
-
 class bf_ref {
     bf_iterator it;
 
@@ -321,6 +320,11 @@ inline void write_bitfield(uint64_t* data_area, size_t field_position, size_t wi
     *it = value;
 }
 
+inline int64_t sign_extend_field_by_mask(size_t sign_mask, uint64_t value)
+{
+    uint64_t sign_extension = 0 - (value & sign_mask);
+    return value | sign_extension;
+}
 
 inline int64_t sign_extend_value(size_t width, uint64_t value)
 {
