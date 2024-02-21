@@ -62,8 +62,7 @@ public:
     /// It is safe to destroy the WebSocket object in these handlers.
     virtual void websocket_read_error_handler(std::error_code) = 0;
     virtual void websocket_write_error_handler(std::error_code) = 0;
-    virtual void websocket_handshake_error_handler(std::error_code, const HTTPHeaders*,
-                                                   const std::string_view* body) = 0;
+    virtual void websocket_handshake_error_handler(std::error_code, const HTTPHeaders*, std::string_view body) = 0;
     virtual void websocket_protocol_error_handler(std::error_code) = 0;
     //@}
 
