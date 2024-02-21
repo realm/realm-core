@@ -500,10 +500,7 @@ TEST_CASE("Reclaim Frozen", "[frozen]") {
     std::vector<Entry> refs;
     refs.resize(num_pending_transactions);
     TestFile config;
-
     config.schema_version = 1;
-    config.automatic_change_notifications = true;
-    config.cache = false;
     config.schema = Schema{
         {"table", {{"value", PropertyType::Int}, {"link", PropertyType::Object | PropertyType::Nullable, "table"}}}};
     auto realm = Realm::get_shared_realm(config);

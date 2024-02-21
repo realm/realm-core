@@ -105,9 +105,7 @@ struct SyncClientConfig {
 };
 
 class SyncManager : public std::enable_shared_from_this<SyncManager> {
-    friend class SyncSession;
-    friend class ::TestSyncManager;
-    friend class ::TestAppSession;
+    struct Private {};
 
 public:
     using MetadataMode = SyncClientConfig::MetadataMode;
@@ -215,11 +213,11 @@ public:
     std::string recovery_directory_path(util::Optional<std::string> const& custom_dir_name = none) const
         REQUIRES(!m_file_system_mutex);
 
-    // Reset the singleton state for testing purposes. DO NOT CALL OUTSIDE OF TESTING CODE.
-    // Precondition: any synced Realms or `SyncSession`s must be closed or rendered inactive prior to
-    // calling this method.
-    void reset_for_testing() REQUIRES(!m_mutex, !m_file_system_mutex, !m_user_mutex, !m_session_mutex);
-
+    // DO NOT CALL OUTSIDE OF TESTING CODE.
+    // Forcibly close all remaining sync sessions, stop the sync client, and
+    // discard all state. The SyncManager must never be used again after this
+    // function has been called.
+    void tear_down_for_testing() REQUIRES(!m_mutex, !m_file_system_mutex, !m_user_mutex, !m_session_mutex);
 
     // Immediately closes any open sync sessions for this sync manager
     void close_all_sessions() REQUIRES(!m_mutex, !m_session_mutex);
@@ -251,6 +249,11 @@ public:
         return m_app;
     }
 
+    const std::string& app_id() const
+    {
+        return m_app_id;
+    }
+
     SyncClientConfig config() const REQUIRES(!m_mutex)
     {
         util::CheckedLockGuard lock(m_mutex);
@@ -260,29 +263,23 @@ public:
     // Return the cached logger
     const std::shared_ptr<util::Logger>& get_logger() const REQUIRES(!m_mutex);
 
-    SyncManager();
-    SyncManager(const SyncManager&) = delete;
-    SyncManager& operator=(const SyncManager&) = delete;
-
     struct OnlyForTesting {
         friend class TestHelper;
 
         static void voluntary_disconnect_all_connections(SyncManager&);
     };
 
-protected:
-    friend class SyncUser;
-    friend class SyncSession;
-
-    using std::enable_shared_from_this<SyncManager>::shared_from_this;
-    using std::enable_shared_from_this<SyncManager>::weak_from_this;
+    static std::shared_ptr<SyncManager> create(std::shared_ptr<app::App> app, std::optional<std::string> sync_route,
+                                               const SyncClientConfig& config, const std::string& app_id);
+    SyncManager(Private, std::shared_ptr<app::App> app, std::optional<std::string> sync_route,
+                const SyncClientConfig& config, const std::string& app_id);
 
 private:
     friend class app::App;
-
-    void configure(std::shared_ptr<app::App> app, std::optional<std::string> sync_route,
-                   const SyncClientConfig& config)
-        REQUIRES(!m_mutex, !m_file_system_mutex, !m_user_mutex, !m_session_mutex);
+    friend class SyncSession;
+    friend class SyncUser;
+    friend class ::TestSyncManager;
+    friend class ::TestAppSession;
 
     // Stop tracking the session for the given path if it is inactive.
     // No-op if the session is either still active or in the active sessions list
@@ -334,7 +331,7 @@ private:
     bool do_has_existing_sessions() REQUIRES(m_session_mutex);
 
     // The sync route URL to connect to the server. This can be initially empty, but should not
-    // be cleared once it has been set to a value, except by `reset_for_testing()`.
+    // be cleared once it has been set to a value, except by `tear_down_for_testing()`.
     std::optional<std::string> m_sync_route GUARDED_BY(m_mutex);
 
     std::weak_ptr<app::App> m_app GUARDED_BY(m_mutex);
@@ -345,6 +342,8 @@ private:
 
     sync::SyncSocketProvider::SyncTimer m_location_update_timer GUARDED_BY(m_mutex);
     time_t m_last_location_update_delay GUARDED_BY(m_mutex) = 0;
+
+    const std::string m_app_id;
 };
 
 } // namespace realm
