@@ -41,8 +41,10 @@ public:
     inline size_t size() const;
     inline size_t width() const;
     inline size_t width_mask() const;
-    inline uint8_t get_kind() const;
-    inline NodeHeader::Encoding get_encoding() const;
+    inline NodeHeader::Encoding get_encoding() const
+    {
+        return m_encoding;
+    }
 
     // get/set
     int64_t get(const Array&, size_t) const;
@@ -70,7 +72,6 @@ private:
     bool always_encode(const Array&, Array&, bool) const; // for testing
 private:
     using Encoding = NodeHeader::Encoding;
-    uint8_t m_kind = 'A';
     Encoding m_encoding{NodeHeader::Encoding::WTypBits}; // this is not ok .... probably
     size_t m_v_width = 0, m_v_size = 0, m_ndx_width = 0, m_ndx_size = 0;
     size_t m_v_mask = 0;
@@ -94,24 +95,6 @@ inline size_t ArrayEncode::width() const
     REALM_ASSERT_DEBUG(m_kind == 'B');
     REALM_ASSERT_DEBUG(m_encoding == Encoding::Packed || m_encoding == Encoding::Flex);
     return m_v_width;
-}
-
-inline size_t ArrayEncode::width_mask() const
-{
-    using Encoding = NodeHeader::Encoding;
-    REALM_ASSERT_DEBUG(m_kind == 'B');
-    REALM_ASSERT_DEBUG(m_encoding == Encoding::Packed || m_encoding == Encoding::Flex);
-    return m_v_mask;
-}
-
-inline uint8_t ArrayEncode::get_kind() const
-{
-    return m_kind;
-}
-
-inline NodeHeader::Encoding ArrayEncode::get_encoding() const
-{
-    return m_encoding;
 }
 
 } // namespace realm

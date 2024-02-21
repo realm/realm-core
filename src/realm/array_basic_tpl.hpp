@@ -50,7 +50,7 @@ inline MemRef BasicArray<T>::create_array(size_t init_size, Allocator& allocator
     uint8_t flags = 0;
     int width = sizeof(T) * 8; // element width is in bits now
     auto header = mem.get_addr();
-    init_header(header, 'A', Encoding::WTypMult, flags, width, init_size);
+    init_header(header, Encoding::WTypMult, flags, width, init_size);
     set_capacity_in_header(byte_size, mem.get_addr());
     // init_header(mem.get_addr(), is_inner_bptree_node, has_refs, context_flag, wtype_Multiply, width, init_size,
     //             byte_size);

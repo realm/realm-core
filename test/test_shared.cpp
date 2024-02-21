@@ -95,9 +95,9 @@ using unit_test::TestContext;
 // `experiments/testcase.cpp` and then run `sh build.sh
 // check-testcase` (or one of its friends) from the command line.
 
-#if 0
+
 // Sorting benchmark
-ONLY(Query_QuickSort2)
+TEST(Query_QuickSort2)
 {
     Random random(random_int<unsigned long>()); // Seed from slow global generator
 
@@ -122,7 +122,7 @@ ONLY(Query_QuickSort2)
         //        tv.ints(strings);
     }
 }
-#endif
+
 
 #if REALM_WINDOWS
 namespace {

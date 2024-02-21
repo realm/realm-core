@@ -50,8 +50,6 @@ inline void encode_array(const T& encoder, Array& arr, size_t byte_size, Arg&&..
     encoder.init_array(h, std::forward<Arg>(args)...);
     NodeHeader::set_capacity_in_header(byte_size, h);
     arr.init_from_mem(mem);
-    REALM_ASSERT_DEBUG(NodeHeader::get_kind(arr.get_header()) == 'B');
-    // REALM_ASSERT_DEBUG(NodeHeader::get_encoding(arr.get_header()) == arr.m_encoder.m_encoding);
 }
 
 template <typename T, typename... Arg>
@@ -155,7 +153,7 @@ bool ArrayEncode::decode(Array& arr) const
 
     auto mem = allocator.alloc(byte_size);
     auto header = mem.get_addr();
-    NodeHeader::init_header(header, 'A', Encoding::WTypBits, flags, width, values.size());
+    NodeHeader::init_header(header, Encoding::WTypBits, flags, width, values.size());
     NodeHeader::set_capacity_in_header(byte_size, header);
     arr.init_from_mem(mem);
     size_t ndx = 0;
@@ -178,7 +176,6 @@ bool ArrayEncode::decode(Array& arr) const
 void ArrayEncode::init(const char* h)
 {
     using Encoding = NodeHeader::Encoding;
-    m_kind = NodeHeader::get_kind(h);
     m_encoding = NodeHeader::get_encoding(h);
     if (m_encoding == Encoding::Packed) {
         m_v_width = NodeHeader::get_element_size<Encoding::Packed>(h);
@@ -198,7 +195,6 @@ int64_t ArrayEncode::get(const Array& arr, size_t ndx) const
 {
     using Encoding = NodeHeader::Encoding;
     REALM_ASSERT_DEBUG(arr.is_attached());
-    REALM_ASSERT_DEBUG(m_kind == 'B');
     REALM_ASSERT_DEBUG(m_encoding == Encoding::Flex || m_encoding == Encoding::Packed);
     return is_packed() ? s_packed.get(arr, ndx) : s_flex.get(arr, ndx);
 }
@@ -206,7 +202,6 @@ int64_t ArrayEncode::get(const Array& arr, size_t ndx) const
 int64_t ArrayEncode::get(const char* data, size_t ndx) const
 {
     using Encoding = NodeHeader::Encoding;
-    REALM_ASSERT_DEBUG(m_kind == 'B');
     REALM_ASSERT_DEBUG(m_encoding == Encoding::Flex || m_encoding == Encoding::Packed);
     return m_encoding == Encoding::Packed
                ? s_packed.get(data, ndx, m_v_width, m_v_size, m_v_mask)
@@ -281,13 +276,11 @@ void ArrayEncode::set(char* data, size_t w, size_t ndx, int64_t v) const
 
 bool inline ArrayEncode::is_packed() const
 {
-    REALM_ASSERT_DEBUG(m_kind == 'B');
     return m_encoding == NodeHeader::Encoding::Packed;
 }
 
 bool inline ArrayEncode::is_flex() const
 {
-    REALM_ASSERT_DEBUG(m_kind == 'B');
     return m_encoding == NodeHeader::Encoding::Flex;
 }
 
