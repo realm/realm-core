@@ -126,7 +126,7 @@ TEST(perf_array_encode_get_vs_array_get)
               << (double)duration_cast<nanoseconds>(t2 - t1).count() / n_values / n_runs << " ns/value" << std::endl;
 }
 
-ONLY(Test_basic_find)
+TEST(Test_basic_find)
 {
     using namespace std;
     using namespace std::chrono;

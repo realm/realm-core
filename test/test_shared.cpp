@@ -103,23 +103,21 @@ TEST(Query_QuickSort2)
 
     // Triggers QuickSort because range > len
     Table ttt;
-    auto ints = ttt.add_column(type_Int, "1");
+    // auto ints = ttt.add_column(type_Int, "1");
     auto strings = ttt.add_column(type_String, "2");
 
     for (size_t t = 0; t < 10000; t++) {
         Obj o = ttt.create_object();
-        //        o.set<int64_t>(ints, random.draw_int_mod(1100));
+        // o.set<int64_t>(ints, random.draw_int_mod(1100));
         o.set<StringData>(strings, "a");
     }
 
     Query q = ttt.where();
 
-    std::cerr << "GO";
-
     for (size_t t = 0; t < 1000; t++) {
         TableView tv = q.find_all();
         tv.sort(strings);
-        //        tv.ints(strings);
+        // tv.ints(strings);
     }
 }
 

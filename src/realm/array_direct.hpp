@@ -211,21 +211,6 @@ public:
         first_word_ptr = data_area + (field_position >> 6);
     }
 
-    void set_end(uint64_t* end)
-    {
-        end_data_area = end;
-    }
-
-    uint64_t* begin()
-    {
-        return data_area;
-    }
-
-    uint64_t* end()
-    {
-        return end_data_area;
-    }
-
     uint64_t get_value() const
     {
         auto in_word_position = field_position & 0x3F;
@@ -338,14 +323,8 @@ inline void write_bitfield(uint64_t* data_area, size_t field_position, size_t wi
 
 inline int64_t sign_extend_field_by_mask(size_t sign_mask, uint64_t value)
 {
-    if (value & sign_mask) { // got a negative value
-        uint64_t negative_extension = -sign_mask;
-        value |= negative_extension;
-        return int64_t(value);
-    }
-    uint64_t below_sign_mask = sign_mask - 1;
-    value &= below_sign_mask;
-    return int64_t(value);
+    uint64_t sign_extension = 0 - (value & sign_mask);
+    return value | sign_extension;
 }
 
 inline int64_t sign_extend_value(size_t width, uint64_t value)

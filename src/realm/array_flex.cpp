@@ -31,6 +31,11 @@
 
 using namespace realm;
 
+template bool ArrayFlex::find_all<Equal>(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*) const;
+template bool ArrayFlex::find_all<NotEqual>(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*) const;
+template bool ArrayFlex::find_all<Greater>(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*) const;
+template bool ArrayFlex::find_all<Less>(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*) const;
+
 void ArrayFlex::init_array(char* h, uint8_t flags, size_t v_width, size_t ndx_width, size_t v_size,
                            size_t ndx_size) const
 {
@@ -103,7 +108,7 @@ int64_t ArrayFlex::get(const char* data, size_t ndx, size_t v_width, size_t v_si
 }
 
 int64_t ArrayFlex::do_get(uint64_t* data, size_t ndx, size_t v_width, size_t ndx_width, size_t v_size,
-                          size_t ndx_size, size_t mask)
+                          size_t ndx_size, size_t mask) const
 {
     if (ndx >= ndx_size)
         return realm::not_found;
@@ -127,4 +132,92 @@ void ArrayFlex::get_chunk(const Array& arr, size_t ndx, int64_t res[8]) const
     for (; index < 8; ++index) {
         res[index++] = get(arr, i++);
     }
+}
+
+template <typename Cond>
+bool ArrayFlex::find_all(const Array& arr, int64_t value, size_t start, size_t end, size_t baseindex,
+                         QueryStateBase* state) const
+{
+    REALM_ASSERT_DEBUG(start <= arr.m_size && (end <= arr.m_size || end == size_t(-1)) && start <= end);
+    Cond c;
+
+    if (end == npos)
+        end = arr.m_size;
+
+    if (!(arr.m_size > start && start < end))
+        return true;
+
+    const auto lbound = arr.m_lbound;
+    const auto ubound = arr.m_ubound;
+
+    if (!c.can_match(value, lbound, ubound))
+        return true;
+
+    if (c.will_match(value, lbound, ubound)) {
+        return find_all_match(start, end, baseindex, state);
+    }
+
+    REALM_ASSERT_3(arr.m_width, !=, 0);
+
+    const auto& encoder = arr.m_encoder;
+    const auto data = (uint64_t*)arr.m_data;
+    const auto v_width = encoder.m_v_width;
+    const auto v_size = encoder.m_v_size;
+    const auto ndx_width = encoder.m_ndx_width;
+    const auto mask = encoder.width_mask();
+
+    auto cmp = [](int64_t v, int64_t value) {
+        if constexpr (std::is_same_v<Cond, Equal>)
+            return v == value;
+        if constexpr (std::is_same_v<Cond, NotEqual>)
+            return v != value;
+        if constexpr (std::is_same_v<Cond, Greater>)
+            return v > value;
+        if constexpr (std::is_same_v<Cond, Less>)
+            return v < value;
+    };
+
+    const auto offset = v_size * v_width;
+    bf_iterator it_index{data, static_cast<size_t>(offset), ndx_width, ndx_width, start};
+    for (; start < end; ++start, ++it_index) {
+        const auto v = sign_extend_field_by_mask(mask, read_bitfield(data, it_index.get_value() * v_width, v_width));
+        if (cmp(v, value))
+            if (!state->match(start + baseindex))
+                return false;
+    }
+    return true;
+}
+
+int64_t ArrayFlex::sum(const Array& arr, size_t start, size_t end) const
+{
+    const auto& encoder = arr.m_encoder;
+    const auto data = (uint64_t*)arr.m_data;
+    const auto v_width = encoder.m_v_width;
+    const auto v_size = encoder.m_v_size;
+    const auto ndx_width = encoder.m_ndx_width;
+    const auto ndx_size = encoder.m_ndx_size;
+    const auto mask = encoder.width_mask();
+
+    REALM_ASSERT_DEBUG(start < ndx_size && end < ndx_size);
+
+    const auto offset = v_size * v_width;
+    int64_t acc = 0;
+
+    bf_iterator it_index{data, static_cast<size_t>(offset), ndx_width, ndx_width, start};
+    for (; start < end; ++start, ++it_index) {
+        const auto v = read_bitfield(data, it_index.get_value() * v_width, v_width);
+        acc += sign_extend_field_by_mask(mask, v);
+    }
+    return acc;
+}
+
+bool ArrayFlex::find_all_match(size_t start, size_t end, size_t baseindex, QueryStateBase* state) const
+{
+    REALM_ASSERT_DEBUG(state->match_count() < state->limit());
+    const auto process = state->limit() - state->match_count();
+    const auto end2 = end - start > process ? start + process : end;
+    for (; start < end2; start++)
+        if (!state->match(start + baseindex))
+            return false;
+    return true;
 }

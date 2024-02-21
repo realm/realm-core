@@ -41,10 +41,7 @@ public:
     inline size_t size() const;
     inline size_t width() const;
     inline size_t width_mask() const;
-    inline NodeHeader::Encoding get_encoding() const
-    {
-        return m_encoding;
-    }
+    inline NodeHeader::Encoding get_encoding() const;
 
     // get/set
     int64_t get(const Array&, size_t) const;
@@ -84,7 +81,6 @@ private:
 inline size_t ArrayEncode::size() const
 {
     using Encoding = NodeHeader::Encoding;
-    REALM_ASSERT_DEBUG(m_kind == 'B');
     REALM_ASSERT_DEBUG(m_encoding == Encoding::Packed || m_encoding == Encoding::Flex);
     return m_encoding == Encoding::Packed ? m_v_size : m_ndx_size;
 }
@@ -92,9 +88,18 @@ inline size_t ArrayEncode::size() const
 inline size_t ArrayEncode::width() const
 {
     using Encoding = NodeHeader::Encoding;
-    REALM_ASSERT_DEBUG(m_kind == 'B');
     REALM_ASSERT_DEBUG(m_encoding == Encoding::Packed || m_encoding == Encoding::Flex);
     return m_v_width;
+}
+
+inline size_t ArrayEncode::width_mask() const
+{
+    return m_v_mask;
+}
+
+inline NodeHeader::Encoding ArrayEncode::get_encoding() const
+{
+    return m_encoding;
 }
 
 } // namespace realm
