@@ -344,6 +344,173 @@ inline std::pair<int64_t, int64_t> get_two(const char* data, size_t width, size_
     REALM_TEMPEX(return get_two, width, (data, ndx));
 }
 
+/* Subword parallel search
+
+    The following provides facilities for subword parallel search for bitfields of any size.
+    To simplify, the first bitfield must be aligned within the word: it must occupy the lowest
+    bits of the word.
+
+    As a running example to explain the code, we'll use 16 bit words and 5-bit bitfields.
+    A word will look like this: "Xaaaaabbbbbccccc", where a,b and c are bitfields and X is
+    a don't care.
+
+    The simplest condition to test is any_field_NE(A,B), where A and B are words.
+    This condition should be true if any bitfield in A is not equal to the corresponding
+    field in B.
+
+    This is almost as simple as a direct word compare, but needs to take into account that
+    we may want to have part of the words undefined.
+*/
+
+template <int width>
+uint64_t num_fields()
+{
+    REALM_ASSERT(width <= 32); // it will not pay off to use this for fields larger
+    return 64 / width;
+};
+template <int width>
+uint64_t num_bits()
+{
+    return width * num_fields<width>();
+}
+template <int width>
+uint64_t cares_about()
+{
+    if (num_bits<width>() == 64)
+        return 0xFFFFFFFFFFFFFFFF;
+    else
+        return (1ULL << width) - 1;
+}
+
+template <int width>
+bool any_field_NE(uint64_t A, uint64_t B)
+{
+    return (A ^ B) & cares_about<width>();
+}
+
+
+template <int width>
+uint64_t populate(uint64_t value)
+{
+    if (width == 1)
+        return -value;
+    // TODO rewrite this into a loop which is completely folded at compile time
+    auto w = width;
+    while (w < 64) {
+        value |= value << w;
+        w <<= 1;
+    }
+    return value;
+}
+
+/*
+    Next is any_field_EQ(A,B). This is true if any bitfield in A is equal to corresponding
+    field in B. We create a difference bit vector. Each field in this difference vector is
+    then compared against 0. If less than 0, the field was non-zero and thus not equal.
+*/
+
+// provides a set bit in pos 0 of each field, remaining bits zero
+template <int width>
+uint64_t field_bit0()
+{
+    return populate<width>(1);
+};
+
+// provides a set sign-bit in each field, remaining bits zero
+template <int width>
+uint64_t field_sign_bit()
+{
+    return populate<width>(1ULL << (width - 1));
+}
+
+/* Unsigned LT.
+
+    This can be determined by trial subtaction. However, some care must be exercised
+    since simply subtracting one vector from another will allow carries from one
+    bitfield to flow into the next one. To avoid this, we split the subtraction in
+    phases
+    1. We subtract bit0 in each field and determine if there is a borrow. This is
+        A simply bitwise logical operation "borrow = ^A & B" applied to bit zero
+        in all bit fields.
+    2. We subtract the remaining bits in each field as well as any borrow found in
+        step 1. Then we determine if there is an overflow. To do this we first or-in a 1
+        in bit 0 of the next field. In case of an overflow this bit will become 0.
+        This bit isolates the subtraction of one field pair from the next by preventing
+        any borrow from rippling into the next field.
+    3. The 0-bits which are no longer 1 has been borrowed and thus indicate an
+        overflow from the next lower field, so a field where A<B. These bits can now be
+        isolated and compared against a fixed value to determine if any field was less than.
+*/
+
+// compute the overflows in unsigned trail subtraction. The overflows
+// will be marked by 1 in the sign bit of each field in the result.
+template <int width>
+uint64_t trial_subtract(uint64_t A, uint64_t B)
+{
+    auto b0 = field_bit0<width>();
+    auto b_sign_bits = field_sign_bit<width>();
+    auto isolators = (b_sign_bits << 1) | b0;
+    uint64_t borrows = ((~A) & B) & b0; // find borrows required to subtract bit 0
+    // borrows must be shifted, to align with borrowing from bit 1
+    borrows <<= 1;
+    uint64_t A_isolated = A | isolators;
+    uint64_t B_isolated = B & ~isolators;
+    auto overflows = A_isolated - B_isolated - borrows;
+    // the overflow bits will now be 0 if A lt B.
+    // flip and align with sign bits. A 1 in the sign bit now indicates overflow
+    overflows = (~overflows) >> 1;
+    return overflows & b_sign_bits;
+}
+
+template <int width>
+bool any_field_unsigned_LT(uint64_t A, uint64_t B)
+{
+    return trial_subtract<width>(A, B) != 0;
+}
+
+/*
+    Handling signed values
+
+    Trial subtraction only works as is for unsigned. We're simply transforming signed into unsigned
+    by pusing all values up by 1<<(field_width-1). This makes all negative values positive and positive
+    values remain positive, although larger. Any overflow during the push can be ignored.
+
+*/
+template <int width>
+bool any_field_signed_LT(uint64_t A, uint64_t B)
+{
+    auto sign_bits = field_sign_bit<width>();
+    return trial_subtract<width>(A ^ sign_bits, B ^ sign_bits) != 0;
+}
+
+
+template <int width>
+bool any_field_EQ(uint64_t A, uint64_t B)
+{
+    if (num_fields<width>() == 1) {
+        return !any_field_NE<width>(A, B);
+    }
+    else {
+        uint64_t bit_diff = A ^ B;
+        uint64_t overflows = trial_subtract<width>(0, bit_diff);
+        return overflows != field_sign_bit<width>();
+    }
+}
+
+
+template <int width>
+bool any_field_unsigned_LE(uint64_t A, uint64_t B)
+{
+    return any_field_EQ<width>(A, B) | any_field_unsigned_LT<width>(A, B);
+}
+
+template <int width>
+bool any_field_signed_LE(uint64_t A, uint64_t B)
+{
+    return any_field_EQ<width>(A, B) | any_field_signed_LT<width>(A, B);
+}
+
+
 namespace impl {
 
 // Lower and Upper bound are mainly used in the B+tree implementation,
