@@ -199,7 +199,6 @@ class bf_iterator {
     size_t field_position;
     uint8_t field_size;
     uint8_t step_size; // may be different than field_size if used for arrays of pairs
-    uint64_t* end_data_area = nullptr; // optional. to be set explicitely for now
 
 public:
     bf_iterator(uint64_t* data_area, size_t initial_offset, size_t field_size, size_t step_size, size_t index)
