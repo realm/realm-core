@@ -414,6 +414,7 @@ uint64_t populate(uint64_t value)
     Next is any_field_EQ(A,B). This is true if any bitfield in A is equal to corresponding
     field in B. We create a difference bit vector. Each field in this difference vector is
     then compared against 0. If less than 0, the field was non-zero and thus not equal.
+    This requires unsigned LT, so we'll put that first.
 */
 
 // provides a set bit in pos 0 of each field, remaining bits zero
@@ -434,19 +435,10 @@ uint64_t field_sign_bit()
 
     This can be determined by trial subtaction. However, some care must be exercised
     since simply subtracting one vector from another will allow carries from one
-    bitfield to flow into the next one. To avoid this, we split the subtraction in
-    phases
-    1. We subtract bit0 in each field and determine if there is a borrow. This is
-        A simply bitwise logical operation "borrow = ^A & B" applied to bit zero
-        in all bit fields.
-    2. We subtract the remaining bits in each field as well as any borrow found in
-        step 1. Then we determine if there is an overflow. To do this we first or-in a 1
-        in bit 0 of the next field. In case of an overflow this bit will become 0.
-        This bit isolates the subtraction of one field pair from the next by preventing
-        any borrow from rippling into the next field.
-    3. The 0-bits which are no longer 1 has been borrowed and thus indicate an
-        overflow from the next lower field, so a field where A<B. These bits can now be
-        isolated and compared against a fixed value to determine if any field was less than.
+    bitfield to flow into the next one. To avoid this, we isolate bitfields by clamping
+    the MSBs to 1 in A and 0 in B before subtraction. After the subtraction the MSBs in
+    the result indicate borrows from the MSB. We then compute overflow (borrow OUT of MSB)
+    using boolean logic as described below.
 */
 
 // compute the overflows in unsigned trail subtraction. The overflows
@@ -454,19 +446,28 @@ uint64_t field_sign_bit()
 template <int width>
 uint64_t trial_subtract(uint64_t A, uint64_t B)
 {
-    auto b0 = field_bit0<width>();
-    auto b_sign_bits = field_sign_bit<width>();
-    auto isolators = (b_sign_bits << 1) | b0;
-    uint64_t borrows = ((~A) & B) & b0; // find borrows required to subtract bit 0
-    // borrows must be shifted, to align with borrowing from bit 1
-    borrows <<= 1;
-    uint64_t A_isolated = A | isolators;
-    uint64_t B_isolated = B & ~isolators;
-    auto overflows = A_isolated - B_isolated - borrows;
-    // the overflow bits will now be 0 if A lt B.
-    // flip and align with sign bits. A 1 in the sign bit now indicates overflow
-    overflows = (~overflows) >> 1;
-    return overflows & b_sign_bits;
+    // 1. compute borrow from most significant bit
+    // Isolate bitfields inside A and B before subtraction (prevent carries from spilling over)
+    // do this by clamping most significant bit in A to 1, and msb in B to 0
+    auto MSBs = field_sign_bit<width>();
+    auto A_isolated = A | MSBs;
+    auto B_isolated = B & ~MSBs;
+    auto borrows_into_sign_bit = ~(A_isolated - B_isolated);
+
+    // 2. determine what subtraction against most significant bit would give:
+    // A B borrow-in:   (A-B-borrow-in)
+    // 0 0 0            (0-0-0) = 0
+    // 0 0 1            (0-0-1) = 1 + borrow-out
+    // 0 1 0            (0-1-0) = 1 + borrow-out
+    // 0 1 1            (0-1-1) = 0 + borrow-out
+    // 1 0 0            (1-0-0) = 1
+    // 1 0 1            (1-0-1) = 0
+    // 1 1 0            (1-1-0) = 0
+    // 1 1 1            (1-1-1) = 1 + borrow-out
+    // borrow-out = (~A & B) | (~A & borrow-in) | (A & B & borrow-in)
+    // The overflows are simply the borrow-out, encoded into the sign bits of each field.
+    auto overflows = (~A & B) | (~A & borrow_into_sign_bit) | (A & B & borrow_into_sign_bit);
+    return overflows & MSBs;
 }
 
 template <int width>
