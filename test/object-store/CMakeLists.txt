@@ -91,6 +91,12 @@ endif()
 target_link_libraries(ObjectStoreTestLib Catch2::Catch2 ObjectStore RealmFFIStatic TestUtil)
 enable_stdfilesystem(ObjectStoreTestLib)
 
+if(REALM_CURL_CACERTS)
+  target_compile_definitions(ObjectStoreTestLib PRIVATE
+    REALM_CURL_CACERTS="${REALM_CURL_CACERTS}"
+  )
+endif()
+
 add_executable(ObjectStoreTests main.cpp ${RESOURCES})
 set_target_properties(ObjectStoreTests PROPERTIES OUTPUT_NAME realm-object-store-tests)
 target_link_libraries(ObjectStoreTests ObjectStoreTestLib TestUtil)

@@ -277,6 +277,23 @@ std::string_view getenv_sv(const char* name) noexcept
     return {};
 }
 
+static std::string unquote_string(std::string_view possibly_quoted_string)
+{
+    if (possibly_quoted_string.size() > 0) {
+        auto check_char = possibly_quoted_string.front();
+        if (check_char == '"' || check_char == '\'') {
+            possibly_quoted_string.remove_prefix(1);
+        }
+    }
+    if (possibly_quoted_string.size() > 0) {
+        auto check_char = possibly_quoted_string.back();
+        if (check_char == '"' || check_char == '\'') {
+            possibly_quoted_string.remove_suffix(1);
+        }
+    }
+    return std::string{possibly_quoted_string};
+}
+
 } // namespace
 
 app::Response do_http_request(const app::Request& request)
@@ -334,6 +351,11 @@ app::Response do_http_request(const app::Request& request)
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
     curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, curl_header_cb);
     curl_easy_setopt(curl, CURLOPT_HEADERDATA, &response_headers);
+
+#ifdef REALM_CURL_CACERTS
+    auto ca_info = unquote_string(REALM_QUOTE(REALM_CURL_CACERTS));
+    curl_easy_setopt(curl, CURLOPT_CAINFO, ca_info.c_str());
+#endif
 
     auto start_time = std::chrono::steady_clock::now();
     auto response_code = curl_easy_perform(curl);
