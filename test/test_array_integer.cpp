@@ -32,7 +32,7 @@
 using namespace realm;
 using namespace realm::test_util;
 
-// #define ARRAY_PERFORMANCE_TESTING
+#define ARRAY_PERFORMANCE_TESTING
 #if !defined(REALM_DEBUG) && defined(ARRAY_PERFORMANCE_TESTING)
 TEST(perf_array_encode_get_vs_array_get)
 {
@@ -129,7 +129,7 @@ TEST(perf_array_encode_get_vs_array_get)
     a_encoded.destroy();
 }
 
-TEST(Test_basic_find)
+ONLY(Test_basic_find)
 {
     using namespace std;
     using namespace std::chrono;
@@ -186,9 +186,9 @@ TEST(Test_basic_find)
         }
     }
     t2 = high_resolution_clock::now();
-    std::cout << "   Positive values - ArrayEncode::find_first(): " << duration_cast<milliseconds>(t2 - t1).count()
-              << " ms" << std::endl;
-    std::cout << "   Positive values - ArrayEncode::find_first(): "
+    std::cout << "   Positive values - ArrayEncode::find(): " << duration_cast<milliseconds>(t2 - t1).count() << " ms"
+              << std::endl;
+    std::cout << "   Positive values - ArrayEncode::find(): "
               << (double)duration_cast<nanoseconds>(t2 - t1).count() / n_values / n_runs << " ns/value" << std::endl;
 
     std::cout << std::endl;
@@ -204,6 +204,12 @@ TEST(Test_basic_find)
     std::shuffle(input_array.begin(), input_array.end(), g1);
     for (const auto& v : input_array)
         a.add(v);
+
+    a.try_encode(a_encoded);
+    CHECK(a_encoded.is_encoded());
+    CHECK(a_encoded.size() == a.size());
+
+    // std::cout << a_encoded.get_width() << std::endl;
 
     // verify that both find the same thing
     for (size_t j = 0; j < n_runs; ++j) {
@@ -222,14 +228,11 @@ TEST(Test_basic_find)
     }
     t2 = high_resolution_clock::now();
 
-    std::cout << "   Negative values - Array::find(): " << duration_cast<nanoseconds>(t2 - t1).count() << " ns"
+    std::cout << "   Negative values - Array::find(): " << duration_cast<milliseconds>(t2 - t1).count() << " ms"
               << std::endl;
     std::cout << "   Negative values - Array::find(): "
               << (double)duration_cast<nanoseconds>(t2 - t1).count() / n_values / n_runs << " ns/value" << std::endl;
 
-    a.try_encode(a_encoded);
-    CHECK(a_encoded.is_encoded());
-    CHECK(a_encoded.size() == a.size());
     t1 = high_resolution_clock::now();
     for (size_t j = 0; j < n_runs; ++j) {
         for (size_t i = 0; i < n_values; ++i) {
@@ -239,9 +242,9 @@ TEST(Test_basic_find)
         }
     }
     t2 = high_resolution_clock::now();
-    std::cout << "   Negative values - ArrayEncode::find_first(): " << duration_cast<nanoseconds>(t2 - t1).count()
-              << " ns" << std::endl;
-    std::cout << "   Negative values - ArrayEncode::find_first(): "
+    std::cout << "   Negative values - ArrayEncode::find(): " << duration_cast<milliseconds>(t2 - t1).count() << " ms"
+              << std::endl;
+    std::cout << "   Negative values - ArrayEncode::find(): "
               << (double)duration_cast<nanoseconds>(t2 - t1).count() / n_values / n_runs << " ns/value" << std::endl;
 
     a.destroy();

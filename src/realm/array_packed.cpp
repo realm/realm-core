@@ -149,9 +149,33 @@ bool ArrayPacked::find_all(const Array& arr, int64_t value, size_t start, size_t
             return v < value;
     };
 
-    //~6/7x slower, we need to do a bitscan before to start this loop when values are less than 32 and 64 bits
-    bf_iterator it((uint64_t*)arr.m_data, 0, arr.m_width, arr.m_width, start);
+    // try to speed loop for finding a matching value.
+    // this is only for testing,
+    // I know I have 11 bit widths.
+    // TODO: have some dispatcher for invoking the right methods
+
+    if (arr.m_width < 32) {
+        // it is highly unlikely that for widths >= 32 we are going to be faster than a single scan. //TODO: measure
+        // this
+        const auto v1 = populate<11>(value);
+        size_t pos = 0;
+        while (start < end) {
+            bf_iterator it((uint64_t*)arr.m_data, 0, arr.m_width, arr.m_width, pos);
+            const auto v2 = it.get_full_word_with_value();
+            const auto eq = any_field_EQ<11>(v1, v2);
+            if (eq)
+                break;
+            pos += num_fields<11>();
+            start += pos;
+        }
+    }
+
+    // this loop is going to be executed for values >= 32 bits, since this is likely the fastest way to compare
+    // things. For values that are less than that, we have made a bit scan in the loop above, in order to try to
+    // compare in parallel as many values as possible and move the start index as close as possible to the value we
+    // are seeking. This is done in order to minimize accesses and comparisons.
     const auto mask = arr.get_encoder().width_mask();
+    bf_iterator it((uint64_t*)arr.m_data, 0, arr.m_width, arr.m_width, start);
     for (; start < end; ++start, ++it) {
         const auto v = sign_extend_field_by_mask(mask, it.get_value());
         if (cmp(v, value)) {
