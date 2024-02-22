@@ -37,15 +37,11 @@ using namespace realm::util;
 using File = realm::util::File;
 using SyncAction = SyncFileActionMetadata::Action;
 
-static const std::string base_path = util::make_temp_dir() + "realm_objectstore_sync_metadata";
+static const std::string base_path = util::make_temp_dir() + "realm_objectstore_sync_metadata.test-dir";
 static const std::string metadata_path = base_path + "/metadata.realm";
 
 TEST_CASE("sync_metadata: user metadata", "[sync][metadata]") {
-    util::try_make_dir(base_path);
-    auto close = util::make_scope_exit([=]() noexcept {
-        util::try_remove_dir_recursive(base_path);
-    });
-
+    test_util::TestDirGuard test_dir(base_path);
     SyncMetadataManager manager(metadata_path, false);
 
     SECTION("can be properly constructed") {
@@ -131,11 +127,7 @@ TEST_CASE("sync_metadata: user metadata", "[sync][metadata]") {
 }
 
 TEST_CASE("sync_metadata: user metadata APIs", "[sync][metadata]") {
-    util::try_make_dir(base_path);
-    auto close = util::make_scope_exit([=]() noexcept {
-        util::try_remove_dir_recursive(base_path);
-    });
-
+    test_util::TestDirGuard test_dir(base_path);
     SyncMetadataManager manager(metadata_path, false);
     const std::string provider_type = "https://realm.example.org";
 
@@ -163,11 +155,7 @@ TEST_CASE("sync_metadata: user metadata APIs", "[sync][metadata]") {
 }
 
 TEST_CASE("sync_metadata: file action metadata", "[sync][metadata]") {
-    util::try_make_dir(base_path);
-    auto close = util::make_scope_exit([=]() noexcept {
-        util::try_remove_dir_recursive(base_path);
-    });
-
+    test_util::TestDirGuard test_dir(base_path);
     SyncMetadataManager manager(metadata_path, false);
 
     const std::string local_uuid_1 = "asdfg";
@@ -207,10 +195,7 @@ TEST_CASE("sync_metadata: file action metadata", "[sync][metadata]") {
 }
 
 TEST_CASE("sync_metadata: file action metadata APIs", "[sync][metadata]") {
-    util::try_make_dir(base_path);
-    auto close = util::make_scope_exit([=]() noexcept {
-        util::try_remove_dir_recursive(base_path);
-    });
+    test_util::TestDirGuard test_dir(base_path);
 
     SyncMetadataManager manager(metadata_path, false);
     SECTION("properly list all pending actions, reflecting their deletion") {
@@ -233,11 +218,7 @@ TEST_CASE("sync_metadata: file action metadata APIs", "[sync][metadata]") {
 }
 
 TEST_CASE("sync_metadata: results", "[sync][metadata]") {
-    util::try_make_dir(base_path);
-    auto close = util::make_scope_exit([=]() noexcept {
-        util::try_remove_dir_recursive(base_path);
-    });
-
+    test_util::TestDirGuard test_dir(base_path);
     SyncMetadataManager manager(metadata_path, false);
     const auto identity1 = "testcase3a1";
     const auto identity2 = "testcase3a3";
@@ -271,10 +252,7 @@ TEST_CASE("sync_metadata: results", "[sync][metadata]") {
 }
 
 TEST_CASE("sync_metadata: persistence across metadata manager instances", "[sync][metadata]") {
-    util::try_make_dir(base_path);
-    auto close = util::make_scope_exit([=]() noexcept {
-        util::try_remove_dir_recursive(base_path);
-    });
+    test_util::TestDirGuard temp_dir(base_path);
 
     SECTION("works for the basic case") {
         const auto identity = "testcase4a";
@@ -297,11 +275,7 @@ TEST_CASE("sync_metadata: persistence across metadata manager instances", "[sync
 }
 
 TEST_CASE("sync_metadata: encryption", "[sync][metadata]") {
-    util::try_make_dir(base_path);
-    auto close = util::make_scope_exit([=]() noexcept {
-        util::try_remove_dir_recursive(base_path);
-    });
-
+    test_util::TestDirGuard test_dir(base_path);
     const auto identity0 = "identity0";
     SECTION("prohibits opening the metadata Realm with different keys") {
         SECTION("different keys") {
@@ -447,10 +421,7 @@ TEST_CASE("sync_metadata: encryption", "[sync][metadata]") {
 
 #ifndef SWIFT_PACKAGE // The SPM build currently doesn't copy resource files
 TEST_CASE("sync metadata: can open old metadata realms", "[sync][metadata]") {
-    util::try_make_dir(base_path);
-    auto close = util::make_scope_exit([=]() noexcept {
-        util::try_remove_dir_recursive(base_path);
-    });
+    test_util::TestDirGuard test_dir(base_path);
 
     const std::string provider_type = "https://realm.example.org";
     const auto identity = "metadata migration test";

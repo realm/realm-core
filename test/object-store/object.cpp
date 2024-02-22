@@ -1982,9 +1982,9 @@ TEST_CASE("object") {
     SECTION("defaults do not override values explicitly passed to create()") {
         TestSyncManager init_sync_manager({}, {false});
         auto& server = init_sync_manager.sync_server();
-        SyncTestFile config1(init_sync_manager.app(), "shared");
+        SyncTestFile config1(init_sync_manager, "shared");
         config1.schema = config.schema;
-        SyncTestFile config2(init_sync_manager.app(), "shared");
+        SyncTestFile config2(init_sync_manager, "shared");
         config2.schema = config.schema;
 
         AnyDict v1{

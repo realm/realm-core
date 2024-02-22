@@ -200,7 +200,7 @@ void wait_for_sessions_to_close(const TestAppSession& test_app_session)
 {
     timed_sleeping_wait_for(
         [&]() -> bool {
-            return !test_app_session.app()->sync_manager()->has_existing_sessions();
+            return !test_app_session.sync_manager()->has_existing_sessions();
         },
         std::chrono::minutes(5), std::chrono::milliseconds(100));
 }
@@ -551,7 +551,7 @@ struct BaasClientReset : public TestClientReset {
     {
         m_did_run = true;
         const AppSession& app_session = m_test_app_session.app_session();
-        auto sync_manager = m_test_app_session.app()->sync_manager();
+        auto sync_manager = m_test_app_session.sync_manager();
         std::string partition_value = m_local_config.sync_config->partition_value;
         REALM_ASSERT(partition_value.size() > 2 && *partition_value.begin() == '"' &&
                      *(partition_value.end() - 1) == '"');

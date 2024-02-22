@@ -135,14 +135,6 @@ const std::shared_ptr<app::GenericNetworkTransport> instance_of = std::make_shar
 
 std::ostream& operator<<(std::ostream& os, util::Optional<app::AppError> error);
 
-template <typename Transport>
-TestSyncManager::Config get_config(Transport&& transport)
-{
-    TestSyncManager::Config config;
-    config.transport = transport;
-    return config;
-}
-
 void subscribe_to_all_and_bootstrap(Realm& realm);
 
 #if REALM_ENABLE_AUTH_TESTS

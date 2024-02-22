@@ -2159,7 +2159,6 @@ TEST_CASE("migration: Additive", "[migration]") {
     };
 
     TestFile config;
-    config.cache = false;
     config.schema = schema;
     config.schema_mode = GENERATE(SchemaMode::AdditiveDiscovered, SchemaMode::AdditiveExplicit);
     auto realm = Realm::get_shared_realm(config);

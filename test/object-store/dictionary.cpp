@@ -73,7 +73,6 @@ TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf
     using W = typename TestType::Wrapped;
 
     InMemoryTestFile config;
-    config.cache = false;
     config.automatic_change_notifications = false;
     config.schema = Schema{
         {"object",
@@ -883,7 +882,6 @@ TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf
 
 TEST_CASE("embedded dictionary", "[dictionary]") {
     InMemoryTestFile config;
-    config.cache = false;
     config.automatic_change_notifications = false;
     config.schema = Schema{
         {"origin", {{"links", PropertyType::Dictionary | PropertyType::Object | PropertyType::Nullable, "target"}}},
@@ -940,7 +938,6 @@ TEMPLATE_TEST_CASE("dictionary of objects", "[dictionary][links]", cf::MixedVal,
     using T = typename TestType::Type;
     using W = typename TestType::Wrapped;
     InMemoryTestFile config;
-    config.cache = false;
     config.automatic_change_notifications = false;
     config.schema = Schema{
         {"object", {{"links", PropertyType::Dictionary | PropertyType::Object | PropertyType::Nullable, "target"}}},
@@ -1050,7 +1047,6 @@ TEMPLATE_TEST_CASE("dictionary of objects", "[dictionary][links]", cf::MixedVal,
 
 TEST_CASE("dictionary with mixed links", "[dictionary]") {
     InMemoryTestFile config;
-    config.cache = false;
     config.automatic_change_notifications = false;
     config.schema = Schema{
         {"object", {{"value", PropertyType::Dictionary | PropertyType::Mixed | PropertyType::Nullable}}},
@@ -1586,7 +1582,6 @@ TEST_CASE("dictionary sort by keyPath value", "[dictionary]") {
 
 TEST_CASE("dictionary sort by linked object value", "[dictionary]") {
     InMemoryTestFile config;
-    config.cache = false;
     config.automatic_change_notifications = false;
     config.schema = Schema{
         {"object",

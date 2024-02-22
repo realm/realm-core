@@ -47,21 +47,24 @@ public:
 
     void transition_to(E new_state)
     {
-        std::lock_guard lock{m_mutex};
-        m_cur_state = new_state;
+        {
+            std::lock_guard lock{m_mutex};
+            m_cur_state = new_state;
+        }
         m_cv.notify_one();
     }
 
     template <typename Func>
     void transition_with(Func&& func)
     {
-        std::lock_guard lock{m_mutex};
-        std::optional<E> new_state = func(m_cur_state);
-        if (!new_state) {
-            return;
+        {
+            std::lock_guard lock{m_mutex};
+            std::optional<E> new_state = func(m_cur_state);
+            if (!new_state) {
+                return;
+            }
+            m_cur_state = *new_state;
         }
-
-        m_cur_state = *new_state;
         m_cv.notify_one();
     }
 
@@ -180,7 +183,6 @@ std::ostream& operator<<(std::ostream&, const Exception&);
 class Realm;
 /// Open a Realm at a given path, creating its files.
 bool create_dummy_realm(std::string path, std::shared_ptr<Realm>* out = nullptr);
-void reset_test_directory(const std::string& base_path);
 std::vector<char> make_test_encryption_key(const char start = 0);
 void catch2_ensure_section_run_workaround(bool did_run_a_section, std::string section_name,
                                           util::FunctionRef<void()> func);

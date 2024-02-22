@@ -16,8 +16,8 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "util/test_file.hpp"
-#include "util/event_loop.hpp"
+#include "../util/test_file.hpp"
+#include "../util/event_loop.hpp"
 
 #include <realm.h>
 
@@ -39,9 +39,10 @@
 #include <fstream>
 
 #if REALM_ENABLE_SYNC
-#include "util/sync/flx_sync_harness.hpp"
-#include "util/sync/sync_test_utils.hpp"
-#include "util/unit_test_transport.hpp"
+#include <util/sync/flx_sync_harness.hpp>
+#include <util/sync/sync_test_utils.hpp>
+#include "../util/test_path.hpp"
+#include "../util/unit_test_transport.hpp"
 
 #include <realm/object-store/sync/app_utils.hpp>
 #include <realm/object-store/sync/sync_user.hpp>
@@ -590,10 +591,7 @@ TEST_CASE("C API (non-database)", "[c_api]") {
         realm_app_config_set_bundle_id(app_config.get(), "some_bundle_id");
         CHECK(app_config->device_info.bundle_id == "some_bundle_id");
 
-        std::string temp_dir = util::make_temp_dir();
-        auto guard = util::make_scope_exit([&temp_dir]() noexcept {
-            util::try_remove_dir_recursive(temp_dir);
-        });
+        test_util::TestDirGuard temp_dir(util::make_temp_dir());
         auto sync_client_config = cptr(realm_sync_client_config_new());
         realm_sync_client_config_set_base_file_path(sync_client_config.get(), temp_dir.c_str());
         realm_sync_client_config_set_metadata_mode(sync_client_config.get(), RLM_SYNC_CLIENT_METADATA_MODE_DISABLED);
@@ -621,14 +619,14 @@ TEST_CASE("C API (non-database)", "[c_api]") {
         auto token =
             realm_sync_user_on_state_change_register_callback(sync_user, user_state, nullptr, user_data_free);
 
-        auto check_base_url = [&](std::string expected) {
+        auto check_base_url = [&](const std::string& expected) {
             CHECK(transport->get_location_called());
             auto app_base_url = realm_app_get_base_url(test_app.get());
             CHECK(app_base_url == expected);
             realm_free(app_base_url);
         };
 
-        auto update_and_check_base_url = [&](const char* new_base_url, std::string expected) {
+        auto update_and_check_base_url = [&](const char* new_base_url, const std::string& expected) {
             transport->set_base_url(expected);
             realm_app_update_base_url(
                 test_app.get(), new_base_url,
@@ -5250,8 +5248,7 @@ static void sync_error_handler(void* p, realm_sync_session_t*, const realm_sync_
 
 TEST_CASE("C API - async_open", "[sync][pbs][c_api]") {
     TestSyncManager init_sync_manager;
-    SyncTestFile test_config(init_sync_manager.app(), "default");
-    test_config.cache = false;
+    SyncTestFile test_config(init_sync_manager, "default");
     ObjectSchema object_schema = {"object",
                                   {
                                       {"_id", PropertyType::Int, Property::IsPrimary{true}},
@@ -5262,7 +5259,7 @@ TEST_CASE("C API - async_open", "[sync][pbs][c_api]") {
     SECTION("can open synced Realms that don't already exist") {
         realm_config_t* config = realm_config_new();
         config->schema = Schema{object_schema};
-        realm_user user(init_sync_manager.app()->current_user());
+        realm_user user(test_config.sync_config->user);
         realm_sync_config_t* sync_config = realm_sync_config_new(&user, "default");
         realm_sync_config_set_initial_subscription_handler(sync_config, task_init_subscription, false, nullptr,
                                                            nullptr);
@@ -5295,14 +5292,31 @@ TEST_CASE("C API - async_open", "[sync][pbs][c_api]") {
     SECTION("cancels download and reports an error on auth error") {
         auto expired_token = encode_fake_jwt("", 123, 456);
 
+        struct Transport : UnitTestTransport {
+            void send_request_to_server(
+                const realm::app::Request& req,
+                realm::util::UniqueFunction<void(const realm::app::Response&)>&& completion) override
+            {
+                if (req.url.find("/auth/session") != std::string::npos) {
+                    completion(app::Response{403});
+                }
+                else {
+                    UnitTestTransport::send_request_to_server(req, std::move(completion));
+                }
+            }
+        };
+        OfflineAppSession::Config oas_config;
+        oas_config.transport = std::make_shared<Transport>();
+        OfflineAppSession oas(oas_config);
+        SyncTestFile test_config(oas, "realm");
+        test_config.sync_config->user->log_in(expired_token, expired_token);
+
         realm_config_t* config = realm_config_new();
         config->schema = Schema{object_schema};
-        realm_user user(init_sync_manager.app()->current_user());
+        realm_user user(test_config.sync_config->user);
         realm_sync_config_t* sync_config = realm_sync_config_new(&user, "realm");
         realm_sync_config_set_initial_subscription_handler(sync_config, task_init_subscription, false, nullptr,
                                                            nullptr);
-        sync_config->user->log_in(expired_token, expired_token);
-
         realm_config_set_path(config, test_config.path.c_str());
         realm_config_set_schema_version(config, 1);
         Userdata userdata;
@@ -5312,7 +5326,6 @@ TEST_CASE("C API - async_open", "[sync][pbs][c_api]") {
         realm_async_open_task_t* task = realm_open_synchronized(config);
         REQUIRE(task);
         realm_async_open_task_start(task, task_completion_func, &userdata, nullptr);
-        init_sync_manager.network_callback(app::Response{403});
         util::EventLoop::main().run_until([&] {
             return userdata.called.load();
         });

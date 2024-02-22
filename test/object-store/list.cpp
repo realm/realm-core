@@ -44,7 +44,6 @@ using util::any_cast;
 
 TEST_CASE("list", "[list]") {
     InMemoryTestFile config;
-    config.cache = false;
     config.automatic_change_notifications = false;
     auto r = Realm::get_shared_realm(config);
     r->update_schema({
@@ -1842,7 +1841,7 @@ TEST_CASE("list with unresolved links", "[list]") {
     TestSyncManager init_sync_manager({}, {false});
     auto& server = init_sync_manager.sync_server();
 
-    SyncTestFile config1(init_sync_manager.app(), "shared");
+    SyncTestFile config1(init_sync_manager, "shared");
     config1.schema = Schema{
         {"origin",
          {{"_id", PropertyType::Int, Property::IsPrimary(true)},
@@ -1850,7 +1849,7 @@ TEST_CASE("list with unresolved links", "[list]") {
         {"target", {{"_id", PropertyType::Int, Property::IsPrimary(true)}, {"value", PropertyType::Int}}},
     };
 
-    SyncTestFile config2(init_sync_manager.app(), "shared");
+    SyncTestFile config2(init_sync_manager, "shared");
 
     auto r1 = Realm::get_shared_realm(config1);
     auto r2 = Realm::get_shared_realm(config2);
