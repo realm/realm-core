@@ -44,7 +44,8 @@
 #include <realm/util/scope_exit.hpp>
 
 #if REALM_ENABLE_SYNC
-#include <util/sync/flx_sync_harness.hpp>
+#include "util/sync/sync_test_utils.hpp"
+#include "util/sync/flx_sync_harness.hpp"
 
 #include <realm/object-store/sync/async_open_task.hpp>
 #include <realm/object-store/sync/impl/sync_metadata.hpp>
@@ -1203,7 +1204,9 @@ TEST_CASE("Get Realm using Async Open", "[sync][pbs][async open]") {
         });
         std::lock_guard<std::mutex> lock(mutex);
         REQUIRE(called);
-        REQUIRE(got_error);
+        timed_wait_for([&] {
+            return got_error;
+        });
     }
 
     SECTION("read-only mode sets the schema version") {

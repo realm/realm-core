@@ -664,9 +664,10 @@ void SyncManager::set_sync_route(std::string sync_route)
         util::CheckedLockGuard lk(m_mutex);
         m_sync_route = std::move(sync_route);
     }
-    // Inform the known sessions that the sync route has been updated
-    util::CheckedLockGuard s_lk(m_session_mutex);
-    for (auto& [_, session] : m_sessions) {
+    // Get a copy of the active sessions
+    auto sessions = get_all_sessions();
+    // Inform the active sessions that the sync route has been updated
+    for (auto& session : sessions) {
         session->handle_location_updated();
     }
 }
