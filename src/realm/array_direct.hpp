@@ -408,7 +408,7 @@ uint64_t num_fields()
     REALM_ASSERT(width <= 32); // it will not pay off to use this for fields larger
     REALM_ASSERT(width);
     return 64 / width;
-};
+}
 template <int width>
 uint64_t num_bits()
 {
@@ -449,7 +449,7 @@ template <int width>
 uint64_t field_bit0()
 {
     return populate<width>(1);
-};
+}
 
 // provides a set sign-bit in each field, remaining bits zero
 template <int width>
@@ -516,7 +516,7 @@ inline uint64_t find_all_fields_unsigned_LT(uint64_t MSBs, uint64_t A, uint64_t 
 inline int first_field_marked(int width, uint64_t vector)
 {
     int result = 0;
-    int msb = 1ULL << (width - 1);
+    uint64_t msb = 1ULL << (width - 1);
     while (msb) {
         if (vector & msb)
             return result;

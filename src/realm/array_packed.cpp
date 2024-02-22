@@ -113,6 +113,145 @@ void ArrayPacked::get_chunk(const Array& arr, size_t ndx, int64_t res[8]) const
     }
 }
 
+inline uint64_t populate_val_64(size_t width, int64_t value)
+{
+    REALM_ASSERT_DEBUG(width > 0 && width < 32);
+    if (width == 1)
+        return populate<1>(value);
+    else if (width == 2)
+        return populate<2>(value);
+    else if (width == 3)
+        return populate<3>(value);
+    else if (width == 4)
+        return populate<4>(value);
+    else if (width == 5)
+        return populate<5>(value);
+    else if (width == 6)
+        return populate<6>(value);
+    else if (width == 7)
+        return populate<7>(value);
+    else if (width == 8)
+        return populate<8>(value);
+    else if (width == 9)
+        return populate<9>(value);
+    else if (width == 10)
+        return populate<10>(value);
+    else if (width == 11)
+        return populate<11>(value);
+    else if (width == 12)
+        return populate<12>(value);
+    else if (width == 13)
+        return populate<13>(value);
+    else if (width == 14)
+        return populate<14>(value);
+    else if (width == 15)
+        return populate<15>(value);
+    else if (width == 16)
+        return populate<16>(value);
+    else if (width == 17)
+        return populate<17>(value);
+    else if (width == 18)
+        return populate<18>(value);
+    else if (width == 19)
+        return populate<19>(value);
+    else if (width == 20)
+        return populate<20>(value);
+    else if (width == 21)
+        return populate<21>(value);
+    else if (width == 22)
+        return populate<22>(value);
+    else if (width == 23)
+        return populate<23>(value);
+    else if (width == 24)
+        return populate<24>(value);
+    else if (width == 25)
+        return populate<25>(value);
+    else if (width == 26)
+        return populate<26>(value);
+    else if (width == 27)
+        return populate<27>(value);
+    else if (width == 28)
+        return populate<28>(value);
+    else if (width == 29)
+        return populate<29>(value);
+    else if (width == 30)
+        return populate<30>(value);
+    else if (width == 31)
+        return populate<31>(value);
+    REALM_UNREACHABLE();
+    // wow I know how to count :-)
+    // finding is critical and we want all this to be generated a compile time
+}
+
+inline uint64_t num_fields_64(size_t width)
+{
+    REALM_ASSERT_DEBUG(width > 0 && width < 32);
+    if (width == 1)
+        return num_fields<1>();
+    else if (width == 2)
+        return num_fields<2>();
+    else if (width == 3)
+        return num_fields<3>();
+    else if (width == 4)
+        return num_fields<4>();
+    else if (width == 5)
+        return num_fields<5>();
+    else if (width == 6)
+        return num_fields<6>();
+    else if (width == 7)
+        return num_fields<7>();
+    else if (width == 8)
+        return num_fields<8>();
+    else if (width == 9)
+        return num_fields<9>();
+    else if (width == 10)
+        return num_fields<10>();
+    else if (width == 11)
+        return num_fields<11>();
+    else if (width == 12)
+        return num_fields<12>();
+    else if (width == 13)
+        return num_fields<13>();
+    else if (width == 14)
+        return num_fields<14>();
+    else if (width == 15)
+        return num_fields<15>();
+    else if (width == 16)
+        return num_fields<16>();
+    else if (width == 17)
+        return num_fields<17>();
+    else if (width == 18)
+        return num_fields<18>();
+    else if (width == 19)
+        return num_fields<19>();
+    else if (width == 20)
+        return num_fields<20>();
+    else if (width == 21)
+        return num_fields<21>();
+    else if (width == 22)
+        return num_fields<22>();
+    else if (width == 23)
+        return num_fields<23>();
+    else if (width == 24)
+        return num_fields<24>();
+    else if (width == 25)
+        return num_fields<25>();
+    else if (width == 26)
+        return num_fields<26>();
+    else if (width == 27)
+        return num_fields<27>();
+    else if (width == 28)
+        return num_fields<28>();
+    else if (width == 29)
+        return num_fields<29>();
+    else if (width == 30)
+        return num_fields<30>();
+    else if (width == 31)
+        return num_fields<31>();
+    REALM_UNREACHABLE();
+    // wow I know for sure how to count up to 31 :-)
+}
+
 template <typename Cond>
 bool ArrayPacked::find_all(const Array& arr, int64_t value, size_t start, size_t end, size_t baseindex,
                            QueryStateBase* state) const
@@ -138,7 +277,23 @@ bool ArrayPacked::find_all(const Array& arr, int64_t value, size_t start, size_t
 
     REALM_ASSERT_3(arr.m_width, !=, 0);
 
-    auto cmp = [](int64_t v, int64_t value) {
+    // NOTE: this is one of the most important functions in the whole codebase, since it determines how fast the
+    // queries run.
+    //
+    // Main idea around find.
+    // If bitwidth is >=32 than a linear scan is the fastest thing we can do, and a trivial comparison can be as fast
+    // as it gets. If the bitwidh is less than 32, we can operate on the same 64 bit word diffently.
+    //
+    // EG: we store the value 6, with width 4bits (0110), 6 is 4 bits because, 110 (6) + sign bit 0.
+    // Inside 64bits we can fit max 16 times 6. If we go from index 0 to 15 throughout the same 64 bits, we need to
+    // apply a mask and a shift bits every time, then compare the values.
+    // This is not the cheapest thing to do. Instead we can compare all values contained within 64 bits in one go and
+    // see if there is a match with what we are looking for. Reducing the number of comparison by ~logk(N) where K is
+    // the width of each single value within a 64 bit word and N is the total number of values stored in the array. On
+    // the other end if we have values of 32 bits or more, accessing twice the same 64 bits word is probably the
+    // cheapest thing to do.
+
+    auto value_cmp = [](int64_t v, int64_t value) {
         if constexpr (std::is_same_v<Cond, Equal>)
             return v == value;
         if constexpr (std::is_same_v<Cond, NotEqual>)
@@ -149,25 +304,29 @@ bool ArrayPacked::find_all(const Array& arr, int64_t value, size_t start, size_t
             return v < value;
     };
 
-    // try to speed loop for finding a matching value.
-    // this is only for testing,
-    // I know I have 11 bit widths.
-    // TODO: have some dispatcher for invoking the right methods
-
     if (arr.m_width < 32) {
-        // it is highly unlikely that for widths >= 32 we are going to be faster than a single scan. //TODO: measure
-        // this
-        const auto v1 = populate<11>(value);
-        size_t pos = 0;
-        while (start < end) {
+        const auto mask = arr.get_encoder().width_mask();
+        auto bitwidth_cmp = [&mask](uint64_t a, uint64_t b) {
+            if constexpr (std::is_same_v<Cond, Equal>)
+                return find_all_fields_EQ(mask, 0, a, b);
+            if constexpr (std::is_same_v<Cond, NotEqual>)
+                return find_all_fields_NE(mask, a, b);
+            if constexpr (std::is_same_v<Cond, Greater>)
+                return !find_all_fields_signed_LE(mask, 0, a, b);
+            if constexpr (std::is_same_v<Cond, Less>)
+                return find_all_fields_signed_LT(mask, a, b);
+        };
+        const auto searching_value = populate_val_64(arr.m_width, value);
+        const auto field_count = num_fields_64(arr.m_width);
+        size_t pos = start;
+        while (pos < end) {
             bf_iterator it((uint64_t*)arr.m_data, 0, arr.m_width, arr.m_width, pos);
-            const auto v2 = it.get_full_word_with_value();
-            const auto eq = any_field_EQ<11>(v1, v2);
-            if (eq)
+            const auto word = it.get_full_word_with_value();
+            if (bitwidth_cmp(word, searching_value))
                 break;
-            pos += num_fields<11>();
-            start += pos;
+            pos += field_count;
         }
+        start = pos;
     }
 
     // this loop is going to be executed for values >= 32 bits, since this is likely the fastest way to compare
@@ -178,7 +337,7 @@ bool ArrayPacked::find_all(const Array& arr, int64_t value, size_t start, size_t
     bf_iterator it((uint64_t*)arr.m_data, 0, arr.m_width, arr.m_width, start);
     for (; start < end; ++start, ++it) {
         const auto v = sign_extend_field_by_mask(mask, it.get_value());
-        if (cmp(v, value)) {
+        if (value_cmp(v, value)) {
             if (!state->match(start + baseindex))
                 return false;
         }
