@@ -34,12 +34,13 @@ using namespace realm::test_util;
 
 #define ARRAY_PERFORMANCE_TESTING
 #if !defined(REALM_DEBUG) && defined(ARRAY_PERFORMANCE_TESTING)
-TEST(perf_array_encode_get_vs_array_get)
+TEST(perf_array_encode_get_vs_array_get_less_32bit)
 {
     using namespace std;
     using namespace std::chrono;
     size_t n_values = 1000;
     size_t n_runs = 100;
+    std::cout << "   < 32 bit values " << std::endl;
     std::cout << "   N values = " << n_values << std::endl;
     std::cout << "   N runs = " << n_runs << std::endl;
 
@@ -129,12 +130,13 @@ TEST(perf_array_encode_get_vs_array_get)
     a_encoded.destroy();
 }
 
-TEST(Test_basic_find_EQ)
+TEST(Test_basic_find_EQ_less_32bit)
 {
     using namespace std;
     using namespace std::chrono;
     size_t n_values = 1000;
     size_t n_runs = 100;
+    std::cout << "   Value with bitwidth < 32 " << std::endl;
     std::cout << "   N values = " << n_values << std::endl;
     std::cout << "   N runs = " << n_runs << std::endl;
 
@@ -161,9 +163,9 @@ TEST(Test_basic_find_EQ)
     }
     auto t2 = high_resolution_clock::now();
 
-    std::cout << "   Positive values - Array::find(): " << duration_cast<milliseconds>(t2 - t1).count() << " ms"
-              << std::endl;
-    std::cout << "   Positive values - Array::find(): "
+    std::cout << "   Positive values - Array::find<Equal>(): " << duration_cast<milliseconds>(t2 - t1).count()
+              << " ms" << std::endl;
+    std::cout << "   Positive values - Array::find<Equal>(): "
               << (double)duration_cast<nanoseconds>(t2 - t1).count() / n_values / n_runs << " ns/value" << std::endl;
 
     a.try_encode(a_encoded);
@@ -186,9 +188,9 @@ TEST(Test_basic_find_EQ)
         }
     }
     t2 = high_resolution_clock::now();
-    std::cout << "   Positive values - ArrayEncode::find(): " << duration_cast<milliseconds>(t2 - t1).count() << " ms"
-              << std::endl;
-    std::cout << "   Positive values - ArrayEncode::find(): "
+    std::cout << "   Positive values - ArrayEncode::find<Equal>(): " << duration_cast<milliseconds>(t2 - t1).count()
+              << " ms" << std::endl;
+    std::cout << "   Positive values - ArrayEncode::find<Equal>(): "
               << (double)duration_cast<nanoseconds>(t2 - t1).count() / n_values / n_runs << " ns/value" << std::endl;
 
     std::cout << std::endl;
@@ -226,9 +228,9 @@ TEST(Test_basic_find_EQ)
     }
     t2 = high_resolution_clock::now();
 
-    std::cout << "   Negative values - Array::find(): " << duration_cast<milliseconds>(t2 - t1).count() << " ms"
-              << std::endl;
-    std::cout << "   Negative values - Array::find(): "
+    std::cout << "   Negative values - Array::find<Equal>(): " << duration_cast<milliseconds>(t2 - t1).count()
+              << " ms" << std::endl;
+    std::cout << "   Negative values - Array::find<Equal>(): "
               << (double)duration_cast<nanoseconds>(t2 - t1).count() / n_values / n_runs << " ns/value" << std::endl;
 
     t1 = high_resolution_clock::now();
@@ -240,21 +242,22 @@ TEST(Test_basic_find_EQ)
         }
     }
     t2 = high_resolution_clock::now();
-    std::cout << "   Negative values - ArrayEncode::find(): " << duration_cast<milliseconds>(t2 - t1).count() << " ms"
-              << std::endl;
-    std::cout << "   Negative values - ArrayEncode::find(): "
+    std::cout << "   Negative values - ArrayEncode::find<Equal>(): " << duration_cast<milliseconds>(t2 - t1).count()
+              << " ms" << std::endl;
+    std::cout << "   Negative values - ArrayEncode::find<Equal>(): "
               << (double)duration_cast<nanoseconds>(t2 - t1).count() / n_values / n_runs << " ns/value" << std::endl;
 
     a.destroy();
     a_encoded.destroy();
 }
 
-TEST(Test_basic_find_NEQ)
+TEST(Test_basic_find_NEQ_value_less_32bit)
 {
     using namespace std;
     using namespace std::chrono;
     size_t n_values = 1000;
     size_t n_runs = 100;
+    std::cout << "   Value with bitwidth < 32 " << std::endl;
     std::cout << "   N values = " << n_values << std::endl;
     std::cout << "   N runs = " << n_runs << std::endl;
 
@@ -375,12 +378,13 @@ TEST(Test_basic_find_NEQ)
     a_encoded.destroy();
 }
 
-TEST(Test_basic_find_LT)
+TEST(Test_basic_find_LT_value_less_32bit)
 {
     using namespace std;
     using namespace std::chrono;
     size_t n_values = 1000;
     size_t n_runs = 100;
+    std::cout << "   Value with bitwidth < 32 " << std::endl;
     std::cout << "   N values = " << n_values << std::endl;
     std::cout << "   N runs = " << n_runs << std::endl;
 
@@ -501,12 +505,13 @@ TEST(Test_basic_find_LT)
     a_encoded.destroy();
 }
 
-TEST(Test_basic_find_GT)
+TEST(Test_basic_find_GT_value_less_32bit)
 {
     using namespace std;
     using namespace std::chrono;
     size_t n_values = 1000;
     size_t n_runs = 100;
+    std::cout << "   Value with bitwidth < 32 " << std::endl;
     std::cout << "   N values = " << n_values << std::endl;
     std::cout << "   N runs = " << n_runs << std::endl;
 
@@ -613,6 +618,609 @@ TEST(Test_basic_find_GT)
     for (size_t j = 0; j < n_runs; ++j) {
         for (size_t i = 0; i < n_values; ++i) {
             a_encoded.find<Greater>(-i, 0, a_encoded.size(), &state2);
+            REALM_ASSERT(state2.m_state != realm::not_found);
+            REALM_ASSERT(a_encoded.get(state2.m_state) == a.get(state2.m_state));
+        }
+    }
+    t2 = high_resolution_clock::now();
+    std::cout << "   Negative values - ArrayEncode::find<Greater>(): " << duration_cast<milliseconds>(t2 - t1).count()
+              << " ms" << std::endl;
+    std::cout << "   Negative values - ArrayEncode::find<Greater>(): "
+              << (double)duration_cast<nanoseconds>(t2 - t1).count() / n_values / n_runs << " ns/value" << std::endl;
+
+    a.destroy();
+    a_encoded.destroy();
+}
+
+TEST(perf_array_encode_get_vs_array_get_greater_32bit)
+{
+    using namespace std;
+    using namespace std::chrono;
+    size_t start_value = 0x0000000010000000; // 32 bit val
+    size_t n_values = 1000;
+    size_t n_runs = 100;
+    std::cout << "   >= 32 bit values " << std::endl;
+    std::cout << "   N values = " << n_values << std::endl;
+    std::cout << "   N runs = " << n_runs << std::endl;
+
+    std::vector<int64_t> input_array;
+    ArrayInteger a(Allocator::get_default());
+    ArrayInteger a_encoded(Allocator::get_default());
+    a.create();
+
+    for (size_t i = 0; i < n_values; i++)
+        input_array.push_back(i);
+    std::random_device rd;
+    std::mt19937 g(rd());
+    std::shuffle(input_array.begin(), input_array.end(), g);
+    for (const auto& v : input_array)
+        a.add(start_value + v);
+
+    auto t1 = high_resolution_clock::now();
+    for (size_t j = 0; j < n_runs; ++j) {
+        for (size_t i = 0; i < n_values; ++i)
+            REALM_ASSERT(a.get(i) == input_array[i]);
+    }
+    auto t2 = high_resolution_clock::now();
+
+    std::cout << "   Positive values - Array::get(): " << duration_cast<nanoseconds>(t2 - t1).count() << " ns"
+              << std::endl;
+    std::cout << "   Positive values - Array::get(): "
+              << (double)duration_cast<nanoseconds>(t2 - t1).count() / n_values / n_runs << " ns/value" << std::endl;
+
+    a.try_encode(a_encoded);
+    CHECK(a_encoded.is_encoded());
+    CHECK(a_encoded.size() == a.size());
+    t1 = high_resolution_clock::now();
+
+    for (size_t j = 0; j < n_runs; ++j) {
+        for (size_t i = 0; i < n_values; ++i) {
+            REALM_ASSERT(a_encoded.get(i) == a.get(i));
+        }
+    }
+    t2 = high_resolution_clock::now();
+    std::cout << "   Positive values - ArrayEncode::get(): " << duration_cast<nanoseconds>(t2 - t1).count() << " ns"
+              << std::endl;
+    std::cout << "   Positive values - ArrayEncode::get(): "
+              << (double)duration_cast<nanoseconds>(t2 - t1).count() / n_values / n_runs << " ns/value" << std::endl;
+
+    a.destroy();
+    a_encoded.destroy();
+    a.create();
+    input_array.clear();
+    for (size_t i = 0; i < n_values; i++)
+        input_array.push_back(-i);
+    std::random_device rd1;
+    std::mt19937 g1(rd1());
+    std::shuffle(input_array.begin(), input_array.end(), g1);
+    for (const auto& v : input_array)
+        a.add(v);
+
+    t1 = high_resolution_clock::now();
+    for (size_t j = 0; j < n_runs; ++j) {
+        for (size_t i = 0; i < n_values; ++i)
+            REALM_ASSERT(a.get(i) == input_array[i]);
+    }
+    t2 = high_resolution_clock::now();
+
+    std::cout << std::endl;
+
+    std::cout << "   Negative values - Array::get(): " << duration_cast<nanoseconds>(t2 - t1).count() << " ns"
+              << std::endl;
+    std::cout << "   Negative values - Array::get(): "
+              << (double)duration_cast<nanoseconds>(t2 - t1).count() / n_values / n_runs << " ns/value" << std::endl;
+
+    a.try_encode(a_encoded);
+    CHECK(a_encoded.is_encoded());
+    CHECK(a_encoded.size() == a.size());
+    t1 = high_resolution_clock::now();
+    for (size_t j = 0; j < n_runs; ++j) {
+        for (size_t i = 0; i < n_values; ++i) {
+            REALM_ASSERT(a_encoded.get(i) == a.get(i));
+        }
+    }
+    t2 = high_resolution_clock::now();
+    std::cout << "   Negative values - ArrayEncode::get(): " << duration_cast<nanoseconds>(t2 - t1).count() << " ns"
+              << std::endl;
+    std::cout << "   Negative values - ArrayEncode::get(): "
+              << (double)duration_cast<nanoseconds>(t2 - t1).count() / n_values / n_runs << " ns/value" << std::endl;
+
+    a.destroy();
+    a_encoded.destroy();
+}
+
+TEST(Test_basic_find_EQ_greater_32bit)
+{
+    using namespace std;
+    using namespace std::chrono;
+    size_t start_value = 0x0000000010000000; // 32 bit val
+    size_t n_values = 1000;
+    size_t n_runs = 100;
+    std::cout << "   Value with bitwidth >= 32 " << std::endl;
+    std::cout << "   N values = " << n_values << std::endl;
+    std::cout << "   N runs = " << n_runs << std::endl;
+
+    std::vector<int64_t> input_array;
+    ArrayInteger a(Allocator::get_default());
+    ArrayInteger a_encoded(Allocator::get_default());
+    a.create();
+
+    for (size_t i = 0; i < n_values; i++)
+        input_array.push_back(start_value + i);
+    std::random_device rd;
+    std::mt19937 g(rd());
+    std::shuffle(input_array.begin(), input_array.end(), g);
+    for (const auto& v : input_array)
+        a.add(v);
+
+    auto t1 = high_resolution_clock::now();
+    for (size_t j = 0; j < n_runs; ++j) {
+        for (size_t i = 0; i < n_values; ++i) {
+            auto ndx = a.find_first(start_value + i);
+            REALM_ASSERT(ndx != realm::not_found);
+            REALM_ASSERT(a.get(ndx) == input_array[ndx]);
+        }
+    }
+    auto t2 = high_resolution_clock::now();
+
+    std::cout << "   Positive values - Array::find<Equal>(): " << duration_cast<milliseconds>(t2 - t1).count()
+              << " ms" << std::endl;
+    std::cout << "   Positive values - Array::find<Equal>(): "
+              << (double)duration_cast<nanoseconds>(t2 - t1).count() / n_values / n_runs << " ns/value" << std::endl;
+
+    a.try_encode(a_encoded);
+    CHECK(a_encoded.is_encoded());
+    CHECK(a_encoded.size() == a.size());
+
+    // verify that both find the same thing
+    for (size_t j = 0; j < n_runs; ++j) {
+        for (size_t i = 0; i < n_values; ++i) {
+            REALM_ASSERT(a.find_first(start_value + i) == a_encoded.find_first(start_value + i));
+        }
+    }
+
+    t1 = high_resolution_clock::now();
+    for (size_t j = 0; j < n_runs; ++j) {
+        for (size_t i = 0; i < n_values; ++i) {
+            auto ndx = a_encoded.find_first(start_value + i);
+            REALM_ASSERT(ndx != realm::not_found);
+            REALM_ASSERT(a_encoded.get(ndx) == a.get(ndx));
+        }
+    }
+    t2 = high_resolution_clock::now();
+    std::cout << "   Positive values - ArrayEncode::find<Equal>(): " << duration_cast<milliseconds>(t2 - t1).count()
+              << " ms" << std::endl;
+    std::cout << "   Positive values - ArrayEncode::find<Equal>(): "
+              << (double)duration_cast<nanoseconds>(t2 - t1).count() / n_values / n_runs << " ns/value" << std::endl;
+
+    std::cout << std::endl;
+
+    a.destroy();
+    a_encoded.destroy();
+    a.create();
+    input_array.clear();
+    for (size_t i = 0; i < n_values; i++)
+        input_array.push_back(-(start_value + i));
+    std::random_device rd1;
+    std::mt19937 g1(rd1());
+    std::shuffle(input_array.begin(), input_array.end(), g1);
+    for (const auto& v : input_array)
+        a.add(v);
+
+    a.try_encode(a_encoded);
+    CHECK(a_encoded.is_encoded());
+    CHECK(a_encoded.size() == a.size());
+
+    // verify that both find the same thing
+    for (size_t j = 0; j < n_runs; ++j) {
+        for (size_t i = 0; i < n_values; ++i) {
+            REALM_ASSERT(a.find_first(-(start_value + i)) == a_encoded.find_first(-(start_value + i)));
+        }
+    }
+
+    t1 = high_resolution_clock::now();
+    for (size_t j = 0; j < n_runs; ++j) {
+        for (size_t i = 0; i < n_values; ++i) {
+            auto ndx = a.find_first(-(start_value + i));
+            REALM_ASSERT(ndx != realm::not_found);
+            REALM_ASSERT(a.get(ndx) == input_array[ndx]);
+        }
+    }
+    t2 = high_resolution_clock::now();
+
+    std::cout << "   Negative values - Array::find<Equal>(): " << duration_cast<milliseconds>(t2 - t1).count()
+              << " ms" << std::endl;
+    std::cout << "   Negative values - Array::find<Equal>(): "
+              << (double)duration_cast<nanoseconds>(t2 - t1).count() / n_values / n_runs << " ns/value" << std::endl;
+
+    t1 = high_resolution_clock::now();
+    for (size_t j = 0; j < n_runs; ++j) {
+        for (size_t i = 0; i < n_values; ++i) {
+            auto ndx = a_encoded.find_first(-(start_value + i));
+            REALM_ASSERT(ndx != realm::not_found);
+            REALM_ASSERT(a_encoded.get(ndx) == a.get(ndx));
+        }
+    }
+    t2 = high_resolution_clock::now();
+    std::cout << "   Negative values - ArrayEncode::find<Equal>(): " << duration_cast<milliseconds>(t2 - t1).count()
+              << " ms" << std::endl;
+    std::cout << "   Negative values - ArrayEncode::find<Equal>(): "
+              << (double)duration_cast<nanoseconds>(t2 - t1).count() / n_values / n_runs << " ns/value" << std::endl;
+
+    a.destroy();
+    a_encoded.destroy();
+}
+
+TEST(Test_basic_find_NEQ_value_greater_32bit)
+{
+    using namespace std;
+    using namespace std::chrono;
+    size_t start_value = 0x0000000010000000; // 32 bit val
+    size_t n_values = 1000;
+    size_t n_runs = 100;
+    std::cout << "   Value with bitwidth >= 32 " << std::endl;
+    std::cout << "   N values = " << n_values << std::endl;
+    std::cout << "   N runs = " << n_runs << std::endl;
+
+    std::vector<int64_t> input_array;
+    ArrayInteger a(Allocator::get_default());
+    ArrayInteger a_encoded(Allocator::get_default());
+    a.create();
+
+    for (size_t i = 0; i < n_values; i++)
+        input_array.push_back(start_value + i);
+    std::random_device rd;
+    std::mt19937 g(rd());
+    std::shuffle(input_array.begin(), input_array.end(), g);
+    for (const auto& v : input_array)
+        a.add(v);
+
+    QueryStateFindFirst state1;
+    QueryStateFindFirst state2;
+    auto t1 = high_resolution_clock::now();
+    for (size_t j = 0; j < n_runs; ++j) {
+        for (size_t i = 0; i < n_values; ++i) {
+            a.find<NotEqual>(start_value + i, 0, a.size(), &state1);
+            REALM_ASSERT(state1.m_state != realm::not_found);
+            REALM_ASSERT(a.get(state1.m_state) == input_array[state1.m_state]);
+        }
+    }
+    auto t2 = high_resolution_clock::now();
+
+    std::cout << "   Positive values - Array::find<NotEqual>(): " << duration_cast<milliseconds>(t2 - t1).count()
+              << " ms" << std::endl;
+    std::cout << "   Positive values - Array::find<NotEqual>(): "
+              << (double)duration_cast<nanoseconds>(t2 - t1).count() / n_values / n_runs << " ns/value" << std::endl;
+
+    a.try_encode(a_encoded);
+    CHECK(a_encoded.is_encoded());
+    CHECK(a_encoded.size() == a.size());
+
+    // verify that both find the same thing
+    for (size_t j = 0; j < n_runs; ++j) {
+        for (size_t i = 0; i < n_values; ++i) {
+            a.find<NotEqual>(start_value + i, 0, a.size(), &state1);
+            a_encoded.find<NotEqual>(i, 0, a_encoded.size(), &state2);
+            REALM_ASSERT(state1.m_state == state2.m_state);
+        }
+    }
+
+    t1 = high_resolution_clock::now();
+    for (size_t j = 0; j < n_runs; ++j) {
+        for (size_t i = 0; i < n_values; ++i) {
+            a_encoded.find<NotEqual>(start_value + i, 0, a_encoded.size(), &state2);
+            REALM_ASSERT(state2.m_state != realm::not_found);
+            REALM_ASSERT(a_encoded.get(state2.m_state) == a.get(state2.m_state));
+        }
+    }
+    t2 = high_resolution_clock::now();
+    std::cout << "   Positive values - ArrayEncode::find<NotEqual>(): "
+              << duration_cast<milliseconds>(t2 - t1).count() << " ms" << std::endl;
+    std::cout << "   Positive values - ArrayEncode::find<NotEqual>(): "
+              << (double)duration_cast<nanoseconds>(t2 - t1).count() / n_values / n_runs << " ns/value" << std::endl;
+
+    std::cout << std::endl;
+
+    a.destroy();
+    a_encoded.destroy();
+    a.create();
+    input_array.clear();
+    for (size_t i = 0; i < n_values; i++)
+        input_array.push_back(-(start_value + i));
+    std::random_device rd1;
+    std::mt19937 g1(rd1());
+    std::shuffle(input_array.begin(), input_array.end(), g1);
+    for (const auto& v : input_array)
+        a.add(v);
+
+    a.try_encode(a_encoded);
+    CHECK(a_encoded.is_encoded());
+    CHECK(a_encoded.size() == a.size());
+
+    // verify that both find the same thing
+    for (size_t j = 0; j < n_runs; ++j) {
+        for (size_t i = 0; i < n_values; ++i) {
+            a.find<NotEqual>(-(start_value + i), 0, a.size(), &state1);
+            a_encoded.find<NotEqual>(-(start_value + i), 0, a_encoded.size(), &state2);
+            REALM_ASSERT(state1.m_state == state2.m_state);
+        }
+    }
+
+    t1 = high_resolution_clock::now();
+    for (size_t j = 0; j < n_runs; ++j) {
+        for (size_t i = 0; i < n_values; ++i) {
+            a.find<NotEqual>(-(start_value + i), 0, a.size(), &state1);
+            REALM_ASSERT(state1.m_state != realm::not_found);
+            REALM_ASSERT(a.get(state1.m_state) == input_array[state1.m_state]);
+        }
+    }
+    t2 = high_resolution_clock::now();
+
+    std::cout << "   Negative values - Array::find<NotEqual>(): " << duration_cast<milliseconds>(t2 - t1).count()
+              << " ms" << std::endl;
+    std::cout << "   Negative values - Array::find<NotEqual>(): "
+              << (double)duration_cast<nanoseconds>(t2 - t1).count() / n_values / n_runs << " ns/value" << std::endl;
+
+    t1 = high_resolution_clock::now();
+    for (size_t j = 0; j < n_runs; ++j) {
+        for (size_t i = 0; i < n_values; ++i) {
+            a_encoded.find<NotEqual>(-(start_value + i), 0, a_encoded.size(), &state2);
+            REALM_ASSERT(state2.m_state != realm::not_found);
+            REALM_ASSERT(a_encoded.get(state2.m_state) == a.get(state2.m_state));
+        }
+    }
+    t2 = high_resolution_clock::now();
+    std::cout << "   Negative values - ArrayEncode::find<NotEqual>(): "
+              << duration_cast<milliseconds>(t2 - t1).count() << " ms" << std::endl;
+    std::cout << "   Negative values - ArrayEncode::find<NotEqual>(): "
+              << (double)duration_cast<nanoseconds>(t2 - t1).count() / n_values / n_runs << " ns/value" << std::endl;
+
+    a.destroy();
+    a_encoded.destroy();
+}
+
+TEST(Test_basic_find_LT_value_greater_32bit)
+{
+    using namespace std;
+    using namespace std::chrono;
+    size_t start_value = 0x0000000010000000; // 32 bit val
+    size_t n_values = 1000;
+    size_t n_runs = 100;
+    std::cout << "   Value with bitwidth >= 32 " << std::endl;
+    std::cout << "   N values = " << n_values << std::endl;
+    std::cout << "   N runs = " << n_runs << std::endl;
+
+    std::vector<int64_t> input_array;
+    ArrayInteger a(Allocator::get_default());
+    ArrayInteger a_encoded(Allocator::get_default());
+    a.create();
+
+    for (size_t i = 0; i < n_values; i++)
+        input_array.push_back(start_value + i);
+    std::random_device rd;
+    std::mt19937 g(rd());
+    std::shuffle(input_array.begin(), input_array.end(), g);
+    for (const auto& v : input_array)
+        a.add(v);
+
+    QueryStateFindFirst state1;
+    QueryStateFindFirst state2;
+    auto t1 = high_resolution_clock::now();
+    for (size_t j = 0; j < n_runs; ++j) {
+        for (size_t i = 0; i < n_values; ++i) {
+            a.find<Less>(start_value + i, 0, a.size(), &state1);
+            REALM_ASSERT(state1.m_state != realm::not_found);
+            REALM_ASSERT(a.get(state1.m_state) == input_array[state1.m_state]);
+        }
+    }
+    auto t2 = high_resolution_clock::now();
+
+    std::cout << "   Positive values - Array::find<Less>(): " << duration_cast<milliseconds>(t2 - t1).count() << " ms"
+              << std::endl;
+    std::cout << "   Positive values - Array::find<Less>(): "
+              << (double)duration_cast<nanoseconds>(t2 - t1).count() / n_values / n_runs << " ns/value" << std::endl;
+
+    a.try_encode(a_encoded);
+    CHECK(a_encoded.is_encoded());
+    CHECK(a_encoded.size() == a.size());
+
+    // verify that both find the same thing
+    for (size_t j = 0; j < n_runs; ++j) {
+        for (size_t i = 0; i < n_values; ++i) {
+            a.find<Less>(i, 0, a.size(), &state1);
+            a_encoded.find<Less>(start_value + i, 0, a_encoded.size(), &state2);
+            REALM_ASSERT(state1.m_state == state2.m_state);
+        }
+    }
+
+    t1 = high_resolution_clock::now();
+    for (size_t j = 0; j < n_runs; ++j) {
+        for (size_t i = 0; i < n_values; ++i) {
+            a_encoded.find<Less>(start_value + i, 0, a_encoded.size(), &state2);
+            REALM_ASSERT(state2.m_state != realm::not_found);
+            REALM_ASSERT(a_encoded.get(state2.m_state) == a.get(state2.m_state));
+        }
+    }
+    t2 = high_resolution_clock::now();
+    std::cout << "   Positive values - ArrayEncode::find<Less>(): " << duration_cast<milliseconds>(t2 - t1).count()
+              << " ms" << std::endl;
+    std::cout << "   Positive values - ArrayEncode::find<Less>(): "
+              << (double)duration_cast<nanoseconds>(t2 - t1).count() / n_values / n_runs << " ns/value" << std::endl;
+
+    std::cout << std::endl;
+
+    a.destroy();
+    a_encoded.destroy();
+    a.create();
+    input_array.clear();
+    for (size_t i = 0; i < n_values; i++)
+        input_array.push_back(-(start_value + i));
+    std::random_device rd1;
+    std::mt19937 g1(rd1());
+    std::shuffle(input_array.begin(), input_array.end(), g1);
+    for (const auto& v : input_array)
+        a.add(v);
+
+    a.try_encode(a_encoded);
+    CHECK(a_encoded.is_encoded());
+    CHECK(a_encoded.size() == a.size());
+
+    // verify that both find the same thing
+    for (size_t j = 0; j < n_runs; ++j) {
+        for (size_t i = 0; i < n_values; ++i) {
+            a.find<Less>(-(start_value + i), 0, a.size(), &state1);
+            a_encoded.find<Less>(-(start_value + i), 0, a_encoded.size(), &state2);
+            REALM_ASSERT(state1.m_state == state2.m_state);
+        }
+    }
+
+    t1 = high_resolution_clock::now();
+    for (size_t j = 0; j < n_runs; ++j) {
+        for (size_t i = 0; i < n_values; ++i) {
+            a.find<Less>(-(start_value + i), 0, a.size(), &state1);
+            REALM_ASSERT(state1.m_state != realm::not_found);
+            REALM_ASSERT(a.get(state1.m_state) == input_array[state1.m_state]);
+        }
+    }
+    t2 = high_resolution_clock::now();
+
+    std::cout << "   Negative values - Array::find<Less>(): " << duration_cast<milliseconds>(t2 - t1).count() << " ms"
+              << std::endl;
+    std::cout << "   Negative values - Array::find<Less>(): "
+              << (double)duration_cast<nanoseconds>(t2 - t1).count() / n_values / n_runs << " ns/value" << std::endl;
+
+    t1 = high_resolution_clock::now();
+    for (size_t j = 0; j < n_runs; ++j) {
+        for (size_t i = 0; i < n_values; ++i) {
+            a_encoded.find<Less>(-(start_value + i), 0, a_encoded.size(), &state2);
+            REALM_ASSERT(state2.m_state != realm::not_found);
+            REALM_ASSERT(a_encoded.get(state2.m_state) == a.get(state2.m_state));
+        }
+    }
+    t2 = high_resolution_clock::now();
+    std::cout << "   Negative values - ArrayEncode::find<Less>(): " << duration_cast<milliseconds>(t2 - t1).count()
+              << " ms" << std::endl;
+    std::cout << "   Negative values - ArrayEncode::find<Less>(): "
+              << (double)duration_cast<nanoseconds>(t2 - t1).count() / n_values / n_runs << " ns/value" << std::endl;
+
+    a.destroy();
+    a_encoded.destroy();
+}
+
+ONLY(Test_basic_find_GT_value_greater_32bit)
+{
+    using namespace std;
+    using namespace std::chrono;
+    size_t start_value = 0x0000000010000000; // 32 bit val
+    size_t n_values = 1000;
+    size_t n_runs = 100;
+    std::cout << "   Value with bitwidth >= 32 " << std::endl;
+    std::cout << "   N values = " << n_values << std::endl;
+    std::cout << "   N runs = " << n_runs << std::endl;
+
+    std::vector<int64_t> input_array;
+    ArrayInteger a(Allocator::get_default());
+    ArrayInteger a_encoded(Allocator::get_default());
+    a.create();
+
+    for (size_t i = 0; i < n_values; i++)
+        input_array.push_back(start_value + i);
+    std::random_device rd;
+    std::mt19937 g(rd());
+    std::shuffle(input_array.begin(), input_array.end(), g);
+    for (const auto& v : input_array)
+        a.add(v);
+
+    QueryStateFindFirst state1;
+    QueryStateFindFirst state2;
+    auto t1 = high_resolution_clock::now();
+    for (size_t j = 0; j < n_runs; ++j) {
+        for (size_t i = 0; i < n_values; ++i) {
+            a.find<Greater>(start_value + i, 0, a.size(), &state1);
+            REALM_ASSERT(state1.m_state != realm::not_found);
+            REALM_ASSERT(a.get(state1.m_state) == input_array[state1.m_state]);
+        }
+    }
+    auto t2 = high_resolution_clock::now();
+
+    std::cout << "   Positive values - Array::find<Greater>(): " << duration_cast<milliseconds>(t2 - t1).count()
+              << " ms" << std::endl;
+    std::cout << "   Positive values - Array::find<Greater>(): "
+              << (double)duration_cast<nanoseconds>(t2 - t1).count() / n_values / n_runs << " ns/value" << std::endl;
+
+    a.try_encode(a_encoded);
+    CHECK(a_encoded.is_encoded());
+    CHECK(a_encoded.size() == a.size());
+
+    // verify that both find the same thing
+    for (size_t j = 0; j < n_runs; ++j) {
+        for (size_t i = 0; i < n_values; ++i) {
+            a.find<Greater>(start_value + i, 0, a.size(), &state1);
+            a_encoded.find<Greater>(start_value + i, 0, a_encoded.size(), &state2);
+            REALM_ASSERT(state1.m_state == state2.m_state);
+        }
+    }
+
+    t1 = high_resolution_clock::now();
+    for (size_t j = 0; j < n_runs; ++j) {
+        for (size_t i = 0; i < n_values; ++i) {
+            a_encoded.find<Greater>(start_value + i, 0, a_encoded.size(), &state2);
+            REALM_ASSERT(state2.m_state != realm::not_found);
+            REALM_ASSERT(a_encoded.get(state2.m_state) == a.get(state2.m_state));
+        }
+    }
+    t2 = high_resolution_clock::now();
+    std::cout << "   Positive values - ArrayEncode::find<Greater>(): " << duration_cast<milliseconds>(t2 - t1).count()
+              << " ms" << std::endl;
+    std::cout << "   Positive values - ArrayEncode::find<Greater>(): "
+              << (double)duration_cast<nanoseconds>(t2 - t1).count() / n_values / n_runs << " ns/value" << std::endl;
+
+    std::cout << std::endl;
+
+    a.destroy();
+    a_encoded.destroy();
+    a.create();
+    input_array.clear();
+    for (size_t i = 0; i < n_values; i++)
+        input_array.push_back(-(start_value + i));
+    std::random_device rd1;
+    std::mt19937 g1(rd1());
+    std::shuffle(input_array.begin(), input_array.end(), g1);
+    for (const auto& v : input_array)
+        a.add(v);
+
+    a.try_encode(a_encoded);
+    CHECK(a_encoded.is_encoded());
+    CHECK(a_encoded.size() == a.size());
+
+    // verify that both find the same thing
+    for (size_t j = 0; j < n_runs; ++j) {
+        for (size_t i = 0; i < n_values; ++i) {
+            a.find<Greater>(-(start_value + i), 0, a.size(), &state1);
+            a_encoded.find<Greater>(-(start_value + i), 0, a_encoded.size(), &state2);
+            REALM_ASSERT(state1.m_state == state2.m_state);
+        }
+    }
+
+    t1 = high_resolution_clock::now();
+    for (size_t j = 0; j < n_runs; ++j) {
+        for (size_t i = 0; i < n_values; ++i) {
+            a.find<Greater>(-(start_value + i), 0, a.size(), &state1);
+            REALM_ASSERT(state1.m_state != realm::not_found);
+            REALM_ASSERT(a.get(state1.m_state) == input_array[state1.m_state]);
+        }
+    }
+    t2 = high_resolution_clock::now();
+
+    std::cout << "   Negative values - Array::find<Greater>(): " << duration_cast<milliseconds>(t2 - t1).count()
+              << " ms" << std::endl;
+    std::cout << "   Negative values - Array::find<Greater>(): "
+              << (double)duration_cast<nanoseconds>(t2 - t1).count() / n_values / n_runs << " ns/value" << std::endl;
+
+    t1 = high_resolution_clock::now();
+    for (size_t j = 0; j < n_runs; ++j) {
+        for (size_t i = 0; i < n_values; ++i) {
+            a_encoded.find<Greater>(-(start_value + i), 0, a_encoded.size(), &state2);
             REALM_ASSERT(state2.m_state != realm::not_found);
             REALM_ASSERT(a_encoded.get(state2.m_state) == a.get(state2.m_state));
         }
