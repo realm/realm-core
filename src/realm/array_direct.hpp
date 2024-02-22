@@ -440,7 +440,7 @@ uint64_t field_sign_bit()
 // compute the overflows in unsigned trail subtraction. The overflows
 // will be marked by 1 in the sign bit of each field in the result.
 template <int width>
-uint64_t trial_subtract(uint64_t A, uint64_t B)
+uint64_t unsigned_LT_vector(uint64_t A, uint64_t B)
 {
     // 1. compute borrow from most significant bit
     // Isolate bitfields inside A and B before subtraction (prevent carries from spilling over)
@@ -469,7 +469,7 @@ uint64_t trial_subtract(uint64_t A, uint64_t B)
 template <int width>
 bool any_field_unsigned_LT(uint64_t A, uint64_t B)
 {
-    return trial_subtract<width>(A, B) != 0;
+    return unsigned_LT_vector<width>(A, B) != 0;
 }
 
 /*
@@ -484,7 +484,7 @@ template <int width>
 bool any_field_signed_LT(uint64_t A, uint64_t B)
 {
     auto sign_bits = field_sign_bit<width>();
-    return trial_subtract<width>(A ^ sign_bits, B ^ sign_bits) != 0;
+    return unsigned_LT_vector<width>(A ^ sign_bits, B ^ sign_bits) != 0;
 }
 
 
@@ -496,7 +496,7 @@ bool any_field_EQ(uint64_t A, uint64_t B)
     }
     else {
         uint64_t bit_diff = A ^ B;
-        uint64_t overflows = trial_subtract<width>(0, bit_diff);
+        uint64_t overflows = unsigned_LT_vector<width>(0, bit_diff);
         return overflows != field_sign_bit<width>();
     }
 }
