@@ -375,9 +375,9 @@ void ListResultsNotifier::run()
 
     // Modifications to nested values in Mixed are recorded in replication as
     // StableIndex and we have to look up the actual index afterwards
-    if (m_change.paths.size()) {
+    if (m_change.stable_indexes.size()) {
         if (auto coll = dynamic_cast<CollectionParent*>(m_list.get())) {
-            for (auto& p : m_change.paths) {
+            for (auto& p : m_change.stable_indexes) {
                 if (auto ndx = coll->find_index(p); ndx != realm::not_found)
                     m_change.modifications.add(ndx);
             }

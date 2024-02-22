@@ -83,6 +83,13 @@ TEST_CASE("nested dictionary in mixed", "[dictionary]") {
         change_dictionary = c;
     });
 
+    Object object(r, any_obj);
+    CollectionChangeSet change_obj;
+    auto token_obj = object.add_notification_callback([&](CollectionChangeSet c) {
+        change_obj = c;
+    });
+
+
     auto write = [&](auto&& f) {
         r->begin_transaction();
         f();
@@ -100,11 +107,11 @@ TEST_CASE("nested dictionary in mixed", "[dictionary]") {
     auto list = dict_mixed.get_list("list");
 
     SECTION("notification on nested list") {
-        CollectionChangeSet change;
+        CollectionChangeSet change_list;
 
         auto require_change = [&] {
             auto token = list.add_notification_callback([&](CollectionChangeSet c) {
-                change = c;
+                change_list = c;
             });
             advance_and_notify(*r);
             return token;
@@ -116,7 +123,12 @@ TEST_CASE("nested dictionary in mixed", "[dictionary]") {
                 list.add(Mixed{5});
                 list.add(Mixed{6});
             });
-            REQUIRE_INDICES(change.insertions, 0, 1);
+            Path modified_path;
+            modified_path.emplace_back("any");
+            modified_path.emplace_back("list");
+            REQUIRE(change_obj.modified_paths.size() == 1);
+            CHECK(change_obj.modified_paths[0] == modified_path);
+            REQUIRE_INDICES(change_list.insertions, 0, 1);
             REQUIRE_INDICES(change_dictionary.modifications, 1);
         }
 
@@ -143,13 +155,13 @@ TEST_CASE("nested dictionary in mixed", "[dictionary]") {
                 list.add(Mixed{5});
                 list.add(Mixed{6});
             });
-            REQUIRE_INDICES(change.insertions, 0, 1);
+            REQUIRE_INDICES(change_list.insertions, 0, 1);
             write([&] {
                 dict_mixed.insert("list", 42);
             });
-            REQUIRE_INDICES(change.deletions, 0, 1);
+            REQUIRE_INDICES(change_list.deletions, 0, 1);
             REQUIRE_INDICES(change_dictionary.modifications, 1);
-            REQUIRE(change.collection_root_was_deleted);
+            REQUIRE(change_list.collection_root_was_deleted);
         }
         SECTION("erase containing dictionary") {
             auto token = require_change();
@@ -157,12 +169,12 @@ TEST_CASE("nested dictionary in mixed", "[dictionary]") {
                 list.add(Mixed{5});
                 list.add(Mixed{6});
             });
-            REQUIRE_INDICES(change.insertions, 0, 1);
+            REQUIRE_INDICES(change_list.insertions, 0, 1);
             write([&] {
                 any_obj.set(col_any, Mixed(42));
             });
-            REQUIRE_INDICES(change.deletions, 0, 1);
-            REQUIRE(change.collection_root_was_deleted);
+            REQUIRE_INDICES(change_list.deletions, 0, 1);
+            REQUIRE(change_list.collection_root_was_deleted);
         }
         SECTION("erase containing object") {
             auto token = require_change();
@@ -170,12 +182,12 @@ TEST_CASE("nested dictionary in mixed", "[dictionary]") {
                 list.add(Mixed{5});
                 list.add(Mixed{6});
             });
-            REQUIRE_INDICES(change.insertions, 0, 1);
+            REQUIRE_INDICES(change_list.insertions, 0, 1);
             write([&] {
                 any_obj.remove();
             });
-            REQUIRE_INDICES(change.deletions, 0, 1);
-            REQUIRE(change.collection_root_was_deleted);
+            REQUIRE_INDICES(change_list.deletions, 0, 1);
+            REQUIRE(change_list.collection_root_was_deleted);
         }
     }
     SECTION("dictionary as Results") {

@@ -105,8 +105,9 @@ struct CollectionChangeSet {
 
     // Per-column version of `modifications`
     std::unordered_map<int64_t, IndexSet> columns;
+    std::vector<Path> modified_paths;
 
-    std::set<StableIndex> paths;
+    std::set<StableIndex> stable_indexes;
 
     bool empty() const noexcept
     {

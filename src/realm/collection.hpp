@@ -39,6 +39,7 @@ public:
     {
         return {};
     }
+    void translate_path(const StablePath&, Path&) const final {}
     void add_index(Path&, const Index&) const noexcept final {}
     size_t find_index(const Index&) const noexcept final
     {

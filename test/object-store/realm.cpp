@@ -96,7 +96,7 @@ public:
     IndexSet array_change(size_t index, ColKey col_key) const noexcept
     {
         auto& changes = m_result[index].changes;
-        auto col = changes.find(col_key.value);
+        auto col = changes.find(col_key);
         return col == changes.end() ? IndexSet{} : col->second.indices;
     }
 

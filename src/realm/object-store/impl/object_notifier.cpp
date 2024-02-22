@@ -100,13 +100,19 @@ void ObjectNotifier::run()
 
     const auto& change = it->second;
 
-    auto column_modifications = change.get_columns_modified(m_obj_key);
-    if (!column_modifications)
+    auto path_modifications = change.get_paths_modified(m_obj_key);
+    if (!path_modifications)
         return;
 
     // Finally we add all changes to `m_change` which is later used to notify about the changed columns.
     m_change.modifications.add(0);
-    for (auto col : *column_modifications) {
-        m_change.columns[col.value].add(0);
+    auto obj = m_table->get_object(m_obj_key);
+    for (const StablePath& stable_path : *path_modifications) {
+        m_change.columns[m_table->get_column_key(stable_path[0]).value].add(0);
+        if (stable_path.size() > 1) {
+            Path path;
+            obj.translate_path(stable_path, path);
+            m_change.modified_paths.emplace_back(std::move(path));
+        }
     }
 }

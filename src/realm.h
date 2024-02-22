@@ -1947,6 +1947,13 @@ RLM_API bool realm_object_changes_is_deleted(const realm_object_changes_t*);
 RLM_API size_t realm_object_changes_get_num_modified_properties(const realm_object_changes_t*);
 
 /**
+ * Get the number of paths to embedded collections that were modified.
+ *
+ * This function cannot fail.
+ */
+RLM_API size_t realm_object_changes_get_num_modified_paths(const realm_object_changes_t*);
+
+/**
  * Get the column keys for the properties that were modified in an object
  * notification.
  *
@@ -1959,6 +1966,20 @@ RLM_API size_t realm_object_changes_get_num_modified_properties(const realm_obje
  */
 RLM_API size_t realm_object_changes_get_modified_properties(const realm_object_changes_t*,
                                                             realm_property_key_t* out_modified, size_t max);
+
+/**
+ * Get the column keys for the properties that were modified in an object
+ * notification.
+ *
+ * This function cannot fail.
+ *
+ * @param out_modified Where the paths should be written. May be NULL.
+ * @param max The maximum number of paths to write.
+ * @return The number of paths written to @a out_modified, or the number
+ *         of modified paths if @a out_modified is NULL.
+ */
+RLM_API size_t realm_object_changes_get_modified_paths(const realm_object_changes_t*, realm_string_t* out_modified,
+                                                       size_t max);
 
 /**
  * Get the number of various types of changes in a collection notification.

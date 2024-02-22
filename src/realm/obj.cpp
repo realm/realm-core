@@ -2090,6 +2090,16 @@ CollectionPtr Obj::get_collection_ptr(const Path& path) const
     return collection;
 }
 
+void Obj::translate_path(const StablePath& stable_path, Path& path) const
+{
+    ColKey col_key = m_table->get_column_key(stable_path[0]);
+    path.emplace_back(m_table->get_column_name(col_key));
+    if (stable_path.size() > 1) {
+        CollectionBasePtr collection = get_collection_ptr(col_key);
+        dynamic_cast<CollectionParent*>(collection.get())->translate_path(stable_path, path);
+    }
+}
+
 CollectionPtr Obj::get_collection_by_stable_path(const StablePath& path) const
 {
     // First element in path is phony column key
