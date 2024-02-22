@@ -378,9 +378,10 @@ inline std::pair<int64_t, int64_t> get_two(const char* data, size_t width, size_
     To simplify, the first bitfield must be aligned within the word: it must occupy the lowest
     bits of the word.
 
-    As a running example to explain the code, we'll use 16 bit words and 5-bit bitfields.
-    A word will look like this: "Xaaaaabbbbbccccc", where a,b and c are bitfields and X is
-    a don't care.
+    In general the metods here return a vector with the most significant bit in each field
+    marking that a condition was met when comparing the corresponding pair of fields in two
+    vectors. Checking if any field meets a condition is as simple as comparing the return
+    vector against 0. Finding the first to meet a condition is also supported.
 
     The simplest condition to test is any_field_NE(A,B), where A and B are words.
     This condition should be true if any bitfield in A is not equal to the corresponding
@@ -394,6 +395,7 @@ template <int width>
 uint64_t num_fields()
 {
     REALM_ASSERT(width <= 32); // it will not pay off to use this for fields larger
+    REALM_ASSERT(width);
     return 64 / width;
 };
 template <int width>
@@ -404,19 +406,19 @@ uint64_t num_bits()
 template <int width>
 uint64_t cares_about()
 {
-    if (num_bits<width>() == 64)
-        return 0xFFFFFFFFFFFFFFFF;
-    else
-        return (1ULL << width) - 1;
+    return 0xFFFFFFFFFFFFFFFFULL >> (64 - num_bits<width>());
 }
 
+// true if any field in A differs from corresponding field in B. If you also want
+// to find which fields, use find_all_fields_NE instead.
 template <int width>
 bool any_field_NE(uint64_t A, uint64_t B)
 {
     return (A ^ B) & cares_about<width>();
 }
 
-
+// Populate all fields in a vector with a given value. The value must have all
+// bits above width clear.
 template <int width>
 uint64_t populate(uint64_t value)
 {
@@ -430,13 +432,6 @@ uint64_t populate(uint64_t value)
     }
     return value;
 }
-
-/*
-    Next is any_field_EQ(A,B). This is true if any bitfield in A is equal to corresponding
-    field in B. We create a difference bit vector. Each field in this difference vector is
-    then compared against 0. If less than 0, the field was non-zero and thus not equal.
-    This requires unsigned LT, so we'll put that first.
-*/
 
 // provides a set bit in pos 0 of each field, remaining bits zero
 template <int width>
@@ -460,20 +455,25 @@ uint64_t field_sign_bit()
     the MSBs to 1 in A and 0 in B before subtraction. After the subtraction the MSBs in
     the result indicate borrows from the MSB. We then compute overflow (borrow OUT of MSB)
     using boolean logic as described below.
+
+    Unsigned LT is also used to find all zero fields or all non-zero fields, so it is
+    the backbone of all comparisons returning vectors.
 */
 
-// compute the overflows in unsigned trail subtraction. The overflows
-// will be marked by 1 in the sign bit of each field in the result.
+// compute the overflows in unsigned trial subtraction A-B. The overflows
+// will be marked by 1 in the sign bit of each field in the result. Other
+// bits in the result are zero.
+// Overflow are detected for each field pair where A is less than B.
 template <int width>
 uint64_t unsigned_LT_vector(uint64_t A, uint64_t B)
 {
     // 1. compute borrow from most significant bit
     // Isolate bitfields inside A and B before subtraction (prevent carries from spilling over)
     // do this by clamping most significant bit in A to 1, and msb in B to 0
-    auto MSBs = field_sign_bit<width>();
-    auto A_isolated = A | MSBs;
-    auto B_isolated = B & ~MSBs;
-    auto borrows_into_sign_bit = ~(A_isolated - B_isolated);
+    auto MSBs = field_sign_bit<width>();                     // constant
+    auto A_isolated = A | MSBs;                              // 1 op
+    auto B_isolated = B & ~MSBs;                             // 2 ops
+    auto borrows_into_sign_bit = ~(A_isolated - B_isolated); // 2 ops (latency 4)
 
     // 2. determine what subtraction against most significant bit would give:
     // A B borrow-in:   (A-B-borrow-in)
@@ -488,13 +488,55 @@ uint64_t unsigned_LT_vector(uint64_t A, uint64_t B)
     // borrow-out = (~A & B) | (~A & borrow-in) | (A & B & borrow-in)
     // The overflows are simply the borrow-out, encoded into the sign bits of each field.
     auto overflows = (~A & B) | (~A & borrows_into_sign_bit) | (A & B & borrows_into_sign_bit);
-    return overflows & MSBs;
+    // ^ 6 ops, latency 6 (4+2)
+    return overflows & MSBs; // 1 op, latency 7
+    // total of 12 ops and a latency of 7. On a beefy CPU 3-4 of those can run in parallel
+    // and still reach a total latency of 10 or less.
 }
 
 template <int width>
-bool any_field_unsigned_LT(uint64_t A, uint64_t B)
+uint64_t find_all_fields_unsigned_LT(uint64_t A, uint64_t B)
 {
-    return unsigned_LT_vector<width>(A, B) != 0;
+    return unsigned_LT_vector<width>(A, B);
+}
+
+// find the first field which have MSB set (marks overflow after trial subtraction, or other
+// requested condition).
+// This may not be the most efficient method, but it is still much faster than reloading
+// each bitfield individually and testing it. To be used after find_all_fields_XXX.
+// TODO: Optimize this to log(N) time instead of linear.
+int first_field_marked(int width, uint64_t vector)
+{
+    int result = 0;
+    int msb = 1ULL << (width - 1);
+    while (msb) {
+        if (vector & msb)
+            return result;
+        msb <<= width;
+        result++;
+    }
+    return -1;
+}
+
+template <int width>
+uint64_t find_all_fields_EQ(uint64_t A, uint64_t B)
+{
+    auto all_ones = field_bit0<width>();
+    // a 0 is only value less than a 1, so this finds all zero fields:
+    return unsigned_LT_vector<width>(A ^ B, all_ones);
+}
+
+template <int width>
+uint64_t find_all_fields_NE(uint64_t A, uint64_t B)
+{
+    return unsigned_LT_vector<width>(0, A ^ B);
+}
+
+
+template <int width>
+uint64_t find_all_fields_unsigned_LE(uint64_t A, uint64_t B)
+{
+    return find_all_fields_EQ<width>(A, B) | find_all_fields_unsigned_LT<width>(A, B);
 }
 
 /*
@@ -506,37 +548,16 @@ bool any_field_unsigned_LT(uint64_t A, uint64_t B)
 
 */
 template <int width>
-bool any_field_signed_LT(uint64_t A, uint64_t B)
+uint64_t find_all_fields_signed_LT(uint64_t A, uint64_t B)
 {
     auto sign_bits = field_sign_bit<width>();
-    return unsigned_LT_vector<width>(A ^ sign_bits, B ^ sign_bits) != 0;
-}
-
-
-template <int width>
-bool any_field_EQ(uint64_t A, uint64_t B)
-{
-    if (num_fields<width>() == 1) {
-        return !any_field_NE<width>(A, B);
-    }
-    else {
-        uint64_t bit_diff = A ^ B;
-        uint64_t overflows = unsigned_LT_vector<width>(0, bit_diff);
-        return overflows != field_sign_bit<width>();
-    }
-}
-
-
-template <int width>
-bool any_field_unsigned_LE(uint64_t A, uint64_t B)
-{
-    return any_field_EQ<width>(A, B) | any_field_unsigned_LT<width>(A, B);
+    return unsigned_LT_vector<width>(A ^ sign_bits, B ^ sign_bits);
 }
 
 template <int width>
-bool any_field_signed_LE(uint64_t A, uint64_t B)
+uint64_t find_all_fields_signed_LE(uint64_t A, uint64_t B)
 {
-    return any_field_EQ<width>(A, B) | any_field_signed_LT<width>(A, B);
+    return find_all_fields_EQ<width>(A, B) | find_all_fields_signed_LT<width>(A, B);
 }
 
 
