@@ -210,7 +210,7 @@ public:
         first_word_ptr = data_area + (field_position >> 6);
     }
 
-    uint64_t get_value() const
+    inline uint64_t get_full_word_with_value() const
     {
         auto in_word_position = field_position & 0x3F;
         auto first_word = first_word_ptr[0];
@@ -223,11 +223,18 @@ public:
             result |= second_word << first_word_size;
             // note: above shifts in zeroes below the bits we want
         }
+        return result;
+    }
+
+    inline uint64_t get_value() const
+    {
+        auto result = get_full_word_with_value();
         // discard any bits above the field we want
         if (field_size < 64)
             result &= (1ULL << field_size) - 1;
         return result;
     }
+
     void set_value(uint64_t value) const
     {
         auto in_word_position = field_position & 0x3F;
@@ -257,7 +264,7 @@ public:
             first_word_ptr[1] = second_word;
         }
     }
-    void operator++()
+    inline void operator++()
     {
         auto next_field_position = field_position + step_size;
         if ((next_field_position >> 6) > (field_position >> 6)) {
@@ -287,11 +294,11 @@ class bf_ref {
     bf_iterator it;
 
 public:
-    bf_ref(bf_iterator& it)
+    inline bf_ref(bf_iterator& it)
         : it(it)
     {
     }
-    operator uint64_t() const
+    inline operator uint64_t() const
     {
         return it.get_value();
     }
