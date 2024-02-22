@@ -5212,10 +5212,12 @@ TEST_CASE("C API: convert", "[c_api]") {
 }
 
 struct Userdata {
-    std::atomic<bool> called{false};
-    bool has_error;
-    realm_error_t error;
+    std::atomic<bool> aopen_called{false};
+    std::atomic<bool> handler_called{false};
+    bool aopen_has_error = false;
+    bool handler_has_error = false;
     realm_thread_safe_reference_t* realm_ref = nullptr;
+    realm_error_t error;
     std::string error_message;
 };
 
@@ -5227,8 +5229,12 @@ static void task_completion_func(void* p, realm_thread_safe_reference_t* realm,
     auto userdata_p = static_cast<Userdata*>(p);
 
     userdata_p->realm_ref = realm;
-    userdata_p->has_error = realm_get_async_error(async_error, &userdata_p->error);
-    userdata_p->called = true;
+    if (realm_get_async_error(async_error, &userdata_p->error)) {
+        userdata_p->aopen_has_error = true;
+        userdata_p->error_message = std::string(userdata_p->error.message);
+        userdata_p->error.message = userdata_p->error_message.c_str();
+    }
+    userdata_p->aopen_called = true;
 }
 
 static void task_init_subscription(realm_t* realm, void*)
@@ -5239,11 +5245,12 @@ static void task_init_subscription(realm_t* realm, void*)
 static void sync_error_handler(void* p, realm_sync_session_t*, const realm_sync_error_t error)
 {
     auto userdata_p = static_cast<Userdata*>(p);
-    userdata_p->has_error = true;
+    userdata_p->handler_has_error = true;
     userdata_p->error_message = error.status.message;
     userdata_p->error.error = error.status.error;
     userdata_p->error.categories = error.status.categories;
     userdata_p->error.message = userdata_p->error_message.c_str();
+    userdata_p->handler_called = true;
 }
 
 TEST_CASE("C API - async_open", "[sync][pbs][c_api]") {
@@ -5271,10 +5278,13 @@ TEST_CASE("C API - async_open", "[sync][pbs][c_api]") {
         Userdata userdata;
         realm_async_open_task_start(task, task_completion_func, &userdata, nullptr);
         util::EventLoop::main().run_until([&] {
-            return userdata.called.load();
+            return userdata.aopen_called.load();
         });
-        REQUIRE(userdata.called);
+        REQUIRE(userdata.aopen_called);
+        REQUIRE(!userdata.aopen_has_error);
         REQUIRE(userdata.realm_ref);
+        REQUIRE(!userdata.handler_called);
+        REQUIRE(!userdata.handler_has_error);
         realm_release(task);
 
         realm_t* realm = realm_from_thread_safe_reference(userdata.realm_ref, nullptr);
@@ -5326,11 +5336,20 @@ TEST_CASE("C API - async_open", "[sync][pbs][c_api]") {
         realm_async_open_task_t* task = realm_open_synchronized(config);
         REQUIRE(task);
         realm_async_open_task_start(task, task_completion_func, &userdata, nullptr);
+        // async open task completes first
         util::EventLoop::main().run_until([&] {
-            return userdata.called.load();
+            return userdata.aopen_called.load();
         });
-        REQUIRE(userdata.called);
+        // then the error handler is called
+        util::EventLoop::main().run_until([&] {
+            return userdata.handler_called.load();
+        });
+        REQUIRE(userdata.aopen_called);
+        REQUIRE(userdata.aopen_has_error);
         REQUIRE(!userdata.realm_ref);
+        REQUIRE(userdata.handler_called);
+        REQUIRE(userdata.handler_has_error);
+        // Error from the error_handler - aopen error returns RLM_ERR_HTTP_ERROR error code
         REQUIRE(userdata.error.error == RLM_ERR_AUTH_ERROR);
         REQUIRE(userdata.error_message ==
                 "Unable to refresh the user access token: http error code considered fatal. Client Error: 403");
