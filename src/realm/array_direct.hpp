@@ -235,6 +235,31 @@ public:
         return result;
     }
 
+    // get unaligned word - this should not be called if the next word extends beyond
+    // end of array. For that particular case, you must use get_last_unaligned_word instead.
+    inline uint64_t get_unaligned_word() const
+    {
+        auto in_word_position = field_position & 0x3F;
+        auto first_word = first_word_ptr[0];
+        if (in_word_position == 0)
+            return first_word;
+        uint64_t result = first_word >> in_word_position;
+        // note: above shifts in zeroes above the bitfield
+        auto first_word_size = 64 - in_word_position;
+        auto second_word = first_word_ptr[1];
+        result |= second_word << first_word_size;
+        // note: above shifts in zeroes below the bits we want
+        return result;
+    }
+
+    inline uint64_t get_last_unaligned_word() const
+    {
+        auto in_word_position = field_position & 0x3F;
+        auto first_word = first_word_ptr[0];
+        uint64_t result = first_word >> in_word_position;
+        // note: above shifts in zeroes above the bitfield
+        return result;
+    }
     void set_value(uint64_t value) const
     {
         auto in_word_position = field_position & 0x3F;
@@ -444,7 +469,7 @@ uint64_t field_sign_bit()
 // compute the overflows in unsigned trail subtraction. The overflows
 // will be marked by 1 in the sign bit of each field in the result.
 template <int width>
-uint64_t trial_subtract(uint64_t A, uint64_t B)
+uint64_t unsigned_LT_vector(uint64_t A, uint64_t B)
 {
     // 1. compute borrow from most significant bit
     // Isolate bitfields inside A and B before subtraction (prevent carries from spilling over)
@@ -466,14 +491,14 @@ uint64_t trial_subtract(uint64_t A, uint64_t B)
     // 1 1 1            (1-1-1) = 1 + borrow-out
     // borrow-out = (~A & B) | (~A & borrow-in) | (A & B & borrow-in)
     // The overflows are simply the borrow-out, encoded into the sign bits of each field.
-    auto overflows = (~A & B) | (~A & borrow_into_sign_bit) | (A & B & borrow_into_sign_bit);
+    auto overflows = (~A & B) | (~A & borrows_into_sign_bit) | (A & B & borrows_into_sign_bit);
     return overflows & MSBs;
 }
 
 template <int width>
 bool any_field_unsigned_LT(uint64_t A, uint64_t B)
 {
-    return trial_subtract<width>(A, B) != 0;
+    return unsigned_LT_vector<width>(A, B) != 0;
 }
 
 /*
@@ -488,7 +513,7 @@ template <int width>
 bool any_field_signed_LT(uint64_t A, uint64_t B)
 {
     auto sign_bits = field_sign_bit<width>();
-    return trial_subtract<width>(A ^ sign_bits, B ^ sign_bits) != 0;
+    return unsigned_LT_vector<width>(A ^ sign_bits, B ^ sign_bits) != 0;
 }
 
 
@@ -500,7 +525,7 @@ bool any_field_EQ(uint64_t A, uint64_t B)
     }
     else {
         uint64_t bit_diff = A ^ B;
-        uint64_t overflows = trial_subtract<width>(0, bit_diff);
+        uint64_t overflows = unsigned_LT_vector<width>(0, bit_diff);
         return overflows != field_sign_bit<width>();
     }
 }
