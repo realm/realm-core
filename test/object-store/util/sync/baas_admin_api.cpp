@@ -256,7 +256,7 @@ size_t curl_header_cb(char* buffer, size_t size, size_t nitems, std::map<std::st
             value = value.substr(first_not_space);
         }
         if (auto last_not_nl = value.find_last_not_of("\r\n"); last_not_nl != std::string::npos) {
-            value = value.substr(0, last_not_nl);
+            value = value.substr(0, last_not_nl + 1);
         }
         response_headers->insert({std::string{key}, std::string{value}});
     }
@@ -361,20 +361,24 @@ app::Response do_http_request(const app::Request& request)
     auto response_code = curl_easy_perform(curl);
     auto total_time = std::chrono::steady_clock::now() - start_time;
 
-    std::string coid = [&] {
-        auto coid_header = response_headers.find("X-Appservices-Request-Id");
-        if (coid_header == response_headers.end()) {
-            return std::string{};
-        }
-        return util::format("BaaS Coid: \"%1\"", coid_header->second);
-    }();
-
-    util::format(std::cerr, "Baas API %1 request to %2 took %3 %4\n", app::httpmethod_to_string(request.method),
-                 request.url, std::chrono::duration_cast<std::chrono::milliseconds>(total_time), coid);
+    auto logger = util::Logger::get_default_logger();
     if (response_code != CURLE_OK) {
-        fprintf(stderr, "curl_easy_perform() failed when sending request to '%s' with body '%s': %s\n",
-                request.url.c_str(), request.body.c_str(), curl_easy_strerror(response_code));
+        logger->error("curl_easy_perform() failed when sending request to '%1' with body '%2': %3", request.url,
+                      request.body, curl_easy_strerror(response_code));
     }
+    if (logger->would_log(util::Logger::Level::trace)) {
+        std::string coid = [&] {
+            auto coid_header = response_headers.find("X-Appservices-Request-Id");
+            if (coid_header == response_headers.end()) {
+                return std::string{};
+            }
+            return util::format("BaaS Coid: \"%1\"", coid_header->second);
+        }();
+
+        logger->trace("Baas API %1 request to %2 took %3 %4\n", app::httpmethod_to_string(request.method),
+                      request.url, std::chrono::duration_cast<std::chrono::milliseconds>(total_time), coid);
+    }
+
     int http_code = 0;
     curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
     return {

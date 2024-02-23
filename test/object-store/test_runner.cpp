@@ -20,6 +20,7 @@
 #include <util/test_path.hpp>
 
 #include <realm/util/features.h>
+#include <realm/util/logger.hpp>
 #include <realm/util/to_string.hpp>
 
 #if TEST_SCHEDULER_UV
@@ -38,6 +39,17 @@
 #include <iostream>
 #include <limits.h>
 
+#ifndef TEST_ENABLE_LOGGING
+#define TEST_ENABLE_LOGGING 0 // change to 1 to enable trace-level logging
+#endif
+
+#ifndef TEST_LOGGING_LEVEL
+#if TEST_ENABLE_LOGGING
+#define TEST_LOGGING_LEVEL all
+#else
+#define TEST_LOGGING_LEVEL off
+#endif // TEST_ENABLE_LOGGING
+#endif // TEST_LOGGING_LEVEL
 
 int run_object_store_tests(int argc, const char** argv);
 
@@ -90,6 +102,8 @@ int run_object_store_tests(int argc, const char** argv)
         return std::make_shared<realm::util::UvMainLoopScheduler>();
     });
 #endif
+
+    realm::util::Logger::set_default_level_threshold(realm::util::Logger::Level::TEST_LOGGING_LEVEL);
 
     Catch::Session session;
     session.useConfigData(config);
