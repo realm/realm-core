@@ -438,10 +438,29 @@ inline std::pair<int64_t, int64_t> get_two(const char* data, size_t width, size_
     This is almost as simple as a direct word compare, but needs to take into account that
     we may want to have part of the words undefined.
 */
+constexpr int num_fields_table[65] = {-1, 64, 32, 21, 16, 12, 10, 9, // 0-7
+                                      8,  7,  6,  5,  5,  4,  4,  4, // 8-15
+                                      4,  3,  3,  3,  3,  3,  2,  2, // 16-23
+                                      2,  2,  2,  2,  2,  2,  2,  2, // 24-31
+                                      2,  1,  1,  1,  1,  1,  1,  1, // 32-39
+                                      1,  1,  1,  1,  1,  1,  1,  1, // 40-47
+                                      1,  1,  1,  1,  1,  1,  1,  1, // 48-55
+                                      1,  1,  1,  1,  1,  1,  1,  1, // 56-63
+                                      1};
 
-template <int width>
-uint64_t num_fields()
+constexpr int num_bits_table[65] = {-1, 64, 64, 63, 64, 60, 60, 63, // 0-7
+                                    64, 63, 60, 55, 60, 52, 56, 60, // 8-15
+                                    64, 51, 54, 57, 60, 63, 44, 46, // 16-23
+                                    48, 50, 52, 54, 56, 58, 60, 64, // 24-31
+                                    64, 33, 34, 35, 36, 37, 38, 39, // 32-39
+                                    40, 41, 42, 43, 44, 45, 46, 47, // 40-47
+                                    48, 49, 50, 51, 52, 53, 54, 55, // 48-55
+                                    56, 57, 58, 59, 60, 61, 62, 63, // 56-63
+                                    64};
+
+inline int num_fields_for_width(int width)
 {
+<<<<<<< HEAD
     REALM_ASSERT(width <= 32); // it will not pay off to use this for fields larger
     REALM_ASSERT(width);
     return 64 / width;
@@ -450,49 +469,69 @@ template <int width>
 uint64_t num_bits()
 {
     return width * num_fields<width>();
+=======
+    return num_fields_table[width];
+>>>>>>> 1f88d48aa02f7467b78e8bdd22137c6361b65c1d
 }
-template <int width>
-uint64_t cares_about()
+
+inline int num_bits_for_width(int width)
 {
-    return 0xFFFFFFFFFFFFFFFFULL >> (64 - num_bits<width>());
+    return num_bits_table[width];
+}
+
+inline uint64_t cares_about(int width)
+{
+    return 0xFFFFFFFFFFFFFFFFULL >> (64 - num_bits_table[width]);
 }
 
 // true if any field in A differs from corresponding field in B. If you also want
 // to find which fields, use find_all_fields_NE instead.
-template <int width>
-bool any_field_NE(uint64_t A, uint64_t B)
+bool inline any_field_NE(int width, uint64_t A, uint64_t B)
 {
-    return (A ^ B) & cares_about<width>();
+    return (A ^ B) & cares_about(width);
 }
 
 // Populate all fields in a vector with a given value. The value must have all
-// bits above width clear.
-template <int width>
-uint64_t populate(uint64_t value)
+// bits outside of the field be zero.
+constexpr uint64_t populate(int width, uint64_t value)
 {
-    if (width == 1)
-        return -value;
-    // TODO rewrite this into a loop which is completely folded at compile time
-    auto w = width;
-    while (w < 64) {
-        value |= value << w;
-        w <<= 1;
+    if (width < 8) {
+        value |= value << width;
+        width <<= 1;
+        value |= value << width;
+        width <<= 1;
+        value |= value << width;
+        width <<= 1;
+    }
+    // width now in range 8..64
+    if (width < 32) {
+        value |= value << width;
+        width <<= 1;
+        value |= value << width;
+        width <<= 1;
+    }
+    // width now in range 32..128
+    if (width < 64) {
+        value |= value << width;
     }
     return value;
 }
 
 // provides a set bit in pos 0 of each field, remaining bits zero
-template <int width>
-uint64_t field_bit0()
+constexpr uint64_t field_bit0(int width)
 {
+<<<<<<< HEAD
     return populate<width>(1);
 }
+=======
+    return populate(width, 1);
+};
+>>>>>>> 1f88d48aa02f7467b78e8bdd22137c6361b65c1d
 
 // provides a set sign-bit in each field, remaining bits zero
-template <int width>
-uint64_t field_sign_bit()
+constexpr uint64_t field_sign_bit(int width)
 {
-    return populate<width>(1ULL << (width - 1));
+    return populate(width, 1ULL << (width - 1));
 }
 
 /* Unsigned LT.
@@ -519,7 +558,7 @@ inline uint64_t unsigned_LT_vector(uint64_t MSBs, uint64_t A, uint64_t B)
     // do this by clamping most significant bit in A to 1, and msb in B to 0
     auto A_isolated = A | MSBs;                              // 1 op
     auto B_isolated = B & ~MSBs;                             // 2 ops
-    auto borrows_into_sign_bit = ~(A_isolated - B_isolated); // 2 ops (latency 4)
+    auto borrows_into_sign_bit = ~(A_isolated - B_isolated); // 2 ops (total latency 4)
 
     // 2. determine what subtraction against most significant bit would give:
     // A B borrow-in:   (A-B-borrow-in)
@@ -532,12 +571,12 @@ inline uint64_t unsigned_LT_vector(uint64_t MSBs, uint64_t A, uint64_t B)
     // 1 1 0            (1-1-0) = 0
     // 1 1 1            (1-1-1) = 1 + borrow-out
     // borrow-out = (~A & B) | (~A & borrow-in) | (A & B & borrow-in)
-    // The overflows are simply the borrow-out, encoded into the sign bits of each field.
+    // The overflows are simply the borrow-out, now encoded into the sign bits of each field.
     auto overflows = (~A & B) | (~A & borrows_into_sign_bit) | (A & B & borrows_into_sign_bit);
-    // ^ 6 ops, latency 6 (4+2)
-    return overflows & MSBs; // 1 op, latency 7
+    // ^ 6 ops, total latency 6 (4+2)
+    return overflows & MSBs; // 1 op, total latency 7
     // total of 12 ops and a latency of 7. On a beefy CPU 3-4 of those can run in parallel
-    // and still reach a total latency of 10 or less.
+    // and still reach a combined latency of 10 or less.
 }
 
 inline uint64_t find_all_fields_unsigned_LT(uint64_t MSBs, uint64_t A, uint64_t B)
@@ -566,25 +605,30 @@ inline int first_field_marked(int width, uint64_t vector)
 inline uint64_t find_all_fields_EQ(uint64_t MSBs, uint64_t all_ones, uint64_t A, uint64_t B)
 {
     // a 0 is only value less than a 1, so this finds all zero fields:
+    // asking A^B < 1 same as asking A^B == 0
     return unsigned_LT_vector(MSBs, A ^ B, all_ones);
 }
 
 inline uint64_t find_all_fields_NE(uint64_t MSBs, uint64_t A, uint64_t B)
 {
+    // 0 < A^B, same as asking A^B != 0.
     return unsigned_LT_vector(MSBs, 0, A ^ B);
 }
 
 inline uint64_t find_all_fields_unsigned_LE(uint64_t MSBs, uint64_t all_ones, uint64_t A, uint64_t B)
 {
+    // There is likely to be a way to optimize this further...some day
+    // for now we just say that LE is EQ or LT :-D
     return find_all_fields_EQ(MSBs, all_ones, A, B) | find_all_fields_unsigned_LT(MSBs, A, B);
 }
 
 /*
     Handling signed values
 
-    Trial subtraction only works as is for unsigned. We're simply transforming signed into unsigned
+    Trial subtraction only works as is for unsigned. We simply transform signed into unsigned
     by pusing all values up by 1<<(field_width-1). This makes all negative values positive and positive
     values remain positive, although larger. Any overflow during the push can be ignored.
+    After that transformation Trial subtraction should correctly detect the LT condition.
 
 */
 inline uint64_t find_all_fields_signed_LT(uint64_t MSBs, uint64_t A, uint64_t B)
