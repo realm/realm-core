@@ -273,7 +273,7 @@ TEST_CASE("app: verify app error codes", "[sync][app][local]") {
                 return false;
             }
         }
-        catch (nlohmann::json::exception ex) {
+        catch (const nlohmann::json::exception& ex) {
             // It's also a failure if parsing the json body throws an exception
             return false;
         }
@@ -1356,8 +1356,11 @@ TEST_CASE("app: call function", "[sync][app][function][baas]") {
     TestAppSession session;
     auto app = session.app();
 
-    bson::BsonArray toSum(5);
-    std::iota(toSum.begin(), toSum.end(), static_cast<int64_t>(1));
+    bson::BsonArray toSum;
+    for (int64_t i : {1, 2, 3, 4, 5}) {
+        toSum.append(i);
+    }
+
     const auto checkFn = [](Optional<int64_t>&& sum, Optional<AppError>&& error) {
         REQUIRE(!error);
         CHECK(*sum == 15);
@@ -1490,7 +1493,7 @@ TEST_CASE("app: remote mongo client", "[sync][app][mongo][baas]") {
             CHECK(static_cast<std::string>(*object_id) == cat_id_string);
         });
 
-        person_document["dogs"] = bson::BsonArray({dog_object_id, dog2_object_id, dog3_object_id});
+        person_document.append("dogs", bson::BsonArray({dog_object_id, dog2_object_id, dog3_object_id}));
         person_collection.insert_one(person_document, [&](Optional<bson::Bson> object_id, Optional<AppError> error) {
             REQUIRE_FALSE(error);
             CHECK((*object_id).to_string() != "");
@@ -1520,7 +1523,7 @@ TEST_CASE("app: remote mongo client", "[sync][app][mongo][baas]") {
             REQUIRE_FALSE(error);
         });
 
-        dog_collection.insert_many(documents, [&](std::vector<bson::Bson> inserted_docs, Optional<AppError> error) {
+        dog_collection.insert_many(documents, [&](bson::BsonArray inserted_docs, Optional<AppError> error) {
             REQUIRE_FALSE(error);
             CHECK(inserted_docs.size() == 3);
             CHECK(inserted_docs[0].type() == bson::Bson::Type::ObjectId);
@@ -1571,7 +1574,7 @@ TEST_CASE("app: remote mongo client", "[sync][app][mongo][baas]") {
             dog2_object_id = static_cast<ObjectId>(*object_id);
         });
 
-        person_document["dogs"] = bson::BsonArray({dog_object_id, dog2_object_id});
+        person_document.append("dogs", bson::BsonArray({dog_object_id, dog2_object_id}));
         person_collection.insert_one(person_document, [&](Optional<bson::Bson> object_id, Optional<AppError> error) {
             REQUIRE_FALSE(error);
             CHECK((*object_id).to_string() != "");
@@ -1692,7 +1695,7 @@ TEST_CASE("app: remote mongo client", "[sync][app][mongo][baas]") {
             dog2_object_id = static_cast<ObjectId>(*object_id);
         });
 
-        person_document["dogs"] = bson::BsonArray({dog_object_id, dog2_object_id});
+        person_document.append("dogs", bson::BsonArray({dog_object_id, dog2_object_id}));
         person_collection.insert_one(person_document, [&](Optional<bson::Bson> object_id, Optional<AppError> error) {
             REQUIRE_FALSE(error);
             CHECK((*object_id).to_string() != "");
@@ -1859,7 +1862,7 @@ TEST_CASE("app: remote mongo client", "[sync][app][mongo][baas]") {
                                        [&](Optional<bson::Bson> bson, Optional<AppError> error) {
                                            REQUIRE_FALSE(error);
                                            auto document = static_cast<bson::BsonDocument>(*bson);
-                                           auto foundUpsertedId = document.find("upsertedId") != document.end();
+                                           auto foundUpsertedId = document.find("upsertedId");
                                            REQUIRE(!foundUpsertedId);
                                        });
 
@@ -1871,9 +1874,9 @@ TEST_CASE("app: remote mongo client", "[sync][app][mongo][baas]") {
                                            REQUIRE(upserted_id == cat_id_string);
                                        });
 
-        person_document["dogs"] = bson::BsonArray();
+        person_document.append("dogs", bson::BsonArray());
         bson::BsonDocument person_document_copy = bson::BsonDocument(person_document);
-        person_document_copy["dogs"] = bson::BsonArray({dog_object_id});
+        person_document_copy.append("dogs", bson::BsonArray({dog_object_id}));
         person_collection.update_one(person_document, person_document, true,
                                      [&](MongoCollection::UpdateResult, Optional<AppError> error) {
                                          REQUIRE_FALSE(error);
@@ -1945,8 +1948,8 @@ TEST_CASE("app: remote mongo client", "[sync][app][mongo][baas]") {
                                                 CHECK(static_cast<std::string>(name) == "fido");
                                             });
 
-        person_document["dogs"] = bson::BsonArray({dog_object_id});
-        person_document2["dogs"] = bson::BsonArray({dog_object_id});
+        person_document.append("dogs", bson::BsonArray({dog_object_id}));
+        person_document2.append("dogs", bson::BsonArray({dog_object_id}));
         person_collection.insert_one(person_document, [&](Optional<bson::Bson> object_id, Optional<AppError> error) {
             REQUIRE_FALSE(error);
             CHECK((*object_id).to_string() != "");
@@ -2000,9 +2003,11 @@ TEST_CASE("app: remote mongo client", "[sync][app][mongo][baas]") {
         bool processed = false;
 
         bson::BsonArray documents;
-        documents.assign(3, dog_document);
+        documents.append(dog_document);
+        documents.append(dog_document);
+        documents.append(dog_document);
 
-        dog_collection.insert_many(documents, [&](std::vector<bson::Bson> inserted_docs, Optional<AppError> error) {
+        dog_collection.insert_many(documents, [&](bson::BsonArray inserted_docs, Optional<AppError> error) {
             REQUIRE_FALSE(error);
             CHECK(inserted_docs.size() == 3);
         });
@@ -3922,7 +3927,7 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
     std::unique_ptr<realm::AppSession> app_session;
     auto redir_transport = std::make_shared<BaseUrlTransport>();
     AutoVerifiedEmailCredentials creds;
-    util::Logger::set_default_level_threshold(realm::util::Logger::Level::TEST_LOGGING_LEVEL);
+    util::LogCategory::realm.set_default_level_threshold(realm::util::Logger::Level::TEST_LOGGING_LEVEL);
     auto logger = util::Logger::get_default_logger();
 
     App::Config app_config = {"fake-app-id"};
@@ -4139,7 +4144,7 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
     SECTION("Verify new sync session updates location") {
         bool use_ssl = GENERATE(true, false);
         std::string expected_host = "redirect.someurl.fake";
-        int expected_port = 8081;
+        unsigned expected_port = 8081;
         std::string init_url = util::format("http%1://alternate.someurl.fake", use_ssl ? "s" : "");
         std::string init_wsurl = util::format("ws%1://alternate.someurl.fake", use_ssl ? "s" : "");
         std::string redir_url = util::format("http%1://%2:%3", use_ssl ? "s" : "", expected_host, expected_port);
@@ -4385,6 +4390,7 @@ TEMPLATE_TEST_CASE("app: collections of links integration", "[sync][pbs][app][co
             test_type.add_link(obj, link);
         }
         r->commit_transaction();
+        return object;
     };
 
     auto create_one_dest_object = [&](realm::SharedRealm r, int64_t val) -> ObjLink {
@@ -4410,11 +4416,13 @@ TEMPLATE_TEST_CASE("app: collections of links integration", "[sync][pbs][app][co
     SECTION("integration testing") {
         auto app = test_session.app();
         SyncTestFile config1(app, partition, schema); // uses the current user created above
+        config1.automatic_change_notifications = false;
         auto r1 = realm::Realm::get_shared_realm(config1);
         Results r1_source_objs = realm::Results(r1, r1->read_group().get_table("class_source"));
 
         create_user_and_log_in(app);
         SyncTestFile config2(app, partition, schema); // uses the user created above
+        config2.automatic_change_notifications = false;
         auto r2 = realm::Realm::get_shared_realm(config2);
         Results r2_source_objs = realm::Results(r2, r2->read_group().get_table("class_source"));
 
@@ -4422,12 +4430,14 @@ TEMPLATE_TEST_CASE("app: collections of links integration", "[sync][pbs][app][co
         constexpr int64_t dest_pk_1 = 1;
         constexpr int64_t dest_pk_2 = 2;
         constexpr int64_t dest_pk_3 = 3;
+        Object object;
+
         { // add a container collection with three valid links
             REQUIRE(r1_source_objs.size() == 0);
             ObjLink dest1 = create_one_dest_object(r1, dest_pk_1);
             ObjLink dest2 = create_one_dest_object(r1, dest_pk_2);
             ObjLink dest3 = create_one_dest_object(r1, dest_pk_3);
-            create_one_source_object(r1, source_pk, {dest1, dest2, dest3});
+            object = create_one_source_object(r1, source_pk, {dest1, dest2, dest3});
             REQUIRE(r1_source_objs.size() == 1);
             REQUIRE(r1_source_objs.get(0).get<Int>(valid_pk_name) == source_pk);
             REQUIRE(r1_source_objs.get(0).get<String>("realm_id") == partition);
@@ -4468,6 +4478,12 @@ TEMPLATE_TEST_CASE("app: collections of links integration", "[sync][pbs][app][co
             remaining_dest_object_ids = {linked_objects[1].template get<Int>(valid_pk_name)};
             REQUIRE(test_type.size_of_collection(r1_source_objs.get(0)) == expected_coll_size);
         }
+        bool coll_cleared = false;
+        advance_and_notify(*r1);
+        auto collection = test_type.get_collection(r1, r1_source_objs.get(0));
+        auto token = collection.add_notification_callback([&coll_cleared](CollectionChangeSet c) {
+            coll_cleared = c.collection_was_cleared;
+        });
 
         { // clear the collection
             REQUIRE(r2_source_objs.size() == 1);
@@ -4483,8 +4499,11 @@ TEMPLATE_TEST_CASE("app: collections of links integration", "[sync][pbs][app][co
         }
 
         { // expect an empty collection
+            REQUIRE(!coll_cleared);
             REQUIRE(r1_source_objs.size() == 1);
             wait_for_num_outgoing_links_to_equal(r1, r1_source_objs.get(0), expected_coll_size);
+            advance_and_notify(*r1);
+            REQUIRE(coll_cleared);
         }
     }
 }

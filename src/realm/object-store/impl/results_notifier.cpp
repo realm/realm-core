@@ -19,6 +19,7 @@
 #include <realm/object-store/impl/results_notifier.hpp>
 
 #include <realm/object-store/shared_realm.hpp>
+#include <realm/util/scope_exit.hpp>
 
 #include <numeric>
 
@@ -63,6 +64,15 @@ ResultsNotifier::ResultsNotifier(Results& target)
     , m_descriptor_ordering(target.get_descriptor_ordering())
     , m_target_is_in_table_order(target.is_in_table_order())
 {
+    if (m_logger) {
+        m_description = std::string("'") + std::string(m_query->get_table()->get_class_name()) + std::string("'");
+        if (m_query->has_conditions()) {
+            m_description += " where \"";
+            m_description += m_query->get_description_safe() + "\"";
+        }
+        m_logger->log(util::LogCategory::notification, util::Logger::Level::debug, "Creating ResultsNotifier for ",
+                      m_description);
+    }
     reattach();
 }
 
@@ -141,7 +151,19 @@ void ResultsNotifier::calculate_changes()
 
 void ResultsNotifier::run()
 {
+    using namespace std::chrono;
+
     REALM_ASSERT(m_info || !has_run());
+
+    auto t1 = steady_clock::now();
+    util::ScopeExit cleanup([&]() noexcept {
+        m_run_time_point = steady_clock::now();
+        if (m_logger) {
+            m_logger->log(util::LogCategory::notification, util::Logger::Level::debug,
+                          "ResultsNotifier %1 did run in %2 us", m_description,
+                          duration_cast<microseconds>(m_run_time_point - t1).count());
+        }
+    });
 
     // Table's been deleted, so report all objects as deleted
     if (!m_query->get_table()) {
@@ -252,6 +274,20 @@ ListResultsNotifier::ListResultsNotifier(Results& target)
         if (descr->get_type() == DescriptorType::Distinct)
             m_distinct = true;
     }
+    if (m_logger) {
+        auto path = m_list->get_short_path();
+        auto prop_name = m_list->get_table()->get_column_name(path[0].get_col_key());
+        path[0] = PathElement(prop_name);
+        std::string sort_order;
+        if (m_sort_order) {
+            sort_order = *m_sort_order ? " sorted ascending" : " sorted descending";
+        }
+
+        m_description =
+            util::format("%1 %2%3%4", m_list->get_collection_type(), m_list->get_obj().get_id(), path, sort_order);
+        m_logger->log(util::LogCategory::notification, util::Logger::Level::debug,
+                      "Creating ListResultsNotifier for %1", m_description);
+    }
 }
 
 void ListResultsNotifier::release_data() noexcept
@@ -279,7 +315,7 @@ bool ListResultsNotifier::do_add_required_change_info(TransactionChangeInfo& inf
         return false; // origin row was deleted after the notification was added
 
     info.collections.push_back(
-        {m_list->get_table()->get_key(), m_list->get_owner_key(), m_list->get_col_key(), &m_change});
+        {m_list->get_table()->get_key(), m_list->get_owner_key(), m_list->get_stable_path(), &m_change});
 
     m_info = &info;
     return true;
@@ -322,6 +358,17 @@ void ListResultsNotifier::calculate_changes()
 
 void ListResultsNotifier::run()
 {
+    using namespace std::chrono;
+    auto t1 = steady_clock::now();
+    util::ScopeExit cleanup([&]() noexcept {
+        m_run_time_point = steady_clock::now();
+        if (m_logger) {
+            m_logger->log(util::LogCategory::notification, util::Logger::Level::debug,
+                          "ListResultsNotifier %1 did run in %2 us", m_description,
+                          duration_cast<microseconds>(m_run_time_point - t1).count());
+        }
+    });
+
     if (!m_list || !m_list->is_attached()) {
         // List was deleted, so report all of the rows being removed
         m_change = {};
@@ -331,8 +378,10 @@ void ListResultsNotifier::run()
         return;
     }
 
-    if (!need_to_run())
+    if (!need_to_run()) {
+        cleanup.cancel();
         return;
+    }
 
     m_run_indices = std::vector<size_t>();
     if (m_distinct)
@@ -342,6 +391,17 @@ void ListResultsNotifier::run()
     else {
         m_run_indices->resize(m_list->size());
         std::iota(m_run_indices->begin(), m_run_indices->end(), 0);
+    }
+
+    if (m_change.paths.size()) {
+        if (auto coll = dynamic_cast<CollectionParent*>(m_list.get())) {
+            for (auto& p : m_change.paths) {
+                // Report changes in substructure as modifications on this list
+                auto ndx = coll->find_index(p[0]);
+                if (ndx != realm::not_found)
+                    m_change.modifications.add(ndx); // OK to insert same index again
+            }
+        }
     }
 
     calculate_changes();

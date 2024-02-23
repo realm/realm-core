@@ -24,6 +24,7 @@ set(REALM_SOURCES
     chunked_binary.cpp
     cluster.cpp
     collection.cpp
+    collection_parent.cpp
     cluster_tree.cpp
     error_codes.cpp
     column_binary.cpp
@@ -60,6 +61,7 @@ set(REALM_SOURCES
     object_id.cpp
     table_view.cpp
     tokenizer.cpp
+    to_json.cpp
     transaction.cpp
     sort_descriptor.cpp
     status.cpp
@@ -139,9 +141,11 @@ set(REALM_INSTALL_HEADERS
     cluster.hpp
     cluster_tree.hpp
     collection.hpp
+    collection_parent.hpp
     column_binary.hpp
     column_fwd.hpp
     column_integer.hpp
+    column_mixed.hpp
     column_type.hpp
     column_type_traits.hpp
     data_type.hpp
@@ -168,6 +172,7 @@ set(REALM_INSTALL_HEADERS
     obj.hpp
     obj_list.hpp
     object_id.hpp
+    path.hpp
     owned_data.hpp
     query.hpp
     query_conditions.hpp
@@ -177,6 +182,7 @@ set(REALM_INSTALL_HEADERS
     query_value.hpp
     realm_nmmintrin.h
     replication.hpp
+    search_index.hpp
     set.hpp
     sort_descriptor.hpp
     spec.hpp

@@ -50,17 +50,42 @@ public:
     void assign_symmetric_difference(const CollectionBase&);
 
 protected:
+    static constexpr CollectionType s_collection_type = CollectionType::Set;
     mutable std::unique_ptr<BPlusTreeBase> m_tree;
 
     void insert_repl(Replication* repl, size_t index, Mixed value) const;
     void erase_repl(Replication* repl, size_t index, Mixed value) const;
     void clear_repl(Replication* repl) const;
+    static std::vector<Mixed> convert_to_mixed_set(const CollectionBase& rhs);
+    bool do_init_from_parent(ref_type ref, bool allow_create) const;
 
     REALM_COLD REALM_NORETURN void throw_invalid_null()
     {
         throw InvalidArgument(ErrorCodes::PropertyNotNullable,
                               util::format("Set: %1", CollectionBase::get_property_name()));
     }
+
+private:
+    template <class It1, class It2>
+    bool is_subset_of(It1, It2) const;
+
+    template <class It1, class It2>
+    bool is_superset_of(It1, It2) const;
+
+    template <class It1, class It2>
+    bool intersects(It1, It2) const;
+
+    template <class It1, class It2>
+    void assign_union(It1, It2);
+
+    template <class It1, class It2>
+    void assign_intersection(It1, It2);
+
+    template <class It1, class It2>
+    void assign_difference(It1, It2);
+
+    template <class It1, class It2>
+    void assign_symmetric_difference(It1, It2);
 };
 
 template <class T>
@@ -71,7 +96,21 @@ public:
     using iterator = CollectionIterator<Set<T>>;
 
     Set() = default;
-    Set(const Obj& owner, ColKey col_key);
+    Set(const Obj& owner, ColKey col_key)
+        : Set<T>(col_key)
+    {
+        this->set_owner(owner, col_key);
+    }
+
+    Set(ColKey col_key)
+        : Base(col_key)
+    {
+        if (!col_key.is_set()) {
+            throw InvalidArgument(ErrorCodes::TypeMismatch, "Property not a set");
+        }
+
+        check_column_type<value_type>(m_col_key);
+    }
     Set(const Set& other);
     Set(Set&& other) noexcept;
     Set& operator=(const Set& other);
@@ -135,7 +174,7 @@ public:
     util::Optional<Mixed> max(size_t* return_ndx = nullptr) const final;
     util::Optional<Mixed> sum(size_t* return_cnt = nullptr) const final;
     util::Optional<Mixed> avg(size_t* return_cnt = nullptr) const final;
-    std::unique_ptr<CollectionBase> clone_collection() const final
+    CollectionBasePtr clone_collection() const final
     {
         return std::make_unique<Set<T>>(*this);
     }
@@ -154,10 +193,11 @@ public:
         return tree();
     }
 
-    UpdateStatus update_if_needed() const final;
-    UpdateStatus ensure_created() final;
+    UpdateStatus update_if_needed_with_status() const final;
+    void ensure_created();
 
     void migrate();
+    void migration_resort();
 
 private:
     // Friend because it needs access to `m_tree` in the implementation of
@@ -165,9 +205,9 @@ private:
     friend class LnkSet;
 
     using Base::bump_content_version;
+    using Base::get_alloc;
     using Base::m_col_key;
     using Base::m_nullable;
-    using Base::m_obj;
 
     BPlusTree<T>& tree() const
     {
@@ -179,7 +219,7 @@ private:
     /// Update the accessor and return true if it is attached after the update.
     inline bool update() const
     {
-        return update_if_needed() != UpdateStatus::Detached;
+        return update_if_needed_with_status() != UpdateStatus::Detached;
     }
 
     // `do_` methods here perform the action after preconditions have been
@@ -187,6 +227,7 @@ private:
     void do_insert(size_t ndx, T value);
     void do_erase(size_t ndx);
     void do_clear();
+    void do_resort(size_t from, size_t to);
 
     iterator find_impl(const T& value) const;
 };
@@ -202,6 +243,11 @@ public:
         : m_set(owner, col_key)
     {
     }
+    LnkSet(ColKey col_key)
+        : m_set(col_key)
+    {
+    }
+
 
     LnkSet(const LnkSet&) = default;
     LnkSet(LnkSet&&) = default;
@@ -218,7 +264,7 @@ public:
 
     // Overriding members of CollectionBase:
     using CollectionBase::get_owner_key;
-    CollectionBasePtr clone_collection() const
+    CollectionBasePtr clone_collection() const override
     {
         return clone_linkset();
     }
@@ -233,12 +279,31 @@ public:
     void sort(std::vector<size_t>& indices, bool ascending = true) const final;
     void distinct(std::vector<size_t>& indices, util::Optional<bool> sort_order = util::none) const final;
     const Obj& get_obj() const noexcept final;
-    bool is_attached() const final;
-    bool has_changed() const final;
+    bool is_attached() const noexcept final;
+    bool has_changed() const noexcept final;
     ColKey get_col_key() const noexcept final;
+    CollectionType get_collection_type() const noexcept override
+    {
+        return CollectionType::Set;
+    }
+
+    FullPath get_path() const noexcept final
+    {
+        return m_set.get_path();
+    }
+
+    Path get_short_path() const noexcept final
+    {
+        return m_set.get_short_path();
+    }
+
+    StablePath get_stable_path() const noexcept final
+    {
+        return m_set.get_stable_path();
+    }
 
     // Overriding members of SetBase:
-    SetBasePtr clone() const
+    SetBasePtr clone() const override
     {
         return clone_linkset();
     }
@@ -293,13 +358,25 @@ public:
         return iterator{this, size()};
     }
 
+    void set_owner(const Obj& obj, ColKey ck) override
+    {
+        m_set.set_owner(obj, ck);
+    }
+
+    void set_owner(std::shared_ptr<CollectionParent> parent, CollectionParent::Index index) override
+    {
+        m_set.set_owner(std::move(parent), index);
+    }
+
+    void to_json(std::ostream&, JSONOutputMode, util::FunctionRef<void(const Mixed&)>) const override;
+
 private:
     Set<ObjKey> m_set;
 
     // Overriding members of ObjCollectionBase:
     UpdateStatus do_update_if_needed() const final
     {
-        return m_set.update_if_needed();
+        return m_set.update_if_needed_with_status();
     }
 
     BPlusTree<ObjKey>* get_mutable_tree() const final
@@ -328,6 +405,12 @@ template <>
 void Set<Mixed>::do_clear();
 template <>
 void Set<Mixed>::migrate();
+template <>
+void Set<Mixed>::migration_resort();
+template <>
+void Set<StringData>::migration_resort();
+template <>
+void Set<BinaryData>::migration_resort();
 
 /// Compare set elements.
 ///
@@ -414,17 +497,6 @@ struct SetElementEquals<Mixed> {
     }
 };
 
-template <class T>
-inline Set<T>::Set(const Obj& obj, ColKey col_key)
-    : Base(obj, col_key)
-{
-    if (!col_key.is_set()) {
-        throw InvalidArgument(ErrorCodes::TypeMismatch, "Property not a set");
-    }
-
-    check_column_type<value_type>(m_col_key);
-}
-
 inline SetBase::SetBase(const SetBase& other)
     : CollectionBase(other)
 {
@@ -505,6 +577,53 @@ inline Set<T>& Set<T>::operator=(Set&& other) noexcept
     return *this;
 }
 
+template <typename T>
+UpdateStatus Set<T>::update_if_needed_with_status() const
+{
+    auto status = Base::get_update_status();
+    switch (status) {
+        case UpdateStatus::Detached: {
+            m_tree.reset();
+            return UpdateStatus::Detached;
+        }
+        case UpdateStatus::NoChange:
+            if (m_tree && tree().is_attached()) {
+                return UpdateStatus::NoChange;
+            }
+            // The tree has not been initialized yet for this accessor, so
+            // perform lazy initialization by treating it as an update.
+            [[fallthrough]];
+        case UpdateStatus::Updated: {
+            bool attached = init_from_parent(false);
+            Base::update_content_version();
+            return attached ? UpdateStatus::Updated : UpdateStatus::Detached;
+        }
+    }
+    REALM_UNREACHABLE();
+}
+
+template <typename T>
+void Set<T>::ensure_created()
+{
+    if (Base::should_update() || !(m_tree && tree().is_attached())) {
+        // When allow_create is true, init_from_parent will always succeed
+        // In case of errors, an exception is thrown.
+        constexpr bool allow_create = true;
+        init_from_parent(allow_create); // Throws
+        Base::update_content_version();
+    }
+}
+
+template <typename T>
+bool Set<T>::init_from_parent(bool allow_create) const
+{
+    if (!m_tree) {
+        m_tree.reset(new BPlusTree<T>(get_alloc()));
+        const ArrayParent* parent = this;
+        m_tree->set_parent(const_cast<ArrayParent*>(parent), 0);
+    }
+    return do_init_from_parent(Base::get_collection_ref(), allow_create);
+}
 
 template <typename U>
 Set<U> Obj::get_set(ColKey col_key) const
@@ -573,18 +692,17 @@ REALM_NOINLINE auto Set<T>::find_impl(const T& value) const -> iterator
 template <class T>
 std::pair<size_t, bool> Set<T>::insert(T value)
 {
+    ensure_created();
+
     if (!m_nullable && value_is_null(value))
         throw_invalid_null();
-
-    update_if_needed();
-    ensure_created();
 
     auto it = find_impl(value);
     if (it != this->end() && SetElementEquals<T>{}(*it, value)) {
         return {it.index(), false};
     }
 
-    if (Replication* repl = m_obj.get_replication()) {
+    if (Replication* repl = Base::get_replication()) {
         // FIXME: We should emit an instruction regardless of element presence for the purposes of conflict
         // resolution in synchronized databases. The reason is that the new insertion may come at a later time
         // than an interleaving erase instruction, so emitting the instruction ensures that last "write" wins.
@@ -621,7 +739,7 @@ std::pair<size_t, bool> Set<T>::erase(T value)
         return {npos, false};
     }
 
-    if (Replication* repl = m_obj.get_replication()) {
+    if (Replication* repl = Base::get_replication()) {
         this->erase_repl(repl, it.index(), value);
     }
     do_erase(it.index());
@@ -673,7 +791,7 @@ template <class T>
 inline void Set<T>::clear()
 {
     if (size() > 0) {
-        if (Replication* repl = this->m_obj.get_replication()) {
+        if (Replication* repl = Base::get_replication()) {
             this->clear_repl(repl);
         }
         do_clear();
@@ -745,13 +863,18 @@ inline void Set<T>::do_insert(size_t ndx, T value)
 template <class T>
 inline void Set<T>::do_erase(size_t ndx)
 {
-    m_tree->erase(ndx);
+    tree().erase(ndx);
 }
 
 template <class T>
 inline void Set<T>::do_clear()
 {
-    m_tree->clear();
+    tree().clear();
+}
+
+template <class T>
+inline void Set<T>::migration_resort()
+{
 }
 
 inline bool LnkSet::operator==(const LnkSet& other) const
@@ -976,12 +1099,12 @@ inline const Obj& LnkSet::get_obj() const noexcept
     return m_set.get_obj();
 }
 
-inline bool LnkSet::is_attached() const
+inline bool LnkSet::is_attached() const noexcept
 {
     return m_set.is_attached();
 }
 
-inline bool LnkSet::has_changed() const
+inline bool LnkSet::has_changed() const noexcept
 {
     return m_set.has_changed();
 }

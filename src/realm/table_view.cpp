@@ -263,8 +263,7 @@ util::Optional<Mixed> TableView::avg(ColKey column_key, size_t* value_count) con
     return aggregate<act_Average>(column_key, value_count, nullptr);
 }
 
-void TableView::to_json(std::ostream& out, size_t link_depth, const std::map<std::string, std::string>& renames,
-                        JSONOutputMode mode) const
+void TableView::to_json(std::ostream& out, JSONOutputMode mode) const
 {
     // Represent table as list of objects
     out << "[";
@@ -279,7 +278,7 @@ void TableView::to_json(std::ostream& out, size_t link_depth, const std::map<std
             else {
                 out << ",";
             }
-            m_table->get_object(key).to_json(out, link_depth, renames, mode);
+            m_table->get_object(key).to_json(out, mode);
         }
     }
 

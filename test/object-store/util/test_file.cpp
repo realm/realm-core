@@ -65,12 +65,62 @@ inline static int mkstemp(char* _template)
 
 using namespace realm;
 
+static std::vector<std::pair<std::string_view, realm::util::Logger::Level>> default_log_levels = {
+    {"Realm", realm::util::Logger::Level::TEST_LOGGING_LEVEL},
+#ifdef TEST_LOGGING_LEVEL_STORAGE
+    {"Realm.Storage", realm::util::Logger::Level::TEST_LOGGING_LEVEL_STORAGE},
+#endif
+#ifdef TEST_LOGGING_LEVEL_TRANSACTION
+    {"Realm.Storage.Transaction", realm::util::Logger::Level::TEST_LOGGING_LEVEL_TRANSACTION},
+#endif
+#ifdef TEST_LOGGING_LEVEL_QUERY
+    {"Realm.Storage.Query", realm::util::Logger::Level::TEST_LOGGING_LEVEL_QUERY},
+#endif
+#ifdef TEST_LOGGING_LEVEL_OBJECT
+    {"Realm.Storage.Object", realm::util::Logger::Level::TEST_LOGGING_LEVEL_OBJECT},
+#endif
+#ifdef TEST_LOGGING_LEVEL_NOTIFICATION
+    {"Realm.Storage.Notification", realm::util::Logger::Level::TEST_LOGGING_LEVEL_NOTIFICATION},
+#endif
+#ifdef TEST_LOGGING_LEVEL_SYNC
+    {"Realm.Sync", realm::util::Logger::Level::TEST_LOGGING_LEVEL_SYNC},
+#endif
+#ifdef TEST_LOGGING_LEVEL_CLIENT
+    {"Realm.Sync.Client", realm::util::Logger::Level::TEST_LOGGING_LEVEL_CLIENT},
+#endif
+#ifdef TEST_LOGGING_LEVEL_SESSION
+    {"Realm.Sync.Client.Session", realm::util::Logger::Level::TEST_LOGGING_LEVEL_SESSION},
+#endif
+#ifdef TEST_LOGGING_LEVEL_CHANGESET
+    {"Realm.Sync.Client.Changeset", realm::util::Logger::Level::TEST_LOGGING_LEVEL_CHANGESET},
+#endif
+#ifdef TEST_LOGGING_LEVEL_NETWORK
+    {"Realm.Sync.Client.Network", realm::util::Logger::Level::TEST_LOGGING_LEVEL_NETWORK},
+#endif
+#ifdef TEST_LOGGING_LEVEL_RESET
+    {"Realm.Sync.Client.Reset", realm::util::Logger::Level::TEST_LOGGING_LEVEL_RESET},
+#endif
+#ifdef TEST_LOGGING_LEVEL_SERVER
+    {"Realm.Sync.Server", realm::util::Logger::Level::TEST_LOGGING_LEVEL_SERVER},
+#endif
+#ifdef TEST_LOGGING_LEVEL_APP
+    {"Realm.App", realm::util::Logger::Level::TEST_LOGGING_LEVEL_APP},
+#endif
+};
+
+static void set_default_level_thresholds()
+{
+    for (auto [cat, level] : default_log_levels) {
+        realm::util::LogCategory::get_category(cat).set_default_level_threshold(level);
+    }
+}
+
 TestFile::TestFile()
 {
     disable_sync_to_disk();
     m_temp_dir = util::make_temp_dir();
     path = (fs::path(m_temp_dir) / "realm.XXXXXX").string();
-    util::Logger::set_default_level_threshold(realm::util::Logger::Level::TEST_LOGGING_LEVEL);
+    set_default_level_thresholds();
     if (const char* crypt_key = test_util::crypt_key()) {
         encryption_key = std::vector<char>(crypt_key, crypt_key + 64);
     }
@@ -117,6 +167,7 @@ InMemoryTestFile::InMemoryTestFile()
     in_memory = true;
     schema_version = 0;
     encryption_key = std::vector<char>();
+    set_default_level_thresholds();
 }
 
 DBOptions InMemoryTestFile::options() const
@@ -202,13 +253,7 @@ SyncServer::SyncServer(const SyncServer::Config& config)
     , m_server(m_local_root_dir, util::none, ([&] {
                    using namespace std::literals::chrono_literals;
 
-#if TEST_ENABLE_LOGGING
                    m_logger = util::Logger::get_default_logger();
-
-#else
-                   // Logging is disabled, use a NullLogger to prevent printing anything
-                   m_logger.reset(new util::NullLogger());
-#endif
 
                    sync::Server::Config c;
                    c.logger = m_logger;
@@ -345,7 +390,7 @@ TestAppSession::TestAppSession(AppSession session,
     if (!m_transport)
         m_transport = instance_of<SynchronousTestTransport>;
     auto app_config = get_config(m_transport, *m_app_session);
-    util::Logger::set_default_level_threshold(realm::util::Logger::Level::TEST_LOGGING_LEVEL);
+    set_default_level_thresholds();
     set_app_config_defaults(app_config, m_transport);
 
     util::try_make_dir(m_base_file_path);
@@ -411,22 +456,26 @@ std::vector<bson::BsonDocument> TestAppSession::get_documents(SyncUser& user, co
         std::chrono::minutes(5));
 
     std::vector<bson::BsonDocument> documents;
-    collection.find({}, {},
-                    [&](util::Optional<std::vector<bson::Bson>>&& result, util::Optional<app::AppError> error) {
-                        REQUIRE(result);
-                        REQUIRE(!error);
-                        REQUIRE(result->size() == expected_count);
-                        documents.reserve(result->size());
-                        for (auto&& bson : *result) {
-                            REQUIRE(bson.type() == bson::Bson::Type::Document);
-                            documents.push_back(std::move(static_cast<bson::BsonDocument&>(bson)));
-                        }
-                    });
+    collection.find({}, {}, [&](util::Optional<bson::BsonArray>&& result, util::Optional<app::AppError> error) {
+        REQUIRE(result);
+        REQUIRE(!error);
+        REQUIRE(result->size() == expected_count);
+        documents.reserve(result->size());
+        for (auto&& bson : *result) {
+            REQUIRE(bson.type() == bson::Bson::Type::Document);
+            documents.push_back(std::move(static_cast<const bson::BsonDocument&>(bson)));
+        }
+    });
     return documents;
 }
 #endif // REALM_ENABLE_AUTH_TESTS
 
 // MARK: - TestSyncManager
+
+TestSyncManager::Config::Config()
+{
+    set_default_level_thresholds();
+}
 
 TestSyncManager::TestSyncManager(const Config& config, const SyncServer::Config& sync_server_config)
     : m_sync_server(sync_server_config)
@@ -434,7 +483,6 @@ TestSyncManager::TestSyncManager(const Config& config, const SyncServer::Config&
     , m_should_teardown_test_directory(config.should_teardown_test_directory)
 {
     util::try_make_dir(m_base_file_path);
-    util::Logger::set_default_level_threshold(config.log_level);
     SyncClientConfig sc_config;
     sc_config.base_file_path = m_base_file_path;
     sc_config.metadata_mode = config.metadata_mode;
@@ -498,7 +546,7 @@ OfflineAppSession::OfflineAppSession(OfflineAppSession::Config config)
     sc_config.metadata_mode = config.metadata_mode;
     sc_config.socket_provider = config.socket_provider;
 
-    util::Logger::set_default_level_threshold(realm::util::Logger::Level::TEST_LOGGING_LEVEL);
+    set_default_level_thresholds();
 
     m_app = app::App::get_app(app::App::CacheMode::Disabled, app_config, sc_config);
 }

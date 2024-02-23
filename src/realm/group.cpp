@@ -382,6 +382,28 @@ uint64_t Group::get_sync_file_id() const noexcept
     return 0;
 }
 
+size_t Group::get_free_space_size(const Array& top) noexcept
+{
+    if (top.is_attached() && top.size() > s_free_size_ndx) {
+        auto ref = top.get_as_ref(s_free_size_ndx);
+        Array free_list_sizes(top.get_alloc());
+        free_list_sizes.init_from_ref(ref);
+        return size_t(free_list_sizes.get_sum());
+    }
+    return 0;
+}
+
+size_t Group::get_history_size(const Array& top) noexcept
+{
+    if (top.is_attached() && top.size() > s_hist_ref_ndx) {
+        auto ref = top.get_as_ref(s_hist_ref_ndx);
+        Array hist(top.get_alloc());
+        hist.init_from_ref(ref);
+        return hist.get_byte_size_deep();
+    }
+    return 0;
+}
+
 int Group::read_only_version_check(SlabAlloc& alloc, ref_type top_ref, const std::string& path)
 {
     // Select file format if it is still undecided.
@@ -397,6 +419,7 @@ int Group::read_only_version_check(SlabAlloc& alloc, ref_type top_ref, const std
         case 0:
             file_format_ok = (top_ref == 0);
             break;
+        case 23:
         case g_current_file_format_version:
             file_format_ok = true;
             break;
@@ -826,7 +849,7 @@ void Group::remove_table(size_t table_ndx, TableKey key)
     size_t prior_num_tables = m_tables.size();
     Replication* repl = *get_repl();
     if (repl)
-        repl->erase_class(key, prior_num_tables); // Throws
+        repl->erase_class(key, table->get_name(), prior_num_tables); // Throws
 
     int64_t ref_64 = m_tables.get(table_ndx);
     REALM_ASSERT(!int_cast_has_overflow<ref_type>(ref_64));
@@ -1182,68 +1205,6 @@ bool Group::operator==(const Group& g) const
     }
     return true;
 }
-void Group::schema_to_json(std::ostream& out, std::map<std::string, std::string>* opt_renames) const
-{
-    check_attached();
-
-    std::map<std::string, std::string> renames;
-    if (opt_renames) {
-        renames = *opt_renames;
-    }
-
-    out << "[" << std::endl;
-
-    auto keys = get_table_keys();
-    int sz = int(keys.size());
-    for (int i = 0; i < sz; ++i) {
-        auto key = keys[i];
-        ConstTableRef table = get_table(key);
-
-        table->schema_to_json(out, renames);
-        if (i < sz - 1)
-            out << ",";
-        out << std::endl;
-    }
-
-    out << "]" << std::endl;
-}
-
-void Group::to_json(std::ostream& out, size_t link_depth, std::map<std::string, std::string>* opt_renames,
-                    JSONOutputMode output_mode) const
-{
-    check_attached();
-
-    std::map<std::string, std::string> renames;
-    if (opt_renames) {
-        renames = *opt_renames;
-    }
-
-    out << "{" << std::endl;
-
-    auto keys = get_table_keys();
-    bool first = true;
-    for (size_t i = 0; i < keys.size(); ++i) {
-        auto key = keys[i];
-        StringData name = get_table_name(key);
-        if (renames[name] != "")
-            name = renames[name];
-
-        ConstTableRef table = get_table(key);
-
-        if (!table->is_embedded()) {
-            if (!first)
-                out << ",";
-            out << "\"" << name << "\"";
-            out << ":";
-            table->to_json(out, link_depth, renames, output_mode);
-            out << std::endl;
-            first = false;
-        }
-    }
-
-    out << "}" << std::endl;
-}
-
 size_t Group::get_used_space() const noexcept
 {
     if (!m_top.is_attached())

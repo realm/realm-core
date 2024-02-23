@@ -58,7 +58,7 @@ static inline void run_corpus(const char* test_key, const CorpusEntry<T>& entry)
 {
     std::string canonical_extjson = remove_whitespace(entry.canonical_extjson);
     auto val = static_cast<BsonDocument>(bson::parse(canonical_extjson));
-    auto& test_value = val[test_key];
+    const Bson& test_value = val[test_key];
     REQUIRE(bson::holds_alternative<T>(test_value));
     entry.check((T)test_value);
     if (!entry.lossy) {

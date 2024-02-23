@@ -40,6 +40,12 @@
 
 namespace realm {
 
+enum JSONOutputMode {
+    output_mode_json,       // default / existing implementation for outputting realm to json
+    output_mode_xjson,      // extended json as described in the spec
+    output_mode_xjson_plus, // extended json as described in the spec with additional modifier used for sync
+};
+using ref_type = size_t;
 
 /// This class represents a polymorphic Realm value.
 ///
@@ -168,6 +174,13 @@ public:
     {
     }
 
+    Mixed(ref_type ref, CollectionType collection_type) noexcept
+        : m_type(int(collection_type) + 1)
+        , int_val(int64_t(ref))
+    {
+    }
+    ref_type get_ref() const noexcept;
+
     DataType get_type() const noexcept
     {
         REALM_ASSERT(m_type);
@@ -215,10 +228,8 @@ public:
     bool accumulate_numeric_to(Decimal128& destination) const noexcept;
     bool is_unresolved_link() const noexcept;
     bool is_same_type(const Mixed& b) const noexcept;
-    // Will use utf8_compare for strings
+    // Will use unsigned lexicographical comparison for strings
     int compare(const Mixed& b) const noexcept;
-    // Will compare strings as arrays of signed chars
-    int compare_signed(const Mixed& b) const noexcept;
     friend bool operator==(const Mixed& a, const Mixed& b) noexcept
     {
         return a.compare(b) == 0;
@@ -250,8 +261,14 @@ public:
     Mixed operator/(const Mixed&) const noexcept;
 
     size_t hash() const;
+    // Used when inserting values into index
     StringData get_index_data(std::array<char, 16>&) const noexcept;
+    // Used when logging values
+    std::string to_string(size_t max_size) const noexcept;
+    // Used when you need a backup buffer for string or binary value
     void use_buffer(std::string& buf) noexcept;
+
+    void to_json(std::ostream& out, JSONOutputMode output_mode) const noexcept;
 
 protected:
     friend std::ostream& operator<<(std::ostream& out, const Mixed& m);
@@ -298,6 +315,8 @@ private:
     {
         return _is_numeric(head) && _is_numeric(tail...);
     }
+    void to_xjson(std::ostream& out) const noexcept;
+    void to_xjson_plus(std::ostream& out) const noexcept;
 };
 static_assert(std::is_trivially_destructible_v<Mixed>);
 
@@ -587,6 +606,11 @@ inline int64_t Mixed::get_int() const noexcept
     return get<int64_t>();
 }
 
+inline ref_type Mixed::get_ref() const noexcept
+{
+    return ref_type(int_val);
+}
+
 template <>
 inline const int64_t* Mixed::get_if<int64_t>() const noexcept
 {
@@ -672,11 +696,8 @@ inline BinaryData Mixed::get<BinaryData>() const noexcept
 {
     if (is_null())
         return BinaryData();
-    if (get_type() == type_Binary) {
-        return binary_val;
-    }
-    REALM_ASSERT(get_type() == type_String);
-    return BinaryData(string_val.data(), string_val.size());
+    REALM_ASSERT(get_type() == type_Binary);
+    return binary_val;
 }
 
 inline BinaryData Mixed::get_binary() const noexcept

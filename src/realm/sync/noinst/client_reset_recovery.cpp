@@ -535,7 +535,7 @@ REALM_NORETURN void RecoverLocalChangesetsHandler::handle_error(const std::strin
 {
     std::string full_message =
         util::format("Unable to automatically recover local changes during client reset: '%1'", message);
-    m_logger.error(full_message.c_str());
+    m_logger.error(util::LogCategory::reset, full_message.c_str());
     throw realm::_impl::client_reset::ClientResetFailed(full_message);
 }
 
@@ -553,11 +553,11 @@ util::AppendBuffer<char> RecoverLocalChangesetsHandler::process_changeset(const 
     if (m_logger.would_log(util::Logger::Level::trace)) {
         std::stringstream dumped_changeset;
         parsed_changeset.print(dumped_changeset);
-        m_logger.trace("Recovering changeset: %1", dumped_changeset.str());
+        m_logger.trace(util::LogCategory::reset, "Recovering changeset: %1", dumped_changeset.str());
     }
 #endif
 
-    InstructionApplier::begin_apply(parsed_changeset, &m_logger);
+    InstructionApplier::begin_apply(parsed_changeset);
     for (auto instr : parsed_changeset) {
         if (!instr)
             continue;
@@ -604,8 +604,8 @@ void RecoverLocalChangesetsHandler::copy_lists_with_unrecoverable_changes()
             Obj remote_obj = remote_list.get_obj();
             InterRealmValueConverter value_converter(local_table, local_col_key, remote_table, remote_col_key,
                                                      &embedded_object_tracker);
-            m_logger.debug("Recovery overwrites list for '%1' size: %2 -> %3", path_str, remote_list.size(),
-                           local_list.size());
+            m_logger.debug(util::LogCategory::reset, "Recovery overwrites list for '%1' size: %2 -> %3", path_str,
+                           remote_list.size(), local_list.size());
             value_converter.copy_value(local_obj, remote_obj, nullptr);
             embedded_object_tracker.process_pending();
         });
@@ -614,7 +614,8 @@ void RecoverLocalChangesetsHandler::copy_lists_with_unrecoverable_changes()
         }
         else {
             // object no longer exists in the local state, ignore and continue
-            m_logger.warn("Discarding a list recovery made to an object which could not be resolved. "
+            m_logger.warn(util::LogCategory::reset,
+                          "Discarding a list recovery made to an object which could not be resolved. "
                           "remote_path='%1'",
                           path_str);
         }
@@ -633,10 +634,10 @@ bool RecoverLocalChangesetsHandler::resolve_path(ListPath& path, Obj remote_obj,
         ColKey col = it->col_key;
         REALM_ASSERT(col);
         if (col.is_list()) {
-            std::unique_ptr<LstBase> remote_list = get_list_from_path(remote_obj, col);
+            auto remote_list = get_list_from_path(remote_obj, col);
             ColKey local_col = local_obj.get_table()->get_column_key(remote_obj.get_table()->get_column_name(col));
             REALM_ASSERT(local_col);
-            std::unique_ptr<LstBase> local_list = get_list_from_path(local_obj, local_col);
+            auto local_list = get_list_from_path(local_obj, local_col);
             ++it;
             if (it == path.end()) {
                 callback(*remote_list, *local_list);
@@ -672,7 +673,46 @@ bool RecoverLocalChangesetsHandler::resolve_path(ListPath& path, Obj remote_obj,
                 return false;
             }
         }
-        else { // single link to embedded object
+        else if (col.get_type() == col_type_Mixed) {
+            StringData col_name = remote_obj.get_table()->get_column_name(col);
+            auto local_any = local_obj.get_any(col_name);
+            auto remote_any = remote_obj.get_any(col);
+
+            if (local_any.is_type(type_List) && remote_any.is_type(type_List)) {
+                ++it;
+                if (it == path.end()) {
+                    auto local_col = local_obj.get_table()->get_column_key(col_name);
+                    Lst<Mixed> local_list{local_obj, local_col};
+                    Lst<Mixed> remote_list{remote_obj, col};
+                    callback(remote_list, local_list);
+                    return true;
+                }
+                else {
+                    // same as above.
+                    REALM_UNREACHABLE();
+                }
+            }
+            else if (local_any.is_type(type_Dictionary) && remote_any.is_type(type_Dictionary)) {
+                ++it;
+                REALM_ASSERT(it != path.end());
+                REALM_ASSERT(it->type == ListPath::Element::Type::InternKey);
+                StringData col_name = remote_obj.get_table()->get_column_name(col);
+                auto local_col = local_obj.get_table()->get_column_key(col_name);
+                Dictionary remote_dict{remote_obj, col};
+                Dictionary local_dict{local_obj, local_col};
+                StringData dict_key = m_intern_keys.get_key(it->intern_key);
+                if (remote_dict.contains(dict_key) && local_dict.contains(dict_key)) {
+                    remote_obj = remote_dict.get_object(dict_key);
+                    local_obj = local_dict.get_object(dict_key);
+                    ++it;
+                }
+                else {
+                    return false;
+                }
+            }
+        }
+        else {
+            // single link to embedded object
             // Neither embedded object sets nor Mixed(TypedLink) to embedded objects are supported.
             REALM_ASSERT_EX(!col.is_collection(), col);
             REALM_ASSERT_EX(col.get_type() == col_type_Link, col);
@@ -793,6 +833,7 @@ RecoverLocalChangesetsHandler::RecoveryResolver::Status
 RecoverLocalChangesetsHandler::RecoveryResolver::on_null_link_advance(StringData table_name, StringData link_name)
 {
     m_recovery_applier->m_logger.warn(
+        util::LogCategory::reset,
         "Discarding a local %1 made to an embedded object which no longer exists along path '%2.%3'", m_instr_name,
         table_name, link_name);
     return Status::DidNotResolve; // discard this instruction as it operates over a null link
@@ -802,7 +843,8 @@ RecoverLocalChangesetsHandler::RecoveryResolver::Status
 RecoverLocalChangesetsHandler::RecoveryResolver::on_begin(const util::Optional<Obj>& obj)
 {
     if (!obj) {
-        m_recovery_applier->m_logger.warn("Cannot recover '%1' which operates on a deleted object", m_instr_name);
+        m_recovery_applier->m_logger.warn(util::LogCategory::reset,
+                                          "Cannot recover '%1' which operates on a deleted object", m_instr_name);
         return Status::DidNotResolve;
     }
     m_list_path = ListPath(obj->get_table()->get_key(), obj->get_key());
@@ -914,7 +956,7 @@ void RecoverLocalChangesetsHandler::operator()(const Instruction::Update& instr)
     if (UpdateResolver(this, instr_copy, instr_name).resolve() == RecoveryResolver::Status::Success) {
         if (!check_links_exist(instr_copy.value)) {
             if (!allows_null_links(instr_copy, instr_name)) {
-                m_logger.warn("Discarding an update which links to a deleted object");
+                m_logger.warn(util::LogCategory::reset, "Discarding an update which links to a deleted object");
                 return;
             }
             instr_copy.value = {};
@@ -1025,7 +1067,7 @@ void RecoverLocalChangesetsHandler::operator()(const Instruction::ArrayInsert& i
 
     static constexpr std::string_view instr_name("ArrayInsert");
     if (!check_links_exist(instr.value)) {
-        m_logger.warn("Discarding %1 which links to a deleted object", instr_name);
+        m_logger.warn(util::LogCategory::reset, "Discarding %1 which links to a deleted object", instr_name);
         return;
     }
     Instruction::ArrayInsert instr_copy = instr;
@@ -1110,7 +1152,7 @@ void RecoverLocalChangesetsHandler::operator()(const Instruction::SetInsert& ins
     };
     static constexpr std::string_view instr_name("SetInsert");
     if (!check_links_exist(instr.value)) {
-        m_logger.warn("Discarding a %1 which links to a deleted object", instr_name);
+        m_logger.warn(util::LogCategory::reset, "Discarding a %1 which links to a deleted object", instr_name);
         return;
     }
     Instruction::SetInsert instr_copy = instr;

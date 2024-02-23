@@ -26,6 +26,7 @@
 #include <realm/data_type.hpp>
 #include <realm/table.hpp>
 #include <realm/impl/transact_log.hpp>
+#include <realm/collection_parent.hpp>
 
 #include <iostream>
 #include <fstream>
@@ -356,7 +357,7 @@ private:
         size_t subspec_ndx = 0;
         for (size_t i = 0; i != column_ndx; ++i) {
             auto type = realm::ColumnType(m_column_types.get_val(i));
-            if (type == realm::col_type_Link || type == realm::col_type_LinkList) {
+            if (type == realm::col_type_Link) {
                 subspec_ndx += 1; // index of dest column
             }
             else if (type == realm::col_type_BackLink) {
@@ -605,7 +606,7 @@ void Table::print_columns(const Group& group) const
             col_key = realm::ColKey(m_column_colkeys.get_val(i));
         }
 
-        if (type == realm::col_type_Link || type == realm::col_type_LinkList) {
+        if (type == realm::col_type_Link) {
             size_t target_table_ndx;
             if (col_key) {
                 // core6
@@ -616,9 +617,6 @@ void Table::print_columns(const Group& group) const
                 target_table_ndx = size_t(m_column_subspecs.get_val(get_subspec_ndx_after(i)));
             }
             type_str += group.get_table_name(target_table_ndx);
-            if (!col_key && type == realm::col_type_LinkList) {
-                type_str += "[]";
-            }
         }
         else {
             type_str = get_data_type_name(realm::DataType(type));
@@ -984,6 +982,12 @@ public:
         return true;
     }
 
+    bool dictionary_clear(size_t)
+    {
+        std::cout << "Dictionary clear " << std::endl;
+        return true;
+    }
+
     bool set_link_type(realm::ColKey)
     {
         return true;
@@ -1005,7 +1009,7 @@ public:
         return true;
     }
 
-    bool select_collection(realm::ColKey col_key, realm::ObjKey key)
+    bool select_collection(realm::ColKey col_key, realm::ObjKey key, const realm::StablePath&)
     {
         std::cout << "Select collection: " << m_table->get_column_name(col_key) << " on " << key << std::endl;
         return true;

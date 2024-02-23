@@ -34,14 +34,13 @@ using VersionList = BackupHandler::VersionList;
 using VersionTimeList = BackupHandler::VersionTimeList;
 
 // Note: accepted versions should have new versions added at front
-const VersionList BackupHandler::accepted_versions_ = {23, 22, 21, 20, 11, 10, 9, 8, 7, 6, 5, 0};
+const VersionList BackupHandler::accepted_versions_ = {24, 23, 22, 21, 20, 11, 10};
 
 // the pair is <version, age-in-seconds>
 // we keep backup files in 3 months.
 static constexpr int three_months = 3 * 31 * 24 * 60 * 60;
-const VersionTimeList BackupHandler::delete_versions_{
-    {22, three_months}, {21, three_months}, {20, three_months}, {11, three_months}, {10, three_months},
-    {9, three_months},  {8, three_months},  {7, three_months},  {6, three_months},  {5, three_months}};
+const VersionTimeList BackupHandler::delete_versions_{{23, three_months}, {22, three_months}, {21, three_months},
+                                                      {20, three_months}, {11, three_months}, {10, three_months}};
 
 
 // helper functions
@@ -109,7 +108,7 @@ void BackupHandler::restore_from_backup()
         if (backup_exists(m_prefix, v)) {
             prep_logging();
             auto backup_nm = backup_name(m_prefix, v);
-            m_logger->info("%1 : Restoring from backup: %2", m_time_buf, backup_nm);
+            m_logger->info(util::LogCategory::storage, "%1 : Restoring from backup: %2", m_time_buf, backup_nm);
             util::File::move(backup_nm, m_path);
             return;
         }
@@ -128,7 +127,8 @@ void BackupHandler::cleanup_backups()
                 double diff = difftime(now, last_modified);
                 if (diff > v.second) {
                     prep_logging();
-                    m_logger->info("%1 : Removing old backup: %2   (age %3)", m_time_buf, fn, diff);
+                    m_logger->info(util::LogCategory::storage, "%1 : Removing old backup: %2   (age %3)", m_time_buf,
+                                   fn, diff);
                     util::File::remove(fn);
                 }
             }
@@ -168,7 +168,8 @@ void BackupHandler::backup_realm_if_needed(int current_file_format_version, int 
         // ignore it, if attempt to get free space fails for any reason
         if (util::File::get_free_space(m_path) < util::File::get_size_static(m_path) * 2) {
             prep_logging();
-            m_logger->error("%1 : Insufficient free space for backup: %2", m_time_buf, backup_nm);
+            m_logger->error(util::LogCategory::storage, "%1 : Insufficient free space for backup: %2", m_time_buf,
+                            backup_nm);
             return;
         }
     }
@@ -177,7 +178,7 @@ void BackupHandler::backup_realm_if_needed(int current_file_format_version, int 
     }
     {
         prep_logging();
-        m_logger->info("%1 : Creating backup: %2", m_time_buf, backup_nm);
+        m_logger->info(util::LogCategory::storage, "%1 : Creating backup: %2", m_time_buf, backup_nm);
     }
     std::string part_name = backup_nm + ".part";
     // The backup file should be a 1-1 copy, so that we can get the original
@@ -189,7 +190,7 @@ void BackupHandler::backup_realm_if_needed(int current_file_format_version, int 
         util::File::copy(m_path, part_name);
         util::File::move(part_name, backup_nm);
         prep_logging();
-        m_logger->info("%1 : Completed backup: %2", m_time_buf, backup_nm);
+        m_logger->info(util::LogCategory::storage, "%1 : Completed backup: %2", m_time_buf, backup_nm);
     }
     catch (...) {
         try {

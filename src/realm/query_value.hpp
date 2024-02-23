@@ -29,22 +29,25 @@ namespace realm {
 class TypeOfValue {
 public:
     enum Attribute {
-        Null = 1,
-        Int = 2,
-        Double = 4,
-        Float = 8,
-        Bool = 16,
-        Timestamp = 32,
-        String = 64,
-        Binary = 128,
-        UUID = 256,
-        ObjectId = 512,
-        Decimal128 = 1024,
-        ObjectLink = 2048,
+        Null = 0x0001,
+        Int = 0x0002,
+        Double = 0x0004,
+        Float = 0x0008,
+        Bool = 0x0010,
+        Timestamp = 0x0020,
+        String = 0x0040,
+        Binary = 0x0080,
+        UUID = 0x0100,
+        ObjectId = 0x0200,
+        Decimal128 = 0x0400,
+        ObjectLink = 0x0800,
+        Object = 0x1000,
+        Array = 0x2000,
         Numeric = Int + Double + Float + Decimal128,
+        Collection = Array + Object
     };
     explicit TypeOfValue(int64_t attributes);
-    explicit TypeOfValue(const std::string& attribute_tags);
+    explicit TypeOfValue(std::string_view attribute_tags);
     explicit TypeOfValue(const class Mixed& value);
     explicit TypeOfValue(const ColKey& col_key);
     explicit TypeOfValue(const DataType& data_type);

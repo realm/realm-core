@@ -22,7 +22,7 @@
 #include <realm/collection.hpp>
 
 #include <realm/obj.hpp>
-#include <realm/bplustree.hpp>
+#include <realm/column_mixed.hpp>
 #include <realm/obj_list.hpp>
 #include <realm/array_basic.hpp>
 #include <realm/array_integer.hpp>
@@ -34,7 +34,6 @@
 #include <realm/array_ref.hpp>
 #include <realm/array_fixed_bytes.hpp>
 #include <realm/array_decimal128.hpp>
-#include <realm/array_mixed.hpp>
 #include <realm/array_typed_link.hpp>
 #include <realm/replication.hpp>
 
@@ -58,6 +57,7 @@ public:
 
     virtual ~LstBase() {}
     virtual LstBasePtr clone() const = 0;
+    virtual DataType get_data_type() const noexcept = 0;
     virtual void set_null(size_t ndx) = 0;
     virtual void set_any(size_t ndx, Mixed val) = 0;
     virtual void insert_null(size_t ndx) = 0;
@@ -68,6 +68,7 @@ public:
     virtual void swap(size_t ndx1, size_t ndx2) = 0;
 
 protected:
+    static constexpr CollectionType s_collection_type = CollectionType::List;
     void swap_repl(Replication* repl, size_t ndx1, size_t ndx2) const;
 };
 
@@ -79,8 +80,28 @@ public:
     using value_type = T;
 
     Lst() = default;
-    Lst(const Obj& owner, ColKey col_key);
-    Lst(const Lst& other);
+    Lst(const Obj& owner, ColKey col_key)
+        : Lst<T>(col_key)
+    {
+        this->set_owner(owner, col_key);
+    }
+    Lst(ColKey col_key)
+        : Base(col_key)
+    {
+        if (!(col_key.is_list() || col_key.get_type() == col_type_Mixed)) {
+            throw InvalidArgument(ErrorCodes::TypeMismatch, "Property not a list");
+        }
+
+        check_column_type<T>(m_col_key);
+    }
+    Lst(DummyParent& parent, CollectionParent::Index index)
+        : Base(parent, index)
+    {
+    }
+    Lst(const Lst& other)
+        : Base(other)
+    {
+    }
     Lst(Lst&&) noexcept;
     Lst& operator=(const Lst& other);
     Lst& operator=(Lst&& other) noexcept;
@@ -118,6 +139,10 @@ public:
     LstBasePtr clone() const final;
     void set_null(size_t ndx) final;
     void set_any(size_t ndx, Mixed val) final;
+    DataType get_data_type() const noexcept final
+    {
+        return ColumnTypeTraits<T>::id;
+    }
     void insert_null(size_t ndx) final;
     void insert_any(size_t ndx, Mixed val) final;
     size_t find_any(Mixed val) const final;
@@ -158,9 +183,9 @@ public:
         return *m_tree;
     }
 
-    UpdateStatus update_if_needed() const final
+    UpdateStatus update_if_needed_with_status() const final
     {
-        auto status = Base::update_if_needed();
+        auto status = Base::get_update_status();
         switch (status) {
             case UpdateStatus::Detached: {
                 m_tree.reset();
@@ -175,40 +200,28 @@ public:
                 [[fallthrough]];
             case UpdateStatus::Updated: {
                 bool attached = init_from_parent(false);
+                Base::update_content_version();
                 return attached ? UpdateStatus::Updated : UpdateStatus::Detached;
             }
         }
         REALM_UNREACHABLE();
     }
 
-    UpdateStatus ensure_created() final
+    void ensure_created()
     {
-        auto status = Base::ensure_created();
-        switch (status) {
-            case UpdateStatus::Detached:
-                break; // Not possible (would have thrown earlier).
-            case UpdateStatus::NoChange: {
-                if (m_tree && m_tree->is_attached()) {
-                    return UpdateStatus::NoChange;
-                }
-                // The tree has not been initialized yet for this accessor, so
-                // perform lazy initialization by treating it as an update.
-                [[fallthrough]];
-            }
-            case UpdateStatus::Updated: {
-                bool attached = init_from_parent(true);
-                REALM_ASSERT(attached);
-                return attached ? UpdateStatus::Updated : UpdateStatus::Detached;
-            }
+        if (Base::should_update() || !(m_tree && m_tree->is_attached())) {
+            // When allow_create is true, init_from_parent will always succeed
+            // In case of errors, an exception is thrown.
+            constexpr bool allow_create = true;
+            init_from_parent(allow_create); // Throws
+            Base::update_content_version();
         }
-
-        REALM_UNREACHABLE();
     }
 
     /// Update the accessor and return true if it is attached after the update.
     inline bool update() const
     {
-        return update_if_needed() != UpdateStatus::Detached;
+        return update_if_needed_with_status() != UpdateStatus::Detached;
     }
 
     size_t translate_index(size_t ndx) const noexcept override
@@ -238,14 +251,14 @@ protected:
     mutable std::unique_ptr<BPlusTree<T>> m_tree;
 
     using Base::bump_content_version;
+    using Base::get_alloc;
     using Base::m_col_key;
     using Base::m_nullable;
-    using Base::m_obj;
 
     bool init_from_parent(bool allow_create) const
     {
         if (!m_tree) {
-            m_tree.reset(new BPlusTree<T>(m_obj.get_alloc()));
+            m_tree.reset(new BPlusTree<T>(get_alloc()));
             const ArrayParent* parent = this;
             m_tree->set_parent(const_cast<ArrayParent*>(parent), 0);
         }
@@ -256,6 +269,7 @@ protected:
         }
 
         if (!allow_create) {
+            m_tree->detach();
             return false;
         }
 
@@ -277,19 +291,278 @@ protected:
     }
 
 private:
-    template <class U>
-    static U unresolved_to_null(U value) noexcept
+    T do_get(size_t ndx, const char* msg) const;
+};
+
+template <>
+class Lst<Mixed> final : public CollectionBaseImpl<LstBase>, public CollectionParent {
+public:
+    using Base = CollectionBaseImpl<LstBase>;
+    using iterator = LstIterator<Mixed>;
+    using value_type = Mixed;
+
+    Lst() = default;
+    Lst(const Obj& owner, ColKey col_key)
+        : Lst(col_key)
     {
-        return value;
+        this->set_owner(owner, col_key);
+    }
+    Lst(ColKey col_key, size_t level = 1)
+        : Base(col_key)
+        , CollectionParent(level)
+    {
+        check_column_type<Mixed>(m_col_key);
+    }
+    Lst(CollectionParent& parent, Index index)
+        : Base(parent, index)
+    {
+    }
+    Lst(const Lst& other)
+        : Base(other)
+        , CollectionParent(other.get_level())
+    {
+    }
+    Lst(Lst&&) noexcept;
+    Lst& operator=(const Lst& other);
+    Lst& operator=(Lst&& other) noexcept;
+
+    iterator begin() const noexcept
+    {
+        return iterator{this, 0};
+    }
+
+    iterator end() const noexcept
+    {
+        return iterator{this, size()};
+    }
+
+    Mixed get(size_t ndx) const
+    {
+        return do_get(ndx, "get()");
+    }
+    size_t find_first(const Mixed& value) const;
+    Mixed set(size_t ndx, Mixed value);
+
+    void insert(size_t ndx, Mixed value);
+    Mixed remove(size_t ndx);
+
+    void insert_collection(const PathElement&, CollectionType dict_or_list) override;
+    void set_collection(const PathElement& path_element, CollectionType dict_or_list) override;
+    DictionaryPtr get_dictionary(const PathElement& path_elem) const override;
+    ListMixedPtr get_list(const PathElement& path_elem) const override;
+
+    int64_t get_key(size_t ndx)
+    {
+        return m_tree->get_key(ndx);
+    }
+
+    // Overriding members of CollectionBase:
+    size_t size() const final
+    {
+        return update() ? m_tree->size() : 0;
+    }
+    void clear() final;
+    Mixed get_any(size_t ndx) const final
+    {
+        return get(ndx);
+    }
+    bool is_null(size_t ndx) const final
+    {
+        return get(ndx).is_null();
+    }
+    CollectionBasePtr clone_collection() const final
+    {
+        return std::make_unique<Lst<Mixed>>(*this);
+    }
+    util::Optional<Mixed> min(size_t* return_ndx = nullptr) const final;
+    util::Optional<Mixed> max(size_t* return_ndx = nullptr) const final;
+    util::Optional<Mixed> sum(size_t* return_cnt = nullptr) const final;
+    util::Optional<Mixed> avg(size_t* return_cnt = nullptr) const final;
+    void sort(std::vector<size_t>& indices, bool ascending = true) const final;
+    void distinct(std::vector<size_t>& indices, util::Optional<bool> sort_order = util::none) const final;
+
+    // Overriding members of LstBase:
+    LstBasePtr clone() const final
+    {
+        return std::make_unique<Lst<Mixed>>(*this);
+    }
+    void set_null(size_t ndx) final
+    {
+        set(ndx, Mixed());
+    }
+    void set_any(size_t ndx, Mixed val) final
+    {
+        set(ndx, val);
+    }
+    DataType get_data_type() const noexcept final
+    {
+        return type_Mixed;
+    }
+    void insert_null(size_t ndx) final
+    {
+        insert(ndx, Mixed());
+    }
+    void insert_any(size_t ndx, Mixed val) final
+    {
+        insert(ndx, val);
+    }
+    size_t find_any(Mixed val) const final
+    {
+        return find_first(val);
+    }
+    void resize(size_t new_size) final;
+    void remove(size_t from, size_t to) final;
+    void move(size_t from, size_t to) final;
+    void swap(size_t ndx1, size_t ndx2) final;
+
+    // Lst<T> interface:
+    Mixed remove(const iterator& it);
+
+    void add(Mixed value)
+    {
+        insert(size(), std::move(value));
+    }
+
+    template <typename T>
+    void add_json(const T&);
+
+    Mixed operator[](size_t ndx) const
+    {
+        return this->get(ndx);
+    }
+
+    template <typename Func>
+    void find_all(value_type value, Func&& func) const
+    {
+        if (update()) {
+            if (value.is_null()) {
+                // if value is null then we find also all the unresolved links with a O(n lg n) scan
+                find_all_mixed_unresolved_links(std::forward<Func>(func));
+            }
+            m_tree->find_all(value, std::forward<Func>(func));
+        }
+    }
+
+    inline const BPlusTree<Mixed>& get_tree() const
+    {
+        return *m_tree;
+    }
+
+    UpdateStatus update_if_needed_with_status() const final;
+
+    void ensure_created()
+    {
+        if (Base::should_update() || !(m_tree && m_tree->is_attached())) {
+            // When allow_create is true, init_from_parent will always succeed
+            // In case of errors, an exception is thrown.
+            constexpr bool allow_create = true;
+            init_from_parent(allow_create); // Throws
+            Base::update_content_version();
+            CollectionParent::m_parent_version++;
+        }
+    }
+
+    /// Update the accessor and return true if it is attached after the update.
+    inline bool update() const
+    {
+        return update_if_needed_with_status() != UpdateStatus::Detached;
+    }
+
+    // Overriding members in CollectionParent
+    FullPath get_path() const override
+    {
+        return Base::get_path();
+    }
+
+    Path get_short_path() const override
+    {
+        update();
+        return Base::get_short_path();
+    }
+
+    StablePath get_stable_path() const override
+    {
+        return Base::get_stable_path();
+    }
+
+    ColKey get_col_key() const noexcept override
+    {
+        return Base::get_col_key();
+    }
+
+    void add_index(Path& path, const Index& ndx) const final;
+    size_t find_index(const Index& ndx) const final;
+
+    bool nullify(ObjLink);
+    bool replace_link(ObjLink old_link, ObjLink replace_link);
+    bool remove_backlinks(CascadeState& state) const;
+    TableRef get_table() const noexcept override
+    {
+        return get_obj().get_table();
+    }
+    bool update_if_needed() const override;
+    const Obj& get_object() const noexcept override
+    {
+        return get_obj();
+    }
+    ref_type get_collection_ref(Index, CollectionType) const override;
+    bool check_collection_ref(Index, CollectionType) const noexcept override;
+    void set_collection_ref(Index, ref_type ref, CollectionType) override;
+
+    void to_json(std::ostream&, JSONOutputMode, util::FunctionRef<void(const Mixed&)>) const override;
+
+private:
+    // `do_` methods here perform the action after preconditions have been
+    // checked (bounds check, writability, etc.).
+    void do_set(size_t ndx, Mixed value);
+    void do_insert(size_t ndx, Mixed value);
+    void do_remove(size_t ndx);
+
+    // BPlusTree must be wrapped in an `std::unique_ptr` because it is not
+    // default-constructible, due to its `Allocator&` member.
+    mutable std::unique_ptr<BPlusTreeMixed> m_tree;
+
+    using Base::bump_content_version;
+    using Base::get_alloc;
+    using Base::m_col_key;
+    using Base::m_nullable;
+
+    bool init_from_parent(bool allow_create) const;
+
+    template <class Func>
+    void find_all_mixed_unresolved_links(Func&& func) const
+    {
+        for (size_t i = 0; i < m_tree->size(); ++i) {
+            auto mixed = m_tree->get(i);
+            if (mixed.is_unresolved_link()) {
+                func(i);
+            }
+        }
     }
 
     static Mixed unresolved_to_null(Mixed value) noexcept
     {
         return value.is_unresolved_link() ? Mixed{} : value;
     }
-    T do_get(size_t ndx, const char* msg) const;
+    Mixed do_get(size_t ndx, const char* msg) const
+    {
+        const auto current_size = size();
+        CollectionBase::validate_index(msg, ndx, current_size);
+
+        return unresolved_to_null(m_tree->get(ndx));
+    }
+    bool clear_backlink(size_t ndx, CascadeState& state) const;
 };
 
+// Specialization of Lst<StringData>:
+template <>
+void Lst<StringData>::do_insert(size_t, StringData);
+template <>
+void Lst<StringData>::do_set(size_t, StringData);
+template <>
+void Lst<StringData>::do_remove(size_t);
+template <>
+void Lst<StringData>::do_clear();
 // Specialization of Lst<ObjKey>:
 template <>
 void Lst<ObjKey>::do_set(size_t, ObjKey);
@@ -301,17 +574,6 @@ template <>
 void Lst<ObjKey>::do_clear();
 
 extern template class Lst<ObjKey>;
-
-// Specialization of Lst<Mixed>:
-template <>
-void Lst<Mixed>::do_set(size_t, Mixed);
-template <>
-void Lst<Mixed>::do_insert(size_t, Mixed);
-template <>
-void Lst<Mixed>::do_remove(size_t);
-template <>
-void Lst<Mixed>::do_clear();
-extern template class Lst<Mixed>;
 
 // Specialization of Lst<ObjLink>:
 template <>
@@ -352,6 +614,10 @@ public:
         : m_list(owner, col_key)
     {
     }
+    LnkLst(ColKey col_key)
+        : m_list(col_key)
+    {
+    }
 
     LnkLst(const LnkLst& other) = default;
     LnkLst(LnkLst&& other) = default;
@@ -376,6 +642,13 @@ public:
         // FIXME: Should this add to the end of the unresolved list?
         insert(size(), value);
     }
+    void add(const Obj& obj)
+    {
+        if (get_target_table()->get_key() != obj.get_table_key()) {
+            throw InvalidArgument("LnkLst::add: Wrong object type");
+        }
+        add(obj.get_key());
+    }
 
     // Overriding members of CollectionBase:
     using CollectionBase::get_owner_key;
@@ -387,35 +660,52 @@ public:
     util::Optional<Mixed> max(size_t* return_ndx = nullptr) const final;
     util::Optional<Mixed> sum(size_t* return_cnt = nullptr) const final;
     util::Optional<Mixed> avg(size_t* return_cnt = nullptr) const final;
-    std::unique_ptr<CollectionBase> clone_collection() const final;
+    CollectionBasePtr clone_collection() const final;
     void sort(std::vector<size_t>& indices, bool ascending = true) const final;
     void distinct(std::vector<size_t>& indices, util::Optional<bool> sort_order = util::none) const final;
     const Obj& get_obj() const noexcept final;
-    bool has_changed() const final;
+    bool is_attached() const noexcept final
+    {
+        return m_list.is_attached();
+    }
+    bool has_changed() const noexcept final;
     ColKey get_col_key() const noexcept final;
+    CollectionType get_collection_type() const noexcept override
+    {
+        return CollectionType::List;
+    }
+
+    FullPath get_path() const noexcept final
+    {
+        return m_list.get_path();
+    }
+
+    Path get_short_path() const noexcept final
+    {
+        return m_list.get_short_path();
+    }
+
+    StablePath get_stable_path() const noexcept final
+    {
+        return m_list.get_stable_path();
+    }
 
     // Overriding members of LstBase:
-    std::unique_ptr<LstBase> clone() const
+    LstBasePtr clone() const override
     {
-        if (get_obj().is_valid()) {
-            return std::make_unique<LnkLst>(get_obj(), get_col_key());
-        }
-        else {
-            return std::make_unique<LnkLst>();
-        }
+        return clone_linklist();
     }
     // Overriding members of ObjList:
-    LinkCollectionPtr clone_obj_list() const
+    LinkCollectionPtr clone_obj_list() const override
     {
-        if (get_obj().is_valid()) {
-            return std::make_unique<LnkLst>(get_obj(), get_col_key());
-        }
-        else {
-            return std::make_unique<LnkLst>();
-        }
+        return clone_linklist();
     }
     void set_null(size_t ndx) final;
     void set_any(size_t ndx, Mixed val) final;
+    DataType get_data_type() const noexcept final
+    {
+        return type_Link;
+    }
     void insert_null(size_t ndx) final;
     void insert_any(size_t ndx, Mixed val) final;
     size_t find_any(Mixed value) const final;
@@ -487,7 +777,18 @@ public:
         return m_list.get_tree();
     }
 
+    void set_owner(const Obj& obj, ColKey ck) override
+    {
+        m_list.set_owner(obj, ck);
+    }
+
+    void set_owner(std::shared_ptr<CollectionParent> parent, CollectionParent::Index index) override
+    {
+        m_list.set_owner(std::move(parent), index);
+    }
+
     void replace_link(ObjKey old_link, ObjKey new_link);
+    void to_json(std::ostream&, JSONOutputMode, util::FunctionRef<void(const Mixed&)>) const override;
 
 private:
     friend class TableView;
@@ -499,7 +800,7 @@ private:
 
     UpdateStatus do_update_if_needed() const final
     {
-        return m_list.update_if_needed();
+        return m_list.update_if_needed_with_status();
     }
 
     BPlusTree<ObjKey>* get_mutable_tree() const final
@@ -518,26 +819,6 @@ inline void LstBase::swap_repl(Replication* repl, size_t ndx1, size_t ndx2) cons
     repl->list_move(*this, ndx2, ndx1);
     if (ndx1 + 1 != ndx2)
         repl->list_move(*this, ndx1 + 1, ndx2);
-}
-
-template <class T>
-inline Lst<T>::Lst(const Obj& obj, ColKey col_key)
-    : Base(obj, col_key)
-{
-    if (!col_key.is_list()) {
-        throw InvalidArgument(ErrorCodes::TypeMismatch, "Property not a list");
-    }
-
-    check_column_type<T>(m_col_key);
-}
-
-template <class T>
-inline Lst<T>::Lst(const Lst& other)
-    : Base(static_cast<const Base&>(other))
-{
-    // Reset the content version so we can rely on init_from_parent() being
-    // called lazily when the accessor is used.
-    Base::reset_content_version();
 }
 
 template <class T>
@@ -659,7 +940,7 @@ template <class T>
 void Lst<T>::clear()
 {
     if (size() > 0) {
-        if (Replication* repl = this->m_obj.get_replication()) {
+        if (Replication* repl = Base::get_replication()) {
             repl->list_clear(*this);
         }
         do_clear();
@@ -670,7 +951,7 @@ void Lst<T>::clear()
 template <class T>
 inline CollectionBasePtr Lst<T>::clone_collection() const
 {
-    return std::make_unique<Lst<T>>(m_obj, m_col_key);
+    return std::make_unique<Lst<T>>(*this);
 }
 
 template <class T>
@@ -685,7 +966,7 @@ inline T Lst<T>::do_get(size_t ndx, const char* msg) const
     const auto current_size = size();
     CollectionBase::validate_index(msg, ndx, current_size);
 
-    return unresolved_to_null(m_tree->get(ndx));
+    return m_tree->get(ndx);
 }
 
 template <class T>
@@ -694,17 +975,6 @@ inline size_t Lst<T>::find_first(const T& value) const
     if (!update())
         return not_found;
 
-    if constexpr (std::is_same_v<T, Mixed>) {
-        if (value.is_null()) {
-            auto ndx = m_tree->find_first(value);
-            auto size = ndx == not_found ? m_tree->size() : ndx;
-            for (size_t i = 0; i < size; ++i) {
-                if (m_tree->get(i).is_unresolved_link())
-                    return i;
-            }
-            return ndx;
-        }
-    }
     return m_tree->find_first(value);
 }
 
@@ -747,7 +1017,7 @@ inline util::Optional<Mixed> Lst<T>::avg(size_t* return_cnt) const
 template <class T>
 inline LstBasePtr Lst<T>::clone() const
 {
-    return std::make_unique<Lst<T>>(m_obj, m_col_key);
+    return std::make_unique<Lst<T>>(*this);
 }
 
 template <class T>
@@ -759,16 +1029,11 @@ inline void Lst<T>::set_null(size_t ndx)
 template <class T>
 void Lst<T>::set_any(size_t ndx, Mixed val)
 {
-    if constexpr (std::is_same_v<T, Mixed>) {
-        set(ndx, val);
+    if (val.is_null()) {
+        set_null(ndx);
     }
     else {
-        if (val.is_null()) {
-            set_null(ndx);
-        }
-        else {
-            set(ndx, val.get<typename util::RemoveOptional<T>::type>());
-        }
+        set(ndx, val.get<typename util::RemoveOptional<T>::type>());
     }
 }
 
@@ -781,45 +1046,37 @@ inline void Lst<T>::insert_null(size_t ndx)
 template <class T>
 inline void Lst<T>::insert_any(size_t ndx, Mixed val)
 {
-    if constexpr (std::is_same_v<T, Mixed>) {
-        insert(ndx, val);
+    if (val.is_null()) {
+        insert_null(ndx);
     }
     else {
-        if (val.is_null()) {
-            insert_null(ndx);
-        }
-        else {
-            insert(ndx, val.get<typename util::RemoveOptional<T>::type>());
-        }
+        insert(ndx, val.get<typename util::RemoveOptional<T>::type>());
     }
 }
 
 template <class T>
 size_t Lst<T>::find_any(Mixed val) const
 {
-    if constexpr (std::is_same_v<T, Mixed>) {
-        return find_first(val);
+    if (val.is_null()) {
+        return find_first(BPlusTree<T>::default_value(m_nullable));
     }
-    else {
-        if (val.is_null()) {
-            return find_first(BPlusTree<T>::default_value(m_nullable));
-        }
-        else if (val.get_type() == ColumnTypeTraits<T>::id) {
-            return find_first(val.get<typename util::RemoveOptional<T>::type>());
-        }
-        return realm::not_found;
+    else if (val.get_type() == ColumnTypeTraits<T>::id) {
+        return find_first(val.get<typename util::RemoveOptional<T>::type>());
     }
+    return realm::not_found;
 }
 
 template <class T>
 void Lst<T>::resize(size_t new_size)
 {
     size_t current_size = size();
-    while (new_size > current_size) {
-        insert_null(current_size++);
+    if (new_size != current_size) {
+        while (new_size > current_size) {
+            insert_null(current_size++);
+        }
+        remove(new_size, current_size);
+        Base::bump_both_versions();
     }
-    remove(new_size, current_size);
-    m_obj.bump_both_versions();
 }
 
 template <class T>
@@ -838,7 +1095,7 @@ void Lst<T>::move(size_t from, size_t to)
     CollectionBase::validate_index("move()", to, sz);
 
     if (from != to) {
-        if (Replication* repl = this->m_obj.get_replication()) {
+        if (Replication* repl = Base::get_replication()) {
             repl->list_move(*this, from, to);
         }
         if (to > from) {
@@ -867,7 +1124,7 @@ void Lst<T>::swap(size_t ndx1, size_t ndx2)
     CollectionBase::validate_index("swap()", ndx2, sz);
 
     if (ndx1 != ndx2) {
-        if (Replication* repl = this->m_obj.get_replication()) {
+        if (Replication* repl = Base::get_replication()) {
             LstBase::swap_repl(repl, ndx1, ndx2);
         }
         m_tree->swap(ndx1, ndx2);
@@ -884,20 +1141,12 @@ T Lst<T>::set(size_t ndx, T value)
 
     // get will check for ndx out of bounds
     T old = do_get(ndx, "set()");
-    if (Replication* repl = this->m_obj.get_replication()) {
+    if (Replication* repl = Base::get_replication()) {
         repl->list_set(*this, ndx, value);
     }
-    if constexpr (std::is_same_v<T, Mixed>) {
-        if (!(old.is_same_type(value) && old == value)) {
-            do_set(ndx, value);
-            bump_content_version();
-        }
-    }
-    else {
-        if (old != value) {
-            do_set(ndx, value);
-            bump_content_version();
-        }
+    if (old != value) {
+        do_set(ndx, value);
+        bump_content_version();
     }
     return old;
 }
@@ -911,10 +1160,8 @@ void Lst<T>::insert(size_t ndx, T value)
 
     auto sz = size();
     CollectionBase::validate_index("insert()", ndx, sz + 1);
-
     ensure_created();
-
-    if (Replication* repl = this->m_obj.get_replication()) {
+    if (Replication* repl = Base::get_replication()) {
         repl->list_insert(*this, ndx, value, sz);
     }
     do_insert(ndx, value);
@@ -926,7 +1173,7 @@ T Lst<T>::remove(size_t ndx)
 {
     // get will check for ndx out of bounds
     T old = do_get(ndx, "remove()");
-    if (Replication* repl = this->m_obj.get_replication()) {
+    if (Replication* repl = Base::get_replication()) {
         repl->list_erase(*this, ndx);
     }
 
@@ -994,7 +1241,7 @@ inline util::Optional<Mixed> LnkLst::avg(size_t* return_cnt) const
     REALM_TERMINATE("Not implemented yet");
 }
 
-inline std::unique_ptr<CollectionBase> LnkLst::clone_collection() const
+inline CollectionBasePtr LnkLst::clone_collection() const
 {
     return clone_linklist();
 }
@@ -1018,7 +1265,7 @@ inline const Obj& LnkLst::get_obj() const noexcept
     return m_list.get_obj();
 }
 
-inline bool LnkLst::has_changed() const
+inline bool LnkLst::has_changed() const noexcept
 {
     return m_list.has_changed();
 }
