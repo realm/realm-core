@@ -1,4 +1,4 @@
-# NEXT MAJOR RELEASE
+# NEXT RELEASE
 
 ### Enhancements
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
@@ -22,7 +22,7 @@
 * If you want to query using @type operation, you must use 'objectlink' to match links to objects. 'object' is reserved for dictionary types.
 
 ### Compatibility
-* Fileformat: Generates files with format v24. Reads and automatically upgrade from fileformat v10. If you want to upgrade from an earlier file format version you will have to use RealmCore v13.x.y or earlier.
+* Fileformat: Generates files with format v24. Reads and automatically upgrade from fileformat v10 and onwards. If you want to upgrade from an earlier file format version you will have to use RealmCore v13.x.y or earlier.
 
 -----------
 
