@@ -24,6 +24,7 @@
 #include <realm/util/bson/min_key.hpp>
 #include <realm/util/bson/max_key.hpp>
 #include <realm/util/bson/mongo_timestamp.hpp>
+#include <realm/util/span.hpp>
 
 #include <realm/binary_data.hpp>
 #include <realm/timestamp.hpp>
@@ -485,7 +486,8 @@ bool holds_alternative(const Bson& bson);
 
 std::ostream& operator<<(std::ostream& out, const Bson& b);
 
-Bson parse(const std::string_view& json);
+Bson parse(util::Span<const char> json);
+bool accept(util::Span<const char> json) noexcept;
 
 } // namespace bson
 } // namespace realm

@@ -1776,11 +1776,6 @@ size_t DB::get_allocated_size() const
     return m_alloc.get_allocated_size();
 }
 
-DB::~DB() noexcept
-{
-    close();
-}
-
 void DB::release_all_read_locks() noexcept
 {
     REALM_ASSERT(!m_fake_read_lock_if_immutable);
@@ -1791,109 +1786,6 @@ void DB::release_all_read_locks() noexcept
     }
     m_local_locks_held.clear();
     REALM_ASSERT(m_transaction_count == 0);
-}
-
-// Note: close() and close_internal() may be called from the DB::~DB().
-// in that case, they will not throw. Throwing can only happen if called
-// directly.
-void DB::close(bool allow_open_read_transactions)
-{
-    // make helper thread(s) terminate
-    m_commit_helper.reset();
-
-    if (m_fake_read_lock_if_immutable) {
-        if (!is_attached())
-            return;
-        {
-            CheckedLockGuard local_lock(m_mutex);
-            if (!allow_open_read_transactions && m_transaction_count)
-                throw WrongTransactionState("Closing with open read transactions");
-        }
-        if (m_alloc.is_attached())
-            m_alloc.detach();
-        m_fake_read_lock_if_immutable.reset();
-    }
-    else {
-        close_internal(std::unique_lock<InterprocessMutex>(m_controlmutex, std::defer_lock),
-                       allow_open_read_transactions);
-    }
-}
-
-void DB::close_internal(std::unique_lock<InterprocessMutex> lock, bool allow_open_read_transactions)
-{
-    if (!is_attached())
-        return;
-
-    {
-        CheckedLockGuard local_lock(m_mutex);
-        if (m_write_transaction_open)
-            throw WrongTransactionState("Closing with open write transactions");
-        if (!allow_open_read_transactions && m_transaction_count)
-            throw WrongTransactionState("Closing with open read transactions");
-    }
-    SharedInfo* info = m_info;
-    {
-        if (!lock.owns_lock())
-            lock.lock();
-
-        if (m_alloc.is_attached())
-            m_alloc.detach();
-
-        if (m_is_sync_agent) {
-            REALM_ASSERT(info->sync_agent_present);
-            info->sync_agent_present = 0; // Set to false
-        }
-        release_all_read_locks();
-        --info->num_participants;
-        bool end_of_session = info->num_participants == 0;
-        // std::cerr << "closing" << std::endl;
-        if (end_of_session) {
-
-            // If the db file is just backing for a transient data structure,
-            // we can delete it when done.
-            if (Durability(info->durability) == Durability::MemOnly && !m_in_memory_info) {
-                try {
-                    util::File::remove(m_db_path.c_str());
-                }
-                catch (...) {
-                } // ignored on purpose.
-            }
-        }
-        lock.unlock();
-    }
-    {
-        CheckedLockGuard local_lock(m_mutex);
-
-        m_new_commit_available.close();
-        m_pick_next_writer.close();
-
-        if (m_in_memory_info) {
-            m_in_memory_info.reset();
-        }
-        else {
-            // On Windows it is important that we unmap before unlocking, else a SetEndOfFile() call from another
-            // thread may interleave which is not permitted on Windows. It is permitted on *nix.
-            m_file_map.unmap();
-            m_version_manager.reset();
-            m_file.rw_unlock();
-            // info->~SharedInfo(); // DO NOT Call destructor
-            m_file.close();
-        }
-        m_info = nullptr;
-        if (m_logger)
-            m_logger->log(util::Logger::Level::detail, "DB closed");
-    }
-}
-
-bool DB::other_writers_waiting_for_lock() const
-{
-    SharedInfo* info = m_info;
-
-    uint32_t next_ticket = info->next_ticket.load(std::memory_order_relaxed);
-    uint32_t next_served = info->next_served.load(std::memory_order_relaxed);
-    // When holding the write lock, next_ticket = next_served + 1, hence, if the diference between 'next_ticket' and
-    // 'next_served' is greater than 1, there is at least one thread waiting to acquire the write lock.
-    return next_ticket > next_served + 1;
 }
 
 class DB::AsyncCommitHelper {
@@ -2057,6 +1949,114 @@ private:
     }
 };
 
+DB::~DB() noexcept
+{
+    close();
+}
+
+// Note: close() and close_internal() may be called from the DB::~DB().
+// in that case, they will not throw. Throwing can only happen if called
+// directly.
+void DB::close(bool allow_open_read_transactions)
+{
+    // make helper thread(s) terminate
+    m_commit_helper.reset();
+
+    if (m_fake_read_lock_if_immutable) {
+        if (!is_attached())
+            return;
+        {
+            CheckedLockGuard local_lock(m_mutex);
+            if (!allow_open_read_transactions && m_transaction_count)
+                throw WrongTransactionState("Closing with open read transactions");
+        }
+        if (m_alloc.is_attached())
+            m_alloc.detach();
+        m_fake_read_lock_if_immutable.reset();
+    }
+    else {
+        close_internal(std::unique_lock<InterprocessMutex>(m_controlmutex, std::defer_lock),
+                       allow_open_read_transactions);
+    }
+}
+
+void DB::close_internal(std::unique_lock<InterprocessMutex> lock, bool allow_open_read_transactions)
+{
+    if (!is_attached())
+        return;
+
+    {
+        CheckedLockGuard local_lock(m_mutex);
+        if (m_write_transaction_open)
+            throw WrongTransactionState("Closing with open write transactions");
+        if (!allow_open_read_transactions && m_transaction_count)
+            throw WrongTransactionState("Closing with open read transactions");
+    }
+    SharedInfo* info = m_info;
+    {
+        if (!lock.owns_lock())
+            lock.lock();
+
+        if (m_alloc.is_attached())
+            m_alloc.detach();
+
+        if (m_is_sync_agent) {
+            REALM_ASSERT(info->sync_agent_present);
+            info->sync_agent_present = 0; // Set to false
+        }
+        release_all_read_locks();
+        --info->num_participants;
+        bool end_of_session = info->num_participants == 0;
+        // std::cerr << "closing" << std::endl;
+        if (end_of_session) {
+
+            // If the db file is just backing for a transient data structure,
+            // we can delete it when done.
+            if (Durability(info->durability) == Durability::MemOnly && !m_in_memory_info) {
+                try {
+                    util::File::remove(m_db_path.c_str());
+                }
+                catch (...) {
+                } // ignored on purpose.
+            }
+        }
+        lock.unlock();
+    }
+    {
+        CheckedLockGuard local_lock(m_mutex);
+
+        m_new_commit_available.close();
+        m_pick_next_writer.close();
+
+        if (m_in_memory_info) {
+            m_in_memory_info.reset();
+        }
+        else {
+            // On Windows it is important that we unmap before unlocking, else a SetEndOfFile() call from another
+            // thread may interleave which is not permitted on Windows. It is permitted on *nix.
+            m_file_map.unmap();
+            m_version_manager.reset();
+            m_file.rw_unlock();
+            // info->~SharedInfo(); // DO NOT Call destructor
+            m_file.close();
+        }
+        m_info = nullptr;
+        if (m_logger)
+            m_logger->log(util::Logger::Level::detail, "DB closed");
+    }
+}
+
+bool DB::other_writers_waiting_for_lock() const
+{
+    SharedInfo* info = m_info;
+
+    uint32_t next_ticket = info->next_ticket.load(std::memory_order_relaxed);
+    uint32_t next_served = info->next_served.load(std::memory_order_relaxed);
+    // When holding the write lock, next_ticket = next_served + 1, hence, if the diference between 'next_ticket' and
+    // 'next_served' is greater than 1, there is at least one thread waiting to acquire the write lock.
+    return next_ticket > next_served + 1;
+}
+
 void DB::AsyncCommitHelper::main()
 {
     std::unique_lock lg(m_mutex);
@@ -2130,7 +2130,6 @@ void DB::AsyncCommitHelper::main()
     }
 }
 
-
 void DB::async_begin_write(util::UniqueFunction<void()> fn)
 {
     REALM_ASSERT(m_commit_helper);
@@ -2183,6 +2182,31 @@ void DB::enable_wait_for_change()
     REALM_ASSERT(!m_fake_read_lock_if_immutable);
     std::lock_guard<InterprocessMutex> lock(m_controlmutex);
     m_wait_for_change_enabled = true;
+}
+
+bool DB::needs_file_format_upgrade(const std::string& file, const std::vector<char>& encryption_key)
+{
+    SlabAlloc alloc;
+    SlabAlloc::Config cfg;
+    cfg.session_initiator = false;
+    cfg.read_only = true;
+    cfg.no_create = true;
+    if (!encryption_key.empty()) {
+        cfg.encryption_key = encryption_key.data();
+    }
+    try {
+        alloc.attach_file(file, cfg);
+        if (auto current_file_format_version = alloc.get_committed_file_format_version()) {
+            auto target_file_format_version = Group::g_current_file_format_version;
+            return current_file_format_version < target_file_format_version;
+        }
+    }
+    catch (const FileAccessError& err) {
+        if (err.code() != ErrorCodes::FileNotFound) {
+            throw;
+        }
+    }
+    return false;
 }
 
 void DB::upgrade_file_format(bool allow_file_format_upgrade, int target_file_format_version,

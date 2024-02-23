@@ -1208,7 +1208,7 @@ void ConstantNode::decode_b64()
     size_t buffer_size = util::base64_decoded_size(encoded_size);
     m_decode_buffer.resize(buffer_size);
     StringData window(text.c_str() + 4, encoded_size);
-    util::Optional<size_t> decoded_size = util::base64_decode(window, m_decode_buffer.data(), buffer_size);
+    util::Optional<size_t> decoded_size = util::base64_decode(window, m_decode_buffer);
     if (!decoded_size) {
         throw SyntaxError("Invalid base64 value");
     }

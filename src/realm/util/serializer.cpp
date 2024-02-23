@@ -227,7 +227,7 @@ std::string print_value<>(StringData data)
     if (contains_invalids(data)) {
         std::string encode_buffer;
         encode_buffer.resize(util::base64_encoded_size(len));
-        util::base64_encode(start, len, encode_buffer.data(), encode_buffer.size());
+        util::base64_encode(data, encode_buffer);
         out = "B64\"" + encode_buffer + "\"";
     }
     else {

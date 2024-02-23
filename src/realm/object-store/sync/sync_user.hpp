@@ -19,13 +19,10 @@
 #ifndef REALM_OS_SYNC_USER_HPP
 #define REALM_OS_SYNC_USER_HPP
 
-#include <realm/object-store/util/atomic_shared_ptr.hpp>
-#include <realm/util/bson/bson.hpp>
+#include <realm/object-store/sync/jwt.hpp>
 #include <realm/object-store/sync/subscribable.hpp>
-
+#include <realm/util/bson/bson.hpp>
 #include <realm/util/checked_mutex.hpp>
-#include <realm/util/optional.hpp>
-#include <realm/table.hpp>
 
 #include <memory>
 #include <mutex>
@@ -41,27 +38,6 @@ class MongoClient;
 class SyncManager;
 class SyncSession;
 class SyncUserMetadata;
-
-// A struct that decodes a given JWT.
-struct RealmJWT {
-    // The token being decoded from.
-    std::string token;
-
-    // When the token expires.
-    int64_t expires_at = 0;
-    // When the token was issued.
-    int64_t issued_at = 0;
-    // Custom user data embedded in the encoded token.
-    util::Optional<bson::BsonDocument> user_data;
-
-    explicit RealmJWT(const std::string& token);
-    RealmJWT() = default;
-
-    bool operator==(const RealmJWT& other) const
-    {
-        return token == other.token;
-    }
-};
 
 struct SyncUserProfile {
     // The full name of the user.
@@ -280,7 +256,7 @@ private:
     // used to locate existing files.
     std::vector<std::string> m_legacy_identities;
 
-    mutable util::CheckedMutex m_mutex;
+    util::CheckedMutex m_mutex;
 
     // Set by the server. The unique ID of the user account on the Realm Application.
     const std::string m_identity;
@@ -292,7 +268,7 @@ private:
     // Waiting sessions are those that should be asked to connect once this user is logged in.
     std::unordered_map<std::string, std::weak_ptr<SyncSession>> m_waiting_sessions;
 
-    mutable util::CheckedMutex m_tokens_mutex;
+    util::CheckedMutex m_tokens_mutex;
 
     // The user's refresh token.
     RealmJWT m_refresh_token GUARDED_BY(m_tokens_mutex);

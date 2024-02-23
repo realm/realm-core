@@ -744,6 +744,12 @@ void IndexArray::_index_string_find_all_prefix(std::set<int64_t>& result, String
         }
 
         size_t end = ::upper_bound<32>(offsets_data, offsets_size, upper); // keys are always 32 bits wide
+
+        if (pos == end) {
+            // No match
+            return;
+        }
+
         if (is_at_string_end) {
             // now get all entries from start to end
             for (size_t ndx = pos_refs; ndx <= end; ndx++) {

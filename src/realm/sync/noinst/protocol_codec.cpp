@@ -174,7 +174,7 @@ std::string ClientProtocol::compressed_hex_dump(BinaryData blob)
     std::string encode_buffer;
     auto encoded_size = util::base64_encoded_size(buf.size());
     encode_buffer.resize(encoded_size);
-    util::base64_encode(buf.data(), buf.size(), encode_buffer.data(), encode_buffer.size());
+    util::base64_encode(buf, encode_buffer);
 
     return encode_buffer;
 }

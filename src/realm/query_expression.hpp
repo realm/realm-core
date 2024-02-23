@@ -4468,18 +4468,22 @@ public:
                 // finding all matches up front.
                 Mixed const_value;
                 Subexpr* column;
+                std::optional<ExpressionComparisonType> const_value_cmp_type;
                 if (m_left->has_single_value()) {
                     const_value = m_left->get_mixed();
+                    const_value_cmp_type = m_left->get_comparison_type();
                     column = m_right.get();
                 }
                 else {
                     const_value = m_right->get_mixed();
+                    const_value_cmp_type = m_right->get_comparison_type();
                     column = m_left.get();
                 }
 
                 if (column->has_search_index() && !column->has_indexes_in_link_map() &&
                     column->get_comparison_type().value_or(ExpressionComparisonType::Any) ==
-                        ExpressionComparisonType::Any) {
+                        ExpressionComparisonType::Any &&
+                    const_value_cmp_type.value_or(ExpressionComparisonType::Any) != ExpressionComparisonType::None) {
                     if (const_value.is_null()) {
                         const ObjPropertyBase* prop = dynamic_cast<const ObjPropertyBase*>(m_right.get());
                         // when checking for null across links, null links are considered matches,

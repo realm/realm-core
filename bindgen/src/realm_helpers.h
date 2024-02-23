@@ -278,6 +278,11 @@ struct Helpers {
             return callback(server_address, server_port, std::string_view(pem_data, pem_size), preverify_ok, depth);
         };
     }
+
+    static bool needs_file_format_upgrade(const RealmConfig& config)
+    {
+        return config.needs_file_format_upgrade();
+    }
 };
 
 struct ObjectChangeSet {

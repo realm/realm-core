@@ -725,7 +725,37 @@ TEST_TYPES(Parser_Numerics, Prop<Int>, Nullable<Int>, Indexed<Int>, NullableInde
         verify_query(test_context, t, out.str(), 1);
         verify_query_sub(test_context, t, util::format("values == $%1", i), args, 1);
     }
+    size_t sz = t->size();
     verify_query(test_context, t, "values == null", nullable ? 1 : 0);
+    verify_query(test_context, t, "values == ANY {-1, 0, 1}", 3);
+    verify_query(test_context, t, "values == ANY {0, 1}", 2);
+    verify_query(test_context, t, "values == ANY {1}", 1);
+    verify_query(test_context, t, "values == ANY {}", 0);
+
+    verify_query(test_context, t, "values == NONE {-1, 0, 1}", sz - 3);
+    verify_query(test_context, t, "values == NONE {-1, 0}", sz - 2);
+    verify_query(test_context, t, "values == NONE {-1}", sz - 1);
+    verify_query(test_context, t, "values == NONE {}", sz);
+
+    verify_query(test_context, t, "values == ALL {-1, 0, 1}", 0);
+    verify_query(test_context, t, "values == ALL {-1, 0}", 0);
+    verify_query(test_context, t, "values == ALL {-1}", 1);
+    verify_query(test_context, t, "values == ALL {}", sz);
+
+    verify_query(test_context, t, "values != NONE {-1, 0, 1}", 0);
+    verify_query(test_context, t, "values != NONE {-1, 0}", 0);
+    verify_query(test_context, t, "values != NONE {-1}", 1);
+    verify_query(test_context, t, "values != NONE {}", sz);
+
+    verify_query(test_context, t, "values != ANY {-1, 0, 1}", sz);
+    verify_query(test_context, t, "values != ANY {0, 1}", sz);
+    verify_query(test_context, t, "values != ANY {1}", sz - 1);
+    verify_query(test_context, t, "values != ANY {}", 0);
+
+    verify_query(test_context, t, "values != ALL {-1, 0, 1}", sz - 3);
+    verify_query(test_context, t, "values != ALL {-1, 0}", sz - 2);
+    verify_query(test_context, t, "values != ALL {-1}", sz - 1);
+    verify_query(test_context, t, "values != ALL {}", sz);
 }
 
 TEST(Parser_LinksToSameTable)

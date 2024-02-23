@@ -85,7 +85,7 @@ util::Optional<std::string> to_optional_string(StringData sd)
 std::vector<AuditEvent> get_audit_events(TestSyncManager& manager, bool parse_events = true)
 {
     // Wait for all sessions to be fully uploaded and then tear them down
-    auto sync_manager = manager.app()->sync_manager();
+    auto sync_manager = manager.sync_manager();
     REALM_ASSERT(sync_manager);
     auto sessions = sync_manager->get_all_sessions();
     for (auto& session : sessions) {
@@ -271,8 +271,8 @@ struct TestClock {
 
 TEST_CASE("audit object serialization", "[sync][pbs][audit]") {
     TestSyncManager test_session;
-    SyncTestFile config(test_session.app(), "parent");
-    config.cache = false;
+    SyncTestFile config(test_session, "parent");
+    config.automatic_change_notifications = false;
     config.schema_version = 1;
     config.schema = Schema{
         {"object",
@@ -312,6 +312,9 @@ TEST_CASE("audit object serialization", "[sync][pbs][audit]") {
     auto realm = Realm::get_shared_realm(config);
     auto audit = realm->audit_context();
     REQUIRE(audit);
+    auto wait_for_completion = util::make_scope_exit([=]() noexcept {
+        audit->wait_for_completion();
+    });
 
     // We open in proper sync mode to let the audit context initialize from that,
     // but we don't actually want the realm to be synchronizing
@@ -1069,8 +1072,8 @@ TEST_CASE("audit management", "[sync][pbs][audit]") {
     TestClock clock;
 
     TestSyncManager test_session;
-    SyncTestFile config(test_session.app(), "parent");
-    config.cache = false;
+    SyncTestFile config(test_session, "parent");
+    config.automatic_change_notifications = false;
     config.schema_version = 1;
     config.schema = Schema{
         {"object", {{"_id", PropertyType::Int, Property::IsPrimary{true}}, {"value", PropertyType::Int}}},
@@ -1079,6 +1082,10 @@ TEST_CASE("audit management", "[sync][pbs][audit]") {
     auto realm = Realm::get_shared_realm(config);
     auto audit = realm->audit_context();
     REQUIRE(audit);
+    auto wait_for_completion = util::make_scope_exit([=]() noexcept {
+        audit->wait_for_completion();
+    });
+
     auto table = realm->read_group().get_table("class_object");
 
     // We open in proper sync mode to let the audit context initialize from that,
@@ -1086,7 +1093,8 @@ TEST_CASE("audit management", "[sync][pbs][audit]") {
     realm->sync_session()->close();
 
     SECTION("config validation") {
-        SyncTestFile config(test_session.app(), "parent2");
+        SyncTestFile config(test_session, "parent2");
+        config.automatic_change_notifications = false;
         config.audit_config = std::make_shared<AuditConfig>();
         SECTION("invalid prefix") {
             config.audit_config->partition_value_prefix = "";
@@ -1493,8 +1501,8 @@ TEST_CASE("audit realm sharding", "[sync][pbs][audit]") {
     // a lot of local unuploaded data.
     TestSyncManager test_session{{}, {.start_immediately = false}};
 
-    SyncTestFile config(test_session.app(), "parent");
-    config.cache = false;
+    SyncTestFile config(test_session, "parent");
+    config.automatic_change_notifications = false;
     config.schema_version = 1;
     config.schema = Schema{
         {"object", {{"_id", PropertyType::Int, Property::IsPrimary{true}}, {"value", PropertyType::Int}}},
@@ -1504,6 +1512,7 @@ TEST_CASE("audit realm sharding", "[sync][pbs][audit]") {
     auto realm = Realm::get_shared_realm(config);
     auto audit = realm->audit_context();
     REQUIRE(audit);
+
     auto table = realm->read_group().get_table("class_object");
 
     // We open in proper sync mode to let the audit context initialize from that,
@@ -1569,7 +1578,7 @@ TEST_CASE("audit realm sharding", "[sync][pbs][audit]") {
     auto close_all_sessions = [&] {
         realm->close();
         realm = nullptr;
-        auto sync_manager = test_session.app()->sync_manager();
+        auto sync_manager = test_session.sync_manager();
         for (auto& session : sync_manager->get_all_sessions()) {
             session->shutdown_and_wait();
         }
@@ -1601,7 +1610,7 @@ TEST_CASE("audit realm sharding", "[sync][pbs][audit]") {
         test_session.sync_server().start();
 
         // Open a different Realm with the same user and audit prefix
-        SyncTestFile config(test_session.app(), "other");
+        SyncTestFile config(test_session, "other");
         config.audit_config = std::make_shared<AuditConfig>();
         config.audit_config->logger = audit_logger;
         auto realm = Realm::get_shared_realm(config);
@@ -1628,7 +1637,7 @@ TEST_CASE("audit realm sharding", "[sync][pbs][audit]") {
         test_session.sync_server().start();
 
         // Open the same Realm with a different audit prefix
-        SyncTestFile config(test_session.app(), "parent");
+        SyncTestFile config(test_session, "parent");
         config.audit_config = std::make_shared<AuditConfig>();
         config.audit_config->logger = audit_logger;
         config.audit_config->partition_value_prefix = "other";
@@ -1685,6 +1694,7 @@ TEST_CASE("audit integration tests", "[sync][pbs][audit][baas]") {
     TestAppSession session = create_app(app_create_config);
 
     SyncTestFile config(session.app()->current_user(), bson::Bson("default"));
+    config.automatic_change_notifications = false;
     config.schema = schema;
     config.audit_config = std::make_shared<AuditConfig>();
     config.audit_config->logger = audit_logger;
@@ -1715,7 +1725,7 @@ TEST_CASE("audit integration tests", "[sync][pbs][audit][baas]") {
         realm->sync_session()->close();
         generate_event(realm);
 
-        auto events = get_audit_events_from_baas(session, *config.sync_config->user, 1);
+        auto events = get_audit_events_from_baas(session, *session.app()->current_user(), 1);
         REQUIRE(events.size() == 1);
         REQUIRE(events[0].activity == "scope");
         REQUIRE(events[0].event == "read");
@@ -1724,18 +1734,20 @@ TEST_CASE("audit integration tests", "[sync][pbs][audit][baas]") {
     }
 
     SECTION("different user from parent Realm") {
+        auto sync_user = session.app()->current_user();
         create_user_and_log_in(session.app());
-        config.audit_config->audit_user = session.app()->current_user();
+        auto audit_user = session.app()->current_user();
+        config.audit_config->audit_user = audit_user;
         auto realm = Realm::get_shared_realm(config);
         // If audit uses the sync user this'll make it fail as that user is logged out
-        config.sync_config->user->log_out();
+        sync_user->log_out();
 
         generate_event(realm);
-        REQUIRE(get_audit_events_from_baas(session, *config.audit_config->audit_user, 1).size() == 1);
+        REQUIRE(get_audit_events_from_baas(session, *audit_user, 1).size() == 1);
     }
 
     SECTION("different app from parent Realm") {
-        auto audit_user = config.sync_config->user;
+        auto audit_user = session.app()->current_user();
 
         // Create an app which does not include AuditEvent in the schema so that
         // things will break if audit tries to use it
@@ -1762,7 +1774,7 @@ TEST_CASE("audit integration tests", "[sync][pbs][audit][baas]") {
         generate_event(realm, 3);
 
         using Metadata = std::map<std::string, std::string>;
-        auto events = get_audit_events_from_baas(session, *config.sync_config->user, 4);
+        auto events = get_audit_events_from_baas(session, *session.app()->current_user(), 4);
         REQUIRE(events[0].metadata.empty());
         REQUIRE(events[1].metadata == Metadata({{"metadata 1", "value 1"}}));
         REQUIRE(events[2].metadata == Metadata({{"metadata 2", "value 2"}}));
@@ -1781,7 +1793,7 @@ TEST_CASE("audit integration tests", "[sync][pbs][audit][baas]") {
         auto audit_user = session.app()->current_user();
         config.audit_config->audit_user = audit_user;
         auto realm = Realm::get_shared_realm(config);
-        session.app()->sync_manager()->remove_user(audit_user->identity());
+        session.sync_manager()->remove_user(audit_user->identity());
 
         auto audit = realm->audit_context();
         auto scope = audit->begin_scope("scope");
@@ -1810,7 +1822,7 @@ TEST_CASE("audit integration tests", "[sync][pbs][audit][baas]") {
     }
 
     SECTION("incoming changesets are discarded") {
-        app::MongoClient remote_client = config.sync_config->user->mongo_client("BackingDB");
+        app::MongoClient remote_client = session.app()->current_user()->mongo_client("BackingDB");
         app::MongoDatabase db = remote_client.db(session.app_session().config.mongo_dbname);
         app::MongoCollection collection = db["AuditEvent"];
 
@@ -1901,7 +1913,7 @@ TEST_CASE("audit integration tests", "[sync][pbs][audit][baas]") {
 
             realm->sync_session()->force_close();
             generate_event(realm, 0);
-            get_audit_events_from_baas(session, *config.audit_config->audit_user, 1);
+            get_audit_events_from_baas(session, *session.app()->current_user(), 1);
         }
     }
 

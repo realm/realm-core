@@ -349,11 +349,9 @@ void out_string(std::ostream& out, std::string str)
 
 void out_binary(std::ostream& out, BinaryData bin)
 {
-    const char* start = bin.data();
-    const size_t len = bin.size();
     std::string encode_buffer;
-    encode_buffer.resize(util::base64_encoded_size(len));
-    util::base64_encode(start, len, encode_buffer.data(), encode_buffer.size());
+    encode_buffer.resize(util::base64_encoded_size(bin.size()));
+    util::base64_encode(bin, encode_buffer);
     out << encode_buffer;
 }
 } // anonymous namespace

@@ -27,6 +27,7 @@
 #include <external/json/json.hpp>
 
 #include <iostream>
+#include <random>
 #include <sys/stat.h>
 
 #ifndef _WIN32
@@ -94,12 +95,6 @@ bool create_dummy_realm(std::string path, std::shared_ptr<Realm>* out)
     }
 }
 
-void reset_test_directory(const std::string& base_path)
-{
-    util::try_remove_dir_recursive(base_path);
-    util::make_dir(base_path);
-}
-
 std::vector<char> make_test_encryption_key(const char start)
 {
     std::vector<char> vector;
@@ -146,8 +141,8 @@ std::string encode_fake_jwt(const std::string& in, util::Optional<int64_t> exp, 
     std::string encoded_prefix, encoded_body;
     encoded_prefix.resize(util::base64_encoded_size(unencoded_prefix.size()));
     encoded_body.resize(util::base64_encoded_size(unencoded_body.size()));
-    util::base64_encode(unencoded_prefix.data(), unencoded_prefix.size(), &encoded_prefix[0], encoded_prefix.size());
-    util::base64_encode(unencoded_body.data(), unencoded_body.size(), &encoded_body[0], encoded_body.size());
+    util::base64_encode(unencoded_prefix, encoded_prefix);
+    util::base64_encode(unencoded_body, encoded_body);
     std::string suffix = "Et9HFtf9R3GEMA0IICOfFMVXY7kkTX1wr4qCyhIf58U";
     return encoded_prefix + "." + encoded_body + "." + suffix;
 }

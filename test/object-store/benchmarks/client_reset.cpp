@@ -196,13 +196,12 @@ TEST_CASE("client reset", "[sync][pbs][benchmark][client reset]") {
     };
 
     TestSyncManager init_sync_manager;
-    SyncTestFile config(init_sync_manager.app(), "default");
-    config.cache = false;
+    SyncTestFile config(init_sync_manager, "default");
     config.automatic_change_notifications = false;
     config.schema = schema;
     ClientResyncMode reset_mode = GENERATE(ClientResyncMode::DiscardLocal, ClientResyncMode::Recover);
     config.sync_config->client_resync_mode = reset_mode;
-    SyncTestFile config2(init_sync_manager.app(), "default");
+    SyncTestFile config2(init_sync_manager, "default");
 
     auto populate_objects = [&](SharedRealm realm, size_t num_objects) {
         TableRef table = get_table(*realm, "object");

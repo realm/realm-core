@@ -262,7 +262,7 @@ static void dump_index(FILE* fp, int64_t ref, const char* arr)
     }
 }
 
-static void usage()
+static void usage(void)
 {
     printf("Usage: realm-dump <file> [?][<ref>] [<array>]\n");
     exit(1);

@@ -232,13 +232,7 @@ public:
 
     std::map<TableKey, std::unordered_map<GlobalKey, ObjKey>> m_optimistic_object_id_collisions;
 
-    ShortCircuitHistory(file_ident_type local_file_ident,
-                        TestDirNameGenerator* changeset_dump_dir_gen)
-        : m_write_history(std::make_unique<History>(*this)) // Throws
-        , m_local_file_ident(local_file_ident)
-        , m_transformer(std::make_unique<TransformerImpl>(changeset_dump_dir_gen)) // Throws
-    {
-    }
+    ShortCircuitHistory(file_ident_type local_file_ident, TestDirNameGenerator* changeset_dump_dir_gen);
 
 private:
     class TempDisableReplication;
@@ -451,6 +445,13 @@ private:
     OutputBuffer m_download_message_buffer;
 };
 
+inline ShortCircuitHistory::ShortCircuitHistory(file_ident_type local_file_ident,
+                                                TestDirNameGenerator* changeset_dump_dir_gen)
+    : m_write_history(std::make_unique<History>(*this)) // Throws
+    , m_local_file_ident(local_file_ident)
+    , m_transformer(std::make_unique<TransformerImpl>(changeset_dump_dir_gen)) // Throws
+{
+}
 
 inline auto ShortCircuitHistory::integrate_remote_changesets(file_ident_type remote_file_ident, DB& sg,
                                                              const RemoteChangeset* incoming_changesets,

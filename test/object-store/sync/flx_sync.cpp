@@ -1831,7 +1831,7 @@ TEST_CASE("flx: query on non-queryable field results in query error message", "[
         if ((reason.find("Invalid query:") == std::string::npos &&
              reason.find("Client provided query with bad syntax:") == std::string::npos) ||
             reason.find("\"TopLevel\": key \"non_queryable_field\" is not a queryable field") == std::string::npos) {
-            FAIL(reason);
+            FAIL(util::format("Error reason did not match expected: `%1`", reason));
         }
     };
 
@@ -1879,6 +1879,27 @@ TEST_CASE("flx: query on non-queryable field results in query error message", "[
 
             CHECK(realm->get_active_subscription_set().version() == 0);
             CHECK(realm->get_latest_subscription_set().version() == 2);
+        });
+    }
+
+    // Test for issue #6839, where wait for download after committing a new subscription and then
+    // wait for the subscription complete notification was leading to a garbage reason value in the
+    // status provided to the subscription complete callback.
+    SECTION("Download during bad query") {
+        harness->do_with_new_realm([&](SharedRealm realm) {
+            // Wait for steady state before committing the new subscription
+            REQUIRE(!wait_for_download(*realm));
+
+            auto subs = create_subscription(realm, "class_TopLevel", "non_queryable_field", [](auto q, auto c) {
+                return q.equal(c, "bar");
+            });
+            // Wait for download is actually waiting for the subscription to be applied after it was committed
+            REQUIRE(!wait_for_download(*realm));
+            // After subscription is complete or fails during wait for download, this function completes
+            // without blocking
+            auto result = subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get_no_throw();
+            // Verify error occurred
+            check_status(result);
         });
     }
 
@@ -2197,7 +2218,6 @@ TEST_CASE("flx: interrupted bootstrap restarts/recovers on reconnect", "[sync][f
     std::vector<ObjectId> obj_ids_at_end = fill_large_array_schema(harness);
     SyncTestFile interrupted_realm_config(harness.app()->current_user(), harness.schema(),
                                           SyncConfig::FLXSyncEnabled{});
-    interrupted_realm_config.cache = false;
 
     {
         auto [interrupted_promise, interrupted] = util::make_promise_future<void>();
@@ -2721,7 +2741,6 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][boot
     std::vector<ObjectId> obj_ids_at_end = fill_large_array_schema(harness);
     SyncTestFile interrupted_realm_config(harness.app()->current_user(), harness.schema(),
                                           SyncConfig::FLXSyncEnabled{});
-    interrupted_realm_config.cache = false;
 
     auto check_interrupted_state = [&](const DBRef& realm) {
         auto tr = realm->start_read();
@@ -4032,7 +4051,6 @@ TEST_CASE("flx: compensating write errors get re-sent across sessions", "[sync][
 
     create_user_and_log_in(harness.app());
     SyncTestFile config(harness.app()->current_user(), harness.schema(), SyncConfig::FLXSyncEnabled{});
-    config.cache = false;
 
     {
         auto error_received_pf = util::make_promise_future<void>();
@@ -4609,7 +4627,6 @@ TEST_CASE("flx sync: resend pending subscriptions when reconnecting", "[sync][fl
     std::vector<ObjectId> obj_ids_at_end = fill_large_array_schema(harness);
     SyncTestFile interrupted_realm_config(harness.app()->current_user(), harness.schema(),
                                           SyncConfig::FLXSyncEnabled{});
-    interrupted_realm_config.cache = false;
 
     {
         auto pf = util::make_promise_future<void>();

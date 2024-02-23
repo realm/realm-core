@@ -6198,6 +6198,12 @@ TEST(Query_FullTextPrefix)
 
     auto q = table->query("text TEXT 'ab*'");
     CHECK_EQUAL(q.count(), 2);
+    q = table->query("text TEXT 'ac*'"); // No match shorter than 4
+    CHECK_EQUAL(q.count(), 0);
+    q = table->query("text TEXT 'abbe*'"); // No match excatly four
+    CHECK_EQUAL(q.count(), 0);
+    q = table->query("text TEXT 'abbex*'"); // No match bigger than 4
+    CHECK_EQUAL(q.count(), 0);
     q = table->query("text TEXT 'Bel*'");
     CHECK_EQUAL(q.count(), 3);
     q = table->query("text TEXT 'Blak*'");
@@ -6207,4 +6213,5 @@ TEST(Query_FullTextPrefix)
     q = table->query("text TEXT 'Bel* Abba -Ada'");
     CHECK_EQUAL(q.count(), 1);
 }
+
 #endif // TEST_QUERY

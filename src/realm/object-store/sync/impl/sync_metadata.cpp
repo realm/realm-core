@@ -24,6 +24,7 @@
 #include <realm/object-store/property.hpp>
 #include <realm/object-store/results.hpp>
 #include <realm/object-store/schema.hpp>
+#include <realm/object-store/sync/impl/sync_file.hpp>
 #include <realm/object-store/util/uuid.hpp>
 #include <realm/object-store/util/scheduler.hpp>
 #if REALM_PLATFORM_APPLE
@@ -39,7 +40,6 @@ using namespace realm;
 namespace {
 static const char* const c_sync_userMetadata = "UserMetadata";
 static const char* const c_sync_identityMetadata = "UserIdentity";
-static const char* const c_sync_app_metadata = "AppMetadata";
 
 static const char* const c_sync_current_user_identity = "current_user_identity";
 
@@ -63,12 +63,6 @@ static const char* const c_sync_original_name = "original_name";
 static const char* const c_sync_new_name = "new_name";
 static const char* const c_sync_action = "action";
 static const char* const c_sync_partition = "url";
-
-static const char* const c_sync_app_metadata_id = "id";
-static const char* const c_sync_app_metadata_deployment_model = "deployment_model";
-static const char* const c_sync_app_metadata_location = "location";
-static const char* const c_sync_app_metadata_hostname = "hostname";
-static const char* const c_sync_app_metadata_ws_hostname = "ws_hostname";
 
 realm::Schema make_schema()
 {
@@ -95,32 +89,24 @@ realm::Schema make_schema()
              {c_sync_original_name, PropertyType::String, Property::IsPrimary{true}},
              {c_sync_new_name, PropertyType::String | PropertyType::Nullable},
              {c_sync_action, PropertyType::Int},
-             {c_sync_partition, PropertyType::String},
-             {c_sync_identity, PropertyType::String},
+             {c_sync_partition, PropertyType::String}, // unused and should be removed in v8
+             {c_sync_identity, PropertyType::String},  // unused and should be removed in v8
          }},
         {c_sync_current_user_identity,
          {
              {c_sync_current_user_identity, PropertyType::String},
          }},
-        {c_sync_app_metadata,
-         {
-             {c_sync_app_metadata_id, PropertyType::Int, Property::IsPrimary{true}},
-             {c_sync_app_metadata_deployment_model, PropertyType::String},
-             {c_sync_app_metadata_location, PropertyType::String},
-             {c_sync_app_metadata_hostname, PropertyType::String},
-             {c_sync_app_metadata_ws_hostname, PropertyType::String},
-         }},
     };
 }
 
-void migrate_to_v7(std::shared_ptr<Realm> old_realm, std::shared_ptr<Realm> realm)
+void migrate_to_v7(Realm& old_realm, Realm& realm)
 {
     // Before schema version 7 there may have been multiple UserMetadata entries
     // for a single user_id with different provider types, so we need to merge
     // any duplicates together
 
-    TableRef table = ObjectStore::table_for_object_type(realm->read_group(), c_sync_userMetadata);
-    TableRef old_table = ObjectStore::table_for_object_type(old_realm->read_group(), c_sync_userMetadata);
+    TableRef table = ObjectStore::table_for_object_type(realm.read_group(), c_sync_userMetadata);
+    TableRef old_table = ObjectStore::table_for_object_type(old_realm.read_group(), c_sync_userMetadata);
     if (table->is_empty())
         return;
     REALM_ASSERT(table->size() == old_table->size());
@@ -207,6 +193,13 @@ void migrate_to_v7(std::shared_ptr<Realm> old_realm, std::shared_ptr<Realm> real
     }
 }
 
+void migrate_to_v8(Realm&, Realm& realm)
+{
+    if (auto app_metadata_table = realm.read_group().get_table("class_AppMetadata")) {
+        realm.read_group().remove_table(app_metadata_table->get_key());
+    }
+}
+
 } // anonymous namespace
 
 // MARK: - Sync metadata manager
@@ -231,7 +224,11 @@ SyncMetadataManager::SyncMetadataManager(std::string path, bool should_encrypt,
     m_metadata_config.migration_function = [](std::shared_ptr<Realm> old_realm, std::shared_ptr<Realm> realm,
                                               Schema&) {
         if (old_realm->schema_version() < 7) {
-            migrate_to_v7(old_realm, realm);
+            migrate_to_v7(*old_realm, *realm);
+        }
+        // note that the schema version has not yet been bumped to 8
+        if (old_realm->schema_version() < 8) {
+            migrate_to_v8(*old_realm, *realm);
         }
     };
 
@@ -248,16 +245,109 @@ SyncMetadataManager::SyncMetadataManager(std::string path, bool should_encrypt,
 
     object_schema = realm->schema().find(c_sync_fileActionMetadata);
     m_file_action_schema = {
-        object_schema->persisted_properties[0].column_key, object_schema->persisted_properties[1].column_key,
-        object_schema->persisted_properties[2].column_key, object_schema->persisted_properties[3].column_key,
-        object_schema->persisted_properties[4].column_key,
+        object_schema->persisted_properties[0].column_key,
+        object_schema->persisted_properties[1].column_key,
+        object_schema->persisted_properties[2].column_key,
     };
+}
 
-    object_schema = realm->schema().find(c_sync_app_metadata);
-    m_app_metadata_schema = {
-        object_schema->persisted_properties[0].column_key, object_schema->persisted_properties[1].column_key,
-        object_schema->persisted_properties[2].column_key, object_schema->persisted_properties[3].column_key,
-        object_schema->persisted_properties[4].column_key};
+void SyncMetadataManager::perform_launch_actions(SyncFileManager& file_manager) const
+{
+    auto realm = get_realm();
+
+    // Perform our "on next startup" actions such as deleting Realm files
+    // which we couldn't delete immediately due to them being in use
+    auto actions_table = ObjectStore::table_for_object_type(realm->read_group(), c_sync_fileActionMetadata);
+    for (auto file_action : *actions_table) {
+        SyncFileActionMetadata md(m_file_action_schema, realm, file_action);
+        run_file_action(file_manager, md);
+    }
+
+    // Delete any users marked for death.
+    auto users_table = ObjectStore::table_for_object_type(realm->read_group(), c_sync_userMetadata);
+    for (auto user : *users_table) {
+        if (user.get<int64_t>(m_user_schema.state_col) != int64_t(SyncUser::State::Removed))
+            continue;
+        try {
+            SyncUserMetadata data(m_user_schema, realm, user);
+            file_manager.remove_user_realms(data.identity(), data.realm_file_paths());
+            realm->begin_transaction();
+            user.remove();
+            realm->commit_transaction();
+        }
+        catch (FileAccessError const&) {
+            continue;
+        }
+    }
+}
+
+bool SyncMetadataManager::run_file_action(SyncFileManager& file_manager, SyncFileActionMetadata& md) const
+{
+    switch (md.action()) {
+        case SyncFileActionMetadata::Action::DeleteRealm:
+            // Delete all the files for the given Realm.
+            if (file_manager.remove_realm(md.original_name())) {
+                md.remove();
+                return true;
+            }
+            break;
+        case SyncFileActionMetadata::Action::BackUpThenDeleteRealm:
+            // Copy the primary Realm file to the recovery dir, and then delete the Realm.
+            auto new_name = md.new_name();
+            auto original_name = md.original_name();
+            if (!util::File::exists(original_name)) {
+                // The Realm file doesn't exist anymore.
+                md.remove();
+                return false;
+            }
+            if (new_name && !util::File::exists(*new_name) &&
+                file_manager.copy_realm_file(original_name, *new_name)) {
+                // We successfully copied the Realm file to the recovery directory.
+                bool did_remove = file_manager.remove_realm(original_name);
+                // if the copy succeeded but not the delete, then running BackupThenDelete
+                // a second time would fail, so change this action to just delete the original file.
+                if (did_remove) {
+                    md.remove();
+                    return true;
+                }
+                md.set_action(SyncFileActionMetadata::Action::DeleteRealm);
+            }
+            break;
+    }
+    return false;
+}
+
+// Some of our string columns are nullable. They never should actually be
+// null as we store "" rather than null when the value isn't present, but
+// be safe and handle it anyway.
+static std::string_view get_string(const Obj& obj, ColKey col)
+{
+    auto str = obj.get<String>(col);
+    return str.is_null() ? "" : std::string_view(str);
+}
+
+static bool is_valid_user(const SyncUserMetadata::Schema& schema, const Obj& obj)
+{
+    // This is overly cautious and merely checking the state should suffice,
+    // but because this is a persisted file that can be modified it's possible
+    // to get invalid combinations of data.
+    return obj && obj.get<int64_t>(schema.state_col) == int64_t(SyncUser::State::LoggedIn) &&
+           RealmJWT::validate(get_string(obj, schema.access_token_col)) &&
+           RealmJWT::validate(get_string(obj, schema.refresh_token_col));
+}
+
+std::vector<SyncUserMetadata> SyncMetadataManager::all_logged_in_users() const
+{
+    auto realm = get_realm();
+    TableRef table = ObjectStore::table_for_object_type(realm->read_group(), c_sync_userMetadata);
+    std::vector<SyncUserMetadata> users;
+    users.reserve(table->size());
+    for (auto obj : *table) {
+        if (is_valid_user(m_user_schema, obj)) {
+            users.emplace_back(m_user_schema, realm, obj);
+        }
+    }
+    return users;
 }
 
 SyncUserMetadataResults SyncMetadataManager::all_unmarked_users() const
@@ -382,31 +472,19 @@ util::Optional<SyncUserMetadata> SyncMetadataManager::get_or_make_user_metadata(
     return SyncUserMetadata(schema, std::move(realm), std::move(*obj));
 }
 
-void SyncMetadataManager::make_file_action_metadata(StringData original_name, StringData partition_key_value,
-                                                    StringData local_uuid, SyncFileActionMetadata::Action action,
+void SyncMetadataManager::make_file_action_metadata(StringData original_name, SyncFileActionMetadata::Action action,
                                                     StringData new_name) const
 {
-    // This function can't use get_shared_realm() because it's called on a
-    // background thread and that's currently not supported by the libuv
-    // implementation of EventLoopSignal
-    auto coordinator = _impl::RealmCoordinator::get_coordinator(m_metadata_config);
-    auto group_ptr = coordinator->begin_read();
-    auto& group = *group_ptr;
-    REALM_ASSERT(typeid(group) == typeid(Transaction));
-    auto& transaction = static_cast<Transaction&>(group);
-    transaction.promote_to_write();
-
-    // Retrieve or create the row for this object.
-    TableRef table = ObjectStore::table_for_object_type(group, c_sync_fileActionMetadata);
+    auto realm = get_realm();
+    realm->begin_transaction();
+    TableRef table = ObjectStore::table_for_object_type(realm->read_group(), c_sync_fileActionMetadata);
 
     auto& schema = m_file_action_schema;
     Obj obj = table->create_object_with_primary_key(original_name);
 
     obj.set(schema.idx_new_name, new_name);
     obj.set(schema.idx_action, static_cast<int64_t>(action));
-    obj.set(schema.idx_partition, partition_key_value);
-    obj.set(schema.idx_user_identity, local_uuid);
-    transaction.commit();
+    realm->commit_transaction();
 }
 
 util::Optional<SyncFileActionMetadata> SyncMetadataManager::get_file_action_metadata(StringData original_name) const
@@ -419,6 +497,14 @@ util::Optional<SyncFileActionMetadata> SyncMetadataManager::get_file_action_meta
         return none;
 
     return SyncFileActionMetadata(std::move(schema), std::move(realm), table->get_object(row_idx));
+}
+
+bool SyncMetadataManager::perform_file_actions(SyncFileManager& file_manager, StringData path) const
+{
+    if (auto md = get_file_action_metadata(path)) {
+        return run_file_action(file_manager, *md);
+    }
+    return false;
 }
 
 std::shared_ptr<Realm> SyncMetadataManager::get_realm() const
@@ -491,56 +577,6 @@ std::shared_ptr<Realm> SyncMetadataManager::open_realm(bool should_encrypt, bool
 #endif // REALM_PLATFORM_APPLE
 }
 
-/// Magic key to fetch app metadata, which there should always only be one of.
-static const auto app_metadata_pk = 1;
-
-bool SyncMetadataManager::set_app_metadata(const std::string& deployment_model, const std::string& location,
-                                           const std::string& hostname, const std::string& ws_hostname)
-{
-    if (m_app_metadata && m_app_metadata->hostname == hostname && m_app_metadata->ws_hostname == ws_hostname &&
-        m_app_metadata->deployment_model == deployment_model && m_app_metadata->location == location) {
-        // App metadata not updated
-        return false;
-    }
-
-    auto realm = get_realm();
-    auto& schema = m_app_metadata_schema;
-
-    // let go of stale cached copy of metadata - it will be refreshed on the next call to get_app_metadata()
-    m_app_metadata = util::none;
-
-    realm->begin_transaction();
-
-    auto table = ObjectStore::table_for_object_type(realm->read_group(), c_sync_app_metadata);
-    auto obj = table->create_object_with_primary_key(app_metadata_pk);
-    obj.set(schema.deployment_model_col, deployment_model);
-    obj.set(schema.location_col, location);
-    obj.set(schema.hostname_col, hostname);
-    obj.set(schema.ws_hostname_col, ws_hostname);
-
-    realm->commit_transaction();
-    // App metadata was updated
-    return true;
-}
-
-util::Optional<SyncAppMetadata> SyncMetadataManager::get_app_metadata()
-{
-    if (!m_app_metadata) {
-        auto realm = get_realm();
-        auto table = ObjectStore::table_for_object_type(realm->read_group(), c_sync_app_metadata);
-        if (!table->size())
-            return util::none;
-
-        auto obj = table->get_object_with_primary_key(app_metadata_pk);
-        auto& schema = m_app_metadata_schema;
-        m_app_metadata =
-            SyncAppMetadata{obj.get<String>(schema.deployment_model_col), obj.get<String>(schema.location_col),
-                            obj.get<String>(schema.hostname_col), obj.get<String>(schema.ws_hostname_col)};
-    }
-
-    return m_app_metadata;
-}
-
 // MARK: - Sync user metadata
 
 SyncUserMetadata::SyncUserMetadata(Schema schema, SharedRealm realm, const Obj& obj)
@@ -598,11 +634,6 @@ std::string SyncUserMetadata::device_id() const
     return result.is_null() ? "" : std::string(result);
 }
 
-inline SyncUserIdentity user_identity_from_obj(const Obj& obj)
-{
-    return SyncUserIdentity(obj.get<String>(c_sync_user_id), obj.get<String>(c_sync_provider_type));
-}
-
 std::vector<SyncUserIdentity> SyncUserMetadata::identities() const
 {
     REALM_ASSERT(m_realm);
@@ -612,7 +643,7 @@ std::vector<SyncUserIdentity> SyncUserMetadata::identities() const
     std::vector<SyncUserIdentity> identities;
     for (size_t i = 0; i < linklist.size(); i++) {
         auto obj = linklist.get_object(i);
-        identities.push_back(user_identity_from_obj(obj));
+        identities.emplace_back(obj.get<String>(c_sync_user_id), obj.get<String>(c_sync_provider_type));
     }
 
     return identities;
@@ -789,25 +820,11 @@ util::Optional<std::string> SyncFileActionMetadata::new_name() const
     return result.is_null() ? util::none : util::make_optional(std::string(result));
 }
 
-std::string SyncFileActionMetadata::user_local_uuid() const
-{
-    REALM_ASSERT(m_realm);
-    m_realm->refresh();
-    return m_obj.get<String>(m_schema.idx_user_identity);
-}
-
 SyncFileActionMetadata::Action SyncFileActionMetadata::action() const
 {
     REALM_ASSERT(m_realm);
     m_realm->refresh();
     return static_cast<SyncFileActionMetadata::Action>(m_obj.get<Int>(m_schema.idx_action));
-}
-
-std::string SyncFileActionMetadata::partition() const
-{
-    REALM_ASSERT(m_realm);
-    m_realm->refresh();
-    return m_obj.get<String>(m_schema.idx_partition);
 }
 
 void SyncFileActionMetadata::remove()

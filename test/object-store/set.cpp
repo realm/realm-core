@@ -20,6 +20,8 @@
 #include <realm/util/any.hpp>
 #include <realm/version.hpp>
 
+#include <numeric>
+
 using namespace realm;
 using namespace realm::util;
 namespace cf = realm::collection_fixtures;
@@ -1388,7 +1390,6 @@ TEMPLATE_TEST_CASE("set", "[set]", CreateNewSet<void>, ReuseSet<void>)
 
 TEST_CASE("set with mixed links", "[set]") {
     InMemoryTestFile config;
-    config.cache = false;
     config.automatic_change_notifications = false;
     config.schema = Schema{
         {"object", {{"value", PropertyType::Set | PropertyType::Mixed | PropertyType::Nullable}}},

@@ -634,9 +634,14 @@ TEST(Shared_EncryptedRemap)
 TEST(Shared_Initial)
 {
     SHARED_GROUP_TEST_PATH(path);
+    std::vector<char> key;
+
+    CHECK_NOT(DB::needs_file_format_upgrade(path, key)); // File not created yet
+
+    auto key_str = crypt_key();
     {
         // Create a new shared db
-        DBRef sg = DB::create(path, false, DBOptions(crypt_key()));
+        DBRef sg = DB::create(path, false, DBOptions(key_str));
 
         // Verify that new group is empty
         {
@@ -644,6 +649,10 @@ TEST(Shared_Initial)
             CHECK(rt.get_group().is_empty());
         }
     }
+    if (key_str) {
+        key.insert(key.end(), key_str, key_str + strlen(key_str));
+    }
+    CHECK_NOT(DB::needs_file_format_upgrade(path, key));
 }
 
 

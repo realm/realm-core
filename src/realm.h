@@ -780,6 +780,11 @@ RLM_API void realm_config_set_should_compact_on_launch_function(realm_config_t*,
 RLM_API bool realm_config_get_disable_format_upgrade(const realm_config_t*);
 
 /**
+ * True if you can open the file without a file_format_upgrade
+ */
+RLM_API bool realm_config_needs_file_format_upgrade(const realm_config_t*);
+
+/**
  * Disable file format upgrade on open (default: false).
  *
  * If a migration is needed to open the realm file with the provided schema, an
@@ -3555,6 +3560,11 @@ typedef struct realm_sync_error {
     void* user_code_error;
 } realm_sync_error_t;
 
+typedef struct realm_salted_file_ident {
+    uint64_t ident;
+    int64_t salt;
+} realm_salted_file_ident_t;
+
 /**
  * Callback function invoked by the sync session once it has uploaded or download
  * all available changesets. See @a realm_sync_session_wait_for_upload and
@@ -3959,6 +3969,13 @@ RLM_API void realm_sync_session_pause(realm_sync_session_t*) RLM_API_NOEXCEPT;
  * No-op if the session is already active.
  */
 RLM_API void realm_sync_session_resume(realm_sync_session_t*) RLM_API_NOEXCEPT;
+
+/**
+ * Gets the file ident/salt currently assigned to the realm by sync. Callers should supply a pointer token
+ * a realm_salted_file_ident_t for this function to fill out.
+ */
+RLM_API void realm_sync_session_get_file_ident(realm_sync_session_t*,
+                                               realm_salted_file_ident_t* out) RLM_API_NOEXCEPT;
 
 /**
  * In case manual reset is needed, run this function in order to reset sync client files.

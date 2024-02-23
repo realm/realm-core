@@ -45,7 +45,7 @@ std::string make_random_sec_websocket_key(std::mt19937_64& random)
     }
 
     char out_buffer[24];
-    size_t encoded_size = util::base64_encode(random_bytes, 16, out_buffer, 24);
+    size_t encoded_size = util::base64_encode(random_bytes, out_buffer);
     REALM_ASSERT(encoded_size == 24);
 
     return std::string{out_buffer, 24};
@@ -62,11 +62,11 @@ std::string make_sec_websocket_accept(StringData sec_websocket_key)
     sha1_input.append(sec_websocket_key.data(), sec_websocket_key.size());
     sha1_input.append(websocket_magic_string.data(), websocket_magic_string.size());
 
-    unsigned char sha1_output[20];
-    util::sha1(sha1_input.data(), sha1_input.length(), sha1_output);
+    char sha1_output[20];
+    util::sha1(sha1_input.data(), sha1_input.length(), reinterpret_cast<unsigned char*>(sha1_output));
 
     char base64_output[28];
-    size_t base64_output_size = util::base64_encode(reinterpret_cast<char*>(sha1_output), 20, base64_output, 28);
+    size_t base64_output_size = util::base64_encode(sha1_output, base64_output);
     REALM_ASSERT(base64_output_size == 28);
 
     return std::string(base64_output, 28);
