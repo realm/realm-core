@@ -622,7 +622,7 @@ Bson dom_elem_to_bson(const Json& json)
         case Json::value_t::array: {
             BsonArray out;
             for (auto&& elem : json) {
-                out.append(dom_elem_to_bson(elem));
+                out.push_back(dom_elem_to_bson(elem));
             }
             return Bson(std::move(out));
         }
@@ -786,7 +786,7 @@ Bson dom_obj_to_bson(const Json& json)
 
     BsonDocument out;
     for (auto&& [k, v] : json.items()) {
-        out.append(k, dom_elem_to_bson(v));
+        out[k] = dom_elem_to_bson(v);
     }
     return out;
 }
