@@ -460,18 +460,14 @@ constexpr int num_bits_table[65] = {-1, 64, 64, 63, 64, 60, 60, 63, // 0-7
 
 inline int num_fields_for_width(int width)
 {
-<<<<<<< HEAD
     REALM_ASSERT(width <= 32); // it will not pay off to use this for fields larger
     REALM_ASSERT(width);
     return 64 / width;
 }
-template <int width>
-uint64_t num_bits()
+
+inline uint64_t num_bits(int width)
 {
-    return width * num_fields<width>();
-=======
     return num_fields_table[width];
->>>>>>> 1f88d48aa02f7467b78e8bdd22137c6361b65c1d
 }
 
 inline int num_bits_for_width(int width)
@@ -520,13 +516,8 @@ constexpr uint64_t populate(int width, uint64_t value)
 // provides a set bit in pos 0 of each field, remaining bits zero
 constexpr uint64_t field_bit0(int width)
 {
-<<<<<<< HEAD
-    return populate<width>(1);
-}
-=======
     return populate(width, 1);
-};
->>>>>>> 1f88d48aa02f7467b78e8bdd22137c6361b65c1d
+}
 
 // provides a set sign-bit in each field, remaining bits zero
 constexpr uint64_t field_sign_bit(int width)

@@ -112,7 +112,6 @@ void ArrayPacked::get_chunk(const Array& arr, size_t ndx, int64_t res[8]) const
         res[index++] = get(arr, i++);
     }
 }
-
 template <typename Cond>
 bool ArrayPacked::find_all(const Array& arr, int64_t value, size_t start, size_t end, size_t baseindex,
                            QueryStateBase* state) const
@@ -165,29 +164,46 @@ bool ArrayPacked::find_all(const Array& arr, int64_t value, size_t start, size_t
             return v < value;
     };
 
-    if (arr.m_width < 32) {
-        const auto mask = arr.get_encoder().width_mask();
-        auto bitwidth_cmp = [&mask](uint64_t a, uint64_t b) {
+    const auto width = arr.m_width;
+    if (width < 32) {
+        const auto mask = populate(width, arr.get_encoder().width_mask());
+        const auto searching_value_mask = populate(width, value);
+        const auto field_count = num_fields_for_width(width);
+        const auto ones = field_bit0(width);
+        const auto last_word_mask = (1ULL << num_bits(width)) - 1;
+
+        auto bitwidth_cmp = [&mask](uint64_t ones, uint64_t a, uint64_t b) {
             if constexpr (std::is_same_v<Cond, Equal>)
-                return find_all_fields_EQ(mask, 0, a, b);
+                return find_all_fields_EQ(mask, ones, a, b);
             if constexpr (std::is_same_v<Cond, NotEqual>)
                 return find_all_fields_NE(mask, a, b);
             if constexpr (std::is_same_v<Cond, Greater>)
-                return !find_all_fields_signed_LE(mask, 0, a, b);
+                return !find_all_fields_signed_LE(mask, ones, a, b);
             if constexpr (std::is_same_v<Cond, Less>)
                 return find_all_fields_signed_LT(mask, a, b);
         };
-        const auto searching_value = populate_val_64(arr.m_width, value);
-        const auto field_count = num_fields_64(arr.m_width);
+
         size_t pos = start;
-        while (pos < end) {
-            bf_iterator it((uint64_t*)arr.m_data, 0, arr.m_width, arr.m_width, pos);
-            const auto word = it.get_full_word_with_value();
-            if (bitwidth_cmp(word, searching_value))
+        unaligned_word_iter it((uint64_t*)arr.m_data, start * arr.m_width);
+        const auto n_bits_per_it = arr.m_width * field_count;
+        const auto current_end = end - field_count + 1;
+        uint64_t vector = 0;
+        while (pos < current_end) {
+            const auto word = it.get(n_bits_per_it);
+            vector = bitwidth_cmp(ones, word, searching_value_mask);
+            if (vector)
                 break;
             pos += field_count;
+            it.bump(n_bits_per_it);
         }
-        start = pos;
+        if (!vector) {
+            // there is still some chance that we may find the value in the last word.
+            const auto last_word = it.get(n_bits_per_it);
+            if (bitwidth_cmp(ones & last_word_mask, last_word, searching_value_mask))
+                start = pos + field_count;
+        }
+        else
+            start = pos;
     }
 
     // this loop is going to be executed for values >= 32 bits, since this is likely the fastest way to compare

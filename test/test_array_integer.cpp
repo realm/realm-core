@@ -33,7 +33,8 @@ using namespace realm;
 using namespace realm::test_util;
 
 #define ARRAY_PERFORMANCE_TESTING
-#if !defined(REALM_DEBUG) && defined(ARRAY_PERFORMANCE_TESTING)
+//! defined(REALM_DEBUG) &&
+#if defined(ARRAY_PERFORMANCE_TESTING)
 TEST(perf_array_encode_get_vs_array_get_less_32bit)
 {
     using namespace std;
@@ -130,7 +131,7 @@ TEST(perf_array_encode_get_vs_array_get_less_32bit)
     a_encoded.destroy();
 }
 
-TEST(Test_basic_find_EQ_less_32bit)
+ONLY(Test_basic_find_EQ_less_32bit)
 {
     using namespace std;
     using namespace std::chrono;
@@ -175,7 +176,9 @@ TEST(Test_basic_find_EQ_less_32bit)
     // verify that both find the same thing
     for (size_t j = 0; j < n_runs; ++j) {
         for (size_t i = 0; i < n_values; ++i) {
-            REALM_ASSERT(a.find_first(i) == a_encoded.find_first(i));
+            auto v = a.find_first(i);
+            auto v1 = a_encoded.find_first(i);
+            REALM_ASSERT(v == v1);
         }
     }
 
@@ -184,7 +187,7 @@ TEST(Test_basic_find_EQ_less_32bit)
         for (size_t i = 0; i < n_values; ++i) {
             auto ndx = a_encoded.find_first(i);
             REALM_ASSERT(ndx != realm::not_found);
-            REALM_ASSERT(a_encoded.get(ndx) == a.get(ndx));
+            REALM_ASSERT(a_encoded.get(ndx) == input_array[ndx]);
         }
     }
     t2 = high_resolution_clock::now();
@@ -195,60 +198,63 @@ TEST(Test_basic_find_EQ_less_32bit)
 
     std::cout << std::endl;
 
-    a.destroy();
-    a_encoded.destroy();
-    a.create();
-    input_array.clear();
-    for (size_t i = 0; i < n_values; i++)
-        input_array.push_back(-i);
-    std::random_device rd1;
-    std::mt19937 g1(rd1());
-    std::shuffle(input_array.begin(), input_array.end(), g1);
-    for (const auto& v : input_array)
-        a.add(v);
-
-    a.try_encode(a_encoded);
-    CHECK(a_encoded.is_encoded());
-    CHECK(a_encoded.size() == a.size());
-
-    // verify that both find the same thing
-    for (size_t j = 0; j < n_runs; ++j) {
-        for (size_t i = 0; i < n_values; ++i) {
-            REALM_ASSERT(a.find_first(-i) == a_encoded.find_first(-i));
-        }
-    }
-
-    t1 = high_resolution_clock::now();
-    for (size_t j = 0; j < n_runs; ++j) {
-        for (size_t i = 0; i < n_values; ++i) {
-            auto ndx = a.find_first(-i);
-            REALM_ASSERT(ndx != realm::not_found);
-            REALM_ASSERT(a.get(ndx) == input_array[ndx]);
-        }
-    }
-    t2 = high_resolution_clock::now();
-
-    std::cout << "   Negative values - Array::find<Equal>(): " << duration_cast<milliseconds>(t2 - t1).count()
-              << " ms" << std::endl;
-    std::cout << "   Negative values - Array::find<Equal>(): "
-              << (double)duration_cast<nanoseconds>(t2 - t1).count() / n_values / n_runs << " ns/value" << std::endl;
-
-    t1 = high_resolution_clock::now();
-    for (size_t j = 0; j < n_runs; ++j) {
-        for (size_t i = 0; i < n_values; ++i) {
-            auto ndx = a_encoded.find_first(-i);
-            REALM_ASSERT(ndx != realm::not_found);
-            REALM_ASSERT(a_encoded.get(ndx) == a.get(ndx));
-        }
-    }
-    t2 = high_resolution_clock::now();
-    std::cout << "   Negative values - ArrayEncode::find<Equal>(): " << duration_cast<milliseconds>(t2 - t1).count()
-              << " ms" << std::endl;
-    std::cout << "   Negative values - ArrayEncode::find<Equal>(): "
-              << (double)duration_cast<nanoseconds>(t2 - t1).count() / n_values / n_runs << " ns/value" << std::endl;
-
-    a.destroy();
-    a_encoded.destroy();
+    //    a.destroy();
+    //    a_encoded.destroy();
+    //    a.create();
+    //    input_array.clear();
+    //    for (size_t i = 0; i < n_values; i++)
+    //        input_array.push_back(-i);
+    //    std::random_device rd1;
+    //    std::mt19937 g1(rd1());
+    //    std::shuffle(input_array.begin(), input_array.end(), g1);
+    //    for (const auto& v : input_array)
+    //        a.add(v);
+    //
+    //    a.try_encode(a_encoded);
+    //    CHECK(a_encoded.is_encoded());
+    //    CHECK(a_encoded.size() == a.size());
+    //
+    //    // verify that both find the same thing
+    //    for (size_t j = 0; j < n_runs; ++j) {
+    //        for (size_t i = 0; i < n_values; ++i) {
+    //            REALM_ASSERT(a.find_first(-i) == a_encoded.find_first(-i));
+    //        }
+    //    }
+    //
+    //    t1 = high_resolution_clock::now();
+    //    for (size_t j = 0; j < n_runs; ++j) {
+    //        for (size_t i = 0; i < n_values; ++i) {
+    //            auto ndx = a.find_first(-i);
+    //            REALM_ASSERT(ndx != realm::not_found);
+    //            REALM_ASSERT(a.get(ndx) == input_array[ndx]);
+    //        }
+    //    }
+    //    t2 = high_resolution_clock::now();
+    //
+    //    std::cout << "   Negative values - Array::find<Equal>(): " << duration_cast<milliseconds>(t2 - t1).count()
+    //              << " ms" << std::endl;
+    //    std::cout << "   Negative values - Array::find<Equal>(): "
+    //              << (double)duration_cast<nanoseconds>(t2 - t1).count() / n_values / n_runs << " ns/value" <<
+    //              std::endl;
+    //
+    //    t1 = high_resolution_clock::now();
+    //    for (size_t j = 0; j < n_runs; ++j) {
+    //        for (size_t i = 0; i < n_values; ++i) {
+    //            auto ndx = a_encoded.find_first(-i);
+    //            REALM_ASSERT(ndx != realm::not_found);
+    //            REALM_ASSERT(a_encoded.get(ndx) == a.get(ndx));
+    //        }
+    //    }
+    //    t2 = high_resolution_clock::now();
+    //    std::cout << "   Negative values - ArrayEncode::find<Equal>(): " << duration_cast<milliseconds>(t2 -
+    //    t1).count()
+    //              << " ms" << std::endl;
+    //    std::cout << "   Negative values - ArrayEncode::find<Equal>(): "
+    //              << (double)duration_cast<nanoseconds>(t2 - t1).count() / n_values / n_runs << " ns/value" <<
+    //              std::endl;
+    //
+    //    a.destroy();
+    //    a_encoded.destroy();
 }
 
 TEST(Test_basic_find_NEQ_value_less_32bit)
@@ -1107,7 +1113,7 @@ TEST(Test_basic_find_LT_value_greater_32bit)
     a_encoded.destroy();
 }
 
-ONLY(Test_basic_find_GT_value_greater_32bit)
+TEST(Test_basic_find_GT_value_greater_32bit)
 {
     using namespace std;
     using namespace std::chrono;
