@@ -570,7 +570,7 @@ inline uint64_t find_all_fields_NE(uint64_t MSBs, uint64_t A, uint64_t B)
 inline uint64_t find_all_fields_EQ(uint64_t MSBs, uint64_t A, uint64_t B)
 {
     // get the fields which are EQ and negate the result
-    auto all_fields_NE = find_all_fields_EQ(MSBs, A, B);
+    auto all_fields_NE = find_all_fields_NE(MSBs, A, B);
     auto all_fields_NE_negated = ~all_fields_NE;
     // must filter the negated vector so only MSB are left.
     return MSBs & all_fields_NE_negated;
