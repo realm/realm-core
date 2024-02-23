@@ -185,6 +185,43 @@ inline int64_t get_direct(const char* data, size_t width, size_t ndx) noexcept
     REALM_TEMPEX(return get_direct, width, (data, ndx));
 }
 
+// An iterator for getting a 64 bit word from any (byte-address+bit-offset) address.
+class unaligned_word_iter {
+public:
+    unaligned_word_iter(const uint64_t* data, size_t bit_offset)
+        : m_word_ptr(data + (bit_offset >> 6))
+        , m_in_word_offset(bit_offset & 0x3F)
+    {
+    }
+    // 'num_bits' number of bits which must be read
+    // WARNING returned word may be garbage above the first 'num_bits' bits.
+    uint64_t get(unsigned num_bits)
+    {
+        auto first_word = m_word_ptr[0];
+        uint64_t result = first_word >> m_in_word_offset;
+        // note: above shifts in zeroes
+        if (m_in_word_offset + num_bits <= 64)
+            return result;
+        // if we're here, in_word_offset > 0
+        auto first_word_size = 64 - m_in_word_offset;
+        auto second_word = m_word_ptr[1];
+        result |= second_word << first_word_size;
+        // note: above shifts in zeroes below the bits we want
+        return result;
+    }
+    // bump the iterator the specified number of bits
+    void bump(unsigned num_bits)
+    {
+        auto total_offset = m_in_word_offset + num_bits;
+        m_word_ptr += total_offset >> 6;
+        m_in_word_offset = total_offset & 0x3F;
+    }
+
+private:
+    const uint64_t* m_word_ptr;
+    unsigned m_in_word_offset;
+};
+
 // Read a bit field of up to 64 bits.
 // - Any alignment and size is supported
 // - The start of the 'data' area must be 64 bit aligned in all cases.
