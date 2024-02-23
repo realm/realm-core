@@ -61,8 +61,6 @@ SyncManager::SyncManager(Private, std::shared_ptr<app::App> app, std::optional<s
     // logger will be created at that time.
     do_make_logger();
 
-    do_reset_update_location();
-
     if (m_config.metadata_mode == MetadataMode::NoMetadata) {
         return;
     }
@@ -728,13 +726,11 @@ void SyncManager::do_update_location()
             if (status.code() == ErrorCodes::OperationAborted) {
                 return;
             }
-            // Timer failed (something bad happened)
-            else if (!status.is_ok()) {
-                throw RuntimeError(std::move(status));
-            }
 
+            // If status is not OK, then something bad happened
+            REALM_ASSERT_EX(status.is_ok(), status);
             std::shared_ptr<app::App> app;
-            if (auto mgr = self.lock(); mgr) {
+            if (auto mgr = self.lock()) {
                 app = mgr->app().lock();
             }
             if (!app) {

@@ -101,9 +101,6 @@ public:
     bool decompose_server_url(const std::string& url, ProtocolEnvelope& protocol, std::string& address,
                               port_type& port, std::string& path) const;
 
-    sync::SyncSocketProvider::SyncTimer create_timer(std::chrono::milliseconds delay,
-                                                     sync::SyncSocketProvider::FunctionHandler&& handler);
-
 private:
     std::unique_ptr<ClientImpl> m_impl;
     friend class Session;

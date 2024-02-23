@@ -958,6 +958,47 @@ TEST(Network_SocketShutdown)
 }
 
 
+TEST(Network_DeadlineTimer_WhileRunning)
+{
+    ThreadWrapper thread;
+    network::Service service;
+    network::DeadlineTimer timer{service};
+    auto pf = util::make_promise_future<void>();
+    std::atomic<bool> called{false};
+
+    auto run_service = [&service] {
+        service.run_until_stopped();
+    };
+
+    // Post
+    service.post([promise = util::CopyablePromiseHolder<void>(std::move(pf.promise))](Status status) mutable {
+        if (status.is_ok()) {
+            promise.get_promise().emplace_value();
+        }
+    });
+
+    // Start the service and wait for the post() to complete
+    thread.start(run_service);
+    pf.future.get();
+    // Wait for the event loop to reach steady state
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+    // Schedule the timer to fire after 100 ms
+    timer.async_wait(std::chrono::milliseconds(100), [&](Status status) {
+        CHECK(status.is_ok());
+        called = true;
+    });
+    // Give the timer time to fire
+    std::this_thread::sleep_for(std::chrono::milliseconds(250));
+    CHECK(called);
+    // If the check failed, make sure to stop the timer
+    if (!called) {
+        timer.cancel();
+    }
+    service.stop();
+    thread.join();
+}
+
 TEST(Network_DeadlineTimer)
 {
     network::Service service;

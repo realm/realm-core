@@ -141,7 +141,8 @@ struct SyncClient {
     sync::SyncSocketProvider::SyncTimer create_timer(std::chrono::milliseconds delay,
                                                      sync::SyncSocketProvider::FunctionHandler&& handler)
     {
-        return m_client.create_timer(delay, std::move(handler));
+        REALM_ASSERT(m_socket_provider);
+        return m_socket_provider->create_timer(delay, std::move(handler));
     }
 
     ~SyncClient() {}
