@@ -859,7 +859,8 @@ public:
     /// The specified transaction reporter (via the config object) is guaranteed
     /// to not be called before activation, and also not after initiation of
     /// deactivation.
-    Session(SessionWrapper&, ClientImpl::Connection&);
+    Session(SessionWrapper&, ClientImpl::Connection&, session_ident_type,
+            std::function<SyncClientHookAction(SyncClientHookData data)>);
     ~Session();
 
     void force_close();
@@ -1036,6 +1037,8 @@ private:
     bool m_error_message_received;       // Session specific ERROR message received
     bool m_unbound_message_received;     // UNBOUND message received
     bool m_error_to_send;
+    bool m_error_message_sent;
+    bool m_error_message_send_complete;
 
     // True when there is a new FLX sync query we need to send to the server.
     util::Optional<SubscriptionStore::PendingSubscription> m_pending_flx_sub_set;
@@ -1132,12 +1135,13 @@ private:
 
     SessionWrapper& m_wrapper;
 
+    std::function<SyncClientHookAction(SyncClientHookData data)> m_debug_hook;
+    bool m_in_debug_hook = false;
+
     request_ident_type m_last_pending_test_command_ident = 0;
     std::list<PendingTestCommand> m_pending_test_commands;
 
     static std::string make_logger_prefix(session_ident_type);
-
-    Session(SessionWrapper& wrapper, Connection&, session_ident_type);
 
     bool do_recognize_sync_version(version_type) noexcept;
 
@@ -1155,6 +1159,7 @@ private:
     // session is in the Active state, and the unbinding process has completed
     // (unbind_process_complete()).
     bool unbind_process_complete() const noexcept;
+    bool pending_client_error() const noexcept;
 
     void activate();
     void initiate_deactivation();
@@ -1420,12 +1425,8 @@ inline void ClientImpl::Session::request_download_completion_notification()
         ensure_enlisted_to_send(); // Throws
 }
 
-inline ClientImpl::Session::Session(SessionWrapper& wrapper, Connection& conn)
-    : Session{wrapper, conn, conn.get_client().get_next_session_ident()} // Throws
-{
-}
-
-inline ClientImpl::Session::Session(SessionWrapper& wrapper, Connection& conn, session_ident_type ident)
+inline ClientImpl::Session::Session(SessionWrapper& wrapper, Connection& conn, session_ident_type ident,
+                                    std::function<SyncClientHookAction(SyncClientHookData data)> debug_hook)
     : logger_ptr{std::make_shared<util::PrefixLogger>(make_logger_prefix(ident), conn.logger_ptr)} // Throws
     , logger{*logger_ptr}
     , m_conn{conn}
@@ -1434,6 +1435,7 @@ inline ClientImpl::Session::Session(SessionWrapper& wrapper, Connection& conn, s
     , m_is_flx_sync_session(conn.is_flx_sync_connection())
     , m_fix_up_object_ids(get_client().m_fix_up_object_ids)
     , m_wrapper{wrapper}
+    , m_debug_hook(std::move(debug_hook))
 {
     if (get_client().m_disable_upload_activation_delay)
         m_allow_upload = true;
@@ -1458,9 +1460,14 @@ inline bool ClientImpl::Session::unbind_process_complete() const noexcept
     return (m_unbind_message_send_complete && (m_error_message_received || m_unbound_message_received));
 }
 
+inline bool ClientImpl::Session::pending_client_error() const noexcept
+{
+    return m_error_to_send || (m_error_message_sent && !m_error_message_send_complete);
+}
+
 inline void ClientImpl::Session::connection_established(bool fast_reconnect)
 {
-    REALM_ASSERT(m_state == Active);
+    REALM_ASSERT(m_state == Active || (m_state == Deactivating && m_error_to_send));
 
     if (!fast_reconnect && !get_client().m_disable_upload_activation_delay) {
         // Disallow immediate activation of the upload process, even if download
@@ -1506,6 +1513,14 @@ inline void ClientImpl::Session::message_sent()
 
     // No message will be sent after the UNBIND message
     REALM_ASSERT(!m_unbind_message_send_complete);
+
+    if (m_error_message_sent) {
+        m_error_message_send_complete = true;
+        if (m_state == Deactivating && !m_bind_message_sent) {
+            complete_deactivation();
+            return;
+        }
+    }
 
     if (m_unbind_message_sent) {
         REALM_ASSERT(!m_enlisted_to_send);
@@ -1553,6 +1568,9 @@ inline void ClientImpl::Session::reset_protocol_state() noexcept
     m_enlisted_to_send                    = false;
     m_bind_message_sent                   = false;
     m_error_to_send                       = false;
+    m_error_message_sent                  = false;
+    m_error_message_send_complete         = false;
+
     m_ident_message_sent = false;
     m_unbind_message_sent = false;
     m_unbind_message_send_complete = false;

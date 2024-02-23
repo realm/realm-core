@@ -82,6 +82,37 @@ private:
     E m_cur_state;
 };
 
+template <typename Matcher>
+class VectorElemMatchesMatcher final : public Catch::Matchers::MatcherGenericBase {
+public:
+    explicit VectorElemMatchesMatcher(Matcher&& matcher)
+        : m_matcher(std::move(matcher))
+    {
+    }
+
+    template <typename Container>
+    bool match(Container const& vec) const
+    {
+        return std::any_of(vec.begin(), vec.end(), [&](const auto& e) {
+            return m_matcher.match(e);
+        });
+    }
+
+    std::string describe() const override
+    {
+        return util::format("VectorElemMatches(%1)", m_matcher.toString());
+    }
+
+private:
+    Matcher m_matcher;
+};
+
+template <typename Matcher>
+inline auto VectorElemMatches(Matcher&& matcher)
+{
+    return VectorElemMatchesMatcher<Matcher>(std::move(matcher));
+}
+
 template <typename MessageMatcher>
 class ExceptionMatcher final : public Catch::Matchers::MatcherBase<Exception> {
 public:

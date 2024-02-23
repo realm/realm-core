@@ -22,6 +22,7 @@
 
 #include <util/sync/baas_admin_api.hpp>
 #include <util/sync/sync_test_utils.hpp>
+#include <util/test_utils.hpp>
 
 #include <vector>
 

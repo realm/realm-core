@@ -174,8 +174,9 @@ private:
     util::UniqueFunction<ProgressHandler> m_progress_handler;
     util::UniqueFunction<ConnectionStateChangeListener> m_connection_state_change_listener;
 
-    std::function<SyncClientHookAction(SyncClientHookData data)> m_debug_hook;
-    bool m_in_debug_hook = false;
+    // This gets passed to the SessionImpl constructor and owned by the SessionImpl after
+    // actualization so that it can outlive the SessionWrapper.
+    std::function<SyncClientHookAction(SyncClientHookData data)> m_debug_hook_for_sess_impl;
 
     SessionReason m_session_reason;
 
@@ -1008,19 +1009,16 @@ void SessionImpl::on_flx_sync_version_complete(int64_t version)
 
 SyncClientHookAction SessionImpl::call_debug_hook(const SyncClientHookData& data)
 {
-    // Should never be called if session is not active
-    REALM_ASSERT_EX(m_state == State::Active, m_state);
-
     // Make sure we don't call the debug hook recursively.
-    if (m_wrapper.m_in_debug_hook) {
+    if (m_in_debug_hook) {
         return SyncClientHookAction::NoAction;
     }
-    m_wrapper.m_in_debug_hook = true;
+    m_in_debug_hook = true;
     auto in_hook_guard = util::make_scope_exit([&]() noexcept {
-        m_wrapper.m_in_debug_hook = false;
+        m_in_debug_hook = false;
     });
 
-    auto action = m_wrapper.m_debug_hook(data);
+    auto action = m_debug_hook(data);
     switch (action) {
         case realm::SyncClientHookAction::SuspendWithRetryableError: {
             SessionErrorInfo err_info(Status{ErrorCodes::RuntimeError, "hook requested error"}, IsFatal{false});
@@ -1043,13 +1041,9 @@ SyncClientHookAction SessionImpl::call_debug_hook(SyncClientHookEvent event, con
                                                   int64_t query_version, DownloadBatchState batch_state,
                                                   size_t num_changesets)
 {
-    if (REALM_LIKELY(!m_wrapper.m_debug_hook)) {
+    if (REALM_LIKELY(!m_debug_hook)) {
         return SyncClientHookAction::NoAction;
     }
-    if (REALM_UNLIKELY(m_state != State::Active)) {
-        return SyncClientHookAction::NoAction;
-    }
-
     SyncClientHookData data;
     data.event = event;
     data.batch_state = batch_state;
@@ -1062,12 +1056,10 @@ SyncClientHookAction SessionImpl::call_debug_hook(SyncClientHookEvent event, con
 
 SyncClientHookAction SessionImpl::call_debug_hook(SyncClientHookEvent event, const ProtocolErrorInfo& error_info)
 {
-    if (REALM_LIKELY(!m_wrapper.m_debug_hook)) {
+    if (REALM_LIKELY(!m_debug_hook)) {
         return SyncClientHookAction::NoAction;
     }
-    if (REALM_UNLIKELY(m_state != State::Active)) {
-        return SyncClientHookAction::NoAction;
-    }
+
 
     SyncClientHookData data;
     data.event = event;
@@ -1164,7 +1156,7 @@ SessionWrapper::SessionWrapper(ClientImpl& client, DBRef db, std::shared_ptr<Sub
     , m_signed_access_token{std::move(config.signed_user_token)}
     , m_client_reset_config{std::move(config.client_reset_config)}
     , m_proxy_config{config.proxy_config} // Throws
-    , m_debug_hook(std::move(config.on_sync_client_event_hook))
+    , m_debug_hook_for_sess_impl(std::move(config.on_sync_client_event_hook))
     , m_session_reason(config.session_reason)
     , m_schema_version(config.schema_version)
     , m_flx_subscription_store(std::move(flx_sub_store))
@@ -1561,8 +1553,9 @@ void SessionWrapper::actualize(ServerEndpoint endpoint)
         was_created); // Throws
     try {
         // FIXME: This only makes sense when each session uses a separate connection.
-        conn.update_connect_info(m_http_request_path_prefix, m_signed_access_token);    // Throws
-        std::unique_ptr<SessionImpl> sess = std::make_unique<SessionImpl>(*this, conn); // Throws
+        conn.update_connect_info(m_http_request_path_prefix, m_signed_access_token); // Throws
+        std::unique_ptr<SessionImpl> sess = std::make_unique<SessionImpl>(
+            *this, conn, m_client.get_next_session_ident(), std::move(m_debug_hook_for_sess_impl)); // Throws
         if (sync_mode == SyncServerMode::FLX) {
             m_flx_pending_bootstrap_store = std::make_unique<PendingBootstrapStore>(m_db, sess->logger);
         }
