@@ -5,6 +5,7 @@
 * Add `SyncClientConfig::security_access_group` which allows specifying the access group to use for the sync metadata Realm's encryption key. Setting this is required when sharing the metadata Realm between apps on Apple platforms ([#7552](https://github.com/realm/realm-core/pull/7552)).
 * When connecting to multiple server apps, a unique encryption key is used for each of the metadata Realms rather than sharing one between them ([#7552](https://github.com/realm/realm-core/pull/7552)).
 * Introduce the new `SyncUser` interface which can be implemented by SDKs to use sync without the core App Services implementation (or just for greater control over user behavior in tests). ([PR #7300](https://github.com/realm/realm-core/pull/7300).
+* Testing.
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
