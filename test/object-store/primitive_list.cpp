@@ -980,3 +980,62 @@ TEST_CASE("list of mixed links", "[primitives]") {
         }
     }
 }
+
+TEST_CASE("list of strings - with index", "[primitives]") {
+    InMemoryTestFile config;
+    config.cache = false;
+    config.automatic_change_notifications = false;
+    config.schema = Schema{
+        {"object",
+         {{"strings", PropertyType::Array | PropertyType::String, Property::IsPrimary{false},
+           Property::IsIndexed{true}}}},
+    };
+
+    auto r = Realm::get_shared_realm(config);
+
+    auto table = r->read_group().get_table("class_object");
+    ColKey col = table->get_column_key("strings");
+    Results has_banana(r, table->query("strings = 'Banana'"));
+    Results has_pear(r, table->query("strings = 'Pear'"));
+
+    auto write = [&](auto&& fn) {
+        r->begin_transaction();
+        fn();
+        r->commit_transaction();
+    };
+
+    r->begin_transaction();
+    Obj obj = table->create_object();
+    List list(r, obj, col);
+    r->commit_transaction();
+
+    write([&] {
+        list.add(StringData("Banana"));
+        list.add(StringData("Apple"));
+        list.add(StringData("Orange"));
+    });
+
+    CHECK(has_banana.size() == 1);
+    CHECK(has_pear.size() == 0);
+
+    write([&] {
+        list.set(0, StringData("Pear")); // Add Pear - remove banana
+        list.add(StringData("Pear"));    // Already there
+        list.add(StringData("Grape"));   // Add
+    });
+    CHECK(has_banana.size() == 0);
+    CHECK(has_pear.size() == 1);
+
+    write([&] {
+        list.set(1, StringData("Orange")); // Already Orange - remove Apple
+        list.set(3, StringData("Banana")); // Add Banana - keep Pear
+    });
+    CHECK(has_banana.size() == 1);
+    CHECK(has_pear.size() == 1);
+
+    write([&] {
+        list.set(2, StringData("Banana")); // No change in index
+    });
+    CHECK(has_banana.size() == 1);
+    CHECK(has_pear.size() == 1);
+}

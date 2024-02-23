@@ -18,9 +18,11 @@
 
 #include <realm/object-store/impl/list_notifier.hpp>
 
-#include <realm/object-store/list.hpp>
+#include <realm/list.hpp>
+#include <realm/dictionary.hpp>
 
 #include <realm/transaction.hpp>
+#include <realm/util/scope_exit.hpp>
 
 using namespace realm;
 using namespace realm::_impl;
@@ -31,6 +33,15 @@ ListNotifier::ListNotifier(std::shared_ptr<Realm> realm, CollectionBase const& l
     , m_prev_size(list.size())
 {
     attach(list);
+    if (m_logger) {
+        auto path = m_list->get_short_path();
+        auto prop_name = m_list->get_table()->get_column_name(path[0].get_col_key());
+        path[0] = PathElement(prop_name);
+
+        m_description = util::format("%1 %2%3", list.get_collection_type(), m_list->get_obj().get_id(), path);
+        m_logger->log(util::LogCategory::notification, util::Logger::Level::debug,
+                      "Creating CollectionNotifier for %1", m_description);
+    }
 }
 
 void ListNotifier::release_data() noexcept
@@ -41,17 +52,18 @@ void ListNotifier::release_data() noexcept
 
 void ListNotifier::reattach()
 {
+    REALM_ASSERT(m_list);
     attach(*m_list);
 }
 
 void ListNotifier::attach(CollectionBase const& src)
 {
     auto& tr = transaction();
-    try {
-        auto obj = tr.get_table(src.get_table()->get_key())->get_object(src.get_owner_key());
-        m_list = obj.get_collection_ptr(src.get_col_key());
+    if (auto obj = tr.get_table(src.get_table()->get_key())->try_get_object(src.get_owner_key())) {
+        auto path = src.get_stable_path();
+        m_list = std::static_pointer_cast<CollectionBase>(obj.get_collection_by_stable_path(path));
     }
-    catch (const KeyNotFound&) {
+    else {
         m_list = nullptr;
     }
 }
@@ -61,8 +73,14 @@ bool ListNotifier::do_add_required_change_info(TransactionChangeInfo& info)
     if (!m_list || !m_list->is_attached())
         return false; // origin row was deleted after the notification was added
 
-    info.collections.push_back(
-        {m_list->get_table()->get_key(), m_list->get_owner_key(), m_list->get_col_key(), &m_change});
+    // We need to have the collections with the shortest paths first
+    StablePath this_path = m_list->get_stable_path();
+    auto it = std::lower_bound(info.collections.begin(), info.collections.end(), this_path.size(),
+                               [](const CollectionChangeInfo& info, size_t sz) {
+                                   return info.path.size() < sz;
+                               });
+    info.collections.insert(
+        it, {m_list->get_table()->get_key(), m_list->get_owner_key(), std::move(this_path), &m_change});
 
     m_info = &info;
 
@@ -79,6 +97,17 @@ bool ListNotifier::do_add_required_change_info(TransactionChangeInfo& info)
 
 void ListNotifier::run()
 {
+    using namespace std::chrono;
+    auto t1 = steady_clock::now();
+    util::ScopeExit cleanup([&]() noexcept {
+        m_run_time_point = steady_clock::now();
+        if (m_logger) {
+            m_logger->log(util::LogCategory::notification, util::Logger::Level::debug,
+                          "ListNotifier %1 did run in %2 us", m_description,
+                          duration_cast<microseconds>(m_run_time_point - t1).count());
+        }
+    });
+
     if (!m_list || !m_list->is_attached()) {
         // List was deleted, so report all of the rows being removed if this is
         // the first run after that
@@ -110,6 +139,17 @@ void ListNotifier::run()
                 continue;
             if (object_did_change(m_list->get_any(move.to).get<ObjKey>()))
                 m_change.modifications.add(move.to);
+        }
+    }
+
+    if (m_change.paths.size()) {
+        if (auto coll = dynamic_cast<CollectionParent*>(m_list.get())) {
+            for (auto& p : m_change.paths) {
+                // Report changes in substructure as modifications on this list
+                auto ndx = coll->find_index(p[0]);
+                if (ndx != realm::not_found)
+                    m_change.modifications.add(ndx); // OK to insert same index again
+            }
         }
     }
 }

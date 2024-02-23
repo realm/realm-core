@@ -35,14 +35,11 @@ public:
     void run();
     virtual void on_list_of_links(LnkLst& list) = 0;
     virtual void on_list_of_mixed(Lst<Mixed>& list) = 0;
-    virtual void on_list_of_typedlink(Lst<ObjLink>& list) = 0;
     virtual void on_set_of_links(LnkSet& set) = 0;
     virtual void on_set_of_mixed(Set<Mixed>& set) = 0;
-    virtual void on_set_of_typedlink(Set<ObjLink>& set) = 0;
     virtual void on_dictionary(Dictionary& dict) = 0;
     virtual void on_link_property(ColKey col) = 0;
     virtual void on_mixed_property(ColKey col) = 0;
-    virtual void on_typedlink_property(ColKey col) = 0;
 
 protected:
     Obj m_origin_obj;

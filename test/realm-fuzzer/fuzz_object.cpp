@@ -179,7 +179,7 @@ void FuzzObject::add_column_link_list(Group& group, FuzzLog& log, State& s)
     TableKey table_key_2 = group.get_table_keys()[get_next_token(s) % group.size()];
     TableRef t1 = group.get_table(table_key_1);
     TableRef t2 = group.get_table(table_key_2);
-    std::string name = create_column_name(type_LinkList);
+    std::string name = create_column_name(type_Link, true);
     log << "group.get_table(" << table_key_1 << ")->add_column_link(type_LinkList, \"" << name
         << "\", group.get_table(" << table_key_2 << "));";
     auto col = t1->add_column_list(*t2, name);
@@ -258,28 +258,30 @@ void FuzzObject::set_obj(Group& group, FuzzLog& log, State& s)
                 obj.set<double>(col, value);
             }
             else if (type == type_Link) {
-                TableRef target = t->get_link_target(col);
-                if (target->size() > 0) {
-                    ObjKey target_key = target->get_object(get_next_token(s) % target->size()).get_key();
-                    log << "obj.set<Key>(" << col << ", " << target_key << ");\n";
-                    obj.set(col, target_key);
-                }
-            }
-            else if (type == type_LinkList) {
-                TableRef target = t->get_link_target(col);
-                if (target->size() > 0) {
-                    LnkLst links = obj.get_linklist(col);
-                    ObjKey target_key = target->get_object(get_next_token(s) % target->size()).get_key();
-                    // either add or set, 50/50 probability
-                    if (links.size() > 0 && get_next_token(s) > 128) {
-                        size_t linklist_row = get_next_token(s) % links.size();
-                        log << "obj.get_linklist(" << col << ")->set(" << linklist_row << ", " << target_key
-                            << ");\n";
-                        links.set(linklist_row, target_key);
+                if (col.is_list()) {
+                    TableRef target = t->get_link_target(col);
+                    if (target->size() > 0) {
+                        LnkLst links = obj.get_linklist(col);
+                        ObjKey target_key = target->get_object(get_next_token(s) % target->size()).get_key();
+                        // either add or set, 50/50 probability
+                        if (links.size() > 0 && get_next_token(s) > 128) {
+                            size_t linklist_row = get_next_token(s) % links.size();
+                            log << "obj.get_linklist(" << col << ")->set(" << linklist_row << ", " << target_key
+                                << ");\n";
+                            links.set(linklist_row, target_key);
+                        }
+                        else {
+                            log << "obj.get_linklist(" << col << ")->add(" << target_key << ");\n";
+                            links.add(target_key);
+                        }
                     }
-                    else {
-                        log << "obj.get_linklist(" << col << ")->add(" << target_key << ");\n";
-                        links.add(target_key);
+                }
+                else {
+                    TableRef target = t->get_link_target(col);
+                    if (target->size() > 0) {
+                        ObjKey target_key = target->get_object(get_next_token(s) % target->size()).get_key();
+                        log << "obj.set<Key>(" << col << ", " << target_key << ");\n";
+                        obj.set(col, target_key);
                     }
                 }
             }
@@ -481,7 +483,7 @@ std::pair<int64_t, int32_t> FuzzObject::get_timestamp_values(State& s) const
     return {seconds, nanoseconds};
 }
 
-std::string FuzzObject::create_column_name(DataType t)
+std::string FuzzObject::create_column_name(DataType t, bool is_list)
 {
     std::string str;
     switch (t) {
@@ -513,13 +515,10 @@ std::string FuzzObject::create_column_name(DataType t)
             str = "id_";
             break;
         case type_Link:
-            str = "link_";
+            str = is_list ? "link_list_" : "link_";
             break;
         case type_TypedLink:
             str = "typed_link_";
-            break;
-        case type_LinkList:
-            str = "link_list_";
             break;
         case type_UUID:
             str = "uuid_";

@@ -201,13 +201,7 @@ SyncServer::SyncServer(const SyncServer::Config& config)
     , m_server(m_local_root_dir, util::none, ([&] {
                    using namespace std::literals::chrono_literals;
 
-#if TEST_ENABLE_LOGGING
                    m_logger = util::Logger::get_default_logger();
-
-#else
-                   // Logging is disabled, use a NullLogger to prevent printing anything
-                   m_logger.reset(new util::NullLogger());
-#endif
 
                    sync::Server::Config c;
                    c.logger = m_logger;
@@ -409,22 +403,25 @@ std::vector<bson::BsonDocument> TestAppSession::get_documents(SyncUser& user, co
         std::chrono::minutes(5));
 
     std::vector<bson::BsonDocument> documents;
-    collection.find({}, {},
-                    [&](util::Optional<std::vector<bson::Bson>>&& result, util::Optional<app::AppError> error) {
-                        REQUIRE(result);
-                        REQUIRE(!error);
-                        REQUIRE(result->size() == expected_count);
-                        documents.reserve(result->size());
-                        for (auto&& bson : *result) {
-                            REQUIRE(bson.type() == bson::Bson::Type::Document);
-                            documents.push_back(std::move(static_cast<bson::BsonDocument&>(bson)));
-                        }
-                    });
+    collection.find({}, {}, [&](util::Optional<bson::BsonArray>&& result, util::Optional<app::AppError> error) {
+        REQUIRE(result);
+        REQUIRE(!error);
+        REQUIRE(result->size() == expected_count);
+        documents.reserve(result->size());
+        for (auto&& bson : *result) {
+            REQUIRE(bson.type() == bson::Bson::Type::Document);
+            documents.push_back(std::move(static_cast<const bson::BsonDocument&>(bson)));
+        }
+    });
     return documents;
 }
 #endif // REALM_ENABLE_AUTH_TESTS
 
 // MARK: - TestSyncManager
+
+TestSyncManager::Config::Config()
+{
+}
 
 TestSyncManager::TestSyncManager(const Config& config, const SyncServer::Config& sync_server_config)
     : m_sync_server(sync_server_config)

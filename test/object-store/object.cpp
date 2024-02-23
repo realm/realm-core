@@ -2366,6 +2366,12 @@ TEST_CASE("Asymmetric Object") {
         REQUIRE(realm->is_empty());
     }
 
+    SECTION("Re-open realm") {
+        realm->close();
+        realm.reset();
+        realm = Realm::get_shared_realm(config);
+    }
+
     SECTION("Delete ephemeral object before comitting") {
         realm->begin_transaction();
         auto obj = realm->read_group().get_table("class_asymmetric")->create_object_with_primary_key(1);

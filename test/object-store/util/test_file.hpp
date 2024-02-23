@@ -174,7 +174,7 @@ struct SyncTestFile : TestFile {
 class TestSyncManager {
 public:
     struct Config {
-        Config() {}
+        Config();
         std::string base_path;
         realm::SyncManager::MetadataMode metadata_mode = realm::SyncManager::MetadataMode::NoMetadata;
         bool should_teardown_test_directory = true;
@@ -284,6 +284,7 @@ private:
     std::shared_ptr<realm::app::GenericNetworkTransport> m_transport;
 };
 #endif
+
 
 bool wait_for_upload(realm::Realm& realm, std::chrono::seconds timeout = std::chrono::seconds(60));
 bool wait_for_download(realm::Realm& realm, std::chrono::seconds timeout = std::chrono::seconds(60));

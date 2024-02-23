@@ -197,7 +197,7 @@ std::ostream& operator<<(std::ostream&, HTTPStatus);
 
 struct HTTPParserBase {
     const std::shared_ptr<util::Logger> logger_ptr;
-    util::Logger& logger;
+    util::Logger& network_logger;
 
     // FIXME: Generally useful?
     struct CallocDeleter {
@@ -208,8 +208,8 @@ struct HTTPParserBase {
     };
 
     HTTPParserBase(const std::shared_ptr<util::Logger>& logger_ptr)
-        : logger_ptr{logger_ptr}
-        , logger{*logger_ptr}
+        : logger_ptr{std::make_shared<util::CategoryLogger>(util::LogCategory::network, logger_ptr)}
+        , network_logger{*logger_ptr}
     {
         // Allocating read buffer with calloc to avoid accidentally spilling
         // data from other sessions in case of a buffer overflow exploit.
@@ -432,7 +432,7 @@ private:
     {
         HTTPStatus status;
         StringData reason;
-        if (this->parse_first_line_of_response(line, status, reason, this->logger)) {
+        if (this->parse_first_line_of_response(line, status, reason, this->network_logger)) {
             m_response.status = status;
             m_response.reason = reason;
             return std::error_code{};

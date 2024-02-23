@@ -143,6 +143,10 @@ Instruction::Payload::Type State::read_payload_type()
             [[fallthrough]];
         case Type::Erased:
             [[fallthrough]];
+        case Type::Set:
+            [[fallthrough]];
+        case Type::List:
+            [[fallthrough]];
         case Type::Dictionary:
             [[fallthrough]];
         case Type::ObjectValue:
@@ -253,6 +257,10 @@ Instruction::Payload State::read_payload()
 
         case Type::Null:
             [[fallthrough]];
+        case Type::Set:
+            [[fallthrough]];
+        case Type::List:
+            [[fallthrough]];
         case Type::Dictionary:
             [[fallthrough]];
         case Type::Erased:
@@ -301,17 +309,17 @@ Instruction::Path State::read_path()
 
     // Note: Not reserving `path_len`, because a corrupt changeset could cause std::bad_alloc to be thrown.
     if (path_len != 0)
-        path.m_path.reserve(16);
+        path.reserve(16);
 
     for (size_t i = 0; i < path_len; ++i) {
         int64_t element = read_int();
         if (element >= 0) {
             // Integer path element
-            path.m_path.emplace_back(uint32_t(element));
+            path.push_back(uint32_t(element));
         }
         else {
             // String path element
-            path.m_path.emplace_back(read_intern_string());
+            path.push_back(read_intern_string());
         }
     }
 

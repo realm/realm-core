@@ -425,6 +425,15 @@ public:
     /// written by a non-recursive invocation of write().
     size_t get_byte_size() const noexcept;
 
+    // Get the number of bytes used by this array and its sub-arrays
+    size_t get_byte_size_deep() const noexcept
+    {
+        size_t mem = 0;
+        _mem_usage(mem);
+        return mem;
+    }
+
+
     /// Get the maximum number of bytes that can be written by a
     /// non-recursive invocation of write() on an array with the
     /// specified number of elements, that is, the maximum value that
@@ -530,6 +539,8 @@ protected:
 private:
     ref_type do_write_shallow(_impl::ArrayWriterBase&) const;
     ref_type do_write_deep(_impl::ArrayWriterBase&, bool only_if_modified) const;
+
+    void _mem_usage(size_t& mem) const noexcept;
 
 #ifdef REALM_DEBUG
     void report_memory_usage_2(MemUsageHandler&) const;

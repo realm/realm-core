@@ -69,6 +69,7 @@ typedef struct realm_key_path_array realm_key_path_array_t;
 
 /* Accessor types */
 typedef struct realm_object realm_object_t;
+
 typedef struct realm_list realm_list_t;
 typedef struct realm_set realm_set_t;
 typedef struct realm_dictionary realm_dictionary_t;
@@ -130,6 +131,8 @@ typedef enum realm_value_type {
     RLM_TYPE_OBJECT_ID,
     RLM_TYPE_LINK,
     RLM_TYPE_UUID,
+    RLM_TYPE_LIST,
+    RLM_TYPE_DICTIONARY,
 } realm_value_type_e;
 
 typedef enum realm_schema_validation_mode {
@@ -599,6 +602,7 @@ typedef void (*realm_log_func_t)(realm_userdata_t userdata, realm_log_level_e le
 RLM_API void realm_set_log_callback(realm_log_func_t, realm_log_level_e, realm_userdata_t userdata,
                                     realm_free_userdata_func_t userdata_free) RLM_API_NOEXCEPT;
 RLM_API void realm_set_log_level(realm_log_level_e) RLM_API_NOEXCEPT;
+RLM_API void realm_set_log_level_category(const char*, realm_log_level_e) RLM_API_NOEXCEPT;
 
 /**
  * Get a thread-safe reference representing the same underlying object as some
@@ -1669,11 +1673,26 @@ RLM_API bool realm_get_values(const realm_object_t*, size_t num_values, const re
 RLM_API bool realm_set_value(realm_object_t*, realm_property_key_t, realm_value_t new_value, bool is_default);
 
 /**
+ * Assign a JSON formatted string to a Mixed property. Underlying structures will be created as needed
+ *
+ * @param json_string The new value for the property.
+ * @return True if no exception occurred.
+ */
+RLM_API bool realm_set_json(realm_object_t*, realm_property_key_t, const char* json_string);
+
+/**
  * Create an embedded object in a given property.
  *
  * @return A non-NULL pointer if the object was created successfully.
  */
 RLM_API realm_object_t* realm_set_embedded(realm_object_t*, realm_property_key_t);
+
+/**
+ * Create a collection in a given Mixed property.
+ *
+ */
+RLM_API realm_list_t* realm_set_list(realm_object_t*, realm_property_key_t);
+RLM_API realm_dictionary_t* realm_set_dictionary(realm_object_t*, realm_property_key_t);
 
 /** Return the object linked by the given property
  *
@@ -1817,6 +1836,46 @@ RLM_API bool realm_list_set(realm_list_t*, size_t index, realm_value_t value);
 RLM_API bool realm_list_insert(realm_list_t*, size_t index, realm_value_t value);
 
 /**
+ * Insert a collection inside a list (only available for mixed types)
+ *
+ * @param list valid ptr to a list of mixed
+ * @param index position in the list where to add the collection
+ * @return pointer to a valid collection that has been just inserted at the index passed as argument
+ */
+RLM_API realm_list_t* realm_list_insert_list(realm_list_t* list, size_t index);
+RLM_API realm_dictionary_t* realm_list_insert_dictionary(realm_list_t* list, size_t index);
+
+/**
+ * Set a collection inside a list (only available for mixed types).
+ * If the list already contains a collection of the requested type, the
+ * operation is idempotent.
+ *
+ * @param list valid ptr to a list where a nested collection needs to be set
+ * @param index position in the list where to set the collection
+ * @return a valid ptr representing the collection just set
+ */
+RLM_API realm_list_t* realm_list_set_list(realm_list_t* list, size_t index);
+RLM_API realm_dictionary_t* realm_list_set_dictionary(realm_list_t* list, size_t index);
+
+/**
+ * Returns a nested list if such collection exists, NULL otherwise.
+ *
+ * @param list pointer to the list that containes the nested list
+ * @param index index of collection in the list
+ * @return a pointer to the the nested list found at the index passed as argument
+ */
+RLM_API realm_list_t* realm_list_get_list(realm_list_t* list, size_t index);
+
+/**
+ * Returns a nested dictionary if such collection exists, NULL otherwise.
+ *
+ * @param list pointer to the list that containes the nested collection into
+ * @param index position of collection in the list
+ * @return a pointer to the the nested dictionary found at index passed as argument
+ */
+RLM_API realm_dictionary_t* realm_list_get_dictionary(realm_list_t* list, size_t index);
+
+/**
  * Move the element at @a from_index to @a to_index.
  *
  * @param from_index The index of the element to move.
@@ -1921,10 +1980,12 @@ RLM_API size_t realm_object_changes_get_modified_properties(const realm_object_c
  * @param out_num_modifications The number of modifications. May be NULL.
  * @param out_num_moves The number of moved elements. May be NULL.
  * @param out_collection_was_cleared a flag to signal if the collection has been cleared. May be NULL
+ * @param out_collection_was_deleted a flag to signal if the collection has been deleted. May be NULL
  */
 RLM_API void realm_collection_changes_get_num_changes(const realm_collection_changes_t*, size_t* out_num_deletions,
                                                       size_t* out_num_insertions, size_t* out_num_modifications,
-                                                      size_t* out_num_moves, bool* out_collection_was_cleared);
+                                                      size_t* out_num_moves, bool* out_collection_was_cleared,
+                                                      bool* out_collection_was_deleted);
 
 /**
  * Get the number of various types of changes in a collection notification,
@@ -2005,9 +2066,11 @@ RLM_API void realm_collection_changes_get_ranges(
  * @param out_deletions_size number of deletions
  * @param out_insertion_size number of insertions
  * @param out_modification_size number of modifications
+ * @param out_was_deleted a flag to signal if the dictionary has been deleted.
  */
 RLM_API void realm_dictionary_get_changes(const realm_dictionary_changes_t* changes, size_t* out_deletions_size,
-                                          size_t* out_insertion_size, size_t* out_modification_size);
+                                          size_t* out_insertion_size, size_t* out_modification_size,
+                                          bool* out_was_deleted);
 
 /**
  * Returns the list of keys changed for the dictionary passed as argument.
@@ -2021,11 +2084,12 @@ RLM_API void realm_dictionary_get_changes(const realm_dictionary_changes_t* chan
  * @param insertions_size size of the list of inserted keys
  * @param modifications list of modified keys
  * @param modification_size size of the list of modified keys
+ * @param collection_was_cleared whether or not the collection was cleared
  */
 RLM_API void realm_dictionary_get_changed_keys(const realm_dictionary_changes_t* changes, realm_value_t* deletions,
                                                size_t* deletions_size, realm_value_t* insertions,
                                                size_t* insertions_size, realm_value_t* modifications,
-                                               size_t* modification_size);
+                                               size_t* modification_size, bool* collection_was_cleared);
 
 /**
  * Get a set instance for the property of an object.
@@ -2291,6 +2355,29 @@ RLM_API bool realm_dictionary_insert(realm_dictionary_t*, realm_value_t key, rea
  * @return A non-NULL pointer if the object was created successfully.
  */
 RLM_API realm_object_t* realm_dictionary_insert_embedded(realm_dictionary_t*, realm_value_t key);
+
+/**
+ * Insert a collection inside a dictionary (only available for mixed types)
+ *
+ * @param dictionary valid ptr to a dictionary of mixed
+ * @param key the mixed representing a key for a dictionary (only string)
+ * @return pointer to a valid collection that has been just inserted at the key passed as argument
+ */
+RLM_API realm_list_t* realm_dictionary_insert_list(realm_dictionary_t* dictionary, realm_value_t key);
+RLM_API realm_dictionary_t* realm_dictionary_insert_dictionary(realm_dictionary_t*, realm_value_t);
+
+
+/**
+ * Fetch a list from a dictionary.
+ * @return a valid list that needs to be deleted by the caller or nullptr in case of an error.
+ */
+RLM_API realm_list_t* realm_dictionary_get_list(realm_dictionary_t* dictionary, realm_value_t key);
+
+/**
+ * Fetch a dictioanry from a dictionary.
+ * @return a valid dictionary that needs to be deleted by the caller or nullptr in case of an error.
+ */
+RLM_API realm_dictionary_t* realm_dictionary_get_dictionary(realm_dictionary_t* dictionary, realm_value_t key);
 
 /**
  * Get object identified by key
@@ -2586,6 +2673,18 @@ RLM_API realm_results_t* realm_results_limit(realm_results_t* results, size_t ma
  * @return True if no exception occurred (including out-of-bounds).
  */
 RLM_API bool realm_results_get(realm_results_t*, size_t index, realm_value_t* out_value);
+
+/**
+ * Returns an instance of realm_list at the index passed as argument.
+ * @return A valid ptr to a list instance or nullptr in case of errors
+ */
+RLM_API realm_list_t* realm_results_get_list(realm_results_t*, size_t index);
+
+/**
+ * Returns an instance of realm_dictionary for the index passed as argument.
+ * @return A valid ptr to a dictionary instance or nullptr in case of errors
+ */
+RLM_API realm_dictionary_t* realm_results_get_dictionary(realm_results_t*, size_t index);
 
 /**
  * Find the index for the value passed as parameter inside realm results pointer passed a input parameter.
