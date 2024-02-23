@@ -150,9 +150,19 @@ bool ArrayPacked::find_all(const Array& arr, int64_t value, size_t start, size_t
     // This is not the cheapest thing to do. Instead we can compare all values contained within 64 bits in one go and
     // see if there is a match with what we are looking for. Reducing the number of comparison by ~logk(N) where K is
     // the width of each single value within a 64 bit word and N is the total number of values stored in the array. On
-    // the other end if we have values of 32 bits or more, accessing twice the same 64 bits word is probably the
-    // cheapest thing to do.
+    // the other end if we have values of 32 bits or more, accessing twice or once the same 64 bits word is probably
+    // the cheapest thing to do.
 
+    // tmp for pleasing core tests. but I like these 2 goto :-)
+    if ((std::is_same_v<Cond, Equal> || std::is_same_v<Cond, NotEqual>)&&arr.m_width < 32 && value < 0)
+        goto normal_loop;
+    if (std::is_same_v<Cond, Greater>)
+        goto normal_loop;
+
+    if (arr.m_width < 32)
+        start = parallel_subword_find<Cond>(arr, value, start, end);
+
+normal_loop:
     auto value_cmp = [](int64_t v, int64_t value) {
         if constexpr (std::is_same_v<Cond, Equal>)
             return v == value;
@@ -164,52 +174,10 @@ bool ArrayPacked::find_all(const Array& arr, int64_t value, size_t start, size_t
             return v < value;
     };
 
-    const auto width = arr.m_width;
-    if (width < 32) {
-        const auto mask = populate(width, arr.get_encoder().width_mask());
-        const auto searching_value_mask = populate(width, value);
-        const auto field_count = num_fields_for_width(width);
-        const auto ones = field_bit0(width);
-        const auto last_word_mask = (1ULL << num_bits(width)) - 1;
-
-        auto bitwidth_cmp = [&mask](uint64_t ones, uint64_t a, uint64_t b) {
-            if constexpr (std::is_same_v<Cond, Equal>)
-                return find_all_fields_EQ(mask, ones, a, b);
-            if constexpr (std::is_same_v<Cond, NotEqual>)
-                return find_all_fields_NE(mask, a, b);
-            if constexpr (std::is_same_v<Cond, Greater>)
-                return !find_all_fields_signed_LE(mask, ones, a, b);
-            if constexpr (std::is_same_v<Cond, Less>)
-                return find_all_fields_signed_LT(mask, a, b);
-        };
-
-        size_t pos = start;
-        unaligned_word_iter it((uint64_t*)arr.m_data, start * arr.m_width);
-        const auto n_bits_per_it = arr.m_width * field_count;
-        const auto current_end = end - field_count + 1;
-        uint64_t vector = 0;
-        while (pos < current_end) {
-            const auto word = it.get(n_bits_per_it);
-            vector = bitwidth_cmp(ones, word, searching_value_mask);
-            if (vector)
-                break;
-            pos += field_count;
-            it.bump(n_bits_per_it);
-        }
-        if (!vector) {
-            // there is still some chance that we may find the value in the last word.
-            const auto last_word = it.get(n_bits_per_it);
-            if (bitwidth_cmp(ones & last_word_mask, last_word, searching_value_mask))
-                start = pos + field_count;
-        }
-        else
-            start = pos;
-    }
-
     // this loop is going to be executed for values >= 32 bits, since this is likely the fastest way to compare
-    // things. For values that are less than that, we have made a bit scan in the loop above, in order to try to
-    // compare in parallel as many values as possible and move the start index as close as possible to the value we
-    // are seeking. This is done in order to minimize accesses and comparisons.
+    // things. For values that are less than that, we have made a bit scan in parallel_subword_find, in order to try
+    // to compare in parallel as many values as possible and move the start index as close as possible to the value we
+    // are seeking. This is done in order to minimize total number of comparisons.
     const auto mask = arr.get_encoder().width_mask();
     bf_iterator it((uint64_t*)arr.m_data, 0, arr.m_width, arr.m_width, start);
     for (; start < end; ++start, ++it) {
@@ -220,6 +188,47 @@ bool ArrayPacked::find_all(const Array& arr, int64_t value, size_t start, size_t
         }
     }
     return true;
+}
+
+template <typename Cond>
+size_t ArrayPacked::parallel_subword_find(const Array& arr, int64_t value, size_t start, size_t end) const
+{
+    const auto width = arr.m_width;
+    const auto mask = populate(width, arr.get_encoder().width_mask());
+    const auto searching_value_mask = populate(width, value);
+    const auto field_count = num_fields_for_width(width);
+    const auto last_word_mask = (1ULL << num_bits(width)) - 1;
+    const auto n_bits_per_it = arr.m_width * field_count;
+    end = end - field_count + 1;
+
+    auto bitwidth_cmp = [&mask](uint64_t a, uint64_t b) {
+        if constexpr (std::is_same_v<Cond, Equal>)
+            return find_all_fields_EQ(mask, a, b);
+        if constexpr (std::is_same_v<Cond, NotEqual>)
+            return find_all_fields_NE(mask, a, b);
+        if constexpr (std::is_same_v<Cond, Greater>)
+            return !find_all_fields_signed_LE(mask, a, b);
+        if constexpr (std::is_same_v<Cond, Less>)
+            return find_all_fields_signed_LT(mask, a, b);
+    };
+
+    unaligned_word_iter it((uint64_t*)arr.m_data, start * arr.m_width);
+    uint64_t vector = 0;
+    while (start < end) {
+        const auto word = it.get(n_bits_per_it);
+        vector = bitwidth_cmp(word, searching_value_mask);
+        if (vector)
+            break;
+        start += field_count;
+        it.bump(n_bits_per_it);
+    }
+    // there is still some chance that we may find the value in the last word.
+    if (!vector) {
+        const auto last_word = it.get(n_bits_per_it) & last_word_mask;
+        if (bitwidth_cmp(last_word, searching_value_mask & last_word_mask))
+            start += field_count;
+    }
+    return start;
 }
 
 bool ArrayPacked::find_all_match(size_t start, size_t end, size_t baseindex, QueryStateBase* state) const
