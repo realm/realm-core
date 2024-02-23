@@ -1296,6 +1296,7 @@ TEST(Parser_TwoColumnAggregates)
     ColKey item_price_col = items->add_column(type_Double, "price");
     ColKey item_price_float_col = items->add_column(type_Float, "price_float");
     ColKey item_price_decimal_col = items->add_column(type_Decimal, "price_decimal");
+    ColKey item_price_mixed_col = items->add_column(type_Mixed, "price_mixed");
     ColKey item_discount_col = items->add_column(*discounts, "discount");
     ColKey item_creation_date = items->add_column(type_Timestamp, "creation_date");
     using item_t = std::pair<std::string, double>;
@@ -1308,6 +1309,7 @@ TEST(Parser_TwoColumnAggregates)
         obj.set(item_price_col, item_info[i].second);
         obj.set(item_price_float_col, float(item_info[i].second));
         obj.set(item_price_decimal_col, Decimal128(item_info[i].second));
+        obj.set(item_price_mixed_col, Mixed(item_info[i].second));
         obj.set(item_creation_date, Timestamp(static_cast<int64_t>(item_info[i].second * 10), 0));
     }
     items->get_object(item_keys[0]).set(item_discount_col, discount_keys[2]); // milk -0.50
@@ -1320,6 +1322,7 @@ TEST(Parser_TwoColumnAggregates)
     ColKey items_col = t->add_column_list(*items, "items");
     ColKey account_float_col = t->add_column(type_Float, "account_balance_float");
     ColKey account_decimal_col = t->add_column(type_Decimal, "account_balance_decimal");
+    ColKey account_mixed_col = t->add_column(type_Mixed, "account_balance_mixed");
     ColKey account_creation_date_col = t->add_column(type_Timestamp, "account_creation_date");
 
     Obj person0 = t->create_object();
@@ -1330,16 +1333,19 @@ TEST(Parser_TwoColumnAggregates)
     person0.set(account_col, double(10.0));
     person0.set(account_float_col, float(10.0));
     person0.set(account_decimal_col, Decimal128(10.0));
+    person0.set(account_mixed_col, Mixed(10.0));
     person0.set(account_creation_date_col, Timestamp(30, 0));
     person1.set(id_col, int64_t(1));
     person1.set(account_col, double(20.0));
     person1.set(account_float_col, float(20.0));
     person1.set(account_decimal_col, Decimal128(20.0));
+    person1.set(account_mixed_col, Mixed(20.0));
     person1.set(account_creation_date_col, Timestamp(50, 0));
     person2.set(id_col, int64_t(2));
     person2.set(account_col, double(30.0));
     person2.set(account_float_col, float(30.0));
     person2.set(account_decimal_col, Decimal128(30.0));
+    person2.set(account_mixed_col, Mixed(30.0));
     person2.set(account_creation_date_col, Timestamp(70, 0));
 
     LnkLst list_0 = person0.get_linklist(items_col);
@@ -1397,6 +1403,15 @@ TEST(Parser_TwoColumnAggregates)
     verify_query(test_context, t, "items.@min.price_decimal > account_balance_decimal", 0);
     verify_query(test_context, t, "items.@max.price_decimal > account_balance_decimal", 0);
     verify_query(test_context, t, "items.@avg.price_decimal > account_balance_decimal", 0);
+    // Mixed vs Mixed
+    verify_query(test_context, t, "items.@sum.price_mixed == 25.5", 2);  // person0, person2
+    verify_query(test_context, t, "items.@min.price_mixed == 4.0", 1);   // person0
+    verify_query(test_context, t, "items.@max.price_mixed == 9.5", 2);   // person0, person2
+    verify_query(test_context, t, "items.@avg.price_mixed == 6.375", 1); // person0
+    verify_query(test_context, t, "items.@sum.price_mixed > account_balance_mixed", 2);
+    verify_query(test_context, t, "items.@min.price_mixed > account_balance_mixed", 0);
+    verify_query(test_context, t, "items.@max.price_mixed > account_balance_mixed", 0);
+    verify_query(test_context, t, "items.@avg.price_mixed > account_balance_mixed", 0);
     // Timestamp vs Timestamp
     verify_query(test_context, t, "items.@min.creation_date == T40:0", 1); // person0
     verify_query(test_context, t, "items.@max.creation_date == T95:0", 2); // person0, person2
