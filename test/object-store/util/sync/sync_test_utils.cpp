@@ -239,6 +239,7 @@ std::string get_admin_url()
 #endif
 }
 #endif // REALM_MONGODB_ENDPOINT
+#endif // REALM_ENABLE_AUTH_TESTS
 
 AutoVerifiedEmailCredentials::AutoVerifiedEmailCredentials()
 {
@@ -315,7 +316,6 @@ void async_open_realm(const Realm::Config& config,
     finish(std::move(tsr), err);
 }
 
-#endif // REALM_ENABLE_AUTH_TESTS
 #endif // REALM_ENABLE_SYNC
 
 class TestHelper {
