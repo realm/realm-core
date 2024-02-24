@@ -241,10 +241,11 @@ public:
     {
         m_table.set_index_maker([](ColKey, const ClusterColumn& cluster, Allocator& alloc, ref_type ref,
                                    Array* parent, size_t col_ndx) -> std::unique_ptr<SearchIndex> {
+            constexpr size_t c_compact_threshold = 100;
             if (parent) {
-                return std::make_unique<RadixTree<8>>(ref, parent, col_ndx, cluster, alloc);
+                return std::make_unique<RadixTree<8>>(ref, parent, col_ndx, cluster, alloc, c_compact_threshold);
             }
-            return std::make_unique<RadixTree<8>>(cluster, alloc); // Throws
+            return std::make_unique<RadixTree<8>>(cluster, alloc, c_compact_threshold); // Throws
         });
     }
     static bool is_nullable()
@@ -264,10 +265,11 @@ public:
     {
         m_table.set_index_maker([](ColKey, const ClusterColumn& cluster, Allocator& alloc, ref_type ref,
                                    Array* parent, size_t col_ndx) -> std::unique_ptr<SearchIndex> {
+            constexpr size_t c_compact_threshold = 100;
             if (parent) {
-                return std::make_unique<RadixTree<8>>(ref, parent, col_ndx, cluster, alloc);
+                return std::make_unique<RadixTree<8>>(ref, parent, col_ndx, cluster, alloc, c_compact_threshold);
             }
-            return std::make_unique<RadixTree<8>>(cluster, alloc); // Throws
+            return std::make_unique<RadixTree<8>>(cluster, alloc, c_compact_threshold); // Throws
         });
     }
     static bool is_nullable()
@@ -673,11 +675,12 @@ TEST_TYPES(StringIndex_FindAllNoCopy, string_column, nullable_string_column, enu
     results.init_from_ref(ref_type(ref_2.payload));
 
     CHECK_EQUAL(4, ref_2.end_ndx - ref_2.start_ndx);
-    CHECK_EQUAL(4, results.size());
-    CHECK_EQUAL(col.key(6), results.get(0));
-    CHECK_EQUAL(col.key(7), results.get(1));
-    CHECK_EQUAL(col.key(8), results.get(2));
-    CHECK_EQUAL(col.key(9), results.get(3));
+    CHECK(ref_2.start_ndx < results.size());
+    CHECK(ref_2.end_ndx <= results.size());
+    CHECK_EQUAL(col.key(6), results.get(ref_2.start_ndx));
+    CHECK_EQUAL(col.key(7), results.get(ref_2.start_ndx + 1));
+    CHECK_EQUAL(col.key(8), results.get(ref_2.start_ndx + 2));
+    CHECK_EQUAL(col.key(9), results.get(ref_2.start_ndx + 3));
 }
 
 // If a column contains a specific value in multiple rows, then the index will store a list of these row numbers
@@ -714,9 +717,10 @@ TEST(StringIndex_FindAllNoCopy2_Int)
             CHECK_EQUAL(FindRes_column, res);
             const IntegerColumn results_column(Allocator::get_default(), ref_type(results.payload));
             CHECK_EQUAL(real, results.end_ndx - results.start_ndx);
-            CHECK_EQUAL(real, results_column.size());
+            CHECK(real <= results_column.size());
+            CHECK(results.end_ndx <= results_column.size());
             for (size_t y = 0; y < real; y++)
-                CHECK_EQUAL(i, ints[size_t(results_column.get(y))]);
+                CHECK_EQUAL(i, ints[size_t(results_column.get(results.start_ndx + y))]);
         }
     }
 }

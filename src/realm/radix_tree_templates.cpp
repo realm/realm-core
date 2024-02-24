@@ -50,8 +50,13 @@ IndexNode<ChunkWidth>::get_accessors_chain(const IndexIterator& it)
     accessors.reserve(it.m_positions.size());
     ArrayParent* parent = get_parent();
     size_t ndx_in_parent = get_ndx_in_parent();
-    for (auto pair : it.m_positions) {
-        accessors.push_back(std::make_unique<IndexNode<ChunkWidth>>(m_alloc, m_cluster));
+    const size_t num_positions = it.m_positions.size();
+    for (size_t i = 0; i < num_positions; ++i) {
+        if (it.m_type == IndexIterator::ResultType::List && i == num_positions - 1) {
+            break; // the last ref is a list, do not try to instantiate a IndexNode
+        }
+        const ArrayChainLink& pair = it.m_positions[i];
+        accessors.push_back(std::make_unique<IndexNode<ChunkWidth>>(m_alloc, m_cluster, m_compact_threshold));
         accessors.back()->init_from_ref(pair.array_ref);
         accessors.back()->set_parent(parent, ndx_in_parent);
         parent = accessors.back().get();
@@ -61,24 +66,52 @@ IndexNode<ChunkWidth>::get_accessors_chain(const IndexIterator& it)
 }
 
 template <size_t ChunkWidth>
-std::unique_ptr<IndexNode<ChunkWidth>> IndexNode<ChunkWidth>::create(Allocator& alloc, const ClusterColumn& cluster)
+std::unique_ptr<IndexNode<ChunkWidth>> IndexNode<ChunkWidth>::create(Allocator& alloc, const ClusterColumn& cluster,
+                                                                     size_t compact_threshold, NodeType type)
 {
-    const Array::Type type = Array::type_HasRefs;
-    std::unique_ptr<IndexNode<ChunkWidth>> top = std::make_unique<IndexNode<ChunkWidth>>(alloc, cluster); // Throws
+    std::unique_ptr<IndexNode<ChunkWidth>> top =
+        std::make_unique<IndexNode<ChunkWidth>>(alloc, cluster, compact_threshold); // Throws
+    top->init(type);
+    return top;
+}
+
+template <size_t ChunkWidth>
+void IndexNode<ChunkWidth>::init(NodeType type)
+{
+    REALM_ASSERT_EX(!is_attached() || size() == 0, size());
     // Mark that this is part of index
     // (as opposed to columns under leaves)
-    constexpr bool set_context_flag = true;
+    constexpr bool context_flag = true;
     constexpr int64_t initial_value = 0;
-    top->Array::create(type, set_context_flag, c_num_metadata_entries, initial_value); // Throws
-    top->ensure_minimum_width(0x7FFFFFFF); // This ensures 31 bits plus a sign bit
-
+    // a compact list doesn't store refs
+    const Array::Type array_type = type == NodeType::Normal ? Array::type_HasRefs : Array::type_Normal;
+    if (!is_attached()) {
+        Array::create(array_type, context_flag, c_num_metadata_entries, initial_value); // Throws
+    }
+    else {
+        for (size_t i = 0; i < c_num_metadata_entries; ++i) {
+            add(initial_value);
+        }
+        Array::set_context_flag(context_flag);
+        Array::set_type(array_type);
+    }
+#if COMPACT_NODE_OPTIMIZATION
+    if (type == NodeType::Compact) {
+        set_compact_list_bit(true);
+        return;
+    }
+#endif // COMPACT_NODE_OPTIMIZATION
+    REALM_ASSERT_EX(type == NodeType::Normal, int(type));
+    ensure_minimum_width(0x7FFFFFFF); // This ensures 31 bits plus a sign bit
     // population is a tagged value
     for (size_t i = 0; i < c_num_population_entries; ++i) {
-        top->set_population(i, 0);
+        set_population(i, 0);
     }
     IndexKey<ChunkWidth> dummy_key(Mixed{});
-    top->set_prefix(dummy_key, 0);
-    return top;
+    set_prefix(dummy_key, 0);
+#if COMPACT_NODE_OPTIMIZATION
+    set_compact_list_bit(false);
+#endif // COMPACT_NODE_OPTIMIZATION
 }
 
 template <size_t ChunkWidth>
@@ -90,6 +123,12 @@ void IndexNode<ChunkWidth>::do_remove(size_t raw_index)
     }
     REALM_ASSERT_3(raw_index, >=, c_num_metadata_entries);
     Array::erase(raw_index);
+
+#if COMPACT_NODE_OPTIMIZATION
+    if (is_compact_list()) {
+        return;
+    }
+#endif // COMPACT_NODE_OPTIMIZATION
 
     // count population prefix zeros to find starting index
     size_t bit_n = raw_index - c_num_metadata_entries;
@@ -113,18 +152,12 @@ template <size_t ChunkWidth>
 void IndexNode<ChunkWidth>::clear()
 {
     init_from_parent();
-    this->truncate_and_destroy_children(c_num_metadata_entries);
-    RefOrTagged rot = get_as_ref_or_tagged(c_ndx_of_null);
-    if (rot.is_ref() && rot.get_as_ref() != 0) {
-        destroy_deep(rot.get_as_ref(), m_alloc);
-    }
-    init_from_parent();
-    set(c_ndx_of_null, 0);
-    for (size_t i = 0; i < c_num_population_entries; ++i) {
-        set_population(i, 0);
-    }
-    IndexKey<ChunkWidth> dummy_key(Mixed{});
-    set_prefix(dummy_key, 0);
+    this->truncate_and_destroy_children(0);
+#if COMPACT_NODE_OPTIMIZATION
+    init(NodeType::Compact);
+#else
+    init(NodeType::Normal);
+#endif // COMPACT_NODE_OPTIMIZATION
 }
 
 template <size_t ChunkWidth>
@@ -140,6 +173,122 @@ void IndexNode<ChunkWidth>::set_population(size_t ndx, uint64_t pop)
     REALM_ASSERT_3(ndx, <, c_num_population_entries);
     set(c_ndx_of_population_0 + ndx, RefOrTagged::make_tagged(pop));
 }
+
+// The top bit in the population metadata is used to indicate if this node is an
+// ordered list. We know that there is room for this because of the calculation
+// of the number of metadata entries required to store the population mask. Because
+// of the requirement to make the population entries a tagged value, we only have 63 bits
+// available so there is always an excess number of bits available.
+// clang-format off
+// +-----------+------------+-----------------------+--------------+-------------+
+// | ChunkSize | Population | #Pop Metadata Entries | Pop Capacity | Unused Bits |
+// +-----------+------------+-----------------------+--------------+-------------+
+// |         4 |         16 |                     1 |           63 |          47 |
+// |         5 |         32 |                     1 |           63 |          31 |
+// |         6 |         64 |                     2 |          126 |          62 |
+// |         7 |        128 |                     3 |          189 |          61 |
+// |         8 |        256 |                     5 |          315 |          59 |
+// |         9 |        512 |                     9 |          567 |          55 |
+// |        10 |       1024 |                    17 |         1071 |          47 |
+// |        11 |       2048 |                    33 |         2079 |          31 |
+// |        12 |       4096 |                    66 |         4158 |          62 |
+// |        13 |       8192 |                   131 |         8253 |          61 |
+// |        14 |      16384 |                   261 |        16443 |          59 |
+// +-----------+------------+-----------------------+--------------+-------------+
+// clang-format on
+
+#if COMPACT_NODE_OPTIMIZATION
+template <size_t ChunkWidth>
+bool IndexNode<ChunkWidth>::is_compact_list() const
+{
+    static_assert((c_num_population_entries * c_num_bits_per_tagged_int) - (1 << ChunkWidth) >= 1);
+    return (uint64_t(get(c_ndx_of_population_0 + c_num_population_entries - 1)) >> 63) & 1;
+}
+
+template <size_t ChunkWidth>
+void IndexNode<ChunkWidth>::set_compact_list_bit(bool enable_compact_mode)
+{
+    // the bit to check is the highest bit in a RefOrTagged value
+    // but since the compact form does not store refs, we directly
+    // use bit 63 instead of using RefOrTagged::make_tagged() because that
+    // interface asserts that the array has the has_refs flag set which is not
+    // the case for the compact form.
+    const size_t ndx_of_last_pop = c_ndx_of_population_0 + c_num_population_entries - 1;
+    uint64_t value = uint64_t(get(ndx_of_last_pop));
+    constexpr static uint64_t upper_bit = uint64_t(1) << 63;
+    if ((value & upper_bit) != enable_compact_mode) {
+        if (enable_compact_mode) {
+            value = value | upper_bit;
+        }
+        else {
+            value = value & (~upper_bit);
+        }
+        set(ndx_of_last_pop, value);
+    }
+}
+
+template <size_t ChunkWidth>
+void IndexNode<ChunkWidth>::insert_to_compact_list(ObjKey obj_key, IndexKey<ChunkWidth>& index_key)
+{
+    size_t real_size = size();
+    REALM_ASSERT_3(real_size, >=, c_num_metadata_entries);
+    if (real_size - c_num_metadata_entries >= m_compact_threshold) {
+        // convert to non-compact mode
+        auto new_node = create(m_alloc, m_cluster, m_compact_threshold, NodeType::Normal);
+        new_node->set_parent(get_parent(), get_ndx_in_parent());
+        new_node->update_parent();
+        for (size_t i = c_num_metadata_entries; i < real_size; ++i) {
+            ObjKey key_i(get(i));
+            IndexKey<ChunkWidth> index_key_i(m_cluster.get_value(key_i));
+            index_key_i.set_offset(index_key.get_offset());
+            new_node->insert(key_i, index_key_i);
+        }
+        new_node->insert(obj_key, index_key);
+        this->destroy();
+        return;
+    }
+    SortedListComparator slc(m_cluster);
+    IntegerColumn self_storage(m_alloc, m_ref);
+    IntegerColumn::const_iterator it_end = self_storage.cend();
+    IntegerColumn::const_iterator it_begin = self_storage.cbegin() + c_num_metadata_entries;
+    SortedListComparator::KeyValuePair to_insert{obj_key, index_key.get_mixed()};
+    IntegerColumn::const_iterator lower = std::lower_bound(it_begin, it_end, to_insert, slc);
+    Array::insert(lower.get_position(), obj_key.value);
+}
+
+template <size_t ChunkWidth>
+void IndexNode<ChunkWidth>::find_in_compact_list(const IndexKey<ChunkWidth>& index_key, IndexIterator& pos,
+                                                 ObjKey optional_known_key)
+{
+    if (optional_known_key) {
+        const size_t size = Array::size();
+        for (size_t i = c_num_metadata_entries; i < size; ++i) {
+            if (get(i) == optional_known_key.value) {
+                pos.m_positions.push_back({get_ref(), i});
+                pos.m_type = IndexIterator::ResultType::CompactList;
+                pos.m_key = optional_known_key;
+                return;
+            }
+        }
+        pos = {}; // not found
+        return;
+    }
+    SortedListComparator slc(m_cluster);
+    IntegerColumn self_storage(m_alloc, m_ref);
+    IntegerColumn::const_iterator it_end = self_storage.cend();
+    IntegerColumn::const_iterator it_begin = self_storage.cbegin() + c_num_metadata_entries;
+    IntegerColumn::const_iterator lower = std::lower_bound(it_begin, it_end, index_key.get_mixed(), slc);
+    if (lower == it_end) {
+        pos = {}; // not found
+        return;
+    }
+    if (m_cluster.get_value(ObjKey(*lower)) == index_key.get_mixed()) {
+        pos.m_positions.push_back({get_ref(), lower.get_position()});
+        pos.m_type = IndexIterator::ResultType::CompactList;
+        pos.m_key = ObjKey(*lower);
+    }
+}
+#endif // COMPACT_NODE_OPTIMIZATION
 
 template <size_t ChunkWidth>
 bool IndexNode<ChunkWidth>::has_prefix() const
@@ -175,25 +324,34 @@ InsertResult IndexNode<ChunkWidth>::do_insert_to_population(uint64_t value)
 template <size_t ChunkWidth>
 bool IndexNode<ChunkWidth>::has_duplicate_values() const
 {
-    std::vector<ref_type> nodes_to_check = {this->get_ref()};
+    std::vector<ref_type> nodes_to_check = {this->get_ref()}; // FIXME: queue
     while (!nodes_to_check.empty()) {
-        IndexNode node(m_alloc, m_cluster);
-        node.init_from_ref(nodes_to_check.back());
-        nodes_to_check.pop_back();
+        ref_type ref = nodes_to_check.front();
+        nodes_to_check.erase(nodes_to_check.begin());
+        // ref to sorted list
+        if (is_sorted_list(ref, m_alloc)) {
+            IntegerColumn list(m_alloc, ref); // Throws
+            if (SortedListComparator::contains_duplicate_values(list, m_cluster, list.cbegin())) {
+                return true;
+            }
+            continue;
+        }
+        IndexNode node(m_alloc, m_cluster, m_compact_threshold);
+        node.init_from_ref(ref);
+#if COMPACT_NODE_OPTIMIZATION
+        if (node.is_compact_list()) {
+            const IntegerColumn compact_form(m_alloc, ref);
+            if (SortedListComparator::contains_duplicate_values(compact_form, m_cluster,
+                                                                compact_form.cbegin() + c_num_metadata_entries)) {
+                return true;
+            }
+            continue;
+        }
+#endif // COMPACT_NODE_OPTIMIZATION
         const size_t size = node.size();
         for (size_t i = c_ndx_of_null; i < size; ++i) {
             RefOrTagged rot = node.get_as_ref_or_tagged(i);
             if (rot.is_ref() && rot.get_as_ref() != 0) {
-                ref_type ref = rot.get_as_ref();
-                char* header = m_alloc.translate(ref);
-                // ref to sorted list
-                if (!Array::get_context_flag_from_header(header)) {
-                    IntegerColumn list(m_alloc, ref); // Throws
-                    if (SortedListComparator::contains_duplicate_values(list, m_cluster)) {
-                        return true;
-                    }
-                }
-                // otherwise this is a nested IndexNode that needs checking
                 nodes_to_check.push_back(rot.get_as_ref());
             }
         }
@@ -211,22 +369,6 @@ template <size_t ChunkWidth>
 void IndexNode<ChunkWidth>::update_data_source(const ClusterColumn& cluster)
 {
     m_cluster = cluster;
-}
-
-inline bool is_sorted_list(ref_type ref, Allocator& alloc)
-{
-    // the context flag in the header is set for IndexNodes but not for lists
-    char* header = alloc.translate(ref);
-    return !Array::get_context_flag_from_header(header);
-}
-
-template <size_t ChunkWidth>
-std::unique_ptr<IndexNode<ChunkWidth>> IndexNode<ChunkWidth>::make_inner_node_at(size_t ndx)
-{
-    std::unique_ptr<IndexNode> child = create(m_alloc, m_cluster);
-    this->Array::set(ndx, child->get_ref());
-    child->set_parent(this, ndx);
-    return child;
 }
 
 template <size_t ChunkWidth>
@@ -259,16 +401,53 @@ IndexNode<ChunkWidth>::do_add_direct(ObjKey value, size_t ndx, const IndexKey<Ch
     if (inner_node) {
         if (rot.is_ref()) {
             ref_type ref = rot.get_as_ref();
-            if (ref && !is_sorted_list(ref, m_alloc)) {
-                // an inner node already exists here
-                auto sub_node = std::make_unique<IndexNode>(m_alloc, m_cluster);
+            if (ref == 0) {
+                // this position contains a newly created empty element,
+                // make a new node here and return it.
+#if COMPACT_NODE_OPTIMIZATION
+                std::unique_ptr<IndexNode<ChunkWidth>> child =
+                    create(m_alloc, m_cluster, m_compact_threshold, NodeType::Compact);
+#else
+                std::unique_ptr<IndexNode<ChunkWidth>> child =
+                    create(m_alloc, m_cluster, m_compact_threshold, NodeType::Normal);
+#endif
+                child->set_parent(this, ndx);
+                child->update_parent(); // this->Array::set(ndx, ref)
+                return child;
+            }
+            if (!is_sorted_list(ref, m_alloc)) {
+                // an inner node already exists here, return it
+                auto sub_node = std::make_unique<IndexNode>(m_alloc, m_cluster, m_compact_threshold);
                 sub_node->init_from_ref(ref);
                 sub_node->set_parent(this, ndx);
                 return sub_node;
             }
+#if COMPACT_NODE_OPTIMIZATION
+            // ref to sorted list
+            IntegerColumn list(m_alloc, ref); // Throws
+            // if the list can fit in a compact node, create one
+            if (list.size() + 1 <= m_compact_threshold) {
+                std::unique_ptr<IndexNode<ChunkWidth>> child =
+                    create(m_alloc, m_cluster, m_compact_threshold, NodeType::Compact);
+                child->set_parent(this, ndx);
+                child->update_parent(); // this->Array::set(ndx, ref)
+                // we can rely on equivilent ordering of the lists to not do any lookups
+                for (size_t i = 0; i < list.size(); ++i) {
+                    child->Array::add(list.get(i));
+                }
+                list.destroy();
+                return child;
+            }
+            // list will exceed threshold, make a normal node below
+#endif // COMPACT_NODE_OPTIMIZATION
         }
-        // make a new node and move the existing value into the null slot
-        std::unique_ptr<IndexNode<ChunkWidth>> child = make_inner_node_at(ndx);
+        // If the entry is a simple tagged ObjKey or a ref to a sorted list
+        // that will exceed the compact form threshold then
+        // make a new normal node and move the existing value into the null slot.
+        std::unique_ptr<IndexNode<ChunkWidth>> child =
+            create(m_alloc, m_cluster, m_compact_threshold, NodeType::Normal);
+        child->set_parent(this, ndx);
+        child->update_parent(); // this->Array::set(ndx, ref)
         child->Array::set(c_ndx_of_null, rot);
         return child;
     }
@@ -297,21 +476,20 @@ IndexNode<ChunkWidth>::do_add_direct(ObjKey value, size_t ndx, const IndexKey<Ch
         verify();
         return nullptr;
     }
-    char* header = m_alloc.translate(ref);
     // ref to sorted list
-    if (!Array::get_context_flag_from_header(header)) {
+    if (is_sorted_list(ref, m_alloc)) {
         IntegerColumn list(m_alloc, ref); // Throws
         list.set_parent(this, ndx);
 #if REALM_DEBUG
         auto pos = list.find_first(value.value);
         REALM_ASSERT_EX(pos == realm::npos || list.get(pos) != value.value, pos, list.size(), value.value);
 #endif // REALM_DEBUG
-        SortedListComparator::insert_to_existing_list(value, key.get_mixed(), list, m_cluster);
+        SortedListComparator::insert_to_existing_sorted_list(value, key.get_mixed(), list, m_cluster);
         verify();
         return nullptr;
     }
     // ref to sub index node
-    auto sub_node = std::make_unique<IndexNode>(m_alloc, m_cluster);
+    auto sub_node = std::make_unique<IndexNode>(m_alloc, m_cluster, m_compact_threshold);
     sub_node->init_from_ref(ref);
     sub_node->set_parent(this, ndx);
     verify();
@@ -323,7 +501,7 @@ void IndexNode<ChunkWidth>::insert(ObjKey value, IndexKey<ChunkWidth> key)
 {
     // util::format(std::cout, "insert '%1'\n", key.get_mixed());
     // auto guard = make_scope_exit([&]() noexcept {
-    //     std::cout << "done insert: \n";
+    //     util::format(std::cout, "done insert ('%1'): \n", key.get_mixed());
     //     update_from_parent();
     //     print();
     // });
@@ -331,11 +509,17 @@ void IndexNode<ChunkWidth>::insert(ObjKey value, IndexKey<ChunkWidth> key)
     update_from_parent();
 
     std::vector<std::unique_ptr<IndexNode>> accessor_chain;
-    auto cur_node = std::make_unique<IndexNode>(m_alloc, m_cluster);
+    auto cur_node = std::make_unique<IndexNode>(m_alloc, m_cluster, m_compact_threshold);
     cur_node->init_from_ref(this->get_ref());
     cur_node->set_parent(this->get_parent(), this->get_ndx_in_parent());
     cur_node->verify();
     while (true) {
+#if COMPACT_NODE_OPTIMIZATION
+        if (cur_node->is_compact_list()) {
+            cur_node->insert_to_compact_list(value, key);
+            return;
+        }
+#endif // COMPACT_NODE_OPTIMIZATION
         InsertResult result = cur_node->insert_to_population(key);
         if (!key.get()) {
             constexpr bool inner_node = false;
@@ -346,19 +530,10 @@ void IndexNode<ChunkWidth>::insert(ObjKey value, IndexKey<ChunkWidth> key)
         const bool inner_node = bool(key.get_next()); // advances key
         std::unique_ptr<IndexNode<ChunkWidth>> next;
         if (!result.did_exist) {
-            if (inner_node) {
-                cur_node->Array::insert(result.real_index, 0);
-                next = cur_node->make_inner_node_at(result.real_index);
-            }
-            else {
-                // no entry for this yet, insert one
-                cur_node->Array::insert(result.real_index, 0);
-                next = cur_node->do_add_direct(value, result.real_index, key, inner_node);
-            }
+            // no entry for this yet, insert one
+            cur_node->Array::insert(result.real_index, 0);
         }
-        else {
-            next = cur_node->do_add_direct(value, result.real_index, key, inner_node);
-        }
+        next = cur_node->do_add_direct(value, result.real_index, key, inner_node);
         cur_node->verify();
         if (!next) {
             break;
@@ -395,10 +570,10 @@ void IndexNode<ChunkWidth>::collapse_nodes(std::vector<std::unique_ptr<IndexNode
     };
 
     REALM_ASSERT(accessors_chain.size());
+    Allocator& alloc = accessors_chain[0]->get_alloc();
+    ClusterColumn& cluster = accessors_chain[0]->m_cluster;
+    const size_t threshold = accessors_chain[0]->m_compact_threshold;
     while (accessors_chain.size() > 1) {
-        Allocator& alloc = accessors_chain[0]->get_alloc();
-        ClusterColumn& cluster = accessors_chain[0]->m_cluster;
-
         IndexNode<ChunkWidth>* last_node = accessors_chain.back().get();
         size_t ndx_in_parent = last_node->get_ndx_in_parent();
         if (last_node->is_empty()) {
@@ -407,6 +582,11 @@ void IndexNode<ChunkWidth>::collapse_nodes(std::vector<std::unique_ptr<IndexNode
             accessors_chain.back()->do_remove(ndx_in_parent);
             continue; // simple deletion of empty node, check next up
         }
+#if COMPACT_NODE_OPTIMIZATION
+        if (last_node->is_compact_list()) {
+            break;
+        }
+#endif // COMPACT_NODE_OPTIMIZATION
         const size_t num_elements = last_node->size();
         const int64_t raw_null_entry = last_node->get(c_ndx_of_null);
         const bool has_nulls = raw_null_entry != 0;
@@ -416,13 +596,17 @@ void IndexNode<ChunkWidth>::collapse_nodes(std::vector<std::unique_ptr<IndexNode
             size_t child_ndx = num_elements - 1;
             RefOrTagged single_item = last_node->get_as_ref_or_tagged(child_ndx);
             if (single_item.is_ref()) {
-                char* header = alloc.translate(single_item.get_as_ref());
-                if (!Array::get_context_flag_from_header(header)) {
+                if (is_sorted_list(single_item.get_as_ref(), alloc)) {
                     break; // ref to List FIXME: combine some cases of this
                 }
-                IndexNode<ChunkWidth> child(alloc, cluster);
+                IndexNode<ChunkWidth> child(alloc, cluster, threshold);
                 child.init_from_ref(single_item.get_as_ref());
                 child.set_parent(last_node, child_ndx);
+#if COMPACT_NODE_OPTIMIZATION
+                if (child.is_compact_list()) {
+                    break; // FIXME: maybe combine?
+                }
+#endif // COMPACT_NODE_OPTIMIZATION
                 if (child.get(c_ndx_of_null) != 0) {
                     break; // if the child has nulls then we can't combine the prefix
                 }
@@ -470,7 +654,11 @@ void IndexNode<ChunkWidth>::collapse_nodes(std::vector<std::unique_ptr<IndexNode
     }
     // clean up the last node's prefix if there are no values
     // nulls don't matter since they come before the prefix
-    if (accessors_chain.size() >= 1 && accessors_chain.back()->Array::size() == c_num_metadata_entries) {
+    if (accessors_chain.size() >= 1 && accessors_chain.back()->Array::size() == c_num_metadata_entries
+#if COMPACT_NODE_OPTIMIZATION
+        && !accessors_chain.back()->is_compact_list()
+#endif
+    ) {
         IndexKey<ChunkWidth> dummy(Mixed{});
         accessors_chain.back()->set_prefix(dummy, 0);
     }
@@ -488,27 +676,26 @@ void IndexNode<ChunkWidth>::erase(ObjKey value, IndexKey<ChunkWidth> key)
     //     print();
     // });
 
-    IndexIterator it = find_first(key);
+    IndexIterator it = find_first(key, value);
     std::vector<std::unique_ptr<IndexNode<ChunkWidth>>> accessors_chain = get_accessors_chain(it);
     REALM_ASSERT_EX(it, value, key.get_mixed());
     REALM_ASSERT_EX(it.m_positions.size(), value, key.get_mixed());
     REALM_ASSERT_EX(accessors_chain.size(), value, key.get_mixed());
 
-    if (it.m_list_position) {
-        auto rot = accessors_chain.back()->get_as_ref_or_tagged(it.m_positions.back().position);
-        REALM_ASSERT(rot.is_ref());
-        IntegerColumn sub(m_alloc, rot.get_as_ref()); // Throws
-        sub.set_parent(accessors_chain.back().get(), it.m_positions.back().position);
-        REALM_ASSERT_3(sub.size(), >, *it.m_list_position);
-        auto ndx_in_list = sub.find_first(value.value);
-        REALM_ASSERT(ndx_in_list != realm::not_found);
+    if (it.m_type == IndexIterator::ResultType::List) {
+        REALM_ASSERT_3(it.m_positions.size(), >=, 2);
+        IntegerColumn sub(m_alloc, it.m_positions.back().array_ref); // Throws
+        const size_t list_position_in_parent = it.m_positions[it.m_positions.size() - 2].position;
+        sub.set_parent(accessors_chain.back().get(), list_position_in_parent);
+        auto ndx_in_list = it.m_positions.back().position;
+        REALM_ASSERT_3(sub.size(), >, ndx_in_list);
         REALM_ASSERT_3(sub.get(ndx_in_list), ==, value.value);
         sub.erase(ndx_in_list);
         const size_t sub_size = sub.size();
         if (sub_size == 0) {
             // if the list is now empty, remove the list
             sub.destroy();
-            accessors_chain.back()->do_remove(it.m_positions.back().position);
+            accessors_chain.back()->do_remove(list_position_in_parent);
         }
         else if (sub_size == 1) {
             uint64_t last_null = uint64_t(sub.get(0));
@@ -516,8 +703,7 @@ void IndexNode<ChunkWidth>::erase(ObjKey value, IndexKey<ChunkWidth> key)
             // put the last null entry inline in the parent
             if (value_can_be_tagged_without_overflow(last_null)) {
                 sub.destroy();
-                accessors_chain.back()->Array::set(it.m_positions.back().position,
-                                                   RefOrTagged::make_tagged(last_null));
+                accessors_chain.back()->Array::set(list_position_in_parent, RefOrTagged::make_tagged(last_null));
             }
         }
     }
@@ -530,16 +716,21 @@ void IndexNode<ChunkWidth>::erase(ObjKey value, IndexKey<ChunkWidth> key)
 }
 
 template <size_t ChunkWidth>
-IndexIterator IndexNode<ChunkWidth>::find_first(IndexKey<ChunkWidth> key) const
+IndexIterator IndexNode<ChunkWidth>::find_first(IndexKey<ChunkWidth> key, ObjKey optional_known_key) const
 {
     IndexIterator ret;
-    IndexNode<ChunkWidth> cur_node = IndexNode<ChunkWidth>(m_alloc, m_cluster);
+    IndexNode<ChunkWidth> cur_node = IndexNode<ChunkWidth>(m_alloc, m_cluster, m_compact_threshold);
     cur_node.init_from_ref(this->get_ref());
     cur_node.set_parent(get_parent(), get_ndx_in_parent());
 
     while (true) {
+#if COMPACT_NODE_OPTIMIZATION
+        if (cur_node.is_compact_list()) {
+            cur_node.find_in_compact_list(key, ret, optional_known_key);
+            return ret;
+        }
+#endif                    // COMPACT_NODE_OPTIMIZATION
         if (!key.get()) { // search for nulls in the root
-            ret.m_positions.push_back(ArrayChainLink{cur_node.get_ref(), c_ndx_of_null});
             auto rot = cur_node.get_as_ref_or_tagged(c_ndx_of_null);
             if (rot.is_ref()) {
                 ref_type ref = rot.get_as_ref();
@@ -548,22 +739,35 @@ IndexIterator IndexNode<ChunkWidth>::find_first(IndexKey<ChunkWidth> key) const
                 }
                 const IntegerColumn list(m_alloc, ref); // Throws
                 REALM_ASSERT(list.size());
+                IntegerColumn::const_iterator it_end = list.cend();
+                IntegerColumn::const_iterator lower = it_end;
                 // in the null entry there could be nulls or the empty string
                 SortedListComparator slc(m_cluster);
-                IntegerColumn::const_iterator it_end = list.cend();
-                IntegerColumn::const_iterator lower = std::lower_bound(list.cbegin(), it_end, key.get_mixed(), slc);
+                if (optional_known_key) {
+                    // FIXME: for small lists, simply search for the key directly in the list
+                    // direct search for key
+                    SortedListComparator::KeyValuePair pair{optional_known_key, key.get_mixed()};
+                    lower = std::lower_bound(list.cbegin(), it_end, pair, slc);
+                }
+                else {
+                    lower = std::lower_bound(list.cbegin(), it_end, key.get_mixed(), slc);
+                }
                 if (lower == it_end) {
                     return {}; // not found
                 }
                 if (m_cluster.get_value(ObjKey(*lower)) != key.get_mixed()) {
                     return {}; // not found
                 }
-                ret.m_list_position = lower.get_position();
+                ret.m_positions.push_back(ArrayChainLink{cur_node.get_ref(), c_ndx_of_null});
+                ret.m_type = IndexIterator::ResultType::List;
+                ret.m_positions.push_back({ref, lower.get_position()});
                 ret.m_key = ObjKey(*lower);
                 return ret;
             }
             if (m_cluster.get_value(ObjKey(rot.get_as_int())) == key.get_mixed()) {
+                ret.m_positions.push_back(ArrayChainLink{cur_node.get_ref(), c_ndx_of_null});
                 ret.m_key = ObjKey(rot.get_as_int());
+                ret.m_type = IndexIterator::ResultType::Exhaustive;
                 return ret;
             }
             return {}; // not found
@@ -594,20 +798,30 @@ IndexIterator IndexNode<ChunkWidth>::find_first(IndexKey<ChunkWidth> key) const
                 return {};
             }
             ret.m_key = ObjKey(rot.get_as_int());
+            ret.m_type = IndexIterator::ResultType::Exhaustive;
             return ret;
         }
         else {
             ref_type ref = rot.get_as_ref();
-            char* header = m_alloc.translate(ref);
             // ref to sorted list
-            if (!Array::get_context_flag_from_header(header)) {
+            if (is_sorted_list(ref, m_alloc)) {
                 if (key.get_next()) {
                     return {}; // there is a list here and no sub nodes
                 }
                 const IntegerColumn sub(m_alloc, ref); // Throws
                 REALM_ASSERT(sub.size());
-                ret.m_key = ObjKey(sub.get(0));
-                ret.m_list_position = 0;
+                size_t position_in_list = 0;
+                if (optional_known_key) {
+                    // this list contains only duplicates sorted by key
+                    IntegerColumn::const_iterator it_end = sub.cend();
+                    IntegerColumn::const_iterator lower =
+                        std::lower_bound(sub.cbegin(), it_end, optional_known_key.value);
+                    REALM_ASSERT_EX(lower != it_end, key.get_mixed());
+                    position_in_list = lower - sub.cbegin();
+                }
+                ret.m_key = ObjKey(sub.get(position_in_list));
+                ret.m_positions.push_back({ref, position_in_list});
+                ret.m_type = IndexIterator::ResultType::List;
                 return ret;
             }
             else {
@@ -627,24 +841,17 @@ void IndexNode<ChunkWidth>::find_all(std::vector<ObjKey>& results, IndexKey<Chun
     if (!it) {
         return;
     }
-    if (!it.m_list_position) {
+    if (it.m_type == IndexIterator::ResultType::Exhaustive) {
         results.push_back(it.get_key());
         return;
     }
     REALM_ASSERT(it.m_positions.size());
-    IndexNode<ChunkWidth> last(m_alloc, m_cluster);
-    last.init_from_ref(it.m_positions.back().array_ref);
-    auto rot = last.get_as_ref_or_tagged(it.m_positions.back().position);
-    REALM_ASSERT(rot.is_ref());
-    ref_type ref = rot.get_as_ref();
-    char* header = m_alloc.translate(ref);
-    REALM_ASSERT_RELEASE(!Array::get_context_flag_from_header(header));
-    const IntegerColumn sub(m_alloc, rot.get_as_ref()); // Throws
+    const IntegerColumn sub(m_alloc, it.m_positions.back().array_ref); // Throws
     REALM_ASSERT(sub.size());
     SortedListComparator slc(m_cluster);
     IntegerColumn::const_iterator it_end = sub.cend();
-    REALM_ASSERT_3(*it.m_list_position, <, sub.size());
-    IntegerColumn::const_iterator lower = sub.cbegin() + *it.m_list_position;
+    REALM_ASSERT_3(it.m_positions.back().position, <, sub.size());
+    IntegerColumn::const_iterator lower = sub.cbegin() + it.m_positions.back().position;
     IntegerColumn::const_iterator upper = std::upper_bound(lower, it_end, key.get_mixed(), slc);
 
     for (auto sub_it = lower; sub_it != upper; ++sub_it) {
@@ -659,28 +866,25 @@ FindRes IndexNode<ChunkWidth>::find_all_no_copy(IndexKey<ChunkWidth> value, Inte
     if (!it) {
         return FindRes::FindRes_not_found;
     }
-    if (!it.m_list_position) {
+    if (it.m_type == IndexIterator::ResultType::Exhaustive) {
         result.payload = it.get_key().value;
         return FindRes::FindRes_single;
     }
     REALM_ASSERT(it.m_positions.size());
-    IndexNode<ChunkWidth> last(m_alloc, m_cluster);
-    last.init_from_ref(it.m_positions.back().array_ref);
-    auto rot = last.get_as_ref_or_tagged(it.m_positions.back().position);
-    REALM_ASSERT(rot.is_ref());
-    ref_type ref = rot.get_as_ref();
-    char* header = m_alloc.translate(ref);
-    REALM_ASSERT_RELEASE(!Array::get_context_flag_from_header(header));
-    const IntegerColumn sub(m_alloc, rot.get_as_ref()); // Throws
+    const IntegerColumn sub(m_alloc, it.m_positions.back().array_ref); // Throws
     REALM_ASSERT(sub.size());
     SortedListComparator slc(m_cluster);
     IntegerColumn::const_iterator it_end = sub.cend();
-    REALM_ASSERT_3(*it.m_list_position, <, sub.size());
-    IntegerColumn::const_iterator lower = sub.cbegin() + *it.m_list_position;
+    REALM_ASSERT_3(it.m_positions.back().position, <, sub.size());
+    IntegerColumn::const_iterator lower = sub.cbegin() + it.m_positions.back().position;
     IntegerColumn::const_iterator upper = std::upper_bound(lower, it_end, value.get_mixed(), slc);
 
-    result.payload = rot.get_as_ref();
-    result.start_ndx = *it.m_list_position;
+    if (upper - lower == 1) {
+        result.payload = it.get_key().value;
+        return FindRes::FindRes_single;
+    }
+    result.payload = it.m_positions.back().array_ref;
+    result.start_ndx = it.m_positions.back().position;
     result.end_ndx = upper - sub.cbegin();
     return FindRes::FindRes_column;
 }
@@ -716,12 +920,20 @@ void IndexNode<ChunkWidth>::find_all_insensitive(std::vector<ObjKey>& results, c
     std::vector<NodeToExplore> items = {NodeToExplore{this->get_ref(), 0}};
 
     while (!items.empty()) {
-        IndexNode<ChunkWidth> cur_node = IndexNode<ChunkWidth>(m_alloc, m_cluster);
+        IndexNode<ChunkWidth> cur_node = IndexNode<ChunkWidth>(m_alloc, m_cluster, m_compact_threshold);
         cur_node.init_from_ref(items.back().array_ref);
         upper_key.set_offset(items.back().depth_in_key);
         lower_key.set_offset(items.back().depth_in_key);
         items.pop_back();
 
+#if COMPACT_NODE_OPTIMIZATION
+        if (cur_node.is_compact_list()) {
+            for (size_t i = c_num_metadata_entries; i < cur_node.size(); ++i) {
+                check_insensitive_value_for_key(cur_node.get(i));
+            }
+            continue;
+        }
+#endif // COMPACT_NODE_OPTIMIZATION
         if (!upper_key.get()) {
             auto rot = cur_node.get_as_ref_or_tagged(c_ndx_of_null);
             if (rot.is_ref()) {
@@ -776,9 +988,8 @@ void IndexNode<ChunkWidth>::find_all_insensitive(std::vector<ObjKey>& results, c
             }
             else {
                 ref_type ref = rot.get_as_ref();
-                char* header = m_alloc.translate(ref);
                 // ref to sorted list
-                if (!Array::get_context_flag_from_header(header)) {
+                if (is_sorted_list(ref, m_alloc)) {
                     const IntegerColumn sub(m_alloc, ref); // Throws
                     REALM_ASSERT(sub.size());
                     for (size_t i = 0; i < sub.size(); ++i) {
@@ -834,7 +1045,7 @@ std::optional<size_t> IndexKey<ChunkWidth>::get() const
         size_t bits_begin = m_offset * ChunkWidth;
         size_t bits_end = (1 + m_offset) * ChunkWidth;
 
-        constexpr size_t chunks_in_seconds = constexpr_ceil(64.0 / double(ChunkWidth));
+        constexpr size_t chunks_in_seconds = constexpr_ceil(float(64.0 / double(ChunkWidth)));
         constexpr size_t remainder_bits_in_seconds = 64 % ChunkWidth;
         constexpr size_t remainder_bits_in_ns =
             remainder_bits_in_seconds == 0 ? 0 : (ChunkWidth - remainder_bits_in_seconds);
@@ -946,7 +1157,7 @@ size_t IndexKey<ChunkWidth>::advance_to_common_prefix(IndexKey<ChunkWidth> other
 template <size_t ChunkWidth>
 ObjKey IndexNode<ChunkWidth>::get_any_child()
 {
-    IndexNode<ChunkWidth> cur_node = IndexNode<ChunkWidth>(m_alloc, m_cluster);
+    IndexNode<ChunkWidth> cur_node = IndexNode<ChunkWidth>(m_alloc, m_cluster, m_compact_threshold);
     cur_node.init_from_ref(this->get_ref());
     cur_node.set_parent(get_parent(), get_ndx_in_parent());
 
@@ -977,9 +1188,8 @@ ObjKey IndexNode<ChunkWidth>::get_any_child()
             }
             else if (rot.is_ref()) {
                 ref_type ref = rot.get_as_ref();
-                char* header = m_alloc.translate(ref);
                 // ref to sorted list
-                if (!Array::get_context_flag_from_header(header)) {
+                if (is_sorted_list(ref, m_alloc)) {
                     const IntegerColumn sub(m_alloc, ref); // Throws
                     REALM_ASSERT(sub.size());
                     return ObjKey(sub.get(0));
@@ -1083,31 +1293,63 @@ void IndexNode<ChunkWidth>::do_prefix_insert(IndexKey<ChunkWidth>& key)
         // and leave `key` ready to insert to the current node at position "x"
         // set the split node's prefix to "de"
 
-        const Array::Type type = Array::type_HasRefs;
-        std::unique_ptr<IndexNode<ChunkWidth>> split_node =
-            std::make_unique<IndexNode<ChunkWidth>>(m_alloc, m_cluster); // Throws
-        // Mark that this is part of index
-        // (as opposed to columns under leaves)
-        constexpr bool set_context_flag = true;
-        split_node->Array::create(type, set_context_flag); // Throws
-        // move all contents to the new child node
-        Array::move(*split_node, 0);
-        // recreate the metadata entries in the current node
-        for (size_t i = 0; i < c_num_metadata_entries; ++i) {
-            Array::add(0);
+        std::unique_ptr<IndexNode<ChunkWidth>> split_node;
+        int64_t null_to_retain = get(c_ndx_of_null);
+#if COMPACT_NODE_OPTIMIZATION
+        bool child_is_compact = false;
+        if (size() <= m_compact_threshold + c_num_metadata_entries) {
+            // the split could fit into a compact node, only proceed if all entries are ObjKeys
+            bool has_refs = false;
+            for (size_t i = c_num_metadata_entries; i < size(); ++i) {
+                if (get_as_ref_or_tagged(i).is_ref()) {
+                    has_refs = true;
+                    break;
+                }
+            }
+            if (!has_refs) {
+                child_is_compact = true;
+            }
         }
+
+        if (child_is_compact) {
+            split_node = create(m_alloc, m_cluster, m_compact_threshold, NodeType::Compact);
+            // Move all data elements to the child.
+            // We rely on the IndexKey ordering to know that they are already in sorted order.
+            // We can't just use Array::move because we need to untag the values
+            for (size_t i = c_num_metadata_entries; i < size(); ++i) {
+                RefOrTagged val_i = this->Array::get_as_ref_or_tagged(i);
+                REALM_ASSERT_DEBUG(val_i.is_tagged());
+                split_node->add(val_i.get_as_int());
+            }
+            this->truncate(0);
+        }
+        else
+#endif // COMPACT_NODE_OPTIMIZATION
+        {
+            split_node = create(m_alloc, m_cluster, m_compact_threshold, NodeType::Normal);
+            split_node->truncate(0);      // prepare to be moved into
+            Array::set(c_ndx_of_null, 0); // child gets an empty null entry
+            // move all contents to the new child node
+            Array::move(*split_node, 0);
+        }
+        this->init(NodeType::Normal); // reset prefix and population metadata
         // retain the null entry at the current level
-        Array::set(c_ndx_of_null, split_node->get(c_ndx_of_null));
-        split_node->set(c_ndx_of_null, 0);
+        Array::set(c_ndx_of_null, null_to_retain);
+
         // set the current node's prefix to the common prefix
         set_prefix(existing_prefix, num_common_chunks); // advances existing_prefix by num_common_chunks
         uint64_t population_split = *existing_prefix.get();
         // set the population of the current node to the single item after the common prefix
         do_insert_to_population(population_split);
-        existing_prefix.next();
-        // set the child's node's prefix to the remainder of the original prefix + 1
-        REALM_ASSERT_3(existing_prefix_size, >=, num_common_chunks + 1);
-        split_node->set_prefix(existing_prefix, existing_prefix_size - num_common_chunks - 1);
+#if COMPACT_NODE_OPTIMIZATION
+        if (!child_is_compact)
+#endif // COMPACT_NODE_OPTIMIZATION
+        {
+            // set the child's node's prefix to the remainder of the original prefix + 1
+            existing_prefix.next();
+            REALM_ASSERT_3(existing_prefix_size, >=, num_common_chunks + 1);
+            split_node->set_prefix(existing_prefix, existing_prefix_size - num_common_chunks - 1);
+        }
         add(split_node->get_ref()); // this is the only item so just add to the end
     }
     // otherwise the entire prefix is shared
@@ -1159,7 +1401,21 @@ void IndexNode<ChunkWidth>::verify() const
 {
 #if REALM_DEBUG
     size_t actual_size = size();
-    REALM_ASSERT(actual_size >= c_num_metadata_entries);
+    REALM_ASSERT_3(actual_size, >=, c_num_metadata_entries);
+#if COMPACT_NODE_OPTIMIZATION
+    if (is_compact_list()) {
+        std::optional<Mixed> cached;
+        for (size_t i = c_num_metadata_entries + 1; i < actual_size; ++i) {
+            ObjKey prev(get(i - 1));
+            ObjKey cur(get(i));
+            Mixed prev_val = cached ? *cached : m_cluster.get_value(prev);
+            Mixed cur_val = m_cluster.get_value(cur);
+            REALM_ASSERT_3(cur_val, >=, prev_val);
+            cached = cur_val;
+        }
+        return;
+    }
+#endif // COMPACT_NODE_OPTIMIZATION
     size_t total_population = 0;
     for (size_t i = 0; i < c_num_population_entries; ++i) {
         total_population += fast_popcount64(get_population(i));
@@ -1180,12 +1436,25 @@ void IndexNode<ChunkWidth>::print() const
     std::vector<NodeInfo> sub_nodes = {{this->get_ref(), 0}};
 
     while (!sub_nodes.empty()) {
-        std::unique_ptr<IndexNode<ChunkWidth>> cur_node = std::make_unique<IndexNode<ChunkWidth>>(m_alloc, m_cluster);
+        std::unique_ptr<IndexNode<ChunkWidth>> cur_node =
+            std::make_unique<IndexNode<ChunkWidth>>(m_alloc, m_cluster, m_compact_threshold);
         cur_node->init_from_ref(sub_nodes.begin()->ref);
         const size_t cur_depth = sub_nodes.begin()->depth;
         sub_nodes.erase(sub_nodes.begin());
 
         size_t array_size = cur_node->size();
+#if COMPACT_NODE_OPTIMIZATION
+        if (cur_node->is_compact_list()) {
+            util::format(std::cout, "IndexNode[%1] depth %2, size %3, compact list: {", cur_node->get_ref(),
+                         cur_depth, array_size);
+            for (size_t i = c_num_metadata_entries; i < array_size; ++i) {
+                util::format(std::cout, "ObjKey(%1)%2", cur_node->get(i), (i == (array_size - 1) ? "" : ", "));
+            }
+            std::cout << "}\n";
+            continue;
+        }
+#endif // COMPACT_NODE_OPTIMIZATION
+
         std::string population_str;
         size_t index_count = 0;
         for (size_t i = 0; i < c_num_population_entries; ++i) {
@@ -1260,9 +1529,8 @@ void IndexNode<ChunkWidth>::print() const
                     std::cout << "NULL";
                     continue;
                 }
-                char* header = m_alloc.translate(ref);
                 // ref to sorted list
-                if (!Array::get_context_flag_from_header(header)) {
+                if (is_sorted_list(ref, m_alloc)) {
                     const IntegerColumn sub(m_alloc, rot.get_as_ref()); // Throws
                     std::cout << "list{";
                     for (size_t j = 0; j < sub.size(); ++j) {
@@ -1293,6 +1561,29 @@ RadixTree<ChunkWidth>::RadixTree(const ClusterColumn& target_column, std::unique
     , m_array(std::move(root))
 {
     m_array->update_data_source(m_target_column);
+}
+
+template <size_t ChunkWidth>
+RadixTree<ChunkWidth>::RadixTree(const ClusterColumn& target_column, Allocator& alloc, size_t compact_threshold)
+    : RadixTree(target_column, IndexNode<ChunkWidth>::create(alloc, target_column, compact_threshold,
+#if COMPACT_NODE_OPTIMIZATION
+                                                             IndexNode<ChunkWidth>::NodeType::Compact
+#else
+                                                             IndexNode<ChunkWidth>::NodeType::Normal
+#endif // COMPACT_NODE_OPTIMIZATION
+                                                             ))
+{
+}
+
+template <size_t ChunkWidth>
+inline RadixTree<ChunkWidth>::RadixTree(ref_type ref, ArrayParent* parent, size_t ndx_in_parent,
+                                        const ClusterColumn& target_column, Allocator& alloc,
+                                        size_t compact_threshold)
+    : RadixTree(target_column, std::make_unique<IndexNode<ChunkWidth>>(alloc, target_column, compact_threshold))
+{
+    REALM_ASSERT_EX(Array::get_context_flag_from_header(alloc.translate(ref)), ref, size_t(alloc.translate(ref)));
+    m_array->init_from_ref(ref);
+    m_array->set_parent(parent, ndx_in_parent);
 }
 
 template <size_t ChunkWidth>
@@ -1368,20 +1659,17 @@ size_t RadixTree<ChunkWidth>::count(const Mixed& val) const
     if (!it) {
         return 0;
     }
-    if (!it.m_list_position) {
+    if (it.m_type == IndexIterator::ResultType::Exhaustive) {
         return 1;
     }
+    // list or compact form
     REALM_ASSERT(it.m_positions.size());
-    IndexNode<ChunkWidth> last(m_array->get_alloc(), m_target_column);
-    last.init_from_ref(it.m_positions.back().array_ref);
-    auto rot = last.get_as_ref_or_tagged(it.m_positions.back().position);
-    REALM_ASSERT_RELEASE_EX(rot.is_ref(), rot.get_as_int());
-    const IntegerColumn sub(last.get_alloc(), rot.get_as_ref()); // Throws
+    const IntegerColumn sub(m_array->get_alloc(), it.m_positions.back().array_ref); // Throws
     REALM_ASSERT(sub.size());
     SortedListComparator slc(m_target_column);
     IntegerColumn::const_iterator it_end = sub.cend();
-    REALM_ASSERT_3(it.m_list_position, <, sub.size());
-    IntegerColumn::const_iterator lower = sub.cbegin() + *it.m_list_position;
+    REALM_ASSERT_3(it.m_positions.back().position, <, sub.size());
+    IntegerColumn::const_iterator lower = sub.cbegin() + it.m_positions.back().position;
     IntegerColumn::const_iterator upper = std::upper_bound(lower, it_end, val, slc);
     return upper - lower;
 }

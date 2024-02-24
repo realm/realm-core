@@ -72,6 +72,23 @@
 //      allows for storing large prefixes without duplicating the prefix data in the
 //      index.
 //
+// 5) A IndexNode has a built-in "small" node size optimization mode which is determined
+// by the configurable `compact_threshold` size. In this mode, there is no prefix, or null
+// in the normal metadata field; just a list of object keys ordered by value and key. The
+// idea is that for a small number of elements, it is faster to do a binary search through a
+// sorted list than to traverse the internal nodes of a full tree. This is especially true in
+// the "erase" case where both the value and the ObjKey is known, because the list can be searched
+// directly without having to do any actual value lookups.
+//
+// Advantages over the StringIndex:
+// 1) Insert/Delete of a 'null' value is fast because it is always stored in the root of the tree
+// (or in a list off the root). This is important because Realm objects often create a default value
+// first for all properties before then setting them to the actual initial value. For an index, this looks
+// like: ndx->insert(null, ObjKey(x)); ndx->erase(null, ObjKey(x)); ndx->insert(actual, ObjKey(x));
+// So, by optimizing insertion and removal of null values, we save time on a very common use case.
+// The other benefit is that by having the nulls at the root of the tree, we don't need to COW the entire
+// sub tree that stores null values like the StringIndex does.
+//
 // clang-format off
 //
 // Example: insert int values {0, 1, 2, 3, 4, 4, 5, 5, 5, null, -1} in order, into an RadixTree<6> will produce this structure:
@@ -90,11 +107,21 @@
 //
 // clang-format on
 
+// disabled until benchmarks prove this is helpful
+#define COMPACT_NODE_OPTIMIZATION 0
+
 namespace realm {
 
 inline bool value_can_be_tagged_without_overflow(uint64_t val)
 {
     return !(val & (uint64_t(1) << 63));
+}
+
+inline bool is_sorted_list(ref_type ref, Allocator& alloc)
+{
+    // the context flag in the header is set for IndexNodes but not for lists
+    char* header = alloc.translate(ref);
+    return !Array::get_context_flag_from_header(header);
 }
 
 template <size_t ChunkWidth>
@@ -120,8 +147,12 @@ struct IndexIterator {
     }
 
 private:
+    enum class ResultType {
+        Exhaustive,  // fully indexed to end
+        List,        // last position is ref to list
+        CompactList, // last ref is compact list
+    } m_type;
     std::vector<ArrayChainLink> m_positions;
-    std::optional<size_t> m_list_position;
     ObjKey m_key;
     template <size_t ChunkWidth>
     friend class RadixTree;
@@ -187,17 +218,26 @@ struct InsertResult {
 template <size_t ChunkWidth>
 class IndexNode : public Array {
 public:
-    IndexNode(Allocator& allocator, const ClusterColumn& cluster)
+    IndexNode(Allocator& allocator, const ClusterColumn& cluster, size_t compact_threshold)
         : Array(allocator)
         , m_cluster(cluster)
+        , m_compact_threshold(compact_threshold)
     {
     }
 
-    static std::unique_ptr<IndexNode> create(Allocator& alloc, const ClusterColumn& cluster);
+    enum class NodeType {
+        Normal
+#if COMPACT_NODE_OPTIMIZATION
+        ,
+        Compact
+#endif // COMPACT_NODE_OPTIMIZATION
+    };
+    static std::unique_ptr<IndexNode> create(Allocator& alloc, const ClusterColumn& cluster, size_t compact_threshold,
+                                             NodeType type);
 
     void insert(ObjKey value, IndexKey<ChunkWidth> key);
     void erase(ObjKey value, IndexKey<ChunkWidth> key);
-    IndexIterator find_first(IndexKey<ChunkWidth> key) const;
+    IndexIterator find_first(IndexKey<ChunkWidth> key, ObjKey optional_known_key = ObjKey()) const;
     void find_all(std::vector<ObjKey>& results, IndexKey<ChunkWidth> key) const;
     FindRes find_all_no_copy(IndexKey<ChunkWidth> value, InternalFindResult& result) const;
     void find_all_insensitive(std::vector<ObjKey>& results, const Mixed& value) const;
@@ -205,7 +245,10 @@ public:
     bool has_duplicate_values() const;
     bool is_empty() const;
     void update_data_source(const ClusterColumn& cluster);
-
+    constexpr size_t get_compact_threshold()
+    {
+        return m_compact_threshold;
+    }
     void print() const;
     void verify() const;
 
@@ -219,13 +262,20 @@ private:
     constexpr static size_t c_ndx_of_null = c_num_population_entries + 2;
     constexpr static size_t c_num_metadata_entries = c_num_population_entries + 3;
 
-    std::unique_ptr<IndexNode> make_inner_node_at(size_t ndx);
+    void init(NodeType type);
     void make_sorted_list_at(size_t ndx, ObjKey existing, ObjKey key_to_insert, Mixed insert_value);
     std::unique_ptr<IndexNode> do_add_direct(ObjKey value, size_t ndx, const IndexKey<ChunkWidth>& key,
                                              bool inner_node);
     std::unique_ptr<IndexNode> do_add_last(ObjKey value, size_t ndx, const IndexKey<ChunkWidth>& key);
     uint64_t get_population(size_t ndx) const;
     void set_population(size_t ndx, uint64_t pop);
+
+#if COMPACT_NODE_OPTIMIZATION
+    bool is_compact_list() const;
+    void set_compact_list_bit(bool enable_compact_mode);
+    void insert_to_compact_list(ObjKey obj_key, IndexKey<ChunkWidth>& index_key);
+    void find_in_compact_list(const IndexKey<ChunkWidth>& index_key, IndexIterator& pos, ObjKey optional_known_key);
+#endif // COMPACT_NODE_OPTIMIZATION
 
     bool has_prefix() const;
     void set_prefix(IndexKey<ChunkWidth>& key, size_t prefix_size);
@@ -247,13 +297,17 @@ private:
     std::vector<std::unique_ptr<IndexNode<ChunkWidth>>> get_accessors_chain(const IndexIterator& it);
 
     ClusterColumn m_cluster;
+    const size_t m_compact_threshold;
 };
+
+constexpr static size_t c_default_compact_threshold = 100;
 
 template <size_t ChunkWidth>
 class RadixTree : public SearchIndex {
 public:
-    RadixTree(const ClusterColumn&, Allocator&);
-    RadixTree(ref_type, ArrayParent*, size_t, const ClusterColumn& target_column, Allocator&);
+    RadixTree(const ClusterColumn&, Allocator&, size_t compact_threshold = c_default_compact_threshold);
+    RadixTree(ref_type, ArrayParent*, size_t, const ClusterColumn& target_column, Allocator&,
+              size_t compact_threshold = c_default_compact_threshold);
     ~RadixTree() = default;
 
     // SearchIndex overrides:
@@ -286,23 +340,6 @@ private:
     RadixTree(const ClusterColumn& target_column, std::unique_ptr<IndexNode<ChunkWidth>> root);
     std::unique_ptr<IndexNode<ChunkWidth>> m_array;
 };
-
-// Implementation:
-template <size_t ChunkWidth>
-RadixTree<ChunkWidth>::RadixTree(const ClusterColumn& target_column, Allocator& alloc)
-    : RadixTree(target_column, IndexNode<ChunkWidth>::create(alloc, target_column))
-{
-}
-
-template <size_t ChunkWidth>
-inline RadixTree<ChunkWidth>::RadixTree(ref_type ref, ArrayParent* parent, size_t ndx_in_parent,
-                                        const ClusterColumn& target_column, Allocator& alloc)
-    : RadixTree(target_column, std::make_unique<IndexNode<ChunkWidth>>(alloc, target_column))
-{
-    REALM_ASSERT_EX(Array::get_context_flag_from_header(alloc.translate(ref)), ref, size_t(alloc.translate(ref)));
-    m_array->init_from_ref(ref);
-    m_array->set_parent(parent, ndx_in_parent);
-}
 
 // The node width is a tradeoff between number of intermediate nodes and write
 // amplification A chunk width of 6 means 63 keys per node which should be a
