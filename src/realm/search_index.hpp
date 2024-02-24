@@ -89,14 +89,23 @@ public:
         : m_column(column)
     {
     }
+    struct KeyValuePair {
+        ObjKey key;
+        const Mixed& value;
+    };
 
+    bool operator()(int64_t key_value, const KeyValuePair& b);
     bool operator()(int64_t key_value, const Mixed& b);
     bool operator()(const Mixed& a, int64_t key_value);
+
+    static void insert_to_existing_sorted_list(ObjKey key, Mixed value, IntegerColumn& list,
+                                               const ClusterColumn& cluster);
 
     static void insert_to_existing_list(ObjKey key, Mixed value, IntegerColumn& list, const ClusterColumn& cluster);
     static void insert_to_existing_list_at_lower(ObjKey key, Mixed value, IntegerColumn& list,
                                                  const IntegerColumnIterator& lower, const ClusterColumn& cluster);
-    static bool contains_duplicate_values(const IntegerColumn& list, const ClusterColumn& cluster);
+    static bool contains_duplicate_values(const IntegerColumn& list, const ClusterColumn& cluster,
+                                          IntegerColumn::const_iterator cbegin);
 
     IntegerColumn::const_iterator find_start_of_unsorted(const Mixed& value, const IntegerColumn& key_values) const;
     IntegerColumn::const_iterator find_end_of_unsorted(const Mixed& value, const IntegerColumn& key_values,

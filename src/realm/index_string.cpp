@@ -871,6 +871,33 @@ void SortedListComparator::insert_to_existing_list_at_lower(ObjKey key, Mixed va
     }
 }
 
+void SortedListComparator::insert_to_existing_sorted_list(ObjKey key, Mixed value, IntegerColumn& list,
+                                                          const ClusterColumn& cluster)
+{
+    SortedListComparator slc(cluster);
+    IntegerColumn::const_iterator it_end = list.cend();
+    IntegerColumn::const_iterator lower = std::lower_bound(list.cbegin(), it_end, value, slc);
+
+    if (lower == it_end) {
+        // Not found and everything is less, just append it to the end.
+        list.add(key.value);
+    }
+    else {
+        ObjKey lower_key = ObjKey(*lower);
+        Mixed lower_value = cluster.get_value(lower_key);
+
+        if (lower_value != value) {
+            list.insert(lower.get_position(), key.value);
+        }
+        else {
+            // At this point there exists duplicates of this value, we need to
+            // insert value beside it's duplicates so that rows are also sorted
+            // in ascending order.
+            insert_to_existing_list_at_lower(key, value, list, lower, cluster);
+        }
+    }
+}
+
 void SortedListComparator::insert_to_existing_list(ObjKey key, Mixed value, IntegerColumn& list,
                                                    const ClusterColumn& cluster)
 {
@@ -898,33 +925,21 @@ void SortedListComparator::insert_to_existing_list(ObjKey key, Mixed value, Inte
     }
 }
 
-bool SortedListComparator::contains_duplicate_values(const IntegerColumn& list, const ClusterColumn& cluster)
+bool SortedListComparator::contains_duplicate_values(const IntegerColumn& list, const ClusterColumn& cluster,
+                                                     IntegerColumn::const_iterator cbegin)
 {
-    if (list.size() > 1) {
-        ObjKey first_key = ObjKey(list.get(0));
-        ObjKey last_key = ObjKey(list.back());
-        Mixed first = cluster.get_value(first_key);
-        Mixed last = cluster.get_value(last_key);
-        // Since the list is kept in sorted order, the first and
-        // last values will be the same only if the whole list is
-        // storing duplicate values.
-        if (first == last) {
-            return true;
+    IntegerColumn::const_iterator it_end = list.cend();
+    REALM_ASSERT_3(it_end.get_position(), >=, cbegin.get_position());
+    if (it_end - cbegin <= 1) {
+        return false;
+    }
+    // There may be several short lists combined, so we need to
+    // check each of these individually for duplicates.
+    while (cbegin != (it_end - 1)) {
+        if (cluster.get_value(ObjKey(*cbegin)) == cluster.get_value(ObjKey(*(cbegin + 1)))) {
+            return true; // duplicates in list
         }
-        // There may also be several short lists combined, so we need to
-        // check each of these individually for duplicates.
-        IntegerColumn::const_iterator it = list.cbegin();
-        IntegerColumn::const_iterator it_end = list.cend();
-        SortedListComparator slc(cluster);
-        while (it != it_end) {
-            Mixed it_data = cluster.get_value(ObjKey(*it));
-            IntegerColumn::const_iterator next = std::upper_bound(it, it_end, it_data, slc);
-            size_t count_of_value = next - it; // row index subtraction in `sub`
-            if (count_of_value > 1) {
-                return true;
-            }
-            it = next;
-        }
+        ++cbegin;
     }
     return false;
 }
@@ -1921,6 +1936,18 @@ bool SortedListComparator::operator()(int64_t key_value, const Mixed& b) // used
     return a.compare(b) < 0;
 }
 
+// Return true if value of object(key_value) is less than 'b'
+// or if the values are equal return true if key_value < b.key
+// used in std::lower_bound
+bool SortedListComparator::operator()(int64_t key_value, const KeyValuePair& b)
+{
+    Mixed a = m_column.get_value(ObjKey(key_value));
+    int cmp = a.compare(b.value); // this handles nulls too
+    if (cmp == 0) {
+        return key_value < b.key.value;
+    }
+    return cmp < 0;
+}
 
 // Must return true if value of 'a' is less than value of object(key).
 bool SortedListComparator::operator()(const Mixed& a, int64_t key_value) // used in upper_bound

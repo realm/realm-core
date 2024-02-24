@@ -58,6 +58,8 @@ using unit_test::TestContext;
 template <size_t Chunk>
 using ChunkOf = typename std::integral_constant<size_t, Chunk>;
 
+constexpr size_t c_compact_threshold = 100;
+
 TEST_TYPES(IndexKey_Get, ChunkOf<4>, ChunkOf<5>, ChunkOf<6>, ChunkOf<7>, ChunkOf<8>, ChunkOf<9>, ChunkOf<10>)
 {
     constexpr size_t ChunkWidth = TEST_TYPE::value;
@@ -93,9 +95,9 @@ TEST(RadixTree_BuildIndexInt)
     table.set_primary_key_column(col_pk);
     const bool nullable = true;
     ColKey col_key = table.add_column(type_Int, "values", nullable);
-
+    std::vector<ObjKey> obj_keys;
     for (auto val : values) {
-        table.create_object_with_primary_key(ObjectId::gen()).set_any(col_key, val);
+        obj_keys.push_back(table.create_object_with_primary_key(ObjectId::gen()).set_any(col_key, val).get_key());
     }
 
     // Create a new index on column
@@ -109,6 +111,21 @@ TEST(RadixTree_BuildIndexInt)
     }
     CHECK_EQUAL(int_index->count(4), 2);
     CHECK_EQUAL(int_index->count(5), 3);
+    CHECK(int_index->has_duplicate_values());
+    std::vector<ObjKey> results;
+    int_index->find_all(results, Mixed{5});
+    CHECK_EQUAL(results[0], obj_keys[6]);
+    CHECK_EQUAL(results[1], obj_keys[7]);
+    CHECK_EQUAL(results[2], obj_keys[8]);
+    CHECK_EQUAL(results.size(), 3);
+    InternalFindResult res;
+    FindRes res_type = int_index->find_all_no_copy(Mixed{4}, res);
+    CHECK_EQUAL(res_type, FindRes_column);
+    IntegerColumn col(table.get_alloc(), ref_type(res.payload));
+    CHECK(col.size() >= res.end_ndx);
+    CHECK_EQUAL(res.end_ndx - res.start_ndx, 2);
+    CHECK_EQUAL(col.get(res.start_ndx), obj_keys[4].value);
+    CHECK_EQUAL(col.get(res.start_ndx + 1), obj_keys[5].value);
     while (table.size()) {
         table.remove_object(table.begin());
     }
@@ -121,9 +138,9 @@ TEST_TYPES(RadixTree_BuildIndexString, ChunkOf<8>)
     Table::IndexMaker hook = [&](ColKey, const ClusterColumn& cluster, Allocator& alloc, ref_type ref, Array* parent,
                                  size_t col_ndx) -> std::unique_ptr<SearchIndex> {
         if (parent) {
-            return std::make_unique<RadixTree<ChunkWidth>>(ref, parent, col_ndx, cluster, alloc);
+            return std::make_unique<RadixTree<ChunkWidth>>(ref, parent, col_ndx, cluster, alloc, c_compact_threshold);
         }
-        return std::make_unique<RadixTree<ChunkWidth>>(cluster, alloc); // Throws
+        return std::make_unique<RadixTree<ChunkWidth>>(cluster, alloc, c_compact_threshold); // Throws
     };
     Table table;
     table.set_index_maker(std::move(hook));
@@ -203,6 +220,21 @@ TEST_TYPES(RadixTree_BuildIndexString, ChunkOf<8>)
         verify_values({"prefix", "prefix one", prefix_two, prefix_three});
         remove_nth_inserted_item(2);
     }
+
+    std::string storage;
+    storage.reserve(513);
+    std::vector<StringData> all_first_level_strings;
+    std::vector<StringData> twice_all_first_level_strings;
+    for (size_t i = 0; i < 255; ++i) {
+        storage.append(std::string(1, char(i)));
+        StringData sd(storage.c_str() + i, 1);
+        all_first_level_strings.push_back(sd);
+        twice_all_first_level_strings.push_back(sd);
+        twice_all_first_level_strings.push_back(sd);
+    }
+    verify_values(std::move(all_first_level_strings));
+    verify_values(std::move(twice_all_first_level_strings));
+
     verify_removal();
 }
 
@@ -211,38 +243,40 @@ void do_test_type(Table& table, TestContext& test_context)
 {
     int64_t dup_positive = 8;
     int64_t dup_negative = -77;
+    // clang-format off
     std::vector<int64_t> values = {
-        0,
-        1,
-        2,
-        3,
-        4,
-        5,
-        99,
-        100,
-        999,
-        1000,
-        -1,
-        -2,
-        -3,
-        -4,
-        -5,
-        dup_positive,
-        dup_positive,
-        dup_positive,
-        dup_positive,
-        dup_negative,
-        dup_negative,
-        dup_negative,
-        dup_negative,
+        0, 1, 2, 3, 4, 5, 99, 100, 999, 1000, 1001,
+        -1, -2, -3, -4, -5, -99, -100, -999, -1000, -1001,
+        dup_positive, dup_positive, dup_positive, dup_positive,
+        dup_negative, dup_negative, dup_negative, dup_negative,
         0xF00000000000000,
         0xFF0000000000000,
         0xFFF000000000000,
         0xFFFFF0000000000,
         0xFFFFFFFFFFFFFFF,
+        0xFFEEEEEEEEEEEEE,
+        0xFFEFEEFEFEFEFEF,
+        0xDEADBEEFDEADBEE,
         0xEEE000000000000,
         0xEFF000000000000,
+        0x00FF00000000000,
+        0x00FFEE000000000,
+        0x00FFEEEEEEEEEEE,
+        0x00FEFEFEFEFEFEF,
+        int64_t(0xFFFFFFFFFFFFFFFF),
+        int64_t(0xFEEEEEEEEEEEEEEE),
+        int64_t(0xDEADBEEFDEADBEEF),
+        int64_t(0xFFEEFFEEFFEEFFEE),
+        int64_t(0xFFADBEEFDEADBEEF),
+        int64_t(0xFFEEBEEFDEADBEEF),
+        int64_t(0xFF00000000000000),
+        int64_t(0xFF0000000000000F),
+        int64_t(0xFF00000000000001),
+        int64_t(0xFFEEEEEEEEEEEEE1),
+        int64_t(0xFF11111111111111),
+        int64_t(0xFF1111111111111F),
     };
+    // clang-format on
     table.clear();
     std::vector<std::string> string_storage;
     auto convert_value = [&](int64_t val) {
@@ -287,6 +321,9 @@ void do_test_type(Table& table, TestContext& test_context)
         if (val_int == dup_positive || val_int == dup_negative) {
             expected_count = 4;
         }
+        if (val_int == -1) {
+            expected_count = 2;
+        }
         CHECK_EQUAL(expected_count, ndx->count(val));
         if (expected_count == 1) {
             ObjKey expected_key = keys[i];
@@ -312,28 +349,32 @@ void do_test_type(Table& table, TestContext& test_context)
 TEST_TYPES(IndexNode, ChunkOf<4>, ChunkOf<5>, ChunkOf<6>, ChunkOf<7>, ChunkOf<8>, ChunkOf<9>, ChunkOf<10>)
 {
     constexpr size_t ChunkWidth = TEST_TYPE::value;
-
-    Table::IndexMaker hook = [&](ColKey col_key, const ClusterColumn& cluster, Allocator& alloc, ref_type ref,
-                                 Array* parent, size_t col_ndx) -> std::unique_ptr<SearchIndex> {
-        if (parent) {
+    std::vector<size_t> compact_thresholds = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 100, 1000, 2000};
+    for (size_t threshold : compact_thresholds) {
+        Table::IndexMaker hook = [&](ColKey col_key, const ClusterColumn& cluster, Allocator& alloc, ref_type ref,
+                                     Array* parent, size_t col_ndx) -> std::unique_ptr<SearchIndex> {
+            if (parent) {
+                if (col_key.get_type() == col_type_Int || col_key.get_type() == col_type_Timestamp ||
+                    col_key.get_type() == col_type_String) {
+                    return std::make_unique<RadixTree<ChunkWidth>>(ref, parent, col_ndx, cluster, alloc, threshold);
+                }
+                return std::make_unique<StringIndex>(ref, parent, col_ndx, cluster, alloc);
+            }
             if (col_key.get_type() == col_type_Int || col_key.get_type() == col_type_Timestamp ||
                 col_key.get_type() == col_type_String) {
-                return std::make_unique<RadixTree<ChunkWidth>>(ref, parent, col_ndx, cluster, alloc);
+                return std::make_unique<RadixTree<ChunkWidth>>(cluster, alloc, threshold); // Throws
             }
-            return std::make_unique<StringIndex>(ref, parent, col_ndx, cluster, alloc);
-        }
-        if (col_key.get_type() == col_type_Int || col_key.get_type() == col_type_Timestamp ||
-            col_key.get_type() == col_type_String) {
-            return std::make_unique<RadixTree<ChunkWidth>>(cluster, alloc); // Throws
-        }
-        return std::make_unique<StringIndex>(cluster, alloc); // Throws
-    };
-    Table table;
-    table.set_index_maker(std::move(hook));
+            return std::make_unique<StringIndex>(cluster, alloc); // Throws
+        };
+        Table table;
+        table.set_index_maker(std::move(hook));
 
-    do_test_type<int64_t>(table, test_context);
-    do_test_type<Timestamp>(table, test_context);
-    //    do_test_type<StringData>(table, test_context);
+        do_test_type<int64_t>(table, test_context);
+        do_test_type<Timestamp>(table, test_context);
+        if constexpr (ChunkWidth == 8) {
+            do_test_type<StringData>(table, test_context);
+        }
+    }
 }
 
 #endif // TEST_RADIX_TREE
