@@ -488,7 +488,7 @@ bool inline any_field_NE(int width, uint64_t A, uint64_t B)
 // Bits outside of the given field are ignored.
 constexpr uint64_t populate(int width, uint64_t value)
 {
-    width &= 0xFFFFFFFFFFFFFFFFULL >> (64 - width);
+    value &= 0xFFFFFFFFFFFFFFFFULL >> (64 - width);
     if (width < 8) {
         value |= value << width;
         width <<= 1;
