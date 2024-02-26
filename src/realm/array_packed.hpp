@@ -50,7 +50,7 @@ private:
     bool find_all_match(size_t start, size_t end, size_t baseindex, QueryStateBase* state) const;
 
     template <typename Cond>
-    size_t parallel_subword_find(const Array&, int64_t, size_t, size_t) const;
+    bool parallel_subword_find(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*) const;
 };
 } // namespace realm
 

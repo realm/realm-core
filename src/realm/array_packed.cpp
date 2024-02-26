@@ -152,45 +152,12 @@ bool ArrayPacked::find_all(const Array& arr, int64_t value, size_t start, size_t
     // the width of each single value within a 64 bit word and N is the total number of values stored in the array. On
     // the other end if we have values of 32 bits or more, accessing twice or once the same 64 bits word is probably
     // the cheapest thing to do.
-
-    // tmp for pleasing core tests. but I like these 2 goto :-)
-    // if ((std::is_same_v<Cond, Equal> || std::is_same_v<Cond, NotEqual>)&&arr.m_width < 32 && value < 0)
-    //    goto normal_loop;
-    // if (std::is_same_v<Cond, Greater>)
-    //    goto normal_loop;
-
-    if (arr.m_width < 32)
-        start = parallel_subword_find<Cond>(arr, value, start, end);
-
-    auto value_cmp = [](int64_t v, int64_t value) {
-        if constexpr (std::is_same_v<Cond, Equal>)
-            return v == value;
-        if constexpr (std::is_same_v<Cond, NotEqual>)
-            return v != value;
-        if constexpr (std::is_same_v<Cond, Greater>)
-            return v > value;
-        if constexpr (std::is_same_v<Cond, Less>)
-            return v < value;
-    };
-
-    // this loop is going to be executed for values >= 32 bits, since this is likely the fastest way to compare
-    // things. For values that are less than that, we have made a bit scan in parallel_subword_find, in order to try
-    // to compare in parallel as many values as possible and move the start index as close as possible to the value we
-    // are seeking. This is done in order to minimize total number of comparisons.
-    const auto mask = arr.get_encoder().width_mask();
-    bf_iterator it((uint64_t*)arr.m_data, 0, arr.m_width, arr.m_width, start);
-    for (; start < end; ++start, ++it) {
-        const auto v = sign_extend_field_by_mask(mask, it.get_value());
-        if (value_cmp(v, value)) {
-            if (!state->match(start + baseindex))
-                return false;
-        }
-    }
-    return true;
+    return parallel_subword_find<Cond>(arr, value, start, end, baseindex, state);
 }
 
 template <typename Cond>
-size_t ArrayPacked::parallel_subword_find(const Array& arr, int64_t value, size_t start, size_t end) const
+bool ArrayPacked::parallel_subword_find(const Array& arr, int64_t value, size_t start, size_t end, size_t baseindex,
+                                        QueryStateBase* state) const
 {
     const auto width = arr.m_width;
     const auto MSBs = populate(width, arr.get_encoder().width_mask());
@@ -216,9 +183,11 @@ size_t ArrayPacked::parallel_subword_find(const Array& arr, int64_t value, size_
     while (total_bit_count_left >= bit_count_pr_iteration) {
         const auto word = it.get(bit_count_pr_iteration);
         vector = bitwidth_cmp(word, search_vector);
-        if (vector) {
+        while (vector) {
             int sub_word_index = first_field_marked(width, vector);
-            return start + sub_word_index;
+            if (!state->match(start + sub_word_index + baseindex))
+                return false;
+            vector &= (vector - 1); // known bithack for clearing least significant bit
         }
         total_bit_count_left -= bit_count_pr_iteration;
         start += field_count;
@@ -227,14 +196,16 @@ size_t ArrayPacked::parallel_subword_find(const Array& arr, int64_t value, size_
     if (total_bit_count_left) {                         // final subword, may be partial
         const auto word = it.get(total_bit_count_left); // <-- limit lookahead to avoid touching memory beyond array
         vector = bitwidth_cmp(word, search_vector);
-        auto last_word_mask = 0xFFFFFFFFFFFFFFFF >> (64 - total_bit_count_left);
+        auto last_word_mask = 0xFFFFFFFFFFFFFFFFULL >> (64 - total_bit_count_left);
         vector &= last_word_mask;
-        if (vector) {
+        while (vector) {
             int sub_word_index = first_field_marked(width, vector);
-            return start + sub_word_index;
+            if (!state->match(start + sub_word_index + baseindex))
+                return false;
+            vector &= (vector - 1);
         }
     }
-    return end;
+    return true;
 }
 
 bool ArrayPacked::find_all_match(size_t start, size_t end, size_t baseindex, QueryStateBase* state) const
