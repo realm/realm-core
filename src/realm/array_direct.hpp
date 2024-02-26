@@ -617,7 +617,19 @@ inline uint64_t find_all_fields_signed_LT(uint64_t MSBs, uint64_t A, uint64_t B)
 inline uint64_t find_all_fields_signed_LE(uint64_t MSBs, uint64_t A, uint64_t B)
 {
     auto sign_bits = MSBs;
-    return !find_all_fields_unsigned_LE(MSBs, A ^ sign_bits, B ^ sign_bits);
+    return find_all_fields_unsigned_LE(MSBs, A ^ sign_bits, B ^ sign_bits);
+}
+
+inline uint64_t find_all_fields_signed_GT(uint64_t MSBs, uint64_t A, uint64_t B)
+{
+    // A > B is the same as B < A
+    return find_all_fields_signed_LT(MSBs, B, A);
+}
+
+inline uint64_t find_all_fields_signed_GE(uint64_t MSBs, uint64_t A, uint64_t B)
+{
+    // A >= B is the same as B <= A
+    return find_all_fields_signed_LE(MSBs, B, A);
 }
 
 // find the first field which have MSB set (marks overflow after trial subtraction, or other
