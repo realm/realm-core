@@ -1059,7 +1059,9 @@ classes:
     constructors:
       make: '(r: SharedRealm, parent: const Obj&, col: ColKey)'
     methods:
-      get: '(ndx: count_t) const -> Obj'
+      get:
+        - sig: '(ndx: count_t) -> Obj'
+          suffix: 'obj'
       get_list: '(path_elem: int) -> List'
       get_dictionary: '(path_elem: int) -> Dictionary'
       move: '(source_ndx: count_t, dest_ndx: count_t)'
@@ -1100,7 +1102,9 @@ classes:
     constructors:
       make: '(r: SharedRealm, parent: const Obj&, col: ColKey)'
     methods:
-      get: '(ndx: count_t) const -> Obj'
+      get:
+        - sig: '(ndx: count_t) -> Obj'
+          suffix: 'obj'
       insert_any: '(val: Mixed) -> std::pair<count_t, bool>'
       remove_any: '(val: Mixed) -> std::pair<count_t, bool>'
       remove_all: '()'
