@@ -735,6 +735,8 @@ classes:
       get_mixed_type: '(obj: const Obj&, col_key: ColKey) -> MixedDataType'
       get_mixed_element_type:
         - '(results: Results, index: count_t) -> MixedDataType'
+        - sig: '(list: List, index: count_t) -> MixedDataType'
+          suffix: from_list
         - sig: '(dictionary: Dictionary, key: std::string) -> MixedDataType'
           suffix: from_dict
 

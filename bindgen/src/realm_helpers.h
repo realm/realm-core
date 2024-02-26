@@ -311,17 +311,17 @@ struct Helpers {
 
     static MixedDataType get_mixed_type(const Obj& obj, ColKey col_key) {
         if (obj.is_null(col_key)) {
-            return MixedDataType::JSNull;
+            return MixedDataType::JSUndefined;
         }
-        return to_mixed_data_type(obj.get_any(col_key).get_type());
+        return to_mixed_data_type(obj.get_any(col_key));
     }
 
     static MixedDataType get_mixed_element_type(Results results, size_t index) {
-        Mixed value = results.get_any(index);
-        if (value.is_null()) {
-            return MixedDataType::JSNull;
-        }
-        return to_mixed_data_type(value.get_type());
+        return to_mixed_data_type(results.get_any(index));
+    }
+
+    static MixedDataType get_mixed_element_type(List list, size_t index) {
+        return to_mixed_data_type(list.get_any(index));
     }
 
     static MixedDataType get_mixed_element_type(object_store::Dictionary dictionary, std::string key) {
@@ -329,16 +329,16 @@ struct Helpers {
         if (!value) {
             return MixedDataType::JSUndefined;
         }
-        if (value->is_null()) {
-            return MixedDataType::JSNull;
-        }
-        return to_mixed_data_type(value->get_type());
+        return to_mixed_data_type(*value);
     }
 
-    private:
-        static MixedDataType to_mixed_data_type(DataType from_type) {
-            return MixedDataType(int(from_type));
+private:
+    static MixedDataType to_mixed_data_type(Mixed value) {
+        if (value.is_null()) {
+            return MixedDataType::JSNull;
         }
+        return MixedDataType(int(value.get_type()));
+    }
 };
 
 struct ObjectChangeSet {
