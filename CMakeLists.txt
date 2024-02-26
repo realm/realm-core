@@ -361,6 +361,11 @@ add_subdirectory(bindgen)
 # Install the licence and changelog files
 install(FILES LICENSE CHANGELOG.md DESTINATION "doc/realm" COMPONENT devel)
 
+# Only prepare test/install/package targets if we're not a submodule
+if(REALM_CORE_SUBMODULE_BUILD AND NOT DEFINED VCPKG_TOOLCHAIN)
+    return()
+endif()
+
 # Make the project importable from the build directory
 set(REALM_EXPORTED_TARGETS
         Storage
@@ -393,11 +398,6 @@ install(FILES tools/cmake/AcquireRealmDependency.cmake
         DESTINATION share/cmake/Realm
         COMPONENT devel
         )
-
-# Only prepare test/install/package targets if we're not a submodule
-if(REALM_CORE_SUBMODULE_BUILD)
-    return()
-endif()
 
 if(CMAKE_SYSTEM_NAME MATCHES "^Windows")
     # Increase the Catch2 virtual console width because our test names can be very long and they break test reports
