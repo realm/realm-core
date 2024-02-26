@@ -207,7 +207,7 @@ size_t ArrayPacked::parallel_subword_find(const Array& arr, int64_t value, size_
         if constexpr (std::is_same_v<Cond, NotEqual>)
             return find_all_fields_NE(mask, a, b);
         if constexpr (std::is_same_v<Cond, Greater>)
-            return !find_all_fields_signed_LE(mask, a, b);
+            return find_all_fields_signed_GT(mask, a, b);
         if constexpr (std::is_same_v<Cond, Less>)
             return find_all_fields_signed_LT(mask, a, b);
     };
