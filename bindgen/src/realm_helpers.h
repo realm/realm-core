@@ -179,7 +179,7 @@ struct Helpers {
     {
         size_t max_size = util::base64_decoded_size(input.size());
         std::unique_ptr<char[]> data(new char[max_size]);
-        if (auto size = util::base64_decode(input, data.get(), max_size)) {
+        if (auto size = util::base64_decode(input, {data.get(), max_size})) {
             OwnedBinaryData result(std::move(data), *size);
             return result;
         }
