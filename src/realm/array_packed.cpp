@@ -194,41 +194,48 @@ template <typename Cond>
 size_t ArrayPacked::parallel_subword_find(const Array& arr, int64_t value, size_t start, size_t end) const
 {
     const auto width = arr.m_width;
-    const auto mask = populate(width, arr.get_encoder().width_mask());
-    const auto searching_value_mask = populate(width, value);
+    const auto MSBs = populate(width, arr.get_encoder().width_mask());
+    const auto search_vector = populate(width, value);
     const auto field_count = num_fields_for_width(width);
-    const auto last_word_mask = (1ULL << num_bits(width)) - 1;
-    const auto n_bits_per_it = arr.m_width * field_count;
-    end = end - field_count + 1;
+    const auto bit_count_pr_iteration = num_bits_for_width(width);
+    auto total_bit_count_left = ((signed)end - start) * width;
+    REALM_ASSERT(total_bit_count_left >= 0);
 
-    auto bitwidth_cmp = [&mask](uint64_t a, uint64_t b) {
+    auto bitwidth_cmp = [&MSBs](uint64_t a, uint64_t b) {
         if constexpr (std::is_same_v<Cond, Equal>)
-            return find_all_fields_EQ(mask, a, b);
+            return find_all_fields_EQ(MSBs, a, b);
         if constexpr (std::is_same_v<Cond, NotEqual>)
-            return find_all_fields_NE(mask, a, b);
+            return find_all_fields_NE(MSBs, a, b);
         if constexpr (std::is_same_v<Cond, Greater>)
-            return find_all_fields_signed_GT(mask, a, b);
+            return find_all_fields_signed_GT(MSBs, a, b);
         if constexpr (std::is_same_v<Cond, Less>)
-            return find_all_fields_signed_LT(mask, a, b);
+            return find_all_fields_signed_LT(MSBs, a, b);
     };
 
     unaligned_word_iter it((uint64_t*)arr.m_data, start * arr.m_width);
     uint64_t vector = 0;
-    while (start < end) {
-        const auto word = it.get(n_bits_per_it);
-        vector = bitwidth_cmp(word, searching_value_mask);
-        if (vector)
-            break;
+    while (total_bit_count_left >= bit_count_pr_iteration) {
+        const auto word = it.get(bit_count_pr_iteration);
+        vector = bitwidth_cmp(word, search_vector);
+        if (vector) {
+            int sub_word_index = first_field_marked(width, vector);
+            return start + sub_word_index;
+        }
+        total_bit_count_left -= bit_count_pr_iteration;
         start += field_count;
-        it.bump(n_bits_per_it);
+        it.bump(bit_count_pr_iteration);
     }
-    // there is still some chance that we may find the value in the last word.
-    if (!vector) {
-        const auto last_word = it.get(n_bits_per_it) & last_word_mask;
-        if (bitwidth_cmp(last_word, searching_value_mask & last_word_mask))
-            start += field_count;
+    if (total_bit_count_left) {                         // final subword, may be partial
+        const auto word = it.get(total_bit_count_left); // <-- limit lookahead to avoid touching memory beyond array
+        vector = bitwidth_cmp(word, search_vector);
+        auto last_word_mask = 0xFFFFFFFFFFFFFFFF >> (64 - total_bit_count_left);
+        vector &= last_word_mask;
+        if (vector) {
+            int sub_word_index = first_field_marked(width, vector);
+            return start + sub_word_index;
+        }
     }
-    return start;
+    return end;
 }
 
 bool ArrayPacked::find_all_match(size_t start, size_t end, size_t baseindex, QueryStateBase* state) const
