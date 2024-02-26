@@ -6,7 +6,7 @@ project(RealmCore)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/tools/cmake")
 
-if(NOT CMAKE_SOURCE_DIR STREQUAL ${CMAKE_CURRENT_SOURCE_DIR})
+if(NOT DEFINED REALM_CORE_SUBMODULE_BUILD AND NOT CMAKE_SOURCE_DIR STREQUAL ${CMAKE_CURRENT_SOURCE_DIR})
     # Realm Core is being built as part of another project, likely an SDK
     set(REALM_CORE_SUBMODULE_BUILD ON)
 endif()
@@ -362,7 +362,7 @@ add_subdirectory(bindgen)
 install(FILES LICENSE CHANGELOG.md DESTINATION "doc/realm" COMPONENT devel)
 
 # Only prepare test/install/package targets if we're not a submodule
-if(REALM_CORE_SUBMODULE_BUILD AND NOT DEFINED VCPKG_TOOLCHAIN)
+if(REALM_CORE_SUBMODULE_BUILD)
     return()
 endif()
 
