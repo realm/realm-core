@@ -154,10 +154,10 @@ bool ArrayPacked::find_all(const Array& arr, int64_t value, size_t start, size_t
     // the cheapest thing to do.
 
     // tmp for pleasing core tests. but I like these 2 goto :-)
-    if ((std::is_same_v<Cond, Equal> || std::is_same_v<Cond, NotEqual>)&&arr.m_width < 32 && value < 0)
-        goto normal_loop;
-    if (std::is_same_v<Cond, Greater>)
-        goto normal_loop;
+    // if ((std::is_same_v<Cond, Equal> || std::is_same_v<Cond, NotEqual>)&&arr.m_width < 32 && value < 0)
+    //    goto normal_loop;
+    // if (std::is_same_v<Cond, Greater>)
+    //    goto normal_loop;
 
     if (arr.m_width < 32)
         start = parallel_subword_find<Cond>(arr, value, start, end);
