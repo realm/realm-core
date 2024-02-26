@@ -243,6 +243,8 @@ std::string get_compile_time_admin_url()
     return {};
 #endif
 }
+#endif // REALM_MONGODB_ENDPOINT
+#endif // REALM_ENABLE_AUTH_TESTS
 
 AutoVerifiedEmailCredentials::AutoVerifiedEmailCredentials()
 {
@@ -318,9 +320,6 @@ void async_open_realm(const Realm::Config& config,
     task->cancel(); // don't run the above notifier again on this session
     finish(std::move(tsr), err);
 }
-
-#endif // REALM_ENABLE_AUTH_TESTS
-#endif // REALM_ENABLE_SYNC
 
 class TestHelper {
 public:
