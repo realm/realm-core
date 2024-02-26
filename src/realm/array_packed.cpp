@@ -162,7 +162,6 @@ bool ArrayPacked::find_all(const Array& arr, int64_t value, size_t start, size_t
     if (arr.m_width < 32)
         start = parallel_subword_find<Cond>(arr, value, start, end);
 
-normal_loop:
     auto value_cmp = [](int64_t v, int64_t value) {
         if constexpr (std::is_same_v<Cond, Equal>)
             return v == value;
@@ -198,7 +197,7 @@ size_t ArrayPacked::parallel_subword_find(const Array& arr, int64_t value, size_
     const auto search_vector = populate(width, value);
     const auto field_count = num_fields_for_width(width);
     const auto bit_count_pr_iteration = num_bits_for_width(width);
-    auto total_bit_count_left = ((signed)end - start) * width;
+    signed total_bit_count_left = ((signed)end - start) * width;
     REALM_ASSERT(total_bit_count_left >= 0);
 
     auto bitwidth_cmp = [&MSBs](uint64_t a, uint64_t b) {
