@@ -484,10 +484,11 @@ bool inline any_field_NE(int width, uint64_t A, uint64_t B)
     return (A ^ B) & cares_about(width);
 }
 
-// Populate all fields in a vector with a given value. The value must have all
-// bits outside of the field be zero.
+// Populate all fields in a vector with a given value of a give width.
+// Bits outside of the given field are ignored.
 constexpr uint64_t populate(int width, uint64_t value)
 {
+    width &= 0xFFFFFFFFFFFFFFFFULL >> (64 - width);
     if (width < 8) {
         value |= value << width;
         width <<= 1;
@@ -581,10 +582,7 @@ inline uint64_t find_all_fields_NE(uint64_t MSBs, uint64_t A, uint64_t B)
 inline uint64_t find_all_fields_EQ(uint64_t MSBs, uint64_t A, uint64_t B)
 {
     // get the fields which are EQ and negate the result
-    // auto sign_bits = MSBs;
-    // A ^ sign_bits, B ^ sign_bits
     auto all_fields_NE = find_all_fields_NE(MSBs, A, B);
-    // auto all_fields_NE = find_all_fields_NE(MSBs, A ^ sign_bits, B ^ sign_bits);
     auto all_fields_NE_negated = ~all_fields_NE;
     // must filter the negated vector so only MSB are left.
     return MSBs & all_fields_NE_negated;
