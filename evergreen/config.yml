@@ -147,6 +147,12 @@ functions:
           if [ -z "${cmake_generator|}" ]; then
               GENERATOR="Ninja Multi-Config"
               set_cmake_var generator_vars CMAKE_MAKE_PROGRAM PATH "${ninja|ninja}"
+          elif [ "${cmake_generator}" == "Xcode"]; then
+              echo $DEVELOPER_DIR
+              xcodes installed
+              xcode-select -p
+              xcrun -f clang
+              xcrun -f clang++
           fi
 
           if [ -n "${cmake_generator_platform|}" ]; then
@@ -1313,7 +1319,7 @@ task_groups:
 buildvariants:
 - name: ubuntu2204-asan
   display_name: "Ubuntu 22.04 x86_64 (Clang 16 ASAN)"
-  run_on: ubuntu2004-large
+  run_on: ubuntu2204-large
   expansions:
     clang_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/clang%2Bllvm-16.0.2-x86_64-linux-gnu-ubuntu-22.04.tar.xz"
     cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.26.3-linux-x86_64.tar.gz"
@@ -1324,11 +1330,9 @@ buildvariants:
     c_compiler: "./clang_binaries/bin/clang"
     cxx_compiler: "./clang_binaries/bin/clang++"
     llvm_symbolizer: "./clang_binaries/bin/llvm-symbolizer"
+    run_with_encryption: On
   tasks:
   - name: compile_test
-  - name: long-running-tests
-    distros:
-    - ubuntu2204-small
 
 - name: ubuntu2204-tsan
   display_name: "Ubuntu 22.04 x86_64 (Clang 16 TSAN)"
@@ -1342,6 +1346,23 @@ buildvariants:
     cmake_build_type: RelWithDebInfo
     c_compiler: "./clang_binaries/bin/clang"
     cxx_compiler: "./clang_binaries/bin/clang++"
+    run_with_encryption: On
+  tasks:
+  - name: compile_test
+
+- name: ubuntu2204-tsan-2
+  display_name: "Ubuntu 22.04 x86_64 (Clang 17 TSAN)"
+  run_on: ubuntu2204-large
+  expansions:
+    clang_url: "https://github.com/llvm/llvm-project/releases/download/llvmorg-17.0.6/clang+llvm-17.0.6-x86_64-linux-gnu-ubuntu-22.04.tar.xz"
+    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.26.3-linux-x86_64.tar.gz"
+    cmake_bindir: "./cmake_binaries/bin"
+    fetch_missing_dependencies: On
+    enable_tsan: On
+    cmake_build_type: RelWithDebInfo
+    c_compiler: "./clang_binaries/bin/clang"
+    cxx_compiler: "./clang_binaries/bin/clang++"
+    run_with_encryption: On
   tasks:
   - name: compile_test
 
@@ -1357,10 +1378,9 @@ buildvariants:
     cmake_build_type: RelWithDebInfo
     c_compiler: "./clang_binaries/bin/clang"
     cxx_compiler: "./clang_binaries/bin/clang++"
+    run_with_encryption: On
   tasks:
   - name: compile_test
-    distros:
-    - ubuntu2004-large
 
 - name: ubuntu2204-arm64-asan
   display_name: "Ubuntu 22.04 ARM64 (ASAN)"
@@ -1383,6 +1403,22 @@ buildvariants:
   display_name: "Ubuntu 22.04 ARM64 (TSAN)"
   run_on: ubuntu2204-arm64-large
   expansions:
+    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.26.3-linux-aarch64.tar.gz"
+    cmake_bindir: "./cmake_binaries/bin"
+    python3: "/opt/mongodbtoolchain/v3/bin/python3"
+    use_system_openssl: On
+    fetch_missing_dependencies: On
+    cmake_build_type: RelWithDebInfo
+    enable_tsan: On
+    run_with_encryption: On
+  tasks:
+  - name: compile_test
+
+- name: ubuntu2204-arm64-tsan-2
+  display_name: "Ubuntu 22.04 ARM64 (Clang 17 TSAN)"
+  run_on: ubuntu2204-arm64-large
+  expansions:
+    clang_url: "https://github.com/llvm/llvm-project/releases/download/llvmorg-17.0.6/clang+llvm-17.0.6-aarch64-linux-gnu.tar.xz"
     cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.26.3-linux-aarch64.tar.gz"
     cmake_bindir: "./cmake_binaries/bin"
     python3: "/opt/mongodbtoolchain/v3/bin/python3"
@@ -1479,7 +1515,7 @@ buildvariants:
 
 - name: macos-1300-arm64-tsan
   display_name: "MacOS 13 arm64 (TSAN)"
-  run_on: macos-1100-arm64
+  run_on: macos-1300-arm64
   expansions:
     cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.26.3-macos-universal.tar.gz"
     cmake_bindir: "./cmake_binaries/CMake.app/Contents/bin"
@@ -1496,14 +1532,28 @@ buildvariants:
 
 - name: macos-1300-arm64-tsan-2
   display_name: "MacOS 13 arm64 (TSAN) 2"
-  run_on: macos-1100-arm64
+  run_on: macos-1300-arm64
   expansions:
     cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.26.3-macos-universal.tar.gz"
     cmake_bindir: "./cmake_binaries/CMake.app/Contents/bin"
-    cmake_toolchain_file: "./tools/cmake/xcode.toolchain.cmake"
-    cmake_generator: Ninja
     max_jobs: $(sysctl -n hw.logicalcpu)
-    xcode_developer_dir: /Applications/Xcode.app/Contents/Developer
+    cmake_build_type: RelWithDebInfo
+    enable_tsan: On
+    run_with_encryption: On
+  tasks:
+  - name: compile_test
+
+- name: macos-1300-arm64-tsan-3
+  display_name: "MacOS 13 arm64 (TSAN) 3"
+  run_on: macos-1300-arm64
+  expansions:
+    clang_url: "https://github.com/llvm/llvm-project/releases/download/llvmorg-17.0.6/clang+llvm-17.0.6-arm64-apple-darwin22.0.tar.xz"
+    c_compiler: "./clang_binaries/bin/clang"
+    cxx_compiler: "./clang_binaries/bin/clang++"
+    llvm_symbolizer: "./clang_binaries/bin/llvm-symbolizer"
+    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.26.3-macos-universal.tar.gz"
+    cmake_bindir: "./cmake_binaries/CMake.app/Contents/bin"
+    max_jobs: $(sysctl -n hw.logicalcpu)
     cmake_build_type: RelWithDebInfo
     enable_tsan: On
     run_with_encryption: On
