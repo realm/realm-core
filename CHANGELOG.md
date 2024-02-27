@@ -7,6 +7,7 @@
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * List KVO information was being populated for non-list collections ([PR #7378](https://github.com/realm/realm-core/pull/7378), since v14.0.0)
+* Setting a Mixed property to an ObjLink equal to its existing value would remove the existing backlinks and then exit before re-adding them, resulting in later assertion failures due to the backlink state being invalid ([PR #7384](https://github.com/realm/realm-core/pull/7384), since v14.0.0).
 * Opening file with file format 23 in read-only mode will crash ([#7388](https://github.com/realm/realm-core/issues/7388), since v14.0.0)
 
 ### Breaking changes
