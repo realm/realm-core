@@ -913,7 +913,7 @@ tasks:
       test_filter: CoreTests
 
 - name: core-tests
-  tags: [ "test_suite", "for_pull_requests", "local_tests" ]
+  tags: [ "test_suite", "for_pull_requests" ]
   exec_timeout_secs: 1800
   commands:
   - func: "compile"
@@ -949,7 +949,7 @@ tasks:
       benchmark_name: sync
 
 - name: sync-tests
-  tags: [ "test_suite", "for_pull_requests", "local_tests" ]
+  tags: [ "test_suite", "for_pull_requests" ]
   exec_timeout_secs: 1800
   commands:
   - func: "compile"
@@ -962,7 +962,7 @@ tasks:
 
 # These are local object store tests; baas is not started, however some use the sync server
 - name: object-store-tests
-  tags: [ "object_store_test_suite", "for_pull_requests", "local_tests" ]
+  tags: [ "object_store_test_suite", "for_pull_requests", "test_suite" ]
   exec_timeout_secs: 3600
   commands:
   - func: "compile"
@@ -1214,7 +1214,7 @@ task_groups:
   - func: "run hang analyzer"
   tasks:
   - compile
-  - .local_tests
+  - .test_suite
 
 # Runs object-store-tests against baas running on remote host
 - name: compile_test
