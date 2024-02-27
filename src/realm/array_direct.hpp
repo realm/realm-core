@@ -457,7 +457,7 @@ constexpr int num_bits_table[65] = {-1, 64, 64, 63, 64, 60, 60, 63, // 0-7
 
 inline int num_fields_for_width(int width)
 {
-    REALM_ASSERT(width <= 32); // it will not pay off to use this for fields larger
+    // REALM_ASSERT(width <= 32); // it will not pay off to use this for fields larger
     REALM_ASSERT(width);
     return 64 / width;
 }

@@ -183,26 +183,51 @@ bool ArrayPacked::parallel_subword_find(const Array& arr, int64_t value, size_t 
     while (total_bit_count_left >= bit_count_pr_iteration) {
         const auto word = it.get(bit_count_pr_iteration);
         vector = bitwidth_cmp(word, search_vector);
-        while (vector) {
+        if (vector) {
             int sub_word_index = first_field_marked(width, vector);
-            if (!state->match(start + sub_word_index + baseindex))
-                return false;
-            vector &= (vector - 1); // known bithack for clearing least significant bit
+            start += sub_word_index;
+            break;
+            //            if (!state->match(start + sub_word_index + baseindex))
+            //                return false;
+            //            vector &= (vector - 1); // known bithack for clearing least significant bit
         }
         total_bit_count_left -= bit_count_pr_iteration;
         start += field_count;
         it.bump(bit_count_pr_iteration);
     }
-    if (total_bit_count_left) {                         // final subword, may be partial
+    if (!vector && total_bit_count_left) {              // final subword, may be partial
         const auto word = it.get(total_bit_count_left); // <-- limit lookahead to avoid touching memory beyond array
         vector = bitwidth_cmp(word, search_vector);
         auto last_word_mask = 0xFFFFFFFFFFFFFFFFULL >> (64 - total_bit_count_left);
         vector &= last_word_mask;
-        while (vector) {
+        if (vector) {
             int sub_word_index = first_field_marked(width, vector);
-            if (!state->match(start + sub_word_index + baseindex))
-                return false;
-            vector &= (vector - 1);
+            start += sub_word_index;
+            // break;
+            //            int sub_word_index = first_field_marked(width, vector);
+            //            if (!state->match(start + sub_word_index + baseindex))
+            //                return false;
+            //            vector &= (vector - 1);
+        }
+    }
+
+    auto cmp_val = [](int64_t v, int64_t value) {
+        if constexpr (std::is_same_v<Cond, Equal>)
+            return v == value;
+        if constexpr (std::is_same_v<Cond, NotEqual>)
+            return v != value;
+        if constexpr (std::is_same_v<Cond, Greater>)
+            return v > value;
+        if constexpr (std::is_same_v<Cond, Less>)
+            return v < value;
+    };
+
+    const auto mask = arr.get_encoder().width_mask();
+    bf_iterator bf_it((uint64_t*)arr.m_data, 0, arr.m_width, arr.m_width, start);
+    for (; start < end; start++, ++bf_it) {
+        auto v = sign_extend_field_by_mask(mask, *bf_it);
+        if (cmp_val(v, value) && !state->match(start + baseindex)) {
+            return false;
         }
     }
     return true;

@@ -33,8 +33,7 @@ using namespace realm;
 using namespace realm::test_util;
 
 #define ARRAY_PERFORMANCE_TESTING
-// #ifdef ARRAY_PERFORMANCE_TESTING
-#if !defined(REALM_DEBUG) && defined(ARRAY_PERFORMANCE_TESTING)
+#if defined(REALM_DEBUG) && defined(ARRAY_PERFORMANCE_TESTING)
 NONCONCURRENT_TEST(perf_array_encode_get_vs_array_get_less_32bit)
 {
     using namespace std;
@@ -132,6 +131,7 @@ NONCONCURRENT_TEST(perf_array_encode_get_vs_array_get_less_32bit)
 }
 
 NONCONCURRENT_TEST(Test_basic_find_EQ_less_32bit)
+// ONLY(Test_basic_find_EQ_less_32bit)
 {
     using namespace std;
     using namespace std::chrono;
@@ -260,6 +260,7 @@ NONCONCURRENT_TEST(Test_basic_find_EQ_less_32bit)
 }
 
 NONCONCURRENT_TEST(Test_basic_find_NEQ_value_less_32bit)
+// ONLY(Test_basic_find_NEQ_value_less_32bit)
 {
     using namespace std;
     using namespace std::chrono;
