@@ -144,49 +144,22 @@ bool ArrayPacked::find_all(const Array& arr, int64_t value, size_t start, size_t
     // Main idea around find.
     // Try to find the starting point where the condition can be met, comparing as many values as a single 64bit can
     // contain in parallel. Once we have found the starting point, keep matching values as much as we can between
-    // start and end. Note: The second loop where we go value by value in order to find a match within the same 64 bit
-    // word, may seem a waste of time, but
-    //       it is actually faster, at least for 2 reasons:
-    //          1. no inner work in the loop (avoid to call state->match + while loop work for matching vectors)
-    //          2. accessing the same word is on average very cheap, once you have the index from where to start.
+    // start and end.
     //
     // EG: we store the value 6, with width 4bits (0110), 6 is 4 bits because, 110 (6) + sign bit 0.
     // Inside 64bits we can fit max 16 times 6. If we go from index 0 to 15 throughout the same 64 bits, we need to
     // apply a mask and a shift bits every time, then compare the values.
     // This is not the cheapest thing to do. Instead we can compare all values contained within 64 bits in one go and
     // see if there is a match with what we are looking for. Reducing the number of comparison by ~logk(N) where K is
-    // the width of each single value within a 64 bit word and N is the total number of values stored in the array. On
-    // the other end if we have values of 32 bits or more, accessing twice or once the same 64 bits word is probably
-    // the cheapest thing to do.
+    // the width of each single value within a 64 bit word and N is the total number of values stored in the array.
 
-    if (arr.m_width <= 32) {
-        while (start < end) {
-            start = parallel_subword_find<Cond>(arr, value, start, end);
-            if (start < end && !state->match(start + baseindex))
-                return false;
-            ++start;
-        }
-    }
-    else {
-        auto cmp_val = [](int64_t v, int64_t value) {
-            if constexpr (std::is_same_v<Cond, Equal>)
-                return v == value;
-            if constexpr (std::is_same_v<Cond, NotEqual>)
-                return v != value;
-            if constexpr (std::is_same_v<Cond, Greater>)
-                return v > value;
-            if constexpr (std::is_same_v<Cond, Less>)
-                return v < value;
-        };
+    while (start < end) {
         start = parallel_subword_find<Cond>(arr, value, start, end);
-        const auto mask = arr.get_encoder().width_mask();
-        bf_iterator bf_it((uint64_t*)arr.m_data, 0, arr.m_width, arr.m_width, start);
-        for (; start < end; start++, ++bf_it) {
-            auto v = sign_extend_field_by_mask(mask, *bf_it);
-            if (cmp_val(v, value) && !state->match(start + baseindex)) {
+        if (start < end) {
+            if (!state->match(start + baseindex))
                 return false;
-            }
         }
+        ++start;
     }
     return true;
 }
@@ -201,7 +174,6 @@ size_t ArrayPacked::parallel_subword_find(const Array& arr, int64_t value, size_
     const auto bit_count_pr_iteration = num_bits_for_width(width);
     auto total_bit_count_left = static_cast<signed>(end - start) * width;
     REALM_ASSERT(total_bit_count_left >= 0);
-
     auto bitwidth_cmp = [&MSBs](uint64_t a, uint64_t b) {
         if constexpr (std::is_same_v<Cond, Equal>)
             return find_all_fields_EQ(MSBs, a, b);
@@ -226,7 +198,7 @@ size_t ArrayPacked::parallel_subword_find(const Array& arr, int64_t value, size_
         start += field_count;
         it.bump(bit_count_pr_iteration);
     }
-    if (total_bit_count_left) {                         // final subword, may be partial
+    if (!vector && total_bit_count_left) {              // final subword, may be partial
         const auto word = it.get(total_bit_count_left); // <-- limit lookahead to avoid touching memory beyond array
         vector = bitwidth_cmp(word, search_vector);
         auto last_word_mask = 0xFFFFFFFFFFFFFFFFULL >> (64 - total_bit_count_left);
@@ -236,7 +208,7 @@ size_t ArrayPacked::parallel_subword_find(const Array& arr, int64_t value, size_
             return start + sub_word_index;
         }
     }
-    return end;
+    return arr.size();
 }
 
 bool ArrayPacked::find_all_match(size_t start, size_t end, size_t baseindex, QueryStateBase* state) const
