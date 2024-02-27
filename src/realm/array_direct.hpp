@@ -703,7 +703,7 @@ constexpr struct find_field_desc find_field_table[65] = {
     /* 15 */
     {3, 0b0000'1111'1111'1111'1110'0000'0000'0000'0011'1111'1111'1111'1000'0000'0000'0000,
      0b0000'1111'1111'1111'1111'1111'1111'1111'1100'0000'0000'0000'0000'0000'0000'0000,
-     0b1111'0000'0000'0000'0000'0000'0000'0000'0000'0000'0000'0000'0000'0000'0000'0000},
+     0b1111'0000'0000'0000'0000'0000'0000'0000'0000'0000'0000'0000'0000'0000'0000'0000, 0, 0, 0},
     /* 16 */
     {2, 0xFFFF0000FFFF0000, 0xFFFFFFFF00000000, 0, 0, 0, 0},
     /* 17 - as we're only interested in msb of each field we can simplify and use same pattern
@@ -773,6 +773,60 @@ constexpr struct find_field_desc find_field_table[65] = {
     {0, 0, 0, 0, 0, 0, 0},
     {0, 0, 0, 0, 0, 0, 0}};
 
+#if 1
+constexpr uint32_t inverse_width[65] = {
+    65536 * 64 / 1, // never used
+    65536 * 64 / 1,  65536 * 64 / 2,  65536 * 64 / 3,  65536 * 64 / 4,  65536 * 64 / 5,  65536 * 64 / 6,
+    65536 * 64 / 7,  65536 * 64 / 8,  65536 * 64 / 9,  65536 * 64 / 10, 65536 * 64 / 11, 65536 * 64 / 12,
+    65536 * 64 / 13, 65536 * 64 / 14, 65536 * 64 / 15, 65536 * 64 / 16, 65536 * 64 / 17, 65536 * 64 / 18,
+    65536 * 64 / 19, 65536 * 64 / 20, 65536 * 64 / 21, 65536 * 64 / 22, 65536 * 64 / 23, 65536 * 64 / 24,
+    65536 * 64 / 25, 65536 * 64 / 26, 65536 * 64 / 27, 65536 * 64 / 28, 65536 * 64 / 29, 65536 * 64 / 30,
+    65536 * 64 / 31, 65536 * 64 / 32, 65536 * 64 / 33, 65536 * 64 / 34, 65536 * 64 / 35, 65536 * 64 / 36,
+    65536 * 64 / 37, 65536 * 64 / 38, 65536 * 64 / 39, 65536 * 64 / 40, 65536 * 64 / 41, 65536 * 64 / 42,
+    65536 * 64 / 43, 65536 * 64 / 44, 65536 * 64 / 45, 65536 * 64 / 46, 65536 * 64 / 47, 65536 * 64 / 48,
+    65536 * 64 / 49, 65536 * 64 / 50, 65536 * 64 / 51, 65536 * 64 / 52, 65536 * 64 / 53, 65536 * 64 / 54,
+    65536 * 64 / 55, 65536 * 64 / 56, 65536 * 64 / 57, 65536 * 64 / 58, 65536 * 64 / 59, 65536 * 64 / 60,
+    65536 * 64 / 61, 65536 * 64 / 62, 65536 * 64 / 63, 65536 * 64 / 64,
+};
+
+inline int first_field_marked(int width, uint64_t vector)
+{
+    int lz = __builtin_ctzll(vector);
+    int field = (lz * inverse_width[width]) >> 22;
+    REALM_ASSERT_DEBUG(field == (lz / width));
+    return field;
+}
+#endif
+#if 0
+inline int first_field_marked(int width, uint64_t vector)
+{
+    // isolate least significant bit
+    vector = vector & (~vector + 1);
+    const struct find_field_desc& desc = find_field_table[width];
+    int result = 0;
+    switch (desc.levels) {
+        // the following case entries are intended to fall through
+        // (this is a variant of Duff's Device)
+        // TODO: disable compiler warnings for it
+        case 6:
+            result |= (vector & desc.m32) ? 32 : 0;
+        case 5:
+            result |= (vector & desc.m16) ? 16 : 0;
+        case 4:
+            result |= (vector & desc.m8) ? 8 : 0;
+        case 3:
+            result |= (vector & desc.m4) ? 4 : 0;
+        case 2:
+            result |= (vector & desc.m2) ? 2 : 0;
+        case 1:
+            result |= (vector & desc.m1) ? 1 : 0;
+        default:
+            break;
+    }
+    return result;
+}
+#endif
+#if 0
 inline int first_field_marked(int width, uint64_t vector)
 {
     // isolate least significant bit
@@ -782,7 +836,8 @@ inline int first_field_marked(int width, uint64_t vector)
     return ((vector & desc.m1) ? 1 : 0) | ((vector & desc.m2) ? 2 : 0) | ((vector & desc.m4) ? 4 : 0) |
            ((vector & desc.m8) ? 8 : 0) | ((vector & desc.m16) ? 16 : 0) | ((vector & desc.m32) ? 32 : 0);
 }
-/*
+#endif
+#if 0
 inline int first_field_marked(int width, uint64_t vector)
 {
     int result = 0;
@@ -795,7 +850,7 @@ inline int first_field_marked(int width, uint64_t vector)
     }
     return -1;
 }
-*/
+#endif
 
 namespace impl {
 
