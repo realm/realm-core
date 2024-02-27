@@ -1168,10 +1168,11 @@ Obj& Obj::set<Mixed>(ColKey col_key, Mixed value, bool is_default)
     }
 
     Mixed old_value = get_unfiltered_mixed(col_ndx);
-    ObjLink old_link{};
-    ObjLink new_link{};
     if (old_value.is_type(type_TypedLink)) {
-        old_link = old_value.get<ObjLink>();
+        if (old_value == value) {
+            return *this;
+        }
+        auto old_link = old_value.get<ObjLink>();
         recurse = remove_backlink(col_key, old_link, state);
     }
     else if (old_value.is_type(type_Dictionary)) {
@@ -1187,10 +1188,8 @@ Obj& Obj::set<Mixed>(ColKey col_key, Mixed value, bool is_default)
         if (m_table->is_asymmetric()) {
             throw IllegalOperation("Links not allowed in asymmetric tables");
         }
-        new_link = value.template get<ObjLink>();
+        auto new_link = value.get<ObjLink>();
         m_table->get_parent_group()->validate(new_link);
-        if (new_link == old_link)
-            return *this;
         set_backlink(col_key, new_link);
     }
 

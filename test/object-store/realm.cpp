@@ -1586,7 +1586,13 @@ TEST_CASE("SharedRealm: async writes") {
     TestFile config;
     config.schema_version = 0;
     config.schema = Schema{
-        {"object", {{"value", PropertyType::Int}, {"ints", PropertyType::Array | PropertyType::Int}}},
+        {"object",
+         {
+             {"value", PropertyType::Int},
+             {"ints", PropertyType::Array | PropertyType::Int},
+             {"int set", PropertyType::Set | PropertyType::Int},
+             {"int dictionary", PropertyType::Dictionary | PropertyType::Int},
+         }},
     };
     bool done = false;
     auto realm = Realm::get_shared_realm(config);
@@ -2238,11 +2244,17 @@ TEST_CASE("SharedRealm: async writes") {
     }
     SECTION("object change information") {
         realm->begin_transaction();
-        auto col = table->get_column_key("ints");
+        auto list_col = table->get_column_key("ints");
+        auto set_col = table->get_column_key("int set");
+        auto dict_col = table->get_column_key("int dictionary");
         auto obj = table->create_object();
-        auto list = obj.get_list<Int>(col);
+        auto list = obj.get_list<Int>(list_col);
         for (int i = 0; i < 3; ++i)
             list.add(i);
+        auto set = obj.get_set<Int>(set_col);
+        set.insert(0);
+        auto dict = obj.get_dictionary(dict_col);
+        dict.insert("a", 0);
         realm->commit_transaction();
 
         Observer observer(obj);
@@ -2251,10 +2263,14 @@ TEST_CASE("SharedRealm: async writes") {
 
         realm->async_begin_transaction([&]() {
             list.clear();
+            set.clear();
+            dict.clear();
             done = true;
         });
         wait_for_done();
-        REQUIRE(observer.array_change(0, col) == IndexSet{0, 1, 2});
+        REQUIRE(observer.array_change(0, list_col) == IndexSet{0, 1, 2});
+        REQUIRE(observer.array_change(0, set_col) == IndexSet{});
+        REQUIRE(observer.array_change(0, dict_col) == IndexSet{});
         realm->m_binding_context.release();
     }
 
