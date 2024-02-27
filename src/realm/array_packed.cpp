@@ -164,7 +164,7 @@ bool ArrayPacked::parallel_subword_find(const Array& arr, int64_t value, size_t 
     const auto search_vector = populate(width, value);
     const auto field_count = num_fields_for_width(width);
     const auto bit_count_pr_iteration = num_bits_for_width(width);
-    signed total_bit_count_left = ((signed)end - start) * width;
+    auto total_bit_count_left = static_cast<signed>(end - start) * width;
     REALM_ASSERT(total_bit_count_left >= 0);
 
     auto bitwidth_cmp = [&MSBs](uint64_t a, uint64_t b) {
@@ -187,9 +187,6 @@ bool ArrayPacked::parallel_subword_find(const Array& arr, int64_t value, size_t 
             int sub_word_index = first_field_marked(width, vector);
             start += sub_word_index;
             break;
-            //            if (!state->match(start + sub_word_index + baseindex))
-            //                return false;
-            //            vector &= (vector - 1); // known bithack for clearing least significant bit
         }
         total_bit_count_left -= bit_count_pr_iteration;
         start += field_count;
@@ -203,11 +200,6 @@ bool ArrayPacked::parallel_subword_find(const Array& arr, int64_t value, size_t 
         if (vector) {
             int sub_word_index = first_field_marked(width, vector);
             start += sub_word_index;
-            // break;
-            //            int sub_word_index = first_field_marked(width, vector);
-            //            if (!state->match(start + sub_word_index + baseindex))
-            //                return false;
-            //            vector &= (vector - 1);
         }
     }
 
