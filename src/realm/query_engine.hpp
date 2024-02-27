@@ -303,7 +303,7 @@ protected:
 
 class IndexEvaluator {
 public:
-    void init(StringIndex* index, Mixed value);
+    void init(SearchIndex* index, Mixed value);
     void init(std::vector<ObjKey>* storage);
 
     size_t do_search_index(const Cluster* cluster, size_t start, size_t end);
@@ -476,7 +476,7 @@ public:
         m_nb_needles = m_needles.size();
 
         if (has_search_index() && m_nb_needles == 0) {
-            StringIndex* index = ParentNode::m_table->get_search_index(ParentNode::m_condition_column_key);
+            SearchIndex* index = ParentNode::m_table->get_search_index(ParentNode::m_condition_column_key);
             m_index_evaluator = IndexEvaluator();
             m_index_evaluator->init(index, BaseType::m_value);
             IntegerNodeBase<LeafType>::m_dT = 0;
@@ -843,7 +843,7 @@ public:
 
         if constexpr (std::is_same_v<TConditionFunction, Equal>) {
             if (m_index_evaluator) {
-                StringIndex* index = m_table->get_search_index(m_condition_column_key);
+                SearchIndex* index = m_table->get_search_index(m_condition_column_key);
                 m_index_evaluator->init(index, m_value);
                 this->m_dT = 0;
             }
@@ -954,7 +954,7 @@ public:
 
         if constexpr (std::is_same_v<TConditionFunction, Equal>) {
             if (m_index_evaluator) {
-                StringIndex* index =
+                SearchIndex* index =
                     TimestampNodeBase::m_table->get_search_index(TimestampNodeBase::m_condition_column_key);
                 m_index_evaluator->init(index, TimestampNodeBase::m_value);
                 this->m_dT = 0;
@@ -1173,7 +1173,7 @@ public:
         }
 
         if (m_index_evaluator) {
-            StringIndex* index = BaseType::m_table->get_search_index(BaseType::m_condition_column_key);
+            SearchIndex* index = BaseType::m_table->get_search_index(BaseType::m_condition_column_key);
             m_index_evaluator->init(index, m_optional_value);
             this->m_dT = 0;
         }
@@ -1303,7 +1303,7 @@ protected:
     void get_ownership()
     {
         if (m_value.is_type(type_String, type_Binary)) {
-            auto bin = m_value.get_binary();
+            auto bin = m_value.export_to_type<BinaryData>();
             m_buffer = OwnedBinaryData(bin.data(), bin.size());
             auto tmp = m_buffer.get();
             if (m_value.is_type(type_String)) {
@@ -2339,7 +2339,7 @@ public:
         m_dT = 50.0;
         m_condition_column_key = origin_column_key;
         auto column_type = origin_column_key.get_type();
-        REALM_ASSERT(column_type == col_type_Link || column_type == col_type_LinkList);
+        REALM_ASSERT(column_type == col_type_Link);
         REALM_ASSERT(!m_target_keys.empty());
     }
 

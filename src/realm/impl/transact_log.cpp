@@ -17,6 +17,7 @@
  **************************************************************************/
 
 #include <realm/impl/transact_log.hpp>
+#include <realm/util/overload.hpp>
 
 namespace realm::_impl {
 
@@ -28,10 +29,30 @@ bool TransactLogEncoder::select_table(TableKey key)
     return true;
 }
 
-bool TransactLogEncoder::select_collection(ColKey col_key, ObjKey key)
+bool TransactLogEncoder::select_collection(ColKey col_key, ObjKey key, const StablePath& path)
 {
-    append_simple_instr(instr_SelectCollection, col_key, key.value); // Throws
+    auto path_size = path.size();
+    if (path_size > 1) {
+        append_simple_instr(instr_SelectCollectionByPath, col_key, key.value);
+        append_simple_instr(path_size - 1);
+
+        for (size_t n = 1; n < path_size; n++) {
+            append_simple_instr(path[n].get_salt());
+        }
+    }
+    else {
+        append_simple_instr(instr_SelectCollection, col_key, key.value); // Throws
+    }
     return true;
+}
+
+void TransactLogEncoder::encode_string(StringData string)
+{
+    size_t max_required_bytes = max_enc_bytes_per_int + string.size();
+    char* ptr = reserve(max_required_bytes); // Throws
+    ptr = encode(ptr, size_t(string.size()));
+    ptr = std::copy(string.data(), string.data() + string.size(), ptr);
+    advance(ptr);
 }
 
 REALM_NORETURN

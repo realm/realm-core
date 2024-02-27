@@ -22,7 +22,7 @@ void print_tables(const Group& group)
             DataType column_type = table->get_column_type(col_key);
             std::string column_type_str = get_data_type_name(column_type);
             std::cout << "  " << column_name << ", " << column_type_str;
-            if (column_type == type_Link || column_type == type_LinkList) {
+            if (column_type == type_Link) {
                 ConstTableRef target_table = table->get_link_target(col_key);
                 StringData target_name = target_table->get_name();
                 std::cout << ", " << target_name;

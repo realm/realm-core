@@ -534,7 +534,8 @@ void ClientHistory::integrate_server_changesets(
             new_version = transact->commit_and_continue_as_read(); // Throws
         }
 
-        logger.debug("Integrated %1 changesets out of %2", changesets_transformed_count, num_changesets);
+        logger.debug(util::LogCategory::changeset, "Integrated %1 changesets out of %2", changesets_transformed_count,
+                     num_changesets);
     }
 
     REALM_ASSERT(new_version.version > 0);
@@ -588,7 +589,7 @@ size_t ClientHistory::transform_and_apply_server_changesets(util::Span<Changeset
             InstructionApplier applier{*transact};
             {
                 TempShortCircuitReplication tscr{m_replication};
-                applier.apply(*transformed_changeset, &logger); // Throws
+                applier.apply(*transformed_changeset); // Throws
             }
             downloaded_bytes += transformed_changeset->original_changeset_size;
 

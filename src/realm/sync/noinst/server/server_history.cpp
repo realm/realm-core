@@ -1193,7 +1193,7 @@ bool ServerHistory::integrate_remote_changesets(file_ident_type remote_file_iden
         auto apply = [&](const Changeset* c) -> bool {
             TempShortCircuitReplication tdr{*this}; // Short-circuit while integrating changes
             InstructionApplier applier{transaction};
-            applier.apply(*c, &logger);
+            applier.apply(*c);
             reset(); // Reset the instruction encoder
             return true;
         };

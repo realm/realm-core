@@ -1589,7 +1589,13 @@ TEST_CASE("SharedRealm: async writes") {
     TestFile config;
     config.schema_version = 0;
     config.schema = Schema{
-        {"object", {{"value", PropertyType::Int}, {"ints", PropertyType::Array | PropertyType::Int}}},
+        {"object",
+         {
+             {"value", PropertyType::Int},
+             {"ints", PropertyType::Array | PropertyType::Int},
+             {"int set", PropertyType::Set | PropertyType::Int},
+             {"int dictionary", PropertyType::Dictionary | PropertyType::Int},
+         }},
     };
     bool done = false;
     auto realm = Realm::get_shared_realm(config);
@@ -2241,11 +2247,17 @@ TEST_CASE("SharedRealm: async writes") {
     }
     SECTION("object change information") {
         realm->begin_transaction();
-        auto col = table->get_column_key("ints");
+        auto list_col = table->get_column_key("ints");
+        auto set_col = table->get_column_key("int set");
+        auto dict_col = table->get_column_key("int dictionary");
         auto obj = table->create_object();
-        auto list = obj.get_list<Int>(col);
+        auto list = obj.get_list<Int>(list_col);
         for (int i = 0; i < 3; ++i)
             list.add(i);
+        auto set = obj.get_set<Int>(set_col);
+        set.insert(0);
+        auto dict = obj.get_dictionary(dict_col);
+        dict.insert("a", 0);
         realm->commit_transaction();
 
         Observer observer(obj);
@@ -2254,10 +2266,14 @@ TEST_CASE("SharedRealm: async writes") {
 
         realm->async_begin_transaction([&]() {
             list.clear();
+            set.clear();
+            dict.clear();
             done = true;
         });
         wait_for_done();
-        REQUIRE(observer.array_change(0, col) == IndexSet{0, 1, 2});
+        REQUIRE(observer.array_change(0, list_col) == IndexSet{0, 1, 2});
+        REQUIRE(observer.array_change(0, set_col) == IndexSet{});
+        REQUIRE(observer.array_change(0, dict_col) == IndexSet{});
         realm->m_binding_context.release();
     }
 
@@ -4254,4 +4270,31 @@ TEST_CASE("Concurrent operations") {
         // This is just to check that the section above did not leave any realms open
         _impl::RealmCoordinator::assert_no_open_realms();
     }
+}
+
+TEST_CASE("Notification logging") {
+    using namespace std::chrono_literals;
+    TestFile config;
+    // util::LogCategory::realm.set_default_level_threshold(util::Logger::Level::all);
+    config.schema_version = 1;
+    config.schema = Schema{{"object", {{"value", PropertyType::Int}}}};
+
+    auto realm = Realm::get_shared_realm(config);
+    auto table = realm->read_group().get_table("class_object");
+    int changed = 0;
+    Results res(realm, table->query("value == 5"));
+    auto token = res.add_notification_callback([&changed](CollectionChangeSet const&) {
+        changed++;
+    });
+
+    int commit_nr = 0;
+    util::EventLoop::main().run_until([&] {
+        for (int64_t i = 0; i < 10; i++) {
+            realm->begin_transaction();
+            table->create_object().set("value", i);
+            realm->commit_transaction();
+            std::this_thread::sleep_for(2ms);
+        }
+        return ++commit_nr == 10;
+    });
 }

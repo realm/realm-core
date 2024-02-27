@@ -32,10 +32,10 @@ using ResponseHandler = MongoCollection::ResponseHandler<T>;
 namespace {
 
 template <typename T>
-util::Optional<T> get(const std::unordered_map<std::string, Bson>& map, const char* key)
+util::Optional<T> get(const BsonDocument& map, const char* key)
 {
-    if (auto it = map.find(key); it != map.end()) {
-        return static_cast<T>(it->second);
+    if (auto val = map.find(key)) {
+        return static_cast<T>((*val));
     }
     return util::none;
 }
@@ -45,7 +45,7 @@ ResponseHandler<util::Optional<Bson>> get_delete_count_handler(ResponseHandler<u
     return [completion = std::move(completion)](util::Optional<Bson>&& value, util::Optional<AppError>&& error) {
         if (value && !error) {
             try {
-                auto& document = static_cast<const BsonDocument&>(*value).entries();
+                auto& document = static_cast<const BsonDocument&>(*value);
                 return completion(get<int32_t>(document, "deletedCount").value_or(0), std::move(error));
             }
             catch (const std::exception& e) {
@@ -65,7 +65,7 @@ ResponseHandler<util::Optional<Bson>> get_update_handler(ResponseHandler<MongoCo
         }
 
         try {
-            auto& document = static_cast<const BsonDocument&>(*value).entries();
+            auto& document = static_cast<const BsonDocument&>(*value);
             return completion(MongoCollection::UpdateResult{get<int32_t>(document, "matchedCount").value_or(0),
                                                             get<int32_t>(document, "modifiedCount").value_or(0),
                                                             get<Bson>(document, "upsertedId")},
@@ -184,7 +184,7 @@ void MongoCollection::count(const BsonDocument& filter_bson, ResponseHandler<uin
     count(filter_bson, 0, std::move(completion));
 }
 
-void MongoCollection::insert_many(const BsonArray& documents, ResponseHandler<std::vector<Bson>>&& completion)
+void MongoCollection::insert_many(const BsonArray& documents, ResponseHandler<BsonArray>&& completion)
 {
     insert_many_bson(documents, [completion = std::move(completion)](util::Optional<Bson>&& value,
                                                                      util::Optional<AppError>&& error) {
@@ -192,7 +192,7 @@ void MongoCollection::insert_many(const BsonArray& documents, ResponseHandler<st
             return completion({}, std::move(error));
         }
 
-        auto& bson = static_cast<const BsonDocument&>(*value).entries();
+        auto& bson = static_cast<const BsonDocument&>(*value);
         return completion(get<BsonArray>(bson, "insertedIds").value_or(BsonArray()), std::move(error));
     });
 }

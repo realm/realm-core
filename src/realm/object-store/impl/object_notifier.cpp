@@ -19,6 +19,7 @@
 #include <realm/object-store/impl/object_notifier.hpp>
 
 #include <realm/object-store/shared_realm.hpp>
+#include <realm/util/scope_exit.hpp>
 
 using namespace realm;
 using namespace realm::_impl;
@@ -28,6 +29,11 @@ ObjectNotifier::ObjectNotifier(std::shared_ptr<Realm> realm, const Obj& obj)
     , m_table(obj.get_table())
     , m_obj_key(obj.get_key())
 {
+    if (m_logger) {
+        m_description = obj.get_id();
+        m_logger->log(util::LogCategory::notification, util::Logger::Level::debug, "Creating ObjectNotifier for %1",
+                      m_description);
+    }
 }
 
 void ObjectNotifier::reattach()
@@ -58,6 +64,16 @@ void ObjectNotifier::run()
 {
     if (!m_table || !m_info)
         return;
+    using namespace std::chrono;
+    auto t1 = steady_clock::now();
+    util::ScopeExit cleanup([&]() noexcept {
+        m_run_time_point = steady_clock::now();
+        if (m_logger) {
+            m_logger->log(util::LogCategory::notification, util::Logger::Level::debug,
+                          "ObjectNotifier %1 did run in %2 us", m_description,
+                          duration_cast<microseconds>(m_run_time_point - t1).count());
+        }
+    });
 
     auto it = m_info->tables.find(m_table->get_key());
     if (it != m_info->tables.end() && it->second.deletions_contains(m_obj_key)) {

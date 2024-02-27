@@ -51,6 +51,7 @@ struct DictionaryChangeSet {
     std::vector<Mixed> modifications;
 
     bool collection_root_was_deleted = false;
+    bool collection_was_cleared = false;
 
     void add_deletion(const Mixed& key)
     {

@@ -2,6 +2,114 @@
 
 ### Enhancements
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
+* None.
+
+### Fixed
+* <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
+* Fix a performance regression when reading values from Bson containers and revert some breaking changes to the Bson API ([PR #7377](https://github.com/realm/realm-core/pull/7377), since v14.0.0)
+* List KVO information was being populated for non-list collections ([PR #7378](https://github.com/realm/realm-core/pull/7378), since v14.0.0)
+* Setting a Mixed property to an ObjLink equal to its existing value would remove the existing backlinks and then exit before re-adding them, resulting in later assertion failures due to the backlink state being invalid ([PR #7384](https://github.com/realm/realm-core/pull/7384), since v14.0.0).
+* Opening file with file format 23 in read-only mode will crash ([#7388](https://github.com/realm/realm-core/issues/7388), since v14.0.0)
+* Querying a dictionary over a link would sometimes result in out-of-bounds memory reads ([PR #7382](https://github.com/realm/realm-core/pull/7382), since v14.0.0).
+
+### Breaking changes
+* None.
+
+### Compatibility
+* Fileformat: Generates files with format v24. Reads and automatically upgrade from fileformat v10. If you want to upgrade from an earlier file format version you will have to use RealmCore v13.x.y or earlier.
+  You cannot open files with an file format older than v24 in read-only mode.
+
+-----------
+
+### Internals
+* None.
+
+----------------------------------------------
+
+# 14.0.1 Release notes
+
+### Enhancements
+* None.
+
+### Fixed
+* Fixed building issues when RealmCore is used as submodule ([#7370](https://github.com/realm/realm-core/pull/7379))
+* None.
+
+### Breaking changes
+* None.
+
+### Compatibility
+* Fileformat: Generates files with format v24. Reads and automatically upgrade from fileformat v10. If you want to upgrade from an earlier file format version you will have to use RealmCore v13.x.y or earlier.
+
+----------------------------------------------
+
+# 14.0.0 Release notes
+
+### Enhancements
+* Property keypath in RQL can be substituted with value given as argument. Use '$P<i>' in query string. (Issue [#7033](https://github.com/realm/realm-core/issues/7033))
+* You can now use query substitution for the @type argument ([#7289](https://github.com/realm/realm-core/issues/7289))
+
+### Fixed
+* Fixed crash when adding a collection to an indexed Mixed property ([#7246](https://github.com/realm/realm-core/issues/7246), since 14.0.0-beta.0)
+* \[C-API] Fixed the return type of `realm_set_list` and `realm_set_dictionary` to be the newly inserted collection, similarly to the behavior of `list/dictionary_insert_collection` (PR [#7247](https://github.com/realm/realm-core/pull/7247), since 14.0.0-beta.0)
+* Throw an exception when trying to insert an embedded object into a list of Mixed ([#7254](https://github.com/realm/realm-core/issues/7254), since 14.0.0-beta.0)
+* Queries on dictionaries in Mixed with @keys did not return correct result ([#7255](https://github.com/realm/realm-core/issues/7255), since 14.0.0-beta.0)
+* Changes to inner collections will not be reported by notifier on owning collection ([#7270](https://github.com/realm/realm-core/issues/7270), since 14.0.0-beta.0)
+* @count/@size not supported for mixed properties ([#7280](https://github.com/realm/realm-core/issues/7280), since v10.0.0)
+* Query with @type does not support filtering on collections ([#7281](https://github.com/realm/realm-core/issues/7281), since 14.0.0-beta.0)
+* Query involving string operations on nested collections would not work ([#7282](https://github.com/realm/realm-core/issues/7282), since 14.0.0-beta.0)
+* Using ANY, ALL or NONE in a query on nested collections would throw an exception ([#7283](https://github.com/realm/realm-core/issues/7283), since 14.0.0-beta.0)
+* Results notifications does not report changes to inner collections ([#7335](https://github.com/realm/realm-core/issues/7335), since 14.0.0-beta.0)
+
+### Breaking changes
+* If you want to query using @type operation, you must use 'objectlink' to match links to objects. 'object' is reserved for dictionary types.
+
+### Compatibility
+* Fileformat: Generates files with format v24. Reads and automatically upgrade from fileformat v10 and onwards. If you want to upgrade from an earlier file format version you will have to use RealmCore v13.x.y or earlier.
+
+-----------
+
+### Internals
+* to_json API changed according to https://docs.google.com/document/d/1YtJN0sC89LMb4UVcPKFIfwC0Hsi9Vj7sIEP2vHQzVcY/edit?usp=sharing. Links to non-embedded objects will never be followed.
+
+----------------------------------------------
+
+# 14.0.0-beta.0 Release notes
+
+### Enhancements
+* Storage of Decimal128 properties has been optimised so that the individual values will take up 0 bits (if all nulls), 32 bits, 64 bits or 128 bits depending on what is needed. (PR [#6111](https://github.com/realm/realm-core/pull/6111))
+* You can have a collection embedded in any Mixed property (except Set<Mixed>).
+* Querying a specific entry in a collection (in particular 'first and 'last') is supported. (PR [#4269](https://github.com/realm/realm-core/issues/4269))
+* Index on list of strings property now supported (PR [#7142](https://github.com/realm/realm-core/pull/7142))
+* You can set the threshold levels for trace output on individual categories. (PR [#7004](https://github.com/realm/realm-core/pull/7004))
+
+### Fixed
+* Align dictionaries to Lists and Sets when they get cleared. ([#6205](https://github.com/realm/realm-core/issues/6205), since v10.4.0)
+* Fixed equality queries on a Mixed property with an index possibly returning the wrong result if values of different types happened to have the same StringIndex hash. ([6407](https://github.com/realm/realm-core/issues/6407) since v11.0.0-beta.5).
+* If you have more than 8388606 links pointing to one specific object, the program will crash. ([#6577](https://github.com/realm/realm-core/issues/6577), since v6.0.0)
+* Query for NULL value in Dictionary<Mixed> would give wrong results ([6748])(https://github.com/realm/realm-core/issues/6748), since v10.0.0)
+* A Realm generated on a non-apple ARM 64 device and copied to another platform (and vice-versa) were non-portable due to a sorting order difference. This impacts strings or binaries that have their first difference at a non-ascii character. These items may not be found in a set, or in an indexed column if the strings had a long common prefix (> 200 characters). ([PR #6670](https://github.com/realm/realm-core/pull/6670), since 2.0.0-rc7 for indexes, and since since the introduction of sets in v10.2.0)
+
+### Breaking changes
+* Support for upgrading from Realm files produced by RealmCore v5.23.9 or earlier is no longer supported.
+* Remove `set_string_compare_method`, only one sort method is now supported which was previously called `STRING_COMPARE_CORE`.
+* BinaryData and StringData are now strongly typed for comparisons and queries. This change is especially relevant when querying for a string constant on a Mixed property, as now only strings will be returned. If searching for BinaryData is desired, then that type must be specified by the constant. In RQL the new way to specify a binary constant is to use `mixed = bin('xyz')` or `mixed = binary('xyz')`. ([6407](https://github.com/realm/realm-core/issues/6407)).
+* In the C API, `realm_collection_changes_get_num_changes` and `realm_dictionary_get_changes` have got an extra parameter to receive information on the deletion of the entire collection.
+* Sorting order of strings has changed to use standard unicode codepoint order instead of grouping similar english letters together. A noticeable change will be from "aAbBzZ" to "ABZabz". ([2573](https://github.com/realm/realm-core/issues/2573))
+
+### Compatibility
+* Fileformat: Generates files with format v24. Reads and automatically upgrade from fileformat v10. If you want to upgrade from an earlier file format version you will have to use RealmCore v13.x.y or earlier.
+
+-----------
+
+### Internals
+* Refactoring of the StringIndex interface.
+
+----------------------------------------------
+
+# 13.27.0 Release notes
+
+### Enhancements
 * Add support in the C API for receiving a notification when sync user state changes. ([#7302](https://github.com/realm/realm-core/pull/7302))
 * Allow the query builder to construct >, >=, <, <= queries for string constants. This is a case sensitive lexicographical comparison. Improved performance of RQL (parsed) queries on a non-linked string property using: >, >=, <, <=, operators and fixed behaviour that a null string should be evaulated as less than everything, previously nulls were not matched. ([#3939](https://github.com/realm/realm-core/issues/3939), this is a prerequisite for https://github.com/realm/realm-swift/issues/8008).
 * Updated bundled OpenSSL version to 3.2.0 (PR [#7303](https://github.com/realm/realm-core/pull/7303))
@@ -67,7 +175,7 @@
 * Bump the sync protocol to v11. The new protocol version comes with the following changes:
   - JSON_ERROR server message contains the previous schema version
   - Flexible sync BIND client message contains the current schema version
-* Add BAAS admin API to create new schema versions (drafts can be used to deploy all changes at once
+* Add BAAS admin API to create new schema versions (drafts can be used to deploy all changes at once)
 
 ----------------------------------------------
 
@@ -78,11 +186,6 @@
 
 ### Compatibility
 * Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
-
------------
-
-### Internals
-* (bindgen) Upgrading `@commander-js/extra-typings` and adds a missing peer dependency on `commander`.
 
 ----------------------------------------------
 
@@ -350,7 +453,7 @@
 
 ### Compatibility
 * Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
-* The metadata Realm used to store sync users has had its schema version bumped. It is automatically migrated to the new version on first open. Downgrading to older version of Realm after upgrading will discard stored user tokens and require logging back in.
+* The metadata Realm used to store sync users has had its schema version bumped. It is automatically migrated to the new version on first open. Downgrading will require manually deletion of the metadata Realm and require logging back in.
 
 -----------
 

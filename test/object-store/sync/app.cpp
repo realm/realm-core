@@ -273,7 +273,7 @@ TEST_CASE("app: verify app error codes", "[sync][app][local]") {
                 return false;
             }
         }
-        catch (nlohmann::json::exception ex) {
+        catch (const nlohmann::json::exception& ex) {
             // It's also a failure if parsing the json body throws an exception
             return false;
         }
@@ -1520,7 +1520,7 @@ TEST_CASE("app: remote mongo client", "[sync][app][mongo][baas]") {
             REQUIRE_FALSE(error);
         });
 
-        dog_collection.insert_many(documents, [&](std::vector<bson::Bson> inserted_docs, Optional<AppError> error) {
+        dog_collection.insert_many(documents, [&](bson::BsonArray inserted_docs, Optional<AppError> error) {
             REQUIRE_FALSE(error);
             CHECK(inserted_docs.size() == 3);
             CHECK(inserted_docs[0].type() == bson::Bson::Type::ObjectId);
@@ -1859,7 +1859,7 @@ TEST_CASE("app: remote mongo client", "[sync][app][mongo][baas]") {
                                        [&](Optional<bson::Bson> bson, Optional<AppError> error) {
                                            REQUIRE_FALSE(error);
                                            auto document = static_cast<bson::BsonDocument>(*bson);
-                                           auto foundUpsertedId = document.find("upsertedId") != document.end();
+                                           auto foundUpsertedId = document.find("upsertedId");
                                            REQUIRE(!foundUpsertedId);
                                        });
 
@@ -2000,9 +2000,11 @@ TEST_CASE("app: remote mongo client", "[sync][app][mongo][baas]") {
         bool processed = false;
 
         bson::BsonArray documents;
-        documents.assign(3, dog_document);
+        documents.push_back(dog_document);
+        documents.push_back(dog_document);
+        documents.push_back(dog_document);
 
-        dog_collection.insert_many(documents, [&](std::vector<bson::Bson> inserted_docs, Optional<AppError> error) {
+        dog_collection.insert_many(documents, [&](bson::BsonArray inserted_docs, Optional<AppError> error) {
             REQUIRE_FALSE(error);
             CHECK(inserted_docs.size() == 3);
         });
@@ -3922,7 +3924,7 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
     std::unique_ptr<realm::AppSession> app_session;
     auto redir_transport = std::make_shared<BaseUrlTransport>();
     AutoVerifiedEmailCredentials creds;
-    util::Logger::set_default_level_threshold(realm::util::Logger::Level::TEST_LOGGING_LEVEL);
+    util::LogCategory::realm.set_default_level_threshold(realm::util::Logger::Level::TEST_LOGGING_LEVEL);
     auto logger = util::Logger::get_default_logger();
 
     App::Config app_config = {"fake-app-id"};
@@ -4139,7 +4141,7 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
     SECTION("Verify new sync session updates location") {
         bool use_ssl = GENERATE(true, false);
         std::string expected_host = "redirect.someurl.fake";
-        int expected_port = 8081;
+        unsigned expected_port = 8081;
         std::string init_url = util::format("http%1://alternate.someurl.fake", use_ssl ? "s" : "");
         std::string init_wsurl = util::format("ws%1://alternate.someurl.fake", use_ssl ? "s" : "");
         std::string redir_url = util::format("http%1://%2:%3", use_ssl ? "s" : "", expected_host, expected_port);
@@ -4392,6 +4394,7 @@ TEMPLATE_TEST_CASE("app: collections of links integration", "[sync][pbs][app][co
             test_type.add_link(obj, link);
         }
         r->commit_transaction();
+        return object;
     };
 
     auto create_one_dest_object = [&](realm::SharedRealm r, int64_t val) -> ObjLink {
@@ -4417,11 +4420,13 @@ TEMPLATE_TEST_CASE("app: collections of links integration", "[sync][pbs][app][co
     SECTION("integration testing") {
         auto app = test_session.app();
         SyncTestFile config1(app, partition, schema); // uses the current user created above
+        config1.automatic_change_notifications = false;
         auto r1 = realm::Realm::get_shared_realm(config1);
         Results r1_source_objs = realm::Results(r1, r1->read_group().get_table("class_source"));
 
         create_user_and_log_in(app);
         SyncTestFile config2(app, partition, schema); // uses the user created above
+        config2.automatic_change_notifications = false;
         auto r2 = realm::Realm::get_shared_realm(config2);
         Results r2_source_objs = realm::Results(r2, r2->read_group().get_table("class_source"));
 
@@ -4429,12 +4434,14 @@ TEMPLATE_TEST_CASE("app: collections of links integration", "[sync][pbs][app][co
         constexpr int64_t dest_pk_1 = 1;
         constexpr int64_t dest_pk_2 = 2;
         constexpr int64_t dest_pk_3 = 3;
+        Object object;
+
         { // add a container collection with three valid links
             REQUIRE(r1_source_objs.size() == 0);
             ObjLink dest1 = create_one_dest_object(r1, dest_pk_1);
             ObjLink dest2 = create_one_dest_object(r1, dest_pk_2);
             ObjLink dest3 = create_one_dest_object(r1, dest_pk_3);
-            create_one_source_object(r1, source_pk, {dest1, dest2, dest3});
+            object = create_one_source_object(r1, source_pk, {dest1, dest2, dest3});
             REQUIRE(r1_source_objs.size() == 1);
             REQUIRE(r1_source_objs.get(0).get<Int>(valid_pk_name) == source_pk);
             REQUIRE(r1_source_objs.get(0).get<String>("realm_id") == partition);
@@ -4475,6 +4482,12 @@ TEMPLATE_TEST_CASE("app: collections of links integration", "[sync][pbs][app][co
             remaining_dest_object_ids = {linked_objects[1].template get<Int>(valid_pk_name)};
             REQUIRE(test_type.size_of_collection(r1_source_objs.get(0)) == expected_coll_size);
         }
+        bool coll_cleared = false;
+        advance_and_notify(*r1);
+        auto collection = test_type.get_collection(r1, r1_source_objs.get(0));
+        auto token = collection.add_notification_callback([&coll_cleared](CollectionChangeSet c) {
+            coll_cleared = c.collection_was_cleared;
+        });
 
         { // clear the collection
             REQUIRE(r2_source_objs.size() == 1);
@@ -4490,8 +4503,11 @@ TEMPLATE_TEST_CASE("app: collections of links integration", "[sync][pbs][app][co
         }
 
         { // expect an empty collection
+            REQUIRE(!coll_cleared);
             REQUIRE(r1_source_objs.size() == 1);
             wait_for_num_outgoing_links_to_equal(r1, r1_source_objs.get(0), expected_coll_size);
+            advance_and_notify(*r1);
+            REQUIRE(coll_cleared);
         }
     }
 }
@@ -5488,200 +5504,106 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app][user][token]") {
     }
 }
 
-namespace {
-class AsyncMockNetworkTransport {
-public:
-    AsyncMockNetworkTransport()
-        : transport_thread(&AsyncMockNetworkTransport::worker_routine, this)
-    {
-    }
-
-    ~AsyncMockNetworkTransport()
-    {
-        {
-            std::lock_guard lk(transport_work_mutex);
-            test_complete = true;
-        }
-        transport_work_cond.notify_one();
-        transport_thread.join();
-        REALM_ASSERT(transport_work.empty());
-    }
-
-    void add_work_item(Response&& response, util::UniqueFunction<void(const Response&)>&& completion)
-    {
-        {
-            std::lock_guard lk(transport_work_mutex);
-            transport_work.push_front([response = std::move(response), completion = std::move(completion)] {
-                completion(response);
-            });
-        }
-        transport_work_cond.notify_one();
-    }
-
-    void add_work_item(util::UniqueFunction<void()> cb)
-    {
-        {
-            std::lock_guard lk(transport_work_mutex);
-            transport_work.push_front(std::move(cb));
-        }
-        transport_work_cond.notify_one();
-    }
-
-private:
-    void worker_routine()
-    {
-        for (;;) {
-            std::unique_lock lk(transport_work_mutex);
-            transport_work_cond.wait(lk, [&] {
-                return test_complete || !transport_work.empty();
-            });
-
-            if (!transport_work.empty()) {
-                auto work_item = std::move(transport_work.back());
-                transport_work.pop_back();
-                lk.unlock();
-
-                work_item();
-                continue;
-            }
-
-            if (test_complete) {
-                return;
-            }
-        }
-    }
-
-    std::mutex transport_work_mutex;
-    std::condition_variable transport_work_cond;
-    bool test_complete = false;
-    std::list<util::UniqueFunction<void()>> transport_work;
-    JoiningThread transport_thread;
-};
-
-} // namespace
-
-TEST_CASE("app: app destroyed during token refresh", "[sync][app][user][token]") {
-    AsyncMockNetworkTransport mock_transport_worker;
-    enum class TestState { unknown, location, login, profile_1, profile_2, refresh_1, refresh_2, refresh_3 };
-    TestingStateMachine<TestState> state(TestState::unknown);
-    struct transport : public GenericNetworkTransport {
-        transport(AsyncMockNetworkTransport& worker, TestingStateMachine<TestState>& state)
-            : mock_transport_worker(worker)
-            , state(state)
-        {
-        }
+TEST_CASE("app: app released during async operation", "[app][user]") {
+    struct Transport : public UnitTestTransport {
+        std::string endpoint_to_hook;
+        std::optional<Request> stored_request;
+        util::UniqueFunction<void(const Response&)> stored_completion;
 
         void send_request_to_server(const Request& request,
                                     util::UniqueFunction<void(const Response&)>&& completion) override
         {
-            if (request.url.find("/login") != std::string::npos) {
-                CHECK(state.get() == TestState::location);
-                state.transition_to(TestState::login);
-                mock_transport_worker.add_work_item(
-                    Response{200, 0, {}, user_json(encode_fake_jwt("access token 1")).dump()}, std::move(completion));
+            // Store the completion handler for the chosen endpoint so that we can
+            // invoke it after releasing the test's references to the App to
+            // verify that it doesn't crash
+            if (request.url.find(endpoint_to_hook) != std::string::npos) {
+                REQUIRE_FALSE(stored_request);
+                REQUIRE_FALSE(stored_completion);
+                stored_request = request;
+                stored_completion = std::move(completion);
+                return;
             }
-            else if (request.url.find("/profile") != std::string::npos) {
-                // simulated bad token request
-                auto cur_state = state.get();
-                CHECK((cur_state == TestState::refresh_1 || cur_state == TestState::login));
-                if (cur_state == TestState::refresh_1) {
-                    state.transition_to(TestState::profile_2);
-                    mock_transport_worker.add_work_item(Response{200, 0, {}, user_profile_json().dump()},
-                                                        std::move(completion));
-                }
-                else if (cur_state == TestState::login) {
-                    state.transition_to(TestState::profile_1);
-                    mock_transport_worker.add_work_item(Response{401, 0, {}}, std::move(completion));
-                }
-            }
-            else if (request.url.find("/session") != std::string::npos && request.method == HttpMethod::post) {
-                if (state.get() == TestState::profile_1) {
-                    state.transition_to(TestState::refresh_1);
-                    nlohmann::json json{{"access_token", encode_fake_jwt("access token 1")}};
-                    mock_transport_worker.add_work_item(Response{200, 0, {}, json.dump()}, std::move(completion));
-                }
-                else if (state.get() == TestState::profile_2) {
-                    state.transition_to(TestState::refresh_2);
-                    mock_transport_worker.add_work_item(Response{200, 0, {}, "{\"error\":\"too bad, buddy!\"}"},
-                                                        std::move(completion));
-                }
-                else {
-                    CHECK(state.get() == TestState::refresh_2);
-                    state.transition_to(TestState::refresh_3);
-                    nlohmann::json json{{"access_token", encode_fake_jwt("access token 2")}};
-                    mock_transport_worker.add_work_item(Response{200, 0, {}, json.dump()}, std::move(completion));
-                }
-            }
-            else if (request.url.find("/location") != std::string::npos) {
-                CHECK(request.method == HttpMethod::get);
-                CHECK(state.get() == TestState::unknown);
-                state.transition_to(TestState::location);
-                mock_transport_worker.add_work_item(
-                    Response{200,
-                             0,
-                             {},
-                             "{\"deployment_model\":\"GLOBAL\",\"location\":\"US-VA\",\"hostname\":"
-                             "\"http://localhost:9090\",\"ws_hostname\":\"ws://localhost:9090\"}"},
-                    std::move(completion));
-            }
+
+            UnitTestTransport::send_request_to_server(request, std::move(completion));
         }
 
-        AsyncMockNetworkTransport& mock_transport_worker;
-        TestingStateMachine<TestState>& state;
+        bool has_stored() const
+        {
+            return !!stored_completion;
+        }
+
+        void send_stored()
+        {
+            REQUIRE(stored_request);
+            REQUIRE(stored_completion);
+            UnitTestTransport::send_request_to_server(*stored_request, std::move(stored_completion));
+            stored_request.reset();
+            stored_completion = nullptr;
+        }
     };
-    OfflineAppSession oas({std::make_shared<transport>(mock_transport_worker, state)});
-    auto app = oas.app();
+    auto transport = std::make_shared<Transport>();
+    App::Config app_config;
+    set_app_config_defaults(app_config, transport);
+    SyncClientConfig sc_config;
+    test_util::TestDirGuard base_path(util::make_temp_dir(), false);
+    sc_config.base_file_path = base_path;
+    sc_config.metadata_mode = SyncManager::MetadataMode::NoMetadata;
 
-    {
-        auto [cur_user_promise, cur_user_future] = util::make_promise_future<std::shared_ptr<SyncUser>>();
-        app->log_in_with_credentials(AppCredentials::anonymous(),
-                                     [promise = std::move(cur_user_promise)](std::shared_ptr<SyncUser> user,
-                                                                             util::Optional<AppError> error) mutable {
-                                         REQUIRE_FALSE(error);
-                                         promise.emplace_value(std::move(user));
-                                     });
+    SECTION("login") {
+        transport->endpoint_to_hook = GENERATE("/location", "/login", "/profile");
+        bool called = false;
+        {
+            auto app = App::get_app(App::CacheMode::Disabled, app_config, sc_config);
+            app->log_in_with_credentials(AppCredentials::anonymous(),
+                                         [&](std::shared_ptr<SyncUser> user, util::Optional<AppError> error) mutable {
+                                             REQUIRE_FALSE(error);
+                                             REQUIRE(user);
+                                             REQUIRE(user->is_logged_in());
+                                             called = true;
+                                         });
+            REQUIRE(transport->has_stored());
+        }
+        REQUIRE_FALSE(called);
+        transport->send_stored();
+        REQUIRE(called);
+    }
 
-        auto cur_user = std::move(cur_user_future).get();
-        CHECK(cur_user);
-
-        SyncTestFile config(app->current_user(), bson::Bson("foo"));
-        // Ignore websocket errors, since sometimes a websocket connection gets started during the test
-        config.sync_config->error_handler = [](std::shared_ptr<SyncSession> session, SyncError error) mutable {
-            // Ignore these errors, since there's not really an app out there...
-            // Primarily make sure we don't crash unexpectedly
-            std::vector<const char*> expected_errors = {"Bad WebSocket", "Connection Failed", "user has been removed",
-                                                        "Connection refused", "The user is not logged in"};
-            auto expected =
-                std::find_if(expected_errors.begin(), expected_errors.end(), [error](const char* err_msg) {
-                    return error.status.reason().find(err_msg) != std::string::npos;
+    SECTION("access token refresh") {
+        transport->endpoint_to_hook = "/auth/session";
+        SECTION("directly via user") {
+            bool completion_called = false;
+            {
+                auto app = App::get_app(App::CacheMode::Disabled, app_config, sc_config);
+                create_user_and_log_in(app);
+                app->current_user()->refresh_custom_data([&](std::optional<app::AppError> error) {
+                    REQUIRE_FALSE(error);
+                    completion_called = true;
                 });
-            if (expected != expected_errors.end()) {
-                util::format(std::cerr,
-                             "An expected possible WebSocket error was caught during test: 'app destroyed during "
-                             "token refresh': '%1' for '%2'",
-                             error.status, session->path());
+                REQUIRE(transport->has_stored());
             }
-            else {
-                std::string err_msg(util::format("An unexpected sync error was caught during test: 'app destroyed "
-                                                 "during token refresh': '%1' for '%2'",
-                                                 error.status, session->path()));
-                std::cerr << err_msg << std::endl;
-                throw std::runtime_error(err_msg);
+
+            REQUIRE_FALSE(completion_called);
+            transport->send_stored();
+            REQUIRE(completion_called);
+        }
+
+        SECTION("via sync session") {
+            {
+                auto app = App::get_app(App::CacheMode::Disabled, app_config, sc_config);
+                create_user_and_log_in(app);
+                auto user = app->current_user();
+                SyncTestFile config(user, bson::Bson("test"));
+                // give the user an expired access token so that the first use will try to refresh it
+                user->update_access_token(encode_fake_jwt("token", 123, 456));
+                REQUIRE_FALSE(transport->stored_completion);
+                auto realm = Realm::get_shared_realm(config);
+                REQUIRE(transport->has_stored());
             }
-        };
-        auto r = Realm::get_shared_realm(config);
-        auto session = r->sync_session();
-        mock_transport_worker.add_work_item([session] {
-            session->initiate_access_token_refresh();
-        });
-    }
-    for (const auto& user : app->all_users()) {
-        user->log_out();
+            transport->send_stored();
+        }
     }
 
-    timed_wait_for([&] {
-        return !app->sync_manager()->has_existing_sessions();
-    });
+    REQUIRE_FALSE(transport->has_stored());
 }
 
 TEST_CASE("app: make_streaming_request", "[sync][app][streaming]") {
@@ -5790,147 +5712,6 @@ TEST_CASE("app: sync_user_profile unit tests", "[sync][app][user]") {
         CHECK(profile.min_age() == "0");
         CHECK(profile.max_age() == "100");
     }
-}
-
-TEST_CASE("app: app cannot get deallocated during log in", "[sync][app]") {
-    AsyncMockNetworkTransport mock_transport_worker;
-    enum class TestState { unknown, app_released };
-    TestingStateMachine<TestState> state(TestState::unknown);
-    struct transport : public GenericNetworkTransport {
-        transport(AsyncMockNetworkTransport& worker, TestingStateMachine<TestState>& state)
-            : mock_transport_worker(worker)
-            , state(state)
-        {
-        }
-
-        void send_request_to_server(const Request& request, util::UniqueFunction<void(const Response&)>&& completion) override
-        {
-            if (request.url.find("/login") != std::string::npos) {
-                state.wait_for(TestState::app_released);
-                mock_transport_worker.add_work_item(
-                    Response{200, 0, {}, user_json(encode_fake_jwt("access token")).dump()},
-                    std::move(completion));
-            }
-            else if (request.url.find("/profile") != std::string::npos) {
-                mock_transport_worker.add_work_item(Response{200, 0, {}, user_profile_json().dump()},
-                                                    std::move(completion));
-            }
-            else if (request.url.find("/location") != std::string::npos) {
-                CHECK(request.method == HttpMethod::get);
-                mock_transport_worker.add_work_item(
-                    Response{200,
-                             0,
-                             {},
-                             "{\"deployment_model\":\"GLOBAL\",\"location\":\"US-VA\",\"hostname\":"
-                             "\"http://localhost:9090\",\"ws_hostname\":\"ws://localhost:9090\"}"},
-                    std::move(completion));
-            }
-        }
-
-        AsyncMockNetworkTransport& mock_transport_worker;
-        TestingStateMachine<TestState>& state;
-    };
-
-    auto [cur_user_promise, cur_user_future] = util::make_promise_future<std::shared_ptr<SyncUser>>();
-    auto transporter = std::make_shared<transport>(mock_transport_worker, state);
-
-    {
-        OfflineAppSession oas({transporter});
-        oas.app()->log_in_with_credentials(
-            AppCredentials::anonymous(), [promise = std::move(cur_user_promise)](
-                                             std::shared_ptr<SyncUser> user, util::Optional<AppError> error) mutable {
-                REQUIRE_FALSE(error);
-                promise.emplace_value(std::move(user));
-            });
-    }
-
-    // At this point the test does not hold any reference to `app`, but the
-    // app is keeping itself alive
-    state.transition_to(TestState::app_released);
-    auto cur_user = std::move(cur_user_future).get();
-    CHECK(cur_user);
-}
-
-TEST_CASE("app: user logs out while profile is fetched", "[sync][app][user]") {
-    AsyncMockNetworkTransport mock_transport_worker;
-    enum class TestState { unknown, location, login, logout, create, profile };
-    TestingStateMachine<TestState> state(TestState::unknown);
-    struct transport : public GenericNetworkTransport {
-        transport(AsyncMockNetworkTransport& worker, TestingStateMachine<TestState>& state)
-            : mock_transport_worker(worker)
-            , state(state)
-        {
-        }
-        void set_app(App* app)
-        {
-            REQUIRE(state.get() == TestState::unknown);
-            m_app = app;
-        }
-
-        void send_request_to_server(const Request& request,
-                                    util::UniqueFunction<void(const Response&)>&& completion) override
-        {
-            if (request.url.find("/login") != std::string::npos) {
-                state.transition_to(TestState::login);
-                mock_transport_worker.add_work_item(
-                    Response{200, 0, {}, user_json(encode_fake_jwt("access token")).dump()}, std::move(completion));
-            }
-            else if (request.url.find("/profile") != std::string::npos) {
-                REQUIRE(m_app);
-                auto user = m_app->current_user();
-                REQUIRE(user);
-                user->log_out();
-                state.transition_to(TestState::profile);
-                mock_transport_worker.add_work_item(Response{200, 0, {}, user_profile_json().dump()},
-                                                    std::move(completion));
-            }
-            else if (request.url.find("/location") != std::string::npos) {
-                CHECK(request.method == HttpMethod::get);
-                state.transition_to(TestState::location);
-                mock_transport_worker.add_work_item(
-                    Response{200,
-                             0,
-                             {},
-                             "{\"deployment_model\":\"GLOBAL\",\"location\":\"US-VA\",\"hostname\":"
-                             "\"http://localhost:9090\",\"ws_hostname\":\"ws://localhost:9090\"}"},
-                    std::move(completion));
-            }
-            else if (request.url.find("/session") != std::string::npos) {
-                CHECK(request.method == HttpMethod::del);
-                state.transition_to(TestState::logout);
-                mock_transport_worker.add_work_item(Response{200, 0, {}, ""}, std::move(completion));
-            }
-            else {
-                FAIL("Unexpected request in test transport " + request.url);
-            }
-        }
-
-        AsyncMockNetworkTransport& mock_transport_worker;
-        TestingStateMachine<TestState>& state;
-        App* m_app;
-    };
-
-    auto transporter = std::make_shared<transport>(mock_transport_worker, state);
-    OfflineAppSession oas({transporter});
-    auto app = oas.app();
-    transporter->set_app(app.get());
-
-    auto custom_credentials = AppCredentials::facebook("a_token");
-    auto [cur_user_promise, cur_user_future] = util::make_promise_future<std::shared_ptr<SyncUser>>();
-
-    app->log_in_with_credentials(custom_credentials,
-                                 [promise = std::move(cur_user_promise)](std::shared_ptr<SyncUser> user,
-                                                                         util::Optional<AppError> error) mutable {
-                                     REQUIRE_FALSE(error);
-                                     promise.emplace_value(std::move(user));
-                                 });
-
-    auto cur_user = std::move(cur_user_future).get();
-    CHECK(state.get() == TestState::profile);
-    CHECK(cur_user);
-    CHECK(cur_user->state() == SyncUser::State::LoggedOut);
-    REQUIRE(app->all_users().size() == 1);
-    CHECK(app->all_users()[0] == cur_user);
 }
 
 TEST_CASE("app: shared instances", "[sync][app]") {

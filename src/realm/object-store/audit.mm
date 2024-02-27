@@ -282,7 +282,7 @@ public:
         return true;
     }
 
-    bool select_collection(ColKey, ObjKey obj) noexcept
+    bool select_collection(ColKey, ObjKey obj, const StablePath&) noexcept
     {
         REALM_ASSERT(m_active_table);
         m_active_table->modifications.push_back(obj);

@@ -328,12 +328,55 @@ RLM_API bool realm_set_values(realm_object_t* obj, size_t num_values, const real
     });
 }
 
+RLM_API bool realm_set_json(realm_object_t* obj, realm_property_key_t col, const char* json_string)
+{
+    return wrap_err([&]() {
+        obj->verify_attached();
+        auto o = obj->get_obj();
+        ColKey col_key(col);
+        if (col_key.get_type() != col_type_Mixed) {
+            auto table = o.get_table();
+            auto& schema = schema_for_table(obj->get_realm(), table->get_key());
+            throw PropertyTypeMismatch{schema.name, table->get_column_name(col_key)};
+        }
+        o.set_json(ColKey(col), json_string);
+        return true;
+    });
+}
+
+
 RLM_API realm_object_t* realm_set_embedded(realm_object_t* obj, realm_property_key_t col)
 {
     return wrap_err([&]() {
         obj->verify_attached();
         auto& o = obj->get_obj();
         return new realm_object_t({obj->get_realm(), o.create_and_set_linked_object(ColKey(col))});
+    });
+}
+
+RLM_API realm_list_t* realm_set_list(realm_object_t* object, realm_property_key_t col)
+{
+    return wrap_err([&]() {
+        object->verify_attached();
+
+        auto& obj = object->get_obj();
+        auto col_key = ColKey(col);
+
+        obj.set_collection(col_key, CollectionType::List);
+        return new realm_list_t{List{object->get_realm(), std::move(obj), col_key}};
+    });
+}
+
+RLM_API realm_dictionary_t* realm_set_dictionary(realm_object_t* object, realm_property_key_t col)
+{
+    return wrap_err([&]() {
+        object->verify_attached();
+
+        auto& obj = object->get_obj();
+        auto col_key = ColKey(col);
+
+        obj.set_collection(col_key, CollectionType::Dictionary);
+        return new realm_dictionary_t{object_store::Dictionary{object->get_realm(), obj, col_key}};
     });
 }
 
@@ -357,7 +400,7 @@ RLM_API realm_list_t* realm_get_list(realm_object_t* object, realm_property_key_
         auto col_key = ColKey(key);
         table->check_column(col_key);
 
-        if (!col_key.is_list()) {
+        if (!(col_key.is_list() || col_key.get_type() == col_type_Mixed)) {
             report_type_mismatch(object->get_realm(), *table, col_key);
         }
 
@@ -376,7 +419,7 @@ RLM_API realm_set_t* realm_get_set(realm_object_t* object, realm_property_key_t 
         auto col_key = ColKey(key);
         table->check_column(col_key);
 
-        if (!col_key.is_set()) {
+        if (!(col_key.is_set() || col_key.get_type() == col_type_Mixed)) {
             report_type_mismatch(object->get_realm(), *table, col_key);
         }
 
@@ -394,7 +437,7 @@ RLM_API realm_dictionary_t* realm_get_dictionary(realm_object_t* object, realm_p
         auto col_key = ColKey(key);
         table->check_column(col_key);
 
-        if (!col_key.is_dictionary()) {
+        if (!(col_key.is_dictionary() || col_key.get_type() == col_type_Mixed)) {
             report_type_mismatch(object->get_realm(), *table, col_key);
         }
 

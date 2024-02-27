@@ -50,7 +50,7 @@ public:
         return ColKey(col_key.get_index(), type, col_key.get_attrs(), col_key.get_tag());
     }
 
-    std::unique_ptr<CollectionBase> clone_collection() const override
+    CollectionBasePtr clone_collection() const override
     {
         return std::make_unique<DictionaryKeyAdapter>(*this);
     }
@@ -82,9 +82,24 @@ public:
     {
         return m_dictionary->get_obj();
     }
-    bool has_changed() const override
+    bool has_changed() const noexcept override
     {
         return m_dictionary->has_changed();
+    }
+
+    FullPath get_path() const noexcept final
+    {
+        return m_dictionary->get_path();
+    }
+
+    Path get_short_path() const noexcept final
+    {
+        return m_dictionary->get_short_path();
+    }
+
+    StablePath get_stable_path() const noexcept final
+    {
+        return m_dictionary->get_stable_path();
     }
 
     // -------------------------------------------------------------------------
@@ -107,6 +122,18 @@ public:
     util::Optional<Mixed> avg(size_t* = nullptr) const override
     {
         REALM_TERMINATE("not implemented");
+    }
+    void set_owner(const Obj& obj, ColKey ck) override
+    {
+        m_dictionary->set_owner(obj, ck);
+    }
+    void set_owner(std::shared_ptr<CollectionParent> parent, CollectionParent::Index index) override
+    {
+        m_dictionary->set_owner(std::move(parent), index);
+    }
+    CollectionType get_collection_type() const noexcept override
+    {
+        return CollectionType::List;
     }
 
 private:
@@ -138,6 +165,7 @@ DictionaryChangeSet::DictionaryChangeSet(const DictionaryChangeSet& other)
     }
 
     collection_root_was_deleted = other.collection_root_was_deleted;
+    collection_was_cleared = other.collection_was_cleared;
 }
 
 DictionaryChangeSet& DictionaryChangeSet::operator=(const DictionaryChangeSet& other)
@@ -160,7 +188,7 @@ DictionaryChangeSet& DictionaryChangeSet::operator=(const DictionaryChangeSet& o
     }
 
     collection_root_was_deleted = other.collection_root_was_deleted;
-
+    collection_was_cleared = other.collection_was_cleared;
     return *this;
 }
 
@@ -294,7 +322,7 @@ public:
     NotificationHandler(realm::Dictionary& dict, Dictionary::CBFunc cb)
         : m_dict(dict)
         , m_prev_rt(static_cast<Transaction*>(dict.get_table()->get_parent_group())->duplicate())
-        , m_prev_dict(static_cast<realm::Dictionary*>(m_prev_rt->import_copy_of(dict).release()))
+        , m_prev_dict(std::dynamic_pointer_cast<realm::Dictionary>(m_prev_rt->import_copy_of(dict)))
         , m_cb(std::move(cb))
     {
     }
@@ -325,6 +353,7 @@ public:
             auto current_tr = static_cast<Transaction*>(m_dict.get_table()->get_parent_group());
             m_prev_rt->advance_read(current_tr->get_version_of_current_transaction());
         }
+        changes.collection_was_cleared = c.collection_was_cleared;
 
         m_cb(std::move(changes));
     }
@@ -332,7 +361,7 @@ public:
 private:
     realm::Dictionary& m_dict;
     TransactionRef m_prev_rt;
-    std::unique_ptr<realm::Dictionary> m_prev_dict;
+    DictionaryPtr m_prev_dict;
     Dictionary::CBFunc m_cb;
 };
 } // namespace

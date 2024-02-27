@@ -52,11 +52,18 @@ using namespace std::string_literals;
 using Catch::Matchers::StartsWith;
 using nlohmann::json;
 
+namespace {
+class NullLogger : public util::Logger {
+    // Since we don't want to log anything, do_log() does nothing
+    void do_log(const util::LogCategory&, Level, const std::string&) override {}
+};
+} // namespace
+
 static auto audit_logger =
 #ifdef AUDIT_LOG_LEVEL
     std::make_shared<util::StderrLogger>(AUDIT_LOG_LEVEL);
 #else
-    std::make_shared<util::NullLogger>();
+    std::make_shared<NullLogger>();
 #endif
 
 namespace {
@@ -175,18 +182,17 @@ static std::vector<AuditEvent> get_audit_events_from_baas(TestAppSession& sessio
     auto documents = session.get_documents(user, "AuditEvent", expected_count);
     std::vector<AuditEvent> events;
     events.reserve(documents.size());
-    for (auto document : documents) {
-        auto doc = document.entries();
+    for (auto doc : documents) {
         AuditEvent event;
         event.activity = static_cast<std::string>(doc["activity"]);
         event.timestamp = static_cast<Timestamp>(doc["timestamp"]);
-        if (auto it = doc.find("event"); it != doc.end() && it->second != bson::Bson()) {
-            event.event = static_cast<std::string>(it->second);
+        if (auto val = doc.find("event"); bool(val) && *val != bson::Bson()) {
+            event.event = static_cast<std::string>(*val);
         }
-        if (auto it = doc.find("data"); it != doc.end() && it->second != bson::Bson()) {
-            event.data = json::parse(static_cast<std::string>(it->second));
+        if (auto val = doc.find("data"); bool(val) && *val != bson::Bson()) {
+            event.data = json::parse(static_cast<std::string>(*val));
         }
-        for (auto& [key, value] : doc) {
+        for (auto [key, value] : doc) {
             if (value.type() == bson::Bson::Type::String && !nonmetadata_fields.count(key))
                 event.metadata.insert({key, static_cast<std::string>(value)});
         }

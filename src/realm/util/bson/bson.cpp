@@ -333,13 +333,13 @@ bool holds_alternative<MaxKey>(const Bson& bson)
 }
 
 template <>
-bool holds_alternative<IndexedMap<Bson>>(const Bson& bson)
+bool holds_alternative<BsonDocument>(const Bson& bson)
 {
     return bson.m_type == Bson::Type::Document;
 }
 
 template <>
-bool holds_alternative<std::vector<Bson>>(const Bson& bson)
+bool holds_alternative<BsonArray>(const Bson& bson)
 {
     return bson.m_type == Bson::Type::Array;
 }
@@ -620,7 +620,7 @@ Bson dom_elem_to_bson(const Json& json)
         case Json::value_t::object:
             return dom_obj_to_bson(json);
         case Json::value_t::array: {
-            std::vector<Bson> out;
+            BsonArray out;
             for (auto&& elem : json) {
                 out.push_back(dom_elem_to_bson(elem));
             }
