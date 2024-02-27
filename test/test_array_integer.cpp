@@ -32,8 +32,7 @@
 using namespace realm;
 using namespace realm::test_util;
 
-#define ARRAY_PERFORMANCE_TESTING
-// #ifdef ARRAY_PERFORMANCE_TESTING
+// #define ARRAY_PERFORMANCE_TESTING
 #if !defined(REALM_DEBUG) && defined(ARRAY_PERFORMANCE_TESTING)
 NONCONCURRENT_TEST(perf_array_encode_get_vs_array_get_less_32bit)
 {
@@ -132,6 +131,7 @@ NONCONCURRENT_TEST(perf_array_encode_get_vs_array_get_less_32bit)
 }
 
 NONCONCURRENT_TEST(Test_basic_find_EQ_less_32bit)
+// ONLY(Test_basic_find_EQ_less_32bit)
 {
     using namespace std;
     using namespace std::chrono;
@@ -260,6 +260,7 @@ NONCONCURRENT_TEST(Test_basic_find_EQ_less_32bit)
 }
 
 NONCONCURRENT_TEST(Test_basic_find_NEQ_value_less_32bit)
+// ONLY(Test_basic_find_NEQ_value_less_32bit)
 {
     using namespace std;
     using namespace std::chrono;
@@ -1184,7 +1185,7 @@ NONCONCURRENT_TEST(Test_basic_find_GT_value_greater_32bit)
             const auto k = start_value + i;
             a.find<Greater>(k, 0, a.size(), &state1);
             a_encoded.find<Greater>(k, 0, a_encoded.size(), &state2);
-            // REALM_ASSERT(state1.m_state == state2.m_state); //not so sure why..
+            REALM_ASSERT(state1.m_state == state2.m_state);
         }
     }
 
