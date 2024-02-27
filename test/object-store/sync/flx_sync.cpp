@@ -1980,10 +1980,10 @@ TEST_CASE("flx: geospatial", "[sync][flx][geospatial][baas]") {
                 bson::BsonArray inner{};
                 REALM_ASSERT_3(polygon.points.size(), ==, 1);
                 for (auto& point : polygon.points[0]) {
-                    inner.append(bson::BsonArray{point.longitude, point.latitude});
+                    inner.push_back(bson::BsonArray{point.longitude, point.latitude});
                 }
                 bson::BsonArray coords;
-                coords.append(inner);
+                coords.push_back(inner);
                 bson::BsonDocument geo_bson{{{"type", "Polygon"}, {"coordinates", coords}}};
                 bson::BsonDocument filter{
                     {"location", bson::BsonDocument{{"$geoWithin", bson::BsonDocument{{"$geometry", geo_bson}}}}}};
@@ -1992,8 +1992,8 @@ TEST_CASE("flx: geospatial", "[sync][flx][geospatial][baas]") {
             auto make_circle_filter = [&](const GeoCircle& circle) -> bson::BsonDocument {
                 bson::BsonArray coords{circle.center.longitude, circle.center.latitude};
                 bson::BsonArray inner;
-                inner.append(coords);
-                inner.append(circle.radius_radians);
+                inner.push_back(coords);
+                inner.push_back(circle.radius_radians);
                 bson::BsonDocument filter{
                     {"location", bson::BsonDocument{{"$geoWithin", bson::BsonDocument{{"$centerSphere", inner}}}}}};
                 return filter;
