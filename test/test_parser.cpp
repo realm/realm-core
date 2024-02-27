@@ -4675,10 +4675,11 @@ TEST(Parser_Decimal128)
     verify_query(test_context, table, "dec >= -infinity", table->size() - num_nans);
 
     // argument substitution checks
-    std::any args[] = {Decimal128("0"), Decimal128("123"), realm::null{}};
-    size_t num_args = 3;
+    std::any args[] = {Decimal128("0"), Decimal128("123"), realm::null{}, 123.0};
+    size_t num_args = 4;
     verify_query_sub(test_context, table, "dec == $0", args, num_args, 1);
     verify_query_sub(test_context, table, "dec == $1", args, num_args, 1);
+    verify_query_sub(test_context, table, "dec == $3", args, num_args, 1);
     verify_query_sub(test_context, table, "dec == $2", args, num_args, 0);
     verify_query_sub(test_context, table, "nullable_dec == $2", args, num_args, 1);
 
