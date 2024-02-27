@@ -158,28 +158,34 @@ bool ArrayPacked::find_all(const Array& arr, int64_t value, size_t start, size_t
     // the width of each single value within a 64 bit word and N is the total number of values stored in the array. On
     // the other end if we have values of 32 bits or more, accessing twice or once the same 64 bits word is probably
     // the cheapest thing to do.
-    start = parallel_subword_find<Cond>(arr, value, start, end);
 
-    if (start >= end)
-        return true;
-
-    auto cmp_val = [](int64_t v, int64_t value) {
-        if constexpr (std::is_same_v<Cond, Equal>)
-            return v == value;
-        if constexpr (std::is_same_v<Cond, NotEqual>)
-            return v != value;
-        if constexpr (std::is_same_v<Cond, Greater>)
-            return v > value;
-        if constexpr (std::is_same_v<Cond, Less>)
-            return v < value;
-    };
-
-    const auto mask = arr.get_encoder().width_mask();
-    bf_iterator bf_it((uint64_t*)arr.m_data, 0, arr.m_width, arr.m_width, start);
-    for (; start < end; start++, ++bf_it) {
-        auto v = sign_extend_field_by_mask(mask, *bf_it);
-        if (cmp_val(v, value) && !state->match(start + baseindex)) {
-            return false;
+    if (arr.m_width <= 32) {
+        while (start < end) {
+            start = parallel_subword_find<Cond>(arr, value, start, end);
+            if (start < end && !state->match(start + baseindex))
+                return false;
+            ++start;
+        }
+    }
+    else {
+        auto cmp_val = [](int64_t v, int64_t value) {
+            if constexpr (std::is_same_v<Cond, Equal>)
+                return v == value;
+            if constexpr (std::is_same_v<Cond, NotEqual>)
+                return v != value;
+            if constexpr (std::is_same_v<Cond, Greater>)
+                return v > value;
+            if constexpr (std::is_same_v<Cond, Less>)
+                return v < value;
+        };
+        start = parallel_subword_find<Cond>(arr, value, start, end);
+        const auto mask = arr.get_encoder().width_mask();
+        bf_iterator bf_it((uint64_t*)arr.m_data, 0, arr.m_width, arr.m_width, start);
+        for (; start < end; start++, ++bf_it) {
+            auto v = sign_extend_field_by_mask(mask, *bf_it);
+            if (cmp_val(v, value) && !state->match(start + baseindex)) {
+                return false;
+            }
         }
     }
     return true;
