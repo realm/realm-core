@@ -5536,6 +5536,25 @@ TEST(Query_AllocatorBug_SourceOlderThanDest)
     cnt = (bar->link(col_link).column<Lst<double>>(col_double).min() == 1).count();
 }
 
+TEST(Query_LinkToDictionary)
+{
+    Group g;
+    auto target = g.add_table("target");
+    auto dict_col = target->add_column_dictionary(type_String, "string", true);
+    auto source = g.add_table("source");
+    auto link_col = source->add_column(*target, "link");
+
+    for (int i = 0; i < 200; ++i) {
+        auto target_obj = target->create_object();
+        target_obj.get_dictionary(dict_col).insert("key", "value");
+        source->create_object().set_all(target_obj.get_key());
+    }
+
+    // Will crash if this uses the wrong allocator
+    auto q = source->link(link_col).column<Dictionary>(dict_col) == StringData();
+    CHECK_EQUAL(q.count(), 0);
+}
+
 TEST(Query_StringNodeEqualBaseBug)
 {
     Group g;
