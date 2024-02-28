@@ -5060,8 +5060,8 @@ TEST(Parser_Dictionary)
     verify_query(test_context, foo, "dict.@keys == {'Bar'}", 19);
     verify_query(test_context, foo, "ANY dict.@keys == {'Bar'}", 100);
     verify_query(test_context, foo, "dict.@keys == {'Bar', 'Foo'}", 3);
-    verify_query(test_context, foo, "dict['Value'] == NULL", 1);
-    verify_query(test_context, foo, "dict['Value'] == {}", 22); // Tricky - what does this even mean?
+    verify_query(test_context, foo, "dict['Value'] == NULL", 23);
+    verify_query(test_context, foo, "dict['Value'] == {}", 0); // Tricky - what does this even mean?
     verify_query(test_context, foo, "dict['Value'] == {0, 100}", 3);
     verify_query(test_context, foo, "dict['Value'].@type == 'int'", num_ints_for_value);
     verify_query(test_context, foo, "dict.@type == 'int'", 100);      // ANY is implied, all have int values
@@ -5076,7 +5076,7 @@ TEST(Parser_Dictionary)
     verify_query(test_context, origin, "link.dict.Value > 50", 3);
     verify_query(test_context, origin, "links.dict['Value'] > 50", 5);
     verify_query(test_context, origin, "links.dict > 50", 6);
-    verify_query(test_context, origin, "links.dict['Value'] == NULL", 1);
+    verify_query(test_context, origin, "links.dict['Value'] == NULL", 10);
 
     verify_query(test_context, foo, "dict.@size == 3", 17);
     verify_query(test_context, foo, "dict.@max == 100", 2);

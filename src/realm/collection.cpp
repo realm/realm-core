@@ -161,6 +161,9 @@ void Collection::get_any(QueryCtrlBlock& ctrl, Mixed val, size_t index)
                             ctrl.matches.insert(k);
                         });
                     }
+                    else {
+                        ctrl.matches.insert(Mixed());
+                    }
                     return;
                 }
                 finish = start + 1;
