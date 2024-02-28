@@ -1,8 +1,7 @@
 #!/bin/bash
 
-source $1
-
-version_and_extra=( ${VERSION//-/ } )
+realm_version=$(sed -rn 's/^VERSION: (.*)/\1/p' < "$1")
+version_and_extra=( ${$realm_version//-/ } )
 version_only=${version_and_extra[0]}
 extra=${version_and_extra[1]}
 
