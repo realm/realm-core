@@ -249,31 +249,28 @@ bool ArrayFlex::find_eq(const Array& arr, int64_t value, size_t start, size_t en
     const auto v_width = encoder.m_v_width;
     const auto v_size = encoder.m_v_size;
     const auto ndx_width = encoder.m_ndx_width;
-    const auto mask = encoder.width_mask();
+    // const auto mask = encoder.width_mask();
     const auto data = (uint64_t*)arr.m_data;
     const auto offset = v_size * v_width;
 
-    //    size_t v_start = 0;
-    //    size_t ndx_pos = start;
-    //    for(;v_start < v_size; ++v_start) {
-    //        auto p = parallel_subword_find<Equal>(arr, value, 0, v_width, v_start, v_size);
-    //        if(p == v_size)
-    //            continue;
-    //        ndx_pos = parallel_subword_find<Equal>(arr, p, offset, ndx_width, ndx_pos, end);
-    //        if(ndx_pos == end)
-    //            continue;
-    //        if(!state->match(ndx_pos + baseindex))
-    //            return false;
-    //
-    //    }
-    // std::cout << "Seking for Val == " << value << std::endl;
-    bf_iterator it_index{data, static_cast<size_t>(offset), ndx_width, ndx_width, start};
-    for (; start < end; ++start, ++it_index) {
-        const auto v = sign_extend_field_by_mask(mask, read_bitfield(data, *it_index * v_width, v_width));
-        if (v == value)
-            if (!state->match(start + baseindex))
-                return false;
+    auto v_start = parallel_subword_find<Equal>(arr, value, encoder.m_v_mask, 0, v_width, 0, v_size);
+    start = parallel_subword_find<Equal>(arr, v_start, encoder.m_ndx_mask, offset, ndx_width, start, end);
+    bf_iterator it(data, offset, ndx_width, ndx_width, start);
+    for (; start < end; ++start, ++it) {
+        if (*it != v_start)
+            continue;
+        if (!state->match(start + baseindex))
+            return false;
     }
+
+    // double jump find
+    //    bf_iterator it_index{data, static_cast<size_t>(offset), ndx_width, ndx_width, start};
+    //    for (; start < end; ++start, ++it_index) {
+    //        const auto v = sign_extend_field_by_mask(mask, read_bitfield(data, *it_index * v_width, v_width));
+    //        if (v == value)
+    //            if (!state->match(start + baseindex))
+    //                return false;
+    //    }
     return true;
 }
 
@@ -284,58 +281,33 @@ bool ArrayFlex::find_neq(const Array& arr, int64_t value, size_t start, size_t e
     const auto v_width = encoder.m_v_width;
     const auto v_size = encoder.m_v_size;
     const auto ndx_width = encoder.m_ndx_width;
-    const auto mask = encoder.width_mask();
+    // const auto mask = encoder.width_mask();
     const auto data = (uint64_t*)arr.m_data;
     const auto offset = v_size * v_width;
 
-    //    std::cout << value << std::endl;
-    //         bf_iterator it_index{data, static_cast<size_t>(offset), ndx_width, ndx_width, start};
-    //         std::cout << "Index: ";
-    //         auto start2 = start;
-    //         for (; start2 < end; ++start2, ++it_index) {
-    //             std::cout << *it_index << ", ";
-    //         } std::cout << std::endl;
-    //         std::cout << "Value: ";
-    //         bf_iterator it_value{data, 0, v_width, v_width, 0};
-    //         start2 = start;
-    //         for (; start2 < v_size; ++start2, ++it_value) {
-    //             std::cout << *it_value << ", ";
-    //         }std::cout << std::endl;
-
-    // x40 slower
-    //    auto p = parallel_subword_find<Equal>(arr, value, encoder.m_v_mask, 0, v_width, 0, v_size);
-    //    if(p == v_size) return true;
-    //    auto ndx = parallel_subword_find<Equal>(arr, p, encoder.m_ndx_mask, offset, ndx_width, start, end);
-    //    if(ndx == end) return true;
-    //
-    //    for(;start < ndx; ++start)
-    //        if (!state->match(start + baseindex))
-    //            return false;
-
-    // all the rest
-    bf_iterator it{data, static_cast<size_t>(offset), ndx_width, ndx_width, start};
+    auto v_start = parallel_subword_find<Equal>(arr, value, encoder.m_v_mask, 0, v_width, 0, v_size);
+    start = parallel_subword_find<NotEqual>(arr, v_start, encoder.m_ndx_mask, offset, ndx_width, start, end);
+    bf_iterator it(data, offset, ndx_width, ndx_width, start);
     for (; start < end; ++start, ++it) {
-        const auto v = sign_extend_field_by_mask(mask, read_bitfield(data, (*it * v_width), v_width));
-        if (v != value)
-            if (!state->match(start + baseindex))
-                return false;
+        if (*it == v_start)
+            continue;
+        if (!state->match(start + baseindex))
+            return false;
     }
+
+    //    bf_iterator it{data, static_cast<size_t>(offset), ndx_width, ndx_width, start};
+    //    for (; start < end; ++start, ++it) {
+    //        const auto v = sign_extend_field_by_mask(mask, read_bitfield(data, (*it * v_width), v_width));
+    //        if (v != value)
+    //            if (!state->match(start + baseindex))
+    //                return false;
+    //    }
     return true;
 }
 
 bool ArrayFlex::find_lt(const Array& arr, int64_t value, size_t start, size_t end, size_t baseindex,
                         QueryStateBase* state) const
 {
-    // auto v_ndx = parallel_subword_find<GreaterEqual>(arr, value, 0, v_width, 0, v_size);
-    //             if(v_ndx >= v_size || v_ndx == 0)
-    //                 break;
-    //             auto pos = parallel_subword_find<Less>(arr, v_ndx, offset, ndx_width, start, end);
-    //             for(;pos < end; pos++) {
-    //                 if(!state->match(pos + baseindex))
-    //                     return false;
-    //             }
-    //             start = pos;
-
     const auto& encoder = arr.m_encoder;
     const auto v_width = encoder.m_v_width;
     const auto v_size = encoder.m_v_size;
@@ -343,8 +315,16 @@ bool ArrayFlex::find_lt(const Array& arr, int64_t value, size_t start, size_t en
     const auto mask = encoder.width_mask();
     const auto data = (uint64_t*)arr.m_data;
     const auto offset = v_size * v_width;
+    // this can be made better... find GTE index and find all the matching values Less than that index..
+    //    auto v_start = parallel_subword_find<Less>(arr, value, encoder.m_v_mask, 0, v_width, 0, v_size);
+    //    start = parallel_subword_find<Equal>(arr, v_start, encoder.m_ndx_mask, offset, ndx_width, start, end);
+    //    bf_iterator it(data, offset, ndx_width, ndx_width, start);
+    //    for(; start<end; ++start,++it) {
+    //        if(*it > v_start) continue;
+    //        if(!state->match(start + baseindex))
+    //            return false;
+    //    }
 
-    // std::cout << "Seking for Val == " << value << std::endl;
     bf_iterator it_index{data, static_cast<size_t>(offset), ndx_width, ndx_width, start};
     for (; start < end; ++start, ++it_index) {
         const auto v = sign_extend_field_by_mask(mask, read_bitfield(data, *it_index * v_width, v_width));
@@ -366,7 +346,16 @@ bool ArrayFlex::find_gt(const Array& arr, int64_t value, size_t start, size_t en
     const auto data = (uint64_t*)arr.m_data;
     const auto offset = v_size * v_width;
 
-    // std::cout << "Seking for Val == " << value << std::endl;
+    // inverse logic of Less should be possible here.
+    //    auto v_start = parallel_subword_find<Greater>(arr, value, encoder.m_v_mask, 0, v_width, 0, v_size);
+    //    start = parallel_subword_find<Equal>(arr, v_start, encoder.m_ndx_mask, offset, ndx_width, start, end);
+    //    bf_iterator it(data, offset, ndx_width, ndx_width, start);
+    //    for(; start<end; ++start,++it) {
+    //        if(*it < v_start) continue;
+    //        if(!state->match(start + baseindex))
+    //            return false;
+    //    }
+
     bf_iterator it_index{data, static_cast<size_t>(offset), ndx_width, ndx_width, start};
     for (; start < end; ++start, ++it_index) {
         const auto v = sign_extend_field_by_mask(mask, read_bitfield(data, *it_index * v_width, v_width));
