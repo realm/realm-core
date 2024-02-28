@@ -734,6 +734,13 @@ public:
 
     virtual DataType get_type() const = 0;
 
+    virtual void reset_path(size_t) {}
+
+    virtual bool more() const
+    {
+        return false;
+    }
+
     virtual void evaluate(size_t index, ValueBase& destination) = 0;
 
     virtual Mixed get_mixed() const
@@ -1756,7 +1763,7 @@ public:
         return m_link_map.get_base_table();
     }
 
-    void set_base_table(ConstTableRef table) final
+    void set_base_table(ConstTableRef table) override
     {
         if (table != get_base_table()) {
             m_link_map.set_base_table(table);
@@ -2012,45 +2019,75 @@ class Columns<Mixed> : public SimpleQuerySupport<Mixed> {
 public:
     using SimpleQuerySupport::evaluate; // don't hide the ObjKey overload
     using SimpleQuerySupport::SimpleQuerySupport;
+    void set_base_table(ConstTableRef table) override
+    {
+        SimpleQuerySupport::set_base_table(table);
+        m_ctrl.alloc = &get_link_map().get_target_table()->get_alloc();
+        m_ctrl.group = table->get_parent_group();
+    }
+
+    void reset_path(size_t index) final
+    {
+        if (m_ctrl.path.size() > 0) {
+            Value<Mixed> destination;
+            destination.init(false, 1);
+            SimpleQuerySupport::evaluate(index, destination);
+
+            m_ctrl.matches.clear();
+            if (auto sz = destination.size()) {
+                for (size_t i = 0; i < sz; i++) {
+                    Collection::get_any(m_ctrl, destination.get(i), 0);
+                }
+            }
+            if (m_ctrl.matches.empty()) {
+                // Make sure we at lease have one empty result
+                m_ctrl.matches.emplace_back();
+            }
+        }
+        m_destination_index = 0;
+    }
+
+    bool more() const final
+    {
+        return m_destination_index < m_ctrl.matches.size();
+    }
+
     void evaluate(size_t index, ValueBase& destination) override
     {
-        destination.init(false, 1); // Size of 1 is expected by SimpleQuerySupport
-        SimpleQuerySupport::evaluate(index, destination);
-        if (m_path.size() > 0) {
-            if (auto sz = destination.size()) {
-                Collection::QueryCtrlBlock ctrl(m_path, *get_base_table(),
-                                                destination.m_from_list || !m_path_only_unary_keys);
-                for (size_t i = 0; i < sz; i++) {
-                    Collection::get_any(ctrl, destination.get(i), 0);
-                }
-                sz = ctrl.matches.size();
-                destination.init(ctrl.from_list || sz == 0, sz);
-                destination.set(ctrl.matches.begin(), ctrl.matches.end());
-            }
+        if (m_ctrl.path.empty()) {
+            destination.init(false, 1); // Size of 1 is expected by SimpleQuerySupport
+            SimpleQuerySupport::evaluate(index, destination);
+        }
+        else {
+            // Copy values over
+            auto& matches = m_ctrl.matches[m_destination_index++];
+            auto sz = matches.size();
+            destination.init(!m_ctrl.path_only_unary_keys || sz == 0, sz);
+            destination.set(matches.begin(), matches.end());
         }
     }
     std::string description(util::serializer::SerialisationState& state) const override
     {
-        return ObjPropertyExpr::description(state) + util::to_string(m_path);
+        return ObjPropertyExpr::description(state) + util::to_string(m_ctrl.path);
     }
     Columns<Mixed>& path(const Path& path)
     {
         for (auto& elem : path) {
             if (elem.is_all()) {
-                m_path_only_unary_keys = false;
+                m_ctrl.path_only_unary_keys = false;
             }
-            m_path.emplace_back(elem);
+            m_ctrl.path.emplace_back(elem);
         }
         return *this;
     }
     bool has_path() const noexcept override
     {
-        return !m_path.empty();
+        return !m_ctrl.path.empty();
     }
 
 private:
-    Path m_path;
-    bool m_path_only_unary_keys = true;
+    Collection::QueryCtrlBlock m_ctrl;
+    size_t m_destination_index = 0;
 };
 
 template <>
@@ -2546,6 +2583,16 @@ public:
         return m_expr->get_base_table();
     }
 
+    void reset_path(size_t index) override
+    {
+        m_expr->reset_path(index);
+    }
+    bool more() const override
+    {
+        return m_expr->more();
+    }
+
+
     // destination = operator(left)
     void evaluate(size_t index, ValueBase& destination) override
     {
@@ -2644,6 +2691,15 @@ public:
     ConstTableRef get_base_table() const override
     {
         return m_expr->get_base_table();
+    }
+
+    void reset_path(size_t index) override
+    {
+        m_expr->reset_path(index);
+    }
+    bool more() const override
+    {
+        return m_expr->more();
     }
 
     // destination = operator(left)
@@ -2954,7 +3010,7 @@ public:
         return m_link_map.get_target_table()->get_alloc();
     }
 
-    void set_base_table(ConstTableRef table) final
+    void set_base_table(ConstTableRef table) override
     {
         m_link_map.set_base_table(table);
     }
@@ -3228,7 +3284,7 @@ public:
         REALM_ASSERT(!path.empty());
         if (ColumnsCollection<Mixed>::index(path[0])) {
             for (auto& elem : path) {
-                m_path.emplace_back(elem);
+                m_ctrl.path.emplace_back(elem);
             }
             return true;
         }
@@ -3243,27 +3299,58 @@ public:
     }
     std::string description(util::serializer::SerialisationState& state) const override
     {
-        return ColumnListBase::description(state) + util::to_string(m_path);
+        return ColumnListBase::description(state) + util::to_string(m_ctrl.path);
+    }
+    void set_base_table(ConstTableRef table) override
+    {
+        ColumnsCollection::set_base_table(table);
+        m_ctrl.alloc = &m_link_map.get_target_table()->get_alloc();
+        m_ctrl.group = table->get_parent_group();
+    }
+
+    void reset_path(size_t index) final
+    {
+        if (m_ctrl.path.size() > 1) {
+            Value<Mixed> destination;
+            ColumnsCollection<Mixed>::evaluate<Mixed>(index, destination);
+
+            m_ctrl.matches.clear();
+            if (auto sz = destination.size()) {
+                for (size_t i = 0; i < sz; i++) {
+                    Collection::get_any(m_ctrl, destination.get(i), 1);
+                }
+            }
+            if (m_ctrl.matches.empty()) {
+                // Make sure we at lease have one empty result
+                m_ctrl.matches.emplace_back();
+            }
+        }
+        m_destination_index = 0;
+    }
+
+    bool more() const final
+    {
+        return m_destination_index < m_ctrl.matches.size();
     }
 
     void evaluate(size_t index, ValueBase& destination) override
     {
-        // Base class will handle path[0] and return result in destination
-        ColumnsCollection<Mixed>::evaluate<Mixed>(index, destination);
-        if (m_path.size() > 1) {
-            if (auto sz = destination.size()) {
-                Collection::QueryCtrlBlock ctrl(m_path, *get_base_table(), destination.m_from_list);
-                for (size_t i = 0; i < sz; i++) {
-                    Collection::get_any(ctrl, destination.get(i), 1);
-                }
-                destination.init(ctrl.from_list, ctrl.matches.size());
-                destination.set(ctrl.matches.begin(), ctrl.matches.end());
-            }
+        if (m_ctrl.path.size() > 1) {
+            // Copy values over
+            auto& matches = m_ctrl.matches[m_destination_index++];
+            auto sz = matches.size();
+            destination.init(!m_ctrl.path_only_unary_keys || sz == 0, sz);
+            destination.set(matches.begin(), matches.end());
+        }
+        else {
+            // Base class will handle path[0] and return result in destination
+            ColumnsCollection<Mixed>::evaluate<Mixed>(index, destination);
         }
     }
 
 private:
-    Path m_path;
+    Collection::QueryCtrlBlock m_ctrl;
+    size_t m_destination_index = 0;
 };
 
 // Returns the keys
@@ -3278,8 +3365,7 @@ public:
         : ColumnsCollection<Mixed>(column, table, links, type)
     {
         m_key_type = m_link_map.get_target_table()->get_dictionary_key_type(m_column_key);
-        m_path.push_back(PathElement::AllTag());
-        m_path_only_unary_keys = false;
+        m_ctrl.path.push_back(PathElement::AllTag());
     }
 
     Columns(const Path& path, ConstTableRef table, const std::vector<ExtendedColumnKey>& links = {},
@@ -3318,6 +3404,12 @@ public:
 
     ColumnDictionaryKeys keys();
 
+    void set_base_table(ConstTableRef table) override
+    {
+        ColumnsCollection::set_base_table(table);
+        m_ctrl.alloc = &m_link_map.get_target_table()->get_alloc();
+        m_ctrl.group = table->get_parent_group();
+    }
     SizeOperator<int64_t> size() override;
     std::unique_ptr<Subexpr> get_element_length() override
     {
@@ -3325,11 +3417,13 @@ public:
         return {};
     }
 
+    void reset_path(size_t) override;
+    bool more() const override;
     void evaluate(size_t index, ValueBase& destination) override;
 
     std::string description(util::serializer::SerialisationState& state) const override
     {
-        return ColumnListBase::description(state) + util::to_string(m_path);
+        return ColumnListBase::description(state) + util::to_string(m_ctrl.path);
     }
 
     std::unique_ptr<Subexpr> clone() const override
@@ -3345,15 +3439,14 @@ public:
     Columns(Columns const& other)
         : ColumnsCollection<Mixed>(other)
         , m_key_type(other.m_key_type)
-        , m_path(other.m_path)
-        , m_path_only_unary_keys(other.m_path_only_unary_keys)
+        , m_ctrl(other.m_ctrl)
     {
     }
 
 protected:
     DataType m_key_type = type_String;
-    Path m_path;
-    bool m_path_only_unary_keys;
+    Collection::QueryCtrlBlock m_ctrl;
+    size_t m_destination_index = 0;
 
     void init_path(const PathElement* begin, const PathElement* end);
 };
@@ -3427,6 +3520,13 @@ public:
         : ColumnsCollection<T>(other)
     {
     }
+
+    void reset_path(size_t) override {}
+    bool more() const override
+    {
+        return false;
+    }
+
     void evaluate(size_t index, ValueBase& destination) override
     {
         if constexpr (realm::is_any_v<T, ObjectId, Int, Bool, UUID>) {
@@ -4531,13 +4631,23 @@ public:
         ValueBase* right = m_right_const_values ? m_right_const_values : &right_buf;
 
         for (; start < end;) {
-            if (!m_left_const_values)
-                m_left->evaluate(start, left_buf);
-            if (!m_right_const_values)
-                m_right->evaluate(start, right_buf);
-            match = ValueBase::template compare<TCond>(*left, *right, left_cmp_type, right_cmp_type);
-            if (match != not_found && match + start < end)
-                return start + match;
+            // In case of wildcard query strings, we will get a value for every collection matching the path
+            // We need to match those separately against the other value - which might also come in multiple
+            // instances.
+            m_right->reset_path(start);
+            do {
+                if (!m_right_const_values) {
+                    m_right->evaluate(start, right_buf);
+                }
+                m_left->reset_path(start);
+                do {
+                    if (!m_left_const_values)
+                        m_left->evaluate(start, left_buf);
+                    match = ValueBase::template compare<TCond>(*left, *right, left_cmp_type, right_cmp_type);
+                    if (match != not_found && match + start < end)
+                        return start + match;
+                } while (m_left->more());
+            } while (m_right->more());
 
             size_t rows = (left->m_from_list || right->m_from_list) ? 1 : std::min(right->size(), left->size());
             start += rows;

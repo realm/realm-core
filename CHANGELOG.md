@@ -13,6 +13,7 @@
 * Opening file with file format 23 in read-only mode will crash ([#7388](https://github.com/realm/realm-core/issues/7388), since v14.0.0)
 * Querying a dictionary over a link would sometimes result in out-of-bounds memory reads ([PR #7382](https://github.com/realm/realm-core/pull/7382), since v14.0.0).
 * Restore the pre-14.0.0 behavior of missing keys in dictionaries in queries  ([PR #7391](https://github.com/realm/realm-core/pull/7391))
+* Query lists vs lists if the property to check is a path with wildcards would not give correct result ([#7393](https://github.com/realm/realm-core/issues/7393), since v14.0.0)
 
 ### Breaking changes
 * None.

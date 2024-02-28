@@ -270,19 +270,19 @@ ColumnDictionaryKeys Columns<Dictionary>::keys()
 
 void Columns<Dictionary>::init_path(const PathElement* begin, const PathElement* end)
 {
-    m_path.clear();
-    m_path_only_unary_keys = true;
+    m_ctrl.path.clear();
+    m_ctrl.path_only_unary_keys = true;
     while (begin != end) {
         if (begin->is_all()) {
-            m_path_only_unary_keys = false;
+            m_ctrl.path_only_unary_keys = false;
         }
-        m_path.emplace_back(std::move(*begin));
+        m_ctrl.path.emplace_back(std::move(*begin));
         ++begin;
     }
-    std::move(begin, end, std::back_inserter(m_path));
-    if (m_path.empty()) {
-        m_path_only_unary_keys = false;
-        m_path.push_back(PathElement::AllTag());
+    std::move(begin, end, std::back_inserter(m_ctrl.path));
+    if (m_ctrl.path.empty()) {
+        m_ctrl.path_only_unary_keys = false;
+        m_ctrl.path.push_back(PathElement::AllTag());
     }
 }
 
@@ -350,6 +350,12 @@ public:
         : Columns<Dictionary>(other)
     {
     }
+    void reset_path(size_t) override {}
+    bool more() const override
+    {
+        return false;
+    }
+
     void evaluate(size_t index, ValueBase& destination) override
     {
         Allocator& alloc = this->m_link_map.get_target_table()->get_alloc();
@@ -375,22 +381,21 @@ SizeOperator<int64_t> Columns<Dictionary>::size()
     return SizeOperator<int64_t>(std::move(ptr));
 }
 
-void Columns<Dictionary>::evaluate(size_t index, ValueBase& destination)
+void Columns<Dictionary>::reset_path(size_t index)
 {
-    Collection::QueryCtrlBlock ctrl(m_path, *m_link_map.get_target_table(), !m_path_only_unary_keys);
-
+    m_ctrl.matches.clear();
     if (links_exist()) {
         REALM_ASSERT(!m_leaf);
         std::vector<ObjKey> links = m_link_map.get_links(index);
         auto sz = links.size();
         if (!m_link_map.only_unary_links())
-            ctrl.from_list = true;
+            m_ctrl.path_only_unary_keys = false;
 
         for (size_t t = 0; t < sz; t++) {
             const Obj obj = m_link_map.get_target_table()->get_object(links[t]);
             auto val = obj.get_any(m_column_key);
             if (!val.is_null()) {
-                Collection::get_any(ctrl, val, 0);
+                Collection::get_any(m_ctrl, val, 0);
             }
         }
     }
@@ -398,14 +403,28 @@ void Columns<Dictionary>::evaluate(size_t index, ValueBase& destination)
         // Not a link column
         REALM_ASSERT(m_leaf);
         if (ref_type ref = to_ref(m_leaf->get(index))) {
-            Collection::get_any(ctrl, {ref, CollectionType::Dictionary}, 0);
+            Collection::get_any(m_ctrl, {ref, CollectionType::Dictionary}, 0);
         }
     }
+    if (m_ctrl.matches.empty()) {
+        // Make sure we at lease have one empty result
+        m_ctrl.matches.emplace_back();
+    }
+    m_destination_index = 0;
+}
 
+bool Columns<Dictionary>::more() const
+{
+    return m_destination_index < m_ctrl.matches.size();
+}
+
+void Columns<Dictionary>::evaluate(size_t, ValueBase& destination)
+{
     // Copy values over
-    auto sz = ctrl.matches.size();
-    destination.init(ctrl.from_list || sz == 0, sz);
-    destination.set(ctrl.matches.begin(), ctrl.matches.end());
+    auto& matches = m_ctrl.matches[m_destination_index++];
+    auto sz = matches.size();
+    destination.init(!m_ctrl.path_only_unary_keys || sz == 0, sz);
+    destination.set(matches.begin(), matches.end());
 }
 
 
