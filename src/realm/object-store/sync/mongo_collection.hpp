@@ -74,19 +74,19 @@ public:
         void set_bson(bson::BsonDocument& bson) const
         {
             if (upsert) {
-                bson.append("upsert", true);
+                bson["upsert"] = true;
             }
 
             if (return_new_document) {
-                bson.append("returnNewDocument", true);
+                bson["returnNewDocument"] = true;
             }
 
             if (projection_bson) {
-                bson.append("projection", *projection_bson);
+                bson["projection"] = *projection_bson;
             }
 
             if (sort_bson) {
-                bson.append("sort", *sort_bson);
+                bson["sort"] = *sort_bson;
             }
         }
     };

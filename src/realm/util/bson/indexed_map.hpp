@@ -110,6 +110,10 @@ public:
     {
         return m_map;
     }
+    std::unordered_map<std::string, T>& entries() noexcept
+    {
+        return m_map;
+    }
 
 private:
     template <typename V>
@@ -243,11 +247,11 @@ typename IndexedMap<T>::iterator IndexedMap<T>::find(const std::string& k) const
 template <typename T>
 T& IndexedMap<T>::operator[](const std::string& k)
 {
-    auto entry = m_map.find(k);
-    if (entry == m_map.end()) {
-        m_keys.push_back(k);
+    if (auto entry = m_map.find(k); entry != m_map.end()) {
+        return entry->second;
     }
 
+    m_keys.push_back(k);
     return m_map[k];
 }
 

@@ -308,31 +308,40 @@ public:
         return size() == 0;
     }
 
-    void append(const std::string& key, const Bson& val)
+    Bson& operator[](const std::string& k)
     {
-        IndexedMap<Bson>::operator[](key) = val;
+        return IndexedMap<Bson>::operator[](k);
     }
 
-    Bson operator[](const std::string& k) const
-    {
-        return at(k);
-    }
-
-    Bson at(const std::string& k) const
+    Bson& at(const std::string& k)
     {
         return IndexedMap<Bson>::at(k);
     }
 
-    std::optional<Bson> find(const std::string& key) const
+    const Bson& at(const std::string& k) const
+    {
+        return IndexedMap<Bson>::at(k);
+    }
+
+    Bson* find(const std::string& key)
     {
         auto& raw = entries();
         if (auto it = raw.find(key); it != raw.end()) {
-            return it->second;
+            return &it->second;
         }
-        return {};
+        return nullptr;
     }
 
-    bool operator==(const BsonDocument& other) const
+    const Bson* find(const std::string& key) const
+    {
+        auto& raw = entries();
+        if (auto it = raw.find(key); it != raw.end()) {
+            return &it->second;
+        }
+        return nullptr;
+    }
+
+    bool operator==(const BsonDocument& other) const noexcept
     {
         return static_cast<const IndexedMap<Bson>*>(this)->entries() == other.entries();
     }
@@ -341,26 +350,13 @@ public:
 class BsonArray : private std::vector<Bson> {
 public:
     using entry = Bson;
+    using vector<Bson>::vector;
     using vector<Bson>::begin;
     using vector<Bson>::end;
     using vector<Bson>::size;
     using vector<Bson>::empty;
-
-    BsonArray() {}
-    BsonArray(std::initializer_list<entry> entries)
-        : std::vector<Bson>(entries)
-    {
-    }
-
-    Bson operator[](size_t n) const
-    {
-        return std::vector<Bson>::operator[](n);
-    }
-
-    void append(const Bson& val)
-    {
-        std::vector<Bson>::push_back(val);
-    }
+    using vector<Bson>::push_back;
+    using vector<Bson>::operator[];
 
     bool operator==(const BsonArray& other) const
     {

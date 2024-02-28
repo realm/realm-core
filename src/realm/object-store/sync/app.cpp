@@ -694,20 +694,20 @@ void App::attach_auth_options(BsonDocument& body)
     log_debug("App: version info: platform: %1  version: %2 - sdk: %3 - sdk version: %4 - core version: %5",
               m_config.device_info.platform, m_config.device_info.platform_version, m_config.device_info.sdk,
               m_config.device_info.sdk_version, m_config.device_info.core_version);
-    options.append("appId", m_config.app_id);
-    options.append("platform", m_config.device_info.platform);
-    options.append("platformVersion", m_config.device_info.platform_version);
-    options.append("sdk", m_config.device_info.sdk);
-    options.append("sdkVersion", m_config.device_info.sdk_version);
-    options.append("cpuArch", m_config.device_info.cpu_arch);
-    options.append("deviceName", m_config.device_info.device_name);
-    options.append("deviceVersion", m_config.device_info.device_version);
-    options.append("frameworkName", m_config.device_info.framework_name);
-    options.append("frameworkVersion", m_config.device_info.framework_version);
-    options.append("coreVersion", m_config.device_info.core_version);
-    options.append("bundleId", m_config.device_info.bundle_id);
+    options["appId"] = m_config.app_id;
+    options["platform"] = m_config.device_info.platform;
+    options["platformVersion"] = m_config.device_info.platform_version;
+    options["sdk"] = m_config.device_info.sdk;
+    options["sdkVersion"] = m_config.device_info.sdk_version;
+    options["cpuArch"] = m_config.device_info.cpu_arch;
+    options["deviceName"] = m_config.device_info.device_name;
+    options["deviceVersion"] = m_config.device_info.device_version;
+    options["frameworkName"] = m_config.device_info.framework_name;
+    options["frameworkVersion"] = m_config.device_info.framework_version;
+    options["coreVersion"] = m_config.device_info.core_version;
+    options["bundleId"] = m_config.device_info.bundle_id;
 
-    body.append("options", BsonDocument({{"device", options}}));
+    body["options"] = BsonDocument({{"device", options}});
 }
 
 void App::log_in_with_credentials(
@@ -1339,7 +1339,7 @@ Request App::make_streaming_request(const std::shared_ptr<SyncUser>& user, const
         {"name", name},
     };
     if (service_name) {
-        args.append("service", *service_name);
+        args["service"] = *service_name;
     }
     const auto args_json = Bson(args).to_string();
 

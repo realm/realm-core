@@ -416,8 +416,11 @@ std::ostream& operator<<(std::ostream& out, const Bson& b)
             out << nlohmann::json(b.operator const std::string&()).dump();
             break;
         case Bson::Type::Binary: {
-            const std::vector<char>& vec = static_cast<std::vector<char>>(b);
-            out << "{\"$binary\":{\"base64\":\"" << std::string(vec.begin(), vec.end()) << "\",\"subType\":\"00\"}}";
+            const std::vector<char>& vec = static_cast<const std::vector<char>&>(b);
+            std::string encode_buffer;
+            encode_buffer.resize(util::base64_encoded_size(vec.size()));
+            util::base64_encode(vec, encode_buffer);
+            out << "{\"$binary\":{\"base64\":\"" << encode_buffer << "\",\"subType\":\"00\"}}";
             break;
         }
         case Bson::Type::Timestamp: {
@@ -622,7 +625,7 @@ Bson dom_elem_to_bson(const Json& json)
         case Json::value_t::array: {
             BsonArray out;
             for (auto&& elem : json) {
-                out.append(dom_elem_to_bson(elem));
+                out.push_back(dom_elem_to_bson(elem));
             }
             return Bson(std::move(out));
         }
@@ -658,16 +661,17 @@ static constexpr std::pair<std::string_view, FancyParser> bson_fancy_parsers[] =
          }
          if (!base64 || !subType)
              throw BsonError("invalid extended json $binary");
+         util::Optional<std::vector<char>> decoded_chars = util::base64_decode_to_vector(*base64);
+         if (!decoded_chars)
+             throw BsonError("Invalid base64 in $binary");
+
          if (subType == 0x04) { // UUID
-             util::Optional<std::vector<char>> uuidChrs = util::base64_decode_to_vector(*base64);
-             if (!uuidChrs)
-                 throw BsonError("Invalid base64 in $binary");
              UUID::UUIDBytes bytes{};
-             std::copy_n(uuidChrs->data(), bytes.size(), bytes.begin());
+             std::copy_n(decoded_chars->data(), bytes.size(), bytes.begin());
              return Bson(UUID(bytes));
          }
          else {
-             return Bson(std::move(*base64)); // TODO don't throw away the subType.
+             return Bson(std::move(*decoded_chars)); // TODO don't throw away the subType.
          }
      }},
     {"$date",
@@ -786,7 +790,7 @@ Bson dom_obj_to_bson(const Json& json)
 
     BsonDocument out;
     for (auto&& [k, v] : json.items()) {
-        out.append(k, dom_elem_to_bson(v));
+        out[k] = dom_elem_to_bson(v);
     }
     return out;
 }
