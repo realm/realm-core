@@ -23,7 +23,7 @@
 -----------
 
 ### Internals
-* None.
+* The `dependencies.list` file that defines the realm core library version and the versions of its dependencies is now a YAML file called `dependencies.yml` ([PR #7394](https://github.com/realm/realm-core/pull/7394)).
 
 ----------------------------------------------
 
