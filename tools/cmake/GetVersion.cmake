@@ -1,4 +1,4 @@
-file(STRINGS "${RealmCore_SOURCE_DIR}/dependencies.list" DEPENDENCIES)
+file(STRINGS "${RealmCore_SOURCE_DIR}/dependencies.yml" DEPENDENCIES)
 set(VALID_DEPENDENCIES "")
 foreach(LINE IN LISTS DEPENDENCIES)
     string(REGEX MATCHALL "([^:]+)" KEY_VALUE ${LINE})
