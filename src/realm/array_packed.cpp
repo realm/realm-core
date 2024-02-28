@@ -198,7 +198,7 @@ size_t ArrayPacked::parallel_subword_find(const Array& arr, int64_t value, size_
         start += field_count;
         it.bump(bit_count_pr_iteration);
     }
-    if (!vector && total_bit_count_left) {              // final subword, may be partial
+    if (total_bit_count_left) {                         // final subword, may be partial
         const auto word = it.get(total_bit_count_left); // <-- limit lookahead to avoid touching memory beyond array
         vector = bitwidth_cmp(word, search_vector);
         auto last_word_mask = 0xFFFFFFFFFFFFFFFFULL >> (64 - total_bit_count_left);
@@ -208,7 +208,7 @@ size_t ArrayPacked::parallel_subword_find(const Array& arr, int64_t value, size_
             return start + sub_word_index;
         }
     }
-    return arr.size();
+    return end;
 }
 
 bool ArrayPacked::find_all_match(size_t start, size_t end, size_t baseindex, QueryStateBase* state) const
