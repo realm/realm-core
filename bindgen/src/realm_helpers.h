@@ -1,7 +1,6 @@
 #pragma once
 
 #include "realm/binary_data.hpp"
-#include "realm/data_type.hpp"
 #include "realm/object-store/object_store.hpp"
 #include "realm/object-store/sync/mongo_collection.hpp"
 #include "realm/object-store/sync/sync_session.hpp"
