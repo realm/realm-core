@@ -72,6 +72,7 @@ private:
     Encoding m_encoding{NodeHeader::Encoding::WTypBits}; // this is not ok .... probably
     size_t m_v_width = 0, m_v_size = 0, m_ndx_width = 0, m_ndx_size = 0;
     size_t m_v_mask = 0;
+    size_t m_ndx_mask = 0;
 
     friend class ArrayPacked;
     friend class ArrayFlex;

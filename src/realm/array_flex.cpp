@@ -176,10 +176,9 @@ bool ArrayFlex::find_all(const Array& arr, int64_t value, size_t start, size_t e
 }
 
 template <typename Cond>
-size_t ArrayFlex::parallel_subword_find(const Array& arr, int64_t value, size_t offset, uint_least8_t width,
-                                        size_t start, size_t end) const
+size_t ArrayFlex::parallel_subword_find(const Array& arr, int64_t value, size_t width_mask, size_t offset,
+                                        uint_least8_t width, size_t start, size_t end) const
 {
-    const auto width_mask = 1ULL << (width - 1);
     const auto MSBs = populate(width, width_mask);
     const auto search_vector = populate(width, value);
     const auto field_count = num_fields_for_width(width);
@@ -197,9 +196,9 @@ size_t ArrayFlex::parallel_subword_find(const Array& arr, int64_t value, size_t 
             return find_all_fields_signed_LE(MSBs, a, b);
         else if constexpr (std::is_same_v<Cond, GreaterEqual>)
             return find_all_fields_signed_GE(MSBs, a, b);
-        // These 2 is supposed to be used only for unsigned indices..
         else if constexpr (std::is_same_v<Cond, Less>)
-            return find_all_fields_unsigned_LT(MSBs, a, b);
+            // return find_all_fields_unsigned_LT(MSBs, a, b);
+            return find_all_fields_signed_LT(MSBs, a, b);
     };
 
     unaligned_word_iter it((uint64_t*)(arr.m_data), offset + start * width);
@@ -256,16 +255,17 @@ bool ArrayFlex::find_eq(const Array& arr, int64_t value, size_t start, size_t en
 
     //    size_t v_start = 0;
     //    size_t ndx_pos = start;
-    //    for(;v_start < v_size;) {
+    //    for(;v_start < v_size; ++v_start) {
     //        auto p = parallel_subword_find<Equal>(arr, value, 0, v_width, v_start, v_size);
-    //        if(p == v_size) break;
+    //        if(p == v_size)
+    //            continue;
     //        ndx_pos = parallel_subword_find<Equal>(arr, p, offset, ndx_width, ndx_pos, end);
-    //        if(ndx_pos == end) break;
+    //        if(ndx_pos == end)
+    //            continue;
     //        if(!state->match(ndx_pos + baseindex))
     //            return false;
-    //        ++v_start;
+    //
     //    }
-
     // std::cout << "Seking for Val == " << value << std::endl;
     bf_iterator it_index{data, static_cast<size_t>(offset), ndx_width, ndx_width, start};
     for (; start < end; ++start, ++it_index) {
@@ -288,9 +288,34 @@ bool ArrayFlex::find_neq(const Array& arr, int64_t value, size_t start, size_t e
     const auto data = (uint64_t*)arr.m_data;
     const auto offset = v_size * v_width;
 
-    bf_iterator it_index{data, static_cast<size_t>(offset), ndx_width, ndx_width, start};
-    for (; start < end; ++start, ++it_index) {
-        const auto v = sign_extend_field_by_mask(mask, read_bitfield(data, *it_index * v_width, v_width));
+    //    std::cout << value << std::endl;
+    //         bf_iterator it_index{data, static_cast<size_t>(offset), ndx_width, ndx_width, start};
+    //         std::cout << "Index: ";
+    //         auto start2 = start;
+    //         for (; start2 < end; ++start2, ++it_index) {
+    //             std::cout << *it_index << ", ";
+    //         } std::cout << std::endl;
+    //         std::cout << "Value: ";
+    //         bf_iterator it_value{data, 0, v_width, v_width, 0};
+    //         start2 = start;
+    //         for (; start2 < v_size; ++start2, ++it_value) {
+    //             std::cout << *it_value << ", ";
+    //         }std::cout << std::endl;
+
+    // x40 slower
+    //    auto p = parallel_subword_find<Equal>(arr, value, encoder.m_v_mask, 0, v_width, 0, v_size);
+    //    if(p == v_size) return true;
+    //    auto ndx = parallel_subword_find<Equal>(arr, p, encoder.m_ndx_mask, offset, ndx_width, start, end);
+    //    if(ndx == end) return true;
+    //
+    //    for(;start < ndx; ++start)
+    //        if (!state->match(start + baseindex))
+    //            return false;
+
+    // all the rest
+    bf_iterator it{data, static_cast<size_t>(offset), ndx_width, ndx_width, start};
+    for (; start < end; ++start, ++it) {
+        const auto v = sign_extend_field_by_mask(mask, read_bitfield(data, (*it * v_width), v_width));
         if (v != value)
             if (!state->match(start + baseindex))
                 return false;
