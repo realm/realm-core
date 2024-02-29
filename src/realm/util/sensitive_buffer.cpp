@@ -147,7 +147,7 @@ void SensitiveBufferBase::secure_erase(void* buffer, size_t size)
 #ifdef _WIN32
     SecureZeroMemory(buffer, size);
 #elif defined(__STDC_LIB_EXT1__) || __APPLE__
-    memset_s(m_buffer, m_size, 0, m_size);
+    memset_s(buffer, size, 0, size);
 #else
 #warning "Platforms lacks memset_s"
 #endif
