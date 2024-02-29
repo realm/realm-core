@@ -12,7 +12,8 @@
 * Passing a double as argument for a Query on Decimal128 did not work ([#7386](https://github.com/realm/realm-core/issues/7386), since v14.0.0)
 * Opening file with file format 23 in read-only mode will crash ([#7388](https://github.com/realm/realm-core/issues/7388), since v14.0.0)
 * Querying a dictionary over a link would sometimes result in out-of-bounds memory reads ([PR #7382](https://github.com/realm/realm-core/pull/7382), since v14.0.0).
-* Restore the pre-14.0.0 behavior of missing keys in dictionaries in queries  ([PR #7391](https://github.com/realm/realm-core/pull/7391))
+* Restore the pre-14.0.0 behavior of missing keys in dictionaries in queries ([PR #7391](https://github.com/realm/realm-core/pull/7391))
+* Fix a ~10% performance regression for bulk insertion when using a log level which does not include debug/trace ([PR #7400](https://github.com/realm/realm-core/pull/7400), since v14.0.0)
 
 ### Breaking changes
 * None.
