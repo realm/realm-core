@@ -598,6 +598,11 @@ inline uint64_t find_all_fields_unsigned_LE(uint64_t MSBs, uint64_t A, uint64_t 
     return MSBs & GT_negated;
 }
 
+inline uint64_t find_all_fields_unsigned_GE(uint64_t MSBs, uint64_t A, uint64_t B)
+{
+    return find_all_fields_unsigned_LE(MSBs, B, A);
+}
+
 /*
     Handling signed values
 

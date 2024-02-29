@@ -175,8 +175,8 @@ bool ArrayFlex::find_all(const Array& arr, int64_t value, size_t start, size_t e
     return true;
 }
 
-template <typename Cond>
-size_t ArrayFlex::parallel_subword_find(const Array& arr, int64_t value, size_t width_mask, size_t offset,
+template <typename Cond, bool v>
+size_t ArrayFlex::parallel_subword_find(const Array& arr, uint64_t value, size_t width_mask, size_t offset,
                                         uint_least8_t width, size_t start, size_t end) const
 {
     const auto MSBs = populate(width, width_mask);
@@ -190,15 +190,18 @@ size_t ArrayFlex::parallel_subword_find(const Array& arr, int64_t value, size_t 
             return find_all_fields_EQ(MSBs, a, b);
         else if constexpr (std::is_same_v<Cond, NotEqual>)
             return find_all_fields_NE(MSBs, a, b);
+        else if constexpr (std::is_same_v<Cond, GreaterEqual>) {
+            if constexpr (v == true)
+                return find_all_fields_signed_GE(MSBs, a, b);
+            if constexpr (v == false)
+                return find_all_fields_unsigned_GE(MSBs, a, b);
+            REALM_UNREACHABLE();
+        }
+
         else if constexpr (std::is_same_v<Cond, Greater>)
             return find_all_fields_signed_GT(MSBs, a, b);
-        else if constexpr (std::is_same_v<Cond, LessEqual>)
-            return find_all_fields_signed_LE(MSBs, a, b);
-        else if constexpr (std::is_same_v<Cond, GreaterEqual>)
-            return find_all_fields_signed_GE(MSBs, a, b);
         else if constexpr (std::is_same_v<Cond, Less>)
             return find_all_fields_unsigned_LT(MSBs, a, b);
-        // return find_all_fields_signed_LT(MSBs, a, b);
     };
 
     unaligned_word_iter it((uint64_t*)(arr.m_data), offset + start * width);
@@ -293,24 +296,18 @@ bool ArrayFlex::find_lt(const Array& arr, int64_t value, size_t start, size_t en
     const auto v_width = encoder.m_v_width;
     const auto v_size = encoder.m_v_size;
     const auto ndx_width = encoder.m_ndx_width;
-    // const auto mask = encoder.width_mask();
-    // const auto data = (uint64_t*)arr.m_data;
     const auto offset = v_size * v_width;
-    // this can be made better... find GTE index and find all the matching values Less than that index..
+
     auto v_start = parallel_subword_find<GreaterEqual>(arr, value, encoder.m_v_mask, 0, v_width, 0, v_size);
+    if (v_start == v_size)
+        return true;
+
     while (start < end) {
         start = parallel_subword_find<Less>(arr, v_start, encoder.m_ndx_mask, offset, ndx_width, start, end);
         if (start < end && !state->match(start + baseindex))
             return false;
         ++start;
     }
-    //    bf_iterator it_index{data, static_cast<size_t>(offset), ndx_width, ndx_width, start};
-    //    for (; start < end; ++start, ++it_index) {
-    //        const auto v = sign_extend_field_by_mask(mask, read_bitfield(data, *it_index * v_width, v_width));
-    //        if (v < value)
-    //            if (!state->match(start + baseindex))
-    //                return false;
-    //    }
     return true;
 }
 
@@ -321,26 +318,18 @@ bool ArrayFlex::find_gt(const Array& arr, int64_t value, size_t start, size_t en
     const auto v_width = encoder.m_v_width;
     const auto v_size = encoder.m_v_size;
     const auto ndx_width = encoder.m_ndx_width;
-    const auto mask = encoder.width_mask();
-    const auto data = (uint64_t*)arr.m_data;
     const auto offset = v_size * v_width;
 
-    // inverse logic of Less should be possible here.
-    //    auto v_start = parallel_subword_find<Greater>(arr, value, encoder.m_v_mask, 0, v_width, 0, v_size);
-    //    start = parallel_subword_find<Equal>(arr, v_start, encoder.m_ndx_mask, offset, ndx_width, start, end);
-    //    bf_iterator it(data, offset, ndx_width, ndx_width, start);
-    //    for(; start<end; ++start,++it) {
-    //        if(*it < v_start) continue;
-    //        if(!state->match(start + baseindex))
-    //            return false;
-    //    }
+    auto v_start = parallel_subword_find<Greater>(arr, value, encoder.m_v_mask, 0, v_width, 0, v_size);
+    if (v_start == v_size)
+        return true;
 
-    bf_iterator it_index{data, static_cast<size_t>(offset), ndx_width, ndx_width, start};
-    for (; start < end; ++start, ++it_index) {
-        const auto v = sign_extend_field_by_mask(mask, read_bitfield(data, *it_index * v_width, v_width));
-        if (v > value)
-            if (!state->match(start + baseindex))
-                return false;
+    while (start < end) {
+        start = parallel_subword_find<GreaterEqual, false>(arr, v_start, encoder.m_ndx_mask, offset, ndx_width, start,
+                                                           end);
+        if (start < end && !state->match(start + baseindex))
+            return false;
+        ++start;
     }
     return true;
 }
