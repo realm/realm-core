@@ -571,7 +571,7 @@ void AESCryptor::crypt(EncryptionMode mode, off_t pos, char* dst, const char* sr
     REALM_ASSERT_RELEASE_EX(i == 0 && "BCryptDestroyKey()", i);
 
 #else
-    if (!EVP_CipherInit_ex(m_ctx, EVP_aes_256_cbc(), NULL, m_aesKey.data().data(), iv, mode))
+    if (!EVP_CipherInit_ex(m_ctx, EVP_aes_256_cbc(), NULL, m_aesKey.data()->data(), iv, mode))
         handle_error();
 
     int len;
