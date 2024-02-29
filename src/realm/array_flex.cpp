@@ -176,8 +176,8 @@ bool ArrayFlex::find_all(const Array& arr, int64_t value, size_t start, size_t e
 }
 
 template <typename Cond, bool v>
-size_t ArrayFlex::parallel_subword_find(const Array& arr, uint64_t value, size_t width_mask, size_t offset,
-                                        uint_least8_t width, size_t start, size_t end) const
+inline size_t ArrayFlex::parallel_subword_find(const Array& arr, uint64_t value, size_t width_mask, size_t offset,
+                                               uint_least8_t width, size_t start, size_t end) const
 {
     const auto MSBs = populate(width, width_mask);
     const auto search_vector = populate(width, value);
@@ -230,21 +230,6 @@ size_t ArrayFlex::parallel_subword_find(const Array& arr, uint64_t value, size_t
     return end;
 }
 
-// print
-//     bf_iterator it_index{data, static_cast<size_t>(offset), ndx_width, ndx_width, start};
-//     std::cout << "Index: ";
-//     auto start2 = start;
-//     for (; start2 < end; ++start2, ++it_index) {
-//         std::cout << *it_index << ", ";
-//     } std::cout << std::endl;
-//     std::cout << "Value: ";
-//     bf_iterator it_value{data, 0, v_width, v_width, 0};
-//     start2 = start;
-//     for (; start2 < v_size; ++start2, ++it_value) {
-//         std::cout << *it_value << ", ";
-//     }std::cout << std::endl;
-//
-
 bool ArrayFlex::find_eq(const Array& arr, int64_t value, size_t start, size_t end, size_t baseindex,
                         QueryStateBase* state) const
 {
@@ -253,6 +238,7 @@ bool ArrayFlex::find_eq(const Array& arr, int64_t value, size_t start, size_t en
     const auto v_size = encoder.m_v_size;
     const auto ndx_width = encoder.m_ndx_width;
     const auto offset = v_size * v_width;
+    const auto inc = num_fields_for_width((int)ndx_width);
 
     auto v_start = parallel_subword_find<Equal>(arr, value, encoder.m_v_mask, 0, v_width, 0, v_size);
     if (v_start == v_size)
@@ -260,10 +246,28 @@ bool ArrayFlex::find_eq(const Array& arr, int64_t value, size_t start, size_t en
 
     while (start < end) {
         start = parallel_subword_find<Equal>(arr, v_start, encoder.m_ndx_mask, offset, ndx_width, start, end);
-        if (start < end && !state->match(start + baseindex))
-            return false;
-        ++start;
+        if (start < end) {
+            if (!state->match(start + baseindex))
+                return false;
+            start += 1;
+        }
+        else
+            start += inc;
     }
+
+    // linear scan is as bad as a parell scan for timestamps both for values <32 and >=32 bits
+    //        const auto data = (uint64_t*)arr.m_data;
+    //        const auto mask = encoder.m_v_mask;
+    //        bf_iterator it(data, offset, ndx_width, ndx_width, start);
+    //        for(; start < end; ++start, ++it)
+    //        {
+    //            bf_iterator it_data(data, 0, v_width, v_width, *it);
+    //            const auto sv = sign_extend_field_by_mask(mask, *it_data);
+    //            if(sv == value)
+    //                if(!state->match(start + baseindex))
+    //                    return false;
+    //        }
+    //    }
     return true;
 }
 
@@ -275,6 +279,7 @@ bool ArrayFlex::find_neq(const Array& arr, int64_t value, size_t start, size_t e
     const auto v_size = encoder.m_v_size;
     const auto ndx_width = encoder.m_ndx_width;
     const auto offset = v_size * v_width;
+    const auto inc = num_fields_for_width((int)ndx_width);
 
     auto v_start = parallel_subword_find<Equal>(arr, value, encoder.m_v_mask, 0, v_width, 0, v_size);
     if (v_start == v_size)
@@ -282,9 +287,13 @@ bool ArrayFlex::find_neq(const Array& arr, int64_t value, size_t start, size_t e
 
     while (start < end) {
         start = parallel_subword_find<NotEqual>(arr, v_start, encoder.m_ndx_mask, offset, ndx_width, start, end);
-        if (start < end && !state->match(start + baseindex))
-            return false;
-        ++start;
+        if (start < end) {
+            if (!state->match(start + baseindex))
+                return false;
+            ++start;
+        }
+        else
+            start += inc;
     }
     return true;
 }
@@ -297,6 +306,7 @@ bool ArrayFlex::find_lt(const Array& arr, int64_t value, size_t start, size_t en
     const auto v_size = encoder.m_v_size;
     const auto ndx_width = encoder.m_ndx_width;
     const auto offset = v_size * v_width;
+    const auto inc = num_fields_for_width((int)ndx_width);
 
     auto v_start = parallel_subword_find<GreaterEqual>(arr, value, encoder.m_v_mask, 0, v_width, 0, v_size);
     if (v_start == v_size)
@@ -304,9 +314,13 @@ bool ArrayFlex::find_lt(const Array& arr, int64_t value, size_t start, size_t en
 
     while (start < end) {
         start = parallel_subword_find<Less>(arr, v_start, encoder.m_ndx_mask, offset, ndx_width, start, end);
-        if (start < end && !state->match(start + baseindex))
-            return false;
-        ++start;
+        if (start < end) {
+            if (!state->match(start + baseindex))
+                return false;
+            ++start;
+        }
+        else
+            start += inc;
     }
     return true;
 }
@@ -319,6 +333,7 @@ bool ArrayFlex::find_gt(const Array& arr, int64_t value, size_t start, size_t en
     const auto v_size = encoder.m_v_size;
     const auto ndx_width = encoder.m_ndx_width;
     const auto offset = v_size * v_width;
+    const auto inc = num_fields_for_width((int)ndx_width);
 
     auto v_start = parallel_subword_find<Greater>(arr, value, encoder.m_v_mask, 0, v_width, 0, v_size);
     if (v_start == v_size)
@@ -327,9 +342,13 @@ bool ArrayFlex::find_gt(const Array& arr, int64_t value, size_t start, size_t en
     while (start < end) {
         start = parallel_subword_find<GreaterEqual, false>(arr, v_start, encoder.m_ndx_mask, offset, ndx_width, start,
                                                            end);
-        if (start < end && !state->match(start + baseindex))
-            return false;
-        ++start;
+        if (start < end) {
+            if (!state->match(start + baseindex))
+                return false;
+            ++start;
+        }
+        else
+            start += inc;
     }
     return true;
 }

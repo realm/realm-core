@@ -79,7 +79,7 @@ bool ArrayIntNull::find_impl(value_type opt_value, size_t start, size_t end, Que
         }
         // if encoded use specialised find
         if (is_encoded())
-            return find_encoded<cond>(value, start2, end, baseindex2, state);
+            return find_encoded<cond>(value, start2, end2, baseindex2, state);
         // Fall back to plain Array find.
         return ArrayWithFind(*this).find<cond>(value, start2, end2, baseindex2, state);
     }

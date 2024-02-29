@@ -95,31 +95,31 @@ bool ArrayEncode::always_encode(const Array& origin, Array& arr, bool packed) co
 bool ArrayEncode::encode(const Array& origin, Array& arr) const
 {
     // return false;
-    return always_encode(origin, arr, false); // true packed, false flex
+    // return always_encode(origin, arr, true); // true packed, false flex
 
-    //    std::vector<int64_t> values;
-    //    std::vector<size_t> indices;
-    //    encode_values(origin, values, indices);
-    //    if (!values.empty()) {
-    //        size_t v_width, ndx_width;
-    //        const auto uncompressed_size = origin.get_byte_size();
-    //        const auto packed_size = packed_encoded_array_size(values, origin.size(), v_width);
-    //        const auto flex_size = flex_encoded_array_size(values, indices, v_width, ndx_width);
-    //
-    //        if (flex_size < packed_size && flex_size < uncompressed_size) {
-    //            const uint8_t flags = NodeHeader::get_flags(origin.get_header());
-    //            encode_array(s_flex, arr, flex_size, flags, v_width, ndx_width, values.size(), indices.size());
-    //            copy_into_encoded_array(s_flex, arr, values, indices);
-    //            return true;
-    //        }
-    //        else if (packed_size < uncompressed_size) {
-    //            const uint8_t flags = NodeHeader::get_flags(origin.get_header());
-    //            encode_array(s_packed, arr, packed_size, flags, v_width, origin.size());
-    //            copy_into_encoded_array(s_packed, origin, arr);
-    //            return true;
-    //        }
-    //    }
-    //    return false;
+    std::vector<int64_t> values;
+    std::vector<size_t> indices;
+    encode_values(origin, values, indices);
+    if (!values.empty()) {
+        size_t v_width, ndx_width;
+        const auto uncompressed_size = origin.get_byte_size();
+        const auto packed_size = packed_encoded_array_size(values, origin.size(), v_width);
+        const auto flex_size = flex_encoded_array_size(values, indices, v_width, ndx_width);
+
+        if (flex_size < packed_size && flex_size < uncompressed_size) {
+            const uint8_t flags = NodeHeader::get_flags(origin.get_header());
+            encode_array(s_flex, arr, flex_size, flags, v_width, ndx_width, values.size(), indices.size());
+            copy_into_encoded_array(s_flex, arr, values, indices);
+            return true;
+        }
+        else if (packed_size < uncompressed_size) {
+            const uint8_t flags = NodeHeader::get_flags(origin.get_header());
+            encode_array(s_packed, arr, packed_size, flags, v_width, origin.size());
+            copy_into_encoded_array(s_packed, origin, arr);
+            return true;
+        }
+    }
+    return false;
 }
 
 bool ArrayEncode::decode(Array& arr) const
