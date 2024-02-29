@@ -109,7 +109,7 @@ void set_key(std::optional<util::File::EncryptionKeyType>& key, CFStringRef acco
 
     auto search_dictionary = build_search_dictionary(account, service, none);
     CFDictionaryAddValue(search_dictionary.get(), kSecAttrAccessible, kSecAttrAccessibleAfterFirstUnlock);
-    auto key_data = adoptCF(CFDataCreate(nullptr, key->data().data(), key_size));
+    auto key_data = adoptCF(CFDataCreate(nullptr, key->data()->data(), key_size));
     if (!key_data)
         throw std::bad_alloc();
 
