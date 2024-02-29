@@ -39,13 +39,13 @@ SensitiveBufferBase::SensitiveBufferBase(size_t size)
     m_buffer = VirtualAlloc(nullptr, m_size, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
     REALM_ASSERT_RELEASE_EX(m_buffer != NULL && "VirtualAlloc()", GetLastError());
 
-// TODO: locking enough pages requires us to increase the current process working set size.
-// We use VirtualLock to prevent the memory range from being saved to swap, but since we're also using CryptProtectMemory()
-// perhaps this isn't as necessary.
-/*
-    BOOL ret = VirtualLock(m_buffer, m_size);
-    REALM_ASSERT_RELEASE_EX(ret != 0 && "VirtualLock()", GetLastError());
-*/
+    // TODO: locking enough pages requires us to increase the current process working set size.
+    // We use VirtualLock to prevent the memory range from being saved to swap, but since we're also using
+    // CryptProtectMemory() perhaps this isn't as necessary.
+    /*
+        BOOL ret = VirtualLock(m_buffer, m_size);
+        REALM_ASSERT_RELEASE_EX(ret != 0 && "VirtualLock()", GetLastError());
+    */
 }
 
 SensitiveBufferBase::~SensitiveBufferBase()
@@ -55,11 +55,11 @@ SensitiveBufferBase::~SensitiveBufferBase()
 
     secure_erase(m_buffer, m_size);
 
-// See comment above.
-/*
-    BOOL ret = VirtualUnlock(m_buffer, m_size);
-    REALM_ASSERT_RELEASE_EX(ret == TRUE && "VirtualUnlock()", GetLastError());
-*/
+    // See comment above.
+    /*
+        BOOL ret = VirtualUnlock(m_buffer, m_size);
+        REALM_ASSERT_RELEASE_EX(ret == TRUE && "VirtualUnlock()", GetLastError());
+    */
 
     BOOL ret = VirtualFree(m_buffer, 0, MEM_RELEASE);
     REALM_ASSERT_RELEASE_EX(ret == TRUE && "VirtualFree()", GetLastError());
