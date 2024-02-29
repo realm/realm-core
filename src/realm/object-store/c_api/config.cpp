@@ -24,9 +24,9 @@ RLM_API size_t realm_config_get_encryption_key(const realm_config_t* config, uin
     if (config->encryption_key.has_value()) {
         const auto& raw_key = config->encryption_key->data();
         if (out_key) {
-            std::copy(raw_key.begin(), raw_key.end(), out_key);
+            std::copy(raw_key->begin(), raw_key->end(), out_key);
         }
-        return raw_key.size();
+        return raw_key->size();
     }
 
     return 0;
@@ -42,6 +42,7 @@ RLM_API bool realm_config_set_encryption_key(realm_config_t* config, const uint8
         std::array<uint8_t, 64> raw_key;
         std::copy(key, key + key_size, raw_key.begin());
         config->encryption_key.emplace(raw_key);
+        util::SensitiveBufferBase::secure_erase(raw_key.data(), raw_key.size());
         return true;
     });
 }

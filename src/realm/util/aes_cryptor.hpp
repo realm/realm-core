@@ -101,7 +101,7 @@ private:
     CCCryptorRef m_encr;
     CCCryptorRef m_decr;
 #elif defined(_WIN32)
-    BCRYPT_KEY_HANDLE m_aes_key_handle;
+    BCRYPT_ALG_HANDLE m_aes_alg_handle;
 #else
     EVP_CIPHER_CTX* m_ctx;
 #endif

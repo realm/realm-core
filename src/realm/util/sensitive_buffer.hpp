@@ -62,6 +62,8 @@ public:
         return !operator==(rhs);
     }
 
+    static void secure_erase(void*, size_t);
+
 protected:
     SensitiveBufferBase(size_t buffer_size);
     SensitiveBufferBase(const SensitiveBufferBase& other);
@@ -93,6 +95,27 @@ struct SensitiveBuffer : private SensitiveBufferBase {
 
 public:
     using element_type = T;
+
+    struct SelfErasingStorage {
+    public:
+        const T& operator*() const
+        {
+            return m_value;
+        }
+
+        const T* operator->() const
+        {
+            return &m_value;
+        }
+
+        ~SelfErasingStorage()
+        {
+            SensitiveBufferBase::secure_erase(&m_value, sizeof(T));
+        }
+    private:
+        friend struct SensitiveBuffer<T>;
+        T m_value;
+    };
 
     SensitiveBuffer()
         : SensitiveBufferBase(sizeof(T))
@@ -130,7 +153,7 @@ public:
         if (this != &other) {
             REALM_ASSERT(engaged());
             with_unprotected_buffer([&other](void* buffer) {
-                *(reinterpret_cast<T*>(buffer)) = other.data();
+                *(reinterpret_cast<T*>(buffer)) = *other.data();
             });
         }
         return *this;
@@ -146,11 +169,11 @@ public:
         return SensitiveBufferBase::operator!=(rhs);
     }
 
-    T data() const
+    SelfErasingStorage data() const
     {
-        T ret;
+        SelfErasingStorage ret;
         with_unprotected_buffer([&ret](void* buffer) {
-            ret = *reinterpret_cast<T*>(buffer);
+            ret.m_value = *reinterpret_cast<T*>(buffer);
         });
         return ret;
     }

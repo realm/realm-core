@@ -53,7 +53,7 @@ SensitiveBufferBase::~SensitiveBufferBase()
     if (!m_buffer)
         return;
 
-    SecureZeroMemory(m_buffer, m_size);
+    secure_erase(m_buffer, m_size);
 
 // See comment above.
 /*
@@ -109,11 +109,7 @@ SensitiveBufferBase::~SensitiveBufferBase()
     if (!m_buffer)
         return;
 
-#if defined(__STDC_LIB_EXT1__) || __APPLE__
-    memset_s(m_buffer, m_size, 0, m_size);
-#else
-#warning "Platforms lacks memset_s"
-#endif
+    secure_erase(m_buffer, m_size);
 
 #if defined(MADV_DONTDUMP) && defined(MADV_DODUMP)
     madvise(m_buffer, m_size, MADV_DODUMP);
@@ -144,4 +140,15 @@ SensitiveBufferBase::SensitiveBufferBase(SensitiveBufferBase&& other) noexcept
     : m_size(other.m_size)
 {
     std::swap(m_buffer, other.m_buffer);
+}
+
+void SensitiveBufferBase::secure_erase(void* buffer, size_t size)
+{
+#ifdef _WIN32
+    SecureZeroMemory(buffer, size);
+#elif defined(__STDC_LIB_EXT1__) || __APPLE__
+    memset_s(m_buffer, m_size, 0, m_size);
+#else
+#warning "Platforms lacks memset_s"
+#endif
 }
