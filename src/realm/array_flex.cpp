@@ -249,28 +249,18 @@ bool ArrayFlex::find_eq(const Array& arr, int64_t value, size_t start, size_t en
     const auto v_width = encoder.m_v_width;
     const auto v_size = encoder.m_v_size;
     const auto ndx_width = encoder.m_ndx_width;
-    // const auto mask = encoder.width_mask();
-    const auto data = (uint64_t*)arr.m_data;
     const auto offset = v_size * v_width;
 
     auto v_start = parallel_subword_find<Equal>(arr, value, encoder.m_v_mask, 0, v_width, 0, v_size);
-    start = parallel_subword_find<Equal>(arr, v_start, encoder.m_ndx_mask, offset, ndx_width, start, end);
-    bf_iterator it(data, offset, ndx_width, ndx_width, start);
-    for (; start < end; ++start, ++it) {
-        if (*it != v_start)
-            continue;
-        if (!state->match(start + baseindex))
-            return false;
-    }
+    if (v_start == v_size)
+        return true;
 
-    // double jump find
-    //    bf_iterator it_index{data, static_cast<size_t>(offset), ndx_width, ndx_width, start};
-    //    for (; start < end; ++start, ++it_index) {
-    //        const auto v = sign_extend_field_by_mask(mask, read_bitfield(data, *it_index * v_width, v_width));
-    //        if (v == value)
-    //            if (!state->match(start + baseindex))
-    //                return false;
-    //    }
+    while (start < end) {
+        start = parallel_subword_find<Equal>(arr, v_start, encoder.m_ndx_mask, offset, ndx_width, start, end);
+        if (start < end && !state->match(start + baseindex))
+            return false;
+        ++start;
+    }
     return true;
 }
 
@@ -281,27 +271,18 @@ bool ArrayFlex::find_neq(const Array& arr, int64_t value, size_t start, size_t e
     const auto v_width = encoder.m_v_width;
     const auto v_size = encoder.m_v_size;
     const auto ndx_width = encoder.m_ndx_width;
-    // const auto mask = encoder.width_mask();
-    const auto data = (uint64_t*)arr.m_data;
     const auto offset = v_size * v_width;
 
     auto v_start = parallel_subword_find<Equal>(arr, value, encoder.m_v_mask, 0, v_width, 0, v_size);
-    start = parallel_subword_find<NotEqual>(arr, v_start, encoder.m_ndx_mask, offset, ndx_width, start, end);
-    bf_iterator it(data, offset, ndx_width, ndx_width, start);
-    for (; start < end; ++start, ++it) {
-        if (*it == v_start)
-            continue;
-        if (!state->match(start + baseindex))
-            return false;
-    }
+    if (v_start == v_size)
+        return true;
 
-    //    bf_iterator it{data, static_cast<size_t>(offset), ndx_width, ndx_width, start};
-    //    for (; start < end; ++start, ++it) {
-    //        const auto v = sign_extend_field_by_mask(mask, read_bitfield(data, (*it * v_width), v_width));
-    //        if (v != value)
-    //            if (!state->match(start + baseindex))
-    //                return false;
-    //    }
+    while (start < end) {
+        start = parallel_subword_find<NotEqual>(arr, v_start, encoder.m_ndx_mask, offset, ndx_width, start, end);
+        if (start < end && !state->match(start + baseindex))
+            return false;
+        ++start;
+    }
     return true;
 }
 
