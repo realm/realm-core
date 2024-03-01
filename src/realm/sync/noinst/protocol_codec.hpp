@@ -87,7 +87,7 @@ private:
     std::pair<T, std::string_view> peek_token_impl() const
     {
         // We currently only support numeric, string, and boolean values in header lines.
-        static_assert(std::is_integral_v<T> || is_any_v<T, std::string_view, std::string>);
+        static_assert(std::is_integral_v<T> || is_any_v<T, std::string_view, std::string, double>);
         if (at_end()) {
             throw ProtocolCodecException("reached end of header line prematurely");
         }
@@ -120,6 +120,24 @@ private:
             }
 
             return {(cur_arg != 0), m_sv.substr(parse_res.ptr - m_sv.data())};
+        }
+        else if constexpr (std::is_same_v<T, double>) {
+            // Currently all double are in the middle of the string delimited by a space.
+            auto delim_at = m_sv.find(' ');
+            if (delim_at == std::string_view::npos)
+                throw ProtocolCodecException("reached end of header line prematurely for double value parsing");
+
+            // FIXME use std::from_chars one day when it's availiable in every std lib
+            T val = {};
+            try {
+                val = std::stod(std::string(m_sv.substr(0, delim_at)));
+            }
+            catch (const std::exception& err) {
+                throw ProtocolCodecException(
+                    util::format("error parsing floating-point number in header line: %1", err.what()));
+            }
+
+            return {val, m_sv.substr(delim_at)};
         }
     }
 
@@ -415,13 +433,10 @@ private:
 
             info.last_in_batch = msg.read_next<bool>();
 
-            auto sv = msg.read_next<std::string_view>();
-            try {
-                info.progress_estimate = std::stod(std::string(sv));
-            }
-            catch (const std::exception& err) {
-                return report_error(ErrorCodes::SyncProtocolInvariantFailed, "Bad progress value: %1", err.what());
-            }
+            info.progress_estimate = msg.read_next<double>();
+            if (info.progress_estimate < 0 || info.progress_estimate > 1)
+                return report_error(ErrorCodes::SyncProtocolInvariantFailed, "Bad progress value: %1",
+                                    info.progress_estimate);
         }
         else
             info.downloadable_bytes = msg.read_next<int64_t>();
