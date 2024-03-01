@@ -64,16 +64,7 @@ void ObjectNotifier::run()
 {
     if (!m_table || !m_info)
         return;
-    using namespace std::chrono;
-    auto t1 = steady_clock::now();
-    util::ScopeExit cleanup([&]() noexcept {
-        m_run_time_point = steady_clock::now();
-        if (m_logger) {
-            m_logger->log(util::LogCategory::notification, util::Logger::Level::debug,
-                          "ObjectNotifier %1 did run in %2 us", m_description,
-                          duration_cast<microseconds>(m_run_time_point - t1).count());
-        }
-    });
+    NotifierRunLogger log(m_logger.get(), "ObjectNotifier", m_description);
 
     auto it = m_info->tables.find(m_table->get_key());
     if (it != m_info->tables.end() && it->second.deletions_contains(m_obj_key)) {

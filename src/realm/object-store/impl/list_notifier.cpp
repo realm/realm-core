@@ -33,7 +33,7 @@ ListNotifier::ListNotifier(std::shared_ptr<Realm> realm, CollectionBase const& l
     , m_prev_size(list.size())
 {
     attach(list);
-    if (m_logger) {
+    if (m_logger && m_logger->would_log(util::Logger::Level::debug)) {
         auto path = m_list->get_short_path();
         auto prop_name = m_list->get_table()->get_column_name(path[0].get_col_key());
         path[0] = PathElement(prop_name);
@@ -94,16 +94,7 @@ bool ListNotifier::do_add_required_change_info(TransactionChangeInfo& info)
 
 void ListNotifier::run()
 {
-    using namespace std::chrono;
-    auto t1 = steady_clock::now();
-    util::ScopeExit cleanup([&]() noexcept {
-        m_run_time_point = steady_clock::now();
-        if (m_logger) {
-            m_logger->log(util::LogCategory::notification, util::Logger::Level::debug,
-                          "ListNotifier %1 did run in %2 us", m_description,
-                          duration_cast<microseconds>(m_run_time_point - t1).count());
-        }
-    });
+    NotifierRunLogger log(m_logger.get(), "ListNotifier", m_description);
 
     if (!m_list || !m_list->is_attached()) {
         // List was deleted, so report all of the rows being removed if this is
