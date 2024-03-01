@@ -1146,6 +1146,9 @@ std::unique_ptr<Subexpr> LinkAggrNode::visit(ParserDriver* drv, DataType)
         case col_type_Timestamp:
             subexpr = link_prop->column<Timestamp>(col_key).clone();
             break;
+        case col_type_Mixed:
+            subexpr = link_prop->column<Mixed>(col_key).clone();
+            break;
         default:
             throw InvalidQueryError(util::format("collection aggregate not supported for type '%1'",
                                                  get_data_type_name(DataType(col_key.get_type()))));
