@@ -154,17 +154,13 @@ bool ArrayPacked::find_all(const Array& arr, int64_t value, size_t start, size_t
     // the width of each single value within a 64 bit word and N is the total number of values stored in the array.
 
     // in packed format a parallel subword find pays off also for width >= 32
-    const auto inc = num_fields_for_width((int)arr.m_encoder.m_v_width);
     while (start < end) {
         start = parallel_subword_find<Cond>(arr, value, start, end);
-        if (start < end) {
+        if (start < end)
             if (!state->match(start + baseindex))
                 return false;
-            ++start;
-        }
-        else {
-            start += inc;
-        }
+
+        ++start;
     }
     return true;
 }
