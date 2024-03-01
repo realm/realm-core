@@ -175,6 +175,7 @@ bool ArrayFlex::find_all(const Array& arr, int64_t value, size_t start, size_t e
     return true;
 }
 
+// this is not nice code!! just for testing
 template <typename Cond, bool v = true>
 inline uint64_t bitwidth_cmp(uint64_t MSBs, uint64_t a, uint64_t b)
 {
@@ -196,21 +197,39 @@ inline uint64_t bitwidth_cmp(uint64_t MSBs, uint64_t a, uint64_t b)
         return find_all_fields_unsigned_LT(MSBs, a, b);
 }
 
+template <bool v>
+inline uint64_t get_MSBs(const Array& arr)
+{
+    if constexpr (v == false)
+        return arr.get_encoder().m_ndx_MSBs;
+    return arr.get_encoder().m_MSBs;
+}
+
+template <bool v>
+inline size_t get_field_count(const Array& arr)
+{
+    if constexpr (v == false)
+        return arr.get_encoder().m_ndx_field_count;
+    return arr.get_encoder().m_field_count;
+}
+
+template <bool v>
+inline int8_t get_bit_count_per_iteration(const Array& arr)
+{
+    if constexpr (v == false)
+        return arr.get_encoder().m_ndx_bit_count_pr_iteration;
+    return arr.get_encoder().m_bit_count_pr_iteration;
+}
+
 template <typename Cond, bool v>
 inline size_t ArrayFlex::parallel_subword_find(const Array& arr, size_t offset, uint_least8_t width, size_t start,
                                                size_t end, uint64_t search_vector, signed total_bit_count_left) const
 {
     // a bit hacky needs to be redesign... true means that we are parallel searching for values,
     // false that we are paralleling searching for indices.
-    auto MSBs = arr.m_encoder.m_MSBs;
-    auto field_count = arr.m_encoder.m_field_count;
-    auto bit_count_pr_iteration = arr.m_encoder.m_bit_count_pr_iteration;
-
-    if constexpr (v == false) {
-        MSBs = arr.m_encoder.m_ndx_MSBs;
-        field_count = arr.m_encoder.m_ndx_field_count;
-        bit_count_pr_iteration = arr.m_encoder.m_ndx_bit_count_pr_iteration;
-    }
+    auto MSBs = get_MSBs<v>(arr);
+    auto field_count = get_field_count<v>(arr);
+    auto bit_count_pr_iteration = get_bit_count_per_iteration<v>(arr);
 
     REALM_ASSERT_DEBUG(total_bit_count_left >= 0);
 
@@ -250,9 +269,13 @@ bool ArrayFlex::find_eq(const Array& arr, int64_t value, size_t start, size_t en
     const auto ndx_width = encoder.m_ndx_width;
     const auto offset = v_size * v_width;
     const auto search_vector_val = populate(v_width, value);
+    const auto total_bit_count_left_val = static_cast<signed>(v_size) * v_width;
+
 
     // auto t1 = std::chrono::high_resolution_clock::now();
 
+    // this is a search among all the values, if we have many values with a large size, it is going to be more
+    // expensive that what it is needed, if [start, end] is a narrow range..
     const auto v_start =
         parallel_subword_find<Equal>(arr, 0, v_width, 0, v_size, search_vector_val, total_bit_count_left_val);
     if (v_start == v_size)
@@ -301,10 +324,11 @@ bool ArrayFlex::find_neq(const Array& arr, int64_t value, size_t start, size_t e
     while (start < end) {
         start = parallel_subword_find<NotEqual, false>(arr, offset, ndx_width, start, end, search_vector_ndx,
                                                        total_bit_count_left_ndx);
-        if (start < end)
+        if (start < end) {
             if (!state->match(start + baseindex))
                 return false;
-        ++start;
+            start += 1;
+        }
     }
     return true;
 }
@@ -330,11 +354,11 @@ bool ArrayFlex::find_lt(const Array& arr, int64_t value, size_t start, size_t en
     while (start < end) {
         start = parallel_subword_find<Less, false>(arr, offset, ndx_width, start, end, search_vector_ndx,
                                                    total_bit_count_left_ndx);
-        if (start < end)
+        if (start < end) {
             if (!state->match(start + baseindex))
                 return false;
-
-        ++start;
+            start += 1;
+        }
     }
     return true;
 }
@@ -360,11 +384,11 @@ bool ArrayFlex::find_gt(const Array& arr, int64_t value, size_t start, size_t en
     while (start < end) {
         start = parallel_subword_find<GreaterEqual, false>(arr, offset, ndx_width, start, end, search_vector_ndx,
                                                            total_bit_count_left_ndx);
-        if (start < end)
+        if (start < end) {
             if (!state->match(start + baseindex))
                 return false;
-
-        ++start;
+            start += 1;
+        }
     }
     return true;
 }
