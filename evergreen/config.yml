@@ -962,7 +962,7 @@ tasks:
 
 # These are local object store tests; baas is not started, however some use the sync server
 - name: object-store-tests
-  tags: [ "object_store_test_suite", "for_pull_requests", "test_suite" ]
+  tags: [ "for_pull_requests", "test_suite" ]
   exec_timeout_secs: 3600
   commands:
   - func: "compile"
@@ -977,7 +977,7 @@ tasks:
 
 # These are baas object store tests that run against baas running on a remote host
 - name: baas-integration-tests
-  tags: [ "object_store_test_suite", "for_pull_requests" ]
+  tags: [ "test_suite", "for_pull_requests", "requires_baas" ]
   exec_timeout_secs: 3600
   commands:
   - func: "launch remote baas"
@@ -1198,7 +1198,6 @@ task_groups:
   tasks:
   - compile
   - .test_suite
-  - .object_store_test_suite
   - package
 
 # Runs core/sync/local object store tests
@@ -1214,7 +1213,7 @@ task_groups:
   - func: "run hang analyzer"
   tasks:
   - compile
-  - .test_suite
+  - ".test_suite !.requires_baas"
 
 # Runs object-store-tests against baas running on remote host
 - name: compile_test
@@ -1231,23 +1230,6 @@ task_groups:
   tasks:
   - compile
   - .test_suite
-  - .object_store_test_suite
-
-# compile and run only object store tests: local and remote
-- name: compile_test_object_store
-  max_hosts: 1
-  setup_group_can_fail_task: true
-  setup_group:
-  - func: "fetch source"
-  - func: "fetch binaries"
-  teardown_task:
-  - func: "upload test results"
-  - func: "upload baas artifacts"
-  timeout:
-  - func: "run hang analyzer"
-  tasks:
-  - compile
-  - .object_store_test_suite
 
 # Runs object-store-tests against baas running on remote host and runs
 # the network simulation tests as a separate task for nightly builds
@@ -1280,7 +1262,6 @@ task_groups:
   tasks:
   - compile
   - .test_suite
-  - .object_store_test_suite
   - process_coverage_data
 
 - name: benchmarks
@@ -1761,7 +1742,7 @@ buildvariants:
   tasks:
   # FIXME: tsan is not stable on arm64, fails often with internal errors
   # - name: compile_test
-  - name: compile_test_object_store
+  - name: compile_test
 
 - name: macos-coverage
   display_name: "MacOS 11 arm64 (Code Coverage)"
