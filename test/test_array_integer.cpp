@@ -766,8 +766,8 @@ NONCONCURRENT_TEST(perf_array_encode_get_vs_array_get_greater_32bit)
     a_encoded.destroy();
 }
 
-NONCONCURRENT_TEST(Test_basic_find_EQ_greater_32bit)
-// ONLY(Test_basic_find_EQ_greater_32bit)
+// NONCONCURRENT_TEST(Test_basic_find_EQ_greater_32bit)
+ONLY(Test_basic_find_EQ_greater_32bit)
 {
     using namespace std;
     using namespace std::chrono;

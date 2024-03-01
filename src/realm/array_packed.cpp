@@ -154,43 +154,56 @@ bool ArrayPacked::find_all(const Array& arr, int64_t value, size_t start, size_t
     // the width of each single value within a 64 bit word and N is the total number of values stored in the array.
 
     // in packed format a parallel subword find pays off also for width >= 32
+
+    // this needs to be computed externally.
+    const auto width = arr.m_encoder.m_v_width;
+    const auto search_vector = populate(width, value);
+    const auto total_bit_count_left = static_cast<signed>(end - start) * width;
+
     while (start < end) {
-        start = parallel_subword_find<Cond>(arr, value, start, end);
+        start = parallel_subword_find<Cond>(arr, start, end, search_vector, total_bit_count_left);
         if (start < end)
             if (!state->match(start + baseindex))
                 return false;
-
         ++start;
     }
     return true;
 }
 
 template <typename Cond>
-size_t ArrayPacked::parallel_subword_find(const Array& arr, int64_t value, size_t start, size_t end) const
+inline uint64_t bitwidth_cmp(uint64_t MSBs, uint64_t a, uint64_t b)
+{
+    if constexpr (std::is_same_v<Cond, Equal>)
+        return find_all_fields_EQ(MSBs, a, b);
+    if constexpr (std::is_same_v<Cond, NotEqual>)
+        return find_all_fields_NE(MSBs, a, b);
+    if constexpr (std::is_same_v<Cond, Greater>)
+        return find_all_fields_signed_GT(MSBs, a, b);
+    if constexpr (std::is_same_v<Cond, Less>)
+        return find_all_fields_signed_LT(MSBs, a, b);
+}
+
+inline uint64_t last_word_mask(signed total_bit_count_left)
+{
+    // generates a mask of 1s shifting by 64-<bit count left> 0xFFFFULL.
+    // Useful for extracting the last number of bits from a vector of matching positions.
+    return 0xFFFFFFFFFFFFFFFFULL >> (64 - total_bit_count_left);
+}
+
+template <typename Cond>
+size_t ArrayPacked::parallel_subword_find(const Array& arr, size_t start, size_t end, uint64_t search_vector,
+                                          signed total_bit_count_left) const
 {
     const auto width = arr.m_width;
-    const auto MSBs = populate(width, arr.get_encoder().width_mask());
-    const auto search_vector = populate(width, value);
-    const auto field_count = num_fields_for_width(width);
-    const auto bit_count_pr_iteration = num_bits_for_width(width);
-    auto total_bit_count_left = static_cast<signed>(end - start) * width;
-    REALM_ASSERT(total_bit_count_left >= 0);
-    auto bitwidth_cmp = [&MSBs](uint64_t a, uint64_t b) {
-        if constexpr (std::is_same_v<Cond, Equal>)
-            return find_all_fields_EQ(MSBs, a, b);
-        if constexpr (std::is_same_v<Cond, NotEqual>)
-            return find_all_fields_NE(MSBs, a, b);
-        if constexpr (std::is_same_v<Cond, Greater>)
-            return find_all_fields_signed_GT(MSBs, a, b);
-        if constexpr (std::is_same_v<Cond, Less>)
-            return find_all_fields_signed_LT(MSBs, a, b);
-    };
-
+    const auto MSBs = arr.m_encoder.m_MSBs;
+    const auto bit_count_pr_iteration = arr.m_encoder.m_bit_count_pr_iteration;
+    const auto field_count = arr.m_encoder.m_field_count;
+    REALM_ASSERT_DEBUG(total_bit_count_left >= 0);
     unaligned_word_iter it((uint64_t*)arr.m_data, start * arr.m_width);
     uint64_t vector = 0;
     while (total_bit_count_left >= bit_count_pr_iteration) {
         const auto word = it.get(bit_count_pr_iteration);
-        vector = bitwidth_cmp(word, search_vector);
+        vector = bitwidth_cmp<Cond>(MSBs, word, search_vector);
         if (vector) {
             int sub_word_index = first_field_marked(width, vector);
             return start + sub_word_index;
@@ -201,9 +214,8 @@ size_t ArrayPacked::parallel_subword_find(const Array& arr, int64_t value, size_
     }
     if (total_bit_count_left) {                         // final subword, may be partial
         const auto word = it.get(total_bit_count_left); // <-- limit lookahead to avoid touching memory beyond array
-        vector = bitwidth_cmp(word, search_vector);
-        auto last_word_mask = 0xFFFFFFFFFFFFFFFFULL >> (64 - total_bit_count_left);
-        vector &= last_word_mask;
+        vector = bitwidth_cmp<Cond>(MSBs, word, search_vector);
+        vector &= last_word_mask(total_bit_count_left);
         if (vector) {
             int sub_word_index = first_field_marked(width, vector);
             return start + sub_word_index;

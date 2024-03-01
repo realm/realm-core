@@ -74,6 +74,14 @@ private:
     size_t m_v_mask = 0;
     size_t m_ndx_mask = 0;
 
+    // parallel search constants.
+    uint64_t m_MSBs = 0;
+    size_t m_field_count = 0;
+    int8_t m_bit_count_pr_iteration = 0;
+    uint64_t m_ndx_MSBs = 0;
+    size_t m_ndx_field_count = 0;
+    int8_t m_ndx_bit_count_pr_iteration = 0;
+
     friend class ArrayPacked;
     friend class ArrayFlex;
 };

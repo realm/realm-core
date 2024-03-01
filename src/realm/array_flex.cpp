@@ -175,42 +175,52 @@ bool ArrayFlex::find_all(const Array& arr, int64_t value, size_t start, size_t e
     return true;
 }
 
-template <typename Cond, bool v>
-inline size_t ArrayFlex::parallel_subword_find(const Array& arr, uint64_t value, size_t width_mask, size_t offset,
-                                               uint_least8_t width, size_t start, size_t end) const
+template <typename Cond, bool v = true>
+inline uint64_t bitwidth_cmp(uint64_t MSBs, uint64_t a, uint64_t b)
 {
-    const auto MSBs = populate(width, width_mask);
-    const auto search_vector = populate(width, value);
-    const auto field_count = num_fields_for_width(width);
-    const auto bit_count_pr_iteration = num_bits_for_width(width);
-    auto total_bit_count_left = static_cast<signed>(end - start) * width;
-    REALM_ASSERT(total_bit_count_left >= 0);
-    auto bitwidth_cmp = [&MSBs](uint64_t a, uint64_t b) {
-        if constexpr (std::is_same_v<Cond, Equal>)
-            return find_all_fields_EQ(MSBs, a, b);
-        else if constexpr (std::is_same_v<Cond, NotEqual>)
-            return find_all_fields_NE(MSBs, a, b);
-        else if constexpr (std::is_same_v<Cond, GreaterEqual>) {
-            if constexpr (v == true)
-                return find_all_fields_signed_GE(MSBs, a, b);
-            if constexpr (v == false)
-                return find_all_fields_unsigned_GE(MSBs, a, b);
-            REALM_UNREACHABLE();
-        }
+    if constexpr (std::is_same_v<Cond, Equal>)
+        return find_all_fields_EQ(MSBs, a, b);
+    else if constexpr (std::is_same_v<Cond, NotEqual>)
+        return find_all_fields_NE(MSBs, a, b);
+    else if constexpr (std::is_same_v<Cond, GreaterEqual>) {
+        if constexpr (v == true)
+            return find_all_fields_signed_GE(MSBs, a, b);
+        if constexpr (v == false)
+            return find_all_fields_unsigned_GE(MSBs, a, b);
+        REALM_UNREACHABLE();
+    }
 
-        else if constexpr (std::is_same_v<Cond, Greater>)
-            return find_all_fields_signed_GT(MSBs, a, b);
-        else if constexpr (std::is_same_v<Cond, Less>)
-            return find_all_fields_unsigned_LT(MSBs, a, b);
-    };
+    else if constexpr (std::is_same_v<Cond, Greater>)
+        return find_all_fields_signed_GT(MSBs, a, b);
+    else if constexpr (std::is_same_v<Cond, Less>)
+        return find_all_fields_unsigned_LT(MSBs, a, b);
+}
+
+template <typename Cond, bool v>
+inline size_t ArrayFlex::parallel_subword_find(const Array& arr, size_t offset, uint_least8_t width, size_t start,
+                                               size_t end, uint64_t search_vector, signed total_bit_count_left) const
+{
+    // a bit hacky needs to be redesign... true means that we are parallel searching for values,
+    // false that we are paralleling searching for indices.
+    auto MSBs = arr.m_encoder.m_MSBs;
+    auto field_count = arr.m_encoder.m_field_count;
+    auto bit_count_pr_iteration = arr.m_encoder.m_bit_count_pr_iteration;
+
+    if constexpr (v == false) {
+        MSBs = arr.m_encoder.m_ndx_MSBs;
+        field_count = arr.m_encoder.m_ndx_field_count;
+        bit_count_pr_iteration = arr.m_encoder.m_ndx_bit_count_pr_iteration;
+    }
+
+    REALM_ASSERT_DEBUG(total_bit_count_left >= 0);
 
     unaligned_word_iter it((uint64_t*)(arr.m_data), offset + start * width);
     uint64_t vector = 0;
     while (total_bit_count_left >= bit_count_pr_iteration) {
         const auto word = it.get(bit_count_pr_iteration);
-        vector = bitwidth_cmp(word, search_vector);
+        vector = bitwidth_cmp<Cond, v>(MSBs, word, search_vector);
         if (vector) {
-            int sub_word_index = first_field_marked((int)width, vector);
+            int sub_word_index = first_field_marked(width, vector);
             return start + sub_word_index;
         }
         total_bit_count_left -= bit_count_pr_iteration;
@@ -219,7 +229,7 @@ inline size_t ArrayFlex::parallel_subword_find(const Array& arr, uint64_t value,
     }
     if (total_bit_count_left) {                         // final subword, may be partial
         const auto word = it.get(total_bit_count_left); // <-- limit lookahead to avoid touching memory beyond array
-        vector = bitwidth_cmp(word, search_vector);
+        vector = bitwidth_cmp<Cond, v>(MSBs, word, search_vector);
         auto last_word_mask = 0xFFFFFFFFFFFFFFFFULL >> (64 - total_bit_count_left);
         vector &= last_word_mask;
         if (vector) {
@@ -233,24 +243,40 @@ inline size_t ArrayFlex::parallel_subword_find(const Array& arr, uint64_t value,
 bool ArrayFlex::find_eq(const Array& arr, int64_t value, size_t start, size_t end, size_t baseindex,
                         QueryStateBase* state) const
 {
+    using namespace std::chrono;
     const auto& encoder = arr.m_encoder;
     const auto v_width = encoder.m_v_width;
     const auto v_size = encoder.m_v_size;
     const auto ndx_width = encoder.m_ndx_width;
     const auto offset = v_size * v_width;
+    const auto search_vector_val = populate(v_width, value);
 
-    auto v_start = parallel_subword_find<Equal>(arr, value, encoder.m_v_mask, 0, v_width, 0, v_size);
+    // auto t1 = std::chrono::high_resolution_clock::now();
+
+    const auto v_start =
+        parallel_subword_find<Equal>(arr, 0, v_width, 0, v_size, search_vector_val, total_bit_count_left_val);
     if (v_start == v_size)
         return true;
 
+    //    auto t2 = std::chrono::high_resolution_clock::now();
+    //    std::cout << "Time first parallel find: " <<  std::chrono::duration_cast<nanoseconds>(t2 - t1).count() << "
+    //    ns" << std::endl;
+
+    // t1 = std::chrono::high_resolution_clock::now();
+    const auto search_vector_ndx = populate(ndx_width, v_start);
+    const auto total_bit_count_left_ndx = static_cast<signed>(end - start) * ndx_width;
     while (start < end) {
-        start = parallel_subword_find<Equal>(arr, v_start, encoder.m_ndx_mask, offset, ndx_width, start, end);
-        if (start < end)
+        start = parallel_subword_find<Equal, false>(arr, offset, ndx_width, start, end, search_vector_ndx,
+                                                    total_bit_count_left_ndx);
+        if (start < end) {
             if (!state->match(start + baseindex))
                 return false;
-
-        ++start;
+            start += 1;
+        }
     }
+    //    t2 = std::chrono::high_resolution_clock::now();
+    //    std::cout << "Time second parallel find: " <<  std::chrono::duration_cast<nanoseconds>(t2 - t1).count() << "
+    //    ns" << std::endl;
     return true;
 }
 
@@ -262,13 +288,19 @@ bool ArrayFlex::find_neq(const Array& arr, int64_t value, size_t start, size_t e
     const auto v_size = encoder.m_v_size;
     const auto ndx_width = encoder.m_ndx_width;
     const auto offset = v_size * v_width;
+    const auto search_vector_val = populate(v_width, value);
+    const auto total_bit_count_left_val = static_cast<signed>(v_size * v_width);
 
-    auto v_start = parallel_subword_find<Equal>(arr, value, encoder.m_v_mask, 0, v_width, 0, v_size);
+    const auto v_start =
+        parallel_subword_find<Equal>(arr, 0, v_width, 0, v_size, search_vector_val, total_bit_count_left_val);
     if (v_start == v_size)
         return true;
 
+    const auto search_vector_ndx = populate(ndx_width, v_start);
+    const auto total_bit_count_left_ndx = static_cast<signed>(end - start) * ndx_width;
     while (start < end) {
-        start = parallel_subword_find<NotEqual>(arr, v_start, encoder.m_ndx_mask, offset, ndx_width, start, end);
+        start = parallel_subword_find<NotEqual, false>(arr, offset, ndx_width, start, end, search_vector_ndx,
+                                                       total_bit_count_left_ndx);
         if (start < end)
             if (!state->match(start + baseindex))
                 return false;
@@ -285,13 +317,19 @@ bool ArrayFlex::find_lt(const Array& arr, int64_t value, size_t start, size_t en
     const auto v_size = encoder.m_v_size;
     const auto ndx_width = encoder.m_ndx_width;
     const auto offset = v_size * v_width;
+    const auto search_vector_val = populate(v_width, value);
+    const auto total_bit_count_left_val = static_cast<signed>(v_size * v_width);
 
-    auto v_start = parallel_subword_find<GreaterEqual>(arr, value, encoder.m_v_mask, 0, v_width, 0, v_size);
+    auto v_start =
+        parallel_subword_find<GreaterEqual>(arr, 0, v_width, 0, v_size, search_vector_val, total_bit_count_left_val);
     if (v_start == v_size)
         return true;
 
+    const auto search_vector_ndx = populate(ndx_width, v_start);
+    const auto total_bit_count_left_ndx = static_cast<signed>(end - start) * ndx_width;
     while (start < end) {
-        start = parallel_subword_find<Less>(arr, v_start, encoder.m_ndx_mask, offset, ndx_width, start, end);
+        start = parallel_subword_find<Less, false>(arr, offset, ndx_width, start, end, search_vector_ndx,
+                                                   total_bit_count_left_ndx);
         if (start < end)
             if (!state->match(start + baseindex))
                 return false;
@@ -309,14 +347,19 @@ bool ArrayFlex::find_gt(const Array& arr, int64_t value, size_t start, size_t en
     const auto v_size = encoder.m_v_size;
     const auto ndx_width = encoder.m_ndx_width;
     const auto offset = v_size * v_width;
+    const auto search_vector_val = populate(v_width, value);
+    const auto total_bit_count_left_val = static_cast<signed>(v_size * v_width);
 
-    auto v_start = parallel_subword_find<Greater>(arr, value, encoder.m_v_mask, 0, v_width, 0, v_size);
+    auto v_start =
+        parallel_subword_find<Greater>(arr, 0, v_width, 0, v_size, search_vector_val, total_bit_count_left_val);
     if (v_start == v_size)
         return true;
 
+    const auto search_vector_ndx = populate(ndx_width, v_start);
+    const auto total_bit_count_left_ndx = static_cast<signed>(end - start) * ndx_width;
     while (start < end) {
-        start = parallel_subword_find<GreaterEqual, false>(arr, v_start, encoder.m_ndx_mask, offset, ndx_width, start,
-                                                           end);
+        start = parallel_subword_find<GreaterEqual, false>(arr, offset, ndx_width, start, end, search_vector_ndx,
+                                                           total_bit_count_left_ndx);
         if (start < end)
             if (!state->match(start + baseindex))
                 return false;

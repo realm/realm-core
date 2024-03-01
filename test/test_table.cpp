@@ -3433,6 +3433,7 @@ NONCONCURRENT_TEST(Table_QuickSort2)
 }
 
 NONCONCURRENT_TEST(Table_object_timestamp)
+// ONLY(Table_object_timestamp)
 {
 #if !defined(REALM_DEBUG) && defined(PERFORMANCE_TESTING)
     int nb_rows = 10'000'000;

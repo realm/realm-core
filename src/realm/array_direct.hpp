@@ -435,57 +435,57 @@ inline std::pair<int64_t, int64_t> get_two(const char* data, size_t width, size_
     This is almost as simple as a direct word compare, but needs to take into account that
     we may want to have part of the words undefined.
 */
-constexpr int num_fields_table[65] = {-1, 64, 32, 21, 16, 12, 10, 9, // 0-7
-                                      8,  7,  6,  5,  5,  4,  4,  4, // 8-15
-                                      4,  3,  3,  3,  3,  3,  2,  2, // 16-23
-                                      2,  2,  2,  2,  2,  2,  2,  2, // 24-31
-                                      2,  1,  1,  1,  1,  1,  1,  1, // 32-39
-                                      1,  1,  1,  1,  1,  1,  1,  1, // 40-47
-                                      1,  1,  1,  1,  1,  1,  1,  1, // 48-55
-                                      1,  1,  1,  1,  1,  1,  1,  1, // 56-63
-                                      1};
+constexpr int8_t num_fields_table[65] = {-1, 64, 32, 21, 16, 12, 10, 9, // 0-7
+                                         8,  7,  6,  5,  5,  4,  4,  4, // 8-15
+                                         4,  3,  3,  3,  3,  3,  2,  2, // 16-23
+                                         2,  2,  2,  2,  2,  2,  2,  2, // 24-31
+                                         2,  1,  1,  1,  1,  1,  1,  1, // 32-39
+                                         1,  1,  1,  1,  1,  1,  1,  1, // 40-47
+                                         1,  1,  1,  1,  1,  1,  1,  1, // 48-55
+                                         1,  1,  1,  1,  1,  1,  1,  1, // 56-63
+                                         1};
 
-constexpr int num_bits_table[65] = {-1, 64, 64, 63, 64, 60, 60, 63, // 0-7
-                                    64, 63, 60, 55, 60, 52, 56, 60, // 8-15
-                                    64, 51, 54, 57, 60, 63, 44, 46, // 16-23
-                                    48, 50, 52, 54, 56, 58, 60, 64, // 24-31
-                                    64, 33, 34, 35, 36, 37, 38, 39, // 32-39
-                                    40, 41, 42, 43, 44, 45, 46, 47, // 40-47
-                                    48, 49, 50, 51, 52, 53, 54, 55, // 48-55
-                                    56, 57, 58, 59, 60, 61, 62, 63, // 56-63
-                                    64};
+constexpr int8_t num_bits_table[65] = {-1, 64, 64, 63, 64, 60, 60, 63, // 0-7
+                                       64, 63, 60, 55, 60, 52, 56, 60, // 8-15
+                                       64, 51, 54, 57, 60, 63, 44, 46, // 16-23
+                                       48, 50, 52, 54, 56, 58, 60, 64, // 24-31
+                                       64, 33, 34, 35, 36, 37, 38, 39, // 32-39
+                                       40, 41, 42, 43, 44, 45, 46, 47, // 40-47
+                                       48, 49, 50, 51, 52, 53, 54, 55, // 48-55
+                                       56, 57, 58, 59, 60, 61, 62, 63, // 56-63
+                                       64};
 
-inline int num_fields_for_width(int width)
+inline size_t num_fields_for_width(size_t width)
 {
     REALM_ASSERT(width);
     return 64 / width;
 }
 
-inline uint64_t num_bits(int width)
+inline int8_t num_bits(size_t width)
 {
     return num_fields_table[width];
 }
 
-inline int num_bits_for_width(int width)
+inline int8_t num_bits_for_width(size_t width)
 {
     return num_bits_table[width];
 }
 
-inline uint64_t cares_about(int width)
+inline uint64_t cares_about(size_t width)
 {
     return 0xFFFFFFFFFFFFFFFFULL >> (64 - num_bits_table[width]);
 }
 
 // true if any field in A differs from corresponding field in B. If you also want
 // to find which fields, use find_all_fields_NE instead.
-bool inline any_field_NE(int width, uint64_t A, uint64_t B)
+bool inline any_field_NE(size_t width, uint64_t A, uint64_t B)
 {
     return (A ^ B) & cares_about(width);
 }
 
 // Populate all fields in a vector with a given value of a give width.
 // Bits outside of the given field are ignored.
-constexpr uint64_t populate(int width, uint64_t value)
+constexpr uint64_t populate(size_t width, uint64_t value)
 {
     value &= 0xFFFFFFFFFFFFFFFFULL >> (64 - width);
     if (width < 8) {
@@ -511,13 +511,13 @@ constexpr uint64_t populate(int width, uint64_t value)
 }
 
 // provides a set bit in pos 0 of each field, remaining bits zero
-constexpr uint64_t field_bit0(int width)
+constexpr uint64_t field_bit0(size_t width)
 {
     return populate(width, 1);
 }
 
 // provides a set sign-bit in each field, remaining bits zero
-constexpr uint64_t field_sign_bit(int width)
+constexpr uint64_t field_sign_bit(size_t width)
 {
     return populate(width, 1ULL << (width - 1));
 }
@@ -795,7 +795,7 @@ constexpr uint32_t inverse_width[65] = {
     65536 * 64 / 61, 65536 * 64 / 62, 65536 * 64 / 63, 65536 * 64 / 64,
 };
 
-inline int first_field_marked(int width, uint64_t vector)
+inline int first_field_marked(size_t width, uint64_t vector)
 {
 #if REALM_WINDOWS
     int lz = (int)_tzcnt_u64(vector); // TODO: not clear if this is ok on all platforms
