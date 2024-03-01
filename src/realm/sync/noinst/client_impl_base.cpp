@@ -1351,15 +1351,15 @@ void Connection::receive_ident_message(session_ident_type session_ident, SaltedF
         close_due_to_protocol_error(std::move(status)); // Throws
 }
 
-void Connection::receive_download_message(session_ident_type session_ident, const SyncProgress& progress,
-                                          const DownloadSyncProgressInfo& info, const ReceivedChangesets& changesets)
+void Connection::receive_download_message(session_ident_type session_ident, const DownloadMessage& message,
+                                          const ReceivedChangesets& changesets)
 {
     Session* sess = find_and_validate_session(session_ident, "DOWNLOAD");
     if (REALM_UNLIKELY(!sess)) {
         return;
     }
 
-    if (auto status = sess->receive_download_message(progress, info, changesets); !status.is_ok()) {
+    if (auto status = sess->receive_download_message(message, changesets); !status.is_ok()) {
         close_due_to_protocol_error(std::move(status));
     }
 }
@@ -2318,7 +2318,7 @@ Status Session::receive_ident_message(SaltedFileIdent client_file_ident)
     return Status::OK();       // Success
 }
 
-Status Session::receive_download_message(const SyncProgress& progress, const DownloadInfoExtra& info,
+Status Session::receive_download_message(const DownloadMessage& message,
                                          const ReceivedChangesets& received_changesets)
 {
     // Ignore the message if the deactivation process has been initiated,
@@ -2328,14 +2328,15 @@ Status Session::receive_download_message(const SyncProgress& progress, const Dow
         return Status::OK();
 
     bool is_flx = m_conn.is_flx_sync_connection();
-    int64_t query_version = is_flx ? info.query_version.value() : 0;
+    int64_t query_version = is_flx ? message.query_version.value() : 0;
 
     // If this is a PBS connection, then every download message is its own complete batch.
-    bool last_in_batch = is_flx ? info.last_in_batch.value() : true;
+    bool last_in_batch = is_flx ? message.last_in_batch.value() : true;
     auto batch_state = last_in_batch ? sync::DownloadBatchState::LastInBatch : sync::DownloadBatchState::MoreToCome;
     if (is_steady_state_download_message(batch_state, query_version))
         batch_state = DownloadBatchState::SteadyState;
 
+    auto&& progress = message.progress;
     if (is_flx) {
         logger.debug("Received: DOWNLOAD(download_server_version=%1, download_client_version=%2, "
                      "latest_server_version=%3, latest_server_version_salt=%4, "
@@ -2344,7 +2345,7 @@ Status Session::receive_download_message(const SyncProgress& progress, const Dow
                      progress.download.server_version, progress.download.last_integrated_client_version,
                      progress.latest_server_version.version, progress.latest_server_version.salt,
                      progress.upload.client_version, progress.upload.last_integrated_server_version,
-                     info.progress_estimate, last_in_batch, query_version, received_changesets.size()); // Throws
+                     message.progress_estimate, last_in_batch, query_version, received_changesets.size()); // Throws
     }
     else {
         logger.debug("Received: DOWNLOAD(download_server_version=%1, download_client_version=%2, "
@@ -2354,7 +2355,7 @@ Status Session::receive_download_message(const SyncProgress& progress, const Dow
                      progress.download.server_version, progress.download.last_integrated_client_version,
                      progress.latest_server_version.version, progress.latest_server_version.salt,
                      progress.upload.client_version, progress.upload.last_integrated_server_version,
-                     info.downloadable_bytes, received_changesets.size()); // Throws
+                     message.downloadable_bytes, received_changesets.size()); // Throws
     }
 
     // Ignore download messages when the client detects an error. This is to prevent transforming the same bad
@@ -2422,7 +2423,7 @@ Status Session::receive_download_message(const SyncProgress& progress, const Dow
     REALM_ASSERT_EX(hook_action == SyncClientHookAction::NoAction, hook_action);
 
     if (is_flx && changesets_size > 0)
-        update_download_estimate(info.progress_estimate);
+        update_download_estimate(message.progress_estimate);
 
     if (process_flx_bootstrap_message(progress, batch_state, query_version, received_changesets)) {
         if (changesets_size > 0 && batch_state != DownloadBatchState::LastInBatch)
@@ -2432,7 +2433,7 @@ Status Session::receive_download_message(const SyncProgress& progress, const Dow
         return Status::OK();
     }
 
-    uint64_t downloadable_bytes = is_flx ? 0 : info.downloadable_bytes;
+    uint64_t downloadable_bytes = is_flx ? 0 : message.downloadable_bytes;
     initiate_integrate_changesets(downloadable_bytes, batch_state, progress, received_changesets); // Throws
 
     hook_action = call_debug_hook(SyncClientHookEvent::DownloadMessageIntegrated, progress, query_version,

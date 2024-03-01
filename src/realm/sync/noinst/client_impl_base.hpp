@@ -407,7 +407,7 @@ public:
     using SSLVerifyCallback = SyncConfig::SSLVerifyCallback;
     using ProxyConfig = SyncConfig::ProxyConfig;
     using ReconnectInfo = ClientImpl::ReconnectInfo;
-    using DownloadSyncProgressInfo = ClientProtocol::DownloadInfoExtra;
+    using DownloadMessage = ClientProtocol::DownloadMessage;
 
     std::shared_ptr<util::Logger> logger_ptr;
     util::Logger& logger;
@@ -571,8 +571,7 @@ private:
     void receive_query_error_message(int error_code, std::string_view message, int64_t query_version,
                                      session_ident_type);
     void receive_ident_message(session_ident_type, SaltedFileIdent);
-    void receive_download_message(session_ident_type, const SyncProgress&, const DownloadSyncProgressInfo&,
-                                  const ReceivedChangesets&);
+    void receive_download_message(session_ident_type, const DownloadMessage&, const ReceivedChangesets&);
 
     void receive_mark_message(session_ident_type, request_ident_type);
     void receive_unbound_message(session_ident_type);
@@ -720,7 +719,7 @@ private:
 class ClientImpl::Session {
 public:
     using ReceivedChangesets = ClientProtocol::ReceivedChangesets;
-    using DownloadInfoExtra = ClientProtocol::DownloadInfoExtra;
+    using DownloadMessage = ClientProtocol::DownloadMessage;
 
     std::shared_ptr<util::Logger> logger_ptr;
     util::Logger& logger;
@@ -1185,7 +1184,7 @@ private:
     void send_json_error_message();
     void send_test_command_message();
     Status receive_ident_message(SaltedFileIdent);
-    Status receive_download_message(const SyncProgress&, const DownloadInfoExtra&, const ReceivedChangesets&);
+    Status receive_download_message(const DownloadMessage&, const ReceivedChangesets&);
     Status receive_mark_message(request_ident_type);
     Status receive_unbound_message();
     Status receive_error_message(const ProtocolErrorInfo& info);

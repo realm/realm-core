@@ -394,7 +394,8 @@ public:
         }
     }
 
-    struct DownloadInfoExtra {
+    struct DownloadMessage {
+        SyncProgress progress;
         std::optional<int64_t> query_version;
         std::optional<bool> last_in_batch;
         union {
@@ -417,7 +418,9 @@ private:
 
         auto msg_with_header = msg.remaining();
         auto session_ident = msg.read_next<session_ident_type>();
-        SyncProgress progress;
+
+        DownloadMessage message;
+        auto&& progress = message.progress;
         progress.download.server_version = msg.read_next<version_type>();
         progress.download.last_integrated_client_version = msg.read_next<version_type>();
         progress.latest_server_version.version = msg.read_next<version_type>();
@@ -425,21 +428,21 @@ private:
         progress.upload.client_version = msg.read_next<version_type>();
         progress.upload.last_integrated_server_version = msg.read_next<version_type>();
 
-        DownloadInfoExtra info;
         if (is_flx) {
-            info.query_version = msg.read_next<int64_t>();
-            if (info.query_version < 0)
-                return report_error(ErrorCodes::SyncProtocolInvariantFailed, "Bad query version", info.query_version);
+            message.query_version = msg.read_next<int64_t>();
+            if (message.query_version < 0)
+                return report_error(ErrorCodes::SyncProtocolInvariantFailed, "Bad query version",
+                                    message.query_version);
 
-            info.last_in_batch = msg.read_next<bool>();
+            message.last_in_batch = msg.read_next<bool>();
 
-            info.progress_estimate = msg.read_next<double>();
-            if (info.progress_estimate < 0 || info.progress_estimate > 1)
+            message.progress_estimate = msg.read_next<double>();
+            if (message.progress_estimate < 0 || message.progress_estimate > 1)
                 return report_error(ErrorCodes::SyncProtocolInvariantFailed, "Bad progress value: %1",
-                                    info.progress_estimate);
+                                    message.progress_estimate);
         }
         else
-            info.downloadable_bytes = msg.read_next<int64_t>();
+            message.downloadable_bytes = msg.read_next<int64_t>();
 
         auto is_body_compressed = msg.read_next<bool>();
         auto uncompressed_body_size = msg.read_next<size_t>();
@@ -519,7 +522,7 @@ private:
             changesets.push_back(std::move(cur_changeset)); // Throws
         }
 
-        connection.receive_download_message(session_ident, progress, info, changesets); // Throws
+        connection.receive_download_message(session_ident, message, changesets); // Throws
     }
 
     static sync::ProtocolErrorInfo::Action string_to_action(const std::string& action_string)
