@@ -873,6 +873,7 @@ bool SessionImpl::process_flx_bootstrap_message(const SyncProgress& progress, Do
     REALM_ASSERT_EX(hook_action == SyncClientHookAction::NoAction, hook_action);
 
     if (batch_state == DownloadBatchState::MoreToCome) {
+        notify_download_progress(bootstrap_store->pending_stats().pending_changeset_bytes);
         return true;
     }
 
@@ -1108,24 +1109,19 @@ bool SessionImpl::is_steady_state_download_message(DownloadBatchState batch_stat
 
 void SessionImpl::update_download_estimate(double download_estimate)
 {
-    if (m_state == State::Active) {
-        m_wrapper.m_download_estimate = download_estimate;
-    }
+    if (m_state != State::Active)
+        return;
+
+    m_wrapper.m_download_estimate = download_estimate;
 }
 
-void SessionImpl::notify_download_progress(const std::optional<uint64_t>& transient_changesets_size)
+void SessionImpl::notify_download_progress(const std::optional<uint64_t>& transient_bytes)
 {
-    if (m_state == State::Active) {
-        if (transient_changesets_size) {
-            m_wrapper.m_transient_downloaded_bytes =
-                m_wrapper.m_transient_downloaded_bytes.value_or(0) + transient_changesets_size.value();
-        }
-        else {
-            m_wrapper.m_transient_downloaded_bytes.reset();
-        }
+    if (m_state != State::Active)
+        return;
 
-        m_wrapper.on_sync_progress(); // Throws
-    }
+    m_wrapper.m_transient_downloaded_bytes = transient_bytes;
+    m_wrapper.on_sync_progress(); // Throws
 }
 
 util::Future<std::string> SessionImpl::send_test_command(std::string body)
@@ -1736,6 +1732,9 @@ void SessionWrapper::on_upload_completion()
 
 void SessionWrapper::on_download_completion()
 {
+    m_download_estimate.reset();
+    m_transient_downloaded_bytes.reset();
+
     while (!m_download_completion_handlers.empty()) {
         auto handler = std::move(m_download_completion_handlers.back());
         m_download_completion_handlers.pop_back();
@@ -1759,8 +1758,6 @@ void SessionWrapper::on_download_completion()
         m_reached_download_mark = m_staged_download_mark;
         m_client.m_wait_or_client_stopped_cond.notify_all();
     }
-
-    m_download_estimate.reset();
 }
 
 
@@ -1843,7 +1840,7 @@ void SessionWrapper::report_progress(bool only_if_new_uploadable_data)
     if (m_download_estimate) {
         download_estimate = m_download_estimate.value();
         if (m_transient_downloaded_bytes)
-            downloaded_bytes += m_transient_downloaded_bytes.value();
+            downloaded_bytes += *m_transient_downloaded_bytes;
 
         // FIXME add some estimate to this
         downloadable_bytes = downloaded_bytes;
