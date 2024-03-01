@@ -35,6 +35,7 @@ using namespace realm::test_util;
 // #define ARRAY_PERFORMANCE_TESTING
 #if !defined(REALM_DEBUG) && defined(ARRAY_PERFORMANCE_TESTING)
 NONCONCURRENT_TEST(perf_array_encode_get_vs_array_get_less_32bit)
+// ONLY(perf_array_encode_get_vs_array_get_less_32bit)
 {
     using namespace std;
     using namespace std::chrono;
@@ -130,6 +131,7 @@ NONCONCURRENT_TEST(perf_array_encode_get_vs_array_get_less_32bit)
     a_encoded.destroy();
 }
 
+
 NONCONCURRENT_TEST(Test_basic_find_EQ_less_32bit)
 // ONLY(Test_basic_find_EQ_less_32bit)
 {
@@ -157,7 +159,7 @@ NONCONCURRENT_TEST(Test_basic_find_EQ_less_32bit)
     auto t1 = high_resolution_clock::now();
     for (size_t j = 0; j < n_runs; ++j) {
         for (size_t i = 0; i < n_values; ++i) {
-            auto ndx = a.find_first(i);
+            auto ndx = a.find_first(input_array[i]);
             REALM_ASSERT(ndx != realm::not_found);
             REALM_ASSERT(a.get(ndx) == input_array[ndx]);
         }
@@ -173,11 +175,16 @@ NONCONCURRENT_TEST(Test_basic_find_EQ_less_32bit)
     CHECK(a_encoded.is_encoded());
     CHECK(a_encoded.size() == a.size());
 
+    //    std::cout << "Array: " << std::endl;
+    //    for(size_t i=0; i<a_encoded.size(); ++i)
+    //        std::cout << a_encoded.get(i) << ", ";
+    //    std::cout << std::endl;
+
     // verify that both find the same thing
     for (size_t j = 0; j < n_runs; ++j) {
         for (size_t i = 0; i < n_values; ++i) {
-            auto v = a.find_first(i);
-            auto v1 = a_encoded.find_first(i);
+            auto v = a.find_first(input_array[i]);
+            auto v1 = a_encoded.find_first(input_array[i]);
             REALM_ASSERT(v == v1);
         }
     }
@@ -185,7 +192,7 @@ NONCONCURRENT_TEST(Test_basic_find_EQ_less_32bit)
     t1 = high_resolution_clock::now();
     for (size_t j = 0; j < n_runs; ++j) {
         for (size_t i = 0; i < n_values; ++i) {
-            auto ndx = a_encoded.find_first(i);
+            auto ndx = a_encoded.find_first(input_array[i]);
             REALM_ASSERT(ndx != realm::not_found);
             REALM_ASSERT(a_encoded.get(ndx) == input_array[ndx]);
         }
@@ -197,9 +204,6 @@ NONCONCURRENT_TEST(Test_basic_find_EQ_less_32bit)
               << (double)duration_cast<nanoseconds>(t2 - t1).count() / n_values / n_runs << " ns/value" << std::endl;
 
     std::cout << std::endl;
-
-    // EQ for signed integers is not working. TODO: investigate this.
-
 
     a.destroy();
     a_encoded.destroy();
@@ -220,8 +224,8 @@ NONCONCURRENT_TEST(Test_basic_find_EQ_less_32bit)
     // verify that both find the same thing
     for (size_t j = 0; j < n_runs; ++j) {
         for (size_t i = 0; i < n_values; ++i) {
-            auto v = a.find_first(-i);
-            auto v1 = a_encoded.find_first(-i);
+            auto v = a.find_first(input_array[i]);
+            auto v1 = a_encoded.find_first(input_array[i]);
             REALM_ASSERT(v == v1);
         }
     }
@@ -229,7 +233,7 @@ NONCONCURRENT_TEST(Test_basic_find_EQ_less_32bit)
     t1 = high_resolution_clock::now();
     for (size_t j = 0; j < n_runs; ++j) {
         for (size_t i = 0; i < n_values; ++i) {
-            auto ndx = a.find_first(-i);
+            auto ndx = a.find_first(input_array[i]);
             REALM_ASSERT(ndx != realm::not_found);
             REALM_ASSERT(a.get(ndx) == input_array[ndx]);
         }
@@ -244,7 +248,7 @@ NONCONCURRENT_TEST(Test_basic_find_EQ_less_32bit)
     t1 = high_resolution_clock::now();
     for (size_t j = 0; j < n_runs; ++j) {
         for (size_t i = 0; i < n_values; ++i) {
-            auto ndx = a_encoded.find_first(-i);
+            auto ndx = a_encoded.find_first(input_array[i]);
             REALM_ASSERT(ndx != realm::not_found);
             REALM_ASSERT(a_encoded.get(ndx) == a.get(ndx));
         }
@@ -390,6 +394,7 @@ NONCONCURRENT_TEST(Test_basic_find_NEQ_value_less_32bit)
 }
 
 NONCONCURRENT_TEST(Test_basic_find_LT_value_less_32bit)
+// ONLY(Test_basic_find_LT_value_less_32bit)
 {
     using namespace std;
     using namespace std::chrono;
@@ -432,6 +437,11 @@ NONCONCURRENT_TEST(Test_basic_find_LT_value_less_32bit)
     a.try_encode(a_encoded);
     CHECK(a_encoded.is_encoded());
     CHECK(a_encoded.size() == a.size());
+
+    //   std::cout << "Array: " << std::endl;
+    //   for(size_t i=0; i<a_encoded.size(); ++i)
+    //       std::cout << a_encoded.get(i) << ", ";
+    //    std::cout << std::endl;
 
     // verify that both find the same thing
     state1 = {};
@@ -521,6 +531,7 @@ NONCONCURRENT_TEST(Test_basic_find_LT_value_less_32bit)
 }
 
 NONCONCURRENT_TEST(Test_basic_find_GT_value_less_32bit)
+// ONLY(Test_basic_find_GT_value_less_32bit)
 {
     // GT subword parallel search is not working... TODO : investigate
     using namespace std;
@@ -564,6 +575,11 @@ NONCONCURRENT_TEST(Test_basic_find_GT_value_less_32bit)
     a.try_encode(a_encoded);
     CHECK(a_encoded.is_encoded());
     CHECK(a_encoded.size() == a.size());
+
+    //       std::cout << "Array: " << std::endl;
+    //       for(size_t i=0; i<a_encoded.size(); ++i)
+    //           std::cout << a_encoded.get(i) << ", ";
+    //        std::cout << std::endl;
 
     // verify that both find the same thing
     state1 = {};
@@ -653,6 +669,7 @@ NONCONCURRENT_TEST(Test_basic_find_GT_value_less_32bit)
 }
 
 NONCONCURRENT_TEST(perf_array_encode_get_vs_array_get_greater_32bit)
+// ONLY(perf_array_encode_get_vs_array_get_greater_32bit)
 {
     using namespace std;
     using namespace std::chrono;
@@ -750,6 +767,7 @@ NONCONCURRENT_TEST(perf_array_encode_get_vs_array_get_greater_32bit)
 }
 
 NONCONCURRENT_TEST(Test_basic_find_EQ_greater_32bit)
+// ONLY(Test_basic_find_EQ_greater_32bit)
 {
     using namespace std;
     using namespace std::chrono;
@@ -1132,7 +1150,9 @@ NONCONCURRENT_TEST(Test_basic_find_LT_value_greater_32bit)
     a_encoded.destroy();
 }
 
+// NONCONCURRENT_TEST(Test_basic_find_GT_value_greater_32bit)
 NONCONCURRENT_TEST(Test_basic_find_GT_value_greater_32bit)
+// ONLY(Test_basic_find_GT_value_greater_32bit)
 {
     using namespace std;
     using namespace std::chrono;

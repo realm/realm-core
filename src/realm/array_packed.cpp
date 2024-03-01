@@ -153,12 +153,13 @@ bool ArrayPacked::find_all(const Array& arr, int64_t value, size_t start, size_t
     // see if there is a match with what we are looking for. Reducing the number of comparison by ~logk(N) where K is
     // the width of each single value within a 64 bit word and N is the total number of values stored in the array.
 
+    // in packed format a parallel subword find pays off also for width >= 32
     while (start < end) {
         start = parallel_subword_find<Cond>(arr, value, start, end);
-        if (start < end) {
+        if (start < end)
             if (!state->match(start + baseindex))
                 return false;
-        }
+
         ++start;
     }
     return true;
@@ -198,7 +199,7 @@ size_t ArrayPacked::parallel_subword_find(const Array& arr, int64_t value, size_
         start += field_count;
         it.bump(bit_count_pr_iteration);
     }
-    if (!vector && total_bit_count_left) {              // final subword, may be partial
+    if (total_bit_count_left) {                         // final subword, may be partial
         const auto word = it.get(total_bit_count_left); // <-- limit lookahead to avoid touching memory beyond array
         vector = bitwidth_cmp(word, search_vector);
         auto last_word_mask = 0xFFFFFFFFFFFFFFFFULL >> (64 - total_bit_count_left);
@@ -208,7 +209,7 @@ size_t ArrayPacked::parallel_subword_find(const Array& arr, int64_t value, size_
             return start + sub_word_index;
         }
     }
-    return arr.size();
+    return end;
 }
 
 bool ArrayPacked::find_all_match(size_t start, size_t end, size_t baseindex, QueryStateBase* state) const
