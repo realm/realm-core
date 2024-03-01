@@ -368,21 +368,19 @@ public:
     {
         modify_object(col, obj);
         auto table = current_table();
+        m_active_collection = nullptr;
         for (auto& c : m_info.collections) {
-
             if (c.table_key == table && c.obj_key == obj && c.path.is_prefix_of(path)) {
                 if (c.path.size() != path.size()) {
-                    StablePath sub_path;
-                    sub_path.insert(sub_path.begin(), path.begin() + c.path.size(), path.end());
-                    c.changes->paths.insert(std::move(sub_path));
+                    c.changes->paths.insert(path[c.path.size()]);
                 }
-                else {
+                // If there are multiple exact matches for this collection we
+                // use the first and then propagate the data to the others later
+                else if (!m_active_collection) {
                     m_active_collection = c.changes;
-                    return true;
                 }
             }
         }
-        m_active_collection = nullptr;
         return true;
     }
 

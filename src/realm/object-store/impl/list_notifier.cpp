@@ -62,9 +62,11 @@ void ListNotifier::attach(CollectionBase const& src)
     if (auto obj = tr.get_table(src.get_table()->get_key())->try_get_object(src.get_owner_key())) {
         auto path = src.get_stable_path();
         m_list = std::static_pointer_cast<CollectionBase>(obj.get_collection_by_stable_path(path));
+        m_collection_parent = dynamic_cast<CollectionParent*>(m_list.get());
     }
     else {
         m_list = nullptr;
+        m_collection_parent = nullptr;
     }
 }
 
@@ -73,14 +75,9 @@ bool ListNotifier::do_add_required_change_info(TransactionChangeInfo& info)
     if (!m_list || !m_list->is_attached())
         return false; // origin row was deleted after the notification was added
 
-    // We need to have the collections with the shortest paths first
     StablePath this_path = m_list->get_stable_path();
-    auto it = std::lower_bound(info.collections.begin(), info.collections.end(), this_path.size(),
-                               [](const CollectionChangeInfo& info, size_t sz) {
-                                   return info.path.size() < sz;
-                               });
-    info.collections.insert(
-        it, {m_list->get_table()->get_key(), m_list->get_owner_key(), std::move(this_path), &m_change});
+    info.collections.push_back(
+        {m_list->get_table()->get_key(), m_list->get_owner_key(), std::move(this_path), &m_change});
 
     m_info = &info;
 
@@ -142,14 +139,14 @@ void ListNotifier::run()
         }
     }
 
+    // Modifications to nested values in Mixed are recorded in replication as
+    // StableIndex and we have to look up the actual index afterwards
     if (m_change.paths.size()) {
-        if (auto coll = dynamic_cast<CollectionParent*>(m_list.get())) {
-            for (auto& p : m_change.paths) {
-                // Report changes in substructure as modifications on this list
-                auto ndx = coll->find_index(p[0]);
-                if (ndx != realm::not_found)
-                    m_change.modifications.add(ndx); // OK to insert same index again
-            }
+        REALM_ASSERT(m_collection_parent);
+        REALM_ASSERT(m_type == PropertyType::Mixed);
+        for (auto& p : m_change.paths) {
+            if (auto ndx = m_collection_parent->find_index(p); ndx != realm::not_found)
+                m_change.modifications.add(ndx);
         }
     }
 }

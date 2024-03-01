@@ -393,13 +393,13 @@ void ListResultsNotifier::run()
         std::iota(m_run_indices->begin(), m_run_indices->end(), 0);
     }
 
+    // Modifications to nested values in Mixed are recorded in replication as
+    // StableIndex and we have to look up the actual index afterwards
     if (m_change.paths.size()) {
         if (auto coll = dynamic_cast<CollectionParent*>(m_list.get())) {
             for (auto& p : m_change.paths) {
-                // Report changes in substructure as modifications on this list
-                auto ndx = coll->find_index(p[0]);
-                if (ndx != realm::not_found)
-                    m_change.modifications.add(ndx); // OK to insert same index again
+                if (auto ndx = coll->find_index(p); ndx != realm::not_found)
+                    m_change.modifications.add(ndx);
             }
         }
     }
