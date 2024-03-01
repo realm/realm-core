@@ -1481,7 +1481,6 @@ DEFINE_NESTED_MERGE(Instruction::Update)
     // Setting a value higher up in the hierarchy overwrites any modification to
     // the inner value, regardless of when this happened.
     if (auto next_element = is_prefix_of(outer, inner)) {
-        // REALM_ASSERT(next_element);
         //  If this is a collection in mixed, we will allow the inner instruction
         //  to pass so long as it references the proper type (list or dictionary).
         if (outer.value.type == Type::List) {
@@ -1699,8 +1698,22 @@ DEFINE_MERGE(Instruction::ArrayErase, Instruction::Update)
     }
 }
 
+DEFINE_MERGE(Instruction::Clear, Instruction::Update)
+{
+    // The two instructions are at the same level of nesting.
+
+    using Type = Instruction::Payload::Type;
+
+    // TODO: We could make it so a Clear instruction does not win against setting a property or
+    // collection item to a different collection.
+    if (same_path(left, right)) {
+        if (right.value.type != Type::List && right.value.type != Type::Dictionary) {
+            left_side.discard();
+        }
+    }
+}
+
 // Handled by nested rule
-DEFINE_MERGE_NOOP(Instruction::Clear, Instruction::Update);
 DEFINE_MERGE_NOOP(Instruction::SetInsert, Instruction::Update);
 DEFINE_MERGE_NOOP(Instruction::SetErase, Instruction::Update);
 
