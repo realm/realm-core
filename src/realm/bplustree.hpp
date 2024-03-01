@@ -207,6 +207,7 @@ public:
 
     virtual void erase(size_t) = 0;
     virtual void clear() = 0;
+    virtual void swap(size_t, size_t) = 0;
 
     void create();
     void destroy();
@@ -416,7 +417,7 @@ public:
         m_root->bptree_access(n, func);
     }
 
-    void swap(size_t ndx1, size_t ndx2)
+    void swap(size_t ndx1, size_t ndx2) override
     {
         if constexpr (std::is_same_v<T, StringData> || std::is_same_v<T, BinaryData>) {
             struct SwapBuffer {

@@ -59,6 +59,8 @@ protected:
     static std::vector<Mixed> convert_to_mixed_set(const CollectionBase& rhs);
     bool do_init_from_parent(ref_type ref, bool allow_create) const;
 
+    void resort_range(size_t from, size_t to);
+
     REALM_COLD REALM_NORETURN void throw_invalid_null()
     {
         throw InvalidArgument(ErrorCodes::PropertyNotNullable,
@@ -227,7 +229,6 @@ private:
     void do_insert(size_t ndx, T value);
     void do_erase(size_t ndx);
     void do_clear();
-    void do_resort(size_t from, size_t to);
 
     iterator find_impl(const T& value) const;
 };
