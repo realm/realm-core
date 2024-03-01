@@ -1146,6 +1146,9 @@ std::unique_ptr<Subexpr> LinkAggrNode::visit(ParserDriver* drv, DataType)
         case col_type_Timestamp:
             subexpr = link_prop->column<Timestamp>(col_key).clone();
             break;
+        case col_type_Mixed:
+            subexpr = link_prop->column<Mixed>(col_key).clone();
+            break;
         default:
             throw InvalidQueryError(util::format("collection aggregate not supported for type '%1'",
                                                  get_data_type_name(DataType(col_key.get_type()))));
@@ -1407,9 +1410,12 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
                 case type_Float:
                     ret = std::make_unique<Value<float>>(float(double_val));
                     break;
-                case type_Decimal:
-                    ret = std::make_unique<Value<Decimal128>>(Decimal128(text));
+                case type_Decimal: {
+                    // If not argument, try decode again to get full precision
+                    Decimal128 dec = (type == Type::ARG) ? Decimal128(double_val) : Decimal128(text);
+                    ret = std::make_unique<Value<Decimal128>>(dec);
                     break;
+                }
                 case type_Int: {
                     int64_t int_val = int64_t(double_val);
                     // Only return an integer if it precisely represents val
