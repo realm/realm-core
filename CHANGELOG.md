@@ -23,7 +23,7 @@
 -----------
 
 ### Internals
-* None.
+* The Linux-armv7 cross-compiling toolchain file prefers the bfd linker over gold because of issues linking against OpenSSL 3.2.0.
 
 ----------------------------------------------
 
