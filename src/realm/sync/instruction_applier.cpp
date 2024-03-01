@@ -886,9 +886,47 @@ void InstructionApplier::operator()(const Instruction::Clear& instr)
         {
             list.clear();
         }
+        Status on_list_index(LstBase& list, uint32_t index) override
+        {
+            auto& mixed_list = static_cast<Lst<Mixed>&>(list);
+            if (index < mixed_list.size()) {
+                auto val = mixed_list.get(index);
+
+                if (val.is_type(type_Dictionary)) {
+                    Dictionary d(mixed_list, mixed_list.get_key(index));
+                    d.clear();
+                    return Status::Pending;
+                }
+                if (val.is_type(type_List)) {
+                    Lst<Mixed> l(mixed_list, mixed_list.get_key(index));
+                    l.clear();
+                    return Status::Pending;
+                }
+            }
+            else {
+                m_applier->bad_transaction_log("Clear: Index out of bounds (%1 > %2)", index, mixed_list.size());
+            }
+
+            return PathResolver::on_list_index(list, index);
+        }
         void on_dictionary(Dictionary& dict) override
         {
             dict.clear();
+        }
+        Status on_dictionary_key(Dictionary& dict, Mixed key) override
+        {
+            auto val = dict.get(key);
+            if (val.is_type(type_Dictionary)) {
+                Dictionary d(dict, dict.build_index(key));
+                d.clear();
+                return Status::Pending;
+            }
+            if (val.is_type(type_List)) {
+                Lst<Mixed> l(dict, dict.build_index(key));
+                l.clear();
+                return Status::Pending;
+            }
+            return PathResolver::on_dictionary_key(dict, key);
         }
         void on_set(SetBase& set) override
         {
