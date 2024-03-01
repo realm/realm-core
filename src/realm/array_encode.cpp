@@ -187,6 +187,7 @@ void ArrayEncode::init(const char* h)
         m_ndx_width = NodeHeader::get_elementB_size<Encoding::Flex>(h);
         m_ndx_size = NodeHeader::get_arrayB_num_elements<Encoding::Flex>(h);
         m_v_mask = 1ULL << (m_v_width - 1);
+        m_ndx_mask = 1ULL << (m_ndx_width - 1);
     }
 }
 

@@ -897,6 +897,7 @@ size_t inline NodeHeader::get_byte_size_from_header(const char* header) noexcept
                                                                 get_elementB_size<NodeHeader::Encoding::Flex>(h));
         default:
             REALM_ASSERT_RELEASE(false && "unknown encoding");
+            return 0; // kill a warning
     }
 }
 
