@@ -17,7 +17,7 @@
 -----------
 
 ### Internals
-* None.
+* Fix several crashes when running the object store benchmarks ([#7403](https://github.com/realm/realm-core/pull/7403)).
 
 ----------------------------------------------
 
