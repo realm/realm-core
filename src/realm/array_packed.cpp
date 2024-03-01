@@ -162,11 +162,10 @@ bool ArrayPacked::find_all(const Array& arr, int64_t value, size_t start, size_t
 
     while (start < end) {
         start = parallel_subword_find<Cond>(arr, start, end, search_vector, total_bit_count_left);
-        if (start < end) {
+        if (start < end)
             if (!state->match(start + baseindex))
                 return false;
-            ++start;
-        }
+        start += 1;
     }
     return true;
 }

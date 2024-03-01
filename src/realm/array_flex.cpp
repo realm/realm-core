@@ -291,11 +291,10 @@ bool ArrayFlex::find_eq(const Array& arr, int64_t value, size_t start, size_t en
     while (start < end) {
         start = parallel_subword_find<Equal, false>(arr, offset, ndx_width, start, end, search_vector_ndx,
                                                     total_bit_count_left_ndx);
-        if (start < end) {
+        if (start < end)
             if (!state->match(start + baseindex))
                 return false;
-            start += 1;
-        }
+        start += 1;
     }
     //    t2 = std::chrono::high_resolution_clock::now();
     //    std::cout << "Time second parallel find: " <<  std::chrono::duration_cast<nanoseconds>(t2 - t1).count() << "
@@ -324,11 +323,10 @@ bool ArrayFlex::find_neq(const Array& arr, int64_t value, size_t start, size_t e
     while (start < end) {
         start = parallel_subword_find<NotEqual, false>(arr, offset, ndx_width, start, end, search_vector_ndx,
                                                        total_bit_count_left_ndx);
-        if (start < end) {
+        if (start < end)
             if (!state->match(start + baseindex))
                 return false;
-            start += 1;
-        }
+        start += 1;
     }
     return true;
 }
@@ -354,11 +352,10 @@ bool ArrayFlex::find_lt(const Array& arr, int64_t value, size_t start, size_t en
     while (start < end) {
         start = parallel_subword_find<Less, false>(arr, offset, ndx_width, start, end, search_vector_ndx,
                                                    total_bit_count_left_ndx);
-        if (start < end) {
+        if (start < end)
             if (!state->match(start + baseindex))
                 return false;
-            start += 1;
-        }
+        start += 1;
     }
     return true;
 }
@@ -384,11 +381,10 @@ bool ArrayFlex::find_gt(const Array& arr, int64_t value, size_t start, size_t en
     while (start < end) {
         start = parallel_subword_find<GreaterEqual, false>(arr, offset, ndx_width, start, end, search_vector_ndx,
                                                            total_bit_count_left_ndx);
-        if (start < end) {
+        if (start < end)
             if (!state->match(start + baseindex))
                 return false;
-            start += 1;
-        }
+        start += 1;
     }
     return true;
 }
