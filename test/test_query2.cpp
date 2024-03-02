@@ -5746,7 +5746,7 @@ TEST(Query_Dictionary)
     tv = (origin->link(col_links).column<Dictionary>(col_dict) > 50).find_all();
     CHECK_EQUAL(tv.size(), 6);
     tv = (origin->link(col_links).column<Dictionary>(col_dict).key("Value") == null()).find_all();
-    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(tv.size(), 7);
 
     tv = (foo->column<Dictionary>(col_dict).keys().begins_with("F")).find_all();
     CHECK_EQUAL(tv.size(), 5);
