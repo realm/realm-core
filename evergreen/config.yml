@@ -154,7 +154,7 @@ functions:
           fi
 
           if [ -n "${curl_base|}" ]; then
-              set_cmake_var curl_vars CURL_LIBRARY PATH "$(./evergreen/abspath.sh ${curl_base}/lib/curl.lib)"
+              set_cmake_var curl_vars CURL_LIBRARY PATH "$(./evergreen/abspath.sh ${curl_base}/lib/libcurl.dll.a)"
               set_cmake_var curl_vars CURL_INCLUDE_DIR PATH "$(./evergreen/abspath.sh ${curl_base}/include)"
               set_cmake_var baas_vars REALM_CURL_CACERTS PATH "$(./evergreen/abspath.sh "${curl_base}/bin/cacert.pem")"
           fi
@@ -219,6 +219,10 @@ functions:
 
           if [ -n "${xcode_developer_dir}" ]; then
               export DEVELOPER_DIR="${xcode_developer_dir}"
+          fi
+
+          if [[ -n "${curl_base}" ]]; then
+              export PATH="${curl_base}/bin":$PATH
           fi
 
           # NOTE: These two values will be ANDed together for matching tests
