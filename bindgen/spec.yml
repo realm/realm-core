@@ -168,20 +168,18 @@ enums:
       Collection: 896 # Array | Set | Dictionary
       Flags: 960 # Nullable | Collection
 
+  CollectionType:
+    values:
+      List: 19
+      Set: 20
+      Dictionary: 21
+
   TableType:
     cppName: ObjectSchema::ObjectType
     values:
       TopLevel: 0
       Embedded: 1
       TopLevelAsymmetric: 0x2
-
-  ClientResetMode:
-    cppName: ClientResyncMode
-    values:
-      - Manual
-      - DiscardLocal
-      - Recover
-      - RecoverOrDiscard
 
   DataType:
     cppName: DataType::Type
@@ -200,12 +198,6 @@ enums:
       TypedLink: 16
       UUID: 17
 
-  AppCacheMode:
-    cppName: app::App::CacheMode
-    values:
-      - Enabled
-      - Disabled
-
   AuthProvider:
     cppName: app::AuthProvider
     values:
@@ -218,12 +210,28 @@ enums:
       - USERNAME_PASSWORD
       - FUNCTION
       - API_KEY
+
+  AppCacheMode:
+    cppName: app::App::CacheMode
+    values:
+      - Enabled
+      - Disabled
+
+  ClientResetMode:
+    cppName: ClientResyncMode
+    values:
+      - Manual
+      - DiscardLocal
+      - Recover
+      - RecoverOrDiscard
+
   MetadataMode:
     cppName: SyncClientConfig::MetadataMode
     values:
       - NoEncryption
       - Encryption
       - NoMetadata
+
   LoggerLevel:
     cppName: util::Logger::Level
     values:
@@ -236,6 +244,7 @@ enums:
       - error
       - fatal
       - off
+
   HttpMethod:
     cppName: app::HttpMethod
     values:
@@ -244,11 +253,13 @@ enums:
       - patch
       - put
       - del
+
   SyncSessionStopPolicy:
     values:
       - Immediately
       - LiveIndefinitely
       - AfterChangesUploaded
+
   SyncSessionState:
     cppName: SyncSession::State
     values:
@@ -256,12 +267,14 @@ enums:
       - Dying
       - Inactive
       - WaitingForAccessToken
+
   SyncSessionConnectionState:
     cppName: SyncSession::ConnectionState
     values:
       - Disconnected
       - Connecting
       - Connected
+
   SyncErrorAction:
     cppName: sync::ProtocolErrorInfo::Action
     values:
@@ -273,17 +286,20 @@ enums:
       - DeleteRealm
       - ClientReset
       - ClientResetNoRecovery
+
   ProgressDirection:
     cppName: SyncSession::ProgressDirection
     values:
       - upload
       - download
+
   SyncUserState:
     cppName: SyncUser::State
     values:
       - LoggedOut
       - LoggedIn
       - Removed
+
   SyncSubscriptionSetState:
     cppName: sync::SubscriptionSet::State
     values:
@@ -294,12 +310,14 @@ enums:
       - Error
       - Superseded
       - AwaitingMark
+
   WatchStreamState:
     cppName: app::WatchStream::State
     values:
       - NEED_DATA
       - HAVE_EVENT
       - HAVE_ERROR
+
   ProxyType:
     cppName: SyncConfig::ProxyConfig::Type
     values:
@@ -768,6 +786,7 @@ classes:
         - '(column: ColKey, value: Mixed)'
         - sig: '(column: ColKey, value: Mixed, is_default: bool)'
           suffix: with_default
+      set_collection: '(column: ColKey, type: CollectionType) -> Obj'
       get_linked_object: '(column: ColKey) const -> Nullable<Obj>'
       to_string: () const -> std::string
       get_backlink_count: '() const -> count_t'
@@ -866,6 +885,8 @@ classes:
           suffix: 'obj'
       get_any: '(index: count_t) -> Mixed'
       get_dictionary_element: '(index: count_t) -> std::pair<StringData, Mixed>'
+      get_list: '(index: count_t) -> List'
+      get_dictionary: '(index: count_t) -> Dictionary'
       filter: '(query: Query&&) const -> Results'
       sort:
         - '(order: SortDescriptor&&) const -> Results'
@@ -1021,7 +1042,11 @@ classes:
     constructors:
       make: '(r: SharedRealm, parent: const Obj&, col: ColKey)'
     methods:
-      get: '(ndx: count_t) const -> Obj'
+      get:
+        - sig: '(ndx: count_t) -> Obj'
+          suffix: 'obj'
+      get_list: '(path_elem: int) -> List'
+      get_dictionary: '(path_elem: int) -> Dictionary'
       move: '(source_ndx: count_t, dest_ndx: count_t)'
       remove: '(ndx: count_t)'
       remove_all: '()'
@@ -1030,8 +1055,10 @@ classes:
       delete_all: '()'
       insert_any: '(list_ndx: count_t, value: Mixed)'
       insert_embedded: '(ndx: count_t) -> Obj'
+      insert_collection: '(path_elem: int, dict_or_list: CollectionType)'
       set_any: '(list_ndx: count_t, value: Mixed)'
       set_embedded: '(list_ndx: count_t) -> Obj'
+      set_collection: '(path_element: int, dict_or_list: CollectionType)'
       filter: '(q: Query) const -> Results'
       freeze: '(frozen_realm: SharedRealm const&) const -> List'
 
@@ -1058,7 +1085,9 @@ classes:
     constructors:
       make: '(r: SharedRealm, parent: const Obj&, col: ColKey)'
     methods:
-      get: '(ndx: count_t) const -> Obj'
+      get:
+        - sig: '(ndx: count_t) -> Obj'
+          suffix: 'obj'
       insert_any: '(val: Mixed) -> std::pair<count_t, bool>'
       remove_any: '(val: Mixed) -> std::pair<count_t, bool>'
       remove_all: '()'
@@ -1108,11 +1137,14 @@ classes:
         - sig: '(key: StringData) const -> Obj'
           cppName: get<Obj> # TODO can't distinguish null from missing
       get_pair: '(ndx: count_t) const -> std::pair<StringData, Mixed>'
+      get_list: '(path_elem: std::string) -> List'
+      get_dictionary: '(path_elem: std::string) -> Dictionary'
       contains: '(key: StringData) -> bool'
       freeze: '(frozen_realm: SharedRealm const&) const -> Dictionary'
       add_key_based_notification_callback: '(cb: (changes: DictionaryChangeSet), keyPaths: std::optional<KeyPathArray>) -> NotificationToken'
       insert_any: '(key: StringData, value: Mixed) -> std::pair<count_t, bool>'
       insert_embedded: '(key: StringData) -> Obj'
+      insert_collection: '(path_elem: std::string, dict_or_list: CollectionType)'
       try_get_any: '(key: StringData) const -> std::optional<Mixed>'
       remove_all: '()'
       try_erase: '(key: StringData) -> bool'

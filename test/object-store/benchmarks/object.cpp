@@ -154,7 +154,8 @@ TEST_CASE("Benchmark object", "[benchmark][object]") {
     using AnyDict = std::map<std::string, std::any>;
     _impl::RealmCoordinator::assert_no_open_realms();
 
-    InMemoryTestFile config;
+    TestFile config;
+    config.in_memory = true;
     config.automatic_change_notifications = false;
     config.schema = Schema{
         {"all types",
@@ -304,7 +305,7 @@ TEST_CASE("Benchmark object", "[benchmark][object]") {
         std::mt19937 rng(dev());
         std::uniform_int_distribution<std::mt19937::result_type> dist(500, 5000);
         int64_t benchmark_pk = dist(rng);
-        for (size_t i = 0; i < 1000; ++i) {
+        for (int64_t i = 0; i < 1000; ++i) {
             auto obj = Object::create(d, r, all_types,
                                       std::any(AnyDict{
                                           {"pk", benchmark_pk + i},
@@ -343,19 +344,6 @@ TEST_CASE("Benchmark object", "[benchmark][object]") {
             });
             r->commit_transaction();
         };
-
-        // TODO remove this once Object::obj() is deleted.
-        //  BENCHMARK_ADVANCED("update object obj()")(Catch::Benchmark::Chronometer meter)
-        //  {
-        //      r->begin_transaction();
-        //      meter.measure([&objs, &col_int] {
-        //          for (Object& obj : objs) {
-        //              obj.obj().set(col_int, 10);
-        //              REQUIRE(obj.obj().get<Int>(col_int) == 10);
-        //          }
-        //      });
-        //      r->commit_transaction();
-        //  };
     }
 
     SECTION("change notifications reporting") {
@@ -388,7 +376,7 @@ TEST_CASE("Benchmark object", "[benchmark][object]") {
 
             r->begin_transaction();
             for (size_t i = 0; i < num_objects; ++i) {
-                auto name = util::format("person_", i);
+                auto name = util::format("person_%1", i);
                 AnyDict person{
                     {"name", name},
                     {"age", static_cast<int64_t>(i)},
@@ -424,7 +412,7 @@ TEST_CASE("Benchmark object", "[benchmark][object]") {
 
             r->begin_transaction();
             for (size_t i = 0; i < num_objects; ++i) {
-                auto name = util::format("person_", i);
+                auto name = util::format("person_%1", i);
                 AnyDict person{
                     {"name", name},
                     {"age", static_cast<int64_t>(i)},
@@ -464,7 +452,7 @@ TEST_CASE("Benchmark object", "[benchmark][object]") {
 
             r->begin_transaction();
             for (size_t i = 0; i < num_objects; ++i) {
-                auto name = util::format("person_", i);
+                auto name = util::format("person_%1", i);
                 AnyDict person{
                     {"name", name},
                     {"age", static_cast<int64_t>(i)},
@@ -483,7 +471,7 @@ TEST_CASE("Benchmark object", "[benchmark][object]") {
 
             r->begin_transaction();
             for (size_t i = 0; i < num_objects; ++i) {
-                auto name = util::format("person_", i);
+                auto name = util::format("person_%1", i);
                 AnyDict person{
                     {"name", name}, {"age", static_cast<int64_t>(i + 1)}, // age differs
                 };
@@ -620,7 +608,7 @@ TEST_CASE("Benchmark object", "[benchmark][object]") {
             r->begin_transaction();
             for (size_t i = 0; i < num_objects; ++i) {
                 size_t index = i + start_index;
-                auto name = util::format("person_", index);
+                auto name = util::format("person_%1", index);
                 AnyDict person{
                     {"name", name},
                     {"age", static_cast<int64_t>(index)},
@@ -738,7 +726,7 @@ TEST_CASE("Benchmark object", "[benchmark][object]") {
 
             r->begin_transaction();
             for (size_t i = 0; i < num_objects; ++i) {
-                auto name = util::format("person_", i);
+                auto name = util::format("person_%1", i);
                 AnyDict person{
                     {"name", name},
                     {"age", static_cast<int64_t>(i * 2)},

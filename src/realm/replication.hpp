@@ -26,8 +26,9 @@
 #include <string>
 
 #include <realm/util/assert.hpp>
-#include <realm/util/safe_int_ops.hpp>
 #include <realm/util/buffer.hpp>
+#include <realm/util/logger.hpp>
+#include <realm/util/safe_int_ops.hpp>
 #include <realm/impl/cont_transact_hist.hpp>
 #include <realm/impl/transact_log.hpp>
 
@@ -438,6 +439,13 @@ private:
                                   Mixed index) const;
     Path get_prop_name(Path&&) const;
     size_t transact_log_size();
+
+    util::Logger* would_log(util::Logger::Level level) const noexcept
+    {
+        if (m_logger && m_logger->would_log(level))
+            return m_logger;
+        return nullptr;
+    }
 };
 
 class Replication::Interrupted : public std::exception {
