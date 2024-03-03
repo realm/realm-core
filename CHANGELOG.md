@@ -6,7 +6,8 @@
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Fix Opening realm with cached user while offline results in fatal error and session does not retry connection. ([#7349](https://github.com/realm/realm-core/issues/7349), since v13.26.0)
+* Fix network::Service does not start waiting on timers if no other events are currently active. ([#7364](https://github.com/realm/realm-core/issues/7364), since v10.0.0)
 
 ### Breaking changes
 * None.
@@ -152,8 +153,6 @@
 * Fixed a crash with `Assertion failed: m_initiated` during sync session startup ([#7074](https://github.com/realm/realm-core/issues/7074), since v10.0.0).
 * Fixed a TSAN violation where the user thread could race to read `m_finalized` with the sync event loop ([#6844](https://github.com/realm/realm-core/issues/6844), since v13.15.1)
 * Fix a minor race condition when backing up Realm files before a client reset which could have lead to overwriting an existing file. ([PR #7341](https://github.com/realm/realm-core/pull/7341)).
-* Fix Opening realm with cached user while offline results in fatal error and session does not retry connection. ([#7349](https://github.com/realm/realm-core/issues/7349), since v13.26.0)
-* Fix network::Service does not start waiting on timers if no other events are currently active. ([#7364](https://github.com/realm/realm-core/issues/7364), since v10.0.0)
 
 ### Breaking changes
 * SyncManager no longer supports reconfiguring after calling reset_for_testing(). SyncManager::configure() has been folded into the constructor, and reset_for_testing() has been renamed to tear_down_for_testing(). ([PR #7351](https://github.com/realm/realm-core/pull/7351))
