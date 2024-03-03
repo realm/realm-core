@@ -35,7 +35,7 @@ public:
     /// \throw util::EventLoop::Implementation::NotAvailable if no event loop
     /// implementation was specified, and
     /// util::EventLoop::Implementation::get_default() throws it.
-    Client(Config = {});
+    Client(Config, RandomEngine&);
     Client(Client&&) noexcept;
     ~Client() noexcept;
 

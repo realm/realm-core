@@ -7,6 +7,8 @@
 #include <realm/sync/network/websocket_error.hpp>
 #include <realm/util/functional.hpp>
 
+#include <random>
+
 namespace realm::sync {
 class ClientImpl;
 class SessionWrapper;
@@ -288,6 +290,83 @@ enum class SessionReason {
     Sync = 0,
     // Download a fresh realm
     ClientReset,
+};
+
+using RandomEngine = std::mt19937_64;
+
+template <typename ErrorType, typename RandomEngine>
+struct ErrorBackoffState {
+    ErrorBackoffState() = default;
+    explicit ErrorBackoffState(ResumptionDelayInfo default_delay_info, RandomEngine& random_engine)
+        : default_delay_info(std::move(default_delay_info))
+        , m_random_engine(random_engine)
+    {
+    }
+
+    // Reset the current delay value when the triggering error changes
+    void update(ErrorType new_error, std::optional<ResumptionDelayInfo> new_delay_info)
+    {
+        if (triggering_error && *triggering_error == new_error) {
+            return;
+        }
+
+        delay_info = new_delay_info.value_or(default_delay_info);
+        cur_delay_interval = util::none;
+        triggering_error = new_error;
+    }
+
+    // Update the triggering error without resetting the current delay value
+    void set_error(ErrorType new_error)
+    {
+        triggering_error = new_error;
+    }
+
+    void reset()
+    {
+        triggering_error = util::none;
+        cur_delay_interval = util::none;
+        delay_info = default_delay_info;
+    }
+
+    std::chrono::milliseconds delay_interval()
+    {
+        if (!cur_delay_interval) {
+            cur_delay_interval = delay_info.resumption_delay_interval;
+            return jitter_value(*cur_delay_interval);
+        }
+        if (*cur_delay_interval == delay_info.max_resumption_delay_interval) {
+            return jitter_value(delay_info.max_resumption_delay_interval);
+        }
+        auto safe_delay_interval = cur_delay_interval->count();
+        if (util::int_multiply_with_overflow_detect(safe_delay_interval,
+                                                    delay_info.resumption_delay_backoff_multiplier)) {
+            *cur_delay_interval = delay_info.max_resumption_delay_interval;
+        }
+        else {
+            *cur_delay_interval =
+                std::min(delay_info.max_resumption_delay_interval, std::chrono::milliseconds(safe_delay_interval));
+        }
+        return jitter_value(*cur_delay_interval);
+    }
+
+    ResumptionDelayInfo default_delay_info;
+    ResumptionDelayInfo delay_info;
+    util::Optional<std::chrono::milliseconds> cur_delay_interval;
+    util::Optional<ErrorType> triggering_error;
+
+private:
+    std::chrono::milliseconds jitter_value(std::chrono::milliseconds value)
+    {
+        if (delay_info.delay_jitter_divisor == 0) {
+            return value;
+        }
+        const auto max_jitter = value.count() / delay_info.delay_jitter_divisor;
+        auto distr = std::uniform_int_distribution<std::chrono::milliseconds::rep>(0, max_jitter);
+        std::chrono::milliseconds randomized_deduction(distr(m_random_engine.get()));
+        return value - randomized_deduction;
+    }
+
+    std::reference_wrapper<RandomEngine> m_random_engine;
 };
 
 } // namespace realm::sync

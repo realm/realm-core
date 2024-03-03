@@ -593,6 +593,49 @@ TEST_CASE("C API (non-database)", "[c_api]") {
         realm_app_config_set_bundle_id(app_config.get(), "some_bundle_id");
         CHECK(app_config->device_info.bundle_id == "some_bundle_id");
 
+        auto test_sync_client_config = cptr(realm_sync_client_config_new());
+        realm_sync_client_config_set_base_file_path(test_sync_client_config.get(), "some string");
+        CHECK(test_sync_client_config->base_file_path == "some string");
+        realm_sync_client_config_set_metadata_mode(test_sync_client_config.get(),
+                                                   RLM_SYNC_CLIENT_METADATA_MODE_DISABLED);
+        CHECK(test_sync_client_config->metadata_mode ==
+              static_cast<realm::SyncClientConfig::MetadataMode>(RLM_SYNC_CLIENT_METADATA_MODE_DISABLED));
+        auto enc_key = make_test_encryption_key(123);
+        realm_sync_client_config_set_metadata_encryption_key(test_sync_client_config.get(),
+                                                             reinterpret_cast<uint8_t*>(enc_key.data()));
+        CHECK(test_sync_client_config->custom_encryption_key);
+        CHECK(std::equal(enc_key.begin(), enc_key.end(), test_sync_client_config->custom_encryption_key->begin()));
+        realm_sync_client_config_set_reconnect_mode(test_sync_client_config.get(),
+                                                    RLM_SYNC_CLIENT_RECONNECT_MODE_TESTING);
+        CHECK(test_sync_client_config->reconnect_mode ==
+              static_cast<ReconnectMode>(RLM_SYNC_CLIENT_RECONNECT_MODE_TESTING));
+        realm_sync_client_config_set_multiplex_sessions(test_sync_client_config.get(), true);
+        CHECK(test_sync_client_config->multiplex_sessions);
+        realm_sync_client_config_set_multiplex_sessions(test_sync_client_config.get(), false);
+        CHECK_FALSE(test_sync_client_config->multiplex_sessions);
+        realm_sync_client_config_set_user_agent_binding_info(test_sync_client_config.get(), "some user agent stg");
+        CHECK(test_sync_client_config->user_agent_binding_info == "some user agent stg");
+        realm_sync_client_config_set_user_agent_application_info(test_sync_client_config.get(), "some application");
+        CHECK(test_sync_client_config->user_agent_application_info == "some application");
+        realm_sync_client_config_set_connect_timeout(test_sync_client_config.get(), 600);
+        CHECK(test_sync_client_config->timeouts.connect_timeout == 600);
+        realm_sync_client_config_set_connection_linger_time(test_sync_client_config.get(), 999);
+        CHECK(test_sync_client_config->timeouts.connection_linger_time == 999);
+        realm_sync_client_config_set_ping_keepalive_period(test_sync_client_config.get(), 500);
+        CHECK(test_sync_client_config->timeouts.ping_keepalive_period == 500);
+        realm_sync_client_config_set_pong_keepalive_timeout(test_sync_client_config.get(), 5000);
+        CHECK(test_sync_client_config->timeouts.pong_keepalive_timeout == 5000);
+        realm_sync_client_config_set_fast_reconnect_limit(test_sync_client_config.get(), 1099);
+        CHECK(test_sync_client_config->timeouts.fast_reconnect_limit == 1099);
+        realm_sync_client_config_set_resumption_delay_interval(test_sync_client_config.get(), 1024);
+        CHECK(test_sync_client_config->timeouts.resumption_delay_interval == 1024);
+        realm_sync_client_config_set_max_resumption_delay_interval(test_sync_client_config.get(), 600024);
+        CHECK(test_sync_client_config->timeouts.max_resumption_delay_interval == 600024);
+        realm_sync_client_config_set_resumption_delay_backoff_multiplier(test_sync_client_config.get(), 10);
+        CHECK(test_sync_client_config->timeouts.resumption_delay_backoff_multiplier == 10);
+        realm_sync_client_config_set_resumption_delay_jitter_divisor(test_sync_client_config.get(), 12);
+        CHECK(test_sync_client_config->timeouts.resumption_delay_jitter_divisor == 12);
+
         test_util::TestDirGuard temp_dir(util::make_temp_dir());
         auto sync_client_config = cptr(realm_sync_client_config_new());
         realm_sync_client_config_set_base_file_path(sync_client_config.get(), temp_dir.c_str());

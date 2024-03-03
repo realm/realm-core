@@ -14,6 +14,7 @@
 #include <realm/sync/noinst/server/server.hpp>
 #include <realm/sync/noinst/server/server_dir.hpp>
 #include <realm/transaction.hpp>
+#include <realm/util/random.hpp>
 #include <realm/version.hpp>
 
 #include "test.hpp"
@@ -479,6 +480,8 @@ public:
 
         m_server_loggers.resize(num_servers);
         m_client_loggers.resize(num_clients);
+        util::seed_prng_nondeterministically(m_random); // Throws
+
 
         if (num_servers == 1) {
             m_server_loggers[0] = std::make_shared<util::PrefixLogger>("Server: ", m_logger);
@@ -551,7 +554,7 @@ public:
             config_2.one_connection_per_session = config.one_connection_per_session;
             config_2.disable_upload_activation_delay = config.disable_upload_activation_delay;
             config_2.fix_up_object_ids = true;
-            m_clients[i] = std::make_unique<Client>(std::move(config_2));
+            m_clients[i] = std::make_unique<Client>(std::move(config_2), m_random);
         }
 
         m_server_threads.resize(num_servers);
@@ -814,6 +817,7 @@ private:
     std::vector<std::pair<int, int>> m_simulated_client_error_rates;
     std::vector<uint_least64_t> m_allow_server_errors;
     FakeClock m_fake_token_expiration_clock;
+    sync::RandomEngine m_random;
 
     static std::optional<std::array<char, 64>> make_crypt_key(const std::string& key)
     {

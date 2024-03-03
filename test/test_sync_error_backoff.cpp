@@ -14,7 +14,7 @@ TEST(Sync_ErrorBackoffCalculation)
     std::default_random_engine rand_eng(seed_seq);
 
     ResumptionDelayInfo delay_info{std::chrono::milliseconds{4}, std::chrono::milliseconds{1}, 2, 0};
-    sync::ErrorBackoffState<int, decltype(rand_eng)> backoff(delay_info, rand_eng);
+    ErrorBackoffState<int, decltype(rand_eng)> backoff(delay_info, rand_eng);
     backoff.update(1, std::nullopt);
 
     // Setup and check the first backoff. We should get the default delay interval and the triggering

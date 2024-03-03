@@ -25,6 +25,7 @@
 #include <realm/util/logger.hpp>
 #include <realm/util/optional.hpp>
 #include <realm/sync/binding_callback_thread_observer.hpp>
+#include <realm/sync/client_base.hpp>
 #include <realm/sync/config.hpp>
 #include <realm/sync/socket_provider.hpp>
 
@@ -61,6 +62,11 @@ struct SyncClientTimeouts {
     uint64_t ping_keepalive_period;
     uint64_t pong_keepalive_timeout;
     uint64_t fast_reconnect_limit;
+    // Used for requesting location metadata at startup and reconnecting sync connections.
+    uint64_t resumption_delay_interval;
+    uint64_t max_resumption_delay_interval;
+    int resumption_delay_backoff_multiplier;
+    int resumption_delay_jitter_divisor;
 };
 
 struct SyncClientConfig {
@@ -236,12 +242,14 @@ public:
         return m_sync_route;
     }
 
-    // If the location hasn't been updated when a SyncSession is activated, trigger a
-    // location update and wait for it to complete before activating the session. Once the
-    // location has been updated, any sessions in PendingLocationUpdate will be started.
-    // If force_restart is true, the current retry timer will be canceled and the location
-    // request will be sent immediately.
-    void start_update_location(bool force_restart = false) REQUIRES(!m_mutex);
+    // Returns true if the location sync_route has already been populated
+    // or initiates the request to retrieve the location metadata to
+    // populate the sync_route.
+    bool check_or_start_location_update() REQUIRES(!m_mutex);
+
+    // If the location metadata request is still in progress, cancel
+    // the last delay and restart the location request operation.
+    void cancel_location_update_delay() REQUIRES(!m_mutex);
 
     std::weak_ptr<app::App> app() const REQUIRES(!m_mutex)
     {
@@ -336,14 +344,17 @@ private:
 
     std::weak_ptr<app::App> m_app GUARDED_BY(m_mutex);
 
-    void do_update_location() REQUIRES(m_mutex); // releases mutex
-    void do_reset_update_location() REQUIRES(m_mutex);
-    void restart_location_update() REQUIRES(!m_mutex);
-
-    sync::SyncSocketProvider::SyncTimer m_location_update_timer GUARDED_BY(m_mutex);
-    time_t m_last_location_update_delay GUARDED_BY(m_mutex) = 0;
-
     const std::string m_app_id;
+
+    void schedule_next_location_update() REQUIRES(!m_mutex);
+    void schedule_next_location_update(util::CheckedLockGuard&& lock) REQUIRES(m_mutex); // releases mutex
+    void perform_location_update() REQUIRES(!m_mutex);
+    void perform_location_update(util::CheckedLockGuard&& lock) REQUIRES(m_mutex);
+    void cancel_pending_location_update() REQUIRES(m_mutex);
+
+    const std::unique_ptr<sync::ResumptionDelayInfo> m_location_delay_info;
+    std::optional<sync::ErrorBackoffState<Status, sync::RandomEngine>> m_location_retry_state GUARDED_BY(m_mutex);
+    sync::SyncSocketProvider::SyncTimer m_location_update_timer GUARDED_BY(m_mutex);
 };
 
 } // namespace realm

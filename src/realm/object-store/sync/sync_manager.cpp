@@ -25,9 +25,12 @@
 #include <realm/object-store/sync/sync_user.hpp>
 #include <realm/object-store/sync/app.hpp>
 #include <realm/object-store/util/uuid.hpp>
+#include <realm/sync/protocol.hpp>
+#include <realm/sync/client_base.hpp>
 
 #include <realm/util/sha_crypto.hpp>
 #include <realm/util/hex_dump.hpp>
+#include <realm/util/random.hpp>
 
 #include <realm/exceptions.hpp>
 
@@ -35,11 +38,15 @@ using namespace realm;
 using namespace realm::_impl;
 
 SyncClientTimeouts::SyncClientTimeouts()
-    : connect_timeout(sync::Client::default_connect_timeout)
-    , connection_linger_time(sync::Client::default_connection_linger_time)
-    , ping_keepalive_period(sync::Client::default_ping_keepalive_period)
-    , pong_keepalive_timeout(sync::Client::default_pong_keepalive_timeout)
-    , fast_reconnect_limit(sync::Client::default_fast_reconnect_limit)
+    : connect_timeout(sync::default_connect_timeout)
+    , connection_linger_time(sync::default_connection_linger_time)
+    , ping_keepalive_period(sync::default_ping_keepalive_period)
+    , pong_keepalive_timeout(sync::default_pong_keepalive_timeout)
+    , fast_reconnect_limit(sync::default_fast_reconnect_limit)
+    , resumption_delay_interval(sync::default_resumption_delay_interval.count())
+    , max_resumption_delay_interval(sync::default_max_resumption_delay_interval.count())
+    , resumption_delay_backoff_multiplier(sync::default_resumption_delay_backoff_multiplier)
+    , resumption_delay_jitter_divisor(sync::default_resumption_delay_jitter_divisor)
 {
 }
 
@@ -56,6 +63,7 @@ SyncManager::SyncManager(Private, std::shared_ptr<app::App> app, std::optional<s
     , m_sync_route(sync_route)
     , m_app(app)
     , m_app_id(app_id)
+    , m_location_delay_info(std::make_unique<sync::ResumptionDelayInfo>())
 {
     // create the initial logger - if the logger_factory is updated later, a new
     // logger will be created at that time.
@@ -64,6 +72,15 @@ SyncManager::SyncManager(Private, std::shared_ptr<app::App> app, std::optional<s
     if (m_config.metadata_mode == MetadataMode::NoMetadata) {
         return;
     }
+
+    if (m_config.timeouts.resumption_delay_interval > 1000)
+        m_location_delay_info->resumption_delay_interval =
+            std::chrono::milliseconds(config.timeouts.resumption_delay_interval);
+    if (m_config.timeouts.max_resumption_delay_interval > 30000)
+        m_location_delay_info->max_resumption_delay_interval =
+            std::chrono::milliseconds(config.timeouts.max_resumption_delay_interval);
+    if (m_config.timeouts.resumption_delay_jitter_divisor >= 0)
+        m_location_delay_info->delay_jitter_divisor = config.timeouts.resumption_delay_jitter_divisor;
 
     bool encrypt = m_config.metadata_mode == MetadataMode::Encryption;
     m_metadata_manager = std::make_unique<SyncMetadataManager>(m_file_manager->metadata_path(), encrypt,
@@ -624,7 +641,7 @@ void SyncManager::unregister_session(const std::string& path)
         // If there are no more active sessions, then cancel the pending location
         // request, if there is one
         util::CheckedLockGuard lk(m_mutex);
-        do_reset_update_location();
+        cancel_pending_location_update();
     }
     lock.unlock();
 }
@@ -670,85 +687,115 @@ void SyncManager::set_sync_route(std::string sync_route)
     }
 }
 
-void SyncManager::start_update_location(bool force_restart)
+bool SyncManager::check_or_start_location_update()
 {
     util::CheckedLockGuard lk(m_mutex);
-    // If forcing a restart, cancel the current timer and restart the delay interval
-    if (force_restart) {
-        do_reset_update_location();
+    // If the sync route has already been set, then we're done
+    if (m_sync_route && !m_sync_route->empty()) {
+        // make sure the timer is canceled if the sync route is already populated
+        cancel_pending_location_update();
+        return true;
     }
     // If the location update hasn't been started yet, then start it now
-    if (!m_location_update_timer) {
-        do_update_location();
+    if (!m_location_retry_state) {
+        schedule_next_location_update(std::move(lk));
     }
+    return false;
 }
 
-void SyncManager::do_reset_update_location()
-{
-    if (m_location_update_timer) {
-        m_location_update_timer->cancel();
-        m_location_update_timer.reset();
-    }
-    m_last_location_update_delay = 0;
-}
-
-void SyncManager::restart_location_update()
+void SyncManager::cancel_location_update_delay()
 {
     util::CheckedLockGuard lk(m_mutex);
-    auto timer = std::move(m_location_update_timer);
-    do_update_location();
+    // If forcing a restart, cancel the current timer
+    cancel_pending_location_update();
+    // and restart the location update if it hasn't completed yet
+    if (!m_sync_route || m_sync_route->empty()) {
+        schedule_next_location_update(std::move(lk));
+    }
 }
 
-void SyncManager::do_update_location()
+void SyncManager::cancel_pending_location_update()
 {
-    constexpr time_t first_delay = 15;
-    constexpr time_t max_location_update_interval = 8 * 60; // 8 minutes
-
-    size_t delay = 1; // For first location update, just delay for 1 second
-
-    // Simple x2 retry delay calculation: 1, 15, 30, 60 ... 8 mins max
-    if (m_last_location_update_delay >= max_location_update_interval) {
-        delay = max_location_update_interval;
-    }
-    else if (m_last_location_update_delay == 1) {
-        delay = first_delay;
-    }
-    else if (m_last_location_update_delay > 0) {
-        delay = m_last_location_update_delay * 2;
-        if (delay > max_location_update_interval) {
-            delay = max_location_update_interval;
-        }
-    }
-    m_last_location_update_delay = delay;
-
-    m_location_update_timer =
-        do_get_sync_client().create_timer(std::chrono::seconds{delay}, [self = weak_from_this()](Status status) {
-            if (status.code() == ErrorCodes::OperationAborted) {
-                return;
+    if (m_location_update_timer) {
+        // Cancel the pending location update timer on the event loop
+        // If it happens to run before it can be cancelled, that is OK, since
+        // it won't do anything if the sync_route is already populated.
+        do_get_sync_client().post([timer = std::move(m_location_update_timer)](Status status) {
+            if (status.is_ok()) {
+                timer->cancel();
             }
-
-            // If status is not OK, then something bad happened
-            REALM_ASSERT_EX(status.is_ok(), status);
-            std::shared_ptr<app::App> app;
-            if (auto mgr = self.lock()) {
-                app = mgr->app().lock();
-            }
-            if (!app) {
-                return;
-            }
-            // Start an app request to update the location
-            app->request_location([self = std::move(self)](util::Optional<app::AppError> error) {
-                if (!error) {
-                    // if the operation is successful, the updated sync route will be set by set_sync_route(),
-                    // which will restart any SyncSessions waiting for a location update
-                    return;
-                }
-                // Since it's unclear if the errors are fatal or not, just retry the location update
-                if (auto mgr = self.lock(); mgr) {
-                    mgr->restart_location_update();
-                }
-            });
         });
+    }
+    m_location_retry_state.reset();
+}
+
+void SyncManager::schedule_next_location_update()
+{
+    util::CheckedLockGuard lk(m_mutex);
+    schedule_next_location_update(std::move(lk));
+}
+
+void SyncManager::schedule_next_location_update(util::CheckedLockGuard&& lock)
+{
+    // If the sync route has already been set, then we're done
+    if (m_sync_route && !m_sync_route->empty()) {
+        cancel_pending_location_update();
+        return;
+    }
+
+    REALM_ASSERT(m_location_delay_info);
+    auto& sync_client = do_get_sync_client();
+
+    if (!m_location_retry_state) {
+        auto default_delay = *m_location_delay_info;
+        m_location_retry_state.emplace(default_delay, sync_client.get_random());
+        // On the first time through, try to update the location immediately
+        perform_location_update(std::move(lock));
+        return;
+    }
+
+    // Otherwise, grab the delay for the next location update and start a timer
+    auto delay = m_location_retry_state->delay_interval();
+    m_location_update_timer = do_get_sync_client().create_timer(delay, [self = weak_from_this()](Status status) {
+        if (status.code() == ErrorCodes::OperationAborted) {
+            return;
+        }
+        // The only error received should be OperationAborted
+        REALM_ASSERT_EX(status.is_ok(), status);
+        if (auto mgr = self.lock()) {
+            mgr->perform_location_update();
+        }
+    });
+}
+
+void SyncManager::perform_location_update()
+{
+    util::CheckedLockGuard lk(m_mutex);
+    perform_location_update(std::move(lk));
+}
+
+void SyncManager::perform_location_update(util::CheckedLockGuard&&)
+{
+    // If the sync route has already been set, then we're done
+    if (m_sync_route && !m_sync_route->empty()) {
+        cancel_pending_location_update();
+        return;
+    }
+
+    if (auto app = m_app.lock()) {
+        // Start an app request to update the location
+        app->request_location([self = weak_from_this()](util::Optional<app::AppError> error) {
+            if (!error) {
+                // if the operation is successful, the updated sync route will be set by set_sync_route(),
+                // which will restart any SyncSessions waiting for a location update
+                return;
+            }
+            // Since it's unclear if the errors are fatal or not, just retry the location update
+            if (auto mgr = self.lock()) {
+                mgr->schedule_next_location_update();
+            }
+        });
+    }
 }
 
 void SyncManager::close_all_sessions()

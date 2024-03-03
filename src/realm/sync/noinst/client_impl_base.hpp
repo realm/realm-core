@@ -82,74 +82,6 @@ private:
     SessionWrapper* m_back = nullptr;
 };
 
-template <typename ErrorType, typename RandomEngine>
-struct ErrorBackoffState {
-    ErrorBackoffState() = default;
-    explicit ErrorBackoffState(ResumptionDelayInfo default_delay_info, RandomEngine& random_engine)
-        : default_delay_info(std::move(default_delay_info))
-        , m_random_engine(random_engine)
-    {
-    }
-
-    void update(ErrorType new_error, std::optional<ResumptionDelayInfo> new_delay_info)
-    {
-        if (triggering_error && *triggering_error == new_error) {
-            return;
-        }
-
-        delay_info = new_delay_info.value_or(default_delay_info);
-        cur_delay_interval = util::none;
-        triggering_error = new_error;
-    }
-
-    void reset()
-    {
-        triggering_error = util::none;
-        cur_delay_interval = util::none;
-        delay_info = default_delay_info;
-    }
-
-    std::chrono::milliseconds delay_interval()
-    {
-        if (!cur_delay_interval) {
-            cur_delay_interval = delay_info.resumption_delay_interval;
-            return jitter_value(*cur_delay_interval);
-        }
-        if (*cur_delay_interval == delay_info.max_resumption_delay_interval) {
-            return jitter_value(delay_info.max_resumption_delay_interval);
-        }
-        auto safe_delay_interval = cur_delay_interval->count();
-        if (util::int_multiply_with_overflow_detect(safe_delay_interval,
-                                                    delay_info.resumption_delay_backoff_multiplier)) {
-            *cur_delay_interval = delay_info.max_resumption_delay_interval;
-        }
-        else {
-            *cur_delay_interval =
-                std::min(delay_info.max_resumption_delay_interval, std::chrono::milliseconds(safe_delay_interval));
-        }
-        return jitter_value(*cur_delay_interval);
-    }
-
-    ResumptionDelayInfo default_delay_info;
-    ResumptionDelayInfo delay_info;
-    util::Optional<std::chrono::milliseconds> cur_delay_interval;
-    util::Optional<ErrorType> triggering_error;
-
-private:
-    std::chrono::milliseconds jitter_value(std::chrono::milliseconds value)
-    {
-        if (delay_info.delay_jitter_divisor == 0) {
-            return value;
-        }
-        const auto max_jitter = value.count() / delay_info.delay_jitter_divisor;
-        auto distr = std::uniform_int_distribution<std::chrono::milliseconds::rep>(0, max_jitter);
-        std::chrono::milliseconds randomized_deduction(distr(m_random_engine.get()));
-        return value - randomized_deduction;
-    }
-
-    std::reference_wrapper<RandomEngine> m_random_engine;
-};
-
 class ClientImpl {
 public:
     enum class ConnectionTerminationReason;
@@ -159,7 +91,6 @@ public:
     using port_type = network::Endpoint::port_type;
     using OutputBuffer = util::ResettableExpandableBufferOutputStream;
     using ClientProtocol = _impl::ClientProtocol;
-    using RandomEngine = std::mt19937_64;
 
     /// Per-server endpoint information used to determine reconnect delays.
     class ReconnectInfo {
@@ -192,16 +123,10 @@ public:
         ErrorBackoffState<ConnectionTerminationReason, RandomEngine> m_backoff_state;
     };
 
-    static constexpr milliseconds_type default_connect_timeout = 120000;        // 2 minutes
-    static constexpr milliseconds_type default_connection_linger_time = 30000;  // 30 seconds
-    static constexpr milliseconds_type default_ping_keepalive_period = 60000;   // 1 minute
-    static constexpr milliseconds_type default_pong_keepalive_timeout = 120000; // 2 minutes
-    static constexpr milliseconds_type default_fast_reconnect_limit = 60000;    // 1 minute
-
     const std::shared_ptr<util::Logger> logger_ptr;
     util::Logger& logger;
 
-    ClientImpl(ClientConfig);
+    ClientImpl(ClientConfig, RandomEngine&);
     ~ClientImpl();
 
     static constexpr int get_oldest_supported_protocol_version() noexcept;
@@ -256,7 +181,7 @@ private:
     session_ident_type m_prev_session_ident = 0;
     const bool m_one_connection_per_session;
 
-    RandomEngine m_random;
+    std::reference_wrapper<RandomEngine> m_random;
     SyncTrigger m_actualize_and_finalize;
 
     // Note: There is one server slot per server endpoint (hostname, port,
@@ -1219,9 +1144,9 @@ inline bool ClientImpl::is_dry_run() const noexcept
     return m_dry_run;
 }
 
-inline ClientImpl::RandomEngine& ClientImpl::get_random() noexcept
+inline RandomEngine& ClientImpl::get_random() noexcept
 {
-    return m_random;
+    return m_random.get();
 }
 
 inline auto ClientImpl::get_next_session_ident() noexcept -> session_ident_type

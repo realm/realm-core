@@ -416,10 +416,6 @@ private:
     void become_waiting_for_access_token() REQUIRES(m_state_mutex);
     void become_waiting_for_location() REQUIRES(m_state_mutex);
 
-    // do restart session restarts the session without freeing any of the waiters
-    void do_restart_session(util::CheckedUniqueLock)
-        REQUIRES(m_state_mutex, !m_connection_state_mutex, !m_config_mutex);
-
     // do_become_inactive is called from both become_paused()/become_inactive() and does all the steps to
     // shutdown and cleanup the sync session besides setting m_state.
     void do_become_inactive(util::CheckedUniqueLock, Status, bool) RELEASE(m_state_mutex)
@@ -427,7 +423,6 @@ private:
     // do_revive is called from both revive_if_needed() and resume(). It does all the steps to transition
     // from a state that is not Active to Active.
     void do_revive(util::CheckedUniqueLock&& lock) RELEASE(m_state_mutex) REQUIRES(!m_config_mutex);
-
     void add_completion_callback(util::UniqueFunction<void(Status)> callback, ProgressDirection direction)
         REQUIRES(m_state_mutex);
 

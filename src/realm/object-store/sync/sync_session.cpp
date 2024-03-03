@@ -148,12 +148,6 @@ void SyncSession::become_active()
     }
 }
 
-void SyncSession::restart_session()
-{
-    util::CheckedUniqueLock lock(m_state_mutex);
-    do_restart_session(std::move(lock));
-}
-
 void SyncSession::become_dying(util::CheckedUniqueLock lock)
 {
     REALM_ASSERT(m_state != State::Dying);
@@ -200,8 +194,9 @@ void SyncSession::become_paused(util::CheckedUniqueLock lock)
     do_become_inactive(std::move(lock), Status::OK(), true);
 }
 
-void SyncSession::do_restart_session(util::CheckedUniqueLock)
+void SyncSession::restart_session()
 {
+    util::CheckedUniqueLock lock(m_state_mutex);
     // Nothing to do if the sync session is currently paused
     // It will be resumed when resume() is called
     if (m_state == State::Paused)
@@ -220,7 +215,7 @@ void SyncSession::do_restart_session(util::CheckedUniqueLock)
     // The latest server path will be retrieved from sync_manager when
     // the new session is created by create_sync_session() in become
     // active.
-    become_active();
+    do_revive(std::move(lock));
 }
 
 void SyncSession::do_become_inactive(util::CheckedUniqueLock lock, Status status,
@@ -272,7 +267,6 @@ void SyncSession::become_waiting_for_location()
 {
     REALM_ASSERT(m_state != State::WaitingForLocation);
     m_state = State::WaitingForLocation;
-    m_sync_manager->start_update_location();
 }
 
 void SyncSession::handle_location_updated()
@@ -1074,7 +1068,7 @@ void SyncSession::revive_if_needed()
     util::CheckedUniqueLock lock(m_state_mutex);
     switch (m_state) {
         case State::WaitingForLocation:
-            m_sync_manager->start_update_location(true);
+            m_sync_manager->cancel_location_update_delay();
             break;
         case State::Active:
         case State::WaitingForAccessToken:
@@ -1095,7 +1089,7 @@ void SyncSession::handle_reconnect()
             m_session->cancel_reconnect_delay();
             break;
         case State::WaitingForLocation:
-            m_sync_manager->start_update_location(true);
+            m_sync_manager->cancel_location_update_delay();
             break;
         case State::Dying:
         case State::Inactive:
@@ -1145,7 +1139,7 @@ void SyncSession::resume()
         case State::WaitingForAccessToken:
             return;
         case State::WaitingForLocation:
-            m_sync_manager->start_update_location(true);
+            m_sync_manager->cancel_location_update_delay();
             break;
         case State::Paused:
         case State::Dying:
@@ -1157,7 +1151,7 @@ void SyncSession::resume()
 
 void SyncSession::do_revive(util::CheckedUniqueLock&& lock)
 {
-    if (!m_sync_manager->sync_route()) {
+    if (!m_sync_manager->check_or_start_location_update()) {
         become_waiting_for_location();
         m_state_mutex.unlock(lock);
         return;
@@ -1257,7 +1251,7 @@ void SyncSession::update_access_token(const std::string& signed_token)
         m_session->refresh(signed_token);
     }
     if (m_state == State::WaitingForAccessToken) {
-        become_active();
+        do_revive(std::move(lock));
     }
 }
 

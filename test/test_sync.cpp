@@ -2941,7 +2941,9 @@ TEST_IF(Sync_SSL_Certificate_Verify_Callback_External, false)
     auto socket_provider = std::make_shared<websocket::DefaultSocketProvider>(config.logger, "");
     config.socket_provider = socket_provider;
     config.reconnect_mode = ReconnectMode::testing;
-    Client client(config);
+    sync::RandomEngine random;
+    util::seed_prng_nondeterministically(random); // Throws
+    Client client(client_config, random);
 
     auto ssl_verify_callback = [&](const std::string server_address, Session::port_type server_port,
                                    const char* pem_data, size_t pem_size, int preverify_ok, int depth) {
@@ -3090,7 +3092,9 @@ TEST(Sync_UploadDownloadProgress_1)
         auto socket_provider = std::make_shared<websocket::DefaultSocketProvider>(config.logger, "");
         config.socket_provider = socket_provider;
         config.reconnect_mode = ReconnectMode::testing;
-        Client client(config);
+        sync::RandomEngine random;
+        util::seed_prng_nondeterministically(random); // Throws
+        Client client(config, random);
 
         Session::Config sess_config;
         sess_config.server_address = "no server";
@@ -3361,7 +3365,9 @@ TEST(Sync_UploadDownloadProgress_3)
     auto socket_provider = std::make_shared<websocket::DefaultSocketProvider>(client_config.logger, "");
     client_config.socket_provider = socket_provider;
     client_config.reconnect_mode = ReconnectMode::testing;
-    Client client(client_config);
+    sync::RandomEngine random;
+    util::seed_prng_nondeterministically(random); // Throws
+    Client client(client_config, random);
 
     // when connecting to the C++ server, use URL prefix:
     Session::Config config;
@@ -3676,7 +3682,9 @@ TEST(Sync_UploadDownloadProgress_6)
     client_config.socket_provider = socket_provider;
     client_config.reconnect_mode = ReconnectMode::testing;
     client_config.one_connection_per_session = false;
-    Client client(client_config);
+    sync::RandomEngine random;
+    util::seed_prng_nondeterministically(random); // Throws
+    Client client(client_config, random);
 
     Session::Config session_config;
     session_config.server_address = "localhost";
@@ -3754,7 +3762,9 @@ TEST(Sync_UploadDownloadProgress_7)
     client_config.socket_provider = socket_provider;
     client_config.reconnect_mode = ReconnectMode::testing;
     client_config.one_connection_per_session = false;
-    Client client(client_config);
+    sync::RandomEngine random;
+    util::seed_prng_nondeterministically(random); // Throws
+    Client client(client_config, random);
 
     Session::Config session_config;
     session_config.server_address = "localhost";
@@ -3859,7 +3869,9 @@ TEST(Sync_MultipleSyncAgentsNotAllowed)
         config.logger, "", nullptr, websocket::DefaultSocketProvider::AutoStart{false});
     config.socket_provider = socket_provider;
     config.reconnect_mode = ReconnectMode::testing;
-    Client client{config};
+    sync::RandomEngine random;
+    util::seed_prng_nondeterministically(random); // Throws
+    Client client{config, random};
     {
         Session::Config config_1;
         config_1.realm_identifier = "blablabla";
@@ -5165,7 +5177,9 @@ TEST_IF(Sync_SSL_Certificates, false)
         Client::Config client_config;
         client_config.logger = client_logger;
         client_config.reconnect_mode = ReconnectMode::testing;
-        Client client(client_config);
+        sync::RandomEngine random;
+        util::seed_prng_nondeterministically(random); // Throws
+        Client client(client_config, random);
 
         Session::Config session_config;
         session_config.server_address = server_address[i];

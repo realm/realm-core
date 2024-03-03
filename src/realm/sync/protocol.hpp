@@ -1,6 +1,7 @@
 #ifndef REALM_SYNC_PROTOCOL_HPP
 #define REALM_SYNC_PROTOCOL_HPP
 
+#include <chrono>
 #include <cstdint>
 #include <system_error>
 
@@ -12,6 +13,7 @@
 
 // NOTE: The protocol specification is in `/doc/protocol.md`
 
+using namespace std::chrono_literals;
 
 namespace realm {
 namespace sync {
@@ -240,21 +242,26 @@ struct CompensatingWriteErrorInfo {
     std::string reason;
 };
 
+static constexpr std::chrono::milliseconds default_resumption_delay_interval = 1s;
+static constexpr std::chrono::milliseconds default_max_resumption_delay_interval = 5min;
+static constexpr int default_resumption_delay_backoff_multiplier = 2; // multiply by 2
+static constexpr int default_resumption_delay_jitter_divisor = 4;     // 1/4 or 25%
+
 struct ResumptionDelayInfo {
     // This is the maximum delay between trying to resume a session/connection.
-    std::chrono::milliseconds max_resumption_delay_interval = std::chrono::minutes{5};
+    std::chrono::milliseconds max_resumption_delay_interval = default_max_resumption_delay_interval;
     // The initial delay between trying to resume a session/connection.
-    std::chrono::milliseconds resumption_delay_interval = std::chrono::seconds{1};
+    std::chrono::milliseconds resumption_delay_interval = default_resumption_delay_interval;
     // After each failure of the same type, the last delay will be multiplied by this value
     // until it is greater-than-or-equal to the max_resumption_delay_interval.
-    int resumption_delay_backoff_multiplier = 2;
+    int resumption_delay_backoff_multiplier = default_resumption_delay_backoff_multiplier;
     // When calculating a new delay interval, a random value betwen zero and the result off
     // dividing the current delay value by the delay_jitter_divisor will be subtracted from the
     // delay interval. The default is to subtract up to 25% of the current delay interval.
     //
     // This is to reduce the likelyhood of a connection storm if the server goes down and
     // all clients attempt to reconnect at once.
-    int delay_jitter_divisor = 4;
+    int delay_jitter_divisor = default_resumption_delay_jitter_divisor;
 };
 
 class IsFatalTag {};

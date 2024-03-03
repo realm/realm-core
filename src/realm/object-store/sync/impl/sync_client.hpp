@@ -20,8 +20,10 @@
 #define REALM_OS_SYNC_CLIENT_HPP
 
 #include <realm/sync/client.hpp>
+#include <realm/sync/client_base.hpp>
 #include <realm/sync/network/default_socket.hpp>
 #include <realm/util/platform_info.hpp>
+#include <realm/util/random.hpp>
 #include <realm/util/scope_exit.hpp>
 
 #include <thread>
@@ -56,27 +58,41 @@ struct SyncClient {
                 logger, std::move(user_agent), config.default_socket_provider_thread_observer);
 #endif
         }())
-        , m_client([&] {
-            sync::Client::Config c;
-            c.logger = logger;
-            c.socket_provider = m_socket_provider;
-            c.reconnect_mode = config.reconnect_mode;
-            c.one_connection_per_session = !config.multiplex_sessions;
+        , m_random{}
+        , m_client(
+              [&] {
+                  sync::Client::Config c;
+                  c.logger = logger;
+                  c.socket_provider = m_socket_provider;
+                  c.reconnect_mode = config.reconnect_mode;
+                  c.one_connection_per_session = !config.multiplex_sessions;
 
-            // Only set the timeouts if they have sensible values
-            if (config.timeouts.connect_timeout >= 1000)
-                c.connect_timeout = config.timeouts.connect_timeout;
-            if (config.timeouts.connection_linger_time > 0)
-                c.connection_linger_time = config.timeouts.connection_linger_time;
-            if (config.timeouts.ping_keepalive_period > 5000)
-                c.ping_keepalive_period = config.timeouts.ping_keepalive_period;
-            if (config.timeouts.pong_keepalive_timeout > 5000)
-                c.pong_keepalive_timeout = config.timeouts.pong_keepalive_timeout;
-            if (config.timeouts.fast_reconnect_limit > 1000)
-                c.fast_reconnect_limit = config.timeouts.fast_reconnect_limit;
+                  // Only set the timeouts if they have sensible values
+                  if (config.timeouts.connect_timeout >= 1000)
+                      c.connect_timeout = config.timeouts.connect_timeout;
+                  if (config.timeouts.connection_linger_time > 0)
+                      c.connection_linger_time = config.timeouts.connection_linger_time;
+                  if (config.timeouts.ping_keepalive_period > 5000)
+                      c.ping_keepalive_period = config.timeouts.ping_keepalive_period;
+                  if (config.timeouts.pong_keepalive_timeout > 5000)
+                      c.pong_keepalive_timeout = config.timeouts.pong_keepalive_timeout;
+                  if (config.timeouts.fast_reconnect_limit > 1000)
+                      c.fast_reconnect_limit = config.timeouts.fast_reconnect_limit;
+                  if (config.timeouts.resumption_delay_interval > 1000)
+                      c.reconnect_backoff_info.resumption_delay_interval =
+                          std::chrono::milliseconds(config.timeouts.resumption_delay_interval);
+                  if (config.timeouts.max_resumption_delay_interval > 30000)
+                      c.reconnect_backoff_info.max_resumption_delay_interval =
+                          std::chrono::milliseconds(config.timeouts.max_resumption_delay_interval);
+                  if (config.timeouts.resumption_delay_backoff_multiplier > 0)
+                      c.reconnect_backoff_info.resumption_delay_backoff_multiplier =
+                          config.timeouts.resumption_delay_backoff_multiplier;
+                  if (config.timeouts.resumption_delay_jitter_divisor >= 0)
+                      c.reconnect_backoff_info.delay_jitter_divisor = config.timeouts.resumption_delay_jitter_divisor;
 
-            return c;
-        }())
+                  return c;
+              }(),
+              m_random)
         , m_logger_ptr(logger)
         , m_logger(*m_logger_ptr)
 #if NETWORK_REACHABILITY_AVAILABLE
@@ -88,6 +104,9 @@ struct SyncClient {
             }
         })
     {
+        // FIXME: Would be better if seeding was up to the application.
+        util::seed_prng_nondeterministically(m_random); // Throws
+
         if (!m_reachability_observer.start_observing())
             m_logger.error("Failed to set up network reachability observer");
     }
@@ -145,10 +164,22 @@ struct SyncClient {
         return m_socket_provider->create_timer(delay, std::move(handler));
     }
 
+    void post(sync::SyncSocketProvider::FunctionHandler&& handler)
+    {
+        REALM_ASSERT(m_socket_provider);
+        m_socket_provider->post(std::move(handler));
+    }
+
+    sync::RandomEngine& get_random()
+    {
+        return m_random;
+    }
+
     ~SyncClient() {}
 
 private:
     std::shared_ptr<sync::SyncSocketProvider> m_socket_provider;
+    sync::RandomEngine m_random;
     sync::Client m_client;
     std::shared_ptr<util::Logger> m_logger_ptr;
     util::Logger& m_logger;

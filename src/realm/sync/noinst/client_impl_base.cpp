@@ -137,7 +137,7 @@ bool ClientImpl::decompose_server_url(const std::string& url, ProtocolEnvelope& 
     return true;
 }
 
-ClientImpl::ClientImpl(ClientConfig config)
+ClientImpl::ClientImpl(ClientConfig config, RandomEngine& random)
     : logger_ptr{std::make_shared<util::CategoryLogger>(util::LogCategory::session, std::move(config.logger))}
     , logger{*logger_ptr}
     , m_reconnect_mode{config.reconnect_mode}
@@ -156,11 +156,8 @@ ClientImpl::ClientImpl(ClientConfig config)
     , m_socket_provider{std::move(config.socket_provider)}
     , m_client_protocol{} // Throws
     , m_one_connection_per_session{config.one_connection_per_session}
-    , m_random{}
+    , m_random{random}
 {
-    // FIXME: Would be better if seeding was up to the application.
-    util::seed_prng_nondeterministically(m_random); // Throws
-
     logger.info("Realm sync client (%1)", REALM_VER_CHUNK); // Throws
     logger.debug("Supported protocol versions: %1-%2", get_oldest_supported_protocol_version(),
                  get_current_protocol_version()); // Throws
@@ -188,10 +185,11 @@ ClientImpl::ClientImpl(ClientConfig config)
                  config.disable_upload_compaction); // Throws
     logger.debug("Config param: disable_sync_to_disk = %1",
                  config.disable_sync_to_disk); // Throws
-    logger.debug("Config param: reconnect backoff info: max_delay: %1 ms, initial_delay: %2 ms, multiplier: %3",
-                 m_reconnect_backoff_info.max_resumption_delay_interval.count(),
-                 m_reconnect_backoff_info.resumption_delay_interval.count(),
-                 m_reconnect_backoff_info.resumption_delay_backoff_multiplier);
+    logger.debug(
+        "Config param: reconnect backoff info: max_delay: %1 ms, initial_delay: %2 ms, multiplier: %3, jitter: 1/%4",
+        m_reconnect_backoff_info.max_resumption_delay_interval.count(),
+        m_reconnect_backoff_info.resumption_delay_interval.count(),
+        m_reconnect_backoff_info.resumption_delay_backoff_multiplier, m_reconnect_backoff_info.delay_jitter_divisor);
 
     if (config.reconnect_mode != ReconnectMode::normal) {
         logger.warn("Testing/debugging feature 'nonnormal reconnect mode' enabled - "

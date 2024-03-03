@@ -2021,8 +2021,8 @@ void ClientImpl::Connection::report_connection_state_change(ConnectionState stat
 }
 
 
-Client::Client(Config config)
-    : m_impl{new ClientImpl{std::move(config)}} // Throws
+Client::Client(Config config, RandomEngine& random)
+    : m_impl{new ClientImpl{std::move(config), random}} // Throws
 {
 }
 
