@@ -508,7 +508,7 @@ template <class Type>
 struct BenchmarkWithType : Benchmark {
     std::string benchmark_name;
     using underlying_type = typename Type::underlying_type;
-    std::vector<Mixed> needles;
+    std::vector<OwnedMixed> needles;
     BenchmarkWithType()
         : Benchmark()
     {
@@ -535,11 +535,11 @@ struct BenchmarkWithType : Benchmark {
             }
         }
         while (needles.size() < 50) {
-            Mixed needle;
+            OwnedMixed needle;
             while (needle.is_null()) {
                 needle = t->get_object(r.draw_int<size_t>(0, t->size())).get_any(m_col);
             }
-            needles.push_back(needle);
+            needles.push_back(std::move(needle));
         }
         if (add_index) {
             t->add_search_index(m_col);
@@ -2441,6 +2441,41 @@ void run_benchmark_once(Benchmark& benchmark, DBRef sg, Timer& timer)
     timer.unpause();
 }
 
+// support for exact matches, and simple pattern matching with a single '*'
+bool matches_filters(std::string benchmark_name)
+{
+    for (auto& filter : g_bench_filter) {
+        size_t filter_size = filter.size();
+        if (filter_size == 0) {
+            continue;
+        }
+        size_t pos_of_asterisk = filter.find('*');
+        // exact match requested
+        if (pos_of_asterisk == std::string::npos) {
+            if (benchmark_name == filter) {
+                return true;
+            }
+            continue;
+        }
+        if (filter_size == 1) {
+            return true; // match '*'
+        }
+        if (benchmark_name.size() < filter_size - 1) {
+            continue;
+        }
+        size_t size_of_suffix = filter_size - pos_of_asterisk - 1;
+        size_t size_of_prefix = pos_of_asterisk;
+        if (benchmark_name.substr(0, pos_of_asterisk) == filter.substr(0, size_of_prefix)) {
+            if (size_of_suffix == 0) {
+                return true;
+            }
+            if (benchmark_name.substr(benchmark_name.size() - size_of_suffix) == filter.substr(pos_of_asterisk + 1)) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
 
 /// This little piece of likely over-engineering runs the benchmark a number of times,
 /// with each durability setting, and reports the results for each run.
@@ -2467,7 +2502,7 @@ void run_benchmark(BenchmarkResults& results, bool force_full = false)
         const char* key = it->second;
 
         B benchmark;
-        if (!g_bench_filter.empty() && g_bench_filter.find(benchmark.name()) == g_bench_filter.end())
+        if (!g_bench_filter.empty() && !matches_filters(benchmark.name()))
             return;
 
         benchmark.m_durability = level;
@@ -2687,6 +2722,7 @@ int main(int argc, const char** argv)
                       << "  PATH            alternate path to store the results files;" << std::endl
                       << "                  this path should end with a slash." << std::endl
                       << "  NAMES           benchmark names to run (',' separated)" << std::endl
+                      << "                  A single '*' is supported as a wildcard in a name" << std::endl
                       << std::endl;
             return 1;
         }
