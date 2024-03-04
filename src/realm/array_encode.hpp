@@ -76,7 +76,6 @@ private:
 
     // parallel search constants.
 public:
-    // for testing...
     uint64_t m_MSBs = 0;
     size_t m_field_count = 0;
     int8_t m_bit_count_pr_iteration = 0;

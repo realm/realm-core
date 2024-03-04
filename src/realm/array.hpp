@@ -610,6 +610,7 @@ inline int64_t Array::get(size_t ndx) const noexcept
 {
     REALM_ASSERT_DEBUG(is_attached());
     REALM_ASSERT_DEBUG_EX(ndx < m_size, ndx, m_size);
+    REALM_ASSERT_DEBUG(this->m_getter);
     return (this->*m_getter)(ndx);
 
     // Two ideas that are not efficient but may be worth looking into again:

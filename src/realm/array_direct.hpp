@@ -195,7 +195,7 @@ public:
     }
     // 'num_bits' number of bits which must be read
     // WARNING returned word may be garbage above the first 'num_bits' bits.
-    uint64_t get(unsigned num_bits)
+    uint64_t get(size_t num_bits)
     {
         auto first_word = m_word_ptr[0];
         uint64_t result = first_word >> m_in_word_offset;
@@ -457,7 +457,7 @@ constexpr int8_t num_bits_table[65] = {-1, 64, 64, 63, 64, 60, 60, 63, // 0-7
 
 inline size_t num_fields_for_width(size_t width)
 {
-    REALM_ASSERT(width);
+    REALM_ASSERT_DEBUG(width);
     return 64 / width;
 }
 

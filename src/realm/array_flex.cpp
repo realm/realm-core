@@ -221,9 +221,16 @@ inline int8_t get_bit_count_per_iteration(const Array& arr)
     return arr.get_encoder().m_bit_count_pr_iteration;
 }
 
+inline uint64_t last_word_mask(size_t total_bit_count_left)
+{
+    // generates a mask of 1s shifting by 64-<bit count left> 0xFFFFULL.
+    // Useful for extracting the last number of bits from a vector of matching positions.
+    return 0xFFFFFFFFFFFFFFFFULL >> (64 - total_bit_count_left);
+}
+
 template <typename Cond, bool v>
 inline size_t ArrayFlex::parallel_subword_find(const Array& arr, size_t offset, uint_least8_t width, size_t start,
-                                               size_t end, uint64_t search_vector, signed total_bit_count_left) const
+                                               size_t end, uint64_t search_vector, int64_t total_bit_count_left) const
 {
     // a bit hacky needs to be redesign... true means that we are parallel searching for values,
     // false that we are paralleling searching for indices.
@@ -249,8 +256,7 @@ inline size_t ArrayFlex::parallel_subword_find(const Array& arr, size_t offset, 
     if (total_bit_count_left) {                         // final subword, may be partial
         const auto word = it.get(total_bit_count_left); // <-- limit lookahead to avoid touching memory beyond array
         vector = bitwidth_cmp<Cond, v>(MSBs, word, search_vector);
-        auto last_word_mask = 0xFFFFFFFFFFFFFFFFULL >> (64 - total_bit_count_left);
-        vector &= last_word_mask;
+        vector &= last_word_mask(total_bit_count_left);
         if (vector) {
             int sub_word_index = first_field_marked(width, vector);
             return start + sub_word_index;
@@ -269,7 +275,7 @@ bool ArrayFlex::find_eq(const Array& arr, int64_t value, size_t start, size_t en
     const auto ndx_width = encoder.m_ndx_width;
     const auto offset = v_size * v_width;
     const auto search_vector_val = populate(v_width, value);
-    const auto total_bit_count_left_val = static_cast<signed>(v_size) * v_width;
+    const auto total_bit_count_left_val = static_cast<int64_t>(v_size) * v_width;
 
 
     // auto t1 = std::chrono::high_resolution_clock::now();
@@ -287,7 +293,7 @@ bool ArrayFlex::find_eq(const Array& arr, int64_t value, size_t start, size_t en
 
     // t1 = std::chrono::high_resolution_clock::now();
     const auto search_vector_ndx = populate(ndx_width, v_start);
-    const auto total_bit_count_left_ndx = static_cast<signed>(end - start) * ndx_width;
+    const auto total_bit_count_left_ndx = static_cast<int64_t>(end - start) * ndx_width;
     while (start < end) {
         start = parallel_subword_find<Equal, false>(arr, offset, ndx_width, start, end, search_vector_ndx,
                                                     total_bit_count_left_ndx);

@@ -283,6 +283,7 @@ void Array::init_from_mem(MemRef mem) noexcept
         m_is_inner_bptree_node = get_is_inner_bptree_node_from_header(header);
         m_has_refs = get_hasrefs_from_header(header);
         m_context_flag = get_context_flag_from_header(header);
+
         // TODO: evaluate if we can get rid of this.
         m_vtable = &VTableForEncodedArray::vtable;
         m_getter = m_vtable->getter;

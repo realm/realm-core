@@ -139,8 +139,9 @@ bool ArrayEncode::decode(Array& arr) const
     REALM_ASSERT_DEBUG(width == 0 || width == 1 || width == 2 || width == 4 || width == 8 || width == 16 ||
                        width == 32 || width == 64);
     auto byte_size = NodeHeader::calc_size<Encoding::WTypBits>(size, width);
-    byte_size += 64; // this is some slab allocator magic number, this padding is needed in order to account for bit
-                     // width expansion.
+    // this is some slab allocator magic number, this padding is needed in order to account for bit
+    // width expansion.
+    byte_size += 64;
 
     REALM_ASSERT_DEBUG(byte_size % 8 == 0); // nevertheless all the values my be aligned to 8
 
@@ -178,6 +179,7 @@ void ArrayEncode::init(const char* h)
     m_encoding = NodeHeader::get_encoding(h);
     if (m_encoding == Encoding::Packed) {
         m_v_width = NodeHeader::get_element_size<Encoding::Packed>(h);
+        REALM_ASSERT_DEBUG(m_v_width);
         m_v_size = NodeHeader::get_num_elements<Encoding::Packed>(h);
         m_v_mask = 1ULL << (m_v_width - 1);
 
@@ -190,6 +192,8 @@ void ArrayEncode::init(const char* h)
         m_v_size = NodeHeader::get_arrayA_num_elements<Encoding::Flex>(h);
         m_ndx_width = NodeHeader::get_elementB_size<Encoding::Flex>(h);
         m_ndx_size = NodeHeader::get_arrayB_num_elements<Encoding::Flex>(h);
+        REALM_ASSERT_DEBUG(m_v_width);
+        REALM_ASSERT_DEBUG(m_ndx_width);
         m_v_mask = 1ULL << (m_v_width - 1);
         m_ndx_mask = 1ULL << (m_ndx_width - 1);
         // values

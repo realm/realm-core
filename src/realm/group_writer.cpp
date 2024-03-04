@@ -672,7 +672,6 @@ ref_type GroupWriter::write_group()
     }
     ref_type names_ref = m_group.m_table_names.write(*writer, deep, only_if_modified, compress); // Throws
     ref_type tables_ref = m_group.typed_write_tables(*writer, deep, only_if_modified, compress);
-    // ref_type tables_ref = m_group.m_tables.write(*writer, deep, only_if_modified, compress); // Throws
 
     int_fast64_t value_1 = from_ref(names_ref);
     int_fast64_t value_2 = from_ref(tables_ref);
@@ -686,7 +685,7 @@ ref_type GroupWriter::write_group()
         if (ref_type history_ref = top.get_as_ref(Group::s_hist_ref_ndx)) {
             Allocator& alloc = top.get_alloc();
             ref_type new_history_ref =
-                Array::write(history_ref, alloc, *writer, only_if_modified, compress); // Throws
+                Array::write(history_ref, alloc, *writer, only_if_modified, false);    // compress); // Throws
             top.set(Group::s_hist_ref_ndx, from_ref(new_history_ref));                 // Throws
         }
     }

@@ -56,7 +56,7 @@ void ArrayPacked::copy_data(const Array& origin, Array& arr) const
     bf_iterator it_value{data, 0, v_width, v_width, 0};
     for (size_t i = 0; i < v_size; ++i) {
         it_value.set_value(origin.get(i));
-        REALM_ASSERT_DEBUG(sign_extend_value(v_width, it_value.get_value()) == origin.get(i));
+        REALM_ASSERT_DEBUG(sign_extend_value(v_width, *it_value) == origin.get(i));
         ++it_value;
     }
 }
@@ -91,8 +91,7 @@ int64_t ArrayPacked::do_get(uint64_t* data, size_t ndx, size_t v_width, size_t v
     if (ndx >= v_size)
         return realm::not_found;
     bf_iterator it{data, 0, v_width, v_width, ndx};
-    const auto value = it.get_value();
-    return sign_extend_field_by_mask(mask, value);
+    return sign_extend_field_by_mask(mask, *it);
 }
 
 void ArrayPacked::get_chunk(const Array& arr, size_t ndx, int64_t res[8]) const
@@ -104,7 +103,6 @@ void ArrayPacked::get_chunk(const Array& arr, size_t ndx, int64_t res[8]) const
     auto supposed_end = ndx + sz;
     size_t i = ndx;
     size_t index = 0;
-    // this can be done better, in one go, retrieve both!!!
     for (; i < supposed_end; ++i) {
         res[index++] = get(arr, i);
     }
@@ -183,7 +181,7 @@ inline uint64_t bitwidth_cmp(uint64_t MSBs, uint64_t a, uint64_t b)
         return find_all_fields_signed_LT(MSBs, a, b);
 }
 
-inline uint64_t last_word_mask(signed total_bit_count_left)
+inline uint64_t last_word_mask(size_t total_bit_count_left)
 {
     // generates a mask of 1s shifting by 64-<bit count left> 0xFFFFULL.
     // Useful for extracting the last number of bits from a vector of matching positions.
@@ -192,7 +190,7 @@ inline uint64_t last_word_mask(signed total_bit_count_left)
 
 template <typename Cond>
 size_t ArrayPacked::parallel_subword_find(const Array& arr, size_t start, size_t end, uint64_t search_vector,
-                                          signed total_bit_count_left) const
+                                          int64_t total_bit_count_left) const
 {
     const auto width = arr.m_width;
     const auto MSBs = arr.m_encoder.m_MSBs;
@@ -215,7 +213,7 @@ size_t ArrayPacked::parallel_subword_find(const Array& arr, size_t start, size_t
     if (total_bit_count_left) {                         // final subword, may be partial
         const auto word = it.get(total_bit_count_left); // <-- limit lookahead to avoid touching memory beyond array
         vector = bitwidth_cmp<Cond>(MSBs, word, search_vector);
-        vector &= last_word_mask(total_bit_count_left);
+        vector &= last_word_mask((size_t)total_bit_count_left);
         if (vector) {
             int sub_word_index = first_field_marked(width, vector);
             return start + sub_word_index;
@@ -241,6 +239,6 @@ int64_t ArrayPacked::sum(const Array& arr, size_t start, size_t end) const
     int64_t acc = 0;
     bf_iterator it((uint64_t*)arr.m_data, 0, arr.m_width, arr.m_width, start);
     for (; start < end; ++start, ++it)
-        acc += sign_extend_field_by_mask(mask, it.get_value());
+        acc += sign_extend_field_by_mask(mask, *it);
     return acc;
 }
