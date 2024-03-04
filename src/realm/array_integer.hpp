@@ -29,16 +29,10 @@ namespace realm {
 class ArrayInteger : public Array, public ArrayPayload {
 public:
     using value_type = int64_t;
-
-    using Array::add;
     using Array::find_first;
-    using Array::get;
-    using Array::insert;
-    using Array::move;
-    using Array::set;
 
     explicit ArrayInteger(Allocator&) noexcept;
-    ~ArrayInteger() noexcept override {}
+    ~ArrayInteger() noexcept override = default;
 
     static value_type default_value(bool)
     {
@@ -155,12 +149,6 @@ private:
 
 // Implementation:
 
-inline ArrayInteger::ArrayInteger(Allocator& allocator) noexcept
-    : Array(allocator)
-{
-    m_is_inner_bptree_node = false;
-}
-
 inline ArrayIntNull::ArrayIntNull(Allocator& allocator) noexcept
     : Array(allocator)
 {
@@ -170,6 +158,7 @@ inline ArrayIntNull::~ArrayIntNull() noexcept {}
 
 inline size_t ArrayIntNull::size() const noexcept
 {
+    // this cannot be right, what if size is 0
     return Array::size() - 1;
 }
 

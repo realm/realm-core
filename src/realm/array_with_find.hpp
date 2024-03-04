@@ -32,6 +32,7 @@ Searching: The main finding function is:
 #define REALM_ARRAY_WITH_FIND_HPP
 
 #include <realm/array.hpp>
+#include <realm/array_encode.hpp>
 #include <realm/query_conditions.hpp>
 
 /*
@@ -161,7 +162,7 @@ public:
 private:
     const Array& m_array;
 
-    template <size_t bitwidth>
+    template <size_t>
     bool find_all_will_match(size_t start, size_t end, size_t baseindex, QueryStateBase* state) const;
 };
 //*************************************************************************************
@@ -289,6 +290,7 @@ REALM_NOINLINE bool ArrayWithFind::find_all_will_match(size_t start2, size_t end
     return true;
 }
 
+
 // This is the main finding function for Array. Other finding functions are just
 // wrappers around this one. Search for 'value' using condition cond (Equal,
 // NotEqual, Less, etc) and call QueryStateBase::match() for each match. Break and
@@ -297,6 +299,7 @@ template <class cond, size_t bitwidth>
 bool ArrayWithFind::find_optimized(int64_t value, size_t start, size_t end, size_t baseindex,
                                    QueryStateBase* state) const
 {
+    REALM_ASSERT_DEBUG(!m_array.is_encoded());
     REALM_ASSERT_DEBUG(start <= m_array.m_size && (end <= m_array.m_size || end == size_t(-1)) && start <= end);
 
     size_t start2 = start;
@@ -567,14 +570,18 @@ inline bool ArrayWithFind::compare_equality(int64_t value, size_t start, size_t 
                                             QueryStateBase* state) const
 {
     REALM_ASSERT_DEBUG(start <= m_array.m_size && (end <= m_array.m_size || end == size_t(-1)) && start <= end);
+    REALM_ASSERT_DEBUG(width == m_array.m_width);
 
-    size_t ee = round_up(start, 64 / no0(width));
+    auto v = 64 / no0(width);
+    size_t ee = round_up(start, v);
     ee = ee > end ? end : ee;
-    for (; start < ee; ++start)
-        if (eq ? (m_array.get<width>(start) == value) : (m_array.get<width>(start) != value)) {
+    for (; start < ee; ++start) {
+        auto v = m_array.get<width>(start);
+        if (eq ? (v == value) : (v != value)) {
             if (!state->match(start + baseindex))
                 return false;
         }
+    }
 
     if (start >= end)
         return true;

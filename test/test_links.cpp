@@ -1167,11 +1167,13 @@ TEST(Links_FormerMemLeakCase)
         auto col = origin->add_column(*target, "link");
         origin->create_object().set(col, k);
         origin->create_object().set(col, k);
+        wt.get_group().verify();
         wt.commit();
     }
     {
         WriteTransaction wt(sg_w);
         TableRef target = wt.get_table("target");
+        wt.get_group().verify();
         target->begin()->remove();
         wt.get_group().verify();
         wt.commit();

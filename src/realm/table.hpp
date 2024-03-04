@@ -63,8 +63,7 @@ template <class>
 class SubQuery;
 class TableView;
 
-struct Link {
-};
+struct Link {};
 typedef Link BackLink;
 
 
@@ -687,6 +686,10 @@ public:
         Replication* const* m_repl;
     };
 
+    ref_type typed_write(ref_type ref, _impl::ArrayWriterBase& out, bool deep, bool only_modified,
+                         bool compress) const;
+    void typed_print(std::string prefix, ref_type ref) const;
+
 private:
     enum LifeCycleCookie {
         cookie_created = 0x1234,
@@ -723,13 +726,13 @@ private:
     {
         m_alloc.refresh_ref_translation();
     }
-    Spec m_spec;                                    // 1st slot in m_top
-    ClusterTree m_clusters;                         // 3rd slot in m_top
-    std::unique_ptr<ClusterTree> m_tombstones;      // 13th slot in m_top
-    TableKey m_key;                                 // 4th slot in m_top
-    Array m_index_refs;                             // 5th slot in m_top
-    Array m_opposite_table;                         // 7th slot in m_top
-    Array m_opposite_column;                        // 8th slot in m_top
+    Spec m_spec;                               // 1st slot in m_top
+    ClusterTree m_clusters;                    // 3rd slot in m_top
+    std::unique_ptr<ClusterTree> m_tombstones; // 13th slot in m_top
+    TableKey m_key;                            // 4th slot in m_top
+    Array m_index_refs;                        // 5th slot in m_top
+    Array m_opposite_table;                    // 7th slot in m_top
+    Array m_opposite_column;                   // 8th slot in m_top
     std::vector<std::unique_ptr<SearchIndex>> m_index_accessors;
     ColKey m_primary_key_col;
     Replication* const* m_repl;

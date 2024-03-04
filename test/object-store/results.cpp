@@ -103,7 +103,6 @@ struct TestContext : CppContext {
     }
 };
 
-
 TEST_CASE("notifications: async delivery", "[notifications]") {
     _impl::RealmCoordinator::assert_no_open_realms();
     TestFile config;

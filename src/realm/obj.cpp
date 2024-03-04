@@ -543,10 +543,17 @@ int64_t Obj::_get<int64_t>(ColKey::Idx col_ndx) const
     }
 
     ref_type ref = to_ref(Array::get(m_mem.get_addr(), col_ndx.val + 1));
-    char* header = alloc.translate(ref);
-    int width = Array::get_width_from_header(header);
-    char* data = Array::get_data_from_header(header);
-    REALM_TEMPEX(return get_direct, width, (data, m_row_ndx));
+    // Possible future optimization: replace the full construction of an Array,
+    // with whatever is needed to get at the value (like we once did in the
+    // commented out section below)
+    Array a(alloc);
+    a.init_from_ref(ref);
+    return a.get(m_row_ndx);
+    //
+    // char* header = alloc.translate(ref);
+    // int width = Array::get_width_from_header(header);
+    // char* data = Array::get_data_from_header(header);
+    // REALM_TEMPEX(return get_direct, width, (data, m_row_ndx));
 }
 
 template <>

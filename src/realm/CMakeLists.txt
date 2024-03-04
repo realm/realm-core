@@ -12,10 +12,14 @@ set(REALM_SOURCES
     array_blobs_small.cpp
     array_blobs_big.cpp
     array_decimal128.cpp
+    array_encode.cpp
     array_fixed_bytes.cpp
+    array_flex.cpp
+    array_packed.cpp
     array_integer.cpp
     array_key.cpp
     array_mixed.cpp
+    array_packed.cpp
     array_unsigned.cpp
     array_string.cpp
     array_string_short.cpp
@@ -122,12 +126,15 @@ set(REALM_INSTALL_HEADERS
     array_bool.hpp
     array_decimal128.hpp
     array_direct.hpp
+    array_encode.hpp
     array_fixed_bytes.hpp
+    array_flex.hpp
     array_integer.hpp
     array_integer_tpl.hpp
     array_key.hpp
     array_list.hpp
     array_mixed.hpp
+    array_packed.hpp
     array_ref.hpp
     array_string.hpp
     array_string_short.hpp
