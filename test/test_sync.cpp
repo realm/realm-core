@@ -3003,13 +3003,17 @@ TEST(Sync_UploadDownloadProgress_1)
 
         Session session = fixture.make_session(db, "/test");
 
-        auto progress_handler = [&](uint_fast64_t downloaded, uint_fast64_t downloadable, uint_fast64_t uploaded,
-                                    uint_fast64_t uploadable, uint_fast64_t snapshot, double, double) {
-            downloaded_bytes = downloaded;
-            downloadable_bytes = downloadable;
-            uploaded_bytes = uploaded;
-            uploadable_bytes = uploadable;
+        auto progress_handler = [&](bool is_download, uint64_t snapshot, uint64_t transferred, uint64_t transferable,
+                                    double, bool) {
             snapshot_version = snapshot;
+            if (is_download) {
+                downloaded_bytes = transferred;
+                downloadable_bytes = transferable;
+            }
+            else {
+                uploaded_bytes = transferred;
+                uploadable_bytes = transferable;
+            }
             ++handler_entry;
         };
 
@@ -3073,13 +3077,19 @@ TEST(Sync_UploadDownloadProgress_1)
 
         int number_of_handler_calls = 0;
 
-        auto progress_handler = [&](uint_fast64_t downloaded, uint_fast64_t downloadable, uint_fast64_t uploaded,
-                                    uint_fast64_t uploadable, uint_fast64_t snapshot, double, double) {
-            CHECK_EQUAL(downloaded, downloaded_bytes);
-            CHECK_EQUAL(downloadable, downloaded_bytes);
-            CHECK_EQUAL(uploaded, uploaded_bytes);
-            CHECK_GREATER(uploadable, uploaded_bytes);
+        auto progress_handler = [&](bool is_download, uint64_t snapshot, uint64_t transferred, uint64_t transferable,
+                                    double, bool) {
             CHECK_GREATER(snapshot, snapshot_version);
+
+            if (is_download) {
+                CHECK_EQUAL(transferred, downloaded_bytes);
+                CHECK_EQUAL(transferable, downloaded_bytes);
+            }
+            else {
+                CHECK_EQUAL(transferred, uploaded_bytes);
+                CHECK_GREATER(transferable, uploaded_bytes);
+            }
+
             number_of_handler_calls++;
 
             std::unique_lock<std::mutex> lock(mutex);
@@ -3095,7 +3105,8 @@ TEST(Sync_UploadDownloadProgress_1)
             wt.get_table("class_table")->create_object_with_primary_key(2);
         });
         cond_var.wait(lock, [&] {
-            return cond_var_signaled;
+            // FIXME shouldn't be 2?
+            return cond_var_signaled && number_of_handler_calls >= 2;
         });
 
         CHECK_EQUAL(number_of_handler_calls, 1);

@@ -1856,8 +1856,9 @@ void SessionWrapper::on_connection_state_changed(ConnectionState state,
 void SessionWrapper::init_progress_handler()
 {
     uint64_t unused = 0;
-    ClientHistory::get_upload_download_bytes(m_db.get(), m_reported_progress.final_downloaded, unused,
-                                             m_reported_progress.final_uploaded, unused, unused);
+    ClientHistory::get_upload_download_bytes(m_db.get(), unused,
+            &m_reported_progress.final_downloaded, nullptr,
+            &m_reported_progress.final_uploaded, nullptr);
 }
 
 void SessionWrapper::report_progress(bool is_download, bool only_if_new_uploadable_data)
@@ -1874,8 +1875,9 @@ void SessionWrapper::report_progress(bool is_download, bool only_if_new_uploadab
         return;
 
     ReportedProgress p = m_reported_progress;
-    ClientHistory::get_upload_download_bytes(m_db.get(), p.downloaded, p.downloadable, p.uploaded, p.uploadable,
-                                             p.snapshot);
+    ClientHistory::get_upload_download_bytes(m_db.get(), p.snapshot,
+            is_download ? &p.downloaded : nullptr, is_download ? &p.downloadable : nullptr,
+            is_download ? nullptr : &p.uploaded, is_download ? nullptr : &p.uploadable);
 
     // If this progress notification was triggered by a commit being made we
     // only want to send it if the uploadable bytes has actually increased,
@@ -1966,8 +1968,10 @@ void SessionWrapper::report_progress(bool is_download, bool only_if_new_uploadab
                              to_str(upload_estimate), p.snapshot);
     }
 
-    m_progress_handler(p.downloaded, p.downloadable, p.uploaded, p.uploadable, p.snapshot, download_estimate,
-                       upload_estimate);
+    uint64_t transferred = is_download ? p.downloaded : p.uploaded;
+    uint64_t transferable = is_download ? p.downloadable : p.uploadable;
+    double progress_estimate = is_download ? download_estimate : upload_estimate;
+    m_progress_handler(is_download, p.snapshot, transferred, transferable, progress_estimate, is_completed);
 }
 
 util::Future<std::string> SessionWrapper::send_test_command(std::string body)
