@@ -6442,9 +6442,12 @@ TEST(Parser_Wildcard)
     obj1.set_json(col_dict, R"({"key1": 1, "key2": 2, "key3": [4, 5, 6]})");
     obj1.set_json(col_list, R"([4, 5, 6])");
     auto obj2 = table->create_object_with_primary_key("obj2");
-    obj2.set_json(col_any, R"([[9, 8, 7], [1, 2, 3]])");
+    obj2.set_json(col_any, R"([[9, 8, 7], [1, 2, 5]])");
     obj2.set_json(col_dict, R"({"key1": 3, "key2": 4, "key3": [3, 2, 1]})");
     obj2.set_json(col_list, R"([1, 2, 3])");
+    auto obj3 = table->create_object_with_primary_key("obj3");
+    obj3.set_json(col_any, R"([[9, 8, 7], [1, 2, 3]])");
+    obj3.set_json(col_dict, R"({"key1": 3, "key2": [8, 10], "key3": [3, 2, 1]})");
 
     auto obj = origin->create_object_with_primary_key("top");
     auto ll = obj.get_linklist(col_link);
@@ -6459,6 +6462,12 @@ TEST(Parser_Wildcard)
     CHECK_EQUAL(q.count(), 1);
     q = table->query("value[*][*] = dict[*][*]");
     CHECK_EQUAL(q.count(), 1);
+    q = table->query("ANY value[*][*] = dict[*][*]");
+    CHECK_EQUAL(q.count(), 3);
+    q = table->query("ALL value[*][*] = dict[*][*]");
+    CHECK_EQUAL(q.count(), 2);
+    q = table->query("NONE value[*][*] = dict[*][*]");
+    CHECK_EQUAL(q.count(), 3);
     q = origin->query("link.dict.key1 = {1, 3}");
     CHECK_EQUAL(q.count(), 0);
     q = origin->query("link.dict.key1 = {1}");
