@@ -1251,7 +1251,7 @@ void SyncSession::update_access_token(const std::string& signed_token)
         m_session->refresh(signed_token);
     }
     if (m_state == State::WaitingForAccessToken) {
-        do_revive(std::move(lock));
+        become_active();
     }
 }
 

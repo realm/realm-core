@@ -273,7 +273,7 @@ TEST_CASE("app: verify app error codes", "[sync][app][local]") {
                 return false;
             }
         }
-        catch (const nlohmann::json::exception& ex) {
+        catch (const nlohmann::json::exception&) {
             // It's also a failure if parsing the json body throws an exception
             return false;
         }
@@ -3033,7 +3033,7 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
         if (auto port_pos = original_host.find(":"); port_pos != std::string::npos) {
             auto original_port_str = original_host.substr(port_pos + 1);
 
-            original_port = strtol(original_port_str.c_str(), nullptr, 10);
+            original_port = static_cast<uint16_t>(strtoul(original_port_str.c_str(), nullptr, 10));
             original_address = original_host.substr(0, port_pos);
         }
 

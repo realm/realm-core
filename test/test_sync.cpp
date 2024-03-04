@@ -2943,7 +2943,7 @@ TEST_IF(Sync_SSL_Certificate_Verify_Callback_External, false)
     config.reconnect_mode = ReconnectMode::testing;
     sync::RandomEngine random;
     util::seed_prng_nondeterministically(random); // Throws
-    Client client(client_config, random);
+    Client client(config, random);
 
     auto ssl_verify_callback = [&](const std::string server_address, Session::port_type server_port,
                                    const char* pem_data, size_t pem_size, int preverify_ok, int depth) {
