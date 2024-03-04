@@ -2,18 +2,39 @@
 
 ### Enhancements
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
-* Add support for using aggregate operations on Mixed properties in queries  ([PR #7398](https://github.com/realm/realm-core/pull/7398))
+* None.
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
+* Query lists vs lists if the property to check is a path with wildcards would not give correct result ([#7393](https://github.com/realm/realm-core/issues/7393), since v14.0.0)
+
+### Breaking changes
+* None.
+
+### Compatibility
+* Fileformat: Generates files with format v24. Reads and automatically upgrade from fileformat v10. If you want to upgrade from an earlier file format version you will have to use RealmCore v13.x.y or earlier.
+
+-----------
+
+### Internals
+* Fix several crashes when running the object store benchmarks ([#7403](https://github.com/realm/realm-core/pull/7403)).
+
+----------------------------------------------
+
+# 14.1.0 Release notes
+
+### Enhancements
+* Add support for using aggregate operations on Mixed properties in queries  ([PR #7398](https://github.com/realm/realm-core/pull/7398))
+
+### Fixed
 * Fix a performance regression when reading values from Bson containers and revert some breaking changes to the Bson API ([PR #7377](https://github.com/realm/realm-core/pull/7377), since v14.0.0)
 * List KVO information was being populated for non-list collections ([PR #7378](https://github.com/realm/realm-core/pull/7378), since v14.0.0)
 * Setting a Mixed property to an ObjLink equal to its existing value would remove the existing backlinks and then exit before re-adding them, resulting in later assertion failures due to the backlink state being invalid ([PR #7384](https://github.com/realm/realm-core/pull/7384), since v14.0.0).
 * Passing a double as argument for a Query on Decimal128 did not work ([#7386](https://github.com/realm/realm-core/issues/7386), since v14.0.0)
 * Opening file with file format 23 in read-only mode will crash ([#7388](https://github.com/realm/realm-core/issues/7388), since v14.0.0)
 * Querying a dictionary over a link would sometimes result in out-of-bounds memory reads ([PR #7382](https://github.com/realm/realm-core/pull/7382), since v14.0.0).
-* Restore the pre-14.0.0 behavior of missing keys in dictionaries in queries  ([PR #7391](https://github.com/realm/realm-core/pull/7391))
-* Query lists vs lists if the property to check is a path with wildcards would not give correct result ([#7393](https://github.com/realm/realm-core/issues/7393), since v14.0.0)
+* Restore the pre-14.0.0 behavior of missing keys in dictionaries in queries ([PR #7391](https://github.com/realm/realm-core/pull/7391))
+* Fix a ~10% performance regression for bulk insertion when using a log level which does not include debug/trace ([PR #7400](https://github.com/realm/realm-core/pull/7400), since v14.0.0)
 
 ### Breaking changes
 * None.
@@ -25,7 +46,7 @@
 -----------
 
 ### Internals
-* None.
+* The Linux-armv7 cross-compiling toolchain file prefers the bfd linker over gold because of issues linking against OpenSSL 3.2.0.
 
 ----------------------------------------------
 
