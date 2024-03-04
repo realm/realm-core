@@ -46,7 +46,7 @@ using namespace std::chrono;
 #include "test_types_helper.hpp"
 
 // #include <valgrind/callgrind.h>
-#define PERFORMANCE_TESTING
+// #define PERFORMANCE_TESTING
 
 using namespace realm;
 using namespace realm::util;

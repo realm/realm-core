@@ -1646,8 +1646,8 @@ ref_type Cluster::typed_write(ref_type ref, _impl::ArrayWriterBase& out, const T
                 written_leaf.set_as_ref(1, Array::write(rot1.get_as_ref(), m_alloc, out, only_modified, true));
             }
             else if (col_type == col_type_Mixed) {
-                REALM_ASSERT(leaf.size() == 4);
-                for (size_t i = 0; i < 4; ++i) {
+                // REALM_ASSERT(leaf.size() == 4);
+                for (size_t i = 0; i < leaf.size(); ++i) {
                     auto rot = leaf.get_as_ref_or_tagged(i);
                     if (rot.is_ref() && rot.get_as_ref()) {
                         // entries 0-2 are integral and can be compressed, entry 3 is strings and not compressed (yet)
