@@ -74,7 +74,7 @@ public:
     using Index = StableIndex;
 
     // Return the nesting level of the parent
-    size_t get_level() const noexcept
+    uint8_t get_level() const noexcept
     {
         return m_level;
     }
@@ -106,10 +106,9 @@ protected:
 #else
     static constexpr size_t s_max_level = 100;
 #endif
-    size_t m_level = 0;
-    mutable size_t m_parent_version = 0;
+    uint8_t m_level = 0;
 
-    constexpr CollectionParent(size_t level = 0)
+    constexpr CollectionParent(uint8_t level = 0)
         : m_level(level)
     {
     }
@@ -117,10 +116,7 @@ protected:
     virtual ~CollectionParent();
     /// Update the accessor (and return `UpdateStatus::Detached` if the
     // collection is not initialized.
-    virtual UpdateStatus update_if_needed_with_status() const = 0;
-    /// Check if the storage version has changed and update if it has
-    /// Return true if the object was updated
-    virtual bool update_if_needed() const = 0;
+    virtual UpdateStatus update_if_needed() const = 0;
     /// Get owning object
     virtual const Obj& get_object() const noexcept = 0;
     /// Get the top ref from pareht
@@ -132,6 +128,8 @@ protected:
     }
     /// Set the top ref in parent
     virtual void set_collection_ref(Index, ref_type ref, CollectionType) = 0;
+
+    virtual uint32_t parent_version() const noexcept = 0;
 
     // Used when inserting a new link. You will not remove existing links in this process
     void set_backlink(ColKey col_key, ObjLink new_link) const;

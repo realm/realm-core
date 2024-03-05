@@ -39,10 +39,7 @@ public:
     using Base = CollectionBaseImpl<DictionaryBase>;
     class Iterator;
 
-    Dictionary()
-        : CollectionParent(0)
-    {
-    }
+    Dictionary() = default;
     ~Dictionary();
 
     Dictionary(const Obj& obj, ColKey col_key)
@@ -213,11 +210,14 @@ public:
     {
         return get_obj().get_table();
     }
-    UpdateStatus update_if_needed_with_status() const override;
-    bool update_if_needed() const override;
+    UpdateStatus update_if_needed() const override;
     const Obj& get_object() const noexcept override
     {
         return get_obj();
+    }
+    uint32_t parent_version() const noexcept override
+    {
+        return m_parent_version;
     }
     ref_type get_collection_ref(Index, CollectionType) const override;
     bool check_collection_ref(Index, CollectionType) const noexcept override;
@@ -239,7 +239,7 @@ private:
 
     Dictionary(Allocator& alloc, ColKey col_key, ref_type ref);
 
-    bool init_from_parent(bool allow_create) const;
+    UpdateStatus init_from_parent(bool allow_create) const;
     Mixed do_get(size_t ndx) const;
     void do_erase(size_t ndx, Mixed key);
     Mixed do_get_key(size_t ndx) const;
@@ -261,12 +261,14 @@ private:
     void do_accumulate(size_t* return_ndx, AggregateType& agg) const;
 
     void ensure_created();
-    inline bool update() const
+    bool update() const
     {
-        return update_if_needed_with_status() != UpdateStatus::Detached;
+        return update_if_needed() != UpdateStatus::Detached;
     }
     void verify() const;
     void get_key_type();
+
+    UpdateStatus do_update_if_needed(bool allow_create) const;
 };
 
 class Dictionary::Iterator {
@@ -459,7 +461,7 @@ public:
     // Overrides of ObjCollectionBase:
     UpdateStatus do_update_if_needed() const final
     {
-        return m_source.update_if_needed_with_status();
+        return m_source.update_if_needed();
     }
     BPlusTree<ObjKey>* get_mutable_tree() const final
     {
