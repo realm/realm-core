@@ -298,27 +298,38 @@ void ColumnDictionaryKeys::set_cluster(const Cluster* cluster)
 }
 
 
+void ColumnDictionaryKeys::reset_path(size_t index)
+{
+    m_links.clear();
+    if (m_link_map.has_links()) {
+        REALM_ASSERT(!m_leaf);
+        m_links = m_link_map.get_links(index);
+    }
+    m_link_map_index = 0;
+}
+
+bool ColumnDictionaryKeys::more() const
+{
+    return m_link_map_index < m_links.size();
+}
+
 void ColumnDictionaryKeys::evaluate(size_t index, ValueBase& destination)
 {
     if (m_link_map.has_links()) {
-        REALM_ASSERT(!m_leaf);
-        std::vector<ObjKey> links = m_link_map.get_links(index);
-        auto sz = links.size();
-
-        // Here we don't really know how many values to expect
-        std::vector<Mixed> values;
-        for (size_t t = 0; t < sz; t++) {
-            const Obj obj = m_link_map.get_target_table()->get_object(links[t]);
+        if (more()) {
+            const Obj obj = m_link_map.get_target_table()->get_object(m_links[m_link_map_index++]);
             auto dict = obj.get_dictionary(m_column_key);
+            destination.init(true, dict.size());
             // Insert all values
-            dict.for_all_keys<StringData>([&values](const Mixed& value) {
-                values.emplace_back(value);
+            size_t n = 0;
+            dict.for_all_keys<StringData>([&](const Mixed& value) {
+                destination.set(n, value);
+                n++;
             });
         }
-
-        // Copy values over
-        destination.init(true, values.size());
-        destination.set(values.begin(), values.end());
+        else {
+            destination.init(true, 0);
+        }
     }
     else {
         // Not a link column
@@ -360,7 +371,7 @@ public:
     {
         Allocator& alloc = this->m_link_map.get_target_table()->get_alloc();
         Value<int64_t> list_refs;
-        this->get_lists(index, list_refs, 1);
+        this->get_lists(index, list_refs);
         destination.init(list_refs.m_from_list, list_refs.size());
         for (size_t i = 0; i < list_refs.size(); i++) {
             ref_type ref = to_ref(list_refs[i].get_int());
@@ -459,7 +470,7 @@ void ColumnListBase::set_cluster(const Cluster* cluster)
     }
 }
 
-void ColumnListBase::get_lists(size_t index, Value<int64_t>& destination, size_t nb_elements)
+void ColumnListBase::get_lists(size_t index, Value<int64_t>& destination)
 {
     if (m_link_map.has_links()) {
         std::vector<ObjKey> links = m_link_map.get_links(index);
@@ -484,13 +495,8 @@ void ColumnListBase::get_lists(size_t index, Value<int64_t>& destination, size_t
         }
     }
     else {
-        size_t rows = std::min(m_leaf->size() - index, nb_elements);
-
-        destination.init(false, rows);
-
-        for (size_t t = 0; t < rows; t++) {
-            destination.set(t, m_leaf->get(index + t));
-        }
+        destination.init(false, 1);
+        destination.set(0, m_leaf->get(index));
     }
 }
 

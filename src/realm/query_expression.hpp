@@ -2940,7 +2940,7 @@ public:
 
     void set_cluster(const Cluster* cluster);
 
-    void get_lists(size_t index, Value<int64_t>& destination, size_t nb_elements);
+    void get_lists(size_t index, Value<int64_t>& destination);
 
     std::string description(util::serializer::SerialisationState& state) const
     {
@@ -3025,6 +3025,15 @@ public:
         m_link_map.collect_dependencies(tables);
     }
 
+    void reset_path(size_t index) override
+    {
+        m_list_refs_index = 0;
+        get_lists(index, m_list_refs);
+    }
+    bool more() const override
+    {
+        return m_list_refs_index < m_list_refs.size();
+    }
     void evaluate(size_t index, ValueBase& destination) override
     {
         if constexpr (realm::is_any_v<T, ObjectId, Int, Bool, UUID>) {
@@ -3150,39 +3159,41 @@ public:
     std::optional<size_t> m_index;
 
 protected:
+    Value<int64_t> m_list_refs;
+    size_t m_list_refs_index = 0;
+
     template <typename StorageType>
-    void evaluate(size_t index, ValueBase& destination)
+    void evaluate(size_t, ValueBase& destination)
     {
-        Allocator& alloc = get_alloc();
-        Value<int64_t> list_refs;
-        get_lists(index, list_refs, 1);
         const bool is_from_list = true;
+        destination.init(is_from_list, 0);
+
+        if (m_list_refs.size() == 0)
+            return;
 
         std::vector<StorageType> values;
-        for (auto&& i : list_refs) {
-            ref_type list_ref = to_ref(i.get_int());
-            if (list_ref) {
-                BPlusTree<StorageType> list(alloc);
-                list.init_from_ref(list_ref);
-                if (size_t s = list.size()) {
-                    if (m_index) {
-                        if (*m_index < s) {
-                            values.push_back(list.get(*m_index));
-                        }
-                        else if (*m_index == size_t(-1)) {
-                            values.push_back(list.get(s - 1));
-                        }
+        ref_type list_ref = to_ref(m_list_refs.get(m_list_refs_index++).get_int());
+        if (list_ref) {
+            BPlusTree<StorageType> list(get_alloc());
+            list.init_from_ref(list_ref);
+            if (size_t s = list.size()) {
+                if (m_index) {
+                    destination.init(is_from_list, 1);
+                    if (*m_index < s) {
+                        destination.set(0, list.get(*m_index));
                     }
-                    else {
-                        for (size_t j = 0; j < s; j++) {
-                            values.push_back(list.get(j));
-                        }
+                    else if (*m_index == size_t(-1)) {
+                        destination.set(0, list.get(s - 1));
+                    }
+                }
+                else {
+                    destination.init(is_from_list, s);
+                    for (size_t j = 0; j < s; j++) {
+                        destination.set(j, list.get(j));
                     }
                 }
             }
         }
-        destination.init(is_from_list, values.size());
-        destination.set(values.begin(), values.end());
     }
 };
 
@@ -3310,27 +3321,32 @@ public:
 
     void reset_path(size_t index) final
     {
+        ColumnsCollection<Mixed>::reset_path(index);
+        m_destination_index = 0;
         if (m_ctrl.path.size() > 1) {
-            Value<Mixed> destination;
-            ColumnsCollection<Mixed>::evaluate<Mixed>(index, destination);
-
             m_ctrl.matches.clear();
-            if (auto sz = destination.size()) {
-                for (size_t i = 0; i < sz; i++) {
-                    Collection::get_any(m_ctrl, destination.get(i), 1);
+
+            do {
+                Value<Mixed> destination;
+                ColumnsCollection<Mixed>::evaluate<Mixed>(index, destination);
+
+                if (auto sz = destination.size()) {
+                    for (size_t i = 0; i < sz; i++) {
+                        Collection::get_any(m_ctrl, destination.get(i), 1);
+                    }
                 }
-            }
+            } while (ColumnsCollection<Mixed>::more());
+
             if (m_ctrl.matches.empty()) {
                 // Make sure we at lease have one empty result
                 m_ctrl.matches.emplace_back();
             }
         }
-        m_destination_index = 0;
     }
 
     bool more() const final
     {
-        return m_destination_index < m_ctrl.matches.size();
+        return ColumnsCollection<Mixed>::more() || m_destination_index < m_ctrl.matches.size();
     }
 
     void evaluate(size_t index, ValueBase& destination) override
@@ -3484,6 +3500,8 @@ public:
     }
 
     void set_cluster(const Cluster* cluster) override;
+    void reset_path(size_t) override;
+    bool more() const override;
     void evaluate(size_t index, ValueBase& destination) override;
 
     std::string description(util::serializer::SerialisationState& state) const override
@@ -3509,8 +3527,10 @@ private:
     DataType m_key_type;
     ColKey m_column_key;
     LinkMap m_link_map;
+    size_t m_link_map_index = 0;
     std::optional<ExpressionComparisonType> m_comparison_type;
     std::optional<ArrayInteger> m_leaf;
+    std::vector<ObjKey> m_links;
 };
 
 template <typename T>
@@ -3549,7 +3569,7 @@ private:
     {
         Allocator& alloc = ColumnsCollection<T>::get_alloc();
         Value<int64_t> list_refs;
-        this->get_lists(index, list_refs, 1);
+        this->get_lists(index, list_refs);
         destination.init(list_refs.m_from_list, list_refs.size());
         for (size_t i = 0; i < list_refs.size(); i++) {
             ref_type list_ref = to_ref(list_refs[i].get_int());
@@ -3582,7 +3602,7 @@ public:
     {
         Allocator& alloc = m_list.get_alloc();
         Value<int64_t> list_refs;
-        m_list.get_lists(index, list_refs, 1);
+        m_list.get_lists(index, list_refs);
         std::vector<Int> sizes;
         for (size_t i = 0; i < list_refs.size(); i++) {
             ref_type list_ref = to_ref(list_refs[i].get_int());
@@ -3744,7 +3764,7 @@ public:
         else {
             Allocator& alloc = m_columns_collection.get_alloc();
             Value<int64_t> list_refs;
-            m_columns_collection.get_lists(index, list_refs, 1);
+            m_columns_collection.get_lists(index, list_refs);
             size_t sz = list_refs.size();
             REALM_ASSERT_DEBUG(sz > 0 || list_refs.m_from_list);
             // The result is an aggregate value for each table
