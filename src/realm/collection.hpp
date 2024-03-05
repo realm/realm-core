@@ -175,6 +175,12 @@ public:
         return PathElement(ndx);
     }
 
+    // Clone this collection if it contains objects, and return nullptr otherwise
+    virtual LinkCollectionPtr clone_as_obj_list() const
+    {
+        return nullptr;
+    }
+
     /// Return true if the collection has changed since the last call to
     /// `has_changed()`. Note that this function is not idempotent and updates
     /// the internal state of the accessor if it has changed.
@@ -202,7 +208,7 @@ public:
     }
 
     /// If this is a collection of links, get the target table.
-    virtual TableRef get_target_table() const final
+    TableRef get_target_table() const
     {
         return get_obj().get_target_table(get_col_key());
     }
@@ -815,24 +821,12 @@ void update_unresolved(std::vector<size_t>& vec, const BPlusTree<ObjKey>* tree);
 
 /// Clear the context flag on the tree if there are no more unresolved links.
 void check_for_last_unresolved(BPlusTree<ObjKey>* tree);
-
-/// Proxy class needed because the ObjList interface clobbers method names from
-/// CollectionBase.
-struct ObjListProxy : ObjList {
-    virtual TableRef proxy_get_target_table() const = 0;
-
-    TableRef get_target_table() const final
-    {
-        return proxy_get_target_table();
-    }
-};
-
 } // namespace _impl
 
 /// Base class for collections of objects, where unresolved links (tombstones)
 /// can occur.
 template <class Interface>
-class ObjCollectionBase : public Interface, public _impl::ObjListProxy {
+class ObjCollectionBase : public Interface, public ObjList {
 public:
     static_assert(std::is_base_of_v<CollectionBase, Interface>);
 
@@ -868,7 +862,15 @@ public:
         return m_unresolved.size() != 0;
     }
 
-    using Interface::get_target_table;
+    LinkCollectionPtr clone_as_obj_list() const final
+    {
+        return clone_obj_list();
+    }
+
+    TableRef get_target_table() const final
+    {
+        return Interface::get_target_table();
+    }
 
 protected:
     ObjCollectionBase() = default;
@@ -956,10 +958,6 @@ private:
     // Sorted set of indices containing unresolved links.
     mutable std::vector<size_t> m_unresolved;
 
-    TableRef proxy_get_target_table() const final
-    {
-        return Interface::get_target_table();
-    }
     bool matches(const ObjList& other) const final
     {
         return get_owning_obj().get_key() == other.get_owning_obj().get_key() &&
