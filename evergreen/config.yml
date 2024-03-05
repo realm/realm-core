@@ -38,6 +38,12 @@ functions:
             cd ..
           fi
 
+          if [[ -n "${ninja_url|}" ]]; then
+            mkdir ninja_bin && cd ninja_bin
+            curl -LsSo ninja.zip ${ninja_url} && unzip -q ninja.zip
+            cd ..
+          fi
+
   "fetch source":
     - command: git.get_project
       params: {directory: realm-core}
@@ -73,6 +79,10 @@ functions:
               [ -n "${cxx_compiler}" ] || (echo "C compiler defined as  but C++ compiler is undefined"; exit 1)
               set_cmake_var compiler_vars CMAKE_C_COMPILER PATH $(./evergreen/abspath.sh ${c_compiler})
               set_cmake_var compiler_vars CMAKE_CXX_COMPILER PATH $(./evergreen/abspath.sh ${cxx_compiler})
+          fi
+
+          if [ -d "./ninja_bin/" ]; then
+            export PATH=$(./evergreen/abspath.sh ./ninja_bin):$PATH
           fi
 
           if [ -z "${disable_tests_against_baas|}" ]; then
@@ -144,16 +154,20 @@ functions:
           fi
 
           GENERATOR="${cmake_generator}"
-          if [ -z "${cmake_generator|}" ]; then
+          if [[ -z "${cmake_generator|}" ]]; then
               GENERATOR="Ninja Multi-Config"
               set_cmake_var generator_vars CMAKE_MAKE_PROGRAM PATH "${ninja|ninja}"
-          elif [ "${cmake_generator}" == "Xcode"]; then
-              echo $DEVELOPER_DIR
-              xcodes installed
-              xcode-select -p
-              xcrun -f clang
-              xcrun -f clang++
+          elif [[ "${cmake_generator}" == "Xcode" ]]; then
+              echo $DEVELOPER_DIR | tee -a debug.txt
+              xcodes installed | tee -a debug.txt
+              xcode-select -p | tee -a debug.txt
+              xcrun -f clang | tee -a debug.txt
+              xcrun -f clang++ | tee -a debug.txt
+              echo "collected vars:"
+              cat debug.txt
+              echo "...done"
           fi
+          echo "GENERATOR: $GENERATOR"
 
           if [ -n "${cmake_generator_platform|}" ]; then
             set_cmake_var realm_vars CMAKE_GENERATOR_PLATFORM STRING "${cmake_generator_platform}"
@@ -1339,13 +1353,13 @@ buildvariants:
   run_on: ubuntu2204-large
   expansions:
     clang_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/clang%2Bllvm-16.0.2-x86_64-linux-gnu-ubuntu-22.04.tar.xz"
+    c_compiler: "./clang_binaries/bin/clang"
+    cxx_compiler: "./clang_binaries/bin/clang++"
     cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.26.3-linux-x86_64.tar.gz"
     cmake_bindir: "./cmake_binaries/bin"
     fetch_missing_dependencies: On
     enable_tsan: On
     cmake_build_type: RelWithDebInfo
-    c_compiler: "./clang_binaries/bin/clang"
-    cxx_compiler: "./clang_binaries/bin/clang++"
     run_with_encryption: On
   tasks:
   - name: compile_test
@@ -1355,13 +1369,14 @@ buildvariants:
   run_on: ubuntu2204-large
   expansions:
     clang_url: "https://github.com/llvm/llvm-project/releases/download/llvmorg-17.0.6/clang+llvm-17.0.6-x86_64-linux-gnu-ubuntu-22.04.tar.xz"
+    c_compiler: "./clang_binaries/bin/clang"
+    cxx_compiler: "./clang_binaries/bin/clang++"
+    llvm_symbolizer: "./clang_binaries/bin/llvm-symbolizer"
     cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.26.3-linux-x86_64.tar.gz"
     cmake_bindir: "./cmake_binaries/bin"
     fetch_missing_dependencies: On
     enable_tsan: On
     cmake_build_type: RelWithDebInfo
-    c_compiler: "./clang_binaries/bin/clang"
-    cxx_compiler: "./clang_binaries/bin/clang++"
     run_with_encryption: On
   tasks:
   - name: compile_test
@@ -1371,13 +1386,13 @@ buildvariants:
   run_on: ubuntu2204-large
   expansions:
     clang_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/clang%2Bllvm-16.0.2-x86_64-linux-gnu-ubuntu-22.04.tar.xz"
+    c_compiler: "./clang_binaries/bin/clang"
+    cxx_compiler: "./clang_binaries/bin/clang++"
     cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.26.3-linux-x86_64.tar.gz"
     cmake_bindir: "./cmake_binaries/bin"
     fetch_missing_dependencies: On
     enable_ubsan: On
     cmake_build_type: RelWithDebInfo
-    c_compiler: "./clang_binaries/bin/clang"
-    cxx_compiler: "./clang_binaries/bin/clang++"
     run_with_encryption: On
   tasks:
   - name: compile_test
@@ -1419,6 +1434,9 @@ buildvariants:
   run_on: ubuntu2204-arm64-large
   expansions:
     clang_url: "https://github.com/llvm/llvm-project/releases/download/llvmorg-17.0.6/clang+llvm-17.0.6-aarch64-linux-gnu.tar.xz"
+    c_compiler: "./clang_binaries/bin/clang"
+    cxx_compiler: "./clang_binaries/bin/clang++"
+    llvm_symbolizer: "./clang_binaries/bin/llvm-symbolizer"
     cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.26.3-linux-aarch64.tar.gz"
     cmake_bindir: "./cmake_binaries/bin"
     python3: "/opt/mongodbtoolchain/v3/bin/python3"
@@ -1536,6 +1554,7 @@ buildvariants:
   expansions:
     cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.26.3-macos-universal.tar.gz"
     cmake_bindir: "./cmake_binaries/CMake.app/Contents/bin"
+    ninja_url: "https://github.com/ninja-build/ninja/releases/download/v1.11.1/ninja-mac.zip"
     max_jobs: $(sysctl -n hw.logicalcpu)
     cmake_build_type: RelWithDebInfo
     enable_tsan: On
@@ -1553,6 +1572,7 @@ buildvariants:
     llvm_symbolizer: "./clang_binaries/bin/llvm-symbolizer"
     cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.26.3-macos-universal.tar.gz"
     cmake_bindir: "./cmake_binaries/CMake.app/Contents/bin"
+    ninja_url: "https://github.com/ninja-build/ninja/releases/download/v1.11.1/ninja-mac.zip"
     max_jobs: $(sysctl -n hw.logicalcpu)
     cmake_build_type: RelWithDebInfo
     enable_tsan: On
