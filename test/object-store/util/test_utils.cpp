@@ -95,12 +95,6 @@ bool create_dummy_realm(std::string path, std::shared_ptr<Realm>* out)
     }
 }
 
-void reset_test_directory(const std::string& base_path)
-{
-    util::try_remove_dir_recursive(base_path);
-    util::make_dir(base_path);
-}
-
 std::vector<char> make_test_encryption_key(const char start)
 {
     std::vector<char> vector;

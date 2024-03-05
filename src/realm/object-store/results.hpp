@@ -36,12 +36,18 @@
 
 namespace realm {
 class Mixed;
+class List;
 class Class;
 class SectionedResults;
 
 namespace _impl {
 class ResultsNotifierBase;
 }
+
+namespace object_store {
+class Dictionary;
+class Set;
+} // namespace object_store
 
 class Results {
 public:
@@ -118,6 +124,9 @@ public:
 
     // Get an element in a list
     Mixed get_any(size_t index) REQUIRES(!m_mutex);
+
+    List get_list(size_t index) REQUIRES(!m_mutex);
+    object_store::Dictionary get_dictionary(size_t index) REQUIRES(!m_mutex);
 
     // Get the key/value pair at an index of the results.
     // This method is only valid when applied to a results based on a

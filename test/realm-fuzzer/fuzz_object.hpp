@@ -62,7 +62,7 @@ private:
     int32_t get_int32(State& s) const;
     std::string create_string(size_t length) const;
     std::pair<int64_t, int32_t> get_timestamp_values(State& s) const;
-    std::string create_column_name(realm::DataType t);
+    std::string create_column_name(realm::DataType t, bool is_list = false);
     std::string create_table_name();
 
     int m_table_index = 0;

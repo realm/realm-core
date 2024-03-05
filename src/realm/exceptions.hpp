@@ -161,7 +161,7 @@ struct InvalidArgument : LogicError {
 struct InvalidColumnKey : InvalidArgument {
     template <class T>
     InvalidColumnKey(const T& name)
-        : InvalidArgument(ErrorCodes::InvalidProperty, util::format("Invalid property for object type %1", name))
+        : InvalidArgument(ErrorCodes::InvalidProperty, util::format("Invalid property for object type: %1", name))
     {
     }
     InvalidColumnKey()

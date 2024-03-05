@@ -20,9 +20,10 @@
 #define REALM_OBJ_HPP
 
 #include <realm/node.hpp>
-#include <realm/table_ref.hpp>
-#include <realm/keys.hpp>
+#include <realm/collection_parent.hpp>
 #include <realm/mixed.hpp>
+#include "realm/column_type_traits.hpp"
+
 #include <map>
 
 #define REALM_CLUSTER_IF
@@ -30,12 +31,8 @@
 namespace realm {
 
 class ClusterTree;
-class Replication;
 class TableView;
-class CollectionBase;
 class CascadeState;
-class LstBase;
-class SetBase;
 class ObjList;
 struct GlobalKey;
 
@@ -45,11 +42,9 @@ template <class>
 class Set;
 template <class T>
 using LstPtr = std::unique_ptr<Lst<T>>;
-using LstBasePtr = std::unique_ptr<LstBase>;
 template <class T>
 using SetPtr = std::unique_ptr<Set<T>>;
-using SetBasePtr = std::unique_ptr<SetBase>;
-using CollectionBasePtr = std::unique_ptr<CollectionBase>;
+
 using LinkCollectionPtr = std::unique_ptr<ObjList>;
 
 class LnkLst;
@@ -57,42 +52,12 @@ using LnkLstPtr = std::unique_ptr<LnkLst>;
 class LnkSet;
 using LnkSetPtr = std::unique_ptr<LnkSet>;
 
-template <class>
-class Set;
-class Dictionary;
-class DictionaryLinkValues;
-using DictionaryPtr = std::unique_ptr<Dictionary>;
-
 namespace _impl {
 class DeepChangeChecker;
 }
 
-enum JSONOutputMode {
-    output_mode_json,       // default / existing implementation for outputting realm to json
-    output_mode_xjson,      // extended json as described in the spec
-    output_mode_xjson_plus, // extended json as described in the spec with additional modifier used for sync
-};
-
-/// The status of an accessor after a call to `update_if_needed()`.
-enum class UpdateStatus {
-    /// The owning object or column no longer exist, and the accessor could
-    /// not be updated. The accessor should be left in a detached state
-    /// after this, and further calls to `update_if_needed()` are not
-    /// guaranteed to reattach the accessor.
-    Detached,
-
-    /// The underlying data of the accessor was changed since the last call
-    /// to `update_if_needed()`. The accessor is still valid.
-    Updated,
-
-    /// The underlying data of the accessor did not change since the last
-    /// call to `update_if_needed()`, and the accessor is still valid in its
-    /// current state.
-    NoChange,
-};
-
 // 'Object' would have been a better name, but it clashes with a class in ObjectStore
-class Obj {
+class Obj : public CollectionParent {
 public:
     constexpr Obj()
         : m_table(nullptr)
@@ -103,24 +68,39 @@ public:
     }
     Obj(TableRef table, MemRef mem, ObjKey key, size_t row_ndx);
 
-    TableRef get_table() const noexcept
+    // Overriding members of CollectionParent:
+    UpdateStatus update_if_needed_with_status() const final;
+    // Get the path in a minimal format without including object accessors.
+    // If you need to obtain additional information for each object in the path,
+    // you should use get_fat_path() or traverse_path() instead (see below).
+    FullPath get_path() const final;
+    std::string get_id() const;
+    Path get_short_path() const noexcept final;
+    ColKey get_col_key() const noexcept final;
+    StablePath get_stable_path() const noexcept final;
+    void add_index(Path& path, const Index& ndx) const final;
+    size_t find_index(const Index&) const final
+    {
+        return realm::npos;
+    }
+
+    bool update_if_needed() const final;
+    TableRef get_table() const noexcept final
     {
         return m_table.cast_away_const();
     }
-
-    Allocator& get_alloc() const;
-
-    bool operator==(const Obj& other) const;
-
-    ObjKey get_key() const noexcept
+    const Obj& get_object() const noexcept final
     {
-        return m_key;
+        return *this;
     }
+    ref_type get_collection_ref(Index, CollectionType) const final;
+    bool check_collection_ref(Index, CollectionType) const noexcept final;
+    void set_collection_ref(Index, ref_type, CollectionType) final;
+    StableIndex build_index(ColKey) const;
+    bool check_index(StableIndex) const;
 
-    GlobalKey get_object_id() const;
-    ObjLink get_link() const;
-
-    Replication* get_replication() const;
+    // Operator overloads
+    bool operator==(const Obj& other) const;
 
     // Check if this object is default constructed
     explicit operator bool() const noexcept
@@ -128,8 +108,19 @@ public:
         return m_table != nullptr;
     }
 
+    // Simple getters
+    Allocator& get_alloc() const;
+    Replication* get_replication() const;
+    ObjKey get_key() const noexcept
+    {
+        return m_key;
+    }
+    GlobalKey get_object_id() const;
+    ObjLink get_link() const;
+
     /// Check if the object is still alive
     bool is_valid() const noexcept;
+
     /// Delete object from table. Object is invalid afterwards.
     void remove();
     /// Invalidate
@@ -146,7 +137,6 @@ public:
     {
         return get_any(get_column_key(col_name));
     }
-    Mixed get_any(std::vector<std::string>::iterator path_start, std::vector<std::string>::iterator path_end) const;
     Mixed get_primary_key() const;
 
     template <typename U>
@@ -169,6 +159,7 @@ public:
     size_t get_backlink_count(const Table& origin, ColKey origin_col_key) const;
     ObjKey get_backlink(const Table& origin, ColKey origin_col_key, size_t backlink_ndx) const;
     TableView get_backlink_view(TableRef src_table, ColKey src_col_key) const;
+    void verify_backlink(const Table& origin, ColKey origin_col_key, ObjKey origin_key) const;
 
     // To be used by the query system when a single object should
     // be tested. Will allow a function to be called in the context
@@ -176,27 +167,9 @@ public:
     template <class T>
     bool evaluate(T func) const;
 
-    void to_json(std::ostream& out, size_t link_depth, const std::map<std::string, std::string>& renames,
-                 std::vector<ObjLink>& followed, JSONOutputMode output_mode) const;
-    void to_json(std::ostream& out, size_t link_depth, const std::map<std::string, std::string>& renames,
-                 JSONOutputMode output_mode = output_mode_json) const
-    {
-        std::vector<ObjLink> followed;
-        to_json(out, link_depth, renames, followed, output_mode);
-    }
+    void to_json(std::ostream& out, JSONOutputMode output_mode = output_mode_json) const;
 
     std::string to_string() const;
-
-    // Get the path in a minimal format without including object accessors.
-    // If you need to obtain additional information for each object in the path,
-    // you should use get_fat_path() or traverse_path() instead (see below).
-    struct PathElement;
-    struct Path {
-        TableKey top_table;
-        ObjKey top_objkey;
-        std::vector<PathElement> path_from_top;
-    };
-    Path get_path() const;
 
     // Get the fat path to this object expressed as a vector of fat path elements.
     // each Fat path elements include a Obj allowing for low cost access to the
@@ -246,6 +219,7 @@ public:
     {
         return set_null(get_column_key(col_name), is_default);
     }
+    Obj& set_json(ColKey col_key, StringData json);
 
     Obj& add_int(ColKey col_key, int64_t value);
     Obj& add_int(StringData col_name, int64_t value)
@@ -284,6 +258,11 @@ public:
     Lst<U> get_list(ColKey col_key) const;
     template <typename U>
     LstPtr<U> get_list_ptr(ColKey col_key) const;
+    template <typename U>
+    std::shared_ptr<Lst<U>> get_list_ptr(const Path& path) const
+    {
+        return std::dynamic_pointer_cast<Lst<U>>(get_collection_ptr(path));
+    }
 
     template <typename U>
     Lst<U> get_list(StringData col_name) const
@@ -311,16 +290,27 @@ public:
     Set<U> get_set(ColKey col_key) const;
     template <typename U>
     SetPtr<U> get_set_ptr(ColKey col_key) const;
+    template <typename U>
+    std::shared_ptr<Set<U>> get_set_ptr(const Path& path) const
+    {
+        return std::dynamic_pointer_cast<Set<U>>(get_collection_ptr(path));
+    }
+
     LnkSet get_linkset(ColKey col_key) const;
     LnkSet get_linkset(StringData col_name) const;
     LnkSetPtr get_linkset_ptr(ColKey col_key) const;
     SetBasePtr get_setbase_ptr(ColKey col_key) const;
     Dictionary get_dictionary(ColKey col_key) const;
-    DictionaryPtr get_dictionary_ptr(ColKey col_key) const;
     Dictionary get_dictionary(StringData col_name) const;
+
+    Obj& set_collection(ColKey col_key, CollectionType type);
+    DictionaryPtr get_dictionary_ptr(ColKey col_key) const;
+    DictionaryPtr get_dictionary_ptr(const Path& path) const;
 
     CollectionBasePtr get_collection_ptr(ColKey col_key) const;
     CollectionBasePtr get_collection_ptr(StringData col_name) const;
+    CollectionPtr get_collection_ptr(const Path& path) const;
+    CollectionPtr get_collection_by_stable_path(const StablePath& path) const;
     LinkCollectionPtr get_linkcollection_ptr(ColKey col_key) const;
 
     void assign_pk_and_backlinks(Obj& other);
@@ -338,8 +328,6 @@ private:
     friend class ColumnListBase;
     friend class CollectionBase;
     friend class TableView;
-    template <class, class>
-    friend class Collection;
     template <class>
     friend class CollectionBaseImpl;
     template <class>
@@ -352,6 +340,7 @@ private:
     friend class Set;
     friend class Table;
     friend class Transaction;
+    friend class CollectionParent;
 
     mutable TableRef m_table;
     ObjKey m_key;
@@ -366,13 +355,7 @@ private:
     /// Update the accessor. Returns true when the accessor was updated to
     /// reflect new changes to the underlying state.
     bool update() const;
-    // update if needed - with and without check of table instance version:
-    bool update_if_needed() const;
     bool _update_if_needed() const; // no check, use only when already checked
-
-    /// Update the accessor (and return `UpdateStatus::Detached` if the Obj is
-    /// no longer valid, rather than throwing an exception).
-    UpdateStatus update_if_needed_with_status() const;
 
     template <class T>
     bool do_is_null(ColKey::Idx col_ndx) const;
@@ -420,22 +403,21 @@ private:
         return _get_linked_object(get_column_key(link_col_name), link);
     }
 
-    void set_int(ColKey col_key, int64_t value);
+    void set_int(ColKey::Idx col_ndx, int64_t value);
+    void set_ref(ColKey::Idx col_ndx, ref_type value, CollectionType type);
     void add_backlink(ColKey backlink_col, ObjKey origin_key);
     bool remove_one_backlink(ColKey backlink_col, ObjKey origin_key);
     void nullify_link(ColKey origin_col, ObjLink target_key) &&;
-    // Used when inserting a new link. You will not remove existing links in this process
-    void set_backlink(ColKey col_key, ObjLink new_link) const;
-    // Used when replacing a link, return true if CascadeState contains objects to remove
-    bool replace_backlink(ColKey col_key, ObjLink old_link, ObjLink new_link, CascadeState& state) const;
-    // Used when removing a backlink, return true if CascadeState contains objects to remove
-    bool remove_backlink(ColKey col_key, ObjLink old_link, CascadeState& state) const;
     template <class T>
     inline void set_spec(T&, ColKey);
     template <class ValueType>
     inline void nullify_single_link(ColKey col, ValueType target);
 
     void fix_linking_object_during_schema_migration(Obj linking_obj, Obj obj, ColKey opposite_col_key) const;
+
+    bool compare_values(Mixed, Mixed, ColKey, Obj, StringData) const;
+    bool compare_list_in_mixed(Lst<Mixed>&, Lst<Mixed>&, ColKey, Obj, StringData) const;
+    bool compare_dict_in_mixed(Dictionary&, Dictionary&, ColKey, Obj, StringData) const;
 };
 
 std::ostream& operator<<(std::ostream&, const Obj& obj);
@@ -456,11 +438,6 @@ ObjKey Obj::_get(ColKey::Idx col_ndx) const;
 
 struct Obj::FatPathElement {
     Obj obj;        // Object which embeds...
-    ColKey col_key; // Column holding link or link list which embeds...
-    Mixed index;    // index into link list or dictionary (or null)
-};
-
-struct Obj::PathElement {
     ColKey col_key; // Column holding link or link list which embeds...
     Mixed index;    // index into link list or dictionary (or null)
 };

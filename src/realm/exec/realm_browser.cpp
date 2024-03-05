@@ -67,7 +67,7 @@ static void print_objects(ConstTableRef table, size_t begin, size_t end)
                 printf("               <null>");
                 continue;
             }
-            if (table->get_column_attr(col).test(col_attr_List) && col_type != type_LinkList) {
+            if (table->get_column_attr(col).test(col_attr_List) && col_type != type_Link) {
                 printf("               <list>");
                 continue;
             }
@@ -109,27 +109,28 @@ static void print_objects(ConstTableRef table, size_t begin, size_t end)
                     break;
                 }
                 case type_Link: {
-                    printf("      -> %12llx", (ULL)obj.get<ObjKey>(col).value);
-                    break;
-                }
-                case type_LinkList: {
-                    std::stringstream links;
-                    links << "[" << std::hex;
-                    auto lv = obj.get_linklist(col);
-                    auto sz = lv.size();
-                    if (sz > 0) {
-                        links << lv.get(0).value;
-                        for (size_t i = 1; i < sz; i++) {
-                            links << "," << lv.get(i).value;
+                    if (col.is_list()) {
+                        std::stringstream links;
+                        links << "[" << std::hex;
+                        auto lv = obj.get_linklist(col);
+                        auto sz = lv.size();
+                        if (sz > 0) {
+                            links << lv.get(0).value;
+                            for (size_t i = 1; i < sz; i++) {
+                                links << "," << lv.get(i).value;
+                            }
                         }
-                    }
-                    links << "]" << std::dec;
-                    std::string str = links.str();
-                    if (str.size() > 20) {
-                        str = str.substr(0, 17) + "...";
-                    }
+                        links << "]" << std::dec;
+                        std::string str = links.str();
+                        if (str.size() > 20) {
+                            str = str.substr(0, 17) + "...";
+                        }
 
-                    printf(" %20s", str.c_str());
+                        printf(" %20s", str.c_str());
+                    }
+                    else {
+                        printf("      -> %12llx", (ULL)obj.get<ObjKey>(col).value);
+                    }
                     break;
                 }
                 default:

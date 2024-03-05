@@ -59,14 +59,16 @@ struct SyncMetadataColumn {
         , name(name)
         , data_type(data_type)
         , is_optional(is_optional)
+        , is_list(false)
     {
     }
 
     SyncMetadataColumn(ColKey* out, std::string_view name, std::string_view target_table, bool is_list)
         : key_out(out)
         , name(name)
-        , data_type(is_list ? type_LinkList : type_Link)
+        , data_type(type_Link)
         , is_optional(is_list ? false : true)
+        , is_list(is_list)
         , target_table(target_table)
     {
     }
@@ -75,6 +77,7 @@ struct SyncMetadataColumn {
     std::string_view name;
     DataType data_type;
     bool is_optional;
+    bool is_list;
     std::string_view target_table;
 };
 
@@ -116,6 +119,7 @@ struct SyncMetadataTable {
     {
     }
 };
+
 
 void create_sync_metadata_schema(const TransactionRef& tr, std::vector<SyncMetadataTable>* tables);
 void load_sync_metadata_schema(const TransactionRef& tr, std::vector<SyncMetadataTable>* tables);

@@ -16,8 +16,8 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "util/test_file.hpp"
-#include "util/event_loop.hpp"
+#include "../util/test_file.hpp"
+#include "../util/event_loop.hpp"
 
 #include <realm.h>
 
@@ -39,9 +39,10 @@
 #include <fstream>
 
 #if REALM_ENABLE_SYNC
-#include "util/sync/flx_sync_harness.hpp"
-#include "util/sync/sync_test_utils.hpp"
-#include "util/unit_test_transport.hpp"
+#include <util/sync/flx_sync_harness.hpp>
+#include <util/sync/sync_test_utils.hpp>
+#include "../util/test_path.hpp"
+#include "../util/unit_test_transport.hpp"
 
 #include <realm/object-store/sync/app_utils.hpp>
 #include <realm/object-store/sync/sync_user.hpp>
@@ -209,6 +210,8 @@ bool rlm_val_eq(realm_value_t lhs, realm_value_t rhs)
 
     switch (lhs.type) {
         case RLM_TYPE_NULL:
+        case RLM_TYPE_LIST:
+        case RLM_TYPE_DICTIONARY:
             return true;
         case RLM_TYPE_INT:
             return lhs.integer == rhs.integer;
@@ -590,10 +593,7 @@ TEST_CASE("C API (non-database)", "[c_api]") {
         realm_app_config_set_bundle_id(app_config.get(), "some_bundle_id");
         CHECK(app_config->device_info.bundle_id == "some_bundle_id");
 
-        std::string temp_dir = util::make_temp_dir();
-        auto guard = util::make_scope_exit([&temp_dir]() noexcept {
-            util::try_remove_dir_recursive(temp_dir);
-        });
+        test_util::TestDirGuard temp_dir(util::make_temp_dir());
         auto sync_client_config = cptr(realm_sync_client_config_new());
         realm_sync_client_config_set_base_file_path(sync_client_config.get(), temp_dir.c_str());
         realm_sync_client_config_set_metadata_mode(sync_client_config.get(), RLM_SYNC_CLIENT_METADATA_MODE_DISABLED);
@@ -621,14 +621,14 @@ TEST_CASE("C API (non-database)", "[c_api]") {
         auto token =
             realm_sync_user_on_state_change_register_callback(sync_user, user_state, nullptr, user_data_free);
 
-        auto check_base_url = [&](std::string expected) {
+        auto check_base_url = [&](const std::string& expected) {
             CHECK(transport->get_location_called());
             auto app_base_url = realm_app_get_base_url(test_app.get());
             CHECK(app_base_url == expected);
             realm_free(app_base_url);
         };
 
-        auto update_and_check_base_url = [&](const char* new_base_url, std::string expected) {
+        auto update_and_check_base_url = [&](const char* new_base_url, const std::string& expected) {
             transport->set_base_url(expected);
             realm_app_update_base_url(
                 test_app.get(), new_base_url,
@@ -1608,29 +1608,36 @@ TEST_CASE("C API logging", "[c_api]") {
     TestFile test_file;
 
     LogUserData userdata;
-    auto log_level_old = util::Logger::get_default_level_threshold();
+    auto log_level_old = util::LogCategory::realm.get_default_level_threshold();
     realm_set_log_callback(realm_log_func, RLM_LOG_LEVEL_DEBUG, &userdata, nullptr);
-    auto config = make_config(test_file.path.c_str(), false);
+    realm_set_log_level_category("Realm.Storage.Object", RLM_LOG_LEVEL_OFF);
+    auto config = make_config(test_file.path.c_str(), true);
     realm_t* realm = realm_open(config.get());
     realm_begin_write(realm);
+    realm_class_info_t class_foo;
+    realm_find_class(realm, "Foo", nullptr, &class_foo);
+    realm_property_info_t info;
+    realm_find_property(realm, class_foo.key, "int", nullptr, &info);
+    auto obj1 = cptr_checked(realm_object_create(realm, class_foo.key));
+    realm_set_value(obj1.get(), info.key, rlm_int_val(123), false);
     realm_commit(realm);
-    REQUIRE(userdata.log.size() == 3);
+    CHECK(userdata.log.size() == 11);
     realm_set_log_level(RLM_LOG_LEVEL_INFO);
     // Commit begin/end should not be logged at INFO level
     realm_begin_write(realm);
     realm_commit(realm);
-    REQUIRE(userdata.log.size() == 3);
+    CHECK(userdata.log.size() == 11);
     realm_release(realm);
     userdata.log.clear();
     realm_set_log_level(RLM_LOG_LEVEL_ERROR);
     realm = realm_open(config.get());
     realm_release(realm);
-    REQUIRE(userdata.log.empty());
+    CHECK(userdata.log.empty());
 
     // Remove this logger again
     realm_set_log_callback(nullptr, RLM_LOG_LEVEL_DEBUG, nullptr, nullptr);
     // Restore old log level
-    util::Logger::set_default_level_threshold(log_level_old);
+    util::LogCategory::realm.set_default_level_threshold(log_level_old);
 }
 
 TEST_CASE("C API - scheduler", "[c_api]") {
@@ -2947,7 +2954,8 @@ TEST_CASE("C API - properties", "[c_api]") {
                     size_t num_deletions, num_insertions, num_modifications;
                     bool collection_cleared = false;
                     realm_collection_changes_get_num_changes(state.changes.get(), &num_deletions, &num_insertions,
-                                                             &num_modifications, &num_moves, &collection_cleared);
+                                                             &num_modifications, &num_moves, &collection_cleared,
+                                                             nullptr);
                     CHECK(num_deletions == 1);
                     CHECK(num_insertions == 2);
                     CHECK(num_modifications == 1);
@@ -2994,7 +3002,8 @@ TEST_CASE("C API - properties", "[c_api]") {
                     });
 
                     realm_collection_changes_get_num_changes(state.changes.get(), &num_deletions, &num_insertions,
-                                                             &num_modifications, &num_moves, &collection_cleared);
+                                                             &num_modifications, &num_moves, &collection_cleared,
+                                                             nullptr);
                     CHECK(collection_cleared == true);
                 }
             }
@@ -3422,7 +3431,8 @@ TEST_CASE("C API - properties", "[c_api]") {
                     size_t num_deletions, num_insertions, num_modifications;
                     bool collection_cleared = false;
                     realm_collection_changes_get_num_changes(state.changes.get(), &num_deletions, &num_insertions,
-                                                             &num_modifications, &num_moves, &collection_cleared);
+                                                             &num_modifications, &num_moves, &collection_cleared,
+                                                             nullptr);
                     CHECK(collection_cleared == true);
                 }
             }
@@ -3892,6 +3902,7 @@ TEST_CASE("C API - properties", "[c_api]") {
                 auto str2 = rlm_str_val("b");
                 auto null = rlm_null();
 
+
                 auto require_change = [&]() {
                     auto token = cptr_checked(realm_dictionary_add_notification_callback(
                         strings.get(), &state, nullptr, nullptr, on_dictionary_change));
@@ -3926,21 +3937,31 @@ TEST_CASE("C API - properties", "[c_api]") {
 
                     size_t num_deletions, num_insertions, num_modifications;
                     realm_dictionary_get_changes(state.dictionary_changes.get(), &num_deletions, &num_insertions,
-                                                 &num_modifications);
+                                                 &num_modifications, nullptr);
                     CHECK(num_deletions == 1);
                     CHECK(num_insertions == 2);
                     CHECK(num_modifications == 0);
                     realm_value_t *deletions = nullptr, *insertions = nullptr, *modifications = nullptr;
+                    bool collection_cleared = false;
                     deletions = (realm_value_t*)malloc(sizeof(realm_value_t) * num_deletions);
                     insertions = (realm_value_t*)malloc(sizeof(realm_value_t) * num_insertions);
                     realm_dictionary_get_changed_keys(state.dictionary_changes.get(), deletions, &num_deletions,
-                                                      insertions, &num_insertions, modifications, &num_modifications);
+                                                      insertions, &num_insertions, modifications, &num_modifications,
+                                                      &collection_cleared);
                     CHECK(deletions != nullptr);
                     CHECK(insertions != nullptr);
                     CHECK(modifications == nullptr);
                     realm_free(deletions);
                     realm_free(insertions);
                     realm_free(modifications);
+
+                    write([&]() {
+                        checked(realm_dictionary_clear(strings.get()));
+                    });
+                    realm_dictionary_get_changed_keys(state.dictionary_changes.get(), deletions, &num_deletions,
+                                                      insertions, &num_insertions, modifications, &num_modifications,
+                                                      &collection_cleared);
+                    CHECK(collection_cleared == true);
                 }
             }
 
@@ -4548,7 +4569,7 @@ TEST_CASE("C API - queries", "[c_api]") {
 
             // Invalid number of arguments
             CHECK(!realm_query_parse(realm, class_foo.key, "string == $0", 0, nullptr));
-            CHECK_ERR_CAT(RLM_ERR_INDEX_OUT_OF_BOUNDS, (RLM_ERR_CAT_INVALID_ARG | RLM_ERR_CAT_LOGIC));
+            CHECK_ERR_CAT(RLM_ERR_INVALID_QUERY_ARG, (RLM_ERR_CAT_INVALID_ARG | RLM_ERR_CAT_LOGIC));
         }
 
         SECTION("string in list") {
@@ -4697,27 +4718,27 @@ TEST_CASE("C API - queries", "[c_api]") {
 
             SECTION("type mismatch") {
                 CHECK(!realm_query_parse(realm, class_foo.key, "int == $2", num_args, arg_list));
-                CHECK_ERR(RLM_ERR_INVALID_QUERY);
+                CHECK_ERR(RLM_ERR_INVALID_QUERY_ARG);
                 CHECK(!realm_query_parse(realm, class_foo.key, "bool == $2", num_args, arg_list));
-                CHECK_ERR(RLM_ERR_INVALID_QUERY);
+                CHECK_ERR(RLM_ERR_INVALID_QUERY_ARG);
                 CHECK(!realm_query_parse(realm, class_foo.key, "string == $7", num_args, arg_list));
-                CHECK_ERR(RLM_ERR_INVALID_QUERY);
+                CHECK_ERR(RLM_ERR_INVALID_QUERY_ARG);
                 CHECK(!realm_query_parse(realm, class_foo.key, "timestamp == $2", num_args, arg_list));
-                CHECK_ERR(RLM_ERR_INVALID_QUERY);
+                CHECK_ERR(RLM_ERR_INVALID_QUERY_ARG);
                 CHECK(!realm_query_parse(realm, class_foo.key, "double == $2", num_args, arg_list));
-                CHECK_ERR(RLM_ERR_INVALID_QUERY);
+                CHECK_ERR(RLM_ERR_INVALID_QUERY_ARG);
                 CHECK(!realm_query_parse(realm, class_foo.key, "float == $2", num_args, arg_list));
-                CHECK_ERR(RLM_ERR_INVALID_QUERY);
+                CHECK_ERR(RLM_ERR_INVALID_QUERY_ARG);
                 CHECK(!realm_query_parse(realm, class_foo.key, "binary == $0", num_args, arg_list));
-                CHECK_ERR(RLM_ERR_INVALID_QUERY);
+                CHECK_ERR(RLM_ERR_INVALID_QUERY_ARG);
                 CHECK(!realm_query_parse(realm, class_foo.key, "decimal == $2", num_args, arg_list));
-                CHECK_ERR(RLM_ERR_INVALID_QUERY);
+                CHECK_ERR(RLM_ERR_INVALID_QUERY_ARG);
                 CHECK(!realm_query_parse(realm, class_foo.key, "object_id == $2", num_args, arg_list));
-                CHECK_ERR(RLM_ERR_INVALID_QUERY);
+                CHECK_ERR(RLM_ERR_INVALID_QUERY_ARG);
                 CHECK(!realm_query_parse(realm, class_foo.key, "uuid == $2", num_args, arg_list));
-                CHECK_ERR(RLM_ERR_INVALID_QUERY);
+                CHECK_ERR(RLM_ERR_INVALID_QUERY_ARG);
                 CHECK(!realm_query_parse(realm, class_foo.key, "link == $2", num_args, arg_list));
-                CHECK_ERR(RLM_ERR_INVALID_QUERY);
+                CHECK_ERR(RLM_ERR_INVALID_QUERY_ARG);
             }
         }
 
@@ -5132,6 +5153,296 @@ TEST_CASE("C API - queries", "[c_api]") {
     realm_release(realm);
 }
 
+TEST_CASE("C API: nested collections", "[c_api]") {
+    TestFile test_file;
+    realm_t* realm;
+    ObjectSchema object_schema = {"Foo",
+                                  {
+                                      {"_id", PropertyType::Int, Property::IsPrimary{true}},
+                                      {"any", PropertyType::Mixed | PropertyType::Nullable},
+                                  }};
+
+    auto config = make_config(test_file.path.c_str(), false);
+    config->schema = Schema{object_schema};
+    config->schema_version = 0;
+    realm = realm_open(config.get());
+
+    realm_class_info_t class_foo;
+    bool found = false;
+    CHECK(checked(realm_find_class(realm, "Foo", &found, &class_foo)));
+    REQUIRE(found);
+
+    realm_property_info_t info;
+    found = false;
+    REQUIRE(realm_find_property(realm, class_foo.key, "any", &found, &info));
+    REQUIRE(found);
+    CHECK(info.key != RLM_INVALID_PROPERTY_KEY);
+    realm_property_key_t foo_any_col_key = info.key;
+
+    CPtr<realm_object_t> obj1;
+    checked(realm_begin_write(realm));
+    realm_value_t pk = rlm_int_val(42);
+    obj1 = cptr_checked(realm_object_create_with_primary_key(realm, class_foo.key, pk));
+
+    auto write = [&](auto&& f) {
+        checked(realm_begin_write(realm));
+        f();
+        checked(realm_commit(realm));
+        checked(realm_refresh(realm, nullptr));
+    };
+
+    SECTION("results of mixed") {
+        SECTION("dictionary") {
+            auto parent_dict = cptr_checked(realm_set_dictionary(obj1.get(), foo_any_col_key));
+            REQUIRE(parent_dict);
+            realm_value_t value;
+            realm_get_value(obj1.get(), foo_any_col_key, &value);
+            REQUIRE(value.type == RLM_TYPE_DICTIONARY);
+            auto dict = cptr_checked(realm_get_dictionary(obj1.get(), foo_any_col_key));
+            auto nlist = cptr_checked(realm_dictionary_insert_list(dict.get(), rlm_str_val("A")));
+            auto ndict = cptr_checked(realm_dictionary_insert_dictionary(dict.get(), rlm_str_val("B")));
+
+            // verify that we can fetch a collection from a result of mixed
+            auto results = cptr_checked(realm_dictionary_to_results(dict.get()));
+            const auto sz = results->size();
+            REQUIRE(sz == dict->size());
+            REQUIRE(results->is_valid());
+            realm_value_t val;
+            realm_results_get(results.get(), 0, &val);
+            REQUIRE(val.type == RLM_TYPE_LIST);
+            realm_results_get(results.get(), 1, &val);
+            REQUIRE(val.type == RLM_TYPE_DICTIONARY);
+            auto result_list = cptr_checked(realm_results_get_list(results.get(), 0));
+            REQUIRE(result_list);
+            REQUIRE(result_list->size() == nlist->size());
+            auto result_dictionary = cptr_checked(realm_results_get_dictionary(results.get(), 1));
+            REQUIRE(result_dictionary);
+            REQUIRE(result_dictionary->size() == ndict->size());
+        }
+        SECTION("list") {
+            auto parent_list = cptr_checked(realm_set_list(obj1.get(), foo_any_col_key));
+            REQUIRE(parent_list);
+            realm_value_t value;
+            realm_get_value(obj1.get(), foo_any_col_key, &value);
+            REQUIRE(value.type == RLM_TYPE_LIST);
+            auto list = cptr_checked(realm_get_list(obj1.get(), foo_any_col_key));
+            auto nlist = cptr_checked(realm_list_insert_list(list.get(), 0));
+            auto ndict = cptr_checked(realm_list_insert_dictionary(list.get(), 1));
+
+            // verify that we can fetch a collection from a result of mixed
+            auto results = cptr_checked(realm_list_to_results(list.get()));
+            const auto sz = results->size();
+            REQUIRE(sz == list->size());
+            REQUIRE(results->is_valid());
+            realm_value_t val;
+            realm_results_get(results.get(), 0, &val);
+            REQUIRE(val.type == RLM_TYPE_LIST);
+            realm_results_get(results.get(), 1, &val);
+            REQUIRE(val.type == RLM_TYPE_DICTIONARY);
+            auto result_list = cptr_checked(realm_results_get_list(results.get(), 0));
+            REQUIRE(result_list);
+            REQUIRE(result_list->size() == nlist->size());
+            auto result_dictionary = cptr_checked(realm_results_get_dictionary(results.get(), 1));
+            REQUIRE(result_dictionary);
+            REQUIRE(result_dictionary->size() == ndict->size());
+        }
+    }
+
+    SECTION("dictionary") {
+        struct UserData {
+            size_t deletions;
+            size_t insertions;
+            size_t modifications;
+            bool was_deleted;
+            realm_dictionary_t* dict;
+        } user_data;
+
+        auto parent_dict = cptr_checked(realm_set_dictionary(obj1.get(), foo_any_col_key));
+        REQUIRE(parent_dict);
+        realm_value_t value;
+        realm_get_value(obj1.get(), foo_any_col_key, &value);
+        REQUIRE(value.type == RLM_TYPE_DICTIONARY);
+        auto dict = cptr_checked(realm_get_dictionary(obj1.get(), foo_any_col_key));
+        checked(realm_dictionary_insert(dict.get(), rlm_str_val("Hello"), rlm_str_val("world"), nullptr, nullptr));
+        // dict -> list
+        auto list = cptr_checked(realm_dictionary_insert_list(dict.get(), rlm_str_val("Goodbye")));
+        realm_list_insert(list.get(), 0, rlm_str_val("Hello"));
+        realm_list_insert(list.get(), 0, rlm_str_val("42"));
+        realm_list_insert(list.get(), 0, rlm_int_val(42));
+        // dict -> dict
+        auto dict2 = cptr_checked(realm_dictionary_insert_dictionary(dict.get(), rlm_str_val("Hi")));
+        user_data.dict = dict2.get();
+        checked(realm_dictionary_insert(dict2.get(), rlm_str_val("Nested-Hello"), rlm_str_val("Nested-World"),
+                                        nullptr, nullptr));
+        checked(realm_commit(realm));
+
+        auto on_dictionary_change = [](void* data, const realm_dictionary_changes_t* changes) {
+            auto* user_data = static_cast<UserData*>(data);
+            realm_dictionary_get_changes(changes, &user_data->deletions, &user_data->insertions,
+                                         &user_data->modifications, &user_data->was_deleted);
+            if (user_data->was_deleted) {
+                CHECK(!realm_dictionary_is_valid(user_data->dict));
+            }
+        };
+        auto require_change = [&]() {
+            auto token = cptr_checked(realm_dictionary_add_notification_callback(dict2.get(), &user_data, nullptr,
+                                                                                 nullptr, on_dictionary_change));
+            checked(realm_refresh(realm, nullptr));
+            return token;
+        };
+
+        auto token = require_change();
+
+        write([&] {
+            checked(realm_dictionary_insert(dict2.get(), rlm_str_val("Nested-Godbye"),
+                                            rlm_str_val("Nested-CruelWorld"), nullptr, nullptr));
+        });
+        CHECK(user_data.insertions == 1);
+
+        write([&] {
+            realm_dictionary_insert(dict.get(), rlm_str_val("Hi"), rlm_str_val("Foo"), nullptr, nullptr);
+        });
+        CHECK(user_data.deletions == 2);
+        CHECK(user_data.was_deleted);
+    }
+
+    SECTION("list") {
+        struct UserData {
+            size_t deletions;
+            size_t insertions;
+            size_t modifications;
+            bool was_deleted;
+            realm_list_t* list;
+        } user_data;
+
+        auto parent_list = cptr_checked(realm_set_list(obj1.get(), foo_any_col_key));
+        REQUIRE(parent_list);
+        realm_value_t value;
+        realm_get_value(obj1.get(), foo_any_col_key, &value);
+        REQUIRE(value.type == RLM_TYPE_LIST);
+        auto list = cptr_checked(realm_get_list(obj1.get(), foo_any_col_key));
+        realm_list_insert(list.get(), 0, rlm_str_val("Hello"));
+        realm_list_insert(list.get(), 1, rlm_str_val("World"));
+        // list -> dict
+        auto dict = cptr_checked(realm_list_insert_dictionary(list.get(), 1));
+        checked(realm_dictionary_insert(dict.get(), rlm_str_val("Hello"), rlm_str_val("world"), nullptr, nullptr));
+        // list -> list
+        auto list2 = cptr_checked(realm_list_insert_list(list.get(), 2));
+        user_data.list = list2.get();
+
+        checked(realm_commit(realm));
+
+        auto on_list_change = [](void* data, const realm_collection_changes_t* changes) {
+            auto* user_data = static_cast<UserData*>(data);
+            realm_collection_changes_get_num_changes(changes, &user_data->deletions, &user_data->insertions,
+                                                     &user_data->modifications, nullptr, nullptr,
+                                                     &user_data->was_deleted);
+            if (user_data->was_deleted) {
+                CHECK(!realm_list_is_valid(user_data->list));
+            }
+        };
+        auto require_change = [&]() {
+            auto token = cptr_checked(
+                realm_list_add_notification_callback(list2.get(), &user_data, nullptr, nullptr, on_list_change));
+            checked(realm_refresh(realm, nullptr));
+            return token;
+        };
+
+        auto token = require_change();
+
+        write([&] {
+            realm_list_insert(list2.get(), 0, rlm_str_val("Nested-Hello"));
+            realm_list_insert(list2.get(), 1, rlm_str_val("Nested-World"));
+        });
+        CHECK(user_data.insertions == 2);
+
+        write([&] {
+            realm_list_set(list.get(), 2, rlm_str_val("Foo"));
+        });
+        CHECK(user_data.deletions == 2);
+        CHECK(user_data.was_deleted);
+    }
+
+    SECTION("set list for collection in mixed, verify that previous reference is invalid") {
+        auto parent_list = cptr_checked(realm_set_list(obj1.get(), foo_any_col_key));
+        REQUIRE(parent_list);
+        realm_value_t value;
+        realm_get_value(obj1.get(), foo_any_col_key, &value);
+        REQUIRE(value.type == RLM_TYPE_LIST);
+        auto list = cptr_checked(realm_get_list(obj1.get(), foo_any_col_key));
+        auto n_list = cptr_checked(realm_list_insert_list(list.get(), 0));
+        size_t size;
+        checked(realm_list_size(list.get(), &size));
+        REQUIRE(size == 1);
+        realm_list_insert(n_list.get(), 0, rlm_str_val("Test1"));
+        auto n_dict = cptr_checked(realm_list_set_dictionary(list.get(), 0));
+        // accessor has become invalid
+        REQUIRE(!realm_list_insert(n_list.get(), 1, rlm_str_val("Test2")));
+        CHECK_ERR(RLM_ERR_INVALIDATED_OBJECT);
+        // try to get a dictionary should work
+        n_dict = cptr_checked(realm_list_get_dictionary(list.get(), 0));
+        bool inserted = false;
+        size_t ndx;
+        realm_value_t key = rlm_str_val("key");
+        realm_value_t val = rlm_str_val("value");
+        REQUIRE(realm_dictionary_insert(n_dict.get(), key, val, &ndx, &inserted));
+        REQUIRE(ndx == 0);
+        REQUIRE(inserted);
+
+        CHECK(realm_list_set(list.get(), 0, rlm_int_val(5)));
+        // accessor invalid
+        REQUIRE(!realm_dictionary_insert(n_dict.get(), key, val, &ndx, &inserted));
+        CHECK_ERR(RLM_ERR_INVALIDATED_OBJECT);
+        realm_value_t out;
+        CHECK(realm_list_get(list.get(), 0, &out));
+
+        n_list = cptr_checked(realm_list_set_list(list.get(), 0));
+        // get a list should work
+        n_list = cptr_checked(realm_list_get_list(list.get(), 0));
+        REQUIRE(realm_list_insert(n_list.get(), 0, rlm_str_val("Test1")));
+        // reset the collection type to the same type (nop)
+        n_list = cptr_checked(realm_list_set_list(list.get(), 0));
+        // accessor is still valid
+        REQUIRE(realm_list_insert(n_list.get(), 0, rlm_str_val("Test2")));
+        checked(realm_list_size(n_list.get(), &size));
+        REQUIRE(size == 2);
+    }
+
+    SECTION("json") {
+        REQUIRE(realm_set_json(
+            obj1.get(), foo_any_col_key,
+            R"( [ { "Seven":7, "Six":6 }, "Hello", { "Points": [1.25, 4.5, 6.75], "Hello": "World" } ])"));
+        realm_value_t value;
+        realm_get_value(obj1.get(), foo_any_col_key, &value);
+        REQUIRE(value.type == RLM_TYPE_LIST);
+        auto list = cptr_checked(realm_get_list(obj1.get(), foo_any_col_key));
+        size_t size;
+        checked(realm_list_size(list.get(), &size));
+        CHECK(size == 3);
+    }
+
+    SECTION("freeze list") {
+        auto parent_dict = cptr_checked(realm_set_dictionary(obj1.get(), foo_any_col_key));
+        REQUIRE(parent_dict);
+        auto dict = cptr_checked(realm_get_dictionary(obj1.get(), foo_any_col_key));
+        auto list = cptr_checked(realm_dictionary_insert_list(dict.get(), rlm_str_val("List")));
+        realm_list_insert(list.get(), 0, rlm_str_val("Hello"));
+        realm_list_insert(list.get(), 0, rlm_str_val("42"));
+        checked(realm_commit(realm));
+        size_t size;
+        checked(realm_list_size(list.get(), &size));
+        REQUIRE(size == 2);
+        auto frozen_realm = cptr_checked(realm_freeze(realm));
+
+        realm_list_t* frozen_list;
+        realm_list_resolve_in(list.get(), frozen_realm.get(), &frozen_list);
+        checked(realm_list_size(frozen_list, &size));
+        REQUIRE(size == 2);
+        realm_release(frozen_list);
+    }
+    realm_release(realm);
+}
+
 TEST_CASE("C API: convert", "[c_api]") {
     TestFile test_file;
     TestFile dest_test_file;
@@ -5250,8 +5561,7 @@ static void sync_error_handler(void* p, realm_sync_session_t*, const realm_sync_
 
 TEST_CASE("C API - async_open", "[sync][pbs][c_api]") {
     TestSyncManager init_sync_manager;
-    SyncTestFile test_config(init_sync_manager.app(), "default");
-    test_config.cache = false;
+    SyncTestFile test_config(init_sync_manager, "default");
     ObjectSchema object_schema = {"object",
                                   {
                                       {"_id", PropertyType::Int, Property::IsPrimary{true}},
@@ -5262,7 +5572,7 @@ TEST_CASE("C API - async_open", "[sync][pbs][c_api]") {
     SECTION("can open synced Realms that don't already exist") {
         realm_config_t* config = realm_config_new();
         config->schema = Schema{object_schema};
-        realm_user user(init_sync_manager.app()->current_user());
+        realm_user user(test_config.sync_config->user);
         realm_sync_config_t* sync_config = realm_sync_config_new(&user, "default");
         realm_sync_config_set_initial_subscription_handler(sync_config, task_init_subscription, false, nullptr,
                                                            nullptr);
@@ -5295,14 +5605,31 @@ TEST_CASE("C API - async_open", "[sync][pbs][c_api]") {
     SECTION("cancels download and reports an error on auth error") {
         auto expired_token = encode_fake_jwt("", 123, 456);
 
+        struct Transport : UnitTestTransport {
+            void send_request_to_server(
+                const realm::app::Request& req,
+                realm::util::UniqueFunction<void(const realm::app::Response&)>&& completion) override
+            {
+                if (req.url.find("/auth/session") != std::string::npos) {
+                    completion(app::Response{403});
+                }
+                else {
+                    UnitTestTransport::send_request_to_server(req, std::move(completion));
+                }
+            }
+        };
+        OfflineAppSession::Config oas_config;
+        oas_config.transport = std::make_shared<Transport>();
+        OfflineAppSession oas(oas_config);
+        SyncTestFile test_config(oas, "realm");
+        test_config.sync_config->user->log_in(expired_token, expired_token);
+
         realm_config_t* config = realm_config_new();
         config->schema = Schema{object_schema};
-        realm_user user(init_sync_manager.app()->current_user());
+        realm_user user(test_config.sync_config->user);
         realm_sync_config_t* sync_config = realm_sync_config_new(&user, "realm");
         realm_sync_config_set_initial_subscription_handler(sync_config, task_init_subscription, false, nullptr,
                                                            nullptr);
-        sync_config->user->log_in(expired_token, expired_token);
-
         realm_config_set_path(config, test_config.path.c_str());
         realm_config_set_schema_version(config, 1);
         Userdata userdata;
@@ -5312,7 +5639,6 @@ TEST_CASE("C API - async_open", "[sync][pbs][c_api]") {
         realm_async_open_task_t* task = realm_open_synchronized(config);
         REQUIRE(task);
         realm_async_open_task_start(task, task_completion_func, &userdata, nullptr);
-        init_sync_manager.network_callback(app::Response{403});
         util::EventLoop::main().run_until([&] {
             return userdata.called.load();
         });

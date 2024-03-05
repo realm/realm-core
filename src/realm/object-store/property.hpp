@@ -27,7 +27,6 @@
 #include <realm/util/tagged_bool.hpp>
 
 #include <string>
-
 namespace realm {
 class BinaryData;
 class Decimal128;
@@ -59,6 +58,7 @@ enum class PropertyType : unsigned short {
     Required = 0,
     Nullable = 64,
     Array = 128,
+
     Set = 256,
     Dictionary = 512,
 
@@ -107,6 +107,7 @@ struct Property {
     // Text property with fulltext index
     Property(std::string name, IsFulltextIndexed indexed, std::string public_name = "");
 
+    // Link to another object
     Property(std::string name, PropertyType type, std::string object_type, std::string link_origin_property_name = "",
              std::string public_name = "");
 
@@ -127,6 +128,7 @@ struct Property {
 
     bool type_is_indexable() const noexcept;
     bool type_is_nullable() const noexcept;
+    size_t type_nesting_levels() const noexcept;
 
     std::string type_string() const;
 };
@@ -338,7 +340,7 @@ inline Property::Property(std::string name, PropertyType type, std::string objec
 
 inline bool Property::type_is_indexable() const noexcept
 {
-    return !is_collection(type) &&
+    return (!is_collection(type) || (is_array(type) && type == PropertyType::String)) &&
            (type == PropertyType::Int || type == PropertyType::Bool || type == PropertyType::Date ||
             type == PropertyType::String || type == PropertyType::ObjectId || type == PropertyType::UUID ||
             type == PropertyType::Mixed);

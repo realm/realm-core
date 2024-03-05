@@ -1982,9 +1982,9 @@ TEST_CASE("object") {
     SECTION("defaults do not override values explicitly passed to create()") {
         TestSyncManager init_sync_manager({}, {false});
         auto& server = init_sync_manager.sync_server();
-        SyncTestFile config1(init_sync_manager.app(), "shared");
+        SyncTestFile config1(init_sync_manager, "shared");
         config1.schema = config.schema;
-        SyncTestFile config2(init_sync_manager.app(), "shared");
+        SyncTestFile config2(init_sync_manager, "shared");
         config2.schema = config.schema;
 
         AnyDict v1{
@@ -2364,6 +2364,12 @@ TEST_CASE("Asymmetric Object") {
         REQUIRE(!obj.get_obj().is_valid());
         // Object gets deleted immediately.
         REQUIRE(realm->is_empty());
+    }
+
+    SECTION("Re-open realm") {
+        realm->close();
+        realm.reset();
+        realm = Realm::get_shared_realm(config);
     }
 
     SECTION("Delete ephemeral object before comitting") {

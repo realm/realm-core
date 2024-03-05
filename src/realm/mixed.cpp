@@ -27,7 +27,7 @@
 
 namespace realm {
 namespace {
-static const int sorting_rank[19] = {
+static const int sorting_rank[] = {
     // Observe! Changing these values breaks the file format for Set<Mixed>
 
     -1, // null
@@ -35,29 +35,34 @@ static const int sorting_rank[19] = {
     0,  // type_Bool = 1,
     2,  // type_String = 2,
     -1,
-    2,  // type_Binary = 4,
+    3,  // type_Binary = 4,
     -1, // type_OldTable = 5,
     -1, // type_Mixed = 6,
     -1, // type_OldDateTime = 7,
-    3,  // type_Timestamp = 8,
+    4,  // type_Timestamp = 8,
     1,  // type_Float = 9,
     1,  // type_Double = 10,
     1,  // type_Decimal = 11,
-    7,  // type_Link = 12,
+    8,  // type_Link = 12,
     -1, // type_LinkList = 13,
     -1,
-    4, // type_ObjectId = 15,
-    6, // type_TypedLink = 16
-    5, // type_UUID = 17
+    5,  // type_ObjectId = 15,
+    7,  // type_TypedLink = 16
+    6,  // type_UUID = 17
+    8,  // type_TypeOfValue = 18
+    9,  // type_List = 19
+    10, // type_Set = 20
+    11, // type_Dictionary = 21
 
     // Observe! Changing these values breaks the file format for Set<Mixed>
 };
 
 int compare_string(StringData a, StringData b)
 {
+    // Observe! Changing these values breaks the file format for Set<Mixed> and the StringIndex
     if (a == b)
         return 0;
-    return utf8_compare(a, b) ? -1 : 1;
+    return a < b ? -1 : 1;
 }
 
 int compare_binary(BinaryData a, BinaryData b)
@@ -181,9 +186,6 @@ bool Mixed::data_types_are_comparable(DataType l_type, DataType r_type)
     if (is_numeric(l_type, r_type)) {
         return true;
     }
-    if ((l_type == type_String && r_type == type_Binary) || (r_type == type_String && l_type == type_Binary)) {
-        return true;
-    }
     if (l_type == type_Mixed || r_type == type_Mixed) {
         return true; // Mixed is comparable with any type
     }
@@ -224,7 +226,7 @@ bool Mixed::accumulate_numeric_to(Decimal128& destination) const noexcept
 
 int Mixed::compare(const Mixed& b) const noexcept
 {
-    // Observe! Changing this function breaks the file format for Set<Mixed>
+    // Observe! Changing this function breaks the file format for Set<Mixed> and the StringIndex
 
     if (is_null()) {
         return b.is_null() ? 0 : -1;
@@ -258,9 +260,9 @@ int Mixed::compare(const Mixed& b) const noexcept
         case type_String:
             if (b.get_type() == type_String)
                 return compare_string(get<StringData>(), b.get<StringData>());
-            [[fallthrough]];
+            break;
         case type_Binary:
-            if (b.get_type() == type_String || b.get_type() == type_Binary)
+            if (b.get_type() == type_Binary)
                 return compare_binary(get<BinaryData>(), b.get<BinaryData>());
             break;
         case type_Float:
@@ -334,6 +336,9 @@ int Mixed::compare(const Mixed& b) const noexcept
             if (type == type_TypeOfValue && b.get_type() == type_TypeOfValue) {
                 return TypeOfValue(int_val).matches(TypeOfValue(b.int_val)) ? 0 : compare_generic(int_val, b.int_val);
             }
+            if ((type == type_List || type == type_Dictionary || type == type_Set)) {
+                return m_type == b.m_type ? 0 : m_type < b.m_type ? -1 : 1;
+            }
             REALM_ASSERT_RELEASE(false && "Compare not supported for this column type");
             break;
     }
@@ -343,17 +348,7 @@ int Mixed::compare(const Mixed& b) const noexcept
     // Using rank table will ensure that all numeric values are kept together
     return (sorting_rank[m_type] > sorting_rank[b.m_type]) ? 1 : -1;
 
-    // Observe! Changing this function breaks the file format for Set<Mixed>
-}
-
-int Mixed::compare_signed(const Mixed& b) const noexcept
-{
-    if (is_type(type_String) && b.is_type(type_String)) {
-        auto a_val = get_string();
-        auto b_val = b.get_string();
-        return a_val == b_val ? 0 : a_val < b_val ? -1 : 1;
-    }
-    return compare(b);
+    // Observe! Changing this function breaks the file format for Set<Mixed> and the StringIndex
 }
 
 template <>
@@ -416,6 +411,32 @@ Decimal128 Mixed::export_to_type() const noexcept
         default:
             REALM_ASSERT(false);
             break;
+    }
+    return {};
+}
+
+template <>
+StringData Mixed::export_to_type() const noexcept
+{
+    REALM_ASSERT(m_type);
+    if (is_type(type_String)) {
+        return string_val;
+    }
+    if (is_type(type_Binary)) {
+        return StringData(binary_val.data(), binary_val.size());
+    }
+    return {};
+}
+
+template <>
+BinaryData Mixed::export_to_type() const noexcept
+{
+    REALM_ASSERT(m_type);
+    if (is_type(type_String)) {
+        return BinaryData(string_val.data(), string_val.size());
+    }
+    if (is_type(type_Binary)) {
+        return binary_val;
     }
     return {};
 }
@@ -625,7 +646,6 @@ size_t Mixed::hash() const
         }
         case type_Mixed:
         case type_Link:
-        case type_LinkList:
             REALM_ASSERT_RELEASE(false && "Hash not supported for this column type");
             break;
     }
@@ -638,7 +658,8 @@ StringData Mixed::get_index_data(std::array<char, 16>& buffer) const noexcept
     if (is_null()) {
         return {};
     }
-    switch (get_type()) {
+    auto type = get_type();
+    switch (type) {
         case type_Int: {
             int64_t i = get_int();
             const char* c = reinterpret_cast<const char*>(&i);
@@ -719,11 +740,69 @@ StringData Mixed::get_index_data(std::array<char, 16>& buffer) const noexcept
         }
         case type_Mixed:
         case type_Link:
-        case type_LinkList:
+            break;
+        default:
+            if (type == type_Dictionary) {
+                return "__Dictionary__";
+            }
+            if (type == type_List) {
+                return "__List__";
+            }
             break;
     }
     REALM_ASSERT_RELEASE(false && "Index not supported for this column type");
     return {};
+}
+
+std::string Mixed::to_string(size_t max_size) const noexcept
+{
+    std::ostringstream ostr;
+    if (is_type(type_String)) {
+        std::string ret = "\"";
+        if (string_val.size() <= max_size) {
+            ret += std::string(string_val);
+        }
+        else {
+            ret += std::string(StringData(string_val.data(), max_size)) + " ...";
+        }
+        ret += "\"";
+        return ret;
+    }
+    else if (is_type(type_Binary)) {
+        static constexpr int size_one_hex_out = 3;
+        static char hex_chars[] = "0123456789ABCDEF";
+        auto out_hex = [&ostr](char c) {
+            ostr << hex_chars[c >> 4];
+            ostr << hex_chars[c & 0xF];
+            ostr << ' ';
+        };
+
+        auto sz = binary_val.size();
+        bool capped = false;
+        size_t out_size = 0;
+
+        ostr << '"';
+        for (size_t n = 0; n < sz; n++) {
+            out_size += size_one_hex_out;
+            if (out_size > max_size) {
+                capped = true;
+                break;
+            }
+            out_hex(binary_val[n]);
+        }
+        if (capped) {
+            ostr << "...";
+        }
+        ostr << '"';
+    }
+    else if (is_type(type_Timestamp)) {
+        std::array<char, 32> buffer{};
+        return date_val.to_string(buffer);
+    }
+    else {
+        ostr << *this;
+    }
+    return ostr.str();
 }
 
 void Mixed::use_buffer(std::string& buf) noexcept
@@ -790,8 +869,18 @@ std::ostream& operator<<(std::ostream& out, const Mixed& m)
                 out << util::serializer::print_value(m.uuid_val);
                 break;
             case type_Mixed:
-            case type_LinkList:
                 REALM_ASSERT(false);
+            default:
+                if (m.is_type(type_List)) {
+                    out << "list";
+                }
+                else if (m.is_type(type_Set)) {
+                    out << "set";
+                }
+                else if (m.is_type(type_Dictionary)) {
+                    out << "dictionary";
+                }
+                break;
         }
     }
     return out;

@@ -3,7 +3,7 @@
 import PackageDescription
 import Foundation
 
-let versionStr = "13.26.0"
+let versionStr = "14.1.0"
 let versionPieces = versionStr.split(separator: "-")
 let versionCompontents = versionPieces[0].split(separator: ".")
 let versionExtra = versionPieces.count > 1 ? versionPieces[1] : ""
@@ -64,6 +64,7 @@ let notSyncServerSources: [String] = [
     "realm/cluster.cpp",
     "realm/cluster_tree.cpp",
     "realm/collection.cpp",
+    "realm/collection_parent.cpp",
     "realm/column_binary.cpp",
     "realm/db.cpp",
     "realm/decimal128.cpp",
@@ -130,6 +131,7 @@ let notSyncServerSources: [String] = [
     "realm/table_ref.cpp",
     "realm/table_view.cpp",
     "realm/tokenizer.cpp",
+    "realm/to_json.cpp",
     "realm/transaction.cpp",
     "realm/unicode.cpp",
     "realm/util",
@@ -258,7 +260,6 @@ let bidExcludes: [String] = [
     "bid32_tan.c",
     "bid32_tanh.c",
     "bid32_tgamma.c",
-    "bid32_to_bid128.c",
     "bid32_to_bid64.c",
     "bid32_to_int16.c",
     "bid32_to_int32.c",

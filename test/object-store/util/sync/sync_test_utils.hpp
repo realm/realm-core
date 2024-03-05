@@ -135,25 +135,16 @@ const std::shared_ptr<app::GenericNetworkTransport> instance_of = std::make_shar
 
 std::ostream& operator<<(std::ostream& os, util::Optional<app::AppError> error);
 
-template <typename Transport>
-TestSyncManager::Config get_config(Transport&& transport)
-{
-    TestSyncManager::Config config;
-    config.transport = transport;
-    return config;
-}
-
 void subscribe_to_all_and_bootstrap(Realm& realm);
 
 #if REALM_ENABLE_AUTH_TESTS
-
 void wait_for_sessions_to_close(const TestAppSession& test_app_session);
 
 #ifdef REALM_MONGODB_ENDPOINT
 std::string get_base_url();
 std::string get_admin_url();
-
 #endif
+#endif // REALM_ENABLE_AUTH_TESTS
 
 struct AutoVerifiedEmailCredentials : app::AppCredentials {
     AutoVerifiedEmailCredentials();
@@ -167,8 +158,6 @@ void wait_for_advance(Realm& realm);
 
 void async_open_realm(const Realm::Config& config,
                       util::UniqueFunction<void(ThreadSafeReference&& ref, std::exception_ptr e)> finish);
-
-#endif // REALM_ENABLE_AUTH_TESTS
 
 #endif // REALM_ENABLE_SYNC
 

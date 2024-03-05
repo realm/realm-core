@@ -55,19 +55,27 @@ static const std::vector<std::pair<std::string, TypeOfValue::Attribute>> attribu
     {"double", TypeOfValue::Double},
     {"decimal128", TypeOfValue::Decimal128},
     {"decimal", TypeOfValue::Decimal128},
-    {"object", TypeOfValue::ObjectLink},
+    {"objectlink", TypeOfValue::ObjectLink},
     {"link", TypeOfValue::ObjectLink},
     {"objectid", TypeOfValue::ObjectId},
     {"uuid", TypeOfValue::UUID},
     {"guid", TypeOfValue::UUID},
     {"numeric", TypeOfValue::Numeric},
-    {"bindata", TypeOfValue::Binary}};
+    {"bindata", TypeOfValue::Binary},
+    {"object", TypeOfValue::Object},
+    {"dictionary", TypeOfValue::Object},
+    {"array", TypeOfValue::Array},
+    {"list", TypeOfValue::Array},
+    {"collection", TypeOfValue::Collection},
+};
 
-TypeOfValue::Attribute get_single_from(std::string str)
+TypeOfValue::Attribute get_single_from(std::string_view str)
 {
-    std::transform(str.begin(), str.end(), str.begin(), toLowerAscii);
+    std::string lower_str;
+    lower_str.resize(str.size());
+    std::transform(str.begin(), str.end(), lower_str.begin(), toLowerAscii);
     auto it = std::find_if(attribute_map.begin(), attribute_map.end(), [&](const auto& attr_pair) {
-        return attr_pair.first == str;
+        return attr_pair.first == lower_str;
     });
     if (it == attribute_map.end()) {
         std::string all_keys =
@@ -112,7 +120,13 @@ TypeOfValue::Attribute attribute_from(DataType type)
             return TypeOfValue::Attribute::ObjectLink;
         case DataType::Type::UUID:
             return TypeOfValue::Attribute::UUID;
-        case DataType::Type::LinkList:
+        default:
+            if (type == type_Dictionary) {
+                return TypeOfValue::Attribute::Object;
+            }
+            if (type == type_List) {
+                return TypeOfValue::Attribute::Array;
+            }
             break;
     }
     throw query_parser::InvalidQueryArgError(
@@ -131,7 +145,7 @@ TypeOfValue::TypeOfValue(int64_t attributes)
     }
 }
 
-TypeOfValue::TypeOfValue(const std::string& attribute_tags)
+TypeOfValue::TypeOfValue(std::string_view attribute_tags)
 {
     m_attributes = get_single_from(attribute_tags);
 }

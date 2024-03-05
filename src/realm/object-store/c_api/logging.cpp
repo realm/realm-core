@@ -36,15 +36,18 @@ static_assert(realm_log_level_e(Logger::Level::off) == RLM_LOG_LEVEL_OFF);
 class CLogger : public realm::util::Logger {
 public:
     CLogger(UserdataPtr userdata, realm_log_func_t log_callback, Logger::Level level)
-        : Logger(level)
+        : Logger()
         , m_userdata(std::move(userdata))
         , m_log_callback(log_callback)
     {
+        set_level_threshold(level);
     }
 
 protected:
-    void do_log(Logger::Level level, const std::string& message) final
+    void do_log(const util::LogCategory&, Logger::Level level, const std::string& message) final
     {
+
+        // FIXME use category
         m_log_callback(m_userdata.get(), realm_log_level_e(level), message.c_str());
     }
 
@@ -67,6 +70,12 @@ RLM_API void realm_set_log_callback(realm_log_func_t callback, realm_log_level_e
 
 RLM_API void realm_set_log_level(realm_log_level_e level) noexcept
 {
-    util::Logger::set_default_level_threshold(realm::util::Logger::Level(level));
+    util::LogCategory::realm.set_default_level_threshold(realm::util::LogCategory::Level(level));
+}
+
+RLM_API void realm_set_log_level_category(const char* category_name, realm_log_level_e level) noexcept
+{
+    util::LogCategory::get_category(category_name)
+        .set_default_level_threshold(realm::util::LogCategory::Level(level));
 }
 } // namespace realm::c_api

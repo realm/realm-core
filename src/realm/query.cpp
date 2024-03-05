@@ -380,7 +380,6 @@ std::unique_ptr<ParentNode> make_condition_node(const Table& table, ColKey colum
             return MakeConditionNode<UUIDNode<Cond>>::make(column_key, value);
         }
         case type_Link:
-        case type_LinkList:
             if constexpr (std::is_same_v<T, Mixed> && realm::is_any_v<Cond, Equal, NotEqual>) {
                 ObjKey key;
                 if (value.is_type(type_Link)) {
@@ -941,7 +940,7 @@ Query& Query::like(ColKey column_key, StringData value, bool case_sensitive)
 
 Query& Query::fulltext(ColKey column_key, StringData value)
 {
-    auto index = m_table->get_search_index(column_key);
+    auto index = m_table->get_string_index(column_key);
     if (!(index && index->is_fulltext_index())) {
         throw IllegalOperation{"Column has no fulltext index"};
     }
@@ -953,7 +952,7 @@ Query& Query::fulltext(ColKey column_key, StringData value)
 
 Query& Query::fulltext(ColKey column_key, StringData value, const LinkMap& link_map)
 {
-    auto index = link_map.get_target_table()->get_search_index(column_key);
+    auto index = link_map.get_target_table()->get_string_index(column_key);
     if (!(index && index->is_fulltext_index())) {
         throw IllegalOperation{"Column has no fulltext index"};
     }
@@ -1222,8 +1221,9 @@ ObjKey Query::find() const
     bool do_log = false;
     std::chrono::steady_clock::time_point t1;
 
-    if (logger && logger->would_log(util::Logger::Level::debug)) {
-        logger->log(util::Logger::Level::debug, "Query find first: '%1'", get_description_safe());
+    if (logger && logger->would_log(util::LogCategory::query, util::Logger::Level::debug)) {
+        logger->log(util::LogCategory::query, util::Logger::Level::debug, "Query find first: '%1'",
+                    get_description_safe());
         t1 = std::chrono::steady_clock::now();
         do_log = true;
     }
@@ -1282,8 +1282,8 @@ ObjKey Query::find() const
 
     if (do_log) {
         auto t2 = std::chrono::steady_clock::now();
-        logger->log(util::Logger::Level::debug, "Query first found: %1, Duration: %2 us", ret,
-                    std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count());
+        logger->log(util::LogCategory::query, util::Logger::Level::debug, "Query first found: %1, Duration: %2 us",
+                    ret, std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count());
     }
 
     return ret;
@@ -1297,14 +1297,15 @@ void Query::do_find_all(QueryStateBase& st) const
 
     if (st.limit() == 0) {
         if (logger) {
-            logger->log(util::Logger::Level::debug, "Query find all: limit = 0 -> result: 0");
+            logger->log(util::LogCategory::query, util::Logger::Level::debug,
+                        "Query find all: limit = 0 -> result: 0");
         }
         return;
     }
 
-    if (logger && logger->would_log(util::Logger::Level::debug)) {
-        logger->log(util::Logger::Level::debug, "Query find all: '%1', limit = %2", get_description_safe(),
-                    int64_t(st.limit()));
+    if (logger && logger->would_log(util::LogCategory::query, util::Logger::Level::debug)) {
+        logger->log(util::LogCategory::query, util::Logger::Level::debug, "Query find all: '%1', limit = %2",
+                    get_description_safe(), int64_t(st.limit()));
         t1 = std::chrono::steady_clock::now();
         do_log = true;
     }
@@ -1392,8 +1393,8 @@ void Query::do_find_all(QueryStateBase& st) const
 
     if (do_log) {
         auto t2 = std::chrono::steady_clock::now();
-        logger->log(util::Logger::Level::debug, "Query found: %1, Duration: %2 us", st.match_count(),
-                    std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count());
+        logger->log(util::LogCategory::query, util::Logger::Level::debug, "Query found: %1, Duration: %2 us",
+                    st.match_count(), std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count());
     }
 }
 
@@ -1419,7 +1420,7 @@ size_t Query::do_count(size_t limit) const
 
     if (limit == 0) {
         if (logger) {
-            logger->log(util::Logger::Level::debug, "Query count: limit = 0 -> result: 0");
+            logger->log(util::LogCategory::query, util::Logger::Level::debug, "Query count: limit = 0 -> result: 0");
         }
         return 0;
     }
@@ -1434,15 +1435,15 @@ size_t Query::do_count(size_t limit) const
             cnt_all = std::min(m_table->size(), limit);
         }
         if (logger) {
-            logger->log(util::Logger::Level::debug, "Query count (no condition): limit = %1 -> result: %2",
-                        int64_t(limit), cnt_all);
+            logger->log(util::LogCategory::query, util::Logger::Level::debug,
+                        "Query count (no condition): limit = %1 -> result: %2", int64_t(limit), cnt_all);
         }
         return cnt_all;
     }
 
-    if (logger && logger->would_log(util::Logger::Level::debug)) {
-        logger->log(util::Logger::Level::debug, "Query count: '%1', limit = %2", get_description_safe(),
-                    int64_t(limit));
+    if (logger && logger->would_log(util::LogCategory::query, util::Logger::Level::debug)) {
+        logger->log(util::LogCategory::query, util::Logger::Level::debug, "Query count: '%1', limit = %2",
+                    get_description_safe(), int64_t(limit));
         t1 = std::chrono::steady_clock::now();
         do_log = true;
     }
@@ -1509,7 +1510,7 @@ size_t Query::do_count(size_t limit) const
 
     if (do_log) {
         auto t2 = std::chrono::steady_clock::now();
-        logger->log(util::Logger::Level::debug, "Query matches: %1, Duration: %2 us", cnt,
+        logger->log(util::LogCategory::query, util::Logger::Level::debug, "Query matches: %1, Duration: %2 us", cnt,
                     std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count());
     }
 
@@ -1735,12 +1736,15 @@ std::string Query::get_description(util::serializer::SerialisationState& state) 
     if (auto root = root_node()) {
         description = root->describe_expression(state);
     }
-    else {
+    if (m_view) {
+        description += util::format(" VIEW { %1 element(s) }", m_view->size());
+    }
+    if (description.length() == 0) {
         // An empty query returns all results and one way to indicate this
         // is to serialise TRUEPREDICATE which is functionally equivalent
         description = "TRUEPREDICATE";
     }
-    if (this->m_ordering) {
+    if (m_ordering) {
         description += " " + m_ordering->get_description(m_table);
     }
     return description;
@@ -1759,9 +1763,6 @@ util::bind_ptr<DescriptorOrdering> Query::get_ordering()
 
 std::string Query::get_description() const
 {
-    if (m_view) {
-        throw SerializationError("Serialization of a query constrained by a view is not currently supported");
-    }
     util::serializer::SerialisationState state(m_table->get_parent_group());
     return get_description(state);
 }
@@ -1772,7 +1773,10 @@ std::string Query::get_description_safe() const noexcept
         util::serializer::SerialisationState state(m_table->get_parent_group());
         return get_description(state);
     }
-    catch (...) {
+    catch (const Exception& e) {
+        if (auto logger = m_table->get_logger()) {
+            logger->log(util::Logger::Level::warn, "Query::get_description() failed: '%1'", e.what());
+        }
     }
     return "Unknown Query";
 }
