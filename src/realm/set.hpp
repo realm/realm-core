@@ -103,7 +103,7 @@ public:
         this->set_owner(owner, col_key);
     }
 
-    Set(ColKey col_key)
+    Set(ColKey col_key, size_t = 0)
         : Base(col_key)
     {
         if (!col_key.is_set()) {

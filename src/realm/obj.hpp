@@ -57,42 +57,30 @@ class DeepChangeChecker;
 }
 
 // 'Object' would have been a better name, but it clashes with a class in ObjectStore
-class Obj : public CollectionParent {
+class Obj {
 public:
     constexpr Obj() = default;
     Obj(TableRef table, MemRef mem, ObjKey key, size_t row_ndx);
 
-    // Overriding members of CollectionParent:
-    UpdateStatus update_if_needed() const final;
+    // CollectionParent implementation
+    UpdateStatus update_if_needed() const;
     // Get the path in a minimal format without including object accessors.
     // If you need to obtain additional information for each object in the path,
     // you should use get_fat_path() or traverse_path() instead (see below).
-    FullPath get_path() const final;
+    FullPath get_path() const;
     std::string get_id() const;
-    Path get_short_path() const noexcept final;
-    ColKey get_col_key() const noexcept final;
-    StablePath get_stable_path() const noexcept final;
-    void add_index(Path& path, const Index& ndx) const final;
-    size_t find_index(const Index&) const final
-    {
-        return realm::npos;
-    }
+    Path get_short_path() const noexcept;
+    ColKey get_col_key() const noexcept;
+    StablePath get_stable_path() const noexcept;
+    void add_index(Path& path, const CollectionParent::Index& ndx) const;
 
-    TableRef get_table() const noexcept final
+    TableRef get_table() const noexcept
     {
         return m_table.cast_away_const();
     }
-    const Obj& get_object() const noexcept final
-    {
-        return *this;
-    }
-    ref_type get_collection_ref(Index, CollectionType) const final;
-    bool check_collection_ref(Index, CollectionType) const noexcept final;
-    void set_collection_ref(Index, ref_type, CollectionType) final;
-    uint32_t parent_version() const noexcept final
-    {
-        return m_version_counter;
-    }
+    ref_type get_collection_ref(CollectionParent::Index, CollectionType) const;
+    bool check_collection_ref(CollectionParent::Index, CollectionType) const noexcept;
+    void set_collection_ref(CollectionParent::Index, ref_type, CollectionType);
     StableIndex build_index(ColKey) const;
     bool check_index(StableIndex) const;
 
@@ -322,22 +310,18 @@ private:
     friend class ArrayBacklink;
     friend class CascadeState;
     friend class Cluster;
+    friend class CollectionParent;
     friend class ColumnListBase;
-    friend class CollectionBase;
+    friend class LinkCount;
+    friend class LinkMap;
+    friend class Lst<ObjKey>;
+    friend class ObjCollectionParent;
+    friend class Table;
     friend class TableView;
     template <class>
     friend class CollectionBaseImpl;
     template <class>
-    friend class Lst;
-    friend class LnkLst;
-    friend class LinkCount;
-    friend class Dictionary;
-    friend class LinkMap;
-    template <class>
     friend class Set;
-    friend class Table;
-    friend class Transaction;
-    friend class CollectionParent;
 
     mutable TableRef m_table;
     ObjKey m_key;
@@ -417,6 +401,82 @@ private:
     bool compare_values(Mixed, Mixed, ColKey, Obj, StringData) const;
     bool compare_list_in_mixed(Lst<Mixed>&, Lst<Mixed>&, ColKey, Obj, StringData) const;
     bool compare_dict_in_mixed(Dictionary&, Dictionary&, ColKey, Obj, StringData) const;
+
+    // Used when inserting a new link. You will not remove existing links in this process
+    void set_backlink(ColKey col_key, ObjLink new_link) const;
+    // Used when replacing a link, return true if CascadeState contains objects to remove
+    bool replace_backlink(ColKey col_key, ObjLink old_link, ObjLink new_link, CascadeState& state) const;
+    // Used when removing a backlink, return true if CascadeState contains objects to remove
+    bool remove_backlink(ColKey col_key, ObjLink old_link, CascadeState& state) const;
+};
+static_assert(std::is_trivially_destructible_v<Obj>);
+
+class ObjCollectionParent : public Obj, public CollectionParent {
+public:
+    ObjCollectionParent() = default;
+    ObjCollectionParent(const Obj& obj) noexcept
+        : Obj(obj)
+    {
+    }
+    ObjCollectionParent& operator=(const Obj& obj) noexcept
+    {
+        static_cast<Obj&>(*this) = obj;
+        return *this;
+    }
+
+private:
+    FullPath get_path() const override
+    {
+        return Obj::get_path();
+    }
+    Path get_short_path() const override
+    {
+        return Obj::get_short_path();
+    }
+    ColKey get_col_key() const noexcept override
+    {
+        return Obj::get_col_key();
+    }
+    StablePath get_stable_path() const override
+    {
+        return Obj::get_stable_path();
+    }
+    void add_index(Path& path, const Index& ndx) const override
+    {
+        Obj::add_index(path, ndx);
+    }
+    size_t find_index(const Index&) const override
+    {
+        return realm::npos;
+    }
+    TableRef get_table() const noexcept override
+    {
+        return Obj::get_table();
+    }
+    UpdateStatus update_if_needed() const override
+    {
+        return Obj::update_if_needed();
+    }
+    const Obj& get_object() const noexcept override
+    {
+        return *this;
+    }
+    uint32_t parent_version() const noexcept override
+    {
+        return m_version_counter;
+    }
+    ref_type get_collection_ref(Index index, CollectionType type) const override
+    {
+        return Obj::get_collection_ref(index, type);
+    }
+    bool check_collection_ref(Index index, CollectionType type) const noexcept override
+    {
+        return Obj::check_collection_ref(index, type);
+    }
+    void set_collection_ref(Index index, ref_type ref, CollectionType type) override
+    {
+        Obj::set_collection_ref(index, ref, type);
+    }
 };
 
 std::ostream& operator<<(std::ostream&, const Obj& obj);

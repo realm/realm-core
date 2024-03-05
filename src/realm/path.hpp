@@ -271,54 +271,45 @@ private:
  */
 class StableIndex {
 public:
-    StableIndex()
-    {
-        value.raw = 0;
-    }
+    StableIndex() = default;
     StableIndex(ColKey col_key, int64_t salt)
     {
-        value.col_index = col_key.get_index().val;
-        value.is_collection = col_key.is_collection();
-        value.is_column = true;
-        value.salt = int32_t(salt);
+        m_col_index = col_key.get_index().val;
+        m_is_collection = col_key.is_collection();
+        m_is_column = true;
+        m_salt = int32_t(salt);
     }
     StableIndex(int64_t salt)
     {
-        value.raw = 0;
-        value.salt = int32_t(salt);
+        m_salt = int32_t(salt);
     }
     int64_t get_salt() const
     {
-        return value.salt;
+        return m_salt;
     }
     ColKey::Idx get_index() const noexcept
     {
-        return {unsigned(value.col_index)};
+        return {unsigned(m_col_index)};
     }
     bool is_collection() const noexcept
     {
-        return value.is_collection;
+        return m_is_collection;
     }
 
     bool operator==(const StableIndex& other) const noexcept
     {
-        return value.is_column ? value.col_index == other.value.col_index : value.salt == other.value.salt;
+        return m_is_column ? m_col_index == other.m_col_index : m_salt == other.m_salt;
     }
     bool operator<(const StableIndex& other) const noexcept
     {
-        return value.is_column ? value.col_index < other.value.col_index : value.salt < other.value.salt;
+        return m_is_column ? m_col_index < other.m_col_index : m_salt < other.m_salt;
     }
 
 private:
-    union {
-        struct {
-            bool is_column;
-            bool is_collection;
-            int16_t col_index;
-            int32_t salt;
-        };
-        int64_t raw;
-    } value;
+    bool m_is_column = false;
+    bool m_is_collection = false;
+    int16_t m_col_index = 0;
+    int32_t m_salt = 0;
 };
 
 static_assert(sizeof(StableIndex) == 8);
