@@ -59,6 +59,8 @@ protected:
     static std::vector<Mixed> convert_to_mixed_set(const CollectionBase& rhs);
     bool do_init_from_parent(ref_type ref, bool allow_create) const;
 
+    void resort_range(size_t from, size_t to);
+
     REALM_COLD REALM_NORETURN void throw_invalid_null()
     {
         throw InvalidArgument(ErrorCodes::PropertyNotNullable,
@@ -227,7 +229,6 @@ private:
     void do_insert(size_t ndx, T value);
     void do_erase(size_t ndx);
     void do_clear();
-    void do_resort(size_t from, size_t to);
 
     iterator find_impl(const T& value) const;
 };
@@ -412,91 +413,6 @@ void Set<StringData>::migration_resort();
 template <>
 void Set<BinaryData>::migration_resort();
 
-/// Compare set elements.
-///
-/// We cannot use `std::less<>` directly, because the ordering of set elements
-/// impacts the file format. For primitive types this is trivial (and can indeed
-/// be just `std::less<>`), but for example `Mixed` has specialized comparison
-/// that defines equality of numeric types.
-template <class T>
-struct SetElementLessThan {
-    bool operator()(const T& a, const T& b) const noexcept
-    {
-        // CAUTION: This routine is technically part of the file format, because
-        // it determines the storage order of Set elements.
-        return a < b;
-    }
-};
-
-template <class T>
-struct SetElementEquals {
-    bool operator()(const T& a, const T& b) const noexcept
-    {
-        // CAUTION: This routine is technically part of the file format, because
-        // it determines the storage order of Set elements.
-        return a == b;
-    }
-};
-
-template <>
-struct SetElementLessThan<Mixed> {
-    bool operator()(const Mixed& a, const Mixed& b) const noexcept
-    {
-        // CAUTION: This routine is technically part of the file format, because
-        // it determines the storage order of Set elements.
-
-        // These are the rules for comparison of Mixed types in a Set<Mixed>:
-        // - If both values are null they are equal
-        // - If only one value is null, that value is lesser than the other
-        // - All numeric types are compared as the corresponding real numbers
-        //   would compare. So integer 3 equals double 3.
-        // - String and binary types are compared using lexicographical comparison.
-        // - All other types are compared using the comparison operators defined
-        //   for the types.
-        // - If two values have different types, the rank of the types are compared.
-        //   the rank is as follows:
-        //       boolean
-        //       numeric
-        //       string
-        //       binary
-        //       Timestamp
-        //       ObjectId
-        //       UUID
-        //       TypedLink
-        //       Link
-        //
-        // The current Mixed::compare function implements these rules except when comparing
-        // string and binary. If that function is changed we should either implement the rules
-        // here or upgrade all Set<Mixed> columns.
-        if (a.is_type(type_String) && b.is_type(type_Binary)) {
-            return true;
-        }
-        if (a.is_type(type_Binary) && b.is_type(type_String)) {
-            return false;
-        }
-        return a.compare(b) < 0;
-    }
-};
-
-template <>
-struct SetElementEquals<Mixed> {
-    bool operator()(const Mixed& a, const Mixed& b) const noexcept
-    {
-        // CAUTION: This routine is technically part of the file format, because
-        // it determines the storage order of Set elements.
-
-        // See comments above
-
-        if (a.is_type(type_String) && b.is_type(type_Binary)) {
-            return false;
-        }
-        if (a.is_type(type_Binary) && b.is_type(type_String)) {
-            return false;
-        }
-        return a.compare(b) == 0;
-    }
-};
-
 inline SetBase::SetBase(const SetBase& other)
     : CollectionBase(other)
 {
@@ -656,7 +572,7 @@ template <class T>
 size_t Set<T>::find(T value) const
 {
     auto it = find_impl(value);
-    if (it != end() && SetElementEquals<T>{}(*it, value)) {
+    if (it != end() && *it == value) {
         return it.index();
     }
     return npos;
@@ -686,7 +602,7 @@ REALM_NOINLINE auto Set<T>::find_impl(const T& value) const -> iterator
 {
     auto b = this->begin();
     auto e = this->end(); // Note: This ends up calling `update_if_needed()`.
-    return std::lower_bound(b, e, value, SetElementLessThan<T>{});
+    return std::lower_bound(b, e, value);
 }
 
 template <class T>
@@ -698,7 +614,7 @@ std::pair<size_t, bool> Set<T>::insert(T value)
         throw_invalid_null();
 
     auto it = find_impl(value);
-    if (it != this->end() && SetElementEquals<T>{}(*it, value)) {
+    if (it != this->end() && *it == value) {
         return {it.index(), false};
     }
 
@@ -735,7 +651,7 @@ std::pair<size_t, bool> Set<T>::erase(T value)
 {
     auto it = find_impl(value); // Note: This ends up calling `update_if_needed()`.
 
-    if (it == end() || !SetElementEquals<T>{}(*it, value)) {
+    if (it == end() || *it != value) {
         return {npos, false};
     }
 
@@ -843,9 +759,6 @@ inline void Set<T>::sort(std::vector<size_t>& indices, bool ascending) const
     auto sz = size();
     set_sorted_indices(sz, indices, ascending);
 }
-
-template <>
-void Set<Mixed>::sort(std::vector<size_t>& indices, bool ascending) const;
 
 template <class T>
 void Set<T>::distinct(std::vector<size_t>& indices, util::Optional<bool> sort_order) const

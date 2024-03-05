@@ -18,6 +18,7 @@
 
 ### Internals
 * Fix several crashes when running the object store benchmarks ([#7403](https://github.com/realm/realm-core/pull/7403)).
+* Remove SetElementEquals and SetElementLessThan, as Mixed now uses the same comparisons as Set did.
 
 ----------------------------------------------
 
