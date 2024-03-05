@@ -534,11 +534,7 @@ void Lst<Mixed>::insert_collection(const PathElement& path_elem, CollectionType 
     check_level();
     m_tree->ensure_keys();
     insert(path_elem.get_ndx(), Mixed(0, dict_or_list));
-    int64_t key = generate_key(size());
-    while (m_tree->find_key(key) != realm::not_found) {
-        key++;
-    }
-    m_tree->set_key(path_elem.get_ndx(), key);
+    set_key(*m_tree, path_elem.get_ndx());
     bump_content_version();
 }
 
@@ -560,11 +556,7 @@ void Lst<Mixed>::set_collection(const PathElement& path_elem, CollectionType dic
         set(ndx, new_val);
         int64_t key = m_tree->get_key(ndx);
         if (key == 0) {
-            key = generate_key(size());
-            while (m_tree->find_key(key) != realm::not_found) {
-                key++;
-            }
-            m_tree->set_key(ndx, key);
+            set_key(*m_tree, path_elem.get_ndx());
         }
         bump_content_version();
     }

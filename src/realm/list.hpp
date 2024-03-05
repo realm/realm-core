@@ -629,7 +629,7 @@ public:
     }
     void add(const Obj& obj)
     {
-        if (get_target_table()->get_key() != obj.get_table_key()) {
+        if (get_target_table() != obj.get_table()) {
             throw InvalidArgument("LnkLst::add: Wrong object type");
         }
         add(obj.get_key());

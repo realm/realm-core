@@ -177,7 +177,7 @@ void Replication::remove_object(const Table* t, ObjKey key)
     m_encoder.remove_object(key); // Throws
 }
 
-inline void Replication::select_obj(ObjKey key)
+void Replication::select_obj(ObjKey key)
 {
     if (key == m_selected_obj) {
         return;

@@ -160,7 +160,6 @@ TEST_CASE("object") {
     _impl::RealmCoordinator::assert_no_open_realms();
 
     InMemoryTestFile config;
-    config.cache = false;
     config.automatic_change_notifications = false;
     config.schema_mode = SchemaMode::AdditiveExplicit;
     config.schema = Schema{

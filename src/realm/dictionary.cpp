@@ -441,11 +441,7 @@ void Dictionary::insert_collection(const PathElement& path_elem, CollectionType 
     if (!old_val || *old_val != new_val) {
         m_values->ensure_keys();
         auto [it, inserted] = insert(path_elem.get_key(), new_val);
-        int64_t key = generate_key(size());
-        while (m_values->find_key(key) != realm::not_found) {
-            key++;
-        }
-        m_values->set_key(it.index(), key);
+        set_key(*m_values, it.index());
     }
 }
 
@@ -682,7 +678,6 @@ void Dictionary::ensure_created()
 {
     constexpr bool allow_create = true;
     if (do_update_if_needed(allow_create) == UpdateStatus::Detached) {
-        // FIXME: untested
         throw StaleAccessor("Dictionary no longer exists");
     }
 }

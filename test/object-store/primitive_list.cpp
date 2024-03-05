@@ -983,7 +983,6 @@ TEST_CASE("list of mixed links", "[primitives]") {
 
 TEST_CASE("list of strings - with index", "[primitives]") {
     InMemoryTestFile config;
-    config.cache = false;
     config.automatic_change_notifications = false;
     config.schema = Schema{
         {"object",

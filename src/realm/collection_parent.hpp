@@ -20,15 +20,16 @@
 #define REALM_COLLECTION_PARENT_HPP
 
 #include <realm/alloc.hpp>
-#include <realm/table_ref.hpp>
-#include <realm/path.hpp>
 #include <realm/mixed.hpp>
+#include <realm/path.hpp>
+#include <realm/table_ref.hpp>
 
 namespace realm {
 
 class Obj;
 class Replication;
 class CascadeState;
+class BPlusTreeMixed;
 
 class Collection;
 class CollectionBase;
@@ -95,6 +96,13 @@ public:
     /// Get table of owning object
     virtual TableRef get_table() const noexcept = 0;
 
+    static LstBasePtr get_listbase_ptr(ColKey col_key, size_t level);
+    static SetBasePtr get_setbase_ptr(ColKey col_key, size_t level);
+    static CollectionBasePtr get_collection_ptr(ColKey col_key, size_t level);
+
+    static int64_t generate_key(size_t sz);
+    static void set_key(BPlusTreeMixed& tree, size_t index);
+
 protected:
     friend class Collection;
     template <class>
@@ -129,20 +137,8 @@ protected:
     /// Set the top ref in parent
     virtual void set_collection_ref(Index, ref_type ref, CollectionType) = 0;
 
+    /// Get the counter which is incremented whenever the root Obj is updated.
     virtual uint32_t parent_version() const noexcept = 0;
-
-    // Used when inserting a new link. You will not remove existing links in this process
-    void set_backlink(ColKey col_key, ObjLink new_link) const;
-    // Used when replacing a link, return true if CascadeState contains objects to remove
-    bool replace_backlink(ColKey col_key, ObjLink old_link, ObjLink new_link, CascadeState& state) const;
-    // Used when removing a backlink, return true if CascadeState contains objects to remove
-    bool remove_backlink(ColKey col_key, ObjLink old_link, CascadeState& state) const;
-
-    LstBasePtr get_listbase_ptr(ColKey col_key) const;
-    SetBasePtr get_setbase_ptr(ColKey col_key) const;
-    CollectionBasePtr get_collection_ptr(ColKey col_key) const;
-
-    static int64_t generate_key(size_t sz);
 };
 
 } // namespace realm

@@ -571,7 +571,7 @@ public:
     using Interface::get_target_table;
 
 protected:
-    Obj m_obj_mem;
+    ObjCollectionParent m_obj_mem;
     std::shared_ptr<CollectionParent> m_col_parent;
     CollectionParent::Index m_index;
     ColKey m_col_key;
@@ -724,19 +724,19 @@ protected:
     void set_backlink(ColKey col_key, ObjLink new_link) const
     {
         check_parent();
-        m_parent->set_backlink(col_key, new_link);
+        m_parent->get_object().set_backlink(col_key, new_link);
     }
     // Used when replacing a link, return true if CascadeState contains objects to remove
     bool replace_backlink(ColKey col_key, ObjLink old_link, ObjLink new_link, CascadeState& state) const
     {
         check_parent();
-        return m_parent->replace_backlink(col_key, old_link, new_link, state);
+        return m_parent->get_object().replace_backlink(col_key, old_link, new_link, state);
     }
     // Used when removing a backlink, return true if CascadeState contains objects to remove
     bool remove_backlink(ColKey col_key, ObjLink old_link, CascadeState& state) const
     {
         check_parent();
-        return m_parent->remove_backlink(col_key, old_link, state);
+        return m_parent->get_object().remove_backlink(col_key, old_link, state);
     }
 
     /// Reset the accessor's tracking of the content version. Derived classes
