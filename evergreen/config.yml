@@ -298,6 +298,7 @@ functions:
           fi
           export TSAN_OPTIONS="suppressions=$(pwd)/test/tsan.suppress history_size=4"
           export UBSAN_OPTIONS="print_stacktrace=1"
+          export LSAN_OPTIONS="suppressions=$(pwd)/test/lsan.suppress"
 
           cd build
           if ! $CTEST -C ${cmake_build_type|Debug} $TEST_FLAGS; then
@@ -1497,14 +1498,17 @@ buildvariants:
   tasks:
   - name: compile_test
 
-- name: macos-1100-arm64-asan
-  display_name: "MacOS 11 arm64 (ASAN)"
-  run_on: macos-1100-arm64
+- name: macos-1300-arm64-asan
+  display_name: "MacOS 13 arm64 (ASAN)"
+  run_on: macos-1300-arm64
   expansions:
+    clang_url: "https://github.com/llvm/llvm-project/releases/download/llvmorg-17.0.6/clang+llvm-17.0.6-arm64-apple-darwin22.0.tar.xz"
+    c_compiler: "./clang_binaries/bin/clang"
+    cxx_compiler: "./clang_binaries/bin/clang++"
+    llvm_symbolizer: "./clang_binaries/bin/llvm-symbolizer"
     cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.26.3-macos-universal.tar.gz"
     cmake_bindir: "./cmake_binaries/CMake.app/Contents/bin"
-    cmake_toolchain_file: "./tools/cmake/xcode.toolchain.cmake"
-    cmake_generator: Xcode
+    ninja_url: "https://github.com/ninja-build/ninja/releases/download/v1.11.1/ninja-mac.zip"
     max_jobs: $(sysctl -n hw.logicalcpu)
     xcode_developer_dir: /Applications/Xcode13.1.app/Contents/Developer
     extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=arm64
@@ -1514,19 +1518,22 @@ buildvariants:
   tasks:
   - name: compile_test
 
-- name: macos-1100-arm64-tsan
-  display_name: "MacOS 11 arm64 (TSAN)"
-  run_on: macos-1100-arm64
+- name: macos-1300-arm64-ubsan
+  display_name: "MacOS 13 arm64 (UBSAN)"
+  run_on: macos-1300-arm64
   expansions:
+    clang_url: "https://github.com/llvm/llvm-project/releases/download/llvmorg-17.0.6/clang+llvm-17.0.6-arm64-apple-darwin22.0.tar.xz"
+    c_compiler: "./clang_binaries/bin/clang"
+    cxx_compiler: "./clang_binaries/bin/clang++"
+    llvm_symbolizer: "./clang_binaries/bin/llvm-symbolizer"
     cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.26.3-macos-universal.tar.gz"
     cmake_bindir: "./cmake_binaries/CMake.app/Contents/bin"
-    cmake_toolchain_file: "./tools/cmake/xcode.toolchain.cmake"
-    cmake_generator: Xcode
+    ninja_url: "https://github.com/ninja-build/ninja/releases/download/v1.11.1/ninja-mac.zip"
     max_jobs: $(sysctl -n hw.logicalcpu)
     xcode_developer_dir: /Applications/Xcode13.1.app/Contents/Developer
     extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=arm64
     cmake_build_type: RelWithDebInfo
-    enable_tsan: On
+    enable_ubsan: On
     run_with_encryption: On
   tasks:
   - name: compile_test
@@ -1579,20 +1586,3 @@ buildvariants:
     run_with_encryption: On
   tasks:
   - name: compile_test
-
-- name: windows-x86-release
-  display_name: "Windows X86 (Release)"
-  run_on: windows-vsCurrent-large
-  expansions:
-    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.26.3-windows-x86_64.zip"
-    cmake_bindir: "./cmake-3.26.3-windows-x86_64/bin"
-    cmake_generator: "Visual Studio 16 2019"
-    cmake_generator_platform: "Win32"
-    cmake_build_type: "Release"
-    max_jobs: $(($(grep -c proc /proc/cpuinfo) / 2))
-    fetch_missing_dependencies: On
-    python3: "/cygdrive/c/python/python37/python.exe"
-    disable_tests_against_baas: On
-  tasks:
-  - name: compile_local_tests
-
