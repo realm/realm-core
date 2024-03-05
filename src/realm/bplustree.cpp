@@ -802,14 +802,14 @@ void BPlusTreeBase::bptree_erase(size_t n, BPlusTreeNode::EraseFunc func)
     size_t root_size = m_root->bptree_erase(n, func);
     while (!m_root->is_leaf() && root_size == 1) {
         BPlusTreeInner* node = static_cast<BPlusTreeInner*>(m_root.get());
-
+        ref_type orig_root_ref = node->get_ref();
         ref_type new_root_ref = node->clear_first_bp_node_ref();
-        node->destroy_deep();
-
         auto new_root = create_root_from_ref(new_root_ref);
 
         replace_root(std::move(new_root));
         root_size = m_root->get_node_size();
+        // destroy after replace_root for valid context flag lookup
+        Array::destroy_deep(orig_root_ref, m_alloc);
     }
 }
 

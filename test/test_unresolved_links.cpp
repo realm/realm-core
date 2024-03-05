@@ -270,6 +270,17 @@ TEST(Unresolved_LinkList)
 
     LnkLst stock_copy{stock1};
     CHECK_EQUAL(stock_copy.get(3), mercedes.get_key());
+    CHECK_EQUAL(stock_copy.size(), 4);
+
+    // Also check that the context flag is copied over when replacing the root during erase
+    stock_copy.remove(0);
+    CHECK_EQUAL(stock_copy.size(), 3);
+    stock_copy.remove(0);
+    CHECK_EQUAL(stock_copy.size(), 2);
+    stock_copy.remove(0);
+    CHECK_EQUAL(stock_copy.size(), 1);
+    stock_copy.remove(0);
+    CHECK_EQUAL(stock_copy.size(), 0);
 }
 
 TEST(Unresolved_LinkSet)
