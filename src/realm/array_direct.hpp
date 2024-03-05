@@ -795,13 +795,28 @@ constexpr uint32_t inverse_width[65] = {
     65536 * 64 / 61, 65536 * 64 / 62, 65536 * 64 / 63, 65536 * 64 / 64,
 };
 
+inline int countr_zero(unsigned long long vector)
+{
+    unsigned long where;
+#if defined(_WIN64)
+    if (_BitScanForward64(&where, vector))
+        return static_cast<int>(where);
+    return 0;
+#elif defined(_WIN32)
+    if (_BitScanForward(&where, static_cast<unsigned long>(vector)))
+        return static_cast<int>(where);
+    else if (_BitScanForward(&where, static_cast<unsigned long>(vector >> 32)))
+        return static_cast<int>(where + 32);
+    return 0;
+#else
+    where = __builtin_ctzll(vector);
+    return static_cast<int>(where);
+#endif
+}
+
 inline int first_field_marked(int width, uint64_t vector)
 {
-#if REALM_WINDOWS
-    int lz = (int)_tzcnt_u64(vector); // TODO: not clear if this is ok on all platforms
-#else
-    int lz = __builtin_ctzll(vector);
-#endif
+    const auto lz = countr_zero(vector);
     int field = (lz * inverse_width[width]) >> 22;
     REALM_ASSERT_DEBUG(field == (lz / width));
     return field;
