@@ -18,6 +18,7 @@
 
 #include <iostream>
 #include <iomanip>
+#include <regex>
 #include <set>
 #include <sstream>
 #include <set>
@@ -43,7 +44,17 @@ using namespace realm;
 using namespace realm::util;
 using namespace realm::test_util;
 
-static std::set<std::string> g_bench_filter;
+static std::vector<std::regex> g_bench_filter;
+
+static bool should_filter_benchmark(const std::string& name)
+{
+    if (g_bench_filter.empty())
+        return false;
+
+    return std::all_of(g_bench_filter.begin(), g_bench_filter.end(), [&](const std::regex& regex) {
+        return !std::regex_match(name, regex);
+    });
+}
 
 namespace {
 // not smaller than 100.000 or the UID based benchmarks has to be modified!
@@ -2441,42 +2452,6 @@ void run_benchmark_once(Benchmark& benchmark, DBRef sg, Timer& timer)
     timer.unpause();
 }
 
-// support for exact matches, and simple pattern matching with a single '*'
-bool matches_filters(std::string benchmark_name)
-{
-    for (auto& filter : g_bench_filter) {
-        size_t filter_size = filter.size();
-        if (filter_size == 0) {
-            continue;
-        }
-        size_t pos_of_asterisk = filter.find('*');
-        // exact match requested
-        if (pos_of_asterisk == std::string::npos) {
-            if (benchmark_name == filter) {
-                return true;
-            }
-            continue;
-        }
-        if (filter_size == 1) {
-            return true; // match '*'
-        }
-        if (benchmark_name.size() < filter_size - 1) {
-            continue;
-        }
-        size_t size_of_suffix = filter_size - pos_of_asterisk - 1;
-        size_t size_of_prefix = pos_of_asterisk;
-        if (benchmark_name.substr(0, pos_of_asterisk) == filter.substr(0, size_of_prefix)) {
-            if (size_of_suffix == 0) {
-                return true;
-            }
-            if (benchmark_name.substr(benchmark_name.size() - size_of_suffix) == filter.substr(pos_of_asterisk + 1)) {
-                return true;
-            }
-        }
-    }
-    return false;
-}
-
 /// This little piece of likely over-engineering runs the benchmark a number of times,
 /// with each durability setting, and reports the results for each run.
 template <typename B>
@@ -2502,7 +2477,7 @@ void run_benchmark(BenchmarkResults& results, bool force_full = false)
         const char* key = it->second;
 
         B benchmark;
-        if (!g_bench_filter.empty() && !matches_filters(benchmark.name()))
+        if (should_filter_benchmark(benchmark.name()))
             return;
 
         benchmark.m_durability = level;
@@ -2721,8 +2696,8 @@ int main(int argc, const char** argv)
                       << "  -h, --help      display this help" << std::endl
                       << "  PATH            alternate path to store the results files;" << std::endl
                       << "                  this path should end with a slash." << std::endl
-                      << "  NAMES           benchmark names to run (',' separated)" << std::endl
-                      << "                  A single '*' is supported as a wildcard in a name" << std::endl
+                      << "  NAMES           benchmark names to run (':' separated)" << std::endl
+                      << "                  Full regex is supported as a filter for a name" << std::endl
                       << std::endl;
             return 1;
         }
@@ -2734,9 +2709,9 @@ int main(int argc, const char** argv)
     if (argc > 2) {
         std::string filter = argv[2];
         for (size_t i = 0, j = 0, len = filter.size(); i <= len; ++i) {
-            if (i == len || filter[i] == ',') {
+            if (i == len || filter[i] == ':') {
                 if (j < i)
-                    g_bench_filter.insert(filter.substr(j, i - j));
+                    g_bench_filter.emplace_back(filter.substr(j, i - j));
                 j = i + 1;
             }
         }
