@@ -59,17 +59,11 @@ class DeepChangeChecker;
 // 'Object' would have been a better name, but it clashes with a class in ObjectStore
 class Obj : public CollectionParent {
 public:
-    constexpr Obj()
-        : m_table(nullptr)
-        , m_row_ndx(size_t(-1))
-        , m_storage_version(-1)
-        , m_valid(false)
-    {
-    }
+    constexpr Obj() = default;
     Obj(TableRef table, MemRef mem, ObjKey key, size_t row_ndx);
 
     // Overriding members of CollectionParent:
-    UpdateStatus update_if_needed_with_status() const final;
+    UpdateStatus update_if_needed() const final;
     // Get the path in a minimal format without including object accessors.
     // If you need to obtain additional information for each object in the path,
     // you should use get_fat_path() or traverse_path() instead (see below).
@@ -84,7 +78,6 @@ public:
         return realm::npos;
     }
 
-    bool update_if_needed() const final;
     TableRef get_table() const noexcept final
     {
         return m_table.cast_away_const();
@@ -96,6 +89,10 @@ public:
     ref_type get_collection_ref(Index, CollectionType) const final;
     bool check_collection_ref(Index, CollectionType) const noexcept final;
     void set_collection_ref(Index, ref_type, CollectionType) final;
+    uint32_t parent_version() const noexcept final
+    {
+        return m_version_counter;
+    }
     StableIndex build_index(ColKey) const;
     bool check_index(StableIndex) const;
 
@@ -345,9 +342,10 @@ private:
     mutable TableRef m_table;
     ObjKey m_key;
     mutable MemRef m_mem;
-    mutable size_t m_row_ndx;
-    mutable uint64_t m_storage_version;
-    mutable bool m_valid;
+    mutable size_t m_row_ndx = -1;
+    mutable uint64_t m_storage_version = -1;
+    mutable uint32_t m_version_counter = 0;
+    mutable bool m_valid = false;
 
     Allocator& _get_alloc() const noexcept;
 
@@ -356,6 +354,7 @@ private:
     /// reflect new changes to the underlying state.
     bool update() const;
     bool _update_if_needed() const; // no check, use only when already checked
+    void checked_update_if_needed() const;
 
     template <class T>
     bool do_is_null(ColKey::Idx col_ndx) const;
@@ -587,15 +586,6 @@ inline Obj& Obj::set_all(Head v, Tail... tail)
     }
 
     return _set_all(start_index, v, tail...);
-}
-
-inline bool Obj::update_if_needed() const
-{
-    auto current_version = get_alloc().get_storage_version();
-    if (current_version != m_storage_version) {
-        return update();
-    }
-    return false;
 }
 
 inline int_fast64_t Obj::bump_content_version()

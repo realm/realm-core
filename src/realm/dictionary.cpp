@@ -651,10 +651,9 @@ size_t Dictionary::find_index(const Index& index) const
     return m_values->find_key(index.get_salt());
 }
 
-UpdateStatus Dictionary::update_if_needed_with_status() const
+UpdateStatus Dictionary::do_update_if_needed(bool allow_create) const
 {
-    auto status = Base::get_update_status();
-    switch (status) {
+    switch (get_update_status()) {
         case UpdateStatus::Detached: {
             m_dictionary_top.reset();
             return UpdateStatus::Detached;
@@ -667,27 +666,24 @@ UpdateStatus Dictionary::update_if_needed_with_status() const
             // perform lazy initialization by treating it as an update.
             [[fallthrough]];
         }
-        case UpdateStatus::Updated: {
-            // Try to initialize. If the dictionary is not initialized
-            // the function will return false;
-            bool attached = init_from_parent(false);
-            Base::update_content_version();
-            CollectionParent::m_parent_version++;
-            return attached ? UpdateStatus::Updated : UpdateStatus::Detached;
-        }
+        case UpdateStatus::Updated:
+            return init_from_parent(allow_create);
     }
     REALM_UNREACHABLE();
 }
 
+UpdateStatus Dictionary::update_if_needed() const
+{
+    constexpr bool allow_create = false;
+    return do_update_if_needed(allow_create);
+}
+
 void Dictionary::ensure_created()
 {
-    if (Base::should_update() || !(m_dictionary_top && m_dictionary_top->is_attached())) {
-        // When allow_create is true, init_from_parent will always succeed
-        // In case of errors, an exception is thrown.
-        constexpr bool allow_create = true;
-        init_from_parent(allow_create); // Throws
-        CollectionParent::m_parent_version++;
-        Base::update_content_version();
+    constexpr bool allow_create = true;
+    if (do_update_if_needed(allow_create) == UpdateStatus::Detached) {
+        // FIXME: untested
+        throw StaleAccessor("Dictionary no longer exists");
     }
 }
 
@@ -836,8 +832,9 @@ void Dictionary::clear()
     }
 }
 
-bool Dictionary::init_from_parent(bool allow_create) const
+UpdateStatus Dictionary::init_from_parent(bool allow_create) const
 {
+    Base::update_content_version();
     try {
         auto ref = Base::get_collection_ref();
         if ((ref || allow_create) && !m_dictionary_top) {
@@ -870,7 +867,7 @@ bool Dictionary::init_from_parent(bool allow_create) const
             // dictionary detached
             if (!allow_create) {
                 m_dictionary_top.reset();
-                return false;
+                return UpdateStatus::Detached;
             }
 
             // Create dictionary
@@ -880,7 +877,7 @@ bool Dictionary::init_from_parent(bool allow_create) const
             m_dictionary_top->update_parent();
         }
 
-        return true;
+        return UpdateStatus::Updated;
     }
     catch (...) {
         m_dictionary_top.reset();
@@ -1178,7 +1175,6 @@ ref_type Dictionary::get_collection_ref(Index index, CollectionType type) const
         throw realm::IllegalOperation(util::format("Not a %1", type));
     }
     throw StaleAccessor("This collection is no more");
-    return 0;
 }
 
 bool Dictionary::check_collection_ref(Index index, CollectionType type) const noexcept
@@ -1197,15 +1193,6 @@ void Dictionary::set_collection_ref(Index index, ref_type ref, CollectionType ty
         throw StaleAccessor("Collection has been deleted");
     }
     m_values->set(ndx, Mixed(ref, type));
-}
-
-bool Dictionary::update_if_needed() const
-{
-    auto status = update_if_needed_with_status();
-    if (status == UpdateStatus::Detached) {
-        throw StaleAccessor("CollectionList no longer exists");
-    }
-    return status == UpdateStatus::Updated;
 }
 
 /************************* DictionaryLinkValues *************************/
