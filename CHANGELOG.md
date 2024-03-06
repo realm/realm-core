@@ -3,6 +3,7 @@
 ### Enhancements
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
 * Added ability to get current log level via C API (PR [#7419](https://github.com/realm/realm-core/pull/7419))
+* Improve performance of object notifiers with complex schemas and very simple changes to process by as much as 20% ([PR #7424](https://github.com/realm/realm-core/pull/7424)).
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
