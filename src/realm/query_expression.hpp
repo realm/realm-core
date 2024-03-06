@@ -735,11 +735,6 @@ public:
     virtual DataType get_type() const = 0;
 
     virtual void evaluate(size_t index, ValueBase& destination) = 0;
-    // This function supports SubColumnAggregate
-    virtual void evaluate(ObjKey, ValueBase&)
-    {
-        REALM_ASSERT(false); // Unimplemented
-    }
 
     virtual Mixed get_mixed() const
     {
@@ -1923,7 +1918,7 @@ public:
         }
     }
 
-    void evaluate(ObjKey key, ValueBase& destination) override
+    void evaluate(ObjKey key, ValueBase& destination)
     {
         Value<T>& d = static_cast<Value<T>&>(destination);
         d.set(0, m_link_map.get_target_table()->get_object(key).template get<T>(m_column_key));
@@ -2015,6 +2010,7 @@ class Columns<Decimal128> : public SimpleQuerySupport<Decimal128> {
 template <>
 class Columns<Mixed> : public SimpleQuerySupport<Mixed> {
 public:
+    using SimpleQuerySupport::evaluate; // don't hide the ObjKey overload
     using SimpleQuerySupport::SimpleQuerySupport;
     void evaluate(size_t index, ValueBase& destination) override
     {
@@ -3891,7 +3887,7 @@ public:
         }
     }
 
-    void evaluate(ObjKey key, ValueBase& destination) override
+    void evaluate(ObjKey key, ValueBase& destination)
     {
         destination.init(false, 1);
         auto table = m_link_map.get_target_table();
@@ -3993,7 +3989,7 @@ public:
 
     std::unique_ptr<Subexpr> max_of() override
     {
-        if constexpr (realm::is_any_v<T, Int, Float, Double, Decimal128, Timestamp>) {
+        if constexpr (realm::is_any_v<T, Int, Float, Double, Decimal128, Timestamp, Mixed>) {
             return max().clone();
         }
         else {
@@ -4002,7 +3998,7 @@ public:
     }
     std::unique_ptr<Subexpr> min_of() override
     {
-        if constexpr (realm::is_any_v<T, Int, Float, Double, Decimal128, Timestamp>) {
+        if constexpr (realm::is_any_v<T, Int, Float, Double, Decimal128, Timestamp, Mixed>) {
             return min().clone();
         }
         else {
@@ -4011,7 +4007,7 @@ public:
     }
     std::unique_ptr<Subexpr> sum_of() override
     {
-        if constexpr (realm::is_any_v<T, Int, Float, Double, Decimal128>) {
+        if constexpr (realm::is_any_v<T, Int, Float, Double, Decimal128, Mixed>) {
             return sum().clone();
         }
         else {
@@ -4020,7 +4016,7 @@ public:
     }
     std::unique_ptr<Subexpr> avg_of() override
     {
-        if constexpr (realm::is_any_v<T, Int, Float, Double, Decimal128>) {
+        if constexpr (realm::is_any_v<T, Int, Float, Double, Decimal128, Mixed>) {
             return average().clone();
         }
         else {

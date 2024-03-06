@@ -151,10 +151,17 @@ functions:
               set_cmake_var generator_vars CMAKE_MAKE_PROGRAM PATH "${ninja|ninja}"
           fi
 
-          if [ -n "${curl_base|}" ]; then
-              set_cmake_var curl_vars CURL_LIBRARY PATH "$(./evergreen/abspath.sh ${curl_base}/lib/curl.lib)"
-              set_cmake_var curl_vars CURL_INCLUDE_DIR PATH "$(./evergreen/abspath.sh ${curl_base}/include)"
+          if [ -n "${cmake_generator_platform|}" ]; then
+            set_cmake_var realm_vars CMAKE_GENERATOR_PLATFORM STRING "${cmake_generator_platform}"
           fi
+
+          if [ -n "${curl_base|}" ]; then
+              set_cmake_var curl_vars CURL_LIBRARY PATH "$(./evergreen/abspath.sh ${curl_base}/lib/libcurl.dll.a)"
+              set_cmake_var curl_vars CURL_INCLUDE_DIR PATH "$(./evergreen/abspath.sh ${curl_base}/include)"
+              set_cmake_var baas_vars REALM_CURL_CACERTS PATH "$(./evergreen/abspath.sh "${curl_base}/bin/cacert.pem")"
+          fi
+
+          set_cmake_var realm_vars REALM_NO_TESTS BOOL ${no_tests|Off}
 
           echo "Running cmake with these vars:"
           cat cmake_vars/*.txt | tee cmake_vars.txt
@@ -221,6 +228,10 @@ functions:
 
           if [ -n "${xcode_developer_dir}" ]; then
               export DEVELOPER_DIR="${xcode_developer_dir}"
+          fi
+
+          if [[ -n "${curl_base}" ]]; then
+              export PATH="${curl_base}/bin":$PATH
           fi
 
           # NOTE: These two values will be ANDed together for matching tests
@@ -970,7 +981,7 @@ tasks:
 
 # These are local object store tests; baas is not started, however some use the sync server
 - name: object-store-tests
-  tags: [ "object_store_test_suite", "for_pull_requests" ]
+  tags: [ "for_pull_requests", "test_suite" ]
   exec_timeout_secs: 3600
   commands:
   - func: "compile"
@@ -986,7 +997,7 @@ tasks:
 
 # These are baas object store tests that run against baas running on a remote host
 - name: baas-integration-tests
-  tags: [ "object_store_test_suite", "for_pull_requests" ]
+  tags: [ "test_suite", "for_pull_requests", "requires_baas" ]
   exec_timeout_secs: 3600
   commands:
   - func: "compile"
@@ -1205,8 +1216,22 @@ task_groups:
   tasks:
   - compile
   - .test_suite
-  - .object_store_test_suite
   - package
+
+# Runs core/sync/local object store tests
+- name: compile_local_tests
+  max_hosts: 1
+  setup_group_can_fail_task: true
+  setup_group:
+  - func: "fetch source"
+  - func: "fetch binaries"
+  teardown_task:
+  - func: "upload test results"
+  timeout:
+  - func: "run hang analyzer"
+  tasks:
+  - compile
+  - ".test_suite !.requires_baas"
 
 # Runs object-store-tests against baas running on remote host
 - name: compile_test
@@ -1223,23 +1248,6 @@ task_groups:
   tasks:
   - compile
   - .test_suite
-  - .object_store_test_suite
-
-# compile and run only object store tests: local and remote
-- name: compile_test_object_store
-  max_hosts: 1
-  setup_group_can_fail_task: true
-  setup_group:
-  - func: "fetch source"
-  - func: "fetch binaries"
-  teardown_task:
-  - func: "upload test results"
-  - func: "upload baas artifacts"
-  timeout:
-  - func: "run hang analyzer"
-  tasks:
-  - compile
-  - .object_store_test_suite
 
 # Runs object-store-tests against baas running on remote host and runs
 # the network simulation tests as a separate task for nightly builds
@@ -1272,7 +1280,6 @@ task_groups:
   tasks:
   - compile
   - .test_suite
-  - .object_store_test_suite
   - process_coverage_data
 
 - name: benchmarks
@@ -1753,7 +1760,7 @@ buildvariants:
   tasks:
   # FIXME: tsan is not stable on arm64, fails often with internal errors
   # - name: compile_test
-  - name: compile_test_object_store
+  - name: compile_test
 
 - name: macos-coverage
   display_name: "MacOS 11 arm64 (Code Coverage)"
@@ -1853,3 +1860,20 @@ buildvariants:
     python3: "/cygdrive/c/python/python37/python.exe"
   tasks:
   - name: compile_test
+
+- name: windows-x86-release
+  display_name: "Windows X86 (Release)"
+  run_on: windows-vsCurrent-large
+  expansions:
+    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.26.3-windows-x86_64.zip"
+    cmake_bindir: "./cmake-3.26.3-windows-x86_64/bin"
+    cmake_generator: "Visual Studio 16 2019"
+    cmake_generator_platform: "Win32"
+    cmake_build_type: "Release"
+    max_jobs: $(($(grep -c proc /proc/cpuinfo) / 2))
+    fetch_missing_dependencies: On
+    python3: "/cygdrive/c/python/python37/python.exe"
+    disable_tests_against_baas: On
+  tasks:
+  - name: compile_local_tests
+
