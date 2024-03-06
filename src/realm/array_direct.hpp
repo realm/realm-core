@@ -301,7 +301,7 @@ public:
     {
         auto in_word_position = field_position & 0x3F;
         auto first_word = first_word_ptr[0];
-        size_t mask = -1;
+        uint64_t mask = 0 - 1ULL;
         if (field_size < 64) {
             mask = static_cast<size_t>((1ULL << field_size) - 1);
             value &= mask;
@@ -795,7 +795,7 @@ constexpr uint32_t inverse_width[65] = {
     65536 * 64 / 61, 65536 * 64 / 62, 65536 * 64 / 63, 65536 * 64 / 64,
 };
 
-inline int countr_zero(unsigned long long vector)
+inline int countr_zero(uint64_t vector)
 {
     unsigned long where;
 #if defined(_WIN64)
@@ -803,11 +803,16 @@ inline int countr_zero(unsigned long long vector)
         return static_cast<int>(where);
     return 0;
 #elif defined(_WIN32)
-    if (_BitScanForward(&where, static_cast<unsigned long>(vector)))
-        return static_cast<int>(where);
-    else if (_BitScanForward(&where, static_cast<unsigned long>(vector >> 32)))
-        return static_cast<int>(where + 32);
-    return 0;
+    uint32_t low = vector & 0xFFFFFFFF;
+    if (low) {
+        REALM_ASSERT_DEBUG(_BitScanForward(&where, low));
+        return where;
+    }
+    else {
+        low = vector >> 32;
+        REALM_ASSERT_DEBUG(_BitScanForward(&where, low));
+        return 32 + where;
+    }
 #else
     where = __builtin_ctzll(vector);
     return static_cast<int>(where);
