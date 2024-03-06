@@ -174,13 +174,15 @@ public:
 
     static size_t unsigned_to_num_bits(uint64_t value)
     {
-        return 1 + log2(static_cast<size_t>(value));
+        return 1 + static_cast<size_t>(std::log2(value));
+        //REALM_DEBUG_ASSERT( == );
+        //return 1 + log2(value);
     }
 
     static size_t signed_to_num_bits(int64_t value)
     {
         if (value >= 0)
-            return 1 + unsigned_to_num_bits(value);
+            return 1+unsigned_to_num_bits(value);
         else
             return 1 + unsigned_to_num_bits(~value); // <-- is this correct????
     }
@@ -401,11 +403,11 @@ public:
         }
         else if (enc == Encoding::Packed) {
             hb[2] = 0;
-            hb[3] = bits_pr_elem;
+            hb[3] = static_cast<uint8_t>(bits_pr_elem);
             hb[4] = (flags << 5) | (wtype_Extend << 3);
             hb[5] = (uint8_t)enc - wtype_Extend;
             auto hw = (uint16_t*)header;
-            hw[3] = num_elems;
+            hw[3] = static_cast<uint16_t>(num_elems);
         }
         else {
             REALM_ASSERT(false && "Illegal header encoding for chosen kind of header");
@@ -452,8 +454,8 @@ public:
         REALM_ASSERT(bits_pr_elemB <= 64);
         REALM_ASSERT(num_elemsA < 1024);
         REALM_ASSERT(num_elemsB < 1024);
-        hh[1] = ((bits_pr_elemB - 1) << 10) | num_elemsB;
-        hh[3] = ((bits_pr_elemA - 1) << 10) | num_elemsA;
+        hh[1] = static_cast<uint16_t>(((bits_pr_elemB - 1) << 10) | num_elemsB);
+        hh[3] = static_cast<uint16_t>(((bits_pr_elemA - 1) << 10) | num_elemsA);
     }
 
     // Setting element size for encodings with a single element size:
@@ -530,7 +532,7 @@ void inline NodeHeader::set_element_size<NodeHeader::Encoding::Packed>(char* hea
 {
     REALM_ASSERT(get_encoding(header) == Encoding::Packed);
     REALM_ASSERT(bits_per_element <= 64);
-    ((uint8_t*)header)[3] = static_cast<uint16_t>(bits_per_element);
+    ((uint8_t*)header)[3] = static_cast<uint8_t>(bits_per_element);
 }
 template <>
 void inline NodeHeader::set_element_size<NodeHeader::Encoding::WTypBits>(char* header, size_t bits_per_element)

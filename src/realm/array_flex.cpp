@@ -177,13 +177,13 @@ bool ArrayFlex::find_all(const Array& arr, int64_t value, size_t start, size_t e
 
 template <typename Cond, bool v>
 inline size_t ArrayFlex::parallel_subword_find(const Array& arr, uint64_t value, size_t width_mask, size_t offset,
-                                               uint_least8_t width, size_t start, size_t end) const
+                                               size_t width, size_t start, size_t end) const
 {
-    const auto MSBs = populate(width, width_mask);
-    const auto search_vector = populate(width, value);
-    const auto field_count = num_fields_for_width(width);
-    const auto bit_count_pr_iteration = num_bits_for_width(width);
-    auto total_bit_count_left = static_cast<signed>(end - start) * width;
+    const auto MSBs = populate(static_cast<int>(width), width_mask);
+    const auto search_vector = populate(static_cast<int>(width), value);
+    const auto field_count = num_fields_for_width(static_cast<int>(width));
+    const auto bit_count_pr_iteration = num_bits_for_width(static_cast<int>(width));
+    int64_t total_bit_count_left = static_cast<int64_t>((end - start) * width);
     REALM_ASSERT(total_bit_count_left >= 0);
     auto bitwidth_cmp = [&MSBs](uint64_t a, uint64_t b) {
         if constexpr (std::is_same_v<Cond, Equal>)
@@ -218,12 +218,12 @@ inline size_t ArrayFlex::parallel_subword_find(const Array& arr, uint64_t value,
         it.bump(bit_count_pr_iteration);
     }
     if (total_bit_count_left) {                         // final subword, may be partial
-        const auto word = it.get(total_bit_count_left); // <-- limit lookahead to avoid touching memory beyond array
+        const auto word = it.get(static_cast<unsigned int>(total_bit_count_left)); // <-- limit lookahead to avoid touching memory beyond array
         vector = bitwidth_cmp(word, search_vector);
         auto last_word_mask = 0xFFFFFFFFFFFFFFFFULL >> (64 - total_bit_count_left);
         vector &= last_word_mask;
         if (vector) {
-            int sub_word_index = first_field_marked(width, vector);
+            int sub_word_index = first_field_marked(static_cast<int>(width), vector);
             return start + sub_word_index;
         }
     }
@@ -343,7 +343,7 @@ int64_t ArrayFlex::sum(const Array& arr, size_t start, size_t end) const
 
     bf_iterator it_index{data, static_cast<size_t>(offset), ndx_width, ndx_width, start};
     for (; start < end; ++start, ++it_index) {
-        const auto v = read_bitfield(data, it_index.get_value() * v_width, v_width);
+        const auto v = read_bitfield(data, static_cast<size_t>(it_index.get_value() * v_width), v_width);
         acc += sign_extend_field_by_mask(mask, v);
     }
     return acc;

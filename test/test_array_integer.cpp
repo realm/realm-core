@@ -1285,6 +1285,20 @@ NONCONCURRENT_TEST(Test_basic_find_GT_value_greater_32bit)
 
 #endif
 
+ONLY(Test_ArrayInt_negative_nums)
+{
+    ArrayInteger a(Allocator::get_default());
+    ArrayInteger a1(Allocator::get_default());
+    a.create();
+    a.add(4427957085475570907);
+    //a.add(-4427957085475570907);
+    CHECK_NOT(a.is_encoded());
+    CHECK(a.try_encode(a1));
+    CHECK(a1.get(0) == a.get(0));
+    //CHECK(a1.get(1) == a.get(1));
+    a1.destroy();
+}
+
 // packed is always on
 #if 0
 TEST(Test_ArrayInt_no_encode)
@@ -1305,7 +1319,6 @@ TEST(Test_ArrayInt_no_encode)
     a.destroy();
     a1.destroy();
 }
-#endif
 
 TEST(Test_array_same_size_less_bits)
 {
@@ -1328,7 +1341,6 @@ TEST(Test_array_same_size_less_bits)
     a1.destroy();
 }
 
-#if 0
 TEST(Test_ArrayInt_encode_decode_needed)
 {
     ArrayInteger a(Allocator::get_default());
@@ -1378,7 +1390,6 @@ TEST(Test_ArrayInt_encode_decode_needed)
     a.destroy();
     a1.destroy();
 }
-#endif
 
 TEST(Test_ArrayInt_negative_nums)
 {
@@ -1619,6 +1630,8 @@ TEST(Test_ArrayInt_compress_data_init_from_mem)
     CHECK_NOT(a1.is_attached());
     CHECK_NOT(a2.is_attached());
 }
+#endif
+
 
 TEST(ArrayIntNull_SetNull)
 {

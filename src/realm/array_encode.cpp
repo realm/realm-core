@@ -94,8 +94,8 @@ bool ArrayEncode::always_encode(const Array& origin, Array& arr, bool packed) co
 
 bool ArrayEncode::encode(const Array& origin, Array& arr) const
 {
-    // return false;
-    // return always_encode(origin, arr, true); // true packed, false flex
+    //return false;
+    return always_encode(origin, arr, true); // true packed, false flex
 
     std::vector<int64_t> values;
     std::vector<size_t> indices;
@@ -292,7 +292,11 @@ size_t ArrayEncode::packed_encoded_array_size(std::vector<int64_t>& values, size
 {
     using Encoding = NodeHeader::Encoding;
     const auto [min_value, max_value] = std::minmax_element(values.begin(), values.end());
-    v_width = std::max(Node::signed_to_num_bits(*min_value), Node::signed_to_num_bits(*max_value));
+    if (min_value == max_value)
+        v_width = Node::signed_to_num_bits(*min_value);
+    else 
+        v_width = std::max(Node::signed_to_num_bits(*min_value), Node::signed_to_num_bits(*max_value));
+    
     REALM_ASSERT_DEBUG(v_width > 0);
     return NodeHeader::calc_size<Encoding::Packed>(sz, v_width);
 }
