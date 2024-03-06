@@ -610,6 +610,14 @@ RLM_API realm_log_level_e realm_set_log_level_category(const char*, realm_log_le
  * Get the logging level for given category.
  */
 RLM_API realm_log_level_e realm_get_log_level_category(const char*) RLM_API_NOEXCEPT;
+/**
+ * Get the actual log category names (currently 15)
+  @param num_values number of values in the out_values array
+  @param out_values pointer to an array of size num_values
+  @return returns the number of categories returned. If num_values is zero, it will
+          return the total number of categories.
+ */
+RLM_API size_t realm_get_category_names(size_t num_values, const char** out_values);
 
 /**
  * Get a thread-safe reference representing the same underlying object as some

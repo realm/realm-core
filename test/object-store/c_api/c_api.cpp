@@ -1608,8 +1608,15 @@ TEST_CASE("C API logging", "[c_api]") {
     TestFile test_file;
 
     LogUserData userdata;
+    const char* category_names[20];
+    auto num_categories = realm_get_category_names(20, category_names);
     auto log_level_old = realm_get_log_level_category("Realm");
+
     realm_set_log_callback(realm_log_func, RLM_LOG_LEVEL_DEBUG, &userdata, nullptr);
+    for (size_t n = 0; n < num_categories; n++) {
+        CHECK(realm_get_log_level_category(category_names[n]) == RLM_LOG_LEVEL_DEBUG);
+    }
+
     auto prev_level = realm_set_log_level_category("Realm.Storage.Object", RLM_LOG_LEVEL_OFF);
     CHECK(prev_level == RLM_LOG_LEVEL_DEBUG);
     CHECK(realm_get_log_level_category("Realm.Storage.Object") == RLM_LOG_LEVEL_OFF);
