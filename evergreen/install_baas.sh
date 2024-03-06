@@ -365,7 +365,7 @@ git config --global url."git@github.com:".insteadOf "https://github.com/"
 
 # If a baas branch or commit version was not provided use the one locked in our dependencies
 if [[ -z "${BAAS_VERSION}" ]]; then
-    dep_file="dependencies.list"
+    dep_file="dependencies.yml"
     test_path1="${BASE_PATH}/../${dep_file}"
     test_path2="${BASE_PATH}/${dep_file}"
     if [[ -f "${test_path1}" ]]; then
@@ -373,7 +373,7 @@ if [[ -z "${BAAS_VERSION}" ]]; then
         BAAS_VERSION=$(sed -rn 's/^BAAS_VERSION: (.*)/\1/p' < "${test_path1}")
     elif [[ -f "${test_path2}" ]]; then
         # if this is run from an evergreen remote host
-        # then the dependencies.list file has been copied over
+        # then the dependencies.yml file has been copied over
         BAAS_VERSION=$(sed -rn 's/^BAAS_VERSION: (.*)/\1/p' < "${test_path2}")
     else
         echo "could not find '${test_path1}' or '${test_path2}'"
