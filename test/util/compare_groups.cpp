@@ -108,7 +108,7 @@ different:
 template <class T>
 bool compare_set_values(const Set<T>& a, const Set<T>& b)
 {
-    return compare_arrays(a, b, SetElementEquals<T>{});
+    return compare_arrays(a, b);
 }
 
 bool compare_dictionaries(const Dictionary& a, const Dictionary& b)

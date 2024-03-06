@@ -2,7 +2,7 @@
 
 ### Enhancements
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
-* None.
+* Added ability to get current log level via C API (PR [#7419](https://github.com/realm/realm-core/pull/7419))
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
@@ -19,6 +19,7 @@
 ### Internals
 * Fix several crashes when running the object store benchmarks ([#7403](https://github.com/realm/realm-core/pull/7403)).
 * The `dependencies.list` file that defines the realm core library version and the versions of its dependencies is now a YAML file called `dependencies.yml` ([PR #7394](https://github.com/realm/realm-core/pull/7394)).
+* Remove SetElementEquals and SetElementLessThan, as Mixed now uses the same comparisons as Set did.
 
 ----------------------------------------------
 
