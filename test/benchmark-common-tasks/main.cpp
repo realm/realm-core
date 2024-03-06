@@ -18,6 +18,7 @@
 
 #include <iostream>
 #include <iomanip>
+#include <regex>
 #include <set>
 #include <sstream>
 #include <set>
@@ -43,7 +44,17 @@ using namespace realm;
 using namespace realm::util;
 using namespace realm::test_util;
 
-static std::set<std::string> g_bench_filter;
+static std::vector<std::regex> g_bench_filter;
+
+static bool should_filter_benchmark(const std::string& name)
+{
+    if (g_bench_filter.empty())
+        return false;
+
+    return std::all_of(g_bench_filter.begin(), g_bench_filter.end(), [&](const std::regex& regex) {
+        return !std::regex_match(name, regex);
+    });
+}
 
 namespace {
 // not smaller than 100.000 or the UID based benchmarks has to be modified!
@@ -508,7 +519,7 @@ template <class Type>
 struct BenchmarkWithType : Benchmark {
     std::string benchmark_name;
     using underlying_type = typename Type::underlying_type;
-    std::vector<Mixed> needles;
+    std::vector<OwnedMixed> needles;
     BenchmarkWithType()
         : Benchmark()
     {
@@ -535,11 +546,11 @@ struct BenchmarkWithType : Benchmark {
             }
         }
         while (needles.size() < 50) {
-            Mixed needle;
+            OwnedMixed needle;
             while (needle.is_null()) {
                 needle = t->get_object(r.draw_int<size_t>(0, t->size())).get_any(m_col);
             }
-            needles.push_back(needle);
+            needles.push_back(std::move(needle));
         }
         if (add_index) {
             t->add_search_index(m_col);
@@ -2441,7 +2452,6 @@ void run_benchmark_once(Benchmark& benchmark, DBRef sg, Timer& timer)
     timer.unpause();
 }
 
-
 /// This little piece of likely over-engineering runs the benchmark a number of times,
 /// with each durability setting, and reports the results for each run.
 template <typename B>
@@ -2467,7 +2477,7 @@ void run_benchmark(BenchmarkResults& results, bool force_full = false)
         const char* key = it->second;
 
         B benchmark;
-        if (!g_bench_filter.empty() && g_bench_filter.find(benchmark.name()) == g_bench_filter.end())
+        if (should_filter_benchmark(benchmark.name()))
             return;
 
         benchmark.m_durability = level;
@@ -2686,7 +2696,8 @@ int main(int argc, const char** argv)
                       << "  -h, --help      display this help" << std::endl
                       << "  PATH            alternate path to store the results files;" << std::endl
                       << "                  this path should end with a slash." << std::endl
-                      << "  NAMES           benchmark names to run (',' separated)" << std::endl
+                      << "  NAMES           benchmark names to run (':' separated)" << std::endl
+                      << "                  Full regex is supported as a filter for a name" << std::endl
                       << std::endl;
             return 1;
         }
@@ -2698,9 +2709,9 @@ int main(int argc, const char** argv)
     if (argc > 2) {
         std::string filter = argv[2];
         for (size_t i = 0, j = 0, len = filter.size(); i <= len; ++i) {
-            if (i == len || filter[i] == ',') {
+            if (i == len || filter[i] == ':') {
                 if (j < i)
-                    g_bench_filter.insert(filter.substr(j, i - j));
+                    g_bench_filter.emplace_back(filter.substr(j, i - j));
                 j = i + 1;
             }
         }
