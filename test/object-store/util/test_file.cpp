@@ -419,9 +419,7 @@ std::vector<bson::BsonDocument> TestAppSession::get_documents(SyncUser& user, co
 
 // MARK: - TestSyncManager
 
-TestSyncManager::Config::Config()
-{
-}
+TestSyncManager::Config::Config() {}
 
 TestSyncManager::TestSyncManager(const Config& config, const SyncServer::Config& sync_server_config)
     : m_sync_server(sync_server_config)

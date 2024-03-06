@@ -110,7 +110,6 @@ static void set_default_level_thresholds()
 }
 
 
-
 int run_object_store_tests(int argc, const char** argv);
 
 int run_object_store_tests(int argc, const char** argv)
