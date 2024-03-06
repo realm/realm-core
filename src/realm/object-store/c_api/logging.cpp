@@ -73,9 +73,18 @@ RLM_API void realm_set_log_level(realm_log_level_e level) noexcept
     util::LogCategory::realm.set_default_level_threshold(realm::util::LogCategory::Level(level));
 }
 
-RLM_API void realm_set_log_level_category(const char* category_name, realm_log_level_e level) noexcept
+RLM_API realm_log_level_e realm_set_log_level_category(const char* category_name, realm_log_level_e level) noexcept
 {
-    util::LogCategory::get_category(category_name)
-        .set_default_level_threshold(realm::util::LogCategory::Level(level));
+    auto& cat = util::LogCategory::get_category(category_name);
+    realm_log_level_e prev_level = realm_log_level_e(util::Logger::get_default_logger()->get_level_threshold(cat));
+    cat.set_default_level_threshold(realm::util::LogCategory::Level(level));
+    return prev_level;
 }
+
+RLM_API realm_log_level_e realm_get_log_level_category(const char* category_name) noexcept
+{
+    auto& cat = util::LogCategory::get_category(category_name);
+    return realm_log_level_e(util::Logger::get_default_logger()->get_level_threshold(cat));
+}
+
 } // namespace realm::c_api

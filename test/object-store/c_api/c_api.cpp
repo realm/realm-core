@@ -1608,9 +1608,11 @@ TEST_CASE("C API logging", "[c_api]") {
     TestFile test_file;
 
     LogUserData userdata;
-    auto log_level_old = util::LogCategory::realm.get_default_level_threshold();
+    auto log_level_old = realm_get_log_level_category("Realm");
     realm_set_log_callback(realm_log_func, RLM_LOG_LEVEL_DEBUG, &userdata, nullptr);
-    realm_set_log_level_category("Realm.Storage.Object", RLM_LOG_LEVEL_OFF);
+    auto prev_level = realm_set_log_level_category("Realm.Storage.Object", RLM_LOG_LEVEL_OFF);
+    CHECK(prev_level == RLM_LOG_LEVEL_DEBUG);
+    CHECK(realm_get_log_level_category("Realm.Storage.Object") == RLM_LOG_LEVEL_OFF);
     auto config = make_config(test_file.path.c_str(), true);
     realm_t* realm = realm_open(config.get());
     realm_begin_write(realm);
@@ -1637,7 +1639,7 @@ TEST_CASE("C API logging", "[c_api]") {
     // Remove this logger again
     realm_set_log_callback(nullptr, RLM_LOG_LEVEL_DEBUG, nullptr, nullptr);
     // Restore old log level
-    util::LogCategory::realm.set_default_level_threshold(log_level_old);
+    realm_set_log_level(log_level_old);
 }
 
 TEST_CASE("C API - scheduler", "[c_api]") {
