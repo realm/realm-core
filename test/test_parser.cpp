@@ -2209,14 +2209,11 @@ TEST(Parser_list_of_primitive_ints)
     verify_query(test_context, t2, "list.integers.@avg == 1", 2);
     verify_query(test_context, t2, "list.integers.@sum == 1", 2);
     verify_query(test_context, t2, "list.integers.@min == 1", 2);
-#if 0
-    // aggregate operators across multiple lists
-    // we haven't supported aggregates across multiple lists previously
-    // but the implementation works and applies the aggregate to the primitive list
-    // this may be surprising, but it is one way to interpret the expression
-    verify_query(test_context, t2, "ALL list.integers == 1", 2);  // row 0 matches {1}. row 1 matches (any of) {} {1}
-    verify_query(test_context, t2, "NONE list.integers == 1", 1); // row 1 matches (any of) {}, {0}, {2}, {3} ...
-#endif
+
+    verify_query(test_context, t2, "ALL list.integers == 1", 3);  // first 2 rows have both a {1} list
+                                                                  // row 2 has only an empty list which matches ALL
+    verify_query(test_context, t2, "NONE list.integers == 1", 2); // row 0 has only one list and it macthes 1
+
     std::any args[] = {Int(1)};
     size_t num_args = 1;
     verify_query_sub(test_context, t, "integers == $0", args, num_args, 1);

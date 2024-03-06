@@ -297,39 +297,27 @@ void ColumnDictionaryKeys::set_cluster(const Cluster* cluster)
     }
 }
 
-
-void ColumnDictionaryKeys::reset_path(size_t index)
-{
-    m_links.clear();
-    if (m_link_map.has_links()) {
-        REALM_ASSERT(!m_leaf);
-        m_links = m_link_map.get_links(index);
-    }
-    m_link_map_index = 0;
-}
-
-bool ColumnDictionaryKeys::more() const
-{
-    return m_link_map_index < m_links.size();
-}
-
-void ColumnDictionaryKeys::evaluate(size_t index, ValueBase& destination)
+void ColumnDictionaryKeys::evaluate(Subexpr::Index& index, ValueBase& destination)
 {
     if (m_link_map.has_links()) {
-        if (more()) {
-            const Obj obj = m_link_map.get_target_table()->get_object(m_links[m_link_map_index++]);
-            auto dict = obj.get_dictionary(m_column_key);
-            destination.init(true, dict.size());
-            // Insert all values
-            size_t n = 0;
-            dict.for_all_keys<StringData>([&](const Mixed& value) {
-                destination.set(n, value);
-                n++;
-            });
+        if (index.initialize()) {
+            m_links.clear();
+            REALM_ASSERT(!m_leaf);
+            m_links = m_link_map.get_links(index);
+            if (!index.set_size(m_links.size())) {
+                destination.init(true, 0);
+                return;
+            }
         }
-        else {
-            destination.init(true, 0);
-        }
+        const Obj obj = m_link_map.get_target_table()->get_object(m_links[index.get_and_incr_sub_index()]);
+        auto dict = obj.get_dictionary(m_column_key);
+        destination.init(true, dict.size());
+        // Insert all values
+        size_t n = 0;
+        dict.for_all_keys<StringData>([&](const Mixed& value) {
+            destination.set(n, value);
+            n++;
+        });
     }
     else {
         // Not a link column
@@ -361,13 +349,7 @@ public:
         : Columns<Dictionary>(other)
     {
     }
-    void reset_path(size_t) override {}
-    bool more() const override
-    {
-        return false;
-    }
-
-    void evaluate(size_t index, ValueBase& destination) override
+    void evaluate(Subexpr::Index& index, ValueBase& destination) override
     {
         Allocator& alloc = this->m_link_map.get_target_table()->get_alloc();
         Value<int64_t> list_refs;
@@ -392,54 +374,46 @@ SizeOperator<int64_t> Columns<Dictionary>::size()
     return SizeOperator<int64_t>(std::move(ptr));
 }
 
-void Columns<Dictionary>::reset_path(size_t index)
+void Columns<Dictionary>::evaluate(Subexpr::Index& index, ValueBase& destination)
 {
-    m_ctrl.matches.clear();
-    if (links_exist()) {
-        REALM_ASSERT(!m_leaf);
-        std::vector<ObjKey> links = m_link_map.get_links(index);
-        auto sz = links.size();
-        if (!m_link_map.only_unary_links())
-            m_ctrl.path_only_unary_keys = false;
+    if (index.initialize()) {
+        m_ctrl.matches.clear();
+        if (links_exist()) {
+            REALM_ASSERT(!m_leaf);
+            std::vector<ObjKey> links = m_link_map.get_links(index);
+            auto sz = links.size();
+            if (!m_link_map.only_unary_links())
+                m_ctrl.path_only_unary_keys = false;
 
-        for (size_t t = 0; t < sz; t++) {
-            const Obj obj = m_link_map.get_target_table()->get_object(links[t]);
-            auto val = obj.get_any(m_column_key);
-            if (!val.is_null()) {
-                Collection::get_any(m_ctrl, val, 0);
+            for (size_t t = 0; t < sz; t++) {
+                const Obj obj = m_link_map.get_target_table()->get_object(links[t]);
+                auto val = obj.get_any(m_column_key);
+                if (!val.is_null()) {
+                    Collection::get_any(m_ctrl, val, 0);
+                }
             }
         }
-    }
-    else {
-        // Not a link column
-        REALM_ASSERT(m_leaf);
-        if (ref_type ref = to_ref(m_leaf->get(index))) {
-            Collection::get_any(m_ctrl, {ref, CollectionType::Dictionary}, 0);
+        else {
+            // Not a link column
+            REALM_ASSERT(m_leaf);
+            if (ref_type ref = to_ref(m_leaf->get(index))) {
+                Collection::get_any(m_ctrl, {ref, CollectionType::Dictionary}, 0);
+            }
+        }
+        if (!index.set_size(m_ctrl.matches.size())) {
+            destination.init(true, 0);
+            return;
         }
     }
-    if (m_ctrl.matches.empty()) {
-        // Make sure we at lease have one empty result
-        m_ctrl.matches.emplace_back();
-    }
-    m_destination_index = 0;
-}
-
-bool Columns<Dictionary>::more() const
-{
-    return m_destination_index < m_ctrl.matches.size();
-}
-
-void Columns<Dictionary>::evaluate(size_t, ValueBase& destination)
-{
     // Copy values over
-    auto& matches = m_ctrl.matches[m_destination_index++];
+    auto& matches = m_ctrl.matches[index.get_and_incr_sub_index()];
     auto sz = matches.size();
     destination.init(!m_ctrl.path_only_unary_keys || sz == 0, sz);
     destination.set(matches.begin(), matches.end());
 }
 
 
-void Columns<Link>::evaluate(size_t index, ValueBase& destination)
+void Columns<Link>::evaluate(Subexpr::Index& index, ValueBase& destination)
 {
     // Destination must be of Key type. It only makes sense to
     // compare keys with keys
@@ -500,7 +474,7 @@ void ColumnListBase::get_lists(size_t index, Value<int64_t>& destination)
     }
 }
 
-void LinkCount::evaluate(size_t index, ValueBase& destination)
+void LinkCount::evaluate(Subexpr::Index& index, ValueBase& destination)
 {
     if (m_column_key) {
         REALM_ASSERT(m_link_map.has_links());
