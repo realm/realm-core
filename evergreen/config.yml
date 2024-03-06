@@ -81,9 +81,6 @@ functions:
               if [ -n "${baas_admin_port|}" ]; then
                 set_cmake_var baas_vars REALM_ADMIN_ENDPOINT STRING "$scheme://localhost:${baas_admin_port}"
               fi
-
-              curl -LO https://curl.se/ca/cacert.pem
-              set_cmake_var baas_vars REALM_CURL_CACERTS PATH $(./evergreen/abspath.sh ./cacert.pem)
           fi
 
           if [ -n "${enable_asan|}" ]; then
@@ -212,7 +209,7 @@ functions:
   "run tests":
     - command: expansions.update
       params:
-        file: realm-core/dependencies.list
+        file: realm-core/dependencies.yml
     - command: shell.exec
       params:
         working_dir: realm-core
