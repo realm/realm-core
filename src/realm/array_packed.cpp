@@ -58,10 +58,6 @@ void ArrayPacked::copy_data(const Array& origin, Array& arr) const
         const auto v = origin.get(i);
         it_value.set_value(v);
         const auto sv = sign_extend_value(v_width, *it_value);
-        /* std::cout << "Value = " << origin.get(i) << ", stored = " << it_value.get_value()
-                  << ",  converted = " << sv
-                  << std::endl; */
-                  
         REALM_ASSERT_DEBUG(sv == v);
         ++it_value;
     }

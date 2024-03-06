@@ -156,10 +156,14 @@ private:
 };
 
 // log2 - returns -1 if x==0, otherwise log2(x)
-inline int log2(size_t x)
+// size_t is not the right type, or probably we should not use this utility for compressed arrays, on 32 bits size_t
+// is defined as unsigned int (max 32 bits), if we pass here a 64 bit number, size_t will overflow, and howevere max bit witdh can only be 32.
+// which is not necesserely correct. int64_t or uint64_t is supported on 32 bits machines.
+inline int log2(size_t x) 
 {
     if (x == 0)
         return -1;
+
 #if defined(__GNUC__)
 #ifdef REALM_PTR_64
     return 63 - __builtin_clzll(x); // returns int
@@ -175,6 +179,7 @@ inline int log2(size_t x)
 #endif
     return static_cast<int>(index);
 #else // not __GNUC__ and not _WIN32
+
     int r = 0;
     while (x >>= 1) {
         r++;

@@ -233,7 +233,7 @@ class bf_ref;
 class bf_iterator {
     uint64_t* data_area;
     uint64_t* first_word_ptr;
-    size_t field_position;
+    uint64_t field_position;
     uint8_t field_size;
     uint8_t step_size; // may be different than field_size if used for arrays of pairs
 
@@ -303,11 +303,12 @@ public:
         auto first_word = first_word_ptr[0];
         uint64_t mask = 0 - 1ULL;
         if (field_size < 64) {
-            mask = static_cast<size_t>((1ULL << field_size) - 1);
+            //we should never cast to size_t, but to uint64_t in order to support 32 bits
+            mask = static_cast<uint64_t>((1ULL << field_size) - 1);
             value &= mask;
         }
         // zero out field in first word:
-        auto first_word_mask = ~(mask << in_word_position);
+        uint64_t first_word_mask = ~(mask << in_word_position);
         first_word &= first_word_mask;
         // or in relevant part of value
         first_word |= value << in_word_position;
@@ -391,14 +392,14 @@ inline void write_bitfield(uint64_t* data_area, size_t field_position, size_t wi
 
 inline int64_t sign_extend_field_by_mask(size_t sign_mask, uint64_t value)
 {
-    uint64_t sign_extension = 0 - (value & sign_mask);
+    uint64_t sign_extension = (uint64_t)0 - (value & sign_mask);
     return value | sign_extension;
 }
 
 inline int64_t sign_extend_value(size_t width, uint64_t value)
 {
     uint64_t sign_mask = 1ULL << (width - 1);
-    uint64_t sign_extension = 0 - (value & sign_mask);
+    uint64_t sign_extension = (uint64_t)0 - (value & sign_mask);
     return value | sign_extension;
 }
 
