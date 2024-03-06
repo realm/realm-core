@@ -27,6 +27,7 @@
 
 #include <realm/object-store/impl/object_accessor_impl.hpp>
 #include <realm/object-store/sync/async_open_task.hpp>
+#include <realm/object-store/util/scheduler.hpp>
 
 using namespace realm::app;
 #endif
@@ -694,6 +695,7 @@ struct FLX : TestSetup {
 TEMPLATE_TEST_CASE("sync progress notifications", "[sync][baas][progress]", PBS, FLX)
 {
     TestType setup;
+    constexpr bool is_flx = std::is_same_v<FLX, TestType>;
     size_t expected_count = 0;
 
 #define VERIFY_REALM(realm_1, realm_2, expected)                                                                     \
@@ -757,7 +759,7 @@ TEMPLATE_TEST_CASE("sync progress notifications", "[sync][baas][progress]", PBS,
         }                                                                                                            \
     }
 
-#define VERIFY_PROGRESS(progress, begin, end)                                                                        \
+#define VERIFY_PROGRESS_EX(progress, begin, end, expect_multiple_stages)                                             \
     {                                                                                                                \
         REQUIRE(begin < end);                                                                                        \
         REQUIRE(end <= progress.size());                                                                             \
@@ -781,18 +783,22 @@ TEMPLATE_TEST_CASE("sync progress notifications", "[sync][baas][progress]", PBS,
                 if (j > 0) {                                                                                         \
                     auto&& prev = values[j - 1];                                                                     \
                     CHECK(prev.xferred <= p.xferred);                                                                \
-                    /* CHECK(prev.xferable <= p.xferable); can decrease by design */                                 \
-                    /* FIXME two full downloads by design or bug */                                                  \
-                    if (!WithinRel(.9999, .0001).match(prev.estimate))                                               \
+                    /* xferable may fluctuate by design */                                                           \
+                    /* FIXME two full downloads by design or bug with flx? */                                        \
+                    if (!expect_multiple_stages || !WithinRel(.9999, .0001).match(prev.estimate))                    \
                         CHECK(prev.estimate <= p.estimate);                                                          \
                 }                                                                                                    \
             }                                                                                                        \
-                                                                                                                     \
-            auto&& last = values.back();                                                                             \
-            /* FIXME CHECK_THAT(last.estimate, WithinRel(.9999, .0001)); */                                          \
-            CHECK(last.xferred == last.xferable);                                                                    \
+            /* FIXME with non-streaming last estimate isn't necessarily 1.0, which depends on bytes xfered */        \
+            if (values.size() > 1) {                                                                                 \
+                auto&& last = values.back();                                                                         \
+                CHECK_THAT(last.estimate, WithinRel(.9999, .0001));                                                  \
+                CHECK(last.xferred == last.xferable);                                                                \
+            }                                                                                                        \
         }                                                                                                            \
     }
+
+#define VERIFY_PROGRESS(progress, begin, end) VERIFY_PROGRESS_EX(progress, begin, end, false)
 
     auto wait_for_sync = [](SharedRealm& realm) {
         realm->sync_session()->resume();
@@ -804,13 +810,16 @@ TEMPLATE_TEST_CASE("sync progress notifications", "[sync][baas][progress]", PBS,
 
     auto config1 = setup.make_config();
     auto realm_1 = Realm::get_shared_realm(config1);
+    if (is_flx) // wait for initial query 0 to sync for cleaner checks
+        wait_for_sync(realm_1);
     realm_1->sync_session()->pause();
 
-    add_callbacks(realm_1);
     expected_count = setup.add_objects(realm_1);
+    add_callbacks(realm_1);
     wait_for_sync(realm_1);
 
-    VERIFY_PROGRESS(progress, 0, 4);
+    VERIFY_PROGRESS(progress, 0, 3);
+    VERIFY_PROGRESS_EX(progress, 3, 4, is_flx); // with flx query 0 emits progress also
     clear(progress);
 
     auto config2 = setup.make_config();
@@ -822,7 +831,8 @@ TEMPLATE_TEST_CASE("sync progress notifications", "[sync][baas][progress]", PBS,
     VERIFY_REALM(realm_1, realm_2, expected_count);
 
     VERIFY_PROGRESS_EMPTY(progress, 0, 4);
-    VERIFY_PROGRESS(progress, 4, 8);
+    VERIFY_PROGRESS(progress, 4, 6);
+    VERIFY_PROGRESS_EX(progress, 6, 8, is_flx); // with flx query 0 emits progress also
     clear(progress);
 
     expected_count = setup.add_objects(realm_2);
@@ -855,6 +865,7 @@ TEMPLATE_TEST_CASE("sync progress notifications", "[sync][baas][progress]", PBS,
     // check async open task
     auto config3 = setup.make_config();
     // FIXME hits no_sessions assert in SyncManager due to issue with libuv scheduler and notifications
+    config3.scheduler = util::Scheduler::make_dummy();
     config3.automatic_change_notifications = false;
 
     for (int i = 0; i < 2; ++i) {

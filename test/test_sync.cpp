@@ -3554,15 +3554,15 @@ TEST(Sync_UploadDownloadProgress_5)
     TEST_DIR(server_dir);
     TEST_CLIENT_DB(db);
 
-    auto [progress_handled_promise, progress_handled] = util::make_promise_future<void>();
+    std::mutex mutex;
+    std::condition_variable session_cv;
 
     ClientServerFixture fixture(server_dir, test_context);
     fixture.start();
 
     Session session = fixture.make_session(db, "/test");
 
-    auto progress_handler = [&, promise = util::CopyablePromiseHolder(std::move(progress_handled_promise))](
-                                uint_fast64_t downloaded_bytes, uint_fast64_t downloadable_bytes,
+    auto progress_handler = [&](uint_fast64_t downloaded_bytes, uint_fast64_t downloadable_bytes,
                                 uint_fast64_t uploaded_bytes, uint_fast64_t uploadable_bytes,
                                 uint_fast64_t snapshot_version, double, double) mutable {
         CHECK_EQUAL(downloaded_bytes, 0);
@@ -3570,13 +3570,20 @@ TEST(Sync_UploadDownloadProgress_5)
         CHECK_EQUAL(uploaded_bytes, 0);
         CHECK_EQUAL(uploadable_bytes, 0);
         CHECK_EQUAL(snapshot_version, 3);
-        promise.get_promise().emplace_value();
+        std::lock_guard lock{mutex};
+        session_cv.notify_one();
     };
 
     session.set_progress_handler(progress_handler);
 
-    session.bind();
-    progress_handled.get();
+    std::cv_status s = std::cv_status::timeout;
+    {
+        std::unique_lock lock{mutex};
+        session.bind();
+        // Wait until the progress handler is called on the session before tearing down the client
+        s = session_cv.wait_for(lock, std::chrono::seconds(5));
+    }
+    CHECK(s == std::cv_status::no_timeout);
 
     // The check is that we reach this point.
 }
@@ -3646,14 +3653,16 @@ TEST(Sync_UploadDownloadProgress_6)
 
     session->set_progress_handler(progress_handler);
 
+    bool signaled = false;
     {
         std::unique_lock lock{mutex};
         session->bind();
         // Wait until the progress handler is called on the session before tearing down the client
-        session_cv.wait_for(lock, std::chrono::seconds(30), [&session]() {
+        signaled = session_cv.wait_for(lock, std::chrono::seconds(5), [&session]() {
             return !bool(session);
         });
     }
+    CHECK(signaled);
 
     // The check is that we reach this point without deadlocking or throwing an assert while tearing
     // down the active session

@@ -1196,8 +1196,8 @@ private:
     void ensure_enlisted_to_send();
     void enlist_to_send();
     Status check_received_sync_progress(const SyncProgress&) noexcept;
-    void check_for_upload_completion();
-    void check_for_download_completion();
+    bool check_for_upload_completion();
+    bool check_for_download_completion();
 
     SyncClientHookAction call_debug_hook(SyncClientHookEvent event, const SyncProgress&, int64_t, DownloadBatchState,
                                          size_t);
@@ -1206,6 +1206,8 @@ private:
 
     bool is_steady_state_download_message(DownloadBatchState batch_state, int64_t query_version);
 
+    void init_progress_handler();
+    void notify_upload_progress();
     void update_download_estimate(double download_estimate);
     void notify_download_progress(const std::optional<uint64_t>& transient_bytes = {});
 
