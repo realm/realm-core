@@ -805,12 +805,14 @@ inline int countr_zero(uint64_t vector)
 #elif defined(_WIN32)
     uint32_t low = vector & 0xFFFFFFFF;
     if (low) {
-        REALM_ASSERT_DEBUG(_BitScanForward(&where, low));
+        bool scan_ok = _BitScanForward(&where, low);
+        REALM_ASSERT_DEBUG(scan_ok);
         return where;
     }
     else {
         low = vector >> 32;
-        REALM_ASSERT_DEBUG(_BitScanForward(&where, low));
+        bool scan_ok = _BitScanForward(&where, low);
+        REALM_ASSERT_DEBUG(scan_ok);
         return 32 + where;
     }
 #else
