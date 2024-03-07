@@ -300,7 +300,7 @@ private:
     const size_t m_compact_threshold;
 };
 
-constexpr static size_t c_default_compact_threshold = 100;
+constexpr static size_t c_default_compact_threshold = 10;
 
 template <size_t ChunkWidth>
 class RadixTree : public SearchIndex {

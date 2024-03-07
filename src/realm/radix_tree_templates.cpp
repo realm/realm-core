@@ -82,7 +82,7 @@ void IndexNode<ChunkWidth>::init(NodeType type)
     // Mark that this is part of index
     // (as opposed to columns under leaves)
     constexpr bool context_flag = true;
-    constexpr int64_t initial_value = 0;
+    constexpr int64_t initial_value = -1; // expand the array to full width immediately
     // a compact list doesn't store refs
     const Array::Type array_type = type == NodeType::Normal ? Array::type_HasRefs : Array::type_Normal;
     if (!is_attached()) {
@@ -102,13 +102,13 @@ void IndexNode<ChunkWidth>::init(NodeType type)
     }
 #endif // COMPACT_NODE_OPTIMIZATION
     REALM_ASSERT_EX(type == NodeType::Normal, int(type));
-    ensure_minimum_width(0x7FFFFFFF); // This ensures 31 bits plus a sign bit
     // population is a tagged value
     for (size_t i = 0; i < c_num_population_entries; ++i) {
         set_population(i, 0);
     }
     IndexKey<ChunkWidth> dummy_key(Mixed{});
     set_prefix(dummy_key, 0);
+    set(c_ndx_of_null, 0);
 #if COMPACT_NODE_OPTIMIZATION
     set_compact_list_bit(false);
 #endif // COMPACT_NODE_OPTIMIZATION
@@ -331,7 +331,9 @@ bool IndexNode<ChunkWidth>::has_duplicate_values() const
         // ref to sorted list
         if (is_sorted_list(ref, m_alloc)) {
             IntegerColumn list(m_alloc, ref); // Throws
-            if (SortedListComparator::contains_duplicate_values(list, m_cluster, list.cbegin())) {
+            // we may have a list of size 1 if the ObjKey value is an invalidated link
+            // (has the highest bit set) because we can't store that directly as a tagged value
+            if (list.size() > 1) {
                 return true;
             }
             continue;
@@ -376,19 +378,12 @@ void IndexNode<ChunkWidth>::make_sorted_list_at(size_t ndx, ObjKey existing, Obj
 {
     Array list(m_alloc);
     list.create(Array::type_Normal);
+#if REALM_DEBUG
     int cmp = m_cluster.get_value(ObjKey(existing)).compare(insert_value);
-    if (cmp < 0) {
-        list.add(existing.value);
-        list.add(key_to_insert.value);
-    }
-    else if (cmp > 0) {
-        list.add(key_to_insert.value);
-        list.add(existing.value);
-    }
-    else {
-        list.add(existing.value < key_to_insert.value ? existing.value : key_to_insert.value);
-        list.add(existing.value < key_to_insert.value ? key_to_insert.value : existing.value);
-    }
+    REALM_ASSERT_EX(cmp == 0, insert_value, existing, key_to_insert);
+#endif
+    list.add(existing.value < key_to_insert.value ? existing.value : key_to_insert.value);
+    list.add(existing.value < key_to_insert.value ? key_to_insert.value : existing.value);
     set(ndx, list.get_ref());
     update_parent();
 }
@@ -480,11 +475,9 @@ IndexNode<ChunkWidth>::do_add_direct(ObjKey value, size_t ndx, const IndexKey<Ch
     if (is_sorted_list(ref, m_alloc)) {
         IntegerColumn list(m_alloc, ref); // Throws
         list.set_parent(this, ndx);
-#if REALM_DEBUG
-        auto pos = list.find_first(value.value);
-        REALM_ASSERT_EX(pos == realm::npos || list.get(pos) != value.value, pos, list.size(), value.value);
-#endif // REALM_DEBUG
-        SortedListComparator::insert_to_existing_sorted_list(value, key.get_mixed(), list, m_cluster);
+        IntegerColumn::const_iterator lower = std::lower_bound(list.cbegin(), list.cend(), value.value);
+        REALM_ASSERT_DEBUG_EX(lower == list.cend() || *lower != value.value, *lower, list.size(), value.value);
+        list.insert(lower - list.cbegin(), value.value);
         verify();
         return nullptr;
     }
@@ -739,38 +732,26 @@ IndexIterator IndexNode<ChunkWidth>::find_first(IndexKey<ChunkWidth> key, ObjKey
                 }
                 const IntegerColumn list(m_alloc, ref); // Throws
                 REALM_ASSERT(list.size());
-                IntegerColumn::const_iterator it_end = list.cend();
-                IntegerColumn::const_iterator lower = it_end;
-                // in the null entry there could be nulls or the empty string
-                SortedListComparator slc(m_cluster);
+                size_t position_in_list = 0;
                 if (optional_known_key) {
-                    // FIXME: for small lists, simply search for the key directly in the list
-                    // direct search for key
-                    SortedListComparator::KeyValuePair pair{optional_known_key, key.get_mixed()};
-                    lower = std::lower_bound(list.cbegin(), it_end, pair, slc);
-                }
-                else {
-                    lower = std::lower_bound(list.cbegin(), it_end, key.get_mixed(), slc);
-                }
-                if (lower == it_end) {
-                    return {}; // not found
-                }
-                if (m_cluster.get_value(ObjKey(*lower)) != key.get_mixed()) {
-                    return {}; // not found
+                    // this list contains only duplicates sorted by key
+                    IntegerColumn::const_iterator it_end = list.cend();
+                    IntegerColumn::const_iterator lower =
+                        std::lower_bound(list.cbegin(), it_end, optional_known_key.value);
+                    REALM_ASSERT_EX(lower != it_end, key.get_mixed());
+                    position_in_list = lower - list.cbegin();
                 }
                 ret.m_positions.push_back(ArrayChainLink{cur_node.get_ref(), c_ndx_of_null});
                 ret.m_type = IndexIterator::ResultType::List;
-                ret.m_positions.push_back({ref, lower.get_position()});
-                ret.m_key = ObjKey(*lower);
+                ret.m_positions.push_back({ref, position_in_list});
+                ret.m_key = ObjKey(list.get(position_in_list));
                 return ret;
             }
-            if (m_cluster.get_value(ObjKey(rot.get_as_int())) == key.get_mixed()) {
-                ret.m_positions.push_back(ArrayChainLink{cur_node.get_ref(), c_ndx_of_null});
-                ret.m_key = ObjKey(rot.get_as_int());
-                ret.m_type = IndexIterator::ResultType::Exhaustive;
-                return ret;
-            }
-            return {}; // not found
+            REALM_ASSERT_3(m_cluster.get_value(ObjKey(rot.get_as_int())), ==, key.get_mixed());
+            ret.m_positions.push_back(ArrayChainLink{cur_node.get_ref(), c_ndx_of_null});
+            ret.m_key = ObjKey(rot.get_as_int());
+            ret.m_type = IndexIterator::ResultType::Exhaustive;
+            return ret;
         }
         size_t cur_prefix_size = cur_node.get_prefix_size();
         if (cur_prefix_size > key.num_chunks_to_penultimate()) {
@@ -848,13 +829,7 @@ void IndexNode<ChunkWidth>::find_all(std::vector<ObjKey>& results, IndexKey<Chun
     REALM_ASSERT(it.m_positions.size());
     const IntegerColumn sub(m_alloc, it.m_positions.back().array_ref); // Throws
     REALM_ASSERT(sub.size());
-    SortedListComparator slc(m_cluster);
-    IntegerColumn::const_iterator it_end = sub.cend();
-    REALM_ASSERT_3(it.m_positions.back().position, <, sub.size());
-    IntegerColumn::const_iterator lower = sub.cbegin() + it.m_positions.back().position;
-    IntegerColumn::const_iterator upper = std::upper_bound(lower, it_end, key.get_mixed(), slc);
-
-    for (auto sub_it = lower; sub_it != upper; ++sub_it) {
+    for (auto sub_it = sub.cbegin() + it.m_positions.back().position; sub_it != sub.cend(); ++sub_it) {
         results.push_back(ObjKey(*sub_it));
     }
 }
@@ -873,11 +848,10 @@ FindRes IndexNode<ChunkWidth>::find_all_no_copy(IndexKey<ChunkWidth> value, Inte
     REALM_ASSERT(it.m_positions.size());
     const IntegerColumn sub(m_alloc, it.m_positions.back().array_ref); // Throws
     REALM_ASSERT(sub.size());
-    SortedListComparator slc(m_cluster);
-    IntegerColumn::const_iterator it_end = sub.cend();
     REALM_ASSERT_3(it.m_positions.back().position, <, sub.size());
+    REALM_ASSERT_DEBUG(it.m_positions.back().position == 0);
     IntegerColumn::const_iterator lower = sub.cbegin() + it.m_positions.back().position;
-    IntegerColumn::const_iterator upper = std::upper_bound(lower, it_end, value.get_mixed(), slc);
+    IntegerColumn::const_iterator upper = sub.cend();
 
     if (upper - lower == 1) {
         result.payload = it.get_key().value;
@@ -943,13 +917,12 @@ void IndexNode<ChunkWidth>::find_all_insensitive(std::vector<ObjKey>& results, c
                 }
                 const IntegerColumn sub(m_alloc, ref); // Throws
                 REALM_ASSERT(sub.size());
-                // in the null entry there could be nulls or the empty string
                 for (size_t i = 0; i < sub.size(); ++i) {
-                    check_insensitive_value_for_key(sub.get(i));
+                    results.push_back(ObjKey(sub.get(i)));
                 }
                 continue;
             }
-            check_insensitive_value_for_key(rot.get_as_int());
+            results.push_back(ObjKey(rot.get_as_int()));
             continue;
         }
 
@@ -1073,7 +1046,18 @@ std::optional<size_t> IndexKey<ChunkWidth>::get() const
     else if (m_mixed.is_type(type_String)) {
         REALM_ASSERT_EX(ChunkWidth == 8, ChunkWidth); // FIXME: other sizes for strings
         StringData str = m_mixed.get<StringData>();
-        if ((m_offset * ChunkWidth) >= (8 * str.size())) {
+        // In order to differentiate between NULL and the empty string,
+        // we append an 'X' character to all non-null strings. This is
+        // the same solution that the StringIndex uses.
+        // "foo" is stored as if it was "fooX", and "" (empty string)
+        // is stored as "X".
+        constexpr size_t bits_per_char = 8;
+        const size_t cur_pos = m_offset * ChunkWidth;
+        const size_t end_pos = bits_per_char * str.size();
+        if (cur_pos >= end_pos) {
+            if (cur_pos == end_pos) {
+                return 'X';
+            }
             return {};
         }
         ret = (unsigned char)(str[m_offset]);
@@ -1104,8 +1088,8 @@ size_t IndexKey<ChunkWidth>::num_chunks_to_penultimate() const
         case type_String: {
             const size_t payload_bits = (m_mixed.get<StringData>().size() * 8);
             size_t chunks_in_str = ceil(double(payload_bits) / double(ChunkWidth));
-            REALM_ASSERT_DEBUG(m_offset <= chunks_in_str - 1);
-            return (chunks_in_str - 1) - m_offset;
+            REALM_ASSERT_DEBUG(m_offset <= chunks_in_str);
+            return chunks_in_str - m_offset;
         }
         default:
             break;
@@ -1666,12 +1650,7 @@ size_t RadixTree<ChunkWidth>::count(const Mixed& val) const
     REALM_ASSERT(it.m_positions.size());
     const IntegerColumn sub(m_array->get_alloc(), it.m_positions.back().array_ref); // Throws
     REALM_ASSERT(sub.size());
-    SortedListComparator slc(m_target_column);
-    IntegerColumn::const_iterator it_end = sub.cend();
-    REALM_ASSERT_3(it.m_positions.back().position, <, sub.size());
-    IntegerColumn::const_iterator lower = sub.cbegin() + it.m_positions.back().position;
-    IntegerColumn::const_iterator upper = std::upper_bound(lower, it_end, val, slc);
-    return upper - lower;
+    return sub.size();
 }
 
 template <size_t ChunkWidth>
