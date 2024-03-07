@@ -36,7 +36,7 @@ static const std::string dummy_device_id = "123400000000000000000000";
 
 TEST_CASE("sync_user: SyncManager `get_user()` API", "[sync][user]") {
     TestSyncManager init_sync_manager;
-    auto sync_manager = init_sync_manager.app()->sync_manager();
+    auto sync_manager = init_sync_manager.sync_manager();
     const std::string identity = "sync_test_identity";
     const std::string refresh_token = ENCODE_FAKE_JWT("1234567890-fake-refresh-token");
     const std::string access_token = ENCODE_FAKE_JWT("1234567890-fake-access-token");
@@ -86,7 +86,7 @@ TEST_CASE("sync_user: SyncManager `get_user()` API", "[sync][user]") {
 
 TEST_CASE("sync_user: update state and tokens", "[sync][user]") {
     TestSyncManager init_sync_manager;
-    auto sync_manager = init_sync_manager.app()->sync_manager();
+    auto sync_manager = init_sync_manager.sync_manager();
     const std::string identity = "sync_test_identity";
     const std::string refresh_token = ENCODE_FAKE_JWT("fake-refresh-token-1");
     const std::string access_token = ENCODE_FAKE_JWT("fake-access-token-1");
@@ -113,8 +113,8 @@ TEST_CASE("sync_user: update state and tokens", "[sync][user]") {
 }
 
 TEST_CASE("sync_user: SyncManager get_existing_logged_in_user() API", "[sync][user]") {
-    TestSyncManager init_sync_manager(SyncManager::MetadataMode::NoMetadata);
-    auto sync_manager = init_sync_manager.app()->sync_manager();
+    TestSyncManager init_sync_manager;
+    auto sync_manager = init_sync_manager.sync_manager();
     const std::string identity = "sync_test_identity";
     const std::string refresh_token = ENCODE_FAKE_JWT("1234567890-fake-refresh-token");
     const std::string access_token = ENCODE_FAKE_JWT("1234567890-fake-access-token");
@@ -165,8 +165,8 @@ TEST_CASE("sync_user: SyncManager get_existing_logged_in_user() API", "[sync][us
 }
 
 TEST_CASE("sync_user: logout", "[sync][user]") {
-    TestSyncManager init_sync_manager(SyncManager::MetadataMode::NoMetadata);
-    auto sync_manager = init_sync_manager.app()->sync_manager();
+    TestSyncManager init_sync_manager;
+    auto sync_manager = init_sync_manager.sync_manager();
     const std::string identity = "sync_test_identity";
     const std::string refresh_token = ENCODE_FAKE_JWT("1234567890-fake-refresh-token");
     const std::string access_token = ENCODE_FAKE_JWT("1234567890-fake-access-token");
@@ -180,9 +180,11 @@ TEST_CASE("sync_user: logout", "[sync][user]") {
 }
 
 TEST_CASE("sync_user: user persistence", "[sync][user]") {
-    TestSyncManager tsm(SyncManager::MetadataMode::NoEncryption);
-    auto sync_manager = tsm.app()->sync_manager();
-    auto file_manager = SyncFileManager(tsm.base_file_path(), tsm.app()->config().app_id);
+    TestSyncManager::Config tsm_config;
+    tsm_config.metadata_mode = SyncManager::MetadataMode::NoEncryption;
+    TestSyncManager tsm(tsm_config);
+    auto sync_manager = tsm.sync_manager();
+    auto file_manager = SyncFileManager(tsm.base_file_path(), "app_id");
     // Open the metadata separately, so we can investigate it ourselves.
     SyncMetadataManager manager(file_manager.metadata_path(), false);
 

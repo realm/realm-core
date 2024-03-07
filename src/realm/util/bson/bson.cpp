@@ -659,8 +659,7 @@ static constexpr std::pair<std::string_view, FancyParser> bson_fancy_parsers[] =
          if (!base64 || !subType)
              throw BsonError("invalid extended json $binary");
          if (subType == 0x04) { // UUID
-             auto stringData = StringData(reinterpret_cast<const char*>(base64->data()), base64->size());
-             util::Optional<std::vector<char>> uuidChrs = util::base64_decode_to_vector(stringData);
+             util::Optional<std::vector<char>> uuidChrs = util::base64_decode_to_vector(*base64);
              if (!uuidChrs)
                  throw BsonError("Invalid base64 in $binary");
              UUID::UUIDBytes bytes{};
@@ -795,9 +794,14 @@ Bson dom_obj_to_bson(const Json& json)
 
 } // anonymous namespace
 
-Bson parse(const std::string_view& json)
+Bson parse(util::Span<const char> json)
 {
     return dom_elem_to_bson(Json::parse(json));
+}
+
+bool accept(util::Span<const char> json) noexcept
+{
+    return Json::accept(json);
 }
 
 } // namespace bson

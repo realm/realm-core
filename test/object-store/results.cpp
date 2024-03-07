@@ -43,6 +43,8 @@
 #include <realm/object-store/sync/sync_session.hpp>
 #endif
 
+#include <random>
+
 namespace realm {
 class TestHelper {
 public:
@@ -899,7 +901,6 @@ TEST_CASE("notifications: async delivery", "[notifications]") {
 TEST_CASE("notifications: skip", "[notifications]") {
     _impl::RealmCoordinator::assert_no_open_realms();
     InMemoryTestFile config;
-    config.cache = false;
     config.automatic_change_notifications = false;
 
     auto r = Realm::get_shared_realm(config);
@@ -1428,8 +1429,7 @@ TEST_CASE("notifications: sync", "[sync][pbs][notifications]") {
     TestSyncManager init_sync_manager({}, {false});
     auto& server = init_sync_manager.sync_server();
 
-    SyncTestFile config(init_sync_manager.app(), "test");
-    config.cache = false;
+    SyncTestFile config(init_sync_manager, "test");
     config.schema = Schema{
         {"object",
          {
@@ -1474,7 +1474,6 @@ TEST_CASE("notifications: sync", "[sync][pbs][notifications]") {
 TEST_CASE("notifications: results", "[notifications][results]") {
     _impl::RealmCoordinator::assert_no_open_realms();
     InMemoryTestFile config;
-    config.cache = false;
     config.automatic_change_notifications = false;
 
     auto r = Realm::get_shared_realm(config);
@@ -3275,7 +3274,6 @@ TEST_CASE("results: notifications after move", "[notifications][results]") {
 TEST_CASE("results: notifier with no callbacks", "[notifications][results]") {
     _impl::RealmCoordinator::assert_no_open_realms();
     InMemoryTestFile config;
-    config.cache = false;
     config.automatic_change_notifications = false;
 
     auto coordinator = _impl::RealmCoordinator::get_coordinator(config.path);
@@ -3351,7 +3349,6 @@ TEST_CASE("results: notifier with no callbacks", "[notifications][results]") {
 
 TEST_CASE("results: snapshots", "[results]") {
     InMemoryTestFile config;
-    config.cache = false;
     config.automatic_change_notifications = false;
     config.schema = Schema{
         {"object",
@@ -3672,7 +3669,6 @@ TEST_CASE("results: snapshots", "[results]") {
 TEST_CASE("results: distinct", "[results]") {
     const int N = 10;
     InMemoryTestFile config;
-    config.cache = false;
     config.automatic_change_notifications = false;
 
     auto r = Realm::get_shared_realm(config);
@@ -3883,7 +3879,6 @@ TEST_CASE("results: distinct", "[results]") {
 
 TEST_CASE("results: sort", "[results]") {
     InMemoryTestFile config;
-    config.cache = false;
     config.schema = Schema{
         {"object",
          {
@@ -4790,7 +4785,6 @@ TEST_CASE("results: nullable list of primitives", "[results]") {
 
 TEST_CASE("results: limit", "[results][limit]") {
     InMemoryTestFile config;
-    // config.cache = false;
     config.automatic_change_notifications = false;
     config.schema = Schema{
         {"object",
@@ -4916,7 +4910,6 @@ TEST_CASE("results: limit", "[results][limit]") {
 
 TEST_CASE("results: filter", "[results]") {
     InMemoryTestFile config;
-    config.cache = false;
     config.automatic_change_notifications = false;
 
     auto r = Realm::get_shared_realm(config);
@@ -4972,7 +4965,6 @@ TEST_CASE("results: filter", "[results]") {
 
 TEST_CASE("results: public name declared", "[results]") {
     InMemoryTestFile config;
-    // config.cache = false;
     config.automatic_change_notifications = false;
     config.schema = Schema{
         {"object",
@@ -5019,7 +5011,6 @@ TEST_CASE("results: public name declared", "[results]") {
 TEST_CASE("notifications: objects with PK recreated", "[results]") {
     _impl::RealmCoordinator::assert_no_open_realms();
     InMemoryTestFile config;
-    config.cache = false;
     config.automatic_change_notifications = false;
 
     auto r = Realm::get_shared_realm(config);

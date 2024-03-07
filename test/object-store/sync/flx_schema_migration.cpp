@@ -43,30 +43,20 @@ namespace realm::app {
 
 namespace {
 
-void create_schema(const AppSession& app_session, std::shared_ptr<SyncUser> user, Schema target_schema,
-                   int64_t target_schema_version)
+void create_schema(const AppSession& app_session, Schema target_schema, int64_t target_schema_version)
 {
     auto create_config = app_session.config;
     create_config.schema = target_schema;
     app_session.admin_api.create_schema(app_session.server_app_id, create_config);
 
-    auto remote_client = user->mongo_client("BackingDB");
-    auto db = remote_client.db("app");
-    auto settings = db["schema_history"];
-
     timed_sleeping_wait_for(
         [&] {
-            bson::BsonDocument filter_doc{{"app_id", ObjectId(app_session.server_app_id)},
-                                          {"version_major", target_schema_version}};
-            bool found = false;
-            settings.find_one(filter_doc,
-                              [&](util::Optional<bson::BsonDocument> document, util::Optional<app::AppError> error) {
-                                  REQUIRE_FALSE(error);
-                                  found = document.has_value();
-                              });
-            return found;
+            auto versions = app_session.admin_api.get_schema_versions(app_session.server_app_id);
+            return std::any_of(versions.begin(), versions.end(), [&](const AdminAPISession::SchemaVersionInfo& info) {
+                return info.version_major == target_schema_version;
+            });
         },
-        std::chrono::minutes(5), std::chrono::milliseconds(500));
+        std::chrono::minutes(5), std::chrono::seconds(1));
 
     // FIXME: There is a delay on the server between the schema being created and actually ready to use. This is due
     // to resource pool key cache keys using second precision (BAAS-18361). So we wait for a couple of seconds so the
@@ -275,7 +265,7 @@ TEST_CASE("Sync schema migrations don't work with sync open", "[sync][flx][flx s
         schema_v1[0].persisted_properties.back() = {"non_queryable_field2",
                                                     PropertyType::String | PropertyType::Nullable};
         config.schema = schema_v1;
-        create_schema(app_session, harness.app()->current_user(), *config.schema, config.schema_version);
+        create_schema(app_session, *config.schema, config.schema_version);
 
         REQUIRE_THROWS_AS(Realm::get_shared_realm(config), InvalidAdditiveSchemaChangeException);
         check_realm_schema(config.path, schema_v0, 0);
@@ -285,7 +275,7 @@ TEST_CASE("Sync schema migrations don't work with sync open", "[sync][flx][flx s
         // Remove table 'TopLevel2'.
         schema_v1.pop_back();
         config.schema = schema_v1;
-        create_schema(app_session, harness.app()->current_user(), *config.schema, config.schema_version);
+        create_schema(app_session, *config.schema, config.schema_version);
 
         config.sync_config->on_sync_client_event_hook = [&](std::weak_ptr<SyncSession>,
                                                             const SyncClientHookData& data) mutable {
@@ -331,7 +321,7 @@ TEST_CASE("Cannot migrate schema to unknown version", "[sync][flx][flx schema mi
         }
 
         SECTION("Schema versions") {
-            create_schema(app_session, harness.app()->current_user(), schema_v1, 1);
+            create_schema(app_session, schema_v1, 1);
         }
     }
 
@@ -360,7 +350,7 @@ TEST_CASE("Cannot migrate schema to unknown version", "[sync][flx][flx schema mi
         }
 
         SECTION(util::format("Schema versions | Realm schema: %1", schema_version)) {
-            create_schema(app_session, harness.app()->current_user(), schema_v1, 1);
+            create_schema(app_session, schema_v1, 1);
         }
     }
 
@@ -396,7 +386,7 @@ TEST_CASE("Schema version mismatch between client and server", "[sync][flx][flx 
 
     const AppSession& app_session = harness.session().app_session();
     auto schema_v1 = get_schema_v1();
-    create_schema(app_session, harness.app()->current_user(), schema_v1, 1);
+    create_schema(app_session, schema_v1, 1);
 
     {
         auto realm = Realm::get_shared_realm(config);
@@ -459,7 +449,7 @@ TEST_CASE("Fresh realm does not require schema migration", "[sync][flx][flx sche
 
     const AppSession& app_session = harness.session().app_session();
     auto schema_v1 = get_schema_v1();
-    create_schema(app_session, harness.app()->current_user(), schema_v1, 1);
+    create_schema(app_session, schema_v1, 1);
 
     config.schema_version = 1;
     config.schema = schema_v1;
@@ -548,9 +538,9 @@ TEST_CASE("Upgrade schema version (with recovery) then downgrade", "[sync][flx][
 
     const AppSession& app_session = harness.session().app_session();
     auto schema_v1 = get_schema_v1();
-    create_schema(app_session, harness.app()->current_user(), schema_v1, 1);
+    create_schema(app_session, schema_v1, 1);
     auto schema_v2 = get_schema_v2();
-    create_schema(app_session, harness.app()->current_user(), schema_v2, 2);
+    create_schema(app_session, schema_v2, 2);
 
     // First schema upgrade.
     {
@@ -668,7 +658,7 @@ TEST_CASE("An interrupted schema migration can recover on the next session",
 
     const AppSession& app_session = harness.session().app_session();
     auto schema_v1 = get_schema_v1();
-    create_schema(app_session, harness.app()->current_user(), schema_v1, 1);
+    create_schema(app_session, schema_v1, 1);
 
     config.schema_version = 1;
     config.schema = schema_v1;
@@ -731,7 +721,7 @@ TEST_CASE("Migrate to new schema version with a schema subset", "[sync][flx][flx
 
     const AppSession& app_session = harness.session().app_session();
     auto schema_v1 = get_schema_v1();
-    create_schema(app_session, harness.app()->current_user(), schema_v1, 1);
+    create_schema(app_session, schema_v1, 1);
 
     config.schema_version = 1;
     auto schema_subset = schema_v1;
@@ -777,7 +767,7 @@ TEST_CASE("Client reset during schema migration", "[sync][flx][flx schema migrat
 
     const AppSession& app_session = harness.session().app_session();
     auto schema_v1 = get_schema_v1();
-    create_schema(app_session, harness.app()->current_user(), schema_v1, 1);
+    create_schema(app_session, schema_v1, 1);
 
     config.schema_version = 1;
     config.schema = schema_v1;
@@ -867,9 +857,9 @@ TEST_CASE("Migrate to new schema version after migration to intermediate version
 
     const AppSession& app_session = harness.session().app_session();
     auto schema_v1 = get_schema_v1();
-    create_schema(app_session, harness.app()->current_user(), schema_v1, 1);
+    create_schema(app_session, schema_v1, 1);
     auto schema_v2 = get_schema_v2();
-    create_schema(app_session, harness.app()->current_user(), schema_v2, 2);
+    create_schema(app_session, schema_v2, 2);
 
     config.schema_version = 1;
     config.schema = schema_v1;
@@ -933,7 +923,7 @@ TEST_CASE("Send schema version zero if no schema is used to open the realm",
 
     const AppSession& app_session = harness.session().app_session();
     auto schema_v1 = get_schema_v1();
-    create_schema(app_session, harness.app()->current_user(), schema_v1, 1);
+    create_schema(app_session, schema_v1, 1);
 
     config.schema = {};
     config.schema_version = -1; // override the schema version set by SyncTestFile constructor

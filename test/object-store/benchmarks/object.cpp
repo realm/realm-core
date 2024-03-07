@@ -35,6 +35,7 @@
 #include <realm/object-store/util/scheduler.hpp>
 
 #include <memory>
+#include <random>
 #include <vector>
 
 using namespace realm;
@@ -780,7 +781,6 @@ TEST_CASE("Benchmark object notification delivery", "[benchmark][notifications]"
     InMemoryTestFile config;
     config.automatic_change_notifications = false;
     config.schema = Schema{{"object", {{"value", PropertyType::Int}}}};
-    config.cache = false;
     auto r = Realm::get_shared_realm(config);
 
     r->begin_transaction();

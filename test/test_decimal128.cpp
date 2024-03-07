@@ -117,7 +117,7 @@ TEST(Decimal_Basics)
 
 TEST(Decimal_Int64_Conversions)
 {
-    auto check_roundtrip = [=](int64_t v) {
+    auto check_roundtrip = [this](int64_t v) {
         int64_t v2 = 0;
         CHECK(Decimal128(v).to_int(v2));
         CHECK_EQUAL(v, v2);

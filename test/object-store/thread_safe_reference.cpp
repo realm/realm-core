@@ -70,10 +70,8 @@ TEST_CASE("thread safe reference") {
 
     TestFile config;
     config.automatic_change_notifications = false;
-    config.cache = false;
-    config.in_memory = true;
-    config.encryption_key = std::vector<char>();
     config.schema = schema;
+    config.in_memory = true;
     auto r = Realm::get_shared_realm(config);
 
     const auto int_obj_col = r->schema().find("int object")->persisted_properties[0].column_key;

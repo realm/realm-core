@@ -647,6 +647,12 @@ records:
      reason: std::string
      primary_key: Mixed
 
+  SaltedFileIdent:
+    cppName: sync::SaltedFileIdent
+    fields:
+      ident: uint64_t
+      salt: int64_t
+
 opaqueTypes:
   - Schema
   - Group
@@ -685,6 +691,7 @@ classes:
       # Converts char* and length to a combined string_view argument to callback.
       # TODO: Consider making preverify_ok a bool.
       make_ssl_verify_callback: '(callback: (server_address: const std::string&, server_port: int, pem_data: std::string_view, preverify_ok: int, depth: int) off_thread -> bool) -> SSLVerifyCallback'
+      needs_file_format_upgrade: '(config: const RealmConfig&) -> bool'
 
   Logger:
     cppName: util::Logger
@@ -1304,6 +1311,7 @@ classes:
       force_close: ()
       shutdown_and_wait: ()
       update_configuration: '(config: SyncConfig)'
+      get_file_ident: '() -> SaltedFileIdent'
 
   SSLVerifyCallback:
     cppName: std::function<SyncConfig::SSLVerifyCallback>

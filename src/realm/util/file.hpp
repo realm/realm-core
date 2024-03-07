@@ -34,12 +34,12 @@
 #include <sys/stat.h>
 #endif
 
-#include <realm/utilities.hpp>
-#include <realm/util/assert.hpp>
 #include <realm/exceptions.hpp>
+#include <realm/util/assert.hpp>
 #include <realm/util/features.h>
 #include <realm/util/function_ref.hpp>
 #include <realm/util/safe_int_ops.hpp>
+#include <realm/utilities.hpp>
 
 #if defined(_MSVC_LANG) // compiling with MSVC
 #include <filesystem>
@@ -516,7 +516,7 @@ public:
     static void move(const std::string& old_path, const std::string& new_path);
 
     /// Copy the file at the specified origin path to the specified target path.
-    static void copy(const std::string& origin_path, const std::string& target_path);
+    static bool copy(const std::string& origin_path, const std::string& target_path, bool overwrite_existing = true);
 
     /// Compare the two files at the specified paths for equality. Returns true
     /// if, and only if they are equal.

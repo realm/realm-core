@@ -455,10 +455,8 @@ void SyncSession::update_error_and_mark_file_for_deletion(SyncError& error, Shou
     using Action = SyncFileActionMetadata::Action;
     auto action = should_backup == ShouldBackup::yes ? Action::BackUpThenDeleteRealm : Action::DeleteRealm;
     m_sync_manager->perform_metadata_update([action, original_path = std::move(original_path),
-                                             recovery_path = std::move(recovery_path),
-                                             partition_value = m_config.sync_config->partition_value,
-                                             identity = m_config.sync_config->user->identity()](const auto& manager) {
-        manager.make_file_action_metadata(original_path, partition_value, identity, action, recovery_path);
+                                             recovery_path = std::move(recovery_path)](const auto& manager) {
+        manager.make_file_action_metadata(original_path, action, recovery_path);
     });
 }
 

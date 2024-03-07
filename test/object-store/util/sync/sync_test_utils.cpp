@@ -200,7 +200,7 @@ void wait_for_sessions_to_close(const TestAppSession& test_app_session)
 {
     timed_sleeping_wait_for(
         [&]() -> bool {
-            return !test_app_session.app()->sync_manager()->has_existing_sessions();
+            return !test_app_session.sync_manager()->has_existing_sessions();
         },
         std::chrono::minutes(5), std::chrono::milliseconds(100));
 }
@@ -518,7 +518,7 @@ void wait_for_num_objects_in_atlas(std::shared_ptr<SyncUser> user, const AppSess
 
 void trigger_client_reset(const AppSession& app_session, const SyncSession& sync_session)
 {
-    auto file_ident = SyncSession::OnlyForTesting::get_file_ident(sync_session);
+    auto file_ident = sync_session.get_file_ident();
     REQUIRE(file_ident.ident != 0);
     app_session.admin_api.trigger_client_reset(app_session.server_app_id, file_ident.ident);
 }
@@ -547,7 +547,7 @@ struct BaasClientReset : public TestClientReset {
     {
         m_did_run = true;
         const AppSession& app_session = m_test_app_session.app_session();
-        auto sync_manager = m_test_app_session.app()->sync_manager();
+        auto sync_manager = m_test_app_session.sync_manager();
         std::string partition_value = m_local_config.sync_config->partition_value;
         REALM_ASSERT(partition_value.size() > 2 && *partition_value.begin() == '"' &&
                      *(partition_value.end() - 1) == '"');

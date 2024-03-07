@@ -5,14 +5,12 @@ include("${CMAKE_CURRENT_LIST_DIR}/AcquireRealmDependency.cmake")
 include(CMakeFindDependencyMacro)
 
 if(@REALM_HAVE_OPENSSL@)
-    if(NOT REALM_USE_SYSTEM_OPENSSL AND (ANDROID OR WIN32 OR CMAKE_SYSTEM_NAME STREQUAL "Linux"))
+    if(NOT @REALM_USE_SYSTEM_OPENSSL@ AND (ANDROID OR WIN32 OR CMAKE_SYSTEM_NAME STREQUAL "Linux"))
         # Use our own prebuilt OpenSSL
         realm_acquire_dependency(openssl @OPENSSL_VERSION@ OPENSSL_CMAKE_INCLUDE_FILE)
 
         include(${OPENSSL_CMAKE_INCLUDE_FILE})
     endif()
-
-    set(OPENSSL_USE_STATIC_LIBS ON)
     find_dependency(OpenSSL @OPENSSL_VERSION@)
 endif()
 
@@ -25,8 +23,11 @@ find_dependency(Threads)
 # Just use -lz and let Xcode figure it out
 if(TARGET Realm::Sync AND NOT APPLE AND NOT TARGET ZLIB::ZLIB)
     if(WIN32 OR (CMAKE_SYSTEM_NAME STREQUAL "Linux" AND REALM_LINUX_TOOLCHAIN))
-        realm_acquire_dependency(zlib @DEP_ZLIB_VERSION@ ZLIB_CMAKE_INCLUDE_FILE)
-        include(${ZLIB_CMAKE_INCLUDE_FILE})
+        find_package(ZLIB)
+        if (NOT ZLIB_FOUND)
+            realm_acquire_dependency(zlib @DEP_ZLIB_VERSION@ ZLIB_CMAKE_INCLUDE_FILE)
+            include(${ZLIB_CMAKE_INCLUDE_FILE})
+        endif()
     elseif(ANDROID)
         # On Android FindZLIB chooses the static libz over the dynamic one, but this leads to issues
         # (see https://github.com/android/ndk/issues/1179)

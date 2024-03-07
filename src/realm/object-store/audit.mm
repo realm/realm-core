@@ -484,7 +484,7 @@ public:
         , m_serializer(serializer)
         , m_table(audit_table)
         , m_repl(*m_table.get_parent_group()->get_replication())
-        , m_repl_buffer([=]() -> const util::AppendBuffer<char>& {
+        , m_repl_buffer([this]() -> const util::AppendBuffer<char>& {
             REALM_ASSERT(typeid(m_repl) == typeid(sync::ClientReplication));
             return static_cast<sync::SyncReplication&>(m_repl).get_instruction_encoder().buffer();
         }())
@@ -683,7 +683,7 @@ std::shared_ptr<AuditRealmPool> AuditRealmPool::get_pool(std::shared_ptr<SyncUse
                                  }),
                   s_pools.end());
 
-    auto app_id = user->sync_manager()->app().lock()->config().app_id;
+    auto app_id = user->sync_manager()->app_id();
     auto it = std::find_if(s_pools.begin(), s_pools.end(), [&](auto& pool) {
         return pool.user_identity == user->identity() && pool.partition_prefix == partition_prefix &&
                pool.app_id == app_id;
@@ -889,7 +889,6 @@ void AuditRealmPool::open_new_realm()
 
     Realm::Config config;
     config.automatic_change_notifications = false;
-    config.cache = false;
     config.path = util::format("%1%2.realm", m_path_root, partition);
     config.scheduler = util::Scheduler::make_dummy();
     config.schema = Schema{schema};
@@ -1173,6 +1172,14 @@ bool AuditContext::is_scope_valid(uint64_t id)
 void AuditContext::process_scope(AuditContext::Scope& scope) const
 {
     m_logger->info("Events: Processing scope for '%1'", m_source_db->get_path());
+    if (scope.events.empty()) {
+        m_logger->detail("Events: Scope is empty");
+        if (scope.completion)
+            scope.completion(nullptr);
+        m_serializer->scope_complete();
+        return;
+    }
+
     try {
         // Merge single object reads following a query into that query and discard
         // duplicate reads on objects.

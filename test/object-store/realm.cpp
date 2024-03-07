@@ -16,10 +16,10 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include <util/event_loop.hpp>
-#include <util/test_file.hpp>
-#include <util/test_utils.hpp>
-#include <../util/semaphore.hpp>
+#include "util/event_loop.hpp"
+#include "util/test_file.hpp"
+#include "util/test_utils.hpp"
+#include "../util/semaphore.hpp"
 
 #include <realm/db.hpp>
 #include <realm/history.hpp>
@@ -48,7 +48,7 @@
 
 #include <realm/object-store/sync/async_open_task.hpp>
 #include <realm/object-store/sync/impl/sync_metadata.hpp>
-
+#include <realm/object-store/sync/sync_session.hpp>
 #include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/subscriptions.hpp>
 #endif
@@ -387,11 +387,7 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
     }
 
     SECTION("should sensibly handle opening an uninitialized file without a schema specified") {
-        SECTION("cached") {
-        }
-        SECTION("uncached") {
-            config.cache = false;
-        }
+        config.cache = GENERATE(false, true);
 
         // create an empty file
         util::File(config.path, util::File::mode_Write);
@@ -926,16 +922,15 @@ TEST_CASE("Get Realm using Async Open", "[sync][pbs][async open]") {
     if (!util::EventLoop::has_implementation())
         return;
 
-    TestSyncManager init_sync_manager;
-    SyncTestFile config(init_sync_manager.app(), "default");
-    config.cache = false;
+    TestSyncManager tsm;
+    SyncTestFile config(tsm, "default");
     ObjectSchema object_schema = {"object",
                                   {
                                       {"_id", PropertyType::Int, Property::IsPrimary{true}},
                                       {"value", PropertyType::Int},
                                   }};
     config.schema = Schema{object_schema};
-    SyncTestFile config2(init_sync_manager.app(), "default");
+    SyncTestFile config2(tsm, "default");
     config2.schema = config.schema;
 
     std::mutex mutex;
@@ -965,7 +960,7 @@ TEST_CASE("Get Realm using Async Open", "[sync][pbs][async open]") {
 
     SECTION("can write a realm file without client file id") {
         ThreadSafeReference realm_ref;
-        SyncTestFile config3(init_sync_manager.app(), "default");
+        SyncTestFile config3(tsm, "default");
         config3.schema = config.schema;
         uint64_t client_file_id;
 
@@ -1116,10 +1111,10 @@ TEST_CASE("Get Realm using Async Open", "[sync][pbs][async open]") {
     }
 
     SECTION("can download multiple Realms at a time") {
-        SyncTestFile config1(init_sync_manager.app(), "realm1");
-        SyncTestFile config2(init_sync_manager.app(), "realm2");
-        SyncTestFile config3(init_sync_manager.app(), "realm3");
-        SyncTestFile config4(init_sync_manager.app(), "realm4");
+        SyncTestFile config1(tsm, "realm1");
+        SyncTestFile config2(tsm, "realm2");
+        SyncTestFile config3(tsm, "realm3");
+        SyncTestFile config4(tsm, "realm4");
 
         std::vector<std::shared_ptr<AsyncOpenTask>> tasks = {
             Realm::get_synchronized_realm(config1),
@@ -1139,17 +1134,13 @@ TEST_CASE("Get Realm using Async Open", "[sync][pbs][async open]") {
         });
     }
 
-    // Create a token which can be parsed as a JWT but is not valid
-    std::string unencoded_body = nlohmann::json({{"exp", 123}, {"iat", 456}}).dump();
-    std::string encoded_body;
-    encoded_body.resize(util::base64_encoded_size(unencoded_body.size()));
-    util::base64_encode(unencoded_body.data(), unencoded_body.size(), &encoded_body[0], encoded_body.size());
-    auto invalid_token = "." + encoded_body + ".";
+    auto expired_token = encode_fake_jwt("", 123, 456);
 
     SECTION("can async open while waiting for a token refresh") {
-        SyncTestFile config(init_sync_manager.app(), "realm");
-        auto valid_token = config.sync_config->user->access_token();
-        config.sync_config->user->update_access_token(std::move(invalid_token));
+        SyncTestFile config(tsm, "realm");
+        auto user = config.sync_config->user;
+        auto valid_token = user->access_token();
+        user->update_access_token(std::move(expired_token));
 
         std::atomic<bool> called{false};
         auto task = Realm::get_synchronized_realm(config);
@@ -1159,9 +1150,11 @@ TEST_CASE("Get Realm using Async Open", "[sync][pbs][async open]") {
             REQUIRE(!error);
             called = true;
         });
+        auto session = tsm.sync_manager()->get_existing_session(config.path);
+        REQUIRE(session);
+        CHECK(session->state() == SyncSession::State::WaitingForAccessToken);
 
-        auto body = nlohmann::json({{"access_token", valid_token}}).dump();
-        init_sync_manager.network_callback(app::Response{200, 0, {}, body});
+        session->update_access_token(valid_token);
         util::EventLoop::main().run_until([&] {
             return called.load();
         });
@@ -1170,20 +1163,25 @@ TEST_CASE("Get Realm using Async Open", "[sync][pbs][async open]") {
     }
 
     SECTION("cancels download and reports an error on auth error") {
-        struct Transport : realm::app::GenericNetworkTransport {
+        struct Transport : UnitTestTransport {
             void send_request_to_server(
-                const realm::app::Request&,
+                const realm::app::Request& req,
                 realm::util::UniqueFunction<void(const realm::app::Response&)>&& completion) override
             {
-                completion(app::Response{403});
+                if (req.url.find("/auth/session") != std::string::npos) {
+                    completion(app::Response{403});
+                }
+                else {
+                    UnitTestTransport::send_request_to_server(req, std::move(completion));
+                }
             }
         };
-        TestSyncManager::Config tsm_config;
-        tsm_config.transport = std::make_shared<Transport>();
-        TestSyncManager tsm(tsm_config);
+        OfflineAppSession::Config oas_config;
+        oas_config.transport = std::make_shared<Transport>();
+        OfflineAppSession oas(oas_config);
 
-        SyncTestFile config(tsm.app(), "realm");
-        config.sync_config->user->log_in(invalid_token, invalid_token);
+        SyncTestFile config(oas, "realm");
+        config.sync_config->user->log_in(expired_token, expired_token);
 
         bool got_error = false;
         config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError) {
@@ -1350,7 +1348,7 @@ TEST_CASE("SharedRealm: convert", "[sync][pbs][convert]") {
                                   }};
     Schema schema{object_schema};
 
-    SyncTestFile sync_config1(tsm.app(), "default");
+    SyncTestFile sync_config1(tsm, "default");
     sync_config1.schema = schema;
     TestFile local_config1;
     local_config1.schema = schema;
@@ -1365,7 +1363,7 @@ TEST_CASE("SharedRealm: convert", "[sync][pbs][convert]") {
         wait_for_download(*sync_realm1);
 
         // Copy to a new sync config
-        SyncTestFile sync_config2(tsm.app(), "default");
+        SyncTestFile sync_config2(tsm, "default");
         sync_config2.schema = schema;
 
         sync_realm1->convert(sync_config2);
@@ -1452,7 +1450,7 @@ TEST_CASE("SharedRealm: convert - embedded objects", "[sync][pbs][convert][embed
                                     }};
     Schema schema{object_schema, embedded_schema};
 
-    SyncTestFile sync_config1(tsm.app(), "default");
+    SyncTestFile sync_config1(tsm, "default");
     sync_config1.schema = schema;
     TestFile local_config1;
     local_config1.schema = schema;
@@ -1477,7 +1475,7 @@ TEST_CASE("SharedRealm: convert - embedded objects", "[sync][pbs][convert][embed
         wait_for_download(*sync_realm1);
 
         // Copy to a new sync config
-        SyncTestFile sync_config2(tsm.app(), "default");
+        SyncTestFile sync_config2(tsm, "default");
         sync_config2.schema = schema;
 
         sync_realm1->convert(sync_config2);
@@ -2619,7 +2617,6 @@ TEST_CASE("SharedRealm: async_writes_2") {
         return;
 
     TestFile config;
-    config.cache = false;
     config.schema_version = 0;
     config.schema = Schema{
         {"object", {{"value", PropertyType::Int}}},

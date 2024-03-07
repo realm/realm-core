@@ -103,13 +103,6 @@ struct StringMaker<Results> {
         return str;
     }
 };
-template <>
-struct StringMaker<util::None> {
-    static std::string convert(util::None)
-    {
-        return "[none]";
-    }
-};
 } // namespace Catch
 
 TEMPLATE_TEST_CASE("primitive list", "[primitives]", cf::MixedVal, cf::Int, cf::Bool, cf::Float, cf::Double,
@@ -125,7 +118,6 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", cf::MixedVal, cf::Int, cf::
     using Boxed = typename TestType::Boxed;
 
     InMemoryTestFile config;
-    config.cache = false;
     config.automatic_change_notifications = false;
     config.schema = Schema{
         {"object", {{"value", PropertyType::Array | TestType::property_type}}},
@@ -855,7 +847,6 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", cf::MixedVal, cf::Int, cf::
 
 TEST_CASE("list of mixed links", "[primitives]") {
     InMemoryTestFile config;
-    config.cache = false;
     config.automatic_change_notifications = false;
     config.schema = Schema{
         {"object", {{"value", PropertyType::Array | PropertyType::Mixed | PropertyType::Nullable}}},

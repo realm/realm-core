@@ -25,28 +25,11 @@
 
 #include <realm/obj.hpp>
 #include <realm/table.hpp>
-#include <realm/util/optional.hpp>
 #include <string>
 
 namespace realm {
+class SyncFileManager;
 class SyncMetadataManager;
-
-// A facade for a metadata Realm object representing app metadata
-class SyncAppMetadata {
-public:
-    struct Schema {
-        ColKey id_col;
-        ColKey deployment_model_col;
-        ColKey location_col;
-        ColKey hostname_col;
-        ColKey ws_hostname_col;
-    };
-
-    std::string deployment_model;
-    std::string location;
-    std::string hostname;
-    std::string ws_hostname;
-};
 
 // A facade for a metadata Realm object representing a sync user.
 class SyncUserMetadata {
@@ -133,10 +116,6 @@ public:
         ColKey idx_new_name;
         // An enum describing the action to take.
         ColKey idx_action;
-        // The partition key of the Realm.
-        ColKey idx_partition;
-        // The local UUID of the user to whom the file action applies (despite the internal column name).
-        ColKey idx_user_identity;
     };
 
     enum class Action {
@@ -155,11 +134,7 @@ public:
     // For all other `Action`s, it is ignored.
     util::Optional<std::string> new_name() const;
 
-    // Get the local UUID of the user associated with this file action metadata.
-    std::string user_local_uuid() const;
-
     Action action() const;
-    std::string partition() const;
     void remove();
     void set_action(Action new_action);
 
@@ -207,6 +182,11 @@ class SyncMetadataManager {
     friend class SyncFileActionMetadata;
 
 public:
+    std::vector<SyncUserMetadata> all_logged_in_users() const;
+
+    // Perform all pending file actions and delete any remaining data for removed users.
+    void perform_launch_actions(SyncFileManager& file_manager) const;
+
     // Return a Results object containing all users not marked for removal.
     SyncUserMetadataResults all_unmarked_users() const;
 
@@ -225,24 +205,15 @@ public:
 
     // Retrieve file action metadata.
     util::Optional<SyncFileActionMetadata> get_file_action_metadata(StringData path) const;
+    // Perform any stored file actions for the given path.
+    bool perform_file_actions(SyncFileManager& file_manager, StringData path) const;
 
     // Create file action metadata.
-    void make_file_action_metadata(StringData original_name, StringData partition_key_value, StringData local_uuid,
-                                   SyncFileActionMetadata::Action action, StringData new_name = {}) const;
+    void make_file_action_metadata(StringData original_name, SyncFileActionMetadata::Action action,
+                                   StringData new_name = {}) const;
 
     util::Optional<std::string> get_current_user_identity() const;
     void set_current_user_identity(const std::string& identity);
-
-    util::Optional<SyncAppMetadata> get_app_metadata();
-    /// Set or update the cached app server metadata. The metadata will not be updated if it has already been
-    /// set and the provided values are not different than the cached information. Returns true if the metadata
-    /// was updated.
-    /// @param deployment_model The deployment model reported by the app server
-    /// @param location The location name where the app server is located
-    /// @param hostname The hostname to use for the app server admin api
-    /// @param ws_hostname The hostname to use for the app server websocket connections
-    bool set_app_metadata(const std::string& deployment_model, const std::string& location,
-                          const std::string& hostname, const std::string& ws_hostname);
 
     /// Construct the metadata manager.
     ///
@@ -257,14 +228,12 @@ private:
     Realm::Config m_metadata_config;
     SyncUserMetadata::Schema m_user_schema;
     SyncFileActionMetadata::Schema m_file_action_schema;
-    SyncAppMetadata::Schema m_app_metadata_schema;
 
     std::shared_ptr<Realm> get_realm() const;
     std::shared_ptr<Realm> try_get_realm() const;
     std::shared_ptr<Realm> open_realm(bool should_encrypt, bool caller_supplied_key);
 
-
-    util::Optional<SyncAppMetadata> m_app_metadata;
+    bool run_file_action(SyncFileManager& file_manager, SyncFileActionMetadata& md) const;
 };
 
 } // namespace realm

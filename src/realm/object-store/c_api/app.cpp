@@ -121,7 +121,7 @@ static inline bson::BsonArray parse_ejson_array(const char* serialized)
         return {};
     }
     else {
-        return bson::BsonArray(bson::parse(serialized));
+        return bson::BsonArray(bson::parse({serialized, strlen(serialized)}));
     }
 }
 
