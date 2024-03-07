@@ -892,7 +892,7 @@ TEMPLATE_TEST_CASE("sync progress notifications", "[sync][baas][progress]", PBS,
 
         CHECK_FALSE(err);
         REQUIRE(ref);
-        auto realm_3 = Realm::get_shared_realm(std::move(ref));
+        auto realm_3 = Realm::get_shared_realm(std::move(ref), util::Scheduler::make_dummy());
         VERIFY_REALM(realm_1, realm_3, expected_count);
         realm_3.reset();
 
