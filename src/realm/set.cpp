@@ -55,7 +55,7 @@ void SetBase::clear_repl(Replication* repl) const
 static std::vector<Mixed> convert_to_set(const CollectionBase& rhs)
 {
     std::vector<Mixed> mixed(rhs.begin(), rhs.end());
-    std::sort(mixed.begin(), mixed.end(), SetElementLessThan<Mixed>());
+    std::sort(mixed.begin(), mixed.end());
     mixed.erase(std::unique(mixed.begin(), mixed.end()), mixed.end());
     return mixed;
 }
@@ -72,7 +72,7 @@ bool SetBase::is_subset_of(const CollectionBase& rhs) const
 template <class It1, class It2>
 bool SetBase::is_subset_of(It1 first, It2 last) const
 {
-    return std::includes(first, last, begin(), end(), SetElementLessThan<Mixed>{});
+    return std::includes(first, last, begin(), end());
 }
 
 bool SetBase::is_strict_subset_of(const CollectionBase& rhs) const
@@ -96,7 +96,7 @@ bool SetBase::is_superset_of(const CollectionBase& rhs) const
 template <class It1, class It2>
 bool SetBase::is_superset_of(It1 first, It2 last) const
 {
-    return std::includes(begin(), end(), first, last, SetElementLessThan<Mixed>{});
+    return std::includes(begin(), end(), first, last);
 }
 
 bool SetBase::is_strict_superset_of(const CollectionBase& rhs) const
@@ -120,13 +120,12 @@ bool SetBase::intersects(const CollectionBase& rhs) const
 template <class It1, class It2>
 bool SetBase::intersects(It1 first, It2 last) const
 {
-    SetElementLessThan<Mixed> less;
     auto it = begin();
     while (it != end() && first != last) {
-        if (less(*it, *first)) {
+        if (*it < *first) {
             ++it;
         }
-        else if (less(*first, *it)) {
+        else if (*first < *it) {
             ++first;
         }
         else {
@@ -161,7 +160,7 @@ template <class It1, class It2>
 void SetBase::assign_union(It1 first, It2 last)
 {
     std::vector<Mixed> the_diff;
-    std::set_difference(first, last, begin(), end(), std::back_inserter(the_diff), SetElementLessThan<Mixed>{});
+    std::set_difference(first, last, begin(), end(), std::back_inserter(the_diff));
     // 'the_diff' now contains all the elements that are in foreign set, but not in 'this'
     // Now insert those elements
     for (auto&& value : the_diff) {
@@ -185,7 +184,7 @@ template <class It1, class It2>
 void SetBase::assign_intersection(It1 first, It2 last)
 {
     std::vector<Mixed> intersection;
-    std::set_intersection(first, last, begin(), end(), std::back_inserter(intersection), SetElementLessThan<Mixed>{});
+    std::set_intersection(first, last, begin(), end(), std::back_inserter(intersection));
     clear();
     // Elements in intersection comes from foreign set, so ok to use here
     for (auto&& value : intersection) {
@@ -210,7 +209,7 @@ template <class It1, class It2>
 void SetBase::assign_difference(It1 first, It2 last)
 {
     std::vector<Mixed> intersection;
-    std::set_intersection(first, last, begin(), end(), std::back_inserter(intersection), SetElementLessThan<Mixed>{});
+    std::set_intersection(first, last, begin(), end(), std::back_inserter(intersection));
     // 'intersection' now contains all the elements that are in both foreign set and 'this'.
     // Remove those elements. The elements comes from the foreign set, so ok to refer to.
     for (auto&& value : intersection) {
@@ -235,9 +234,9 @@ template <class It1, class It2>
 void SetBase::assign_symmetric_difference(It1 first, It2 last)
 {
     std::vector<Mixed> difference;
-    std::set_difference(first, last, begin(), end(), std::back_inserter(difference), SetElementLessThan<Mixed>{});
+    std::set_difference(first, last, begin(), end(), std::back_inserter(difference));
     std::vector<Mixed> intersection;
-    std::set_intersection(first, last, begin(), end(), std::back_inserter(intersection), SetElementLessThan<Mixed>{});
+    std::set_intersection(first, last, begin(), end(), std::back_inserter(intersection));
     // Now remove the common elements and add the differences
     for (auto&& value : intersection) {
         erase_any(value);
@@ -298,6 +297,31 @@ bool SetBase::do_init_from_parent(ref_type ref, bool allow_create) const
         throw;
     }
     return true;
+}
+
+void SetBase::resort_range(size_t start, size_t end)
+{
+    if (end > size()) {
+        end = size();
+    }
+    if (start >= end) {
+        return;
+    }
+    std::vector<size_t> indices;
+    indices.resize(end - start);
+    std::iota(indices.begin(), indices.end(), 0);
+    std::sort(indices.begin(), indices.end(), [&](auto a, auto b) {
+        return get_any(a + start) < get_any(b + start);
+    });
+    for (size_t i = 0; i < indices.size(); ++i) {
+        if (indices[i] != i) {
+            m_tree->swap(i + start, start + indices[i]);
+            auto it = std::find(indices.begin() + i, indices.end(), i);
+            REALM_ASSERT(it != indices.end());
+            *it = indices[i];
+            indices[i] = i;
+        }
+    }
 }
 
 /********************************* Set<Key> *********************************/
@@ -445,32 +469,6 @@ void Set<Mixed>::migrate()
     }
 }
 
-template <class T>
-void Set<T>::do_resort(size_t start, size_t end)
-{
-    if (end > size()) {
-        end = size();
-    }
-    if (start >= end) {
-        return;
-    }
-    std::vector<size_t> indices;
-    indices.resize(end - start);
-    std::iota(indices.begin(), indices.end(), 0);
-    std::sort(indices.begin(), indices.end(), [&](auto a, auto b) {
-        return get(a + start) < get(b + start);
-    });
-    for (size_t i = 0; i < indices.size(); ++i) {
-        if (indices[i] != i) {
-            tree().swap(i + start, start + indices[i]);
-            auto it = std::find(indices.begin() + i, indices.end(), i);
-            REALM_ASSERT(it != indices.end());
-            *it = indices[i];
-            indices[i] = i;
-        }
-    }
-}
-
 template <>
 void Set<Mixed>::migration_resort()
 {
@@ -479,21 +477,21 @@ void Set<Mixed>::migration_resort()
     auto last_binary = std::partition_point(first_string, end(), [](const Mixed& item) {
         return item.is_type(type_String, type_Binary);
     });
-    do_resort(first_string.index(), last_binary.index());
+    resort_range(first_string.index(), last_binary.index());
 }
 
 template <>
 void Set<StringData>::migration_resort()
 {
     // sort order of strings changed
-    do_resort(0, size());
+    resort_range(0, size());
 }
 
 template <>
 void Set<BinaryData>::migration_resort()
 {
     // sort order of binaries changed
-    do_resort(0, size());
+    resort_range(0, size());
 }
 
 void LnkSet::remove_target_row(size_t link_ndx)
@@ -526,7 +524,6 @@ void LnkSet::to_json(std::ostream& out, JSONOutputMode, util::FunctionRef<void(c
     out << "]";
 }
 
-
 void set_sorted_indices(size_t sz, std::vector<size_t>& indices, bool ascending)
 {
     indices.resize(sz);
@@ -537,48 +534,4 @@ void set_sorted_indices(size_t sz, std::vector<size_t>& indices, bool ascending)
         std::iota(indices.rbegin(), indices.rend(), 0);
     }
 }
-
-template <typename Iterator>
-static bool partition_points(const Set<Mixed>& set, std::vector<size_t>& indices, Iterator& first_string,
-                             Iterator& first_binary, Iterator& end)
-{
-    first_string = std::partition_point(indices.begin(), indices.end(), [&](size_t i) {
-        return set.get(i).is_type(type_Bool, type_Int, type_Float, type_Double, type_Decimal);
-    });
-    if (first_string == indices.end() || !set.get(*first_string).is_type(type_String))
-        return false;
-    first_binary = std::partition_point(first_string + 1, indices.end(), [&](size_t i) {
-        return set.get(i).is_type(type_String);
-    });
-    if (first_binary == indices.end() || !set.get(*first_binary).is_type(type_Binary))
-        return false;
-    end = std::partition_point(first_binary + 1, indices.end(), [&](size_t i) {
-        return set.get(i).is_type(type_Binary);
-    });
-    return true;
-}
-
-template <>
-void Set<Mixed>::sort(std::vector<size_t>& indices, bool ascending) const
-{
-    set_sorted_indices(size(), indices, true);
-
-    // The on-disk order is bool -> numbers -> string -> binary -> others
-    // We want to merge the string and binary sections to match the sort order
-    // of other collections. To do this we find the three partition points
-    // where the first string occurs, the first binary occurs, and the first
-    // non-binary after binaries occurs. If there's no strings or binaries we
-    // don't have to do anything. If they're both non-empty, we perform an
-    // in-place merge on the strings and binaries.
-    std::vector<size_t>::iterator first_string, first_binary, end;
-    if (partition_points(*this, indices, first_string, first_binary, end)) {
-        std::inplace_merge(first_string, first_binary, end, [&](auto a, auto b) {
-            return get(a) < get(b);
-        });
-    }
-    if (!ascending) {
-        std::reverse(indices.begin(), indices.end());
-    }
-}
-
 } // namespace realm

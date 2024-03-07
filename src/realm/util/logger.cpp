@@ -66,6 +66,15 @@ LogCategory& LogCategory::get_category(std::string_view name)
     return *log_catagory_map.at(name); // Throws
 }
 
+std::vector<const char*> LogCategory::get_category_names()
+{
+    std::vector<const char*> ret;
+    for (auto& it : log_catagory_map) {
+        ret.push_back(it.second->get_name().c_str());
+    }
+    return ret;
+}
+
 void LogCategory::set_default_level_threshold(Level level)
 {
     m_default_level.store(level);

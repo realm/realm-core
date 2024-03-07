@@ -1,7 +1,0 @@
-PACKAGE_NAME=realm-core
-VERSION=14.1.0
-OPENSSL_VERSION=3.2.0
-ZLIB_VERSION=1.2.13
-# https://github.com/10gen/baas/commits
-# 5087f is 2024 Jan 13
-BAAS_VERSION=5087ffd5a0e4975e625f0fbcceed23107f611055
