@@ -389,7 +389,7 @@ inline void write_bitfield(uint64_t* data_area, size_t field_position, size_t wi
     *it = value;
 }
 
-inline int64_t sign_extend_field_by_mask(size_t sign_mask, uint64_t value)
+inline int64_t sign_extend_field_by_mask(uint64_t sign_mask, uint64_t value)
 {
     uint64_t sign_extension = 0ULL - (value & sign_mask);
     return value | sign_extension;

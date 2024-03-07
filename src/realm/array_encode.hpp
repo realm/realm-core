@@ -40,7 +40,7 @@ public:
     // init from mem B
     inline size_t size() const;
     inline size_t width() const;
-    inline size_t width_mask() const;
+    inline uint64_t width_mask() const;
     inline NodeHeader::Encoding get_encoding() const;
 
     // get/set
@@ -71,8 +71,7 @@ private:
     using Encoding = NodeHeader::Encoding;
     Encoding m_encoding{NodeHeader::Encoding::WTypBits}; // this is not ok .... probably
     size_t m_v_width = 0, m_v_size = 0, m_ndx_width = 0, m_ndx_size = 0;
-    size_t m_v_mask = 0;
-    size_t m_ndx_mask = 0;
+    uint64_t m_v_mask = 0, m_ndx_mask = 0;
 
     friend class ArrayPacked;
     friend class ArrayFlex;
@@ -93,7 +92,7 @@ inline size_t ArrayEncode::width() const
     return m_v_width;
 }
 
-inline size_t ArrayEncode::width_mask() const
+inline uint64_t ArrayEncode::width_mask() const
 {
     return m_v_mask;
 }
