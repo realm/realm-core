@@ -176,9 +176,13 @@ public:
     {
         if constexpr (sizeof(size_t) == sizeof(uint64_t))
             return 1 + log2(value);
-        if (value & 0xFFFFFFFF)
-            return 33 + log2(value >> 32);
-        return 1 + log2(value);
+        uint32_t high = value >> 32;
+        if (high)
+            return 33 + log2(high);
+        uint32_t low = value & 0xFFFFFFFFUL;
+        if (low)
+            return 1 + log2(low);
+        return 0;
     }
 
     static size_t signed_to_num_bits(int64_t value)
