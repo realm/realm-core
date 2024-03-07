@@ -831,6 +831,82 @@ std::unique_ptr<BPlusTreeNode> BPlusTreeBase::create_root_from_ref(ref_type ref)
     }
 }
 
+// this should only be called for a column_type which we can safely compress.
+ref_type realm::bptree_typed_write(ref_type ref, _impl::ArrayWriterBase& out, Allocator& alloc, ColumnType col_type,
+                                   bool deep, bool only_modified, bool compress)
+{
+    if (only_modified && alloc.is_read_only(ref))
+        return ref;
+    char* header = alloc.translate(ref);
+    Array node(alloc);
+    node.init_from_ref(ref);
+    if (NodeHeader::get_is_inner_bptree_node_from_header(header)) {
+        REALM_ASSERT(node.has_refs());
+        Array written_node(Allocator::get_default());
+        written_node.create(NodeHeader::type_InnerBptreeNode, false, node.size());
+        for (unsigned j = 0; j < node.size(); ++j) {
+            RefOrTagged rot = node.get_as_ref_or_tagged(j);
+            if (rot.is_ref() && rot.get_as_ref()) {
+                if (j == 0) {
+                    // keys (ArrayUnsigned me thinks)
+                    Array a(alloc);
+                    a.init_from_ref(rot.get_as_ref());
+                    written_node.set_as_ref(j, a.write(out, deep, only_modified, false));
+                }
+                else {
+                    written_node.set_as_ref(
+                        j, bptree_typed_write(rot.get_as_ref(), out, alloc, col_type, deep, only_modified, compress));
+                }
+            }
+            else
+                written_node.set(j, rot);
+        }
+        auto written_ref = written_node.write(out, false, false, false);
+        written_node.destroy();
+        return written_ref;
+    }
+    else {
+        if (node.has_refs()) {
+            // this should be extended to handle Mixed....
+            return node.write(out, deep, only_modified, false); // unknown substructure, don't compress
+        }
+        else {
+            return node.write(out, false, only_modified, compress); // leaf array - do compress
+        }
+    }
+}
+
+void realm::bptree_typed_print(std::string prefix, Allocator& alloc, ref_type root, ColumnType col_type)
+{
+    char* header = alloc.translate(root);
+    Array a(alloc);
+    a.init_from_ref(root);
+    if (NodeHeader::get_is_inner_bptree_node_from_header(header)) {
+        std::cout << "{" << std::endl;
+        REALM_ASSERT(a.has_refs());
+        for (unsigned j = 0; j < a.size(); ++j) {
+            auto pref = prefix + "  " + std::to_string(j) + ":\t";
+            RefOrTagged rot = a.get_as_ref_or_tagged(j);
+            if (rot.is_ref() && rot.get_as_ref()) {
+                if (j == 0) {
+                    std::cout << pref << "BPTree offsets as ArrayUnsigned as ";
+                    Array a(alloc);
+                    a.init_from_ref(rot.get_as_ref());
+                    a.typed_print(prefix);
+                }
+                else {
+                    std::cout << pref << "Subtree beeing ";
+                    bptree_typed_print(pref, alloc, rot.get_as_ref(), col_type);
+                }
+            }
+        }
+    }
+    else {
+        std::cout << "BPTree Leaf[" << col_type << "] as ";
+        a.typed_print(prefix);
+    }
+}
+
 size_t BPlusTreeBase::size_from_header(const char* header)
 {
     auto node_size = Array::get_size_from_header(header);
@@ -840,89 +916,4 @@ size_t BPlusTreeBase::size_from_header(const char* header)
         node_size = size_t(get_direct(data, width, node_size - 1)) >> 1;
     }
     return node_size;
-    // this should only be called for a column_type which we can safely compress.
-    ref_type realm::bptree_typed_write(ref_type ref, _impl::ArrayWriterBase & out, Allocator & alloc,
-                                       ColumnType col_type, bool deep, bool only_modified, bool compress)
-    {
-        if (only_modified && alloc.is_read_only(ref))
-            return ref;
-        char* header = alloc.translate(ref);
-        Array node(alloc);
-        node.init_from_ref(ref);
-        if (NodeHeader::get_is_inner_bptree_node_from_header(header)) {
-            REALM_ASSERT(node.has_refs());
-            Array written_node(Allocator::get_default());
-            written_node.create(NodeHeader::type_InnerBptreeNode, false, node.size());
-            for (unsigned j = 0; j < node.size(); ++j) {
-                RefOrTagged rot = node.get_as_ref_or_tagged(j);
-                if (rot.is_ref() && rot.get_as_ref()) {
-                    if (j == 0) {
-                        // keys (ArrayUnsigned me thinks)
-                        Array a(alloc);
-                        a.init_from_ref(rot.get_as_ref());
-                        written_node.set_as_ref(j, a.write(out, deep, only_modified, false));
-                    }
-                    else {
-                        written_node.set_as_ref(j, bptree_typed_write(rot.get_as_ref(), out, alloc, col_type, deep,
-                                                                      only_modified, compress));
-                    }
-                }
-                else
-                    written_node.set(j, rot);
-            }
-            auto written_ref = written_node.write(out, false, false, false);
-            written_node.destroy();
-            return written_ref;
-        }
-        else {
-            if (node.has_refs()) {
-                // this should be extended to handle Mixed....
-                return node.write(out, deep, only_modified, false); // unknown substructure, don't compress
-            }
-            else {
-                return node.write(out, false, only_modified, compress); // leaf array - do compress
-            }
-        }
-    }
-
-    void realm::bptree_typed_print(std::string prefix, Allocator & alloc, ref_type root, ColumnType col_type)
-    {
-        char* header = alloc.translate(root);
-        Array a(alloc);
-        a.init_from_ref(root);
-        if (NodeHeader::get_is_inner_bptree_node_from_header(header)) {
-            std::cout << "{" << std::endl;
-            REALM_ASSERT(a.has_refs());
-            for (unsigned j = 0; j < a.size(); ++j) {
-                auto pref = prefix + "  " + std::to_string(j) + ":\t";
-                RefOrTagged rot = a.get_as_ref_or_tagged(j);
-                if (rot.is_ref() && rot.get_as_ref()) {
-                    if (j == 0) {
-                        std::cout << pref << "BPTree offsets as ArrayUnsigned as ";
-                        Array a(alloc);
-                        a.init_from_ref(rot.get_as_ref());
-                        a.typed_print(prefix);
-                    }
-                    else {
-                        std::cout << pref << "Subtree beeing ";
-                        bptree_typed_print(pref, alloc, rot.get_as_ref(), col_type);
-                    }
-                }
-            }
-        }
-        else {
-            std::cout << "BPTree Leaf[" << col_type << "] as ";
-            a.typed_print(prefix);
-        }
-    }
-
-    size_t BPlusTreeBase::size_from_header(const char* header)
-    {
-        auto node_size = Array::get_size_from_header(header);
-        if (Array::get_is_inner_bptree_node_from_header(header)) {
-            auto data = Array::get_data_from_header(header);
-            auto width = Array::get_width_from_header(header);
-            node_size = size_t(get_direct(data, width, node_size - 1)) >> 1;
-        }
-        return node_size;
-    }
+}

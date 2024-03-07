@@ -1383,21 +1383,6 @@ void Array::_mem_usage(size_t& mem) const noexcept
     }
 }
 
-void Array::_mem_usage(size_t& mem) const noexcept
-{
-    mem += get_byte_size();
-    if (m_has_refs) {
-        for (size_t i = 0; i < m_size; ++i) {
-            int64_t val = get(i);
-            if (val && !(val & 1)) {
-                Array subarray(m_alloc);
-                subarray.init_from_ref(to_ref(val));
-                subarray._mem_usage(mem);
-            }
-        }
-    }
-}
-
 #ifdef REALM_DEBUG
 namespace {
 

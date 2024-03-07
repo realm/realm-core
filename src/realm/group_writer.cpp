@@ -1366,7 +1366,6 @@ ref_type GroupWriter::write_array(const char* data, size_t size, uint32_t checks
 template <class T>
 void GroupWriter::write_array_at(T* translator, ref_type ref, const char* data, size_t size)
 {
-    // TODO this cannot not be used in case of B arrays...
     size_t pos = size_t(ref);
 
     REALM_ASSERT_3(pos + size, <=, to_size_t(m_group.m_top.get(2) / 2));
