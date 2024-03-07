@@ -7,9 +7,10 @@
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Fixed an issue when removing items from a LnkLst that could result in invalidated links becoming visable which could cause crashes or exceptions when accessing those list items later on. This affects sync Realms where another client had previously removed a link in a linklist that has over 1000 links in it, and then further local removals from the same list caused the list to have fewer than 1000 items. ([#7414](https://github.com/realm/realm-core/pull/7414), since v10.0.0)
+* Query lists vs lists if the property to check is a path with wildcards would not give correct result. This has for a long time also been a problem for queries with linklist properties in the path ([#7393](https://github.com/realm/realm-core/issues/7393), since v14.0.0)
 
 ### Breaking changes
-* None.
+* The fix of querying involving multiple lists may cause tests that depended on the broken beharior to fail.
 
 ### Compatibility
 * Fileformat: Generates files with format v24. Reads and automatically upgrade from fileformat v10. If you want to upgrade from an earlier file format version you will have to use RealmCore v13.x.y or earlier.

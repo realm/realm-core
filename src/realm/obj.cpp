@@ -1979,6 +1979,10 @@ Dictionary Obj::get_dictionary(ColKey col_key) const
 Obj& Obj::set_collection(ColKey col_key, CollectionType type)
 {
     REALM_ASSERT(col_key.get_type() == col_type_Mixed);
+    if ((col_key.is_dictionary() && type == CollectionType::Dictionary) ||
+        (col_key.is_list() && type == CollectionType::List)) {
+        return *this;
+    }
     update_if_needed();
     Mixed new_val(0, type);
 
