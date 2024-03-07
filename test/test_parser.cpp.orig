@@ -6401,6 +6401,8 @@ TEST(Parser_issue6831)
     CHECK_EQUAL(q.count(), 1);
     q = inventory->query("Plants.Rose.Family == 'Rosaceae'");
     CHECK_EQUAL(q.count(), 1);
+<<<<<<< HEAD
+=======
 }
 
 TEST(Parser_issue7393)
@@ -6495,6 +6497,7 @@ TEST(Parser_Wildcard)
     CHECK_EQUAL(q.count(), 1);
     q = origin->query("ALL link.dict.@keys = {'key4', 'key3', 'key1'}"); // Order does not matter
     CHECK_EQUAL(q.count(), 1);
+>>>>>>> edf70641cbbe308df5feaf102640a79ae1d33371
 }
 
 #endif // TEST_PARSER

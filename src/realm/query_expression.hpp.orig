@@ -772,7 +772,11 @@ public:
 
     virtual DataType get_type() const = 0;
 
+<<<<<<< HEAD
+    virtual void evaluate(size_t index, ValueBase& destination) = 0;
+=======
     virtual void evaluate(Subexpr::Index& index, ValueBase& destination) = 0;
+>>>>>>> edf70641cbbe308df5feaf102640a79ae1d33371
 
     virtual Mixed get_mixed() const
     {
@@ -2050,6 +2054,23 @@ class Columns<Mixed> : public SimpleQuerySupport<Mixed> {
 public:
     using SimpleQuerySupport::evaluate; // don't hide the ObjKey overload
     using SimpleQuerySupport::SimpleQuerySupport;
+<<<<<<< HEAD
+    void evaluate(size_t index, ValueBase& destination) override
+    {
+        destination.init(false, 1); // Size of 1 is expected by SimpleQuerySupport
+        SimpleQuerySupport::evaluate(index, destination);
+        if (m_path.size() > 0) {
+            if (auto sz = destination.size()) {
+                Collection::QueryCtrlBlock ctrl(m_path, *get_base_table(),
+                                                destination.m_from_list || !m_path_only_unary_keys);
+                for (size_t i = 0; i < sz; i++) {
+                    Collection::get_any(ctrl, destination.get(i), 0);
+                }
+                sz = ctrl.matches.size();
+                destination.init(ctrl.from_list || sz == 0, sz);
+                destination.set(ctrl.matches.begin(), ctrl.matches.end());
+            }
+=======
     void set_base_table(ConstTableRef table) override
     {
         SimpleQuerySupport::set_base_table(table);
@@ -2085,29 +2106,49 @@ public:
             auto sz = matches.size();
             destination.init(!m_ctrl.path_only_unary_keys || sz == 0, sz);
             destination.set(matches.begin(), matches.end());
+>>>>>>> edf70641cbbe308df5feaf102640a79ae1d33371
         }
     }
     std::string description(util::serializer::SerialisationState& state) const override
     {
+<<<<<<< HEAD
+        return ObjPropertyExpr::description(state) + util::to_string(m_path);
+=======
         return ObjPropertyExpr::description(state) + util::to_string(m_ctrl.path);
+>>>>>>> edf70641cbbe308df5feaf102640a79ae1d33371
     }
     Columns<Mixed>& path(const Path& path)
     {
         for (auto& elem : path) {
             if (elem.is_all()) {
+<<<<<<< HEAD
+                m_path_only_unary_keys = false;
+            }
+            m_path.emplace_back(elem);
+=======
                 m_ctrl.path_only_unary_keys = false;
             }
             m_ctrl.path.emplace_back(elem);
+>>>>>>> edf70641cbbe308df5feaf102640a79ae1d33371
         }
         return *this;
     }
     bool has_path() const noexcept override
     {
+<<<<<<< HEAD
+        return !m_path.empty();
+    }
+
+private:
+    Path m_path;
+    bool m_path_only_unary_keys = true;
+=======
         return !m_ctrl.path.empty();
     }
 
 private:
     Collection::QueryCtrlBlock m_ctrl;
+>>>>>>> edf70641cbbe308df5feaf102640a79ae1d33371
 };
 
 template <>
@@ -3151,10 +3192,15 @@ public:
     std::optional<size_t> m_index;
 
 protected:
+<<<<<<< HEAD
+    template <typename StorageType>
+    void evaluate(size_t index, ValueBase& destination)
+=======
     Value<int64_t> m_list_refs;
 
     template <typename StorageType>
     void evaluate(Subexpr::Index& index, ValueBase& destination)
+>>>>>>> edf70641cbbe308df5feaf102640a79ae1d33371
     {
         const bool is_from_list = true;
         destination.init(is_from_list, 0);
@@ -3166,6 +3212,26 @@ protected:
         }
 
         std::vector<StorageType> values;
+<<<<<<< HEAD
+        for (auto&& i : list_refs) {
+            ref_type list_ref = to_ref(i.get_int());
+            if (list_ref) {
+                BPlusTree<StorageType> list(alloc);
+                list.init_from_ref(list_ref);
+                if (size_t s = list.size()) {
+                    if (m_index) {
+                        if (*m_index < s) {
+                            values.push_back(list.get(*m_index));
+                        }
+                        else if (*m_index == size_t(-1)) {
+                            values.push_back(list.get(s - 1));
+                        }
+                    }
+                    else {
+                        for (size_t j = 0; j < s; j++) {
+                            values.push_back(list.get(j));
+                        }
+=======
         ref_type list_ref = to_ref(m_list_refs.get(index.get_and_incr_sub_index()).get_int());
         if (list_ref) {
             BPlusTree<StorageType> list(get_alloc());
@@ -3184,6 +3250,7 @@ protected:
                     destination.init(is_from_list, s);
                     for (size_t j = 0; j < s; j++) {
                         destination.set(j, list.get(j));
+>>>>>>> edf70641cbbe308df5feaf102640a79ae1d33371
                     }
                 }
             }
@@ -3289,7 +3356,11 @@ public:
         REALM_ASSERT(!path.empty());
         if (ColumnsCollection<Mixed>::index(path[0])) {
             for (auto& elem : path) {
+<<<<<<< HEAD
+                m_path.emplace_back(elem);
+=======
                 m_ctrl.path.emplace_back(elem);
+>>>>>>> edf70641cbbe308df5feaf102640a79ae1d33371
             }
             return true;
         }
@@ -3304,6 +3375,24 @@ public:
     }
     std::string description(util::serializer::SerialisationState& state) const override
     {
+<<<<<<< HEAD
+        return ColumnListBase::description(state) + util::to_string(m_path);
+    }
+
+    void evaluate(size_t index, ValueBase& destination) override
+    {
+        // Base class will handle path[0] and return result in destination
+        ColumnsCollection<Mixed>::evaluate<Mixed>(index, destination);
+        if (m_path.size() > 1) {
+            if (auto sz = destination.size()) {
+                Collection::QueryCtrlBlock ctrl(m_path, *get_base_table(), destination.m_from_list);
+                for (size_t i = 0; i < sz; i++) {
+                    Collection::get_any(ctrl, destination.get(i), 1);
+                }
+                destination.init(ctrl.from_list, ctrl.matches.size());
+                destination.set(ctrl.matches.begin(), ctrl.matches.end());
+            }
+=======
         return ColumnListBase::description(state) + util::to_string(m_ctrl.path);
     }
     void set_base_table(ConstTableRef table) override
@@ -3345,12 +3434,17 @@ public:
         else {
             // Base class will handle path[0] and return result in destination
             ColumnsCollection<Mixed>::evaluate<Mixed>(index, destination);
+>>>>>>> edf70641cbbe308df5feaf102640a79ae1d33371
         }
     }
 
 private:
+<<<<<<< HEAD
+    Path m_path;
+=======
     Collection::QueryCtrlBlock m_ctrl;
     Subexpr::Index m_sub_index = 0;
+>>>>>>> edf70641cbbe308df5feaf102640a79ae1d33371
 };
 
 // Returns the keys
@@ -3365,7 +3459,12 @@ public:
         : ColumnsCollection<Mixed>(column, table, links, type)
     {
         m_key_type = m_link_map.get_target_table()->get_dictionary_key_type(m_column_key);
+<<<<<<< HEAD
+        m_path.push_back(PathElement::AllTag());
+        m_path_only_unary_keys = false;
+=======
         m_ctrl.path.push_back(PathElement::AllTag());
+>>>>>>> edf70641cbbe308df5feaf102640a79ae1d33371
     }
 
     Columns(const Path& path, ConstTableRef table, const std::vector<ExtendedColumnKey>& links = {},
@@ -3424,6 +3523,11 @@ public:
         return ColumnListBase::description(state) + util::to_string(m_ctrl.path);
     }
 
+    std::string description(util::serializer::SerialisationState& state) const override
+    {
+        return ColumnListBase::description(state) + util::to_string(m_path);
+    }
+
     std::unique_ptr<Subexpr> clone() const override
     {
         return make_subexpr<Columns<Dictionary>>(*this);
@@ -3437,13 +3541,23 @@ public:
     Columns(Columns const& other)
         : ColumnsCollection<Mixed>(other)
         , m_key_type(other.m_key_type)
+<<<<<<< HEAD
+        , m_path(other.m_path)
+        , m_path_only_unary_keys(other.m_path_only_unary_keys)
+=======
         , m_ctrl(other.m_ctrl)
+>>>>>>> edf70641cbbe308df5feaf102640a79ae1d33371
     {
     }
 
 protected:
     DataType m_key_type = type_String;
+<<<<<<< HEAD
+    Path m_path;
+    bool m_path_only_unary_keys;
+=======
     Collection::QueryCtrlBlock m_ctrl;
+>>>>>>> edf70641cbbe308df5feaf102640a79ae1d33371
 
     void init_path(const PathElement* begin, const PathElement* end);
 };

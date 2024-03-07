@@ -58,8 +58,11 @@ protected:
     void clear_repl(Replication* repl) const;
     static std::vector<Mixed> convert_to_mixed_set(const CollectionBase& rhs);
     bool do_init_from_parent(ref_type ref, bool allow_create) const;
+<<<<<<< HEAD
+=======
 
     void resort_range(size_t from, size_t to);
+>>>>>>> edf70641cbbe308df5feaf102640a79ae1d33371
 
     REALM_COLD REALM_NORETURN void throw_invalid_null()
     {
@@ -229,6 +232,7 @@ private:
     void do_insert(size_t ndx, T value);
     void do_erase(size_t ndx);
     void do_clear();
+    void do_resort(size_t from, size_t to);
 
     iterator find_impl(const T& value) const;
 };
@@ -406,12 +410,68 @@ template <>
 void Set<Mixed>::do_clear();
 template <>
 void Set<Mixed>::migrate();
+<<<<<<< HEAD
 template <>
 void Set<Mixed>::migration_resort();
 template <>
 void Set<StringData>::migration_resort();
 template <>
 void Set<BinaryData>::migration_resort();
+
+/// Compare set elements.
+///
+/// We cannot use `std::less<>` directly, because the ordering of set elements
+/// impacts the file format. For primitive types this is trivial (and can indeed
+/// be just `std::less<>`), but for example `Mixed` has specialized comparison
+/// that defines equality of numeric types.
+template <class T>
+struct SetElementLessThan {
+    bool operator()(const T& a, const T& b) const noexcept
+    {
+        // CAUTION: This routine is technically part of the file format, because
+        // it determines the storage order of Set elements.
+        return a < b;
+    }
+};
+
+template <class T>
+struct SetElementEquals {
+    bool operator()(const T& a, const T& b) const noexcept
+    {
+        // CAUTION: This routine is technically part of the file format, because
+        // it determines the storage order of Set elements.
+        return a == b;
+    }
+};
+
+=======
+>>>>>>> edf70641cbbe308df5feaf102640a79ae1d33371
+template <>
+void Set<Mixed>::migration_resort();
+template <>
+<<<<<<< HEAD
+struct SetElementEquals<Mixed> {
+    bool operator()(const Mixed& a, const Mixed& b) const noexcept
+    {
+        // CAUTION: This routine is technically part of the file format, because
+        // it determines the storage order of Set elements.
+
+        // See comments above
+
+        if (a.is_type(type_String) && b.is_type(type_Binary)) {
+            return false;
+        }
+        if (a.is_type(type_Binary) && b.is_type(type_String)) {
+            return false;
+        }
+        return a.compare(b) == 0;
+    }
+};
+=======
+void Set<StringData>::migration_resort();
+template <>
+void Set<BinaryData>::migration_resort();
+>>>>>>> edf70641cbbe308df5feaf102640a79ae1d33371
 
 inline SetBase::SetBase(const SetBase& other)
     : CollectionBase(other)

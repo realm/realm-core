@@ -72,7 +72,11 @@ bool SetBase::is_subset_of(const CollectionBase& rhs) const
 template <class It1, class It2>
 bool SetBase::is_subset_of(It1 first, It2 last) const
 {
+<<<<<<< HEAD
+    return std::includes(first, last, begin(), end(), SetElementLessThan<Mixed>{});
+=======
     return std::includes(first, last, begin(), end());
+>>>>>>> edf70641cbbe308df5feaf102640a79ae1d33371
 }
 
 bool SetBase::is_strict_subset_of(const CollectionBase& rhs) const
@@ -96,7 +100,11 @@ bool SetBase::is_superset_of(const CollectionBase& rhs) const
 template <class It1, class It2>
 bool SetBase::is_superset_of(It1 first, It2 last) const
 {
+<<<<<<< HEAD
+    return std::includes(begin(), end(), first, last, SetElementLessThan<Mixed>{});
+=======
     return std::includes(begin(), end(), first, last);
+>>>>>>> edf70641cbbe308df5feaf102640a79ae1d33371
 }
 
 bool SetBase::is_strict_superset_of(const CollectionBase& rhs) const
@@ -120,12 +128,22 @@ bool SetBase::intersects(const CollectionBase& rhs) const
 template <class It1, class It2>
 bool SetBase::intersects(It1 first, It2 last) const
 {
+<<<<<<< HEAD
+    SetElementLessThan<Mixed> less;
+    auto it = begin();
+    while (it != end() && first != last) {
+        if (less(*it, *first)) {
+            ++it;
+        }
+        else if (less(*first, *it)) {
+=======
     auto it = begin();
     while (it != end() && first != last) {
         if (*it < *first) {
             ++it;
         }
         else if (*first < *it) {
+>>>>>>> edf70641cbbe308df5feaf102640a79ae1d33371
             ++first;
         }
         else {
@@ -160,7 +178,11 @@ template <class It1, class It2>
 void SetBase::assign_union(It1 first, It2 last)
 {
     std::vector<Mixed> the_diff;
+<<<<<<< HEAD
+    std::set_difference(first, last, begin(), end(), std::back_inserter(the_diff), SetElementLessThan<Mixed>{});
+=======
     std::set_difference(first, last, begin(), end(), std::back_inserter(the_diff));
+>>>>>>> edf70641cbbe308df5feaf102640a79ae1d33371
     // 'the_diff' now contains all the elements that are in foreign set, but not in 'this'
     // Now insert those elements
     for (auto&& value : the_diff) {
@@ -184,7 +206,11 @@ template <class It1, class It2>
 void SetBase::assign_intersection(It1 first, It2 last)
 {
     std::vector<Mixed> intersection;
+<<<<<<< HEAD
+    std::set_intersection(first, last, begin(), end(), std::back_inserter(intersection), SetElementLessThan<Mixed>{});
+=======
     std::set_intersection(first, last, begin(), end(), std::back_inserter(intersection));
+>>>>>>> edf70641cbbe308df5feaf102640a79ae1d33371
     clear();
     // Elements in intersection comes from foreign set, so ok to use here
     for (auto&& value : intersection) {
@@ -209,7 +235,11 @@ template <class It1, class It2>
 void SetBase::assign_difference(It1 first, It2 last)
 {
     std::vector<Mixed> intersection;
+<<<<<<< HEAD
+    std::set_intersection(first, last, begin(), end(), std::back_inserter(intersection), SetElementLessThan<Mixed>{});
+=======
     std::set_intersection(first, last, begin(), end(), std::back_inserter(intersection));
+>>>>>>> edf70641cbbe308df5feaf102640a79ae1d33371
     // 'intersection' now contains all the elements that are in both foreign set and 'this'.
     // Remove those elements. The elements comes from the foreign set, so ok to refer to.
     for (auto&& value : intersection) {
@@ -234,9 +264,15 @@ template <class It1, class It2>
 void SetBase::assign_symmetric_difference(It1 first, It2 last)
 {
     std::vector<Mixed> difference;
+<<<<<<< HEAD
+    std::set_difference(first, last, begin(), end(), std::back_inserter(difference), SetElementLessThan<Mixed>{});
+    std::vector<Mixed> intersection;
+    std::set_intersection(first, last, begin(), end(), std::back_inserter(intersection), SetElementLessThan<Mixed>{});
+=======
     std::set_difference(first, last, begin(), end(), std::back_inserter(difference));
     std::vector<Mixed> intersection;
     std::set_intersection(first, last, begin(), end(), std::back_inserter(intersection));
+>>>>>>> edf70641cbbe308df5feaf102640a79ae1d33371
     // Now remove the common elements and add the differences
     for (auto&& value : intersection) {
         erase_any(value);
@@ -299,6 +335,8 @@ bool SetBase::do_init_from_parent(ref_type ref, bool allow_create) const
     return true;
 }
 
+<<<<<<< HEAD
+=======
 void SetBase::resort_range(size_t start, size_t end)
 {
     if (end > size()) {
@@ -324,6 +362,7 @@ void SetBase::resort_range(size_t start, size_t end)
     }
 }
 
+>>>>>>> edf70641cbbe308df5feaf102640a79ae1d33371
 /********************************* Set<Key> *********************************/
 
 template <>
@@ -469,6 +508,35 @@ void Set<Mixed>::migrate()
     }
 }
 
+<<<<<<< HEAD
+template <class T>
+void Set<T>::do_resort(size_t start, size_t end)
+{
+    if (end > size()) {
+        end = size();
+    }
+    if (start >= end) {
+        return;
+    }
+    std::vector<size_t> indices;
+    indices.resize(end - start);
+    std::iota(indices.begin(), indices.end(), 0);
+    std::sort(indices.begin(), indices.end(), [&](auto a, auto b) {
+        return get(a + start) < get(b + start);
+    });
+    for (size_t i = 0; i < indices.size(); ++i) {
+        if (indices[i] != i) {
+            tree().swap(i + start, start + indices[i]);
+            auto it = std::find(indices.begin() + i, indices.end(), i);
+            REALM_ASSERT(it != indices.end());
+            *it = indices[i];
+            indices[i] = i;
+        }
+    }
+}
+
+=======
+>>>>>>> edf70641cbbe308df5feaf102640a79ae1d33371
 template <>
 void Set<Mixed>::migration_resort()
 {
@@ -477,21 +545,33 @@ void Set<Mixed>::migration_resort()
     auto last_binary = std::partition_point(first_string, end(), [](const Mixed& item) {
         return item.is_type(type_String, type_Binary);
     });
+<<<<<<< HEAD
+    do_resort(first_string.index(), last_binary.index());
+=======
     resort_range(first_string.index(), last_binary.index());
+>>>>>>> edf70641cbbe308df5feaf102640a79ae1d33371
 }
 
 template <>
 void Set<StringData>::migration_resort()
 {
     // sort order of strings changed
+<<<<<<< HEAD
+    do_resort(0, size());
+=======
     resort_range(0, size());
+>>>>>>> edf70641cbbe308df5feaf102640a79ae1d33371
 }
 
 template <>
 void Set<BinaryData>::migration_resort()
 {
     // sort order of binaries changed
+<<<<<<< HEAD
+    do_resort(0, size());
+=======
     resort_range(0, size());
+>>>>>>> edf70641cbbe308df5feaf102640a79ae1d33371
 }
 
 void LnkSet::remove_target_row(size_t link_ndx)
@@ -524,6 +604,10 @@ void LnkSet::to_json(std::ostream& out, JSONOutputMode, util::FunctionRef<void(c
     out << "]";
 }
 
+<<<<<<< HEAD
+
+=======
+>>>>>>> edf70641cbbe308df5feaf102640a79ae1d33371
 void set_sorted_indices(size_t sz, std::vector<size_t>& indices, bool ascending)
 {
     indices.resize(sz);

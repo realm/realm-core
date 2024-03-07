@@ -339,7 +339,12 @@ bool Spec::operator==(const Spec& spec) const noexcept
 
 ColKey Spec::get_key(size_t column_ndx) const
 {
+<<<<<<< HEAD
+    const auto val = m_keys.get(column_ndx);
+    const auto key = ColKey(val);
+=======
     auto key = ColKey(m_keys.get(column_ndx));
+>>>>>>> edf70641cbbe308df5feaf102640a79ae1d33371
     return key;
 }
 

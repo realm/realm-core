@@ -589,6 +589,8 @@ private:
 
     void _mem_usage(size_t& mem) const noexcept;
 
+    void _mem_usage(size_t& mem) const noexcept;
+
 #ifdef REALM_DEBUG
     void report_memory_usage_2(MemUsageHandler&) const;
 #endif

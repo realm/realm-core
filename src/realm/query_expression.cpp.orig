@@ -270,6 +270,21 @@ ColumnDictionaryKeys Columns<Dictionary>::keys()
 
 void Columns<Dictionary>::init_path(const PathElement* begin, const PathElement* end)
 {
+<<<<<<< HEAD
+    m_path.clear();
+    m_path_only_unary_keys = true;
+    while (begin != end) {
+        if (begin->is_all()) {
+            m_path_only_unary_keys = false;
+        }
+        m_path.emplace_back(std::move(*begin));
+        ++begin;
+    }
+    std::move(begin, end, std::back_inserter(m_path));
+    if (m_path.empty()) {
+        m_path_only_unary_keys = false;
+        m_path.push_back(PathElement::AllTag());
+=======
     m_ctrl.path.clear();
     m_ctrl.path_only_unary_keys = true;
     while (begin != end) {
@@ -283,6 +298,7 @@ void Columns<Dictionary>::init_path(const PathElement* begin, const PathElement*
     if (m_ctrl.path.empty()) {
         m_ctrl.path_only_unary_keys = false;
         m_ctrl.path.push_back(PathElement::AllTag());
+>>>>>>> edf70641cbbe308df5feaf102640a79ae1d33371
     }
 }
 
@@ -376,6 +392,37 @@ SizeOperator<int64_t> Columns<Dictionary>::size()
 
 void Columns<Dictionary>::evaluate(Subexpr::Index& index, ValueBase& destination)
 {
+<<<<<<< HEAD
+    Collection::QueryCtrlBlock ctrl(m_path, *m_link_map.get_target_table(), !m_path_only_unary_keys);
+
+    if (links_exist()) {
+        REALM_ASSERT(!m_leaf);
+        std::vector<ObjKey> links = m_link_map.get_links(index);
+        auto sz = links.size();
+        if (!m_link_map.only_unary_links())
+            ctrl.from_list = true;
+
+        for (size_t t = 0; t < sz; t++) {
+            const Obj obj = m_link_map.get_target_table()->get_object(links[t]);
+            auto val = obj.get_any(m_column_key);
+            if (!val.is_null()) {
+                Collection::get_any(ctrl, val, 0);
+            }
+        }
+    }
+    else {
+        // Not a link column
+        REALM_ASSERT(m_leaf);
+        if (ref_type ref = to_ref(m_leaf->get(index))) {
+            Collection::get_any(ctrl, {ref, CollectionType::Dictionary}, 0);
+        }
+    }
+
+    // Copy values over
+    auto sz = ctrl.matches.size();
+    destination.init(ctrl.from_list || sz == 0, sz);
+    destination.set(ctrl.matches.begin(), ctrl.matches.end());
+=======
     if (index.initialize()) {
         m_ctrl.matches.clear();
         if (links_exist()) {
@@ -410,6 +457,7 @@ void Columns<Dictionary>::evaluate(Subexpr::Index& index, ValueBase& destination
     auto sz = matches.size();
     destination.init(!m_ctrl.path_only_unary_keys || sz == 0, sz);
     destination.set(matches.begin(), matches.end());
+>>>>>>> edf70641cbbe308df5feaf102640a79ae1d33371
 }
 
 
