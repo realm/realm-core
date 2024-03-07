@@ -53,18 +53,17 @@ public:
     {
         return m_obj;
     }
-    uint32_t parent_version() const noexcept final
-    {
-        return 0;
-    }
-    void update_content_version() const noexcept final {}
 
 protected:
     Obj m_obj;
     ref_type m_ref;
-    UpdateStatus update_if_needed() const final
+    UpdateStatus update_if_needed_with_status() const final
     {
         return UpdateStatus::Updated;
+    }
+    bool update_if_needed() const final
+    {
+        return true;
     }
     ref_type get_collection_ref(Index, CollectionType) const final
     {
@@ -106,11 +105,18 @@ public:
     virtual StablePath get_stable_path() const = 0;
 
     struct QueryCtrlBlock {
-        Path path;
-        std::vector<std::vector<Mixed>> matches;
-        bool path_only_unary_keys = false; // Not from list
-        Allocator* alloc = nullptr;
-        Group* group = nullptr;
+        QueryCtrlBlock(Path& p, const Table& table, bool is_from_list)
+            : path(p)
+            , from_list(is_from_list)
+            , alloc(table.get_alloc())
+            , group(table.get_parent_group())
+        {
+        }
+        Path& path;
+        std::set<Mixed> matches;
+        bool from_list;
+        Allocator& alloc;
+        Group* group;
     };
     static void get_any(QueryCtrlBlock&, Mixed, size_t);
 };
@@ -747,6 +753,17 @@ protected:
     {
         check_parent();
         return m_parent->get_object().remove_backlink(col_key, old_link, state);
+    // Used when replacing a link, return true if CascadeState contains objects to remove
+    bool replace_backlink(ColKey col_key, ObjLink old_link, ObjLink new_link, CascadeState& state) const
+    {
+        check_parent();
+        return m_parent->replace_backlink(col_key, old_link, new_link, state);
+    }
+    // Used when removing a backlink, return true if CascadeState contains objects to remove
+    bool remove_backlink(ColKey col_key, ObjLink old_link, CascadeState& state) const
+    {
+        check_parent();
+        return m_parent->remove_backlink(col_key, old_link, state);
     }
 
     /// Reset the accessor's tracking of the content version. Derived classes

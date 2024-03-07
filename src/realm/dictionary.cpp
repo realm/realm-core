@@ -457,6 +457,18 @@ std::shared_ptr<Lst<Mixed>> Dictionary::get_list(const PathElement& path_elem) c
     return ret;
 }
 
+}
+
+std::shared_ptr<Lst<Mixed>> Dictionary::get_list(const PathElement& path_elem) const
+{
+    update();
+    auto weak = const_cast<Dictionary*>(this)->weak_from_this();
+    auto shared = weak.expired() ? std::make_shared<Dictionary>(*this) : weak.lock();
+    std::shared_ptr<Lst<Mixed>> ret = std::make_shared<Lst<Mixed>>(m_col_key, get_level() + 1);
+    ret->set_owner(shared, build_index(path_elem.get_key()));
+    return ret;
+}
+
 Mixed Dictionary::get(Mixed key) const
 {
     if (auto opt_val = try_get(key)) {
@@ -666,6 +678,9 @@ UpdateStatus Dictionary::do_update_if_needed(bool allow_create) const
         }
         case UpdateStatus::Updated:
             return init_from_parent(allow_create);
+            // the function will return false;
+            Base::update_content_version();
+            CollectionParent::m_parent_version++;
     }
     REALM_UNREACHABLE();
 }
@@ -675,7 +690,6 @@ UpdateStatus Dictionary::update_if_needed() const
     constexpr bool allow_create = false;
     return do_update_if_needed(allow_create);
 }
-
 void Dictionary::ensure_created()
 {
     constexpr bool allow_create = true;
@@ -752,6 +766,14 @@ bool Dictionary::nullify(ObjLink target_link)
             }
             if (val.is_type(type_List)) {
                 auto list = get_list(key.get_string());
+                if (list->nullify(target_link)) {
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
+}
                 if (list->nullify(target_link)) {
                     return true;
                 }
@@ -875,6 +897,11 @@ UpdateStatus Dictionary::init_from_parent(bool allow_create) const
         }
 
         return UpdateStatus::Updated;
+    }
+    catch (...) {
+        m_dictionary_top.reset();
+        throw;
+    }
     }
     catch (...) {
         m_dictionary_top.reset();
@@ -1198,6 +1225,8 @@ LinkCollectionPtr Dictionary::clone_as_obj_list() const
         return std::make_unique<DictionaryLinkValues>(*this);
     }
     return nullptr;
+    }
+    return status == UpdateStatus::Updated;
 }
 
 /************************* DictionaryLinkValues *************************/

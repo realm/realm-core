@@ -130,6 +130,7 @@ RLM_API realm_dictionary_t* realm_list_get_dictionary(realm_list_t* list, size_t
     });
 }
 
+
 RLM_API bool realm_list_move(realm_list_t* list, size_t from_index, size_t to_index)
 {
     return wrap_err([&]() {

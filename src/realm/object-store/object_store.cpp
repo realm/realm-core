@@ -887,6 +887,8 @@ void ObjectStore::apply_schema_changes(Transaction& transaction, uint64_t schema
 
     create_metadata_tables(transaction);
 
+    create_metadata_tables(transaction);
+
     if (mode == SchemaMode::AdditiveDiscovered || mode == SchemaMode::AdditiveExplicit) {
         // With sync v2.x, indexes are no longer synced, so there's no reason to avoid creating them.
         bool update_indexes = true;

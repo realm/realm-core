@@ -322,3 +322,12 @@ public:
 } // namespace realm
 
 #endif /* REALM_PATH_HPP */
+
+class StablePath : public std::vector<StableIndex> {
+public:
+    bool is_prefix_of(const StablePath& other) const noexcept;
+};
+
+} // namespace realm
+
+#endif /* REALM_PATH_HPP */

@@ -143,3 +143,10 @@ protected:
 } // namespace realm
 
 #endif
+
+    static int64_t generate_key(size_t sz);
+};
+
+} // namespace realm
+
+#endif

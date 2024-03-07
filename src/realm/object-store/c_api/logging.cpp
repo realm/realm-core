@@ -40,12 +40,14 @@ public:
         , m_userdata(std::move(userdata))
         , m_log_callback(log_callback)
     {
+        set_level_threshold(level);
     }
 
 protected:
     void do_log(const util::LogCategory& category, Logger::Level level, const std::string& message) final
     {
         m_log_callback(m_userdata.get(), category.get_name().c_str(), realm_log_level_e(level), message.c_str());
+        // FIXME use category
     }
 
 private:

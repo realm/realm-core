@@ -322,7 +322,9 @@ public:
     void dump_objects(int64_t key_offset, std::string lead) const override;
     virtual ref_type typed_write(ref_type ref, _impl::ArrayWriterBase& out, const Table& table, bool deep,
                                  bool only_modified, bool compress) const override;
-                                 const std::vector<ObjKey>& keys, CascadeState& state);
+    virtual void typed_print(std::string prefix, const Table& table) const override;
+    static void remove_backlinks(const Table* origin_table, ObjKey origin_key, ColKey col,
+                                 const std::vector<ObjLink>& links, CascadeState& state);
     static void remove_backlinks(const Table* origin_table, ObjKey origin_key, ColKey col,
                                  const std::vector<ObjLink>& links, CascadeState& state);
 

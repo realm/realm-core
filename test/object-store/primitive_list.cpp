@@ -1037,4 +1037,5 @@ TEST_CASE("list of strings - with index", "[primitives]") {
     });
     CHECK(has_banana.size() == 1);
     CHECK(has_pear.size() == 1);
+    CHECK(has_pear.size() == 1);
 }

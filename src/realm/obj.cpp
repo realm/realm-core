@@ -1106,7 +1106,7 @@ StablePath Obj::get_stable_path() const noexcept
 {
     return {};
 }
-
+    if (path.empty()) {
 void Obj::add_index(Path& path, const CollectionParent::Index& index) const
 {
     if (path.empty()) {
@@ -1188,6 +1188,9 @@ Obj& Obj::set<Mixed>(ColKey col_key, Mixed value, bool is_default)
         else if (old_value.is_type(type_List)) {
             Lst<Mixed> list(*this, col_key);
             recurse = list.remove_backlinks(state);
+    else if (old_value.is_type(type_List)) {
+        Lst<Mixed> list(*this, col_key);
+        recurse = list.remove_backlinks(state);
         }
 
         if (value.is_type(type_TypedLink)) {
@@ -1995,6 +1998,45 @@ Obj& Obj::set_collection(ColKey col_key, CollectionType type)
         throw IllegalOperation("Set nested in Mixed is not supported");
     }
     set(col_key, Mixed(0, type));
+
+    return *this;
+}
+
+    if (old_val != new_val) {
+        CascadeState state;
+        if (old_val.is_type(type_TypedLink)) {
+            remove_backlink(col_key, old_val.get<ObjLink>(), state);
+        }
+        else if (old_val.is_type(type_Dictionary)) {
+            Dictionary dict(*this, col_key);
+            dict.remove_backlinks(state);
+        }
+        else if (old_val.is_type(type_List)) {
+            Lst<Mixed> list(*this, col_key);
+            list.remove_backlinks(state);
+        }
+
+        if (SearchIndex* index = m_table->get_search_index(col_key)) {
+            index->set(m_key, new_val);
+        }
+
+        Allocator& alloc = _get_alloc();
+        alloc.bump_content_version();
+
+        Array fallback(alloc);
+        Array& fields = get_tree_top()->get_fields_accessor(fallback, m_mem);
+        ArrayMixed values(alloc);
+        values.set_parent(&fields, col_key.get_index().val + 1);
+        values.init_from_parent();
+
+        values.set(m_row_ndx, new_val);
+        values.set_key(m_row_ndx, generate_key(0x10));
+
+        sync(fields);
+
+        if (Replication* repl = get_replication())
+            repl->set(m_table.unchecked_ptr(), col_key, m_key, new_val); // Throws
+    }
 
     return *this;
 }

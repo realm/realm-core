@@ -198,6 +198,8 @@ private:
     bool m_was_short_circuited;
 };
 
+constexpr bool SYNC_SUPPORTS_NESTED_COLLECTIONS = false;
+
 } // namespace sync
 } // namespace realm
 

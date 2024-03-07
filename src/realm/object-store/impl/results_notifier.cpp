@@ -155,6 +155,16 @@ void ResultsNotifier::run()
 
     REALM_ASSERT(m_info || !has_run());
 
+    auto t1 = steady_clock::now();
+    util::ScopeExit cleanup([&]() noexcept {
+        m_run_time_point = steady_clock::now();
+        if (m_logger) {
+            m_logger->log(util::LogCategory::notification, util::Logger::Level::debug,
+                          "ResultsNotifier %1 did run in %2 us", m_description,
+                          duration_cast<microseconds>(m_run_time_point - t1).count());
+        }
+    });
+
     // Table's been deleted, so report all objects as deleted
     if (!m_query->get_table()) {
         m_change = {};
@@ -348,6 +358,17 @@ void ListResultsNotifier::calculate_changes()
 
 void ListResultsNotifier::run()
 {
+    using namespace std::chrono;
+    auto t1 = steady_clock::now();
+    util::ScopeExit cleanup([&]() noexcept {
+        m_run_time_point = steady_clock::now();
+        if (m_logger) {
+            m_logger->log(util::LogCategory::notification, util::Logger::Level::debug,
+                          "ListResultsNotifier %1 did run in %2 us", m_description,
+                          duration_cast<microseconds>(m_run_time_point - t1).count());
+        }
+    });
+
     if (!m_list || !m_list->is_attached()) {
         // List was deleted, so report all of the rows being removed
         m_change = {};
@@ -358,6 +379,7 @@ void ListResultsNotifier::run()
     }
 
     if (!need_to_run()) {
+        cleanup.cancel();
         return;
     }
 

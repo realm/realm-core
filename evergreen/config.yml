@@ -155,7 +155,7 @@ functions:
           if [ -n "${curl_base|}" ]; then
               set_cmake_var curl_vars CURL_LIBRARY PATH "$(./evergreen/abspath.sh ${curl_base}/lib/libcurl.dll.a)"
               set_cmake_var curl_vars CURL_INCLUDE_DIR PATH "$(./evergreen/abspath.sh ${curl_base}/include)"
-              set_cmake_var baas_vars REALM_CURL_CACERTS PATH "$(./evergreen/abspath.sh "${curl_base}/bin/curl-ca-bundle.crt")"
+              set_cmake_var baas_vars REALM_CURL_CACERTS PATH "$(./evergreen/abspath.sh "${curl_base}/bin/cacert.pem")"
           fi
 
           set_cmake_var realm_vars REALM_NO_TESTS BOOL ${no_tests|Off}

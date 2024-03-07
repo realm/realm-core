@@ -193,6 +193,8 @@ TEST_CASE("nested dictionary in mixed", "[dictionary]") {
     }
 }
 
+}
+
 TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf::Bool, cf::Float, cf::Double,
                    cf::String, cf::Binary, cf::Date, cf::OID, cf::Decimal, cf::UUID, cf::BoxedOptional<cf::Int>,
                    cf::BoxedOptional<cf::Bool>, cf::BoxedOptional<cf::Float>, cf::BoxedOptional<cf::Double>,

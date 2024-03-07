@@ -57,7 +57,7 @@ class DeepChangeChecker;
 }
 
 // 'Object' would have been a better name, but it clashes with a class in ObjectStore
-class Obj {
+class Obj : public CollectionParent {
 public:
     constexpr Obj() = default;
     Obj(TableRef table, MemRef mem, ObjKey key, size_t row_ndx);
@@ -74,9 +74,8 @@ public:
     StablePath get_stable_path() const noexcept;
     void add_index(Path& path, const CollectionParent::Index& ndx) const;
 
-    TableRef get_table() const noexcept
     {
-        return m_table.cast_away_const();
+        return realm::npos;
     }
     ref_type get_collection_ref(CollectionParent::Index, CollectionType) const;
     bool check_collection_ref(CollectionParent::Index, CollectionType) const noexcept;
@@ -85,13 +84,29 @@ public:
     bool check_index(StableIndex) const;
 
     // Operator overloads
-    bool operator==(const Obj& other) const;
-
     // Check if this object is default constructed
     explicit operator bool() const noexcept
     {
         return m_table != nullptr;
     }
+    const Obj& get_object() const noexcept final
+    {
+        return *this;
+    }
+    ref_type get_collection_ref(Index, CollectionType) const final;
+    bool check_collection_ref(Index, CollectionType) const noexcept final;
+    void set_collection_ref(Index, ref_type, CollectionType) final;
+    StableIndex build_index(ColKey) const;
+    bool check_index(StableIndex) const;
+
+    // Simple getters
+    Allocator& get_alloc() const;
+    ObjKey get_key() const noexcept
+    {
+        return m_key;
+    }
+    GlobalKey get_object_id() const;
+    ObjLink get_link() const;
 
     // Simple getters
     Allocator& get_alloc() const;
@@ -322,6 +337,7 @@ private:
     friend class CollectionBaseImpl;
     template <class>
     friend class Set;
+    friend class CollectionParent;
 
     mutable TableRef m_table;
     ObjKey m_key;
@@ -339,7 +355,6 @@ private:
     bool update() const;
     bool _update_if_needed() const; // no check, use only when already checked
     void checked_update_if_needed() const;
-
     template <class T>
     bool do_is_null(ColKey::Idx col_ndx) const;
 
@@ -401,12 +416,6 @@ private:
     bool compare_list_in_mixed(Lst<Mixed>&, Lst<Mixed>&, ColKey, Obj, StringData) const;
     bool compare_dict_in_mixed(Dictionary&, Dictionary&, ColKey, Obj, StringData) const;
 
-    // Used when inserting a new link. You will not remove existing links in this process
-    void set_backlink(ColKey col_key, ObjLink new_link) const;
-    // Used when replacing a link, return true if CascadeState contains objects to remove
-    bool replace_backlink(ColKey col_key, ObjLink old_link, ObjLink new_link, CascadeState& state) const;
-    // Used when removing a backlink, return true if CascadeState contains objects to remove
-    bool remove_backlink(ColKey col_key, ObjLink old_link, CascadeState& state) const;
 };
 static_assert(std::is_trivially_destructible_v<Obj>);
 
@@ -503,7 +512,6 @@ struct Obj::FatPathElement {
     ColKey col_key; // Column holding link or link list which embeds...
     Mixed index;    // index into link list or dictionary (or null)
 };
-
 template <>
 Obj& Obj::set(ColKey, int64_t value, bool is_default);
 

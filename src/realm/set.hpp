@@ -194,7 +194,7 @@ public:
         return tree();
     }
 
-    UpdateStatus update_if_needed() const final;
+    UpdateStatus update_if_needed_with_status() const final;
     void ensure_created();
 
     void migrate();
@@ -220,7 +220,7 @@ private:
     /// Update the accessor and return true if it is attached after the update.
     inline bool update() const
     {
-        return update_if_needed() != UpdateStatus::Detached;
+        return update_if_needed_with_status() != UpdateStatus::Detached;
     }
 
     // `do_` methods here perform the action after preconditions have been
@@ -228,6 +228,7 @@ private:
     void do_insert(size_t ndx, T value);
     void do_erase(size_t ndx);
     void do_clear();
+    void do_resort(size_t from, size_t to);
 
     iterator find_impl(const T& value) const;
 };
@@ -376,7 +377,7 @@ private:
     // Overriding members of ObjCollectionBase:
     UpdateStatus do_update_if_needed() const final
     {
-        return m_set.update_if_needed();
+        return m_set.update_if_needed_with_status();
     }
 
     BPlusTree<ObjKey>* get_mutable_tree() const final
@@ -411,7 +412,12 @@ template <>
 void Set<StringData>::migration_resort();
 template <>
 void Set<BinaryData>::migration_resort();
-
+template <>
+void Set<Mixed>::migration_resort();
+template <>
+void Set<StringData>::migration_resort();
+template <>
+void Set<BinaryData>::migration_resort();
 inline SetBase::SetBase(const SetBase& other)
     : CollectionBase(other)
 {
@@ -534,6 +540,10 @@ UpdateStatus Set<T>::init_from_parent(bool allow_create) const
         m_tree->set_parent(const_cast<ArrayParent*>(parent), 0);
     }
     return do_init_from_parent(m_tree.get(), Base::get_collection_ref(), allow_create);
+}
+        m_tree->set_parent(const_cast<ArrayParent*>(parent), 0);
+    }
+    return do_init_from_parent(Base::get_collection_ref(), allow_create);
 }
 
 template <typename U>

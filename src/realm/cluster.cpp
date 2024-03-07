@@ -1646,12 +1646,15 @@ ref_type Cluster::typed_write(ref_type ref, _impl::ArrayWriterBase& out, const T
                 written_leaf.set_as_ref(1, Array::write(rot1.get_as_ref(), m_alloc, out, only_modified, true));
             }
             else if (col_type == col_type_Mixed) {
-                REALM_ASSERT(leaf.size() == 4);
-                for (size_t i = 0; i < 4; ++i) {
+                const auto sz = leaf.size();
+                REALM_ASSERT(sz == 6);
+                // temporary disable mixed. in order to re-enable them in a separate PR
+                for (size_t i = 0; i < sz; ++i) {
                     auto rot = leaf.get_as_ref_or_tagged(i);
                     if (rot.is_ref() && rot.get_as_ref()) {
                         // entries 0-2 are integral and can be compressed, entry 3 is strings and not compressed (yet)
-                        bool do_compress = compress && i < 3;
+                        // collections in mixed are stored at position 4.
+                        bool do_compress = false; // (i < 3 || i == 4) ? true : false;
                         written_leaf.set_as_ref(
                             i, Array::write(rot.get_as_ref(), m_alloc, out, only_modified, do_compress));
                     }

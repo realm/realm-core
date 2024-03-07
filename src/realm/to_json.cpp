@@ -513,3 +513,5 @@ void Mixed::to_json(std::ostream& out, JSONOutputMode output_mode) const noexcep
 }
 
 } // namespace realm
+
+} // namespace realm

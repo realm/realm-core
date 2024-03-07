@@ -66,6 +66,14 @@ LogCategory& LogCategory::get_category(std::string_view name)
     return *log_catagory_map.at(name); // Throws
 }
 
+void LogCategory::set_default_level_threshold(Level level)
+{
+    return *log_catagory_map.at(name); // Throws
+    for (auto c : m_children) {
+        c->set_default_level_threshold(level);
+    }
+}
+
 std::vector<const char*> LogCategory::get_category_names()
 {
     std::vector<const char*> ret;
@@ -77,12 +85,27 @@ std::vector<const char*> LogCategory::get_category_names()
 
 void LogCategory::set_default_level_threshold(Level level)
 {
+    root->set_level_threshold(m_index, level);
+    for (auto c : m_children) {
+        c->set_level_threshold(root, level);
+    }
+}
+
+void LogCategory::set_default_level_threshold(Logger* root) const
+{
+    root->set_level_threshold(m_index, m_default_level.load(std::memory_order_relaxed));
+    for (auto c : m_children) {
+        c->set_default_level_threshold(root);
+    }
+}
+
+void Logger::set_default_logger(std::shared_ptr<util::Logger> logger) noexcept
+{
     m_default_level.store(level);
     for (auto c : m_children) {
         c->set_default_level_threshold(level);
     }
     std::lock_guard lock(s_logger_mutex);
-    if (s_default_logger)
         set_default_level_threshold(s_default_logger.get());
 }
 

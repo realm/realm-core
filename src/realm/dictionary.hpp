@@ -40,6 +40,9 @@ public:
     class Iterator;
 
     Dictionary() = default;
+        : CollectionParent(0)
+    {
+    }
     ~Dictionary();
 
     Dictionary(const Obj& obj, ColKey col_key)
@@ -271,7 +274,7 @@ private:
     void ensure_created();
     bool update() const
     {
-        return update_if_needed() != UpdateStatus::Detached;
+        return update_if_needed_with_status() != UpdateStatus::Detached;
     }
     void verify() const;
     void get_key_type();
@@ -469,7 +472,7 @@ public:
     // Overrides of ObjCollectionBase:
     UpdateStatus do_update_if_needed() const final
     {
-        return m_source.update_if_needed();
+        return m_source.update_if_needed_with_status();
     }
     BPlusTree<ObjKey>* get_mutable_tree() const final
     {
