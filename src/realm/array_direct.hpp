@@ -301,9 +301,9 @@ public:
     {
         auto in_word_position = field_position & 0x3F;
         auto first_word = first_word_ptr[0];
-        uint64_t mask = 0 - 1ULL;
+        uint64_t mask = 0ULL - 1ULL;
         if (field_size < 64) {
-            mask = static_cast<size_t>((1ULL << field_size) - 1);
+            mask = (1ULL << field_size) - 1;
             value &= mask;
         }
         // zero out field in first word:
@@ -389,16 +389,16 @@ inline void write_bitfield(uint64_t* data_area, size_t field_position, size_t wi
     *it = value;
 }
 
-inline int64_t sign_extend_field_by_mask(size_t sign_mask, uint64_t value)
+inline int64_t sign_extend_field_by_mask(uint64_t sign_mask, uint64_t value)
 {
-    uint64_t sign_extension = 0 - (value & sign_mask);
+    uint64_t sign_extension = 0ULL - (value & sign_mask);
     return value | sign_extension;
 }
 
 inline int64_t sign_extend_value(size_t width, uint64_t value)
 {
     uint64_t sign_mask = 1ULL << (width - 1);
-    uint64_t sign_extension = 0 - (value & sign_mask);
+    uint64_t sign_extension = 0ULL - (value & sign_mask);
     return value | sign_extension;
 }
 

@@ -81,12 +81,12 @@ int64_t ArrayPacked::get(const Array& arr, size_t ndx) const
     return do_get((uint64_t*)arr.m_data, ndx, w, sz, arr.get_encoder().width_mask());
 }
 
-int64_t ArrayPacked::get(const char* data, size_t ndx, size_t width, size_t sz, size_t mask) const
+int64_t ArrayPacked::get(const char* data, size_t ndx, size_t width, size_t sz, uint64_t mask) const
 {
     return do_get((uint64_t*)data, ndx, width, sz, mask);
 }
 
-int64_t ArrayPacked::do_get(uint64_t* data, size_t ndx, size_t v_width, size_t v_size, size_t mask) const
+int64_t ArrayPacked::do_get(uint64_t* data, size_t ndx, size_t v_width, size_t v_size, uint64_t mask) const
 {
     if (ndx >= v_size)
         return realm::not_found;
