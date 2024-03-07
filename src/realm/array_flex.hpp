@@ -49,7 +49,8 @@ private:
     bool find_all_match(size_t start, size_t end, size_t baseindex, QueryStateBase* state) const;
 
     template <typename Cond, bool = true> // true int64_t, false uint64_t
-    inline size_t parallel_subword_find(const Array&, uint64_t, uint64_t, size_t, uint_least8_t, size_t, size_t) const;
+    inline size_t parallel_subword_find(const Array&, uint64_t, uint64_t, size_t, uint_least8_t, size_t,
+                                        size_t) const;
 
     bool find_eq(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*) const;
     bool find_neq(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*) const;
