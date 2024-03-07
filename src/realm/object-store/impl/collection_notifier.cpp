@@ -259,14 +259,16 @@ std::vector<NotificationCallback>::iterator CollectionNotifier::find_callback(ui
 
 void CollectionNotifier::unregister() noexcept
 {
-    std::lock_guard<std::mutex> lock(m_realm_mutex);
-    m_realm = nullptr;
+    {
+        std::lock_guard lock(m_realm_mutex);
+        m_realm = nullptr;
+    }
+    m_is_alive.store(false, std::memory_order_release);
 }
 
 bool CollectionNotifier::is_alive() const noexcept
 {
-    std::lock_guard<std::mutex> lock(m_realm_mutex);
-    return m_realm != nullptr;
+    return m_is_alive.load(std::memory_order_acquire);
 }
 
 std::unique_lock<std::mutex> CollectionNotifier::lock_target()
