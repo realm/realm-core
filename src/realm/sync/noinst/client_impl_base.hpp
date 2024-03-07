@@ -292,7 +292,6 @@ private:
 
     bool m_stopped = false;                       // Protected by `m_mutex`
     bool m_sessions_terminated = false;           // Protected by `m_mutex`
-    bool m_actualize_and_finalize_needed = false; // Protected by `m_mutex`
 
     // The set of session wrappers that are not yet wrapping a session object,
     // and are not yet abandoned (still referenced by the application).
@@ -1427,7 +1426,8 @@ inline ClientImpl::Session::Session(SessionWrapper& wrapper, Connection& conn)
 }
 
 inline ClientImpl::Session::Session(SessionWrapper& wrapper, Connection& conn, session_ident_type ident)
-    : logger_ptr{std::make_shared<util::PrefixLogger>(make_logger_prefix(ident), conn.logger_ptr)} // Throws
+    : logger_ptr{std::make_shared<util::PrefixLogger>(util::LogCategory::session, make_logger_prefix(ident),
+                                                      conn.logger_ptr)} // Throws
     , logger{*logger_ptr}
     , m_conn{conn}
     , m_ident{ident}

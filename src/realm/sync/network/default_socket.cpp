@@ -21,7 +21,7 @@ public:
                          std::mt19937_64& random, const std::string user_agent,
                          std::unique_ptr<WebSocketObserver> observer, WebSocketEndpoint&& endpoint)
         : m_logger_ptr{logger_ptr}
-        , m_logger{*m_logger_ptr}
+        , m_network_logger{*m_logger_ptr}
         , m_random{random}
         , m_service{service}
         , m_user_agent{user_agent}
@@ -80,13 +80,13 @@ private:
     }
     void websocket_read_error_handler(std::error_code ec) override
     {
-        m_logger.error("Reading failed: %1", ec.message()); // Throws
+        m_network_logger.error("Reading failed: %1", ec.message()); // Throws
         constexpr bool was_clean = false;
         websocket_error_and_close_handler(was_clean, WebSocketError::websocket_read_error, ec.message());
     }
     void websocket_write_error_handler(std::error_code ec) override
     {
-        m_logger.error("Writing failed: %1", ec.message()); // Throws
+        m_network_logger.error("Writing failed: %1", ec.message()); // Throws
         constexpr bool was_clean = false;
         websocket_error_and_close_handler(was_clean, WebSocketError::websocket_write_error, ec.message());
     }
@@ -216,7 +216,7 @@ private:
     void handle_pong_timeout();
 
     const std::shared_ptr<util::Logger> m_logger_ptr;
-    util::Logger& m_logger;
+    util::Logger& m_network_logger;
     std::mt19937_64& m_random;
     network::Service& m_service;
     const std::string m_user_agent;
@@ -279,7 +279,7 @@ void DefaultWebSocketImpl::initiate_resolve()
         // logger.detail("Using %1 proxy", proxy->type); // Throws
     }
 
-    m_logger.detail("Resolving '%1:%2'", address, port); // Throws
+    m_network_logger.detail("Resolving '%1:%2'", address, port); // Throws
 
     network::Resolver::Query query(address, util::to_string(port)); // Throws
     auto handler = [this](std::error_code ec, network::Endpoint::List endpoints) {
@@ -296,7 +296,8 @@ void DefaultWebSocketImpl::initiate_resolve()
 void DefaultWebSocketImpl::handle_resolve(std::error_code ec, network::Endpoint::List endpoints)
 {
     if (ec) {
-        m_logger.error("Failed to resolve '%1:%2': %3", m_endpoint.address, m_endpoint.port, ec.message()); // Throws
+        m_network_logger.error("Failed to resolve '%1:%2': %3", m_endpoint.address, m_endpoint.port,
+                               ec.message()); // Throws
         constexpr bool was_clean = false;
         websocket_error_and_close_handler(was_clean, WebSocketError::websocket_resolve_failed,
                                           ec.message()); // Throws
@@ -320,24 +321,24 @@ void DefaultWebSocketImpl::initiate_tcp_connect(network::Endpoint::List endpoint
         if (ec != util::error::operation_aborted)
             handle_tcp_connect(ec, std::move(endpoints), i); // Throws
     });
-    m_logger.detail("Connecting to endpoint '%1:%2' (%3/%4)", ep.address(), ep.port(), (i + 1), n); // Throws
+    m_network_logger.detail("Connecting to endpoint '%1:%2' (%3/%4)", ep.address(), ep.port(), (i + 1), n); // Throws
 }
-
 
 void DefaultWebSocketImpl::handle_tcp_connect(std::error_code ec, network::Endpoint::List endpoints, std::size_t i)
 {
     REALM_ASSERT(i < endpoints.size());
     const network::Endpoint& ep = *(endpoints.begin() + i);
     if (ec) {
-        m_logger.error("Failed to connect to endpoint '%1:%2': %3", ep.address(), ep.port(),
-                       ec.message()); // Throws
+        m_network_logger.error("Failed to connect to endpoint '%1:%2': %3", ep.address(), ep.port(),
+                               ec.message()); // Throws
         std::size_t i_2 = i + 1;
         if (i_2 < endpoints.size()) {
             initiate_tcp_connect(std::move(endpoints), i_2); // Throws
             return;
         }
         // All endpoints failed
-        m_logger.error("Failed to connect to '%1:%2': All endpoints failed", m_endpoint.address, m_endpoint.port);
+        m_network_logger.error("Failed to connect to '%1:%2': All endpoints failed", m_endpoint.address,
+                               m_endpoint.port);
         constexpr bool was_clean = false;
         websocket_error_and_close_handler(was_clean, WebSocketError::websocket_connection_failed,
                                           ec.message()); // Throws
@@ -346,8 +347,8 @@ void DefaultWebSocketImpl::handle_tcp_connect(std::error_code ec, network::Endpo
 
     REALM_ASSERT(m_socket);
     network::Endpoint ep_2 = m_socket->local_endpoint();
-    m_logger.info("Connected to endpoint '%1:%2' (from '%3:%4')", ep.address(), ep.port(), ep_2.address(),
-                  ep_2.port()); // Throws
+    m_network_logger.info("Connected to endpoint '%1:%2' (from '%3:%4')", ep.address(), ep.port(), ep_2.address(),
+                          ep_2.port()); // Throws
 
     // TODO: Handle HTTPS proxies
     if (m_endpoint.proxy) {
@@ -378,7 +379,7 @@ void DefaultWebSocketImpl::initiate_http_tunnel()
     m_proxy_client.emplace(*this, m_logger_ptr);
     auto handler = [this](HTTPResponse response, std::error_code ec) {
         if (ec && ec != util::error::operation_aborted) {
-            m_logger.error("Failed to establish HTTP tunnel: %1", ec.message());
+            m_network_logger.error("Failed to establish HTTP tunnel: %1", ec.message());
             constexpr bool was_clean = false;
             websocket_error_and_close_handler(was_clean, WebSocketError::websocket_connection_failed,
                                               ec.message()); // Throws
@@ -386,7 +387,8 @@ void DefaultWebSocketImpl::initiate_http_tunnel()
         }
 
         if (response.status != HTTPStatus::Ok) {
-            m_logger.error("Proxy server returned response '%1 %2'", response.status, response.reason); // Throws
+            m_network_logger.error("Proxy server returned response '%1 %2'", response.status,
+                                   response.reason); // Throws
             constexpr bool was_clean = false;
             websocket_error_and_close_handler(was_clean, WebSocketError::websocket_connection_failed,
                                               response.reason); // Throws
@@ -499,7 +501,7 @@ DefaultSocketProvider::DefaultSocketProvider(const std::shared_ptr<util::Logger>
                                              const std::string user_agent,
                                              const std::shared_ptr<BindingCallbackThreadObserver>& observer_ptr,
                                              AutoStart auto_start)
-    : m_logger_ptr{logger}
+    : m_logger_ptr{std::make_shared<util::CategoryLogger>(util::LogCategory::network, logger)}
     , m_observer_ptr{observer_ptr}
     , m_service{}
     , m_random{}

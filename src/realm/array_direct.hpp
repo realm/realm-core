@@ -301,9 +301,9 @@ public:
     {
         auto in_word_position = field_position & 0x3F;
         auto first_word = first_word_ptr[0];
-        size_t mask = -1;
+        uint64_t mask = 0ULL - 1ULL;
         if (field_size < 64) {
-            mask = static_cast<size_t>((1ULL << field_size) - 1);
+            mask = (1ULL << field_size) - 1;
             value &= mask;
         }
         // zero out field in first word:
@@ -389,16 +389,16 @@ inline void write_bitfield(uint64_t* data_area, size_t field_position, size_t wi
     *it = value;
 }
 
-inline int64_t sign_extend_field_by_mask(size_t sign_mask, uint64_t value)
+inline int64_t sign_extend_field_by_mask(uint64_t sign_mask, uint64_t value)
 {
-    uint64_t sign_extension = 0 - (value & sign_mask);
+    uint64_t sign_extension = 0ULL - (value & sign_mask);
     return value | sign_extension;
 }
 
 inline int64_t sign_extend_value(size_t width, uint64_t value)
 {
     uint64_t sign_mask = 1ULL << (width - 1);
-    uint64_t sign_extension = 0 - (value & sign_mask);
+    uint64_t sign_extension = 0ULL - (value & sign_mask);
     return value | sign_extension;
 }
 
@@ -795,13 +795,35 @@ constexpr uint32_t inverse_width[65] = {
     65536 * 64 / 61, 65536 * 64 / 62, 65536 * 64 / 63, 65536 * 64 / 64,
 };
 
+inline int countr_zero(uint64_t vector)
+{
+    unsigned long where;
+#if defined(_WIN64)
+    if (_BitScanForward64(&where, vector))
+        return static_cast<int>(where);
+    return 0;
+#elif defined(_WIN32)
+    uint32_t low = vector & 0xFFFFFFFF;
+    if (low) {
+        bool scan_ok = _BitScanForward(&where, low);
+        REALM_ASSERT_DEBUG(scan_ok);
+        return where;
+    }
+    else {
+        low = vector >> 32;
+        bool scan_ok = _BitScanForward(&where, low);
+        REALM_ASSERT_DEBUG(scan_ok);
+        return 32 + where;
+    }
+#else
+    where = __builtin_ctzll(vector);
+    return static_cast<int>(where);
+#endif
+}
+
 inline int first_field_marked(int width, uint64_t vector)
 {
-#if REALM_WINDOWS
-    int lz = (int)_tzcnt_u64(vector); // TODO: not clear if this is ok on all platforms
-#else
-    int lz = __builtin_ctzll(vector);
-#endif
+    const auto lz = countr_zero(vector);
     int field = (lz * inverse_width[width]) >> 22;
     REALM_ASSERT_DEBUG(field == (lz / width));
     return field;

@@ -44,7 +44,6 @@ using util::any_cast;
 
 TEST_CASE("list", "[list]") {
     InMemoryTestFile config;
-    config.cache = false;
     config.automatic_change_notifications = false;
     auto r = Realm::get_shared_realm(config);
     r->update_schema({
@@ -1280,6 +1279,207 @@ TEST_CASE("list", "[list]") {
     }
 }
 
+TEST_CASE("nested List") {
+    InMemoryTestFile config;
+    config.automatic_change_notifications = false;
+    auto r = Realm::get_shared_realm(config);
+    r->update_schema({
+        {"table",
+         {{"pk", PropertyType::Int, Property::IsPrimary{true}},
+          {"any", PropertyType::Mixed | PropertyType::Nullable}}},
+    });
+
+    auto& coordinator = *_impl::RealmCoordinator::get_coordinator(config.path);
+
+    auto table = r->read_group().get_table("class_table");
+    ColKey col_any = table->get_column_key("any");
+
+    r->begin_transaction();
+
+    Obj obj = table->create_object_with_primary_key(47);
+    obj.set_collection(col_any, CollectionType::List);
+    auto top_list = obj.get_list<Mixed>(col_any);
+    top_list.insert(0, "Hello");
+    top_list.insert_collection(1, CollectionType::List);
+    top_list.insert(2, "Godbye");
+    top_list.insert_collection(3, CollectionType::List);
+    top_list.insert_collection(4, CollectionType::List);
+    auto l0 = obj.get_list_ptr<Mixed>(Path{"any", 1});
+    l0->insert_collection(0, CollectionType::Dictionary);
+    auto d = l0->get_dictionary(0);
+    d->insert_collection("list", CollectionType::List);
+    d->get_list("list")->add(Mixed(5));
+    auto l1 = obj.get_list_ptr<Mixed>(Path{"any", 3});
+
+    r->commit_transaction();
+
+    auto r2 = coordinator.get_realm();
+
+    auto write = [&](auto&& f) {
+        r->begin_transaction();
+        f();
+        r->commit_transaction();
+        advance_and_notify(*r);
+    };
+
+    SECTION("add_notification_block()") {
+        CollectionChangeSet change;
+        List lst0(r, l0);
+        List lst1(r, l1);
+
+        auto require_change = [&] {
+            auto token = lst0.add_notification_callback([&](CollectionChangeSet c) {
+                change = c;
+            });
+            advance_and_notify(*r);
+            return token;
+        };
+
+        auto require_no_change = [&] {
+            bool first = true;
+            auto token = lst0.add_notification_callback([&, first](CollectionChangeSet) mutable {
+                REQUIRE(first);
+                first = false;
+            });
+            advance_and_notify(*r);
+            return token;
+        };
+
+        SECTION("modifying the list sends a change notifications") {
+            auto token = require_change();
+            write([&] {
+                lst0.add(Mixed(8));
+            });
+            REQUIRE_INDICES(change.insertions, 1);
+            REQUIRE(!change.collection_was_cleared);
+        }
+
+        SECTION("inserting in sub structure sends a change notifications") {
+            // Check that notifications on Results are correct
+            Results res = lst0.as_results();
+            CollectionChangeSet change1;
+            auto token_res = res.add_notification_callback([&](CollectionChangeSet c) {
+                change1 = c;
+            });
+
+            auto token = require_change();
+            write([&] {
+                lst0.get_dictionary(0).get_list("list").add(Mixed(42));
+            });
+            REQUIRE_INDICES(change.modifications, 0);
+            REQUIRE_INDICES(change1.modifications, 0);
+            REQUIRE(!change.collection_was_cleared);
+        }
+
+        SECTION("modifying in sub structure sends a change notifications") {
+            auto token = require_change();
+            write([&] {
+                lst0.get_dictionary(0).get_list("list").set(0, Mixed(42));
+            });
+            REQUIRE_INDICES(change.modifications, 0);
+            REQUIRE(!change.collection_was_cleared);
+        }
+
+        SECTION("clearing in sub structure sends a change notifications") {
+            auto token = require_change();
+            write([&] {
+                lst0.get_dictionary(0).get_list("list").remove_all();
+            });
+            REQUIRE_INDICES(change.modifications, 0);
+            REQUIRE(!change.collection_was_cleared);
+        }
+
+        SECTION("deleting sub structure sends a change notifications") {
+            auto token = require_change();
+            write([&] {
+                lst0.get_dictionary(0).erase("list");
+            });
+            REQUIRE_INDICES(change.modifications, 0);
+            REQUIRE(!change.collection_was_cleared);
+        }
+
+        SECTION("creating and modifying sub structure results in insert change only") {
+            auto token = require_change();
+            write([&] {
+                lst0.insert_collection(1, CollectionType::Dictionary);
+                lst0.get_dictionary(1).insert("Value", Mixed(42));
+            });
+            REQUIRE_INDICES(change.insertions, 1);
+            REQUIRE(change.modifications.empty());
+            REQUIRE(!change.collection_was_cleared);
+        }
+
+        SECTION("modifying another list does not send notifications") {
+            auto token = require_no_change();
+            write([&] {
+                lst1.add(Mixed(47));
+            });
+        }
+
+        SECTION("modifying the list sends a change notifications - even when index changes") {
+            auto token = require_change();
+            write([&] {
+                obj.get_collection_ptr(col_any)->insert_collection(0, CollectionType::List);
+                lst0.add(Mixed(8));
+            });
+            REQUIRE_INDICES(change.insertions, 1);
+            REQUIRE(!change.collection_was_cleared);
+        }
+
+        SECTION("a notifier can be attached in a different transaction") {
+            {
+                r2->begin_transaction();
+                auto t = r2->read_group().get_table("class_table");
+                auto l = t->get_object_with_primary_key(47).get_list<Mixed>("any");
+                l.remove(0);
+                r2->commit_transaction();
+            }
+
+            auto token = require_change();
+            write([&] {
+                lst0.add(Mixed(8));
+            });
+            REQUIRE_INDICES(change.insertions, 1);
+            REQUIRE(!change.collection_was_cleared);
+        }
+        SECTION("remove item from collection") {
+            auto token = require_change();
+            write([&] {
+                lst0.add(Mixed(8));
+            });
+            REQUIRE_INDICES(change.insertions, 1);
+            write([&] {
+                lst0.remove(1);
+            });
+            REQUIRE_INDICES(change.deletions, 1);
+        }
+        SECTION("erase from containing list") {
+            auto token = require_change();
+            write([&] {
+                lst0.add(Mixed(8));
+            });
+            REQUIRE_INDICES(change.insertions, 1);
+            write([&] {
+                top_list.set(1, 42);
+            });
+            REQUIRE_INDICES(change.deletions, 0, 1);
+            REQUIRE(change.collection_root_was_deleted);
+        }
+        SECTION("remove containing object") {
+            auto token = require_change();
+            write([&] {
+                lst0.add(Mixed(8));
+            });
+            REQUIRE_INDICES(change.insertions, 1);
+            write([&] {
+                obj.remove();
+            });
+            REQUIRE_INDICES(change.deletions, 0, 1);
+            REQUIRE(change.collection_root_was_deleted);
+        }
+    }
+}
+
 TEST_CASE("embedded List", "[list]") {
     InMemoryTestFile config;
     config.automatic_change_notifications = false;
@@ -1289,7 +1489,9 @@ TEST_CASE("embedded List", "[list]") {
          {{"pk", PropertyType::Int, Property::IsPrimary{true}},
           {"array", PropertyType::Array | PropertyType::Object, "target"}}},
         {"target", ObjectSchema::ObjectType::Embedded, {{"value", PropertyType::Int}}},
-        {"other_origin", {{"array", PropertyType::Array | PropertyType::Object, "other_target"}}},
+        {"other_origin",
+         {{"id", PropertyType::Int, Property::IsPrimary{true}},
+          {"array", PropertyType::Array | PropertyType::Object, "other_target"}}},
         {"other_target", ObjectSchema::ObjectType::Embedded, {{"value", PropertyType::Int}}},
     });
 
@@ -1313,7 +1515,7 @@ TEST_CASE("embedded List", "[list]") {
         lv2->create_and_insert_linked_object(i).set_all(i);
 
 
-    Obj other_obj = other_origin->create_object();
+    Obj other_obj = other_origin->create_object_with_primary_key(1);
     auto other_lv = other_obj.get_linklist_ptr(other_col_link);
     for (int i = 0; i < 10; ++i)
         other_lv->create_and_insert_linked_object(i).set_all(i);
@@ -1842,7 +2044,7 @@ TEST_CASE("list with unresolved links", "[list]") {
     TestSyncManager init_sync_manager({}, {false});
     auto& server = init_sync_manager.sync_server();
 
-    SyncTestFile config1(init_sync_manager.app(), "shared");
+    SyncTestFile config1(init_sync_manager, "shared");
     config1.schema = Schema{
         {"origin",
          {{"_id", PropertyType::Int, Property::IsPrimary(true)},
@@ -1850,7 +2052,7 @@ TEST_CASE("list with unresolved links", "[list]") {
         {"target", {{"_id", PropertyType::Int, Property::IsPrimary(true)}, {"value", PropertyType::Int}}},
     };
 
-    SyncTestFile config2(init_sync_manager.app(), "shared");
+    SyncTestFile config2(init_sync_manager, "shared");
 
     auto r1 = Realm::get_shared_realm(config1);
     auto r2 = Realm::get_shared_realm(config2);

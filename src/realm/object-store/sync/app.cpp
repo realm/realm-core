@@ -64,9 +64,8 @@ T as(const Bson& bson)
 template <typename T>
 T get(const BsonDocument& doc, const std::string& key)
 {
-    auto& raw = doc.entries();
-    if (auto it = raw.find(key); it != raw.end()) {
-        return as<T>(it->second);
+    if (auto val = doc.find(key)) {
+        return as<T>(*val);
     }
     throw_json_error(ErrorCodes::MissingJsonKey, key);
     return {};
@@ -75,9 +74,8 @@ T get(const BsonDocument& doc, const std::string& key)
 template <typename T>
 void read_field(const BsonDocument& data, const std::string& key, T& value)
 {
-    auto& raw = data.entries();
-    if (auto it = raw.find(key); it != raw.end()) {
-        value = as<T>(it->second);
+    if (auto val = data.find(key)) {
+        value = as<T>(*val);
     }
     else {
         throw_json_error(ErrorCodes::MissingJsonKey, key);
@@ -93,9 +91,8 @@ void read_field(const BsonDocument& data, const std::string& key, ObjectId& valu
 template <typename T>
 void read_field(const BsonDocument& data, const std::string& key, Optional<T>& value)
 {
-    auto& raw = data.entries();
-    if (auto it = raw.find(key); it != raw.end()) {
-        value = as<T>(it->second);
+    if (auto val = data.find(key)) {
+        value = as<T>(*val);
     }
 }
 
@@ -313,8 +310,7 @@ void App::configure(const SyncClientConfig& sync_client_config)
     // Start with an empty sync route in the sync manager. It will ensure the
     // location has been updated at least once when the first sync session is
     // started by requesting a new access token.
-    m_sync_manager = std::make_shared<SyncManager>();
-    m_sync_manager->configure(shared_from_this(), util::none, sync_client_config);
+    m_sync_manager = SyncManager::create(shared_from_this(), {}, sync_client_config, config().app_id);
 }
 
 bool App::init_logger()
@@ -327,14 +323,15 @@ bool App::init_logger()
 
 bool App::would_log(util::Logger::Level level)
 {
-    return init_logger() && m_logger_ptr->would_log(level);
+    return init_logger() && m_logger_ptr->would_log(util::LogCategory::app, level);
 }
 
 template <class... Params>
 void App::log_debug(const char* message, Params&&... params)
 {
     if (init_logger()) {
-        m_logger_ptr->log(util::Logger::Level::debug, message, std::forward<Params>(params)...);
+        m_logger_ptr->log(util::LogCategory::app, util::Logger::Level::debug, message,
+                          std::forward<Params>(params)...);
     }
 }
 
@@ -342,7 +339,8 @@ template <class... Params>
 void App::log_error(const char* message, Params&&... params)
 {
     if (init_logger()) {
-        m_logger_ptr->log(util::Logger::Level::error, message, std::forward<Params>(params)...);
+        m_logger_ptr->log(util::LogCategory::app, util::Logger::Level::error, message,
+                          std::forward<Params>(params)...);
     }
 }
 
@@ -1279,10 +1277,12 @@ void App::call_function(const std::shared_ptr<SyncUser>& user, const std::string
     auto service_name2 = service_name ? *service_name : "<none>";
     std::stringstream args_ejson;
     args_ejson << "[";
+    bool not_first = false;
     for (auto&& arg : args_bson) {
-        if (&arg != &args_bson.front())
+        if (not_first)
             args_ejson << ',';
         args_ejson << arg.toJson();
+        not_first = true;
     }
     args_ejson << "]";
 

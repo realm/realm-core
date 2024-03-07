@@ -102,13 +102,13 @@ int64_t ArrayFlex::get(const Array& arr, size_t ndx) const
 }
 
 int64_t ArrayFlex::get(const char* data, size_t ndx, size_t v_width, size_t v_size, size_t ndx_width, size_t ndx_size,
-                       size_t mask) const
+                       uint64_t mask) const
 {
     return do_get((uint64_t*)data, ndx, v_width, v_size, ndx_width, ndx_size, mask);
 }
 
 int64_t ArrayFlex::do_get(uint64_t* data, size_t ndx, size_t v_width, size_t ndx_width, size_t v_size,
-                          size_t ndx_size, size_t mask) const
+                          size_t ndx_size, uint64_t mask) const
 {
     if (ndx >= ndx_size)
         return realm::not_found;
@@ -176,7 +176,7 @@ bool ArrayFlex::find_all(const Array& arr, int64_t value, size_t start, size_t e
 }
 
 template <typename Cond, bool v>
-inline size_t ArrayFlex::parallel_subword_find(const Array& arr, uint64_t value, size_t width_mask, size_t offset,
+inline size_t ArrayFlex::parallel_subword_find(const Array& arr, uint64_t value, uint64_t width_mask, size_t offset,
                                                uint_least8_t width, size_t start, size_t end) const
 {
     const auto MSBs = populate(width, width_mask);

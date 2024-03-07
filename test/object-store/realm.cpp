@@ -16,10 +16,10 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include <util/event_loop.hpp>
-#include <util/test_file.hpp>
-#include <util/test_utils.hpp>
-#include <../util/semaphore.hpp>
+#include "util/event_loop.hpp"
+#include "util/test_file.hpp"
+#include "util/test_utils.hpp"
+#include "../util/semaphore.hpp"
 
 #include <realm/db.hpp>
 #include <realm/history.hpp>
@@ -48,7 +48,7 @@
 
 #include <realm/object-store/sync/async_open_task.hpp>
 #include <realm/object-store/sync/impl/sync_metadata.hpp>
-
+#include <realm/object-store/sync/sync_session.hpp>
 #include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/subscriptions.hpp>
 #endif
@@ -387,11 +387,7 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
     }
 
     SECTION("should sensibly handle opening an uninitialized file without a schema specified") {
-        SECTION("cached") {
-        }
-        SECTION("uncached") {
-            config.cache = false;
-        }
+        config.cache = GENERATE(false, true);
 
         // create an empty file
         util::File(config.path, util::File::mode_Write);
@@ -926,16 +922,15 @@ TEST_CASE("Get Realm using Async Open", "[sync][pbs][async open]") {
     if (!util::EventLoop::has_implementation())
         return;
 
-    TestSyncManager init_sync_manager;
-    SyncTestFile config(init_sync_manager.app(), "default");
-    config.cache = false;
+    TestSyncManager tsm;
+    SyncTestFile config(tsm, "default");
     ObjectSchema object_schema = {"object",
                                   {
                                       {"_id", PropertyType::Int, Property::IsPrimary{true}},
                                       {"value", PropertyType::Int},
                                   }};
     config.schema = Schema{object_schema};
-    SyncTestFile config2(init_sync_manager.app(), "default");
+    SyncTestFile config2(tsm, "default");
     config2.schema = config.schema;
 
     std::mutex mutex;
@@ -965,7 +960,7 @@ TEST_CASE("Get Realm using Async Open", "[sync][pbs][async open]") {
 
     SECTION("can write a realm file without client file id") {
         ThreadSafeReference realm_ref;
-        SyncTestFile config3(init_sync_manager.app(), "default");
+        SyncTestFile config3(tsm, "default");
         config3.schema = config.schema;
         uint64_t client_file_id;
 
@@ -1116,10 +1111,10 @@ TEST_CASE("Get Realm using Async Open", "[sync][pbs][async open]") {
     }
 
     SECTION("can download multiple Realms at a time") {
-        SyncTestFile config1(init_sync_manager.app(), "realm1");
-        SyncTestFile config2(init_sync_manager.app(), "realm2");
-        SyncTestFile config3(init_sync_manager.app(), "realm3");
-        SyncTestFile config4(init_sync_manager.app(), "realm4");
+        SyncTestFile config1(tsm, "realm1");
+        SyncTestFile config2(tsm, "realm2");
+        SyncTestFile config3(tsm, "realm3");
+        SyncTestFile config4(tsm, "realm4");
 
         std::vector<std::shared_ptr<AsyncOpenTask>> tasks = {
             Realm::get_synchronized_realm(config1),
@@ -1142,9 +1137,10 @@ TEST_CASE("Get Realm using Async Open", "[sync][pbs][async open]") {
     auto expired_token = encode_fake_jwt("", 123, 456);
 
     SECTION("can async open while waiting for a token refresh") {
-        SyncTestFile config(init_sync_manager.app(), "realm");
-        auto valid_token = config.sync_config->user->access_token();
-        config.sync_config->user->update_access_token(std::move(expired_token));
+        SyncTestFile config(tsm, "realm");
+        auto user = config.sync_config->user;
+        auto valid_token = user->access_token();
+        user->update_access_token(std::move(expired_token));
 
         std::atomic<bool> called{false};
         auto task = Realm::get_synchronized_realm(config);
@@ -1154,9 +1150,11 @@ TEST_CASE("Get Realm using Async Open", "[sync][pbs][async open]") {
             REQUIRE(!error);
             called = true;
         });
+        auto session = tsm.sync_manager()->get_existing_session(config.path);
+        REQUIRE(session);
+        CHECK(session->state() == SyncSession::State::WaitingForAccessToken);
 
-        auto body = nlohmann::json({{"access_token", valid_token}}).dump();
-        init_sync_manager.network_callback(app::Response{200, 0, {}, body});
+        session->update_access_token(valid_token);
         util::EventLoop::main().run_until([&] {
             return called.load();
         });
@@ -1165,19 +1163,24 @@ TEST_CASE("Get Realm using Async Open", "[sync][pbs][async open]") {
     }
 
     SECTION("cancels download and reports an error on auth error") {
-        struct Transport : realm::app::GenericNetworkTransport {
+        struct Transport : UnitTestTransport {
             void send_request_to_server(
-                const realm::app::Request&,
+                const realm::app::Request& req,
                 realm::util::UniqueFunction<void(const realm::app::Response&)>&& completion) override
             {
-                completion(app::Response{403});
+                if (req.url.find("/auth/session") != std::string::npos) {
+                    completion(app::Response{403});
+                }
+                else {
+                    UnitTestTransport::send_request_to_server(req, std::move(completion));
+                }
             }
         };
-        TestSyncManager::Config tsm_config;
-        tsm_config.transport = std::make_shared<Transport>();
-        TestSyncManager tsm(tsm_config);
+        OfflineAppSession::Config oas_config;
+        oas_config.transport = std::make_shared<Transport>();
+        OfflineAppSession oas(oas_config);
 
-        SyncTestFile config(tsm.app(), "realm");
+        SyncTestFile config(oas, "realm");
         config.sync_config->user->log_in(expired_token, expired_token);
 
         bool got_error = false;
@@ -1345,7 +1348,7 @@ TEST_CASE("SharedRealm: convert", "[sync][pbs][convert]") {
                                   }};
     Schema schema{object_schema};
 
-    SyncTestFile sync_config1(tsm.app(), "default");
+    SyncTestFile sync_config1(tsm, "default");
     sync_config1.schema = schema;
     TestFile local_config1;
     local_config1.schema = schema;
@@ -1360,7 +1363,7 @@ TEST_CASE("SharedRealm: convert", "[sync][pbs][convert]") {
         wait_for_download(*sync_realm1);
 
         // Copy to a new sync config
-        SyncTestFile sync_config2(tsm.app(), "default");
+        SyncTestFile sync_config2(tsm, "default");
         sync_config2.schema = schema;
 
         sync_realm1->convert(sync_config2);
@@ -1447,7 +1450,7 @@ TEST_CASE("SharedRealm: convert - embedded objects", "[sync][pbs][convert][embed
                                     }};
     Schema schema{object_schema, embedded_schema};
 
-    SyncTestFile sync_config1(tsm.app(), "default");
+    SyncTestFile sync_config1(tsm, "default");
     sync_config1.schema = schema;
     TestFile local_config1;
     local_config1.schema = schema;
@@ -1472,7 +1475,7 @@ TEST_CASE("SharedRealm: convert - embedded objects", "[sync][pbs][convert][embed
         wait_for_download(*sync_realm1);
 
         // Copy to a new sync config
-        SyncTestFile sync_config2(tsm.app(), "default");
+        SyncTestFile sync_config2(tsm, "default");
         sync_config2.schema = schema;
 
         sync_realm1->convert(sync_config2);
@@ -1583,7 +1586,13 @@ TEST_CASE("SharedRealm: async writes") {
     TestFile config;
     config.schema_version = 0;
     config.schema = Schema{
-        {"object", {{"value", PropertyType::Int}, {"ints", PropertyType::Array | PropertyType::Int}}},
+        {"object",
+         {
+             {"value", PropertyType::Int},
+             {"ints", PropertyType::Array | PropertyType::Int},
+             {"int set", PropertyType::Set | PropertyType::Int},
+             {"int dictionary", PropertyType::Dictionary | PropertyType::Int},
+         }},
     };
     bool done = false;
     auto realm = Realm::get_shared_realm(config);
@@ -2235,11 +2244,17 @@ TEST_CASE("SharedRealm: async writes") {
     }
     SECTION("object change information") {
         realm->begin_transaction();
-        auto col = table->get_column_key("ints");
+        auto list_col = table->get_column_key("ints");
+        auto set_col = table->get_column_key("int set");
+        auto dict_col = table->get_column_key("int dictionary");
         auto obj = table->create_object();
-        auto list = obj.get_list<Int>(col);
+        auto list = obj.get_list<Int>(list_col);
         for (int i = 0; i < 3; ++i)
             list.add(i);
+        auto set = obj.get_set<Int>(set_col);
+        set.insert(0);
+        auto dict = obj.get_dictionary(dict_col);
+        dict.insert("a", 0);
         realm->commit_transaction();
 
         Observer observer(obj);
@@ -2248,10 +2263,14 @@ TEST_CASE("SharedRealm: async writes") {
 
         realm->async_begin_transaction([&]() {
             list.clear();
+            set.clear();
+            dict.clear();
             done = true;
         });
         wait_for_done();
-        REQUIRE(observer.array_change(0, col) == IndexSet{0, 1, 2});
+        REQUIRE(observer.array_change(0, list_col) == IndexSet{0, 1, 2});
+        REQUIRE(observer.array_change(0, set_col) == IndexSet{});
+        REQUIRE(observer.array_change(0, dict_col) == IndexSet{});
         realm->m_binding_context.release();
     }
 
@@ -2614,7 +2633,6 @@ TEST_CASE("SharedRealm: async_writes_2") {
         return;
 
     TestFile config;
-    config.cache = false;
     config.schema_version = 0;
     config.schema = Schema{
         {"object", {{"value", PropertyType::Int}}},
@@ -4249,4 +4267,31 @@ TEST_CASE("Concurrent operations") {
         // This is just to check that the section above did not leave any realms open
         _impl::RealmCoordinator::assert_no_open_realms();
     }
+}
+
+TEST_CASE("Notification logging") {
+    using namespace std::chrono_literals;
+    TestFile config;
+    // util::LogCategory::realm.set_default_level_threshold(util::Logger::Level::all);
+    config.schema_version = 1;
+    config.schema = Schema{{"object", {{"value", PropertyType::Int}}}};
+
+    auto realm = Realm::get_shared_realm(config);
+    auto table = realm->read_group().get_table("class_object");
+    int changed = 0;
+    Results res(realm, table->query("value == 5"));
+    auto token = res.add_notification_callback([&changed](CollectionChangeSet const&) {
+        changed++;
+    });
+
+    int commit_nr = 0;
+    util::EventLoop::main().run_until([&] {
+        for (int64_t i = 0; i < 10; i++) {
+            realm->begin_transaction();
+            table->create_object().set("value", i);
+            realm->commit_transaction();
+            std::this_thread::sleep_for(2ms);
+        }
+        return ++commit_nr == 10;
+    });
 }

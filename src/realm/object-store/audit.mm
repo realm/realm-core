@@ -282,7 +282,7 @@ public:
         return true;
     }
 
-    bool select_collection(ColKey, ObjKey obj) noexcept
+    bool select_collection(ColKey, ObjKey obj, const StablePath&) noexcept
     {
         REALM_ASSERT(m_active_table);
         m_active_table->modifications.push_back(obj);
@@ -683,7 +683,7 @@ std::shared_ptr<AuditRealmPool> AuditRealmPool::get_pool(std::shared_ptr<SyncUse
                                  }),
                   s_pools.end());
 
-    auto app_id = user->sync_manager()->app().lock()->config().app_id;
+    auto app_id = user->sync_manager()->app_id();
     auto it = std::find_if(s_pools.begin(), s_pools.end(), [&](auto& pool) {
         return pool.user_identity == user->identity() && pool.partition_prefix == partition_prefix &&
                pool.app_id == app_id;
@@ -889,7 +889,6 @@ void AuditRealmPool::open_new_realm()
 
     Realm::Config config;
     config.automatic_change_notifications = false;
-    config.cache = false;
     config.path = util::format("%1%2.realm", m_path_root, partition);
     config.scheduler = util::Scheduler::make_dummy();
     config.schema = Schema{schema};

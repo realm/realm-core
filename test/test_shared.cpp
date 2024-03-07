@@ -4197,6 +4197,10 @@ TEST(Shared_WriteTo)
         baas->add_column(type_Mixed, "any", true);
         baas->add_column(*foos, "link");
 
+        // collections in mixed
+        baas->add_column(type_Mixed, "mixed_nested_list", true);
+        baas->add_column(type_Mixed, "mixed_nested_dictionary", true);
+
         auto col_str = foos->add_column(type_String, "str");
         foos->add_search_index(col_str);
         foos->add_column_list(*embedded, "list_of_embedded");
@@ -4234,6 +4238,35 @@ TEST(Shared_WriteTo)
         dict.insert("key7", 7);
         dict.insert("key8", 8);
         dict.insert("key9", 9);
+
+        // nested collections
+        // nested list
+        auto col_key_mixed_list = baas->get_column_key("mixed_nested_list");
+        baa.set_collection(col_key_mixed_list, CollectionType::List);
+        auto any_nested_list = baa.get_collection_ptr(col_key_mixed_list);
+        any_nested_list->insert_collection(0, CollectionType::List);
+        any_nested_list->insert_collection(1, CollectionType::Dictionary);
+        auto nested_list1 = any_nested_list->get_list(0);
+        nested_list1->add(1);
+        nested_list1->add(2);
+        nested_list1->add(3);
+        auto nested_dict1 = any_nested_list->get_dictionary(1);
+        nested_dict1->insert("test", 10);
+        nested_dict1->insert("test", "test");
+
+        // nested dictionary
+        auto col_key_mixed_dict = baas->get_column_key("mixed_nested_dictionary");
+        baa.set_collection(col_key_mixed_dict, CollectionType::Dictionary);
+        auto any_nested_dict = baa.get_collection_ptr(col_key_mixed_dict);
+        any_nested_dict->insert_collection("List", CollectionType::List);
+        any_nested_dict->insert_collection("Dict", CollectionType::Dictionary);
+        auto nested_list2 = any_nested_dict->get_list("List");
+        nested_list2->add(1);
+        nested_list2->add(2);
+        nested_list2->add(3);
+        auto nested_dict2 = any_nested_dict->get_dictionary("Dict");
+        nested_dict2->insert("test", 10);
+        nested_dict2->insert("test", "test");
 
         auto baa1 = baas->create_object_with_primary_key(666).set("link", foo.get_key());
         obj = baa1.create_and_set_linked_object(baas->get_column_key("embedded"));

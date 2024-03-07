@@ -72,10 +72,11 @@ struct Contains : public HackClass {
     {
         if (m1.is_null())
             return !m2.is_null();
-        if (m1.is_type(type_String, type_Binary) && Mixed::types_are_comparable(m1, m2)) {
-            BinaryData b1 = m1.get_binary();
-            BinaryData b2 = m2.get_binary();
-            return operator()(b1, b2, false, false);
+        if (m1.is_type(type_String) && m2.is_type(type_String)) {
+            return operator()(m1.get<StringData>(), m2.get<StringData>(), false, false);
+        }
+        if (m1.is_type(type_Binary) && m2.is_type(type_Binary)) {
+            return operator()(m1.get<BinaryData>(), m2.get<BinaryData>(), false, false);
         }
         return false;
     }
@@ -133,10 +134,11 @@ struct Like : public HackClass {
     {
         if (m1.is_null() && m2.is_null())
             return true;
-        if (m1.is_type(type_String, type_Binary) && Mixed::types_are_comparable(m1, m2)) {
-            BinaryData b1 = m1.get_binary();
-            BinaryData b2 = m2.get_binary();
-            return operator()(b1, b2, false, false);
+        if (m1.is_type(type_String) && m2.is_type(type_String)) {
+            return operator()(m1.get<StringData>(), m2.get<StringData>(), false, false);
+        }
+        if (m1.is_type(type_Binary) && m2.is_type(type_Binary)) {
+            return operator()(m1.get<BinaryData>(), m2.get<BinaryData>(), false, false);
         }
         return false;
     }
@@ -186,9 +188,14 @@ struct BeginsWith : public HackClass {
 
     bool operator()(const QueryValue& m1, const QueryValue& m2) const
     {
-        if (m1.is_type(type_String, type_Binary) && Mixed::types_are_comparable(m1, m2)) {
-            BinaryData b1 = m1.get_binary();
-            BinaryData b2 = m2.get_binary();
+        if (m1.is_type(type_String) && m2.is_type(type_String)) {
+            StringData s1 = m1.get<StringData>();
+            StringData s2 = m2.get<StringData>();
+            return s2.begins_with(s1);
+        }
+        if (m1.is_type(type_Binary) && m2.is_type(type_Binary)) {
+            BinaryData b1 = m1.get<BinaryData>();
+            BinaryData b2 = m2.get<BinaryData>();
             return b2.begins_with(b1);
         }
         return false;
@@ -232,10 +239,12 @@ struct EndsWith : public HackClass {
 
     bool operator()(const QueryValue& m1, const QueryValue& m2) const
     {
-        if (m1.is_type(type_String, type_Binary) && Mixed::types_are_comparable(m1, m2)) {
-            BinaryData b1 = m1.get_binary();
-            BinaryData b2 = m2.get_binary();
-            return operator()(b1, b2, false, false);
+
+        if (m1.is_type(type_String) && m2.is_type(type_String)) {
+            return operator()(m1.get<StringData>(), m2.get<StringData>(), false, false);
+        }
+        if (m1.is_type(type_Binary) && m2.is_type(type_Binary)) {
+            return operator()(m1.get<BinaryData>(), m2.get<BinaryData>(), false, false);
         }
         return false;
     }
@@ -395,10 +404,11 @@ struct ContainsIns : public HackClass {
     {
         if (m1.is_null())
             return !m2.is_null();
-        if (m1.is_type(type_String, type_Binary) && Mixed::types_are_comparable(m1, m2)) {
-            BinaryData b1 = m1.get_binary();
-            BinaryData b2 = m2.get_binary();
-            return operator()(b1, b2, false, false);
+        if (m1.is_type(type_String) && m2.is_type(type_String)) {
+            return operator()(m1.get<StringData>(), m2.get<StringData>(), false, false);
+        }
+        if (m1.is_type(type_Binary) && m2.is_type(type_Binary)) {
+            return operator()(m1.get<BinaryData>(), m2.get<BinaryData>(), false, false);
         }
         return false;
     }
@@ -479,10 +489,11 @@ struct LikeIns : public HackClass {
     {
         if (m1.is_null() && m2.is_null())
             return true;
-        if (m1.is_type(type_String, type_Binary) && Mixed::types_are_comparable(m1, m2)) {
-            BinaryData b1 = m1.get_binary();
-            BinaryData b2 = m2.get_binary();
-            return operator()(b1, b2, false, false);
+        if (m1.is_type(type_String) && m2.is_type(type_String)) {
+            return operator()(m1.get<StringData>(), m2.get<StringData>(), false, false);
+        }
+        if (m1.is_type(type_Binary) && m2.is_type(type_Binary)) {
+            return operator()(m1.get<BinaryData>(), m2.get<BinaryData>(), false, false);
         }
         return false;
     }
@@ -544,10 +555,11 @@ struct BeginsWithIns : public HackClass {
 
     bool operator()(const QueryValue& m1, const QueryValue& m2) const
     {
-        if (m1.is_type(type_String, type_Binary) && Mixed::types_are_comparable(m1, m2)) {
-            BinaryData b1 = m1.get_binary();
-            BinaryData b2 = m2.get_binary();
-            return operator()(b1, b2, false, false);
+        if (m1.is_type(type_String) && m2.is_type(type_String)) {
+            return operator()(m1.get<StringData>(), m2.get<StringData>(), false, false);
+        }
+        if (m1.is_type(type_Binary) && m2.is_type(type_Binary)) {
+            return operator()(m1.get<BinaryData>(), m2.get<BinaryData>(), false, false);
         }
         return false;
     }
@@ -610,10 +622,11 @@ struct EndsWithIns : public HackClass {
 
     bool operator()(const QueryValue& m1, const QueryValue& m2) const
     {
-        if (m1.is_type(type_String, type_Binary) && Mixed::types_are_comparable(m1, m2)) {
-            BinaryData b1 = m1.get_binary();
-            BinaryData b2 = m2.get_binary();
-            return operator()(b1, b2, false, false);
+        if (m1.is_type(type_String) && m2.is_type(type_String)) {
+            return operator()(m1.get<StringData>(), m2.get<StringData>(), false, false);
+        }
+        if (m1.is_type(type_Binary) && m2.is_type(type_Binary)) {
+            return operator()(m1.get<BinaryData>(), m2.get<BinaryData>(), false, false);
         }
         return false;
     }
@@ -678,13 +691,14 @@ struct EqualIns : public HackClass {
         if (m1.is_null() && m2.is_null()) {
             return true;
         }
-        else if (Mixed::types_are_comparable(m1, m2)) {
-            if (m1.is_type(type_String, type_Binary)) {
-                return operator()(m1.get_binary(), m2.get_binary(), false, false);
+        if (Mixed::types_are_comparable(m1, m2)) {
+            if (m1.is_type(type_String) && m2.is_type(type_String)) {
+                return operator()(m1.get<StringData>(), m2.get<StringData>(), false, false);
             }
-            else {
-                return m1 == m2;
+            if (m1.is_type(type_Binary) && m2.is_type(type_Binary)) {
+                return operator()(m1.get<BinaryData>(), m2.get<BinaryData>(), false, false);
             }
+            return m1 == m2;
         }
         return false;
     }
@@ -985,25 +999,6 @@ struct GreaterEqual : public HackClass {
         return ">=";
     }
     static const int condition = -1;
-};
-
-
-// CompareLess is a temporary hack to have a generalized way to compare any realm types. Todo, enable correct <
-// operator of StringData (currently gives circular header dependency with utf8.hpp)
-template <class T>
-struct CompareLess {
-    static bool compare(T v1, T v2, bool = false, bool = false)
-    {
-        return v1 < v2;
-    }
-};
-template <>
-struct CompareLess<StringData> {
-    static bool compare(StringData v1, StringData v2, bool = false, bool = false)
-    {
-        bool ret = utf8_compare(v1.data(), v2.data());
-        return ret;
-    }
 };
 
 } // namespace realm

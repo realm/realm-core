@@ -845,7 +845,7 @@ TEST_CASE("flx: client reset", "[sync][flx][client reset][baas]") {
                 local_realm->refresh();
                 auto table = local_realm->read_group().get_table("class_TopLevel");
                 if (table->size() != 1) {
-                    table->to_json(std::cout, 1, {});
+                    table->to_json(std::cout);
                 }
                 REQUIRE(table->size() == 1);
                 auto mut_sub = latest_subs.make_mutable_copy();
@@ -2218,7 +2218,6 @@ TEST_CASE("flx: interrupted bootstrap restarts/recovers on reconnect", "[sync][f
     std::vector<ObjectId> obj_ids_at_end = fill_large_array_schema(harness);
     SyncTestFile interrupted_realm_config(harness.app()->current_user(), harness.schema(),
                                           SyncConfig::FLXSyncEnabled{});
-    interrupted_realm_config.cache = false;
 
     {
         auto [interrupted_promise, interrupted] = util::make_promise_future<void>();
@@ -2742,7 +2741,6 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][boot
     std::vector<ObjectId> obj_ids_at_end = fill_large_array_schema(harness);
     SyncTestFile interrupted_realm_config(harness.app()->current_user(), harness.schema(),
                                           SyncConfig::FLXSyncEnabled{});
-    interrupted_realm_config.cache = false;
 
     auto check_interrupted_state = [&](const DBRef& realm) {
         auto tr = realm->start_read();
@@ -3136,25 +3134,25 @@ static void check_document(const std::vector<bson::BsonDocument>& documents, Obj
                            std::initializer_list<std::pair<const char*, bson::Bson>> fields)
 {
     auto it = std::find_if(documents.begin(), documents.end(), [&](auto&& doc) {
-        auto it = doc.entries().find("_id");
-        REQUIRE(it != doc.entries().end());
-        return it->second == id;
+        auto val = doc.find("_id");
+        REQUIRE(val);
+        return *val == id;
     });
     REQUIRE(it != documents.end());
-    auto& doc = it->entries();
+    auto& doc = *it;
     for (auto& [name, expected_value] : fields) {
-        auto it = doc.find(name);
-        REQUIRE(it != doc.end());
+        auto val = doc.find(name);
+        REQUIRE(val);
 
         // bson documents are ordered  but Realm dictionaries aren't, so the
         // document might validly be in a different order than we expected and
         // we need to do a comparison that doesn't check order.
         if (expected_value.type() == bson::Bson::Type::Document) {
-            REQUIRE(static_cast<const bson::BsonDocument&>(it->second).entries() ==
-                    static_cast<const bson::BsonDocument&>(expected_value).entries());
+            REQUIRE(static_cast<const bson::BsonDocument&>(*val) ==
+                    static_cast<const bson::BsonDocument&>(expected_value));
         }
         else {
-            REQUIRE(it->second == expected_value);
+            REQUIRE(*val == expected_value);
         }
     }
 }
@@ -4053,7 +4051,6 @@ TEST_CASE("flx: compensating write errors get re-sent across sessions", "[sync][
 
     create_user_and_log_in(harness.app());
     SyncTestFile config(harness.app()->current_user(), harness.schema(), SyncConfig::FLXSyncEnabled{});
-    config.cache = false;
 
     {
         auto error_received_pf = util::make_promise_future<void>();
@@ -4630,7 +4627,6 @@ TEST_CASE("flx sync: resend pending subscriptions when reconnecting", "[sync][fl
     std::vector<ObjectId> obj_ids_at_end = fill_large_array_schema(harness);
     SyncTestFile interrupted_realm_config(harness.app()->current_user(), harness.schema(),
                                           SyncConfig::FLXSyncEnabled{});
-    interrupted_realm_config.cache = false;
 
     {
         auto pf = util::make_promise_future<void>();

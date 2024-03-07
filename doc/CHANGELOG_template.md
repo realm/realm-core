@@ -12,7 +12,7 @@
 * None.
 
 ### Compatibility
-* Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
+* Fileformat: Generates files with format v24. Reads and automatically upgrade from fileformat v10. If you want to upgrade from an earlier file format version you will have to use RealmCore v13.x.y or earlier.
 
 -----------
 

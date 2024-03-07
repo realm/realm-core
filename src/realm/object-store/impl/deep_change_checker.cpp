@@ -210,7 +210,7 @@ bool DeepChangeChecker::do_check_for_collection_modifications(const Obj& obj, Co
         return false;
     }
 
-    if (col.get_type() == col_type_LinkList || (col.is_set() && col.get_type() == col_type_Link)) {
+    if ((col.is_list() || col.is_set()) && col.get_type() == col_type_Link) {
         return check_collection<ObjKey>(ref, obj, col, filtered_columns, depth);
     }
 
@@ -427,8 +427,8 @@ void CollectionKeyPathChangeChecker::find_changed_columns(std::vector<ColKey>& c
 
     // Only continue for any kind of link.
     auto column_type = column_key.get_type();
-    if (column_type != col_type_Link && column_type != col_type_LinkList && column_type != col_type_BackLink &&
-        column_type != col_type_TypedLink && column_type != col_type_Mixed) {
+    if (column_type != col_type_Link && column_type != col_type_BackLink && column_type != col_type_TypedLink &&
+        column_type != col_type_Mixed) {
         return;
     }
 
@@ -456,7 +456,7 @@ void CollectionKeyPathChangeChecker::find_changed_columns(std::vector<ColKey>& c
             }
         }
         else {
-            REALM_ASSERT(column_type == col_type_Link || column_type == col_type_LinkList);
+            REALM_ASSERT(column_type == col_type_Link);
             auto list = object.get_linklist(column_key);
             auto target_table = table.get_link_target(column_key);
             for (size_t i = 0; i < list.size(); i++) {
@@ -473,7 +473,7 @@ void CollectionKeyPathChangeChecker::find_changed_columns(std::vector<ColKey>& c
             }
         }
         else {
-            REALM_ASSERT(column_type == col_type_Link || column_type == col_type_LinkList);
+            REALM_ASSERT(column_type == col_type_Link);
             auto set = object.get_linkset(column_key);
             auto target_table = table.get_link_target(column_key);
             for (auto& target_object : set) {

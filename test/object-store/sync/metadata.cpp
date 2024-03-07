@@ -37,15 +37,11 @@ using namespace realm::util;
 using File = realm::util::File;
 using SyncAction = SyncFileActionMetadata::Action;
 
-static const std::string base_path = util::make_temp_dir() + "realm_objectstore_sync_metadata";
+static const std::string base_path = util::make_temp_dir() + "realm_objectstore_sync_metadata.test-dir";
 static const std::string metadata_path = base_path + "/metadata.realm";
 
 TEST_CASE("sync_metadata: user metadata", "[sync][metadata]") {
-    util::try_make_dir(base_path);
-    auto close = util::make_scope_exit([=]() noexcept {
-        util::try_remove_dir_recursive(base_path);
-    });
-
+    test_util::TestDirGuard test_dir(base_path);
     SyncMetadataManager manager(metadata_path, false);
 
     SECTION("can be properly constructed") {
@@ -131,11 +127,7 @@ TEST_CASE("sync_metadata: user metadata", "[sync][metadata]") {
 }
 
 TEST_CASE("sync_metadata: user metadata APIs", "[sync][metadata]") {
-    util::try_make_dir(base_path);
-    auto close = util::make_scope_exit([=]() noexcept {
-        util::try_remove_dir_recursive(base_path);
-    });
-
+    test_util::TestDirGuard test_dir(base_path);
     SyncMetadataManager manager(metadata_path, false);
     const std::string provider_type = "https://realm.example.org";
 
@@ -163,11 +155,7 @@ TEST_CASE("sync_metadata: user metadata APIs", "[sync][metadata]") {
 }
 
 TEST_CASE("sync_metadata: file action metadata", "[sync][metadata]") {
-    util::try_make_dir(base_path);
-    auto close = util::make_scope_exit([=]() noexcept {
-        util::try_remove_dir_recursive(base_path);
-    });
-
+    test_util::TestDirGuard test_dir(base_path);
     SyncMetadataManager manager(metadata_path, false);
 
     const std::string local_uuid_1 = "asdfg";
@@ -177,13 +165,11 @@ TEST_CASE("sync_metadata: file action metadata", "[sync][metadata]") {
 
     SECTION("can be properly constructed") {
         const auto original_name = util::make_temp_dir() + "foobar/test1";
-        manager.make_file_action_metadata(original_name, url_1, local_uuid_1, SyncAction::BackUpThenDeleteRealm);
+        manager.make_file_action_metadata(original_name, SyncAction::BackUpThenDeleteRealm);
         auto metadata = *manager.get_file_action_metadata(original_name);
         REQUIRE(metadata.original_name() == original_name);
         REQUIRE(metadata.new_name() == none);
         REQUIRE(metadata.action() == SyncAction::BackUpThenDeleteRealm);
-        REQUIRE(metadata.partition() == url_1);
-        REQUIRE(metadata.user_local_uuid() == local_uuid_1);
     }
 
     SECTION("properly reflects updating state, across multiple instances") {
@@ -191,16 +177,13 @@ TEST_CASE("sync_metadata: file action metadata", "[sync][metadata]") {
         const std::string new_name_1 = util::make_temp_dir() + "foobar/test2b";
         const std::string new_name_2 = util::make_temp_dir() + "foobar/test2c";
 
-        manager.make_file_action_metadata(original_name, url_1, local_uuid_1, SyncAction::BackUpThenDeleteRealm,
-                                          new_name_1);
+        manager.make_file_action_metadata(original_name, SyncAction::BackUpThenDeleteRealm, new_name_1);
         auto metadata_1 = *manager.get_file_action_metadata(original_name);
         REQUIRE(metadata_1.original_name() == original_name);
         REQUIRE(metadata_1.new_name() == new_name_1);
         REQUIRE(metadata_1.action() == SyncAction::BackUpThenDeleteRealm);
-        REQUIRE(metadata_1.partition() == url_1);
-        REQUIRE(metadata_1.user_local_uuid() == local_uuid_1);
 
-        manager.make_file_action_metadata(original_name, url_2, local_uuid_2, SyncAction::DeleteRealm, new_name_2);
+        manager.make_file_action_metadata(original_name, SyncAction::DeleteRealm, new_name_2);
         auto metadata_2 = *manager.get_file_action_metadata(original_name);
         REQUIRE(metadata_1.original_name() == original_name);
         REQUIRE(metadata_1.new_name() == new_name_2);
@@ -208,28 +191,20 @@ TEST_CASE("sync_metadata: file action metadata", "[sync][metadata]") {
         REQUIRE(metadata_2.original_name() == original_name);
         REQUIRE(metadata_2.new_name() == new_name_2);
         REQUIRE(metadata_2.action() == SyncAction::DeleteRealm);
-        REQUIRE(metadata_1.partition() == url_2);
-        REQUIRE(metadata_1.user_local_uuid() == local_uuid_2);
     }
 }
 
 TEST_CASE("sync_metadata: file action metadata APIs", "[sync][metadata]") {
-    util::try_make_dir(base_path);
-    auto close = util::make_scope_exit([=]() noexcept {
-        util::try_remove_dir_recursive(base_path);
-    });
+    test_util::TestDirGuard test_dir(base_path);
 
     SyncMetadataManager manager(metadata_path, false);
     SECTION("properly list all pending actions, reflecting their deletion") {
         const auto filename1 = util::make_temp_dir() + "foobar/file1";
         const auto filename2 = util::make_temp_dir() + "foobar/file2";
         const auto filename3 = util::make_temp_dir() + "foobar/file3";
-        manager.make_file_action_metadata(filename1, "asdf", "realm://realm.example.com/1",
-                                          SyncAction::BackUpThenDeleteRealm);
-        manager.make_file_action_metadata(filename2, "asdf", "realm://realm.example.com/2",
-                                          SyncAction::BackUpThenDeleteRealm);
-        manager.make_file_action_metadata(filename3, "asdf", "realm://realm.example.com/3",
-                                          SyncAction::BackUpThenDeleteRealm);
+        manager.make_file_action_metadata(filename1, SyncAction::BackUpThenDeleteRealm);
+        manager.make_file_action_metadata(filename2, SyncAction::BackUpThenDeleteRealm);
+        manager.make_file_action_metadata(filename3, SyncAction::BackUpThenDeleteRealm);
         auto actions = manager.all_pending_actions();
         REQUIRE(actions.size() == 3);
         REQUIRE(results_contains_original_name(actions, filename1));
@@ -243,11 +218,7 @@ TEST_CASE("sync_metadata: file action metadata APIs", "[sync][metadata]") {
 }
 
 TEST_CASE("sync_metadata: results", "[sync][metadata]") {
-    util::try_make_dir(base_path);
-    auto close = util::make_scope_exit([=]() noexcept {
-        util::try_remove_dir_recursive(base_path);
-    });
-
+    test_util::TestDirGuard test_dir(base_path);
     SyncMetadataManager manager(metadata_path, false);
     const auto identity1 = "testcase3a1";
     const auto identity2 = "testcase3a3";
@@ -281,10 +252,7 @@ TEST_CASE("sync_metadata: results", "[sync][metadata]") {
 }
 
 TEST_CASE("sync_metadata: persistence across metadata manager instances", "[sync][metadata]") {
-    util::try_make_dir(base_path);
-    auto close = util::make_scope_exit([=]() noexcept {
-        util::try_remove_dir_recursive(base_path);
-    });
+    test_util::TestDirGuard temp_dir(base_path);
 
     SECTION("works for the basic case") {
         const auto identity = "testcase4a";
@@ -307,11 +275,7 @@ TEST_CASE("sync_metadata: persistence across metadata manager instances", "[sync
 }
 
 TEST_CASE("sync_metadata: encryption", "[sync][metadata]") {
-    util::try_make_dir(base_path);
-    auto close = util::make_scope_exit([=]() noexcept {
-        util::try_remove_dir_recursive(base_path);
-    });
-
+    test_util::TestDirGuard test_dir(base_path);
     const auto identity0 = "identity0";
     SECTION("prohibits opening the metadata Realm with different keys") {
         SECTION("different keys") {
@@ -457,10 +421,7 @@ TEST_CASE("sync_metadata: encryption", "[sync][metadata]") {
 
 #ifndef SWIFT_PACKAGE // The SPM build currently doesn't copy resource files
 TEST_CASE("sync metadata: can open old metadata realms", "[sync][metadata]") {
-    util::try_make_dir(base_path);
-    auto close = util::make_scope_exit([=]() noexcept {
-        util::try_remove_dir_recursive(base_path);
-    });
+    test_util::TestDirGuard test_dir(base_path);
 
     const std::string provider_type = "https://realm.example.org";
     const auto identity = "metadata migration test";

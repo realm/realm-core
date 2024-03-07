@@ -323,6 +323,10 @@ public:
     virtual ref_type typed_write(ref_type ref, _impl::ArrayWriterBase& out, const Table& table, bool deep,
                                  bool only_modified, bool compress) const override;
     virtual void typed_print(std::string prefix, const Table& table) const override;
+    static void remove_backlinks(const Table* origin_table, ObjKey origin_key, ColKey col,
+                                 const std::vector<ObjKey>& keys, CascadeState& state);
+    static void remove_backlinks(const Table* origin_table, ObjKey origin_key, ColKey col,
+                                 const std::vector<ObjLink>& links, CascadeState& state);
 
 private:
     friend class ClusterTree;
@@ -346,9 +350,16 @@ private:
     void do_move(size_t ndx, ColKey col, Cluster* to);
     template <class T>
     void do_erase(size_t ndx, ColKey col);
-    void remove_backlinks(ObjKey origin_key, ColKey col, const std::vector<ObjKey>& keys, CascadeState& state) const;
-    void remove_backlinks(ObjKey origin_key, ColKey col, const std::vector<ObjLink>& links,
-                          CascadeState& state) const;
+    void do_remove_backlinks(ObjKey origin_key, ColKey col, const std::vector<ObjKey>& keys,
+                             CascadeState& state) const
+    {
+        remove_backlinks(get_owning_table(), origin_key, col, keys, state);
+    }
+    void do_remove_backlinks(ObjKey origin_key, ColKey col, const std::vector<ObjLink>& links,
+                             CascadeState& state) const
+    {
+        remove_backlinks(get_owning_table(), origin_key, col, links, state);
+    }
     void do_erase_key(size_t ndx, ColKey col, CascadeState& state);
     void do_insert_key(size_t ndx, ColKey col, Mixed init_val, ObjKey origin_key);
     void do_insert_link(size_t ndx, ColKey col, Mixed init_val, ObjKey origin_key);

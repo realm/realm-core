@@ -1,20 +1,31 @@
-[
-  {
-    "_key": 0,
-    "str1": "hello",
-    "linkA": {
-      "table": "table2",
-      "keys": [
+{
+  "Foo": [
+    {
+      "_key": 0,
+      "str1": "hello",
+      "linkA": [
+        1
+      ]
+    },
+    {
+      "_key": 1,
+      "str1": "world",
+      "linkA": []
+    }
+  ],
+  "Bar": [
+    {
+      "_key": 0,
+      "str2": "bar",
+      "linkB": []
+    },
+    {
+      "_key": 1,
+      "str2": "foo",
+      "linkB": [
+        0,
         1
       ]
     }
-  },
-  {
-    "_key": 1,
-    "str1": "world",
-    "linkA": {
-      "table": "table2",
-      "keys": []
-    }
-  }
-]
+  ]
+}

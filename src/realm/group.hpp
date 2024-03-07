@@ -478,9 +478,8 @@ public:
     //@}
 
     // Conversion
-    void schema_to_json(std::ostream& out, std::map<std::string, std::string>* renames = nullptr) const;
-    void to_json(std::ostream& out, size_t link_depth = 0, std::map<std::string, std::string>* renames = nullptr,
-                 JSONOutputMode output_mode = output_mode_json) const;
+    void schema_to_json(std::ostream& out) const;
+    void to_json(std::ostream& out, JSONOutputMode output_mode = output_mode_json) const;
 
     /// Compare two groups for equality. Two groups are equal if, and
     /// only if, they contain the same tables in the same order, that
@@ -762,6 +761,11 @@ private:
     ///
     ///  23 Layout of Set and Dictionary changed.
     ///
+    ///  24 Variable sized arrays for Decimal128.
+    ///     Nested collections
+    ///     Backlinks in BPlusTree
+    ///     Sort order of Strings changed (affects sets and the string index)
+    ///
     /// IMPORTANT: When introducing a new file format version, be sure to review
     /// the file validity checks in Group::open() and DB::do_open, the file
     /// format selection logic in
@@ -769,7 +773,7 @@ private:
     /// upgrade logic in Group::upgrade_file_format(), AND the lists of accepted
     /// file formats and the version deletion list residing in "backup_restore.cpp"
 
-    static constexpr int g_current_file_format_version = 23;
+    static constexpr int g_current_file_format_version = 24;
 
     int get_file_format_version() const noexcept;
     void set_file_format_version(int) noexcept;
@@ -785,6 +789,8 @@ private:
                                              int& history_type, int& history_schema_version) noexcept;
     static ref_type get_history_ref(const Array& top) noexcept;
     static size_t get_logical_file_size(const Array& top) noexcept;
+    static size_t get_free_space_size(const Array& top) noexcept;
+    static size_t get_history_size(const Array& top) noexcept;
     size_t get_logical_file_size() const noexcept
     {
         return get_logical_file_size(m_top);
