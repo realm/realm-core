@@ -301,9 +301,9 @@ public:
     {
         auto in_word_position = field_position & 0x3F;
         auto first_word = first_word_ptr[0];
-        uint64_t mask = 0 - 1ULL;
+        uint64_t mask = 0ULL - 1ULL;
         if (field_size < 64) {
-            mask = static_cast<size_t>((1ULL << field_size) - 1);
+            mask = (1ULL << field_size) - 1;
             value &= mask;
         }
         // zero out field in first word:
