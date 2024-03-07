@@ -174,7 +174,11 @@ public:
 
     static size_t unsigned_to_num_bits(uint64_t value)
     {
-        return 1 + log2(static_cast<size_t>(value));
+        if constexpr (sizeof(size_t) == sizeof(uint64_t))
+            return 1 + log2(value);
+        if (value & 0xFFFFFFFF)
+            return 33 + log2(value >> 32);
+        return 1 + log2(value);
     }
 
     static size_t signed_to_num_bits(int64_t value)
