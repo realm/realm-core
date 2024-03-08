@@ -95,7 +95,7 @@ bool ArrayEncode::always_encode(const Array& origin, Array& arr, bool packed) co
 bool ArrayEncode::encode(const Array& origin, Array& arr) const
 {
     // return false;
-    // return always_encode(origin, arr, true); // true packed, false flex
+    // return always_encode(origin, arr, false); // true packed, false flex
 
     std::vector<int64_t> values;
     std::vector<size_t> indices;
@@ -180,6 +180,9 @@ void ArrayEncode::init(const char* h)
         m_v_width = NodeHeader::get_element_size<Encoding::Packed>(h);
         m_v_size = NodeHeader::get_num_elements<Encoding::Packed>(h);
         m_v_mask = 1ULL << (m_v_width - 1);
+        m_MSBs = populate(m_v_width, m_v_mask);
+        m_field_count = num_fields_for_width(m_v_width);
+        m_bit_count_pr_iteration = num_bits_for_width(m_v_width);
     }
     else if (m_encoding == Encoding::Flex) {
         m_v_width = NodeHeader::get_elementA_size<Encoding::Flex>(h);
@@ -188,6 +191,14 @@ void ArrayEncode::init(const char* h)
         m_ndx_size = NodeHeader::get_arrayB_num_elements<Encoding::Flex>(h);
         m_v_mask = 1ULL << (m_v_width - 1);
         m_ndx_mask = 1ULL << (m_ndx_width - 1);
+        // values
+        m_MSBs = populate(m_v_width, m_v_mask);
+        m_field_count = num_fields_for_width(m_v_width);
+        m_bit_count_pr_iteration = num_bits_for_width(m_v_width);
+        // ndxs
+        m_ndx_MSBs = populate(m_ndx_width, m_ndx_mask);
+        m_ndx_field_count = num_fields_for_width(m_ndx_width);
+        m_ndx_bit_count_pr_iteration = num_bits_for_width(m_ndx_width);
     }
 }
 

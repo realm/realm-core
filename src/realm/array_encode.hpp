@@ -40,8 +40,18 @@ public:
     // init from mem B
     inline size_t size() const;
     inline size_t width() const;
-    inline uint64_t width_mask() const;
+    inline size_t ndx_size() const;
+    inline size_t ndx_width() const;
     inline NodeHeader::Encoding get_encoding() const;
+    inline size_t v_size() const;
+    inline uint64_t width_mask() const;
+    inline uint64_t ndx_mask() const;
+    inline uint64_t msb() const;
+    inline uint64_t ndx_msb() const;
+    inline size_t field_count() const;
+    inline size_t ndx_field_count() const;
+    inline size_t bit_count_per_iteration() const;
+    inline size_t ndx_bit_count_per_iteration() const;
 
     // get/set
     int64_t get(const Array&, size_t) const;
@@ -73,6 +83,11 @@ private:
     size_t m_v_width = 0, m_v_size = 0, m_ndx_width = 0, m_ndx_size = 0;
     uint64_t m_v_mask = 0, m_ndx_mask = 0;
 
+    // these can all be computed during compression.
+    uint64_t m_MSBs = 0, m_ndx_MSBs = 0;
+    size_t m_field_count = 0, m_ndx_field_count = 0;
+    size_t m_bit_count_pr_iteration = 0, m_ndx_bit_count_pr_iteration = 0;
+
     friend class ArrayPacked;
     friend class ArrayFlex;
 };
@@ -82,7 +97,21 @@ inline size_t ArrayEncode::size() const
 {
     using Encoding = NodeHeader::Encoding;
     REALM_ASSERT_DEBUG(m_encoding == Encoding::Packed || m_encoding == Encoding::Flex);
-    return m_encoding == Encoding::Packed ? m_v_size : m_ndx_size;
+    return m_encoding == Encoding::Packed ? v_size() : ndx_size();
+}
+
+inline size_t ArrayEncode::v_size() const
+{
+    using Encoding = NodeHeader::Encoding;
+    REALM_ASSERT_DEBUG(m_encoding == Encoding::Packed || m_encoding == Encoding::Flex);
+    return m_v_size;
+}
+
+inline size_t ArrayEncode::ndx_size() const
+{
+    using Encoding = NodeHeader::Encoding;
+    REALM_ASSERT_DEBUG(m_encoding == Encoding::Packed || m_encoding == Encoding::Flex);
+    return m_ndx_size;
 }
 
 inline size_t ArrayEncode::width() const
@@ -92,14 +121,72 @@ inline size_t ArrayEncode::width() const
     return m_v_width;
 }
 
-inline uint64_t ArrayEncode::width_mask() const
+inline size_t ArrayEncode::ndx_width() const
 {
-    return m_v_mask;
+    using Encoding = NodeHeader::Encoding;
+    REALM_ASSERT_DEBUG(m_encoding == Encoding::Packed || m_encoding == Encoding::Flex);
+    return m_ndx_width;
 }
 
 inline NodeHeader::Encoding ArrayEncode::get_encoding() const
 {
     return m_encoding;
+}
+
+inline uint64_t ArrayEncode::width_mask() const
+{
+    using Encoding = NodeHeader::Encoding;
+    REALM_ASSERT_DEBUG(m_encoding == Encoding::Packed || m_encoding == Encoding::Flex);
+    return m_v_mask;
+}
+
+inline uint64_t ArrayEncode::ndx_mask() const
+{
+    using Encoding = NodeHeader::Encoding;
+    REALM_ASSERT_DEBUG(m_encoding == Encoding::Packed || m_encoding == Encoding::Flex);
+    return m_ndx_mask;
+}
+
+inline uint64_t ArrayEncode::msb() const
+{
+    using Encoding = NodeHeader::Encoding;
+    REALM_ASSERT_DEBUG(m_encoding == Encoding::Packed || m_encoding == Encoding::Flex);
+    return m_MSBs;
+}
+
+inline uint64_t ArrayEncode::ndx_msb() const
+{
+    using Encoding = NodeHeader::Encoding;
+    REALM_ASSERT_DEBUG(m_encoding == Encoding::Packed || m_encoding == Encoding::Flex);
+    return m_ndx_MSBs;
+}
+
+inline size_t ArrayEncode::field_count() const
+{
+    using Encoding = NodeHeader::Encoding;
+    REALM_ASSERT_DEBUG(m_encoding == Encoding::Packed || m_encoding == Encoding::Flex);
+    return m_field_count;
+}
+
+inline size_t ArrayEncode::ndx_field_count() const
+{
+    using Encoding = NodeHeader::Encoding;
+    REALM_ASSERT_DEBUG(m_encoding == Encoding::Packed || m_encoding == Encoding::Flex);
+    return m_ndx_field_count;
+}
+
+inline size_t ArrayEncode::bit_count_per_iteration() const
+{
+    using Encoding = NodeHeader::Encoding;
+    REALM_ASSERT_DEBUG(m_encoding == Encoding::Packed || m_encoding == Encoding::Flex);
+    return m_bit_count_pr_iteration;
+}
+
+inline size_t ArrayEncode::ndx_bit_count_per_iteration() const
+{
+    using Encoding = NodeHeader::Encoding;
+    REALM_ASSERT_DEBUG(m_encoding == Encoding::Packed || m_encoding == Encoding::Flex);
+    return m_ndx_bit_count_pr_iteration;
 }
 
 } // namespace realm

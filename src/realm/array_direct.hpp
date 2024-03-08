@@ -195,7 +195,7 @@ public:
     }
     // 'num_bits' number of bits which must be read
     // WARNING returned word may be garbage above the first 'num_bits' bits.
-    uint64_t get(unsigned num_bits)
+    uint64_t get(uint64_t num_bits)
     {
         auto first_word = m_word_ptr[0];
         uint64_t result = first_word >> m_in_word_offset;
@@ -210,7 +210,7 @@ public:
         return result;
     }
     // bump the iterator the specified number of bits
-    void bump(unsigned num_bits)
+    void bump(uint64_t num_bits)
     {
         auto total_offset = m_in_word_offset + num_bits;
         m_word_ptr += total_offset >> 6;
@@ -455,18 +455,18 @@ constexpr int num_bits_table[65] = {-1, 64, 64, 63, 64, 60, 60, 63, // 0-7
                                     56, 57, 58, 59, 60, 61, 62, 63, // 56-63
                                     64};
 
-inline int num_fields_for_width(int width)
+inline int num_fields_for_width(size_t width)
 {
     REALM_ASSERT(width);
     return 64 / width;
 }
 
-inline uint64_t num_bits(int width)
+inline int num_bits(int width)
 {
     return num_fields_table[width];
 }
 
-inline int num_bits_for_width(int width)
+inline int num_bits_for_width(size_t width)
 {
     return num_bits_table[width];
 }
@@ -485,7 +485,7 @@ bool inline any_field_NE(int width, uint64_t A, uint64_t B)
 
 // Populate all fields in a vector with a given value of a give width.
 // Bits outside of the given field are ignored.
-constexpr uint64_t populate(int width, uint64_t value)
+constexpr uint64_t populate(size_t width, uint64_t value)
 {
     value &= 0xFFFFFFFFFFFFFFFFULL >> (64 - width);
     if (width < 8) {
@@ -795,7 +795,7 @@ constexpr uint32_t inverse_width[65] = {
     65536 * 64 / 61, 65536 * 64 / 62, 65536 * 64 / 63, 65536 * 64 / 64,
 };
 
-inline int countr_zero(uint64_t vector)
+inline size_t countr_zero(uint64_t vector)
 {
     unsigned long where;
 #if defined(_WIN64)
@@ -821,10 +821,11 @@ inline int countr_zero(uint64_t vector)
 #endif
 }
 
-inline int first_field_marked(int width, uint64_t vector)
+inline size_t first_field_marked(size_t width, uint64_t vector)
 {
     const auto lz = countr_zero(vector);
-    int field = (lz * inverse_width[width]) >> 22;
+    const auto field = (lz * inverse_width[width]) >> 22;
+    REALM_ASSERT_DEBUG(width != 0);
     REALM_ASSERT_DEBUG(field == (lz / width));
     return field;
 }
