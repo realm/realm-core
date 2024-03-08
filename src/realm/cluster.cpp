@@ -1594,8 +1594,9 @@ ref_type Cluster::typed_write(ref_type ref, _impl::ArrayWriterBase& out, const T
                 for (size_t i = 0; i < leaf.size(); ++i) {
                     auto bptree_rot = leaf.get_as_ref_or_tagged(i);
                     if (bptree_rot.is_ref() && bptree_rot.get_as_ref()) {
-                        written_leaf.set_as_ref(i, bptree_typed_write(bptree_rot.get_as_ref(), out, m_alloc, col_type,
-                                                                      deep, only_modified, compress && compressible));
+                        written_leaf.set_as_ref(i, BPlusTreeBase::typed_write(bptree_rot.get_as_ref(), out, m_alloc,
+                                                                              col_type, deep, only_modified,
+                                                                              compress && compressible));
                     }
                     else
                         written_leaf.set(i, bptree_rot);
@@ -1626,11 +1627,13 @@ ref_type Cluster::typed_write(ref_type ref, _impl::ArrayWriterBase& out, const T
                     if (dict_top.size() == 2) {
                         // non empty dictionary
                         auto bptree_rot = dict_top.get_as_ref(0);
-                        written_dict_top.set_as_ref(0, bptree_typed_write(bptree_rot, out, m_alloc, col_type, deep,
-                                                                          only_modified, compress && compressible));
+                        written_dict_top.set_as_ref(0, BPlusTreeBase::typed_write(bptree_rot, out, m_alloc, col_type,
+                                                                                  deep, only_modified,
+                                                                                  compress && compressible));
                         bptree_rot = dict_top.get_as_ref(1);
-                        written_dict_top.set_as_ref(1, bptree_typed_write(bptree_rot, out, m_alloc, col_type, deep,
-                                                                          only_modified, compress && compressible));
+                        written_dict_top.set_as_ref(1, BPlusTreeBase::typed_write(bptree_rot, out, m_alloc, col_type,
+                                                                                  deep, only_modified,
+                                                                                  compress && compressible));
                     }
                     written_leaf.set_as_ref(i, written_dict_top.write(out, false, false, false));
                     written_dict_top.destroy();
@@ -1708,7 +1711,7 @@ void Cluster::typed_print(std::string prefix, const Table& table) const
                     // That is a single bplustree
                     // propagation of nullable missing here?
                     // handling of mixed missing here?
-                    bptree_typed_print(pref, m_alloc, rot.get_as_ref(), col_type);
+                    BPlusTreeBase::typed_print(pref, m_alloc, rot.get_as_ref(), col_type);
                 }
                 else if (col_attr.test(col_attr_Dictionary)) {
                     Array dict_top(m_alloc);
@@ -1722,7 +1725,7 @@ void Cluster::typed_print(std::string prefix, const Table& table) const
                     if (ref0) {
                         auto p = pref + "  0:\t";
                         std::cout << p;
-                        bptree_typed_print(p, m_alloc, ref0, col_type);
+                        BPlusTreeBase::typed_print(p, m_alloc, ref0, col_type);
                     }
                     if (dict_top.size() == 1) {
                         continue; // is this really possible? or should all dicts have both trees?
@@ -1731,7 +1734,7 @@ void Cluster::typed_print(std::string prefix, const Table& table) const
                     if (ref1) {
                         auto p = pref + "  1:\t";
                         std::cout << p;
-                        bptree_typed_print(p, m_alloc, dict_top.get_as_ref(1), col_type);
+                        BPlusTreeBase::typed_print(p, m_alloc, dict_top.get_as_ref(1), col_type);
                     }
                 }
                 else {
