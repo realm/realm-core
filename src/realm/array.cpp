@@ -269,7 +269,7 @@ void Array::init_from_mem(MemRef mem) noexcept
         // encoder knows which format we are compressed into, width and size are read accordingly with the format of
         // the header
         m_size = m_encoder.size();
-        m_width = m_encoder.width();
+        m_width = static_cast<uint_least8_t>(m_encoder.width());
         // we need to compute lower and upper bound, these are useful during Array::find and in general in every query
         // related optimisation.
         if (m_width) {
@@ -283,7 +283,6 @@ void Array::init_from_mem(MemRef mem) noexcept
         m_is_inner_bptree_node = get_is_inner_bptree_node_from_header(header);
         m_has_refs = get_hasrefs_from_header(header);
         m_context_flag = get_context_flag_from_header(header);
-        // TODO: evaluate if we can get rid of this.
         m_vtable = &VTableForEncodedArray::vtable;
         m_getter = m_vtable->getter;
     }
