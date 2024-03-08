@@ -69,7 +69,7 @@ private:
     bool always_encode(const Array&, Array&, bool) const; // for testing
 private:
     using Encoding = NodeHeader::Encoding;
-    Encoding m_encoding{NodeHeader::Encoding::WTypBits}; // this is not ok .... probably
+    Encoding m_encoding{NodeHeader::Encoding::WTypBits};
     size_t m_v_width = 0, m_v_size = 0, m_ndx_width = 0, m_ndx_size = 0;
     uint64_t m_v_mask = 0, m_ndx_mask = 0;
 
