@@ -777,7 +777,7 @@ void Realm::call_completion_callbacks()
     }
 
     CountGuard sending_completions(m_is_running_async_commit_completions);
-    auto error = m_transaction->get_commit_exception();
+    auto error = m_transaction ? m_transaction->get_commit_exception() : nullptr;
     auto completions = std::move(m_async_commit_q);
     m_async_commit_q.clear();
     for (auto& cb : completions) {
