@@ -829,8 +829,8 @@ std::unique_ptr<BPlusTreeNode> BPlusTreeBase::create_root_from_ref(ref_type ref)
 }
 
 // this should only be called for a column_type which we can safely compress.
-ref_type realm::bptree_typed_write(ref_type ref, _impl::ArrayWriterBase& out, Allocator& alloc, ColumnType col_type,
-                                   bool deep, bool only_modified, bool compress)
+ref_type BPlusTreeBase::typed_write(ref_type ref, _impl::ArrayWriterBase& out, Allocator& alloc, ColumnType col_type,
+                                    bool deep, bool only_modified, bool compress)
 {
     if (only_modified && alloc.is_read_only(ref))
         return ref;
@@ -851,8 +851,8 @@ ref_type realm::bptree_typed_write(ref_type ref, _impl::ArrayWriterBase& out, Al
                     written_node.set_as_ref(j, a.write(out, deep, only_modified, false));
                 }
                 else {
-                    written_node.set_as_ref(
-                        j, bptree_typed_write(rot.get_as_ref(), out, alloc, col_type, deep, only_modified, compress));
+                    written_node.set_as_ref(j, BPlusTreeBase::typed_write(rot.get_as_ref(), out, alloc, col_type,
+                                                                          deep, only_modified, compress));
                 }
             }
             else
@@ -873,7 +873,7 @@ ref_type realm::bptree_typed_write(ref_type ref, _impl::ArrayWriterBase& out, Al
     }
 }
 
-void realm::bptree_typed_print(std::string prefix, Allocator& alloc, ref_type root, ColumnType col_type)
+void BPlusTreeBase::typed_print(std::string prefix, Allocator& alloc, ref_type root, ColumnType col_type)
 {
     char* header = alloc.translate(root);
     Array a(alloc);
@@ -893,7 +893,7 @@ void realm::bptree_typed_print(std::string prefix, Allocator& alloc, ref_type ro
                 }
                 else {
                     std::cout << pref << "Subtree beeing ";
-                    bptree_typed_print(pref, alloc, rot.get_as_ref(), col_type);
+                    BPlusTreeBase::typed_print(pref, alloc, rot.get_as_ref(), col_type);
                 }
             }
         }

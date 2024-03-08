@@ -216,6 +216,11 @@ public:
         m_root->verify();
     }
 
+    static ref_type typed_write(ref_type ref, _impl::ArrayWriterBase& out, Allocator& alloc, ColumnType col_type,
+                                bool deep, bool only_modified, bool compress);
+    static void typed_print(std::string prefix, Allocator& alloc, ref_type root, ColumnType col_type);
+
+
 protected:
     template <class U>
     struct LeafTypeTrait {
@@ -685,10 +690,6 @@ ColumnAverageType<T> bptree_average(const BPlusTree<T>& tree, size_t* return_cnt
         *return_cnt = cnt;
     return avg;
 }
-
-ref_type bptree_typed_write(ref_type ref, _impl::ArrayWriterBase& out, Allocator& alloc, ColumnType col_type,
-                            bool deep, bool only_modified, bool compress);
-void bptree_typed_print(std::string prefix, Allocator& alloc, ref_type root, ColumnType col_type);
 
 } // namespace realm
 
