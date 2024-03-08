@@ -1285,8 +1285,8 @@ NONCONCURRENT_TEST(Test_basic_find_GT_value_greater_32bit)
 
 #endif
 
-// packed is always on
-#if 0
+// disable this test if forcing compression to Packed.
+#if 1
 TEST(Test_ArrayInt_no_encode)
 {
     ArrayInteger a(Allocator::get_default());
@@ -1328,7 +1328,7 @@ TEST(Test_array_same_size_less_bits)
     a1.destroy();
 }
 
-#if 0
+#if 1
 TEST(Test_ArrayInt_encode_decode_needed)
 {
     ArrayInteger a(Allocator::get_default());
