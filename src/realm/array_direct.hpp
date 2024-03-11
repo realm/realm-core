@@ -457,13 +457,12 @@ constexpr int num_bits_table[65] = {-1, 64, 64, 63, 64, 60, 60, 63, // 0-7
 
 inline int num_fields_for_width(int width)
 {
-    REALM_ASSERT(width);
-    return 64 / width;
-}
-
-inline uint64_t num_bits(int width)
-{
-    return num_fields_table[width];
+    REALM_ASSERT_DEBUG(width);
+    auto retval = num_fields_table[width];
+#ifdef REALM_DEBUG
+    REALM_ASSERT_DEBUG(retval == 64 / width);
+#endif
+    return retval;
 }
 
 inline int num_bits_for_width(int width)
