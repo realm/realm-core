@@ -1483,15 +1483,11 @@ DEFINE_NESTED_MERGE(Instruction::Update)
     if (auto next_element = is_prefix_of(outer, inner)) {
         //  If this is a collection in mixed, we will allow the inner instruction
         //  to pass so long as it references the proper type (list or dictionary).
-        if (outer.value.type == Type::List) {
-            if (mpark::holds_alternative<uint32_t>(*next_element)) {
-                return;
-            }
+        if (outer.value.type == Type::List && mpark::holds_alternative<uint32_t>(*next_element)) {
+            return;
         }
-        else if (outer.value.type == Type::Dictionary) {
-            if (mpark::holds_alternative<InternString>(*next_element)) {
-                return;
-            }
+        else if (outer.value.type == Type::Dictionary && mpark::holds_alternative<InternString>(*next_element)) {
+            return;
         }
         inner_side.discard();
     }
@@ -1538,10 +1534,8 @@ DEFINE_MERGE(Instruction::Update, Instruction::Update)
         // Updates to List or Dictionary are idempotent. If both sides are setting to the same value,
         // let them both pass through. It is important that the instruction application rules reflect this.
         // If it is not two lists or dictionaries, then the normal last-writer-wins rules will take effect below.
-        if (left.value.type == Type::List && right.value.type == Type::List) {
-            return;
-        }
-        else if (left.value.type == Type::Dictionary && right.value.type == Type::Dictionary) {
+        if (left.value.type == right.value.type &&
+            (left.value.type == Type::List || left.value.type == Type::Dictionary)) {
             return;
         }
 
@@ -1700,13 +1694,12 @@ DEFINE_MERGE(Instruction::ArrayErase, Instruction::Update)
 
 DEFINE_MERGE(Instruction::Clear, Instruction::Update)
 {
-    // The two instructions are at the same level of nesting.
-
     using Type = Instruction::Payload::Type;
 
-    // TODO: We could make it so a Clear instruction does not win against setting a property or
-    // collection item to a different collection.
+    // The two instructions are at the same level of nesting.
     if (same_path(left, right)) {
+        // TODO: We could make it so a Clear instruction does not win against setting a property or
+        // collection item to a different collection.
         if (right.value.type != Type::List && right.value.type != Type::Dictionary) {
             left_side.discard();
         }

@@ -888,26 +888,27 @@ void InstructionApplier::operator()(const Instruction::Clear& instr)
         }
         Status on_list_index(LstBase& list, uint32_t index) override
         {
+            REALM_ASSERT(dynamic_cast<Lst<Mixed>*>(&list));
             auto& mixed_list = static_cast<Lst<Mixed>&>(list);
-            if (index < mixed_list.size()) {
-                auto val = mixed_list.get(index);
-
-                if (val.is_type(type_Dictionary)) {
-                    Dictionary d(mixed_list, mixed_list.get_key(index));
-                    d.clear();
-                    return Status::Pending;
-                }
-                if (val.is_type(type_List)) {
-                    Lst<Mixed> l(mixed_list, mixed_list.get_key(index));
-                    l.clear();
-                    return Status::Pending;
-                }
+            if (index >= mixed_list.size()) {
+                m_applier->bad_transaction_log("Clear: Index out of bounds (%1 > %2)", index,
+                                               mixed_list.size()); // Throws
+                return Status::DidNotResolve;
             }
-            else {
-                m_applier->bad_transaction_log("Clear: Index out of bounds (%1 > %2)", index, mixed_list.size());
+            auto val = mixed_list.get(index);
+            if (val.is_type(type_Dictionary)) {
+                Dictionary d(mixed_list, mixed_list.get_key(index));
+                d.clear();
+                return Status::Pending;
             }
-
-            return PathResolver::on_list_index(list, index);
+            if (val.is_type(type_List)) {
+                Lst<Mixed> l(mixed_list, mixed_list.get_key(index));
+                l.clear();
+                return Status::Pending;
+            }
+            m_applier->bad_transaction_log("Clear: Item (%1) at index %2 is not a collection", val.get_type(),
+                                           index); // Throws
+            return Status::DidNotResolve;
         }
         void on_dictionary(Dictionary& dict) override
         {
@@ -926,7 +927,9 @@ void InstructionApplier::operator()(const Instruction::Clear& instr)
                 l.clear();
                 return Status::Pending;
             }
-            return PathResolver::on_dictionary_key(dict, key);
+            m_applier->bad_transaction_log("Clear: Item (%1) at key '%2' is not a collection", val.get_type(),
+                                           key); // Throws
+            return Status::DidNotResolve;
         }
         void on_set(SetBase& set) override
         {
