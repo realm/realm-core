@@ -201,7 +201,7 @@ inline size_t ArrayFlex::parallel_subword_find(const Array& arr, uint64_t value,
 {
     const auto MSBs = populate(width, width_mask);
     const auto search_vector = populate(width, value);
-    return ::parallel_subword_find(vector_compare<Cond, v>, (const uint64_t*)arr.m_data, offset, arr.m_width, MSBs,
+    return ::parallel_subword_find(vector_compare<Cond, v>, (const uint64_t*)arr.m_data, offset, width, MSBs,
                                    search_vector, start, end);
 }
 #if 0
