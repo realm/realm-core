@@ -124,7 +124,7 @@ uint64_t vector_compare(uint64_t MSBs, uint64_t a, uint64_t b)
         return find_all_fields_signed_GT(MSBs, a, b);
     if constexpr (std::is_same_v<Cond, Less>)
         return find_all_fields_signed_LT(MSBs, a, b);
-};
+}
 
 template <typename Cond>
 bool ArrayPacked::find_all(const Array& arr, int64_t value, size_t start, size_t end, size_t baseindex,

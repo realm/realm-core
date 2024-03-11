@@ -455,7 +455,7 @@ constexpr int num_bits_table[65] = {-1, 64, 64, 63, 64, 60, 60, 63, // 0-7
                                     56, 57, 58, 59, 60, 61, 62, 63, // 56-63
                                     64};
 
-inline int num_fields_for_width(int width)
+inline int num_fields_for_width(size_t width)
 {
     REALM_ASSERT_DEBUG(width);
     auto retval = num_fields_table[width];
@@ -465,7 +465,7 @@ inline int num_fields_for_width(int width)
     return retval;
 }
 
-inline int num_bits_for_width(int width)
+inline int num_bits_for_width(size_t width)
 {
     return num_bits_table[width];
 }
@@ -820,7 +820,7 @@ inline int countr_zero(uint64_t vector)
 #endif
 }
 
-inline int first_field_marked(int width, uint64_t vector)
+inline int first_field_marked(size_t width, uint64_t vector)
 {
     const auto lz = countr_zero(vector);
     int field = (lz * inverse_width[width]) >> 22;
