@@ -188,10 +188,11 @@ ClientImpl::ClientImpl(ClientConfig config)
                  config.disable_upload_compaction); // Throws
     logger.debug("Config param: disable_sync_to_disk = %1",
                  config.disable_sync_to_disk); // Throws
-    logger.debug("Config param: reconnect backoff info: max_delay: %1 ms, initial_delay: %2 ms, multiplier: %3",
-                 m_reconnect_backoff_info.max_resumption_delay_interval.count(),
-                 m_reconnect_backoff_info.resumption_delay_interval.count(),
-                 m_reconnect_backoff_info.resumption_delay_backoff_multiplier);
+    logger.debug(
+        "Config param: reconnect backoff info: max_delay: %1 ms, initial_delay: %2 ms, multiplier: %3, jitter: 1/%4",
+        m_reconnect_backoff_info.max_resumption_delay_interval.count(),
+        m_reconnect_backoff_info.resumption_delay_interval.count(),
+        m_reconnect_backoff_info.resumption_delay_backoff_multiplier, m_reconnect_backoff_info.delay_jitter_divisor);
 
     if (config.reconnect_mode != ReconnectMode::normal) {
         logger.warn("Testing/debugging feature 'nonnormal reconnect mode' enabled - "
@@ -1294,6 +1295,15 @@ void Connection::receive_error_message(const ProtocolErrorInfo& info, session_id
     logger.info("Received: ERROR \"%1\" (error_code=%2, is_fatal=%3, session_ident=%4, error_action=%5)",
                 info.message, info.raw_error_code, info.is_fatal, session_ident,
                 info.server_requests_action); // Throws
+
+    if (info.resumption_delay_interval) {
+        logger.debug("                (reconnect backoff info: max_delay=%1ms, initial_delay=%2ms, multiplier=%3, "
+                     "jitter=1/%4)",
+                     info.resumption_delay_interval->max_resumption_delay_interval.count(),
+                     info.resumption_delay_interval->resumption_delay_interval.count(),
+                     info.resumption_delay_interval->resumption_delay_backoff_multiplier,
+                     info.resumption_delay_interval->delay_jitter_divisor);
+    }
 
     bool known_error_code = bool(get_protocol_error_message(info.raw_error_code));
     if (REALM_LIKELY(known_error_code)) {
