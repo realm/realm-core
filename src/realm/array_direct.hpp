@@ -209,6 +209,19 @@ public:
         // note: above shifts in zeroes below the bits we want
         return result;
     }
+    uint64_t get_with_unsafe_prefetch(unsigned num_bits)
+    {
+        auto first_word = m_word_ptr[0];
+        uint64_t result = first_word >> m_in_word_offset;
+        // note: above shifts in zeroes
+        uint64_t last_word_mask = (m_in_word_offset + num_bits <= 64) ? 0 : -1ULL;
+        // if we're here, in_word_offset > 0
+        auto first_word_size = 64 - m_in_word_offset;
+        auto second_word = m_word_ptr[1];
+        result |= (second_word << first_word_size) & last_word_mask;
+        // note: above shifts in zeroes below the bits we want
+        return result;
+    }
     // bump the iterator the specified number of bits
     void bump(unsigned num_bits)
     {
@@ -884,16 +897,36 @@ inline int first_field_marked(int width, uint64_t vector)
 #endif
 
 template <typename VectorCompare>
-size_t parallel_subword_find(VectorCompare vector_compare, const uint64_t* data, size_t offset, size_t width,
-                             uint64_t MSBs, uint64_t search_vector, size_t start, size_t end)
+inline size_t parallel_subword_find(VectorCompare vector_compare, const uint64_t* data, size_t offset, size_t width,
+                                    uint64_t MSBs, uint64_t search_vector, size_t start, size_t end)
 {
     const auto field_count = num_fields_for_width(width);
     const auto bit_count_pr_iteration = num_bits_for_width(width);
+    const auto fast_scan_limit = 4 * bit_count_pr_iteration;
     // use signed to make it easier to ascertain correctness of loop condition below
     signed total_bit_count_left = static_cast<signed>(end - start) * static_cast<signed>(width);
     REALM_ASSERT(total_bit_count_left >= 0);
     unaligned_word_iter it(data, offset + start * width);
     uint64_t found_vector = 0;
+    while (total_bit_count_left >= fast_scan_limit) {
+        // unrolling 2x
+        const auto word0 = it.get_with_unsafe_prefetch(bit_count_pr_iteration);
+        it.bump(bit_count_pr_iteration);
+        const auto word1 = it.get_with_unsafe_prefetch(bit_count_pr_iteration);
+        auto found_vector0 = vector_compare(MSBs, word0, search_vector);
+        auto found_vector1 = vector_compare(MSBs, word1, search_vector);
+        it.bump(bit_count_pr_iteration);
+        if (found_vector0) {
+            int sub_word_index = first_field_marked(width, found_vector0);
+            return start + sub_word_index;
+        }
+        if (found_vector1) {
+            int sub_word_index = first_field_marked(width, found_vector1);
+            return start + field_count + sub_word_index;
+        }
+        total_bit_count_left -= 2 * bit_count_pr_iteration;
+        start += 2 * field_count;
+    }
     while (total_bit_count_left >= bit_count_pr_iteration) {
         const auto word = it.get(bit_count_pr_iteration);
         found_vector = vector_compare(MSBs, word, search_vector);
