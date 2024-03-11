@@ -1296,15 +1296,6 @@ void Connection::receive_error_message(const ProtocolErrorInfo& info, session_id
                 info.message, info.raw_error_code, info.is_fatal, session_ident,
                 info.server_requests_action); // Throws
 
-    if (info.resumption_delay_interval) {
-        logger.debug("                (reconnect backoff info: max_delay=%1ms, initial_delay=%2ms, multiplier=%3, "
-                     "jitter=1/%4)",
-                     info.resumption_delay_interval->max_resumption_delay_interval.count(),
-                     info.resumption_delay_interval->resumption_delay_interval.count(),
-                     info.resumption_delay_interval->resumption_delay_backoff_multiplier,
-                     info.resumption_delay_interval->delay_jitter_divisor);
-    }
-
     bool known_error_code = bool(get_protocol_error_message(info.raw_error_code));
     if (REALM_LIKELY(known_error_code)) {
         ProtocolError error_code = ProtocolError(info.raw_error_code);

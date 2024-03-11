@@ -74,17 +74,13 @@ struct SyncClient {
                 c.pong_keepalive_timeout = config.timeouts.pong_keepalive_timeout;
             if (config.timeouts.fast_reconnect_limit > 1000)
                 c.fast_reconnect_limit = config.timeouts.fast_reconnect_limit;
-            if (config.timeouts.resumption_delay_interval >= 1000)
-                c.reconnect_backoff_info.resumption_delay_interval =
-                    std::chrono::milliseconds(config.timeouts.resumption_delay_interval);
-            if (config.timeouts.max_resumption_delay_interval > 30000)
-                c.reconnect_backoff_info.max_resumption_delay_interval =
-                    std::chrono::milliseconds(config.timeouts.max_resumption_delay_interval);
-            if (config.timeouts.resumption_delay_backoff_multiplier >= 1)
-                c.reconnect_backoff_info.resumption_delay_backoff_multiplier =
-                    config.timeouts.resumption_delay_backoff_multiplier;
-            c.reconnect_backoff_info.delay_jitter_divisor = config.timeouts.resumption_delay_jitter_divisor;
-
+            c.reconnect_backoff_info = config.timeouts.reconnect_backoff_info;
+            if (c.reconnect_backoff_info.resumption_delay_interval.count() < 1000)
+                logger->info("A resumption delay interval less than 1000 (1 second) is not recommended");
+            if (c.reconnect_backoff_info.resumption_delay_backoff_multiplier < 1)
+                throw InvalidArgument("Delay backoff multiplier in reconnect backoff info cannot be less than 1");
+            if (c.reconnect_backoff_info.delay_jitter_divisor < 0)
+                throw InvalidArgument("Delay jitter divisor in reconnect backoff info cannot be less than 0");
             return c;
         }())
         , m_logger_ptr(logger)

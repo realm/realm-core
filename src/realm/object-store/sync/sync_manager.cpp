@@ -40,10 +40,6 @@ SyncClientTimeouts::SyncClientTimeouts()
     , ping_keepalive_period(sync::default_ping_keepalive_period)
     , pong_keepalive_timeout(sync::default_pong_keepalive_timeout)
     , fast_reconnect_limit(sync::default_fast_reconnect_limit)
-    , resumption_delay_interval(sync::default_resumption_delay_interval)
-    , max_resumption_delay_interval(sync::default_max_resumption_delay_interval)
-    , resumption_delay_backoff_multiplier(sync::default_resumption_delay_backoff_multiplier)
-    , resumption_delay_jitter_divisor(sync::default_delay_jitter_divisor)
 {
 }
 

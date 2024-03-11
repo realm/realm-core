@@ -3678,7 +3678,7 @@ RLM_API void realm_sync_client_config_set_max_resumption_delay_interval(realm_sy
 RLM_API void realm_sync_client_config_set_resumption_delay_backoff_multiplier(realm_sync_client_config_t*,
                                                                               int) RLM_API_NOEXCEPT;
 RLM_API void realm_sync_client_config_set_resumption_delay_jitter_divisor(realm_sync_client_config_t*,
-                                                                          uint8_t) RLM_API_NOEXCEPT;
+                                                                          int) RLM_API_NOEXCEPT;
 RLM_API void realm_sync_client_config_set_sync_socket(realm_sync_client_config_t*,
                                                       realm_sync_socket_t*) RLM_API_NOEXCEPT;
 RLM_API void realm_sync_client_config_set_default_binding_thread_observer(

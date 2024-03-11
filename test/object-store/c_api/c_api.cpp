@@ -572,13 +572,14 @@ TEST_CASE("C API (non-database)", "[c_api]") {
         realm_sync_client_config_set_fast_reconnect_limit(test_sync_client_config.get(), 1099);
         CHECK(test_sync_client_config->timeouts.fast_reconnect_limit == 1099);
         realm_sync_client_config_set_resumption_delay_interval(test_sync_client_config.get(), 1024);
-        CHECK(test_sync_client_config->timeouts.resumption_delay_interval == 1024);
+        CHECK(test_sync_client_config->timeouts.reconnect_backoff_info.resumption_delay_interval.count() == 1024);
         realm_sync_client_config_set_max_resumption_delay_interval(test_sync_client_config.get(), 600024);
-        CHECK(test_sync_client_config->timeouts.max_resumption_delay_interval == 600024);
+        CHECK(test_sync_client_config->timeouts.reconnect_backoff_info.max_resumption_delay_interval.count() ==
+              600024);
         realm_sync_client_config_set_resumption_delay_backoff_multiplier(test_sync_client_config.get(), 1010);
-        CHECK(test_sync_client_config->timeouts.resumption_delay_backoff_multiplier == 1010);
+        CHECK(test_sync_client_config->timeouts.reconnect_backoff_info.resumption_delay_backoff_multiplier == 1010);
         realm_sync_client_config_set_resumption_delay_jitter_divisor(test_sync_client_config.get(), 212);
-        CHECK(test_sync_client_config->timeouts.resumption_delay_jitter_divisor == 212);
+        CHECK(test_sync_client_config->timeouts.reconnect_backoff_info.delay_jitter_divisor == 212);
     }
 
     SECTION("realm_app_config_t") {

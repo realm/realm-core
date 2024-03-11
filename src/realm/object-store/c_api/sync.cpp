@@ -215,25 +215,25 @@ RLM_API void realm_sync_client_config_set_fast_reconnect_limit(realm_sync_client
 RLM_API void realm_sync_client_config_set_resumption_delay_interval(realm_sync_client_config_t* config,
                                                                     uint64_t interval) noexcept
 {
-    config->timeouts.resumption_delay_interval = interval;
+    config->timeouts.reconnect_backoff_info.resumption_delay_interval = std::chrono::milliseconds{interval};
 }
 
 RLM_API void realm_sync_client_config_set_max_resumption_delay_interval(realm_sync_client_config_t* config,
                                                                         uint64_t interval) noexcept
 {
-    config->timeouts.max_resumption_delay_interval = interval;
+    config->timeouts.reconnect_backoff_info.max_resumption_delay_interval = std::chrono::milliseconds{interval};
 }
 
 RLM_API void realm_sync_client_config_set_resumption_delay_backoff_multiplier(realm_sync_client_config_t* config,
                                                                               int multiplier) noexcept
 {
-    config->timeouts.resumption_delay_backoff_multiplier = multiplier;
+    config->timeouts.reconnect_backoff_info.resumption_delay_backoff_multiplier = multiplier;
 }
 
 RLM_API void realm_sync_client_config_set_resumption_delay_jitter_divisor(realm_sync_client_config_t* config,
-                                                                          uint8_t divisor) noexcept
+                                                                          int divisor) noexcept
 {
-    config->timeouts.resumption_delay_jitter_divisor = divisor;
+    config->timeouts.reconnect_backoff_info.delay_jitter_divisor = divisor;
 }
 
 /// Register an app local callback handler for bindings interested in registering callbacks before/after
