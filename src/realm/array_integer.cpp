@@ -125,12 +125,6 @@ void ArrayIntNull::replace_nulls_with(int64_t new_null)
 
 void ArrayIntNull::avoid_null_collision(int64_t value)
 {
-    // if the array is compressed, Array::set is called before copy on write will be happening.
-    // So we need to decompress here.
-    if (is_encoded()) {
-        decode_array(*this);
-    }
-
     if (m_width == 64) {
         if (value == null_value()) {
             int_fast64_t new_null = choose_random_null(value);
