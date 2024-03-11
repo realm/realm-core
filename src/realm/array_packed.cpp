@@ -112,6 +112,24 @@ void ArrayPacked::get_chunk(const Array& arr, size_t ndx, int64_t res[8]) const
         res[index++] = get(arr, i++);
     }
 }
+
+template <typename Cond>
+uint64_t vector_compare(uint64_t MSBs, uint64_t a, uint64_t b)
+{
+    if constexpr (std::is_same_v<Cond, Equal>)
+        return find_all_fields_EQ(MSBs, a, b);
+    if constexpr (std::is_same_v<Cond, NotEqual>)
+        return find_all_fields_NE(MSBs, a, b);
+    if constexpr (std::is_same_v<Cond, Greater>)
+        return find_all_fields_signed_GT(MSBs, a, b);
+    if constexpr (std::is_same_v<Cond, Less>)
+        return find_all_fields_signed_LT(MSBs, a, b);
+};
+
+template <typename Cond>
+size_t parallel_subword_find(Cond cond, const uint64_t* data, size_t offset, size_t width, uint64_t MSBs,
+                             uint64_t search_vector, size_t start, size_t end);
+
 template <typename Cond>
 bool ArrayPacked::find_all(const Array& arr, int64_t value, size_t start, size_t end, size_t baseindex,
                            QueryStateBase* state) const
@@ -154,8 +172,12 @@ bool ArrayPacked::find_all(const Array& arr, int64_t value, size_t start, size_t
     // the width of each single value within a 64 bit word and N is the total number of values stored in the array.
 
     // in packed format a parallel subword find pays off also for width >= 32
+
+    const auto MSBs = populate(arr.m_width, arr.get_encoder().width_mask());
+    const auto search_vector = populate(arr.m_width, value);
     while (start < end) {
-        start = parallel_subword_find<Cond>(arr, value, start, end);
+        start = parallel_subword_find(vector_compare<Cond>, (const uint64_t*)arr.m_data, 0, arr.m_width, MSBs,
+                                      search_vector, start, end);
         if (start < end)
             if (!state->match(start + baseindex))
                 return false;
@@ -165,34 +187,22 @@ bool ArrayPacked::find_all(const Array& arr, int64_t value, size_t start, size_t
     return true;
 }
 
-template <typename Cond>
-size_t ArrayPacked::parallel_subword_find(const Array& arr, int64_t value, size_t start, size_t end) const
+template <typename VectorCompare>
+size_t parallel_subword_find(VectorCompare vector_compare, const uint64_t* data, size_t offset, size_t width,
+                             uint64_t MSBs, uint64_t search_vector, size_t start, size_t end)
 {
-    const auto width = arr.m_width;
-    const auto MSBs = populate(width, arr.get_encoder().width_mask());
-    const auto search_vector = populate(width, value);
     const auto field_count = num_fields_for_width(width);
     const auto bit_count_pr_iteration = num_bits_for_width(width);
-    auto total_bit_count_left = static_cast<signed>(end - start) * width;
+    // use signed to make it easier to ascertain correctness of loop condition below
+    signed total_bit_count_left = static_cast<signed>(end - start) * static_cast<signed>(width);
     REALM_ASSERT(total_bit_count_left >= 0);
-    auto bitwidth_cmp = [&MSBs](uint64_t a, uint64_t b) {
-        if constexpr (std::is_same_v<Cond, Equal>)
-            return find_all_fields_EQ(MSBs, a, b);
-        if constexpr (std::is_same_v<Cond, NotEqual>)
-            return find_all_fields_NE(MSBs, a, b);
-        if constexpr (std::is_same_v<Cond, Greater>)
-            return find_all_fields_signed_GT(MSBs, a, b);
-        if constexpr (std::is_same_v<Cond, Less>)
-            return find_all_fields_signed_LT(MSBs, a, b);
-    };
-
-    unaligned_word_iter it((uint64_t*)arr.m_data, start * arr.m_width);
-    uint64_t vector = 0;
+    unaligned_word_iter it(data, offset + start * width);
+    uint64_t found_vector = 0;
     while (total_bit_count_left >= bit_count_pr_iteration) {
         const auto word = it.get(bit_count_pr_iteration);
-        vector = bitwidth_cmp(word, search_vector);
-        if (vector) {
-            int sub_word_index = first_field_marked(width, vector);
+        found_vector = vector_compare(MSBs, word, search_vector);
+        if (found_vector) {
+            int sub_word_index = first_field_marked(width, found_vector);
             return start + sub_word_index;
         }
         total_bit_count_left -= bit_count_pr_iteration;
@@ -201,11 +211,11 @@ size_t ArrayPacked::parallel_subword_find(const Array& arr, int64_t value, size_
     }
     if (total_bit_count_left) {                         // final subword, may be partial
         const auto word = it.get(total_bit_count_left); // <-- limit lookahead to avoid touching memory beyond array
-        vector = bitwidth_cmp(word, search_vector);
+        found_vector = vector_compare(MSBs, word, search_vector);
         auto last_word_mask = 0xFFFFFFFFFFFFFFFFULL >> (64 - total_bit_count_left);
-        vector &= last_word_mask;
-        if (vector) {
-            int sub_word_index = first_field_marked(width, vector);
+        found_vector &= last_word_mask;
+        if (found_vector) {
+            int sub_word_index = first_field_marked(width, found_vector);
             return start + sub_word_index;
         }
     }

@@ -48,9 +48,6 @@ public:
 private:
     int64_t do_get(uint64_t*, size_t, size_t, size_t, uint64_t) const;
     bool find_all_match(size_t start, size_t end, size_t baseindex, QueryStateBase* state) const;
-
-    template <typename Cond>
-    size_t parallel_subword_find(const Array&, int64_t, size_t, size_t) const;
 };
 } // namespace realm
 
