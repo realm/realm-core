@@ -1098,51 +1098,57 @@ TEST(List_UpdateIfNeeded)
     auto table = tr->add_table("table");
     auto col = table->add_column(type_Mixed, "mixed");
     auto col2 = table->add_column(type_Mixed, "col2");
-    table->create_object();
+    Obj obj0 = table->create_object();
     Obj obj = table->create_object();
     obj.set_collection(col, CollectionType::List);
 
-    auto list_1 = obj.get_list<Mixed>(col);
+    auto list_1 = std::dynamic_pointer_cast<Lst<Mixed>>(obj.get_collection_ptr(col));
     auto list_2 = obj.get_list<Mixed>(col);
 
     // The underlying object starts out up-to-date
-    CHECK_EQUAL(list_1.get_obj().update_if_needed(), UpdateStatus::NoChange);
+    CHECK_EQUAL(list_1->get_obj().update_if_needed(), UpdateStatus::NoChange);
 
     // Attempt to initialize the accessor and fail because the list is empty,
     // leaving it detached (only size() can be called on an empty list)
-    CHECK_EQUAL(list_1.update_if_needed(), UpdateStatus::Detached);
+    CHECK_EQUAL(list_1->update_if_needed(), UpdateStatus::Detached);
     CHECK_EQUAL(list_2.update_if_needed(), UpdateStatus::Detached);
 
-    list_1.add(Mixed());
+    list_1->add(Mixed());
 
     // First accessor was used to create the list so it's already up to date,
     // but the second is updated
-    CHECK_EQUAL(list_1.update_if_needed(), UpdateStatus::NoChange);
+    CHECK_EQUAL(list_1->update_if_needed(), UpdateStatus::NoChange);
     CHECK_EQUAL(list_2.update_if_needed(), UpdateStatus::Updated);
 
-    // The list is now non-empty, so a new accessor can initialize
-    auto list_3 = obj.get_list<Mixed>(col);
-    CHECK_EQUAL(list_3.update_if_needed(), UpdateStatus::Updated);
+    // You can create a sub-lists in list_1
+    list_1->insert_collection(1, CollectionType::List);
+    list_1->insert_collection(2, CollectionType::List);
+    auto list_1_1 = list_1->get_list(1);
+    auto list_1_2 = list_1->get_list(2);
+    list_1_1->add(Mixed());
+    list_1_2->add(Mixed());
 
     // Update the row index of the parent object, forcing it to update
-    table->remove_object(table->begin());
+    obj0.remove();
 
     // Updating the base object directly first doesn't change the result of
     // updating the list
-    CHECK_EQUAL(list_1.get_obj().update_if_needed(), UpdateStatus::Updated);
-    CHECK_EQUAL(list_1.update_if_needed(), UpdateStatus::Updated);
+    CHECK_EQUAL(list_1->get_obj().update_if_needed(), UpdateStatus::Updated);
+    CHECK_EQUAL(list_1->update_if_needed(), UpdateStatus::Updated);
 
     CHECK_EQUAL(list_2.update_if_needed(), UpdateStatus::Updated);
-    CHECK_EQUAL(list_3.update_if_needed(), UpdateStatus::Updated);
+    CHECK_EQUAL(list_1_1->update_if_needed(), UpdateStatus::Updated);
+    CHECK_EQUAL(list_1_2->update_if_needed(), UpdateStatus::Updated);
 
     tr->commit_and_continue_as_read();
 
     // Committing the write transaction changes the obj's ref, so everything
     // has to update
-    CHECK_EQUAL(list_1.get_obj().update_if_needed(), UpdateStatus::Updated);
-    CHECK_EQUAL(list_1.update_if_needed(), UpdateStatus::Updated);
+    CHECK_EQUAL(list_1->get_obj().update_if_needed(), UpdateStatus::Updated);
+    CHECK_EQUAL(list_1->update_if_needed(), UpdateStatus::Updated);
     CHECK_EQUAL(list_2.update_if_needed(), UpdateStatus::Updated);
-    CHECK_EQUAL(list_3.update_if_needed(), UpdateStatus::Updated);
+    CHECK_EQUAL(list_1_1->update_if_needed(), UpdateStatus::Updated);
+    CHECK_EQUAL(list_1_2->update_if_needed(), UpdateStatus::Updated);
 
     // Perform a write which does not result in obj changing
     {
@@ -1153,10 +1159,11 @@ TEST(List_UpdateIfNeeded)
     tr->advance_read();
 
     // The obj's storage version has changed, but nothing needs to update
-    CHECK_EQUAL(list_1.get_obj().update_if_needed(), UpdateStatus::NoChange);
-    CHECK_EQUAL(list_1.update_if_needed(), UpdateStatus::NoChange);
+    CHECK_EQUAL(list_1->get_obj().update_if_needed(), UpdateStatus::NoChange);
+    CHECK_EQUAL(list_1->update_if_needed(), UpdateStatus::NoChange);
     CHECK_EQUAL(list_2.update_if_needed(), UpdateStatus::NoChange);
-    CHECK_EQUAL(list_3.update_if_needed(), UpdateStatus::NoChange);
+    CHECK_EQUAL(list_1_1->update_if_needed(), UpdateStatus::NoChange);
+    CHECK_EQUAL(list_1_2->update_if_needed(), UpdateStatus::NoChange);
 
     // Perform a write which does modify obj
     {
@@ -1167,17 +1174,19 @@ TEST(List_UpdateIfNeeded)
     tr->advance_read();
 
     // Everything needs to update even though the allocator's content version is unchanged
-    CHECK_EQUAL(list_1.get_obj().update_if_needed(), UpdateStatus::Updated);
-    CHECK_EQUAL(list_1.update_if_needed(), UpdateStatus::Updated);
+    CHECK_EQUAL(list_1->get_obj().update_if_needed(), UpdateStatus::Updated);
+    CHECK_EQUAL(list_1->update_if_needed(), UpdateStatus::Updated);
     CHECK_EQUAL(list_2.update_if_needed(), UpdateStatus::Updated);
-    CHECK_EQUAL(list_3.update_if_needed(), UpdateStatus::Updated);
+    CHECK_EQUAL(list_1_1->update_if_needed(), UpdateStatus::Updated);
+    CHECK_EQUAL(list_1_2->update_if_needed(), UpdateStatus::Updated);
 
     // Everything updates to detached when the object is removed
     tr->promote_to_write();
     obj.remove();
 
-    CHECK_EQUAL(list_1.get_obj().update_if_needed(), UpdateStatus::Detached);
-    CHECK_EQUAL(list_1.update_if_needed(), UpdateStatus::Detached);
+    CHECK_EQUAL(list_1->get_obj().update_if_needed(), UpdateStatus::Detached);
+    CHECK_EQUAL(list_1->update_if_needed(), UpdateStatus::Detached);
     CHECK_EQUAL(list_2.update_if_needed(), UpdateStatus::Detached);
-    CHECK_EQUAL(list_3.update_if_needed(), UpdateStatus::Detached);
+    CHECK_EQUAL(list_1_1->update_if_needed(), UpdateStatus::Detached);
+    CHECK_EQUAL(list_1_2->update_if_needed(), UpdateStatus::Detached);
 }
