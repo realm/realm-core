@@ -19,9 +19,8 @@
 #ifndef REALM_ARRAY_PACKED_HPP
 #define REALM_ARRAY_PACKED_HPP
 
-#include <realm/array_encode.hpp>
-#include <realm/node_header.hpp>
-#include <realm/array.hpp>
+#include <cstdint>
+#include <stddef.h>
 
 namespace realm {
 
@@ -30,6 +29,8 @@ namespace realm {
 // Decompress array in WTypeBits formats
 //
 class Array;
+class ArrayEncode;
+class QueryStateBase;
 class ArrayPacked {
 public:
     // encoding/decoding
@@ -37,7 +38,7 @@ public:
     void copy_data(const Array&, Array&) const;
     // get or set
     int64_t get(const Array&, size_t) const;
-    int64_t get(const char*, size_t, size_t, size_t, uint64_t) const;
+    int64_t get(const char*, size_t, const ArrayEncode&) const;
     void get_chunk(const Array&, size_t, int64_t res[8]) const;
     void set_direct(const Array&, size_t, int64_t) const;
 

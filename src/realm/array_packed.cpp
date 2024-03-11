@@ -19,6 +19,7 @@
 #include <realm/array_packed.hpp>
 #include <realm/node_header.hpp>
 #include <realm/array_direct.hpp>
+#include <realm/array_encode.hpp>
 #include <realm/array.hpp>
 
 #include <vector>
@@ -76,14 +77,12 @@ int64_t ArrayPacked::get(const Array& arr, size_t ndx) const
 {
     REALM_ASSERT_DEBUG(arr.is_attached());
     REALM_ASSERT_DEBUG(arr.is_encoded());
-    const auto w = arr.m_encoder.m_v_width;
-    const auto sz = arr.m_encoder.m_v_size;
-    return do_get((uint64_t*)arr.m_data, ndx, w, sz, arr.get_encoder().width_mask());
+    return get(arr.m_data, ndx, arr.get_encoder());
 }
 
-int64_t ArrayPacked::get(const char* data, size_t ndx, size_t width, size_t sz, uint64_t mask) const
+int64_t ArrayPacked::get(const char* data, size_t ndx, const ArrayEncode& encode) const
 {
-    return do_get((uint64_t*)data, ndx, width, sz, mask);
+    return do_get((uint64_t*)data, ndx, encode.width(), encode.size(), encode.width_mask());
 }
 
 int64_t ArrayPacked::do_get(uint64_t* data, size_t ndx, size_t v_width, size_t v_size, uint64_t mask) const
@@ -193,11 +192,17 @@ template <typename Cond>
 size_t ArrayPacked::parallel_subword_find(const Array& arr, size_t start, size_t end, uint64_t search_vector,
                                           int64_t total_bit_count_left) const
 {
-    const auto width = arr.m_width;
     const auto& encoder = arr.m_encoder;
-    const auto MSBs = encoder.msb();
-    const auto bit_count_pr_iteration = encoder.bit_count_per_iteration();
-    const auto field_count = encoder.field_count();
+    const auto width = arr.m_width;
+    const auto mask = encoder.width_mask();
+
+    const auto MSBs = populate(width, mask);
+    const auto bit_count_pr_iteration = num_bits_for_width(width);
+    const auto field_count = num_fields_for_width(width);
+
+    //    const auto MSBs = encoder.msb();
+    //    const auto bit_count_pr_iteration = encoder.bit_count_per_iteration();
+    //    const auto field_count = encoder.field_count();
     REALM_ASSERT_DEBUG(total_bit_count_left >= 0);
 
     unaligned_word_iter it((uint64_t*)arr.m_data, start * arr.m_width);

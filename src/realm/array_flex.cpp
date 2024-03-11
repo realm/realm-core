@@ -92,19 +92,17 @@ int64_t ArrayFlex::get(const Array& arr, size_t ndx) const
 {
     REALM_ASSERT_DEBUG(arr.is_attached());
     REALM_ASSERT_DEBUG(arr.is_encoded());
-    const auto& encoder = arr.m_encoder;
-    const auto v_width = encoder.m_v_width;
-    const auto v_size = encoder.m_v_size;
-    const auto ndx_width = encoder.m_ndx_width;
-    const auto ndx_size = encoder.m_ndx_size;
-    const auto mask = encoder.width_mask();
-    return get(arr.m_data, ndx, v_width, ndx_width, v_size, ndx_size, mask);
+    return get(arr.m_data, ndx, arr.get_encoder());
 }
 
-int64_t ArrayFlex::get(const char* data, size_t ndx, size_t v_width, size_t v_size, size_t ndx_width, size_t ndx_size,
-                       uint64_t mask) const
+int64_t ArrayFlex::get(const char* data, size_t ndx, const ArrayEncode& encoder) const
 {
-    return do_get((uint64_t*)data, ndx, v_width, v_size, ndx_width, ndx_size, mask);
+    const auto v_width = encoder.width();
+    const auto v_size = encoder.v_size();
+    const auto ndx_width = encoder.ndx_width();
+    const auto ndx_size = encoder.ndx_size();
+    const auto mask = encoder.width_mask();
+    return do_get((uint64_t*)data, ndx, v_width, ndx_width, v_size, ndx_size, mask);
 }
 
 int64_t ArrayFlex::do_get(uint64_t* data, size_t ndx, size_t v_width, size_t ndx_width, size_t v_size,
@@ -199,25 +197,37 @@ inline uint64_t bitwidth_cmp(uint64_t MSBs, uint64_t a, uint64_t b)
 template <typename Type>
 inline uint64_t get_MSBs(const Array& arr)
 {
+    const auto& encoder = arr.get_encoder();
     if constexpr (std::is_same_v<Type, ArrayFlex::WordTypeIndex>)
-        return arr.get_encoder().ndx_msb();
-    return arr.get_encoder().msb();
+        return populate(encoder.ndx_width(), encoder.ndx_mask());
+    return populate(encoder.width(), encoder.width_mask());
+    //    if constexpr (std::is_same_v<Type, ArrayFlex::WordTypeIndex>)
+    //        return arr.get_encoder().ndx_msb();
+    //    return arr.get_encoder().msb();
 }
 
 template <typename Type>
 inline size_t get_field_count(const Array& arr)
 {
+    const auto& encoder = arr.get_encoder();
     if constexpr (std::is_same_v<Type, ArrayFlex::WordTypeIndex>)
-        return arr.get_encoder().ndx_field_count();
-    return arr.get_encoder().field_count();
+        return num_fields_for_width(encoder.ndx_width());
+    return num_fields_for_width(encoder.width());
+    //    if constexpr (std::is_same_v<Type, ArrayFlex::WordTypeIndex>)
+    //        return arr.get_encoder().ndx_field_count();
+    //    return arr.get_encoder().field_count();
 }
 
 template <typename Type>
 inline size_t get_bit_count_per_iteration(const Array& arr)
 {
+    const auto& encoder = arr.get_encoder();
     if constexpr (std::is_same_v<Type, ArrayFlex::WordTypeIndex>)
-        return arr.get_encoder().ndx_bit_count_per_iteration();
-    return arr.get_encoder().bit_count_per_iteration();
+        return num_bits_for_width(encoder.ndx_width());
+    return num_bits_for_width(encoder.width());
+    //    if constexpr (std::is_same_v<Type, ArrayFlex::WordTypeIndex>)
+    //        return arr.get_encoder().ndx_bit_count_per_iteration();
+    //    return arr.get_encoder().bit_count_per_iteration();
 }
 
 inline uint64_t last_word_mask(size_t total_bit_count_left)

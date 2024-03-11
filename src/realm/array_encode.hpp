@@ -19,11 +19,11 @@
 #ifndef REALM_ARRAY_ENCODE_HPP
 #define REALM_ARRAY_ENCODE_HPP
 
-#include <realm/node_header.hpp>
-
 #include <cstdint>
 #include <cstddef>
 #include <vector>
+#include <realm/query_conditions.hpp>
+
 
 namespace realm {
 
@@ -63,20 +63,60 @@ public:
     template <typename Cond>
     size_t find_first(const Array&, int64_t, size_t, size_t) const;
     template <typename Cond>
-    bool find_all(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*) const;
-    // sum
+    inline bool find_all(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*) const;
     int64_t sum(const Array&, size_t start, size_t end) const;
 
-    inline bool is_packed() const;
-    inline bool is_flex() const;
-
 private:
+    // Branch misprediction could kill performance, in order to avoid to dispatch computation
+    // towards the right encoder via some if/else (which makes even 400% slower queries) we set up
+    // a bunch of function pointers to the proper implementation code in order to avoid to repeat
+    // the same if/else check over and over again.
+
+    // vtable impl
+    using Getter = int64_t (ArrayEncode::*)(const Array&, size_t) const;
+    using GetterFromData = int64_t (ArrayEncode::*)(const char*, size_t) const;
+    using GetterChunk = void (ArrayEncode::*)(const Array&, size_t, int64_t[8]) const;
+    using SetterDirect = void (ArrayEncode::*)(const Array&, size_t, int64_t) const;
+    using Finder = bool (ArrayEncode::*)(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*) const;
+    using Accumulator = int64_t (ArrayEncode::*)(const Array&, size_t, size_t) const;
+
+    Getter m_getter;
+    GetterFromData m_getter_from_data;
+    GetterChunk m_getter_chunk;
+    SetterDirect m_setter_direct;
+    // we only call find using ==, !=, <, > operators
+    Finder m_finder[cond_VTABLE_FINDER_COUNT];
+    Accumulator m_accumulator;
+
+    // getting and setting interface
+    int64_t get_packed(const Array&, size_t) const;
+    int64_t get_flex(const Array&, size_t) const;
+    int64_t get_from_data_packed(const char*, size_t) const;
+    int64_t get_from_data_flex(const char*, size_t) const;
+    void get_chunk_packed(const Array&, size_t, int64_t[8]) const;
+    void get_chunk_flex(const Array&, size_t, int64_t[8]) const;
+    void set_direct_packed(const Array&, size_t, int64_t) const;
+    void set_direct_flex(const Array&, size_t, int64_t) const;
+    // query interface
+    template <typename Cond>
+    bool find_all_packed(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*) const;
+    template <typename Cond>
+    bool find_all_flex(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*) const;
+    int64_t sum_packed(const Array&, size_t, size_t) const;
+    int64_t sum_flex(const Array&, size_t, size_t) const;
+
+    // internal impl
+    void init_widths(const char* h);
+    void init_vtable();
+    void init_masks();
     void set(char* data, size_t w, size_t ndx, int64_t v) const;
     size_t flex_encoded_array_size(const std::vector<int64_t>&, const std::vector<size_t>&, size_t&, size_t&) const;
     size_t packed_encoded_array_size(std::vector<int64_t>&, size_t, size_t&) const;
-
     void encode_values(const Array&, std::vector<int64_t>&, std::vector<size_t>&) const;
+    inline bool is_packed() const;
+    inline bool is_flex() const;
     bool always_encode(const Array&, Array&, bool) const; // for testing
+
 private:
     using Encoding = NodeHeader::Encoding;
     Encoding m_encoding{NodeHeader::Encoding::WTypBits};
@@ -92,6 +132,15 @@ private:
     friend class ArrayFlex;
 };
 
+inline bool ArrayEncode::is_packed() const
+{
+    return m_encoding == NodeHeader::Encoding::Packed;
+}
+
+inline bool ArrayEncode::is_flex() const
+{
+    return m_encoding == NodeHeader::Encoding::Flex;
+}
 
 inline size_t ArrayEncode::size() const
 {
@@ -187,6 +236,27 @@ inline size_t ArrayEncode::ndx_bit_count_per_iteration() const
     using Encoding = NodeHeader::Encoding;
     REALM_ASSERT_DEBUG(m_encoding == Encoding::Packed || m_encoding == Encoding::Flex);
     return m_ndx_bit_count_pr_iteration;
+}
+
+template <typename Cond>
+inline bool ArrayEncode::find_all(const Array& arr, int64_t value, size_t start, size_t end, size_t baseindex,
+                                  QueryStateBase* state) const
+{
+    REALM_ASSERT_DEBUG(is_packed() || is_flex());
+    REALM_ASSERT_DEBUG(m_finder);
+    if constexpr (std::is_same_v<Cond, Equal>) {
+        return (this->*m_finder[cond_Equal])(arr, value, start, end, baseindex, state);
+    }
+    if constexpr (std::is_same_v<Cond, NotEqual>) {
+        return (this->*m_finder[cond_NotEqual])(arr, value, start, end, baseindex, state);
+    }
+    if constexpr (std::is_same_v<Cond, Less>) {
+        return (this->*m_finder[cond_Less])(arr, value, start, end, baseindex, state);
+    }
+    if constexpr (std::is_same_v<Cond, Greater>) {
+        return (this->*m_finder[cond_Greater])(arr, value, start, end, baseindex, state);
+    }
+    REALM_UNREACHABLE();
 }
 
 } // namespace realm

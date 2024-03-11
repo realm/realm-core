@@ -219,10 +219,10 @@ struct Array::VTableForWidth {
             getter = &Array::get<width>;
             setter = &Array::set<width>;
             chunk_getter = &Array::get_chunk<width>;
-            finder[cond_Equal] = &Array::find_vtable<Equal, width>;
-            finder[cond_NotEqual] = &Array::find_vtable<NotEqual, width>;
-            finder[cond_Greater] = &Array::find_vtable<Greater, width>;
-            finder[cond_Less] = &Array::find_vtable<Less, width>;
+            finder[cond_Equal] = &Array::find_vtable<Equal>;
+            finder[cond_NotEqual] = &Array::find_vtable<NotEqual>;
+            finder[cond_Greater] = &Array::find_vtable<Greater>;
+            finder[cond_Less] = &Array::find_vtable<Less>;
         }
     };
     static const PopulatedVTable vtable;
@@ -765,8 +765,6 @@ void Array::set_encoded(size_t ndx, int64_t val)
 
 int64_t Array::sum(size_t start, size_t end) const
 {
-    if (is_encoded())
-        return m_encoder.sum(*this, start, end);
     REALM_TEMPEX(return sum, m_width, (start, end));
 }
 
@@ -1262,10 +1260,10 @@ MemRef Array::create(Type type, bool context_flag, WidthType width_type, size_t 
 }
 
 // This is the one installed into the m_vtable->finder slots.
-template <class cond, size_t bitwidth>
+template <class cond>
 bool Array::find_vtable(int64_t value, size_t start, size_t end, size_t baseindex, QueryStateBase* state) const
 {
-    return ArrayWithFind(*this).find_optimized<cond, bitwidth>(value, start, end, baseindex, state);
+    REALM_TEMPEX2(return ArrayWithFind(*this).find_optimized, cond, m_width, (value, start, end, baseindex, state));
 }
 
 template <class cond>
@@ -1626,21 +1624,3 @@ void Array::typed_print(std::string prefix) const
         */
     }
 }
-
-template <typename cond>
-size_t Array::do_find_first(int64_t value, size_t start, size_t end) const
-{
-    if (is_encoded())
-        return m_encoder.find_first<cond>(*this, value, start, end);
-
-    // QueryStateFindFirst is probably not needed, all we need here is to return the index
-    // Also we could or should add to the array ArrayWithFind, in order to avoid to create a new object every time.
-    // ArrayWithFind is lightweight, but probably it is faster, to just create it once.
-    QueryStateFindFirst state;
-    REALM_TEMPEX2(ArrayWithFind(*this).find_optimized, cond, m_width, (value, start, end, 0, &state));
-    return state.m_state;
-}
-template size_t Array::do_find_first<NotEqual>(int64_t value, size_t start, size_t end) const;
-template size_t Array::do_find_first<Equal>(int64_t value, size_t start, size_t end) const;
-template size_t Array::do_find_first<Less>(int64_t value, size_t start, size_t end) const;
-template size_t Array::do_find_first<Greater>(int64_t value, size_t start, size_t end) const;

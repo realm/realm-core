@@ -19,8 +19,9 @@
 #ifndef REALM_ARRAY_FLEX_HPP
 #define REALM_ARRAY_FLEX_HPP
 
-#include <realm/array_encode.hpp>
-#include <realm/node_header.hpp>
+#include <cstdint>
+#include <stddef.h>
+#include <vector>
 
 namespace realm {
 //
@@ -28,6 +29,8 @@ namespace realm {
 // Decompress array in WTypeBits formats
 //
 class Array;
+class ArrayEncode;
+class QueryStateBase;
 class ArrayFlex {
 public:
     // encoding/decoding
@@ -35,7 +38,7 @@ public:
     void copy_data(const Array&, const std::vector<int64_t>&, const std::vector<size_t>&) const;
     // getters/setters
     int64_t get(const Array&, size_t) const;
-    int64_t get(const char*, size_t, size_t, size_t, size_t, size_t, uint64_t) const;
+    int64_t get(const char*, size_t, const ArrayEncode&) const;
     void get_chunk(const Array& h, size_t ndx, int64_t res[8]) const;
     void set_direct(const Array&, size_t, int64_t) const;
 

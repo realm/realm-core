@@ -297,7 +297,7 @@ public:
         // note: above shifts in zeroes above the bitfield
         return result;
     }
-    void set_value(size_t value) const
+    void set_value(uint64_t value) const
     {
         auto in_word_position = field_position & 0x3F;
         auto first_word = first_word_ptr[0];
