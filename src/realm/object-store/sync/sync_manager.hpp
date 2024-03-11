@@ -61,6 +61,11 @@ struct SyncClientTimeouts {
     uint64_t ping_keepalive_period;
     uint64_t pong_keepalive_timeout;
     uint64_t fast_reconnect_limit;
+    // Used for requesting location metadata at startup and reconnecting sync connections.
+    uint64_t resumption_delay_interval;      // in milliseconds (min 1000)
+    uint64_t max_resumption_delay_interval;  // in milliseconds (min 30000)
+    int resumption_delay_backoff_multiplier; // multiplier applied after each attempt (min 1)
+    uint8_t resumption_delay_jitter_divisor; // fractional divisor to determine jitter (0: disabled)
 };
 
 struct SyncClientConfig {

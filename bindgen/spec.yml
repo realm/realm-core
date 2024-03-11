@@ -570,6 +570,18 @@ records:
       fast_reconnect_limit:
         type: uint64_t
         default: 60000
+      resumption_delay_interval:
+        type: uint64_t
+        default: 1000
+      max_resumption_delay_interval:
+        type: uint64_t
+        default: 300000
+      resumption_delay_backoff_multiplier:
+        type: int
+        default: 2
+      resumption_delay_jitter_divisor:
+        type: uint8_t
+        default: 4
 
   SyncClientConfig:
     fields:

@@ -212,6 +212,30 @@ RLM_API void realm_sync_client_config_set_fast_reconnect_limit(realm_sync_client
     config->timeouts.fast_reconnect_limit = limit;
 }
 
+RLM_API void realm_sync_client_config_set_resumption_delay_interval(realm_sync_client_config_t* config,
+                                                                    uint64_t interval) noexcept
+{
+    config->timeouts.resumption_delay_interval = interval;
+}
+
+RLM_API void realm_sync_client_config_set_max_resumption_delay_interval(realm_sync_client_config_t* config,
+                                                                        uint64_t interval) noexcept
+{
+    config->timeouts.max_resumption_delay_interval = interval;
+}
+
+RLM_API void realm_sync_client_config_set_resumption_delay_backoff_multiplier(realm_sync_client_config_t* config,
+                                                                              int multiplier) noexcept
+{
+    config->timeouts.resumption_delay_backoff_multiplier = multiplier;
+}
+
+RLM_API void realm_sync_client_config_set_resumption_delay_jitter_divisor(realm_sync_client_config_t* config,
+                                                                          uint8_t divisor) noexcept
+{
+    config->timeouts.resumption_delay_jitter_divisor = divisor;
+}
+
 /// Register an app local callback handler for bindings interested in registering callbacks before/after
 /// the ObjectStore thread runs for this app. This only works for the default socket provider implementation.
 /// IMPORTANT: If a function is supplied that handles the exception, it must call abort() or cause the
