@@ -86,7 +86,7 @@ int run_object_store_tests(int argc, const char** argv)
 #endif
 
 #if TEST_SCHEDULER_UV
-    realm::util::Scheduler::set_default_factory([]() {
+    realm::util::Scheduler::set_default_factory([]() -> std::shared_ptr<realm::util::Scheduler> {
         return std::make_shared<realm::util::UvMainLoopScheduler>();
     });
 #endif

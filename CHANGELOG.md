@@ -6,10 +6,10 @@
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Fix a spurious crash related to opening a Realm on background thread while the process was in the middle of exiting ([#7420](https://github.com/realm/realm-core/issues/7420jj))
 
 ### Breaking changes
-* None.
+* Remove `realm_scheduler_set_default_factory()` and `realm_scheduler_has_default_factory()`, and change the `Scheduler` factory function to a bare function pointer rather than a `UniqueFunction` so that it does not have a non-trivial destructor.
 
 ### Compatibility
 * Fileformat: Generates files with format v24. Reads and automatically upgrade from fileformat v10. If you want to upgrade from an earlier file format version you will have to use RealmCore v13.x.y or earlier.
