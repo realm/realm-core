@@ -83,8 +83,7 @@ struct SyncClient {
             if (config.timeouts.resumption_delay_backoff_multiplier >= 1)
                 c.reconnect_backoff_info.resumption_delay_backoff_multiplier =
                     config.timeouts.resumption_delay_backoff_multiplier;
-            c.reconnect_backoff_info.delay_jitter_divisor =
-                static_cast<int>(config.timeouts.resumption_delay_jitter_divisor);
+            c.reconnect_backoff_info.delay_jitter_divisor = config.timeouts.resumption_delay_jitter_divisor;
 
             return c;
         }())
