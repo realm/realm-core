@@ -484,7 +484,7 @@ bool inline any_field_NE(int width, uint64_t A, uint64_t B)
 
 // Populate all fields in a vector with a given value of a give width.
 // Bits outside of the given field are ignored.
-constexpr uint64_t populate(int width, uint64_t value)
+constexpr uint64_t populate(size_t width, uint64_t value)
 {
     value &= 0xFFFFFFFFFFFFFFFFULL >> (64 - width);
     if (width < 8) {

@@ -175,7 +175,7 @@ bool ArrayFlex::find_all(const Array& arr, int64_t value, size_t start, size_t e
     return true;
 }
 
-template <typename Cond, bool v>
+template <typename Cond, bool v = true> // true int64_t, false uint64_t
 uint64_t vector_compare(uint64_t MSBs, uint64_t a, uint64_t b)
 {
     if constexpr (std::is_same_v<Cond, Equal>)
@@ -195,49 +195,7 @@ uint64_t vector_compare(uint64_t MSBs, uint64_t a, uint64_t b)
     else if constexpr (std::is_same_v<Cond, Less>)
         return find_all_fields_unsigned_LT(MSBs, a, b);
 }
-template <typename Cond, bool v>
-inline size_t ArrayFlex::parallel_subword_find(const Array& arr, uint64_t value, uint64_t width_mask, size_t offset,
-                                               uint_least8_t width, size_t start, size_t end) const
-{
-    const auto MSBs = populate(width, width_mask);
-    const auto search_vector = populate(width, value);
-    return ::parallel_subword_find(vector_compare<Cond, v>, (const uint64_t*)arr.m_data, offset, width, MSBs,
-                                   search_vector, start, end);
-}
-#if 0
-    const auto field_count = num_fields_for_width(width);
-    const auto bit_count_pr_iteration = num_bits_for_width(width);
-    auto total_bit_count_left = static_cast<signed>(end - start) * width;
-    REALM_ASSERT(total_bit_count_left >= 0);
-    auto bitwidth_cmp = [&MSBs](uint64_t a, uint64_t b) {
-    };
 
-    unaligned_word_iter it((uint64_t*)(arr.m_data), offset + start * width);
-    uint64_t vector = 0;
-    while (total_bit_count_left >= bit_count_pr_iteration) {
-        const auto word = it.get(bit_count_pr_iteration);
-        vector = bitwidth_cmp(word, search_vector);
-        if (vector) {
-            int sub_word_index = first_field_marked((int)width, vector);
-            return start + sub_word_index;
-        }
-        total_bit_count_left -= bit_count_pr_iteration;
-        start += field_count;
-        it.bump(bit_count_pr_iteration);
-    }
-    if (total_bit_count_left) {                         // final subword, may be partial
-        const auto word = it.get(total_bit_count_left); // <-- limit lookahead to avoid touching memory beyond array
-        vector = bitwidth_cmp(word, search_vector);
-        auto last_word_mask = 0xFFFFFFFFFFFFFFFFULL >> (64 - total_bit_count_left);
-        vector &= last_word_mask;
-        if (vector) {
-            int sub_word_index = first_field_marked(width, vector);
-            return start + sub_word_index;
-        }
-    }
-    return end;
-}
-#endif
 bool ArrayFlex::find_eq(const Array& arr, int64_t value, size_t start, size_t end, size_t baseindex,
                         QueryStateBase* state) const
 {
@@ -246,13 +204,19 @@ bool ArrayFlex::find_eq(const Array& arr, int64_t value, size_t start, size_t en
     const auto v_size = encoder.m_v_size;
     const auto ndx_width = encoder.m_ndx_width;
     const auto offset = v_size * v_width;
+    const uint64_t* data = (const uint64_t*)arr.m_data;
 
-    auto v_start = parallel_subword_find<Equal>(arr, value, encoder.m_v_mask, 0, v_width, 0, v_size);
+    auto MSBs = populate(v_width, encoder.m_v_mask);
+    auto search_vector = populate(v_width, value);
+    auto v_start = parallel_subword_find(vector_compare<Equal>, data, 0, v_width, MSBs, search_vector, 0, v_size);
     if (v_start == v_size)
         return true;
 
+    MSBs = populate(ndx_width, encoder.m_ndx_mask);
+    search_vector = populate(ndx_width, v_start);
     while (start < end) {
-        start = parallel_subword_find<Equal>(arr, v_start, encoder.m_ndx_mask, offset, ndx_width, start, end);
+        start =
+            parallel_subword_find(vector_compare<Equal>, data, offset, ndx_width, MSBs, search_vector, start, end);
         if (start < end)
             if (!state->match(start + baseindex))
                 return false;
@@ -270,13 +234,19 @@ bool ArrayFlex::find_neq(const Array& arr, int64_t value, size_t start, size_t e
     const auto v_size = encoder.m_v_size;
     const auto ndx_width = encoder.m_ndx_width;
     const auto offset = v_size * v_width;
+    const uint64_t* data = (const uint64_t*)arr.m_data;
 
-    auto v_start = parallel_subword_find<Equal>(arr, value, encoder.m_v_mask, 0, v_width, 0, v_size);
+    auto MSBs = populate(v_width, encoder.m_v_mask);
+    auto search_vector = populate(v_width, value);
+    auto v_start = parallel_subword_find(vector_compare<Equal>, data, 0, v_width, MSBs, search_vector, 0, v_size);
     if (v_start == v_size)
         return true;
 
+    MSBs = populate(ndx_width, encoder.m_ndx_mask);
+    search_vector = populate(ndx_width, v_start);
     while (start < end) {
-        start = parallel_subword_find<NotEqual>(arr, v_start, encoder.m_ndx_mask, offset, ndx_width, start, end);
+        start =
+            parallel_subword_find(vector_compare<NotEqual>, data, offset, ndx_width, MSBs, search_vector, start, end);
         if (start < end)
             if (!state->match(start + baseindex))
                 return false;
@@ -293,13 +263,19 @@ bool ArrayFlex::find_lt(const Array& arr, int64_t value, size_t start, size_t en
     const auto v_size = encoder.m_v_size;
     const auto ndx_width = encoder.m_ndx_width;
     const auto offset = v_size * v_width;
+    const uint64_t* data = (const uint64_t*)arr.m_data;
 
-    auto v_start = parallel_subword_find<GreaterEqual>(arr, value, encoder.m_v_mask, 0, v_width, 0, v_size);
+    auto MSBs = populate(v_width, encoder.m_v_mask);
+    auto search_vector = populate(v_width, value);
+    auto v_start =
+        parallel_subword_find(vector_compare<GreaterEqual>, data, 0, v_width, MSBs, search_vector, 0, v_size);
     if (v_start == v_size)
         return true;
 
+    MSBs = populate(ndx_width, encoder.m_ndx_mask);
+    search_vector = populate(ndx_width, v_start);
     while (start < end) {
-        start = parallel_subword_find<Less>(arr, v_start, encoder.m_ndx_mask, offset, ndx_width, start, end);
+        start = parallel_subword_find(vector_compare<Less>, data, offset, ndx_width, MSBs, search_vector, start, end);
         if (start < end)
             if (!state->match(start + baseindex))
                 return false;
@@ -317,14 +293,19 @@ bool ArrayFlex::find_gt(const Array& arr, int64_t value, size_t start, size_t en
     const auto v_size = encoder.m_v_size;
     const auto ndx_width = encoder.m_ndx_width;
     const auto offset = v_size * v_width;
+    const uint64_t* data = (const uint64_t*)arr.m_data;
 
-    auto v_start = parallel_subword_find<Greater>(arr, value, encoder.m_v_mask, 0, v_width, 0, v_size);
+    auto MSBs = populate(v_width, encoder.m_v_mask);
+    auto search_vector = populate(v_width, value);
+    auto v_start = parallel_subword_find(vector_compare<Greater>, data, 0, v_width, MSBs, search_vector, 0, v_size);
     if (v_start == v_size)
         return true;
 
+    MSBs = populate(ndx_width, encoder.m_ndx_mask);
+    search_vector = populate(ndx_width, v_start);
     while (start < end) {
-        start = parallel_subword_find<GreaterEqual, false>(arr, v_start, encoder.m_ndx_mask, offset, ndx_width, start,
-                                                           end);
+        start = parallel_subword_find(vector_compare<GreaterEqual, false>, data, offset, ndx_width, MSBs,
+                                      search_vector, start, end);
         if (start < end)
             if (!state->match(start + baseindex))
                 return false;
