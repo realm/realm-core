@@ -176,32 +176,40 @@ bool ArrayFlex::find_all(const Array& arr, int64_t value, size_t start, size_t e
 }
 
 template <typename Cond, bool v>
+uint64_t vector_compare(uint64_t MSBs, uint64_t a, uint64_t b)
+{
+    if constexpr (std::is_same_v<Cond, Equal>)
+        return find_all_fields_EQ(MSBs, a, b);
+    else if constexpr (std::is_same_v<Cond, NotEqual>)
+        return find_all_fields_NE(MSBs, a, b);
+    else if constexpr (std::is_same_v<Cond, GreaterEqual>) {
+        if constexpr (v == true)
+            return find_all_fields_signed_GE(MSBs, a, b);
+        if constexpr (v == false)
+            return find_all_fields_unsigned_GE(MSBs, a, b);
+        REALM_UNREACHABLE();
+    }
+
+    else if constexpr (std::is_same_v<Cond, Greater>)
+        return find_all_fields_signed_GT(MSBs, a, b);
+    else if constexpr (std::is_same_v<Cond, Less>)
+        return find_all_fields_unsigned_LT(MSBs, a, b);
+}
+template <typename Cond, bool v>
 inline size_t ArrayFlex::parallel_subword_find(const Array& arr, uint64_t value, uint64_t width_mask, size_t offset,
                                                uint_least8_t width, size_t start, size_t end) const
 {
     const auto MSBs = populate(width, width_mask);
     const auto search_vector = populate(width, value);
+    return ::parallel_subword_find(vector_compare<Cond, v>, (const uint64_t*)arr.m_data, offset, arr.m_width, MSBs,
+                                   search_vector, start, end);
+}
+#if 0
     const auto field_count = num_fields_for_width(width);
     const auto bit_count_pr_iteration = num_bits_for_width(width);
     auto total_bit_count_left = static_cast<signed>(end - start) * width;
     REALM_ASSERT(total_bit_count_left >= 0);
     auto bitwidth_cmp = [&MSBs](uint64_t a, uint64_t b) {
-        if constexpr (std::is_same_v<Cond, Equal>)
-            return find_all_fields_EQ(MSBs, a, b);
-        else if constexpr (std::is_same_v<Cond, NotEqual>)
-            return find_all_fields_NE(MSBs, a, b);
-        else if constexpr (std::is_same_v<Cond, GreaterEqual>) {
-            if constexpr (v == true)
-                return find_all_fields_signed_GE(MSBs, a, b);
-            if constexpr (v == false)
-                return find_all_fields_unsigned_GE(MSBs, a, b);
-            REALM_UNREACHABLE();
-        }
-
-        else if constexpr (std::is_same_v<Cond, Greater>)
-            return find_all_fields_signed_GT(MSBs, a, b);
-        else if constexpr (std::is_same_v<Cond, Less>)
-            return find_all_fields_unsigned_LT(MSBs, a, b);
     };
 
     unaligned_word_iter it((uint64_t*)(arr.m_data), offset + start * width);
@@ -229,7 +237,7 @@ inline size_t ArrayFlex::parallel_subword_find(const Array& arr, uint64_t value,
     }
     return end;
 }
-
+#endif
 bool ArrayFlex::find_eq(const Array& arr, int64_t value, size_t start, size_t end, size_t baseindex,
                         QueryStateBase* state) const
 {

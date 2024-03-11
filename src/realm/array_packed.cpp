@@ -127,10 +127,6 @@ uint64_t vector_compare(uint64_t MSBs, uint64_t a, uint64_t b)
 };
 
 template <typename Cond>
-size_t parallel_subword_find(Cond cond, const uint64_t* data, size_t offset, size_t width, uint64_t MSBs,
-                             uint64_t search_vector, size_t start, size_t end);
-
-template <typename Cond>
 bool ArrayPacked::find_all(const Array& arr, int64_t value, size_t start, size_t end, size_t baseindex,
                            QueryStateBase* state) const
 {
@@ -185,41 +181,6 @@ bool ArrayPacked::find_all(const Array& arr, int64_t value, size_t start, size_t
         ++start;
     }
     return true;
-}
-
-template <typename VectorCompare>
-size_t parallel_subword_find(VectorCompare vector_compare, const uint64_t* data, size_t offset, size_t width,
-                             uint64_t MSBs, uint64_t search_vector, size_t start, size_t end)
-{
-    const auto field_count = num_fields_for_width(width);
-    const auto bit_count_pr_iteration = num_bits_for_width(width);
-    // use signed to make it easier to ascertain correctness of loop condition below
-    signed total_bit_count_left = static_cast<signed>(end - start) * static_cast<signed>(width);
-    REALM_ASSERT(total_bit_count_left >= 0);
-    unaligned_word_iter it(data, offset + start * width);
-    uint64_t found_vector = 0;
-    while (total_bit_count_left >= bit_count_pr_iteration) {
-        const auto word = it.get(bit_count_pr_iteration);
-        found_vector = vector_compare(MSBs, word, search_vector);
-        if (found_vector) {
-            int sub_word_index = first_field_marked(width, found_vector);
-            return start + sub_word_index;
-        }
-        total_bit_count_left -= bit_count_pr_iteration;
-        start += field_count;
-        it.bump(bit_count_pr_iteration);
-    }
-    if (total_bit_count_left) {                         // final subword, may be partial
-        const auto word = it.get(total_bit_count_left); // <-- limit lookahead to avoid touching memory beyond array
-        found_vector = vector_compare(MSBs, word, search_vector);
-        auto last_word_mask = 0xFFFFFFFFFFFFFFFFULL >> (64 - total_bit_count_left);
-        found_vector &= last_word_mask;
-        if (found_vector) {
-            int sub_word_index = first_field_marked(width, found_vector);
-            return start + sub_word_index;
-        }
-    }
-    return end;
 }
 
 bool ArrayPacked::find_all_match(size_t start, size_t end, size_t baseindex, QueryStateBase* state) const
