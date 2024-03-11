@@ -237,7 +237,7 @@ inline size_t ArrayFlex::parallel_subword_find(const Array& arr, size_t offset, 
     REALM_ASSERT_DEBUG(total_bit_count_left >= 0);
     unaligned_word_iter it((uint64_t*)(arr.m_data), offset + start * width);
     uint64_t vector = 0;
-    while (total_bit_count_left >= (int64_t)bit_count_pr_iteration) {
+    while (total_bit_count_left >= (unsigned)bit_count_pr_iteration) {
         const auto word = it.get(bit_count_pr_iteration);
         vector = bitwidth_cmp<Cond, Type>(MSBs, word, search_vector);
         if (vector) {

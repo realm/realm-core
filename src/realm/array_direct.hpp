@@ -195,7 +195,7 @@ public:
     }
     // 'num_bits' number of bits which must be read
     // WARNING returned word may be garbage above the first 'num_bits' bits.
-    uint64_t get(uint64_t num_bits)
+    uint64_t get(size_t num_bits)
     {
         auto first_word = m_word_ptr[0];
         uint64_t result = first_word >> m_in_word_offset;
@@ -210,7 +210,7 @@ public:
         return result;
     }
     // bump the iterator the specified number of bits
-    void bump(uint64_t num_bits)
+    void bump(size_t num_bits)
     {
         auto total_offset = m_in_word_offset + num_bits;
         m_word_ptr += total_offset >> 6;
@@ -297,7 +297,7 @@ public:
         // note: above shifts in zeroes above the bitfield
         return result;
     }
-    void set_value(uint64_t value) const
+    void set_value(size_t value) const
     {
         auto in_word_position = field_position & 0x3F;
         auto first_word = first_word_ptr[0];
