@@ -227,6 +227,8 @@ public:
     void to_json(std::ostream&, JSONOutputMode, util::FunctionRef<void(const Mixed&)>) const override;
 
 private:
+    using Base::set_collection;
+
     template <typename T, typename Op>
     friend class CollectionColumnAggregate;
     friend class DictionaryLinkValues;

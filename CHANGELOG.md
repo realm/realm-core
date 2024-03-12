@@ -1,11 +1,10 @@
 # NEXT RELEASE
 
 ### Enhancements
-* <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
-* None.
+* Add support to synchronize collections embedded in Mixed properties and other collections (except sets) ([PR #7353](https://github.com/realm/realm-core/pull/7353)).
 
 ### Fixed
-* <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
+* Fixed conflict resolution bug which may result in an crash when the AddInteger instruction on Mixed properties is merged against updates to a non-integer type ([PR #7353](https://github.com/realm/realm-core/pull/7353)).
 * Fix a spurious crash related to opening a Realm on background thread while the process was in the middle of exiting ([#7420](https://github.com/realm/realm-core/issues/7420jj))
 
 ### Breaking changes

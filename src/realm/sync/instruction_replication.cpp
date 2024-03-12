@@ -81,18 +81,12 @@ Instruction::Payload SyncReplication::as_payload(Mixed value)
         }
     }
     if (type == type_Dictionary) {
-        if (!SYNC_SUPPORTS_NESTED_COLLECTIONS)
-            throw IllegalOperation("Cannot sync nested dictionary");
         return Instruction::Payload(Instruction::Payload::Dictionary());
     }
     else if (type == type_List) {
-        if (!SYNC_SUPPORTS_NESTED_COLLECTIONS)
-            throw IllegalOperation("Cannot sync nested list");
         return Instruction::Payload(Instruction::Payload::List());
     }
     else if (type == type_Set) {
-        if (!SYNC_SUPPORTS_NESTED_COLLECTIONS)
-            throw IllegalOperation("Cannot sync nested set");
         return Instruction::Payload(Instruction::Payload::Set());
     }
     return Instruction::Payload{};
@@ -810,11 +804,11 @@ void SyncReplication::populate_path_instr(Instruction::PathInstruction& instr, c
     }
 }
 
-void SyncReplication::populate_path_instr(Instruction::PathInstruction& instr, const CollectionBase& list)
+void SyncReplication::populate_path_instr(Instruction::PathInstruction& instr, const CollectionBase& collection)
 {
-    ConstTableRef source_table = list.get_table();
-    ObjKey source_obj = list.get_owner_key();
-    populate_path_instr(instr, *source_table, source_obj, list.get_short_path());
+    ConstTableRef source_table = collection.get_table();
+    ObjKey source_obj = collection.get_owner_key();
+    populate_path_instr(instr, *source_table, source_obj, collection.get_short_path());
 }
 
 void SyncReplication::populate_path_instr(Instruction::PathInstruction& instr, const CollectionBase& list,

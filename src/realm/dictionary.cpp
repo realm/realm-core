@@ -707,7 +707,6 @@ bool Dictionary::try_erase(Mixed key)
     return true;
 }
 
-
 void Dictionary::erase(Mixed key)
 {
     if (!try_erase(key)) {
