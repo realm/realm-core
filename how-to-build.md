@@ -174,7 +174,7 @@ cmake --build build.sync.ninja --target realm-object-store-tests
 You can tell the object-store tests to use a specific version of baas with the
 `BAASAAS_START_MODE` environment variable, which can either be `githash`, `patchid`,
 or `branch`. If you specify a start mode, you need to tell it which githash or
-branch name to start with via the `BAASAAS_REF_SPEC` environment variable. Ommitting
+branch name to start with via the `BAASAAS_REF_SPEC` environment variable. Omitting
 these will use the latest available commit from the main branch of baas.
 
 If you've started a baasaas container already via the baasaas CLI, you can tell
