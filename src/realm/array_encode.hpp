@@ -67,28 +67,35 @@ public:
     int64_t sum(const Array&, size_t start, size_t end) const;
 
 private:
-    // Branch misprediction could kill performance, in order to avoid to dispatch computation
-    // towards the right encoder via some if/else (which makes even 400% slower queries) we set up
-    // a bunch of function pointers to the proper implementation code in order to avoid to repeat
-    // the same if/else check over and over again.
+    // Same idea we have for Array, we want to avoid to constantly the whether we
+    // have compressed in packed or flex, and jump straight to the right implementation,
+    // avoiding branch mis-predictions, which made some queries run ~6/7x slower.
 
-    // vtable impl
     using Getter = int64_t (ArrayEncode::*)(const Array&, size_t) const;
-    using GetterFromData = int64_t (ArrayEncode::*)(const char*, size_t) const;
-    using GetterChunk = void (ArrayEncode::*)(const Array&, size_t, int64_t[8]) const;
-    using SetterDirect = void (ArrayEncode::*)(const Array&, size_t, int64_t) const;
+    using DataGetter = int64_t (ArrayEncode::*)(const char*, size_t) const;
+    using ChunkGetterChunk = void (ArrayEncode::*)(const Array&, size_t, int64_t[8]) const;
+    using DirectSetter = void (ArrayEncode::*)(const Array&, size_t, int64_t) const;
     using Finder = bool (ArrayEncode::*)(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*) const;
+    using FinderTable = std::array<Finder, cond_VTABLE_FINDER_COUNT>;
     using Accumulator = int64_t (ArrayEncode::*)(const Array&, size_t, size_t) const;
 
-    Getter m_getter;
-    GetterFromData m_getter_from_data;
-    GetterChunk m_getter_chunk;
-    SetterDirect m_setter_direct;
-    // we only call find using ==, !=, <, > operators
-    Finder m_finder[cond_VTABLE_FINDER_COUNT];
-    Accumulator m_accumulator;
+    struct VTable {
+        Getter m_getter;
+        DataGetter m_data_getter;
+        ChunkGetterChunk m_chunk_getter;
+        DirectSetter m_direct_setter;
+        FinderTable m_finder;
+        Accumulator m_accumulator;
+    };
+    struct VTableForPacked;
+    struct VTableForFlex;
+    const VTable* m_vtable = nullptr;
+    // cached in order to avoid indirection since they are used in a critical path
+    Getter m_getter = nullptr;
+    FinderTable* m_finder = nullptr;
+    // Finder m_finder[cond_VTABLE_FINDER_COUNT];
 
-    // getting and setting interface
+    // getting and setting interface specifically for encoding formats
     int64_t get_packed(const Array&, size_t) const;
     int64_t get_flex(const Array&, size_t) const;
     int64_t get_from_data_packed(const char*, size_t) const;
@@ -106,9 +113,6 @@ private:
     int64_t sum_flex(const Array&, size_t, size_t) const;
 
     // internal impl
-    void init_widths(const char* h);
-    void init_vtable();
-    void init_masks();
     void set(char* data, size_t w, size_t ndx, int64_t v) const;
     size_t flex_encoded_array_size(const std::vector<int64_t>&, const std::vector<size_t>&, size_t&, size_t&) const;
     size_t packed_encoded_array_size(std::vector<int64_t>&, size_t, size_t&) const;
@@ -122,14 +126,7 @@ private:
     Encoding m_encoding{NodeHeader::Encoding::WTypBits};
     size_t m_v_width = 0, m_v_size = 0, m_ndx_width = 0, m_ndx_size = 0;
     uint64_t m_v_mask = 0, m_ndx_mask = 0;
-
-    // these can all be computed during compression.
     uint64_t m_MSBs = 0, m_ndx_MSBs = 0;
-    size_t m_field_count = 0, m_ndx_field_count = 0;
-    size_t m_bit_count_pr_iteration = 0, m_ndx_bit_count_pr_iteration = 0;
-
-    friend class ArrayPacked;
-    friend class ArrayFlex;
 };
 
 inline bool ArrayEncode::is_packed() const
@@ -210,34 +207,6 @@ inline uint64_t ArrayEncode::ndx_msb() const
     return m_ndx_MSBs;
 }
 
-inline size_t ArrayEncode::field_count() const
-{
-    using Encoding = NodeHeader::Encoding;
-    REALM_ASSERT_DEBUG(m_encoding == Encoding::Packed || m_encoding == Encoding::Flex);
-    return m_field_count;
-}
-
-inline size_t ArrayEncode::ndx_field_count() const
-{
-    using Encoding = NodeHeader::Encoding;
-    REALM_ASSERT_DEBUG(m_encoding == Encoding::Packed || m_encoding == Encoding::Flex);
-    return m_ndx_field_count;
-}
-
-inline size_t ArrayEncode::bit_count_per_iteration() const
-{
-    using Encoding = NodeHeader::Encoding;
-    REALM_ASSERT_DEBUG(m_encoding == Encoding::Packed || m_encoding == Encoding::Flex);
-    return m_bit_count_pr_iteration;
-}
-
-inline size_t ArrayEncode::ndx_bit_count_per_iteration() const
-{
-    using Encoding = NodeHeader::Encoding;
-    REALM_ASSERT_DEBUG(m_encoding == Encoding::Packed || m_encoding == Encoding::Flex);
-    return m_ndx_bit_count_pr_iteration;
-}
-
 template <typename Cond>
 inline bool ArrayEncode::find_all(const Array& arr, int64_t value, size_t start, size_t end, size_t baseindex,
                                   QueryStateBase* state) const
@@ -245,16 +214,16 @@ inline bool ArrayEncode::find_all(const Array& arr, int64_t value, size_t start,
     REALM_ASSERT_DEBUG(is_packed() || is_flex());
     REALM_ASSERT_DEBUG(m_finder);
     if constexpr (std::is_same_v<Cond, Equal>) {
-        return (this->*m_finder[cond_Equal])(arr, value, start, end, baseindex, state);
+        return (this->*(m_finder->operator[](cond_Equal)))(arr, value, start, end, baseindex, state);
     }
     if constexpr (std::is_same_v<Cond, NotEqual>) {
-        return (this->*m_finder[cond_NotEqual])(arr, value, start, end, baseindex, state);
+        return (this->*(m_finder->operator[](cond_NotEqual)))(arr, value, start, end, baseindex, state);
     }
     if constexpr (std::is_same_v<Cond, Less>) {
-        return (this->*m_finder[cond_Less])(arr, value, start, end, baseindex, state);
+        return (this->*(m_finder->operator[](cond_Less)))(arr, value, start, end, baseindex, state);
     }
     if constexpr (std::is_same_v<Cond, Greater>) {
-        return (this->*m_finder[cond_Greater])(arr, value, start, end, baseindex, state);
+        return (this->*(m_finder->operator[](cond_Greater)))(arr, value, start, end, baseindex, state);
     }
     REALM_UNREACHABLE();
 }

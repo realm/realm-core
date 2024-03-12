@@ -65,8 +65,8 @@ void ArrayPacked::copy_data(const Array& origin, Array& arr) const
 void ArrayPacked::set_direct(const Array& arr, size_t ndx, int64_t value) const
 {
     REALM_ASSERT_DEBUG(arr.is_encoded());
-    const auto v_width = arr.m_encoder.m_v_width;
-    const auto v_size = arr.m_encoder.m_v_size;
+    const auto v_width = arr.m_encoder.width();
+    const auto v_size = arr.m_encoder.size();
     REALM_ASSERT_DEBUG(ndx < v_size);
     auto data = (uint64_t*)arr.m_data;
     bf_iterator it_value{data, static_cast<size_t>(ndx * v_width), v_width, v_width, 0};
@@ -168,7 +168,7 @@ bool ArrayPacked::find_all(const Array& arr, int64_t value, size_t start, size_t
 
     // in packed format a parallel subword find pays off also for width >= 32
 
-    const auto MSBs = populate(arr.m_width, arr.get_encoder().width_mask());
+    const auto MSBs = arr.get_encoder().msb();
     const auto search_vector = populate(arr.m_width, value);
     while (start < end) {
         start = parallel_subword_find(vector_compare<Cond>, (const uint64_t*)arr.m_data, 0, arr.m_width, MSBs,
