@@ -4336,10 +4336,6 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
     if (!util::EventLoop::has_implementation())
         return;
 
-    // remove this check once sync is ready
-    if (!realm::sync::SYNC_SUPPORTS_NESTED_COLLECTIONS)
-        return;
-
     OfflineAppSession oas;
     SyncTestFile config(oas, "default");
     config.cache = false;
@@ -4440,7 +4436,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 auto obj = table->get_object(0);
                 auto col = table->get_column_key("any_mixed");
                 List list{local, obj, col};
-                REQUIRE(list.size() == 4);
+                REQUIRE(list.size() == 3);
                 auto mixed = list.get_any(0);
                 REQUIRE(mixed.get_int() == 42);
                 auto nlist = list.get_list(1);
@@ -4491,7 +4487,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 auto obj = table->get_object(0);
                 auto col = table->get_column_key("any_mixed");
                 object_store::Dictionary dict{local, obj, col};
-                REQUIRE(dict.size() == 4);
+                REQUIRE(dict.size() == 3);
                 auto mixed = dict.get_any("Scalar");
                 REQUIRE(mixed.get_int() == 42);
                 auto nlist = dict.get_list("List");
@@ -4502,55 +4498,6 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 REQUIRE(n_dict.size() == 2);
                 REQUIRE(n_dict.get<Mixed>("Test").get_string() == "10");
                 REQUIRE(n_dict.get<Mixed>("Test1").get_int() == 10);
-            })
-            ->run();
-    }
-    SECTION("add nested collection both locally and remotely List vs Set") {
-        ObjectId pk_val = ObjectId::gen();
-        SyncTestFile config2(oas.app()->current_user(), "default");
-        config2.schema = config.schema;
-        auto test_reset = reset_utils::make_fake_local_client_reset(config, config2);
-        test_reset
-            ->make_local_changes([&](SharedRealm local) {
-                advance_and_notify(*local);
-                auto table = get_table(*local, "TopLevel");
-                auto obj = table->create_object_with_primary_key(pk_val);
-                auto col = table->get_column_key("any_mixed");
-                obj.set_collection(col, CollectionType::List);
-                List list{local, obj, col};
-                list.insert(0, Mixed{30});
-                REQUIRE(list.size() == 1);
-            })
-            ->make_remote_changes([&](SharedRealm remote_realm) {
-                advance_and_notify(*remote_realm);
-                auto table = get_table(*remote_realm, "TopLevel");
-                auto obj = table->create_object_with_primary_key(pk_val);
-                auto col = table->get_column_key("any_mixed");
-                obj.set_collection(col, CollectionType::Set);
-                object_store::Set set{remote_realm, obj, col};
-                set.insert(Mixed{40});
-                REQUIRE(set.size() == 1);
-            })
-            ->on_post_reset([&](SharedRealm local_realm) {
-                advance_and_notify(*local_realm);
-                if (test_mode == ClientResyncMode::DiscardLocal) {
-                    TableRef table = get_table(*local_realm, "TopLevel");
-                    REQUIRE(table->size() == 1);
-                    auto obj = table->get_object(0);
-                    auto col = table->get_column_key("any_mixed");
-                    object_store::Set set{local_realm, obj, col};
-                    REQUIRE(set.size() == 1);
-                    REQUIRE(set.get_any(0).get_int() == 40);
-                }
-                else {
-                    TableRef table = get_table(*local_realm, "TopLevel");
-                    REQUIRE(table->size() == 1);
-                    auto obj = table->get_object(0);
-                    auto col = table->get_column_key("any_mixed");
-                    List list{local_realm, obj, col};
-                    REQUIRE(list.size() == 1);
-                    REQUIRE(list.get_any(0).get_int() == 30);
-                }
             })
             ->run();
     }
