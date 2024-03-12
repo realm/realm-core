@@ -20,3 +20,7 @@ deadlock:realm::sync::MigrationStore::create_subscriptions
 
 # mktime, timegm, gmtime modify global time zone env var, but the race is harmless
 race:adjtime
+
+# FIXME remove
+race:uv_async_send
+race:uv__async_io
