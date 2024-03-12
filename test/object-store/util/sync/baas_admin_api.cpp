@@ -604,6 +604,8 @@ public:
         auto& baasaas_holder = get_baasaas_holder();
         REALM_ASSERT(!baasaas_holder);
         baasaas_holder.emplace(std::string{api_key}, mode, std::string{ref_spec});
+
+        get_runtime_app_session();
     }
 
     void testRunEnded(Catch::TestRunStats const&) override
