@@ -1,15 +1,38 @@
 # NEXT RELEASE
 
 ### Enhancements
-* <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
-* Added ability to get current log level via C API (PR [#7419](https://github.com/realm/realm-core/pull/7419))
+* Add support to synchronize collections embedded in Mixed properties and other collections (except sets) ([PR #7353](https://github.com/realm/realm-core/pull/7353)).
 
 ### Fixed
-* <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* Fixed an issue when removing items from a LnkLst that could result in invalidated links becoming visable which could cause crashes or exceptions when accessing those list items later on. This affects sync Realms where another client had previously removed a link in a linklist that has over 1000 links in it, and then further local removals from the same list caused the list to have fewer than 1000 items. ([#7414](https://github.com/realm/realm-core/pull/7414), since v10.0.0)
+* Fixed conflict resolution bug which may result in an crash when the AddInteger instruction on Mixed properties is merged against updates to a non-integer type ([PR #7353](https://github.com/realm/realm-core/pull/7353)).
+* Fix a spurious crash related to opening a Realm on background thread while the process was in the middle of exiting ([#7420](https://github.com/realm/realm-core/issues/7420jj))
 
 ### Breaking changes
+* Remove `realm_scheduler_set_default_factory()` and `realm_scheduler_has_default_factory()`, and change the `Scheduler` factory function to a bare function pointer rather than a `UniqueFunction` so that it does not have a non-trivial destructor.
+
+### Compatibility
+* Fileformat: Generates files with format v24. Reads and automatically upgrade from fileformat v10. If you want to upgrade from an earlier file format version you will have to use RealmCore v13.x.y or earlier.
+
+-----------
+
+### Internals
 * None.
+
+----------------------------------------------
+
+# 14.2.0 Release notes
+
+### Enhancements
+* Added ability to get current log level via C API (PR [#7419](https://github.com/realm/realm-core/pull/7419))
+* Improve performance of object notifiers with complex schemas and very simple changes to process by as much as 20% ([PR #7424](https://github.com/realm/realm-core/pull/7424)).
+* Improve performance with very large number of notifiers as much as 75% ([PR #7424](https://github.com/realm/realm-core/pull/7424)).
+
+### Fixed
+* Fixed an issue when removing items from a LnkLst that could result in invalidated links becoming visable which could cause crashes or exceptions when accessing those list items later on. This affects sync Realms where another client had previously removed a link in a linklist that has over 1000 links in it, and then further local removals from the same list caused the list to have fewer than 1000 items. ([#7414](https://github.com/realm/realm-core/pull/7414), since v10.0.0)
+* Query lists vs lists if the property to check is a path with wildcards would not give correct result. This has for a long time also been a problem for queries with linklist properties in the path ([#7393](https://github.com/realm/realm-core/issues/7393), since v14.0.0)
+
+### Breaking changes
+* The fix of querying involving multiple lists may cause tests that depended on the broken beharior to fail.
 
 ### Compatibility
 * Fileformat: Generates files with format v24. Reads and automatically upgrade from fileformat v10. If you want to upgrade from an earlier file format version you will have to use RealmCore v13.x.y or earlier.

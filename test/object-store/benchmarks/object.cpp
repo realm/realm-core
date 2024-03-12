@@ -767,7 +767,10 @@ TEST_CASE("Benchmark object notification delivery", "[benchmark][notifications]"
     _impl::RealmCoordinator::assert_no_open_realms();
 
     InMemoryTestFile config;
-    config.automatic_change_notifications = false;
+    // This test has meaningfully different performance with and without the
+    // background thread, since immediately waiting on the background thread
+    // is the worst-case scenario and makes it a pessimization
+    config.automatic_change_notifications = GENERATE(false, true);
     config.schema = Schema{{"object", {{"value", PropertyType::Int}}}};
     auto r = Realm::get_shared_realm(config);
 
@@ -788,5 +791,28 @@ TEST_CASE("Benchmark object notification delivery", "[benchmark][notifications]"
             r2->commit_transaction();
             r->refresh();
         }
+    };
+
+    BENCHMARK("very large number of notifiers") {
+        std::vector<Object> objects(10'000, object);
+        std::vector<NotificationToken> tokens;
+        for (auto& object : objects) {
+            tokens.push_back(object.add_notification_callback([&](auto) {}));
+        }
+
+        auto r2 = Realm::get_shared_realm(config);
+        auto obj2 = *r2->read_group().get_table("class_object")->begin();
+
+        r2->begin_transaction();
+        obj2.set<int64_t>("value", 0);
+        r2->commit_transaction();
+        r->refresh();
+
+        tokens.clear();
+
+        r2->begin_transaction();
+        obj2.set<int64_t>("value", 0);
+        r2->commit_transaction();
+        r->refresh();
     };
 }

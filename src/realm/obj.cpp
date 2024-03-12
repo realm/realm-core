@@ -1660,7 +1660,7 @@ Obj& Obj::set(ColKey col_key, T value, bool is_default)
 
     if (type != ColumnTypeTraits<T>::column_id)
         throw InvalidArgument(ErrorCodes::TypeMismatch,
-                              util::format("Property not a %1", ColumnTypeTraits<int64_t>::column_id));
+                              util::format("Property not a %1", ColumnTypeTraits<T>::column_id));
     if (value_is_null(value) && !attrs.test(col_attr_Nullable))
         throw NotNullable(Group::table_name_to_class_name(m_table->get_name()), m_table->get_column_name(col_key));
 
@@ -1979,6 +1979,10 @@ Dictionary Obj::get_dictionary(ColKey col_key) const
 Obj& Obj::set_collection(ColKey col_key, CollectionType type)
 {
     REALM_ASSERT(col_key.get_type() == col_type_Mixed);
+    if ((col_key.is_dictionary() && type == CollectionType::Dictionary) ||
+        (col_key.is_list() && type == CollectionType::List)) {
+        return *this;
+    }
     update_if_needed();
     Mixed new_val(0, type);
 

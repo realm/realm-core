@@ -176,7 +176,7 @@ struct Payload {
     struct List {};
     /// Create an empty dictionary in-place (does not clear an existing dictionary).
     struct Dictionary {};
-    /// Create an empty set in-place (does not clear an existing dictionary).
+    /// Create an empty set in-place (does not clear an existing set).
     struct Set {};
     /// Sentinel value for an erased dictionary element.
     struct Erased {};
