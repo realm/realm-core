@@ -8,6 +8,7 @@
 
 race:realm::util::AESCryptor::read
 race:realm::util::EncryptedFileMapping::copy_up_to_date_page
+race:realm::util::EncryptedFileMapping::refresh_page
 
 # Avoid a false positive instance of lock-order-inversion.
 # SyncManager::m_sessions_mutex and SyncSession::m_state_mutex are locked
