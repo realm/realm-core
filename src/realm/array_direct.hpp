@@ -214,11 +214,10 @@ public:
         auto first_word = m_word_ptr[0];
         uint64_t result = first_word >> m_in_word_offset;
         // note: above shifts in zeroes
-        uint64_t last_word_mask = (m_in_word_offset + num_bits <= 64) ? 0 : -1ULL;
-        // if we're here, in_word_offset > 0
         auto first_word_size = 64 - m_in_word_offset;
         auto second_word = m_word_ptr[1];
-        result |= (second_word << first_word_size) & last_word_mask;
+        REALM_ASSERT_DEBUG(num_bits <= 64);
+        result |= (m_in_word_offset + num_bits > 64) ? (second_word << first_word_size) : 0;
         // note: above shifts in zeroes below the bits we want
         return result;
     }
@@ -897,8 +896,8 @@ inline int first_field_marked(int width, uint64_t vector)
 #endif
 
 template <typename VectorCompare>
-inline size_t parallel_subword_find(VectorCompare vector_compare, const uint64_t* data, size_t offset, size_t width,
-                                    uint64_t MSBs, uint64_t search_vector, size_t start, size_t end)
+size_t parallel_subword_find(VectorCompare vector_compare, const uint64_t* data, size_t offset, size_t width,
+                             uint64_t MSBs, uint64_t search_vector, size_t start, size_t end)
 {
     const auto field_count = num_fields_for_width(width);
     const auto bit_count_pr_iteration = num_bits_for_width(width);
