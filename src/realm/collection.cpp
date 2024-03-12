@@ -140,14 +140,20 @@ void Collection::get_any(QueryCtrlBlock& ctrl, Mixed val, size_t index)
 {
     auto path_size = ctrl.path.size() - index;
     PathElement& pe = ctrl.path[index];
+    bool end_of_path = path_size == 1;
+
+    if (end_of_path) {
+        ctrl.matches.emplace_back();
+    }
+
     if (val.is_type(type_Dictionary) && (pe.is_key() || pe.is_all())) {
         auto ref = val.get_ref();
         if (!ref)
             return;
-        Array top(ctrl.alloc);
+        Array top(*ctrl.alloc);
         top.init_from_ref(ref);
 
-        BPlusTree<StringData> keys(ctrl.alloc);
+        BPlusTree<StringData> keys(*ctrl.alloc);
         keys.set_parent(&top, 0);
         keys.init_from_parent();
         size_t start = 0;
@@ -156,28 +162,29 @@ void Collection::get_any(QueryCtrlBlock& ctrl, Mixed val, size_t index)
                 start = keys.find_first(StringData(pe.get_key()));
                 if (start == realm::not_found) {
                     if (pe.get_key() == "@keys") {
-                        ctrl.from_list = true;
+                        ctrl.path_only_unary_keys = false;
+                        REALM_ASSERT(end_of_path);
                         keys.for_all([&](const auto& k) {
-                            ctrl.matches.insert(k);
+                            ctrl.matches.back().push_back(k);
                         });
                     }
                     else {
-                        ctrl.matches.insert(Mixed());
+                        ctrl.matches.back().push_back(Mixed());
                     }
                     return;
                 }
                 finish = start + 1;
             }
-            BPlusTree<Mixed> values(ctrl.alloc);
+            BPlusTree<Mixed> values(*ctrl.alloc);
             values.set_parent(&top, 1);
             values.init_from_parent();
             for (; start < finish; start++) {
                 val = values.get(start);
-                if (path_size > 1) {
-                    Collection::get_any(ctrl, val, index + 1);
+                if (end_of_path) {
+                    ctrl.matches.back().push_back(val);
                 }
                 else {
-                    ctrl.matches.insert(val);
+                    Collection::get_any(ctrl, val, index + 1);
                 }
             }
         }
@@ -186,7 +193,7 @@ void Collection::get_any(QueryCtrlBlock& ctrl, Mixed val, size_t index)
         auto ref = val.get_ref();
         if (!ref)
             return;
-        BPlusTree<Mixed> list(ctrl.alloc);
+        BPlusTree<Mixed> list(*ctrl.alloc);
         list.init_from_ref(ref);
         if (size_t sz = list.size()) {
             size_t start = 0;
@@ -202,11 +209,11 @@ void Collection::get_any(QueryCtrlBlock& ctrl, Mixed val, size_t index)
             }
             for (; start < finish; start++) {
                 val = list.get(start);
-                if (path_size > 1) {
-                    Collection::get_any(ctrl, val, index + 1);
+                if (end_of_path) {
+                    ctrl.matches.back().push_back(val);
                 }
                 else {
-                    ctrl.matches.insert(val);
+                    Collection::get_any(ctrl, val, index + 1);
                 }
             }
         }
@@ -217,14 +224,14 @@ void Collection::get_any(QueryCtrlBlock& ctrl, Mixed val, size_t index)
         auto col = obj.get_table()->get_column_key(pe.get_key());
         if (col) {
             val = obj.get_any(col);
-            if (path_size > 1) {
+            if (end_of_path) {
+                ctrl.matches.back().push_back(val);
+            }
+            else {
                 if (val.is_type(type_Link)) {
                     val = ObjLink(obj.get_target_table(col)->get_key(), val.get<ObjKey>());
                 }
                 Collection::get_any(ctrl, val, index + 1);
-            }
-            else {
-                ctrl.matches.insert(val);
             }
         }
     }

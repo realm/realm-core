@@ -73,9 +73,32 @@ RLM_API void realm_set_log_level(realm_log_level_e level) noexcept
     util::LogCategory::realm.set_default_level_threshold(realm::util::LogCategory::Level(level));
 }
 
-RLM_API void realm_set_log_level_category(const char* category_name, realm_log_level_e level) noexcept
+RLM_API realm_log_level_e realm_set_log_level_category(const char* category_name, realm_log_level_e level) noexcept
 {
-    util::LogCategory::get_category(category_name)
-        .set_default_level_threshold(realm::util::LogCategory::Level(level));
+    auto& cat = util::LogCategory::get_category(category_name);
+    realm_log_level_e prev_level = realm_log_level_e(util::Logger::get_default_logger()->get_level_threshold(cat));
+    cat.set_default_level_threshold(realm::util::LogCategory::Level(level));
+    return prev_level;
 }
+
+RLM_API realm_log_level_e realm_get_log_level_category(const char* category_name) noexcept
+{
+    auto& cat = util::LogCategory::get_category(category_name);
+    return realm_log_level_e(util::Logger::get_default_logger()->get_level_threshold(cat));
+}
+
+RLM_API size_t realm_get_category_names(size_t num_values, const char** out_values)
+{
+    auto vec = util::LogCategory::get_category_names();
+    auto number_to_copy = vec.size();
+    if (num_values > 0) {
+        if (number_to_copy > num_values)
+            number_to_copy = num_values;
+        for (size_t n = 0; n < number_to_copy; n++) {
+            out_values[n] = vec[n];
+        }
+    }
+    return number_to_copy;
+}
+
 } // namespace realm::c_api

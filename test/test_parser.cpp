@@ -2209,12 +2209,10 @@ TEST(Parser_list_of_primitive_ints)
     verify_query(test_context, t2, "list.integers.@avg == 1", 2);
     verify_query(test_context, t2, "list.integers.@sum == 1", 2);
     verify_query(test_context, t2, "list.integers.@min == 1", 2);
-    // aggregate operators across multiple lists
-    // we haven't supported aggregates across multiple lists previously
-    // but the implementation works and applies the aggregate to the primitive list
-    // this may be surprising, but it is one way to interpret the expression
-    verify_query(test_context, t2, "ALL list.integers == 1", 2);  // row 0 matches {1}. row 1 matches (any of) {} {1}
-    verify_query(test_context, t2, "NONE list.integers == 1", 1); // row 1 matches (any of) {}, {0}, {2}, {3} ...
+
+    verify_query(test_context, t2, "ALL list.integers == 1", 3);  // first 2 rows have both a {1} list
+                                                                  // row 2 has only an empty list which matches ALL
+    verify_query(test_context, t2, "NONE list.integers == 1", 2); // row 0 has only one list and it macthes 1
 
     std::any args[] = {Int(1)};
     size_t num_args = 1;
@@ -6402,6 +6400,100 @@ TEST(Parser_issue6831)
     auto q = inventory->query("Plants.@keys == 'Petunia'");
     CHECK_EQUAL(q.count(), 1);
     q = inventory->query("Plants.Rose.Family == 'Rosaceae'");
+    CHECK_EQUAL(q.count(), 1);
+}
+
+TEST(Parser_issue7393)
+{
+    Group g;
+    auto table = g.add_table_with_primary_key("Table", type_String, "id");
+    auto col_value = table->add_column(type_Mixed, "value");
+    auto obj = table->create_object_with_primary_key("EMBEDDED");
+    obj.set_json(col_value, R"([
+        [4, 5, 6],
+        {
+            "key1": 7,
+            "key2": 8,
+            "key3": [9]
+        }
+    ])");
+    auto q = table->query("value[*][*] == {4, 5, 6}");
+    CHECK_EQUAL(q.count(), 1);
+    q = table->query("value[0][*] == {4, 5, 6}");
+    CHECK_EQUAL(q.count(), 1);
+    q = table->query("value[1][*] == {4, 5, 6}");
+    CHECK_EQUAL(q.count(), 0);
+}
+
+TEST(Parser_Wildcard)
+{
+    Group g;
+    auto table = g.add_table_with_primary_key("table", type_String, "id");
+    auto origin = g.add_table_with_primary_key("origin", type_String, "id");
+    auto col_any = table->add_column(type_Mixed, "value");
+    auto col_dict = table->add_column_dictionary(type_Mixed, "dict");
+    auto col_list = table->add_column_list(type_Int, "list");
+    auto col_list_any = table->add_column_list(type_Mixed, "list_any");
+    auto col_link = origin->add_column_list(*table, "link");
+
+    auto obj1 = table->create_object_with_primary_key("obj1");
+    obj1.set_json(col_any, R"([[3, 2, 1], [4, 5, 6]])");
+    obj1.set_json(col_dict, R"({"key1": 1, "key2": 2, "key3": [4, 5, 6]})");
+    obj1.set_json(col_list_any, R"([4, 5, 6])");
+    auto list = obj1.get_list<Int>(col_list);
+    list.add(4);
+    list.add(5);
+    list.add(6);
+    auto obj2 = table->create_object_with_primary_key("obj2");
+    obj2.set_json(col_any, R"([[9, 8, 7], [1, 2, 5]])");
+    obj2.set_json(col_dict, R"({"key1": 3, "key3": 4, "key4": [3, 2, 1]})");
+    obj2.set_json(col_list_any, R"([1, 2, [8, 9, 10]])");
+    list = obj2.get_list<Int>(col_list);
+    list.add(1);
+    list.add(2);
+    list.add(3);
+    auto obj3 = table->create_object_with_primary_key("obj3");
+    obj3.set_json(col_any, R"([[9, 8, 7], [1, 2, 3]])");
+    obj3.set_json(col_dict, R"({"key1": 3, "key2": [8, 10], "key3": [3, 2, 1]})");
+
+    auto obj = origin->create_object_with_primary_key("top");
+    auto ll = obj.get_linklist(col_link);
+    ll.add(obj1.get_key());
+    ll.add(obj2.get_key());
+
+    auto q = table->query("value[*][*] = {1, 2, 3, 4, 5, 6}");
+    CHECK_EQUAL(q.count(), 0);
+    q = table->query("value[*][*] = {3, 2, 1}");
+    CHECK_EQUAL(q.count(), 1);
+    q = table->query("{3, 2, 1} = value[*][*]");
+    CHECK_EQUAL(q.count(), 1);
+    q = table->query("value[*][*] = dict[*][*]");
+    CHECK_EQUAL(q.count(), 1);
+    q = table->query("ANY value[*][*] = dict[*][*]");
+    CHECK_EQUAL(q.count(), 3);
+    q = table->query("ALL value[*][*] = dict[*][*]");
+    CHECK_EQUAL(q.count(), 2);
+    q = table->query("NONE value[*][*] = dict[*][*]");
+    CHECK_EQUAL(q.count(), 3);
+    q = origin->query("link.dict.key1 = {1, 3}");
+    CHECK_EQUAL(q.count(), 0);
+    q = origin->query("link.dict.key1 = {1}");
+    CHECK_EQUAL(q.count(), 1);
+
+    q = origin->query("link[0].list = {4, 5, 6}");
+    CHECK_EQUAL(q.count(), 1);
+    q = origin->query("link.list = {4, 5, 6}");
+    CHECK_EQUAL(q.count(), 1);
+    q = origin->query("link.list_any = {4, 5, 6}");
+    CHECK_EQUAL(q.count(), 1);
+    q = origin->query("link.list_any[0] = 4");
+    CHECK_EQUAL(q.count(), 1);
+    q = origin->query("link.list_any[2][1] = 9");
+    CHECK_EQUAL(q.count(), 1);
+
+    q = origin->query("link.dict.@keys = {'key1', 'key2', 'key3'}"); // Order matters
+    CHECK_EQUAL(q.count(), 1);
+    q = origin->query("ALL link.dict.@keys = {'key4', 'key3', 'key1'}"); // Order does not matter
     CHECK_EQUAL(q.count(), 1);
 }
 

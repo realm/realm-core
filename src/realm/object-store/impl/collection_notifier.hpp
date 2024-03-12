@@ -252,6 +252,7 @@ private:
 
     mutable std::mutex m_realm_mutex;
     std::shared_ptr<Realm> m_realm;
+    std::atomic<bool> m_is_alive = true;
 
     std::shared_ptr<Transaction> m_transaction;
 

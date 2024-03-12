@@ -231,6 +231,7 @@ void BPlusTree<int64_t>::split_root()
         auto sz = m_root->get_node_size();
 
         LeafNode* leaf = static_cast<LeafNode*>(m_root.get());
+        ref_type orig_root_ref = leaf->get_ref();
         auto new_root = std::make_unique<BPlusTreeInner>(this);
 
         new_root->create(REALM_MAX_BPNODE_SIZE);
@@ -246,8 +247,9 @@ void BPlusTree<int64_t>::split_root()
             new_root->add_bp_node_ref(new_leaf.get_ref()); // Throws
         }
         new_root->append_tree_size(sz);
-        leaf->destroy();
         replace_root(std::move(new_root));
+        // destroy after replace_root in case we need a valid context flag lookup
+        Array::destroy(orig_root_ref, m_alloc);
     }
     else {
         BPlusTreeInner* inner = static_cast<BPlusTreeInner*>(m_root.get());
@@ -554,6 +556,7 @@ std::unique_ptr<BPlusTreeInner> BPlusTreeInner::split_root()
     auto sz = get_node_size();
     size_t elems_per_child = get_elems_per_child();
     new_root->create(REALM_MAX_BPNODE_SIZE * elems_per_child);
+    new_root->Array::set_context_flag(this->Array::get_context_flag());
     size_t ndx = 0;
     size_t tree_size = get_tree_size();
     size_t accumulated_size = 0;
@@ -802,14 +805,14 @@ void BPlusTreeBase::bptree_erase(size_t n, BPlusTreeNode::EraseFunc func)
     size_t root_size = m_root->bptree_erase(n, func);
     while (!m_root->is_leaf() && root_size == 1) {
         BPlusTreeInner* node = static_cast<BPlusTreeInner*>(m_root.get());
-
+        ref_type orig_root_ref = node->get_ref();
         ref_type new_root_ref = node->clear_first_bp_node_ref();
-        node->destroy_deep();
-
         auto new_root = create_root_from_ref(new_root_ref);
 
         replace_root(std::move(new_root));
         root_size = m_root->get_node_size();
+        // destroy after replace_root for valid context flag lookup
+        Array::destroy_deep(orig_root_ref, m_alloc);
     }
 }
 
