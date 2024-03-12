@@ -1451,7 +1451,7 @@ buildvariants:
     cmake_toolchain_file: "./tools/cmake/xcode.toolchain.cmake"
     cmake_generator: Xcode
     max_jobs: $(sysctl -n hw.logicalcpu)
-    xcode_developer_dir: /Applications/Xcode13.1.app/Contents/Developer
+    xcode_developer_dir: /Applications/Xcode13.2.1.app/Contents/Developer
     extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=x86_64
     cmake_build_type: RelWithDebInfo
     enable_asan: On
@@ -1468,7 +1468,7 @@ buildvariants:
     cmake_toolchain_file: "./tools/cmake/xcode.toolchain.cmake"
     cmake_generator: Xcode
     max_jobs: $(sysctl -n hw.logicalcpu)
-    xcode_developer_dir: /Applications/Xcode13.1.app/Contents/Developer
+    xcode_developer_dir: /Applications/Xcode13.2.1.app/Contents/Developer
     extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=x86_64
     cmake_build_type: RelWithDebInfo
     enable_tsan: On
@@ -1566,6 +1566,24 @@ buildvariants:
     cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.26.3-macos-universal.tar.gz"
     cmake_bindir: "./cmake_binaries/CMake.app/Contents/bin"
     ninja_url: "https://github.com/ninja-build/ninja/releases/download/v1.11.1/ninja-mac.zip"
+    max_jobs: $(sysctl -n hw.logicalcpu)
+    cmake_build_type: RelWithDebInfo
+    enable_tsan: On
+    run_with_encryption: On
+  tasks:
+  - name: compile_test
+
+- name: macos-1300-arm64-tsan-3
+  display_name: "MacOS 13 arm64 (TSAN) 3"
+  run_on: macos-1300-arm64
+  expansions:
+    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.26.3-macos-universal.tar.gz"
+    cmake_bindir: "./cmake_binaries/CMake.app/Contents/bin"
+    cmake_toolchain_file: "./tools/cmake/xcode.toolchain.cmake"
+    cmake_generator: Xcode
+    #xcode_developer_dir: /Applications/Xcode14.3.1.app/Contents/Developer
+    xcode_developer_dir: /Applications/Xcode.app/Contents/Developer
+    extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=arm64
     max_jobs: $(sysctl -n hw.logicalcpu)
     cmake_build_type: RelWithDebInfo
     enable_tsan: On
