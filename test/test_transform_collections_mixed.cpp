@@ -157,7 +157,9 @@ TEST(Transform_Nested_CreateArrayVsArrayInsert)
     // and the insert is on the same type
     // {id: 1, any: {{"A": [[[42]]]}}}
     h.check_merge_result([&](Obj obj, ColKey col_any) {
-        CHECK_EQUAL(obj.get_list_ptr<Mixed>({col_any, "A", 0, 0})->get(0), 42);
+        auto list = obj.get_list_ptr<Mixed>({col_any, "A", 0, 0});
+        CHECK_EQUAL(list->size(), 1);
+        CHECK_EQUAL(list->get(0), 42);
     });
 }
 
@@ -236,14 +238,14 @@ TEST(Transform_CreateDictionaryVsDictionaryInsert)
         obj.set_collection(col_any, CollectionType::Dictionary);
     };
 
-    // Client 2 sets property 'any' from Dictionary to List
-    // {id: 1, any: {}}
+    // Client 2 sets property 'any' from List to Dictionary
+    // {id: 1, any: []}
     h.transaction(h.client_2, set_nested_dictionary);
 
     synchronize(h.server.get(), {h.client_2.get()});
 
-    // Client 1 sets property 'any' from Dictionary to List
-    // {id: 1, any: {}}
+    // Client 1 sets property 'any' from List to Dictionary
+    // {id: 1, any: []}
     h.transaction(h.client_1, set_nested_dictionary);
 
     // Client 2 inserts one integer in dictionary at 'any'
@@ -257,7 +259,9 @@ TEST(Transform_CreateDictionaryVsDictionaryInsert)
     // and the insert is on the same type
     // {id: 1, any: {{"key": 42}}}
     h.check_merge_result([&](Obj obj, ColKey col_any) {
-        CHECK_EQUAL(obj.get_dictionary(col_any).get("key"), 42);
+        auto dict = obj.get_dictionary(col_any);
+        CHECK_EQUAL(dict.size(), 1);
+        CHECK_EQUAL(dict.get("key"), 42);
     });
 }
 
@@ -301,7 +305,9 @@ TEST(Transform_Nested_CreateDictionaryVsDictionaryInsert)
     // and the insert is on the same type
     // {id: 1, any: {{"A": [{{"B": {{"key": 42}}}}]}}}
     h.check_merge_result([&](Obj obj, ColKey col_any) {
-        CHECK_EQUAL(obj.get_dictionary_ptr({col_any, "A", 0, "B"})->get("key"), 42);
+        auto dict = obj.get_dictionary_ptr({col_any, "A", 0, "B"});
+        CHECK_EQUAL(dict->size(), 1);
+        CHECK_EQUAL(dict->get("key"), 42);
     });
 }
 
@@ -347,7 +353,7 @@ TEST(Transform_Nested_CreateDictionaryVsArrayInsert)
         dict2->insert_collection("B", CollectionType::List);
     });
 
-    // Client 1 sets 'any.A.0.B' from Dictionary to List
+    // Client 1 sets 'any.A.0.B' from List to Dictionary
     // {id: 1, any: {{"A": [{{"B": {}}}]}}}
     h.transaction(h.client_1, [](Obj obj, ColKey col_any) {
         auto dict = obj.get_dictionary_ptr({col_any, "A", 0});
@@ -518,7 +524,9 @@ TEST(Transform_Nested_CreateArrayBeforeUpdateInt)
     // Result: Client 2 wins because its change has a higher timestamp
     // {id: 1, any: {{"A": [{{"B": 42}}]}}}
     h.check_merge_result([&](Obj obj, ColKey col_any) {
-        CHECK_EQUAL(obj.get_dictionary_ptr({col_any, "A", 0})->get("B"), 42);
+        auto dict = obj.get_dictionary_ptr({col_any, "A", 0});
+        CHECK_EQUAL(dict->size(), 1);
+        CHECK_EQUAL(dict->get("B"), 42);
     });
 }
 
@@ -559,14 +567,14 @@ TEST(Transform_CreateDictionaryAfterUpdateInt)
         obj.set_collection(col_any, CollectionType::Dictionary);
     });
 
-    // Client 2 sets property 'any' to an integer value (after Client 1's change)
+    // Client 2 sets property 'any' to an integer value (before Client 1's change)
     // {id: 1, any: 42}
     h.transaction(h.client_2, [](Obj obj, ColKey col_any) {
         obj.set_any(col_any, 42);
     });
 
     // Result: Client 1 wins because its change has a higher timestamp
-    // {id: 1, any: []}
+    // {id: 1, any: {}}
     h.check_merge_result([&](Obj obj, ColKey col_any) {
         CHECK(obj.get_dictionary(col_any).is_empty());
     });
@@ -593,15 +601,15 @@ TEST(Transform_Nested_CreateDictionaryAfterUpdateInt)
         dict->insert_collection("B", CollectionType::Dictionary);
     });
 
-    // Client 2 sets 'any.A.0.B' from string to integer (after Client 1's change)
+    // Client 2 sets 'any.A.0.B' from string to integer (before Client 1's change)
     // {id: 1, any: {{"A": [{{"B": 42}}]}}}
     h.transaction(h.client_2, [](Obj obj, ColKey col_any) {
         auto dict = obj.get_dictionary_ptr({col_any, "A", 0});
         dict->insert("B", 42);
     });
 
-    // Result: Client 2 wins because its change has a higher timestamp
-    // {id: 1, any: {{"A": [{{"B": 42}}]}}}
+    // Result: Client 1 wins because its change has a higher timestamp
+    // {id: 1, any: {{"A": [{{"B": {}}}]}}}
     h.check_merge_result([&](Obj obj, ColKey col_any) {
         CHECK(obj.get_dictionary_ptr({col_any, "A", 0, "B"})->is_empty());
     });
@@ -688,6 +696,54 @@ TEST(Transform_Nested_MergeArrays)
         CHECK_EQUAL(list->get(1), "b");
         CHECK_EQUAL(list->get(2), "c");
         CHECK_EQUAL(list->get(3), "d");
+    });
+}
+
+TEST(Transform_Nested_MergeArrays_CorrectOrder)
+{
+    // Baseline: set 'any.A.0.B' to Dictionary
+    // {id: 1, any: {{"A": [{{"B": {}}}]}}}
+    TransformTestHarness h(test_context, TransformTestHarness::ClientTwoBeforeOne, [](Obj obj, ColKey col_any) {
+        obj.set_collection(col_any, CollectionType::Dictionary);
+        auto dict = obj.get_dictionary_ptr(col_any);
+        dict->insert_collection("A", CollectionType::List);
+        auto list = dict->get_list("A");
+        list->insert_collection(0, CollectionType::Dictionary);
+        auto dict2 = list->get_dictionary(0);
+        dict2->insert_collection("B", CollectionType::Dictionary);
+    });
+
+    // Client 1 sets 'any.A.0.B' from Dictionary to List and inserts two strings in the list
+    // {id: 1, any: {{"A": [{{"B": ["a", "b"]}}]}}}
+    h.transaction(h.client_1, [](Obj obj, ColKey col_any) {
+        auto dict = obj.get_dictionary_ptr({col_any, "A", 0});
+        dict->insert_collection("B", CollectionType::List);
+        auto list = dict->get_list("B");
+        list->insert(0, "a");
+        list->insert(1, "b");
+    });
+
+    // Client 2 sets 'any.A.0.B' from Dictionary to List and inserts two strings in the list (before Client 1's
+    // changes)
+    // {id: 1, any: {{"A": [{{"B": ["c", "d"]}}]}}}
+    h.transaction(h.client_2, [](Obj obj, ColKey col_any) {
+        auto dict = obj.get_dictionary_ptr({col_any, "A", 0});
+        dict->insert_collection("B", CollectionType::List);
+        auto list = dict->get_list("B");
+        list->insert(0, "c");
+        list->insert(1, "d");
+    });
+
+    // Result: Both changes are accepted and the lists are merged - both clients are setting the same type
+    // (idempotent), and inserts are all in the same list (but Client 2's changes come first)
+    // {id: 1, any: {{"A": [{{"B": ["c", "d", "a", "b"]}}]}}}
+    h.check_merge_result([&](Obj obj, ColKey col_any) {
+        auto list = obj.get_list_ptr<Mixed>({col_any, "A", 0, "B"});
+        CHECK_EQUAL(list->size(), 4);
+        CHECK_EQUAL(list->get(0), "c");
+        CHECK_EQUAL(list->get(1), "d");
+        CHECK_EQUAL(list->get(2), "a");
+        CHECK_EQUAL(list->get(3), "b");
     });
 }
 
@@ -865,7 +921,7 @@ TEST(Transform_Nested_CreateArrayAfterCreateDictionary)
         list->insert(1, "b");
     });
 
-    // Client 1 inserts a Dictionary in dictionary at 'any.A.0' and then inserts two strings in the dictionary (before
+    // Client 2 inserts a Dictionary in dictionary at 'any.A.0' and then inserts two strings in the dictionary (before
     // Client 1's changes)
     // {id: 1, any: {{"A": [{{"B": {{"key1": "a", {"key2": "b"}}}}}]}}}
     h.transaction(h.client_2, [](Obj obj, ColKey col_any) {
@@ -914,9 +970,8 @@ TEST(Transform_Nested_ClearArrayVsUpdateString)
         dict->insert("A", "some value");
     });
 
-    // Result: Client 2 wins - setting a property or item to a non-collections type wins agains any updates (including
-    // clear) on that collection
-    // {id: 1, any: {{"A", "some value"}}}
+    // Result: Client 2 wins - setting a property or item to a non-collections type wins against any updates
+    // (including clear) on that collection {id: 1, any: {{"A", "some value"}}}
     h.check_merge_result([&](Obj obj, ColKey col_any) {
         auto dict = obj.get_dictionary_ptr(col_any);
         CHECK_EQUAL(dict->size(), 1);
@@ -935,8 +990,8 @@ TEST(Transform_ClearArrayVsCreateArray)
         dict.insert("key2", 2);
     });
 
-    // Client 1 sets property 'any' from Dictionary to List, inserts an integer in the list, clears the list, and
-    // inserts one more integer in the list
+    // Client 1 sets property 'any' from Dictionary to List, inserts one integer in the list, clears the list, and
+    // inserts one integer in the list
     // {id: 1, any: [2]}
     h.transaction(h.client_1, [](Obj obj, ColKey col_any) {
         obj.set_collection(col_any, CollectionType::List);
@@ -977,7 +1032,7 @@ TEST(Transform_ClearArrayInsideArrayVsCreateArray)
     });
 
     // Client 1 sets 'any.0' from Dictionary to List, inserts one integer in the list, clears the list, and inserts
-    // one more integer in the list
+    // one integer in the list
     // {id: 1, any: [2]}
     h.transaction(h.client_1, [](Obj obj, ColKey col_any) {
         auto list = obj.get_list<Mixed>(col_any);
@@ -1020,7 +1075,7 @@ TEST(Transform_ClearArrayInsideDictionaryVsCreateArray)
     });
 
     // Client 1 sets 'any.A' from Dictionary to List, inserts one integer in the list, clears the list, and inserts
-    // one more integer in the list
+    // one integer in the list
     // {id: 1, any: {{"A": [2]}}}
     h.transaction(h.client_1, [](Obj obj, ColKey col_any) {
         auto dict = obj.get_dictionary(col_any);
@@ -1057,7 +1112,7 @@ TEST(Transform_ClearArrayVsCreateDictionary)
         obj.set_collection(col_any, CollectionType::List);
     });
 
-    // Client 1 inserts two integers in list at 'any', clears the list, and inserts one more integer
+    // Client 1 inserts two integers in list at 'any', clears the list, and inserts one integer in the list
     // {id: 1, any: [3]}
     h.transaction(h.client_1, [](Obj obj, ColKey col_any) {
         auto list = obj.get_list<Mixed>(col_any);
@@ -1095,7 +1150,7 @@ TEST(Transform_ClearArrayInsideArrayVsCreateDictionary)
     });
 
     // Client 1 sets 'any.0' from integer to List, inserts one integer in the list, clears the list, and inserts one
-    // more integer in the list
+    // integer in the list
     // {id: 1, any: [[2]]}
     h.transaction(h.client_1, [](Obj obj, ColKey col_any) {
         auto list = obj.get_list<Mixed>(col_any);
@@ -1136,7 +1191,7 @@ TEST(Transform_ClearArrayInsideDictionaryVsCreateDictionary)
     });
 
     // Client 1 sets 'any.A' from string to List, inserts one integer in the list, clears the list, and inserts one
-    // more integer in the list
+    // integer in the list
     // {id: 1, any: {{"A": [2]}}}
     h.transaction(h.client_1, [](Obj obj, ColKey col_any) {
         auto dict = obj.get_dictionary(col_any);
@@ -1177,7 +1232,7 @@ TEST(Transform_ClearDictionaryVsCreateArray)
         dict.insert("key2", 2);
     });
 
-    // Client 1 insert one integer in dictionary at 'any', clears the dictionary, and inserts one more integer in the
+    // Client 1 insert one integer in dictionary at 'any', clears the dictionary, and inserts one integer in the
     // dictionary
     // {id: 1, any: {{"key4": 4}}}
     h.transaction(h.client_1, [](Obj obj, ColKey col_any) {
@@ -1206,7 +1261,7 @@ TEST(Transform_ClearDictionaryVsCreateArray)
 
 TEST(Transform_ClearDictionaryInsideArrayVsCreateArray)
 {
-    // Baseline: set 'any.0' as Dictionary and insert two integers in the dictionary
+    // Baseline: set 'any.0' to Dictionary and insert two integers in the dictionary
     // {id: 1, any: [{{"key1": 1}, {"key2": 2}}]}
     TransformTestHarness h(test_context, TransformTestHarness::ClientOneBeforeTwo, [](Obj obj, ColKey col_any) {
         obj.set_collection(col_any, CollectionType::List);
@@ -1217,7 +1272,7 @@ TEST(Transform_ClearDictionaryInsideArrayVsCreateArray)
         dict->insert("key2", 2);
     });
 
-    // Client 1 inserts one integer in dictionary at 'any.0', clears it, and insert one more integer in the dictionary
+    // Client 1 inserts one integer in dictionary at 'any.0', clears it, and insert one integer in the dictionary
     // {id: 1, any: [{{"key4": 4}}]}
     h.transaction(h.client_1, [](Obj obj, ColKey col_any) {
         auto dict = obj.get_dictionary_ptr({col_any, 0});
@@ -1246,7 +1301,7 @@ TEST(Transform_ClearDictionaryInsideArrayVsCreateArray)
 
 TEST(Transform_ClearDictionaryInsideDictionaryVsCreateArray)
 {
-    // Baseline: set 'any.A' as Dictionary and insert two integers in the dictionary
+    // Baseline: set 'any.A' to Dictionary and insert two integers in the dictionary
     // {id: 1, any: {{"A": {{"key1": 1}, {"key2": 2}}}}}
     TransformTestHarness h(test_context, TransformTestHarness::ClientOneBeforeTwo, [](Obj obj, ColKey col_any) {
         obj.set_collection(col_any, CollectionType::Dictionary);
@@ -1257,7 +1312,7 @@ TEST(Transform_ClearDictionaryInsideDictionaryVsCreateArray)
         dict2->insert("key2", 2);
     });
 
-    // Client 1 inserts an integer in dictionary at 'any.A', clear the dictionary, and inserts another integer in the
+    // Client 1 inserts one integer in dictionary at 'any.A', clear the dictionary, and inserts one integer in the
     // dictionary
     // {id: 1, any: {{"A": {{"key4": 4}}}}}
     h.transaction(h.client_1, [](Obj obj, ColKey col_any) {
@@ -1294,7 +1349,7 @@ TEST(Transform_ClearDictionaryVsCreateDictionary)
     });
 
     // Client 1 sets property 'any' from List to Dictionary, inserts one integer in the dictionary, clears the
-    // dictionary, and inserts one more integer in the dictionary
+    // dictionary, and inserts one integer in the dictionary
     // {id: 1, any: {{"key2": 2}}}
     h.transaction(h.client_1, [](Obj obj, ColKey col_any) {
         obj.set_collection(col_any, CollectionType::Dictionary);
@@ -1332,7 +1387,7 @@ TEST(Transform_ClearDictionaryInsideArrayVsCreateDictionary)
     });
 
     // Client 1 sets 'any.0' from integer to Dictionary, inserts one integer in the dictionary, clears the
-    // dictionary, and inserts one more integer in the dictionary
+    // dictionary, and inserts one integer in the dictionary
     // {id: 1, any: [{{"key2": 2}}]}
     h.transaction(h.client_1, [](Obj obj, ColKey col_any) {
         auto list = obj.get_list<Mixed>(col_any);
@@ -1372,7 +1427,7 @@ TEST(Transform_ClearDictionaryInsideDictionaryVsCreateDictionary)
     });
 
     // Client 1 sets 'any.A' from string to Dictionary, inserts one integer in the dictionary, clears the dictionary,
-    // and inserts one more integer in the dictionary
+    // and inserts one integer in the dictionary
     // {id: 1, any: {{"A": {{"key2": 2}}}}}
     h.transaction(h.client_1, [](Obj obj, ColKey col_any) {
         auto dict = obj.get_dictionary(col_any);
