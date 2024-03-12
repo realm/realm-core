@@ -277,23 +277,6 @@ std::string_view getenv_sv(const char* name) noexcept
     return {};
 }
 
-static std::string unquote_string(std::string_view possibly_quoted_string)
-{
-    if (possibly_quoted_string.size() > 0) {
-        auto check_char = possibly_quoted_string.front();
-        if (check_char == '"' || check_char == '\'') {
-            possibly_quoted_string.remove_prefix(1);
-        }
-    }
-    if (possibly_quoted_string.size() > 0) {
-        auto check_char = possibly_quoted_string.back();
-        if (check_char == '"' || check_char == '\'') {
-            possibly_quoted_string.remove_suffix(1);
-        }
-    }
-    return std::string{possibly_quoted_string};
-}
-
 } // namespace
 
 app::Response do_http_request(const app::Request& request)
@@ -394,6 +377,8 @@ public:
     enum class StartMode { Default, GitHash, Branch, PatchId };
     explicit Baasaas(std::string api_key, StartMode mode, std::string ref_spec)
         : m_api_key(std::move(api_key))
+        , m_base_url(get_baasaas_base_url())
+        , m_externally_managed_instance(false)
     {
         auto logger = util::Logger::get_default_logger();
         std::string url_path = "startContainer";
@@ -416,7 +401,20 @@ public:
         auto resp = do_request(std::move(url_path), app::HttpMethod::post);
         m_container_id = resp["id"].get<std::string>();
         logger->info("Baasaas container started with id \"%1\"", m_container_id);
+        auto lock_file = util::File(std::string{s_baasaas_lock_file_name}, util::File::mode_Write);
+        lock_file.write(m_container_id);
     }
+
+    explicit Baasaas(std::string api_key, std::string baasaas_instance_id)
+        : m_api_key(std::move(api_key))
+        , m_base_url(get_baasaas_base_url())
+        , m_container_id(std::move(baasaas_instance_id))
+        , m_externally_managed_instance(true)
+    {
+        auto logger = util::Logger::get_default_logger();
+        logger->info("Using externally managed baasaas instance \"%1\"", m_container_id);
+    }
+
     Baasaas(const Baasaas&) = delete;
     Baasaas(Baasaas&&) = delete;
     Baasaas& operator=(const Baasaas&) = delete;
@@ -476,6 +474,9 @@ public:
 
     void stop()
     {
+        if (m_externally_managed_instance) {
+            return;
+        }
         auto container_id = std::move(m_container_id);
         if (container_id.empty()) {
             return;
@@ -484,6 +485,10 @@ public:
         auto logger = util::Logger::get_default_logger();
         logger->info("Stopping baasaas container with id \"%1\"", container_id);
         do_request(util::format("stopContainer?id=%1", container_id), app::HttpMethod::post);
+        auto lock_file = util::File(std::string{s_baasaas_lock_file_name}, util::File::mode_Write);
+        lock_file.resize(0);
+        lock_file.close();
+        util::File::remove(lock_file.get_path());
     }
 
     const std::string& http_endpoint()
@@ -502,8 +507,8 @@ private:
     nlohmann::json do_request(std::string api_path, app::HttpMethod method)
     {
         app::Request request;
-        request.url = util::format(
-            "https://us-east-1.aws.data.mongodb-api.com/app/baas-container-service-autzb/endpoint/%1", api_path);
+
+        request.url = util::format("%1/%2", m_base_url, api_path);
         request.method = method;
         request.headers.insert_or_assign("apiKey", m_api_key);
         request.headers.insert_or_assign("Content-Type", "application/json");
@@ -514,8 +519,24 @@ private:
         return nlohmann::json::parse(response.body);
     }
 
+    static std::string get_baasaas_base_url()
+    {
+        auto env_value = getenv_sv("BAASAAS_BASE_URL");
+        if (env_value.empty()) {
+            // This is the current default endpoint for baasaas maintained by the sync team.
+            // You can reach out for help in #appx-device-sync-internal if there are problems.
+            return "https://us-east-1.aws.data.mongodb-api.com/app/baas-container-service-autzb/endpoint";
+        }
+
+        return unquote_string(env_value);
+    }
+
+    constexpr static std::string_view s_baasaas_lock_file_name = "baasaas_instance.lock";
+
     std::string m_api_key;
+    std::string m_base_url;
     std::string m_container_id;
+    bool m_externally_managed_instance;
     std::string m_http_endpoint;
     std::string m_mongo_endpoint;
 };
@@ -540,6 +561,15 @@ public:
         // Allow overriding the baas base url at runtime via an environment variable, even if BAASAAS_API_KEY
         // is also specified.
         if (!getenv_sv("BAAS_BASE_URL").empty()) {
+            return;
+        }
+
+        // If we've started a baasaas container outside of running the tests, then use that instead of
+        // figuring out how to start our own.
+        if (auto baasaas_instance = getenv_sv("BAASAAS_INSTANCE_ID"); !baasaas_instance.empty()) {
+            auto& baasaas_holder = get_baasaas_holder();
+            REALM_ASSERT(!baasaas_holder);
+            baasaas_holder.emplace(std::string{api_key}, std::string{baasaas_instance});
             return;
         }
 

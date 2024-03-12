@@ -128,6 +128,10 @@ struct ExpectedRealmPaths {
     std::vector<std::string> legacy_sync_directories_to_make;
 };
 
+// Takes a string_view of a possibly quoted string (i.e. the string begins with '"' and ends with '"')
+// and returns an owned string without the quotes.
+std::string unquote_string(std::string_view possibly_quoted_string);
+
 #if REALM_ENABLE_SYNC
 
 template <typename Transport>
