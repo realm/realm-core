@@ -167,7 +167,6 @@ UniqueFunction<void(const Response&)> handle_default_response(UniqueFunction<voi
     };
 }
 
-constexpr static std::string_view s_default_base_url = "https://realm.mongodb.com";
 constexpr static std::string_view s_base_path = "/api/client/v2.0";
 constexpr static std::string_view s_app_path = "/app";
 constexpr static std::string_view s_auth_path = "/auth";
@@ -215,7 +214,7 @@ SharedApp App::get_app(CacheMode mode, const Config& config,
 {
     if (mode == CacheMode::Enabled) {
         std::lock_guard<std::mutex> lock(s_apps_mutex);
-        auto& app = s_apps_cache[config.app_id][config.base_url.value_or(std::string(s_default_base_url))];
+        auto& app = s_apps_cache[config.app_id][config.base_url.value_or(std::string(default_base_url))];
         if (!app) {
             app = std::make_shared<App>(Private(), config);
             app->configure(sync_client_config);
@@ -261,7 +260,7 @@ void App::close_all_sync_sessions()
 
 App::App(Private, const Config& config)
     : m_config(config)
-    , m_base_url(m_config.base_url.value_or(std::string(s_default_base_url)))
+    , m_base_url(m_config.base_url.value_or(std::string(default_base_url)))
     , m_location_updated(false)
     , m_request_timeout_ms(m_config.default_request_timeout_ms.value_or(s_default_timeout_ms))
 {
@@ -301,16 +300,21 @@ App::~App() {}
 
 void App::configure(const SyncClientConfig& sync_client_config)
 {
+    std::string ws_route;
     {
         util::CheckedLockGuard guard(m_route_mutex);
         // Make sure to request the location when the app is configured
         m_location_updated = false;
+        // Create a tentative sync route using the generated ws_host_url
+        REALM_ASSERT(!m_ws_host_url.empty());
+        ws_route = make_sync_route();
     }
 
-    // Start with an empty sync route in the sync manager. It will ensure the
-    // location has been updated at least once when the first sync session is
-    // started by requesting a new access token.
-    m_sync_manager = SyncManager::create(shared_from_this(), {}, sync_client_config, config().app_id);
+    // When App starts, the ws_host_url will be populated with the generated value based on
+    // the provided host_url value and the sync route will be created using this. If this is
+    // is incorrect, the websocket connection will fail and the SyncSession will request a
+    // new access token, which will update the location if it has not already.
+    m_sync_manager = SyncManager::create(shared_from_this(), ws_route, sync_client_config, config().app_id);
 }
 
 bool App::init_logger()
@@ -384,21 +388,52 @@ void App::configure_route(const std::string& host_url, const std::optional<std::
     if (ws_host_url && ws_host_url->length() > 0) {
         m_ws_host_url = *ws_host_url;
     }
-    // Otherwise, convert the host url to a websocket host url (http[s]:// -> ws[s]://)
+    // Otherwise, convert the host url to a websocket host url
     else {
-        m_ws_host_url = m_host_url;
-        if (m_ws_host_url.find("http") == 0) {
-            m_ws_host_url.replace(0, 4, "ws");
-        }
+        m_ws_host_url = App::create_ws_host_url(m_host_url);
     }
 
     // host_url is the url to the server: e.g., https://realm.mongodb.com or https://localhost:9090
-    // base_route is the baseline client api path: e.g. https://realm.mongodb.com/api/client/v2.0
+    // base_route is the baseline client api path: e.g. <host_url>/api/client/v2.0
     m_base_route = util::format("%1%2", m_host_url, s_base_path);
-    // app_route is the cloud app URL: https://realm.mongodb.com/api/client/v2.0/app/<app_id>
+    // app_route is the cloud app URL: <host_url>/api/client/v2.0/app/<app_id>
     m_app_route = util::format("%1%2/%3", m_base_route, s_app_path, m_config.app_id);
-    // auth_route is cloud app auth URL: https://realm.mongodb.com/api/client/v2.0/app/<app_id>/auth
+    // auth_route is cloud app auth URL: <host_url>/api/client/v2.0/app/<app_id>/auth
     m_auth_route = util::format("%1%2", m_app_route, s_auth_path);
+}
+
+// Create a temporary websocket URL domain using the given host URL
+// This updates the URL based on the following assumptions:
+// If the URL doesn't start with 'http' => <host-url>
+// http[s]://[region-prefix]realm.mongodb.com => ws[s]://ws.[region-prefix]realm.mongodb.com
+// http[s]://[region-prefix]services.cloud.mongodb.com => ws[s]://[region-prefix].ws.services.cloud.mongodb.com
+// All others => http[s]://<host-url> => ws[s]://<host-url>
+std::string App::create_ws_host_url(const std::string_view& host_url)
+{
+    constexpr static std::string_view s_orig_base_domain = "realm.mongodb.com";
+    constexpr static std::string_view s_new_base_domain = "services.cloud.mongodb.com";
+
+    // Doesn't start with http, just return provided string
+    if (host_url.substr(0, 4) != "http") {
+        return std::string(host_url);
+    }
+    // If it starts with 'https' then ws url will start with wss
+    bool https = host_url[4] == 's';
+    size_t prefix_len = std::char_traits<char>::length("http://") + (https ? 1 : 0);
+    std::string_view prefix = https ? "wss://" : "ws://";
+
+    // http[s]://[region-prefix]realm.mongodb.com => ws[s]://ws.[region-prefix]realm.mongodb.com
+    if (host_url.find(s_orig_base_domain) != std::string_view::npos) {
+        return util::format("%1ws.%2", prefix, host_url.substr(prefix_len));
+    }
+    // http[s]://[region-prefix]services.cloud.mongodb.com => ws[s]://[region-prefix].ws.services.cloud.mongodb.com
+    if (auto start = host_url.find(s_new_base_domain); start != std::string_view::npos) {
+        return util::format("%1%2ws.%3", prefix, host_url.substr(prefix_len, start - prefix_len),
+                            host_url.substr(start));
+    }
+
+    // All others => http[s]://<host-url> => ws[s]://<host-url>
+    return util::format("ws%1", host_url.substr(4));
 }
 
 void App::update_hostname(const std::string& host_url, const std::optional<std::string>& ws_host_url,
@@ -612,11 +647,11 @@ std::string App::get_base_url() const
 
 void App::update_base_url(std::optional<std::string> base_url, UniqueFunction<void(Optional<AppError>)>&& completion)
 {
-    std::string new_base_url = base_url.value_or(std::string(s_default_base_url));
+    std::string new_base_url = base_url.value_or(std::string(default_base_url));
 
     if (new_base_url.empty()) {
         // Treat an empty string the same as requesting the default base url
-        new_base_url = s_default_base_url;
+        new_base_url = default_base_url;
         log_debug("App::update_base_url: empty => %1", new_base_url);
     }
     else {
@@ -1023,8 +1058,6 @@ std::optional<AppError> App::update_location(const Response& response, const std
         return error;
     }
 
-    REALM_ASSERT(m_sync_manager); // Need a valid sync manager
-
     // Update the location info with the data from the response
     try {
         auto json = parse<BsonDocument>(response.body);
@@ -1038,8 +1071,10 @@ std::optional<AppError> App::update_location(const Response& response, const std
             // Update the local hostname and path information
             update_hostname(hostname, ws_hostname, base_url);
             m_location_updated = true;
-            // Provide the Device Sync websocket route to the SyncManager
-            m_sync_manager->set_sync_route(make_sync_route());
+            if (m_sync_manager) {
+                // Provide the Device Sync websocket route to the SyncManager
+                m_sync_manager->set_sync_route(make_sync_route());
+            }
         }
     }
     catch (const AppError& ex) {

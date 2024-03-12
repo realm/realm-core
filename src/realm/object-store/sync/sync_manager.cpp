@@ -43,13 +43,13 @@ SyncClientTimeouts::SyncClientTimeouts()
 {
 }
 
-std::shared_ptr<SyncManager> SyncManager::create(std::shared_ptr<app::App> app, std::optional<std::string> sync_route,
+std::shared_ptr<SyncManager> SyncManager::create(std::shared_ptr<app::App> app, std::string sync_route,
                                                  const SyncClientConfig& config, const std::string& app_id)
 {
-    return std::make_shared<SyncManager>(Private(), std::move(app), std::move(sync_route), config, app_id);
+    return std::make_shared<SyncManager>(Private(), std::move(app), sync_route, config, app_id);
 }
 
-SyncManager::SyncManager(Private, std::shared_ptr<app::App> app, std::optional<std::string> sync_route,
+SyncManager::SyncManager(Private, std::shared_ptr<app::App> app, std::string sync_route,
                          const SyncClientConfig& config, const std::string& app_id)
     : m_config(config)
     , m_file_manager(std::make_unique<SyncFileManager>(m_config.base_file_path, app_id))
@@ -150,7 +150,6 @@ void SyncManager::tear_down_for_testing()
         // Destroy the client now that we have no remaining sessions.
         m_sync_client = nullptr;
         m_logger_ptr.reset();
-        m_sync_route.reset();
     }
 
     {

@@ -263,7 +263,7 @@ public:
 
     // If the `SyncSession` has been configured, the full remote URL of the Realm
     // this `SyncSession` represents.
-    util::Optional<std::string> full_realm_url() const REQUIRES(!m_config_mutex)
+    std::string full_realm_url() const REQUIRES(!m_config_mutex)
     {
         util::CheckedLockGuard lock(m_config_mutex);
         return m_server_url;
@@ -427,7 +427,7 @@ private:
         REQUIRES(m_state_mutex);
 
     std::string get_appservices_connection_id() const REQUIRES(!m_state_mutex);
-    std::optional<std::string> get_sync_route() const REQUIRES(!m_state_mutex);
+    std::string get_sync_route() const REQUIRES(!m_state_mutex);
 
     util::Future<std::string> send_test_command(std::string body) REQUIRES(!m_state_mutex);
 
@@ -486,7 +486,7 @@ private:
     std::unique_ptr<sync::Session> m_session GUARDED_BY(m_state_mutex);
 
     // The fully-resolved URL of this Realm, including the server and the path.
-    util::Optional<std::string> m_server_url GUARDED_BY(m_config_mutex);
+    std::string m_server_url GUARDED_BY(m_config_mutex);
 
     _impl::SyncProgressNotifier m_progress_notifier;
     ConnectionChangeNotifier m_connection_change_notifier;
