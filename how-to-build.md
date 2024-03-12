@@ -145,6 +145,19 @@ These are the available variables:
    testing process as soon as a check fails or an unexpected exception is thrown
    in a test.
 
+## Running [app] tests against a local BAAS instance
+
+If you already have a baas instance running, you can specify that directly via the
+`BAAS_BASE_URL` environment variable. You can run baas in a local docker container using
+instructions from [the wiki](https://wiki.corp.mongodb.com/display/10GEN/%28Device+Sync%29+Using+Docker+to+run+a+BAAS+server+instance).
+```
+export BAAS_BASE_URL=http://localhost:9090
+mkdir build.sync.ninja
+cmake -B build.sync.ninja -G Ninja -DREALM_ENABLE_AUTH_TESTS=1
+cmake --build build.sync.ninja --target realm-object-store-tests
+./build.sync.ninja/test/object-store/realm-object-store-tests -d=1
+```
+
 ## Running [app] tests against an on-demand BAASAAS container
 
 Due to MongoDB security policies, running baas requires company issued credentials.
@@ -167,17 +180,6 @@ these will use the latest available commit from the main branch of baas.
 If you've started a baasaas container already via the baasaas CLI, you can tell
 the object-store tests to use that with the `BAASAAS_INSTANCE_ID` environment variable.
 
-## Running [app] tests against a local BAAS instance
-
-If you already have a baas instance running, you can specify that directly via the
-`BAAS_BASE_URL` environment variable.
-```
-export BAAS_BASE_URL=http://localhost:9090
-mkdir build.sync.ninja
-cmake -B build.sync.ninja -G Ninja -DREALM_ENABLE_AUTH_TESTS=1
-cmake --build build.sync.ninja --target realm-object-store-tests
-./build.sync.ninja/test/object-store/realm-object-store-tests -d=1
-```
 
 ### Developing inside a container
 
