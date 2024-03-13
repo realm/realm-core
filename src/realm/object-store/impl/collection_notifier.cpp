@@ -307,8 +307,9 @@ void CollectionNotifier::prepare_handover()
     REALM_ASSERT(m_change.empty());
     m_has_run = true;
 
-#ifdef REALM_DEBUG
     util::CheckedLockGuard lock(m_callback_mutex);
+    m_run_time_point = std::chrono::steady_clock::now();
+#ifdef REALM_DEBUG
     for (auto& callback : m_callbacks)
         REALM_ASSERT(!callback.skip_next);
 #endif
@@ -330,10 +331,59 @@ void CollectionNotifier::before_advance()
     });
 }
 
+static void log_changeset(util::Logger* logger, const CollectionChangeSet& changes, std::string_view description,
+                          std::chrono::microseconds elapsed)
+{
+    if (!logger) {
+        return;
+    }
+
+    logger->log(util::LogCategory::notification, util::Logger::Level::debug,
+                "Delivering notifications for %1 after %2 us", description, elapsed.count());
+    if (!logger->would_log(util::Logger::Level::trace)) {
+        return;
+    }
+    if (changes.empty()) {
+        logger->log(util::LogCategory::notification, util::Logger::Level::trace, "   No changes");
+    }
+    else {
+        if (changes.collection_root_was_deleted) {
+            logger->log(util::LogCategory::notification, util::Logger::Level::trace, "   collection deleted");
+        }
+        else if (changes.collection_was_cleared) {
+            logger->log(util::LogCategory::notification, util::Logger::Level::trace, "   collection cleared");
+        }
+        else {
+            auto log = [logger](const char* change, const IndexSet& index_set) {
+                if (auto cnt = index_set.count()) {
+                    std::ostringstream ostr;
+                    bool first = true;
+                    for (auto [a, b] : index_set) {
+                        if (!first)
+                            ostr << ',';
+                        if (b > a + 1) {
+                            ostr << '[' << a << ',' << b - 1 << ']';
+                        }
+                        else {
+                            ostr << a;
+                        }
+                        first = false;
+                    }
+                    logger->log(util::LogCategory::notification, util::Logger::Level::trace, "   %1 %2: %3", cnt,
+                                change, ostr.str().c_str());
+                }
+            };
+            log("deletions", changes.deletions);
+            log("insertions", changes.insertions);
+            log("modifications", changes.modifications);
+        }
+    }
+}
+
 void CollectionNotifier::after_advance()
 {
     using namespace std::chrono;
-    auto t1 = steady_clock::now();
+    auto now = steady_clock::now();
 
     for_each_callback([&](auto& lock, auto& callback) {
         if (callback.initial_delivered && callback.changes_to_deliver.empty()) {
@@ -346,51 +396,9 @@ void CollectionNotifier::after_advance()
         // acquire a local reference to the callback so that removing the
         // callback from within it can't result in a dangling pointer
         auto cb = callback.fn;
+        auto elapsed = duration_cast<microseconds>(now - m_run_time_point);
         lock.unlock_unchecked();
-        if (m_logger) {
-            m_logger->log(util::LogCategory::notification, util::Logger::Level::debug,
-                          "Delivering notifications for %1 after %2 us", m_description,
-                          duration_cast<microseconds>(t1 - m_run_time_point).count());
-            if (m_logger->would_log(util::Logger::Level::trace)) {
-                if (changes.empty()) {
-                    m_logger->log(util::LogCategory::notification, util::Logger::Level::trace, "   No changes");
-                }
-                else {
-                    if (changes.collection_root_was_deleted) {
-                        m_logger->log(util::LogCategory::notification, util::Logger::Level::trace,
-                                      "   collection deleted");
-                    }
-                    else if (changes.collection_was_cleared) {
-                        m_logger->log(util::LogCategory::notification, util::Logger::Level::trace,
-                                      "   collection cleared");
-                    }
-                    else {
-                        auto log = [this](const char* change, const IndexSet& index_set) {
-                            if (auto cnt = index_set.count()) {
-                                std::ostringstream ostr;
-                                bool first = true;
-                                for (auto [a, b] : index_set) {
-                                    if (!first)
-                                        ostr << ',';
-                                    if (b > a + 1) {
-                                        ostr << '[' << a << ',' << b - 1 << ']';
-                                    }
-                                    else {
-                                        ostr << a;
-                                    }
-                                    first = false;
-                                }
-                                m_logger->log(util::LogCategory::notification, util::Logger::Level::trace,
-                                              "   %1 %2: %3", cnt, change, ostr.str().c_str());
-                            }
-                        };
-                        log("deletions", changes.deletions);
-                        log("insertions", changes.insertions);
-                        log("modifications", changes.modifications);
-                    }
-                }
-            }
-        }
+        log_changeset(m_logger.get(), changes, m_description, elapsed);
         cb.after(changes);
     });
 }
@@ -528,4 +536,25 @@ void NotifierPackage::after_advance()
 {
     for (auto& notifier : m_notifiers)
         notifier->after_advance();
+}
+
+NotifierRunLogger::NotifierRunLogger(util::Logger* logger, std::string_view name, std::string_view description)
+    : m_logger(logger)
+    , m_name(name)
+    , m_description(description)
+{
+    if (logger && logger->would_log(util::Logger::Level::debug)) {
+        m_logger = logger;
+        m_start = std::chrono::steady_clock::now();
+    }
+}
+
+NotifierRunLogger::~NotifierRunLogger()
+{
+    using namespace std::chrono;
+    if (m_logger) {
+        auto now = steady_clock::now();
+        m_logger->log(util::LogCategory::notification, util::Logger::Level::debug, "%1 %2 ran in %3 us", m_name,
+                      m_description, duration_cast<microseconds>(now - m_start).count());
+    }
 }

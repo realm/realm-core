@@ -385,7 +385,7 @@ bool Obj::update() const
     if (changes) {
         m_mem = new_obj.m_mem;
         m_row_ndx = new_obj.m_row_ndx;
-        CollectionParent::m_parent_version++;
+        ++m_version_counter;
     }
     // Always update versions
     m_storage_version = new_obj.m_storage_version;
@@ -402,14 +402,14 @@ inline bool Obj::_update_if_needed() const
     return false;
 }
 
-UpdateStatus Obj::update_if_needed_with_status() const
+UpdateStatus Obj::update_if_needed() const
 {
     if (!m_table) {
         // Table deleted
         return UpdateStatus::Detached;
     }
 
-    auto current_version = get_alloc().get_storage_version();
+    auto current_version = _get_alloc().get_storage_version();
     if (current_version != m_storage_version) {
         ClusterNode::State state = get_tree_top()->try_get(m_key);
 
@@ -423,11 +423,19 @@ UpdateStatus Obj::update_if_needed_with_status() const
         if ((m_mem.get_addr() != state.mem.get_addr()) || (m_row_ndx != state.index)) {
             m_mem = state.mem;
             m_row_ndx = state.index;
-            CollectionParent::m_parent_version++;
+            ++m_version_counter;
             return UpdateStatus::Updated;
         }
     }
     return UpdateStatus::NoChange;
+}
+
+void Obj::checked_update_if_needed() const
+{
+    if (update_if_needed() == UpdateStatus::Detached) {
+        m_table.check();
+        get_tree_top()->get(m_key); // should always throw
+    }
 }
 
 template <class T>
@@ -704,7 +712,7 @@ Obj Obj::_get_linked_object(ColKey link_col_key, Mixed link) const
 Obj Obj::get_parent_object() const
 {
     Obj obj;
-    update_if_needed();
+    checked_update_if_needed();
 
     if (!m_table->is_embedded()) {
         throw LogicError(ErrorCodes::TopLevelObject, "Object is not embedded");
@@ -747,7 +755,7 @@ size_t Obj::get_link_count(ColKey col_key) const
 
 bool Obj::is_null(ColKey col_key) const
 {
-    update_if_needed();
+    checked_update_if_needed();
     ColumnAttrMask attr = col_key.get_attrs();
     ColKey::Idx col_ndx = col_key.get_index();
     if (attr.test(col_attr_Nullable) && !attr.test(col_attr_Collection)) {
@@ -802,7 +810,7 @@ bool Obj::has_backlinks(bool only_strong_links) const
 
 size_t Obj::get_backlink_count() const
 {
-    update_if_needed();
+    checked_update_if_needed();
 
     size_t cnt = 0;
     m_table->for_each_backlink_column([&](ColKey backlink_col_key) {
@@ -814,7 +822,7 @@ size_t Obj::get_backlink_count() const
 
 size_t Obj::get_backlink_count(const Table& origin, ColKey origin_col_key) const
 {
-    update_if_needed();
+    checked_update_if_needed();
 
     size_t cnt = 0;
     if (TableKey origin_table_key = origin.get_key()) {
@@ -867,7 +875,7 @@ ObjKey Obj::get_backlink(ColKey backlink_col, size_t backlink_ndx) const
 
 std::vector<ObjKey> Obj::get_all_backlinks(ColKey backlink_col) const
 {
-    update_if_needed();
+    checked_update_if_needed();
 
     get_table()->check_column(backlink_col);
     Allocator& alloc = get_alloc();
@@ -1099,7 +1107,7 @@ StablePath Obj::get_stable_path() const noexcept
     return {};
 }
 
-void Obj::add_index(Path& path, const Index& index) const
+void Obj::add_index(Path& path, const CollectionParent::Index& index) const
 {
     if (path.empty()) {
         path.emplace_back(get_table()->get_column_key(index));
@@ -1151,7 +1159,7 @@ REALM_FORCEINLINE void Obj::sync(Node& arr)
 template <>
 Obj& Obj::set<Mixed>(ColKey col_key, Mixed value, bool is_default)
 {
-    update_if_needed();
+    checked_update_if_needed();
     get_table()->check_column(col_key);
     auto type = col_key.get_type();
     auto col_ndx = col_key.get_index();
@@ -1284,7 +1292,7 @@ Obj& Obj::set_any(ColKey col_key, Mixed value, bool is_default)
 template <>
 Obj& Obj::set<int64_t>(ColKey col_key, int64_t value, bool is_default)
 {
-    update_if_needed();
+    checked_update_if_needed();
     get_table()->check_column(col_key);
     auto col_ndx = col_key.get_index();
 
@@ -1328,7 +1336,7 @@ Obj& Obj::set<int64_t>(ColKey col_key, int64_t value, bool is_default)
 
 Obj& Obj::add_int(ColKey col_key, int64_t value)
 {
-    update_if_needed();
+    checked_update_if_needed();
     get_table()->check_column(col_key);
     auto col_ndx = col_key.get_index();
 
@@ -1406,7 +1414,7 @@ Obj& Obj::add_int(ColKey col_key, int64_t value)
 template <>
 Obj& Obj::set<ObjKey>(ColKey col_key, ObjKey target_key, bool is_default)
 {
-    update_if_needed();
+    checked_update_if_needed();
     get_table()->check_column(col_key);
     ColKey::Idx col_ndx = col_key.get_index();
     ColumnType type = col_key.get_type();
@@ -1460,7 +1468,7 @@ Obj& Obj::set<ObjKey>(ColKey col_key, ObjKey target_key, bool is_default)
 template <>
 Obj& Obj::set<ObjLink>(ColKey col_key, ObjLink target_link, bool is_default)
 {
-    update_if_needed();
+    checked_update_if_needed();
     get_table()->check_column(col_key);
     ColKey::Idx col_ndx = col_key.get_index();
     ColumnType type = col_key.get_type();
@@ -1504,7 +1512,7 @@ Obj& Obj::set<ObjLink>(ColKey col_key, ObjLink target_link, bool is_default)
 
 Obj Obj::create_and_set_linked_object(ColKey col_key, bool is_default)
 {
-    update_if_needed();
+    checked_update_if_needed();
     get_table()->check_column(col_key);
     ColKey::Idx col_ndx = col_key.get_index();
     ColumnType type = col_key.get_type();
@@ -1601,7 +1609,7 @@ inline void Obj::set_spec<ArrayString>(ArrayString& values, ColKey col_key)
 template <>
 Obj& Obj::set(ColKey col_key, Geospatial value, bool)
 {
-    update_if_needed();
+    checked_update_if_needed();
     get_table()->check_column(col_key);
     auto type = col_key.get_type();
 
@@ -1621,7 +1629,7 @@ Obj& Obj::set(ColKey col_key, Geospatial value, bool)
 template <>
 Obj& Obj::set(ColKey col_key, std::optional<Geospatial> value, bool)
 {
-    update_if_needed();
+    checked_update_if_needed();
     auto table = get_table();
     table->check_column(col_key);
     auto type = col_key.get_type();
@@ -1652,7 +1660,7 @@ Obj& Obj::set(ColKey col_key, std::optional<Geospatial> value, bool)
 template <class T>
 Obj& Obj::set(ColKey col_key, T value, bool is_default)
 {
-    update_if_needed();
+    checked_update_if_needed();
     get_table()->check_column(col_key);
     auto type = col_key.get_type();
     auto attrs = col_key.get_attrs();
@@ -1660,7 +1668,7 @@ Obj& Obj::set(ColKey col_key, T value, bool is_default)
 
     if (type != ColumnTypeTraits<T>::column_id)
         throw InvalidArgument(ErrorCodes::TypeMismatch,
-                              util::format("Property not a %1", ColumnTypeTraits<int64_t>::column_id));
+                              util::format("Property not a %1", ColumnTypeTraits<T>::column_id));
     if (value_is_null(value) && !attrs.test(col_attr_Nullable))
         throw NotNullable(Group::table_name_to_class_name(m_table->get_name()), m_table->get_column_name(col_key));
 
@@ -1705,7 +1713,7 @@ INSTANTIATE_OBJ_SET(UUID);
 
 void Obj::set_int(ColKey::Idx col_ndx, int64_t value)
 {
-    update_if_needed();
+    checked_update_if_needed();
 
     Allocator& alloc = get_alloc();
     alloc.bump_content_version();
@@ -1722,7 +1730,7 @@ void Obj::set_int(ColKey::Idx col_ndx, int64_t value)
 
 void Obj::set_ref(ColKey::Idx col_ndx, ref_type value, CollectionType type)
 {
-    update_if_needed();
+    checked_update_if_needed();
 
     Allocator& alloc = get_alloc();
     alloc.bump_content_version();
@@ -1957,14 +1965,14 @@ void Obj::handle_multiple_backlinks_during_schema_migration()
 
 LstBasePtr Obj::get_listbase_ptr(ColKey col_key) const
 {
-    auto list = CollectionParent::get_listbase_ptr(col_key);
+    auto list = CollectionParent::get_listbase_ptr(col_key, 0);
     list->set_owner(*this, col_key);
     return list;
 }
 
 SetBasePtr Obj::get_setbase_ptr(ColKey col_key) const
 {
-    auto set = CollectionParent::get_setbase_ptr(col_key);
+    auto set = CollectionParent::get_setbase_ptr(col_key, 0);
     set->set_owner(*this, col_key);
     return set;
 }
@@ -1972,7 +1980,7 @@ SetBasePtr Obj::get_setbase_ptr(ColKey col_key) const
 Dictionary Obj::get_dictionary(ColKey col_key) const
 {
     REALM_ASSERT(col_key.is_dictionary() || col_key.get_type() == col_type_Mixed);
-    update_if_needed();
+    checked_update_if_needed();
     return Dictionary(Obj(*this), col_key);
 }
 
@@ -1983,7 +1991,7 @@ Obj& Obj::set_collection(ColKey col_key, CollectionType type)
         (col_key.is_list() && type == CollectionType::List)) {
         return *this;
     }
-    update_if_needed();
+    checked_update_if_needed();
     Mixed new_val(0, type);
 
     if (type == CollectionType::Set) {
@@ -2023,7 +2031,7 @@ Obj& Obj::set_collection(ColKey col_key, CollectionType type)
         values.init_from_parent();
 
         values.set(m_row_ndx, new_val);
-        values.set_key(m_row_ndx, generate_key(0x10));
+        values.set_key(m_row_ndx, CollectionParent::generate_key(0x10));
 
         sync(fields);
 
@@ -2131,7 +2139,7 @@ CollectionPtr Obj::get_collection_by_stable_path(const StablePath& path) const
 CollectionBasePtr Obj::get_collection_ptr(ColKey col_key) const
 {
     if (col_key.is_collection()) {
-        auto collection = CollectionParent::get_collection_ptr(col_key);
+        auto collection = CollectionParent::get_collection_ptr(col_key, 0);
         collection->set_owner(*this, col_key);
         return collection;
     }
@@ -2357,7 +2365,7 @@ Obj& Obj::set_null(ColKey col_key, bool is_default)
                               m_table->get_column_name(col_key));
         }
 
-        update_if_needed();
+        checked_update_if_needed();
 
         SearchIndex* index = m_table->get_search_index(col_key);
         if (index && !m_key.is_unresolved()) {
@@ -2431,7 +2439,7 @@ ref_type Obj::Internal::get_ref(const Obj& obj, ColKey col_key)
     return to_ref(obj._get<int64_t>(col_key.get_index()));
 }
 
-ref_type Obj::get_collection_ref(Index index, CollectionType type) const
+ref_type Obj::get_collection_ref(StableIndex index, CollectionType type) const
 {
     if (index.is_collection()) {
         return to_ref(_get<int64_t>(index.get_index()));
@@ -2446,7 +2454,7 @@ ref_type Obj::get_collection_ref(Index index, CollectionType type) const
     throw StaleAccessor("This collection is no more");
 }
 
-bool Obj::check_collection_ref(Index index, CollectionType type) const noexcept
+bool Obj::check_collection_ref(StableIndex index, CollectionType type) const noexcept
 {
     if (index.is_collection()) {
         return true;
@@ -2457,13 +2465,87 @@ bool Obj::check_collection_ref(Index index, CollectionType type) const noexcept
     return false;
 }
 
-void Obj::set_collection_ref(Index index, ref_type ref, CollectionType type)
+void Obj::set_collection_ref(StableIndex index, ref_type ref, CollectionType type)
 {
     if (index.is_collection()) {
         set_int(index.get_index(), from_ref(ref));
         return;
     }
     set_ref(index.get_index(), ref, type);
+}
+
+void Obj::set_backlink(ColKey col_key, ObjLink new_link) const
+{
+    if (!new_link) {
+        return;
+    }
+
+    auto target_table = m_table->get_parent_group()->get_table(new_link.get_table_key());
+    ColKey backlink_col_key;
+    auto type = col_key.get_type();
+    if (type == col_type_TypedLink || type == col_type_Mixed || col_key.is_dictionary()) {
+        // This may modify the target table
+        backlink_col_key = target_table->find_or_add_backlink_column(col_key, m_table->get_key());
+        // it is possible that this was a link to the same table and that adding a backlink column has
+        // caused the need to update this object as well.
+        update_if_needed();
+    }
+    else {
+        backlink_col_key = m_table->get_opposite_column(col_key);
+    }
+    auto obj_key = new_link.get_obj_key();
+    auto target_obj =
+        obj_key.is_unresolved() ? target_table->try_get_tombstone(obj_key) : target_table->try_get_object(obj_key);
+    if (!target_obj) {
+        throw InvalidArgument(ErrorCodes::KeyNotFound, "Target object not found");
+    }
+    target_obj.add_backlink(backlink_col_key, m_key);
+}
+
+bool Obj::replace_backlink(ColKey col_key, ObjLink old_link, ObjLink new_link, CascadeState& state) const
+{
+    bool recurse = remove_backlink(col_key, old_link, state);
+    set_backlink(col_key, new_link);
+    return recurse;
+}
+
+bool Obj::remove_backlink(ColKey col_key, ObjLink old_link, CascadeState& state) const
+{
+    if (!old_link) {
+        return false;
+    }
+
+    REALM_ASSERT(m_table->valid_column(col_key));
+    ObjKey old_key = old_link.get_obj_key();
+    auto target_obj = m_table->get_parent_group()->get_object(old_link);
+    TableRef target_table = target_obj.get_table();
+    ColKey backlink_col_key;
+    auto type = col_key.get_type();
+    if (type == col_type_TypedLink || type == col_type_Mixed || col_key.is_dictionary()) {
+        backlink_col_key = target_table->find_or_add_backlink_column(col_key, m_table->get_key());
+    }
+    else {
+        backlink_col_key = m_table->get_opposite_column(col_key);
+    }
+
+    bool strong_links = target_table->is_embedded();
+    bool is_unres = old_key.is_unresolved();
+
+    bool last_removed = target_obj.remove_one_backlink(backlink_col_key, m_key); // Throws
+    if (is_unres) {
+        if (last_removed) {
+            // Check is there are more backlinks
+            if (!target_obj.has_backlinks(false)) {
+                // Tombstones can be erased right away - there is no cascading effect
+                target_table->m_tombstones->erase(old_key, state);
+            }
+        }
+    }
+    else {
+        return state.enqueue_for_cascade(target_obj, strong_links, last_removed);
+    }
+
+    return false;
 }
 
 } // namespace realm

@@ -112,7 +112,6 @@ RLM_API realm_dictionary_t* realm_list_set_dictionary(realm_list_t* list, size_t
     return wrap_err([&]() {
         list->set_collection(index, CollectionType::Dictionary);
         return new realm_dictionary_t{list->get_dictionary(index)};
-        ;
     });
 }
 

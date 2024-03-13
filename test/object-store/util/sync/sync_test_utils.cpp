@@ -175,6 +175,23 @@ ExpectedRealmPaths::ExpectedRealmPaths(const std::string& base_path, const std::
     legacy_sync_path = (dir_builder / cleaned_partition).string();
 }
 
+std::string unquote_string(std::string_view possibly_quoted_string)
+{
+    if (possibly_quoted_string.size() > 0) {
+        auto check_char = possibly_quoted_string.front();
+        if (check_char == '"' || check_char == '\'') {
+            possibly_quoted_string.remove_prefix(1);
+        }
+    }
+    if (possibly_quoted_string.size() > 0) {
+        auto check_char = possibly_quoted_string.back();
+        if (check_char == '"' || check_char == '\'') {
+            possibly_quoted_string.remove_suffix(1);
+        }
+    }
+    return std::string{possibly_quoted_string};
+}
+
 #if REALM_ENABLE_SYNC
 
 void subscribe_to_all_and_bootstrap(Realm& realm)
@@ -205,37 +222,23 @@ void wait_for_sessions_to_close(const TestAppSession& test_app_session)
         std::chrono::minutes(5), std::chrono::milliseconds(100));
 }
 
-static std::string unquote_string(std::string_view possibly_quoted_string)
+std::string get_compile_time_base_url()
 {
-    if (possibly_quoted_string.size() > 0) {
-        auto check_char = possibly_quoted_string.front();
-        if (check_char == '"' || check_char == '\'') {
-            possibly_quoted_string.remove_prefix(1);
-        }
-    }
-    if (possibly_quoted_string.size() > 0) {
-        auto check_char = possibly_quoted_string.back();
-        if (check_char == '"' || check_char == '\'') {
-            possibly_quoted_string.remove_suffix(1);
-        }
-    }
-    return std::string{possibly_quoted_string};
-}
-
 #ifdef REALM_MONGODB_ENDPOINT
-std::string get_base_url()
-{
     // allows configuration with or without quotes
     return unquote_string(REALM_QUOTE(REALM_MONGODB_ENDPOINT));
+#else
+    return {};
+#endif
 }
 
-std::string get_admin_url()
+std::string get_compile_time_admin_url()
 {
 #ifdef REALM_ADMIN_ENDPOINT
     // allows configuration with or without quotes
     return unquote_string(REALM_QUOTE(REALM_ADMIN_ENDPOINT));
 #else
-    return get_base_url();
+    return {};
 #endif
 }
 #endif // REALM_MONGODB_ENDPOINT
@@ -315,8 +318,6 @@ void async_open_realm(const Realm::Config& config,
     task->cancel(); // don't run the above notifier again on this session
     finish(std::move(tsr), err);
 }
-
-#endif // REALM_ENABLE_SYNC
 
 class TestHelper {
 public:
@@ -561,9 +562,11 @@ struct BaasClientReset : public TestClientReset {
         //
         // So just don't try to do anything until initial sync is done and we're sure the server is in a stable
         // state.
-        timed_sleeping_wait_for([&] {
-            return app_session.admin_api.is_initial_sync_complete(app_session.server_app_id);
-        });
+        timed_sleeping_wait_for(
+            [&] {
+                return app_session.admin_api.is_initial_sync_complete(app_session.server_app_id);
+            },
+            std::chrono::seconds(30), std::chrono::seconds(1));
 
         auto realm = Realm::get_shared_realm(m_local_config);
         auto session = sync_manager->get_existing_session(realm->config().path);

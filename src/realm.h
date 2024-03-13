@@ -954,33 +954,6 @@ RLM_API realm_scheduler_t* realm_scheduler_make_default(void);
 RLM_API const realm_scheduler_t* realm_scheduler_get_frozen(void);
 
 /**
- * Returns true if there is a default scheduler implementation for the current
- * platform, or one has been set with `realm_scheduler_set_default_factory()`.
- *
- * If there is no default factory, and no scheduler is provided in the config,
- * `realm_open()` will fail. Note that `realm_scheduler_get_frozen()` always
- * returns a valid scheduler.
- *
- * This function is thread-safe, and cannot fail.
- */
-RLM_API bool realm_scheduler_has_default_factory(void);
-
-/**
- * For platforms with no default scheduler implementation, register a factory
- * function which can produce custom schedulers. If there is a platform-specific
- * scheduler, this function will fail. If a custom scheduler is desired for
- * platforms that already have a default scheduler implementation, the caller
- * must call `realm_open()` with a config that indicates the desired scheduler.
- *
- * The provided callback may produce a scheduler by calling
- * `realm_scheduler_new()`.
- *
- * This function is thread-safe, but should generally only be called once.
- */
-RLM_API bool realm_scheduler_set_default_factory(realm_userdata_t userdata, realm_free_userdata_func_t userdata_free,
-                                                 realm_scheduler_default_factory_func_t);
-
-/**
  * Open a Realm file.
  *
  * @param config Realm configuration. If the Realm is already opened on another

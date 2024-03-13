@@ -63,9 +63,7 @@ struct StringMaker<object_store::Dictionary> {
 namespace cf = realm::collection_fixtures;
 
 TEST_CASE("nested dictionary in mixed", "[dictionary]") {
-
     InMemoryTestFile config;
-    config.cache = false;
     config.automatic_change_notifications = false;
     config.schema = Schema{{"any_collection", {{"any", PropertyType::Mixed | PropertyType::Nullable}}}};
 
