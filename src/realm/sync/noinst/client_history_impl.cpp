@@ -38,7 +38,7 @@
 
 namespace realm::sync {
 
-void ClientHistory::set_client_reset_adjustments(
+void ClientHistory::set_history_adjustments(
     util::Logger& logger, version_type current_version, SaltedFileIdent client_file_ident,
     SaltedVersion server_version, const std::vector<_impl::client_reset::RecoveredChange>& recovered_changesets)
 {
@@ -53,7 +53,7 @@ void ClientHistory::set_client_reset_adjustments(
     size_t uploadable_bytes = 0;
     if (recovered_changesets.empty()) {
         // Either we had nothing to upload or we're discarding the unsynced changes
-        logger.debug("Client reset adjustments: discarding %1 history entries", sync_history_size());
+        logger.debug("History adjustments: discarding %1 history entries", sync_history_size());
         do_trim_sync_history(sync_history_size()); // Throws
     }
     else {
@@ -66,7 +66,7 @@ void ClientHistory::set_client_reset_adjustments(
         do_trim_sync_history(discard_count);
 
         if (logger.would_log(util::Logger::Level::debug)) {
-            logger.debug("Client reset adjustments: trimming %1 history entries and updating the remaining history "
+            logger.debug("History adjustments: trimming %1 history entries and updating the remaining history "
                          "entries (%2)",
                          discard_count, sync_history_size());
             for (size_t i = 0, size = m_arrays->changesets.size(); i < size; ++i) {
@@ -94,7 +94,7 @@ void ClientHistory::set_client_reset_adjustments(
                          m_arrays->changesets.get(i).size(), server_version.version);
         }
     }
-    logger.debug("New uploadable bytes after client reset adjustment: %1", uploadable_bytes);
+    logger.debug("New uploadable bytes after history adjustment: %1", uploadable_bytes);
 
     // Client progress versions are set to 0 to signal to the server that we've
     // reset our versioning. If we send the actual values, the server would

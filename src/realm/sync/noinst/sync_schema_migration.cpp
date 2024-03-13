@@ -17,6 +17,8 @@
  **************************************************************************/
 
 #include <realm/sync/noinst/sync_schema_migration.hpp>
+#include <realm/sync/noinst/client_history_impl.hpp>
+#include <realm/sync/noinst/client_reset_recovery.hpp>
 
 #include <realm/exceptions.hpp>
 
@@ -34,6 +36,13 @@ constexpr static std::string_view s_version_column_name("version");
 constexpr static std::string_view s_timestamp_col_name("event_time");
 constexpr static std::string_view s_previous_schema_version_col_name("previous_schema_version");
 constexpr int64_t metadata_version = 1;
+
+static void remove_pending_schema_migration(Transaction& wt)
+{
+    if (auto table = wt.get_table(s_meta_schema_migration_table_name); table && !table->is_empty()) {
+        table->clear();
+    }
+}
 
 std::optional<uint64_t> has_pending_migration(const Transaction& rt)
 {
@@ -104,6 +113,38 @@ void track_sync_schema_migration(Transaction& wt, uint64_t previous_schema_versi
                              schema_version, previous_schema_version));
         }
     }
+}
+
+void perform_schema_migration(DB& db, sync::SubscriptionStore& store)
+{
+    auto tr = db.start_write();
+
+    // Delete all public tables (and their columns).
+    const bool ignore_backlinks = true;
+    for (const auto& tk : tr->get_table_keys()) {
+        // Do not remove the metadata tables
+        if (!tr->table_is_public(tk)) {
+            continue;
+        }
+        tr->remove_table(tk, ignore_backlinks);
+    }
+
+    // Clear sync history, reset the file ident and the server version in the download and upload progress.
+    auto& repl = dynamic_cast<sync::ClientReplication&>(*db.get_replication());
+    auto& history = repl.get_history();
+    sync::SaltedFileIdent reset_file_ident{0, 0};
+    sync::SaltedVersion reset_server_version{0, 0};
+    std::vector<_impl::client_reset::RecoveredChange> changes{};
+    history.set_history_adjustments(*db.get_logger(), tr->get_version(), reset_file_ident, reset_server_version,
+                                    changes);
+
+    // Reset the subscription store (it initializes it with the zeroth subscription set).
+    store.reset(*tr);
+
+    // Mark the migration complete.
+    remove_pending_schema_migration(*tr);
+
+    tr->commit();
 }
 
 } // namespace realm::_impl::sync_schema_migration

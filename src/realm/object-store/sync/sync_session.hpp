@@ -297,7 +297,10 @@ public:
             return session.m_db;
         }
 
-        static util::Future<void> pause_async(SyncSession& session);
+        static void migrate_schema(SyncSession& session, util::UniqueFunction<void(Status)>&& callback)
+        {
+            session.migrate_schema(std::move(callback));
+        }
     };
 
     // Expose some internal functionality to testing code.
@@ -410,6 +413,7 @@ private:
         REQUIRES(!m_connection_state_mutex);
     void become_paused(util::CheckedUniqueLock) RELEASE(m_state_mutex) REQUIRES(!m_connection_state_mutex);
     void become_waiting_for_access_token() REQUIRES(m_state_mutex);
+    util::Future<void> pause_async() REQUIRES(!m_state_mutex, !m_connection_state_mutex);
 
     // do restart session restarts the session without freeing any of the waiters
     void do_restart_session(util::CheckedUniqueLock)
@@ -430,6 +434,9 @@ private:
     std::optional<std::string> get_sync_route() const REQUIRES(!m_state_mutex);
 
     util::Future<std::string> send_test_command(std::string body) REQUIRES(!m_state_mutex);
+
+    void migrate_schema(util::UniqueFunction<void(Status)>&& callback)
+        REQUIRES(!m_state_mutex, !m_config_mutex, !m_connection_state_mutex);
 
     std::function<TransactionCallback> m_sync_transact_callback GUARDED_BY(m_state_mutex);
 
@@ -497,6 +504,7 @@ private:
 
     // Set if ProtocolError::schema_version_changed error is received from the server.
     std::optional<uint64_t> m_previous_schema_version GUARDED_BY(m_state_mutex);
+    bool m_schema_migration_in_progress GUARDED_BY(m_state_mutex) = false;
 };
 
 } // namespace realm

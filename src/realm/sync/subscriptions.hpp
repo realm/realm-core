@@ -361,7 +361,7 @@ public:
     // Reset SubscriptionStore and erase all current subscriptions and supersede any pending
     // subscriptions. Must be called from the event loop thread to prevent data race issues
     // with the subscription store.
-    void terminate() REQUIRES(!m_pending_notifications_mutex);
+    void reset(Transaction& wt) REQUIRES(!m_pending_notifications_mutex);
 
     // Recreate the active subscription set, marking any newer pending ones as
     // superseded. This is a no-op if there are no pending subscription sets.
@@ -394,9 +394,10 @@ private:
     SubscriptionSet get_refreshed(ObjKey, int64_t flx_version, std::optional<DB::VersionID> version = util::none);
     MutableSubscriptionSet make_mutable_copy(const SubscriptionSet& set);
 
-    // Ensure the subscriptions table is properly initialized
-    // If clear_table is true, the subscriptions table will be cleared before initialization
-    void initialize_subscriptions_table(TransactionRef&& tr, bool clear_table);
+    // Ensure the subscriptions table is properly initialized. No-op if already initialized.
+    void initialize_subscriptions_table(TransactionRef&& tr);
+    // Clear the table and reinitialize it.
+    void clear(Transaction& wt);
 
     friend class MutableSubscriptionSet;
     friend class Subscription;
