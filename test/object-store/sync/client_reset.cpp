@@ -23,6 +23,9 @@
 #include <util/test_utils.hpp>
 #include <util/sync/baas_admin_api.hpp>
 #include <util/sync/sync_test_utils.hpp>
+#if REALM_ENABLE_AUTH_TESTS
+#include <util/sync/flx_sync_harness.hpp>
+#endif
 
 #include <realm/object-store/thread_safe_reference.hpp>
 #include <realm/object-store/util/scheduler.hpp>
@@ -4357,12 +4360,23 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                                 {"any_mixed", PropertyType::Mixed | PropertyType::Nullable},
                             }}};
 
+#if REALM_ENABLE_AUTH_TESTS
+    realm::app::FLXSyncTestHarness harness("flx_client_reset");
+    auto make_client_reset = [&harness](const auto& config1, const auto& config2) {
+        return realm::reset_utils::make_baas_flx_client_reset(config1, config2, harness.session());
+    };
+#else
+    auto make_client_reset = [](const auto& config1, const auto& config2) {
+        return realm::reset_utils::make_fake_local_client_reset(config1, config2);
+    };
+#endif
+
     SECTION("add nested collection locally") {
         ObjectId pk_val = ObjectId::gen();
         SyncTestFile config2(oas.app()->current_user(), "default");
         config2.schema = Schema{shared_class};
 
-        auto test_reset = reset_utils::make_fake_local_client_reset(config, config2);
+        auto test_reset = make_client_reset(config, config2);
         test_reset->make_local_changes([&](SharedRealm local) {
             advance_and_notify(*local);
             TableRef table = get_table(*local, "TopLevel");
@@ -4403,7 +4417,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
         SyncTestFile config2(oas.app()->current_user(), "default");
         config2.schema = config.schema;
         config.schema = Schema{shared_class};
-        auto test_reset = reset_utils::make_fake_local_client_reset(config, config2);
+        auto test_reset = make_client_reset(config, config2);
 
         test_reset
             ->make_remote_changes([&](SharedRealm remote) {
@@ -4455,7 +4469,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
         SyncTestFile config2(oas.app()->current_user(), "default");
         config2.schema = config.schema;
         config.schema = Schema{shared_class};
-        auto test_reset = reset_utils::make_fake_local_client_reset(config, config2);
+        auto test_reset = make_client_reset(config, config2);
         test_reset
             ->make_remote_changes([&](SharedRealm remote) {
                 advance_and_notify(*remote);
@@ -4505,7 +4519,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
         ObjectId pk_val = ObjectId::gen();
         SyncTestFile config2(oas.app()->current_user(), "default");
         config2.schema = config.schema;
-        auto test_reset = reset_utils::make_fake_local_client_reset(config, config2);
+        auto test_reset = make_client_reset(config, config2);
         test_reset
             ->make_local_changes([&](SharedRealm local) {
                 advance_and_notify(*local);
@@ -4554,7 +4568,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
         ObjectId pk_val = ObjectId::gen();
         SyncTestFile config2(oas.app()->current_user(), "default");
         config2.schema = config.schema;
-        auto test_reset = reset_utils::make_fake_local_client_reset(config, config2);
+        auto test_reset = make_client_reset(config, config2);
         test_reset
             ->make_local_changes([&](SharedRealm local) {
                 advance_and_notify(*local);
@@ -4615,7 +4629,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
         ObjectId pk_val = ObjectId::gen();
         SyncTestFile config2(oas.app()->current_user(), "default");
         config2.schema = config.schema;
-        auto test_reset = reset_utils::make_fake_local_client_reset(config, config2);
+        auto test_reset = make_client_reset(config, config2);
         test_reset
             ->make_local_changes([&](SharedRealm local) {
                 advance_and_notify(*local);
@@ -4684,7 +4698,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
         ObjectId pk_val = ObjectId::gen();
         SyncTestFile config2(oas.app()->current_user(), "default");
         config2.schema = config.schema;
-        auto test_reset = reset_utils::make_fake_local_client_reset(config, config2);
+        auto test_reset = make_client_reset(config, config2);
         test_reset
             ->make_local_changes([&](SharedRealm local) {
                 advance_and_notify(*local);
@@ -4760,7 +4774,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
         ObjectId pk_val = ObjectId::gen();
         SyncTestFile config2(oas.app()->current_user(), "default");
         config2.schema = config.schema;
-        auto test_reset = reset_utils::make_fake_local_client_reset(config, config2);
+        auto test_reset = make_client_reset(config, config2);
         test_reset
             ->make_local_changes([&](SharedRealm local) {
                 advance_and_notify(*local);
@@ -4811,7 +4825,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
         ObjectId pk_val = ObjectId::gen();
         SyncTestFile config2(oas.app()->current_user(), "default");
         config2.schema = config.schema;
-        auto test_reset = reset_utils::make_fake_local_client_reset(config, config2);
+        auto test_reset = make_client_reset(config, config2);
         test_reset
             ->setup([&](SharedRealm realm) {
                 auto table = get_table(*realm, "TopLevel");
@@ -4879,7 +4893,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
         ObjectId pk_val = ObjectId::gen();
         SyncTestFile config2(oas.app()->current_user(), "default");
         config2.schema = config.schema;
-        auto test_reset = reset_utils::make_fake_local_client_reset(config, config2);
+        auto test_reset = make_client_reset(config, config2);
         test_reset
             ->setup([&](SharedRealm realm) {
                 auto table = get_table(*realm, "TopLevel");
@@ -4940,7 +4954,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
         ObjectId pk_val = ObjectId::gen();
         SyncTestFile config2(oas.app()->current_user(), "default");
         config2.schema = config.schema;
-        auto test_reset = reset_utils::make_fake_local_client_reset(config, config2);
+        auto test_reset = make_client_reset(config, config2);
         test_reset
             ->setup([&](SharedRealm realm) {
                 auto table = get_table(*realm, "TopLevel");
@@ -5017,7 +5031,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
         ObjectId pk_val = ObjectId::gen();
         SyncTestFile config2(oas.app()->current_user(), "default");
         config2.schema = config.schema;
-        auto test_reset = reset_utils::make_fake_local_client_reset(config, config2);
+        auto test_reset = make_client_reset(config, config2);
         test_reset
             ->setup([&](SharedRealm realm) {
                 auto table = get_table(*realm, "TopLevel");
@@ -5075,7 +5089,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
         ObjectId pk_val = ObjectId::gen();
         SyncTestFile config2(oas.app()->current_user(), "default");
         config2.schema = config.schema;
-        auto test_reset = reset_utils::make_fake_local_client_reset(config, config2);
+        auto test_reset = make_client_reset(config, config2);
         test_reset
             ->setup([&](SharedRealm realm) {
                 auto table = get_table(*realm, "TopLevel");
@@ -5146,7 +5160,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
         ObjectId pk_val = ObjectId::gen();
         SyncTestFile config2(oas.app()->current_user(), "default");
         config2.schema = config.schema;
-        auto test_reset = reset_utils::make_fake_local_client_reset(config, config2);
+        auto test_reset = make_client_reset(config, config2);
         test_reset
             ->setup([&](SharedRealm realm) {
                 auto table = get_table(*realm, "TopLevel");
@@ -5205,7 +5219,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
         ObjectId pk_val = ObjectId::gen();
         SyncTestFile config2(oas.app()->current_user(), "default");
         config2.schema = config.schema;
-        auto test_reset = reset_utils::make_fake_local_client_reset(config, config2);
+        auto test_reset = make_client_reset(config, config2);
         test_reset
             ->setup([&](SharedRealm realm) {
                 auto table = get_table(*realm, "TopLevel");
@@ -5292,7 +5306,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
         ObjectId pk_val = ObjectId::gen();
         SyncTestFile config2(oas.app()->current_user(), "default");
         config2.schema = config.schema;
-        auto test_reset = reset_utils::make_fake_local_client_reset(config, config2);
+        auto test_reset = make_client_reset(config, config2);
         test_reset
             ->setup([&](SharedRealm realm) {
                 auto table = get_table(*realm, "TopLevel");
@@ -5357,7 +5371,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
         ObjectId pk_val = ObjectId::gen();
         SyncTestFile config2(oas.app()->current_user(), "default");
         config2.schema = config.schema;
-        auto test_reset = reset_utils::make_fake_local_client_reset(config, config2);
+        auto test_reset = make_client_reset(config, config2);
         test_reset
             ->setup([&](SharedRealm realm) {
                 auto table = get_table(*realm, "TopLevel");
@@ -5503,7 +5517,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
         ObjectId pk_val = ObjectId::gen();
         SyncTestFile config2(oas.app()->current_user(), "default");
         config2.schema = config.schema;
-        auto test_reset = reset_utils::make_fake_local_client_reset(config, config2);
+        auto test_reset = make_client_reset(config, config2);
         test_reset
             ->setup([&](SharedRealm realm) {
                 auto table = get_table(*realm, "TopLevel");
@@ -5648,7 +5662,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
         ObjectId pk_val = ObjectId::gen();
         SyncTestFile config2(oas.app()->current_user(), "default");
         config2.schema = config.schema;
-        auto test_reset = reset_utils::make_fake_local_client_reset(config, config2);
+        auto test_reset = make_client_reset(config, config2);
         test_reset
             ->setup([&](SharedRealm realm) {
                 auto table = get_table(*realm, "TopLevel");
@@ -5796,7 +5810,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
         ObjectId pk_val = ObjectId::gen();
         SyncTestFile config2(oas.app()->current_user(), "default");
         config2.schema = config.schema;
-        auto test_reset = reset_utils::make_fake_local_client_reset(config, config2);
+        auto test_reset = make_client_reset(config, config2);
         test_reset
             ->setup([&](SharedRealm realm) {
                 auto table = get_table(*realm, "TopLevel");
