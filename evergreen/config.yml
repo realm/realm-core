@@ -23,13 +23,15 @@ functions:
           set -o pipefail
           set -o verbose
 
-          if [[ "$OS" = "Windows_NT" ]]; then
-            curl -LsSo cmake_binaries.zip ${cmake_url}
-            unzip -q cmake_binaries.zip
-          else
-            mkdir cmake_binaries && cd cmake_binaries
-            curl -LsS ${cmake_url} | tar -xz --strip-components=1
-            cd ..
+          if [[ -n "${cmake_url}" ]]; then
+            if [[ "$OS" = "Windows_NT" ]]; then
+              curl -LsSo cmake_binaries.zip ${cmake_url}
+              unzip -q cmake_binaries.zip
+            else
+              mkdir cmake_binaries && cd cmake_binaries
+              curl -LsS ${cmake_url} | tar -xz --strip-components=1
+              cd ..
+            fi
           fi
 
           if [[ -n "${clang_url|}" ]]; then
@@ -63,7 +65,11 @@ functions:
           fi
           export CMAKE_VARS_DIR=$(./evergreen/abspath.sh cmake_vars)
           source evergreen/cmake_vars_utils.sh
-          export CMAKE=$(./evergreen/abspath.sh ${cmake_bindir}/cmake)
+          if [[ -n "${cmake_bindir|}" ]]; then
+              export CMAKE=$(./evergreen/abspath.sh "${cmake_bindir}/cmake")
+          else
+              export CMAKE=cmake
+          fi
 
           if [ -n "${xcode_developer_dir}" ]; then
               export DEVELOPER_DIR="${xcode_developer_dir}"
@@ -71,11 +77,11 @@ functions:
 
           if [ -n "${c_compiler}" ]; then
               [ -n "${cxx_compiler}" ] || (echo "C compiler defined as  but C++ compiler is undefined"; exit 1)
-              set_cmake_var compiler_vars CMAKE_C_COMPILER PATH $(./evergreen/abspath.sh ${c_compiler})
-              set_cmake_var compiler_vars CMAKE_CXX_COMPILER PATH $(./evergreen/abspath.sh ${cxx_compiler})
+              set_cmake_var compiler_vars CMAKE_C_COMPILER PATH $(./evergreen/abspath.sh "${c_compiler}")
+              set_cmake_var compiler_vars CMAKE_CXX_COMPILER PATH $(./evergreen/abspath.sh "${cxx_compiler}")
           fi
 
-          if [ -z "${disable_tests_against_baas|}" ]; then
+          if [ -z "${disable_tests_against_baas|}" && -z "${no_tests|}" ]; then
               scheme="http"
               set_cmake_var baas_vars REALM_ENABLE_AUTH_TESTS BOOL On
               if [ -n "${baas_admin_port|}" ]; then
@@ -152,7 +158,7 @@ functions:
             set_cmake_var realm_vars CMAKE_GENERATOR_PLATFORM STRING "${cmake_generator_platform}"
           fi
 
-          if [ -n "${curl_base|}" ]; then
+          if [ -n "${curl_base|}" && -z "${no_tests|}" ]; then
               set_cmake_var curl_vars CURL_LIBRARY PATH "$(./evergreen/abspath.sh ${curl_base}/lib/libcurl.dll.a)"
               set_cmake_var curl_vars CURL_INCLUDE_DIR PATH "$(./evergreen/abspath.sh ${curl_base}/include)"
               set_cmake_var baas_vars REALM_CURL_CACERTS PATH "$(./evergreen/abspath.sh "${curl_base}/bin/curl-ca-bundle.crt")"
@@ -164,7 +170,7 @@ functions:
           cat cmake_vars/*.txt | tee cmake_vars.txt
           echo
 
-          $CMAKE \
+          "$CMAKE" \
             -B build \
             -C cmake_vars.txt ${extra_flags} \
             -G "$GENERATOR"
@@ -173,7 +179,7 @@ functions:
               target="--target ${target_to_build|}"
           fi
 
-          ${cmake_bindir}/cmake \
+          "$CMAKE" \
               --build build \
               --config ${cmake_build_type|Debug} \
               -j ${max_jobs|$(grep -c proc /proc/cpuinfo)} \
@@ -221,7 +227,11 @@ functions:
         script: |-
           set -o errexit
           set -o verbose
-          CTEST=$(pwd)/${cmake_bindir}/ctest
+          if [[ -n "${cmake_bindir|}" ]]; then
+              CTEST=$(./evergreen/abspath.sh "${cmake_bindir}/ctest")
+          else
+              CTEST=ctest
+          fi
 
           if [ -n "${xcode_developer_dir}" ]; then
               export DEVELOPER_DIR="${xcode_developer_dir}"
@@ -292,7 +302,7 @@ functions:
           export UBSAN_OPTIONS="print_stacktrace=1"
 
           cd build
-          if ! $CTEST -C ${cmake_build_type|Debug} $TEST_FLAGS; then
+          if ! "$CTEST" -C ${cmake_build_type|Debug} $TEST_FLAGS; then
             BAAS_PID=$(pgrep baas_server)
             if [[ -n "$BAAS_PID" ]]; then
               echo "Dumping baas to log file"
@@ -1321,6 +1331,20 @@ task_groups:
   tasks:
   - fuzzer
 
+- name: compile_only
+  max_hosts: 1
+  setup_group_can_fail_task: true
+  setup_group:
+  - func: "fetch source"
+  - func: "fetch binaries"
+  teardown_task:
+  - func: "upload test results"
+  - func: "upload baas artifacts"
+  timeout:
+  - func: "run hang analyzer"
+  tasks:
+  - compile
+
 buildvariants:
 - name: ubuntu2004
   display_name: "Ubuntu 20.04 x86_64 (Clang 11)"
@@ -1797,8 +1821,7 @@ buildvariants:
   display_name: "Windows x86_64 (VS 2019)"
   run_on: windows-vsCurrent-large
   expansions:
-    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.26.3-windows-x86_64.zip"
-    cmake_bindir: "./cmake-3.26.3-windows-x86_64/bin"
+    cmake_bindir: "/cygdrive/c/Program Files/CMake/bin"
     cmake_generator: "Visual Studio 16 2019"
     extra_flags: "-A x64"
     max_jobs: $(($(grep -c proc /proc/cpuinfo) / 2))
@@ -1812,8 +1835,7 @@ buildvariants:
   display_name: "Windows x86_64 (Encryption enabled)"
   run_on: windows-vsCurrent-large
   expansions:
-    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.26.3-windows-x86_64.zip"
-    cmake_bindir: "./cmake-3.26.3-windows-x86_64/bin"
+    cmake_bindir: "/cygdrive/c/Program Files/CMake/bin"
     cmake_generator: "Visual Studio 16 2019"
     extra_flags: "-A x64"
     max_jobs: $(($(grep -c proc /proc/cpuinfo) / 2))
@@ -1828,8 +1850,7 @@ buildvariants:
   display_name: "Windows x86_64 (VS 2019 Release build)"
   run_on: windows-vsCurrent-large
   expansions:
-    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.26.3-windows-x86_64.zip"
-    cmake_bindir: "./cmake-3.26.3-windows-x86_64/bin"
+    cmake_bindir: "/cygdrive/c/Program Files/CMake/bin"
     cmake_generator: "Visual Studio 16 2019"
     extra_flags: "-A x64"
     cmake_build_type: "Release"
@@ -1845,8 +1866,7 @@ buildvariants:
   display_name: "Windows x86_64 (VS 2019 ASAN)"
   run_on: windows-vsCurrent-large
   expansions:
-    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.26.3-windows-x86_64.zip"
-    cmake_bindir: "./cmake-3.26.3-windows-x86_64/bin"
+    cmake_bindir: "/cygdrive/c/Program Files/CMake/bin"
     cmake_generator: "Visual Studio 16 2019"
     extra_flags: "-A x64"
     cmake_build_type: "Debug"
@@ -1862,8 +1882,7 @@ buildvariants:
   display_name: "Windows X86 (Release)"
   run_on: windows-vsCurrent-large
   expansions:
-    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.26.3-windows-x86_64.zip"
-    cmake_bindir: "./cmake-3.26.3-windows-x86_64/bin"
+    cmake_bindir: "/cygdrive/c/Program Files/CMake/bin"
     cmake_generator: "Visual Studio 16 2019"
     cmake_generator_platform: "Win32"
     cmake_build_type: "Release"
@@ -1874,3 +1893,49 @@ buildvariants:
   tasks:
   - name: compile_local_tests
 
+- name: windows-arm64-uwp
+  display_name: "Windows ARM64 (UWP)"
+  run_on: windows-vsCurrent-large
+  expansions:
+    cmake_bindir: "/cygdrive/c/Program Files/CMake/bin/"
+    cmake_generator: "Visual Studio 16 2019"
+    cmake_generator_platform: "ARM64"
+    cmake_build_type: "Debug"
+    extra_flags: -DCMAKE_SYSTEM_NAME=WindowsStore -DCMAKE_SYSTEM_VERSION=10.0
+    max_jobs: $(($(grep -c proc /proc/cpuinfo) / 2))
+    fetch_missing_dependencies: On
+    python3: "/cygdrive/c/python/python37/python.exe"
+    no_tests: On
+  tasks:
+  - name: compile_only
+
+- name: windows-x86-uwp
+  display_name: "Windows X86 (UWP)"
+  run_on: windows-vsCurrent-large
+  expansions:
+    cmake_bindir: "/cygdrive/c/Program Files/CMake/bin/"
+    cmake_generator: "Visual Studio 16 2019"
+    cmake_generator_platform: "Win32"
+    cmake_build_type: "Debug"
+    extra_flags: -DCMAKE_SYSTEM_NAME=WindowsStore -DCMAKE_SYSTEM_VERSION=10.0
+    max_jobs: $(($(grep -c proc /proc/cpuinfo) / 2))
+    fetch_missing_dependencies: On
+    python3: "/cygdrive/c/python/python37/python.exe"
+    no_tests: On
+  tasks:
+  - name: compile_only
+
+- name: windows-arm64
+  display_name: "Windows ARM64"
+  run_on: windows-vsCurrent-large
+  expansions:
+    cmake_bindir: "/cygdrive/c/Program Files/CMake/bin/"
+    cmake_generator: "Visual Studio 16 2019"
+    cmake_generator_platform: "ARM64"
+    cmake_build_type: "Debug"
+    max_jobs: $(($(grep -c proc /proc/cpuinfo) / 2))
+    fetch_missing_dependencies: On
+    python3: "/cygdrive/c/python/python37/python.exe"
+    no_tests: on
+  tasks:
+  - name: compile_only
