@@ -44,11 +44,9 @@ public:
     }
 
 protected:
-    void do_log(const util::LogCategory&, Logger::Level level, const std::string& message) final
+    void do_log(const util::LogCategory& category, Logger::Level level, const std::string& message) final
     {
-
-        // FIXME use category
-        m_log_callback(m_userdata.get(), realm_log_level_e(level), message.c_str());
+        m_log_callback(m_userdata.get(), category.get_name().c_str(), realm_log_level_e(level), message.c_str());
     }
 
 private:
