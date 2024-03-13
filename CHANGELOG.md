@@ -16,7 +16,8 @@
 -----------
 
 ### Internals
-* None.
+* The CMake option `REALM_MONGODB_ENDPOINT` for running the object-store-tests against baas has been deprecated in favor of an environment variable of the same name ([PR #7423](https://github.com/realm/realm-core/pull/7423)).
+* The object-store-tests test suite can now launch baas containers on its own by specifying a `BAASAAS_API_KEY` in the environment ([PR #7423](https://github.com/realm/realm-core/pull/7423)).
 
 ----------------------------------------------
 
