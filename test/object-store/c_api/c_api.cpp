@@ -1010,13 +1010,13 @@ bool should_compact_on_launch(void* userdata_p, uint64_t, uint64_t)
 }
 
 struct LogUserData {
-    std::vector<std::string> log;
+    std::vector<std::pair<std::string, std::string>> log;
 };
 
-void realm_log_func(realm_userdata_t u, realm_log_level_e, const char* message)
+void realm_log_func(realm_userdata_t u, const char* category, realm_log_level_e, const char* message)
 {
     LogUserData* userdata = static_cast<LogUserData*>(u);
-    userdata->log.emplace_back(message);
+    userdata->log.emplace_back(std::make_pair(category, message));
 }
 
 realm_t* open_realm(TestFile& test_file)
@@ -1636,6 +1636,10 @@ TEST_CASE("C API logging", "[c_api]") {
     realm_begin_write(realm);
     realm_commit(realm);
     CHECK(userdata.log.size() == 11);
+    // We only expect Realm.Storage category logs
+    for (size_t n = 0; n < userdata.log.size(); n++) {
+        CHECK(userdata.log.at(n).first.rfind("Realm.Storage", 0) == 0);
+    }
     realm_release(realm);
     userdata.log.clear();
     realm_set_log_level(RLM_LOG_LEVEL_ERROR);
