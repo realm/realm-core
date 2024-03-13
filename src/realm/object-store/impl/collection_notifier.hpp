@@ -252,6 +252,7 @@ private:
 
     mutable std::mutex m_realm_mutex;
     std::shared_ptr<Realm> m_realm;
+    std::atomic<bool> m_is_alive = true;
 
     std::shared_ptr<Transaction> m_transaction;
 
@@ -378,6 +379,18 @@ private:
     std::shared_ptr<Transaction> m_pin_tr;
     std::vector<std::shared_ptr<CollectionNotifier>> m_notifiers;
     RealmCoordinator* m_coordinator = nullptr;
+};
+
+class NotifierRunLogger {
+public:
+    NotifierRunLogger(util::Logger* logger, std::string_view name, std::string_view description);
+    ~NotifierRunLogger();
+
+private:
+    util::Logger* m_logger;
+    std::string_view m_name;
+    std::string_view m_description;
+    std::chrono::steady_clock::time_point m_start;
 };
 
 } // namespace realm::_impl

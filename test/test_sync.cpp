@@ -6107,7 +6107,7 @@ TEST(Sync_Dictionary)
     }
 }
 
-TEST_IF(Sync_CollectionInMixed, sync::SYNC_SUPPORTS_NESTED_COLLECTIONS)
+TEST(Sync_CollectionInMixed)
 {
     TEST_CLIENT_DB(db_1);
     TEST_CLIENT_DB(db_2);
@@ -6266,7 +6266,7 @@ TEST_IF(Sync_CollectionInMixed, sync::SYNC_SUPPORTS_NESTED_COLLECTIONS)
     }
 }
 
-TEST_IF(Sync_CollectionInCollection, SYNC_SUPPORTS_NESTED_COLLECTIONS)
+TEST(Sync_CollectionInCollection)
 {
     TEST_CLIENT_DB(db_1);
     TEST_CLIENT_DB(db_2);

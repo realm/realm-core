@@ -807,7 +807,7 @@ private:
     Table* get_table_unchecked(TableKey);
     size_t find_table_index(StringData name) const noexcept;
     TableKey ndx2key(size_t ndx) const;
-    size_t key2ndx(TableKey key) const;
+    static size_t key2ndx(TableKey key);
     size_t key2ndx_checked(TableKey key) const;
     void set_size() const noexcept;
     std::map<TableRef, ColKey> get_primary_key_columns_from_pk_table(TableRef pk_table);
@@ -822,15 +822,16 @@ private:
             throw StaleAccessor("Stale transaction");
     }
 
-    friend class Table;
-    friend class GroupWriter;
-    friend class GroupCommitter;
-    friend class DB;
-    friend class _impl::GroupFriend;
-    friend class Transaction;
-    friend class TableKeyIterator;
     friend class CascadeState;
+    friend class DB;
+    friend class GroupCommitter;
+    friend class GroupWriter;
     friend class SlabAlloc;
+    friend class Table;
+    friend class TableKeyIterator;
+    friend class Transaction;
+    friend class _impl::DeepChangeChecker;
+    friend class _impl::GroupFriend;
 };
 
 class TableKeyIterator {
@@ -904,7 +905,7 @@ inline bool Group::is_empty() const noexcept
     return size() == 0;
 }
 
-inline size_t Group::key2ndx(TableKey key) const
+inline size_t Group::key2ndx(TableKey key)
 {
     size_t idx = key.value & 0xFFFF;
     return idx;

@@ -1279,6 +1279,9 @@ private:
 
 
 /// \brief A timer object supporting asynchronous wait operations.
+///
+/// NOTE: The DeadlineTimer is not thread safe and async_wait() or cancel()
+/// must be called prior to calling run() or directly from the event loop.
 class DeadlineTimer {
 public:
     DeadlineTimer(Service&);

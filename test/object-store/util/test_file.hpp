@@ -98,26 +98,6 @@ struct InMemoryTestFile : realm::Realm::Config {
 void advance_and_notify(realm::Realm& realm);
 void on_change_but_no_notify(realm::Realm& realm);
 
-#ifndef TEST_ENABLE_LOGGING
-#define TEST_ENABLE_LOGGING 0 // change to 1 to enable trace-level logging
-#endif
-
-#ifndef TEST_LOGGING_LEVEL
-#if TEST_ENABLE_LOGGING
-#define TEST_LOGGING_LEVEL all
-#else
-#define TEST_LOGGING_LEVEL off
-#endif // TEST_ENABLE_LOGGING
-#endif // TEST_LOGGING_LEVEL
-
-#define TEST_LOGGING_LEVEL_STORAGE off
-#define TEST_LOGGING_LEVEL_SERVER off
-/*
-#define TEST_LOGGING_LEVEL_SYNC off
-#define TEST_LOGGING_LEVEL_RESET trace
-#define TEST_LOGGING_LEVEL_APP off
-*/
-
 #if REALM_ENABLE_SYNC
 
 using StartImmediately = realm::util::TaggedBool<class StartImmediatelyTag>;
@@ -198,7 +178,6 @@ public:
         std::string base_path;
         realm::SyncManager::MetadataMode metadata_mode = realm::SyncManager::MetadataMode::NoMetadata;
         bool should_teardown_test_directory = true;
-        realm::util::Logger::Level log_level = realm::util::Logger::Level::TEST_LOGGING_LEVEL;
         bool start_sync_client = true;
     };
 

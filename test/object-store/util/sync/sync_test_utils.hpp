@@ -128,6 +128,10 @@ struct ExpectedRealmPaths {
     std::vector<std::string> legacy_sync_directories_to_make;
 };
 
+// Takes a string_view of a possibly quoted string (i.e. the string begins with '"' and ends with '"')
+// and returns an owned string without the quotes.
+std::string unquote_string(std::string_view possibly_quoted_string);
+
 #if REALM_ENABLE_SYNC
 
 template <typename Transport>
@@ -140,10 +144,8 @@ void subscribe_to_all_and_bootstrap(Realm& realm);
 #if REALM_ENABLE_AUTH_TESTS
 void wait_for_sessions_to_close(const TestAppSession& test_app_session);
 
-#ifdef REALM_MONGODB_ENDPOINT
-std::string get_base_url();
-std::string get_admin_url();
-#endif
+std::string get_compile_time_base_url();
+std::string get_compile_time_admin_url();
 #endif // REALM_ENABLE_AUTH_TESTS
 
 struct AutoVerifiedEmailCredentials : app::AppCredentials {

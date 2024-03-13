@@ -3924,7 +3924,6 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
     std::unique_ptr<realm::AppSession> app_session;
     auto redir_transport = std::make_shared<BaseUrlTransport>();
     AutoVerifiedEmailCredentials creds;
-    util::LogCategory::realm.set_default_level_threshold(realm::util::Logger::Level::TEST_LOGGING_LEVEL);
     auto logger = util::Logger::get_default_logger();
 
     App::Config app_config = {"fake-app-id"};

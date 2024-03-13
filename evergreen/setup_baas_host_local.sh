@@ -223,9 +223,9 @@ echo "Transferring setup scripts to ${SSH_USER}:${FILE_DEST_DIR}"
 scp "${SSH_OPTIONS[@]}" -o ConnectTimeout=60 "${BAAS_HOST_VARS}" "${SSH_USER}:${FILE_DEST_DIR}/"
 # Copy the entire evergreen/ directory from the working copy of realm-core to the remote host
 # This ensures the remote host the latest copy, esp when running evergreen patches
-# dependencies.list contains the BAAS_VERSION to use
+# dependencies.yml contains the BAAS_VERSION to use
 echo "Transferring evergreen scripts to ${SSH_USER}:${FILE_DEST_DIR}"
-cp "${EVERGREEN_PATH}/../dependencies.list" "${EVERGREEN_PATH}/"
+cp "${EVERGREEN_PATH}/../dependencies.yml" "${EVERGREEN_PATH}/"
 scp -r "${SSH_OPTIONS[@]}" -o ConnectTimeout=60 "${EVERGREEN_PATH}/" "${SSH_USER}:${FILE_DEST_DIR}/"
 
 BAAS_TUNNELS=()
