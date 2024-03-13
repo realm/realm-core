@@ -381,6 +381,18 @@ private:
     RealmCoordinator* m_coordinator = nullptr;
 };
 
+class NotifierRunLogger {
+public:
+    NotifierRunLogger(util::Logger* logger, std::string_view name, std::string_view description);
+    ~NotifierRunLogger();
+
+private:
+    util::Logger* m_logger;
+    std::string_view m_name;
+    std::string_view m_description;
+    std::chrono::steady_clock::time_point m_start;
+};
+
 } // namespace realm::_impl
 
 #endif /* REALM_BACKGROUND_COLLECTION_HPP */

@@ -347,45 +347,30 @@ void Lst<ObjLink>::do_remove(size_t ndx)
 
 /******************************** Lst<Mixed> *********************************/
 
-bool Lst<Mixed>::init_from_parent(bool allow_create) const
+UpdateStatus Lst<Mixed>::init_from_parent(bool allow_create) const
 {
+    Base::update_content_version();
+
     if (!m_tree) {
         m_tree.reset(new BPlusTreeMixed(get_alloc()));
         const ArrayParent* parent = this;
         m_tree->set_parent(const_cast<ArrayParent*>(parent), 0);
     }
     try {
-        auto ref = Base::get_collection_ref();
-        if (ref) {
-            m_tree->init_from_ref(ref);
-        }
-        else {
-            if (!allow_create) {
-                m_tree->detach();
-                return false;
-            }
-
-            // The ref in the column was NULL, create the tree in place.
-            m_tree->create();
-            REALM_ASSERT(m_tree->is_attached());
-        }
+        return do_init_from_parent(m_tree.get(), Base::get_collection_ref(), allow_create);
     }
     catch (...) {
         m_tree->detach();
         throw;
     }
-
-    return true;
 }
 
-UpdateStatus Lst<Mixed>::update_if_needed_with_status() const
+UpdateStatus Lst<Mixed>::update_if_needed() const
 {
-    auto status = Base::get_update_status();
-    switch (status) {
-        case UpdateStatus::Detached: {
+    switch (get_update_status()) {
+        case UpdateStatus::Detached:
             m_tree.reset();
             return UpdateStatus::Detached;
-        }
         case UpdateStatus::NoChange:
             if (m_tree && m_tree->is_attached()) {
                 return UpdateStatus::NoChange;
@@ -393,12 +378,8 @@ UpdateStatus Lst<Mixed>::update_if_needed_with_status() const
             // The tree has not been initialized yet for this accessor, so
             // perform lazy initialization by treating it as an update.
             [[fallthrough]];
-        case UpdateStatus::Updated: {
-            bool attached = init_from_parent(false);
-            Base::update_content_version();
-            CollectionParent::m_parent_version++;
-            return attached ? UpdateStatus::Updated : UpdateStatus::Detached;
-        }
+        case UpdateStatus::Updated:
+            return init_from_parent(false);
     }
     REALM_UNREACHABLE();
 }
@@ -553,11 +534,7 @@ void Lst<Mixed>::insert_collection(const PathElement& path_elem, CollectionType 
     check_level();
     m_tree->ensure_keys();
     insert(path_elem.get_ndx(), Mixed(0, dict_or_list));
-    int64_t key = generate_key(size());
-    while (m_tree->find_key(key) != realm::not_found) {
-        key++;
-    }
-    m_tree->set_key(path_elem.get_ndx(), key);
+    set_key(*m_tree, path_elem.get_ndx());
     bump_content_version();
 }
 
@@ -579,11 +556,7 @@ void Lst<Mixed>::set_collection(const PathElement& path_elem, CollectionType dic
         set(ndx, new_val);
         int64_t key = m_tree->get_key(ndx);
         if (key == 0) {
-            key = generate_key(size());
-            while (m_tree->find_key(key) != realm::not_found) {
-                key++;
-            }
-            m_tree->set_key(ndx, key);
+            set_key(*m_tree, path_elem.get_ndx());
         }
         bump_content_version();
     }
@@ -896,15 +869,6 @@ bool Lst<Mixed>::remove_backlinks(CascadeState& state) const
         }
     }
     return recurse;
-}
-
-bool Lst<Mixed>::update_if_needed() const
-{
-    auto status = update_if_needed_with_status();
-    if (status == UpdateStatus::Detached) {
-        throw StaleAccessor("CollectionList no longer exists");
-    }
-    return status == UpdateStatus::Updated;
 }
 
 /********************************** LnkLst ***********************************/

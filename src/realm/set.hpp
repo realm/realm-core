@@ -57,7 +57,6 @@ protected:
     void erase_repl(Replication* repl, size_t index, Mixed value) const;
     void clear_repl(Replication* repl) const;
     static std::vector<Mixed> convert_to_mixed_set(const CollectionBase& rhs);
-    bool do_init_from_parent(ref_type ref, bool allow_create) const;
 
     void resort_range(size_t from, size_t to);
 
@@ -104,7 +103,7 @@ public:
         this->set_owner(owner, col_key);
     }
 
-    Set(ColKey col_key)
+    Set(ColKey col_key, size_t = 0)
         : Base(col_key)
     {
         if (!col_key.is_set()) {
@@ -195,7 +194,7 @@ public:
         return tree();
     }
 
-    UpdateStatus update_if_needed_with_status() const final;
+    UpdateStatus update_if_needed() const final;
     void ensure_created();
 
     void migrate();
@@ -216,12 +215,12 @@ private:
         return static_cast<BPlusTree<T>&>(*m_tree);
     }
 
-    bool init_from_parent(bool allow_create) const;
+    UpdateStatus init_from_parent(bool allow_create) const;
 
     /// Update the accessor and return true if it is attached after the update.
     inline bool update() const
     {
-        return update_if_needed_with_status() != UpdateStatus::Detached;
+        return update_if_needed() != UpdateStatus::Detached;
     }
 
     // `do_` methods here perform the action after preconditions have been
@@ -377,7 +376,7 @@ private:
     // Overriding members of ObjCollectionBase:
     UpdateStatus do_update_if_needed() const final
     {
-        return m_set.update_if_needed_with_status();
+        return m_set.update_if_needed();
     }
 
     BPlusTree<ObjKey>* get_mutable_tree() const final
@@ -494,10 +493,9 @@ inline Set<T>& Set<T>::operator=(Set&& other) noexcept
 }
 
 template <typename T>
-UpdateStatus Set<T>::update_if_needed_with_status() const
+UpdateStatus Set<T>::update_if_needed() const
 {
-    auto status = Base::get_update_status();
-    switch (status) {
+    switch (get_update_status()) {
         case UpdateStatus::Detached: {
             m_tree.reset();
             return UpdateStatus::Detached;
@@ -509,11 +507,8 @@ UpdateStatus Set<T>::update_if_needed_with_status() const
             // The tree has not been initialized yet for this accessor, so
             // perform lazy initialization by treating it as an update.
             [[fallthrough]];
-        case UpdateStatus::Updated: {
-            bool attached = init_from_parent(false);
-            Base::update_content_version();
-            return attached ? UpdateStatus::Updated : UpdateStatus::Detached;
-        }
+        case UpdateStatus::Updated:
+            return init_from_parent(false);
     }
     REALM_UNREACHABLE();
 }
@@ -526,19 +521,19 @@ void Set<T>::ensure_created()
         // In case of errors, an exception is thrown.
         constexpr bool allow_create = true;
         init_from_parent(allow_create); // Throws
-        Base::update_content_version();
     }
 }
 
 template <typename T>
-bool Set<T>::init_from_parent(bool allow_create) const
+UpdateStatus Set<T>::init_from_parent(bool allow_create) const
 {
+    Base::update_content_version();
     if (!m_tree) {
         m_tree.reset(new BPlusTree<T>(get_alloc()));
         const ArrayParent* parent = this;
         m_tree->set_parent(const_cast<ArrayParent*>(parent), 0);
     }
-    return do_init_from_parent(Base::get_collection_ref(), allow_create);
+    return do_init_from_parent(m_tree.get(), Base::get_collection_ref(), allow_create);
 }
 
 template <typename U>

@@ -5843,8 +5843,8 @@ TEST(Parser_CollectionLinks)
     Obj charlie = persons->create_object_with_primary_key("charlie");
 
     Obj david = persons->create_object_with_primary_key("david");
-    Obj elisabeth = persons->create_object_with_primary_key("elisabeth");
-    Obj felix = persons->create_object_with_primary_key("felix");
+    persons->create_object_with_primary_key("elisabeth");
+    persons->create_object_with_primary_key("felix");
 
     Obj gary = persons->create_object_with_primary_key("gary");
     Obj hutch = persons->create_object_with_primary_key("hutch");

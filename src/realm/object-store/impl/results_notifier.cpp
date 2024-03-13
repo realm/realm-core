@@ -65,12 +65,12 @@ ResultsNotifier::ResultsNotifier(Results& target)
     , m_target_is_in_table_order(target.is_in_table_order())
 {
     if (m_logger) {
-        m_description = std::string("'") + std::string(m_query->get_table()->get_class_name()) + std::string("'");
+        m_description = "'" + std::string(m_query->get_table()->get_class_name()) + "'";
         if (m_query->has_conditions()) {
             m_description += " where \"";
             m_description += m_query->get_description_safe() + "\"";
         }
-        m_logger->log(util::LogCategory::notification, util::Logger::Level::debug, "Creating ResultsNotifier for ",
+        m_logger->log(util::LogCategory::notification, util::Logger::Level::debug, "Creating ResultsNotifier for %1",
                       m_description);
     }
     reattach();
@@ -151,19 +151,9 @@ void ResultsNotifier::calculate_changes()
 
 void ResultsNotifier::run()
 {
-    using namespace std::chrono;
+    NotifierRunLogger log(m_logger.get(), "ResultsNotifier", m_description);
 
     REALM_ASSERT(m_info || !has_run());
-
-    auto t1 = steady_clock::now();
-    util::ScopeExit cleanup([&]() noexcept {
-        m_run_time_point = steady_clock::now();
-        if (m_logger) {
-            m_logger->log(util::LogCategory::notification, util::Logger::Level::debug,
-                          "ResultsNotifier %1 did run in %2 us", m_description,
-                          duration_cast<microseconds>(m_run_time_point - t1).count());
-        }
-    });
 
     // Table's been deleted, so report all objects as deleted
     if (!m_query->get_table()) {
@@ -278,7 +268,7 @@ ListResultsNotifier::ListResultsNotifier(Results& target)
         auto path = m_list->get_short_path();
         auto prop_name = m_list->get_table()->get_column_name(path[0].get_col_key());
         path[0] = PathElement(prop_name);
-        std::string sort_order;
+        std::string_view sort_order = "";
         if (m_sort_order) {
             sort_order = *m_sort_order ? " sorted ascending" : " sorted descending";
         }
@@ -358,17 +348,6 @@ void ListResultsNotifier::calculate_changes()
 
 void ListResultsNotifier::run()
 {
-    using namespace std::chrono;
-    auto t1 = steady_clock::now();
-    util::ScopeExit cleanup([&]() noexcept {
-        m_run_time_point = steady_clock::now();
-        if (m_logger) {
-            m_logger->log(util::LogCategory::notification, util::Logger::Level::debug,
-                          "ListResultsNotifier %1 did run in %2 us", m_description,
-                          duration_cast<microseconds>(m_run_time_point - t1).count());
-        }
-    });
-
     if (!m_list || !m_list->is_attached()) {
         // List was deleted, so report all of the rows being removed
         m_change = {};
@@ -379,9 +358,10 @@ void ListResultsNotifier::run()
     }
 
     if (!need_to_run()) {
-        cleanup.cancel();
         return;
     }
+
+    NotifierRunLogger log(m_logger.get(), "ListResultsNotifier", m_description);
 
     m_run_indices = std::vector<size_t>();
     if (m_distinct)
@@ -393,13 +373,13 @@ void ListResultsNotifier::run()
         std::iota(m_run_indices->begin(), m_run_indices->end(), 0);
     }
 
+    // Modifications to nested values in Mixed are recorded in replication as
+    // StableIndex and we have to look up the actual index afterwards
     if (m_change.paths.size()) {
         if (auto coll = dynamic_cast<CollectionParent*>(m_list.get())) {
             for (auto& p : m_change.paths) {
-                // Report changes in substructure as modifications on this list
-                auto ndx = coll->find_index(p[0]);
-                if (ndx != realm::not_found)
-                    m_change.modifications.add(ndx); // OK to insert same index again
+                if (auto ndx = coll->find_index(p); ndx != realm::not_found)
+                    m_change.modifications.add(ndx);
             }
         }
     }
