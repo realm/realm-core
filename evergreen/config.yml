@@ -66,7 +66,7 @@ functions:
           if [ -n "${cmake_bindir|}" ]; then
             export CMAKE=$(./evergreen/abspath.sh ${cmake_bindir}/cmake)
           else
-            export CMAKE=cmake
+            export CMAKE="cmake"
           fi
 
           if [ -n "${xcode_developer_dir}" ]; then
