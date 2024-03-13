@@ -564,6 +564,11 @@ public:
         m_content_version = 0;
     }
 
+    CollectionParent* get_owner() const noexcept
+    {
+        return m_parent;
+    }
+
     void to_json(std::ostream&, JSONOutputMode, util::FunctionRef<void(const Mixed&)>) const override;
 
     using Interface::get_owner_key;

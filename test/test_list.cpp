@@ -1098,7 +1098,7 @@ TEST(List_UpdateIfNeeded)
     auto table = tr->add_table("table");
     auto col = table->add_column(type_Mixed, "mixed");
     auto col2 = table->add_column(type_Mixed, "col2");
-    table->create_object();
+    auto leading_obj = table->create_object();
     Obj obj = table->create_object();
     obj.set_collection(col, CollectionType::List);
 
@@ -1123,9 +1123,24 @@ TEST(List_UpdateIfNeeded)
     // The list is now non-empty, so a new accessor can initialize
     auto list_3 = obj.get_list<Mixed>(col);
     CHECK_EQUAL(list_3.update_if_needed(), UpdateStatus::Updated);
+    CHECK_EQUAL(list_3.update_if_needed(), UpdateStatus::NoChange);
+
+    // A copy of a list is lazily initialized, so it's updated on first call
+    // even if the source was up-to-date
+    auto list_4 = std::make_shared<Lst<Mixed>>(list_3);
+    CHECK_EQUAL(list_4->update_if_needed(), UpdateStatus::Updated);
+
+    // Nested lists work the same way as top-level ones
+    list_4->insert_collection(1, CollectionType::List);
+    auto list_4_1 = list_4->get_list(1);
+    auto list_4_2 = list_4->get_list(1);
+    list_4_1->add(Mixed());
+    // FIXME: this should be NoChange
+    CHECK_EQUAL(list_4_1->update_if_needed(), UpdateStatus::Updated);
+    CHECK_EQUAL(list_4_2->update_if_needed(), UpdateStatus::Updated);
 
     // Update the row index of the parent object, forcing it to update
-    table->remove_object(table->begin());
+    leading_obj.remove();
 
     // Updating the base object directly first doesn't change the result of
     // updating the list
@@ -1135,6 +1150,12 @@ TEST(List_UpdateIfNeeded)
     CHECK_EQUAL(list_2.update_if_needed(), UpdateStatus::Updated);
     CHECK_EQUAL(list_3.update_if_needed(), UpdateStatus::Updated);
 
+    // These two lists share the same parent, so the first updates due to the
+    // parent returning Updated, and the second updates due to seeing that the
+    // parent version has changed
+    CHECK_EQUAL(list_4_1->update_if_needed(), UpdateStatus::Updated);
+    CHECK_EQUAL(list_4_2->update_if_needed(), UpdateStatus::Updated);
+
     tr->commit_and_continue_as_read();
 
     // Committing the write transaction changes the obj's ref, so everything
@@ -1143,6 +1164,8 @@ TEST(List_UpdateIfNeeded)
     CHECK_EQUAL(list_1.update_if_needed(), UpdateStatus::Updated);
     CHECK_EQUAL(list_2.update_if_needed(), UpdateStatus::Updated);
     CHECK_EQUAL(list_3.update_if_needed(), UpdateStatus::Updated);
+    CHECK_EQUAL(list_4_1->update_if_needed(), UpdateStatus::Updated);
+    CHECK_EQUAL(list_4_2->update_if_needed(), UpdateStatus::Updated);
 
     // Perform a write which does not result in obj changing
     {
@@ -1157,6 +1180,8 @@ TEST(List_UpdateIfNeeded)
     CHECK_EQUAL(list_1.update_if_needed(), UpdateStatus::NoChange);
     CHECK_EQUAL(list_2.update_if_needed(), UpdateStatus::NoChange);
     CHECK_EQUAL(list_3.update_if_needed(), UpdateStatus::NoChange);
+    CHECK_EQUAL(list_4_1->update_if_needed(), UpdateStatus::NoChange);
+    CHECK_EQUAL(list_4_2->update_if_needed(), UpdateStatus::NoChange);
 
     // Perform a write which does modify obj
     {
@@ -1171,6 +1196,8 @@ TEST(List_UpdateIfNeeded)
     CHECK_EQUAL(list_1.update_if_needed(), UpdateStatus::Updated);
     CHECK_EQUAL(list_2.update_if_needed(), UpdateStatus::Updated);
     CHECK_EQUAL(list_3.update_if_needed(), UpdateStatus::Updated);
+    CHECK_EQUAL(list_4_1->update_if_needed(), UpdateStatus::Updated);
+    CHECK_EQUAL(list_4_2->update_if_needed(), UpdateStatus::Updated);
 
     // Everything updates to detached when the object is removed
     tr->promote_to_write();
@@ -1180,4 +1207,41 @@ TEST(List_UpdateIfNeeded)
     CHECK_EQUAL(list_1.update_if_needed(), UpdateStatus::Detached);
     CHECK_EQUAL(list_2.update_if_needed(), UpdateStatus::Detached);
     CHECK_EQUAL(list_3.update_if_needed(), UpdateStatus::Detached);
+    CHECK_EQUAL(list_4_1->update_if_needed(), UpdateStatus::Detached);
+    CHECK_EQUAL(list_4_2->update_if_needed(), UpdateStatus::Detached);
+}
+
+TEST(List_AsCollectionParent)
+{
+    Group g;
+    auto table = g.add_table("table");
+    auto col = table->add_column(type_Mixed, "mixed");
+
+    Obj obj = table->create_object();
+    obj.set_collection(col, CollectionType::List);
+    auto list_1 = obj.get_list<Mixed>(col);
+    list_1.insert_collection(0, CollectionType::List);
+
+    // list_1 is stack allocated, so we have to create a new object which can
+    // serve as the owner. This object is not reused for multiple calls.
+    auto list_1_1 = list_1.get_list(0);
+    auto list_1_2 = list_1.get_list(0);
+    CHECK_NOT_EQUAL(list_1_1->get_owner(), &list_1);
+    CHECK_NOT_EQUAL(list_1_1->get_owner(), list_1_2->get_owner());
+
+    // list_2 is heap allocated but not owned by a shared_ptr, so we have to
+    // create a new object which can serve as the owner. This object is not
+    // reused for multiple calls.
+    auto list_2 = obj.get_list_ptr<Mixed>(col);
+    auto list_2_1 = list_2->get_list(0);
+    auto list_2_2 = list_2->get_list(0);
+    CHECK_NOT_EQUAL(list_2_1->get_owner(), list_2.get());
+    CHECK_NOT_EQUAL(list_2_1->get_owner(), list_2_2->get_owner());
+
+    // list_3 is owned by a shared_ptr, so we can just use it as the owner directly
+    auto list_3 = std::shared_ptr{std::move(list_2)};
+    auto list_3_1 = list_3->get_list(0);
+    auto list_3_2 = list_3->get_list(0);
+    CHECK_EQUAL(list_3_1->get_owner(), list_3.get());
+    CHECK_EQUAL(list_3_1->get_owner(), list_3_2->get_owner());
 }
