@@ -254,6 +254,7 @@ functions:
 
           if [[ -n "${llvm_symbolizer}" ]]; then
               export ASAN_SYMBOLIZER_PATH="$(./evergreen/abspath.sh ${llvm_symbolizer})"
+              export TSAN_OPTIONS="external_symbolizer_path=$(./evergreen/abspath.sh ${llvm_symbolizer})"
           fi
           if [[ -n "${enable_llvm_coverage}" ]]; then
               if [[ -z "${test_executable_name}" ]]; then
@@ -284,7 +285,7 @@ functions:
           if [[ -n "${run_with_encryption}" ]]; then
               export UNITTEST_ENCRYPT_ALL=1
           fi
-          export TSAN_OPTIONS="suppressions=$(pwd)/test/tsan.suppress history_size=4"
+          export TSAN_OPTIONS="suppressions=$(pwd)/test/tsan.suppress history_size=4 $TSAN_OPTIONS"
           export UBSAN_OPTIONS="print_stacktrace=1"
 
           cd build
@@ -1350,6 +1351,7 @@ buildvariants:
     fetch_missing_dependencies: On
     c_compiler: "./clang_binaries/bin/clang"
     cxx_compiler: "./clang_binaries/bin/clang++"
+    llvm_symbolizer: "./clang_binaries/bin/llvm-symbolizer"
     run_with_encryption: On
     enable_tsan: On
     cmake_build_type: RelWithDebInfo
@@ -1413,6 +1415,7 @@ buildvariants:
     cmake_build_type: RelWithDebInfo
     c_compiler: "./clang_binaries/bin/clang"
     cxx_compiler: "./clang_binaries/bin/clang++"
+    llvm_symbolizer: "./clang_binaries/bin/llvm-symbolizer"
   tasks:
   - name: compile_test
 
@@ -1426,6 +1429,7 @@ buildvariants:
     cmake_build_type: RelWithDebInfo
     c_compiler: "./clang_binaries/bin/clang"
     cxx_compiler: "./clang_binaries/bin/clang++"
+    llvm_symbolizer: "./clang_binaries/bin/llvm-symbolizer"
   tasks:
   - name: compile_test
 
