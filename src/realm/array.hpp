@@ -333,6 +333,8 @@ public:
     /// by doing a linear search for short sequences.
     size_t lower_bound_int(int64_t value) const noexcept;
     size_t upper_bound_int(int64_t value) const noexcept;
+    size_t lower_bound_int_encoded(int64_t value) const noexcept;
+    size_t upper_bound_int_encoded(int64_t value) const noexcept;
     //@}
 
     int64_t get_sum(size_t start = 0, size_t end = size_t(-1)) const

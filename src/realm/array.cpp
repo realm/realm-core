@@ -270,16 +270,8 @@ void Array::init_from_mem(MemRef mem) noexcept
         // the header
         m_size = m_encoder.size();
         m_width = static_cast<uint_least8_t>(m_encoder.width());
-        // we need to compute lower and upper bound, these are useful during Array::find and in general in every query
-        // related optimisation.
-        if (m_width) {
-            const auto max_v = 1ULL << (m_width - 1);
-            m_lbound = -max_v;
-            m_ubound = max_v - 1;
-        }
-        else {
-            m_lbound = m_ubound = 0;
-        }
+        m_lbound = -m_encoder.width_mask();
+        m_ubound = m_encoder.width_mask() - 1;
         m_is_inner_bptree_node = get_is_inner_bptree_node_from_header(header);
         m_has_refs = get_hasrefs_from_header(header);
         m_context_flag = get_context_flag_from_header(header);
@@ -1489,16 +1481,25 @@ void Array::verify() const
 size_t Array::lower_bound_int(int64_t value) const noexcept
 {
     if (is_encoded())
-        // not really nice
-        return lower_bound<0, ArrayEncode>(m_data, m_size, value, m_encoder);
+        return lower_bound_int_encoded(value);
     REALM_TEMPEX(return lower_bound, m_width, (m_data, m_size, value));
 }
 
 size_t Array::upper_bound_int(int64_t value) const noexcept
 {
     if (is_encoded())
-        return upper_bound<0, ArrayEncode>(m_data, m_size, value, m_encoder);
+        return upper_bound_int_encoded(value);
     REALM_TEMPEX(return upper_bound, m_width, (m_data, m_size, value));
+}
+
+size_t Array::lower_bound_int_encoded(int64_t value) const noexcept
+{
+    return lower_bound(m_data, m_size, value, m_encoder);
+}
+
+size_t Array::upper_bound_int_encoded(int64_t value) const noexcept
+{
+    return upper_bound(m_data, m_size, value, m_encoder);
 }
 
 int_fast64_t Array::get(const char* header, size_t ndx) noexcept

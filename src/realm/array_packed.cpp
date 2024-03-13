@@ -176,7 +176,6 @@ bool ArrayPacked::find_all(const Array& arr, int64_t value, size_t start, size_t
         if (start < end)
             if (!state->match(start + baseindex))
                 return false;
-
         ++start;
     }
     return true;
