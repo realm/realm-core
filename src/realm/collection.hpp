@@ -53,17 +53,17 @@ public:
     {
         return m_obj;
     }
+    uint32_t parent_version() const noexcept final
+    {
+        return 0;
+    }
 
 protected:
     Obj m_obj;
     ref_type m_ref;
-    UpdateStatus update_if_needed_with_status() const final
+    UpdateStatus update_if_needed() const final
     {
         return UpdateStatus::Updated;
-    }
-    bool update_if_needed() const final
-    {
-        return true;
     }
     ref_type get_collection_ref(Index, CollectionType) const final
     {
@@ -255,6 +255,7 @@ protected:
     CollectionBase& operator=(CollectionBase&&) noexcept = default;
 
     void validate_index(const char* msg, size_t index, size_t size) const;
+    static UpdateStatus do_init_from_parent(BPlusTreeBase* tree, ref_type ref, bool allow_create);
 };
 
 inline std::string_view collection_type_name(CollectionType col_type, bool uppercase = false)
@@ -492,7 +493,7 @@ public:
         if (m_parent) {
             try {
                 // Update the parent. Will throw if parent is not existing.
-                switch (m_parent->update_if_needed_with_status()) {
+                switch (m_parent->update_if_needed()) {
                     case UpdateStatus::Updated:
                         // Make sure to update next time around
                         m_content_version = 0;
@@ -524,7 +525,7 @@ public:
     {
         try {
             // `has_changed()` sneakily modifies internal state.
-            update_if_needed_with_status();
+            update_if_needed();
             if (m_last_content_version != m_content_version) {
                 m_last_content_version = m_content_version;
                 return true;
@@ -563,6 +564,11 @@ public:
         m_content_version = 0;
     }
 
+    CollectionParent* get_owner() const noexcept
+    {
+        return m_parent;
+    }
+
     void to_json(std::ostream&, JSONOutputMode, util::FunctionRef<void(const Mixed&)>) const override;
 
     using Interface::get_owner_key;
@@ -570,17 +576,15 @@ public:
     using Interface::get_target_table;
 
 protected:
-    Obj m_obj_mem;
+    ObjCollectionParent m_obj_mem;
     std::shared_ptr<CollectionParent> m_col_parent;
     CollectionParent::Index m_index;
-    mutable size_t m_my_version = 0;
     ColKey m_col_key;
-    bool m_nullable = false;
-
     mutable uint_fast64_t m_content_version = 0;
-
     // Content version used by `has_changed()`.
     mutable uint_fast64_t m_last_content_version = 0;
+    mutable uint32_t m_parent_version = 0;
+    bool m_nullable = false;
 
     CollectionBaseImpl() = default;
     CollectionBaseImpl(const CollectionBaseImpl& other)
@@ -650,13 +654,14 @@ protected:
 
     UpdateStatus get_update_status() const
     {
-        UpdateStatus status = m_parent ? m_parent->update_if_needed_with_status() : UpdateStatus::Detached;
+        UpdateStatus status = m_parent ? m_parent->update_if_needed() : UpdateStatus::Detached;
 
         if (status != UpdateStatus::Detached) {
             auto content_version = m_alloc->get_content_version();
-            if (content_version != m_content_version || m_my_version != m_parent->m_parent_version) {
+            auto parent_version = m_parent->parent_version();
+            if (content_version != m_content_version || m_parent_version != parent_version) {
                 m_content_version = content_version;
-                m_my_version = m_parent->m_parent_version;
+                m_parent_version = parent_version;
                 status = UpdateStatus::Updated;
             }
         }
@@ -667,18 +672,14 @@ protected:
     /// Refresh the parent object (if needed) and compare version numbers.
     /// Return true if the collection should initialize from parent
     /// Throws if the owning object no longer exists.
-    bool should_update()
+    bool should_update() const
     {
         check_parent();
-        bool changed = m_parent->update_if_needed(); // Throws if the object does not exist.
-        auto content_version = m_alloc->get_content_version();
-
-        if (changed || content_version != m_content_version || m_my_version != m_parent->m_parent_version) {
-            m_content_version = content_version;
-            m_my_version = m_parent->m_parent_version;
-            return true;
+        auto status = get_update_status();
+        if (status == UpdateStatus::Detached) {
+            throw StaleAccessor("Parent no longer exists");
         }
-        return false;
+        return status == UpdateStatus::Updated;
     }
 
     void bump_content_version()
@@ -728,19 +729,19 @@ protected:
     void set_backlink(ColKey col_key, ObjLink new_link) const
     {
         check_parent();
-        m_parent->set_backlink(col_key, new_link);
+        m_parent->get_object().set_backlink(col_key, new_link);
     }
     // Used when replacing a link, return true if CascadeState contains objects to remove
     bool replace_backlink(ColKey col_key, ObjLink old_link, ObjLink new_link, CascadeState& state) const
     {
         check_parent();
-        return m_parent->replace_backlink(col_key, old_link, new_link, state);
+        return m_parent->get_object().replace_backlink(col_key, old_link, new_link, state);
     }
     // Used when removing a backlink, return true if CascadeState contains objects to remove
     bool remove_backlink(ColKey col_key, ObjLink old_link, CascadeState& state) const
     {
         check_parent();
-        return m_parent->remove_backlink(col_key, old_link, state);
+        return m_parent->get_object().remove_backlink(col_key, old_link, state);
     }
 
     /// Reset the accessor's tracking of the content version. Derived classes
@@ -796,7 +797,7 @@ private:
     ///
     /// If no change has happened to the data, this function returns
     /// `UpdateStatus::NoChange`, and the caller is allowed to not do anything.
-    virtual UpdateStatus update_if_needed_with_status() const = 0;
+    virtual UpdateStatus update_if_needed() const = 0;
 };
 
 namespace _impl {
@@ -884,7 +885,7 @@ protected:
     /// `BPlusTree<T>`.
     virtual BPlusTree<ObjKey>* get_mutable_tree() const = 0;
 
-    /// Implements update_if_needed() in a way that ensures the consistency of
+    /// Implements `update_if_needed()` in a way that ensures the consistency of
     /// the unresolved list. Derived classes should call this instead of calling
     /// `update_if_needed()` on their inner accessor.
     UpdateStatus update_if_needed() const

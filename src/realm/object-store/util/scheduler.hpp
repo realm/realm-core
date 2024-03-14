@@ -125,8 +125,9 @@ public:
 #endif
 
     /// Register a factory function which can produce custom schedulers when
-    /// `Scheduler::make_default()` is called.
-    static void set_default_factory(util::UniqueFunction<std::shared_ptr<Scheduler>()>);
+    /// `Scheduler::make_default()` is called. This function is not thread-safe
+    /// and must be called before any schedulers are created.
+    static void set_default_factory(std::shared_ptr<Scheduler> (*factory)());
 };
 
 // A thread-safe queue of functions to invoke, used in the implemenation of
@@ -140,7 +141,6 @@ private:
     std::mutex m_mutex;
     std::vector<util::UniqueFunction<void()>> m_functions;
 };
-
 
 } // namespace realm::util
 
