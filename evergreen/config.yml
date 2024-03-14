@@ -1619,15 +1619,15 @@ buildvariants:
 
 - name: ubuntu-coverage
   display_name: "Ubuntu (Code Coverage)"
-  run_on: ubuntu2204-large
+  run_on: ubuntu2204-arm64-large
   expansions:
     clang_url: "https://github.com/llvm/llvm-project/releases/download/llvmorg-18.1.1/clang+llvm-18.1.1-aarch64-linux-gnu.tar.xz"
     fetch_missing_dependencies: On
     c_compiler: "./clang_binaries/bin/clang"
     cxx_compiler: "./clang_binaries/bin/clang++"
     enable_llvm_coverage: On
-    coveralls_flag_name: "ubuntu-x86_64"
-    grcov_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/grcov-x86_64-unknown-linux-gnu.tar.bz2"
+    coveralls_flag_name: "ubuntu-arm64"
+    grcov_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/grcov-aarch64-unknown-linux-gnu.tar.bz2"
   tasks:
   - name: compile_test_coverage
   - name: finalize_coverage_data
