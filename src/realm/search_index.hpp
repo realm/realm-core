@@ -143,6 +143,10 @@ public:
 
 #ifdef REALM_DEBUG
     virtual void print() const = 0;
+    size_t get_byte_size_deep() const
+    {
+        return m_root_array->get_byte_size_deep();
+    }
 #endif // REALM_DEBUG
 
     // Accessor concept:

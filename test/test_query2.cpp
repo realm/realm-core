@@ -4613,29 +4613,32 @@ TEST_TYPES(Query_CaseInsensitiveNullable, std::true_type, std::false_type)
     table.create_object().set(col_ndx, "words");
     ObjKey key2 = table.create_object().get_key();
     ObjKey key3 = table.create_object().get_key();
-    table.create_object().set(col_ndx, "");
-    table.create_object().set(col_ndx, "");
+    ObjKey key4 = table.create_object().set(col_ndx, "").get_key();
+    ObjKey key5 = table.create_object().set(col_ndx, "").get_key();
+
+    auto verify_query_for = [&](StringData str, bool case_sensitive, std::vector<ObjKey> expected) {
+        Query q = table.where().equal(col_ndx, str, case_sensitive);
+        CHECK_EQUAL(q.count(), expected.size());
+        TableView tv = q.find_all();
+        CHECK_EQUAL(tv.size(), expected.size());
+        for (size_t i = 0; i < expected.size(); ++i) {
+            CHECK_EQUAL(tv.get_key(i), expected[i]);
+        }
+    };
 
     bool case_sensitive = true;
     StringData null_string;
-    Query q = table.where().equal(col_ndx, null_string, case_sensitive);
-    CHECK_EQUAL(q.count(), 2);
-    TableView tv = q.find_all();
-    CHECK_EQUAL(tv.size(), 2);
-    CHECK_EQUAL(tv.get_key(0), key2);
-    CHECK_EQUAL(tv.get_key(1), key3);
+    StringData empty_string("");
+    verify_query_for(null_string, case_sensitive, {key2, key3});
     Query q2 = table.where().contains(col_ndx, null_string, case_sensitive);
     CHECK_EQUAL(q2.count(), 6);
-    tv = q2.find_all();
+    TableView tv = q2.find_all();
     CHECK_EQUAL(tv.size(), 6);
+    verify_query_for(empty_string, case_sensitive, {key4, key5});
 
     case_sensitive = false;
-    q = table.where().equal(col_ndx, null_string, case_sensitive);
-    CHECK_EQUAL(q.count(), 2);
-    tv = q.find_all();
-    CHECK_EQUAL(tv.size(), 2);
-    CHECK_EQUAL(tv.get_key(0), key2);
-    CHECK_EQUAL(tv.get_key(1), key3);
+    verify_query_for(null_string, case_sensitive, {key2, key3});
+    verify_query_for(empty_string, case_sensitive, {key4, key5});
     q2 = table.where().contains(col_ndx, null_string, case_sensitive);
     CHECK_EQUAL(q2.count(), 6);
     tv = q2.find_all();

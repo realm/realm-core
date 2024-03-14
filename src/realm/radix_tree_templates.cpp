@@ -374,14 +374,10 @@ void IndexNode<ChunkWidth>::update_data_source(const ClusterColumn& cluster)
 }
 
 template <size_t ChunkWidth>
-void IndexNode<ChunkWidth>::make_sorted_list_at(size_t ndx, ObjKey existing, ObjKey key_to_insert, Mixed insert_value)
+void IndexNode<ChunkWidth>::make_sorted_list_at(size_t ndx, ObjKey existing, ObjKey key_to_insert)
 {
     Array list(m_alloc);
     list.create(Array::type_Normal);
-#if REALM_DEBUG
-    int cmp = m_cluster.get_value(ObjKey(existing)).compare(insert_value);
-    REALM_ASSERT_EX(cmp == 0, insert_value, existing, key_to_insert);
-#endif
     list.add(existing.value < key_to_insert.value ? existing.value : key_to_insert.value);
     list.add(existing.value < key_to_insert.value ? key_to_insert.value : existing.value);
     set(ndx, list.get_ref());
@@ -389,8 +385,7 @@ void IndexNode<ChunkWidth>::make_sorted_list_at(size_t ndx, ObjKey existing, Obj
 }
 
 template <size_t ChunkWidth>
-std::unique_ptr<IndexNode<ChunkWidth>>
-IndexNode<ChunkWidth>::do_add_direct(ObjKey value, size_t ndx, const IndexKey<ChunkWidth>& key, bool inner_node)
+std::unique_ptr<IndexNode<ChunkWidth>> IndexNode<ChunkWidth>::do_add_direct(ObjKey value, size_t ndx, bool inner_node)
 {
     RefOrTagged rot = get_as_ref_or_tagged(ndx);
     if (inner_node) {
@@ -452,7 +447,7 @@ IndexNode<ChunkWidth>::do_add_direct(ObjKey value, size_t ndx, const IndexKey<Ch
         int64_t existing = rot.get_as_int();
         REALM_ASSERT_EX(existing != value.value, existing, value.value);
         // put these two entries into a new list
-        make_sorted_list_at(ndx, ObjKey(existing), value, key.get_mixed());
+        make_sorted_list_at(ndx, ObjKey(existing), value);
         return nullptr;
     }
     ref_type ref = rot.get_as_ref();
@@ -492,9 +487,9 @@ IndexNode<ChunkWidth>::do_add_direct(ObjKey value, size_t ndx, const IndexKey<Ch
 template <size_t ChunkWidth>
 void IndexNode<ChunkWidth>::insert(ObjKey value, IndexKey<ChunkWidth> key)
 {
-    // util::format(std::cout, "insert '%1'\n", key.get_mixed());
+    // util::format(std::cout, "insert '%1'\n", value.value);
     // auto guard = make_scope_exit([&]() noexcept {
-    //     util::format(std::cout, "done insert ('%1'): \n", key.get_mixed());
+    //     util::format(std::cout, "done insert ('%1'): \n", value.value);
     //     update_from_parent();
     //     print();
     // });
@@ -516,7 +511,7 @@ void IndexNode<ChunkWidth>::insert(ObjKey value, IndexKey<ChunkWidth> key)
         InsertResult result = cur_node->insert_to_population(key);
         if (!key.get()) {
             constexpr bool inner_node = false;
-            auto has_nesting = cur_node->do_add_direct(value, c_ndx_of_null, key, inner_node);
+            auto has_nesting = cur_node->do_add_direct(value, c_ndx_of_null, inner_node);
             REALM_ASSERT(!has_nesting);
             return;
         }
@@ -526,7 +521,7 @@ void IndexNode<ChunkWidth>::insert(ObjKey value, IndexKey<ChunkWidth> key)
             // no entry for this yet, insert one
             cur_node->Array::insert(result.real_index, 0);
         }
-        next = cur_node->do_add_direct(value, result.real_index, key, inner_node);
+        next = cur_node->do_add_direct(value, result.real_index, inner_node);
         cur_node->verify();
         if (!next) {
             break;
@@ -613,21 +608,21 @@ void IndexNode<ChunkWidth>::collapse_nodes(std::vector<std::unique_ptr<IndexNode
                 size_t parent_prefix_size = node_to_collapse->get_prefix_size() + 1;
                 size_t child_prefix_size = child.get_prefix_size();
                 const size_t combined_prefix_size = parent_prefix_size + child_prefix_size;
-                IndexKey<ChunkWidth> combined_prefix(0);
+                IndexKey<ChunkWidth> combined_prefix(typename IndexKey<ChunkWidth>::InternalTag(), 0);
                 if (prefix_fits_inline(combined_prefix_size)) {
                     IndexKey<ChunkWidth> parent_prefix = node_to_collapse->get_prefix();
                     IndexKey<ChunkWidth> child_prefix = child.get_prefix();
                     uint64_t child_entry_in_parent = get_chunk_value_from_population(node_to_collapse.get());
-                    uint64_t combined = parent_prefix.get_mixed().template get<Int>();
+                    uint64_t combined = parent_prefix.get_internal_value();
                     combined += (child_entry_in_parent << (64 - (ChunkWidth * parent_prefix_size)));
-                    combined +=
-                        uint64_t(child_prefix.get_mixed().template get<Int>()) >> (parent_prefix_size * ChunkWidth);
-                    combined_prefix = IndexKey<ChunkWidth>(int64_t(combined));
+                    combined += uint64_t(child_prefix.get_internal_value()) >> (parent_prefix_size * ChunkWidth);
+                    combined_prefix =
+                        IndexKey<ChunkWidth>(typename IndexKey<ChunkWidth>::InternalTag(), int64_t(combined));
                 }
                 else {
                     const size_t prefix_offset = get_prefix_offset_to_last_node();
                     ObjKey child_key = node_to_collapse->get_any_child();
-                    combined_prefix = IndexKey<ChunkWidth>(cluster.get_value(child_key));
+                    combined_prefix = IndexKey<ChunkWidth>(Mixed{cluster.get_value(child_key)});
                     combined_prefix.set_offset(prefix_offset);
                 }
                 child.set_prefix(combined_prefix, combined_prefix_size);
@@ -662,7 +657,7 @@ void IndexNode<ChunkWidth>::erase(ObjKey value, IndexKey<ChunkWidth> key)
 {
     update_from_parent();
 
-    // util::format(std::cout, "erase '%1'\n", key.get_mixed());
+    // util::format(std::cout, "erase '%1'\n", value.value);
     // auto guard = make_scope_exit([&]() noexcept {
     //     std::cout << "done erase: \n";
     //     update_from_parent();
@@ -671,9 +666,9 @@ void IndexNode<ChunkWidth>::erase(ObjKey value, IndexKey<ChunkWidth> key)
 
     IndexIterator it = find_first(key, value);
     std::vector<std::unique_ptr<IndexNode<ChunkWidth>>> accessors_chain = get_accessors_chain(it);
-    REALM_ASSERT_EX(it, value, key.get_mixed());
-    REALM_ASSERT_EX(it.m_positions.size(), value, key.get_mixed());
-    REALM_ASSERT_EX(accessors_chain.size(), value, key.get_mixed());
+    REALM_ASSERT_EX(it, value);
+    REALM_ASSERT_EX(it.m_positions.size(), value);
+    REALM_ASSERT_EX(accessors_chain.size(), value);
 
     if (it.m_type == IndexIterator::ResultType::List) {
         REALM_ASSERT_3(it.m_positions.size(), >=, 2);
@@ -738,7 +733,7 @@ IndexIterator IndexNode<ChunkWidth>::find_first(IndexKey<ChunkWidth> key, ObjKey
                     IntegerColumn::const_iterator it_end = list.cend();
                     IntegerColumn::const_iterator lower =
                         std::lower_bound(list.cbegin(), it_end, optional_known_key.value);
-                    REALM_ASSERT_EX(lower != it_end, key.get_mixed());
+                    REALM_ASSERT(lower != it_end);
                     position_in_list = lower - list.cbegin();
                 }
                 ret.m_positions.push_back(ArrayChainLink{cur_node.get_ref(), c_ndx_of_null});
@@ -747,7 +742,6 @@ IndexIterator IndexNode<ChunkWidth>::find_first(IndexKey<ChunkWidth> key, ObjKey
                 ret.m_key = ObjKey(list.get(position_in_list));
                 return ret;
             }
-            REALM_ASSERT_3(m_cluster.get_value(ObjKey(rot.get_as_int())), ==, key.get_mixed());
             ret.m_positions.push_back(ArrayChainLink{cur_node.get_ref(), c_ndx_of_null});
             ret.m_key = ObjKey(rot.get_as_int());
             ret.m_type = IndexIterator::ResultType::Exhaustive;
@@ -797,7 +791,7 @@ IndexIterator IndexNode<ChunkWidth>::find_first(IndexKey<ChunkWidth> key, ObjKey
                     IntegerColumn::const_iterator it_end = sub.cend();
                     IntegerColumn::const_iterator lower =
                         std::lower_bound(sub.cbegin(), it_end, optional_known_key.value);
-                    REALM_ASSERT_EX(lower != it_end, key.get_mixed());
+                    REALM_ASSERT(lower != it_end);
                     position_in_list = lower - sub.cbegin();
                 }
                 ret.m_key = ObjKey(sub.get(position_in_list));
@@ -874,10 +868,14 @@ void IndexNode<ChunkWidth>::find_all_insensitive(std::vector<ObjKey>& results, c
     if (!value.is_type(type_String) && !value.is_null()) {
         return;
     }
-    const util::Optional<std::string> upper_value = case_map(value.get<StringData>(), true);
-    const util::Optional<std::string> lower_value = case_map(value.get<StringData>(), false);
-    IndexKey<ChunkWidth> upper_key(Mixed{upper_value});
-    IndexKey<ChunkWidth> lower_key(Mixed{lower_value});
+    const std::optional<std::string> upper_value =
+        value.is_null() ? util::none : case_map(value.get<StringData>(), true);
+    const std::optional<std::string> lower_value =
+        value.is_null() ? util::none : case_map(value.get<StringData>(), false);
+    const Mixed upper_mixed{upper_value};
+    const Mixed lower_mixed{lower_value};
+    IndexKey<ChunkWidth> upper_key(upper_mixed);
+    IndexKey<ChunkWidth> lower_key(lower_mixed);
 
     auto check_insensitive_value_for_key = [&upper_value, &cluster = m_cluster, &results, &value](int64_t obj_key) {
         Mixed val = cluster.get_value(ObjKey(obj_key));
@@ -982,7 +980,7 @@ void IndexNode<ChunkWidth>::find_all_insensitive(std::vector<ObjKey>& results, c
         }
         if (std::optional<size_t> ndx_lower = cur_node.index_of(lower_key)) {
             // no need to check again if the case mapping is identical for this key chunk.
-            if (ndx_lower != *ndx_upper) {
+            if (ndx_lower != ndx_upper) {
                 check_existing(*ndx_lower, lower_key);
             }
         }
@@ -991,111 +989,259 @@ void IndexNode<ChunkWidth>::find_all_insensitive(std::vector<ObjKey>& results, c
 }
 
 template <size_t ChunkWidth>
-std::optional<size_t> IndexKey<ChunkWidth>::get() const
+void IndexNode<ChunkWidth>::find_all(IndexIterator begin, IndexIterator end, std::vector<ObjKey>& results) const
 {
-    if (m_mixed.is_null()) {
-        return {};
+    while (!begin.m_positions.empty() && begin.less_equal_to(end)) {
+        results.push_back(begin.m_key);
+        increment(begin);
     }
-    size_t ret = 0;
-    if (m_mixed.is_type(type_Int)) {
-        if ((m_offset * ChunkWidth) >= 64) {
-            return {};
-        }
-        size_t rshift = (1 + m_offset) * ChunkWidth;
-        rshift = rshift < 64 ? 64 - rshift : 0;
-        ret = (uint64_t(m_mixed.get<Int>()) & (c_int_mask >> (m_offset * ChunkWidth))) >> rshift;
-        REALM_ASSERT_3(ret, <, (1 << ChunkWidth));
-        return ret;
-    }
-    else if (m_mixed.is_type(type_Timestamp)) {
-        // 64 bit seconds, 32 bit nanoseconds
-        if ((m_offset * ChunkWidth) >= (64 + 32)) {
-            return {};
-        }
-        Timestamp ts = m_mixed.get<Timestamp>();
-        static_assert(sizeof(ts.get_seconds()) == 8, "index format change");
-        static_assert(sizeof(ts.get_nanoseconds()) == 4, "index format change");
-        size_t bits_begin = m_offset * ChunkWidth;
-        size_t bits_end = (1 + m_offset) * ChunkWidth;
+}
 
-        constexpr size_t chunks_in_seconds = constexpr_ceil(float(64.0 / double(ChunkWidth)));
-        constexpr size_t remainder_bits_in_seconds = 64 % ChunkWidth;
-        constexpr size_t remainder_bits_in_ns =
-            remainder_bits_in_seconds == 0 ? 0 : (ChunkWidth - remainder_bits_in_seconds);
-        if (bits_begin < 64) {
-            if (bits_end <= 64) {
-                // just seconds
-                ret = (uint64_t(ts.get_seconds()) & (c_int_mask >> (m_offset * ChunkWidth))) >> (64 - bits_end);
+template <size_t ChunkWidth>
+IndexIterator IndexNode<ChunkWidth>::begin() const
+{
+    IndexIterator ret;
+    ret.m_positions = {ArrayChainLink{m_ref, realm::npos}};
+    descend(ret, Order::Firsts);
+    return ret;
+}
+
+template <size_t ChunkWidth>
+IndexIterator IndexNode<ChunkWidth>::end() const
+{
+    return IndexIterator{};
+}
+
+template <size_t ChunkWidth>
+void IndexNode<ChunkWidth>::increment(IndexIterator& it) const
+{
+    IndexNode<ChunkWidth> node = IndexNode<ChunkWidth>(m_alloc, m_cluster, m_compact_threshold);
+    while (!it.m_positions.empty()) {
+        ref_type node_ref = it.m_positions.back().array_ref;
+        if (is_sorted_list(node_ref, m_alloc)) {
+            const IntegerColumn list(m_alloc, node_ref); // Throws
+            REALM_ASSERT(list.size());
+            if (it.m_positions.back().position + 1 < list.size()) {
+                it.m_key = ObjKey(list.get(++it.m_positions.back().position));
+                return;
+            }
+            it.m_positions.pop_back();
+            continue;
+        }
+        node.init_from_ref(node_ref);
+        if (it.m_positions.back().position + 1 < node.size()) {
+            ++it.m_positions.back().position;
+            descend(it, Order::Firsts);
+            return;
+        }
+        it.m_positions.pop_back();
+    }
+}
+
+template <size_t ChunkWidth>
+void IndexNode<ChunkWidth>::descend(IndexIterator& it, Order order) const
+{
+    auto get_next_ndx = [&order](IndexNode<ChunkWidth>& node) -> size_t {
+        size_t ndx_to_explore = realm::npos;
+        if (order == Order::Firsts) {
+            auto rot = node.get_as_ref_or_tagged(c_ndx_of_null);
+            if (rot.is_tagged()) {
+                ndx_to_explore = c_ndx_of_null;
             }
             else {
-                // both seconds and nanoseconds
-                ret = (uint64_t(ts.get_seconds()) & (c_int_mask >> (m_offset * ChunkWidth))) << remainder_bits_in_ns;
-                ret += uint32_t(ts.get_nanoseconds()) >> (32 - (bits_end - 64));
+                ref_type ref = rot.get_as_ref();
+                ndx_to_explore = c_ndx_of_null;
+                if (ref == 0) {
+                    if (c_ndx_of_null + 1 < node.size()) {
+                        ndx_to_explore = c_ndx_of_null + 1;
+                    }
+                    else {
+                        return realm::npos; // empty tree
+                    }
+                }
             }
         }
-        else {
-            size_t rshift = (bits_end - 64 > 32) ? 0 : (32 - (bits_end - 64));
-            // nanoseconds only
-            ret = (uint32_t(ts.get_nanoseconds()) &
-                   (c_int_mask >> (32 + remainder_bits_in_ns + (m_offset - chunks_in_seconds) * ChunkWidth))) >>
-                  rshift;
+        else if (order == Order::Lasts) {
+            ndx_to_explore = node.size() - 1;
+            REALM_ASSERT_3(ndx_to_explore, >=, c_ndx_of_null);
         }
-        REALM_ASSERT_EX(ret < (1 << ChunkWidth), ret, ts.get_seconds(), ts.get_nanoseconds(), m_offset);
-        return ret;
+        return ndx_to_explore;
+    };
+
+    REALM_ASSERT(it.m_positions.size());
+    IndexNode<ChunkWidth> node = IndexNode<ChunkWidth>(m_alloc, m_cluster, m_compact_threshold);
+    while (true) {
+        ref_type node_ref = it.m_positions.back().array_ref;
+        if (node_ref == 0) {
+            return; // empty tree
+        }
+        if (is_sorted_list(node_ref, m_alloc)) {
+            REALM_ASSERT_3(it.m_positions.back().position, ==, realm::npos);
+            const IntegerColumn list(m_alloc, node_ref); // Throws
+            REALM_ASSERT(list.size());
+            size_t offset_in_list = order == Order::Firsts ? 0 : (list.size() - 1);
+            it.m_key = ObjKey(*(list.cbegin() + offset_in_list));
+            it.m_type = IndexIterator::ResultType::List;
+            it.m_positions.back().position = offset_in_list;
+            return;
+        }
+        node.init_from_ref(node_ref);
+
+        size_t ndx_to_explore = it.m_positions.back().position;
+        if (ndx_to_explore == realm::npos) {
+            ndx_to_explore = get_next_ndx(node);
+            if (ndx_to_explore == realm::npos) {
+                return; // empty tree
+            }
+            it.m_positions.back().position = ndx_to_explore;
+        }
+
+        auto rot = node.get_as_ref_or_tagged(ndx_to_explore);
+        if (rot.is_tagged()) {
+            it.m_key = ObjKey(rot.get_as_int());
+            it.m_type = IndexIterator::ResultType::Exhaustive;
+            return;
+        }
+        it.m_positions.push_back(ArrayChainLink{rot.get_as_ref(), realm::npos});
     }
-    else if (m_mixed.is_type(type_String)) {
+    REALM_UNREACHABLE();
+    return;
+}
+
+template <size_t ChunkWidth>
+IndexKey<ChunkWidth>::IndexKey(const Mixed& m)
+{
+    if (m.is_null()) {
+        m_type = Type::Null;
+        m_num_chunks = 0;
+    }
+    else if (m.is_type(type_Int)) {
+        constexpr size_t chunks_in_int = constexpr_ceil(64.0 / double(ChunkWidth));
+        // flip the sign bit so that negatives come before positives
+        constexpr static uint64_t sign_bit = (uint64_t(1) << 63);
+        m_int_data = uint64_t(m.get<Int>()) ^ (sign_bit);
+        m_type = Type::IntData;
+        m_num_chunks = chunks_in_int;
+    }
+    else if (m.is_type(type_Timestamp)) {
+        constexpr size_t chunks_in_ts = constexpr_ceil((64.0 + 32.0) / double(ChunkWidth));
+        m_int_data = m.get<Timestamp>().get_seconds();
+        m_ns_data = uint32_t(m.get<Timestamp>().get_nanoseconds());
+        m_type = Type::Timestamp;
+        m_num_chunks = chunks_in_ts;
+    }
+    else if (m.is_type(type_String)) {
+        StringData str = m.get<StringData>();
+        m_type = Type::String;
         REALM_ASSERT_EX(ChunkWidth == 8, ChunkWidth); // FIXME: other sizes for strings
-        StringData str = m_mixed.get<StringData>();
-        // In order to differentiate between NULL and the empty string,
-        // we append an 'X' character to all non-null strings. This is
-        // the same solution that the StringIndex uses.
-        // "foo" is stored as if it was "fooX", and "" (empty string)
-        // is stored as "X".
-        constexpr size_t bits_per_char = 8;
-        const size_t cur_pos = m_offset * ChunkWidth;
-        const size_t end_pos = bits_per_char * str.size();
-        if (cur_pos >= end_pos) {
-            if (cur_pos == end_pos) {
+        m_string_data = str.data();
+        m_num_chunks = str.size() + 1; // account for 'X'
+    }
+    else {
+        REALM_UNREACHABLE(); // FIXME: implement if needed
+    }
+}
+
+template <size_t ChunkWidth>
+IndexKey<ChunkWidth>::IndexKey(InternalTag, int64_t value)
+    : m_num_chunks(constexpr_ceil(64.0 / double(ChunkWidth)))
+{
+    m_int_data = uint64_t(value);
+    m_type = Type::IntExact;
+}
+
+template <size_t ChunkWidth>
+uint64_t IndexKey<ChunkWidth>::get_internal_value() const
+{
+    REALM_ASSERT(m_type == Type::IntExact);
+    return m_int_data;
+}
+
+template <size_t ChunkWidth>
+std::optional<size_t> IndexKey<ChunkWidth>::get() const
+{
+    switch (m_type) {
+        case Type::Null:
+            return {};
+        case Type::IntData:
+        case Type::IntExact: {
+            if (m_offset >= m_num_chunks) {
+                return {};
+            }
+            size_t rshift = (1 + m_offset) * ChunkWidth;
+            rshift = rshift < 64 ? 64 - rshift : 0;
+            size_t ret = (m_int_data & (c_int_mask >> (m_offset * ChunkWidth))) >> rshift;
+            REALM_ASSERT_3(ret, <, (1 << ChunkWidth));
+            return ret;
+        }
+        case Type::Timestamp: {
+            // 64 bit seconds, 32 bit nanoseconds
+            if (m_offset >= m_num_chunks) {
+                return {};
+            }
+            static_assert(sizeof(m_int_data) == 8, "index format change");
+            static_assert(sizeof(m_ns_data) == 4, "index format change");
+            size_t bits_begin = m_offset * ChunkWidth;
+            size_t bits_end = (1 + m_offset) * ChunkWidth;
+
+            constexpr size_t chunks_in_seconds = constexpr_ceil(float(64.0 / double(ChunkWidth)));
+            constexpr size_t remainder_bits_in_seconds = 64 % ChunkWidth;
+            constexpr size_t remainder_bits_in_ns =
+                remainder_bits_in_seconds == 0 ? 0 : (ChunkWidth - remainder_bits_in_seconds);
+            size_t ret = 0;
+            if (bits_begin < 64) {
+                if (bits_end <= 64) {
+                    // just seconds
+                    ret = (m_int_data & (c_int_mask >> (m_offset * ChunkWidth))) >> (64 - bits_end);
+                }
+                else {
+                    // both seconds and nanoseconds
+                    ret = (m_int_data & (c_int_mask >> (m_offset * ChunkWidth))) << remainder_bits_in_ns;
+                    ret += m_ns_data >> (32 - (bits_end - 64));
+                }
+            }
+            else {
+                size_t rshift = (bits_end - 64 > 32) ? 0 : (32 - (bits_end - 64));
+                // nanoseconds only
+                ret = (m_ns_data &
+                       (c_int_mask >> (32 + remainder_bits_in_ns + (m_offset - chunks_in_seconds) * ChunkWidth))) >>
+                      rshift;
+            }
+            REALM_ASSERT_EX(ret < (1 << ChunkWidth), ret, m_int_data, m_ns_data, m_offset);
+            return ret;
+        }
+        case Type::String:
+            // In order to differentiate between NULL and the empty string,
+            // we prepend an 'X' character to all non-null strings. This is
+            // the same solution that the StringIndex uses.
+            // "foo" is stored as if it was "Xfoo", and "" (empty string)
+            // is stored as "X". Prepending allows use of the prefix optimization.
+            if (m_offset >= m_num_chunks) {
+                return {};
+            }
+            if (m_offset == 0) {
                 return 'X';
             }
-            return {};
-        }
-        ret = (unsigned char)(str[m_offset]);
-        REALM_ASSERT_EX(ret < (1 << ChunkWidth), ret, str[m_offset], str.size(), m_offset);
-        return ret;
+            return (unsigned char)(m_string_data[m_offset - 1]);
     }
-    REALM_UNREACHABLE(); // FIXME: implement if needed
+    REALM_UNREACHABLE();
+}
+
+template <size_t ChunkWidth>
+std::optional<size_t> IndexKey<ChunkWidth>::get_next()
+{
+    REALM_ASSERT_DEBUG_EX(get(), m_offset);
+    ++m_offset;
+    return get();
 }
 
 template <size_t ChunkWidth>
 size_t IndexKey<ChunkWidth>::num_chunks_to_penultimate() const
 {
-    if (m_mixed.is_null()) {
+    if (m_type == Type::Null || m_offset >= m_num_chunks - 1) {
         return 0;
     }
-    switch (m_mixed.get_type()) {
-        case type_Int: {
-            constexpr size_t chunks_in_int = constexpr_ceil(64.0 / double(ChunkWidth));
-            REALM_ASSERT_DEBUG(m_offset <= chunks_in_int - 1);
-            return (chunks_in_int - 1) - m_offset;
-        }
-        case type_Timestamp: {
-            // 64 bit seconds + 32 bit nanoseconds
-            constexpr size_t chunks_in_ts = constexpr_ceil((64.0 + 32.0) / double(ChunkWidth));
-            REALM_ASSERT_DEBUG(m_offset <= chunks_in_ts - 1);
-            return (chunks_in_ts - 1) - m_offset;
-        }
-        case type_String: {
-            const size_t payload_bits = (m_mixed.get<StringData>().size() * 8);
-            size_t chunks_in_str = ceil(double(payload_bits) / double(ChunkWidth));
-            REALM_ASSERT_DEBUG(m_offset <= chunks_in_str);
-            return chunks_in_str - m_offset;
-        }
-        default:
-            break;
-    }
-    REALM_UNREACHABLE(); // implement other types if needed
-    return 0;
+    return m_num_chunks - m_offset - 1;
 }
 
 template <size_t ChunkWidth>
@@ -1120,7 +1266,7 @@ template <size_t ChunkWidth>
 size_t IndexKey<ChunkWidth>::advance_to_common_prefix(IndexKey<ChunkWidth> other, size_t other_max_prefix_size)
 {
     size_t num_common_chunks = 0;
-    REALM_ASSERT_EX(get(), m_offset, get_mixed());
+    REALM_ASSERT_EX(get(), m_offset);
     size_t max_self_prefix_size = num_chunks_to_penultimate();
     while (num_common_chunks < other_max_prefix_size && num_common_chunks < max_self_prefix_size) {
         auto self_chunk = get();
@@ -1212,7 +1358,8 @@ IndexKey<ChunkWidth> IndexNode<ChunkWidth>::get_prefix()
     RefOrTagged rot_payload = get_as_ref_or_tagged(c_ndx_of_prefix_payload);
     if (prefix_fits_inline(prefix_size)) {
         REALM_ASSERT(rot_payload.is_tagged());
-        return IndexKey<ChunkWidth>(Mixed{int64_t(rot_payload.get_as_int() << 1)});
+        return IndexKey<ChunkWidth>(typename IndexKey<ChunkWidth>::InternalTag(),
+                                    int64_t(rot_payload.get_as_int() << 1));
     }
     REALM_ASSERT(rot_payload.is_tagged());
     ObjKey any_child = get_any_child();
@@ -1353,7 +1500,7 @@ InsertResult IndexNode<ChunkWidth>::insert_to_population(IndexKey<ChunkWidth>& k
     do_prefix_insert(key);
 
     auto optional_value = key.get(); // do_prefix_insert may have advanced the key
-    REALM_ASSERT_EX(optional_value, key.get_mixed(), key.get_offset());
+    REALM_ASSERT_EX(optional_value, key.get_offset());
     return do_insert_to_population(*optional_value);
 }
 
@@ -1651,6 +1798,37 @@ size_t RadixTree<ChunkWidth>::count(const Mixed& val) const
     const IntegerColumn sub(m_array->get_alloc(), it.m_positions.back().array_ref); // Throws
     REALM_ASSERT(sub.size());
     return sub.size();
+}
+
+template <size_t ChunkWidth>
+void RadixTree<ChunkWidth>::find_all_greater_equal(const Mixed& value, std::vector<ObjKey>& results) const
+{
+    m_array->update_from_parent();
+    IndexIterator begin = m_array->find_first(IndexKey<ChunkWidth>(value));
+    IndexIterator end = m_array->end();
+    results.clear();
+    m_array->find_all(begin, end, results);
+}
+
+template <size_t ChunkWidth>
+void RadixTree<ChunkWidth>::find_all_less_equal(const Mixed& value, std::vector<ObjKey>& results) const
+{
+    m_array->update_from_parent();
+    IndexIterator begin = m_array->begin();
+    IndexIterator end = m_array->find_first(IndexKey<ChunkWidth>(value));
+    results.clear();
+    m_array->find_all(begin, end, results);
+}
+
+template <size_t ChunkWidth>
+void RadixTree<ChunkWidth>::find_all_between_inclusive(const Mixed& begin, const Mixed& end,
+                                                       std::vector<ObjKey>& results) const
+{
+    m_array->update_from_parent();
+    IndexIterator begin_it = m_array->find_first(IndexKey<ChunkWidth>(begin));
+    IndexIterator end_it = m_array->find_first(IndexKey<ChunkWidth>(end));
+    results.clear();
+    m_array->find_all(begin_it, end_it, results);
 }
 
 template <size_t ChunkWidth>
