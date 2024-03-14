@@ -2630,6 +2630,7 @@ int benchmark_common_tasks_main()
     BENCH(BenchmarkMixedCaseInsensitiveEqual<Indexed<String>>);
 
     BENCH(BenchmarkRangeForType<Prop<Int>>);
+    BENCH(BenchmarkRangeForType<NullableIndexed<Int>>);
     BENCH(BenchmarkCreateIndexForType<NullableIndexed<String>>);
     BENCH(BenchmarkCreateIndexForType<NullableIndexed<Int>>);
     BENCH(BenchmarkCreateIndexForType<NullableIndexed<Timestamp>>);

@@ -133,10 +133,6 @@ struct ArrayChainLink {
 };
 
 struct IndexIterator {
-    IndexIterator& operator++();
-    IndexIterator next() const;
-    size_t num_matches() const;
-
     ObjKey get_key() const
     {
         return m_key;
@@ -144,6 +140,19 @@ struct IndexIterator {
     operator bool() const
     {
         return bool(m_key);
+    }
+    bool less_equal_to(const IndexIterator& other) const
+    {
+        if (other.m_positions.size() == 0) {
+            return true; // end()
+        }
+        for (size_t i = 0; i < m_positions.size() && i < other.m_positions.size(); ++i) {
+            if (m_positions[i].array_ref == other.m_positions[i].array_ref &&
+                m_positions[i].position <= other.m_positions[i].position) {
+                return true;
+            }
+        }
+        return false;
     }
 
 private:
@@ -163,26 +172,17 @@ private:
 template <size_t ChunkWidth>
 class IndexKey {
 public:
-    IndexKey(Mixed m)
-        : m_mixed(m)
-    {
-    }
+    IndexKey(const Mixed& m);
+    struct InternalTag {};
+    IndexKey(InternalTag, int64_t value);
     std::optional<size_t> get() const;
-    std::optional<size_t> get_next()
-    {
-        REALM_ASSERT_DEBUG_EX(get(), m_offset, m_mixed);
-        ++m_offset;
-        return get();
-    }
+    std::optional<size_t> get_next();
     void next()
     {
-        REALM_ASSERT_DEBUG_EX(get(), m_offset, m_mixed);
+        REALM_ASSERT_DEBUG_EX(get(), m_offset);
         ++m_offset;
     }
-    const Mixed& get_mixed() const
-    {
-        return m_mixed;
-    }
+    uint64_t get_internal_value() const;
     size_t get_offset() const
     {
         return m_offset;
@@ -206,7 +206,11 @@ public:
 
 private:
     size_t m_offset = 0;
-    Mixed m_mixed;
+    enum class Type { Null, IntData, IntExact, Timestamp, String } m_type;
+    size_t m_num_chunks;
+    const char* m_string_data = nullptr;
+    uint64_t m_int_data = 0;
+    uint32_t m_ns_data = 0;
 };
 
 struct InsertResult {
@@ -241,6 +245,10 @@ public:
     void find_all(std::vector<ObjKey>& results, IndexKey<ChunkWidth> key) const;
     FindRes find_all_no_copy(IndexKey<ChunkWidth> value, InternalFindResult& result) const;
     void find_all_insensitive(std::vector<ObjKey>& results, const Mixed& value) const;
+    void find_all(IndexIterator begin, IndexIterator end, std::vector<ObjKey>& results) const;
+    IndexIterator begin() const;
+    IndexIterator end() const;
+    void increment(IndexIterator& it) const;
     void clear();
     bool has_duplicate_values() const;
     bool is_empty() const;
@@ -263,9 +271,8 @@ private:
     constexpr static size_t c_num_metadata_entries = c_num_population_entries + 3;
 
     void init(NodeType type);
-    void make_sorted_list_at(size_t ndx, ObjKey existing, ObjKey key_to_insert, Mixed insert_value);
-    std::unique_ptr<IndexNode> do_add_direct(ObjKey value, size_t ndx, const IndexKey<ChunkWidth>& key,
-                                             bool inner_node);
+    void make_sorted_list_at(size_t ndx, ObjKey existing, ObjKey key_to_insert);
+    std::unique_ptr<IndexNode> do_add_direct(ObjKey value, size_t ndx, bool inner_node);
     std::unique_ptr<IndexNode> do_add_last(ObjKey value, size_t ndx, const IndexKey<ChunkWidth>& key);
     uint64_t get_population(size_t ndx) const;
     void set_population(size_t ndx, uint64_t pop);
@@ -295,6 +302,12 @@ private:
     std::optional<size_t> index_of(const IndexKey<ChunkWidth>& key) const;
     void do_remove(size_t index_raw);
     std::vector<std::unique_ptr<IndexNode<ChunkWidth>>> get_accessors_chain(const IndexIterator& it);
+
+    enum class Order {
+        Firsts,
+        Lasts,
+    };
+    void descend(IndexIterator& it, Order order) const;
 
     ClusterColumn m_cluster;
     const size_t m_compact_threshold;
@@ -333,6 +346,9 @@ public:
 
     // RadixTree specials
     void insert(ObjKey value, IndexKey<ChunkWidth> key);
+    void find_all_greater_equal(const Mixed& begin, std::vector<ObjKey>& results) const;
+    void find_all_less_equal(const Mixed& begin, std::vector<ObjKey>& results) const;
+    void find_all_between_inclusive(const Mixed& begin, const Mixed& end, std::vector<ObjKey>& results) const;
 
 private:
     void erase(ObjKey key, const Mixed& new_value);

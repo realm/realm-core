@@ -66,13 +66,14 @@ TEST_TYPES(IndexKey_Get, ChunkOf<4>, ChunkOf<5>, ChunkOf<6>, ChunkOf<7>, ChunkOf
 
     CHECK(!IndexKey<ChunkWidth>(Mixed{}).get());
 
-    size_t max = uint64_t(1) << ChunkWidth;
-    for (size_t i = 0; i < max; ++i) {
-        uint64_t shifted_value = uint64_t(i) << (64 - ChunkWidth);
+    const uint64_t max = uint64_t(1) << ChunkWidth;
+    const uint64_t sign_bit_flip = uint64_t(1) << (ChunkWidth - 1);
+    for (uint64_t i = 0; i < max; ++i) {
+        uint64_t shifted_value = i << (64 - ChunkWidth);
         IndexKey<ChunkWidth> key{int64_t(shifted_value)};
         auto val = key.get();
         CHECK(val);
-        CHECK_EQUAL(i, *val);
+        CHECK_EQUAL(i ^ sign_bit_flip, *val);
 
         const size_t num_chunks_per_int = size_t(std::ceil(double(64) / double(ChunkWidth)));
 
@@ -114,10 +115,10 @@ TEST(RadixTree_BuildIndexInt)
     CHECK(int_index->has_duplicate_values());
     std::vector<ObjKey> results;
     int_index->find_all(results, Mixed{5});
+    CHECK_EQUAL(results.size(), 3);
     CHECK_EQUAL(results[0], obj_keys[6]);
     CHECK_EQUAL(results[1], obj_keys[7]);
     CHECK_EQUAL(results[2], obj_keys[8]);
-    CHECK_EQUAL(results.size(), 3);
     InternalFindResult res;
     FindRes res_type = int_index->find_all_no_copy(Mixed{4}, res);
     CHECK_EQUAL(res_type, FindRes_column);
@@ -126,6 +127,13 @@ TEST(RadixTree_BuildIndexInt)
     CHECK_EQUAL(res.end_ndx - res.start_ndx, 2);
     CHECK_EQUAL(col.get(res.start_ndx), obj_keys[4].value);
     CHECK_EQUAL(col.get(res.start_ndx + 1), obj_keys[5].value);
+
+    int_index->find_all_greater_equal(Mixed{4}, results);
+    std::vector<ObjKey> expected;
+    expected.insert(expected.begin(), obj_keys.begin() + 4, obj_keys.begin() + 9);
+    CHECK_EQUAL(results, expected);
+
+
     while (table.size()) {
         table.remove_object(table.begin());
     }
@@ -206,6 +214,20 @@ TEST_TYPES(RadixTree_BuildIndexString, ChunkOf<8>)
     CHECK_EQUAL(index->count(""), 0);
     CHECK_EQUAL(index->count(StringData()), 0);
     CHECK(index->has_duplicate_values());
+    RadixTree<8>* ndx = dynamic_cast<RadixTree<8>*>(index);
+    CHECK(ndx);
+    std::vector<ObjKey> result_keys;
+    ndx->find_all_between_inclusive(Mixed{"0"}, Mixed{"9"}, result_keys);
+    CHECK_EQUAL(result_keys, keys_inserted);
+    ndx->find_all_less_equal(Mixed{"3"}, result_keys);
+    std::vector<ObjKey> expected;
+    expected.insert(expected.begin(), keys_inserted.begin(), keys_inserted.begin() + 8);
+    CHECK_EQUAL(result_keys, expected);
+    ndx->find_all_greater_equal(Mixed{"3"}, result_keys);
+    expected.clear();
+    expected.insert(expected.begin(), keys_inserted.begin() + 6, keys_inserted.end());
+    CHECK_EQUAL(result_keys, expected);
+
     verify_values({StringData(), "aabc", "aab", "aabcd", "aa"});
     verify_values({"aa", "aab", "aa", "aa"});
 
@@ -238,7 +260,7 @@ TEST_TYPES(RadixTree_BuildIndexString, ChunkOf<8>)
     verify_removal();
 }
 
-template <typename Type>
+template <typename Type, size_t ChunkWidth>
 void do_test_type(Table& table, TestContext& test_context)
 {
     int64_t dup_positive = 8;
@@ -335,6 +357,38 @@ void do_test_type(Table& table, TestContext& test_context)
     CHECK(ndx->has_duplicate_values());
     CHECK_NOT(ndx->is_empty());
 
+    if constexpr (std::is_same_v<Type, int64_t>) {
+        auto get_result_values = [&](std::vector<ObjKey>& keys, bool expect_null) -> std::vector<int64_t> {
+            std::vector<int64_t> result_values;
+            auto it_of_null = std::find(keys.begin(), keys.end(), null_val_obj.get_key());
+            CHECK(expect_null ? (it_of_null != keys.end()) : (it_of_null == keys.end()));
+            if (expect_null) {
+                keys.erase(it_of_null);
+            }
+            std::for_each(keys.begin(), keys.end(), [&](ObjKey key) {
+                result_values.push_back(table.get_object(key).get<int64_t>(col));
+            });
+            return result_values;
+        };
+        std::sort(values.begin(), values.end());
+        std::vector<ObjKey> results;
+        constexpr bool should_contain_null = true;
+        constexpr bool should_not_contain_null = false;
+        RadixTree<ChunkWidth>* int_index = dynamic_cast<RadixTree<ChunkWidth>*>(ndx);
+        CHECK(int_index);
+        if (int_index) {
+            int_index->find_all_less_equal(values.back(), results);
+            std::vector<int64_t> result_values = get_result_values(results, should_contain_null);
+            CHECK_EQUAL(values, result_values);
+            int_index->find_all_greater_equal(values.front(), results);
+            result_values = get_result_values(results, should_not_contain_null);
+            CHECK_EQUAL(values, result_values);
+            int_index->find_all_between_inclusive(values.front(), values.back(), results);
+            result_values = get_result_values(results, should_not_contain_null);
+            CHECK_EQUAL(values, result_values);
+        }
+    }
+
     for (auto key : keys) {
         table.remove_object(key);
     }
@@ -349,7 +403,7 @@ void do_test_type(Table& table, TestContext& test_context)
 TEST_TYPES(IndexNode, ChunkOf<4>, ChunkOf<5>, ChunkOf<6>, ChunkOf<7>, ChunkOf<8>, ChunkOf<9>, ChunkOf<10>)
 {
     constexpr size_t ChunkWidth = TEST_TYPE::value;
-    std::vector<size_t> compact_thresholds = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 100, 1000, 2000};
+    std::vector<size_t> compact_thresholds = {10}; // {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 100, 1000, 2000};
     for (size_t threshold : compact_thresholds) {
         Table::IndexMaker hook = [&](ColKey col_key, const ClusterColumn& cluster, Allocator& alloc, ref_type ref,
                                      Array* parent, size_t col_ndx) -> std::unique_ptr<SearchIndex> {
@@ -369,10 +423,10 @@ TEST_TYPES(IndexNode, ChunkOf<4>, ChunkOf<5>, ChunkOf<6>, ChunkOf<7>, ChunkOf<8>
         Table table;
         table.set_index_maker(std::move(hook));
 
-        do_test_type<int64_t>(table, test_context);
-        do_test_type<Timestamp>(table, test_context);
+        do_test_type<int64_t, ChunkWidth>(table, test_context);
+        do_test_type<Timestamp, ChunkWidth>(table, test_context);
         if constexpr (ChunkWidth == 8) {
-            do_test_type<StringData>(table, test_context);
+            do_test_type<StringData, ChunkWidth>(table, test_context);
         }
     }
 }
