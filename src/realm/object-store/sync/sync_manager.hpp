@@ -332,7 +332,7 @@ private:
     std::string m_sync_route GUARDED_BY(m_mutex);
     // If true, then the sync route has been verified by querying the location info or successfully
     // connecting to the server.
-    bool m_sync_route_verified GUARDED_BY(m_mutex);
+    bool m_sync_route_verified GUARDED_BY(m_mutex) = false;
 
     std::weak_ptr<app::App> m_app GUARDED_BY(m_mutex);
     const std::string m_app_id;
