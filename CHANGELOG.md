@@ -3,6 +3,7 @@
 ### Enhancements
 * Add support to synchronize collections embedded in Mixed properties and other collections (except sets) ([PR #7353](https://github.com/realm/realm-core/pull/7353)).
 * Improve performance of change notifications on nested collections somewhat ([PR #7402](https://github.com/realm/realm-core/pull/7402)).
+* Improve performance of aggregate operations on Dictionaries of objects, particularly when the dictionaries are empty ([PR #7418](https://github.com/realm/realm-core/pull/7418))
 * Added Resumption delay configuration to SyncClientTimeouts. ([PR #7441](https://github.com/realm/realm-core/pull/7441))
 
 ### Fixed

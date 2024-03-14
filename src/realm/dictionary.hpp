@@ -226,6 +226,8 @@ public:
 
     void to_json(std::ostream&, JSONOutputMode, util::FunctionRef<void(const Mixed&)>) const override;
 
+    LinkCollectionPtr clone_as_obj_list() const final;
+
 private:
     using Base::set_collection;
 
