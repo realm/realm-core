@@ -412,8 +412,8 @@ void App::configure_route(const std::string& host_url, const std::optional<std::
 // All others => http[s]://<host-url> => ws[s]://<host-url>
 std::string App::create_ws_host_url(const std::string_view host_url)
 {
-    constexpr static std::string_view s_orig_base_domain = "realm.mongodb.com";
-    constexpr static std::string_view s_new_base_domain = "services.cloud.mongodb.com";
+    constexpr static std::string_view orig_base_domain = "realm.mongodb.com";
+    constexpr static std::string_view new_base_domain = "services.cloud.mongodb.com";
 
     // Doesn't start with http, just return provided string
     if (host_url.substr(0, 4) != "http") {
@@ -425,11 +425,11 @@ std::string App::create_ws_host_url(const std::string_view host_url)
     std::string_view prefix = https ? "wss://" : "ws://";
 
     // http[s]://[region-prefix]realm.mongodb.com => ws[s]://ws.[region-prefix]realm.mongodb.com
-    if (host_url.find(s_orig_base_domain) != std::string_view::npos) {
+    if (host_url.find(orig_base_domain) != std::string_view::npos) {
         return util::format("%1ws.%2", prefix, host_url.substr(prefix_len));
     }
     // http[s]://[region-prefix]services.cloud.mongodb.com => ws[s]://[region-prefix].ws.services.cloud.mongodb.com
-    if (auto start = host_url.find(s_new_base_domain); start != std::string_view::npos) {
+    if (auto start = host_url.find(new_base_domain); start != std::string_view::npos) {
         return util::format("%1%2ws.%3", prefix, host_url.substr(prefix_len, start - prefix_len),
                             host_url.substr(start));
     }

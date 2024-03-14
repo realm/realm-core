@@ -4180,20 +4180,16 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
     // Verify new sync session updates location after app created with cached user
     SECTION("Verify new sync session updates location") {
         bool use_ssl = GENERATE(true, false);
+        std::string initial_host = "alternate.someurl.fake";
+        unsigned initial_port = use_ssl ? 443 : 80;
         std::string expected_host = "redirect.someurl.fake";
         unsigned expected_port = 8081;
-        std::string init_url = util::format("http%1://alternate.someurl.fake", use_ssl ? "s" : "");
-        std::string init_wsurl = util::format("ws%1://alternate.someurl.fake", use_ssl ? "s" : "");
+        std::string init_url = util::format("http%1://%2", use_ssl ? "s" : "", initial_host);
+        std::string init_wsurl = util::format("ws%1://%2", use_ssl ? "s" : "", initial_host);
         std::string redir_url = util::format("http%1://%2:%3", use_ssl ? "s" : "", expected_host, expected_port);
         std::string redir_wsurl = util::format("ws%1://%2:%3", use_ssl ? "s" : "", expected_host, expected_port);
 
         auto socket_provider = std::make_shared<HookedSocketProvider>(logger, "some user agent");
-        //        socket_provider->endpoint_verify_func = [&use_ssl, &expected_host,
-        //                                                 &expected_port](sync::WebSocketEndpoint& ep) {
-        //            CHECK(ep.address == expected_host);
-        //            CHECK(ep.port == expected_port);
-        //            CHECK(ep.is_ssl == use_ssl);
-        //        };
         socket_provider->force_failure_func = [](bool& was_clean, sync::websocket::WebSocketError& error_code,
                                                  std::string& message) {
             was_clean = false;
@@ -4244,6 +4240,13 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
                 CHECK_FALSE(verified);
             }
 
+            socket_provider->endpoint_verify_func = [&use_ssl, &expected_host,
+                                                     &expected_port](sync::WebSocketEndpoint& ep) {
+                CHECK(ep.address == expected_host);
+                CHECK(ep.port == expected_port);
+                CHECK(ep.is_ssl == use_ssl);
+            };
+
             RealmConfig r_config;
             r_config.path = sc_config.base_file_path + "/fakerealm.realm";
             r_config.sync_config = std::make_shared<SyncConfig>(app->current_user(), SyncConfig::FLXSyncEnabled{});
@@ -4286,6 +4289,13 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
                 CHECK_FALSE(verified);
             }
 
+            socket_provider->endpoint_verify_func = [&use_ssl, &initial_host,
+                                                     &initial_port](sync::WebSocketEndpoint& ep) {
+                CHECK(ep.address == initial_host);
+                CHECK(ep.port == initial_port);
+                CHECK(ep.is_ssl == use_ssl);
+            };
+
             socket_provider->force_failure_func = [&](bool& was_clean, sync::websocket::WebSocketError& error_code,
                                                       std::string& message) {
                 state.transition_with([&](TestState cur_state) -> std::optional<TestState> {
@@ -4304,6 +4314,12 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
                         // After number of location verify attempts has passed, let the location succeed
                         if (--retry_count <= 0) {
                             redir_transport->reset(init_url, redir_url);
+                            socket_provider->endpoint_verify_func = [&use_ssl, &expected_host,
+                                                                     &expected_port](sync::WebSocketEndpoint& ep) {
+                                CHECK(ep.address == expected_host);
+                                CHECK(ep.port == expected_port);
+                                CHECK(ep.is_ssl == use_ssl);
+                            };
                             return TestState::location_failed;
                         }
                         redir_transport->location_requested = false;
@@ -4419,15 +4435,15 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
             session->resume();
             state.wait_for(TestState::session_started);
 
-            //            CHECK(redir_transport->location_requested);
-            //            CHECK(app->get_base_url() == init_url);
-            //            CHECK(app->get_host_url() == redir_url);
-            //            CHECK(app->get_ws_host_url() == redir_wsurl);
-            //            {
-            //            auto [sync_route, verified] = app->sync_manager()->sync_route();
-            //            CHECK(sync_route.find(app::App::create_ws_host_url(redir_url)) != std::string::npos);
-            //            CHECK(verified);
-            //            }
+            CHECK(redir_transport->location_requested);
+            CHECK(app->get_base_url() == init_url);
+            CHECK(app->get_host_url() == redir_url);
+            CHECK(app->get_ws_host_url() == redir_wsurl);
+            {
+                auto [sync_route, verified] = app->sync_manager()->sync_route();
+                CHECK(sync_route.find(app::App::create_ws_host_url(redir_url)) != std::string::npos);
+                CHECK(verified);
+            }
         }
 #endif
     }
