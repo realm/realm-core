@@ -665,13 +665,18 @@ void SyncManager::close_all_sessions()
     get_sync_client().wait_for_session_terminations();
 }
 
-void SyncManager::set_sync_route(std::string sync_route, bool verified)
+void SyncManager::set_sync_route(std::string sync_route, bool verified, RestartSessions restart_sessions)
 {
     REALM_ASSERT(!sync_route.empty()); // Cannot be set to empty string
     {
         util::CheckedLockGuard lock(m_mutex);
         m_sync_route = sync_route;
         m_sync_route_verified = verified;
+    }
+
+    // Bail out early if not restarting the existing sessions
+    if (!restart_sessions) {
+        return;
     }
 
     std::vector<std::shared_ptr<SyncSession>> sessions;

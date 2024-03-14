@@ -183,6 +183,8 @@ std::mutex s_apps_mutex;
 namespace realm {
 namespace app {
 
+std::string_view App::default_base_url = "https://realm.mongodb.com";
+
 App::Config::DeviceInfo::DeviceInfo()
     : platform(util::get_library_platform())
     , cpu_arch(util::get_library_cpu_arch())

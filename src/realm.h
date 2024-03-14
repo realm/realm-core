@@ -88,6 +88,9 @@ typedef bool (*realm_migration_func_t)(realm_userdata_t userdata, realm_t* old_r
 typedef bool (*realm_data_initialization_func_t)(realm_userdata_t userdata, realm_t* realm);
 typedef bool (*realm_should_compact_on_launch_func_t)(realm_userdata_t userdata, uint64_t total_bytes,
                                                       uint64_t used_bytes);
+
+RLM_API const char* RLM_DEFAULT_BASE_URL;
+
 typedef enum realm_schema_mode {
     RLM_SCHEMA_MODE_AUTOMATIC,
     RLM_SCHEMA_MODE_IMMUTABLE,

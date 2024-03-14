@@ -222,13 +222,18 @@ public:
     // Immediately closes any open sync sessions for this sync manager
     void close_all_sessions() REQUIRES(!m_mutex, !m_session_mutex);
 
+    struct RestartSessionsTag {};
+
+    using RestartSessions = util::TaggedBool<RestartSessionsTag>;
     // Used by App to update the sync route any time the location info has been refreshed.
     // m_sync_route starts out as a generated value based on the configured base_url when
     // the SyncManager is created by App. If this is incorrect, the websocket connection
     // will fail, resulting in an update to the access token (and the location, if it hasn't
     // been updated yet). If the sync route is being manually set without being validated,
     // then set validated to false.
-    void set_sync_route(std::string sync_route, bool verified = true) REQUIRES(!m_mutex, !m_session_mutex);
+    void set_sync_route(std::string sync_route, bool verified = true,
+                        RestartSessions restart_sessions = RestartSessions{true})
+        REQUIRES(!m_mutex, !m_session_mutex);
 
     std::pair<const std::string, bool> sync_route() REQUIRES(!m_mutex)
     {

@@ -90,7 +90,7 @@ public:
         DeviceInfo device_info;
     };
 
-    constexpr static std::string_view default_base_url = "https://realm.mongodb.com";
+    static std::string_view default_base_url;
 
     // `enable_shared_from_this` is unsafe with public constructors;
     // use `App::get_app()` instead
