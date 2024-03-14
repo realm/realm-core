@@ -399,6 +399,12 @@ public:
         }
 
         auto resp = do_request(std::move(url_path), app::HttpMethod::post);
+        if (!resp["id"].is_string()) {
+            throw RuntimeError(
+                ErrorCodes::RuntimeError,
+                util::format("Failed to start baas container, got response without container ID: \"%1\"",
+                             resp.dump()));
+        }
         m_container_id = resp["id"].get<std::string>();
         logger->info("Baasaas container started with id \"%1\"", m_container_id);
         auto lock_file = util::File(std::string{s_baasaas_lock_file_name}, util::File::mode_Write);
@@ -442,6 +448,13 @@ public:
                 auto status_obj =
                     do_request(util::format("containerStatus?id=%1", m_container_id), app::HttpMethod::get);
                 if (!status_obj["httpUrl"].is_null()) {
+                    if (!status_obj["httpUrl"].is_string() || !status_obj["mongoUrl"].is_string()) {
+                        throw RuntimeError(
+                            ErrorCodes::RuntimeError,
+                            util::format(
+                                "Error polling for baasaas instance. httpUrl or mongoUrl is the wrong format: \"%1\"",
+                                status_obj.dump()));
+                    }
                     http_endpoint = status_obj["httpUrl"].get<std::string>();
                     mongo_endpoint = status_obj["mongoUrl"].get<std::string>();
                 }
@@ -516,7 +529,14 @@ private:
         REALM_ASSERT_EX(response.http_status_code >= 200 && response.http_status_code < 300,
                         util::format("Baasaas api response code: %1 Response body: %2", response.http_status_code,
                                      response.body));
-        return nlohmann::json::parse(response.body);
+        try {
+            return nlohmann::json::parse(response.body);
+        }
+        catch (const nlohmann::json::exception& e) {
+            throw RuntimeError(ErrorCodes::MalformedJson,
+                               util::format("Error making baasaas request to %1: Invalid json returned \"%2\" (%3)",
+                                            request.url, response.body, e.what()));
+        }
     }
 
     static std::string get_baasaas_base_url()
