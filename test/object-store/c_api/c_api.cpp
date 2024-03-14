@@ -578,8 +578,6 @@ TEST_CASE("C API (non-database)", "[c_api]") {
               600024);
         realm_sync_client_config_set_resumption_delay_backoff_multiplier(test_sync_client_config.get(), 1010);
         CHECK(test_sync_client_config->timeouts.reconnect_backoff_info.resumption_delay_backoff_multiplier == 1010);
-        realm_sync_client_config_set_resumption_delay_jitter_divisor(test_sync_client_config.get(), 212);
-        CHECK(test_sync_client_config->timeouts.reconnect_backoff_info.delay_jitter_divisor == 212);
     }
 
     SECTION("realm_app_config_t") {

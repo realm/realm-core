@@ -230,12 +230,6 @@ RLM_API void realm_sync_client_config_set_resumption_delay_backoff_multiplier(re
     config->timeouts.reconnect_backoff_info.resumption_delay_backoff_multiplier = multiplier;
 }
 
-RLM_API void realm_sync_client_config_set_resumption_delay_jitter_divisor(realm_sync_client_config_t* config,
-                                                                          int divisor) noexcept
-{
-    config->timeouts.reconnect_backoff_info.delay_jitter_divisor = divisor;
-}
-
 /// Register an app local callback handler for bindings interested in registering callbacks before/after
 /// the ObjectStore thread runs for this app. This only works for the default socket provider implementation.
 /// IMPORTANT: If a function is supplied that handles the exception, it must call abort() or cause the
