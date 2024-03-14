@@ -132,7 +132,11 @@ private:
 
     friend struct std::hash<List>;
 };
+} // namespace realm
 
+#include <realm/object-store/dictionary.hpp>
+
+namespace realm {
 template <>
 Obj List::get(size_t row_ndx) const;
 
@@ -183,15 +187,7 @@ size_t List::find(Context& ctx, T&& value) const
 template <typename T, typename Context>
 void List::add(Context& ctx, T&& value, CreatePolicy policy)
 {
-    if (m_is_embedded) {
-        validate_embedded(ctx, value, policy);
-        auto key = as<Obj>().create_and_insert_linked_object(size()).get_key();
-        ctx.template unbox<Obj>(value, policy, key);
-        return;
-    }
-    dispatch([&](auto t) {
-        this->add(ctx.template unbox<std::decay_t<decltype(*t)>>(value, policy));
-    });
+    this->insert(ctx, size(), std::move(value), policy);
 }
 
 template <typename T, typename Context>
@@ -203,9 +199,28 @@ void List::insert(Context& ctx, size_t list_ndx, T&& value, CreatePolicy policy)
         ctx.template unbox<Obj>(value, policy, key);
         return;
     }
-    dispatch([&](auto t) {
-        this->insert(list_ndx, ctx.template unbox<std::decay_t<decltype(*t)>>(value, policy));
-    });
+    if (m_type == PropertyType::Mixed) {
+        Mixed new_val = ctx.template unbox<Mixed>(value, policy);
+        if (new_val.is_type(type_Dictionary)) {
+            insert_collection(list_ndx, CollectionType::Dictionary);
+            auto dict = get_dictionary(list_ndx);
+            dict.assign(ctx, value, policy);
+            return;
+        }
+        if (new_val.is_type(type_List)) {
+            insert_collection(list_ndx, CollectionType::List);
+            auto list = get_list(list_ndx);
+            list.assign(ctx, value, policy);
+            return;
+        }
+
+        this->insert(list_ndx, new_val);
+    }
+    else {
+        dispatch([&](auto t) {
+            this->insert(list_ndx, ctx.template unbox<std::decay_t<decltype(*t)>>(value, policy));
+        });
+    }
 }
 
 template <typename T, typename Context>
@@ -219,35 +234,75 @@ void List::set(Context& ctx, size_t list_ndx, T&& value, CreatePolicy policy)
         ctx.template unbox<Obj>(value, policy, key);
         return;
     }
-    dispatch([&](auto t) {
-        this->set(list_ndx, ctx.template unbox<std::decay_t<decltype(*t)>>(value, policy));
-    });
+    if (m_type == PropertyType::Mixed) {
+        Mixed new_val = ctx.template unbox<Mixed>(value, policy);
+        if (new_val.is_type(type_Dictionary)) {
+            set_collection(list_ndx, CollectionType::Dictionary);
+            auto dict = get_dictionary(list_ndx);
+            dict.assign(ctx, value, policy);
+            return;
+        }
+        if (new_val.is_type(type_List)) {
+            set_collection(list_ndx, CollectionType::List);
+            auto list = get_list(list_ndx);
+            list.assign(ctx, value, policy);
+            return;
+        }
+
+        this->set(list_ndx, new_val);
+    }
+    else {
+        dispatch([&](auto t) {
+            this->set(list_ndx, ctx.template unbox<std::decay_t<decltype(*t)>>(value, policy));
+        });
+    }
 }
 
 template <typename T, typename Context>
-void List::set_if_different(Context& ctx, size_t row_ndx, T&& value, CreatePolicy policy)
+void List::set_if_different(Context& ctx, size_t list_ndx, T&& value, CreatePolicy policy)
 {
     if (m_is_embedded) {
         validate_embedded(ctx, value, policy);
-        auto key = policy.diff ? this->get<Obj>(row_ndx) : as<Obj>().create_and_set_linked_object(row_ndx);
+        auto key = policy.diff ? this->get<Obj>(list_ndx) : as<Obj>().create_and_set_linked_object(list_ndx);
         ctx.template unbox<Obj>(value, policy, key.get_key());
         return;
     }
-    dispatch([&](auto t) {
-        using U = std::decay_t<decltype(*t)>;
-        if constexpr (std::is_same_v<U, Obj>) {
-            auto old_value = this->get<U>(row_ndx);
-            auto new_value = ctx.template unbox<U>(value, policy, old_value.get_key());
-            if (new_value.get_key() != old_value.get_key())
-                this->set(row_ndx, new_value);
+    if (m_type == PropertyType::Mixed) {
+        Mixed new_val = ctx.template unbox<Mixed>(value, policy);
+        if (new_val.is_type(type_Dictionary)) {
+            set_collection(list_ndx, CollectionType::Dictionary);
+            auto dict = get_dictionary(list_ndx);
+            dict.assign(ctx, value, policy);
+            return;
         }
-        else {
-            auto old_value = this->get<U>(row_ndx);
-            auto new_value = ctx.template unbox<U>(value, policy);
-            if (old_value != new_value)
-                this->set(row_ndx, new_value);
+        if (new_val.is_type(type_List)) {
+            set_collection(list_ndx, CollectionType::List);
+            auto list = get_list(list_ndx);
+            list.assign(ctx, value, policy);
+            return;
         }
-    });
+        Mixed old_value = this->get<Mixed>(list_ndx);
+        Mixed new_value = ctx.template unbox<Mixed>(value, policy);
+        if (old_value != new_value)
+            this->set(list_ndx, new_value);
+    }
+    else {
+        dispatch([&](auto t) {
+            using U = std::decay_t<decltype(*t)>;
+            if constexpr (std::is_same_v<U, Obj>) {
+                auto old_value = this->get<U>(list_ndx);
+                auto new_value = ctx.template unbox<U>(value, policy, old_value.get_key());
+                if (new_value.get_key() != old_value.get_key())
+                    this->set(list_ndx, new_value);
+            }
+            else {
+                auto old_value = this->get<U>(list_ndx);
+                auto new_value = ctx.template unbox<U>(value, policy);
+                if (old_value != new_value)
+                    this->set(list_ndx, new_value);
+            }
+        });
+    }
 }
 
 template <typename T, typename Context>
@@ -267,12 +322,15 @@ void List::assign(Context& ctx, T&& values, CreatePolicy policy)
     size_t sz = size();
     size_t index = 0;
     ctx.enumerate_collection(values, [&](auto&& element) {
-        if (index >= sz)
+        if (index >= sz) {
             this->add(ctx, element, policy);
-        else if (policy.diff)
+        }
+        else {
+            // If index is within legal range, policy.diff must be true -
+            // otherwise the list would have been cleared
+            REALM_ASSERT(policy.diff);
             this->set_if_different(ctx, index, element, policy);
-        else
-            this->set(ctx, index, element, policy);
+        }
         index++;
     });
     while (index < sz)

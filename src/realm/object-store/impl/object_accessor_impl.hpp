@@ -408,6 +408,12 @@ inline Mixed CppContext::unbox(std::any& v, CreatePolicy, ObjKey) const
         else if (this_type == typeid(UUID)) {
             return Mixed(util::any_cast<UUID>(v));
         }
+        else if (this_type == typeid(AnyDict)) {
+            return Mixed(0, CollectionType::Dictionary);
+        }
+        else if (this_type == typeid(AnyVector)) {
+            return Mixed(0, CollectionType::List);
+        }
     }
     return Mixed{};
 }

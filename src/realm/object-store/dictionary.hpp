@@ -142,6 +142,12 @@ private:
     Obj get_object(StringData key) const;
 };
 
+} // namespace object_store
+} // namespace realm
+
+#include <realm/object-store/list.hpp>
+
+namespace realm::object_store {
 
 template <typename Fn>
 auto Dictionary::dispatch(Fn&& fn) const
@@ -191,9 +197,27 @@ void Dictionary::insert(Context& ctx, StringData key, T&& value, CreatePolicy po
         ctx.template unbox<Obj>(value, policy, obj_key);
         return;
     }
-    dispatch([&](auto t) {
-        this->insert(key, ctx.template unbox<std::decay_t<decltype(*t)>>(value, policy));
-    });
+    if (m_type == PropertyType::Mixed) {
+        Mixed new_val = ctx.template unbox<Mixed>(value, policy);
+        if (new_val.is_type(type_Dictionary)) {
+            insert_collection(key, CollectionType::Dictionary);
+            auto dict = get_dictionary(key);
+            dict.assign(ctx, value, policy);
+            return;
+        }
+        if (new_val.is_type(type_List)) {
+            insert_collection(key, CollectionType::List);
+            auto list = get_list(key);
+            list.assign(ctx, value, policy);
+            return;
+        }
+        this->insert(key, new_val);
+    }
+    else {
+        dispatch([&](auto t) {
+            this->insert(key, ctx.template unbox<std::decay_t<decltype(*t)>>(value, policy));
+        });
+    }
 }
 
 template <typename Context>
@@ -220,20 +244,19 @@ void Dictionary::assign(Context& ctx, T&& values, CreatePolicy policy)
 
     ctx.enumerate_dictionary(values, [&](StringData key, auto&& value) {
         if (policy.diff) {
-            util::Optional<Mixed> old_value = dict().try_get(key);
-            auto new_value = ctx.template unbox<Mixed>(value);
-            if (!old_value || *old_value != new_value) {
-                dict().insert(key, new_value);
+            Mixed new_value = ctx.template unbox<Mixed>(value);
+            if (!new_value.is_type(type_Dictionary, type_List)) {
+                util::Optional<Mixed> old_value = dict().try_get(key);
+                if (!old_value || *old_value != new_value) {
+                    dict().insert(key, new_value);
+                }
+                return;
             }
         }
-        else {
-            this->insert(ctx, key, value, policy);
-        }
+        this->insert(ctx, key, value, policy);
     });
 }
 
-} // namespace object_store
-} // namespace realm
-
+} // namespace realm::object_store
 
 #endif /* REALM_OS_DICTIONARY_HPP */
