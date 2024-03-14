@@ -92,6 +92,12 @@ endif()
 target_link_libraries(ObjectStoreTestLib Catch2::Catch2 ObjectStore RealmFFIStatic TestUtil)
 enable_stdfilesystem(ObjectStoreTestLib)
 
+if(REALM_CURL_CACERTS)
+  target_compile_definitions(ObjectStoreTestLib PRIVATE
+    REALM_CURL_CACERTS="${REALM_CURL_CACERTS}"
+  )
+endif()
+
 add_executable(ObjectStoreTests main.cpp ${RESOURCES})
 set_target_properties(ObjectStoreTests PROPERTIES OUTPUT_NAME realm-object-store-tests)
 target_link_libraries(ObjectStoreTests ObjectStoreTestLib TestUtil)
@@ -131,15 +137,16 @@ if(REALM_ENABLE_SYNC)
     target_link_libraries(ObjectStoreTestLib SyncServer)
     option(REALM_ENABLE_AUTH_TESTS "" OFF)
     if(REALM_ENABLE_AUTH_TESTS)
-        if(NOT REALM_MONGODB_ENDPOINT)
-            message(FATAL_ERROR "REALM_MONGODB_ENDPOINT must be set when specifying REALM_ENABLE_AUTH_TESTS.")
-        endif()
-
-        message(STATUS "Auth tests enabled: ${REALM_MONGODB_ENDPOINT}")
         target_compile_definitions(ObjectStoreTestLib PRIVATE
             REALM_ENABLE_AUTH_TESTS=1
-            REALM_MONGODB_ENDPOINT="${REALM_MONGODB_ENDPOINT}"
         )
+
+        if(REALM_MONGODB_ENDPOINT)
+          message(STATUS "Auth tests enabled: ${REALM_MONGODB_ENDPOINT}")
+          target_compile_definitions(ObjectStoreTestLib PRIVATE
+              REALM_MONGODB_ENDPOINT="${REALM_MONGODB_ENDPOINT}"
+          )
+        endif()
 
         if(REALM_ADMIN_ENDPOINT)
             message(STATUS "BAAS admin endpoint: ${REALM_ADMIN_ENDPOINT}")

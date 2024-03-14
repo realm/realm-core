@@ -237,4 +237,25 @@ void Collection::get_any(QueryCtrlBlock& ctrl, Mixed val, size_t index)
     }
 }
 
+UpdateStatus CollectionBase::do_init_from_parent(BPlusTreeBase* tree, ref_type ref, bool allow_create)
+{
+    if (ref) {
+        tree->init_from_ref(ref);
+    }
+    else {
+        if (tree->init_from_parent()) {
+            // All is well
+            return UpdateStatus::Updated;
+        }
+        if (!allow_create) {
+            tree->detach();
+            return UpdateStatus::Detached;
+        }
+        // The ref in the column was NULL, create the tree in place.
+        tree->create();
+        REALM_ASSERT(tree->is_attached());
+    }
+    return UpdateStatus::Updated;
+}
+
 } // namespace realm

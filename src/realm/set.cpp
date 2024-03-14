@@ -273,32 +273,6 @@ void CollectionBaseImpl<SetBase>::to_json(std::ostream& out, JSONOutputMode outp
     }
 }
 
-bool SetBase::do_init_from_parent(ref_type ref, bool allow_create) const
-{
-    try {
-        if (ref) {
-            m_tree->init_from_ref(ref);
-        }
-        else {
-            if (m_tree->init_from_parent()) {
-                // All is well
-                return true;
-            }
-            if (!allow_create) {
-                return false;
-            }
-            // The ref in the column was NULL, create the tree in place.
-            m_tree->create();
-            REALM_ASSERT(m_tree->is_attached());
-        }
-    }
-    catch (...) {
-        m_tree->detach();
-        throw;
-    }
-    return true;
-}
-
 void SetBase::resort_range(size_t start, size_t end)
 {
     if (end > size()) {

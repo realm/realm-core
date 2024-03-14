@@ -419,7 +419,7 @@ _impl::History* Transaction::get_history() const
 Obj Transaction::import_copy_of(const Obj& original)
 {
     if (bool(original) && original.is_valid()) {
-        TableKey tk = original.get_table_key();
+        TableKey tk = original.get_table()->get_key();
         ObjKey rk = original.get_key();
         auto table = get_table(tk);
         if (table->is_valid(rk))
