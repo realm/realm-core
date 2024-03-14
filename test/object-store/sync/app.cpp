@@ -3143,8 +3143,10 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
 
             // Verify session is using the updated server url from the redirect
             auto server_url = sync_session->full_realm_url();
-            logger->trace("FULL_REALM_URL: %1", server_url);
+            auto verified = sync_session->realm_url_verified();
+            logger->trace("FULL_REALM_URL: %1 (%2)", server_url, verified ? "verified" : "not verified");
             REQUIRE((server_url.find(redirect_host) != std::string::npos));
+            REQUIRE(verified);
         }
         SECTION("Websocket redirect logs out user") {
             auto sync_manager = test_session.sync_manager();
