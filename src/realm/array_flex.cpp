@@ -204,7 +204,7 @@ bool ArrayFlex::find_eq(const Array& arr, int64_t value, size_t start, size_t en
     const auto offset = v_size * v_width;
     const uint64_t* data = (const uint64_t*)arr.m_data;
 
-    auto MSBs = populate(v_width, encoder.width_mask());
+    auto MSBs = encoder.msb();
     auto search_vector = populate(v_width, value);
     auto v_start = parallel_subword_find(vector_compare<Equal>, data, 0, v_width, MSBs, search_vector, 0, v_size);
     if (v_start == v_size)
@@ -213,8 +213,8 @@ bool ArrayFlex::find_eq(const Array& arr, int64_t value, size_t start, size_t en
     MSBs = encoder.ndx_msb();
     search_vector = populate(ndx_width, v_start);
     while (start < end) {
-        start = parallel_subword_find(vector_compare<Equal, ArrayFlex::WordTypeIndex>, data, offset, ndx_width, MSBs,
-                                      search_vector, start, end);
+        start =
+            parallel_subword_find(vector_compare<Equal>, data, offset, ndx_width, MSBs, search_vector, start, end);
         if (start < end)
             if (!state->match(start + baseindex))
                 return false;
@@ -243,8 +243,8 @@ bool ArrayFlex::find_neq(const Array& arr, int64_t value, size_t start, size_t e
     MSBs = encoder.ndx_msb();
     search_vector = populate(ndx_width, v_start);
     while (start < end) {
-        start = parallel_subword_find(vector_compare<NotEqual, ArrayFlex::WordTypeIndex>, data, offset, ndx_width,
-                                      MSBs, search_vector, start, end);
+        start =
+            parallel_subword_find(vector_compare<NotEqual>, data, offset, ndx_width, MSBs, search_vector, start, end);
         if (start < end)
             if (!state->match(start + baseindex))
                 return false;
@@ -273,8 +273,7 @@ bool ArrayFlex::find_lt(const Array& arr, int64_t value, size_t start, size_t en
     MSBs = encoder.ndx_msb();
     search_vector = populate(ndx_width, v_start);
     while (start < end) {
-        start = parallel_subword_find(vector_compare<Less, ArrayFlex::WordTypeIndex>, data, offset, ndx_width, MSBs,
-                                      search_vector, start, end);
+        start = parallel_subword_find(vector_compare<Less>, data, offset, ndx_width, MSBs, search_vector, start, end);
         if (start < end)
             if (!state->match(start + baseindex))
                 return false;

@@ -236,7 +236,9 @@ void ArrayEncode::init(const char* h)
         m_MSBs = populate(m_v_width, m_v_mask);
         m_vtable = &VTableForPacked::vtable;
         m_getter = m_vtable->m_getter;
-        m_finder = const_cast<FinderTable*>(&m_vtable->m_finder);
+        m_data_getter = m_vtable->m_data_getter;
+        // TODO: investigate if it is worth it
+        // m_finder = (FinderTable*)&m_vtable->m_finder;
     }
     else if (m_encoding == Encoding::Flex) {
         m_v_width = NodeHeader::get_elementA_size<Encoding::Flex>(h);
@@ -249,7 +251,8 @@ void ArrayEncode::init(const char* h)
         m_ndx_MSBs = populate(m_ndx_width, m_ndx_mask);
         m_vtable = &VTableForFlex::vtable;
         m_getter = m_vtable->m_getter;
-        m_finder = const_cast<FinderTable*>(&m_vtable->m_finder);
+        m_data_getter = m_vtable->m_data_getter;
+        // m_finder = (FinderTable*)&m_vtable->m_finder;
     }
 }
 
@@ -266,10 +269,8 @@ int64_t ArrayEncode::get(const char* data, size_t ndx) const
 {
     using Encoding = NodeHeader::Encoding;
     REALM_ASSERT_DEBUG(m_encoding == Encoding::Flex || m_encoding == Encoding::Packed);
-    REALM_ASSERT_DEBUG(m_vtable->m_data_getter);
-    // REALM_ASSERT_DEBUG(m_data_getter);
-    // return (this->*m_data_getter)(data, ndx);
-    return (this->*(m_vtable->m_data_getter))(data, ndx);
+    REALM_ASSERT_DEBUG(m_data_getter);
+    return (this->*m_data_getter)(data, ndx);
 }
 
 void ArrayEncode::get_chunk(const Array& arr, size_t ndx, int64_t res[8]) const

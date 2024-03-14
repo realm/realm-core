@@ -961,11 +961,11 @@ inline int64_t default_fetcher(int w, const char* data, size_t ndx)
 
 struct EncodedFetcher {
 
-    int64_t operator()(int w, const char* data, size_t ndx) const
+    int64_t operator()(int, const char* data, size_t ndx) const
     {
         return ptr->get(data, ndx);
     }
-    ArrayEncode* ptr;
+    const ArrayEncode* ptr;
 };
 static EncodedFetcher s_encoded_fetcher;
 
@@ -1159,7 +1159,7 @@ inline size_t lower_bound(const char* data, size_t size, int64_t value) noexcept
 
 inline size_t lower_bound(const char* data, size_t size, int64_t value, const ArrayEncode& encoder) noexcept
 {
-    impl::s_encoded_fetcher.ptr = (ArrayEncode*)&encoder;
+    impl::s_encoded_fetcher.ptr = &encoder;
     return impl::lower_bound<0>(data, 0, size, value, impl::s_encoded_fetcher);
 }
 
@@ -1171,7 +1171,7 @@ inline size_t upper_bound(const char* data, size_t size, int64_t value) noexcept
 
 inline size_t upper_bound(const char* data, size_t size, int64_t value, const ArrayEncode& encoder) noexcept
 {
-    impl::s_encoded_fetcher.ptr = (ArrayEncode*)&encoder;
+    impl::s_encoded_fetcher.ptr = &encoder;
     return impl::lower_bound<0>(data, 0, size, value, impl::s_encoded_fetcher);
 }
 
