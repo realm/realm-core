@@ -260,7 +260,7 @@ protected:
             m_tree->set_parent(const_cast<ArrayParent*>(parent), 0);
         }
         Base::update_content_version();
-        return do_init_from_parent(m_tree.get(), 0, allow_create);
+        return do_init_from_parent(m_tree.get(), Base::get_collection_ref(), allow_create);
     }
 
     template <class Func>
