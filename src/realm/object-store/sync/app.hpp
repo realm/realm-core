@@ -434,7 +434,7 @@ public:
     // Return the base url path used for Sync Session Websocket requests
     std::string get_ws_host_url() REQUIRES(!m_route_mutex);
 
-    static std::string create_ws_host_url(const std::string_view& host_url);
+    static std::string create_ws_host_url(const std::string_view host_url);
 
 private:
     const Config m_config;

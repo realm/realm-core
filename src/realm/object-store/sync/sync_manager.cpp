@@ -679,17 +679,8 @@ void SyncManager::set_sync_route(std::string sync_route, bool verified, RestartS
         return;
     }
 
-    std::vector<std::shared_ptr<SyncSession>> sessions;
-    {
-        util::CheckedLockGuard lk(m_session_mutex);
-        // Make a copy of the session ptrs
-        sessions.reserve(m_sessions.size());
-        for (auto& session : m_sessions) {
-            sessions.push_back(session.second);
-        }
-    }
-
     // Restart the sessions that are currently active
+    auto sessions = get_all_sessions();
     for (auto& session : sessions) {
         session->restart_session();
     }
