@@ -297,13 +297,13 @@ void InterRealmValueConverter::copy_value(const Obj& src_obj, Obj& dst_obj, bool
             Lst<Mixed> dst_list{dst_obj, m_dst_col};
             handle_list_in_mixed(src_list, dst_list);
         }
-        else if (src_mixed.is_type(type_Set)) {
-            dst_obj.set_collection(m_dst_col, CollectionType::Set);
-            realm::Set<Mixed> src_set{src_obj, m_src_col};
-            realm::Set<Mixed> dst_set{dst_obj, m_dst_col};
-            // sets cannot be nested, so we just need to copy the values
-            copy_set(src_set, dst_set, nullptr);
-        }
+        //        else if (src_mixed.is_type(type_Set)) {
+        //            dst_obj.set_collection(m_dst_col, CollectionType::Set);
+        //            realm::Set<Mixed> src_set{src_obj, m_src_col};
+        //            realm::Set<Mixed> dst_set{dst_obj, m_dst_col};
+        //            // sets cannot be nested, so we just need to copy the values
+        //            copy_set(src_set, dst_set, nullptr);
+        //        }
         else if (src_mixed.is_type(type_Dictionary)) {
             dst_obj.set_collection(m_dst_col, CollectionType::Dictionary);
             Dictionary src_dict{src_obj, m_src_col};

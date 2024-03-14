@@ -381,9 +381,9 @@ void InstructionApplier::operator()(const Instruction::Update& instr)
                 else if (mpark::get_if<Instruction::Payload::List>(&arg)) {
                     obj.set_collection(col, CollectionType::List);
                 }
-                else if (mpark::get_if<Instruction::Payload::Set>(&arg)) {
-                    obj.set_collection(col, CollectionType::Set);
-                }
+                //                else if (mpark::get_if<Instruction::Payload::Set>(&arg)) {
+                //                    obj.set_collection(col, CollectionType::Set);
+                //                }
             };
 
             m_applier->visit_payload(m_instr.value, visitor);
@@ -1493,12 +1493,19 @@ InstructionApplier::PathResolver::Status InstructionApplier::PathResolver::resol
                 ++m_it_begin;
                 return resolve_dictionary_element(dict, *pkey);
             }
+            else {
+                return InstructionApplier::PathResolver::Status::Pending;
+                /// fine
+            }
         }
         if (val.is_type(type_List)) {
             if (auto pindex = mpark::get_if<uint32_t>(&*m_it_begin)) {
                 Lst<Mixed> list(obj, col);
                 ++m_it_begin;
                 return resolve_list_element(list, *pindex);
+            }
+            else {
+                return InstructionApplier::PathResolver::Status::Pending;
             }
         }
         on_error(util::format("%1: Not a list or dictionary on field '%2' in class '%3'", m_instr_name, field_name,

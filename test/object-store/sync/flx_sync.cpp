@@ -1499,10 +1499,10 @@ TEST_CASE("flx: client reset collection in mixed", "[sync][flx][client reset][ba
 
     std::vector<ObjectSchema> schema{{"TopLevel",
                                       {{"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+                                       {"queryable_str_field", PropertyType::String | PropertyType::Nullable},
                                        {"any", PropertyType::Mixed | PropertyType::Nullable}}}};
     constexpr bool dev_mode = false;
-    FLXSyncTestHarness harness("flx_client_reset",
-                               {schema, {"queryable_str_field", "queryable_int_field"}, {}, dev_mode});
+    FLXSyncTestHarness harness("flx_client_reset", {schema, {"queryable_str_field"}, {}, dev_mode});
     create_user_and_log_in(harness.app());
     auto user1 = harness.app()->current_user();
     create_user_and_log_in(harness.app());
@@ -1514,69 +1514,203 @@ TEST_CASE("flx: client reset collection in mixed", "[sync][flx][client reset][ba
 
     //    SECTION("Recover Collection in Mixed: List vs Dictionary") {
 
+    SECTION("A") {
+        config_local.sync_config->client_resync_mode = ClientResyncMode::Recover;
+        auto&& [reset_future, reset_handler] = make_client_reset_handler();
+        config_local.sync_config->notify_after_client_reset = reset_handler;
+        auto test_reset = reset_utils::make_baas_flx_client_reset(config_local, config_remote, harness.session());
+        test_reset
+            ->populate_initial_object([&](SharedRealm realm) {
+                auto pk_of_added_object = ObjectId::gen();
+                auto mut_subs = realm->get_latest_subscription_set().make_mutable_copy();
+                auto table = realm->read_group().get_table("class_TopLevel");
+                REALM_ASSERT(table);
+                mut_subs.insert_or_assign(Query(table));
+                mut_subs.commit();
 
-    config_local.sync_config->client_resync_mode = ClientResyncMode::Recover;
-    auto&& [reset_future, reset_handler] = make_client_reset_handler();
-    config_local.sync_config->notify_after_client_reset = reset_handler;
-    auto test_reset = reset_utils::make_baas_flx_client_reset(config_local, config_remote, harness.session());
-    test_reset
-        ->populate_initial_object([&](SharedRealm realm) {
-            auto pk_of_added_object = ObjectId::gen();
-            auto mut_subs = realm->get_latest_subscription_set().make_mutable_copy();
-            auto table = realm->read_group().get_table("class_TopLevel");
-            REALM_ASSERT(table);
-            mut_subs.insert_or_assign(Query(table));
-            mut_subs.commit();
+                realm->begin_transaction();
+                CppContext c(realm);
+                auto obj = Object::create(c, realm, "TopLevel",
+                                          std::any(AnyDict{{"_id"s, pk_of_added_object},
+                                                           {"queryable_str_field"s, "initial value"s},
+                                                           {"sum_of_list_field"s, int64_t(42)}}));
+                auto col_any = table->get_column_key("any");
+                obj.get_obj().set_collection(col_any, CollectionType::List);
+                auto list = obj.get_obj().get_list_ptr<Mixed>(col_any);
+                list->add(1);
+                realm->commit_transaction();
+                wait_for_upload(*realm);
+                return pk_of_added_object;
+            })
+            ->make_local_changes([&](SharedRealm local_realm) {
+                local_realm->begin_transaction();
+                auto table = local_realm->read_group().get_table("class_TopLevel");
+                auto col_any = table->get_column_key("any");
+                auto list = table->get_object(0).get_list_ptr<Mixed>(col_any);
+                list->add(2);
+                list->add(3);
+                local_realm->commit_transaction();
+            })
+            ->make_remote_changes([&](SharedRealm remote_realm) {
+                remote_realm->begin_transaction();
+                auto table = remote_realm->read_group().get_table("class_TopLevel");
+                auto col_any = table->get_column_key("any");
+                auto obj = table->get_object(0);
+                auto list = obj.get_list_ptr<Mixed>(col_any);
+                list->add(2);
+                list->add(3);
+                remote_realm->commit_transaction();
+            })
+            ->on_post_reset([&, client_reset_future = std::move(reset_future)](SharedRealm local_realm) {
+                wait_for_advance(*local_realm);
+                ClientResyncMode mode = client_reset_future.get();
+                REQUIRE(mode == ClientResyncMode::Recover);
+                auto table = local_realm->read_group().get_table("class_TopLevel");
+                REQUIRE(table->size() == 1);
+                auto obj = table->get_object(0);
+                auto col = table->get_column_key("any");
+                List list{local_realm, obj, col};
+                REQUIRE(list.size() == 5);
+                REQUIRE(list.get_any(0).get_int() == 1);
+                REQUIRE(list.get_any(1).get_int() == 2);
+                REQUIRE(list.get_any(2).get_int() == 3);
+                REQUIRE(list.get_any(3).get_int() == 2);
+                REQUIRE(list.get_any(4).get_int() == 3);
+            })
+            ->run();
+    }
+    SECTION("B") {
+        config_local.sync_config->client_resync_mode = ClientResyncMode::Recover;
+        auto&& [reset_future, reset_handler] = make_client_reset_handler();
+        config_local.sync_config->notify_after_client_reset = reset_handler;
+        auto test_reset = reset_utils::make_baas_flx_client_reset(config_local, config_remote, harness.session());
+        test_reset
+            ->populate_initial_object([&](SharedRealm realm) {
+                auto pk_of_added_object = ObjectId::gen();
+                auto mut_subs = realm->get_latest_subscription_set().make_mutable_copy();
+                auto table = realm->read_group().get_table("class_TopLevel");
+                REALM_ASSERT(table);
+                mut_subs.insert_or_assign(Query(table));
+                mut_subs.commit();
 
-            realm->begin_transaction();
-            CppContext c(realm);
-            auto obj = Object::create(c, realm, "TopLevel",
-                                      std::any(AnyDict{{"_id"s, pk_of_added_object},
-                                                       {"queryable_str_field"s, "initial value"s},
-                                                       {"sum_of_list_field"s, int64_t(42)}}));
-            auto col_any = table->get_column_key("any");
-            obj.get_obj().set_collection(col_any, CollectionType::List);
-            auto list = obj.get_obj().get_list_ptr<Mixed>(col_any);
-            list->add(1);
-            realm->commit_transaction();
-            wait_for_upload(*realm);
-            return pk_of_added_object;
-        })
-        ->make_local_changes([&](SharedRealm local_realm) {
-            local_realm->begin_transaction();
-            auto table = local_realm->read_group().get_table("class_TopLevel");
-            auto col_any = table->get_column_key("any");
-            auto list = table->get_object(0).get_list_ptr<Mixed>(col_any);
-            list->add(2);
-            list->add(3);
-            local_realm->commit_transaction();
-        })
-        ->make_remote_changes([&](SharedRealm remote_realm) {
-            remote_realm->begin_transaction();
-            auto table = remote_realm->read_group().get_table("class_TopLevel");
-            auto col_any = table->get_column_key("any");
-            auto obj = table->get_object(0);
-            obj.set_collection(col_any, CollectionType::Dictionary);
-            auto dict = obj.get_dictionary(col_any);
-            dict.insert("key1", "a");
-            dict.insert("key2", "b");
-            remote_realm->commit_transaction();
-        })
-        ->on_post_reset([&, client_reset_future = std::move(reset_future)](SharedRealm local_realm) {
-            wait_for_advance(*local_realm);
-            ClientResyncMode mode = client_reset_future.get();
-            REQUIRE(mode == ClientResyncMode::Recover);
-            auto table = local_realm->read_group().get_table("class_TopLevel");
-            REQUIRE(table->size() == 1);
-            auto obj = table->get_object(0);
-            auto col = table->get_column_key("any");
-            object_store::Dictionary dictionary{local_realm, obj, col};
-            REQUIRE(dictionary.size() == 2);
-            REQUIRE(dictionary.get_any("key1").get_string() == "a");
-            REQUIRE(dictionary.get_any("key2").get_string() == "b");
-        })
-        ->run();
-    //   }
+                realm->begin_transaction();
+                CppContext c(realm);
+                auto obj = Object::create(c, realm, "TopLevel",
+                                          std::any(AnyDict{{"_id"s, pk_of_added_object},
+                                                           {"queryable_str_field"s, "initial value"s},
+                                                           {"sum_of_list_field"s, int64_t(42)}}));
+                auto col_any = table->get_column_key("any");
+                obj.get_obj().set_collection(col_any, CollectionType::List);
+                auto list = obj.get_obj().get_list_ptr<Mixed>(col_any);
+                list->add(1);
+                realm->commit_transaction();
+                wait_for_upload(*realm);
+                return pk_of_added_object;
+            })
+            ->make_local_changes([&](SharedRealm local_realm) {
+                local_realm->begin_transaction();
+                auto table = local_realm->read_group().get_table("class_TopLevel");
+                auto col_any = table->get_column_key("any");
+                auto list = table->get_object(0).get_list_ptr<Mixed>(col_any);
+                list->add(2);
+                list->add(3);
+                local_realm->commit_transaction();
+            })
+            ->make_remote_changes([&](SharedRealm remote_realm) {
+                remote_realm->begin_transaction();
+                auto table = remote_realm->read_group().get_table("class_TopLevel");
+                auto col_any = table->get_column_key("any");
+                auto obj = table->get_object(0);
+                obj.set_collection(col_any, CollectionType::Dictionary);
+                auto dict = obj.get_dictionary(col_any);
+                dict.insert("key1", "a");
+                dict.insert("key2", "b");
+                remote_realm->commit_transaction();
+            })
+            ->on_post_reset([&, client_reset_future = std::move(reset_future)](SharedRealm local_realm) {
+                wait_for_advance(*local_realm);
+                ClientResyncMode mode = client_reset_future.get();
+                REQUIRE(mode == ClientResyncMode::Recover);
+                auto table = local_realm->read_group().get_table("class_TopLevel");
+                REQUIRE(table->size() == 1);
+                auto obj = table->get_object(0);
+                auto col = table->get_column_key("any");
+                object_store::Dictionary dictionary{local_realm, obj, col};
+                REQUIRE(dictionary.size() == 2);
+                REQUIRE(dictionary.get_any("key1").get_string() == "a");
+                REQUIRE(dictionary.get_any("key2").get_string() == "b");
+            })
+            ->run();
+    }
+    SECTION("C") {
+        config_local.sync_config->client_resync_mode = ClientResyncMode::Recover;
+        auto&& [reset_future, reset_handler] = make_client_reset_handler();
+        config_local.sync_config->notify_after_client_reset = reset_handler;
+        auto test_reset = reset_utils::make_baas_flx_client_reset(config_local, config_remote, harness.session());
+        test_reset
+            ->populate_initial_object([&](SharedRealm realm) {
+                auto pk_of_added_object = ObjectId::gen();
+                auto mut_subs = realm->get_latest_subscription_set().make_mutable_copy();
+                auto table = realm->read_group().get_table("class_TopLevel");
+                REALM_ASSERT(table);
+                mut_subs.insert_or_assign(Query(table));
+                mut_subs.commit();
+
+                realm->begin_transaction();
+                CppContext c(realm);
+                auto obj = Object::create(c, realm, "TopLevel",
+                                          std::any(AnyDict{{"_id"s, pk_of_added_object},
+                                                           {"queryable_str_field"s, "initial value"s},
+                                                           {"sum_of_list_field"s, int64_t(42)}}));
+                auto col_any = table->get_column_key("any");
+                obj.get_obj().set_collection(col_any, CollectionType::List);
+                auto list = obj.get_obj().get_list_ptr<Mixed>(col_any);
+                list->add(1);
+                list->insert_collection(1, CollectionType::List);
+                auto list2 = list->get_list(1);
+                list2->add(11);
+                realm->commit_transaction();
+                wait_for_upload(*realm);
+                return pk_of_added_object;
+            })
+            ->make_local_changes([&](SharedRealm local_realm) {
+                local_realm->begin_transaction();
+                auto table = local_realm->read_group().get_table("class_TopLevel");
+                auto col_any = table->get_column_key("any");
+                auto list = table->get_object(0).get_list_ptr<Mixed>(col_any);
+                list->add(2);
+                list->add(3);
+                local_realm->commit_transaction();
+            })
+            ->make_remote_changes([&](SharedRealm remote_realm) {
+                remote_realm->begin_transaction();
+                auto table = remote_realm->read_group().get_table("class_TopLevel");
+                auto col_any = table->get_column_key("any");
+                auto obj = table->get_object(0);
+                auto list = obj.get_list_ptr<Mixed>(col_any);
+                list->insert_collection(1, CollectionType::Dictionary);
+                auto dict = list->get_dictionary(1);
+                dict->insert("key1", "a");
+                dict->insert("key2", "b");
+                remote_realm->commit_transaction();
+            })
+            ->on_post_reset([&, client_reset_future = std::move(reset_future)](SharedRealm local_realm) {
+                wait_for_advance(*local_realm);
+                ClientResyncMode mode = client_reset_future.get();
+                REQUIRE(mode == ClientResyncMode::Recover);
+                auto table = local_realm->read_group().get_table("class_TopLevel");
+                REQUIRE(table->size() == 1);
+                auto obj = table->get_object(0);
+                auto col = table->get_column_key("any");
+                List list{local_realm, obj, col};
+                REQUIRE(list.size() == 5);
+                //                object_store::Dictionary dictionary{local_realm, obj, col};
+                //                REQUIRE(dictionary.size() == 2);
+                //                REQUIRE(dictionary.get_any("key1").get_string() == "a");
+                //                REQUIRE(dictionary.get_any("key2").get_string() == "b");
+            })
+            ->run();
+    }
 }
 
 TEST_CASE("flx: creating an object on a class with no subscription throws", "[sync][flx][subscription][baas]") {
