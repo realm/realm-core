@@ -269,6 +269,12 @@ public:
         return m_server_url;
     }
 
+    bool realm_url_verified() const REQUIRES(!m_config_mutex)
+    {
+        util::CheckedLockGuard lock(m_config_mutex);
+        return m_server_url_verified;
+    }
+
     std::shared_ptr<sync::SubscriptionStore> get_flx_subscription_store() REQUIRES(!m_state_mutex);
 
     // Create an external reference to this session. The sync session attempts to remain active
@@ -427,7 +433,6 @@ private:
         REQUIRES(m_state_mutex);
 
     std::string get_appservices_connection_id() const REQUIRES(!m_state_mutex);
-    std::string get_sync_route() const REQUIRES(!m_state_mutex);
 
     util::Future<std::string> send_test_command(std::string body) REQUIRES(!m_state_mutex);
 
@@ -444,6 +449,10 @@ private:
 
     // Return the subscription_store_base - to be used only for testing
     std::shared_ptr<sync::SubscriptionStore> get_subscription_store_base() REQUIRES(!m_state_mutex);
+
+    // Updates the connection state for this SyncSession and notify any registered callbacks if changed.
+    // Also ensures server_url_verified is set if the connection state is updated to connected.
+    void update_connection_state(ConnectionState new_state) REQUIRES(!m_config_mutex, !m_connection_state_mutex);
 
     util::CheckedMutex m_state_mutex;
     util::CheckedMutex m_connection_state_mutex;
@@ -487,6 +496,7 @@ private:
 
     // The fully-resolved URL of this Realm, including the server and the path.
     std::string m_server_url GUARDED_BY(m_config_mutex);
+    bool m_server_url_verified GUARDED_BY(m_config_mutex) = false;
 
     _impl::SyncProgressNotifier m_progress_notifier;
     ConnectionChangeNotifier m_connection_change_notifier;

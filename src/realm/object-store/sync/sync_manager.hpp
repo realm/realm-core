@@ -226,18 +226,14 @@ public:
     // m_sync_route starts out as a generated value based on the configured base_url when
     // the SyncManager is created by App. If this is incorrect, the websocket connection
     // will fail, resulting in an update to the access token (and the location, if it hasn't
-    // been updated yet).
-    void set_sync_route(std::string sync_route) REQUIRES(!m_mutex, !m_session_mutex)
-    {
-        REALM_ASSERT(!sync_route.empty()); // Cannot be set to empty string
-        util::CheckedLockGuard lock(m_mutex);
-        m_sync_route = sync_route;
-    }
+    // been updated yet). If the sync route is being manually set without being validated,
+    // then set validated to false.
+    void set_sync_route(std::string sync_route, bool verified = true) REQUIRES(!m_mutex, !m_session_mutex);
 
-    const std::string sync_route() const REQUIRES(!m_mutex)
+    std::pair<const std::string, bool> sync_route() REQUIRES(!m_mutex)
     {
         util::CheckedLockGuard lock(m_mutex);
-        return m_sync_route;
+        return std::make_pair(m_sync_route, m_sync_route_verified);
     }
 
     std::weak_ptr<app::App> app() const REQUIRES(!m_mutex)
@@ -327,9 +323,11 @@ private:
     // Callers of this method should hold the `m_session_mutex` themselves.
     bool do_has_existing_sessions() REQUIRES(m_session_mutex);
 
-    // The sync route URL to connect to the server. This can be initially empty, but should not
-    // be cleared once it has been set to a value, except by `tear_down_for_testing()`.
+    // The sync route URL for the sync connection to the server.
     std::string m_sync_route GUARDED_BY(m_mutex);
+    // If true, then the sync route has been verified by querying the location info or successfully
+    // connecting to the server.
+    bool m_sync_route_verified GUARDED_BY(m_mutex);
 
     std::weak_ptr<app::App> m_app GUARDED_BY(m_mutex);
     const std::string m_app_id;

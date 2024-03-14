@@ -3006,7 +3006,9 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
             creds.email, creds.password, [&](util::Optional<app::AppError> error) {
                 REQUIRE(!error);
             });
-        REQUIRE(redir_app->sync_manager()->sync_route().find(original_ws_host) != std::string::npos);
+        auto [sync_route, verified] = app->sync_manager()->sync_route();
+        REQUIRE(sync_route.find(original_ws_host) != std::string::npos);
+        REQUIRE(verified);
 
         // Register another email address and verify location data isn't requested again
         request_count = 0;
@@ -4207,41 +4209,125 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
             redir_transport->reset(init_url);
 
             auto app = app::App::get_app(app::App::CacheMode::Disabled, app_config, sc_config);
-            // At this point, the sync route is not set
-            CHECK(app->sync_manager()->sync_route().find(app::App::create_ws_host_url(init_url)) !=
-                  std::string::npos);
+
+            {
+                auto [sync_route, verified] = app->sync_manager()->sync_route();
+                CHECK(sync_route.find(app::App::create_ws_host_url(init_url)) != std::string::npos);
+                CHECK_FALSE(verified);
+            }
 
             do_login(app);
             CHECK(redir_transport->location_requested);
             CHECK(app->get_base_url() == init_url);
             CHECK(app->get_host_url() == init_url);
             CHECK(app->get_ws_host_url() == init_wsurl);
-            CHECK(app->sync_manager()->sync_route().find(init_wsurl) != std::string::npos);
+            {
+                auto [sync_route, verified] = app->sync_manager()->sync_route();
+                CHECK(sync_route.find(app::App::create_ws_host_url(init_url)) != std::string::npos);
+                CHECK(verified);
+            }
         }
         // Recreate the app using the cached user and start a sync session, which will is set to fail on connect
-        SECTION("Sync Session fails on connect") {
+        SECTION("Sync Session fails on connect after updating location") {
             enum class TestState { start, session_started };
             TestingStateMachine<TestState> state(TestState::start);
 
             redir_transport->reset(init_url, redir_url);
 
             auto app = app::App::get_app(app::App::CacheMode::Disabled, app_config, sc_config);
-            // At this point, the sync route is not set
-            CHECK(app->sync_manager()->sync_route().find(app::App::create_ws_host_url(init_url)) !=
-                  std::string::npos);
+            // Verify the default sync route, which has not been verified
+            {
+                auto [sync_route, verified] = app->sync_manager()->sync_route();
+                CHECK(sync_route.find(app::App::create_ws_host_url(init_url)) != std::string::npos);
+                CHECK_FALSE(verified);
+            }
 
             RealmConfig r_config;
             r_config.path = sc_config.base_file_path + "/fakerealm.realm";
             r_config.sync_config = std::make_shared<SyncConfig>(app->current_user(), SyncConfig::FLXSyncEnabled{});
             r_config.sync_config->error_handler = [&state, &logger](std::shared_ptr<SyncSession>,
                                                                     SyncError error) mutable {
-                // Expect an error due to 404 response when creating websocket
-                state.transition_with([&error, &logger](TestState cur_state) -> std::optional<TestState> {
+                // Websocket is forcing a 404 failure so it won't actually start
+                logger->debug("Received expected error: %1", error.status);
+                CHECK(!error.status.is_ok());
+                CHECK(error.status.code() == ErrorCodes::SyncConnectFailed);
+                CHECK(!error.is_fatal);
+                state.transition_to(TestState::session_started);
+            };
+            auto realm = Realm::get_shared_realm(r_config);
+            state.wait_for(TestState::session_started);
+
+            CHECK(redir_transport->location_requested);
+            CHECK(app->get_base_url() == init_url);
+            CHECK(app->get_host_url() == redir_url);
+            CHECK(app->get_ws_host_url() == redir_wsurl);
+            {
+                auto [sync_route, verified] = app->sync_manager()->sync_route();
+                CHECK(sync_route.find(app::App::create_ws_host_url(redir_url)) != std::string::npos);
+                CHECK(verified);
+            }
+        }
+
+        SECTION("Sync Session retries after initial location failure") {
+            enum class TestState { start, location_failed, session_started };
+            TestingStateMachine<TestState> state(TestState::start);
+            int retry_count = GENERATE(1, 3);
+
+            redir_transport->reset(init_url);
+            redir_transport->location_returns_error = true;
+
+            auto app = app::App::get_app(app::App::CacheMode::Disabled, app_config, sc_config);
+            // Verify the default sync route, which has not been verified
+            {
+                auto [sync_route, verified] = app->sync_manager()->sync_route();
+                CHECK(sync_route.find(app::App::create_ws_host_url(init_url)) != std::string::npos);
+                CHECK_FALSE(verified);
+            }
+
+            socket_provider->force_failure_func = [&](bool& was_clean, sync::websocket::WebSocketError& error_code,
+                                                      std::string& message) {
+                state.transition_with([&](TestState cur_state) -> std::optional<TestState> {
                     if (cur_state == TestState::start) {
-                        // The session will start, but the connection is rejected on purpose
-                        logger->debug("Expected error: %1", error.status);
-                        CHECK(!error.status.is_ok());
-                        CHECK(error.status.code() == ErrorCodes::SyncConnectFailed);
+                        logger->debug("State: start");
+                        // Verify the location update failed
+                        CHECK(redir_transport->location_requested);
+                        CHECK(app->get_base_url() == init_url);
+                        CHECK(app->get_host_url() == init_url);
+                        CHECK(app->get_ws_host_url() == init_wsurl);
+                        {
+                            auto [sync_route, verified] = app->sync_manager()->sync_route();
+                            CHECK(sync_route.find(app::App::create_ws_host_url(init_url)) != std::string::npos);
+                            CHECK_FALSE(verified);
+                        }
+                        // After number of location verify attempts has passed, let the location succeed
+                        if (--retry_count <= 0) {
+                            redir_transport->reset(init_url, redir_url);
+                            return TestState::location_failed;
+                        }
+                        redir_transport->location_requested = false;
+                    }
+                    return std::nullopt;
+                });
+
+                was_clean = false;
+                error_code = sync::websocket::WebSocketError::websocket_connection_failed;
+                message = "404 not found";
+                return true;
+            };
+
+            RealmConfig r_config;
+            r_config.path = sc_config.base_file_path + "/fakerealm.realm";
+            r_config.sync_config = std::make_shared<SyncConfig>(app->current_user(), SyncConfig::FLXSyncEnabled{});
+            r_config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) mutable {
+                // An error will only be reported if the websocket fails after updating the location and access token
+                logger->debug("Received expected error: %1", error.status);
+                CHECK(!error.status.is_ok());
+                CHECK(error.status.code() == ErrorCodes::SyncConnectFailed);
+                CHECK(!error.is_fatal);
+                state.transition_with([&](TestState cur_state) -> std::optional<TestState> {
+                    if (cur_state == TestState::location_failed) {
+                        // This time, the session was being started, and the location was successful
+                        // Websocket is forcing a 404 failure so it won't actually start
                         return TestState::session_started;
                     }
                     return std::nullopt;
@@ -4254,8 +4340,13 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
             CHECK(app->get_base_url() == init_url);
             CHECK(app->get_host_url() == redir_url);
             CHECK(app->get_ws_host_url() == redir_wsurl);
-            CHECK(app->sync_manager()->sync_route().find(redir_wsurl) != std::string::npos);
+            {
+                auto [sync_route, verified] = app->sync_manager()->sync_route();
+                CHECK(sync_route.find(app::App::create_ws_host_url(redir_url)) != std::string::npos);
+                CHECK(verified);
+            }
         }
+#if 0
         // Recreate the app using the cached user and start a sync session, which will fail during location update
         SECTION("Location update fails prior to sync session connect") {
             enum class TestState { start, location_failed, waiting_for_session, session_started };
@@ -4264,10 +4355,21 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
             redir_transport->reset(init_url, redir_url);
             redir_transport->location_returns_error = true;
 
+            socket_provider->force_failure_func = [](bool& was_clean, sync::websocket::WebSocketError& error_code,
+                                                    std::string& message) {
+                was_clean = false;
+                error_code = sync::websocket::WebSocketError::websocket_connection_failed;
+                message = "404 not found";
+                return true;
+            };
+
             auto app = app::App::get_app(app::App::CacheMode::Disabled, app_config, sc_config);
-            // Verify the default sync route
-            CHECK(app->sync_manager()->sync_route().find(app::App::create_ws_host_url(init_url)) !=
-                  std::string::npos);
+            // Verify the default sync route, which has not been verified
+            {
+                auto [sync_route, verified] = app->sync_manager()->sync_route();
+                CHECK(sync_route.find(app::App::create_ws_host_url(init_url)) != std::string::npos);
+                CHECK_FALSE(verified);
+            }
 
             RealmConfig r_config;
             r_config.path = sc_config.base_file_path + "/fakerealm.realm";
@@ -4300,8 +4402,11 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
             // Location was never updated
             CHECK(app->get_host_url() == init_url);
             CHECK(app->get_ws_host_url() == init_wsurl);
-            CHECK(app->sync_manager()->sync_route().find(app::App::create_ws_host_url(init_wsurl)) !=
-                  std::string::npos);
+            {
+                auto [sync_route, verified] = app->sync_manager()->sync_route();
+                CHECK(sync_route.find(app::App::create_ws_host_url(init_url)) != std::string::npos);
+                CHECK_FALSE(verified);
+            }
 
             // Location request will pass this time, try to reconnect
             // expecting 404 when websocket connects
@@ -4316,8 +4421,13 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
             //            CHECK(app->get_base_url() == init_url);
             //            CHECK(app->get_host_url() == redir_url);
             //            CHECK(app->get_ws_host_url() == redir_wsurl);
-            //            CHECK(app->sync_manager()->sync_route().find(redir_wsurl) != std::string::npos);
+            //            {
+            //            auto [sync_route, verified] = app->sync_manager()->sync_route();
+            //            CHECK(sync_route.find(app::App::create_ws_host_url(redir_url)) != std::string::npos);
+            //            CHECK(verified);
+            //            }
         }
+#endif
     }
 }
 

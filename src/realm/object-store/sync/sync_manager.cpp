@@ -665,6 +665,31 @@ void SyncManager::close_all_sessions()
     get_sync_client().wait_for_session_terminations();
 }
 
+void SyncManager::set_sync_route(std::string sync_route, bool verified)
+{
+    REALM_ASSERT(!sync_route.empty()); // Cannot be set to empty string
+    {
+        util::CheckedLockGuard lock(m_mutex);
+        m_sync_route = sync_route;
+        m_sync_route_verified = verified;
+    }
+
+    std::vector<std::shared_ptr<SyncSession>> sessions;
+    {
+        util::CheckedLockGuard lk(m_session_mutex);
+        // Make a copy of the session ptrs
+        sessions.reserve(m_sessions.size());
+        for (auto& session : m_sessions) {
+            sessions.push_back(session.second);
+        }
+    }
+
+    // Restart the sessions that are currently active
+    for (auto& session : sessions) {
+        session->restart_session();
+    }
+}
+
 void SyncManager::OnlyForTesting::voluntary_disconnect_all_connections(SyncManager& mgr)
 {
     mgr.get_sync_client().voluntary_disconnect_all_connections();

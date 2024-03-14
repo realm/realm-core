@@ -147,6 +147,7 @@ private:
     const ProtocolEnvelope m_protocol_envelope;
     const std::string m_server_address;
     const port_type m_server_port;
+    const bool m_server_verified;
     const std::string m_user_id;
     const SyncServerMode m_sync_mode;
     const std::string m_authorization_header_name;
@@ -1150,6 +1151,7 @@ SessionWrapper::SessionWrapper(ClientImpl& client, DBRef db, std::shared_ptr<Sub
     , m_protocol_envelope{config.protocol_envelope}
     , m_server_address{std::move(config.server_address)}
     , m_server_port{config.server_port}
+    , m_server_verified{config.server_verified}
     , m_user_id(std::move(config.user_id))
     , m_sync_mode(flx_sub_store ? SyncServerMode::FLX : SyncServerMode::PBS)
     , m_authorization_header_name{config.authorization_header_name}
@@ -1309,7 +1311,8 @@ SessionWrapper::set_connection_state_change_listener(util::UniqueFunction<Connec
 
 void SessionWrapper::initiate()
 {
-    ServerEndpoint server_endpoint{m_protocol_envelope, m_server_address, m_server_port, m_user_id, m_sync_mode};
+    ServerEndpoint server_endpoint{m_protocol_envelope, m_server_address, m_server_port,
+                                   m_user_id,           m_sync_mode,      m_server_verified};
     m_client.register_unactualized_session_wrapper(this, std::move(server_endpoint)); // Throws
     m_db->add_commit_listener(this);
 }
