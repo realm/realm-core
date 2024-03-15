@@ -954,14 +954,15 @@ size_t parallel_subword_find(VectorCompare vector_compare, const uint64_t* data,
 
 namespace impl {
 
-inline int64_t default_fetcher(int w, const char* data, size_t ndx)
+template <int width>
+inline int64_t default_fetcher(const char* data, size_t ndx)
 {
-    REALM_TEMPEX(return get_direct, w, (data, ndx));
+    return get_direct<width>(data, ndx);
 }
 
 struct EncodedFetcher {
 
-    int64_t operator()(int, const char* data, size_t ndx) const
+    int64_t operator()(const char* data, size_t ndx) const
     {
         return ptr->get(data, ndx);
     }
@@ -996,18 +997,10 @@ static EncodedFetcher s_encoded_fetcher;
 //
 // We currently use binary search. See for example
 // http://www.tbray.org/ongoing/When/200x/2003/03/22/Binary.
-template <int width, typename F = decltype(default_fetcher)>
+template <int width, typename F = decltype(default_fetcher<width>)>
 inline size_t lower_bound(const char* data, size_t start, size_t end, int64_t value,
                           F fetcher = default_fetcher) noexcept
 {
-    //    auto fetcher = [](auto data, size_t ndx) {
-    ////        if constexpr (std::is_same_v<T, ArrayEncode>) {
-    ////            return enc.get(data, ndx);
-    ////        }
-    //        return get_direct<width>(data, ndx);
-    //    };
-
-
     // The binary search used here is carefully optimized. Key trick is to use a single
     // loop controlling variable (size) instead of high/low pair, and to keep updates
     // to size done inside the loop independent of comparisons. Further key to speed
@@ -1031,7 +1024,7 @@ inline size_t lower_bound(const char* data, size_t start, size_t end, int64_t va
         size_t other_half = size - half;
         size_t probe = low + half;
         size_t other_low = low + other_half;
-        int64_t v = fetcher(width, data, probe);
+        int64_t v = fetcher(data, probe);
         size = half;
         low = (v < value) ? other_low : low;
 
@@ -1040,7 +1033,7 @@ inline size_t lower_bound(const char* data, size_t start, size_t end, int64_t va
         other_half = size - half;
         probe = low + half;
         other_low = low + other_half;
-        v = fetcher(width, data, probe);
+        v = fetcher(data, probe);
         size = half;
         low = (v < value) ? other_low : low;
 
@@ -1049,7 +1042,7 @@ inline size_t lower_bound(const char* data, size_t start, size_t end, int64_t va
         other_half = size - half;
         probe = low + half;
         other_low = low + other_half;
-        v = fetcher(width, data, probe);
+        v = fetcher(data, probe);
         size = half;
         low = (v < value) ? other_low : low;
     }
@@ -1082,7 +1075,7 @@ inline size_t lower_bound(const char* data, size_t start, size_t end, int64_t va
         size_t other_half = size - half;
         size_t probe = low + half;
         size_t other_low = low + other_half;
-        int64_t v = fetcher(width, data, probe); // get_direct<width>(data, probe);
+        int64_t v = fetcher(data, probe); // get_direct<width>(data, probe);
         size = half;
         // for max performance, the line below should compile into a conditional
         // move instruction. Not all compilers do this. To maximize chance
@@ -1095,19 +1088,11 @@ inline size_t lower_bound(const char* data, size_t start, size_t end, int64_t va
 }
 
 // See lower_bound()
-template <int width, typename F = decltype(default_fetcher)>
+template <int width, typename F = decltype(default_fetcher<width>)>
 inline size_t upper_bound(const char* data, size_t start, size_t end, int64_t value,
                           F fetcher = default_fetcher) noexcept
 {
     REALM_ASSERT_DEBUG(end >= start);
-
-    //    auto fetcher = [](auto data, size_t ndx) {
-    ////        if constexpr (std::is_same_v<T, ArrayEncode>) {
-    ////            return enc.get(data, ndx);
-    ////        }
-    //        return get_direct<width>(data, ndx);
-    //    };
-
     size_t size = end - start;
     // size_t low = 0;
     size_t low = start;
@@ -1116,7 +1101,7 @@ inline size_t upper_bound(const char* data, size_t start, size_t end, int64_t va
         size_t other_half = size - half;
         size_t probe = low + half;
         size_t other_low = low + other_half;
-        int64_t v = fetcher(width, data, probe);
+        int64_t v = fetcher(data, probe);
         size = half;
         low = (value >= v) ? other_low : low;
 
@@ -1124,7 +1109,7 @@ inline size_t upper_bound(const char* data, size_t start, size_t end, int64_t va
         other_half = size - half;
         probe = low + half;
         other_low = low + other_half;
-        v = fetcher(width, data, probe);
+        v = fetcher(data, probe);
         size = half;
         low = (value >= v) ? other_low : low;
 
@@ -1132,7 +1117,7 @@ inline size_t upper_bound(const char* data, size_t start, size_t end, int64_t va
         other_half = size - half;
         probe = low + half;
         other_low = low + other_half;
-        v = fetcher(width, data, probe);
+        v = fetcher(data, probe);
         size = half;
         low = (value >= v) ? other_low : low;
     }
@@ -1142,7 +1127,7 @@ inline size_t upper_bound(const char* data, size_t start, size_t end, int64_t va
         size_t other_half = size - half;
         size_t probe = low + half;
         size_t other_low = low + other_half;
-        int64_t v = fetcher(width, data, probe);
+        int64_t v = fetcher(data, probe);
         size = half;
         low = (value >= v) ? other_low : low;
     };
@@ -1154,7 +1139,7 @@ inline size_t upper_bound(const char* data, size_t start, size_t end, int64_t va
 template <int width>
 inline size_t lower_bound(const char* data, size_t size, int64_t value) noexcept
 {
-    return impl::lower_bound<width>(data, 0, size, value, impl::default_fetcher);
+    return impl::lower_bound<width>(data, 0, size, value, impl::default_fetcher<width>);
 }
 
 inline size_t lower_bound(const char* data, size_t size, int64_t value, const ArrayEncode& encoder) noexcept
@@ -1166,7 +1151,7 @@ inline size_t lower_bound(const char* data, size_t size, int64_t value, const Ar
 template <int width>
 inline size_t upper_bound(const char* data, size_t size, int64_t value) noexcept
 {
-    return impl::upper_bound<width>(data, 0, size, value, impl::default_fetcher);
+    return impl::upper_bound<width>(data, 0, size, value, impl::default_fetcher<width>);
 }
 
 inline size_t upper_bound(const char* data, size_t size, int64_t value, const ArrayEncode& encoder) noexcept
