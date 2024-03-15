@@ -81,7 +81,7 @@ struct SyncClient {
             c.reconnect_backoff_info.resumption_delay_backoff_multiplier =
                 config.timeouts.reconnect_backoff_info.resumption_delay_backoff_multiplier;
             if (c.reconnect_backoff_info.resumption_delay_interval.count() < 1000)
-                logger->info("A resumption delay interval less than 1000 (1 second) is not recommended");
+                logger->warn("A resumption delay interval less than 1000 (1 second) is not recommended");
             if (c.reconnect_backoff_info.resumption_delay_backoff_multiplier < 1)
                 throw InvalidArgument("Delay backoff multiplier in reconnect backoff info cannot be less than 1");
             return c;
