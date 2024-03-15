@@ -6,7 +6,7 @@
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Fix depth level for nested collection in debug mode, set it to the same level as release ([#7484](https://github.com/realm/realm-core/issues/7484), since v14.0.0).
 
 ### Breaking changes
 * None.
