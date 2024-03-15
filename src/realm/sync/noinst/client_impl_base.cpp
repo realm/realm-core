@@ -188,10 +188,11 @@ ClientImpl::ClientImpl(ClientConfig config)
                  config.disable_upload_compaction); // Throws
     logger.debug("Config param: disable_sync_to_disk = %1",
                  config.disable_sync_to_disk); // Throws
-    logger.debug("Config param: reconnect backoff info: max_delay: %1 ms, initial_delay: %2 ms, multiplier: %3",
-                 m_reconnect_backoff_info.max_resumption_delay_interval.count(),
-                 m_reconnect_backoff_info.resumption_delay_interval.count(),
-                 m_reconnect_backoff_info.resumption_delay_backoff_multiplier);
+    logger.debug(
+        "Config param: reconnect backoff info: max_delay: %1 ms, initial_delay: %2 ms, multiplier: %3, jitter: 1/%4",
+        m_reconnect_backoff_info.max_resumption_delay_interval.count(),
+        m_reconnect_backoff_info.resumption_delay_interval.count(),
+        m_reconnect_backoff_info.resumption_delay_backoff_multiplier, m_reconnect_backoff_info.delay_jitter_divisor);
 
     if (config.reconnect_mode != ReconnectMode::normal) {
         logger.warn("Testing/debugging feature 'nonnormal reconnect mode' enabled - "
