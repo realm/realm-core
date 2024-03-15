@@ -424,17 +424,19 @@ std::string App::create_ws_host_url(const std::string_view host_url)
     size_t prefix_len = std::char_traits<char>::length("http://") + (https ? 1 : 0);
     std::string_view prefix = https ? "wss://" : "ws://";
 
-    // http[s]://[region-prefix]realm.mongodb.com => ws[s]://ws.[region-prefix]realm.mongodb.com
+    // http[s]://[<region-prefix>]realm.mongodb.com[/<path>] =>
+    //     ws[s]://ws.[<region-prefix>]realm.mongodb.com[/<path>]
     if (host_url.find(orig_base_domain) != std::string_view::npos) {
         return util::format("%1ws.%2", prefix, host_url.substr(prefix_len));
     }
-    // http[s]://[region-prefix]services.cloud.mongodb.com => ws[s]://[region-prefix].ws.services.cloud.mongodb.com
+    // http[s]://[<region-prefix>]services.cloud.mongodb.com[/<path>] =>
+    //     ws[s]://[<region-prefix>].ws.services.cloud.mongodb.com[/<path>]
     if (auto start = host_url.find(new_base_domain); start != std::string_view::npos) {
         return util::format("%1%2ws.%3", prefix, host_url.substr(prefix_len, start - prefix_len),
                             host_url.substr(start));
     }
 
-    // All others => http[s]://<host-url> => ws[s]://<host-url>
+    // All others => http[s]://<host-url>[/<path>] => ws[s]://<host-url>[/<path>]
     return util::format("ws%1", host_url.substr(4));
 }
 
