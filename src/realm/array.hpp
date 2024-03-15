@@ -333,6 +333,8 @@ public:
     /// by doing a linear search for short sequences.
     size_t lower_bound_int(int64_t value) const noexcept;
     size_t upper_bound_int(int64_t value) const noexcept;
+    size_t lower_bound_int_encoded(int64_t value) const noexcept;
+    size_t upper_bound_int_encoded(int64_t value) const noexcept;
     //@}
 
     int64_t get_sum(size_t start = 0, size_t end = size_t(-1)) const
@@ -421,8 +423,19 @@ public:
     template <class cond>
     size_t find_first(int64_t value, size_t start = 0, size_t end = size_t(-1)) const
     {
-        return do_find_first<cond>(value, start, end);
+        QueryStateFindFirst state;
+        Finder finder = m_vtable->finder[cond::condition];
+        (this->*finder)(value, start, end, 0, &state);
+        return state.m_state;
     }
+
+    template <class cond>
+    bool find(int64_t value, size_t start, size_t end, size_t baseIndex, QueryStateBase* state) const
+    {
+        Finder finder = m_vtable->finder[cond::condition];
+        return (this->*finder)(value, start, end, baseIndex, state);
+    }
+
 
     /// Get the specified element without the cost of constructing an
     /// array instance. If an array instance is already available, or
@@ -530,10 +543,6 @@ protected:
     void destroy_children(size_t offset = 0) noexcept;
 
 protected:
-    // attempt to remove the vtabler
-    template <typename cond>
-    size_t do_find_first(int64_t value, size_t start, size_t end) const;
-
     // Getters and Setters for adaptive-packed arrays
     typedef int64_t (Array::*Getter)(size_t) const; // Note: getters must not throw
     typedef void (Array::*Setter)(size_t, int64_t);
@@ -551,7 +560,7 @@ protected:
     struct VTableForEncodedArray;
 
     // This is the one installed into the m_vtable->finder slots.
-    template <class cond, size_t bitwidth>
+    template <class cond>
     bool find_vtable(int64_t value, size_t start, size_t end, size_t baseindex, QueryStateBase* state) const;
 
     template <size_t w>

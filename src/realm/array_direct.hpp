@@ -195,7 +195,7 @@ public:
     }
     // 'num_bits' number of bits which must be read
     // WARNING returned word may be garbage above the first 'num_bits' bits.
-    uint64_t get(unsigned num_bits)
+    uint64_t get(size_t num_bits)
     {
         auto first_word = m_word_ptr[0];
         uint64_t result = first_word >> m_in_word_offset;
@@ -222,7 +222,7 @@ public:
         return result;
     }
     // bump the iterator the specified number of bits
-    void bump(unsigned num_bits)
+    void bump(size_t num_bits)
     {
         auto total_offset = m_in_word_offset + num_bits;
         m_word_ptr += total_offset >> 6;
@@ -806,7 +806,7 @@ constexpr uint32_t inverse_width[65] = {
     65536 * 64 / 61, 65536 * 64 / 62, 65536 * 64 / 63, 65536 * 64 / 64,
 };
 
-inline int countr_zero(uint64_t vector)
+inline size_t countr_zero(uint64_t vector)
 {
     unsigned long where;
 #if defined(_WIN64)
@@ -832,10 +832,11 @@ inline int countr_zero(uint64_t vector)
 #endif
 }
 
-inline int first_field_marked(size_t width, uint64_t vector)
+inline size_t first_field_marked(size_t width, uint64_t vector)
 {
     const auto lz = countr_zero(vector);
-    int field = (lz * inverse_width[width]) >> 22;
+    const auto field = (lz * inverse_width[width]) >> 22;
+    REALM_ASSERT_DEBUG(width != 0);
     REALM_ASSERT_DEBUG(field == (lz / width));
     return field;
 }
@@ -916,11 +917,11 @@ size_t parallel_subword_find(VectorCompare vector_compare, const uint64_t* data,
         auto found_vector1 = vector_compare(MSBs, word1, search_vector);
         it.bump(bit_count_pr_iteration);
         if (found_vector0) {
-            int sub_word_index = first_field_marked(width, found_vector0);
+            const auto sub_word_index = first_field_marked(width, found_vector0);
             return start + sub_word_index;
         }
         if (found_vector1) {
-            int sub_word_index = first_field_marked(width, found_vector1);
+            const auto sub_word_index = first_field_marked(width, found_vector1);
             return start + field_count + sub_word_index;
         }
         total_bit_count_left -= 2 * bit_count_pr_iteration;
@@ -930,7 +931,7 @@ size_t parallel_subword_find(VectorCompare vector_compare, const uint64_t* data,
         const auto word = it.get(bit_count_pr_iteration);
         found_vector = vector_compare(MSBs, word, search_vector);
         if (found_vector) {
-            int sub_word_index = first_field_marked(width, found_vector);
+            const auto sub_word_index = first_field_marked(width, found_vector);
             return start + sub_word_index;
         }
         total_bit_count_left -= bit_count_pr_iteration;
@@ -943,7 +944,7 @@ size_t parallel_subword_find(VectorCompare vector_compare, const uint64_t* data,
         auto last_word_mask = 0xFFFFFFFFFFFFFFFFULL >> (64 - total_bit_count_left);
         found_vector &= last_word_mask;
         if (found_vector) {
-            int sub_word_index = first_field_marked(width, found_vector);
+            const auto sub_word_index = first_field_marked(width, found_vector);
             return start + sub_word_index;
         }
     }
@@ -952,6 +953,22 @@ size_t parallel_subword_find(VectorCompare vector_compare, const uint64_t* data,
 
 
 namespace impl {
+
+inline int64_t default_fetcher(int w, const char* data, size_t ndx)
+{
+    REALM_TEMPEX(return get_direct, w, (data, ndx));
+}
+
+struct EncodedFetcher {
+
+    int64_t operator()(int, const char* data, size_t ndx) const
+    {
+        return ptr->get(data, ndx);
+    }
+    const ArrayEncode* ptr;
+};
+static EncodedFetcher s_encoded_fetcher;
+
 
 // Lower and Upper bound are mainly used in the B+tree implementation,
 // but also for indexing, we can exploit these functions when the array
@@ -979,15 +996,16 @@ namespace impl {
 //
 // We currently use binary search. See for example
 // http://www.tbray.org/ongoing/When/200x/2003/03/22/Binary.
-template <int width, class T = void*>
-inline size_t lower_bound(const char* data, size_t start, size_t end, int64_t value, T enc = nullptr) noexcept
+template <int width, typename F = decltype(default_fetcher)>
+inline size_t lower_bound(const char* data, size_t start, size_t end, int64_t value,
+                          F fetcher = default_fetcher) noexcept
 {
-    auto fetcher = [](auto enc, auto data, size_t ndx) {
-        if constexpr (std::is_same_v<T, ArrayEncode>) {
-            return enc.get(data, ndx);
-        }
-        return get_direct<width>(data, ndx);
-    };
+    //    auto fetcher = [](auto data, size_t ndx) {
+    ////        if constexpr (std::is_same_v<T, ArrayEncode>) {
+    ////            return enc.get(data, ndx);
+    ////        }
+    //        return get_direct<width>(data, ndx);
+    //    };
 
 
     // The binary search used here is carefully optimized. Key trick is to use a single
@@ -1013,7 +1031,7 @@ inline size_t lower_bound(const char* data, size_t start, size_t end, int64_t va
         size_t other_half = size - half;
         size_t probe = low + half;
         size_t other_low = low + other_half;
-        int64_t v = fetcher(enc, data, probe);
+        int64_t v = fetcher(width, data, probe);
         size = half;
         low = (v < value) ? other_low : low;
 
@@ -1022,7 +1040,7 @@ inline size_t lower_bound(const char* data, size_t start, size_t end, int64_t va
         other_half = size - half;
         probe = low + half;
         other_low = low + other_half;
-        v = fetcher(enc, data, probe);
+        v = fetcher(width, data, probe);
         size = half;
         low = (v < value) ? other_low : low;
 
@@ -1031,7 +1049,7 @@ inline size_t lower_bound(const char* data, size_t start, size_t end, int64_t va
         other_half = size - half;
         probe = low + half;
         other_low = low + other_half;
-        v = fetcher(enc, data, probe);
+        v = fetcher(width, data, probe);
         size = half;
         low = (v < value) ? other_low : low;
     }
@@ -1064,7 +1082,7 @@ inline size_t lower_bound(const char* data, size_t start, size_t end, int64_t va
         size_t other_half = size - half;
         size_t probe = low + half;
         size_t other_low = low + other_half;
-        int64_t v = fetcher(enc, data, probe); // get_direct<width>(data, probe);
+        int64_t v = fetcher(width, data, probe); // get_direct<width>(data, probe);
         size = half;
         // for max performance, the line below should compile into a conditional
         // move instruction. Not all compilers do this. To maximize chance
@@ -1077,17 +1095,18 @@ inline size_t lower_bound(const char* data, size_t start, size_t end, int64_t va
 }
 
 // See lower_bound()
-template <int width, class T = void*>
-inline size_t upper_bound(const char* data, size_t start, size_t end, int64_t value, T enc = nullptr) noexcept
+template <int width, typename F = decltype(default_fetcher)>
+inline size_t upper_bound(const char* data, size_t start, size_t end, int64_t value,
+                          F fetcher = default_fetcher) noexcept
 {
     REALM_ASSERT_DEBUG(end >= start);
 
-    auto fetcher = [](auto enc, auto data, size_t ndx) {
-        if constexpr (std::is_same_v<T, ArrayEncode>) {
-            return enc.get(data, ndx);
-        }
-        return get_direct<width>(data, ndx);
-    };
+    //    auto fetcher = [](auto data, size_t ndx) {
+    ////        if constexpr (std::is_same_v<T, ArrayEncode>) {
+    ////            return enc.get(data, ndx);
+    ////        }
+    //        return get_direct<width>(data, ndx);
+    //    };
 
     size_t size = end - start;
     // size_t low = 0;
@@ -1097,7 +1116,7 @@ inline size_t upper_bound(const char* data, size_t start, size_t end, int64_t va
         size_t other_half = size - half;
         size_t probe = low + half;
         size_t other_low = low + other_half;
-        int64_t v = fetcher(enc, data, probe);
+        int64_t v = fetcher(width, data, probe);
         size = half;
         low = (value >= v) ? other_low : low;
 
@@ -1105,7 +1124,7 @@ inline size_t upper_bound(const char* data, size_t start, size_t end, int64_t va
         other_half = size - half;
         probe = low + half;
         other_low = low + other_half;
-        v = fetcher(enc, data, probe);
+        v = fetcher(width, data, probe);
         size = half;
         low = (value >= v) ? other_low : low;
 
@@ -1113,7 +1132,7 @@ inline size_t upper_bound(const char* data, size_t start, size_t end, int64_t va
         other_half = size - half;
         probe = low + half;
         other_low = low + other_half;
-        v = fetcher(enc, data, probe);
+        v = fetcher(width, data, probe);
         size = half;
         low = (value >= v) ? other_low : low;
     }
@@ -1123,7 +1142,7 @@ inline size_t upper_bound(const char* data, size_t start, size_t end, int64_t va
         size_t other_half = size - half;
         size_t probe = low + half;
         size_t other_low = low + other_half;
-        int64_t v = fetcher(enc, data, probe);
+        int64_t v = fetcher(width, data, probe);
         size = half;
         low = (value >= v) ? other_low : low;
     };
@@ -1132,17 +1151,28 @@ inline size_t upper_bound(const char* data, size_t start, size_t end, int64_t va
 }
 } // namespace impl
 
-
-template <int width, typename T = void*>
-inline size_t lower_bound(const char* data, size_t size, int64_t value, T enc = nullptr) noexcept
+template <int width>
+inline size_t lower_bound(const char* data, size_t size, int64_t value) noexcept
 {
-    return impl::lower_bound<width>(data, 0, size, value, enc);
+    return impl::lower_bound<width>(data, 0, size, value, impl::default_fetcher);
 }
 
-template <int width, typename T = void*>
-inline size_t upper_bound(const char* data, size_t size, int64_t value, T enc = nullptr) noexcept
+inline size_t lower_bound(const char* data, size_t size, int64_t value, const ArrayEncode& encoder) noexcept
 {
-    return impl::upper_bound<width>(data, 0, size, value, enc);
+    impl::s_encoded_fetcher.ptr = &encoder;
+    return impl::lower_bound<0>(data, 0, size, value, impl::s_encoded_fetcher);
+}
+
+template <int width>
+inline size_t upper_bound(const char* data, size_t size, int64_t value) noexcept
+{
+    return impl::upper_bound<width>(data, 0, size, value, impl::default_fetcher);
+}
+
+inline size_t upper_bound(const char* data, size_t size, int64_t value, const ArrayEncode& encoder) noexcept
+{
+    impl::s_encoded_fetcher.ptr = &encoder;
+    return impl::lower_bound<0>(data, 0, size, value, impl::s_encoded_fetcher);
 }
 
 } // namespace realm

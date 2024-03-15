@@ -219,10 +219,10 @@ struct Array::VTableForWidth {
             getter = &Array::get<width>;
             setter = &Array::set<width>;
             chunk_getter = &Array::get_chunk<width>;
-            finder[cond_Equal] = &Array::find_vtable<Equal, width>;
-            finder[cond_NotEqual] = &Array::find_vtable<NotEqual, width>;
-            finder[cond_Greater] = &Array::find_vtable<Greater, width>;
-            finder[cond_Less] = &Array::find_vtable<Less, width>;
+            finder[cond_Equal] = &Array::find_vtable<Equal>;
+            finder[cond_NotEqual] = &Array::find_vtable<NotEqual>;
+            finder[cond_Greater] = &Array::find_vtable<Greater>;
+            finder[cond_Less] = &Array::find_vtable<Less>;
         }
     };
     static const PopulatedVTable vtable;
@@ -270,16 +270,8 @@ void Array::init_from_mem(MemRef mem) noexcept
         // the header
         m_size = m_encoder.size();
         m_width = static_cast<uint_least8_t>(m_encoder.width());
-        // we need to compute lower and upper bound, these are useful during Array::find and in general in every query
-        // related optimisation.
-        if (m_width) {
-            const auto max_v = 1ULL << (m_width - 1);
-            m_lbound = -max_v;
-            m_ubound = max_v - 1;
-        }
-        else {
-            m_lbound = m_ubound = 0;
-        }
+        m_lbound = -m_encoder.width_mask();
+        m_ubound = m_encoder.width_mask() - 1;
         m_is_inner_bptree_node = get_is_inner_bptree_node_from_header(header);
         m_has_refs = get_hasrefs_from_header(header);
         m_context_flag = get_context_flag_from_header(header);
@@ -765,8 +757,6 @@ void Array::set_encoded(size_t ndx, int64_t val)
 
 int64_t Array::sum(size_t start, size_t end) const
 {
-    if (is_encoded())
-        return m_encoder.sum(*this, start, end);
     REALM_TEMPEX(return sum, m_width, (start, end));
 }
 
@@ -1262,10 +1252,10 @@ MemRef Array::create(Type type, bool context_flag, WidthType width_type, size_t 
 }
 
 // This is the one installed into the m_vtable->finder slots.
-template <class cond, size_t bitwidth>
+template <class cond>
 bool Array::find_vtable(int64_t value, size_t start, size_t end, size_t baseindex, QueryStateBase* state) const
 {
-    return ArrayWithFind(*this).find_optimized<cond, bitwidth>(value, start, end, baseindex, state);
+    REALM_TEMPEX2(return ArrayWithFind(*this).find_optimized, cond, m_width, (value, start, end, baseindex, state));
 }
 
 template <class cond>
@@ -1491,16 +1481,25 @@ void Array::verify() const
 size_t Array::lower_bound_int(int64_t value) const noexcept
 {
     if (is_encoded())
-        // not really nice
-        return lower_bound<0, ArrayEncode>(m_data, m_size, value, m_encoder);
+        return lower_bound_int_encoded(value);
     REALM_TEMPEX(return lower_bound, m_width, (m_data, m_size, value));
 }
 
 size_t Array::upper_bound_int(int64_t value) const noexcept
 {
     if (is_encoded())
-        return upper_bound<0, ArrayEncode>(m_data, m_size, value, m_encoder);
+        return upper_bound_int_encoded(value);
     REALM_TEMPEX(return upper_bound, m_width, (m_data, m_size, value));
+}
+
+size_t Array::lower_bound_int_encoded(int64_t value) const noexcept
+{
+    return lower_bound(m_data, m_size, value, m_encoder);
+}
+
+size_t Array::upper_bound_int_encoded(int64_t value) const noexcept
+{
+    return upper_bound(m_data, m_size, value, m_encoder);
 }
 
 int_fast64_t Array::get(const char* header, size_t ndx) noexcept
@@ -1626,21 +1625,3 @@ void Array::typed_print(std::string prefix) const
         */
     }
 }
-
-template <typename cond>
-size_t Array::do_find_first(int64_t value, size_t start, size_t end) const
-{
-    if (is_encoded())
-        return m_encoder.find_first<cond>(*this, value, start, end);
-
-    // QueryStateFindFirst is probably not needed, all we need here is to return the index
-    // Also we could or should add to the array ArrayWithFind, in order to avoid to create a new object every time.
-    // ArrayWithFind is lightweight, but probably it is faster, to just create it once.
-    QueryStateFindFirst state;
-    REALM_TEMPEX2(ArrayWithFind(*this).find_optimized, cond, m_width, (value, start, end, 0, &state));
-    return state.m_state;
-}
-template size_t Array::do_find_first<NotEqual>(int64_t value, size_t start, size_t end) const;
-template size_t Array::do_find_first<Equal>(int64_t value, size_t start, size_t end) const;
-template size_t Array::do_find_first<Less>(int64_t value, size_t start, size_t end) const;
-template size_t Array::do_find_first<Greater>(int64_t value, size_t start, size_t end) const;

@@ -19,6 +19,7 @@
 #include <realm/array_packed.hpp>
 #include <realm/node_header.hpp>
 #include <realm/array_direct.hpp>
+#include <realm/array_encode.hpp>
 #include <realm/array.hpp>
 
 #include <vector>
@@ -64,8 +65,8 @@ void ArrayPacked::copy_data(const Array& origin, Array& arr) const
 void ArrayPacked::set_direct(const Array& arr, size_t ndx, int64_t value) const
 {
     REALM_ASSERT_DEBUG(arr.is_encoded());
-    const auto v_width = arr.m_encoder.m_v_width;
-    const auto v_size = arr.m_encoder.m_v_size;
+    const auto v_width = arr.m_encoder.width();
+    const auto v_size = arr.m_encoder.size();
     REALM_ASSERT_DEBUG(ndx < v_size);
     auto data = (uint64_t*)arr.m_data;
     bf_iterator it_value{data, static_cast<size_t>(ndx * v_width), v_width, v_width, 0};
@@ -76,14 +77,12 @@ int64_t ArrayPacked::get(const Array& arr, size_t ndx) const
 {
     REALM_ASSERT_DEBUG(arr.is_attached());
     REALM_ASSERT_DEBUG(arr.is_encoded());
-    const auto w = arr.m_encoder.m_v_width;
-    const auto sz = arr.m_encoder.m_v_size;
-    return do_get((uint64_t*)arr.m_data, ndx, w, sz, arr.get_encoder().width_mask());
+    return get(arr.m_data, ndx, arr.get_encoder());
 }
 
-int64_t ArrayPacked::get(const char* data, size_t ndx, size_t width, size_t sz, uint64_t mask) const
+int64_t ArrayPacked::get(const char* data, size_t ndx, const ArrayEncode& encode) const
 {
-    return do_get((uint64_t*)data, ndx, width, sz, mask);
+    return do_get((uint64_t*)data, ndx, encode.width(), encode.size(), encode.width_mask());
 }
 
 int64_t ArrayPacked::do_get(uint64_t* data, size_t ndx, size_t v_width, size_t v_size, uint64_t mask) const
@@ -169,7 +168,7 @@ bool ArrayPacked::find_all(const Array& arr, int64_t value, size_t start, size_t
 
     // in packed format a parallel subword find pays off also for width >= 32
 
-    const auto MSBs = populate(arr.m_width, arr.get_encoder().width_mask());
+    const auto MSBs = arr.get_encoder().msb();
     const auto search_vector = populate(arr.m_width, value);
     while (start < end) {
         start = parallel_subword_find(vector_compare<Cond>, (const uint64_t*)arr.m_data, 0, arr.m_width, MSBs,
@@ -177,7 +176,6 @@ bool ArrayPacked::find_all(const Array& arr, int64_t value, size_t start, size_t
         if (start < end)
             if (!state->match(start + baseindex))
                 return false;
-
         ++start;
     }
     return true;

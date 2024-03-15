@@ -35,10 +35,63 @@ template size_t ArrayEncode::find_first<Equal>(const Array&, int64_t, size_t, si
 template size_t ArrayEncode::find_first<NotEqual>(const Array&, int64_t, size_t, size_t) const;
 template size_t ArrayEncode::find_first<Greater>(const Array&, int64_t, size_t, size_t) const;
 template size_t ArrayEncode::find_first<Less>(const Array&, int64_t, size_t, size_t) const;
-template bool ArrayEncode::find_all<Equal>(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*) const;
-template bool ArrayEncode::find_all<NotEqual>(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*) const;
-template bool ArrayEncode::find_all<Greater>(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*) const;
-template bool ArrayEncode::find_all<Less>(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*) const;
+
+template bool ArrayEncode::find_all_packed<Equal>(const Array&, int64_t, size_t, size_t, size_t,
+                                                  QueryStateBase*) const;
+template bool ArrayEncode::find_all_packed<NotEqual>(const Array&, int64_t, size_t, size_t, size_t,
+                                                     QueryStateBase*) const;
+template bool ArrayEncode::find_all_packed<Greater>(const Array&, int64_t, size_t, size_t, size_t,
+                                                    QueryStateBase*) const;
+template bool ArrayEncode::find_all_packed<Less>(const Array&, int64_t, size_t, size_t, size_t,
+                                                 QueryStateBase*) const;
+
+template bool ArrayEncode::find_all_flex<Equal>(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*) const;
+template bool ArrayEncode::find_all_flex<NotEqual>(const Array&, int64_t, size_t, size_t, size_t,
+                                                   QueryStateBase*) const;
+template bool ArrayEncode::find_all_flex<Greater>(const Array&, int64_t, size_t, size_t, size_t,
+                                                  QueryStateBase*) const;
+template bool ArrayEncode::find_all_flex<Less>(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*) const;
+
+
+struct ArrayEncode::VTableForPacked {
+    struct PopulatedVTablePacked : ArrayEncode::VTable {
+        PopulatedVTablePacked()
+        {
+            m_getter = &ArrayEncode::get_packed;
+            m_data_getter = &ArrayEncode::get_from_data_packed;
+            m_chunk_getter = &ArrayEncode::get_chunk_packed;
+            m_direct_setter = &ArrayEncode::set_direct_packed;
+            m_finder[cond_Equal] = &ArrayEncode::find_all_packed<Equal>;
+            m_finder[cond_NotEqual] = &ArrayEncode::find_all_packed<NotEqual>;
+            m_finder[cond_Less] = &ArrayEncode::find_all_packed<Less>;
+            m_finder[cond_Greater] = &ArrayEncode::find_all_packed<Greater>;
+            m_accumulator = &ArrayEncode::sum_packed;
+        }
+    };
+    static const PopulatedVTablePacked vtable;
+};
+
+struct ArrayEncode::VTableForFlex {
+    struct PopulatedVTableFlex : ArrayEncode::VTable {
+        PopulatedVTableFlex()
+        {
+            m_getter = &ArrayEncode::get_flex;
+            m_data_getter = &ArrayEncode::get_from_data_flex;
+            m_chunk_getter = &ArrayEncode::get_chunk_flex;
+            m_direct_setter = &ArrayEncode::set_direct_flex;
+            m_finder[cond_Equal] = &ArrayEncode::find_all_flex<Equal>;
+            m_finder[cond_NotEqual] = &ArrayEncode::find_all_flex<NotEqual>;
+            m_finder[cond_Less] = &ArrayEncode::find_all_flex<Less>;
+            m_finder[cond_Greater] = &ArrayEncode::find_all_flex<Greater>;
+            m_accumulator = &ArrayEncode::sum_flex;
+        }
+    };
+    static const PopulatedVTableFlex vtable;
+};
+
+const typename ArrayEncode::VTableForPacked::PopulatedVTablePacked ArrayEncode::VTableForPacked::vtable;
+const typename ArrayEncode::VTableForFlex::PopulatedVTableFlex ArrayEncode::VTableForFlex::vtable;
+
 
 template <typename T, typename... Arg>
 inline void encode_array(const T& encoder, Array& arr, size_t byte_size, Arg&&... args)
@@ -95,7 +148,7 @@ bool ArrayEncode::always_encode(const Array& origin, Array& arr, bool packed) co
 bool ArrayEncode::encode(const Array& origin, Array& arr) const
 {
     // return false;
-    // return always_encode(origin, arr, true); // true packed, false flex
+    // return always_encode(origin, arr, false); // true packed, false flex
 
     std::vector<int64_t> values;
     std::vector<size_t> indices;
@@ -177,12 +230,14 @@ bool ArrayEncode::decode(Array& arr) const
 
 void ArrayEncode::init(const char* h)
 {
-    using Encoding = NodeHeader::Encoding;
     m_encoding = NodeHeader::get_encoding(h);
+
     if (m_encoding == Encoding::Packed) {
         m_v_width = NodeHeader::get_element_size<Encoding::Packed>(h);
         m_v_size = NodeHeader::get_num_elements<Encoding::Packed>(h);
         m_v_mask = 1ULL << (m_v_width - 1);
+        m_MSBs = populate(m_v_width, m_v_mask);
+        m_vtable = &VTableForPacked::vtable;
     }
     else if (m_encoding == Encoding::Flex) {
         m_v_width = NodeHeader::get_elementA_size<Encoding::Flex>(h);
@@ -191,6 +246,9 @@ void ArrayEncode::init(const char* h)
         m_ndx_size = NodeHeader::get_arrayB_num_elements<Encoding::Flex>(h);
         m_v_mask = 1ULL << (m_v_width - 1);
         m_ndx_mask = 1ULL << (m_ndx_width - 1);
+        m_MSBs = populate(m_v_width, m_v_mask);
+        m_ndx_MSBs = populate(m_ndx_width, m_ndx_mask);
+        m_vtable = &VTableForFlex::vtable;
     }
 }
 
@@ -199,52 +257,47 @@ int64_t ArrayEncode::get(const Array& arr, size_t ndx) const
     using Encoding = NodeHeader::Encoding;
     REALM_ASSERT_DEBUG(arr.is_attached());
     REALM_ASSERT_DEBUG(m_encoding == Encoding::Flex || m_encoding == Encoding::Packed);
-    return is_packed() ? s_packed.get(arr, ndx) : s_flex.get(arr, ndx);
+    REALM_ASSERT_DEBUG(m_vtable->m_getter);
+    return (this->*(m_vtable->m_getter))(arr, ndx);
 }
 
 int64_t ArrayEncode::get(const char* data, size_t ndx) const
 {
     using Encoding = NodeHeader::Encoding;
     REALM_ASSERT_DEBUG(m_encoding == Encoding::Flex || m_encoding == Encoding::Packed);
-    return m_encoding == Encoding::Packed
-               ? s_packed.get(data, ndx, m_v_width, m_v_size, m_v_mask)
-               : s_flex.get(data, ndx, m_v_width, m_v_size, m_ndx_width, m_ndx_size, m_v_mask);
+    REALM_ASSERT_DEBUG(m_vtable->m_data_getter);
+    return (this->*(m_vtable->m_data_getter))(data, ndx);
 }
 
 void ArrayEncode::get_chunk(const Array& arr, size_t ndx, int64_t res[8]) const
 {
     REALM_ASSERT_DEBUG(arr.is_attached());
-    return is_packed() ? s_packed.get_chunk(arr, ndx, res) : s_flex.get_chunk(arr, ndx, res);
+    REALM_ASSERT_DEBUG(m_vtable->m_chunk_getter);
+    (this->*(m_vtable->m_chunk_getter))(arr, ndx, res);
 }
 
 void ArrayEncode::set_direct(const Array& arr, size_t ndx, int64_t value) const
 {
     REALM_ASSERT_DEBUG(is_packed() || is_flex());
-    is_packed() ? s_packed.set_direct(arr, ndx, value) : s_flex.set_direct(arr, ndx, value);
+    REALM_ASSERT_DEBUG(m_vtable->m_direct_setter);
+    (this->*(m_vtable->m_direct_setter))(arr, ndx, value);
 }
 
 template <typename Cond>
 size_t ArrayEncode::find_first(const Array& arr, int64_t value, size_t start, size_t end) const
 {
+    REALM_ASSERT_DEBUG(is_packed() || is_flex());
     QueryStateFindFirst state;
     find_all<Cond>(arr, value, start, end, 0, &state);
     return state.m_state;
-}
-
-template <typename Cond>
-bool ArrayEncode::find_all(const Array& arr, int64_t value, size_t start, size_t end, size_t baseindex,
-                           QueryStateBase* state) const
-{
-    REALM_ASSERT_DEBUG(is_packed() || is_flex());
-    return is_packed() ? s_packed.find_all<Cond>(arr, value, start, end, baseindex, state)
-                       : s_flex.find_all<Cond>(arr, value, start, end, baseindex, state);
 }
 
 int64_t ArrayEncode::sum(const Array& arr, size_t start, size_t end) const
 {
     REALM_ASSERT_DEBUG(is_packed() || is_flex());
     REALM_ASSERT_DEBUG(arr.m_size >= start && arr.m_size <= end);
-    return is_packed() ? s_packed.sum(arr, start, end) : s_flex.sum(arr, start, end);
+    REALM_ASSERT_DEBUG(m_vtable->m_accumulator);
+    return (this->*(m_vtable->m_accumulator))(arr, start, end);
 }
 
 void ArrayEncode::set(char* data, size_t w, size_t ndx, int64_t v) const
@@ -267,16 +320,6 @@ void ArrayEncode::set(char* data, size_t w, size_t ndx, int64_t v) const
         realm::set_direct<64>(data, ndx, v);
     else
         REALM_UNREACHABLE();
-}
-
-bool inline ArrayEncode::is_packed() const
-{
-    return m_encoding == NodeHeader::Encoding::Packed;
-}
-
-bool inline ArrayEncode::is_flex() const
-{
-    return m_encoding == NodeHeader::Encoding::Flex;
 }
 
 size_t ArrayEncode::flex_encoded_array_size(const std::vector<int64_t>& values, const std::vector<size_t>& indices,
@@ -338,4 +381,68 @@ void ArrayEncode::encode_values(const Array& arr, std::vector<int64_t>& values, 
     }
 #endif
     REALM_ASSERT_DEBUG(indices.size() == sz);
+}
+
+int64_t ArrayEncode::get_packed(const Array& arr, size_t ndx) const
+{
+    return s_packed.get(arr, ndx);
+}
+
+int64_t ArrayEncode::get_flex(const Array& arr, size_t ndx) const
+{
+    return s_flex.get(arr, ndx);
+}
+
+int64_t ArrayEncode::get_from_data_packed(const char* data, size_t ndx) const
+{
+    return s_packed.get(data, ndx, *this);
+}
+
+int64_t ArrayEncode::get_from_data_flex(const char* data, size_t ndx) const
+{
+    return s_flex.get(data, ndx, *this);
+}
+
+void ArrayEncode::get_chunk_packed(const Array& arr, size_t ndx, int64_t res[8]) const
+{
+    s_packed.get_chunk(arr, ndx, res);
+}
+
+void ArrayEncode::get_chunk_flex(const Array& arr, size_t ndx, int64_t res[8]) const
+{
+    s_flex.get_chunk(arr, ndx, res);
+}
+
+void ArrayEncode::set_direct_packed(const Array& arr, size_t ndx, int64_t value) const
+{
+    s_packed.set_direct(arr, ndx, value);
+}
+
+void ArrayEncode::set_direct_flex(const Array& arr, size_t ndx, int64_t value) const
+{
+    s_flex.set_direct(arr, ndx, value);
+}
+
+template <typename Cond>
+bool ArrayEncode::find_all_packed(const Array& arr, int64_t value, size_t start, size_t end, size_t baseindex,
+                                  QueryStateBase* state) const
+{
+    return s_packed.find_all<Cond>(arr, value, start, end, baseindex, state);
+}
+
+template <typename Cond>
+bool ArrayEncode::find_all_flex(const Array& arr, int64_t value, size_t start, size_t end, size_t baseindex,
+                                QueryStateBase* state) const
+{
+    return s_flex.find_all<Cond>(arr, value, start, end, baseindex, state);
+}
+
+int64_t ArrayEncode::sum_packed(const Array& array, size_t start, size_t end) const
+{
+    return s_packed.sum(array, start, end);
+}
+
+int64_t ArrayEncode::sum_flex(const Array& array, size_t start, size_t end) const
+{
+    return s_flex.sum(array, start, end);
 }
