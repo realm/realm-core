@@ -105,14 +105,17 @@ bool ArrayEncode::encode(const Array& origin, Array& arr) const
         const auto uncompressed_size = origin.get_byte_size();
         const auto packed_size = packed_encoded_array_size(values, origin.size(), v_width);
         const auto flex_size = flex_encoded_array_size(values, indices, v_width, ndx_width);
-
-        if (flex_size < packed_size && flex_size < uncompressed_size) {
+        // heuristic: only compress to packed if gain at least 12.5%
+        const auto adjusted_packed_size = packed_size + packed_size / 8;
+        // heuristic: only compress to flex if gain at least 25%
+        const auto adjusted_flex_size = flex_size + flex_size / 4;
+        if (adjusted_flex_size < adjusted_packed_size && adjusted_flex_size < uncompressed_size) {
             const uint8_t flags = NodeHeader::get_flags(origin.get_header());
             encode_array(s_flex, arr, flex_size, flags, v_width, ndx_width, values.size(), indices.size());
             copy_into_encoded_array(s_flex, arr, values, indices);
             return true;
         }
-        else if (packed_size < uncompressed_size) {
+        else if (adjusted_packed_size < uncompressed_size) {
             const uint8_t flags = NodeHeader::get_flags(origin.get_header());
             encode_array(s_packed, arr, packed_size, flags, v_width, origin.size());
             copy_into_encoded_array(s_packed, origin, arr);
