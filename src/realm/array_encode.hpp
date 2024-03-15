@@ -80,20 +80,16 @@ private:
     using Accumulator = int64_t (ArrayEncode::*)(const Array&, size_t, size_t) const;
 
     struct VTable {
-        Getter m_getter;
-        DataGetter m_data_getter;
-        ChunkGetterChunk m_chunk_getter;
-        DirectSetter m_direct_setter;
+        Getter m_getter{nullptr};
+        DataGetter m_data_getter{nullptr};
+        ChunkGetterChunk m_chunk_getter{nullptr};
+        DirectSetter m_direct_setter{nullptr};
         FinderTable m_finder;
-        Accumulator m_accumulator;
+        Accumulator m_accumulator{nullptr};
     };
     struct VTableForPacked;
     struct VTableForFlex;
     const VTable* m_vtable = nullptr;
-    // cached in order to avoid indirection since they are used in a critical path
-    Getter m_getter = nullptr;
-    DataGetter m_data_getter = nullptr;
-    FinderTable* m_finder = nullptr;
 
     // getting and setting interface specifically for encoding formats
     int64_t get_packed(const Array&, size_t) const;
@@ -213,19 +209,15 @@ inline bool ArrayEncode::find_all(const Array& arr, int64_t value, size_t start,
 {
     REALM_ASSERT_DEBUG(is_packed() || is_flex());
     if constexpr (std::is_same_v<Cond, Equal>) {
-        // return (this->*((*m_finder)[cond_Equal]))(arr, value, start, end, baseindex, state);
         return (this->*(m_vtable->m_finder[cond_Equal]))(arr, value, start, end, baseindex, state);
     }
     if constexpr (std::is_same_v<Cond, NotEqual>) {
-        // return (this->*((*m_finder)[cond_NotEqual]))(arr, value, start, end, baseindex, state);
         return (this->*(m_vtable->m_finder[cond_NotEqual]))(arr, value, start, end, baseindex, state);
     }
     if constexpr (std::is_same_v<Cond, Less>) {
-        // return (this->*((*m_finder)[cond_Less]))(arr, value, start, end, baseindex, state);
         return (this->*(m_vtable->m_finder[cond_Less]))(arr, value, start, end, baseindex, state);
     }
     if constexpr (std::is_same_v<Cond, Greater>) {
-        // return (this->*((*m_finder)[cond_Greater]))(arr, value, start, end, baseindex, state);
         return (this->*(m_vtable->m_finder[cond_Greater]))(arr, value, start, end, baseindex, state);
     }
     REALM_UNREACHABLE();

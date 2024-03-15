@@ -178,20 +178,32 @@ inline uint64_t vector_compare(uint64_t MSBs, uint64_t a, uint64_t b)
 {
     if constexpr (std::is_same_v<Cond, Equal>)
         return find_all_fields_EQ(MSBs, a, b);
-    else if constexpr (std::is_same_v<Cond, NotEqual>)
+    if constexpr (std::is_same_v<Cond, NotEqual>)
         return find_all_fields_NE(MSBs, a, b);
-    else if constexpr (std::is_same_v<Cond, GreaterEqual>) {
+    if constexpr (std::is_same_v<Cond, Greater>)
+        return find_all_fields_signed_GT(MSBs, a, b);
+
+    if constexpr (std::is_same_v<Cond, GreaterEqual>) {
         if constexpr (std::is_same_v<Type, ArrayFlex::WordTypeValue>)
             return find_all_fields_signed_GE(MSBs, a, b);
         if constexpr (std::is_same_v<Type, ArrayFlex::WordTypeIndex>)
             return find_all_fields_unsigned_GE(MSBs, a, b);
         REALM_UNREACHABLE();
     }
-
-    else if constexpr (std::is_same_v<Cond, Greater>)
-        return find_all_fields_signed_GT(MSBs, a, b);
-    else if constexpr (std::is_same_v<Cond, Less>)
-        return find_all_fields_unsigned_LT(MSBs, a, b);
+    if constexpr (std::is_same_v<Cond, Less>) {
+        if constexpr (std::is_same_v<Type, ArrayFlex::WordTypeValue>)
+            return find_all_fields_signed_LT(MSBs, a, b);
+        if constexpr (std::is_same_v<Type, ArrayFlex::WordTypeIndex>)
+            return find_all_fields_unsigned_LT(MSBs, a, b);
+        REALM_UNREACHABLE();
+    }
+    if constexpr (std::is_same_v<Cond, LessEqual>) {
+        if constexpr (std::is_same_v<Type, ArrayFlex::WordTypeValue>)
+            return find_all_fields_signed_LT(MSBs, a, b);
+        if constexpr (std::is_same_v<Type, ArrayFlex::WordTypeIndex>)
+            return find_all_fields_unsigned_LE(MSBs, a, b);
+        REALM_UNREACHABLE();
+    }
 }
 
 bool ArrayFlex::find_eq(const Array& arr, int64_t value, size_t start, size_t end, size_t baseindex,
@@ -236,15 +248,15 @@ bool ArrayFlex::find_neq(const Array& arr, int64_t value, size_t start, size_t e
 
     auto MSBs = encoder.msb();
     auto search_vector = populate(v_width, value);
-    auto v_start = parallel_subword_find(vector_compare<Equal>, data, 0, v_width, MSBs, search_vector, 0, v_size);
+    auto v_start = parallel_subword_find(vector_compare<NotEqual>, data, 0, v_width, MSBs, search_vector, 0, v_size);
     if (v_start == v_size)
         return true;
 
     MSBs = encoder.ndx_msb();
     search_vector = populate(ndx_width, v_start);
     while (start < end) {
-        start =
-            parallel_subword_find(vector_compare<NotEqual>, data, offset, ndx_width, MSBs, search_vector, start, end);
+        start = parallel_subword_find(vector_compare<LessEqual, WordTypeIndex>, data, offset, ndx_width, MSBs,
+                                      search_vector, start, end);
         if (start < end)
             if (!state->match(start + baseindex))
                 return false;
@@ -273,7 +285,8 @@ bool ArrayFlex::find_lt(const Array& arr, int64_t value, size_t start, size_t en
     MSBs = encoder.ndx_msb();
     search_vector = populate(ndx_width, v_start);
     while (start < end) {
-        start = parallel_subword_find(vector_compare<Less>, data, offset, ndx_width, MSBs, search_vector, start, end);
+        start = parallel_subword_find(vector_compare<Less, WordTypeIndex>, data, offset, ndx_width, MSBs,
+                                      search_vector, start, end);
         if (start < end)
             if (!state->match(start + baseindex))
                 return false;
