@@ -1369,9 +1369,10 @@ TEST_CASE("nested collection set by Object::create", "[dictionary]") {
     auto obj = Object::create(ctx, r, *r->schema().find("DictionaryObject"), value);
     r->commit_transaction();
 
-    object_store::Dictionary dict(obj, r->schema().find("DictionaryObject")->property_for_name("any"));
-    auto dict0 = dict.get_dictionary("0");
-    auto list1 = dict.get_list("1");
+    auto dict = util::any_cast<object_store::Dictionary&&>(obj.get_property_value<std::any>(ctx, "any"));
+
+    auto dict0 = util::any_cast<object_store::Dictionary&&>(dict.get(ctx, "0"));
+    auto list1 = util::any_cast<List&&>(dict.get(ctx, "1"));
     auto dict2 = dict.get_dictionary("2");
     CHECK(dict0.get_any("zero") == Mixed(0));
     CHECK(list1.get_any(0) == Mixed("one"));
@@ -1422,8 +1423,8 @@ TEST_CASE("nested collection set by Object::create", "[dictionary]") {
         r->begin_transaction();
         Object::create(ctx, r, *r->schema().find("DictionaryObject"), value, CreatePolicy::UpdateModified);
         r->commit_transaction();
-        List list(obj, r->schema().find("DictionaryObject")->property_for_name("any"));
-        dict0 = list.get_dictionary(0);
+        auto list = util::any_cast<List&&>(obj.get_property_value<std::any>(ctx, "any"));
+        dict0 = util::any_cast<object_store::Dictionary&&>(list.get(ctx, 0));
         CHECK(dict0.get_any("zero") == Mixed(0));
 
         SECTION("modify dictionary only") {
@@ -1443,7 +1444,7 @@ TEST_CASE("nested collection set by Object::create", "[dictionary]") {
             r->begin_transaction();
             Object::create(ctx, r, *r->schema().find("DictionaryObject"), new_value, CreatePolicy::UpdateModified);
             r->commit_transaction();
-            auto list0 = list.get_list(0);
+            auto list0 = util::any_cast<List&&>(list.get(ctx, 0));
             CHECK(list0.get_any(0) == Mixed("seven"));
             CHECK(list0.get_any(1) == Mixed(7));
         }

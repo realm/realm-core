@@ -171,9 +171,21 @@ auto List::dispatch(Fn&& fn) const
 template <typename Context>
 auto List::get(Context& ctx, size_t row_ndx) const
 {
-    return dispatch([&](auto t) {
-        return ctx.box(this->get<std::decay_t<decltype(*t)>>(row_ndx));
-    });
+    if (m_type == PropertyType::Mixed) {
+        Mixed value = get<Mixed>(row_ndx);
+        if (value.is_type(type_Dictionary)) {
+            return ctx.box(get_dictionary(row_ndx));
+        }
+        if (value.is_type(type_List)) {
+            return ctx.box(get_list(row_ndx));
+        }
+        return ctx.box(value);
+    }
+    else {
+        return dispatch([&](auto t) {
+            return ctx.box(this->get<std::decay_t<decltype(*t)>>(row_ndx));
+        });
+    }
 }
 
 template <typename T, typename Context>

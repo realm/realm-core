@@ -234,8 +234,16 @@ ValueType Object::get_property_value_impl(ContextType& ctx, const Property& prop
         case PropertyType::UUID:
             return is_nullable(property.type) ? ctx.box(m_obj.get<util::Optional<UUID>>(column))
                                               : ctx.box(m_obj.get<UUID>(column));
-        case PropertyType::Mixed:
-            return ctx.box(m_obj.get<Mixed>(column));
+        case PropertyType::Mixed: {
+            Mixed value = m_obj.get<Mixed>(column);
+            if (value.is_type(type_Dictionary)) {
+                return ctx.box(object_store::Dictionary(m_realm, m_obj, column));
+            }
+            if (value.is_type(type_List)) {
+                return ctx.box(List(m_realm, m_obj, column));
+            }
+            return ctx.box(value);
+        }
         case PropertyType::Object: {
             auto linkObjectSchema = m_realm->schema().find(property.object_type);
             auto linked = const_cast<Obj&>(m_obj).get_linked_object(column);

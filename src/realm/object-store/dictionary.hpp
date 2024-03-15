@@ -223,9 +223,21 @@ void Dictionary::insert(Context& ctx, StringData key, T&& value, CreatePolicy po
 template <typename Context>
 auto Dictionary::get(Context& ctx, StringData key) const
 {
-    return dispatch([&](auto t) {
-        return ctx.box(this->get<std::decay_t<decltype(*t)>>(key));
-    });
+    if (m_type == PropertyType::Mixed) {
+        Mixed value = dict().get(key);
+        if (value.is_type(type_Dictionary)) {
+            return ctx.box(get_dictionary(key));
+        }
+        if (value.is_type(type_List)) {
+            return ctx.box(get_list(key));
+        }
+        return ctx.box(value);
+    }
+    else {
+        return dispatch([&](auto t) {
+            return ctx.box(this->get<std::decay_t<decltype(*t)>>(key));
+        });
+    }
 }
 
 template <typename T, typename Context>
