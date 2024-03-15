@@ -156,9 +156,6 @@ TEST(Alloc_AttachFile)
     }
 }
 
-
-// FIXME: Fails on Windows
-#ifndef _MSC_VER
 TEST(Alloc_BadFile)
 {
     GROUP_TEST_PATH(path_1);
@@ -166,7 +163,7 @@ TEST(Alloc_BadFile)
 
     {
         File file(path_1, File::mode_Append);
-        file.write("foo");
+        file.write(0, "foo");
     }
 
     {
@@ -189,8 +186,6 @@ TEST(Alloc_BadFile)
         CHECK_THROW(alloc.attach_file(path_1, cfg), InvalidDatabase);
     }
 }
-#endif
-
 
 TEST(Alloc_AttachBuffer)
 {
@@ -211,7 +206,7 @@ TEST(Alloc_AttachBuffer)
             buffer_size = size_t(file.get_size());
             buffer.reset(new char[buffer_size]);
             CHECK(bool(buffer));
-            file.read(buffer.get(), buffer_size);
+            file.read(0, buffer.get(), buffer_size);
         }
         File::remove(path);
     }

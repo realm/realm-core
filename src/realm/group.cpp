@@ -984,10 +984,6 @@ void Group::write(File& file, const char* encryption_key, uint_fast64_t version_
 
     file.set_encryption_key(encryption_key);
 
-    // Force the file system to allocate a node so we get a stable unique id.
-    // See File::get_unique_id(). This is used to distinguish encrypted mappings.
-    file.resize(1);
-
     // The aim is that the buffer size should be at least 1/256 of needed size but less than 64 Mb
     constexpr size_t upper_bound = 64 * 1024 * 1024;
     size_t min_space = std::min(get_used_space() >> 8, upper_bound);

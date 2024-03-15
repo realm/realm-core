@@ -17,6 +17,7 @@
  **************************************************************************/
 
 #include <realm.hpp>
+#include <realm/disable_sync_to_disk.hpp>
 #include <realm/util/scope_exit.hpp>
 #include "test.hpp"
 

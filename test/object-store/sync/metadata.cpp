@@ -75,7 +75,6 @@ bool can_access_keychain()
     }();
     return can_access_keychain;
 }
-#endif
 
 CFPtr<CFMutableDictionaryRef> build_search_dictionary(CFStringRef account, CFStringRef service)
 {
@@ -117,6 +116,7 @@ std::vector<char> generate_key()
     arc4random_buf(key.data(), key.size());
     return key;
 }
+#endif // REALM_ENABLE_ENCRYPTION
 #endif // REALM_PLATFORM_APPLE
 } // anonymous namespace
 
