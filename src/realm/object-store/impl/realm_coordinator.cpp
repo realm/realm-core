@@ -1244,7 +1244,7 @@ bool RealmCoordinator::compact()
     return m_db->compact();
 }
 
-void RealmCoordinator::write_copy(StringData path, const char* key)
+void RealmCoordinator::write_copy(std::string_view path, const char* key)
 {
     m_db->write_copy(path, key);
 }

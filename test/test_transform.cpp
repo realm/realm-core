@@ -14,6 +14,7 @@
 #include <realm/util/features.h>
 #include <realm/binary_data.hpp>
 #include <realm/db.hpp>
+#include <realm/disable_sync_to_disk.hpp>
 #include <realm/replication.hpp>
 #include <realm/list.hpp>
 #include <realm/set.hpp>

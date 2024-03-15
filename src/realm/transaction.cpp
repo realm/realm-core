@@ -119,7 +119,6 @@ Transaction::Transaction(DBRef _db, SlabAlloc* alloc, DB::ReadLockInfo& rli, DB:
     bool writable = stage == DB::transact_Writing;
     m_transact_stage = DB::transact_Ready;
     set_transact_stage(stage);
-    m_alloc.note_reader_start(this);
     attach_shared(m_read_lock.m_top_ref, m_read_lock.m_file_size, writable,
                   VersionID{rli.m_version, rli.m_reader_idx});
     if (db->m_logger) {
@@ -882,7 +881,6 @@ void Transaction::do_end_read() noexcept
     }
     db->release_read_lock(m_read_lock);
 
-    m_alloc.note_reader_end(this);
     set_transact_stage(DB::transact_Ready);
     // reset the std::shared_ptr to allow the DB object to release resources
     // as early as possible.
@@ -906,7 +904,6 @@ void Transaction::close_read_with_lock()
                     m_oldest_version_not_persisted->m_file_size);
     db->do_release_read_lock(m_read_lock);
 
-    m_alloc.note_reader_end(this);
     set_transact_stage(DB::transact_Ready);
     // reset the std::shared_ptr to allow the DB object to release resources
     // as early as possible.

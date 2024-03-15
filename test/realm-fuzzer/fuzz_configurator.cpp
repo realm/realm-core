@@ -15,9 +15,13 @@
  * limitations under the License.
  *
  **************************************************************************/
+
 #include "fuzz_configurator.hpp"
+
 #include "fuzz_object.hpp"
 #include "../util/test_path.hpp"
+
+#include <realm/disable_sync_to_disk.hpp>
 #include <realm/object-store/util/scheduler.hpp>
 
 FuzzConfigurator::FuzzConfigurator(FuzzObject& fuzzer, const std::string& input, bool use_input_file,

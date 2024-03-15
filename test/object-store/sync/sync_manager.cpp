@@ -169,7 +169,7 @@ TEST_CASE("sync_manager: `path_for_realm` API", "[sync][sync manager]") {
             std::string path = sync_manager->path_for_realm(config, util::make_optional<std::string>("custom.realm"));
             realm::test_util::TestPathGuard guard(path);
             realm::util::File existing_realm_file(path, File::mode_Write);
-            existing_realm_file.write(std::string("test"));
+            existing_realm_file.write(0, std::string("test"));
             existing_realm_file.sync();
             REQUIRE(sync_manager->path_for_realm(config, util::make_optional<std::string>("custom.realm")) ==
                     base_path / "custom.realm");

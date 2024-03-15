@@ -119,7 +119,7 @@ TEST(Group_OpenUnencryptedFileWithKey_TwoPages)
         Group group;
         TableRef table = group.get_or_add_table("table");
         auto col = table->add_column(type_String, "str");
-        table->create_object().set(col, std::string(page_size() - 100, '\1'));
+        table->create_object().set(col, std::string(4096 - 100, '\1'));
         group.write(path);
     }
 
@@ -135,7 +135,7 @@ TEST(Group_OpenUnencryptedFileWithKey_ThreePages)
         Group group;
         TableRef table = group.get_or_add_table("table");
         auto col = table->add_column(type_String, "str");
-        std::string data(page_size() - 100, '\1');
+        std::string data(4096 - 100, '\1');
         table->create_object().set<String>(col, data);
         table->create_object().set<String>(col, data);
         group.write(path);
@@ -184,7 +184,7 @@ TEST(Group_BadFile)
 
     {
         File file(path_1, File::mode_Append);
-        file.write("foo");
+        file.write(0, "foo");
     }
 
     {
@@ -214,7 +214,7 @@ TEST(Group_OpenBuffer)
             buffer_size = size_t(file.get_size());
             buffer.reset(new char[buffer_size]);
             CHECK(bool(buffer));
-            file.read(buffer.get(), buffer_size);
+            file.read(0, buffer.get(), buffer_size);
         }
     }
 
@@ -285,7 +285,7 @@ TEST(Group_TableNameTooLong)
 {
     Group group;
     size_t buf_len = 64;
-    std::unique_ptr<char[]> buf(new char[buf_len]);
+    std::unique_ptr<char[]> buf(new char[buf_len]());
     CHECK_LOGIC_ERROR(group.add_table(StringData(buf.get(), buf_len)), ErrorCodes::InvalidName);
     group.add_table(StringData(buf.get(), buf_len - 1));
 }

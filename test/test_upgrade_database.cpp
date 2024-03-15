@@ -143,8 +143,8 @@ static void compare_files(test_util::unit_test::TestContext& test_context, const
 
     auto old_buffer = std::make_unique<char[]>(old_size);
     auto new_buffer = std::make_unique<char[]>(old_size);
-    old_file.read(old_buffer.get(), old_size);
-    new_file.read(new_buffer.get(), old_size);
+    old_file.read(0, old_buffer.get(), old_size);
+    new_file.read(0, new_buffer.get(), old_size);
     CHECK_NOT(memcmp(old_buffer.get(), new_buffer.get(), old_size));
 }
 
