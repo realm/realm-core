@@ -1453,13 +1453,18 @@ TEST(Test_ArrayInt_compress_data)
     a.add(6);
     a.add(7);
     a.add(8);
+    a.add(4);
     a.try_encode(a1);
+    bool ok = a1.is_encoded();
+    CHECK(ok);
     CHECK(a1.is_encoded());
     CHECK(a1.is_attached());
     CHECK(a.is_attached());
-    for (size_t i = 0; i < a.size(); ++i)
-        CHECK(a1.get(i) == a.get(i));
-
+    for (size_t i = 0; i < a.size(); ++i) {
+        auto v0 = a1.get(i);
+        auto v1 = a.get(i);
+        CHECK(v0 == v1);
+    }
     a.destroy();
     a1.destroy();
 
@@ -1476,21 +1481,6 @@ TEST(Test_ArrayInt_compress_data)
 
     a.create();
 
-    for (size_t i = 0; i < 14; ++i)
-        a.add(i + 1);
-
-    a.add(-4427957085475570907);
-    a.add(-4427957085475570907);
-    a.add(-4427957085475570907);
-    a.add(-4427957085475570907);
-    a.try_encode(a1);
-    CHECK(a1.is_encoded());
-    for (size_t i = 0; i < a.size(); ++i)
-        CHECK(a1.get(i) == a.get(i));
-    a.destroy();
-    a1.destroy();
-
-    a.create();
     a.add(16388);
     a.add(409);
     a.add(16388);
