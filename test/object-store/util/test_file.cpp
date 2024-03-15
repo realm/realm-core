@@ -260,8 +260,6 @@ static Status wait_for_session(Realm& realm, void (SyncSession::*fn)(util::Uniqu
                                std::chrono::seconds timeout)
 {
     auto shared_state = std::make_shared<WaitForSessionState>();
-    REALM_ASSERT(realm.config().sync_config);
-    REALM_ASSERT(realm.config().sync_config->user);
     auto& session = *realm.config().sync_config->user->session_for_on_disk_path(realm.config().path);
     auto delay = TEST_TIMEOUT_EXTRA > 0 ? timeout + std::chrono::seconds(TEST_TIMEOUT_EXTRA) : timeout;
     (session.*fn)([weak_state = std::weak_ptr<WaitForSessionState>(shared_state)](Status s) {

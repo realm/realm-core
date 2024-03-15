@@ -40,7 +40,7 @@
 #include <limits.h>
 
 #ifndef TEST_ENABLE_LOGGING
-#define TEST_ENABLE_LOGGING 1 // change to 1 to enable trace-level logging
+#define TEST_ENABLE_LOGGING 0 // change to 1 to enable trace-level logging
 #endif
 
 #ifndef TEST_LOGGING_LEVEL

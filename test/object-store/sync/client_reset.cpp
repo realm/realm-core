@@ -5925,7 +5925,6 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                     REQUIRE(!ndictionary_setup_changes.collection_root_was_deleted);
                     REQUIRE_INDICES(ndictionary_setup_changes.insertions);
                     REQUIRE_INDICES(ndictionary_setup_changes.deletions);
-                    // wait_for_upload(*local_realm);
                 }
             })
             ->run();

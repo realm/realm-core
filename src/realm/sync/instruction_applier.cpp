@@ -381,9 +381,6 @@ void InstructionApplier::operator()(const Instruction::Update& instr)
                 else if (mpark::get_if<Instruction::Payload::List>(&arg)) {
                     obj.set_collection(col, CollectionType::List);
                 }
-                //                else if (mpark::get_if<Instruction::Payload::Set>(&arg)) {
-                //                    obj.set_collection(col, CollectionType::Set);
-                //                }
             };
 
             m_applier->visit_payload(m_instr.value, visitor);
@@ -1494,8 +1491,8 @@ InstructionApplier::PathResolver::Status InstructionApplier::PathResolver::resol
                 return resolve_dictionary_element(dict, *pkey);
             }
             else {
+                // TODO: this needs to be fixed..
                 return InstructionApplier::PathResolver::Status::Pending;
-                /// fine
             }
         }
         if (val.is_type(type_List)) {

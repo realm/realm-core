@@ -748,7 +748,6 @@ struct BaasFLXClientReset : public TestClientReset {
         wait_for_upload(*realm);
         if (m_on_post_reset) {
             m_on_post_reset(realm);
-            wait_for_upload(*realm);
         }
     }
 
