@@ -5,8 +5,7 @@
 * None.
 
 ### Fixed
-* <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Fix Opening realm with cached user while offline results in fatal error and session does not retry connection. ([#7349](https://github.com/realm/realm-core/issues/7349), since v13.26.0)
 
 ### Breaking changes
 * None.
@@ -34,7 +33,6 @@
 * Fix a spurious crash related to opening a Realm on background thread while the process was in the middle of exiting ([#7420](https://github.com/realm/realm-core/issues/7420jj))
 * Fix a data race in change notification delivery when running at debug log level ([PR #7402](https://github.com/realm/realm-core/pull/7402), since v14.0.0).
 * Fix a 10-15% performance regression when reading data from the Realm resulting from Obj being made a non-trivial type ([PR #7402](https://github.com/realm/realm-core/pull/7402), since v14.0.0).
-* Fix Opening realm with cached user while offline results in fatal error and session does not retry connection. ([#7349](https://github.com/realm/realm-core/issues/7349), since v13.26.0)
 
 ### Breaking changes
 * Remove `realm_scheduler_set_default_factory()` and `realm_scheduler_has_default_factory()`, and change the `Scheduler` factory function to a bare function pointer rather than a `UniqueFunction` so that it does not have a non-trivial destructor.
