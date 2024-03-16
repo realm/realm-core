@@ -261,14 +261,29 @@ public:
         return *m_config.sync_config;
     }
 
-    // If the `SyncSession` has been configured, the full remote URL of the Realm
-    // this `SyncSession` represents.
+    // When App is created, it will provide a generated websocket sync route when the SyncManager is
+    // created. When the next AppServices HTTP request is made via the App object, the location info
+    // will be requested and a verified websocket sync route will be provided to the SyncManager. If
+    // the SyncSession is started with a cached user, the websocket connection will be initially
+    // established using the generated sync route. If that connection is successful, then the sync
+    // route will be marked verified and used from that point on. If that connection fails, the
+    // SyncSession will update the location via an access token update to retrieve the verified
+    // sync route from the server's location info. The SyncSessio will then be restarted so it
+    // uses the updated sync route value.
+
+    // If the SyncSession is active, this function returns the sync route that is being used
+    // by the current underlying session to connect to the server.
     std::string full_realm_url() const REQUIRES(!m_config_mutex)
     {
         util::CheckedLockGuard lock(m_config_mutex);
         return m_server_url;
     }
 
+    // If the sync route value was returned by querying the location information, or the
+    // SyncSession has successfully connected to the server using the configured sync route,
+    // then the sync route will be marked "verified". Otherwise, the location information will
+    // be requested from the server if the connection fails when trying to open a websocket
+    // to the server.
     bool realm_url_verified() const REQUIRES(!m_config_mutex)
     {
         util::CheckedLockGuard lock(m_config_mutex);

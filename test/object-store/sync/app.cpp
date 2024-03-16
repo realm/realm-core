@@ -4225,7 +4225,7 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
                 CHECK(verified);
             }
         }
-        // Recreate the app using the cached user and start a sync session, which will is set to fail on connect
+        // Recreate the app using the cached user and start a sync session, which is set to fail on connect
         SECTION("Sync Session fails on connect after updating location") {
             enum class TestState { start, session_started };
             TestingStateMachine<TestState> state(TestState::start);
