@@ -121,6 +121,10 @@ void perform_schema_migration(DBRef db, sync::SubscriptionStore& store)
     // Everything is performed in one single write transaction.
     auto tr = db->start_write();
 
+    // Disable sync replication.
+    auto& repl = dynamic_cast<sync::ClientReplication&>(*db->get_replication());
+    sync::TempShortCircuitReplication sync_history_guard(repl);
+
     // Delete all public tables (and their columns).
     const bool ignore_backlinks = true;
     for (const auto& tk : tr->get_table_keys()) {
@@ -132,7 +136,7 @@ void perform_schema_migration(DBRef db, sync::SubscriptionStore& store)
     }
 
     // Clear sync history, reset the file ident and the server version in the download and upload progress.
-    auto& repl = dynamic_cast<sync::ClientReplication&>(*db->get_replication());
+
     auto& history = repl.get_history();
     sync::SaltedFileIdent reset_file_ident{0, 0};
     sync::SaltedVersion reset_server_version{0, 0};
@@ -145,7 +149,7 @@ void perform_schema_migration(DBRef db, sync::SubscriptionStore& store)
 
     // Clear the pending boostrap store in case a boostrap was in progress.
     sync::PendingBootstrapStore pending_bootstrap_store(db, *db->get_logger());
-    pending_bootstrap_store.clear();
+    pending_bootstrap_store.clear(*tr);
 
     // Mark the migration complete.
     remove_pending_schema_migration(*tr);
