@@ -31,7 +31,7 @@ std::optional<uint64_t> has_pending_migration(const Transaction& rt);
 
 void track_sync_schema_migration(Transaction& wt, uint64_t previous_schema_version);
 
-void perform_schema_migration(DB& db, sync::SubscriptionStore& store);
+void perform_schema_migration(DBRef db, sync::SubscriptionStore& store);
 
 } // namespace _impl::sync_schema_migration
 } // namespace realm

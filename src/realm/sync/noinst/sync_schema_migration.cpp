@@ -19,6 +19,7 @@
 #include <realm/sync/noinst/sync_schema_migration.hpp>
 #include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/noinst/client_reset_recovery.hpp>
+#include <realm/sync/noinst/pending_bootstrap_store.hpp>
 
 #include <realm/exceptions.hpp>
 
@@ -115,9 +116,10 @@ void track_sync_schema_migration(Transaction& wt, uint64_t previous_schema_versi
     }
 }
 
-void perform_schema_migration(DB& db, sync::SubscriptionStore& store)
+void perform_schema_migration(DBRef db, sync::SubscriptionStore& store)
 {
-    auto tr = db.start_write();
+    // Everything is performed in one single write transaction.
+    auto tr = db->start_write();
 
     // Delete all public tables (and their columns).
     const bool ignore_backlinks = true;
@@ -130,16 +132,20 @@ void perform_schema_migration(DB& db, sync::SubscriptionStore& store)
     }
 
     // Clear sync history, reset the file ident and the server version in the download and upload progress.
-    auto& repl = dynamic_cast<sync::ClientReplication&>(*db.get_replication());
+    auto& repl = dynamic_cast<sync::ClientReplication&>(*db->get_replication());
     auto& history = repl.get_history();
     sync::SaltedFileIdent reset_file_ident{0, 0};
     sync::SaltedVersion reset_server_version{0, 0};
     std::vector<_impl::client_reset::RecoveredChange> changes{};
-    history.set_history_adjustments(*db.get_logger(), tr->get_version(), reset_file_ident, reset_server_version,
+    history.set_history_adjustments(*db->get_logger(), tr->get_version(), reset_file_ident, reset_server_version,
                                     changes);
 
     // Reset the subscription store (it initializes it with the zeroth subscription set).
     store.reset(*tr);
+
+    // Clear the pending boostrap store in case a boostrap was in progress.
+    sync::PendingBootstrapStore pending_bootstrap_store(db, *db->get_logger());
+    pending_bootstrap_store.clear();
 
     // Mark the migration complete.
     remove_pending_schema_migration(*tr);

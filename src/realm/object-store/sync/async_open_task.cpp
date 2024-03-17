@@ -193,8 +193,8 @@ void AsyncOpenTask::migrate_schema_or_complete(AsyncOpenCallback&& callback,
 
     // Migrate the schema.
     //  * First upload the changes at the old schema version
-    //  * Then, delete the realm, reopen it, and bootstrap at new schema version
-    // The lifetime of the task is extended until bootstrap completes.
+    //  * Then, pause the session, delete all tables, re-initialize the metadata, and finally restart the session.
+    // The lifetime of the task is extended until the bootstrap completes.
     std::shared_ptr<AsyncOpenTask> self(shared_from_this());
     session->wait_for_upload_completion([callback = std::move(callback), coordinator, session, self,
                                          this](Status status) mutable {

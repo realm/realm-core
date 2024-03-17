@@ -1703,8 +1703,9 @@ void SyncSession::migrate_schema(util::UniqueFunction<void(Status)>&& callback)
     //  2. Once the sync client releases the realm file:
     //      a. Delete all public tables
     //      b. Reset the subscription store
-    //      c. Empty the sync history and adjust cursors
-    //      d. Reset file ident (the server flags the old ident as in the case of a client reset)
+    //      c. Clear the pending boostrap store
+    //      d. Empty the sync history and adjust cursors
+    //      e. Reset file ident (the server flags the old ident as in the case of a client reset)
     // 3. Resume the session (the client asks for a new file ident)
     // See `sync_schema_migration::perform_schema_migration` for more details.
 
@@ -1730,7 +1731,7 @@ void SyncSession::migrate_schema(util::UniqueFunction<void(Status)>&& callback)
                 status = Status(ErrorCodes::InvalidSession, "Sync session was destroyed during schema migration");
                 return callback(status);
             }
-            sync_schema_migration::perform_schema_migration(*session->m_db, *session->get_flx_subscription_store());
+            sync_schema_migration::perform_schema_migration(session->m_db, *session->get_flx_subscription_store());
             {
                 util::CheckedUniqueLock lock(session->m_state_mutex);
                 session->m_previous_schema_version.reset();
