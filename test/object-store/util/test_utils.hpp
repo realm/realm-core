@@ -58,14 +58,11 @@ public:
     void transition_with(Func&& func)
     {
         {
-            std::unique_lock lock{m_mutex};
-            E cur_state = m_cur_state;
-            lock.unlock();
-            std::optional<E> new_state = func(cur_state);
+            std::lock_guard lock{m_mutex};
+            std::optional<E> new_state = func(m_cur_state);
             if (!new_state) {
                 return;
             }
-            lock.lock();
             m_cur_state = *new_state;
         }
         m_cv.notify_one();

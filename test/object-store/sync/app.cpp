@@ -4298,19 +4298,23 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
 
             socket_provider->force_failure_func = [&](bool& was_clean, sync::websocket::WebSocketError& error_code,
                                                       std::string& message) {
+                // Check these items prior to holding the lock in transition_with()
+                if (state.get() == TestState::start) {
+                    logger->debug("State: start");
+                    // Verify the location update failed
+                    CHECK(redir_transport->location_requested);
+                    CHECK(app->get_base_url() == init_url);
+                    CHECK(app->get_host_url() == init_url);
+                    CHECK(app->get_ws_host_url() == init_wsurl);
+                    {
+                        auto [sync_route, verified] = app->sync_manager()->sync_route();
+                        CHECK(sync_route.find(app::App::create_ws_host_url(init_url)) != std::string::npos);
+                        CHECK_FALSE(verified);
+                    }
+                }
+
                 state.transition_with([&](TestState cur_state) -> std::optional<TestState> {
                     if (cur_state == TestState::start) {
-                        logger->debug("State: start");
-                        // Verify the location update failed
-                        CHECK(redir_transport->location_requested);
-                        CHECK(app->get_base_url() == init_url);
-                        CHECK(app->get_host_url() == init_url);
-                        CHECK(app->get_ws_host_url() == init_wsurl);
-                        {
-                            auto [sync_route, verified] = app->sync_manager()->sync_route();
-                            CHECK(sync_route.find(app::App::create_ws_host_url(init_url)) != std::string::npos);
-                            CHECK_FALSE(verified);
-                        }
                         // After number of location verify attempts has passed, let the location succeed
                         if (--retry_count <= 0) {
                             redir_transport->reset(init_url, redir_url);

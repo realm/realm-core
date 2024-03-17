@@ -414,14 +414,16 @@ std::string App::create_ws_host_url(const std::string_view host_url)
 {
     constexpr static std::string_view orig_base_domain = "realm.mongodb.com";
     constexpr static std::string_view new_base_domain = "services.cloud.mongodb.com";
+    const size_t base_len = std::char_traits<char>::length("http://");
 
-    // Doesn't start with http, just return provided string
-    if (host_url.substr(0, 4) != "http") {
+    // Doesn't contain 7 or more characters (length of 'http://') or start with http,
+    // just return provided string
+    if (host_url.length() < base_len || host_url.substr(0, 4) != "http") {
         return std::string(host_url);
     }
-    // If it starts with 'https' then ws url will start with wss
+    // If it starts with 'https' then ws url will start with 'wss'
     bool https = host_url[4] == 's';
-    size_t prefix_len = std::char_traits<char>::length("http://") + (https ? 1 : 0);
+    size_t prefix_len = base_len + (https ? 1 : 0);
     std::string_view prefix = https ? "wss://" : "ws://";
 
     // http[s]://[<region-prefix>]realm.mongodb.com[/<path>] =>
