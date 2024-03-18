@@ -1703,7 +1703,7 @@ void SyncSession::migrate_schema(util::UniqueFunction<void(Status)>&& callback)
     //  2. Once the sync client releases the realm file:
     //      a. Delete all public tables
     //      b. Reset the subscription store
-    //      c. Clear the pending boostrap store
+    //      c. Clear the pending bootstrap store
     //      d. Empty the sync history and adjust cursors
     //      e. Reset file ident (the server flags the old ident as in the case of a client reset)
     // 3. Resume the session (the client asks for a new file ident)
