@@ -29,6 +29,7 @@
 #if REALM_PLATFORM_APPLE
 #include <realm/object-store/impl/apple/keychain_helper.hpp>
 #endif
+#include <realm/object-store/impl/realm_coordinator.hpp>
 
 #include <realm/db.hpp>
 #include <realm/dictionary.hpp>
@@ -338,7 +339,7 @@ std::shared_ptr<Realm> open_realm(RealmConfig& config, bool should_encrypt, bool
 
 struct PersistedSyncMetadataManager : public app::MetadataStore {
     app::App* const m_app;
-    RealmConfig m_config;
+    std::shared_ptr<_impl::RealmCoordinator> m_coordinator;
     SyncUserSchema m_user_schema;
     FileActionSchema m_file_action_schema;
     UserIdentitySchema m_user_identity_schema;
@@ -354,28 +355,29 @@ struct PersistedSyncMetadataManager : public app::MetadataStore {
         if (!REALM_PLATFORM_APPLE && should_encrypt && !encryption_key)
             throw InvalidArgument("Metadata Realm encryption was specified, but no encryption key was provided.");
 
-        m_config.automatic_change_notifications = false;
-        m_config.path = std::move(path);
-        m_config.schema = Schema{
+        RealmConfig config;
+        config.automatic_change_notifications = false;
+        config.path = std::move(path);
+        config.schema = Schema{
             UserIdentitySchema::object_schema(),
             SyncUserSchema::object_schema(),
             FileActionSchema::object_schema(),
             CurrentUserSchema::object_schema(),
         };
 
-        m_config.schema_version = SCHEMA_VERSION;
-        m_config.schema_mode = SchemaMode::Automatic;
-        m_config.scheduler = util::Scheduler::make_dummy();
+        config.schema_version = SCHEMA_VERSION;
+        config.schema_mode = SchemaMode::Automatic;
+        config.scheduler = util::Scheduler::make_dummy();
         if (encryption_key)
-            m_config.encryption_key = std::move(*encryption_key);
-        m_config.automatically_handle_backlinks_in_migrations = true;
-        m_config.migration_function = [](std::shared_ptr<Realm> old_realm, std::shared_ptr<Realm> realm, Schema&) {
+            config.encryption_key = std::move(*encryption_key);
+        config.automatically_handle_backlinks_in_migrations = true;
+        config.migration_function = [](std::shared_ptr<Realm> old_realm, std::shared_ptr<Realm> realm, Schema&) {
             if (old_realm->schema_version() < 7) {
                 migrate_to_v7(old_realm, realm);
             }
         };
 
-        auto realm = open_realm(m_config, should_encrypt, encryption_key != none);
+        auto realm = open_realm(config, should_encrypt, encryption_key != none);
         m_user_schema.read(*realm);
         m_file_action_schema.read(*realm);
         m_user_identity_schema.read(*realm);
@@ -385,6 +387,8 @@ struct PersistedSyncMetadataManager : public app::MetadataStore {
         perform_file_actions(*realm, file_manager);
         remove_dead_users(*realm, file_manager);
         realm->commit_transaction();
+
+        m_coordinator = _impl::RealmCoordinator::get_existing_coordinator(config.path);
     }
 
     void notify_app(std::string_view user_id, std::optional<UserData>&& data)
@@ -396,7 +400,7 @@ struct PersistedSyncMetadataManager : public app::MetadataStore {
 
     std::shared_ptr<Realm> get_realm() const
     {
-        return Realm::get_shared_realm(m_config);
+        return m_coordinator->get_realm();
     }
 
     void remove_dead_users(Realm& realm, SyncFileManager& file_manager)
