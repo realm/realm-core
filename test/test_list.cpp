@@ -1000,6 +1000,9 @@ TEST(List_NestedList_Path)
         CHECK_EQUAL(path.path_from_top[0], col_child);
         CHECK_EQUAL(path.path_from_top[1], "Any");
         CHECK_EQUAL(path.path_from_top[2], "Foo");
+        std::string message;
+        CHECK_THROW_ANY_GET_MESSAGE(list_int->set(7, 0), message);
+        CHECK(message.find("Any['Foo']") != std::string::npos);
     }
 
     // Collections contained in Mixed
