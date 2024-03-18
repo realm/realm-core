@@ -520,13 +520,21 @@ struct PersistedSyncMetadataManager : public app::MetadataStore {
         realm->commit_transaction();
     }
 
-    void update_user(std::string_view user_id, const UserData& data) override
+    void update_user(std::string_view user_id, util::FunctionRef<void(UserData&)> update_fn) override
     {
         auto realm = get_realm();
         realm->begin_transaction();
         auto& schema = m_user_schema;
         Obj obj = find_user(*realm, user_id);
-        REALM_ASSERT(obj);
+        auto opt_data = read_user(obj);
+        if (!opt_data) {
+            realm->cancel_transaction();
+            return;
+        }
+
+        auto& data = *opt_data;
+        update_fn(data);
+
         obj.set(schema.state_col,
                 int64_t(data.access_token ? SyncUser::State::LoggedIn : SyncUser::State::LoggedOut));
         obj.set<String>(schema.refresh_token_col, data.refresh_token.token);
@@ -794,12 +802,16 @@ class InMemoryMetadataStorage : public app::MetadataStore {
         }
     }
 
-    void update_user(std::string_view user_id, const UserData& data) override
+    void update_user(std::string_view user_id, util::FunctionRef<void(UserData&)> update_fn) override
     {
         std::lock_guard lock(m_mutex);
-        auto& user = m_users.find(user_id)->second;
-        user = data;
-        user.legacy_identities.clear();
+        auto it = m_users.find(user_id);
+        if (it == m_users.end()) {
+            return;
+        }
+
+        update_fn(it->second);
+        it->second.legacy_identities.clear();
     }
 
     void log_out(std::string_view user_id, SyncUser::State new_state) override

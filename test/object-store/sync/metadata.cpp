@@ -187,11 +187,12 @@ TEST_CASE("app metadata: common", "[sync][metadata]") {
 
     SECTION("create_user() only updates the given fields and leaves the rest unchanged") {
         store->create_user(user_id, refresh_token, access_token, device_id);
-        auto data = store->get_user(user_id);
-        REQUIRE(data);
-        data->profile = bson::BsonDocument{{"name", "user's name"}, {"email", "user's email"}};
-        data->identities = {{"identity", "provider"}};
-        store->update_user(user_id, *data);
+        UserProfile profile = bson::BsonDocument{{"name", "user's name"}, {"email", "user's email"}};
+        std::vector<UserIdentity> identities{{"identity", "provider"}};
+        store->update_user(user_id, [&](UserData& data) {
+            data.profile = profile;
+            data.identities = identities;
+        });
 
         const auto access_token_2 = encode_fake_jwt("access_token_2", 123, 456);
         const auto refresh_token_2 = encode_fake_jwt("refresh_token_2", 123, 456);
@@ -203,8 +204,8 @@ TEST_CASE("app metadata: common", "[sync][metadata]") {
         CHECK(data2->refresh_token.token == refresh_token_2);
         CHECK(data2->legacy_identities.empty());
         CHECK(data2->device_id == "device id 2");
-        CHECK(data2->identities == data->identities);
-        CHECK(data2->profile.data() == data->profile.data());
+        CHECK(data2->identities == identities);
+        CHECK(data2->profile.data() == profile.data());
     }
 
     SECTION("has_logged_in_user() is only true if user is present and valid") {
@@ -296,12 +297,15 @@ TEST_CASE("app metadata: common", "[sync][metadata]") {
         store->create_user("user 2", refresh_token, access_token, device_id);
         store->create_user("user 3", refresh_token, access_token, device_id);
 
-        auto data = store->get_user("user 3");
-        data->access_token.token.clear();
-        data->refresh_token.token.clear();
-        store->update_user("user 3", *data);
+        store->update_user("user 3", [](auto& data) {
+            data.access_token.token.clear();
+            data.refresh_token.token.clear();
+        });
         CHECK(store->get_current_user() == "user 1");
-        store->update_user("user 1", *data);
+        store->update_user("user 1", [](auto& data) {
+            data.access_token.token.clear();
+            data.refresh_token.token.clear();
+        });
         CHECK(store->get_current_user() == "user 2");
 
         store->set_current_user("not a user");
@@ -334,10 +338,10 @@ TEST_CASE("app metadata: common", "[sync][metadata]") {
 
     SECTION("update_user() does not set legacy identities") {
         store->create_user(user_id, refresh_token, access_token, device_id);
+        store->update_user(user_id, [](auto& data) {
+            data.legacy_identities.push_back("legacy uuid");
+        });
         auto data = store->get_user(user_id);
-        data->legacy_identities.push_back("legacy uuid");
-        store->update_user(user_id, *data);
-        data = store->get_user(user_id);
         REQUIRE(data->legacy_identities.empty());
     }
 
