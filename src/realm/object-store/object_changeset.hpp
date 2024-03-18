@@ -38,7 +38,8 @@ class ObjectChangeSet {
 public:
     using ObjectSet = std::unordered_set<ObjKey>;
     using ColumnSet = std::unordered_set<ColKey>;
-    using ObjectMapToColumnSet = std::unordered_map<ObjKey, ColumnSet>;
+    using PathSet = std::set<StablePath>;
+    using ObjectMapToColumnSet = std::unordered_map<ObjKey, PathSet>;
 
     ObjectChangeSet() = default;
     ObjectChangeSet(ObjectChangeSet const&) = default;
@@ -47,7 +48,7 @@ public:
     ObjectChangeSet& operator=(ObjectChangeSet&&) = default;
 
     void insertions_add(ObjKey obj);
-    void modifications_add(ObjKey obj, ColKey col);
+    void modifications_add(ObjKey obj, const StablePath& path);
     void deletions_add(ObjKey obj);
 
     bool insertions_remove(ObjKey obj);
@@ -69,7 +70,7 @@ public:
     bool deletions_contains(ObjKey obj) const;
     // if the specified object has not been modified, returns nullptr
     // if the object has been modified, returns a pointer to the ObjectSet
-    const ColumnSet* get_columns_modified(ObjKey obj) const;
+    const PathSet* get_paths_modified(ObjKey obj) const;
 
     bool insertions_empty() const noexcept
     {

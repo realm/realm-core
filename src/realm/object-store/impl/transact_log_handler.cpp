@@ -110,10 +110,10 @@ void KVOAdapter::before(Transaction& sg)
             m_invalidated.push_back(observer.info);
             continue;
         }
-        auto column_modifications = table.get_columns_modified(key);
-        if (column_modifications) {
-            for (auto col : *column_modifications) {
-                observer.changes[col.value].kind = BindingContext::ColumnInfo::Kind::Set;
+        auto tbl = sg.get_table(observer.table_key);
+        if (auto path_modifications = table.get_paths_modified(key)) {
+            for (const StablePath& path : *path_modifications) {
+                observer.changes[tbl->get_column_key(path[0])].kind = BindingContext::ColumnInfo::Kind::Set;
             }
         }
     }
@@ -123,7 +123,7 @@ void KVOAdapter::before(Transaction& sg)
             // We may have pre-emptively marked the column as modified if the
             // LinkList was selected but the actual changes made ended up being
             // a no-op
-            list.observer->changes.erase(list.col_key.value);
+            list.observer->changes.erase(list.col_key);
             continue;
         }
         // If the containing row was deleted then changes will be empty
@@ -132,7 +132,7 @@ void KVOAdapter::before(Transaction& sg)
             continue;
         }
         // otherwise the column should have been marked as modified
-        auto it = list.observer->changes.find(list.col_key.value);
+        auto it = list.observer->changes.find(list.col_key);
         REALM_ASSERT(it != list.observer->changes.end());
         auto& builder = list.builder;
         auto& changes = it->second;
@@ -364,15 +364,17 @@ public:
         return true;
     }
 
-    bool select_collection(ColKey col, ObjKey obj, const StablePath& path)
+    bool select_collection(ColKey, ObjKey obj, const StablePath& path)
     {
-        modify_object(col, obj);
+        if (m_active_table) {
+            m_active_table->modifications_add(obj, path);
+        }
         auto table = current_table();
         m_active_collection = nullptr;
         for (auto& c : m_info.collections) {
             if (c.table_key == table && c.obj_key == obj && c.path.is_prefix_of(path)) {
                 if (c.path.size() != path.size()) {
-                    c.changes->paths.insert(path[c.path.size()]);
+                    c.changes->stable_indexes.insert(path[c.path.size()]);
                 }
                 // If there are multiple exact matches for this collection we
                 // use the first and then propagate the data to the others later
@@ -463,8 +465,11 @@ public:
 
     bool modify_object(ColKey col, ObjKey key)
     {
-        if (m_active_table)
-            m_active_table->modifications_add(key, col);
+        if (m_active_table) {
+            StablePath path;
+            path.push_back(StableIndex(col, 0));
+            m_active_table->modifications_add(key, path);
+        }
         return true;
     }
 

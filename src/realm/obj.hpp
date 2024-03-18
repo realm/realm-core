@@ -72,6 +72,7 @@ public:
     Path get_short_path() const noexcept;
     ColKey get_col_key() const noexcept;
     StablePath get_stable_path() const noexcept;
+    void translate_path(const StablePath&, Path&) const;
     void add_index(Path& path, const CollectionParent::Index& ndx) const;
 
     TableRef get_table() const noexcept
@@ -439,6 +440,10 @@ private:
     StablePath get_stable_path() const override
     {
         return Obj::get_stable_path();
+    }
+    void translate_path(const StablePath& stable_path, Path& path) const override
+    {
+        Obj::translate_path(stable_path, path);
     }
     void add_index(Path& path, const Index& ndx) const override
     {

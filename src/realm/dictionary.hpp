@@ -202,6 +202,7 @@ public:
     {
         return Base::get_stable_path();
     }
+    void translate_path(const StablePath& stable_path, Path& path) const final;
 
     void add_index(Path& path, const Index& ndx) const final;
     size_t find_index(const Index&) const final;

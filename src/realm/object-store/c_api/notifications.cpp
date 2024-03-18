@@ -113,6 +113,11 @@ RLM_API size_t realm_object_changes_get_num_modified_properties(const realm_obje
     return changes->columns.size();
 }
 
+RLM_API size_t realm_object_changes_get_num_modified_paths(const realm_object_changes_t* changes)
+{
+    return changes->modified_paths.size();
+}
+
 RLM_API size_t realm_object_changes_get_modified_properties(const realm_object_changes_t* changes,
                                                             realm_property_key_t* out_properties, size_t max)
 {
@@ -125,6 +130,39 @@ RLM_API size_t realm_object_changes_get_modified_properties(const realm_object_c
             break;
         }
         out_properties[i] = col_key_val;
+        ++i;
+    }
+    return i;
+}
+
+RLM_API size_t realm_object_changes_get_modified_paths(const realm_object_changes_t* const_changes,
+                                                       realm_string_t* out_paths, size_t max)
+{
+    if (!out_paths)
+        return const_changes->modified_paths.size();
+
+    realm_object_changes_t* changes = const_cast<realm_object_changes_t*>(const_changes);
+    changes->path_buffer.resize(changes->modified_paths.size());
+    size_t i = 0;
+    for (const auto& p : changes->modified_paths) {
+        if (i >= max) {
+            break;
+        }
+        std::string& path = changes->path_buffer[i];
+        path = p[0].get_key();
+        for (auto path_elem = p.begin() + 1; path_elem != p.end(); ++path_elem) {
+            if (path_elem->is_key()) {
+                path += '.';
+                path += path_elem->get_key();
+            }
+            else {
+                char buffer[10];
+                sprintf(buffer, "[%u]", unsigned(path_elem->get_ndx()));
+                path += buffer;
+            }
+        }
+        out_paths[i].data = path.data();
+        out_paths[i].size = path.size();
         ++i;
     }
     return i;

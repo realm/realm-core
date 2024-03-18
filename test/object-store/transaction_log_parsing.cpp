@@ -195,7 +195,7 @@ public:
         });
         if (it == m_result.end())
             return false;
-        auto col = it->changes.find(col_key.value);
+        auto col = it->changes.find(col_key);
         return col != it->changes.end() && col->second.kind != BindingContext::ColumnInfo::Kind::None;
     }
 
@@ -207,7 +207,7 @@ public:
     ArrayChange array_change(size_t index, ColKey col_key) const noexcept
     {
         auto& changes = m_result[index].changes;
-        auto col = changes.find(col_key.value);
+        auto col = changes.find(col_key);
         return col == changes.end() ? ArrayChange{ColumnInfo::Kind::None, {}}
                                     : ArrayChange{col->second.kind, col->second.indices};
     }

@@ -165,7 +165,7 @@ public:
         // Populated with information about which columns were changed
         // May be shorter than the actual number of columns if the later columns
         // are not modified
-        std::unordered_map<int64_t, ColumnInfo> changes;
+        std::unordered_map<ColKey, ColumnInfo> changes;
 
         // Simple lexographic ordering
         friend bool operator<(ObserverState const& lft, ObserverState const& rgt)

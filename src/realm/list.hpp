@@ -466,6 +466,7 @@ public:
     {
         return Base::get_stable_path();
     }
+    void translate_path(const StablePath& stable_path, Path& path) const final;
 
     ColKey get_col_key() const noexcept override
     {

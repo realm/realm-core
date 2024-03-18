@@ -25,11 +25,11 @@ void ObjectChangeSet::insertions_add(ObjKey obj)
     m_insertions.insert(obj);
 }
 
-void ObjectChangeSet::modifications_add(ObjKey obj, ColKey col)
+void ObjectChangeSet::modifications_add(ObjKey obj, const StablePath& path)
 {
     // don't report modifications on new objects
     if (m_insertions.find(obj) == m_insertions.end()) {
-        m_modifications[obj].insert(col);
+        m_modifications[obj].insert(path);
     }
 }
 
@@ -82,9 +82,13 @@ bool ObjectChangeSet::modifications_contains(ObjKey obj, const std::vector<ColKe
     }
 
     // If a filter was set we need to check if the changed column is part of this filter.
-    const std::unordered_set<ColKey>& changed_columns_for_object = m_modifications.at(obj);
+    const std::set<StablePath>& changed_paths_for_object = m_modifications.at(obj);
     for (const auto& column_key_in_filter : filtered_column_keys) {
-        if (changed_columns_for_object.count(column_key_in_filter)) {
+        auto it =
+            std::find_if(changed_paths_for_object.begin(), changed_paths_for_object.end(), [&](const StablePath& p) {
+                return p[0].get_index().val == column_key_in_filter.get_index().val;
+            });
+        if (it != changed_paths_for_object.end()) {
             return true;
         }
     }
@@ -92,7 +96,7 @@ bool ObjectChangeSet::modifications_contains(ObjKey obj, const std::vector<ColKe
     return false;
 }
 
-const ObjectChangeSet::ColumnSet* ObjectChangeSet::get_columns_modified(ObjKey obj) const
+const ObjectChangeSet::PathSet* ObjectChangeSet::get_paths_modified(ObjKey obj) const
 {
     auto it = m_modifications.find(obj);
     if (it == m_modifications.end()) {

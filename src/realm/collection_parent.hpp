@@ -90,6 +90,7 @@ public:
     // Return path from owning object
     virtual StablePath get_stable_path() const = 0;
     // Add a translation of Index to PathElement
+    virtual void translate_path(const StablePath&, Path&) const = 0;
     virtual void add_index(Path& path, const Index& ndx) const = 0;
     // Return position of Index held by child
     virtual size_t find_index(const Index& ndx) const = 0;
@@ -113,9 +114,9 @@ protected:
     friend class CollectionList;
 
 #ifdef REALM_DEBUG
-    static constexpr size_t s_max_level = 4;
+    static constexpr int s_max_level = 4;
 #else
-    static constexpr size_t s_max_level = 100;
+    static constexpr int s_max_level = 100;
 #endif
     uint8_t m_level = 0;
 

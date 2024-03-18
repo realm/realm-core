@@ -763,6 +763,26 @@ void Lst<Mixed>::set_collection_ref(Index index, ref_type ref, CollectionType ty
     m_tree->set(ndx, Mixed(ref, type));
 }
 
+void Lst<Mixed>::translate_path(const StablePath& stable_path, Path& path) const
+{
+    auto& index = stable_path[m_level];
+    auto ndx = find_index(index);
+    path.emplace_back(ndx);
+    if (stable_path.size() > size_t(m_level) + 1) {
+        Mixed val = get(ndx);
+        if (val.is_type(type_Dictionary)) {
+            DummyParent parent(this->get_table(), val.get_ref());
+            Dictionary dict(parent, 0);
+            dict.translate_path(stable_path, path);
+        }
+        else if (val.is_type(type_List)) {
+            DummyParent parent(this->get_table(), val.get_ref());
+            Lst<Mixed> list(parent, 0);
+            list.translate_path(stable_path, path);
+        }
+    }
+}
+
 void Lst<Mixed>::add_index(Path& path, const Index& index) const
 {
     auto ndx = m_tree->find_key(index.get_salt());

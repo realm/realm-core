@@ -428,6 +428,7 @@ struct realm_object_changes : realm::c_api::WrapC, realm::CollectionChangeSet {
     {
         return new realm_object_changes{static_cast<const realm::CollectionChangeSet&>(*this)};
     }
+    std::vector<std::string> path_buffer;
 };
 
 struct realm_collection_changes : realm::c_api::WrapC, realm::CollectionChangeSet {

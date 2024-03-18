@@ -634,6 +634,28 @@ Dictionary::Iterator Dictionary::find(Mixed key) const noexcept
     return end();
 }
 
+
+void Dictionary::translate_path(const StablePath& stable_path, Path& path) const
+{
+    auto& index = stable_path[m_level];
+    auto ndx = find_index(index);
+    StringData key = do_get_key(ndx).get_string();
+    path.emplace_back(key);
+    if (stable_path.size() > size_t(m_level) + 1) {
+        Mixed val = do_get(ndx);
+        if (val.is_type(type_Dictionary)) {
+            DummyParent parent(this->get_table(), val.get_ref());
+            Dictionary dict(parent, 0);
+            dict.translate_path(stable_path, path);
+        }
+        else if (val.is_type(type_List)) {
+            DummyParent parent(this->get_table(), val.get_ref());
+            Lst<Mixed> list(parent, 0);
+            list.translate_path(stable_path, path);
+        }
+    }
+}
+
 void Dictionary::add_index(Path& path, const Index& index) const
 {
     auto ndx = m_values->find_key(index.get_salt());

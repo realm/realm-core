@@ -4117,8 +4117,8 @@ TEST_CASE("C API - properties", "[c_api]") {
                 realm_property_key_t modified_keys[2];
                 size_t n = realm_object_changes_get_modified_properties(state.changes.get(), modified_keys, 2);
                 CHECK(n == 2);
-                CHECK(modified_keys[0] == foo_int_key);
-                CHECK(modified_keys[1] == foo_str_key);
+                CHECK(modified_keys[0] == foo_str_key);
+                CHECK(modified_keys[1] == foo_int_key);
 
                 n = realm_object_changes_get_modified_properties(state.changes.get(), nullptr, 2);
                 CHECK(n == 2);
@@ -5308,6 +5308,7 @@ TEST_CASE("C API: nested collections", "[c_api]") {
             size_t modifications;
             bool was_deleted;
             realm_dictionary_t* dict;
+            std::vector<std::string> paths;
         } user_data;
 
         auto parent_dict = cptr_checked(realm_set_dictionary(obj1.get(), foo_any_col_key));
@@ -5337,20 +5338,28 @@ TEST_CASE("C API: nested collections", "[c_api]") {
                 CHECK(!realm_dictionary_is_valid(user_data->dict));
             }
         };
-        auto require_change = [&]() {
-            auto token = cptr_checked(realm_dictionary_add_notification_callback(dict2.get(), &user_data, nullptr,
-                                                                                 nullptr, on_dictionary_change));
-            checked(realm_refresh(realm, nullptr));
-            return token;
+        auto on_obj_change = [](void* userdata, const realm_object_changes_t* changes) {
+            auto state = static_cast<UserData*>(userdata);
+            realm_string_t paths[10];
+            auto num = realm_object_changes_get_modified_paths(changes, paths, 10);
+            for (size_t i = 0; i < num; i++) {
+                state->paths.emplace_back(paths[0].data, paths[0].size);
+            }
         };
 
-        auto token = require_change();
+        auto token_dict = cptr_checked(realm_dictionary_add_notification_callback(dict2.get(), &user_data, nullptr,
+                                                                                  nullptr, on_dictionary_change));
+        auto token =
+            cptr(realm_object_add_notification_callback(obj1.get(), &user_data, nullptr, nullptr, on_obj_change));
+        checked(realm_refresh(realm, nullptr));
 
         write([&] {
             checked(realm_dictionary_insert(dict2.get(), rlm_str_val("Nested-Godbye"),
                                             rlm_str_val("Nested-CruelWorld"), nullptr, nullptr));
         });
         CHECK(user_data.insertions == 1);
+        REQUIRE(user_data.paths.size() == 1);
+        CHECK(user_data.paths[0] == "any.Hi");
 
         write([&] {
             realm_dictionary_insert(dict.get(), rlm_str_val("Hi"), rlm_str_val("Foo"), nullptr, nullptr);
