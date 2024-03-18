@@ -17,7 +17,34 @@
  **************************************************************************/
 
 #include <realm/string_interner.hpp>
-
+#include <realm/string_data.hpp>
 namespace realm {
+
+
+StringInterner::StringInterner() {}
+
+StringInterner::~StringInterner() {}
+
+StringID StringInterner::intern(StringData)
+{
+    return 0; //<-- null
+}
+
+std::optional<StringID> StringInterner::lookup(StringData) {}
+
+int StringInterner::compare(StringID A, StringID B)
+{
+    return 0;
+}
+
+int StringInterner::compare(StringData, StringID A)
+{
+    return 0;
+}
+
+StringData StringInterner::get(StringID)
+{
+    return "";
+}
 
 } // namespace realm

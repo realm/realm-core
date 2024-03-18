@@ -3396,3 +3396,13 @@ void Table::typed_print(std::string prefix, ref_type ref) const
     }
     std::cout << prefix << "}" << std::endl;
 }
+
+StringInterner& Table::get_string_interner(ColKey) const
+{
+    REALM_ASSERT(false);
+}
+
+StringInterner& Table::get_string_interner(ColKey::Idx) const
+{
+    REALM_ASSERT(false);
+}

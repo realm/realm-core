@@ -66,14 +66,13 @@ public:
     {
         m_arr->set_parent(p, n);
     }
-    bool need_spec() const override
+    bool need_string_interner() const override
     {
         return true;
     }
-    void set_spec(Spec* spec, size_t col_ndx) const override
+    void set_string_interner(StringInterner& string_interner) const override
     {
-        m_spec = spec;
-        m_col_ndx = col_ndx;
+        m_string_interner = &string_interner;
     }
 
     void update_parent()
@@ -134,11 +133,9 @@ private:
     Allocator& m_alloc;
     alignas(storage_alignment) std::byte m_storage[storage_size];
     Array* m_arr;
-    mutable Spec* m_spec = nullptr;
-    mutable size_t m_col_ndx = realm::npos;
     bool m_nullable = true;
 
-    std::unique_ptr<ArrayString> m_string_enum_values;
+    mutable StringInterner* m_string_interner = nullptr;
 
     Type upgrade_leaf(size_t value_size);
 };
@@ -160,6 +157,6 @@ inline StringData ArrayString::get(const char* header, size_t ndx, Allocator& al
     }
 }
 
-}
+} // namespace realm
 
 #endif /* REALM_ARRAY_STRING_HPP */

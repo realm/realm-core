@@ -19,8 +19,7 @@
 #ifndef REALM_STRING_INTERNER_HPP
 #define REALM_STRING_INTERNER_HPP
 
-#include <realm.hpp>
-
+#include <realm/utilities.hpp>
 namespace realm {
 
 
@@ -34,7 +33,7 @@ public:
     std::optional<StringID> lookup(StringData);
     int compare(StringID A, StringID B);
     int compare(StringData, StringID A);
-    std::optional<StringData> get(StringID);
+    StringData get(StringID);
 };
 } // namespace realm
 

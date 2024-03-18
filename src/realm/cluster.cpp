@@ -251,14 +251,14 @@ size_t Cluster::node_size_from_header(Allocator& alloc, const char* header)
 }
 
 template <class T>
-inline void Cluster::set_spec(T&, ColKey::Idx) const
+inline void Cluster::set_string_interner(T&, ColKey) const
 {
 }
 
 template <>
-inline void Cluster::set_spec(ArrayString& arr, ColKey::Idx col_ndx) const
+inline void Cluster::set_string_interner(ArrayString& arr, ColKey col_key) const
 {
-    m_tree_top.set_spec(arr, col_ndx);
+    m_tree_top.set_string_interner(arr, col_key);
 }
 
 template <class T>
@@ -269,7 +269,7 @@ inline void Cluster::do_insert_row(size_t ndx, ColKey col, Mixed init_val, bool 
     T arr(m_alloc);
     auto col_ndx = col.get_index();
     arr.set_parent(this, col_ndx.val + s_first_col_index);
-    set_spec<T>(arr, col_ndx);
+    set_string_interner<T>(arr, col);
     arr.init_from_parent();
     if (init_val.is_null()) {
         arr.insert(ndx, T::default_value(nullable));
@@ -759,7 +759,7 @@ inline void Cluster::do_erase(size_t ndx, ColKey col_key)
     auto col_ndx = col_key.get_index();
     T values(m_alloc);
     values.set_parent(this, col_ndx.val + s_first_col_index);
-    set_spec<T>(values, col_ndx);
+    set_string_interner<T>(values, col_key);
     values.init_from_parent();
     ObjLink link;
     if constexpr (std::is_same_v<T, ArrayTypedLink>) {
@@ -1028,8 +1028,8 @@ void Cluster::init_leaf(ColKey col_key, ArrayPayload* leaf) const
     if (auto t = m_tree_top.get_owning_table())
         t->check_column(col_key);
     ref_type ref = to_ref(Array::get(col_ndx.val + 1));
-    if (leaf->need_spec()) {
-        m_tree_top.set_spec(*leaf, col_ndx);
+    if (leaf->need_string_interner()) {
+        m_tree_top.set_string_interner(*leaf, col_key);
     }
     leaf->init_from_ref(ref);
     leaf->set_parent(const_cast<Cluster*>(this), col_ndx.val + 1);
@@ -1046,7 +1046,8 @@ template <typename ArrayType>
 void Cluster::verify(ref_type ref, size_t index, util::Optional<size_t>& sz) const
 {
     ArrayType arr(get_alloc());
-    set_spec(arr, ColKey::Idx{unsigned(index) - 1});
+    // TODO: find col_key for this call instead of index:
+    // set_string_interner(arr, ColKey::Idx{unsigned(index) - 1});
     arr.set_parent(const_cast<Cluster*>(this), index);
     arr.init_from_ref(ref);
     arr.verify();
@@ -1384,7 +1385,7 @@ void Cluster::dump_objects(int64_t key_offset, std::string lead) const
                 }
                 case col_type_String: {
                     ArrayString arr(m_alloc);
-                    set_spec(arr, col.get_index());
+                    set_string_interner(arr, col);
                     ref_type ref = Array::get_as_ref(j);
                     arr.init_from_ref(ref);
                     std::cout << ", " << arr.get(i);
