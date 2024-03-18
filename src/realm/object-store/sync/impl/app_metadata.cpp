@@ -18,6 +18,7 @@
 
 #include <realm/object-store/sync/impl/app_metadata.hpp>
 
+#include <realm/object-store/sync/app.hpp>
 #include <realm/object-store/sync/impl/sync_file.hpp>
 #include <realm/object-store/object_schema.hpp>
 #include <realm/object-store/object_store.hpp>
@@ -336,6 +337,7 @@ std::shared_ptr<Realm> open_realm(RealmConfig& config, bool should_encrypt, bool
 }
 
 struct PersistedSyncMetadataManager : public app::MetadataStore {
+    app::App* const m_app;
     RealmConfig m_config;
     SyncUserSchema m_user_schema;
     FileActionSchema m_file_action_schema;
@@ -343,7 +345,9 @@ struct PersistedSyncMetadataManager : public app::MetadataStore {
     CurrentUserSchema m_current_user_schema;
 
     PersistedSyncMetadataManager(std::string path, bool should_encrypt,
-                                 util::Optional<std::vector<char>> encryption_key, SyncFileManager& file_manager)
+                                 util::Optional<std::vector<char>> encryption_key, SyncFileManager& file_manager,
+                                 app::App* app)
+        : m_app(app)
     {
         constexpr uint64_t SCHEMA_VERSION = 7;
 
@@ -381,6 +385,13 @@ struct PersistedSyncMetadataManager : public app::MetadataStore {
         perform_file_actions(*realm, file_manager);
         remove_dead_users(*realm, file_manager);
         realm->commit_transaction();
+    }
+
+    void notify_app(std::string_view user_id, std::optional<UserData>&& data)
+    {
+        if (m_app) {
+            m_app->refresh_user(user_id, std::move(data));
+        }
     }
 
     std::shared_ptr<Realm> get_realm() const
@@ -517,6 +528,8 @@ struct PersistedSyncMetadataManager : public app::MetadataStore {
         obj.set<String>(schema.device_id_col, device_id);
 
         realm->commit_transaction();
+
+        notify_app(user_id, read_user(obj));
     }
 
     void update_user(std::string_view user_id, util::FunctionRef<void(UserData&)> update_fn) override
@@ -557,6 +570,7 @@ struct PersistedSyncMetadataManager : public app::MetadataStore {
         // read-only and no longer used
 
         realm->commit_transaction();
+        notify_app(user_id, std::move(data));
     }
 
     Obj current_user_obj(Realm& realm) const
@@ -639,13 +653,16 @@ struct PersistedSyncMetadataManager : public app::MetadataStore {
         REALM_ASSERT(new_state != SyncUser::State::LoggedIn);
         auto realm = get_realm();
         realm->begin_transaction();
-        if (auto obj = find_user(*realm, user_id)) {
+        auto obj = find_user(*realm, user_id);
+        if (obj) {
             obj.set(m_user_schema.state_col, (int64_t)new_state);
             obj.set<String>(m_user_schema.access_token_col, "");
             obj.set<String>(m_user_schema.refresh_token_col, "");
             update_current_user(*realm, user_id);
         }
         realm->commit_transaction();
+
+        notify_app(user_id, read_user(obj));
     }
 
     void delete_user(SyncFileManager& file_manager, std::string_view user_id) override
@@ -657,6 +674,7 @@ struct PersistedSyncMetadataManager : public app::MetadataStore {
             update_current_user(*realm, user_id);
         }
         realm->commit_transaction();
+        notify_app(user_id, std::nullopt);
     }
 
     void add_realm_path(std::string_view user_id, std::string_view path) override
@@ -763,6 +781,7 @@ class InMemoryMetadataStorage : public app::MetadataStore {
         std::string backup_path;
     };
     std::map<std::string, FileAction, std::less<>> m_file_actions;
+    app::App* const m_app;
 
     bool has_logged_in_user(std::string_view user_id) override
     {
@@ -783,49 +802,70 @@ class InMemoryMetadataStorage : public app::MetadataStore {
     void create_user(std::string_view user_id, std::string_view refresh_token, std::string_view access_token,
                      std::string_view device_id) override
     {
-        std::lock_guard lock(m_mutex);
-        auto it = m_users.find(user_id);
-        if (it == m_users.end()) {
-            it = m_users.insert({std::string(user_id), UserData{}}).first;
-            m_active_user = user_id;
+        UserData copy;
+        {
+            std::lock_guard lock(m_mutex);
+            auto it = m_users.find(user_id);
+            if (it == m_users.end()) {
+                it = m_users.insert({std::string(user_id), UserData{}}).first;
+                m_active_user = user_id;
+            }
+            auto& user = it->second;
+            user.device_id = device_id;
+            try {
+                user.refresh_token = RealmJWT(refresh_token);
+                user.access_token = RealmJWT(access_token);
+            }
+            catch (...) {
+                user.refresh_token = {};
+                user.access_token = {};
+            }
+            copy = user;
         }
-        auto& user = it->second;
-        user.device_id = device_id;
-        try {
-            user.refresh_token = RealmJWT(refresh_token);
-            user.access_token = RealmJWT(access_token);
-        }
-        catch (...) {
-            user.refresh_token = {};
-            user.access_token = {};
+        if (m_app) {
+            m_app->refresh_user(std::string(user_id), std::move(copy));
         }
     }
 
     void update_user(std::string_view user_id, util::FunctionRef<void(UserData&)> update_fn) override
     {
-        std::lock_guard lock(m_mutex);
-        auto it = m_users.find(user_id);
-        if (it == m_users.end()) {
-            return;
-        }
+        UserData copy;
+        {
+            std::lock_guard lock(m_mutex);
+            auto it = m_users.find(user_id);
+            if (it == m_users.end()) {
+                return;
+            }
 
-        update_fn(it->second);
-        it->second.legacy_identities.clear();
+            update_fn(it->second);
+            it->second.legacy_identities.clear();
+            copy = it->second;
+        }
+        if (m_app) {
+            m_app->refresh_user(std::string(user_id), std::move(copy));
+        }
     }
 
     void log_out(std::string_view user_id, SyncUser::State new_state) override
     {
-        std::lock_guard lock(m_mutex);
-        if (auto it = m_users.find(user_id); it != m_users.end()) {
-            if (new_state == SyncUser::State::Removed) {
-                m_users.erase(it);
+        std::optional<UserData> copy;
+        {
+            std::lock_guard lock(m_mutex);
+            if (auto it = m_users.find(user_id); it != m_users.end()) {
+                if (new_state == SyncUser::State::Removed) {
+                    m_users.erase(it);
+                }
+                else {
+                    auto& user = it->second;
+                    user.access_token = {};
+                    user.refresh_token = {};
+                    user.device_id.clear();
+                    copy = user;
+                }
             }
-            else {
-                auto& user = it->second;
-                user.access_token = {};
-                user.refresh_token = {};
-                user.device_id.clear();
-            }
+        }
+        if (m_app) {
+            m_app->refresh_user(std::string(user_id), std::move(copy));
         }
     }
 
@@ -839,6 +879,9 @@ class InMemoryMetadataStorage : public app::MetadataStore {
             for (auto& path : it->second) {
                 file_manager.remove_realm(path);
             }
+        }
+        if (m_app) {
+            m_app->refresh_user(std::string(user_id), std::nullopt);
         }
     }
 
@@ -921,18 +964,25 @@ class InMemoryMetadataStorage : public app::MetadataStore {
         REALM_ASSERT(action != SyncFileAction::BackUpThenDeleteRealm || !backup_path.empty());
         m_file_actions[std::string(path)] = FileAction{action, std::string(backup_path)};
     }
+
+public:
+    InMemoryMetadataStorage(app::App* app)
+        : m_app(app)
+    {
+    }
 };
 
 } // anonymous namespace
 
 app::MetadataStore::~MetadataStore() = default;
 
-std::unique_ptr<app::MetadataStore> app::create_metadata_store(const AppConfig& config, SyncFileManager& file_manager)
+std::unique_ptr<app::MetadataStore> app::create_metadata_store(const AppConfig& config, SyncFileManager& file_manager,
+                                                               app::App* app)
 {
     if (config.metadata_mode == AppConfig::MetadataMode::InMemory) {
-        return std::make_unique<InMemoryMetadataStorage>();
+        return std::make_unique<InMemoryMetadataStorage>(app);
     }
     return std::make_unique<PersistedSyncMetadataManager>(
         file_manager.metadata_path(), config.metadata_mode != AppConfig::MetadataMode::NoEncryption,
-        config.custom_encryption_key, file_manager);
+        config.custom_encryption_key, file_manager, app);
 }

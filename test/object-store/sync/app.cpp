@@ -5029,6 +5029,7 @@ TEST_CASE("app: remove user", "[sync][app][user]") {
         CHECK(app->all_users().empty());
 
         app->remove_user(user_a, [&](Optional<AppError> error) {
+            REQUIRE(error);
             CHECK(error->reason() == "User has already been removed");
             CHECK(app->all_users().size() == 0);
         });
@@ -5074,6 +5075,7 @@ TEST_CASE("app: remove user", "[sync][app][user]") {
         app->remove_user(user, [&](Optional<AppError> err) {
             error = err;
         });
+        REQUIRE(error);
         CHECK(error->code() > 0);
         CHECK(app->all_users().size() == 0);
         CHECK(user->state() == SyncUser::State::Removed);

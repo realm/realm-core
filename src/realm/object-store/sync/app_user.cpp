@@ -163,22 +163,6 @@ void User::log_out()
     }
 }
 
-void User::detach_and_tear_down()
-{
-    std::shared_ptr<App> app;
-    {
-        util::CheckedLockGuard lk(m_mutex);
-        m_data.access_token.token.clear();
-        m_data.refresh_token.token.clear();
-        app = std::exchange(m_app, nullptr);
-    }
-
-    if (app) {
-        app->sync_manager()->update_sessions_for(*this, SyncUser::State::LoggedIn, SyncUser::State::Removed, {});
-        app->unregister_sync_user(*this);
-    }
-}
-
 void User::update_data_for_testing(util::FunctionRef<void(UserData&)> fn)
 {
     UserData data;
@@ -192,29 +176,31 @@ void User::update_data_for_testing(util::FunctionRef<void(UserData&)> fn)
 
 void User::update_backing_data(std::optional<UserData>&& data)
 {
-    if (!data) {
-        detach_and_tear_down();
-        emit_change_to_subscribers(*this);
-        return;
-    }
-
     std::string new_token;
     SyncUser::State old_state;
-    SyncUser::State new_state = data->access_token ? SyncUser::State::LoggedIn : SyncUser::State::LoggedOut;
-    std::shared_ptr<SyncManager> sync_manager;
+    SyncUser::State new_state = data ? (data->access_token ? SyncUser::State::LoggedIn : SyncUser::State::LoggedOut)
+                                     : SyncUser::State::Removed;
+    std::shared_ptr<App> app;
     {
         util::CheckedLockGuard lock(m_mutex);
         if (!m_app) {
             return; // is already detached
         }
-        sync_manager = m_app->sync_manager();
+        app = m_app;
         old_state = m_data.access_token ? SyncUser::State::LoggedIn : SyncUser::State::LoggedOut;
         if (new_state == SyncUser::State::LoggedIn && data->access_token != m_data.access_token)
             new_token = data->access_token.token;
-        m_data = std::move(*data);
+        if (data) {
+            m_data = std::move(*data);
+        }
+        else {
+            m_data.access_token.token.clear();
+            m_data.refresh_token.token.clear();
+            m_app.reset();
+        }
     }
 
-    sync_manager->update_sessions_for(*this, old_state, new_state, new_token);
+    app->sync_manager()->update_sessions_for(*this, old_state, new_state, new_token);
     emit_change_to_subscribers(*this);
 }
 

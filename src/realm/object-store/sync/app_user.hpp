@@ -228,7 +228,6 @@ public:
 
     void update_backing_data(std::optional<UserData>&& data) REQUIRES(!m_mutex);
     void update_data_for_testing(util::FunctionRef<void(UserData&)>) REQUIRES(!m_mutex);
-    void detach_and_tear_down() REQUIRES(!m_mutex);
 
     /// Refreshes the custom data for this user
     /// If `update_location` is true, the location metadata will be queried before the request

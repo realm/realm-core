@@ -238,7 +238,7 @@ App::App(Private, const AppConfig& config)
     , m_base_url(m_config.base_url.value_or(std::string(s_default_base_url)))
     , m_request_timeout_ms(m_config.default_request_timeout_ms.value_or(s_default_timeout_ms))
     , m_file_manager(std::make_unique<SyncFileManager>(config))
-    , m_metadata_store(create_metadata_store(config, *m_file_manager))
+    , m_metadata_store(create_metadata_store(config, *m_file_manager, this))
     , m_sync_manager(SyncManager::create(config.sync_client_config))
 {
 #ifdef __EMSCRIPTEN__
@@ -573,13 +573,6 @@ std::shared_ptr<User> App::get_user_for_id(const std::string& user_id)
     return User::make(shared_from_this(), user_id);
 }
 
-void App::user_data_updated(const std::string& user_id)
-{
-    if (auto it = m_users.find(user_id); it != m_users.end()) {
-        it->second->update_backing_data(m_metadata_store->get_user(user_id));
-    }
-}
-
 std::shared_ptr<User> App::current_user()
 {
     util::CheckedLockGuard lock(m_user_mutex);
@@ -691,7 +684,6 @@ void App::get_profile(const std::shared_ptr<User>& user,
                 m_metadata_store->update_user(user->user_id(), [&](auto& data) {
                     data.identities = std::move(identities);
                     data.profile = UserProfile(get<BsonDocument>(profile_json, "data"));
-                    user->update_backing_data(data); // FIXME
                 });
             }
             catch (const AppError& err) {
@@ -786,8 +778,6 @@ void App::log_in_with_credentials(const AppCredentials& credentials, const std::
                 if (linking_user) {
                     m_metadata_store->update_user(linking_user->user_id(), [&](auto& data) {
                         data.access_token = RealmJWT(get<std::string>(json, "access_token"));
-                        // FIXME: should be powered by callback
-                        linking_user->update_backing_data(data);
                     });
                 }
                 else {
@@ -796,7 +786,6 @@ void App::log_in_with_credentials(const AppCredentials& credentials, const std::
                                                   get<std::string>(json, "access_token"),
                                                   get<std::string>(json, "device_id"));
                     util::CheckedLockGuard lock(m_user_mutex);
-                    user_data_updated(user_id); // FIXME: needs to be callback from metadata store
                     sync_user = get_user_for_id(user_id);
                 }
             }
@@ -839,7 +828,6 @@ void App::log_out(const std::shared_ptr<User>& user, SyncUser::State new_state,
     req.headers = get_request_headers(user);
 
     m_metadata_store->log_out(user->user_id(), new_state);
-    user->update_backing_data(m_metadata_store->get_user(user->user_id()));
 
     do_request(std::move(req),
                [self = shared_from_this(), completion = std::move(completion)](const Response& response) {
@@ -871,6 +859,22 @@ bool App::verify_user_present(const std::shared_ptr<User>& user) const
             return true;
     }
     return false;
+}
+
+void App::refresh_user(std::string_view user_id, std::optional<UserData>&& data)
+{
+    util::CheckedLockGuard lock(m_user_mutex);
+    if (auto it = m_users.find(std::string(user_id)); it != m_users.end()) { // FIXME
+        bool remove = !data;
+        it->second->update_backing_data(std::move(data));
+        // FIXME: there's an ownership problem here where removing a user could release the final reference to `this`
+        if (remove) {
+            if (m_current_user == it->second) {
+                m_current_user = nullptr;
+            }
+            m_users.erase(it);
+        }
+    }
 }
 
 void App::switch_user(const std::shared_ptr<User>& user)
@@ -905,7 +909,6 @@ void App::remove_user(const std::shared_ptr<User>& user, UniqueFunction<void(Opt
         log_out(
             user, SyncUser::State::Removed,
             [user, completion = std::move(completion), self = shared_from_this()](const Optional<AppError>& error) {
-                user->update_backing_data(std::nullopt);
                 if (completion) {
                     completion(error);
                 }
@@ -913,7 +916,6 @@ void App::remove_user(const std::shared_ptr<User>& user, UniqueFunction<void(Opt
     }
     else {
         m_metadata_store->log_out(user->user_id(), SyncUser::State::Removed);
-        user->update_backing_data(std::nullopt);
         if (completion) {
             completion(std::nullopt);
         }
@@ -946,7 +948,6 @@ void App::delete_user(const std::shared_ptr<User>& user, UniqueFunction<void(Opt
             auto error = AppUtils::check_for_errors(response);
             if (!error) {
                 auto user_id = user->user_id();
-                user->detach_and_tear_down();
                 m_metadata_store->delete_user(*m_file_manager, user_id);
                 emit_change_to_subscribers(*self);
             }
@@ -1295,7 +1296,6 @@ void App::refresh_access_token(const std::shared_ptr<User>& sync_user, bool upda
                 RealmJWT access_token{get<std::string>(json, "access_token")};
                 self->m_metadata_store->update_user(sync_user->user_id(), [&](auto& data) {
                     data.access_token = access_token;
-                    sync_user->update_backing_data(data);
                 });
             }
             catch (AppError& err) {

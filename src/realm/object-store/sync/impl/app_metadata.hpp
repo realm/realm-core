@@ -69,7 +69,8 @@ public:
     virtual void add_realm_path(std::string_view user_id, std::string_view path) = 0;
 };
 
-std::unique_ptr<MetadataStore> create_metadata_store(const AppConfig& config, SyncFileManager& file_manager);
+std::unique_ptr<MetadataStore> create_metadata_store(const AppConfig& config, SyncFileManager& file_manager,
+                                                     App* app = nullptr);
 
 } // namespace app
 } // namespace realm

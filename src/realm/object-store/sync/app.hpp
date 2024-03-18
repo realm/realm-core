@@ -42,6 +42,7 @@ namespace app {
 class App;
 class MetadataStore;
 class User;
+struct UserData;
 
 typedef std::shared_ptr<App> SharedApp;
 
@@ -428,6 +429,8 @@ public:
     // true if any were performed.
     bool immediately_run_file_actions(std::string_view realm_path);
 
+    void refresh_user(std::string_view user_id, std::optional<UserData>&& data) REQUIRES(!m_user_mutex);
+
 private:
     const AppConfig m_config;
 
@@ -602,7 +605,6 @@ private:
 
     // user helpers
     std::shared_ptr<User> get_user_for_id(const std::string& user_id) REQUIRES(m_user_mutex);
-    void user_data_updated(const std::string& user_id) REQUIRES(m_user_mutex);
     void log_out(const std::shared_ptr<User>& user, SyncUser::State new_state,
                  util::UniqueFunction<void(std::optional<AppError>)>&& completion) REQUIRES(!m_route_mutex);
 };
