@@ -472,7 +472,7 @@ inline int num_fields_for_width(size_t width)
     REALM_ASSERT_DEBUG(width);
     auto retval = num_fields_table[width];
 #ifdef REALM_DEBUG
-    REALM_ASSERT_DEBUG(retval == 64 / width);
+    REALM_ASSERT_DEBUG(retval == (int)(64 / width));
 #endif
     return retval;
 }
