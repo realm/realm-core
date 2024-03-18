@@ -74,7 +74,16 @@ struct SyncClient {
                 c.pong_keepalive_timeout = config.timeouts.pong_keepalive_timeout;
             if (config.timeouts.fast_reconnect_limit > 1000)
                 c.fast_reconnect_limit = config.timeouts.fast_reconnect_limit;
-
+            c.reconnect_backoff_info.resumption_delay_interval =
+                config.timeouts.reconnect_backoff_info.resumption_delay_interval;
+            c.reconnect_backoff_info.max_resumption_delay_interval =
+                config.timeouts.reconnect_backoff_info.max_resumption_delay_interval;
+            c.reconnect_backoff_info.resumption_delay_backoff_multiplier =
+                config.timeouts.reconnect_backoff_info.resumption_delay_backoff_multiplier;
+            if (c.reconnect_backoff_info.resumption_delay_interval.count() < 1000)
+                logger->warn("A resumption delay interval less than 1000 (1 second) is not recommended");
+            if (c.reconnect_backoff_info.resumption_delay_backoff_multiplier < 1)
+                throw InvalidArgument("Delay backoff multiplier in reconnect backoff info cannot be less than 1");
             return c;
         }())
         , m_logger_ptr(logger)

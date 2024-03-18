@@ -591,7 +591,11 @@ public:
     {
         return Query(m_own_ref, list);
     }
-    Query where(const DictionaryLinkValues& dictionary_of_links) const;
+    Query where(const Dictionary& dict) const;
+    Query where(LinkCollectionPtr&& list) const
+    {
+        return Query(m_own_ref, std::move(list));
+    }
 
     Query query(const std::string& query_string,
                 const std::vector<mpark::variant<Mixed, std::vector<Mixed>>>& arguments = {}) const;
