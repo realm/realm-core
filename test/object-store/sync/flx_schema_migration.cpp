@@ -389,7 +389,7 @@ TEST_CASE("Schema version mismatch between client and server", "[sync][flx][flx 
         realm->sync_session()->shutdown_and_wait();
         check_realm_schema(config.path, schema_v0, 0);
     }
-    _impl::RealmCoordinator::assert_no_open_realms();
+    REQUIRE_FALSE(_impl::RealmCoordinator::get_existing_coordinator(config.path));
 
     SECTION("Realm already on the latest schema version") {
         DBOptions options;
@@ -647,7 +647,7 @@ TEST_CASE("An interrupted schema migration can recover on the next session",
         wait_for_upload(*realm);
         check_realm_schema(config.path, schema_v0, 0);
     }
-    _impl::RealmCoordinator::assert_no_open_realms();
+    REQUIRE_FALSE(_impl::RealmCoordinator::get_existing_coordinator(config.path));
 
     const AppSession& app_session = harness.session().app_session();
     auto schema_v1 = get_schema_v1();
@@ -754,7 +754,7 @@ TEST_CASE("Client reset during schema migration", "[sync][flx][flx schema migrat
             std::any(AnyDict{{"_id", ObjectId::gen()}, {"queryable_int_field", static_cast<int64_t>(42)}}));
         realm->commit_transaction();
     }
-    _impl::RealmCoordinator::assert_no_open_realms();
+    REQUIRE_FALSE(_impl::RealmCoordinator::get_existing_coordinator(config.path));
 
     const AppSession& app_session = harness.session().app_session();
     auto schema_v1 = get_schema_v1();
@@ -842,7 +842,7 @@ TEST_CASE("Migrate to new schema version after migration to intermediate version
         realm->commit_transaction();
         realm->close();
     }
-    _impl::RealmCoordinator::assert_no_open_realms();
+    REQUIRE_FALSE(_impl::RealmCoordinator::get_existing_coordinator(config.path));
 
     const AppSession& app_session = harness.session().app_session();
     auto schema_v1 = get_schema_v1();
@@ -989,7 +989,7 @@ TEST_CASE("Client reset and schema migration", "[sync][flx][flx schema migration
         // Trigger a client reset.
         reset_utils::trigger_client_reset(harness.session().app_session(), *realm->sync_session());
     }
-    _impl::RealmCoordinator::assert_no_open_realms();
+    REQUIRE_FALSE(_impl::RealmCoordinator::get_existing_coordinator(config.path));
 
     const AppSession& app_session = harness.session().app_session();
     auto schema_v1 = get_schema_v1();

@@ -1369,7 +1369,7 @@ TEST_CASE("flx: client reset", "[sync][flx][client reset][baas]") {
             realm->sync_session()->shutdown_and_wait();
             realm->close();
         }
-        _impl::RealmCoordinator::assert_no_open_realms();
+        REQUIRE_FALSE(_impl::RealmCoordinator::get_existing_coordinator(config_local.path));
         {
             // ensure that an additional schema change after the successful reset is also accepted by the server
             changed_schema[0].persisted_properties.push_back(
@@ -2311,7 +2311,8 @@ TEST_CASE("flx: interrupted bootstrap restarts/recovers on reconnect", "[sync][f
         realm->sync_session()->shutdown_and_wait();
     }
 
-    _impl::RealmCoordinator::assert_no_open_realms();
+    // Verify that the file was fully closed
+    REQUIRE(DB::call_with_lock(interrupted_realm_config.path, [](auto&) {}));
 
     {
         DBOptions options;
@@ -2840,7 +2841,7 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][boot
             realm->close();
         }
 
-        _impl::RealmCoordinator::assert_no_open_realms();
+        REQUIRE_FALSE(_impl::RealmCoordinator::get_existing_coordinator(interrupted_realm_config.path));
 
         // Open up the realm without the sync client attached and verify that the realm got interrupted in the state
         // we expected it to be in.
@@ -2933,7 +2934,7 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][boot
             realm->close();
         }
 
-        _impl::RealmCoordinator::assert_no_open_realms();
+        REQUIRE_FALSE(_impl::RealmCoordinator::get_existing_coordinator(interrupted_realm_config.path));
 
         // Open up the realm without the sync client attached and verify that the realm got interrupted in the state
         // we expected it to be in.
@@ -3002,7 +3003,7 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][boot
             realm->close();
         }
 
-        _impl::RealmCoordinator::assert_no_open_realms();
+        REQUIRE_FALSE(_impl::RealmCoordinator::get_existing_coordinator(interrupted_realm_config.path));
 
         // Open up the realm without the sync client attached and verify that the realm got interrupted in the state
         // we expected it to be in.
@@ -3079,7 +3080,7 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][boot
             realm->close();
         }
 
-        _impl::RealmCoordinator::assert_no_open_realms();
+        REQUIRE_FALSE(_impl::RealmCoordinator::get_existing_coordinator(interrupted_realm_config.path));
 
         // Open up the realm without the sync client attached and verify that the realm got interrupted in the state
         // we expected it to be in.
@@ -4583,7 +4584,7 @@ TEST_CASE("flx: open realm + register subscription callback while bootstrapping"
                 realm->close();
             }
 
-            _impl::RealmCoordinator::assert_no_open_realms();
+            REQUIRE_FALSE(_impl::RealmCoordinator::get_existing_coordinator(config.path));
 
             // Client 2 uploads data matching Client 1's subscription at version 1
             harness.load_initial_data([&](SharedRealm realm) {
@@ -4742,7 +4743,7 @@ TEST_CASE("flx sync: resend pending subscriptions when reconnecting", "[sync][fl
         realm->close();
     }
 
-    _impl::RealmCoordinator::assert_no_open_realms();
+    REQUIRE_FALSE(_impl::RealmCoordinator::get_existing_coordinator(interrupted_realm_config.path));
 
     // Check at least one subscription set needs to be resent.
     {

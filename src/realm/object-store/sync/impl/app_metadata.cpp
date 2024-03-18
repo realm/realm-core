@@ -18,13 +18,15 @@
 
 #include <realm/object-store/sync/impl/app_metadata.hpp>
 
-#include <realm/object-store/sync/impl/sync_file.hpp>
+#include <realm/object-store/impl/realm_coordinator.hpp>
 #include <realm/object-store/object_schema.hpp>
 #include <realm/object-store/object_store.hpp>
 #include <realm/object-store/property.hpp>
 #include <realm/object-store/results.hpp>
 #include <realm/object-store/schema.hpp>
+#include <realm/object-store/sync/impl/sync_file.hpp>
 #include <realm/object-store/util/scheduler.hpp>
+
 #if REALM_PLATFORM_APPLE
 #include <realm/object-store/impl/apple/keychain_helper.hpp>
 #endif
@@ -336,13 +338,13 @@ std::shared_ptr<Realm> open_realm(RealmConfig& config, const app::AppConfig& app
 }
 
 struct PersistedSyncMetadataManager : public app::MetadataStore {
-    RealmConfig m_config;
+    std::shared_ptr<_impl::RealmCoordinator> m_coordinator;
     SyncUserSchema m_user_schema;
     FileActionSchema m_file_action_schema;
     UserIdentitySchema m_user_identity_schema;
     CurrentUserSchema m_current_user_schema;
 
-    PersistedSyncMetadataManager(std::string path, const app::AppConfig& app_config, SyncFileManager& file_manager)
+    PersistedSyncMetadataManager(const app::AppConfig& app_config, SyncFileManager& file_manager)
     {
         // Note that there are several deferred schema changes which don't
         // justify bumping the schema version by themself, but should be done
@@ -353,26 +355,27 @@ struct PersistedSyncMetadataManager : public app::MetadataStore {
         // - change most of the nullable columns to non-nullable
         constexpr uint64_t SCHEMA_VERSION = 7;
 
-        m_config.automatic_change_notifications = false;
-        m_config.path = std::move(path);
-        m_config.schema = Schema{
+        RealmConfig config;
+        config.automatic_change_notifications = false;
+        config.path = file_manager.metadata_path();
+        config.schema = Schema{
             UserIdentitySchema::object_schema(),
             SyncUserSchema::object_schema(),
             FileActionSchema::object_schema(),
             CurrentUserSchema::object_schema(),
         };
 
-        m_config.schema_version = SCHEMA_VERSION;
-        m_config.schema_mode = SchemaMode::Automatic;
-        m_config.scheduler = util::Scheduler::make_dummy();
-        m_config.automatically_handle_backlinks_in_migrations = true;
-        m_config.migration_function = [](std::shared_ptr<Realm> old_realm, std::shared_ptr<Realm> realm, Schema&) {
+        config.schema_version = SCHEMA_VERSION;
+        config.schema_mode = SchemaMode::Automatic;
+        config.scheduler = util::Scheduler::make_dummy();
+        config.automatically_handle_backlinks_in_migrations = true;
+        config.migration_function = [](std::shared_ptr<Realm> old_realm, std::shared_ptr<Realm> realm, Schema&) {
             if (old_realm->schema_version() < 7) {
                 migrate_to_v7(old_realm, realm);
             }
         };
 
-        auto realm = open_realm(m_config, app_config);
+        auto realm = open_realm(config, app_config);
         m_user_schema.read(*realm);
         m_file_action_schema.read(*realm);
         m_user_identity_schema.read(*realm);
@@ -382,11 +385,13 @@ struct PersistedSyncMetadataManager : public app::MetadataStore {
         perform_file_actions(*realm, file_manager);
         remove_dead_users(*realm, file_manager);
         realm->commit_transaction();
+
+        m_coordinator = _impl::RealmCoordinator::get_existing_coordinator(config.path);
     }
 
     std::shared_ptr<Realm> get_realm() const
     {
-        return Realm::get_shared_realm(m_config);
+        return m_coordinator->get_realm(util::Scheduler::make_dummy());
     }
 
     void remove_dead_users(Realm& realm, SyncFileManager& file_manager)
@@ -933,5 +938,5 @@ std::unique_ptr<app::MetadataStore> app::create_metadata_store(const AppConfig& 
     if (config.metadata_mode == AppConfig::MetadataMode::InMemory) {
         return std::make_unique<InMemoryMetadataStorage>();
     }
-    return std::make_unique<PersistedSyncMetadataManager>(file_manager.metadata_path(), config, file_manager);
+    return std::make_unique<PersistedSyncMetadataManager>(config, file_manager);
 }

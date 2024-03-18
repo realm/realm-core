@@ -1344,22 +1344,18 @@ TEST_CASE("Get Realm using Async Open", "[sync][pbs][async open]") {
         // User should be logged in at this point
         REQUIRE(config.sync_config->user->is_logged_in());
 
-        auto task = Realm::get_synchronized_realm(config);
-        auto pf = util::make_promise_future<std::exception_ptr>();
-        task->start([&pf](auto ref, auto error) mutable {
-            REQUIRE(!ref);
-            REQUIRE(error);
-            pf.promise.emplace_value(error);
-        });
+        auto status = async_open_realm(config);
+        REQUIRE_FALSE(status.is_ok());
 
-        auto result = pf.future.get_no_throw();
-        REQUIRE(result.is_ok());
-        REQUIRE(result.get_value());
-        std::lock_guard<std::mutex> lock(mutex);
-        REQUIRE(location_refresh_called);
-        if (failure != FailureMode::location_fails) {
-            REQUIRE(token_refresh_called);
+        {
+            std::lock_guard lock(mutex);
+            REQUIRE(location_refresh_called);
+            if (failure != FailureMode::location_fails) {
+                REQUIRE(token_refresh_called);
+            }
         }
+
+        app->sync_manager()->tear_down_for_testing();
     }
 
 #endif // REALM_APP_SERVICES
