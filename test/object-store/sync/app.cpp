@@ -2585,50 +2585,6 @@ TEST_CASE("app: make distributable client file", "[sync][pbs][app][baas]") {
     }
 }
 
-struct HookedSocketProvider : public sync::websocket::DefaultSocketProvider {
-    HookedSocketProvider(const std::shared_ptr<util::Logger>& logger, const std::string user_agent,
-                         AutoStart auto_start = AutoStart{true})
-        : DefaultSocketProvider(logger, user_agent, nullptr, auto_start)
-    {
-    }
-
-    std::unique_ptr<sync::WebSocketInterface> connect(std::unique_ptr<sync::WebSocketObserver> observer,
-                                                      sync::WebSocketEndpoint&& endpoint) override
-    {
-        using WebSocketError = sync::websocket::WebSocketError;
-
-        int status_code = 101;
-        bool was_clean = true;
-        WebSocketError ws_error = WebSocketError::websocket_ok;
-        std::string body;
-
-        sync::WebSocketEndpoint ep{std::move(endpoint)};
-        if (endpoint_verify_func) {
-            endpoint_verify_func(ep);
-        }
-
-        if (force_failure_func && force_failure_func(was_clean, ws_error, body)) {
-            observer->websocket_error_handler();
-            observer->websocket_closed_handler(was_clean, ws_error, body);
-            return nullptr;
-        }
-
-        bool use_simulated_response = websocket_connect_func && websocket_connect_func(status_code, body);
-        auto websocket = DefaultSocketProvider::connect(std::move(observer), std::move(ep));
-        if (use_simulated_response) {
-            auto default_websocket = static_cast<sync::websocket::DefaultWebSocket*>(websocket.get());
-            if (default_websocket)
-                default_websocket->force_handshake_response_for_testing(status_code, body);
-        }
-        return websocket;
-    }
-
-    std::function<void(sync::WebSocketEndpoint& endpoint)> endpoint_verify_func;
-    std::function<bool(bool& was_clean, sync::websocket::WebSocketError& error_code, std::string& message)>
-        force_failure_func;
-    std::function<bool(int&, std::string&)> websocket_connect_func;
-};
-
 TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
     auto logger = util::Logger::get_default_logger();
 
@@ -2728,63 +2684,7 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
             REQUIRE(dogs.get(0).get<String>("name") == "fido");
         }
     }
-
-    class HookedTransport : public SynchronousTestTransport {
-    public:
-        void send_request_to_server(const Request& request,
-                                    util::UniqueFunction<void(const Response&)>&& completion) override
-        {
-            if (request_hook) {
-                if (auto simulated_response = request_hook(request)) {
-                    return completion(*simulated_response);
-                }
-            }
-            SynchronousTestTransport::send_request_to_server(request, [&](const Response& response) mutable {
-                if (response_hook) {
-                    response_hook(request, response);
-                }
-                completion(response);
-            });
-        }
-        // Optional handler for the request and response before it is returned to completion
-        std::function<void(const Request&, const Response&)> response_hook;
-        // Optional handler for the request before it is sent to the server
-        std::function<std::optional<Response>(const Request&)> request_hook;
-    };
-
-    struct HookedSocketProvider : public sync::websocket::DefaultSocketProvider {
-        HookedSocketProvider(const std::shared_ptr<util::Logger>& logger, const std::string user_agent,
-                             AutoStart auto_start = AutoStart{true})
-            : DefaultSocketProvider(logger, user_agent, nullptr, auto_start)
-        {
-        }
-
-        std::unique_ptr<sync::WebSocketInterface> connect(std::unique_ptr<sync::WebSocketObserver> observer,
-                                                          sync::WebSocketEndpoint&& endpoint) override
-        {
-            auto simulated_response = websocket_connect_simulated_response_func
-                                          ? websocket_connect_simulated_response_func()
-                                          : std::nullopt;
-
-            if (websocket_endpoint_resolver) {
-                endpoint = websocket_endpoint_resolver(std::move(endpoint));
-            }
-            std::unique_ptr<sync::WebSocketInterface> websocket =
-                DefaultSocketProvider::connect(std::move(observer), std::move(endpoint));
-            if (simulated_response) {
-                auto default_websocket = static_cast<sync::websocket::DefaultWebSocket*>(websocket.get());
-                if (default_websocket)
-                    default_websocket->force_handshake_response_for_testing(*simulated_response, "");
-            }
-            return websocket;
-        }
-
-        std::function<std::optional<int>()> websocket_connect_simulated_response_func;
-        std::function<sync::WebSocketEndpoint(sync::WebSocketEndpoint&&)> websocket_endpoint_resolver;
-    };
-
     {
-        std::unique_ptr<realm::AppSession> app_session;
         auto redir_transport = std::make_shared<HookedTransport>();
         AutoVerifiedEmailCredentials creds;
 
@@ -2952,7 +2852,6 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
         }
     }
     SECTION("Test app redirect with no metadata") {
-        std::unique_ptr<realm::AppSession> app_session;
         auto redir_transport = std::make_shared<HookedTransport>();
         AutoVerifiedEmailCredentials creds, creds2;
 
@@ -3083,13 +2982,17 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
             auto sync_manager = test_session.sync_manager();
             auto sync_session = sync_manager->get_existing_session(r->config().path);
             sync_session->pause();
+            SyncManager::OnlyForTesting::voluntary_disconnect_all_connections(*sync_manager);
 
             int connect_count = 0;
-            redir_provider->websocket_connect_simulated_response_func = [&connect_count]() -> std::optional<int> {
-                if (connect_count++ > 0)
-                    return std::nullopt;
-
-                return static_cast<int>(sync::HTTPStatus::PermanentRedirect);
+            redir_provider->websocket_connect_func = [&logger,
+                                                      &connect_count]() -> std::optional<SocketProviderError> {
+                logger->trace("websocket connect (%1)", ++connect_count);
+                if (connect_count == 1)
+                    return SocketProviderError(sync::HTTPStatus::PermanentRedirect);
+                if (connect_count == 2)
+                    return SocketProviderError(sync::websocket::WebSocketError::websocket_moved_permanently);
+                return std::nullopt;
             };
             redir_provider->websocket_endpoint_resolver = [&](sync::WebSocketEndpoint&& ep) {
                 if (connect_count < 2) {
@@ -3135,8 +3038,6 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
                 }
                 return std::nullopt;
             };
-
-            SyncManager::OnlyForTesting::voluntary_disconnect_all_connections(*sync_manager);
             sync_session->resume();
             REQUIRE(!wait_for_download(*r));
             REQUIRE(user1->is_logged_in());
@@ -3154,11 +3055,11 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
             sync_session->pause();
 
             int connect_count = 0;
-            redir_provider->websocket_connect_simulated_response_func = [&connect_count]() -> std::optional<int> {
+            redir_provider->websocket_connect_func = [&connect_count]() -> std::optional<SocketProviderError> {
                 if (connect_count++ > 0)
                     return std::nullopt;
 
-                return static_cast<int>(sync::HTTPStatus::MovedPermanently);
+                return SocketProviderError(sync::HTTPStatus::MovedPermanently);
             };
             int request_count = 0;
             redir_transport->request_hook = [&](const Request& request) -> std::optional<Response> {
@@ -3208,11 +3109,11 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
             sync_session->pause();
 
             int connect_count = 0;
-            redir_provider->websocket_connect_simulated_response_func = [&connect_count]() -> std::optional<int> {
+            redir_provider->websocket_connect_func = [&connect_count]() -> std::optional<SocketProviderError> {
                 if (connect_count++ > 0)
                     return std::nullopt;
 
-                return static_cast<int>(sync::HTTPStatus::MovedPermanently);
+                return SocketProviderError(sync::HTTPStatus::MovedPermanently);
             };
             int request_count = 0;
             const int max_http_redirects = 20; // from app.cpp in object-store
@@ -3250,6 +3151,98 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
         }
     }
 
+#if 0
+    SECTION("Test websocket location update with invalid ws host url") {
+        std::string configured_app_url = get_base_url();
+        std::string original_host = configured_app_url.substr(configured_app_url.find("://") + 3);
+        original_host = original_host.substr(0, original_host.find("/"));
+        std::string original_address = original_host;
+        uint16_t original_port = 443;
+        if (auto port_pos = original_host.find(":"); port_pos != std::string::npos) {
+            auto original_port_str = original_host.substr(port_pos + 1);
+
+            original_port = strtol(original_port_str.c_str(), nullptr, 10);
+            original_address = original_host.substr(0, port_pos);
+        }
+
+        auto redir_transport = std::make_shared<HookedTransport>();
+        auto redir_provider = std::make_shared<HookedSocketProvider>(logger, "");
+        redir_provider->websocket_endpoint_resolver = [&](sync::WebSocketEndpoint&& ep) {
+            ep.address = original_address;
+            ep.port = original_port;
+            return ep;
+        };
+
+        // Create App and User and log in
+        auto server_app_config = minimal_app_config("websocket_location_update", schema);
+        TestAppSession test_session(create_app(server_app_config), redir_transport, DeleteApp{true},
+                                    realm::ReconnectMode::normal, redir_provider);
+        auto partition = random_string(100);
+        auto user1 = test_session.app()->current_user();
+        SyncTestFile r_config(user1, partition, schema);
+
+        // Open the realm with the current user
+        {
+            auto r = Realm::get_shared_realm(r_config);
+            REQUIRE(!wait_for_download(*r));
+        }
+
+        // Close the app
+        test_session.close();
+
+//#if 0
+        std::string redirect_scheme = "http://";
+        std::string websocket_scheme = "ws://";
+        const std::string redirect_address = "fakerealm.example.com";
+        const std::string redirect_host = "fakerealm.example.com:9090";
+        const std::string redirect_url = "http://fakerealm.example.com:9090";
+
+        redir_transport->request_hook = [&](const Request& request) -> std::optional<Response> {
+            logger->trace("request.url (%1): %2", request_count, request.url);
+            if (request_count++ == 0) {
+                // First request should be a location request against the original URL
+                REQUIRE(request.url.find(original_host) != std::string::npos);
+                REQUIRE(request.url.find("/location") != std::string::npos);
+                REQUIRE(request.redirect_count == 0);
+                return Response{static_cast<int>(sync::HTTPStatus::PermanentRedirect),
+                                0,
+                                {{"Location", redirect_url}, {"Content-Type", "application/json"}},
+                                "Some body data"};
+            }
+            else if (request.url.find("/location") != std::string::npos) {
+                REQUIRE(request.url.find(redirect_host) != std::string::npos);
+                ++request_count;
+                return Response{
+                    static_cast<int>(sync::HTTPStatus::Ok),
+                    0,
+                    {{"Content-Type", "application/json"}},
+                    util::format(
+                        "{\"deployment_model\":\"GLOBAL\",\"location\":\"US-VA\",\"hostname\":\"%2%1\",\"ws_"
+                        "hostname\":\"%3%1\"}",
+                        redirect_host, redirect_scheme, websocket_scheme)};
+            }
+            else if (request.url.find(redirect_host) != std::string::npos) {
+                auto new_req = request;
+                new_req.url = util::format("%1%2", configured_app_url, request.url.substr(redirect_url.size()));
+                logger->trace("Proxying request from %1 to %2", request.url, new_req.url);
+                auto resp = do_http_request(new_req);
+                logger->trace("Response: \"%1\"", resp.body);
+                return resp;
+            }
+            return std::nullopt;
+        };
+//#endif
+
+        // Reopen the app, but don't log in at this point
+        test_session.reopen(false);
+
+        // Open the realm with the cached user
+        {
+            auto r = Realm::get_shared_realm(r_config);
+            REQUIRE(!wait_for_download(*r));
+        }
+    }
+#endif
     SECTION("Fast clock on client") {
         {
             SyncTestFile config(app, partition, schema);
@@ -4190,12 +4183,8 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
         std::string redir_wsurl = util::format("ws%1://%2:%3", use_ssl ? "s" : "", expected_host, expected_port);
 
         auto socket_provider = std::make_shared<HookedSocketProvider>(logger, "some user agent");
-        socket_provider->force_failure_func = [](bool& was_clean, sync::websocket::WebSocketError& error_code,
-                                                 std::string& message) {
-            was_clean = false;
-            error_code = sync::websocket::WebSocketError::websocket_connection_failed;
-            message = "404 not found";
-            return true;
+        socket_provider->websocket_connect_func = []() -> std::optional<SocketProviderError> {
+            return SocketProviderError(sync::websocket::WebSocketError::websocket_connection_failed, "404 not found");
         };
 
         sc_config.socket_provider = socket_provider;
@@ -4296,8 +4285,7 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
                 CHECK(ep.is_ssl == use_ssl);
             };
 
-            socket_provider->force_failure_func = [&](bool& was_clean, sync::websocket::WebSocketError& error_code,
-                                                      std::string& message) {
+            socket_provider->websocket_connect_func = [&]() -> std::optional<SocketProviderError> {
                 // Check these items prior to holding the lock in transition_with()
                 if (state.get() == TestState::start) {
                     logger->debug("State: start");
@@ -4331,10 +4319,8 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
                     return std::nullopt;
                 });
 
-                was_clean = false;
-                error_code = sync::websocket::WebSocketError::websocket_connection_failed;
-                message = "404 not found";
-                return true;
+                return SocketProviderError(sync::websocket::WebSocketError::websocket_connection_failed,
+                                           "404 not found");
             };
 
             RealmConfig r_config;

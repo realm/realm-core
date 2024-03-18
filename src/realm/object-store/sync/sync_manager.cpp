@@ -665,7 +665,7 @@ void SyncManager::close_all_sessions()
     get_sync_client().wait_for_session_terminations();
 }
 
-void SyncManager::set_sync_route(std::string sync_route, bool verified, RestartSessions restart_sessions)
+void SyncManager::set_sync_route(std::string sync_route, bool verified)
 {
     REALM_ASSERT(!sync_route.empty()); // Cannot be set to empty string
     {
@@ -673,12 +673,10 @@ void SyncManager::set_sync_route(std::string sync_route, bool verified, RestartS
         m_sync_route = sync_route;
         m_sync_route_verified = verified;
     }
+}
 
-    // Bail out early if not restarting the existing sessions
-    if (!restart_sessions) {
-        return;
-    }
-
+void SyncManager::restart_all_sessions()
+{
     // Restart the sessions that are currently active
     auto sessions = get_all_sessions();
     for (auto& session : sessions) {

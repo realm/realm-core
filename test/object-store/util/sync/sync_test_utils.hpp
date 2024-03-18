@@ -28,6 +28,9 @@
 #include <realm/object-store/sync/impl/sync_metadata.hpp>
 #include <realm/object-store/sync/sync_session.hpp>
 #include <realm/object-store/thread_safe_reference.hpp>
+#include <realm/sync/network/http.hpp>
+#include <realm/sync/socket_provider.hpp>
+#include <realm/sync/network/default_socket.hpp>
 
 #include <realm/util/functional.hpp>
 #include <realm/util/function_ref.hpp>
@@ -155,11 +158,139 @@ struct AutoVerifiedEmailCredentials : app::AppCredentials {
 };
 
 AutoVerifiedEmailCredentials create_user_and_log_in(app::SharedApp app);
+// Log in the user again using the AutoVerifiedEmailCredentials returned
+// when calling create_user_and_log_in()
+void log_in_user(app::SharedApp app, app::AppCredentials creds);
 
 void wait_for_advance(Realm& realm);
 
 void async_open_realm(const Realm::Config& config,
                       util::UniqueFunction<void(ThreadSafeReference&& ref, std::exception_ptr e)> finish);
+
+app::Response do_http_request(const app::Request& request);
+
+class SynchronousTestTransport : public app::GenericNetworkTransport {
+public:
+    void send_request_to_server(const app::Request& request,
+                                util::UniqueFunction<void(const app::Response&)>&& completion) override
+    {
+        {
+            std::lock_guard barrier(m_mutex);
+        }
+        completion(do_http_request(request));
+    }
+
+    void block()
+    {
+        m_mutex.lock();
+    }
+    void unblock()
+    {
+        m_mutex.unlock();
+    }
+
+private:
+    std::mutex m_mutex;
+};
+
+
+class HookedTransport : public SynchronousTestTransport {
+public:
+    void send_request_to_server(const app::Request& request,
+                                util::UniqueFunction<void(const app::Response&)>&& completion) override
+    {
+        if (request_hook) {
+            if (auto simulated_response = request_hook(request)) {
+                return completion(*simulated_response);
+            }
+        }
+        SynchronousTestTransport::send_request_to_server(request, [&](const app::Response& response) mutable {
+            if (response_hook) {
+                response_hook(request, response);
+            }
+            completion(response);
+        });
+    }
+
+    // Optional handler for the request and response before it is returned to completion
+    std::function<void(const app::Request&, const app::Response&)> response_hook;
+    // Optional handler for the request before it is sent to the server
+    std::function<std::optional<app::Response>(const app::Request&)> request_hook;
+};
+
+
+struct SocketProviderError {
+    SocketProviderError(sync::HTTPStatus code, std::string message = "")
+        : SocketProviderError(static_cast<int>(code), message)
+    {
+    }
+
+    SocketProviderError(int code, std::string message = "")
+        : status_code(code)
+        , was_clean(code == 101)
+        , body(message)
+    {
+    }
+
+    using WebSocketError = sync::websocket::WebSocketError;
+    SocketProviderError(WebSocketError error, std::string message = "")
+        : was_clean(false)
+        , ws_error(error)
+        , body(message)
+    {
+    }
+
+    int status_code = 0;
+    bool was_clean = true;
+    WebSocketError ws_error = WebSocketError::websocket_ok;
+    std::string body;
+};
+
+
+struct HookedSocketProvider : public sync::websocket::DefaultSocketProvider {
+    HookedSocketProvider(const std::shared_ptr<util::Logger>& logger, const std::string user_agent,
+                         AutoStart auto_start = AutoStart{true})
+        : DefaultSocketProvider(logger, user_agent, nullptr, auto_start)
+    {
+    }
+
+    std::unique_ptr<sync::WebSocketInterface> connect(std::unique_ptr<sync::WebSocketObserver> observer,
+                                                      sync::WebSocketEndpoint&& endpoint) override
+    {
+        sync::WebSocketEndpoint ep{std::move(endpoint)};
+        std::optional<SocketProviderError> error;
+        if (endpoint_verify_func) {
+            endpoint_verify_func(ep);
+        }
+
+        if (websocket_endpoint_resolver) {
+            ep = websocket_endpoint_resolver(std::move(ep));
+        }
+
+        if (websocket_connect_func) {
+            error = websocket_connect_func();
+        }
+
+        if (error && error->ws_error != sync::websocket::WebSocketError::websocket_ok) {
+            observer->websocket_error_handler();
+            observer->websocket_closed_handler(error->was_clean, error->ws_error, error->body);
+            return nullptr;
+        }
+
+        std::unique_ptr<sync::WebSocketInterface> websocket =
+            DefaultSocketProvider::connect(std::move(observer), std::move(ep));
+        if (error && error->status_code > 0) {
+            auto default_websocket = dynamic_cast<sync::websocket::DefaultWebSocket*>(websocket.get());
+            if (default_websocket)
+                default_websocket->force_handshake_response_for_testing(error->status_code, error->body);
+        }
+        return websocket;
+    }
+
+    std::function<sync::WebSocketEndpoint(sync::WebSocketEndpoint&&)> websocket_endpoint_resolver;
+    std::function<void(sync::WebSocketEndpoint& endpoint)> endpoint_verify_func;
+    std::function<std::optional<SocketProviderError>()> websocket_connect_func;
+};
 
 #endif // REALM_ENABLE_SYNC
 
