@@ -599,7 +599,7 @@ typedef void (*realm_log_func_t)(realm_userdata_t userdata, const char* category
 /**
  * Install the default logger
  */
-RLM_API void realm_set_log_callback(realm_log_func_t, realm_log_level_e, realm_userdata_t userdata,
+RLM_API void realm_set_log_callback(realm_log_func_t, realm_userdata_t userdata,
                                     realm_free_userdata_func_t userdata_free) RLM_API_NOEXCEPT;
 RLM_API void realm_set_log_level(realm_log_level_e) RLM_API_NOEXCEPT;
 /**
