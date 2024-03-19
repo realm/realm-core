@@ -346,6 +346,12 @@ public:
         }
         field_position = next_field_position;
     }
+    
+    inline void move(size_t index, size_t initial_offset = 0)
+    {
+        field_position = initial_offset + index * step_size;
+        first_word_ptr = data_area + (field_position >> 6);
+    }
     // The compiler should be able to generate code matching this
     // from operator* and the bf_ref declared below:
     //
@@ -612,6 +618,11 @@ inline uint64_t find_all_fields_unsigned_LE(uint64_t MSBs, uint64_t A, uint64_t 
 inline uint64_t find_all_fields_unsigned_GE(uint64_t MSBs, uint64_t A, uint64_t B)
 {
     return find_all_fields_unsigned_LE(MSBs, B, A);
+}
+
+inline uint64_t find_all_fields_unsigned_GT(uint64_t MSBs, uint64_t A, uint64_t B)
+{
+    return find_all_fields_unsigned_LT(MSBs, B, A);
 }
 
 /*

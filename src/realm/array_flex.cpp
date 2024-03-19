@@ -180,9 +180,14 @@ inline uint64_t vector_compare(uint64_t MSBs, uint64_t a, uint64_t b)
         return find_all_fields_EQ(MSBs, a, b);
     if constexpr (std::is_same_v<Cond, NotEqual>)
         return find_all_fields_NE(MSBs, a, b);
-    if constexpr (std::is_same_v<Cond, Greater>)
-        return find_all_fields_signed_GT(MSBs, a, b);
-
+    
+    if constexpr (std::is_same_v<Cond, Greater>){
+        if(std::is_same_v<Type, ArrayFlex::WordTypeValue>)
+            return find_all_fields_signed_GT(MSBs, a, b);
+        if(std::is_same_v<Type, ArrayFlex::WordTypeIndex>)
+            return find_all_fields_unsigned_GT(MSBs,a, b);
+        REALM_UNREACHABLE();
+    }
     if constexpr (std::is_same_v<Cond, GreaterEqual>) {
         if constexpr (std::is_same_v<Type, ArrayFlex::WordTypeValue>)
             return find_all_fields_signed_GE(MSBs, a, b);
@@ -204,6 +209,28 @@ inline uint64_t vector_compare(uint64_t MSBs, uint64_t a, uint64_t b)
             return find_all_fields_unsigned_LE(MSBs, a, b);
         REALM_UNREACHABLE();
     }
+    
+}
+
+//we need some heuristics for running parallel subscan in flex mode.
+//For eq and neq running a parallel subscan almost always wins, instead
+//of performing a linear scan.
+inline bool run_parallel_scan_eq_neq(size_t w, size_t range)
+{
+    return w <= 32 && range >= 50;
+}
+
+//For lt and gt and in general for range queries, things diverge
+//a little bit compared to eq and neq. This is due to the implementation
+//of our query algorithm. When we process in parallel the values, we don't
+//filter the range (because it will result in worse perf), but we just
+//explore the entire list of values.
+//This has a big const, if repeated N times for all the M values.
+//It only pays off if we have a lot of values and we query the range of
+//values that is big enough.
+inline bool run_parallel_scan_lt_gt(size_t w, size_t range)
+{
+    return w <= 8 && range >= 50;
 }
 
 bool ArrayFlex::find_eq(const Array& arr, int64_t value, size_t start, size_t end, size_t baseindex,
@@ -215,24 +242,42 @@ bool ArrayFlex::find_eq(const Array& arr, int64_t value, size_t start, size_t en
     const auto ndx_width = encoder.ndx_width();
     const auto offset = v_size * v_width;
     const uint64_t* data = (const uint64_t*)arr.m_data;
+    
+    const auto range = end-start;
+    if(run_parallel_scan_eq_neq(v_width, range))
+    {
+        auto MSBs = encoder.msb();
+        auto search_vector = populate(v_width, value);
+        auto v_start = parallel_subword_find(vector_compare<Equal>, data, 0, v_width, MSBs, search_vector, 0, v_size);
+        if (v_start == v_size)
+            return true;
 
-    auto MSBs = encoder.msb();
-    auto search_vector = populate(v_width, value);
-    auto v_start = parallel_subword_find(vector_compare<Equal>, data, 0, v_width, MSBs, search_vector, 0, v_size);
-    if (v_start == v_size)
-        return true;
+        MSBs = encoder.ndx_msb();
+        search_vector = populate(ndx_width, v_start);
+        while (start < end) {
+            start =
+                parallel_subword_find(vector_compare<Equal>, data, offset, ndx_width, MSBs, search_vector, start, end);
+            if (start < end)
+                if (!state->match(start + baseindex))
+                    return false;
 
-    MSBs = encoder.ndx_msb();
-    search_vector = populate(ndx_width, v_start);
-    while (start < end) {
-        start =
-            parallel_subword_find(vector_compare<Equal>, data, offset, ndx_width, MSBs, search_vector, start, end);
-        if (start < end)
-            if (!state->match(start + baseindex))
-                return false;
-
-        ++start;
+            ++start;
+        }
     }
+    else
+    {
+        bf_iterator ndx_it((uint64_t*)data, offset, ndx_width, ndx_width, start);
+        bf_iterator val_it((uint64_t*)data, 0, v_width, v_width, *ndx_it);
+        while(start < end) {
+            const auto sv = sign_extend_field_by_mask(encoder.width_mask(), *val_it);
+            if(sv == value && !state->match(start + baseindex))
+                return false;
+            ++start;
+            ++ndx_it;
+            val_it.move(*ndx_it);
+        }
+    }
+    
     return true;
 }
 
@@ -245,23 +290,42 @@ bool ArrayFlex::find_neq(const Array& arr, int64_t value, size_t start, size_t e
     const auto ndx_width = encoder.ndx_width();
     const auto offset = v_size * v_width;
     const uint64_t* data = (const uint64_t*)arr.m_data;
+    
+    const auto range = end-start;
+    if(run_parallel_scan_eq_neq(v_width, range))
+    {
+        auto MSBs = encoder.msb();
+        auto search_vector = populate(v_width, value);
+        auto v_start = parallel_subword_find(vector_compare<NotEqual>, data, 0, v_width, MSBs, search_vector, 0, v_size);
+        if (v_start == v_size)
+            return true;
 
-    auto MSBs = encoder.msb();
-    auto search_vector = populate(v_width, value);
-    auto v_start = parallel_subword_find(vector_compare<NotEqual>, data, 0, v_width, MSBs, search_vector, 0, v_size);
-    if (v_start == v_size)
-        return true;
-
-    MSBs = encoder.ndx_msb();
-    search_vector = populate(ndx_width, v_start);
-    while (start < end) {
-        start = parallel_subword_find(vector_compare<LessEqual, WordTypeIndex>, data, offset, ndx_width, MSBs,
-                                      search_vector, start, end);
-        if (start < end)
-            if (!state->match(start + baseindex))
-                return false;
-        ++start;
+        MSBs = encoder.ndx_msb();
+        search_vector = populate(ndx_width, v_start);
+        while (start < end) {
+            start = parallel_subword_find(vector_compare<LessEqual, WordTypeIndex>, data, offset, ndx_width, MSBs,
+                                          search_vector, start, end);
+            if (start < end)
+                if (!state->match(start + baseindex))
+                    return false;
+            ++start;
+        }
     }
+    else
+    {
+        bf_iterator ndx_it((uint64_t*)data, offset, ndx_width, ndx_width, start);
+        bf_iterator val_it((uint64_t*)data, 0, v_width, v_width, *ndx_it);
+        while(start < end) {
+            const auto sv = sign_extend_field_by_mask(encoder.width_mask(), *val_it);
+            if(sv != value && !state->match(start + baseindex))
+                return false;
+            ++start;
+            ++ndx_it;
+            val_it.move(*ndx_it);
+        }
+    }
+    
+    
     return true;
 }
 
@@ -274,24 +338,41 @@ bool ArrayFlex::find_lt(const Array& arr, int64_t value, size_t start, size_t en
     const auto ndx_width = encoder.ndx_width();
     const auto offset = v_size * v_width;
     const uint64_t* data = (const uint64_t*)arr.m_data;
-
-    auto MSBs = encoder.msb();
-    auto search_vector = populate(v_width, value);
-    auto v_start =
+    
+    const auto range = end-start;
+    if(run_parallel_scan_lt_gt(v_width, range))
+    {
+        auto MSBs = encoder.msb();
+        auto search_vector = populate(v_width, value);
+        auto v_start =
         parallel_subword_find(vector_compare<GreaterEqual>, data, 0, v_width, MSBs, search_vector, 0, v_size);
-    if (v_start == v_size)
-        return true;
-
-    MSBs = encoder.ndx_msb();
-    search_vector = populate(ndx_width, v_start);
-    while (start < end) {
-        start = parallel_subword_find(vector_compare<Less, WordTypeIndex>, data, offset, ndx_width, MSBs,
-                                      search_vector, start, end);
-        if (start < end)
-            if (!state->match(start + baseindex))
+        if (v_start == v_size)
+            return true;
+        
+        MSBs = encoder.ndx_msb();
+        search_vector = populate(ndx_width, v_start);
+        while (start < end) {
+            start = parallel_subword_find(vector_compare<Less, WordTypeIndex>, data, offset, ndx_width, MSBs,
+                                          search_vector, start, end);
+            if (start < end)
+                if (!state->match(start + baseindex))
+                    return false;
+            
+            ++start;
+        }
+    }
+    else 
+    {
+        bf_iterator ndx_it((uint64_t*)data, offset, ndx_width, ndx_width, start);
+        bf_iterator val_it((uint64_t*)data, 0, v_width, v_width, *ndx_it);
+        while(start < end) {
+            const auto sv = sign_extend_field_by_mask(encoder.width_mask(), *val_it);
+            if(sv < value && !state->match(start + baseindex))
                 return false;
-
-        ++start;
+            ++start;
+            ++ndx_it;
+            val_it.move(*ndx_it);
+        }
     }
     return true;
 }
@@ -305,23 +386,40 @@ bool ArrayFlex::find_gt(const Array& arr, int64_t value, size_t start, size_t en
     const auto ndx_width = encoder.ndx_width();
     const auto offset = v_size * v_width;
     const uint64_t* data = (const uint64_t*)arr.m_data;
-
-    auto MSBs = encoder.msb();
-    auto search_vector = populate(v_width, value);
-    auto v_start = parallel_subword_find(vector_compare<Greater>, data, 0, v_width, MSBs, search_vector, 0, v_size);
-    if (v_start == v_size)
-        return true;
-
-    MSBs = encoder.ndx_msb();
-    search_vector = populate(ndx_width, v_start);
-    while (start < end) {
-        start = parallel_subword_find(vector_compare<GreaterEqual, ArrayFlex::WordTypeIndex>, data, offset, ndx_width,
-                                      MSBs, search_vector, start, end);
-        if (start < end)
-            if (!state->match(start + baseindex))
+    
+    const auto range = end-start;
+    if(run_parallel_scan_lt_gt(v_width, range))
+    {
+        auto MSBs = encoder.msb();
+        auto search_vector = populate(v_width, value);
+        auto v_start = parallel_subword_find(vector_compare<Greater>, data, 0, v_width, MSBs, search_vector, 0, v_size);
+        if (v_start == v_size)
+            return true;
+        
+        MSBs = encoder.ndx_msb();
+        search_vector = populate(ndx_width, v_start);
+        while (start < end) {
+            start = parallel_subword_find(vector_compare<GreaterEqual, ArrayFlex::WordTypeIndex>, data, offset, ndx_width,
+                                          MSBs, search_vector, start, end);
+            if (start < end)
+                if (!state->match(start + baseindex))
+                    return false;
+            
+            ++start;
+        }
+    }
+    else
+    {
+        bf_iterator ndx_it((uint64_t*)data, offset, ndx_width, ndx_width, start);
+        bf_iterator val_it((uint64_t*)data, 0, v_width, v_width, *ndx_it);
+        while(start < end) {
+            const auto sv = sign_extend_field_by_mask(encoder.width_mask(), *val_it);
+            if(sv > value && !state->match(start + baseindex))
                 return false;
-
-        ++start;
+            ++start;
+            ++ndx_it;
+            val_it.move(*ndx_it);
+        }
     }
     return true;
 }
