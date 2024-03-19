@@ -1656,7 +1656,8 @@ TEST_CASE("C API logging", "[c_api]") {
     auto num_categories = realm_get_category_names(20, category_names);
     auto log_level_old = realm_get_log_level_category("Realm");
 
-    realm_set_log_callback(realm_log_func, RLM_LOG_LEVEL_DEBUG, &userdata, nullptr);
+    realm_set_log_callback(realm_log_func, &userdata, nullptr);
+    realm_set_log_level(RLM_LOG_LEVEL_DEBUG);
     for (size_t n = 0; n < num_categories; n++) {
         CHECK(realm_get_log_level_category(category_names[n]) == RLM_LOG_LEVEL_DEBUG);
     }
@@ -1692,7 +1693,7 @@ TEST_CASE("C API logging", "[c_api]") {
     CHECK(userdata.log.empty());
 
     // Remove this logger again
-    realm_set_log_callback(nullptr, RLM_LOG_LEVEL_DEBUG, nullptr, nullptr);
+    realm_set_log_callback(nullptr, nullptr, nullptr);
     // Restore old log level
     realm_set_log_level(log_level_old);
 }
