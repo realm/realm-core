@@ -2,9 +2,10 @@
 
 ### Enhancements
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
-* None.
+* Improve file compaction performance on platforms with page sizes greater than 4k (for example arm64 Apple platforms) for files less than 256 pages in size ([PR #7492](https://github.com/realm/realm-core/pull/7492)).
 
 ### Fixed
+* Modifying nested collections left the accessor used to make the modification in a stale state, resulting in some unneccesary work being done when making multiple modifications via one accessor ([PR #7470](https://github.com/realm/realm-core/pull/7470), since v14.0.0).
 * Fix Opening realm with cached user while offline results in fatal error and session does not retry connection. ([#7349](https://github.com/realm/realm-core/issues/7349), since v13.26.0)
 
 ### Breaking changes
