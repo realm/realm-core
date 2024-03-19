@@ -1752,6 +1752,9 @@ inline void SessionWrapper::on_upload_progress(bool only_if_new_uploadable_data)
 {
     REALM_ASSERT(!m_finalized);
 
+    // don't set the flag in case of the progress change of local origin
+    // progress should be delayed until first DOWNLOAD message received
+    // since uploads are not allowed before that and can't progress
     if (!only_if_new_uploadable_data)
         m_reliable_download_progress = true;
 
@@ -1910,7 +1913,7 @@ void SessionWrapper::report_progress(bool is_download, bool only_if_new_uploadab
         if (m_bootstrap_store_bytes)
             p.downloaded += *m_bootstrap_store_bytes;
 
-        // FIXME for flx with download estimate these bytest are not known
+        // FIXME for flx with download estimate these bytes are not known
         // provide some sensible value for non-streaming version of object-store callbackas
         // until these field are completely removed from the api after pbs deprecation
         p.downloadable = p.downloaded;
