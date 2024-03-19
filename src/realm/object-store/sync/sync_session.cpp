@@ -1608,12 +1608,14 @@ SyncProgressNotifier::NotifierPackage::create_invocation(Progress const& current
     uint64_t transferred = is_download ? current_progress.downloaded : current_progress.uploaded;
     uint64_t transferrable = is_download ? current_progress.downloadable : current_progress.uploadable;
     double progress_estimate = is_download ? current_progress.dowload_estimate : current_progress.upload_estimate;
+
+    // If the sync client has not yet processed all of the local
+    // transactions then the uploadable data is incorrect and we should
+    // not invoke the callback
+    if (!is_download && snapshot_version > current_progress.snapshot_version)
+        return [] {};
+
     if (!is_streaming) {
-        // If the sync client has not yet processed all of the local
-        // transactions then the uploadable data is incorrect and we should
-        // not invoke the callback
-        if (!is_download && snapshot_version > current_progress.snapshot_version)
-            return [] {};
 
         // The initial download size we get from the server is the uncompacted
         // size, and so the download may complete before we actually receive
