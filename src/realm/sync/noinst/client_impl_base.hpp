@@ -847,7 +847,8 @@ public:
     /// It is an error to call this function before activation of the session
     /// (Connection::activate_session()), or after initiation of deactivation
     /// (Connection::initiate_session_deactivation()).
-    void on_changesets_integrated(version_type client_version, const SyncProgress& progress);
+    void on_changesets_integrated(version_type client_version, const SyncProgress& progress,
+                                  bool changesets_integrated);
 
     void on_integration_failure(const IntegrationException& e);
 
@@ -1187,8 +1188,8 @@ private:
     void ensure_enlisted_to_send();
     void enlist_to_send();
     Status check_received_sync_progress(const SyncProgress&) noexcept;
-    bool check_for_upload_completion();
-    bool check_for_download_completion();
+    void check_for_upload_completion();
+    void check_for_download_completion();
 
     SyncClientHookAction call_debug_hook(SyncClientHookEvent event, const SyncProgress&, int64_t, DownloadBatchState,
                                          size_t);
@@ -1200,7 +1201,7 @@ private:
     void init_progress_handler();
     void notify_upload_progress();
     void update_download_estimate(double download_estimate);
-    void notify_download_progress(const std::optional<uint64_t>& transient_bytes = {});
+    void notify_download_progress(const std::optional<uint64_t>& bootstrap_store_bytes = {});
 
     friend class Connection;
 };

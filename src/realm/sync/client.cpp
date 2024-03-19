@@ -239,7 +239,7 @@ private:
     bool m_reliable_download_progress = false;
 
     std::optional<double> m_download_estimate;
-    std::optional<uint64_t> m_transient_downloaded_bytes;
+    std::optional<uint64_t> m_bootstrap_store_bytes;
 
     // Set to point to an activated session object during actualization of the
     // session wrapper. Set to null during finalization of the session
@@ -274,8 +274,8 @@ private:
     std::int_fast64_t m_staged_upload_mark = 0, m_staged_download_mark = 0;
     std::int_fast64_t m_reached_upload_mark = 0, m_reached_download_mark = 0;
 
-    void on_upload_progress(bool completed = false, bool only_if_new_uploadable_data = false);
-    void on_download_progress(bool completed = false, const std::optional<uint64_t>& transient_bytes = {});
+    void on_upload_progress(bool only_if_new_uploadable_data = false);
+    void on_download_progress(const std::optional<uint64_t>& bootstrap_store_bytes = {});
     void on_upload_completion();
     void on_download_completion();
     void on_suspended(const SessionErrorInfo& error_info);
@@ -286,7 +286,7 @@ private:
     void on_flx_sync_version_complete(int64_t version);
 
     void init_progress_handler();
-    void report_progress(bool is_download, bool is_completed = false, bool only_if_new_uploadable_data = false);
+    void report_progress(bool is_download, bool only_if_new_uploadable_data = false);
 
     friend class SessionWrapperStack;
     friend class ClientImpl::Session;
@@ -781,7 +781,7 @@ void SessionImpl::initiate_integrate_changesets(std::uint_fast64_t downloadable_
             // Fake it for "dry run" mode
             client_version = m_last_version_available + 1;
         }
-        on_changesets_integrated(client_version, progress); // Throws
+        on_changesets_integrated(client_version, progress, !changesets.empty()); // Throws
     }
     catch (const IntegrationException& e) {
         on_integration_failure(e);
@@ -793,7 +793,6 @@ void SessionImpl::on_upload_completion()
 {
     // Ignore the call if the session is not active
     if (m_state == State::Active) {
-        m_wrapper.on_upload_progress(true);
         m_wrapper.on_upload_completion(); // Throws
     }
 }
@@ -803,7 +802,6 @@ void SessionImpl::on_download_completion()
 {
     // Ignore the call if the session is not active
     if (m_state == State::Active) {
-        m_wrapper.on_download_progress(true);
         m_wrapper.on_download_completion(); // Throws
     }
 }
@@ -894,7 +892,7 @@ bool SessionImpl::process_flx_bootstrap_message(const SyncProgress& progress, Do
     }
     else {
         // FIXME this shouldn't be needed anymore when progress is reported separately for every direction
-        m_wrapper.m_transient_downloaded_bytes.reset();
+        m_wrapper.m_bootstrap_store_bytes.reset();
     }
 
     try {
@@ -982,7 +980,7 @@ void SessionImpl::process_pending_flx_bootstrap()
                     std::chrono::duration_cast<std::chrono::milliseconds>(duration).count(),
                     pending_batch.remaining_changesets);
     }
-    on_changesets_integrated(new_version.realm_version, progress);
+    on_changesets_integrated(new_version.realm_version, progress, changesets_processed > 0);
 
     REALM_ASSERT_3(query_version, !=, -1);
     on_flx_sync_progress(query_version, DownloadBatchState::LastInBatch);
@@ -1149,12 +1147,12 @@ void SessionImpl::update_download_estimate(double download_estimate)
     m_wrapper.m_download_estimate = download_estimate;
 }
 
-void SessionImpl::notify_download_progress(const std::optional<uint64_t>& transient_bytes)
+void SessionImpl::notify_download_progress(const std::optional<uint64_t>& bootstrap_store_bytes)
 {
     if (m_state != State::Active)
         return;
 
-    m_wrapper.on_download_progress(false, transient_bytes); // Throws
+    m_wrapper.on_download_progress(bootstrap_store_bytes); // Throws
 }
 
 util::Future<std::string> SessionImpl::send_test_command(std::string body)
@@ -1393,7 +1391,7 @@ void SessionWrapper::on_commit(version_type new_version)
             return; // Already finalized
         SessionImpl& sess = *self->m_sess;
         sess.recognize_sync_version(new_version); // Throws
-        self->on_upload_progress(/* is_completed = */ false, /* only_if_new_uploadable_data = */ true); // Throws
+        self->on_upload_progress(/* only_if_new_uploadable_data = */ true); // Throws
     });
 }
 
@@ -1656,9 +1654,9 @@ void SessionWrapper::actualize(ServerEndpoint endpoint)
         }
     }
 
-    if (!m_client_reset_config && m_reliable_download_progress) {
+    if (!m_client_reset_config) {
         // FIXME looks like noop, could be removed without an issue?
-        on_upload_progress(); // Throws
+        on_upload_progress(/* only_if_new_uploadable_data = */ true); // Throws
     }
 }
 
@@ -1750,22 +1748,22 @@ inline void SessionWrapper::finalize_before_actualization() noexcept
     m_force_closed = true;
 }
 
-inline void SessionWrapper::on_upload_progress(bool is_completed, bool only_if_new_uploadable_data)
+inline void SessionWrapper::on_upload_progress(bool only_if_new_uploadable_data)
 {
     REALM_ASSERT(!m_finalized);
 
     if (!only_if_new_uploadable_data)
         m_reliable_download_progress = true;
 
-    report_progress(/* is_download = */ false, is_completed, only_if_new_uploadable_data); // Throws
+    report_progress(/* is_download = */ false, only_if_new_uploadable_data); // Throws
 }
 
-inline void SessionWrapper::on_download_progress(bool is_completed, const std::optional<uint64_t>& transient_bytes)
+inline void SessionWrapper::on_download_progress(const std::optional<uint64_t>& bootstrap_store_bytes)
 {
     REALM_ASSERT(!m_finalized);
     m_reliable_download_progress = true;
-    m_transient_downloaded_bytes = transient_bytes;
-    report_progress(/* is_download = */ true, is_completed); // Throws
+    m_bootstrap_store_bytes = bootstrap_store_bytes;
+    report_progress(/* is_download = */ true); // Throws
 }
 
 
@@ -1859,7 +1857,7 @@ void SessionWrapper::init_progress_handler()
                                              m_reported_progress.final_uploaded, unused, unused);
 }
 
-void SessionWrapper::report_progress(bool is_download, bool is_completed, bool only_if_new_uploadable_data)
+void SessionWrapper::report_progress(bool is_download, bool only_if_new_uploadable_data)
 {
     REALM_ASSERT(!m_finalized);
     REALM_ASSERT(m_sess);
@@ -1886,6 +1884,17 @@ void SessionWrapper::report_progress(bool is_download, bool is_completed, bool o
     // the same units.
     p.downloadable += p.downloaded;
 
+    bool is_completed = false;
+    if (is_download) {
+        if (m_download_estimate)
+            is_completed = *m_download_estimate >= 1.0;
+        else
+            is_completed = p.downloaded == p.downloadable;
+    }
+    else {
+        is_completed = p.uploaded == p.uploadable;
+    }
+
     double upload_estimate = 1.0, download_estimate = 1.0;
 
     if ((!is_completed || is_download) && p.uploaded != p.uploadable) {
@@ -1897,9 +1906,9 @@ void SessionWrapper::report_progress(bool is_download, bool is_completed, bool o
     if (m_download_estimate) {
         download_estimate = *m_download_estimate;
 
-        // ... and transient bytes are only relevant with bootstrap store
-        if (m_transient_downloaded_bytes)
-            p.downloaded += *m_transient_downloaded_bytes;
+        // ... bootstrap store bytes should be null after initial sync when every changeset integrated immediately
+        if (m_bootstrap_store_bytes)
+            p.downloaded += *m_bootstrap_store_bytes;
 
         // FIXME for flx with download estimate these bytest are not known
         // provide some sensible value for non-streaming version of object-store callbackas
@@ -1915,9 +1924,6 @@ void SessionWrapper::report_progress(bool is_download, bool is_completed, bool o
                 download_estimate = (p.downloaded - p.final_downloaded) / double(p.downloadable - p.final_downloaded);
     }
 
-    // exclude upload notification to not report completed sync with empty commits
-    bool may_skip = m_reported_progress.compare(p, is_download);
-
     if (is_completed) {
         if (is_download)
             p.final_downloaded = p.downloaded;
@@ -1926,13 +1932,17 @@ void SessionWrapper::report_progress(bool is_download, bool is_completed, bool o
     }
 
     m_reported_progress = p;
-    if (may_skip)
-        return;
 
+    auto to_str = [](double d) {
+        std::ostringstream ss;
+        // progress estimate string in the DOWNLOAD message isn't expected to have more than 4 digits of precision
+        ss << std::fixed << std::setprecision(4) << d;
+        return ss.str();
+    };
     m_sess->logger.debug("Progress handler called, downloaded = %1, downloadable = %2, estimate = %3, "
                          "uploaded = %4, uploadable = %5, estimate = %6, snapshot version = %7",
-                         p.downloaded, p.downloadable, download_estimate, p.uploaded, p.uploadable, upload_estimate,
-                         p.snapshot);
+                         p.downloaded, p.downloadable, to_str(download_estimate), p.uploaded, p.uploadable,
+                         to_str(upload_estimate), p.snapshot);
 
     m_progress_handler(p.downloaded, p.downloadable, p.uploaded, p.uploadable, p.snapshot, download_estimate,
                        upload_estimate);

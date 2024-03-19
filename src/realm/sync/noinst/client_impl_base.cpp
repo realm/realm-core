@@ -1593,14 +1593,12 @@ void Session::on_integration_failure(const IntegrationException& error)
     }
 }
 
-void Session::on_changesets_integrated(version_type client_version, const SyncProgress& progress)
+void Session::on_changesets_integrated(version_type client_version, const SyncProgress& progress,
+                                       bool changesets_integrated)
 {
     REALM_ASSERT_EX(m_state == Active, m_state);
     REALM_ASSERT_3(progress.download.server_version, >=, m_download_progress.server_version);
     bool upload_progressed = (progress.upload.client_version > m_progress.upload.client_version);
-    bool download_progressed =
-        progress.download.server_version > m_progress.download.server_version &&
-        progress.download.last_integrated_client_version == m_progress.download.last_integrated_client_version;
 
     m_download_progress = progress.download;
     m_progress = progress;
@@ -1612,16 +1610,18 @@ void Session::on_changesets_integrated(version_type client_version, const SyncPr
             m_last_version_selected_for_upload = progress.upload.client_version;
         }
 
-        bool is_completed = check_for_upload_completion();
-        if (!is_completed)
-            notify_upload_progress();
+        notify_upload_progress();
+        check_for_upload_completion();
     }
 
-    do_recognize_sync_version(client_version); // Allows upload process to resume
+    bool resume_upload = do_recognize_sync_version(client_version); // Allows upload process to resume
 
-    bool is_completed = check_for_download_completion(); // Throws
-    if (!is_completed && download_progressed)
+    // notify also when final DOWNLOAD received with no changesets
+    bool download_progressed = changesets_integrated || (!upload_progressed && resume_upload);
+    if (download_progressed)
         notify_download_progress();
+
+    check_for_download_completion(); // Throws
 
     // If the client migrated from PBS to FLX, create subscriptions when new tables are received from server.
     if (auto migration_store = get_migration_store(); migration_store && m_is_flx_sync_session) {
@@ -2738,45 +2738,45 @@ Status Session::check_received_sync_progress(const SyncProgress& progress) noexc
 }
 
 
-bool Session::check_for_upload_completion()
+void Session::check_for_upload_completion()
 {
     REALM_ASSERT_EX(m_state == Active, m_state);
     if (!m_upload_completion_notification_requested) {
-        return false;
+        return;
     }
 
     // during an ongoing client reset operation, we never upload anything
     if (m_performing_client_reset)
-        return false;
+        return;
 
     // Upload process must have reached end of history
     REALM_ASSERT_3(m_upload_progress.client_version, <=, m_last_version_available);
     bool scan_complete = (m_upload_progress.client_version == m_last_version_available);
     if (!scan_complete)
-        return false;
+        return;
 
     // All uploaded changesets must have been acknowledged by the server
     REALM_ASSERT_3(m_progress.upload.client_version, <=, m_last_version_selected_for_upload);
     bool all_uploads_accepted = (m_progress.upload.client_version == m_last_version_selected_for_upload);
     if (!all_uploads_accepted)
-        return false;
+        return;
 
     m_upload_completion_notification_requested = false;
     on_upload_completion(); // Throws
-    return true;
+    return;
 }
 
 
-bool Session::check_for_download_completion()
+void Session::check_for_download_completion()
 {
     REALM_ASSERT_3(m_target_download_mark, >=, m_last_download_mark_received);
     REALM_ASSERT_3(m_last_download_mark_received, >=, m_last_triggering_download_mark);
     if (m_last_download_mark_received == m_last_triggering_download_mark)
-        return false;
+        return;
     if (m_last_download_mark_received < m_target_download_mark)
-        return false;
+        return;
     if (m_download_progress.server_version < m_server_version_at_last_download_mark)
-        return false;
+        return;
     m_last_triggering_download_mark = m_target_download_mark;
     if (REALM_UNLIKELY(!m_allow_upload)) {
         // Activate the upload process now, and enable immediate reactivation
@@ -2785,5 +2785,5 @@ bool Session::check_for_download_completion()
         ensure_enlisted_to_send(); // Throws
     }
     on_download_completion(); // Throws
-    return true;
+    return;
 }
