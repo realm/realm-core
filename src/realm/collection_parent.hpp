@@ -112,11 +112,7 @@ protected:
     friend class CollectionBaseImpl;
     friend class CollectionList;
 
-#ifdef REALM_DEBUG
-    static constexpr size_t s_max_level = 4;
-#else
     static constexpr size_t s_max_level = 100;
-#endif
     uint8_t m_level = 0;
 
     constexpr CollectionParent(uint8_t level = 0)
