@@ -270,6 +270,7 @@ public:
     }
     const std::shared_ptr<realm::SyncManager>& sync_manager() const
     {
+        REALM_ASSERT(m_app);
         return m_app->sync_manager();
     }
 
@@ -290,8 +291,8 @@ public:
                                                          size_t expected_count) const;
 
 private:
-    // Close the app and remove the base_file_path directory if remove_dir
-    void close(bool remove_dir);
+    // Close the app and, if tear_down, remove the app data and base_file_path directory
+    void close(bool tear_down);
 
     std::shared_ptr<realm::app::App> m_app;
     std::unique_ptr<realm::AppSession> m_app_session;

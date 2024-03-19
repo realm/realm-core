@@ -3151,7 +3151,6 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
         }
     }
 
-#if 0
     SECTION("Test websocket location update with invalid ws host url") {
         std::string configured_app_url = get_base_url();
         std::string original_host = configured_app_url.substr(configured_app_url.find("://") + 3);
@@ -3178,11 +3177,12 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
         TestAppSession test_session(create_app(server_app_config), redir_transport, DeleteApp{true},
                                     realm::ReconnectMode::normal, redir_provider);
         auto partition = random_string(100);
-        auto user1 = test_session.app()->current_user();
-        SyncTestFile r_config(user1, partition, schema);
 
-        // Open the realm with the current user
         {
+            // Open the realm with the current user
+            auto user = test_session.app()->current_user();
+            REQUIRE(user);
+            SyncTestFile r_config(user, partition, schema);
             auto r = Realm::get_shared_realm(r_config);
             REQUIRE(!wait_for_download(*r));
         }
@@ -3190,59 +3190,61 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
         // Close the app
         test_session.close();
 
-//#if 0
-        std::string redirect_scheme = "http://";
-        std::string websocket_scheme = "ws://";
-        const std::string redirect_address = "fakerealm.example.com";
-        const std::string redirect_host = "fakerealm.example.com:9090";
-        const std::string redirect_url = "http://fakerealm.example.com:9090";
+        // Set the base URL to an invalid value
+        std::string fake_host = "http://fakerealm.example.com:1234";
+        test_session.app_config.base_url = fake_host;
 
+        // Set up the socket provider and transport to report the correct server
+        int connect_count = 0;
+        redir_provider->websocket_endpoint_resolver = [&connect_count](sync::WebSocketEndpoint&& ep) {
+            // Verify the first websocket attempt uses the iniital fake URL
+            ++connect_count;
+            if (connect_count == 1) {
+                REQUIRE(ep.address == "fakerealm.example.com");
+                REQUIRE(ep.port == 1234);
+            }
+            return ep;
+        };
+
+        redir_provider->websocket_connect_func = [&connect_count]() -> std::optional<SocketProviderError> {
+            if (connect_count == 1) {
+                return SocketProviderError(sync::websocket::WebSocketError::websocket_fatal_error);
+            }
+            return std::nullopt;
+        };
+
+        int request_count = 0;
         redir_transport->request_hook = [&](const Request& request) -> std::optional<Response> {
             logger->trace("request.url (%1): %2", request_count, request.url);
             if (request_count++ == 0) {
                 // First request should be a location request against the original URL
-                REQUIRE(request.url.find(original_host) != std::string::npos);
+                REQUIRE(request.url.find(fake_host) != std::string::npos);
                 REQUIRE(request.url.find("/location") != std::string::npos);
-                REQUIRE(request.redirect_count == 0);
                 return Response{static_cast<int>(sync::HTTPStatus::PermanentRedirect),
                                 0,
-                                {{"Location", redirect_url}, {"Content-Type", "application/json"}},
+                                {{"Location", configured_app_url}, {"Content-Type", "application/json"}},
                                 "Some body data"};
-            }
-            else if (request.url.find("/location") != std::string::npos) {
-                REQUIRE(request.url.find(redirect_host) != std::string::npos);
-                ++request_count;
-                return Response{
-                    static_cast<int>(sync::HTTPStatus::Ok),
-                    0,
-                    {{"Content-Type", "application/json"}},
-                    util::format(
-                        "{\"deployment_model\":\"GLOBAL\",\"location\":\"US-VA\",\"hostname\":\"%2%1\",\"ws_"
-                        "hostname\":\"%3%1\"}",
-                        redirect_host, redirect_scheme, websocket_scheme)};
-            }
-            else if (request.url.find(redirect_host) != std::string::npos) {
-                auto new_req = request;
-                new_req.url = util::format("%1%2", configured_app_url, request.url.substr(redirect_url.size()));
-                logger->trace("Proxying request from %1 to %2", request.url, new_req.url);
-                auto resp = do_http_request(new_req);
-                logger->trace("Response: \"%1\"", resp.body);
-                return resp;
             }
             return std::nullopt;
         };
-//#endif
 
         // Reopen the app, but don't log in at this point
         test_session.reopen(false);
 
         // Open the realm with the cached user
         {
+            auto user = test_session.app()->current_user();
+            REQUIRE(user);
+            // Verify no transport calls have been made at this point since the
+            // app was re-opened.
+            REQUIRE(request_count == 0);
+            SyncTestFile r_config(user, partition, schema);
+
             auto r = Realm::get_shared_realm(r_config);
             REQUIRE(!wait_for_download(*r));
         }
     }
-#endif
+
     SECTION("Fast clock on client") {
         {
             SyncTestFile config(app, partition, schema);

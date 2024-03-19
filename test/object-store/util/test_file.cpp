@@ -365,18 +365,28 @@ TestAppSession::~TestAppSession()
     }
 }
 
-void TestAppSession::close(bool remove_dir)
+void TestAppSession::close(bool tear_down)
 {
     try {
-        if (remove_dir && !m_base_file_path.empty() && util::File::exists(m_base_file_path)) {
+        if (tear_down && !m_base_file_path.empty() && util::File::exists(m_base_file_path)) {
             util::try_remove_dir_recursive(m_base_file_path);
             m_base_file_path.clear();
         }
 
-        if (m_app) {
+        if (tear_down) {
+            // If tearing down, make sure there's an app to work with
+            if (!m_app) {
+                reopen(false);
+            }
+            REALM_ASSERT(m_app);
+            // Clean up the app data
             m_app->sync_manager()->tear_down_for_testing();
-            m_app.reset();
         }
+        else if (m_app) {
+            // Otherwise, make sure all the session are closed
+            m_app->sync_manager()->close_all_sessions();
+        }
+        m_app.reset();
     }
     catch (const std::exception& ex) {
         std::cerr << "Error tearing down TestAppSession: " << ex.what() << "\n";
@@ -389,8 +399,7 @@ void TestAppSession::reopen(bool log_in)
 {
     // These are REALM_ASSERTs so the test crashes if this object is in a bad state
     REALM_ASSERT(!m_base_file_path.empty());
-    // Make sure the current app is closed
-    close(false);
+    REALM_ASSERT(!m_app);
     m_app = app::App::get_app(app::App::CacheMode::Disabled, app_config, sc_config);
 
     // initialize sync client
