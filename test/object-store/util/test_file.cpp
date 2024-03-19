@@ -368,11 +368,6 @@ TestAppSession::~TestAppSession()
 void TestAppSession::close(bool tear_down)
 {
     try {
-        if (tear_down && !m_base_file_path.empty() && util::File::exists(m_base_file_path)) {
-            util::try_remove_dir_recursive(m_base_file_path);
-            m_base_file_path.clear();
-        }
-
         if (tear_down) {
             // If tearing down, make sure there's an app to work with
             if (!m_app) {
@@ -387,6 +382,12 @@ void TestAppSession::close(bool tear_down)
             m_app->sync_manager()->close_all_sessions();
         }
         m_app.reset();
+
+        // If tearing down, clean up the test file directory
+        if (tear_down && !m_base_file_path.empty() && util::File::exists(m_base_file_path)) {
+            util::try_remove_dir_recursive(m_base_file_path);
+            m_base_file_path.clear();
+        }
     }
     catch (const std::exception& ex) {
         std::cerr << "Error tearing down TestAppSession: " << ex.what() << "\n";
