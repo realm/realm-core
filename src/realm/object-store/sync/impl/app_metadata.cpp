@@ -407,12 +407,13 @@ struct PersistedSyncMetadataManager : public app::MetadataStore {
         m_user_identity_schema.read(*realm);
         m_current_user_schema.read(*realm);
 
-        realm->begin_transaction();
-        perform_file_actions(*realm, file_manager);
-        remove_dead_users(*realm, file_manager);
-        realm->commit_transaction();
-
         m_coordinator = _impl::RealmCoordinator::get_existing_coordinator(config.path);
+        if (m_coordinator->try_claim_sync_agent()) {
+            realm->begin_transaction();
+            perform_file_actions(*realm, file_manager);
+            remove_dead_users(*realm, file_manager);
+            realm->commit_transaction();
+        }
     }
 
     void create_notifier()

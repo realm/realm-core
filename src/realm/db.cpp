@@ -2858,20 +2858,27 @@ DBRef DB::create(BinaryData buffer, bool take_ownership) NO_THREAD_SAFETY_ANALYS
     return retval;
 }
 
-void DB::claim_sync_agent()
+bool DB::try_claim_sync_agent()
 {
     REALM_ASSERT(is_attached());
-    std::unique_lock<InterprocessMutex> lock(m_controlmutex);
+    std::lock_guard lock(m_controlmutex);
     if (m_info->sync_agent_present)
-        throw MultipleSyncAgents{};
+        return false;
     m_info->sync_agent_present = 1; // Set to true
     m_is_sync_agent = true;
+    return true;
+}
+
+void DB::claim_sync_agent()
+{
+    if (!try_claim_sync_agent())
+        throw MultipleSyncAgents{};
 }
 
 void DB::release_sync_agent()
 {
     REALM_ASSERT(is_attached());
-    std::unique_lock<InterprocessMutex> lock(m_controlmutex);
+    std::lock_guard lock(m_controlmutex);
     if (!m_is_sync_agent)
         return;
     REALM_ASSERT(m_info->sync_agent_present);
