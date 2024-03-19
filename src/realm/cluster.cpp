@@ -1640,13 +1640,15 @@ ref_type Cluster::typed_write(ref_type ref, _impl::ArrayWriterBase& out, const T
                 }
             }
             else if (col_type == col_type_Timestamp) {
+                // timestamps could be compressed, but the formats we support at the moment are not producing
+                // noticeable gains.
                 REALM_ASSERT(leaf.size() == 2);
                 auto rot0 = leaf.get_as_ref_or_tagged(0);
                 auto rot1 = leaf.get_as_ref_or_tagged(1);
                 REALM_ASSERT(rot0.is_ref() && rot0.get_as_ref());
                 REALM_ASSERT(rot1.is_ref() && rot1.get_as_ref());
-                written_leaf.set_as_ref(0, Array::write(rot0.get_as_ref(), m_alloc, out, only_modified, true));
-                written_leaf.set_as_ref(1, Array::write(rot1.get_as_ref(), m_alloc, out, only_modified, true));
+                written_leaf.set_as_ref(0, Array::write(rot0.get_as_ref(), m_alloc, out, only_modified, false));
+                written_leaf.set_as_ref(1, Array::write(rot1.get_as_ref(), m_alloc, out, only_modified, false));
             }
             else if (col_type == col_type_Mixed) {
                 const auto sz = leaf.size();
