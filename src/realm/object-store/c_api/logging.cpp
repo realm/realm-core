@@ -39,7 +39,8 @@ public:
         : Logger()
         , m_userdata(std::move(userdata))
         , m_log_callback(log_callback)
-    {}
+    {
+    }
 
 protected:
     void do_log(const util::LogCategory& category, Logger::Level level, const std::string& message) final
