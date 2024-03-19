@@ -543,6 +543,69 @@ TEST_CASE("app metadata: persisted", "[sync][metadata]") {
     }
 }
 
+TEST_CASE("app metadata: multiple stores", "[sync][metadata]") {
+    test_util::TestDirGuard test_dir(base_path);
+
+    AppConfig config;
+    config.app_id = "app id";
+    config.metadata_mode = AppConfig::MetadataMode::NoEncryption;
+    config.base_file_path = base_path;
+    SyncFileManager file_manager(config);
+
+    auto store_1 = create_metadata_store(config, file_manager);
+    auto store_2 = create_metadata_store(config, file_manager);
+    REQUIRE(store_1 != store_2);
+
+    SECTION("create user in one store then read from the other") {
+        store_1->create_user(user_id, refresh_token, access_token, device_id);
+        auto user = store_2->get_user(user_id);
+        REQUIRE(user);
+    }
+
+    SECTION("update existing user in one store then read from the other") {
+        store_1->create_user(user_id, refresh_token, access_token, device_id);
+        auto user_1 = store_1->get_user(user_id);
+
+        UserProfile profile = bson::BsonDocument{{"name", "user's name"}, {"email", "user's email"}};
+        std::vector<UserIdentity> identities{{"identity", "provider"}};
+        store_2->update_user(user_id, [&](UserData& data) {
+            data.identities = identities;
+        });
+
+        auto user_2 = store_1->get_user(user_id);
+        CHECK(user_1->identities.empty());
+        CHECK(user_2->identities == identities);
+    }
+
+    SECTION("remove user in use") {
+
+    }
+
+    SECTION("delete user in use") {
+
+    }
+
+    SECTION("file actions are not performed on open if there is already a live store") {
+        auto path = util::make_temp_file("file_to_delete");
+        store_1->create_user(user_id, refresh_token, access_token, device_id);
+        store_1->add_realm_path(user_id, path);
+        store_1->log_out(user_id, SyncUser::State::Removed);
+
+        create_metadata_store(config, file_manager);
+        REQUIRE(File::exists(path));
+
+        store_1.reset();
+
+        create_metadata_store(config, file_manager);
+        REQUIRE(File::exists(path));
+
+        store_2.reset();
+
+        create_metadata_store(config, file_manager);
+        REQUIRE_FALSE(File::exists(path));
+    }
+}
+
 TEST_CASE("app metadata: encryption", "[sync][metadata]") {
     test_util::TestDirGuard test_dir(base_path);
 
