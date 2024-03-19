@@ -12,7 +12,7 @@
 * Fix Opening realm with cached user while offline results in fatal error and session does not retry connection. ([#7349](https://github.com/realm/realm-core/issues/7349), since v13.26.0)
 
 ### Breaking changes
-* None.
+* Update C-API log callback signature to include the log category, and `realm_set_log_callback` to not take a `realm_log_level_e`. ([PR #7494](https://github.com/realm/realm-core/pull/7494)
 
 ### Compatibility
 * Fileformat: Generates files with format v24. Reads and automatically upgrade from fileformat v10. If you want to upgrade from an earlier file format version you will have to use RealmCore v13.x.y or earlier.
