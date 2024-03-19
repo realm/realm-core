@@ -490,6 +490,10 @@ public:
     {
         return m_parent_version;
     }
+    void update_content_version() const noexcept override
+    {
+        Base::update_content_version();
+    }
     ref_type get_collection_ref(Index, CollectionType) const override;
     bool check_collection_ref(Index, CollectionType) const noexcept override;
     void set_collection_ref(Index, ref_type ref, CollectionType) override;
