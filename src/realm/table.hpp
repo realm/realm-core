@@ -48,19 +48,20 @@ namespace realm {
 class BacklinkColumn;
 template <class>
 class BacklinkCount;
-class TableView;
-class Group;
-class SortDescriptor;
-class TableView;
+class ColKeys;
 template <class>
 class Columns;
+class DictionaryLinkValues;
+struct GlobalKey;
+class Group;
+class LinkChain;
+class SearchIndex;
+class SortDescriptor;
+class StringIndex;
+class Subexpr;
 template <class>
 class SubQuery;
-class ColKeys;
-struct GlobalKey;
-class LinkChain;
-class Subexpr;
-class StringIndex;
+class TableView;
 
 struct Link {
 };
@@ -120,6 +121,12 @@ public:
     /// otherwise null is returned.
     Group* get_parent_group() const noexcept;
 
+
+    Replication* get_repl() const noexcept
+    {
+        return *m_repl;
+    }
+
     // Whether or not elements can be null.
     bool is_nullable(ColKey col_key) const;
 
@@ -135,9 +142,11 @@ public:
     size_t get_column_count() const noexcept;
     DataType get_column_type(ColKey column_key) const;
     StringData get_column_name(ColKey column_key) const;
+    StringData get_column_name(StableIndex) const;
     ColumnAttrMask get_column_attr(ColKey column_key) const noexcept;
     DataType get_dictionary_key_type(ColKey column_key) const noexcept;
     ColKey get_column_key(StringData name) const noexcept;
+    ColKey get_column_key(StableIndex) const noexcept;
     ColKeys get_column_keys() const;
     typedef util::Optional<std::pair<ConstTableRef, ColKey>> BacklinkOrigin;
     BacklinkOrigin find_backlink_origin(StringData origin_table_name, StringData origin_col_name) const noexcept;
@@ -155,19 +164,45 @@ public:
     ///
     static const size_t max_column_name_length = 63;
     static const uint64_t max_num_columns = 0xFFFFUL; // <-- must be power of two -1
-    ColKey add_column(DataType type, StringData name, bool nullable = false);
-    ColKey add_column(Table& target, StringData name);
-    ColKey add_column_list(DataType type, StringData name, bool nullable = false);
-    ColKey add_column_list(Table& target, StringData name);
-    ColKey add_column_set(DataType type, StringData name, bool nullable = false);
-    ColKey add_column_set(Table& target, StringData name);
-    ColKey add_column_dictionary(DataType type, StringData name, bool nullable = false,
-                                 DataType key_type = type_String);
-    ColKey add_column_dictionary(Table& target, StringData name, DataType key_type = type_String);
 
-    [[deprecated("Use add_column(Table&) or add_column_list(Table&) instead.")]] //
-    ColKey
-    add_column_link(DataType type, StringData name, Table& target);
+    // Add column holding primitive values. The optional CollectionType specifies if the
+    // property is a collection. If collection type is not specified, the property is a single value.
+    // If the vector contains a value - eg. CollectionType::Dictionary, the property is a dictionary
+    // of the type specified.
+    ColKey add_column(DataType type, StringData name, bool nullable = false, std::optional<CollectionType> = {},
+                      DataType key_type = type_String);
+    // As above, but the values are links to objects in the target table.
+    ColKey add_column(Table& target, StringData name, std::optional<CollectionType> = {},
+                      DataType key_type = type_String);
+
+    // Map old functions to the more general interface above
+    ColKey add_column_list(DataType type, StringData name, bool nullable = false)
+    {
+        return add_column(type, name, nullable, {CollectionType::List});
+    }
+    ColKey add_column_list(Table& target, StringData name)
+    {
+        return add_column(target, name, {CollectionType::List});
+    }
+    ColKey add_column_set(DataType type, StringData name, bool nullable = false)
+    {
+        return add_column(type, name, nullable, {CollectionType::Set});
+    }
+    ColKey add_column_set(Table& target, StringData name)
+    {
+        return add_column(target, name, {CollectionType::Set});
+    }
+    ColKey add_column_dictionary(DataType type, StringData name, bool nullable = false,
+                                 DataType key_type = type_String)
+    {
+        return add_column(type, name, nullable, {CollectionType::Dictionary}, key_type);
+    }
+    ColKey add_column_dictionary(Table& target, StringData name, DataType key_type = type_String)
+    {
+        return add_column(target, name, {CollectionType::Dictionary}, key_type);
+    }
+
+    CollectionType get_collection_type(ColKey col_key) const;
 
     void remove_column(ColKey col_key);
     void rename_column(ColKey col_key, StringData new_name);
@@ -405,11 +440,9 @@ public:
     std::optional<Mixed> avg(ColKey col_key, size_t* value_count = nullptr) const;
 
     // Will return pointer to search index accessor. Will return nullptr if no index
-    StringIndex* get_search_index(ColKey col) const noexcept
-    {
-        check_column(col);
-        return m_index_accessors[col.get_index().val].get();
-    }
+    SearchIndex* get_search_index(ColKey col) const noexcept;
+    StringIndex* get_string_index(ColKey col) const noexcept;
+
     template <class T>
     ObjKey find_first(ColKey col_key, T value) const;
 
@@ -558,7 +591,11 @@ public:
     {
         return Query(m_own_ref, list);
     }
-    Query where(const DictionaryLinkValues& dictionary_of_links) const;
+    Query where(const Dictionary& dict) const;
+    Query where(LinkCollectionPtr&& list) const
+    {
+        return Query(m_own_ref, std::move(list));
+    }
 
     Query query(const std::string& query_string,
                 const std::vector<mpark::variant<Mixed, std::vector<Mixed>>>& arguments = {}) const;
@@ -599,9 +636,8 @@ public:
     LinkChain backlink(const Table& origin, ColKey origin_col_key) const;
 
     // Conversion
-    void schema_to_json(std::ostream& out, const std::map<std::string, std::string>& renames) const;
-    void to_json(std::ostream& out, size_t link_depth, const std::map<std::string, std::string>& renames,
-                 JSONOutputMode output_mode = output_mode_json) const;
+    void schema_to_json(std::ostream& out) const;
+    void to_json(std::ostream& out, JSONOutputMode output_mode = output_mode_json) const;
 
     /// \brief Compare two tables for equality.
     ///
@@ -698,7 +734,7 @@ private:
     Array m_index_refs;                             // 5th slot in m_top
     Array m_opposite_table;                         // 7th slot in m_top
     Array m_opposite_column;                        // 8th slot in m_top
-    std::vector<std::unique_ptr<StringIndex>> m_index_accessors;
+    std::vector<std::unique_ptr<SearchIndex>> m_index_accessors;
     ColKey m_primary_key_col;
     Replication* const* m_repl;
     static Replication* g_dummy_replication;
@@ -713,17 +749,13 @@ private:
     void erase_from_search_indexes(ObjKey key);
     void update_indexes(ObjKey key, const FieldValues& values);
     void clear_indexes();
+    template <typename T>
+    void do_populate_index(StringIndex* index, ColKey::Idx col_ndx);
 
     // Migration support
-    void migrate_column_info();
-    bool verify_column_keys();
-    void migrate_indexes(ColKey pk_col_key);
-    void migrate_subspec();
-    void create_columns();
-    bool migrate_objects(); // Returns true if there are no links to migrate
-    void migrate_links();
-    void finalize_migration(ColKey pk_col_key);
     void migrate_sets_and_dictionaries();
+    void migrate_set_orderings();
+    void migrate_col_keys();
 
     /// Disable copying assignment.
     ///
@@ -807,7 +839,6 @@ private:
     void nullify_links(CascadeState&);
     void remove_recursive(CascadeState&);
 
-    Replication* get_repl() const noexcept;
     util::Logger* get_logger() const noexcept;
 
     void set_ndx_in_parent(size_t ndx_in_parent) noexcept;
@@ -868,6 +899,8 @@ private:
     friend class ClusterTree;
     friend class ColKeyIterator;
     friend class Obj;
+    friend class CollectionParent;
+    friend class CollectionList;
     friend class LnkLst;
     friend class Dictionary;
     friend class IncludeDescriptor;
@@ -983,15 +1016,40 @@ public:
         return *this;
     }
 
-    LinkChain& link(std::string col_name)
+    void pop_back()
     {
-        auto ck = m_current_table->get_column_key(col_name);
-        if (!ck) {
-            throw LogicError(ErrorCodes::InvalidProperty,
-                             util::format("'%1' has no property '%2'", m_current_table->get_class_name(), col_name));
+        m_link_cols.pop_back();
+        // Recalculate m_current_table
+        m_current_table = m_base_table;
+        for (auto col : m_link_cols) {
+            m_current_table = m_current_table->get_opposite_table(col);
         }
-        add(ck);
-        return *this;
+    }
+
+    bool link(std::string col_name)
+    {
+        if (auto ck = m_current_table->get_column_key(col_name)) {
+            return add(ck);
+        }
+        return false;
+    }
+
+    bool index(PathElement index)
+    {
+        if (!m_link_cols.empty() && !m_link_cols.back().has_index()) {
+            if (index.is_all())
+                return true;
+            ColKey last_col = m_link_cols.back();
+            if (index.is_ndx() && last_col.is_list()) {
+                m_link_cols.back().set_index(index);
+                return true;
+            }
+            if (index.is_key() && last_col.is_dictionary()) {
+                m_link_cols.back().set_index(index);
+                return true;
+            }
+        }
+        return false;
     }
 
     LinkChain& backlink(const Table& origin, ColKey origin_col_key)
@@ -1000,7 +1058,7 @@ public:
         return link(backlink_col_key);
     }
 
-    std::unique_ptr<Subexpr> column(const std::string&);
+    std::unique_ptr<Subexpr> column(const std::string&, bool has_path);
     std::unique_ptr<Subexpr> subquery(Query subquery);
 
     template <class T>
@@ -1009,15 +1067,12 @@ public:
         m_current_table->check_column(col_key);
 
         // Check if user-given template type equals Realm type.
-        auto ct = col_key.get_type();
-        if (ct == col_type_LinkList)
-            ct = col_type_Link;
         if constexpr (std::is_same_v<T, Dictionary>) {
             if (!col_key.is_dictionary())
                 throw LogicError(ErrorCodes::TypeMismatch, "Not a dictionary");
         }
         else {
-            if (ct != ColumnTypeTraits<T>::column_id)
+            if (col_key.get_type() != ColumnTypeTraits<T>::column_id)
                 throw LogicError(ErrorCodes::TypeMismatch,
                                  util::format("Expected %1 to be a %2", m_current_table->get_column_name(col_key),
                                               ColumnTypeTraits<T>::column_id));
@@ -1037,7 +1092,7 @@ public:
         auto backlink_col_key = origin.get_opposite_column(origin_col_key);
         m_link_cols.push_back(backlink_col_key);
 
-        return Columns<T>(backlink_col_key, m_base_table, std::move(m_link_cols));
+        return Columns<T>(backlink_col_key, m_base_table, m_link_cols);
     }
     template <class T>
     SubQuery<T> column(ColKey col_key, Query subquery)
@@ -1063,12 +1118,12 @@ private:
     friend class Table;
     friend class query_parser::ParserDriver;
 
-    std::vector<ColKey> m_link_cols;
+    std::vector<ExtendedColumnKey> m_link_cols;
     ConstTableRef m_current_table;
     ConstTableRef m_base_table;
     util::Optional<ExpressionComparisonType> m_comparison_type;
 
-    void add(ColKey ck);
+    bool add(ColKey ck);
 
     template <class T>
     std::unique_ptr<Subexpr> create_subexpr(ColKey col_key)
@@ -1149,12 +1204,22 @@ inline StringData Table::get_column_name(ColKey column_key) const
     return m_spec.get_column_name(spec_ndx);
 }
 
+inline StringData Table::get_column_name(StableIndex index) const
+{
+    return m_spec.get_column_name(m_leaf_ndx2spec_ndx[index.get_index().val]);
+}
+
 inline ColKey Table::get_column_key(StringData name) const noexcept
 {
     size_t spec_ndx = m_spec.get_column_index(name);
     if (spec_ndx == npos)
         return ColKey();
     return spec_ndx2colkey(spec_ndx);
+}
+
+inline ColKey Table::get_column_key(StableIndex index) const noexcept
+{
+    return m_leaf_ndx2colkey[index.get_index().val];
 }
 
 inline ColumnType Table::get_real_column_type(ColKey col_key) const noexcept
@@ -1174,9 +1239,12 @@ inline ColumnAttrMask Table::get_column_attr(ColKey column_key) const noexcept
 
 inline DataType Table::get_dictionary_key_type(ColKey column_key) const noexcept
 {
-    auto spec_ndx = colkey2spec_ndx(column_key);
-    REALM_ASSERT_3(spec_ndx, <, get_column_count());
-    return m_spec.get_dictionary_key_type(spec_ndx);
+    if (column_key.is_dictionary()) {
+        auto spec_ndx = colkey2spec_ndx(column_key);
+        REALM_ASSERT_3(spec_ndx, <, get_column_count());
+        return m_spec.get_dictionary_key_type(spec_ndx);
+    }
+    return type_String;
 }
 
 
@@ -1272,12 +1340,7 @@ inline bool Table::operator!=(const Table& t) const
 
 inline bool Table::is_link_type(ColumnType col_type) noexcept
 {
-    return col_type == col_type_Link || col_type == col_type_LinkList;
-}
-
-inline Replication* Table::get_repl() const noexcept
-{
-    return *m_repl;
+    return col_type == col_type_Link;
 }
 
 inline void Table::set_ndx_in_parent(size_t ndx_in_parent) noexcept

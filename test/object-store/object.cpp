@@ -160,7 +160,6 @@ TEST_CASE("object") {
     _impl::RealmCoordinator::assert_no_open_realms();
 
     InMemoryTestFile config;
-    config.cache = false;
     config.automatic_change_notifications = false;
     config.schema_mode = SchemaMode::AdditiveExplicit;
     config.schema = Schema{
@@ -2364,6 +2363,12 @@ TEST_CASE("Asymmetric Object") {
         REQUIRE(!obj.get_obj().is_valid());
         // Object gets deleted immediately.
         REQUIRE(realm->is_empty());
+    }
+
+    SECTION("Re-open realm") {
+        realm->close();
+        realm.reset();
+        realm = Realm::get_shared_realm(config);
     }
 
     SECTION("Delete ephemeral object before comitting") {

@@ -40,7 +40,6 @@ void DeepChangeChecker::find_related_tables(std::vector<RelatedTable>& related_t
     struct LinkInfo {
         std::vector<ColKey> forward_links;
         std::vector<TableKey> forward_tables;
-
         std::vector<TableKey> backlink_tables;
         bool processed_table = false;
     };
@@ -56,24 +55,35 @@ void DeepChangeChecker::find_related_tables(std::vector<RelatedTable>& related_t
     // so we rely on the fact that if there are any TypedLinks from a
     // Mixed value, there will be a corresponding backlink column
     // created at the destination table.
-    std::unordered_map<TableKey, LinkInfo> complete_mapping;
     Group* group = table.get_parent_group();
     REALM_ASSERT(group);
+    std::vector<LinkInfo> complete_mapping;
+    complete_mapping.resize(group->size());
+    auto get_mapping = [&](TableKey key) -> LinkInfo& {
+        size_t ndx = Group::key2ndx(key);
+        // Removed tables leave gaps, so the maximum index can be greater than
+        // the size. This is very unusual, though.
+        if (ndx >= complete_mapping.size()) {
+            complete_mapping.resize(ndx + 1);
+        }
+        return complete_mapping[ndx];
+    };
+
     auto all_table_keys = group->get_table_keys();
-    for (auto key : all_table_keys) {
-        auto cur_table = group->get_table(key);
+    for (auto table_key : all_table_keys) {
+        auto cur_table = group->get_table(table_key).unchecked_ptr();
         REALM_ASSERT(cur_table);
 
         LinkInfo* backlinks = nullptr;
         if (has_key_paths) {
-            backlinks = &complete_mapping[cur_table->get_key()];
+            backlinks = &get_mapping(table_key);
         }
         cur_table->for_each_backlink_column([&](ColKey backlink_col_key) {
             auto origin_table_key = cur_table->get_opposite_table_key(backlink_col_key);
             auto origin_link_col = cur_table->get_opposite_column(backlink_col_key);
-            auto& links = complete_mapping[origin_table_key];
+            auto& links = get_mapping(origin_table_key);
             links.forward_links.push_back(origin_link_col);
-            links.forward_tables.push_back(cur_table->get_key());
+            links.forward_tables.push_back(table_key);
 
             if (any_of(key_path_array.begin(), key_path_array.end(), [&](const KeyPath& key_path) {
                     return any_of(key_path.begin(), key_path.end(), [&](std::pair<TableKey, ColKey> pair) {
@@ -89,7 +99,7 @@ void DeepChangeChecker::find_related_tables(std::vector<RelatedTable>& related_t
     // Remove duplicates:
     // duplicates in link_columns can occur when a Mixed(TypedLink) contain links to different tables
     // duplicates in connected_tables can occur when there are different link paths to the same table
-    for (auto& [_, info] : complete_mapping) {
+    for (auto& info : complete_mapping) {
         sort_and_unique(info.forward_links);
         sort_and_unique(info.forward_tables);
     }
@@ -98,7 +108,7 @@ void DeepChangeChecker::find_related_tables(std::vector<RelatedTable>& related_t
     while (tables_to_check.size()) {
         auto table_key_to_check = tables_to_check.back();
         tables_to_check.pop_back();
-        auto& link_info = complete_mapping[table_key_to_check];
+        auto& link_info = get_mapping(table_key_to_check);
         if (link_info.processed_table) {
             continue;
         }
@@ -107,16 +117,13 @@ void DeepChangeChecker::find_related_tables(std::vector<RelatedTable>& related_t
         related_tables.push_back({table_key_to_check, std::move(link_info.forward_links)});
 
         // Add all tables reachable via a forward link to the vector of tables that need to be checked
-        for (auto linked_table_key : link_info.forward_tables) {
-            tables_to_check.push_back(linked_table_key);
-        }
+        tables_to_check.insert(tables_to_check.end(), link_info.forward_tables.begin(),
+                               link_info.forward_tables.end());
 
         // Backlinks can only come into consideration when added via key paths.
-        if (has_key_paths) {
-            for (auto linked_table_key : link_info.backlink_tables) {
-                tables_to_check.push_back(linked_table_key);
-            }
-        }
+        REALM_ASSERT(has_key_paths || link_info.backlink_tables.empty());
+        tables_to_check.insert(tables_to_check.end(), link_info.backlink_tables.begin(),
+                               link_info.backlink_tables.end());
     }
 }
 
@@ -210,7 +217,7 @@ bool DeepChangeChecker::do_check_for_collection_modifications(const Obj& obj, Co
         return false;
     }
 
-    if (col.get_type() == col_type_LinkList || (col.is_set() && col.get_type() == col_type_Link)) {
+    if ((col.is_list() || col.is_set()) && col.get_type() == col_type_Link) {
         return check_collection<ObjKey>(ref, obj, col, filtered_columns, depth);
     }
 
@@ -427,8 +434,8 @@ void CollectionKeyPathChangeChecker::find_changed_columns(std::vector<ColKey>& c
 
     // Only continue for any kind of link.
     auto column_type = column_key.get_type();
-    if (column_type != col_type_Link && column_type != col_type_LinkList && column_type != col_type_BackLink &&
-        column_type != col_type_TypedLink && column_type != col_type_Mixed) {
+    if (column_type != col_type_Link && column_type != col_type_BackLink && column_type != col_type_TypedLink &&
+        column_type != col_type_Mixed) {
         return;
     }
 
@@ -456,7 +463,7 @@ void CollectionKeyPathChangeChecker::find_changed_columns(std::vector<ColKey>& c
             }
         }
         else {
-            REALM_ASSERT(column_type == col_type_Link || column_type == col_type_LinkList);
+            REALM_ASSERT(column_type == col_type_Link);
             auto list = object.get_linklist(column_key);
             auto target_table = table.get_link_target(column_key);
             for (size_t i = 0; i < list.size(); i++) {
@@ -473,7 +480,7 @@ void CollectionKeyPathChangeChecker::find_changed_columns(std::vector<ColKey>& c
             }
         }
         else {
-            REALM_ASSERT(column_type == col_type_Link || column_type == col_type_LinkList);
+            REALM_ASSERT(column_type == col_type_Link);
             auto set = object.get_linkset(column_key);
             auto target_table = table.get_link_target(column_key);
             for (auto& target_object : set) {

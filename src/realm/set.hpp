@@ -50,17 +50,43 @@ public:
     void assign_symmetric_difference(const CollectionBase&);
 
 protected:
+    static constexpr CollectionType s_collection_type = CollectionType::Set;
     mutable std::unique_ptr<BPlusTreeBase> m_tree;
 
     void insert_repl(Replication* repl, size_t index, Mixed value) const;
     void erase_repl(Replication* repl, size_t index, Mixed value) const;
     void clear_repl(Replication* repl) const;
+    static std::vector<Mixed> convert_to_mixed_set(const CollectionBase& rhs);
+
+    void resort_range(size_t from, size_t to);
 
     REALM_COLD REALM_NORETURN void throw_invalid_null()
     {
         throw InvalidArgument(ErrorCodes::PropertyNotNullable,
                               util::format("Set: %1", CollectionBase::get_property_name()));
     }
+
+private:
+    template <class It1, class It2>
+    bool is_subset_of(It1, It2) const;
+
+    template <class It1, class It2>
+    bool is_superset_of(It1, It2) const;
+
+    template <class It1, class It2>
+    bool intersects(It1, It2) const;
+
+    template <class It1, class It2>
+    void assign_union(It1, It2);
+
+    template <class It1, class It2>
+    void assign_intersection(It1, It2);
+
+    template <class It1, class It2>
+    void assign_difference(It1, It2);
+
+    template <class It1, class It2>
+    void assign_symmetric_difference(It1, It2);
 };
 
 template <class T>
@@ -71,7 +97,21 @@ public:
     using iterator = CollectionIterator<Set<T>>;
 
     Set() = default;
-    Set(const Obj& owner, ColKey col_key);
+    Set(const Obj& owner, ColKey col_key)
+        : Set<T>(col_key)
+    {
+        this->set_owner(owner, col_key);
+    }
+
+    Set(ColKey col_key, size_t = 0)
+        : Base(col_key)
+    {
+        if (!col_key.is_set()) {
+            throw InvalidArgument(ErrorCodes::TypeMismatch, "Property not a set");
+        }
+
+        check_column_type<value_type>(m_col_key);
+    }
     Set(const Set& other);
     Set(Set&& other) noexcept;
     Set& operator=(const Set& other);
@@ -135,7 +175,7 @@ public:
     util::Optional<Mixed> max(size_t* return_ndx = nullptr) const final;
     util::Optional<Mixed> sum(size_t* return_cnt = nullptr) const final;
     util::Optional<Mixed> avg(size_t* return_cnt = nullptr) const final;
-    std::unique_ptr<CollectionBase> clone_collection() const final
+    CollectionBasePtr clone_collection() const final
     {
         return std::make_unique<Set<T>>(*this);
     }
@@ -155,9 +195,10 @@ public:
     }
 
     UpdateStatus update_if_needed() const final;
-    UpdateStatus ensure_created() final;
+    void ensure_created();
 
     void migrate();
+    void migration_resort();
 
 private:
     // Friend because it needs access to `m_tree` in the implementation of
@@ -165,16 +206,16 @@ private:
     friend class LnkSet;
 
     using Base::bump_content_version;
+    using Base::get_alloc;
     using Base::m_col_key;
     using Base::m_nullable;
-    using Base::m_obj;
 
     BPlusTree<T>& tree() const
     {
         return static_cast<BPlusTree<T>&>(*m_tree);
     }
 
-    bool init_from_parent(bool allow_create) const;
+    UpdateStatus init_from_parent(bool allow_create) const;
 
     /// Update the accessor and return true if it is attached after the update.
     inline bool update() const
@@ -202,6 +243,11 @@ public:
         : m_set(owner, col_key)
     {
     }
+    LnkSet(ColKey col_key)
+        : m_set(col_key)
+    {
+    }
+
 
     LnkSet(const LnkSet&) = default;
     LnkSet(LnkSet&&) = default;
@@ -218,7 +264,7 @@ public:
 
     // Overriding members of CollectionBase:
     using CollectionBase::get_owner_key;
-    CollectionBasePtr clone_collection() const
+    CollectionBasePtr clone_collection() const override
     {
         return clone_linkset();
     }
@@ -233,12 +279,31 @@ public:
     void sort(std::vector<size_t>& indices, bool ascending = true) const final;
     void distinct(std::vector<size_t>& indices, util::Optional<bool> sort_order = util::none) const final;
     const Obj& get_obj() const noexcept final;
-    bool is_attached() const final;
-    bool has_changed() const final;
+    bool is_attached() const noexcept final;
+    bool has_changed() const noexcept final;
     ColKey get_col_key() const noexcept final;
+    CollectionType get_collection_type() const noexcept override
+    {
+        return CollectionType::Set;
+    }
+
+    FullPath get_path() const noexcept final
+    {
+        return m_set.get_path();
+    }
+
+    Path get_short_path() const noexcept final
+    {
+        return m_set.get_short_path();
+    }
+
+    StablePath get_stable_path() const noexcept final
+    {
+        return m_set.get_stable_path();
+    }
 
     // Overriding members of SetBase:
-    SetBasePtr clone() const
+    SetBasePtr clone() const override
     {
         return clone_linkset();
     }
@@ -293,6 +358,18 @@ public:
         return iterator{this, size()};
     }
 
+    void set_owner(const Obj& obj, ColKey ck) override
+    {
+        m_set.set_owner(obj, ck);
+    }
+
+    void set_owner(std::shared_ptr<CollectionParent> parent, CollectionParent::Index index) override
+    {
+        m_set.set_owner(std::move(parent), index);
+    }
+
+    void to_json(std::ostream&, JSONOutputMode, util::FunctionRef<void(const Mixed&)>) const override;
+
 private:
     Set<ObjKey> m_set;
 
@@ -328,102 +405,12 @@ template <>
 void Set<Mixed>::do_clear();
 template <>
 void Set<Mixed>::migrate();
-
-/// Compare set elements.
-///
-/// We cannot use `std::less<>` directly, because the ordering of set elements
-/// impacts the file format. For primitive types this is trivial (and can indeed
-/// be just `std::less<>`), but for example `Mixed` has specialized comparison
-/// that defines equality of numeric types.
-template <class T>
-struct SetElementLessThan {
-    bool operator()(const T& a, const T& b) const noexcept
-    {
-        // CAUTION: This routine is technically part of the file format, because
-        // it determines the storage order of Set elements.
-        return a < b;
-    }
-};
-
-template <class T>
-struct SetElementEquals {
-    bool operator()(const T& a, const T& b) const noexcept
-    {
-        // CAUTION: This routine is technically part of the file format, because
-        // it determines the storage order of Set elements.
-        return a == b;
-    }
-};
-
 template <>
-struct SetElementLessThan<Mixed> {
-    bool operator()(const Mixed& a, const Mixed& b) const noexcept
-    {
-        // CAUTION: This routine is technically part of the file format, because
-        // it determines the storage order of Set elements.
-
-        // These are the rules for comparison of Mixed types in a Set<Mixed>:
-        // - If both values are null they are equal
-        // - If only one value is null, that value is lesser than the other
-        // - All numeric types are compared as the corresponding real numbers
-        //   would compare. So integer 3 equals double 3.
-        // - String and binary types are compared using lexicographical comparison.
-        // - All other types are compared using the comparison operators defined
-        //   for the types.
-        // - If two values have different types, the rank of the types are compared.
-        //   the rank is as follows:
-        //       boolean
-        //       numeric
-        //       string
-        //       binary
-        //       Timestamp
-        //       ObjectId
-        //       UUID
-        //       TypedLink
-        //       Link
-        //
-        // The current Mixed::compare function implements these rules except when comparing
-        // string and binary. If that function is changed we should either implement the rules
-        // here or upgrade all Set<Mixed> columns.
-        if (a.is_type(type_String) && b.is_type(type_Binary)) {
-            return true;
-        }
-        if (a.is_type(type_Binary) && b.is_type(type_String)) {
-            return false;
-        }
-        return a.compare(b) < 0;
-    }
-};
-
+void Set<Mixed>::migration_resort();
 template <>
-struct SetElementEquals<Mixed> {
-    bool operator()(const Mixed& a, const Mixed& b) const noexcept
-    {
-        // CAUTION: This routine is technically part of the file format, because
-        // it determines the storage order of Set elements.
-
-        // See comments above
-
-        if (a.is_type(type_String) && b.is_type(type_Binary)) {
-            return false;
-        }
-        if (a.is_type(type_Binary) && b.is_type(type_String)) {
-            return false;
-        }
-        return a.compare(b) == 0;
-    }
-};
-
-template <class T>
-inline Set<T>::Set(const Obj& obj, ColKey col_key)
-    : Base(obj, col_key)
-{
-    if (!col_key.is_set()) {
-        throw InvalidArgument(ErrorCodes::TypeMismatch, "Property not a set");
-    }
-
-    check_column_type<value_type>(m_col_key);
-}
+void Set<StringData>::migration_resort();
+template <>
+void Set<BinaryData>::migration_resort();
 
 inline SetBase::SetBase(const SetBase& other)
     : CollectionBase(other)
@@ -505,6 +492,49 @@ inline Set<T>& Set<T>::operator=(Set&& other) noexcept
     return *this;
 }
 
+template <typename T>
+UpdateStatus Set<T>::update_if_needed() const
+{
+    switch (get_update_status()) {
+        case UpdateStatus::Detached: {
+            m_tree.reset();
+            return UpdateStatus::Detached;
+        }
+        case UpdateStatus::NoChange:
+            if (m_tree && tree().is_attached()) {
+                return UpdateStatus::NoChange;
+            }
+            // The tree has not been initialized yet for this accessor, so
+            // perform lazy initialization by treating it as an update.
+            [[fallthrough]];
+        case UpdateStatus::Updated:
+            return init_from_parent(false);
+    }
+    REALM_UNREACHABLE();
+}
+
+template <typename T>
+void Set<T>::ensure_created()
+{
+    if (Base::should_update() || !(m_tree && tree().is_attached())) {
+        // When allow_create is true, init_from_parent will always succeed
+        // In case of errors, an exception is thrown.
+        constexpr bool allow_create = true;
+        init_from_parent(allow_create); // Throws
+    }
+}
+
+template <typename T>
+UpdateStatus Set<T>::init_from_parent(bool allow_create) const
+{
+    Base::update_content_version();
+    if (!m_tree) {
+        m_tree.reset(new BPlusTree<T>(get_alloc()));
+        const ArrayParent* parent = this;
+        m_tree->set_parent(const_cast<ArrayParent*>(parent), 0);
+    }
+    return do_init_from_parent(m_tree.get(), Base::get_collection_ref(), allow_create);
+}
 
 template <typename U>
 Set<U> Obj::get_set(ColKey col_key) const
@@ -537,7 +567,7 @@ template <class T>
 size_t Set<T>::find(T value) const
 {
     auto it = find_impl(value);
-    if (it != end() && SetElementEquals<T>{}(*it, value)) {
+    if (it != end() && *it == value) {
         return it.index();
     }
     return npos;
@@ -567,24 +597,23 @@ REALM_NOINLINE auto Set<T>::find_impl(const T& value) const -> iterator
 {
     auto b = this->begin();
     auto e = this->end(); // Note: This ends up calling `update_if_needed()`.
-    return std::lower_bound(b, e, value, SetElementLessThan<T>{});
+    return std::lower_bound(b, e, value);
 }
 
 template <class T>
 std::pair<size_t, bool> Set<T>::insert(T value)
 {
+    ensure_created();
+
     if (!m_nullable && value_is_null(value))
         throw_invalid_null();
 
-    update_if_needed();
-    ensure_created();
-
     auto it = find_impl(value);
-    if (it != this->end() && SetElementEquals<T>{}(*it, value)) {
+    if (it != this->end() && *it == value) {
         return {it.index(), false};
     }
 
-    if (Replication* repl = m_obj.get_replication()) {
+    if (Replication* repl = Base::get_replication()) {
         // FIXME: We should emit an instruction regardless of element presence for the purposes of conflict
         // resolution in synchronized databases. The reason is that the new insertion may come at a later time
         // than an interleaving erase instruction, so emitting the instruction ensures that last "write" wins.
@@ -617,11 +646,11 @@ std::pair<size_t, bool> Set<T>::erase(T value)
 {
     auto it = find_impl(value); // Note: This ends up calling `update_if_needed()`.
 
-    if (it == end() || !SetElementEquals<T>{}(*it, value)) {
+    if (it == end() || *it != value) {
         return {npos, false};
     }
 
-    if (Replication* repl = m_obj.get_replication()) {
+    if (Replication* repl = Base::get_replication()) {
         this->erase_repl(repl, it.index(), value);
     }
     do_erase(it.index());
@@ -673,7 +702,7 @@ template <class T>
 inline void Set<T>::clear()
 {
     if (size() > 0) {
-        if (Replication* repl = this->m_obj.get_replication()) {
+        if (Replication* repl = Base::get_replication()) {
             this->clear_repl(repl);
         }
         do_clear();
@@ -726,9 +755,6 @@ inline void Set<T>::sort(std::vector<size_t>& indices, bool ascending) const
     set_sorted_indices(sz, indices, ascending);
 }
 
-template <>
-void Set<Mixed>::sort(std::vector<size_t>& indices, bool ascending) const;
-
 template <class T>
 void Set<T>::distinct(std::vector<size_t>& indices, util::Optional<bool> sort_order) const
 {
@@ -745,13 +771,18 @@ inline void Set<T>::do_insert(size_t ndx, T value)
 template <class T>
 inline void Set<T>::do_erase(size_t ndx)
 {
-    m_tree->erase(ndx);
+    tree().erase(ndx);
 }
 
 template <class T>
 inline void Set<T>::do_clear()
 {
-    m_tree->clear();
+    tree().clear();
+}
+
+template <class T>
+inline void Set<T>::migration_resort()
+{
 }
 
 inline bool LnkSet::operator==(const LnkSet& other) const
@@ -976,12 +1007,12 @@ inline const Obj& LnkSet::get_obj() const noexcept
     return m_set.get_obj();
 }
 
-inline bool LnkSet::is_attached() const
+inline bool LnkSet::is_attached() const noexcept
 {
     return m_set.is_attached();
 }
 
-inline bool LnkSet::has_changed() const
+inline bool LnkSet::has_changed() const noexcept
 {
     return m_set.has_changed();
 }

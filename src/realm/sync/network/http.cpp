@@ -137,7 +137,7 @@ bool HTTPParserBase::parse_header_line(size_t len)
     auto colon = std::find(p, end, ':');
 
     if (colon == end) {
-        logger.error("Bad header line in HTTP message:\n%1", line);
+        network_logger.error("Bad header line in HTTP message:\n%1", line);
         return false;
     }
 
@@ -153,7 +153,7 @@ bool HTTPParserBase::parse_header_line(size_t len)
     value = trim_whitespace(value);
 
     if (key.size() == 0) {
-        logger.error("Bad header line in HTTP message:\n%1", line);
+        network_logger.error("Bad header line in HTTP message:\n%1", line);
         return false;
     }
 
@@ -161,7 +161,7 @@ bool HTTPParserBase::parse_header_line(size_t len)
         if (value.size() == 0) {
             // We consider the empty Content-Length to mean 0.
             // A warning is logged.
-            logger.warn("Empty Content-Length header in HTTP message:\n%1", line);
+            network_logger.warn("Empty Content-Length header in HTTP message:\n%1", line);
             m_found_content_length = 0;
         }
         else {
@@ -172,7 +172,7 @@ bool HTTPParserBase::parse_header_line(size_t len)
                 m_found_content_length = content_length;
             }
             else {
-                logger.error("Bad Content-Length header in HTTP message:\n%1", line);
+                network_logger.error("Bad Content-Length header in HTTP message:\n%1", line);
                 return false;
             }
         }

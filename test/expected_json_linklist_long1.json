@@ -1,9 +1,60 @@
-[
-  {
-    "_key": 0,
-    "link": {
-      "key": 9,
-      "table": "foo"
+{
+  "foo": [
+    {
+      "_key": 0,
+      "str1": "String_0",
+      "sub": null
+    },
+    {
+      "_key": 1,
+      "str1": "String_1",
+      "sub": 0
+    },
+    {
+      "_key": 2,
+      "str1": "String_2",
+      "sub": 1
+    },
+    {
+      "_key": 3,
+      "str1": "String_3",
+      "sub": 2
+    },
+    {
+      "_key": 4,
+      "str1": "String_4",
+      "sub": 3
+    },
+    {
+      "_key": 5,
+      "str1": "String_5",
+      "sub": 4
+    },
+    {
+      "_key": 6,
+      "str1": "String_6",
+      "sub": 5
+    },
+    {
+      "_key": 7,
+      "str1": "String_7",
+      "sub": 6
+    },
+    {
+      "_key": 8,
+      "str1": "String_8",
+      "sub": 7
+    },
+    {
+      "_key": 9,
+      "str1": "String_9",
+      "sub": 8
     }
-  }
-]
+  ],
+  "bar": [
+    {
+      "_key": 0,
+      "link": 9
+    }
+  ]
+}

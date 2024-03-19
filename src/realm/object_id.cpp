@@ -111,12 +111,16 @@ Timestamp ObjectId::get_timestamp() const
 
 std::string ObjectId::to_string() const
 {
+    constexpr size_t buffer_size = 2 * sizeof(ObjectIdBytes);
+    char buffer[buffer_size];
     std::string ret;
+    char* p = buffer;
     for (size_t i = 0; i < m_bytes.size(); i++) {
-        ret += hex_digits[m_bytes[i] >> 4];
-        ret += hex_digits[m_bytes[i] & 0xf];
+        auto c = m_bytes[i];
+        *p++ = hex_digits[c >> 4];
+        *p++ = hex_digits[c & 0xf];
     }
-    return ret;
+    return {buffer, buffer_size};
 }
 
 ObjectId::ObjectIdBytes ObjectId::to_bytes() const

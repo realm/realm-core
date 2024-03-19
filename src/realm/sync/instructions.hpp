@@ -84,14 +84,14 @@ using PrimaryKey = mpark::variant<mpark::monostate, int64_t, GlobalKey, InternSt
 struct Path {
     using Element = mpark::variant<InternString, uint32_t>;
 
-    // FIXME: Use a "small_vector" type for this -- most paths are very short.
-    // Alternatively, we could use some kind of interning with copy-on-write,
-    // but that seems complicated.
-    std::vector<Element> m_path;
-
     size_t size() const noexcept
     {
         return m_path.size();
+    }
+
+    void reserve(size_t sz)
+    {
+        m_path.reserve(sz);
     }
 
     // If this path is referring to an element of an array (the last path
@@ -142,6 +142,11 @@ struct Path {
         m_path.push_back(element);
     }
 
+    void clear()
+    {
+        m_path.clear();
+    }
+
     friend bool operator==(const Path& lhs, const Path& rhs) noexcept
     {
         return lhs.m_path == rhs.m_path;
@@ -156,18 +161,25 @@ struct Path {
     {
         return m_path.end();
     }
+
+private:
+    // FIXME: Use a "small_vector" type for this -- most paths are very short.
+    // Alternatively, we could use some kind of interning with copy-on-write,
+    // but that seems complicated.
+    std::vector<Element> m_path;
 };
 
 struct Payload {
     /// Create a new object in-place (embedded object).
-    struct ObjectValue {
-    };
+    struct ObjectValue {};
+    /// Create an empty list in-place (does not clear an existing list).
+    struct List {};
     /// Create an empty dictionary in-place (does not clear an existing dictionary).
-    struct Dictionary {
-    };
+    struct Dictionary {};
+    /// Create an empty set in-place (does not clear an existing set).
+    struct Set {};
     /// Sentinel value for an erased dictionary element.
-    struct Erased {
-    };
+    struct Erased {};
 
     /// Payload data types, corresponding loosely to the `DataType` enum in
     /// Core, but with some special values:
@@ -177,7 +189,7 @@ struct Payload {
     /// - ObjectValue (-2) indicates the creation of an embedded object.
     /// - Dictionary (-3) indicates the creation of a dictionary.
     /// - Erased (-4) indicates that a dictionary element should be erased.
-    /// - Undefined (-5) indicates the
+    /// - List (-5) indicates the creation of a list
     ///
     /// Furthermore, link values for both Link and LinkList columns are
     /// represented by a single Link type.
@@ -185,6 +197,12 @@ struct Payload {
     /// Note: For Mixed columns (including typed links), no separate value is required, because the
     /// instruction set encodes the type of each value in the instruction.
     enum class Type : int8_t {
+        // Special value indicating that a set should be created at the position.
+        Set = -6,
+
+        // Special value indicating that a list should be created at the position.
+        List = -5,
+
         // Special value indicating that a dictionary element should be erased.
         Erased = -4,
 
@@ -295,6 +313,18 @@ struct Payload {
         : type(Type::Erased)
     {
     }
+    Payload(const Dictionary&) noexcept
+        : type(Type::Dictionary)
+    {
+    }
+    Payload(const List&) noexcept
+        : type(Type::List)
+    {
+    }
+    Payload(const Set&) noexcept
+        : type(Type::Set)
+    {
+    }
 
     explicit Payload(Timestamp value) noexcept
         : type(value.is_null() ? Type::Null : Type::Timestamp)
@@ -343,16 +373,15 @@ struct Payload {
     {
         if (lhs.type == rhs.type) {
             switch (lhs.type) {
+                case Type::Null:
                 case Type::Erased:
-                    return true;
+                case Type::List:
+                case Type::Set:
                 case Type::Dictionary:
-                    return true;
                 case Type::ObjectValue:
                     return true;
                 case Type::GlobalKey:
                     return lhs.data.key == rhs.data.key;
-                case Type::Null:
-                    return true;
                 case Type::Int:
                     return lhs.data.integer == rhs.data.integer;
                 case Type::Bool:
@@ -761,6 +790,10 @@ inline const char* get_type_name(Instruction::Payload::Type type)
     switch (type) {
         case Type::Erased:
             return "Erased";
+        case Type::Set:
+            return "Set";
+        case Type::List:
+            return "List";
         case Type::Dictionary:
             return "Dictionary";
         case Type::ObjectValue:
@@ -878,6 +911,10 @@ inline DataType get_data_type(Instruction::Payload::Type type) noexcept
         case Type::Erased:
             [[fallthrough]];
         case Type::Dictionary:
+            [[fallthrough]];
+        case Type::List:
+            [[fallthrough]];
+        case Type::Set:
             [[fallthrough]];
         case Type::ObjectValue:
             [[fallthrough]];

@@ -165,44 +165,6 @@ RLM_API const realm_scheduler_t* realm_scheduler_get_frozen()
     });
 }
 
-// FIXME: Move this into `GenericScheduler` (i.e. make `Scheduler::set_default_factory()` thread-safe).
-static std::mutex s_default_factory_mutex;
-static bool s_default_factory_set = false;
-
-RLM_API bool realm_scheduler_has_default_factory()
-{
-#if REALM_HAS_DEFAULT_SCHEDULER
-    return true;
-#else
-    return s_default_factory_set;
-#endif
-}
-
-RLM_API bool realm_scheduler_set_default_factory(realm_userdata_t userdata, realm_free_userdata_func_t free_func,
-                                                 realm_scheduler_default_factory_func_t factory_func)
-{
-    return wrap_err([&]() {
-#if REALM_HAS_DEFAULT_SCHEDULER
-        static_cast<void>(userdata);
-        static_cast<void>(free_func);
-        static_cast<void>(factory_func);
-        static_cast<void>(s_default_factory_mutex);
-        static_cast<void>(s_default_factory_set);
-        throw IllegalOperation{"This platform already has a default scheduler implementation"};
-        return true;
-#else
-        std::unique_lock<std::mutex> lock{s_default_factory_mutex};
-        if (s_default_factory_set) {
-            throw IllegalOperation{"A default scheduler factory has already been registered"};
-        }
-        DefaultFactory factory{userdata, free_func, factory_func};
-        Scheduler::set_default_factory(std::move(factory));
-        s_default_factory_set = true;
-        return true;
-#endif
-    });
-}
-
 } // namespace realm::c_api
 
 // LCOV_EXCL_STOP

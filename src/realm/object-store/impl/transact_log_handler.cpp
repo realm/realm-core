@@ -47,7 +47,7 @@ private:
     struct ListInfo {
         BindingContext::ObserverState* observer;
         _impl::CollectionChangeBuilder builder;
-        ColKey col;
+        ColKey col_key;
     };
     std::vector<ListInfo> m_lists;
     VersionID m_version;
@@ -76,8 +76,9 @@ KVOAdapter::KVOAdapter(std::vector<BindingContext::ObserverState>& observers, Bi
     for (auto& observer : observers) {
         auto table = group.get_table(TableKey(observer.table_key));
         for (auto key : table->get_column_keys()) {
-            if (table->get_column_attr(key).test(col_attr_List))
-                m_lists.push_back({&observer, {}, key});
+            if (key.is_list()) {
+                m_lists.push_back({&observer, {}, {key}});
+            }
         }
     }
 
@@ -85,7 +86,8 @@ KVOAdapter::KVOAdapter(std::vector<BindingContext::ObserverState>& observers, Bi
     for (auto& tbl : tables_needed)
         tables[tbl] = {};
     for (auto& list : m_lists)
-        collections.push_back({list.observer->table_key, list.observer->obj_key, list.col, &list.builder});
+        collections.push_back({list.observer->table_key, list.observer->obj_key,
+                               StablePath{{StableIndex(list.col_key, 0)}}, &list.builder});
 }
 
 void KVOAdapter::before(Transaction& sg)
@@ -121,7 +123,7 @@ void KVOAdapter::before(Transaction& sg)
             // We may have pre-emptively marked the column as modified if the
             // LinkList was selected but the actual changes made ended up being
             // a no-op
-            list.observer->changes.erase(list.col.value);
+            list.observer->changes.erase(list.col_key.value);
             continue;
         }
         // If the containing row was deleted then changes will be empty
@@ -130,7 +132,7 @@ void KVOAdapter::before(Transaction& sg)
             continue;
         }
         // otherwise the column should have been marked as modified
-        auto it = list.observer->changes.find(list.col.value);
+        auto it = list.observer->changes.find(list.col_key.value);
         REALM_ASSERT(it != list.observer->changes.end());
         auto& builder = list.builder;
         auto& changes = it->second;
@@ -320,7 +322,7 @@ struct TransactLogValidator : public TransactLogValidationMixin {
     {
         return true;
     }
-    bool select_collection(ColKey, ObjKey)
+    bool select_collection(ColKey, ObjKey, const StablePath&)
     {
         return true;
     }
@@ -362,17 +364,23 @@ public:
         return true;
     }
 
-    bool select_collection(ColKey col, ObjKey obj)
+    bool select_collection(ColKey col, ObjKey obj, const StablePath& path)
     {
         modify_object(col, obj);
         auto table = current_table();
+        m_active_collection = nullptr;
         for (auto& c : m_info.collections) {
-            if (c.table_key == table && c.obj_key == obj && c.col_key == col) {
-                m_active_collection = c.changes;
-                return true;
+            if (c.table_key == table && c.obj_key == obj && c.path.is_prefix_of(path)) {
+                if (c.path.size() != path.size()) {
+                    c.changes->paths.insert(path[c.path.size()]);
+                }
+                // If there are multiple exact matches for this collection we
+                // use the first and then propagate the data to the others later
+                else if (!m_active_collection) {
+                    m_active_collection = c.changes;
+                }
             }
         }
-        m_active_collection = nullptr;
         return true;
     }
 

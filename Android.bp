@@ -115,7 +115,7 @@ cc_object {
 genrule {
     name: "version_numbers.hpp",
     srcs: [
-        "dependencies.list",
+        "dependencies.yml",
         "src/realm/version_numbers.hpp.in",
     ],
     out: ["realm/version_numbers.hpp"],

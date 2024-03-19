@@ -52,6 +52,7 @@ set(CORE_TEST_SOURCES
     test_json.cpp
     test_link_query_view.cpp
     test_links.cpp
+    test_list.cpp
     test_mixed_null_assertions.cpp
     test_object_id.cpp
     test_optional.cpp
@@ -119,7 +120,7 @@ set(FUZZY_TEST_SOURCES fuzz_group.cpp)
 
 set(CORE_TESTS ${CORE_TEST_SOURCES} ${LARGE_TEST_SOURCES} ${FUZZY_TEST_SOURCES})
 
-set_source_files_properties(test_query_geo.cpp PROPERTIES
+set_source_files_properties(test_query_geo.cpp test_json.cpp PROPERTIES
     INCLUDE_DIRECTORIES "${RealmCore_SOURCE_DIR}/src/external"
     # the only flag not supported with pragma diagnostic disable in src file by gcc until 13.
     COMPILE_FLAGS "$<$<CXX_COMPILER_ID:GNU>: -Wno-unknown-pragmas>"
@@ -140,7 +141,7 @@ file(GLOB REQUIRED_TEST_FILES
 
 add_library(CoreTestLib OBJECT ${CORE_TESTS} ${REQUIRED_TEST_FILES} ${REALM_TEST_HEADERS})
 enable_stdfilesystem(CoreTestLib)
-target_link_libraries(CoreTestLib QueryParser)
+target_link_libraries(CoreTestLib QueryParser Bson)
 
 add_executable(CoreTests main.cpp test_all.cpp ${REQUIRED_TEST_FILES})
 target_link_libraries(CoreTests CoreTestLib TestUtil)
@@ -200,6 +201,7 @@ if(REALM_ENABLE_SYNC)
         test_sync_subscriptions.cpp
         test_sync_pending_bootstraps.cpp
         test_sync_error_backoff.cpp
+        test_transform_collections_mixed.cpp
         test_transform.cpp
         test_util_buffer_stream.cpp
         test_util_circular_buffer.cpp

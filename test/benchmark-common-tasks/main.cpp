@@ -18,6 +18,7 @@
 
 #include <iostream>
 #include <iomanip>
+#include <regex>
 #include <set>
 #include <sstream>
 #include <set>
@@ -43,7 +44,17 @@ using namespace realm;
 using namespace realm::util;
 using namespace realm::test_util;
 
-static std::set<std::string> g_bench_filter;
+static std::vector<std::regex> g_bench_filter;
+
+static bool should_filter_benchmark(const std::string& name)
+{
+    if (g_bench_filter.empty())
+        return false;
+
+    return std::all_of(g_bench_filter.begin(), g_bench_filter.end(), [&](const std::regex& regex) {
+        return !std::regex_match(name, regex);
+    });
+}
 
 namespace {
 // not smaller than 100.000 or the UID based benchmarks has to be modified!
@@ -508,7 +519,7 @@ template <class Type>
 struct BenchmarkWithType : Benchmark {
     std::string benchmark_name;
     using underlying_type = typename Type::underlying_type;
-    std::vector<Mixed> needles;
+    std::vector<OwnedMixed> needles;
     BenchmarkWithType()
         : Benchmark()
     {
@@ -520,11 +531,10 @@ struct BenchmarkWithType : Benchmark {
             util::format("%1<%2><%3><%4>", prefix, get_data_type_name(Type::data_type),
                          Type::is_nullable ? "Nullable" : "NonNullable", Type::is_indexed ? "Indexed" : "NonIndexed");
     }
-    void before_all(DBRef group)
+    void do_add_perf_data(WriteTransaction& tr, bool add_index)
     {
         TestValueGenerator gen;
-        WriteTransaction tr(group);
-        TableRef t = tr.add_table(name());
+        TableRef t = tr.get_or_add_table(name());
         m_col = t->add_column(Type::data_type, name(), Type::is_nullable);
         Random r;
         for (size_t i = 0; i < BASE_SIZE / 2; ++i) {
@@ -536,15 +546,20 @@ struct BenchmarkWithType : Benchmark {
             }
         }
         while (needles.size() < 50) {
-            Mixed needle;
+            OwnedMixed needle;
             while (needle.is_null()) {
                 needle = t->get_object(r.draw_int<size_t>(0, t->size())).get_any(m_col);
             }
-            needles.push_back(needle);
+            needles.push_back(std::move(needle));
         }
-        if constexpr (Type::is_indexed) {
+        if (add_index) {
             t->add_search_index(m_col);
         }
+    }
+    void before_all(DBRef group)
+    {
+        WriteTransaction tr(group);
+        do_add_perf_data(tr, Type::is_indexed);
         tr.commit();
     }
 
@@ -634,6 +649,118 @@ struct BenchmarkRangeForType : public BenchmarkWithType<Type> {
     }
 };
 
+template <typename Type>
+struct BenchmarkCreateIndexForType : public BenchmarkWithType<Type> {
+    using Base = BenchmarkWithType<Type>;
+    using underlying_type = typename Type::underlying_type;
+    BenchmarkCreateIndexForType<Type>()
+        : BenchmarkWithType<Type>()
+    {
+        BenchmarkWithType<Type>::set_name_with_prefix("CreateIndexFor");
+    }
+    void before_all(DBRef group) override
+    {
+        WriteTransaction tr(group);
+        constexpr bool add_index = false;
+        BenchmarkWithType<Type>::do_add_perf_data(tr, add_index);
+        tr.commit();
+    }
+    void operator()(DBRef) override
+    {
+        Benchmark::m_table->add_search_index(Benchmark::m_col);
+    }
+};
+
+template <typename Type>
+struct BenchmarkInsertToIndexForType : public BenchmarkWithType<Type> {
+    using Base = BenchmarkWithType<Type>;
+    using underlying_type = typename Type::underlying_type;
+    BenchmarkInsertToIndexForType<Type>()
+        : BenchmarkWithType<Type>()
+    {
+        BenchmarkWithType<Type>::set_name_with_prefix("InsertWithIndex");
+    }
+    void before_all(DBRef group) override
+    {
+        WriteTransaction tr(group);
+        TableRef t = tr.get_or_add_table(Base::name());
+        Base::m_col = t->add_column(Type::data_type, Base::name(), Type::is_nullable);
+        if (Type::is_indexed) {
+            t->add_search_index(Base::m_col);
+        }
+        tr.commit();
+        m_random_values.reserve(BASE_SIZE / 2);
+        for (size_t i = 0; i < BASE_SIZE / 2; ++i) {
+            int64_t randomness = m_random.draw_int<int64_t>();
+            m_random_values.push_back(m_test_value_generator.convert_for_test<underlying_type>(randomness));
+        }
+    }
+    void operator()(DBRef) override
+    {
+        for (auto it = m_random_values.begin(); it != m_random_values.end(); ++it) {
+            // a hand full of duplicates
+            Base::m_table->create_object().set_any(Base::m_col, *it);
+            Base::m_table->create_object().set_any(Base::m_col, *it);
+        }
+    }
+    std::vector<Mixed> m_random_values;
+    TestValueGenerator m_test_value_generator;
+    Random m_random;
+};
+
+template <typename Type>
+struct BenchmarkInsertPKToIndexForType : public BenchmarkWithType<Type> {
+    using Base = BenchmarkWithType<Type>;
+    using underlying_type = typename Type::underlying_type;
+    BenchmarkInsertPKToIndexForType<Type>()
+        : BenchmarkWithType<Type>()
+    {
+        BenchmarkWithType<Type>::set_name_with_prefix("InsertPK");
+    }
+    void before_all(DBRef group) override
+    {
+        WriteTransaction tr(group);
+        TableRef t = tr.get_or_add_table(Base::name());
+        Base::m_col = t->add_column(Type::data_type, Base::name(), Type::is_nullable);
+        t->set_primary_key_column(Base::m_col);
+        REALM_ASSERT(t->has_search_index(Base::m_col));
+        tr.commit();
+        while (m_unique_randoms.size() < BASE_SIZE) {
+            int64_t random_int = m_random.draw_int<int64_t>();
+            m_unique_randoms.insert(m_test_value_generator.convert_for_test<underlying_type>(random_int));
+        }
+    }
+    void operator()(DBRef) override
+    {
+        for (auto it = m_unique_randoms.begin(); it != m_unique_randoms.end(); ++it) {
+            Base::m_table->create_object_with_primary_key(*it);
+        }
+    }
+    TestValueGenerator m_test_value_generator;
+    Random m_random;
+    std::set<underlying_type> m_unique_randoms;
+};
+
+template <typename Type>
+struct BenchmarkEraseObjectForType : public BenchmarkWithType<Type> {
+    using Base = BenchmarkWithType<Type>;
+    using underlying_type = typename Type::underlying_type;
+    BenchmarkEraseObjectForType<Type>()
+        : BenchmarkWithType<Type>()
+    {
+        BenchmarkWithType<Type>::set_name_with_prefix("EraseObject");
+    }
+    void before_all(DBRef group) override
+    {
+        Base::before_all(group);
+    }
+    void operator()(DBRef) override
+    {
+        while (!Base::m_table->is_empty()) {
+            Base::m_table->begin()->remove();
+        }
+    }
+};
 
 struct BenchmarkWithTimestamps : Benchmark {
     std::multiset<Timestamp> values;
@@ -2325,7 +2452,6 @@ void run_benchmark_once(Benchmark& benchmark, DBRef sg, Timer& timer)
     timer.unpause();
 }
 
-
 /// This little piece of likely over-engineering runs the benchmark a number of times,
 /// with each durability setting, and reports the results for each run.
 template <typename B>
@@ -2351,7 +2477,7 @@ void run_benchmark(BenchmarkResults& results, bool force_full = false)
         const char* key = it->second;
 
         B benchmark;
-        if (!g_bench_filter.empty() && g_bench_filter.find(benchmark.name()) == g_bench_filter.end())
+        if (should_filter_benchmark(benchmark.name()))
             return;
 
         benchmark.m_durability = level;
@@ -2494,6 +2620,8 @@ int benchmark_common_tasks_main()
     BENCH(BenchmarkWithType<Prop<ObjectId>>);
     BENCH(BenchmarkWithType<Indexed<Timestamp>>);
     BENCH(BenchmarkWithType<Prop<Timestamp>>);
+    BENCH(BenchmarkWithType<Indexed<Int>>);
+    BENCH(BenchmarkWithType<Indexed<String>>);
     BENCH(BenchmarkWithType<Indexed<Bool>>);
     BENCH(BenchmarkWithType<Prop<Bool>>);
     BENCH(BenchmarkMixedCaseInsensitiveEqual<Prop<Mixed>>);
@@ -2502,6 +2630,23 @@ int benchmark_common_tasks_main()
     BENCH(BenchmarkMixedCaseInsensitiveEqual<Indexed<String>>);
 
     BENCH(BenchmarkRangeForType<Prop<Int>>);
+    BENCH(BenchmarkCreateIndexForType<NullableIndexed<String>>);
+    BENCH(BenchmarkCreateIndexForType<NullableIndexed<Int>>);
+    BENCH(BenchmarkCreateIndexForType<NullableIndexed<Timestamp>>);
+
+    BENCH(BenchmarkInsertToIndexForType<NullableIndexed<String>>);
+    BENCH(BenchmarkInsertToIndexForType<NullableIndexed<Int>>);
+    BENCH(BenchmarkInsertToIndexForType<NullableIndexed<Timestamp>>);
+
+    BENCH(BenchmarkInsertPKToIndexForType<NullableIndexed<String>>);
+    BENCH(BenchmarkInsertPKToIndexForType<NullableIndexed<Int>>);
+
+    BENCH(BenchmarkEraseObjectForType<Prop<String>>);
+    BENCH(BenchmarkEraseObjectForType<Prop<Int>>);
+    BENCH(BenchmarkEraseObjectForType<Prop<Timestamp>>);
+    BENCH(BenchmarkEraseObjectForType<NullableIndexed<String>>);
+    BENCH(BenchmarkEraseObjectForType<NullableIndexed<Int>>);
+    BENCH(BenchmarkEraseObjectForType<NullableIndexed<Timestamp>>);
 
     BENCH(BenchmarkQueryTimestampGreaterOverLinks);
     BENCH(BenchmarkQueryTimestampGreater);
@@ -2551,7 +2696,8 @@ int main(int argc, const char** argv)
                       << "  -h, --help      display this help" << std::endl
                       << "  PATH            alternate path to store the results files;" << std::endl
                       << "                  this path should end with a slash." << std::endl
-                      << "  NAMES           benchmark names to run (',' separated)" << std::endl
+                      << "  NAMES           benchmark names to run (':' separated)" << std::endl
+                      << "                  Full regex is supported as a filter for a name" << std::endl
                       << std::endl;
             return 1;
         }
@@ -2563,9 +2709,9 @@ int main(int argc, const char** argv)
     if (argc > 2) {
         std::string filter = argv[2];
         for (size_t i = 0, j = 0, len = filter.size(); i <= len; ++i) {
-            if (i == len || filter[i] == ',') {
+            if (i == len || filter[i] == ':') {
                 if (j < i)
-                    g_bench_filter.insert(filter.substr(j, i - j));
+                    g_bench_filter.emplace_back(filter.substr(j, i - j));
                 j = i + 1;
             }
         }

@@ -58,7 +58,7 @@ static inline void run_corpus(const char* test_key, const CorpusEntry<T>& entry)
 {
     std::string canonical_extjson = remove_whitespace(entry.canonical_extjson);
     auto val = static_cast<BsonDocument>(bson::parse(canonical_extjson));
-    auto& test_value = val[test_key];
+    const Bson& test_value = val[test_key];
     REQUIRE(bson::holds_alternative<T>(test_value));
     entry.check((T)test_value);
     if (!entry.lossy) {
@@ -157,8 +157,8 @@ TEST_CASE("canonical_extjson_corpus", "[bson]") {
 
         SECTION("subtype 0x00") {
             run_corpus<std::vector<char>>(
-                "x", {"{\"x\" : { \"$binary\" : {\"base64\" : \"//8=\", \"subType\" : \"00\"}}}", [](auto val) {
-                          std::string bin = "//8=";
+                "x", {"{\"x\" : { \"$binary\" : {\"base64\" : \"SGVsbG8K\", \"subType\" : \"00\"}}}", [](auto val) {
+                          std::string bin = "Hello\n";
                           CHECK(val == std::vector<char>(bin.begin(), bin.end()));
                       }});
         }
@@ -504,8 +504,9 @@ TEST_CASE("canonical_extjson_corpus", "[bson]") {
         auto canonical_extjson = remove_whitespace(
             "{\"_id\": {\"$oid\": \"57e193d7a9cc81b4027498b5\"}, \"String\": \"string\", \"Int32\": {\"$numberInt\": "
             "\"42\"}, \"Int64\": {\"$numberLong\": \"42\"}, \"Double\": {\"$numberDouble\": \"-1\"}, \"Binary\": { "
-            "\"$binary\" : {\"base64\": \"o0w498Or7cijeBSpkquNtg==\", \"subType\": \"00\"}}, \"BinaryUserDefined\": "
-            "{ \"$binary\" : {\"base64\": \"AQIDBAU=\", \"subType\": \"00\"}}, \"Subdocument\": {\"foo\": \"bar\"}, "
+            "\"$binary\" : {\"base64\": \"QmluYXJ5Cg==\", \"subType\": \"00\"}}, \"BinaryUserDefined\": "
+            "{ \"$binary\" : {\"base64\": \"QmluYXJ5IFVzZXIgRGVmaW5lZAo=\", \"subType\": \"00\"}}, \"Subdocument\": "
+            "{\"foo\": \"bar\"}, "
             "\"Array\": [{\"$numberInt\": \"1\"}, {\"$numberInt\": \"2\"}, {\"$numberInt\": \"3\"}, {\"$numberInt\": "
             "\"4\"}, {\"$numberInt\": \"5\"}], \"Timestamp\": {\"$timestamp\": {\"t\": 42, \"i\": 1}}, \"Regex\": "
             "{\"$regularExpression\": {\"pattern\": \"pattern\", \"options\": \"\"}}, \"DatetimeEpoch\": {\"$date\": "
@@ -514,8 +515,10 @@ TEST_CASE("canonical_extjson_corpus", "[bson]") {
             "false, \"Minkey\": {\"$minKey\": 1}, \"Maxkey\": {\"$maxKey\": 1}, \"Null\": null, \"UUID\": "
             "{\"$binary\":{\"base64\":\"AAAAAAAAAAAAAAAAAAAAAA==\", \"subType\":\"04\"}}}");
 
-        std::string binary = "o0w498Or7cijeBSpkquNtg==";
-        std::string binary_user_defined = "AQIDBAU=";
+        std::string binary = "Binary\n";
+        std::string binary_64 = "QmluYXJ5Cg==";
+        std::string binary_user_defined = "Binary User Defined\n";
+        std::string binary_user_defined_b64 = "QmluYXJ5IFVzZXIgRGVmaW5lZAo=";
 
         const BsonDocument document = {
             {"_id", ObjectId("57e193d7a9cc81b4027498b5")},

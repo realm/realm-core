@@ -60,7 +60,7 @@ struct AnyContext {
     DataType get_type_of(const std::any& wrapper)
     {
         const std::type_info& type{wrapper.type()};
-        if (type == typeid(int64_t)) {
+        if (type == typeid(int64_t) || type == typeid(int)) {
             return type_Int;
         }
         if (type == typeid(StringData)) {
@@ -133,6 +133,8 @@ public:
     {
         return m_count;
     }
+    virtual Mixed mixed_for_argument(size_t argument_index);
+
 protected:
     void verify_ndx(size_t ndx) const
     {
@@ -145,7 +147,7 @@ protected:
             else {
                 error_message = util::format("Request for argument at index %1 but no arguments are provided", ndx);
             }
-            throw InvalidArgument(ErrorCodes::OutOfBounds, error_message);
+            throw InvalidQueryArgError(error_message);
         }
     }
     size_t m_count;

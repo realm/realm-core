@@ -26,8 +26,9 @@
 #include <string>
 
 #include <realm/util/assert.hpp>
-#include <realm/util/safe_int_ops.hpp>
 #include <realm/util/buffer.hpp>
+#include <realm/util/logger.hpp>
+#include <realm/util/safe_int_ops.hpp>
 #include <realm/impl/cont_transact_hist.hpp>
 #include <realm/impl/transact_log.hpp>
 
@@ -49,7 +50,7 @@ public:
     virtual void add_class(TableKey table_key, StringData table_name, Table::Type table_type);
     virtual void add_class_with_primary_key(TableKey, StringData table_name, DataType pk_type, StringData pk_field,
                                             bool nullable, Table::Type table_type);
-    virtual void erase_class(TableKey table_key, size_t num_tables);
+    virtual void erase_class(TableKey, StringData table_name, size_t num_tables);
     virtual void rename_class(TableKey table_key, StringData new_name);
     virtual void insert_column(const Table*, ColKey col_key, DataType type, StringData name, Table* target_table);
     virtual void erase_column(const Table*, ColKey col_key);
@@ -72,6 +73,7 @@ public:
     virtual void dictionary_insert(const CollectionBase& dict, size_t dict_ndx, Mixed key, Mixed value);
     virtual void dictionary_set(const CollectionBase& dict, size_t dict_ndx, Mixed key, Mixed value);
     virtual void dictionary_erase(const CollectionBase& dict, size_t dict_ndx, Mixed key);
+    virtual void dictionary_clear(const CollectionBase& dict);
 
     virtual void create_object(const Table*, GlobalKey);
     virtual void create_object_with_primary_key(const Table*, ObjKey, Mixed);
@@ -396,24 +398,24 @@ private:
     struct CollectionId {
         TableKey table_key;
         ObjKey object_key;
-        ColKey col_id;
+        StablePath path;
 
         CollectionId() = default;
         CollectionId(const CollectionBase& list)
             : table_key(list.get_table()->get_key())
             , object_key(list.get_owner_key())
-            , col_id(list.get_col_key())
+            , path(list.get_stable_path())
         {
         }
-        CollectionId(TableKey t, ObjKey k, ColKey c)
+        CollectionId(TableKey t, ObjKey k, StablePath&& p)
             : table_key(t)
             , object_key(k)
-            , col_id(c)
+            , path(std::move(p))
         {
         }
         bool operator!=(const CollectionId& other)
         {
-            return object_key != other.object_key || table_key != other.table_key || col_id != other.col_id;
+            return object_key != other.object_key || table_key != other.table_key || path != other.path;
         }
     };
 
@@ -421,18 +423,29 @@ private:
     _impl::TransactLogEncoder m_encoder{m_stream};
     util::Logger* m_logger = nullptr;
     mutable const Table* m_selected_table = nullptr;
+    mutable ObjKey m_selected_obj;
     mutable CollectionId m_selected_list;
 
     void unselect_all() noexcept;
-    void select_table(const Table*); // unselects link list
+    void select_table(const Table*); // unselects link list and obj
+    void select_obj(ObjKey key);
     void select_collection(const CollectionBase&);
 
     void do_select_table(const Table*);
     void do_select_collection(const CollectionBase&);
 
     void do_set(const Table*, ColKey col_key, ObjKey key, _impl::Instruction variant = _impl::instr_Set);
-
+    void log_collection_operation(const char* operation, const CollectionBase& collection, Mixed value,
+                                  Mixed index) const;
+    Path get_prop_name(Path&&) const;
     size_t transact_log_size();
+
+    util::Logger* would_log(util::Logger::Level level) const noexcept
+    {
+        if (m_logger && m_logger->would_log(level))
+            return m_logger;
+        return nullptr;
+    }
 };
 
 class Replication::Interrupted : public std::exception {
@@ -483,7 +496,6 @@ inline void Replication::select_table(const Table* table)
 {
     if (table != m_selected_table)
         do_select_table(table); // Throws
-    m_selected_list = CollectionId();
 }
 
 inline void Replication::select_collection(const CollectionBase& list)
@@ -493,107 +505,16 @@ inline void Replication::select_collection(const CollectionBase& list)
     }
 }
 
-inline void Replication::erase_class(TableKey table_key, size_t)
-{
-    unselect_all();
-    m_encoder.erase_class(table_key); // Throws
-}
-
 inline void Replication::rename_class(TableKey table_key, StringData)
 {
     unselect_all();
     m_encoder.rename_class(table_key); // Throws
 }
 
-inline void Replication::insert_column(const Table* t, ColKey col_key, DataType, StringData, Table*)
-{
-    select_table(t);                  // Throws
-    m_encoder.insert_column(col_key); // Throws
-}
-
-inline void Replication::erase_column(const Table* t, ColKey col_key)
-{
-    select_table(t);                 // Throws
-    m_encoder.erase_column(col_key); // Throws
-}
-
-
 inline void Replication::rename_column(const Table* t, ColKey col_key, StringData)
 {
     select_table(t);                  // Throws
     m_encoder.rename_column(col_key); // Throws
-}
-
-inline void Replication::do_set(const Table* t, ColKey col_key, ObjKey key, _impl::Instruction variant)
-{
-    if (variant != _impl::Instruction::instr_SetDefault) {
-        select_table(t);                       // Throws
-        m_encoder.modify_object(col_key, key); // Throws
-    }
-}
-
-inline void Replication::set(const Table* t, ColKey col_key, ObjKey key, Mixed, _impl::Instruction variant)
-{
-    do_set(t, col_key, key, variant); // Throws
-}
-
-inline void Replication::add_int(const Table* t, ColKey col_key, ObjKey key, int_fast64_t)
-{
-    do_set(t, col_key, key); // Throws
-}
-
-inline void Replication::nullify_link(const Table* t, ColKey col_key, ObjKey key)
-{
-    select_table(t);                       // Throws
-    m_encoder.modify_object(col_key, key); // Throws
-}
-
-inline void Replication::list_set(const CollectionBase& list, size_t list_ndx, Mixed)
-{
-    select_collection(list);                            // Throws
-    m_encoder.collection_set(list.translate_index(list_ndx)); // Throws
-}
-
-inline void Replication::list_insert(const CollectionBase& list, size_t list_ndx, Mixed, size_t)
-{
-    select_collection(list);                               // Throws
-    m_encoder.collection_insert(list.translate_index(list_ndx)); // Throws
-}
-
-inline void Replication::set_insert(const CollectionBase& set, size_t set_ndx, Mixed)
-{
-    select_collection(set);        // Throws
-    m_encoder.collection_insert(set_ndx); // Throws
-}
-
-inline void Replication::set_erase(const CollectionBase& set, size_t set_ndx, Mixed)
-{
-    select_collection(set);       // Throws
-    m_encoder.collection_erase(set_ndx); // Throws
-}
-
-inline void Replication::set_clear(const CollectionBase& set)
-{
-    select_collection(set);          // Throws
-    m_encoder.collection_clear(set.size()); // Throws
-}
-
-inline void Replication::remove_object(const Table* t, ObjKey key)
-{
-    select_table(t);              // Throws
-    m_encoder.remove_object(key); // Throws
-}
-
-inline void Replication::list_move(const CollectionBase& list, size_t from_link_ndx, size_t to_link_ndx)
-{
-    select_collection(list);                                                                     // Throws
-    m_encoder.collection_move(list.translate_index(from_link_ndx), list.translate_index(to_link_ndx)); // Throws
-}
-
-inline void Replication::list_erase(const CollectionBase& list, size_t link_ndx)
-{
-    select_collection(list);                              // Throws
-    m_encoder.collection_erase(list.translate_index(link_ndx)); // Throws
 }
 
 inline void Replication::typed_link_change(const Table* source_table, ColKey col, TableKey dest_table)

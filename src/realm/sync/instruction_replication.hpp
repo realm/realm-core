@@ -51,7 +51,7 @@ public:
     void create_object(const Table*, GlobalKey) final;
     void create_object_with_primary_key(const Table*, ObjKey, Mixed) final;
 
-    void erase_class(TableKey table_key, size_t num_tables) final;
+    void erase_class(TableKey table_key, StringData table_name, size_t num_tables) final;
     void rename_class(TableKey table_key, StringData new_name) final;
     void insert_column(const Table*, ColKey col_key, DataType type, StringData name, Table* target_table) final;
     void erase_column(const Table*, ColKey col_key) final;
@@ -73,6 +73,7 @@ public:
     void dictionary_insert(const CollectionBase&, size_t ndx, Mixed key, Mixed val) final;
     void dictionary_set(const CollectionBase&, size_t ndx, Mixed key, Mixed val) final;
     void dictionary_erase(const CollectionBase&, size_t ndx, Mixed key) final;
+    void dictionary_clear(const CollectionBase& dict) final;
 
     void remove_object(const Table*, ObjKey) final;
 
@@ -127,7 +128,7 @@ private:
 
     Instruction::PrimaryKey as_primary_key(Mixed);
     Instruction::PrimaryKey primary_key_for_object(const Table&, ObjKey key);
-    void populate_path_instr(Instruction::PathInstruction&, const Table&, ObjKey key, ColKey field);
+    void populate_path_instr(Instruction::PathInstruction&, const Table&, ObjKey key, Path path);
     void populate_path_instr(Instruction::PathInstruction&, const CollectionBase&);
     void populate_path_instr(Instruction::PathInstruction&, const CollectionBase&, uint32_t ndx);
 
@@ -137,10 +138,10 @@ private:
     // lookups.
     const Table* m_last_table = nullptr;
     ObjKey m_last_object;
-    ColKey m_last_field;
+    StringData m_last_field_name;
     InternString m_last_class_name;
     util::Optional<Instruction::PrimaryKey> m_last_primary_key;
-    InternString m_last_field_name;
+    InternString m_last_interned_field_name;
     util::UniqueFunction<WriteValidator> m_write_validator;
 };
 

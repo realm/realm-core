@@ -128,6 +128,7 @@ const char* file_order[] = {
 
     "large_tests*.cpp",
     "test_crypto.cpp",
+    "test_transform_collections_mixed.cpp",
     "test_transform.cpp",
     "test_array.cpp",
     "test_lang_bind_helper_sync.cpp",

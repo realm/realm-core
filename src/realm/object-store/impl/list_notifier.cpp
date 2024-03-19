@@ -18,9 +18,11 @@
 
 #include <realm/object-store/impl/list_notifier.hpp>
 
-#include <realm/object-store/list.hpp>
+#include <realm/list.hpp>
+#include <realm/dictionary.hpp>
 
 #include <realm/transaction.hpp>
+#include <realm/util/scope_exit.hpp>
 
 using namespace realm;
 using namespace realm::_impl;
@@ -31,6 +33,15 @@ ListNotifier::ListNotifier(std::shared_ptr<Realm> realm, CollectionBase const& l
     , m_prev_size(list.size())
 {
     attach(list);
+    if (m_logger && m_logger->would_log(util::Logger::Level::debug)) {
+        auto path = m_list->get_short_path();
+        auto prop_name = m_list->get_table()->get_column_name(path[0].get_col_key());
+        path[0] = PathElement(prop_name);
+
+        m_description = util::format("%1 %2%3", list.get_collection_type(), m_list->get_obj().get_id(), path);
+        m_logger->log(util::LogCategory::notification, util::Logger::Level::debug,
+                      "Creating CollectionNotifier for %1", m_description);
+    }
 }
 
 void ListNotifier::release_data() noexcept
@@ -41,18 +52,21 @@ void ListNotifier::release_data() noexcept
 
 void ListNotifier::reattach()
 {
+    REALM_ASSERT(m_list);
     attach(*m_list);
 }
 
 void ListNotifier::attach(CollectionBase const& src)
 {
     auto& tr = transaction();
-    try {
-        auto obj = tr.get_table(src.get_table()->get_key())->get_object(src.get_owner_key());
-        m_list = obj.get_collection_ptr(src.get_col_key());
+    if (auto obj = tr.get_table(src.get_table()->get_key())->try_get_object(src.get_owner_key())) {
+        auto path = src.get_stable_path();
+        m_list = std::static_pointer_cast<CollectionBase>(obj.get_collection_by_stable_path(path));
+        m_collection_parent = dynamic_cast<CollectionParent*>(m_list.get());
     }
-    catch (const KeyNotFound&) {
+    else {
         m_list = nullptr;
+        m_collection_parent = nullptr;
     }
 }
 
@@ -61,8 +75,9 @@ bool ListNotifier::do_add_required_change_info(TransactionChangeInfo& info)
     if (!m_list || !m_list->is_attached())
         return false; // origin row was deleted after the notification was added
 
+    StablePath this_path = m_list->get_stable_path();
     info.collections.push_back(
-        {m_list->get_table()->get_key(), m_list->get_owner_key(), m_list->get_col_key(), &m_change});
+        {m_list->get_table()->get_key(), m_list->get_owner_key(), std::move(this_path), &m_change});
 
     m_info = &info;
 
@@ -79,6 +94,8 @@ bool ListNotifier::do_add_required_change_info(TransactionChangeInfo& info)
 
 void ListNotifier::run()
 {
+    NotifierRunLogger log(m_logger.get(), "ListNotifier", m_description);
+
     if (!m_list || !m_list->is_attached()) {
         // List was deleted, so report all of the rows being removed if this is
         // the first run after that
@@ -110,6 +127,17 @@ void ListNotifier::run()
                 continue;
             if (object_did_change(m_list->get_any(move.to).get<ObjKey>()))
                 m_change.modifications.add(move.to);
+        }
+    }
+
+    // Modifications to nested values in Mixed are recorded in replication as
+    // StableIndex and we have to look up the actual index afterwards
+    if (m_change.paths.size()) {
+        REALM_ASSERT(m_collection_parent);
+        REALM_ASSERT(m_type == PropertyType::Mixed);
+        for (auto& p : m_change.paths) {
+            if (auto ndx = m_collection_parent->find_index(p); ndx != realm::not_found)
+                m_change.modifications.add(ndx);
         }
     }
 }

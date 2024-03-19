@@ -36,15 +36,18 @@ static_assert(realm_log_level_e(Logger::Level::off) == RLM_LOG_LEVEL_OFF);
 class CLogger : public realm::util::Logger {
 public:
     CLogger(UserdataPtr userdata, realm_log_func_t log_callback, Logger::Level level)
-        : Logger(level)
+        : Logger()
         , m_userdata(std::move(userdata))
         , m_log_callback(log_callback)
     {
+        set_level_threshold(level);
     }
 
 protected:
-    void do_log(Logger::Level level, const std::string& message) final
+    void do_log(const util::LogCategory&, Logger::Level level, const std::string& message) final
     {
+
+        // FIXME use category
         m_log_callback(m_userdata.get(), realm_log_level_e(level), message.c_str());
     }
 
@@ -67,6 +70,35 @@ RLM_API void realm_set_log_callback(realm_log_func_t callback, realm_log_level_e
 
 RLM_API void realm_set_log_level(realm_log_level_e level) noexcept
 {
-    util::Logger::set_default_level_threshold(realm::util::Logger::Level(level));
+    util::LogCategory::realm.set_default_level_threshold(realm::util::LogCategory::Level(level));
 }
+
+RLM_API realm_log_level_e realm_set_log_level_category(const char* category_name, realm_log_level_e level) noexcept
+{
+    auto& cat = util::LogCategory::get_category(category_name);
+    realm_log_level_e prev_level = realm_log_level_e(util::Logger::get_default_logger()->get_level_threshold(cat));
+    cat.set_default_level_threshold(realm::util::LogCategory::Level(level));
+    return prev_level;
+}
+
+RLM_API realm_log_level_e realm_get_log_level_category(const char* category_name) noexcept
+{
+    auto& cat = util::LogCategory::get_category(category_name);
+    return realm_log_level_e(util::Logger::get_default_logger()->get_level_threshold(cat));
+}
+
+RLM_API size_t realm_get_category_names(size_t num_values, const char** out_values)
+{
+    auto vec = util::LogCategory::get_category_names();
+    auto number_to_copy = vec.size();
+    if (num_values > 0) {
+        if (number_to_copy > num_values)
+            number_to_copy = num_values;
+        for (size_t n = 0; n < number_to_copy; n++) {
+            out_values[n] = vec[n];
+        }
+    }
+    return number_to_copy;
+}
+
 } // namespace realm::c_api
