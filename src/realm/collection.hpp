@@ -57,6 +57,7 @@ public:
     {
         return 0;
     }
+    void update_content_version() const noexcept final {}
 
 protected:
     Obj m_obj;
@@ -688,13 +689,14 @@ protected:
         return status == UpdateStatus::Updated;
     }
 
-    void bump_content_version()
+    void bump_content_version() noexcept
     {
         REALM_ASSERT(m_alloc);
         m_content_version = m_alloc->bump_content_version();
+        m_parent->update_content_version();
     }
 
-    void update_content_version() const
+    void update_content_version() const noexcept
     {
         REALM_ASSERT(m_alloc);
         m_content_version = m_alloc->get_content_version();
@@ -705,6 +707,7 @@ protected:
         REALM_ASSERT(m_alloc);
         m_alloc->bump_content_version();
         m_alloc->bump_storage_version();
+        m_parent->update_content_version();
     }
 
     Replication* get_replication() const
