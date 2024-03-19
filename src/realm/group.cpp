@@ -995,7 +995,7 @@ void Group::write(File& file, const char* encryption_key, uint_fast64_t version_
     // The aim is that the buffer size should be at least 1/256 of needed size but less than 64 Mb
     constexpr size_t upper_bound = 64 * 1024 * 1024;
     size_t min_space = std::min(get_used_space() >> 8, upper_bound);
-    size_t buffer_size = 4096;
+    size_t buffer_size = page_size();
     while (buffer_size < min_space) {
         buffer_size <<= 1;
     }
