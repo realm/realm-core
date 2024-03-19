@@ -87,7 +87,8 @@ private:
     std::pair<T, std::string_view> peek_token_impl() const
     {
         // We currently only support numeric, string, and boolean values in header lines.
-        static_assert(std::is_integral_v<T> || is_any_v<T, std::string_view, std::string, double>);
+        static_assert(std::is_integral_v<T> || std::is_floating_point_v<T> ||
+                      is_any_v<T, std::string_view, std::string>);
         if (at_end()) {
             throw ProtocolCodecException("reached end of header line prematurely");
         }
@@ -121,7 +122,7 @@ private:
 
             return {(cur_arg != 0), m_sv.substr(parse_res.ptr - m_sv.data())};
         }
-        else if constexpr (std::is_same_v<T, double>) {
+        else if constexpr (std::is_floating_point_v<T>) {
             // Currently all double are in the middle of the string delimited by a space.
             auto delim_at = m_sv.find(' ');
             if (delim_at == std::string_view::npos)
@@ -130,7 +131,13 @@ private:
             // FIXME use std::from_chars one day when it's availiable in every std lib
             T val = {};
             try {
-                val = std::stod(std::string(m_sv.substr(0, delim_at)));
+                std::string str(m_sv.substr(0, delim_at));
+                if constexpr (std::is_same_v<T, float>)
+                    val = std::stof(str);
+                else if constexpr (std::is_same_v<T, double>)
+                    val = std::stod(str);
+                else if constexpr (std::is_same_v<T, long double>)
+                    val = std::stold(str);
             }
             catch (const std::exception& err) {
                 throw ProtocolCodecException(
@@ -402,6 +409,7 @@ public:
             uint64_t downloadable_bytes = 0;
             double progress_estimate;
         };
+        ReceivedChangesets changesets;
     };
 
 private:
@@ -473,8 +481,6 @@ private:
                      "compressed_body_size=%3, uncompressed_body_size=%4",
                      session_ident, is_body_compressed, compressed_body_size, uncompressed_body_size);
 
-        ReceivedChangesets changesets;
-
         // Loop through the body and find the changesets.
         while (!msg.at_end()) {
             RemoteChangeset cur_changeset;
@@ -521,10 +527,10 @@ private:
             }
 
             cur_changeset.data = changeset_data;
-            changesets.push_back(std::move(cur_changeset)); // Throws
+            message.changesets.push_back(std::move(cur_changeset)); // Throws
         }
 
-        connection.receive_download_message(session_ident, message, changesets); // Throws
+        connection.receive_download_message(session_ident, message); // Throws
     }
 
     static sync::ProtocolErrorInfo::Action string_to_action(const std::string& action_string)
