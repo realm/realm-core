@@ -261,7 +261,13 @@ protected:
     CollectionBase& operator=(const CollectionBase&) noexcept = default;
     CollectionBase& operator=(CollectionBase&&) noexcept = default;
 
-    void validate_index(const char* msg, size_t index, size_t size) const;
+    void validate_index(const char* msg, size_t index, size_t size) const
+    {
+        if (index >= size) {
+            out_of_bounds(msg, index, size);
+        }
+    }
+    void out_of_bounds(const char* msg, size_t index, size_t size) const;
     static UpdateStatus do_init_from_parent(BPlusTreeBase* tree, ref_type ref, bool allow_create);
 };
 
@@ -277,16 +283,6 @@ inline std::string_view collection_type_name(CollectionType col_type, bool upper
     }
     return "";
 }
-
-inline void CollectionBase::validate_index(const char* msg, size_t index, size_t size) const
-{
-    if (index >= size) {
-        throw OutOfBounds(util::format("%1 on %2 '%3.%4'", msg, collection_type_name(get_collection_type()),
-                                       get_table()->get_class_name(), get_property_name()),
-                          index, size);
-    }
-}
-
 
 template <class T>
 inline void check_column_type(ColKey col)
