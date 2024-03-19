@@ -297,10 +297,6 @@ std::shared_ptr<Realm> open_realm(RealmConfig& config, const app::AppConfig& app
         }
     };
 
-    // This logic is all a giant race condition once we have multi-process sync.
-    // Wrapping it all (including the keychain accesses) in DB::call_with_lock()
-    // might suffice.
-
     // First try to open the Realm with a key already stored in the keychain.
     // This works for both the case where everything is sensible and valid and
     // when we have a key but no metadata Realm.
@@ -381,12 +377,13 @@ struct PersistedSyncMetadataManager : public app::MetadataStore {
         m_user_identity_schema.read(*realm);
         m_current_user_schema.read(*realm);
 
-        realm->begin_transaction();
-        perform_file_actions(*realm, file_manager);
-        remove_dead_users(*realm, file_manager);
-        realm->commit_transaction();
-
         m_coordinator = _impl::RealmCoordinator::get_existing_coordinator(config.path);
+        if (m_coordinator->try_claim_sync_agent()) {
+            realm->begin_transaction();
+            perform_file_actions(*realm, file_manager);
+            remove_dead_users(*realm, file_manager);
+            realm->commit_transaction();
+        }
     }
 
     std::shared_ptr<Realm> get_realm() const
