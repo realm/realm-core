@@ -165,38 +165,6 @@ bool ArrayPacked::find_all(const Array& arr, int64_t value, size_t start, size_t
     // the width of each single value within a 64 bit word and N is the total number of values stored in the array.
 
     // in packed format a parallel subword find pays off also for width >= 32
-    
-    
-//    bf_iterator it((uint64_t*)arr.m_data, 0, arr.m_width, arr.m_width, start);
-//    while(start < end) {
-//        
-//        const auto sv = sign_extend_field_by_mask(arr.get_encoder().width_mask(), *it);
-//        
-//        if constexpr(std::is_same_v<Cond, Equal>) {
-//            if(sv == value && !state->match(start + baseindex))
-//                return false;
-//            //else if(sv > value)
-//            //    break;
-//        }
-//        if constexpr(std::is_same_v<Cond, NotEqual>) {
-//            if(sv != value && !state->match(start + baseindex))
-//                return false;
-//        }
-//        if constexpr(std::is_same_v<Cond, Less>) {
-//            if(sv < value && !state->match(start + baseindex))
-//                return false;
-//            //else if(sv >= value)
-//            //    break;
-//        }
-//        if constexpr(std::is_same_v<Cond, Greater>) {
-//            if(sv > value && !state->match(start + baseindex))
-//                return false;
-//        }
-//        
-//        start++;
-//        ++it;
-//    }
-    
     const auto MSBs = arr.get_encoder().msb();
     const auto search_vector = populate(arr.m_width, value);
     while (start < end) {
