@@ -97,6 +97,7 @@ struct AppConfig {
     };
     MetadataMode metadata_mode = MetadataMode::Encryption;
     std::optional<std::vector<char>> custom_encryption_key;
+    bool enable_multiprocess_metadata = true;
 };
 
 } // namespace app

@@ -337,6 +337,27 @@ std::shared_ptr<Realm> open_realm(RealmConfig& config, bool should_encrypt, bool
 #endif // REALM_PLATFORM_APPLE
 }
 
+// A scheduler which immediately invokes notifications on the background worker thread
+class ImmediateScheduler : public util::Scheduler {
+public:
+    bool is_on_thread() const noexcept override
+    {
+        return true;
+    }
+    bool is_same_as(const Scheduler*) const noexcept override
+    {
+        return false;
+    }
+    bool can_invoke() const noexcept override
+    {
+        return true;
+    }
+    void invoke(util::UniqueFunction<void()>&& fn) override
+    {
+        fn();
+    }
+};
+
 struct PersistedSyncMetadataManager : public app::MetadataStore {
     app::App* const m_app;
     std::shared_ptr<_impl::RealmCoordinator> m_coordinator;
@@ -345,19 +366,23 @@ struct PersistedSyncMetadataManager : public app::MetadataStore {
     UserIdentitySchema m_user_identity_schema;
     CurrentUserSchema m_current_user_schema;
 
-    PersistedSyncMetadataManager(std::string path, bool should_encrypt,
-                                 util::Optional<std::vector<char>> encryption_key, SyncFileManager& file_manager,
+    std::atomic<bool> m_need_notifications;
+    NotificationToken m_notification_token;
+
+    PersistedSyncMetadataManager(const app::AppConfig& app_config, SyncFileManager& file_manager,
                                  app::App* app)
         : m_app(app)
+        , m_need_notifications(app_config.enable_multiprocess_metadata)
     {
         constexpr uint64_t SCHEMA_VERSION = 7;
 
-        if (!REALM_PLATFORM_APPLE && should_encrypt && !encryption_key)
+        bool should_encrypt = app_config.metadata_mode != app::AppConfig::MetadataMode::NoEncryption;
+        if (!REALM_PLATFORM_APPLE && should_encrypt && !app_config.custom_encryption_key)
             throw InvalidArgument("Metadata Realm encryption was specified, but no encryption key was provided.");
 
         RealmConfig config;
-        config.automatic_change_notifications = false;
-        config.path = std::move(path);
+        config.automatic_change_notifications = app_config.enable_multiprocess_metadata;
+        config.path = file_manager.metadata_path();
         config.schema = Schema{
             UserIdentitySchema::object_schema(),
             SyncUserSchema::object_schema(),
@@ -367,9 +392,8 @@ struct PersistedSyncMetadataManager : public app::MetadataStore {
 
         config.schema_version = SCHEMA_VERSION;
         config.schema_mode = SchemaMode::Automatic;
-        config.scheduler = util::Scheduler::make_dummy();
-        if (encryption_key)
-            config.encryption_key = std::move(*encryption_key);
+        if (app_config.custom_encryption_key)
+            config.encryption_key = *app_config.custom_encryption_key;
         config.automatically_handle_backlinks_in_migrations = true;
         config.migration_function = [](std::shared_ptr<Realm> old_realm, std::shared_ptr<Realm> realm, Schema&) {
             if (old_realm->schema_version() < 7) {
@@ -377,7 +401,7 @@ struct PersistedSyncMetadataManager : public app::MetadataStore {
             }
         };
 
-        auto realm = open_realm(config, should_encrypt, encryption_key != none);
+        auto realm = open_realm(config, should_encrypt, app_config.custom_encryption_key != none);
         m_user_schema.read(*realm);
         m_file_action_schema.read(*realm);
         m_user_identity_schema.read(*realm);
@@ -389,6 +413,21 @@ struct PersistedSyncMetadataManager : public app::MetadataStore {
         realm->commit_transaction();
 
         m_coordinator = _impl::RealmCoordinator::get_existing_coordinator(config.path);
+    }
+
+    void create_notifier()
+    {
+        if (!m_need_notifications.exchange(false)) {
+            return;
+        }
+
+        auto config = m_coordinator->get_config();
+        config.scheduler = std::make_shared<ImmediateScheduler>();
+        auto realm = m_coordinator->get_realm(config, {});
+        Results results(realm, realm->read_group().get_table(m_user_schema.table_key));
+        m_notification_token = results.add_notification_callback([&](CollectionChangeSet const&) {
+            m_app->refresh_users();
+        });
     }
 
     void notify_app(std::string_view user_id, std::optional<UserData>&& data)
@@ -492,6 +531,7 @@ struct PersistedSyncMetadataManager : public app::MetadataStore {
         bool did_run = perform_file_action(file_manager, obj);
         if (did_run)
             obj.remove();
+        m_notification_token.suppress_next();
         realm->commit_transaction();
         return did_run;
     }
@@ -531,6 +571,7 @@ struct PersistedSyncMetadataManager : public app::MetadataStore {
         obj.set<String>(schema.access_token_col, access_token);
         obj.set<String>(schema.device_id_col, device_id);
 
+        m_notification_token.suppress_next();
         realm->commit_transaction();
 
         notify_app(user_id, read_user(obj));
@@ -573,6 +614,7 @@ struct PersistedSyncMetadataManager : public app::MetadataStore {
         // intentionally does not update `legacy_identities` as that field is
         // read-only and no longer used
 
+        m_notification_token.suppress_next();
         realm->commit_transaction();
         notify_app(user_id, std::move(data));
     }
@@ -664,6 +706,7 @@ struct PersistedSyncMetadataManager : public app::MetadataStore {
             obj.set<String>(m_user_schema.refresh_token_col, "");
             update_current_user(*realm, user_id);
         }
+        m_notification_token.suppress_next();
         realm->commit_transaction();
 
         notify_app(user_id, read_user(obj));
@@ -677,6 +720,7 @@ struct PersistedSyncMetadataManager : public app::MetadataStore {
             delete_user_realms(file_manager, obj); // also removes obj
             update_current_user(*realm, user_id);
         }
+        m_notification_token.suppress_next();
         realm->commit_transaction();
         notify_app(user_id, std::nullopt);
     }
@@ -688,6 +732,7 @@ struct PersistedSyncMetadataManager : public app::MetadataStore {
         if (auto obj = find_user(*realm, user_id)) {
             obj.get_set<String>(m_user_schema.realm_file_paths_col).insert(path);
         }
+        m_notification_token.suppress_next();
         realm->commit_transaction();
     }
 
@@ -986,7 +1031,5 @@ std::unique_ptr<app::MetadataStore> app::create_metadata_store(const AppConfig& 
     if (config.metadata_mode == AppConfig::MetadataMode::InMemory) {
         return std::make_unique<InMemoryMetadataStorage>(app);
     }
-    return std::make_unique<PersistedSyncMetadataManager>(
-        file_manager.metadata_path(), config.metadata_mode != AppConfig::MetadataMode::NoEncryption,
-        config.custom_encryption_key, file_manager, app);
+    return std::make_unique<PersistedSyncMetadataManager>(config, file_manager, app);
 }

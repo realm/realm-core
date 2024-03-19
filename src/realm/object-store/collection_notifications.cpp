@@ -62,5 +62,7 @@ void NotificationToken::unregister()
 
 void NotificationToken::suppress_next()
 {
-    m_notifier.load()->suppress_next_notification(m_token);
+    if (auto notifier = m_notifier.load()) {
+        notifier->suppress_next_notification(m_token);
+    }
 }

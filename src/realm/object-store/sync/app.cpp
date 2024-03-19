@@ -861,20 +861,36 @@ bool App::verify_user_present(const std::shared_ptr<User>& user) const
     return false;
 }
 
+void App::do_refresh_user(UserMap::iterator it, std::optional<UserData>&& data)
+{
+    bool remove = !data;
+    it->second->update_backing_data(std::move(data));
+    // FIXME: there's an ownership problem here where removing a user could release the final reference to `this`
+    if (remove) {
+        if (m_current_user == it->second) {
+            m_current_user = nullptr;
+        }
+        m_users.erase(it);
+    }
+}
+
 void App::refresh_user(std::string_view user_id, std::optional<UserData>&& data)
 {
     util::CheckedLockGuard lock(m_user_mutex);
     if (auto it = m_users.find(std::string(user_id)); it != m_users.end()) { // FIXME
-        bool remove = !data;
-        it->second->update_backing_data(std::move(data));
-        // FIXME: there's an ownership problem here where removing a user could release the final reference to `this`
-        if (remove) {
-            if (m_current_user == it->second) {
-                m_current_user = nullptr;
-            }
-            m_users.erase(it);
+        do_refresh_user(it, std::move(data));
+    }
+}
+
+void App::refresh_users()
+{
+    {
+        util::CheckedLockGuard lock(m_user_mutex);
+        for (auto it = m_users.begin(); it != m_users.end();) {
+            do_refresh_user(it++, m_metadata_store->get_user(it->first));
         }
     }
+    emit_change_to_subscribers(*this);
 }
 
 void App::switch_user(const std::shared_ptr<User>& user)

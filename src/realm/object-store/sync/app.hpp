@@ -430,6 +430,7 @@ public:
     bool immediately_run_file_actions(std::string_view realm_path);
 
     void refresh_user(std::string_view user_id, std::optional<UserData>&& data) REQUIRES(!m_user_mutex);
+    void refresh_users() REQUIRES(!m_user_mutex);
 
 private:
     const AppConfig m_config;
@@ -597,7 +598,8 @@ private:
     friend class User;
 
     util::CheckedMutex m_user_mutex;
-    mutable std::unordered_map<std::string, User*> m_users GUARDED_BY(m_user_mutex);
+    using UserMap = std::unordered_map<std::string, User*>;
+    mutable UserMap m_users GUARDED_BY(m_user_mutex);
     User* m_current_user GUARDED_BY(m_user_mutex) = nullptr;
 
     void register_sync_user(User& sync_user) REQUIRES(m_user_mutex);
@@ -607,6 +609,7 @@ private:
     std::shared_ptr<User> get_user_for_id(const std::string& user_id) REQUIRES(m_user_mutex);
     void log_out(const std::shared_ptr<User>& user, SyncUser::State new_state,
                  util::UniqueFunction<void(std::optional<AppError>)>&& completion) REQUIRES(!m_route_mutex);
+    void do_refresh_user(UserMap::iterator, std::optional<UserData>&& data) REQUIRES(m_user_mutex);
 };
 
 // MARK: Provider client templates
