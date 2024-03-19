@@ -3242,8 +3242,7 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
         SyncTestFile r_config(user, partition, schema);
 
         std::vector<SharedRealm> realms;
-        int i;
-        for (i = 0; i < num_realms; i++) {
+        for (int i = 0; i < num_realms; i++) {
             SyncTestFile r_config(user, partition, schema);
             realms.push_back(Realm::get_shared_realm(r_config));
         }
@@ -4240,7 +4239,7 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
             }
 
             socket_provider->endpoint_verify_func = [&use_ssl, &expected_host,
-                                                     &expected_port](sync::WebSocketEndpoint& ep) {
+                                                     &expected_port](const sync::WebSocketEndpoint& ep) {
                 CHECK(ep.address == expected_host);
                 CHECK(ep.port == expected_port);
                 CHECK(ep.is_ssl == use_ssl);
@@ -4289,7 +4288,7 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
             }
 
             socket_provider->endpoint_verify_func = [&use_ssl, &initial_host,
-                                                     &initial_port](sync::WebSocketEndpoint& ep) {
+                                                     &initial_port](const sync::WebSocketEndpoint& ep) {
                 CHECK(ep.address == initial_host);
                 CHECK(ep.port == initial_port);
                 CHECK(ep.is_ssl == use_ssl);
@@ -4316,12 +4315,12 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
                         // After number of location verify attempts has passed, let the location succeed
                         if (--retry_count <= 0) {
                             redir_transport->reset(init_url, redir_url);
-                            socket_provider->endpoint_verify_func = [&use_ssl, &expected_host,
-                                                                     &expected_port](sync::WebSocketEndpoint& ep) {
-                                CHECK(ep.address == expected_host);
-                                CHECK(ep.port == expected_port);
-                                CHECK(ep.is_ssl == use_ssl);
-                            };
+                            socket_provider->endpoint_verify_func =
+                                [&use_ssl, &expected_host, &expected_port](const sync::WebSocketEndpoint& ep) {
+                                    CHECK(ep.address == expected_host);
+                                    CHECK(ep.port == expected_port);
+                                    CHECK(ep.is_ssl == use_ssl);
+                                };
                             return TestState::location_failed;
                         }
                         redir_transport->location_requested = false;

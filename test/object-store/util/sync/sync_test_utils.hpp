@@ -257,14 +257,13 @@ struct HookedSocketProvider : public sync::websocket::DefaultSocketProvider {
     std::unique_ptr<sync::WebSocketInterface> connect(std::unique_ptr<sync::WebSocketObserver> observer,
                                                       sync::WebSocketEndpoint&& endpoint) override
     {
-        sync::WebSocketEndpoint ep{std::move(endpoint)};
         std::optional<SocketProviderError> error;
         if (endpoint_verify_func) {
-            endpoint_verify_func(ep);
+            endpoint_verify_func(endpoint);
         }
 
         if (websocket_endpoint_resolver) {
-            ep = websocket_endpoint_resolver(std::move(ep));
+            endpoint = websocket_endpoint_resolver(std::move(endpoint));
         }
 
         if (websocket_connect_func) {
@@ -278,7 +277,7 @@ struct HookedSocketProvider : public sync::websocket::DefaultSocketProvider {
         }
 
         std::unique_ptr<sync::WebSocketInterface> websocket =
-            DefaultSocketProvider::connect(std::move(observer), std::move(ep));
+            DefaultSocketProvider::connect(std::move(observer), std::move(endpoint));
         if (error && error->status_code > 0) {
             auto default_websocket = dynamic_cast<sync::websocket::DefaultWebSocket*>(websocket.get());
             if (default_websocket)
@@ -288,7 +287,7 @@ struct HookedSocketProvider : public sync::websocket::DefaultSocketProvider {
     }
 
     std::function<sync::WebSocketEndpoint(sync::WebSocketEndpoint&&)> websocket_endpoint_resolver;
-    std::function<void(sync::WebSocketEndpoint& endpoint)> endpoint_verify_func;
+    std::function<void(const sync::WebSocketEndpoint&)> endpoint_verify_func;
     std::function<std::optional<SocketProviderError>()> websocket_connect_func;
 };
 

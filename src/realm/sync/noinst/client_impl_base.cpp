@@ -584,18 +584,18 @@ bool Connection::websocket_closed_handler(bool was_clean, WebSocketError error_c
             break;
         }
         case WebSocketError::websocket_fatal_error: {
+            // Error is fatal if the sync_route has already been verified
+            SessionErrorInfo error_info(
+                {ErrorCodes::SyncConnectFailed, util::format("Failed to connect to sync: %1", msg)},
+                IsFatal{m_server_endpoint.is_verified});
+            ConnectionTerminationReason reason = ConnectionTerminationReason::http_response_says_fatal_error;
             // If the connection fails/times out and the server has not been contacted yet, refresh the location
             // to make sure the websocket URL is correct
             if (!m_server_endpoint.is_verified) {
-                SessionErrorInfo error_info(
-                    {ErrorCodes::SyncConnectFailed, util::format("Failed to connect to sync: %1", msg)},
-                    IsFatal{false});
                 error_info.server_requests_action = ProtocolErrorInfo::Action::RefreshLocation;
-                involuntary_disconnect(std::move(error_info), ConnectionTerminationReason::connect_operation_failed);
-                break;
+                reason = ConnectionTerminationReason::connect_operation_failed;
             }
-            involuntary_disconnect(SessionErrorInfo({ErrorCodes::ConnectionClosed, msg}, IsFatal{true}),
-                                   ConnectionTerminationReason::http_response_says_fatal_error);
+            involuntary_disconnect(std::move(error_info), reason);
             break;
         }
         case WebSocketError::websocket_forbidden: {
