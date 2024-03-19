@@ -977,8 +977,11 @@ TEMPLATE_TEST_CASE("sync progress notifications", "[sync][baas][progress]", PBS,
             // add more objects through realm_1 and reopen existing realm on second iteration
             if (i == 0) {
                 expected_count = setup.add_objects(realm_1);
+                add_callbacks(realm_1, progress_1);
                 wait_for_sync(realm_1);
-                clear(progress);
+                VERIFY_PROGRESS_EMPTY(progress_1, 0, 2);
+                VERIFY_PROGRESS_CONSISTENCY(progress_1, 2, 8);
+                clear(progress_1);
             }
         }
     }

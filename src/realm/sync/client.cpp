@@ -178,12 +178,6 @@ private:
         uint64_t downloadable = 0;
         uint64_t final_uploaded = 0;
         uint64_t final_downloaded = 0;
-        bool compare(const ReportedProgress& o, bool with_snapshot)
-        {
-            return (!with_snapshot || snapshot == o.snapshot) && uploaded == o.uploaded &&
-                   uploadable == o.uploadable && final_uploaded == o.final_uploaded && downloaded == o.downloaded &&
-                   downloadable == o.downloadable && final_downloaded == o.final_downloaded;
-        }
     } m_reported_progress;
 
     util::UniqueFunction<ProgressHandler> m_progress_handler;
@@ -1914,7 +1908,7 @@ void SessionWrapper::report_progress(bool is_download, bool only_if_new_uploadab
             p.downloaded += *m_bootstrap_store_bytes;
 
         // FIXME for flx with download estimate these bytes are not known
-        // provide some sensible value for non-streaming version of object-store callbackas
+        // provide some sensible value for non-streaming version of object-store callbacks
         // until these field are completely removed from the api after pbs deprecation
         p.downloadable = p.downloaded;
         if (0.01 <= download_estimate && download_estimate <= 0.99)
@@ -1941,16 +1935,18 @@ void SessionWrapper::report_progress(bool is_download, bool only_if_new_uploadab
 
     m_reported_progress = p;
 
-    auto to_str = [](double d) {
-        std::ostringstream ss;
-        // progress estimate string in the DOWNLOAD message isn't expected to have more than 4 digits of precision
-        ss << std::fixed << std::setprecision(4) << d;
-        return ss.str();
-    };
-    m_sess->logger.debug("Progress handler called, downloaded = %1, downloadable = %2, estimate = %3, "
-                         "uploaded = %4, uploadable = %5, estimate = %6, snapshot version = %7",
-                         p.downloaded, p.downloadable, to_str(download_estimate), p.uploaded, p.uploadable,
-                         to_str(upload_estimate), p.snapshot);
+    if (m_sess->logger.would_log(Logger::Level::debug)) {
+        auto to_str = [](double d) {
+            std::ostringstream ss;
+            // progress estimate string in the DOWNLOAD message isn't expected to have more than 4 digits of precision
+            ss << std::fixed << std::setprecision(4) << d;
+            return ss.str();
+        };
+        m_sess->logger.debug("Progress handler called, downloaded = %1, downloadable = %2, estimate = %3, "
+                             "uploaded = %4, uploadable = %5, estimate = %6, snapshot version = %7",
+                             p.downloaded, p.downloadable, to_str(download_estimate), p.uploaded, p.uploadable,
+                             to_str(upload_estimate), p.snapshot);
+    }
 
     m_progress_handler(p.downloaded, p.downloadable, p.uploaded, p.uploadable, p.snapshot, download_estimate,
                        upload_estimate);

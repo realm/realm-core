@@ -2764,7 +2764,6 @@ void Session::check_for_upload_completion()
 
     m_upload_completion_notification_requested = false;
     on_upload_completion(); // Throws
-    return;
 }
 
 
@@ -2786,5 +2785,4 @@ void Session::check_for_download_completion()
         ensure_enlisted_to_send(); // Throws
     }
     on_download_completion(); // Throws
-    return;
 }

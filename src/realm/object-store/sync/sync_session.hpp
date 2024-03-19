@@ -72,7 +72,7 @@ private:
         uint64_t uploaded;
         uint64_t downloaded;
         double upload_estimate;
-        double dowload_estimate;
+        double download_estimate;
         uint64_t snapshot_version;
     };
 
