@@ -3193,6 +3193,7 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
         // Set the base URL to an invalid value
         std::string fake_host = "http://fakerealm.example.com:1234";
         test_session.app_config.base_url = fake_host;
+        test_session.sc_config.multiplex_sessions = GENERATE(true, false);
 
         // Set up the socket provider and transport to report the correct server
         int connect_count = 0;
@@ -3232,16 +3233,23 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
         test_session.reopen(false);
 
         // Open the realm with the cached user
-        {
-            auto user = test_session.app()->current_user();
-            REQUIRE(user);
-            // Verify no transport calls have been made at this point since the
-            // app was re-opened.
-            REQUIRE(request_count == 0);
-            SyncTestFile r_config(user, partition, schema);
+        int num_realms = GENERATE(1, 3);
+        auto user = test_session.app()->current_user();
+        REQUIRE(user);
+        // Verify no transport calls have been made at this point since the
+        // app was re-opened.
+        REQUIRE(request_count == 0);
+        SyncTestFile r_config(user, partition, schema);
 
-            auto r = Realm::get_shared_realm(r_config);
-            REQUIRE(!wait_for_download(*r));
+        std::vector<SharedRealm> realms;
+        int i;
+        for (i = 0; i < num_realms; i++) {
+            SyncTestFile r_config(user, partition, schema);
+            realms.push_back(Realm::get_shared_realm(r_config));
+        }
+        // wait for download
+        for (auto& realm : realms) {
+            REQUIRE(!wait_for_download(*realm));
         }
     }
 
