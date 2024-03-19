@@ -1125,7 +1125,7 @@ bool SessionImpl::is_steady_state_download_message(DownloadBatchState batch_stat
 
 void SessionImpl::init_progress_handler()
 {
-    if (m_state != State::Unactivated)
+    if (m_state != State::Unactivated && m_state != State::Active)
         return;
 
     m_wrapper.init_progress_handler();
@@ -1926,6 +1926,11 @@ void SessionWrapper::report_progress(bool is_download, bool only_if_new_uploadab
             if (p.downloadable > p.final_downloaded)
                 download_estimate = (p.downloaded - p.final_downloaded) / double(p.downloadable - p.final_downloaded);
     }
+
+    REALM_ASSERT_DEBUG_EX(0 <= download_estimate && download_estimate <= 1, download_estimate, p.final_downloaded,
+                          p.downloaded, p.downloadable);
+    REALM_ASSERT_DEBUG_EX(0 <= upload_estimate && upload_estimate <= 1, upload_estimate, p.final_uploaded, p.uploaded,
+                          p.uploadable);
 
     if (is_completed) {
         if (is_download)

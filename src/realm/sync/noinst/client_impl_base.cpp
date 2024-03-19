@@ -2257,6 +2257,7 @@ bool Session::client_reset_if_needed()
 
     m_upload_progress = m_progress.upload;
     m_download_progress = m_progress.download;
+    init_progress_handler();
     // In recovery mode, there may be new changesets to upload and nothing left to download.
     // In FLX DiscardLocal mode, there may be new commits due to subscription handling.
     // For both, we want to allow uploads again without needing external changes to download first.
