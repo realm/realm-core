@@ -30,16 +30,6 @@
 
 using namespace realm;
 
-inline bool run_eq_neq_parallel_subscan(size_t w, size_t range)
-{
-    return w < 32 && range >= 50;
-}
-
-inline bool run_lt_gt_parallel_subscan(size_t w, size_t range)
-{
-    return w < 16 && range >= 50;
-}
-
 void ArrayFlex::init_array(char* h, uint8_t flags, size_t v_width, size_t ndx_width, size_t v_size,
                            size_t ndx_size) const
 {
@@ -134,38 +124,6 @@ void ArrayFlex::get_chunk(const Array& arr, size_t ndx, int64_t res[8]) const
     for (; index < 8; ++index) {
         res[index++] = get(arr, i++);
     }
-}
-
-bool ArrayFlex::find_eq(const Array& arr, int64_t value, size_t start, size_t end, size_t baseindex,
-                        QueryStateBase* state) const
-{
-    if(!run_eq_neq_parallel_subscan(arr.m_width, end-start))
-        return find_linear<Equal>(arr, value, start, end, baseindex, state);
-    return find_parallel<Equal, Equal>(arr, value, start, end, baseindex, state);
-}
-
-bool ArrayFlex::find_neq(const Array& arr, int64_t value, size_t start, size_t end, size_t baseindex,
-                         QueryStateBase* state) const
-{
-    if(!run_eq_neq_parallel_subscan(arr.m_width, end-start))
-        return find_linear<NotEqual>(arr, value, start, end, baseindex, state);
-    return find_parallel<NotEqual, LessEqual>(arr, value, start, end, baseindex, state);
-}
-
-bool ArrayFlex::find_lt(const Array& arr, int64_t value, size_t start, size_t end, size_t baseindex,
-                        QueryStateBase* state) const
-{
-    if(!run_lt_gt_parallel_subscan(arr.m_width, end-start))
-        return find_linear<Less>(arr, value, start, end, baseindex, state);
-    return find_parallel<GreaterEqual, Less>(arr, value, start, end, baseindex, state);
-}
-
-bool ArrayFlex::find_gt(const Array& arr, int64_t value, size_t start, size_t end, size_t baseindex,
-                        QueryStateBase* state) const
-{
-    if(!run_lt_gt_parallel_subscan(arr.m_width, end-start))
-        return find_linear<Greater>(arr, value, start, end, baseindex, state);
-    return find_parallel<Greater, GreaterEqual>(arr, value, start, end, baseindex, state);
 }
 
 int64_t ArrayFlex::sum(const Array& arr, size_t start, size_t end) const

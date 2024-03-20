@@ -32,12 +32,6 @@
 
 using namespace realm;
 
-template bool ArrayPacked::find_all<Equal>(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*) const;
-template bool ArrayPacked::find_all<NotEqual>(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*) const;
-template bool ArrayPacked::find_all<Greater>(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*) const;
-template bool ArrayPacked::find_all<Less>(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*) const;
-
-
 void ArrayPacked::init_array(char* h, uint8_t flags, size_t v_width, size_t v_size) const
 {
     using Encoding = NodeHeader::Encoding;
@@ -110,72 +104,6 @@ void ArrayPacked::get_chunk(const Array& arr, size_t ndx, int64_t res[8]) const
     for (; index < 8; ++index) {
         res[index++] = get(arr, i++);
     }
-}
-
-template <typename Cond>
-uint64_t vector_compare(uint64_t MSBs, uint64_t a, uint64_t b)
-{
-    if constexpr (std::is_same_v<Cond, Equal>)
-        return find_all_fields_EQ(MSBs, a, b);
-    if constexpr (std::is_same_v<Cond, NotEqual>)
-        return find_all_fields_NE(MSBs, a, b);
-    if constexpr (std::is_same_v<Cond, Greater>)
-        return find_all_fields_signed_GT(MSBs, a, b);
-    if constexpr (std::is_same_v<Cond, Less>)
-        return find_all_fields_signed_LT(MSBs, a, b);
-}
-
-template <typename Cond>
-bool ArrayPacked::find_all(const Array& arr, int64_t value, size_t start, size_t end, size_t baseindex,
-                           QueryStateBase* state) const
-{
-    REALM_ASSERT_DEBUG(start <= arr.m_size && (end <= arr.m_size || end == size_t(-1)) && start <= end);
-    Cond c;
-
-    if (end == npos)
-        end = arr.m_size;
-
-    if (!(arr.m_size > start && start < end))
-        return true;
-
-    const auto lbound = arr.m_lbound;
-    const auto ubound = arr.m_ubound;
-
-    if (!c.can_match(value, lbound, ubound))
-        return true;
-
-    if (c.will_match(value, lbound, ubound)) {
-        return find_all_match(start, end, baseindex, state);
-    }
-
-    REALM_ASSERT_3(arr.m_width, !=, 0);
-    // NOTE: this is one of the most important functions in the whole codebase, since it determines how fast the
-    // queries run.
-    //
-    // Main idea around find.
-    // Try to find the starting point where the condition can be met, comparing as many values as a single 64bit can
-    // contain in parallel. Once we have found the starting point, keep matching values as much as we can between
-    // start and end.
-    //
-    // EG: we store the value 6, with width 4bits (0110), 6 is 4 bits because, 110 (6) + sign bit 0.
-    // Inside 64bits we can fit max 16 times 6. If we go from index 0 to 15 throughout the same 64 bits, we need to
-    // apply a mask and a shift bits every time, then compare the values.
-    // This is not the cheapest thing to do. Instead we can compare all values contained within 64 bits in one go and
-    // see if there is a match with what we are looking for. Reducing the number of comparison by ~logk(N) where K is
-    // the width of each single value within a 64 bit word and N is the total number of values stored in the array.
-
-    // in packed format a parallel subword find pays off also for width >= 32
-    const auto MSBs = arr.get_encoder().msb();
-    const auto search_vector = populate(arr.m_width, value);
-    while (start < end) {
-        start = parallel_subword_find(vector_compare<Cond>, (const uint64_t*)arr.m_data, 0, arr.m_width, MSBs,
-                                      search_vector, start, end);
-        if (start < end)
-            if (!state->match(start + baseindex))
-                return false;
-        ++start;
-    }
-    return true;
 }
 
 bool ArrayPacked::find_all_match(size_t start, size_t end, size_t baseindex, QueryStateBase* state) const

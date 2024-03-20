@@ -346,7 +346,7 @@ public:
         }
         field_position = next_field_position;
     }
-    
+
     inline void move(size_t index, size_t initial_offset = 0)
     {
         field_position = initial_offset + index * step_size;
