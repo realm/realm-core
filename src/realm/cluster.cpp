@@ -1653,13 +1653,34 @@ ref_type Cluster::typed_write(ref_type ref, _impl::ArrayWriterBase& out, const T
             else if (col_type == col_type_Mixed) {
                 const auto sz = leaf.size();
                 REALM_ASSERT(sz == 6);
-                // temporary disable mixed. in order to re-enable them in a separate PR
                 for (size_t i = 0; i < sz; ++i) {
                     auto rot = leaf.get_as_ref_or_tagged(i);
                     if (rot.is_ref() && rot.get_as_ref()) {
-                        // entries 0-2 are integral and can be compressed, entry 3 is strings and not compressed (yet)
-                        // collections in mixed are stored at position 4.
-                        bool do_compress = false; // (i < 3 || i == 4) ? true : false;
+
+                        /*
+                         In order to know how Mixed stores things, we need to take in consideration this enum
+                         enum {
+                             payload_idx_type,
+                             payload_idx_int,
+                             payload_idx_pair,
+                             payload_idx_str,
+                             payload_idx_ref,
+                             payload_idx_key,
+                             payload_idx_size
+                         };
+                         Note:
+                         1. First 3 entries can be compressed (they are integers)
+                         2. entry number 4 is for strings (no compression for now)
+                         3. entry number 5 is actually storing refs to collections (List or Dictionaries).
+                            They can only be BPlusTree<int, Mixed> or BPlusTree<string, Mixed>.
+                         4. Other entries should be skipped, we do not compress them.
+                         */
+
+                        const auto do_compress = (i < 3) ? true : false;
+                        if (i == 4) {
+                            // TODO: handle collections in mixed
+                        }
+                        // compress only mixed arrays that are integers. skip all the rest for now.
                         written_leaf.set_as_ref(
                             i, Array::write(rot.get_as_ref(), m_alloc, out, only_modified, do_compress));
                     }
