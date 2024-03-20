@@ -23,12 +23,6 @@ class Client {
 public:
     using port_type = sync::port_type;
 
-    static constexpr milliseconds_type default_connect_timeout = sync::default_connect_timeout;
-    static constexpr milliseconds_type default_connection_linger_time = sync::default_connection_linger_time;
-    static constexpr milliseconds_type default_ping_keepalive_period = sync::default_ping_keepalive_period;
-    static constexpr milliseconds_type default_pong_keepalive_timeout = sync::default_pong_keepalive_timeout;
-    static constexpr milliseconds_type default_fast_reconnect_limit = sync::default_fast_reconnect_limit;
-
     using Config = ClientConfig;
 
     /// \throw util::EventLoop::Implementation::NotAvailable if no event loop

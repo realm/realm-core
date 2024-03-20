@@ -1082,9 +1082,9 @@ void Table::do_erase_root_column(ColKey col_key)
     bump_storage_version();
 }
 
-Query Table::where(const DictionaryLinkValues& dictionary_of_links) const
+Query Table::where(const Dictionary& dict) const
 {
-    return Query(m_own_ref, dictionary_of_links);
+    return Query(m_own_ref, dict.clone_as_obj_list());
 }
 
 void Table::set_table_type(Type table_type, bool handle_backlinks)

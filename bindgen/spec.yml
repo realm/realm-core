@@ -553,6 +553,21 @@ records:
       before_notify: 'Nullable<util::UniqueFunction<(r: SharedRealm)>>'
       schema_did_change: 'Nullable<util::UniqueFunction<(r: SharedRealm)>>' # new schema available as r.schema
 
+  ResumptionDelayInfo:
+    fields:
+      max_resumption_delay_interval:
+        type: std::chrono::milliseconds
+        default: 3000000
+      resumption_delay_interval:
+        type: std::chrono::milliseconds
+        default: 1000
+      resumption_delay_backoff_multiplier:
+        type: int
+        default: 2
+      delay_jitter_divisor:
+        type: int
+        default: 4
+
   SyncClientTimeouts:
     fields:
       connect_timeout:
@@ -570,6 +585,9 @@ records:
       fast_reconnect_limit:
         type: uint64_t
         default: 60000
+      reconnect_backoff_info:
+        type: ResumptionDelayInfo
+        default: {}
 
   SyncClientConfig:
     fields:
