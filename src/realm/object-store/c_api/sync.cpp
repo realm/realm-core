@@ -438,9 +438,10 @@ RLM_API void realm_sync_config_set_initial_subscription_handler(
     realm_sync_config_t* config, realm_async_open_task_init_subscription_func_t callback, bool rerun_on_open,
     realm_userdata_t userdata, realm_free_userdata_func_t userdata_free)
 {
-    auto cb = [callback, userdata = SharedUserdata(userdata, FreeUserdata(userdata_free))](SharedRealm realm) {
-        realm_t r{realm};
-        callback(&r, userdata.get());
+    auto cb = [callback,
+               userdata = SharedUserdata(userdata, FreeUserdata(userdata_free))](ThreadSafeReference realm) {
+        auto tsr = new realm_t::thread_safe_reference(std::move(realm));
+        callback(tsr, userdata.get());
     };
     config->subscription_initializer = std::move(cb);
     config->rerun_init_subscription_on_open = rerun_on_open;

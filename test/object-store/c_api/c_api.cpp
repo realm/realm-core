@@ -5602,7 +5602,7 @@ static void task_completion_func(void* p, realm_thread_safe_reference_t* realm,
     userdata_p->called = true;
 }
 
-static void task_init_subscription(realm_t* realm, void*)
+static void task_init_subscription(realm_thread_safe_reference_t* realm, void*)
 {
     REQUIRE(realm);
 }
