@@ -1678,7 +1678,17 @@ ref_type Cluster::typed_write(ref_type ref, _impl::ArrayWriterBase& out, const T
 
                         const auto do_compress = (i < 3) ? true : false;
                         if (i == 4) {
-                            // TODO: handle collections in mixed
+                            // TODO this is not working...
+                            bool compress = true;
+                            auto bptree_rot = leaf.get_as_ref_or_tagged(i);
+                            if (bptree_rot.is_ref() && bptree_rot.get_as_ref()) {
+                                written_leaf.set_as_ref(i, BPlusTreeBase::typed_write(bptree_rot.get_as_ref(), out,
+                                                                                      m_alloc, col_type, deep,
+                                                                                      only_modified, compress));
+                            }
+                            else {
+                                written_leaf.set(i, bptree_rot);
+                            }
                         }
                         // compress only mixed arrays that are integers. skip all the rest for now.
                         written_leaf.set_as_ref(
