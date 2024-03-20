@@ -584,7 +584,8 @@ bool Connection::websocket_closed_handler(bool was_clean, WebSocketError error_c
             break;
         }
         case WebSocketError::websocket_fatal_error: {
-            // Error is fatal if the sync_route has already been verified
+            // Error is fatal if the sync_route has already been verified - if the sync_route has not
+            // been verified, then use a non-fatal error and try to perform a location update.
             SessionErrorInfo error_info(
                 {ErrorCodes::SyncConnectFailed, util::format("Failed to connect to sync: %1", msg)},
                 IsFatal{m_server_endpoint.is_verified});
