@@ -192,6 +192,11 @@ public:
         /// to file system paths, and thus, these restrictions do not apply.
         std::string realm_identifier = "";
 
+        // If the client has successfully contacted the server, then this will be
+        // set to true, otherwise it is false and the sync sessions will attempt
+        // to update the location info if the connection fails.
+        bool server_verified = false;
+
         /// The user id of the logged in user for this sync session. This will be used
         /// along with the server_address/server_port/protocol_envelope to determine
         /// which connection to the server this session will use.

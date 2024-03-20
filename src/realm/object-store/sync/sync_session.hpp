@@ -261,12 +261,33 @@ public:
         return *m_config.sync_config;
     }
 
-    // If the `SyncSession` has been configured, the full remote URL of the Realm
-    // this `SyncSession` represents.
-    util::Optional<std::string> full_realm_url() const REQUIRES(!m_config_mutex)
+    // When App is created, it will provide a generated websocket sync route when the SyncManager is
+    // created. When the next AppServices HTTP request is made via the App object, the location info
+    // will be requested and a verified websocket sync route will be provided to the SyncManager. If
+    // the SyncSession is started with a cached user, the websocket connection will be initially
+    // established using the generated sync route. If that connection is successful, then the sync
+    // route will be marked verified and used from that point on. If that connection fails, the
+    // SyncSession will update the location via an access token update to retrieve the verified
+    // sync route from the server's location info. The SyncSessio will then be restarted so it
+    // uses the updated sync route value.
+
+    // If the SyncSession is active, this function returns the sync route that is being used
+    // by the current underlying session to connect to the server.
+    std::string full_realm_url() const REQUIRES(!m_config_mutex)
     {
         util::CheckedLockGuard lock(m_config_mutex);
         return m_server_url;
+    }
+
+    // If the sync route value was returned by querying the location information, or the
+    // SyncSession has successfully connected to the server using the configured sync route,
+    // then the sync route will be marked "verified". Otherwise, the location information will
+    // be requested from the server if the connection fails when trying to open a websocket
+    // to the server.
+    bool realm_url_verified() const REQUIRES(!m_config_mutex)
+    {
+        util::CheckedLockGuard lock(m_config_mutex);
+        return m_server_url_verified;
     }
 
     std::shared_ptr<sync::SubscriptionStore> get_flx_subscription_store() REQUIRES(!m_state_mutex);
@@ -427,7 +448,6 @@ private:
         REQUIRES(m_state_mutex);
 
     std::string get_appservices_connection_id() const REQUIRES(!m_state_mutex);
-    std::optional<std::string> get_sync_route() const REQUIRES(!m_state_mutex);
 
     util::Future<std::string> send_test_command(std::string body) REQUIRES(!m_state_mutex);
 
@@ -444,6 +464,10 @@ private:
 
     // Return the subscription_store_base - to be used only for testing
     std::shared_ptr<sync::SubscriptionStore> get_subscription_store_base() REQUIRES(!m_state_mutex);
+
+    // Updates the connection state for this SyncSession and notify any registered callbacks if changed.
+    // Also ensures server_url_verified is set if the connection state is updated to connected.
+    void update_connection_state(ConnectionState new_state) REQUIRES(!m_config_mutex, !m_connection_state_mutex);
 
     util::CheckedMutex m_state_mutex;
     util::CheckedMutex m_connection_state_mutex;
@@ -486,7 +510,8 @@ private:
     std::unique_ptr<sync::Session> m_session GUARDED_BY(m_state_mutex);
 
     // The fully-resolved URL of this Realm, including the server and the path.
-    util::Optional<std::string> m_server_url GUARDED_BY(m_config_mutex);
+    std::string m_server_url GUARDED_BY(m_config_mutex);
+    bool m_server_url_verified GUARDED_BY(m_config_mutex) = false;
 
     _impl::SyncProgressNotifier m_progress_notifier;
     ConnectionChangeNotifier m_connection_change_notifier;
