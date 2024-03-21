@@ -18,7 +18,7 @@
 -----------
 
 ### Internals
-* None.
+* Update Catch2 from v3.3.2 to v3.5.3 ([PR #7297](https://github.com/realm/realm-core/pull/7509)).
 
 ----------------------------------------------
 
