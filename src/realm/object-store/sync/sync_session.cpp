@@ -124,12 +124,6 @@ void SyncSession::become_active()
     }
 }
 
-void SyncSession::restart_session()
-{
-    util::CheckedUniqueLock lock(m_state_mutex);
-    do_restart_session(std::move(lock));
-}
-
 void SyncSession::become_dying(util::CheckedUniqueLock lock)
 {
     REALM_ASSERT(m_state != State::Dying);
@@ -176,13 +170,23 @@ void SyncSession::become_paused(util::CheckedUniqueLock lock)
     do_become_inactive(std::move(lock), Status::OK(), true);
 }
 
+void SyncSession::restart_session()
+{
+    util::CheckedUniqueLock lock(m_state_mutex);
+    switch (m_state) {
+        case State::Active:
+            do_restart_session(std::move(lock));
+            break;
+        case State::WaitingForAccessToken:
+        case State::Paused:
+        case State::Dying:
+        case State::Inactive:
+            return;
+    }
+}
+
 void SyncSession::do_restart_session(util::CheckedUniqueLock)
 {
-    // Nothing to do if the sync session is currently paused
-    // It will be resumed when resume() is called
-    if (m_state == State::Paused)
-        return;
-
     // Go straight to inactive so the progress completion waiters will
     // continue to wait until the session restarts and completes the
     // upload/download sync
@@ -244,23 +248,6 @@ void SyncSession::become_waiting_for_access_token()
     m_state = State::WaitingForAccessToken;
 }
 
-void SyncSession::handle_location_update_failed(Status status)
-{
-    // TODO: ideally this would write to the logs as well in case users didn't set up their error handler.
-    {
-        util::CheckedUniqueLock lock(m_state_mutex);
-        // Should only be called while waiting to update the access token
-        REALM_ASSERT(m_state == State::WaitingForAccessToken);
-        // Close the session, since there's nothing more to do at this point, it can be resumed
-        // after resolving the location update failure
-        become_inactive(std::move(lock), status);
-    }
-    if (auto error_handler = config(&SyncConfig::error_handler)) {
-        auto user_facing_error = SyncError({ErrorCodes::SyncConnectFailed, status.reason()}, true);
-        error_handler(shared_from_this(), std::move(user_facing_error));
-    }
-}
-
 void SyncSession::handle_bad_auth(const std::shared_ptr<SyncUser>& user, Status status)
 {
     // TODO: ideally this would write to the logs as well in case users didn't set up their error handler.
@@ -317,17 +304,6 @@ SyncSession::handle_refresh(const std::shared_ptr<SyncSession>& session, bool re
         else if (error) {
             if (error->code() == ErrorCodes::ClientAppDeallocated) {
                 return; // this response came in after the app shut down, ignore it
-            }
-            else if (!session->get_sync_route()) {
-                // If the sync route is empty at this point, it means the forced location update
-                // failed while trying to start a sync session with a cached user and no other
-                // AppServices HTTP requests have been performed since the App was created.
-                // Since a valid websocket host url is not available, fail the SyncSession start
-                // and pass the error to the user.
-                // This function will not log out the user, since it is not known at this point
-                // whether or not the user is valid.
-                session->handle_location_update_failed(
-                    {error->code(), util::format("Unable to reach the server: %1", error->reason())});
             }
             else if (ErrorCodes::error_categories(error->code()).test(ErrorCategory::client_error)) {
                 // any other client errors other than app_deallocated are considered fatal because
@@ -954,18 +930,22 @@ void SyncSession::create_sync_session()
     }
 
     {
-        // At this point, the sync_route should be valid, since the location should have been updated by
-        // an AppServices http request or by updating the access token before starting the sync session.
-        auto sync_route = m_sync_manager->sync_route();
-        REALM_ASSERT_EX(sync_route && !sync_route->empty(), "Location was not updated prior to sync session start");
+        // At this point the sync route was either updated when the first App request was performed, or
+        // was populated by a generated value that will be used for first contact. If the generated sync
+        // route is not correct, either a redirection will be received or the connection will fail,
+        // resulting in an update to both the access token and the location.
+        auto [sync_route, verified] = m_sync_manager->sync_route();
+        REALM_ASSERT_EX(!sync_route.empty(), "Server URL cannot be empty");
 
-        if (!m_client.decompose_server_url(*sync_route, session_config.protocol_envelope,
+        if (!m_client.decompose_server_url(sync_route, session_config.protocol_envelope,
                                            session_config.server_address, session_config.server_port,
                                            session_config.service_identifier)) {
-            throw sync::BadServerUrl(*sync_route);
+            throw sync::BadServerUrl(sync_route);
         }
+        session_config.server_verified = verified;
 
-        m_server_url = *sync_route;
+        m_server_url = sync_route;
+        m_server_url_verified = verified;
     }
 
     if (sync_config.authorization_header_name) {
@@ -1005,12 +985,6 @@ void SyncSession::create_sync_session()
     // the connection state.
     m_session->set_connection_state_change_listener(
         [weak_self](sync::ConnectionState state, util::Optional<sync::SessionErrorInfo> error) {
-            // If the OS SyncSession object is destroyed, we ignore any events from the underlying Session as there is
-            // nothing useful we can do with them.
-            auto self = weak_self.lock();
-            if (!self) {
-                return;
-            }
             using cs = sync::ConnectionState;
             ConnectionState new_state = [&] {
                 switch (state) {
@@ -1023,19 +997,35 @@ void SyncSession::create_sync_session()
                 }
                 REALM_UNREACHABLE();
             }();
-            util::CheckedUniqueLock lock(self->m_connection_state_mutex);
-            auto old_state = self->m_connection_state;
-            self->m_connection_state = new_state;
-            lock.unlock();
-
-            if (old_state != new_state) {
-                self->m_connection_change_notifier.invoke_callbacks(old_state, new_state);
-            }
-
-            if (error) {
-                self->handle_error(std::move(*error));
+            // If the OS SyncSession object is destroyed, we ignore any events from the underlying Session as there is
+            // nothing useful we can do with them.
+            if (auto self = weak_self.lock()) {
+                self->update_connection_state(new_state);
+                if (error) {
+                    self->handle_error(std::move(*error));
+                }
             }
         });
+}
+
+void SyncSession::update_connection_state(ConnectionState new_state)
+{
+    if (new_state == ConnectionState::Connected) {
+        util::CheckedLockGuard lock(m_config_mutex);
+        m_server_url_verified = true;
+    }
+
+    ConnectionState old_state;
+    {
+        util::CheckedLockGuard lock(m_connection_state_mutex);
+        old_state = m_connection_state;
+        m_connection_state = new_state;
+    }
+
+    // Notify any registered connection callbacks of the state transition
+    if (old_state != new_state) {
+        m_connection_change_notifier.invoke_callbacks(old_state, new_state);
+    }
 }
 
 void SyncSession::nonsync_transact_notify(sync::version_type version)
@@ -1137,7 +1127,7 @@ void SyncSession::do_revive(util::CheckedUniqueLock&& lock)
     auto u = user();
     // If the sync manager has a valid route and the user and it's access token
     // are valid, then revive the session.
-    if (m_sync_manager->sync_route() && (!u || !u->access_token_refresh_required())) {
+    if (!u || !u->access_token_refresh_required()) {
         become_active();
         m_state_mutex.unlock(lock);
         return;
@@ -1351,15 +1341,6 @@ std::string SyncSession::get_appservices_connection_id() const
         return {};
     }
     return m_session->get_appservices_connection_id();
-}
-
-std::optional<std::string> SyncSession::get_sync_route() const
-{
-    util::CheckedLockGuard lk(m_state_mutex);
-    if (!m_sync_manager) {
-        return std::nullopt;
-    }
-    return m_sync_manager->sync_route();
 }
 
 void SyncSession::update_configuration(SyncConfig new_config)

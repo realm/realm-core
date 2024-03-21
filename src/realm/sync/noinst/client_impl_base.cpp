@@ -525,6 +525,11 @@ bool Connection::websocket_closed_handler(bool was_clean, WebSocketError error_c
         case WebSocketError::websocket_connection_failed: {
             SessionErrorInfo error_info(
                 {ErrorCodes::SyncConnectFailed, util::format("Failed to connect to sync: %1", msg)}, IsFatal{false});
+            // If the connection fails/times out and the server has not been contacted yet, refresh the location
+            // to make sure the websocket URL is correct
+            if (!m_server_endpoint.is_verified) {
+                error_info.server_requests_action = ProtocolErrorInfo::Action::RefreshLocation;
+            }
             involuntary_disconnect(std::move(error_info), ConnectionTerminationReason::connect_operation_failed);
             break;
         }
@@ -579,8 +584,19 @@ bool Connection::websocket_closed_handler(bool was_clean, WebSocketError error_c
             break;
         }
         case WebSocketError::websocket_fatal_error: {
-            involuntary_disconnect(SessionErrorInfo({ErrorCodes::ConnectionClosed, msg}, IsFatal{true}),
-                                   ConnectionTerminationReason::http_response_says_fatal_error);
+            // Error is fatal if the sync_route has already been verified - if the sync_route has not
+            // been verified, then use a non-fatal error and try to perform a location update.
+            SessionErrorInfo error_info(
+                {ErrorCodes::SyncConnectFailed, util::format("Failed to connect to sync: %1", msg)},
+                IsFatal{m_server_endpoint.is_verified});
+            ConnectionTerminationReason reason = ConnectionTerminationReason::http_response_says_fatal_error;
+            // If the connection fails/times out and the server has not been contacted yet, refresh the location
+            // to make sure the websocket URL is correct
+            if (!m_server_endpoint.is_verified) {
+                error_info.server_requests_action = ProtocolErrorInfo::Action::RefreshLocation;
+                reason = ConnectionTerminationReason::connect_operation_failed;
+            }
+            involuntary_disconnect(std::move(error_info), reason);
             break;
         }
         case WebSocketError::websocket_forbidden: {
@@ -806,10 +822,14 @@ void Connection::handle_connect_wait(Status status)
 
     REALM_ASSERT_EX(m_state == ConnectionState::connecting, m_state);
     logger.info("Connect timeout"); // Throws
-    involuntary_disconnect(
-        SessionErrorInfo{Status{ErrorCodes::SyncConnectTimeout, "Sync connection was not fully established in time"},
-                         IsFatal{false}},
-        ConnectionTerminationReason::sync_connect_timeout); // Throws
+    SessionErrorInfo error_info({ErrorCodes::SyncConnectTimeout, "Sync connection was not fully established in time"},
+                                IsFatal{false});
+    // If the connection fails/times out and the server has not been contacted yet, refresh the location
+    // to make sure the websocket URL is correct
+    if (!m_server_endpoint.is_verified) {
+        error_info.server_requests_action = ProtocolErrorInfo::Action::RefreshLocation;
+    }
+    involuntary_disconnect(std::move(error_info), ConnectionTerminationReason::sync_connect_timeout); // Throws
 }
 
 
@@ -819,6 +839,7 @@ void Connection::handle_connection_established()
     m_connect_timer.reset();
 
     m_state = ConnectionState::connected;
+    m_server_endpoint.is_verified = true; // sync route is valid since connection is successful
 
     milliseconds_type now = monotonic_clock_now();
     m_pong_wait_started_at = now; // Initially, no time was spent waiting for a PONG message
