@@ -42,6 +42,7 @@ struct ServerEndpoint {
     network::Endpoint::port_type port;
     std::string user_id;
     SyncServerMode server_mode = SyncServerMode::PBS;
+    bool is_verified = false;
 
 private:
     auto to_tuple() const
@@ -691,7 +692,7 @@ private:
     OutputBuffer m_output_buffer;
 
     const connection_ident_type m_ident;
-    const ServerEndpoint m_server_endpoint;
+    ServerEndpoint m_server_endpoint;
     std::string m_appservices_coid;
 
     /// DEPRECATED - These will be removed in a future release
