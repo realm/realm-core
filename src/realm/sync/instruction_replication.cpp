@@ -616,16 +616,33 @@ void SyncReplication::dictionary_update(const CollectionBase& dict, const Mixed&
         return;
     }
 
-    if (select_collection(dict)) {
-        Instruction::Update instr;
-        REALM_ASSERT(key.get_type() == type_String);
-        populate_path_instr(instr, dict);
+    Instruction::Update instr;
+    REALM_ASSERT(key.get_type() == type_String);
+
+    const Table* source_table = dict.get_table().unchecked_ptr();
+    auto col = dict.get_col_key();
+    ObjKey obj_key = dict.get_owner_key();
+    if (source_table->is_additional_props_col(col)) {
+        // Here we have to fake it and pretend we are setting a property on the object
+        if (!select_table(*source_table)) {
+            return;
+        }
+
+        populate_path_instr(instr, *source_table, obj_key, {key.get_string()});
+    }
+    else {
+        if (!select_collection(dict)) {
+            return;
+        }
+
+        auto path = dict.get_short_path();
+        populate_path_instr(instr, *source_table, obj_key, path);
         StringData key_value = key.get_string();
         instr.path.push_back(m_encoder.intern_string(key_value));
-        instr.value = as_payload(dict, value);
-        instr.is_default = false;
-        emit(instr);
     }
+    instr.value = as_payload(*source_table, col, value);
+    instr.is_default = false;
+    emit(instr);
 }
 
 void SyncReplication::dictionary_insert(const CollectionBase& dict, size_t ndx, Mixed key, Mixed value)
@@ -743,11 +760,12 @@ Instruction::PrimaryKey SyncReplication::primary_key_for_object(const Table& tab
 }
 
 void SyncReplication::populate_path_instr(Instruction::PathInstruction& instr, const Table& table, ObjKey key,
-                                          Path path)
+                                          const Path& path)
 {
     REALM_ASSERT(key);
     // The first path entry will be the column key
-    REALM_ASSERT(path[0].is_col_key());
+    StringData field_name =
+        path[0].is_col_key() ? table.get_column_name(path[0].get_col_key()) : StringData(path[0].get_key());
 
     if (table.is_embedded()) {
         // For embedded objects, Obj::traverse_path() yields the top object
@@ -757,7 +775,7 @@ void SyncReplication::populate_path_instr(Instruction::PathInstruction& instr, c
         // Populate top object in the normal way.
         auto top_table = table.get_parent_group()->get_table(full_path.top_table);
 
-        full_path.path_from_top.emplace_back(table.get_column_name(path[0].get_col_key()));
+        full_path.path_from_top.emplace_back(field_name);
 
         for (auto it = path.begin() + 1; it != path.end(); ++it) {
             full_path.path_from_top.emplace_back(std::move(*it));
@@ -778,8 +796,6 @@ void SyncReplication::populate_path_instr(Instruction::PathInstruction& instr, c
         m_last_object = key;
         m_last_primary_key = instr.object;
     }
-
-    StringData field_name = table.get_column_name(path[0].get_col_key());
 
     if (m_last_field_name == field_name) {
         instr.field = m_last_interned_field_name;

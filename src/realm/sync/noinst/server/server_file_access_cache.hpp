@@ -229,6 +229,7 @@ inline DBOptions ServerFileAccessCache::Slot::make_shared_group_options() const 
         options.encryption_key = m_cache.m_encryption_key->data();
     if (m_disable_sync_to_disk)
         options.durability = DBOptions::Durability::Unsafe;
+    options.allow_flexible_schema = true;
     return options;
 }
 
