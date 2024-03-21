@@ -2802,9 +2802,13 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][boot
             auto realm = DB::create(sync::make_client_replication(), interrupted_realm_config.path, options);
             auto logger = util::Logger::get_default_logger();
             sync::PendingBootstrapStore bootstrap_store(realm, *logger);
+            // Bootstrap was complete and is available to be processed when the sync session restarts
             REQUIRE(bootstrap_store.has_pending());
+            REQUIRE(bootstrap_store.bootstrap_complete());
             auto pending_batch = bootstrap_store.peek_pending(1024 * 1024 * 16);
             REQUIRE(pending_batch.query_version == 1);
+            REQUIRE(bootstrap_store.query_version() == pending_batch.query_version);
+            REQUIRE(bootstrap_store.remote_version() == pending_batch.remote_version);
             REQUIRE(pending_batch.progress);
 
             check_interrupted_state(realm);
@@ -2895,9 +2899,13 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][boot
             auto realm = DB::create(sync::make_client_replication(), interrupted_realm_config.path, options);
             util::StderrLogger logger;
             sync::PendingBootstrapStore bootstrap_store(realm, logger);
+            // Bootstrap was complete and is available to be processed when the sync session restarts
             REQUIRE(bootstrap_store.has_pending());
+            REQUIRE(bootstrap_store.bootstrap_complete());
             auto pending_batch = bootstrap_store.peek_pending(1024 * 1024 * 16);
             REQUIRE(pending_batch.query_version == 1);
+            REQUIRE(bootstrap_store.query_version() == pending_batch.query_version);
+            REQUIRE(bootstrap_store.remote_version() == pending_batch.remote_version);
             REQUIRE(pending_batch.progress);
 
             check_interrupted_state(realm);
@@ -2964,12 +2972,8 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][boot
             auto realm = DB::create(sync::make_client_replication(), interrupted_realm_config.path, options);
             auto logger = util::Logger::get_default_logger();
             sync::PendingBootstrapStore bootstrap_store(realm, *logger);
-            REQUIRE(bootstrap_store.has_pending());
-            auto pending_batch = bootstrap_store.peek_pending(1024 * 1024 * 16);
-            REQUIRE(pending_batch.query_version == 1);
-            REQUIRE(!pending_batch.progress);
-            REQUIRE(pending_batch.remaining_changesets == 0);
-            REQUIRE(pending_batch.changesets.size() == 1);
+            // Since the bootstrap was not complete, it will be deleted when the Store is re-opened
+            REQUIRE_FALSE(bootstrap_store.has_pending());
 
             check_interrupted_state(realm);
         }
@@ -3041,12 +3045,17 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][boot
             auto realm = DB::create(sync::make_client_replication(), interrupted_realm_config.path, options);
             auto logger = util::Logger::get_default_logger();
             sync::PendingBootstrapStore bootstrap_store(realm, *logger);
+            // Bootstrap was complete and is available to be processed when the sync session restarts
             REQUIRE(bootstrap_store.has_pending());
+            REQUIRE(bootstrap_store.bootstrap_complete());
             auto pending_batch = bootstrap_store.peek_pending(1024 * 1024 * 16);
             REQUIRE(pending_batch.query_version == 1);
+            REQUIRE(bootstrap_store.query_version() == pending_batch.query_version);
+            REQUIRE(bootstrap_store.remote_version() == pending_batch.remote_version);
             REQUIRE(static_cast<bool>(pending_batch.progress));
             REQUIRE(pending_batch.remaining_changesets == 0);
             REQUIRE(pending_batch.changesets.size() == 6);
+            REQUIRE(pending_batch.progress);
 
             check_interrupted_state(realm);
         }

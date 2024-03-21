@@ -842,7 +842,8 @@ bool SessionImpl::process_flx_bootstrap_message(const SyncProgress& progress, Do
 
     bool new_batch = false;
     try {
-        bootstrap_store->add_batch(query_version, std::move(maybe_progress), received_changesets, &new_batch);
+        bootstrap_store->add_batch(query_version, progress.download.server_version, std::move(maybe_progress),
+                                   received_changesets, &new_batch);
     }
     catch (const LogicError& ex) {
         if (ex.code() == ErrorCodes::LimitExceeded) {
