@@ -865,33 +865,27 @@ ref_type BPlusTreeBase::typed_write(ref_type ref, _impl::ArrayWriterBase& out, A
         written_node.destroy();
         return written_ref;
     }
-    else {
-        if (node.has_refs()) {
-            // TODO: handle collection in mixed here. This is breaking..
-            Array written_node(Allocator::get_default());
-            written_node.create(NodeHeader::type_InnerBptreeNode, false, node.size());
-            for (unsigned j = 0; j < node.size(); ++j) {
-                RefOrTagged rot = node.get_as_ref_or_tagged(j);
-                if (rot.is_ref() && rot.get_as_ref()) {
-                    // it should/could only be a nested collection
-                    compress = true;
-                    written_node.set_as_ref(j, BPlusTreeBase::typed_write(rot.get_as_ref(), out, alloc, col_type,
-                                                                          deep, only_modified, compress));
-                }
-                else {
-                    Array a(alloc);
-                    a.init_from_ref(rot.get_as_ref());
-                    written_node.set_as_ref(j, a.write(out, deep, only_modified, false));
-                }
+    else if (node.has_refs()) {
+        Array ref_node(Allocator::get_default());
+        ref_node.create(NodeHeader::type_HasRefs, false, node.size());
+        for (size_t j = 0; j < node.size(); ++j) {
+            RefOrTagged rot = node.get_as_ref_or_tagged(j);
+            if (rot.is_ref() && rot.get_as_ref()) {
+                auto btree_ref =
+                    BPlusTreeBase::typed_write(rot.get_as_ref(), out, alloc, col_type, deep, only_modified, true);
+                ref_node.set_as_ref(j, btree_ref);
             }
-            auto written_ref = written_node.write(out, false, false, false);
-            written_node.destroy();
-            return written_ref;
-            // return node.write(out, deep, only_modified, false); // unknown substructure, don't compress
+            else {
+                ref_node.set(j, rot);
+            }
         }
-        else {
-            return node.write(out, false, only_modified, compress); // leaf array - do compress
-        }
+        auto new_ref = ref_node.write(out, false, false, false);
+        ref_node.destroy();
+        return new_ref;
+        // return node.write(out, deep, only_modified, false);
+    }
+    else {
+        return node.write(out, deep, only_modified, true); // leaf array - do compress
     }
 }
 

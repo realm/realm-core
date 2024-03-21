@@ -1674,59 +1674,43 @@ ref_type Cluster::typed_write(ref_type ref, _impl::ArrayWriterBase& out, const T
                     They can only be BPlusTree<int, Mixed> or BPlusTree<string, Mixed>.
                  5. Is the key array, marks whether the composite array at position i is a collection or not
                  */
-                auto rot_parent = leaf.get_as_ref_or_tagged(0);
-                auto rot_int = leaf.get_as_ref_or_tagged(1);
-                auto rot_pair_int = leaf.get_as_ref_or_tagged(2);
-                auto rot_string = leaf.get_as_ref_or_tagged(3);
-                auto rot_composite = leaf.get_as_ref_or_tagged(4);
-                auto rot_key = leaf.get_as_ref_or_tagged(5);
-
-                if (rot_parent.get_as_ref())
-                    written_leaf.set(0, Array::write(rot_parent.get_as_ref(), m_alloc, out, only_modified, false));
-                else
-                    written_leaf.set(0, rot_parent);
-
-                if (rot_int.get_as_ref())
-                    written_leaf.set_as_ref(1, Array::write(rot_int.get_as_ref(), m_alloc, out, only_modified, true));
-                else
-                    written_leaf.set(1, rot_int);
-
-                if (rot_pair_int.get_as_ref())
-                    written_leaf.set_as_ref(
-                        2, Array::write(rot_pair_int.get_as_ref(), m_alloc, out, only_modified, true));
-                else
-                    written_leaf.set(2, rot_pair_int);
-
-                written_leaf.set(3, rot_string); // no compression for strings now.
-
-                if (rot_composite.get_as_ref() && rot_key.get_as_ref()) {
-                    Array composite(Allocator::get_default());
-                    Array keys(Allocator::get_default());
-                    composite.init_from_ref(rot_composite.get_as_ref());
-                    keys.init_from_ref(rot_key.get_as_ref());
-
-                    for (size_t i = 0; i < composite.size(); ++i) {
-                        if (i < keys.size() && keys.get(i)) {
-                            // collection.
-                            auto rot = composite.get_as_ref_or_tagged(i);
-                            REALM_ASSERT_DEBUG(rot.is_ref() && rot.get_as_ref());
+                std::cout << "type write for ref " << ref << std::endl;
+                for (size_t i = 0; i < sz; ++i) {
+                    auto rot = leaf.get_as_ref_or_tagged(i);
+                    if (rot.is_ref() && rot.get_as_ref()) {
+                        if (i == 1 || i == 2) {
+                            // this check is not fine grained.. we are compressing everything that fits into m_int and
+                            // m_pair_int which means timestamps, doubles, floats and links alongside integers.
+                            // TODO: build an array mixed and check the type
+                            written_leaf.set_as_ref(
+                                i, Array::write(rot.get_as_ref(), m_alloc, out, only_modified, compressible));
+                        }
+                        else if (i == 4) {
                             const auto new_ref = BPlusTreeBase::typed_write(rot.get_as_ref(), out, m_alloc, col_type,
-                                                                            deep, only_modified, true);
-                            composite.set_as_ref(i, new_ref);
+                                                                            deep, only_modified, compressible);
+                            written_leaf.set_as_ref(i, new_ref);
+                        }
+                        // else if(i == 5) {
+                        // collection in mixed keys do not need to be compressed (or maybe yes, there are integers
+                        // afterall)
+                        //}
+                        else {
+                            // all the rest should be a ref we don't want to compress it.
+                            written_leaf.set_as_ref(
+                                i, Array::write(rot.get_as_ref(), m_alloc, out, only_modified, false));
                         }
                     }
-                    written_leaf.set(4, rot_composite);
-                    written_leaf.set(5, rot_key);
-                }
-                else {
-                    written_leaf.set(4, rot_composite);
-                    written_leaf.set(5, rot_key);
+                    else {
+                        // what about integers that are max 32 bits and we store stuff straight in the composite
+                        // array. we are not compressing those.
+                        written_leaf.set(i, rot);
+                    }
                 }
             }
             else {
                 REALM_ASSERT(false);
             }
-            written_cluster.set_as_ref(j, written_leaf.write(out, false, false, false));
+            written_cluster.set_as_ref(j, written_leaf.write(out, false, false, compressible));
             written_leaf.destroy();
         }
     }

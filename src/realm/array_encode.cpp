@@ -148,7 +148,7 @@ bool ArrayEncode::always_encode(const Array& origin, Array& arr, bool packed) co
 bool ArrayEncode::encode(const Array& origin, Array& arr) const
 {
     // return false;
-    // return always_encode(origin, arr, true); // true packed, false flex
+    return always_encode(origin, arr, true); // true packed, false flex
 
     std::vector<int64_t> values;
     std::vector<size_t> indices;
