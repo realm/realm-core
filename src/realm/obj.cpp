@@ -617,12 +617,14 @@ StringData Obj::_get<StringData>(ColKey::Idx col_ndx) const
     auto& spec = get_spec();
     if (spec.is_string_enum_type(spec_ndx)) {
         ArrayString values(get_alloc());
-        values.set_string_interner(m_table->get_string_interner(col_ndx));
+        values.set_spec(const_cast<Spec*>(&spec), spec_ndx);
         values.init_from_ref(ref);
 
         return values.get(m_row_ndx);
     }
     else {
+        // TODO: set a string interner if needed
+        // values.set_string_interner(m_table->get_string_interner(col_ndx));
         return ArrayString::get(alloc.translate(ref), m_row_ndx, alloc);
     }
 }
@@ -750,7 +752,9 @@ inline bool Obj::do_is_null<ArrayString>(ColKey::Idx col_ndx) const
 {
     ArrayString values(get_alloc());
     ref_type ref = to_ref(Array::get(m_mem.get_addr(), col_ndx.val + 1));
-    values.set_string_interner(m_table->get_string_interner(col_ndx));
+    values.set_spec(const_cast<Spec*>(&get_spec()), m_table->leaf_ndx2spec_ndx(col_ndx));
+    // TODO: Set string interner if needed
+    // values.set_string_interner(m_table->get_string_interner(col_ndx));
     values.init_from_ref(ref);
     return values.is_null(m_row_ndx);
 }
@@ -1598,7 +1602,7 @@ inline void check_range(const BinaryData& val)
 }
 } // namespace
 
-// helper functions for filtering out calls to set_spec()
+// helper functions for filtering out calls to set_string_interner()
 template <class T>
 inline void Obj::set_string_interner(T&, ColKey)
 {
@@ -1607,6 +1611,19 @@ template <>
 inline void Obj::set_string_interner<ArrayString>(ArrayString& values, ColKey col_key)
 {
     values.set_string_interner(m_table->get_string_interner(col_key));
+}
+
+// helper functions for filtering out calls to set_spec()
+template <class T>
+inline void Obj::set_spec(T&, ColKey)
+{
+}
+template <>
+inline void Obj::set_spec<ArrayString>(ArrayString& values, ColKey col_key)
+{
+    size_t spec_ndx = m_table->colkey2spec_ndx(col_key);
+    Spec* spec = const_cast<Spec*>(&get_spec());
+    values.set_spec(spec, spec_ndx);
 }
 
 #if REALM_ENABLE_GEOSPATIAL
@@ -1692,6 +1709,7 @@ Obj& Obj::set(ColKey col_key, T value, bool is_default)
     using LeafType = typename ColumnTypeTraits<T>::cluster_leaf_type;
     LeafType values(alloc);
     values.set_parent(&fields, col_ndx.val + 1);
+    set_spec<LeafType>(values, col_key);
     set_string_interner<LeafType>(values, col_key);
     values.init_from_parent();
     values.set(m_row_ndx, value);
@@ -2338,6 +2356,7 @@ template <>
 inline void Obj::do_set_null<ArrayString>(ColKey col_key)
 {
     ColKey::Idx col_ndx = col_key.get_index();
+    size_t spec_ndx = m_table->leaf_ndx2spec_ndx(col_ndx);
     Allocator& alloc = get_alloc();
     alloc.bump_content_version();
     Array fallback(alloc);
@@ -2345,6 +2364,7 @@ inline void Obj::do_set_null<ArrayString>(ColKey col_key)
 
     ArrayString values(alloc);
     values.set_parent(&fields, col_ndx.val + 1);
+    values.set_spec(const_cast<Spec*>(&get_spec()), spec_ndx);
     values.set_string_interner(m_table->get_string_interner(col_key));
     values.init_from_parent();
     values.set_null(m_row_ndx);

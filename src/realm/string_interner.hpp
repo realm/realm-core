@@ -34,6 +34,10 @@ public:
     int compare(StringID A, StringID B);
     int compare(StringData, StringID A);
     StringData get(StringID);
+
+private:
+    std::vector<std::string> m_strings;
+    std::unordered_map<std::string, size_t> m_string_map;
 };
 } // namespace realm
 

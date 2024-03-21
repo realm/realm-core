@@ -2931,4 +2931,24 @@ DisableReplication::~DisableReplication()
         m_tr.initialize_replication();
 }
 
+StringInterner* DB::get_string_interner(TableKey tk, ColKey::Idx col_idx)
+{
+    std::lock_guard lock(m_string_interners_mutex);
+    auto it = m_string_interners.find(tk);
+    std::vector<StringInterner*>* interners;
+    if (it == m_string_interners.end()) {
+        interners = new std::vector<StringInterner*>();
+        m_string_interners[tk] = interners;
+    }
+    else {
+        interners = it->second;
+    }
+    while (col_idx.val >= interners->size()) {
+        interners->push_back(nullptr);
+    }
+    if ((*interners)[col_idx.val] == nullptr)
+        (*interners)[col_idx.val] = new StringInterner;
+    return (*interners)[col_idx.val];
+}
+
 } // namespace realm

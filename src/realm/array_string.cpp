@@ -52,6 +52,15 @@ void ArrayString::init_from_mem(MemRef mem) noexcept
         else {
             auto arr = new (&m_storage) Array(m_alloc);
             arr->init_from_mem(mem);
+            // Further init (also of m_is_interned) should depend on the header
+            // here is init for old enum strings
+            m_string_enum_values = std::make_unique<ArrayString>(m_alloc);
+            ArrayParent* p;
+            REALM_ASSERT(m_spec != nullptr);
+            REALM_ASSERT(m_col_ndx != realm::npos);
+            ref_type r = m_spec->get_enumkeys_ref(m_col_ndx, p);
+            m_string_enum_values->init_from_ref(r);
+            m_string_enum_values->set_parent(p, m_col_ndx);
             m_type = Type::enum_strings;
         }
     }
@@ -144,8 +153,19 @@ void ArrayString::set(size_t ndx, StringData value)
             static_cast<ArrayBigBlobs*>(m_arr)->set_string(ndx, value);
             break;
         case Type::enum_strings: {
-            auto id = m_string_interner->intern(value);
-            static_cast<Array*>(m_arr)->set(ndx, id);
+            if (m_is_interned) {
+                auto id = m_string_interner->intern(value);
+                static_cast<Array*>(m_arr)->set(ndx, id);
+            }
+            else {
+                size_t sz = m_string_enum_values->size();
+                size_t res = m_string_enum_values->find_first(value, 0, sz);
+                if (res == realm::not_found) {
+                    m_string_enum_values->add(value);
+                    res = sz;
+                }
+                static_cast<Array*>(m_arr)->set(ndx, res);
+            }
             break;
         }
     }
@@ -180,8 +200,14 @@ StringData ArrayString::get(size_t ndx) const
         case Type::big_strings:
             return static_cast<ArrayBigBlobs*>(m_arr)->get_string(ndx);
         case Type::enum_strings: {
-            size_t id = size_t(static_cast<Array*>(m_arr)->get(ndx));
-            return m_string_interner->get(id);
+            if (m_is_interned) {
+                size_t id = size_t(static_cast<Array*>(m_arr)->get(ndx));
+                return m_string_interner->get(id);
+            }
+            else {
+                size_t index = size_t(static_cast<Array*>(m_arr)->get(ndx));
+                return m_string_enum_values->get(index);
+            }
         }
     }
     return {};
@@ -197,8 +223,14 @@ StringData ArrayString::get_legacy(size_t ndx) const
         case Type::big_strings:
             return static_cast<ArrayBigBlobs*>(m_arr)->get_string(ndx);
         case Type::enum_strings: {
-            size_t id = size_t(static_cast<Array*>(m_arr)->get(ndx));
-            return m_string_interner->get(id);
+            if (m_is_interned) {
+                size_t id = size_t(static_cast<Array*>(m_arr)->get(ndx));
+                return m_string_interner->get(id);
+            }
+            else {
+                size_t index = size_t(static_cast<Array*>(m_arr)->get(ndx));
+                return m_string_enum_values->get(index);
+            }
         }
     }
     return {};
@@ -220,7 +252,12 @@ bool ArrayString::is_null(size_t ndx) const
             return static_cast<ArrayBigBlobs*>(m_arr)->is_null(ndx);
         case Type::enum_strings: {
             size_t id = size_t(static_cast<Array*>(m_arr)->get(ndx));
-            return id == 0;
+            if (m_is_interned) {
+                return id == 0;
+            } 
+            else {
+                return m_string_enum_values->is_null(id);
+            }
         }
     }
     return {};
@@ -302,11 +339,20 @@ size_t ArrayString::find_first(StringData value, size_t begin, size_t end) const
             break;
         }
         case Type::enum_strings: {
-            // we need a way to avoid this lookup for each leaf array. The lookup must appear
-            // higher up the stack.
-            auto id = m_string_interner->lookup(value);
-            if (id) {
-                return static_cast<Array*>(m_arr)->find_first(*id, begin, end);
+            if (m_is_interned) {
+                // we need a way to avoid this lookup for each leaf array. The lookup must appear
+                // higher up the stack.
+                auto id = m_string_interner->lookup(value);
+                if (id) {
+                    return static_cast<Array*>(m_arr)->find_first(*id, begin, end);
+                }
+            }
+            else {
+                size_t sz = m_string_enum_values->size();
+                size_t res = m_string_enum_values->find_first(value, 0, sz);
+                if (res != realm::not_found) {
+                    return static_cast<Array*>(m_arr)->find_first(res, begin, end);
+                }
             }
             break;
         }

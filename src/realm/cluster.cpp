@@ -262,6 +262,17 @@ inline void Cluster::set_string_interner(ArrayString& arr, ColKey col_key) const
 }
 
 template <class T>
+inline void Cluster::set_spec(T&, ColKey::Idx) const
+{
+}
+
+template <>
+inline void Cluster::set_spec(ArrayString& arr, ColKey::Idx col_ndx) const
+{
+    m_tree_top.set_spec(arr, col_ndx);
+}
+
+template <class T>
 inline void Cluster::do_insert_row(size_t ndx, ColKey col, Mixed init_val, bool nullable)
 {
     using U = typename util::RemoveOptional<typename T::value_type>::type;
@@ -269,6 +280,7 @@ inline void Cluster::do_insert_row(size_t ndx, ColKey col, Mixed init_val, bool 
     T arr(m_alloc);
     auto col_ndx = col.get_index();
     arr.set_parent(this, col_ndx.val + s_first_col_index);
+    set_spec<T>(arr, col_ndx);
     set_string_interner<T>(arr, col);
     arr.init_from_parent();
     if (init_val.is_null()) {
@@ -759,6 +771,7 @@ inline void Cluster::do_erase(size_t ndx, ColKey col_key)
     auto col_ndx = col_key.get_index();
     T values(m_alloc);
     values.set_parent(this, col_ndx.val + s_first_col_index);
+    set_spec<T>(values, col_ndx);
     set_string_interner<T>(values, col_key);
     values.init_from_parent();
     ObjLink link;
@@ -1031,6 +1044,9 @@ void Cluster::init_leaf(ColKey col_key, ArrayPayload* leaf) const
     if (leaf->need_string_interner()) {
         m_tree_top.set_string_interner(*leaf, col_key);
     }
+    if (leaf->need_spec()) {
+        m_tree_top.set_spec(*leaf, col_ndx);
+    }
     leaf->init_from_ref(ref);
     leaf->set_parent(const_cast<Cluster*>(this), col_ndx.val + 1);
 }
@@ -1046,6 +1062,7 @@ template <typename ArrayType>
 void Cluster::verify(ref_type ref, size_t index, util::Optional<size_t>& sz) const
 {
     ArrayType arr(get_alloc());
+    set_spec(arr, ColKey::Idx{unsigned(index) - 1});
     // TODO: find col_key for this call instead of index:
     // set_string_interner(arr, ColKey::Idx{unsigned(index) - 1});
     arr.set_parent(const_cast<Cluster*>(this), index);
@@ -1385,6 +1402,7 @@ void Cluster::dump_objects(int64_t key_offset, std::string lead) const
                 }
                 case col_type_String: {
                     ArrayString arr(m_alloc);
+                    set_spec(arr, col.get_index());
                     set_string_interner(arr, col);
                     ref_type ref = Array::get_as_ref(j);
                     arr.init_from_ref(ref);

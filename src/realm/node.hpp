@@ -360,7 +360,12 @@ public:
     {
         return false;
     }
-    virtual void set_string_interner(StringInterner&) const {}
+    virtual void set_string_interner(StringInterner*) const {}
+    virtual bool need_spec() const
+    {
+        return false;
+    }
+    virtual void set_spec(Spec*, size_t) const {}
 };
 
 } // namespace realm

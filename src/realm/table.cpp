@@ -26,6 +26,7 @@
 #include <realm/array_string.hpp>
 #include <realm/array_timestamp.hpp>
 #include <realm/db.hpp>
+#include <realm/transaction.hpp>
 #include <realm/dictionary.hpp>
 #include <realm/exceptions.hpp>
 #include <realm/impl/destroy_guard.hpp>
@@ -645,6 +646,7 @@ void Table::init(ref_type top_ref, ArrayParent* parent, size_t ndx_in_parent, bo
     else {
         m_tombstones = nullptr;
     }
+    m_string_interners.clear();
     m_cookie = cookie_initialized;
 }
 
@@ -1231,6 +1233,18 @@ void Table::detach(LifeCycleCookie cookie) noexcept
 {
     m_cookie = cookie;
     m_alloc.bump_instance_version();
+    // release string interners (if not shared and hosted by DB)
+    Group* g = get_parent_group();
+    Transaction* t = nullptr;
+    if (g) {
+        t = dynamic_cast<Transaction*>(g);
+    }
+    if (!t) {
+        // we have our own local string interners - delete them
+        for (auto ptr : m_string_interners)
+            delete ptr;
+    }
+    m_string_interners.clear();
 }
 
 void Table::fully_detach() noexcept
@@ -1241,6 +1255,7 @@ void Table::fully_detach() noexcept
     m_opposite_table.detach();
     m_opposite_column.detach();
     m_index_accessors.clear();
+    m_string_interners.clear();
 }
 
 
@@ -3397,12 +3412,38 @@ void Table::typed_print(std::string prefix, ref_type ref) const
     std::cout << prefix << "}" << std::endl;
 }
 
-StringInterner& Table::get_string_interner(ColKey) const
+StringInterner* Table::get_string_interner(ColKey col_key) const
 {
-    REALM_ASSERT(false);
+    return get_string_interner(col_key.get_index());
 }
 
-StringInterner& Table::get_string_interner(ColKey::Idx) const
+StringInterner* Table::get_string_interner(ColKey::Idx idx) const
 {
-    REALM_ASSERT(false);
+    // TODO: This method likely needs to be lock-free
+    std::lock_guard lock(m_string_interners_mutex);
+    size_t j = idx.val;
+    while (j >= m_string_interners.size()) {
+        m_string_interners.push_back((StringInterner*)nullptr);
+    }
+    auto interner = m_string_interners[j];
+    if (interner)
+        return interner;
+    // if we're in a transactional scenario, we need to obtain the interner from DB
+    auto group = get_parent_group();
+    DBRef db;
+    if (group) {
+        auto transaction = dynamic_cast<Transaction*>(group);
+        if (transaction)
+            db = transaction->get_db();
+    }
+    if (db) {
+        // obtain interner from DB
+        interner = db->get_string_interner(get_key(), idx);
+    }
+    else {
+        // create a local interner instead
+        interner = new StringInterner;
+    }
+    m_string_interners[j] = interner;
+    return interner;
 }

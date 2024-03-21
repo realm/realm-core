@@ -575,8 +575,8 @@ public:
     ColKey::Idx spec_ndx2leaf_ndx(size_t idx) const;
     ColKey leaf_ndx2colkey(ColKey::Idx idx) const;
     ColKey spec_ndx2colkey(size_t ndx) const;
-    StringInterner& get_string_interner(ColKey::Idx idx) const;
-    StringInterner& get_string_interner(ColKey col_key) const;
+    StringInterner* get_string_interner(ColKey::Idx idx) const;
+    StringInterner* get_string_interner(ColKey col_key) const;
     // Queries
     // Using where(tv) is the new method to perform queries on TableView. The 'tv' can have any order; it does not
     // need to be sorted, and, resulting view retains its order.
@@ -858,6 +858,8 @@ private:
     std::vector<ColKey> m_leaf_ndx2colkey;
     std::vector<ColKey::Idx> m_spec_ndx2leaf_ndx;
     std::vector<size_t> m_leaf_ndx2spec_ndx;
+    mutable std::vector<StringInterner*> m_string_interners;
+    mutable std::mutex m_string_interners_mutex; // we should be able to make access lock-free, but not yet.
     Type m_table_type = Type::TopLevel;
     uint64_t m_in_file_version_at_transaction_boundary = 0;
     AtomicLifeCycleCookie m_cookie;
@@ -1410,7 +1412,7 @@ public:
         return table.m_spec;
     }
 
-    static StringInterner& get_string_interner(const Table& table, ColKey col_key)
+    static StringInterner* get_string_interner(const Table& table, ColKey col_key)
     {
         return table.get_string_interner(col_key);
     }

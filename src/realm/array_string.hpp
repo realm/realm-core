@@ -70,9 +70,18 @@ public:
     {
         return true;
     }
-    void set_string_interner(StringInterner& string_interner) const override
+    void set_string_interner(StringInterner* string_interner) const override
     {
-        m_string_interner = &string_interner;
+        m_string_interner = string_interner;
+    }
+    bool need_spec() const override
+    {
+        return true;
+    }
+    void set_spec(Spec* spec, size_t col_ndx) const override
+    {
+        m_spec = spec;
+        m_col_ndx = col_ndx;
     }
 
     void update_parent()
@@ -134,8 +143,11 @@ private:
     alignas(storage_alignment) std::byte m_storage[storage_size];
     Array* m_arr;
     bool m_nullable = true;
-
+    mutable Spec* m_spec = nullptr;
+    mutable size_t m_col_ndx = realm::npos;
+    std::unique_ptr<ArrayString> m_string_enum_values;
     mutable StringInterner* m_string_interner = nullptr;
+    bool m_is_interned = false;
 
     Type upgrade_leaf(size_t value_size);
 };

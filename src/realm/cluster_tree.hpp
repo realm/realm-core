@@ -180,6 +180,7 @@ public:
     // Visit all leaves and call the supplied function. The function can modify the leaf.
     void update(UpdateFunction func);
 
+    void set_spec(ArrayPayload& arr, ColKey::Idx col_ndx) const;
     void set_string_interner(ArrayPayload& arr, ColKey col_key) const;
 
     virtual std::unique_ptr<ClusterNode> get_root_from_parent();
