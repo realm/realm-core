@@ -280,6 +280,7 @@ private:
     void on_flx_sync_version_complete(int64_t version);
 
     void init_progress_handler();
+    // only_if_new_uploadable_data can be true only if is_download is false
     void report_progress(bool is_download, bool only_if_new_uploadable_data = false);
 
     friend class SessionWrapperStack;
@@ -885,7 +886,11 @@ bool SessionImpl::process_flx_bootstrap_message(const SyncProgress& progress, Do
         return true;
     }
     else {
-        // FIXME this shouldn't be needed anymore when progress is reported separately for every direction
+        // FIXME (#7451) this variable is not needed in principle, and bootstrap store bytes could be passed just
+        // through notify_download_progress, but since it is needed in report_progress, and it is also called on
+        // upload progress for now until progress is reported separately. As soon as we understand here that there
+        // are no more changesets for bootstrap store, and we want to process bootstrap, we don't need to notify
+        // intermediate progress - so reset these bytes to not accidentally double report them.
         m_wrapper.m_bootstrap_store_bytes.reset();
     }
 
@@ -1648,10 +1653,8 @@ void SessionWrapper::actualize(ServerEndpoint endpoint)
         }
     }
 
-    if (!m_client_reset_config) {
-        // FIXME looks like noop, could be removed without an issue?
+    if (!m_client_reset_config)
         on_upload_progress(/* only_if_new_uploadable_data = */ true); // Throws
-    }
 }
 
 void SessionWrapper::force_close()
@@ -1858,6 +1861,7 @@ void SessionWrapper::report_progress(bool is_download, bool only_if_new_uploadab
 {
     REALM_ASSERT(!m_finalized);
     REALM_ASSERT(m_sess);
+    REALM_ASSERT(!(only_if_new_uploadable_data && is_download));
 
     if (!m_progress_handler)
         return;

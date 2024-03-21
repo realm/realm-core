@@ -667,7 +667,6 @@ struct FLX : TestSetup {
         : harness(app_id)
     {
         table_name = (*harness.schema().begin()).name;
-        harness.do_with_new_user([](std::shared_ptr<SyncUser>&&) {});
     }
 
     SyncTestFile make_config() override
@@ -709,14 +708,20 @@ struct FLX : TestSetup {
  * It doesn't try to check for particular reported values: these are checked in sync impl tests,
  * and specific combinations of updates verified directly in SyncProgressNotifier tests.
  *
- * Test emulates adding a few changes into one realm, verifies that the progress is reported until upload completion,
- * and then checks how this exact changes are downloaded into the second realm file (check with bootstrap store for
- * flx). Then without realm instances reset it is the other way around: test adds more changes to the second realm and
- * does the upload, then it resumes the download on the first realm and checks reported progress.
+ * First, test adds a few objects into one realm, verifies that the progress is reported until upload completion.
+ * Then it checks how this exact changes are downloaded into the second realm file (this essentially checks
+ * how progress is reported with bootstrap store for flx).
  *
- * Also, AsyncOpenTask is checked twice with initial empty third realm file, and with subsequent second opening with
- * more changes to download from the server. The progress reported through task interface should behave in the same
- * way as with cases tested above.
+ * Next subtests, are here to check how continuous sync reports progress. It reuses the same two realm files
+ * with synchronized objects in them both. Test adds more objects into the second realm to sync more changes
+ * the other way around: from second realm to the first one, and check if also upload progress correct for
+ * the second realm, and download progress for the first realm after its initial upload.
+ *  - first by reusing the same realm instance for the second realm
+ *  - second by closing and reopening second realm file with new SharedRealm instance
+ *
+ * Separately, AsyncOpenTask is checked twice: with initial empty third realm file, and with subsequent second opening
+ * with more changes to download from the server. The progress reported through task interface should behave in the
+ * same way as with cases tested above.
  */
 TEMPLATE_TEST_CASE("sync progress notifications", "[sync][baas][progress]", PBS, FLX)
 {

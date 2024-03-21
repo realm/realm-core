@@ -21,6 +21,6 @@ deadlock:realm::sync::MigrationStore::create_subscriptions
 race:adjtime
 
 # libuv scheduler is only supposed to be used on main thread but constructed
-# on the sync thread for asyn open task, should be harmless to suppress,
+# on the sync thread for async open task, should be harmless to suppress,
 # but ultimately needs to be fixed: #7083
 race:uv_async_init
