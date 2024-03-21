@@ -133,7 +133,6 @@ TEST(RadixTree_BuildIndexInt)
     expected.insert(expected.begin(), obj_keys.begin() + 4, obj_keys.begin() + 9);
     CHECK_EQUAL(results, expected);
 
-
     while (table.size()) {
         table.remove_object(table.begin());
     }

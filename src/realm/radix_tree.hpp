@@ -239,8 +239,8 @@ public:
     static std::unique_ptr<IndexNode> create(Allocator& alloc, const ClusterColumn& cluster, size_t compact_threshold,
                                              NodeType type);
 
-    void insert(ObjKey value, IndexKey<ChunkWidth> key);
-    void erase(ObjKey value, IndexKey<ChunkWidth> key);
+    void insert(const ObjKey& value, IndexKey<ChunkWidth>& key);
+    void erase(const ObjKey& value, IndexKey<ChunkWidth>& key);
     IndexIterator find_first(IndexKey<ChunkWidth> key, ObjKey optional_known_key = ObjKey()) const;
     void find_all(std::vector<ObjKey>& results, IndexKey<ChunkWidth> key) const;
     FindRes find_all_no_copy(IndexKey<ChunkWidth> value, InternalFindResult& result) const;
@@ -272,7 +272,7 @@ private:
 
     void init(NodeType type);
     void make_sorted_list_at(size_t ndx, ObjKey existing, ObjKey key_to_insert);
-    std::unique_ptr<IndexNode> do_add_direct(ObjKey value, size_t ndx, bool inner_node);
+    void do_add_direct(const ObjKey& value, size_t ndx, bool inner_node, IndexKey<ChunkWidth>& key);
     std::unique_ptr<IndexNode> do_add_last(ObjKey value, size_t ndx, const IndexKey<ChunkWidth>& key);
     uint64_t get_population(size_t ndx) const;
     void set_population(size_t ndx, uint64_t pop);
@@ -294,14 +294,14 @@ private:
     {
         return prefix_size <= IndexKey<ChunkWidth>::c_key_chunks_per_prefix;
     }
-    static void collapse_nodes(std::vector<std::unique_ptr<IndexNode<ChunkWidth>>>& accessors_chain);
+    void collapse_nodes(IndexNode<ChunkWidth>* parent, size_t payload_offset);
 
     InsertResult insert_to_population(IndexKey<ChunkWidth>& key);
     InsertResult do_insert_to_population(uint64_t population_value);
 
     std::optional<size_t> index_of(const IndexKey<ChunkWidth>& key) const;
+    void do_erase(const ObjKey& value, IndexKey<ChunkWidth>& key, IndexNode<ChunkWidth>* parent);
     void do_remove(size_t index_raw);
-    std::vector<std::unique_ptr<IndexNode<ChunkWidth>>> get_accessors_chain(const IndexIterator& it);
 
     enum class Order {
         Firsts,
@@ -345,7 +345,6 @@ public:
 #endif // REALM_DEBUG
 
     // RadixTree specials
-    void insert(ObjKey value, IndexKey<ChunkWidth> key);
     void find_all_greater_equal(const Mixed& begin, std::vector<ObjKey>& results) const;
     void find_all_less_equal(const Mixed& begin, std::vector<ObjKey>& results) const;
     void find_all_between_inclusive(const Mixed& begin, const Mixed& end, std::vector<ObjKey>& results) const;
