@@ -633,6 +633,30 @@ TEST(List_AggOps)
     test_lists_numeric_agg<Decimal128>(test_context, sg, type_Decimal, Decimal128(realm::null()), true);
 }
 
+ONLY(Test_Write_List_Nested_InMixed)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::string message;
+    DBOptions options;
+    options.logger = test_context.logger;
+    DBRef db = DB::create(make_in_realm_history(), path, options);
+    auto tr = db->start_write();
+    auto table = tr->add_table_with_primary_key("table", type_Int, "id");
+    auto col_any = table->add_column(type_Mixed, "something");
+
+    Obj obj = table->create_object_with_primary_key(1);
+    obj.set_any(col_any, Mixed{20});
+    tr->verify();
+    tr->commit_and_continue_writing(); // commit simple mixed
+
+    obj.set_collection(col_any, CollectionType::List);
+    auto list = obj.get_list_ptr<Mixed>(col_any);
+    list->add(Mixed{10});
+    list->add(Mixed{11});
+    tr->verify();
+    tr->commit(); // commit nested list in mixed
+}
+
 TEST(List_Nested_InMixed)
 {
     SHARED_GROUP_TEST_PATH(path);

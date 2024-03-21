@@ -1653,50 +1653,74 @@ ref_type Cluster::typed_write(ref_type ref, _impl::ArrayWriterBase& out, const T
             else if (col_type == col_type_Mixed) {
                 const auto sz = leaf.size();
                 REALM_ASSERT(sz == 6);
-                for (size_t i = 0; i < sz; ++i) {
-                    auto rot = leaf.get_as_ref_or_tagged(i);
-                    if (rot.is_ref() && rot.get_as_ref()) {
 
-                        /*
-                         In order to know how Mixed stores things, we need to take in consideration this enum
-                         enum {
-                             payload_idx_type,
-                             payload_idx_int,
-                             payload_idx_pair,
-                             payload_idx_str,
-                             payload_idx_ref,
-                             payload_idx_key,
-                             payload_idx_size
-                         };
-                         Note:
-                         1. First 3 entries can be compressed (they are integers)
-                         2. entry number 4 is for strings (no compression for now)
-                         3. entry number 5 is actually storing refs to collections (List or Dictionaries).
-                            They can only be BPlusTree<int, Mixed> or BPlusTree<string, Mixed>.
-                         4. Other entries should be skipped, we do not compress them.
-                         */
+                /*
+                 In order to know how Mixed stores things, we need to take in consideration this enum
+                 enum {
+                 payload_idx_type,
+                 payload_idx_int,
+                 payload_idx_pair,
+                 payload_idx_str,
+                 payload_idx_ref,
+                 payload_idx_key,
+                 payload_idx_size
+                 };
+                 Note:
+                 1. entry at index 0 is the parent pointer
+                 2. entries at indices 1 and 2 can be compressed (they are integers)
+                 3. entry at index 3 is for strings (no compression for now)
+                 4. entry at index 4 is actually storing refs to all the stored types,
+                    including to collections (List or Dictionaries).
+                    They can only be BPlusTree<int, Mixed> or BPlusTree<string, Mixed>.
+                 5. Is the key array, marks whether the composite array at position i is a collection or not
+                 */
+                auto rot_parent = leaf.get_as_ref_or_tagged(0);
+                auto rot_int = leaf.get_as_ref_or_tagged(1);
+                auto rot_pair_int = leaf.get_as_ref_or_tagged(2);
+                auto rot_string = leaf.get_as_ref_or_tagged(3);
+                auto rot_composite = leaf.get_as_ref_or_tagged(4);
+                auto rot_key = leaf.get_as_ref_or_tagged(5);
 
-                        const auto do_compress = (i < 3) ? true : false;
-                        if (i == 4) {
-                            // TODO this is not working...
-                            bool compress = true;
-                            auto bptree_rot = leaf.get_as_ref_or_tagged(i);
-                            if (bptree_rot.is_ref() && bptree_rot.get_as_ref()) {
-                                written_leaf.set_as_ref(i, BPlusTreeBase::typed_write(bptree_rot.get_as_ref(), out,
-                                                                                      m_alloc, col_type, deep,
-                                                                                      only_modified, compress));
-                            }
-                            else {
-                                written_leaf.set(i, bptree_rot);
-                            }
+                if (rot_parent.get_as_ref())
+                    written_leaf.set(0, Array::write(rot_parent.get_as_ref(), m_alloc, out, only_modified, false));
+                else
+                    written_leaf.set(0, rot_parent);
+
+                if (rot_int.get_as_ref())
+                    written_leaf.set_as_ref(1, Array::write(rot_int.get_as_ref(), m_alloc, out, only_modified, true));
+                else
+                    written_leaf.set(1, rot_int);
+
+                if (rot_pair_int.get_as_ref())
+                    written_leaf.set_as_ref(
+                        2, Array::write(rot_pair_int.get_as_ref(), m_alloc, out, only_modified, true));
+                else
+                    written_leaf.set(2, rot_pair_int);
+
+                written_leaf.set(3, rot_string); // no compression for strings now.
+
+                if (rot_composite.get_as_ref() && rot_key.get_as_ref()) {
+                    Array composite(Allocator::get_default());
+                    Array keys(Allocator::get_default());
+                    composite.init_from_ref(rot_composite.get_as_ref());
+                    keys.init_from_ref(rot_key.get_as_ref());
+
+                    for (size_t i = 0; i < composite.size(); ++i) {
+                        if (i < keys.size() && keys.get(i)) {
+                            // collection.
+                            auto rot = composite.get_as_ref_or_tagged(i);
+                            REALM_ASSERT_DEBUG(rot.is_ref() && rot.get_as_ref());
+                            const auto new_ref = BPlusTreeBase::typed_write(rot.get_as_ref(), out, m_alloc, col_type,
+                                                                            deep, only_modified, true);
+                            composite.set_as_ref(i, new_ref);
                         }
-                        // compress only mixed arrays that are integers. skip all the rest for now.
-                        written_leaf.set_as_ref(
-                            i, Array::write(rot.get_as_ref(), m_alloc, out, only_modified, do_compress));
                     }
-                    else {
-                        written_leaf.set(i, rot);
-                    }
+                    written_leaf.set(4, rot_composite);
+                    written_leaf.set(5, rot_key);
+                }
+                else {
+                    written_leaf.set(4, rot_composite);
+                    written_leaf.set(5, rot_key);
                 }
             }
             else {
