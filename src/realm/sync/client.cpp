@@ -1892,12 +1892,29 @@ void SessionWrapper::report_progress(bool is_download, bool only_if_new_uploadab
         is_completed = p.uploaded == p.uploadable;
     }
 
+    auto calculate_progress = [](uint64_t transferred, uint64_t transferable, uint64_t final_transferred) {
+        REALM_ASSERT_DEBUG_EX(final_transferred <= transferred, final_transferred, transferred, transferable);
+        REALM_ASSERT_DEBUG_EX(transferred <= transferable, final_transferred, transferred, transferable);
+
+        // The effect of this calculation is that if new bytes are added for download/upload,
+        // the progress estimate doesn't go back to zero, but it goes back to some non-zero percentage.
+        // This calculation allows a clean progression from 0 to 1.0 even if the new data is added for the sync
+        // before progress has reached 1.0.
+        // Then once it is at 1.0 the next batch of changes will restart the estimate at 0.
+        // Example for upload progress reported:
+        // 0 -> 1.0 -> new data added -> 0.0 -> 0.1 ...sync... -> 0.4 -> new data added -> 0.3 ...sync.. -> 1.0
+
+        double progress_estimate = 1.0;
+        if (final_transferred < transferable && transferred < transferable)
+            progress_estimate = (transferred - final_transferred) / double(transferable - final_transferred);
+        return progress_estimate;
+    };
+
     double upload_estimate = 1.0, download_estimate = 1.0;
 
-    if ((!is_completed || is_download) && p.uploaded != p.uploadable) {
-        if (p.uploadable > p.final_uploaded)
-            upload_estimate = (p.uploaded - p.final_uploaded) / double(p.uploadable - p.final_uploaded);
-    }
+    // calculate estimate for both download/upload since the progress is reported all at once
+    if (!is_completed || is_download)
+        upload_estimate = calculate_progress(p.uploaded, p.uploadable, p.final_uploaded);
 
     // download estimate only known for flx
     if (m_download_estimate) {
@@ -1916,15 +1933,9 @@ void SessionWrapper::report_progress(bool is_download, bool only_if_new_uploadab
                 p.downloadable = p.final_downloaded + (p.downloaded - p.final_downloaded) / download_estimate;
     }
     else {
-        if ((!is_completed || !is_download) && p.downloaded != p.downloadable)
-            if (p.downloadable > p.final_downloaded)
-                download_estimate = (p.downloaded - p.final_downloaded) / double(p.downloadable - p.final_downloaded);
+        if (!is_completed || !is_download)
+            download_estimate = calculate_progress(p.downloaded, p.downloadable, p.final_downloaded);
     }
-
-    REALM_ASSERT_DEBUG_EX(0 <= download_estimate && download_estimate <= 1, download_estimate, p.final_downloaded,
-                          p.downloaded, p.downloadable);
-    REALM_ASSERT_DEBUG_EX(0 <= upload_estimate && upload_estimate <= 1, upload_estimate, p.final_uploaded, p.uploaded,
-                          p.uploadable);
 
     if (is_completed) {
         if (is_download)
