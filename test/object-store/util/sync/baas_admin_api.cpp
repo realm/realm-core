@@ -277,6 +277,8 @@ std::string_view getenv_sv(const char* name) noexcept
     return {};
 }
 
+const static std::string g_baas_coid_header_name("X-Appservices-Request-Id");
+
 } // namespace
 
 app::Response do_http_request(const app::Request& request)
@@ -351,7 +353,7 @@ app::Response do_http_request(const app::Request& request)
     }
     if (logger->would_log(util::Logger::Level::trace)) {
         std::string coid = [&] {
-            auto coid_header = response_headers.find("X-Appservices-Request-Id");
+            auto coid_header = response_headers.find(g_baas_coid_header_name);
             if (coid_header == response_headers.end()) {
                 return std::string{};
             }
@@ -398,12 +400,13 @@ public:
             logger->info("Starting baasaas container");
         }
 
-        auto resp = do_request(std::move(url_path), app::HttpMethod::post);
+        auto [resp, baas_coid] = do_request(std::move(url_path), app::HttpMethod::post);
         if (!resp["id"].is_string()) {
             throw RuntimeError(
                 ErrorCodes::RuntimeError,
-                util::format("Failed to start baas container, got response without container ID: \"%1\"",
-                             resp.dump()));
+                util::format(
+                    "Failed to start baas container, got response without container ID: \"%1\" (baas coid: %2)",
+                    resp.dump(), baas_coid));
         }
         m_container_id = resp["id"].get<std::string>();
         logger->info("Baasaas container started with id \"%1\"", m_container_id);
@@ -445,15 +448,14 @@ public:
         while (std::chrono::system_clock::now() - poll_start_at < std::chrono::minutes(2) &&
                m_http_endpoint.empty()) {
             if (http_endpoint.empty()) {
-                auto status_obj =
+                auto [status_obj, baas_coid] =
                     do_request(util::format("containerStatus?id=%1", m_container_id), app::HttpMethod::get);
                 if (!status_obj["httpUrl"].is_null()) {
                     if (!status_obj["httpUrl"].is_string() || !status_obj["mongoUrl"].is_string()) {
-                        throw RuntimeError(
-                            ErrorCodes::RuntimeError,
-                            util::format(
-                                "Error polling for baasaas instance. httpUrl or mongoUrl is the wrong format: \"%1\"",
-                                status_obj.dump()));
+                        throw RuntimeError(ErrorCodes::RuntimeError,
+                                           util::format("Error polling for baasaas instance. httpUrl or mongoUrl is "
+                                                        "the wrong format: \"%1\" (baas coid: %2)",
+                                                        status_obj.dump(), baas_coid));
                     }
                     http_endpoint = status_obj["httpUrl"].get<std::string>();
                     mongo_endpoint = status_obj["mongoUrl"].get<std::string>();
@@ -517,7 +519,7 @@ public:
     }
 
 private:
-    nlohmann::json do_request(std::string api_path, app::HttpMethod method)
+    std::pair<nlohmann::json, std::string> do_request(std::string api_path, app::HttpMethod method)
     {
         app::Request request;
 
@@ -530,13 +532,22 @@ private:
                         util::format("Baasaas api response code: %1 Response body: %2", response.http_status_code,
                                      response.body));
         try {
-            return nlohmann::json::parse(response.body);
+            return {nlohmann::json::parse(response.body), baas_coid_from_response(response)};
         }
         catch (const nlohmann::json::exception& e) {
-            throw RuntimeError(ErrorCodes::MalformedJson,
-                               util::format("Error making baasaas request to %1: Invalid json returned \"%2\" (%3)",
-                                            request.url, response.body, e.what()));
+            throw RuntimeError(
+                ErrorCodes::MalformedJson,
+                util::format("Error making baasaas request to %1 (baas coid %4): Invalid json returned \"%2\" (%3)",
+                             request.url, response.body, e.what(), baas_coid_from_response(response)));
         }
+    }
+
+    std::string baas_coid_from_response(const app::Response& resp)
+    {
+        if (auto it = resp.headers.find(g_baas_coid_header_name); it != resp.headers.end()) {
+            return it->second;
+        }
+        return {};
     }
 
     static std::string get_baasaas_base_url()
