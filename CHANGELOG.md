@@ -6,7 +6,8 @@
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Fix pass a thread safe reference to init subscription callback. ([#7497](https://github.com/realm/realm-core/issues/7497), since v13.16.0)
+
 
 ### Breaking changes
 * None.
