@@ -1681,7 +1681,7 @@ ref_type Cluster::typed_write(ref_type ref, _impl::ArrayWriterBase& out, const T
                         if (i == 1 || i == 2) {
                             // this check is not fine grained.. we are compressing everything that fits into m_int and
                             // m_pair_int which means timestamps, doubles, floats and links alongside integers.
-                            // TODO: build an array mixed and check the type
+                            // TODO: find a solution for this, maybe build an array of mixed and check the type.
                             written_leaf.set_as_ref(
                                 i, Array::write(rot.get_as_ref(), m_alloc, out, only_modified, compressible));
                         }
@@ -1710,6 +1710,7 @@ ref_type Cluster::typed_write(ref_type ref, _impl::ArrayWriterBase& out, const T
             else {
                 REALM_ASSERT(false);
             }
+            // can this be the solution to for the integers that are stored straigh into composite array??
             written_cluster.set_as_ref(j, written_leaf.write(out, false, false, compressible));
             written_leaf.destroy();
         }
