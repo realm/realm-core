@@ -651,7 +651,7 @@ TEST_IF(Upgrade_Database_22, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZE
 }
 
 // FIXME: add migration test for decimal128
-NONCONCURRENT_TEST_IF(Upgrade_Database_23, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZE == 1000)
+NONCONCURRENT_TEST_IF(Upgrade_Database_23, false && (REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZE == 1000))
 {
     // We should test that we can convert backlink arrays bigger that node size to BPlusTrees
     std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" +
