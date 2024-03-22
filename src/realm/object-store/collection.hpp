@@ -156,6 +156,13 @@ void Collection::validate_embedded(Context& ctx, T&& value, CreatePolicy policy)
         throw IllegalOperation(util::format("Cannot add an existing managed embedded object to a %1.", type_name()));
 }
 
+// Dummy implementation to satisfy StringifyingContext
+inline std::ostream& operator<<(std::ostream& out, const Collection&)
+{
+    return out;
+}
+
+
 } // namespace object_store
 } // namespace realm
 

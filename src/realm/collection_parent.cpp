@@ -75,7 +75,7 @@ CollectionParent::~CollectionParent() {}
 
 void CollectionParent::check_level() const
 {
-    if (m_level + 1 > s_max_level) {
+    if (size_t(m_level) + 1 > s_max_level) {
         throw LogicError(ErrorCodes::LimitExceeded, "Max nesting level reached");
     }
 }

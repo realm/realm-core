@@ -170,6 +170,26 @@ void Object::set_property_value_impl(ContextType& ctx, const Property& property,
         return;
     }
 
+    if (property.type == PropertyType::Mixed) {
+        Mixed new_val = ctx.template unbox<Mixed>(value, policy);
+        if (new_val.is_type(type_Dictionary)) {
+            ContextType child_ctx(ctx, m_obj, property);
+            m_obj.set_collection(col, CollectionType::Dictionary);
+            object_store::Dictionary dict(m_realm, m_obj, col);
+            dict.assign(child_ctx, value, policy);
+            ctx.did_change();
+            return;
+        }
+        if (new_val.is_type(type_List)) {
+            ContextType child_ctx(ctx, m_obj, property);
+            m_obj.set_collection(col, CollectionType::List);
+            List list(m_realm, m_obj, col);
+            list.assign(child_ctx, value, policy);
+            ctx.did_change();
+            return;
+        }
+    }
+
     ValueUpdater<ValueType, ContextType> updater{ctx, property, value, m_obj, col, policy, is_default};
     switch_on_type(property.type, updater);
     ctx.did_change();
@@ -214,8 +234,16 @@ ValueType Object::get_property_value_impl(ContextType& ctx, const Property& prop
         case PropertyType::UUID:
             return is_nullable(property.type) ? ctx.box(m_obj.get<util::Optional<UUID>>(column))
                                               : ctx.box(m_obj.get<UUID>(column));
-        case PropertyType::Mixed:
-            return ctx.box(m_obj.get<Mixed>(column));
+        case PropertyType::Mixed: {
+            Mixed value = m_obj.get<Mixed>(column);
+            if (value.is_type(type_Dictionary)) {
+                return ctx.box(object_store::Dictionary(m_realm, m_obj, column));
+            }
+            if (value.is_type(type_List)) {
+                return ctx.box(List(m_realm, m_obj, column));
+            }
+            return ctx.box(value);
+        }
         case PropertyType::Object: {
             auto linkObjectSchema = m_realm->schema().find(property.object_type);
             auto linked = const_cast<Obj&>(m_obj).get_linked_object(column);
