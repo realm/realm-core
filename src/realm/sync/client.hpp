@@ -159,10 +159,8 @@ public:
     using ErrorInfo = SessionErrorInfo;
     using port_type = sync::port_type;
     using SyncTransactCallback = void(VersionID old_version, VersionID new_version);
-    using ProgressHandler = void(std::uint_fast64_t downloaded_bytes, std::uint_fast64_t downloadable_bytes,
-                                 std::uint_fast64_t uploaded_bytes, std::uint_fast64_t uploadable_bytes,
-                                 std::uint_fast64_t snapshot_version, double download_estimate,
-                                 double upload_estimate);
+    using ProgressHandler = void(bool is_download, uint64_t snapshot_version, uint64_t transferred,
+                                 uint64_t transferable, double progress_estimate, bool is_completed);
     using WaitOperCompletionHandler = util::UniqueFunction<void(Status)>;
     using SSLVerifyCallback = bool(const std::string& server_address, port_type server_port, const char* pem_data,
                                    size_t pem_size, int preverify_ok, int depth);
@@ -469,6 +467,14 @@ public:
     /// the session object is destroyed. Please see "Callback semantics" section
     /// under Session for more on this.
     void set_progress_handler(util::UniqueFunction<ProgressHandler>);
+
+    // FIXME remove
+    using ProgressHandler2 = void(uint_fast64_t downloaded, uint_fast64_t downloadable, uint_fast64_t uploaded,
+                                  uint_fast64_t uploadable, uint_fast64_t snapshot, double, double);
+    void set_progress_handler(util::UniqueFunction<ProgressHandler2>)
+    {
+        REALM_ASSERT_RELEASE(false);
+    }
 
     using ConnectionStateChangeListener = void(ConnectionState, util::Optional<SessionErrorInfo>);
 

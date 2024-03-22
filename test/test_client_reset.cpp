@@ -1354,14 +1354,14 @@ TEST(ClientReset_Recover_UploadableBytes)
     }
 
     auto& history = static_cast<ClientReplication*>(db->get_replication())->get_history();
-    uint_fast64_t unused, pre_reset_uploadable_bytes;
-    history.get_upload_download_bytes(db.get(), unused, unused, unused, pre_reset_uploadable_bytes, unused);
+    uint_fast64_t unused = 0, pre_reset_uploadable_bytes = 0;
+    history.get_upload_download_bytes(db.get(), unused, nullptr, nullptr, nullptr, &pre_reset_uploadable_bytes);
     CHECK_GREATER(pre_reset_uploadable_bytes, 0);
 
     expect_reset(test_context, *db, *db_fresh, ClientResyncMode::Recover, nullptr);
 
-    uint_fast64_t post_reset_uploadable_bytes;
-    history.get_upload_download_bytes(db.get(), unused, unused, unused, post_reset_uploadable_bytes, unused);
+    uint_fast64_t post_reset_uploadable_bytes = 0;
+    history.get_upload_download_bytes(db.get(), unused, nullptr, nullptr, nullptr, &post_reset_uploadable_bytes);
     CHECK_GREATER(post_reset_uploadable_bytes, 0);
     CHECK_GREATER(pre_reset_uploadable_bytes, post_reset_uploadable_bytes);
 }

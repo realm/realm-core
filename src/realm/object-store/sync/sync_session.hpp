@@ -59,21 +59,20 @@ public:
     void unregister_callback(uint64_t);
 
     void set_local_version(uint64_t);
-    void update(uint64_t downloaded, uint64_t downloadable, uint64_t uploaded, uint64_t uploadable,
-                uint64_t snapshot_version, double download_estimate = 1.0, double upload_estimate = 1.0);
+
+    void update(NotifierType direction, uint64_t snapshot_version, uint64_t transferred, uint64_t transferable,
+                double progress_estimate, bool is_completed);
 
 private:
     mutable std::mutex m_mutex;
 
     // How many bytes are uploadable or downloadable.
     struct Progress {
-        uint64_t uploadable;
-        uint64_t downloadable;
-        uint64_t uploaded;
-        uint64_t downloaded;
-        double upload_estimate;
-        double download_estimate;
         uint64_t snapshot_version;
+        uint64_t transferred;
+        uint64_t transferable;
+        double progress_estimate;
+        bool is_completed;
     };
 
     // A PODS encapsulating some information for progress notifier callbacks a binding
@@ -99,7 +98,8 @@ private:
     // event more up-to-date information isn't yet available.  FIXME: If we support transparent
     // client reset in the future, we might need to reset the progress state variables if the Realm
     // is rolled back.
-    util::Optional<Progress> m_current_progress;
+    util::Optional<Progress> m_download_progress;
+    util::Optional<Progress> m_upload_progress;
 
     std::unordered_map<uint64_t, NotifierPackage> m_packages;
 };
@@ -418,7 +418,7 @@ private:
     void cancel_pending_waits(util::CheckedUniqueLock, Status) RELEASE(m_state_mutex);
     enum class ShouldBackup { yes, no };
     void update_error_and_mark_file_for_deletion(SyncError&, ShouldBackup) REQUIRES(m_state_mutex, !m_config_mutex);
-    void handle_progress_update(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, double, double);
+    void handle_progress_update(bool, uint64_t, uint64_t, uint64_t, double, bool);
     void handle_new_flx_sync_query(int64_t version);
 
     void nonsync_transact_notify(VersionID::version_type) REQUIRES(!m_state_mutex);

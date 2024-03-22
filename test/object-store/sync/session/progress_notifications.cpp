@@ -40,8 +40,25 @@ using namespace realm;
 
 using NotifierType = SyncSession::ProgressDirection;
 
+struct TestSyncProgressNotifier : _impl::SyncProgressNotifier {
+    void update(uint64_t downloaded, uint64_t downloadable, uint64_t uploaded, uint64_t uploadable,
+                uint64_t snapshot_version)
+    {
+        bool download_is_completed = downloaded >= downloadable;
+        double download_estimate =
+            !download_is_completed && downloadable > 0 ? (downloaded / double(downloadable)) : 1.0;
+        bool upload_is_completed = uploaded >= uploadable;
+        double upload_estimate = !upload_is_completed && uploadable > 0 ? (uploaded / double(uploadable)) : 1.0;
+        using Base = _impl::SyncProgressNotifier;
+        Base::update(NotifierType::download, snapshot_version, downloaded, downloadable, download_estimate,
+                     download_is_completed);
+        Base::update(NotifierType::upload, snapshot_version, uploaded, uploadable, upload_estimate,
+                     upload_is_completed);
+    }
+};
+
 TEST_CASE("progress notification", "[sync][session][progress]") {
-    _impl::SyncProgressNotifier progress;
+    TestSyncProgressNotifier progress;
     uint64_t transferred = 0;
     uint64_t transferrable = 0;
     double progress_estimate = 0;

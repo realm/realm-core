@@ -831,12 +831,11 @@ void SyncSession::cancel_pending_waits(util::CheckedUniqueLock lock, Status erro
         callback.second(error);
 }
 
-void SyncSession::handle_progress_update(uint64_t downloaded, uint64_t downloadable, uint64_t uploaded,
-                                         uint64_t uploadable, uint64_t snapshot_version, double download_estimate,
-                                         double upload_estimate)
+void SyncSession::handle_progress_update(bool is_download, uint64_t snapshot, uint64_t transferred,
+                                         uint64_t transferable, double estimate, bool is_completed)
 {
-    m_progress_notifier.update(downloaded, downloadable, uploaded, uploadable, snapshot_version, download_estimate,
-                               upload_estimate);
+    auto direction = is_download ? SyncSession::ProgressDirection::download : SyncSession::ProgressDirection::upload;
+    m_progress_notifier.update(direction, snapshot, transferred, transferable, estimate, is_completed);
 }
 
 static sync::Session::Config::ClientReset make_client_reset_config(const RealmConfig& base_config,
@@ -971,13 +970,10 @@ void SyncSession::create_sync_session()
     std::weak_ptr<SyncSession> weak_self = weak_from_this();
 
     // Set up the wrapped progress handler callback
-    m_session->set_progress_handler([weak_self](uint_fast64_t downloaded, uint_fast64_t downloadable,
-                                                uint_fast64_t uploaded, uint_fast64_t uploadable,
-                                                uint_fast64_t snapshot_version, double download_estimate,
-                                                double upload_estimate) {
+    m_session->set_progress_handler([weak_self](bool is_download, uint64_t snapshot, uint64_t transferred,
+                                                uint64_t transferable, double estimate, bool is_completed) {
         if (auto self = weak_self.lock()) {
-            self->handle_progress_update(downloaded, downloadable, uploaded, uploadable, snapshot_version,
-                                         download_estimate, upload_estimate);
+            self->handle_progress_update(is_download, snapshot, transferred, transferable, estimate, is_completed);
         }
     });
 
@@ -1526,20 +1522,22 @@ void SyncSession::did_drop_external_reference()
 uint64_t SyncProgressNotifier::register_callback(std::function<ProgressNotifierCallback> notifier,
                                                  NotifierType direction, bool is_streaming)
 {
+    bool is_download = direction == NotifierType::download;
     util::UniqueFunction<void()> invocation;
     uint64_t token_value = 0;
     {
         std::lock_guard<std::mutex> lock(m_mutex);
         token_value = m_progress_notifier_token++;
         NotifierPackage package{std::move(notifier), util::none, m_local_transaction_version, is_streaming,
-                                direction == NotifierType::download};
-        if (!m_current_progress) {
+                                is_download};
+        auto&& progress = is_download ? m_download_progress : m_upload_progress;
+        if (!progress) {
             // Simply register the package, since we have no data yet.
             m_packages.emplace(token_value, std::move(package));
             return token_value;
         }
         bool skip_registration = false;
-        invocation = package.create_invocation(*m_current_progress, skip_registration);
+        invocation = package.create_invocation(*progress, skip_registration);
         if (skip_registration) {
             token_value = 0;
         }
@@ -1557,18 +1555,25 @@ void SyncProgressNotifier::unregister_callback(uint64_t token)
     m_packages.erase(token);
 }
 
-void SyncProgressNotifier::update(uint64_t downloaded, uint64_t downloadable, uint64_t uploaded, uint64_t uploadable,
-                                  uint64_t snapshot_version, double download_estimate, double upload_estimate)
+void SyncProgressNotifier::update(NotifierType direction, uint64_t snapshot_version, uint64_t transferred,
+                                  uint64_t transferable, double progress_estimate, bool is_completed)
 {
+    bool is_download = direction == NotifierType::download;
     std::vector<util::UniqueFunction<void()>> invocations;
     {
         std::lock_guard<std::mutex> lock(m_mutex);
-        m_current_progress = Progress{uploadable,      downloadable,      uploaded,        downloaded,
-                                      upload_estimate, download_estimate, snapshot_version};
+        auto&& progress = is_download ? m_download_progress : m_upload_progress;
+        progress = Progress{snapshot_version, transferred, transferable, progress_estimate, is_completed};
 
         for (auto it = m_packages.begin(); it != m_packages.end();) {
+            auto&& package = it->second;
+            if (package.is_download != is_download) {
+                ++it;
+                continue;
+            }
+
             bool should_delete = false;
-            invocations.emplace_back(it->second.create_invocation(*m_current_progress, should_delete));
+            invocations.emplace_back(package.create_invocation(*progress, should_delete));
             it = should_delete ? m_packages.erase(it) : std::next(it);
         }
     }
@@ -1583,34 +1588,33 @@ void SyncProgressNotifier::set_local_version(uint64_t snapshot_version)
     m_local_transaction_version = snapshot_version;
 }
 
-util::UniqueFunction<void()>
-SyncProgressNotifier::NotifierPackage::create_invocation(Progress const& current_progress, bool& is_expired)
+util::UniqueFunction<void()> SyncProgressNotifier::NotifierPackage::create_invocation(Progress const& progress,
+                                                                                      bool& is_expired)
 {
-    uint64_t transferred = is_download ? current_progress.downloaded : current_progress.uploaded;
-    uint64_t transferrable = is_download ? current_progress.downloadable : current_progress.uploadable;
-    double progress_estimate = is_download ? current_progress.download_estimate : current_progress.upload_estimate;
-
     // If the sync client has not yet processed all of the local
     // transactions then the uploadable data is incorrect and we should
     // not invoke the callback
-    if (!is_download && snapshot_version > current_progress.snapshot_version)
+    if (!is_download && snapshot_version > progress.snapshot_version)
         return [] {};
+
+    uint64_t transferable = progress.transferable;
 
     if (!is_streaming) {
         // The initial download size we get from the server is the uncompacted
         // size, and so the download may complete before we actually receive
-        // that much data. When that happens, transferrable will drop and we
+        // that much data. When that happens, transferable will drop and we
         // need to use the new value instead of the captured one.
-        if (!captured_transferrable || *captured_transferrable > transferrable)
-            captured_transferrable = transferrable;
-        transferrable = *captured_transferrable;
+        if (!captured_transferrable || *captured_transferrable > transferable)
+            captured_transferrable = transferable;
+        transferable = *captured_transferrable;
     }
 
     // A notifier is expired if at least as many bytes have been transferred
     // as were originally considered transferrable.
-    is_expired = !is_streaming && transferred >= transferrable;
+    // FIXME wouldn't it make sense to take actual download/upload completion into an account?
+    is_expired = !is_streaming && progress.transferred >= transferable;
     return [=, notifier = notifier] {
-        notifier(transferred, transferrable, progress_estimate);
+        notifier(progress.transferred, transferable, progress.progress_estimate);
     };
 }
 
