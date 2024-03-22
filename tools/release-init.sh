@@ -15,7 +15,6 @@ function usage()
     echo "    10.123.1"
     echo "    99.999999.999999"
     echo "    4.5.0-CustDemo"
-    # Default to 0 if exit code not provided
     exit 1
 }
 
@@ -23,6 +22,7 @@ if [[ -z "$1" ]]; then
     usage
 fi
 
+# egrep has been replaced with 'grep -E'
 realm_version=$(echo "$1" | grep -E "${VERSION_GREP}")
 if [ -z "${realm_version}" ]; then
     echo Wrong version format: "$1"
