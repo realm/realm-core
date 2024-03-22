@@ -65,24 +65,25 @@ util::Uri::Uri(std::string_view str)
     m_frag.assign(b, e); // Throws
 }
 
-util::Uri util::Uri::parse(std::string_view str)
+StatusWith<util::Uri> util::Uri::try_parse(std::string_view str)
 {
     Uri uri(str);
-    if (auto status = uri.validate(str); !status.is_ok()) {
-        throw Exception(std::move(status));
+    if (uri.m_scheme.empty()) {
+        return {ErrorCodes::BadServerUrl, util::format("URL missing scheme: %1", str)};
+    }
+    if (uri.m_auth.empty()) {
+        return {ErrorCodes::BadServerUrl, util::format("URL missing server: %1", str)};
     }
     return uri;
 }
 
-Status util::Uri::validate(std::string_view original) const
+util::Uri util::Uri::parse(std::string_view str)
 {
-    if (m_scheme.empty()) {
-        return {ErrorCodes::BadServerUrl, util::format("URL missing scheme: %1", original)};
+    auto status = try_parse(str);
+    if (!status.is_ok()) {
+        throw Exception(status.get_status());
     }
-    if (m_auth.empty()) {
-        return {ErrorCodes::BadServerUrl, util::format("URL missing server: %1", original)};
-    }
-    return Status::OK();
+    return status.get_value();
 }
 
 void util::Uri::set_scheme(const std::string& val)

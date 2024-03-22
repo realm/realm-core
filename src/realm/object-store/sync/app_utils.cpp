@@ -65,7 +65,7 @@ std::optional<std::string> AppUtils::extract_redir_location(const std::map<std::
 {
     // Look for case insensitive redirect "location" in headers
     auto location = AppUtils::find_header("location", headers);
-    if (location && !location->second.empty() && util::Uri(location->second).validate(location->second).is_ok()) {
+    if (location && !location->second.empty() && util::Uri::try_parse(location->second).is_ok()) {
         // If the location is valid, return it wholesale (e.g., it could include a path for API proxies)
         return location->second;
     }
