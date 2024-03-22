@@ -6,7 +6,8 @@
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Fix pass a thread safe reference to init subscription callback. ([#7497](https://github.com/realm/realm-core/issues/7497), since v13.16.0)
+
 
 ### Breaking changes
 * None.
@@ -17,7 +18,7 @@
 -----------
 
 ### Internals
-* None.
+* Update Catch2 from v3.3.2 to v3.5.3 ([PR #7297](https://github.com/realm/realm-core/pull/7509)).
 
 ----------------------------------------------
 
