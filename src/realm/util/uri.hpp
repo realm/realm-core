@@ -1,7 +1,7 @@
 #ifndef REALM_UTIL_URI_HPP
 #define REALM_UTIL_URI_HPP
 
-#include <realm/status.hpp>
+#include <realm/status_with.hpp>
 
 namespace realm::util {
 
@@ -78,8 +78,8 @@ public:
     /// Parse the given string, throwing if it's not a valid Uri
     static Uri parse(std::string_view str);
 
-    /// Check if this Uri is well-formed, returning an error if it isn't.
-    Status validate(std::string_view original) const;
+    /// Parse the given string, returning an error if it's not a valid Uri.
+    static StatusWith<Uri> try_parse(std::string_view str);
 
     /// Reconstruct a URI reference from its 5 components.
     std::string recompose() const;
