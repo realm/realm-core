@@ -841,7 +841,7 @@ ref_type BPlusTreeBase::typed_write(ref_type ref, _impl::ArrayWriterBase& out, A
     Array node(alloc);
     node.init_from_ref(ref);
     if (NodeHeader::get_is_inner_bptree_node_from_header(header)) {
-        REALM_ASSERT(node.has_refs());
+        REALM_ASSERT_DEBUG(node.has_refs());
         Array written_node(Allocator::get_default());
         written_node.create(NodeHeader::type_InnerBptreeNode, false, node.size());
         for (unsigned j = 0; j < node.size(); ++j) {

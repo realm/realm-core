@@ -1534,11 +1534,11 @@ void Cluster::remove_backlinks(const Table* origin_table, ObjKey origin_key, Col
 ref_type Cluster::typed_write(ref_type ref, _impl::ArrayWriterBase& out, const Table& table, bool deep,
                               bool only_modified, bool compress) const
 {
-    REALM_ASSERT(ref == get_mem().get_ref());
+    REALM_ASSERT_DEBUG(ref == get_mem().get_ref());
     if (only_modified && m_alloc.is_read_only(ref))
         return ref;
-    REALM_ASSERT(!get_is_inner_bptree_node_from_header(get_header()));
-    REALM_ASSERT(!get_context_flag_from_header(get_header()));
+    REALM_ASSERT_DEBUG(!get_is_inner_bptree_node_from_header(get_header()));
+    REALM_ASSERT_DEBUG(!get_context_flag_from_header(get_header()));
     Array written_cluster(Allocator::get_default());
     written_cluster.create(type_HasRefs, false, size());
     for (size_t j = 0; j < size(); ++j) {
@@ -1570,7 +1570,7 @@ ref_type Cluster::typed_write(ref_type ref, _impl::ArrayWriterBase& out, const T
                                 col_type == col_type_TypedLink || col_type == col_type_UUID;
             // First handle true leafs (not collections or complex leafs)
             if (!leaf.has_refs()) {
-                REALM_ASSERT(col_type != col_type_Mixed && col_type != col_type_Timestamp);
+                REALM_ASSERT_DEBUG(col_type != col_type_Mixed && col_type != col_type_Timestamp);
                 written_cluster.set_as_ref(j, leaf.write(out, deep, only_modified, compress && compressible));
                 continue;
             }
@@ -1584,9 +1584,9 @@ ref_type Cluster::typed_write(ref_type ref, _impl::ArrayWriterBase& out, const T
             // leafs and collections (for example: a collection of ints will be of col_type_Int)
             // but have attribute indicating it is a collection. Handling it as a leaf would be
             // an error).
-            REALM_ASSERT(leaf.has_refs());
+            REALM_ASSERT_DEBUG(leaf.has_refs());
             auto wtype = leaf.get_wtype_from_header(leaf.get_header());
-            REALM_ASSERT(wtype == wtype_Bits);
+            REALM_ASSERT_DEBUG(wtype == wtype_Bits);
             Array written_leaf(Allocator::get_default());
             written_leaf.create(type_HasRefs, false, leaf.size());
             if (col_attr.test(col_attr_List) || col_attr.test(col_attr_Set)) {
@@ -1621,7 +1621,7 @@ ref_type Cluster::typed_write(ref_type ref, _impl::ArrayWriterBase& out, const T
                     // got a subtree to handle: (which must be a dict, as indicated by column type)
                     Array dict_top(m_alloc);
                     dict_top.init_from_ref(dict_rot.get_as_ref());
-                    REALM_ASSERT(dict_top.size() == 2);
+                    REALM_ASSERT_DEBUG(dict_top.size() == 2);
                     Array written_dict_top(Allocator::get_default());
                     written_dict_top.create(type_HasRefs, false, dict_top.size());
                     if (dict_top.size() == 2) {
@@ -1642,17 +1642,17 @@ ref_type Cluster::typed_write(ref_type ref, _impl::ArrayWriterBase& out, const T
             else if (col_type == col_type_Timestamp) {
                 // timestamps could be compressed, but the formats we support at the moment are not producing
                 // noticeable gains.
-                REALM_ASSERT(leaf.size() == 2);
+                REALM_ASSERT_DEBUG(leaf.size() == 2);
                 auto rot0 = leaf.get_as_ref_or_tagged(0);
                 auto rot1 = leaf.get_as_ref_or_tagged(1);
-                REALM_ASSERT(rot0.is_ref() && rot0.get_as_ref());
-                REALM_ASSERT(rot1.is_ref() && rot1.get_as_ref());
+                REALM_ASSERT_DEBUG(rot0.is_ref() && rot0.get_as_ref());
+                REALM_ASSERT_DEBUG(rot1.is_ref() && rot1.get_as_ref());
                 written_leaf.set_as_ref(0, Array::write(rot0.get_as_ref(), m_alloc, out, only_modified, false));
                 written_leaf.set_as_ref(1, Array::write(rot1.get_as_ref(), m_alloc, out, only_modified, false));
             }
             else if (col_type == col_type_Mixed) {
                 const auto sz = leaf.size();
-                REALM_ASSERT(sz == 6);
+                REALM_ASSERT_DEBUG(sz == 6);
 
                 /*
                  In order to know how Mixed stores things, we need to take in consideration this enum
@@ -1726,7 +1726,7 @@ ref_type Cluster::typed_write(ref_type ref, _impl::ArrayWriterBase& out, const T
 
 void Cluster::typed_print(std::string prefix, const Table& table) const
 {
-    REALM_ASSERT(!get_is_inner_bptree_node_from_header(get_header()));
+    REALM_ASSERT_DEBUG(!get_is_inner_bptree_node_from_header(get_header()));
     std::cout << "Cluster of size " << size() << " " << header_to_string(get_header()) << std::endl;
     for (unsigned j = 0; j < size(); ++j) {
         RefOrTagged rot = get_as_ref_or_tagged(j);
