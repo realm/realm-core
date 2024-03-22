@@ -26,6 +26,19 @@ include(AcquireRealmDependency)
 
 include(CodeCoverage)
 
+if (REALM_SANITIZER_FLAGS AND APPLE)
+    message("sanitizer flags recognized: turned off code signing?")
+    set(CMAKE_TRY_COMPILE_PLATFORM_VARIABLES
+        ${CMAKE_TRY_COMPILE_PLATFORM_VARIABLES}
+        "CMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_REQUIRED"
+        "CMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED")
+    set(CMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED NO)
+    set(CMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_REQUIRED NO)
+    set(CMAKE_XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY "")
+else()
+    message("sanitizer flags aren't recognized")
+endif()
+
 if(NOT DEFINED REALM_VERSION)
     # Get accurate git-describe version
     include(GetGitRevisionDescription)
