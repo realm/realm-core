@@ -75,7 +75,10 @@ struct SyncClientConfig {
 
     std::string base_file_path;
     MetadataMode metadata_mode = MetadataMode::Encryption;
-    util::Optional<std::vector<char>> custom_encryption_key;
+    std::optional<std::vector<char>> custom_encryption_key;
+#if REALM_PLATFORM_APPLE
+    std::string security_access_group;
+#endif
 
     using LoggerFactory = std::function<std::shared_ptr<util::Logger>(util::Logger::Level)>;
     LoggerFactory logger_factory;

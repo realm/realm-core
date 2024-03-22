@@ -186,7 +186,9 @@ TEST_CASE("sync_user: user persistence", "[sync][user]") {
     auto sync_manager = tsm.sync_manager();
     auto file_manager = SyncFileManager(tsm.base_file_path(), "app_id");
     // Open the metadata separately, so we can investigate it ourselves.
-    SyncMetadataManager manager(file_manager.metadata_path(), false);
+    SyncClientConfig client_config;
+    client_config.metadata_mode = tsm_config.metadata_mode;
+    SyncMetadataManager manager(file_manager.metadata_path(), client_config, "app_id");
 
     SECTION("properly persists a user's information upon creation") {
         const std::string identity = "test_identity_1";

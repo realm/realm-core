@@ -3660,6 +3660,8 @@ RLM_API void realm_sync_client_config_set_default_binding_thread_observer(
     realm_sync_client_config_t* config, realm_on_object_store_thread_callback_t on_thread_create,
     realm_on_object_store_thread_callback_t on_thread_destroy, realm_on_object_store_error_callback_t on_error,
     realm_userdata_t user_data, realm_free_userdata_func_t free_userdata);
+RLM_API void realm_sync_client_config_set_security_access_group(realm_sync_client_config_t*,
+                                                                const char*) RLM_API_NOEXCEPT;
 
 RLM_API realm_sync_config_t* realm_sync_config_new(const realm_user_t*, const char* partition_value) RLM_API_NOEXCEPT;
 RLM_API realm_sync_config_t* realm_flx_sync_config_new(const realm_user_t*) RLM_API_NOEXCEPT;

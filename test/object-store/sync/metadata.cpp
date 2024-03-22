@@ -32,17 +32,89 @@
 
 #include <iostream>
 
+#if REALM_PLATFORM_APPLE
+#include <realm/util/cf_str.hpp>
+#include <Security/Security.h>
+#endif
+
 using namespace realm;
 using namespace realm::util;
 using File = realm::util::File;
 using SyncAction = SyncFileActionMetadata::Action;
 
+namespace {
 static const std::string base_path = util::make_temp_dir() + "realm_objectstore_sync_metadata.test-dir";
 static const std::string metadata_path = base_path + "/metadata.realm";
+static const auto no_encryption = [] {
+    SyncClientConfig config;
+    config.metadata_mode = SyncClientConfig::MetadataMode::NoEncryption;
+    return config;
+}();
+
+#if REALM_PLATFORM_APPLE
+static constexpr const char* app_id = "app id";
+static constexpr const char* access_group = "";
+static bool can_access_keychain()
+{
+    static bool can_access_keychain = [] {
+        bool can_access = keychain::create_new_metadata_realm_key(app_id, access_group) != none;
+        if (can_access) {
+            keychain::delete_metadata_realm_encryption_key(app_id, access_group);
+        }
+        else {
+            std::cout << "Skipping keychain tests as the keychain is not accessible\n";
+        }
+        return can_access;
+    }();
+    return can_access_keychain;
+}
+
+CFPtr<CFMutableDictionaryRef> build_search_dictionary(CFStringRef account, CFStringRef service)
+{
+    auto d = adoptCF(
+        CFDictionaryCreateMutable(nullptr, 0, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks));
+    CFDictionaryAddValue(d.get(), kSecClass, kSecClassGenericPassword);
+    CFDictionaryAddValue(d.get(), kSecReturnData, kCFBooleanTrue);
+    CFDictionaryAddValue(d.get(), kSecAttrAccount, account);
+    CFDictionaryAddValue(d.get(), kSecAttrService, service);
+    return d;
+}
+
+OSStatus get_key(CFStringRef account, CFStringRef service, std::vector<char>& result)
+{
+    auto search_dictionary = build_search_dictionary(account, service);
+    CFDataRef retained_key_data;
+    OSStatus status = SecItemCopyMatching(search_dictionary.get(), (CFTypeRef*)&retained_key_data);
+    if (status == errSecSuccess) {
+        CFPtr<CFDataRef> key_data = adoptCF(retained_key_data);
+        auto key_bytes = reinterpret_cast<const char*>(CFDataGetBytePtr(key_data.get()));
+        result.assign(key_bytes, key_bytes + CFDataGetLength(key_data.get()));
+    }
+    return status;
+}
+
+OSStatus set_key(const std::vector<char>& key, CFStringRef account, CFStringRef service)
+{
+    auto search_dictionary = build_search_dictionary(account, service);
+    CFDictionaryAddValue(search_dictionary.get(), kSecAttrAccessible, kSecAttrAccessibleAfterFirstUnlock);
+    auto key_data = adoptCF(CFDataCreateWithBytesNoCopy(nullptr, reinterpret_cast<const UInt8*>(key.data()),
+                                                        key.size(), kCFAllocatorNull));
+    CFDictionaryAddValue(search_dictionary.get(), kSecValueData, key_data.get());
+    return SecItemAdd(search_dictionary.get(), nullptr);
+}
+
+std::vector<char> generate_key()
+{
+    std::vector<char> key(64);
+    arc4random_buf(key.data(), key.size());
+    return key;
+}
+#endif // REALM_PLATFORM_APPLE
+} // anonymous namespace
 
 TEST_CASE("sync_metadata: user metadata", "[sync][metadata]") {
     test_util::TestDirGuard test_dir(base_path);
-    SyncMetadataManager manager(metadata_path, false);
+    SyncMetadataManager manager(metadata_path, no_encryption, "app id");
 
     SECTION("can be properly constructed") {
         const auto identity = "testcase1a";
@@ -128,7 +200,7 @@ TEST_CASE("sync_metadata: user metadata", "[sync][metadata]") {
 
 TEST_CASE("sync_metadata: user metadata APIs", "[sync][metadata]") {
     test_util::TestDirGuard test_dir(base_path);
-    SyncMetadataManager manager(metadata_path, false);
+    SyncMetadataManager manager(metadata_path, no_encryption, "app id");
     const std::string provider_type = "https://realm.example.org";
 
     SECTION("properly list all marked and unmarked users") {
@@ -156,7 +228,7 @@ TEST_CASE("sync_metadata: user metadata APIs", "[sync][metadata]") {
 
 TEST_CASE("sync_metadata: file action metadata", "[sync][metadata]") {
     test_util::TestDirGuard test_dir(base_path);
-    SyncMetadataManager manager(metadata_path, false);
+    SyncMetadataManager manager(metadata_path, no_encryption, "app id");
 
     const std::string local_uuid_1 = "asdfg";
     const std::string local_uuid_2 = "qwerty";
@@ -197,7 +269,7 @@ TEST_CASE("sync_metadata: file action metadata", "[sync][metadata]") {
 TEST_CASE("sync_metadata: file action metadata APIs", "[sync][metadata]") {
     test_util::TestDirGuard test_dir(base_path);
 
-    SyncMetadataManager manager(metadata_path, false);
+    SyncMetadataManager manager(metadata_path, no_encryption, "app id");
     SECTION("properly list all pending actions, reflecting their deletion") {
         const auto filename1 = util::make_temp_dir() + "foobar/file1";
         const auto filename2 = util::make_temp_dir() + "foobar/file2";
@@ -219,7 +291,7 @@ TEST_CASE("sync_metadata: file action metadata APIs", "[sync][metadata]") {
 
 TEST_CASE("sync_metadata: results", "[sync][metadata]") {
     test_util::TestDirGuard test_dir(base_path);
-    SyncMetadataManager manager(metadata_path, false);
+    SyncMetadataManager manager(metadata_path, no_encryption, "app id");
     const auto identity1 = "testcase3a1";
     const auto identity2 = "testcase3a3";
 
@@ -258,7 +330,7 @@ TEST_CASE("sync_metadata: persistence across metadata manager instances", "[sync
         const auto identity = "testcase4a";
         const std::string provider_type = "any-type";
         const std::string sample_token = "this_is_a_user_token";
-        SyncMetadataManager first_manager(metadata_path, false);
+        SyncMetadataManager first_manager(metadata_path, no_encryption, "app id");
         auto first = first_manager.get_or_make_user_metadata(identity);
         first->set_access_token(sample_token);
         REQUIRE(first->identity() == identity);
@@ -266,7 +338,7 @@ TEST_CASE("sync_metadata: persistence across metadata manager instances", "[sync
         REQUIRE(first->state() == SyncUser::State::LoggedIn);
         first->set_state(SyncUser::State::LoggedOut);
 
-        SyncMetadataManager second_manager(metadata_path, false);
+        SyncMetadataManager second_manager(metadata_path, no_encryption, "app id");
         auto second = second_manager.get_or_make_user_metadata(identity, false);
         REQUIRE(second->identity() == identity);
         REQUIRE(second->access_token() == sample_token);
@@ -276,13 +348,14 @@ TEST_CASE("sync_metadata: persistence across metadata manager instances", "[sync
 
 TEST_CASE("sync_metadata: encryption", "[sync][metadata]") {
     test_util::TestDirGuard test_dir(base_path);
+    SyncClientConfig config;
     const auto identity0 = "identity0";
     SECTION("prohibits opening the metadata Realm with different keys") {
         SECTION("different keys") {
             {
                 // Open metadata realm, make metadata
-                std::vector<char> key0 = make_test_encryption_key(10);
-                SyncMetadataManager manager0(metadata_path, true, key0);
+                config.custom_encryption_key = make_test_encryption_key(10);
+                SyncMetadataManager manager0(metadata_path, config, "app id");
 
                 auto user_metadata0 = manager0.get_or_make_user_metadata(identity0);
                 REQUIRE(bool(user_metadata0));
@@ -292,8 +365,8 @@ TEST_CASE("sync_metadata: encryption", "[sync][metadata]") {
             }
             // Metadata realm is closed because only reference to the realm (user_metadata) is now out of scope
             // Open new metadata realm at path with different key
-            std::vector<char> key1 = make_test_encryption_key(11);
-            SyncMetadataManager manager1(metadata_path, true, key1);
+            config.custom_encryption_key = make_test_encryption_key(11);
+            SyncMetadataManager manager1(metadata_path, config, "app id");
 
             auto user_metadata1 = manager1.get_or_make_user_metadata(identity0, false);
             // Expect previous metadata to have been deleted
@@ -309,7 +382,8 @@ TEST_CASE("sync_metadata: encryption", "[sync][metadata]") {
         SECTION("different encryption settings") {
             {
                 // Encrypt metadata realm at path, make metadata
-                SyncMetadataManager manager0(metadata_path, true, make_test_encryption_key(10));
+                config.custom_encryption_key = make_test_encryption_key(10);
+                SyncMetadataManager manager0(metadata_path, config, "app id");
 
                 auto user_metadata0 = manager0.get_or_make_user_metadata(identity0);
                 REQUIRE(bool(user_metadata0));
@@ -319,7 +393,8 @@ TEST_CASE("sync_metadata: encryption", "[sync][metadata]") {
             }
             // Metadata realm is closed because only reference to the realm (user_metadata) is now out of scope
             // Open new metadata realm at path with different encryption configuration
-            SyncMetadataManager manager1(metadata_path, false);
+            config.metadata_mode = SyncClientConfig::MetadataMode::NoEncryption;
+            SyncMetadataManager manager1(metadata_path, config, "app id");
             auto user_metadata1 = manager1.get_or_make_user_metadata(identity0, false);
             // Expect previous metadata to have been deleted
             CHECK_FALSE(bool(user_metadata1));
@@ -334,16 +409,16 @@ TEST_CASE("sync_metadata: encryption", "[sync][metadata]") {
     }
 
     SECTION("works when enabled") {
-        std::vector<char> key = make_test_encryption_key(10);
+        config.custom_encryption_key = make_test_encryption_key(10);
         const auto identity = "testcase5a";
-        SyncMetadataManager manager(metadata_path, true, key);
+        SyncMetadataManager manager(metadata_path, config, "app id");
         auto user_metadata = manager.get_or_make_user_metadata(identity);
         REQUIRE(bool(user_metadata));
         CHECK(user_metadata->identity() == identity);
         CHECK(user_metadata->access_token().empty());
         CHECK(user_metadata->is_valid());
         // Reopen the metadata file with the same key.
-        SyncMetadataManager manager_2(metadata_path, true, key);
+        SyncMetadataManager manager_2(metadata_path, config, "app id");
         auto user_metadata_2 = manager_2.get_or_make_user_metadata(identity, false);
         REQUIRE(bool(user_metadata_2));
         CHECK(user_metadata_2->identity() == identity);
@@ -352,29 +427,23 @@ TEST_CASE("sync_metadata: encryption", "[sync][metadata]") {
 
     SECTION("enabled without custom encryption key") {
 #if REALM_PLATFORM_APPLE
-        static bool can_access_keychain = [] {
-            bool can_access = keychain::create_new_metadata_realm_key() != none;
-            if (!can_access) {
-                std::cout << "Skipping keychain tests as the keychain is not accessible\n";
-            }
-            return can_access;
-        }();
-        if (!can_access_keychain) {
+        if (!can_access_keychain()) {
             return;
         }
-        auto delete_key = util::make_scope_exit([=]() noexcept {
-            keychain::delete_metadata_realm_encryption_key();
+        auto delete_key = util::make_scope_exit([]() noexcept {
+            keychain::delete_metadata_realm_encryption_key(app_id, access_group);
         });
+        SyncClientConfig config;
 
         SECTION("automatically generates an encryption key for new files") {
             {
-                SyncMetadataManager manager(metadata_path, true, none);
+                SyncMetadataManager manager(metadata_path, config, app_id);
                 manager.set_current_user_identity(identity0);
             }
 
             // Should be able to reopen and read data
             {
-                SyncMetadataManager manager(metadata_path, true, none);
+                SyncMetadataManager manager(metadata_path, config, app_id);
                 REQUIRE(manager.get_current_user_identity() == identity0);
             }
 
@@ -385,11 +454,13 @@ TEST_CASE("sync_metadata: encryption", "[sync][metadata]") {
 
         SECTION("leaves existing unencrypted files unencrypted") {
             {
-                SyncMetadataManager manager(metadata_path, false, none);
+                config.metadata_mode = SyncClientConfig::MetadataMode::NoEncryption;
+                SyncMetadataManager manager(metadata_path, config, app_id);
                 manager.set_current_user_identity(identity0);
             }
             {
-                SyncMetadataManager manager(metadata_path, true, none);
+                config.metadata_mode = SyncClientConfig::MetadataMode::Encryption;
+                SyncMetadataManager manager(metadata_path, config, app_id);
                 REQUIRE(manager.get_current_user_identity() == identity0);
             }
             REQUIRE_NOTHROW(Group(metadata_path));
@@ -397,23 +468,30 @@ TEST_CASE("sync_metadata: encryption", "[sync][metadata]") {
 
         SECTION("recreates the file if the old encryption key was lost") {
             {
-                SyncMetadataManager manager(metadata_path, true, none);
+                SyncMetadataManager manager(metadata_path, config, app_id);
                 manager.set_current_user_identity(identity0);
             }
 
-            keychain::delete_metadata_realm_encryption_key();
+            keychain::delete_metadata_realm_encryption_key(app_id, access_group);
 
             {
                 // File should now be missing the data
-                SyncMetadataManager manager(metadata_path, true, none);
+                SyncMetadataManager manager(metadata_path, config, app_id);
                 REQUIRE(manager.get_current_user_identity() == none);
             }
             // New file should be encrypted
             REQUIRE_EXCEPTION(Group(metadata_path), InvalidDatabase,
                               Catch::Matchers::ContainsSubstring("invalid mnemonic"));
         }
+
+        SECTION("invalid access group throws an error") {
+            config.security_access_group = "invalid";
+            REQUIRE_EXCEPTION(SyncMetadataManager(metadata_path, config, app_id), InvalidArgument,
+                              "Invalid access group 'invalid'. Make sure that you have added the access group to "
+                              "your app's Keychain Access Groups Entitlement.");
+        }
 #else
-        REQUIRE_EXCEPTION(SyncMetadataManager(metadata_path, true, none), InvalidArgument,
+        REQUIRE_EXCEPTION(SyncMetadataManager(metadata_path, SyncClientConfig(), "app id"), InvalidArgument,
                           "Metadata Realm encryption was specified, but no encryption key was provided.");
 #endif
     }
@@ -496,7 +574,7 @@ TEST_CASE("sync metadata: can open old metadata realms", "[sync][metadata]") {
         }
 #else
         { // Create a metadata Realm with a test user
-            SyncMetadataManager manager(metadata_path, false);
+            SyncMetadataManager manager(metadata_path, no_encryption, "app id");
             auto user_metadata = manager.get_or_make_user_metadata(identity);
             user_metadata->set_access_token(sample_token);
         }
@@ -528,7 +606,7 @@ TEST_CASE("sync metadata: can open old metadata realms", "[sync][metadata]") {
 
     SECTION("open schema version 4") {
         File::copy(test_util::get_test_resource_path() + "sync-metadata-v4.realm", metadata_path);
-        SyncMetadataManager manager(metadata_path, false);
+        SyncMetadataManager manager(metadata_path, no_encryption, "app id");
         auto user_metadata = manager.get_or_make_user_metadata(identity);
         REQUIRE(user_metadata->identity() == identity);
         REQUIRE(user_metadata->access_token() == sample_token);
@@ -536,7 +614,7 @@ TEST_CASE("sync metadata: can open old metadata realms", "[sync][metadata]") {
 
     SECTION("open schema version 5") {
         File::copy(test_util::get_test_resource_path() + "sync-metadata-v5.realm", metadata_path);
-        SyncMetadataManager manager(metadata_path, false);
+        SyncMetadataManager manager(metadata_path, no_encryption, "app id");
         auto user_metadata = manager.get_or_make_user_metadata(identity);
         REQUIRE(user_metadata->identity() == identity);
         REQUIRE(user_metadata->access_token() == sample_token);
@@ -545,7 +623,7 @@ TEST_CASE("sync metadata: can open old metadata realms", "[sync][metadata]") {
     SECTION("open schema version 6") {
         using State = SyncUser::State;
         File::copy(test_util::get_test_resource_path() + "sync-metadata-v6.realm", metadata_path);
-        SyncMetadataManager manager(metadata_path, false);
+        SyncMetadataManager manager(metadata_path, no_encryption, "app id");
 
         SyncUserIdentity id_1{"identity 1", "a"};
         SyncUserIdentity id_2{"identity 2", "b"};
@@ -578,3 +656,93 @@ TEST_CASE("sync metadata: can open old metadata realms", "[sync][metadata]") {
     }
 }
 #endif // SWIFT_PACKAGE
+
+#if REALM_PLATFORM_APPLE
+TEST_CASE("keychain", "[sync][metadata]") {
+    if (!can_access_keychain()) {
+        return;
+    }
+    auto delete_key = util::make_scope_exit([=]() noexcept {
+        keychain::delete_metadata_realm_encryption_key(app_id, access_group);
+        keychain::delete_metadata_realm_encryption_key("app id 1", access_group);
+        keychain::delete_metadata_realm_encryption_key("app id 2", access_group);
+    });
+
+    SECTION("create_new_metadata_realm_key() creates a new key if none exists") {
+        auto key_1 = keychain::create_new_metadata_realm_key(app_id, access_group);
+        REQUIRE(key_1);
+        keychain::delete_metadata_realm_encryption_key(app_id, access_group);
+        auto key_2 = keychain::create_new_metadata_realm_key(app_id, access_group);
+        REQUIRE(key_2);
+        REQUIRE(key_1 != key_2);
+    }
+
+    SECTION("create_new_metadata_realm_key() returns the existing one if inserting fails") {
+        auto key_1 = keychain::create_new_metadata_realm_key(app_id, access_group);
+        REQUIRE(key_1);
+        auto key_2 = keychain::create_new_metadata_realm_key(app_id, access_group);
+        REQUIRE(key_2);
+        REQUIRE(key_1 == key_2);
+    }
+
+    SECTION("get_existing_metadata_realm_key() returns the key from create_new_metadata_realm_key()") {
+        auto key_1 = keychain::get_existing_metadata_realm_key(app_id, access_group);
+        REQUIRE_FALSE(key_1);
+        auto key_2 = keychain::create_new_metadata_realm_key(app_id, access_group);
+        REQUIRE(key_2);
+        auto key_3 = keychain::get_existing_metadata_realm_key(app_id, access_group);
+        REQUIRE(key_3);
+        REQUIRE(key_2 == key_3);
+    }
+
+    SECTION("keys are scoped to app ids") {
+        auto key_1 = keychain::create_new_metadata_realm_key("app id 1", access_group);
+        REQUIRE(key_1);
+        auto key_2 = keychain::create_new_metadata_realm_key("app id 2", access_group);
+        REQUIRE(key_2);
+        REQUIRE(key_1 != key_2);
+    }
+
+    SECTION("legacy key migration") {
+        auto key = generate_key();
+        const auto legacy_account = CFSTR("metadata");
+        const auto service_name = CFSTR("io.realm.sync.keychain");
+        const auto bundle_id = CFBundleGetIdentifier(CFBundleGetMainBundle());
+        // Could be either ObjectStoreTests or CombinedTests but must be set
+        REQUIRE(bundle_id);
+        const auto bundle_service =
+            adoptCF(CFStringCreateWithFormat(nullptr, nullptr, CFSTR("%@ - Realm Sync Metadata Key"), bundle_id));
+
+        enum class Location { Original, Bundle, BundleAndAppId };
+        auto location = GENERATE(Location::Original, Location::Bundle, Location::BundleAndAppId);
+        CAPTURE(location);
+        CFStringRef account, service;
+        switch (location) {
+            case Location::Original:
+                account = legacy_account;
+                service = service_name;
+                break;
+            case Location::Bundle:
+                account = legacy_account;
+                service = bundle_service.get();
+                break;
+            case Location::BundleAndAppId:
+                account = CFSTR("app id");
+                service = bundle_service.get();
+                break;
+        }
+
+        set_key(key, account, service);
+        auto key_2 = keychain::get_existing_metadata_realm_key(app_id, {});
+        REQUIRE(key_2 == key);
+
+        // Key should have been copied to the preferred location
+        REQUIRE(get_key(CFSTR("app id"), bundle_service.get(), key) == errSecSuccess);
+        REQUIRE(key_2 == key);
+
+        // Key should not have been deleted from the original location
+        REQUIRE(get_key(account, service, key) == errSecSuccess);
+        REQUIRE(key_2 == key);
+    }
+}
+#endif
