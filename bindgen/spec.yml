@@ -555,6 +555,7 @@ records:
       schema_did_change: 'Nullable<util::UniqueFunction<(r: SharedRealm)>>' # new schema available as r.schema
 
   ResumptionDelayInfo:
+    cppName: sync::ResumptionDelayInfo
     fields:
       max_resumption_delay_interval:
         type: std::chrono::milliseconds
