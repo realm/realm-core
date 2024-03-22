@@ -1000,6 +1000,9 @@ TEST(List_NestedList_Path)
         CHECK_EQUAL(path.path_from_top[0], col_child);
         CHECK_EQUAL(path.path_from_top[1], "Any");
         CHECK_EQUAL(path.path_from_top[2], "Foo");
+        std::string message;
+        CHECK_THROW_ANY_GET_MESSAGE(list_int->set(7, 0), message);
+        CHECK(message.find("Any['Foo']") != std::string::npos);
     }
 
     // Collections contained in Mixed
@@ -1135,8 +1138,7 @@ TEST(List_UpdateIfNeeded)
     auto list_4_1 = list_4->get_list(1);
     auto list_4_2 = list_4->get_list(1);
     list_4_1->add(Mixed());
-    // FIXME: this should be NoChange
-    CHECK_EQUAL(list_4_1->update_if_needed(), UpdateStatus::Updated);
+    CHECK_EQUAL(list_4_1->update_if_needed(), UpdateStatus::NoChange);
     CHECK_EQUAL(list_4_2->update_if_needed(), UpdateStatus::Updated);
 
     // Update the row index of the parent object, forcing it to update

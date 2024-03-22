@@ -36,7 +36,6 @@
 #include <external/mpark/variant.hpp>
 
 namespace realm {
-app::Response do_http_request(const app::Request& request);
 
 class AdminAPIEndpoint {
 public:
@@ -259,30 +258,6 @@ struct AppSession {
     AppCreateConfig config;
 };
 AppSession create_app(const AppCreateConfig& config);
-
-class SynchronousTestTransport : public app::GenericNetworkTransport {
-public:
-    void send_request_to_server(const app::Request& request,
-                                util::UniqueFunction<void(const app::Response&)>&& completion) override
-    {
-        {
-            std::lock_guard barrier(m_mutex);
-        }
-        completion(do_http_request(request));
-    }
-
-    void block()
-    {
-        m_mutex.lock();
-    }
-    void unblock()
-    {
-        m_mutex.unlock();
-    }
-
-private:
-    std::mutex m_mutex;
-};
 
 // This will create a new test app in the baas server - base_url and admin_url
 // are automatically set

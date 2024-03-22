@@ -1,7 +1,7 @@
 PACKAGE_NAME: realm-core
-VERSION: 14.2.0
+VERSION: 14.4.0
 OPENSSL_VERSION: 3.2.0
 ZLIB_VERSION: 1.2.13
 # https://github.com/10gen/baas/commits
-# acb71d0 is 2024 Mar 12
-BAAS_VERSION: acb71d0183b33eb304bb496390567efcfb8a6e60
+# 6bf5e1 is 2024 Mar 20
+BAAS_VERSION: 6bf5e111499ba32d04224e2fc10acca3595edb20

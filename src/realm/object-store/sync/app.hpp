@@ -90,6 +90,8 @@ public:
         DeviceInfo device_info;
     };
 
+    static std::string_view default_base_url;
+
     // `enable_shared_from_this` is unsafe with public constructors;
     // use `App::get_app()` instead
     explicit App(Private, const Config& config);
@@ -431,6 +433,8 @@ public:
 
     // Return the base url path used for Sync Session Websocket requests
     std::string get_ws_host_url() REQUIRES(!m_route_mutex);
+
+    static std::string create_ws_host_url(const std::string_view host_url);
 
 private:
     const Config m_config;

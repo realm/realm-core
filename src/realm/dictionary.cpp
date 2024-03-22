@@ -1190,6 +1190,14 @@ void Dictionary::set_collection_ref(Index index, ref_type ref, CollectionType ty
     m_values->set(ndx, Mixed(ref, type));
 }
 
+LinkCollectionPtr Dictionary::clone_as_obj_list() const
+{
+    if (get_value_data_type() == type_Link) {
+        return std::make_unique<DictionaryLinkValues>(*this);
+    }
+    return nullptr;
+}
+
 /************************* DictionaryLinkValues *************************/
 
 DictionaryLinkValues::DictionaryLinkValues(const Obj& obj, ColKey col_key)
