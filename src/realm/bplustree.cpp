@@ -851,7 +851,7 @@ ref_type BPlusTreeBase::typed_write(ref_type ref, _impl::ArrayWriterBase& out, A
                     // keys (ArrayUnsigned me thinks)
                     Array a(alloc);
                     a.init_from_ref(rot.get_as_ref());
-                    written_node.set_as_ref(j, a.write(out, deep, only_modified, collection_in_mixed));
+                    written_node.set_as_ref(j, a.write(out, deep, only_modified, false));
                 }
                 else {
                     written_node.set_as_ref(j,
@@ -867,6 +867,9 @@ ref_type BPlusTreeBase::typed_write(ref_type ref, _impl::ArrayWriterBase& out, A
         return written_ref;
     }
     else if (node.has_refs()) {
+        // if collection in mixed is set, it means that this node is actually a mixed property that contains
+        // a collection in it. So we need to vist the collection that is part of the node and reach the final leaf,
+        // in order to determine whether the leaf can be compressed.
         if (collection_in_mixed) {
             const auto sz = node.size();
             for (size_t j = 0; j < sz; ++j) {

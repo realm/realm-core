@@ -305,7 +305,7 @@ void Array::update_from_parent() noexcept
 
 void Array::set_type(Type type)
 {
-    REALM_ASSERT(is_attached());
+    REALM_ASSERT_DEBUG(is_attached());
 
     copy_on_write(); // Throws
 
