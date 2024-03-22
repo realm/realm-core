@@ -69,8 +69,9 @@ typedef SSIZE_T ssize_t;
 
 
 #if defined(REALM_PTR_64) && defined(REALM_X86_OR_X64) && !REALM_WATCHOS
-#define REALM_COMPILER_SSE // Compiler supports SSE 4.2 through __builtin_ accessors or back-end assembler
-#define REALM_COMPILER_AVX
+// Disable SSE and AVX for benchmarking purposes, since these facilites are not present on the important architectures
+// #define REALM_COMPILER_SSE // Compiler supports SSE 4.2 through __builtin_ accessors or back-end assembler
+// #define REALM_COMPILER_AVX
 #endif
 
 namespace realm {
