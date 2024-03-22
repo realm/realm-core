@@ -1666,9 +1666,10 @@ ref_type Cluster::typed_write(ref_type ref, _impl::ArrayWriterBase& out, const T
                  payload_idx_size
                  };
                  Note:
-                 1. entry at index 0 is the composite array (where the actual data is stored)
+                 1. entry at index 0 is the composite array (the main information about the data is stored, it can
+                 either be a small int <32 bit or a ref to the array where the actual data is stored).
                  2. entries at indices 1 and 2 can be compressed (they are integers) .. but we gotta be careful, since
-                 they can also contain floats, doubles, timestamps
+                 they can also contain floats, doubles, timestamps. Controlling the col_type should prevent this.
                  3. entry at index 3 is for strings and binary data (no compression for now)
                  4. entry at index 4 is actually storing refs to collections,
                     They can only be BPlusTree<int, Mixed> or BPlusTree<string, Mixed>.
@@ -1677,13 +1678,16 @@ ref_type Cluster::typed_write(ref_type ref, _impl::ArrayWriterBase& out, const T
                 for (size_t i = 0; i < sz; ++i) {
                     auto rot = leaf.get_as_ref_or_tagged(i);
                     if (rot.is_ref() && rot.get_as_ref()) {
-                        if (i == 1 || i == 2) {
+                        if (i < 3) { // composite, int, and pair_int
                             // integer arrays
                             written_leaf.set_as_ref(
                                 i, Array::write(rot.get_as_ref(), m_alloc, out, only_modified, true));
                         }
-                        else if (i == 4) {
-                            // collection in mixed
+                        else if (i == 4) { // collection in mixed
+                            // we need to differenciate between a mixed that contains
+                            // an objlink and a mixed that contains a collection.
+                            // This flag is used to differentiate this while descending the
+                            // cluster.
                             const bool collection_in_mixed = true;
                             const bool compress = true;
                             const auto new_ref =
@@ -1691,8 +1695,7 @@ ref_type Cluster::typed_write(ref_type ref, _impl::ArrayWriterBase& out, const T
                                                            only_modified, compress, collection_in_mixed);
                             written_leaf.set_as_ref(i, new_ref);
                         }
-                        else if (i == 5) {
-                            // unique keys associated to collections in mixed
+                        else if (i == 5) { // unique keys associated to collections in mixed
                             written_leaf.set_as_ref(
                                 i, Array::write(rot.get_as_ref(), m_alloc, out, only_modified, true));
                         }
@@ -1703,8 +1706,7 @@ ref_type Cluster::typed_write(ref_type ref, _impl::ArrayWriterBase& out, const T
                         }
                     }
                     else {
-                        // what about integers that are max 32 bits and we store stuff straight in the composite
-                        // array. we are not compressing those.
+                        // all the other data types that we don't compress
                         written_leaf.set(i, rot);
                     }
                 }

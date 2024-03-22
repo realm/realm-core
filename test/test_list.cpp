@@ -633,7 +633,7 @@ TEST(List_AggOps)
     test_lists_numeric_agg<Decimal128>(test_context, sg, type_Decimal, Decimal128(realm::null()), true);
 }
 
-ONLY(Test_Write_List_Nested_In_Mixed)
+TEST(Test_Write_List_Nested_In_Mixed)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::string message;
