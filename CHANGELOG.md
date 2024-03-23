@@ -17,7 +17,7 @@
 -----------
 
 ### Internals
-* None.
+* Made `set_default_logger` nullable in the bindgen spec.yml (PR [#7515](https://github.com/realm/realm-core/pull/7515)).
 
 ----------------------------------------------
 
