@@ -126,6 +126,10 @@ public:
     static StringData get(const char* header, size_t ndx, Allocator& alloc) noexcept;
 
     void verify() const;
+    // Write to 'out', if needed using 'interner' to intern any strings.
+    // An interner of 0 will disable interning. Interned values may be further
+    // compressed using leaf compression for integer arrays.
+    ref_type write(_impl::ArrayWriterBase& out, StringInterner* interner);
 
 private:
     static constexpr size_t small_string_max_size = 15;  // ArrayStringShort
@@ -135,7 +139,7 @@ private:
     static constexpr size_t storage_size =
         std::max({sizeof(ArrayStringShort), sizeof(ArraySmallBlobs), sizeof(ArrayBigBlobs), sizeof(Array)});
 
-    enum class Type { small_strings, medium_strings, big_strings, enum_strings };
+    enum class Type { small_strings, medium_strings, big_strings, enum_strings, interned_strings };
 
     Type m_type = Type::small_strings;
 
@@ -147,7 +151,6 @@ private:
     mutable size_t m_col_ndx = realm::npos;
     std::unique_ptr<ArrayString> m_string_enum_values;
     mutable StringInterner* m_string_interner = nullptr;
-    bool m_is_interned = false;
 
     Type upgrade_leaf(size_t value_size);
 };
