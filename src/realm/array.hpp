@@ -485,7 +485,7 @@ protected:
     /// It is an error to specify a non-zero value unless the width
     /// type is wtype_Bits. It is also an error to specify a non-zero
     /// size if the width type is wtype_Ignore.
-    static MemRef create(Type, bool context_flag, WidthType, size_t size, int_fast64_t value, Allocator&);
+    static MemRef create(Type, bool, WidthType, size_t, int_fast64_t, Allocator&);
 
     // Overriding method in ArrayParent
     void update_child_ref(size_t, ref_type) override;
