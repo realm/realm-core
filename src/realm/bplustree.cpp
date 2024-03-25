@@ -833,7 +833,7 @@ std::unique_ptr<BPlusTreeNode> BPlusTreeBase::create_root_from_ref(ref_type ref)
 
 // this should only be called for a column_type which we can safely compress.
 ref_type BPlusTreeBase::typed_write(ref_type ref, _impl::ArrayWriterBase& out, Allocator& alloc, ColumnType col_type,
-                                    bool deep, bool only_modified, bool compress)
+                                    bool deep, bool only_modified, bool compress, bool collection_in_mixed)
 {
     if (only_modified && alloc.is_read_only(ref))
         return ref;
@@ -854,8 +854,9 @@ ref_type BPlusTreeBase::typed_write(ref_type ref, _impl::ArrayWriterBase& out, A
                     written_node.set_as_ref(j, a.write(out, deep, only_modified, false));
                 }
                 else {
-                    written_node.set_as_ref(j, BPlusTreeBase::typed_write(rot.get_as_ref(), out, alloc, col_type,
-                                                                          deep, only_modified, compress));
+                    written_node.set_as_ref(j,
+                                            BPlusTreeBase::typed_write(rot.get_as_ref(), out, alloc, col_type, deep,
+                                                                       only_modified, compress, collection_in_mixed));
                 }
             }
             else
@@ -865,14 +866,25 @@ ref_type BPlusTreeBase::typed_write(ref_type ref, _impl::ArrayWriterBase& out, A
         written_node.destroy();
         return written_ref;
     }
+    else if (node.has_refs()) {
+        // if collection in mixed is set, it means that this node is actually a mixed property that contains
+        // a collection in it. So we need to vist the collection that is part of the node and reach the final leaf,
+        // in order to determine whether the leaf can be compressed.
+        if (collection_in_mixed) {
+            const auto sz = node.size();
+            for (size_t j = 0; j < sz; ++j) {
+                RefOrTagged rot = node.get_as_ref_or_tagged(j);
+                if (rot.is_ref() && rot.get_as_ref()) {
+                    const auto btree_ref = BPlusTreeBase::typed_write(rot.get_as_ref(), out, alloc, col_type, deep,
+                                                                      only_modified, compress, collection_in_mixed);
+                    node.set_as_ref(j, btree_ref);
+                }
+            }
+        }
+        return node.write(out, deep, only_modified, false);
+    }
     else {
-        if (node.has_refs()) {
-            // this should be extended to handle Mixed....
-            return node.write(out, deep, only_modified, false); // unknown substructure, don't compress
-        }
-        else {
-            return node.write(out, false, only_modified, compress); // leaf array - do compress
-        }
+        return node.write(out, deep, only_modified, true); // leaf array - do compress
     }
 }
 

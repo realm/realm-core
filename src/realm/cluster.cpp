@@ -1596,7 +1596,7 @@ ref_type Cluster::typed_write(ref_type ref, _impl::ArrayWriterBase& out, const T
                     if (bptree_rot.is_ref() && bptree_rot.get_as_ref()) {
                         written_leaf.set_as_ref(i, BPlusTreeBase::typed_write(bptree_rot.get_as_ref(), out, m_alloc,
                                                                               col_type, deep, only_modified,
-                                                                              compress && compressible));
+                                                                              compress && compressible, false));
                     }
                     else
                         written_leaf.set(i, bptree_rot);
@@ -1629,11 +1629,11 @@ ref_type Cluster::typed_write(ref_type ref, _impl::ArrayWriterBase& out, const T
                         auto bptree_rot = dict_top.get_as_ref(0);
                         written_dict_top.set_as_ref(0, BPlusTreeBase::typed_write(bptree_rot, out, m_alloc, col_type,
                                                                                   deep, only_modified,
-                                                                                  compress && compressible));
+                                                                                  compress && compressible, false));
                         bptree_rot = dict_top.get_as_ref(1);
                         written_dict_top.set_as_ref(1, BPlusTreeBase::typed_write(bptree_rot, out, m_alloc, col_type,
                                                                                   deep, only_modified,
-                                                                                  compress && compressible));
+                                                                                  compress && compressible, false));
                     }
                     written_leaf.set_as_ref(i, written_dict_top.write(out, false, false, false));
                     written_dict_top.destroy();
@@ -1653,17 +1653,62 @@ ref_type Cluster::typed_write(ref_type ref, _impl::ArrayWriterBase& out, const T
             else if (col_type == col_type_Mixed) {
                 const auto sz = leaf.size();
                 REALM_ASSERT(sz == 6);
-                // temporary disable mixed. in order to re-enable them in a separate PR
+
+                /*
+                 Mixed stores things using different arrays. We need to take into account this in order to
+                 understand what we need to compress and what we can instead leave not compressed.
+
+                 The main subarrays are:
+
+                 composite array : index 0
+                 int array : index 1
+                 pair_int array: index 2
+                 string array: index 3
+                 ref array: index 4
+                 key array: index 5
+
+                 Description of each array:
+                 1. composite array: the data stored here is either a small int (< 32 bits) or an offset to one of
+                    the other arrays where the actual data is.
+                 2. int and pair int arrays, they are used for storing integers, timestamps, floats, doubles,
+                 decimals, links. In general we can compress them, but we need to be careful, controlling the col_type
+                 should prevent compressing data that we want to leave in the current format.
+                 3. string array is for strings and binary data (no compression for now)
+                 4. ref array is actually storing refs to collections. they can only be BPlusTree<int, Mixed> or
+                 BPlusTree<string, Mixed>.
+                 5. key array stores unique identifiers for collections in mixed (integers that can be compressed)
+                 */
                 for (size_t i = 0; i < sz; ++i) {
                     auto rot = leaf.get_as_ref_or_tagged(i);
                     if (rot.is_ref() && rot.get_as_ref()) {
-                        // entries 0-2 are integral and can be compressed, entry 3 is strings and not compressed (yet)
-                        // collections in mixed are stored at position 4.
-                        bool do_compress = false; // (i < 3 || i == 4) ? true : false;
-                        written_leaf.set_as_ref(
-                            i, Array::write(rot.get_as_ref(), m_alloc, out, only_modified, do_compress));
+                        if (i < 3) { // composite, int, and pair_int
+                            // integer arrays
+                            written_leaf.set_as_ref(
+                                i, Array::write(rot.get_as_ref(), m_alloc, out, only_modified, compress));
+                        }
+                        else if (i == 4) { // collection in mixed
+                            // we need to differenciate between a mixed that contains
+                            // an objlink and a mixed that contains a collection.
+                            // This flag is used to differentiate this while descending the
+                            // cluster.
+                            const bool collection_in_mixed = true;
+                            const auto new_ref =
+                                BPlusTreeBase::typed_write(rot.get_as_ref(), out, m_alloc, col_type, deep,
+                                                           only_modified, compress, collection_in_mixed);
+                            written_leaf.set_as_ref(i, new_ref);
+                        }
+                        else if (i == 5) { // unique keys associated to collections in mixed
+                            written_leaf.set_as_ref(
+                                i, Array::write(rot.get_as_ref(), m_alloc, out, only_modified, compress));
+                        }
+                        else {
+                            // all the rest we don't want to compress it, at least for now (strings will be needed)
+                            written_leaf.set_as_ref(
+                                i, Array::write(rot.get_as_ref(), m_alloc, out, only_modified, false));
+                        }
                     }
                     else {
+                        // all the other data types that we don't compress
                         written_leaf.set(i, rot);
                     }
                 }
@@ -1671,6 +1716,7 @@ ref_type Cluster::typed_write(ref_type ref, _impl::ArrayWriterBase& out, const T
             else {
                 REALM_ASSERT(false);
             }
+
             written_cluster.set_as_ref(j, written_leaf.write(out, false, false, false));
             written_leaf.destroy();
         }

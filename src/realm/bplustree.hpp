@@ -217,7 +217,7 @@ public:
     }
 
     static ref_type typed_write(ref_type ref, _impl::ArrayWriterBase& out, Allocator& alloc, ColumnType col_type,
-                                bool deep, bool only_modified, bool compress);
+                                bool deep, bool only_modified, bool compress, bool collection_in_mixed);
     static void typed_print(std::string prefix, Allocator& alloc, ref_type root, ColumnType col_type);
 
 
