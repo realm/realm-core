@@ -90,13 +90,12 @@ void AsyncOpenTask::cancel()
     }
 }
 
-uint64_t
-AsyncOpenTask::register_download_progress_notifier(std::function<SyncSession::ProgressNotifierCallback>&& callback)
+uint64_t AsyncOpenTask::register_download_progress_notifier(std::function<ProgressNotifierCallback>&& callback)
 {
     util::CheckedLockGuard lock(m_mutex);
     if (m_session) {
         auto token = m_session->register_progress_notifier(std::move(callback),
-                                                           SyncSession::ProgressDirection::download, false);
+                                                           SyncSession::ProgressDirection::download, true);
         m_registered_callbacks.emplace_back(token);
         return token;
     }

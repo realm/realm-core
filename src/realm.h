@@ -3570,7 +3570,7 @@ typedef void (*realm_sync_connection_state_changed_func_t)(realm_userdata_t user
                                                            realm_sync_connection_state_e old_state,
                                                            realm_sync_connection_state_e new_state);
 typedef void (*realm_sync_progress_func_t)(realm_userdata_t userdata, uint64_t transferred_bytes,
-                                           uint64_t total_bytes);
+                                           uint64_t total_bytes, double progress_estimate);
 typedef void (*realm_sync_error_handler_func_t)(realm_userdata_t userdata, realm_sync_session_t*,
                                                 const realm_sync_error_t);
 typedef bool (*realm_sync_ssl_verify_func_t)(realm_userdata_t userdata, const char* server_address, short server_port,
@@ -3623,7 +3623,8 @@ typedef void (*realm_async_open_task_completion_func_t)(realm_userdata_t userdat
 
 // invoked once the file has been downloaded. Allows the caller to run some initial subscription before the completion
 // callback runs.
-typedef void (*realm_async_open_task_init_subscription_func_t)(realm_t* realm, realm_userdata_t userdata);
+typedef void (*realm_async_open_task_init_subscription_func_t)(realm_thread_safe_reference_t* realm,
+                                                               realm_userdata_t userdata);
 
 RLM_API realm_sync_client_config_t* realm_sync_client_config_new(void) RLM_API_NOEXCEPT;
 RLM_API void realm_sync_client_config_set_base_file_path(realm_sync_client_config_t*, const char*) RLM_API_NOEXCEPT;
