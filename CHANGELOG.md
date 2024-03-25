@@ -16,7 +16,7 @@
 -----------
 
 ### Internals
-* None.
+* Update libuv used in object store tests from v1.35.0 to v1.48.0 ([PR #7508](https://github.com/realm/realm-core/pull/7508)).
 
 ----------------------------------------------
 

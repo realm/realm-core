@@ -203,10 +203,7 @@ if(NOT APPLE AND NOT EMSCRIPTEN AND NOT WINDOWS_STORE AND NOT ANDROID)
     elseif(REALM_FETCH_MISSING_DEPENDENCIES)
         message(STATUS "LibUV not found, building from source with FetchContent")
         include(FetchContent)
-        set(libUV_Git_TAG "v1.35.0")
-        if(MSVC)
-            set(liUV_Git_TAG "v1.43.0")
-        endif()
+        set(libUV_Git_TAG "v1.48.0")
         FetchContent_Declare(
             libuv
             GIT_REPOSITORY https://github.com/libuv/libuv.git
