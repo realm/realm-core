@@ -94,7 +94,7 @@ inline bool ArrayFlex::find_all(const Array& arr, int64_t value, size_t start, s
         return find_all_match(start, end, baseindex, state);
     }
 
-    REALM_ASSERT_3(arr.m_width, !=, 0);
+    REALM_ASSERT_DEBUG(arr.m_width != 0);
 
     if constexpr (std::is_same_v<Equal, Cond>) {
         return find_eq(arr, value, start, end, baseindex, state);

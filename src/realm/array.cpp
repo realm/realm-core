@@ -305,7 +305,7 @@ void Array::update_from_parent() noexcept
 
 void Array::set_type(Type type)
 {
-    REALM_ASSERT(is_attached());
+    REALM_ASSERT_DEBUG(is_attached());
 
     copy_on_write(); // Throws
 
@@ -363,9 +363,9 @@ size_t Array::get_byte_size() const noexcept
 
 ref_type Array::write(_impl::ArrayWriterBase& out, bool deep, bool only_if_modified, bool compress_in_flight) const
 {
-    REALM_ASSERT(is_attached());
+    REALM_ASSERT_DEBUG(is_attached());
     // The default allocator cannot be trusted wrt is_read_only():
-    REALM_ASSERT(!only_if_modified || &m_alloc != &Allocator::get_default());
+    REALM_ASSERT_DEBUG(!only_if_modified || &m_alloc != &Allocator::get_default());
     if (only_if_modified && m_alloc.is_read_only(m_ref))
         return m_ref;
 
@@ -398,7 +398,7 @@ ref_type Array::write(ref_type ref, Allocator& alloc, _impl::ArrayWriterBase& ou
                       bool compress_in_flight)
 {
     // The default allocator cannot be trusted wrt is_read_only():
-    REALM_ASSERT(!only_if_modified || &alloc != &Allocator::get_default());
+    REALM_ASSERT_DEBUG(!only_if_modified || &alloc != &Allocator::get_default());
     if (only_if_modified && alloc.is_read_only(ref))
         return ref;
 

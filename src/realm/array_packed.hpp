@@ -82,7 +82,7 @@ inline bool ArrayPacked::find_all(const Array& arr, int64_t value, size_t start,
         return find_all_match(start, end, baseindex, state);
     }
 
-    REALM_ASSERT_3(arr.m_width, !=, 0);
+    REALM_ASSERT_DEBUG(arr.m_width != 0);
 
     if (!run_parallel_scan(arr.m_width, end - start))
         return find_linear<Cond>(arr, value, start, end, baseindex, state);

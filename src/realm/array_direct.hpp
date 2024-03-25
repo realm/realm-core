@@ -916,7 +916,7 @@ size_t parallel_subword_find(VectorCompare vector_compare, const uint64_t* data,
     const auto fast_scan_limit = 4 * bit_count_pr_iteration;
     // use signed to make it easier to ascertain correctness of loop condition below
     signed total_bit_count_left = static_cast<signed>(end - start) * static_cast<signed>(width);
-    REALM_ASSERT(total_bit_count_left >= 0);
+    REALM_ASSERT_DEBUG(total_bit_count_left >= 0);
     unaligned_word_iter it(data, offset + start * width);
     uint64_t found_vector = 0;
     while (total_bit_count_left >= fast_scan_limit) {
