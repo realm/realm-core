@@ -126,29 +126,6 @@ void ArrayFlex::get_chunk(const Array& arr, size_t ndx, int64_t res[8]) const
     }
 }
 
-int64_t ArrayFlex::sum(const Array& arr, size_t start, size_t end) const
-{
-    const auto& encoder = arr.m_encoder;
-    const auto data = (uint64_t*)arr.m_data;
-    const auto v_width = encoder.width();
-    const auto v_size = encoder.v_size();
-    const auto ndx_width = encoder.ndx_width();
-    const auto ndx_size = encoder.ndx_size();
-    const auto mask = encoder.width_mask();
-
-    REALM_ASSERT_DEBUG(start < ndx_size && end < ndx_size);
-
-    const auto offset = v_size * v_width;
-    int64_t acc = 0;
-
-    bf_iterator it_index{data, static_cast<size_t>(offset), ndx_width, ndx_width, start};
-    for (; start < end; ++start, ++it_index) {
-        const auto v = read_bitfield(data, *it_index * v_width, v_width);
-        acc += sign_extend_field_by_mask(mask, v);
-    }
-    return acc;
-}
-
 bool ArrayFlex::find_all_match(size_t start, size_t end, size_t baseindex, QueryStateBase* state) const
 {
     REALM_ASSERT_DEBUG(state->match_count() < state->limit());

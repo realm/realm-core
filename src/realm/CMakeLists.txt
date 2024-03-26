@@ -16,10 +16,10 @@ set(REALM_SOURCES
     array_fixed_bytes.cpp
     array_flex.cpp
     array_packed.cpp
+    array_leaf_optimization.cpp
     array_integer.cpp
     array_key.cpp
     array_mixed.cpp
-    array_packed.cpp
     array_unsigned.cpp
     array_string.cpp
     array_string_short.cpp

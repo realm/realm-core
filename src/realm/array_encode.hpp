@@ -64,7 +64,6 @@ public:
     size_t find_first(const Array&, int64_t, size_t, size_t) const;
     template <typename Cond>
     inline bool find_all(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*) const;
-    int64_t sum(const Array&, size_t start, size_t end) const;
 
 private:
     // Same idea we have for Array, we want to avoid to constantly the whether we
@@ -77,7 +76,6 @@ private:
     using DirectSetter = void (ArrayEncode::*)(const Array&, size_t, int64_t) const;
     using Finder = bool (ArrayEncode::*)(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*) const;
     using FinderTable = std::array<Finder, cond_VTABLE_FINDER_COUNT>;
-    using Accumulator = int64_t (ArrayEncode::*)(const Array&, size_t, size_t) const;
 
     struct VTable {
         Getter m_getter{nullptr};
@@ -85,7 +83,6 @@ private:
         ChunkGetterChunk m_chunk_getter{nullptr};
         DirectSetter m_direct_setter{nullptr};
         FinderTable m_finder;
-        Accumulator m_accumulator{nullptr};
     };
     struct VTableForPacked;
     struct VTableForFlex;
@@ -105,8 +102,6 @@ private:
     bool find_all_packed(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*) const;
     template <typename Cond>
     bool find_all_flex(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*) const;
-    int64_t sum_packed(const Array&, size_t, size_t) const;
-    int64_t sum_flex(const Array&, size_t, size_t) const;
 
     // internal impl
     void set(char* data, size_t w, size_t ndx, int64_t v) const;

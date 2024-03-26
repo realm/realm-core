@@ -65,7 +65,6 @@ struct ArrayEncode::VTableForPacked {
             m_finder[cond_NotEqual] = &ArrayEncode::find_all_packed<NotEqual>;
             m_finder[cond_Less] = &ArrayEncode::find_all_packed<Less>;
             m_finder[cond_Greater] = &ArrayEncode::find_all_packed<Greater>;
-            m_accumulator = &ArrayEncode::sum_packed;
         }
     };
     static const PopulatedVTablePacked vtable;
@@ -83,7 +82,6 @@ struct ArrayEncode::VTableForFlex {
             m_finder[cond_NotEqual] = &ArrayEncode::find_all_flex<NotEqual>;
             m_finder[cond_Less] = &ArrayEncode::find_all_flex<Less>;
             m_finder[cond_Greater] = &ArrayEncode::find_all_flex<Greater>;
-            m_accumulator = &ArrayEncode::sum_flex;
         }
     };
     static const PopulatedVTableFlex vtable;
@@ -292,14 +290,6 @@ size_t ArrayEncode::find_first(const Array& arr, int64_t value, size_t start, si
     return state.m_state;
 }
 
-int64_t ArrayEncode::sum(const Array& arr, size_t start, size_t end) const
-{
-    REALM_ASSERT_DEBUG(is_packed() || is_flex());
-    REALM_ASSERT_DEBUG(arr.m_size >= start && arr.m_size <= end);
-    REALM_ASSERT_DEBUG(m_vtable->m_accumulator);
-    return (this->*(m_vtable->m_accumulator))(arr, start, end);
-}
-
 void ArrayEncode::set(char* data, size_t w, size_t ndx, int64_t v) const
 {
     if (w == 0)
@@ -435,14 +425,4 @@ bool ArrayEncode::find_all_flex(const Array& arr, int64_t value, size_t start, s
                                 QueryStateBase* state) const
 {
     return s_flex.find_all<Cond>(arr, value, start, end, baseindex, state);
-}
-
-int64_t ArrayEncode::sum_packed(const Array& array, size_t start, size_t end) const
-{
-    return s_packed.sum(array, start, end);
-}
-
-int64_t ArrayEncode::sum_flex(const Array& array, size_t start, size_t end) const
-{
-    return s_flex.sum(array, start, end);
 }
