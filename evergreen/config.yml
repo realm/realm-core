@@ -139,6 +139,10 @@ functions:
 
           set_cmake_var realm_vars REALM_BUILD_COMMANDLINE_TOOLS BOOL "${build_command_line_tools|On}"
           set_cmake_var realm_vars REALM_ENABLE_ENCRYPTION BOOL "${enable_realm_encryption|On}"
+          if [[ -n "${compress|}" ]]; then
+              set_cmake_var realm_vars REALM_COMPRESS PATH "${cmake_toolchain_file}"
+          fi
+
 
           if [[ -n "${fetch_missing_dependencies|}" ]]; then
               set_cmake_var realm_vars REALM_FETCH_MISSING_DEPENDENCIES BOOL On
@@ -1702,6 +1706,23 @@ buildvariants:
   tasks:
   - name: compile_test_coverage
   - name: finalize_coverage_data
+
+- name: macos-array-compression
+  display_name: "MacOS 11 arm64 (Compress Arrays)"
+  run_on: macos-1100-arm64
+  expansions:
+    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.26.3-macos-universal.tar.gz"
+    cmake_bindir: "./cmake_binaries/CMake.app/Contents/bin"
+    cmake_toolchain_file: "./tools/cmake/xcode.toolchain.cmake"
+    cmake_generator: Xcode
+    max_jobs: $(sysctl -n hw.logicalcpu)
+    xcode_developer_dir: /Applications/Xcode13.1.app/Contents/Developer
+    extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=arm64
+    compress: On
+    cmake_build_type: Debug
+    coveralls_flag_name: "macos-arm64"
+  tasks:
+  - name: compile_test
 
 - name: windows-64-vs2019
   display_name: "Windows x86_64 (VS 2019)"
