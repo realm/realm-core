@@ -398,8 +398,6 @@ TEST_CASE("Schema version mismatch between client and server", "[sync][flx][flx 
     }
     _impl::RealmCoordinator::assert_no_open_realms();
 
-    uint64_t target_schema_version = 0;
-
     SECTION("Realm already on the latest schema version") {
         DBOptions options;
         options.encryption_key = test_util::crypt_key();
@@ -409,11 +407,9 @@ TEST_CASE("Schema version mismatch between client and server", "[sync][flx][flx 
         tr->commit();
         auto schema_version = ObjectStore::get_schema_version(*db->start_read());
         CHECK(schema_version == 1);
-        target_schema_version = 1;
     }
 
     SECTION("Open realm with the lastest schema version for the first time") {
-        target_schema_version = 0;
     }
 
     config.schema_version = 1;
@@ -441,8 +437,10 @@ TEST_CASE("Schema version mismatch between client and server", "[sync][flx][flx 
     REQUIRE_THROWS_CONTAINING(std::rethrow_exception(error),
                               "The following changes cannot be made in additive-only schema mode");
     REQUIRE(schema_migration_required);
-    // The server schema is already applied by the time the client applies the mismatch schema.
-    check_realm_schema(config.path, schema_v1, target_schema_version);
+    // Applying the new schema (and version) fails, therefore the schema is unversioned (the metadata table is removed
+    // during migration). There is a schema though because the server schema is already applied by the time the client
+    // applies the mismatch schema.
+    check_realm_schema(config.path, schema_v1, ObjectStore::NotVersioned);
     wait_for_sessions_to_close(harness.session());
 }
 
@@ -945,7 +943,7 @@ TEST_CASE("Send schema version zero if no schema is used to open the realm",
     REQUIRE(realm);
     REQUIRE_FALSE(error);
     // The schema is received from the server, but it is unversioned.
-    check_realm_schema(config.path, schema_v0, -1);
+    check_realm_schema(config.path, schema_v0, ObjectStore::NotVersioned);
 }
 
 TEST_CASE("Allow resetting the schema version to zero after bad schema version error",

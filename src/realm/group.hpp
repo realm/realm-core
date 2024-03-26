@@ -321,6 +321,8 @@ public:
     TableRef get_or_add_table_with_primary_key(StringData name, DataType pk_type, StringData pk_name,
                                                bool nullable = false, Table::Type table_type = Table::Type::TopLevel);
 
+    // Use 'ignore_backlinks' with caution. ignore_backlinks=true will leave things in an invalid state
+    // if the target table (or column) is not removed as well.
     void remove_table(TableKey key, bool ignore_backlinks = false);
     void remove_table(StringData name, bool ignore_backlinks = false);
 
