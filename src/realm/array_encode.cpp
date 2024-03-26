@@ -121,7 +121,7 @@ std::vector<int64_t> fetch_values(const Encoder& encoder, const Array& arr)
     return res;
 }
 
-bool ArrayEncode::always_encode(const Array& origin, Array& arr, bool packed) const
+bool ArrayEncode::always_encode(const Array& origin, Array& arr, Encoding encoding) const
 {
     std::vector<int64_t> values;
     std::vector<size_t> indices;
@@ -130,15 +130,18 @@ bool ArrayEncode::always_encode(const Array& origin, Array& arr, bool packed) co
         size_t v_width, ndx_width;
         const uint8_t flags = NodeHeader::get_flags(origin.get_header());
 
-        if (packed) {
+        if (encoding == Encoding::Packed) {
             const auto packed_size = packed_encoded_array_size(values, origin.size(), v_width);
             encode_array(s_packed, arr, packed_size, flags, v_width, origin.size());
             copy_into_encoded_array(s_packed, origin, arr);
         }
-        else {
+        else if (encoding == Encoding::Flex) {
             const auto flex_size = flex_encoded_array_size(values, indices, v_width, ndx_width);
             encode_array(s_flex, arr, flex_size, flags, v_width, ndx_width, values.size(), indices.size());
             copy_into_encoded_array(s_flex, arr, values, indices);
+        }
+        else {
+            REALM_UNREACHABLE();
         }
         return true;
     }
@@ -147,9 +150,9 @@ bool ArrayEncode::always_encode(const Array& origin, Array& arr, bool packed) co
 
 bool ArrayEncode::encode(const Array& origin, Array& arr) const
 {
-    // return false;
-    // return always_encode(origin, arr, true); // true packed, false flex
-
+#if REALM_COMPRESS
+    return always_encode(origin, arr, Encoding::Flex);
+#else
     std::vector<int64_t> values;
     std::vector<size_t> indices;
     encode_values(origin, values, indices);
@@ -176,6 +179,7 @@ bool ArrayEncode::encode(const Array& origin, Array& arr) const
         }
     }
     return false;
+#endif
 }
 
 bool ArrayEncode::decode(Array& arr) const
