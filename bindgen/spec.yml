@@ -745,7 +745,7 @@ classes:
     properties:
       get_default_logger: SharedLogger
     staticMethods:
-      set_default_logger: '(logger: SharedLogger)'
+      set_default_logger: '(logger: Nullable<SharedLogger>)'
 
   ConstTableRef:
     needsDeref: true

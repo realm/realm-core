@@ -17,6 +17,7 @@
 
 ### Internals
 * Update libuv used in object store tests from v1.35.0 to v1.48.0 ([PR #7508](https://github.com/realm/realm-core/pull/7508)).
+* Made `set_default_logger` nullable in the bindgen spec.yml (PR [#7515](https://github.com/realm/realm-core/pull/7515)).
 
 ----------------------------------------------
 
