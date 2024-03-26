@@ -364,7 +364,7 @@ size_t ArrayString::find_first(StringData value, size_t begin, size_t end) const
         }
         case Type::interned_strings: {
             // we need a way to avoid this lookup for each leaf array. The lookup must appear
-            // higher up the stack.
+            // higher up the call stack and passed down.
             auto id = m_string_interner->lookup(value);
             if (id) {
                 return static_cast<Array*>(m_arr)->find_first(*id, begin, end);
@@ -538,5 +538,6 @@ void ArrayString::verify() const
 
 ref_type ArrayString::write(_impl::ArrayWriterBase& out, StringInterner* interner)
 {
-    return m_arr->write(out, true, true, false);
+    // we have to write out all, modified or not, to match the total cleanup
+    return m_arr->write(out, true, false, false);
 }

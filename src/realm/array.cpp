@@ -329,7 +329,7 @@ void Array::set_type(Type type)
     set_hasrefs_in_header(init_has_refs, header);
 }
 
-void Array::destroy_children(size_t offset) noexcept
+void Array::destroy_children(size_t offset, bool ro_only) noexcept
 {
     for (size_t i = offset; i != m_size; ++i) {
         int64_t value = get(i);
@@ -345,7 +345,7 @@ void Array::destroy_children(size_t offset) noexcept
             continue;
 
         ref_type ref = to_ref(value);
-        destroy_deep(ref, m_alloc);
+        destroy_deep(ref, m_alloc, ro_only);
     }
 }
 

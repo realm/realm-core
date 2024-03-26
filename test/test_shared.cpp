@@ -2454,6 +2454,7 @@ TEST(Shared_MovingSearchIndex)
     // Remove the padding column to shift the indexed columns
     {
         WriteTransaction wt(sg);
+        wt.get_group().verify();
         TableRef table = wt.get_table("foo");
 
         CHECK(table->has_search_index(int_col));

@@ -1584,19 +1584,21 @@ ref_type Cluster::typed_write(ref_type ref, _impl::ArrayWriterBase& out, const T
             auto col_key = table.m_leaf_ndx2colkey[j - 1];
             auto col_type = col_key.get_type();
             auto col_attr = col_key.get_attrs();
-#if 0
+            // #if 0
             // String columns are interned at this point
-            if (compress && col_type == col_type_String) {
+            if (compress && col_type == col_type_String && !col_attr.test(col_attr_Collection)) {
                 if (NodeHeader::get_hasrefs_from_header(leaf.get_header())) {
                     // we're interning and we have a subtree
                     ArrayString as(m_alloc);
                     as.init_from_ref(leaf_rot.get_as_ref());
                     written_cluster.set_as_ref(j, as.write(out, table.get_string_interner(col_key)));
+                    // in a transactional setting:
                     // Destroy all sub-arrays if present, in order to release memory in file
                     // This is contrary to the rest of the handling in this function, but needed
                     // here since sub-arrays may not have been COW'ed and therefore not freed in file.
-                    // THIS IS NOT WORKING:
-                    // leaf.destroy_deep();
+                    // We rely on 'only_modified' to indicate that we're in a transactional setting.
+                    if (only_modified)
+                        leaf.destroy_deep(true);
                     continue;
                 }
                 if (NodeHeader::get_wtype_from_header(leaf.get_header()) == wtype_Multiply) {
@@ -1611,8 +1613,9 @@ ref_type Cluster::typed_write(ref_type ref, _impl::ArrayWriterBase& out, const T
                 // whether it's the old enum strings or the new interned strings,
                 // just write out the array using integer leaf compression
                 written_cluster.set_as_ref(j, leaf.write(out, false, false, false));
+                continue;
             }
-#endif
+            // #endif
             bool compressible = col_type == col_type_Int || col_type == col_type_Link ||
                                 col_type == col_type_BackLink || col_type == col_type_ObjectId ||
                                 col_type == col_type_TypedLink || col_type == col_type_UUID;
