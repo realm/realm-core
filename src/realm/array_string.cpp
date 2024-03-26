@@ -263,11 +263,11 @@ bool ArrayString::is_null(size_t ndx) const
             return static_cast<ArrayBigBlobs*>(m_arr)->is_null(ndx);
         case Type::enum_strings: {
             size_t id = size_t(static_cast<Array*>(m_arr)->get(ndx));
-            return id == 0;
+            return m_string_enum_values->is_null(id);
         }
         case Type::interned_strings: {
             size_t id = size_t(static_cast<Array*>(m_arr)->get(ndx));
-            return m_string_enum_values->is_null(id);
+            return id == 0;
         }
     }
     return {};
@@ -539,5 +539,14 @@ void ArrayString::verify() const
 ref_type ArrayString::write(_impl::ArrayWriterBase& out, StringInterner* interner)
 {
     // we have to write out all, modified or not, to match the total cleanup
-    return m_arr->write(out, true, false, false);
+    Array interned(Allocator::get_default());
+    auto sz = size();
+    interned.create(NodeHeader::type_Normal, true, sz);
+    for (size_t i = 0; i < sz; ++i) {
+        interned.set(i, interner->intern(get(i)));
+    }
+    auto retval = interned.write(out, false, false, false);
+    interned.destroy();
+    return retval;
+    // return m_arr->write(out, true, false, false);
 }

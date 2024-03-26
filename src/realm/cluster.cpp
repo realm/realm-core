@@ -1020,6 +1020,7 @@ void Cluster::upgrade_string_to_enum(ColKey col_key, ArrayString& keys)
     indexes.create(Array::type_Normal, false);
     ArrayString values(m_alloc);
     ref_type ref = Array::get_as_ref(col_ndx.val + s_first_col_index);
+    set_string_interner(values, col_key);
     values.init_from_ref(ref);
     size_t sz = values.size();
     for (size_t i = 0; i < sz; i++) {
@@ -1063,6 +1064,9 @@ void Cluster::verify(ref_type ref, size_t index, util::Optional<size_t>& sz) con
 {
     ArrayType arr(get_alloc());
     set_spec(arr, ColKey::Idx{unsigned(index) - 1});
+    auto table = get_owning_table();
+    auto col_key = table->m_leaf_ndx2colkey[index];
+    set_string_interner(arr, col_key);
     // TODO: find col_key for this call instead of index:
     // set_string_interner(arr, ColKey::Idx{unsigned(index) - 1});
     arr.set_parent(const_cast<Cluster*>(this), index);
@@ -1581,14 +1585,17 @@ ref_type Cluster::typed_write(ref_type ref, _impl::ArrayWriterBase& out, const T
         }
         else {
             // Columns
+            // (Column 0 is not a real column, hence [j-1])
             auto col_key = table.m_leaf_ndx2colkey[j - 1];
             auto col_type = col_key.get_type();
             auto col_attr = col_key.get_attrs();
             // #if 0
             // String columns are interned at this point
             if (compress && col_type == col_type_String && !col_attr.test(col_attr_Collection)) {
-                if (NodeHeader::get_hasrefs_from_header(leaf.get_header())) {
-                    // we're interning and we have a subtree
+                auto header = leaf.get_header();
+                if (NodeHeader::get_hasrefs_from_header(header) ||
+                    NodeHeader::get_wtype_from_header(header) == wtype_Multiply) {
+                    // We're interning these strings
                     ArrayString as(m_alloc);
                     as.init_from_ref(leaf_rot.get_as_ref());
                     written_cluster.set_as_ref(j, as.write(out, table.get_string_interner(col_key)));
@@ -1599,15 +1606,6 @@ ref_type Cluster::typed_write(ref_type ref, _impl::ArrayWriterBase& out, const T
                     // We rely on 'only_modified' to indicate that we're in a transactional setting.
                     if (only_modified)
                         leaf.destroy_deep(true);
-                    continue;
-                }
-                if (NodeHeader::get_wtype_from_header(leaf.get_header()) == wtype_Multiply) {
-                    // Small strings!
-                    ArrayString as(m_alloc);
-                    as.init_from_ref(leaf_rot.get_as_ref());
-                    written_cluster.set_as_ref(j, as.write(out, table.get_string_interner(col_key)));
-                    // We're only compressing the array which is already in slab, so no need to
-                    // destroy subtrees
                     continue;
                 }
                 // whether it's the old enum strings or the new interned strings,

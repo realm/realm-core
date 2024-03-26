@@ -623,9 +623,11 @@ StringData Obj::_get<StringData>(ColKey::Idx col_ndx) const
         return values.get(m_row_ndx);
     }
     else {
-        // TODO: set a string interner if needed
-        // values.set_string_interner(m_table->get_string_interner(col_ndx));
-        return ArrayString::get(alloc.translate(ref), m_row_ndx, alloc);
+        ArrayString values(get_alloc());
+        auto col_key = m_table->leaf_ndx2colkey(col_ndx);
+        values.set_string_interner(m_table->get_string_interner(col_key));
+        values.init_from_ref(ref);
+        return values.get(m_row_ndx);
     }
 }
 
