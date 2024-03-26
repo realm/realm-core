@@ -115,7 +115,7 @@ private:
     void encode_values(const Array&, std::vector<int64_t>&, std::vector<size_t>&) const;
     inline bool is_packed() const;
     inline bool is_flex() const;
-    bool always_encode(const Array&, Array&, bool) const; // for testing
+    bool always_encode(const Array&, Array&, Node::Encoding) const; // for testing
 
 private:
     using Encoding = NodeHeader::Encoding;

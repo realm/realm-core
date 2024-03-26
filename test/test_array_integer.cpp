@@ -1262,7 +1262,7 @@ NONCONCURRENT_TEST(Test_basic_find_GT_value_greater_32bit)
 #endif
 
 // disable this test if forcing compression to Packed.
-#if 1
+#if !REALM_COMPRESS
 TEST(Test_ArrayInt_no_encode)
 {
     ArrayInteger a(Allocator::get_default());
@@ -1281,30 +1281,7 @@ TEST(Test_ArrayInt_no_encode)
     a.destroy();
     a1.destroy();
 }
-#endif
 
-TEST(Test_array_same_size_less_bits)
-{
-    ArrayInteger a(Allocator::get_default());
-    ArrayInteger a1(Allocator::get_default());
-    a.create();
-    a.add(1000000);
-    a.add(1000000);
-    a.add(1000000);
-    CHECK(a.try_encode(a1));
-    CHECK_NOT(a.is_encoded());
-    CHECK(a.get_any(0) == 1000000);
-    CHECK(a.get_any(1) == 1000000);
-    CHECK(a.get_any(2) == 1000000);
-    CHECK(a1.is_encoded());
-    CHECK(a1.get_any(0) == 1000000);
-    CHECK(a1.get_any(1) == 1000000);
-    CHECK(a1.get_any(2) == 1000000);
-    a.destroy();
-    a1.destroy();
-}
-
-#if 1
 TEST(Test_ArrayInt_encode_decode_needed)
 {
     ArrayInteger a(Allocator::get_default());
@@ -1355,6 +1332,27 @@ TEST(Test_ArrayInt_encode_decode_needed)
     a1.destroy();
 }
 #endif
+
+TEST(Test_array_same_size_less_bits)
+{
+    ArrayInteger a(Allocator::get_default());
+    ArrayInteger a1(Allocator::get_default());
+    a.create();
+    a.add(1000000);
+    a.add(1000000);
+    a.add(1000000);
+    CHECK(a.try_encode(a1));
+    CHECK_NOT(a.is_encoded());
+    CHECK(a.get_any(0) == 1000000);
+    CHECK(a.get_any(1) == 1000000);
+    CHECK(a.get_any(2) == 1000000);
+    CHECK(a1.is_encoded());
+    CHECK(a1.get_any(0) == 1000000);
+    CHECK(a1.get_any(1) == 1000000);
+    CHECK(a1.get_any(2) == 1000000);
+    a.destroy();
+    a1.destroy();
+}
 
 TEST(Test_ArrayInt_negative_nums)
 {
