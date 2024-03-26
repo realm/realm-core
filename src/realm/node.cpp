@@ -88,14 +88,9 @@ size_t Node::calc_item_count(size_t bytes, size_t width) const noexcept
 
 void Node::alloc(size_t init_size, size_t new_width)
 {
-    // This method is never taking in consideration the possibility of extending a B type array.
-    // This is fine as long as we have decompressed the array from B to A type before!!
-
     REALM_ASSERT(is_attached());
     char* header = get_header_from_data(m_data);
-    // only not compressed arrays are allowed here. Essentialy the compressed array must have decompressed before.
     REALM_ASSERT(!wtype_is_extended(header));
-
     size_t needed_bytes = calc_byte_len(init_size, new_width);
     // this method is not public and callers must (and currently do) ensure that
     // needed_bytes are never larger than max_array_payload.
