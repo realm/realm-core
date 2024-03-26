@@ -21,7 +21,6 @@
 #include <realm/sync/subscriptions.hpp>
 #include <realm/sync/noinst/sync_schema_migration.hpp>
 #include <realm/object-store/impl/realm_coordinator.hpp>
-#include <realm/object-store/sync/sync_manager.hpp>
 #include <realm/object-store/sync/sync_session.hpp>
 #include <realm/object-store/thread_safe_reference.hpp>
 
@@ -191,20 +190,10 @@ void AsyncOpenTask::migrate_schema_or_complete(AsyncOpenCallback&& callback,
         return;
     }
 
-    // Sync schema migrations require setting a subscription initializer callback to bootstrap the data. The
-    // subscriptions in the current realm file may not be compatible with the new schema so cannot rely on them.
-    auto config = coordinator->get_config();
-    if (!config.sync_config->subscription_initializer) {
-        status = Status(ErrorCodes::SyncSchemaMigrationError,
-                        "Sync schema migrations must provide a subscription initializer callback in the sync config");
-        async_open_complete(std::move(callback), coordinator, status);
-        return;
-    }
-
     // Migrate the schema.
     //  * First upload the changes at the old schema version
-    //  * Then, delete the realm, reopen it, and bootstrap at new schema version
-    // The lifetime of the task is extended until bootstrap completes.
+    //  * Then, pause the session, delete all tables, re-initialize the metadata, and finally restart the session.
+    // The lifetime of the task is extended until the bootstrap completes.
     std::shared_ptr<AsyncOpenTask> self(shared_from_this());
     session->wait_for_upload_completion([callback = std::move(callback), coordinator, session, self,
                                          this](Status status) mutable {
@@ -219,38 +208,11 @@ void AsyncOpenTask::migrate_schema_or_complete(AsyncOpenCallback&& callback,
             return;
         }
 
-        auto future = SyncSession::Internal::pause_async(*session);
-        // Wait until the SessionWrapper is done using the DBRef.
-        std::move(future).get_async([callback = std::move(callback), coordinator, self, this](Status status) mutable {
-            {
-                util::CheckedLockGuard lock(m_mutex);
-                if (!m_session)
-                    return; // Swallow all events if the task has been cancelled.
-            }
-
-            if (!status.is_ok()) {
-                self->async_open_complete(std::move(callback), coordinator, status);
-                return;
-            }
-
-            // Delete the realm file and reopen it.
-            try {
-                util::CheckedLockGuard lock(m_mutex);
-                auto config = coordinator->get_config();
-                m_session = nullptr;
-                coordinator->close();
-                coordinator = nullptr;
-                util::File::remove(config.path);
-                coordinator = _impl::RealmCoordinator::get_coordinator(config);
-                m_session = coordinator->sync_session();
-            }
-            catch (...) {
-                async_open_complete(std::move(callback), coordinator, exception_to_status());
-                return;
-            }
-
+        auto migration_completed_callback = [callback = std::move(callback), coordinator = std::move(coordinator),
+                                             self](Status status) mutable {
             self->wait_for_bootstrap_or_complete(std::move(callback), coordinator, status);
-        });
+        };
+        SyncSession::Internal::migrate_schema(*session, std::move(migration_completed_callback));
     });
 }
 
