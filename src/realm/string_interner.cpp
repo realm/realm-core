@@ -61,13 +61,33 @@ int StringInterner::compare(StringData, StringID A)
     return 0;
 }
 
+// We're handing out StringData which has no ownership, but must be able to
+// access the underlying decompressed string. We keep only a limited number of these
+// decompressed strings available. A value of 8 allows Core Unit tests to pass.
+// A value of 4 does not. This approach is called empirical software construction :-D
+constexpr size_t per_thread_decompressed = 8;
+
+thread_local std::vector<std::string> keep_alive(per_thread_decompressed);
+thread_local size_t string_index = 0;
+
 StringData StringInterner::get(StringID id)
 {
     if (id == 0)
         return StringData{nullptr};
     REALM_ASSERT(id <= m_strings.size());
     std::string& str = m_strings[id - 1];
-    return str;
+    // decompressed string must be kept in memory for a while....
+    if (keep_alive.size() < per_thread_decompressed) {
+        keep_alive.push_back(str);
+        return keep_alive.back();
+    }
+    keep_alive[string_index] = str;
+    auto return_index = string_index;
+    // bump index with wrap-around
+    string_index++;
+    if (string_index == keep_alive.size())
+        string_index = 0;
+    return keep_alive[return_index];
 }
 
 } // namespace realm
