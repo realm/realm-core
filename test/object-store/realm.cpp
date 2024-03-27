@@ -1209,7 +1209,7 @@ TEST_CASE("Get Realm using Async Open", "[sync][pbs][async open]") {
 
     SECTION("waiters are cancelled if cancel_waits_on_nonfatal_error") {
         auto logger = util::Logger::get_default_logger();
-        auto transport = std::make_shared<HookedTransport<UnitTestTransport>>();
+        auto transport = std::make_shared<HookedUnitTestTransport>();
         auto socket_provider = std::make_shared<HookedSocketProvider>(logger, "some user agent");
         enum TestMode { location_fails, token_fails, token_not_authorized };
 
@@ -1254,6 +1254,7 @@ TEST_CASE("Get Realm using Async Open", "[sync][pbs][async open]") {
         }
 
         transport->request_hook = [&](const app::Request& req) -> std::optional<app::Response> {
+            static constexpr int CURLE_OPERATION_TIMEDOUT = 28;
             std::lock_guard<std::mutex> lock(mutex);
             if (req.url.find("/auth/session") != std::string::npos) {
                 token_refresh_called = true;
@@ -1261,14 +1262,14 @@ TEST_CASE("Get Realm using Async Open", "[sync][pbs][async open]") {
                     return app::Response{403, 0, {}, "403 not authorized"};
                 }
                 if (mode == token_fails) {
-                    return app::Response{0, 28, {}, "Operation timed out"};
+                    return app::Response{0, CURLE_OPERATION_TIMEDOUT, {}, "Operation timed out"};
                 }
             }
             else if (req.url.find("/location") != std::string::npos) {
                 location_refresh_called = true;
                 if (mode == location_fails) {
                     // Fake "offline/request timed out" custom error response
-                    return app::Response{0, 28, {}, "Operation timed out"};
+                    return app::Response{0, CURLE_OPERATION_TIMEDOUT, {}, "Operation timed out"};
                 }
             }
             return std::nullopt;

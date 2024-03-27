@@ -224,6 +224,9 @@ public:
     std::function<std::optional<app::Response>(const app::Request&)> request_hook;
 };
 
+using HookedSynchronousTransport = HookedTransport<SynchronousTestTransport>;
+using HookedUnitTestTransport = HookedTransport<UnitTestTransport>;
+
 
 struct SocketProviderError {
     SocketProviderError(sync::HTTPStatus code, std::string message = "")

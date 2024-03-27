@@ -2678,7 +2678,7 @@ TEST_CASE("flx: connect to PBS as FLX returns an error", "[sync][flx][protocol][
 }
 
 TEST_CASE("flx: commit subscription while refreshing the access token", "[sync][flx][token][baas]") {
-    auto transport = std::make_shared<HookedTransport<SynchronousTestTransport>>();
+    auto transport = std::make_shared<HookedSynchronousTransport>();
     FLXSyncTestHarness harness("flx_wait_access_token2", FLXSyncTestHarness::default_server_schema(), transport);
     auto app = harness.app();
     std::shared_ptr<SyncUser> user = app->current_user();
