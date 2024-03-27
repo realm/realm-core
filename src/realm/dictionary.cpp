@@ -433,16 +433,8 @@ void Dictionary::insert_collection(const PathElement& path_elem, CollectionType 
     if (dict_or_list == CollectionType::Set) {
         throw IllegalOperation("Set nested in Dictionary is not supported");
     }
-
     check_level();
-    ensure_created();
-    Mixed new_val(0, dict_or_list);
-    auto old_val = try_get(path_elem.get_key());
-    if (!old_val || *old_val != new_val) {
-        m_values->ensure_keys();
-        auto [it, inserted] = insert(path_elem.get_key(), new_val);
-        set_key(*m_values, it.index());
-    }
+    insert(path_elem.get_key(), Mixed(0, dict_or_list));
 }
 
 DictionaryPtr Dictionary::get_dictionary(const PathElement& path_elem) const
@@ -549,6 +541,7 @@ std::pair<Dictionary::Iterator, bool> Dictionary::insert(Mixed key, Mixed value)
         throw StaleAccessor("Stale dictionary");
     }
 
+    bool add_salt = value.is_type(type_Dictionary, type_List);
     bool old_entry = false;
     auto [ndx, actual_key] = find_impl(key);
     if (actual_key != key) {
@@ -577,16 +570,25 @@ std::pair<Dictionary::Iterator, bool> Dictionary::insert(Mixed key, Mixed value)
             repl->dictionary_insert(*this, ndx, key, value);
         }
     }
-
     bump_content_version();
 
     ObjLink old_link;
     if (old_entry) {
         Mixed old_value = m_values->get(ndx);
-        if (old_value.is_type(type_TypedLink)) {
-            old_link = old_value.get<ObjLink>();
+        if (!value.is_same_type(old_value) || value != old_value) {
+            if (old_value.is_type(type_TypedLink)) {
+                old_link = old_value.get<ObjLink>();
+            }
+            m_values->set(ndx, value);
         }
-        m_values->set(ndx, value);
+        else {
+            add_salt = false;
+        }
+    }
+
+    if (add_salt) {
+        m_values->ensure_keys();
+        set_key(*m_values, ndx);
     }
 
     if (new_link != old_link) {
