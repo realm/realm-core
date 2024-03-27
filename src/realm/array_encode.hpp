@@ -24,7 +24,6 @@
 #include <vector>
 #include <realm/query_conditions.hpp>
 
-
 namespace realm {
 
 class Array;
@@ -54,14 +53,12 @@ public:
     inline size_t ndx_bit_count_per_iteration() const;
 
     // get/set
-    int64_t get(const Array&, size_t) const;
-    int64_t get(const char* data, size_t) const;
-    void get_chunk(const Array&, size_t ndx, int64_t res[8]) const;
-    void set_direct(const Array&, size_t, int64_t) const;
+    inline int64_t get(const Array&, size_t) const;
+    inline int64_t get(const char* data, size_t) const;
+    inline void get_chunk(const Array&, size_t ndx, int64_t res[8]) const;
+    inline void set_direct(const Array&, size_t, int64_t) const;
 
     // query interface
-    template <typename Cond>
-    size_t find_first(const Array&, int64_t, size_t, size_t) const;
     template <typename Cond>
     inline bool find_all(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*) const;
 
@@ -87,6 +84,7 @@ private:
     struct VTableForPacked;
     struct VTableForFlex;
     const VTable* m_vtable = nullptr;
+    Getter m_getter = nullptr;
 
     // getting and setting interface specifically for encoding formats
     int64_t get_packed(const Array&, size_t) const;
@@ -196,6 +194,35 @@ inline uint64_t ArrayEncode::ndx_msb() const
     using Encoding = NodeHeader::Encoding;
     REALM_ASSERT_DEBUG(m_encoding == Encoding::Packed || m_encoding == Encoding::Flex);
     return m_ndx_MSBs;
+}
+
+inline int64_t ArrayEncode::get(const Array& arr, size_t ndx) const
+{
+    REALM_ASSERT_DEBUG(is_packed() || is_flex());
+    REALM_ASSERT_DEBUG(m_vtable->m_getter);
+    return (this->*m_getter)(arr, ndx);
+    // return (this->*(m_vtable->m_getter))(arr, ndx);
+}
+
+inline int64_t ArrayEncode::get(const char* data, size_t ndx) const
+{
+    REALM_ASSERT_DEBUG(is_packed() || is_flex());
+    REALM_ASSERT_DEBUG(m_vtable->m_data_getter);
+    return (this->*(m_vtable->m_data_getter))(data, ndx);
+}
+
+inline void ArrayEncode::get_chunk(const Array& arr, size_t ndx, int64_t res[8]) const
+{
+    REALM_ASSERT_DEBUG(is_packed() || is_flex());
+    REALM_ASSERT_DEBUG(m_vtable->m_chunk_getter);
+    (this->*(m_vtable->m_chunk_getter))(arr, ndx, res);
+}
+
+inline void ArrayEncode::set_direct(const Array& arr, size_t ndx, int64_t value) const
+{
+    REALM_ASSERT_DEBUG(is_packed() || is_flex());
+    REALM_ASSERT_DEBUG(m_vtable->m_direct_setter);
+    (this->*(m_vtable->m_direct_setter))(arr, ndx, value);
 }
 
 template <typename Cond>
