@@ -69,6 +69,7 @@
 * Fix a spurious crash related to opening a Realm on background thread while the process was in the middle of exiting ([#7420](https://github.com/realm/realm-core/issues/7420jj))
 * Fix a data race in change notification delivery when running at debug log level ([PR #7402](https://github.com/realm/realm-core/pull/7402), since v14.0.0).
 * Fix a 10-15% performance regression when reading data from the Realm resulting from Obj being made a non-trivial type ([PR #7402](https://github.com/realm/realm-core/pull/7402), since v14.0.0).
+* Fix an assertion failure "m_lock_info && m_lock_info->m_file.get_path() == m_filename" that appears to be related to opening a Realm while the file is in the process of being closed on another thread ([Swift #8507](https://github.com/realm/realm-swift/issues/8507)).
 
 ### Breaking changes
 * Remove `realm_scheduler_set_default_factory()` and `realm_scheduler_has_default_factory()`, and change the `Scheduler` factory function to a bare function pointer rather than a `UniqueFunction` so that it does not have a non-trivial destructor.
