@@ -44,7 +44,6 @@ public:
 
     template <typename Cond>
     inline bool find_all(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*) const;
-    int64_t sum(const Array&, size_t, size_t) const;
 
 private:
     int64_t do_get(uint64_t*, size_t, size_t, size_t, uint64_t) const;

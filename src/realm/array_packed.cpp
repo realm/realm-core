@@ -116,13 +116,3 @@ bool ArrayPacked::find_all_match(size_t start, size_t end, size_t baseindex, Que
             return false;
     return true;
 }
-
-int64_t ArrayPacked::sum(const Array& arr, size_t start, size_t end) const
-{
-    const auto mask = arr.get_encoder().width_mask();
-    int64_t acc = 0;
-    bf_iterator it((uint64_t*)arr.m_data, 0, arr.m_width, arr.m_width, start);
-    for (; start < end; ++start, ++it)
-        acc += sign_extend_field_by_mask(mask, it.get_value());
-    return acc;
-}
