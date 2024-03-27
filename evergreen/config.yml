@@ -38,6 +38,12 @@ functions:
             cd ..
           fi
 
+          if [[ -n "${ninja_url|}" ]]; then
+            mkdir ninja_bin && cd ninja_bin
+            curl -LsSo ninja.zip ${ninja_url} && unzip -q ninja.zip
+            cd ..
+          fi
+
   "fetch source":
     - command: git.get_project
       params: {directory: realm-core}
@@ -73,6 +79,10 @@ functions:
               [ -n "${cxx_compiler}" ] || (echo "C compiler defined as  but C++ compiler is undefined"; exit 1)
               set_cmake_var compiler_vars CMAKE_C_COMPILER PATH $(./evergreen/abspath.sh ${c_compiler})
               set_cmake_var compiler_vars CMAKE_CXX_COMPILER PATH $(./evergreen/abspath.sh ${cxx_compiler})
+          fi
+
+          if [ -d "./ninja_bin/" ]; then
+            export PATH=$(./evergreen/abspath.sh ./ninja_bin):$PATH
           fi
 
           if [ -z "${disable_tests_against_baas|}" ]; then
@@ -1725,38 +1735,58 @@ buildvariants:
   tasks:
   - name: compile_test
 
-- name: macos-1100-arm64-asan
-  display_name: "MacOS 11 arm64 (ASAN)"
-  run_on: macos-1100-arm64
+- name: macos-1300-arm64-asan
+  display_name: "MacOS 13 arm64 (ASAN)"
+  run_on: macos-1300-arm64
   expansions:
     cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.26.3-macos-universal.tar.gz"
     cmake_bindir: "./cmake_binaries/CMake.app/Contents/bin"
-    cmake_toolchain_file: "./tools/cmake/xcode.toolchain.cmake"
-    cmake_generator: Xcode
+    ninja_url: "https://github.com/ninja-build/ninja/releases/download/v1.11.1/ninja-mac.zip"
     max_jobs: $(sysctl -n hw.logicalcpu)
-    xcode_developer_dir: /Applications/Xcode13.1.app/Contents/Developer
-    extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=arm64
     cmake_build_type: RelWithDebInfo
     enable_asan: On
   tasks:
   - name: compile_test
 
-- name: macos-1100-arm64-tsan
-  display_name: "MacOS 11 arm64 (TSAN)"
-  run_on: macos-1100-arm64
+- name: macos-1300-arm64-tsan
+  display_name: "MacOS 13 arm64 (TSAN)"
+  run_on: macos-1300-arm64
   expansions:
     cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.26.3-macos-universal.tar.gz"
     cmake_bindir: "./cmake_binaries/CMake.app/Contents/bin"
-    cmake_toolchain_file: "./tools/cmake/xcode.toolchain.cmake"
-    cmake_generator: Xcode
+    ninja_url: "https://github.com/ninja-build/ninja/releases/download/v1.11.1/ninja-mac.zip"
     max_jobs: $(sysctl -n hw.logicalcpu)
-    xcode_developer_dir: /Applications/Xcode13.1.app/Contents/Developer
-    extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=arm64
     cmake_build_type: RelWithDebInfo
     enable_tsan: On
   tasks:
-  # FIXME: tsan is not stable on arm64, fails often with internal errors
-  # - name: compile_test
+  - name: compile_test
+
+- name: macos-1300-arm64-asan-encrypted
+  display_name: "MacOS 13 arm64 (ASAN, Encryption)"
+  run_on: macos-1300-arm64
+  expansions:
+    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.26.3-macos-universal.tar.gz"
+    cmake_bindir: "./cmake_binaries/CMake.app/Contents/bin"
+    ninja_url: "https://github.com/ninja-build/ninja/releases/download/v1.11.1/ninja-mac.zip"
+    max_jobs: $(sysctl -n hw.logicalcpu)
+    cmake_build_type: RelWithDebInfo
+    enable_asan: On
+    run_with_encryption: On
+  tasks:
+  - name: compile_test
+
+- name: macos-1300-arm64-tsan-encrypted
+  display_name: "MacOS 13 arm64 (TSAN, Encryption)"
+  run_on: macos-1300-arm64
+  expansions:
+    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.26.3-macos-universal.tar.gz"
+    cmake_bindir: "./cmake_binaries/CMake.app/Contents/bin"
+    ninja_url: "https://github.com/ninja-build/ninja/releases/download/v1.11.1/ninja-mac.zip"
+    max_jobs: $(sysctl -n hw.logicalcpu)
+    cmake_build_type: RelWithDebInfo
+    enable_tsan: On
+    run_with_encryption: On
+  tasks:
   - name: compile_test
 
 - name: macos-coverage
