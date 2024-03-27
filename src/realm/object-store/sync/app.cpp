@@ -823,7 +823,7 @@ void App::log_out(const std::shared_ptr<SyncUser>& user, UniqueFunction<void(Opt
         return completion(util::none);
     }
 
-    log_debug("App: log_out(%1)", user->user_profile().name());
+    log_debug("App: log_out(%1)", user->identity());
     auto refresh_token = user->refresh_token();
     user->log_out();
 
@@ -1255,15 +1255,18 @@ void App::refresh_access_token(const std::shared_ptr<SyncUser>& sync_user, bool 
         return;
     }
 
-    log_debug("App: refresh_access_token: email: %1 %2", sync_user->user_profile().email(),
+    log_debug("App: refresh_access_token: email: %1 %2", sync_user->identity(),
               update_location ? "(updating location)" : "");
 
     // If update_location is set, force the location info to be updated before sending the request
     do_request(
         {HttpMethod::post, url_for_path("/auth/session"), m_request_timeout_ms,
          get_request_headers(sync_user, RequestTokenType::RefreshToken)},
-        [completion = std::move(completion), sync_user](const Response& response) {
+        [self = shared_from_this(), completion = std::move(completion), sync_user](const Response& response) {
             if (auto error = AppUtils::check_for_errors(response)) {
+                self->log_error("App: refresh_access_token: %1 -> %2 ERROR: %3", sync_user->identity(),
+                                response.http_status_code, error->what());
+
                 return completion(std::move(error));
             }
 

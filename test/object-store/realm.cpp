@@ -1206,6 +1206,101 @@ TEST_CASE("Get Realm using Async Open", "[sync][pbs][async open]") {
         REQUIRE(got_error);
     }
 
+    SECTION("waiters are cancelled if cancel_waits_on_nonfatal_error") {
+        auto logger = util::Logger::get_default_logger();
+        auto transport = std::make_shared<HookedTransport<UnitTestTransport>>();
+        auto socket_provider = std::make_shared<HookedSocketProvider>(logger, "some user agent");
+        enum TestMode { location_fails, token_fails, token_not_authorized };
+
+        OfflineAppSession::Config oas_config;
+        oas_config.transport = transport;
+        oas_config.socket_provider = socket_provider;
+        OfflineAppSession oas(oas_config);
+
+        SyncTestFile config(oas, "realm");
+        auto user = config.sync_config->user;
+        config.sync_config->cancel_waits_on_nonfatal_error = true;
+        config.sync_config->error_handler = [&logger](std::shared_ptr<SyncSession> session, SyncError error) {
+            logger->debug("The error handler caught an unexpected sync error: '%1' for '%2'", error.status,
+                          session->path());
+            // Ignore connection failed non-fatal errors and check for access token refresh unauthorized fatal errors
+            if (error.status.code() == ErrorCodes::SyncConnectFailed) {
+                REQUIRE_FALSE(error.is_fatal);
+                return;
+            }
+            if (error.status.code() == ErrorCodes::AuthError) {
+                REQUIRE(error.is_fatal);
+            }
+        };
+
+        auto valid_token = user->access_token();
+        // User should be logged in at this point
+        bool not_authorized = false;
+        bool token_refresh_called = false;
+        bool location_refresh_called = false;
+
+        TestMode mode = GENERATE(location_fails, token_fails, token_not_authorized);
+
+        SECTION("access token expired when realm is opened") {
+            logger->info(">>> access token expired at start - mode: %1", mode);
+            user->update_access_token(std::move(expired_token));
+        }
+        SECTION("access token expired when websocket connects") {
+            logger->info(">>> access token expired by websocket - mode: %1", mode);
+            not_authorized = true;
+        }
+        SECTION("access token expired when websocket connects") {
+            logger->info(">>> websocket returns connection failed - mode: %1", mode);
+        }
+
+        transport->request_hook = [&](const app::Request& req) -> std::optional<app::Response> {
+            if (req.url.find("/auth/session") != std::string::npos) {
+                token_refresh_called = true;
+                if (mode == token_not_authorized) {
+                    return app::Response{403, 0, {}, "403 not authorized"};
+                }
+                if (mode == token_fails) {
+                    return app::Response{0, 28, {}, "Operation timed out"};
+                }
+            }
+            else if (req.url.find("/location") != std::string::npos) {
+                location_refresh_called = true;
+                if (mode == location_fails) {
+                    // Fake "offline/request timed out" custom error response
+                    return app::Response{0, 28, {}, "Operation timed out"};
+                }
+            }
+            return std::nullopt;
+        };
+
+        socket_provider->websocket_connect_func = [&]() -> std::optional<SocketProviderError> {
+            if (not_authorized) {
+                not_authorized = false; // one shot
+                return SocketProviderError(sync::websocket::WebSocketError::websocket_unauthorized,
+                                           "403 not authorized");
+            }
+            return SocketProviderError(sync::websocket::WebSocketError::websocket_connection_failed,
+                                       "Operation timed out");
+        };
+
+        std::atomic<bool> called{false};
+
+        auto task = Realm::get_synchronized_realm(config);
+        task->start([&](auto ref, auto error) {
+            REQUIRE(!ref);
+            REQUIRE(error);
+            called = true;
+        });
+        util::EventLoop::main().run_until([&] {
+            return called.load();
+        });
+        REQUIRE(called);
+        REQUIRE(location_refresh_called);
+        if (mode != TestMode::location_fails) {
+            REQUIRE(token_refresh_called);
+        }
+    }
+
     SECTION("read-only mode sets the schema version") {
         {
             SharedRealm realm = Realm::get_shared_realm(config);

@@ -194,7 +194,8 @@ private:
 };
 
 
-class HookedTransport : public SynchronousTestTransport {
+template <typename Parent, typename = std::enable_if<std::is_base_of<app::GenericNetworkTransport, Parent>::value>>
+class HookedTransport : public Parent {
 public:
     void send_request_to_server(const app::Request& request,
                                 util::UniqueFunction<void(const app::Response&)>&& completion) override
@@ -204,7 +205,7 @@ public:
                 return completion(*simulated_response);
             }
         }
-        SynchronousTestTransport::send_request_to_server(request, [&](const app::Response& response) mutable {
+        Parent::send_request_to_server(request, [&](const app::Response& response) mutable {
             if (response_hook) {
                 response_hook(request, response);
             }

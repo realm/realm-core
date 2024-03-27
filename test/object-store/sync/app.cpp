@@ -2685,7 +2685,7 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
         }
     }
     {
-        auto redir_transport = std::make_shared<HookedTransport>();
+        auto redir_transport = std::make_shared<HookedTransport<SynchronousTestTransport>>();
         AutoVerifiedEmailCredentials creds;
 
         auto app_config = get_config(redir_transport, session.app_session());
@@ -2852,7 +2852,7 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
         }
     }
     SECTION("Test app redirect with no metadata") {
-        auto redir_transport = std::make_shared<HookedTransport>();
+        auto redir_transport = std::make_shared<HookedTransport<SynchronousTestTransport>>();
         AutoVerifiedEmailCredentials creds, creds2;
 
         auto app_config = get_config(redir_transport, session.app_session());
@@ -2943,7 +2943,7 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
         const std::string redirect_host = "fakerealm.example.com:9090";
         const std::string redirect_url = "http://fakerealm.example.com:9090";
 
-        auto redir_transport = std::make_shared<HookedTransport>();
+        auto redir_transport = std::make_shared<HookedTransport<SynchronousTestTransport>>();
         auto redir_provider = std::make_shared<HookedSocketProvider>(logger, "");
         redir_provider->websocket_endpoint_resolver = [&](sync::WebSocketEndpoint&& ep) {
             ep.address = original_address;
@@ -3164,7 +3164,7 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
             original_address = original_host.substr(0, port_pos);
         }
 
-        auto redir_transport = std::make_shared<HookedTransport>();
+        auto redir_transport = std::make_shared<HookedTransport<SynchronousTestTransport>>();
         auto redir_provider = std::make_shared<HookedSocketProvider>(logger, "");
         redir_provider->websocket_endpoint_resolver = [&](sync::WebSocketEndpoint&& ep) {
             ep.address = original_address;
@@ -3262,7 +3262,7 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
             REQUIRE(get_dogs(r).size() == 1);
         }
 
-        auto transport = std::make_shared<HookedTransport>();
+        auto transport = std::make_shared<HookedTransport<SynchronousTestTransport>>();
         TestAppSession hooked_session(session.app_session(), transport, DeleteApp{false});
         auto app = hooked_session.app();
         std::shared_ptr<SyncUser> user = app->current_user();
@@ -3321,7 +3321,7 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
             REQUIRE(token.expired(now));
         }
 
-        auto transport = std::make_shared<HookedTransport>();
+        auto transport = std::make_shared<HookedTransport<SynchronousTestTransport>>();
         TestAppSession hooked_session(session.app_session(), transport, DeleteApp{false});
         auto app = hooked_session.app();
         std::shared_ptr<SyncUser> user = app->current_user();
