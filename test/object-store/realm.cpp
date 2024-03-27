@@ -1254,6 +1254,7 @@ TEST_CASE("Get Realm using Async Open", "[sync][pbs][async open]") {
         }
 
         transport->request_hook = [&](const app::Request& req) -> std::optional<app::Response> {
+            std::lock_guard<std::mutex> lock(mutex);
             if (req.url.find("/auth/session") != std::string::npos) {
                 token_refresh_called = true;
                 if (mode == token_not_authorized) {
@@ -1283,19 +1284,21 @@ TEST_CASE("Get Realm using Async Open", "[sync][pbs][async open]") {
                                        "Operation timed out");
         };
 
-        std::atomic<bool> called{false};
         auto task = Realm::get_synchronized_realm(config);
-        task->start([&](auto ref, auto error) {
-            std::lock_guard<std::mutex> lock(mutex);
-            REQUIRE(!ref);
-            REQUIRE(error);
-            called = true;
-        });
-        util::EventLoop::main().run_until([&] {
-            return called.load();
-        });
+        auto [promise, async_future] = util::make_promise_future<void>();
+        task->start(
+            [async_promise = util::CopyablePromiseHolder<void>(std::move(promise))](auto ref, auto error) mutable {
+                REQUIRE(!ref);
+                REQUIRE(error);
+                if (error)
+                    async_promise.get_promise().set_error(exception_to_status(error));
+                else
+                    async_promise.get_promise().emplace_value();
+            });
+
+        auto result = async_future.get_no_throw();
+        REQUIRE_FALSE(result.is_ok());
         std::lock_guard<std::mutex> lock(mutex);
-        REQUIRE(called);
         REQUIRE(location_refresh_called);
         if (mode != TestMode::location_fails) {
             REQUIRE(token_refresh_called);
