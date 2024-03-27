@@ -1212,6 +1212,18 @@ TEST_CASE("Get Realm using Async Open", "[sync][pbs][async open]") {
         auto transport = std::make_shared<HookedUnitTestTransport>();
         auto socket_provider = std::make_shared<HookedSocketProvider>(logger, "some user agent");
         enum TestMode { location_fails, token_fails, token_not_authorized };
+        auto txt_test_mode = [](TestMode mode) {
+            switch (mode) {
+                case TestMode::location_fails:
+                    return "location_fails";
+                case TestMode::token_fails:
+                    return "token_fails";
+                case TestMode::token_not_authorized:
+                    return "token_not_authorized";
+                default:
+                    return "Unknown TestMode";
+            }
+        };
 
         OfflineAppSession::Config oas_config;
         oas_config.transport = transport;
@@ -1233,24 +1245,27 @@ TEST_CASE("Get Realm using Async Open", "[sync][pbs][async open]") {
             }
         };
 
-        auto valid_token = user->access_token();
         // User should be logged in at this point
+        REQUIRE(user->is_logged_in());
         bool not_authorized = false;
         bool token_refresh_called = false;
         bool location_refresh_called = false;
 
         TestMode mode = GENERATE(location_fails, token_fails, token_not_authorized);
 
-        SECTION("access token expired when realm is opened") {
-            logger->trace(">>> access token expired at start - mode: %1", mode);
+        SECTION(util::format("access token expired when realm is opened - mode: %1", txt_test_mode(mode))) {
+            logger->trace(">>> access token expired when realm is opened - mode: %1", txt_test_mode(mode));
+            // invalidate the user's cached access token
             user->update_access_token(std::move(expired_token));
         }
-        SECTION("access token expired when websocket connects") {
-            logger->trace(">>> access token expired by websocket - mode: %1", mode);
+        SECTION(util::format("access token expired by websocket - mode: %1", txt_test_mode(mode))) {
+            logger->trace(">>> access token expired by websocket - mode: %1", txt_test_mode(mode));
+            // tell websocket to return not authorized to refresh access token
             not_authorized = true;
         }
-        SECTION("access token expired when websocket connects") {
-            logger->trace(">>> websocket returns connection failed - mode: %1", mode);
+        SECTION(util::format("websocket returns connection failed - mode: %1", txt_test_mode(mode))) {
+            logger->trace(">>> websocket returns connection failed - mode: %1", txt_test_mode(mode));
+            // default case
         }
 
         transport->request_hook = [&](const app::Request& req) -> std::optional<app::Response> {
