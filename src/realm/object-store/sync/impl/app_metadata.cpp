@@ -345,6 +345,13 @@ struct PersistedSyncMetadataManager : public app::MetadataStore {
 
     PersistedSyncMetadataManager(std::string path, const app::AppConfig& app_config, SyncFileManager& file_manager)
     {
+        // Note that there are several deferred schema changes which don't
+        // justify bumping the schema version by themself, but should be done
+        // the next time something does justify a migration.
+        // These include:
+        // - remove FileActionSchema url and identity columns
+        // - rename current_user_identity to CurrentUserId
+        // - change most of the nullable columns to non-nullable
         constexpr uint64_t SCHEMA_VERSION = 7;
 
         m_config.automatic_change_notifications = false;
