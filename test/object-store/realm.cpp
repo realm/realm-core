@@ -1211,17 +1211,30 @@ TEST_CASE("Get Realm using Async Open", "[sync][pbs][async open]") {
         auto logger = util::Logger::get_default_logger();
         auto transport = std::make_shared<HookedUnitTestTransport>();
         auto socket_provider = std::make_shared<HookedSocketProvider>(logger, "some user agent");
-        enum TestMode { location_fails, token_fails, token_not_authorized };
+        enum TestMode { expired_at_start, expired_by_websocket, websocket_fails };
+        enum FailureMode { location_fails, token_fails, token_not_authorized };
         auto txt_test_mode = [](TestMode mode) {
             switch (mode) {
-                case TestMode::location_fails:
-                    return "location_fails";
-                case TestMode::token_fails:
-                    return "token_fails";
-                case TestMode::token_not_authorized:
-                    return "token_not_authorized";
+                case TestMode::expired_at_start:
+                    return "access token expired when realm is opened";
+                case TestMode::expired_by_websocket:
+                    return "access token expired by websocket";
+                case TestMode::websocket_fails:
+                    return "websocket returns connection failed";
                 default:
                     return "Unknown TestMode";
+            }
+        };
+        auto txt_failure_mode = [](FailureMode mode) {
+            switch (mode) {
+                case FailureMode::location_fails:
+                    return "location update fails";
+                case FailureMode::token_fails:
+                    return "access token refresh fails";
+                case FailureMode::token_not_authorized:
+                    return "websocket connect not authorized";
+                default:
+                    return "Unknown FailureMode";
             }
         };
 
@@ -1240,9 +1253,9 @@ TEST_CASE("Get Realm using Async Open", "[sync][pbs][async open]") {
                 REQUIRE_FALSE(error.is_fatal);
                 return;
             }
-            if (error.status.code() == ErrorCodes::AuthError) {
-                REQUIRE(error.is_fatal);
-            }
+            // If it's not SyncConnectFailed, then it should be AuthError
+            REQUIRE(error.status.code() == ErrorCodes::AuthError);
+            REQUIRE(error.is_fatal);
         };
 
         // User should be logged in at this point
@@ -1251,21 +1264,18 @@ TEST_CASE("Get Realm using Async Open", "[sync][pbs][async open]") {
         bool token_refresh_called = false;
         bool location_refresh_called = false;
 
-        TestMode mode = GENERATE(location_fails, token_fails, token_not_authorized);
+        TestMode test_mode = GENERATE(expired_at_start, expired_by_websocket, websocket_fails);
+        FailureMode failure = GENERATE(location_fails, token_fails, token_not_authorized);
 
-        SECTION(util::format("access token expired when realm is opened - mode: %1", txt_test_mode(mode))) {
-            logger->trace(">>> access token expired when realm is opened - mode: %1", txt_test_mode(mode));
-            // invalidate the user's cached access token
-            user->update_access_token(std::move(expired_token));
-        }
-        SECTION(util::format("access token expired by websocket - mode: %1", txt_test_mode(mode))) {
-            logger->trace(">>> access token expired by websocket - mode: %1", txt_test_mode(mode));
-            // tell websocket to return not authorized to refresh access token
-            not_authorized = true;
-        }
-        SECTION(util::format("websocket returns connection failed - mode: %1", txt_test_mode(mode))) {
-            logger->trace(">>> websocket returns connection failed - mode: %1", txt_test_mode(mode));
-            // default case
+        DYNAMIC_SECTION(txt_test_mode(test_mode) << " - " << txt_failure_mode(failure)) {
+            if (test_mode == TestMode::expired_at_start) {
+                // invalidate the user's cached access token
+                user->update_access_token(std::move(expired_token));
+            }
+            else if (test_mode == TestMode::expired_by_websocket) {
+                // tell websocket to return not authorized to refresh access token
+                not_authorized = true;
+            }
         }
 
         transport->request_hook = [&](const app::Request& req) -> std::optional<app::Response> {
@@ -1273,16 +1283,16 @@ TEST_CASE("Get Realm using Async Open", "[sync][pbs][async open]") {
             std::lock_guard<std::mutex> lock(mutex);
             if (req.url.find("/auth/session") != std::string::npos) {
                 token_refresh_called = true;
-                if (mode == token_not_authorized) {
+                if (failure == FailureMode::token_not_authorized) {
                     return app::Response{403, 0, {}, "403 not authorized"};
                 }
-                if (mode == token_fails) {
+                if (failure == FailureMode::token_fails) {
                     return app::Response{0, CURLE_OPERATION_TIMEDOUT, {}, "Operation timed out"};
                 }
             }
             else if (req.url.find("/location") != std::string::npos) {
                 location_refresh_called = true;
-                if (mode == location_fails) {
+                if (failure == FailureMode::location_fails) {
                     // Fake "offline/request timed out" custom error response
                     return app::Response{0, CURLE_OPERATION_TIMEDOUT, {}, "Operation timed out"};
                 }
@@ -1313,7 +1323,7 @@ TEST_CASE("Get Realm using Async Open", "[sync][pbs][async open]") {
         REQUIRE(result.get_value());
         std::lock_guard<std::mutex> lock(mutex);
         REQUIRE(location_refresh_called);
-        if (mode != TestMode::location_fails) {
+        if (failure != FailureMode::location_fails) {
             REQUIRE(token_refresh_called);
         }
     }
