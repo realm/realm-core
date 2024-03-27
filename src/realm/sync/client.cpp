@@ -825,12 +825,8 @@ void SessionImpl::update_subscription_version_info()
 bool SessionImpl::process_flx_bootstrap_message(const SyncProgress& progress, DownloadBatchState batch_state,
                                                 int64_t query_version, const ReceivedChangesets& received_changesets)
 {
-    // Ignore the call if the session is not active
-    if (m_state != State::Active) {
-        return false;
-    }
-
-    if (is_steady_state_download_message(batch_state, query_version)) {
+    // Ignore the message if the session is not active or a steady state message
+    if (m_state != State::Active || batch_state == DownloadBatchState::SteadyState) {
         return false;
     }
 
@@ -1081,23 +1077,36 @@ SyncClientHookAction SessionImpl::call_debug_hook(SyncClientHookEvent event, con
     return call_debug_hook(data);
 }
 
-bool SessionImpl::is_steady_state_download_message(DownloadBatchState batch_state, int64_t query_version)
+bool SessionImpl::is_steady_state_download_message(DownloadBatchState batch_state, int64_t query_version,
+                                                   bool same_server_version)
 {
     // Should never be called if session is not active
     REALM_ASSERT_EX(m_state == State::Active, m_state);
-    if (batch_state == DownloadBatchState::SteadyState) {
+    // Query version should always be the same or increasing
+    REALM_ASSERT_3(query_version, >=, m_wrapper.m_flx_active_version);
+
+    // Return early if already steady state or PBS (doesn't use bootstraps)
+    if (batch_state == DownloadBatchState::SteadyState || !m_is_flx_sync_session) {
         return true;
     }
 
-    if (!m_is_flx_sync_session) {
-        return true;
+    // Bootstrap messages (i.e. non-steady state) are identified by:
+    // * DownloadBatchState of MoreToCome
+    // * DownloadBatchState of LastInBatch, and
+    //   * first LastInBatch after one or more MoreToCome messages
+    //   * query_version greater than the active query_version
+    //   * message has 2 or more changesets and all have the same remote_version
+
+    // If this is a single LastInBatch message, check to see if it is a single
+    // message bootstrap or just a steady state download message
+    if (batch_state == DownloadBatchState::LastInBatch &&
+        m_last_download_batch_state != DownloadBatchState::MoreToCome) {
+        if (query_version == m_wrapper.m_flx_active_version && !same_server_version) {
+            return true;
+        }
     }
 
-    // If this is a steady state DOWNLOAD, no need for special handling.
-    if (batch_state == DownloadBatchState::LastInBatch && query_version == m_wrapper.m_flx_active_version) {
-        return true;
-    }
-
+    // Otherwise this is a bootstrap message
     return false;
 }
 

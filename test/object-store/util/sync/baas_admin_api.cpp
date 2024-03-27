@@ -942,6 +942,17 @@ void AdminAPISession::create_schema(const std::string& app_id, const AppCreateCo
     }
 }
 
+bool AdminAPISession::set_feature_flag(const std::string& app_id, const std::string& flag_name, bool enable) const
+{
+    auto endpoint =
+        AdminAPIEndpoint(util::format("%1/api/private/v1.0/features/%2", m_base_url, flag_name), m_access_token);
+    auto flag_response = endpoint.put_json(
+        nlohmann::json{{"app_ids", nlohmann::json::array({app_id})}, {"action", enable ? "enable" : "disable"}});
+    auto actual_modified = flag_response["actual_modified"];
+    // "actual_modified" should only be 1 since only 1 app_id was provided
+    return actual_modified.is_number_integer() && actual_modified.get<int>() == 1;
+}
+
 static nlohmann::json convert_config(AdminAPISession::ServiceConfig config)
 {
     if (config.mode == AdminAPISession::ServiceConfig::SyncMode::Flexible) {

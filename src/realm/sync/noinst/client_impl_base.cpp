@@ -2360,10 +2360,6 @@ Status Session::receive_download_message(const SyncProgress& progress, std::uint
     if (m_state != Active)
         return Status::OK();
 
-    if (is_steady_state_download_message(batch_state, query_version)) {
-        batch_state = DownloadBatchState::SteadyState;
-    }
-
     logger.debug("Received: DOWNLOAD(download_server_version=%1, download_client_version=%2, "
                  "latest_server_version=%3, latest_server_version_salt=%4, "
                  "upload_client_version=%5, upload_server_version=%6, downloadable_bytes=%7, "
@@ -2390,6 +2386,11 @@ Status Session::receive_download_message(const SyncProgress& progress, std::uint
     }
 
     version_type server_version = m_progress.download.server_version;
+    // If there are 2 or more changesets in this message, track whether or not the changesets have the same
+    // download_server_version to help with determining if this is a bootstrap message or not.
+    bool same_server_version =
+        received_changesets.size() > 1 && progress.download.server_version == received_changesets[0].remote_version;
+    bool after_first_changeset = false;
     version_type last_integrated_client_version = m_progress.download.last_integrated_client_version;
     for (const RemoteChangeset& changeset : received_changesets) {
         // Check that per-changeset server version is strictly increasing, except in FLX sync where the server
@@ -2403,7 +2404,16 @@ Status Session::receive_download_message(const SyncProgress& progress, std::uint
                     util::format("Bad server version in changeset header (DOWNLOAD) (%1, %2, %3)",
                                  changeset.remote_version, server_version, progress.download.server_version)};
         }
+        if (after_first_changeset)
+            // After the first changeset compare the previous changeset's server version to the current changeset
+            // server version. If they are different then this is definitely not a bootstrap message
+            same_server_version = same_server_version && server_version == changeset.remote_version;
+        else
+            // Skip the first changeset, since `server_version` contains the incorrect value for this check
+            after_first_changeset = true;
+
         server_version = changeset.remote_version;
+
         // Check that per-changeset last integrated client version is "weakly"
         // increasing.
         bool good_client_version =
@@ -2427,6 +2437,11 @@ Status Session::receive_download_message(const SyncProgress& progress, std::uint
                                  changeset.origin_file_ident)};
         }
     }
+
+    if (is_steady_state_download_message(batch_state, query_version, same_server_version)) {
+        batch_state = DownloadBatchState::SteadyState;
+    }
+    m_last_download_batch_state = batch_state;
 
     auto hook_action = call_debug_hook(SyncClientHookEvent::DownloadMessageReceived, progress, query_version,
                                        batch_state, received_changesets.size());

@@ -169,6 +169,7 @@ void PendingBootstrapStore::add_batch(int64_t query_version, util::Optional<Sync
         BinaryData compressed_data(compressed_changesets[idx].data(), compressed_changesets[idx].size());
         cur_changeset.set(m_changeset_data, compressed_data);
     }
+    size_t total_changesets = changesets_list.size();
 
     tr->commit();
 
@@ -177,15 +178,18 @@ void PendingBootstrapStore::add_batch(int64_t query_version, util::Optional<Sync
     }
 
     if (did_create) {
-        m_logger.debug(util::LogCategory::changeset, "Created new pending bootstrap object for query version %1",
-                       query_version);
+        m_logger.debug(util::LogCategory::changeset,
+                       "Created new pending bootstrap object with %1 changesets for query version %2",
+                       total_changesets, query_version);
     }
     else {
-        m_logger.debug(util::LogCategory::changeset, "Added batch to pending bootstrap object for query version %1",
-                       query_version);
+        m_logger.debug(util::LogCategory::changeset,
+                       "Added batch of %1 changesets (%2 total) to pending bootstrap object for query version %3",
+                       changesets.size(), total_changesets, query_version);
     }
     if (progress) {
-        m_logger.debug(util::LogCategory::changeset, "Finalized pending bootstrap object for query version %1",
+        m_logger.debug(util::LogCategory::changeset,
+                       "Finalized pending bootstrap object with %1 changesets for query version %2", total_changesets,
                        query_version);
     }
     m_has_pending = true;
@@ -198,8 +202,13 @@ bool PendingBootstrapStore::has_pending()
 
 void PendingBootstrapStore::clear()
 {
-    auto tr = m_db->start_write();
+    auto tr = m_db->start_read();
     auto bootstrap_table = tr->get_table(m_table);
+    // Just make sure the state is reset if the bootstrap table is empty
+    if (bootstrap_table->is_empty()) {
+        return;
+    }
+    tr->promote_to_write();
     bootstrap_table->clear();
     m_has_pending = false;
     tr->commit();
