@@ -21,3 +21,4 @@
 #cmakedefine01 REALM_VALGRIND
 #cmakedefine01 REALM_ASAN
 #cmakedefine01 REALM_TSAN
+#cmakedefine01 REALM_COMPRESS

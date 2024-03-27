@@ -70,17 +70,21 @@ using namespace realm::util;
 
 namespace {
 
+
 void set_capacity(char* header, size_t value)
 {
+    NodeHeader::set_wtype_in_header(NodeHeader::wtype_Ignore, header);
     typedef unsigned char uchar;
     uchar* h = reinterpret_cast<uchar*>(header);
     h[0] = uchar((value >> 19) & 0x000000FF);
     h[1] = uchar((value >> 11) & 0x000000FF);
     h[2] = uchar((value >> 3) & 0x000000FF);
+    REALM_ASSERT(NodeHeader::get_capacity_from_header(header) == value);
 }
 
 size_t get_capacity(const char* header)
 {
+    REALM_ASSERT(NodeHeader::get_wtype_from_header(header) == NodeHeader::wtype_Ignore);
     typedef unsigned char uchar;
     const uchar* h = reinterpret_cast<const uchar*>(header);
     return (size_t(h[0]) << 19) + (size_t(h[1]) << 11) + (h[2] << 3);
@@ -286,8 +290,11 @@ TEST(Alloc_Fuzzy)
             refs.push_back(r);
             set_capacity(r.get_addr(), siz);
 
-            // write some data to the allcoated area so that we can verify it later
-            memset(r.get_addr() + 3, static_cast<char>(reinterpret_cast<intptr_t>(r.get_addr())), siz - 3);
+            // write some data to the allcoated area so that we can verify it later.
+            // We must keep byte 4 in the header unharmed, since it is needed later by the allocator
+            // to determine the encoding, and hence the size of any released object.
+            // We simply skip the header.
+            memset(r.get_addr() + 8, static_cast<char>(reinterpret_cast<intptr_t>(r.get_addr())), siz - 8);
         }
         else if (refs.size() > 0) {
             // free random entry
@@ -303,7 +310,7 @@ TEST(Alloc_Fuzzy)
                 size_t siz = get_capacity(r.get_addr());
 
                 // verify that all the data we wrote during allocation is intact
-                for (size_t c = 3; c < siz; c++) {
+                for (size_t c = 8; c < siz; c++) {
                     if (r.get_addr()[c] != static_cast<char>(reinterpret_cast<intptr_t>(r.get_addr()))) {
                         // faster than using 'CHECK' for each character, which is slow
                         CHECK(false);
@@ -365,7 +372,7 @@ NONCONCURRENT_TEST_IF(Alloc_MapFailureRecovery, _impl::SimulatedFailure::is_enab
     { // Extendind the first mapping
         const auto initial_baseline = alloc.get_baseline();
         const auto initial_version = alloc.get_mapping_version();
-        const char* initial_translated = alloc.translate(1000);
+        const char* initial_translated = alloc.translate_in_slab(1000);
 
         _impl::SimulatedFailure::prime_mmap([](size_t) {
             return true;
@@ -376,7 +383,7 @@ NONCONCURRENT_TEST_IF(Alloc_MapFailureRecovery, _impl::SimulatedFailure::is_enab
         CHECK_THROW(alloc.update_reader_view(page_size * 2), std::bad_alloc);
         CHECK_EQUAL(initial_baseline, alloc.get_baseline());
         CHECK_EQUAL(initial_version, alloc.get_mapping_version());
-        CHECK_EQUAL(initial_translated, alloc.translate(1000));
+        CHECK_EQUAL(initial_translated, alloc.translate_in_slab(1000));
 
         _impl::SimulatedFailure::prime_mmap(nullptr);
         alloc.get_file().resize(page_size * 2);
@@ -400,7 +407,7 @@ NONCONCURRENT_TEST_IF(Alloc_MapFailureRecovery, _impl::SimulatedFailure::is_enab
     { // Add a new complete section after a complete section
         const auto initial_baseline = alloc.get_baseline();
         const auto initial_version = alloc.get_mapping_version();
-        const char* initial_translated = alloc.translate(1000);
+        const char* initial_translated = alloc.translate_in_slab(1000);
 
         _impl::SimulatedFailure::prime_mmap([](size_t) {
             return true;
@@ -409,14 +416,14 @@ NONCONCURRENT_TEST_IF(Alloc_MapFailureRecovery, _impl::SimulatedFailure::is_enab
         CHECK_THROW(alloc.update_reader_view(section_size * 2), std::bad_alloc);
         CHECK_EQUAL(initial_baseline, alloc.get_baseline());
         CHECK_EQUAL(initial_version, alloc.get_mapping_version());
-        CHECK_EQUAL(initial_translated, alloc.translate(1000));
+        CHECK_EQUAL(initial_translated, alloc.translate_in_slab(1000));
 
         _impl::SimulatedFailure::prime_mmap(nullptr);
         alloc.update_reader_view(section_size * 2);
         CHECK_EQUAL(alloc.get_baseline(), section_size * 2);
-        CHECK_EQUAL(initial_version, alloc.get_mapping_version()); // did not alter an existing mapping
-        CHECK_EQUAL(initial_translated, alloc.translate(1000));    // first section was not remapped
-        CHECK_EQUAL(0, *alloc.translate(section_size * 2 - page_size));
+        CHECK_EQUAL(initial_version, alloc.get_mapping_version());      // did not alter an existing mapping
+        CHECK_EQUAL(initial_translated, alloc.translate_in_slab(1000)); // first section was not remapped
+        CHECK_EQUAL(0, *alloc.translate_in_slab(section_size * 2 - page_size));
 
         alloc.purge_old_mappings(4, 4);
     }
@@ -426,8 +433,8 @@ NONCONCURRENT_TEST_IF(Alloc_MapFailureRecovery, _impl::SimulatedFailure::is_enab
     { // Add complete section and a a partial section after that
         const auto initial_baseline = alloc.get_baseline();
         const auto initial_version = alloc.get_mapping_version();
-        const char* initial_translated_1 = alloc.translate(1000);
-        const char* initial_translated_2 = alloc.translate(section_size + 1000);
+        const char* initial_translated_1 = alloc.translate_in_slab(1000);
+        const char* initial_translated_2 = alloc.translate_in_slab(section_size + 1000);
 
         _impl::SimulatedFailure::prime_mmap([](size_t size) {
             // Let the first allocation succeed and only the second one fail
@@ -437,20 +444,21 @@ NONCONCURRENT_TEST_IF(Alloc_MapFailureRecovery, _impl::SimulatedFailure::is_enab
         CHECK_THROW(alloc.update_reader_view(section_size * 3 + page_size), std::bad_alloc);
         CHECK_EQUAL(initial_baseline, alloc.get_baseline());
         CHECK_EQUAL(initial_version, alloc.get_mapping_version());
-        CHECK_EQUAL(initial_translated_1, alloc.translate(1000));
-        CHECK_EQUAL(initial_translated_2, alloc.translate(section_size + 1000));
+        CHECK_EQUAL(initial_translated_1, alloc.translate_in_slab(1000));
+        CHECK_EQUAL(initial_translated_2, alloc.translate_in_slab(section_size + 1000));
 
         _impl::SimulatedFailure::prime_mmap(nullptr);
         alloc.update_reader_view(section_size * 3 + page_size);
         CHECK_EQUAL(alloc.get_baseline(), section_size * 3 + page_size);
         CHECK_EQUAL(initial_version, alloc.get_mapping_version()); // did not alter an existing mapping
-        CHECK_EQUAL(initial_translated_1, alloc.translate(1000));
-        CHECK_EQUAL(initial_translated_2, alloc.translate(section_size + 1000));
-        CHECK_EQUAL(0, *alloc.translate(section_size * 2 + 1000));
+        CHECK_EQUAL(initial_translated_1, alloc.translate_in_slab(1000));
+        CHECK_EQUAL(initial_translated_2, alloc.translate_in_slab(section_size + 1000));
+        CHECK_EQUAL(0, *alloc.translate_in_slab(section_size * 2 + 1000));
 
         alloc.purge_old_mappings(5, 5);
     }
 }
+
 
 // This test reproduces the sporadic issue that was seen for large refs (addresses)
 // on 32-bit iPhone 5 Simulator runs on certain host machines.

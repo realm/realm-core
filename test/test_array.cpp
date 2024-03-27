@@ -95,6 +95,27 @@ void has_zero_byte(TestContext& test_context, int64_t value, size_t reps)
 
 } // anonymous namespace
 
+TEST(Array_Bits)
+{
+    CHECK_EQUAL(NodeHeader::unsigned_to_num_bits(0), 0);
+    CHECK_EQUAL(NodeHeader::unsigned_to_num_bits(1), 1);
+    CHECK_EQUAL(NodeHeader::unsigned_to_num_bits(2), 2);
+    CHECK_EQUAL(NodeHeader::unsigned_to_num_bits(3), 2);
+    CHECK_EQUAL(NodeHeader::unsigned_to_num_bits(4), 3);
+    CHECK_EQUAL(NodeHeader::unsigned_to_num_bits(5), 3);
+    CHECK_EQUAL(NodeHeader::unsigned_to_num_bits(7), 3);
+    CHECK_EQUAL(NodeHeader::unsigned_to_num_bits(8), 4);
+    CHECK_EQUAL(NodeHeader::signed_to_num_bits(0), 1);
+    CHECK_EQUAL(NodeHeader::signed_to_num_bits(1), 2);
+    CHECK_EQUAL(NodeHeader::signed_to_num_bits(-1), 1);
+    CHECK_EQUAL(NodeHeader::signed_to_num_bits(-2), 2);
+    CHECK_EQUAL(NodeHeader::signed_to_num_bits(-3), 3);
+    CHECK_EQUAL(NodeHeader::signed_to_num_bits(-4), 3);
+    CHECK_EQUAL(NodeHeader::signed_to_num_bits(3), 3);
+    CHECK_EQUAL(NodeHeader::signed_to_num_bits(4), 4);
+    CHECK_EQUAL(NodeHeader::signed_to_num_bits(7), 4);
+}
+
 TEST(Array_General)
 {
     Array c(Allocator::get_default());
@@ -1557,6 +1578,82 @@ NONCONCURRENT_TEST(Array_count)
     CHECK_EQUAL(c.count(8000000000LL), size_32_64_bit);
 
     c.destroy();
+}
+
+TEST(DirectBitFields)
+{
+    uint64_t a[2];
+    a[0] = a[1] = 0;
+    {
+        bf_iterator it(a, 0, 7, 7, 8);
+        REALM_ASSERT(*it == 0);
+        auto it2(it);
+        ++it2;
+        *it2 = 127 + 128;
+        REALM_ASSERT(*it == 0);
+        ++it;
+        REALM_ASSERT(*it == 127);
+        ++it;
+        REALM_ASSERT(*it == 0);
+    }
+    // reverse polarity
+    a[0] = a[1] = -1ULL;
+    {
+        bf_iterator it(a, 0, 7, 7, 8);
+        REALM_ASSERT(*it == 127);
+        auto it2(it);
+        ++it2;
+        *it2 = 42 + 128;
+        REALM_ASSERT(*it == 127);
+        ++it;
+        REALM_ASSERT(*it == 42);
+        ++it;
+        REALM_ASSERT(*it == 127);
+    }
+}
+
+TEST(B_Array_creation)
+{
+    using Encoding = NodeHeader::Encoding;
+    Array array(Allocator::get_default());
+    auto& allocator = array.get_alloc();
+    auto mem = allocator.alloc(10);
+    NodeHeader::init_header(mem.get_addr(), Encoding::Flex, 6, 1, 1, 1, 1);
+    array.init_from_mem(mem);
+    auto array_header = array.get_header();
+    auto encoding = array.get_encoding(array_header);
+    REALM_ASSERT(encoding == Encoding::Flex); // this is missing << operator in order to be printed in case of error
+    CHECK_EQUAL(array.get_flags(array_header), 6);
+    CHECK_EQUAL(array.get_elementA_size<Encoding::Flex>(array_header), 1);
+    CHECK_EQUAL(array.get_elementB_size<Encoding::Flex>(array_header), 1);
+    CHECK_EQUAL(array.get_arrayA_num_elements<Encoding::Flex>(array_header), 1);
+    CHECK_EQUAL(array.get_arrayB_num_elements<Encoding::Flex>(array_header), 1);
+    // set flags explicitely (this should not change kind and encoding)
+    array.set_flags(array_header, 5);
+    auto flags = array.get_flags(array_header);
+    CHECK_EQUAL(flags, 5);
+    REALM_ASSERT(array.get_encoding(array_header) == Encoding::Flex);
+    allocator.free_(mem);
+}
+
+TEST(B_Array_encoding)
+{
+    using Encoding = NodeHeader::Encoding;
+    Array array(Allocator::get_default());
+    auto mem = array.get_alloc().alloc(10);
+    NodeHeader::init_header(mem.get_addr(), Encoding::Flex, 7, 1, 1, 1, 1);
+    array.init_from_mem(mem);
+    auto array_header = array.get_header();
+    auto encoding = array.get_encoding(array_header);
+    CHECK(encoding == Encoding::Flex);
+
+    Array another_array(Allocator::get_default());
+    another_array.init_from_ref(array.get_ref());
+    auto another_header = another_array.get_header();
+    auto another_encoding = another_array.get_encoding(another_header);
+    CHECK(encoding == another_encoding);
+
+    array.get_alloc().free_(mem);
 }
 
 #endif // TEST_ARRAY

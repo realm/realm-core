@@ -633,6 +633,41 @@ TEST(List_AggOps)
     test_lists_numeric_agg<Decimal128>(test_context, sg, type_Decimal, Decimal128(realm::null()), true);
 }
 
+TEST(Test_Write_List_Nested_In_Mixed)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::string message;
+    DBOptions options;
+    options.logger = test_context.logger;
+    DBRef db = DB::create(make_in_realm_history(), path, options);
+    auto tr = db->start_write();
+    auto table = tr->add_table("table");
+    auto col_any = table->add_column(type_Mixed, "something");
+
+    Obj obj = table->create_object();
+    obj.set_any(col_any, Mixed{20});
+    tr->verify();
+    tr->commit_and_continue_writing(); // commit simple mixed
+    tr->verify();
+
+    obj.set_collection(col_any, CollectionType::List);
+    auto list = obj.get_list_ptr<Mixed>(col_any);
+    list->add(Mixed{10});
+    list->add(Mixed{11});
+    tr->verify();
+    tr->commit_and_continue_writing(); // commit nested list in mixed
+    tr->verify();
+
+    // spicy it up a little bit...
+    list->insert_collection(2, CollectionType::List);
+    list->insert_collection(3, CollectionType::List);
+    list->get_list(2)->add(Mixed{20});
+    list->get_list(3)->add(Mixed{21});
+    tr->commit_and_continue_writing();
+    tr->verify();
+    tr->close();
+}
+
 TEST(List_Nested_InMixed)
 {
     SHARED_GROUP_TEST_PATH(path);

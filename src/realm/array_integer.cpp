@@ -21,8 +21,19 @@
 #include <realm/array_integer_tpl.hpp>
 #include <realm/impl/destroy_guard.hpp>
 #include <realm/column_integer.hpp>
+#include <realm/array_flex.hpp>
+
+#include <iostream>
 
 using namespace realm;
+
+// this is a bad idea. Since Accessors are constructed everywhere, we need to store the information that array
+// integers can be compressed in the header
+ArrayInteger::ArrayInteger(Allocator& allocator) noexcept
+    : Array(allocator)
+{
+    m_is_inner_bptree_node = false;
+}
 
 Mixed ArrayInteger::get_any(size_t ndx) const
 {
@@ -111,7 +122,6 @@ void ArrayIntNull::replace_nulls_with(int64_t new_null)
         }
     }
 }
-
 
 void ArrayIntNull::avoid_null_collision(int64_t value)
 {

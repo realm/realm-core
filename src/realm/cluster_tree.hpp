@@ -190,6 +190,24 @@ public:
     }
     void verify() const;
 
+    ref_type typed_write(ref_type ref, _impl::ArrayWriterBase& out, const Table& table, bool deep, bool only_modified,
+                         bool compress) const
+    {
+        REALM_ASSERT(m_root);
+        return m_root->typed_write(ref, out, table, deep, only_modified, compress);
+    }
+
+    void typed_print(std::string prefix, const Table& table) const
+    {
+        if (m_root) {
+            std::cout << prefix << "ClusterTree as ";
+            m_root->typed_print(prefix, table);
+        }
+        else {
+            std::cout << "Emtpy ClusterTree" << std::endl;
+        }
+    }
+
 protected:
     friend class Obj;
     friend class Cluster;

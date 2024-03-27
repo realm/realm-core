@@ -490,12 +490,24 @@ void Group::remap_and_update_refs(ref_type new_top_ref, size_t new_file_size, bo
     update_refs(new_top_ref);
 }
 
+void Group::update_table_accessors()
+{
+    for (unsigned j = 0; j < m_table_accessors.size(); ++j) {
+        Table* table = m_table_accessors[j];
+        // this should be filtered further as an optimization
+        if (table) {
+            table->refresh_allocator_wrapper();
+            table->update_from_parent();
+        }
+    }
+}
+
+
 void Group::validate_top_array(const Array& arr, const SlabAlloc& alloc, std::optional<size_t> read_lock_file_size,
                                std::optional<uint_fast64_t> read_lock_version)
 {
     size_t top_size = arr.size();
     ref_type top_ref = arr.get_ref();
-
     switch (top_size) {
         // These are the valid sizes
         case 3:
@@ -928,23 +940,95 @@ void Group::validate(ObjLink link) const
     }
 }
 
+ref_type Group::typed_write_tables(_impl::ArrayWriterBase& out, bool deep, bool only_modified, bool compress) const
+{
+    ref_type ref = m_top.get_as_ref(1);
+    if (only_modified && m_alloc.is_read_only(ref))
+        return ref;
+    Array a(m_alloc);
+    a.init_from_ref(ref);
+    REALM_ASSERT(a.has_refs());
+    Array dest(Allocator::get_default());
+    dest.create(NodeHeader::type_HasRefs, false, a.size());
+    for (unsigned j = 0; j < a.size(); ++j) {
+        RefOrTagged rot = a.get_as_ref_or_tagged(j);
+        if (rot.is_tagged()) {
+            dest.set(j, rot);
+        }
+        else {
+            auto table = do_get_table(j);
+            REALM_ASSERT(table);
+            dest.set_as_ref(j, table->typed_write(rot.get_as_ref(), out, deep, only_modified, compress));
+        }
+    }
+    ref = dest.write(out, false, false, false);
+    dest.destroy();
+    return ref;
+}
+void Group::table_typed_print(std::string prefix, ref_type ref) const
+{
+    REALM_ASSERT(m_top.get_as_ref(1) == ref);
+    Array a(m_alloc);
+    a.init_from_ref(ref);
+    REALM_ASSERT(a.has_refs());
+    for (unsigned j = 0; j < a.size(); ++j) {
+        auto pref = prefix + "  " + to_string(j) + ":\t";
+        RefOrTagged rot = a.get_as_ref_or_tagged(j);
+        if (rot.is_tagged() || rot.get_as_ref() == 0)
+            continue;
+        auto table_accessor = do_get_table(j);
+        REALM_ASSERT(table_accessor);
+        table_accessor->typed_print(pref, rot.get_as_ref());
+    }
+}
+void Group::typed_print(std::string prefix) const
+{
+    std::cout << "Group top array" << std::endl;
+    for (unsigned j = 0; j < m_top.size(); ++j) {
+        auto pref = prefix + "  " + to_string(j) + ":\t";
+        RefOrTagged rot = m_top.get_as_ref_or_tagged(j);
+        if (rot.is_ref() && rot.get_as_ref()) {
+            if (j == 1) {
+                // Tables
+                std::cout << pref << "All Tables" << std::endl;
+                table_typed_print(pref, rot.get_as_ref());
+            }
+            else {
+                Array a(m_alloc);
+                a.init_from_ref(rot.get_as_ref());
+                std::cout << pref;
+                a.typed_print(pref);
+            }
+        }
+        else {
+            std::cout << pref << rot.get_as_int() << std::endl;
+        }
+    }
+    std::cout << "}" << std::endl;
+}
+
+
 ref_type Group::DefaultTableWriter::write_names(_impl::OutputStream& out)
 {
-    bool deep = true;                                                 // Deep
-    bool only_if_modified = false;                                    // Always
-    return m_group->m_table_names.write(out, deep, only_if_modified); // Throws
+    bool deep = true;                                                           // Deep
+    bool only_if_modified = false;                                              // Always
+    bool compress = false;                                                      // true;
+    return m_group->m_table_names.write(out, deep, only_if_modified, compress); // Throws
 }
 ref_type Group::DefaultTableWriter::write_tables(_impl::OutputStream& out)
 {
-    bool deep = true;                                            // Deep
-    bool only_if_modified = false;                               // Always
-    return m_group->m_tables.write(out, deep, only_if_modified); // Throws
+    bool deep = true;              // Deep
+    bool only_if_modified = false; // Always
+    bool compress = false;         // true;
+    // return m_group->m_tables.write(out, deep, only_if_modified, compress); // Throws
+    return m_group->typed_write_tables(out, deep, only_if_modified, compress);
 }
 
 auto Group::DefaultTableWriter::write_history(_impl::OutputStream& out) -> HistoryInfo
 {
     bool deep = true;              // Deep
     bool only_if_modified = false; // Always
+    bool compress = false;         // true;
     ref_type history_ref = _impl::GroupFriend::get_history_ref(*m_group);
     HistoryInfo info;
     if (history_ref) {
@@ -962,7 +1046,7 @@ auto Group::DefaultTableWriter::write_history(_impl::OutputStream& out) -> Histo
         info.version = history_schema_version;
         Array history{const_cast<Allocator&>(_impl::GroupFriend::get_alloc(*m_group))};
         history.init_from_ref(history_ref);
-        info.ref = history.write(out, deep, only_if_modified); // Throws
+        info.ref = history.write(out, deep, only_if_modified, compress); // Throws
     }
     info.sync_file_id = m_group->get_sync_file_id();
     return info;
@@ -1062,6 +1146,7 @@ void Group::write(std::ostream& out, int file_format_version, TableWriter& table
         REALM_ASSERT(version_number == 0 || version_number == 1);
     }
     else {
+        // table_writer.typed_print("");
         // Because we need to include the total logical file size in the
         // top-array, we have to start by writing everything except the
         // top-array, and then finally compute and write a correct version of
@@ -1098,9 +1183,10 @@ void Group::write(std::ostream& out, int file_format_version, TableWriter& table
             _impl::DeepArrayDestroyGuard dg_3(&version_list);
             bool deep = true;              // Deep
             bool only_if_modified = false; // Always
-            ref_type free_list_ref = free_list.write(out_2, deep, only_if_modified);
-            ref_type size_list_ref = size_list.write(out_2, deep, only_if_modified);
-            ref_type version_list_ref = version_list.write(out_2, deep, only_if_modified);
+            bool compress = false;
+            ref_type free_list_ref = free_list.write(out_2, deep, only_if_modified, compress);
+            ref_type size_list_ref = size_list.write(out_2, deep, only_if_modified, compress);
+            ref_type version_list_ref = version_list.write(out_2, deep, only_if_modified, compress);
             top.add(RefOrTagged::make_ref(free_list_ref));     // Throws
             top.add(RefOrTagged::make_ref(size_list_ref));     // Throws
             top.add(RefOrTagged::make_ref(version_list_ref));  // Throws
@@ -1133,9 +1219,10 @@ void Group::write(std::ostream& out, int file_format_version, TableWriter& table
         top.set(2, RefOrTagged::make_tagged(final_file_size)); // Throws
 
         // Write the top array
-        bool deep = false;                        // Shallow
-        bool only_if_modified = false;            // Always
-        top.write(out_2, deep, only_if_modified); // Throws
+        bool deep = false;             // Shallow
+        bool only_if_modified = false; // Always
+        bool compress = false;
+        top.write(out_2, deep, only_if_modified, compress); // Throws
         REALM_ASSERT_3(size_t(out_2.get_ref_of_next_array()), ==, final_file_size);
 
         dg_top.reset(nullptr); // Destroy now
@@ -1274,6 +1361,11 @@ private:
 void Group::update_allocator_wrappers(bool writable)
 {
     m_is_writable = writable;
+    // This is tempting:
+    // m_alloc.set_read_only(!writable);
+    // - but m_alloc may refer to the "global" allocator in the DB object.
+    // Setting it here would cause different transactions to raze for
+    // changing the shared allocator setting. This is somewhat of a mess.
     for (size_t i = 0; i < m_table_accessors.size(); ++i) {
         auto table_accessor = m_table_accessors[i];
         if (table_accessor) {
@@ -1664,9 +1756,8 @@ void Group::verify() const
         mem_usage_1.add_immutable(ref, corrected_size);
         mem_usage_1.canonicalize();
     }
-
-    // At this point we have accounted for all memory managed by the slab
-    // allocator
+    //  At this point we have accounted for all memory managed by the slab
+    //  allocator
     mem_usage_1.check_total_coverage();
 #endif
 }

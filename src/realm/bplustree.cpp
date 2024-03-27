@@ -169,13 +169,11 @@ private:
         return (child_ndx) > 0 ? size_t(m_offsets.get(child_ndx - 1)) : 0;
     }
 };
-}
+} // namespace realm
 
 /****************************** BPlusTreeNode ********************************/
 
-BPlusTreeNode::~BPlusTreeNode()
-{
-}
+BPlusTreeNode::~BPlusTreeNode() {}
 
 /****************************** BPlusTreeLeaf ********************************/
 
@@ -275,9 +273,7 @@ void BPlusTreeInner::create(size_t elems_per_child)
     Array::create(Array::type_InnerBptreeNode, false, 1, tagged);
 }
 
-BPlusTreeInner::~BPlusTreeInner()
-{
-}
+BPlusTreeInner::~BPlusTreeInner() {}
 
 void BPlusTreeInner::init_from_mem(MemRef mem)
 {
@@ -651,7 +647,7 @@ ref_type BPlusTreeInner::insert_bp_node(size_t child_ndx, ref_type new_sibling_r
         new_split_offset = size_t(elem_ndx_offset + state.split_offset);
         new_split_size = elem_ndx_offset + state.split_size;
         new_sibling.add_bp_node_ref(new_sibling_ref); // Throws
-        set_tree_size(new_split_offset);             // Throws
+        set_tree_size(new_split_offset);              // Throws
     }
     else {
         // Case 2/2: The split child was not the last child of the
@@ -661,9 +657,9 @@ ref_type BPlusTreeInner::insert_bp_node(size_t child_ndx, ref_type new_sibling_r
         new_split_offset = size_t(elem_ndx_offset + state.split_size);
         new_split_size = get_tree_size() + 1;
 
-        move(&new_sibling, new_ref_ndx, (new_split_offset - 1));               // Strips off tree size
+        move(&new_sibling, new_ref_ndx, (new_split_offset - 1));                // Strips off tree size
         add_bp_node_ref(new_sibling_ref, elem_ndx_offset + state.split_offset); // Throws
-        append_tree_size(new_split_offset);                                    // Throws
+        append_tree_size(new_split_offset);                                     // Throws
     }
 
     new_sibling.append_tree_size(new_split_size - new_split_offset); // Throws
@@ -737,9 +733,7 @@ void BPlusTreeInner::verify() const
 
 /****************************** BPlusTreeBase ********************************/
 
-BPlusTreeBase::~BPlusTreeBase()
-{
-}
+BPlusTreeBase::~BPlusTreeBase() {}
 
 void BPlusTreeBase::create()
 {
@@ -834,6 +828,94 @@ std::unique_ptr<BPlusTreeNode> BPlusTreeBase::create_root_from_ref(ref_type ref)
         std::unique_ptr<BPlusTreeNode> new_root = std::make_unique<BPlusTreeInner>(this);
         new_root->init_from_ref(ref);
         return new_root;
+    }
+}
+
+// this should only be called for a column_type which we can safely compress.
+ref_type BPlusTreeBase::typed_write(ref_type ref, _impl::ArrayWriterBase& out, Allocator& alloc, ColumnType col_type,
+                                    bool deep, bool only_modified, bool compress, bool collection_in_mixed)
+{
+    if (only_modified && alloc.is_read_only(ref))
+        return ref;
+    char* header = alloc.translate(ref);
+    Array node(alloc);
+    node.init_from_ref(ref);
+    if (NodeHeader::get_is_inner_bptree_node_from_header(header)) {
+        REALM_ASSERT_DEBUG(node.has_refs());
+        Array written_node(Allocator::get_default());
+        written_node.create(NodeHeader::type_InnerBptreeNode, false, node.size());
+        for (unsigned j = 0; j < node.size(); ++j) {
+            RefOrTagged rot = node.get_as_ref_or_tagged(j);
+            if (rot.is_ref() && rot.get_as_ref()) {
+                if (j == 0) {
+                    // keys (ArrayUnsigned me thinks)
+                    Array a(alloc);
+                    a.init_from_ref(rot.get_as_ref());
+                    written_node.set_as_ref(j, a.write(out, deep, only_modified, false));
+                }
+                else {
+                    written_node.set_as_ref(j,
+                                            BPlusTreeBase::typed_write(rot.get_as_ref(), out, alloc, col_type, deep,
+                                                                       only_modified, compress, collection_in_mixed));
+                }
+            }
+            else
+                written_node.set(j, rot);
+        }
+        auto written_ref = written_node.write(out, false, false, false);
+        written_node.destroy();
+        return written_ref;
+    }
+    else if (node.has_refs()) {
+        // if collection in mixed is set, it means that this node is actually a mixed property that contains
+        // a collection in it. So we need to vist the collection that is part of the node and reach the final leaf,
+        // in order to determine whether the leaf can be compressed.
+        if (collection_in_mixed) {
+            const auto sz = node.size();
+            for (size_t j = 0; j < sz; ++j) {
+                RefOrTagged rot = node.get_as_ref_or_tagged(j);
+                if (rot.is_ref() && rot.get_as_ref()) {
+                    const auto btree_ref = BPlusTreeBase::typed_write(rot.get_as_ref(), out, alloc, col_type, deep,
+                                                                      only_modified, compress, collection_in_mixed);
+                    node.set_as_ref(j, btree_ref);
+                }
+            }
+        }
+        return node.write(out, deep, only_modified, false);
+    }
+    else {
+        return node.write(out, deep, only_modified, true); // leaf array - do compress
+    }
+}
+
+void BPlusTreeBase::typed_print(std::string prefix, Allocator& alloc, ref_type root, ColumnType col_type)
+{
+    char* header = alloc.translate(root);
+    Array a(alloc);
+    a.init_from_ref(root);
+    if (NodeHeader::get_is_inner_bptree_node_from_header(header)) {
+        std::cout << "{" << std::endl;
+        REALM_ASSERT(a.has_refs());
+        for (unsigned j = 0; j < a.size(); ++j) {
+            auto pref = prefix + "  " + std::to_string(j) + ":\t";
+            RefOrTagged rot = a.get_as_ref_or_tagged(j);
+            if (rot.is_ref() && rot.get_as_ref()) {
+                if (j == 0) {
+                    std::cout << pref << "BPTree offsets as ArrayUnsigned as ";
+                    Array a(alloc);
+                    a.init_from_ref(rot.get_as_ref());
+                    a.typed_print(prefix);
+                }
+                else {
+                    std::cout << pref << "Subtree beeing ";
+                    BPlusTreeBase::typed_print(pref, alloc, rot.get_as_ref(), col_type);
+                }
+            }
+        }
+    }
+    else {
+        std::cout << "BPTree Leaf[" << col_type << "] as ";
+        a.typed_print(prefix);
     }
 }
 
