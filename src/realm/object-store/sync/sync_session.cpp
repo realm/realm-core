@@ -377,7 +377,6 @@ SyncSession::SyncSession(Private, SyncClient& client, std::shared_ptr<DB> db, co
     , m_migration_store{sync::MigrationStore::create(m_db)}
     , m_client(client)
     , m_sync_manager(sync_manager)
-    , m_previous_schema_version(_impl::sync_schema_migration::has_pending_migration(*m_db->start_read()))
 {
     REALM_ASSERT(m_config.sync_config);
     // we don't want the following configs enabled during a client reset
@@ -639,12 +638,12 @@ void SyncSession::handle_fresh_realm_downloaded(DBRef db, Status status,
     revive_if_needed();
 }
 
-util::Future<void> SyncSession::Internal::pause_async(SyncSession& session)
+util::Future<void> SyncSession::pause_async()
 {
     {
-        util::CheckedUniqueLock lock(session.m_state_mutex);
+        util::CheckedUniqueLock lock(m_state_mutex);
         // Nothing to wait for if the session is already paused or inactive.
-        if (session.m_state == SyncSession::State::Paused || session.m_state == SyncSession::State::Inactive) {
+        if (m_state == SyncSession::State::Paused || m_state == SyncSession::State::Inactive) {
             return util::Future<void>::make_ready();
         }
     }
@@ -653,8 +652,8 @@ util::Future<void> SyncSession::Internal::pause_async(SyncSession& session)
     // must have been destroyed upon return. This allows the caller to follow up with a call to
     // sync::Client::notify_session_terminated() in order to be notified when the Realm file is closed. This works
     // so long as this SyncSession object remains in the `paused` state after the invocation of shutdown().
-    session.pause();
-    return session.m_client.notify_session_terminated();
+    pause();
+    return m_client.notify_session_terminated();
 }
 
 void SyncSession::OnlyForTesting::handle_error(SyncSession& session, sync::SessionErrorInfo&& error)
@@ -664,7 +663,7 @@ void SyncSession::OnlyForTesting::handle_error(SyncSession& session, sync::Sessi
 
 util::Future<void> SyncSession::OnlyForTesting::pause_async(SyncSession& session)
 {
-    return SyncSession::Internal::pause_async(session);
+    return session.pause_async();
 }
 
 // This method should only be called from within the error handler callback registered upon the underlying
@@ -1407,10 +1406,10 @@ void SyncSession::update_subscription_store(bool flx_sync_requested, std::option
             // waiters
             auto subscription_store = std::move(m_flx_subscription_store);
             lock.unlock();
-            subscription_store->terminate();
             auto tr = m_db->start_write();
+            subscription_store->reset(*tr);
             history.set_write_validator_factory(nullptr);
-            tr->rollback();
+            tr->commit();
         }
         return;
     }
@@ -1675,4 +1674,60 @@ util::Future<std::string> SyncSession::send_test_command(std::string body)
     }
 
     return m_session->send_test_command(std::move(body));
+}
+
+void SyncSession::migrate_schema(util::UniqueFunction<void(Status)>&& callback)
+{
+    util::CheckedUniqueLock lock(m_state_mutex);
+    // If the schema migration is already in progress, just wait to complete.
+    if (m_schema_migration_in_progress) {
+        add_completion_callback(std::move(callback), ProgressDirection::download);
+        return;
+    }
+    m_schema_migration_in_progress = true;
+
+    // Perform the migration:
+    //  1. Pause the sync session
+    //  2. Once the sync client releases the realm file:
+    //      a. Delete all tables (private and public)
+    //      b. Reset the subscription store
+    //      d. Empty the sync history and adjust cursors
+    //      e. Reset file ident (the server flags the old ident as in the case of a client reset)
+    // 3. Resume the session (the client asks for a new file ident)
+    // See `sync_schema_migration::perform_schema_migration` for more details.
+
+    CompletionCallbacks callbacks;
+    std::swap(m_completion_callbacks, callbacks);
+    auto guard = util::make_scope_exit([&]() noexcept {
+        util::CheckedUniqueLock lock(m_state_mutex);
+        if (m_completion_callbacks.empty())
+            std::swap(callbacks, m_completion_callbacks);
+        else
+            m_completion_callbacks.merge(std::move(callbacks));
+    });
+    m_state_mutex.unlock(lock);
+
+    auto future = pause_async();
+    std::move(future).get_async(
+        [callback = std::move(callback), weak_session = weak_from_this()](Status status) mutable {
+            if (!status.is_ok())
+                return callback(status);
+
+            auto session = weak_session.lock();
+            if (!session) {
+                status = Status(ErrorCodes::InvalidSession, "Sync session was destroyed during schema migration");
+                return callback(status);
+            }
+            sync_schema_migration::perform_schema_migration(*session->m_db);
+            {
+                util::CheckedUniqueLock lock(session->m_state_mutex);
+                session->m_previous_schema_version.reset();
+                session->m_schema_migration_in_progress = false;
+                session->m_subscription_store_base.reset();
+                session->m_flx_subscription_store.reset();
+            }
+            session->update_subscription_store(true, {});
+            session->wait_for_download_completion(std::move(callback));
+            session->resume();
+        });
 }
