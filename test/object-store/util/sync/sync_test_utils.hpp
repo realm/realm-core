@@ -196,9 +196,12 @@ private:
 
 // Converted to a templated class to allow creating against the UnitTestTransport or
 // SynchronousTestTransport (or other custom) GenericNetworkTransport base class.
-template <typename Parent, typename = std::enable_if<std::is_base_of<app::GenericNetworkTransport, Parent>::value>>
+template <typename Parent>
 class HookedTransport : public Parent {
 public:
+    static_assert(std::is_base_of<app::GenericNetworkTransport, Parent>::value,
+                    "HookedTransport must be derived from a class whose parent is app::GenericNetworkTransport");
+
     void send_request_to_server(const app::Request& request,
                                 util::UniqueFunction<void(const app::Response&)>&& completion) override
     {
