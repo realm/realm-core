@@ -511,13 +511,6 @@ std::string SyncFileManager::get_user_directory_path(const std::string& user_id)
                                             util::FilePathType::Directory);
 }
 
-struct UnsupportedBsonPartition : public std::logic_error {
-    UnsupportedBsonPartition(std::string msg)
-        : std::logic_error(msg)
-    {
-    }
-};
-
 static std::string string_from_partition(std::string_view partition)
 {
     bson::Bson partition_value = bson::parse(partition);
@@ -535,9 +528,9 @@ static std::string string_from_partition(std::string_view partition)
         case bson::Bson::Type::Null:
             return "null";
         default:
-            throw UnsupportedBsonPartition(util::format("Unsupported partition key value: '%1'. Only int, string "
-                                                        "UUID and ObjectId types are currently supported.",
-                                                        partition_value.to_string()));
+            throw InvalidArgument(util::format("Unsupported partition key value: '%1'. Only int, string "
+                                               "UUID and ObjectId types are currently supported.",
+                                               partition_value.to_string()));
     }
 }
 
