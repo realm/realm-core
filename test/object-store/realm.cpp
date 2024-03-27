@@ -1222,7 +1222,7 @@ TEST_CASE("Get Realm using Async Open", "[sync][pbs][async open]") {
         auto user = config.sync_config->user;
         config.sync_config->cancel_waits_on_nonfatal_error = true;
         config.sync_config->error_handler = [&logger](std::shared_ptr<SyncSession> session, SyncError error) {
-            logger->debug("The error handler caught a sync error: '%1' for '%2'", error.status, session->path());
+            logger->debug("The sync error handler caught an error: '%1' for '%2'", error.status, session->path());
             // Ignore connection failed non-fatal errors and check for access token refresh unauthorized fatal errors
             if (error.status.code() == ErrorCodes::SyncConnectFailed) {
                 REQUIRE_FALSE(error.is_fatal);
@@ -1285,19 +1285,16 @@ TEST_CASE("Get Realm using Async Open", "[sync][pbs][async open]") {
         };
 
         auto task = Realm::get_synchronized_realm(config);
-        auto [promise, async_future] = util::make_promise_future<void>();
-        task->start(
-            [async_promise = util::CopyablePromiseHolder<void>(std::move(promise))](auto ref, auto error) mutable {
-                REQUIRE(!ref);
-                REQUIRE(error);
-                if (error)
-                    async_promise.get_promise().set_error(exception_to_status(error));
-                else
-                    async_promise.get_promise().emplace_value();
-            });
+        auto pf = util::make_promise_future<std::exception_ptr>();
+        task->start([&pf](auto ref, auto error) mutable {
+            REQUIRE(!ref);
+            REQUIRE(error);
+            pf.promise.emplace_value(error);
+        });
 
-        auto result = async_future.get_no_throw();
-        REQUIRE_FALSE(result.is_ok());
+        auto result = pf.future.get_no_throw();
+        REQUIRE(result.is_ok());
+        REQUIRE(result.get_value());
         std::lock_guard<std::mutex> lock(mutex);
         REQUIRE(location_refresh_called);
         if (mode != TestMode::location_fails) {
