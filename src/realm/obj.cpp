@@ -1607,7 +1607,7 @@ inline void Obj::set_spec<ArrayString>(ArrayString& values, ColKey col_key)
 #if REALM_ENABLE_GEOSPATIAL
 
 template <>
-Obj& Obj::set(ColKey col_key, Geospatial value, bool)
+Obj& Obj::set(ColKey col_key, Geospatial value, bool is_default)
 {
     checked_update_if_needed();
     get_table()->check_column(col_key);
@@ -1620,7 +1620,7 @@ Obj& Obj::set(ColKey col_key, Geospatial value, bool)
 
     Obj geo = get_linked_object(col_key);
     if (!geo) {
-        geo = create_and_set_linked_object(col_key);
+        geo = create_and_set_linked_object(col_key, is_default);
     }
     value.assign_to(geo);
     return *this;

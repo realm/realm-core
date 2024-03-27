@@ -541,7 +541,7 @@ std::pair<Dictionary::Iterator, bool> Dictionary::insert(Mixed key, Mixed value)
         throw StaleAccessor("Stale dictionary");
     }
 
-    bool add_salt = value.is_type(type_Dictionary, type_List);
+    bool set_nested_collection_key = value.is_type(type_Dictionary, type_List);
     bool old_entry = false;
     auto [ndx, actual_key] = find_impl(key);
     if (actual_key != key) {
@@ -582,11 +582,11 @@ std::pair<Dictionary::Iterator, bool> Dictionary::insert(Mixed key, Mixed value)
             m_values->set(ndx, value);
         }
         else {
-            add_salt = false;
+            set_nested_collection_key = false;
         }
     }
 
-    if (add_salt) {
+    if (set_nested_collection_key) {
         m_values->ensure_keys();
         set_key(*m_values, ndx);
     }
