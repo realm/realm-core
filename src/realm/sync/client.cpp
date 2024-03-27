@@ -1937,7 +1937,7 @@ void SessionWrapper::report_progress(bool is_download, bool only_if_new_uploadab
         p.downloadable = p.downloaded;
         if (0.01 <= download_estimate && download_estimate <= 0.99)
             if (p.downloaded > p.final_downloaded)
-                p.downloadable = p.final_downloaded + (p.downloaded - p.final_downloaded) / download_estimate;
+                p.downloadable = p.final_downloaded + uint64_t((p.downloaded - p.final_downloaded) / download_estimate);
     }
     else {
         if (!is_completed || !is_download)
