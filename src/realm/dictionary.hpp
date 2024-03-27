@@ -51,7 +51,7 @@ public:
         : Base(parent, index)
     {
     }
-    Dictionary(ColKey col_key, size_t level = 1);
+    Dictionary(ColKey col_key, uint8_t level = 1);
     Dictionary(const Dictionary& other)
         : Base(static_cast<const Base&>(other))
         , CollectionParent(other.get_level())
