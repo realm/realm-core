@@ -45,6 +45,7 @@
 
 #if REALM_ENABLE_SYNC
 #include <util/sync/flx_sync_harness.hpp>
+#include <util/sync/sync_test_utils.hpp>
 
 #include <realm/object-store/sync/async_open_task.hpp>
 #include <realm/object-store/sync/impl/sync_metadata.hpp>
@@ -1283,9 +1284,9 @@ TEST_CASE("Get Realm using Async Open", "[sync][pbs][async open]") {
         };
 
         std::atomic<bool> called{false};
-
         auto task = Realm::get_synchronized_realm(config);
         task->start([&](auto ref, auto error) {
+            std::lock_guard<std::mutex> lock(mutex);
             REQUIRE(!ref);
             REQUIRE(error);
             called = true;
@@ -1293,6 +1294,7 @@ TEST_CASE("Get Realm using Async Open", "[sync][pbs][async open]") {
         util::EventLoop::main().run_until([&] {
             return called.load();
         });
+        std::lock_guard<std::mutex> lock(mutex);
         REQUIRE(called);
         REQUIRE(location_refresh_called);
         if (mode != TestMode::location_fails) {
