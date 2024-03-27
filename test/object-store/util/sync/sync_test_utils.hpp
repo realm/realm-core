@@ -194,6 +194,8 @@ private:
 };
 
 
+// Converted to a templated class to allow creating against the UnitTestTransport or
+// SynchronousTestTransport (or other custom) GenericNetworkTransport base class.
 template <typename Parent, typename = std::enable_if<std::is_base_of<app::GenericNetworkTransport, Parent>::value>>
 class HookedTransport : public Parent {
 public:

@@ -1221,8 +1221,7 @@ TEST_CASE("Get Realm using Async Open", "[sync][pbs][async open]") {
         auto user = config.sync_config->user;
         config.sync_config->cancel_waits_on_nonfatal_error = true;
         config.sync_config->error_handler = [&logger](std::shared_ptr<SyncSession> session, SyncError error) {
-            logger->debug("The error handler caught an unexpected sync error: '%1' for '%2'", error.status,
-                          session->path());
+            logger->debug("The error handler caught a sync error: '%1' for '%2'", error.status, session->path());
             // Ignore connection failed non-fatal errors and check for access token refresh unauthorized fatal errors
             if (error.status.code() == ErrorCodes::SyncConnectFailed) {
                 REQUIRE_FALSE(error.is_fatal);
@@ -1242,15 +1241,15 @@ TEST_CASE("Get Realm using Async Open", "[sync][pbs][async open]") {
         TestMode mode = GENERATE(location_fails, token_fails, token_not_authorized);
 
         SECTION("access token expired when realm is opened") {
-            logger->info(">>> access token expired at start - mode: %1", mode);
+            logger->trace(">>> access token expired at start - mode: %1", mode);
             user->update_access_token(std::move(expired_token));
         }
         SECTION("access token expired when websocket connects") {
-            logger->info(">>> access token expired by websocket - mode: %1", mode);
+            logger->trace(">>> access token expired by websocket - mode: %1", mode);
             not_authorized = true;
         }
         SECTION("access token expired when websocket connects") {
-            logger->info(">>> websocket returns connection failed - mode: %1", mode);
+            logger->trace(">>> websocket returns connection failed - mode: %1", mode);
         }
 
         transport->request_hook = [&](const app::Request& req) -> std::optional<app::Response> {
