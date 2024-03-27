@@ -31,11 +31,6 @@ using namespace realm;
 static ArrayFlex s_flex;
 static ArrayPacked s_packed;
 
-template size_t ArrayEncode::find_first<Equal>(const Array&, int64_t, size_t, size_t) const;
-template size_t ArrayEncode::find_first<NotEqual>(const Array&, int64_t, size_t, size_t) const;
-template size_t ArrayEncode::find_first<Greater>(const Array&, int64_t, size_t, size_t) const;
-template size_t ArrayEncode::find_first<Less>(const Array&, int64_t, size_t, size_t) const;
-
 template bool ArrayEncode::find_all_packed<Equal>(const Array&, int64_t, size_t, size_t, size_t,
                                                   QueryStateBase*) const;
 template bool ArrayEncode::find_all_packed<NotEqual>(const Array&, int64_t, size_t, size_t, size_t,
@@ -240,6 +235,7 @@ void ArrayEncode::init(const char* h)
         m_v_mask = 1ULL << (m_v_width - 1);
         m_MSBs = populate(m_v_width, m_v_mask);
         m_vtable = &VTableForPacked::vtable;
+        m_getter = m_vtable->m_getter;
     }
     else if (m_encoding == Encoding::Flex) {
         m_v_width = NodeHeader::get_elementA_size<Encoding::Flex>(h);
@@ -251,47 +247,8 @@ void ArrayEncode::init(const char* h)
         m_MSBs = populate(m_v_width, m_v_mask);
         m_ndx_MSBs = populate(m_ndx_width, m_ndx_mask);
         m_vtable = &VTableForFlex::vtable;
+        m_getter = m_vtable->m_getter;
     }
-}
-
-int64_t ArrayEncode::get(const Array& arr, size_t ndx) const
-{
-    using Encoding = NodeHeader::Encoding;
-    REALM_ASSERT_DEBUG(arr.is_attached());
-    REALM_ASSERT_DEBUG(m_encoding == Encoding::Flex || m_encoding == Encoding::Packed);
-    REALM_ASSERT_DEBUG(m_vtable->m_getter);
-    return (this->*(m_vtable->m_getter))(arr, ndx);
-}
-
-int64_t ArrayEncode::get(const char* data, size_t ndx) const
-{
-    using Encoding = NodeHeader::Encoding;
-    REALM_ASSERT_DEBUG(m_encoding == Encoding::Flex || m_encoding == Encoding::Packed);
-    REALM_ASSERT_DEBUG(m_vtable->m_data_getter);
-    return (this->*(m_vtable->m_data_getter))(data, ndx);
-}
-
-void ArrayEncode::get_chunk(const Array& arr, size_t ndx, int64_t res[8]) const
-{
-    REALM_ASSERT_DEBUG(arr.is_attached());
-    REALM_ASSERT_DEBUG(m_vtable->m_chunk_getter);
-    (this->*(m_vtable->m_chunk_getter))(arr, ndx, res);
-}
-
-void ArrayEncode::set_direct(const Array& arr, size_t ndx, int64_t value) const
-{
-    REALM_ASSERT_DEBUG(is_packed() || is_flex());
-    REALM_ASSERT_DEBUG(m_vtable->m_direct_setter);
-    (this->*(m_vtable->m_direct_setter))(arr, ndx, value);
-}
-
-template <typename Cond>
-size_t ArrayEncode::find_first(const Array& arr, int64_t value, size_t start, size_t end) const
-{
-    REALM_ASSERT_DEBUG(is_packed() || is_flex());
-    QueryStateFindFirst state;
-    find_all<Cond>(arr, value, start, end, 0, &state);
-    return state.m_state;
 }
 
 void ArrayEncode::set(char* data, size_t w, size_t ndx, int64_t v) const
