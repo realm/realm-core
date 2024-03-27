@@ -45,6 +45,7 @@
 
 #if REALM_ENABLE_SYNC
 #include <util/sync/flx_sync_harness.hpp>
+#include <util/sync/sync_test_utils.hpp>
 
 #include <realm/object-store/sync/async_open_task.hpp>
 #include <realm/object-store/sync/impl/sync_metadata.hpp>
@@ -1204,6 +1205,127 @@ TEST_CASE("Get Realm using Async Open", "[sync][pbs][async open]") {
         std::lock_guard<std::mutex> lock(mutex);
         REQUIRE(called);
         REQUIRE(got_error);
+    }
+
+    SECTION("waiters are cancelled if cancel_waits_on_nonfatal_error") {
+        auto logger = util::Logger::get_default_logger();
+        auto transport = std::make_shared<HookedUnitTestTransport>();
+        auto socket_provider = std::make_shared<HookedSocketProvider>(logger, "some user agent");
+        enum TestMode { expired_at_start, expired_by_websocket, websocket_fails };
+        enum FailureMode { location_fails, token_fails, token_not_authorized };
+        auto txt_test_mode = [](TestMode mode) {
+            switch (mode) {
+                case TestMode::expired_at_start:
+                    return "access token expired when realm is opened";
+                case TestMode::expired_by_websocket:
+                    return "access token expired by websocket";
+                case TestMode::websocket_fails:
+                    return "websocket returns connection failed";
+                default:
+                    return "Unknown TestMode";
+            }
+        };
+        auto txt_failure_mode = [](FailureMode mode) {
+            switch (mode) {
+                case FailureMode::location_fails:
+                    return "location update fails";
+                case FailureMode::token_fails:
+                    return "access token refresh fails";
+                case FailureMode::token_not_authorized:
+                    return "websocket connect not authorized";
+                default:
+                    return "Unknown FailureMode";
+            }
+        };
+
+        OfflineAppSession::Config oas_config;
+        oas_config.transport = transport;
+        oas_config.socket_provider = socket_provider;
+        OfflineAppSession oas(oas_config);
+
+        SyncTestFile config(oas, "realm");
+        auto user = config.sync_config->user;
+        config.sync_config->cancel_waits_on_nonfatal_error = true;
+        config.sync_config->error_handler = [&logger](std::shared_ptr<SyncSession> session, SyncError error) {
+            logger->debug("The sync error handler caught an error: '%1' for '%2'", error.status, session->path());
+            // Ignore connection failed non-fatal errors and check for access token refresh unauthorized fatal errors
+            if (error.status.code() == ErrorCodes::SyncConnectFailed) {
+                REQUIRE_FALSE(error.is_fatal);
+                return;
+            }
+            // If it's not SyncConnectFailed, then it should be AuthError
+            REQUIRE(error.status.code() == ErrorCodes::AuthError);
+            REQUIRE(error.is_fatal);
+        };
+
+        // User should be logged in at this point
+        REQUIRE(user->is_logged_in());
+        bool not_authorized = false;
+        bool token_refresh_called = false;
+        bool location_refresh_called = false;
+
+        TestMode test_mode = GENERATE(expired_at_start, expired_by_websocket, websocket_fails);
+        FailureMode failure = GENERATE(location_fails, token_fails, token_not_authorized);
+
+        DYNAMIC_SECTION(txt_test_mode(test_mode) << " - " << txt_failure_mode(failure)) {
+            if (test_mode == TestMode::expired_at_start) {
+                // invalidate the user's cached access token
+                user->update_access_token(std::move(expired_token));
+            }
+            else if (test_mode == TestMode::expired_by_websocket) {
+                // tell websocket to return not authorized to refresh access token
+                not_authorized = true;
+            }
+        }
+
+        transport->request_hook = [&](const app::Request& req) -> std::optional<app::Response> {
+            static constexpr int CURLE_OPERATION_TIMEDOUT = 28;
+            std::lock_guard<std::mutex> lock(mutex);
+            if (req.url.find("/auth/session") != std::string::npos) {
+                token_refresh_called = true;
+                if (failure == FailureMode::token_not_authorized) {
+                    return app::Response{403, 0, {}, "403 not authorized"};
+                }
+                if (failure == FailureMode::token_fails) {
+                    return app::Response{0, CURLE_OPERATION_TIMEDOUT, {}, "Operation timed out"};
+                }
+            }
+            else if (req.url.find("/location") != std::string::npos) {
+                location_refresh_called = true;
+                if (failure == FailureMode::location_fails) {
+                    // Fake "offline/request timed out" custom error response
+                    return app::Response{0, CURLE_OPERATION_TIMEDOUT, {}, "Operation timed out"};
+                }
+            }
+            return std::nullopt;
+        };
+
+        socket_provider->websocket_connect_func = [&]() -> std::optional<SocketProviderError> {
+            if (not_authorized) {
+                not_authorized = false; // one shot
+                return SocketProviderError(sync::websocket::WebSocketError::websocket_unauthorized,
+                                           "403 not authorized");
+            }
+            return SocketProviderError(sync::websocket::WebSocketError::websocket_connection_failed,
+                                       "Operation timed out");
+        };
+
+        auto task = Realm::get_synchronized_realm(config);
+        auto pf = util::make_promise_future<std::exception_ptr>();
+        task->start([&pf](auto ref, auto error) mutable {
+            REQUIRE(!ref);
+            REQUIRE(error);
+            pf.promise.emplace_value(error);
+        });
+
+        auto result = pf.future.get_no_throw();
+        REQUIRE(result.is_ok());
+        REQUIRE(result.get_value());
+        std::lock_guard<std::mutex> lock(mutex);
+        REQUIRE(location_refresh_called);
+        if (failure != FailureMode::location_fails) {
+            REQUIRE(token_refresh_called);
+        }
     }
 
     SECTION("read-only mode sets the schema version") {

@@ -194,8 +194,14 @@ private:
 };
 
 
-class HookedTransport : public SynchronousTestTransport {
+// Converted to a templated class to allow creating against the UnitTestTransport or
+// SynchronousTestTransport (or other custom) GenericNetworkTransport base class.
+template <typename Parent>
+class HookedTransport : public Parent {
 public:
+    static_assert(std::is_base_of<app::GenericNetworkTransport, Parent>::value,
+                  "HookedTransport must be derived from a class whose parent is app::GenericNetworkTransport");
+
     void send_request_to_server(const app::Request& request,
                                 util::UniqueFunction<void(const app::Response&)>&& completion) override
     {
@@ -204,7 +210,7 @@ public:
                 return completion(*simulated_response);
             }
         }
-        SynchronousTestTransport::send_request_to_server(request, [&](const app::Response& response) mutable {
+        Parent::send_request_to_server(request, [&](const app::Response& response) mutable {
             if (response_hook) {
                 response_hook(request, response);
             }
@@ -217,6 +223,9 @@ public:
     // Optional handler for the request before it is sent to the server
     std::function<std::optional<app::Response>(const app::Request&)> request_hook;
 };
+
+using HookedSynchronousTransport = HookedTransport<SynchronousTestTransport>;
+using HookedUnitTestTransport = HookedTransport<UnitTestTransport>;
 
 
 struct SocketProviderError {

@@ -64,9 +64,12 @@ Exception::Exception(Status status)
 {
 }
 
-Status exception_to_status() noexcept
+Status exception_to_status(std::exception_ptr exc_ptr) noexcept
 {
     try {
+        if (exc_ptr) {
+            std::rethrow_exception(exc_ptr);
+        }
         throw;
     }
     catch (const Exception& e) {

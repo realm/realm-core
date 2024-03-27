@@ -5,7 +5,7 @@
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Enabling 'cancel_waits_on_nonfatal_error' does not cancel waits during location update while offline ([#7527](https://github.com/realm/realm-core/issues/7527), since v13.26.0)
 
 ### Breaking changes
 * None.

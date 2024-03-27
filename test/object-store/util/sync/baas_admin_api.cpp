@@ -346,8 +346,11 @@ app::Response do_http_request(const app::Request& request)
 
     auto logger = util::Logger::get_default_logger();
     if (response_code != CURLE_OK) {
+        std::string message = curl_easy_strerror(response_code);
         logger->error("curl_easy_perform() failed when sending request to '%1' with body '%2': %3", request.url,
-                      request.body, curl_easy_strerror(response_code));
+                      request.body, message);
+        // Return a failing response with the CURL error as the custom code
+        return {0, response_code, {}, message};
     }
     if (logger->would_log(util::Logger::Level::trace)) {
         std::string coid = [&] {
