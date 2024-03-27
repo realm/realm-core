@@ -200,7 +200,7 @@ template <typename Parent>
 class HookedTransport : public Parent {
 public:
     static_assert(std::is_base_of<app::GenericNetworkTransport, Parent>::value,
-                    "HookedTransport must be derived from a class whose parent is app::GenericNetworkTransport");
+                  "HookedTransport must be derived from a class whose parent is app::GenericNetworkTransport");
 
     void send_request_to_server(const app::Request& request,
                                 util::UniqueFunction<void(const app::Response&)>&& completion) override
