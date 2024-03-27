@@ -5195,7 +5195,7 @@ TEST(LangBindHelper_SessionHistoryConsistency)
     // session participants must still agree
     {
         // No history
-        DBRef sg = DB::create(path, false, DBOptions(crypt_key()));
+        DBRef sg = DB::create(path, DBOptions(crypt_key()));
 
         // Out-of-Realm history
         std::unique_ptr<Replication> hist = realm::make_in_realm_history();
@@ -5224,7 +5224,7 @@ TEST(LangBindHelper_InRealmHistory_Upgrade)
     SHARED_GROUP_TEST_PATH(path_2);
     {
         // No history
-        DBRef sg = DB::create(path_2, false, DBOptions(crypt_key()));
+        DBRef sg = DB::create(path_2, DBOptions(crypt_key()));
         WriteTransaction wt(sg);
         wt.commit();
     }
@@ -5249,7 +5249,7 @@ TEST(LangBindHelper_InRealmHistory_Downgrade)
     }
     {
         // No history
-        CHECK_THROW(DB::create(path, false, DBOptions(crypt_key())), IncompatibleHistories);
+        CHECK_THROW(DB::create(path, DBOptions(crypt_key())), IncompatibleHistories);
     }
 }
 

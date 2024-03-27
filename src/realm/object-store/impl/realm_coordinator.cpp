@@ -479,6 +479,7 @@ bool RealmCoordinator::open_db()
         }
         options.encryption_key = m_config.encryption_key.data();
         options.allow_file_format_upgrade = !m_config.disable_format_upgrade && !schema_mode_reset_file;
+        options.clear_on_invalid_file = m_config.clear_on_invalid_file;
         if (history) {
             options.backup_at_file_format_change = m_config.backup_at_file_format_change;
 #ifdef __EMSCRIPTEN__
@@ -496,7 +497,8 @@ bool RealmCoordinator::open_db()
 #endif
         }
         else {
-            m_db = DB::create(m_config.path, true, options);
+            options.no_create = true;
+            m_db = DB::create(m_config.path, options);
         }
     }
     catch (realm::FileFormatUpgradeRequired const&) {

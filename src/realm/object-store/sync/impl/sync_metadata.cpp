@@ -527,12 +527,7 @@ std::shared_ptr<Realm> SyncMetadataManager::try_get_realm() const
 std::shared_ptr<Realm> SyncMetadataManager::open_realm(bool should_encrypt, bool caller_supplied_key)
 {
     if (caller_supplied_key || !should_encrypt || !REALM_PLATFORM_APPLE) {
-        if (auto realm = try_get_realm())
-            return realm;
-
-        // Encryption key changed, so delete the existing metadata realm and
-        // recreate it
-        util::File::remove(m_metadata_config.path);
+        m_metadata_config.clear_on_invalid_file = true;
         return get_realm();
     }
 
@@ -560,8 +555,8 @@ std::shared_ptr<Realm> SyncMetadataManager::open_realm(bool should_encrypt, bool
             return realm;
 
         // We weren't able to open the existing file with either the stored key
-        // or no key, so just delete it.
-        util::File::remove(m_metadata_config.path);
+        // or no key, so just recreate it
+        m_metadata_config.clear_on_invalid_file = true;
     }
 
     // We now have no metadata Realm. If we don't have an existing stored key,
