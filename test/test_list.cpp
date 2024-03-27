@@ -763,6 +763,7 @@ TEST(List_Nested_InMixed)
     dict2 = list2->get_dictionary(2);
     dict2->insert("Hello", "World");
     dict2->insert("Date", Timestamp(std::chrono::system_clock::now()));
+    list2->set_collection(0, CollectionType::Dictionary); // Idempotent
     {
         std::stringstream ss;
         tr->to_json(ss, JSONOutputMode::output_mode_xjson_plus);
