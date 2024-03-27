@@ -19,6 +19,7 @@
 #ifndef REALM_ARRAY_DIRECT_HPP
 #define REALM_ARRAY_DIRECT_HPP
 
+#include <cstring>
 #include <realm/utilities.hpp>
 #include <realm/alloc.hpp>
 
@@ -188,6 +189,152 @@ inline int64_t get_direct(const char* data, size_t width, size_t ndx) noexcept
     REALM_TEMPEX(return get_direct, width, (data, ndx));
 }
 
+// Read a bit field of up to 64 bits.
+// - Any alignment and size is supported
+// - The start of the 'data' area must be 64 bit aligned in all cases.
+// - For fields of 64-bit or less, the first 64-bit word is filled with the zero-extended
+//   value of the bitfield.
+// iterator useful for scanning arrays faster than by indexing each element
+// supports arrays of pairs by differentiating field size and step size.
+class bf_ref;
+class bf_iterator {
+    uint64_t* data_area;
+    uint64_t* first_word_ptr;
+    int field_position;
+    uint8_t field_size;
+    uint8_t step_size; // may be different than field_size if used for arrays of pairs
+
+public:
+    bf_iterator(uint64_t* data_area, int initial_offset, int field_size, int step_size, int index)
+        : data_area(data_area)
+        , field_size(field_size)
+        , step_size(step_size)
+    {
+        field_position = initial_offset + index * step_size;
+        first_word_ptr = data_area + (field_position >> 6);
+    }
+    uint64_t get_value() const
+    {
+        auto in_word_position = field_position & 0x3F;
+        auto first_word = first_word_ptr[0];
+        uint64_t result = first_word >> in_word_position;
+        // note: above shifts in zeroes above the bitfield
+        if (in_word_position + field_size > 64) {
+            auto first_word_size = 64 - in_word_position;
+            auto second_word = first_word_ptr[1];
+            result |= second_word << first_word_size;
+            // note: above shifts in zeroes below the bits we want
+        }
+        // discard any bits above the field we want
+        result &= (1ULL << field_size) - 1;
+        return result;
+    }
+    void set_value(uint64_t value) const
+    {
+        auto in_word_position = field_position & 0x3F;
+        auto first_word = first_word_ptr[0];
+        size_t mask = (1ULL << field_size) - 1;
+        value &= mask;
+        // zero out field in first word:
+        auto first_word_mask = mask << in_word_position;
+        first_word &= ~first_word_mask;
+        // or in relevant part of value
+        first_word |= value << in_word_position;
+        first_word_ptr[0] = first_word;
+        if (in_word_position + field_size > 64) {
+            // bitfield crosses word boundary.
+            // discard the lowest bits of value (it has been written to the first word)
+            auto bits_written_to_first_word = 64 - in_word_position;
+            value >>= bits_written_to_first_word;
+            auto second_word_mask = mask >> bits_written_to_first_word;
+            auto second_word = first_word_ptr[1];
+            // zero out the field in second word, then or in the (high part of) value
+            second_word &= ~second_word_mask;
+            second_word |= value;
+            first_word_ptr[1] = second_word;
+        }
+    }
+    void operator++()
+    {
+        auto next_field_position = field_position + step_size;
+        if ((next_field_position >> 6) > (field_position >> 6)) {
+            first_word_ptr = data_area + (next_field_position >> 6);
+        }
+        field_position = next_field_position;
+    }
+    // The compiler should be able to generate code matching this
+    // from operator* and the bf_ref declared below:
+    //
+    //    uint64_t operator*() const
+    //    {
+    //        return get_value();
+    //    }
+    bf_ref operator*();
+    friend bool operator<(const bf_iterator&, const bf_iterator&);
+};
+
+
+inline bool operator<(const bf_iterator& a, const bf_iterator& b)
+{
+    REALM_ASSERT(a.data_area == b.data_area);
+    return a.field_position < b.field_position;
+}
+
+
+class bf_ref {
+    bf_iterator it;
+
+public:
+    bf_ref(bf_iterator& it)
+        : it(it)
+    {
+    }
+    operator uint64_t() const
+    {
+        return it.get_value();
+    }
+    uint64_t operator=(uint64_t value)
+    {
+        it.set_value(value);
+        return value;
+    }
+};
+
+inline bf_ref bf_iterator::operator*()
+{
+    return bf_ref(*this);
+}
+
+
+inline uint64_t read_bitfield(uint64_t* data_area, int field_position, int width)
+{
+    bf_iterator it(data_area, field_position, width, 0, 0);
+    return *it;
+}
+
+inline void write_bitfield(uint64_t* data_area, int field_position, int width, uint64_t value)
+{
+    bf_iterator it(data_area, field_position, width, 0, 0);
+    *it = value;
+}
+
+
+inline int64_t sign_extend_field(size_t width, uint64_t value)
+{
+    uint64_t sign_mask = 1ULL << (width - 1);
+    if (value & sign_mask) { // got a negative value
+        uint64_t negative_extension = -sign_mask;
+        value |= negative_extension;
+        return int64_t(value);
+    }
+    else {
+        // zero out anything above the sign bit
+        // (actually, also zero out the sign bit, but it is already known to be zero)
+        uint64_t below_sign_mask = sign_mask - 1;
+        value &= below_sign_mask;
+        return int64_t(value);
+    }
+}
 
 template <int width>
 inline std::pair<int64_t, int64_t> get_two(const char* data, size_t ndx) noexcept
@@ -350,6 +497,6 @@ inline size_t upper_bound(const char* data, size_t size, int64_t value) noexcept
 
     return low;
 }
-}
+} // namespace realm
 
 #endif /* ARRAY_TPL_HPP_ */
