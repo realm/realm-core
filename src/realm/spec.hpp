@@ -56,6 +56,7 @@ public:
     size_t get_public_column_count() const noexcept;
     ColumnType get_column_type(size_t column_ndx) const noexcept;
     StringData get_column_name(size_t column_ndx) const noexcept;
+    std::vector<StringData> get_column_names() const;
 
     /// Returns size_t(-1) if the specified column is not found.
     size_t get_column_index(StringData name) const noexcept;

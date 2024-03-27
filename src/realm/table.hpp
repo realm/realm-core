@@ -147,7 +147,17 @@ public:
     DataType get_dictionary_key_type(ColKey column_key) const noexcept;
     ColKey get_column_key(StringData name) const noexcept;
     ColKey get_column_key(StableIndex) const noexcept;
+    bool is_additional_props_col(ColKey ck) const
+    {
+        return ck == m_additional_prop_col;
+    }
+    ColKey get_additional_prop_col() const
+    {
+        return m_additional_prop_col;
+    }
+
     ColKeys get_column_keys() const;
+    std::vector<StringData> get_column_names() const;
     typedef util::Optional<std::pair<ConstTableRef, ColKey>> BacklinkOrigin;
     BacklinkOrigin find_backlink_origin(StringData origin_table_name, StringData origin_col_name) const noexcept;
     BacklinkOrigin find_backlink_origin(ColKey backlink_col) const noexcept;
@@ -736,6 +746,7 @@ private:
     Array m_opposite_column;                        // 8th slot in m_top
     std::vector<std::unique_ptr<SearchIndex>> m_index_accessors;
     ColKey m_primary_key_col;
+    ColKey m_additional_prop_col;
     Replication* const* m_repl;
     static Replication* g_dummy_replication;
     bool m_is_frozen = false;
@@ -791,6 +802,7 @@ private:
     ColKey find_backlink_column(ColKey origin_col_key, TableKey origin_table) const;
     ColKey find_or_add_backlink_column(ColKey origin_col_key, TableKey origin_table);
     void do_set_primary_key_column(ColKey col_key);
+    void do_add_additional_prop_column();
     void validate_column_is_unique(ColKey col_key) const;
 
     ObjKey get_next_valid_key();
@@ -952,6 +964,7 @@ class ColKeys {
 public:
     ColKeys(ConstTableRef&& t)
         : m_table(std::move(t))
+        , m_offset(m_table->get_additional_prop_col() ? 1 : 0)
     {
     }
 
@@ -962,7 +975,7 @@ public:
 
     size_t size() const
     {
-        return m_table->get_column_count();
+        return m_table->get_column_count() - m_offset;
     }
     bool empty() const
     {
@@ -970,19 +983,20 @@ public:
     }
     ColKey operator[](size_t p) const
     {
-        return ColKeyIterator(m_table, p).operator*();
+        return ColKeyIterator(m_table, p + m_offset).operator*();
     }
     ColKeyIterator begin() const
     {
-        return ColKeyIterator(m_table, 0);
+        return ColKeyIterator(m_table, m_offset);
     }
     ColKeyIterator end() const
     {
-        return ColKeyIterator(m_table, size());
+        return ColKeyIterator(m_table, m_table->get_column_count());
     }
 
 private:
     ConstTableRef m_table;
+    unsigned m_offset = 0;
 };
 
 // Class used to collect a chain of links when building up a Query following links.
@@ -1138,6 +1152,12 @@ inline ColKeys Table::get_column_keys() const
 {
     return ColKeys(ConstTableRef(this, m_alloc.get_instance_version()));
 }
+
+inline std::vector<StringData> Table::get_column_names() const
+{
+    return m_spec.get_column_names();
+}
+
 
 inline uint_fast64_t Table::get_content_version() const noexcept
 {

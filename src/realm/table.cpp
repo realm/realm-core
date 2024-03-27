@@ -262,6 +262,7 @@ using namespace realm;
 using namespace realm::util;
 
 Replication* Table::g_dummy_replication = nullptr;
+static const StringData additional_properties_colum_name{"__additional__"};
 
 bool TableVersions::operator==(const TableVersions& other) const
 {
@@ -625,6 +626,14 @@ void Table::init(ref_type top_ref, ArrayParent* parent, size_t ndx_in_parent, bo
 
     auto rot_pk_key = m_top.get_as_ref_or_tagged(top_position_for_pk_col);
     m_primary_key_col = rot_pk_key.is_tagged() ? ColKey(rot_pk_key.get_as_int()) : ColKey();
+
+    // If we have an additional properties column, it will always be first
+    if (m_spec.m_names.size() > 0 && m_spec.m_names.get(0) == additional_properties_colum_name) {
+        m_additional_prop_col = ColKey(m_spec.m_keys.get(0));
+    }
+    else {
+        m_additional_prop_col = ColKey();
+    }
 
     if (m_top.size() <= top_position_for_flags) {
         m_table_type = Type::TopLevel;
@@ -2936,6 +2945,17 @@ void Table::do_set_primary_key_column(ColKey col_key)
     }
 
     m_primary_key_col = col_key;
+}
+
+void Table::do_add_additional_prop_column()
+{
+    ColumnAttrMask attr;
+    attr.set(col_attr_Dictionary);
+    attr.set(col_attr_Nullable);
+    ColKey col_key = generate_col_key(col_type_Mixed, attr);
+
+    m_additional_prop_col =
+        do_insert_root_column(col_key, col_type_Mixed, additional_properties_colum_name, type_String);
 }
 
 bool Table::contains_unique_values(ColKey col) const

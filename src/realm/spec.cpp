@@ -278,6 +278,22 @@ ref_type Spec::get_enumkeys_ref(size_t column_ndx, ArrayParent*& keys_parent) no
     return m_enumkeys.get_as_ref(column_ndx);
 }
 
+
+std::vector<StringData> Spec::get_column_names() const
+{
+    std::vector<StringData> ret;
+    auto sz = m_names.size();
+    for (size_t n = 0; n < sz; n++) {
+        StringData name = m_names.get(n);
+        if (n == 0 && name == "__additional__") {
+            continue;
+        }
+        ret.push_back(name);
+    }
+    return ret;
+}
+
+
 namespace {
 
 template <class T>
