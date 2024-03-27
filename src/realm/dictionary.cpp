@@ -48,7 +48,7 @@ void validate_key_value(const Mixed& key)
 
 /******************************** Dictionary *********************************/
 
-Dictionary::Dictionary(ColKey col_key, size_t level)
+Dictionary::Dictionary(ColKey col_key, uint8_t level)
     : Base(col_key)
     , CollectionParent(level)
 {

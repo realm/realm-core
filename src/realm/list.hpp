@@ -291,7 +291,7 @@ public:
     {
         this->set_owner(owner, col_key);
     }
-    Lst(ColKey col_key, size_t level = 1)
+    Lst(ColKey col_key, uint8_t level = 1)
         : Base(col_key)
         , CollectionParent(level)
     {
