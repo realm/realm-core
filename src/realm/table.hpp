@@ -33,6 +33,7 @@
 #include <realm/table_ref.hpp>
 #include <realm/spec.hpp>
 #include <realm/query.hpp>
+#include <realm/radix_tree.hpp>
 #include <realm/cluster_tree.hpp>
 #include <realm/keys.hpp>
 #include <realm/global_key.hpp>
@@ -442,6 +443,11 @@ public:
     // Will return pointer to search index accessor. Will return nullptr if no index
     SearchIndex* get_search_index(ColKey col) const noexcept;
     StringIndex* get_string_index(ColKey col) const noexcept;
+    IntegerIndex* get_int_index(ColKey col) const noexcept;
+
+    using IndexMaker = util::UniqueFunction<std::unique_ptr<SearchIndex>(ColKey, const ClusterColumn&, Allocator&,
+                                                                         ref_type, Array*, size_t)>;
+    void set_index_maker(IndexMaker hook); // for testing only
 
     template <class T>
     ObjKey find_first(ColKey col_key, T value) const;
@@ -861,6 +867,7 @@ private:
     Type m_table_type = Type::TopLevel;
     uint64_t m_in_file_version_at_transaction_boundary = 0;
     AtomicLifeCycleCookie m_cookie;
+    IndexMaker m_index_maker = nullptr;
 
     static constexpr int top_position_for_spec = 0;
     static constexpr int top_position_for_columns = 1;
