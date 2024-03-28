@@ -3992,21 +3992,21 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
 
     SECTION("Test app config baseurl") {
         {
-            redir_transport->reset(App::default_base_url);
+            redir_transport->reset(App::default_base_url());
 
             // First time through, base_url is empty; https://services.cloud.mongodb.com is expected
             auto app = app::App::get_app(app::App::CacheMode::Disabled, app_config, sc_config);
             // Location is not requested until first app services request
             CHECK(!redir_transport->location_requested);
             // Initial hostname and ws hostname use base url, but aren't used until location is updated
-            CHECK(app->get_host_url() == App::default_base_url);
-            CHECK(app->get_ws_host_url() == App::create_ws_host_url(App::default_base_url));
+            CHECK(app->get_host_url() == App::default_base_url());
+            CHECK(app->get_ws_host_url() == App::create_ws_host_url(App::default_base_url()));
 
             do_login(app);
             CHECK(redir_transport->location_requested);
-            CHECK(app->get_base_url() == App::default_base_url);
-            CHECK(app->get_host_url() == App::default_base_url);
-            CHECK(app->get_ws_host_url() == App::create_ws_host_url(App::default_base_url));
+            CHECK(app->get_base_url() == App::default_base_url());
+            CHECK(app->get_host_url() == App::default_base_url());
+            CHECK(app->get_ws_host_url() == App::create_ws_host_url(App::default_base_url()));
         }
         {
             // Second time through, base_url is set to https://alternate.someurl.fake is expected
@@ -4030,8 +4030,8 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
             // Third time through, base_url is not set, expect https://services.cloud.mongodb.com,
             // since metadata is no longer used
             app_config.base_url = util::none;
-            std::string expected_url = std::string(App::default_base_url);
-            std::string expected_wsurl = App::create_ws_host_url(App::default_base_url);
+            std::string expected_url = std::string(App::default_base_url());
+            std::string expected_wsurl = App::create_ws_host_url(App::default_base_url());
             redir_transport->reset(expected_url);
 
             auto app = app::App::get_app(app::App::CacheMode::Disabled, app_config, sc_config);
@@ -4084,16 +4084,16 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
             CHECK(app->get_host_url() == "https://alternate.someurl.fake");
             CHECK(app->get_ws_host_url() == "wss://alternate.someurl.fake");
 
-            redir_transport->reset(App::default_base_url);
+            redir_transport->reset(App::default_base_url());
 
             // Revert the base URL to the default URL value using std::nullopt
             app->update_base_url(std::nullopt, [](util::Optional<app::AppError> error) {
                 CHECK(!error);
             });
             CHECK(redir_transport->location_requested);
-            CHECK(app->get_base_url() == App::default_base_url);
-            CHECK(app->get_host_url() == App::default_base_url);
-            CHECK(app->get_ws_host_url() == App::create_ws_host_url(App::default_base_url));
+            CHECK(app->get_base_url() == App::default_base_url());
+            CHECK(app->get_host_url() == App::default_base_url());
+            CHECK(app->get_ws_host_url() == App::create_ws_host_url(App::default_base_url()));
             // Expected URL is still App::default_base_url
             do_login(app);
 
@@ -4108,16 +4108,16 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
             // Expected URL is still "http://some-other.url.fake"
             do_login(app);
 
-            redir_transport->reset(App::default_base_url);
+            redir_transport->reset(App::default_base_url());
 
             // Revert the base URL to the default URL value using the empty string
             app->update_base_url("", [](util::Optional<app::AppError> error) {
                 CHECK(!error);
             });
             CHECK(redir_transport->location_requested);
-            CHECK(app->get_base_url() == App::default_base_url);
-            CHECK(app->get_host_url() == App::default_base_url);
-            CHECK(app->get_ws_host_url() == App::create_ws_host_url(App::default_base_url));
+            CHECK(app->get_base_url() == App::default_base_url());
+            CHECK(app->get_host_url() == App::default_base_url());
+            CHECK(app->get_ws_host_url() == App::create_ws_host_url(App::default_base_url()));
             // Expected URL is still App::default_base_url
             do_login(app);
         }
@@ -5806,7 +5806,7 @@ TEST_CASE("app: shared instances", "[sync][app]") {
 
     auto config2 = base_config;
     config2.app_id = "app1";
-    config2.base_url = std::string(App::default_base_url);
+    config2.base_url = std::string(App::default_base_url());
 
     auto config3 = base_config;
     config3.app_id = "app2";

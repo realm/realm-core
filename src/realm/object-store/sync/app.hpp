@@ -90,7 +90,8 @@ public:
         DeviceInfo device_info;
     };
 
-    static std::string_view default_base_url;
+    // Returns the default base_url for SDKs to use instead of defining their own
+    static std::string_view default_base_url();
 
     // `enable_shared_from_this` is unsafe with public constructors;
     // use `App::get_app()` instead

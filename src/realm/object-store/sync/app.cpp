@@ -183,7 +183,10 @@ std::mutex s_apps_mutex;
 namespace realm {
 namespace app {
 
-std::string_view App::default_base_url = "https://services.cloud.mongodb.com";
+std::string_view App::default_base_url()
+{
+    return "https://services.cloud.mongodb.com";
+}
 
 App::Config::DeviceInfo::DeviceInfo()
     : platform(util::get_library_platform())
@@ -216,7 +219,7 @@ SharedApp App::get_app(CacheMode mode, const Config& config,
 {
     if (mode == CacheMode::Enabled) {
         std::lock_guard<std::mutex> lock(s_apps_mutex);
-        auto& app = s_apps_cache[config.app_id][config.base_url.value_or(std::string(default_base_url))];
+        auto& app = s_apps_cache[config.app_id][config.base_url.value_or(std::string(App::default_base_url()))];
         if (!app) {
             app = std::make_shared<App>(Private(), config);
             app->configure(sync_client_config);
@@ -262,7 +265,7 @@ void App::close_all_sync_sessions()
 
 App::App(Private, const Config& config)
     : m_config(config)
-    , m_base_url(m_config.base_url.value_or(std::string(default_base_url)))
+    , m_base_url(m_config.base_url.value_or(std::string(App::default_base_url())))
     , m_location_updated(false)
     , m_request_timeout_ms(m_config.default_request_timeout_ms.value_or(s_default_timeout_ms))
 {
@@ -653,11 +656,11 @@ std::string App::get_base_url() const
 
 void App::update_base_url(std::optional<std::string> base_url, UniqueFunction<void(Optional<AppError>)>&& completion)
 {
-    std::string new_base_url = base_url.value_or(std::string(default_base_url));
+    std::string new_base_url = base_url.value_or(std::string(App::default_base_url()));
 
     if (new_base_url.empty()) {
         // Treat an empty string the same as requesting the default base url
-        new_base_url = default_base_url;
+        new_base_url = std::string(App::default_base_url());
         log_debug("App::update_base_url: empty => %1", new_base_url);
     }
     else {
