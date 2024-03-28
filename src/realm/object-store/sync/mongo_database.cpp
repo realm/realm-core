@@ -19,8 +19,7 @@
 #include <realm/object-store/sync/mongo_database.hpp>
 #include <realm/object-store/sync/mongo_collection.hpp>
 
-namespace realm {
-namespace app {
+namespace realm::app {
 
 MongoCollection MongoDatabase::collection(const std::string& collection_name)
 {
@@ -32,5 +31,4 @@ MongoCollection MongoDatabase::operator[](const std::string& collection_name)
     return MongoCollection(collection_name, m_name, m_user, m_service, m_service_name);
 }
 
-} // namespace app
-} // namespace realm
+} // namespace realm::app

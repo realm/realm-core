@@ -113,6 +113,7 @@ public:
         std::string local_dir;
     };
 
+    SyncServer(const Config& config);
     ~SyncServer();
 
     void start();
@@ -127,6 +128,7 @@ public:
     {
         return m_local_root_dir;
     }
+    int port() const;
 
     template <class R, class P>
     void advance_clock(std::chrono::duration<R, P> duration = std::chrono::seconds(1)) noexcept
@@ -135,8 +137,6 @@ public:
     }
 
 private:
-    friend class TestSyncManager;
-    SyncServer(const Config& config);
     std::string m_local_root_dir;
     std::shared_ptr<realm::util::Logger> m_logger;
     realm::sync::Server m_server;
@@ -147,6 +147,75 @@ private:
     time_point now() const noexcept override
     {
         return time_point{time_point::duration{m_now}};
+    }
+};
+
+struct TestUser : realm::SyncUser {
+    const std::string m_user_id;
+    std::string m_access_token;
+    std::string m_refresh_token;
+    std::shared_ptr<realm::SyncManager> m_sync_manager;
+    realm::SyncUser::State m_state = realm::SyncUser::State::LoggedIn;
+
+    TestUser(std::string user_id, std::shared_ptr<realm::SyncManager> sync_manager)
+        : m_user_id(std::move(user_id))
+        , m_sync_manager(std::move(sync_manager))
+    {
+    }
+
+    void log_out()
+    {
+        auto old_state = m_state;
+        m_state = realm::SyncUser::State::LoggedOut;
+        m_sync_manager->update_sessions_for(*this, old_state, m_state, {});
+    }
+
+    void log_in()
+    {
+        auto old_state = m_state;
+        m_state = realm::SyncUser::State::LoggedIn;
+        m_sync_manager->update_sessions_for(*this, old_state, m_state, m_access_token);
+    }
+
+    std::string user_id() const noexcept override
+    {
+        return m_user_id;
+    }
+    std::string app_id() const noexcept override
+    {
+        return "app id";
+    }
+
+    std::string access_token() const override
+    {
+        return m_access_token;
+    }
+    std::string refresh_token() const override
+    {
+        return m_access_token;
+    }
+    realm::SyncUser::State state() const override
+    {
+        return m_state;
+    }
+    bool access_token_refresh_required() const override
+    {
+        return false;
+    }
+    realm::SyncManager* sync_manager() override
+    {
+        return m_sync_manager.get();
+    }
+
+    void request_log_out() override {}
+    void request_refresh_user(CompletionHandler&&) override {}
+    void request_refresh_location(CompletionHandler&&) override {}
+    void request_access_token(CompletionHandler&&) override {}
+
+    void track_realm(std::string_view) override {}
+    std::string create_file_action(realm::SyncFileAction, std::string_view, std::optional<std::string>) override
+    {
+        return "";
     }
 };
 
@@ -169,7 +238,7 @@ struct SyncTestFile : TestFile {
     SyncTestFile(std::shared_ptr<realm::SyncUser> user, realm::bson::Bson partition,
                  realm::util::Optional<realm::Schema> schema,
                  std::function<realm::SyncSessionErrorHandler>&& error_handler);
-    SyncTestFile(std::shared_ptr<realm::app::App> app, realm::bson::Bson partition, realm::Schema schema);
+    SyncTestFile(TestSyncManager&, realm::bson::Bson partition, realm::Schema schema);
     SyncTestFile(std::shared_ptr<realm::SyncUser> user, realm::Schema schema, realm::SyncConfig::FLXSyncEnabled);
 };
 
@@ -178,7 +247,6 @@ public:
     struct Config {
         Config();
         std::string base_path;
-        realm::SyncManager::MetadataMode metadata_mode = realm::SyncManager::MetadataMode::NoMetadata;
         bool should_teardown_test_directory = true;
         bool start_sync_client = true;
     };
@@ -199,13 +267,13 @@ public:
         return m_sync_manager;
     }
 
-    std::shared_ptr<realm::SyncUser> fake_user(const std::string& name = "test");
+    std::shared_ptr<TestUser> fake_user(const std::string& name = "test");
 
 private:
     std::shared_ptr<realm::SyncManager> m_sync_manager;
     SyncServer m_sync_server;
-    std::string m_base_file_path;
-    bool m_should_teardown_test_directory = true;
+    const std::string m_base_file_path;
+    const bool m_should_teardown_test_directory = true;
 };
 
 class OfflineAppSession {
@@ -215,7 +283,7 @@ public:
         std::shared_ptr<realm::app::GenericNetworkTransport> transport;
         bool delete_storage = true;
         std::optional<std::string> storage_path;
-        realm::SyncManager::MetadataMode metadata_mode = realm::SyncManager::MetadataMode::NoMetadata;
+        realm::app::AppConfig::MetadataMode metadata_mode = realm::app::AppConfig::MetadataMode::InMemory;
         std::optional<std::string> base_url;
         std::shared_ptr<realm::sync::SyncSocketProvider> socket_provider;
         std::optional<std::string> app_id;
@@ -227,7 +295,7 @@ public:
     {
         return m_app;
     }
-    std::shared_ptr<realm::SyncUser> make_user() const;
+    std::shared_ptr<realm::app::User> make_user() const;
     realm::app::GenericNetworkTransport* transport()
     {
         return m_transport.get();
@@ -276,26 +344,12 @@ public:
         return m_app->sync_manager();
     }
 
-    void close()
-    {
-        close(false);
-    }
+    realm::app::AppConfig app_config;
 
-    // Re-open the app without deleting the dir contents - if close() has not been called
-    // the App will be closed first before recreating the object.
-    // If log_in is true, user will be logged in again once the App instance is created
-    void reopen(bool log_in);
-
-    realm::app::App::Config app_config;
-    realm::SyncClientConfig sc_config;
-
-    std::vector<realm::bson::BsonDocument> get_documents(realm::SyncUser& user, const std::string& object_type,
+    std::vector<realm::bson::BsonDocument> get_documents(realm::app::User& user, const std::string& object_type,
                                                          size_t expected_count) const;
 
 private:
-    // Close the app and, if tear_down, remove the app data and base_file_path directory
-    void close(bool tear_down);
-
     std::shared_ptr<realm::app::App> m_app;
     std::unique_ptr<realm::AppSession> m_app_session;
     std::string m_base_file_path;
@@ -309,7 +363,7 @@ private:
 bool wait_for_upload(realm::Realm& realm, std::chrono::seconds timeout = std::chrono::seconds(60));
 bool wait_for_download(realm::Realm& realm, std::chrono::seconds timeout = std::chrono::seconds(60));
 
-void set_app_config_defaults(realm::app::App::Config& app_config,
+void set_app_config_defaults(realm::app::AppConfig& app_config,
                              const std::shared_ptr<realm::app::GenericNetworkTransport>& transport);
 
 #endif // REALM_ENABLE_SYNC

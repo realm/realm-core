@@ -19,13 +19,17 @@
 #ifndef REALM_OS_SYNC_FILE_HPP
 #define REALM_OS_SYNC_FILE_HPP
 
+#include <optional>
 #include <string>
-
-#include <realm/object-store/sync/app.hpp>
-
-#include <realm/util/optional.hpp>
+#include <vector>
 
 namespace realm {
+struct SyncConfig;
+class SyncUser;
+
+namespace app {
+struct AppConfig;
+}
 
 namespace util {
 
@@ -58,27 +62,32 @@ std::string reserve_unique_file_name(const std::string& path, const std::string&
 // This class manages how Synced Realms are stored on the filesystem.
 class SyncFileManager {
 public:
-    SyncFileManager(const std::string& base_path, const std::string& app_id);
+    SyncFileManager(const app::AppConfig&);
 
     /// Remove the Realms at the specified absolute paths along with any associated helper files.
-    void remove_user_realms(const std::string& user_identity,
-                            const std::vector<std::string>& realm_paths) const; // throws
+    void remove_user_realms(const std::string& user_id) const; // throws
 
     /// A non throw version of File::exists(),  returning false if any exceptions are thrown when attempting to access
     /// this file.
     static bool try_file_exists(const std::string& path) noexcept;
 
-    util::Optional<std::string> get_existing_realm_file_path(const std::string& user_identity,
-                                                             const std::vector<std::string>& legacy_user_identities,
-                                                             const std::string& realm_file_name,
-                                                             const std::string& partition) const;
+    std::optional<std::string> get_existing_realm_file_path(const std::string& user_id,
+                                                            const std::vector<std::string>& legacy_user_identities,
+                                                            const std::string& realm_file_name,
+                                                            const std::string& partition) const;
     /// Return the path for a given Realm, creating the user directory if it does not already exist.
-    std::string realm_file_path(const std::string& user_identity,
-                                const std::vector<std::string>& legacy_user_identities,
+    std::string realm_file_path(const std::string& user_id, const std::vector<std::string>& legacy_user_identities,
                                 const std::string& realm_file_name, const std::string& partition) const;
 
+    // Get the default path for a Realm for the given configuration.
+    // The default value is `<rootDir>/<appId>/<userId>/<partitionValue>.realm`.
+    // If the file cannot be created at this location, for example due to path length restrictions,
+    // this function may pass back `<rootDir>/<hashedFileName>.realm`
+    std::string path_for_realm(const SyncConfig& config,
+                               std::optional<std::string> custom_file_name = std::nullopt) const;
+
     /// Remove the Realm at a given path for a given user. Returns `true` if the remove operation fully succeeds.
-    bool remove_realm(const std::string& user_identity, const std::vector<std::string>& legacy_user_identities,
+    bool remove_realm(const std::string& user_id, const std::vector<std::string>& legacy_user_identities,
                       const std::string& realm_file_name, const std::string& partition) const;
 
     /// Remove the Realm whose primary Realm file is located at `absolute_path`. Returns `true` if the remove
@@ -104,7 +113,7 @@ public:
         return m_app_path;
     }
 
-    std::string recovery_directory_path(util::Optional<std::string> const& directory = none) const
+    std::string recovery_directory_path(std::optional<std::string> const& directory = {}) const
     {
         return get_special_directory(directory.value_or(c_recovery_directory));
     }
@@ -134,15 +143,15 @@ private:
         return get_special_directory(c_utility_directory);
     }
     /// Return the user directory for a given user, creating it if it does not already exist.
-    std::string user_directory(const std::string& identity) const;
+    std::string user_directory(const std::string& user_id) const;
     // Construct the absolute path to the users directory
-    std::string get_user_directory_path(const std::string& user_identity) const;
-    std::string legacy_hashed_partition_path(const std::string& user_identity, const std::string& partition) const;
+    std::string get_user_directory_path(const std::string& user_id) const;
+    std::string legacy_hashed_partition_path(const std::string& user_id, const std::string& partition) const;
     std::string legacy_realm_file_path(const std::string& local_user_identity,
                                        const std::string& realm_file_name) const;
     std::string legacy_local_identity_path(const std::string& local_user_identity,
                                            const std::string& realm_file_name) const;
-    std::string preferred_realm_path_without_suffix(const std::string& user_identity,
+    std::string preferred_realm_path_without_suffix(const std::string& user_id,
                                                     const std::string& realm_file_name) const;
     std::string fallback_hashed_realm_file_path(const std::string& preferred_path) const;
 };

@@ -71,7 +71,6 @@ if(REALM_ENABLE_SYNC)
         sync/session/session.cpp
         sync/session/wait_for_completion.cpp
         sync/sync_manager.cpp
-        sync/user.cpp
         util/sync/sync_test_utils.cpp
         util/unit_test_transport.cpp
     )

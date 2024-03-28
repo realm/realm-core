@@ -110,7 +110,7 @@ public:
     bool wait_for_upload_complete_or_client_stopped();
     bool wait_for_download_complete_or_client_stopped();
 
-    void refresh(std::string signed_access_token);
+    void refresh(std::string_view signed_access_token);
 
     static void abandon(util::bind_ptr<SessionWrapper>) noexcept;
 
@@ -1557,13 +1557,13 @@ bool SessionWrapper::wait_for_download_complete_or_client_stopped()
 }
 
 
-void SessionWrapper::refresh(std::string signed_access_token)
+void SessionWrapper::refresh(std::string_view signed_access_token)
 {
     // Thread safety required
     REALM_ASSERT(m_initiated);
     REALM_ASSERT(!m_abandoned);
 
-    m_client.post([self = util::bind_ptr(this), token = std::move(signed_access_token)](Status status) {
+    m_client.post([self = util::bind_ptr(this), token = std::string(signed_access_token)](Status status) {
         if (status == ErrorCodes::OperationAborted)
             return;
         else if (!status.is_ok())
@@ -2279,7 +2279,7 @@ bool Session::wait_for_download_complete_or_client_stopped()
 }
 
 
-void Session::refresh(const std::string& signed_access_token)
+void Session::refresh(std::string_view signed_access_token)
 {
     m_impl->refresh(signed_access_token); // Throws
 }

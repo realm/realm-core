@@ -37,7 +37,7 @@ wrap_completion(util::UniqueFunction<void(util::Optional<AppError>)>&& completio
 }
 } // anonymous namespace
 
-void PushClient::register_device(const std::string& registration_token, const std::shared_ptr<SyncUser>& sync_user,
+void PushClient::register_device(const std::string& registration_token, const std::shared_ptr<User>& sync_user,
                                  util::UniqueFunction<void(util::Optional<AppError>)>&& completion)
 {
     auto push_route = util::format("/app/%1/push/providers/%2/registration", m_app_id, m_service_name);
@@ -49,7 +49,7 @@ void PushClient::register_device(const std::string& registration_token, const st
         wrap_completion(std::move(completion)));
 }
 
-void PushClient::deregister_device(const std::shared_ptr<SyncUser>& sync_user,
+void PushClient::deregister_device(const std::shared_ptr<User>& sync_user,
                                    util::UniqueFunction<void(util::Optional<AppError>)>&& completion)
 {
     auto push_route = util::format("/app/%1/push/providers/%2/registration", m_app_id, m_service_name);

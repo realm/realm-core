@@ -319,8 +319,6 @@ RLM_API realm_t* realm_from_thread_safe_reference(realm_thread_safe_reference_t*
             throw LogicError{ErrorCodes::IllegalOperation, "Thread safe reference type mismatch"};
         }
 
-        // FIXME: This moves out of the ThreadSafeReference, so it isn't
-        // reusable.
         std::shared_ptr<util::Scheduler> sch;
         if (scheduler) {
             sch = *scheduler;

@@ -610,7 +610,7 @@ public:
 
     void testRunEnded(Catch::TestRunStats const&) override
     {
-        if (auto& baasaas_holder = get_baasaas_holder(); baasaas_holder.has_value()) {
+        if (auto& baasaas_holder = get_baasaas_holder()) {
             baasaas_holder->stop();
         }
     }

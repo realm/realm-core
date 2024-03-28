@@ -2,13 +2,33 @@
 
 ### Enhancements
 * Introduce sync 'progress_estimate' parameter (value from 0.0 to 1.0) for existing sync 'ProgressNotifierCallback' api to report sync progress on current batch of upload/download until completion ([#7450](https://github.com/realm/realm-core/issues/7450))
+* Introduce the new `SyncUser` interface which can be implemented by SDKs to use sync without the core App Services implementation (or just for greater control over user behavior in tests). ([PR #7300](https://github.com/realm/realm-core/pull/7300).
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* SyncUser::all_sessions() included sessions in every state *except* for waiting for access token, which was weirdly inconsistent. It now includes all sessions. ([PR #7300](https://github.com/realm/realm-core/pull/7300)).
+* App::all_users() included logged out users only if they were logged out while the App instance existed. It now always includes all logged out users. ([PR #7300](https://github.com/realm/realm-core/pull/7300)).
+* Deleting the active user left the active user unset rather than selecting another logged-in user as the active user like logging out and removing users did. ([PR #7300](https://github.com/realm/realm-core/pull/7300)).
 
 ### Breaking changes
-* None.
+* The following things have been renamed or moved as part of moving all of the App Services functionality to the app namespace:
+  - SyncUser -> app::User. Note that there is a new, different type named SyncUser.
+  - SyncUser::identity -> app::User::user_id. The "identity" word was overloaded to mean two unrelated things, and one has been changed to user_id everywhere.
+  - SyncUserSubscriptionToken -> app::UserSubscriptionToken
+  - SyncUserProfile -> app::UserProfile
+  - App::Config -> AppConfig
+  - SyncConfig::MetadataMode -> AppConfig::MetadataMode
+  - MetadataMode::NoMetadata -> MetadataMode::InMemory
+  - SyncUser::session_for_on_disk_path() -> SyncManager::get_existing_session()
+  - SyncUser::all_sessions() -> SyncManager::get_all_sessions_for(User&)
+  - SyncManager::immediately_run_file_actions() -> App::immediately_run_file_actions()
+  - realm_sync_user_subscription_token -> realm_app_user_subscription_token
+  ([PR #7300](https://github.com/realm/realm-core/pull/7300).
+* The `ClientAppDeallocated` error code no longer exists as this error code can no longer occur. ([PR #7300](https://github.com/realm/realm-core/pull/7300).
+* Some fields have moved from SyncClientConfig to AppConfig. AppConfig now has a SyncClientConfig field rather than it being passed separately to App::get_app(). ([PR #7300](https://github.com/realm/realm-core/pull/7300).
+* Sync user management has been removed from SyncManager. This functionality was already additionally available on App. ([PR #7300](https://github.com/realm/realm-core/pull/7300).
+* AuditConfig now has a base_file_path field which must be set by the SDK rather than inheriting it from the SyncManager. ([PR #7300](https://github.com/realm/realm-core/pull/7300).
+* App::switch_user() no longer returns a user. The return value was always exactly the passed-in user and any code which needs it can just use that. ([PR #7300](https://github.com/realm/realm-core/pull/7300).
 
 ### Compatibility
 * Fileformat: Generates files with format v24. Reads and automatically upgrade from fileformat v10. If you want to upgrade from an earlier file format version you will have to use RealmCore v13.x.y or earlier.
@@ -18,6 +38,9 @@
 ### Internals
 * Update libuv used in object store tests from v1.35.0 to v1.48.0 ([PR #7508](https://github.com/realm/realm-core/pull/7508)).
 * Made `set_default_logger` nullable in the bindgen spec.yml (PR [#7515](https://github.com/realm/realm-core/pull/7515)).
+* App metadata storage has been entirely rewritten in preparation for supporting sharing metadata realms between processes. ([PR #7300](https://github.com/realm/realm-core/pull/7300).
+* The metadata disabled mode has been replaced with an in-memory metadata mode which performs similarly and doesn't work weirdly differently from the normal mode. The new mode is intended for testing purposes, but should be suitable for production usage if there is a scenario where metadata persistence is not needed. ([PR #7300](https://github.com/realm/realm-core/pull/7300).
+* The ownership relationship between App and User has changed. User now strongly retains App and App has a weak cache of Users. This means that creating a SyncConfig or opening a Realm will keep the parent App alive, rather than things being in a broken state if the App is deallocated. ([PR #7300](https://github.com/realm/realm-core/pull/7300).
 
 ----------------------------------------------
 
@@ -241,7 +264,7 @@
 * Fixed a crash with `Assertion failed: m_initiated` during sync session startup ([#7074](https://github.com/realm/realm-core/issues/7074), since v10.0.0).
 * Fixed a TSAN violation where the user thread could race to read `m_finalized` with the sync event loop ([#6844](https://github.com/realm/realm-core/issues/6844), since v13.15.1)
 * Fix a minor race condition when backing up Realm files before a client reset which could have lead to overwriting an existing file. ([PR #7341](https://github.com/realm/realm-core/pull/7341)).
- 
+
 ### Breaking changes
 * SyncManager no longer supports reconfiguring after calling reset_for_testing(). SyncManager::configure() has been folded into the constructor, and reset_for_testing() has been renamed to tear_down_for_testing(). ([PR #7351](https://github.com/realm/realm-core/pull/7351))
 

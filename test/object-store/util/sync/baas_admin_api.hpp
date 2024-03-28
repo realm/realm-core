@@ -268,7 +268,7 @@ std::string get_base_url();
 std::string get_admin_url();
 
 template <typename Factory>
-inline app::App::Config get_config(Factory factory, const AppSession& app_session)
+inline app::AppConfig get_config(Factory factory, const AppSession& app_session)
 {
     return {app_session.client_app_id,
             factory,
