@@ -41,9 +41,9 @@ public:
     void init_array(char* h, uint8_t flags, size_t v_width, size_t ndx_width, size_t v_size, size_t ndx_size) const;
     void copy_data(const Array&, const std::vector<int64_t>&, const std::vector<size_t>&) const;
     // getters/setters
-    inline int64_t get(const Array&, size_t) const;
+    inline int64_t get(bf_iterator&, const Array&, size_t) const;
     inline int64_t get(const char*, size_t, const ArrayEncode&) const;
-    inline void get_chunk(const Array& h, size_t ndx, int64_t res[8]) const;
+    inline void get_chunk(bf_iterator&, const Array& h, size_t ndx, int64_t res[8]) const;
     inline void set_direct(const Array&, size_t, int64_t) const;
 
     template <typename Cond>
@@ -66,7 +66,7 @@ private:
     inline bool run_parallel_subscan(size_t, size_t, size_t) const;
 };
 
-inline int64_t ArrayFlex::get(const Array& arr, size_t ndx) const
+inline int64_t ArrayFlex::get(bf_iterator&, const Array& arr, size_t ndx) const
 {
     REALM_ASSERT_DEBUG(arr.is_attached());
     REALM_ASSERT_DEBUG(arr.is_encoded());
@@ -93,7 +93,7 @@ inline int64_t ArrayFlex::do_get(uint64_t* data, size_t ndx, size_t v_width, siz
     return sign_extend_field_by_mask(mask, it_value.get_value());
 }
 
-inline void ArrayFlex::get_chunk(const Array& arr, size_t ndx, int64_t res[8]) const
+inline void ArrayFlex::get_chunk(bf_iterator& it, const Array& arr, size_t ndx, int64_t res[8]) const
 {
     REALM_ASSERT_DEBUG(ndx < arr.m_size);
     auto sz = 8;
@@ -102,10 +102,10 @@ inline void ArrayFlex::get_chunk(const Array& arr, size_t ndx, int64_t res[8]) c
     size_t i = ndx;
     size_t index = 0;
     for (; i < supposed_end; ++i) {
-        res[index++] = get(arr, i);
+        res[index++] = get(it, arr, i);
     }
     for (; index < 8; ++index) {
-        res[index++] = get(arr, i++);
+        res[index++] = get(it, arr, i++);
     }
 }
 

@@ -23,6 +23,7 @@
 #include <cstddef>
 #include <vector>
 #include <realm/query_conditions.hpp>
+#include <realm/array_direct.hpp>
 
 namespace realm {
 
@@ -84,7 +85,7 @@ private:
     struct VTableForPacked;
     struct VTableForFlex;
     const VTable* m_vtable = nullptr;
-    Getter m_getter = nullptr;
+    // Getter m_getter = nullptr;
 
     // getting and setting interface specifically for encoding formats
     int64_t get_packed(const Array&, size_t) const;
@@ -116,6 +117,7 @@ private:
     size_t m_v_width = 0, m_v_size = 0, m_ndx_width = 0, m_ndx_size = 0;
     uint64_t m_v_mask = 0, m_ndx_mask = 0;
     uint64_t m_MSBs = 0, m_ndx_MSBs = 0;
+    mutable bf_iterator m_data_iterator;
 };
 
 inline bool ArrayEncode::is_packed() const
@@ -200,8 +202,8 @@ inline int64_t ArrayEncode::get(const Array& arr, size_t ndx) const
 {
     REALM_ASSERT_DEBUG(is_packed() || is_flex());
     REALM_ASSERT_DEBUG(m_vtable->m_getter);
-    return (this->*m_getter)(arr, ndx);
-    // return (this->*(m_vtable->m_getter))(arr, ndx);
+    // return (this->*m_getter)(arr, ndx);
+    return (this->*(m_vtable->m_getter))(arr, ndx);
 }
 
 inline int64_t ArrayEncode::get(const char* data, size_t ndx) const

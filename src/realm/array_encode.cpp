@@ -103,16 +103,19 @@ inline void copy_into_encoded_array(const T& encoder, Arg&&... args)
     encoder.copy_data(std::forward<Arg>(args)...);
 }
 
-template <typename Encoder>
-std::vector<int64_t> fetch_values(const Encoder& encoder, const Array& arr)
-{
-    std::vector<int64_t> res;
-    const auto sz = arr.size();
-    res.reserve(sz);
-    for (size_t i = 0; i < sz; ++i)
-        res.push_back(encoder.get(arr, i));
-    return res;
-}
+// template <typename Encoder, typename I>
+// inline std::vector<int64_t> fetch_values(const Encoder& encoder, I it, const Array& arr)
+//{
+//     std::vector<int64_t> res;
+//     const auto sz = arr.size();
+//     res.reserve(sz);
+//     for (size_t i = 0; i < sz; ++i)
+//         if constexpr(std::is_same_v<Encoder, ArrayPacked>)
+//             res.push_back(encoder.get(it, i, ));
+//         else
+//             res.push_back(encoder.get(it, arr, i));
+//     return res;
+// }
 
 bool ArrayEncode::always_encode(const Array& origin, Array& arr, Encoding encoding) const
 {
@@ -143,8 +146,9 @@ bool ArrayEncode::always_encode(const Array& origin, Array& arr, Encoding encodi
 
 bool ArrayEncode::encode(const Array& origin, Array& arr) const
 {
+    // return false;
 #if REALM_COMPRESS
-    return always_encode(origin, arr, Encoding::Flex);
+    return always_encode(origin, arr, Encoding::Packed);
 #else
     std::vector<int64_t> values;
     std::vector<size_t> indices;
@@ -179,7 +183,12 @@ bool ArrayEncode::decode(Array& arr) const
 {
     REALM_ASSERT_DEBUG(arr.is_attached());
     auto values_fetcher = [&arr, this]() {
-        return is_packed() ? fetch_values(s_packed, arr) : fetch_values(s_flex, arr);
+        std::vector<int64_t> res;
+        const auto sz = arr.size();
+        res.reserve(sz);
+        for (size_t i = 0; i < sz; ++i)
+            res.push_back((this->*(m_vtable->m_getter))(arr, i));
+        return res;
     };
     const auto& values = values_fetcher();
     //  do the reverse of compressing the array
@@ -235,7 +244,9 @@ void ArrayEncode::init(const char* h)
         m_v_mask = 1ULL << (m_v_width - 1);
         m_MSBs = populate(m_v_width, m_v_mask);
         m_vtable = &VTableForPacked::vtable;
-        m_getter = m_vtable->m_getter;
+        // here init a new iterator
+        const auto data = (uint64_t*)NodeHeader::get_data_from_header(h);
+        m_data_iterator = bf_iterator(data, 0, m_v_width, m_v_width, 0);
     }
     else if (m_encoding == Encoding::Flex) {
         m_v_width = NodeHeader::get_elementA_size<Encoding::Flex>(h);
@@ -247,7 +258,6 @@ void ArrayEncode::init(const char* h)
         m_MSBs = populate(m_v_width, m_v_mask);
         m_ndx_MSBs = populate(m_ndx_width, m_ndx_mask);
         m_vtable = &VTableForFlex::vtable;
-        m_getter = m_vtable->m_getter;
     }
 }
 
@@ -334,19 +344,19 @@ void ArrayEncode::encode_values(const Array& arr, std::vector<int64_t>& values, 
     REALM_ASSERT_DEBUG(indices.size() == sz);
 }
 
-int64_t ArrayEncode::get_packed(const Array& arr, size_t ndx) const
+int64_t ArrayEncode::get_packed(const Array&, size_t ndx) const
 {
-    return s_packed.get(arr, ndx);
+    return s_packed.get(m_data_iterator, ndx, m_v_mask);
 }
 
 int64_t ArrayEncode::get_flex(const Array& arr, size_t ndx) const
 {
-    return s_flex.get(arr, ndx);
+    return s_flex.get(m_data_iterator, arr, ndx);
 }
 
-int64_t ArrayEncode::get_from_data_packed(const char* data, size_t ndx) const
+int64_t ArrayEncode::get_from_data_packed(const char*, size_t ndx) const
 {
-    return s_packed.get(data, ndx, *this);
+    return s_packed.get(m_data_iterator, ndx, m_v_mask);
 }
 
 int64_t ArrayEncode::get_from_data_flex(const char* data, size_t ndx) const
@@ -354,19 +364,19 @@ int64_t ArrayEncode::get_from_data_flex(const char* data, size_t ndx) const
     return s_flex.get(data, ndx, *this);
 }
 
-void ArrayEncode::get_chunk_packed(const Array& arr, size_t ndx, int64_t res[8]) const
+void ArrayEncode::get_chunk_packed(const Array&, size_t ndx, int64_t res[8]) const
 {
-    s_packed.get_chunk(arr, ndx, res);
+    s_packed.get_chunk(m_data_iterator, ndx, width_mask(), res);
 }
 
 void ArrayEncode::get_chunk_flex(const Array& arr, size_t ndx, int64_t res[8]) const
 {
-    s_flex.get_chunk(arr, ndx, res);
+    s_flex.get_chunk(m_data_iterator, arr, ndx, res);
 }
 
-void ArrayEncode::set_direct_packed(const Array& arr, size_t ndx, int64_t value) const
+void ArrayEncode::set_direct_packed(const Array&, size_t ndx, int64_t value) const
 {
-    s_packed.set_direct(arr, ndx, value);
+    s_packed.set_direct(m_data_iterator, ndx, value, m_v_width);
 }
 
 void ArrayEncode::set_direct_flex(const Array& arr, size_t ndx, int64_t value) const

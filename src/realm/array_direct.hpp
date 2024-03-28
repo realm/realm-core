@@ -22,7 +22,6 @@
 #include <cstring>
 #include <realm/utilities.hpp>
 #include <realm/alloc.hpp>
-#include <realm/array_encode.hpp>
 
 // clang-format off
 /* wid == 16/32 likely when accessing offsets in B tree */
@@ -243,6 +242,8 @@ private:
 // supports arrays of pairs by differentiating field size and step size.
 class bf_ref;
 class bf_iterator {
+    friend class ArrayPacked;
+    friend class ArrayFlex;
     uint64_t* data_area;
     uint64_t* first_word_ptr;
     size_t field_position;
@@ -250,6 +251,9 @@ class bf_iterator {
     uint8_t step_size; // may be different than field_size if used for arrays of pairs
 
 public:
+    bf_iterator() = default;
+    bf_iterator(const bf_iterator&) = default;
+    bf_iterator& operator=(const bf_iterator&) = default;
     bf_iterator(uint64_t* data_area, size_t initial_offset, size_t field_size, size_t step_size, size_t index)
         : data_area(data_area)
         , field_size(static_cast<uint8_t>(field_size))
@@ -971,15 +975,16 @@ inline int64_t default_fetcher(const char* data, size_t ndx)
     return get_direct<width>(data, ndx);
 }
 
+template <typename T>
 struct EncodedFetcher {
 
     int64_t operator()(const char* data, size_t ndx) const
     {
         return ptr->get(data, ndx);
     }
-    const ArrayEncode* ptr;
+    const T* ptr;
 };
-static EncodedFetcher s_encoded_fetcher;
+// static EncodedFetcher s_encoded_fetcher;
 
 
 // Lower and Upper bound are mainly used in the B+tree implementation,
@@ -1153,10 +1158,11 @@ inline size_t lower_bound(const char* data, size_t size, int64_t value) noexcept
     return impl::lower_bound<width>(data, 0, size, value, impl::default_fetcher<width>);
 }
 
-inline size_t lower_bound(const char* data, size_t size, int64_t value, const ArrayEncode& encoder) noexcept
+template <typename T>
+inline size_t lower_bound(const char* data, size_t size, int64_t value,
+                          const impl::EncodedFetcher<T>& encoder) noexcept
 {
-    impl::s_encoded_fetcher.ptr = &encoder;
-    return impl::lower_bound<0>(data, 0, size, value, impl::s_encoded_fetcher);
+    return impl::lower_bound<0>(data, 0, size, value, encoder);
 }
 
 template <int width>
@@ -1165,10 +1171,11 @@ inline size_t upper_bound(const char* data, size_t size, int64_t value) noexcept
     return impl::upper_bound<width>(data, 0, size, value, impl::default_fetcher<width>);
 }
 
-inline size_t upper_bound(const char* data, size_t size, int64_t value, const ArrayEncode& encoder) noexcept
+template <typename T>
+inline size_t upper_bound(const char* data, size_t size, int64_t value,
+                          const impl::EncodedFetcher<T>& encoder) noexcept
 {
-    impl::s_encoded_fetcher.ptr = &encoder;
-    return impl::lower_bound<0>(data, 0, size, value, impl::s_encoded_fetcher);
+    return impl::lower_bound<0>(data, 0, size, value, encoder);
 }
 
 } // namespace realm

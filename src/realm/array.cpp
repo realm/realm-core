@@ -1142,12 +1142,16 @@ size_t Array::upper_bound_int(int64_t value) const noexcept
 
 size_t Array::lower_bound_int_encoded(int64_t value) const noexcept
 {
-    return lower_bound(m_data, m_size, value, m_encoder);
+    static impl::EncodedFetcher<ArrayEncode> encoder;
+    encoder.ptr = &m_encoder;
+    return lower_bound(m_data, m_size, value, encoder);
 }
 
 size_t Array::upper_bound_int_encoded(int64_t value) const noexcept
 {
-    return upper_bound(m_data, m_size, value, m_encoder);
+    static impl::EncodedFetcher<ArrayEncode> encoder;
+    encoder.ptr = &m_encoder;
+    return upper_bound(m_data, m_size, value, encoder);
 }
 
 int_fast64_t Array::get(const char* header, size_t ndx) noexcept

@@ -37,16 +37,15 @@ public:
     void init_array(char*, uint8_t, size_t, size_t) const;
     void copy_data(const Array&, Array&) const;
     // get or set
-    inline int64_t get(const Array&, size_t) const;
-    inline int64_t get(const char*, size_t, const ArrayEncode&) const;
-    inline void get_chunk(const Array&, size_t, int64_t res[8]) const;
-    inline void set_direct(const Array&, size_t, int64_t) const;
+    inline int64_t get(bf_iterator& it, size_t, uint64_t) const;
+    inline void get_chunk(bf_iterator& it, size_t, uint64_t, int64_t res[8]) const;
+    inline void set_direct(bf_iterator& it, size_t, int64_t, size_t) const;
 
     template <typename Cond>
     inline bool find_all(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*) const;
 
 private:
-    inline int64_t do_get(uint64_t*, size_t, size_t, size_t, uint64_t) const;
+    inline int64_t do_get(bf_iterator&, size_t, uint64_t) const;
 
     bool find_all_match(size_t start, size_t end, size_t baseindex, QueryStateBase* state) const;
 
@@ -59,22 +58,14 @@ private:
     inline bool run_parallel_scan(size_t width, size_t range) const;
 };
 
-inline int64_t ArrayPacked::get(const Array& arr, size_t ndx) const
+inline int64_t ArrayPacked::get(bf_iterator& it, size_t ndx, uint64_t mask) const
 {
-    REALM_ASSERT_DEBUG(arr.is_attached());
-    REALM_ASSERT_DEBUG(arr.is_encoded());
-    return get(arr.m_data, ndx, arr.get_encoder());
+    return do_get(it, ndx, mask);
 }
 
-inline int64_t ArrayPacked::get(const char* data, size_t ndx, const ArrayEncode& encode) const
+inline int64_t ArrayPacked::do_get(bf_iterator& it, size_t ndx, uint64_t mask) const
 {
-    return do_get((uint64_t*)data, ndx, encode.width(), encode.size(), encode.width_mask());
-}
-
-inline int64_t ArrayPacked::do_get(uint64_t* data, size_t ndx, size_t v_width, size_t v_size, uint64_t mask) const
-{
-    REALM_ASSERT_DEBUG(ndx < v_size);
-    bf_iterator it{data, 0, v_width, v_width, ndx};
+    it.move(ndx);
     return sign_extend_field_by_mask(mask, *it);
 }
 
@@ -109,21 +100,14 @@ inline bool ArrayPacked::find_all(const Array& arr, int64_t value, size_t start,
     return find_parallel<Cond>(arr, value, start, end, baseindex, state);
 }
 
-inline void ArrayPacked::set_direct(const Array& arr, size_t ndx, int64_t value) const
+inline void ArrayPacked::set_direct(bf_iterator& it, size_t ndx, int64_t value, size_t v_width) const
 {
-    const auto v_width = arr.m_encoder.width();
-    const auto v_size = arr.m_encoder.size();
-    REALM_ASSERT_DEBUG(ndx < v_size);
-    REALM_ASSERT_DEBUG(arr.is_encoded());
-    auto data = (uint64_t*)arr.m_data;
-    bf_iterator it_value{data, static_cast<size_t>(ndx * v_width), v_width, v_width, 0};
-    it_value.set_value(value);
+    it.move(0, ndx * v_width);
+    it.set_value(value);
 }
 
-inline void ArrayPacked::get_chunk(const Array& arr, size_t ndx, int64_t res[8]) const
+inline void ArrayPacked::get_chunk(bf_iterator& it, size_t ndx, uint64_t mask, int64_t res[8]) const
 {
-    const auto v_size = arr.m_size;
-    REALM_ASSERT_DEBUG(ndx < v_size);
     auto sz = 8;
     std::memset(res, 0, sizeof(int64_t) * sz);
     auto supposed_end = ndx + sz;
@@ -131,10 +115,10 @@ inline void ArrayPacked::get_chunk(const Array& arr, size_t ndx, int64_t res[8])
     size_t index = 0;
     // this can be done better, in one go, retrieve both!!!
     for (; i < supposed_end; ++i) {
-        res[index++] = get(arr, i);
+        res[index++] = get(it, i, mask);
     }
     for (; index < 8; ++index) {
-        res[index++] = get(arr, i++);
+        res[index++] = get(it, i++, mask);
     }
 }
 
@@ -197,9 +181,11 @@ inline bool ArrayPacked::find_linear(const Array& arr, int64_t value, size_t sta
         if constexpr (std::is_same_v<Cond, Less>)
             return a < b;
     };
-    bf_iterator it((uint64_t*)arr.m_data, 0, arr.m_width, arr.m_width, start);
+
+    bf_iterator it{(uint64_t*)arr.m_data, 0, arr.m_width, arr.m_width, start};
+    const auto mask = arr.get_encoder().width_mask();
     while (start < end) {
-        const auto sv = sign_extend_field_by_mask(arr.get_encoder().width_mask(), *it);
+        const auto sv = sign_extend_field_by_mask(mask, *it);
         if (compare(sv, value) && !state->match(start + baseindex))
             return false;
         ++start;
