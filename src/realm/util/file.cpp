@@ -49,6 +49,7 @@
 using namespace realm::util;
 
 namespace {
+constexpr size_t c_min_supported_page_size = 4096;
 size_t get_page_size()
 {
 #ifdef _WIN32
@@ -60,7 +61,7 @@ size_t get_page_size()
 #else
     long size = sysconf(_SC_PAGESIZE);
 #endif
-    REALM_ASSERT(size > 0 && size % 4096 == 0);
+    REALM_ASSERT(size > 0 && size % c_min_supported_page_size == 0);
     return static_cast<size_t>(size);
 }
 

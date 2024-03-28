@@ -81,6 +81,13 @@ SharedFileInfo::SharedFileInfo(const uint8_t* key)
 // the ciphertext, we can still determine that we should use the old IV, since
 // the ciphertext's hash will match the old ciphertext.
 
+// This produces a file on disk with the following layout:
+// 4k block of metadata   (up to 64 iv_table instances stored here)
+// 64 * 4k blocks of data (up to 262144 bytes of data are stored here)
+// 4k block of metadata
+// 64 * 4k blocks of data
+// ...
+
 struct iv_table {
     uint32_t iv1 = 0;
     std::array<uint8_t, 28> hmac1 = {};
@@ -102,6 +109,8 @@ const size_t block_size = 4096;
 
 const size_t metadata_size = sizeof(iv_table);
 const size_t blocks_per_metadata_block = block_size / metadata_size;
+static_assert(metadata_size == 64,
+              "changing the size of the metadata breaks compatibility with existing Realm files");
 
 // map an offset in the data to the actual location in the file
 template <typename Int>
@@ -1025,7 +1034,7 @@ void EncryptedFileMapping::read_barrier(const void* addr, size_t size, Header_to
 
 void EncryptedFileMapping::extend_to(size_t offset, size_t new_size)
 {
-    REALM_ASSERT(new_size % (1ULL << m_page_shift) == 0);
+    REALM_ASSERT_EX(new_size % page_size() == 0, new_size, page_size());
     size_t num_pages = new_size >> m_page_shift;
     m_page_state.resize(num_pages, PageState::Clean);
     m_chunk_dont_scan.resize((num_pages + page_to_chunk_factor - 1) >> page_to_chunk_shift, false);

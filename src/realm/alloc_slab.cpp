@@ -74,7 +74,7 @@ size_t SlabAlloc::get_total_slab_size() noexcept
 
 SlabAlloc::SlabAlloc()
 {
-    m_initial_section_size = 1UL << section_shift; // page_size();
+    m_initial_section_size = section_size();
     m_free_space_state = free_space_Clean;
     m_baseline = 0;
 }
@@ -738,7 +738,6 @@ bool SlabAlloc::align_filesize_for_mmap(ref_type top_ref, Config& cfg)
         detach(true); // keep m_file open
         m_file.resize(expected_size);
         m_file.close();
-        size = expected_size;
         return true;
     }
 
@@ -849,7 +848,7 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg, util::Writ
         if (REALM_UNLIKELY(cfg.read_only))
             throw InvalidDatabase("Read-only access to empty Realm file", path);
 
-        size_t initial_size = page_size(); // m_initial_section_size;
+        size_t initial_size = page_size();
         // exFAT does not allocate a unique id for the file until it is non-empty. It must be
         // valid at this point because File::get_unique_id() is used to distinguish
         // mappings_for_file in the encryption layer. So the prealloc() is required before
