@@ -3962,6 +3962,7 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
         CHECK(result == "ws://172.0.0.1:9090");
         result = App::create_ws_host_url("https://172.0.0.1:9090");
         CHECK(result == "wss://172.0.0.1:9090");
+        // Old default base url
         result = App::create_ws_host_url("http://realm.mongodb.com");
         CHECK(result == "ws://ws.realm.mongodb.com");
         result = App::create_ws_host_url("https://realm.mongodb.com");
@@ -3974,6 +3975,7 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
         CHECK(result == "wss://ws.us-east-1.aws.realm.mongodb.com");
         result = App::create_ws_host_url("https://us-east-1.aws.realm.mongodb.com/some/extra/stuff");
         CHECK(result == "wss://ws.us-east-1.aws.realm.mongodb.com/some/extra/stuff");
+        // New default base url
         result = App::create_ws_host_url("http://services.cloud.mongodb.com");
         CHECK(result == "ws://ws.services.cloud.mongodb.com");
         result = App::create_ws_host_url("https://services.cloud.mongodb.com");
@@ -3992,7 +3994,7 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
         {
             redir_transport->reset(App::default_base_url);
 
-            // First time through, base_url is empty; https://realm.mongodb.com is expected
+            // First time through, base_url is empty; https://services.cloud.mongodb.com is expected
             auto app = app::App::get_app(app::App::CacheMode::Disabled, app_config, sc_config);
             // Location is not requested until first app services request
             CHECK(!redir_transport->location_requested);
@@ -4025,8 +4027,8 @@ TEST_CASE("app: base_url", "[sync][app][base_url]") {
             CHECK(app->get_ws_host_url() == "wss://alternate.someurl.fake");
         }
         {
-            // Third time through, base_url is not set, expect https://realm.mongodb.com, since metadata
-            // is no longer used
+            // Third time through, base_url is not set, expect https://services.cloud.mongodb.com,
+            // since metadata is no longer used
             app_config.base_url = util::none;
             std::string expected_url = std::string(App::default_base_url);
             std::string expected_wsurl = App::create_ws_host_url(App::default_base_url);

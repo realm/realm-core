@@ -183,7 +183,7 @@ std::mutex s_apps_mutex;
 namespace realm {
 namespace app {
 
-std::string_view App::default_base_url = "https://realm.mongodb.com";
+std::string_view App::default_base_url = "https://services.cloud.mongodb.com";
 
 App::Config::DeviceInfo::DeviceInfo()
     : platform(util::get_library_platform())
@@ -395,7 +395,7 @@ void App::configure_route(const std::string& host_url, const std::optional<std::
         m_ws_host_url = App::create_ws_host_url(m_host_url);
     }
 
-    // host_url is the url to the server: e.g., https://realm.mongodb.com or https://localhost:9090
+    // host_url is the url to the server: e.g., https://services.cloud.mongodb.com or https://localhost:9090
     // base_route is the baseline client api path: e.g. <host_url>/api/client/v2.0
     m_base_route = util::format("%1%2", m_host_url, s_base_path);
     // app_route is the cloud app URL: <host_url>/api/client/v2.0/app/<app_id>
@@ -412,7 +412,7 @@ void App::configure_route(const std::string& host_url, const std::optional<std::
 // All others => http[s]://<host-url> => ws[s]://<host-url>
 std::string App::create_ws_host_url(const std::string_view host_url)
 {
-    constexpr static std::string_view orig_base_domain = "realm.mongodb.com";
+    constexpr static std::string_view old_base_domain = "realm.mongodb.com";
     constexpr static std::string_view new_base_domain = "services.cloud.mongodb.com";
     const size_t base_len = std::char_traits<char>::length("http://");
 
@@ -428,7 +428,7 @@ std::string App::create_ws_host_url(const std::string_view host_url)
 
     // http[s]://[<region-prefix>]realm.mongodb.com[/<path>] =>
     //     ws[s]://ws.[<region-prefix>]realm.mongodb.com[/<path>]
-    if (host_url.find(orig_base_domain) != std::string_view::npos) {
+    if (host_url.find(old_base_domain) != std::string_view::npos) {
         return util::format("%1ws.%2", prefix, host_url.substr(prefix_len));
     }
     // http[s]://[<region-prefix>]services.cloud.mongodb.com[/<path>] =>
