@@ -127,7 +127,7 @@ static inline bson::BsonArray parse_ejson_array(const char* serialized)
 
 RLM_API const char* realm_app_get_default_base_url(void) noexcept
 {
-    return app::App::default_base_url.data();
+    return app::App::default_base_url().data();
 }
 
 RLM_API realm_app_credentials_t* realm_app_credentials_new_anonymous(bool reuse_credentials) noexcept
