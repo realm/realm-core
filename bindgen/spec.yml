@@ -1244,6 +1244,7 @@ classes:
       all_users: std::vector<SharedSyncUser>
       sync_manager: SharedSyncManager
       subscribers_count: count_t
+      default_base_url: std::string_view
     staticMethods:
       get_app: '(mode: AppCacheMode, config: AppConfig, sync_client_config: SyncClientConfig) -> SharedApp'
       get_cached_app: '(app_id: const std::string&) -> SharedApp'
