@@ -472,14 +472,14 @@ void IndexSet::insert_at(IndexSet const& positions)
     size_t shift = 0;
     while (begin1 != end1 && begin2 != end2) {
         if (*begin1 + shift < *begin2) {
-            begin1++;
             size_t b = *begin1;
+            begin1++;
             builder.push_back(b + shift);
         }
         else {
             ++shift;
-            begin2++;
             size_t b = *begin2;
+            begin2++;
             builder.push_back(b);
         }
     }
@@ -526,8 +526,8 @@ void IndexSet::shift_for_insert_at(realm::IndexSet const& values)
     size_t shift = 0;
     while (begin1 != end1 && begin2 != end2) {
         if (*begin1 + shift < *begin2) {
-            begin1++;
             size_t b = *begin1;
+            begin1++;
             builder.push_back(b + shift);
         }
         else {
@@ -561,8 +561,8 @@ void IndexSet::erase_at(IndexSet const& positions)
     size_t shift = 0;
     while (begin1 != end1 && begin2 != end2) {
         if (*begin1 < *begin2) {
-            begin1++;
             size_t b = *begin1;
+            begin1++;
             builder.push_back(b - shift);
         }
         else if (*begin1 == *begin2) {
