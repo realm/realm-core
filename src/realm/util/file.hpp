@@ -114,6 +114,10 @@ std::string make_temp_file(const char* prefix);
 
 size_t page_size();
 
+struct OnlyForTestingPageSizeChange {
+    OnlyForTestingPageSizeChange(size_t new_page_size);
+    ~OnlyForTestingPageSizeChange();
+};
 
 /// This class provides a RAII abstraction over the concept of a file
 /// descriptor (or file handle).

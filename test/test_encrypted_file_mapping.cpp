@@ -20,6 +20,7 @@
 
 #if defined(TEST_ENCRYPTED_FILE_MAPPING)
 
+#include <realm.hpp>
 #include <realm/util/aes_cryptor.hpp>
 #include <realm/util/encrypted_file_mapping.hpp>
 #include <realm/util/file.hpp>
@@ -57,6 +58,7 @@
 
 #if REALM_ENABLE_ENCRYPTION
 
+using namespace realm;
 using namespace realm::util;
 using realm::FileDesc;
 
@@ -315,6 +317,56 @@ TEST(EncryptedFile_IVRefreshing)
     read_data_pos = off_t(data_size - 1);
     states = cryptor.refresh_ivs(fd, read_data_pos, page_needing_refresh, num_pages);
     verify_page_states(states, read_data_pos, {page_needing_refresh});
+}
+
+// This test changes the global page_size() and should not run with other tests.
+// It checks that an encrypted Realm is portable between systems with a different page size
+NONCONCURRENT_TEST(EncryptedFile_Portablility)
+{
+    TEST_PATH(path);
+    constexpr size_t num_entries = 5000;
+    const char* key = test_util::crypt_key(true);
+
+    auto check_attach_and_read = [&]() {
+        auto hist = make_in_realm_history();
+        DBOptions options(key);
+        auto sg = DB::create(*hist, path, options);
+        auto rt = sg->start_read();
+        auto foo = rt->get_table("foo");
+        auto pk_col = foo->get_primary_key_column();
+        CHECK_EQUAL(foo->size(), num_entries);
+        CHECK_EQUAL(foo->where().equal(pk_col, "name 4999").count(), 1);
+    };
+
+    {
+        OnlyForTestingPageSizeChange change_page_size(4096);
+        Group g;
+        TableRef foo = g.add_table_with_primary_key("foo", type_String, "name", false);
+        for (size_t i = 0; i < num_entries; ++i) {
+            foo->create_object_with_primary_key(util::format("name %1", i));
+        }
+        g.write(path, key);
+    }
+    {
+        OnlyForTestingPageSizeChange change_page_size(8192);
+        check_attach_and_read();
+    }
+    {
+        OnlyForTestingPageSizeChange change_page_size(16384);
+        check_attach_and_read();
+    }
+    // also check with the native page_size (which is probably redundant with one of the above)
+    check_attach_and_read();
+
+    // check that modifications work
+    auto history = make_in_realm_history();
+    DBOptions options(key);
+    DBRef db = DB::create(*history, path, options);
+    auto wt = db->start_write();
+    TableRef bar = wt->get_or_add_table_with_primary_key("bar", type_String, "pk");
+    bar->create_object_with_primary_key("test");
+    wt->commit();
+    check_attach_and_read();
 }
 
 #endif // REALM_ENABLE_ENCRYPTION
