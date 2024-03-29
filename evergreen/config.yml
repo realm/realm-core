@@ -264,9 +264,10 @@ functions:
               unset BAASAAS_START_MODE
           fi
 
-          if [[ -n "${llvm_symbolizer}" ]]; then
-              export ASAN_SYMBOLIZER_PATH="$(./evergreen/abspath.sh ${llvm_symbolizer})"
-              export TSAN_OPTIONS="external_symbolizer_path=$(./evergreen/abspath.sh ${llvm_symbolizer})"
+          if [[ -n "${c_compiler}" && "$(basename ${c_compiler})" = "clang" && -f "$(dirname ${c_compiler})/llvm-symbolizer" ]]; then
+              LLVM_SYMBOLIZER="$(dirname ${c_compiler})/llvm-symbolizer"
+              export ASAN_SYMBOLIZER_PATH="$(./evergreen/abspath.sh $LLVM_SYMBOLIZER)"
+              export TSAN_OPTIONS="external_symbolizer_path=$(./evergreen/abspath.sh $LLVM_SYMBOLIZER)"
           fi
           if [[ -n "${enable_llvm_coverage}" ]]; then
               if [[ -z "${test_executable_name}" ]]; then
@@ -824,108 +825,6 @@ tasks:
         export UNITTEST_THREADS=1
         valgrind --tool=memcheck --leak-check=full --undef-value-errors=yes --track-origins=yes --child-silent-after-fork=no --trace-children=yes --suppressions=$(pwd)/../../test/valgrind.suppress --error-exitcode=1 --max-threads=5000 ./RelWithDebInfo/realm-tests
 
-- name: bloaty
-  exec_timeout_secs: 1800
-  commands:
-  - func: "fetch source"
-  - func: "fetch binaries"
-  - func: "compile"
-    vars:
-      target_to_build: RealmFFI
-  - command: shell.exec
-    params:
-      working_dir: realm-core
-      shell: /bin/bash
-      script: |-
-        #!/bin/bash
-        set -o errexit
-        set -o pipefail
-
-        mkdir bloaty-binaries && cd bloaty-binaries
-        curl --silent -L ${bloaty_url} | tar -xz --strip-components=1
-        BLOATY=$(pwd)/bin/bloaty
-        cd ..
-
-        FILES_TO_ANALYZE="./build/src/realm/object-store/c_api/${cmake_build_type|Debug}/librealm-ffi.so"
-
-        mkdir bloaty-results
-        for input_path in $FILES_TO_ANALYZE; do
-            input_file=$(basename $input_path)
-            $BLOATY -d shortsymbols $input_path -n 0 --csv > "bloaty-results/$input_file-shortsymbols.csv"
-            $BLOATY -d sections $input_path -n 0 --csv > "bloaty-results/$input_file-sections.csv"
-            $BLOATY -d shortsymbols $input_path -n 0 > "bloaty-results/$input_file-shortsymbols.txt"
-            $BLOATY -d sections $input_path -n 0 > "bloaty-results/$input_file-sections.txt"
-            $BLOATY -d compileunits $input_path -n 0 > "bloaty-results/$input_file-compileunits.txt"
-            $BLOATY -d compileunits $input_path -n 0 --csv > "bloaty-results/$input_file-compileunits.csv"
-
-            echo "Bloaty sections output for $input_file"
-            head -n 100 "bloaty-results/$input_file-sections.txt"
-            echo
-            echo "Bloaty compile units output for $input_file"
-            head -n 100 "bloaty-results/$input_file-compileunits.txt"
-            echo
-            echo "Bloaty short symbols output for $input_file"
-            head -n 100 "bloaty-results/$input_file-shortsymbols.txt"
-
-            ${python3|} ./evergreen/bloaty_to_json.py \
-                --short-symbols-input="bloaty-results/$input_file-shortsymbols.csv" \
-                --sections-input="bloaty-results/$input_file-sections.csv" \
-                --compileunits-input="bloaty-results/$input_file-compileunits.csv" \
-                --analyzed-file=$input_file \
-                --output "bloaty-results/$input_file-results.json" \
-                --project=${project} \
-                --execution=${execution} \
-                --is-patch=${is_patch} \
-                --build-variant=${build_variant} \
-                --branch=${branch_name} \
-                --revision=${revision} \
-                --task-id=${task_id} \
-                --task-name=${task_name} \
-                --revision-order-id=${revision_order_id} \
-                --version-id=${version_id}
-
-            # TODO(JBR) This is pointing to a test application for now. When we have charts configured we can create
-            # a real realm app to house them and this URL will change.
-            curl \
-                -H "Content-Type: application/json" \
-                -d "@bloaty-results/$input_file-results.json" \
-                https://us-east-1.aws.webhooks.mongodb-realm.com/api/client/v2.0/app/application-0-htnkr/service/http1/incoming_webhook/upload_bloaty_results?secret=${bloaty_secret}
-        done
-
-  - command: s3.put
-    params:
-      aws_key: '${artifacts_aws_access_key}'
-      aws_secret: '${artifacts_aws_secret_key}'
-      local_files_include_filter:
-        - realm-core/bloaty-results/*.csv
-      remote_file: '${project}/${branch_name}/${task_id}/${execution}/bloaty-results-'
-      bucket: mciuploads
-      permissions: public-read
-      content_type: text/csv
-      display_name: bloaty-results
-  - command: s3.put
-    params:
-      aws_key: '${artifacts_aws_access_key}'
-      aws_secret: '${artifacts_aws_secret_key}'
-      local_files_include_filter:
-        - realm-core/bloaty-results/*.txt
-      remote_file: '${project}/${branch_name}/${task_id}/${execution}/bloaty-results-'
-      bucket: mciuploads
-      permissions: public-read
-      content_type: text/plain
-      display_name: bloaty-results
-  - command: s3.put
-    params:
-      aws_key: '${artifacts_aws_access_key}'
-      aws_secret: '${artifacts_aws_secret_key}'
-      local_files_include_filter:
-        - realm-core/bloaty-results/*.json
-      remote_file: '${project}/${branch_name}/${task_id}/${execution}/bloaty-results-'
-      bucket: mciuploads
-      permissions: public-read
-      content_type: application/json
-      display_name: bloaty-results
-
 - name: long-running-core-tests
   tags: [ "for_nightly_tests" ]
   allowed_requesters: [ "ad_hoc", "patch" ]
@@ -1335,10 +1234,9 @@ buildvariants:
   display_name: "Ubuntu"
   run_on: ubuntu2204-arm64-large
   expansions:
-    clang_url: "https://github.com/llvm/llvm-project/releases/download/llvmorg-18.1.1/clang+llvm-18.1.1-aarch64-linux-gnu.tar.xz"
     fetch_missing_dependencies: On
-    c_compiler: "./clang_binaries/bin/clang"
-    cxx_compiler: "./clang_binaries/bin/clang++"
+    c_compiler: "/opt/clang+llvm/bin/clang"
+    cxx_compiler: "/opt/clang+llvm/bin/clang++"
   tasks:
   - name: compile_test
 
@@ -1346,10 +1244,9 @@ buildvariants:
   display_name: "Ubuntu (Sync Multiplexing Disabled)"
   run_on: ubuntu2204-arm64-large
   expansions:
-    clang_url: "https://github.com/llvm/llvm-project/releases/download/llvmorg-18.1.1/clang+llvm-18.1.1-aarch64-linux-gnu.tar.xz"
     fetch_missing_dependencies: On
-    c_compiler: "./clang_binaries/bin/clang"
-    cxx_compiler: "./clang_binaries/bin/clang++"
+    c_compiler: "/opt/clang+llvm/bin/clang"
+    cxx_compiler: "/opt/clang+llvm/bin/clang++"
     disable_sync_multiplexing: On
   tasks:
   - name: compile_test
@@ -1358,11 +1255,9 @@ buildvariants:
   display_name: "Ubuntu (Encryption Enabled w/TSAN)"
   run_on: ubuntu2204-arm64-small
   expansions:
-    clang_url: "https://github.com/llvm/llvm-project/releases/download/llvmorg-18.1.1/clang+llvm-18.1.1-aarch64-linux-gnu.tar.xz"
     fetch_missing_dependencies: On
-    c_compiler: "./clang_binaries/bin/clang"
-    cxx_compiler: "./clang_binaries/bin/clang++"
-    llvm_symbolizer: "./clang_binaries/bin/llvm-symbolizer"
+    c_compiler: "/opt/clang+llvm/bin/clang"
+    cxx_compiler: "/opt/clang+llvm/bin/clang++"
     run_with_encryption: On
     enable_tsan: On
     cmake_build_type: RelWithDebInfo
@@ -1373,11 +1268,9 @@ buildvariants:
   display_name: "Ubuntu (Encryption Enabled w/ASAN)"
   run_on: ubuntu2204-arm64-large
   expansions:
-    clang_url: "https://github.com/llvm/llvm-project/releases/download/llvmorg-18.1.1/clang+llvm-18.1.1-aarch64-linux-gnu.tar.xz"
     fetch_missing_dependencies: On
-    c_compiler: "./clang_binaries/bin/clang"
-    cxx_compiler: "./clang_binaries/bin/clang++"
-    llvm_symbolizer: "./clang_binaries/bin/llvm-symbolizer"
+    c_compiler: "/opt/clang+llvm/bin/clang"
+    cxx_compiler: "/opt/clang+llvm/bin/clang++"
     run_with_encryption: On
     enable_asan: On
     cmake_build_type: RelWithDebInfo
@@ -1388,30 +1281,25 @@ buildvariants:
   display_name: "Ubuntu (Release build)"
   run_on: ubuntu2204-arm64-large
   expansions:
-    clang_url: "https://github.com/llvm/llvm-project/releases/download/llvmorg-18.1.1/clang+llvm-18.1.1-aarch64-linux-gnu.tar.xz"
-    bloaty_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/bloaty-v1.1-39-gefc1c61-ubuntu2004-x86_64.tar.gz"
     cmake_build_type: RelWithDebInfo
     fetch_missing_dependencies: On
-    c_compiler: "./clang_binaries/bin/clang"
-    cxx_compiler: "./clang_binaries/bin/clang++"
+    c_compiler: "/opt/clang+llvm/bin/clang"
+    cxx_compiler: "/opt/clang+llvm/bin/clang++"
     python3: /opt/mongodbtoolchain/v3/bin/python3
   tasks:
   - name: compile_test_and_package
   - name: benchmarks
   - name: long-running-tests
-  - name: bloaty
 
 - name: ubuntu-asan
   display_name: "Ubuntu (ASAN)"
   run_on: ubuntu2204-arm64-large
   expansions:
-    clang_url: "https://github.com/llvm/llvm-project/releases/download/llvmorg-18.1.1/clang+llvm-18.1.1-aarch64-linux-gnu.tar.xz"
     fetch_missing_dependencies: On
     enable_asan: On
     cmake_build_type: RelWithDebInfo
-    c_compiler: "./clang_binaries/bin/clang"
-    cxx_compiler: "./clang_binaries/bin/clang++"
-    llvm_symbolizer: "./clang_binaries/bin/llvm-symbolizer"
+    c_compiler: "/opt/clang+llvm/bin/clang"
+    cxx_compiler: "/opt/clang+llvm/bin/clang++"
   tasks:
   - name: compile_test
   - name: long-running-tests
@@ -1420,13 +1308,11 @@ buildvariants:
   display_name: "Ubuntu (TSAN)"
   run_on: ubuntu2204-arm64-large
   expansions:
-    clang_url: "https://github.com/llvm/llvm-project/releases/download/llvmorg-18.1.1/clang+llvm-18.1.1-aarch64-linux-gnu.tar.xz"
     fetch_missing_dependencies: On
     enable_tsan: On
     cmake_build_type: RelWithDebInfo
-    c_compiler: "./clang_binaries/bin/clang"
-    cxx_compiler: "./clang_binaries/bin/clang++"
-    llvm_symbolizer: "./clang_binaries/bin/llvm-symbolizer"
+    c_compiler: "/opt/clang+llvm/bin/clang"
+    cxx_compiler: "/opt/clang+llvm/bin/clang++"
   tasks:
   - name: compile_test
 
@@ -1434,13 +1320,11 @@ buildvariants:
   display_name: "Ubuntu (UBSAN)"
   run_on: ubuntu2204-arm64-large
   expansions:
-    clang_url: "https://github.com/llvm/llvm-project/releases/download/llvmorg-18.1.1/clang+llvm-18.1.1-aarch64-linux-gnu.tar.xz"
     fetch_missing_dependencies: On
     enable_ubsan: On
     cmake_build_type: RelWithDebInfo
-    c_compiler: "./clang_binaries/bin/clang"
-    cxx_compiler: "./clang_binaries/bin/clang++"
-    llvm_symbolizer: "./clang_binaries/bin/llvm-symbolizer"
+    c_compiler: "/opt/clang+llvm/bin/clang"
+    cxx_compiler: "/opt/clang+llvm/bin/clang++"
   tasks:
   - name: compile_test
 
@@ -1448,11 +1332,10 @@ buildvariants:
   display_name: "Ubuntu (Fuzzer)"
   run_on: ubuntu2204-arm64-large
   expansions:
-    clang_url: "https://github.com/llvm/llvm-project/releases/download/llvmorg-18.1.1/clang+llvm-18.1.1-aarch64-linux-gnu.tar.xz"
     fetch_missing_dependencies: On
     enable_ubsan: On
-    c_compiler: "./clang_binaries/bin/clang"
-    cxx_compiler: "./clang_binaries/bin/clang++"
+    c_compiler: "/opt/clang+llvm/bin/clang"
+    cxx_compiler: "/opt/clang+llvm/bin/clang++"
     cmake_build_type: RelWithDebInfo
     run_with_encryption: On
     enable_fuzzer: On
@@ -1537,9 +1420,8 @@ buildvariants:
   display_name: "Ubuntu Small"
   run_on: ubuntu2204-arm64-small
   expansions:
-    clang_url: "https://github.com/llvm/llvm-project/releases/download/llvmorg-18.1.1/clang+llvm-18.1.1-aarch64-linux-gnu.tar.xz"
-    c_compiler: "./clang_binaries/bin/clang"
-    cxx_compiler: "./clang_binaries/bin/clang++"
+    c_compiler: "/opt/clang+llvm/bin/clang"
+    cxx_compiler: "/opt/clang+llvm/bin/clang++"
     python3: "/opt/mongodbtoolchain/v3/bin/python3"
     use_system_openssl: On
     fetch_missing_dependencies: On
@@ -1632,10 +1514,9 @@ buildvariants:
   display_name: "Ubuntu (Code Coverage)"
   run_on: ubuntu2204-arm64-large
   expansions:
-    clang_url: "https://github.com/llvm/llvm-project/releases/download/llvmorg-18.1.1/clang+llvm-18.1.1-aarch64-linux-gnu.tar.xz"
     fetch_missing_dependencies: On
-    c_compiler: "./clang_binaries/bin/clang"
-    cxx_compiler: "./clang_binaries/bin/clang++"
+    c_compiler: "/opt/clang+llvm/bin/clang"
+    cxx_compiler: "/opt/clang+llvm/bin/clang++"
     enable_llvm_coverage: On
     coveralls_flag_name: "ubuntu-arm64"
     grcov_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/grcov-aarch64-unknown-linux-gnu.tar.bz2"
