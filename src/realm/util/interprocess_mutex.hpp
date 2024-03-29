@@ -74,7 +74,7 @@ private:
 
 class InterprocessMutex {
 public:
-    InterprocessMutex();
+    InterprocessMutex() = default;
     ~InterprocessMutex() noexcept;
 
     // Disable copying. Copying a locked Mutex will create a scenario
@@ -93,7 +93,6 @@ public:
     /// The SharedPart is assumed to have been initialized (possibly by another process)
     /// elsewhere.
     void set_shared_part(SharedPart& shared_part, const std::string& path, const std::string& mutex_name);
-    void set_shared_part(SharedPart& shared_part, File&& lock_file);
 
     /// Destroy shared object. Potentially release system resources. Caller must
     /// ensure that the shared_part is not in use at the point of call.
@@ -130,43 +129,13 @@ public:
 
 private:
 #if REALM_ROBUST_MUTEX_EMULATION
-    struct LockInfo {
-        File m_file;
+    File m_file;
 #if REALM_PLATFORM_APPLE
-        SemaphoreMutex m_local_mutex;
+    SemaphoreMutex m_local_mutex;
 #else
-        Mutex m_local_mutex;
+    Mutex m_local_mutex;
 #endif
-        LockInfo() {}
-        ~LockInfo() noexcept;
-        // Disable copying.
-        LockInfo(const LockInfo&) = delete;
-        LockInfo& operator=(const LockInfo&) = delete;
-    };
-    /// InterprocessMutex created on the same file (same inode on POSIX) share the same LockInfo.
-    /// LockInfo will be saved in a static map as a weak ptr and use the UniqueID as the key.
-    /// Operations on the map need to be protected by s_mutex
-    static std::map<File::UniqueID, std::weak_ptr<LockInfo>>* s_info_map;
-    static Mutex* s_mutex;
-    /// We manually initialize these static variables when first needed,
-    /// creating them on the heap so that they last for the entire lifetime
-    /// of the process. The destructor of these is never called; the
-    /// process will clean up their memory when exiting. It is not enough
-    /// to count instances of InterprocessMutex and clean up these statics when
-    /// the count reaches zero because the program can create more
-    /// InterprocessMutex instances before the process ends, so we really need
-    /// these variables for the entire lifetime of the process.
-    static std::once_flag s_init_flag;
-    static void initialize_statics();
 
-    /// Only used for release_shared_part
-    std::string m_filename;
-    File::UniqueID m_fileuid;
-    std::shared_ptr<LockInfo> m_lock_info;
-
-    /// Free the lock info hold by this instance.
-    /// If it is the last reference, underly resources will be freed as well.
-    void free_lock_info();
 #else
     SharedPart* m_shared_part = nullptr;
 
@@ -178,13 +147,6 @@ private:
     friend class InterprocessCondVar;
 };
 
-inline InterprocessMutex::InterprocessMutex()
-{
-#if REALM_ROBUST_MUTEX_EMULATION
-    std::call_once(s_init_flag, initialize_statics);
-#endif
-}
-
 inline InterprocessMutex::~InterprocessMutex() noexcept
 {
 #ifdef _WIN32
@@ -193,41 +155,7 @@ inline InterprocessMutex::~InterprocessMutex() noexcept
         REALM_ASSERT_RELEASE(b);
     }
 #endif
-
-#if REALM_ROBUST_MUTEX_EMULATION
-    free_lock_info();
-#endif
 }
-
-#if REALM_ROBUST_MUTEX_EMULATION
-inline InterprocessMutex::LockInfo::~LockInfo() noexcept
-{
-    if (m_file.is_attached()) {
-        m_file.close();
-    }
-}
-
-inline void InterprocessMutex::free_lock_info()
-{
-    // It has not been initialized yet.
-    if (!m_lock_info)
-        return;
-
-    std::lock_guard<Mutex> guard(*s_mutex);
-
-    m_lock_info.reset();
-    if ((*s_info_map)[m_fileuid].expired()) {
-        s_info_map->erase(m_fileuid);
-    }
-    m_filename.clear();
-}
-
-inline void InterprocessMutex::initialize_statics()
-{
-    s_mutex = new Mutex();
-    s_info_map = new std::map<File::UniqueID, std::weak_ptr<LockInfo>>();
-}
-#endif
 
 inline void InterprocessMutex::set_shared_part(SharedPart& shared_part, const std::string& path,
                                                const std::string& mutex_name)
@@ -235,41 +163,23 @@ inline void InterprocessMutex::set_shared_part(SharedPart& shared_part, const st
 #if REALM_ROBUST_MUTEX_EMULATION
     static_cast<void>(shared_part);
 
-    free_lock_info();
+    std::string filename;
     if (path.size() == 0) {
-        m_filename = make_temp_file(mutex_name.c_str());
+        filename = make_temp_file(mutex_name.c_str());
     }
     else {
-        m_filename = path + "." + mutex_name + ".mx";
+        filename = util::format("%1.%2.mx", path, mutex_name);
     }
 
-    std::lock_guard<Mutex> guard(*s_mutex);
-
-    // Try to get the file uid if the file exists
-    if (auto uid = File::get_unique_id(m_filename)) {
-        m_fileuid = std::move(*uid);
-        auto result = s_info_map->find(m_fileuid);
-        if (result != s_info_map->end()) {
-            // File exists and the lock info has been created in the map.
-            m_lock_info = result->second.lock();
-            REALM_ASSERT_RELEASE(m_lock_info && m_lock_info->m_file.get_path() == m_filename);
-            return;
-        }
-    }
-
-    // LockInfo has not been created yet.
-    m_lock_info = std::make_shared<LockInfo>();
     // Always open file for write and retreive the uid in case other process
     // deletes the file. Avoid using just mode_Write (which implies truncate).
     // On fat32/exfat uid could be reused by OS in a situation when
     // multiple processes open and truncate the same lock file concurrently.
-    m_lock_info->m_file.open(m_filename, File::mode_Append);
+    m_file.close();
+    m_file.open(filename, File::mode_Append);
     // exFAT does not allocate a unique id for the file until it's non-empty
-    m_lock_info->m_file.resize(1);
-    m_fileuid = m_lock_info->m_file.get_unique_id();
+    m_file.resize(1);
 
-    REALM_ASSERT_RELEASE(s_info_map->find(m_fileuid) == s_info_map->end());
-    (*s_info_map)[m_fileuid] = m_lock_info;
 #elif defined(_WIN32)
     if (m_handle) {
         bool b = CloseHandle(m_handle);
@@ -292,40 +202,13 @@ inline void InterprocessMutex::set_shared_part(SharedPart& shared_part, const st
 #endif
 }
 
-inline void InterprocessMutex::set_shared_part(SharedPart& shared_part, File&& lock_file)
-{
-#if REALM_ROBUST_MUTEX_EMULATION
-    static_cast<void>(shared_part);
-
-    free_lock_info();
-
-    std::lock_guard<Mutex> guard(*s_mutex);
-
-    m_fileuid = lock_file.get_unique_id();
-    auto result = s_info_map->find(m_fileuid);
-    if (result == s_info_map->end()) {
-        m_lock_info = std::make_shared<LockInfo>();
-        m_lock_info->m_file = std::move(lock_file);
-        (*s_info_map)[m_fileuid] = m_lock_info;
-    }
-    else {
-        // File exists and the lock info has been created in the map.
-        m_lock_info = result->second.lock();
-        lock_file.close();
-    }
-#else
-    m_shared_part = &shared_part;
-    static_cast<void>(lock_file);
-#endif
-}
-
 inline void InterprocessMutex::release_shared_part()
 {
 #if REALM_ROBUST_MUTEX_EMULATION
-    if (!m_filename.empty())
-        File::try_remove(m_filename);
-
-    free_lock_info();
+    if (m_file.is_attached()) {
+        m_file.close();
+        File::try_remove(m_file.get_path());
+    }
 #else
     m_shared_part = nullptr;
 #endif
@@ -334,8 +217,8 @@ inline void InterprocessMutex::release_shared_part()
 inline void InterprocessMutex::lock()
 {
 #if REALM_ROBUST_MUTEX_EMULATION
-    std::unique_lock mutex_lock(m_lock_info->m_local_mutex);
-    m_lock_info->m_file.lock();
+    std::unique_lock mutex_lock(m_local_mutex);
+    m_file.lock();
     mutex_lock.release();
 #else
 
@@ -352,21 +235,16 @@ inline void InterprocessMutex::lock()
 inline bool InterprocessMutex::try_lock()
 {
 #if REALM_ROBUST_MUTEX_EMULATION
-    std::unique_lock mutex_lock(m_lock_info->m_local_mutex, std::try_to_lock_t());
+    std::unique_lock mutex_lock(m_local_mutex, std::try_to_lock_t());
     if (!mutex_lock.owns_lock()) {
         return false;
     }
-    bool success = m_lock_info->m_file.try_lock();
-    if (success) {
-        mutex_lock.release();
-        return true;
-    }
-    else {
+    if (!m_file.try_lock()) {
         return false;
     }
-#else
-
-#ifdef _WIN32
+    mutex_lock.release();
+    return true;
+#elif defined(_WIN32)
     DWORD ret = WaitForSingleObject(m_handle, 0);
     REALM_ASSERT_RELEASE(ret != WAIT_FAILED);
 
@@ -380,15 +258,14 @@ inline bool InterprocessMutex::try_lock()
     REALM_ASSERT(m_shared_part);
     return m_shared_part->try_lock([]() {});
 #endif
-#endif
 }
 
 
 inline void InterprocessMutex::unlock()
 {
 #if REALM_ROBUST_MUTEX_EMULATION
-    m_lock_info->m_file.unlock();
-    m_lock_info->m_local_mutex.unlock();
+    m_file.unlock();
+    m_local_mutex.unlock();
 #else
 #ifdef _WIN32
     bool b = ReleaseMutex(m_handle);
