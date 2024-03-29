@@ -158,7 +158,7 @@ public:
     }
 
 protected:
-    constexpr static int section_shift = 26;
+    constexpr static int section_shift = 25;
 
     std::atomic<size_t> m_baseline; // Separation line between immutable and mutable refs.
 
