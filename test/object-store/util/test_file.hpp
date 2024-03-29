@@ -76,6 +76,8 @@ struct TestFile : realm::Realm::Config {
 
     TestFile(const TestFile&) = delete;
     TestFile& operator=(const TestFile&) = delete;
+    TestFile(TestFile&&) = default;
+    TestFile& operator=(TestFile&&) = default;
 
     // The file should outlive the object, ie. should not be deleted in destructor
     void persist()
@@ -97,26 +99,6 @@ struct InMemoryTestFile : realm::Realm::Config {
 
 void advance_and_notify(realm::Realm& realm);
 void on_change_but_no_notify(realm::Realm& realm);
-
-#ifndef TEST_ENABLE_LOGGING
-#define TEST_ENABLE_LOGGING 0 // change to 1 to enable trace-level logging
-#endif
-
-#ifndef TEST_LOGGING_LEVEL
-#if TEST_ENABLE_LOGGING
-#define TEST_LOGGING_LEVEL all
-#else
-#define TEST_LOGGING_LEVEL off
-#endif // TEST_ENABLE_LOGGING
-#endif // TEST_LOGGING_LEVEL
-
-#define TEST_LOGGING_LEVEL_STORAGE off
-#define TEST_LOGGING_LEVEL_SERVER off
-/*
-#define TEST_LOGGING_LEVEL_SYNC off
-#define TEST_LOGGING_LEVEL_RESET trace
-#define TEST_LOGGING_LEVEL_APP off
-*/
 
 #if REALM_ENABLE_SYNC
 
@@ -198,7 +180,6 @@ public:
         std::string base_path;
         realm::SyncManager::MetadataMode metadata_mode = realm::SyncManager::MetadataMode::NoMetadata;
         bool should_teardown_test_directory = true;
-        realm::util::Logger::Level log_level = realm::util::Logger::Level::TEST_LOGGING_LEVEL;
         bool start_sync_client = true;
     };
 
@@ -291,18 +272,36 @@ public:
     }
     const std::shared_ptr<realm::SyncManager>& sync_manager() const
     {
+        REALM_ASSERT(m_app);
         return m_app->sync_manager();
     }
+
+    void close()
+    {
+        close(false);
+    }
+
+    // Re-open the app without deleting the dir contents - if close() has not been called
+    // the App will be closed first before recreating the object.
+    // If log_in is true, user will be logged in again once the App instance is created
+    void reopen(bool log_in);
+
+    realm::app::App::Config app_config;
+    realm::SyncClientConfig sc_config;
 
     std::vector<realm::bson::BsonDocument> get_documents(realm::SyncUser& user, const std::string& object_type,
                                                          size_t expected_count) const;
 
 private:
+    // Close the app and, if tear_down, remove the app data and base_file_path directory
+    void close(bool tear_down);
+
     std::shared_ptr<realm::app::App> m_app;
     std::unique_ptr<realm::AppSession> m_app_session;
     std::string m_base_file_path;
     bool m_delete_app = true;
     std::shared_ptr<realm::app::GenericNetworkTransport> m_transport;
+    realm::app::AppCredentials user_creds;
 };
 #endif
 

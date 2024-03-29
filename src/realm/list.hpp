@@ -183,7 +183,7 @@ public:
         return *m_tree;
     }
 
-    UpdateStatus update_if_needed_with_status() const final
+    UpdateStatus update_if_needed() const final
     {
         auto status = Base::get_update_status();
         switch (status) {
@@ -199,9 +199,7 @@ public:
                 // perform lazy initialization by treating it as an update.
                 [[fallthrough]];
             case UpdateStatus::Updated: {
-                bool attached = init_from_parent(false);
-                Base::update_content_version();
-                return attached ? UpdateStatus::Updated : UpdateStatus::Detached;
+                return init_from_parent(false);
             }
         }
         REALM_UNREACHABLE();
@@ -214,14 +212,13 @@ public:
             // In case of errors, an exception is thrown.
             constexpr bool allow_create = true;
             init_from_parent(allow_create); // Throws
-            Base::update_content_version();
         }
     }
 
     /// Update the accessor and return true if it is attached after the update.
     inline bool update() const
     {
-        return update_if_needed_with_status() != UpdateStatus::Detached;
+        return update_if_needed() != UpdateStatus::Detached;
     }
 
     size_t translate_index(size_t ndx) const noexcept override
@@ -255,28 +252,15 @@ protected:
     using Base::m_col_key;
     using Base::m_nullable;
 
-    bool init_from_parent(bool allow_create) const
+    UpdateStatus init_from_parent(bool allow_create) const
     {
         if (!m_tree) {
             m_tree.reset(new BPlusTree<T>(get_alloc()));
             const ArrayParent* parent = this;
             m_tree->set_parent(const_cast<ArrayParent*>(parent), 0);
         }
-
-        if (m_tree->init_from_parent()) {
-            // All is well
-            return true;
-        }
-
-        if (!allow_create) {
-            m_tree->detach();
-            return false;
-        }
-
-        // The ref in the column was NULL, create the tree in place.
-        m_tree->create();
-        REALM_ASSERT(m_tree->is_attached());
-        return true;
+        Base::update_content_version();
+        return do_init_from_parent(m_tree.get(), 0, allow_create);
     }
 
     template <class Func>
@@ -307,7 +291,7 @@ public:
     {
         this->set_owner(owner, col_key);
     }
-    Lst(ColKey col_key, size_t level = 1)
+    Lst(ColKey col_key, uint8_t level = 1)
         : Base(col_key)
         , CollectionParent(level)
     {
@@ -448,7 +432,7 @@ public:
         return *m_tree;
     }
 
-    UpdateStatus update_if_needed_with_status() const final;
+    UpdateStatus update_if_needed() const final;
 
     void ensure_created()
     {
@@ -457,15 +441,13 @@ public:
             // In case of errors, an exception is thrown.
             constexpr bool allow_create = true;
             init_from_parent(allow_create); // Throws
-            Base::update_content_version();
-            CollectionParent::m_parent_version++;
         }
     }
 
     /// Update the accessor and return true if it is attached after the update.
     inline bool update() const
     {
-        return update_if_needed_with_status() != UpdateStatus::Detached;
+        return update_if_needed() != UpdateStatus::Detached;
     }
 
     // Overriding members in CollectionParent
@@ -500,10 +482,17 @@ public:
     {
         return get_obj().get_table();
     }
-    bool update_if_needed() const override;
     const Obj& get_object() const noexcept override
     {
         return get_obj();
+    }
+    uint32_t parent_version() const noexcept override
+    {
+        return m_parent_version;
+    }
+    void update_content_version() const noexcept override
+    {
+        Base::update_content_version();
     }
     ref_type get_collection_ref(Index, CollectionType) const override;
     bool check_collection_ref(Index, CollectionType) const noexcept override;
@@ -527,7 +516,7 @@ private:
     using Base::m_col_key;
     using Base::m_nullable;
 
-    bool init_from_parent(bool allow_create) const;
+    UpdateStatus init_from_parent(bool allow_create) const;
 
     template <class Func>
     void find_all_mixed_unresolved_links(Func&& func) const
@@ -644,7 +633,7 @@ public:
     }
     void add(const Obj& obj)
     {
-        if (get_target_table()->get_key() != obj.get_table_key()) {
+        if (get_target_table() != obj.get_table()) {
             throw InvalidArgument("LnkLst::add: Wrong object type");
         }
         add(obj.get_key());
@@ -800,7 +789,7 @@ private:
 
     UpdateStatus do_update_if_needed() const final
     {
-        return m_list.update_if_needed_with_status();
+        return m_list.update_if_needed();
     }
 
     BPlusTree<ObjKey>* get_mutable_tree() const final

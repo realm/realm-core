@@ -1,10 +1,11 @@
 # NEXT RELEASE
 
 ### Enhancements
-* Add support to synchronize collections embedded in Mixed properties and other collections (except sets) ([PR #7353](https://github.com/realm/realm-core/pull/7353)).
+* Introduce sync 'progress_estimate' parameter (value from 0.0 to 1.0) for existing sync 'ProgressNotifierCallback' api to report sync progress on current batch of upload/download until completion ([#7450](https://github.com/realm/realm-core/issues/7450))
 
 ### Fixed
-* Fixed conflict resolution bug which may result in an crash when the AddInteger instruction on Mixed properties is merged against updates to a non-integer type ([PR #7353](https://github.com/realm/realm-core/pull/7353)).
+* <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
+* Fix an assertion failure "m_lock_info && m_lock_info->m_file.get_path() == m_filename" that appears to be related to opening a Realm while the file is in the process of being closed on another thread ([Swift #8507](https://github.com/realm/realm-swift/issues/8507)).
 
 ### Breaking changes
 * None.
@@ -15,7 +16,71 @@
 -----------
 
 ### Internals
-* None.
+* Update libuv used in object store tests from v1.35.0 to v1.48.0 ([PR #7508](https://github.com/realm/realm-core/pull/7508)).
+* Made `set_default_logger` nullable in the bindgen spec.yml (PR [#7515](https://github.com/realm/realm-core/pull/7515)).
+
+----------------------------------------------
+
+# 14.4.1 Release notes
+
+### Fixed
+* Fix pass a thread safe reference to init subscription callback. ([#7497](https://github.com/realm/realm-core/issues/7497), since v13.16.0)
+
+### Compatibility
+* Fileformat: Generates files with format v24. Reads and automatically upgrade from fileformat v10. If you want to upgrade from an earlier file format version you will have to use RealmCore v13.x.y or earlier.
+
+-----------
+
+### Internals
+* Update Catch2 from v3.3.2 to v3.5.3 ([PR #7297](https://github.com/realm/realm-core/pull/7509)).
+
+----------------------------------------------
+
+# 14.4.0 Release notes
+
+### Enhancements
+* Nested path included in 'OutOfBoundsø error message ([#7438](https://github.com/realm/realm-core/issues/7438))
+* Improve file compaction performance on platforms with page sizes greater than 4k (for example arm64 Apple platforms) for files less than 256 pages in size ([PR #7492](https://github.com/realm/realm-core/pull/7492)).
+
+### Fixed
+* Modifying nested collections left the accessor used to make the modification in a stale state, resulting in some unneccesary work being done when making multiple modifications via one accessor ([PR #7470](https://github.com/realm/realm-core/pull/7470), since v14.0.0).
+* Fix depth level for nested collection in debug mode, set it to the same level as release ([#7484](https://github.com/realm/realm-core/issues/7484), since v14.0.0).
+* Fix opening realm with cached user while offline results in fatal error and session does not retry connection. ([#7349](https://github.com/realm/realm-core/issues/7349), since v13.26.0)
+* Fix disallow Sets in ArrayMixed. ([#7502](https://github.com/realm/realm-core/pull/7502), since v14.0.0)
+
+### Breaking changes
+* Update C-API log callback signature to include the log category, and `realm_set_log_callback` to not take a `realm_log_level_e`. ([PR #7494](https://github.com/realm/realm-core/pull/7494)
+
+### Compatibility
+* Fileformat: Generates files with format v24. Reads and automatically upgrade from fileformat v10. If you want to upgrade from an earlier file format version you will have to use RealmCore v13.x.y or earlier.
+
+----------------------------------------------
+
+# 14.3.0 Release notes
+
+### Enhancements
+* Add support to synchronize collections embedded in Mixed properties and other collections (except sets) ([PR #7353](https://github.com/realm/realm-core/pull/7353)).
+* Improve performance of change notifications on nested collections somewhat ([PR #7402](https://github.com/realm/realm-core/pull/7402)).
+* Improve performance of aggregate operations on Dictionaries of objects, particularly when the dictionaries are empty ([PR #7418](https://github.com/realm/realm-core/pull/7418))
+* Added Resumption delay configuration to SyncClientTimeouts. ([PR #7441](https://github.com/realm/realm-core/pull/7441))
+
+### Fixed
+* Fixed conflict resolution bug which may result in an crash when the AddInteger instruction on Mixed properties is merged against updates to a non-integer type ([PR #7353](https://github.com/realm/realm-core/pull/7353)).
+* Fix a spurious crash related to opening a Realm on background thread while the process was in the middle of exiting ([#7420](https://github.com/realm/realm-core/issues/7420jj))
+* Fix a data race in change notification delivery when running at debug log level ([PR #7402](https://github.com/realm/realm-core/pull/7402), since v14.0.0).
+* Fix a 10-15% performance regression when reading data from the Realm resulting from Obj being made a non-trivial type ([PR #7402](https://github.com/realm/realm-core/pull/7402), since v14.0.0).
+
+### Breaking changes
+* Remove `realm_scheduler_set_default_factory()` and `realm_scheduler_has_default_factory()`, and change the `Scheduler` factory function to a bare function pointer rather than a `UniqueFunction` so that it does not have a non-trivial destructor.
+
+### Compatibility
+* Fileformat: Generates files with format v24. Reads and automatically upgrade from fileformat v10. If you want to upgrade from an earlier file format version you will have to use RealmCore v13.x.y or earlier.
+
+-----------
+
+### Internals
+* The CMake option `REALM_MONGODB_ENDPOINT` for running the object-store-tests against baas has been deprecated in favor of an environment variable of the same name ([PR #7423](https://github.com/realm/realm-core/pull/7423)).
+* The object-store-tests test suite can now launch baas containers on its own by specifying a `BAASAAS_API_KEY` in the environment ([PR #7423](https://github.com/realm/realm-core/pull/7423)).
 
 ----------------------------------------------
 

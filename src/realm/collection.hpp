@@ -53,17 +53,18 @@ public:
     {
         return m_obj;
     }
+    uint32_t parent_version() const noexcept final
+    {
+        return 0;
+    }
+    void update_content_version() const noexcept final {}
 
 protected:
     Obj m_obj;
     ref_type m_ref;
-    UpdateStatus update_if_needed_with_status() const final
+    UpdateStatus update_if_needed() const final
     {
         return UpdateStatus::Updated;
-    }
-    bool update_if_needed() const final
-    {
-        return true;
     }
     ref_type get_collection_ref(Index, CollectionType) const final
     {
@@ -175,6 +176,12 @@ public:
         return PathElement(ndx);
     }
 
+    // Clone this collection if it contains objects, and return nullptr otherwise
+    virtual LinkCollectionPtr clone_as_obj_list() const
+    {
+        return nullptr;
+    }
+
     /// Return true if the collection has changed since the last call to
     /// `has_changed()`. Note that this function is not idempotent and updates
     /// the internal state of the accessor if it has changed.
@@ -202,7 +209,7 @@ public:
     }
 
     /// If this is a collection of links, get the target table.
-    virtual TableRef get_target_table() const final
+    TableRef get_target_table() const
     {
         return get_obj().get_target_table(get_col_key());
     }
@@ -254,7 +261,14 @@ protected:
     CollectionBase& operator=(const CollectionBase&) noexcept = default;
     CollectionBase& operator=(CollectionBase&&) noexcept = default;
 
-    void validate_index(const char* msg, size_t index, size_t size) const;
+    void validate_index(const char* msg, size_t index, size_t size) const
+    {
+        if (index >= size) {
+            out_of_bounds(msg, index, size);
+        }
+    }
+    void out_of_bounds(const char* msg, size_t index, size_t size) const;
+    static UpdateStatus do_init_from_parent(BPlusTreeBase* tree, ref_type ref, bool allow_create);
 };
 
 inline std::string_view collection_type_name(CollectionType col_type, bool uppercase = false)
@@ -269,16 +283,6 @@ inline std::string_view collection_type_name(CollectionType col_type, bool upper
     }
     return "";
 }
-
-inline void CollectionBase::validate_index(const char* msg, size_t index, size_t size) const
-{
-    if (index >= size) {
-        throw OutOfBounds(util::format("%1 on %2 '%3.%4'", msg, collection_type_name(get_collection_type()),
-                                       get_table()->get_class_name(), get_property_name()),
-                          index, size);
-    }
-}
-
 
 template <class T>
 inline void check_column_type(ColKey col)
@@ -492,7 +496,7 @@ public:
         if (m_parent) {
             try {
                 // Update the parent. Will throw if parent is not existing.
-                switch (m_parent->update_if_needed_with_status()) {
+                switch (m_parent->update_if_needed()) {
                     case UpdateStatus::Updated:
                         // Make sure to update next time around
                         m_content_version = 0;
@@ -524,7 +528,7 @@ public:
     {
         try {
             // `has_changed()` sneakily modifies internal state.
-            update_if_needed_with_status();
+            update_if_needed();
             if (m_last_content_version != m_content_version) {
                 m_last_content_version = m_content_version;
                 return true;
@@ -563,6 +567,11 @@ public:
         m_content_version = 0;
     }
 
+    CollectionParent* get_owner() const noexcept
+    {
+        return m_parent;
+    }
+
     void to_json(std::ostream&, JSONOutputMode, util::FunctionRef<void(const Mixed&)>) const override;
 
     using Interface::get_owner_key;
@@ -570,17 +579,15 @@ public:
     using Interface::get_target_table;
 
 protected:
-    Obj m_obj_mem;
+    ObjCollectionParent m_obj_mem;
     std::shared_ptr<CollectionParent> m_col_parent;
     CollectionParent::Index m_index;
-    mutable size_t m_my_version = 0;
     ColKey m_col_key;
-    bool m_nullable = false;
-
     mutable uint_fast64_t m_content_version = 0;
-
     // Content version used by `has_changed()`.
     mutable uint_fast64_t m_last_content_version = 0;
+    mutable uint32_t m_parent_version = 0;
+    bool m_nullable = false;
 
     CollectionBaseImpl() = default;
     CollectionBaseImpl(const CollectionBaseImpl& other)
@@ -650,13 +657,14 @@ protected:
 
     UpdateStatus get_update_status() const
     {
-        UpdateStatus status = m_parent ? m_parent->update_if_needed_with_status() : UpdateStatus::Detached;
+        UpdateStatus status = m_parent ? m_parent->update_if_needed() : UpdateStatus::Detached;
 
         if (status != UpdateStatus::Detached) {
             auto content_version = m_alloc->get_content_version();
-            if (content_version != m_content_version || m_my_version != m_parent->m_parent_version) {
+            auto parent_version = m_parent->parent_version();
+            if (content_version != m_content_version || m_parent_version != parent_version) {
                 m_content_version = content_version;
-                m_my_version = m_parent->m_parent_version;
+                m_parent_version = parent_version;
                 status = UpdateStatus::Updated;
             }
         }
@@ -667,27 +675,24 @@ protected:
     /// Refresh the parent object (if needed) and compare version numbers.
     /// Return true if the collection should initialize from parent
     /// Throws if the owning object no longer exists.
-    bool should_update()
+    bool should_update() const
     {
         check_parent();
-        bool changed = m_parent->update_if_needed(); // Throws if the object does not exist.
-        auto content_version = m_alloc->get_content_version();
-
-        if (changed || content_version != m_content_version || m_my_version != m_parent->m_parent_version) {
-            m_content_version = content_version;
-            m_my_version = m_parent->m_parent_version;
-            return true;
+        auto status = get_update_status();
+        if (status == UpdateStatus::Detached) {
+            throw StaleAccessor("Parent no longer exists");
         }
-        return false;
+        return status == UpdateStatus::Updated;
     }
 
-    void bump_content_version()
+    void bump_content_version() noexcept
     {
         REALM_ASSERT(m_alloc);
         m_content_version = m_alloc->bump_content_version();
+        m_parent->update_content_version();
     }
 
-    void update_content_version() const
+    void update_content_version() const noexcept
     {
         REALM_ASSERT(m_alloc);
         m_content_version = m_alloc->get_content_version();
@@ -698,6 +703,7 @@ protected:
         REALM_ASSERT(m_alloc);
         m_alloc->bump_content_version();
         m_alloc->bump_storage_version();
+        m_parent->update_content_version();
     }
 
     Replication* get_replication() const
@@ -728,19 +734,19 @@ protected:
     void set_backlink(ColKey col_key, ObjLink new_link) const
     {
         check_parent();
-        m_parent->set_backlink(col_key, new_link);
+        m_parent->get_object().set_backlink(col_key, new_link);
     }
     // Used when replacing a link, return true if CascadeState contains objects to remove
     bool replace_backlink(ColKey col_key, ObjLink old_link, ObjLink new_link, CascadeState& state) const
     {
         check_parent();
-        return m_parent->replace_backlink(col_key, old_link, new_link, state);
+        return m_parent->get_object().replace_backlink(col_key, old_link, new_link, state);
     }
     // Used when removing a backlink, return true if CascadeState contains objects to remove
     bool remove_backlink(ColKey col_key, ObjLink old_link, CascadeState& state) const
     {
         check_parent();
-        return m_parent->remove_backlink(col_key, old_link, state);
+        return m_parent->get_object().remove_backlink(col_key, old_link, state);
     }
 
     /// Reset the accessor's tracking of the content version. Derived classes
@@ -796,7 +802,7 @@ private:
     ///
     /// If no change has happened to the data, this function returns
     /// `UpdateStatus::NoChange`, and the caller is allowed to not do anything.
-    virtual UpdateStatus update_if_needed_with_status() const = 0;
+    virtual UpdateStatus update_if_needed() const = 0;
 };
 
 namespace _impl {
@@ -814,24 +820,12 @@ void update_unresolved(std::vector<size_t>& vec, const BPlusTree<ObjKey>* tree);
 
 /// Clear the context flag on the tree if there are no more unresolved links.
 void check_for_last_unresolved(BPlusTree<ObjKey>* tree);
-
-/// Proxy class needed because the ObjList interface clobbers method names from
-/// CollectionBase.
-struct ObjListProxy : ObjList {
-    virtual TableRef proxy_get_target_table() const = 0;
-
-    TableRef get_target_table() const final
-    {
-        return proxy_get_target_table();
-    }
-};
-
 } // namespace _impl
 
 /// Base class for collections of objects, where unresolved links (tombstones)
 /// can occur.
 template <class Interface>
-class ObjCollectionBase : public Interface, public _impl::ObjListProxy {
+class ObjCollectionBase : public Interface, public ObjList {
 public:
     static_assert(std::is_base_of_v<CollectionBase, Interface>);
 
@@ -867,7 +861,15 @@ public:
         return m_unresolved.size() != 0;
     }
 
-    using Interface::get_target_table;
+    LinkCollectionPtr clone_as_obj_list() const final
+    {
+        return clone_obj_list();
+    }
+
+    TableRef get_target_table() const final
+    {
+        return Interface::get_target_table();
+    }
 
 protected:
     ObjCollectionBase() = default;
@@ -884,7 +886,7 @@ protected:
     /// `BPlusTree<T>`.
     virtual BPlusTree<ObjKey>* get_mutable_tree() const = 0;
 
-    /// Implements update_if_needed() in a way that ensures the consistency of
+    /// Implements `update_if_needed()` in a way that ensures the consistency of
     /// the unresolved list. Derived classes should call this instead of calling
     /// `update_if_needed()` on their inner accessor.
     UpdateStatus update_if_needed() const
@@ -955,10 +957,6 @@ private:
     // Sorted set of indices containing unresolved links.
     mutable std::vector<size_t> m_unresolved;
 
-    TableRef proxy_get_target_table() const final
-    {
-        return Interface::get_target_table();
-    }
     bool matches(const ObjList& other) const final
     {
         return get_owning_obj().get_key() == other.get_owning_obj().get_key() &&

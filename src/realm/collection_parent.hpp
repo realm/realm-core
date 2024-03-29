@@ -20,15 +20,16 @@
 #define REALM_COLLECTION_PARENT_HPP
 
 #include <realm/alloc.hpp>
-#include <realm/table_ref.hpp>
-#include <realm/path.hpp>
 #include <realm/mixed.hpp>
+#include <realm/path.hpp>
+#include <realm/table_ref.hpp>
 
 namespace realm {
 
 class Obj;
 class Replication;
 class CascadeState;
+class BPlusTreeMixed;
 
 class Collection;
 class CollectionBase;
@@ -74,7 +75,7 @@ public:
     using Index = StableIndex;
 
     // Return the nesting level of the parent
-    size_t get_level() const noexcept
+    uint8_t get_level() const noexcept
     {
         return m_level;
     }
@@ -94,6 +95,16 @@ public:
     virtual size_t find_index(const Index& ndx) const = 0;
     /// Get table of owning object
     virtual TableRef get_table() const noexcept = 0;
+    // Reread the content version from the allocator. Called when a child makes
+    // a write to mark the already up-to-date parent as still being up-to-date.
+    virtual void update_content_version() const noexcept = 0;
+
+    static LstBasePtr get_listbase_ptr(ColKey col_key, uint8_t level);
+    static SetBasePtr get_setbase_ptr(ColKey col_key, uint8_t level);
+    static CollectionBasePtr get_collection_ptr(ColKey col_key, uint8_t level);
+
+    static int64_t generate_key(size_t sz);
+    static void set_key(BPlusTreeMixed& tree, size_t index);
 
 protected:
     friend class Collection;
@@ -101,15 +112,10 @@ protected:
     friend class CollectionBaseImpl;
     friend class CollectionList;
 
-#ifdef REALM_DEBUG
-    static constexpr size_t s_max_level = 4;
-#else
     static constexpr size_t s_max_level = 100;
-#endif
-    size_t m_level = 0;
-    mutable size_t m_parent_version = 0;
+    uint8_t m_level = 0;
 
-    constexpr CollectionParent(size_t level = 0)
+    constexpr CollectionParent(uint8_t level = 0)
         : m_level(level)
     {
     }
@@ -117,10 +123,7 @@ protected:
     virtual ~CollectionParent();
     /// Update the accessor (and return `UpdateStatus::Detached` if the
     // collection is not initialized.
-    virtual UpdateStatus update_if_needed_with_status() const = 0;
-    /// Check if the storage version has changed and update if it has
-    /// Return true if the object was updated
-    virtual bool update_if_needed() const = 0;
+    virtual UpdateStatus update_if_needed() const = 0;
     /// Get owning object
     virtual const Obj& get_object() const noexcept = 0;
     /// Get the top ref from pareht
@@ -133,18 +136,8 @@ protected:
     /// Set the top ref in parent
     virtual void set_collection_ref(Index, ref_type ref, CollectionType) = 0;
 
-    // Used when inserting a new link. You will not remove existing links in this process
-    void set_backlink(ColKey col_key, ObjLink new_link) const;
-    // Used when replacing a link, return true if CascadeState contains objects to remove
-    bool replace_backlink(ColKey col_key, ObjLink old_link, ObjLink new_link, CascadeState& state) const;
-    // Used when removing a backlink, return true if CascadeState contains objects to remove
-    bool remove_backlink(ColKey col_key, ObjLink old_link, CascadeState& state) const;
-
-    LstBasePtr get_listbase_ptr(ColKey col_key) const;
-    SetBasePtr get_setbase_ptr(ColKey col_key) const;
-    CollectionBasePtr get_collection_ptr(ColKey col_key) const;
-
-    static int64_t generate_key(size_t sz);
+    /// Get the counter which is incremented whenever the root Obj is updated.
+    virtual uint32_t parent_version() const noexcept = 0;
 };
 
 } // namespace realm

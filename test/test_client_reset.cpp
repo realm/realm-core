@@ -1477,13 +1477,6 @@ TEST(ClientReset_Recover_RecoverableChangesOnListsAfterUnrecoverableAreNotDuplic
     CHECK_EQUAL(changes.size(), 1);
 }
 
-namespace {
-class NullLogger : public util::Logger {
-    // Since we don't want to log anything, do_log() does nothing
-    void do_log(const util::LogCategory&, Level, const std::string&) override {}
-};
-} // namespace
-
 // Apply uploaded changes in src to dst as if they had been exchanged by sync
 void apply_changes(DB& src, DB& dst)
 {
@@ -1515,7 +1508,7 @@ void apply_changes(DB& src, DB& dst)
     dst_progress.download.server_version += remote_changesets.size();
     dst_progress.latest_server_version.version += remote_changesets.size();
 
-    NullLogger logger;
+    util::NullLogger logger;
     VersionInfo new_version;
     dst_history.integrate_server_changesets(dst_progress, nullptr, remote_changesets, new_version,
                                             DownloadBatchState::SteadyState, logger, dst.start_read());

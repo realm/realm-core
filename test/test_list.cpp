@@ -1000,6 +1000,9 @@ TEST(List_NestedList_Path)
         CHECK_EQUAL(path.path_from_top[0], col_child);
         CHECK_EQUAL(path.path_from_top[1], "Any");
         CHECK_EQUAL(path.path_from_top[2], "Foo");
+        std::string message;
+        CHECK_THROW_ANY_GET_MESSAGE(list_int->set(7, 0), message);
+        CHECK(message.find("Any['Foo']") != std::string::npos);
     }
 
     // Collections contained in Mixed
@@ -1070,4 +1073,177 @@ TEST(List_Nested_Replication)
     tr->advance_read(&parser);
     Dictionary dict3(*dict, dict2_index);
     CHECK_EQUAL(dict3.get_col_key(), col_any);
+}
+
+namespace realm {
+static std::ostream& operator<<(std::ostream& os, UpdateStatus status)
+{
+    switch (status) {
+        case UpdateStatus::Detached:
+            os << "Detatched";
+            break;
+        case UpdateStatus::Updated:
+            os << "Updated";
+            break;
+        case UpdateStatus::NoChange:
+            os << "NoChange";
+            break;
+    }
+    return os;
+}
+} // namespace realm
+
+TEST(List_UpdateIfNeeded)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    DBRef db = DB::create(make_in_realm_history(), path);
+    auto tr = db->start_write();
+    auto table = tr->add_table("table");
+    auto col = table->add_column(type_Mixed, "mixed");
+    auto col2 = table->add_column(type_Mixed, "col2");
+    auto leading_obj = table->create_object();
+    Obj obj = table->create_object();
+    obj.set_collection(col, CollectionType::List);
+
+    auto list_1 = obj.get_list<Mixed>(col);
+    auto list_2 = obj.get_list<Mixed>(col);
+
+    // The underlying object starts out up-to-date
+    CHECK_EQUAL(list_1.get_obj().update_if_needed(), UpdateStatus::NoChange);
+
+    // Attempt to initialize the accessor and fail because the list is empty,
+    // leaving it detached (only size() can be called on an empty list)
+    CHECK_EQUAL(list_1.update_if_needed(), UpdateStatus::Detached);
+    CHECK_EQUAL(list_2.update_if_needed(), UpdateStatus::Detached);
+
+    list_1.add(Mixed());
+
+    // First accessor was used to create the list so it's already up to date,
+    // but the second is updated
+    CHECK_EQUAL(list_1.update_if_needed(), UpdateStatus::NoChange);
+    CHECK_EQUAL(list_2.update_if_needed(), UpdateStatus::Updated);
+
+    // The list is now non-empty, so a new accessor can initialize
+    auto list_3 = obj.get_list<Mixed>(col);
+    CHECK_EQUAL(list_3.update_if_needed(), UpdateStatus::Updated);
+    CHECK_EQUAL(list_3.update_if_needed(), UpdateStatus::NoChange);
+
+    // A copy of a list is lazily initialized, so it's updated on first call
+    // even if the source was up-to-date
+    auto list_4 = std::make_shared<Lst<Mixed>>(list_3);
+    CHECK_EQUAL(list_4->update_if_needed(), UpdateStatus::Updated);
+
+    // Nested lists work the same way as top-level ones
+    list_4->insert_collection(1, CollectionType::List);
+    auto list_4_1 = list_4->get_list(1);
+    auto list_4_2 = list_4->get_list(1);
+    list_4_1->add(Mixed());
+    CHECK_EQUAL(list_4_1->update_if_needed(), UpdateStatus::NoChange);
+    CHECK_EQUAL(list_4_2->update_if_needed(), UpdateStatus::Updated);
+
+    // Update the row index of the parent object, forcing it to update
+    leading_obj.remove();
+
+    // Updating the base object directly first doesn't change the result of
+    // updating the list
+    CHECK_EQUAL(list_1.get_obj().update_if_needed(), UpdateStatus::Updated);
+    CHECK_EQUAL(list_1.update_if_needed(), UpdateStatus::Updated);
+
+    CHECK_EQUAL(list_2.update_if_needed(), UpdateStatus::Updated);
+    CHECK_EQUAL(list_3.update_if_needed(), UpdateStatus::Updated);
+
+    // These two lists share the same parent, so the first updates due to the
+    // parent returning Updated, and the second updates due to seeing that the
+    // parent version has changed
+    CHECK_EQUAL(list_4_1->update_if_needed(), UpdateStatus::Updated);
+    CHECK_EQUAL(list_4_2->update_if_needed(), UpdateStatus::Updated);
+
+    tr->commit_and_continue_as_read();
+
+    // Committing the write transaction changes the obj's ref, so everything
+    // has to update
+    CHECK_EQUAL(list_1.get_obj().update_if_needed(), UpdateStatus::Updated);
+    CHECK_EQUAL(list_1.update_if_needed(), UpdateStatus::Updated);
+    CHECK_EQUAL(list_2.update_if_needed(), UpdateStatus::Updated);
+    CHECK_EQUAL(list_3.update_if_needed(), UpdateStatus::Updated);
+    CHECK_EQUAL(list_4_1->update_if_needed(), UpdateStatus::Updated);
+    CHECK_EQUAL(list_4_2->update_if_needed(), UpdateStatus::Updated);
+
+    // Perform a write which does not result in obj changing
+    {
+        auto tr2 = db->start_write();
+        tr2->add_table("other table");
+        tr2->commit();
+    }
+    tr->advance_read();
+
+    // The obj's storage version has changed, but nothing needs to update
+    CHECK_EQUAL(list_1.get_obj().update_if_needed(), UpdateStatus::NoChange);
+    CHECK_EQUAL(list_1.update_if_needed(), UpdateStatus::NoChange);
+    CHECK_EQUAL(list_2.update_if_needed(), UpdateStatus::NoChange);
+    CHECK_EQUAL(list_3.update_if_needed(), UpdateStatus::NoChange);
+    CHECK_EQUAL(list_4_1->update_if_needed(), UpdateStatus::NoChange);
+    CHECK_EQUAL(list_4_2->update_if_needed(), UpdateStatus::NoChange);
+
+    // Perform a write which does modify obj
+    {
+        auto tr2 = db->start_write();
+        tr2->get_table("table")->get_object(obj.get_key()).set_any(col2, "value");
+        tr2->commit();
+    }
+    tr->advance_read();
+
+    // Everything needs to update even though the allocator's content version is unchanged
+    CHECK_EQUAL(list_1.get_obj().update_if_needed(), UpdateStatus::Updated);
+    CHECK_EQUAL(list_1.update_if_needed(), UpdateStatus::Updated);
+    CHECK_EQUAL(list_2.update_if_needed(), UpdateStatus::Updated);
+    CHECK_EQUAL(list_3.update_if_needed(), UpdateStatus::Updated);
+    CHECK_EQUAL(list_4_1->update_if_needed(), UpdateStatus::Updated);
+    CHECK_EQUAL(list_4_2->update_if_needed(), UpdateStatus::Updated);
+
+    // Everything updates to detached when the object is removed
+    tr->promote_to_write();
+    obj.remove();
+
+    CHECK_EQUAL(list_1.get_obj().update_if_needed(), UpdateStatus::Detached);
+    CHECK_EQUAL(list_1.update_if_needed(), UpdateStatus::Detached);
+    CHECK_EQUAL(list_2.update_if_needed(), UpdateStatus::Detached);
+    CHECK_EQUAL(list_3.update_if_needed(), UpdateStatus::Detached);
+    CHECK_EQUAL(list_4_1->update_if_needed(), UpdateStatus::Detached);
+    CHECK_EQUAL(list_4_2->update_if_needed(), UpdateStatus::Detached);
+}
+
+TEST(List_AsCollectionParent)
+{
+    Group g;
+    auto table = g.add_table("table");
+    auto col = table->add_column(type_Mixed, "mixed");
+
+    Obj obj = table->create_object();
+    obj.set_collection(col, CollectionType::List);
+    auto list_1 = obj.get_list<Mixed>(col);
+    list_1.insert_collection(0, CollectionType::List);
+
+    // list_1 is stack allocated, so we have to create a new object which can
+    // serve as the owner. This object is not reused for multiple calls.
+    auto list_1_1 = list_1.get_list(0);
+    auto list_1_2 = list_1.get_list(0);
+    CHECK_NOT_EQUAL(list_1_1->get_owner(), &list_1);
+    CHECK_NOT_EQUAL(list_1_1->get_owner(), list_1_2->get_owner());
+
+    // list_2 is heap allocated but not owned by a shared_ptr, so we have to
+    // create a new object which can serve as the owner. This object is not
+    // reused for multiple calls.
+    auto list_2 = obj.get_list_ptr<Mixed>(col);
+    auto list_2_1 = list_2->get_list(0);
+    auto list_2_2 = list_2->get_list(0);
+    CHECK_NOT_EQUAL(list_2_1->get_owner(), list_2.get());
+    CHECK_NOT_EQUAL(list_2_1->get_owner(), list_2_2->get_owner());
+
+    // list_3 is owned by a shared_ptr, so we can just use it as the owner directly
+    auto list_3 = std::shared_ptr{std::move(list_2)};
+    auto list_3_1 = list_3->get_list(0);
+    auto list_3_2 = list_3->get_list(0);
+    CHECK_EQUAL(list_3_1->get_owner(), list_3.get());
+    CHECK_EQUAL(list_3_1->get_owner(), list_3_2->get_owner());
 }

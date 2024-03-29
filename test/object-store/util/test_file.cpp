@@ -65,62 +65,11 @@ inline static int mkstemp(char* _template)
 
 using namespace realm;
 
-static std::vector<std::pair<std::string_view, realm::util::Logger::Level>> default_log_levels = {
-    {"Realm", realm::util::Logger::Level::TEST_LOGGING_LEVEL},
-#ifdef TEST_LOGGING_LEVEL_STORAGE
-    {"Realm.Storage", realm::util::Logger::Level::TEST_LOGGING_LEVEL_STORAGE},
-#endif
-#ifdef TEST_LOGGING_LEVEL_TRANSACTION
-    {"Realm.Storage.Transaction", realm::util::Logger::Level::TEST_LOGGING_LEVEL_TRANSACTION},
-#endif
-#ifdef TEST_LOGGING_LEVEL_QUERY
-    {"Realm.Storage.Query", realm::util::Logger::Level::TEST_LOGGING_LEVEL_QUERY},
-#endif
-#ifdef TEST_LOGGING_LEVEL_OBJECT
-    {"Realm.Storage.Object", realm::util::Logger::Level::TEST_LOGGING_LEVEL_OBJECT},
-#endif
-#ifdef TEST_LOGGING_LEVEL_NOTIFICATION
-    {"Realm.Storage.Notification", realm::util::Logger::Level::TEST_LOGGING_LEVEL_NOTIFICATION},
-#endif
-#ifdef TEST_LOGGING_LEVEL_SYNC
-    {"Realm.Sync", realm::util::Logger::Level::TEST_LOGGING_LEVEL_SYNC},
-#endif
-#ifdef TEST_LOGGING_LEVEL_CLIENT
-    {"Realm.Sync.Client", realm::util::Logger::Level::TEST_LOGGING_LEVEL_CLIENT},
-#endif
-#ifdef TEST_LOGGING_LEVEL_SESSION
-    {"Realm.Sync.Client.Session", realm::util::Logger::Level::TEST_LOGGING_LEVEL_SESSION},
-#endif
-#ifdef TEST_LOGGING_LEVEL_CHANGESET
-    {"Realm.Sync.Client.Changeset", realm::util::Logger::Level::TEST_LOGGING_LEVEL_CHANGESET},
-#endif
-#ifdef TEST_LOGGING_LEVEL_NETWORK
-    {"Realm.Sync.Client.Network", realm::util::Logger::Level::TEST_LOGGING_LEVEL_NETWORK},
-#endif
-#ifdef TEST_LOGGING_LEVEL_RESET
-    {"Realm.Sync.Client.Reset", realm::util::Logger::Level::TEST_LOGGING_LEVEL_RESET},
-#endif
-#ifdef TEST_LOGGING_LEVEL_SERVER
-    {"Realm.Sync.Server", realm::util::Logger::Level::TEST_LOGGING_LEVEL_SERVER},
-#endif
-#ifdef TEST_LOGGING_LEVEL_APP
-    {"Realm.App", realm::util::Logger::Level::TEST_LOGGING_LEVEL_APP},
-#endif
-};
-
-static void set_default_level_thresholds()
-{
-    for (auto [cat, level] : default_log_levels) {
-        realm::util::LogCategory::get_category(cat).set_default_level_threshold(level);
-    }
-}
-
 TestFile::TestFile()
 {
     disable_sync_to_disk();
     m_temp_dir = util::make_temp_dir();
     path = (fs::path(m_temp_dir) / "realm.XXXXXX").string();
-    set_default_level_thresholds();
     if (const char* crypt_key = test_util::crypt_key()) {
         encryption_key = std::vector<char>(crypt_key, crypt_key + 64);
     }
@@ -167,7 +116,6 @@ InMemoryTestFile::InMemoryTestFile()
     in_memory = true;
     schema_version = 0;
     encryption_key = std::vector<char>();
-    set_default_level_thresholds();
 }
 
 DBOptions InMemoryTestFile::options() const
@@ -389,12 +337,10 @@ TestAppSession::TestAppSession(AppSession session,
 {
     if (!m_transport)
         m_transport = instance_of<SynchronousTestTransport>;
-    auto app_config = get_config(m_transport, *m_app_session);
-    set_default_level_thresholds();
+    app_config = get_config(m_transport, *m_app_session);
     set_app_config_defaults(app_config, m_transport);
 
     util::try_make_dir(m_base_file_path);
-    SyncClientConfig sc_config;
     sc_config.base_file_path = m_base_file_path;
     sc_config.metadata_mode = realm::SyncManager::MetadataMode::NoEncryption;
     sc_config.reconnect_mode = reconnect_mode;
@@ -408,23 +354,59 @@ TestAppSession::TestAppSession(AppSession session,
 
     // initialize sync client
     m_app->sync_manager()->get_sync_client();
-    create_user_and_log_in(m_app);
+    user_creds = create_user_and_log_in(m_app);
 }
 
 TestAppSession::~TestAppSession()
 {
-    if (util::File::exists(m_base_file_path)) {
-        try {
-            m_app->sync_manager()->tear_down_for_testing();
-            util::try_remove_dir_recursive(m_base_file_path);
-        }
-        catch (const std::exception& ex) {
-            std::cerr << ex.what() << "\n";
-        }
-        app::App::clear_cached_apps();
-    }
+    close(true);
     if (m_delete_app) {
         m_app_session->admin_api.delete_app(m_app_session->server_app_id);
+    }
+}
+
+void TestAppSession::close(bool tear_down)
+{
+    try {
+        if (tear_down) {
+            // If tearing down, make sure there's an app to work with
+            if (!m_app) {
+                reopen(false);
+            }
+            REALM_ASSERT(m_app);
+            // Clean up the app data
+            m_app->sync_manager()->tear_down_for_testing();
+        }
+        else if (m_app) {
+            // Otherwise, make sure all the session are closed
+            m_app->sync_manager()->close_all_sessions();
+        }
+        m_app.reset();
+
+        // If tearing down, clean up the test file directory
+        if (tear_down && !m_base_file_path.empty() && util::File::exists(m_base_file_path)) {
+            util::try_remove_dir_recursive(m_base_file_path);
+            m_base_file_path.clear();
+        }
+    }
+    catch (const std::exception& ex) {
+        std::cerr << "Error tearing down TestAppSession: " << ex.what() << "\n";
+    }
+    // Ensure all cached apps are cleared
+    app::App::clear_cached_apps();
+}
+
+void TestAppSession::reopen(bool log_in)
+{
+    // These are REALM_ASSERTs so the test crashes if this object is in a bad state
+    REALM_ASSERT(!m_base_file_path.empty());
+    REALM_ASSERT(!m_app);
+    m_app = app::App::get_app(app::App::CacheMode::Disabled, app_config, sc_config);
+
+    // initialize sync client
+    m_app->sync_manager()->get_sync_client();
+    if (log_in) {
+        log_in_user(m_app, user_creds);
     }
 }
 
@@ -472,10 +454,7 @@ std::vector<bson::BsonDocument> TestAppSession::get_documents(SyncUser& user, co
 
 // MARK: - TestSyncManager
 
-TestSyncManager::Config::Config()
-{
-    set_default_level_thresholds();
-}
+TestSyncManager::Config::Config() {}
 
 TestSyncManager::TestSyncManager(const Config& config, const SyncServer::Config& sync_server_config)
     : m_sync_server(sync_server_config)
@@ -545,8 +524,6 @@ OfflineAppSession::OfflineAppSession(OfflineAppSession::Config config)
     sc_config.base_file_path = m_base_file_path;
     sc_config.metadata_mode = config.metadata_mode;
     sc_config.socket_provider = config.socket_provider;
-
-    set_default_level_thresholds();
 
     m_app = app::App::get_app(app::App::CacheMode::Disabled, app_config, sc_config);
 }

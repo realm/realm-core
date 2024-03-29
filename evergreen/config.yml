@@ -82,7 +82,6 @@ functions:
           if [ -z "${disable_tests_against_baas|}" ]; then
               scheme="http"
               set_cmake_var baas_vars REALM_ENABLE_AUTH_TESTS BOOL On
-              set_cmake_var baas_vars REALM_MONGODB_ENDPOINT STRING "$scheme://localhost:9090"
               if [ -n "${baas_admin_port|}" ]; then
                 set_cmake_var baas_vars REALM_ADMIN_ENDPOINT STRING "$scheme://localhost:${baas_admin_port}"
               fi
@@ -160,7 +159,7 @@ functions:
           if [ -n "${curl_base|}" ]; then
               set_cmake_var curl_vars CURL_LIBRARY PATH "$(./evergreen/abspath.sh ${curl_base}/lib/libcurl.dll.a)"
               set_cmake_var curl_vars CURL_INCLUDE_DIR PATH "$(./evergreen/abspath.sh ${curl_base}/include)"
-              set_cmake_var baas_vars REALM_CURL_CACERTS PATH "$(./evergreen/abspath.sh "${curl_base}/bin/cacert.pem")"
+              set_cmake_var baas_vars REALM_CURL_CACERTS PATH "$(./evergreen/abspath.sh "${curl_base}/bin/curl-ca-bundle.crt")"
           fi
 
           set_cmake_var realm_vars REALM_NO_TESTS BOOL ${no_tests|Off}
@@ -212,10 +211,17 @@ functions:
         file: './realm-core/benchmark_results/results.latest.json'
 
   "run tests":
+    - command: expansions.update
+      params:
+        file: realm-core/dependencies.yml
     - command: shell.exec
       params:
         working_dir: realm-core
         shell: bash
+        env:
+          BAASAAS_API_KEY: "${baasaas_api_key}"
+          BAASAAS_REF_SPEC: "${BAAS_VERSION}"
+          BAASAAS_START_MODE: "githash"
         script: |-
           set -o errexit
           set -o verbose
@@ -251,6 +257,12 @@ functions:
           fi
 
           TEST_FLAGS="--no-tests=error $TEST_FLAGS ${test_flags|}"
+
+          if [[ -n "${disable_tests_against_baas|}" ]]; then
+              unset BAASAAS_API_KEY
+              unset BAASAAS_REF_SPEC
+              unset BAASAAS_START_MODE
+          fi
 
           if [[ -n "${llvm_symbolizer}" ]]; then
               export ASAN_SYMBOLIZER_PATH="$(./evergreen/abspath.sh ${llvm_symbolizer})"
@@ -986,6 +998,7 @@ tasks:
       test_label: objstore-local
       test_executable_name: "realm-object-store-tests"
       verbose_test_output: true
+      disable_tests_against_baas: true
   - func: "check branch state"
 
 # These are baas object store tests that run against baas running on a remote host
@@ -993,11 +1006,9 @@ tasks:
   tags: [ "test_suite", "for_pull_requests", "requires_baas" ]
   exec_timeout_secs: 3600
   commands:
-  - func: "launch remote baas"
   - func: "compile"
     vars:
       target_to_build: ObjectStoreTests
-  - func: "wait for remote baas to start"
   - func: "run tests"
     vars:
       test_label: objstore-baas

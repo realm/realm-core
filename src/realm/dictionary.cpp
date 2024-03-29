@@ -48,7 +48,7 @@ void validate_key_value(const Mixed& key)
 
 /******************************** Dictionary *********************************/
 
-Dictionary::Dictionary(ColKey col_key, size_t level)
+Dictionary::Dictionary(ColKey col_key, uint8_t level)
     : Base(col_key)
     , CollectionParent(level)
 {
@@ -441,11 +441,7 @@ void Dictionary::insert_collection(const PathElement& path_elem, CollectionType 
     if (!old_val || *old_val != new_val) {
         m_values->ensure_keys();
         auto [it, inserted] = insert(path_elem.get_key(), new_val);
-        int64_t key = generate_key(size());
-        while (m_values->find_key(key) != realm::not_found) {
-            key++;
-        }
-        m_values->set_key(it.index(), key);
+        set_key(*m_values, it.index());
     }
 }
 
@@ -651,10 +647,9 @@ size_t Dictionary::find_index(const Index& index) const
     return m_values->find_key(index.get_salt());
 }
 
-UpdateStatus Dictionary::update_if_needed_with_status() const
+UpdateStatus Dictionary::do_update_if_needed(bool allow_create) const
 {
-    auto status = Base::get_update_status();
-    switch (status) {
+    switch (get_update_status()) {
         case UpdateStatus::Detached: {
             m_dictionary_top.reset();
             return UpdateStatus::Detached;
@@ -667,27 +662,23 @@ UpdateStatus Dictionary::update_if_needed_with_status() const
             // perform lazy initialization by treating it as an update.
             [[fallthrough]];
         }
-        case UpdateStatus::Updated: {
-            // Try to initialize. If the dictionary is not initialized
-            // the function will return false;
-            bool attached = init_from_parent(false);
-            Base::update_content_version();
-            CollectionParent::m_parent_version++;
-            return attached ? UpdateStatus::Updated : UpdateStatus::Detached;
-        }
+        case UpdateStatus::Updated:
+            return init_from_parent(allow_create);
     }
     REALM_UNREACHABLE();
 }
 
+UpdateStatus Dictionary::update_if_needed() const
+{
+    constexpr bool allow_create = false;
+    return do_update_if_needed(allow_create);
+}
+
 void Dictionary::ensure_created()
 {
-    if (Base::should_update() || !(m_dictionary_top && m_dictionary_top->is_attached())) {
-        // When allow_create is true, init_from_parent will always succeed
-        // In case of errors, an exception is thrown.
-        constexpr bool allow_create = true;
-        init_from_parent(allow_create); // Throws
-        CollectionParent::m_parent_version++;
-        Base::update_content_version();
+    constexpr bool allow_create = true;
+    if (do_update_if_needed(allow_create) == UpdateStatus::Detached) {
+        throw StaleAccessor("Dictionary no longer exists");
     }
 }
 
@@ -836,8 +827,9 @@ void Dictionary::clear()
     }
 }
 
-bool Dictionary::init_from_parent(bool allow_create) const
+UpdateStatus Dictionary::init_from_parent(bool allow_create) const
 {
+    Base::update_content_version();
     try {
         auto ref = Base::get_collection_ref();
         if ((ref || allow_create) && !m_dictionary_top) {
@@ -870,7 +862,7 @@ bool Dictionary::init_from_parent(bool allow_create) const
             // dictionary detached
             if (!allow_create) {
                 m_dictionary_top.reset();
-                return false;
+                return UpdateStatus::Detached;
             }
 
             // Create dictionary
@@ -880,7 +872,7 @@ bool Dictionary::init_from_parent(bool allow_create) const
             m_dictionary_top->update_parent();
         }
 
-        return true;
+        return UpdateStatus::Updated;
     }
     catch (...) {
         m_dictionary_top.reset();
@@ -1178,7 +1170,6 @@ ref_type Dictionary::get_collection_ref(Index index, CollectionType type) const
         throw realm::IllegalOperation(util::format("Not a %1", type));
     }
     throw StaleAccessor("This collection is no more");
-    return 0;
 }
 
 bool Dictionary::check_collection_ref(Index index, CollectionType type) const noexcept
@@ -1199,13 +1190,12 @@ void Dictionary::set_collection_ref(Index index, ref_type ref, CollectionType ty
     m_values->set(ndx, Mixed(ref, type));
 }
 
-bool Dictionary::update_if_needed() const
+LinkCollectionPtr Dictionary::clone_as_obj_list() const
 {
-    auto status = update_if_needed_with_status();
-    if (status == UpdateStatus::Detached) {
-        throw StaleAccessor("CollectionList no longer exists");
+    if (get_value_data_type() == type_Link) {
+        return std::make_unique<DictionaryLinkValues>(*this);
     }
-    return status == UpdateStatus::Updated;
+    return nullptr;
 }
 
 /************************* DictionaryLinkValues *************************/
