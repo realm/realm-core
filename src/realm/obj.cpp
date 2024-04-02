@@ -1627,7 +1627,7 @@ Obj& Obj::set(ColKey col_key, Geospatial value, bool is_default)
 }
 
 template <>
-Obj& Obj::set(ColKey col_key, std::optional<Geospatial> value, bool)
+Obj& Obj::set(ColKey col_key, std::optional<Geospatial> value, bool is_default)
 {
     checked_update_if_needed();
     auto table = get_table();
@@ -1643,12 +1643,12 @@ Obj& Obj::set(ColKey col_key, std::optional<Geospatial> value, bool)
         throw NotNullable(Group::table_name_to_class_name(table->get_name()), table->get_column_name(col_key));
 
     if (!value) {
-        set_null(col_key);
+        set_null(col_key, is_default);
     }
     else {
         Obj geo = get_linked_object(col_key);
         if (!geo) {
-            geo = create_and_set_linked_object(col_key);
+            geo = create_and_set_linked_object(col_key, is_default);
         }
         value->assign_to(geo);
     }
