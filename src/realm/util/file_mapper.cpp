@@ -128,7 +128,6 @@ int64_t fetch_value_in_file(const std::string& fname, const char* scan_pattern)
     return PageReclaimGovernor::no_match;
 }
 
-
 /* Default reclaim governor
  *
  */
@@ -491,7 +490,8 @@ EncryptedFileMapping* add_mapping(void* addr, size_t size, const FileAttributes&
 {
     size_t fs = to_size_t(File::get_size_static(file.fd));
     if (fs > 0 && fs < page_size())
-        throw DecryptionFailed();
+        throw DecryptionFailed(
+            util::format("file size %1 is less than page size of %2 for '%3'", fs, page_size(), file.path));
 
     LockGuard lock(mapping_mutex);
 

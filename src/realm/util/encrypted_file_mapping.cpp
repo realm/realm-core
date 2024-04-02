@@ -692,7 +692,9 @@ void EncryptedFileMapping::refresh_page(size_t local_page_ndx, size_t required)
                 memset(addr + actual, 0x55, size - actual);
             }
             else {
-                throw DecryptionFailed();
+                size_t fs = to_size_t(File::get_size_static(m_file.fd));
+                throw DecryptionFailed(
+                    util::format("failed to decrypt block %1 in file of size %2", local_page_ndx + m_first_page, fs));
             }
         }
     }

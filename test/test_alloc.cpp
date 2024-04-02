@@ -354,8 +354,13 @@ NONCONCURRENT_TEST_IF(Alloc_MapFailureRecovery, _impl::SimulatedFailure::is_enab
         _impl::SimulatedFailure::prime_mmap(nullptr);
         auto top_ref = alloc.attach_file(path, cfg);
         CHECK(alloc.is_attached());
-        // the internal baseline has capacity for a page but it is not entirely backed by a file (yet)
-        CHECK_EQUAL(alloc.get_baseline(), page_size);
+        if (cfg.encryption_key) {
+            // the internal baseline has capacity for a page but it is not entirely backed by a file (yet)
+            CHECK_EQUAL(alloc.get_baseline(), page_size);
+        }
+        else {
+            CHECK_NOT_EQUAL(alloc.get_baseline(), page_size);
+        }
         // file has not (yet) been expanded to match:
         CHECK_NOT_EQUAL(alloc.get_file_size(), page_size);
         // convert before aligning file size

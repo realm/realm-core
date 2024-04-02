@@ -884,7 +884,9 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg, util::Writ
 
     // the file could have been produced on a device with a different
     // page size than our own so don't expect the size to be aligned
-    size = round_up_to_page_size(size);
+    if (cfg.encryption_key && size != 0 && size != round_up_to_page_size(size)) {
+        size = round_up_to_page_size(size);
+    }
     update_reader_view(size);
     REALM_ASSERT(m_mappings.size());
     m_data = m_mappings[0].primary_mapping.get_addr();

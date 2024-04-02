@@ -412,7 +412,7 @@ std::string make_temp_file(const char* prefix)
 
 size_t page_size()
 {
-    return cached_page_size;
+    return cached_page_size.load(std::memory_order::memory_order_relaxed);
 }
 
 OnlyForTestingPageSizeChange::OnlyForTestingPageSizeChange(size_t new_page_size)

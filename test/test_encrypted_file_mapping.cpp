@@ -324,6 +324,7 @@ TEST(EncryptedFile_IVRefreshing)
 NONCONCURRENT_TEST(EncryptedFile_Portablility)
 {
     TEST_PATH(path);
+    // FIXME: test num_entries= 1. DecryptionFailed() if the file size is less than page_size()
     constexpr size_t num_entries = 5000;
     const char* key = test_util::crypt_key(true);
 
