@@ -2023,10 +2023,10 @@ TEST_CASE("object") {
 
         Obj obj = object1.get_obj();
         REQUIRE(obj.get<Int>("_id") == 7); // pk
-        REQUIRE(obj.get_linklist("array 1").size() == 1);
+        REQUIRE(obj.get_linklist("array 1").size() == 2);
         REQUIRE(obj.get<Int>("int 1") == 1); // non-default from r1
         REQUIRE(obj.get<Int>("int 2") == 2); // non-default from r2
-        REQUIRE(obj.get_linklist("array 2").size() == 1);
+        REQUIRE(obj.get_linklist("array 2").size() == 2);
     }
 #endif
 }
