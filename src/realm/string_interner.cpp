@@ -40,7 +40,7 @@ StringID StringInterner::intern(StringData sd)
     }
     m_strings.push_back(sd);
     m_compressed_strings.push_back(c_str);
-    auto id = m_strings.size();
+    auto id = m_compressed_strings.size();
     m_compressed_string_map[c_str] = id;
     return id;
 }
@@ -53,7 +53,7 @@ std::optional<StringID> StringInterner::lookup(StringData sd)
     auto c_str = compressor.compress(sd, dont_learn);
     auto it = m_compressed_string_map.find(c_str);
     if (it != m_compressed_string_map.end()) {
-        REALM_ASSERT_DEBUG(sd == m_strings[it->second]);
+        REALM_ASSERT_DEBUG(sd == m_strings[it->second - 1]);
         return it->second;
     }
     return {};
@@ -97,7 +97,7 @@ StringData StringInterner::get(StringID id)
 {
     if (id == 0)
         return StringData{nullptr};
-    REALM_ASSERT_DEBUG(id <= m_strings.size());
+    REALM_ASSERT_DEBUG(id <= m_compressed_strings.size());
     std::string str = compressor.decompress(m_compressed_strings[id - 1]);
     REALM_ASSERT_DEBUG(str == m_strings[id - 1]);
     // decompressed string must be kept in memory for a while....

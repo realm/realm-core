@@ -77,7 +77,7 @@ CompressedString StringCompressor::compress(StringData sd, bool learn)
                     m_symbols.push_back({id, from[0], from[1]});
                     m_compression_map[hash] = {id, from[0], from[1]};
                     *to++ = id;
-                    *from += 2;
+                    from += 2;
                 }
                 else {
                     // no more symbol space, so can't compress
@@ -89,7 +89,10 @@ CompressedString StringCompressor::compress(StringData sd, bool learn)
             // copy over trailing symbol
             *to++ = *from++;
         }
-        result.resize(to - result.data());
+        REALM_ASSERT_DEBUG(to > result.data());
+        size_t sz = to - result.data();
+        REALM_ASSERT_DEBUG(sz <= sd.size());
+        result.resize(sz);
         if (from == to) // no compression took place in last iteration
             break;
     }
@@ -121,12 +124,17 @@ std::string StringCompressor::decompress(CompressedString& c_str)
 
 int StringCompressor::compare(CompressedString& A, CompressedString& B)
 {
-    return 0;
+    // TODO: Optimize
+    std::string a = decompress(A);
+    std::string b = decompress(B);
+    return a.compare(b);
 }
 
 int StringCompressor::compare(StringData sd, CompressedString& B)
 {
-    return 0;
+    // TODO: Optimize
+    std::string b = decompress(B);
+    return -b.compare(sd.data());
 }
 
 
