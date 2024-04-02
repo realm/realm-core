@@ -20,6 +20,23 @@
 #define REALM_STRING_INTERNER_HPP
 
 #include <realm/utilities.hpp>
+#include <realm/string_compressor.hpp>
+
+
+template <>
+struct std::hash<CompressedString> {
+    std::size_t operator()(const CompressedString& c) const noexcept
+    {
+        // Why this hash function? I dreamt it up! Feel free to find a better!
+        auto seed = c.size();
+        for (auto& x : c) {
+            seed = (seed + 3) * (x + 7);
+        }
+        return seed;
+    }
+};
+
+
 namespace realm {
 
 
@@ -36,8 +53,11 @@ public:
     StringData get(StringID);
 
 private:
+    StringCompressor compressor;
+    std::vector<CompressedString> m_compressed_strings;
+    std::unordered_map<CompressedString, size_t> m_compressed_string_map;
+    // for reference/debugging (to be removed)
     std::vector<std::string> m_strings;
-    std::unordered_map<std::string, size_t> m_string_map;
 };
 } // namespace realm
 

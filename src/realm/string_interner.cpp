@@ -18,6 +18,7 @@
 
 #include <realm/string_interner.hpp>
 #include <realm/string_data.hpp>
+
 namespace realm {
 
 
@@ -30,13 +31,17 @@ StringID StringInterner::intern(StringData sd)
     // special case for null string
     if (sd.data() == nullptr)
         return 0;
-    std::string string(sd);
-    auto it = m_string_map.find(string);
-    if (it != m_string_map.end())
+    bool learn = true;
+    auto c_str = compressor.compress(sd, learn);
+    auto it = m_compressed_string_map.find(c_str);
+    if (it != m_compressed_string_map.end()) {
+        REALM_ASSERT_DEBUG(sd == m_strings[it->second - 1]);
         return it->second;
+    }
     m_strings.push_back(sd);
+    m_compressed_strings.push_back(c_str);
     auto id = m_strings.size();
-    m_string_map[string] = id;
+    m_compressed_string_map[c_str] = id;
     return id;
 }
 
@@ -44,21 +49,39 @@ std::optional<StringID> StringInterner::lookup(StringData sd)
 {
     if (sd.data() == nullptr)
         return 0;
-    std::string string(sd);
-    auto it = m_string_map.find(string);
-    if (it != m_string_map.end())
+    bool dont_learn = false;
+    auto c_str = compressor.compress(sd, dont_learn);
+    auto it = m_compressed_string_map.find(c_str);
+    if (it != m_compressed_string_map.end()) {
+        REALM_ASSERT_DEBUG(sd == m_strings[it->second]);
         return it->second;
+    }
     return {};
 }
 
 int StringInterner::compare(StringID A, StringID B)
 {
-    return 0;
+    REALM_ASSERT_DEBUG(A < m_compressed_strings.size());
+    REALM_ASSERT_DEBUG(B < m_compressed_strings.size());
+    if (A == B && A == 0)
+        return 0;
+    if (A == 0)
+        return -1;
+    if (B == 0)
+        return 1;
+    return compressor.compare(m_compressed_strings[A], m_compressed_strings[B]);
 }
 
-int StringInterner::compare(StringData, StringID A)
+int StringInterner::compare(StringData s, StringID A)
 {
-    return 0;
+    REALM_ASSERT_DEBUG(A < m_compressed_strings.size());
+    if (s.data() == nullptr && A == 0)
+        return 0;
+    if (s.data() == nullptr)
+        return 1;
+    if (A == 0)
+        return -1;
+    return compressor.compare(s, m_compressed_strings[A]);
 }
 
 // We're handing out StringData which has no ownership, but must be able to
@@ -74,8 +97,9 @@ StringData StringInterner::get(StringID id)
 {
     if (id == 0)
         return StringData{nullptr};
-    REALM_ASSERT(id <= m_strings.size());
-    std::string& str = m_strings[id - 1];
+    REALM_ASSERT_DEBUG(id <= m_strings.size());
+    std::string str = compressor.decompress(m_compressed_strings[id - 1]);
+    REALM_ASSERT_DEBUG(str == m_strings[id - 1]);
     // decompressed string must be kept in memory for a while....
     if (keep_alive.size() < per_thread_decompressed) {
         keep_alive.push_back(str);
