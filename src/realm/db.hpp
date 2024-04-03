@@ -128,7 +128,7 @@ public:
     // calling DB::close(), but after that no new association can be established. To reopen the
     // file (or another file), a new DB object is needed. The specified Replication instance, if
     // any, must remain in existence for as long as the DB.
-    static DBRef create(const std::string& file, bool no_create = false, const DBOptions& options = DBOptions());
+    static DBRef create(const std::string& file, const DBOptions& options = DBOptions());
     static DBRef create(Replication& repl, const std::string& file, const DBOptions& options = DBOptions());
     static DBRef create(std::unique_ptr<Replication> repl, const std::string& file,
                         const DBOptions& options = DBOptions());
@@ -534,10 +534,6 @@ private:
     ///
     /// \param file Filesystem path to a Realm database file.
     ///
-    /// \param no_create If the database file does not already exist, it will be
-    /// created (unless this is set to true.) When multiple threads are involved,
-    /// it is safe to let the first thread, that gets to it, create the file.
-    ///
     /// \param options See DBOptions for details of each option.
     /// Sensible defaults are provided if this parameter is left out.
     ///
@@ -553,13 +549,12 @@ private:
     /// \throw UnsupportedFileFormatVersion if the file format version or
     /// history schema version is one which this version of Realm does not know
     /// how to migrate from.
-    void open(const std::string& file, bool no_create = false, const DBOptions& options = DBOptions())
-        REQUIRES(!m_mutex);
+    void open(const std::string& file, const DBOptions& options = DBOptions()) REQUIRES(!m_mutex);
     void open(BinaryData, bool take_ownership = true) REQUIRES(!m_mutex);
     void open(Replication&, const std::string& file, const DBOptions& options = DBOptions()) REQUIRES(!m_mutex);
-    void open(Replication& repl, const DBOptions options = DBOptions()) REQUIRES(!m_mutex);
+    void open(Replication& repl, const DBOptions& options = DBOptions()) REQUIRES(!m_mutex);
 
-    void do_open(const std::string& file, bool no_create, const DBOptions& options);
+    void do_open(const std::string& file, const DBOptions& options);
 
     Replication* const* get_repl() const noexcept
     {
