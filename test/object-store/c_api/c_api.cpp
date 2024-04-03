@@ -605,7 +605,7 @@ TEST_CASE("C API (non-database)", "[c_api]") {
         CHECK(app_config->app_id == "app_id_123");
         CHECK(app_config->transport == transport);
 
-        CHECK(realm_app_get_default_base_url() == app::App::default_base_url);
+        CHECK(realm_app_get_default_base_url() == app::App::default_base_url());
 
         CHECK(!app_config->base_url);
         realm_app_config_set_base_url(app_config.get(), base_url.c_str());
@@ -695,13 +695,13 @@ TEST_CASE("C API (non-database)", "[c_api]") {
         check_base_url(base_url);
 
         // Reset to the default base url using nullptr
-        update_and_check_base_url(nullptr, app::App::default_base_url);
+        update_and_check_base_url(nullptr, app::App::default_base_url());
 
         // Set to some other base url
         update_and_check_base_url(base_url2.c_str(), base_url2);
 
         // Reset to default base url using empty string
-        update_and_check_base_url("", app::App::default_base_url);
+        update_and_check_base_url("", app::App::default_base_url());
 
         realm_release(sync_user);
         realm_release(token);

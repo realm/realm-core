@@ -275,11 +275,12 @@ void Obj::to_json(std::ostream& out, JSONOutputMode output_mode) const
             else {
                 if (tt->is_embedded()) {
                     if (output_mode == output_mode_xjson_plus) {
-                        out << "{ \"$embedded\": ";
+                        out << "{ \"$embedded\": {";
+                        out << "\"table\": \"" << tt->get_name() << "\", \"value\": ";
                     }
                     tt->get_object(obj_key).to_json(out, output_mode);
                     if (output_mode == output_mode_xjson_plus) {
-                        out << "}";
+                        out << "}}";
                     }
                 }
                 else {
