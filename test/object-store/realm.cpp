@@ -1461,6 +1461,105 @@ TEST_CASE("Get Realm using Async Open", "[sync][pbs][async open]") {
     }
 }
 
+
+TEST_CASE("Syhcnronized realm: AutoOpen", "[sync][baas][pbs][async open]") {
+    const auto partition = random_string(100);
+    auto schema = get_default_schema();
+    enum TestMode { expired_at_start, expired_by_websocket, websocket_fails };
+    enum FailureMode { location_fails, token_fails, token_not_authorized };
+
+    auto logger = util::Logger::get_default_logger();
+    auto transport = std::make_shared<HookedSynchronousTransport>();
+    auto socket_provider = std::make_shared<HookedSocketProvider>(logger, "some user agent");
+    std::mutex mutex;
+
+    // Create the app session and get the logged in user identity
+    auto server_app_config = minimal_app_config("autoopen-realm", schema);
+    TestAppSession session(create_app(server_app_config), transport, DeleteApp{true}, realm::ReconnectMode::normal,
+                           socket_provider);
+    auto user = session.app()->current_user();
+    std::string identity = user->identity();
+    REQUIRE(user->is_logged_in());
+    REQUIRE(!identity.empty());
+    // Reopen the App instance and retrieve the cached user
+    session.reopen(false);
+    user = session.sync_manager()->get_existing_logged_in_user(identity);
+
+    SyncTestFile config(user, partition, schema);
+    config.sync_config->cancel_waits_on_nonfatal_error = true;
+    config.sync_config->error_handler = [&logger](std::shared_ptr<SyncSession> session, SyncError error) {
+        logger->debug("The sync error handler caught an error: '%1' for '%2'", error.status, session->path());
+        // Ignore connection failed non-fatal errors and check for access token refresh unauthorized fatal errors
+        if (error.status.code() == ErrorCodes::SyncConnectFailed) {
+            REQUIRE_FALSE(error.is_fatal);
+            return;
+        }
+        // If it's not SyncConnectFailed, then it should be AuthError
+        REQUIRE(error.status.code() == ErrorCodes::AuthError);
+        REQUIRE(error.is_fatal);
+    };
+
+    bool not_authorized = false;
+    bool token_refresh_called = false;
+    bool location_refresh_called = false;
+
+    FailureMode failure = FailureMode::location_fails;
+
+    transport->request_hook = [&](const app::Request& req) -> std::optional<app::Response> {
+        static constexpr int CURLE_OPERATION_TIMEDOUT = 28;
+        std::lock_guard<std::mutex> lock(mutex);
+        if (req.url.find("/auth/session") != std::string::npos) {
+            token_refresh_called = true;
+            if (failure == FailureMode::token_not_authorized) {
+                return app::Response{403, 0, {}, "403 not authorized"};
+            }
+            if (failure == FailureMode::token_fails) {
+                return app::Response{0, CURLE_OPERATION_TIMEDOUT, {}, "Operation timed out"};
+            }
+        }
+        else if (req.url.find("/location") != std::string::npos) {
+            location_refresh_called = true;
+            if (failure == FailureMode::location_fails) {
+                // Fake "offline/request timed out" custom error response
+                return app::Response{0, CURLE_OPERATION_TIMEDOUT, {}, "Operation timed out"};
+            }
+        }
+        return std::nullopt;
+    };
+
+    socket_provider->websocket_connect_func = [&]() -> std::optional<SocketProviderError> {
+        if (not_authorized) {
+            not_authorized = false; // one shot
+            return SocketProviderError(sync::websocket::WebSocketError::websocket_unauthorized, "403 not authorized");
+        }
+        return SocketProviderError(sync::websocket::WebSocketError::websocket_connection_failed,
+                                   "Operation timed out");
+    };
+
+    auto task = Realm::get_synchronized_realm(config);
+    auto pf = util::make_promise_future<std::exception_ptr>();
+    task->start([&pf](auto ref, auto error) mutable {
+        REQUIRE(!ref);
+        REQUIRE(error);
+        pf.promise.emplace_value(error);
+    });
+
+    auto result = pf.future.get_no_throw();
+    REQUIRE(result.is_ok());
+    REQUIRE(result.get_value());
+    std::lock_guard<std::mutex> lock(mutex);
+    REQUIRE(location_refresh_called);
+    if (failure != FailureMode::location_fails) {
+        REQUIRE(token_refresh_called);
+    }
+
+    // transport->request_hook = nullptr;
+    // socket_provider->websocket_connect_func = nullptr;
+    auto r = Realm::get_shared_realm(config);
+    wait_for_download(*r);
+}
+
+
 TEST_CASE("SharedRealm: convert", "[sync][pbs][convert]") {
     TestSyncManager tsm;
     ObjectSchema object_schema = {"object",

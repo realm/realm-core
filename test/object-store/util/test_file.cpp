@@ -400,7 +400,9 @@ void TestAppSession::reopen(bool log_in)
 {
     // These are REALM_ASSERTs so the test crashes if this object is in a bad state
     REALM_ASSERT(!m_base_file_path.empty());
-    REALM_ASSERT(!m_app);
+    if (m_app) {
+        close(false);
+    }
     m_app = app::App::get_app(app::App::CacheMode::Disabled, app_config, sc_config);
 
     // initialize sync client
