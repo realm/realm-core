@@ -408,8 +408,12 @@ Mixed Lst<Mixed>::set(size_t ndx, Mixed value)
     if (Replication* repl = Base::get_replication()) {
         repl->list_set(*this, ndx, value);
     }
-    if (!(old.is_same_type(value) && old == value)) {
+    if (!value.is_same_type(old) || value != old) {
         do_set(ndx, value);
+        if (value.is_type(type_Dictionary, type_List)) {
+            m_tree->ensure_keys();
+            set_key(*m_tree, ndx);
+        }
         bump_content_version();
     }
     return old;
@@ -427,6 +431,10 @@ void Lst<Mixed>::insert(size_t ndx, Mixed value)
         repl->list_insert(*this, ndx, value, sz);
     }
     do_insert(ndx, value);
+    if (value.is_type(type_Dictionary, type_List)) {
+        m_tree->ensure_keys();
+        set_key(*m_tree, ndx);
+    }
     bump_content_version();
 }
 
@@ -529,13 +537,8 @@ void Lst<Mixed>::insert_collection(const PathElement& path_elem, CollectionType 
     if (dict_or_list == CollectionType::Set) {
         throw IllegalOperation("Set nested in List<Mixed> is not supported");
     }
-
-    ensure_created();
     check_level();
-    m_tree->ensure_keys();
     insert(path_elem.get_ndx(), Mixed(0, dict_or_list));
-    set_key(*m_tree, path_elem.get_ndx());
-    bump_content_version();
 }
 
 void Lst<Mixed>::set_collection(const PathElement& path_elem, CollectionType dict_or_list)
@@ -543,23 +546,8 @@ void Lst<Mixed>::set_collection(const PathElement& path_elem, CollectionType dic
     if (dict_or_list == CollectionType::Set) {
         throw IllegalOperation("Set nested in List<Mixed> is not supported");
     }
-
-    auto ndx = path_elem.get_ndx();
-    // get will check for ndx out of bounds
-    Mixed old_val = do_get(ndx, "set_collection()");
-    Mixed new_val(0, dict_or_list);
-
     check_level();
-
-    if (old_val != new_val) {
-        m_tree->ensure_keys();
-        set(ndx, new_val);
-        int64_t key = m_tree->get_key(ndx);
-        if (key == 0) {
-            set_key(*m_tree, path_elem.get_ndx());
-        }
-        bump_content_version();
-    }
+    set(path_elem.get_ndx(), Mixed(0, dict_or_list));
 }
 
 DictionaryPtr Lst<Mixed>::get_dictionary(const PathElement& path_elem) const

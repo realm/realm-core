@@ -101,13 +101,13 @@ public:
         std::unique_ptr<char[]> buffer;
     };
 
-    /// set_client_reset_adjustments() is used by client reset to adjust the
+    /// set_history_adjustments() is used by client reset to adjust the
     /// content of the history compartment. The DB associated with
     /// this history object must be in a write transaction when this function
     /// is called.
-    void set_client_reset_adjustments(util::Logger& logger, version_type current_version,
-                                      SaltedFileIdent client_file_ident, SaltedVersion server_version,
-                                      const std::vector<_impl::client_reset::RecoveredChange>&);
+    void set_history_adjustments(util::Logger& logger, version_type current_version,
+                                 SaltedFileIdent client_file_ident, SaltedVersion server_version,
+                                 const std::vector<_impl::client_reset::RecoveredChange>&);
 
     struct LocalChange {
         version_type version;

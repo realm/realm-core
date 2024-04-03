@@ -730,9 +730,9 @@ realm_async_open_task_register_download_progress_notifier(realm_async_open_task_
                                                           realm_userdata_t userdata,
                                                           realm_free_userdata_func_t userdata_free) noexcept
 {
-    auto cb = [notifier, userdata = SharedUserdata(userdata, FreeUserdata(userdata_free))](uint64_t transferred,
-                                                                                           uint64_t transferrable) {
-        notifier(userdata.get(), transferred, transferrable);
+    auto cb = [notifier, userdata = SharedUserdata(userdata, FreeUserdata(userdata_free))](
+                  uint64_t transferred, uint64_t transferrable, double progress_estimate) {
+        notifier(userdata.get(), transferred, transferrable, progress_estimate);
     };
     auto token = (*task)->register_download_progress_notifier(std::move(cb));
     return new realm_async_open_task_progress_notification_token_t{(*task), token};
@@ -819,9 +819,9 @@ RLM_API realm_sync_session_connection_state_notification_token_t* realm_sync_ses
     bool is_streaming, realm_userdata_t userdata, realm_free_userdata_func_t userdata_free) noexcept
 {
     std::function<realm::SyncSession::ProgressNotifierCallback> cb =
-        [notifier, userdata = SharedUserdata(userdata, FreeUserdata(userdata_free))](uint64_t transferred,
-                                                                                     uint64_t transferrable) {
-            notifier(userdata.get(), transferred, transferrable);
+        [notifier, userdata = SharedUserdata(userdata, FreeUserdata(userdata_free))](
+            uint64_t transferred, uint64_t transferrable, double progress_estimate) {
+            notifier(userdata.get(), transferred, transferrable, progress_estimate);
         };
     auto token = (*session)->register_progress_notifier(std::move(cb), SyncSession::ProgressDirection(direction),
                                                         is_streaming);

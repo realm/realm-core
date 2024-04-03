@@ -209,9 +209,15 @@ void PendingBootstrapStore::clear()
         return;
     }
     tr->promote_to_write();
+    clear(*tr);
+    tr->commit();
+}
+
+void PendingBootstrapStore::clear(Transaction& wt)
+{
+    auto bootstrap_table = wt.get_table(m_table);
     bootstrap_table->clear();
     m_has_pending = false;
-    tr->commit();
 }
 
 PendingBootstrapStore::PendingBatch PendingBootstrapStore::peek_pending(size_t limit_in_bytes)
