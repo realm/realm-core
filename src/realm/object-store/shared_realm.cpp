@@ -765,12 +765,12 @@ void Realm::run_writes_on_proper_thread()
 
 void Realm::call_completion_callbacks()
 {
-    if (m_is_running_async_commit_completions) {
+    if (m_is_running_async_commit_completions || m_async_commit_q.empty()) {
         return;
     }
 
     CountGuard sending_completions(m_is_running_async_commit_completions);
-    auto error = m_transaction ? m_transaction->get_commit_exception() : nullptr;
+    auto error = m_transaction->get_commit_exception();
     auto completions = std::move(m_async_commit_q);
     m_async_commit_q.clear();
     for (auto& cb : completions) {
