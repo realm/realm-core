@@ -898,7 +898,7 @@ std::string DBOptions::sys_tmp_dir = getenv("TMPDIR") ? getenv("TMPDIR") : "";
 // initializing process crashes and leaves the shared memory in an
 // undefined state.
 
-void DB::open(const std::string& path, bool no_create_file, const DBOptions& options)
+void DB::open(const std::string& path, const DBOptions& options)
 {
     // Exception safety: Since do_open() is called from constructors, if it
     // throws, it must leave the file closed.
@@ -1144,10 +1144,11 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions& opt
             cfg.read_only = false;
             cfg.skip_validate = !begin_new_session;
             cfg.disable_sync = options.durability == Durability::MemOnly || options.durability == Durability::Unsafe;
+            cfg.clear_file_on_error = options.clear_on_invalid_file;
 
             // only the session initiator is allowed to create the database, all other
             // must assume that it already exists.
-            cfg.no_create = (begin_new_session ? no_create_file : true);
+            cfg.no_create = (begin_new_session ? options.no_create : true);
 
             // if we're opening a MemOnly file that isn't already opened by
             // someone else then it's a file which should have been deleted on
@@ -1499,8 +1500,7 @@ void DB::open(Replication& repl, const std::string& file, const DBOptions& optio
 
     set_replication(&repl);
 
-    bool no_create = false;
-    open(file, no_create, options); // Throws
+    open(file, options); // Throws
 }
 
 class DBLogger : public Logger {
@@ -1532,7 +1532,7 @@ void DB::set_logger(const std::shared_ptr<util::Logger>& logger) noexcept
         m_logger = std::make_shared<DBLogger>(logger, m_log_id);
 }
 
-void DB::open(Replication& repl, const DBOptions options)
+void DB::open(Replication& repl, const DBOptions& options)
 {
     REALM_ASSERT(!is_attached());
     repl.initialize(*this); // Throws
@@ -2808,10 +2808,10 @@ inline DB::DB(Private, const DBOptions& options)
     }
 }
 
-DBRef DB::create(const std::string& file, bool no_create, const DBOptions& options) NO_THREAD_SAFETY_ANALYSIS
+DBRef DB::create(const std::string& file, const DBOptions& options) NO_THREAD_SAFETY_ANALYSIS
 {
     DBRef retval = std::make_shared<DB>(Private(), options);
-    retval->open(file, no_create, options);
+    retval->open(file, options);
     return retval;
 }
 

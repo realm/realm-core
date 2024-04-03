@@ -19,6 +19,7 @@
 ### Internals
 * Update libuv used in object store tests from v1.35.0 to v1.48.0 ([PR #7508](https://github.com/realm/realm-core/pull/7508)).
 * Made `set_default_logger` nullable in the bindgen spec.yml (PR [#7515](https://github.com/realm/realm-core/pull/7515)).
+* Recreating the sync metadata Realm when the encryption key changes is now done in a multi-process safe manner ([PR #7526](https://github.com/realm/realm-core/pull/7526)).
 * Added `App::default_base_url()` static accessor for SDKs to retrieve the default base URL from Core. ([PR #7534](https://github.com/realm/realm-core/pull/7534))
 * Realm2JSON tool will now correctly upgrade file to current fileformat.
 
