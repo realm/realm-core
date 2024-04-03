@@ -20,14 +20,6 @@
 
 using namespace realm::util;
 
-#if REALM_ROBUST_MUTEX_EMULATION
-
-std::once_flag InterprocessMutex::s_init_flag;
-std::map<File::UniqueID, std::weak_ptr<InterprocessMutex::LockInfo>>* InterprocessMutex::s_info_map;
-Mutex* InterprocessMutex::s_mutex;
-
-#endif // REALM_ROBUST_MUTEX_EMULATION
-
 #if REALM_PLATFORM_APPLE
 SemaphoreMutex::SemaphoreMutex() noexcept
     : m_semaphore(dispatch_semaphore_create(1))
