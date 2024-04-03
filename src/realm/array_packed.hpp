@@ -39,14 +39,12 @@ public:
     // get or set
     inline int64_t get(bf_iterator& it, size_t, uint64_t) const;
     inline void get_chunk(bf_iterator& it, size_t, uint64_t, int64_t res[8]) const;
-    inline void set_direct(bf_iterator& it, size_t, int64_t, size_t) const;
+    inline void set_direct(bf_iterator& it, size_t, int64_t) const;
 
     template <typename Cond>
     inline bool find_all(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*) const;
 
 private:
-    inline int64_t do_get(bf_iterator&, size_t, uint64_t) const;
-
     bool find_all_match(size_t start, size_t end, size_t baseindex, QueryStateBase* state) const;
 
     template <typename Cond>
@@ -59,11 +57,6 @@ private:
 };
 
 inline int64_t ArrayPacked::get(bf_iterator& it, size_t ndx, uint64_t mask) const
-{
-    return do_get(it, ndx, mask);
-}
-
-inline int64_t ArrayPacked::do_get(bf_iterator& it, size_t ndx, uint64_t mask) const
 {
     it.move(ndx);
     return sign_extend_field_by_mask(mask, *it);
@@ -100,9 +93,9 @@ inline bool ArrayPacked::find_all(const Array& arr, int64_t value, size_t start,
     return find_parallel<Cond>(arr, value, start, end, baseindex, state);
 }
 
-inline void ArrayPacked::set_direct(bf_iterator& it, size_t ndx, int64_t value, size_t v_width) const
+inline void ArrayPacked::set_direct(bf_iterator& it, size_t ndx, int64_t value) const
 {
-    it.move(0, ndx * v_width);
+    it.move(ndx);
     it.set_value(value);
 }
 

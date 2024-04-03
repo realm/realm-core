@@ -249,17 +249,21 @@ class bf_iterator {
     size_t field_position;
     uint8_t field_size;
     uint8_t step_size; // may be different than field_size if used for arrays of pairs
+    size_t offset;
 
 public:
     bf_iterator() = default;
     bf_iterator(const bf_iterator&) = default;
+    bf_iterator(bf_iterator&&) = default;
     bf_iterator& operator=(const bf_iterator&) = default;
+    bf_iterator& operator=(bf_iterator&&) = default;
     bf_iterator(uint64_t* data_area, size_t initial_offset, size_t field_size, size_t step_size, size_t index)
         : data_area(data_area)
         , field_size(static_cast<uint8_t>(field_size))
         , step_size(static_cast<uint8_t>(step_size))
+        , offset(initial_offset)
     {
-        field_position = initial_offset + index * step_size;
+        field_position = offset + index * step_size;
         first_word_ptr = data_area + (field_position >> 6);
     }
 
@@ -351,9 +355,9 @@ public:
         field_position = next_field_position;
     }
 
-    inline void move(size_t index, size_t initial_offset = 0)
+    inline void move(size_t index)
     {
-        field_position = initial_offset + index * step_size;
+        field_position = offset + index * step_size;
         first_word_ptr = data_area + (field_position >> 6);
     }
     // The compiler should be able to generate code matching this
@@ -978,14 +982,12 @@ inline int64_t default_fetcher(const char* data, size_t ndx)
 template <typename T>
 struct EncodedFetcher {
 
-    int64_t operator()(const char* data, size_t ndx) const
+    int64_t operator()(const char*, size_t ndx) const
     {
-        return ptr->get(data, ndx);
+        return ptr->get(ndx);
     }
     const T* ptr;
 };
-// static EncodedFetcher s_encoded_fetcher;
-
 
 // Lower and Upper bound are mainly used in the B+tree implementation,
 // but also for indexing, we can exploit these functions when the array

@@ -745,12 +745,17 @@ bool Array::try_decode()
 
 int64_t Array::get_encoded(size_t ndx) const noexcept
 {
-    return m_encoder.get(*this, ndx);
+    return m_encoder.get(ndx);
 }
 
 void Array::set_encoded(size_t ndx, int64_t val)
 {
-    m_encoder.set_direct(*this, ndx, val);
+    m_encoder.set_direct(ndx, val);
+}
+
+void Array::get_chunk_encoded(size_t ndx, int64_t res[8]) const noexcept
+{
+    m_encoder.get_chunk(ndx, res);
 }
 
 size_t Array::calc_aligned_byte_size(size_t size, int width)
@@ -986,11 +991,6 @@ void Array::get_chunk(size_t ndx, int64_t res[8]) const noexcept
 #endif
 }
 
-void Array::get_chunk_encoded(size_t ndx, int64_t res[8]) const noexcept
-{
-    m_encoder.get_chunk(*this, ndx, res);
-}
-
 template <>
 void Array::get_chunk<0>(size_t ndx, int64_t res[8]) const noexcept
 {
@@ -1159,7 +1159,7 @@ int_fast64_t Array::get(const char* header, size_t ndx) noexcept
     if (wtype_is_extended(header)) {
         static ArrayEncode encoder;
         encoder.init(header);
-        return encoder.get(NodeHeader::get_data_from_header(header), ndx);
+        return encoder.get(ndx);
     }
 
     auto sz = get_size_from_header(header);

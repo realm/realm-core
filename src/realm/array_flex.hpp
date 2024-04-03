@@ -41,16 +41,14 @@ public:
     void init_array(char* h, uint8_t flags, size_t v_width, size_t ndx_width, size_t v_size, size_t ndx_size) const;
     void copy_data(const Array&, const std::vector<int64_t>&, const std::vector<size_t>&) const;
     // getters/setters
-    inline int64_t get(bf_iterator&, const Array&, size_t) const;
-    inline int64_t get(const char*, size_t, const ArrayEncode&) const;
-    inline void get_chunk(bf_iterator&, const Array& h, size_t ndx, int64_t res[8]) const;
-    inline void set_direct(const Array&, size_t, int64_t) const;
+    inline int64_t get(bf_iterator&, bf_iterator&, size_t, uint64_t) const;
+    inline void get_chunk(bf_iterator&, bf_iterator&, size_t, uint64_t, int64_t[8]) const;
+    inline void set_direct(bf_iterator&, bf_iterator&, size_t, int64_t) const;
 
     template <typename Cond>
     inline bool find_all(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*) const;
 
 private:
-    inline int64_t do_get(uint64_t*, size_t, size_t, size_t, size_t, size_t, uint64_t) const;
     bool find_all_match(size_t, size_t, size_t, QueryStateBase*) const;
 
     template <typename Cond>
@@ -66,63 +64,35 @@ private:
     inline bool run_parallel_subscan(size_t, size_t, size_t) const;
 };
 
-inline int64_t ArrayFlex::get(bf_iterator&, const Array& arr, size_t ndx) const
+inline int64_t ArrayFlex::get(bf_iterator& data_iterator, bf_iterator& ndx_iterator, size_t ndx, uint64_t mask) const
 {
-    REALM_ASSERT_DEBUG(arr.is_attached());
-    REALM_ASSERT_DEBUG(arr.is_encoded());
-    return get(arr.m_data, ndx, arr.get_encoder());
+    ndx_iterator.move(ndx); //, data_iterator.field_size * v_size);
+    data_iterator.move(*ndx_iterator);
+    return sign_extend_field_by_mask(mask, *data_iterator);
 }
 
-inline int64_t ArrayFlex::get(const char* data, size_t ndx, const ArrayEncode& encoder) const
+inline void ArrayFlex::get_chunk(bf_iterator& data_it, bf_iterator& ndx_it, size_t ndx, uint64_t mask,
+                                 int64_t res[8]) const
 {
-    const auto v_width = encoder.width();
-    const auto v_size = encoder.v_size();
-    const auto ndx_width = encoder.ndx_width();
-    const auto ndx_size = encoder.ndx_size();
-    const auto mask = encoder.width_mask();
-    return do_get((uint64_t*)data, ndx, v_width, ndx_width, v_size, ndx_size, mask);
-}
-
-inline int64_t ArrayFlex::do_get(uint64_t* data, size_t ndx, size_t v_width, size_t ndx_width, size_t v_size,
-                                 size_t ndx_size, uint64_t mask) const
-{
-    REALM_ASSERT_DEBUG(ndx < ndx_size);
-    const uint64_t offset = v_size * v_width;
-    const bf_iterator it_index{data, static_cast<size_t>(offset + (ndx * ndx_width)), ndx_width, ndx_width, 0};
-    const bf_iterator it_value{data, static_cast<size_t>(v_width * it_index.get_value()), v_width, v_width, 0};
-    return sign_extend_field_by_mask(mask, it_value.get_value());
-}
-
-inline void ArrayFlex::get_chunk(bf_iterator& it, const Array& arr, size_t ndx, int64_t res[8]) const
-{
-    REALM_ASSERT_DEBUG(ndx < arr.m_size);
     auto sz = 8;
     std::memset(res, 0, sizeof(int64_t) * sz);
     auto supposed_end = ndx + sz;
     size_t i = ndx;
     size_t index = 0;
     for (; i < supposed_end; ++i) {
-        res[index++] = get(it, arr, i);
+        res[index++] = get(data_it, ndx_it, i, mask);
     }
     for (; index < 8; ++index) {
-        res[index++] = get(it, arr, i++);
+        res[index++] = get(data_it, ndx_it, i++, mask);
     }
 }
 
-void ArrayFlex::set_direct(const Array& arr, size_t ndx, int64_t value) const
+void ArrayFlex::set_direct(bf_iterator& data_it, bf_iterator& ndx_it, size_t ndx, int64_t value) const
 {
-    const auto v_width = arr.m_encoder.width();
-    const auto v_size = arr.m_encoder.v_size();
-    const auto ndx_width = arr.m_encoder.ndx_width();
-    const auto ndx_size = arr.m_encoder.ndx_size();
-    REALM_ASSERT_DEBUG(ndx < ndx_size);
-    auto data = (uint64_t*)arr.m_data;
-    uint64_t offset = v_size * v_width;
-    bf_iterator it_index{data, static_cast<size_t>(offset + (ndx * ndx_width)), ndx_width, ndx_size, 0};
-    bf_iterator it_value{data, static_cast<size_t>(*it_index * v_width), v_width, v_width, 0};
-    it_value.set_value(value);
+    ndx_it.move(ndx);
+    data_it.move(*ndx_it);
+    data_it.set_value(value);
 }
-
 
 template <typename Cond>
 inline bool ArrayFlex::find_all(const Array& arr, int64_t value, size_t start, size_t end, size_t baseindex,
