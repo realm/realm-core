@@ -813,6 +813,10 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg, util::Writ
     // the call below to set_encryption_key.
     m_file.set_encryption_key(cfg.encryption_key);
 
+    note_reader_start(this);
+    util::ScopeExit reader_end_guard([this]() noexcept {
+        note_reader_end(this);
+    });
     size_t size = 0;
     // The size of a database file must not exceed what can be encoded in
     // size_t.
@@ -851,7 +855,7 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg, util::Writ
         // mappings_for_file in the encryption layer. So the prealloc() is required before
         // interacting with the encryption layer in File::write().
         // Pre-alloc initial space
-        m_file.prealloc(initial_size);     // Throws
+        m_file.prealloc(initial_size); // Throws
         // seek() back to the start of the file in preparation for writing the header
         // This sequence of File operations is protected from races by
         // DB::m_controlmutex, so we know we are the only ones operating on the file
@@ -865,10 +869,6 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg, util::Writ
 
         size = initial_size;
     }
-    note_reader_start(this);
-    util::ScopeExit reader_end_guard([this]() noexcept {
-        note_reader_end(this);
-    });
 
     ref_type top_ref = read_and_validate_header(m_file, path, size, cfg.session_initiator, m_write_observer);
     m_attach_mode = cfg.is_shared ? attach_SharedFile : attach_UnsharedFile;
