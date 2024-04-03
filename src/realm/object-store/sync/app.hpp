@@ -90,6 +90,9 @@ public:
         DeviceInfo device_info;
     };
 
+    // Returns the default base_url for SDKs to use instead of defining their own
+    static std::string_view default_base_url();
+
     // `enable_shared_from_this` is unsafe with public constructors;
     // use `App::get_app()` instead
     explicit App(Private, const Config& config);
@@ -432,6 +435,8 @@ public:
     // Return the base url path used for Sync Session Websocket requests
     std::string get_ws_host_url() REQUIRES(!m_route_mutex);
 
+    static std::string create_ws_host_url(const std::string_view host_url);
+
 private:
     const Config m_config;
 
@@ -440,18 +445,18 @@ private:
     // The following variables hold the different paths to Atlas, depending on the
     // request being performed
     // Base hostname from config.base_url or update_base_url() for querying location info
-    // (e.g. "https://realm.mongodb.com")
+    // (e.g. "https://services.cloud.mongodb.com")
     std::string m_base_url GUARDED_BY(m_route_mutex);
     // Baseline URL for AppServices and Device Sync requests
-    // (e.g. "https://us-east-1.aws.realm.mongodb.com/api/client/v2.0" or
-    // "wss://ws.us-east-1.aws.realm.mongodb.com/api/client/v2.0")
+    // (e.g. "https://us-east-1.aws.services.cloud.mongodb.com/api/client/v2.0" or
+    // "wss://us-east-1.aws.ws.services.cloud.mongodb.com/api/client/v2.0")
     std::string m_base_route GUARDED_BY(m_route_mutex);
     // URL for app-based AppServices and Device Sync requests using config.app_id
-    // (e.g. "https://us-east-1.aws.realm.mongodb.com/api/client/v2.0/app/<app_id>"
-    // or "wss://ws.us-east-1.aws.realm.mongodb.com/api/client/v2.0/app/<app_id>")
+    // (e.g. "https://us-east-1.aws.services.cloud.mongodb.com/api/client/v2.0/app/<app_id>"
+    // or "wss://us-east-1.aws.ws.services.cloud.mongodb.com/api/client/v2.0/app/<app_id>")
     std::string m_app_route GUARDED_BY(m_route_mutex);
     // URL for app-based AppServices authentication requests (e.g. email/password)
-    // (e.g. "https://us-east-1.aws.realm.mongodb.com/api/client/v2.0/app/<app_id>/auth")
+    // (e.g. "https://us-east-1.aws.services.cloud.mongodb.com/api/client/v2.0/app/<app_id>/auth")
     std::string m_auth_route GUARDED_BY(m_route_mutex);
     // If false, the location info will be updated upon the next AppServices request
     bool m_location_updated GUARDED_BY(m_route_mutex);

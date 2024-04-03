@@ -52,14 +52,15 @@ struct SyncClient;
 class SyncProgressNotifier {
 public:
     enum class NotifierType { upload, download };
-    using ProgressNotifierCallback = void(uint64_t transferred_bytes, uint64_t transferrable_bytes);
+    using ProgressNotifierCallback = void(uint64_t transferred_bytes, uint64_t transferrable_bytes,
+                                          double progress_estimate);
 
     uint64_t register_callback(std::function<ProgressNotifierCallback>, NotifierType direction, bool is_streaming);
     void unregister_callback(uint64_t);
 
     void set_local_version(uint64_t);
-    void update(uint64_t downloaded, uint64_t downloadable, uint64_t uploaded, uint64_t uploadable, uint64_t,
-                uint64_t);
+    void update(uint64_t downloaded, uint64_t downloadable, uint64_t uploaded, uint64_t uploadable,
+                uint64_t snapshot_version, double download_estimate = 1.0, double upload_estimate = 1.0);
 
 private:
     mutable std::mutex m_mutex;
@@ -70,6 +71,8 @@ private:
         uint64_t downloadable;
         uint64_t uploaded;
         uint64_t downloaded;
+        double upload_estimate;
+        double download_estimate;
         uint64_t snapshot_version;
     };
 
@@ -261,12 +264,33 @@ public:
         return *m_config.sync_config;
     }
 
-    // If the `SyncSession` has been configured, the full remote URL of the Realm
-    // this `SyncSession` represents.
-    util::Optional<std::string> full_realm_url() const REQUIRES(!m_config_mutex)
+    // When App is created, it will provide a generated websocket sync route when the SyncManager is
+    // created. When the next AppServices HTTP request is made via the App object, the location info
+    // will be requested and a verified websocket sync route will be provided to the SyncManager. If
+    // the SyncSession is started with a cached user, the websocket connection will be initially
+    // established using the generated sync route. If that connection is successful, then the sync
+    // route will be marked verified and used from that point on. If that connection fails, the
+    // SyncSession will update the location via an access token update to retrieve the verified
+    // sync route from the server's location info. The SyncSessio will then be restarted so it
+    // uses the updated sync route value.
+
+    // If the SyncSession is active, this function returns the sync route that is being used
+    // by the current underlying session to connect to the server.
+    std::string full_realm_url() const REQUIRES(!m_config_mutex)
     {
         util::CheckedLockGuard lock(m_config_mutex);
         return m_server_url;
+    }
+
+    // If the sync route value was returned by querying the location information, or the
+    // SyncSession has successfully connected to the server using the configured sync route,
+    // then the sync route will be marked "verified". Otherwise, the location information will
+    // be requested from the server if the connection fails when trying to open a websocket
+    // to the server.
+    bool realm_url_verified() const REQUIRES(!m_config_mutex)
+    {
+        util::CheckedLockGuard lock(m_config_mutex);
+        return m_server_url_verified;
     }
 
     std::shared_ptr<sync::SubscriptionStore> get_flx_subscription_store() REQUIRES(!m_state_mutex);
@@ -297,7 +321,10 @@ public:
             return session.m_db;
         }
 
-        static util::Future<void> pause_async(SyncSession& session);
+        static void migrate_schema(SyncSession& session, util::UniqueFunction<void(Status)>&& callback)
+        {
+            session.migrate_schema(std::move(callback));
+        }
     };
 
     // Expose some internal functionality to testing code.
@@ -394,7 +421,7 @@ private:
     void cancel_pending_waits(util::CheckedUniqueLock, Status) RELEASE(m_state_mutex);
     enum class ShouldBackup { yes, no };
     void update_error_and_mark_file_for_deletion(SyncError&, ShouldBackup) REQUIRES(m_state_mutex, !m_config_mutex);
-    void handle_progress_update(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t);
+    void handle_progress_update(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, double, double);
     void handle_new_flx_sync_query(int64_t version);
 
     void nonsync_transact_notify(VersionID::version_type) REQUIRES(!m_state_mutex);
@@ -410,6 +437,7 @@ private:
         REQUIRES(!m_connection_state_mutex);
     void become_paused(util::CheckedUniqueLock) RELEASE(m_state_mutex) REQUIRES(!m_connection_state_mutex);
     void become_waiting_for_access_token() REQUIRES(m_state_mutex);
+    util::Future<void> pause_async() REQUIRES(!m_state_mutex, !m_connection_state_mutex);
 
     // do restart session restarts the session without freeing any of the waiters
     void do_restart_session(util::CheckedUniqueLock)
@@ -427,9 +455,11 @@ private:
         REQUIRES(m_state_mutex);
 
     std::string get_appservices_connection_id() const REQUIRES(!m_state_mutex);
-    std::optional<std::string> get_sync_route() const REQUIRES(!m_state_mutex);
 
     util::Future<std::string> send_test_command(std::string body) REQUIRES(!m_state_mutex);
+
+    void migrate_schema(util::UniqueFunction<void(Status)>&& callback)
+        REQUIRES(!m_state_mutex, !m_config_mutex, !m_connection_state_mutex);
 
     std::function<TransactionCallback> m_sync_transact_callback GUARDED_BY(m_state_mutex);
 
@@ -444,6 +474,10 @@ private:
 
     // Return the subscription_store_base - to be used only for testing
     std::shared_ptr<sync::SubscriptionStore> get_subscription_store_base() REQUIRES(!m_state_mutex);
+
+    // Updates the connection state for this SyncSession and notify any registered callbacks if changed.
+    // Also ensures server_url_verified is set if the connection state is updated to connected.
+    void update_connection_state(ConnectionState new_state) REQUIRES(!m_config_mutex, !m_connection_state_mutex);
 
     util::CheckedMutex m_state_mutex;
     util::CheckedMutex m_connection_state_mutex;
@@ -486,7 +520,8 @@ private:
     std::unique_ptr<sync::Session> m_session GUARDED_BY(m_state_mutex);
 
     // The fully-resolved URL of this Realm, including the server and the path.
-    util::Optional<std::string> m_server_url GUARDED_BY(m_config_mutex);
+    std::string m_server_url GUARDED_BY(m_config_mutex);
+    bool m_server_url_verified GUARDED_BY(m_config_mutex) = false;
 
     _impl::SyncProgressNotifier m_progress_notifier;
     ConnectionChangeNotifier m_connection_change_notifier;
@@ -497,6 +532,7 @@ private:
 
     // Set if ProtocolError::schema_version_changed error is received from the server.
     std::optional<uint64_t> m_previous_schema_version GUARDED_BY(m_state_mutex);
+    bool m_schema_migration_in_progress GUARDED_BY(m_state_mutex) = false;
 };
 
 } // namespace realm

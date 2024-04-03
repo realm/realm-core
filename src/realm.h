@@ -88,6 +88,7 @@ typedef bool (*realm_migration_func_t)(realm_userdata_t userdata, realm_t* old_r
 typedef bool (*realm_data_initialization_func_t)(realm_userdata_t userdata, realm_t* realm);
 typedef bool (*realm_should_compact_on_launch_func_t)(realm_userdata_t userdata, uint64_t total_bytes,
                                                       uint64_t used_bytes);
+
 typedef enum realm_schema_mode {
     RLM_SCHEMA_MODE_AUTOMATIC,
     RLM_SCHEMA_MODE_IMMUTABLE,
@@ -594,12 +595,13 @@ typedef enum realm_log_level {
     RLM_LOG_LEVEL_OFF = 8,
 } realm_log_level_e;
 
-typedef void (*realm_log_func_t)(realm_userdata_t userdata, realm_log_level_e level, const char* message);
+typedef void (*realm_log_func_t)(realm_userdata_t userdata, const char* category, realm_log_level_e level,
+                                 const char* message);
 
 /**
  * Install the default logger
  */
-RLM_API void realm_set_log_callback(realm_log_func_t, realm_log_level_e, realm_userdata_t userdata,
+RLM_API void realm_set_log_callback(realm_log_func_t, realm_userdata_t userdata,
                                     realm_free_userdata_func_t userdata_free) RLM_API_NOEXCEPT;
 RLM_API void realm_set_log_level(realm_log_level_e) RLM_API_NOEXCEPT;
 /**
@@ -2976,6 +2978,7 @@ RLM_API realm_auth_provider_e realm_auth_credentials_get_provider(realm_app_cred
 RLM_API realm_app_config_t* realm_app_config_new(const char* app_id,
                                                  const realm_http_transport_t* http_transport) RLM_API_NOEXCEPT;
 
+RLM_API const char* realm_app_get_default_base_url(void) RLM_API_NOEXCEPT;
 RLM_API void realm_app_config_set_base_url(realm_app_config_t*, const char*) RLM_API_NOEXCEPT;
 RLM_API void realm_app_config_set_default_request_timeout(realm_app_config_t*, uint64_t ms) RLM_API_NOEXCEPT;
 RLM_API void realm_app_config_set_platform_version(realm_app_config_t*, const char*) RLM_API_NOEXCEPT;
@@ -3567,7 +3570,7 @@ typedef void (*realm_sync_connection_state_changed_func_t)(realm_userdata_t user
                                                            realm_sync_connection_state_e old_state,
                                                            realm_sync_connection_state_e new_state);
 typedef void (*realm_sync_progress_func_t)(realm_userdata_t userdata, uint64_t transferred_bytes,
-                                           uint64_t total_bytes);
+                                           uint64_t total_bytes, double progress_estimate);
 typedef void (*realm_sync_error_handler_func_t)(realm_userdata_t userdata, realm_sync_session_t*,
                                                 const realm_sync_error_t);
 typedef bool (*realm_sync_ssl_verify_func_t)(realm_userdata_t userdata, const char* server_address, short server_port,
@@ -3620,7 +3623,8 @@ typedef void (*realm_async_open_task_completion_func_t)(realm_userdata_t userdat
 
 // invoked once the file has been downloaded. Allows the caller to run some initial subscription before the completion
 // callback runs.
-typedef void (*realm_async_open_task_init_subscription_func_t)(realm_t* realm, realm_userdata_t userdata);
+typedef void (*realm_async_open_task_init_subscription_func_t)(realm_thread_safe_reference_t* realm,
+                                                               realm_userdata_t userdata);
 
 RLM_API realm_sync_client_config_t* realm_sync_client_config_new(void) RLM_API_NOEXCEPT;
 RLM_API void realm_sync_client_config_set_base_file_path(realm_sync_client_config_t*, const char*) RLM_API_NOEXCEPT;
@@ -3644,6 +3648,12 @@ RLM_API void realm_sync_client_config_set_pong_keepalive_timeout(realm_sync_clie
                                                                  uint64_t) RLM_API_NOEXCEPT;
 RLM_API void realm_sync_client_config_set_fast_reconnect_limit(realm_sync_client_config_t*,
                                                                uint64_t) RLM_API_NOEXCEPT;
+RLM_API void realm_sync_client_config_set_resumption_delay_interval(realm_sync_client_config_t*,
+                                                                    uint64_t) RLM_API_NOEXCEPT;
+RLM_API void realm_sync_client_config_set_max_resumption_delay_interval(realm_sync_client_config_t*,
+                                                                        uint64_t) RLM_API_NOEXCEPT;
+RLM_API void realm_sync_client_config_set_resumption_delay_backoff_multiplier(realm_sync_client_config_t*,
+                                                                              int) RLM_API_NOEXCEPT;
 RLM_API void realm_sync_client_config_set_sync_socket(realm_sync_client_config_t*,
                                                       realm_sync_socket_t*) RLM_API_NOEXCEPT;
 RLM_API void realm_sync_client_config_set_default_binding_thread_observer(

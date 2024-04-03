@@ -45,9 +45,9 @@ public:
     static const std::string identity_0_id;
     static const std::string identity_1_id;
 
-    void set_base_url(const std::string& base_url)
+    void set_base_url(const std::string_view base_url)
     {
-        m_base_url = base_url;
+        m_base_url = std::string(base_url);
         m_location_called = false;
     }
 

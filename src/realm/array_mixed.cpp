@@ -550,7 +550,7 @@ int64_t ArrayMixed::store(const Mixed& value)
             break;
         }
         default:
-            REALM_ASSERT(type == type_List || type == type_Dictionary || type == type_Set);
+            REALM_ASSERT(type == type_List || type == type_Dictionary);
             ensure_ref_array();
             size_t ndx = m_refs.size();
             m_refs.add(value.get_ref());

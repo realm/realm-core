@@ -370,7 +370,6 @@ private:
     bool ensure_writeable();
     void sync(Node& arr);
     int_fast64_t bump_content_version();
-    void bump_both_versions();
     template <class T>
     void do_set_null(ColKey col_key);
 
@@ -476,6 +475,10 @@ private:
     void set_collection_ref(Index index, ref_type ref, CollectionType type) override
     {
         Obj::set_collection_ref(index, ref, type);
+    }
+    void update_content_version() const noexcept override
+    {
+        // not applicable to Obj
     }
 };
 
@@ -652,13 +655,6 @@ inline int_fast64_t Obj::bump_content_version()
 {
     Allocator& alloc = get_alloc();
     return alloc.bump_content_version();
-}
-
-inline void Obj::bump_both_versions()
-{
-    Allocator& alloc = get_alloc();
-    alloc.bump_content_version();
-    alloc.bump_storage_version();
 }
 
 } // namespace realm
