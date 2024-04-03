@@ -1553,8 +1553,8 @@ TEST_CASE("Syhcnronized realm: AutoOpen", "[sync][baas][pbs][async open]") {
         REQUIRE(token_refresh_called);
     }
 
-    // transport->request_hook = nullptr;
-    // socket_provider->websocket_connect_func = nullptr;
+    transport->request_hook = nullptr;
+    socket_provider->websocket_connect_func = nullptr;
     auto r = Realm::get_shared_realm(config);
     wait_for_download(*r);
 }
