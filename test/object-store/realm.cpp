@@ -2494,9 +2494,9 @@ TEST_CASE("Call run_async_completions after realm has been closed") {
         scheduler->cv.wait(lock, [&] {
             return !scheduler->callbacks.empty();
         });
-        realm->close();
         callbacks.swap(scheduler->callbacks);
     }
+    realm->close();
     // Call whatever functions that was added to scheduler.
     for (auto& cb : callbacks)
         cb();
