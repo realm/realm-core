@@ -41,16 +41,14 @@ public:
     void init_array(char* h, uint8_t flags, size_t v_width, size_t ndx_width, size_t v_size, size_t ndx_size) const;
     void copy_data(const Array&, const std::vector<int64_t>&, const std::vector<size_t>&) const;
     // getters/setters
-    int64_t get(const Array&, size_t) const;
-    int64_t get(const char*, size_t, const ArrayEncode&) const;
-    void get_chunk(const Array& h, size_t ndx, int64_t res[8]) const;
-    void set_direct(const Array&, size_t, int64_t) const;
+    inline int64_t get(bf_iterator&, bf_iterator&, size_t, uint64_t) const;
+    inline void get_chunk(bf_iterator&, bf_iterator&, size_t, uint64_t, int64_t[8]) const;
+    inline void set_direct(bf_iterator&, bf_iterator&, size_t, int64_t) const;
 
     template <typename Cond>
     inline bool find_all(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*) const;
 
 private:
-    int64_t do_get(uint64_t*, size_t, size_t, size_t, size_t, size_t, uint64_t) const;
     bool find_all_match(size_t, size_t, size_t, QueryStateBase*) const;
 
     template <typename Cond>
@@ -59,15 +57,42 @@ private:
     template <typename CondVal, typename CondIndex>
     inline bool find_parallel(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*) const;
 
-    inline bool find_eq(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*) const;
-    inline bool find_neq(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*) const;
-    inline bool find_lt(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*) const;
-    inline bool find_gt(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*) const;
+    template <typename LinearCond, typename ParallelCond1, typename ParallelCond2>
+    inline bool do_find_all(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*) const;
 
-    inline bool run_eq_neq_parallel_subscan(size_t, size_t, size_t, size_t) const;
-    inline bool run_lt_gt_parallel_subscan(size_t, size_t, size_t, size_t) const;
+    template <typename Cond>
+    inline bool run_parallel_subscan(size_t, size_t, size_t) const;
 };
 
+inline int64_t ArrayFlex::get(bf_iterator& data_iterator, bf_iterator& ndx_iterator, size_t ndx, uint64_t mask) const
+{
+    ndx_iterator.move(ndx);
+    data_iterator.move(*ndx_iterator);
+    return sign_extend_field_by_mask(mask, *data_iterator);
+}
+
+inline void ArrayFlex::get_chunk(bf_iterator& data_it, bf_iterator& ndx_it, size_t ndx, uint64_t mask,
+                                 int64_t res[8]) const
+{
+    auto sz = 8;
+    std::memset(res, 0, sizeof(int64_t) * sz);
+    auto supposed_end = ndx + sz;
+    size_t i = ndx;
+    size_t index = 0;
+    for (; i < supposed_end; ++i) {
+        res[index++] = get(data_it, ndx_it, i, mask);
+    }
+    for (; index < 8; ++index) {
+        res[index++] = get(data_it, ndx_it, i++, mask);
+    }
+}
+
+void ArrayFlex::set_direct(bf_iterator& data_it, bf_iterator& ndx_it, size_t ndx, int64_t value) const
+{
+    ndx_it.move(ndx);
+    data_it.move(*ndx_it);
+    data_it.set_value(value);
+}
 
 template <typename Cond>
 inline bool ArrayFlex::find_all(const Array& arr, int64_t value, size_t start, size_t end, size_t baseindex,
@@ -95,18 +120,30 @@ inline bool ArrayFlex::find_all(const Array& arr, int64_t value, size_t start, s
     REALM_ASSERT_DEBUG(arr.m_width != 0);
 
     if constexpr (std::is_same_v<Equal, Cond>) {
-        return find_eq(arr, value, start, end, baseindex, state);
+        return do_find_all<Equal, Equal, Equal>(arr, value, start, end, baseindex, state);
     }
     else if constexpr (std::is_same_v<NotEqual, Cond>) {
-        return find_neq(arr, value, start, end, baseindex, state);
+        return do_find_all<NotEqual, NotEqual, LessEqual>(arr, value, start, end, baseindex, state);
     }
     else if constexpr (std::is_same_v<Less, Cond>) {
-        return find_lt(arr, value, start, end, baseindex, state);
+        return do_find_all<Less, GreaterEqual, Less>(arr, value, start, end, baseindex, state);
     }
     else if constexpr (std::is_same_v<Greater, Cond>) {
-        return find_gt(arr, value, start, end, baseindex, state);
+        return do_find_all<Greater, Greater, GreaterEqual>(arr, value, start, end, baseindex, state);
     }
     return true;
+}
+
+template <typename LinearCond, typename ParallelCond1, typename ParallelCond2>
+inline bool ArrayFlex::do_find_all(const Array& arr, int64_t value, size_t start, size_t end, size_t baseindex,
+                                   QueryStateBase* state) const
+{
+    const auto v_width = arr.m_width;
+    const auto v_range = arr.get_encoder().v_size();
+    const auto ndx_range = end - start;
+    if (!run_parallel_subscan<LinearCond>(v_width, v_range, ndx_range))
+        return find_linear<LinearCond>(arr, value, start, end, baseindex, state);
+    return find_parallel<ParallelCond1, ParallelCond2>(arr, value, start, end, baseindex, state);
 }
 
 template <typename Cond>
@@ -128,21 +165,17 @@ inline bool ArrayFlex::find_linear(const Array& arr, int64_t value, size_t start
         REALM_UNREACHABLE();
     };
 
-    auto data = (uint64_t*)arr.m_data;
     const auto& encoder = arr.get_encoder();
-    const auto offset = encoder.width() * encoder.v_size();
-    const auto v_width = encoder.width();
-    const auto ndx_width = encoder.ndx_width();
-
-    bf_iterator ndx_it((uint64_t*)data, offset, ndx_width, ndx_width, start);
-    bf_iterator val_it((uint64_t*)data, 0, v_width, v_width, *ndx_it);
+    auto& ndx_it = encoder.ndx_iterator();
+    auto& data_it = encoder.data_iterator();
+    ndx_it.move(start);
     while (start < end) {
-        const auto sv = sign_extend_field_by_mask(encoder.width_mask(), *val_it);
+        data_it.move(*ndx_it);
+        const auto sv = sign_extend_field_by_mask(encoder.width_mask(), *data_it);
         if (cmp(sv, value) && !state->match(start + baseindex))
             return false;
         ++start;
         ++ndx_it;
-        val_it.move(*ndx_it);
     }
     return true;
 }
@@ -216,66 +249,18 @@ inline bool ArrayFlex::find_parallel(const Array& arr, int64_t value, size_t sta
     return true;
 }
 
-inline bool ArrayFlex::find_eq(const Array& arr, int64_t value, size_t start, size_t end, size_t baseindex,
-                               QueryStateBase* state) const
+template <typename Cond>
+inline bool ArrayFlex::run_parallel_subscan(size_t v_width, size_t v_range, size_t ndx_range) const
 {
-    const auto v_width = arr.m_width;
-    const auto v_range = arr.get_encoder().v_size();
-    const auto ndx_width = arr.get_encoder().ndx_width();
-    const auto ndx_range = end - start;
-    if (!run_eq_neq_parallel_subscan(v_width, v_range, ndx_width, ndx_range))
-        return find_linear<Equal>(arr, value, start, end, baseindex, state);
-    return find_parallel<Equal, Equal>(arr, value, start, end, baseindex, state);
+    if (ndx_range <= 32)
+        return false;
+    // the threshold for v_width is empirical, some intuition for this is probably that we need to consider 2 parallel
+    // scans, one for finding the matching value and one for the indices (max bit-width 8, becasue max array size is
+    // 256). When we scan the values in parallel, we go through them all, we can't follow the hint given [start, end],
+    // thus a full scan of values makes sense only for certain widths that are not too big, in order to compare in
+    // parallel as many values as we can in one go.
+    return v_width <= 20 && v_range >= 20;
 }
-
-inline bool ArrayFlex::find_neq(const Array& arr, int64_t value, size_t start, size_t end, size_t baseindex,
-                                QueryStateBase* state) const
-{
-    const auto v_width = arr.m_width;
-    const auto v_range = arr.get_encoder().v_size();
-    const auto ndx_width = arr.get_encoder().ndx_width();
-    const auto ndx_range = end - start;
-    if (!run_eq_neq_parallel_subscan(v_width, v_range, ndx_width, ndx_range))
-        return find_linear<NotEqual>(arr, value, start, end, baseindex, state);
-    return find_parallel<NotEqual, LessEqual>(arr, value, start, end, baseindex, state);
-}
-
-inline bool ArrayFlex::find_lt(const Array& arr, int64_t value, size_t start, size_t end, size_t baseindex,
-                               QueryStateBase* state) const
-{
-    const auto v_width = arr.m_width;
-    const auto v_range = arr.get_encoder().v_size();
-    const auto ndx_width = arr.get_encoder().ndx_width();
-    const auto ndx_range = end - start;
-    if (!run_lt_gt_parallel_subscan(v_width, v_range, ndx_width, ndx_range))
-        return find_linear<Less>(arr, value, start, end, baseindex, state);
-    return find_parallel<GreaterEqual, Less>(arr, value, start, end, baseindex, state);
-}
-
-inline bool ArrayFlex::find_gt(const Array& arr, int64_t value, size_t start, size_t end, size_t baseindex,
-                               QueryStateBase* state) const
-{
-    const auto v_width = arr.m_width;
-    const auto v_range = arr.get_encoder().v_size();
-    const auto ndx_width = arr.get_encoder().ndx_width();
-    const auto ndx_range = end - start;
-    if (!run_lt_gt_parallel_subscan(v_width, v_range, ndx_width, ndx_range))
-        return find_linear<Greater>(arr, value, start, end, baseindex, state);
-    return find_parallel<Greater, GreaterEqual>(arr, value, start, end, baseindex, state);
-}
-
-inline bool ArrayFlex::run_eq_neq_parallel_subscan(size_t v_width, size_t v_range, size_t ndx_width,
-                                                   size_t ndx_range) const
-{
-    return v_width < 32 && ndx_width < 32 && v_range >= 16 && ndx_range >= 16;
-}
-
-inline bool ArrayFlex::run_lt_gt_parallel_subscan(size_t v_width, size_t v_range, size_t ndx_width,
-                                                  size_t ndx_range) const
-{
-    return v_width < 16 && ndx_width < 16 && v_range >= 16 && ndx_range >= 16;
-}
-
 
 } // namespace realm
 #endif // REALM_ARRAY_COMPRESS_HPP

@@ -37,16 +37,14 @@ public:
     void init_array(char*, uint8_t, size_t, size_t) const;
     void copy_data(const Array&, Array&) const;
     // get or set
-    int64_t get(const Array&, size_t) const;
-    int64_t get(const char*, size_t, const ArrayEncode&) const;
-    void get_chunk(const Array&, size_t, int64_t res[8]) const;
-    void set_direct(const Array&, size_t, int64_t) const;
+    inline int64_t get(bf_iterator& it, size_t, uint64_t) const;
+    inline void get_chunk(bf_iterator& it, size_t, uint64_t, int64_t res[8]) const;
+    inline void set_direct(bf_iterator& it, size_t, int64_t) const;
 
     template <typename Cond>
     inline bool find_all(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*) const;
 
 private:
-    int64_t do_get(uint64_t*, size_t, size_t, size_t, uint64_t) const;
     bool find_all_match(size_t start, size_t end, size_t baseindex, QueryStateBase* state) const;
 
     template <typename Cond>
@@ -57,6 +55,12 @@ private:
 
     inline bool run_parallel_scan(size_t width, size_t range) const;
 };
+
+inline int64_t ArrayPacked::get(bf_iterator& it, size_t ndx, uint64_t mask) const
+{
+    it.move(ndx);
+    return sign_extend_field_by_mask(mask, *it);
+}
 
 template <typename Cond>
 inline bool ArrayPacked::find_all(const Array& arr, int64_t value, size_t start, size_t end, size_t baseindex,
@@ -87,6 +91,28 @@ inline bool ArrayPacked::find_all(const Array& arr, int64_t value, size_t start,
         return find_linear<Cond>(arr, value, start, end, baseindex, state);
 
     return find_parallel<Cond>(arr, value, start, end, baseindex, state);
+}
+
+inline void ArrayPacked::set_direct(bf_iterator& it, size_t ndx, int64_t value) const
+{
+    it.move(ndx);
+    it.set_value(value);
+}
+
+inline void ArrayPacked::get_chunk(bf_iterator& it, size_t ndx, uint64_t mask, int64_t res[8]) const
+{
+    auto sz = 8;
+    std::memset(res, 0, sizeof(int64_t) * sz);
+    auto supposed_end = ndx + sz;
+    size_t i = ndx;
+    size_t index = 0;
+    // this can be done better, in one go, retrieve both!!!
+    for (; i < supposed_end; ++i) {
+        res[index++] = get(it, i, mask);
+    }
+    for (; index < 8; ++index) {
+        res[index++] = get(it, i++, mask);
+    }
 }
 
 template <typename Cond>
@@ -148,20 +174,22 @@ inline bool ArrayPacked::find_linear(const Array& arr, int64_t value, size_t sta
         if constexpr (std::is_same_v<Cond, Less>)
             return a < b;
     };
-    bf_iterator it((uint64_t*)arr.m_data, 0, arr.m_width, arr.m_width, start);
+    const auto mask = arr.get_encoder().width_mask();
+    auto& data_it = arr.get_encoder().data_iterator();
+    data_it.move(start);
     while (start < end) {
-        const auto sv = sign_extend_field_by_mask(arr.get_encoder().width_mask(), *it);
+        const auto sv = sign_extend_field_by_mask(mask, *data_it);
         if (compare(sv, value) && !state->match(start + baseindex))
             return false;
         ++start;
-        ++it;
+        ++data_it;
     }
     return true;
 }
 
 inline bool ArrayPacked::run_parallel_scan(size_t width, size_t range) const
 {
-    return width < 32 && range >= 16;
+    return width < 32 && range >= 32;
 }
 
 } // namespace realm
