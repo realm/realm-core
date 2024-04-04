@@ -34,7 +34,14 @@ functions:
 
           if [[ -n "${clang_url|}" ]]; then
             mkdir clang_binaries && cd clang_binaries
-            curl -LsS ${clang_url} | tar -xJ --strip-components=1
+            curl -LsS "${clang_url}" -o clang_binaries.tar.xz
+            computed_sum=$(shasum -a 256 -b clang_binaries.tar.xz | awk '{ print $1 }')
+            if [[ $computed_sum != "${clang_sha256_sum}" ]]; then
+              echo "sha256 checksum mismatch for \"${clang_url}\". got checksum $computed_sum"
+              exit 1
+            fi
+            tar -xJf clang_binaries.tar.xz --strip-components=1
+            rm clang_binaries.tar.xz
             cd ..
           fi
 
@@ -1512,14 +1519,18 @@ buildvariants:
 
 - name: ubuntu-coverage
   display_name: "Ubuntu (Code Coverage)"
-  run_on: ubuntu2204-arm64-large
+  run_on: ubuntu2204-large
   expansions:
     fetch_missing_dependencies: On
-    c_compiler: "/opt/clang+llvm/bin/clang"
-    cxx_compiler: "/opt/clang+llvm/bin/clang++"
+    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.26.3-linux-x86_64.tar.gz"
+    cmake_bindir: "./cmake_binaries/bin"
+    clang_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/clang%2Bllvm-18.1.2-x86_64-linux-gnu.tar.xz"
+    clang_sha256_sum: "feab4b0f5fba325bfe0f4245710fd19fd74f813f44b5e81eda794f4f75bca343"
+    c_compiler: "./clang_binaries/bin/clang"
+    cxx_compiler: "./clang_binaries/bin/clang++"
     enable_llvm_coverage: On
-    coveralls_flag_name: "ubuntu-arm64"
-    grcov_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/grcov-aarch64-unknown-linux-gnu.tar.bz2"
+    coveralls_flag_name: "ubuntu-x86_64"
+    grcov_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/grcov-x86_64-unknown-linux-gnu.tar.bz2"
   tasks:
   - name: compile_test_coverage
   - name: finalize_coverage_data
