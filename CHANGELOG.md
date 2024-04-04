@@ -7,6 +7,7 @@
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Fix an assertion failure "m_lock_info && m_lock_info->m_file.get_path() == m_filename" that appears to be related to opening a Realm while the file is in the process of being closed on another thread ([Swift #8507](https://github.com/realm/realm-swift/issues/8507)).
 * Fixed diverging history due to a bug in the replication code when setting default null values (embedded objects included) ([#7536](https://github.com/realm/realm-core/issues/7536)).
+* Version 19.39.33523 of MSVC would crash when compiling for arm64 in release mode ([PR #7533](https://github.com/realm/realm-core/pull/7533)).
 
 ### Breaking changes
 * Updated default base URL to be `https://services.cloud.mongodb.com` to support the new domains (was `https://realm.mongodb.com`). ([PR #7534](https://github.com/realm/realm-core/pull/7534))
@@ -19,7 +20,9 @@
 ### Internals
 * Update libuv used in object store tests from v1.35.0 to v1.48.0 ([PR #7508](https://github.com/realm/realm-core/pull/7508)).
 * Made `set_default_logger` nullable in the bindgen spec.yml (PR [#7515](https://github.com/realm/realm-core/pull/7515)).
+* Recreating the sync metadata Realm when the encryption key changes is now done in a multi-process safe manner ([PR #7526](https://github.com/realm/realm-core/pull/7526)).
 * Added `App::default_base_url()` static accessor for SDKs to retrieve the default base URL from Core. ([PR #7534](https://github.com/realm/realm-core/pull/7534))
+* Realm2JSON tool will now correctly upgrade file to current fileformat.
 * (bindgen) Remove dependency on the `clang-format` package and rely on a binary provided by the system instead.
 
 ----------------------------------------------
