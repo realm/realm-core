@@ -32,17 +32,10 @@ MemRef Node::create_node(size_t size, Allocator& alloc, bool context_flag, Type 
     size_t byte_size = std::max(byte_size_0, size_t(initial_capacity));
 
     MemRef mem = alloc.alloc(byte_size); // Throws
-    auto header = mem.get_addr();
-    Encoding encoding = Encoding::WTypBits;
-    if (width_type == wtype_Bits)
-        encoding = Encoding::WTypBits;
-    else if (width_type == wtype_Multiply)
-        encoding = Encoding::WTypMult;
-    else if (width_type == wtype_Ignore)
-        encoding = Encoding::WTypIgn;
-    else {
-        REALM_ASSERT(false && "Wrong width type for encoding");
-    }
+    const auto header = mem.get_addr();
+    REALM_ASSERT_DEBUG(width_type != WidthType::wtype_Extend);
+    Encoding encoding{int(width_type)};
+
     uint8_t flags = 0;
     if (type == type_InnerBptreeNode)
         flags |= (uint8_t)Flags::InnerBPTree | (uint8_t)Flags::HasRefs;
