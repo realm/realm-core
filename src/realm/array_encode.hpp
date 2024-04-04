@@ -52,6 +52,8 @@ public:
     inline size_t ndx_field_count() const;
     inline size_t bit_count_per_iteration() const;
     inline size_t ndx_bit_count_per_iteration() const;
+    inline bf_iterator& data_iterator() const;
+    inline bf_iterator& ndx_iterator() const;
 
     // get/set
     inline int64_t get(size_t) const;
@@ -97,7 +99,7 @@ private:
     bool find_all_flex(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*) const;
 
     // internal impl
-    inline void set(char* data, size_t w, size_t ndx, int64_t v) const;
+    void set(char* data, size_t w, size_t ndx, int64_t v) const;
     size_t flex_encoded_array_size(const std::vector<int64_t>&, const std::vector<size_t>&, size_t&, size_t&) const;
     size_t packed_encoded_array_size(std::vector<int64_t>&, size_t, size_t&) const;
     void encode_values(const Array&, std::vector<int64_t>&, std::vector<size_t>&) const;
@@ -115,6 +117,16 @@ private:
     mutable bf_iterator m_data_iterator;
     mutable bf_iterator m_ndx_iterator;
 };
+
+inline bf_iterator& ArrayEncode::data_iterator() const
+{
+    return m_data_iterator;
+}
+
+inline bf_iterator& ArrayEncode::ndx_iterator() const
+{
+    return m_ndx_iterator;
+}
 
 inline bool ArrayEncode::is_packed() const
 {
@@ -192,28 +204,6 @@ inline uint64_t ArrayEncode::ndx_msb() const
     using Encoding = NodeHeader::Encoding;
     REALM_ASSERT_DEBUG(m_encoding == Encoding::Packed || m_encoding == Encoding::Flex);
     return m_ndx_MSBs;
-}
-
-inline void ArrayEncode::set(char* data, size_t w, size_t ndx, int64_t v) const
-{
-    if (w == 0)
-        realm::set_direct<0>(data, ndx, v);
-    else if (w == 1)
-        realm::set_direct<1>(data, ndx, v);
-    else if (w == 2)
-        realm::set_direct<2>(data, ndx, v);
-    else if (w == 4)
-        realm::set_direct<4>(data, ndx, v);
-    else if (w == 8)
-        realm::set_direct<8>(data, ndx, v);
-    else if (w == 16)
-        realm::set_direct<16>(data, ndx, v);
-    else if (w == 32)
-        realm::set_direct<32>(data, ndx, v);
-    else if (w == 64)
-        realm::set_direct<64>(data, ndx, v);
-    else
-        REALM_UNREACHABLE();
 }
 
 inline int64_t ArrayEncode::get(size_t ndx) const

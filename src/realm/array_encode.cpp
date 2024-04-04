@@ -228,7 +228,6 @@ void ArrayEncode::init(const char* h)
         m_v_mask = 1ULL << (m_v_width - 1);
         m_MSBs = populate(m_v_width, m_v_mask);
         m_vtable = &VTableForPacked::vtable;
-        // here init a new iterator
         const auto data = (uint64_t*)NodeHeader::get_data_from_header(h);
         m_data_iterator = bf_iterator(data, 0, m_v_width, m_v_width, 0);
     }
@@ -307,6 +306,28 @@ void ArrayEncode::encode_values(const Array& arr, std::vector<int64_t>& values, 
     }
 #endif
     REALM_ASSERT_DEBUG(indices.size() == sz);
+}
+
+void ArrayEncode::set(char* data, size_t w, size_t ndx, int64_t v) const
+{
+    if (w == 0)
+        realm::set_direct<0>(data, ndx, v);
+    else if (w == 1)
+        realm::set_direct<1>(data, ndx, v);
+    else if (w == 2)
+        realm::set_direct<2>(data, ndx, v);
+    else if (w == 4)
+        realm::set_direct<4>(data, ndx, v);
+    else if (w == 8)
+        realm::set_direct<8>(data, ndx, v);
+    else if (w == 16)
+        realm::set_direct<16>(data, ndx, v);
+    else if (w == 32)
+        realm::set_direct<32>(data, ndx, v);
+    else if (w == 64)
+        realm::set_direct<64>(data, ndx, v);
+    else
+        REALM_UNREACHABLE();
 }
 
 int64_t ArrayEncode::get_packed(size_t ndx) const

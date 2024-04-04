@@ -66,7 +66,7 @@ private:
 
 inline int64_t ArrayFlex::get(bf_iterator& data_iterator, bf_iterator& ndx_iterator, size_t ndx, uint64_t mask) const
 {
-    ndx_iterator.move(ndx); //, data_iterator.field_size * v_size);
+    ndx_iterator.move(ndx);
     data_iterator.move(*ndx_iterator);
     return sign_extend_field_by_mask(mask, *data_iterator);
 }
@@ -165,21 +165,17 @@ inline bool ArrayFlex::find_linear(const Array& arr, int64_t value, size_t start
         REALM_UNREACHABLE();
     };
 
-    auto data = (uint64_t*)arr.m_data;
     const auto& encoder = arr.get_encoder();
-    const auto offset = encoder.width() * encoder.v_size();
-    const auto v_width = encoder.width();
-    const auto ndx_width = encoder.ndx_width();
-
-    bf_iterator ndx_it((uint64_t*)data, offset, ndx_width, ndx_width, start);
-    bf_iterator val_it((uint64_t*)data, 0, v_width, v_width, *ndx_it);
+    auto& ndx_it = encoder.ndx_iterator();
+    auto& data_it = encoder.data_iterator();
+    ndx_it.move(start);
     while (start < end) {
-        const auto sv = sign_extend_field_by_mask(encoder.width_mask(), *val_it);
+        data_it.move(*ndx_it);
+        const auto sv = sign_extend_field_by_mask(encoder.width_mask(), *data_it);
         if (cmp(sv, value) && !state->match(start + baseindex))
             return false;
         ++start;
         ++ndx_it;
-        val_it.move(*ndx_it);
     }
     return true;
 }

@@ -174,15 +174,15 @@ inline bool ArrayPacked::find_linear(const Array& arr, int64_t value, size_t sta
         if constexpr (std::is_same_v<Cond, Less>)
             return a < b;
     };
-
-    bf_iterator it{(uint64_t*)arr.m_data, 0, arr.m_width, arr.m_width, start};
     const auto mask = arr.get_encoder().width_mask();
+    auto& data_it = arr.get_encoder().data_iterator();
+    data_it.move(start);
     while (start < end) {
-        const auto sv = sign_extend_field_by_mask(mask, *it);
+        const auto sv = sign_extend_field_by_mask(mask, *data_it);
         if (compare(sv, value) && !state->match(start + baseindex))
             return false;
         ++start;
-        ++it;
+        ++data_it;
     }
     return true;
 }
