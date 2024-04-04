@@ -233,7 +233,7 @@ public:
             return (size_t(h[0]) << 19) + (size_t(h[1]) << 11) + (h[2] << 3);
         }
         else {
-            return ((uint16_t*)header)[0] << 3;
+            return reinterpret_cast<const uint16_t*>(header)[0] << 3;
         }
     }
 
@@ -252,7 +252,7 @@ public:
         else {
             REALM_ASSERT_DEBUG(value < (65536 << 3));
             REALM_ASSERT_DEBUG((value & 0x7) == 0);
-            ((uint16_t*)header)[0] = static_cast<uint16_t>(value >> 3);
+            (reinterpret_cast<uint16_t*>(header))[0] = static_cast<uint16_t>(value >> 3);
         }
     }
 
@@ -318,23 +318,22 @@ public:
     static Encoding get_encoding(const char* header)
     {
         if (!wtype_is_extended(header)) {
-            return (Encoding)get_wtype_from_header(header);
+            return static_cast<Encoding>(get_wtype_from_header(header));
         }
         else {
-            auto h = (const uint8_t*)header;
-            auto byte = (uint8_t)h[5];
-            return (Encoding)(byte + 3);
+            const auto h = reinterpret_cast<const uint8_t*>(header);
+            return static_cast<Encoding>(h[5] + 3);
         }
     }
     static void set_encoding(char* header, Encoding enc)
     {
         if (enc < Encoding::Packed) {
-            set_wtype_in_header((WidthType)enc, header);
+            set_wtype_in_header(static_cast<WidthType>(enc), header);
         }
         else {
             set_wtype_in_header(wtype_Extend, header);
-            auto h = (uint8_t*)header;
-            h[5] = (uint8_t)enc - 3;
+            auto h = reinterpret_cast<uint8_t*>(header);
+            h[5] = static_cast<uint8_t>(enc) - 3;
         }
     }
     // * Packed: tightly packed array (any element size <= 64)
@@ -389,75 +388,70 @@ public:
     }
 
     // valid for encodings with one element size
-    static void init_header(char* header, Encoding enc, uint8_t flags, size_t bits_pr_elem, size_t num_elems)
+    static void init_header(char* header, Encoding enc, uint8_t flags, uint8_t bits_pr_elem, size_t num_elems)
     {
-        std::fill((char*)header, (char*)header + header_size, 0);
-        auto hb = (uint8_t*)header;
+        std::fill(header, header + header_size, 0);
+        const auto hb = reinterpret_cast<uint8_t*>(header);
+        REALM_ASSERT_DEBUG(enc <= Encoding::Packed);
         if (enc < Encoding::Packed) {
             // old layout
-            uint8_t wtype = (uint8_t)enc;
+            uint8_t wtype = static_cast<uint8_t>(enc);
             hb[4] = (flags << 5) | (wtype << 3);
             if (enc == Encoding::WTypBits)
-                set_width_in_header(bits_pr_elem, (char*)header);
+                set_width_in_header(bits_pr_elem, reinterpret_cast<char*>(header));
             else
-                set_width_in_header(bits_pr_elem >> 3, (char*)header);
-            set_size_in_header(num_elems, (char*)header);
+                set_width_in_header(bits_pr_elem >> 3, reinterpret_cast<char*>(header));
+            set_size_in_header(num_elems, reinterpret_cast<char*>(header));
         }
         else if (enc == Encoding::Packed) {
             hb[2] = 0;
             hb[3] = static_cast<uint8_t>(bits_pr_elem);
             hb[4] = (flags << 5) | (wtype_Extend << 3);
             hb[5] = static_cast<uint8_t>(enc) - wtype_Extend;
-            auto hw = (uint16_t*)header;
+            const auto hw = reinterpret_cast<uint16_t*>(header);
             hw[3] = static_cast<uint16_t>(num_elems);
-        }
-        else {
-            REALM_ASSERT(false && "Illegal header encoding for chosen kind of header");
         }
     }
 
     // valid for encodings with two element sizes, but only one number of elements
-    static void init_header(char* header, Encoding enc, uint8_t flags, size_t bits_pr_elemA, size_t bits_pr_elemB,
+    static void init_header(char* header, Encoding enc, uint8_t flags, uint8_t bits_pr_elemA, uint8_t bits_pr_elemB,
                             size_t num_elems)
     {
-        std::fill((char*)header, (char*)header + header_size, 0);
-        auto hb = (uint8_t*)header;
+        std::fill(header, header + header_size, 0);
+        const auto hb = reinterpret_cast<uint8_t*>(header);
+        REALM_ASSERT_DEBUG(enc == Encoding::AofP || enc == Encoding::PofA);
         if (enc == Encoding::AofP) {
             hb[4] = (flags << 5) | (wtype_Extend << 3);
-            hb[5] = (int)Encoding::AofP - (int)Encoding::Packed;
+            hb[5] = static_cast<int>(Encoding::AofP) - static_cast<int>(Encoding::Packed);
         }
         else if (enc == Encoding::PofA) {
             hb[4] = (flags << 5) | (wtype_Extend << 3);
-            hb[5] = (int)Encoding::PofA - (int)Encoding::Packed;
+            hb[5] = static_cast<int>(Encoding::PofA) - static_cast<int>(Encoding::Packed);
         }
-        else
-            REALM_ASSERT(false && "Illegal header encoding for chosen kind of header");
         hb[2] = static_cast<uint8_t>(bits_pr_elemA);
         hb[3] = static_cast<uint8_t>(bits_pr_elemB);
-        auto hh = (uint16_t*)header;
-        hh[3] = static_cast<uint16_t>(num_elems);
+        const auto hw = reinterpret_cast<uint16_t*>(header);
+        hw[3] = static_cast<uint16_t>(num_elems);
     }
 
-    static void init_header(char* header, Encoding enc, uint8_t flags, size_t bits_pr_elemA, size_t bits_pr_elemB,
+    static void init_header(char* header, Encoding enc, uint8_t flags, uint8_t bits_pr_elemA, uint8_t bits_pr_elemB,
                             size_t num_elemsA, size_t num_elemsB)
     {
-        std::fill((char*)header, (char*)header + header_size, 0);
-        auto hb = (uint8_t*)header;
-        if (enc != Encoding::Flex) {
-            REALM_ASSERT(false && "Illegal header encoding for chosen kind of header");
-        }
-        REALM_ASSERT(flags < 8);
+        std::fill(header, header + header_size, 0);
+        const auto hb = reinterpret_cast<uint8_t*>(header);
+        REALM_ASSERT_DEBUG(enc == Encoding::Flex);
+        REALM_ASSERT_DEBUG(flags < 8);
         hb[4] = (flags << 5) | (wtype_Extend << 3);
-        hb[5] = (int)Encoding::Flex - (int)Encoding::Packed;
-        auto hh = (uint16_t*)header;
-        REALM_ASSERT(bits_pr_elemA > 0);
-        REALM_ASSERT(bits_pr_elemB > 0);
-        REALM_ASSERT(bits_pr_elemA <= 64);
-        REALM_ASSERT(bits_pr_elemB <= 64);
-        REALM_ASSERT(num_elemsA < 1024);
-        REALM_ASSERT(num_elemsB < 1024);
-        hh[1] = static_cast<uint16_t>(((bits_pr_elemB - 1) << 10) | num_elemsB);
-        hh[3] = static_cast<uint16_t>(((bits_pr_elemA - 1) << 10) | num_elemsA);
+        hb[5] = static_cast<int>(Encoding::Flex) - static_cast<int>(Encoding::Packed);
+        const auto hw = reinterpret_cast<uint16_t*>(header);
+        REALM_ASSERT_DEBUG(bits_pr_elemA > 0);
+        REALM_ASSERT_DEBUG(bits_pr_elemB > 0);
+        REALM_ASSERT_DEBUG(bits_pr_elemA <= 64);
+        REALM_ASSERT_DEBUG(bits_pr_elemB <= 64);
+        REALM_ASSERT_DEBUG(num_elemsA < 1024);
+        REALM_ASSERT_DEBUG(num_elemsB < 1024);
+        hw[1] = static_cast<uint16_t>(((bits_pr_elemB - 1) << 10) | num_elemsB);
+        hw[3] = static_cast<uint16_t>(((bits_pr_elemA - 1) << 10) | num_elemsA);
     }
 
     // Setting element size for encodings with a single element size:
@@ -506,25 +500,25 @@ public:
 
     static inline void set_flags(char* header, uint8_t flags)
     {
-        REALM_ASSERT(flags <= 7);
-        auto h = (uint8_t*)header;
+        REALM_ASSERT_DEBUG(flags <= 7);
+        auto h = reinterpret_cast<uint8_t*>(header);
         h[4] = (h[4] & 0b00011111) | flags << 5;
     }
     static inline uint8_t get_flags(char* header)
     {
-        auto h = (uint8_t*)header;
+        auto h = reinterpret_cast<uint8_t*>(header);
         return h[4] >> 5;
     }
 
     static inline void set_flags2(char* header, uint8_t flags)
     {
-        REALM_ASSERT(flags <= 7);
-        auto h = (uint8_t*)header;
+        REALM_ASSERT_DEBUG(flags <= 7);
+        auto h = reinterpret_cast<uint8_t*>(header);
         h[4] = (h[4] & 0b11111000) | flags;
     }
     static inline uint8_t get_flags2(char* header)
     {
-        auto h = (uint8_t*)header;
+        auto h = reinterpret_cast<uint8_t*>(header);
         return h[4] & 0b0111;
     }
 };
@@ -532,28 +526,28 @@ public:
 template <>
 void inline NodeHeader::set_element_size<NodeHeader::Encoding::Packed>(char* header, size_t bits_per_element)
 {
-    REALM_ASSERT(get_encoding(header) == Encoding::Packed);
-    REALM_ASSERT(bits_per_element <= 64);
-    ((uint8_t*)header)[3] = static_cast<uint8_t>(bits_per_element);
+    REALM_ASSERT_DEBUG(get_encoding(header) == Encoding::Packed);
+    REALM_ASSERT_DEBUG(bits_per_element <= 64);
+    (reinterpret_cast<uint8_t*>(header)[3] = static_cast<uint8_t>(bits_per_element));
 }
 template <>
 void inline NodeHeader::set_element_size<NodeHeader::Encoding::WTypBits>(char* header, size_t bits_per_element)
 {
-    REALM_ASSERT(bits_per_element <= 64);
+    REALM_ASSERT_DEBUG(bits_per_element <= 64);
     // TODO: Only powers of two allowed
     // TODO: Optimize
-    NodeHeader::set_wtype_in_header(wtype_Bits, (char*)header);
-    NodeHeader::set_width_in_header(bits_per_element, (char*)header);
+    NodeHeader::set_wtype_in_header(wtype_Bits, reinterpret_cast<char*>(header));
+    NodeHeader::set_width_in_header(bits_per_element, reinterpret_cast<char*>(header));
 }
 template <>
 void inline NodeHeader::set_element_size<NodeHeader::Encoding::WTypMult>(char* header, size_t bits_per_element)
 {
-    REALM_ASSERT(bits_per_element <= 64);
-    REALM_ASSERT((bits_per_element & 0x7) == 0);
+    REALM_ASSERT_DEBUG(bits_per_element <= 64);
+    REALM_ASSERT_DEBUG((bits_per_element & 0x7) == 0);
     // TODO: Only powers of two allowed
     // TODO: Optimize
-    NodeHeader::set_wtype_in_header(wtype_Multiply, (char*)header);
-    NodeHeader::set_width_in_header(bits_per_element >> 3, (char*)header);
+    NodeHeader::set_wtype_in_header(wtype_Multiply, reinterpret_cast<char*>(header));
+    NodeHeader::set_width_in_header(bits_per_element >> 3, reinterpret_cast<char*>(header));
 }
 
 
@@ -561,7 +555,7 @@ template <>
 inline size_t NodeHeader::get_element_size<NodeHeader::Encoding::Packed>(const char* header)
 {
     REALM_ASSERT_DEBUG(get_encoding(header) == Encoding::Packed);
-    auto bits_per_element = ((uint8_t*)header)[3];
+    const auto bits_per_element = (reinterpret_cast<const uint8_t*>(header))[3];
     REALM_ASSERT_DEBUG(bits_per_element <= 64);
     return bits_per_element;
 }
@@ -569,7 +563,7 @@ template <>
 inline size_t NodeHeader::get_element_size<NodeHeader::Encoding::WTypBits>(const char* header)
 {
     REALM_ASSERT_DEBUG(get_wtype_from_header(header) == wtype_Bits);
-    auto bits_per_element = NodeHeader::get_width_from_header((char*)header);
+    const auto bits_per_element = NodeHeader::get_width_from_header(reinterpret_cast<const char*>(header));
     REALM_ASSERT_DEBUG(bits_per_element <= 64);
     return bits_per_element;
 }
@@ -577,7 +571,7 @@ template <>
 inline size_t NodeHeader::get_element_size<NodeHeader::Encoding::WTypMult>(const char* header)
 {
     REALM_ASSERT_DEBUG(get_wtype_from_header(header) == wtype_Multiply);
-    auto bits_per_element = NodeHeader::get_width_from_header((char*)header) << 3;
+    const auto bits_per_element = NodeHeader::get_width_from_header(reinterpret_cast<const char*>(header)) << 3;
     REALM_ASSERT_DEBUG(bits_per_element <= 64);
     return bits_per_element;
 }
@@ -587,14 +581,14 @@ inline void NodeHeader::set_elementA_size<NodeHeader::Encoding::AofP>(char* head
 {
     REALM_ASSERT_DEBUG(get_encoding(header) == Encoding::AofP);
     REALM_ASSERT_DEBUG(bits_per_element <= 64);
-    ((uint8_t*)header)[2] = static_cast<uint8_t>(bits_per_element);
+    (reinterpret_cast<uint8_t*>(header))[2] = static_cast<uint8_t>(bits_per_element);
 }
 template <>
 inline void NodeHeader::set_elementA_size<NodeHeader::Encoding::PofA>(char* header, size_t bits_per_element)
 {
     REALM_ASSERT_DEBUG(get_encoding(header) == Encoding::PofA);
     REALM_ASSERT_DEBUG(bits_per_element <= 64);
-    ((uint8_t*)header)[2] = static_cast<uint8_t>(bits_per_element);
+    (reinterpret_cast<uint8_t*>(header))[2] = static_cast<uint8_t>(bits_per_element);
 }
 template <>
 inline void NodeHeader::set_elementA_size<NodeHeader::Encoding::Flex>(char* header, size_t bits_per_element)
@@ -603,11 +597,11 @@ inline void NodeHeader::set_elementA_size<NodeHeader::Encoding::Flex>(char* head
     REALM_ASSERT_DEBUG(get_encoding(header) == Encoding::Flex);
     REALM_ASSERT_DEBUG(bits_per_element <= 64);
     REALM_ASSERT_DEBUG(bits_per_element > 0);
-    uint16_t word = ((uint16_t*)header)[3];
+    uint16_t word = (reinterpret_cast<uint16_t*>(header))[3];
     word &= ~(0b111111 << 10);
     //  we only have 6 bits, so store values in range 1-64 as 0-63
     word |= (bits_per_element - 1) << 10;
-    ((uint16_t*)header)[3] = word;
+    (reinterpret_cast<uint16_t*>(header))[3] = word;
 }
 
 
@@ -616,14 +610,14 @@ inline void NodeHeader::set_elementB_size<NodeHeader::Encoding::AofP>(char* head
 {
     REALM_ASSERT_DEBUG(get_encoding(header) == Encoding::AofP);
     REALM_ASSERT_DEBUG(bits_per_element <= 64);
-    ((uint8_t*)header)[3] = static_cast<uint8_t>(bits_per_element);
+    (reinterpret_cast<uint8_t*>(header))[3] = static_cast<uint8_t>(bits_per_element);
 }
 template <>
 inline void NodeHeader::set_elementB_size<NodeHeader::Encoding::PofA>(char* header, size_t bits_per_element)
 {
     REALM_ASSERT_DEBUG(get_encoding(header) == Encoding::PofA);
     REALM_ASSERT_DEBUG(bits_per_element <= 64);
-    ((uint8_t*)header)[3] = static_cast<uint8_t>(bits_per_element);
+    (reinterpret_cast<uint8_t*>(header))[3] = static_cast<uint8_t>(bits_per_element);
 }
 template <>
 inline void NodeHeader::set_elementB_size<NodeHeader::Encoding::Flex>(char* header, size_t bits_per_element)
@@ -632,20 +626,20 @@ inline void NodeHeader::set_elementB_size<NodeHeader::Encoding::Flex>(char* head
     REALM_ASSERT_DEBUG(get_encoding(header) == Encoding::Flex);
     REALM_ASSERT_DEBUG(bits_per_element <= 64);
     REALM_ASSERT_DEBUG(bits_per_element > 0);
-    uint16_t word = ((uint16_t*)header)[1];
+    uint16_t word = (reinterpret_cast<uint16_t*>(header))[1];
     word &= ~(0b111111 << 10);
     //  we only have 6 bits, so store values in range 1-64 as 0-63
     word |= (bits_per_element - 1) << 10;
-    ((uint16_t*)header)[1] = word;
+    (reinterpret_cast<uint16_t*>(header))[1] = word;
 }
 
 
 template <>
 inline size_t NodeHeader::get_elementA_size<NodeHeader::Encoding::AofP>(const char* header)
 {
-    auto encoding = get_encoding(header);
+    const auto encoding = get_encoding(header);
     REALM_ASSERT_DEBUG(encoding == Encoding::AofP);
-    auto bits_per_element = ((uint8_t*)header)[2];
+    const auto bits_per_element = (reinterpret_cast<const uint8_t*>(header))[2];
     REALM_ASSERT_DEBUG(bits_per_element <= 64);
     return bits_per_element;
 }
@@ -653,7 +647,7 @@ template <>
 inline size_t NodeHeader::get_elementA_size<NodeHeader::Encoding::PofA>(const char* header)
 {
     REALM_ASSERT_DEBUG(get_encoding(header) == Encoding::PofA);
-    auto bits_per_element = ((uint8_t*)header)[2];
+    const auto bits_per_element = (reinterpret_cast<const uint8_t*>(header))[2];
     REALM_ASSERT(bits_per_element <= 64);
     return bits_per_element;
 }
@@ -662,7 +656,7 @@ inline size_t NodeHeader::get_elementA_size<NodeHeader::Encoding::Flex>(const ch
 {
     const auto encoding = get_encoding(header);
     REALM_ASSERT_DEBUG(encoding == Encoding::Flex);
-    uint16_t word = ((uint16_t*)header)[3];
+    uint16_t word = (reinterpret_cast<const uint16_t*>(header))[3];
     auto bits_per_element = (word >> 10) & 0b111111;
     //  we only have 6 bits, so store values in range 1-64 as 0-63
     // this means that Flex cannot support element sizes of 0
@@ -676,7 +670,7 @@ template <>
 inline size_t NodeHeader::get_elementB_size<NodeHeader::Encoding::AofP>(const char* header)
 {
     REALM_ASSERT_DEBUG(get_encoding(header) == Encoding::AofP);
-    auto bits_per_element = ((uint8_t*)header)[3];
+    const auto bits_per_element = (reinterpret_cast<const uint8_t*>(header))[3];
     REALM_ASSERT_DEBUG(bits_per_element <= 64);
     return bits_per_element;
 }
@@ -684,7 +678,7 @@ template <>
 inline size_t NodeHeader::get_elementB_size<NodeHeader::Encoding::PofA>(const char* header)
 {
     REALM_ASSERT_DEBUG(get_encoding(header) == Encoding::PofA);
-    auto bits_per_element = ((uint8_t*)header)[3];
+    const auto bits_per_element = (reinterpret_cast<const uint8_t*>(header))[3];
     REALM_ASSERT_DEBUG(bits_per_element <= 64);
     return bits_per_element;
 }
@@ -692,7 +686,7 @@ template <>
 inline size_t NodeHeader::get_elementB_size<NodeHeader::Encoding::Flex>(const char* header)
 {
     REALM_ASSERT_DEBUG(get_encoding(header) == Encoding::Flex);
-    uint16_t word = ((uint16_t*)header)[1];
+    uint16_t word = (reinterpret_cast<const uint16_t*>(header))[1];
     auto bits_per_element = (word >> 10) & 0b111111;
     // same as above
     bits_per_element++;
@@ -706,42 +700,42 @@ inline void NodeHeader::set_num_elements<NodeHeader::Encoding::Packed>(char* hea
 {
     REALM_ASSERT_DEBUG(get_encoding(header) == Encoding::Packed);
     REALM_ASSERT_DEBUG(num_elements < 0x10000);
-    ((uint16_t*)header)[3] = static_cast<uint16_t>(num_elements);
+    (reinterpret_cast<uint16_t*>(header))[3] = static_cast<uint16_t>(num_elements);
 }
 template <>
 inline void NodeHeader::set_num_elements<NodeHeader::Encoding::WTypBits>(char* header, size_t num_elements)
 {
     // TODO optimize
-    NodeHeader::set_wtype_in_header(wtype_Bits, (char*)header);
-    NodeHeader::set_size_in_header(num_elements, (char*)header);
+    NodeHeader::set_wtype_in_header(wtype_Bits, header);
+    NodeHeader::set_size_in_header(num_elements, header);
 }
 template <>
 inline void NodeHeader::set_num_elements<NodeHeader::Encoding::WTypMult>(char* header, size_t num_elements)
 {
     // TODO optimize
-    NodeHeader::set_wtype_in_header(wtype_Multiply, (char*)header);
-    NodeHeader::set_size_in_header(num_elements, (char*)header);
+    NodeHeader::set_wtype_in_header(wtype_Multiply, header);
+    NodeHeader::set_size_in_header(num_elements, header);
 }
 template <>
 inline void NodeHeader::set_num_elements<NodeHeader::Encoding::WTypIgn>(char* header, size_t num_elements)
 {
     // TODO optimize
-    NodeHeader::set_wtype_in_header(wtype_Ignore, (char*)header);
-    NodeHeader::set_size_in_header(num_elements, (char*)header);
+    NodeHeader::set_wtype_in_header(wtype_Ignore, header);
+    NodeHeader::set_size_in_header(num_elements, header);
 }
 template <>
 inline void NodeHeader::set_num_elements<NodeHeader::Encoding::AofP>(char* header, size_t num_elements)
 {
     REALM_ASSERT_DEBUG(get_encoding(header) == Encoding::AofP);
     REALM_ASSERT_DEBUG(num_elements < 0x10000);
-    ((uint16_t*)header)[3] = static_cast<uint16_t>(num_elements);
+    (reinterpret_cast<uint16_t*>(header))[3] = static_cast<uint16_t>(num_elements);
 }
 template <>
 inline void NodeHeader::set_num_elements<NodeHeader::Encoding::PofA>(char* header, size_t num_elements)
 {
     REALM_ASSERT_DEBUG(get_encoding(header) == Encoding::PofA);
     REALM_ASSERT_DEBUG(num_elements < 0x10000);
-    ((uint16_t*)header)[3] = static_cast<uint16_t>(num_elements);
+    (reinterpret_cast<uint16_t*>(header))[3] = static_cast<uint16_t>(num_elements);
 }
 
 
@@ -750,57 +744,57 @@ inline void NodeHeader::set_arrayA_num_elements<NodeHeader::Encoding::Flex>(char
 {
     REALM_ASSERT_DEBUG(get_encoding(header) == Encoding::Flex);
     REALM_ASSERT_DEBUG(num_elements < 0b10000000000); // 10 bits
-    uint16_t word = ((uint16_t*)header)[3];
+    uint16_t word = (reinterpret_cast<uint16_t*>(header))[3];
     word &= ~(0b1111111111 << 10);
     word |= num_elements << 10;
-    ((uint16_t*)header)[3] = word;
+    (reinterpret_cast<uint16_t*>(header))[3] = word;
 }
 template <>
 inline void NodeHeader::set_arrayB_num_elements<NodeHeader::Encoding::Flex>(char* header, size_t num_elements)
 {
     REALM_ASSERT_DEBUG(get_encoding(header) == Encoding::Flex);
     REALM_ASSERT_DEBUG(num_elements < 0b10000000000); // 10 bits
-    uint16_t word = ((uint16_t*)header)[1];
+    uint16_t word = (reinterpret_cast<uint16_t*>(header))[1];
     word &= ~(0b1111111111 << 10);
     word |= num_elements << 10;
-    ((uint16_t*)header)[1] = word;
+    (reinterpret_cast<uint16_t*>(header))[1] = word;
 }
 
 template <>
 inline size_t NodeHeader::get_num_elements<NodeHeader::Encoding::Packed>(const char* header)
 {
     REALM_ASSERT_DEBUG(get_encoding(header) == Encoding::Packed);
-    return ((uint16_t*)header)[3];
+    return (reinterpret_cast<const uint16_t*>(header))[3];
 }
 template <>
 inline size_t NodeHeader::get_num_elements<NodeHeader::Encoding::AofP>(const char* header)
 {
     REALM_ASSERT_DEBUG(get_encoding(header) == Encoding::AofP);
-    return ((uint16_t*)header)[3];
+    return (reinterpret_cast<const uint16_t*>(header))[3];
 }
 template <>
 inline size_t NodeHeader::get_num_elements<NodeHeader::Encoding::PofA>(const char* header)
 {
     REALM_ASSERT_DEBUG(get_encoding(header) == Encoding::PofA);
-    return ((uint16_t*)header)[3];
+    return (reinterpret_cast<const uint16_t*>(header))[3];
 }
 template <>
 inline size_t NodeHeader::get_num_elements<NodeHeader::Encoding::WTypBits>(const char* header)
 {
     REALM_ASSERT_DEBUG(get_wtype_from_header(header) == wtype_Bits);
-    return NodeHeader::get_size_from_header((const char*)header);
+    return NodeHeader::get_size_from_header(header);
 }
 template <>
 inline size_t NodeHeader::get_num_elements<NodeHeader::Encoding::WTypMult>(const char* header)
 {
     REALM_ASSERT_DEBUG(get_wtype_from_header(header) == wtype_Multiply);
-    return NodeHeader::get_size_from_header((const char*)header);
+    return NodeHeader::get_size_from_header(header);
 }
 template <>
 inline size_t NodeHeader::get_num_elements<NodeHeader::Encoding::WTypIgn>(const char* header)
 {
     REALM_ASSERT_DEBUG(get_wtype_from_header(header) == wtype_Ignore);
-    return NodeHeader::get_size_from_header((const char*)header);
+    return NodeHeader::get_size_from_header(header);
 }
 
 template <>
@@ -808,8 +802,8 @@ inline size_t NodeHeader::get_arrayA_num_elements<NodeHeader::Encoding::Flex>(co
 {
     const auto encoding = get_encoding(header);
     REALM_ASSERT_DEBUG(encoding == Encoding::Flex);
-    uint16_t word = ((uint16_t*)header)[3];
-    auto num_elements = word & 0b1111111111;
+    const uint16_t word = (reinterpret_cast<const uint16_t*>(header))[3];
+    const auto num_elements = word & 0b1111111111;
     return num_elements;
 }
 
@@ -817,11 +811,10 @@ template <>
 inline size_t NodeHeader::get_arrayB_num_elements<NodeHeader::Encoding::Flex>(const char* header)
 {
     REALM_ASSERT_DEBUG(get_encoding(header) == Encoding::Flex);
-    uint16_t word = ((uint16_t*)header)[1];
-    auto num_elements = word & 0b1111111111;
+    const uint16_t word = (reinterpret_cast<const uint16_t*>(header))[1];
+    const auto num_elements = word & 0b1111111111;
     return num_elements;
 }
-
 
 template <>
 inline size_t NodeHeader::calc_size<NodeHeader::Encoding::Packed>(size_t num_elements, size_t element_size)
@@ -832,14 +825,12 @@ template <>
 inline size_t NodeHeader::calc_size<NodeHeader::Encoding::WTypBits>(size_t num_elements, size_t element_size)
 {
     return calc_byte_size(wtype_Bits, num_elements, static_cast<uint_least8_t>(element_size));
-    // return NodeHeader::header_size + align_bits_to8(num_elements * element_size);
 }
 template <>
 inline size_t NodeHeader::calc_size<NodeHeader::Encoding::WTypMult>(size_t num_elements, size_t element_size)
 {
     return calc_byte_size(wtype_Multiply, num_elements, static_cast<uint_least8_t>(element_size));
 }
-
 
 template <>
 inline size_t NodeHeader::calc_size<NodeHeader::Encoding::WTypIgn>(size_t num_elements)
@@ -872,6 +863,7 @@ size_t inline NodeHeader::get_byte_size_from_header(const char* header) noexcept
     auto h = header;
 
     auto encoding = get_encoding(h);
+    REALM_ASSERT_DEBUG(encoding >= Encoding::WTypBits && encoding <= Encoding::Flex);
     switch (encoding) {
         case Encoding::WTypBits:
         case Encoding::WTypIgn:
@@ -900,8 +892,7 @@ size_t inline NodeHeader::get_byte_size_from_header(const char* header) noexcept
                                                             get_arrayB_num_elements<NodeHeader::Encoding::Flex>(h) *
                                                                 get_elementB_size<NodeHeader::Encoding::Flex>(h));
         default:
-            REALM_ASSERT_RELEASE(false && "unknown encoding");
-            return 0; // kill a warning
+            REALM_UNREACHABLE();
     }
 }
 

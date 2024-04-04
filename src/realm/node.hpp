@@ -114,7 +114,7 @@ public:
     {
     }
 
-    virtual ~Node() noexcept = default;
+    virtual ~Node() = default;
 
     /**************************** Initializers *******************************/
 

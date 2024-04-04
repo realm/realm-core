@@ -1008,19 +1008,19 @@ MemRef Array::create(Type type, bool context_flag, WidthType width_type, size_t 
         case type_Normal:
             break;
         case type_InnerBptreeNode:
-            flags |= (uint8_t)Flags::HasRefs | (uint8_t)Flags::InnerBPTree;
+            flags |= static_cast<uint8_t>(Flags::HasRefs) | static_cast<uint8_t>(Flags::InnerBPTree);
 
             break;
         case type_HasRefs:
-            flags |= (uint8_t)Flags::HasRefs;
+            flags |= static_cast<uint8_t>(Flags::HasRefs);
             break;
     }
     if (context_flag)
-        flags |= (uint8_t)Flags::Context;
+        flags |= static_cast<uint8_t>(Flags::Context);
     int width = 0;
     size_t byte_size_0 = header_size;
     if (value != 0) {
-        width = int(bit_width(value));
+        width = static_cast<int>(bit_width(value));
         byte_size_0 = calc_aligned_byte_size(size, width); // Throws
     }
     // Adding zero to Array::initial_capacity to avoid taking the
@@ -1028,12 +1028,12 @@ MemRef Array::create(Type type, bool context_flag, WidthType width_type, size_t 
     size_t byte_size = std::max(byte_size_0, initial_capacity + 0);
 
     MemRef mem = alloc.alloc(byte_size); // Throws
-    auto header = mem.get_addr();
+    const auto header = mem.get_addr();
     init_header(header, encoding, flags, width, size);
-    set_capacity_in_header(byte_size, mem.get_addr());
+    set_capacity_in_header(byte_size, header);
 
     if (value != 0) {
-        char* data = get_data_from_header(mem.get_addr());
+        char* data = get_data_from_header(header);
         size_t begin = 0, end = size;
         REALM_TEMPEX(fill_direct, width, (data, begin, end, value));
     }
