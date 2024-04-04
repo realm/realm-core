@@ -22,6 +22,8 @@
 #include <realm/node_header.hpp>
 #include <realm/alloc.hpp>
 
+#include <iostream>
+
 namespace realm {
 
 class Mixed;
