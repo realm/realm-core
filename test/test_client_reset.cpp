@@ -975,7 +975,8 @@ TEST(ClientReset_NoChanges)
     db->write_copy(path_backup, nullptr);
     DBOptions options;
     options.is_immutable = true;
-    auto backup_db = DB::create(path_backup, true, options);
+    options.no_create = true;
+    auto backup_db = DB::create(path_backup, options);
 
     const ClientResyncMode modes[] = {ClientResyncMode::Recover, ClientResyncMode::DiscardLocal,
                                       ClientResyncMode::RecoverOrDiscard};
