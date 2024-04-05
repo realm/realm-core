@@ -23,7 +23,7 @@
 #include <cstddef>
 #include <vector>
 #include <realm/query_conditions.hpp>
-
+#include <realm/array_direct.hpp>
 
 namespace realm {
 
@@ -52,34 +52,31 @@ public:
     inline size_t ndx_field_count() const;
     inline size_t bit_count_per_iteration() const;
     inline size_t ndx_bit_count_per_iteration() const;
+    inline bf_iterator& data_iterator() const;
+    inline bf_iterator& ndx_iterator() const;
 
     // get/set
-    int64_t get(const Array&, size_t) const;
-    int64_t get(const char* data, size_t) const;
-    void get_chunk(const Array&, size_t ndx, int64_t res[8]) const;
-    void set_direct(const Array&, size_t, int64_t) const;
+    inline int64_t get(size_t) const;
+    inline void get_chunk(size_t ndx, int64_t res[8]) const;
+    inline void set_direct(size_t, int64_t) const;
 
     // query interface
-    template <typename Cond>
-    size_t find_first(const Array&, int64_t, size_t, size_t) const;
     template <typename Cond>
     inline bool find_all(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*) const;
 
 private:
-    // Same idea we have for Array, we want to avoid to constantly the whether we
+    // Same idea we have for Array, we want to avoid to constantly checking whether we
     // have compressed in packed or flex, and jump straight to the right implementation,
     // avoiding branch mis-predictions, which made some queries run ~6/7x slower.
 
-    using Getter = int64_t (ArrayEncode::*)(const Array&, size_t) const;
-    using DataGetter = int64_t (ArrayEncode::*)(const char*, size_t) const;
-    using ChunkGetterChunk = void (ArrayEncode::*)(const Array&, size_t, int64_t[8]) const;
-    using DirectSetter = void (ArrayEncode::*)(const Array&, size_t, int64_t) const;
+    using Getter = int64_t (ArrayEncode::*)(size_t) const;
+    using ChunkGetterChunk = void (ArrayEncode::*)(size_t, int64_t[8]) const;
+    using DirectSetter = void (ArrayEncode::*)(size_t, int64_t) const;
     using Finder = bool (ArrayEncode::*)(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*) const;
     using FinderTable = std::array<Finder, cond_VTABLE_FINDER_COUNT>;
 
     struct VTable {
         Getter m_getter{nullptr};
-        DataGetter m_data_getter{nullptr};
         ChunkGetterChunk m_chunk_getter{nullptr};
         DirectSetter m_direct_setter{nullptr};
         FinderTable m_finder;
@@ -89,14 +86,12 @@ private:
     const VTable* m_vtable = nullptr;
 
     // getting and setting interface specifically for encoding formats
-    int64_t get_packed(const Array&, size_t) const;
-    int64_t get_flex(const Array&, size_t) const;
-    int64_t get_from_data_packed(const char*, size_t) const;
-    int64_t get_from_data_flex(const char*, size_t) const;
-    void get_chunk_packed(const Array&, size_t, int64_t[8]) const;
-    void get_chunk_flex(const Array&, size_t, int64_t[8]) const;
-    void set_direct_packed(const Array&, size_t, int64_t) const;
-    void set_direct_flex(const Array&, size_t, int64_t) const;
+    int64_t get_packed(size_t) const;
+    int64_t get_flex(size_t) const;
+    void get_chunk_packed(size_t, int64_t[8]) const;
+    void get_chunk_flex(size_t, int64_t[8]) const;
+    void set_direct_packed(size_t, int64_t) const;
+    void set_direct_flex(size_t, int64_t) const;
     // query interface
     template <typename Cond>
     bool find_all_packed(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*) const;
@@ -110,15 +105,28 @@ private:
     void encode_values(const Array&, std::vector<int64_t>&, std::vector<size_t>&) const;
     inline bool is_packed() const;
     inline bool is_flex() const;
-    bool always_encode(const Array&, Array&, Node::Encoding) const; // for testing
+
+    // for testing
+    bool always_encode(const Array&, Array&, Node::Encoding) const;
 
 private:
     using Encoding = NodeHeader::Encoding;
     Encoding m_encoding{NodeHeader::Encoding::WTypBits};
     size_t m_v_width = 0, m_v_size = 0, m_ndx_width = 0, m_ndx_size = 0;
-    uint64_t m_v_mask = 0, m_ndx_mask = 0;
-    uint64_t m_MSBs = 0, m_ndx_MSBs = 0;
+    uint64_t m_MSBs = 0, m_ndx_MSBs = 0, m_v_mask = 0, m_ndx_mask = 0;
+    mutable bf_iterator m_data_iterator;
+    mutable bf_iterator m_ndx_iterator;
 };
+
+inline bf_iterator& ArrayEncode::data_iterator() const
+{
+    return m_data_iterator;
+}
+
+inline bf_iterator& ArrayEncode::ndx_iterator() const
+{
+    return m_ndx_iterator;
+}
 
 inline bool ArrayEncode::is_packed() const
 {
@@ -196,6 +204,30 @@ inline uint64_t ArrayEncode::ndx_msb() const
     using Encoding = NodeHeader::Encoding;
     REALM_ASSERT_DEBUG(m_encoding == Encoding::Packed || m_encoding == Encoding::Flex);
     return m_ndx_MSBs;
+}
+
+inline int64_t ArrayEncode::get(size_t ndx) const
+{
+    REALM_ASSERT_DEBUG(ndx < size());
+    REALM_ASSERT_DEBUG(is_packed() || is_flex());
+    REALM_ASSERT_DEBUG(m_vtable->m_getter);
+    return (this->*(m_vtable->m_getter))(ndx);
+}
+
+inline void ArrayEncode::get_chunk(size_t ndx, int64_t res[8]) const
+{
+    REALM_ASSERT_DEBUG(ndx < size());
+    REALM_ASSERT_DEBUG(is_packed() || is_flex());
+    REALM_ASSERT_DEBUG(m_vtable->m_chunk_getter);
+    (this->*(m_vtable->m_chunk_getter))(ndx, res);
+}
+
+inline void ArrayEncode::set_direct(size_t ndx, int64_t value) const
+{
+    REALM_ASSERT_DEBUG(ndx < size());
+    REALM_ASSERT_DEBUG(is_packed() || is_flex());
+    REALM_ASSERT_DEBUG(m_vtable->m_direct_setter);
+    (this->*(m_vtable->m_direct_setter))(ndx, value);
 }
 
 template <typename Cond>

@@ -56,56 +56,6 @@ void ArrayPacked::copy_data(const Array& origin, Array& arr) const
     }
 }
 
-void ArrayPacked::set_direct(const Array& arr, size_t ndx, int64_t value) const
-{
-    REALM_ASSERT_DEBUG(arr.is_encoded());
-    const auto v_width = arr.m_encoder.width();
-    const auto v_size = arr.m_encoder.size();
-    REALM_ASSERT_DEBUG(ndx < v_size);
-    auto data = (uint64_t*)arr.m_data;
-    bf_iterator it_value{data, static_cast<size_t>(ndx * v_width), v_width, v_width, 0};
-    it_value.set_value(value);
-}
-
-int64_t ArrayPacked::get(const Array& arr, size_t ndx) const
-{
-    REALM_ASSERT_DEBUG(arr.is_attached());
-    REALM_ASSERT_DEBUG(arr.is_encoded());
-    return get(arr.m_data, ndx, arr.get_encoder());
-}
-
-int64_t ArrayPacked::get(const char* data, size_t ndx, const ArrayEncode& encode) const
-{
-    return do_get((uint64_t*)data, ndx, encode.width(), encode.size(), encode.width_mask());
-}
-
-int64_t ArrayPacked::do_get(uint64_t* data, size_t ndx, size_t v_width, size_t v_size, uint64_t mask) const
-{
-    if (ndx >= v_size)
-        return realm::not_found;
-    bf_iterator it{data, 0, v_width, v_width, ndx};
-    const auto value = it.get_value();
-    return sign_extend_field_by_mask(mask, value);
-}
-
-void ArrayPacked::get_chunk(const Array& arr, size_t ndx, int64_t res[8]) const
-{
-    const auto v_size = arr.m_size;
-    REALM_ASSERT_DEBUG(ndx < v_size);
-    auto sz = 8;
-    std::memset(res, 0, sizeof(int64_t) * sz);
-    auto supposed_end = ndx + sz;
-    size_t i = ndx;
-    size_t index = 0;
-    // this can be done better, in one go, retrieve both!!!
-    for (; i < supposed_end; ++i) {
-        res[index++] = get(arr, i);
-    }
-    for (; index < 8; ++index) {
-        res[index++] = get(arr, i++);
-    }
-}
-
 bool ArrayPacked::find_all_match(size_t start, size_t end, size_t baseindex, QueryStateBase* state) const
 {
     REALM_ASSERT_DEBUG(state->match_count() < state->limit());

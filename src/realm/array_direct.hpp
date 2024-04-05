@@ -22,7 +22,6 @@
 #include <cstring>
 #include <realm/utilities.hpp>
 #include <realm/alloc.hpp>
-#include <realm/array_encode.hpp>
 
 // clang-format off
 /* wid == 16/32 likely when accessing offsets in B tree */
@@ -243,33 +242,44 @@ private:
 // supports arrays of pairs by differentiating field size and step size.
 class bf_ref;
 class bf_iterator {
-    uint64_t* data_area;
-    uint64_t* first_word_ptr;
-    size_t field_position;
-    uint8_t field_size;
-    uint8_t step_size; // may be different than field_size if used for arrays of pairs
+    friend class ArrayPacked;
+    friend class ArrayFlex;
+    uint64_t* data_area = nullptr;
+    uint64_t* first_word_ptr = nullptr;
+    size_t field_position = 0;
+    uint8_t field_size = 0;
+    uint8_t step_size = 0; // may be different than field_size if used for arrays of pairs
+    size_t offset = 0;
+    uint64_t mask = 0;
 
 public:
+    bf_iterator() = default;
+    bf_iterator(const bf_iterator&) = default;
+    bf_iterator(bf_iterator&&) = default;
+    bf_iterator& operator=(const bf_iterator&) = default;
+    bf_iterator& operator=(bf_iterator&&) = default;
     bf_iterator(uint64_t* data_area, size_t initial_offset, size_t field_size, size_t step_size, size_t index)
         : data_area(data_area)
         , field_size(static_cast<uint8_t>(field_size))
         , step_size(static_cast<uint8_t>(step_size))
+        , offset(initial_offset)
     {
-        field_position = initial_offset + index * step_size;
-        first_word_ptr = data_area + (field_position >> 6);
+        if (field_size < 64)
+            mask = (1ULL << field_size) - 1;
+        move(index);
     }
 
     inline uint64_t get_full_word_with_value() const
     {
-        auto in_word_position = field_position & 0x3F;
-        auto first_word = first_word_ptr[0];
+        const auto in_word_position = field_position & 0x3F;
+        const auto first_word = first_word_ptr[0];
         uint64_t result = first_word >> in_word_position;
         // note: above shifts in zeroes above the bitfield
         if (in_word_position + field_size > 64) {
             // if we're here, in_word_position > 0
-            auto first_word_size = 64 - in_word_position;
-            auto second_word = first_word_ptr[1];
-            result |= second_word << first_word_size;
+            const auto first_word_size = 64 - in_word_position;
+            const auto second_word = first_word_ptr[1];
+            return result | second_word << first_word_size;
             // note: above shifts in zeroes below the bits we want
         }
         return result;
@@ -280,7 +290,7 @@ public:
         auto result = get_full_word_with_value();
         // discard any bits above the field we want
         if (field_size < 64)
-            result &= (1ULL << field_size) - 1;
+            result &= mask;
         return result;
     }
 
@@ -288,14 +298,14 @@ public:
     // end of array. For that particular case, you must use get_last_unaligned_word instead.
     inline uint64_t get_unaligned_word() const
     {
-        auto in_word_position = field_position & 0x3F;
-        auto first_word = first_word_ptr[0];
+        const auto in_word_position = field_position & 0x3F;
+        const auto first_word = first_word_ptr[0];
         if (in_word_position == 0)
             return first_word;
         uint64_t result = first_word >> in_word_position;
         // note: above shifts in zeroes above the bitfield
-        auto first_word_size = 64 - in_word_position;
-        auto second_word = first_word_ptr[1];
+        const auto first_word_size = 64 - in_word_position;
+        const auto second_word = first_word_ptr[1];
         result |= second_word << first_word_size;
         // note: above shifts in zeroes below the bits we want
         return result;
@@ -303,15 +313,15 @@ public:
 
     inline uint64_t get_last_unaligned_word() const
     {
-        auto in_word_position = field_position & 0x3F;
-        auto first_word = first_word_ptr[0];
-        uint64_t result = first_word >> in_word_position;
+        const auto in_word_position = field_position & 0x3F;
+        const auto first_word = first_word_ptr[0];
+        const uint64_t result = first_word >> in_word_position;
         // note: above shifts in zeroes above the bitfield
         return result;
     }
     void set_value(uint64_t value) const
     {
-        auto in_word_position = field_position & 0x3F;
+        const auto in_word_position = field_position & 0x3F;
         auto first_word = first_word_ptr[0];
         uint64_t mask = 0ULL - 1ULL;
         if (field_size < 64) {
@@ -319,7 +329,7 @@ public:
             value &= mask;
         }
         // zero out field in first word:
-        auto first_word_mask = ~(mask << in_word_position);
+        const auto first_word_mask = ~(mask << in_word_position);
         first_word &= first_word_mask;
         // or in relevant part of value
         first_word |= value << in_word_position;
@@ -327,10 +337,10 @@ public:
         if (in_word_position + field_size > 64) {
             // bitfield crosses word boundary.
             // discard the lowest bits of value (it has been written to the first word)
-            auto bits_written_to_first_word = 64 - in_word_position;
+            const auto bits_written_to_first_word = 64 - in_word_position;
             // bit_written_to_first_word must be lower than 64, so shifts based on it are well defined
             value >>= bits_written_to_first_word;
-            auto second_word_mask = mask >> bits_written_to_first_word;
+            const auto second_word_mask = mask >> bits_written_to_first_word;
             auto second_word = first_word_ptr[1];
             // zero out the field in second word, then or in the (high part of) value
             second_word &= ~second_word_mask;
@@ -340,26 +350,24 @@ public:
     }
     inline void operator++()
     {
-        auto next_field_position = field_position + step_size;
+        const auto next_field_position = field_position + step_size;
         if ((next_field_position >> 6) > (field_position >> 6)) {
             first_word_ptr = data_area + (next_field_position >> 6);
         }
         field_position = next_field_position;
     }
 
-    inline void move(size_t index, size_t initial_offset = 0)
+    inline void move(size_t index)
     {
-        field_position = initial_offset + index * step_size;
+        field_position = offset + index * step_size;
         first_word_ptr = data_area + (field_position >> 6);
     }
-    // The compiler should be able to generate code matching this
-    // from operator* and the bf_ref declared below:
-    //
-    //    uint64_t operator*() const
-    //    {
-    //        return get_value();
-    //    }
-    bf_ref operator*();
+
+    inline uint64_t operator*() const
+    {
+        return get_value();
+    }
+
     friend bool operator<(const bf_iterator&, const bf_iterator&);
 };
 
@@ -389,12 +397,6 @@ public:
     }
 };
 
-inline bf_ref bf_iterator::operator*()
-{
-    return bf_ref(*this);
-}
-
-
 inline uint64_t read_bitfield(uint64_t* data_area, size_t field_position, size_t width)
 {
     bf_iterator it(data_area, field_position, width, width, 0);
@@ -404,7 +406,7 @@ inline uint64_t read_bitfield(uint64_t* data_area, size_t field_position, size_t
 inline void write_bitfield(uint64_t* data_area, size_t field_position, size_t width, uint64_t value)
 {
     bf_iterator it(data_area, field_position, width, width, 0);
-    *it = value;
+    it.set_value(value);
 }
 
 inline int64_t sign_extend_field_by_mask(uint64_t sign_mask, uint64_t value)
@@ -971,16 +973,15 @@ inline int64_t default_fetcher(const char* data, size_t ndx)
     return get_direct<width>(data, ndx);
 }
 
+template <typename T>
 struct EncodedFetcher {
 
-    int64_t operator()(const char* data, size_t ndx) const
+    int64_t operator()(const char*, size_t ndx) const
     {
-        return ptr->get(data, ndx);
+        return ptr->get(ndx);
     }
-    const ArrayEncode* ptr;
+    const T* ptr;
 };
-static EncodedFetcher s_encoded_fetcher;
-
 
 // Lower and Upper bound are mainly used in the B+tree implementation,
 // but also for indexing, we can exploit these functions when the array
@@ -1153,10 +1154,11 @@ inline size_t lower_bound(const char* data, size_t size, int64_t value) noexcept
     return impl::lower_bound<width>(data, 0, size, value, impl::default_fetcher<width>);
 }
 
-inline size_t lower_bound(const char* data, size_t size, int64_t value, const ArrayEncode& encoder) noexcept
+template <typename T>
+inline size_t lower_bound(const char* data, size_t size, int64_t value,
+                          const impl::EncodedFetcher<T>& encoder) noexcept
 {
-    impl::s_encoded_fetcher.ptr = &encoder;
-    return impl::lower_bound<0>(data, 0, size, value, impl::s_encoded_fetcher);
+    return impl::lower_bound<0>(data, 0, size, value, encoder);
 }
 
 template <int width>
@@ -1165,10 +1167,11 @@ inline size_t upper_bound(const char* data, size_t size, int64_t value) noexcept
     return impl::upper_bound<width>(data, 0, size, value, impl::default_fetcher<width>);
 }
 
-inline size_t upper_bound(const char* data, size_t size, int64_t value, const ArrayEncode& encoder) noexcept
+template <typename T>
+inline size_t upper_bound(const char* data, size_t size, int64_t value,
+                          const impl::EncodedFetcher<T>& encoder) noexcept
 {
-    impl::s_encoded_fetcher.ptr = &encoder;
-    return impl::lower_bound<0>(data, 0, size, value, impl::s_encoded_fetcher);
+    return impl::lower_bound<0>(data, 0, size, value, encoder);
 }
 
 } // namespace realm

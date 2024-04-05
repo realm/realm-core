@@ -1589,7 +1589,7 @@ TEST(DirectBitFields)
         REALM_ASSERT(*it == 0);
         auto it2(it);
         ++it2;
-        *it2 = 127 + 128;
+        it2.set_value(127 + 128);
         REALM_ASSERT(*it == 0);
         ++it;
         REALM_ASSERT(*it == 127);
@@ -1603,7 +1603,7 @@ TEST(DirectBitFields)
         REALM_ASSERT(*it == 127);
         auto it2(it);
         ++it2;
-        *it2 = 42 + 128;
+        it2.set_value(42 + 128);
         REALM_ASSERT(*it == 127);
         ++it;
         REALM_ASSERT(*it == 42);
