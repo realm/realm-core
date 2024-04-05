@@ -439,7 +439,7 @@ public:
     {
         std::fill(header, header + header_size, 0);
         const auto hb = reinterpret_cast<uint8_t*>(header);
-        REALM_ASSERT_DEBUG(enc != Encoding::Flex);
+        REALM_ASSERT_DEBUG(enc == Encoding::Flex);
         REALM_ASSERT_DEBUG(flags < 8);
         hb[4] = (flags << 5) | (wtype_Extend << 3);
         hb[5] = static_cast<int>(Encoding::Flex) - static_cast<int>(Encoding::Packed);
