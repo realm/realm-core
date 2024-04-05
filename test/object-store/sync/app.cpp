@@ -5429,7 +5429,6 @@ TEST_CASE("app: make_streaming_request", "[sync][app][streaming]") {
         CHECK(req.body == "");
         CHECK(req.headers == Headers{{"Accept", "text/event-stream"}});
         CHECK(req.timeout_ms == timeout_ms);
-        CHECK(req.uses_refresh_token == false);
 
         auto req_args = get_request_args(req);
         CHECK(req_args["name"] == "func");

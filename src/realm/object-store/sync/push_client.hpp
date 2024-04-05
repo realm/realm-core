@@ -20,24 +20,22 @@
 #define PUSH_CLIENT_HPP
 
 #include <realm/util/functional.hpp>
-#include <realm/util/optional.hpp>
 
 #include <memory>
+#include <optional>
 #include <string>
 
-namespace realm {
-namespace app {
+namespace realm::app {
 class AuthRequestClient;
 class User;
 struct AppError;
 
 class PushClient {
 public:
-    PushClient(const std::string& service_name, const std::string& app_id, uint64_t timeout_ms,
+    PushClient(const std::string& service_name, const std::string& app_id,
                std::shared_ptr<AuthRequestClient>&& auth_request_client)
         : m_service_name(service_name)
         , m_app_id(app_id)
-        , m_timeout_ms(timeout_ms)
         , m_auth_request_client(std::move(auth_request_client))
     {
     }
@@ -54,7 +52,7 @@ public:
     /// @param sync_user The sync user requesting push registration.
     /// @param completion An error will be returned should something go wrong.
     void register_device(const std::string& registration_token, const std::shared_ptr<User>& sync_user,
-                         util::UniqueFunction<void(util::Optional<AppError>)>&& completion);
+                         util::UniqueFunction<void(std::optional<AppError>)>&& completion);
 
 
     /// Deregister a device for push notificatons, no token or device id needs to be passed
@@ -62,16 +60,14 @@ public:
     /// @param sync_user The sync user requesting push degistration.
     /// @param completion An error will be returned should something go wrong.
     void deregister_device(const std::shared_ptr<User>& sync_user,
-                           util::UniqueFunction<void(util::Optional<AppError>)>&& completion);
+                           util::UniqueFunction<void(std::optional<AppError>)>&& completion);
 
 private:
     std::string m_service_name;
     std::string m_app_id;
-    uint64_t m_timeout_ms;
     std::shared_ptr<AuthRequestClient> m_auth_request_client;
 };
 
-} // namespace app
-} // namespace realm
+} // namespace realm::app
 
 #endif /* PUSH_CLIENT_HPP */

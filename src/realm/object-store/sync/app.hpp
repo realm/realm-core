@@ -491,15 +491,17 @@ private:
                               util::UniqueFunction<void(std::optional<AppError>)>&& completion)
         REQUIRES(!m_route_mutex);
 
+    /// The completion type for all intermediate operations which occur before performing the original request
+    using IntermediateCompletion = util::UniqueFunction<void(std::unique_ptr<Request>&&, const Response&)>;
+
     /// Checks if an auth failure has taken place and if so it will attempt to refresh the
     /// access token and then perform the orginal request again with the new access token
     /// @param error The error to check for auth failures
-    /// @param response The original response to pass back should this not be an auth error
     /// @param request The request to perform
     /// @param completion returns the original response in the case it is not an auth error, or if a failure
     /// occurs, if the refresh was a success the newly attempted response will be passed back
-    void handle_auth_failure(const AppError& error, const Response& response, Request&& request,
-                             const std::shared_ptr<User>& user,
+    void handle_auth_failure(const AppError& error, std::unique_ptr<Request>&& request, const Response& response,
+                             const std::shared_ptr<User>& user, RequestTokenType token_type,
                              util::UniqueFunction<void(const Response&)>&& completion) REQUIRES(!m_route_mutex);
 
     std::string url_for_path(const std::string& path) const override REQUIRES(!m_route_mutex);
@@ -531,7 +533,7 @@ private:
     /// @param request The original request object that needs to be sent after the update
     /// @param completion The original completion object that will be called with the response to the request
     /// @param new_hostname If provided, the metadata will be requested from this hostname
-    void update_location_and_resend(Request&& request, util::UniqueFunction<void(const Response&)>&& completion,
+    void update_location_and_resend(std::unique_ptr<Request>&& request, IntermediateCompletion&& completion,
                                     std::optional<std::string>&& new_hostname = util::none) REQUIRES(!m_route_mutex);
 
     void post(std::string&& route, util::UniqueFunction<void(std::optional<AppError>)>&& completion,
@@ -541,23 +543,22 @@ private:
     /// @param request The request to be performed
     /// @param completion Returns the response from the server
     /// @param update_location Force the location metadata to be updated prior to sending the request
-    void do_request(Request&& request, util::UniqueFunction<void(const Response&)>&& completion,
+    void do_request(std::unique_ptr<Request>&& request, IntermediateCompletion&& completion,
                     bool update_location = false) REQUIRES(!m_route_mutex);
+
+    std::unique_ptr<Request> make_request(HttpMethod method, std::string&& url, const std::shared_ptr<User>& user,
+                                          RequestTokenType, std::string&& body) const;
 
     /// Process the redirect response received from the last request that was sent to the server
     /// @param request The request to be performed (in case it needs to be sent again)
     /// @param response The response from the send_request_to_server operation
     /// @param completion Returns the response from the server if not a redirect
-    void check_for_redirect_response(Request&& request, const Response& response,
-                                     util::UniqueFunction<void(const Response&)>&& completion)
-        REQUIRES(!m_route_mutex);
+    void check_for_redirect_response(std::unique_ptr<Request>&& request, const Response& response,
+                                     IntermediateCompletion&& completion) REQUIRES(!m_route_mutex);
 
-    /// Performs an authenticated request to the Stitch server, using the current authentication state
-    /// @param request The request to be performed
-    /// @param completion Returns the response from the server
-    void do_authenticated_request(Request&& request, const std::shared_ptr<User>& user,
-                                  util::UniqueFunction<void(const Response&)>&& completion) override
-        REQUIRES(!m_route_mutex);
+    void do_authenticated_request(HttpMethod, std::string&& route, std::string&& body,
+                                  const std::shared_ptr<User>& user, RequestTokenType,
+                                  util::UniqueFunction<void(const Response&)>&&) override REQUIRES(!m_route_mutex);
 
 
     /// Gets the social profile for a `User`.

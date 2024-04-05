@@ -78,6 +78,7 @@ std::ostream& operator<<(std::ostream& os, AppError error);
  * An HTTP method type.
  */
 enum class HttpMethod { get, post, patch, put, del };
+std::ostream& operator<<(std::ostream&, HttpMethod);
 
 /**
  * Request/Response headers type
@@ -113,10 +114,10 @@ struct Request {
      * The body of the request.
      */
     std::string body;
-
-    /// Indicates if the request uses the refresh token or the access token
-    bool uses_refresh_token = false;
 };
+
+/// What type of auth token should be used for a HTTP request.
+enum class RequestTokenType { NoAuth, AccessToken, RefreshToken };
 
 /**
  * The contents of an HTTP response.
@@ -154,8 +155,6 @@ struct GenericNetworkTransport {
     virtual void send_request_to_server(const Request& request,
                                         util::UniqueFunction<void(const Response&)>&& completion) = 0;
 };
-
-const char* httpmethod_to_string(HttpMethod method);
 
 } // namespace realm::app
 

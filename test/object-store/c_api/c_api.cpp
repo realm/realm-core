@@ -6118,8 +6118,7 @@ TEST_CASE("C API app: link_user integration w/c_api transport", "[sync][app][c_a
         REQUIRE(request_context != nullptr);
         auto new_request = Request{HttpMethod(request.method), request.url, default_timeout_ms, std::move(headers),
                                    std::string(request.body, request.body_size)};
-        user_data->logger->trace("CAPI: Request URL (%1): %2", httpmethod_to_string(new_request.method),
-                                 new_request.url);
+        user_data->logger->trace("CAPI: Request URL (%1): %2", new_request.method, new_request.url);
         user_data->logger->trace("CAPI: Request body: %1", new_request.body);
         user_data->transport->send_request_to_server(new_request, [&](const Response& response) mutable {
             std::vector<realm_http_header_t> c_headers;
