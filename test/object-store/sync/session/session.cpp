@@ -462,7 +462,7 @@ TEST_CASE("sync: error handling", "[sync][session]") {
         CHECK(idx != std::string::npos);
         idx = recovery_path.find(oas.app()->config().base_file_path);
         CHECK(idx != std::string::npos);
-        idx = recovery_path.find(oas.app()->config().app_id);
+        idx = recovery_path.find(oas.app()->app_id());
         CHECK(idx != std::string::npos);
         if (just_before.tm_year == just_after.tm_year) {
             idx = recovery_path.find(util::format_local_time(just_after_raw, "%Y"));

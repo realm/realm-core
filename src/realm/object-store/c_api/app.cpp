@@ -305,7 +305,7 @@ RLM_API void realm_clear_cached_apps(void) noexcept
 
 RLM_API const char* realm_app_get_app_id(const realm_app_t* app) noexcept
 {
-    return (*app)->config().app_id.c_str();
+    return (*app)->app_id().c_str();
 }
 
 RLM_API bool realm_app_update_base_url(realm_app_t* app, const char* base_url,

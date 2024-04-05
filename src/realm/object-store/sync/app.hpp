@@ -92,6 +92,11 @@ public:
         return m_config;
     }
 
+    const std::string& app_id() const noexcept
+    {
+        return m_config.app_id;
+    }
+
     // MARK: - Other objects owned by App
     const std::shared_ptr<SyncManager>& sync_manager() const
     {

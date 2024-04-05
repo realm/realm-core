@@ -36,7 +36,7 @@ UserIdentity::UserIdentity(const std::string& id, const std::string& provider_ty
 
 User::User(Private, std::shared_ptr<app::App> app, std::string_view user_id)
     : m_app(std::move(app))
-    , m_app_id(m_app->config().app_id)
+    , m_app_id(m_app->app_id())
     , m_user_id(user_id)
 {
     REALM_ASSERT(m_app);
