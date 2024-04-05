@@ -5250,6 +5250,56 @@ TEST_CASE("C API: nested collections", "[c_api]") {
         checked(realm_refresh(realm, nullptr));
     };
 
+    SECTION("deletion of nested list through clearing of parent") {
+        struct UserData {
+            size_t deletions;
+            size_t insertions;
+            size_t modifications;
+            bool was_deleted;
+            realm_list_t* list;
+            realm_dictionary_t* dict;
+        } user_data;
+        auto parent_list = cptr_checked(realm_set_list(obj1.get(), foo_any_col_key));
+        REQUIRE(parent_list);
+        realm_value_t value;
+        realm_get_value(obj1.get(), foo_any_col_key, &value);
+        REQUIRE(value.type == RLM_TYPE_LIST);
+        auto list = cptr_checked(realm_get_list(obj1.get(), foo_any_col_key));
+        // list[0] = nestedlist
+        auto nested_list = cptr_checked(realm_list_insert_list(list.get(), 0));
+        auto nested_dict = cptr_checked(realm_list_insert_dictionary(list.get(), 1));
+        user_data.list = nested_list.get();
+        user_data.dict = nested_dict.get();
+
+        checked(realm_commit(realm));
+
+        auto on_list_change = [](void* data, const realm_collection_changes_t* changes) {
+            auto* user_data = static_cast<UserData*>(data);
+            realm_collection_changes_get_num_changes(changes, &user_data->deletions, &user_data->insertions,
+                                                     &user_data->modifications, nullptr, nullptr,
+                                                     &user_data->was_deleted);
+            if (user_data->was_deleted) {
+                CHECK(!realm_list_is_valid(user_data->list));
+            }
+        };
+        auto require_change = [&]() {
+            auto token = cptr_checked(
+                realm_list_add_notification_callback(nested_list.get(), &user_data, nullptr, nullptr, on_list_change));
+            checked(realm_refresh(realm, nullptr));
+            return token;
+        };
+
+        auto token = require_change();
+
+        write([&] {
+            realm_list_clear(list.get());
+            // realm_list_set(list.get(), 0, rlm_str_val("Foo"));
+        });
+        CHECK(user_data.was_deleted);
+        CHECK(!realm_list_is_valid(user_data.list));
+        CHECK(!realm_dictionary_is_valid(user_data.dict));
+    }
+
     SECTION("results of mixed") {
         SECTION("dictionary") {
             auto parent_dict = cptr_checked(realm_set_dictionary(obj1.get(), foo_any_col_key));
