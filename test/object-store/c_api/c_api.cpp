@@ -578,10 +578,8 @@ TEST_CASE("C API (non-database)", "[c_api]") {
               600024);
         realm_sync_client_config_set_resumption_delay_backoff_multiplier(test_sync_client_config.get(), 1010);
         CHECK(test_sync_client_config->timeouts.reconnect_backoff_info.resumption_delay_backoff_multiplier == 1010);
-#if REALM_PLATFORM_APPLE
         realm_sync_client_config_set_security_access_group(test_sync_client_config.get(), "group.io.realm.test");
         CHECK(test_sync_client_config->security_access_group == "group.io.realm.test");
-#endif
     }
 
     SECTION("realm_app_config_t") {
