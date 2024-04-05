@@ -101,8 +101,9 @@ inline void copy_into_encoded_array(const T& encoder, Arg&&... args)
     encoder.copy_data(std::forward<Arg>(args)...);
 }
 
-bool ArrayEncode::always_encode(const Array& origin, Array& arr, Encoding encoding) const
+bool ArrayEncode::always_encode(const Array& origin, Array& arr, NodeHeader::Encoding encoding) const
 {
+    using Encoding = NodeHeader::Encoding;
     std::vector<int64_t> values;
     std::vector<size_t> indices;
     encode_values(origin, values, indices);
@@ -132,7 +133,7 @@ bool ArrayEncode::encode(const Array& origin, Array& arr) const
 {
     // return false;
 #if REALM_COMPRESS
-    return always_encode(origin, arr, Encoding::Flex);
+    return always_encode(origin, arr, NodeHeader::Encoding::Flex);
 #else
     std::vector<int64_t> values;
     std::vector<size_t> indices;
@@ -220,31 +221,12 @@ bool ArrayEncode::decode(Array& arr) const
 
 void ArrayEncode::init(const char* h)
 {
-    m_encoding = NodeHeader::get_encoding(h);
-
-    if (m_encoding == Encoding::Packed) {
-        m_v_width = NodeHeader::get_element_size<Encoding::Packed>(h);
-        m_v_size = NodeHeader::get_num_elements<Encoding::Packed>(h);
-        m_v_mask = 1ULL << (m_v_width - 1);
-        m_MSBs = populate(m_v_width, m_v_mask);
+    if (!m_info.set(h))
+        return;
+    if (is_packed())
         m_vtable = &VTableForPacked::vtable;
-        const auto data = (uint64_t*)NodeHeader::get_data_from_header(h);
-        m_data_iterator = bf_iterator(data, 0, m_v_width, m_v_width, 0);
-    }
-    else if (m_encoding == Encoding::Flex) {
-        m_v_width = NodeHeader::get_elementA_size<Encoding::Flex>(h);
-        m_v_size = NodeHeader::get_arrayA_num_elements<Encoding::Flex>(h);
-        m_ndx_width = NodeHeader::get_elementB_size<Encoding::Flex>(h);
-        m_ndx_size = NodeHeader::get_arrayB_num_elements<Encoding::Flex>(h);
-        m_v_mask = 1ULL << (m_v_width - 1);
-        m_ndx_mask = 1ULL << (m_ndx_width - 1);
-        m_MSBs = populate(m_v_width, m_v_mask);
-        m_ndx_MSBs = populate(m_ndx_width, m_ndx_mask);
+    else
         m_vtable = &VTableForFlex::vtable;
-        const auto data = (uint64_t*)NodeHeader::get_data_from_header(h);
-        m_data_iterator = bf_iterator(data, 0, m_v_width, m_v_width, 0);
-        m_ndx_iterator = bf_iterator(data, m_v_width * m_v_size, m_ndx_width, m_ndx_width, 0);
-    }
 }
 
 size_t ArrayEncode::flex_encoded_array_size(const std::vector<int64_t>& values, const std::vector<size_t>& indices,
@@ -332,32 +314,32 @@ void ArrayEncode::set(char* data, size_t w, size_t ndx, int64_t v) const
 
 int64_t ArrayEncode::get_packed(size_t ndx) const
 {
-    return s_packed.get(m_data_iterator, ndx, width_mask());
+    return s_packed.get(m_info.m_data_iterator, ndx, width_mask());
 }
 
 int64_t ArrayEncode::get_flex(size_t ndx) const
 {
-    return s_flex.get(m_data_iterator, m_ndx_iterator, ndx, width_mask());
+    return s_flex.get(m_info.m_data_iterator, m_info.m_ndx_iterator, ndx, width_mask());
 }
 
 void ArrayEncode::get_chunk_packed(size_t ndx, int64_t res[8]) const
 {
-    s_packed.get_chunk(m_data_iterator, ndx, width_mask(), res);
+    s_packed.get_chunk(m_info.m_data_iterator, ndx, width_mask(), res);
 }
 
 void ArrayEncode::get_chunk_flex(size_t ndx, int64_t res[8]) const
 {
-    s_flex.get_chunk(m_data_iterator, m_ndx_iterator, ndx, width_mask(), res);
+    s_flex.get_chunk(m_info.m_data_iterator, m_info.m_ndx_iterator, ndx, width_mask(), res);
 }
 
 void ArrayEncode::set_direct_packed(size_t ndx, int64_t value) const
 {
-    s_packed.set_direct(m_data_iterator, ndx, value);
+    s_packed.set_direct(m_info.m_data_iterator, ndx, value);
 }
 
 void ArrayEncode::set_direct_flex(size_t ndx, int64_t value) const
 {
-    s_flex.set_direct(m_data_iterator, m_ndx_iterator, ndx, value);
+    s_flex.set_direct(m_info.m_data_iterator, m_info.m_ndx_iterator, ndx, value);
 }
 
 template <typename Cond>

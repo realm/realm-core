@@ -65,6 +65,18 @@ public:
     inline bool find_all(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*) const;
 
 private:
+    struct Info {
+
+        inline bool set(const char* header);
+
+        using Encoding = NodeHeader::Encoding;
+        Encoding m_encoding{NodeHeader::Encoding::WTypBits};
+        size_t m_v_width = 0, m_v_size = 0, m_ndx_width = 0, m_ndx_size = 0;
+        uint64_t m_MSBs = 0, m_ndx_MSBs = 0, m_v_mask = 0, m_ndx_mask = 0;
+        mutable bf_iterator m_data_iterator;
+        mutable bf_iterator m_ndx_iterator;
+    };
+
     // Same idea we have for Array, we want to avoid to constantly checking whether we
     // have compressed in packed or flex, and jump straight to the right implementation,
     // avoiding branch mis-predictions, which made some queries run ~6/7x slower.
@@ -110,100 +122,119 @@ private:
     bool always_encode(const Array&, Array&, Node::Encoding) const;
 
 private:
-    using Encoding = NodeHeader::Encoding;
-    Encoding m_encoding{NodeHeader::Encoding::WTypBits};
-    size_t m_v_width = 0, m_v_size = 0, m_ndx_width = 0, m_ndx_size = 0;
-    uint64_t m_MSBs = 0, m_ndx_MSBs = 0, m_v_mask = 0, m_ndx_mask = 0;
-    mutable bf_iterator m_data_iterator;
-    mutable bf_iterator m_ndx_iterator;
+    Info m_info;
 };
+
+inline bool ArrayEncode::Info::set(const char* h)
+{
+    m_encoding = NodeHeader::get_encoding(h);
+    const auto is_extended = NodeHeader::wtype_is_extended(h);
+
+    if (!is_extended)
+        return false;
+
+    if (m_encoding == Encoding::Packed) {
+        m_v_width = NodeHeader::get_element_size<Encoding::Packed>(h);
+        m_v_size = NodeHeader::get_num_elements<Encoding::Packed>(h);
+        m_v_mask = 1ULL << (m_v_width - 1);
+        m_MSBs = populate(m_v_width, m_v_mask);
+        const auto data = (uint64_t*)NodeHeader::get_data_from_header(h);
+        m_data_iterator = bf_iterator(data, 0, m_v_width, m_v_width, 0);
+    }
+    else {
+        // can only flex
+        m_v_width = NodeHeader::get_elementA_size<Encoding::Flex>(h);
+        m_v_size = NodeHeader::get_arrayA_num_elements<Encoding::Flex>(h);
+        m_ndx_width = NodeHeader::get_elementB_size<Encoding::Flex>(h);
+        m_ndx_size = NodeHeader::get_arrayB_num_elements<Encoding::Flex>(h);
+        m_v_mask = 1ULL << (m_v_width - 1);
+        m_ndx_mask = 1ULL << (m_ndx_width - 1);
+        m_MSBs = populate(m_v_width, m_v_mask);
+        m_ndx_MSBs = populate(m_ndx_width, m_ndx_mask);
+        const auto data = (uint64_t*)NodeHeader::get_data_from_header(h);
+        m_data_iterator = bf_iterator(data, 0, m_v_width, m_v_width, 0);
+        m_ndx_iterator = bf_iterator(data, m_v_width * m_v_size, m_ndx_width, m_ndx_width, 0);
+    }
+    return true;
+}
 
 inline bf_iterator& ArrayEncode::data_iterator() const
 {
-    return m_data_iterator;
+    return m_info.m_data_iterator;
 }
 
 inline bf_iterator& ArrayEncode::ndx_iterator() const
 {
-    return m_ndx_iterator;
+    return m_info.m_ndx_iterator;
 }
 
 inline bool ArrayEncode::is_packed() const
 {
-    return m_encoding == NodeHeader::Encoding::Packed;
+    return m_info.m_encoding == NodeHeader::Encoding::Packed;
 }
 
 inline bool ArrayEncode::is_flex() const
 {
-    return m_encoding == NodeHeader::Encoding::Flex;
+    return m_info.m_encoding == NodeHeader::Encoding::Flex;
 }
 
 inline size_t ArrayEncode::size() const
 {
-    using Encoding = NodeHeader::Encoding;
-    REALM_ASSERT_DEBUG(m_encoding == Encoding::Packed || m_encoding == Encoding::Flex);
-    return m_encoding == Encoding::Packed ? v_size() : ndx_size();
+    REALM_ASSERT_DEBUG(is_packed() || is_flex());
+    return m_info.m_encoding == NodeHeader::Encoding::Packed ? v_size() : ndx_size();
 }
 
 inline size_t ArrayEncode::v_size() const
 {
-    using Encoding = NodeHeader::Encoding;
-    REALM_ASSERT_DEBUG(m_encoding == Encoding::Packed || m_encoding == Encoding::Flex);
-    return m_v_size;
+    REALM_ASSERT_DEBUG(is_packed() || is_flex());
+    return m_info.m_v_size;
 }
 
 inline size_t ArrayEncode::ndx_size() const
 {
-    using Encoding = NodeHeader::Encoding;
-    REALM_ASSERT_DEBUG(m_encoding == Encoding::Packed || m_encoding == Encoding::Flex);
-    return m_ndx_size;
+    REALM_ASSERT_DEBUG(is_packed() || is_flex());
+    return m_info.m_ndx_size;
 }
 
 inline size_t ArrayEncode::width() const
 {
-    using Encoding = NodeHeader::Encoding;
-    REALM_ASSERT_DEBUG(m_encoding == Encoding::Packed || m_encoding == Encoding::Flex);
-    return m_v_width;
+    REALM_ASSERT_DEBUG(is_packed() || is_flex());
+    return m_info.m_v_width;
 }
 
 inline size_t ArrayEncode::ndx_width() const
 {
-    using Encoding = NodeHeader::Encoding;
-    REALM_ASSERT_DEBUG(m_encoding == Encoding::Packed || m_encoding == Encoding::Flex);
-    return m_ndx_width;
+    REALM_ASSERT_DEBUG(is_packed() || is_flex());
+    return m_info.m_ndx_width;
 }
 
 inline NodeHeader::Encoding ArrayEncode::get_encoding() const
 {
-    return m_encoding;
+    return m_info.m_encoding;
 }
 
 inline uint64_t ArrayEncode::width_mask() const
 {
-    using Encoding = NodeHeader::Encoding;
-    REALM_ASSERT_DEBUG(m_encoding == Encoding::Packed || m_encoding == Encoding::Flex);
-    return m_v_mask;
+    REALM_ASSERT_DEBUG(is_packed() || is_flex());
+    return m_info.m_v_mask;
 }
 
 inline uint64_t ArrayEncode::ndx_mask() const
 {
-    using Encoding = NodeHeader::Encoding;
-    REALM_ASSERT_DEBUG(m_encoding == Encoding::Packed || m_encoding == Encoding::Flex);
-    return m_ndx_mask;
+    REALM_ASSERT_DEBUG(is_packed() || is_flex());
+    return m_info.m_ndx_mask;
 }
 
 inline uint64_t ArrayEncode::msb() const
 {
-    using Encoding = NodeHeader::Encoding;
-    REALM_ASSERT_DEBUG(m_encoding == Encoding::Packed || m_encoding == Encoding::Flex);
-    return m_MSBs;
+    REALM_ASSERT_DEBUG(is_packed() || is_flex());
+    return m_info.m_MSBs;
 }
 
 inline uint64_t ArrayEncode::ndx_msb() const
 {
-    using Encoding = NodeHeader::Encoding;
-    REALM_ASSERT_DEBUG(m_encoding == Encoding::Packed || m_encoding == Encoding::Flex);
-    return m_ndx_MSBs;
+    REALM_ASSERT_DEBUG(is_packed() || is_flex());
+    return m_info.m_ndx_MSBs;
 }
 
 inline int64_t ArrayEncode::get(size_t ndx) const

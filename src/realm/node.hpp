@@ -125,7 +125,7 @@ public:
     char* init_from_mem(MemRef mem) noexcept
     {
         char* header = mem.get_addr();
-        REALM_ASSERT(!wtype_is_extended(header));
+        REALM_ASSERT_DEBUG(!wtype_is_extended(header));
         m_ref = mem.get_ref();
         m_data = get_data_from_header(header);
         m_size = get_size_from_header(header);

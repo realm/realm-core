@@ -255,36 +255,32 @@ void Array::init_from_mem(MemRef mem) noexcept
     // Since we will try to fetch some data from the just initialised header, and never reset
     // important fields used for type A arrays, like width, lower, upper_bound which are used
     // for expanding the array, but also query the data.
-    char* header = mem.get_addr();
-    const auto old_header = !NodeHeader::wtype_is_extended(header);
-    // Cache all the header info as long as this array is alive and encoded.
+    const auto header = mem.get_addr();
+    const bool is_extended = NodeHeader::wtype_is_extended(header);
     m_encoder.init(header);
-    if (!old_header) {
-        REALM_ASSERT_DEBUG(NodeHeader::get_encoding(header) == Encoding::Flex ||
-                           NodeHeader::get_encoding(header) == Encoding::Packed);
-        char* header = mem.get_addr();
+    if (is_extended) {
         m_ref = mem.get_ref();
         m_data = get_data_from_header(header);
-        // encoder knows which format we are compressed into, width and size are read accordingly with the format of
-        // the header
-        m_size = m_encoder.size();
-        m_width = static_cast<uint_least8_t>(m_encoder.width());
-        m_lbound = -m_encoder.width_mask();
-        m_ubound = m_encoder.width_mask() - 1;
-        m_is_inner_bptree_node = get_is_inner_bptree_node_from_header(header);
-        m_has_refs = get_hasrefs_from_header(header);
-        m_context_flag = get_context_flag_from_header(header);
-        m_vtable = &VTableForEncodedArray::vtable;
-        m_getter = m_vtable->getter;
+        update_width_cache_from_encoder(); // encoder knows which format this array is
     }
     else {
         // Old init phase.
-        header = Node::init_from_mem(mem);
-        m_is_inner_bptree_node = get_is_inner_bptree_node_from_header(header);
-        m_has_refs = get_hasrefs_from_header(header);
-        m_context_flag = get_context_flag_from_header(header);
+        (void)Node::init_from_mem(mem);
         update_width_cache_from_header();
     }
+    m_is_inner_bptree_node = get_is_inner_bptree_node_from_header(header);
+    m_has_refs = get_hasrefs_from_header(header);
+    m_context_flag = get_context_flag_from_header(header);
+}
+
+void Array::update_width_cache_from_encoder() noexcept
+{
+    m_size = m_encoder.size();
+    m_width = static_cast<uint_least8_t>(m_encoder.width());
+    m_lbound = -m_encoder.width_mask();
+    m_ubound = m_encoder.width_mask() - 1;
+    m_vtable = &VTableForEncodedArray::vtable;
+    m_getter = m_vtable->getter;
 }
 
 MemRef Array::get_mem() const noexcept

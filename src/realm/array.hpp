@@ -519,6 +519,8 @@ protected:
     size_t count(int64_t value) const noexcept;
 
 private:
+    void update_width_cache_from_encoder() noexcept;
+
     void update_width_cache_from_header() noexcept;
 
     void do_ensure_minimum_width(int_fast64_t);
