@@ -85,7 +85,8 @@ private:
         bool is_streaming;
         bool is_download;
 
-        util::UniqueFunction<void()> create_invocation(const Progress&, bool&);
+        util::UniqueFunction<void()> create_invocation(const Progress&, bool& is_expired,
+                                                       bool initial_registration = false);
     };
 
     // A counter used as a token to identify progress notifier callbacks registered on this session.

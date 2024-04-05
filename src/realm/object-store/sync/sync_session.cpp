@@ -1538,7 +1538,7 @@ uint64_t SyncProgressNotifier::register_callback(std::function<ProgressNotifierC
             return token_value;
         }
         bool skip_registration = false;
-        invocation = package.create_invocation(*m_current_progress, skip_registration);
+        invocation = package.create_invocation(*m_current_progress, skip_registration, true);
         if (skip_registration) {
             token_value = 0;
         }
@@ -1583,7 +1583,8 @@ void SyncProgressNotifier::set_local_version(uint64_t snapshot_version)
 }
 
 util::UniqueFunction<void()>
-SyncProgressNotifier::NotifierPackage::create_invocation(Progress const& current_progress, bool& is_expired)
+SyncProgressNotifier::NotifierPackage::create_invocation(Progress const& current_progress, bool& is_expired,
+                                                         bool initial_registration)
 {
     uint64_t transferred = is_download ? current_progress.downloaded : current_progress.uploaded;
     uint64_t transferrable = is_download ? current_progress.downloadable : current_progress.uploadable;
@@ -1595,19 +1596,25 @@ SyncProgressNotifier::NotifierPackage::create_invocation(Progress const& current
     if (!is_download && snapshot_version > current_progress.snapshot_version)
         return [] {};
 
-    if (!is_streaming) {
-        // The initial download size we get from the server is the uncompacted
-        // size, and so the download may complete before we actually receive
-        // that much data. When that happens, transferrable will drop and we
-        // need to use the new value instead of the captured one.
+    // only invoke the callback on registration if is in active data transfer
+    if (is_download && initial_registration && progress_estimate >= 1)
+        return [] {};
+
+    // only capture and adjust transferable bytest for upload non-streaming to provide
+    // the progress of upload for the callback registered right after the commit
+    if (!is_streaming && !is_download) {
         if (!captured_transferrable || *captured_transferrable > transferrable)
             captured_transferrable = transferrable;
         transferrable = *captured_transferrable;
     }
 
-    // A notifier is expired if at least as many bytes have been transferred
-    // as were originally considered transferrable.
-    is_expired = !is_streaming && transferred >= transferrable;
+    // A notifier is expired for upload if at least as many bytes have been transferred
+    // as were originally considered transferrable based on local committed version
+    // on callback registration, or when simply 1.0 progress is reached for download
+    // since the amount of bytes is not precisely known until the end
+    if (!is_streaming)
+        is_expired = is_download ? progress_estimate >= 1 : transferred >= transferrable;
+
     return [=, notifier = notifier] {
         notifier(transferred, transferrable, progress_estimate);
     };
