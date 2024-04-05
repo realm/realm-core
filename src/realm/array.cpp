@@ -256,8 +256,12 @@ void Array::init_from_mem(MemRef mem) noexcept
     // important fields used for type A arrays, like width, lower, upper_bound which are used
     // for expanding the array, but also query the data.
     const auto header = mem.get_addr();
-    const bool is_extended = NodeHeader::wtype_is_extended(header);
-    m_encoder.init(header);
+    const auto is_extended = m_encoder.init(header);
+
+    m_is_inner_bptree_node = get_is_inner_bptree_node_from_header(header);
+    m_has_refs = get_hasrefs_from_header(header);
+    m_context_flag = get_context_flag_from_header(header);
+
     if (is_extended) {
         m_ref = mem.get_ref();
         m_data = get_data_from_header(header);
@@ -268,9 +272,6 @@ void Array::init_from_mem(MemRef mem) noexcept
         (void)Node::init_from_mem(mem);
         update_width_cache_from_header();
     }
-    m_is_inner_bptree_node = get_is_inner_bptree_node_from_header(header);
-    m_has_refs = get_hasrefs_from_header(header);
-    m_context_flag = get_context_flag_from_header(header);
 }
 
 void Array::update_width_cache_from_encoder() noexcept

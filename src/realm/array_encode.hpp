@@ -35,7 +35,7 @@ public:
     bool encode(const Array&, Array&) const;
     bool decode(Array&) const;
 
-    void init(const char* h);
+    bool init(const char* h);
 
     // init from mem B
     inline size_t size() const;
@@ -65,7 +65,7 @@ public:
     inline bool find_all(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*) const;
 
 private:
-    struct Info {
+    struct EncodingInfo {
 
         inline bool set(const char* header);
 
@@ -122,10 +122,10 @@ private:
     bool always_encode(const Array&, Array&, Node::Encoding) const;
 
 private:
-    Info m_info;
+    EncodingInfo m_info;
 };
 
-inline bool ArrayEncode::Info::set(const char* h)
+inline bool ArrayEncode::EncodingInfo::set(const char* h)
 {
     m_encoding = NodeHeader::get_encoding(h);
     const auto is_extended = NodeHeader::wtype_is_extended(h);

@@ -219,14 +219,15 @@ bool ArrayEncode::decode(Array& arr) const
     return true;
 }
 
-void ArrayEncode::init(const char* h)
+bool ArrayEncode::init(const char* h)
 {
     if (!m_info.set(h))
-        return;
+        return false;
     if (is_packed())
         m_vtable = &VTableForPacked::vtable;
     else
         m_vtable = &VTableForFlex::vtable;
+    return true;
 }
 
 size_t ArrayEncode::flex_encoded_array_size(const std::vector<int64_t>& values, const std::vector<size_t>& indices,
