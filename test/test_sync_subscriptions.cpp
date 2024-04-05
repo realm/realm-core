@@ -646,7 +646,9 @@ TEST(Sync_SubscriptionStoreTerminate)
     CHECK_EQUAL(store->get_latest().version(), 3);
     CHECK_EQUAL(store->get_pending_subscriptions().size(), 3);
 
-    store->terminate(); // notifications are called on this thread
+    auto write_tr = fixture.db->start_write();
+    store->reset(*write_tr); // notifications are called on this thread
+    write_tr->commit();
 
     CHECK_EQUAL(hit_count, 3);
     CHECK_EQUAL(store->get_latest().version(), 0);

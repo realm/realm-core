@@ -183,7 +183,10 @@ std::mutex s_apps_mutex;
 namespace realm {
 namespace app {
 
-std::string_view App::default_base_url = "https://realm.mongodb.com";
+std::string_view App::default_base_url()
+{
+    return "https://services.cloud.mongodb.com";
+}
 
 App::Config::DeviceInfo::DeviceInfo()
     : platform(util::get_library_platform())
@@ -216,7 +219,7 @@ SharedApp App::get_app(CacheMode mode, const Config& config,
 {
     if (mode == CacheMode::Enabled) {
         std::lock_guard<std::mutex> lock(s_apps_mutex);
-        auto& app = s_apps_cache[config.app_id][config.base_url.value_or(std::string(default_base_url))];
+        auto& app = s_apps_cache[config.app_id][config.base_url.value_or(std::string(App::default_base_url()))];
         if (!app) {
             app = std::make_shared<App>(Private(), config);
             app->configure(sync_client_config);
@@ -262,7 +265,7 @@ void App::close_all_sync_sessions()
 
 App::App(Private, const Config& config)
     : m_config(config)
-    , m_base_url(m_config.base_url.value_or(std::string(default_base_url)))
+    , m_base_url(m_config.base_url.value_or(std::string(App::default_base_url())))
     , m_location_updated(false)
     , m_request_timeout_ms(m_config.default_request_timeout_ms.value_or(s_default_timeout_ms))
 {
@@ -395,7 +398,7 @@ void App::configure_route(const std::string& host_url, const std::optional<std::
         m_ws_host_url = App::create_ws_host_url(m_host_url);
     }
 
-    // host_url is the url to the server: e.g., https://realm.mongodb.com or https://localhost:9090
+    // host_url is the url to the server: e.g., https://services.cloud.mongodb.com or https://localhost:9090
     // base_route is the baseline client api path: e.g. <host_url>/api/client/v2.0
     m_base_route = util::format("%1%2", m_host_url, s_base_path);
     // app_route is the cloud app URL: <host_url>/api/client/v2.0/app/<app_id>
@@ -412,7 +415,7 @@ void App::configure_route(const std::string& host_url, const std::optional<std::
 // All others => http[s]://<host-url> => ws[s]://<host-url>
 std::string App::create_ws_host_url(const std::string_view host_url)
 {
-    constexpr static std::string_view orig_base_domain = "realm.mongodb.com";
+    constexpr static std::string_view old_base_domain = "realm.mongodb.com";
     constexpr static std::string_view new_base_domain = "services.cloud.mongodb.com";
     const size_t base_len = std::char_traits<char>::length("http://");
 
@@ -428,7 +431,7 @@ std::string App::create_ws_host_url(const std::string_view host_url)
 
     // http[s]://[<region-prefix>]realm.mongodb.com[/<path>] =>
     //     ws[s]://ws.[<region-prefix>]realm.mongodb.com[/<path>]
-    if (host_url.find(orig_base_domain) != std::string_view::npos) {
+    if (host_url.find(old_base_domain) != std::string_view::npos) {
         return util::format("%1ws.%2", prefix, host_url.substr(prefix_len));
     }
     // http[s]://[<region-prefix>]services.cloud.mongodb.com[/<path>] =>
@@ -653,11 +656,11 @@ std::string App::get_base_url() const
 
 void App::update_base_url(std::optional<std::string> base_url, UniqueFunction<void(Optional<AppError>)>&& completion)
 {
-    std::string new_base_url = base_url.value_or(std::string(default_base_url));
+    std::string new_base_url = base_url.value_or(std::string(App::default_base_url()));
 
     if (new_base_url.empty()) {
         // Treat an empty string the same as requesting the default base url
-        new_base_url = default_base_url;
+        new_base_url = std::string(App::default_base_url());
         log_debug("App::update_base_url: empty => %1", new_base_url);
     }
     else {
@@ -1110,6 +1113,8 @@ void App::update_location_and_resend(Request&& request, UniqueFunction<void(cons
             }
             request.url = self->get_host_url() + comp.get_value().request;
 
+            self->log_debug("App: send_request(after location update): %1 %2", httpmethod_to_string(request.method),
+                            request.url);
             // Retry the original request with the updated url
             self->m_config.transport->send_request_to_server(
                 std::move(request), [self = std::move(self), completion = std::move(completion)](
@@ -1155,6 +1160,7 @@ void App::do_request(Request&& request, UniqueFunction<void(const Response& resp
         }
     }
 
+    log_debug("App: do_request: %1 %2", httpmethod_to_string(request.method), request.url);
     // If location info has already been updated, then send the request directly
     m_config.transport->send_request_to_server(
         std::move(request), [self = shared_from_this(), completion = std::move(completion)](
@@ -1191,7 +1197,6 @@ void App::do_authenticated_request(Request&& request, const std::shared_ptr<Sync
     request.headers = get_request_headers(sync_user, request.uses_refresh_token ? RequestTokenType::RefreshToken
                                                                                 : RequestTokenType::AccessToken);
 
-    log_debug("App: do_authenticated_request: %1 %2", httpmethod_to_string(request.method), request.url);
     auto completion_2 = [completion = std::move(completion), request, sync_user,
                          self = shared_from_this()](const Response& response) mutable {
         if (auto error = AppUtils::check_for_errors(response)) {

@@ -87,10 +87,6 @@ enum class SchemaMode : uint8_t {
     // The only changes allowed are to add new tables, add columns to
     // existing tables, and to add or remove indexes from existing
     // columns. Extra tables not present in the schema are ignored.
-    // Indexes are only added to or removed from existing columns if the
-    // schema version is greater than the existing one (and unlike other
-    // modes, the schema version is allowed to be less than the existing
-    // one).
     // The migration function is not used.
     // This should be used when including discovered user classes.
     // Previously called Additive.

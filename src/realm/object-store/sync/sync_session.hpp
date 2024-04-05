@@ -52,14 +52,15 @@ struct SyncClient;
 class SyncProgressNotifier {
 public:
     enum class NotifierType { upload, download };
-    using ProgressNotifierCallback = void(uint64_t transferred_bytes, uint64_t transferrable_bytes);
+    using ProgressNotifierCallback = void(uint64_t transferred_bytes, uint64_t transferrable_bytes,
+                                          double progress_estimate);
 
     uint64_t register_callback(std::function<ProgressNotifierCallback>, NotifierType direction, bool is_streaming);
     void unregister_callback(uint64_t);
 
     void set_local_version(uint64_t);
-    void update(uint64_t downloaded, uint64_t downloadable, uint64_t uploaded, uint64_t uploadable, uint64_t,
-                uint64_t);
+    void update(uint64_t downloaded, uint64_t downloadable, uint64_t uploaded, uint64_t uploadable,
+                uint64_t snapshot_version, double download_estimate = 1.0, double upload_estimate = 1.0);
 
 private:
     mutable std::mutex m_mutex;
@@ -70,6 +71,8 @@ private:
         uint64_t downloadable;
         uint64_t uploaded;
         uint64_t downloaded;
+        double upload_estimate;
+        double download_estimate;
         uint64_t snapshot_version;
     };
 
@@ -318,7 +321,10 @@ public:
             return session.m_db;
         }
 
-        static util::Future<void> pause_async(SyncSession& session);
+        static void migrate_schema(SyncSession& session, util::UniqueFunction<void(Status)>&& callback)
+        {
+            session.migrate_schema(std::move(callback));
+        }
     };
 
     // Expose some internal functionality to testing code.
@@ -415,7 +421,7 @@ private:
     void cancel_pending_waits(util::CheckedUniqueLock, Status) RELEASE(m_state_mutex);
     enum class ShouldBackup { yes, no };
     void update_error_and_mark_file_for_deletion(SyncError&, ShouldBackup) REQUIRES(m_state_mutex, !m_config_mutex);
-    void handle_progress_update(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t);
+    void handle_progress_update(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, double, double);
     void handle_new_flx_sync_query(int64_t version);
 
     void nonsync_transact_notify(VersionID::version_type) REQUIRES(!m_state_mutex);
@@ -431,6 +437,7 @@ private:
         REQUIRES(!m_connection_state_mutex);
     void become_paused(util::CheckedUniqueLock) RELEASE(m_state_mutex) REQUIRES(!m_connection_state_mutex);
     void become_waiting_for_access_token() REQUIRES(m_state_mutex);
+    util::Future<void> pause_async() REQUIRES(!m_state_mutex, !m_connection_state_mutex);
 
     // do restart session restarts the session without freeing any of the waiters
     void do_restart_session(util::CheckedUniqueLock)
@@ -450,6 +457,9 @@ private:
     std::string get_appservices_connection_id() const REQUIRES(!m_state_mutex);
 
     util::Future<std::string> send_test_command(std::string body) REQUIRES(!m_state_mutex);
+
+    void migrate_schema(util::UniqueFunction<void(Status)>&& callback)
+        REQUIRES(!m_state_mutex, !m_config_mutex, !m_connection_state_mutex);
 
     std::function<TransactionCallback> m_sync_transact_callback GUARDED_BY(m_state_mutex);
 
@@ -522,6 +532,7 @@ private:
 
     // Set if ProtocolError::schema_version_changed error is received from the server.
     std::optional<uint64_t> m_previous_schema_version GUARDED_BY(m_state_mutex);
+    bool m_schema_migration_in_progress GUARDED_BY(m_state_mutex) = false;
 };
 
 } // namespace realm
