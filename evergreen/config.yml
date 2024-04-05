@@ -1062,7 +1062,9 @@ tasks:
         set -o verbose
         set -o errexit
 
-        export PATH=$(./evergreen/abspath.sh ./clang_binaries/bin):$PATH
+        if [[ -n "${clang_format|}" ]]; then
+          export PATH="$(./evergreen/abspath.sh $(dirname ${clang_format}))":$PATH
+        fi
 
         if [[ "${is_patch}" == "true" ]]; then
             format_ref="$(git merge-base origin/${branch_name} HEAD)"
@@ -1244,6 +1246,7 @@ buildvariants:
     fetch_missing_dependencies: On
     c_compiler: "/opt/clang+llvm/bin/clang"
     cxx_compiler: "/opt/clang+llvm/bin/clang++"
+    clang_format: "/opt/clang+llvm/bin/clang-format"
   tasks:
   - name: compile_test
   - name: lint
