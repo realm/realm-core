@@ -49,5 +49,6 @@ rm "${project_dir}/Package.swift.bak" || exit 1
 RELEASE_HEADER="# $realm_version Release notes" || exit 1
 sed -i.bak -e "1s/.*/$RELEASE_HEADER/" "${project_dir}/CHANGELOG.md" || exit 1
 rm "${project_dir}/CHANGELOG.md.bak" || exit 1
+cat "${project_dir}/doc/CHANGELOG_template.md" "${project_dir}/CHANGELOG.md" > temp_file.md; mv temp_file.md "${project_dir}/CHANGELOG.md"
 
 echo Ready to make "${realm_version}"
