@@ -323,51 +323,71 @@ TEST(EncryptedFile_IVRefreshing)
 // It checks that an encrypted Realm is portable between systems with a different page size
 NONCONCURRENT_TEST(EncryptedFile_Portablility)
 {
-    TEST_PATH(path);
-    // FIXME: test num_entries= 1. DecryptionFailed() if the file size is less than page_size()
-    constexpr size_t num_entries = 5000;
     const char* key = test_util::crypt_key(true);
+    // The idea here is to incrementally increase the allocations in the Realm
+    // such that the top ref written eventually crosses over the block_size and
+    // page_size() thresholds. This has caught faulty top_ref + size calculations.
+    std::vector<size_t> test_sizes;
+#if false && TEST_DURATION == 0
+    test_sizes.resize(100);
+    std::iota(test_sizes.begin(), test_sizes.end(), 500);
+    // The allocations are not controlled, but at the time of writing this test
+    // 539 objects produced a file of size 16384 while 540 objects produced a file of size 20480
+    // so at least one threshold is crossed here, though this may change if the allocator changes
+    // or if compression is implemented
+#else
+    test_sizes.resize(5000);
+    std::iota(test_sizes.begin(), test_sizes.end(), 500);
+#endif
 
-    auto check_attach_and_read = [&]() {
-        auto hist = make_in_realm_history();
-        DBOptions options(key);
-        auto sg = DB::create(*hist, path, options);
-        auto rt = sg->start_read();
-        auto foo = rt->get_table("foo");
-        auto pk_col = foo->get_primary_key_column();
-        CHECK_EQUAL(foo->size(), num_entries);
-        CHECK_EQUAL(foo->where().equal(pk_col, "name 4999").count(), 1);
-    };
+    test_sizes.push_back(1); // check the lower limit
+    for (auto num_entries : test_sizes) {
 
-    {
-        OnlyForTestingPageSizeChange change_page_size(4096);
-        Group g;
-        TableRef foo = g.add_table_with_primary_key("foo", type_String, "name", false);
-        for (size_t i = 0; i < num_entries; ++i) {
-            foo->create_object_with_primary_key(util::format("name %1", i));
+        TEST_PATH(path);
+
+        auto check_attach_and_read = [&]() {
+            auto hist = make_in_realm_history();
+            DBOptions options(key);
+            auto sg = DB::create(*hist, path, options);
+            auto rt = sg->start_read();
+            auto foo = rt->get_table("foo");
+            auto pk_col = foo->get_primary_key_column();
+            CHECK_EQUAL(foo->size(), num_entries);
+            CHECK_EQUAL(foo->where().equal(pk_col, util::format("name %1", num_entries - 1).c_str()).count(), 1);
+        };
+
+        {
+            // create the Realm with the smallest supported page_size() of 4096
+            OnlyForTestingPageSizeChange change_page_size(4096);
+            Group g;
+            TableRef foo = g.add_table_with_primary_key("foo", type_String, "name", false);
+            for (size_t i = 0; i < num_entries; ++i) {
+                foo->create_object_with_primary_key(util::format("name %1", i));
+            }
+            g.write(path, key);
+            // size_t fs = File::get_size_static(path);
+            // util::format(std::cout, "write of %1 objects produced a file of size %2\n", num_entries, fs);
         }
-        g.write(path, key);
-    }
-    {
-        OnlyForTestingPageSizeChange change_page_size(8192);
-        check_attach_and_read();
-    }
-    {
-        OnlyForTestingPageSizeChange change_page_size(16384);
-        check_attach_and_read();
-    }
-    // also check with the native page_size (which is probably redundant with one of the above)
-    check_attach_and_read();
+        {
+            OnlyForTestingPageSizeChange change_page_size(8192);
+            check_attach_and_read();
+        }
+        {
+            OnlyForTestingPageSizeChange change_page_size(16384);
+            check_attach_and_read();
+        }
 
-    // check that modifications work
-    auto history = make_in_realm_history();
-    DBOptions options(key);
-    DBRef db = DB::create(*history, path, options);
-    auto wt = db->start_write();
-    TableRef bar = wt->get_or_add_table_with_primary_key("bar", type_String, "pk");
-    bar->create_object_with_primary_key("test");
-    wt->commit();
-    check_attach_and_read();
+        // check with the native page_size (which is probably redundant with one of the above)
+        // and check that a write works correctly
+        auto history = make_in_realm_history();
+        DBOptions options(key);
+        DBRef db = DB::create(*history, path, options);
+        auto wt = db->start_write();
+        TableRef bar = wt->get_or_add_table_with_primary_key("bar", type_String, "pk");
+        bar->create_object_with_primary_key("test");
+        wt->commit();
+        check_attach_and_read();
+    }
 }
 
 #endif // REALM_ENABLE_ENCRYPTION

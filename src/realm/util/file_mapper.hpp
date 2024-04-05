@@ -200,6 +200,7 @@ File::SizeType encrypted_size_to_data_size(File::SizeType size) noexcept;
 File::SizeType data_size_to_encrypted_size(File::SizeType size) noexcept;
 
 size_t round_up_to_page_size(size_t size) noexcept;
+
 } // namespace util
 } // namespace realm
 #endif

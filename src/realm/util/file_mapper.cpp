@@ -48,6 +48,7 @@
 #include <sstream>
 #include <regex>
 #include <thread>
+#include <iostream>
 
 #include <realm/util/file.hpp>
 #include <realm/util/errno.hpp>
@@ -484,14 +485,14 @@ SharedFileInfo* get_file_info_for_file(File& file)
         return it->info.get();
 }
 
-
 namespace {
 EncryptedFileMapping* add_mapping(void* addr, size_t size, const FileAttributes& file, size_t file_offset)
 {
     size_t fs = to_size_t(File::get_size_static(file.fd));
-    if (fs > 0 && fs < page_size())
+    if (fs > 0 && fs < c_min_encrypted_file_size)
         throw DecryptionFailed(
-            util::format("file size %1 is less than page size of %2 for '%3'", fs, page_size(), file.path));
+            util::format("file size %1 is less than the minimum encrypted file size of %2 for '%3'", fs,
+                         c_min_encrypted_file_size, file.path));
 
     LockGuard lock(mapping_mutex);
 

@@ -718,16 +718,9 @@ bool SlabAlloc::align_filesize_for_mmap(ref_type top_ref, Config& cfg)
     // check if online compaction allows us to shrink the file:
     if (top_ref) {
         // Get the expected file size by looking up logical file size stored in top array
-        constexpr size_t max_top_size = (Group::s_file_size_ndx + 1) * 8 + sizeof(Header);
-        size_t top_page_base = top_ref & ~(page_size() - 1);
-        size_t top_offset = top_ref - top_page_base;
-        size_t map_size = std::min(max_top_size + top_offset, size - top_page_base);
-        File::Map<char> map_top(m_file, top_page_base, File::access_ReadOnly, map_size, 0, m_write_observer);
-        realm::util::encryption_read_barrier(map_top, top_offset, max_top_size);
-        auto top_header = map_top.get_addr() + top_offset;
-        auto top_data = NodeHeader::get_data_from_header(top_header);
-        auto w = NodeHeader::get_width_from_header(top_header);
-        auto logical_size = size_t(get_direct(top_data, w, Group::s_file_size_ndx)) >> 1;
+        Array top(*this);
+        top.init_from_ref(top_ref);
+        size_t logical_size = Group::get_logical_file_size(top);
         // make sure we're page aligned, so the code below doesn't first
         // truncate the file, then expand it again
         expected_size = round_up_to_page_size(logical_size);

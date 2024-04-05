@@ -161,6 +161,10 @@ size_t check_read(FileDesc fd, off_t pos, void* dst, size_t len)
 
 } // anonymous namespace
 
+// first block is iv data, second page is data
+static_assert(c_min_encrypted_file_size == 2 * block_size,
+              "chaging the block size breaks encrypted file portability");
+
 AESCryptor::AESCryptor(const uint8_t* key)
     : m_rw_buffer(new char[block_size])
     , m_dst_buffer(new char[block_size])
