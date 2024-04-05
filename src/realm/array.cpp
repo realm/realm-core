@@ -867,19 +867,19 @@ MemRef Array::create(Type type, bool context_flag, WidthType width_type, size_t 
         case type_Normal:
             break;
         case type_InnerBptreeNode:
-            flags |= (uint8_t)Flags::HasRefs | (uint8_t)Flags::InnerBPTree;
+            flags |= static_cast<uint8_t>(Flags::HasRefs) | static_cast<uint8_t>(Flags::InnerBPTree);
 
             break;
         case type_HasRefs:
-            flags |= (uint8_t)Flags::HasRefs;
+            flags |= static_cast<uint8_t>(Flags::HasRefs);
             break;
     }
     if (context_flag)
-        flags |= (uint8_t)Flags::Context;
+        flags |= static_cast<uint8_t>(Flags::Context);
     int width = 0;
     size_t byte_size_0 = header_size;
     if (value != 0) {
-        width = int(bit_width(value));
+        width = static_cast<int>(bit_width(value));
         byte_size_0 = calc_aligned_byte_size(size, width); // Throws
     }
     // Adding zero to Array::initial_capacity to avoid taking the

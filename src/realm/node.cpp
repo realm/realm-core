@@ -34,15 +34,15 @@ MemRef Node::create_node(size_t size, Allocator& alloc, bool context_flag, Type 
     MemRef mem = alloc.alloc(byte_size); // Throws
     const auto header = mem.get_addr();
     REALM_ASSERT_DEBUG(width_type != WidthType::wtype_Extend);
-    Encoding encoding{int(width_type)};
+    Encoding encoding{static_cast<int>(width_type)};
 
     uint8_t flags = 0;
     if (type == type_InnerBptreeNode)
-        flags |= (uint8_t)Flags::InnerBPTree | (uint8_t)Flags::HasRefs;
+        flags |= static_cast<uint8_t>(Flags::InnerBPTree) | static_cast<uint8_t>(Flags::HasRefs);
     if (type != type_Normal)
-        flags |= (uint8_t)Flags::HasRefs;
+        flags |= static_cast<uint8_t>(Flags::HasRefs);
     if (context_flag)
-        flags |= (uint8_t)Flags::Context;
+        flags |= static_cast<uint8_t>(Flags::Context);
     // width must be passed to init_header in bits, but for wtype_Multiply and wtype_Ignore
     // it is provided by the caller of this function in bytes, so convert to bits
     if (width_type != wtype_Bits)

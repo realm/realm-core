@@ -252,7 +252,7 @@ public:
         else {
             REALM_ASSERT_DEBUG(value < (65536 << 3));
             REALM_ASSERT_DEBUG((value & 0x7) == 0);
-            ((uint16_t*)header)[0] = static_cast<uint16_t>(value >> 3);
+            (reinterpret_cast<uint16_t*>(header))[0] = static_cast<uint16_t>(value >> 3);
         }
     }
 
@@ -321,7 +321,7 @@ public:
             return static_cast<Encoding>(get_wtype_from_header(header));
         }
         else {
-            const auto h = (const uint8_t*)header;
+            const auto h = reinterpret_cast<const uint8_t*>(header);
             return static_cast<Encoding>(h[5] + 3);
         }
     }
@@ -430,7 +430,7 @@ public:
         }
         hb[2] = static_cast<uint8_t>(bits_pr_elemA);
         hb[3] = static_cast<uint8_t>(bits_pr_elemB);
-        const auto hw = (uint16_t*)header;
+        const auto hw = reinterpret_cast<uint16_t*>(header);
         hw[3] = static_cast<uint16_t>(num_elems);
     }
 
@@ -439,7 +439,7 @@ public:
     {
         std::fill(header, header + header_size, 0);
         const auto hb = reinterpret_cast<uint8_t*>(header);
-        REALM_ASSERT_DEBUG(enc == Encoding::Flex);
+        REALM_ASSERT_DEBUG(enc != Encoding::Flex);
         REALM_ASSERT_DEBUG(flags < 8);
         hb[4] = (flags << 5) | (wtype_Extend << 3);
         hb[5] = static_cast<int>(Encoding::Flex) - static_cast<int>(Encoding::Packed);
@@ -744,10 +744,10 @@ inline void NodeHeader::set_arrayA_num_elements<NodeHeader::Encoding::Flex>(char
 {
     REALM_ASSERT_DEBUG(get_encoding(header) == Encoding::Flex);
     REALM_ASSERT_DEBUG(num_elements < 0b10000000000); // 10 bits
-    uint16_t word = ((uint16_t*)header)[3];
+    uint16_t word = (reinterpret_cast<uint16_t*>(header))[3];
     word &= ~(0b1111111111 << 10);
     word |= num_elements << 10;
-    ((uint16_t*)header)[3] = word;
+    (reinterpret_cast<uint16_t*>(header))[3] = word;
 }
 template <>
 inline void NodeHeader::set_arrayB_num_elements<NodeHeader::Encoding::Flex>(char* header, size_t num_elements)
