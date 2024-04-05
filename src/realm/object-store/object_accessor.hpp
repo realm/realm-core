@@ -188,10 +188,20 @@ void Object::set_property_value_impl(ContextType& ctx, const Property& property,
             ctx.did_change();
             return;
         }
-    }
+        bool attr_changed = !policy.diff;
 
-    ValueUpdater<ValueType, ContextType> updater{ctx, property, value, m_obj, col, policy, is_default};
-    switch_on_type(property.type, updater);
+        if (!attr_changed) {
+            auto old_val = m_obj.get<Mixed>(col);
+            attr_changed = !new_val.is_same_type(old_val) || new_val != old_val;
+        }
+
+        if (attr_changed)
+            m_obj.set(col, new_val, is_default);
+    }
+    else {
+        ValueUpdater<ValueType, ContextType> updater{ctx, property, value, m_obj, col, policy, is_default};
+        switch_on_type(property.type, updater);
+    }
     ctx.did_change();
 }
 

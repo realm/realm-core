@@ -184,6 +184,41 @@ inline Obj Dictionary::get<Obj>(StringData key) const
     return get_object(key);
 }
 
+namespace {
+template <typename ValueType, typename ContextType>
+struct ValueUpdater {
+    ContextType& ctx;
+    ValueType& value;
+    Dictionary& dict;
+    StringData key;
+    CreatePolicy policy;
+
+    template <typename T>
+    void operator()(T*)
+    {
+        bool attr_changed = !policy.diff;
+        auto new_val = ctx.template unbox<T>(value, policy);
+
+        if (!attr_changed) {
+            util::Optional<Mixed> old_val = dict.try_get_any(key);
+            if (old_val) {
+                if constexpr (std::is_same<T, realm::Mixed>::value) {
+                    attr_changed = !new_val.is_same_type(*old_val);
+                }
+
+                attr_changed = attr_changed || new_val != *old_val;
+            }
+            else {
+                attr_changed = true;
+            }
+        }
+
+        if (attr_changed)
+            dict.insert(key, new_val);
+    }
+};
+} // namespace
+
 template <typename T, typename Context>
 void Dictionary::insert(Context& ctx, StringData key, T&& value, CreatePolicy policy)
 {
@@ -211,12 +246,19 @@ void Dictionary::insert(Context& ctx, StringData key, T&& value, CreatePolicy po
             list.assign(ctx, value, policy);
             return;
         }
-        this->insert(key, new_val);
+
+        bool attr_changed = !policy.diff;
+        if (!attr_changed) {
+            util::Optional<Mixed> old_value = dict().try_get(key);
+            attr_changed = !old_value || !new_val.is_same_type(*old_value) || new_val != *old_value;
+        }
+
+        if (attr_changed)
+            this->insert(key, new_val);
     }
     else {
-        dispatch([&](auto t) {
-            this->insert(key, ctx.template unbox<std::decay_t<decltype(*t)>>(value, policy));
-        });
+        ValueUpdater<T, Context> updater{ctx, value, *this, key, policy};
+        dispatch(updater);
     }
 }
 
@@ -255,16 +297,6 @@ void Dictionary::assign(Context& ctx, T&& values, CreatePolicy policy)
         remove_all();
 
     ctx.enumerate_dictionary(values, [&](StringData key, auto&& value) {
-        if (policy.diff) {
-            Mixed new_value = ctx.template unbox<Mixed>(value);
-            if (!new_value.is_type(type_Dictionary, type_List)) {
-                util::Optional<Mixed> old_value = dict().try_get(key);
-                if (!old_value || *old_value != new_value) {
-                    dict().insert(key, new_value);
-                }
-                return;
-            }
-        }
         this->insert(ctx, key, value, policy);
     });
 }

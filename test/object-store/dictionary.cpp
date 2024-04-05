@@ -1350,13 +1350,16 @@ TEST_CASE("dictionary nullify", "[dictionary]") {
 
 TEST_CASE("nested collection set by Object::create", "[dictionary]") {
     InMemoryTestFile config;
-    config.schema = Schema{
-        {"DictionaryObject",
-         {
-             {"_id", PropertyType::Int, Property::IsPrimary{true}},
-             {"any", PropertyType::Mixed | PropertyType::Nullable},
-         }},
-    };
+    config.schema = Schema{{"DictionaryObject",
+                            {
+                                {"_id", PropertyType::Int, Property::IsPrimary{true}},
+                                {"any", PropertyType::Mixed | PropertyType::Nullable},
+                            }},
+                           {"StringObject",
+                            {
+                                {"_id", PropertyType::Int, Property::IsPrimary{true}},
+                                {"string", PropertyType::String},
+                            }}};
 
     auto r = Realm::get_shared_realm(config);
     CppContext ctx(r);
@@ -1365,8 +1368,13 @@ TEST_CASE("nested collection set by Object::create", "[dictionary]") {
                       {"any", AnyDict{{"0", Any(AnyDict{{"zero", INT64_C(0)}})},
                                       {"1", Any(AnyVector{std::string("one"), INT64_C(1)})},
                                       {"2", Any(AnyDict{{"two", INT64_C(2)}, {"three", INT64_C(3)}})}}}}};
+    Any value2{AnyDict{
+        {"_id", INT64_C(6)},
+        {"any", UnmanagedObject{"StringObject", AnyDict{{"_id", INT64_C(2)}, {"string", std::string("hello")}}}}}};
+
     r->begin_transaction();
     auto obj = Object::create(ctx, r, *r->schema().find("DictionaryObject"), value);
+    Obj obj1 = Object::create(ctx, r, *r->schema().find("DictionaryObject"), value2).get_obj();
     r->commit_transaction();
 
     auto dict = util::any_cast<object_store::Dictionary&&>(obj.get_property_value<std::any>(ctx, "any"));
@@ -1389,6 +1397,20 @@ TEST_CASE("nested collection set by Object::create", "[dictionary]") {
         r->commit_transaction();
         CHECK(list1.get_any(0) == Mixed("seven"));
         CHECK(list1.get_any(1) == Mixed(7));
+    }
+
+    SECTION("assign managed object") {
+        r->begin_transaction();
+        Any godbye{AnyDict{{"_id", INT64_C(3)}, {"string", std::string("godbye")}}};
+        Obj new_obj = Object::create(ctx, r, *r->schema().find("StringObject"), godbye).get_obj();
+
+        Any new_value{AnyDict{{"_id", INT64_C(6)}, {"any", new_obj}}};
+
+        Object::create(ctx, r, *r->schema().find("DictionaryObject"), new_value, CreatePolicy::UpdateModified);
+        r->commit_transaction();
+        auto link = obj1.get_any("any");
+        auto linked_obj = r->read_group().get_object(link.get_link());
+        CHECK(linked_obj.get<String>("string") == "godbye");
     }
 
     SECTION("update with less data") {

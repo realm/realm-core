@@ -295,7 +295,7 @@ void List::set_if_different(Context& ctx, size_t list_ndx, T&& value, CreatePoli
         }
         Mixed old_value = this->get<Mixed>(list_ndx);
         Mixed new_value = ctx.template unbox<Mixed>(value, policy);
-        if (old_value != new_value)
+        if (!new_value.is_same_type(old_value) || old_value != new_value)
             this->set(list_ndx, new_value);
     }
     else {
@@ -308,9 +308,14 @@ void List::set_if_different(Context& ctx, size_t list_ndx, T&& value, CreatePoli
                     this->set(list_ndx, new_value);
             }
             else {
+                bool attr_changed = false;
                 auto old_value = this->get<U>(list_ndx);
                 auto new_value = ctx.template unbox<U>(value, policy);
-                if (old_value != new_value)
+                if constexpr (std::is_same_v<U, realm::Mixed>) {
+                    attr_changed = !new_value.is_same_type(old_value);
+                }
+                attr_changed = attr_changed || old_value != new_value;
+                if (attr_changed)
                     this->set(list_ndx, new_value);
             }
         });
