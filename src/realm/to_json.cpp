@@ -252,41 +252,38 @@ void Obj::to_json(std::ostream& out, JSONOutputMode output_mode) const
         auto print_link = [&](const Mixed& val) {
             REALM_ASSERT(val.is_type(type_Link, type_TypedLink));
             TableRef tt = target_table;
+            bool typed_link = false;
+            if (!tt) {
+                // It must be a typed link
+                tt = m_table->get_parent_group()->get_table(val.get_link().get_table_key());
+                typed_link = true;
+            }
             auto obj_key = val.get<ObjKey>();
+            std::string closing;
 
-            auto out_obj_key = [&] {
+            if (tt->is_embedded()) {
+                if (output_mode == output_mode_xjson_plus) {
+                    out << "{ \"$embedded\": {";
+                    out << "\"table\": \"" << tt->get_name() << "\", \"value\": ";
+                    closing = "}}";
+                }
+                tt->get_object(obj_key).to_json(out, output_mode);
+            }
+            else {
+                pk_col_key = tt->get_primary_key_column();
+                if (output_mode == output_mode_xjson_plus || typed_link) {
+                    out << "{ \"$link\": {";
+                    out << "\"table\": \"" << tt->get_class_name() << "\", \"key\": ";
+                    closing = "}}";
+                }
                 if (pk_col_key) {
                     tt->get_primary_key(obj_key).to_json(out, output_mode);
                 }
                 else {
                     out << obj_key.value;
                 }
-            };
-            if (!tt) {
-                // It must be a typed link
-                tt = m_table->get_parent_group()->get_table(val.get_link().get_table_key());
-                pk_col_key = tt->get_primary_key_column();
-                out << "{ \"$link\": {";
-
-                out << "\"table\": \"" << tt->get_class_name() << "\", \"key\": ";
-                out_obj_key();
-                out << " }}";
             }
-            else {
-                if (tt->is_embedded()) {
-                    if (output_mode == output_mode_xjson_plus) {
-                        out << "{ \"$embedded\": {";
-                        out << "\"table\": \"" << tt->get_name() << "\", \"value\": ";
-                    }
-                    tt->get_object(obj_key).to_json(out, output_mode);
-                    if (output_mode == output_mode_xjson_plus) {
-                        out << "}}";
-                    }
-                }
-                else {
-                    out_obj_key();
-                }
-            }
+            out << closing;
         };
 
         if (ck.is_collection()) {
