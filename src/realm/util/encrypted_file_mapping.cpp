@@ -30,6 +30,7 @@
 #include <cstdlib>
 #include <algorithm>
 #include <chrono>
+#include <sstream>
 #include <stdexcept>
 #include <string_view>
 #include <system_error>
@@ -1099,3 +1100,13 @@ File::SizeType data_size_to_encrypted_size(File::SizeType size) noexcept
 }
 } // namespace realm::util
 #endif // REALM_ENABLE_ENCRYPTION
+
+namespace realm::util {
+std::string DecryptionFailed::get_message_with_bt(std::string_view msg)
+{
+    auto bt = Backtrace::capture();
+    std::stringstream ss;
+    bt.print(ss);
+    return util::format("Decryption failed: %1\n%2\n", msg, ss.str());
+}
+} // namespace realm::util

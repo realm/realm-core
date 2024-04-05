@@ -240,13 +240,14 @@ namespace realm::util {
 /// contain valid encrypted data
 struct DecryptionFailed : FileAccessError {
     DecryptionFailed()
-        : FileAccessError(ErrorCodes::DecryptionFailed, "Decryption failed", std::string(), 0)
+        : FileAccessError(ErrorCodes::DecryptionFailed, get_message_with_bt(""), std::string(), 0)
     {
     }
     DecryptionFailed(const std::string& msg)
-        : FileAccessError(ErrorCodes::DecryptionFailed, util::format("Decryption failed: '%1'", msg), std::string())
+        : FileAccessError(ErrorCodes::DecryptionFailed, get_message_with_bt(msg), std::string())
     {
     }
+    static std::string get_message_with_bt(std::string_view msg);
 };
 } // namespace realm::util
 

@@ -319,9 +319,29 @@ TEST(EncryptedFile_IVRefreshing)
     verify_page_states(states, read_data_pos, {page_needing_refresh});
 }
 
+static void check_attach_and_read(const char* key, const std::string& path, size_t num_entries)
+{
+    try {
+        auto hist = make_in_realm_history();
+        DBOptions options(key);
+        auto sg = DB::create(*hist, path, options);
+        auto rt = sg->start_read();
+        auto foo = rt->get_table("foo");
+        auto pk_col = foo->get_primary_key_column();
+        REALM_ASSERT_3(foo->size(), ==, num_entries);
+        REALM_ASSERT_3(foo->where().equal(pk_col, util::format("name %1", num_entries - 1).c_str()).count(), ==, 1);
+    }
+    catch (const std::exception& e) {
+        size_t fs = File::get_size_static(path);
+        util::format(std::cout, "Error for num_entries %1 with page_size of %2 on file of size %3\n%4", num_entries,
+                     page_size(), fs, e.what());
+        throw e;
+    }
+}
+
 // This test changes the global page_size() and should not run with other tests.
 // It checks that an encrypted Realm is portable between systems with a different page size
-NONCONCURRENT_TEST(EncryptedFile_Portablility)
+/*NONCONCURRENT_TEST*/ ONLY(EncryptedFile_Portablility)
 {
     const char* key = test_util::crypt_key(true);
     // The idea here is to incrementally increase the allocations in the Realm
@@ -342,20 +362,7 @@ NONCONCURRENT_TEST(EncryptedFile_Portablility)
 
     test_sizes.push_back(1); // check the lower limit
     for (auto num_entries : test_sizes) {
-
         TEST_PATH(path);
-
-        auto check_attach_and_read = [&]() {
-            auto hist = make_in_realm_history();
-            DBOptions options(key);
-            auto sg = DB::create(*hist, path, options);
-            auto rt = sg->start_read();
-            auto foo = rt->get_table("foo");
-            auto pk_col = foo->get_primary_key_column();
-            CHECK_EQUAL(foo->size(), num_entries);
-            CHECK_EQUAL(foo->where().equal(pk_col, util::format("name %1", num_entries - 1).c_str()).count(), 1);
-        };
-
         {
             // create the Realm with the smallest supported page_size() of 4096
             OnlyForTestingPageSizeChange change_page_size(4096);
@@ -370,11 +377,11 @@ NONCONCURRENT_TEST(EncryptedFile_Portablility)
         }
         {
             OnlyForTestingPageSizeChange change_page_size(8192);
-            check_attach_and_read();
+            check_attach_and_read(key, path, num_entries);
         }
         {
             OnlyForTestingPageSizeChange change_page_size(16384);
-            check_attach_and_read();
+            check_attach_and_read(key, path, num_entries);
         }
 
         // check with the native page_size (which is probably redundant with one of the above)
@@ -386,7 +393,7 @@ NONCONCURRENT_TEST(EncryptedFile_Portablility)
         TableRef bar = wt->get_or_add_table_with_primary_key("bar", type_String, "pk");
         bar->create_object_with_primary_key("test");
         wt->commit();
-        check_attach_and_read();
+        check_attach_and_read(key, path, num_entries);
     }
 }
 
