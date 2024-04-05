@@ -765,7 +765,7 @@ void Realm::run_writes_on_proper_thread()
 
 void Realm::call_completion_callbacks()
 {
-    if (m_is_running_async_commit_completions) {
+    if (m_is_running_async_commit_completions || m_async_commit_q.empty()) {
         return;
     }
 
