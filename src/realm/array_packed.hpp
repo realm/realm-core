@@ -189,7 +189,7 @@ inline bool ArrayPacked::find_linear(const Array& arr, int64_t value, size_t sta
 
 inline bool ArrayPacked::run_parallel_scan(size_t width, size_t range) const
 {
-    return width < 32 && range >= 32;
+    return width < 32 && range >= 16;
 }
 
 } // namespace realm
