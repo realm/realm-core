@@ -1246,6 +1246,7 @@ buildvariants:
     cxx_compiler: "/opt/clang+llvm/bin/clang++"
   tasks:
   - name: compile_test
+  - name: lint
 
 - name: ubuntu-no-session-multiplexing
   display_name: "Ubuntu (Sync Multiplexing Disabled)"
@@ -1299,7 +1300,7 @@ buildvariants:
   - name: long-running-tests
 
 - name: ubuntu-asan
-  display_name: "Ubuntu (ASAN)"
+  display_name: "Ubuntu (ASAN ARM64)"
   run_on: ubuntu2204-arm64-large
   expansions:
     fetch_missing_dependencies: On
@@ -1310,6 +1311,24 @@ buildvariants:
   tasks:
   - name: compile_test
   - name: long-running-tests
+
+- name: ubuntu-asan-x86_64
+  display_name: "Ubuntu (ASAN x86_64)"
+  run_on: ubuntu2204-large
+  expansions:
+    fetch_missing_dependencies: On
+    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.26.3-linux-x86_64.tar.gz"
+    cmake_bindir: "./cmake_binaries/bin"
+    clang_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/clang%2Bllvm-18.1.2-x86_64-linux-gnu.tar.xz"
+    clang_sha256_sum: "feab4b0f5fba325bfe0f4245710fd19fd74f813f44b5e81eda794f4f75bca343"
+    c_compiler: "./clang_binaries/bin/clang"
+    cxx_compiler: "./clang_binaries/bin/clang++"
+    fetch_missing_dependencies: On
+    enable_asan: On
+    cmake_build_type: RelWithDebInfo
+  tasks:
+  - name: compile_test_coverage
+  - name: finalize_coverage_data
 
 - name: ubuntu-tsan
   display_name: "Ubuntu (TSAN)"
@@ -1453,7 +1472,7 @@ buildvariants:
   - name: validate-installed-headers
 
 - name: macos-encrypted
-  display_name: "MacOS 11.0 x86_64 (Encryption enabled)"
+  display_name: "MacOS 11.0 arm64 (Encryption enabled)"
   run_on: macos-1100-arm64
   expansions:
     cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.26.3-macos-universal.tar.gz"
@@ -1482,7 +1501,7 @@ buildvariants:
   - name: compile_test
   - name: swift-build-and-test
 
-- name: macos-1100-arm64-release
+- name: macos-release
   display_name: "MacOS 11 arm64 (Release build)"
   run_on: macos-1100-arm64
   expansions:
