@@ -1054,12 +1054,12 @@ TEST_CASE("Get Realm using Async Open", "[sync][pbs][async open]") {
         std::shared_ptr<AsyncOpenTask> task2 = Realm::get_synchronized_realm(config);
         REQUIRE(task);
         REQUIRE(task2);
-        task->register_download_progress_notifier([&](uint64_t, uint64_t) {
+        task->register_download_progress_notifier([&](uint64_t, uint64_t, double) {
             std::lock_guard<std::mutex> guard(mutex);
             REQUIRE(!task1_completed);
             progress_notifier1_called = true;
         });
-        task2->register_download_progress_notifier([&](uint64_t, uint64_t) {
+        task2->register_download_progress_notifier([&](uint64_t, uint64_t, double) {
             std::lock_guard<std::mutex> guard(mutex);
             REQUIRE(!task2_completed);
             progress_notifier2_called = true;
@@ -2440,6 +2440,68 @@ TEST_CASE("SharedRealm: async writes") {
 
     _impl::RealmCoordinator::clear_all_caches();
 }
+
+TEST_CASE("Call run_async_completions after realm has been closed") {
+    // This requires a special scheduler as we have to call Realm::close
+    // just after DB::AsyncCommitHelper has made a callback to the function
+    // that asks the scheduler to invoke run_async_completions()
+
+    struct ManualScheduler : util::Scheduler {
+        std::mutex mutex;
+        std::condition_variable cv;
+        std::vector<util::UniqueFunction<void()>> callbacks;
+
+        void invoke(util::UniqueFunction<void()>&& cb) override
+        {
+            {
+                std::lock_guard lock(mutex);
+                callbacks.push_back(std::move(cb));
+            }
+            cv.notify_all();
+        }
+
+        bool is_on_thread() const noexcept override
+        {
+            return true;
+        }
+        bool is_same_as(const Scheduler*) const noexcept override
+        {
+            return false;
+        }
+        bool can_invoke() const noexcept override
+        {
+            return true;
+        }
+    };
+
+    auto scheduler = std::make_shared<ManualScheduler>();
+
+    TestFile config;
+    config.schema_version = 0;
+    config.schema = Schema{{"object", {{"value", PropertyType::Int}}}};
+    config.scheduler = scheduler;
+    config.automatic_change_notifications = false;
+
+    auto realm = Realm::get_shared_realm(config);
+
+    realm->begin_transaction();
+    realm->async_commit_transaction([](std::exception_ptr) {});
+
+    std::vector<util::UniqueFunction<void()>> callbacks;
+    {
+        std::unique_lock lock(scheduler->mutex);
+        // Wait for scheduler to be invoked
+        scheduler->cv.wait(lock, [&] {
+            return !scheduler->callbacks.empty();
+        });
+        callbacks.swap(scheduler->callbacks);
+    }
+    realm->close();
+    // Call whatever functions that was added to scheduler.
+    for (auto& cb : callbacks)
+        cb();
+}
+
 // Our libuv scheduler currently does not support background threads, so we can
 // only run this on apple platforms
 #if REALM_PLATFORM_APPLE

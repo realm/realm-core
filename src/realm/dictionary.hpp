@@ -51,7 +51,7 @@ public:
         : Base(parent, index)
     {
     }
-    Dictionary(ColKey col_key, size_t level = 1);
+    Dictionary(ColKey col_key, uint8_t level = 1);
     Dictionary(const Dictionary& other)
         : Base(static_cast<const Base&>(other))
         , CollectionParent(other.get_level())
@@ -218,6 +218,10 @@ public:
     uint32_t parent_version() const noexcept override
     {
         return m_parent_version;
+    }
+    void update_content_version() const noexcept override
+    {
+        Base::update_content_version();
     }
     ref_type get_collection_ref(Index, CollectionType) const override;
     bool check_collection_ref(Index, CollectionType) const noexcept override;

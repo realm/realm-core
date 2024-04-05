@@ -260,12 +260,18 @@ AutoVerifiedEmailCredentials create_user_and_log_in(app::SharedApp app)
         creds.email, creds.password, [&](util::Optional<app::AppError> error) {
             REQUIRE(!error);
         });
-    app->log_in_with_credentials(realm::app::AppCredentials::username_password(creds.email, creds.password),
+    log_in_user(app, creds);
+    return creds;
+}
+
+void log_in_user(app::SharedApp app, app::AppCredentials creds)
+{
+    REQUIRE(app);
+    app->log_in_with_credentials(creds,
                                  [&](std::shared_ptr<realm::SyncUser> user, util::Optional<app::AppError> error) {
                                      REQUIRE(user);
                                      REQUIRE(!error);
                                  });
-    return creds;
 }
 
 void wait_for_advance(Realm& realm)

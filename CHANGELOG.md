@@ -1,15 +1,18 @@
 # NEXT RELEASE
 
 ### Enhancements
-* <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
+* Introduce sync 'progress_estimate' parameter (value from 0.0 to 1.0) for existing sync 'ProgressNotifierCallback' api to report sync progress on current batch of upload/download until completion ([#7450](https://github.com/realm/realm-core/issues/7450))
 * Support assigning nested collections via templated API (PR [#7478](https://github.com/realm/realm-core/pull/7478))
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Fix an assertion failure "m_lock_info && m_lock_info->m_file.get_path() == m_filename" that appears to be related to opening a Realm while the file is in the process of being closed on another thread ([Swift #8507](https://github.com/realm/realm-swift/issues/8507)).
+* Fixed diverging history due to a bug in the replication code when setting default null values (embedded objects included) ([#7536](https://github.com/realm/realm-core/issues/7536)).
+* Version 19.39.33523 of MSVC would crash when compiling for arm64 in release mode ([PR #7533](https://github.com/realm/realm-core/pull/7533)).
+* Null pointer exception may be triggered when logging out and async commits callbacks not executed ([#7434](https://github.com/realm/realm-core/issues/7434), since v13.26.0)
 
 ### Breaking changes
-* None.
+* Updated default base URL to be `https://services.cloud.mongodb.com` to support the new domains (was `https://realm.mongodb.com`). ([PR #7534](https://github.com/realm/realm-core/pull/7534))
 
 ### Compatibility
 * Fileformat: Generates files with format v24. Reads and automatically upgrade from fileformat v10. If you want to upgrade from an earlier file format version you will have to use RealmCore v13.x.y or earlier.
@@ -17,7 +20,47 @@
 -----------
 
 ### Internals
-* None.
+* Update libuv used in object store tests from v1.35.0 to v1.48.0 ([PR #7508](https://github.com/realm/realm-core/pull/7508)).
+* Made `set_default_logger` nullable in the bindgen spec.yml (PR [#7515](https://github.com/realm/realm-core/pull/7515)).
+* Recreating the sync metadata Realm when the encryption key changes is now done in a multi-process safe manner ([PR #7526](https://github.com/realm/realm-core/pull/7526)).
+* Added `App::default_base_url()` static accessor for SDKs to retrieve the default base URL from Core. ([PR #7534](https://github.com/realm/realm-core/pull/7534))
+* Realm2JSON tool will now correctly upgrade file to current fileformat.
+* (bindgen) Remove dependency on the `clang-format` package and rely on a binary provided by the system instead.
+
+----------------------------------------------
+
+# 14.4.1 Release notes
+
+### Fixed
+* Fix pass a thread safe reference to init subscription callback. ([#7497](https://github.com/realm/realm-core/issues/7497), since v13.16.0)
+
+### Compatibility
+* Fileformat: Generates files with format v24. Reads and automatically upgrade from fileformat v10. If you want to upgrade from an earlier file format version you will have to use RealmCore v13.x.y or earlier.
+
+-----------
+
+### Internals
+* Update Catch2 from v3.3.2 to v3.5.3 ([PR #7297](https://github.com/realm/realm-core/pull/7509)).
+
+----------------------------------------------
+
+# 14.4.0 Release notes
+
+### Enhancements
+* Nested path included in 'OutOfBoundsø error message ([#7438](https://github.com/realm/realm-core/issues/7438))
+* Improve file compaction performance on platforms with page sizes greater than 4k (for example arm64 Apple platforms) for files less than 256 pages in size ([PR #7492](https://github.com/realm/realm-core/pull/7492)).
+
+### Fixed
+* Modifying nested collections left the accessor used to make the modification in a stale state, resulting in some unneccesary work being done when making multiple modifications via one accessor ([PR #7470](https://github.com/realm/realm-core/pull/7470), since v14.0.0).
+* Fix depth level for nested collection in debug mode, set it to the same level as release ([#7484](https://github.com/realm/realm-core/issues/7484), since v14.0.0).
+* Fix opening realm with cached user while offline results in fatal error and session does not retry connection. ([#7349](https://github.com/realm/realm-core/issues/7349), since v13.26.0)
+* Fix disallow Sets in ArrayMixed. ([#7502](https://github.com/realm/realm-core/pull/7502), since v14.0.0)
+
+### Breaking changes
+* Update C-API log callback signature to include the log category, and `realm_set_log_callback` to not take a `realm_log_level_e`. ([PR #7494](https://github.com/realm/realm-core/pull/7494)
+
+### Compatibility
+* Fileformat: Generates files with format v24. Reads and automatically upgrade from fileformat v10. If you want to upgrade from an earlier file format version you will have to use RealmCore v13.x.y or earlier.
 
 ----------------------------------------------
 

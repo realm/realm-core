@@ -798,27 +798,27 @@ void Group::recycle_table_accessor(Table* to_be_recycled)
     g_table_recycler_1.push_back(to_be_recycled);
 }
 
-void Group::remove_table(StringData name)
+void Group::remove_table(StringData name, bool ignore_backlinks)
 {
     check_attached();
     size_t table_ndx = m_table_names.find_first(name);
     if (table_ndx == not_found)
         throw NoSuchTable();
     auto key = ndx2key(table_ndx);
-    remove_table(table_ndx, key); // Throws
+    remove_table(table_ndx, key, ignore_backlinks); // Throws
 }
 
 
-void Group::remove_table(TableKey key)
+void Group::remove_table(TableKey key, bool ignore_backlinks)
 {
     check_attached();
 
     size_t table_ndx = key2ndx_checked(key);
-    remove_table(table_ndx, key);
+    remove_table(table_ndx, key, ignore_backlinks);
 }
 
 
-void Group::remove_table(size_t table_ndx, TableKey key)
+void Group::remove_table(size_t table_ndx, TableKey key, bool ignore_backlinks)
 {
     if (!m_is_writable)
         throw LogicError(ErrorCodes::ReadOnlyDB, "Database not writable");
@@ -832,7 +832,7 @@ void Group::remove_table(size_t table_ndx, TableKey key)
     // tables. Such a behaviour is deemed too obscure, and we shall therefore
     // require that a removed table does not contain foreign origin backlink
     // columns.
-    if (table->is_cross_table_link_target())
+    if (!ignore_backlinks && table->is_cross_table_link_target())
         throw CrossTableLinkTarget(table->get_name());
 
     {
@@ -995,7 +995,7 @@ void Group::write(File& file, const char* encryption_key, uint_fast64_t version_
     // The aim is that the buffer size should be at least 1/256 of needed size but less than 64 Mb
     constexpr size_t upper_bound = 64 * 1024 * 1024;
     size_t min_space = std::min(get_used_space() >> 8, upper_bound);
-    size_t buffer_size = 4096;
+    size_t buffer_size = page_size();
     while (buffer_size < min_space) {
         buffer_size <<= 1;
     }

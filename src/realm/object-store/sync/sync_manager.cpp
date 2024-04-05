@@ -43,13 +43,13 @@ SyncClientTimeouts::SyncClientTimeouts()
 {
 }
 
-std::shared_ptr<SyncManager> SyncManager::create(std::shared_ptr<app::App> app, std::optional<std::string> sync_route,
+std::shared_ptr<SyncManager> SyncManager::create(std::shared_ptr<app::App> app, std::string sync_route,
                                                  const SyncClientConfig& config, const std::string& app_id)
 {
-    return std::make_shared<SyncManager>(Private(), std::move(app), std::move(sync_route), config, app_id);
+    return std::make_shared<SyncManager>(Private(), std::move(app), sync_route, config, app_id);
 }
 
-SyncManager::SyncManager(Private, std::shared_ptr<app::App> app, std::optional<std::string> sync_route,
+SyncManager::SyncManager(Private, std::shared_ptr<app::App> app, std::string sync_route,
                          const SyncClientConfig& config, const std::string& app_id)
     : m_config(config)
     , m_file_manager(std::make_unique<SyncFileManager>(m_config.base_file_path, app_id))
@@ -150,7 +150,6 @@ void SyncManager::tear_down_for_testing()
         // Destroy the client now that we have no remaining sessions.
         m_sync_client = nullptr;
         m_logger_ptr.reset();
-        m_sync_route.reset();
     }
 
     {
@@ -664,6 +663,25 @@ void SyncManager::close_all_sessions()
     }
 
     get_sync_client().wait_for_session_terminations();
+}
+
+void SyncManager::set_sync_route(std::string sync_route, bool verified)
+{
+    REALM_ASSERT(!sync_route.empty()); // Cannot be set to empty string
+    {
+        util::CheckedLockGuard lock(m_mutex);
+        m_sync_route = sync_route;
+        m_sync_route_verified = verified;
+    }
+}
+
+void SyncManager::restart_all_sessions()
+{
+    // Restart the sessions that are currently active
+    auto sessions = get_all_sessions();
+    for (auto& session : sessions) {
+        session->restart_session();
+    }
 }
 
 void SyncManager::OnlyForTesting::voluntary_disconnect_all_connections(SyncManager& mgr)

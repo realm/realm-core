@@ -225,23 +225,20 @@ public:
     // Immediately closes any open sync sessions for this sync manager
     void close_all_sessions() REQUIRES(!m_mutex, !m_session_mutex);
 
-    // Used by App to update the sync route any time the location info has been refreshed.
-    // m_sync_route starts out as unset when the SyncManager is created or configured.
-    // It will be updated to a valid value upon the first App AppServices HTTP request or
-    // the access token will be refreshed (forcing a location update) when a SyncSession
-    // is activated and it is still unset. This value is not allowed to be reset to
-    // nullopt once it has a valid value.
-    void set_sync_route(std::string sync_route) REQUIRES(!m_mutex)
-    {
-        REALM_ASSERT(!sync_route.empty());
-        util::CheckedLockGuard lock(m_mutex);
-        m_sync_route = std::move(sync_route);
-    }
+    // Force all the active sessions to restart
+    void restart_all_sessions() REQUIRES(!m_mutex, !m_session_mutex);
 
-    const std::optional<std::string> sync_route() const REQUIRES(!m_mutex)
+    // Used by App to update the sync route any time the location info has been refreshed.
+    // m_sync_route starts out as a generated value based on the configured base_url when
+    // the SyncManager is created by App. If this is incorrect, the websocket connection
+    // will fail, resulting in an update to the access token (and the location, if it hasn't
+    // been updated yet).
+    void set_sync_route(std::string sync_route, bool verified = true) REQUIRES(!m_mutex);
+
+    std::pair<const std::string, bool> sync_route() REQUIRES(!m_mutex)
     {
         util::CheckedLockGuard lock(m_mutex);
-        return m_sync_route;
+        return std::make_pair(m_sync_route, m_sync_route_verified);
     }
 
     std::weak_ptr<app::App> app() const REQUIRES(!m_mutex)
@@ -270,10 +267,10 @@ public:
         static void voluntary_disconnect_all_connections(SyncManager&);
     };
 
-    static std::shared_ptr<SyncManager> create(std::shared_ptr<app::App> app, std::optional<std::string> sync_route,
+    static std::shared_ptr<SyncManager> create(std::shared_ptr<app::App> app, std::string sync_route,
                                                const SyncClientConfig& config, const std::string& app_id);
-    SyncManager(Private, std::shared_ptr<app::App> app, std::optional<std::string> sync_route,
-                const SyncClientConfig& config, const std::string& app_id);
+    SyncManager(Private, std::shared_ptr<app::App> app, std::string sync_route, const SyncClientConfig& config,
+                const std::string& app_id);
 
 private:
     friend class app::App;
@@ -331,9 +328,11 @@ private:
     // Callers of this method should hold the `m_session_mutex` themselves.
     bool do_has_existing_sessions() REQUIRES(m_session_mutex);
 
-    // The sync route URL to connect to the server. This can be initially empty, but should not
-    // be cleared once it has been set to a value, except by `tear_down_for_testing()`.
-    std::optional<std::string> m_sync_route GUARDED_BY(m_mutex);
+    // The sync route URL for the sync connection to the server.
+    std::string m_sync_route GUARDED_BY(m_mutex);
+    // If true, then the sync route has been verified by querying the location info or successfully
+    // connecting to the server.
+    bool m_sync_route_verified GUARDED_BY(m_mutex) = false;
 
     std::weak_ptr<app::App> m_app GUARDED_BY(m_mutex);
     const std::string m_app_id;

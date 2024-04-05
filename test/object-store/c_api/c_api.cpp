@@ -584,7 +584,6 @@ TEST_CASE("C API (non-database)", "[c_api]") {
         const uint64_t request_timeout = 2500;
         std::string base_url = "https://path/to/app";
         std::string base_url2 = "https://some/other/path";
-        std::string default_base_url = "https://realm.mongodb.com";
         auto transport = std::make_shared<UnitTestTransport>(request_timeout);
         transport->set_expected_options({{"device",
                                           {{"appId", "app_id_123"},
@@ -605,6 +604,8 @@ TEST_CASE("C API (non-database)", "[c_api]") {
         CHECK(app_config.get() != nullptr);
         CHECK(app_config->app_id == "app_id_123");
         CHECK(app_config->transport == transport);
+
+        CHECK(realm_app_get_default_base_url() == app::App::default_base_url());
 
         CHECK(!app_config->base_url);
         realm_app_config_set_base_url(app_config.get(), base_url.c_str());
@@ -665,14 +666,14 @@ TEST_CASE("C API (non-database)", "[c_api]") {
         auto token =
             realm_sync_user_on_state_change_register_callback(sync_user, user_state, nullptr, user_data_free);
 
-        auto check_base_url = [&](const std::string& expected) {
+        auto check_base_url = [&](const std::string_view expected) {
             CHECK(transport->get_location_called());
             auto app_base_url = realm_app_get_base_url(test_app.get());
             CHECK(app_base_url == expected);
             realm_free(app_base_url);
         };
 
-        auto update_and_check_base_url = [&](const char* new_base_url, const std::string& expected) {
+        auto update_and_check_base_url = [&](const char* new_base_url, const std::string_view expected) {
             transport->set_base_url(expected);
             realm_app_update_base_url(
                 test_app.get(), new_base_url,
@@ -694,13 +695,13 @@ TEST_CASE("C API (non-database)", "[c_api]") {
         check_base_url(base_url);
 
         // Reset to the default base url using nullptr
-        update_and_check_base_url(nullptr, default_base_url);
+        update_and_check_base_url(nullptr, app::App::default_base_url());
 
         // Set to some other base url
         update_and_check_base_url(base_url2.c_str(), base_url2);
 
         // Reset to default base url using empty string
-        update_and_check_base_url("", default_base_url);
+        update_and_check_base_url("", app::App::default_base_url());
 
         realm_release(sync_user);
         realm_release(token);
@@ -1054,13 +1055,13 @@ bool should_compact_on_launch(void* userdata_p, uint64_t, uint64_t)
 }
 
 struct LogUserData {
-    std::vector<std::string> log;
+    std::vector<std::pair<std::string, std::string>> log;
 };
 
-void realm_log_func(realm_userdata_t u, realm_log_level_e, const char* message)
+void realm_log_func(realm_userdata_t u, const char* category, realm_log_level_e, const char* message)
 {
     LogUserData* userdata = static_cast<LogUserData*>(u);
-    userdata->log.emplace_back(message);
+    userdata->log.emplace_back(std::make_pair(category, message));
 }
 
 realm_t* open_realm(TestFile& test_file)
@@ -1656,7 +1657,8 @@ TEST_CASE("C API logging", "[c_api]") {
     auto num_categories = realm_get_category_names(20, category_names);
     auto log_level_old = realm_get_log_level_category("Realm");
 
-    realm_set_log_callback(realm_log_func, RLM_LOG_LEVEL_DEBUG, &userdata, nullptr);
+    realm_set_log_callback(realm_log_func, &userdata, nullptr);
+    realm_set_log_level(RLM_LOG_LEVEL_DEBUG);
     for (size_t n = 0; n < num_categories; n++) {
         CHECK(realm_get_log_level_category(category_names[n]) == RLM_LOG_LEVEL_DEBUG);
     }
@@ -1680,6 +1682,10 @@ TEST_CASE("C API logging", "[c_api]") {
     realm_begin_write(realm);
     realm_commit(realm);
     CHECK(userdata.log.size() == 11);
+    // We only expect Realm.Storage category logs
+    for (size_t n = 0; n < userdata.log.size(); n++) {
+        CHECK(userdata.log.at(n).first.rfind("Realm.Storage", 0) == 0);
+    }
     realm_release(realm);
     userdata.log.clear();
     realm_set_log_level(RLM_LOG_LEVEL_ERROR);
@@ -1688,7 +1694,7 @@ TEST_CASE("C API logging", "[c_api]") {
     CHECK(userdata.log.empty());
 
     // Remove this logger again
-    realm_set_log_callback(nullptr, RLM_LOG_LEVEL_DEBUG, nullptr, nullptr);
+    realm_set_log_callback(nullptr, nullptr, nullptr);
     // Restore old log level
     realm_set_log_level(log_level_old);
 }
@@ -5597,7 +5603,7 @@ static void task_completion_func(void* p, realm_thread_safe_reference_t* realm,
     userdata_p->called = true;
 }
 
-static void task_init_subscription(realm_t* realm, void*)
+static void task_init_subscription(realm_thread_safe_reference_t* realm, void*)
 {
     REQUIRE(realm);
 }

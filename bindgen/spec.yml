@@ -35,6 +35,7 @@ primitives:
   - void
   - std::string
   - std::string_view
+  - std::chrono::milliseconds
   # TODO: see if we need nullable versions of these. For now null buffers are treated as empty.
   - StringData
   - OwnedBinaryData
@@ -554,6 +555,7 @@ records:
       schema_did_change: 'Nullable<util::UniqueFunction<(r: SharedRealm)>>' # new schema available as r.schema
 
   ResumptionDelayInfo:
+    cppName: sync::ResumptionDelayInfo
     fields:
       max_resumption_delay_interval:
         type: std::chrono::milliseconds
@@ -743,7 +745,7 @@ classes:
     properties:
       get_default_logger: SharedLogger
     staticMethods:
-      set_default_logger: '(logger: SharedLogger)'
+      set_default_logger: '(logger: Nullable<SharedLogger>)'
 
   ConstTableRef:
     needsDeref: true
@@ -1342,7 +1344,7 @@ classes:
     methods:
       start: '(callback: AsyncCallback<(realm: Nullable<ThreadSafeReference>, error: Nullable<std::exception_ptr>) off_thread>)'
       cancel: ()
-      register_download_progress_notifier: '(callback: (transferred_bytes: uint64_t, transferrable_bytes: uint64_t) off_thread) -> uint64_t'
+      register_download_progress_notifier: '(callback: (transferred_bytes: uint64_t, transferrable_bytes: uint64_t, progress_estimate: double) off_thread) -> uint64_t'
       unregister_download_progress_notifier: '(token: uint64_t)'
 
   SyncSession:
@@ -1353,11 +1355,11 @@ classes:
       path: std::string
       user: SharedSyncUser
       config: SyncConfig
-      full_realm_url: std::optional<std::string>
+      full_realm_url: std::string
     methods:
       wait_for_upload_completion: '(callback: AsyncCallback<(err: Status) off_thread>)'
       wait_for_download_completion: '(callback: AsyncCallback<(err: Status) off_thread>)'
-      register_progress_notifier: '(callback: (transferred_bytes: uint64_t, transferrable_bytes: uint64_t) off_thread, direction: ProgressDirection, is_streaming: bool) -> uint64_t'
+      register_progress_notifier: '(callback: (transferred_bytes: uint64_t, transferrable_bytes: uint64_t, progress_estimate: double) off_thread, direction: ProgressDirection, is_streaming: bool) -> uint64_t'
       unregister_progress_notifier: '(token: uint64_t)'
       register_connection_change_callback: '(callback: (old_state: SyncSessionConnectionState, new_state: SyncSessionConnectionState) off_thread) -> uint64_t'
       unregister_connection_change_callback: '(token: uint64_t)'

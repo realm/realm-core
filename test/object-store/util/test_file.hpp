@@ -76,6 +76,8 @@ struct TestFile : realm::Realm::Config {
 
     TestFile(const TestFile&) = delete;
     TestFile& operator=(const TestFile&) = delete;
+    TestFile(TestFile&&) = default;
+    TestFile& operator=(TestFile&&) = default;
 
     // The file should outlive the object, ie. should not be deleted in destructor
     void persist()
@@ -270,18 +272,36 @@ public:
     }
     const std::shared_ptr<realm::SyncManager>& sync_manager() const
     {
+        REALM_ASSERT(m_app);
         return m_app->sync_manager();
     }
+
+    void close()
+    {
+        close(false);
+    }
+
+    // Re-open the app without deleting the dir contents - if close() has not been called
+    // the App will be closed first before recreating the object.
+    // If log_in is true, user will be logged in again once the App instance is created
+    void reopen(bool log_in);
+
+    realm::app::App::Config app_config;
+    realm::SyncClientConfig sc_config;
 
     std::vector<realm::bson::BsonDocument> get_documents(realm::SyncUser& user, const std::string& object_type,
                                                          size_t expected_count) const;
 
 private:
+    // Close the app and, if tear_down, remove the app data and base_file_path directory
+    void close(bool tear_down);
+
     std::shared_ptr<realm::app::App> m_app;
     std::unique_ptr<realm::AppSession> m_app_session;
     std::string m_base_file_path;
     bool m_delete_app = true;
     std::shared_ptr<realm::app::GenericNetworkTransport> m_transport;
+    realm::app::AppCredentials user_creds;
 };
 #endif
 

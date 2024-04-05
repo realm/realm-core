@@ -61,8 +61,6 @@ struct ClientResetFailed : public std::runtime_error {
 void transfer_group(const Transaction& tr_src, Transaction& tr_dst, util::Logger& logger,
                     bool allow_schema_additions);
 
-void remove_all_tables(Transaction& tr_dst, util::Logger& logger);
-
 struct PendingReset {
     ClientResyncMode type;
     Timestamp time;

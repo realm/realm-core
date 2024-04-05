@@ -254,4 +254,13 @@ UpdateStatus CollectionBase::do_init_from_parent(BPlusTreeBase* tree, ref_type r
     return UpdateStatus::Updated;
 }
 
+void CollectionBase::out_of_bounds(const char* msg, size_t index, size_t size) const
+{
+    auto path = get_short_path();
+    path.erase(path.begin());
+    throw OutOfBounds(util::format("%1 on %2 '%3.%4%5'", msg, collection_type_name(get_collection_type()),
+                                   get_table()->get_class_name(), get_property_name(), path),
+                      index, size);
+}
+
 } // namespace realm

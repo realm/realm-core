@@ -161,7 +161,8 @@ public:
     using SyncTransactCallback = void(VersionID old_version, VersionID new_version);
     using ProgressHandler = void(std::uint_fast64_t downloaded_bytes, std::uint_fast64_t downloadable_bytes,
                                  std::uint_fast64_t uploaded_bytes, std::uint_fast64_t uploadable_bytes,
-                                 std::uint_fast64_t progress_version, std::uint_fast64_t snapshot_version);
+                                 std::uint_fast64_t snapshot_version, double download_estimate,
+                                 double upload_estimate);
     using WaitOperCompletionHandler = util::UniqueFunction<void(Status)>;
     using SSLVerifyCallback = bool(const std::string& server_address, port_type server_port, const char* pem_data,
                                    size_t pem_size, int preverify_ok, int depth);
@@ -191,6 +192,11 @@ public:
         /// On the MongoDB Realm-based Sync server, virtual paths are not coupled
         /// to file system paths, and thus, these restrictions do not apply.
         std::string realm_identifier = "";
+
+        // If the client has successfully contacted the server, then this will be
+        // set to true, otherwise it is false and the sync sessions will attempt
+        // to update the location info if the connection fails.
+        bool server_verified = false;
 
         /// The user id of the logged in user for this sync session. This will be used
         /// along with the server_address/server_port/protocol_envelope to determine

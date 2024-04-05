@@ -291,7 +291,7 @@ public:
     {
         this->set_owner(owner, col_key);
     }
-    Lst(ColKey col_key, size_t level = 1)
+    Lst(ColKey col_key, uint8_t level = 1)
         : Base(col_key)
         , CollectionParent(level)
     {
@@ -489,6 +489,10 @@ public:
     uint32_t parent_version() const noexcept override
     {
         return m_parent_version;
+    }
+    void update_content_version() const noexcept override
+    {
+        Base::update_content_version();
     }
     ref_type get_collection_ref(Index, CollectionType) const override;
     bool check_collection_ref(Index, CollectionType) const noexcept override;
