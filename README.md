@@ -20,7 +20,7 @@ This repository holds the source code for the core database component used by al
 
 Realm Core is not in itself an "end-user" product with a publicly stable and supported API.
 
-Refer to the [Realm documentation](https://www.mongodb.com/docs/realm) for information about Realm and using the SDKs.
+Refer to the [Atlas Device SDK documentation](https://www.mongodb.com/docs/atlas/device-sdks/) for information about Realm and using the SDKs.
 
 ## Building Realm
 
