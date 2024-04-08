@@ -2,11 +2,11 @@ name: "Post Release Tasks"
 # this must be triggered manually
 on: workflow_dispatch
 jobs:
-  changelog:
+  post-release:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout
-      uses: uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         submodules: false
     - name: Read version
@@ -24,7 +24,7 @@ jobs:
       with:
         bodyFile: extracted_changelog.md
         name: ${{ steps.get-version.outputs.version }}
-        commit: master
+        commit: ${{ github.ref }}
         tag: ${{ steps.get-version.outputs.version }}
         token: ${{ secrets.GITHUB_TOKEN }}
         draft: false
@@ -40,7 +40,7 @@ jobs:
         title: Prepare for vNext
         body: Update Changelog for vNext
         delete-branch: true
-        base: master
+        base: ${{ github.ref }}
         commit-message: Prepare for vNext
     - name: Merge Pull Request
       uses: juliangruber/merge-pull-request-action@333730196b34b74936aad75a4e31c23a57582d14
