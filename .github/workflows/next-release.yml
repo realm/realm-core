@@ -1,0 +1,17 @@
+on:
+  release:
+    types: [published]
+
+jobs:
+  changelog-next-release:
+    name: Update CHANGELOG.md for next release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout 'master'
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+      - name: Update CHANGELOG.md file
+        run: cat "doc/CHANGELOG_template.md" "CHANGELOG.md" > temp_file.md; mv temp_file.md "CHANGELOG.md"
+      - name: Commit updated CHANGELOG.md file
+        run: head -n 25 CHANGELOG.md
