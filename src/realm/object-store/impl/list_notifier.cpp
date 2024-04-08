@@ -76,24 +76,18 @@ bool ListNotifier::do_add_required_change_info(TransactionChangeInfo& info)
         return false; // origin row was deleted after the notification was added
 
     StablePath this_path = m_list->get_stable_path();
-    StablePath this_path = m_list->get_stable_path();
+    info.collections.push_back(
         {m_list->get_table()->get_key(), m_list->get_owner_key(), std::move(this_path), &m_change});
-                               [](const CollectionChangeInfo& info, size_t sz) {
-        return info.path.size() < sz;
-                               });
-                               info.collections.insert(it, {m_list->get_table()->get_key(), m_list->get_owner_key(),
-                                                            std::move(this_path), &m_change});
 
-                               m_info = &info;
+    m_info = &info;
 
-                               // When adding or removing a callback, the related tables can change due to the way we
-                               // calculate related tables when key path filters are set, hence we need to recalculate
-                               // every time the callbacks are changed. We only need to do this for lists that link to
-                               // other lists. Lists of primitives cannot have related tables.
-                               util::CheckedLockGuard lock(m_callback_mutex);
-                               if (m_did_modify_callbacks && m_type == PropertyType::Object) {
+    // When adding or removing a callback, the related tables can change due to the way we calculate related tables
+    // when key path filters are set, hence we need to recalculate every time the callbacks are changed.
+    // We only need to do this for lists that link to other lists. Lists of primitives cannot have related tables.
+    util::CheckedLockGuard lock(m_callback_mutex);
+    if (m_did_modify_callbacks && m_type == PropertyType::Object) {
         update_related_tables(*m_list->get_table());
-                               }
+    }
 
     return true;
 }
@@ -101,15 +95,6 @@ bool ListNotifier::do_add_required_change_info(TransactionChangeInfo& info)
 void ListNotifier::run()
 {
     NotifierRunLogger log(m_logger.get(), "ListNotifier", m_description);
-
-    util::ScopeExit cleanup([&]() noexcept {
-        m_run_time_point = steady_clock::now();
-        if (m_logger) {
-            m_logger->log(util::LogCategory::notification, util::Logger::Level::debug,
-                          "ListNotifier %1 did run in %2 us", m_description,
-                          duration_cast<microseconds>(m_run_time_point - t1).count());
-        }
-    });
 
     if (!m_list || !m_list->is_attached()) {
         // List was deleted, so report all of the rows being removed if this is

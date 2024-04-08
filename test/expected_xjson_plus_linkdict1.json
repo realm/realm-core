@@ -35,7 +35,6 @@
           "$link": {
             "table": "table2",
             "key": "t2o2"
-        "key3": "t2o3",
           }
         },
         "key3": {

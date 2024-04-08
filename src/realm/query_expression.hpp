@@ -3187,8 +3187,6 @@ protected:
                     }
                 }
             }
-                }
-            }
         }
     }
 };
@@ -3368,7 +3366,6 @@ public:
     {
         m_key_type = m_link_map.get_target_table()->get_dictionary_key_type(m_column_key);
         m_ctrl.path.push_back(PathElement::AllTag());
-        m_path_only_unary_keys = false;
     }
 
     Columns(const Path& path, ConstTableRef table, const std::vector<ExtendedColumnKey>& links = {},
@@ -3382,11 +3379,13 @@ public:
         }
         init_path(&path[1], &path[1] + path_size - 1);
     }
-    init_path(&path[1], &path[1] + path_size - 1);
+
     // Change the node to handle a specific key value only
-    Columns<Dictionary>& key(StringData key) PathElement p(key);
-    init_path(&p, &p + 1);
-    return *this;
+    Columns<Dictionary>& key(StringData key)
+    {
+        PathElement p(key);
+        init_path(&p, &p + 1);
+        return *this;
     }
 
     // Change the node to handle a specific key value only
@@ -3401,12 +3400,10 @@ public:
     DataType get_key_type() const
     {
         return m_key_type;
-        const PathElement* first = &path[0];
-        init_path(first, first + sz);
-        return *this;
     }
 
     ColumnDictionaryKeys keys();
+
     void set_base_table(ConstTableRef table) override
     {
         ColumnsCollection::set_base_table(table);
@@ -3414,9 +3411,6 @@ public:
         m_ctrl.group = table->get_parent_group();
     }
     SizeOperator<int64_t> size() override;
-    std::unique_ptr<Subexpr> get_element_length() override
-
-        SizeOperator<int64_t> size() override;
     std::unique_ptr<Subexpr> get_element_length() override
     {
         // Not supported for Dictionary
@@ -3446,13 +3440,11 @@ public:
         , m_ctrl(other.m_ctrl)
     {
     }
-    }
 
 protected:
     DataType m_key_type = type_String;
     Collection::QueryCtrlBlock m_ctrl;
 
-    void init_path(const PathElement* begin, const PathElement* end);
     void init_path(const PathElement* begin, const PathElement* end);
 };
 

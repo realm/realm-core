@@ -498,7 +498,12 @@ protected:
 };
 
 /// A logger that performs a noop when logging functions are called
-void do_log(const LogCategory&, Level, const std::string&) override {}
+class NullLogger : public Logger {
+    // Since we don't want to log anything, do_log() does nothing
+    void do_log(const LogCategory&, Level, const std::string&) override {}
+};
+
+
 // Implementation
 
 template <class... Params>

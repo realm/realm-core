@@ -570,45 +570,6 @@ std::shared_ptr<Lst<Mixed>> Lst<Mixed>::get_list(const PathElement& path_elem) c
     return ret;
 }
 
-Mixed new_val(0, dict_or_list);
-
-check_level();
-
-if (old_val != new_val) {
-    m_tree->ensure_keys();
-    set(ndx, new_val);
-    int64_t key = m_tree->get_key(ndx);
-    if (key == 0) {
-        key = generate_key(size());
-        while (m_tree->find_key(key) != realm::not_found) {
-            key++;
-        }
-        m_tree->set_key(ndx, key);
-    }
-    bump_content_version();
-}
-}
-
-DictionaryPtr Lst<Mixed>::get_dictionary(const PathElement& path_elem) const
-{
-    update();
-    auto weak = const_cast<Lst<Mixed>*>(this)->weak_from_this();
-    auto shared = weak.expired() ? std::make_shared<Lst<Mixed>>(*this) : weak.lock();
-    DictionaryPtr ret = std::make_shared<Dictionary>(m_col_key, get_level() + 1);
-    ret->set_owner(shared, m_tree->get_key(path_elem.get_ndx()));
-    return ret;
-}
-
-std::shared_ptr<Lst<Mixed>> Lst<Mixed>::get_list(const PathElement& path_elem) const
-{
-    update();
-    auto weak = const_cast<Lst<Mixed>*>(this)->weak_from_this();
-    auto shared = weak.expired() ? std::make_shared<Lst<Mixed>>(*this) : weak.lock();
-    std::shared_ptr<Lst<Mixed>> ret = std::make_shared<Lst<Mixed>>(m_col_key, get_level() + 1);
-    ret->set_owner(shared, m_tree->get_key(path_elem.get_ndx()));
-    return ret;
-}
-
 void Lst<Mixed>::do_set(size_t ndx, Mixed value)
 {
     ObjLink old_link;
@@ -896,22 +857,6 @@ bool Lst<Mixed>::remove_backlinks(CascadeState& state) const
         }
     }
     return recurse;
-}
-
-/********************************** LnkLst ***********************************/
-recurse = true;
-}
-}
-return recurse;
-}
-
-bool Lst<Mixed>::update_if_needed() const
-{
-    auto status = update_if_needed_with_status();
-    if (status == UpdateStatus::Detached) {
-        throw StaleAccessor("CollectionList no longer exists");
-    }
-    return status == UpdateStatus::Updated;
 }
 
 /********************************** LnkLst ***********************************/

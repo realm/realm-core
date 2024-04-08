@@ -183,7 +183,7 @@ public:
         return *m_tree;
     }
 
-    UpdateStatus update_if_needed_with_status() const final
+    UpdateStatus update_if_needed() const final
     {
         auto status = Base::get_update_status();
         switch (status) {
@@ -200,7 +200,6 @@ public:
                 [[fallthrough]];
             case UpdateStatus::Updated: {
                 return init_from_parent(false);
-                Base::update_content_version();
             }
         }
         REALM_UNREACHABLE();
@@ -219,7 +218,7 @@ public:
     /// Update the accessor and return true if it is attached after the update.
     inline bool update() const
     {
-        return update_if_needed_with_status() != UpdateStatus::Detached;
+        return update_if_needed() != UpdateStatus::Detached;
     }
 
     size_t translate_index(size_t ndx) const noexcept override
@@ -530,261 +529,19 @@ private:
         }
     }
 
-
-    template <>
-    class Lst<Mixed> final : public CollectionBaseImpl<LstBase>, public CollectionParent {
-    public:
-        using Base = CollectionBaseImpl<LstBase>;
-        using iterator = LstIterator<Mixed>;
-        using value_type = Mixed;
-
-        Lst() = default;
-        Lst(const Obj& owner, ColKey col_key)
-            : Lst(col_key)
-    } Lst(ColKey col_key, size_t level = 1)
-        : Base(col_key)
-        , CollectionParent(level)
+    static Mixed unresolved_to_null(Mixed value) noexcept
     {
-        check_column_type<Mixed>(m_col_key);
+        return value.is_unresolved_link() ? Mixed{} : value;
     }
-    Lst(CollectionParent& parent, Index index)
-        : Base(parent, index)
+    Mixed do_get(size_t ndx, const char* msg) const
     {
+        const auto current_size = size();
+        CollectionBase::validate_index(msg, ndx, current_size);
+
+        return unresolved_to_null(m_tree->get(ndx));
     }
-    Lst(const Lst& other)
-        : Base(other)
-        , CollectionParent(other.get_level())
-    {
-    }
-    Lst(Lst&&) noexcept;
-    Lst& operator=(const Lst& other);
-    Lst& operator=(Lst&& other) noexcept;
-
-    iterator begin() const noexcept
-    {
-        return iterator{this, 0};
-    }
-
-    iterator end() const noexcept
-    {
-        return iterator{this, size()};
-    }
-
-    Mixed get(size_t ndx) const
-    {
-        return do_get(ndx, "get()");
-    }
-    size_t find_first(const Mixed& value) const;
-    Mixed set(size_t ndx, Mixed value);
-
-    void insert(size_t ndx, Mixed value);
-    Mixed remove(size_t ndx);
-
-    void insert_collection(const PathElement&, CollectionType dict_or_list) override;
-    void set_collection(const PathElement& path_element, CollectionType dict_or_list) override;
-    DictionaryPtr get_dictionary(const PathElement& path_elem) const override;
-    ListMixedPtr get_list(const PathElement& path_elem) const override;
-
-    int64_t get_key(size_t ndx)
-    {
-        return m_tree->get_key(ndx);
-    }
-
-    // Overriding members of CollectionBase:
-    size_t size() const final
-    {
-        return update() ? m_tree->size() : 0;
-    }
-    void clear() final;
-    Mixed get_any(size_t ndx) const final
-    {
-        return get(ndx);
-    }
-    bool is_null(size_t ndx) const final
-    {
-        return get(ndx).is_null();
-    }
-    CollectionBasePtr clone_collection() const final
-    {
-        return std::make_unique<Lst<Mixed>>(*this);
-    }
-    util::Optional<Mixed> min(size_t* return_ndx = nullptr) const final;
-    util::Optional<Mixed> max(size_t* return_ndx = nullptr) const final;
-    util::Optional<Mixed> sum(size_t* return_cnt = nullptr) const final;
-    util::Optional<Mixed> avg(size_t* return_cnt = nullptr) const final;
-    void sort(std::vector<size_t>& indices, bool ascending = true) const final;
-    void distinct(std::vector<size_t>& indices, util::Optional<bool> sort_order = util::none) const final;
-
-    // Overriding members of LstBase:
-    LstBasePtr clone() const final
-    {
-        return std::make_unique<Lst<Mixed>>(*this);
-    }
-    void set_null(size_t ndx) final
-    {
-        set(ndx, Mixed());
-    }
-    void set_any(size_t ndx, Mixed val) final
-    {
-        set(ndx, val);
-    }
-    DataType get_data_type() const noexcept final
-    {
-        return type_Mixed;
-    }
-    void insert_null(size_t ndx) final
-    {
-        insert(ndx, Mixed());
-    }
-    void insert_any(size_t ndx, Mixed val) final
-    {
-        insert(ndx, val);
-    }
-    size_t find_any(Mixed val) const final
-    {
-        return find_first(val);
-    }
-    void resize(size_t new_size) final;
-    void remove(size_t from, size_t to) final;
-    void move(size_t from, size_t to) final;
-    void swap(size_t ndx1, size_t ndx2) final;
-
-    // Lst<T> interface:
-    Mixed remove(const iterator& it);
-
-    void add(Mixed value)
-    {
-        insert(size(), std::move(value));
-    }
-
-    template <typename T>
-    void add_json(const T&);
-
-    Mixed operator[](size_t ndx) const
-    {
-        return this->get(ndx);
-    }
-
-    template <typename Func>
-    void find_all(value_type value, Func&& func) const
-    {
-        if (update()) {
-            if (value.is_null()) {
-                // if value is null then we find also all the unresolved links with a O(n lg n) scan
-                find_all_mixed_unresolved_links(std::forward<Func>(func));
-            }
-            m_tree->find_all(value, std::forward<Func>(func));
-        }
-    }
-
-    inline const BPlusTree<Mixed>& get_tree() const
-    {
-        return *m_tree;
-    }
-
-    UpdateStatus update_if_needed_with_status() const final;
-
-    void ensure_created()
-    {
-        if (Base::should_update() || !(m_tree && m_tree->is_attached())) {
-            // When allow_create is true, init_from_parent will always succeed
-            // In case of errors, an exception is thrown.
-            constexpr bool allow_create = true;
-            init_from_parent(allow_create); // Throws
-            Base::update_content_version();
-            CollectionParent::m_parent_version++;
-        }
-    }
-
-    /// Update the accessor and return true if it is attached after the update.
-    inline bool update() const
-    {
-        return update_if_needed_with_status() != UpdateStatus::Detached;
-    }
-
-    // Overriding members in CollectionParent
-    FullPath get_path() const override
-    {
-        return Base::get_path();
-    }
-
-    Path get_short_path() const override
-    {
-        update();
-        return Base::get_short_path();
-    }
-
-    StablePath get_stable_path() const override
-    {
-        return Base::get_stable_path();
-    }
-
-    ColKey get_col_key() const noexcept override
-    {
-        return Base::get_col_key();
-    }
-
-    void add_index(Path& path, const Index& ndx) const final;
-    size_t find_index(const Index& ndx) const final;
-
-    bool nullify(ObjLink);
-    bool replace_link(ObjLink old_link, ObjLink replace_link);
-    bool remove_backlinks(CascadeState& state) const;
-    TableRef get_table() const noexcept override
-    {
-        return get_obj().get_table();
-    }
-    bool update_if_needed() const override;
-    const Obj& get_object() const noexcept override
-    {
-        return get_obj();
-    }
-    ref_type get_collection_ref(Index, CollectionType) const override;
-    bool check_collection_ref(Index, CollectionType) const noexcept override;
-    void set_collection_ref(Index, ref_type ref, CollectionType) override;
-
-    void to_json(std::ostream&, JSONOutputMode, util::FunctionRef<void(const Mixed&)>) const override;
-
-private:
-    // `do_` methods here perform the action after preconditions have been
-    // checked (bounds check, writability, etc.).
-    void do_set(size_t ndx, Mixed value);
-    void do_insert(size_t ndx, Mixed value);
-    void do_remove(size_t ndx);
-
-    // BPlusTree must be wrapped in an `std::unique_ptr` because it is not
-    // default-constructible, due to its `Allocator&` member.
-    mutable std::unique_ptr<BPlusTreeMixed> m_tree;
-
-    using Base::bump_content_version;
-    using Base::get_alloc;
-    using Base::m_col_key;
-    using Base::m_nullable;
-
-    bool init_from_parent(bool allow_create) const;
-
-    template <class Func>
-    void find_all_mixed_unresolved_links(Func&& func) const
-    {
-        for (size_t i = 0; i < m_tree->size(); ++i) {
-            auto mixed = m_tree->get(i);
-            if (mixed.is_unresolved_link()) {
-                func(i);
-            }
-        }
-        static Mixed unresolved_to_null(Mixed value) noexcept
-        {
-            return value.is_unresolved_link() ? Mixed{} : value;
-        }
-        Mixed do_get(size_t ndx, const char* msg) const
-        {
-            const auto current_size = size();
-            CollectionBase::validate_index(msg, ndx, current_size);
-
-            return unresolved_to_null(m_tree->get(ndx));
-        }
-        bool clear_backlink(size_t ndx, CascadeState & state) const;
-    };
+    bool clear_backlink(size_t ndx, CascadeState& state) const;
+};
 
 // Specialization of Lst<StringData>:
 template <>
@@ -1032,7 +789,7 @@ private:
 
     UpdateStatus do_update_if_needed() const final
     {
-        return m_list.update_if_needed_with_status();
+        return m_list.update_if_needed();
     }
 
     BPlusTree<ObjKey>* get_mutable_tree() const final

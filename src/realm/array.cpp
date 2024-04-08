@@ -276,88 +276,6 @@ void Array::destroy_children(size_t offset) noexcept
     }
 }
 
-size_t Array::get_byte_size() const noexcept
-{
-    // A and B type array
-    REALM_ASSERT(m_kind == 'A' || m_kind == 'B');
-    const auto header = get_header();
-    auto num_bytes = get_byte_size_from_header(header);
-    auto read_only = m_alloc.is_read_only(m_ref) == true;
-    auto bytes_ok = num_bytes <= get_capacity_from_header(header);
-    REALM_ASSERT(read_only || bytes_ok);
-    REALM_ASSERT_7(m_alloc.is_read_only(m_ref), ==, true, ||, num_bytes, <=, get_capacity_from_header(header));
-    return num_bytes;
-}
-
-ref_type Array::write(_impl::ArrayWriterBase& out, bool deep, bool only_if_modified, bool compress_in_flight) const
-{
-    REALM_ASSERT(is_attached());
-    // The default allocator cannot be trusted wrt is_read_only():
-    REALM_ASSERT(!only_if_modified || &m_alloc != &Allocator::get_default());
-    if (only_if_modified && m_alloc.is_read_only(m_ref))
-        return m_ref;
-
-    if (!deep || !m_has_refs) {
-        // however - creating an array using ANYTHING BUT the default allocator during commit is also wrong....
-        // it only works by accident, because the whole slab area is reinitialized after commit.
-        // We should have: Array encoded_array{Allocator::get_default()};
-        Array encoded_array{Allocator::get_default()};
-        if (compress_in_flight && size() != 0 && encode_array(encoded_array)) {
-            REALM_ASSERT_DEBUG(encoded_array.m_kind == 'B');
-            REALM_ASSERT_DEBUG(
-                encoded_array.m_encoding == Encoding::Flex || encoded_array.m_encoding == Encoding::Packed ||
-                encoded_array.m_encoding == Encoding::AofP || encoded_array.m_encoding == Encoding::PofA);
-            REALM_ASSERT_DEBUG(size() == encoded_array.size());
-#ifdef REALM_DEBUG
-            for (size_t i = 0; i < encoded_array.size(); ++i)
-                REALM_ASSERT_DEBUG(get(i) == encoded_array.get(i));
-#endif
-            auto ref = encoded_array.do_write_shallow(out);
-            encoded_array.destroy();
-            return ref;
-        }
-        return do_write_shallow(out); // Throws
-    }
-
-    return do_write_deep(out, only_if_modified, compress_in_flight); // Throws
-}
-
-ref_type Array::write(ref_type ref, Allocator& alloc, _impl::ArrayWriterBase& out, bool only_if_modified,
-                      bool compress_in_flight)
-{
-    // The default allocator cannot be trusted wrt is_read_only():
-    REALM_ASSERT(!only_if_modified || &alloc != &Allocator::get_default());
-    if (only_if_modified && alloc.is_read_only(ref))
-        return ref;
-
-    Array array(alloc);
-    array.init_from_ref(ref);
-    REALM_ASSERT_DEBUG(array.is_attached());
-
-    if (!array.m_has_refs) {
-        Array encoded_array{Allocator::get_default()};
-        if (compress_in_flight && array.size() != 0 && array.encode_array(encoded_array)) {
-            REALM_ASSERT_DEBUG(encoded_array.m_kind == 'B');
-            REALM_ASSERT_DEBUG(
-                encoded_array.m_encoding == Encoding::Flex || encoded_array.m_encoding == Encoding::Packed ||
-                encoded_array.m_encoding == Encoding::AofP || encoded_array.m_encoding == Encoding::PofA);
-            REALM_ASSERT_DEBUG(array.size() == encoded_array.size());
-#ifdef REALM_DEBUG
-            for (size_t i = 0; i < encoded_array.size(); ++i) {
-                REALM_ASSERT_DEBUG(array.get(i) == encoded_array.get(i));
-            }
-#endif
-            auto ref = encoded_array.do_write_shallow(out);
-            encoded_array.destroy();
-            return ref;
-        }
-        else {
-            return array.do_write_shallow(out); // Throws
-        }
-    }
-    return array.do_write_deep(out, only_if_modified, compress_in_flight); // Throws
-}
-
 
 ref_type Array::do_write_shallow(_impl::ArrayWriterBase& out) const
 {
@@ -371,7 +289,7 @@ ref_type Array::do_write_shallow(_impl::ArrayWriterBase& out) const
 }
 
 
-ref_type Array::do_write_deep(_impl::ArrayWriterBase& out, bool only_if_modified, bool compress) const
+ref_type Array::do_write_deep(_impl::ArrayWriterBase& out, bool only_if_modified) const
 {
     // Temp array for updated refs
     Array new_array(Allocator::get_default());
@@ -1074,45 +992,32 @@ MemRef Array::create(Type type, bool context_flag, WidthType width_type, size_t 
     REALM_ASSERT_7(value, ==, 0, ||, width_type, ==, wtype_Bits);
     REALM_ASSERT_7(size, ==, 0, ||, width_type, !=, wtype_Ignore);
 
-    uint8_t flags = 0;
-    Encoding encoding = Encoding::WTypBits;
-    if (width_type == wtype_Bits)
-        encoding = Encoding::WTypBits;
-    else if (width_type == wtype_Multiply)
-        encoding = Encoding::WTypMult;
-    else if (width_type == wtype_Ignore)
-        encoding = Encoding::WTypIgn;
-    else {
-        REALM_ASSERT(false && "Wrong width type for encoding");
-    }
-
+    bool is_inner_bptree_node = false, has_refs = false;
     switch (type) {
         case type_Normal:
             break;
         case type_InnerBptreeNode:
-            flags |= static_cast<uint8_t>(Flags::HasRefs) | static_cast<uint8_t>(Flags::InnerBPTree);
-
+            is_inner_bptree_node = true;
+            has_refs = true;
             break;
         case type_HasRefs:
-            flags |= static_cast<uint8_t>(Flags::HasRefs);
+            has_refs = true;
             break;
     }
-    if (context_flag)
-        flags |= static_cast<uint8_t>(Flags::Context);
+
     int width = 0;
     size_t byte_size_0 = header_size;
     if (value != 0) {
-        width = static_cast<int>(bit_width(value));
+        width = int(bit_width(value));
         byte_size_0 = calc_aligned_byte_size(size, width); // Throws
     }
     // Adding zero to Array::initial_capacity to avoid taking the
     // address of that member
     size_t byte_size = std::max(byte_size_0, initial_capacity + 0);
-
     MemRef mem = alloc.alloc(byte_size); // Throws
-    const auto header = mem.get_addr();
-    init_header(header, encoding, flags, width, size);
-    set_capacity_in_header(byte_size, header);
+    char* header = mem.get_addr();
+
+    init_header(header, is_inner_bptree_node, has_refs, context_flag, width_type, width, size, byte_size);
 
     if (value != 0) {
         char* data = get_data_from_header(header);
@@ -1238,21 +1143,6 @@ template <size_t width>
 void Array::set(size_t ndx, int64_t value)
 {
     set_direct<width>(m_data, ndx, value);
-}
-
-void Array::_mem_usage(size_t& mem) const noexcept
-{
-    mem += get_byte_size();
-    if (m_has_refs) {
-        for (size_t i = 0; i < m_size; ++i) {
-            int64_t val = get(i);
-            if (val && !(val & 1)) {
-                Array subarray(m_alloc);
-                subarray.init_from_ref(to_ref(val));
-                subarray._mem_usage(mem);
-            }
-        }
-    }
 }
 
 void Array::_mem_usage(size_t& mem) const noexcept
@@ -1467,44 +1357,4 @@ bool QueryStateFindAll<IntegerColumn>::match(size_t index) noexcept
     m_keys.add(index);
 
     return (m_limit > m_match_count);
-}
-
-void Array::typed_print(std::string prefix) const
-{
-    std::cout << "Generic Array " << header_to_string(get_header()) << " @ " << m_ref;
-    if (!is_attached()) {
-        std::cout << " Unattached";
-        return;
-    }
-    if (size() == 0) {
-        std::cout << " Empty" << std::endl;
-        return;
-    }
-    std::cout << " size = " << size() << " {";
-    if (has_refs()) {
-        std::cout << std::endl;
-        for (unsigned n = 0; n < size(); ++n) {
-            auto pref = prefix + "  " + to_string(n) + ":\t";
-            RefOrTagged rot = get_as_ref_or_tagged(n);
-            if (rot.is_ref() && rot.get_as_ref()) {
-                Array a(m_alloc);
-                a.init_from_ref(rot.get_as_ref());
-                std::cout << pref;
-                a.typed_print(pref);
-            }
-            else if (rot.is_tagged()) {
-                std::cout << pref << rot.get_as_int() << std::endl;
-            }
-        }
-        std::cout << prefix << "}" << std::endl;
-    }
-    else {
-        std::cout << " Leaf of unknown type }" << std::endl;
-        /*
-        for (unsigned n = 0; n < size(); ++n) {
-            auto pref = prefix + to_string(n) + ":\t";
-            std::cout << pref << get(n) << std::endl;
-        }
-        */
-    }
 }
