@@ -1113,6 +1113,8 @@ void App::update_location_and_resend(Request&& request, UniqueFunction<void(cons
             }
             request.url = self->get_host_url() + comp.get_value().request;
 
+            self->log_debug("App: send_request(after location update): %1 %2", httpmethod_to_string(request.method),
+                            request.url);
             // Retry the original request with the updated url
             self->m_config.transport->send_request_to_server(
                 std::move(request), [self = std::move(self), completion = std::move(completion)](
@@ -1158,6 +1160,7 @@ void App::do_request(Request&& request, UniqueFunction<void(const Response& resp
         }
     }
 
+    log_debug("App: do_request: %1 %2", httpmethod_to_string(request.method), request.url);
     // If location info has already been updated, then send the request directly
     m_config.transport->send_request_to_server(
         std::move(request), [self = shared_from_this(), completion = std::move(completion)](
@@ -1194,7 +1197,6 @@ void App::do_authenticated_request(Request&& request, const std::shared_ptr<Sync
     request.headers = get_request_headers(sync_user, request.uses_refresh_token ? RequestTokenType::RefreshToken
                                                                                 : RequestTokenType::AccessToken);
 
-    log_debug("App: do_authenticated_request: %1 %2", httpmethod_to_string(request.method), request.url);
     auto completion_2 = [completion = std::move(completion), request, sync_user,
                          self = shared_from_this()](const Response& response) mutable {
         if (auto error = AppUtils::check_for_errors(response)) {
