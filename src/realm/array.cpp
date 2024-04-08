@@ -209,7 +209,6 @@ size_t Array::bit_width(int64_t v)
     return uint64_t(v) >> 31 ? 64 : uint64_t(v) >> 15 ? 32 : uint64_t(v) >> 7 ? 16 : 8;
 }
 
-
 void Array::init_from_mem(MemRef mem) noexcept
 {
     char* header = Node::init_from_mem(mem);
@@ -289,7 +288,7 @@ ref_type Array::do_write_shallow(_impl::ArrayWriterBase& out) const
 }
 
 
-ref_type Array::do_write_deep(_impl::ArrayWriterBase& out, bool only_if_modified) const
+ref_type Array::do_write_deep(_impl::ArrayWriterBase& out, bool only_if_modified, bool compress) const
 {
     // Temp array for updated refs
     Array new_array(Allocator::get_default());
@@ -304,7 +303,7 @@ ref_type Array::do_write_deep(_impl::ArrayWriterBase& out, bool only_if_modified
         bool is_ref = (value != 0 && (value & 1) == 0);
         if (is_ref) {
             ref_type subref = to_ref(value);
-            ref_type new_subref = write(subref, m_alloc, out, only_if_modified); // Throws
+            ref_type new_subref = write(subref, m_alloc, out, only_if_modified, compress); // Throws
             value = from_ref(new_subref);
         }
         new_array.add(value); // Throws
@@ -992,19 +991,31 @@ MemRef Array::create(Type type, bool context_flag, WidthType width_type, size_t 
     REALM_ASSERT_7(value, ==, 0, ||, width_type, ==, wtype_Bits);
     REALM_ASSERT_7(size, ==, 0, ||, width_type, !=, wtype_Ignore);
 
-    bool is_inner_bptree_node = false, has_refs = false;
+    uint8_t flags = 0;
+    Encoding encoding = Encoding::WTypBits;
+    if (width_type == wtype_Bits)
+        encoding = Encoding::WTypBits;
+    else if (width_type == wtype_Multiply)
+        encoding = Encoding::WTypMult;
+    else if (width_type == wtype_Ignore)
+        encoding = Encoding::WTypIgn;
+    else {
+        REALM_ASSERT(false && "Wrong width type for encoding");
+    }
+
     switch (type) {
         case type_Normal:
             break;
         case type_InnerBptreeNode:
-            is_inner_bptree_node = true;
-            has_refs = true;
+            flags |= static_cast<uint8_t>(Flags::HasRefs) | static_cast<uint8_t>(Flags::InnerBPTree);
+
             break;
         case type_HasRefs:
-            has_refs = true;
+            flags |= static_cast<uint8_t>(Flags::HasRefs);
             break;
     }
-
+    if (context_flag)
+        flags |= static_cast<uint8_t>(Flags::Context);
     int width = 0;
     size_t byte_size_0 = header_size;
     if (value != 0) {
@@ -1015,12 +1026,12 @@ MemRef Array::create(Type type, bool context_flag, WidthType width_type, size_t 
     // address of that member
     size_t byte_size = std::max(byte_size_0, initial_capacity + 0);
     MemRef mem = alloc.alloc(byte_size); // Throws
-    char* header = mem.get_addr();
+    auto header = mem.get_addr();
 
-    init_header(header, is_inner_bptree_node, has_refs, context_flag, width_type, width, size, byte_size);
-
+    init_header(header, encoding, flags, width, size);
+    set_capacity_in_header(byte_size, mem.get_addr());
     if (value != 0) {
-        char* data = get_data_from_header(header);
+        char* data = get_data_from_header(mem.get_addr());
         size_t begin = 0, end = size;
         REALM_TEMPEX(fill_direct, width, (data, begin, end, value));
     }
@@ -1357,4 +1368,44 @@ bool QueryStateFindAll<IntegerColumn>::match(size_t index) noexcept
     m_keys.add(index);
 
     return (m_limit > m_match_count);
+}
+
+void Array::typed_print(std::string prefix) const
+{
+    std::cout << "Generic Array " << header_to_string(get_header()) << " @ " << m_ref;
+    if (!is_attached()) {
+        std::cout << " Unattached";
+        return;
+    }
+    if (size() == 0) {
+        std::cout << " Empty" << std::endl;
+        return;
+    }
+    std::cout << " size = " << size() << " {";
+    if (has_refs()) {
+        std::cout << std::endl;
+        for (unsigned n = 0; n < size(); ++n) {
+            auto pref = prefix + "  " + to_string(n) + ":\t";
+            RefOrTagged rot = get_as_ref_or_tagged(n);
+            if (rot.is_ref() && rot.get_as_ref()) {
+                Array a(m_alloc);
+                a.init_from_ref(rot.get_as_ref());
+                std::cout << pref;
+                a.typed_print(pref);
+            }
+            else if (rot.is_tagged()) {
+                std::cout << pref << rot.get_as_int() << std::endl;
+            }
+        }
+        std::cout << prefix << "}" << std::endl;
+    }
+    else {
+        std::cout << " Leaf of unknown type }" << std::endl;
+        /*
+        for (unsigned n = 0; n < size(); ++n) {
+            auto pref = prefix + to_string(n) + ":\t";
+            std::cout << pref << get(n) << std::endl;
+        }
+        */
+    }
 }

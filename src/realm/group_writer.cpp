@@ -660,7 +660,7 @@ ref_type GroupWriter::write_group()
     // commit), as that would lead to clobbering of the previous database
     // version.
     bool deep = true, only_if_modified = true;
-    bool compress = true; // true;
+    bool compress = true;
     std::unique_ptr<InMemoryWriter> in_memory_writer;
     _impl::ArrayWriterBase* writer = this;
     if (m_alloc.is_in_memory()) {
@@ -706,7 +706,7 @@ ref_type GroupWriter::write_group()
             for (auto index : m_evacuation_progress) {
                 arr.add(int64_t(index));
             }
-            ref = arr.write(*writer, false, only_if_modified);
+            ref = arr.write(*writer, false, only_if_modified, compress);
             top.set_as_ref(Group::s_evacuation_point_ndx, ref);
         }
         else if (ref) {

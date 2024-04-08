@@ -222,7 +222,7 @@ protected:
 
         uint64_t get(size_t ndx) const
         {
-            return (m_data != nullptr) ? ArrayUnsigned::get(ndx) : uint64_t(ndx);
+            return is_attached() ? ArrayUnsigned::get(ndx) : uint64_t(ndx);
         }
     };
 
@@ -324,7 +324,7 @@ public:
                                  bool only_modified, bool compress) const override;
     virtual void typed_print(std::string prefix, const Table& table) const override;
     static void remove_backlinks(const Table* origin_table, ObjKey origin_key, ColKey col,
-                                 const std::vector<ObjLink>& links, CascadeState& state);
+                                 const std::vector<ObjKey>& keys, CascadeState& state);
     static void remove_backlinks(const Table* origin_table, ObjKey origin_key, ColKey col,
                                  const std::vector<ObjLink>& links, CascadeState& state);
 
