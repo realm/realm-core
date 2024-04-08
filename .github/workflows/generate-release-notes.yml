@@ -1,0 +1,57 @@
+name: "Post Release Tasks"
+# this must be triggered manually
+on: workflow_dispatch
+jobs:
+  changelog:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: uses: actions/checkout@v3
+      with:
+        submodules: false
+    - name: Read version
+      id: get-version
+      run: |
+        realm_version=$(sed -rn 's/^VERSION: (.*)/\1/p' < "dependencies.yml")
+        echo "version=$realm_version" >> $GITHUB_OUTPUT
+      shell: bash
+    - name: Extract Release Notes Section
+      run: |
+        awk '/^#.*Release notes/{if(++i>1)exit} i' CHANGELOG.md > extracted_changelog.md
+      shell: bash
+    - name: Publish Github Release
+      uses: ncipollo/release-action@3ac4132803a6419fa2a7f4e9dbd1d93fceb690b9
+      with:
+        bodyFile: extracted_changelog.md
+        name: ${{ steps.get-version.outputs.version }}
+        commit: master
+        tag: ${{ steps.get-version.outputs.version }}
+        token: ${{ secrets.GITHUB_TOKEN }}
+        draft: false
+    - name: Update Changelog
+      run: |
+        cat "doc/CHANGELOG_template.md" "CHANGELOG.md" > temp_file.md; mv temp_file.md "CHANGELOG.md"
+      shell: bash
+    - name: Create vNext PR
+      id: vnext-pr
+      uses: peter-evans/create-pull-request@6c704eb7a8ba1daa13da0dcea9bb93a4fe530275
+      with:
+        branch: prepare-vnext
+        title: Prepare for vNext
+        body: Update Changelog for vNext
+        delete-branch: true
+        base: master
+        commit-message: Prepare for vNext
+    - name: Merge Pull Request
+      uses: juliangruber/merge-pull-request-action@333730196b34b74936aad75a4e31c23a57582d14
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        number: ${{ steps.vnext-pr.outputs.pull-request-number }}
+        method: squash
+    - name: 'Post to #realm-releases'
+      uses: realm/ci-actions/release-to-slack@fa20eb972b9f018654fdb4e2c7afb52b0532f907
+      with:
+        changelog: extracted_changelog.md
+        sdk: Core
+        webhook-url: ${{ secrets.SLACK_RELEASE_WEBHOOK }}
+        version: ${{ steps.get-version.outputs.version }}
