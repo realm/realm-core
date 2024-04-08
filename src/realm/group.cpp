@@ -948,7 +948,7 @@ ref_type Group::typed_write_tables(_impl::ArrayWriterBase& out, bool deep, bool 
         return ref;
     Array a(m_alloc);
     a.init_from_ref(ref);
-    REALM_ASSERT(a.has_refs());
+    REALM_ASSERT_DEBUG(a.has_refs());
     Array dest(Allocator::get_default());
     dest.create(NodeHeader::type_HasRefs, false, a.size());
     for (unsigned j = 0; j < a.size(); ++j) {
@@ -958,7 +958,7 @@ ref_type Group::typed_write_tables(_impl::ArrayWriterBase& out, bool deep, bool 
         }
         else {
             auto table = do_get_table(j);
-            REALM_ASSERT(table);
+            REALM_ASSERT_DEBUG(table);
             dest.set_as_ref(j, table->typed_write(rot.get_as_ref(), out, deep, only_modified, compress));
         }
     }

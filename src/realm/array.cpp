@@ -1019,17 +1019,17 @@ MemRef Array::create(Type type, bool context_flag, WidthType width_type, size_t 
     int width = 0;
     size_t byte_size_0 = header_size;
     if (value != 0) {
-        width = int(bit_width(value));
+        width = static_cast<int>(bit_width(value));
         byte_size_0 = calc_aligned_byte_size(size, width); // Throws
     }
     // Adding zero to Array::initial_capacity to avoid taking the
     // address of that member
     size_t byte_size = std::max(byte_size_0, initial_capacity + 0);
     MemRef mem = alloc.alloc(byte_size); // Throws
-    auto header = mem.get_addr();
+    const auto header = mem.get_addr();
 
     init_header(header, encoding, flags, width, size);
-    set_capacity_in_header(byte_size, mem.get_addr());
+    set_capacity_in_header(byte_size, header);
     if (value != 0) {
         char* data = get_data_from_header(mem.get_addr());
         size_t begin = 0, end = size;
@@ -1401,11 +1401,5 @@ void Array::typed_print(std::string prefix) const
     }
     else {
         std::cout << " Leaf of unknown type }" << std::endl;
-        /*
-        for (unsigned n = 0; n < size(); ++n) {
-            auto pref = prefix + to_string(n) + ":\t";
-            std::cout << pref << get(n) << std::endl;
-        }
-        */
     }
 }
