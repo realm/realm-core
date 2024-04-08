@@ -216,6 +216,12 @@ void ArrayMixed::clear()
     Array::set(payload_idx_pair, 0);
     Array::set(payload_idx_str, 0);
     Array::set(payload_idx_ref, 0);
+    if (Array::size() > payload_idx_key) {
+        if (auto ref = Array::get_as_ref(payload_idx_key)) {
+            Array::destroy(ref, m_composite.get_alloc());
+            Array::set(payload_idx_key, 0);
+        }
+    }
 }
 
 void ArrayMixed::erase(size_t ndx)
@@ -289,9 +295,12 @@ bool ArrayMixed::ensure_keys()
 
 size_t ArrayMixed::find_key(int64_t key) const noexcept
 {
-    Array keys(Array::get_alloc());
-    ensure_array_accessor(keys, payload_idx_key);
-    return keys.find_first(key);
+    if (ref_type ref = get_as_ref(payload_idx_key)) {
+        Array keys(Array::get_alloc());
+        keys.init_from_ref(ref);
+        return keys.find_first(key);
+    }
+    return realm::not_found;
 }
 
 void ArrayMixed::set_key(size_t ndx, int64_t key)

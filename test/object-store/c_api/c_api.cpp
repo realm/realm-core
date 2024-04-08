@@ -5283,8 +5283,8 @@ TEST_CASE("C API: nested collections", "[c_api]") {
             }
         };
         auto require_change = [&]() {
-            auto token = cptr_checked(
-                realm_list_add_notification_callback(nested_list.get(), &user_data, nullptr, nullptr, on_list_change));
+            auto token = cptr_checked(realm_list_add_notification_callback(nested_list.get(), &user_data, nullptr,
+                                                                           nullptr, on_list_change));
             checked(realm_refresh(realm, nullptr));
             return token;
         };
