@@ -187,132 +187,131 @@ void CollectionParent::set_key(BPlusTreeMixed& tree, size_t index)
 
 } // namespace realm
 
-                return std::make_unique<Lst<util::Optional<Double>>>(col_key);
-            else
-                return std::make_unique<Lst<Double>>(col_key);
-        }
-        case type_String: {
-            return std::make_unique<Lst<String>>(col_key);
-        }
-        case type_Binary: {
-            return std::make_unique<Lst<Binary>>(col_key);
-        }
-        case type_Timestamp: {
-            return std::make_unique<Lst<Timestamp>>(col_key);
-        }
-        case type_Decimal: {
-            return std::make_unique<Lst<Decimal128>>(col_key);
-        }
-        case type_ObjectId: {
-            if (nullable)
-                return std::make_unique<Lst<util::Optional<ObjectId>>>(col_key);
-            else
-                return std::make_unique<Lst<ObjectId>>(col_key);
-        }
-        case type_UUID: {
-            if (nullable)
-                return std::make_unique<Lst<util::Optional<UUID>>>(col_key);
-            else
-                return std::make_unique<Lst<UUID>>(col_key);
-        }
-        case type_TypedLink: {
-            return std::make_unique<Lst<ObjLink>>(col_key);
-        }
-        case type_Mixed: {
-            return std::make_unique<Lst<Mixed>>(col_key, get_level() + 1);
-        }
-        case type_Link:
-            return std::make_unique<LnkLst>(col_key);
+return std::make_unique<Lst<util::Optional<Double>>>(col_key);
+else return std::make_unique<Lst<Double>>(col_key);
+}
+case type_String: {
+    return std::make_unique<Lst<String>>(col_key);
+}
+case type_Binary: {
+    return std::make_unique<Lst<Binary>>(col_key);
+}
+case type_Timestamp: {
+    return std::make_unique<Lst<Timestamp>>(col_key);
+}
+case type_Decimal: {
+    return std::make_unique<Lst<Decimal128>>(col_key);
+}
+case type_ObjectId: {
+    if (nullable)
+        return std::make_unique<Lst<util::Optional<ObjectId>>>(col_key);
+    else
+        return std::make_unique<Lst<ObjectId>>(col_key);
+}
+case type_UUID: {
+    if (nullable)
+        return std::make_unique<Lst<util::Optional<UUID>>>(col_key);
+    else
+        return std::make_unique<Lst<UUID>>(col_key);
+}
+case type_TypedLink: {
+    return std::make_unique<Lst<ObjLink>>(col_key);
+}
+case type_Mixed: {
+    return std::make_unique<Lst<Mixed>>(col_key, get_level() + 1);
+}
+case type_Link:
+    return std::make_unique<LnkLst>(col_key);
     }
     REALM_TERMINATE("Unsupported column type");
-}
-
-SetBasePtr CollectionParent::get_setbase_ptr(ColKey col_key) const
-{
-    auto table = get_table();
-    auto attr = table->get_column_attr(col_key);
-    REALM_ASSERT(attr.test(col_attr_Set));
-    bool nullable = attr.test(col_attr_Nullable);
-
-    switch (table->get_column_type(col_key)) {
-        case type_Int:
-            if (nullable)
-                return std::make_unique<Set<util::Optional<Int>>>(col_key);
-            return std::make_unique<Set<Int>>(col_key);
-        case type_Bool:
-            if (nullable)
-                return std::make_unique<Set<util::Optional<Bool>>>(col_key);
-            return std::make_unique<Set<Bool>>(col_key);
-        case type_Float:
-            if (nullable)
-                return std::make_unique<Set<util::Optional<Float>>>(col_key);
-            return std::make_unique<Set<Float>>(col_key);
-        case type_Double:
-            if (nullable)
-                return std::make_unique<Set<util::Optional<Double>>>(col_key);
-            return std::make_unique<Set<Double>>(col_key);
-        case type_String:
-            return std::make_unique<Set<String>>(col_key);
-        case type_Binary:
-            return std::make_unique<Set<Binary>>(col_key);
-        case type_Timestamp:
-            return std::make_unique<Set<Timestamp>>(col_key);
-        case type_Decimal:
-            return std::make_unique<Set<Decimal128>>(col_key);
-        case type_ObjectId:
-            if (nullable)
-                return std::make_unique<Set<util::Optional<ObjectId>>>(col_key);
-            return std::make_unique<Set<ObjectId>>(col_key);
-        case type_UUID:
-            if (nullable)
-                return std::make_unique<Set<util::Optional<UUID>>>(col_key);
-            return std::make_unique<Set<UUID>>(col_key);
-        case type_TypedLink:
-            return std::make_unique<Set<ObjLink>>(col_key);
-        case type_Mixed:
-            return std::make_unique<Set<Mixed>>(col_key);
-        case type_Link:
-            return std::make_unique<LnkSet>(col_key);
     }
-    REALM_TERMINATE("Unsupported column type.");
-}
 
-CollectionBasePtr CollectionParent::get_collection_ptr(ColKey col_key) const
-{
-    if (col_key.is_list()) {
-        return get_listbase_ptr(col_key);
-    }
-    else if (col_key.is_set()) {
-        return get_setbase_ptr(col_key);
-    }
-    else if (col_key.is_dictionary()) {
-        return std::make_unique<Dictionary>(col_key, get_level() + 1);
-    }
-    return {};
-}
+    SetBasePtr CollectionParent::get_setbase_ptr(ColKey col_key) const
+    {
+        auto table = get_table();
+        auto attr = table->get_column_attr(col_key);
+        REALM_ASSERT(attr.test(col_attr_Set));
+        bool nullable = attr.test(col_attr_Nullable);
 
-
-int64_t CollectionParent::generate_key(size_t sz)
-{
-    static std::mt19937 gen32;
-    static std::mutex mutex;
-
-    int64_t key;
-    const std::lock_guard<std::mutex> lock(mutex);
-    do {
-        if (sz < 0x10) {
-            key = int8_t(gen32());
+        switch (table->get_column_type(col_key)) {
+            case type_Int:
+                if (nullable)
+                    return std::make_unique<Set<util::Optional<Int>>>(col_key);
+                return std::make_unique<Set<Int>>(col_key);
+            case type_Bool:
+                if (nullable)
+                    return std::make_unique<Set<util::Optional<Bool>>>(col_key);
+                return std::make_unique<Set<Bool>>(col_key);
+            case type_Float:
+                if (nullable)
+                    return std::make_unique<Set<util::Optional<Float>>>(col_key);
+                return std::make_unique<Set<Float>>(col_key);
+            case type_Double:
+                if (nullable)
+                    return std::make_unique<Set<util::Optional<Double>>>(col_key);
+                return std::make_unique<Set<Double>>(col_key);
+            case type_String:
+                return std::make_unique<Set<String>>(col_key);
+            case type_Binary:
+                return std::make_unique<Set<Binary>>(col_key);
+            case type_Timestamp:
+                return std::make_unique<Set<Timestamp>>(col_key);
+            case type_Decimal:
+                return std::make_unique<Set<Decimal128>>(col_key);
+            case type_ObjectId:
+                if (nullable)
+                    return std::make_unique<Set<util::Optional<ObjectId>>>(col_key);
+                return std::make_unique<Set<ObjectId>>(col_key);
+            case type_UUID:
+                if (nullable)
+                    return std::make_unique<Set<util::Optional<UUID>>>(col_key);
+                return std::make_unique<Set<UUID>>(col_key);
+            case type_TypedLink:
+                return std::make_unique<Set<ObjLink>>(col_key);
+            case type_Mixed:
+                return std::make_unique<Set<Mixed>>(col_key);
+            case type_Link:
+                return std::make_unique<LnkSet>(col_key);
         }
-        else if (sz < 0x1000) {
-            key = int16_t(gen32());
+        REALM_TERMINATE("Unsupported column type.");
+    }
+
+    CollectionBasePtr CollectionParent::get_collection_ptr(ColKey col_key) const
+    {
+        if (col_key.is_list()) {
+            return get_listbase_ptr(col_key);
         }
-        else {
-            key = int32_t(gen32());
+        else if (col_key.is_set()) {
+            return get_setbase_ptr(col_key);
         }
-    } while (key == 0);
+        else if (col_key.is_dictionary()) {
+            return std::make_unique<Dictionary>(col_key, get_level() + 1);
+        }
+        return {};
+    }
 
-    return key;
-}
+
+    int64_t CollectionParent::generate_key(size_t sz)
+    {
+        static std::mt19937 gen32;
+        static std::mutex mutex;
+
+        int64_t key;
+        const std::lock_guard<std::mutex> lock(mutex);
+        do {
+            if (sz < 0x10) {
+                key = int8_t(gen32());
+            }
+            else if (sz < 0x1000) {
+                key = int16_t(gen32());
+            }
+            else {
+                key = int32_t(gen32());
+            }
+        } while (key == 0);
+
+        return key;
+    }
 
 
-} // namespace realm
+    } // namespace realm

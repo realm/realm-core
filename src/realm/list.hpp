@@ -531,18 +531,17 @@ private:
     }
 
 
-template <>
-class Lst<Mixed> final : public CollectionBaseImpl<LstBase>, public CollectionParent {
-public:
-    using Base = CollectionBaseImpl<LstBase>;
-    using iterator = LstIterator<Mixed>;
-    using value_type = Mixed;
+    template <>
+    class Lst<Mixed> final : public CollectionBaseImpl<LstBase>, public CollectionParent {
+    public:
+        using Base = CollectionBaseImpl<LstBase>;
+        using iterator = LstIterator<Mixed>;
+        using value_type = Mixed;
 
-    Lst() = default;
-    Lst(const Obj& owner, ColKey col_key)
-        : Lst(col_key)
-    }
-    Lst(ColKey col_key, size_t level = 1)
+        Lst() = default;
+        Lst(const Obj& owner, ColKey col_key)
+            : Lst(col_key)
+    } Lst(ColKey col_key, size_t level = 1)
         : Base(col_key)
         , CollectionParent(level)
     {
@@ -773,19 +772,19 @@ private:
                 func(i);
             }
         }
-    static Mixed unresolved_to_null(Mixed value) noexcept
-    {
-        return value.is_unresolved_link() ? Mixed{} : value;
-    }
-    Mixed do_get(size_t ndx, const char* msg) const
-    {
-        const auto current_size = size();
-        CollectionBase::validate_index(msg, ndx, current_size);
+        static Mixed unresolved_to_null(Mixed value) noexcept
+        {
+            return value.is_unresolved_link() ? Mixed{} : value;
+        }
+        Mixed do_get(size_t ndx, const char* msg) const
+        {
+            const auto current_size = size();
+            CollectionBase::validate_index(msg, ndx, current_size);
 
-        return unresolved_to_null(m_tree->get(ndx));
-    }
-    bool clear_backlink(size_t ndx, CascadeState& state) const;
-};
+            return unresolved_to_null(m_tree->get(ndx));
+        }
+        bool clear_backlink(size_t ndx, CascadeState & state) const;
+    };
 
 // Specialization of Lst<StringData>:
 template <>

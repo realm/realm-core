@@ -122,9 +122,9 @@ bool SetBase::intersects(It1 first, It2 last) const
     auto it = begin();
     while (it != end() && first != last) {
         if (*it < *first) {
-        if (less(*it, *first)) {
-            ++it;
-        }
+            if (less(*it, *first)) {
+                ++it;
+            }
         else if (*first < *it) {
             ++first;
         }
@@ -285,16 +285,16 @@ void SetBase::resort_range(size_t start, size_t end)
     indices.resize(end - start);
     std::iota(indices.begin(), indices.end(), 0);
     std::sort(indices.begin(), indices.end(), [&](auto a, auto b) {
-        return get_any(a + start) < get_any(b + start);
-    for (size_t i = 0; i < indices.size(); ++i) {
-        if (indices[i] != i) {
-            m_tree->swap(i + start, start + indices[i]);
-            auto it = std::find(indices.begin() + i, indices.end(), i);
-            REALM_ASSERT(it != indices.end());
-            *it = indices[i];
-            indices[i] = i;
-        }
-    }
+            return get_any(a + start) < get_any(b + start);
+            for (size_t i = 0; i < indices.size(); ++i) {
+                if (indices[i] != i) {
+                    m_tree->swap(i + start, start + indices[i]);
+                    auto it = std::find(indices.begin() + i, indices.end(), i);
+                    REALM_ASSERT(it != indices.end());
+                    *it = indices[i];
+                    indices[i] = i;
+                }
+            }
 }
 
 /********************************* Set<Key> *********************************/
@@ -303,53 +303,53 @@ template <>
 void CollectionBaseImpl<SetBase>::to_json(std::ostream& out, JSONOutputMode output_mode,
                                           util::FunctionRef<void(const Mixed&)> fn) const
 {
-    if (output_mode == output_mode_xjson_plus) {
-        out << "{ \"$set\": ";
-    }
+            if (output_mode == output_mode_xjson_plus) {
+                out << "{ \"$set\": ";
+            }
 
-    out << "[";
-    auto sz = size();
-    for (size_t i = 0; i < sz; i++) {
-        if (i > 0)
-            out << ",";
-        Mixed val = get_any(i);
-        if (val.is_type(type_Link, type_TypedLink)) {
-            fn(val);
-        }
-        else {
-            val.to_json(out, output_mode);
-        }
-    }
-    out << "]";
-    if (output_mode == output_mode_xjson_plus) {
-        out << "}";
-    }
+            out << "[";
+            auto sz = size();
+            for (size_t i = 0; i < sz; i++) {
+                if (i > 0)
+                    out << ",";
+                Mixed val = get_any(i);
+                if (val.is_type(type_Link, type_TypedLink)) {
+                    fn(val);
+                }
+                else {
+                    val.to_json(out, output_mode);
+                }
+            }
+            out << "]";
+            if (output_mode == output_mode_xjson_plus) {
+                out << "}";
+            }
 }
 
 bool SetBase::do_init_from_parent(ref_type ref, bool allow_create) const
 {
-    try {
-        if (ref) {
-            m_tree->init_from_ref(ref);
-        }
-        else {
-            if (m_tree->init_from_parent()) {
-                // All is well
-                return true;
+            try {
+                if (ref) {
+                    m_tree->init_from_ref(ref);
+                }
+                else {
+                    if (m_tree->init_from_parent()) {
+                        // All is well
+                        return true;
+                    }
+                    if (!allow_create) {
+                        return false;
+                    }
+                    // The ref in the column was NULL, create the tree in place.
+                    m_tree->create();
+                    REALM_ASSERT(m_tree->is_attached());
+                }
             }
-            if (!allow_create) {
-                return false;
+            catch (...) {
+                m_tree->detach();
+                throw;
             }
-            // The ref in the column was NULL, create the tree in place.
-            m_tree->create();
-            REALM_ASSERT(m_tree->is_attached());
-        }
-    }
-    catch (...) {
-        m_tree->detach();
-        throw;
-    }
-    return true;
+            return true;
 }
 
 /********************************* Set<Key> *********************************/
@@ -526,26 +526,26 @@ void Set<BinaryData>::migration_resort()
 template <>
 void Set<Mixed>::migration_resort()
 {
-    // sort order of strings and binaries changed
-    auto first_string = std::lower_bound(begin(), end(), StringData(""));
-    auto last_binary = std::partition_point(first_string, end(), [](const Mixed& item) {
-        return item.is_type(type_String, type_Binary);
-    });
-    do_resort(first_string.index(), last_binary.index());
+            // sort order of strings and binaries changed
+            auto first_string = std::lower_bound(begin(), end(), StringData(""));
+            auto last_binary = std::partition_point(first_string, end(), [](const Mixed& item) {
+                return item.is_type(type_String, type_Binary);
+            });
+            do_resort(first_string.index(), last_binary.index());
 }
 
 template <>
 void Set<StringData>::migration_resort()
 {
-    // sort order of strings changed
-    do_resort(0, size());
+            // sort order of strings changed
+            do_resort(0, size());
 }
 
 template <>
 void Set<BinaryData>::migration_resort()
 {
-    // sort order of binaries changed
-    do_resort(0, size());
+            // sort order of binaries changed
+            do_resort(0, size());
 }
 
 void LnkSet::remove_target_row(size_t link_ndx)
@@ -565,17 +565,17 @@ void LnkSet::remove_all_target_rows()
 
 void LnkSet::to_json(std::ostream& out, JSONOutputMode, util::FunctionRef<void(const Mixed&)> fn) const
 {
-    out << "[";
+            out << "[";
 
-    auto sz = m_set.size();
-    for (size_t i = 0; i < sz; i++) {
-        if (i > 0)
-            out << ",";
-        Mixed val(m_set.get(i));
-        fn(val);
-    }
+            auto sz = m_set.size();
+            for (size_t i = 0; i < sz; i++) {
+                if (i > 0)
+                    out << ",";
+                Mixed val(m_set.get(i));
+                fn(val);
+            }
 
-    out << "]";
+            out << "]";
 }
 
 

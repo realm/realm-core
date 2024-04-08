@@ -541,9 +541,9 @@ UpdateStatus Set<T>::init_from_parent(bool allow_create) const
     }
     return do_init_from_parent(m_tree.get(), Base::get_collection_ref(), allow_create);
 }
-        m_tree->set_parent(const_cast<ArrayParent*>(parent), 0);
-    }
-    return do_init_from_parent(Base::get_collection_ref(), allow_create);
+m_tree->set_parent(const_cast<ArrayParent*>(parent), 0);
+}
+return do_init_from_parent(Base::get_collection_ref(), allow_create);
 }
 
 template <typename U>

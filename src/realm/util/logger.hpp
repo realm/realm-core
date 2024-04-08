@@ -498,7 +498,7 @@ protected:
 };
 
 /// A logger that performs a noop when logging functions are called
-    void do_log(const LogCategory&, Level, const std::string&) override {}
+void do_log(const LogCategory&, Level, const std::string&) override {}
 // Implementation
 
 template <class... Params>

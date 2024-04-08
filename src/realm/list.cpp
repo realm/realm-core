@@ -570,23 +570,23 @@ std::shared_ptr<Lst<Mixed>> Lst<Mixed>::get_list(const PathElement& path_elem) c
     return ret;
 }
 
-    Mixed new_val(0, dict_or_list);
+Mixed new_val(0, dict_or_list);
 
-    check_level();
+check_level();
 
-    if (old_val != new_val) {
-        m_tree->ensure_keys();
-        set(ndx, new_val);
-        int64_t key = m_tree->get_key(ndx);
-        if (key == 0) {
-            key = generate_key(size());
-            while (m_tree->find_key(key) != realm::not_found) {
-                key++;
-            }
-            m_tree->set_key(ndx, key);
+if (old_val != new_val) {
+    m_tree->ensure_keys();
+    set(ndx, new_val);
+    int64_t key = m_tree->get_key(ndx);
+    if (key == 0) {
+        key = generate_key(size());
+        while (m_tree->find_key(key) != realm::not_found) {
+            key++;
         }
-        bump_content_version();
+        m_tree->set_key(ndx, key);
     }
+    bump_content_version();
+}
 }
 
 DictionaryPtr Lst<Mixed>::get_dictionary(const PathElement& path_elem) const
@@ -899,10 +899,10 @@ bool Lst<Mixed>::remove_backlinks(CascadeState& state) const
 }
 
 /********************************** LnkLst ***********************************/
-            recurse = true;
-        }
-    }
-    return recurse;
+recurse = true;
+}
+}
+return recurse;
 }
 
 bool Lst<Mixed>::update_if_needed() const

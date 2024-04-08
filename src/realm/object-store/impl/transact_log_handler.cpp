@@ -377,9 +377,10 @@ public:
                 // If there are multiple exact matches for this collection we
                 // use the first and then propagate the data to the others later
                 else if (!m_active_collection) {
-                else {
-                    m_active_collection = c.changes;
-                }
+                    else
+                    {
+                        m_active_collection = c.changes;
+                    }
                 }
             }
         }

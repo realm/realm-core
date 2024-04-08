@@ -3185,8 +3185,8 @@ protected:
                     for (size_t j = 0; j < s; j++) {
                         destination.set(j, list.get(j));
                     }
-                        }
-                    }
+                }
+            }
                 }
             }
         }
@@ -3381,13 +3381,12 @@ public:
             m_key_type = m_link_map.get_target_table()->get_dictionary_key_type(m_column_key);
         }
         init_path(&path[1], &path[1] + path_size - 1);
-        }
-        init_path(&path[1], &path[1] + path_size - 1);
+    }
+    init_path(&path[1], &path[1] + path_size - 1);
     // Change the node to handle a specific key value only
-    Columns<Dictionary>& key(StringData key)
-        PathElement p(key);
-        init_path(&p, &p + 1);
-        return *this;
+    Columns<Dictionary>& key(StringData key) PathElement p(key);
+    init_path(&p, &p + 1);
+    return *this;
     }
 
     // Change the node to handle a specific key value only
@@ -3417,7 +3416,7 @@ public:
     SizeOperator<int64_t> size() override;
     std::unique_ptr<Subexpr> get_element_length() override
 
-    SizeOperator<int64_t> size() override;
+        SizeOperator<int64_t> size() override;
     std::unique_ptr<Subexpr> get_element_length() override
     {
         // Not supported for Dictionary

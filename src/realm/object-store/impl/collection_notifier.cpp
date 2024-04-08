@@ -399,48 +399,48 @@ void CollectionNotifier::after_advance()
         auto elapsed = duration_cast<microseconds>(now - m_run_time_point);
         lock.unlock_unchecked();
         log_changeset(m_logger.get(), changes, m_description, elapsed);
-            m_logger->log(util::LogCategory::notification, util::Logger::Level::debug,
-                          "Delivering notifications for %1 after %2 us", m_description,
-                          duration_cast<microseconds>(t1 - m_run_time_point).count());
-            if (m_logger->would_log(util::Logger::Level::trace)) {
-                if (changes.empty()) {
-                    m_logger->log(util::LogCategory::notification, util::Logger::Level::trace, "   No changes");
+        m_logger->log(util::LogCategory::notification, util::Logger::Level::debug,
+                      "Delivering notifications for %1 after %2 us", m_description,
+                      duration_cast<microseconds>(t1 - m_run_time_point).count());
+        if (m_logger->would_log(util::Logger::Level::trace)) {
+            if (changes.empty()) {
+                m_logger->log(util::LogCategory::notification, util::Logger::Level::trace, "   No changes");
+            }
+            else {
+                if (changes.collection_root_was_deleted) {
+                    m_logger->log(util::LogCategory::notification, util::Logger::Level::trace,
+                                  "   collection deleted");
+                }
+                else if (changes.collection_was_cleared) {
+                    m_logger->log(util::LogCategory::notification, util::Logger::Level::trace,
+                                  "   collection cleared");
                 }
                 else {
-                    if (changes.collection_root_was_deleted) {
-                        m_logger->log(util::LogCategory::notification, util::Logger::Level::trace,
-                                      "   collection deleted");
-                    }
-                    else if (changes.collection_was_cleared) {
-                        m_logger->log(util::LogCategory::notification, util::Logger::Level::trace,
-                                      "   collection cleared");
-                    }
-                    else {
-                        auto log = [this](const char* change, const IndexSet& index_set) {
-                            if (auto cnt = index_set.count()) {
-                                std::ostringstream ostr;
-                                bool first = true;
-                                for (auto [a, b] : index_set) {
-                                    if (!first)
-                                        ostr << ',';
-                                    if (b > a + 1) {
-                                        ostr << '[' << a << ',' << b - 1 << ']';
-                                    }
-                                    else {
-                                        ostr << a;
-                                    }
-                                    first = false;
+                    auto log = [this](const char* change, const IndexSet& index_set) {
+                        if (auto cnt = index_set.count()) {
+                            std::ostringstream ostr;
+                            bool first = true;
+                            for (auto [a, b] : index_set) {
+                                if (!first)
+                                    ostr << ',';
+                                if (b > a + 1) {
+                                    ostr << '[' << a << ',' << b - 1 << ']';
                                 }
-                                m_logger->log(util::LogCategory::notification, util::Logger::Level::trace,
-                                              "   %1 %2: %3", cnt, change, ostr.str().c_str());
+                                else {
+                                    ostr << a;
+                                }
+                                first = false;
                             }
-                        };
-                        log("deletions", changes.deletions);
-                        log("insertions", changes.insertions);
-                        log("modifications", changes.modifications);
-                    }
+                            m_logger->log(util::LogCategory::notification, util::Logger::Level::trace, "   %1 %2: %3",
+                                          cnt, change, ostr.str().c_str());
+                        }
+                    };
+                    log("deletions", changes.deletions);
+                    log("insertions", changes.insertions);
+                    log("modifications", changes.modifications);
                 }
             }
+        }
         }
         cb.after(changes);
     });

@@ -415,7 +415,6 @@ private:
     bool compare_values(Mixed, Mixed, ColKey, Obj, StringData) const;
     bool compare_list_in_mixed(Lst<Mixed>&, Lst<Mixed>&, ColKey, Obj, StringData) const;
     bool compare_dict_in_mixed(Dictionary&, Dictionary&, ColKey, Obj, StringData) const;
-
 };
 static_assert(std::is_trivially_destructible_v<Obj>);
 

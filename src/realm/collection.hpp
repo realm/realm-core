@@ -753,18 +753,18 @@ protected:
     {
         check_parent();
         return m_parent->get_object().remove_backlink(col_key, old_link, state);
-    // Used when replacing a link, return true if CascadeState contains objects to remove
-    bool replace_backlink(ColKey col_key, ObjLink old_link, ObjLink new_link, CascadeState& state) const
-    {
-        check_parent();
-        return m_parent->replace_backlink(col_key, old_link, new_link, state);
-    }
-    // Used when removing a backlink, return true if CascadeState contains objects to remove
-    bool remove_backlink(ColKey col_key, ObjLink old_link, CascadeState& state) const
-    {
-        check_parent();
-        return m_parent->remove_backlink(col_key, old_link, state);
-    }
+        // Used when replacing a link, return true if CascadeState contains objects to remove
+        bool replace_backlink(ColKey col_key, ObjLink old_link, ObjLink new_link, CascadeState & state) const
+        {
+            check_parent();
+            return m_parent->replace_backlink(col_key, old_link, new_link, state);
+        }
+        // Used when removing a backlink, return true if CascadeState contains objects to remove
+        bool remove_backlink(ColKey col_key, ObjLink old_link, CascadeState & state) const
+        {
+            check_parent();
+            return m_parent->remove_backlink(col_key, old_link, state);
+        }
 
     /// Reset the accessor's tracking of the content version. Derived classes
     /// may choose to call this to force the accessor to become out of date,

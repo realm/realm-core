@@ -106,7 +106,7 @@ void Logger::set_default_logger(std::shared_ptr<util::Logger> logger) noexcept
         c->set_default_level_threshold(level);
     }
     std::lock_guard lock(s_logger_mutex);
-        set_default_level_threshold(s_default_logger.get());
+    set_default_level_threshold(s_default_logger.get());
 }
 
 LogCategory::Level LogCategory::get_default_level_threshold() const noexcept

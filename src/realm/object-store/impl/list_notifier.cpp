@@ -79,20 +79,21 @@ bool ListNotifier::do_add_required_change_info(TransactionChangeInfo& info)
     StablePath this_path = m_list->get_stable_path();
         {m_list->get_table()->get_key(), m_list->get_owner_key(), std::move(this_path), &m_change});
                                [](const CollectionChangeInfo& info, size_t sz) {
-                                   return info.path.size() < sz;
+        return info.path.size() < sz;
                                });
-    info.collections.insert(
-        it, {m_list->get_table()->get_key(), m_list->get_owner_key(), std::move(this_path), &m_change});
+                               info.collections.insert(it, {m_list->get_table()->get_key(), m_list->get_owner_key(),
+                                                            std::move(this_path), &m_change});
 
-    m_info = &info;
+                               m_info = &info;
 
-    // When adding or removing a callback, the related tables can change due to the way we calculate related tables
-    // when key path filters are set, hence we need to recalculate every time the callbacks are changed.
-    // We only need to do this for lists that link to other lists. Lists of primitives cannot have related tables.
-    util::CheckedLockGuard lock(m_callback_mutex);
-    if (m_did_modify_callbacks && m_type == PropertyType::Object) {
+                               // When adding or removing a callback, the related tables can change due to the way we
+                               // calculate related tables when key path filters are set, hence we need to recalculate
+                               // every time the callbacks are changed. We only need to do this for lists that link to
+                               // other lists. Lists of primitives cannot have related tables.
+                               util::CheckedLockGuard lock(m_callback_mutex);
+                               if (m_did_modify_callbacks && m_type == PropertyType::Object) {
         update_related_tables(*m_list->get_table());
-    }
+                               }
 
     return true;
 }

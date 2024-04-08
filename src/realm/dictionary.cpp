@@ -774,13 +774,13 @@ bool Dictionary::nullify(ObjLink target_link)
     }
     return false;
 }
-                if (list->nullify(target_link)) {
-                    return true;
-                }
-            }
-        }
-    }
-    return false;
+if (list->nullify(target_link)) {
+    return true;
+}
+}
+}
+}
+return false;
 }
 
 bool Dictionary::replace_link(ObjLink old_link, ObjLink replace_link)
@@ -902,11 +902,12 @@ UpdateStatus Dictionary::init_from_parent(bool allow_create) const
         m_dictionary_top.reset();
         throw;
     }
-    }
-    catch (...) {
-        m_dictionary_top.reset();
-        throw;
-    }
+}
+catch (...)
+{
+    m_dictionary_top.reset();
+    throw;
+}
 }
 
 size_t Dictionary::do_find_key(Mixed key) const noexcept
@@ -1225,8 +1226,8 @@ LinkCollectionPtr Dictionary::clone_as_obj_list() const
         return std::make_unique<DictionaryLinkValues>(*this);
     }
     return nullptr;
-    }
-    return status == UpdateStatus::Updated;
+}
+return status == UpdateStatus::Updated;
 }
 
 /************************* DictionaryLinkValues *************************/

@@ -192,7 +192,6 @@ TEST_CASE("nested dictionary in mixed", "[dictionary]") {
         REQUIRE(list.is_valid());
     }
 }
-
 }
 
 TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf::Bool, cf::Float, cf::Double,
