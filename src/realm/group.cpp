@@ -69,12 +69,13 @@ Group::Group()
 }
 
 
-Group::Group(const std::string& file_path, const char* encryption_key)
+Group::Group(const std::string& file_path, const char* encryption_key, bool allow_additional_properties)
     : m_local_alloc(new SlabAlloc) // Throws
     , m_alloc(*m_local_alloc)
     , m_top(m_alloc)
     , m_tables(m_alloc)
     , m_table_names(m_alloc)
+    , m_allow_additional_properties(allow_additional_properties)
 {
     init_array_parents();
 
@@ -683,6 +684,10 @@ TableRef Group::add_table_with_primary_key(StringData name, DataType pk_type, St
     check_table_name_uniqueness(name);
 
     auto table = do_add_table(name, table_type, false);
+
+    if (m_allow_additional_properties && name.begins_with(g_class_name_prefix)) {
+        table->do_add_additional_prop_column();
+    }
 
     // Add pk column - without replication
     ColumnAttrMask attr;

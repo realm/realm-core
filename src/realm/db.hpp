@@ -497,6 +497,7 @@ private:
     SharedInfo* m_info = nullptr;
     bool m_wait_for_change_enabled = true; // Initially wait_for_change is enabled
     bool m_write_transaction_open GUARDED_BY(m_mutex) = false;
+    bool m_allow_flexible_schema;
     std::string m_db_path;
     int m_file_format_version = 0;
     util::InterprocessMutex m_writemutex;

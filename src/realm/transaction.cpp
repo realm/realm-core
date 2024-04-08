@@ -170,6 +170,7 @@ Transaction::Transaction(DBRef _db, SlabAlloc* alloc, DB::ReadLockInfo& rli, DB:
 {
     bool writable = stage == DB::transact_Writing;
     m_transact_stage = DB::transact_Ready;
+    m_allow_additional_properties = db->m_allow_flexible_schema;
     set_transact_stage(stage);
     attach_shared(m_read_lock.m_top_ref, m_read_lock.m_file_size, writable,
                   VersionID{rli.m_version, rli.m_reader_idx});

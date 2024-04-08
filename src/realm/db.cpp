@@ -2800,7 +2800,8 @@ void DB::async_request_write_mutex(TransactionRef& tr, util::UniqueFunction<void
 }
 
 inline DB::DB(Private, const DBOptions& options)
-    : m_upgrade_callback(std::move(options.upgrade_callback))
+    : m_allow_flexible_schema(options.allow_flexible_schema)
+    , m_upgrade_callback(std::move(options.upgrade_callback))
     , m_log_id(util::gen_log_id(this))
 {
     if (options.enable_async_writes) {

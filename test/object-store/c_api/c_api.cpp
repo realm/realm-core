@@ -5817,6 +5817,47 @@ TEST_CASE("C API: convert", "[c_api]") {
     realm_release(realm);
 }
 
+TEST_CASE("C API: flexible schema", "[c_api]") {
+    TestFile test_file;
+    ObjectSchema object_schema = {"Foo", {{"_id", PropertyType::Int, Property::IsPrimary{true}}}};
+
+    auto config = make_config(test_file.path.c_str(), false);
+    config->schema = Schema{object_schema};
+    config->schema_version = 0;
+    config->flexible_schema = 1;
+    auto realm = realm_open(config.get());
+    realm_class_info_t class_foo;
+    bool found = false;
+    CHECK(checked(realm_find_class(realm, "Foo", &found, &class_foo)));
+    REQUIRE(found);
+
+    SECTION("Simple set/get/delete") {
+        checked(realm_begin_write(realm));
+
+        realm_value_t pk = rlm_int_val(42);
+        auto obj1 = cptr_checked(realm_object_create_with_primary_key(realm, class_foo.key, pk));
+        checked(realm_set_value_by_name(obj1.get(), "age", rlm_int_val(23)));
+        const char* prop_names[10];
+        size_t actual;
+        realm_get_additional_properties(obj1.get(), prop_names, 10, &actual);
+        REQUIRE(actual == 1);
+        CHECK(prop_names[0] == std::string_view("age"));
+
+        realm_value_t value;
+        CHECK(checked(realm_get_value_by_name(obj1.get(), "age", &value)));
+        CHECK(value.type == RLM_TYPE_INT);
+        CHECK(value.integer == 23);
+
+        checked(realm_erase_property(obj1.get(), "age"));
+        realm_get_additional_properties(obj1.get(), nullptr, 0, &actual);
+        REQUIRE(actual == 0);
+        realm_commit(realm);
+    }
+    realm_close(realm);
+    REQUIRE(realm_is_closed(realm));
+    realm_release(realm);
+}
+
 struct Userdata {
     std::atomic<bool> called{false};
     bool has_error;

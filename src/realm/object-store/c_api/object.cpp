@@ -286,6 +286,20 @@ RLM_API bool realm_get_values(const realm_object_t* obj, size_t num_values, cons
     });
 }
 
+RLM_API bool realm_get_value_by_name(const realm_object_t* obj, const char* property_name, realm_value_t* out_value)
+{
+    return wrap_err([&]() {
+        obj->verify_attached();
+
+        auto o = obj->get_obj();
+        auto val = o.get_any(property_name);
+        if (out_value) {
+            *out_value = to_capi(val);
+        }
+        return true;
+    });
+}
+
 RLM_API bool realm_set_value(realm_object_t* obj, realm_property_key_t col, realm_value_t new_value, bool is_default)
 {
     return realm_set_values(obj, 1, &col, &new_value, is_default);
@@ -324,6 +338,52 @@ RLM_API bool realm_set_values(realm_object_t* obj, size_t num_values, const real
             o.set_any(col_key, val, is_default);
         }
 
+        return true;
+    });
+}
+
+RLM_API bool realm_set_value_by_name(realm_object_t* obj, const char* property_name, realm_value_t new_value)
+{
+    return wrap_err([&]() {
+        obj->verify_attached();
+        auto o = obj->get_obj();
+        o.set_any(property_name, from_capi(new_value));
+        return true;
+    });
+}
+
+RLM_API void realm_get_additional_properties(realm_object_t* obj, const char** out_prop_names, size_t max,
+                                             size_t* out_n)
+{
+    size_t copied = 0;
+    wrap_err([&]() {
+        obj->verify_attached();
+        auto o = obj->get_obj();
+        auto vec = o.get_additional_properties();
+        copied = vec.size();
+        if (out_prop_names) {
+            if (max < copied) {
+                copied = max;
+            }
+            auto it = vec.begin();
+            auto to_copy = copied;
+            while (to_copy--) {
+                *out_prop_names++ = (*it++).data();
+            }
+        }
+        return true;
+    });
+    if (out_n) {
+        *out_n = copied;
+    }
+}
+
+RLM_API bool realm_erase_property(realm_object_t* obj, const char* property_name)
+{
+    return wrap_err([&]() {
+        obj->verify_attached();
+        auto o = obj->get_obj();
+        o.erase_prop(property_name);
         return true;
     });
 }

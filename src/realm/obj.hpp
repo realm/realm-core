@@ -117,17 +117,26 @@ public:
     template <typename U>
     U get(ColKey col_key) const;
 
+    std::vector<StringData> get_additional_properties() const;
+
     Mixed get_any(ColKey col_key) const;
     Mixed get_any(StringData col_name) const
     {
-        return get_any(get_column_key(col_name));
+        if (auto ck = get_column_key(col_name)) {
+            return get_any(ck);
+        }
+        return get_additional_prop(col_name);
     }
+    Mixed get_additional_prop(StringData col_name) const;
     Mixed get_primary_key() const;
 
     template <typename U>
     U get(StringData col_name) const
     {
-        return get<U>(get_column_key(col_name));
+        if (auto ck = get_column_key(col_name)) {
+            return get<U>(ck);
+        }
+        return get_additional_prop(col_name).get<U>();
     }
     bool is_unresolved(ColKey col_key) const;
 
@@ -187,16 +196,24 @@ public:
     // default state. If the object does not exist, create a
     // new object and link it. (To Be Implemented)
     Obj clear_linked_object(ColKey col_key);
+
+    Obj& erase_prop(StringData prop_name);
     Obj& set_any(ColKey col_key, Mixed value, bool is_default = false);
     Obj& set_any(StringData col_name, Mixed value, bool is_default = false)
     {
-        return set_any(get_column_key(col_name), value, is_default);
+        if (auto ck = get_column_key(col_name)) {
+            return set_any(ck, value, is_default);
+        }
+        return set_additional_prop(col_name, value);
     }
 
     template <typename U>
     Obj& set(StringData col_name, U value, bool is_default = false)
     {
-        return set(get_column_key(col_name), value, is_default);
+        if (auto ck = get_column_key(col_name)) {
+            return set(ck, value, is_default);
+        }
+        return set_additional_prop(col_name, Mixed(value));
     }
 
     Obj& set_null(ColKey col_key, bool is_default = false);
@@ -205,6 +222,7 @@ public:
         return set_null(get_column_key(col_name), is_default);
     }
     Obj& set_json(ColKey col_key, StringData json);
+
 
     Obj& add_int(ColKey col_key, int64_t value);
     Obj& add_int(StringData col_name, int64_t value)
@@ -289,6 +307,7 @@ public:
     Dictionary get_dictionary(StringData col_name) const;
 
     Obj& set_collection(ColKey col_key, CollectionType type);
+    Obj& set_collection(StringData, CollectionType type);
     DictionaryPtr get_dictionary_ptr(ColKey col_key) const;
     DictionaryPtr get_dictionary_ptr(const Path& path) const;
 
@@ -385,6 +404,7 @@ private:
         return _get_linked_object(get_column_key(link_col_name), link);
     }
 
+    Obj& set_additional_prop(StringData prop_name, const Mixed& value);
     void set_int(ColKey::Idx col_ndx, int64_t value);
     void set_ref(ColKey::Idx col_ndx, ref_type value, CollectionType type);
     void add_backlink(ColKey backlink_col, ObjKey origin_key);

@@ -6204,6 +6204,71 @@ TEST(Sync_DeleteCollectionInCollection)
     }
 }
 
+TEST(Sync_AdditionalProperties)
+{
+    DBOptions options;
+    options.allow_flexible_schema = true;
+    SHARED_GROUP_TEST_PATH(db_1_path);
+    SHARED_GROUP_TEST_PATH(db_2_path);
+    auto db_1 = DB::create(make_client_replication(), db_1_path, options);
+    auto db_2 = DB::create(make_client_replication(), db_2_path, options);
+
+    TEST_DIR(dir);
+    fixtures::ClientServerFixture fixture{dir, test_context};
+    fixture.start();
+
+    Session session_1 = fixture.make_session(db_1, "/test");
+    Session session_2 = fixture.make_session(db_2, "/test");
+
+    Timestamp now{std::chrono::system_clock::now()};
+
+    write_transaction(db_1, [&](WriteTransaction& tr) {
+        auto& g = tr.get_group();
+        auto table = g.add_table_with_primary_key("class_Table", type_Int, "id");
+        auto col_any = table->add_column(type_Mixed, "any");
+        auto foo = table->create_object_with_primary_key(123);
+        foo.set_any(col_any, "FooBar");
+        foo.set<Int>("age", 10);
+        foo.set_collection("scores", CollectionType::List);
+        auto list = foo.get_list_ptr<Mixed>({"scores"});
+        list->add(4.6);
+    });
+
+    session_1.wait_for_upload_complete_or_client_stopped();
+    session_2.wait_for_download_complete_or_client_stopped();
+
+    write_transaction(db_2, [&](WriteTransaction& tr) {
+        auto table = tr.get_table("class_Table");
+        CHECK_EQUAL(table->size(), 1);
+
+        auto obj = table->get_object_with_primary_key(123);
+        auto col_keys = table->get_column_keys();
+        CHECK_EQUAL(col_keys.size(), 2);
+        CHECK_EQUAL(table->get_column_name(col_keys[0]), "id");
+        CHECK_EQUAL(table->get_column_name(col_keys[1]), "any");
+        auto props = obj.get_additional_properties();
+        CHECK_EQUAL(props.size(), 2);
+        CHECK_EQUAL(obj.get<Int>("age"), 10);
+        CHECK_EQUAL(obj.get_any("any"), Mixed("FooBar"));
+        auto list = obj.get_list_ptr<Mixed>({"scores"});
+        CHECK_EQUAL(list->get(0), Mixed(4.6));
+        CHECK_THROW_ANY(obj.erase_prop("any"));
+        obj.erase_prop("age");
+    });
+
+    session_2.wait_for_upload_complete_or_client_stopped();
+    session_1.wait_for_download_complete_or_client_stopped();
+
+    write_transaction(db_1, [&](WriteTransaction& tr) {
+        auto table = tr.get_table("class_Table");
+        CHECK_EQUAL(table->size(), 1);
+
+        auto obj = table->get_object_with_primary_key(123);
+        auto props = obj.get_additional_properties();
+        CHECK_EQUAL(props.size(), 1);
+    });
+}
+
 TEST(Sync_Dictionary_Links)
 {
     TEST_CLIENT_DB(db_1);

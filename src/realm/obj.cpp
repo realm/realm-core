@@ -634,6 +634,19 @@ BinaryData Obj::_get<BinaryData>(ColKey::Idx col_ndx) const
     return ArrayBinary::get(alloc.translate(ref), m_row_ndx, alloc);
 }
 
+std::vector<StringData> Obj::get_additional_properties() const
+{
+    std::vector<StringData> ret;
+
+    if (auto ck = m_table->m_additional_prop_col) {
+        Dictionary dict(*this, ck);
+        dict.for_all_keys<StringData>([&ret](StringData key) {
+            ret.push_back(key);
+        });
+    }
+    return ret;
+}
+
 Mixed Obj::get_any(ColKey col_key) const
 {
     m_table->check_column(col_key);
@@ -675,6 +688,20 @@ Mixed Obj::get_any(ColKey col_key) const
         default:
             REALM_UNREACHABLE();
             break;
+    }
+    return {};
+}
+
+Mixed Obj::get_additional_prop(StringData prop_name) const
+{
+    if (auto ck = m_table->m_additional_prop_col) {
+        Dictionary dict(*this, ck);
+        if (auto val = dict.try_get(prop_name)) {
+            return *val;
+        }
+    }
+    else {
+        throw InvalidArgument(ErrorCodes::InvalidProperty, util::format("Property not found: %1", prop_name));
     }
     return {};
 }
@@ -1110,7 +1137,8 @@ StablePath Obj::get_stable_path() const noexcept
 void Obj::add_index(Path& path, const CollectionParent::Index& index) const
 {
     if (path.empty()) {
-        path.emplace_back(get_table()->get_column_key(index));
+        auto ck = m_table->get_column_key(index);
+        path.emplace_back(ck);
     }
     else {
         StringData col_name = get_table()->get_column_name(index);
@@ -1229,6 +1257,31 @@ Obj& Obj::set<Mixed>(ColKey col_key, Mixed value, bool is_default)
     if (recurse)
         const_cast<Table*>(m_table.unchecked_ptr())->remove_recursive(state);
 
+    return *this;
+}
+
+Obj& Obj::erase_prop(StringData prop_name)
+{
+    bool erased = false;
+    if (auto ck = m_table->m_additional_prop_col) {
+        Dictionary dict(*this, ck);
+        erased = dict.try_erase(prop_name);
+    }
+    if (!erased) {
+        throw InvalidArgument(ErrorCodes::InvalidProperty, util::format("Could not erase property: %1", prop_name));
+    }
+    return *this;
+}
+
+Obj& Obj::set_additional_prop(StringData prop_name, const Mixed& value)
+{
+    if (auto ck = m_table->m_additional_prop_col) {
+        Dictionary dict(*this, ck);
+        dict.insert(prop_name, value);
+    }
+    else {
+        throw InvalidArgument(ErrorCodes::InvalidProperty, util::format("Property not found: %1", prop_name));
+    }
     return *this;
 }
 
@@ -1999,6 +2052,21 @@ Obj& Obj::set_collection(ColKey col_key, CollectionType type)
     return *this;
 }
 
+Obj& Obj::set_collection(StringData prop_name, CollectionType type)
+{
+    if (auto ck = get_column_key(prop_name)) {
+        return set_collection(ck, type);
+    }
+    if (auto ck = m_table->m_additional_prop_col) {
+        Dictionary dict(*this, ck);
+        dict.insert_collection(prop_name, type);
+    }
+    else {
+        throw InvalidArgument(ErrorCodes::InvalidProperty, util::format("Property not found: %1", prop_name));
+    }
+    return *this;
+}
+
 DictionaryPtr Obj::get_dictionary_ptr(ColKey col_key) const
 {
     return std::make_shared<Dictionary>(get_dictionary(col_key));
@@ -2019,9 +2087,28 @@ CollectionPtr Obj::get_collection_ptr(const Path& path) const
     REALM_ASSERT(path.size() > 0);
     // First element in path must be column name
     auto col_key = path[0].is_col_key() ? path[0].get_col_key() : m_table->get_column_key(path[0].get_key());
-    REALM_ASSERT(col_key);
+
+    CollectionBasePtr collection;
     size_t level = 1;
-    CollectionBasePtr collection = get_collection_ptr(col_key);
+    if (col_key) {
+        collection = get_collection_ptr(col_key);
+    }
+    else {
+        if (auto ck = m_table->m_additional_prop_col) {
+            auto prop_name = path[0].get_key();
+            Dictionary dict(*this, ck);
+            auto ref = dict.get(prop_name);
+            if (ref.is_type(type_List)) {
+                collection = dict.get_list(prop_name);
+            }
+            else if (ref.is_type(type_Dictionary)) {
+                collection = dict.get_dictionary(prop_name);
+            }
+            else {
+                throw InvalidArgument("Wrong path");
+            }
+        }
+    }
 
     while (level < path.size()) {
         auto& path_elem = path[level];
