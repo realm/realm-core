@@ -2021,7 +2021,7 @@ struct BenchmarkNonInitiatorOpen : Benchmark {
 
     DBRef do_open()
     {
-        return DB::create(*path, false, DBOptions(m_durability, m_encryption_key));
+        return DB::create(*path, DBOptions(m_durability, m_encryption_key));
     }
 
     void before_all(DBRef)
@@ -2502,7 +2502,7 @@ void run_benchmark(BenchmarkResults& results, bool force_full = false)
         realm::test_util::DBTestPathGuard realm_path(
             test_util::get_test_path("benchmark_common_tasks_" + ident, ".realm"));
         DBRef group;
-        group = DB::create(realm_path, false, DBOptions(level, key));
+        group = DB::create(realm_path, DBOptions(level, key));
         benchmark.before_all(group);
 
         // Warm-up and initial measuring:

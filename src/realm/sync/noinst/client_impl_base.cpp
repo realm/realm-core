@@ -2365,10 +2365,10 @@ Status Session::receive_download_message(const DownloadMessage& message)
         return Status::OK();
 
     bool is_flx = m_conn.is_flx_sync_connection();
-    int64_t query_version = is_flx ? message.query_version.value() : 0;
+    int64_t query_version = is_flx ? *message.query_version : 0;
 
     // If this is a PBS connection, then every download message is its own complete batch.
-    bool last_in_batch = is_flx ? message.last_in_batch.value() : true;
+    bool last_in_batch = is_flx ? *message.last_in_batch : true;
     auto batch_state = last_in_batch ? sync::DownloadBatchState::LastInBatch : sync::DownloadBatchState::MoreToCome;
     if (is_steady_state_download_message(batch_state, query_version))
         batch_state = DownloadBatchState::SteadyState;
