@@ -598,6 +598,9 @@ records:
         type: MetadataMode
         default: MetadataMode::Encryption
       custom_encryption_key: std::optional<EncryptionKey>
+      security_access_group:
+        type: std::string
+        default: ""
       logger_factory: Nullable<LoggerFactory>
       log_level:
         type: LoggerLevel

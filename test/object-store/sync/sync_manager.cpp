@@ -271,7 +271,9 @@ TEST_CASE("sync_manager: persistent user state management", "[sync][sync manager
     config.should_teardown_test_directory = false;
     auto file_manager = SyncFileManager(tsm.base_file_path(), "app_id");
     // Open the metadata separately, so we can investigate it ourselves.
-    SyncMetadataManager manager(file_manager.metadata_path(), false);
+    SyncClientConfig client_config;
+    client_config.metadata_mode = config.metadata_mode;
+    SyncMetadataManager manager(file_manager.metadata_path(), client_config, "app_id");
 
     const std::string r_token_1 = ENCODE_FAKE_JWT("foo_token");
     const std::string r_token_2 = ENCODE_FAKE_JWT("bar_token");
@@ -447,7 +449,9 @@ TEST_CASE("sync_manager: file actions", "[sync][sync manager]") {
 
     auto file_manager = SyncFileManager(base_path.string(), "app_id");
     // Open the metadata separately, so we can investigate it ourselves.
-    SyncMetadataManager manager(file_manager.metadata_path(), false);
+    SyncClientConfig client_config;
+    client_config.metadata_mode = SyncManager::MetadataMode::NoEncryption;
+    SyncMetadataManager manager(file_manager.metadata_path(), client_config, "app_id");
 
     TestSyncManager::Config config;
     config.base_path = base_path.string();

@@ -30,6 +30,7 @@
 namespace realm {
 class SyncFileManager;
 class SyncMetadataManager;
+struct SyncClientConfig;
 
 // A facade for a metadata Realm object representing a sync user.
 class SyncUserMetadata {
@@ -220,8 +221,7 @@ public:
     /// If the platform supports it, setting `should_encrypt` to `true` and not specifying an encryption key will make
     /// the object store handle generating and persisting an encryption key for the metadata database. Otherwise, an
     /// exception will be thrown.
-    SyncMetadataManager(std::string path, bool should_encrypt,
-                        util::Optional<std::vector<char>> encryption_key = none);
+    SyncMetadataManager(const std::string& path, const SyncClientConfig& config, std::string_view app_id);
 
 private:
     SyncUserMetadataResults get_users(bool marked) const;
@@ -231,7 +231,7 @@ private:
 
     std::shared_ptr<Realm> get_realm() const;
     std::shared_ptr<Realm> try_get_realm() const;
-    std::shared_ptr<Realm> open_realm(bool should_encrypt, bool caller_supplied_key);
+    std::shared_ptr<Realm> open_realm(const SyncClientConfig& config, std::string_view app_id);
 
     bool run_file_action(SyncFileManager& file_manager, SyncFileActionMetadata& md) const;
 };

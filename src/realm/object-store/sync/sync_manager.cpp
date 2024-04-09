@@ -65,9 +65,7 @@ SyncManager::SyncManager(Private, std::shared_ptr<app::App> app, std::string syn
         return;
     }
 
-    bool encrypt = m_config.metadata_mode == MetadataMode::Encryption;
-    m_metadata_manager = std::make_unique<SyncMetadataManager>(m_file_manager->metadata_path(), encrypt,
-                                                               m_config.custom_encryption_key);
+    m_metadata_manager = std::make_unique<SyncMetadataManager>(m_file_manager->metadata_path(), m_config, app_id);
 
     m_metadata_manager->perform_launch_actions(*m_file_manager);
 

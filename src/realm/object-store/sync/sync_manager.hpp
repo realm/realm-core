@@ -75,7 +75,8 @@ struct SyncClientConfig {
 
     std::string base_file_path;
     MetadataMode metadata_mode = MetadataMode::Encryption;
-    util::Optional<std::vector<char>> custom_encryption_key;
+    std::optional<std::vector<char>> custom_encryption_key;
+    std::string security_access_group;
 
     using LoggerFactory = std::function<std::shared_ptr<util::Logger>(util::Logger::Level)>;
     LoggerFactory logger_factory;

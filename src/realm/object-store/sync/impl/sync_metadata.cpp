@@ -25,6 +25,7 @@
 #include <realm/object-store/results.hpp>
 #include <realm/object-store/schema.hpp>
 #include <realm/object-store/sync/impl/sync_file.hpp>
+#include <realm/object-store/sync/sync_manager.hpp>
 #include <realm/object-store/util/uuid.hpp>
 #include <realm/object-store/util/scheduler.hpp>
 #if REALM_PLATFORM_APPLE
@@ -204,13 +205,10 @@ void migrate_to_v8(Realm&, Realm& realm)
 
 // MARK: - Sync metadata manager
 
-SyncMetadataManager::SyncMetadataManager(std::string path, bool should_encrypt,
-                                         util::Optional<std::vector<char>> encryption_key)
+SyncMetadataManager::SyncMetadataManager(const std::string& path, const SyncClientConfig& config,
+                                         std::string_view app_id)
 {
     constexpr uint64_t SCHEMA_VERSION = 7;
-
-    if (!REALM_PLATFORM_APPLE && should_encrypt && !encryption_key)
-        throw InvalidArgument("Metadata Realm encryption was specified, but no encryption key was provided.");
 
     m_metadata_config.automatic_change_notifications = false;
     m_metadata_config.path = path;
@@ -218,8 +216,8 @@ SyncMetadataManager::SyncMetadataManager(std::string path, bool should_encrypt,
     m_metadata_config.schema_version = SCHEMA_VERSION;
     m_metadata_config.schema_mode = SchemaMode::Automatic;
     m_metadata_config.scheduler = util::Scheduler::make_dummy();
-    if (encryption_key)
-        m_metadata_config.encryption_key = std::move(*encryption_key);
+    if (config.metadata_mode == SyncClientConfig::MetadataMode::Encryption && config.custom_encryption_key)
+        m_metadata_config.encryption_key = *config.custom_encryption_key;
     m_metadata_config.automatically_handle_backlinks_in_migrations = true;
     m_metadata_config.migration_function = [](std::shared_ptr<Realm> old_realm, std::shared_ptr<Realm> realm,
                                               Schema&) {
@@ -232,7 +230,7 @@ SyncMetadataManager::SyncMetadataManager(std::string path, bool should_encrypt,
         }
     };
 
-    auto realm = open_realm(should_encrypt, encryption_key != none);
+    auto realm = open_realm(config, app_id);
 
     // Get data about the (hardcoded) schemas
     auto object_schema = realm->schema().find(c_sync_userMetadata);
@@ -524,9 +522,13 @@ std::shared_ptr<Realm> SyncMetadataManager::try_get_realm() const
     }
 }
 
-std::shared_ptr<Realm> SyncMetadataManager::open_realm(bool should_encrypt, bool caller_supplied_key)
+std::shared_ptr<Realm> SyncMetadataManager::open_realm(const SyncClientConfig& config, std::string_view app_id)
 {
-    if (caller_supplied_key || !should_encrypt || !REALM_PLATFORM_APPLE) {
+    bool should_encrypt = config.metadata_mode == SyncClientConfig::MetadataMode::Encryption;
+    if (!REALM_PLATFORM_APPLE && should_encrypt && !config.custom_encryption_key)
+        throw InvalidArgument("Metadata Realm encryption was specified, but no encryption key was provided.");
+
+    if (config.custom_encryption_key || !should_encrypt || !REALM_PLATFORM_APPLE) {
         m_metadata_config.clear_on_invalid_file = true;
         return get_realm();
     }
@@ -539,7 +541,7 @@ std::shared_ptr<Realm> SyncMetadataManager::open_realm(bool should_encrypt, bool
     // First try to open the Realm with a key already stored in the keychain.
     // This works for both the case where everything is sensible and valid and
     // when we have a key but no metadata Realm.
-    auto key = keychain::get_existing_metadata_realm_key();
+    auto key = keychain::get_existing_metadata_realm_key(app_id, config.security_access_group);
     if (key) {
         m_metadata_config.encryption_key = *key;
         if (auto realm = try_get_realm())
@@ -563,7 +565,7 @@ std::shared_ptr<Realm> SyncMetadataManager::open_realm(bool should_encrypt, bool
     // try to create and store a new one. This might fail, in which case we
     // just create an unencrypted Realm file.
     if (!key)
-        key = keychain::create_new_metadata_realm_key();
+        key = keychain::create_new_metadata_realm_key(app_id, config.security_access_group);
     if (key)
         m_metadata_config.encryption_key = std::move(*key);
     return get_realm();
