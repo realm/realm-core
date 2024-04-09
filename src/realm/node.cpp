@@ -49,7 +49,7 @@ MemRef Node::create_node(size_t size, Allocator& alloc, bool context_flag, Type 
         width = width * 8;
 
     init_header(header, encoding, flags, width, size);
-    set_capacity_in_header(byte_size, mem.get_addr());
+    set_capacity_in_header(byte_size, header);
     return mem;
 }
 
