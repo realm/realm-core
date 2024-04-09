@@ -341,7 +341,7 @@ static void check_attach_and_read(const char* key, const std::string& path, size
 
 // This test changes the global page_size() and should not run with other tests.
 // It checks that an encrypted Realm is portable between systems with a different page size
-/*NONCONCURRENT_TEST*/ ONLY(EncryptedFile_Portablility)
+NONCONCURRENT_TEST(EncryptedFile_Portablility)
 {
     const char* key = test_util::crypt_key(true);
     // The idea here is to incrementally increase the allocations in the Realm

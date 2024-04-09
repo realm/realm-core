@@ -170,7 +170,8 @@ private:
 
 inline size_t EncryptedFileMapping::get_offset_of_address(const void* addr) const
 {
-    return reinterpret_cast<size_t>(addr) & ((1 << m_page_shift) - 1);
+    REALM_ASSERT_3(reinterpret_cast<size_t>(addr), >=, reinterpret_cast<size_t>(m_addr));
+    return (reinterpret_cast<size_t>(addr) - reinterpret_cast<size_t>(m_addr)) & ((1ULL << m_page_shift) - 1);
 }
 
 inline size_t EncryptedFileMapping::get_local_index_of_address(const void* addr, size_t offset) const
