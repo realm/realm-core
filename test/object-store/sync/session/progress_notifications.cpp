@@ -701,91 +701,46 @@ struct FLX : TestSetup {
     FLXSyncTestHarness harness;
 };
 
-/*
- * This test runs a few scenarios for synchronizing changes between two separate realm files for the same app,
- * and verifies high-level consistency in reported progress notification's values.
- *
- * It doesn't try to check for particular reported values: these are checked in sync impl tests,
- * and specific combinations of updates verified directly in SyncProgressNotifier tests.
- *
- * First, test adds a few objects into one realm, verifies that the progress is reported until upload completion.
- * Then it checks how this exact changes are downloaded into the second realm file (this essentially checks
- * how progress is reported with bootstrap store for flx).
- *
- * Next subtests, are here to check how continuous sync reports progress. It reuses the same two realm files
- * with synchronized objects in them both. Test adds more objects into the second realm to sync more changes
- * the other way around: from second realm to the first one, and check if also upload progress correct for
- * the second realm, and download progress for the first realm after its initial upload.
- *  - first by reusing the same realm instance for the second realm
- *  - second by closing and reopening second realm file with new SharedRealm instance
- *
- * Separately, AsyncOpenTask is checked twice: with initial empty third realm file, and with subsequent second opening
- * with more changes to download from the server. The progress reported through task interface should behave in the
- * same way as with cases tested above.
- */
-TEMPLATE_TEST_CASE("sync progress notifications", "[sync][baas][progress]", PBS, FLX)
-{
-    TestType setup;
-    constexpr bool is_flx = std::is_same_v<FLX, TestType>;
-    size_t expected_count = 0;
+struct ProgressNotification {
+    uint64_t xferred, xferable;
+    double estimate;
+};
 
-#define VERIFY_REALM(realm_1, realm_2, expected)                                                                     \
-    {                                                                                                                \
-        REQUIRE(expected > 0);                                                                                       \
-        REQUIRE(realm_1);                                                                                            \
-        REQUIRE(realm_2);                                                                                            \
-        REQUIRE(realm_1 != realm_2);                                                                                 \
-        auto table1 = setup.get_table(realm_1);                                                                      \
-        auto table2 = setup.get_table(realm_2);                                                                      \
-        REQUIRE(table1);                                                                                             \
-        REQUIRE(table2);                                                                                             \
-        REQUIRE(table1->size() == expected);                                                                         \
-        REQUIRE(table2->size() == expected);                                                                         \
+struct ReportedProgress : std::vector<std::vector<ProgressNotification>> {
+    void add(size_t idx, uint64_t xferred, uint64_t xferable, double estimate)
+    {
+        std::lock_guard lock(mutex);
+        (*this)[idx].emplace_back(ProgressNotification{xferred, xferable, estimate});
     }
 
-    struct Progress {
-        uint64_t xferred, xferable;
-        double estimate;
-    };
-    typedef std::vector<std::vector<Progress>> ReportedProgress;
-    std::mutex progress_mutex;
-
-    // register set of 4 callbacks to put values in predefined places in reported progress list:
-    // idx 0: non-streaming/download, 1: non-streaming/upload, 2: streaming/download, 3: streaming/upload
-    auto add_callbacks = [&](SharedRealm& realm, ReportedProgress& progress) {
-        std::lock_guard lock(progress_mutex);
-        size_t idx = progress.size();
-        progress.resize(idx + 4);
-        for (auto&& stream : {false, true})
-            for (auto&& direction : {NotifierType::download, NotifierType::upload})
-                realm->sync_session()->register_progress_notifier(
-                    [&, i = idx++](uint64_t xferred, uint64_t xferable, double estimate) {
-                        progress[i].emplace_back(Progress{xferred, xferable, estimate});
-                    },
-                    direction, stream);
-    };
-
-    auto dump = [](const ReportedProgress& progress, size_t begin = 0, size_t end = -1) {
+    std::string dump(size_t begin = 0, size_t end = -1)
+    {
+        auto&& self = *this;
         std::ostringstream out;
-        for (size_t i = begin, e = std::min(end, progress.size()); i < e; ++i) {
-            out << (i > begin ? "\n" : "") << i << " [" << progress[i].size() << "]: ";
-            for (auto&& p : progress[i])
+        for (size_t i = begin, e = std::min(end, self.size()); i < e; ++i) {
+            out << (i > begin ? "\n" : "") << i << " [" << self[i].size() << "]: ";
+            for (auto&& p : self[i])
                 out << "(" << p.xferred << ", " << p.xferable << ", " << std::setprecision(4) << p.estimate << "), ";
         }
         return out.str();
-    };
+    }
 
-    auto clear = [&](ReportedProgress& progress) {
-        std::lock_guard lock(progress_mutex);
-        for (auto&& values : progress)
+    void clear()
+    {
+        std::lock_guard lock(mutex);
+        // cout << dump() << endl; // uncomment to dump full progress values on every test stage
+        for (auto&& values : *this)
             values.clear();
-    };
+    }
+
+    std::mutex mutex;
+};
 
 #define VERIFY_PROGRESS_EMPTY(progress, begin, end)                                                                  \
     {                                                                                                                \
-        std::lock_guard lock(progress_mutex);                                                                        \
+        std::lock_guard lock(progress.mutex);                                                                        \
         for (size_t i = begin; i < end; ++i) {                                                                       \
-            INFO(util::format("i = %1, %2", i, dump(progress, i, i + 1)));                                           \
+            INFO(util::format("i = %1, %2", i, progress.dump(i, i + 1)));                                            \
             auto&& values = progress[i];                                                                             \
             CHECK(values.size() == 0);                                                                               \
         }                                                                                                            \
@@ -803,7 +758,7 @@ TEMPLATE_TEST_CASE("sync progress notifications", "[sync][baas][progress]", PBS,
                                                                                                                      \
         for (size_t j = 0; j < values.size(); ++j) {                                                                 \
             auto&& p = values[j];                                                                                    \
-            INFO(util::format("Fail index i: %1, j: %2 | Reported progress:\n%3", i, j, dump(progress)));            \
+            INFO(util::format("Fail index i: %1, j: %2 | Reported progress:\n%3", i, j, progress.dump()));           \
                                                                                                                      \
             CHECK(0 <= p.xferred);                                                                                   \
             CHECK(p.xferred <= p.xferable);                                                                          \
@@ -833,34 +788,80 @@ TEMPLATE_TEST_CASE("sync progress notifications", "[sync][baas][progress]", PBS,
                 CHECK(prev.estimate <= p.estimate);                                                                  \
             }                                                                                                        \
         }                                                                                                            \
-        /* FIXME with non-streaming download last estimate isn't necessarily 1.0                                     \
-         *       notification is emitted immediately upon registration and for download the state of remaining       \
-         *       changesets for get is not known before first DOWNLOAD message, so until first update happened       \
-         *       xferred == xferable and that concludes notifier calls for this callback immediately                 \
-         *       see #7452 for details for how this could be solved sensibly */                                      \
-        if (!(is_download && !is_streaming && values.size() <= 1)) {                                                 \
-            auto&& last = values.back();                                                                             \
-            CHECK(last.estimate == 1.0);                                                                             \
-            CHECK(last.xferred == last.xferable);                                                                    \
-        }                                                                                                            \
+        auto&& last = values.back();                                                                                 \
+        CHECK(last.estimate == 1.0);                                                                                 \
+        CHECK(last.xferred == last.xferable);                                                                        \
     }
 
-#define VERIFY_PROGRESS_CONSISTENCY_EX(progress, begin, end, expected_download_stages)                               \
+/*
+ * This test runs a few scenarios for synchronizing changes between two separate realm files for the same app,
+ * and verifies high-level consistency in reported progress notification's values.
+ *
+ * It doesn't try to check for particular reported values: these are checked in sync impl tests,
+ * and specific combinations of updates verified directly in SyncProgressNotifier tests.
+ *
+ * First, test adds a few objects into one realm, verifies that the progress is reported until upload completion.
+ * Then it checks how this exact changes are downloaded into the second realm file (this essentially checks
+ * how progress is reported with bootstrap store for flx).
+ *
+ * Next subtests, are here to check how continuous sync reports progress. It reuses the same two realm files
+ * with synchronized objects in them both. Test adds more objects into the second realm to sync more changes
+ * the other way around: from second realm to the first one, and check if also upload progress correct for
+ * the second realm, and download progress for the first realm after its initial upload.
+ *  - first by reusing the same realm instance for the second realm
+ *  - second by closing and reopening second realm file with new SharedRealm instance
+ *
+ * Separately, AsyncOpenTask is checked twice: with initial empty third realm file, and with subsequent second opening
+ * with more changes to download from the server. The progress reported through task interface should behave in the
+ * same way as with cases tested above.
+ */
+TEMPLATE_TEST_CASE("sync progress notifications", "[sync][baas][progress]", PBS, FLX)
+{
+    TestType setup;
+    size_t expected_count = 0;
+
+#define VERIFY_REALM(realm_1, realm_2, expected)                                                                     \
     {                                                                                                                \
+        REQUIRE(expected > 0);                                                                                       \
+        REQUIRE(realm_1);                                                                                            \
+        REQUIRE(realm_2);                                                                                            \
+        REQUIRE(realm_1 != realm_2);                                                                                 \
+        auto table1 = setup.get_table(realm_1);                                                                      \
+        auto table2 = setup.get_table(realm_2);                                                                      \
+        REQUIRE(table1);                                                                                             \
+        REQUIRE(table2);                                                                                             \
+        REQUIRE(table1->size() == expected);                                                                         \
+        REQUIRE(table2->size() == expected);                                                                         \
+    }
+
+    // register set of 4 callbacks to put values in predefined places in reported progress list:
+    // idx 0: non-streaming/download, 1: non-streaming/upload, 2: streaming/download, 3: streaming/upload
+    auto add_callbacks = [&](SharedRealm& realm, ReportedProgress& progress) {
+        size_t idx = progress.size();
+        progress.resize(idx + 4);
+        for (auto&& stream : {false, true})
+            for (auto&& direction : {NotifierType::download, NotifierType::upload})
+                realm->sync_session()->register_progress_notifier(
+                    [&, i = idx++](uint64_t xferred, uint64_t xferable, double estimate) {
+                        progress.add(i, xferred, xferable, estimate);
+                    },
+                    direction, stream);
+    };
+
+#define VERIFY_PROGRESS_CONSISTENCY(progress, begin, end)                                                            \
+    {                                                                                                                \
+        std::lock_guard lock(progress.mutex);                                                                        \
         REQUIRE(begin < end);                                                                                        \
         REQUIRE(end <= progress.size());                                                                             \
                                                                                                                      \
-        std::lock_guard lock(progress_mutex);                                                                        \
         for (size_t i = begin; i < end; ++i) {                                                                       \
             /* from add_callbacks: odd sequence number: upload, even: download */                                    \
             bool is_download = i % 2 == 0;                                                                           \
             /* first two lists are for non-streaming, next streaming callbacks */                                    \
-            bool is_streaming = i % 4 >= 1;                                                                          \
-            VERIFY_PROGRESS_CONSISTENCY_ONE(progress, i, expected_download_stages, is_download, is_streaming);       \
+            bool is_streaming = i % 4 > 1;                                                                           \
+            VERIFY_PROGRESS_CONSISTENCY_ONE(progress, i, 1, is_download, is_streaming);                              \
         }                                                                                                            \
     }
-
-#define VERIFY_PROGRESS_CONSISTENCY(progress, begin, end) VERIFY_PROGRESS_CONSISTENCY_EX(progress, begin, end, 1)
 
     auto wait_for_sync = [](SharedRealm& realm) {
         realm->sync_session()->resume();
@@ -880,7 +881,7 @@ TEMPLATE_TEST_CASE("sync progress notifications", "[sync][baas][progress]", PBS,
 
     wait_for_sync(realm_1);
     VERIFY_PROGRESS_CONSISTENCY(progress_1, 0, 4);
-    clear(progress_1);
+    progress_1.clear();
 
     SECTION("progress from second realm") {
         auto config2 = setup.make_config();
@@ -891,9 +892,8 @@ TEMPLATE_TEST_CASE("sync progress notifications", "[sync][baas][progress]", PBS,
         wait_for_sync(realm_2);
         VERIFY_REALM(realm_1, realm_2, expected_count);
 
-        int expected_download_stages = is_flx ? 2 : 1; // + query version 0 progress
-        VERIFY_PROGRESS_CONSISTENCY_EX(progress_2, 0, 4, expected_download_stages);
-        clear(progress_2);
+        VERIFY_PROGRESS_CONSISTENCY(progress_2, 0, 4);
+        progress_2.clear();
 
         VERIFY_PROGRESS_EMPTY(progress_1, 0, progress_1.size());
 
@@ -930,8 +930,8 @@ TEMPLATE_TEST_CASE("sync progress notifications", "[sync][baas][progress]", PBS,
             VERIFY_PROGRESS_CONSISTENCY(progress_2, 4, 8);
         }
 
-        clear(progress_1);
-        clear(progress_2);
+        progress_1.clear();
+        progress_2.clear();
     }
 
     SECTION("progress through async open task on a new realm") {
@@ -952,8 +952,7 @@ TEMPLATE_TEST_CASE("sync progress notifications", "[sync][baas][progress]", PBS,
             progress.resize(progress.size() + 1);
 
             task->register_download_progress_notifier([&](uint64_t xferred, uint64_t xferable, double estimate) {
-                std::lock_guard lock(progress_mutex);
-                progress[progress_index].emplace_back(Progress{xferred, xferable, estimate});
+                progress.add(progress_index, xferred, xferable, estimate);
             });
 
             std::atomic<bool> finished = false;
@@ -977,7 +976,7 @@ TEMPLATE_TEST_CASE("sync progress notifications", "[sync][baas][progress]", PBS,
 
             VERIFY_PROGRESS_CONSISTENCY_ONE(progress, progress_index, 1, true, false);
             VERIFY_PROGRESS_EMPTY(progress, 0, progress_index); // previous (from i = 0) should be empty
-            clear(progress);
+            progress.clear();
 
             // add more objects through realm_1 and reopen existing realm on second iteration
             if (i == 0) {
@@ -986,7 +985,7 @@ TEMPLATE_TEST_CASE("sync progress notifications", "[sync][baas][progress]", PBS,
                 wait_for_sync(realm_1);
                 VERIFY_PROGRESS_EMPTY(progress_1, 0, 2);
                 VERIFY_PROGRESS_CONSISTENCY(progress_1, 2, 8);
-                clear(progress_1);
+                progress_1.clear();
             }
         }
     }
