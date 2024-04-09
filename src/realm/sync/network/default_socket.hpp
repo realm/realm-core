@@ -50,12 +50,9 @@ public:
     };
 
     using AutoStart = util::TaggedBool<AutoStartTag>;
-    DefaultSocketProvider(const std::shared_ptr<util::Logger>& logger, const std::string user_agent,
+    DefaultSocketProvider(const std::shared_ptr<util::Logger>& logger, const std::string& user_agent,
                           const std::shared_ptr<BindingCallbackThreadObserver>& observer_ptr = nullptr,
                           AutoStart auto_start = AutoStart{true});
-
-    // Don't allow move or copy constructor
-    DefaultSocketProvider(DefaultSocketProvider&&) = delete;
 
     ~DefaultSocketProvider();
 

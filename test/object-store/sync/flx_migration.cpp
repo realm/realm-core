@@ -125,8 +125,8 @@ TEST_CASE("Test server migration and rollback", "[sync][flx][flx migration][baas
     };
     auto server_app_config = minimal_app_config("server_migrate_rollback", mig_schema);
     TestAppSession session(create_app(server_app_config));
-    SyncTestFile config1(session.app(), partition1, server_app_config.schema);
-    SyncTestFile config2(session.app(), partition2, server_app_config.schema);
+    SyncTestFile config1(session.app()->current_user(), partition1, server_app_config.schema);
+    SyncTestFile config2(session.app()->current_user(), partition2, server_app_config.schema);
 
     // Fill some objects
     auto objects1 = fill_test_data(config1, partition1);    // 5 objects starting at 1
@@ -243,7 +243,7 @@ TEST_CASE("Test server migration and rollback", "[sync][flx][flx migration][baas
     }
 
     {
-        SyncTestFile pbs_config(session.app(), partition1, server_app_config.schema);
+        SyncTestFile pbs_config(session.app()->current_user(), partition1, server_app_config.schema);
         auto pbs_realm = Realm::get_shared_realm(pbs_config);
 
         REQUIRE(!wait_for_upload(*pbs_realm));
@@ -252,7 +252,7 @@ TEST_CASE("Test server migration and rollback", "[sync][flx][flx migration][baas
         check_data(pbs_realm, true, false);
     }
     {
-        SyncTestFile pbs_config(session.app(), partition2, server_app_config.schema);
+        SyncTestFile pbs_config(session.app()->current_user(), partition2, server_app_config.schema);
         auto pbs_realm = Realm::get_shared_realm(pbs_config);
 
         REQUIRE(!wait_for_upload(*pbs_realm));
@@ -273,7 +273,7 @@ TEST_CASE("Test client migration and rollback", "[sync][flx][flx migration][baas
     };
     auto server_app_config = minimal_app_config("server_migrate_rollback", mig_schema);
     TestAppSession session(create_app(server_app_config));
-    SyncTestFile config(session.app(), partition, server_app_config.schema);
+    SyncTestFile config(session.app()->current_user(), partition, server_app_config.schema);
     config.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
     config.schema_version = 0;
 
@@ -328,7 +328,7 @@ TEST_CASE("Test client migration and rollback with recovery", "[sync][flx][flx m
     };
     auto server_app_config = minimal_app_config("server_migrate_rollback", mig_schema);
     TestAppSession session(create_app(server_app_config));
-    SyncTestFile config(session.app(), partition, server_app_config.schema);
+    SyncTestFile config(session.app()->current_user(), partition, server_app_config.schema);
     config.sync_config->client_resync_mode = ClientResyncMode::Recover;
     config.schema_version = 0;
 
@@ -484,7 +484,7 @@ TEST_CASE("An interrupted migration or rollback can recover on the next session"
     };
     auto server_app_config = minimal_app_config("server_migrate_rollback", mig_schema);
     TestAppSession session(create_app(server_app_config));
-    SyncTestFile config(session.app(), partition, server_app_config.schema);
+    SyncTestFile config(session.app()->current_user(), partition, server_app_config.schema);
     config.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
     config.schema_version = 0;
 
@@ -621,7 +621,7 @@ TEST_CASE("Update to native FLX after migration", "[sync][flx][flx migration][ba
     };
     auto server_app_config = minimal_app_config("server_migrate_rollback", mig_schema);
     TestAppSession session(create_app(server_app_config));
-    SyncTestFile config(session.app(), partition, server_app_config.schema);
+    SyncTestFile config(session.app()->current_user(), partition, server_app_config.schema);
     config.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
     config.schema_version = 0;
 
@@ -742,7 +742,7 @@ TEST_CASE("New table is synced after migration", "[sync][flx][flx migration][baa
     const Schema two_obj_schema{obj1_schema, obj2_schema};
     auto server_app_config = minimal_app_config("server_migrate_rollback", two_obj_schema);
     TestAppSession session(create_app(server_app_config));
-    SyncTestFile config(session.app(), partition, server_app_config.schema);
+    SyncTestFile config(session.app()->current_user(), partition, server_app_config.schema);
     config.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
     config.schema_version = 0;
 
@@ -847,7 +847,7 @@ TEST_CASE("Async open + client reset", "[sync][flx][flx migration][baas]") {
     server_app_config.dev_mode_enabled = true;
     std::optional<SyncTestFile> config; // destruct this after the sessions are torn down
     TestAppSession session(create_app(server_app_config));
-    config.emplace(session.app(), partition, server_app_config.schema);
+    config.emplace(session.app()->current_user(), partition, server_app_config.schema);
     config->sync_config->client_resync_mode = ClientResyncMode::Recover;
     config->sync_config->notify_before_client_reset = [&](SharedRealm before) {
         logger_ptr->debug("notify_before_client_reset");
