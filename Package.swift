@@ -420,6 +420,9 @@ let package = Package(
                 "swift",
                 "win32",
             ] + syncExcludes + syncServerSources) as [String],
+            resources: [
+                .copy("realm/PrivacyInfo.xcprivacy")
+            ],
             publicHeadersPath: ".",
             cxxSettings: ([
                 .headerSearchPath("external"),
