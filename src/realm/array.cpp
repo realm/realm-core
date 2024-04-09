@@ -994,7 +994,6 @@ MemRef Array::create(Type type, bool context_flag, WidthType width_type, size_t 
     if (value != 0)
         width = static_cast<int>(bit_width(value));
     auto mem = Node::create_node(size, alloc, context_flag, type, width_type, width);
-
     if (value != 0) {
         const auto header = mem.get_addr();
         char* data = get_data_from_header(header);

@@ -353,8 +353,6 @@ public:
     // name:       |  b0   |  b1   |  b2   |  b3   | b4:0-2 | b4:3-4 | b4:5-7 |  b5   |  b6   |  b7  |
     // oldies      |  cap/chksum           |  'A'  | width  | wtype  | flags  |          size        |
     // Packed      |  cap/chksum   | -     | width | flags2 | wtype  | flags  | wtyp2 |     size     |
-    // AofP        |  cap/chksum   | w_A   | w_B   | flags2 | wtype  | flags  | wtyp2 |     size     |
-    // PofA        |  cap/chksum   | w_A   | w_B   | flags2 | wtype  | flags  | wtyp2 |     size     |
     // Flex        |  cap/chksum   | w_B + size_B  | flags2 | wtype  | flags  | wtyp2 | w_A + size_A |
     //
     // legend: cap = capacity, chksum = checksum, flags = 3 flag bits, flags2 = 3 additional flag bits
