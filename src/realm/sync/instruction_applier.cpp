@@ -489,7 +489,7 @@ void InstructionApplier::operator()(const Instruction::Update& instr)
                     }
                 },
                 [&](const Instruction::Payload::Erased&) {
-                    dict.erase(key);
+                    dict.try_erase(key);
                 },
                 [&](const Instruction::Payload::ObjectValue&) {
                     dict.create_and_insert_linked_object(key);
