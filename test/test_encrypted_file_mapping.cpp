@@ -348,7 +348,7 @@ NONCONCURRENT_TEST(EncryptedFile_Portablility)
     // such that the top ref written eventually crosses over the block_size and
     // page_size() thresholds. This has caught faulty top_ref + size calculations.
     std::vector<size_t> test_sizes;
-#if false && TEST_DURATION == 0
+#if TEST_DURATION == 0
     test_sizes.resize(100);
     std::iota(test_sizes.begin(), test_sizes.end(), 500);
     // The allocations are not controlled, but at the time of writing this test
