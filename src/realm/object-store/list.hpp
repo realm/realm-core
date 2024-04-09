@@ -246,28 +246,25 @@ void List::set(Context& ctx, size_t list_ndx, T&& value, CreatePolicy policy)
         ctx.template unbox<Obj>(value, policy, key);
         return;
     }
-    if (m_type == PropertyType::Mixed) {
-        Mixed new_val = ctx.template unbox<Mixed>(value, policy);
-        if (new_val.is_type(type_Dictionary)) {
-            set_collection(list_ndx, CollectionType::Dictionary);
-            auto dict = get_dictionary(list_ndx);
-            dict.assign(ctx, value, policy);
-            return;
+    dispatch([&](auto t) {
+        using U = std::decay_t<decltype(*t)>;
+        auto new_val = ctx.template unbox<U>(value, policy);
+        if constexpr (std::is_same_v<U, realm::Mixed>) {
+            if (new_val.is_type(type_Dictionary)) {
+                set_collection(list_ndx, CollectionType::Dictionary);
+                auto dict = get_dictionary(list_ndx);
+                dict.assign(ctx, value, policy);
+                return;
+            }
+            if (new_val.is_type(type_List)) {
+                set_collection(list_ndx, CollectionType::List);
+                auto list = get_list(list_ndx);
+                list.assign(ctx, value, policy);
+                return;
+            }
         }
-        if (new_val.is_type(type_List)) {
-            set_collection(list_ndx, CollectionType::List);
-            auto list = get_list(list_ndx);
-            list.assign(ctx, value, policy);
-            return;
-        }
-
         this->set(list_ndx, new_val);
-    }
-    else {
-        dispatch([&](auto t) {
-            this->set(list_ndx, ctx.template unbox<std::decay_t<decltype(*t)>>(value, policy));
-        });
-    }
+    });
 }
 
 template <typename T, typename Context>

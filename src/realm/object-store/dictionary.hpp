@@ -184,41 +184,6 @@ inline Obj Dictionary::get<Obj>(StringData key) const
     return get_object(key);
 }
 
-namespace {
-template <typename ValueType, typename ContextType>
-struct ValueUpdater {
-    ContextType& ctx;
-    ValueType& value;
-    Dictionary& dict;
-    StringData key;
-    CreatePolicy policy;
-
-    template <typename T>
-    void operator()(T*)
-    {
-        bool attr_changed = !policy.diff;
-        auto new_val = ctx.template unbox<T>(value, policy);
-
-        if (!attr_changed) {
-            util::Optional<Mixed> old_val = dict.try_get_any(key);
-            if (old_val) {
-                if constexpr (std::is_same<T, realm::Mixed>::value) {
-                    attr_changed = !new_val.is_same_type(*old_val);
-                }
-
-                attr_changed = attr_changed || new_val != *old_val;
-            }
-            else {
-                attr_changed = true;
-            }
-        }
-
-        if (attr_changed)
-            dict.insert(key, new_val);
-    }
-};
-} // namespace
-
 template <typename T, typename Context>
 void Dictionary::insert(Context& ctx, StringData key, T&& value, CreatePolicy policy)
 {
@@ -232,34 +197,43 @@ void Dictionary::insert(Context& ctx, StringData key, T&& value, CreatePolicy po
         ctx.template unbox<Obj>(value, policy, obj_key);
         return;
     }
-    if (m_type == PropertyType::Mixed) {
-        Mixed new_val = ctx.template unbox<Mixed>(value, policy);
-        if (new_val.is_type(type_Dictionary)) {
-            insert_collection(key, CollectionType::Dictionary);
-            auto dict = get_dictionary(key);
-            dict.assign(ctx, value, policy);
-            return;
-        }
-        if (new_val.is_type(type_List)) {
-            insert_collection(key, CollectionType::List);
-            auto list = get_list(key);
-            list.assign(ctx, value, policy);
-            return;
+    dispatch([&](auto t) {
+        using U = std::decay_t<decltype(*t)>;
+        bool attr_changed = !policy.diff;
+        auto new_val = ctx.template unbox<U>(value, policy);
+
+        if constexpr (std::is_same_v<U, realm::Mixed>) {
+            if (new_val.is_type(type_Dictionary)) {
+                insert_collection(key, CollectionType::Dictionary);
+                auto dict = get_dictionary(key);
+                dict.assign(ctx, value, policy);
+                return;
+            }
+            if (new_val.is_type(type_List)) {
+                insert_collection(key, CollectionType::List);
+                auto list = get_list(key);
+                list.assign(ctx, value, policy);
+                return;
+            }
         }
 
-        bool attr_changed = !policy.diff;
         if (!attr_changed) {
-            util::Optional<Mixed> old_value = dict().try_get(key);
-            attr_changed = !old_value || !new_val.is_same_type(*old_value) || new_val != *old_value;
+            util::Optional<Mixed> old_val = dict().try_get(key);
+            if (old_val) {
+                if constexpr (std::is_same_v<U, realm::Mixed>) {
+                    attr_changed = !new_val.is_same_type(*old_val);
+                }
+
+                attr_changed = attr_changed || new_val != *old_val;
+            }
+            else {
+                attr_changed = true;
+            }
         }
 
         if (attr_changed)
-            this->insert(key, new_val);
-    }
-    else {
-        ValueUpdater<T, Context> updater{ctx, value, *this, key, policy};
-        dispatch(updater);
-    }
+            dict().insert(key, new_val);
+    });
 }
 
 template <typename Context>

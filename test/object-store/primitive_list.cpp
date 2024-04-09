@@ -46,6 +46,12 @@ using namespace realm;
 using namespace realm::util;
 namespace cf = realm::collection_fixtures;
 
+// Dummy implementation to satisfy StringifyingContext
+inline std::ostream& operator<<(std::ostream& out, const realm::object_store::Collection&)
+{
+    return out;
+}
+
 struct StringifyingContext {
     template <typename T>
     std::string box(T value)
