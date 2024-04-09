@@ -1031,7 +1031,7 @@ MemRef Array::create(Type type, bool context_flag, WidthType width_type, size_t 
     init_header(header, encoding, flags, width, size);
     set_capacity_in_header(byte_size, header);
     if (value != 0) {
-        char* data = get_data_from_header(mem.get_addr());
+        char* data = get_data_from_header(header);
         size_t begin = 0, end = size;
         REALM_TEMPEX(fill_direct, width, (data, begin, end, value));
     }

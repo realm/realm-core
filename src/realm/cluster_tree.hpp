@@ -193,7 +193,7 @@ public:
     ref_type typed_write(ref_type ref, _impl::ArrayWriterBase& out, const Table& table, bool deep, bool only_modified,
                          bool compress) const
     {
-        REALM_ASSERT(m_root);
+        REALM_ASSERT_DEBUG(m_root);
         return m_root->typed_write(ref, out, table, deep, only_modified, compress);
     }
 
