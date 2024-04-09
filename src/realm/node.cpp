@@ -19,7 +19,6 @@
 #include <realm/node.hpp>
 #include <realm/utilities.hpp>
 #include <realm/mixed.hpp>
-#include <realm/array_encode.hpp>
 
 #if REALM_ENABLE_MEMDEBUG
 #include <cstring>

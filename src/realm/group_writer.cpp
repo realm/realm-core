@@ -29,7 +29,6 @@
 #include <realm/impl/destroy_guard.hpp>
 #include <realm/impl/simulated_failure.hpp>
 #include <realm/util/safe_int_ops.hpp>
-#include <realm/array_encode.hpp>
 
 using namespace realm;
 using namespace realm::util;
