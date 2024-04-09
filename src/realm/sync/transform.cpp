@@ -341,7 +341,7 @@ public:
             m_fields.emplace(n, get_type_name(type));
         }
 
-        void field(StringData n, Instruction::AddColumn::CollectionType type) override
+        void field(StringData n, Instruction::CollectionType type) override
         {
             m_fields.emplace(n, get_collection_type(type));
         }
@@ -421,7 +421,7 @@ public:
             diff_field(n, get_type_name(type));
         }
 
-        void field(StringData n, Instruction::AddColumn::CollectionType type) override
+        void field(StringData n, Instruction::CollectionType type) override
         {
             diff_field(n, get_collection_type(type));
         }
@@ -1751,15 +1751,15 @@ DEFINE_MERGE(Instruction::AddColumn, Instruction::AddColumn)
         }
 
         if (left.collection_type != right.collection_type) {
-            auto collection_type_name = [](Instruction::AddColumn::CollectionType type) -> const char* {
+            auto collection_type_name = [](Instruction::CollectionType type) -> const char* {
                 switch (type) {
-                    case Instruction::AddColumn::CollectionType::Single:
+                    case Instruction::CollectionType::Single:
                         return "single value";
-                    case Instruction::AddColumn::CollectionType::List:
+                    case Instruction::CollectionType::List:
                         return "list";
-                    case Instruction::AddColumn::CollectionType::Dictionary:
+                    case Instruction::CollectionType::Dictionary:
                         return "dictionary";
-                    case Instruction::AddColumn::CollectionType::Set:
+                    case Instruction::CollectionType::Set:
                         return "set";
                 }
                 REALM_TERMINATE("");
