@@ -27,36 +27,29 @@ namespace realm::app {
 
 PushClient::~PushClient() = default;
 
-namespace {
-util::UniqueFunction<void(const Response&)>
-wrap_completion(util::UniqueFunction<void(util::Optional<AppError>)>&& completion)
-{
-    return [completion = std::move(completion)](const Response& response) {
-        completion(AppUtils::check_for_errors(response));
-    };
-}
-} // anonymous namespace
-
-void PushClient::register_device(const std::string& registration_token, const std::shared_ptr<SyncUser>& sync_user,
-                                 util::UniqueFunction<void(util::Optional<AppError>)>&& completion)
+void PushClient::request(const std::shared_ptr<User>& user, HttpMethod method, std::string&& body,
+                         util::UniqueFunction<void(util::Optional<AppError>)>&& completion)
 {
     auto push_route = util::format("/app/%1/push/providers/%2/registration", m_app_id, m_service_name);
     std::string route = m_auth_request_client->url_for_path(push_route);
-
-    bson::BsonDocument args{{"registrationToken", registration_token}};
-    m_auth_request_client->do_authenticated_request(
-        {HttpMethod::put, std::move(route), m_timeout_ms, {}, bson::Bson(args).to_string(), false}, sync_user,
-        wrap_completion(std::move(completion)));
+    m_auth_request_client->do_authenticated_request(method, std::move(route), std::move(body), user,
+                                                    RequestTokenType::AccessToken,
+                                                    [completion = std::move(completion)](const Response& response) {
+                                                        completion(AppUtils::check_for_errors(response));
+                                                    });
 }
 
-void PushClient::deregister_device(const std::shared_ptr<SyncUser>& sync_user,
+void PushClient::register_device(const std::string& registration_token, const std::shared_ptr<User>& user,
+                                 util::UniqueFunction<void(util::Optional<AppError>)>&& completion)
+{
+    bson::BsonDocument args{{"registrationToken", registration_token}};
+    request(user, HttpMethod::put, bson::Bson(args).to_string(), std::move(completion));
+}
+
+void PushClient::deregister_device(const std::shared_ptr<User>& user,
                                    util::UniqueFunction<void(util::Optional<AppError>)>&& completion)
 {
-    auto push_route = util::format("/app/%1/push/providers/%2/registration", m_app_id, m_service_name);
-
-    m_auth_request_client->do_authenticated_request(
-        {HttpMethod::del, m_auth_request_client->url_for_path(push_route), m_timeout_ms, {}, "", false}, sync_user,
-        wrap_completion(std::move(completion)));
+    request(user, HttpMethod::del, "", std::move(completion));
 }
 
 } // namespace realm::app

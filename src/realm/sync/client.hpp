@@ -564,7 +564,7 @@ public:
     ///
     /// \param signed_user_token A cryptographically signed token describing the
     /// identity and access rights of the current user. See ProtocolEnvelope.
-    void refresh(const std::string& signed_user_token);
+    void refresh(std::string_view signed_user_token);
 
     /// \brief Inform the synchronization agent about changes of local origin.
     ///

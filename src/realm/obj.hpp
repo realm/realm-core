@@ -549,6 +549,12 @@ inline Obj& Obj::set(ColKey col_key, std::string str, bool is_default)
 }
 
 template <>
+inline Obj& Obj::set(ColKey col_key, std::string_view str, bool is_default)
+{
+    return set(col_key, StringData(str), is_default);
+}
+
+template <>
 inline Obj& Obj::set(ColKey col_key, realm::null, bool is_default)
 {
     return set_null(col_key, is_default);

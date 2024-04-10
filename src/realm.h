@@ -2883,6 +2883,12 @@ typedef enum realm_auth_provider {
     RLM_AUTH_PROVIDER_API_KEY,
 } realm_auth_provider_e;
 
+typedef enum realm_sync_client_metadata_mode {
+    RLM_SYNC_CLIENT_METADATA_MODE_PLAINTEXT,
+    RLM_SYNC_CLIENT_METADATA_MODE_ENCRYPTED,
+    RLM_SYNC_CLIENT_METADATA_MODE_DISABLED,
+} realm_sync_client_metadata_mode_e;
+
 typedef struct realm_app_user_apikey {
     realm_object_id_t id;
     const char* key;
@@ -2992,6 +2998,13 @@ RLM_API void realm_app_config_set_framework_name(realm_app_config_t* config,
 RLM_API void realm_app_config_set_framework_version(realm_app_config_t* config,
                                                     const char* framework_version) RLM_API_NOEXCEPT;
 RLM_API void realm_app_config_set_bundle_id(realm_app_config_t* config, const char* bundle_id) RLM_API_NOEXCEPT;
+RLM_API void realm_app_config_set_base_file_path(realm_app_config_t*, const char*) RLM_API_NOEXCEPT;
+RLM_API void realm_app_config_set_metadata_mode(realm_app_config_t*,
+                                                realm_sync_client_metadata_mode_e) RLM_API_NOEXCEPT;
+RLM_API void realm_app_config_set_metadata_encryption_key(realm_app_config_t*, const uint8_t[64]) RLM_API_NOEXCEPT;
+RLM_API void realm_app_config_set_security_access_group(realm_app_config_t*, const char*) RLM_API_NOEXCEPT;
+
+RLM_API realm_sync_client_config_t* realm_app_config_get_sync_client_config(realm_app_config_t*) RLM_API_NOEXCEPT;
 
 /**
  * Get an existing @a realm_app_credentials_t and return it's json representation
@@ -3002,18 +3015,18 @@ RLM_API void realm_app_config_set_bundle_id(realm_app_config_t* config, const ch
 RLM_API const char* realm_app_credentials_serialize_as_json(realm_app_credentials_t*) RLM_API_NOEXCEPT;
 
 /**
- * Create realm_app_t* instance given a valid realm configuration and sync client configuration.
+ * Create realm_app_t* instance given a valid realm app configuration.
  *
  * @return A non-null pointer if no error occurred.
  */
-RLM_API realm_app_t* realm_app_create(const realm_app_config_t*, const realm_sync_client_config_t*);
+RLM_API realm_app_t* realm_app_create(const realm_app_config_t*);
 
 /**
- * Create cached realm_app_t* instance given a valid realm configuration and sync client configuration.
+ * Create cached realm_app_t* instance given a valid realm app configuration.
  *
  * @return A non-null pointer if no error occurred.
  */
-RLM_API realm_app_t* realm_app_create_cached(const realm_app_config_t*, const realm_sync_client_config_t*);
+RLM_API realm_app_t* realm_app_create_cached(const realm_app_config_t*);
 
 /**
  * Get a cached realm_app_t* instance given an app id. out_app may be null if the app with this id hasn't been
@@ -3143,11 +3156,10 @@ RLM_API bool realm_app_link_user(realm_app_t* app, realm_user_t* user, realm_app
  * Switches the active user with the specified one. The user must exist in the list of all users who have logged into
  * this application.
  * @param app ptr to realm_app
- * @param user ptr to current user
- * @param new_user ptr to the new user to switch
+ * @param user ptr to user to set as current.
  * @return True if no error has been recorded, False otherwise
  */
-RLM_API bool realm_app_switch_user(realm_app_t* app, realm_user_t* user, realm_user_t** new_user);
+RLM_API bool realm_app_switch_user(realm_app_t* app, realm_user_t* user);
 
 /**
  * Logs out and removes the provided user.
@@ -3382,9 +3394,9 @@ RLM_API char* realm_app_sync_client_get_default_file_path_for_realm(const realm_
 /**
  * Return the identiy for the user passed as argument
  * @param user ptr to the user for which the identiy has to be retrieved
- * @return a ptr to the identity string
+ * @return a ptr to the identity string. This must be manually released with realm_free().
  */
-RLM_API const char* realm_user_get_identity(const realm_user_t* user) RLM_API_NOEXCEPT;
+RLM_API char* realm_user_get_identity(const realm_user_t* user) RLM_API_NOEXCEPT;
 
 /**
  * Retrieve the state for the user passed as argument
@@ -3460,12 +3472,6 @@ RLM_API realm_app_t* realm_user_get_app(const realm_user_t*) RLM_API_NOEXCEPT;
 
 
 /* Sync */
-typedef enum realm_sync_client_metadata_mode {
-    RLM_SYNC_CLIENT_METADATA_MODE_PLAINTEXT,
-    RLM_SYNC_CLIENT_METADATA_MODE_ENCRYPTED,
-    RLM_SYNC_CLIENT_METADATA_MODE_DISABLED,
-} realm_sync_client_metadata_mode_e;
-
 typedef enum realm_sync_client_reconnect_mode {
     RLM_SYNC_CLIENT_RECONNECT_MODE_NORMAL,
     RLM_SYNC_CLIENT_RECONNECT_MODE_TESTING,
@@ -3601,7 +3607,7 @@ typedef void (*realm_sync_on_user_state_changed_t)(realm_userdata_t userdata, re
 typedef struct realm_async_open_task_progress_notification_token realm_async_open_task_progress_notification_token_t;
 typedef struct realm_sync_session_connection_state_notification_token
     realm_sync_session_connection_state_notification_token_t;
-typedef struct realm_sync_user_subscription_token realm_sync_user_subscription_token_t;
+typedef struct realm_app_user_subscription_token realm_app_user_subscription_token_t;
 
 /**
  * Callback function invoked by the async open task once the realm is open and fully synchronized.
@@ -3627,11 +3633,6 @@ typedef void (*realm_async_open_task_init_subscription_func_t)(realm_thread_safe
                                                                realm_userdata_t userdata);
 
 RLM_API realm_sync_client_config_t* realm_sync_client_config_new(void) RLM_API_NOEXCEPT;
-RLM_API void realm_sync_client_config_set_base_file_path(realm_sync_client_config_t*, const char*) RLM_API_NOEXCEPT;
-RLM_API void realm_sync_client_config_set_metadata_mode(realm_sync_client_config_t*,
-                                                        realm_sync_client_metadata_mode_e) RLM_API_NOEXCEPT;
-RLM_API void realm_sync_client_config_set_metadata_encryption_key(realm_sync_client_config_t*,
-                                                                  const uint8_t[64]) RLM_API_NOEXCEPT;
 RLM_API void realm_sync_client_config_set_reconnect_mode(realm_sync_client_config_t*,
                                                          realm_sync_client_reconnect_mode_e) RLM_API_NOEXCEPT;
 RLM_API void realm_sync_client_config_set_multiplex_sessions(realm_sync_client_config_t*, bool) RLM_API_NOEXCEPT;
@@ -4016,7 +4017,7 @@ RLM_API realm_sync_session_connection_state_notification_token_t* realm_sync_ses
 /**
  * @return a notification token object. Dispose it to stop receiving notifications.
  */
-RLM_API realm_sync_user_subscription_token_t*
+RLM_API realm_app_user_subscription_token_t*
 realm_sync_user_on_state_change_register_callback(realm_user_t*, realm_sync_on_user_state_changed_t,
                                                   realm_userdata_t userdata,
                                                   realm_free_userdata_func_t userdata_free);

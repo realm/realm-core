@@ -23,31 +23,40 @@
 
 #if REALM_PLATFORM_APPLE
 
-#include <CoreFoundation/CoreFoundation.h>
+#include <realm/util/cf_ptr.hpp>
 
-namespace realm {
-namespace util {
+namespace realm::util {
 
-inline std::string cfstring_to_std_string(CFStringRef cf_str)
+inline const char* cfstring_to_cstring(CFStringRef cf_str, std::unique_ptr<char[]>& buffer)
 {
-    std::string ret;
     // If the CFString happens to store UTF-8 we can read its data directly
     if (const char* utf8 = CFStringGetCStringPtr(cf_str, kCFStringEncodingUTF8)) {
-        ret = utf8;
-        return ret;
+        return utf8;
     }
 
     // Otherwise we need to convert the CFString to UTF-8
     CFIndex length = CFStringGetLength(cf_str);
     CFIndex max_size = CFStringGetMaximumSizeForEncoding(length, kCFStringEncodingUTF8) + 1;
-    ret.resize(max_size);
-    CFStringGetCString(cf_str, &ret[0], max_size, kCFStringEncodingUTF8);
-    ret.resize(strlen(ret.c_str()));
-    return ret;
+    buffer = std::make_unique<char[]>(max_size);
+    CFStringGetCString(cf_str, buffer.get(), max_size, kCFStringEncodingUTF8);
+    return buffer.get();
 }
 
-} // namespace util
-} // namespace realm
+inline CFPtr<CFStringRef> string_view_to_cfstring(std::string_view string)
+{
+    if (!string.data()) {
+        return CFPtr<CFStringRef>{};
+    }
+    auto result =
+        adoptCF(CFStringCreateWithBytesNoCopy(kCFAllocatorDefault, reinterpret_cast<const UInt8*>(string.data()),
+                                              string.size(), kCFStringEncodingUTF8, false, kCFAllocatorNull));
+    if (!result) {
+        throw std::bad_alloc();
+    }
+    return result;
+}
+
+} // namespace realm::util
 
 #endif // REALM_PLATFORM_APPLE
 

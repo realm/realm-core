@@ -227,7 +227,7 @@ enums:
       - RecoverOrDiscard
 
   MetadataMode:
-    cppName: SyncClientConfig::MetadataMode
+    cppName: app::AppConfig::MetadataMode
     values:
       - NoEncryption
       - Encryption
@@ -288,6 +288,12 @@ enums:
       - ClientReset
       - ClientResetNoRecovery
 
+  SyncFileAction:
+    cppName: SyncFileAction
+    values:
+      - DeleteRealm
+      - BackUpThenDeleteRealm
+
   ProgressDirection:
     cppName: SyncSession::ProgressDirection
     values:
@@ -295,7 +301,7 @@ enums:
       - download
 
   SyncUserState:
-    cppName: SyncUser::State
+    cppName: UserState
     values:
       - LoggedOut
       - LoggedIn
@@ -451,7 +457,7 @@ records:
         default: false
 
   UserIdentity:
-    cppName: SyncUserIdentity
+    cppName: app::UserIdentity
     fields:
       id:
         type: std::string
@@ -593,11 +599,6 @@ records:
 
   SyncClientConfig:
     fields:
-      base_file_path: std::string
-      metadata_mode:
-        type: MetadataMode
-        default: MetadataMode::Encryption
-      custom_encryption_key: std::optional<EncryptionKey>
       logger_factory: Nullable<LoggerFactory>
       log_level:
         type: LoggerLevel
@@ -656,7 +657,7 @@ records:
       body: std::string
 
   DeviceInfo:
-    cppName: app::App::Config::DeviceInfo
+    cppName: app::AppConfig::DeviceInfo
     fields:
       platform_version: std::string
       sdk_version: std::string
@@ -668,13 +669,22 @@ records:
       bundle_id: std::string
 
   AppConfig:
-    cppName: app::App::Config
+    cppName: app::AppConfig
     fields:
       app_id: std::string
       transport: SharedGenericNetworkTransport
       base_url: std::optional<std::string>
       default_request_timeout_ms: std::optional<uint64_t>
       device_info: DeviceInfo
+      base_file_path: std::string
+      sync_client_config: SyncClientConfig
+      metadata_mode:
+        type: MetadataMode
+        default: MetadataMode::Encryption
+      custom_encryption_key: std::optional<EncryptionKey>
+      security_access_group:
+        type: std::string
+        default: ""
 
   CompensatingWriteErrorInfo:
    cppName: sync::CompensatingWriteErrorInfo
@@ -1190,36 +1200,49 @@ classes:
       provider: AuthProvider
       provider_as_string: std::string
 
-  SyncUserSubscriptionToken:
-    cppName: SyncUser::Token
+  UserSubscriptionToken:
+    cppName: app::User::Token
 
   SyncUser:
     sharedPtrWrapped: SharedSyncUser
     properties:
-      all_sessions: std::vector<SharedSyncSession>
       is_logged_in: bool
-      identity: const std::string&
-      provider_type: const std::string&
-      local_identity: const std::string&
+      user_id: std::string
+      app_id: std::string
+      legacy_identities: std::vector<std::string>
       access_token: std::string
       refresh_token: std::string
+      state: SyncUserState
+      sync_manager: SharedSyncManager
+    methods:
+      access_token_refresh_required: bool
+      request_log_out: '(cb: AsyncCallback<(err: std::optional<AppError>)>&&)'
+      request_refresh_user: '(cb: AsyncCallback<(err: std::optional<AppError>)>&&)'
+      request_refresh_location: '(cb: AsyncCallback<(err: std::optional<AppError>)>&&)'
+      request_access_token: '(cb: AsyncCallback<(err: std::optional<AppError>)>&&)'
+      track_realm: '(std::string_view)'
+      create_file_action: '(action: SyncFileAction, original_path: std::string_view, requested_recovery_dir: std::optional<std::string>, partition_value: std::string_view) -> std::string'
+
+  User:
+    base: SyncUser
+    cppName: app::User
+    sharedPtrWrapped: SharedUser
+    properties:
+      is_anonymous: bool
       device_id: std::string
       has_device_id: bool
       user_profile: UserProfile
       identities: std::vector<UserIdentity>
       custom_data: std::optional<bson::BsonDocument>
-      sync_manager: SharedSyncManager
-      state: SyncUserState
       subscribers_count: count_t
+      app: SharedApp
     methods:
       log_out: ()
-      session_for_on_disk_path: '(path: StringData) -> Nullable<SharedSyncSession>'
-      subscribe: '(observer: (user: IgnoreArgument<const SyncUser&>)) -> SyncUserSubscriptionToken'
-      unsubscribe: '(token: SyncUserSubscriptionToken)'
-      # TODO update methods?
+      subscribe: '(observer: (user: IgnoreArgument<const app::User&>)) -> UserSubscriptionToken'
+      unsubscribe: '(token: UserSubscriptionToken)'
 
   UserProfile:
-    cppName: SyncUserProfile
+    cppName: app::UserProfile
     methods:
       name: '() -> std::optional<std::string>'
       email: '() -> std::optional<std::string>'
@@ -1240,27 +1263,27 @@ classes:
     sharedPtrWrapped: SharedApp
     properties:
       config: const AppConfig&
-      current_user: Nullable<SharedSyncUser>
-      all_users: std::vector<SharedSyncUser>
+      current_user: Nullable<SharedUser>
+      all_users: std::vector<SharedUser>
       sync_manager: SharedSyncManager
       subscribers_count: count_t
     staticMethods:
-      get_app: '(mode: AppCacheMode, config: AppConfig, sync_client_config: SyncClientConfig) -> SharedApp'
+      get_app: '(mode: AppCacheMode, config: const AppConfig&) -> SharedApp'
       get_cached_app: '(app_id: const std::string&) -> SharedApp'
       clear_cached_apps: ()
       close_all_sync_sessions: ()
 
     methods:
-      log_in_with_credentials: '(credentials: AppCredentials, cb: AsyncCallback<(user: const Nullable<SharedSyncUser>&, err: std::optional<AppError>)>&&)'
+      log_in_with_credentials: '(credentials: AppCredentials, cb: AsyncCallback<(user: const Nullable<SharedUser>&, err: std::optional<AppError>)>&&)'
       log_out:
         - '(cb: AsyncCallback<(err: std::optional<AppError>)>&&)'
-        - sig: '(user: SharedSyncUser, cb: AsyncCallback<(err: std::optional<AppError>)>&&)'
+        - sig: '(user: SharedUser, cb: AsyncCallback<(err: std::optional<AppError>)>&&)'
           suffix: user
-      refresh_custom_data: '(user: SharedSyncUser, cb: AsyncCallback<(err: std::optional<AppError>)>&&)'
-      link_user: '(user: SharedSyncUser, credentials: const AppCredentials&, cb: AsyncCallback<(user: const Nullable<SharedSyncUser>&, err: std::optional<AppError>)>&&)'
-      switch_user: '(user: SharedSyncUser)'
-      remove_user: '(user: SharedSyncUser, cb: AsyncCallback<(err: std::optional<AppError>)>&&)'
-      delete_user: '(user: SharedSyncUser, cb: AsyncCallback<(err: std::optional<AppError>)>&&)'
+      refresh_custom_data: '(user: SharedUser, cb: AsyncCallback<(err: std::optional<AppError>)>&&)'
+      link_user: '(user: SharedUser, credentials: const AppCredentials&, cb: AsyncCallback<(user: const Nullable<SharedUser>&, err: std::optional<AppError>)>&&)'
+      switch_user: '(user: SharedUser)'
+      remove_user: '(user: SharedUser, cb: AsyncCallback<(err: std::optional<AppError>)>&&)'
+      delete_user: '(user: SharedUser, cb: AsyncCallback<(err: std::optional<AppError>)>&&)'
       usernamePasswordProviderClient:
         - sig: () -> UsernamePasswordProviderClient
           cppName: provider_client<app::App::UsernamePasswordProviderClient>
@@ -1270,8 +1293,8 @@ classes:
       push_notification_client: '(service_name: const std::string&) -> PushClient'
       subscribe: '(observer: (app: IgnoreArgument<const App&>)) -> AppSubscriptionToken'
       unsubscribe: '(token: AppSubscriptionToken)'
-      call_function: '(user: const SharedSyncUser&, name: std::string, args: EJsonArray, service_name: std::optional<std::string>, cb: AsyncCallback<(result: Nullable<const EJson*>, err: std::optional<AppError>)>)'
-      make_streaming_request: '(user: SharedSyncUser, name: std::string, args: bson::BsonArray, service_name: std::optional<std::string>) -> Request'
+      call_function: '(user: const SharedUser&, name: std::string, args: EJsonArray, service_name: std::optional<std::string>, cb: AsyncCallback<(result: Nullable<const EJson*>, err: std::optional<AppError>)>)'
+      make_streaming_request: '(user: SharedUser, name: std::string, args: bson::BsonArray, service_name: std::optional<std::string>) -> Request'
       update_base_url: '(base_url: std::optional<std::string>, cb: AsyncCallback<(err: std::optional<AppError>)>&&)'
       get_base_url: '() const -> std::string'
 
@@ -1288,8 +1311,8 @@ classes:
   PushClient:
     cppName: app::PushClient
     methods:
-      register_device: '(registration_token: const std::string&, sync_user: const SharedSyncUser&, completion: AsyncCallback<(err: std::optional<AppError>)>&&)'
-      deregister_device: '(sync_user: const SharedSyncUser&, completion: AsyncCallback<(err: std::optional<AppError>)>&&)'
+      register_device: '(registration_token: const std::string&, sync_user: const SharedUser&, completion: AsyncCallback<(err: std::optional<AppError>)>&&)'
+      deregister_device: '(sync_user: const SharedUser&, completion: AsyncCallback<(err: std::optional<AppError>)>&&)'
 
   UsernamePasswordProviderClient:
     cppName: app::App::UsernamePasswordProviderClient
@@ -1305,12 +1328,12 @@ classes:
   UserAPIKeyProviderClient:
     cppName: app::App::UserAPIKeyProviderClient
     methods:
-      create_api_key: '(name: const std::string&, user: SharedSyncUser, completion: AsyncCallback<(apiKey: UserAPIKey&&, err: std::optional<AppError>)>&&)'
-      fetch_api_key: '(id: ObjectId&, user: const SharedSyncUser, completion: AsyncCallback<(apiKey: UserAPIKey&&, err: std::optional<AppError>)>&&)'
-      fetch_api_keys: '(user: const SharedSyncUser, completion: AsyncCallback<(apiKeys: std::vector<UserAPIKey>&&, err: std::optional<AppError>)>&&)'
-      delete_api_key: '(id: ObjectId&, user: const SharedSyncUser, completion: AsyncCallback<(err: std::optional<AppError>)>&&)'
-      enable_api_key: '(id: ObjectId&, user: const SharedSyncUser, completion: AsyncCallback<(err: std::optional<AppError>)>&&)'
-      disable_api_key: '(id: ObjectId&, user: const SharedSyncUser, completion: AsyncCallback<(err: std::optional<AppError>)>&&)'
+      create_api_key: '(name: const std::string&, user: SharedUser, completion: AsyncCallback<(apiKey: UserAPIKey&&, err: std::optional<AppError>)>&&)'
+      fetch_api_key: '(id: ObjectId&, user: const SharedUser, completion: AsyncCallback<(apiKey: UserAPIKey&&, err: std::optional<AppError>)>&&)'
+      fetch_api_keys: '(user: const SharedUser, completion: AsyncCallback<(apiKeys: std::vector<UserAPIKey>&&, err: std::optional<AppError>)>&&)'
+      delete_api_key: '(id: ObjectId&, user: const SharedUser, completion: AsyncCallback<(err: std::optional<AppError>)>&&)'
+      enable_api_key: '(id: ObjectId&, user: const SharedUser, completion: AsyncCallback<(err: std::optional<AppError>)>&&)'
+      disable_api_key: '(id: ObjectId&, user: const SharedUser, completion: AsyncCallback<(err: std::optional<AppError>)>&&)'
 
   # See Helpers::make_loger_factory to construct one.
   # Using an opaque class here rather than exposing the factory to avoid having to
@@ -1327,7 +1350,6 @@ classes:
       log_level: LoggerLevel
       has_existing_sessions: bool
     methods:
-      immediately_run_file_actions: '(original_name: std::string) -> bool'
       set_session_multiplexing: '(allowed: bool)'
       set_log_level: '(level: LoggerLevel)'
       set_logger_factory: '(factory: LoggerFactory)'
@@ -1335,8 +1357,8 @@ classes:
       set_timeouts: '(timeouts: SyncClientTimeouts)'
       reconnect: ()
       wait_for_sessions_to_terminate: ()
-      path_for_realm: '(config: SyncConfig, custom_file_name: std::optional<std::string>) -> StringData'
       get_existing_active_session: '(path: const std::string&) -> SharedSyncSession'
+      get_all_sessions_for: '(user: const SyncUser&) -> std::vector<SharedSyncSession>'
 
   ThreadSafeReference: {}
   AsyncOpenTask:
