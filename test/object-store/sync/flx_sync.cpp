@@ -4788,6 +4788,166 @@ TEST_CASE("flx: pause and resume bootstrapping at query version 0", "[sync][flx]
     REQUIRE(active_sub_set.state() == sync::SubscriptionSet::State::Complete);
 }
 
+
+static void fill_person_schema(FLXSyncTestHarness& harness)
+{
+    harness.load_initial_data([&](SharedRealm realm) {
+        int cnt = 1;
+        {
+            CppContext c(realm);
+            for (int i = 0; i < 100; ++i) {
+                auto obj = Object::create(c, realm, "Person",
+                                          std::any(AnyDict{
+                                              {"_id", ObjectId::gen()},
+                                              {"age", static_cast<int64_t>(40 + i)},
+                                              {"role", "manager"s},
+                                              {"firstName", util::format("firstname-%1", cnt)},
+                                              {"lastName", util::format("lastname-%1", cnt)},
+                                          }));
+                ++cnt;
+            }
+        }
+        {
+            CppContext c(realm);
+            for (int i = 0; i < 5000; ++i) {
+                auto obj = Object::create(c, realm, "Person",
+                                          std::any(AnyDict{{"_id", ObjectId::gen()},
+                                                           {"age", static_cast<int64_t>(20 + i % 30)},
+                                                           {"role", "employee"s},
+                                                           {"firstName", util::format("firstname-%1", cnt)},
+                                                           {"lastName", util::format("lastname-%1", cnt)}}));
+                ++cnt;
+            }
+        }
+        {
+            CppContext c(realm);
+            for (int i = 0; i < 125; ++i) {
+                auto obj = Object::create(c, realm, "Person",
+                                          std::any(AnyDict{{"_id", ObjectId::gen()},
+                                                           {"age", static_cast<int64_t>(45 + i)},
+                                                           {"role", "director"s},
+                                                           {"firstName", util::format("firstname-9999%1", cnt)},
+                                                           {"lastName", util::format("lastname-9999%1", cnt)}}));
+                ++cnt;
+            }
+        }
+    });
+}
+
+TEST_CASE("flx: role change bootstrap", "[sync][flx][baas][role_change][bootstrap]") {
+    const Schema person_schema{{"Person",
+                                {{"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+                                 {"age", PropertyType::Int | PropertyType::Nullable},
+                                 {"role", PropertyType::String},
+                                 {"firstName", PropertyType::String},
+                                 {"lastName", PropertyType::String}}}};
+    enum TestState { initial, disconnected, connecting, connected };
+    TestingStateMachine<TestState> machina(initial);
+
+    auto logger = util::Logger::get_default_logger();
+    FLXSyncTestHarness harness("flx_role_change_bootstrap", {person_schema, {"role", "firstName", "lastName"}});
+    auto& app_session = harness.session().app_session();
+    // Enable the role change bootstraps
+    REQUIRE(app_session.admin_api.set_feature_flag(app_session.server_app_id, "allow_permissions_bootstrap", true));
+    // Ensure the feature flag is enabled
+    REQUIRE(app_session.admin_api.get_feature_flag(app_session.server_app_id, "allow_permissions_bootstrap"));
+
+    auto rule = app_session.admin_api.get_default_rule(app_session.server_app_id);
+
+    // Initialize the realm with some data
+    fill_person_schema(harness);
+
+    auto config = harness.make_test_file();
+    auto realm = Realm::get_shared_realm(config);
+    REQUIRE(!wait_for_download(*realm));
+    REQUIRE(!wait_for_upload(*realm));
+
+
+    // Set up the initial subscription
+    {
+        auto table = realm->read_group().get_table("class_Person");
+        auto new_subs = realm->get_latest_subscription_set().make_mutable_copy();
+        new_subs.insert_or_assign(Query(table));
+        auto subs = new_subs.commit();
+
+        // Wait for subscription update and sync to complete
+        subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
+        REQUIRE(!wait_for_download(*realm));
+        REQUIRE(!wait_for_upload(*realm));
+        wait_for_advance(*realm);
+    }
+    {
+        auto table = realm->read_group().get_table("class_Person");
+        Results results(realm, Query(table));
+        CHECK(results.size() == 5225);
+    }
+
+    // Register connection change callback to verify session was restarted
+    using ConnState = SyncSession::ConnectionState;
+    auto session = realm->sync_session();
+    session->register_connection_change_callback([&machina, &logger](ConnState old_state, ConnState new_state) {
+        logger->info("Connection state: %1 -> %2", old_state, new_state);
+        machina.transition_with([new_state](TestState curr_state) {
+            switch (new_state) {
+                case ConnState::Disconnected:
+                    return TestState::disconnected;
+                case ConnState::Connecting:
+                    REQUIRE(curr_state == TestState::disconnected);
+                    return TestState::connecting;
+                case ConnState::Connected:
+                    REQUIRE(curr_state == TestState::connecting);
+                    return TestState::connected;
+                default:
+                    FAIL(util::format("Unknown connection state: %1", new_state));
+            }
+        });
+    });
+
+    auto update_perms = [&](std::optional<nlohmann::json> doc_filter, size_t num_employees, size_t num_dirs_mgrs) {
+        // Updating the role to employees only
+        logger->trace(">>>>> Updating permissions...JSON: %1", doc_filter);
+        if (doc_filter) {
+            rule["roles"][0]["document_filters"]["read"] = *doc_filter;
+            rule["roles"][0]["document_filters"]["write"] = *doc_filter;
+        }
+        else {
+            rule["roles"][0]["document_filters"]["read"] = true;
+            rule["roles"][0]["document_filters"]["write"] = true;
+        }
+        app_session.admin_api.update_default_rule(app_session.server_app_id, rule);
+        logger->trace(">>>>> Complete");
+
+        // Client should receive an error and drop/reconnect the session
+        REQUIRE(machina.wait_for(TestState::disconnected));
+        REQUIRE(machina.wait_for(TestState::connected));
+
+        REQUIRE(!wait_for_download(*realm));
+        REQUIRE(!wait_for_upload(*realm));
+        wait_for_advance(*realm);
+        {
+            auto table = realm->read_group().get_table("class_Person");
+            REQUIRE(table->size() == (num_employees + num_dirs_mgrs));
+            auto role_col = table->get_column_key("role");
+            Query query_mgrs(table);
+            query_mgrs.equal(role_col, "director").Or().equal(role_col, "manager");
+            Results results_mgrs(realm, query_mgrs);
+            CHECK(results_mgrs.size() == num_dirs_mgrs);
+            Query query_emps(table);
+            query_emps.equal(role_col, "employee");
+            Results results_emps(realm, query_emps);
+            CHECK(results_emps.size() == num_employees);
+        }
+    };
+    {
+        nlohmann::json doc_filter = {{"role", {{"$in", {"manager", "director"}}}}};
+        update_perms(doc_filter, 0, 225);
+    }
+    {
+        nlohmann::json doc_filter = {{"role", "employee"}};
+        update_perms(doc_filter, 5000, 0);
+    }
+}
+
 } // namespace realm::app
 
 #endif // REALM_ENABLE_AUTH_TESTS

@@ -944,13 +944,58 @@ void AdminAPISession::create_schema(const std::string& app_id, const AppCreateCo
 
 bool AdminAPISession::set_feature_flag(const std::string& app_id, const std::string& flag_name, bool enable) const
 {
-    auto endpoint =
+    auto features_endpoint =
         AdminAPIEndpoint(util::format("%1/api/private/v1.0/features/%2", m_base_url, flag_name), m_access_token);
-    auto flag_response = endpoint.put_json(
+    auto flag_response = features_endpoint.post_json(
         nlohmann::json{{"app_ids", nlohmann::json::array({app_id})}, {"action", enable ? "enable" : "disable"}});
     auto actual_modified = flag_response["actual_modified"];
     // "actual_modified" should only be 1 since only 1 app_id was provided
     return actual_modified.is_number_integer() && actual_modified.get<int>() == 1;
+}
+
+bool AdminAPISession::get_feature_flag(const std::string& app_id, const std::string& flag_name) const
+{
+    auto settings_json = get_app_settings(app_id);
+    // Format: {..., "features": {"enabled": ["<feature1-name>", "<feature2-name>", ...], ...}, ...}
+    if (auto features = settings_json.find("features");
+        features != settings_json.end() && features->is_object() && !features->empty()) {
+        if (auto enabled_list = features->find("enabled");
+            enabled_list != features->end() && enabled_list->is_array() && !enabled_list->empty()) {
+            for (auto& item : *enabled_list) {
+                if (item.is_string() && item.get<std::string>() == flag_name) {
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
+}
+
+nlohmann::json AdminAPISession::get_default_rule(const std::string& app_id) const
+{
+    auto baas_sync_service = get_sync_service(app_id);
+    auto rule_endpoint = apps()[app_id]["services"][baas_sync_service.id]["default_rule"];
+    auto rule = rule_endpoint.get_json();
+    return rule;
+}
+
+bool AdminAPISession::update_default_rule(const std::string& app_id, nlohmann::json rule_json) const
+{
+    if (auto id = rule_json.find("_id");
+        id == rule_json.end() || !id->is_string() || id->get<std::string>().empty()) {
+        return false;
+    }
+
+    auto baas_sync_service = get_sync_service(app_id);
+    auto rule_endpoint = apps()[app_id]["services"][baas_sync_service.id]["default_rule"];
+    auto response = rule_endpoint.put_json(rule_json);
+    return response.empty();
+}
+
+nlohmann::json AdminAPISession::get_app_settings(const std::string& app_id) const
+{
+    auto settings_endpoint = apps(APIFamily::Private)[app_id]["settings"];
+    return settings_endpoint.get_json();
 }
 
 static nlohmann::json convert_config(AdminAPISession::ServiceConfig config)

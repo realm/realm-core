@@ -84,6 +84,9 @@ public:
     void migrate_to_flx(const std::string& app_id, const std::string& service_id, bool migrate_to_flx) const;
     void create_schema(const std::string& app_id, const AppCreateConfig& config, bool use_draft = true) const;
     bool set_feature_flag(const std::string& app_id, const std::string& flag_name, bool enable) const;
+    bool get_feature_flag(const std::string& app_id, const std::string& flag_name) const;
+    nlohmann::json get_default_rule(const std::string& app_id) const;
+    bool update_default_rule(const std::string& app_id, nlohmann::json roles) const;
 
     struct Service {
         std::string id;
@@ -141,6 +144,7 @@ public:
     };
 
     MigrationStatus get_migration_status(const std::string& app_id) const;
+    nlohmann::json get_app_settings(const std::string& app_id) const;
 
     const std::string& admin_url() const noexcept
     {
