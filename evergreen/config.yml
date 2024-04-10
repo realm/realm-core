@@ -1262,6 +1262,17 @@ buildvariants:
   tasks:
   - name: compile_test
 
+- name: ubuntu-no-geospatial
+  display_name: "Ubuntu (Geospatial Disabled)"
+  run_on: ubuntu2204-arm64-large
+  expansions:
+    fetch_missing_dependencies: On
+    c_compiler: "/opt/clang+llvm/bin/clang"
+    cxx_compiler: "/opt/clang+llvm/bin/clang++"
+    extra_flags: "-DREALM_ENABLE_GEOSPATIAL=OFF"
+  tasks:
+  - name: compile_test
+
 - name: ubuntu-encryption-tsan
   display_name: "Ubuntu (Encryption Enabled w/TSAN)"
   run_on: ubuntu2204-arm64-small
@@ -1330,8 +1341,7 @@ buildvariants:
     enable_asan: On
     cmake_build_type: RelWithDebInfo
   tasks:
-  - name: compile_test_coverage
-  - name: finalize_coverage_data
+  - name: compile_test
 
 - name: ubuntu-tsan
   display_name: "Ubuntu (TSAN)"
