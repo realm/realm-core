@@ -260,6 +260,22 @@ void ClientImpl::post(SyncSocketProvider::FunctionHandler&& handler)
     });
 }
 
+void ClientImpl::post(util::UniqueFunction<void()>&& handler)
+{
+    REALM_ASSERT(m_socket_provider);
+    incr_outstanding_posts();
+    m_socket_provider->post([handler = std::move(handler), this](Status status) {
+        auto decr_guard = util::make_scope_exit([&]() noexcept {
+            decr_outstanding_posts();
+        });
+        if (status == ErrorCodes::OperationAborted)
+            return;
+        if (!status.is_ok())
+            throw Exception(status);
+        handler();
+    });
+}
+
 
 void ClientImpl::drain_connections()
 {
