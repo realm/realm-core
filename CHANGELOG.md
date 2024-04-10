@@ -124,6 +124,8 @@
 * Fix possible file corruption if using Transaction::copy_to if nested collections are present.
 * Evergreen config was udpated so most linux CI testing is done on ubuntu 22.04 on aarch64 with clang 18, upgrading from clang 11 on ubuntu 20.04 mostly on x86_64 ([PR #7475](https://github.com/realm/realm-core/pull/7475)).
 * Evergreen config was updated to move most MacOS testing to MacOS 14 on arm64 with Xcode 15.2, updating from Macos 11 on x86_64 with Xcode 13.1 ([PR #7618](https://github.com/realm/realm-core/pull/7618)).
+* Refactor `sync::Session` to eliminate the bind() step of session creation ([#7609](https://github.com/realm/realm-core/pull/7609)).
+* Add ScopeExitFail which only calls the handler if exiting the scope via an uncaught exception ([#7609](https://github.com/realm/realm-core/pull/7609)).
 
 ----------------------------------------------
 

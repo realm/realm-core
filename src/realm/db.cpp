@@ -1189,10 +1189,9 @@ void DB::open(const std::string& path, const DBOptions& options)
             SlabAlloc::DetachGuard alloc_detach_guard(alloc);
             alloc.note_reader_start(this);
             // must come after the alloc detach guard
-            auto handler = [this, &alloc]() noexcept {
+            auto reader_end_guard = make_scope_exit([this, &alloc]() noexcept {
                 alloc.note_reader_end(this);
-            };
-            auto reader_end_guard = make_scope_exit(handler);
+            });
 
             // Check validity of top array (to give more meaningful errors
             // early)

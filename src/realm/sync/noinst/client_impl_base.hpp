@@ -31,7 +31,7 @@
 
 namespace realm::sync {
 
-// (protocol, address, port, session_multiplex_ident)
+// (protocol, address, port, user_id)
 //
 // `protocol` is included for convenience, even though it is not strictly part
 // of an endpoint.
@@ -47,6 +47,8 @@ struct ServerEndpoint {
 private:
     auto to_tuple() const
     {
+        // Does not include server_mode because PBS and FLX connections can be
+        // multiplexed together. is_verified is not part of an endpoint's identity.
         return std::make_tuple(server_mode, envelope, std::ref(address), port, std::ref(user_id));
     }
 
@@ -71,13 +73,9 @@ public:
     void push(util::bind_ptr<SessionWrapper>) noexcept;
     util::bind_ptr<SessionWrapper> pop() noexcept;
     void clear() noexcept;
+    bool erase(SessionWrapper*) noexcept;
     SessionWrapperStack() noexcept = default;
-    SessionWrapperStack(SessionWrapperStack&&) noexcept;
     ~SessionWrapperStack();
-    friend void swap(SessionWrapperStack& q_1, SessionWrapperStack& q_2) noexcept
-    {
-        std::swap(q_1.m_back, q_2.m_back);
-    }
 
 private:
     SessionWrapper* m_back = nullptr;
@@ -218,6 +216,7 @@ public:
     // Functions to post onto the event loop and create an event loop timer using the
     // SyncSocketProvider
     void post(SyncSocketProvider::FunctionHandler&& handler) REQUIRES(!m_drain_mutex);
+    void post(util::UniqueFunction<void()>&& handler) REQUIRES(!m_drain_mutex);
     SyncSocketProvider::SyncTimer create_timer(std::chrono::milliseconds delay,
                                                SyncSocketProvider::FunctionHandler&& handler)
         REQUIRES(!m_drain_mutex);
@@ -262,10 +261,10 @@ private:
     SyncTrigger m_actualize_and_finalize;
 
     // Note: There is one server slot per server endpoint (hostname, port,
-    // session_multiplex_ident), and it survives from one connection object to
-    // the next, which is important because it carries information about a
-    // possible reconnect delay applying to the new connection object (server
-    // hammering protection).
+    // user_id), and it survives from one connection object to the next, which
+    // is important because it carries information about a possible reconnect
+    // delay applying to the new connection object (server hammering
+    // protection).
     struct ServerSlot {
         explicit ServerSlot(ReconnectInfo reconnect_info);
         ~ServerSlot();
@@ -297,7 +296,7 @@ private:
 
     // The set of session wrappers that are not yet wrapping a session object,
     // and are not yet abandoned (still referenced by the application).
-    std::map<SessionWrapper*, ServerEndpoint> m_unactualized_session_wrappers GUARDED_BY(m_mutex);
+    SessionWrapperStack m_unactualized_session_wrappers GUARDED_BY(m_mutex);
 
     // The set of session wrappers that were successfully actualized, but are
     // now abandoned (no longer referenced by the application), and have not yet
@@ -307,7 +306,7 @@ private:
     // Used with m_mutex
     std::condition_variable m_wait_or_client_stopped_cond;
 
-    void register_unactualized_session_wrapper(SessionWrapper*, ServerEndpoint) REQUIRES(!m_mutex);
+    void register_unactualized_session_wrapper(SessionWrapper*) REQUIRES(!m_mutex);
     void register_abandoned_session_wrapper(util::bind_ptr<SessionWrapper>) noexcept REQUIRES(!m_mutex);
     void actualize_and_finalize_session_wrappers() REQUIRES(!m_mutex);
 
@@ -325,13 +324,6 @@ private:
     // approach would be to allow for per-endpoint SSL parameters to be
     // specifiable through public member functions of ClientImpl from where they
     // could then be picked up as new connections are created on demand.
-    //
-    // FIXME: `session_multiplex_ident` should be eliminated from ServerEndpoint
-    // as it effectively disables part of the hammering protection scheme if it
-    // is used to ensure that each session gets a separate connection. With the
-    // alternative approach outlined in the previous FIXME (specify per endpoint
-    // SSL parameters at the client object level), there seems to be no more use
-    // for `session_multiplex_ident`.
     ClientImpl::Connection& get_connection(ServerEndpoint, const std::string& authorization_header_name,
                                            const std::map<std::string, std::string>& custom_http_headers,
                                            bool verify_servers_ssl_certificate,
@@ -952,13 +944,9 @@ private:
                                        const SyncProgress& progress, const ReceivedChangesets&);
 
     /// See request_upload_completion_notification().
-    ///
-    /// The default implementation does nothing.
     void on_upload_completion();
 
     /// See request_download_completion_notification().
-    ///
-    /// The default implementation does nothing.
     void on_download_completion();
 
     //@{
@@ -968,8 +956,6 @@ private:
     ///
     /// A switch to the suspended state only happens when an error occurs,
     /// and information about that error is passed to on_suspended().
-    ///
-    /// The default implementations of these functions do nothing.
     ///
     /// These functions are always called by the event loop thread of the
     /// associated client object.
@@ -1287,6 +1273,9 @@ void ClientImpl::Connection::for_each_active_session(H handler)
 
 inline void ClientImpl::Connection::voluntary_disconnect()
 {
+    if (m_state == ConnectionState::disconnected) {
+        return;
+    }
     m_reconnect_info.update(ConnectionTerminationReason::closed_voluntarily, std::nullopt);
     SessionErrorInfo error_info{Status{ErrorCodes::ConnectionClosed, "Connection closed"}, IsFatal{false}};
     error_info.server_requests_action = ProtocolErrorInfo::Action::Transient;
