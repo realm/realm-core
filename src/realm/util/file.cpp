@@ -395,19 +395,16 @@ std::string make_temp_file(const char* prefix)
     char* tmp_dir_env = getenv("TMPDIR");
     std::string base_dir = tmp_dir_env ? tmp_dir_env : std::string(P_tmpdir);
     if (!base_dir.empty() && base_dir[base_dir.length() - 1] != '/') {
-        base_dir = base_dir + "/";
+        base_dir += '/';
     }
 #endif
-    std::string tmp = base_dir + prefix + std::string("_XXXXXX") + std::string("\0", 1);
-    std::unique_ptr<char[]> buffer = std::make_unique<char[]>(tmp.size()); // Throws
-    memcpy(buffer.get(), tmp.c_str(), tmp.size());
-    char* filename = buffer.get();
-    auto fd = mkstemp(filename);
+    std::string filename = util::format("%1%2_XXXXXX", base_dir, prefix);
+    auto fd = mkstemp(filename.data());
     if (fd == -1) {
         throw std::system_error(errno, std::system_category(), "mkstemp() failed"); // LCOV_EXCL_LINE
     }
     close(fd);
-    return std::string(filename);
+    return filename;
 #endif
 }
 

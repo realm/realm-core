@@ -538,17 +538,6 @@ TEST_CASE("C API (non-database)", "[c_api]") {
 #if REALM_ENABLE_SYNC
     SECTION("sync_client_config_t") {
         auto test_sync_client_config = cptr(realm_sync_client_config_new());
-        realm_sync_client_config_set_base_file_path(test_sync_client_config.get(), "some string");
-        CHECK(test_sync_client_config->base_file_path == "some string");
-        realm_sync_client_config_set_metadata_mode(test_sync_client_config.get(),
-                                                   RLM_SYNC_CLIENT_METADATA_MODE_ENCRYPTED);
-        CHECK(test_sync_client_config->metadata_mode ==
-              static_cast<realm::SyncClientConfig::MetadataMode>(RLM_SYNC_CLIENT_METADATA_MODE_ENCRYPTED));
-        auto enc_key = make_test_encryption_key(123);
-        realm_sync_client_config_set_metadata_encryption_key(test_sync_client_config.get(),
-                                                             reinterpret_cast<uint8_t*>(enc_key.data()));
-        CHECK(test_sync_client_config->custom_encryption_key);
-        CHECK(std::equal(enc_key.begin(), enc_key.end(), test_sync_client_config->custom_encryption_key->begin()));
         realm_sync_client_config_set_reconnect_mode(test_sync_client_config.get(),
                                                     RLM_SYNC_CLIENT_RECONNECT_MODE_TESTING);
         CHECK(test_sync_client_config->reconnect_mode ==
@@ -638,12 +627,30 @@ TEST_CASE("C API (non-database)", "[c_api]") {
         realm_app_config_set_bundle_id(app_config.get(), "some_bundle_id");
         CHECK(app_config->device_info.bundle_id == "some_bundle_id");
 
-        test_util::TestDirGuard temp_dir(util::make_temp_dir());
-        auto sync_client_config = cptr(realm_sync_client_config_new());
-        realm_sync_client_config_set_base_file_path(sync_client_config.get(), temp_dir.c_str());
-        realm_sync_client_config_set_metadata_mode(sync_client_config.get(), RLM_SYNC_CLIENT_METADATA_MODE_DISABLED);
+        realm_app_config_set_base_file_path(app_config.get(), "some string");
+        CHECK(app_config->base_file_path == "some string");
 
-        auto test_app = cptr(realm_app_create(app_config.get(), sync_client_config.get()));
+        realm_app_config_set_metadata_mode(app_config.get(), RLM_SYNC_CLIENT_METADATA_MODE_DISABLED);
+        CHECK(app_config->metadata_mode == app::AppConfig::MetadataMode::InMemory);
+        realm_app_config_set_metadata_mode(app_config.get(), RLM_SYNC_CLIENT_METADATA_MODE_ENCRYPTED);
+        CHECK(app_config->metadata_mode == app::AppConfig::MetadataMode::Encryption);
+        realm_app_config_set_metadata_mode(app_config.get(), RLM_SYNC_CLIENT_METADATA_MODE_PLAINTEXT);
+        CHECK(app_config->metadata_mode == app::AppConfig::MetadataMode::NoEncryption);
+
+        realm_app_config_set_security_access_group(app_config.get(), "group.io.realm.test");
+        CHECK(app_config->security_access_group == "group.io.realm.test");
+
+        auto enc_key = make_test_encryption_key(123);
+        realm_app_config_set_metadata_encryption_key(app_config.get(), reinterpret_cast<uint8_t*>(enc_key.data()));
+        CHECK(app_config->custom_encryption_key);
+        CHECK(std::equal(enc_key.begin(), enc_key.end(), app_config->custom_encryption_key->begin()));
+
+        test_util::TestDirGuard temp_dir(util::make_temp_dir());
+        realm_app_config_set_base_file_path(app_config.get(), temp_dir.c_str());
+        realm_app_config_set_metadata_mode(app_config.get(), RLM_SYNC_CLIENT_METADATA_MODE_DISABLED);
+        realm_app_config_set_security_access_group(app_config.get(), "");
+
+        auto test_app = cptr(realm_app_create(app_config.get()));
         realm_user_t* sync_user;
         auto user_data_free = [](realm_userdata_t) {};
 
@@ -673,7 +680,9 @@ TEST_CASE("C API (non-database)", "[c_api]") {
             realm_free(app_base_url);
         };
 
-        auto update_and_check_base_url = [&](const char* new_base_url, const std::string_view expected) {
+        auto update_and_check_base_url = [&](const char* new_base_url, std::string_view expected) {
+            INFO(util::format("new_base_url: %1", new_base_url ? new_base_url : "<null>"));
+
             transport->set_base_url(expected);
             realm_app_update_base_url(
                 test_app.get(), new_base_url,
@@ -5250,6 +5259,56 @@ TEST_CASE("C API: nested collections", "[c_api]") {
         checked(realm_refresh(realm, nullptr));
     };
 
+    SECTION("deletion of nested list through clearing of parent") {
+        struct UserData {
+            size_t deletions;
+            size_t insertions;
+            size_t modifications;
+            bool was_deleted;
+            realm_list_t* list;
+            realm_dictionary_t* dict;
+        } user_data;
+        auto parent_list = cptr_checked(realm_set_list(obj1.get(), foo_any_col_key));
+        REQUIRE(parent_list);
+        realm_value_t value;
+        realm_get_value(obj1.get(), foo_any_col_key, &value);
+        REQUIRE(value.type == RLM_TYPE_LIST);
+        auto list = cptr_checked(realm_get_list(obj1.get(), foo_any_col_key));
+        // list[0] = nestedlist
+        auto nested_list = cptr_checked(realm_list_insert_list(list.get(), 0));
+        auto nested_dict = cptr_checked(realm_list_insert_dictionary(list.get(), 1));
+        user_data.list = nested_list.get();
+        user_data.dict = nested_dict.get();
+
+        checked(realm_commit(realm));
+
+        auto on_list_change = [](void* data, const realm_collection_changes_t* changes) {
+            auto* user_data = static_cast<UserData*>(data);
+            realm_collection_changes_get_num_changes(changes, &user_data->deletions, &user_data->insertions,
+                                                     &user_data->modifications, nullptr, nullptr,
+                                                     &user_data->was_deleted);
+            if (user_data->was_deleted) {
+                CHECK(!realm_list_is_valid(user_data->list));
+            }
+        };
+        auto require_change = [&]() {
+            auto token = cptr_checked(realm_list_add_notification_callback(nested_list.get(), &user_data, nullptr,
+                                                                           nullptr, on_list_change));
+            checked(realm_refresh(realm, nullptr));
+            return token;
+        };
+
+        auto token = require_change();
+
+        write([&] {
+            realm_list_clear(list.get());
+            // realm_list_set(list.get(), 0, rlm_str_val("Foo"));
+        });
+        CHECK(user_data.was_deleted);
+        CHECK(!realm_list_is_valid(user_data.list));
+        CHECK(!realm_dictionary_is_valid(user_data.dict));
+    }
+
     SECTION("results of mixed") {
         SECTION("dictionary") {
             auto parent_dict = cptr_checked(realm_set_dictionary(obj1.get(), foo_any_col_key));
@@ -5631,7 +5690,7 @@ TEST_CASE("C API - async_open", "[sync][pbs][c_api]") {
     SECTION("can open synced Realms that don't already exist") {
         realm_config_t* config = realm_config_new();
         config->schema = Schema{object_schema};
-        realm_user user(test_config.sync_config->user);
+        realm_user user(init_sync_manager.fake_user());
         realm_sync_config_t* sync_config = realm_sync_config_new(&user, "default");
         realm_sync_config_set_initial_subscription_handler(sync_config, task_init_subscription, false, nullptr,
                                                            nullptr);
@@ -5663,32 +5722,28 @@ TEST_CASE("C API - async_open", "[sync][pbs][c_api]") {
 
     SECTION("cancels download and reports an error on auth error") {
         auto expired_token = encode_fake_jwt("", 123, 456);
-
-        struct Transport : UnitTestTransport {
-            void send_request_to_server(
-                const realm::app::Request& req,
-                realm::util::UniqueFunction<void(const realm::app::Response&)>&& completion) override
+        struct User : TestUser {
+            using TestUser::TestUser;
+            void request_access_token(CompletionHandler&& completion) override
             {
-                if (req.url.find("/auth/session") != std::string::npos) {
-                    completion(app::Response{403});
-                }
-                else {
-                    UnitTestTransport::send_request_to_server(req, std::move(completion));
-                }
+                completion(app::AppError(ErrorCodes::HTTPError, "403 error", "", 403));
+            }
+            bool access_token_refresh_required() const override
+            {
+                return true;
             }
         };
-        OfflineAppSession::Config oas_config;
-        oas_config.transport = std::make_shared<Transport>();
-        OfflineAppSession oas(oas_config);
-        SyncTestFile test_config(oas, "realm");
-        test_config.sync_config->user->log_in(expired_token, expired_token);
+        auto user = std::make_shared<User>("realm", init_sync_manager.sync_manager());
+        user->m_access_token = expired_token;
+        user->m_refresh_token = expired_token;
 
         realm_config_t* config = realm_config_new();
         config->schema = Schema{object_schema};
-        realm_user user(test_config.sync_config->user);
-        realm_sync_config_t* sync_config = realm_sync_config_new(&user, "realm");
+        realm_user c_user(user);
+        realm_sync_config_t* sync_config = realm_sync_config_new(&c_user, "realm");
         realm_sync_config_set_initial_subscription_handler(sync_config, task_init_subscription, false, nullptr,
                                                            nullptr);
+
         realm_config_set_path(config, test_config.path.c_str());
         realm_config_set_schema_version(config, 1);
         Userdata userdata;
@@ -5704,8 +5759,7 @@ TEST_CASE("C API - async_open", "[sync][pbs][c_api]") {
         REQUIRE(userdata.called);
         REQUIRE(!userdata.realm_ref);
         REQUIRE(userdata.error.error == RLM_ERR_AUTH_ERROR);
-        REQUIRE(userdata.error_message ==
-                "Unable to refresh the user access token: http error code considered fatal. Client Error: 403");
+        REQUIRE(userdata.error_message == "Unable to refresh the user access token: 403 error. Client Error: 403");
         realm_release(task);
         realm_release(config);
         realm_release(sync_config);
@@ -6114,8 +6168,7 @@ TEST_CASE("C API app: link_user integration w/c_api transport", "[sync][app][c_a
         REQUIRE(request_context != nullptr);
         auto new_request = Request{HttpMethod(request.method), request.url, default_timeout_ms, std::move(headers),
                                    std::string(request.body, request.body_size)};
-        user_data->logger->trace("CAPI: Request URL (%1): %2", httpmethod_to_string(new_request.method),
-                                 new_request.url);
+        user_data->logger->trace("CAPI: Request URL (%1): %2", new_request.method, new_request.url);
         user_data->logger->trace("CAPI: Request body: %1", new_request.body);
         user_data->transport->send_request_to_server(new_request, [&](const Response& response) mutable {
             std::vector<realm_http_header_t> c_headers;
@@ -6212,8 +6265,7 @@ TEST_CASE("C API app: link_user integration w/c_api transport", "[sync][app][c_a
         CHECK(realm_equals(sync_user_1, current_user));
         realm_release(current_user);
 
-        realm_user_t* sync_user_2;
-        realm_app_switch_user(&app, sync_user_1, &sync_user_2);
+        realm_app_switch_user(&app, sync_user_1);
         size_t out_n = 0;
 
         realm_app_get_all_users(&app, nullptr, 0, &out_n);
@@ -6228,7 +6280,6 @@ TEST_CASE("C API app: link_user integration w/c_api transport", "[sync][app][c_a
         for (size_t i = 0; i < out_n; ++i)
             realm_release(out_users[i]);
         realm_release(sync_user_1);
-        realm_release(sync_user_2);
     }
     SECTION("realm_app_user_apikey_provider_client_fetch_apikeys") {
         SECTION("Failure") {

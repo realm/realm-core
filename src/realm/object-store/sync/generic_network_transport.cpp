@@ -44,21 +44,21 @@ std::string http_message(const std::string& prefix, int code)
 }
 } // anonymous namespace
 
-const char* httpmethod_to_string(HttpMethod method)
+std::ostream& operator<<(std::ostream& os, HttpMethod method)
 {
     switch (method) {
         case HttpMethod::get:
-            return "GET";
+            return os << "GET";
         case HttpMethod::post:
-            return "POST";
+            return os << "POST";
         case HttpMethod::patch:
-            return "PATCH";
+            return os << "PATCH";
         case HttpMethod::put:
-            return "PUT";
+            return os << "PUT";
         case HttpMethod::del:
-            return "DEL";
+            return os << "DEL";
     }
-    return "UNKNOWN";
+    return os << "UNKNOWN";
 }
 
 AppError::AppError(ErrorCodes::Error ec, std::string message, std::string link,
