@@ -215,11 +215,11 @@ StringData ArrayString::get(size_t ndx) const
         case Type::big_strings:
             return static_cast<ArrayBigBlobs*>(m_arr)->get_string(ndx);
         case Type::enum_strings: {
-            size_t index = size_t(static_cast<Array*>(m_arr)->get(ndx));
+            const auto index = static_cast<size_t>(m_arr->get(ndx));
             return m_string_enum_values->get(index);
         }
         case Type::interned_strings: {
-            size_t id = size_t(static_cast<Array*>(m_arr)->get(ndx));
+            const auto id = static_cast<size_t>(m_arr->get(ndx));
             return m_string_interner->get(id);
         }
     }
@@ -545,7 +545,7 @@ ref_type ArrayString::write(_impl::ArrayWriterBase& out, StringInterner* interne
     for (size_t i = 0; i < sz; ++i) {
         interned.set(i, interner->intern(get(i)));
     }
-    auto retval = interned.write(out, false, false, false);
+    auto retval = interned.write(out, false, false, true); // interning returns a number. So compress it!
     interned.destroy();
     return retval;
     // return m_arr->write(out, true, false, false);

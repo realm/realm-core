@@ -50,6 +50,11 @@ public:
         return m_arr->is_attached();
     }
 
+    bool is_interned() const
+    {
+        return m_type == Type::interned_strings;
+    }
+
     ref_type get_ref() const
     {
         return m_arr->get_ref();

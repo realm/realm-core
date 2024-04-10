@@ -28,7 +28,7 @@ StringCompressor::StringCompressor()
 
 StringCompressor::~StringCompressor() {}
 
-size_t symbol_pair_hash(CompressionSymbol a, CompressionSymbol b)
+static inline size_t symbol_pair_hash(CompressionSymbol a, CompressionSymbol b)
 {
     // range of return value must match size of encoding table
     uint32_t tmp = a + 3;

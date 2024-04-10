@@ -625,7 +625,8 @@ StringData Obj::_get<StringData>(ColKey::Idx col_ndx) const
     else {
         ArrayString values(get_alloc());
         auto col_key = m_table->leaf_ndx2colkey(col_ndx);
-        values.set_string_interner(m_table->get_string_interner(col_key));
+        const auto interner = m_table->get_string_interner(col_key);
+        values.set_string_interner(interner);
         values.init_from_ref(ref);
         return values.get(m_row_ndx);
     }

@@ -413,9 +413,18 @@ bool StringNode<Equal>::do_consume_condition(ParentNode& node)
 size_t StringNode<Equal>::_find_first_local(size_t start, size_t end)
 {
     if (m_needles.empty()) {
+
+        if (m_leaf->is_interned()) {
+            return _find_first_local_interned_string(m_string_value, start, end);
+        }
         return m_leaf->find_first(m_string_value, start, end);
     }
     else {
+
+        // here, can we do something? it seems the needles are small
+        // prefixes that we try to match agains the stored string.
+        // for interned strings this should be slower.
+
         if (end == npos)
             end = m_leaf->size();
         REALM_ASSERT_3(start, <=, end);
@@ -454,9 +463,11 @@ void StringNode<EqualIns>::_search_index_init()
 size_t StringNode<EqualIns>::_find_first_local(size_t start, size_t end)
 {
     EqualIns cond;
+    if (m_leaf->is_interned()) {
+        return _find_first_local_interned_string(m_string_value, m_lcase, m_ucase, start, end);
+    }
     for (size_t s = start; s < end; ++s) {
         StringData t = get_string(s);
-
         if (cond(m_string_value, m_ucase.c_str(), m_lcase.c_str(), t))
             return s;
     }

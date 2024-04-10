@@ -1539,6 +1539,25 @@ protected:
     {
         return m_leaf->get(s);
     }
+
+    size_t _find_first_local_interned_string(const StringData& data, size_t start, size_t end) const
+    {
+        REALM_ASSERT_DEBUG(m_leaf->is_interned());
+        return m_leaf->find_first(data, start, end);
+    }
+
+    size_t _find_first_local_interned_string(const StringData& data, const StringData& lcase, const StringData& ucase,
+                                             size_t start, size_t end) const
+    {
+        REALM_ASSERT_DEBUG(m_leaf->is_interned());
+        if (const auto pos = _find_first_local_interned_string(data, start, end) != not_found)
+            return pos;
+        if (const auto pos = _find_first_local_interned_string(lcase, start, end) != not_found)
+            return pos;
+        if (const auto pos = _find_first_local_interned_string(ucase, start, end) != not_found)
+            return pos;
+        return not_found;
+    }
 };
 
 // Conditions for strings. Note that Equal is specialized later in this file!
@@ -1573,6 +1592,30 @@ public:
     size_t find_first_local(size_t start, size_t end) override
     {
         TConditionFunction cond;
+
+        if constexpr (std::is_same_v<TConditionFunction, NotEqual> ||
+                      std::is_same_v<TConditionFunction, NotEqualIns>) {
+            // TODO: move all this in some utility method or specialized class.
+            // string interning NEQ can benefit by the fact that
+            // interned strings are just integers.
+            size_t pos = not_found;
+            if constexpr (case_sensitive_comparison) {
+                pos = _find_first_local_interned_string(m_string_value, start, end);
+            }
+            else {
+                pos = _find_first_local_interned_string(m_string_value, m_lcase, m_ucase, start, end);
+            }
+
+            if (pos == not_found && start < m_leaf->size())
+                return start;
+            if (pos != not_found) {
+                if (pos == start && start + 1 < m_leaf->size())
+                    return start + 1;
+                if (pos > start)
+                    return start;
+            }
+            return not_found;
+        }
 
         for (size_t s = start; s < end; ++s) {
             StringData t = get_string(s);

@@ -5555,6 +5555,68 @@ TEST(Query_LinkToDictionary)
     CHECK_EQUAL(q.count(), 0);
 }
 
+ONLY(Test_String_interning)
+{
+    // test string interning.
+    SHARED_GROUP_TEST_PATH(path);
+    {
+        DBRef sg = DB::create(path, false, DBOptions(DBOptions::Durability::MemOnly));
+        {
+            WriteTransaction wt(sg);
+            wt.get_group().verify();
+            const auto t1 = wt.add_table("test");
+            const auto col_str = t1->add_column(type_String, "str");
+            t1->create_object(ObjKey(7)).set_all("testtesttest");
+            wt.commit();
+
+            ReadTransaction rt(sg);
+            rt.get_group().verify();
+            const auto table = rt.get_table("test");
+            CHECK_EQUAL(1, table->size());
+            const Obj obj = table->get_object(ObjKey(7));
+            CHECK_EQUAL("testtesttest", obj.get<String>(col_str));
+
+            // run query equality.
+            Query q = table->where()
+                          .equal(col_str, StringData("test"), false)
+                          .Or()
+                          .contains(col_str, StringData("test"), false);
+            auto tv = q.find_all();
+            CHECK_EQUAL(tv.size(), 1);
+
+            q = table->where().contains(col_str, StringData("TEST"), false);
+            tv = q.find_all();
+            CHECK_EQUAL(tv.size(), 1);
+
+            q = table->where().equal(col_str, StringData("test"), false);
+            tv = q.find_all();
+            CHECK_EQUAL(tv.size(), 0);
+
+            q = table->where().not_equal(col_str, StringData("test"), false);
+            tv = q.find_all();
+            CHECK_EQUAL(tv.size(), 1);
+
+            q = table->where().not_equal(col_str, StringData("TEST"), true);
+            tv = q.find_all();
+            CHECK_EQUAL(tv.size(), 1);
+
+            q = table->where().not_equal(col_str, StringData("testtesttest"), false);
+            tv = q.find_all();
+            CHECK_EQUAL(tv.size(), 1);
+
+            std::string s = "testtesttest";
+            for (auto& c : s)
+                c = std::toupper(c);
+            q = table->where().not_equal(col_str, StringData(s), false);
+            tv = q.find_all();
+            CHECK_EQUAL(tv.size(), 1);
+            q = table->where().not_equal(col_str, StringData(s), true);
+            tv = q.find_all();
+            CHECK_EQUAL(tv.size(), 1);
+        }
+    }
+}
+
 TEST(Query_StringNodeEqualBaseBug)
 {
     Group g;

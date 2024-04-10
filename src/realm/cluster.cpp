@@ -1598,7 +1598,8 @@ ref_type Cluster::typed_write(ref_type ref, _impl::ArrayWriterBase& out, const T
                     // We're interning these strings
                     ArrayString as(m_alloc);
                     as.init_from_ref(leaf_rot.get_as_ref());
-                    written_cluster.set_as_ref(j, as.write(out, table.get_string_interner(col_key)));
+                    const auto interner = table.get_string_interner(col_key);
+                    written_cluster.set_as_ref(j, as.write(out, interner));
                     // in a transactional setting:
                     // Destroy all sub-arrays if present, in order to release memory in file
                     // This is contrary to the rest of the handling in this function, but needed
@@ -1610,7 +1611,7 @@ ref_type Cluster::typed_write(ref_type ref, _impl::ArrayWriterBase& out, const T
                 }
                 // whether it's the old enum strings or the new interned strings,
                 // just write out the array using integer leaf compression
-                written_cluster.set_as_ref(j, leaf.write(out, false, false, false));
+                written_cluster.set_as_ref(j, leaf.write(out, false, false, compress));
                 continue;
             }
             // #endif
