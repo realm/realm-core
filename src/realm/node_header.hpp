@@ -338,6 +338,7 @@ public:
 
 private:
     friend class Node;
+    friend class IntegerCompressor;
     // Setting element size for encodings with a single element size:
     static void inline set_element_size(char* header, size_t bits_per_element, Encoding);
     // Getting element size for encodings with a single element size:

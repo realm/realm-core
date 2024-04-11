@@ -346,17 +346,17 @@ void Array::destroy_children(size_t offset) noexcept
     }
 }
 
-size_t Array::get_byte_size() const noexcept
-{
-    const auto header = get_header();
-    auto num_bytes = get_byte_size_from_header(header);
-    auto read_only = m_alloc.is_read_only(m_ref) == true;
-    auto capacity = get_capacity_from_header(header);
-    auto bytes_ok = num_bytes <= capacity;
-    REALM_ASSERT(read_only || bytes_ok);
-    REALM_ASSERT_7(m_alloc.is_read_only(m_ref), ==, true, ||, num_bytes, <=, get_capacity_from_header(header));
-    return num_bytes;
-}
+// size_t Array::get_byte_size() const noexcept
+//{
+//     const auto header = get_header();
+//     auto num_bytes = get_byte_size_from_header(header);
+//     auto read_only = m_alloc.is_read_only(m_ref) == true;
+//     auto capacity = get_capacity_from_header(header);
+//     auto bytes_ok = num_bytes <= capacity;
+//     REALM_ASSERT(read_only || bytes_ok);
+//     REALM_ASSERT_7(m_alloc.is_read_only(m_ref), ==, true, ||, num_bytes, <=, get_capacity_from_header(header));
+//     return num_bytes;
+// }
 
 ref_type Array::write(_impl::ArrayWriterBase& out, bool deep, bool only_if_modified, bool compress_in_flight) const
 {
