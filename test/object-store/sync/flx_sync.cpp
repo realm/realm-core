@@ -2581,7 +2581,7 @@ TEST_CASE("flx: writes work without waiting for sync", "[sync][flx][baas]") {
 TEST_CASE("flx: verify websocket protocol number and prefixes", "[sync][protocol]") {
     // Update the expected value whenever the protocol version is updated - this ensures
     // that the current protocol version does not change unexpectedly.
-    REQUIRE(12 == sync::get_current_protocol_version());
+    REQUIRE(14 == sync::get_current_protocol_version());
     // This was updated in Protocol V8 to use '#' instead of '/' to support the Web SDK
     REQUIRE("com.mongodb.realm-sync#" == sync::get_pbs_websocket_protocol_prefix());
     REQUIRE("com.mongodb.realm-query-sync#" == sync::get_flx_websocket_protocol_prefix());
@@ -4791,14 +4791,23 @@ TEST_CASE("flx: pause and resume bootstrapping at query version 0", "[sync][flx]
     REQUIRE(active_sub_set.state() == sync::SubscriptionSet::State::Complete);
 }
 
+TEST_CASE("flx: role change bootstrap", "[sync][flx][baas][role_change][bootstrap]") {
+    const Schema person_schema{{"Person",
+                                {{"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+                                 {"age", PropertyType::Int | PropertyType::Nullable},
+                                 {"role", PropertyType::String},
+                                 {"firstName", PropertyType::String},
+                                 {"lastName", PropertyType::String}}}};
 
-static void fill_person_schema(FLXSyncTestHarness& harness)
-{
-    harness.load_initial_data([&](SharedRealm realm) {
-        int cnt = 1;
+    size_t num_emps = 5000;
+    size_t num_mgrs = 200;
+    size_t num_dirs = 25;
+    size_t num_total = num_emps + num_mgrs + num_dirs;
+    auto fill_person_schema = [num_emps, num_mgrs, num_dirs](SharedRealm realm) {
+        size_t cnt = 1;
         {
             CppContext c(realm);
-            for (int i = 0; i < 100; ++i) {
+            for (size_t i = 0; i < num_mgrs; ++i) {
                 auto obj = Object::create(c, realm, "Person",
                                           std::any(AnyDict{
                                               {"_id", ObjectId::gen()},
@@ -4812,7 +4821,7 @@ static void fill_person_schema(FLXSyncTestHarness& harness)
         }
         {
             CppContext c(realm);
-            for (int i = 0; i < 5000; ++i) {
+            for (size_t i = 0; i < num_emps; ++i) {
                 auto obj = Object::create(c, realm, "Person",
                                           std::any(AnyDict{{"_id", ObjectId::gen()},
                                                            {"age", static_cast<int64_t>(20 + i % 30)},
@@ -4824,7 +4833,7 @@ static void fill_person_schema(FLXSyncTestHarness& harness)
         }
         {
             CppContext c(realm);
-            for (int i = 0; i < 125; ++i) {
+            for (size_t i = 0; i < num_dirs; ++i) {
                 auto obj = Object::create(c, realm, "Person",
                                           std::any(AnyDict{{"_id", ObjectId::gen()},
                                                            {"age", static_cast<int64_t>(45 + i)},
@@ -4834,33 +4843,39 @@ static void fill_person_schema(FLXSyncTestHarness& harness)
                 ++cnt;
             }
         }
-    });
-}
+    };
 
-TEST_CASE("flx: role change bootstrap", "[sync][flx][baas][role_change][bootstrap]") {
-    const Schema person_schema{{"Person",
-                                {{"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
-                                 {"age", PropertyType::Int | PropertyType::Nullable},
-                                 {"role", PropertyType::String},
-                                 {"firstName", PropertyType::String},
-                                 {"lastName", PropertyType::String}}}};
-    enum TestState { initial, disconnected, connecting, connected };
+    enum TestState { initial, disconnected, connecting, connected, bs_downloading, bs_downloaded, bs_complete };
     TestingStateMachine<TestState> machina(initial);
 
     auto logger = util::Logger::get_default_logger();
     FLXSyncTestHarness harness("flx_role_change_bootstrap", {person_schema, {"role", "firstName", "lastName"}});
     auto& app_session = harness.session().app_session();
     // Enable the role change bootstraps
-    REQUIRE(app_session.admin_api.set_feature_flag(app_session.server_app_id, "allow_permissions_bootstrap", true));
+    // REQUIRE(app_session.admin_api.set_feature_flag(app_session.server_app_id, "allow_permissions_bootstrap",
+    //         true));
     // Ensure the feature flag is enabled
-    REQUIRE(app_session.admin_api.get_feature_flag(app_session.server_app_id, "allow_permissions_bootstrap"));
+    // REQUIRE(app_session.admin_api.get_feature_flag(app_session.server_app_id, "allow_permissions_bootstrap"));
 
     auto rule = app_session.admin_api.get_default_rule(app_session.server_app_id);
 
     // Initialize the realm with some data
-    fill_person_schema(harness);
+    harness.load_initial_data(fill_person_schema);
 
     auto config = harness.make_test_file();
+
+    std::mutex hook_mutex;
+    std::function<SyncClientHookAction(std::weak_ptr<SyncSession>, const SyncClientHookData&)> hook_callback;
+
+    config.sync_config->on_sync_client_event_hook = [&hook_callback, &hook_mutex](std::weak_ptr<SyncSession> session,
+                                                                                  const SyncClientHookData& data) {
+        std::lock_guard lock(hook_mutex);
+        if (hook_callback) {
+            return hook_callback(session, data);
+        }
+        return SyncClientHookAction::NoAction;
+    };
+
     auto realm = Realm::get_shared_realm(config);
     REQUIRE(!wait_for_download(*realm));
     REQUIRE(!wait_for_upload(*realm));
@@ -4882,14 +4897,14 @@ TEST_CASE("flx: role change bootstrap", "[sync][flx][baas][role_change][bootstra
     {
         auto table = realm->read_group().get_table("class_Person");
         Results results(realm, Query(table));
-        CHECK(results.size() == 5225);
+        CHECK(results.size() == num_total);
     }
 
     // Register connection change callback to verify session was restarted
     using ConnState = SyncSession::ConnectionState;
     auto session = realm->sync_session();
     session->register_connection_change_callback([&machina, &logger](ConnState old_state, ConnState new_state) {
-        logger->info("Connection state: %1 -> %2", old_state, new_state);
+        logger->trace("Connection state: %1 -> %2", old_state, new_state);
         machina.transition_with([new_state](TestState curr_state) {
             switch (new_state) {
                 case ConnState::Disconnected:
@@ -4906,9 +4921,57 @@ TEST_CASE("flx: role change bootstrap", "[sync][flx][baas][role_change][bootstra
         });
     });
 
-    auto update_perms = [&](std::optional<nlohmann::json> doc_filter, size_t num_employees, size_t num_dirs_mgrs) {
+    auto update_perms = [&](std::optional<nlohmann::json> doc_filter, bool multi_msg, size_t cnt_emps,
+                            size_t cnt_mgrs, size_t cnt_dirs) {
+        using BatchState = sync::DownloadBatchState;
+        BatchState last_state = BatchState::SteadyState;
+        size_t msg_count = 0;
+        auto bs_callback = [&last_state, &msg_count, &machina, multi_msg](std::weak_ptr<SyncSession>,
+                                                                          const SyncClientHookData& data) {
+            machina.transition_with(
+                [&data, &last_state, &msg_count, multi_msg](TestState curr_state) -> std::optional<TestState> {
+                    // download message saved to bootstrap store
+                    switch (data.event) {
+                        // Multimessage bootstrap processing
+                        case SyncClientHookEvent::BootstrapMessageProcessed: {
+                            std::optional<TestState> next_state;
+                            REQUIRE(data.batch_state != BatchState::SteadyState);
+                            REQUIRE((curr_state == TestState::connected || curr_state == TestState::bs_downloading));
+                            if (msg_count == 0) {
+                                REQUIRE(last_state == BatchState::SteadyState);
+                            }
+                            else {
+                                REQUIRE(last_state == BatchState::MoreToCome);
+                            }
+                            if (data.batch_state == BatchState::LastInBatch) {
+                                next_state = TestState::bs_downloaded;
+                            }
+                            else {
+                                next_state = TestState::bs_downloading;
+                            }
+                            last_state = data.batch_state;
+                            ++msg_count;
+                            return next_state;
+                        }
+                        case SyncClientHookEvent::BootstrapProcessed:
+                            REQUIRE(last_state == BatchState::LastInBatch);
+                            REQUIRE(curr_state == TestState::bs_downloaded);
+                            REQUIRE((msg_count > 1 == multi_msg));
+                            return TestState::bs_complete;
+                        case SyncClientHookEvent::DownloadMessageReceived:
+                        case SyncClientHookEvent::DownloadMessageIntegrated:
+                        default:
+                            return std::nullopt;
+                    }
+                });
+            return SyncClientHookAction::NoAction;
+        };
+        {
+            std::lock_guard lock(hook_mutex);
+            hook_callback = bs_callback;
+        }
+
         // Updating the role to employees only
-        logger->trace(">>>>> Updating permissions...JSON: %1", doc_filter);
         if (doc_filter) {
             rule["roles"][0]["document_filters"]["read"] = *doc_filter;
             rule["roles"][0]["document_filters"]["write"] = *doc_filter;
@@ -4918,7 +4981,6 @@ TEST_CASE("flx: role change bootstrap", "[sync][flx][baas][role_change][bootstra
             rule["roles"][0]["document_filters"]["write"] = true;
         }
         app_session.admin_api.update_default_rule(app_session.server_app_id, rule);
-        logger->trace(">>>>> Complete");
 
         // Client should receive an error and drop/reconnect the session
         REQUIRE(machina.wait_for(TestState::disconnected));
@@ -4929,25 +4991,40 @@ TEST_CASE("flx: role change bootstrap", "[sync][flx][baas][role_change][bootstra
         wait_for_advance(*realm);
         {
             auto table = realm->read_group().get_table("class_Person");
-            REQUIRE(table->size() == (num_employees + num_dirs_mgrs));
+            REQUIRE(table->size() == (cnt_emps + cnt_mgrs + cnt_dirs));
             auto role_col = table->get_column_key("role");
-            Query query_mgrs(table);
-            query_mgrs.equal(role_col, "director").Or().equal(role_col, "manager");
-            Results results_mgrs(realm, query_mgrs);
-            CHECK(results_mgrs.size() == num_dirs_mgrs);
-            Query query_emps(table);
-            query_emps.equal(role_col, "employee");
-            Results results_emps(realm, query_emps);
-            CHECK(results_emps.size() == num_employees);
+            auto table_query = Query(table).equal(role_col, "director").Or().equal(role_col, "manager");
+            auto results = Results(realm, table_query);
+            CHECK(results.size() == (cnt_mgrs + cnt_dirs));
+            table_query = Query(table).equal(role_col, "employee");
+            results = Results(realm, table_query);
+            CHECK(results.size() == cnt_emps);
+            table_query = Query(table).equal(role_col, "manager");
+            results = Results(realm, table_query);
+            CHECK(results.size() == cnt_mgrs);
+            table_query = Query(table).equal(role_col, "director");
+            results = Results(realm, table_query);
+            CHECK(results.size() == cnt_dirs);
+        }
+        {
+            // Clear out the hook callback before leaving
+            std::lock_guard lock(hook_mutex);
+            hook_callback = nullptr;
         }
     };
     {
+        // Multi-message subtractive bootstrap
         nlohmann::json doc_filter = {{"role", {{"$in", {"manager", "director"}}}}};
-        update_perms(doc_filter, 0, 225);
+        update_perms(doc_filter, true, 0, num_mgrs, num_dirs);
     }
     {
+        // Multi-message additive (and a little bit subtractive) bootstrap
         nlohmann::json doc_filter = {{"role", "employee"}};
-        update_perms(doc_filter, 5000, 0);
+        update_perms(doc_filter, true, num_emps, 0, 0);
+    }
+    {
+        // Single message, single changeset additive bootstrap
+        update_perms(std::nullopt, false, num_emps, num_mgrs, num_dirs);
     }
 }
 

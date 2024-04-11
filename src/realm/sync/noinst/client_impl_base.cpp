@@ -1891,7 +1891,7 @@ void Session::send_bind_message()
     session_ident_type session_ident = m_ident;
     bool need_client_file_ident = !have_client_file_ident();
     const bool is_subserver = false;
-
+    m_last_download_batch_state = DownloadBatchState::SteadyState;
 
     ClientProtocol& protocol = m_conn.get_client_protocol();
     int protocol_version = m_conn.get_negotiated_protocol_version();
