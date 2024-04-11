@@ -485,7 +485,7 @@ protected:
     /// It is an error to specify a non-zero value unless the width
     /// type is wtype_Bits. It is also an error to specify a non-zero
     /// size if the width type is wtype_Ignore.
-    static MemRef create(Type, bool context_flag, WidthType, size_t size, int_fast64_t value, Allocator&);
+    static MemRef create(Type, bool, WidthType, size_t, int_fast64_t, Allocator&);
 
     // Overriding method in ArrayParent
     void update_child_ref(size_t, ref_type) override;
@@ -938,8 +938,7 @@ inline void Array::adjust(size_t begin, size_t end, int_fast64_t diff)
 inline size_t Array::get_byte_size() const noexcept
 {
     const char* header = get_header_from_data(m_data);
-    WidthType wtype = Node::get_wtype_from_header(header);
-    size_t num_bytes = NodeHeader::calc_byte_size(wtype, m_size, m_width);
+    size_t num_bytes = NodeHeader::get_byte_size_from_header(header);
 
     REALM_ASSERT_7(m_alloc.is_read_only(m_ref), ==, true, ||, num_bytes, <=, get_capacity_from_header(header));
 

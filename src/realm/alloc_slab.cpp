@@ -235,7 +235,7 @@ MemRef SlabAlloc::do_alloc(size_t size)
 #endif
 
     char* addr = reinterpret_cast<char*>(entry);
-    REALM_ASSERT_EX(addr == translate(ref), addr, ref, get_file_path_for_assertions());
+    REALM_ASSERT_EX(addr == translate_in_slab(ref), addr, ref, get_file_path_for_assertions());
 
 #if REALM_ENABLE_ALLOC_SET_ZERO
     std::fill(addr, addr + size, 0);
@@ -300,6 +300,7 @@ SlabAlloc::FreeBlock* SlabAlloc::pop_freelist_entry(FreeList list)
 
 void SlabAlloc::FreeBlock::unlink()
 {
+    REALM_ASSERT_DEBUG(next != nullptr && prev != nullptr);
     auto _next = next;
     auto _prev = prev;
     _next->prev = prev;

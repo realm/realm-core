@@ -113,6 +113,9 @@ public:
     /// Calls do_translate().
     char* translate(ref_type ref) const noexcept;
 
+    /// Simpler version if we know the ref points inside the slab area
+    char* translate_in_slab(ref_type ref) const noexcept;
+
     /// Returns true if, and only if the object at the specified 'ref'
     /// is in the immutable part of the memory managed by this
     /// allocator. The method by which some objects become part of the
@@ -249,8 +252,8 @@ protected:
     /// then entirely the responsibility of the caller that the memory
     /// is not modified by way of the returned memory pointer.
     virtual char* do_translate(ref_type ref) const noexcept = 0;
-    char* translate_critical(RefTranslation*, ref_type ref) const noexcept;
-    char* translate_less_critical(RefTranslation*, ref_type ref) const noexcept;
+    char* translate_critical(RefTranslation*, ref_type ref, bool known_in_slab = false) const noexcept;
+    char* translate_less_critical(RefTranslation*, ref_type ref, bool known_in_slab = false) const noexcept;
     virtual void get_or_add_xover_mapping(RefTranslation&, size_t, size_t, size_t) = 0;
     Allocator() noexcept;
     size_t get_section_index(size_t pos) const noexcept;
@@ -556,7 +559,8 @@ inline Allocator::Allocator() noexcept
 }
 
 // performance critical part of the translation process. Less critical code is in translate_less_critical.
-inline char* Allocator::translate_critical(RefTranslation* ref_translation_ptr, ref_type ref) const noexcept
+inline char* Allocator::translate_critical(RefTranslation* ref_translation_ptr, ref_type ref,
+                                           bool known_in_slab) const noexcept
 {
     size_t idx = get_section_index(ref);
     RefTranslation& txl = ref_translation_ptr[idx];
@@ -574,7 +578,7 @@ inline char* Allocator::translate_critical(RefTranslation* ref_translation_ptr, 
         }
         else {
             // the lowest possible xover offset may grow concurrently, but that will be handled inside the call
-            return translate_less_critical(ref_translation_ptr, ref);
+            return translate_less_critical(ref_translation_ptr, ref, known_in_slab);
         }
     }
     realm::util::terminate("Invalid ref translation entry", __FILE__, __LINE__, txl.cookie, 0x1234567890, ref, idx);
@@ -586,6 +590,17 @@ inline char* Allocator::translate(ref_type ref) const noexcept
     auto ref_translation_ptr = m_ref_translation_ptr.load(std::memory_order_acquire);
     if (REALM_LIKELY(ref_translation_ptr)) {
         return translate_critical(ref_translation_ptr, ref);
+    }
+    else {
+        return do_translate(ref);
+    }
+}
+
+inline char* Allocator::translate_in_slab(ref_type ref) const noexcept
+{
+    auto ref_translation_ptr = m_ref_translation_ptr.load(std::memory_order_acquire);
+    if (REALM_LIKELY(ref_translation_ptr)) {
+        return translate_critical(ref_translation_ptr, ref, true);
     }
     else {
         return do_translate(ref);

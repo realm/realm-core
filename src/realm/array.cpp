@@ -989,42 +989,18 @@ MemRef Array::clone(MemRef mem, Allocator& alloc, Allocator& target_alloc)
 MemRef Array::create(Type type, bool context_flag, WidthType width_type, size_t size, int_fast64_t value,
                      Allocator& alloc)
 {
-    REALM_ASSERT_7(value, ==, 0, ||, width_type, ==, wtype_Bits);
-    REALM_ASSERT_7(size, ==, 0, ||, width_type, !=, wtype_Ignore);
-
-    bool is_inner_bptree_node = false, has_refs = false;
-    switch (type) {
-        case type_Normal:
-            break;
-        case type_InnerBptreeNode:
-            is_inner_bptree_node = true;
-            has_refs = true;
-            break;
-        case type_HasRefs:
-            has_refs = true;
-            break;
-    }
-
+    REALM_ASSERT_DEBUG(value == 0 || width_type == wtype_Bits);
+    REALM_ASSERT_DEBUG(size == 0 || width_type != wtype_Ignore);
     int width = 0;
-    size_t byte_size_0 = header_size;
+    if (value != 0)
+        width = static_cast<int>(bit_width(value));
+    auto mem = Node::create_node(size, alloc, context_flag, type, width_type, width);
     if (value != 0) {
-        width = int(bit_width(value));
-        byte_size_0 = calc_aligned_byte_size(size, width); // Throws
-    }
-    // Adding zero to Array::initial_capacity to avoid taking the
-    // address of that member
-    size_t byte_size = std::max(byte_size_0, initial_capacity + 0);
-    MemRef mem = alloc.alloc(byte_size); // Throws
-    char* header = mem.get_addr();
-
-    init_header(header, is_inner_bptree_node, has_refs, context_flag, width_type, width, size, byte_size);
-
-    if (value != 0) {
+        const auto header = mem.get_addr();
         char* data = get_data_from_header(header);
         size_t begin = 0, end = size;
         REALM_TEMPEX(fill_direct, width, (data, begin, end, value));
     }
-
     return mem;
 }
 

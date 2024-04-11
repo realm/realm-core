@@ -32,11 +32,24 @@ MemRef Node::create_node(size_t size, Allocator& alloc, bool context_flag, Type 
     size_t byte_size = std::max(byte_size_0, size_t(initial_capacity));
 
     MemRef mem = alloc.alloc(byte_size); // Throws
-    char* header = mem.get_addr();
+    const auto header = mem.get_addr();
+    REALM_ASSERT_DEBUG(width_type != WidthType::wtype_Extend);
+    Encoding encoding{static_cast<int>(width_type)};
 
-    init_header(header, type == type_InnerBptreeNode, type != type_Normal, context_flag, width_type, width, size,
-                byte_size);
+    uint8_t flags = 0;
+    if (type == type_InnerBptreeNode)
+        flags |= static_cast<uint8_t>(Flags::InnerBPTree) | static_cast<uint8_t>(Flags::HasRefs);
+    if (type != type_Normal)
+        flags |= static_cast<uint8_t>(Flags::HasRefs);
+    if (context_flag)
+        flags |= static_cast<uint8_t>(Flags::Context);
+    // width must be passed to init_header in bits, but for wtype_Multiply and wtype_Ignore
+    // it is provided by the caller of this function in bytes, so convert to bits
+    if (width_type != wtype_Bits)
+        width = width * 8;
 
+    init_header(header, encoding, flags, width, size);
+    set_capacity_in_header(byte_size, header);
     return mem;
 }
 
@@ -69,17 +82,20 @@ size_t Node::calc_item_count(size_t bytes, size_t width) const noexcept
 void Node::alloc(size_t init_size, size_t new_width)
 {
     REALM_ASSERT(is_attached());
-
+    char* header = get_header_from_data(m_data);
+    REALM_ASSERT(!wtype_is_extended(header));
     size_t needed_bytes = calc_byte_len(init_size, new_width);
     // this method is not public and callers must (and currently do) ensure that
     // needed_bytes are never larger than max_array_payload.
     REALM_ASSERT_RELEASE(init_size <= max_array_size);
 
-    if (is_read_only())
+    if (is_read_only()) {
         do_copy_on_write(needed_bytes);
+        // header has changed after copy on write if the array was compressed
+        header = get_header_from_data(m_data);
+    }
 
     REALM_ASSERT(!m_alloc.is_read_only(m_ref));
-    char* header = get_header_from_data(m_data);
     size_t orig_capacity_bytes = get_capacity_from_header(header);
     size_t orig_width = get_width_from_header(header);
 
@@ -114,8 +130,7 @@ void Node::alloc(size_t init_size, size_t new_width)
         // this array instance in a corrupt state
         update_parent(); // Throws
     }
-
-    // Update header
+    // update width (important when we convert from normal uncompressed array into compressed format)
     if (new_width != orig_width) {
         set_width_in_header(int(new_width), header);
     }
@@ -123,9 +138,20 @@ void Node::alloc(size_t init_size, size_t new_width)
     m_size = init_size;
 }
 
+void Node::destroy() noexcept
+{
+    if (!is_attached())
+        return;
+    char* header = get_header_from_data(m_data);
+    m_alloc.free_(m_ref, header);
+    m_data = nullptr;
+}
+
 void Node::do_copy_on_write(size_t minimum_size)
 {
     const char* header = get_header_from_data(m_data);
+    // only type A arrays should be allowed during copy on write
+    REALM_ASSERT(!wtype_is_extended(header));
 
     // Calculate size in bytes
     size_t array_size = calc_byte_size(get_wtype_from_header(header), m_size, get_width_from_header(header));
@@ -140,7 +166,6 @@ void Node::do_copy_on_write(size_t minimum_size)
     const char* old_end = header + array_size;
     char* new_begin = mref.get_addr();
     realm::safe_copy_n(old_begin, old_end - old_begin, new_begin);
-
     ref_type old_ref = m_ref;
 
     // Update internal data
@@ -150,7 +175,6 @@ void Node::do_copy_on_write(size_t minimum_size)
     // Update capacity in header. Uses m_data to find header, so
     // m_data must be initialized correctly first.
     set_capacity_in_header(new_size, new_begin);
-
     update_parent();
 
 #if REALM_ENABLE_MEMDEBUG
