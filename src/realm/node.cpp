@@ -32,31 +32,24 @@ MemRef Node::create_node(size_t size, Allocator& alloc, bool context_flag, Type 
     size_t byte_size = std::max(byte_size_0, size_t(initial_capacity));
 
     MemRef mem = alloc.alloc(byte_size); // Throws
-    auto header = mem.get_addr();
-    Encoding encoding = Encoding::WTypBits;
-    if (width_type == wtype_Bits)
-        encoding = Encoding::WTypBits;
-    else if (width_type == wtype_Multiply)
-        encoding = Encoding::WTypMult;
-    else if (width_type == wtype_Ignore)
-        encoding = Encoding::WTypIgn;
-    else {
-        REALM_ASSERT(false && "Wrong width type for encoding");
-    }
+    const auto header = mem.get_addr();
+    REALM_ASSERT_DEBUG(width_type != WidthType::wtype_Extend);
+    Encoding encoding{static_cast<int>(width_type)};
+
     uint8_t flags = 0;
     if (type == type_InnerBptreeNode)
-        flags |= (uint8_t)Flags::InnerBPTree | (uint8_t)Flags::HasRefs;
+        flags |= static_cast<uint8_t>(Flags::InnerBPTree) | static_cast<uint8_t>(Flags::HasRefs);
     if (type != type_Normal)
-        flags |= (uint8_t)Flags::HasRefs;
+        flags |= static_cast<uint8_t>(Flags::HasRefs);
     if (context_flag)
-        flags |= (uint8_t)Flags::Context;
+        flags |= static_cast<uint8_t>(Flags::Context);
     // width must be passed to init_header in bits, but for wtype_Multiply and wtype_Ignore
     // it is provided by the caller of this function in bytes, so convert to bits
     if (width_type != wtype_Bits)
         width = width * 8;
 
     init_header(header, encoding, flags, width, size);
-    set_capacity_in_header(byte_size, mem.get_addr());
+    set_capacity_in_header(byte_size, header);
     return mem;
 }
 
@@ -88,14 +81,40 @@ size_t Node::calc_item_count(size_t bytes, size_t width) const noexcept
 
 void Node::alloc(size_t init_size, size_t new_width)
 {
-    // This method is never taking in consideration the possibility of extending a B type array.
-    // This is fine as long as we have decompressed the array from B to A type before!!
+    return mem;
+}
 
+size_t Node::calc_byte_len(size_t num_items, size_t width) const
+{
+    REALM_ASSERT_3(get_wtype_from_header(get_header_from_data(m_data)), ==, wtype_Bits);
+
+    // FIXME: Consider calling `calc_aligned_byte_size(size)`
+    // instead. Note however, that calc_byte_len() is supposed to return
+    // the unaligned byte size. It is probably the case that no harm
+    // is done by returning the aligned version, and most callers of
+    // calc_byte_len() will actually benefit if calc_byte_len() was
+    // changed to always return the aligned byte size.
+
+    size_t bits = num_items * width;
+    size_t bytes = (bits + 7) / 8; // round up
+    return bytes + header_size;    // add room for 8 byte header
+}
+
+size_t Node::calc_item_count(size_t bytes, size_t width) const noexcept
+{
+    if (width == 0)
+        return std::numeric_limits<size_t>::max(); // Zero width gives "infinite" space
+
+    size_t bytes_data = bytes - header_size; // ignore 8 byte header
+    size_t total_bits = bytes_data * 8;
+    return total_bits / width;
+}
+
+void Node::alloc(size_t init_size, size_t new_width)
+{
     REALM_ASSERT(is_attached());
     char* header = get_header_from_data(m_data);
-    // only type old style arrays should be allowed during copy on write
     REALM_ASSERT(!wtype_is_extended(header));
-
     size_t needed_bytes = calc_byte_len(init_size, new_width);
     // this method is not public and callers must (and currently do) ensure that
     // needed_bytes are never larger than max_array_payload.
@@ -103,7 +122,7 @@ void Node::alloc(size_t init_size, size_t new_width)
 
     if (is_read_only()) {
         do_copy_on_write(needed_bytes);
-        // header will have changed:
+        // header has changed after copy on write if the array was compressed
         header = get_header_from_data(m_data);
     }
 
@@ -133,8 +152,6 @@ void Node::alloc(size_t init_size, size_t new_width)
         MemRef mem_ref = m_alloc.realloc_(m_ref, header, orig_capacity_bytes, new_capacity_bytes); // Throws
 
         header = mem_ref.get_addr();
-        // here the header is not going to be init.
-        // set_kind((uint64_t*)header, 'A');
         set_capacity_in_header(new_capacity_bytes, header);
 
         // Update this accessor and its ancestors
@@ -144,9 +161,7 @@ void Node::alloc(size_t init_size, size_t new_width)
         // this array instance in a corrupt state
         update_parent(); // Throws
     }
-
-    // this is likely going to fail if header is not A
-    //  Update header
+    // update width (important when we convert from normal uncompressed array into compressed format)
     if (new_width != orig_width) {
         set_width_in_header(int(new_width), header);
     }
@@ -183,7 +198,6 @@ void Node::do_copy_on_write(size_t minimum_size)
     const char* old_end = header + array_size;
     char* new_begin = mref.get_addr();
     realm::safe_copy_n(old_begin, old_end - old_begin, new_begin);
-
     ref_type old_ref = m_ref;
 
     // Update internal data
@@ -193,7 +207,6 @@ void Node::do_copy_on_write(size_t minimum_size)
     // Update capacity in header. Uses m_data to find header, so
     // m_data must be initialized correctly first.
     set_capacity_in_header(new_size, new_begin);
-
     update_parent();
 
 #if REALM_ENABLE_MEMDEBUG
