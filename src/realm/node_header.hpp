@@ -81,6 +81,33 @@ public:
         InnerBPTree = 4,
         // additional flags can be supported by new layouts, but old layout is full
     };
+    // Possible header encodings (and corresponding memory layouts):
+    enum class Encoding {
+        WTypBits = 0, // Corresponds to wtype_Bits
+        WTypMult = 1, // Corresponds to wtype_Multiply
+        WTypIgn = 2,  // Corresponds to wtype_Ignore
+        Packed = 4,   // wtype is wtype_Extend
+        Flex = 5      // wtype is wtype_Extend
+    };
+    // * Packed: tightly packed array (any element size <= 64)
+    // * WTypBits: less tightly packed. Correspond to wtype_Bits
+    // * WTypMult: less tightly packed. Correspond to wtype_Multiply
+    // * WTypIgn: single byte elements. Correspond to wtype_Ignore
+    // encodings with more flexibility but lower number of elements:
+    // * Flex: Pair of arrays (2 element sizes, 2 element count)
+    //
+    // Encodings:     bytes:
+    // name:       |  b0   |  b1   |  b2   |  b3   | b4:0-2 | b4:3-4 | b4:5-7 |  b5   |  b6   |  b7  |
+    // oldies      |  cap/chksum           |  'A'  | width  | wtype  | flags  |          size        |
+    // Packed      |  cap/chksum   | -     | width | flags2 | wtype  | flags  | enc   |     size     |
+    // Flex        |  cap/chksum   |  w_A + size_A | flags2 | wtype  | flags  | enc   | w_B + size_B |
+    //
+    // legend: cap = capacity, chksum = checksum, flags = 3 flag bits, flags2 = 3 additional flag bits
+    //         size = number of elements, w_A = bits per A element, w_B = bits per B element
+    //         size_A = number of A elements, size_B = number of B elements,
+    //         enc = the encoding for the array, corresponding to different memory layouts
+    //         For Flex: w + size is 6 bits for element width, 10 bits for number of elements
+    //
 
     static const int header_size = 8; // Number of bytes used by header
 
@@ -268,8 +295,6 @@ public:
 
     static size_t get_byte_size_from_header(const char* header) noexcept;
 
-    // Possible header encodings (and corresponding memory layouts):
-    enum class Encoding { WTypBits, WTypMult, WTypIgn, Packed, Flex };
     // ^ First 3 must overlap numerically with corresponding wtype_X enum.
     static Encoding get_encoding(const char* header)
     {
@@ -291,28 +316,6 @@ public:
             h[5] = static_cast<uint8_t>(enc) - 3;
         }
     }
-    // * Packed: tightly packed array (any element size <= 64)
-    // * WTypBits: less tightly packed. Correspond to wtype_Bits
-    // * WTypMult: less tightly packed. Correspond to wtype_Multiply
-    // * WTypIgn: single byte elements. Correspond to wtype_Ignore
-    // encodings with more flexibility but lower number of elements:
-    // * AofP: Array of pairs (2 element sizes, 1 element count)
-    // * PofA: Pair of arrays (2 elememt sizes, 1 element count)
-    //   Choose between them according to spatial locality
-    // Encodings with even more flexibility with even lower number of elements
-    // * Flex: Pair of arrays (like PofA) but allowing different element count
-    //
-    // Encodings:     bytes:
-    // name:       |  b0   |  b1   |  b2   |  b3   | b4:0-2 | b4:3-4 | b4:5-7 |  b5   |  b6   |  b7  |
-    // oldies      |  cap/chksum           |  'A'  | width  | wtype  | flags  |          size        |
-    // Packed      |  cap/chksum   | -     | width | flags2 | wtype  | flags  | wtyp2 |     size     |
-    // Flex        |  cap/chksum   |  w_A + size_A | flags2 | wtype  | flags  | wtyp2 | w_B + size_B |
-    //
-    // legend: cap = capacity, chksum = checksum, flags = 3 flag bits, flags2 = 3 additional flag bits
-    //         size = number of elements, w_A = bits per A element, w_B = bits per B element
-    //         size_A = number of A elements, size_B = number of B elements,
-    //         For Flex: w + size is 6 bits for element width, 10 bits for number of elements
-    //
     static std::string enc_to_string(Encoding enc)
     {
         switch (enc) {
