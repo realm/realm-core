@@ -849,54 +849,18 @@ MemRef Array::clone(MemRef mem, Allocator& alloc, Allocator& target_alloc)
 MemRef Array::create(Type type, bool context_flag, WidthType width_type, size_t size, int_fast64_t value,
                      Allocator& alloc)
 {
-    REALM_ASSERT_7(value, ==, 0, ||, width_type, ==, wtype_Bits);
-    REALM_ASSERT_7(size, ==, 0, ||, width_type, !=, wtype_Ignore);
-
-    uint8_t flags = 0;
-    Encoding encoding = Encoding::WTypBits;
-    if (width_type == wtype_Bits)
-        encoding = Encoding::WTypBits;
-    else if (width_type == wtype_Multiply)
-        encoding = Encoding::WTypMult;
-    else if (width_type == wtype_Ignore)
-        encoding = Encoding::WTypIgn;
-    else {
-        REALM_ASSERT(false && "Wrong width type for encoding");
-    }
-
-    switch (type) {
-        case type_Normal:
-            break;
-        case type_InnerBptreeNode:
-            flags |= (uint8_t)Flags::HasRefs | (uint8_t)Flags::InnerBPTree;
-
-            break;
-        case type_HasRefs:
-            flags |= (uint8_t)Flags::HasRefs;
-            break;
-    }
-    if (context_flag)
-        flags |= (uint8_t)Flags::Context;
+    REALM_ASSERT_DEBUG(value == 0 || width_type == wtype_Bits);
+    REALM_ASSERT_DEBUG(size == 0 || width_type != wtype_Ignore);
     int width = 0;
-    size_t byte_size_0 = header_size;
+    if (value != 0)
+        width = static_cast<int>(bit_width(value));
+    auto mem = Node::create_node(size, alloc, context_flag, type, width_type, width);
     if (value != 0) {
-        width = int(bit_width(value));
-        byte_size_0 = calc_aligned_byte_size(size, width); // Throws
-    }
-    // Adding zero to Array::initial_capacity to avoid taking the
-    // address of that member
-    size_t byte_size = std::max(byte_size_0, initial_capacity + 0);
-    MemRef mem = alloc.alloc(byte_size); // Throws
-    auto header = mem.get_addr();
-
-    init_header(header, encoding, flags, width, size);
-    set_capacity_in_header(byte_size, mem.get_addr());
-    if (value != 0) {
-        char* data = get_data_from_header(mem.get_addr());
+        const auto header = mem.get_addr();
+        char* data = get_data_from_header(header);
         size_t begin = 0, end = size;
         REALM_TEMPEX(fill_direct, width, (data, begin, end, value));
     }
-
     return mem;
 }
 

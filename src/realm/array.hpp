@@ -980,6 +980,21 @@ inline void Array::adjust(size_t begin, size_t end, int_fast64_t diff)
     }
 }
 
+
+//-------------------------------------------------
+
+
+inline size_t Array::get_byte_size() const noexcept
+{
+    const char* header = get_header_from_data(m_data);
+    size_t num_bytes = NodeHeader::get_byte_size_from_header(header);
+
+    REALM_ASSERT_7(m_alloc.is_read_only(m_ref), ==, true, ||, num_bytes, <=, get_capacity_from_header(header));
+
+    return num_bytes;
+}
+
+
 //-------------------------------------------------
 
 inline MemRef Array::create_empty_array(Type type, bool context_flag, Allocator& alloc)

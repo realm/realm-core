@@ -22,12 +22,9 @@
 #include <realm/node_header.hpp>
 #include <realm/alloc.hpp>
 
-#include <iostream>
-
 namespace realm {
 
 class Mixed;
-class ArrayEncode;
 
 /// Special index value. It has various meanings depending on
 /// context. It is returned by some search functions to indicate 'not
@@ -117,7 +114,7 @@ public:
     {
     }
 
-    virtual ~Node() noexcept = default;
+    virtual ~Node() = default;
 
     /**************************** Initializers *******************************/
 
@@ -126,7 +123,7 @@ public:
     char* init_from_mem(MemRef mem) noexcept
     {
         char* header = mem.get_addr();
-        REALM_ASSERT(!wtype_is_extended(header));
+        REALM_ASSERT_DEBUG(!wtype_is_extended(header));
         m_ref = mem.get_ref();
         m_data = get_data_from_header(header);
         m_size = get_size_from_header(header);
@@ -230,7 +227,6 @@ public:
         alloc.free_(mem);
     }
 
-
     /// Setting a new parent affects ownership of the attached array node, if
     /// any. If a non-null parent is specified, and there was no parent
     /// originally, then the caller passes ownership to the parent, and vice
@@ -241,6 +237,7 @@ public:
         m_parent = parent;
         m_ndx_in_parent = ndx_in_parent;
     }
+
     void set_ndx_in_parent(size_t ndx) noexcept
     {
         m_ndx_in_parent = ndx;
@@ -334,10 +331,9 @@ protected:
     // Includes array header. Not necessarily 8-byte aligned.
     virtual size_t calc_byte_len(size_t num_items, size_t width) const;
     virtual size_t calc_item_count(size_t bytes, size_t width) const noexcept;
-    // static void init_header(char* header, bool is_inner_bptree_node, bool has_refs, bool context_flag,
-    //                        WidthType width_type, int width, size_t size, size_t capacity) noexcept;
 
 private:
+    friend class NodeTree;
     ArrayParent* m_parent = nullptr;
     size_t m_ndx_in_parent = 0; // Ignored if m_parent is null.
     bool m_missing_parent_update = false;
