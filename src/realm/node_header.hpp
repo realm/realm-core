@@ -292,7 +292,6 @@ public:
             (reinterpret_cast<uint16_t*>(header))[0] = static_cast<uint16_t>(value >> 3);
         }
     }
-
     static size_t get_byte_size_from_header(const char* header) noexcept;
 
     // ^ First 3 must overlap numerically with corresponding wtype_X enum.
@@ -341,6 +340,7 @@ public:
 
 private:
     friend class Node;
+    friend class IntegerCompressor;
     // Setting element size for encodings with a single element size:
     static void inline set_element_size(char* header, size_t bits_per_element, Encoding);
     // Getting element size for encodings with a single element size:

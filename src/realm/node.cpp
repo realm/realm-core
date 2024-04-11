@@ -81,9 +81,9 @@ size_t Node::calc_item_count(size_t bytes, size_t width) const noexcept
 
 void Node::alloc(size_t init_size, size_t new_width)
 {
-    REALM_ASSERT(is_attached());
+    REALM_ASSERT_DEBUG(is_attached());
     char* header = get_header_from_data(m_data);
-    REALM_ASSERT(!wtype_is_extended(header));
+    REALM_ASSERT_DEBUG(!wtype_is_extended(header));
     size_t needed_bytes = calc_byte_len(init_size, new_width);
     // this method is not public and callers must (and currently do) ensure that
     // needed_bytes are never larger than max_array_payload.
@@ -160,9 +160,8 @@ void Node::do_copy_on_write(size_t minimum_size)
     // Plus a bit of matchcount room for expansion
     new_size += 64;
 
-    // Create new copy of array.
+    // Create new copy of array
     MemRef mref = m_alloc.alloc(new_size); // Throws
-
     const char* old_begin = header;
     const char* old_end = header + array_size;
     char* new_begin = mref.get_addr();

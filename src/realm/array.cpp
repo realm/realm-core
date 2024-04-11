@@ -346,17 +346,17 @@ void Array::destroy_children(size_t offset) noexcept
     }
 }
 
-size_t Array::get_byte_size() const noexcept
-{
-    const auto header = get_header();
-    auto num_bytes = get_byte_size_from_header(header);
-    auto read_only = m_alloc.is_read_only(m_ref) == true;
-    auto capacity = get_capacity_from_header(header);
-    auto bytes_ok = num_bytes <= capacity;
-    REALM_ASSERT(read_only || bytes_ok);
-    REALM_ASSERT_7(m_alloc.is_read_only(m_ref), ==, true, ||, num_bytes, <=, get_capacity_from_header(header));
-    return num_bytes;
-}
+// size_t Array::get_byte_size() const noexcept
+//{
+//     const auto header = get_header();
+//     auto num_bytes = get_byte_size_from_header(header);
+//     auto read_only = m_alloc.is_read_only(m_ref) == true;
+//     auto capacity = get_capacity_from_header(header);
+//     auto bytes_ok = num_bytes <= capacity;
+//     REALM_ASSERT(read_only || bytes_ok);
+//     REALM_ASSERT_7(m_alloc.is_read_only(m_ref), ==, true, ||, num_bytes, <=, get_capacity_from_header(header));
+//     return num_bytes;
+// }
 
 ref_type Array::write(_impl::ArrayWriterBase& out, bool deep, bool only_if_modified, bool compress_in_flight) const
 {
@@ -374,8 +374,7 @@ ref_type Array::write(_impl::ArrayWriterBase& out, bool deep, bool only_if_modif
         if (compress_in_flight && size() != 0 && compress_array(compressed_array)) {
 #ifdef REALM_DEBUG
             const auto encoding = compressed_array.m_integer_compressor.get_encoding();
-            REALM_ASSERT_DEBUG(encoding == Encoding::Flex || encoding == Encoding::Packed ||
-                               encoding == Encoding::AofP || encoding == Encoding::PofA);
+            REALM_ASSERT_DEBUG(encoding == Encoding::Flex || encoding == Encoding::Packed);
             REALM_ASSERT_DEBUG(size() == compressed_array.size());
             for (size_t i = 0; i < compressed_array.size(); ++i) {
                 REALM_ASSERT_DEBUG(get(i) == compressed_array.get(i));
@@ -408,8 +407,7 @@ ref_type Array::write(ref_type ref, Allocator& alloc, _impl::ArrayWriterBase& ou
         if (compress_in_flight && array.size() != 0 && array.compress_array(compressed_array)) {
 #ifdef REALM_DEBUG
             const auto encoding = compressed_array.m_integer_compressor.get_encoding();
-            REALM_ASSERT_DEBUG(encoding == Encoding::Flex || encoding == Encoding::Packed ||
-                               encoding == Encoding::AofP || encoding == Encoding::PofA);
+            REALM_ASSERT_DEBUG(encoding == Encoding::Flex || encoding == Encoding::Packed);
             REALM_ASSERT_DEBUG(array.size() == compressed_array.size());
             for (size_t i = 0; i < compressed_array.size(); ++i) {
                 REALM_ASSERT_DEBUG(array.get(i) == compressed_array.get(i));
