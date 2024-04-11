@@ -26,6 +26,8 @@
 #include <realm/data_type.hpp>
 #include <realm/column_type_traits.hpp>
 
+#include <iostream>
+
 namespace realm {
 
 class Spec;

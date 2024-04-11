@@ -86,7 +86,7 @@ public:
         WTypBits = 0, // Corresponds to wtype_Bits
         WTypMult = 1, // Corresponds to wtype_Multiply
         WTypIgn = 2,  // Corresponds to wtype_Ignore
-        Packed = 4,   // wtype is wtype_Extend
+        Packed = 3,   // wtype is wtype_Extend
         Flex = 5      // wtype is wtype_Extend
     };
     // * Packed: tightly packed array (any element size <= 64)
@@ -300,9 +300,9 @@ public:
         auto wtype = get_wtype_from_header(header);
         if (wtype == wtype_Extend) {
             const auto h = reinterpret_cast<const uint8_t*>(header);
-            return static_cast<Encoding>(h[5] + 3);
+            return Encoding{static_cast<int>(h[5]) + 3};
         }
-        return Encoding(int(wtype));
+        return Encoding(static_cast<int>(wtype));
     }
     static void set_encoding(char* header, Encoding enc)
     {
@@ -753,8 +753,9 @@ static inline void init_header(char* header, realm::NodeHeader::Encoding enc, ui
     REALM_ASSERT_DEBUG(bits_pr_elemB <= 64);
     REALM_ASSERT_DEBUG(num_elemsA < 1024);
     REALM_ASSERT_DEBUG(num_elemsB < 1024);
-    hw[3] = static_cast<uint16_t>(((bits_pr_elemB - 1) << 10) | num_elemsB);
     hw[1] = static_cast<uint16_t>(((bits_pr_elemA - 1) << 10) | num_elemsA);
+    hw[3] = static_cast<uint16_t>(((bits_pr_elemB - 1) << 10) | num_elemsB);
+    REALM_ASSERT_DEBUG(realm::NodeHeader::get_encoding(header) == realm::NodeHeader::Encoding::Flex);
 }
 } // namespace
 
