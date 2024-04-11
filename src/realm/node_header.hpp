@@ -268,64 +268,17 @@ public:
 
     static size_t get_byte_size_from_header(const char* header) noexcept;
 
-    static size_t calc_byte_size(WidthType wtype, size_t size, uint_least8_t width) noexcept
-    {
-        // the width need to be adjusted to nearest power of two:
-        if (width > 8) {
-            if (width > 32)
-                width = 64;
-            else if (width > 16)
-                width = 32;
-            else
-                width = 16;
-        }
-        else { // width <= 8
-            if (width > 4)
-                width = 8;
-            else if (width > 2)
-                width = 4;
-            // else width is already a power of 2
-        }
-        size_t num_bytes = 0;
-        switch (wtype) {
-            case wtype_Bits: {
-                // Current assumption is that size is at most 2^24 and that width is at most 64.
-                // In that case the following will never overflow. (Assuming that size_t is at least 32 bits)
-                REALM_ASSERT_3(size, <, 0x1000000);
-                size_t num_bits = size * width;
-                num_bytes = (num_bits + 7) >> 3;
-                break;
-            }
-            case wtype_Multiply: {
-                num_bytes = size * width;
-                break;
-            }
-            case wtype_Ignore:
-                num_bytes = size;
-                break;
-            default: {
-                REALM_ASSERT(false);
-                break;
-            }
-        }
-        num_bytes += header_size;
-        // Ensure 8-byte alignment
-        num_bytes = (num_bytes + 7) & ~size_t(7);
-        return num_bytes;
-    }
-
     // Possible header encodings (and corresponding memory layouts):
     enum class Encoding { WTypBits, WTypMult, WTypIgn, Packed, Flex };
     // ^ First 3 must overlap numerically with corresponding wtype_X enum.
     static Encoding get_encoding(const char* header)
     {
-        if (!wtype_is_extended(header)) {
-            return static_cast<Encoding>(get_wtype_from_header(header));
-        }
-        else {
+        auto wtype = get_wtype_from_header(header);
+        if (wtype == wtype_Extend) {
             const auto h = reinterpret_cast<const uint8_t*>(header);
             return static_cast<Encoding>(h[5] + 3);
         }
+        return Encoding(int(wtype));
     }
     static void set_encoding(char* header, Encoding enc)
     {
@@ -383,6 +336,8 @@ public:
         return retval;
     }
 
+private:
+    friend class Node;
     // Setting element size for encodings with a single element size:
     static void inline set_element_size(char* header, size_t bits_per_element, Encoding);
     // Getting element size for encodings with a single element size:
@@ -404,6 +359,52 @@ public:
     static inline size_t get_num_elements(const char* header, Encoding);
     // Setting the number of elements in the array(s). All encodings except Flex have one number of elements.
     static inline void set_num_elements(char* header, size_t num_elements, Encoding);
+
+    static size_t calc_byte_size(WidthType wtype, size_t size, uint_least8_t width) noexcept
+    {
+        // the width need to be adjusted to nearest power of two:
+        if (width > 8) {
+            if (width > 32)
+                width = 64;
+            else if (width > 16)
+                width = 32;
+            else
+                width = 16;
+        }
+        else { // width <= 8
+            if (width > 4)
+                width = 8;
+            else if (width > 2)
+                width = 4;
+            // else width is already a power of 2
+        }
+        size_t num_bytes = 0;
+        switch (wtype) {
+            case wtype_Bits: {
+                // Current assumption is that size is at most 2^24 and that width is at most 64.
+                // In that case the following will never overflow. (Assuming that size_t is at least 32 bits)
+                REALM_ASSERT_3(size, <, 0x1000000);
+                size_t num_bits = size * width;
+                num_bytes = (num_bits + 7) >> 3;
+                break;
+            }
+            case wtype_Multiply: {
+                num_bytes = size * width;
+                break;
+            }
+            case wtype_Ignore:
+                num_bytes = size;
+                break;
+            default: {
+                REALM_ASSERT(false);
+                break;
+            }
+        }
+        num_bytes += header_size;
+        // Ensure 8-byte alignment
+        num_bytes = (num_bytes + 7) & ~size_t(7);
+        return num_bytes;
+    }
 
     static inline void set_flags(char* header, uint8_t flags)
     {
@@ -540,22 +541,22 @@ inline size_t NodeHeader::get_elementB_size(const char* header)
 inline size_t NodeHeader::get_num_elements(const char* header, Encoding encoding)
 {
     switch (encoding) {
-        case NodeHeader::Encoding::Packed: {
+        case NodeHeader::Encoding::Packed:
             REALM_ASSERT_DEBUG(get_encoding(header) == Encoding::Packed);
             return (reinterpret_cast<const uint16_t*>(header))[3];
-        } break;
-        case NodeHeader::Encoding::WTypBits: {
-            REALM_ASSERT_DEBUG(get_wtype_from_header(header) == wtype_Bits);
-            return NodeHeader::get_size_from_header(header);
-        } break;
-        case NodeHeader::Encoding::WTypMult: {
-            REALM_ASSERT_DEBUG(get_wtype_from_header(header) == wtype_Multiply);
-            return NodeHeader::get_size_from_header(header);
-        } break;
+        break;
+        case NodeHeader::Encoding::WTypBits:
+        case NodeHeader::Encoding::WTypMult:
         case NodeHeader::Encoding::WTypIgn: {
-            REALM_ASSERT_DEBUG(get_wtype_from_header(header) == wtype_Ignore);
-            return NodeHeader::get_size_from_header(header);
-        } break;
+            REALM_ASSERT_DEBUG(get_wtype_from_header(header) != wtype_Extend);
+            typedef unsigned char uchar;
+            const uchar* h = reinterpret_cast<const uchar*>(header);
+            return (size_t(h[5]) << 16) + (size_t(h[6]) << 8) + h[7];
+            break;
+        }
+        case NodeHeader::Encoding::Flex:
+            return get_arrayB_num_elements(header);
+        break;
         default:
             REALM_UNREACHABLE();
     }
@@ -632,18 +633,17 @@ size_t inline NodeHeader::get_byte_size_from_header(const char* header) noexcept
 
     const auto encoding = get_encoding(h);
     REALM_ASSERT_DEBUG(encoding >= Encoding::WTypBits && encoding <= Encoding::Flex);
+    const auto size = get_num_elements(h, encoding);
     switch (encoding) {
         case Encoding::WTypBits:
         case Encoding::WTypIgn:
         case Encoding::WTypMult: {
-            const WidthType wtype = get_wtype_from_header(header);
             const auto width = get_width_from_header(header);
-            const auto size = get_size_from_header(header);
-            return calc_byte_size(wtype, size, static_cast<uint_least8_t>(width));
+            return calc_byte_size(WidthType(int(encoding)), size, static_cast<uint_least8_t>(width));
         }
         case Encoding::Packed:
             return NodeHeader::header_size +
-                   align_bits_to8(get_num_elements(h, encoding) * get_element_size(h, encoding));
+                   align_bits_to8(size * get_element_size(h, encoding));
         case Encoding::Flex:
             return NodeHeader::header_size + align_bits_to8(get_arrayA_num_elements(h) * get_elementA_size(h) +
                                                             get_arrayB_num_elements(h) * get_elementB_size(h));
@@ -664,21 +664,7 @@ uint_least8_t inline NodeHeader::get_width_from_header(const char* header) noexc
 // A little helper:
 size_t inline NodeHeader::get_size_from_header(const char* header) noexcept
 {
-    using Encoding = NodeHeader::Encoding;
-    if (wtype_is_extended(header)) {
-        const auto encoding = get_encoding(header);
-        if (encoding == Encoding::Flex) {
-            return get_arrayB_num_elements(header);
-        }
-        else if (encoding == Encoding::Packed) {
-            return get_num_elements(header, encoding);
-        }
-        REALM_UNREACHABLE(); // other encodings are not supported.
-    }
-    // must be not extended.
-    typedef unsigned char uchar;
-    const uchar* h = reinterpret_cast<const uchar*>(header);
-    return (size_t(h[5]) << 16) + (size_t(h[6]) << 8) + h[7];
+    return get_num_elements(header, get_encoding(header));
 }
 
 } // namespace realm
