@@ -349,10 +349,10 @@ void Lst<ObjLink>::do_remove(size_t ndx)
 
 Lst<Mixed>& Lst<Mixed>::operator=(const Lst<Mixed>& other)
 {
-    Base::operator=(other);
-    CollectionParent::operator=(other);
-
     if (this != &other) {
+        Base::operator=(other);
+        CollectionParent::operator=(other);
+
         // Just reset the pointer and rely on init_from_parent() being called
         // when the accessor is actually used.
         m_tree.reset();
@@ -364,10 +364,10 @@ Lst<Mixed>& Lst<Mixed>::operator=(const Lst<Mixed>& other)
 
 Lst<Mixed>& Lst<Mixed>::operator=(Lst<Mixed>&& other) noexcept
 {
-    Base::operator=(std::move(other));
-    CollectionParent::operator=(std::move(other));
-
     if (this != &other) {
+        Base::operator=(std::move(other));
+        CollectionParent::operator=(std::move(other));
+
         m_tree = std::exchange(other.m_tree, nullptr);
         if (m_tree) {
             m_tree->set_parent(this, 0);
@@ -589,7 +589,7 @@ inline std::shared_ptr<T> Lst<Mixed>::do_get_collection(const PathElement& path_
         auto weak = weak_from_this();
 
         if (weak.expired()) {
-            REALM_ASSERT(m_level == 1);
+            REALM_ASSERT_DEBUG(m_level == 1);
             return std::make_shared<Lst<Mixed>>(*this);
         }
 
@@ -880,12 +880,12 @@ bool Lst<Mixed>::clear_backlink(size_t ndx, CascadeState& state) const
             return Base::remove_backlink(m_col_key, link, state);
         }
         else if (value.is_type(type_List)) {
-            Lst<Mixed> l(*const_cast<Lst<Mixed>*>(this), m_tree->get_key(ndx));
-            return l.remove_backlinks(state);
+            Lst<Mixed> list{*const_cast<Lst<Mixed>*>(this), m_tree->get_key(ndx)};
+            return list.remove_backlinks(state);
         }
         else if (value.is_type(type_Dictionary)) {
-            Dictionary d(*const_cast<Lst<Mixed>*>(this), m_tree->get_key(ndx));
-            return d.remove_backlinks(state);
+            Dictionary dict{*const_cast<Lst<Mixed>*>(this), m_tree->get_key(ndx)};
+            return dict.remove_backlinks(state);
         }
     }
     return false;

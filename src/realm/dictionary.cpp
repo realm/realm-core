@@ -77,10 +77,10 @@ Dictionary::~Dictionary() = default;
 
 Dictionary& Dictionary::operator=(const Dictionary& other)
 {
-    Base::operator=(other);
-    CollectionParent::operator=(other);
-
     if (this != &other) {
+        Base::operator=(other);
+        CollectionParent::operator=(other);
+
         // Back to scratch
         m_dictionary_top.reset();
         reset_content_version();
@@ -446,7 +446,7 @@ inline std::shared_ptr<T> Dictionary::do_get_collection(const PathElement& path_
         auto weak = weak_from_this();
 
         if (weak.expired()) {
-            REALM_ASSERT(m_level == 1);
+            REALM_ASSERT_DEBUG(m_level == 1);
             return std::make_shared<Dictionary>(*this);
         }
 
@@ -995,12 +995,12 @@ bool Dictionary::clear_backlink(size_t ndx, CascadeState& state) const
         return Base::remove_backlink(m_col_key, value.get_link(), state);
     }
     if (value.is_type(type_Dictionary)) {
-        Dictionary d(*const_cast<Dictionary*>(this), m_values->get_key(ndx));
-        return d.remove_backlinks(state);
+        Dictionary dict{*const_cast<Dictionary*>(this), m_values->get_key(ndx)};
+        return dict.remove_backlinks(state);
     }
     if (value.is_type(type_List)) {
-        Lst<Mixed> l(*const_cast<Dictionary*>(this), m_values->get_key(ndx));
-        return l.remove_backlinks(state);
+        Lst<Mixed> list{*const_cast<Dictionary*>(this), m_values->get_key(ndx)};
+        return list.remove_backlinks(state);
     }
     return false;
 }
