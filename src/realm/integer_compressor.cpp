@@ -185,7 +185,7 @@ bool IntegerCompressor::decompress(Array& arr) const
     auto width = std::max(Array::bit_width(*min_v), Array::bit_width(*max_v));
     REALM_ASSERT_DEBUG(width == 0 || width == 1 || width == 2 || width == 4 || width == 8 || width == 16 ||
                        width == 32 || width == 64);
-    auto byte_size = NodeHeader::calc_size<Encoding::WTypBits>(size, width);
+    auto byte_size = NodeHeader::calc_size(size, width, Encoding::WTypBits);
     byte_size += 64; // this is some slab allocator magic number, this padding is needed in order to account for bit
                      // width expansion.
 
@@ -199,7 +199,7 @@ bool IntegerCompressor::decompress(Array& arr) const
 
     const auto mem = allocator.alloc(byte_size);
     const auto header = mem.get_addr();
-    NodeHeader::init_header(header, Encoding::WTypBits, flags, width, values.size());
+    init_header(header, Encoding::WTypBits, flags, width, values.size());
     NodeHeader::set_capacity_in_header(byte_size, header);
     arr.init_from_mem(mem);
 
@@ -225,8 +225,8 @@ void IntegerCompressor::init(const char* h)
     m_encoding = NodeHeader::get_encoding(h);
 
     if (m_encoding == Encoding::Packed) {
-        m_v_width = NodeHeader::get_element_size<Encoding::Packed>(h);
-        m_v_size = NodeHeader::get_num_elements<Encoding::Packed>(h);
+        m_v_width = NodeHeader::get_element_size(h, Encoding::Packed);
+        m_v_size = NodeHeader::get_num_elements(h, Encoding::Packed);
         m_v_mask = 1ULL << (m_v_width - 1);
         m_MSBs = populate(m_v_width, m_v_mask);
         m_vtable = &VTableForPacked::vtable;
@@ -234,10 +234,10 @@ void IntegerCompressor::init(const char* h)
         m_data_iterator = bf_iterator(data, 0, m_v_width, m_v_width, 0);
     }
     else if (m_encoding == Encoding::Flex) {
-        m_v_width = NodeHeader::get_elementA_size<Encoding::Flex>(h);
-        m_v_size = NodeHeader::get_arrayA_num_elements<Encoding::Flex>(h);
-        m_ndx_width = NodeHeader::get_elementB_size<Encoding::Flex>(h);
-        m_ndx_size = NodeHeader::get_arrayB_num_elements<Encoding::Flex>(h);
+        m_v_width = NodeHeader::get_elementA_size(h);
+        m_v_size = NodeHeader::get_arrayA_num_elements(h);
+        m_ndx_width = NodeHeader::get_elementB_size(h);
+        m_ndx_size = NodeHeader::get_arrayB_num_elements(h);
         m_v_mask = 1ULL << (m_v_width - 1);
         m_ndx_mask = 1ULL << (m_ndx_width - 1);
         m_MSBs = populate(m_v_width, m_v_mask);
@@ -252,13 +252,12 @@ void IntegerCompressor::init(const char* h)
 size_t IntegerCompressor::flex_disk_size(const std::vector<int64_t>& values, const std::vector<size_t>& indices,
                                          size_t& v_width, size_t& ndx_width) const
 {
-    using Encoding = NodeHeader::Encoding;
     const auto [min_value, max_value] = std::minmax_element(values.begin(), values.end());
     ndx_width = NodeHeader::unsigned_to_num_bits(values.size());
     v_width = std::max(Node::signed_to_num_bits(*min_value), Node::signed_to_num_bits(*max_value));
     REALM_ASSERT_DEBUG(v_width > 0);
     REALM_ASSERT_DEBUG(ndx_width > 0);
-    return NodeHeader::calc_size<Encoding::Flex>(values.size(), indices.size(), v_width, ndx_width);
+    return NodeHeader::calc_size(values.size(), indices.size(), v_width, ndx_width);
 }
 
 size_t IntegerCompressor::packed_disk_size(std::vector<int64_t>& values, size_t sz, size_t& v_width) const
@@ -267,7 +266,7 @@ size_t IntegerCompressor::packed_disk_size(std::vector<int64_t>& values, size_t 
     const auto [min_value, max_value] = std::minmax_element(values.begin(), values.end());
     v_width = std::max(Node::signed_to_num_bits(*min_value), Node::signed_to_num_bits(*max_value));
     REALM_ASSERT_DEBUG(v_width > 0);
-    return NodeHeader::calc_size<Encoding::Packed>(sz, v_width);
+    return NodeHeader::calc_size(sz, v_width, Encoding::Packed);
 }
 
 void IntegerCompressor::compress_values(const Array& arr, std::vector<int64_t>& values,

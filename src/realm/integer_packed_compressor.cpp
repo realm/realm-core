@@ -35,7 +35,7 @@ using namespace realm;
 void PackedCompressor::init_array(char* h, uint8_t flags, size_t v_width, size_t v_size) const
 {
     using Encoding = NodeHeader::Encoding;
-    NodeHeader::init_header((char*)h, Encoding::Packed, flags, v_width, v_size);
+    init_header((char*)h, Encoding::Packed, flags, v_width, v_size);
 }
 
 void PackedCompressor::copy_data(const Array& origin, Array& arr) const

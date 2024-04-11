@@ -1618,16 +1618,16 @@ TEST(B_Array_creation)
     Array array(Allocator::get_default());
     auto& allocator = array.get_alloc();
     auto mem = allocator.alloc(10);
-    NodeHeader::init_header(mem.get_addr(), Encoding::Flex, 6, 1, 1, 1, 1);
+    init_header(mem.get_addr(), Encoding::Flex, 6, 1, 1, 1, 1);
     array.init_from_mem(mem);
     auto array_header = array.get_header();
     auto encoding = array.get_encoding(array_header);
     REALM_ASSERT(encoding == Encoding::Flex); // this is missing << operator in order to be printed in case of error
     CHECK_EQUAL(array.get_flags(array_header), 6);
-    CHECK_EQUAL(array.get_elementA_size<Encoding::Flex>(array_header), 1);
-    CHECK_EQUAL(array.get_elementB_size<Encoding::Flex>(array_header), 1);
-    CHECK_EQUAL(array.get_arrayA_num_elements<Encoding::Flex>(array_header), 1);
-    CHECK_EQUAL(array.get_arrayB_num_elements<Encoding::Flex>(array_header), 1);
+    CHECK_EQUAL(array.get_elementA_size(array_header), 1);
+    CHECK_EQUAL(array.get_elementB_size(array_header), 1);
+    CHECK_EQUAL(array.get_arrayA_num_elements(array_header), 1);
+    CHECK_EQUAL(array.get_arrayB_num_elements(array_header), 1);
     // set flags explicitely (this should not change kind and encoding)
     array.set_flags(array_header, 5);
     auto flags = array.get_flags(array_header);
@@ -1641,7 +1641,7 @@ TEST(B_Array_encoding)
     using Encoding = NodeHeader::Encoding;
     Array array(Allocator::get_default());
     auto mem = array.get_alloc().alloc(10);
-    NodeHeader::init_header(mem.get_addr(), Encoding::Flex, 7, 1, 1, 1, 1);
+    init_header(mem.get_addr(), Encoding::Flex, 7, 1, 1, 1, 1);
     array.init_from_mem(mem);
     auto array_header = array.get_header();
     auto encoding = array.get_encoding(array_header);

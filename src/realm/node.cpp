@@ -81,40 +81,9 @@ size_t Node::calc_item_count(size_t bytes, size_t width) const noexcept
 
 void Node::alloc(size_t init_size, size_t new_width)
 {
-    return mem;
-}
-
-size_t Node::calc_byte_len(size_t num_items, size_t width) const
-{
-    REALM_ASSERT_3(get_wtype_from_header(get_header_from_data(m_data)), ==, wtype_Bits);
-
-    // FIXME: Consider calling `calc_aligned_byte_size(size)`
-    // instead. Note however, that calc_byte_len() is supposed to return
-    // the unaligned byte size. It is probably the case that no harm
-    // is done by returning the aligned version, and most callers of
-    // calc_byte_len() will actually benefit if calc_byte_len() was
-    // changed to always return the aligned byte size.
-
-    size_t bits = num_items * width;
-    size_t bytes = (bits + 7) / 8; // round up
-    return bytes + header_size;    // add room for 8 byte header
-}
-
-size_t Node::calc_item_count(size_t bytes, size_t width) const noexcept
-{
-    if (width == 0)
-        return std::numeric_limits<size_t>::max(); // Zero width gives "infinite" space
-
-    size_t bytes_data = bytes - header_size; // ignore 8 byte header
-    size_t total_bits = bytes_data * 8;
-    return total_bits / width;
-}
-
-void Node::alloc(size_t init_size, size_t new_width)
-{
-    REALM_ASSERT(is_attached());
+    REALM_ASSERT_DEBUG(is_attached());
     char* header = get_header_from_data(m_data);
-    REALM_ASSERT(!wtype_is_extended(header));
+    REALM_ASSERT_DEBUG(!wtype_is_extended(header));
     size_t needed_bytes = calc_byte_len(init_size, new_width);
     // this method is not public and callers must (and currently do) ensure that
     // needed_bytes are never larger than max_array_payload.
@@ -191,9 +160,8 @@ void Node::do_copy_on_write(size_t minimum_size)
     // Plus a bit of matchcount room for expansion
     new_size += 64;
 
-    // Create new copy of array.
+    // Create new copy of array
     MemRef mref = m_alloc.alloc(new_size); // Throws
-
     const char* old_begin = header;
     const char* old_end = header + array_size;
     char* new_begin = mref.get_addr();
