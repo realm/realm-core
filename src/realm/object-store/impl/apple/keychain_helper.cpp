@@ -205,7 +205,7 @@ std::optional<std::vector<char>> get_existing_metadata_realm_key(std::string_vie
     // in one client is unusual, but when it's done we want each metadata realm to
     // have a separate key.
 
-#if TARGET_OS_OSX
+#if TARGET_OS_MAC
     if (auto service = bundle_service()) {
         if (get_key(cf_app_id.get(), service.get(), {}, key))
             return key;
