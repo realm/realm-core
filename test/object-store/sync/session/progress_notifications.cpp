@@ -647,8 +647,7 @@ struct PBS : TestSetup {
 
     SyncTestFile make_config() override
     {
-        const auto schema = get_default_schema();
-        return SyncTestFile(session.app(), partition, schema);
+        return SyncTestFile(session.app()->current_user(), partition, get_default_schema());
     }
 
     AnyDict make_one(int64_t /* idx */) override
@@ -666,7 +665,7 @@ struct FLX : TestSetup {
     FLX(const std::string& app_id = "flx_sync_progress")
         : harness(app_id)
     {
-        table_name = (*harness.schema().begin()).name;
+        table_name = harness.schema().begin()->name;
     }
 
     SyncTestFile make_config() override

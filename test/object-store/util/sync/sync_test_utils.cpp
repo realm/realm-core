@@ -52,27 +52,6 @@ std::ostream& operator<<(std::ostream& os, util::Optional<app::AppError> error)
     return os;
 }
 
-bool results_contains_user(SyncUserMetadataResults& results, const std::string& identity)
-{
-    for (size_t i = 0; i < results.size(); i++) {
-        auto this_result = results.get(i);
-        if (this_result.identity() == identity) {
-            return true;
-        }
-    }
-    return false;
-}
-
-bool results_contains_original_name(SyncFileActionMetadataResults& results, const std::string& original_name)
-{
-    for (size_t i = 0; i < results.size(); i++) {
-        if (results.get(i).original_name() == original_name) {
-            return true;
-        }
-    }
-    return false;
-}
-
 bool ReturnsTrueWithinTimeLimit::match(util::FunctionRef<bool()> condition) const
 {
     const auto wait_start = std::chrono::steady_clock::now();
@@ -466,7 +445,7 @@ private:
 
 #if REALM_ENABLE_AUTH_TESTS
 
-void wait_for_object_to_persist_to_atlas(std::shared_ptr<SyncUser> user, const AppSession& app_session,
+void wait_for_object_to_persist_to_atlas(std::shared_ptr<app::User> user, const AppSession& app_session,
                                          const std::string& schema_name, const bson::BsonDocument& filter_bson)
 {
     // While at this point the object has been sync'd successfully, we must also
@@ -497,7 +476,7 @@ void wait_for_object_to_persist_to_atlas(std::shared_ptr<SyncUser> user, const A
         std::chrono::minutes(15), std::chrono::milliseconds(500));
 }
 
-void wait_for_num_objects_in_atlas(std::shared_ptr<SyncUser> user, const AppSession& app_session,
+void wait_for_num_objects_in_atlas(std::shared_ptr<app::User> user, const AppSession& app_session,
                                    const std::string& schema_name, size_t expected_size)
 {
     app::MongoClient remote_client = user->mongo_client("BackingDB");

@@ -51,8 +51,8 @@ TEST_CASE("SyncSession: management by SyncUser", "[sync][session]") {
     auto& server = tsm.sync_server();
     const std::string realm_base_url = server.base_url();
 
-    auto check_for_sessions = [](SyncUser& user, size_t count, SyncSession::State state) {
-        auto sessions = user.all_sessions();
+    auto check_for_sessions = [](TestUser& user, size_t count, SyncSession::State state) {
+        auto sessions = user.sync_manager()->get_all_sessions_for(user);
         CHECK(sessions.size() == count);
         for (auto& session : sessions) {
             CHECK(session->state() == state);
@@ -69,9 +69,9 @@ TEST_CASE("SyncSession: management by SyncUser", "[sync][session]") {
 
         // Check the sessions on the SyncUser.
         check_for_sessions(*user, 2, SyncSession::State::Active);
-        auto s1 = user->session_for_on_disk_path(session1->path());
+        auto s1 = tsm.sync_manager()->get_existing_session(session1->path());
         REQUIRE(s1 == session1);
-        auto s2 = user->session_for_on_disk_path(session2->path());
+        auto s2 = tsm.sync_manager()->get_existing_session(session2->path());
         REQUIRE(s2 == session2);
     }
 
@@ -88,7 +88,7 @@ TEST_CASE("SyncSession: management by SyncUser", "[sync][session]") {
         EventLoop::main().run_until([&] {
             return sessions_are_inactive(*session1, *session2);
         });
-        check_for_sessions(*user, 0, SyncSession::State::Inactive);
+        check_for_sessions(*user, 2, SyncSession::State::Inactive);
     }
 
     SECTION("a SyncUser defers binding new sessions until it is logged in") {
@@ -101,8 +101,9 @@ TEST_CASE("SyncSession: management by SyncUser", "[sync][session]") {
         spin_runloop();
         REQUIRE(session1->state() == SyncSession::State::Inactive);
         REQUIRE(session2->state() == SyncSession::State::Inactive);
-        check_for_sessions(*user, 0, SyncSession::State::Inactive);
-        user->log_in(ENCODE_FAKE_JWT("fake_access_token"), ENCODE_FAKE_JWT("fake_refresh_token"));
+        check_for_sessions(*user, 2, SyncSession::State::Inactive);
+        // Log the user back in via the sync manager.
+        user->log_in();
         EventLoop::main().run_until([&] {
             return sessions_are_active(*session1, *session2);
         });
@@ -118,14 +119,16 @@ TEST_CASE("SyncSession: management by SyncUser", "[sync][session]") {
             return sessions_are_active(*session1, *session2);
         });
         check_for_sessions(*user, 2, SyncSession::State::Active);
+        // Log the user out.
         user->log_out();
         REQUIRE(user->state() == State::LoggedOut);
         // Run the runloop many iterations to see if the sessions spuriously rebind.
         spin_runloop();
         REQUIRE(session1->state() == SyncSession::State::Inactive);
         REQUIRE(session2->state() == SyncSession::State::Inactive);
-        check_for_sessions(*user, 0, SyncSession::State::Inactive);
-        user->log_in(ENCODE_FAKE_JWT("fake_access_token"), ENCODE_FAKE_JWT("fake_refresh_token"));
+        check_for_sessions(*user, 2, SyncSession::State::Inactive);
+        // Log the user back in via the sync manager.
+        user->log_in();
         EventLoop::main().run_until([&] {
             return sessions_are_active(*session1, *session2);
         });
@@ -158,7 +161,7 @@ TEST_CASE("SyncSession: management by SyncUser", "[sync][session]") {
         auto session = sync_session(
             user, path, [](auto, auto) {}, SyncSessionStopPolicy::Immediately, &on_disk_path);
         CHECK(session);
-        session = user->session_for_on_disk_path(on_disk_path);
+        session = tsm.sync_manager()->get_existing_session(on_disk_path);
         CHECK(session);
     }
 
@@ -366,7 +369,7 @@ TEST_CASE("sync: error handling", "[sync][session]") {
     };
 
     SECTION("reports DNS error") {
-        tsm.sync_manager()->set_sync_route("ws://invalid.com:9090");
+        tsm.sync_manager()->set_sync_route("ws://invalid.com:9090", true);
 
         auto user = tsm.fake_user();
         auto session = sync_session(user, "/test", store_sync_error);
@@ -427,7 +430,8 @@ TEST_CASE("sync: error handling", "[sync][session]") {
     }
 
     SECTION("Properly handles a client reset error") {
-        auto user = tsm.fake_user();
+        OfflineAppSession oas;
+        auto user = oas.make_user();
 
         auto session = sync_session(user, "/test", store_sync_error);
         std::string on_disk_path = session->path();
@@ -456,7 +460,9 @@ TEST_CASE("sync: error handling", "[sync][session]") {
         std::string recovery_path = error->user_info[SyncError::c_recovery_file_path_key];
         auto idx = recovery_path.find("recovered_realm");
         CHECK(idx != std::string::npos);
-        idx = recovery_path.find(tsm.sync_manager()->recovery_directory_path());
+        idx = recovery_path.find(oas.app()->config().base_file_path);
+        CHECK(idx != std::string::npos);
+        idx = recovery_path.find(oas.app()->app_id());
         CHECK(idx != std::string::npos);
         if (just_before.tm_year == just_after.tm_year) {
             idx = recovery_path.find(util::format_local_time(just_after_raw, "%Y"));
