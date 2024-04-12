@@ -4971,7 +4971,7 @@ TEST_CASE("flx: role change bootstrap", "[sync][flx][baas][role_change][bootstra
         };
         {
             std::lock_guard lock(hook_mutex);
-            hook_callback = bs_callback;
+            hook_callback = std::move(bs_callback);
         }
 
         // Updating the role to employees only
