@@ -87,7 +87,7 @@ public:
         WTypMult = 1, // Corresponds to wtype_Multiply
         WTypIgn = 2,  // Corresponds to wtype_Ignore
         Packed = 3,   // wtype is wtype_Extend
-        Flex = 5      // wtype is wtype_Extend
+        Flex = 4      // wtype is wtype_Extend
     };
     // * Packed: tightly packed array (any element size <= 64)
     // * WTypBits: less tightly packed. Correspond to wtype_Bits
