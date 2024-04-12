@@ -364,7 +364,7 @@ let package = Package(
     products: [
         .library(
             name: "RealmCore",
-            targets: ["RealmCore"]),
+            targets: ["RealmCoreResources"]),
         .library(
             name: "RealmQueryParser",
             targets: ["RealmQueryParser"]),
@@ -417,12 +417,10 @@ let package = Package(
                 "realm/tools",
                 "realm/util/config.h.in",
                 "realm/version_numbers.hpp.in",
+                "spm",
                 "swift",
                 "win32",
             ] + syncExcludes + syncServerSources) as [String],
-            resources: [
-                .copy("realm/PrivacyInfo.xcprivacy")
-            ],
             publicHeadersPath: ".",
             cxxSettings: ([
                 .headerSearchPath("external"),
@@ -433,6 +431,20 @@ let package = Package(
                 .linkedFramework("Foundation", .when(platforms: [.macOS, .iOS, .tvOS, .watchOS, .macCatalyst])),
                 .linkedFramework("Security", .when(platforms: [.macOS, .iOS, .tvOS, .watchOS, .macCatalyst])),
             ]),
+        // Adding resources to a target makes command line swift build (but not
+        // xcodebuild) force-include Foundation.h without properly excluding
+        // non-objc c++ files. Adding the resources in a separate target which
+        // depends on RealmCore works around this. This target needs a single
+        // source file (dummy.mm) to work around a different bug in xcodebuild
+        // (but not swift build) that makes empty targets not work.
+        .target(
+            name: "RealmCoreResources",
+            dependencies: ["RealmCore"],
+            path: "src/spm",
+            resources: [
+                .copy("PrivacyInfo.xcprivacy")
+            ],
+            publicHeadersPath: "."),
         .target(
             name: "RealmQueryParser",
             dependencies: ["RealmCore"],
