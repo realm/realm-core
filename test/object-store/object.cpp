@@ -2340,11 +2340,16 @@ TEST_CASE("Typed Object") {
     UnmanagedObject unmanaged{"StringObject", AnyDict{{"_id", INT64_C(2)}, {"string", std::string("hello")}}};
     util::Any value1{AnyDict{{"_id", INT64_C(6)}, {"any", unmanaged}}};
     util::Any value2{AnyDict{{"_id", INT64_C(3)}, {"string", std::string("godbye")}}};
+    util::Any value3{AnyDict{{"_id", INT64_C(7)}, {"any", AnyDict{{"obj", INT64_C(5)}}}}};
+    util::Any value4{AnyDict{{"_id", INT64_C(7)}, {"any", AnyDict{{"obj", unmanaged}}}}};
 
     r->begin_transaction();
     Obj mixed_obj = Object::create(ctx, r, *r->schema().find("MixedObject"), value1).get_obj();
     Obj string_obj = Object::create(ctx, r, *r->schema().find("StringObject"), value2).get_obj();
+    Object::create(ctx, r, *r->schema().find("MixedObject"), value3);
+    Object::create(ctx, r, *r->schema().find("MixedObject"), value4, CreatePolicy::UpdateModified);
     r->commit_transaction();
+    CHECK(r->read_group().get_table("class_StringObject")->size() == 2);
 
     auto link = mixed_obj.get_any("any");
     auto linked_obj = r->read_group().get_object(link.get_link());

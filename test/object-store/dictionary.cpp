@@ -1064,6 +1064,15 @@ TEST_CASE("embedded dictionary", "[dictionary]") {
             REQUIRE(dict.get_object("foo").get<Int>(col_value) == 20);
         }
 
+        SECTION("mutates the existing object for update mode Modified") {
+            auto old_object = dict.get<Obj>("0");
+            dict.insert(ctx, "0", std::any(AnyDict{{"value", INT64_C(20)}}), CreatePolicy::UpdateModified);
+            REQUIRE(dict.size() == 10);
+            REQUIRE(target->size() == initial_target_size);
+            REQUIRE(dict.get_object("0").get<Int>(col_value) == 20);
+            REQUIRE(old_object.is_valid());
+        }
+
         r->cancel_transaction();
     }
 }

@@ -142,13 +142,6 @@ private:
     Obj get_object(StringData key) const;
 };
 
-} // namespace object_store
-} // namespace realm
-
-#include <realm/object-store/list.hpp>
-
-namespace realm::object_store {
-
 template <typename Fn>
 auto Dictionary::dispatch(Fn&& fn) const
 {
@@ -184,97 +177,7 @@ inline Obj Dictionary::get<Obj>(StringData key) const
     return get_object(key);
 }
 
-template <typename T, typename Context>
-void Dictionary::insert(Context& ctx, StringData key, T&& value, CreatePolicy policy)
-{
-    if (ctx.is_null(value)) {
-        this->insert(key, Mixed());
-        return;
-    }
-    if (m_is_embedded) {
-        validate_embedded(ctx, value, policy);
-        auto obj_key = dict().create_and_insert_linked_object(key).get_key();
-        ctx.template unbox<Obj>(value, policy, obj_key);
-        return;
-    }
-    dispatch([&](auto t) {
-        using U = std::decay_t<decltype(*t)>;
-        bool attr_changed = !policy.diff;
-        auto new_val = ctx.template unbox<U>(value, policy);
-
-        if constexpr (std::is_same_v<U, realm::Mixed>) {
-            if (new_val.is_type(type_Dictionary)) {
-                insert_collection(key, CollectionType::Dictionary);
-                auto dict = get_dictionary(key);
-                dict.assign(ctx, value, policy);
-                return;
-            }
-            if (new_val.is_type(type_List)) {
-                insert_collection(key, CollectionType::List);
-                auto list = get_list(key);
-                list.assign(ctx, value, policy);
-                return;
-            }
-        }
-
-        if (!attr_changed) {
-            util::Optional<Mixed> old_val = dict().try_get(key);
-            if (old_val) {
-                if constexpr (std::is_same_v<U, realm::Mixed>) {
-                    attr_changed = !new_val.is_same_type(*old_val);
-                }
-
-                attr_changed = attr_changed || new_val != *old_val;
-            }
-            else {
-                attr_changed = true;
-            }
-        }
-
-        if (attr_changed)
-            dict().insert(key, new_val);
-    });
-}
-
-template <typename Context>
-auto Dictionary::get(Context& ctx, StringData key) const
-{
-    if (m_type == PropertyType::Mixed) {
-        Mixed value = dict().get(key);
-        if (value.is_type(type_Dictionary)) {
-            return ctx.box(get_dictionary(key));
-        }
-        if (value.is_type(type_List)) {
-            return ctx.box(get_list(key));
-        }
-        return ctx.box(value);
-    }
-    else {
-        return dispatch([&](auto t) {
-            return ctx.box(this->get<std::decay_t<decltype(*t)>>(key));
-        });
-    }
-}
-
-template <typename T, typename Context>
-void Dictionary::assign(Context& ctx, T&& values, CreatePolicy policy)
-{
-    if (ctx.is_same_dictionary(*this, values))
-        return;
-
-    if (ctx.is_null(values)) {
-        remove_all();
-        return;
-    }
-
-    if (!policy.diff)
-        remove_all();
-
-    ctx.enumerate_dictionary(values, [&](StringData key, auto&& value) {
-        this->insert(ctx, key, value, policy);
-    });
-}
-
-} // namespace realm::object_store
+} // namespace object_store
+} // namespace realm
 
 #endif /* REALM_OS_DICTIONARY_HPP */
