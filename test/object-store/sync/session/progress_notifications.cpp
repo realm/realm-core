@@ -128,6 +128,27 @@ TEST_CASE("progress notification", "[sync][session][progress]") {
             REQUIRE(transferrable == 2);
         }
 
+        SECTION("for download notifications, when new data transfer starts") {
+            register_default_download_callback();
+            REQUIRE_FALSE(callback_was_called);
+
+            // upload progress shouldn't have any effect on this
+            progress.update_upload(1, 1, 1);
+            CHECK_FALSE(callback_was_called);
+            callback_was_called = false;
+
+            progress.update_download(1, 2, 1);
+            CHECK(callback_was_called);
+
+            callback_was_called = false;
+            progress.update_download(2, 2, 1);
+            CHECK(callback_was_called);
+
+            callback_was_called = false;
+            progress.update_upload(2, 2, 1);
+            CHECK_FALSE(callback_was_called);
+        }
+
         SECTION("can register another notifier while in the initial notification without deadlock") {
             int counter = 0;
             progress.register_callback(
@@ -768,7 +789,9 @@ struct ReportedProgress : std::vector<std::vector<ProgressNotification>> {
         REQUIRE(i < progress.size());                                                                                \
         auto&& values = progress[i];                                                                                 \
                                                                                                                      \
-        REQUIRE(values.size() > 0);                                                                                  \
+        CHECK(values.size() > 0);                                                                                    \
+        if (values.front().estimate < 1)                                                                             \
+            CHECK(values.size() >= 3);                                                                               \
         int progress_stages = expected_download_stages;                                                              \
                                                                                                                      \
         for (size_t j = 0; j < values.size(); ++j) {                                                                 \
@@ -802,10 +825,14 @@ struct ReportedProgress : std::vector<std::vector<ProgressNotification>> {
             else {                                                                                                   \
                 CHECK(prev.estimate <= p.estimate);                                                                  \
             }                                                                                                        \
+                                                                                                                     \
+            bool is_last = j == values.size() - 1;                                                                   \
+            if (is_last) {                                                                                           \
+                auto&& last = values.back();                                                                         \
+                CHECK(last.estimate == 1.0);                                                                         \
+                CHECK(last.xferred == last.xferable);                                                                \
+            }                                                                                                        \
         }                                                                                                            \
-        auto&& last = values.back();                                                                                 \
-        CHECK(last.estimate == 1.0);                                                                                 \
-        CHECK(last.xferred == last.xferable);                                                                        \
     }
 
 /*
@@ -863,7 +890,7 @@ TEMPLATE_TEST_CASE("sync progress notifications", "[sync][baas][progress]", PBS,
                     direction, stream);
     };
 
-#define VERIFY_PROGRESS_CONSISTENCY(progress, begin, end)                                                            \
+#define VERIFY_PROGRESS_CONSISTENCY(progress, begin, end, sync_direction_is_download)                                \
     {                                                                                                                \
         std::lock_guard lock(progress.mutex);                                                                        \
         REQUIRE(begin < end);                                                                                        \
@@ -874,6 +901,15 @@ TEMPLATE_TEST_CASE("sync progress notifications", "[sync][baas][progress]", PBS,
             bool is_download = i % 2 == 0;                                                                           \
             /* first two lists are for non-streaming, next streaming callbacks */                                    \
             bool is_streaming = i % 4 > 1;                                                                           \
+                                                                                                                     \
+            /* since the test checks only one direction at a time: from one realm to the other,                      \
+             * allow empty reported progress only for the other direction,                                           \
+             * this is the case when the session is simply restarted after initial sync */                           \
+            if (progress[i].empty()) {                                                                               \
+                CHECK(sync_direction_is_download != is_download);                                                    \
+                continue;                                                                                            \
+            }                                                                                                        \
+                                                                                                                     \
             VERIFY_PROGRESS_CONSISTENCY_ONE(progress, i, 1, is_download, is_streaming);                              \
         }                                                                                                            \
     }
@@ -895,7 +931,7 @@ TEMPLATE_TEST_CASE("sync progress notifications", "[sync][baas][progress]", PBS,
     add_callbacks(realm_1, progress_1);
 
     wait_for_sync(realm_1);
-    VERIFY_PROGRESS_CONSISTENCY(progress_1, 0, 4);
+    VERIFY_PROGRESS_CONSISTENCY(progress_1, 0, 4, false);
     progress_1.clear();
 
     SECTION("progress from second realm") {
@@ -907,7 +943,7 @@ TEMPLATE_TEST_CASE("sync progress notifications", "[sync][baas][progress]", PBS,
         wait_for_sync(realm_2);
         VERIFY_REALM(realm_1, realm_2, expected_count);
 
-        VERIFY_PROGRESS_CONSISTENCY(progress_2, 0, 4);
+        VERIFY_PROGRESS_CONSISTENCY(progress_2, 0, 4, true);
         progress_2.clear();
 
         VERIFY_PROGRESS_EMPTY(progress_1, 0, progress_1.size());
@@ -925,8 +961,8 @@ TEMPLATE_TEST_CASE("sync progress notifications", "[sync][baas][progress]", PBS,
             VERIFY_PROGRESS_EMPTY(progress_1, 0, 2);
             VERIFY_PROGRESS_EMPTY(progress_2, 0, 2);
             // old streaming and newly registered should be reported
-            VERIFY_PROGRESS_CONSISTENCY(progress_1, 2, 8);
-            VERIFY_PROGRESS_CONSISTENCY(progress_2, 2, 8);
+            VERIFY_PROGRESS_CONSISTENCY(progress_1, 2, 8, true);
+            VERIFY_PROGRESS_CONSISTENCY(progress_2, 2, 8, false);
         }
 
         SECTION("reopen and sync existing realm") {
@@ -940,9 +976,9 @@ TEMPLATE_TEST_CASE("sync progress notifications", "[sync][baas][progress]", PBS,
             VERIFY_REALM(realm_1, realm_2, expected_count);
 
             VERIFY_PROGRESS_EMPTY(progress_1, 0, 2);
-            VERIFY_PROGRESS_CONSISTENCY(progress_1, 2, 4);
+            VERIFY_PROGRESS_CONSISTENCY(progress_1, 2, 4, false);
             VERIFY_PROGRESS_EMPTY(progress_2, 0, 4);
-            VERIFY_PROGRESS_CONSISTENCY(progress_2, 4, 8);
+            VERIFY_PROGRESS_CONSISTENCY(progress_2, 4, 8, true);
         }
 
         progress_1.clear();
@@ -999,7 +1035,7 @@ TEMPLATE_TEST_CASE("sync progress notifications", "[sync][baas][progress]", PBS,
                 add_callbacks(realm_1, progress_1);
                 wait_for_sync(realm_1);
                 VERIFY_PROGRESS_EMPTY(progress_1, 0, 2);
-                VERIFY_PROGRESS_CONSISTENCY(progress_1, 2, 8);
+                VERIFY_PROGRESS_CONSISTENCY(progress_1, 2, 8, false);
                 progress_1.clear();
             }
         }

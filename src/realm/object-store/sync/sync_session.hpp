@@ -80,13 +80,16 @@ private:
     // can register upon this session.
     struct NotifierPackage {
         std::function<ProgressNotifierCallback> notifier;
-        util::Optional<uint64_t> captured_transferrable;
         uint64_t snapshot_version;
         bool is_streaming;
         bool is_download;
 
         util::UniqueFunction<void()> create_invocation(const Progress&, bool& is_expired,
                                                        bool initial_registration = false);
+
+        bool started_notifying = false;
+        uint64_t initial_transferred = 0;
+        util::Optional<uint64_t> captured_transferable;
     };
 
     // A counter used as a token to identify progress notifier callbacks registered on this session.

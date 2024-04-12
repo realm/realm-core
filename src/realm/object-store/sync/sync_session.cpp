@@ -1530,7 +1530,7 @@ uint64_t SyncProgressNotifier::register_callback(std::function<ProgressNotifierC
     {
         std::lock_guard<std::mutex> lock(m_mutex);
         token_value = m_progress_notifier_token++;
-        NotifierPackage package{std::move(notifier), util::none, m_local_transaction_version, is_streaming,
+        NotifierPackage package{std::move(notifier), m_local_transaction_version, is_streaming,
                                 direction == NotifierType::download};
         if (!m_current_progress) {
             // Simply register the package, since we have no data yet.
@@ -1587,7 +1587,7 @@ SyncProgressNotifier::NotifierPackage::create_invocation(Progress const& current
                                                          bool initial_registration)
 {
     uint64_t transferred = is_download ? current_progress.downloaded : current_progress.uploaded;
-    uint64_t transferrable = is_download ? current_progress.downloadable : current_progress.uploadable;
+    uint64_t transferable = is_download ? current_progress.downloadable : current_progress.uploadable;
     double progress_estimate = is_download ? current_progress.download_estimate : current_progress.upload_estimate;
 
     // If the sync client has not yet processed all of the local
@@ -1596,27 +1596,36 @@ SyncProgressNotifier::NotifierPackage::create_invocation(Progress const& current
     if (!is_download && snapshot_version > current_progress.snapshot_version)
         return [] {};
 
-    // only invoke the callback on registration if is in active data transfer
-    if (is_download && initial_registration && progress_estimate >= 1)
-        return [] {};
+    // for download only invoke the callback on registration if is in active data transfer,
+    // otherwise delay notifying until an update with the new transfer signaled
+    if (is_download && !started_notifying && progress_estimate >= 1) {
+        if (initial_registration) {
+            initial_transferred = transferred;
+            return [] {};
+        }
+        else if (initial_transferred == transferred)
+            return [] {};
+    }
 
-    // only capture and adjust transferable bytest for upload non-streaming to provide
+    started_notifying = true;
+
+    // only capture and adjust transferable bytes for upload non-streaming to provide
     // the progress of upload for the callback registered right after the commit
     if (!is_streaming && !is_download) {
-        if (!captured_transferrable || *captured_transferrable > transferrable)
-            captured_transferrable = transferrable;
-        transferrable = *captured_transferrable;
+        if (!captured_transferable || *captured_transferable > transferable)
+            captured_transferable = transferable;
+        transferable = *captured_transferable;
     }
 
     // A notifier is expired for upload if at least as many bytes have been transferred
-    // as were originally considered transferrable based on local committed version
+    // as were originally considered transferable based on local committed version
     // on callback registration, or when simply 1.0 progress is reached for download
     // since the amount of bytes is not precisely known until the end
     if (!is_streaming)
-        is_expired = is_download ? progress_estimate >= 1 : transferred >= transferrable;
+        is_expired = is_download ? progress_estimate >= 1 : transferred >= transferable;
 
     return [=, notifier = notifier] {
-        notifier(transferred, transferrable, progress_estimate);
+        notifier(transferred, transferable, progress_estimate);
     };
 }
 
