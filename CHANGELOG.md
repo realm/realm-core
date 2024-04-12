@@ -11,7 +11,6 @@
 * SyncUser::all_sessions() included sessions in every state *except* for waiting for access token, which was weirdly inconsistent. It now includes all sessions. ([PR #7300](https://github.com/realm/realm-core/pull/7300)).
 * App::all_users() included logged out users only if they were logged out while the App instance existed. It now always includes all logged out users. ([PR #7300](https://github.com/realm/realm-core/pull/7300)).
 * Deleting the active user left the active user unset rather than selecting another logged-in user as the active user like logging out and removing users did. ([PR #7300](https://github.com/realm/realm-core/pull/7300)).
-* Add a privacy manifest to the Swift package ([Swift #8535](https://github.com/realm/realm-swift/issues/8535)).
 
 ### Breaking changes
 * The following things have been renamed or moved as part of moving all of the App Services functionality to the app namespace:
@@ -45,6 +44,17 @@
 
 ----------------------------------------------
 
+# 14.5.1 Release notes
+
+### Fixed
+* Clearing a nested collection may end with a crash ([#7556](https://github.com/realm/realm-core/issues/7556), since v14.0.0)
+* Removing nested collections in Mixed for synced realms throws realm::StaleAccessor ([#7573](https://github.com/realm/realm-core/issues/7573), since v14.0.0)
+* Add a privacy manifest to the Swift package ([Swift #8535](https://github.com/realm/realm-swift/issues/8535)).
+
+### Compatibility
+* Fileformat: Generates files with format v24. Reads and automatically upgrade from fileformat v10. If you want to upgrade from an earlier file format version you will have to use RealmCore v13.x.y or earlier.
+
+----------------------------------------------
 # 14.5.0 Release notes
 
 ### Enhancements
@@ -56,7 +66,6 @@
 * Version 19.39.33523 of MSVC would crash when compiling for arm64 in release mode ([PR #7533](https://github.com/realm/realm-core/pull/7533)).
 * Null pointer exception may be triggered when logging out and async commits callbacks not executed ([#7434](https://github.com/realm/realm-core/issues/7434), since v13.26.0)
 * Fixed building for iPhone simulators targeting deployment target 11 ([#7554](https://github.com/realm/realm-core/pull/7554)).
-* Clearing a nested collection may end with a crash ([#7556](https://github.com/realm/realm-core/issues/7556), since v14.0.0)
 
 ### Breaking changes
 * Updated default base URL to be `https://services.cloud.mongodb.com` to support the new domains (was `https://realm.mongodb.com`). ([PR #7534](https://github.com/realm/realm-core/pull/7534))
