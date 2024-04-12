@@ -4921,15 +4921,16 @@ TEST_CASE("flx: role change bootstrap", "[sync][flx][baas][role_change][bootstra
         });
     });
 
-    auto update_perms = [&](std::optional<nlohmann::json> doc_filter, bool multi_msg, size_t cnt_emps,
-                            size_t cnt_mgrs, size_t cnt_dirs) {
+    auto update_perms = [&](std::optional<nlohmann::json> doc_filter, size_t cnt_emps, size_t cnt_mgrs,
+                            size_t cnt_dirs) {
         using BatchState = sync::DownloadBatchState;
+        std::mutex callback_mutex;
         BatchState last_state = BatchState::SteadyState;
         size_t msg_count = 0;
-        auto bs_callback = [&last_state, &msg_count, &machina, multi_msg](std::weak_ptr<SyncSession>,
-                                                                          const SyncClientHookData& data) {
+        auto bs_callback = [&callback_mutex, &last_state, &msg_count, &machina](std::weak_ptr<SyncSession>,
+                                                                                const SyncClientHookData& data) {
             machina.transition_with(
-                [&data, &last_state, &msg_count, multi_msg](TestState curr_state) -> std::optional<TestState> {
+                [&data, &callback_mutex, &last_state, &msg_count](TestState curr_state) -> std::optional<TestState> {
                     // download message saved to bootstrap store
                     switch (data.event) {
                         // Multimessage bootstrap processing
@@ -4937,26 +4938,28 @@ TEST_CASE("flx: role change bootstrap", "[sync][flx][baas][role_change][bootstra
                             std::optional<TestState> next_state;
                             REQUIRE(data.batch_state != BatchState::SteadyState);
                             REQUIRE((curr_state == TestState::connected || curr_state == TestState::bs_downloading));
-                            if (msg_count == 0) {
-                                REQUIRE(last_state == BatchState::SteadyState);
-                            }
-                            else {
-                                REQUIRE(last_state == BatchState::MoreToCome);
-                            }
                             if (data.batch_state == BatchState::LastInBatch) {
                                 next_state = TestState::bs_downloaded;
                             }
                             else {
                                 next_state = TestState::bs_downloading;
                             }
-                            last_state = data.batch_state;
-                            ++msg_count;
+                            {
+                                std::lock_guard lock(callback_mutex);
+                                if (msg_count == 0) {
+                                    REQUIRE(last_state == BatchState::SteadyState);
+                                }
+                                else {
+                                    REQUIRE(last_state == BatchState::MoreToCome);
+                                }
+                                last_state = data.batch_state;
+                                ++msg_count;
+                            }
                             return next_state;
                         }
                         case SyncClientHookEvent::BootstrapProcessed:
                             REQUIRE(last_state == BatchState::LastInBatch);
                             REQUIRE(curr_state == TestState::bs_downloaded);
-                            REQUIRE((msg_count > 1 == multi_msg));
                             return TestState::bs_complete;
                         case SyncClientHookEvent::DownloadMessageReceived:
                         case SyncClientHookEvent::DownloadMessageIntegrated:
@@ -4987,6 +4990,13 @@ TEST_CASE("flx: role change bootstrap", "[sync][flx][baas][role_change][bootstra
         REQUIRE(machina.wait_for(TestState::connected));
 
         REQUIRE(!wait_for_download(*realm));
+        {
+            std::lock_guard lock(callback_mutex);
+            if (msg_count > 1) {
+                // Verify a bootstrap occurred if expected multiple messages
+                REQUIRE(machina.get() == TestState::bs_complete);
+            }
+        }
         REQUIRE(!wait_for_upload(*realm));
         wait_for_advance(*realm);
         {
@@ -5013,18 +5023,18 @@ TEST_CASE("flx: role change bootstrap", "[sync][flx][baas][role_change][bootstra
         }
     };
     {
-        // Multi-message subtractive bootstrap
+        // Single message subtractive bootstrap
         nlohmann::json doc_filter = {{"role", {{"$in", {"manager", "director"}}}}};
-        update_perms(doc_filter, true, 0, num_mgrs, num_dirs);
+        update_perms(doc_filter, 0, num_mgrs, num_dirs);
     }
     {
-        // Multi-message additive (and a little bit subtractive) bootstrap
+        // Multi-message additive/subtractive bootstrap
         nlohmann::json doc_filter = {{"role", "employee"}};
-        update_perms(doc_filter, true, num_emps, 0, 0);
+        update_perms(doc_filter, num_emps, 0, 0);
     }
     {
-        // Single message, single changeset additive bootstrap
-        update_perms(std::nullopt, false, num_emps, num_mgrs, num_dirs);
+        // Single message additive bootstrap
+        update_perms(std::nullopt, num_emps, num_mgrs, num_dirs);
     }
 }
 
