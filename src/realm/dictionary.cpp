@@ -77,9 +77,10 @@ Dictionary::~Dictionary() = default;
 
 Dictionary& Dictionary::operator=(const Dictionary& other)
 {
-    Base::operator=(static_cast<const Base&>(other));
-
     if (this != &other) {
+        Base::operator=(other);
+        CollectionParent::operator=(other);
+
         // Back to scratch
         m_dictionary_top.reset();
         reset_content_version();
@@ -437,24 +438,35 @@ void Dictionary::insert_collection(const PathElement& path_elem, CollectionType 
     insert(path_elem.get_key(), Mixed(0, dict_or_list));
 }
 
-DictionaryPtr Dictionary::get_dictionary(const PathElement& path_elem) const
+template <class T>
+inline std::shared_ptr<T> Dictionary::do_get_collection(const PathElement& path_elem)
 {
     update();
-    auto weak = const_cast<Dictionary*>(this)->weak_from_this();
-    auto shared = weak.expired() ? std::make_shared<Dictionary>(*this) : weak.lock();
-    DictionaryPtr ret = std::make_shared<Dictionary>(m_col_key, get_level() + 1);
+    auto get_shared = [&]() -> std::shared_ptr<CollectionParent> {
+        auto weak = weak_from_this();
+
+        if (weak.expired()) {
+            REALM_ASSERT_DEBUG(m_level == 1);
+            return std::make_shared<Dictionary>(*this);
+        }
+
+        return weak.lock();
+    };
+
+    auto shared = get_shared();
+    auto ret = std::make_shared<T>(m_col_key, get_level() + 1);
     ret->set_owner(shared, build_index(path_elem.get_key()));
     return ret;
 }
 
+DictionaryPtr Dictionary::get_dictionary(const PathElement& path_elem) const
+{
+    return const_cast<Dictionary*>(this)->do_get_collection<Dictionary>(path_elem);
+}
+
 std::shared_ptr<Lst<Mixed>> Dictionary::get_list(const PathElement& path_elem) const
 {
-    update();
-    auto weak = const_cast<Dictionary*>(this)->weak_from_this();
-    auto shared = weak.expired() ? std::make_shared<Dictionary>(*this) : weak.lock();
-    std::shared_ptr<Lst<Mixed>> ret = std::make_shared<Lst<Mixed>>(m_col_key, get_level() + 1);
-    ret->set_owner(shared, build_index(path_elem.get_key()));
-    return ret;
+    return const_cast<Dictionary*>(this)->do_get_collection<Lst<Mixed>>(path_elem);
 }
 
 Mixed Dictionary::get(Mixed key) const
@@ -983,12 +995,12 @@ bool Dictionary::clear_backlink(size_t ndx, CascadeState& state) const
         return Base::remove_backlink(m_col_key, value.get_link(), state);
     }
     if (value.is_type(type_Dictionary)) {
-        auto key = do_get_key(ndx);
-        return get_dictionary(key.get_string())->remove_backlinks(state);
+        Dictionary dict{*const_cast<Dictionary*>(this), m_values->get_key(ndx)};
+        return dict.remove_backlinks(state);
     }
     if (value.is_type(type_List)) {
-        auto key = do_get_key(ndx);
-        return get_list(key.get_string())->remove_backlinks(state);
+        Lst<Mixed> list{*const_cast<Dictionary*>(this), m_values->get_key(ndx)};
+        return list.remove_backlinks(state);
     }
     return false;
 }
