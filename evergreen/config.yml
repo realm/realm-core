@@ -23,13 +23,15 @@ functions:
           set -o pipefail
           set -o verbose
 
-          if [[ "$OS" = "Windows_NT" ]]; then
-            curl -LsSo cmake_binaries.zip ${cmake_url}
-            unzip -q cmake_binaries.zip
-          else
-            mkdir cmake_binaries && cd cmake_binaries
-            curl -LsS ${cmake_url} | tar -xz --strip-components=1
-            cd ..
+          if [[ -n "${cmake_url}" ]]; then
+            if [[ "$OS" = "Windows_NT" ]]; then
+              curl -LsSo cmake_binaries.zip ${cmake_url}
+              unzip -q cmake_binaries.zip
+            else
+              mkdir cmake_binaries && cd cmake_binaries
+              curl -LsS ${cmake_url} | tar -xz --strip-components=1
+              cd ..
+            fi
           fi
 
           if [[ -n "${clang_url|}" ]]; then
@@ -173,7 +175,11 @@ functions:
               target="--target ${target_to_build|}"
           fi
 
-          ${cmake_bindir}/cmake \
+          if [[ -n "${cmake_build_tool_options}" ]]; then
+              target="$target -- ${cmake_build_tool_options}"
+          fi
+
+          $CMAKE \
               --build build \
               --config ${cmake_build_type|Debug} \
               -j ${max_jobs|$(grep -c proc /proc/cpuinfo)} \
@@ -221,7 +227,7 @@ functions:
         script: |-
           set -o errexit
           set -o verbose
-          CTEST=$(pwd)/${cmake_bindir}/ctest
+          CTEST="$(./evergreen/abspath.sh ${cmake_bindir}/ctest)"
 
           if [ -n "${xcode_developer_dir}" ]; then
               export DEVELOPER_DIR="${xcode_developer_dir}"
@@ -277,6 +283,12 @@ functions:
               if [[ ! -f "coverage_binaries/${test_executable_name}" ]]; then
                 ln -s "$EXECUTABLE_PATH" "coverage_binaries/${test_executable_name}"
               fi
+          fi
+
+          # on later MacOS's the system curl is built against an old version of openssl that
+          # can't talk to baasaas over TLS.
+          if [[ "$(uname -s)" = "Darwin" ]]; then
+            export CURL_SSL_BACKEND=Secure-Transport
           fi
 
           export UNITTEST_EVERGREEN_TEST_RESULTS="$(./evergreen/abspath.sh ${task_name}_results.json)"
@@ -1660,33 +1672,34 @@ buildvariants:
   - name: swift-build-and-test
   - name: test-on-exfat
 
-- name: macos-1100-arm64
-  display_name: "MacOS 11 arm64"
-  run_on: macos-1100-arm64
+- name: macos-14-arm64
+  display_name: "MacOS 14 arm64"
+  run_on: macos-14-arm64
   expansions:
-    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.26.3-macos-universal.tar.gz"
-    cmake_bindir: "./cmake_binaries/CMake.app/Contents/bin"
+    cmake_bindir: "/opt/homebrew/bin"
     cmake_toolchain_file: "./tools/cmake/xcode.toolchain.cmake"
+    cmake_build_tool_options: "-sdk macosx"
     cmake_generator: Xcode
     max_jobs: $(sysctl -n hw.logicalcpu)
-    xcode_developer_dir: /Applications/Xcode13.1.app/Contents/Developer
-    extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=arm64 -DREALM_ENABLE_GEOSPATIAL=OFF
+    xcode_developer_dir: /Applications/Xcode15.2.app/Contents/Developer
+    extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=arm64
   tasks:
   - name: compile_test
   - name: swift-build-and-test
 
-- name: macos-1100-arm64-release
-  display_name: "MacOS 11 arm64 (Release build)"
-  run_on: macos-1100-arm64
+- name: macos-14-arm64-release
+  display_name: "MacOS 14 arm64 (Release build)"
+  run_on: macos-14-arm64
   expansions:
-    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.26.3-macos-universal.tar.gz"
-    cmake_bindir: "./cmake_binaries/CMake.app/Contents/bin"
+    cmake_bindir: "/opt/homebrew/bin"
     cmake_toolchain_file: "./tools/cmake/xcode.toolchain.cmake"
+    cmake_build_tool_options: "-sdk macosx"
     cmake_generator: Xcode
     max_jobs: $(sysctl -n hw.logicalcpu)
     cmake_build_type: Release
-    xcode_developer_dir: /Applications/Xcode13.1.app/Contents/Developer
+    xcode_developer_dir: /Applications/Xcode15.2.app/Contents/Developer
     extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=arm64
+
   tasks:
   - name: compile_test_and_package
   - name: benchmarks
@@ -1697,7 +1710,6 @@ buildvariants:
   display_name: "MacOS 11.0 x86_64 (ASAN)"
   run_on: macos-1100
   expansions:
-    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.26.3-macos-universal.tar.gz"
     cmake_bindir: "./cmake_binaries/CMake.app/Contents/bin"
     cmake_toolchain_file: "./tools/cmake/xcode.toolchain.cmake"
     cmake_generator: Xcode
@@ -1713,9 +1725,9 @@ buildvariants:
   display_name: "MacOS 11.0 x86_64 (TSAN)"
   run_on: macos-1100
   expansions:
-    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.26.3-macos-universal.tar.gz"
-    cmake_bindir: "./cmake_binaries/CMake.app/Contents/bin"
+    cmake_bindir: "/opt/homebrew/bin"
     cmake_toolchain_file: "./tools/cmake/xcode.toolchain.cmake"
+    cmake_build_tool_options: "-sdk macosx"
     cmake_generator: Xcode
     max_jobs: $(sysctl -n hw.logicalcpu)
     xcode_developer_dir: /Applications/Xcode13.1.app/Contents/Developer
@@ -1725,32 +1737,32 @@ buildvariants:
   tasks:
   - name: compile_test
 
-- name: macos-1100-arm64-asan
-  display_name: "MacOS 11 arm64 (ASAN)"
-  run_on: macos-1100-arm64
+- name: macos-14-arm64-asan
+  display_name: "MacOS 14 arm64 (ASAN)"
+  run_on: macos-14-arm64
   expansions:
-    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.26.3-macos-universal.tar.gz"
-    cmake_bindir: "./cmake_binaries/CMake.app/Contents/bin"
+    cmake_bindir: "/opt/homebrew/bin"
     cmake_toolchain_file: "./tools/cmake/xcode.toolchain.cmake"
+    cmake_build_tool_options: "-sdk macosx"
     cmake_generator: Xcode
     max_jobs: $(sysctl -n hw.logicalcpu)
-    xcode_developer_dir: /Applications/Xcode13.1.app/Contents/Developer
+    xcode_developer_dir: /Applications/Xcode15.2.app/Contents/Developer
     extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=arm64
     cmake_build_type: RelWithDebInfo
     enable_asan: On
   tasks:
   - name: compile_test
 
-- name: macos-1100-arm64-tsan
-  display_name: "MacOS 11 arm64 (TSAN)"
-  run_on: macos-1100-arm64
+- name: macos-14-arm64-tsan
+  display_name: "MacOS 14 arm64 (TSAN)"
+  run_on: macos-14-arm64
   expansions:
-    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.26.3-macos-universal.tar.gz"
-    cmake_bindir: "./cmake_binaries/CMake.app/Contents/bin"
+    cmake_bindir: "/opt/homebrew/bin"
     cmake_toolchain_file: "./tools/cmake/xcode.toolchain.cmake"
+    cmake_build_tool_options: "-sdk macosx"
     cmake_generator: Xcode
     max_jobs: $(sysctl -n hw.logicalcpu)
-    xcode_developer_dir: /Applications/Xcode13.1.app/Contents/Developer
+    xcode_developer_dir: /Applications/Xcode15.2.app/Contents/Developer
     extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=arm64
     cmake_build_type: RelWithDebInfo
     enable_tsan: On
@@ -1760,15 +1772,15 @@ buildvariants:
   - name: compile_test
 
 - name: macos-coverage
-  display_name: "MacOS 11 arm64 (Code Coverage)"
-  run_on: macos-1100-arm64
+  display_name: "MacOS 14 arm64 (Code Coverage)"
+  run_on: macos-14-arm64
   expansions:
-    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.26.3-macos-universal.tar.gz"
-    cmake_bindir: "./cmake_binaries/CMake.app/Contents/bin"
+    cmake_bindir: "/opt/homebrew/bin"
     cmake_toolchain_file: "./tools/cmake/xcode.toolchain.cmake"
+    cmake_build_tool_options: "-sdk macosx"
     cmake_generator: Xcode
     max_jobs: $(sysctl -n hw.logicalcpu)
-    xcode_developer_dir: /Applications/Xcode13.1.app/Contents/Developer
+    xcode_developer_dir: /Applications/Xcode15.2.app/Contents/Developer
     extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=arm64
     enable_llvm_coverage: On
     coveralls_flag_name: "macos-arm64"
