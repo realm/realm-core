@@ -4990,13 +4990,15 @@ TEST_CASE("flx: role change bootstrap", "[sync][flx][baas][role_change][bootstra
         REQUIRE(machina.wait_for(TestState::connected));
 
         REQUIRE(!wait_for_download(*realm));
+        bool multi_msg = false;
         {
             std::lock_guard lock(callback_mutex);
-            if (msg_count > 1) {
-                // Verify a bootstrap occurred if expected multiple messages
-                REQUIRE(machina.get() == TestState::bs_complete);
-            }
+            if (msg_count > 1)
+                multi_msg = true;
         }
+        // Verify a bootstrap occurred if multiple messages were received
+        REQUIRE((!multi_msg || machina.get() == TestState::bs_complete));
+
         REQUIRE(!wait_for_upload(*realm));
         wait_for_advance(*realm);
         {
