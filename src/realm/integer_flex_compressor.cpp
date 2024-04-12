@@ -16,7 +16,7 @@
  *
  **************************************************************************/
 
-#include <realm/array_flex.hpp>
+#include <realm/integer_flex_compressor.hpp>
 #include <realm/node_header.hpp>
 #include <realm/array_direct.hpp>
 
@@ -30,23 +30,22 @@
 
 using namespace realm;
 
-void ArrayFlex::init_array(char* h, uint8_t flags, size_t v_width, size_t ndx_width, size_t v_size,
-                           size_t ndx_size) const
+void FlexCompressor::init_array(char* h, uint8_t flags, size_t v_width, size_t ndx_width, size_t v_size,
+                                size_t ndx_size) const
 {
     using Encoding = NodeHeader::Encoding;
-    NodeHeader::init_header(h, Encoding::Flex, flags, v_width, ndx_width, v_size, ndx_size);
+    init_header(h, Encoding::Flex, flags, v_width, ndx_width, v_size, ndx_size);
 }
 
-void ArrayFlex::copy_data(const Array& arr, const std::vector<int64_t>& values,
-                          const std::vector<size_t>& indices) const
+void FlexCompressor::copy_data(const Array& arr, const std::vector<int64_t>& values,
+                               const std::vector<size_t>& indices) const
 {
     using Encoding = NodeHeader::Encoding;
     REALM_ASSERT_DEBUG(arr.is_attached());
-    REALM_ASSERT_DEBUG(arr.m_encoder.get_encoding() == Encoding::Flex);
-
-    const auto& encoder = arr.get_encoder();
-    const auto v_width = encoder.width();
-    const auto ndx_width = encoder.ndx_width();
+    const auto& compressor = arr.integer_compressor();
+    REALM_ASSERT_DEBUG(compressor.get_encoding() == Encoding::Flex);
+    const auto v_width = compressor.width();
+    const auto ndx_width = compressor.ndx_width();
     const auto v_size = values.size();
     const auto data = (uint64_t*)arr.m_data;
     const auto offset = static_cast<size_t>(v_size * v_width);
@@ -68,7 +67,7 @@ void ArrayFlex::copy_data(const Array& arr, const std::vector<int64_t>& values,
     }
 }
 
-bool ArrayFlex::find_all_match(size_t start, size_t end, size_t baseindex, QueryStateBase* state) const
+bool FlexCompressor::find_all_match(size_t start, size_t end, size_t baseindex, QueryStateBase* state) const
 {
     REALM_ASSERT_DEBUG(state->match_count() < state->limit());
     const auto process = state->limit() - state->match_count();

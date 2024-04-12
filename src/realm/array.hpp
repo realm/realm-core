@@ -24,7 +24,7 @@
 #include <realm/query_conditions.hpp>
 #include <realm/column_fwd.hpp>
 #include <realm/array_direct.hpp>
-#include <realm/array_encode.hpp>
+#include <realm/integer_compressor.hpp>
 
 namespace realm {
 
@@ -333,8 +333,8 @@ public:
     /// by doing a linear search for short sequences.
     size_t lower_bound_int(int64_t value) const noexcept;
     size_t upper_bound_int(int64_t value) const noexcept;
-    size_t lower_bound_int_encoded(int64_t value) const noexcept;
-    size_t upper_bound_int_encoded(int64_t value) const noexcept;
+    size_t lower_bound_int_compressed(int64_t value) const noexcept;
+    size_t upper_bound_int_compressed(int64_t value) const noexcept;
     //@}
 
     int64_t get_sum(size_t start = 0, size_t end = size_t(-1)) const
@@ -365,16 +365,16 @@ public:
     void destroy_deep() noexcept;
 
     /// check if the array is encoded (in B format)
-    inline bool is_encoded() const;
+    inline bool is_compressed() const;
 
-    inline const ArrayEncode& get_encoder() const;
+    inline const IntegerCompressor& integer_compressor() const;
 
     /// used only for testing, encode the array passed as argument
-    bool try_encode(Array&) const;
+    bool try_compress(Array&) const;
 
     /// used only for testing, decode the array, on which this method is invoked. If the array is not encoded, this is
     /// a NOP
-    bool try_decode();
+    bool try_decompress();
 
     /// Shorthand for `destroy_deep(MemRef(ref, alloc), alloc)`.
     static void destroy_deep(ref_type ref, Allocator& alloc) noexcept;
@@ -519,7 +519,7 @@ protected:
     size_t count(int64_t value) const noexcept;
 
 private:
-    void update_width_cache_from_encoder() noexcept;
+    void update_width_cache_from_int_compressor() noexcept;
 
     void update_width_cache_from_header() noexcept;
 
@@ -580,19 +580,20 @@ protected:
     bool m_has_refs;             // Elements whose first bit is zero are refs to subarrays.
     bool m_context_flag;         // Meaning depends on context.
 
-    ArrayEncode m_encoder;
-    // encode/decode this array
-    bool encode_array(Array&) const;
-    bool decode_array(Array& arr) const;
-    int64_t get_encoded(size_t ndx) const noexcept;
-    void set_encoded(size_t ndx, int64_t);
-    void get_chunk_encoded(size_t, int64_t[8]) const noexcept;
+    IntegerCompressor m_integer_compressor;
+    // compress/decompress this array
+    bool compress_array(Array&) const;
+    bool decompress_array(Array& arr) const;
+    int64_t get_from_compressed_array(size_t ndx) const noexcept;
+    void set_compressed_array(size_t ndx, int64_t);
+    void get_chunk_compressed_array(size_t, int64_t[8]) const noexcept;
 
 #ifdef REALM_DEBUG
 public: // make it public for testing
 #endif
     template <class cond>
-    bool find_encoded(int64_t value, size_t start, size_t end, size_t baseindex, QueryStateBase* state) const;
+    bool find_compressed_array(int64_t value, size_t start, size_t end, size_t baseindex,
+                               QueryStateBase* state) const;
 
 private:
     ref_type do_write_shallow(_impl::ArrayWriterBase&) const;
@@ -610,22 +611,22 @@ private:
     friend class SlabAlloc;
     friend class GroupWriter;
     friend class ArrayWithFind;
-    friend class ArrayFlex;
-    friend class ArrayPacked;
-    friend class ArrayEncode;
+    friend class IntegerCompressor;
+    friend class PackedCompressor;
+    friend class FlexCompressor;
 };
 
 // Implementation:
 
-inline bool Array::is_encoded() const
+inline bool Array::is_compressed() const
 {
-    auto enc = m_encoder.get_encoding();
+    const auto enc = m_integer_compressor.get_encoding();
     return enc == NodeHeader::Encoding::Flex || enc == NodeHeader::Encoding::Packed;
 }
 
-inline const ArrayEncode& Array::get_encoder() const
+inline const IntegerCompressor& Array::integer_compressor() const
 {
-    return m_encoder;
+    return m_integer_compressor;
 }
 
 inline int64_t Array::get(size_t ndx) const noexcept
@@ -980,6 +981,21 @@ inline void Array::adjust(size_t begin, size_t end, int_fast64_t diff)
             adjust(i, diff); // Throws
     }
 }
+
+
+//-------------------------------------------------
+
+
+inline size_t Array::get_byte_size() const noexcept
+{
+    const char* header = get_header_from_data(m_data);
+    size_t num_bytes = NodeHeader::get_byte_size_from_header(header);
+
+    REALM_ASSERT_7(m_alloc.is_read_only(m_ref), ==, true, ||, num_bytes, <=, get_capacity_from_header(header));
+
+    return num_bytes;
+}
+
 
 //-------------------------------------------------
 

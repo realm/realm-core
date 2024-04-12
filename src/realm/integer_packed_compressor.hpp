@@ -16,8 +16,8 @@
  *
  **************************************************************************/
 
-#ifndef REALM_ARRAY_PACKED_HPP
-#define REALM_ARRAY_PACKED_HPP
+#ifndef PACKED_COMPRESSOR_HPP
+#define PACKED_COMPRESSOR_HPP
 
 #include <realm/array.hpp>
 #include <realm/array_direct.hpp>
@@ -31,7 +31,7 @@ namespace realm {
 // Compress array in Packed format
 // Decompress array in WTypeBits formats
 //
-class ArrayPacked {
+class PackedCompressor {
 public:
     // encoding/decoding
     void init_array(char*, uint8_t, size_t, size_t) const;
@@ -56,15 +56,15 @@ private:
     inline bool run_parallel_scan(size_t width, size_t range) const;
 };
 
-inline int64_t ArrayPacked::get(bf_iterator& it, size_t ndx, uint64_t mask) const
+inline int64_t PackedCompressor::get(bf_iterator& it, size_t ndx, uint64_t mask) const
 {
     it.move(ndx);
     return sign_extend_field_by_mask(mask, *it);
 }
 
 template <typename Cond>
-inline bool ArrayPacked::find_all(const Array& arr, int64_t value, size_t start, size_t end, size_t baseindex,
-                                  QueryStateBase* state) const
+inline bool PackedCompressor::find_all(const Array& arr, int64_t value, size_t start, size_t end, size_t baseindex,
+                                       QueryStateBase* state) const
 {
     REALM_ASSERT_DEBUG(start <= arr.m_size && (end <= arr.m_size || end == size_t(-1)) && start <= end);
     Cond c;
@@ -93,13 +93,13 @@ inline bool ArrayPacked::find_all(const Array& arr, int64_t value, size_t start,
     return find_parallel<Cond>(arr, value, start, end, baseindex, state);
 }
 
-inline void ArrayPacked::set_direct(bf_iterator& it, size_t ndx, int64_t value) const
+inline void PackedCompressor::set_direct(bf_iterator& it, size_t ndx, int64_t value) const
 {
     it.move(ndx);
     it.set_value(value);
 }
 
-inline void ArrayPacked::get_chunk(bf_iterator& it, size_t ndx, uint64_t mask, int64_t res[8]) const
+inline void PackedCompressor::get_chunk(bf_iterator& it, size_t ndx, uint64_t mask, int64_t res[8]) const
 {
     auto sz = 8;
     std::memset(res, 0, sizeof(int64_t) * sz);
@@ -116,8 +116,8 @@ inline void ArrayPacked::get_chunk(bf_iterator& it, size_t ndx, uint64_t mask, i
 }
 
 template <typename Cond>
-inline bool ArrayPacked::find_parallel(const Array& arr, int64_t value, size_t start, size_t end, size_t baseindex,
-                                       QueryStateBase* state) const
+inline bool PackedCompressor::find_parallel(const Array& arr, int64_t value, size_t start, size_t end,
+                                            size_t baseindex, QueryStateBase* state) const
 {
     //
     // Main idea around find parallel (applicable to flex arrays too).
@@ -148,7 +148,7 @@ inline bool ArrayPacked::find_parallel(const Array& arr, int64_t value, size_t s
 
     const auto data = (const uint64_t*)arr.m_data;
     const auto width = arr.m_width;
-    const auto MSBs = arr.get_encoder().msb();
+    const auto MSBs = arr.integer_compressor().msb();
     const auto search_vector = populate(arr.m_width, value);
     while (start < end) {
         start = parallel_subword_find(vector_compare, data, 0, width, MSBs, search_vector, start, end);
@@ -161,8 +161,8 @@ inline bool ArrayPacked::find_parallel(const Array& arr, int64_t value, size_t s
 }
 
 template <typename Cond>
-inline bool ArrayPacked::find_linear(const Array& arr, int64_t value, size_t start, size_t end, size_t baseindex,
-                                     QueryStateBase* state) const
+inline bool PackedCompressor::find_linear(const Array& arr, int64_t value, size_t start, size_t end, size_t baseindex,
+                                          QueryStateBase* state) const
 {
     auto compare = [](int64_t a, int64_t b) {
         if constexpr (std::is_same_v<Cond, Equal>)
@@ -174,8 +174,8 @@ inline bool ArrayPacked::find_linear(const Array& arr, int64_t value, size_t sta
         if constexpr (std::is_same_v<Cond, Less>)
             return a < b;
     };
-    const auto mask = arr.get_encoder().width_mask();
-    auto& data_it = arr.get_encoder().data_iterator();
+    const auto mask = arr.integer_compressor().width_mask();
+    auto& data_it = arr.integer_compressor().data_iterator();
     data_it.move(start);
     while (start < end) {
         const auto sv = sign_extend_field_by_mask(mask, *data_it);
@@ -187,11 +187,11 @@ inline bool ArrayPacked::find_linear(const Array& arr, int64_t value, size_t sta
     return true;
 }
 
-inline bool ArrayPacked::run_parallel_scan(size_t width, size_t range) const
+inline bool PackedCompressor::run_parallel_scan(size_t width, size_t range) const
 {
     return width < 32 && range >= 16;
 }
 
 } // namespace realm
 
-#endif // REALM_ARRAY_PACKED_HPP
+#endif // PACKED_COMPRESSOR_HPP

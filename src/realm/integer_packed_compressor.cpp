@@ -16,10 +16,10 @@
  *
  **************************************************************************/
 
-#include <realm/array_packed.hpp>
+#include <realm/integer_packed_compressor.hpp>
+#include <realm/integer_compressor.hpp>
 #include <realm/node_header.hpp>
 #include <realm/array_direct.hpp>
-#include <realm/array_encode.hpp>
 #include <realm/array.hpp>
 
 #include <vector>
@@ -32,18 +32,18 @@
 
 using namespace realm;
 
-void ArrayPacked::init_array(char* h, uint8_t flags, size_t v_width, size_t v_size) const
+void PackedCompressor::init_array(char* h, uint8_t flags, size_t v_width, size_t v_size) const
 {
     using Encoding = NodeHeader::Encoding;
-    NodeHeader::init_header((char*)h, Encoding::Packed, flags, v_width, v_size);
+    init_header((char*)h, Encoding::Packed, flags, v_width, v_size);
 }
 
-void ArrayPacked::copy_data(const Array& origin, Array& arr) const
+void PackedCompressor::copy_data(const Array& origin, Array& arr) const
 {
     // this can be boosted a little bit, with and size should be known at this stage.
     using Encoding = NodeHeader::Encoding;
     REALM_ASSERT_DEBUG(arr.is_attached());
-    REALM_ASSERT_DEBUG(arr.m_encoder.get_encoding() == Encoding::Packed);
+    REALM_ASSERT_DEBUG(arr.integer_compressor().get_encoding() == Encoding::Packed);
     // we don't need to access the header, init from mem must have been called
     const auto v_width = arr.m_width;
     const auto v_size = arr.m_size;
@@ -56,7 +56,7 @@ void ArrayPacked::copy_data(const Array& origin, Array& arr) const
     }
 }
 
-bool ArrayPacked::find_all_match(size_t start, size_t end, size_t baseindex, QueryStateBase* state) const
+bool PackedCompressor::find_all_match(size_t start, size_t end, size_t baseindex, QueryStateBase* state) const
 {
     REALM_ASSERT_DEBUG(state->match_count() < state->limit());
     const auto process = state->limit() - state->match_count();

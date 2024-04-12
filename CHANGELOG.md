@@ -1,10 +1,32 @@
-# NEXT RELEASE
+# NEXT MAJOR RELEASE
+
+### Enhancements
+* <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
+* None.
+
+### Fixed
+* <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
+* None.
+
+### Breaking changes
+* None.
+
+### Compatibility
+* Fileformat: Generates files with format v24. Reads and automatically upgrade from fileformat v10. If you want to upgrade from an earlier file format version you will have to use RealmCore v13.x.y or earlier.
+
+-----------
+
+### Internals
+* None.
+
+----------------------------------------------
+
+# 14.5.0 Release notes
 
 ### Enhancements
 * Introduce sync 'progress_estimate' parameter (value from 0.0 to 1.0) for existing sync 'ProgressNotifierCallback' api to report sync progress on current batch of upload/download until completion ([#7450](https://github.com/realm/realm-core/issues/7450))
 
 ### Fixed
-* <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Fix an assertion failure "m_lock_info && m_lock_info->m_file.get_path() == m_filename" that appears to be related to opening a Realm while the file is in the process of being closed on another thread ([Swift #8507](https://github.com/realm/realm-swift/issues/8507)).
 * Fixed diverging history due to a bug in the replication code when setting default null values (embedded objects included) ([#7536](https://github.com/realm/realm-core/issues/7536)).
 * Version 19.39.33523 of MSVC would crash when compiling for arm64 in release mode ([PR #7533](https://github.com/realm/realm-core/pull/7533)).

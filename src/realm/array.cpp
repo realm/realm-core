@@ -25,8 +25,6 @@
 #include <realm/array_integer.hpp>
 #include <realm/array_key.hpp>
 #include <realm/impl/array_writer.hpp>
-#include <realm/array_flex.hpp>
-#include <realm/array_packed.hpp>
 
 #include <array>
 #include <cstring> // std::memcpy
@@ -232,13 +230,13 @@ struct Array::VTableForEncodedArray {
     struct PopulatedVTableEncoded : Array::VTable {
         PopulatedVTableEncoded()
         {
-            getter = &Array::get_encoded;
-            setter = &Array::set_encoded;
-            chunk_getter = &Array::get_chunk_encoded;
-            finder[cond_Equal] = &Array::find_encoded<Equal>;
-            finder[cond_NotEqual] = &Array::find_encoded<NotEqual>;
-            finder[cond_Greater] = &Array::find_encoded<Greater>;
-            finder[cond_Less] = &Array::find_encoded<Less>;
+            getter = &Array::get_from_compressed_array;
+            setter = &Array::set_compressed_array;
+            chunk_getter = &Array::get_chunk_compressed_array;
+            finder[cond_Equal] = &Array::find_compressed_array<Equal>;
+            finder[cond_NotEqual] = &Array::find_compressed_array<NotEqual>;
+            finder[cond_Greater] = &Array::find_compressed_array<Greater>;
+            finder[cond_Less] = &Array::find_compressed_array<Less>;
         }
     };
     static const PopulatedVTableEncoded vtable;
@@ -256,7 +254,7 @@ void Array::init_from_mem(MemRef mem) noexcept
     // important fields used for type A arrays, like width, lower, upper_bound which are used
     // for expanding the array, but also query the data.
     const auto header = mem.get_addr();
-    const auto is_extended = m_encoder.init(header);
+    const auto is_extended = m_integer_compressor.init(header);
 
     m_is_inner_bptree_node = get_is_inner_bptree_node_from_header(header);
     m_has_refs = get_hasrefs_from_header(header);
@@ -265,7 +263,7 @@ void Array::init_from_mem(MemRef mem) noexcept
     if (is_extended) {
         m_ref = mem.get_ref();
         m_data = get_data_from_header(header);
-        update_width_cache_from_encoder(); // encoder knows which format this array is
+        update_width_cache_from_int_compressor(); // compressor knows which format this array is
     }
     else {
         // Old init phase.
@@ -274,12 +272,12 @@ void Array::init_from_mem(MemRef mem) noexcept
     }
 }
 
-void Array::update_width_cache_from_encoder() noexcept
+void Array::update_width_cache_from_int_compressor() noexcept
 {
-    m_size = m_encoder.size();
-    m_width = static_cast<uint_least8_t>(m_encoder.width());
-    m_lbound = -m_encoder.width_mask();
-    m_ubound = m_encoder.width_mask() - 1;
+    m_size = m_integer_compressor.size();
+    m_width = static_cast<uint_least8_t>(m_integer_compressor.width());
+    m_lbound = -m_integer_compressor.width_mask();
+    m_ubound = m_integer_compressor.width_mask() - 1;
     m_vtable = &VTableForEncodedArray::vtable;
     m_getter = m_vtable->getter;
 }
@@ -345,17 +343,17 @@ void Array::destroy_children(size_t offset) noexcept
     }
 }
 
-size_t Array::get_byte_size() const noexcept
-{
-    const auto header = get_header();
-    auto num_bytes = get_byte_size_from_header(header);
-    auto read_only = m_alloc.is_read_only(m_ref) == true;
-    auto capacity = get_capacity_from_header(header);
-    auto bytes_ok = num_bytes <= capacity;
-    REALM_ASSERT(read_only || bytes_ok);
-    REALM_ASSERT_7(m_alloc.is_read_only(m_ref), ==, true, ||, num_bytes, <=, get_capacity_from_header(header));
-    return num_bytes;
-}
+// size_t Array::get_byte_size() const noexcept
+//{
+//     const auto header = get_header();
+//     auto num_bytes = get_byte_size_from_header(header);
+//     auto read_only = m_alloc.is_read_only(m_ref) == true;
+//     auto capacity = get_capacity_from_header(header);
+//     auto bytes_ok = num_bytes <= capacity;
+//     REALM_ASSERT(read_only || bytes_ok);
+//     REALM_ASSERT_7(m_alloc.is_read_only(m_ref), ==, true, ||, num_bytes, <=, get_capacity_from_header(header));
+//     return num_bytes;
+// }
 
 ref_type Array::write(_impl::ArrayWriterBase& out, bool deep, bool only_if_modified, bool compress_in_flight) const
 {
@@ -369,19 +367,18 @@ ref_type Array::write(_impl::ArrayWriterBase& out, bool deep, bool only_if_modif
         // however - creating an array using ANYTHING BUT the default allocator during commit is also wrong....
         // it only works by accident, because the whole slab area is reinitialized after commit.
         // We should have: Array encoded_array{Allocator::get_default()};
-        Array encoded_array{Allocator::get_default()};
-        if (compress_in_flight && size() != 0 && encode_array(encoded_array)) {
+        Array compressed_array{Allocator::get_default()};
+        if (compress_in_flight && size() != 0 && compress_array(compressed_array)) {
 #ifdef REALM_DEBUG
-            const auto encoding = encoded_array.m_encoder.get_encoding();
-            REALM_ASSERT_DEBUG(encoding == Encoding::Flex || encoding == Encoding::Packed ||
-                               encoding == Encoding::AofP || encoding == Encoding::PofA);
-            REALM_ASSERT_DEBUG(size() == encoded_array.size());
-            for (size_t i = 0; i < encoded_array.size(); ++i) {
-                REALM_ASSERT_DEBUG(get(i) == encoded_array.get(i));
+            const auto encoding = compressed_array.m_integer_compressor.get_encoding();
+            REALM_ASSERT_DEBUG(encoding == Encoding::Flex || encoding == Encoding::Packed);
+            REALM_ASSERT_DEBUG(size() == compressed_array.size());
+            for (size_t i = 0; i < compressed_array.size(); ++i) {
+                REALM_ASSERT_DEBUG(get(i) == compressed_array.get(i));
             }
 #endif
-            auto ref = encoded_array.do_write_shallow(out);
-            encoded_array.destroy();
+            auto ref = compressed_array.do_write_shallow(out);
+            compressed_array.destroy();
             return ref;
         }
         return do_write_shallow(out); // Throws
@@ -403,19 +400,18 @@ ref_type Array::write(ref_type ref, Allocator& alloc, _impl::ArrayWriterBase& ou
     REALM_ASSERT_DEBUG(array.is_attached());
 
     if (!array.m_has_refs) {
-        Array encoded_array{Allocator::get_default()};
-        if (compress_in_flight && array.size() != 0 && array.encode_array(encoded_array)) {
+        Array compressed_array{Allocator::get_default()};
+        if (compress_in_flight && array.size() != 0 && array.compress_array(compressed_array)) {
 #ifdef REALM_DEBUG
-            const auto encoding = encoded_array.m_encoder.get_encoding();
-            REALM_ASSERT_DEBUG(encoding == Encoding::Flex || encoding == Encoding::Packed ||
-                               encoding == Encoding::AofP || encoding == Encoding::PofA);
-            REALM_ASSERT_DEBUG(array.size() == encoded_array.size());
-            for (size_t i = 0; i < encoded_array.size(); ++i) {
-                REALM_ASSERT_DEBUG(array.get(i) == encoded_array.get(i));
+            const auto encoding = compressed_array.m_integer_compressor.get_encoding();
+            REALM_ASSERT_DEBUG(encoding == Encoding::Flex || encoding == Encoding::Packed);
+            REALM_ASSERT_DEBUG(array.size() == compressed_array.size());
+            for (size_t i = 0; i < compressed_array.size(); ++i) {
+                REALM_ASSERT_DEBUG(array.get(i) == compressed_array.get(i));
             }
 #endif
-            auto ref = encoded_array.do_write_shallow(out);
-            encoded_array.destroy();
+            auto ref = compressed_array.do_write_shallow(out);
+            compressed_array.destroy();
             return ref;
         }
         else {
@@ -431,11 +427,9 @@ ref_type Array::do_write_shallow(_impl::ArrayWriterBase& out) const
     // here we might want to compress the array and write down.
     const char* header = get_header_from_data(m_data);
     size_t byte_size = get_byte_size();
-    const auto encoded = is_encoded();
-    uint32_t dummy_checksum =
-        encoded ? 0x42424242UL : 0x41414141UL; // A/B (A for normal arrays, B for compressed arrays)
-    uint32_t dummy_checksum_bytes =
-        encoded ? 2 : 4; // AAAA / BB (only 2 bytes for B arrays, since B arrays use more header space)
+    const auto compressed = is_compressed();
+    uint32_t dummy_checksum = compressed ? 0x42424242UL : 0x41414141UL; //
+    uint32_t dummy_checksum_bytes = compressed ? 2 : 4; // AAAA / BB (only 2 bytes for extended arrays)
     ref_type new_ref = out.write_array(header, byte_size, dummy_checksum, dummy_checksum_bytes); // Throws
     REALM_ASSERT_3(new_ref % 8, ==, 0);                                                          // 8-byte alignment
     return new_ref;
@@ -579,7 +573,7 @@ void Array::insert(size_t ndx, int_fast64_t value)
 {
     REALM_ASSERT_DEBUG(ndx <= m_size);
 
-    decode_array(*this);
+    decompress_array(*this);
     const auto old_width = m_width;
     const auto old_size = m_size;
     const Getter old_getter = m_getter; // Save old getter before potential width expansion
@@ -629,13 +623,13 @@ void Array::insert(size_t ndx, int_fast64_t value)
 
 void Array::copy_on_write()
 {
-    if (is_read_only() && !decode_array(*this))
+    if (is_read_only() && !decompress_array(*this))
         Node::copy_on_write();
 }
 
 void Array::copy_on_write(size_t min_size)
 {
-    if (is_read_only() && !decode_array(*this))
+    if (is_read_only() && !decompress_array(*this))
         Node::copy_on_write(min_size);
 }
 
@@ -717,42 +711,42 @@ size_t Array::size() const noexcept
     return m_size;
 }
 
-bool Array::encode_array(Array& arr) const
+bool Array::compress_array(Array& arr) const
 {
-    if (!is_encoded() && m_encoder.get_encoding() == NodeHeader::Encoding::WTypBits) {
-        return m_encoder.encode(*this, arr);
+    if (!is_compressed() && m_integer_compressor.get_encoding() == NodeHeader::Encoding::WTypBits) {
+        return m_integer_compressor.compress(*this, arr);
     }
     return false;
 }
 
-bool Array::decode_array(Array& arr) const
+bool Array::decompress_array(Array& arr) const
 {
-    return arr.is_encoded() ? m_encoder.decode(arr) : false;
+    return arr.is_compressed() ? m_integer_compressor.decompress(arr) : false;
 }
 
-bool Array::try_encode(Array& arr) const
+bool Array::try_compress(Array& arr) const
 {
-    return encode_array(arr);
+    return compress_array(arr);
 }
 
-bool Array::try_decode()
+bool Array::try_decompress()
 {
-    return decode_array(*this);
+    return decompress_array(*this);
 }
 
-int64_t Array::get_encoded(size_t ndx) const noexcept
+int64_t Array::get_from_compressed_array(size_t ndx) const noexcept
 {
-    return m_encoder.get(ndx);
+    return m_integer_compressor.get(ndx);
 }
 
-void Array::set_encoded(size_t ndx, int64_t val)
+void Array::set_compressed_array(size_t ndx, int64_t val)
 {
-    m_encoder.set_direct(ndx, val);
+    m_integer_compressor.set_direct(ndx, val);
 }
 
-void Array::get_chunk_encoded(size_t ndx, int64_t res[8]) const noexcept
+void Array::get_chunk_compressed_array(size_t ndx, int64_t res[8]) const noexcept
 {
-    m_encoder.get_chunk(ndx, res);
+    m_integer_compressor.get_chunk(ndx, res);
 }
 
 size_t Array::calc_aligned_byte_size(size_t size, int width)
@@ -850,55 +844,18 @@ MemRef Array::clone(MemRef mem, Allocator& alloc, Allocator& target_alloc)
 MemRef Array::create(Type type, bool context_flag, WidthType width_type, size_t size, int_fast64_t value,
                      Allocator& alloc)
 {
-    REALM_ASSERT_7(value, ==, 0, ||, width_type, ==, wtype_Bits);
-    REALM_ASSERT_7(size, ==, 0, ||, width_type, !=, wtype_Ignore);
-
-    uint8_t flags = 0;
-    Encoding encoding = Encoding::WTypBits;
-    if (width_type == wtype_Bits)
-        encoding = Encoding::WTypBits;
-    else if (width_type == wtype_Multiply)
-        encoding = Encoding::WTypMult;
-    else if (width_type == wtype_Ignore)
-        encoding = Encoding::WTypIgn;
-    else {
-        REALM_ASSERT(false && "Wrong width type for encoding");
-    }
-
-    switch (type) {
-        case type_Normal:
-            break;
-        case type_InnerBptreeNode:
-            flags |= static_cast<uint8_t>(Flags::HasRefs) | static_cast<uint8_t>(Flags::InnerBPTree);
-
-            break;
-        case type_HasRefs:
-            flags |= static_cast<uint8_t>(Flags::HasRefs);
-            break;
-    }
-    if (context_flag)
-        flags |= static_cast<uint8_t>(Flags::Context);
+    REALM_ASSERT_DEBUG(value == 0 || width_type == wtype_Bits);
+    REALM_ASSERT_DEBUG(size == 0 || width_type != wtype_Ignore);
     int width = 0;
-    size_t byte_size_0 = header_size;
-    if (value != 0) {
+    if (value != 0)
         width = static_cast<int>(bit_width(value));
-        byte_size_0 = calc_aligned_byte_size(size, width); // Throws
-    }
-    // Adding zero to Array::initial_capacity to avoid taking the
-    // address of that member
-    size_t byte_size = std::max(byte_size_0, initial_capacity + 0);
-
-    MemRef mem = alloc.alloc(byte_size); // Throws
-    const auto header = mem.get_addr();
-    init_header(header, encoding, flags, width, size);
-    set_capacity_in_header(byte_size, header);
-
+    auto mem = Node::create_node(size, alloc, context_flag, type, width_type, width);
     if (value != 0) {
+        const auto header = mem.get_addr();
         char* data = get_data_from_header(header);
         size_t begin = 0, end = size;
         REALM_TEMPEX(fill_direct, width, (data, begin, end, value));
     }
-
     return mem;
 }
 
@@ -910,9 +867,10 @@ bool Array::find_vtable(int64_t value, size_t start, size_t end, size_t baseinde
 }
 
 template <class cond>
-bool Array::find_encoded(int64_t value, size_t start, size_t end, size_t baseindex, QueryStateBase* state) const
+bool Array::find_compressed_array(int64_t value, size_t start, size_t end, size_t baseindex,
+                                  QueryStateBase* state) const
 {
-    return m_encoder.find_all<cond>(*this, value, start, end, baseindex, state);
+    return m_integer_compressor.find_all<cond>(*this, value, start, end, baseindex, state);
 }
 
 void Array::update_width_cache_from_header() noexcept
@@ -1126,38 +1084,38 @@ void Array::verify() const
 
 size_t Array::lower_bound_int(int64_t value) const noexcept
 {
-    if (is_encoded())
-        return lower_bound_int_encoded(value);
+    if (is_compressed())
+        return lower_bound_int_compressed(value);
     REALM_TEMPEX(return lower_bound, m_width, (m_data, m_size, value));
 }
 
 size_t Array::upper_bound_int(int64_t value) const noexcept
 {
-    if (is_encoded())
-        return upper_bound_int_encoded(value);
+    if (is_compressed())
+        return upper_bound_int_compressed(value);
     REALM_TEMPEX(return upper_bound, m_width, (m_data, m_size, value));
 }
 
-size_t Array::lower_bound_int_encoded(int64_t value) const noexcept
+size_t Array::lower_bound_int_compressed(int64_t value) const noexcept
 {
-    static impl::EncodedFetcher<ArrayEncode> encoder;
-    encoder.ptr = &m_encoder;
+    static impl::EncodedFetcher<IntegerCompressor> encoder;
+    encoder.ptr = &m_integer_compressor;
     return lower_bound(m_data, m_size, value, encoder);
 }
 
-size_t Array::upper_bound_int_encoded(int64_t value) const noexcept
+size_t Array::upper_bound_int_compressed(int64_t value) const noexcept
 {
-    static impl::EncodedFetcher<ArrayEncode> encoder;
-    encoder.ptr = &m_encoder;
+    static impl::EncodedFetcher<IntegerCompressor> encoder;
+    encoder.ptr = &m_integer_compressor;
     return upper_bound(m_data, m_size, value, encoder);
 }
 
 int_fast64_t Array::get(const char* header, size_t ndx) noexcept
 {
     if (wtype_is_extended(header)) {
-        static ArrayEncode encoder;
-        encoder.init(header);
-        return encoder.get(ndx);
+        static IntegerCompressor compressor;
+        compressor.init(header);
+        return compressor.get(ndx);
     }
 
     auto sz = get_size_from_header(header);
