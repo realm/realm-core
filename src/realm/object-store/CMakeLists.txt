@@ -91,20 +91,11 @@ set(HEADERS
 
 if(REALM_ENABLE_SYNC)
     list(APPEND HEADERS
-        sync/app.hpp
-        sync/app_config.hpp
-        sync/app_credentials.hpp
-        sync/app_service_client.hpp
-        sync/app_user.hpp
         sync/app_utils.hpp
         sync/async_open_task.hpp
         sync/auth_request_client.hpp
         sync/generic_network_transport.hpp
         sync/jwt.hpp
-        sync/mongo_client.hpp
-        sync/mongo_collection.hpp
-        sync/mongo_database.hpp
-        sync/push_client.hpp
         sync/subscribable.hpp
         sync/sync_manager.hpp
         sync/sync_session.hpp
@@ -116,21 +107,37 @@ if(REALM_ENABLE_SYNC)
         sync/impl/sync_file.hpp)
 
     list(APPEND SOURCES
-        sync/app.cpp
-        sync/app_credentials.cpp
-        sync/app_user.cpp
         sync/app_utils.cpp
         sync/async_open_task.cpp
         sync/generic_network_transport.cpp
         sync/impl/app_metadata.cpp
         sync/impl/sync_file.cpp
         sync/jwt.cpp
-        sync/mongo_client.cpp
-        sync/mongo_collection.cpp
-        sync/mongo_database.cpp
-        sync/push_client.cpp
         sync/sync_manager.cpp
         sync/sync_session.cpp)
+
+    if (REALM_APP_SERVICES)
+        list(APPEND HEADERS
+            sync/app.hpp
+            sync/app_config.hpp
+            sync/app_credentials.hpp
+            sync/app_service_client.hpp
+            sync/app_user.hpp
+            sync/mongo_client.hpp
+            sync/mongo_collection.hpp
+            sync/mongo_database.hpp
+            sync/push_client.hpp
+        )
+        list(APPEND SOURCES
+            sync/app.cpp
+            sync/app_credentials.cpp
+            sync/app_user.cpp
+            sync/mongo_client.cpp
+            sync/mongo_collection.cpp
+            sync/mongo_database.cpp
+            sync/push_client.cpp
+        )
+    endif()
 
     if(APPLE)
         list(APPEND HEADERS

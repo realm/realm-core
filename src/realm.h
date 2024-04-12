@@ -1,7 +1,20 @@
-/*
-    FIXME: License, since this header may be distributed independently from
-    other headers.
-*/
+/*************************************************************************
+ *
+ * Copyright 2024 Realm Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ **************************************************************************/
 
 #ifndef REALM_H
 #define REALM_H
@@ -10,6 +23,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <realm/error_codes.h>
+#include <realm/util/config.h>
 
 #if defined(_WIN32) || defined(__CYGWIN__)
 
@@ -2861,15 +2875,16 @@ RLM_API realm_http_transport_t* realm_http_transport_new(realm_http_request_func
 RLM_API void realm_http_transport_complete_request(void* request_context, const realm_http_response_t* response);
 
 /* App */
-typedef struct realm_app realm_app_t;
-typedef struct realm_app_credentials realm_app_credentials_t;
 typedef struct realm_user realm_user_t;
-
 typedef enum realm_user_state {
     RLM_USER_STATE_LOGGED_OUT,
     RLM_USER_STATE_LOGGED_IN,
     RLM_USER_STATE_REMOVED
 } realm_user_state_e;
+
+#if REALM_APP_SERVICES
+typedef struct realm_app realm_app_t;
+typedef struct realm_app_credentials realm_app_credentials_t;
 
 typedef enum realm_auth_provider {
     RLM_AUTH_PROVIDER_ANONYMOUS,
@@ -3391,19 +3406,6 @@ RLM_API void realm_app_sync_client_wait_for_sessions_to_terminate(realm_app_t*) 
  */
 RLM_API char* realm_app_sync_client_get_default_file_path_for_realm(const realm_sync_config_t*,
                                                                     const char* custom_filename);
-/**
- * Return the identiy for the user passed as argument
- * @param user ptr to the user for which the identiy has to be retrieved
- * @return a ptr to the identity string. This must be manually released with realm_free().
- */
-RLM_API char* realm_user_get_identity(const realm_user_t* user) RLM_API_NOEXCEPT;
-
-/**
- * Retrieve the state for the user passed as argument
- * @param user ptr to the user for which the state has to be retrieved
- * @return realm_user_state_e value
- */
-RLM_API realm_user_state_e realm_user_get_state(const realm_user_t* user) RLM_API_NOEXCEPT;
 
 /**
  * Get the list of identities of this @a user.
@@ -3430,8 +3432,6 @@ RLM_API char* realm_user_get_device_id(const realm_user_t*) RLM_API_NOEXCEPT;
  */
 RLM_API bool realm_user_log_out(realm_user_t*);
 
-RLM_API bool realm_user_is_logged_in(const realm_user_t*) RLM_API_NOEXCEPT;
-
 /**
  * Get the custom user data from the user's access token.
  *
@@ -3452,6 +3452,53 @@ RLM_API char* realm_user_get_custom_data(const realm_user_t*) RLM_API_NOEXCEPT;
  */
 RLM_API char* realm_user_get_profile_data(const realm_user_t*);
 
+typedef struct realm_app_user_subscription_token realm_app_user_subscription_token_t;
+typedef void (*realm_sync_on_user_state_changed_t)(realm_userdata_t userdata, realm_user_state_e s);
+/**
+ * @return a notification token object. Dispose it to stop receiving notifications.
+ */
+RLM_API realm_app_user_subscription_token_t*
+realm_sync_user_on_state_change_register_callback(realm_user_t*, realm_sync_on_user_state_changed_t,
+                                                  realm_userdata_t userdata,
+                                                  realm_free_userdata_func_t userdata_free);
+
+/**
+ * In case manual reset is needed, run this function in order to reset sync client files.
+ * The sync_path is going to passed into realm_sync_error_handler_func_t, if manual reset is needed.
+ * This function is supposed to be called inside realm_sync_error_handler_func_t callback, if sync client reset is
+ * needed
+ * @param realm_app ptr to realm app.
+ * @param sync_path path where the sync files are.
+ * @param did_run ptr to bool, which will be set to true if operation was successful
+ * @return true if operation was successful
+ */
+RLM_API bool realm_sync_immediately_run_file_actions(realm_app_t* realm_app, const char* sync_path,
+                                                     bool* did_run) RLM_API_NOEXCEPT;
+
+/**
+ * Return the realm app for the user passed as parameter.
+ * @return a ptr to the app for the user.
+ */
+RLM_API realm_app_t* realm_user_get_app(const realm_user_t*) RLM_API_NOEXCEPT;
+
+#endif // REALM_APP_SERVICES
+
+/**
+ * Return the identiy for the user passed as argument
+ * @param user ptr to the user for which the identiy has to be retrieved
+ * @return a ptr to the identity string. This must be manually released with realm_free().
+ */
+RLM_API char* realm_user_get_identity(const realm_user_t* user) RLM_API_NOEXCEPT;
+
+/**
+ * Retrieve the state for the user passed as argument
+ * @param user ptr to the user for which the state has to be retrieved
+ * @return realm_user_state_e value
+ */
+RLM_API realm_user_state_e realm_user_get_state(const realm_user_t* user) RLM_API_NOEXCEPT;
+
+RLM_API bool realm_user_is_logged_in(const realm_user_t*) RLM_API_NOEXCEPT;
+
 /**
  * Return the access token associated with the user.
  * @return a string that rapresents the access token
@@ -3463,12 +3510,6 @@ RLM_API char* realm_user_get_access_token(const realm_user_t*);
  * @return a string that represents the refresh token
  */
 RLM_API char* realm_user_get_refresh_token(const realm_user_t*);
-
-/**
- * Return the realm app for the user passed as parameter.
- * @return a ptr to the app for the user.
- */
-RLM_API realm_app_t* realm_user_get_app(const realm_user_t*) RLM_API_NOEXCEPT;
 
 
 /* Sync */
@@ -3601,13 +3642,10 @@ typedef enum realm_flx_sync_subscription_set_state {
 typedef void (*realm_sync_on_subscription_state_changed_t)(realm_userdata_t userdata,
                                                            realm_flx_sync_subscription_set_state_e state);
 
-typedef void (*realm_sync_on_user_state_changed_t)(realm_userdata_t userdata, realm_user_state_e s);
-
 
 typedef struct realm_async_open_task_progress_notification_token realm_async_open_task_progress_notification_token_t;
 typedef struct realm_sync_session_connection_state_notification_token
     realm_sync_session_connection_state_notification_token_t;
-typedef struct realm_app_user_subscription_token realm_app_user_subscription_token_t;
 
 /**
  * Callback function invoked by the async open task once the realm is open and fully synchronized.
@@ -3976,18 +4014,6 @@ RLM_API void realm_sync_session_resume(realm_sync_session_t*) RLM_API_NOEXCEPT;
 RLM_API void realm_sync_session_get_file_ident(realm_sync_session_t*,
                                                realm_salted_file_ident_t* out) RLM_API_NOEXCEPT;
 
-/**
- * In case manual reset is needed, run this function in order to reset sync client files.
- * The sync_path is going to passed into realm_sync_error_handler_func_t, if manual reset is needed.
- * This function is supposed to be called inside realm_sync_error_handler_func_t callback, if sync client reset is
- * needed
- * @param realm_app ptr to realm app.
- * @param sync_path path where the sync files are.
- * @param did_run ptr to bool, which will be set to true if operation was successful
- * @return true if operation was successful
- */
-RLM_API bool realm_sync_immediately_run_file_actions(realm_app_t* realm_app, const char* sync_path,
-                                                     bool* did_run) RLM_API_NOEXCEPT;
 
 /**
  * Register a callback that will be invoked every time the session's connection state changes.
@@ -4013,14 +4039,6 @@ RLM_API realm_sync_session_connection_state_notification_token_t* realm_sync_ses
     realm_sync_session_t*, realm_sync_progress_func_t, realm_sync_progress_direction_e, bool is_streaming,
     realm_userdata_t userdata, realm_free_userdata_func_t userdata_free) RLM_API_NOEXCEPT;
 
-
-/**
- * @return a notification token object. Dispose it to stop receiving notifications.
- */
-RLM_API realm_app_user_subscription_token_t*
-realm_sync_user_on_state_change_register_callback(realm_user_t*, realm_sync_on_user_state_changed_t,
-                                                  realm_userdata_t userdata,
-                                                  realm_free_userdata_func_t userdata_free);
 
 /**
  * Register a callback that will be invoked when all pending downloads have completed.
@@ -4056,6 +4074,9 @@ RLM_API void realm_sync_session_handle_error_for_testing(const realm_sync_sessio
  * @param usercode_error pointer representing whatever object the SDK treats as exception/error.
  */
 RLM_API void realm_register_user_code_callback_error(realm_userdata_t usercode_error) RLM_API_NOEXCEPT;
+
+
+#if REALM_APP_SERVICES
 
 typedef struct realm_mongodb_collection realm_mongodb_collection_t;
 
@@ -4274,6 +4295,8 @@ RLM_API bool realm_mongo_collection_find_one_and_delete(realm_mongodb_collection
                                                         const realm_mongodb_find_one_and_modify_options_t* options,
                                                         realm_userdata_t data, realm_free_userdata_func_t delete_data,
                                                         realm_mongodb_callback_t callback);
+
+#endif // REALM_APP_SERVICES
 
 /**
  * Creates a new sync socket instance for the Sync Client that handles the operations for a custom

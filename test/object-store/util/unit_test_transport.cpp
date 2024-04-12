@@ -72,7 +72,9 @@ void UnitTestTransport::handle_profile(const Request& request,
 
     std::string user_id = util::uuid_string();
     std::string response;
-    if (m_provider_type == IdentityProviderAnonymous) {
+    // "anon-user" is the value of the IdentityProviderAnonymous constant
+    // which is not available here in non REALM_APP_SERVICES configurations
+    if (m_provider_type == "anon-user") {
         response = nlohmann::json({{"user_id", user_id},
                                    {"identities", {{{"id", identity_0_id}, {"provider_type", m_provider_type}}}},
                                    {"data", m_user_profile}})

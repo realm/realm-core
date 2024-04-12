@@ -18,6 +18,7 @@
 #cmakedefine01 REALM_ENABLE_ENCRYPTION
 #cmakedefine01 REALM_ENABLE_MEMDEBUG
 #cmakedefine01 REALM_ENABLE_GEOSPATIAL
+#cmakedefine01 REALM_APP_SERVICES
 #cmakedefine01 REALM_VALGRIND
 #cmakedefine01 REALM_ASAN
 #cmakedefine01 REALM_TSAN

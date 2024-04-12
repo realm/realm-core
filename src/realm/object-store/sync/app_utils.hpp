@@ -31,8 +31,10 @@ struct Response;
 
 class AppUtils {
 public:
+#if REALM_APP_SERVICES
     static std::optional<AppError> check_for_errors(const Response& response);
     static Response make_apperror_response(const AppError& error);
+#endif // REALM_APP_SERVICES
     static Response make_clienterror_response(ErrorCodes::Error code, const std::string_view message,
                                               std::optional<int> http_status);
     static const std::pair<const std::string, std::string>*
