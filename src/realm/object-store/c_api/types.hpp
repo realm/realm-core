@@ -1,30 +1,30 @@
 #ifndef REALM_OBJECT_STORE_C_API_TYPES_HPP
 #define REALM_OBJECT_STORE_C_API_TYPES_HPP
 
-#include <memory>
 #include <realm.h>
-#include <realm/object-store/c_api/conversion.hpp>
-#include <realm/object-store/c_api/error.hpp>
 
 #include <realm/util/to_string.hpp>
 
-#include <realm/object-store/shared_realm.hpp>
-#include <realm/object-store/object_schema.hpp>
+#include <realm/object-store/c_api/conversion.hpp>
+#include <realm/object-store/c_api/error.hpp>
 #include <realm/object-store/object.hpp>
 #include <realm/object-store/object_accessor.hpp>
-#include <realm/object-store/util/scheduler.hpp>
+#include <realm/object-store/object_schema.hpp>
+#include <realm/object-store/shared_realm.hpp>
 #include <realm/object-store/thread_safe_reference.hpp>
+#include <realm/object-store/util/scheduler.hpp>
 
 #if REALM_ENABLE_SYNC
 #include <realm/object-store/sync/app.hpp>
+#include <realm/object-store/sync/app_user.hpp>
 #include <realm/object-store/sync/impl/sync_client.hpp>
-#include <realm/object-store/sync/sync_user.hpp>
 #include <realm/object-store/sync/mongo_collection.hpp>
 #include <realm/sync/binding_callback_thread_observer.hpp>
 #include <realm/sync/socket_provider.hpp>
 #include <realm/sync/subscriptions.hpp>
 #endif
 
+#include <memory>
 #include <stdexcept>
 #include <string>
 
@@ -570,15 +570,15 @@ struct realm_results : realm::c_api::WrapC, realm::Results {
 
 #if REALM_ENABLE_SYNC
 
-struct realm_sync_user_subscription_token : realm::c_api::WrapC {
-    using Token = realm::Subscribable<realm::SyncUser>::Token;
-    realm_sync_user_subscription_token(std::shared_ptr<realm::SyncUser> user, Token&& token)
+struct realm_app_user_subscription_token : realm::c_api::WrapC {
+    using Token = realm::Subscribable<realm::app::User>::Token;
+    realm_app_user_subscription_token(std::shared_ptr<realm::app::User> user, Token&& token)
         : user(user)
         , token(std::move(token))
     {
     }
-    ~realm_sync_user_subscription_token();
-    std::shared_ptr<realm::SyncUser> user;
+    ~realm_app_user_subscription_token();
+    std::shared_ptr<realm::app::User> user;
     Token token;
 };
 
@@ -625,8 +625,8 @@ struct realm_http_transport : realm::c_api::WrapC, std::shared_ptr<realm::app::G
     }
 };
 
-struct realm_app_config : realm::c_api::WrapC, realm::app::App::Config {
-    using Config::Config;
+struct realm_app_config : realm::c_api::WrapC, realm::app::AppConfig {
+    using AppConfig::AppConfig;
 };
 
 struct realm_sync_client_config : realm::c_api::WrapC, realm::SyncClientConfig {

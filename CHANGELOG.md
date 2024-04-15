@@ -4,12 +4,35 @@
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
 * Add `SyncClientConfig::security_access_group` which allows specifying the access group to use for the sync metadata Realm's encryption key. Setting this is required when sharing the metadata Realm between apps on Apple platforms ([#7552](https://github.com/realm/realm-core/pull/7552)).
 * When connecting to multiple server apps, a unique encryption key is used for each of the metadata Realms rather than sharing one between them ([#7552](https://github.com/realm/realm-core/pull/7552)).
+* Introduce the new `SyncUser` interface which can be implemented by SDKs to use sync without the core App Services implementation (or just for greater control over user behavior in tests). ([PR #7300](https://github.com/realm/realm-core/pull/7300).
 
 ### Fixed
-* Fixed crash when integrating removal of already removed dictionary key ([#7488](https://github.com/realm/realm-core/issues/7488)).
+* <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
+* SyncUser::all_sessions() included sessions in every state *except* for waiting for access token, which was weirdly inconsistent. It now includes all sessions. ([PR #7300](https://github.com/realm/realm-core/pull/7300)).
+* App::all_users() included logged out users only if they were logged out while the App instance existed. It now always includes all logged out users. ([PR #7300](https://github.com/realm/realm-core/pull/7300)).
+* Deleting the active user left the active user unset rather than selecting another logged-in user as the active user like logging out and removing users did. ([PR #7300](https://github.com/realm/realm-core/pull/7300)).
+* Fix compilation errors when using command-line `swift build` ([#7587](https://github.com/realm/realm-core/pull/7587), since v14.5.1).
+* Fixed crash when integrating removal of already removed dictionary key ([#7488](https://github.com/realm/realm-core/issues/7488), since v10.0.0).
 
 ### Breaking changes
-* None.
+* The following things have been renamed or moved as part of moving all of the App Services functionality to the app namespace:
+  - SyncUser -> app::User. Note that there is a new, different type named SyncUser.
+  - SyncUser::identity -> app::User::user_id. The "identity" word was overloaded to mean two unrelated things, and one has been changed to user_id everywhere.
+  - SyncUserSubscriptionToken -> app::UserSubscriptionToken
+  - SyncUserProfile -> app::UserProfile
+  - App::Config -> AppConfig
+  - SyncConfig::MetadataMode -> AppConfig::MetadataMode
+  - MetadataMode::NoMetadata -> MetadataMode::InMemory
+  - SyncUser::session_for_on_disk_path() -> SyncManager::get_existing_session()
+  - SyncUser::all_sessions() -> SyncManager::get_all_sessions_for(User&)
+  - SyncManager::immediately_run_file_actions() -> App::immediately_run_file_actions()
+  - realm_sync_user_subscription_token -> realm_app_user_subscription_token
+  ([PR #7300](https://github.com/realm/realm-core/pull/7300).
+* The `ClientAppDeallocated` error code no longer exists as this error code can no longer occur. ([PR #7300](https://github.com/realm/realm-core/pull/7300).
+* Some fields have moved from SyncClientConfig to AppConfig. AppConfig now has a SyncClientConfig field rather than it being passed separately to App::get_app(). ([PR #7300](https://github.com/realm/realm-core/pull/7300).
+* Sync user management has been removed from SyncManager. This functionality was already additionally available on App. ([PR #7300](https://github.com/realm/realm-core/pull/7300).
+* AuditConfig now has a base_file_path field which must be set by the SDK rather than inheriting it from the SyncManager. ([PR #7300](https://github.com/realm/realm-core/pull/7300).
+* App::switch_user() no longer returns a user. The return value was always exactly the passed-in user and any code which needs it can just use that. ([PR #7300](https://github.com/realm/realm-core/pull/7300).
 
 ### Compatibility
 * Fileformat: Generates files with format v24. Reads and automatically upgrade from fileformat v10. If you want to upgrade from an earlier file format version you will have to use RealmCore v13.x.y or earlier.
@@ -17,10 +40,23 @@
 -----------
 
 ### Internals
-* None.
+* App metadata storage has been entirely rewritten in preparation for supporting sharing metadata realms between processes. ([PR #7300](https://github.com/realm/realm-core/pull/7300).
+* The metadata disabled mode has been replaced with an in-memory metadata mode which performs similarly and doesn't work weirdly differently from the normal mode. The new mode is intended for testing purposes, but should be suitable for production usage if there is a scenario where metadata persistence is not needed. ([PR #7300](https://github.com/realm/realm-core/pull/7300).
+* The ownership relationship between App and User has changed. User now strongly retains App and App has a weak cache of Users. This means that creating a SyncConfig or opening a Realm will keep the parent App alive, rather than things being in a broken state if the App is deallocated. ([PR #7300](https://github.com/realm/realm-core/pull/7300).
 
 ----------------------------------------------
 
+# 14.5.1 Release notes
+
+### Fixed
+* Clearing a nested collection may end with a crash ([#7556](https://github.com/realm/realm-core/issues/7556), since v14.0.0)
+* Removing nested collections in Mixed for synced realms throws realm::StaleAccessor ([#7573](https://github.com/realm/realm-core/issues/7573), since v14.0.0)
+* Add a privacy manifest to the Swift package ([Swift #8535](https://github.com/realm/realm-swift/issues/8535)).
+
+### Compatibility
+* Fileformat: Generates files with format v24. Reads and automatically upgrade from fileformat v10. If you want to upgrade from an earlier file format version you will have to use RealmCore v13.x.y or earlier.
+
+----------------------------------------------
 # 14.5.0 Release notes
 
 ### Enhancements
@@ -271,7 +307,7 @@
 * Fixed a crash with `Assertion failed: m_initiated` during sync session startup ([#7074](https://github.com/realm/realm-core/issues/7074), since v10.0.0).
 * Fixed a TSAN violation where the user thread could race to read `m_finalized` with the sync event loop ([#6844](https://github.com/realm/realm-core/issues/6844), since v13.15.1)
 * Fix a minor race condition when backing up Realm files before a client reset which could have lead to overwriting an existing file. ([PR #7341](https://github.com/realm/realm-core/pull/7341)).
- 
+
 ### Breaking changes
 * SyncManager no longer supports reconfiguring after calling reset_for_testing(). SyncManager::configure() has been folded into the constructor, and reset_for_testing() has been renamed to tear_down_for_testing(). ([PR #7351](https://github.com/realm/realm-core/pull/7351))
 
