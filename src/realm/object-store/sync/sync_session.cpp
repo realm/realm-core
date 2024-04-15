@@ -291,10 +291,10 @@ static bool check_for_redirect_response(const app::AppError& error)
     return false;
 }
 
-util::UniqueFunction<void(util::Optional<app::AppError>)>
+util::UniqueFunction<void(std::optional<app::AppError>)>
 SyncSession::handle_refresh(const std::shared_ptr<SyncSession>& session, bool restart_session)
 {
-    return [session, restart_session](util::Optional<app::AppError> error) {
+    return [session, restart_session](std::optional<app::AppError> error) {
         auto session_user = session->user();
         if (!session_user) {
             util::CheckedUniqueLock lock(session->m_state_mutex);
@@ -666,7 +666,7 @@ void SyncSession::handle_error(sync::SessionErrorInfo error)
 {
     enum class NextStateAfterError { none, inactive, error };
     auto next_state = error.is_fatal ? NextStateAfterError::error : NextStateAfterError::none;
-    util::Optional<ShouldBackup> delete_file;
+    std::optional<ShouldBackup> delete_file;
     bool log_out_user = false;
     bool unrecognized_by_client = false;
 
@@ -983,7 +983,7 @@ void SyncSession::create_sync_session()
     // Sets up the connection state listener. This callback is used for both reporting errors as well as changes to
     // the connection state.
     m_session->set_connection_state_change_listener(
-        [weak_self](sync::ConnectionState state, util::Optional<sync::SessionErrorInfo> error) {
+        [weak_self](sync::ConnectionState state, std::optional<sync::SessionErrorInfo> error) {
             using cs = sync::ConnectionState;
             ConnectionState new_state = [&] {
                 switch (state) {

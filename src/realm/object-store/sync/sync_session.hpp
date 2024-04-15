@@ -27,7 +27,6 @@
 
 #include <realm/util/checked_mutex.hpp>
 #include <realm/util/future.hpp>
-#include <realm/util/optional.hpp>
 #include <realm/version_id.hpp>
 
 #include <mutex>
@@ -83,13 +82,11 @@ private:
         uint64_t snapshot_version;
         bool is_streaming;
         bool is_download;
-
-        util::UniqueFunction<void()> create_invocation(const Progress&, bool& is_expired,
-                                                       bool initial_registration = false);
-
         bool started_notifying = false;
         uint64_t initial_transferred = 0;
-        util::Optional<uint64_t> captured_transferable;
+        std::optional<uint64_t> captured_transferable;
+        util::UniqueFunction<void()> create_invocation(const Progress&, bool& is_expired,
+                                                       bool initial_registration = false);
     };
 
     // A counter used as a token to identify progress notifier callbacks registered on this session.
@@ -103,7 +100,7 @@ private:
     // event more up-to-date information isn't yet available.  FIXME: If we support transparent
     // client reset in the future, we might need to reset the progress state variables if the Realm
     // is rolled back.
-    util::Optional<Progress> m_current_progress;
+    std::optional<Progress> m_current_progress;
 
     std::unordered_map<uint64_t, NotifierPackage> m_packages;
 };
@@ -397,7 +394,7 @@ private:
 
     std::shared_ptr<SyncManager> sync_manager() const REQUIRES(!m_state_mutex);
 
-    static util::UniqueFunction<void(util::Optional<app::AppError>)>
+    static util::UniqueFunction<void(std::optional<app::AppError>)>
     handle_refresh(const std::shared_ptr<SyncSession>&, bool);
 
     // Initialize or tear down the subscription store based on whether or not flx_sync_requested is true
