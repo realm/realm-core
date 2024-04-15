@@ -1140,6 +1140,11 @@ void SessionImpl::init_progress_handler()
     m_wrapper.init_progress_handler();
 }
 
+void SessionImpl::enable_progress_notifications()
+{
+    m_wrapper.m_reliable_download_progress = true;
+}
+
 void SessionImpl::notify_upload_progress()
 {
     if (m_state != State::Active)
@@ -1760,20 +1765,12 @@ inline void SessionWrapper::finalize_before_actualization() noexcept
 inline void SessionWrapper::on_upload_progress(bool only_if_new_uploadable_data)
 {
     REALM_ASSERT(!m_finalized);
-
-    // don't set the flag in case of the progress change of local origin
-    // progress should be delayed until first DOWNLOAD message received
-    // since uploads are not allowed before that and can't progress
-    if (!only_if_new_uploadable_data)
-        m_reliable_download_progress = true;
-
     report_progress(/* is_download = */ false, only_if_new_uploadable_data); // Throws
 }
 
 inline void SessionWrapper::on_download_progress(const std::optional<uint64_t>& bootstrap_store_bytes)
 {
     REALM_ASSERT(!m_finalized);
-    m_reliable_download_progress = true;
     m_bootstrap_store_bytes = bootstrap_store_bytes;
     report_progress(/* is_download = */ true); // Throws
 }

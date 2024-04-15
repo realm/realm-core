@@ -1205,6 +1205,7 @@ private:
                                           bool same_server_version);
 
     void init_progress_handler();
+    void enable_progress_notifications();
     void notify_upload_progress();
     void update_download_estimate(double download_estimate);
     void notify_download_progress(const std::optional<uint64_t>& bootstrap_store_bytes = {});

@@ -27,7 +27,6 @@
 
 #include <realm/util/checked_mutex.hpp>
 #include <realm/util/future.hpp>
-#include <realm/util/optional.hpp>
 #include <realm/version_id.hpp>
 
 #include <iosfwd>
@@ -81,12 +80,14 @@ private:
     // can register upon this session.
     struct NotifierPackage {
         std::function<ProgressNotifierCallback> notifier;
-        util::Optional<uint64_t> captured_transferrable;
         uint64_t snapshot_version;
         bool is_streaming;
         bool is_download;
-
-        util::UniqueFunction<void()> create_invocation(const Progress&, bool&);
+        bool started_notifying = false;
+        uint64_t initial_transferred = 0;
+        std::optional<uint64_t> captured_transferable;
+        util::UniqueFunction<void()> create_invocation(const Progress&, bool& is_expired,
+                                                       bool initial_registration = false);
     };
 
     // A counter used as a token to identify progress notifier callbacks registered on this session.
@@ -97,8 +98,10 @@ private:
     // Will be `none` until we've received the initial notification from sync.  Note that this
     // happens only once ever during the lifetime of a given `SyncSession`, since these values are
     // expected to semi-monotonically increase, and a lower-bounds estimate is still useful in the
-    // event more up-to-date information isn't yet available.
-    util::Optional<Progress> m_current_progress;
+    // event more up-to-date information isn't yet available.  FIXME: If we support transparent
+    // client reset in the future, we might need to reset the progress state variables if the Realm
+    // is rolled back.
+    std::optional<Progress> m_current_progress;
 
     std::unordered_map<uint64_t, NotifierPackage> m_packages;
 };
@@ -390,7 +393,9 @@ private:
     }
     // }
 
-    static util::UniqueFunction<void(util::Optional<app::AppError>)>
+    std::shared_ptr<SyncManager> sync_manager() const REQUIRES(!m_state_mutex);
+
+    static util::UniqueFunction<void(std::optional<app::AppError>)>
     handle_refresh(const std::shared_ptr<SyncSession>&, bool);
 
     // Initialize or tear down the subscription store based on whether or not flx_sync_requested is true

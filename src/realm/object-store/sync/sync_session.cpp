@@ -310,10 +310,10 @@ static bool check_for_redirect_response(const app::AppError& error)
     return false;
 }
 
-util::UniqueFunction<void(util::Optional<app::AppError>)>
+util::UniqueFunction<void(std::optional<app::AppError>)>
 SyncSession::handle_refresh(const std::shared_ptr<SyncSession>& session, bool restart_session)
 {
-    return [session, restart_session](util::Optional<app::AppError> error) {
+    return [session, restart_session](std::optional<app::AppError> error) {
         auto session_user = session->user();
         if (!session_user) {
             util::CheckedUniqueLock lock(session->m_state_mutex);
@@ -670,7 +670,7 @@ void SyncSession::handle_error(sync::SessionErrorInfo error)
 {
     enum class NextStateAfterError { none, inactive, error };
     auto next_state = error.is_fatal ? NextStateAfterError::error : NextStateAfterError::none;
-    util::Optional<ShouldBackup> delete_file;
+    std::optional<ShouldBackup> delete_file;
     bool log_out_user = false;
     bool unrecognized_by_client = false;
 
@@ -985,7 +985,7 @@ void SyncSession::create_sync_session()
     // Sets up the connection state listener. This callback is used for both reporting errors as well as changes to
     // the connection state.
     m_session->set_connection_state_change_listener(
-        [weak_self](sync::ConnectionState state, util::Optional<sync::SessionErrorInfo> error) {
+        [weak_self](sync::ConnectionState state, std::optional<sync::SessionErrorInfo> error) {
             using cs = sync::ConnectionState;
             ConnectionState new_state = [&] {
                 switch (state) {
@@ -1539,7 +1539,7 @@ uint64_t SyncProgressNotifier::register_callback(std::function<ProgressNotifierC
     {
         std::lock_guard<std::mutex> lock(m_mutex);
         token_value = m_progress_notifier_token++;
-        NotifierPackage package{std::move(notifier), util::none, m_local_transaction_version, is_streaming,
+        NotifierPackage package{std::move(notifier), m_local_transaction_version, is_streaming,
                                 direction == NotifierType::download};
         if (!m_current_progress) {
             // Simply register the package, since we have no data yet.
@@ -1547,7 +1547,7 @@ uint64_t SyncProgressNotifier::register_callback(std::function<ProgressNotifierC
             return token_value;
         }
         bool skip_registration = false;
-        invocation = package.create_invocation(*m_current_progress, skip_registration);
+        invocation = package.create_invocation(*m_current_progress, skip_registration, true);
         if (skip_registration) {
             token_value = 0;
         }
@@ -1592,10 +1592,11 @@ void SyncProgressNotifier::set_local_version(uint64_t snapshot_version)
 }
 
 util::UniqueFunction<void()>
-SyncProgressNotifier::NotifierPackage::create_invocation(Progress const& current_progress, bool& is_expired)
+SyncProgressNotifier::NotifierPackage::create_invocation(Progress const& current_progress, bool& is_expired,
+                                                         bool initial_registration)
 {
     uint64_t transferred = is_download ? current_progress.downloaded : current_progress.uploaded;
-    uint64_t transferrable = is_download ? current_progress.downloadable : current_progress.uploadable;
+    uint64_t transferable = is_download ? current_progress.downloadable : current_progress.uploadable;
     double progress_estimate = is_download ? current_progress.download_estimate : current_progress.upload_estimate;
 
     // If the sync client has not yet processed all of the local
@@ -1604,21 +1605,36 @@ SyncProgressNotifier::NotifierPackage::create_invocation(Progress const& current
     if (!is_download && snapshot_version > current_progress.snapshot_version)
         return [] {};
 
-    if (!is_streaming) {
-        // The initial download size we get from the server is the uncompacted
-        // size, and so the download may complete before we actually receive
-        // that much data. When that happens, transferrable will drop and we
-        // need to use the new value instead of the captured one.
-        if (!captured_transferrable || *captured_transferrable > transferrable)
-            captured_transferrable = transferrable;
-        transferrable = *captured_transferrable;
+    // for download only invoke the callback on registration if is in active data transfer,
+    // otherwise delay notifying until an update with the new transfer signaled
+    if (is_download && !started_notifying && progress_estimate >= 1) {
+        if (initial_registration) {
+            initial_transferred = transferred;
+            return [] {};
+        }
+        else if (initial_transferred == transferred)
+            return [] {};
     }
 
-    // A notifier is expired if at least as many bytes have been transferred
-    // as were originally considered transferrable.
-    is_expired = !is_streaming && transferred >= transferrable;
+    started_notifying = true;
+
+    // only capture and adjust transferable bytes for upload non-streaming to provide
+    // the progress of upload for the callback registered right after the commit
+    if (!is_streaming && !is_download) {
+        if (!captured_transferable || *captured_transferable > transferable)
+            captured_transferable = transferable;
+        transferable = *captured_transferable;
+    }
+
+    // A notifier is expired for upload if at least as many bytes have been transferred
+    // as were originally considered transferable based on local committed version
+    // on callback registration, or when simply 1.0 progress is reached for download
+    // since the amount of bytes is not precisely known until the end
+    if (!is_streaming)
+        is_expired = is_download ? progress_estimate >= 1 : transferred >= transferable;
+
     return [=, notifier = notifier] {
-        notifier(transferred, transferrable, progress_estimate);
+        notifier(transferred, transferable, progress_estimate);
     };
 }
 
