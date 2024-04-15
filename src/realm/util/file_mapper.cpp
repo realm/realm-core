@@ -48,7 +48,6 @@
 #include <sstream>
 #include <regex>
 #include <thread>
-#include <iostream>
 
 #include <realm/util/file.hpp>
 #include <realm/util/errno.hpp>
