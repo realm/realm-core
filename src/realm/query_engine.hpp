@@ -248,11 +248,12 @@ public:
         // cases end will always be start+1 and we'll have O(N*M) runtime even with a search index, so we want to
         // combine even with an index.
         //
-        // If the column is not a string type, then as the number of conditions increases, the cost of using the index for each condition
-        // rises faster than using a hash set to check if each value in a leaf matches a condition.
+        // If the column is not a string type, then as the number of conditions increases, the cost of using the index
+        // for each condition rises faster than using a hash set to check if each value in a leaf matches a condition.
         // So if there are _many_ conditions (as defined below), combine conditions even if an index is present.
         if (has_search_index() && !ignore_indexes &&
-            (m_condition_column_key.get_type() == col_type_String || !num_identical_conditions || *num_identical_conditions < c_threshold_of_conditions_overwhelming_index))
+            (m_condition_column_key.get_type() == col_type_String || !num_identical_conditions ||
+             *num_identical_conditions < c_threshold_of_conditions_overwhelming_index))
             return false;
         return do_consume_condition(other);
     }
