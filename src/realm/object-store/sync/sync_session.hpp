@@ -236,7 +236,7 @@ public:
 
     // The access token needs to periodically be refreshed and this is how to
     // let the sync session know to update it's internal copy.
-    void update_access_token(const std::string& signed_token) REQUIRES(!m_state_mutex, !m_config_mutex);
+    void update_access_token(std::string_view signed_token) REQUIRES(!m_state_mutex, !m_config_mutex);
 
     // Request an updated access token from this session's sync user.
     void initiate_access_token_refresh() REQUIRES(!m_config_mutex);
@@ -388,7 +388,7 @@ private:
                                                const RealmConfig& config, SyncManager* sync_manager)
     {
         REALM_ASSERT(config.sync_config);
-        return std::make_shared<SyncSession>(Private(), client, std::move(db), config, std::move(sync_manager));
+        return std::make_shared<SyncSession>(Private(), client, std::move(db), config, sync_manager);
     }
     // }
 

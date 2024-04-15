@@ -25,7 +25,7 @@
 #include <realm/object-store/sync/app.hpp>
 #include <realm/object-store/sync/generic_network_transport.hpp>
 #include <realm/object-store/sync/impl/sync_file.hpp>
-#include <realm/object-store/sync/impl/sync_metadata.hpp>
+#include <realm/object-store/sync/impl/app_metadata.hpp>
 #include <realm/object-store/sync/sync_session.hpp>
 #include <realm/object-store/thread_safe_reference.hpp>
 #include <realm/sync/network/http.hpp>
@@ -48,9 +48,6 @@
 #endif
 
 namespace realm {
-
-bool results_contains_user(SyncUserMetadataResults& results, const std::string& identity);
-bool results_contains_original_name(SyncFileActionMetadataResults& results, const std::string& original_name);
 
 void timed_wait_for(util::FunctionRef<bool()> condition,
                     std::chrono::milliseconds max_ms = std::chrono::milliseconds(5000));
@@ -144,13 +141,6 @@ std::ostream& operator<<(std::ostream& os, util::Optional<app::AppError> error);
 
 void subscribe_to_all_and_bootstrap(Realm& realm);
 
-#if REALM_ENABLE_AUTH_TESTS
-void wait_for_sessions_to_close(const TestAppSession& test_app_session);
-
-std::string get_compile_time_base_url();
-std::string get_compile_time_admin_url();
-#endif // REALM_ENABLE_AUTH_TESTS
-
 struct AutoVerifiedEmailCredentials : app::AppCredentials {
     AutoVerifiedEmailCredentials();
     std::string email;
@@ -161,6 +151,13 @@ AutoVerifiedEmailCredentials create_user_and_log_in(app::SharedApp app);
 // Log in the user again using the AutoVerifiedEmailCredentials returned
 // when calling create_user_and_log_in()
 void log_in_user(app::SharedApp app, app::AppCredentials creds);
+
+#if REALM_ENABLE_AUTH_TESTS
+void wait_for_sessions_to_close(const TestAppSession& test_app_session);
+
+std::string get_compile_time_base_url();
+std::string get_compile_time_admin_url();
+#endif // REALM_ENABLE_AUTH_TESTS
 
 void wait_for_advance(Realm& realm);
 
@@ -193,8 +190,10 @@ private:
     std::mutex m_mutex;
 };
 
+template <typename BaseTransport = SynchronousTestTransport>
+class HookedTransport : public BaseTransport {
+    static_assert(std::is_base_of_v<app::GenericNetworkTransport, BaseTransport>);
 
-class HookedTransport : public SynchronousTestTransport {
 public:
     void send_request_to_server(const app::Request& request,
                                 util::UniqueFunction<void(const app::Response&)>&& completion) override
@@ -204,7 +203,7 @@ public:
                 return completion(*simulated_response);
             }
         }
-        SynchronousTestTransport::send_request_to_server(request, [&](const app::Response& response) mutable {
+        BaseTransport::send_request_to_server(request, [&](app::Response response) mutable {
             if (response_hook) {
                 response_hook(request, response);
             }
@@ -213,9 +212,9 @@ public:
     }
 
     // Optional handler for the request and response before it is returned to completion
-    std::function<void(const app::Request&, const app::Response&)> response_hook;
+    util::UniqueFunction<void(const app::Request&, app::Response&)> response_hook;
     // Optional handler for the request before it is sent to the server
-    std::function<std::optional<app::Response>(const app::Request&)> request_hook;
+    util::UniqueFunction<std::optional<app::Response>(const app::Request&)> request_hook;
 };
 
 
@@ -248,7 +247,7 @@ struct SocketProviderError {
 
 
 struct HookedSocketProvider : public sync::websocket::DefaultSocketProvider {
-    HookedSocketProvider(const std::shared_ptr<util::Logger>& logger, const std::string user_agent,
+    HookedSocketProvider(const std::shared_ptr<util::Logger>& logger, const std::string& user_agent,
                          AutoStart auto_start = AutoStart{true})
         : DefaultSocketProvider(logger, user_agent, nullptr, auto_start)
     {
@@ -263,7 +262,7 @@ struct HookedSocketProvider : public sync::websocket::DefaultSocketProvider {
         }
 
         if (websocket_endpoint_resolver) {
-            endpoint = websocket_endpoint_resolver(std::move(endpoint));
+            websocket_endpoint_resolver(endpoint);
         }
 
         if (websocket_connect_func) {
@@ -286,9 +285,9 @@ struct HookedSocketProvider : public sync::websocket::DefaultSocketProvider {
         return websocket;
     }
 
-    std::function<sync::WebSocketEndpoint(sync::WebSocketEndpoint&&)> websocket_endpoint_resolver;
-    std::function<void(const sync::WebSocketEndpoint&)> endpoint_verify_func;
-    std::function<std::optional<SocketProviderError>()> websocket_connect_func;
+    util::UniqueFunction<void(sync::WebSocketEndpoint&)> websocket_endpoint_resolver;
+    util::UniqueFunction<void(const sync::WebSocketEndpoint&)> endpoint_verify_func;
+    util::UniqueFunction<std::optional<SocketProviderError>()> websocket_connect_func;
 };
 
 #endif // REALM_ENABLE_SYNC
@@ -349,10 +348,10 @@ std::unique_ptr<TestClientReset> make_baas_flx_client_reset(const Realm::Config&
                                                             const Realm::Config& remote_config,
                                                             const TestAppSession& test_app_session);
 
-void wait_for_object_to_persist_to_atlas(std::shared_ptr<SyncUser> user, const AppSession& app_session,
+void wait_for_object_to_persist_to_atlas(std::shared_ptr<app::User> user, const AppSession& app_session,
                                          const std::string& schema_name, const bson::BsonDocument& filter_bson);
 
-void wait_for_num_objects_in_atlas(std::shared_ptr<SyncUser> user, const AppSession& app_session,
+void wait_for_num_objects_in_atlas(std::shared_ptr<app::User> user, const AppSession& app_session,
                                    const std::string& schema_name, size_t expected_size);
 
 void trigger_client_reset(const AppSession& app_session, const SyncSession& sync_session);

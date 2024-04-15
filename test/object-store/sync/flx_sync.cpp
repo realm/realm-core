@@ -2613,7 +2613,7 @@ TEST_CASE("flx: subscriptions persist after closing/reopening", "[sync][flx][baa
 TEST_CASE("flx: no subscription store created for PBS app", "[sync][flx][baas]") {
     auto server_app_config = minimal_app_config("flx_connect_as_pbs", g_minimal_schema);
     TestAppSession session(create_app(server_app_config));
-    SyncTestFile config(session.app(), bson::Bson{}, g_minimal_schema);
+    SyncTestFile config(session.app()->current_user(), bson::Bson{}, g_minimal_schema);
 
     auto realm = Realm::get_shared_realm(config);
     CHECK(!wait_for_download(*realm));
@@ -2627,7 +2627,7 @@ TEST_CASE("flx: no subscription store created for PBS app", "[sync][flx][baas]")
 
 TEST_CASE("flx: connect to FLX as PBS returns an error", "[sync][flx][baas]") {
     FLXSyncTestHarness harness("connect_to_flx_as_pbs");
-    SyncTestFile config(harness.app(), bson::Bson{}, harness.schema());
+    SyncTestFile config(harness.app()->current_user(), bson::Bson{}, harness.schema());
     std::mutex sync_error_mutex;
     util::Optional<SyncError> sync_error;
     config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) mutable {
@@ -2678,17 +2678,19 @@ TEST_CASE("flx: connect to PBS as FLX returns an error", "[sync][flx][protocol][
 }
 
 TEST_CASE("flx: commit subscription while refreshing the access token", "[sync][flx][token][baas]") {
-    auto transport = std::make_shared<HookedTransport>();
+    auto transport = std::make_shared<HookedTransport<>>();
     FLXSyncTestHarness harness("flx_wait_access_token2", FLXSyncTestHarness::default_server_schema(), transport);
     auto app = harness.app();
-    std::shared_ptr<SyncUser> user = app->current_user();
+    std::shared_ptr<User> user = app->current_user();
     REQUIRE(user);
     REQUIRE(!user->access_token_refresh_required());
     // Set a bad access token, with an expired time. This will trigger a refresh initiated by the client.
     std::chrono::system_clock::time_point now = std::chrono::system_clock::now();
     using namespace std::chrono_literals;
     auto expires = std::chrono::system_clock::to_time_t(now - 30s);
-    user->update_access_token(encode_fake_jwt("fake_access_token", expires));
+    user->update_data_for_testing([&](UserData& data) {
+        data.access_token = RealmJWT(encode_fake_jwt("fake_access_token", expires));
+    });
     REQUIRE(user->access_token_refresh_required());
 
     bool seen_waiting_for_access_token = false;
@@ -2697,7 +2699,7 @@ TEST_CASE("flx: commit subscription while refreshing the access token", "[sync][
     transport->request_hook = [&](const Request&) {
         auto user = app->current_user();
         REQUIRE(user);
-        for (auto& session : user->all_sessions()) {
+        for (auto& session : app->sync_manager()->get_all_sessions_for(*user)) {
             if (session->state() == SyncSession::State::WaitingForAccessToken) {
                 REQUIRE(!seen_waiting_for_access_token);
                 seen_waiting_for_access_token = true;
@@ -3426,7 +3428,7 @@ TEST_CASE("flx: data ingest", "[sync][flx][data ingest][baas]") {
              }},
         };
 
-        SyncTestFile config(harness->app(), Bson{}, schema);
+        SyncTestFile config(harness->app()->current_user(), Bson{}, schema);
         REQUIRE_EXCEPTION(
             Realm::get_shared_realm(config), SchemaValidationFailed,
             Catch::Matchers::ContainsSubstring("Asymmetric table 'Asymmetric2' not allowed in partition based sync"));
@@ -3517,8 +3519,9 @@ TEST_CASE("flx: data ingest - dev mode", "[sync][flx][data ingest][baas]") {
             Object::create(c, realm, "Asymmetric", std::any(AnyDict{{"_id", foo_obj_id}, {"location", "foo"s}}));
             Object::create(c, realm, "Asymmetric", std::any(AnyDict{{"_id", bar_obj_id}, {"location", "bar"s}}));
             realm->commit_transaction();
-
-            auto docs = harness.session().get_documents(*realm->config().sync_config->user, "Asymmetric", 2);
+            User* user = dynamic_cast<User*>(realm->config().sync_config->user.get());
+            REALM_ASSERT(user);
+            auto docs = harness.session().get_documents(*user, "Asymmetric", 2);
             check_document(docs, foo_obj_id, {{"location", "foo"}});
             check_document(docs, bar_obj_id, {{"location", "bar"}});
         },

@@ -40,18 +40,18 @@ realm_sync_session_connection_state_notification_token::~realm_sync_session_conn
     session->unregister_connection_change_callback(token);
 }
 
-realm_sync_user_subscription_token::~realm_sync_user_subscription_token()
+realm_app_user_subscription_token::~realm_app_user_subscription_token()
 {
     user->unsubscribe(token);
 }
 
 namespace realm::c_api {
 
-static_assert(realm_sync_client_metadata_mode_e(SyncClientConfig::MetadataMode::NoEncryption) ==
+static_assert(realm_sync_client_metadata_mode_e(app::AppConfig::MetadataMode::NoEncryption) ==
               RLM_SYNC_CLIENT_METADATA_MODE_PLAINTEXT);
-static_assert(realm_sync_client_metadata_mode_e(SyncClientConfig::MetadataMode::Encryption) ==
+static_assert(realm_sync_client_metadata_mode_e(app::AppConfig::MetadataMode::Encryption) ==
               RLM_SYNC_CLIENT_METADATA_MODE_ENCRYPTED);
-static_assert(realm_sync_client_metadata_mode_e(SyncClientConfig::MetadataMode::NoMetadata) ==
+static_assert(realm_sync_client_metadata_mode_e(app::AppConfig::MetadataMode::InMemory) ==
               RLM_SYNC_CLIENT_METADATA_MODE_DISABLED);
 
 static_assert(realm_sync_client_reconnect_mode_e(ReconnectMode::normal) == RLM_SYNC_CLIENT_RECONNECT_MODE_NORMAL);
@@ -141,24 +141,6 @@ RLM_API realm_sync_client_config_t* realm_sync_client_config_new(void) noexcept
     return new realm_sync_client_config_t;
 }
 
-RLM_API void realm_sync_client_config_set_base_file_path(realm_sync_client_config_t* config,
-                                                         const char* path) noexcept
-{
-    config->base_file_path = path;
-}
-
-RLM_API void realm_sync_client_config_set_metadata_mode(realm_sync_client_config_t* config,
-                                                        realm_sync_client_metadata_mode_e mode) noexcept
-{
-    config->metadata_mode = SyncClientConfig::MetadataMode(mode);
-}
-
-RLM_API void realm_sync_client_config_set_metadata_encryption_key(realm_sync_client_config_t* config,
-                                                                  const uint8_t key[64]) noexcept
-{
-    config->custom_encryption_key = std::vector<char>(key, key + 64);
-}
-
 RLM_API void realm_sync_client_config_set_reconnect_mode(realm_sync_client_config_t* config,
                                                          realm_sync_client_reconnect_mode_e mode) noexcept
 {
@@ -229,13 +211,6 @@ RLM_API void realm_sync_client_config_set_resumption_delay_backoff_multiplier(re
 {
     config->timeouts.reconnect_backoff_info.resumption_delay_backoff_multiplier = multiplier;
 }
-
-RLM_API void realm_sync_client_config_set_security_access_group(realm_sync_client_config_t* config,
-                                                                const char* group) noexcept
-{
-    config->security_access_group = group;
-}
-
 
 /// Register an app local callback handler for bindings interested in registering callbacks before/after
 /// the ObjectStore thread runs for this app. This only works for the default socket provider implementation.
@@ -801,7 +776,7 @@ RLM_API bool realm_sync_immediately_run_file_actions(realm_app_t* realm_app, con
                                                      bool* did_run) noexcept
 {
     return wrap_err([&]() {
-        *did_run = (*realm_app)->sync_manager()->immediately_run_file_actions(sync_path);
+        *did_run = (*realm_app)->immediately_run_file_actions(sync_path);
         return true;
     });
 }

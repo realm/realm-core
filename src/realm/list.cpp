@@ -347,6 +347,37 @@ void Lst<ObjLink>::do_remove(size_t ndx)
 
 /******************************** Lst<Mixed> *********************************/
 
+Lst<Mixed>& Lst<Mixed>::operator=(const Lst<Mixed>& other)
+{
+    if (this != &other) {
+        Base::operator=(other);
+        CollectionParent::operator=(other);
+
+        // Just reset the pointer and rely on init_from_parent() being called
+        // when the accessor is actually used.
+        m_tree.reset();
+        Base::reset_content_version();
+    }
+
+    return *this;
+}
+
+Lst<Mixed>& Lst<Mixed>::operator=(Lst<Mixed>&& other) noexcept
+{
+    if (this != &other) {
+        Base::operator=(std::move(other));
+        CollectionParent::operator=(std::move(other));
+
+        m_tree = std::exchange(other.m_tree, nullptr);
+        if (m_tree) {
+            m_tree->set_parent(this, 0);
+        }
+    }
+
+    return *this;
+}
+
+
 UpdateStatus Lst<Mixed>::init_from_parent(bool allow_create) const
 {
     Base::update_content_version();
@@ -550,24 +581,35 @@ void Lst<Mixed>::set_collection(const PathElement& path_elem, CollectionType dic
     set(path_elem.get_ndx(), Mixed(0, dict_or_list));
 }
 
-DictionaryPtr Lst<Mixed>::get_dictionary(const PathElement& path_elem) const
+template <class T>
+inline std::shared_ptr<T> Lst<Mixed>::do_get_collection(const PathElement& path_elem)
 {
     update();
-    auto weak = const_cast<Lst<Mixed>*>(this)->weak_from_this();
-    auto shared = weak.expired() ? std::make_shared<Lst<Mixed>>(*this) : weak.lock();
-    DictionaryPtr ret = std::make_shared<Dictionary>(m_col_key, get_level() + 1);
+    auto get_shared = [&]() -> std::shared_ptr<CollectionParent> {
+        auto weak = weak_from_this();
+
+        if (weak.expired()) {
+            REALM_ASSERT_DEBUG(m_level == 1);
+            return std::make_shared<Lst<Mixed>>(*this);
+        }
+
+        return weak.lock();
+    };
+
+    auto shared = get_shared();
+    auto ret = std::make_shared<T>(m_col_key, get_level() + 1);
     ret->set_owner(shared, m_tree->get_key(path_elem.get_ndx()));
     return ret;
 }
 
+DictionaryPtr Lst<Mixed>::get_dictionary(const PathElement& path_elem) const
+{
+    return const_cast<Lst<Mixed>*>(this)->do_get_collection<Dictionary>(path_elem);
+}
+
 std::shared_ptr<Lst<Mixed>> Lst<Mixed>::get_list(const PathElement& path_elem) const
 {
-    update();
-    auto weak = const_cast<Lst<Mixed>*>(this)->weak_from_this();
-    auto shared = weak.expired() ? std::make_shared<Lst<Mixed>>(*this) : weak.lock();
-    std::shared_ptr<Lst<Mixed>> ret = std::make_shared<Lst<Mixed>>(m_col_key, get_level() + 1);
-    ret->set_owner(shared, m_tree->get_key(path_elem.get_ndx()));
-    return ret;
+    return const_cast<Lst<Mixed>*>(this)->do_get_collection<Lst<Mixed>>(path_elem);
 }
 
 void Lst<Mixed>::do_set(size_t ndx, Mixed value)
@@ -838,10 +880,12 @@ bool Lst<Mixed>::clear_backlink(size_t ndx, CascadeState& state) const
             return Base::remove_backlink(m_col_key, link, state);
         }
         else if (value.is_type(type_List)) {
-            return get_list(ndx)->remove_backlinks(state);
+            Lst<Mixed> list{*const_cast<Lst<Mixed>*>(this), m_tree->get_key(ndx)};
+            return list.remove_backlinks(state);
         }
         else if (value.is_type(type_Dictionary)) {
-            return get_dictionary(ndx)->remove_backlinks(state);
+            Dictionary dict{*const_cast<Lst<Mixed>*>(this), m_tree->get_key(ndx)};
+            return dict.remove_backlinks(state);
         }
     }
     return false;
