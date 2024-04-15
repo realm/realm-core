@@ -41,9 +41,9 @@ public:
     void init_array(char* h, uint8_t flags, size_t v_width, size_t ndx_width, size_t v_size, size_t ndx_size) const;
     void copy_data(const Array&, const std::vector<int64_t>&, const std::vector<size_t>&) const;
     // getters/setters
-    inline int64_t get(bf_iterator&, bf_iterator&, size_t, uint64_t) const;
-    inline void get_chunk(bf_iterator&, bf_iterator&, size_t, uint64_t, int64_t[8]) const;
-    inline void set_direct(bf_iterator&, bf_iterator&, size_t, int64_t) const;
+    inline int64_t get(const IntegerCompressor&, size_t) const;
+    inline void get_chunk(const IntegerCompressor&, size_t, int64_t[8]) const;
+    inline void set_direct(const IntegerCompressor&, size_t, int64_t) const;
 
     template <typename Cond>
     inline bool find_all(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*) const;
@@ -64,16 +64,18 @@ private:
     inline bool run_parallel_subscan(size_t, size_t, size_t) const;
 };
 
-inline int64_t FlexCompressor::get(bf_iterator& data_iterator, bf_iterator& ndx_iterator, size_t ndx,
-                                   uint64_t mask) const
+inline int64_t FlexCompressor::get(const IntegerCompressor& c, size_t ndx) const
 {
-    ndx_iterator.move(ndx);
-    data_iterator.move(*ndx_iterator);
-    return sign_extend_field_by_mask(mask, *data_iterator);
+    const auto offset = c.width() * c.v_size();
+    const auto ndx_w = c.ndx_width();
+    const auto v_w = c.width();
+    const auto data = c.data();
+    bf_iterator ndx_iterator{data, offset, ndx_w, ndx_w, ndx};
+    bf_iterator data_iterator{data, 0, v_w, v_w, *ndx_iterator};
+    return sign_extend_field_by_mask(c.width_mask(), *data_iterator);
 }
 
-inline void FlexCompressor::get_chunk(bf_iterator& data_it, bf_iterator& ndx_it, size_t ndx, uint64_t mask,
-                                      int64_t res[8]) const
+inline void FlexCompressor::get_chunk(const IntegerCompressor& c, size_t ndx, int64_t res[8]) const
 {
     auto sz = 8;
     std::memset(res, 0, sizeof(int64_t) * sz);
@@ -81,18 +83,22 @@ inline void FlexCompressor::get_chunk(bf_iterator& data_it, bf_iterator& ndx_it,
     size_t i = ndx;
     size_t index = 0;
     for (; i < supposed_end; ++i) {
-        res[index++] = get(data_it, ndx_it, i, mask);
+        res[index++] = get(c, i);
     }
     for (; index < 8; ++index) {
-        res[index++] = get(data_it, ndx_it, i++, mask);
+        res[index++] = get(c, i);
     }
 }
 
-void FlexCompressor::set_direct(bf_iterator& data_it, bf_iterator& ndx_it, size_t ndx, int64_t value) const
+void FlexCompressor::set_direct(const IntegerCompressor& c, size_t ndx, int64_t value) const
 {
-    ndx_it.move(ndx);
-    data_it.move(*ndx_it);
-    data_it.set_value(value);
+    const auto offset = c.width() * c.v_size();
+    const auto ndx_w = c.ndx_width();
+    const auto v_w = c.width();
+    const auto data = c.data();
+    bf_iterator ndx_iterator{data, offset, ndx_w, ndx_w, ndx};
+    bf_iterator data_iterator{data, 0, v_w, v_w, *ndx_iterator};
+    data_iterator.set_value(value);
 }
 
 template <typename Cond>
@@ -167,9 +173,12 @@ inline bool FlexCompressor::find_linear(const Array& arr, int64_t value, size_t 
     };
 
     const auto& compressor = arr.integer_compressor();
-    auto& ndx_it = compressor.ndx_iterator();
-    auto& data_it = compressor.data_iterator();
-    ndx_it.move(start);
+    const auto data = (uint64_t*)arr.m_data;
+    const auto ndx_width = compressor.ndx_width();
+    const auto v_width = compressor.width();
+    const auto offset = v_width * compressor.v_size();
+    bf_iterator ndx_it{data, offset, ndx_width, ndx_width, start};
+    bf_iterator data_it{data, 0, v_width, v_width, 0};
     while (start < end) {
         data_it.move(*ndx_it);
         const auto sv = sign_extend_field_by_mask(compressor.width_mask(), *data_it);
@@ -253,14 +262,14 @@ inline bool FlexCompressor::find_parallel(const Array& arr, int64_t value, size_
 template <typename Cond>
 inline bool FlexCompressor::run_parallel_subscan(size_t v_width, size_t v_range, size_t ndx_range) const
 {
-    if (ndx_range <= 32)
+    if (ndx_range <= 20)
         return false;
     // the threshold for v_width is empirical, some intuition for this is probably that we need to consider 2 parallel
     // scans, one for finding the matching value and one for the indices (max bit-width 8, becasue max array size is
     // 256). When we scan the values in parallel, we go through them all, we can't follow the hint given [start, end],
     // thus a full scan of values makes sense only for certain widths that are not too big, in order to compare in
     // parallel as many values as we can in one go.
-    return v_width <= 20 && v_range >= 20;
+    return v_width < 32 && v_range >= 0;
 }
 
 } // namespace realm

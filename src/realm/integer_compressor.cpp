@@ -223,12 +223,18 @@ bool IntegerCompressor::decompress(Array& arr) const
 
 bool IntegerCompressor::init(const char* h)
 {
-    if (!m_info.set(h))
+    m_encoding = NodeHeader::get_encoding(h);
+    if (!NodeHeader::wtype_is_extended(h))
         return false;
-    if (is_packed())
+
+    if (is_packed()) {
+        init_packed(h);
         m_vtable = &VTableForPacked::vtable;
-    else
+    }
+    else {
+        init_flex(h);
         m_vtable = &VTableForFlex::vtable;
+    }
     return true;
 }
 
@@ -317,32 +323,32 @@ void IntegerCompressor::set(char* data, size_t w, size_t ndx, int64_t v) const
 
 int64_t IntegerCompressor::get_packed(size_t ndx) const
 {
-    return s_packed.get(m_info.m_data_iterator, ndx, width_mask());
+    return s_packed.get(*this, ndx);
 }
 
 int64_t IntegerCompressor::get_flex(size_t ndx) const
 {
-    return s_flex.get(m_info.m_data_iterator, m_info.m_ndx_iterator, ndx, width_mask());
+    return s_flex.get(*this, ndx);
 }
 
 void IntegerCompressor::get_chunk_packed(size_t ndx, int64_t res[8]) const
 {
-    s_packed.get_chunk(m_info.m_data_iterator, ndx, width_mask(), res);
+    s_packed.get_chunk(*this, ndx, res);
 }
 
 void IntegerCompressor::get_chunk_flex(size_t ndx, int64_t res[8]) const
 {
-    s_flex.get_chunk(m_info.m_data_iterator, m_info.m_ndx_iterator, ndx, width_mask(), res);
+    s_flex.get_chunk(*this, ndx, res);
 }
 
 void IntegerCompressor::set_direct_packed(size_t ndx, int64_t value) const
 {
-    s_packed.set_direct(m_info.m_data_iterator, ndx, value);
+    s_packed.set_direct(*this, ndx, value);
 }
 
 void IntegerCompressor::set_direct_flex(size_t ndx, int64_t value) const
 {
-    s_flex.set_direct(m_info.m_data_iterator, m_info.m_ndx_iterator, ndx, value);
+    s_flex.set_direct(*this, ndx, value);
 }
 
 template <typename Cond>
