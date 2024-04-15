@@ -23,7 +23,10 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <realm/error_codes.h>
+
+#if !defined(REALM_APP_SERVICES)
 #include <realm/util/config.h>
+#endif
 
 #if defined(_WIN32) || defined(__CYGWIN__)
 

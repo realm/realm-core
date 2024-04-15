@@ -494,7 +494,8 @@ let package = Package(
         .target(
             name: "RealmFFI",
             dependencies: ["Capi"],
-            path: "src/swift"),
+            path: "src/swift",
+            cxxSettings: (cxxSettings) as [CXXSetting]),
         .target(
             name: "Catch2Generated",
             path: "external/generated",

@@ -1884,6 +1884,7 @@ buildvariants:
     c_compiler: "/opt/clang+llvm/bin/clang"
     cxx_compiler: "/opt/clang+llvm/bin/clang++"
     extra_flags: "-DREALM_APP_SERVICES=OFF"
+    disable_tests_against_baas: On
   tasks:
   - name: compile_test
 
