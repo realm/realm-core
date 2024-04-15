@@ -2142,29 +2142,32 @@ public:
 
 private:
     struct ConditionType {
-        ConditionType(const ParentNode* node)
-            : m_col(node->m_condition_column_key.value)
-            , m_type_hash(typeid(node).hash_code())
+        ConditionType(const ParentNode& node)
+            : m_col(node.m_condition_column_key.value)
+            , m_type(typeid(node))
         {
         }
         int64_t m_col;
-        size_t m_type_hash;
+        std::type_index m_type;
         bool operator<(const ConditionType& other) const
         {
-            return this->m_col < other.m_col && this->m_type_hash < other.m_type_hash;
+            return this->m_col < other.m_col && this->m_type < other.m_type;
         }
         bool operator!=(const ConditionType& other) const
         {
-            return this->m_col != other.m_col || this->m_type_hash != other.m_type_hash;
+            return this->m_col != other.m_col || this->m_type != other.m_type;
         }
     };
 
     void combine_conditions(bool ignore_indexes)
     {
         // Although ColKey is not unique per table, it is not important to consider
-        // the table when sorting here because
+        // the table when sorting here because ParentNode::m_condition_column_key
+        // is only a valid ColKey when the node has a direct condition on a column
+        // of the table this query is running on. Any link query nodes use a special
+        // LinkChain state to store the column path.
         std::sort(m_conditions.begin(), m_conditions.end(), [](auto& a, auto& b) {
-            return ConditionType(a.get()) < ConditionType(b.get());
+            return ConditionType(*a) < ConditionType(*b);
         });
 
         bool compute_condition_counts = num_conditions_may_need_combination_counts(m_conditions.size());
@@ -2178,27 +2181,27 @@ private:
                     ++it;
                     continue;
                 }
-                ConditionType cur_type((*it).get());
+                ConditionType cur_type(*(*it));
                 auto next = std::upper_bound(it, m_conditions.end(), cur_type,
                                              [](const ConditionType& a, const std::unique_ptr<ParentNode>& b) {
-                                                 return a < ConditionType(b.get());
+                                                 return a < ConditionType(*b);
                                              });
                 condition_type_counts[cur_type] = next - it;
                 it = next;
             }
         }
 
-        auto prev = m_conditions.begin()->get();
+        ParentNode* prev = m_conditions.begin()->get();
         std::optional<size_t> cur_type_count;
         if (compute_condition_counts) {
-            cur_type_count = condition_type_counts[ConditionType{prev}];
+            cur_type_count = condition_type_counts[ConditionType{*prev}];
         }
         auto cond = [&](auto& node) {
             if (prev->consume_condition(*node, ignore_indexes, cur_type_count))
                 return true;
             prev = &*node;
             if (compute_condition_counts) {
-                cur_type_count = condition_type_counts[ConditionType{prev}];
+                cur_type_count = condition_type_counts[ConditionType{*prev}];
             }
             return false;
         };
