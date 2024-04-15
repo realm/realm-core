@@ -1202,7 +1202,7 @@ private:
     SyncClientHookAction call_debug_hook(const SyncClientHookData& data);
 
     bool is_steady_state_download_message(DownloadBatchState batch_state, int64_t query_version,
-                                          bool same_server_version);
+                                          bool same_remote_versions);
 
     void init_progress_handler();
     void enable_progress_notifications();

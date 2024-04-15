@@ -39,7 +39,7 @@
 #include <realm/sync/noinst/sync_schema_migration.hpp>
 #include <realm/sync/protocol.hpp>
 
-#include <iostream>
+#include <ostream>
 
 using namespace realm;
 using namespace realm::_impl;

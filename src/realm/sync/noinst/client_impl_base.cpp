@@ -2412,34 +2412,38 @@ Status Session::receive_download_message(const DownloadMessage& message)
         return status;
     }
 
-    version_type server_version = m_progress.download.server_version;
-    // If there are 2 or more changesets in this message, track whether or not the changesets have the same
-    // download_server_version to help with determining if this is a bootstrap message or not.
-    bool same_server_version =
-        message.changesets.size() > 1 && progress.download.server_version == message.changesets[0].remote_version;
-    bool after_first_changeset = false;
+    // Start with the download server version from the last download message, since the changesets in the new
+    // download message must have a remote version greater than (or equal to for FLX) this value.
+    version_type last_remote_version = m_progress.download.server_version;
     version_type last_integrated_client_version = m_progress.download.last_integrated_client_version;
+    // If there are 2 or more changesets in this message, track whether or not the changesets all have the same
+    // download_server_version to help with determining if this is a single message server-initiated bootstrap or not.
+    bool same_remote_version = last_in_batch && message.changesets.size() > 1;
+    bool after_first_changeset = false;
+
     for (const RemoteChangeset& changeset : message.changesets) {
-        // Check that per-changeset server version is strictly increasing, except in FLX sync where the server
-        // version must be increasing, but can stay the same during bootstraps.
-        bool good_server_version = m_is_flx_sync_session ? (changeset.remote_version >= server_version)
-                                                         : (changeset.remote_version > server_version);
+        // Check that per-changeset server version is strictly increasing since the last download server version,
+        // except in FLX sync where the server version must be increasing, but can stay the same during bootstraps.
+        bool good_server_version = m_is_flx_sync_session ? (changeset.remote_version >= last_remote_version)
+                                                         : (changeset.remote_version > last_remote_version);
         // Each server version cannot be greater than the one in the header of the download message.
         good_server_version = good_server_version && (changeset.remote_version <= progress.download.server_version);
         if (!good_server_version) {
             return {ErrorCodes::SyncProtocolInvariantFailed,
                     util::format("Bad server version in changeset header (DOWNLOAD) (%1, %2, %3)",
-                                 changeset.remote_version, server_version, progress.download.server_version)};
+                                 changeset.remote_version, last_remote_version, progress.download.server_version)};
         }
-        if (after_first_changeset)
+        // Check to see if all the changesets in this LastInBatch=true message have the same remote_version
+        // If so, this is a server-initiated single message bootstrap
+        if (same_remote_version && after_first_changeset) {
             // After the first changeset compare the previous changeset's server version to the current changeset
             // server version. If they are different then this is definitely not a bootstrap message
-            same_server_version = same_server_version && server_version == changeset.remote_version;
-        else
-            // Skip the first changeset, since `server_version` contains the incorrect value for this check
-            after_first_changeset = true;
-
-        server_version = changeset.remote_version;
+            same_remote_version = changeset.remote_version == last_remote_version;
+        }
+        // Skip the first changeset, since `server_version` contains the incorrect value for this check
+        after_first_changeset = true;
+        // Save the remote version for the current changeset to compare against the next changeset
+        last_remote_version = changeset.remote_version;
 
         // Check that per-changeset last integrated client version is "weakly"
         // increasing.
@@ -2465,7 +2469,7 @@ Status Session::receive_download_message(const DownloadMessage& message)
         }
     }
 
-    if (is_steady_state_download_message(batch_state, query_version, same_server_version)) {
+    if (is_steady_state_download_message(batch_state, query_version, same_remote_version)) {
         batch_state = DownloadBatchState::SteadyState;
     }
     m_last_download_batch_state = batch_state;
