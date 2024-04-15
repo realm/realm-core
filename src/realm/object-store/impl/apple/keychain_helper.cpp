@@ -36,17 +36,21 @@ REALM_NORETURN
 REALM_COLD
 void keychain_access_exception(int32_t error_code)
 {
-    if (auto message = adoptCF(SecCopyErrorMessageString(error_code, nullptr))) {
-        if (auto msg = CFStringGetCStringPtr(message.get(), kCFStringEncodingUTF8)) {
-            throw RuntimeError(ErrorCodes::RuntimeError,
-                               util::format("Keychain returned unexpected status code: %1 (%2)", msg, error_code));
-        }
-        auto length = CFStringGetMaximumSizeForEncoding(CFStringGetLength(message.get()), kCFStringEncodingUTF8) + 1;
-        auto buffer = std::make_unique<char[]>(length);
-        if (CFStringGetCString(message.get(), buffer.get(), length, kCFStringEncodingUTF8)) {
-            throw RuntimeError(
-                ErrorCodes::RuntimeError,
-                util::format("Keychain returned unexpected status code: %1 (%2)", buffer.get(), error_code));
+    if (__builtin_available(iOS 11.3, macOS 10.3, tvOS 11.3, watchOS 4.3, *)) {
+        if (auto message = adoptCF(SecCopyErrorMessageString(error_code, nullptr))) {
+            if (auto msg = CFStringGetCStringPtr(message.get(), kCFStringEncodingUTF8)) {
+                throw RuntimeError(
+                    ErrorCodes::RuntimeError,
+                    util::format("Keychain returned unexpected status code: %1 (%2)", msg, error_code));
+            }
+            auto length =
+                CFStringGetMaximumSizeForEncoding(CFStringGetLength(message.get()), kCFStringEncodingUTF8) + 1;
+            auto buffer = std::make_unique<char[]>(length);
+            if (CFStringGetCString(message.get(), buffer.get(), length, kCFStringEncodingUTF8)) {
+                throw RuntimeError(
+                    ErrorCodes::RuntimeError,
+                    util::format("Keychain returned unexpected status code: %1 (%2)", buffer.get(), error_code));
+            }
         }
     }
     throw RuntimeError(ErrorCodes::RuntimeError,
@@ -201,7 +205,7 @@ std::optional<std::vector<char>> get_existing_metadata_realm_key(std::string_vie
     // in one client is unusual, but when it's done we want each metadata realm to
     // have a separate key.
 
-#if TARGET_OS_OSX
+#if TARGET_OS_MAC
     if (auto service = bundle_service()) {
         if (get_key(cf_app_id.get(), service.get(), {}, key))
             return key;
