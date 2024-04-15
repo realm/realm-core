@@ -596,7 +596,6 @@ TEST(Shared_ReadOverRead2)
     CHECK_EQUAL(table2->get_object(0).get<int64_t>("col"), 1);
 }
 
-
 TEST(Shared_EncryptedRemap)
 {
     // Attempts to trigger code coverage in util::mremap() for the case where the file is encrypted.

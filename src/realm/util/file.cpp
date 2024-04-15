@@ -23,6 +23,7 @@
 #include <realm/util/file_mapper.hpp>
 
 #include <algorithm>
+#include <atomic>
 #include <cerrno>
 #include <climits>
 #include <cstddef>
@@ -49,6 +50,7 @@
 using namespace realm::util;
 
 namespace {
+constexpr size_t c_min_supported_page_size = 4096;
 size_t get_page_size()
 {
 #ifdef _WIN32
@@ -60,13 +62,13 @@ size_t get_page_size()
 #else
     long size = sysconf(_SC_PAGESIZE);
 #endif
-    REALM_ASSERT(size > 0 && size % 4096 == 0);
+    REALM_ASSERT(size > 0 && size % c_min_supported_page_size == 0);
     return static_cast<size_t>(size);
 }
 
 // This variable exists such that page_size() can return the page size without having to make any system calls.
 // It could also have been a static local variable, but Valgrind/Helgrind gives a false error on that.
-size_t cached_page_size = get_page_size();
+std::atomic<size_t> cached_page_size = get_page_size();
 
 bool for_each_helper(const std::string& path, const std::string& dir, realm::util::File::ForEachHandler& handler)
 {
@@ -413,7 +415,18 @@ std::string make_temp_file(const char* prefix)
 
 size_t page_size()
 {
-    return cached_page_size;
+    return cached_page_size.load(std::memory_order::memory_order_relaxed);
+}
+
+OnlyForTestingPageSizeChange::OnlyForTestingPageSizeChange(size_t new_page_size)
+{
+    REALM_ASSERT(new_page_size % c_min_supported_page_size == 0);
+    cached_page_size = new_page_size;
+}
+
+OnlyForTestingPageSizeChange::~OnlyForTestingPageSizeChange()
+{
+    cached_page_size = get_page_size();
 }
 
 void File::open_internal(const std::string& path, AccessMode a, CreateMode c, int flags, bool* success)

@@ -154,7 +154,7 @@ public:
 
     static constexpr size_t section_size() noexcept
     {
-        return 1 << section_shift;
+        return 1UL << section_shift;
     }
 
 protected:
