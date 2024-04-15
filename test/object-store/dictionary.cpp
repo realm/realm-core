@@ -190,6 +190,10 @@ TEST_CASE("nested dictionary in mixed", "[dictionary]") {
         REQUIRE(val.is_type(type_List));
         auto list = results.get_list(1);
         REQUIRE(list.is_valid());
+
+        CppContext ctx(r);
+        CHECK(util::any_cast<object_store::Dictionary&&>(results.get(ctx, 0)).is_valid());
+        CHECK(util::any_cast<List&&>(results.get(ctx, 1)).is_valid());
     }
 }
 
