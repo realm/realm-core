@@ -222,7 +222,8 @@ private:
 
     bool m_suspended = false;
 
-    // Set when the session has been abandoned, but before it's been finalized.
+    // Set when the session has been abandoned. After this point none of the
+    // public API functions should be called again.
     bool m_abandoned = false;
     // Has the SessionWrapper been finalized?
     bool m_finalized = false;
@@ -439,7 +440,7 @@ bool ClientImpl::wait_for_session_terminations_or_client_stopped()
     // Thread safety required
 
     {
-        std::lock_guard lock{m_mutex};
+        util::CheckedLockGuard lock{m_mutex};
         m_sessions_terminated = false;
     }
 
@@ -466,16 +467,19 @@ bool ClientImpl::wait_for_session_terminations_or_client_stopped()
         else if (!status.is_ok())
             throw Exception(status);
 
-        std::lock_guard lock{m_mutex};
-        m_sessions_terminated = true;
+        {
+            util::CheckedLockGuard lock{m_mutex};
+            m_sessions_terminated = true;
+        }
         m_wait_or_client_stopped_cond.notify_all();
     }); // Throws
 
     bool completion_condition_was_satisfied;
     {
-        std::unique_lock lock{m_mutex};
-        while (!m_sessions_terminated && !m_stopped)
-            m_wait_or_client_stopped_cond.wait(lock);
+        util::CheckedUniqueLock lock{m_mutex};
+        m_wait_or_client_stopped_cond.wait(lock.native_handle(), [&]() REQUIRES(m_mutex) {
+            return m_sessions_terminated || m_stopped;
+        });
         completion_condition_was_satisfied = !m_stopped;
     }
     return completion_condition_was_satisfied;
@@ -510,13 +514,13 @@ void ClientImpl::drain_connections_on_loop()
 void ClientImpl::shutdown_and_wait()
 {
     shutdown();
-    std::unique_lock lock{m_drain_mutex};
+    util::CheckedUniqueLock lock{m_drain_mutex};
     if (m_drained) {
         return;
     }
 
     logger.debug("Waiting for %1 connections to drain", m_num_connections);
-    m_drain_cv.wait(lock, [&] {
+    m_drain_cv.wait(lock.native_handle(), [&]() REQUIRES(m_drain_mutex) {
         return m_num_connections == 0 && m_outstanding_posts == 0;
     });
 
@@ -526,12 +530,12 @@ void ClientImpl::shutdown_and_wait()
 void ClientImpl::shutdown() noexcept
 {
     {
-        std::lock_guard lock{m_mutex};
+        util::CheckedLockGuard lock{m_mutex};
         if (m_stopped)
             return;
         m_stopped = true;
-        m_wait_or_client_stopped_cond.notify_all();
     }
+    m_wait_or_client_stopped_cond.notify_all();
 
     drain_connections_on_loop();
 }
@@ -541,7 +545,7 @@ void ClientImpl::register_unactualized_session_wrapper(SessionWrapper* wrapper, 
 {
     // Thread safety required.
     {
-        std::lock_guard lock{m_mutex};
+        util::CheckedLockGuard lock{m_mutex};
         REALM_ASSERT(m_actualize_and_finalize);
         wrapper->mark_initiated();
         m_unactualized_session_wrappers.emplace(wrapper, std::move(endpoint)); // Throws
@@ -554,7 +558,7 @@ void ClientImpl::register_abandoned_session_wrapper(util::bind_ptr<SessionWrappe
 {
     // Thread safety required.
     {
-        std::lock_guard lock{m_mutex};
+        util::CheckedLockGuard lock{m_mutex};
         REALM_ASSERT(m_actualize_and_finalize);
         wrapper->mark_abandoned();
 
@@ -581,7 +585,7 @@ void ClientImpl::actualize_and_finalize_session_wrappers()
     SessionWrapperStack abandoned_session_wrappers;
     bool stopped;
     {
-        std::lock_guard lock{m_mutex};
+        util::CheckedLockGuard lock{m_mutex};
         swap(m_unactualized_session_wrappers, unactualized_session_wrappers);
         swap(m_abandoned_session_wrappers, abandoned_session_wrappers);
         stopped = m_stopped;
@@ -643,7 +647,7 @@ ClientImpl::Connection& ClientImpl::get_connection(ServerEndpoint endpoint,
     m_prev_connection_ident = ident;
     was_created = true;
     {
-        std::lock_guard lk(m_drain_mutex);
+        util::CheckedLockGuard lk(m_drain_mutex);
         ++m_num_connections;
     }
     return conn;
@@ -671,10 +675,13 @@ void ClientImpl::remove_connection(ClientImpl::Connection& conn) noexcept
         server_slot.alt_connections.erase(j);
     }
 
+    bool notify;
     {
-        std::lock_guard lk(m_drain_mutex);
+        util::CheckedLockGuard lk(m_drain_mutex);
         REALM_ASSERT(m_num_connections);
-        --m_num_connections;
+        notify = --m_num_connections <= 0;
+    }
+    if (notify) {
         m_drain_cv.notify_all();
     }
 }
@@ -1480,7 +1487,7 @@ bool SessionWrapper::wait_for_upload_complete_or_client_stopped()
 
     std::int_fast64_t target_mark;
     {
-        std::lock_guard lock{m_client.m_mutex};
+        util::CheckedLockGuard lock{m_client.m_mutex};
         target_mark = ++m_target_upload_mark;
     }
 
@@ -1508,9 +1515,10 @@ bool SessionWrapper::wait_for_upload_complete_or_client_stopped()
 
     bool completion_condition_was_satisfied;
     {
-        std::unique_lock lock{m_client.m_mutex};
-        while (m_reached_upload_mark < target_mark && !m_client.m_stopped)
-            m_client.m_wait_or_client_stopped_cond.wait(lock);
+        util::CheckedUniqueLock lock{m_client.m_mutex};
+        m_client.m_wait_or_client_stopped_cond.wait(lock.native_handle(), [&]() REQUIRES(m_client.m_mutex) {
+            return m_reached_upload_mark >= target_mark || m_client.m_stopped;
+        });
         completion_condition_was_satisfied = !m_client.m_stopped;
     }
     return completion_condition_was_satisfied;
@@ -1525,7 +1533,7 @@ bool SessionWrapper::wait_for_download_complete_or_client_stopped()
 
     std::int_fast64_t target_mark;
     {
-        std::lock_guard lock{m_client.m_mutex};
+        util::CheckedLockGuard lock{m_client.m_mutex};
         target_mark = ++m_target_download_mark;
     }
 
@@ -1553,9 +1561,10 @@ bool SessionWrapper::wait_for_download_complete_or_client_stopped()
 
     bool completion_condition_was_satisfied;
     {
-        std::unique_lock lock{m_client.m_mutex};
-        while (m_reached_download_mark < target_mark && !m_client.m_stopped)
-            m_client.m_wait_or_client_stopped_cond.wait(lock);
+        util::CheckedUniqueLock lock{m_client.m_mutex};
+        m_client.m_wait_or_client_stopped_cond.wait(lock.native_handle(), [&]() REQUIRES(m_client.m_mutex) {
+            return m_reached_download_mark >= target_mark || m_client.m_stopped;
+        });
         completion_condition_was_satisfied = !m_client.m_stopped;
     }
     return completion_condition_was_satisfied;
@@ -1688,6 +1697,10 @@ void SessionWrapper::force_close()
 }
 
 // Must be called from event loop thread
+//
+// `m_client.m_mutex` is not held while this is called, but it is guaranteed to
+// have been acquired at some point in between the final read or write ever made
+// from a different thread and when this is called.
 void SessionWrapper::finalize()
 {
     REALM_ASSERT(m_actualized);
@@ -1780,7 +1793,7 @@ void SessionWrapper::on_upload_completion()
         m_download_completion_handlers.push_back(std::move(handler)); // Throws
         m_sync_completion_handlers.pop_back();
     }
-    std::lock_guard lock{m_client.m_mutex};
+    util::CheckedLockGuard lock{m_client.m_mutex};
     if (m_staged_upload_mark > m_reached_upload_mark) {
         m_reached_upload_mark = m_staged_upload_mark;
         m_client.m_wait_or_client_stopped_cond.notify_all();
@@ -1808,7 +1821,7 @@ void SessionWrapper::on_download_completion()
         m_flx_pending_mark_version = SubscriptionSet::EmptyVersion;
     }
 
-    std::lock_guard lock{m_client.m_mutex};
+    util::CheckedLockGuard lock{m_client.m_mutex};
     if (m_staged_download_mark > m_reached_download_mark) {
         m_reached_download_mark = m_staged_download_mark;
         m_client.m_wait_or_client_stopped_cond.notify_all();
