@@ -1466,7 +1466,7 @@ DEFINE_MERGE_NOOP(Instruction::SetInsert, Instruction::EraseObject);
 DEFINE_MERGE_NOOP(Instruction::SetErase, Instruction::EraseObject);
 
 
-/// Set rules
+/// Update rules
 
 DEFINE_NESTED_MERGE(Instruction::Update)
 {
@@ -1695,13 +1695,31 @@ DEFINE_MERGE(Instruction::ArrayErase, Instruction::Update)
 DEFINE_MERGE(Instruction::Clear, Instruction::Update)
 {
     using Type = Instruction::Payload::Type;
+    using CollectionType = Instruction::CollectionType;
 
     // The two instructions are at the same level of nesting.
     if (same_path(left, right)) {
-        // TODO: We could make it so a Clear instruction does not win against setting a property or
-        // collection item to a different collection.
-        if (right.value.type != Type::List && right.value.type != Type::Dictionary) {
+        // If both sides are setting/operating on the same type, let them both pass through.
+        // It is important that the instruction application rules reflect this.
+        // If it is not two lists or dictionaries, then the normal last-writer-wins rules will take effect below.
+        if (left.collection_type == CollectionType::List && right.value.type == Type::List) {
+            return;
+        }
+        if (left.collection_type == CollectionType::Dictionary && right.value.type == Type::Dictionary) {
+            return;
+        }
+
+        // CONFLICT: Clear and Update of the same element.
+        //
+        // RESOLUTION: Discard the instruction with the lower timestamp. This has the
+        // effect of preserving insertions that came after the clear (if it has the
+        // higher timestamp), or preserve additional updates (and potential insertions)
+        // that came after the update.
+        if (left_side.timestamp() < right_side.timestamp()) {
             left_side.discard();
+        }
+        else {
+            right_side.discard();
         }
     }
 }
@@ -1720,13 +1738,20 @@ DEFINE_NESTED_MERGE(Instruction::AddInteger)
     }
 }
 
+DEFINE_MERGE(Instruction::Clear, Instruction::AddInteger)
+{
+    // The two instructions are at the same level of nesting.
+    if (same_path(left, right)) {
+        right_side.discard();
+    }
+}
+
 DEFINE_MERGE_NOOP(Instruction::AddInteger, Instruction::AddInteger);
 DEFINE_MERGE_NOOP(Instruction::AddColumn, Instruction::AddInteger);
 DEFINE_MERGE_NOOP(Instruction::EraseColumn, Instruction::AddInteger);
 DEFINE_MERGE_NOOP(Instruction::ArrayInsert, Instruction::AddInteger);
 DEFINE_MERGE_NOOP(Instruction::ArrayMove, Instruction::AddInteger);
 DEFINE_MERGE_NOOP(Instruction::ArrayErase, Instruction::AddInteger);
-DEFINE_MERGE_NOOP(Instruction::Clear, Instruction::AddInteger);
 DEFINE_MERGE_NOOP(Instruction::SetInsert, Instruction::AddInteger);
 DEFINE_MERGE_NOOP(Instruction::SetErase, Instruction::AddInteger);
 

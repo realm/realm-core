@@ -877,13 +877,30 @@ void InstructionApplier::operator()(const Instruction::ArrayErase& instr)
 
 void InstructionApplier::operator()(const Instruction::Clear& instr)
 {
+    // For collections and nested collections in Mixed, applying a Clear instruction
+    // implicitly sets the collection type (of the clear instruction) too.
     struct ClearResolver : public PathResolver {
         ClearResolver(InstructionApplier* applier, const Instruction::Clear& instr)
             : PathResolver(applier, instr, "Clear")
         {
+            switch (instr.collection_type) {
+                case Instruction::CollectionType::Single:
+                    m_applier->bad_transaction_log("Clear: Collection type is missing");
+                    break;
+                case Instruction::CollectionType::List:
+                    m_collection_type = CollectionType::List;
+                    break;
+                case Instruction::CollectionType::Dictionary:
+                    m_collection_type = CollectionType::Dictionary;
+                    break;
+                case Instruction::CollectionType::Set:
+                    m_collection_type = CollectionType::Set;
+                    break;
+            }
         }
         void on_list(LstBase& list) override
         {
+            // list property
             list.clear();
         }
         Status on_list_index(LstBase& list, uint32_t index) override
@@ -893,25 +910,26 @@ void InstructionApplier::operator()(const Instruction::Clear& instr)
             if (index >= mixed_list.size()) {
                 m_applier->bad_transaction_log("Clear: Index out of bounds (%1 > %2)", index,
                                                mixed_list.size()); // Throws
-                return Status::DidNotResolve;
             }
             auto val = mixed_list.get(index);
             if (val.is_type(type_Dictionary)) {
                 Dictionary d(mixed_list, mixed_list.get_key(index));
                 d.clear();
-                return Status::Pending;
             }
-            if (val.is_type(type_List)) {
+            else if (val.is_type(type_List)) {
                 Lst<Mixed> l(mixed_list, mixed_list.get_key(index));
                 l.clear();
-                return Status::Pending;
             }
-            m_applier->bad_transaction_log("Clear: Item (%1) at index %2 is not a collection", val.get_type(),
-                                           index); // Throws
-            return Status::DidNotResolve;
+            else if (val.is_type(type_Set)) {
+                m_applier->bad_transaction_log("Clear: Item at index %1 is a Set",
+                                               index); // Throws
+            }
+            mixed_list.set_collection(size_t(index), m_collection_type);
+            return Status::Pending;
         }
         void on_dictionary(Dictionary& dict) override
         {
+            // dictionary property
             dict.clear();
         }
         Status on_dictionary_key(Dictionary& dict, Mixed key) override
@@ -920,19 +938,21 @@ void InstructionApplier::operator()(const Instruction::Clear& instr)
             if (val.is_type(type_Dictionary)) {
                 Dictionary d(dict, dict.build_index(key));
                 d.clear();
-                return Status::Pending;
             }
-            if (val.is_type(type_List)) {
+            else if (val.is_type(type_List)) {
                 Lst<Mixed> l(dict, dict.build_index(key));
                 l.clear();
-                return Status::Pending;
             }
-            m_applier->bad_transaction_log("Clear: Item (%1) at key '%2' is not a collection", val.get_type(),
-                                           key); // Throws
-            return Status::DidNotResolve;
+            else if (val.is_type(type_Set)) {
+                m_applier->bad_transaction_log("Clear: Item at key '%1' is a Set",
+                                               key); // Throws
+            }
+            dict.insert_collection(key.get_string(), m_collection_type);
+            return Status::Pending;
         }
         void on_set(SetBase& set) override
         {
+            // set property
             set.clear();
         }
         void on_property(Obj& obj, ColKey col_key) override
@@ -942,22 +962,23 @@ void InstructionApplier::operator()(const Instruction::Clear& instr)
                 if (val.is_type(type_Dictionary)) {
                     Dictionary dict(obj, col_key);
                     dict.clear();
-                    return;
                 }
                 else if (val.is_type(type_List)) {
                     Lst<Mixed> list(obj, col_key);
                     list.clear();
-                    return;
                 }
                 else if (val.is_type(type_Set)) {
-                    Set<Mixed> set(obj, col_key);
-                    set.clear();
-                    return;
+                    m_applier->bad_transaction_log("Clear: Mixed property is a Set"); // Throws
                 }
+                obj.set_collection(col_key, m_collection_type);
+                return;
             }
 
             PathResolver::on_property(obj, col_key);
         }
+
+    private:
+        CollectionType m_collection_type;
     };
     ClearResolver(this, instr).resolve();
 }
