@@ -2562,17 +2562,17 @@ int benchmark_common_tasks_main()
     BENCH(IterateTableByIndexNoPrimaryKey);
     BENCH(IterateTableByIndexIntPrimaryKey);
     BENCH(IterateTableByIndexStringPrimaryKey);
-    BENCH(IterateTableByIterator);
-    BENCH(IterateTableByIteratorIndex);
+    //  BENCH(IterateTableByIterator);
+    //  BENCH(IterateTableByIteratorIndex);
 
-    BENCH(BenchmarkSort);
-    BENCH(BenchmarkSortInt);
+    //  BENCH(BenchmarkSort);
+    //  BENCH(BenchmarkSortInt);
     BENCH(BenchmarkSortIntList);
     // BENCH(BenchmarkSortIntDictionary);
     BENCH(BenchmarkSortThenLimit);
 
-    BENCH(BenchmarkUnorderedTableViewClear);
-    BENCH(BenchmarkUnorderedTableViewClearIndexed);
+    //  BENCH(BenchmarkUnorderedTableViewClear);
+    //  BENCH(BenchmarkUnorderedTableViewClearIndexed);
 
     // getting/setting - tableview or not
     //    BENCH(BenchmarkGetString);
@@ -2604,10 +2604,10 @@ int benchmark_common_tasks_main()
     //    BENCH(BenchmarkQueryNotChainedOrStrings<false>);
     //    BENCH(BenchmarkQueryNotChainedOrStrings<true>);
     BENCH(BenchmarkQueryChainedOrInts);
-    BENCH(BenchmarkQueryChainedOrIntsIndexed);
+    //  BENCH(BenchmarkQueryChainedOrIntsIndexed);
     BENCH(BenchmarkQueryChainedOrIntsCount);
     BENCH(BenchmarkQueryIntEquality);
-    BENCH(BenchmarkQueryIntEqualityIndexed);
+    //    BENCH(BenchmarkQueryIntEqualityIndexed);
     //    BENCH(BenchmarkForeignAggAvg);
     //    BENCH(BenchmarkIntVsDoubleColumns);
     //    BENCH(BenchmarkQueryStringOverLinks);
@@ -2657,7 +2657,7 @@ int benchmark_common_tasks_main()
     //    BENCH(BenchmarkQueryTimestampNotEqual);
     //    BENCH(BenchmarkQueryTimestampNotNull);
     //    BENCH(BenchmarkQueryTimestampEqualNull);
-    BENCH(BenchmarkQueryIntListSize);
+    //    BENCH(BenchmarkQueryIntListSize);
     //
     //    BENCH(BenchmarkWithIntUIDsRandomOrderSeqAccess);
     //    BENCH(BenchmarkWithIntUIDsRandomOrderRandomAccess);
