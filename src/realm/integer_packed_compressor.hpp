@@ -38,6 +38,7 @@ public:
     void copy_data(const Array&, Array&) const;
     // get or set
     inline int64_t get(const IntegerCompressor&, size_t) const;
+    inline std::vector<int64_t> get_all(const IntegerCompressor& c, size_t b, size_t e) const;
     inline void get_chunk(const IntegerCompressor&, size_t, int64_t res[8]) const;
     inline void set_direct(const IntegerCompressor&, size_t, int64_t) const;
 
@@ -60,6 +61,20 @@ inline int64_t PackedCompressor::get(const IntegerCompressor& c, size_t ndx) con
 {
     bf_iterator it{c.data(), 0, c.width(), c.width(), ndx};
     return sign_extend_field_by_mask(c.width_mask(), *it);
+}
+
+inline std::vector<int64_t> PackedCompressor::get_all(const IntegerCompressor& c, size_t b, size_t e) const
+{
+    std::vector<int64_t> res;
+    res.reserve(e-b);
+    bf_iterator data_iterator{c.data(), 0, c.width(), c.width(), b};
+    const auto mask = c.width_mask();
+    while(b<e) {
+        const auto sv = sign_extend_field_by_mask(mask, *data_iterator);
+        res.push_back(sv);
+        data_iterator.move(++b);
+    }
+    return res;
 }
 
 inline void PackedCompressor::set_direct(const IntegerCompressor& c, size_t ndx, int64_t value) const

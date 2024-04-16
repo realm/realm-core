@@ -233,6 +233,7 @@ struct Array::VTableForEncodedArray {
             getter = &Array::get_from_compressed_array;
             setter = &Array::set_compressed_array;
             chunk_getter = &Array::get_chunk_compressed_array;
+            getter_all = &Array::get_all_compressed_array;
             finder[cond_Equal] = &Array::find_compressed_array<Equal>;
             finder[cond_NotEqual] = &Array::find_compressed_array<NotEqual>;
             finder[cond_Greater] = &Array::find_compressed_array<Greater>;
@@ -737,6 +738,11 @@ bool Array::try_decompress()
 int64_t Array::get_from_compressed_array(size_t ndx) const noexcept
 {
     return m_integer_compressor.get(ndx);
+}
+
+std::vector<int64_t> Array::get_all_compressed_array(size_t b, size_t e) const
+{
+    return m_integer_compressor.get_all(b,e);
 }
 
 void Array::set_compressed_array(size_t ndx, int64_t val)

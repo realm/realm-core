@@ -38,13 +38,13 @@ public:
     bool init(const char* h);
 
     // init from mem B
-    inline uint64_t* data() const;
-    inline constexpr size_t size() const;
-    inline constexpr size_t width() const;
-    inline constexpr size_t ndx_size() const;
-    inline constexpr size_t ndx_width() const;
-    inline constexpr NodeHeader::Encoding get_encoding() const;
-    inline constexpr size_t v_size() const;
+    inline const uint64_t* data() const;
+    inline size_t size() const;
+    inline size_t width() const;
+    inline size_t ndx_size() const;
+    inline size_t ndx_width() const;
+    inline NodeHeader::Encoding get_encoding() const;
+    inline size_t v_size() const;
     inline constexpr uint64_t width_mask() const;
     inline constexpr uint64_t ndx_mask() const;
     inline constexpr uint64_t msb() const;
@@ -52,6 +52,7 @@ public:
 
     // get/set
     inline int64_t get(size_t) const;
+    inline std::vector<int64_t> get_all(size_t b, size_t e) const;
     inline void get_chunk(size_t ndx, int64_t res[8]) const;
     inline void set_direct(size_t, int64_t) const;
 
@@ -66,6 +67,7 @@ private:
 
     using ArrayInitializer = void (IntegerCompressor::*)(const char*);
     using Getter = int64_t (IntegerCompressor::*)(size_t) const;
+    using GetterAll = std::vector<int64_t> (IntegerCompressor::*)(size_t, size_t) const;
     using ChunkGetterChunk = void (IntegerCompressor::*)(size_t, int64_t[8]) const;
     using DirectSetter = void (IntegerCompressor::*)(size_t, int64_t) const;
     using Finder = bool (IntegerCompressor::*)(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*) const;
@@ -74,6 +76,7 @@ private:
     struct VTable {
         ArrayInitializer m_init{nullptr};
         Getter m_getter{nullptr};
+        GetterAll m_getter_all{nullptr};
         ChunkGetterChunk m_chunk_getter{nullptr};
         DirectSetter m_direct_setter{nullptr};
         FinderTable m_finder;
@@ -87,6 +90,10 @@ private:
     inline void init_flex(const char*);
     int64_t get_packed(size_t) const;
     int64_t get_flex(size_t) const;
+    
+    std::vector<int64_t> get_all_packed(size_t, size_t) const;
+    std::vector<int64_t> get_all_flex(size_t, size_t) const;
+    
     void get_chunk_packed(size_t, int64_t[8]) const;
     void get_chunk_flex(size_t, int64_t[8]) const;
     void set_direct_packed(size_t, int64_t) const;
@@ -132,7 +139,7 @@ inline void IntegerCompressor::init_flex(const char* h)
     m_ndx_size = NodeHeader::get_arrayB_num_elements(h);
 }
 
-inline uint64_t* IntegerCompressor::data() const
+inline const uint64_t* IntegerCompressor::data() const
 {
     return m_data;
 }
@@ -147,37 +154,37 @@ inline bool IntegerCompressor::is_flex() const
     return m_encoding == NodeHeader::Encoding::Flex;
 }
 
-inline constexpr size_t IntegerCompressor::size() const
+inline size_t IntegerCompressor::size() const
 {
     REALM_ASSERT_DEBUG(is_packed() || is_flex());
     return m_encoding == NodeHeader::Encoding::Packed ? v_size() : ndx_size();
 }
 
-inline constexpr size_t IntegerCompressor::v_size() const
+inline size_t IntegerCompressor::v_size() const
 {
     REALM_ASSERT_DEBUG(is_packed() || is_flex());
     return m_v_size;
 }
 
-inline constexpr size_t IntegerCompressor::ndx_size() const
+inline size_t IntegerCompressor::ndx_size() const
 {
     REALM_ASSERT_DEBUG(is_packed() || is_flex());
     return m_ndx_size;
 }
 
-inline constexpr size_t IntegerCompressor::width() const
+inline size_t IntegerCompressor::width() const
 {
     REALM_ASSERT_DEBUG(is_packed() || is_flex());
     return m_v_width;
 }
 
-inline constexpr size_t IntegerCompressor::ndx_width() const
+inline size_t IntegerCompressor::ndx_width() const
 {
     REALM_ASSERT_DEBUG(is_packed() || is_flex());
     return m_ndx_width;
 }
 
-inline constexpr NodeHeader::Encoding IntegerCompressor::get_encoding() const
+inline NodeHeader::Encoding IntegerCompressor::get_encoding() const
 {
     return m_encoding;
 }
@@ -221,6 +228,14 @@ inline int64_t IntegerCompressor::get(size_t ndx) const
     REALM_ASSERT_DEBUG(m_vtable->m_getter);
     return (this->*(m_vtable->m_getter))(ndx);
 }
+
+inline std::vector<int64_t> IntegerCompressor::get_all(size_t b, size_t e) const
+{
+    REALM_ASSERT_DEBUG(is_packed() || is_flex());
+    REALM_ASSERT_DEBUG(m_vtable->m_getter_all);
+    return (this->*(m_vtable->m_getter_all))(b, e);
+}
+
 
 inline void IntegerCompressor::get_chunk(size_t ndx, int64_t res[8]) const
 {

@@ -42,6 +42,7 @@ public:
     void copy_data(const Array&, const std::vector<int64_t>&, const std::vector<size_t>&) const;
     // getters/setters
     inline int64_t get(const IntegerCompressor&, size_t) const;
+    inline std::vector<int64_t> get_all(const IntegerCompressor&, size_t b, size_t e) const;
     inline void get_chunk(const IntegerCompressor&, size_t, int64_t[8]) const;
     inline void set_direct(const IntegerCompressor&, size_t, int64_t) const;
 
@@ -73,6 +74,26 @@ inline int64_t FlexCompressor::get(const IntegerCompressor& c, size_t ndx) const
     bf_iterator ndx_iterator{data, offset, ndx_w, ndx_w, ndx};
     bf_iterator data_iterator{data, 0, v_w, v_w, *ndx_iterator};
     return sign_extend_field_by_mask(c.width_mask(), *data_iterator);
+}
+
+inline std::vector<int64_t> FlexCompressor::get_all(const IntegerCompressor& c, size_t b, size_t e) const
+{
+    std::vector<int64_t> res;
+    res.reserve(e-b);
+    const auto offset = c.width() * c.v_size();
+    const auto ndx_w = c.ndx_width();
+    const auto v_w = c.width();
+    const auto data = c.data();
+    const auto mask = c.width_mask();
+    bf_iterator ndx_iterator{data, offset, ndx_w, ndx_w, b};
+    bf_iterator data_iterator{data, 0, v_w, v_w, *ndx_iterator};
+    while(b<e) {
+        const auto sv = sign_extend_field_by_mask(mask, *data_iterator);
+        res.push_back(sv);
+        ndx_iterator.move(++b);
+        data_iterator.move(*ndx_iterator);
+    }
+    return res;
 }
 
 inline void FlexCompressor::get_chunk(const IntegerCompressor& c, size_t ndx, int64_t res[8]) const

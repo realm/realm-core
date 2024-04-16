@@ -258,14 +258,14 @@ public:
     bf_iterator(bf_iterator&&) = default;
     bf_iterator& operator=(const bf_iterator&) = default;
     bf_iterator& operator=(bf_iterator&&) = default;
-    bf_iterator(uint64_t* data_area, size_t initial_offset, size_t field_size, size_t step_size, size_t index)
+    bf_iterator(const uint64_t* data_area, size_t initial_offset, size_t field_size, size_t step_size, size_t index)
     {
         init(data_area, initial_offset, field_size, step_size, index);
     }
 
-    inline void init(uint64_t* data_area, size_t initial_offset, size_t field_size, size_t step_size, size_t index)
+    inline void init(const uint64_t* data_area, size_t initial_offset, size_t field_size, size_t step_size, size_t index)
     {
-        this->data_area = data_area;
+        this->data_area = (uint64_t*)data_area;
         this->field_size = static_cast<uint8_t>(field_size);
         this->step_size = static_cast<uint8_t>(step_size);
         this->offset = initial_offset;

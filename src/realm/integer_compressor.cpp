@@ -56,6 +56,7 @@ struct IntegerCompressor::VTableForPacked {
         {
             m_getter = &IntegerCompressor::get_packed;
             m_chunk_getter = &IntegerCompressor::get_chunk_packed;
+            m_getter_all = &IntegerCompressor::get_all_packed;
             m_direct_setter = &IntegerCompressor::set_direct_packed;
             m_finder[cond_Equal] = &IntegerCompressor::find_all_packed<Equal>;
             m_finder[cond_NotEqual] = &IntegerCompressor::find_all_packed<NotEqual>;
@@ -72,6 +73,7 @@ struct IntegerCompressor::VTableForFlex {
         {
             m_getter = &IntegerCompressor::get_flex;
             m_chunk_getter = &IntegerCompressor::get_chunk_flex;
+            m_getter_all = &IntegerCompressor::get_all_flex;
             m_direct_setter = &IntegerCompressor::set_direct_flex;
             m_finder[cond_Equal] = &IntegerCompressor::find_all_flex<Equal>;
             m_finder[cond_NotEqual] = &IntegerCompressor::find_all_flex<NotEqual>;
@@ -329,6 +331,16 @@ int64_t IntegerCompressor::get_packed(size_t ndx) const
 int64_t IntegerCompressor::get_flex(size_t ndx) const
 {
     return s_flex.get(*this, ndx);
+}
+
+std::vector<int64_t> IntegerCompressor::get_all_packed(size_t begin, size_t end) const
+{
+    return s_packed.get_all(*this, begin, end);
+}
+
+std::vector<int64_t> IntegerCompressor::get_all_flex(size_t begin, size_t end) const
+{
+    return s_flex.get_all(*this, begin, end);
 }
 
 void IntegerCompressor::get_chunk_packed(size_t ndx, int64_t res[8]) const
