@@ -442,29 +442,29 @@ static size_t find_first_haystack(LeafType& leaf, NeedleContainer& needles, size
     // for a small number of conditions, it is faster to do a linear search than to compute the hash
     // the exact thresholds were found experimentally
 
-    if constexpr (std::is_same_v<LeafType, ArrayInteger>) {
-        if (leaf.is_compressed()) {
-            //
-            // integer compression leaf, different search
-            //
-            if (needles.size() < 200) {
-                // compressed array!
-                for (const auto& needle : needles) {
-                    const auto pos = leaf.find_first(needle, start, end);
-                    if (pos != realm::npos)
-                        return pos;
-                }
-            }
-            else {
-                for (size_t i = start; i < end; ++i) {
-                    auto element = leaf.get(i);
-                    if (needles.count(element))
-                        return i;
-                }
-            }
-        }
-        return realm::npos;
-    }
+    //    if constexpr (std::is_same_v<LeafType, ArrayInteger>) {
+    //        if (leaf.is_compressed()) {
+    //            //
+    //            // integer compression leaf, different search
+    //            //
+    //            if (needles.size() < 200) {
+    //                // compressed array!
+    //                for (const auto& needle : needles) {
+    //                    const auto pos = leaf.find_first(needle, start, end);
+    //                    if (pos != realm::npos)
+    //                        return pos;
+    //                }
+    //            }
+    //            else {
+    //                for (size_t i = start; i < end; ++i) {
+    //                    auto element = leaf.get(i);
+    //                    if (needles.count(element))
+    //                        return i;
+    //                }
+    //            }
+    //        }
+    //        return realm::npos;
+    //    }
     //
     // normal search
     //
