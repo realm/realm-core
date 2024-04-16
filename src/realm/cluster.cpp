@@ -1681,7 +1681,7 @@ ref_type Cluster::typed_write(ref_type ref, _impl::ArrayWriterBase& out, const T
                 for (size_t i = 0; i < sz; ++i) {
                     auto rot = leaf.get_as_ref_or_tagged(i);
                     if (rot.is_ref() && rot.get_as_ref()) {
-                        if (i < 3) { // composite, int, and pair_int
+                        if (i > 0 && i < 3) { // composite, int, and pair_int
                             // integer arrays
                             written_leaf.set_as_ref(
                                 i, Array::write(rot.get_as_ref(), m_alloc, out, only_modified, compress));
