@@ -8,7 +8,7 @@ struct TransformTestHarness {
     enum ConflictOrdering { ClientOneBeforeTwo, ClientTwoBeforeOne, SameTime };
 
     template <typename Func>
-    explicit TransformTestHarness(unit_test::TestContext& test_context, ConflictOrdering ordering,
+    explicit TransformTestHarness(unit_test::TestContext& test_context, std::optional<ConflictOrdering> ordering,
                                   Func&& baseline_func)
         : TransformTestHarness(test_context)
     {
@@ -22,7 +22,10 @@ struct TransformTestHarness {
 
         synchronize(server.get(), {client_1.get(), client_2.get()});
 
-        switch (ordering) {
+        if (!ordering)
+            return;
+
+        switch (*ordering) {
             case SameTime:
                 break;
             case ClientOneBeforeTwo:
@@ -46,8 +49,11 @@ struct TransformTestHarness {
     }
 
     template <typename Func>
-    void transaction(const std::unique_ptr<Peer>& p, Func&& func)
+    void transaction(const std::unique_ptr<Peer>& p, Func&& func, std::optional<int> timestamp = {})
     {
+        if (timestamp) {
+            p->history.set_time(*timestamp);
+        }
         p->transaction([&](Peer& p) {
             auto col_any = p.table("class_Table")->get_column_key("any");
             auto obj = p.table("class_Table")->get_object_with_primary_key(1);
@@ -424,7 +430,8 @@ TEST(Transform_ClearArrayVsDictionaryInsert)
         list.add(3);
     });
 
-    // Client 2 sets property 'any' from List to Dictionary and inserts one integer in the dictionary
+    // Client 2 sets property 'any' from List to Dictionary and inserts one integer in the dictionary (after Client
+    // 1's changes)
     // {id: 1, any: {{"key1": 42}}}
     h.transaction(h.client_2, [](Obj obj, ColKey col_any) {
         obj.set_collection(col_any, CollectionType::Dictionary);
@@ -432,12 +439,11 @@ TEST(Transform_ClearArrayVsDictionaryInsert)
         dict.insert("key1", 42);
     });
 
-    // Result: Client 2 wins because changing the collection type is higher up in the path than updating the
-    // collection. Also, Clear wins against any updates on the collection from the other users
-    // {id: 1, any: {}}
+    // Result: Client 2 wins because Update comes after Clear
     h.check_merge_result([&](Obj obj, ColKey col_any) {
         auto dict = obj.get_dictionary(col_any);
-        CHECK(dict.is_empty());
+        CHECK(dict.size() == 1);
+        CHECK(dict.get("key1") == 42);
     });
 }
 
@@ -963,15 +969,15 @@ TEST(Transform_Nested_ClearArrayVsUpdateString)
         list->add(3);
     });
 
-    // Client 2 sets 'any.A' from List to a string value
+    // Client 2 sets 'any.A' from List to a string value (after Client 1's changes)
     // {id: 1, any: {{"A", "some value"}}}
     h.transaction(h.client_2, [](Obj obj, ColKey col_any) {
         auto dict = obj.get_dictionary_ptr(col_any);
         dict->insert("A", "some value");
     });
 
-    // Result: Client 2 wins - setting a property or item to a non-collections type wins against any updates
-    // (including clear) on that collection {id: 1, any: {{"A", "some value"}}}
+    // Result: Client 2 wins because Update comes after Clear
+    // {id: 1, any: {{"A", "some value"}}}
     h.check_merge_result([&](Obj obj, ColKey col_any) {
         auto dict = obj.get_dictionary_ptr(col_any);
         CHECK_EQUAL(dict->size(), 1);
@@ -1130,12 +1136,12 @@ TEST(Transform_ClearArrayVsCreateDictionary)
         dict.insert("key1", 42);
     });
 
-    // Result: Client 2 wins because changing the collection type is higher up in the path than updating the
-    // collection. Also, Clear wins against any updates on the collection from the other users
-    // {id: 1, any: {}}
+    // Result: Client 2 wins because Update comes after Clear
+    // {id: 1, any: {"key1": 42}}
     h.check_merge_result([&](Obj obj, ColKey col_any) {
         auto dict = obj.get_dictionary(col_any);
-        CHECK(dict.is_empty());
+        CHECK(dict.size() == 1);
+        CHECK(dict.get("key1") == 42);
     });
 }
 
@@ -1171,12 +1177,12 @@ TEST(Transform_ClearArrayInsideArrayVsCreateDictionary)
         dict->insert("key1", "some value");
     });
 
-    // Result: Client 2 wins because its change has a higher timestamp
-    // Also, Clear wins against any updates on the collection from the other users
-    // {id: 1, any: [{}]}
+    // Result: Client 2 wins because Update comes after Clear
+    // {id: 1, any: [{"key1": "some value"}]}
     h.check_merge_result([&](Obj obj, ColKey col_any) {
         auto dict = obj.get_dictionary_ptr({col_any, 0});
-        CHECK(dict->is_empty());
+        CHECK(dict->size() == 1);
+        CHECK(dict->get("key1") == "some value");
     });
 }
 
@@ -1212,12 +1218,12 @@ TEST(Transform_ClearArrayInsideDictionaryVsCreateDictionary)
         dict2->insert("key1", "some other value");
     });
 
-    // Result: Client 2 wins because its change has a higher timestamp
-    // Also, Clear wins against any updates on the collection from the other users
-    // {id: 1, any: {{"A": {}}}}
+    // Result: Client 2 wins because Update comes after Clear
+    // {id: 1, any: {{"A": {"key1": "some other value"}}}}
     h.check_merge_result([&](Obj obj, ColKey col_any) {
         auto dict = obj.get_dictionary_ptr({col_any, "A"});
-        CHECK(dict->is_empty());
+        CHECK(dict->size() == 1);
+        CHECK(dict->get("key1") == "some other value");
     });
 }
 
@@ -1250,12 +1256,12 @@ TEST(Transform_ClearDictionaryVsCreateArray)
         list.add(1);
     });
 
-    // Result: Client 2 wins because changing the collection type is higher up in the path than updating the
-    // collection. Also, Clear wins against any updates on the collection from the other users
-    // {id: 1, any: []}
+    // Result: Client 2 wins because Update comes after Clear
+    // {id: 1, any: [1]}
     h.check_merge_result([&](Obj obj, ColKey col_any) {
         auto list = obj.get_list_ptr<Mixed>(col_any);
-        CHECK(list->is_empty());
+        CHECK(list->size() == 1);
+        CHECK(list->get(0) == 1);
     });
 }
 
@@ -1290,12 +1296,12 @@ TEST(Transform_ClearDictionaryInsideArrayVsCreateArray)
         list2->add(4);
     });
 
-    // Result: Client 2 wins because changing the collection type is higher up in the path than updating the
-    // collection. Also, Clear wins against any updates on the collection from the other users
-    // {id: 1, any: [[]]}
+    // Result: Client 2 wins because Update comes after Clear
+    // {id: 1, any: [[4]]}
     h.check_merge_result([&](Obj obj, ColKey col_any) {
         auto list = obj.get_list_ptr<Mixed>({col_any, 0});
-        CHECK(list->is_empty());
+        CHECK(list->size() == 1);
+        CHECK(list->get(0) == 4);
     });
 }
 
@@ -1331,12 +1337,12 @@ TEST(Transform_ClearDictionaryInsideDictionaryVsCreateArray)
         list->add(4);
     });
 
-    // Result: Client 2 wins because changing the collection type is higher up in the path than updating the
-    // collection. Also, Clear wins against any updates on the collection from the other users
-    // {id: 1, any: {{"A": []}}}
+    // Result: Client 2 wins because Update comes after Clear
+    // {id: 1, any: {{"A": [4]}}}
     h.check_merge_result([&](Obj obj, ColKey col_any) {
         auto list = obj.get_list_ptr<Mixed>({col_any, "A"});
-        CHECK(list->is_empty());
+        CHECK(list->size() == 1);
+        CHECK(list->get(0) == 4);
     });
 }
 
@@ -1454,4 +1460,262 @@ TEST(Transform_ClearDictionaryInsideDictionaryVsCreateDictionary)
         CHECK_EQUAL(dict->size(), 1);
         CHECK_EQUAL(dict->get("key2"), 2);
     });
+}
+
+TEST(Transform_UpdateClearVsUpdateClear)
+{
+    std::vector<int> timestamps{1, 2, 3, 4};
+
+    do {
+        // Baseline: property 'any' is not set to any type
+        // {id: 1, any: null}
+        TransformTestHarness h(test_context, {}, [](Obj, ColKey) {});
+
+        auto t1 = timestamps[0];
+        auto t2 = timestamps[1];
+        auto t3 = timestamps[2];
+        auto t4 = timestamps[3];
+
+        if (t1 > t2 || t3 > t4)
+            continue;
+
+        // Client 1 sets property 'any' to List and inserts one integer in the list
+        // {id: 1, any: [1]}
+        h.transaction(
+            h.client_1,
+            [](Obj obj, ColKey col_any) {
+                obj.set_collection(col_any, CollectionType::List);
+                auto l = obj.get_list<Mixed>(col_any);
+                l.add(1);
+            },
+            t1);
+
+        // Client 1 clears the list at property 'any'
+        // {id: 1, any: []}
+        h.transaction(
+            h.client_1,
+            [](Obj obj, ColKey col_any) {
+                auto l = obj.get_list<Mixed>(col_any);
+                l.clear();
+            },
+            t2);
+
+        // Client 2 sets property 'any' to List and inserts one integer in the list
+        // {id: 1, any: [2]}
+        h.transaction(
+            h.client_2,
+            [](Obj obj, ColKey col_any) {
+                obj.set_collection(col_any, CollectionType::List);
+                auto l = obj.get_list<Mixed>(col_any);
+                l.add(2);
+            },
+            t3);
+
+        // Client 2 clears the list at property 'any'
+        // {id: 1, any: []}
+        h.transaction(
+            h.client_2,
+            [](Obj obj, ColKey col_any) {
+                auto l = obj.get_list<Mixed>(col_any);
+                l.clear();
+            },
+            t4);
+
+        h.check_merge_result([&](Obj, ColKey) {});
+
+    } while (std::next_permutation(timestamps.begin(), timestamps.end()));
+}
+
+TEST(Transform_UpdateClearVsUpdateClear_DifferentTypes)
+{
+    std::vector<int> timestamps{1, 2, 3, 4};
+
+    do {
+        // Baseline: property 'any' is not set to any type
+        // {id: 1, any: null}
+        TransformTestHarness h(test_context, {}, [](Obj, ColKey) {});
+
+        auto t1 = timestamps[0];
+        auto t2 = timestamps[1];
+        auto t3 = timestamps[2];
+        auto t4 = timestamps[3];
+
+        if (t1 > t2 || t3 > t4)
+            continue;
+
+        // Client 1 sets property 'any' to List and inserts one integer in the list
+        // {id: 1, any: [1]}
+        h.transaction(
+            h.client_1,
+            [](Obj obj, ColKey col_any) {
+                obj.set_collection(col_any, CollectionType::List);
+                auto l = obj.get_list<Mixed>(col_any);
+                l.add(42);
+            },
+            t1);
+
+        // Client 1 clears the list at property 'any'
+        // {id: 1, any: []}
+        h.transaction(
+            h.client_1,
+            [](Obj obj, ColKey col_any) {
+                auto l = obj.get_list<Mixed>(col_any);
+                l.clear();
+            },
+            t2);
+
+        // Client 2 sets property 'any' to Dictionary and inserts one integer in the dictionary
+        // {id: 1, any: {{"key": 42}}}
+        h.transaction(
+            h.client_2,
+            [](Obj obj, ColKey col_any) {
+                obj.set_collection(col_any, CollectionType::Dictionary);
+                auto d = obj.get_dictionary(col_any);
+                d.insert("key", 42);
+            },
+            t3);
+
+        // Client 2 clears the dictionary at property 'any'
+        // {id: 1, any: {}}
+        h.transaction(
+            h.client_2,
+            [](Obj obj, ColKey col_any) {
+                auto d = obj.get_dictionary(col_any);
+                d.clear();
+            },
+            t4);
+
+        h.check_merge_result([&](Obj, ColKey) {});
+
+    } while (std::next_permutation(timestamps.begin(), timestamps.end()));
+}
+
+TEST(Transform_UpdateClearVsAddInteger)
+{
+    // Baseline: set property 'any' to integer value
+    // {id: 1, any: 42}
+    TransformTestHarness h(test_context, TransformTestHarness::ClientOneBeforeTwo, [](Obj obj, ColKey col_any) {
+        obj.set_any(col_any, 42);
+    });
+
+    // Client 1 sets property 'any' from integer to Dictionary, inserts one integer in the dictionary and clears the
+    // dictionary, inserts one more integer in the dictionary
+    // {id: 1, any: {{"key2": 2}}}
+    h.transaction(h.client_1, [](Obj obj, ColKey col_any) {
+        obj.set_collection(col_any, CollectionType::Dictionary);
+        auto dict = obj.get_dictionary(col_any);
+        dict.insert("key1", 1);
+        dict.clear();
+        dict.insert("key2", 2);
+    });
+
+    // Client 2 adds integer to property 'any'
+    // {id: 1, any: 43}
+    h.transaction(h.client_2, [](Obj obj, ColKey col_any) {
+        obj.add_int(col_any, 1);
+    });
+
+    // Result: Client 1 wins - Update wins against AddInteger from Client 2
+    // {id: 1, any: {{"key2": 2}}}
+    h.check_merge_result([&](Obj obj, ColKey col_any) {
+        auto dict = obj.get_dictionary(col_any);
+        CHECK_EQUAL(dict.size(), 1);
+        CHECK_EQUAL(dict.get("key2"), 2);
+    });
+}
+
+TEST(Transform_ClearVsUpdateAddInteger)
+{
+    // Baseline: set property 'any' to Dictionary and insert one integer in the dictionary
+    // {id: 1, any: {{"key1": 1}}}
+    TransformTestHarness h(test_context, TransformTestHarness::ClientOneBeforeTwo, [](Obj obj, ColKey col_any) {
+        obj.set_collection(col_any, CollectionType::Dictionary);
+        auto dict = obj.get_dictionary(col_any);
+        dict.insert("key1", 1);
+    });
+
+    // Client 1 clears the dictionary at property 'any' and adds one integer in the dictionary
+    // {id: 1, any: {{"key2": 2}}}
+    h.transaction(h.client_1, [](Obj obj, ColKey col_any) {
+        auto dict = obj.get_dictionary(col_any);
+        dict.clear();
+        dict.insert("key2", 2);
+    });
+
+    // Client 2 sets property 'any' from Dictionary to integer value and adds another integer to it
+    // {id: 1, any: 43}
+    h.transaction(h.client_2, [](Obj obj, ColKey col_any) {
+        obj.set_any(col_any, 42);
+        obj.add_int(col_any, 1);
+    });
+
+    // Result: Client 2 wins - Update wins against Clear from Client 2
+    // {id: 1, any: 43}
+    h.check_merge_result([&](Obj obj, ColKey col_any) {
+        CHECK_EQUAL(obj.get<Mixed>(col_any), 43);
+    });
+}
+
+TEST(Transform_UpdateClearVsUpdateAddInteger)
+{
+    std::vector<int> timestamps{1, 2, 3, 4};
+
+    do {
+        // Baseline: set property 'any' to List
+        // {id: 1, any: []}
+        TransformTestHarness h(test_context, {}, [](Obj obj, ColKey col_any) {
+            obj.set_collection(col_any, CollectionType::List);
+        });
+
+        auto t1 = timestamps[0];
+        auto t2 = timestamps[1];
+        auto t3 = timestamps[2];
+        auto t4 = timestamps[3];
+
+        if (t1 > t2 || t3 > t4)
+            continue;
+
+        // Client 1 sets property 'any' from List to Dictionary and inserts one integer in the dictionary
+        // {id: 1, any: {{"key1": 1}}}
+        h.transaction(
+            h.client_1,
+            [](Obj obj, ColKey col_any) {
+                obj.set_collection(col_any, CollectionType::Dictionary);
+                auto dict = obj.get_dictionary(col_any);
+                dict.insert("key1", 1);
+            },
+            t1);
+
+        // Client 1 clears the dictionary at property 'any' and inserts one integer in the dictionary
+        // {id: 1, any: {{"key2": 2}}}
+        h.transaction(
+            h.client_1,
+            [](Obj obj, ColKey col_any) {
+                auto dict = obj.get_dictionary(col_any);
+                dict.clear();
+                dict.insert("key2", 2);
+            },
+            t2);
+
+        // Client 2 sets property 'any' from Dictionary to integer value
+        // {id: 1, any: 42}
+        h.transaction(
+            h.client_2,
+            [](Obj obj, ColKey col_any) {
+                obj.set_any(col_any, 42);
+            },
+            t3);
+
+        // Client 2 adds integer value to property 'any'
+        // {id: 1, any: 43}
+        h.transaction(
+            h.client_2,
+            [](Obj obj, ColKey col_any) {
+                obj.add_int(col_any, 1);
+            },
+            t4);
+
+        h.check_merge_result([&](Obj, ColKey) {});
+
+    } while (std::next_permutation(timestamps.begin(), timestamps.end()));
 }
