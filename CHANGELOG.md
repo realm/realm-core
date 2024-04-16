@@ -7,6 +7,11 @@
 ### Compatibility
 * Fileformat: Generates files with format v24. Reads and automatically upgrade from fileformat v10. If you want to upgrade from an earlier file format version you will have to use RealmCore v13.x.y or earlier.
 
+-----------
+
+### Internals
+* `prior_size` field in Clear instruction is being repurposed as `collection_type` (no protocol changes required)
+
 ----------------------------------------------
 
 # 14.5.1 Release notes

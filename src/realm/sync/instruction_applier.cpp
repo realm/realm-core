@@ -550,7 +550,7 @@ void InstructionApplier::operator()(const Instruction::AddInteger& instr)
 void InstructionApplier::operator()(const Instruction::AddColumn& instr)
 {
     using Type = Instruction::Payload::Type;
-    using CollectionType = Instruction::AddColumn::CollectionType;
+    using CollectionType = Instruction::CollectionType;
 
     // Temporarily swap out the last object key so it doesn't get included in error messages
     TemporarySwapOut<decltype(m_last_object_key)> last_object_key_guard(m_last_object_key);
