@@ -487,6 +487,7 @@ void State::parse_one()
             Instruction::Clear instr;
             read_path_instr(instr);
             instr.collection_type = read_collection_type();
+            // TODO: Add validation for collection_type once BAAS-29262 is done
             m_handler(instr);
             return;
         }

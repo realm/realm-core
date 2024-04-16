@@ -1,3 +1,11 @@
+
+-----------
+
+### Internals
+* `prior_size` field in Clear instruction is being repurposed as `collection_type` (no protocol changes required)
+
+----------------------------------------------
+
 # 14.5.1 Release notes
 
 ### Fixed
