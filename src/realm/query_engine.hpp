@@ -179,9 +179,7 @@ public:
         cluster_changed();
     }
 
-    virtual void collect_dependencies(std::vector<TableKey>&) const
-    {
-    }
+    virtual void collect_dependencies(std::vector<TableKey>&) const {}
 
     virtual size_t find_first_local(size_t start, size_t end) = 0;
     virtual size_t find_all_local(size_t start, size_t end);
@@ -273,9 +271,7 @@ protected:
     }
 
 private:
-    virtual void table_changed()
-    {
-    }
+    virtual void table_changed() {}
     virtual void cluster_changed()
     {
         // TODO: Should eventually be pure
@@ -298,7 +294,6 @@ protected:
         : ParentNode(from)
     {
     }
-
 };
 
 class IndexEvaluator {
@@ -1485,6 +1480,9 @@ public:
     void table_changed() override
     {
         m_is_string_enum = m_table.unchecked_ptr()->is_enumerated(m_condition_column_key);
+        m_string_interner = m_table.unchecked_ptr()->get_string_interner(m_condition_column_key);
+        REALM_ASSERT_DEBUG(m_string_interner);
+        m_interned_string = m_string_interner->lookup(m_value);
     }
 
     void cluster_changed() override
@@ -1528,6 +1526,8 @@ protected:
     std::optional<std::string> m_value;
     std::optional<ArrayString> m_leaf;
     StringData m_string_value;
+    StringInterner* m_string_interner = nullptr;
+    std::optional<uint64_t> m_interned_string;
 
     bool m_is_string_enum = false;
 

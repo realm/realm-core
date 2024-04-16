@@ -115,7 +115,7 @@ public:
     void move(ArrayString& dst, size_t ndx);
     void clear();
 
-    size_t find_first(StringData value, size_t begin, size_t end) const noexcept;
+    size_t find_first(StringData value, size_t begin, size_t end, std::optional<StringID> = {}) const noexcept;
 
     size_t lower_bound(StringData value);
 

@@ -339,7 +339,7 @@ void ArrayString::clear()
     }
 }
 
-size_t ArrayString::find_first(StringData value, size_t begin, size_t end) const noexcept
+size_t ArrayString::find_first(StringData value, size_t begin, size_t end, std::optional<StringID> id) const noexcept
 {
     switch (m_type) {
         case Type::small_strings:
@@ -363,9 +363,6 @@ size_t ArrayString::find_first(StringData value, size_t begin, size_t end) const
             break;
         }
         case Type::interned_strings: {
-            // we need a way to avoid this lookup for each leaf array. The lookup must appear
-            // higher up the call stack and passed down.
-            auto id = m_string_interner->lookup(value);
             if (id) {
                 return static_cast<Array*>(m_arr)->find_first(*id, begin, end);
             }
