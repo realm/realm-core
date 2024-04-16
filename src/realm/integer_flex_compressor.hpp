@@ -160,32 +160,21 @@ inline bool FlexCompressor::find_linear(const Array& arr, int64_t value, size_t 
     const auto cmp = [](int64_t item, int64_t key) {
         if constexpr (std::is_same_v<Cond, Equal>)
             return item == key;
-        if constexpr (std::is_same_v<Cond, NotEqual>) {
+        if constexpr (std::is_same_v<Cond, NotEqual>)
             return item != key;
-        }
-        if constexpr (std::is_same_v<Cond, Less>) {
+        if constexpr (std::is_same_v<Cond, Less>)
             return item < key;
-        }
-        if constexpr (std::is_same_v<Cond, Greater>) {
+        if constexpr (std::is_same_v<Cond, Greater>)
             return item > key;
-        }
         REALM_UNREACHABLE();
     };
 
     const auto& compressor = arr.integer_compressor();
-    const auto data = (uint64_t*)arr.m_data;
-    const auto ndx_width = compressor.ndx_width();
-    const auto v_width = compressor.width();
-    const auto offset = v_width * compressor.v_size();
-    bf_iterator ndx_it{data, offset, ndx_width, ndx_width, start};
-    bf_iterator data_it{data, 0, v_width, v_width, 0};
     while (start < end) {
-        data_it.move(*ndx_it);
-        const auto sv = sign_extend_field_by_mask(compressor.width_mask(), *data_it);
+        const auto sv = get(compressor, start);
         if (cmp(sv, value) && !state->match(start + baseindex))
             return false;
         ++start;
-        ++ndx_it;
     }
     return true;
 }

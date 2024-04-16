@@ -176,19 +176,11 @@ inline bool PackedCompressor::find_linear(const Array& arr, int64_t value, size_
             return a < b;
     };
     const auto& compressor = arr.integer_compressor();
-    const auto mask = compressor.width_mask();
-    const auto width = compressor.width();
-    const auto data = (uint64_t*)arr.m_data;
-    // uint64_t* data_area, size_t initial_offset, size_t field_size, size_t step_size, size_t index
-    bf_iterator data_it{data, 0, width, width, start};
-    // auto& data_it = arr.integer_compressor().data_iterator();
-    data_it.move(start);
     while (start < end) {
-        const auto sv = sign_extend_field_by_mask(mask, *data_it);
+        const auto sv = get(compressor, start);
         if (compare(sv, value) && !state->match(start + baseindex))
             return false;
         ++start;
-        ++data_it;
     }
     return true;
 }
