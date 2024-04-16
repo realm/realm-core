@@ -190,12 +190,20 @@ inline bool FlexCompressor::find_linear(const Array& arr, int64_t value, size_t 
         REALM_UNREACHABLE();
     };
 
-    const auto& compressor = arr.integer_compressor();
+    const auto& c = arr.integer_compressor();
+    const auto offset = c.width() * c.v_size();
+    const auto ndx_w = c.ndx_width();
+    const auto v_w = c.width();
+    const auto data = c.data();
+    const auto mask = c.width_mask();
+    bf_iterator ndx_iterator{data, offset, ndx_w, ndx_w, start};
+    bf_iterator data_iterator{data, 0, v_w, v_w, *ndx_iterator};
     while (start < end) {
-        const auto sv = get(compressor, start);
+        const auto sv = sign_extend_field_by_mask(mask, *data_iterator);
         if (cmp(sv, value) && !state->match(start + baseindex))
             return false;
-        ++start;
+        ndx_iterator.move(++start);
+        data_iterator.move(*ndx_iterator);
     }
     return true;
 }

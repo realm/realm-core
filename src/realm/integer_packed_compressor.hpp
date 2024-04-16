@@ -190,12 +190,14 @@ inline bool PackedCompressor::find_linear(const Array& arr, int64_t value, size_
         if constexpr (std::is_same_v<Cond, Less>)
             return a < b;
     };
-    const auto& compressor = arr.integer_compressor();
+    const auto& c = arr.integer_compressor();
+    bf_iterator it{c.data(), 0, c.width(), c.width(), start};
     while (start < end) {
-        const auto sv = get(compressor, start);
+        const auto sv = sign_extend_field_by_mask(c.width_mask(), *it);
         if (compare(sv, value) && !state->match(start + baseindex))
             return false;
         ++start;
+        it.move(start);
     }
     return true;
 }

@@ -2552,131 +2552,131 @@ int benchmark_common_tasks_main()
 
 #define BENCH(B) run_benchmark<B>(results)
 #define BENCH2(B, mode) run_benchmark<B>(results, mode)
-    //    BENCH2(BenchmarkEmptyCommit, true);
-    //    BENCH2(BenchmarkEmptyCommit, false);
-    //    BENCH2(BenchmarkNonInitiatorOpen, true);
-    //    BENCH2(BenchmarkInitiatorOpen, true);
-    //    BENCH2(AddTable, true);
-    //    BENCH2(AddTable, false);
+    BENCH2(BenchmarkEmptyCommit, true);
+    BENCH2(BenchmarkEmptyCommit, false);
+    BENCH2(BenchmarkNonInitiatorOpen, true);
+    BENCH2(BenchmarkInitiatorOpen, true);
+    BENCH2(AddTable, true);
+    BENCH2(AddTable, false);
 
     BENCH(IterateTableByIndexNoPrimaryKey);
     BENCH(IterateTableByIndexIntPrimaryKey);
     BENCH(IterateTableByIndexStringPrimaryKey);
-    //  BENCH(IterateTableByIterator);
-    //  BENCH(IterateTableByIteratorIndex);
+    BENCH(IterateTableByIterator);
+    BENCH(IterateTableByIteratorIndex);
 
-    //  BENCH(BenchmarkSort);
-    //  BENCH(BenchmarkSortInt);
+    BENCH(BenchmarkSort);
+    BENCH(BenchmarkSortInt);
     BENCH(BenchmarkSortIntList);
-    // BENCH(BenchmarkSortIntDictionary);
+    BENCH(BenchmarkSortIntDictionary);
     BENCH(BenchmarkSortThenLimit);
 
-    //  BENCH(BenchmarkUnorderedTableViewClear);
-    //  BENCH(BenchmarkUnorderedTableViewClearIndexed);
+    BENCH(BenchmarkUnorderedTableViewClear);
+    BENCH(BenchmarkUnorderedTableViewClearIndexed);
 
     // getting/setting - tableview or not
-    //    BENCH(BenchmarkGetString);
-    //    BENCH(BenchmarkSetString);
-    //    BENCH(BenchmarkGetLinkList);
-    //    BENCH(BenchmarkInsert);
-    //    BENCH2(BenchmarkCreateIndex, true);
-    //    BENCH2(BenchmarkCreateIndex, false);
-    //    BENCH(BenchmarkGetLongString);
-    //    BENCH(BenchmarkSetLongString);
+    BENCH(BenchmarkGetString);
+    BENCH(BenchmarkSetString);
+    BENCH(BenchmarkGetLinkList);
+    BENCH(BenchmarkInsert);
+    BENCH2(BenchmarkCreateIndex, true);
+    BENCH2(BenchmarkCreateIndex, false);
+    BENCH(BenchmarkGetLongString);
+    BENCH(BenchmarkSetLongString);
 
     // queries / searching
-    //    BENCH(BenchmarkFindAllStringFewDupes);
-    //    BENCH(BenchmarkFindAllStringManyDupes);
-    //    BENCH(BenchmarkFindAllFulltextStringManyDupes);
-    //    BENCH(BenchmarkFindFirstStringFewDupes);
-    //    BENCH(BenchmarkFindFirstStringManyDupes);
-    //    BENCH(BenchmarkCountStringManyDupes<false>);
-    //    BENCH(BenchmarkCountStringManyDupes<true>);
-    //    BENCH(BenchmarkQuery);
-    //    BENCH(BenchmarkQueryNot);
-    //    BENCH(BenchmarkQueryLongString);
+    BENCH(BenchmarkFindAllStringFewDupes);
+    BENCH(BenchmarkFindAllStringManyDupes);
+    BENCH(BenchmarkFindAllFulltextStringManyDupes);
+    BENCH(BenchmarkFindFirstStringFewDupes);
+    BENCH(BenchmarkFindFirstStringManyDupes);
+    BENCH(BenchmarkCountStringManyDupes<false>);
+    BENCH(BenchmarkCountStringManyDupes<true>);
+    BENCH(BenchmarkQuery);
+    BENCH(BenchmarkQueryNot);
+    BENCH(BenchmarkQueryLongString);
 
-    //    BENCH(BenchmarkQueryInsensitiveString);
-    //    BENCH(BenchmarkQueryInsensitiveStringIndexed);
-    //    BENCH(BenchmarkQueryChainedOrStrings<false>);
-    //    BENCH(BenchmarkQueryChainedOrStrings<true>);
-    //    BENCH(BenchmarkQueryChainedOrStringsViewFilterPredicate);
-    //    BENCH(BenchmarkQueryNotChainedOrStrings<false>);
-    //    BENCH(BenchmarkQueryNotChainedOrStrings<true>);
+    BENCH(BenchmarkQueryInsensitiveString);
+    BENCH(BenchmarkQueryInsensitiveStringIndexed);
+    BENCH(BenchmarkQueryChainedOrStrings<false>);
+    BENCH(BenchmarkQueryChainedOrStrings<true>);
+    BENCH(BenchmarkQueryChainedOrStringsViewFilterPredicate);
+    BENCH(BenchmarkQueryNotChainedOrStrings<false>);
+    BENCH(BenchmarkQueryNotChainedOrStrings<true>);
     BENCH(BenchmarkQueryChainedOrInts);
-    //  BENCH(BenchmarkQueryChainedOrIntsIndexed);
+    BENCH(BenchmarkQueryChainedOrIntsIndexed);
     BENCH(BenchmarkQueryChainedOrIntsCount);
     BENCH(BenchmarkQueryIntEquality);
-    //    BENCH(BenchmarkQueryIntEqualityIndexed);
-    //    BENCH(BenchmarkForeignAggAvg);
-    //    BENCH(BenchmarkIntVsDoubleColumns);
-    //    BENCH(BenchmarkQueryStringOverLinks);
-    //    BENCH(BenchmarkSubQuery);
-    //    BENCH(BenchmarkWithType<Indexed<Mixed>>);
+    BENCH(BenchmarkQueryIntEqualityIndexed);
+    BENCH(BenchmarkForeignAggAvg);
+    BENCH(BenchmarkIntVsDoubleColumns);
+    BENCH(BenchmarkQueryStringOverLinks);
+    BENCH(BenchmarkSubQuery);
+    BENCH(BenchmarkWithType<Indexed<Mixed>>);
     BENCH(BenchmarkWithType<Prop<Mixed>>);
-    //    BENCH(BenchmarkWithType<Indexed<UUID>>);
-    //    BENCH(BenchmarkWithType<Prop<UUID>>);
-    //    BENCH(BenchmarkWithType<Indexed<ObjectId>>);
-    //    BENCH(BenchmarkWithType<Prop<ObjectId>>);
-    //    BENCH(BenchmarkWithType<Indexed<Timestamp>>);
-    //    BENCH(BenchmarkWithType<Prop<Timestamp>>);
-    //    BENCH(BenchmarkWithType<Indexed<Int>>);
-    //    BENCH(BenchmarkWithType<Indexed<String>>);
-    //    BENCH(BenchmarkWithType<Indexed<Bool>>);
-    //    BENCH(BenchmarkWithType<Prop<Bool>>);
-    //    BENCH(BenchmarkMixedCaseInsensitiveEqual<Prop<Mixed>>);
-    //    BENCH(BenchmarkMixedCaseInsensitiveEqual<Indexed<Mixed>>);
-    //    BENCH(BenchmarkMixedCaseInsensitiveEqual<Prop<String>>);
-    //    BENCH(BenchmarkMixedCaseInsensitiveEqual<Indexed<String>>);
+    BENCH(BenchmarkWithType<Indexed<UUID>>);
+    BENCH(BenchmarkWithType<Prop<UUID>>);
+    BENCH(BenchmarkWithType<Indexed<ObjectId>>);
+    BENCH(BenchmarkWithType<Prop<ObjectId>>);
+    BENCH(BenchmarkWithType<Indexed<Timestamp>>);
+    BENCH(BenchmarkWithType<Prop<Timestamp>>);
+    BENCH(BenchmarkWithType<Indexed<Int>>);
+    BENCH(BenchmarkWithType<Indexed<String>>);
+    BENCH(BenchmarkWithType<Indexed<Bool>>);
+    BENCH(BenchmarkWithType<Prop<Bool>>);
+    BENCH(BenchmarkMixedCaseInsensitiveEqual<Prop<Mixed>>);
+    BENCH(BenchmarkMixedCaseInsensitiveEqual<Indexed<Mixed>>);
+    BENCH(BenchmarkMixedCaseInsensitiveEqual<Prop<String>>);
+    BENCH(BenchmarkMixedCaseInsensitiveEqual<Indexed<String>>);
 
     BENCH(BenchmarkRangeForType<Prop<Int>>);
-    //    BENCH(BenchmarkCreateIndexForType<NullableIndexed<String>>);
-    //    BENCH(BenchmarkCreateIndexForType<NullableIndexed<Int>>);
-    //    BENCH(BenchmarkCreateIndexForType<NullableIndexed<Timestamp>>);
-    //
-    //    BENCH(BenchmarkInsertToIndexForType<NullableIndexed<String>>);
-    //    BENCH(BenchmarkInsertToIndexForType<NullableIndexed<Int>>);
-    //    BENCH(BenchmarkInsertToIndexForType<NullableIndexed<Timestamp>>);
-    //
-    //    BENCH(BenchmarkInsertPKToIndexForType<NullableIndexed<String>>);
-    //    BENCH(BenchmarkInsertPKToIndexForType<NullableIndexed<Int>>);
-    //
-    //    BENCH(BenchmarkEraseObjectForType<Prop<String>>);
-    //    BENCH(BenchmarkEraseObjectForType<Prop<Int>>);
-    //    BENCH(BenchmarkEraseObjectForType<Prop<Timestamp>>);
-    //    BENCH(BenchmarkEraseObjectForType<NullableIndexed<String>>);
-    //    BENCH(BenchmarkEraseObjectForType<NullableIndexed<Int>>);
-    //    BENCH(BenchmarkEraseObjectForType<NullableIndexed<Timestamp>>);
-    //
-    //    BENCH(BenchmarkQueryTimestampGreaterOverLinks);
-    //    BENCH(BenchmarkQueryTimestampGreater);
-    //    BENCH(BenchmarkQueryTimestampGreaterEqual);
-    //    BENCH(BenchmarkQueryTimestampLess);
-    //    BENCH(BenchmarkQueryTimestampLessEqual);
-    //    BENCH(BenchmarkQueryTimestampEqual);
-    //    BENCH(BenchmarkQueryTimestampNotEqual);
-    //    BENCH(BenchmarkQueryTimestampNotNull);
-    //    BENCH(BenchmarkQueryTimestampEqualNull);
-    //    BENCH(BenchmarkQueryIntListSize);
-    //
-    //    BENCH(BenchmarkWithIntUIDsRandomOrderSeqAccess);
-    //    BENCH(BenchmarkWithIntUIDsRandomOrderRandomAccess);
-    //    BENCH(BenchmarkWithIntUIDsRandomOrderRandomDelete);
-    //    BENCH(BenchmarkWithIntUIDsRandomOrderRandomCreate);
-    //
-    //    BENCH(TransactionDuplicate);
+    BENCH(BenchmarkCreateIndexForType<NullableIndexed<String>>);
+    BENCH(BenchmarkCreateIndexForType<NullableIndexed<Int>>);
+    BENCH(BenchmarkCreateIndexForType<NullableIndexed<Timestamp>>);
 
-    // #if REALM_ENABLE_GEOSPATIAL
-    //     BENCH(BenchmarkAssignGeoPoints);
-    //     BENCH(BenchmarkAssignGeoPointsFromNull);
-    //     BENCH(BenchmarkFetchGeoPoints);
-    //     BENCH(BenchmarkGeoPointsWithinBox);
-    //     BENCH(BenchmarkGeoPointsWithinBoxRQL);
-    //     BENCH(BenchmarkGeoPointsWithinCircle);
-    //     BENCH(BenchmarkGeoPointsWithinCircleRQL);
-    //     BENCH(BenchmarkGeoPointsWithinPolygon);
-    //     BENCH(BenchmarkGeoPointsWithinPolygonRQL);
-    // #endif
+    BENCH(BenchmarkInsertToIndexForType<NullableIndexed<String>>);
+    BENCH(BenchmarkInsertToIndexForType<NullableIndexed<Int>>);
+    BENCH(BenchmarkInsertToIndexForType<NullableIndexed<Timestamp>>);
+
+    BENCH(BenchmarkInsertPKToIndexForType<NullableIndexed<String>>);
+    BENCH(BenchmarkInsertPKToIndexForType<NullableIndexed<Int>>);
+
+    BENCH(BenchmarkEraseObjectForType<Prop<String>>);
+    BENCH(BenchmarkEraseObjectForType<Prop<Int>>);
+    BENCH(BenchmarkEraseObjectForType<Prop<Timestamp>>);
+    BENCH(BenchmarkEraseObjectForType<NullableIndexed<String>>);
+    BENCH(BenchmarkEraseObjectForType<NullableIndexed<Int>>);
+    BENCH(BenchmarkEraseObjectForType<NullableIndexed<Timestamp>>);
+
+    BENCH(BenchmarkQueryTimestampGreaterOverLinks);
+    BENCH(BenchmarkQueryTimestampGreater);
+    BENCH(BenchmarkQueryTimestampGreaterEqual);
+    BENCH(BenchmarkQueryTimestampLess);
+    BENCH(BenchmarkQueryTimestampLessEqual);
+    BENCH(BenchmarkQueryTimestampEqual);
+    BENCH(BenchmarkQueryTimestampNotEqual);
+    BENCH(BenchmarkQueryTimestampNotNull);
+    BENCH(BenchmarkQueryTimestampEqualNull);
+    BENCH(BenchmarkQueryIntListSize);
+
+    BENCH(BenchmarkWithIntUIDsRandomOrderSeqAccess);
+    BENCH(BenchmarkWithIntUIDsRandomOrderRandomAccess);
+    BENCH(BenchmarkWithIntUIDsRandomOrderRandomDelete);
+    BENCH(BenchmarkWithIntUIDsRandomOrderRandomCreate);
+
+    BENCH(TransactionDuplicate);
+
+#if REALM_ENABLE_GEOSPATIAL
+    BENCH(BenchmarkAssignGeoPoints);
+    BENCH(BenchmarkAssignGeoPointsFromNull);
+    BENCH(BenchmarkFetchGeoPoints);
+    BENCH(BenchmarkGeoPointsWithinBox);
+    BENCH(BenchmarkGeoPointsWithinBoxRQL);
+    BENCH(BenchmarkGeoPointsWithinCircle);
+    BENCH(BenchmarkGeoPointsWithinCircleRQL);
+    BENCH(BenchmarkGeoPointsWithinPolygon);
+    BENCH(BenchmarkGeoPointsWithinPolygonRQL);
+#endif
 
 #undef BENCH
 #undef BENCH2
