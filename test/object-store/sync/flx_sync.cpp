@@ -27,10 +27,12 @@
 
 #include <realm/object_id.hpp>
 #include <realm/query_expression.hpp>
+#include <realm/list.hpp>
 
 #include <realm/object-store/binding_context.hpp>
 #include <realm/object-store/impl/object_accessor_impl.hpp>
 #include <realm/object-store/impl/realm_coordinator.hpp>
+#include <realm/object-store/list.hpp>
 #include <realm/object-store/schema.hpp>
 #include <realm/object-store/sync/generic_network_transport.hpp>
 #include <realm/object-store/sync/mongo_client.hpp>
@@ -4808,22 +4810,13 @@ TEST_CASE("flx: collections in mixed - merge lists", "[sync][flx][baas]") {
     auto foo_obj_id = ObjectId::gen();
     harness.load_initial_data([&](SharedRealm realm) {
         CppContext c(realm);
-        auto obj = Object::create(c, realm, "TopLevel",
-                                  std::any(AnyDict{{"_id", foo_obj_id}, {"queryable_str_field", "foo"s}}));
-        auto table = realm->read_group().get_table("class_TopLevel");
-        auto col_any = table->get_column_key("any");
-        obj.get_obj().set(col_any, Mixed{42});
+        Object::create(c, realm, "TopLevel",
+                       std::any(AnyDict{{"_id", foo_obj_id}, {"queryable_str_field", "foo"s}, {"any", 42}}));
     });
 
     // Client 2 opens the realm and downloads schema and object created by Client 1.
     auto realm = Realm::get_shared_realm(config);
-    auto table = realm->read_group().get_table("class_TopLevel");
-    auto sub_set = realm->get_latest_subscription_set();
-    auto mut_sub = sub_set.make_mutable_copy();
-    mut_sub.insert_or_assign(Query(table));
-    auto sub = mut_sub.commit();
-
-    sub.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
+    subscribe_to_all_and_bootstrap(*realm);
     realm->sync_session()->pause();
 
     // Client 3 sets property 'any' to List and inserts two integers in the list.
@@ -4838,6 +4831,7 @@ TEST_CASE("flx: collections in mixed - merge lists", "[sync][flx][baas]") {
     // While its session is paused, Client 2 sets property 'any' to List and inserts two integers in the list.
     CppContext c(realm);
     realm->begin_transaction();
+    auto table = realm->read_group().get_table("class_TopLevel");
     auto obj = table->get_object_with_primary_key(Mixed{foo_obj_id});
     auto col_any = table->get_column_key("any");
     set_list_and_insert_element(obj, col_any, 3);
@@ -4875,48 +4869,39 @@ TEST_CASE("flx: nested collections in mixed", "[sync][flx][baas]") {
                                   std::any(AnyDict{{"_id", INT64_C(1)}, {"queryable_str_field", "foo"s}}));
         auto table = realm->read_group().get_table("class_TopLevel");
         auto col_any = table->get_column_key("any");
-        auto o = obj.get_obj();
-        o.set_collection(col_any, CollectionType::List);
-        auto list = o.get_list_ptr<Mixed>(col_any);
-        list->add("abc");
-        list->insert_collection(1, CollectionType::List);
-        auto list2 = list->get_list(1);
-        list2->add(42);
+        obj.get_obj().set_collection(col_any, CollectionType::List);
+        List list(obj, obj.get_object_schema().property_for_name("any"));
+        list.insert_any(0, "abc");
+        list.insert_collection(1, CollectionType::List);
+        auto list2 = list.get_list(1);
+        list2.insert_any(0, 42);
     });
 
     // Client 2 opens the realm and downloads schema and object created by Client 1.
     // {_id: 1, any: ["abc", [42]]}
     auto realm = Realm::get_shared_realm(config);
-    auto table = realm->read_group().get_table("class_TopLevel");
-    auto sub_set = realm->get_latest_subscription_set();
-    auto mut_sub = sub_set.make_mutable_copy();
-    mut_sub.insert_or_assign(Query(table));
-    auto sub = mut_sub.commit();
-
-    sub.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
+    subscribe_to_all_and_bootstrap(*realm);
     realm->sync_session()->pause();
 
     // Client 3 adds a dictionary with an element to list 'any'
     // {_id: 1, any: [{{"key": 6}}, "abc", [42]]}
     harness.load_initial_data([&](SharedRealm realm) {
-        auto table = realm->read_group().get_table("class_TopLevel");
-        auto obj = table->get_object_with_primary_key(1);
-        auto col_any = table->get_column_key("any");
-        auto list = obj.get_list_ptr<Mixed>(col_any);
-        list->insert_collection(0, CollectionType::Dictionary);
-        auto dict = list->get_dictionary(0);
-        dict->insert("key", 6);
+        CppContext c(realm);
+        auto obj = Object::get_for_primary_key(c, realm, "TopLevel", std::any(INT64_C(1)));
+        List list(obj, obj.get_object_schema().property_for_name("any"));
+        list.insert_collection(PathElement(0), CollectionType::Dictionary);
+        auto dict = list.get_dictionary(PathElement(0));
+        dict.insert_any("key", INT64_C(6));
     });
 
     // While its session is paused, Client 2 makes a change to a nested list
     // {_id: 1, any: ["abc", [42, "foo"]]}
     CppContext c(realm);
     realm->begin_transaction();
-    auto obj = table->get_object_with_primary_key(1);
-    auto col_any = table->get_column_key("any");
-    auto list = obj.get_list_ptr<Mixed>(col_any);
-    auto list2 = list->get_list(1);
-    list2->add("foo");
+    auto obj = Object::get_for_primary_key(c, realm, "TopLevel", std::any(INT64_C(1)));
+    List list(obj, obj.get_object_schema().property_for_name("any"));
+    List list2 = list.get_list(PathElement(1));
+    list2.insert_any(list2.size(), "foo");
     realm->commit_transaction();
 
     realm->sync_session()->resume();
@@ -4926,19 +4911,17 @@ TEST_CASE("flx: nested collections in mixed", "[sync][flx][baas]") {
 
     // Client 2 after the session is resumed
     // {_id: 1, any: [{{"key": 6}}, "abc", [42, "foo"]]}
-    col_any = table->get_column_key("any");
-    list = obj.get_list_ptr<Mixed>(col_any);
-    CHECK(list->size() == 3);
-    auto nested_dict = list->get_dictionary(0);
-    CHECK(nested_dict->size() == 1);
-    CHECK(nested_dict->get("key") == 6);
+    CHECK(list.size() == 3);
+    auto nested_dict = list.get_dictionary(0);
+    CHECK(nested_dict.size() == 1);
+    CHECK(nested_dict.get<Int>("key") == 6);
 
-    CHECK(list->get(1) == "abc");
+    CHECK(list.get_any(1) == "abc");
 
-    auto nested_list = list->get_list(2);
-    CHECK(nested_list->size() == 2);
-    CHECK(nested_list->get(0) == 42);
-    CHECK(nested_list->get(1) == "foo");
+    auto nested_list = list.get_list(2);
+    CHECK(nested_list.size() == 2);
+    CHECK(nested_list.get_any(0) == 42);
+    CHECK(nested_list.get_any(1) == "foo");
 }
 
 } // namespace realm::app
