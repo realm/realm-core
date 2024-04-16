@@ -2885,6 +2885,28 @@ typedef enum realm_user_state {
     RLM_USER_STATE_REMOVED
 } realm_user_state_e;
 
+// This type should never be returned from a function.
+// It's only meant as an asynchronous callback argument.
+// Pointers to this struct and its pointer members are only valid inside the scope
+// of the callback they were passed to.
+typedef struct realm_app_error {
+    realm_errno_e error;
+    realm_error_categories categories;
+    const char* message;
+
+    /**
+     * The underlying HTTP status code returned by the server,
+     * otherwise zero.
+     */
+    int http_status_code;
+
+    /**
+     * A link to MongoDB Realm server logs related to the error,
+     * or NULL if error response didn't contain log information.
+     */
+    const char* link_to_server_logs;
+} realm_app_error_t;
+
 #if REALM_APP_SERVICES
 typedef struct realm_app realm_app_t;
 typedef struct realm_app_credentials realm_app_credentials_t;
@@ -2913,28 +2935,6 @@ typedef struct realm_app_user_apikey {
     const char* name;
     bool disabled;
 } realm_app_user_apikey_t;
-
-// This type should never be returned from a function.
-// It's only meant as an asynchronous callback argument.
-// Pointers to this struct and its pointer members are only valid inside the scope
-// of the callback they were passed to.
-typedef struct realm_app_error {
-    realm_errno_e error;
-    realm_error_categories categories;
-    const char* message;
-
-    /**
-     * The underlying HTTP status code returned by the server,
-     * otherwise zero.
-     */
-    int http_status_code;
-
-    /**
-     * A link to MongoDB Realm server logs related to the error,
-     * or NULL if error response didn't contain log information.
-     */
-    const char* link_to_server_logs;
-} realm_app_error_t;
 
 typedef struct realm_user_identity {
     /**

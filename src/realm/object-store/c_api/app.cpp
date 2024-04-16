@@ -43,6 +43,13 @@ static_assert(realm_auth_provider_e(AuthProvider::USERNAME_PASSWORD) == RLM_AUTH
 static_assert(realm_auth_provider_e(AuthProvider::FUNCTION) == RLM_AUTH_PROVIDER_FUNCTION);
 static_assert(realm_auth_provider_e(AuthProvider::API_KEY) == RLM_AUTH_PROVIDER_API_KEY);
 
+static_assert(realm_sync_client_metadata_mode_e(app::AppConfig::MetadataMode::NoEncryption) ==
+              RLM_SYNC_CLIENT_METADATA_MODE_PLAINTEXT);
+static_assert(realm_sync_client_metadata_mode_e(app::AppConfig::MetadataMode::Encryption) ==
+              RLM_SYNC_CLIENT_METADATA_MODE_ENCRYPTED);
+static_assert(realm_sync_client_metadata_mode_e(app::AppConfig::MetadataMode::InMemory) ==
+              RLM_SYNC_CLIENT_METADATA_MODE_DISABLED);
+
 static inline bson::BsonArray parse_ejson_array(const char* serialized)
 {
     if (!serialized) {

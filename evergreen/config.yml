@@ -1886,5 +1886,5 @@ buildvariants:
     extra_flags: "-DREALM_APP_SERVICES=OFF"
     disable_tests_against_baas: On
   tasks:
-  - name: compile_test
+  - name: compile_local_tests
 
