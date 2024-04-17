@@ -40,15 +40,18 @@ public:
     // init from mem B
     inline const uint64_t* data() const;
     inline size_t size() const;
-    inline size_t width() const;
+    inline NodeHeader::Encoding get_encoding() const;
+
+    inline size_t v_width() const;
+    inline size_t v_size() const;
     inline size_t ndx_size() const;
     inline size_t ndx_width() const;
-    inline NodeHeader::Encoding get_encoding() const;
-    inline size_t v_size() const;
-    inline constexpr uint64_t width_mask() const;
-    inline constexpr uint64_t ndx_mask() const;
-    inline constexpr uint64_t msb() const;
-    inline constexpr uint64_t ndx_msb() const;
+    inline uint64_t v_mask() const;
+    inline uint64_t ndx_mask() const;
+    inline uint64_t msb() const;
+    inline uint64_t ndx_msb() const;
+    inline uint64_t v_bits() const;
+    inline uint64_t ndx_bits() const;
 
     // get/set
     inline int64_t get(size_t) const;
@@ -120,7 +123,7 @@ private:
     Encoding m_encoding{NodeHeader::Encoding::WTypBits};
     uint64_t* m_data;
     size_t m_v_width = 0, m_v_size = 0, m_ndx_width = 0, m_ndx_size = 0;
-    mutable uint64_t m_mask = 0, m_ndx_mask = 0, m_msb = 0, m_ndx_msb = 0;
+    mutable uint64_t m_mask = 0, m_ndx_mask = 0, m_msb = 0, m_ndx_msb = 0, m_v_bits = 0, m_ndx_bits = 0;
 };
 
 inline void IntegerCompressor::init_packed(const char* h)
@@ -172,7 +175,7 @@ inline size_t IntegerCompressor::ndx_size() const
     return m_ndx_size;
 }
 
-inline size_t IntegerCompressor::width() const
+inline size_t IntegerCompressor::v_width() const
 {
     REALM_ASSERT_DEBUG(is_packed() || is_flex());
     return m_v_width;
@@ -189,7 +192,7 @@ inline NodeHeader::Encoding IntegerCompressor::get_encoding() const
     return m_encoding;
 }
 
-inline constexpr uint64_t IntegerCompressor::width_mask() const
+inline uint64_t IntegerCompressor::v_mask() const
 {
     REALM_ASSERT_DEBUG(is_packed() || is_flex());
     if (!m_mask)
@@ -197,7 +200,7 @@ inline constexpr uint64_t IntegerCompressor::width_mask() const
     return m_mask;
 }
 
-inline constexpr uint64_t IntegerCompressor::ndx_mask() const
+inline uint64_t IntegerCompressor::ndx_mask() const
 {
     REALM_ASSERT_DEBUG(is_packed() || is_flex());
     if (!m_ndx_mask)
@@ -205,20 +208,35 @@ inline constexpr uint64_t IntegerCompressor::ndx_mask() const
     return m_ndx_mask;
 }
 
-inline constexpr uint64_t IntegerCompressor::msb() const
+inline uint64_t IntegerCompressor::msb() const
 {
     REALM_ASSERT_DEBUG(is_packed() || is_flex());
     if (!m_msb)
-        m_msb = populate(m_v_width, width_mask());
+        m_msb = populate(m_v_width, v_mask());
     return m_msb;
 }
 
-inline constexpr uint64_t IntegerCompressor::ndx_msb() const
+inline uint64_t IntegerCompressor::ndx_msb() const
 {
     REALM_ASSERT_DEBUG(is_packed() || is_flex());
     if (!m_ndx_msb)
         m_ndx_msb = populate(m_ndx_width, ndx_mask());
     return m_ndx_msb;
+}
+inline uint64_t IntegerCompressor::v_bits() const
+{
+    REALM_ASSERT_DEBUG(is_packed() || is_flex());
+    if (!m_v_bits)
+        m_v_bits = (1ULL << m_v_width) - 1;
+    return m_v_bits;
+}
+
+inline uint64_t IntegerCompressor::ndx_bits() const
+{
+    REALM_ASSERT_DEBUG(is_packed() || is_flex());
+    if (!m_ndx_bits)
+        m_ndx_bits = (1ULL << m_ndx_width) - 1;
+    return m_ndx_bits;
 }
 
 inline int64_t IntegerCompressor::get(size_t ndx) const
