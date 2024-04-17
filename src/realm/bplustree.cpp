@@ -20,6 +20,7 @@
 #include <realm/impl/destroy_guard.hpp>
 #include <realm/array_unsigned.hpp>
 #include <realm/array_integer.hpp>
+#include <realm/impl/array_writer.hpp>
 
 using namespace realm;
 
@@ -832,15 +833,15 @@ std::unique_ptr<BPlusTreeNode> BPlusTreeBase::create_root_from_ref(ref_type ref)
 }
 
 // this should only be called for a column_type which we can safely compress.
-ref_type BPlusTreeBase::typed_write(ref_type ref, _impl::ArrayWriterBase& out, Allocator& alloc, bool only_modified,
+ref_type BPlusTreeBase::typed_write(ref_type ref, _impl::ArrayWriterBase& out, Allocator& alloc,
                                     TypedWriteFunc leaf_write_func)
 {
-    if (only_modified && alloc.is_read_only(ref))
+    if (out.only_modified && alloc.is_read_only(ref))
         return ref;
 
     if (!NodeHeader::get_is_inner_bptree_node_from_header(alloc.translate(ref))) {
         // leaf
-        return leaf_write_func(ref, out, alloc, only_modified);
+        return leaf_write_func(ref, out, alloc);
     }
 
     Array node(alloc);
@@ -855,11 +856,10 @@ ref_type BPlusTreeBase::typed_write(ref_type ref, _impl::ArrayWriterBase& out, A
                 // keys (ArrayUnsigned me thinks)
                 Array a(alloc);
                 a.init_from_ref(rot.get_as_ref());
-                written_node.set_as_ref(j, a.write(out, false, only_modified, false));
+                written_node.set_as_ref(j, a.write(out, false, out.only_modified, false));
             }
             else {
-                written_node.set_as_ref(
-                    j, BPlusTreeBase::typed_write(rot.get_as_ref(), out, alloc, only_modified, leaf_write_func));
+                written_node.set_as_ref(j, BPlusTreeBase::typed_write(rot.get_as_ref(), out, alloc, leaf_write_func));
             }
         }
         else

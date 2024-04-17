@@ -362,7 +362,7 @@ public:
         return false;
     }
     virtual void set_spec(Spec*, size_t) const {}
-    static ref_type typed_write(ref_type ref, _impl::ArrayWriterBase& out, Allocator& alloc, bool only_modified);
+    static ref_type typed_write(ref_type ref, _impl::ArrayWriterBase& out, Allocator& alloc);
 };
 
 } // namespace realm

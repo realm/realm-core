@@ -1565,14 +1565,15 @@ static auto switch_on_type(ColKey ck, Fn&& fn)
         default:
             REALM_COMPILER_HINT_UNREACHABLE();
     }
+    return ref_type(0);
 }
 
 } // namespace
 
-ref_type Cluster::typed_write(ref_type ref, _impl::ArrayWriterBase& out, const Table& table, bool, bool only_modified,
-                              bool) const
+ref_type Cluster::typed_write(ref_type ref, _impl::ArrayWriterBase& out) const
 {
     REALM_ASSERT_DEBUG(ref == get_mem().get_ref());
+    bool only_modified = out.only_modified;
     if (only_modified && m_alloc.is_read_only(ref))
         return ref;
     REALM_ASSERT_DEBUG(!get_is_inner_bptree_node_from_header(get_header()));
@@ -1602,7 +1603,7 @@ ref_type Cluster::typed_write(ref_type ref, _impl::ArrayWriterBase& out, const T
         }
         else {
             // Columns
-            auto col_key = table.m_leaf_ndx2colkey[j - 1];
+            auto col_key = out.table->m_leaf_ndx2colkey[j - 1];
             if (col_key.is_collection()) {
                 ArrayRef arr_ref(m_alloc);
                 arr_ref.init_from_ref(ref);
@@ -1617,13 +1618,13 @@ ref_type Cluster::typed_write(ref_type ref, _impl::ArrayWriterBase& out, const T
                     // and it is not a BplusTree inner node, then it is a dictionary
                     if (auto sub_ref = arr_ref.get(k)) {
                         if (col_key.is_dictionary()) {
-                            new_sub_ref = Dictionary::typed_write(sub_ref, out, m_alloc, only_modified);
+                            new_sub_ref = Dictionary::typed_write(sub_ref, out, m_alloc);
                         }
                         else {
                             // List or set - Can be handled the same way
                             new_sub_ref = switch_on_type(col_key, [&](auto t) {
                                 using U = std::decay_t<decltype(*t)>;
-                                return BPlusTree<U>::typed_write(sub_ref, out, m_alloc, only_modified);
+                                return BPlusTree<U>::typed_write(sub_ref, out, m_alloc);
                             });
                         }
                     }
@@ -1634,7 +1635,7 @@ ref_type Cluster::typed_write(ref_type ref, _impl::ArrayWriterBase& out, const T
             else {
                 new_ref = switch_on_type(col_key, [&](auto t) {
                     using U = std::decay_t<decltype(*t)>;
-                    return ColumnTypeTraits<U>::cluster_leaf_type::typed_write(ref, out, m_alloc, only_modified);
+                    return ColumnTypeTraits<U>::cluster_leaf_type::typed_write(ref, out, m_alloc);
                 });
             }
         }

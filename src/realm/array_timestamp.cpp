@@ -18,6 +18,7 @@
 
 #include <realm/array_timestamp.hpp>
 #include <realm/array_integer_tpl.hpp>
+#include <realm/impl/array_writer.hpp>
 
 using namespace realm;
 
@@ -245,7 +246,7 @@ void ArrayTimestamp::verify() const
 #endif
 }
 
-ref_type ArrayTimestamp::typed_write(ref_type ref, _impl::ArrayWriterBase& out, Allocator& alloc, bool only_modified)
+ref_type ArrayTimestamp::typed_write(ref_type ref, _impl::ArrayWriterBase& out, Allocator& alloc)
 {
     // timestamps could be compressed, but the formats we support at the moment are not producing
     // noticeable gains.
@@ -260,8 +261,8 @@ ref_type ArrayTimestamp::typed_write(ref_type ref, _impl::ArrayWriterBase& out, 
     auto rot1 = top.get_as_ref_or_tagged(1);
     REALM_ASSERT_DEBUG(rot0.is_ref() && rot0.get_as_ref());
     REALM_ASSERT_DEBUG(rot1.is_ref() && rot1.get_as_ref());
-    written_top.set_as_ref(0, Array::write(rot0.get_as_ref(), alloc, out, only_modified, false));
-    written_top.set_as_ref(1, Array::write(rot1.get_as_ref(), alloc, out, only_modified, false));
+    written_top.set_as_ref(0, Array::write(rot0.get_as_ref(), alloc, out, out.only_modified, false));
+    written_top.set_as_ref(1, Array::write(rot1.get_as_ref(), alloc, out, out.only_modified, false));
 
     auto ret = written_top.write(out, false, false, false);
     written_top.destroy();

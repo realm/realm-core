@@ -3337,12 +3337,12 @@ ColKey Table::find_opposite_column(ColKey col_key) const
     return ColKey();
 }
 
-ref_type Table::typed_write(ref_type ref, _impl::ArrayWriterBase& out, bool deep, bool only_modified,
-                            bool compress) const
+ref_type Table::typed_write(ref_type ref, _impl::ArrayWriterBase& out) const
 {
     REALM_ASSERT(ref == m_top.get_mem().get_ref());
-    if (only_modified && m_alloc.is_read_only(ref))
+    if (out.only_modified && m_alloc.is_read_only(ref))
         return ref;
+    out.table = this;
     // ignore ref from here, just use Tables own accessors
     Array dest(Allocator::get_default());
     dest.create(NodeHeader::type_HasRefs, false, m_top.size());
@@ -3355,13 +3355,13 @@ ref_type Table::typed_write(ref_type ref, _impl::ArrayWriterBase& out, bool deep
             ref_type new_ref;
             if (j == 2) {
                 // only do type driven write for clustertree
-                new_ref = m_clusters.typed_write(rot.get_as_ref(), out, *this, deep, only_modified, compress);
+                new_ref = m_clusters.typed_write(rot.get_as_ref(), out);
             }
             else {
                 // rest is handled using untyped approach
                 Array a(m_alloc);
                 a.init_from_ref(rot.get_as_ref());
-                new_ref = a.write(out, deep, only_modified, false);
+                new_ref = a.write(out, true, out.only_modified, false);
             }
             dest.set_as_ref(j, new_ref);
         }

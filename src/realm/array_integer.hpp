@@ -71,11 +71,12 @@ public:
     template <class cond>
     bool find(value_type value, size_t start, size_t end, QueryStateBase* state) const;
 
-    static ref_type typed_write(ref_type ref, _impl::ArrayWriterBase& out, Allocator& alloc, bool only_modified)
+    template <class T>
+    static ref_type typed_write(ref_type ref, T& out, Allocator& alloc)
     {
         Array arr(alloc);
         arr.init_from_ref(ref);
-        return arr.write(out, false, only_modified, true);
+        return arr.write(out, false, out.only_modified, true);
     }
 };
 

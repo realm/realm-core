@@ -1200,9 +1200,9 @@ LinkCollectionPtr Dictionary::clone_as_obj_list() const
     return nullptr;
 }
 
-ref_type Dictionary::typed_write(ref_type ref, _impl::ArrayWriterBase& out, Allocator& alloc, bool only_modified)
+ref_type Dictionary::typed_write(ref_type ref, _impl::ArrayWriterBase& out, Allocator& alloc)
 {
-    if (only_modified && alloc.is_read_only(ref))
+    if (out.only_modified && alloc.is_read_only(ref))
         return ref;
 
     ArrayRef dict_top(alloc);
@@ -1219,14 +1219,14 @@ ref_type Dictionary::typed_write(ref_type ref, _impl::ArrayWriterBase& out, Allo
         NodeHeader::get_wtype_from_header(header) != Array::wtype_Multiply) {
         // Key type int.
         REALM_ASSERT(!NodeHeader::get_is_inner_bptree_node_from_header(header));
-        written_dict_top.set_as_ref(0, BPlusTree<int64_t>::typed_write(key_ref, out, alloc, only_modified));
+        written_dict_top.set_as_ref(0, BPlusTree<int64_t>::typed_write(key_ref, out, alloc));
     }
     else {
-        written_dict_top.set_as_ref(0, BPlusTree<StringData>::typed_write(key_ref, out, alloc, only_modified));
+        written_dict_top.set_as_ref(0, BPlusTree<StringData>::typed_write(key_ref, out, alloc));
     }
 
     auto values_ref = dict_top.get_as_ref(1);
-    written_dict_top.set_as_ref(1, BPlusTree<Mixed>::typed_write(values_ref, out, alloc, only_modified));
+    written_dict_top.set_as_ref(1, BPlusTree<Mixed>::typed_write(values_ref, out, alloc));
 
     auto ret = written_dict_top.write(out, false, false, false);
     written_dict_top.destroy();

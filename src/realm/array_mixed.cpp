@@ -19,6 +19,7 @@
 #include <realm/array_mixed.hpp>
 #include <realm/array_basic.hpp>
 #include <realm/dictionary.hpp>
+#include <realm/impl/array_writer.hpp>
 
 using namespace realm;
 
@@ -320,9 +321,9 @@ void ArrayMixed::verify() const
     // TODO: Implement
 }
 
-ref_type ArrayMixed::typed_write(ref_type ref, _impl::ArrayWriterBase& out, Allocator& alloc, bool only_modified)
+ref_type ArrayMixed::typed_write(ref_type ref, _impl::ArrayWriterBase& out, Allocator& alloc)
 {
-    if (only_modified && alloc.is_read_only(ref))
+    if (out.only_modified && alloc.is_read_only(ref))
         return ref;
     ArrayRef top(alloc);
     top.init_from_ref(ref);
@@ -356,13 +357,13 @@ ref_type ArrayMixed::typed_write(ref_type ref, _impl::ArrayWriterBase& out, Allo
      */
     Array composite(alloc);
     composite.init_from_ref(top.get_as_ref(0));
-    written_leaf.set_as_ref(0, composite.write(out, true, only_modified, false));
+    written_leaf.set_as_ref(0, composite.write(out, true, out.only_modified, false));
     for (size_t i = 1; i < sz; ++i) {
         ref_type new_ref = 0;
         if (auto ref = top.get(i)) {
             if (i < 3) { // int, and pair_int
                 // integer arrays
-                new_ref = Array::write(ref, alloc, out, only_modified, true);
+                new_ref = Array::write(ref, alloc, out, out.only_modified, out.compress);
             }
             else if (i == 4) { // collection in mixed
                 ArrayRef arr_ref(alloc);
@@ -380,10 +381,10 @@ ref_type ArrayMixed::typed_write(ref_type ref, _impl::ArrayWriterBase& out, Allo
                         // and it is not a BplusTree inner node, then it is a dictionary
                         if (NodeHeader::get_size_from_header(header) == 2 &&
                             !NodeHeader::get_is_inner_bptree_node_from_header(header)) {
-                            new_sub_ref = Dictionary::typed_write(sub_ref, out, alloc, only_modified);
+                            new_sub_ref = Dictionary::typed_write(sub_ref, out, alloc);
                         }
                         else {
-                            new_sub_ref = BPlusTree<Mixed>::typed_write(sub_ref, out, alloc, only_modified);
+                            new_sub_ref = BPlusTree<Mixed>::typed_write(sub_ref, out, alloc);
                         }
                     }
                     written_ref_leaf.set_as_ref(k, new_sub_ref);
@@ -391,11 +392,11 @@ ref_type ArrayMixed::typed_write(ref_type ref, _impl::ArrayWriterBase& out, Allo
                 new_ref = written_ref_leaf.write(out, false, false, false);
             }
             else if (i == 5) { // unique keys associated to collections in mixed
-                new_ref = Array::write(ref, alloc, out, only_modified, true);
+                new_ref = Array::write(ref, alloc, out, out.only_modified, out.compress);
             }
             else {
                 // all the rest we don't want to compress it, at least for now (strings will be needed)
-                new_ref = Array::write(ref, alloc, out, only_modified, false);
+                new_ref = Array::write(ref, alloc, out, out.only_modified, false);
             }
         }
         written_leaf.set(i, new_ref);

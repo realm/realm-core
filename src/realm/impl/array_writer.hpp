@@ -22,10 +22,14 @@
 #include <realm/alloc.hpp>
 
 namespace realm {
+class Table;
 namespace _impl {
 
 class ArrayWriterBase {
 public:
+    bool only_modified = true;
+    bool compress = true;
+    const Table* table;
     virtual ~ArrayWriterBase()
     {
     }

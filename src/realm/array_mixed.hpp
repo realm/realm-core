@@ -100,7 +100,7 @@ public:
     int64_t get_key(size_t ndx) const;
 
     void verify() const;
-    static ref_type typed_write(ref_type ref, _impl::ArrayWriterBase& outs, Allocator& alloc, bool only_modified);
+    static ref_type typed_write(ref_type ref, _impl::ArrayWriterBase& outs, Allocator& alloc);
 
 private:
     enum {

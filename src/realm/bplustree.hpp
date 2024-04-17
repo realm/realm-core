@@ -126,7 +126,7 @@ public:
 /*****************************************************************************/
 class BPlusTreeBase {
 public:
-    using TypedWriteFunc = ref_type (*)(ref_type, _impl::ArrayWriterBase&, Allocator&, bool);
+    using TypedWriteFunc = ref_type (*)(ref_type, _impl::ArrayWriterBase&, Allocator&);
 
     BPlusTreeBase(Allocator& alloc)
         : m_alloc(alloc)
@@ -218,7 +218,7 @@ public:
         m_root->verify();
     }
 
-    static ref_type typed_write(ref_type, _impl::ArrayWriterBase&, Allocator&, bool, TypedWriteFunc);
+    static ref_type typed_write(ref_type, _impl::ArrayWriterBase&, Allocator&, TypedWriteFunc);
     static void typed_print(std::string prefix, Allocator& alloc, ref_type root, ColumnType col_type);
 
 
@@ -562,9 +562,9 @@ public:
         }
     }
 
-    static ref_type typed_write(ref_type ref, _impl::ArrayWriterBase& out, Allocator& alloc, bool only_modified)
+    static ref_type typed_write(ref_type ref, _impl::ArrayWriterBase& out, Allocator& alloc)
     {
-        return BPlusTreeBase::typed_write(ref, out, alloc, only_modified, LeafArray::typed_write);
+        return BPlusTreeBase::typed_write(ref, out, alloc, LeafArray::typed_write);
     }
 
 protected:

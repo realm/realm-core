@@ -1368,9 +1368,11 @@ void Array::typed_print(std::string prefix) const
     }
 }
 
-ref_type ArrayPayload::typed_write(ref_type ref, _impl::ArrayWriterBase& out, Allocator& alloc, bool only_modified)
+ref_type ArrayPayload::typed_write(ref_type ref, _impl::ArrayWriterBase& out, Allocator& alloc)
 {
     Array arr(alloc);
     arr.init_from_ref(ref);
-    return arr.write(out, true, only_modified, false);
+    // By default we are not compressing
+    constexpr bool compress = false;
+    return arr.write(out, true, out.only_modified, compress);
 }
