@@ -204,6 +204,10 @@ if(REALM_ENABLE_SYNC)
     endif()
 endif()
 
+if (REALM_APP_SERVICES)
+    target_compile_definitions(ObjectStore PUBLIC REALM_APP_SERVICES=1)
+endif()
+
 set_target_properties(ObjectStore PROPERTIES OUTPUT_NAME "realm-object-store")
 
 foreach(FILE ${HEADERS})
