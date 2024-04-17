@@ -1299,6 +1299,52 @@ buildvariants:
   tasks:
   - name: core_tests_group
 
+# TODO RCORE-2085 ubuntu2004-release/ubuntu2004-arm64 build variants are here until we've established
+# a new baseline for the updated ubuntu 2204/clang 18 builders.
+- name: ubuntu2004-release
+  display_name: "Ubuntu 20.04 x86_64 (Clang 11 benchmarks)"
+  run_on: ubuntu2004-large
+  expansions:
+    clang_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/clang%2Bllvm-11.0.0-x86_64-linux-gnu-ubuntu-20.04.tar.xz"
+    clang_sha256_sum: "829f5fb0ebda1d8716464394f97d5475d465ddc7bea2879c0601316b611ff6db"
+    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.26.3-linux-x86_64.tar.gz"
+    cmake_bindir: "./cmake_binaries/bin"
+    cmake_build_type: RelWithDebInfo
+    fetch_missing_dependencies: On
+    c_compiler: "./clang_binaries/bin/clang"
+    cxx_compiler: "./clang_binaries/bin/clang++"
+    python3: /opt/mongodbtoolchain/v3/bin/python3
+  tasks:
+  - name: benchmarks
+
+- name: ubuntu2004-arm64
+  display_name: "Ubuntu 20.04 ARM64 (Clang 11 benchmarks)"
+  run_on: ubuntu2004-arm64-large
+  expansions:
+    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.26.3-linux-aarch64.tar.gz"
+    cmake_bindir: "./cmake_binaries/bin"
+    python3: "/opt/mongodbtoolchain/v3/bin/python3"
+    use_system_openssl: On
+    fetch_missing_dependencies: On
+    cmake_build_type: RelWithDebInfo
+  tasks:
+  - name: benchmarks
+
+- name: ubuntu-x86_64-benchmarks
+  display_name: "Ubuntu x86_64 benchmarks"
+  run_on: ubuntu2204-large
+  expansions:
+    fetch_missing_dependencies: On
+    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.26.3-linux-x86_64.tar.gz"
+    cmake_bindir: "./cmake_binaries/bin"
+    clang_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/clang%2Bllvm-18.1.2-x86_64-linux-gnu.tar.xz"
+    clang_sha256_sum: "feab4b0f5fba325bfe0f4245710fd19fd74f813f44b5e81eda794f4f75bca343"
+    c_compiler: "./clang_binaries/bin/clang"
+    cxx_compiler: "./clang_binaries/bin/clang++"
+    cmake_build_type: RelWithDebInfo
+  tasks:
+  - name: benchmarks
+
 - name: ubuntu-release
   display_name: "Ubuntu (Release build)"
   run_on: ubuntu2204-arm64-large
