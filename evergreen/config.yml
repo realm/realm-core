@@ -732,7 +732,11 @@ tasks:
       working_dir: realm-core
       script: |-
         set -o errexit
-        CPACK="$(./evergreen/abspath.sh ${cmake_bindir}/cpack)"
+        if [[ -n "${cmake_bindir}" ]]; then
+          CPACK="$(./evergreen/abspath.sh ${cmake_bindir}/cpack)"
+        else
+          CPACK="cpack"
+        fi
 
         cd build
         $CPACK -C ${cmake_build_type|Debug} -G TGZ -D "CPACK_PACKAGE_FILE_NAME=realm-core-artifacts" ${package_flags|}
