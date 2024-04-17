@@ -232,6 +232,8 @@ public:
 
     LinkCollectionPtr clone_as_obj_list() const final;
 
+    static ref_type typed_write(ref_type ref, _impl::ArrayWriterBase& out, Allocator& alloc, bool only_modified);
+
 private:
     using Base::set_collection;
 

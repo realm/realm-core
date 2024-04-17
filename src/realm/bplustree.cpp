@@ -832,60 +832,42 @@ std::unique_ptr<BPlusTreeNode> BPlusTreeBase::create_root_from_ref(ref_type ref)
 }
 
 // this should only be called for a column_type which we can safely compress.
-ref_type BPlusTreeBase::typed_write(ref_type ref, _impl::ArrayWriterBase& out, Allocator& alloc, ColumnType col_type,
-                                    bool deep, bool only_modified, bool compress, bool collection_in_mixed)
+ref_type BPlusTreeBase::typed_write(ref_type ref, _impl::ArrayWriterBase& out, Allocator& alloc, bool only_modified,
+                                    TypedWriteFunc leaf_write_func)
 {
     if (only_modified && alloc.is_read_only(ref))
         return ref;
-    char* header = alloc.translate(ref);
+
+    if (!NodeHeader::get_is_inner_bptree_node_from_header(alloc.translate(ref))) {
+        // leaf
+        return leaf_write_func(ref, out, alloc, only_modified);
+    }
+
     Array node(alloc);
     node.init_from_ref(ref);
-    if (NodeHeader::get_is_inner_bptree_node_from_header(header)) {
-        REALM_ASSERT_DEBUG(node.has_refs());
-        Array written_node(Allocator::get_default());
-        written_node.create(NodeHeader::type_InnerBptreeNode, false, node.size());
-        for (unsigned j = 0; j < node.size(); ++j) {
-            RefOrTagged rot = node.get_as_ref_or_tagged(j);
-            if (rot.is_ref() && rot.get_as_ref()) {
-                if (j == 0) {
-                    // keys (ArrayUnsigned me thinks)
-                    Array a(alloc);
-                    a.init_from_ref(rot.get_as_ref());
-                    written_node.set_as_ref(j, a.write(out, deep, only_modified, false));
-                }
-                else {
-                    written_node.set_as_ref(j,
-                                            BPlusTreeBase::typed_write(rot.get_as_ref(), out, alloc, col_type, deep,
-                                                                       only_modified, compress, collection_in_mixed));
-                }
+    REALM_ASSERT_DEBUG(node.has_refs());
+    Array written_node(Allocator::get_default());
+    written_node.create(NodeHeader::type_InnerBptreeNode, false, node.size());
+    for (unsigned j = 0; j < node.size(); ++j) {
+        RefOrTagged rot = node.get_as_ref_or_tagged(j);
+        if (rot.is_ref() && rot.get_as_ref()) {
+            if (j == 0) {
+                // keys (ArrayUnsigned me thinks)
+                Array a(alloc);
+                a.init_from_ref(rot.get_as_ref());
+                written_node.set_as_ref(j, a.write(out, false, only_modified, false));
             }
-            else
-                written_node.set(j, rot);
-        }
-        auto written_ref = written_node.write(out, false, false, false);
-        written_node.destroy();
-        return written_ref;
-    }
-    else if (node.has_refs()) {
-        // if collection in mixed is set, it means that this node is actually a mixed property that contains
-        // a collection in it. So we need to vist the collection that is part of the node and reach the final leaf,
-        // in order to determine whether the leaf can be compressed.
-        if (collection_in_mixed) {
-            const auto sz = node.size();
-            for (size_t j = 0; j < sz; ++j) {
-                RefOrTagged rot = node.get_as_ref_or_tagged(j);
-                if (rot.is_ref() && rot.get_as_ref()) {
-                    const auto btree_ref = BPlusTreeBase::typed_write(rot.get_as_ref(), out, alloc, col_type, deep,
-                                                                      only_modified, compress, collection_in_mixed);
-                    node.set_as_ref(j, btree_ref);
-                }
+            else {
+                written_node.set_as_ref(
+                    j, BPlusTreeBase::typed_write(rot.get_as_ref(), out, alloc, only_modified, leaf_write_func));
             }
         }
-        return node.write(out, deep, only_modified, false);
+        else
+            written_node.set(j, rot);
     }
-    else {
-        return node.write(out, deep, only_modified, true); // leaf array - do compress
-    }
+    auto written_ref = written_node.write(out, false, false, false);
+    written_node.destroy();
+    return written_ref;
 }
 
 void BPlusTreeBase::typed_print(std::string prefix, Allocator& alloc, ref_type root, ColumnType col_type)

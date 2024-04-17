@@ -753,6 +753,7 @@ static void do_Dictionary_HashCollisionTransaction(realm::test_util::unit_test::
     auto rt = db->start_read();
     for (int64_t i = 0; i < nb_entries; i++) {
         rt->promote_to_write();
+        rt->verify();
 
         auto foos = rt->get_table("Foo");
         auto bars = rt->get_table("Bar");

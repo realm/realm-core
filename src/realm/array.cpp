@@ -1367,3 +1367,10 @@ void Array::typed_print(std::string prefix) const
         std::cout << " Leaf of unknown type }" << std::endl;
     }
 }
+
+ref_type ArrayPayload::typed_write(ref_type ref, _impl::ArrayWriterBase& out, Allocator& alloc, bool only_modified)
+{
+    Array arr(alloc);
+    arr.init_from_ref(ref);
+    return arr.write(out, true, only_modified, false);
+}
