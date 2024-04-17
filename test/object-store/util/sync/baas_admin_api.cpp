@@ -1081,8 +1081,14 @@ bool AdminAPISession::is_initial_sync_complete(const std::string& app_id) const
 {
     auto progress_endpoint = apps()[app_id]["sync"]["progress"];
     auto progress_result = progress_endpoint.get_json();
-    if (auto it = progress_result.find("accepting_clients"); it != progress_result.end()) {
-        return it->get<bool>();
+    if (auto it = progress_result.find("progress"); it != progress_result.end() && it->is_object() && !it->empty()) {
+        for (auto& elem : *it) {
+            auto is_complete = elem["complete"];
+            if (!is_complete.is_boolean() || !is_complete.get<bool>()) {
+                return false;
+            }
+        }
+        return true;
     }
     return false;
 }
