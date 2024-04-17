@@ -248,7 +248,6 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
         }
     }
 
-
 // Windows doesn't use fifos
 #ifndef _WIN32
     SECTION("should be able to set a FIFO fallback path") {
@@ -461,6 +460,7 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
         REQUIRE(realm4->schema().size() == 1);
         REQUIRE(realm4->schema().find("object") != realm4->schema().end());
     }
+
 #ifndef _WIN32
     SECTION("should throw when creating the notification pipe fails") {
         // The ExternalCommitHelper implementation on Windows doesn't rely on FIFOs
@@ -480,21 +480,23 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
     }
 #endif
 
+#if !REALM_USE_UV && !TEST_SCHEDULER_UV // uv scheduler does not support background threads
     SECTION("should get different instances on different threads") {
         config.cache = true;
         auto realm1 = Realm::get_shared_realm(config);
-        std::thread([&] {
+        JoiningThread([&] {
             auto realm2 = Realm::get_shared_realm(config);
             REQUIRE(realm1 != realm2);
-        }).join();
+        });
     }
+#endif
 
     SECTION("should detect use of Realm on incorrect thread") {
         auto realm = Realm::get_shared_realm(config);
-        std::thread([&] {
+        JoiningThread([&] {
             REQUIRE_THROWS_MATCHES(realm->verify_thread(), LogicError,
                                    Catch::Matchers::Message("Realm accessed from incorrect thread."));
-        }).join();
+        });
     }
 
     // Our test scheduler uses a simple integer identifier to allow cross thread scheduling
@@ -543,19 +545,19 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
         config.cache = true;
         config.scheduler = std::make_shared<SimpleScheduler>(1);
         auto realm = Realm::get_shared_realm(config);
-        std::thread([&] {
+        JoiningThread([&] {
             REQUIRE_NOTHROW(realm->verify_thread());
-        }).join();
+        });
     }
 
     SECTION("should get same instance for same explicit execution context on different thread") {
         config.cache = true;
         config.scheduler = std::make_shared<SimpleScheduler>(1);
         auto realm1 = Realm::get_shared_realm(config);
-        std::thread([&] {
+        JoiningThread([&] {
             auto realm2 = Realm::get_shared_realm(config);
             REQUIRE(realm1 == realm2);
-        }).join();
+        });
     }
 
     SECTION("should not modify the schema when fetching from the cache") {
@@ -4059,15 +4061,15 @@ TEST_CASE("SharedRealm: compact on launch") {
         config.scheduler = util::Scheduler::make_frozen(VersionID());
         r = Realm::get_shared_realm(config);
         REQUIRE(num_opens == 2);
-        std::thread([&] {
+        JoiningThread([&] {
             auto r2 = Realm::get_shared_realm(config);
             REQUIRE(num_opens == 2);
-        }).join();
+        });
         r->close();
-        std::thread([&] {
+        JoiningThread([&] {
             auto r3 = Realm::get_shared_realm(config);
             REQUIRE(num_opens == 3);
-        }).join();
+        });
     }
 }
 
@@ -4355,16 +4357,16 @@ TEST_CASE("RealmCoordinator: get_unbound_realm()") {
     };
 
     ThreadSafeReference ref;
-    std::thread([&] {
+    JoiningThread([&] {
         ref = _impl::RealmCoordinator::get_coordinator(config)->get_unbound_realm();
-    }).join();
+    });
 
     SECTION("checks thread after being resolved") {
         auto realm = Realm::get_shared_realm(std::move(ref));
         REQUIRE_NOTHROW(realm->verify_thread());
-        std::thread([&] {
+        JoiningThread([&] {
             REQUIRE_EXCEPTION(realm->verify_thread(), WrongThread, "Realm accessed from incorrect thread.");
-        }).join();
+        });
     }
 
     SECTION("delivers notifications to the thread it is resolved on") {
@@ -4396,9 +4398,9 @@ TEST_CASE("RealmCoordinator: get_unbound_realm()") {
         REQUIRE(r1 != r2);
 
         // New unbound with cache disabled
-        std::thread([&] {
+        JoiningThread([&] {
             ref = _impl::RealmCoordinator::get_coordinator(config)->get_unbound_realm();
-        }).join();
+        });
         auto r3 = Realm::get_shared_realm(std::move(ref));
         REQUIRE(r1 != r3);
         REQUIRE(r2 != r3);
