@@ -15,8 +15,6 @@
   * Fixed `Assertion failed: new_size % (1ULL << m_page_shift) == 0` when opening an encrypted Realm less than 64Mb that was generated on a platform with a different page size than the current platform. ([#7322](https://github.com/realm/realm-core/issues/7322), since v13.17.1)
   * Fixed a `DecryptionFailed` exception thrown when opening a small (<4k of data) Realm generated on a device with a page size of 4k if it was bundled and opened on a device with a larger page size (since the beginning).
   * Fixed an issue during a subsequent open of an encrypted Realm for some rare allocation patterns when the top ref was within ~50 bytes of the end of a page. This could manifest as a DecryptionFailed exception or as an assertion: `encrypted_file_mapping.hpp:183: Assertion failed: local_ndx < m_page_state.size()`. ([#7319](https://github.com/realm/realm-core/issues/7319))
-* Fix compilation errors when using command-line `swift build` ([#7587](https://github.com/realm/realm-core/pull/7587), since v14.5.1).
-* Fixed crash when integrating removal of already removed dictionary key ([#7488](https://github.com/realm/realm-core/issues/7488), since v10.0.0).
 * Non-streaming download sync progress notification is fixed for flexible sync Realms where before it was sometimes stopping to emit values right after the registration of the callback (PR [#7561](https://github.com/realm/realm-core/issues/7561)).
 
 ### Breaking changes
@@ -49,6 +47,22 @@
 * App metadata storage has been entirely rewritten in preparation for supporting sharing metadata realms between processes. ([PR #7300](https://github.com/realm/realm-core/pull/7300).
 * The metadata disabled mode has been replaced with an in-memory metadata mode which performs similarly and doesn't work weirdly differently from the normal mode. The new mode is intended for testing purposes, but should be suitable for production usage if there is a scenario where metadata persistence is not needed. ([PR #7300](https://github.com/realm/realm-core/pull/7300).
 * The ownership relationship between App and User has changed. User now strongly retains App and App has a weak cache of Users. This means that creating a SyncConfig or opening a Realm will keep the parent App alive, rather than things being in a broken state if the App is deallocated. ([PR #7300](https://github.com/realm/realm-core/pull/7300).
+
+----------------------------------------------
+
+# 14.5.2 Release notes
+
+### Fixed
+* Fix compilation errors when using command-line `swift build` ([#7587](https://github.com/realm/realm-core/pull/7587), since v14.5.1).
+* Fixed crash when integrating removal of already removed dictionary key ([#7488](https://github.com/realm/realm-core/issues/7488), since v10.0.0).
+
+### Compatibility
+* Fileformat: Generates files with format v24. Reads and automatically upgrade from fileformat v10. If you want to upgrade from an earlier file format version you will have to use RealmCore v13.x.y or earlier.
+
+-----------
+
+### Internals
+* `prior_size` field in Clear instruction is being repurposed as `collection_type` (no protocol changes required)
 
 ----------------------------------------------
 
