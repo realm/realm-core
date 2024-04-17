@@ -58,6 +58,7 @@ private:
     std::unordered_map<CompressedString, size_t> m_compressed_string_map;
     // for reference/debugging (to be removed)
     std::vector<std::string> m_strings;
+    bool null_seen = false;
 };
 } // namespace realm
 

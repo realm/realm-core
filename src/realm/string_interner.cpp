@@ -29,8 +29,10 @@ StringInterner::~StringInterner() {}
 StringID StringInterner::intern(StringData sd)
 {
     // special case for null string
-    if (sd.data() == nullptr)
+    if (sd.data() == nullptr) {
+        null_seen = true;
         return 0;
+    }
     bool learn = true;
     auto c_str = compressor.compress(sd, learn);
     auto it = m_compressed_string_map.find(c_str);
@@ -47,8 +49,11 @@ StringID StringInterner::intern(StringData sd)
 
 std::optional<StringID> StringInterner::lookup(StringData sd)
 {
-    if (sd.data() == nullptr)
-        return 0;
+    if (sd.data() == nullptr) {
+        if (null_seen)
+            return 0;
+        return {};
+    }
     bool dont_learn = false;
     auto c_str = compressor.compress(sd, dont_learn);
     auto it = m_compressed_string_map.find(c_str);

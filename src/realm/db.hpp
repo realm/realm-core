@@ -452,7 +452,7 @@ public:
     void add_commit_listener(CommitListener*);
     void remove_commit_listener(CommitListener*);
 
-    StringInterner* get_string_interner(TableKey, ColKey::Idx);
+    StringInterner* get_string_interner(TableKey, ColKey);
 
 private:
     class AsyncCommitHelper;
@@ -518,7 +518,7 @@ private:
     std::shared_ptr<util::Logger> m_logger;
     std::mutex m_commit_listener_mutex;
     std::vector<CommitListener*> m_commit_listeners;
-    std::unordered_map<TableKey, std::vector<StringInterner*>*> m_string_interners;
+    std::unordered_map<TableKey, std::unordered_map<ColKey, StringInterner*>*> m_string_interners;
     std::mutex m_string_interners_mutex;
     bool m_is_sync_agent = false;
     // Id for this DB to be used in logging. We will just use some bits from the pointer.

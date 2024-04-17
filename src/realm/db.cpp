@@ -2931,24 +2931,25 @@ DisableReplication::~DisableReplication()
         m_tr.initialize_replication();
 }
 
-StringInterner* DB::get_string_interner(TableKey tk, ColKey::Idx col_idx)
+StringInterner* DB::get_string_interner(TableKey tk, ColKey col_key)
 {
     std::lock_guard lock(m_string_interners_mutex);
     auto it = m_string_interners.find(tk);
-    std::vector<StringInterner*>* interners;
+    std::unordered_map<ColKey, StringInterner*>* interners;
     if (it == m_string_interners.end()) {
-        interners = new std::vector<StringInterner*>();
+        interners = new std::unordered_map<ColKey, StringInterner*>();
         m_string_interners[tk] = interners;
     }
     else {
         interners = it->second;
     }
-    while (col_idx.val >= interners->size()) {
-        interners->push_back(nullptr);
+    auto it2 = interners->find(col_key);
+    if (it2 == interners->end()) {
+        auto interner = new StringInterner;
+        (*interners)[col_key] = interner;
+        return interner;
     }
-    if ((*interners)[col_idx.val] == nullptr)
-        (*interners)[col_idx.val] = new StringInterner;
-    return (*interners)[col_idx.val];
+    return it2->second;
 }
 
 } // namespace realm

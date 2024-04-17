@@ -1080,6 +1080,22 @@ void Table::do_erase_root_column(ColKey col_key)
         REALM_ASSERT(m_index_accessors.back() == nullptr);
         m_index_accessors.pop_back();
     }
+    // clean up any string interner on the column
+    {
+        // reassses if this is really needed
+        std::lock_guard lock(m_string_interners_mutex);
+        if (m_string_interners[col_ndx]) {
+            Group* g = get_parent_group();
+            Transaction* t = nullptr;
+            if (g) {
+                t = dynamic_cast<Transaction*>(g);
+            }
+            if (!t) {
+                delete m_string_interners[col_ndx];
+            }
+            m_string_interners[col_ndx] = nullptr;
+        }
+    }
     bump_content_version();
     bump_storage_version();
 }
@@ -3414,11 +3430,7 @@ void Table::typed_print(std::string prefix, ref_type ref) const
 
 StringInterner* Table::get_string_interner(ColKey col_key) const
 {
-    return get_string_interner(col_key.get_index());
-}
-
-StringInterner* Table::get_string_interner(ColKey::Idx idx) const
-{
+    ColKey::Idx idx = col_key.get_index();
     // TODO: This method likely needs to be lock-free
     std::lock_guard lock(m_string_interners_mutex);
     size_t j = idx.val;
@@ -3438,7 +3450,7 @@ StringInterner* Table::get_string_interner(ColKey::Idx idx) const
     }
     if (db) {
         // obtain interner from DB
-        interner = db->get_string_interner(get_key(), idx);
+        interner = db->get_string_interner(get_key(), col_key);
     }
     else {
         // create a local interner instead

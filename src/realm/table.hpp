@@ -575,7 +575,6 @@ public:
     ColKey::Idx spec_ndx2leaf_ndx(size_t idx) const;
     ColKey leaf_ndx2colkey(ColKey::Idx idx) const;
     ColKey spec_ndx2colkey(size_t ndx) const;
-    StringInterner* get_string_interner(ColKey::Idx idx) const;
     StringInterner* get_string_interner(ColKey col_key) const;
     // Queries
     // Using where(tv) is the new method to perform queries on TableView. The 'tv' can have any order; it does not
