@@ -65,14 +65,28 @@ inline int64_t PackedCompressor::get(const IntegerCompressor& c, size_t ndx) con
 
 inline std::vector<int64_t> PackedCompressor::get_all(const IntegerCompressor& c, size_t b, size_t e) const
 {
+    const auto range = (e-b);
+    const auto v_w = c.width();
+    const auto data = c.data();
+    const auto value_mask = c.width_mask();
+    const auto starting_bit = b * v_w;
+    const auto total_bits = starting_bit + (v_w * range);
+    const auto mask = (1ULL << v_w)-1;
+    const auto bit_per_it = num_bits_for_width(v_w);
+    
     std::vector<int64_t> res;
-    res.reserve(e-b);
-    bf_iterator data_iterator{c.data(), 0, c.width(), c.width(), b};
-    const auto mask = c.width_mask();
-    while(b<e) {
-        const auto sv = sign_extend_field_by_mask(mask, *data_iterator);
-        res.push_back(sv);
-        data_iterator.move(++b);
+    res.reserve(range); //this is very important, x4 faster pre-allocating the array
+    unaligned_word_iter unaligned_data_iterator(data, starting_bit);
+    auto cnt_bits = starting_bit;
+    while(cnt_bits < total_bits) {
+        auto word = unaligned_data_iterator.get_with_unsafe_prefetch(bit_per_it);
+        const auto next_chunk = cnt_bits + bit_per_it;
+        while(cnt_bits < next_chunk && cnt_bits < total_bits) {
+            res.push_back(sign_extend_field_by_mask(value_mask, word & mask));
+            cnt_bits+=v_w;
+            word>>=v_w;
+        }
+        unaligned_data_iterator.bump(bit_per_it);
     }
     return res;
 }

@@ -78,20 +78,32 @@ inline int64_t FlexCompressor::get(const IntegerCompressor& c, size_t ndx) const
 
 inline std::vector<int64_t> FlexCompressor::get_all(const IntegerCompressor& c, size_t b, size_t e) const
 {
-    std::vector<int64_t> res;
-    res.reserve(e-b);
     const auto offset = c.width() * c.v_size();
     const auto ndx_w = c.ndx_width();
     const auto v_w = c.width();
     const auto data = c.data();
-    const auto mask = c.width_mask();
-    bf_iterator ndx_iterator{data, offset, ndx_w, ndx_w, b};
-    bf_iterator data_iterator{data, 0, v_w, v_w, *ndx_iterator};
-    while(b<e) {
-        const auto sv = sign_extend_field_by_mask(mask, *data_iterator);
-        res.push_back(sv);
-        ndx_iterator.move(++b);
-        data_iterator.move(*ndx_iterator);
+    const auto value_mask = c.width_mask();
+    const auto range = (e-b);
+    const auto starting_bit = offset + b * ndx_w;
+    const auto total_bits = starting_bit + (ndx_w * range);
+    const auto ndx_mask = (1ULL << ndx_w)-1;
+    const auto bit_per_it = num_bits_for_width(ndx_w);
+    
+    std::vector<int64_t> res;
+    res.reserve(range); //this is very important, x4 faster pre-allocating the array
+    unaligned_word_iter unaligned_ndx_iterator(data, starting_bit);
+    auto cnt_bits = starting_bit;
+    bf_iterator data_iterator{data, 0, v_w, v_w, 0};
+    while(cnt_bits < total_bits) {
+        auto word = unaligned_ndx_iterator.get_with_unsafe_prefetch(bit_per_it);
+        const auto next_chunk = cnt_bits + bit_per_it;
+        while(cnt_bits < next_chunk && cnt_bits < total_bits) {
+            data_iterator.move(word & ndx_mask);
+            res.push_back(sign_extend_field_by_mask(value_mask, *data_iterator));
+            cnt_bits+=ndx_w;
+            word>>=ndx_w;
+        }
+        unaligned_ndx_iterator.bump(bit_per_it);
     }
     return res;
 }

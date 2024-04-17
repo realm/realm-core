@@ -242,8 +242,8 @@ private:
 // supports arrays of pairs by differentiating field size and step size.
 class bf_ref;
 class bf_iterator {
-    friend class ArrayPacked;
-    friend class ArrayFlex;
+    friend class FlexCompressor;
+    friend class PackedCompressor;
     uint64_t* data_area = nullptr;
     uint64_t* first_word_ptr = nullptr;
     size_t field_position = 0;
