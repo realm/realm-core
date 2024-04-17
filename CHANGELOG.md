@@ -47,6 +47,7 @@
 * App metadata storage has been entirely rewritten in preparation for supporting sharing metadata realms between processes. ([PR #7300](https://github.com/realm/realm-core/pull/7300).
 * The metadata disabled mode has been replaced with an in-memory metadata mode which performs similarly and doesn't work weirdly differently from the normal mode. The new mode is intended for testing purposes, but should be suitable for production usage if there is a scenario where metadata persistence is not needed. ([PR #7300](https://github.com/realm/realm-core/pull/7300).
 * The ownership relationship between App and User has changed. User now strongly retains App and App has a weak cache of Users. This means that creating a SyncConfig or opening a Realm will keep the parent App alive, rather than things being in a broken state if the App is deallocated. ([PR #7300](https://github.com/realm/realm-core/pull/7300).
+* A new CMake define `REALM_APP_SERVICES` can be used to compile out core's default implmentation of the application services. ([#7268](https://github.com/realm/realm-core/issues/7268))
 
 ----------------------------------------------
 
