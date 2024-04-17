@@ -20,19 +20,28 @@
 #include <realm/util/backtrace.hpp>
 #include <realm/util/assert.hpp>
 
+#define REALM_USE_BUNDLED_SHA1 1
+
 #if REALM_PLATFORM_APPLE
 #include <CommonCrypto/CommonCrypto.h>
+#undef REALM_USE_BUNDLED_SHA1
+#define REALM_USE_BUNDLED_SHA1 0
 #elif defined(_WIN32)
 #include <windows.h>
 #include <stdio.h>
 #include <bcrypt.h>
 #pragma comment(lib, "bcrypt.lib")
-#define REALM_USE_BUNDLED_SHA2 1
-#elif REALM_HAVE_OPENSSL
+#endif
+
+#if REALM_HAVE_OPENSSL
 #include <openssl/sha.h>
 #include <openssl/evp.h>
 #include <openssl/hmac.h>
-#else
+#undef REALM_USE_BUNDLED_SHA1
+#define REALM_USE_BUNDLED_SHA1 0
+#endif
+
+#if REALM_USE_BUNDLED_SHA1
 #include <sha1.h>
 #define REALM_USE_BUNDLED_SHA2 1
 #endif
