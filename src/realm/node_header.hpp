@@ -301,7 +301,9 @@ public:
         auto wtype = get_wtype_from_header(header);
         if (wtype == wtype_Extend) {
             const auto h = reinterpret_cast<const uint8_t*>(header);
-            return static_cast<Encoding>(h[5] + 3);
+            int encoding = h[5] + 3;
+            REALM_ASSERT_DEBUG_EX(encoding >= int(Encoding::Packed) && encoding <= int(Encoding::Flex), encoding);
+            return static_cast<Encoding>(encoding);
         }
         return Encoding(int(wtype));
     }
@@ -669,7 +671,6 @@ size_t inline NodeHeader::get_byte_size_from_header(const char* header) noexcept
     const auto h = header;
 
     const auto encoding = get_encoding(h);
-    REALM_ASSERT_DEBUG(encoding >= Encoding::WTypBits && encoding <= Encoding::Flex);
     const auto size = get_num_elements(h, encoding);
     switch (encoding) {
         case Encoding::WTypBits:
