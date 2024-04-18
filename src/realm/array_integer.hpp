@@ -76,7 +76,7 @@ public:
     {
         Array arr(alloc);
         arr.init_from_ref(ref);
-        return arr.write(out, false, out.only_modified, true);
+        return arr.write(out, false, out.only_modified, out.compress);
     }
 };
 

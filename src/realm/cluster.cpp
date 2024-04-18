@@ -1534,10 +1534,11 @@ void Cluster::remove_backlinks(const Table* origin_table, ObjKey origin_key, Col
 namespace {
 
 template <typename Fn>
-static auto switch_on_type(ColKey ck, Fn&& fn)
+static void switch_on_type(ColKey ck, Fn&& fn)
 {
     bool is_optional = ck.is_nullable();
-    switch (ck.get_type()) {
+    auto type = ck.get_type();
+    switch (type) {
         case col_type_Int:
             return is_optional ? fn((util::Optional<int64_t>*)0) : fn((int64_t*)0);
         case col_type_Bool:
@@ -1565,7 +1566,6 @@ static auto switch_on_type(ColKey ck, Fn&& fn)
         default:
             REALM_COMPILER_HINT_UNREACHABLE();
     }
-    return ref_type(0);
 }
 
 } // namespace
@@ -1604,6 +1604,7 @@ ref_type Cluster::typed_write(ref_type ref, _impl::ArrayWriterBase& out) const
         else {
             // Columns
             auto col_key = out.table->m_leaf_ndx2colkey[j - 1];
+            auto col_type = col_key.get_type();
             if (col_key.is_collection()) {
                 ArrayRef arr_ref(m_alloc);
                 arr_ref.init_from_ref(ref);
@@ -1622,20 +1623,66 @@ ref_type Cluster::typed_write(ref_type ref, _impl::ArrayWriterBase& out) const
                         }
                         else {
                             // List or set - Can be handled the same way
-                            new_sub_ref = switch_on_type(col_key, [&](auto t) {
-                                using U = std::decay_t<decltype(*t)>;
-                                return BPlusTree<U>::typed_write(sub_ref, out, m_alloc);
-                            });
+                            // For some reason, switch_on_type() would not compile on Windows
+                            // switch_on_type(col_key, [&](auto t) {
+                            //     using U = std::decay_t<decltype(*t)>;
+                            //     new_sub_ref = BPlusTree<U>::typed_write(sub_ref, out, m_alloc);
+                            // });
+                            switch (col_type) {
+                                case col_type_Int:
+                                    new_sub_ref = BPlusTree<int64_t>::typed_write(sub_ref, out, m_alloc);
+                                    break;
+                                case col_type_Bool:
+                                    new_sub_ref = BPlusTree<bool>::typed_write(sub_ref, out, m_alloc);
+                                    break;
+                                case col_type_Float:
+                                    new_sub_ref = BPlusTree<float>::typed_write(sub_ref, out, m_alloc);
+                                    break;
+                                case col_type_Double:
+                                    new_sub_ref = BPlusTree<double>::typed_write(sub_ref, out, m_alloc);
+                                    break;
+                                case col_type_String:
+                                    new_sub_ref = BPlusTree<StringData>::typed_write(sub_ref, out, m_alloc);
+                                    break;
+                                case col_type_Binary:
+                                    new_sub_ref = BPlusTree<BinaryData>::typed_write(sub_ref, out, m_alloc);
+                                    break;
+                                case col_type_Timestamp:
+                                    new_sub_ref = BPlusTree<Timestamp>::typed_write(sub_ref, out, m_alloc);
+                                    break;
+                                case col_type_Link:
+                                    new_sub_ref = BPlusTree<ObjKey>::typed_write(sub_ref, out, m_alloc);
+                                    break;
+                                case col_type_ObjectId:
+                                    new_sub_ref = BPlusTree<ObjectId>::typed_write(sub_ref, out, m_alloc);
+                                    break;
+                                case col_type_Decimal:
+                                    new_sub_ref = BPlusTree<Decimal128>::typed_write(sub_ref, out, m_alloc);
+                                    break;
+                                case col_type_UUID:
+                                    new_sub_ref = BPlusTree<UUID>::typed_write(sub_ref, out, m_alloc);
+                                    break;
+                                case col_type_Mixed:
+                                    new_sub_ref = BPlusTree<Mixed>::typed_write(sub_ref, out, m_alloc);
+                                    break;
+                                default:
+                                    REALM_COMPILER_HINT_UNREACHABLE();
+                            }
                         }
                     }
                     written_ref_leaf.set_as_ref(k, new_sub_ref);
                 }
                 new_ref = written_ref_leaf.write(out, false, false, false);
             }
+            else if (col_type == col_type_BackLink) {
+                Array leaf(m_alloc);
+                leaf.init_from_ref(ref);
+                new_ref = leaf.write(out, true, only_modified, false);
+            }
             else {
-                new_ref = switch_on_type(col_key, [&](auto t) {
+                switch_on_type(col_key, [&](auto t) {
                     using U = std::decay_t<decltype(*t)>;
-                    return ColumnTypeTraits<U>::cluster_leaf_type::typed_write(ref, out, m_alloc);
+                    new_ref = ColumnTypeTraits<U>::cluster_leaf_type::typed_write(ref, out, m_alloc);
                 });
             }
         }
