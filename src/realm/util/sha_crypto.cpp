@@ -28,7 +28,7 @@
 #include <bcrypt.h>
 #pragma comment(lib, "bcrypt.lib")
 #define REALM_USE_BUNDLED_SHA2 1
-#else
+#elif !REALM_HAVE_OPENSSL
 #include <sha1.h>
 #define REALM_USE_BUNDLED_SHA2 1
 #endif
