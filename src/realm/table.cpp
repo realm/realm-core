@@ -357,6 +357,7 @@ Table::Table(Allocator& alloc)
     , m_index_refs(m_alloc)
     , m_opposite_table(m_alloc)
     , m_opposite_column(m_alloc)
+    , m_interner_data(m_alloc)
     , m_repl(&g_dummy_replication)
     , m_own_ref(this, alloc.get_instance_version())
 {
@@ -364,7 +365,7 @@ Table::Table(Allocator& alloc)
     m_index_refs.set_parent(&m_top, top_position_for_search_indexes);
     m_opposite_table.set_parent(&m_top, top_position_for_opposite_table);
     m_opposite_column.set_parent(&m_top, top_position_for_opposite_column);
-
+    m_interner_data.set_parent(&m_top, top_position_for_interners);
     ref_type ref = create_empty_table(m_alloc); // Throws
     ArrayParent* parent = nullptr;
     size_t ndx_in_parent = 0;
@@ -379,6 +380,7 @@ Table::Table(Replication* const* repl, Allocator& alloc)
     , m_index_refs(m_alloc)
     , m_opposite_table(m_alloc)
     , m_opposite_column(m_alloc)
+    , m_interner_data(m_alloc)
     , m_repl(repl)
     , m_own_ref(this, alloc.get_instance_version())
 {
@@ -386,6 +388,8 @@ Table::Table(Replication* const* repl, Allocator& alloc)
     m_index_refs.set_parent(&m_top, top_position_for_search_indexes);
     m_opposite_table.set_parent(&m_top, top_position_for_opposite_table);
     m_opposite_column.set_parent(&m_top, top_position_for_opposite_column);
+    m_opposite_column.set_parent(&m_top, top_position_for_opposite_column);
+    m_interner_data.set_parent(&m_top, top_position_for_interners);
     m_cookie = cookie_created;
 }
 
@@ -645,6 +649,10 @@ void Table::init(ref_type top_ref, ArrayParent* parent, size_t ndx_in_parent, bo
     }
     else {
         m_tombstones = nullptr;
+    }
+    if (m_top.size() > top_position_for_interners && m_top.get_as_ref(top_position_for_interners)) {
+        // Interner data exist
+        m_interner_data.init_from_parent();
     }
     m_string_interners.clear();
     m_cookie = cookie_initialized;
@@ -1472,6 +1480,7 @@ ref_type Table::create_empty_table(Allocator& alloc, TableKey key)
     top.add(0); // pk col key
     top.add(0); // flags
     top.add(0); // tombstones
+    top.add(0); // string interners
 
     REALM_ASSERT(top.size() == top_array_size);
 
@@ -2154,7 +2163,15 @@ void Table::refresh_accessor_tree()
     refresh_content_version();
     bump_storage_version();
     build_column_mapping();
+    refresh_string_interners();
     refresh_index_accessors();
+}
+
+void Table::refresh_string_interners()
+{
+    std::lock_guard lock(m_string_interners_mutex);
+    // force later calls to get_string_interner() to rebuild interners from storage
+    m_string_interners.clear();
 }
 
 void Table::refresh_index_accessors()
@@ -3414,13 +3431,12 @@ void Table::typed_print(std::string prefix, ref_type ref) const
 
 StringInterner* Table::get_string_interner(ColKey col_key) const
 {
-    return get_string_interner(col_key.get_index());
-}
+    auto idx = col_key.get_index();
 
-StringInterner* Table::get_string_interner(ColKey::Idx idx) const
-{
-    // TODO: This method likely needs to be lock-free
+    // TODO: This method likely needs to be lock-free. Possibly by moving all
+    // setup to Table::init(). (But careful - or it will pose a perf problem....)
     std::lock_guard lock(m_string_interners_mutex);
+    auto This = const_cast<Table*>(this);
     size_t j = idx.val;
     while (j >= m_string_interners.size()) {
         m_string_interners.push_back((StringInterner*)nullptr);
@@ -3428,6 +3444,27 @@ StringInterner* Table::get_string_interner(ColKey::Idx idx) const
     auto interner = m_string_interners[j];
     if (interner)
         return interner;
+    if (!m_interner_data.is_attached()) {
+        // This is the first interner for this Table.
+        // Make sure top array is large enough to hold interner data
+        // and create array of interner data
+        while (This->m_top.size() <= top_position_for_interners)
+            This->m_top.add(0);
+        This->m_interner_data.create(NodeHeader::type_HasRefs);
+        This->m_interner_data.update_parent();
+    }
+    // ensure there is a spot for this interner in the interner data array
+    if (idx.val >= This->m_interner_data.size()) {
+        size_t elems_to_add = idx.val - This->m_interner_data.size() + 1;
+        while (elems_to_add--) {
+            This->m_interner_data.add(0);
+        }
+        This->m_interner_data.update_parent();
+    }
+    interner = new StringInterner(m_alloc, This->m_interner_data, idx.val);
+    m_string_interners[j] = interner;
+    return interner;
+#if 0
     // if we're in a transactional scenario, we need to obtain the interner from DB
     auto group = get_parent_group();
     DBRef db;
@@ -3446,4 +3483,5 @@ StringInterner* Table::get_string_interner(ColKey::Idx idx) const
     }
     m_string_interners[j] = interner;
     return interner;
+#endif
 }

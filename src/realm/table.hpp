@@ -575,7 +575,6 @@ public:
     ColKey::Idx spec_ndx2leaf_ndx(size_t idx) const;
     ColKey leaf_ndx2colkey(ColKey::Idx idx) const;
     ColKey spec_ndx2colkey(size_t ndx) const;
-    StringInterner* get_string_interner(ColKey::Idx idx) const;
     StringInterner* get_string_interner(ColKey col_key) const;
     // Queries
     // Using where(tv) is the new method to perform queries on TableView. The 'tv' can have any order; it does not
@@ -734,6 +733,7 @@ private:
     Array m_index_refs;                        // 5th slot in m_top
     Array m_opposite_table;                    // 7th slot in m_top
     Array m_opposite_column;                   // 8th slot in m_top
+    Array m_interner_data;                     // 14th slot in m_top
     std::vector<std::unique_ptr<SearchIndex>> m_index_accessors;
     ColKey m_primary_key_col;
     Replication* const* m_repl;
@@ -847,6 +847,7 @@ private:
     /// table.
     void refresh_accessor_tree();
     void refresh_index_accessors();
+    void refresh_string_interners();
     void refresh_content_version();
     void flush_for_commit();
 
@@ -879,7 +880,8 @@ private:
     static constexpr int top_position_for_flags = 12;
     // flags contents: bit 0-1 - table type
     static constexpr int top_position_for_tombstones = 13;
-    static constexpr int top_array_size = 14;
+    static constexpr int top_position_for_interners = 14;
+    static constexpr int top_array_size = 15;
 
     enum { s_collision_map_lo = 0, s_collision_map_hi = 1, s_collision_map_local_id = 2, s_collision_map_num_slots };
 

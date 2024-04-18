@@ -22,7 +22,6 @@
 #include <realm/utilities.hpp>
 #include <realm/string_compressor.hpp>
 
-
 template <>
 struct std::hash<CompressedString> {
     std::size_t operator()(const CompressedString& c) const noexcept
@@ -42,10 +41,17 @@ namespace realm {
 
 using StringID = size_t;
 
+class Array;
+class Allocator;
+
 class StringInterner {
 public:
-    StringInterner();
+    // To be used exclusively from Table
+    StringInterner(Allocator& alloc, Array& parent, size_t position);
+    void refresh();
     ~StringInterner();
+
+    // To be used from Obj and for searching
     StringID intern(StringData);
     std::optional<StringID> lookup(StringData);
     int compare(StringID A, StringID B);
@@ -53,11 +59,14 @@ public:
     StringData get(StringID);
 
 private:
-    StringCompressor compressor;
+    std::unique_ptr<Array> m_top;
+    std::unique_ptr<Array> m_data;
+    std::unique_ptr<Array> m_current_leaf;
+    void rebuild_internal();
+
+    std::unique_ptr<StringCompressor> m_compressor;
     std::vector<CompressedString> m_compressed_strings;
     std::unordered_map<CompressedString, size_t> m_compressed_string_map;
-    // for reference/debugging (to be removed)
-    std::vector<std::string> m_strings;
 };
 } // namespace realm
 
