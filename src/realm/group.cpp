@@ -798,27 +798,27 @@ void Group::recycle_table_accessor(Table* to_be_recycled)
     g_table_recycler_1.push_back(to_be_recycled);
 }
 
-void Group::remove_table(StringData name, bool ignore_backlinks)
+void Group::remove_table(StringData name)
 {
     check_attached();
     size_t table_ndx = m_table_names.find_first(name);
     if (table_ndx == not_found)
         throw NoSuchTable();
     auto key = ndx2key(table_ndx);
-    remove_table(table_ndx, key, ignore_backlinks); // Throws
+    remove_table(table_ndx, key); // Throws
 }
 
 
-void Group::remove_table(TableKey key, bool ignore_backlinks)
+void Group::remove_table(TableKey key)
 {
     check_attached();
 
     size_t table_ndx = key2ndx_checked(key);
-    remove_table(table_ndx, key, ignore_backlinks);
+    remove_table(table_ndx, key);
 }
 
 
-void Group::remove_table(size_t table_ndx, TableKey key, bool ignore_backlinks)
+void Group::remove_table(size_t table_ndx, TableKey key)
 {
     if (!m_is_writable)
         throw LogicError(ErrorCodes::ReadOnlyDB, "Database not writable");
@@ -832,7 +832,7 @@ void Group::remove_table(size_t table_ndx, TableKey key, bool ignore_backlinks)
     // tables. Such a behaviour is deemed too obscure, and we shall therefore
     // require that a removed table does not contain foreign origin backlink
     // columns.
-    if (!ignore_backlinks && table->is_cross_table_link_target())
+    if (table->is_cross_table_link_target())
         throw CrossTableLinkTarget(table->get_name());
 
     {

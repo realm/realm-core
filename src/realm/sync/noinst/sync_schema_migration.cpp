@@ -117,9 +117,18 @@ void perform_schema_migration(DB& db)
     repl.set_write_validator_factory(nullptr);
 
     // Delete all tables (and their columns).
-    const bool ignore_backlinks = true;
     for (const auto& tk : tr->get_table_keys()) {
-        tr->remove_table(tk, ignore_backlinks);
+        auto cur_table = tr->get_table(tk);
+        // First delete the columns linking to this table.
+        cur_table->for_each_backlink_column([&](ColKey backlink_col_key) {
+            auto origin_table_key = cur_table->get_opposite_table_key(backlink_col_key);
+            auto origin_link_col = cur_table->get_opposite_column(backlink_col_key);
+            auto origin_table = tr->get_table(origin_table_key);
+            origin_table->remove_column(origin_link_col);
+            return IteratorControl::AdvanceToNext;
+        });
+        // Then delete the table.
+        tr->remove_table(tk);
     }
 
     // Clear sync history, reset the file ident and the server version in the download and upload progress.
