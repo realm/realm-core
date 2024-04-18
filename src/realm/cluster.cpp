@@ -1578,8 +1578,7 @@ ref_type Cluster::typed_write(ref_type ref, _impl::ArrayWriterBase& out) const
         return ref;
     REALM_ASSERT_DEBUG(!get_is_inner_bptree_node_from_header(get_header()));
     REALM_ASSERT_DEBUG(!get_context_flag_from_header(get_header()));
-    Array written_cluster(Allocator::get_default());
-    written_cluster.create(type_HasRefs, false, size());
+    TempArray written_cluster(size());
     for (size_t j = 0; j < size(); ++j) {
         RefOrTagged leaf_rot = get_as_ref_or_tagged(j);
         // Handle nulls
@@ -1609,8 +1608,7 @@ ref_type Cluster::typed_write(ref_type ref, _impl::ArrayWriterBase& out) const
                 ArrayRef arr_ref(m_alloc);
                 arr_ref.init_from_ref(ref);
                 auto sz = arr_ref.size();
-                Array written_ref_leaf(Allocator::get_default());
-                written_ref_leaf.create(type_HasRefs, false, sz);
+                TempArray written_ref_leaf(sz);
 
                 for (size_t k = 0; k < sz; k++) {
                     ref_type new_sub_ref = 0;
@@ -1672,7 +1670,7 @@ ref_type Cluster::typed_write(ref_type ref, _impl::ArrayWriterBase& out) const
                     }
                     written_ref_leaf.set_as_ref(k, new_sub_ref);
                 }
-                new_ref = written_ref_leaf.write(out, false, false, false);
+                new_ref = written_ref_leaf.write(out);
             }
             else if (col_type == col_type_BackLink) {
                 Array leaf(m_alloc);
@@ -1688,9 +1686,7 @@ ref_type Cluster::typed_write(ref_type ref, _impl::ArrayWriterBase& out) const
         }
         written_cluster.set_as_ref(j, new_ref);
     }
-    auto written_ref = written_cluster.write(out, false, false, false);
-    written_cluster.destroy();
-    return written_ref;
+    return written_cluster.write(out);
 }
 
 void Cluster::typed_print(std::string prefix, const Table& table) const

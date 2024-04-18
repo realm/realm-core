@@ -254,8 +254,7 @@ ref_type ArrayTimestamp::typed_write(ref_type ref, _impl::ArrayWriterBase& out, 
     top.init_from_ref(ref);
     REALM_ASSERT_DEBUG(top.size() == 2);
 
-    Array written_top(Allocator::get_default());
-    written_top.create(Node::type_HasRefs, false, 2);
+    TempArray written_top(2);
 
     auto rot0 = top.get_as_ref_or_tagged(0);
     auto rot1 = top.get_as_ref_or_tagged(1);
@@ -264,9 +263,7 @@ ref_type ArrayTimestamp::typed_write(ref_type ref, _impl::ArrayWriterBase& out, 
     written_top.set_as_ref(0, Array::write(rot0.get_as_ref(), alloc, out, out.only_modified, false));
     written_top.set_as_ref(1, Array::write(rot1.get_as_ref(), alloc, out, out.only_modified, false));
 
-    auto ret = written_top.write(out, false, false, false);
-    written_top.destroy();
-    return ret;
+    return written_top.write(out);
 }
 
 } // namespace realm

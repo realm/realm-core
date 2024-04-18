@@ -3344,8 +3344,7 @@ ref_type Table::typed_write(ref_type ref, _impl::ArrayWriterBase& out) const
         return ref;
     out.table = this;
     // ignore ref from here, just use Tables own accessors
-    Array dest(Allocator::get_default());
-    dest.create(NodeHeader::type_HasRefs, false, m_top.size());
+    TempArray dest(m_top.size());
     for (unsigned j = 0; j < m_top.size(); ++j) {
         RefOrTagged rot = m_top.get_as_ref_or_tagged(j);
         if (rot.is_tagged() || (rot.is_ref() && rot.get_as_ref() == 0)) {
@@ -3366,9 +3365,7 @@ ref_type Table::typed_write(ref_type ref, _impl::ArrayWriterBase& out) const
             dest.set_as_ref(j, new_ref);
         }
     }
-    ref = dest.write(out, false, false, false);
-    dest.destroy();
-    return ref;
+    return dest.write(out);
 }
 
 void Table::typed_print(std::string prefix, ref_type ref) const

@@ -321,15 +321,15 @@ void ArrayMixed::verify() const
     // TODO: Implement
 }
 
-ref_type ArrayMixed::typed_write(ref_type ref, _impl::ArrayWriterBase& out, Allocator& alloc)
+ref_type ArrayMixed::typed_write(ref_type top_ref, _impl::ArrayWriterBase& out, Allocator& alloc)
 {
-    if (out.only_modified && alloc.is_read_only(ref))
-        return ref;
+    if (out.only_modified && alloc.is_read_only(top_ref))
+        return top_ref;
+
     ArrayRef top(alloc);
-    top.init_from_ref(ref);
+    top.init_from_ref(top_ref);
     size_t sz = top.size();
-    Array written_leaf(Allocator::get_default());
-    written_leaf.create(type_HasRefs, false, sz);
+    TempArray written_leaf(sz);
 
     /*
      Mixed stores things using different arrays. We need to take into account this in order to
@@ -368,11 +368,10 @@ ref_type ArrayMixed::typed_write(ref_type ref, _impl::ArrayWriterBase& out, Allo
             else if (i == 4) { // collection in mixed
                 ArrayRef arr_ref(alloc);
                 arr_ref.init_from_ref(ref);
-                auto sz = arr_ref.size();
-                Array written_ref_leaf(Allocator::get_default());
-                written_ref_leaf.create(type_HasRefs, false, sz);
+                auto ref_sz = arr_ref.size();
+                TempArray written_ref_leaf(ref_sz);
 
-                for (size_t k = 0; k < sz; k++) {
+                for (size_t k = 0; k < ref_sz; k++) {
                     ref_type new_sub_ref = 0;
                     if (auto sub_ref = arr_ref.get(k)) {
                         auto header = alloc.translate(sub_ref);
@@ -389,7 +388,7 @@ ref_type ArrayMixed::typed_write(ref_type ref, _impl::ArrayWriterBase& out, Allo
                     }
                     written_ref_leaf.set_as_ref(k, new_sub_ref);
                 }
-                new_ref = written_ref_leaf.write(out, false, false, false);
+                new_ref = written_ref_leaf.write(out);
             }
             else if (i == 5) { // unique keys associated to collections in mixed
                 new_ref = Array::write(ref, alloc, out, out.only_modified, out.compress);
@@ -401,9 +400,7 @@ ref_type ArrayMixed::typed_write(ref_type ref, _impl::ArrayWriterBase& out, Allo
         }
         written_leaf.set(i, new_ref);
     }
-    auto ret = written_leaf.write(out, false, false, false);
-    written_leaf.destroy();
-    return ret;
+    return written_leaf.write(out);
 }
 
 void ArrayMixed::ensure_array_accessor(Array& arr, size_t ndx_in_parent) const

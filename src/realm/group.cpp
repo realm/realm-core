@@ -949,8 +949,7 @@ ref_type Group::typed_write_tables(_impl::ArrayWriterBase& out) const
     Array a(m_alloc);
     a.init_from_ref(ref);
     REALM_ASSERT_DEBUG(a.has_refs());
-    Array dest(Allocator::get_default());
-    dest.create(NodeHeader::type_HasRefs, false, a.size());
+    TempArray dest(a.size());
     for (unsigned j = 0; j < a.size(); ++j) {
         RefOrTagged rot = a.get_as_ref_or_tagged(j);
         if (rot.is_tagged()) {
@@ -962,9 +961,7 @@ ref_type Group::typed_write_tables(_impl::ArrayWriterBase& out) const
             dest.set_as_ref(j, table->typed_write(rot.get_as_ref(), out));
         }
     }
-    ref = dest.write(out, false, false, false);
-    dest.destroy();
-    return ref;
+    return dest.write(out);
 }
 void Group::table_typed_print(std::string prefix, ref_type ref) const
 {

@@ -1208,8 +1208,7 @@ ref_type Dictionary::typed_write(ref_type ref, _impl::ArrayWriterBase& out, Allo
     ArrayRef dict_top(alloc);
     dict_top.init_from_ref(ref);
     REALM_ASSERT_DEBUG(dict_top.size() == 2);
-    Array written_dict_top(Allocator::get_default());
-    written_dict_top.create(Node::type_HasRefs, false, 2);
+    TempArray written_dict_top(2);
 
     // We have to find out what kind of keys we are using - strings or ints
     // Btw - ints is only used in tests. Can probably be removed at some point
@@ -1228,9 +1227,7 @@ ref_type Dictionary::typed_write(ref_type ref, _impl::ArrayWriterBase& out, Allo
     auto values_ref = dict_top.get_as_ref(1);
     written_dict_top.set_as_ref(1, BPlusTree<Mixed>::typed_write(values_ref, out, alloc));
 
-    auto ret = written_dict_top.write(out, false, false, false);
-    written_dict_top.destroy();
-    return ret;
+    return written_dict_top.write(out);
 }
 
 /************************* DictionaryLinkValues *************************/

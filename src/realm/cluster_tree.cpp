@@ -129,8 +129,7 @@ public:
         REALM_ASSERT_DEBUG(get_is_inner_bptree_node_from_header(get_header()));
         REALM_ASSERT_DEBUG(!get_context_flag_from_header(get_header()));
         REALM_ASSERT_DEBUG(has_refs());
-        Array written_node(Allocator::get_default());
-        written_node.create(type_InnerBptreeNode, false, size());
+        TempArray written_node(size(), type_InnerBptreeNode);
         for (unsigned j = 0; j < size(); ++j) {
             RefOrTagged rot = get_as_ref_or_tagged(j);
             if (rot.is_ref() && rot.get_as_ref()) {
@@ -163,9 +162,7 @@ public:
                 written_node.set(j, rot);
             }
         }
-        auto written_ref = written_node.write(out, false, false, false);
-        written_node.destroy();
-        return written_ref;
+        return written_node.write(out);
     }
 
     virtual void typed_print(std::string prefix, const Table& table) const override

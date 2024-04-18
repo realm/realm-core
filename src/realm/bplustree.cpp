@@ -847,8 +847,7 @@ ref_type BPlusTreeBase::typed_write(ref_type ref, _impl::ArrayWriterBase& out, A
     Array node(alloc);
     node.init_from_ref(ref);
     REALM_ASSERT_DEBUG(node.has_refs());
-    Array written_node(Allocator::get_default());
-    written_node.create(NodeHeader::type_InnerBptreeNode, false, node.size());
+    TempArray written_node(node.size(), NodeHeader::type_InnerBptreeNode);
     for (unsigned j = 0; j < node.size(); ++j) {
         RefOrTagged rot = node.get_as_ref_or_tagged(j);
         if (rot.is_ref() && rot.get_as_ref()) {
@@ -865,9 +864,7 @@ ref_type BPlusTreeBase::typed_write(ref_type ref, _impl::ArrayWriterBase& out, A
         else
             written_node.set(j, rot);
     }
-    auto written_ref = written_node.write(out, false, false, false);
-    written_node.destroy();
-    return written_ref;
+    return written_node.write(out);
 }
 
 void BPlusTreeBase::typed_print(std::string prefix, Allocator& alloc, ref_type root, ColumnType col_type)
