@@ -20,30 +20,31 @@
 #include <realm/util/backtrace.hpp>
 #include <realm/util/assert.hpp>
 
-#define REALM_USE_BUNDLED_SHA1 1
-
 #if REALM_PLATFORM_APPLE
 #include <CommonCrypto/CommonCrypto.h>
-#undef REALM_USE_BUNDLED_SHA1
-#define REALM_USE_BUNDLED_SHA1 0
 #elif defined(_WIN32)
 #include <windows.h>
 #include <stdio.h>
 #include <bcrypt.h>
 #pragma comment(lib, "bcrypt.lib")
+#define REALM_USE_BUNDLED_SHA2 1
+#else
+#include <sha1.h>
+#define REALM_USE_BUNDLED_SHA2 1
 #endif
 
+/*
+ * OpenSSL can be used with Windows. If this is the case:
+ * The Sha-1 & Sha-2 submodules are no longer needed, so the
+ * REALM_USE_BUNDLED_SHA2 macro should be undefined.
+ * This is particularly relevant when integrating realm-core
+ * via vcpkg.
+ */
 #if REALM_HAVE_OPENSSL
 #include <openssl/sha.h>
 #include <openssl/evp.h>
 #include <openssl/hmac.h>
-#undef REALM_USE_BUNDLED_SHA1
-#define REALM_USE_BUNDLED_SHA1 0
-#endif
-
-#if REALM_USE_BUNDLED_SHA1
-#include <sha1.h>
-#define REALM_USE_BUNDLED_SHA2 1
+#undef REALM_USE_BUNDLED_SHA2
 #endif
 
 #ifdef REALM_USE_BUNDLED_SHA2
