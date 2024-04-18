@@ -498,7 +498,7 @@ let package = Package(
             cxxSettings: (cxxSettings) as [CXXSetting]),
         .target(
             name: "Catch2Generated",
-            path: "external/generated",
+            path: "test/external/generated",
             // this file was manually generated with catch v3.0.1
             // and should be regenerated when catch is upgraded
             resources: [.copy("catch2/catch_user_config.hpp")],
@@ -506,7 +506,7 @@ let package = Package(
         .target(
             name: "Catch2",
             dependencies: ["Catch2Generated"],
-            path: "external/catch/src",
+            path: "test/external/catch/src",
             exclude: [
                 "CMakeLists.txt",
                 "catch2/catch_user_config.hpp.in",
