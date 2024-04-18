@@ -107,7 +107,6 @@ private:
     bool find_all_flex(const Array&, int64_t, size_t, size_t, size_t, QueryStateBase*) const;
 
     // internal impl
-    void set(char* data, size_t w, size_t ndx, int64_t v) const;
     size_t flex_disk_size(const std::vector<int64_t>&, const std::vector<size_t>&, size_t&, size_t&) const;
     size_t packed_disk_size(std::vector<int64_t>&, size_t, size_t&) const;
     void compress_values(const Array&, std::vector<int64_t>&, std::vector<size_t>&) const;

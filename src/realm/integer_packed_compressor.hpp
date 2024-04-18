@@ -207,12 +207,11 @@ inline bool PackedCompressor::find_linear(const Array& arr, int64_t value, size_
     };
     const auto& c = arr.integer_compressor();
     bf_iterator it{c.data(), 0, c.v_width(), c.v_width(), start};
-    while (start < end) {
+    for (; start < end; ++start) {
+        it.move(start);
         const auto sv = sign_extend_field_by_mask(c.v_mask(), *it);
         if (compare(sv, value) && !state->match(start + baseindex))
             return false;
-        ++start;
-        it.move(start);
     }
     return true;
 }
@@ -220,7 +219,6 @@ inline bool PackedCompressor::find_linear(const Array& arr, int64_t value, size_
 template <typename Cond>
 inline bool PackedCompressor::run_parallel_scan(size_t width, size_t range) const
 {
-    return width < 32 && range >= 16;
     if constexpr (std::is_same_v<Cond, NotEqual>) {
         // we seem to be particularly slow doing parallel scan in packed for NotEqual.
         // we are much better with a linear scan. TODO: investigate this.
@@ -229,7 +227,7 @@ inline bool PackedCompressor::run_parallel_scan(size_t width, size_t range) cons
     if constexpr (std::is_same_v<Cond, Equal>) {
         return width < 32 && range >= 20;
     }
-    // greater and less need a different heuristic
+    // > and < need a different heuristic
     return width <= 20 && range >= 20;
 }
 

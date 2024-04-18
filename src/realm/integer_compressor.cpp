@@ -87,6 +87,13 @@ struct IntegerCompressor::VTableForFlex {
 const typename IntegerCompressor::VTableForPacked::PopulatedVTablePacked IntegerCompressor::VTableForPacked::vtable;
 const typename IntegerCompressor::VTableForFlex::PopulatedVTableFlex IntegerCompressor::VTableForFlex::vtable;
 
+using SetDirect = void (*)(char*, size_t, int_fast64_t);
+static std::unordered_map<size_t, SetDirect> s_direct_array_set = {
+    {0, &realm::set_direct<0>},   {1, &realm::set_direct<1>},   {2, &realm::set_direct<2>},
+    {4, &realm::set_direct<4>},   {8, &realm::set_direct<8>},   {16, &realm::set_direct<16>},
+    {32, &realm::set_direct<32>}, {64, &realm::set_direct<64>},
+};
+
 
 template <typename T, typename... Arg>
 inline void compress_array(const T& compressor, Array& arr, size_t byte_size, Arg&&... args)
@@ -171,14 +178,18 @@ bool IntegerCompressor::decompress(Array& arr) const
 {
     REALM_ASSERT_DEBUG(arr.is_attached());
     auto values_fetcher = [&arr, this]() {
-        std::vector<int64_t> res;
         const auto sz = arr.size();
-        res.reserve(sz);
-        for (size_t i = 0; i < sz; ++i)
-            res.push_back((this->*(m_vtable->m_getter))(i));
-        return res;
+        if (is_packed()) {
+            std::vector<int64_t> res;
+            res.reserve(sz);
+            for (size_t i = 0; i < sz; ++i)
+                res.push_back((this->*(m_vtable->m_getter))(i));
+            return res;
+        }
+        // in flex format this is faster.
+        return get_all(0, sz);
     };
-    const auto& values = values_fetcher();
+    const auto& values = values_fetcher(); // get_all(0, arr.size());// values_fetcher();
     //  do the reverse of compressing the array
     REALM_ASSERT_DEBUG(!values.empty());
     using Encoding = NodeHeader::Encoding;
@@ -206,11 +217,13 @@ bool IntegerCompressor::decompress(Array& arr) const
     NodeHeader::set_capacity_in_header(byte_size, header);
     arr.init_from_mem(mem);
 
-    // this is copying the bits straight, without doing any COW.
-    // Restoring the array is basically COW.
-    const auto sz = values.size();
-    for (size_t ndx = 0; ndx < sz; ++ndx)
-        set(arr.m_data, width, ndx, values[ndx]);
+    // this is copying the bits straight, without doing any COW, since the array is basically restored, we just need
+    // to copy the data straight back into it. This makes decompressing the array equivalent to copy on write, in fact
+    // for a compressed array, we skip COW and we just decompress.
+    const auto set = s_direct_array_set[width];
+    REALM_ASSERT_DEBUG(set != nullptr);
+    for (size_t ndx = 0; ndx < size; ++ndx)
+        (set)(arr.m_data, ndx, values[ndx]);
 
     // very important: since the ref of the current array has changed, the parent must be informed.
     // Otherwise we will lose the link between parent array and child array.
@@ -299,28 +312,6 @@ void IntegerCompressor::compress_values(const Array& arr, std::vector<int64_t>& 
     }
 #endif
     REALM_ASSERT_DEBUG(indices.size() == sz);
-}
-
-void IntegerCompressor::set(char* data, size_t w, size_t ndx, int64_t v) const
-{
-    if (w == 0)
-        realm::set_direct<0>(data, ndx, v);
-    else if (w == 1)
-        realm::set_direct<1>(data, ndx, v);
-    else if (w == 2)
-        realm::set_direct<2>(data, ndx, v);
-    else if (w == 4)
-        realm::set_direct<4>(data, ndx, v);
-    else if (w == 8)
-        realm::set_direct<8>(data, ndx, v);
-    else if (w == 16)
-        realm::set_direct<16>(data, ndx, v);
-    else if (w == 32)
-        realm::set_direct<32>(data, ndx, v);
-    else if (w == 64)
-        realm::set_direct<64>(data, ndx, v);
-    else
-        REALM_UNREACHABLE();
 }
 
 int64_t IntegerCompressor::get_packed(size_t ndx) const
