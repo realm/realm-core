@@ -89,6 +89,7 @@ std::pair<SharedRealm, std::exception_ptr> async_open_realm(const Realm::Config&
 std::vector<ObjectSchema> get_schema_v0()
 {
     return {
+        {"Embedded", ObjectSchema::ObjectType::Embedded, {{"str_field", PropertyType::String}}},
         {"TopLevel",
          {{"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
           {"queryable_str_field", PropertyType::String | PropertyType::Nullable},
@@ -101,7 +102,10 @@ std::vector<ObjectSchema> get_schema_v0()
           {"queryable_int_field", PropertyType::Int | PropertyType::Nullable},
           {"non_queryable_field", PropertyType::String | PropertyType::Nullable}}},
         {"TopLevel3",
-         {{"_id", PropertyType::ObjectId, Property::IsPrimary{true}}, {"queryable_int_field", PropertyType::Int}}},
+         {{"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+          {"queryable_int_field", PropertyType::Int},
+          {"link", PropertyType::Object | PropertyType::Nullable, "TopLevel"},
+          {"embedded_link", PropertyType::Object | PropertyType::Nullable, "Embedded"}}},
     };
 }
 
@@ -135,12 +139,16 @@ auto get_subscription_initializer_callback_for_schema_v0()
 std::vector<ObjectSchema> get_schema_v1()
 {
     return {
+        {"Embedded", ObjectSchema::ObjectType::Embedded, {{"str_field", PropertyType::String}}},
         {"TopLevel",
          {{"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
           {"queryable_int_field", PropertyType::Int | PropertyType::Nullable},
           {"non_queryable_field", PropertyType::String},
           {"non_queryable_field2", PropertyType::String | PropertyType::Nullable}}},
-        {"TopLevel3", {{"_id", PropertyType::ObjectId, Property::IsPrimary{true}}}},
+        {"TopLevel3",
+         {{"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+          {"link", PropertyType::Object | PropertyType::Nullable, "TopLevel"},
+          {"embedded_link", PropertyType::Object | PropertyType::Nullable, "Embedded"}}},
     };
 }
 
@@ -165,12 +173,16 @@ auto get_subscription_initializer_callback_for_schema_v1()
 std::vector<ObjectSchema> get_schema_v2()
 {
     return {
+        {"Embedded", ObjectSchema::ObjectType::Embedded, {{"str_field", PropertyType::String}}},
         {"TopLevel",
          {{"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
           {"queryable_int_field", PropertyType::Int},
           {"non_queryable_field", PropertyType::String},
           {"non_queryable_field2", PropertyType::String | PropertyType::Nullable}}},
-        {"TopLevel3", {{"_id", PropertyType::ObjectId, Property::IsPrimary{true}}}},
+        {"TopLevel3",
+         {{"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+          {"link", PropertyType::Object | PropertyType::Nullable, "TopLevel"},
+          {"embedded_link", PropertyType::Object | PropertyType::Nullable, "Embedded"}}},
     };
 }
 
