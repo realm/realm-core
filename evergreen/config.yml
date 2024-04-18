@@ -1096,6 +1096,7 @@ tasks:
             --ignore='build/external/**' \
             --ignore='external/**' \
             --ignore='src/external/**' \
+            --ignore='test/external/**' \
             --ignore='src/realm/parser/generated/**' \
             --ignore='test/large_tests/**' \
             --excl-line='LCOV_EXCL_LINE|REALM_TERMINATE|REALM_UNREACHABLE' \

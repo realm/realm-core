@@ -400,9 +400,11 @@ install(FILES tools/cmake/AcquireRealmDependency.cmake
         COMPONENT devel
         )
 
-if(REALM_BUILD_LIB_ONLY OR REALM_NO_TESTS)
+if(REALM_BUILD_LIB_ONLY)
     set(REALM_EXCLUDE_TESTS EXCLUDE_FROM_ALL)
-else()
+endif()
+
+if (NOT REALM_NO_TESTS)
     add_subdirectory(test ${REALM_EXCLUDE_TESTS})
 endif()
 
