@@ -1467,10 +1467,6 @@ TEST(Transform_UpdateClearVsUpdateClear)
     std::vector<int> timestamps{1, 2, 3, 4};
 
     do {
-        // Baseline: property 'any' is not set to any type
-        // {id: 1, any: null}
-        TransformTestHarness h(test_context, {}, [](Obj, ColKey) {});
-
         auto t1 = timestamps[0];
         auto t2 = timestamps[1];
         auto t3 = timestamps[2];
@@ -1478,6 +1474,10 @@ TEST(Transform_UpdateClearVsUpdateClear)
 
         if (t1 > t2 || t3 > t4)
             continue;
+
+        // Baseline: property 'any' is not set to any type
+        // {id: 1, any: null}
+        TransformTestHarness h(test_context, {}, [](Obj, ColKey) {});
 
         // Client 1 sets property 'any' to List and inserts one integer in the list
         // {id: 1, any: [1]}
@@ -1521,6 +1521,7 @@ TEST(Transform_UpdateClearVsUpdateClear)
             },
             t4);
 
+        // Check clients converge.
         h.check_merge_result([&](Obj, ColKey) {});
 
     } while (std::next_permutation(timestamps.begin(), timestamps.end()));
@@ -1531,10 +1532,6 @@ TEST(Transform_UpdateClearVsUpdateClear_DifferentTypes)
     std::vector<int> timestamps{1, 2, 3, 4};
 
     do {
-        // Baseline: property 'any' is not set to any type
-        // {id: 1, any: null}
-        TransformTestHarness h(test_context, {}, [](Obj, ColKey) {});
-
         auto t1 = timestamps[0];
         auto t2 = timestamps[1];
         auto t3 = timestamps[2];
@@ -1542,6 +1539,10 @@ TEST(Transform_UpdateClearVsUpdateClear_DifferentTypes)
 
         if (t1 > t2 || t3 > t4)
             continue;
+
+        // Baseline: property 'any' is not set to any type
+        // {id: 1, any: null}
+        TransformTestHarness h(test_context, {}, [](Obj, ColKey) {});
 
         // Client 1 sets property 'any' to List and inserts one integer in the list
         // {id: 1, any: [1]}
@@ -1585,6 +1586,7 @@ TEST(Transform_UpdateClearVsUpdateClear_DifferentTypes)
             },
             t4);
 
+        // Check clients converge.
         h.check_merge_result([&](Obj, ColKey) {});
 
     } while (std::next_permutation(timestamps.begin(), timestamps.end()));
@@ -1661,12 +1663,6 @@ TEST(Transform_UpdateClearVsUpdateAddInteger)
     std::vector<int> timestamps{1, 2, 3, 4};
 
     do {
-        // Baseline: set property 'any' to List
-        // {id: 1, any: []}
-        TransformTestHarness h(test_context, {}, [](Obj obj, ColKey col_any) {
-            obj.set_collection(col_any, CollectionType::List);
-        });
-
         auto t1 = timestamps[0];
         auto t2 = timestamps[1];
         auto t3 = timestamps[2];
@@ -1674,6 +1670,12 @@ TEST(Transform_UpdateClearVsUpdateAddInteger)
 
         if (t1 > t2 || t3 > t4)
             continue;
+
+        // Baseline: set property 'any' to List
+        // {id: 1, any: []}
+        TransformTestHarness h(test_context, {}, [](Obj obj, ColKey col_any) {
+            obj.set_collection(col_any, CollectionType::List);
+        });
 
         // Client 1 sets property 'any' from List to Dictionary and inserts one integer in the dictionary
         // {id: 1, any: {{"key1": 1}}}
@@ -1715,6 +1717,7 @@ TEST(Transform_UpdateClearVsUpdateAddInteger)
             },
             t4);
 
+        // Check clients converge.
         h.check_merge_result([&](Obj, ColKey) {});
 
     } while (std::next_permutation(timestamps.begin(), timestamps.end()));

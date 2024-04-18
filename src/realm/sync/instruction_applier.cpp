@@ -885,7 +885,6 @@ void InstructionApplier::operator()(const Instruction::Clear& instr)
         {
             switch (instr.collection_type) {
                 case Instruction::CollectionType::Single:
-                    m_applier->bad_transaction_log("Clear: Collection type is missing");
                     break;
                 case Instruction::CollectionType::List:
                     m_collection_type = CollectionType::List;
@@ -901,10 +900,12 @@ void InstructionApplier::operator()(const Instruction::Clear& instr)
         void on_list(LstBase& list) override
         {
             // list property
+            REALM_ASSERT(!m_collection_type || *m_collection_type == CollectionType::List);
             list.clear();
         }
         Status on_list_index(LstBase& list, uint32_t index) override
         {
+            REALM_ASSERT(m_collection_type);
             REALM_ASSERT(dynamic_cast<Lst<Mixed>*>(&list));
             auto& mixed_list = static_cast<Lst<Mixed>&>(list);
             if (index >= mixed_list.size()) {
@@ -924,16 +925,18 @@ void InstructionApplier::operator()(const Instruction::Clear& instr)
                 m_applier->bad_transaction_log("Clear: Item at index %1 is a Set",
                                                index); // Throws
             }
-            mixed_list.set_collection(size_t(index), m_collection_type);
+            mixed_list.set_collection(size_t(index), *m_collection_type);
             return Status::Pending;
         }
         void on_dictionary(Dictionary& dict) override
         {
             // dictionary property
+            REALM_ASSERT(!m_collection_type || *m_collection_type == CollectionType::Dictionary);
             dict.clear();
         }
         Status on_dictionary_key(Dictionary& dict, Mixed key) override
         {
+            REALM_ASSERT(m_collection_type);
             auto val = dict.get(key);
             if (val.is_type(type_Dictionary)) {
                 Dictionary d(dict, dict.build_index(key));
@@ -947,17 +950,19 @@ void InstructionApplier::operator()(const Instruction::Clear& instr)
                 m_applier->bad_transaction_log("Clear: Item at key '%1' is a Set",
                                                key); // Throws
             }
-            dict.insert_collection(key.get_string(), m_collection_type);
+            dict.insert_collection(key.get_string(), *m_collection_type);
             return Status::Pending;
         }
         void on_set(SetBase& set) override
         {
             // set property
+            REALM_ASSERT(!m_collection_type || *m_collection_type == CollectionType::Set);
             set.clear();
         }
         void on_property(Obj& obj, ColKey col_key) override
         {
             if (col_key.get_type() == col_type_Mixed) {
+                REALM_ASSERT(m_collection_type);
                 auto val = obj.get<Mixed>(col_key);
                 if (val.is_type(type_Dictionary)) {
                     Dictionary dict(obj, col_key);
@@ -970,7 +975,7 @@ void InstructionApplier::operator()(const Instruction::Clear& instr)
                 else if (val.is_type(type_Set)) {
                     m_applier->bad_transaction_log("Clear: Mixed property is a Set"); // Throws
                 }
-                obj.set_collection(col_key, m_collection_type);
+                obj.set_collection(col_key, *m_collection_type);
                 return;
             }
 
@@ -978,7 +983,9 @@ void InstructionApplier::operator()(const Instruction::Clear& instr)
         }
 
     private:
-        CollectionType m_collection_type;
+        // The server may not send the type for collection properties (non-Mixed)
+        // since the clients don't send it either before v13.
+        std::optional<CollectionType> m_collection_type;
     };
     ClearResolver(this, instr).resolve();
 }

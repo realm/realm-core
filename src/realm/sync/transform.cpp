@@ -1699,6 +1699,7 @@ DEFINE_MERGE(Instruction::Clear, Instruction::Update)
 
     // The two instructions are at the same level of nesting.
     if (same_path(left, right)) {
+        REALM_ASSERT(right.value.type != Type::Set);
         // If both sides are setting/operating on the same type, let them both pass through.
         // It is important that the instruction application rules reflect this.
         // If it is not two lists or dictionaries, then the normal last-writer-wins rules will take effect below.
