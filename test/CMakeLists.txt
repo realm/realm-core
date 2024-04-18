@@ -1,3 +1,4 @@
+add_subdirectory(external/catch)
 add_subdirectory(util)
 add_custom_target(benchmarks)
 add_subdirectory(object-store)
