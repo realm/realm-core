@@ -67,26 +67,26 @@ private:
 
 inline int64_t FlexCompressor::get(const IntegerCompressor& c, size_t ndx) const
 {
-    const auto offset = c.width() * c.v_size();
+    const auto offset = c.v_width() * c.v_size();
     const auto ndx_w = c.ndx_width();
-    const auto v_w = c.width();
+    const auto v_w = c.v_width();
     const auto data = c.data();
     bf_iterator ndx_iterator{data, offset, ndx_w, ndx_w, ndx};
     bf_iterator data_iterator{data, 0, v_w, v_w, *ndx_iterator};
-    return sign_extend_field_by_mask(c.width_mask(), *data_iterator);
+    return sign_extend_field_by_mask(c.v_mask(), *data_iterator);
 }
 
 inline std::vector<int64_t> FlexCompressor::get_all(const IntegerCompressor& c, size_t b, size_t e) const
 {
-    const auto offset = c.width() * c.v_size();
+    const auto offset = c.v_width() * c.v_size();
     const auto ndx_w = c.ndx_width();
-    const auto v_w = c.width();
+    const auto v_w = c.v_width();
     const auto data = c.data();
-    const auto value_mask = c.width_mask();
+    const auto sign_mask = c.v_mask();
     const auto range = (e-b);
     const auto starting_bit = offset + b * ndx_w;
     const auto total_bits = starting_bit + (ndx_w * range);
-    const auto ndx_mask = (1ULL << ndx_w)-1;
+    const auto ndx_mask = c.ndx_bit_mask();
     const auto bit_per_it = num_bits_for_width(ndx_w);
     
     std::vector<int64_t> res;
@@ -99,7 +99,7 @@ inline std::vector<int64_t> FlexCompressor::get_all(const IntegerCompressor& c, 
         const auto next_chunk = cnt_bits + bit_per_it;
         while(cnt_bits < next_chunk && cnt_bits < total_bits) {
             data_iterator.move(word & ndx_mask);
-            res.push_back(sign_extend_field_by_mask(value_mask, *data_iterator));
+            res.push_back(sign_extend_field_by_mask(sign_mask, *data_iterator));
             cnt_bits+=ndx_w;
             word>>=ndx_w;
         }
@@ -125,9 +125,9 @@ inline void FlexCompressor::get_chunk(const IntegerCompressor& c, size_t ndx, in
 
 void FlexCompressor::set_direct(const IntegerCompressor& c, size_t ndx, int64_t value) const
 {
-    const auto offset = c.width() * c.v_size();
+    const auto offset = c.v_width() * c.v_size();
     const auto ndx_w = c.ndx_width();
-    const auto v_w = c.width();
+    const auto v_w = c.v_width();
     const auto data = c.data();
     bf_iterator ndx_iterator{data, offset, ndx_w, ndx_w, ndx};
     bf_iterator data_iterator{data, 0, v_w, v_w, *ndx_iterator};
@@ -203,11 +203,11 @@ inline bool FlexCompressor::find_linear(const Array& arr, int64_t value, size_t 
     };
 
     const auto& c = arr.integer_compressor();
-    const auto offset = c.width() * c.v_size();
+    const auto offset = c.v_width() * c.v_size();
     const auto ndx_w = c.ndx_width();
-    const auto v_w = c.width();
+    const auto v_w = c.v_width();
     const auto data = c.data();
-    const auto mask = c.width_mask();
+    const auto mask = c.v_mask();
     bf_iterator ndx_iterator{data, offset, ndx_w, ndx_w, start};
     bf_iterator data_iterator{data, 0, v_w, v_w, *ndx_iterator};
     while (start < end) {
@@ -263,7 +263,7 @@ inline bool FlexCompressor::find_parallel(const Array& arr, int64_t value, size_
                                           QueryStateBase* state) const
 {
     const auto& compressor = arr.integer_compressor();
-    const auto v_width = compressor.width();
+    const auto v_width = compressor.v_width();
     const auto v_size = compressor.v_size();
     const auto ndx_width = compressor.ndx_width();
     const auto offset = v_size * v_width;

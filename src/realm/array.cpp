@@ -276,9 +276,9 @@ void Array::init_from_mem(MemRef mem) noexcept
 void Array::update_width_cache_from_int_compressor() noexcept
 {
     m_size = m_integer_compressor.size();
-    m_width = static_cast<uint_least8_t>(m_integer_compressor.width());
-    m_lbound = -m_integer_compressor.width_mask();
-    m_ubound = m_integer_compressor.width_mask() - 1;
+    m_width = static_cast<uint_least8_t>(m_integer_compressor.v_width());
+    m_lbound = -m_integer_compressor.v_mask();
+    m_ubound = m_integer_compressor.v_mask() - 1;
     m_vtable = &VTableForEncodedArray::vtable;
     m_getter = m_vtable->getter;
 }

@@ -44,7 +44,7 @@ void FlexCompressor::copy_data(const Array& arr, const std::vector<int64_t>& val
     REALM_ASSERT_DEBUG(arr.is_attached());
     const auto& compressor = arr.integer_compressor();
     REALM_ASSERT_DEBUG(compressor.get_encoding() == Encoding::Flex);
-    const auto v_width = compressor.width();
+    const auto v_width = compressor.v_width();
     const auto ndx_width = compressor.ndx_width();
     const auto v_size = values.size();
     const auto data = (uint64_t*)arr.m_data;
