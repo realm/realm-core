@@ -82,11 +82,11 @@ inline std::vector<int64_t> FlexCompressor::get_all(const IntegerCompressor& c, 
     const auto ndx_w = c.ndx_width();
     const auto v_w = c.v_width();
     const auto data = c.data();
-    const auto sign_value_mask = c.v_mask();
+    const auto sign_mask = c.v_mask();
     const auto range = (e-b);
     const auto starting_bit = offset + b * ndx_w;
     const auto total_bits = starting_bit + (ndx_w * range);
-    const auto ndx_mask = c.ndx_bits();
+    const auto ndx_mask = c.ndx_bit_mask();
     const auto bit_per_it = num_bits_for_width(ndx_w);
     
     std::vector<int64_t> res;
@@ -99,7 +99,7 @@ inline std::vector<int64_t> FlexCompressor::get_all(const IntegerCompressor& c, 
         const auto next_chunk = cnt_bits + bit_per_it;
         while(cnt_bits < next_chunk && cnt_bits < total_bits) {
             data_iterator.move(word & ndx_mask);
-            res.push_back(sign_extend_field_by_mask(sign_value_mask, *data_iterator));
+            res.push_back(sign_extend_field_by_mask(sign_mask, *data_iterator));
             cnt_bits+=ndx_w;
             word>>=ndx_w;
         }
@@ -207,14 +207,13 @@ inline bool FlexCompressor::find_linear(const Array& arr, int64_t value, size_t 
     const auto ndx_w = c.ndx_width();
     const auto v_w = c.v_width();
     const auto data = c.data();
-    const auto sign_mask = c.v_mask();
+    const auto mask = c.v_mask();
     bf_iterator ndx_iterator{data, offset, ndx_w, ndx_w, start};
     bf_iterator data_iterator{data, 0, v_w, v_w, *ndx_iterator};
     while (start < end) {
-        const auto sv = sign_extend_field_by_mask(sign_mask, *data_iterator);
-        if (cmp(sv, value) && !state->match(start + baseindex)) {
+        const auto sv = sign_extend_field_by_mask(mask, *data_iterator);
+        if (cmp(sv, value) && !state->match(start + baseindex))
             return false;
-        }
         ndx_iterator.move(++start);
         data_iterator.move(*ndx_iterator);
     }

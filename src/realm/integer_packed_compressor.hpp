@@ -69,10 +69,10 @@ inline std::vector<int64_t> PackedCompressor::get_all(const IntegerCompressor& c
     const auto range = (e-b);
     const auto v_w = c.v_width();
     const auto data = c.data();
-    const auto sign_value_mask = c.v_mask();
+    const auto sign_mask = c.v_mask();
     const auto starting_bit = b * v_w;
     const auto total_bits = starting_bit + (v_w * range);
-    const auto mask = c.v_bits();
+    const auto mask = c.v_bit_mask();
     const auto bit_per_it = num_bits_for_width(v_w);
     
     std::vector<int64_t> res;
@@ -83,7 +83,7 @@ inline std::vector<int64_t> PackedCompressor::get_all(const IntegerCompressor& c
         auto word = unaligned_data_iterator.get_with_unsafe_prefetch(bit_per_it);
         const auto next_chunk = cnt_bits + bit_per_it;
         while(cnt_bits < next_chunk && cnt_bits < total_bits) {
-            res.push_back(sign_extend_field_by_mask(sign_value_mask, word & mask));
+            res.push_back(sign_extend_field_by_mask(sign_mask, word & mask));
             cnt_bits+=v_w;
             word>>=v_w;
         }
@@ -206,12 +206,13 @@ inline bool PackedCompressor::find_linear(const Array& arr, int64_t value, size_
             return a < b;
     };
     const auto& c = arr.integer_compressor();
-    bf_iterator data_iterator(c.data(), 0, c.v_width(), c.v_width(), start);
-    for (; start < end; ++start) {
-        const auto v = sign_extend_field_by_mask(c.v_mask(), *data_iterator);
-        if (compare(v, value) && !state->match(start + baseindex))
+    bf_iterator it{c.data(), 0, c.v_width(), c.v_width(), start};
+    while (start < end) {
+        const auto sv = sign_extend_field_by_mask(c.v_mask(), *it);
+        if (compare(sv, value) && !state->match(start + baseindex))
             return false;
-        data_iterator.move(start);
+        ++start;
+        it.move(start);
     }
     return true;
 }
@@ -219,6 +220,7 @@ inline bool PackedCompressor::find_linear(const Array& arr, int64_t value, size_
 template <typename Cond>
 inline bool PackedCompressor::run_parallel_scan(size_t width, size_t range) const
 {
+    return width < 32 && range >= 16;
     if constexpr (std::is_same_v<Cond, NotEqual>) {
         // we seem to be particularly slow doing parallel scan in packed for NotEqual.
         // we are much better with a linear scan. TODO: investigate this.

@@ -135,10 +135,8 @@ bool IntegerCompressor::always_compress(const Array& origin, Array& arr, NodeHea
 
 bool IntegerCompressor::compress(const Array& origin, Array& arr) const
 {
-
 #if REALM_COMPRESS
     return always_compress(origin, arr, NodeHeader::Encoding::Flex);
-    return always_compress(origin, arr, NodeHeader::Encoding::Packed);
 #else
     std::vector<int64_t> values;
     std::vector<size_t> indices;
