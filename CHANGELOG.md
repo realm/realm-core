@@ -51,6 +51,8 @@
 * Fix a race condition in Promise which could result in an assertion failure if it was destroyed immediately after a `get()` on the Future returned. The problematic scenario only occurred in test code and not in library code ([PR #7602](https://github.com/realm/realm-core/pull/7602)).
 * Catch2 is no longer required as a submodule if the `REALM_NO_TESTS` or `REALM_BUILD_LIB_ONLY` flags are set.
 * Sha-1 and Sha-2 are no longer required as submodules on Windows if linking with OpenSSL.
+* The Catch2 submodule has moved to `test/external/catch`.
+
 ----------------------------------------------
 
 # 14.5.2 Release notes
