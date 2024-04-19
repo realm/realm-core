@@ -94,7 +94,7 @@ inline std::vector<int64_t> FlexCompressor::get_all(const IntegerCompressor& c, 
     unaligned_word_iter unaligned_ndx_iterator(data, starting_bit);
     auto cnt_bits = starting_bit;
     bf_iterator data_iterator{data, 0, v_w, v_w, 0};
-    while(cnt_bits < total_bits) {
+    while ((cnt_bits + bit_per_it) < total_bits) {
         auto word = unaligned_ndx_iterator.get_with_unsafe_prefetch(bit_per_it);
         const auto next_chunk = cnt_bits + bit_per_it;
         while(cnt_bits < next_chunk && cnt_bits < total_bits) {
@@ -104,6 +104,15 @@ inline std::vector<int64_t> FlexCompressor::get_all(const IntegerCompressor& c, 
             word>>=ndx_w;
         }
         unaligned_ndx_iterator.bump(bit_per_it);
+    }
+    if (cnt_bits < total_bits) {
+        auto word = unaligned_ndx_iterator.get_with_unsafe_prefetch(static_cast<unsigned>(total_bits - cnt_bits));
+        while (cnt_bits < total_bits) {
+            data_iterator.move(static_cast<size_t>(word & ndx_mask));
+            res.push_back(sign_extend_field_by_mask(sign_mask, *data_iterator));
+            cnt_bits += ndx_w;
+            word >>= ndx_w;
+        }
     }
     return res;
 }
