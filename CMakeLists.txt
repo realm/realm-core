@@ -405,7 +405,8 @@ if(REALM_BUILD_LIB_ONLY)
 endif()
 
 if (NOT REALM_NO_TESTS)
-    add_subdirectory(test ${REALM_EXCLUDE_TESTS})
+    enable_testing()
+    add_subdirectory(test)
 endif()
 
 if (REALM_BUILD_TEST_CLIENT)
