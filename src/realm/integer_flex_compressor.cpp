@@ -34,7 +34,8 @@ void FlexCompressor::init_array(char* h, uint8_t flags, size_t v_width, size_t n
                                 size_t ndx_size) const
 {
     using Encoding = NodeHeader::Encoding;
-    init_header(h, Encoding::Flex, flags, v_width, ndx_width, v_size, ndx_size);
+    init_header(h, Encoding::Flex, flags, static_cast<uint8_t>(v_width), static_cast<uint8_t>(ndx_width), v_size,
+                ndx_size);
 }
 
 void FlexCompressor::copy_data(const Array& arr, const std::vector<int64_t>& values,

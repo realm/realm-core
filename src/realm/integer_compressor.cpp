@@ -143,7 +143,7 @@ bool IntegerCompressor::always_compress(const Array& origin, Array& arr, NodeHea
 bool IntegerCompressor::compress(const Array& origin, Array& arr) const
 {
 #if REALM_COMPRESS
-    return always_compress(origin, arr, NodeHeader::Encoding::Packed);
+    // return always_compress(origin, arr, NodeHeader::Encoding::Packed);
     return always_compress(origin, arr, NodeHeader::Encoding::Flex);
 #else
     std::vector<int64_t> values;
@@ -214,7 +214,7 @@ bool IntegerCompressor::decompress(Array& arr) const
 
     const auto mem = allocator.alloc(byte_size);
     const auto header = mem.get_addr();
-    init_header(header, Encoding::WTypBits, flags, width, values.size());
+    init_header(header, Encoding::WTypBits, flags, static_cast<uint8_t>(width), values.size());
     NodeHeader::set_capacity_in_header(byte_size, header);
     arr.init_from_mem(mem);
 

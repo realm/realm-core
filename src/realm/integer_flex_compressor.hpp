@@ -72,7 +72,7 @@ inline int64_t FlexCompressor::get(const IntegerCompressor& c, size_t ndx) const
     const auto v_w = c.v_width();
     const auto data = c.data();
     bf_iterator ndx_iterator{data, offset, ndx_w, ndx_w, ndx};
-    bf_iterator data_iterator{data, 0, v_w, v_w, *ndx_iterator};
+    bf_iterator data_iterator{data, 0, v_w, v_w, static_cast<size_t>(*ndx_iterator)};
     return sign_extend_field_by_mask(c.v_mask(), *data_iterator);
 }
 
@@ -98,7 +98,7 @@ inline std::vector<int64_t> FlexCompressor::get_all(const IntegerCompressor& c, 
         auto word = unaligned_ndx_iterator.get_with_unsafe_prefetch(bit_per_it);
         const auto next_chunk = cnt_bits + bit_per_it;
         while(cnt_bits < next_chunk && cnt_bits < total_bits) {
-            data_iterator.move(word & ndx_mask);
+            data_iterator.move(static_cast<size_t>(word & ndx_mask));
             res.push_back(sign_extend_field_by_mask(sign_mask, *data_iterator));
             cnt_bits+=ndx_w;
             word>>=ndx_w;
@@ -130,7 +130,7 @@ void FlexCompressor::set_direct(const IntegerCompressor& c, size_t ndx, int64_t 
     const auto v_w = c.v_width();
     const auto data = c.data();
     bf_iterator ndx_iterator{data, offset, ndx_w, ndx_w, ndx};
-    bf_iterator data_iterator{data, 0, v_w, v_w, *ndx_iterator};
+    bf_iterator data_iterator{data, 0, v_w, v_w, static_cast<size_t>(*ndx_iterator)};
     data_iterator.set_value(value);
 }
 
@@ -209,13 +209,13 @@ inline bool FlexCompressor::find_linear(const Array& arr, int64_t value, size_t 
     const auto data = c.data();
     const auto mask = c.v_mask();
     bf_iterator ndx_iterator{data, offset, ndx_w, ndx_w, start};
-    bf_iterator data_iterator{data, 0, v_w, v_w, *ndx_iterator};
+    bf_iterator data_iterator{data, 0, v_w, v_w, static_cast<size_t>(*ndx_iterator)};
     while (start < end) {
         const auto sv = sign_extend_field_by_mask(mask, *data_iterator);
         if (cmp(sv, value) && !state->match(start + baseindex))
             return false;
         ndx_iterator.move(++start);
-        data_iterator.move(*ndx_iterator);
+        data_iterator.move(static_cast<size_t>(*ndx_iterator));
     }
     return true;
 }
