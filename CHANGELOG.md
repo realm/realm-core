@@ -49,6 +49,9 @@
 * The ownership relationship between App and User has changed. User now strongly retains App and App has a weak cache of Users. This means that creating a SyncConfig or opening a Realm will keep the parent App alive, rather than things being in a broken state if the App is deallocated. ([PR #7300](https://github.com/realm/realm-core/pull/7300).
 * A new CMake define `REALM_APP_SERVICES` can be used to compile out core's default implmentation of the application services. ([#7268](https://github.com/realm/realm-core/issues/7268))
 * Fix a race condition in Promise which could result in an assertion failure if it was destroyed immediately after a `get()` on the Future returned. The problematic scenario only occurred in test code and not in library code ([PR #7602](https://github.com/realm/realm-core/pull/7602)).
+* Catch2 is no longer required as a submodule if the `REALM_NO_TESTS` flag is set.
+* Sha-2 is no longer required as a submodule on Windows if linking with OpenSSL.
+* The Catch2 submodule has moved to `test/external/catch`.
 
 ----------------------------------------------
 
