@@ -415,6 +415,10 @@ struct Payload {
     }
 };
 
+// This is backwards compatible with previous boolean type where 0
+// indicated simple type and 1 indicated list.
+enum class CollectionType : uint8_t { Single, List, Dictionary, Set };
+
 /// All instructions are TableInstructions.
 struct TableInstruction {
     InternString table;
@@ -501,10 +505,6 @@ struct EraseTable : TableInstruction {
 
 struct AddColumn : TableInstruction {
     using TableInstruction::TableInstruction;
-
-    // This is backwards compatible with previous boolean type where 0
-    // indicated simple type and 1 indicated list.
-    enum class CollectionType : uint8_t { Single, List, Dictionary, Set };
 
     InternString field;
 
@@ -632,6 +632,7 @@ struct ArrayErase : PathInstruction {
 
 struct Clear : PathInstruction {
     using PathInstruction::PathInstruction;
+    CollectionType collection_type;
 
     bool operator==(const Clear& rhs) const noexcept
     {
@@ -674,6 +675,7 @@ struct Instruction {
     using Payload = instr::Payload;
     using Path = instr::Path;
     using Vector = std::vector<Instruction>;
+    using CollectionType = instr::CollectionType;
 
     // CAUTION: Any change to the enum values for the instruction types is a protocol-breaking
     // change!
@@ -828,9 +830,9 @@ inline const char* get_type_name(Instruction::Payload::Type type)
     return "(unknown)";
 }
 
-inline const char* get_collection_type(Instruction::AddColumn::CollectionType type)
+inline const char* get_collection_type(Instruction::CollectionType type)
 {
-    using Type = Instruction::AddColumn::CollectionType;
+    using Type = Instruction::CollectionType;
     switch (type) {
         case Type::Single:
             return "Single";

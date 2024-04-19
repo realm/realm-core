@@ -57,10 +57,10 @@ namespace sync {
 //      Server replaces 'downloadable_bytes' (which was always zero prior this version)
 //      with an estimated progress value (double from 0.0 to 1.0) for flx sessions
 //
-//   13 Support for collections in mixed
+//   13 Support for syncing collections (lists and dictionaries) in Mixed columns
 //
 //   14 Support for server initiated bootstraps, including bootstraps for role/
-//      permissions changes instead of performing a client reset.
+//      permissions changes instead of performing a client reset when changed.
 //
 //  XX Changes:
 //     - TBD

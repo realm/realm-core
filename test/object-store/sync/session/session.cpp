@@ -410,7 +410,6 @@ TEST_CASE("sync: error handling", "[sync][session]") {
     }
 #endif // !defined(SWIFT_PACKAGE) && !REALM_MOBILE
 
-    using ProtocolError = realm::sync::ProtocolError;
     using ProtocolErrorInfo = realm::sync::ProtocolErrorInfo;
 
     SECTION("Doesn't treat unknown system errors as being fatal") {
@@ -429,6 +428,8 @@ TEST_CASE("sync: error handling", "[sync][session]") {
         REQUIRE_FALSE(error);
     }
 
+#if REALM_APP_SERVICES
+    using ProtocolError = realm::sync::ProtocolError;
     SECTION("Properly handles a client reset error") {
         OfflineAppSession oas;
         auto user = oas.make_user();
@@ -477,6 +478,7 @@ TEST_CASE("sync: error handling", "[sync][session]") {
             CHECK(idx != std::string::npos);
         }
     }
+#endif // REALM_APP_SERVICES
 }
 
 TEST_CASE("sync: stop policy behavior", "[sync][session]") {

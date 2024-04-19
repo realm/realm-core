@@ -328,7 +328,7 @@ void SyncReplication::insert_column(const Table* table, ColKey col_key, DataType
                                     Table* target_table)
 {
     Replication::insert_column(table, col_key, type, name, target_table);
-    using CollectionType = Instruction::AddColumn::CollectionType;
+    using CollectionType = Instruction::CollectionType;
 
     if (select_table(*table)) {
         Instruction::AddColumn instr;
@@ -570,6 +570,7 @@ void SyncReplication::list_clear(const CollectionBase& view)
     if (select_collection(view)) {
         Instruction::Clear instr;
         populate_path_instr(instr, view);
+        instr.collection_type = Instruction::CollectionType::List;
         emit(instr);
     }
 }
@@ -605,6 +606,7 @@ void SyncReplication::set_clear(const CollectionBase& set)
     if (select_collection(set)) {
         Instruction::Clear instr;
         populate_path_instr(instr, set);
+        instr.collection_type = Instruction::CollectionType::Set;
         emit(instr);
     }
 }
@@ -663,6 +665,7 @@ void SyncReplication::dictionary_clear(const CollectionBase& dict)
     if (select_collection(dict)) {
         Instruction::Clear instr;
         populate_path_instr(instr, dict);
+        instr.collection_type = Instruction::CollectionType::Dictionary;
         emit(instr);
     }
 }

@@ -121,7 +121,7 @@ void ChangesetEncoder::append_value(Instruction::Payload::Type type)
     append_value(int64_t(type));
 }
 
-void ChangesetEncoder::append_value(Instruction::AddColumn::CollectionType type)
+void ChangesetEncoder::append_value(Instruction::CollectionType type)
 {
     append_value(uint8_t(type));
 }
@@ -190,7 +190,7 @@ void ChangesetEncoder::operator()(const Instruction::AddInteger& instr)
 
 void ChangesetEncoder::operator()(const Instruction::AddColumn& instr)
 {
-    bool is_dictionary = (instr.collection_type == Instruction::AddColumn::CollectionType::Dictionary);
+    bool is_dictionary = (instr.collection_type == Instruction::CollectionType::Dictionary);
     // Mixed columns are always nullable.
     REALM_ASSERT(instr.type != Instruction::Payload::Type::Null || instr.nullable || is_dictionary);
     append(Instruction::Type::AddColumn, instr.table, instr.field, instr.type, instr.nullable, instr.collection_type);
@@ -225,8 +225,7 @@ void ChangesetEncoder::operator()(const Instruction::ArrayErase& instr)
 
 void ChangesetEncoder::operator()(const Instruction::Clear& instr)
 {
-    uint32_t prior_size = 0; // Ignored
-    append_path_instr(Instruction::Type::Clear, instr, prior_size);
+    append_path_instr(Instruction::Type::Clear, instr, instr.collection_type);
 }
 
 void ChangesetEncoder::operator()(const Instruction::SetInsert& instr)

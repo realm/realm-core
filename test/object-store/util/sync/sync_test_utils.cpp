@@ -220,9 +220,10 @@ std::string get_compile_time_admin_url()
     return {};
 #endif
 }
-#endif // REALM_MONGODB_ENDPOINT
 #endif // REALM_ENABLE_AUTH_TESTS
+#endif // REALM_ENABLE_SYNC
 
+#if REALM_APP_SERVICES
 AutoVerifiedEmailCredentials::AutoVerifiedEmailCredentials()
 {
     // emails with this prefix will pass through the baas app due to the register function
@@ -252,6 +253,8 @@ void log_in_user(app::SharedApp app, app::AppCredentials creds)
                                      REQUIRE(!error);
                                  });
 }
+
+#endif // REALM_APP_SERVICES
 
 void wait_for_advance(Realm& realm)
 {

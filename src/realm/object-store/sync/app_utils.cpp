@@ -72,6 +72,14 @@ std::optional<std::string> AppUtils::extract_redir_location(const std::map<std::
     return std::nullopt;
 }
 
+// Create a Response object with the given client error, message and optional http status code
+Response AppUtils::make_clienterror_response(ErrorCodes::Error code, const std::string_view message,
+                                             std::optional<int> http_status)
+{
+    return Response{http_status ? *http_status : 0, 0, {}, std::string(message), code};
+}
+
+#if REALM_APP_SERVICES
 std::optional<AppError> AppUtils::check_for_errors(const Response& response)
 {
     std::string error_msg;
@@ -169,11 +177,6 @@ Response AppUtils::make_apperror_response(const AppError& error)
     return {error.additional_status_code.value_or(0), 0, {}, std::string(error.reason()), error.code()};
 }
 
-// Create a Response object with the given client error, message and optional http status code
-Response AppUtils::make_clienterror_response(ErrorCodes::Error code, const std::string_view message,
-                                             std::optional<int> http_status)
-{
-    return Response{http_status ? *http_status : 0, 0, {}, std::string(message), code};
-}
+#endif // REALM_APP_SERVICES
 
 } // namespace realm::app

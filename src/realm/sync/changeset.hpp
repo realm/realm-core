@@ -348,7 +348,7 @@ struct Changeset::Reflector {
                           util::Optional<InternString> field, const Instruction::Path* path) = 0;
         virtual void field(StringData, InternString) = 0;
         virtual void field(StringData, Instruction::Payload::Type) = 0;
-        virtual void field(StringData, Instruction::AddColumn::CollectionType) = 0;
+        virtual void field(StringData, Instruction::CollectionType) = 0;
         virtual void field(StringData, const Instruction::PrimaryKey&) = 0;
         virtual void field(StringData, const Instruction::Payload&) = 0;
         virtual void field(StringData, const Instruction::Path&) = 0;
@@ -393,7 +393,7 @@ struct Changeset::Printer : Changeset::Reflector::Tracer {
               const Instruction::Path* path) final;
     void field(StringData, InternString) final;
     void field(StringData, Instruction::Payload::Type) final;
-    void field(StringData, Instruction::AddColumn::CollectionType) final;
+    void field(StringData, Instruction::CollectionType) final;
     void field(StringData, const Instruction::PrimaryKey&) final;
     void field(StringData, const Instruction::Payload&) final;
     void field(StringData, const Instruction::Path&) final;

@@ -3,7 +3,7 @@
 import PackageDescription
 import Foundation
 
-let versionStr = "14.5.1"
+let versionStr = "14.5.2"
 let versionPieces = versionStr.split(separator: "-")
 let versionCompontents = versionPieces[0].split(separator: ".")
 let versionExtra = versionPieces.count > 1 ? versionPieces[1] : ""
@@ -17,6 +17,7 @@ var cxxSettings: [CXXSetting] = [
     .define("REALM_ENABLE_ENCRYPTION", to: "1"),
     .define("REALM_ENABLE_SYNC", to: "1"),
     .define("REALM_ENABLE_GEOSPATIAL", to: "1"),
+    .define("REALM_APP_SERVICES", to: "1"),
 
     .define("REALM_VERSION_MAJOR", to: String(versionCompontents[0])),
     .define("REALM_VERSION_MINOR", to: String(versionCompontents[1])),
@@ -493,7 +494,8 @@ let package = Package(
         .target(
             name: "RealmFFI",
             dependencies: ["Capi"],
-            path: "src/swift"),
+            path: "src/swift",
+            cxxSettings: (cxxSettings) as [CXXSetting]),
         .target(
             name: "Catch2Generated",
             path: "external/generated",
