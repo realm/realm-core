@@ -3,11 +3,13 @@
 #include <realm/sync/changeset.hpp>
 #include <realm/sync/changeset_encoder.hpp>
 #include <realm/sync/changeset_parser.hpp>
+#include <realm/sync/instructions.hpp>
 #include <realm/sync/noinst/integer_codec.hpp>
 
 using namespace realm;
 using namespace realm::sync::instr;
 using realm::sync::Changeset;
+using realm::sync::Instruction;
 
 namespace {
 Changeset encode_then_parse(const Changeset& changeset)
@@ -75,7 +77,7 @@ TEST(ChangesetEncoding_AddColumn)
     instr.table = changeset.intern_string("Foo");
     instr.field = changeset.intern_string("foo");
     instr.type = Payload::Type::Link;
-    instr.collection_type = AddColumn::CollectionType::List;
+    instr.collection_type = Instruction::CollectionType::List;
     instr.nullable = false;
     instr.link_target_table = changeset.intern_string("Bar");
     instr.key_type = Payload::Type::Null;
@@ -270,6 +272,7 @@ TEST(ChangesetEncoding_Clear)
     instr.path.push_back(234);
     instr.path.push_back(changeset.intern_string("lol"));
     instr.path.push_back(5);
+    instr.collection_type = Instruction::CollectionType::List;
     changeset.push_back(instr);
 
     auto parsed = encode_then_parse(changeset);
