@@ -116,18 +116,11 @@ void perform_schema_migration(DB& db)
     sync::TempShortCircuitReplication sync_history_guard(repl);
     repl.set_write_validator_factory(nullptr);
 
-    // Delete all tables (and their columns).
-    for (const auto& tk : tr->get_table_keys()) {
-        auto cur_table = tr->get_table(tk);
-        // First delete the columns linking to this table.
-        cur_table->for_each_backlink_column([&](ColKey backlink_col_key) {
-            auto origin_table_key = cur_table->get_opposite_table_key(backlink_col_key);
-            auto origin_link_col = cur_table->get_opposite_column(backlink_col_key);
-            auto origin_table = tr->get_table(origin_table_key);
-            origin_table->remove_column(origin_link_col);
-            return IteratorControl::AdvanceToNext;
-        });
-        // Then delete the table.
+    // Delete all columns before deleting tables to avoid complications with links
+    for (auto tk : tr->get_table_keys()) {
+        tr->get_table(tk)->remove_columns();
+    }
+    for (auto tk : tr->get_table_keys()) {
         tr->remove_table(tk);
     }
 
