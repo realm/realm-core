@@ -292,14 +292,11 @@ inline bool FlexCompressor::find_parallel(const Array& arr, int64_t value, size_
 template <typename Cond>
 inline bool FlexCompressor::run_parallel_subscan(size_t v_width, size_t v_range, size_t ndx_range) const
 {
-    if (ndx_range <= 20)
-        return false;
-    // the threshold for v_width is empirical, some intuition for this is probably that we need to consider 2 parallel
-    // scans, one for finding the matching value and one for the indices (max bit-width 8, becasue max array size is
-    // 256). When we scan the values in parallel, we go through them all, we can't follow the hint given [start, end],
-    // thus a full scan of values makes sense only for certain widths that are not too big, in order to compare in
-    // parallel as many values as we can in one go.
-    return v_width <= 20 && v_range >= 20;
+    if constexpr (std::is_same_v<Cond, Equal> || std::is_same_v<Cond, NotEqual>) {
+        return v_width < 32 && v_range >= 20 && ndx_range >= 20;
+    }
+    // > and < need looks slower in parallel scan for large values
+    return v_width <= 16 && v_range >= 20 && ndx_range >= 20;
 }
 
 } // namespace realm

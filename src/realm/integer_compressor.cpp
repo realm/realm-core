@@ -143,6 +143,7 @@ bool IntegerCompressor::always_compress(const Array& origin, Array& arr, NodeHea
 bool IntegerCompressor::compress(const Array& origin, Array& arr) const
 {
 #if REALM_COMPRESS
+    return always_compress(origin, arr, NodeHeader::Encoding::Packed);
     return always_compress(origin, arr, NodeHeader::Encoding::Flex);
 #else
     std::vector<int64_t> values;
@@ -183,13 +184,13 @@ bool IntegerCompressor::decompress(Array& arr) const
             std::vector<int64_t> res;
             res.reserve(sz);
             for (size_t i = 0; i < sz; ++i)
-                res.push_back((this->*(m_vtable->m_getter))(i));
+                res.push_back(get(i));
             return res;
         }
         // in flex format this is faster.
         return get_all(0, sz);
     };
-    const auto& values = values_fetcher(); // get_all(0, arr.size());// values_fetcher();
+    const auto& values = values_fetcher();
     //  do the reverse of compressing the array
     REALM_ASSERT_DEBUG(!values.empty());
     using Encoding = NodeHeader::Encoding;
@@ -218,8 +219,8 @@ bool IntegerCompressor::decompress(Array& arr) const
     arr.init_from_mem(mem);
 
     // this is copying the bits straight, without doing any COW, since the array is basically restored, we just need
-    // to copy the data straight back into it. This makes decompressing the array equivalent to copy on write, in fact
-    // for a compressed array, we skip COW and we just decompress.
+    // to copy the data straight back into it. This makes decompressing the array equivalent to copy on write for
+    // normal arrays, in fact for a compressed array, we skip COW and we just decompress, getting the same result.
     const auto set = s_direct_array_set[width];
     REALM_ASSERT_DEBUG(set != nullptr);
     for (size_t ndx = 0; ndx < size; ++ndx)
@@ -239,7 +240,10 @@ bool IntegerCompressor::decompress(Array& arr) const
 bool IntegerCompressor::init(const char* h)
 {
     m_encoding = NodeHeader::get_encoding(h);
-    if (!NodeHeader::wtype_is_extended(h))
+    // avoid to check wtype here, it is another access to the header, that we can avoid.
+    // We just need to know if the encoding is packed or flex.
+    // This makes Array::init_from_mem faster.
+    if (REALM_LIKELY(!(is_packed() || is_flex())))
         return false;
 
     if (is_packed()) {
