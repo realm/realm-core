@@ -219,7 +219,8 @@ public:
     // SyncSocketProvider
     void post(SyncSocketProvider::FunctionHandler&& handler) REQUIRES(!m_drain_mutex);
     SyncSocketProvider::SyncTimer create_timer(std::chrono::milliseconds delay,
-                                               SyncSocketProvider::FunctionHandler&& handler) REQUIRES(!m_drain_mutex);
+                                               SyncSocketProvider::FunctionHandler&& handler)
+        REQUIRES(!m_drain_mutex);
     using SyncTrigger = std::unique_ptr<Trigger<ClientImpl>>;
     SyncTrigger create_trigger(SyncSocketProvider::FunctionHandler&& handler);
 
@@ -336,7 +337,8 @@ private:
                                            bool verify_servers_ssl_certificate,
                                            util::Optional<std::string> ssl_trust_certificate_path,
                                            std::function<SyncConfig::SSLVerifyCallback>,
-                                           util::Optional<SyncConfig::ProxyConfig>, bool& was_created) REQUIRES(!m_drain_mutex);
+                                           util::Optional<SyncConfig::ProxyConfig>, bool& was_created)
+        REQUIRES(!m_drain_mutex);
 
     // Destroys the specified connection.
     void remove_connection(ClientImpl::Connection&) noexcept REQUIRES(!m_drain_mutex);
