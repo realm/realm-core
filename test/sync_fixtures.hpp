@@ -464,6 +464,8 @@ public:
         std::set<file_ident_type> server_disable_download_for;
 
         std::function<Server::SessionBootstrapCallback> server_session_bootstrap_callback;
+
+        std::shared_ptr<BindingCallbackThreadObserver> socket_provider_observer;
     };
 
 
@@ -541,7 +543,8 @@ public:
             Client::Config config_2;
 
             m_client_socket_providers.push_back(std::make_shared<websocket::DefaultSocketProvider>(
-                m_client_loggers[i], "", nullptr, websocket::DefaultSocketProvider::AutoStart{false}));
+                m_client_loggers[i], "", config.socket_provider_observer,
+                websocket::DefaultSocketProvider::AutoStart{false}));
             config_2.socket_provider = m_client_socket_providers.back();
             config_2.logger = m_client_loggers[i];
             config_2.reconnect_mode = ReconnectMode::testing;

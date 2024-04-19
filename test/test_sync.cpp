@@ -3804,30 +3804,53 @@ TEST(Sync_MultipleSyncAgentsNotAllowed)
     // particular session participant over the "temporally overlapping access"
     // relation.
 
+    TEST_DIR(server_dir);
     TEST_CLIENT_DB(db);
-    Client::Config config;
-    config.logger = test_context.logger;
-    auto socket_provider = std::make_shared<websocket::DefaultSocketProvider>(
-        config.logger, "", nullptr, websocket::DefaultSocketProvider::AutoStart{false});
-    config.socket_provider = socket_provider;
-    config.reconnect_mode = ReconnectMode::testing;
-    Client client{config};
+
+    auto pf = util::make_promise_future<void>();
+    struct Observer : BindingCallbackThreadObserver {
+        unit_test::TestContext& test_context;
+        util::Promise<void>& got_error;
+        Observer(unit_test::TestContext& test_context, util::Promise<void>& got_error)
+            : test_context(test_context)
+            , got_error(got_error)
+        {
+        }
+
+        bool has_handle_error() override
+        {
+            return true;
+        }
+        bool handle_error(const std::exception& e) override
+        {
+            CHECK(dynamic_cast<const MultipleSyncAgents*>(&e));
+            got_error.emplace_value();
+            return true;
+        }
+    };
+
+    auto observer = std::make_shared<Observer>(test_context, pf.promise);
+    ClientServerFixture::Config config;
+    config.socket_provider_observer = observer;
+    ClientServerFixture fixture(server_dir, test_context, std::move(config));
+    fixture.start();
+
     {
-        Session::Config config_1;
-        config_1.realm_identifier = "blablabla";
-        Session::Config config_2;
-        config_2.realm_identifier = config_1.realm_identifier;
-        Session session_1{client, db, nullptr, nullptr, std::move(config_1)};
-        Session session_2{client, db, nullptr, nullptr, std::move(config_2)};
-        session_1.bind();
-        session_2.bind();
-        CHECK_THROW(
-            websocket::DefaultSocketProvider::OnlyForTesting::run_event_loop_on_current_thread(socket_provider.get()),
-            MultipleSyncAgents);
-        websocket::DefaultSocketProvider::OnlyForTesting::prep_event_loop_for_restart(socket_provider.get());
+        Session session = fixture.make_session(db, "/test");
+        session.bind();
+        Session session2 = fixture.make_session(db, "/test");
+        session2.bind();
+        pf.future.get();
+
+        // The exception caused the event loop to stop so we need to restart it
+        fixture.start_client(0);
     }
 
-    socket_provider->start();
+    // Verify that after the error occurs (and is ignored) things are still
+    // in a functional state
+    Session session = fixture.make_session(db, "/test");
+    session.bind();
+    session.wait_for_upload_complete_or_client_stopped();
 }
 
 TEST(Sync_CancelReconnectDelay)
