@@ -274,7 +274,7 @@ TEST_CASE("Sync schema migrations don't work with sync open", "[sync][flx][flx s
 
     SECTION("Breaking change detected by client") {
         // Make field 'non_queryable_field2' of table 'TopLevel' optional.
-        schema_v1[0].persisted_properties.back() = {"non_queryable_field2",
+        schema_v1[1].persisted_properties.back() = {"non_queryable_field2",
                                                     PropertyType::String | PropertyType::Nullable};
         config.schema = schema_v1;
         create_schema(app_session, *config.schema, config.schema_version);
@@ -284,8 +284,8 @@ TEST_CASE("Sync schema migrations don't work with sync open", "[sync][flx][flx s
     }
 
     SECTION("Breaking change detected by server") {
-        // Remove table 'TopLevel3'.
-        schema_v1.pop_back();
+        // Remove table 'TopLevel2'.
+        schema_v1.erase(schema_v1.begin() + 2);
         config.schema = schema_v1;
         create_schema(app_session, *config.schema, config.schema_version);
 
@@ -306,8 +306,8 @@ TEST_CASE("Sync schema migrations don't work with sync open", "[sync][flx][flx s
         wait_for_download(*realm);
         wait_for_upload(*realm);
 
-        auto table = realm->read_group().get_table("class_TopLevel3");
-        // Migration did not succeed because table 'TopLevel3' still exists (but there is no error).
+        auto table = realm->read_group().get_table("class_TopLevel2");
+        // Migration did not succeed because table 'TopLevel2' still exists (but there is no error).
         CHECK(table);
         check_realm_schema(config.path, schema_v0, 1);
     }
