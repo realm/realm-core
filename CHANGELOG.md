@@ -52,6 +52,7 @@
 * Catch2 is no longer required as a submodule if the `REALM_NO_TESTS` flag is set.
 * Sha-2 is no longer required as a submodule on Windows if linking with OpenSSL.
 * The Catch2 submodule has moved to `test/external/catch`.
+* Fix possible file corruption if using Transaction::copy_to if nested collections are present.
 
 ----------------------------------------------
 
