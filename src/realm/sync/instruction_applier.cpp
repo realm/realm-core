@@ -900,7 +900,9 @@ void InstructionApplier::operator()(const Instruction::Clear& instr)
         void on_list(LstBase& list) override
         {
             // list property
-            REALM_ASSERT(!m_collection_type || *m_collection_type == CollectionType::List);
+            if (m_collection_type && *m_collection_type != CollectionType::List) {
+                m_applier->bad_transaction_log("Clear: Not a List");
+            }
             list.clear();
         }
         Status on_list_index(LstBase& list, uint32_t index) override
@@ -931,7 +933,9 @@ void InstructionApplier::operator()(const Instruction::Clear& instr)
         void on_dictionary(Dictionary& dict) override
         {
             // dictionary property
-            REALM_ASSERT(!m_collection_type || *m_collection_type == CollectionType::Dictionary);
+            if (m_collection_type && *m_collection_type != CollectionType::Dictionary) {
+                m_applier->bad_transaction_log("Clear: Not a Dictionary");
+            }
             dict.clear();
         }
         Status on_dictionary_key(Dictionary& dict, Mixed key) override
@@ -956,7 +960,9 @@ void InstructionApplier::operator()(const Instruction::Clear& instr)
         void on_set(SetBase& set) override
         {
             // set property
-            REALM_ASSERT(!m_collection_type || *m_collection_type == CollectionType::Set);
+            if (m_collection_type && *m_collection_type != CollectionType::Set) {
+                m_applier->bad_transaction_log("Clear: Not a Set");
+            }
             set.clear();
         }
         void on_property(Obj& obj, ColKey col_key) override
