@@ -1118,17 +1118,21 @@ size_t Array::upper_bound_int_compressed(int64_t value) const noexcept
 
 int_fast64_t Array::get(const char* header, size_t ndx) noexcept
 {
-    if (wtype_is_extended(header)) {
-        static IntegerCompressor compressor;
-        compressor.init(header);
-        return compressor.get(ndx);
+    // this is very important. Most of the times we end up here
+    // because we are traversing the cluster, the keys/refs in the cluster
+    // are not compressed (because there is almost no gain), so the intent
+    // is avoiding to pollute traversing the cluster as little as possible.
+    // We need to check the header wtype and only initialise the
+    // integer compressor, if needed. Otherwise we should just call
+    // get_direct. On average there should be one more access to the header.
+    if (REALM_LIKELY(!NodeHeader::wtype_is_extended(header))) {
+        const char* data = get_data_from_header(header);
+        uint_least8_t width = get_width_from_header(header);
+        return get_direct(data, width, ndx);
     }
-
-    auto sz = get_size_from_header(header);
-    REALM_ASSERT(ndx < sz);
-    const char* data = get_data_from_header(header);
-    uint_least8_t width = get_width_from_header(header);
-    return get_direct(data, width, ndx);
+    static IntegerCompressor s_compressor;
+    s_compressor.init(header);
+    return s_compressor.get(ndx);
 }
 
 std::pair<int64_t, int64_t> Array::get_two(const char* header, size_t ndx) noexcept

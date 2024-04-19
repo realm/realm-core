@@ -448,8 +448,8 @@ ObjKey ClusterNodeInner::get(size_t ndx, ClusterNode::State& state) const
         int64_t key_offset = m_keys.is_attached() ? m_keys.get(child_ndx) : (child_ndx << m_shift_factor);
 
         ref_type child_ref = _get_child_ref(child_ndx);
-        char* child_header = m_alloc.translate(child_ref);
-        bool child_is_leaf = !Array::get_is_inner_bptree_node_from_header(child_header);
+        const auto child_header = m_alloc.translate(child_ref);
+        const auto child_is_leaf = !Array::get_is_inner_bptree_node_from_header(child_header);
         size_t sub_tree_size;
         if (child_is_leaf) {
             sub_tree_size = Cluster::node_size_from_header(m_alloc, child_header);
