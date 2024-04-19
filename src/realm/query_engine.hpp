@@ -471,6 +471,27 @@ static size_t find_first_haystack(LeafType& leaf, NeedleContainer& needles, size
     return realm::npos;
 }
 
+template <size_t linear_search_threshold, class LeafType, class NeedleContainer>
+static size_t find_all_haystack(LeafType& leaf, NeedleContainer& needles, size_t start, size_t end,
+                                QueryStateBase* state)
+{
+    if (needles.size() < linear_search_threshold) {
+        for (size_t i = start; i < end; ++i) {
+            auto element = leaf.get(i);
+            if (std::find(needles.begin(), needles.end(), element) != needles.end())
+                state->match(i);
+        }
+    }
+    else {
+        for (size_t i = start; i < end; ++i) {
+            auto element = leaf.get(i);
+            if (needles.count(element))
+                state->match(i);
+        }
+    }
+    return end;
+}
+
 template <class LeafType>
 class IntegerNode<LeafType, Equal> : public IntegerNodeBase<LeafType> {
 public:
@@ -481,6 +502,22 @@ public:
     IntegerNode(TConditionValue value, ColKey column_key)
         : BaseType(value, column_key)
     {
+    }
+    IntegerNode(ColKey col, const Mixed* begin, const Mixed* end)
+        : BaseType(realm::npos, col)
+    {
+        static_assert(is_any_v<TConditionValue, std::optional<int64_t>, int64_t>, "unexpected type change");
+        for (const Mixed* it = begin; it != end; ++it) {
+            if constexpr (std::is_same_v<TConditionValue, std::optional<int64_t>>) {
+                if (it->is_null()) {
+                    m_needles.insert(std::nullopt);
+                    continue;
+                }
+            }
+            if (const int64_t* val = it->get_if<int64_t>()) {
+                m_needles.insert(*val);
+            }
+        }
     }
 
     void init(bool will_query_ranges) override
@@ -546,6 +583,9 @@ public:
 
     size_t find_all_local(size_t start, size_t end) override
     {
+        if (m_nb_needles) {
+            return find_all_haystack<22>(*this->m_leaf, m_needles, start, end, ParentNode::m_state);
+        }
         return BaseType::template find_all_local<Equal>(start, end);
     }
 
@@ -1177,6 +1217,25 @@ public:
     using FixedBytesNodeBase<ObjectType, ArrayType>::FixedBytesNodeBase;
     using BaseType = FixedBytesNodeBase<ObjectType, ArrayType>;
     using ThisType = FixedBytesNode<Equal, ObjectType, ArrayType>;
+
+    FixedBytesNode(ColKey col, const Mixed* begin, const Mixed* end)
+        : BaseType(realm::null(), col)
+    {
+        REALM_ASSERT(begin && end);
+        REALM_ASSERT(begin != end);
+        for (const Mixed* val = begin; val != end; ++val) {
+            if (val->is_null()) {
+                m_needles.insert(std::nullopt);
+                continue;
+            }
+            if (const ObjectType* v = val->get_if<ObjectType>()) {
+                m_needles.insert({*v});
+            }
+        }
+        if (m_needles.size() == 0) {
+            throw InvalidArgument("No arguments to compare to");
+        }
+    }
 
     void init(bool will_query_ranges) override
     {
@@ -1872,6 +1931,7 @@ public:
         : StringNodeEqualBase(v, column)
     {
     }
+    StringNode(ColKey col, const Mixed* begin, const Mixed* end);
 
     void _search_index_init() override;
 

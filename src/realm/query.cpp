@@ -278,6 +278,12 @@ struct MakeConditionNode {
         return std::unique_ptr<ParentNode>{new Node(null{}, col_key)};
     }
 
+    static std::unique_ptr<ParentNode> make(ColKey col_key, Mixed value)
+    {
+        return std::unique_ptr<ParentNode>{new Node(value.get<typename Node::TConditionValue>(), col_key)};
+    }
+
+    // overload for optional types
     template <class T = typename Node::TConditionValue>
     static typename std::enable_if<!std::is_same<typename util::RemoveOptional<T>::type, T>::value,
                                    std::unique_ptr<ParentNode>>::type
@@ -317,6 +323,35 @@ struct MakeConditionNode<StringNode<Cond>> {
     static std::unique_ptr<ParentNode> make(ColKey col_key, null)
     {
         return std::unique_ptr<ParentNode>{new StringNode<Cond>(null{}, col_key)};
+    }
+
+    template <class T>
+    REALM_FORCEINLINE static std::unique_ptr<ParentNode> make(ColKey, T&&)
+    {
+        throw_type_mismatch_error();
+    }
+};
+
+template <class Cond>
+struct MakeConditionNode<TimestampNode<Cond>> {
+    static std::unique_ptr<ParentNode> make(ColKey col_key, Timestamp value)
+    {
+        return std::unique_ptr<ParentNode>{new TimestampNode<Cond>(std::move(value), col_key)};
+    }
+
+    // only enable certain template conditions of supported timestamp operations
+    template <typename... SubstitutionEnabler, typename U = Cond>
+    static std::enable_if_t<is_any_v<U, Equal, NotEqual, Greater, Less, GreaterEqual, LessEqual>,
+                            std::unique_ptr<ParentNode>>
+    make(ColKey col_key, Mixed value)
+    {
+        static_assert(sizeof...(SubstitutionEnabler) == 0, "Do not specify template arguments");
+        return std::unique_ptr<ParentNode>{new TimestampNode<Cond>(value.get<Timestamp>(), col_key)};
+    }
+
+    static std::unique_ptr<ParentNode> make(ColKey col_key, null)
+    {
+        return std::unique_ptr<ParentNode>{new TimestampNode<Cond>(null{}, col_key)};
     }
 
     template <class T>
@@ -851,6 +886,66 @@ Query& Query::like(ColKey column_key, Mixed value, bool case_sensitive)
         add_condition<LikeIns>(column_key, value);
     return *this;
 }
+Query& Query::in(ColKey column_key, const Mixed* begin, const Mixed* end)
+{
+    REALM_ASSERT(!column_key.is_collection());
+    std::unique_ptr<ParentNode> node;
+    try {
+        if (begin == end) {
+            node = std::make_unique<ExpressionNode>(std::make_unique<FalseExpression>());
+        }
+        else if (column_key.get_type() == col_type_UUID) {
+            node = std::make_unique<UUIDNode<Equal>>(column_key, begin, end);
+        }
+        else if (column_key.get_type() == col_type_ObjectId) {
+            node = std::make_unique<ObjectIdNode<Equal>>(column_key, begin, end);
+        }
+        else if (column_key.get_type() == col_type_String) {
+            node = std::make_unique<StringNode<Equal>>(column_key, begin, end);
+        }
+        else if (column_key.get_type() == col_type_Int) {
+            if (column_key.is_nullable()) {
+                node = std::make_unique<IntegerNode<ArrayIntNull, Equal>>(column_key, begin, end);
+            }
+            else {
+                node = std::make_unique<IntegerNode<ArrayInteger, Equal>>(column_key, begin, end);
+            }
+        }
+        else {
+            // general path for nodes that don't have this optimization yet
+            Query cond = this->m_table->where();
+            ColumnType col_type = column_key.get_type();
+            if (col_type == col_type_Mixed) {
+                for (const Mixed* it = begin; it != end; ++it) {
+                    cond.add_node(make_condition_node<Equal>(*m_table, column_key, *it));
+                    cond.Or();
+                }
+            }
+            else {
+                for (const Mixed* it = begin; it != end; ++it) {
+                    if (it->is_type(DataType(col_type))) {
+                        cond.add_node(make_condition_node<Equal>(*m_table, column_key, *it));
+                        cond.Or();
+                    }
+                    else if (it->is_null() && column_key.is_nullable()) {
+                        cond.add_node(make_condition_node<Equal>(*m_table, column_key, realm::null()));
+                        cond.Or();
+                    }
+                }
+            }
+            this->and_query(cond);
+            return *this;
+        }
+    }
+    catch (const InvalidArgument&) {
+        // if none of the arguments matched the right type we'd end up with an
+        // empty condition node which won't evaluate correctly. The right behaviour
+        // is to match nothing, so make a false condition
+        node = std::make_unique<ExpressionNode>(std::make_unique<FalseExpression>());
+    }
+    add_node(std::move(node));
+    return *this;
+}
 
 // ------------- size
 Query& Query::size_equal(ColKey column_key, int64_t value)
@@ -1017,9 +1112,7 @@ void Query::aggregate(QueryStateBase& st, ColKey column_key) const
             auto pn = root_node();
             auto best = find_best_node(pn);
             auto node = pn->m_children[best];
-            if (node->has_search_index()) {
-                auto keys = node->index_based_keys();
-                REALM_ASSERT(keys);
+            if (auto keys = node->index_based_keys()) {
                 // The node having the search index can be removed from the query as we know that
                 // all the objects will match this condition
                 pn->m_children[best] = pn->m_children.back();
@@ -1344,10 +1437,7 @@ void Query::do_find_all(QueryStateBase& st) const
             auto pn = root_node();
             auto best = find_best_node(pn);
             auto node = pn->m_children[best];
-            if (node->has_search_index()) {
-                auto keys = node->index_based_keys();
-                REALM_ASSERT(keys);
-
+            if (auto keys = node->index_based_keys()) {
                 // The node having the search index can be removed from the query as we know that
                 // all the objects will match this condition
                 pn->m_children[best] = pn->m_children.back();
@@ -1463,9 +1553,7 @@ size_t Query::do_count(size_t limit) const
         auto pn = root_node();
         auto best = find_best_node(pn);
         auto node = pn->m_children[best];
-        if (node->has_search_index()) {
-            auto keys = node->index_based_keys();
-            REALM_ASSERT(keys);
+        if (auto keys = node->index_based_keys()) {
             if (pn->m_children.size() > 1) {
                 // The node having the search index can be removed from the query as we know that
                 // all the objects will match this condition

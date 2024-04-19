@@ -5907,6 +5907,104 @@ TEST(Query_links_to_with_bpnode_split)
     }
 }
 
+TEST_TYPES(Query_ManyIn, Prop<Int>, Prop<String>, Prop<Float>, Prop<Double>, Prop<Timestamp>, Prop<UUID>,
+           Prop<ObjectId>, Prop<Decimal128>, Prop<BinaryData>, Prop<Mixed>, Nullable<Int>, Nullable<String>,
+           Nullable<Float>, Nullable<Double>, Nullable<Timestamp>, Nullable<UUID>, Nullable<ObjectId>,
+           Nullable<Decimal128>, Nullable<BinaryData>, Indexed<Int>, Indexed<String>, Indexed<Float>, Indexed<Double>,
+           Indexed<Timestamp>, Indexed<UUID>, Indexed<ObjectId>, Indexed<Decimal128>, Indexed<BinaryData>,
+           Indexed<Mixed>)
+{
+    using type = typename TEST_TYPE::type;
+    TestValueGenerator gen;
+    Group g;
+
+    auto t = g.add_table("foo");
+    auto col = t->add_column(TEST_TYPE::data_type, "value", TEST_TYPE::is_nullable);
+    constexpr size_t num_values = 200;
+    std::vector<int64_t> seed_values;
+    seed_values.resize(num_values);
+    std::iota(seed_values.begin(), seed_values.end(), 1000);
+    auto values = gen.values_from_int<type>(seed_values);
+    for (auto& v : values) {
+        t->create_object().set_any(col, v);
+    }
+    if (TEST_TYPE::is_nullable) {
+        t->create_object(); // null
+    }
+    std::vector<Mixed> mixed_vals;
+    mixed_vals.insert(mixed_vals.begin(), values.begin(), values.end());
+
+    CHECK_EQUAL(t->where().in(col, mixed_vals.data(), mixed_vals.data() + mixed_vals.size()).count(), num_values);
+
+    mixed_vals.push_back(Mixed{});                  // exists for nullable types
+    mixed_vals.push_back(Mixed{ObjectId()});        // value does not exist in data
+    mixed_vals.push_back(Mixed{Timestamp{-1, -1}}); // value does not exist in data
+
+    CHECK_EQUAL(t->where().in(col, mixed_vals.data(), mixed_vals.data() + mixed_vals.size()).count(),
+                TEST_TYPE::is_nullable ? num_values + 1 : num_values);
+    // empty values for begin == end
+    CHECK_EQUAL(t->where().in(col, mixed_vals.data(), mixed_vals.data()).count(), 0);
+    CHECK_EQUAL(t->where().in(col, nullptr, nullptr).count(), 0);
+    // subset of existing values
+    CHECK_EQUAL(t->where().in(col, mixed_vals.data() + 1, mixed_vals.data() + 2).count(),
+                1); // assumes test data at mixed_vals[1] is unique
+    CHECK_EQUAL(t->where().in(col, mixed_vals.data() + 1, mixed_vals.data() + 3).count(),
+                2); // same for mixed_vals[2]
+
+    CHECK(mixed_vals[1] != mixed_vals[2]); // the following relies on test data uniqueness
+    TableView tv = t->where().in(col, mixed_vals.data() + 1, mixed_vals.data() + 3).find_all();
+    CHECK_EQUAL(tv.size(), 2);
+    auto first = tv.get_object(0).get<type>(col);
+    auto second = tv.get_object(1).get<type>(col);
+    bool order = first == mixed_vals[1];
+    CHECK_EQUAL(first, order ? mixed_vals[1] : mixed_vals[2]);
+    CHECK_EQUAL(second, order ? mixed_vals[2] : mixed_vals[1]);
+}
+
+TEST(Query_ManyIntConditionsAgg)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    DBRef db = DB::create(path);
+
+    constexpr size_t num_values = 1000;
+    {
+        auto wt = db->start_write();
+        auto table = wt->add_table("Foo");
+        auto col_int = table->add_column(type_Int, "int", true);
+        for (size_t i = 0; i < num_values; i++) {
+            table->create_object().set(col_int, int64_t(i));
+        }
+        table->create_object(); // Contains null
+        wt->commit();
+    }
+    {
+        auto rt = db->start_read();
+        auto table = rt->get_table("Foo");
+        auto col = table->get_column_key("int");
+
+        auto check_query = [&](Query& q) {
+            CHECK_EQUAL(q.count(), num_values);
+            TableView tv = q.find_all();
+            CHECK_EQUAL(tv.size(), num_values);
+            CHECK_EQUAL(q.min(col)->get<Int>(), 0);
+            CHECK_EQUAL(q.max(col)->get<Int>(), num_values - 1);
+            CHECK_EQUAL(q.avg(col)->get<double>(), double(num_values - 1) / 2.0);
+            CHECK_EQUAL(q.sum(col)->get<Int>(), (num_values / 2) * (num_values - 1));
+        };
+
+        std::vector<Mixed> args;
+        args.reserve(num_values);
+        Query q = table->where();
+        for (size_t i = 0; i < num_values; ++i) {
+            q.equal(col, int64_t(i)).Or();
+            args.push_back(Mixed(int64_t(i)));
+        }
+        check_query(q);
+        Query q_in = table->where().in(col, args.data(), args.data() + args.size());
+        check_query(q_in);
+    }
+}
+
 TEST(Query_FullText)
 {
     Group g;
