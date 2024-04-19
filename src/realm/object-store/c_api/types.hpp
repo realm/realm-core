@@ -870,7 +870,7 @@ struct realm_sync_socket_callback : realm::c_api::WrapC,
     }
 };
 
-struct CBindingThreadObserver : public realm::BindingCallbackThreadObserver {
+struct CBindingThreadObserver final : public realm::BindingCallbackThreadObserver {
 public:
     CBindingThreadObserver(realm_on_object_store_thread_callback_t on_thread_create,
                            realm_on_object_store_thread_callback_t on_thread_destroy,
@@ -882,13 +882,10 @@ public:
         , m_user_data{userdata, [&free_userdata] {
                           if (free_userdata)
                               return free_userdata;
-                          else
-                              return CBindingThreadObserver::m_default_free_userdata;
+                          return CBindingThreadObserver::m_default_free_userdata;
                       }()}
     {
     }
-
-    virtual ~CBindingThreadObserver() = default;
 
     void did_create_thread() override
     {
@@ -918,25 +915,25 @@ public:
     /// {@
     /// For testing: Return the values in this CBindingThreadObserver for comparing if two objects
     /// have the same callback functions and userdata ptr values.
-    inline realm_on_object_store_thread_callback_t test_get_create_callback_func() const noexcept
+    realm_on_object_store_thread_callback_t test_get_create_callback_func() const noexcept
     {
         return m_create_callback_func;
     }
-    inline realm_on_object_store_thread_callback_t test_get_destroy_callback_func() const noexcept
+    realm_on_object_store_thread_callback_t test_get_destroy_callback_func() const noexcept
     {
         return m_destroy_callback_func;
     }
-    inline realm_on_object_store_error_callback_t test_get_error_callback_func() const noexcept
+    realm_on_object_store_error_callback_t test_get_error_callback_func() const noexcept
     {
         return m_error_callback_func;
     }
-    inline realm_userdata_t test_get_userdata_ptr() const noexcept
+    realm_userdata_t test_get_userdata_ptr() const noexcept
     {
         return m_user_data.get();
     }
     /// @}
 
-protected:
+private:
     CBindingThreadObserver() = default;
 
     static constexpr realm_free_userdata_func_t m_default_free_userdata = [](realm_userdata_t) {};
