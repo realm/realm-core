@@ -415,17 +415,19 @@ auto Results::get(Context& ctx, size_t ndx)
 {
     return dispatch([&](auto t) {
         using U = std::decay_t<decltype(*t)>;
-        auto value = this->get<U>(ndx);
         if constexpr (std::is_same_v<U, Mixed>) {
+            Mixed value = this->get<Mixed>(ndx);
             if (value.is_type(type_Dictionary)) {
                 return ctx.box(get_dictionary(ndx));
             }
             if (value.is_type(type_List)) {
                 return ctx.box(get_list(ndx));
             }
+            return ctx.box(value);
         }
-
-        return ctx.box(value);
+        else {
+            return ctx.box(this->get<U>(ndx));
+        }
     });
 }
 
