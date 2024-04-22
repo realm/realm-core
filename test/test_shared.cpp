@@ -598,7 +598,6 @@ TEST(Shared_ReadOverRead2)
     CHECK_EQUAL(table2->get_object(0).get<int64_t>("col"), 1);
 }
 
-
 TEST(Shared_EncryptedRemap)
 {
     // Attempts to trigger code coverage in util::mremap() for the case where the file is encrypted.
@@ -4277,7 +4276,6 @@ TEST(Shared_WriteTo)
     tr->commit_and_continue_as_read();
     // tr->to_json(std::cout);
 
-
     // Create remote db
     DBRef db2 = DB::create(make_in_realm_history(), path2);
     {
@@ -4309,7 +4307,9 @@ TEST(Shared_WriteTo)
     // Copy local object over
     auto dest = db2->start_write();
     tr->copy_to(dest);
+    dest->verify();
     dest->commit_and_continue_as_read();
+    // dest->to_json(std::cout);
 
     // The difference between the two realms should now be that the remote db has an
     // extra baa object with pk 333.

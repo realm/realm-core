@@ -16,17 +16,17 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "app_utils.hpp"
 #include <realm/object-store/sync/app_utils.hpp>
+
 #include <realm/object-store/sync/generic_network_transport.hpp>
 #include <realm/sync/network/http.hpp>
+#include <realm/util/uri.hpp>
 
 #include <external/json/json.hpp>
 
 #include <algorithm>
 
-namespace realm {
-namespace app {
+namespace realm::app {
 
 const std::pair<const std::string, std::string>*
 AppUtils::find_header(const std::string& key_name, const std::map<std::string, std::string>& search_map)
@@ -43,34 +43,6 @@ AppUtils::find_header(const std::string& key_name, const std::map<std::string, s
 #endif
     }
     return nullptr;
-}
-
-StatusWith<AppUtils::UrlComponents> AppUtils::split_url(std::string url)
-{
-    UrlComponents comp;
-    // Find the position of the scheme separator "://"
-    size_t scheme_end_pos = url.find("://");
-    if (scheme_end_pos == std::string::npos) {
-        // Missing scheme separator
-        return {ErrorCodes::BadServerUrl, util::format("URL missing scheme separator '://': %1", url)};
-    }
-    comp.scheme = url.substr(0, scheme_end_pos);
-    url.erase(0, scheme_end_pos + std::char_traits<char>::length("://"));
-
-    // Find the first slash "/"
-    size_t host_end_pos = url.find("/");
-    if (url.empty() || host_end_pos == 0) {
-        // No server provided
-        return {ErrorCodes::BadServerUrl, util::format("URL missing server: %1", url)};
-    }
-    if (host_end_pos == std::string::npos) {
-        // No path/query/components section
-        comp.server = url;
-        return comp;
-    }
-    comp.server = url.substr(0, host_end_pos);
-    comp.request = url.substr(host_end_pos);
-    return comp;
 }
 
 bool AppUtils::is_success_status_code(int status_code)
@@ -93,13 +65,21 @@ std::optional<std::string> AppUtils::extract_redir_location(const std::map<std::
 {
     // Look for case insensitive redirect "location" in headers
     auto location = AppUtils::find_header("location", headers);
-    if (location && !location->second.empty() && AppUtils::split_url(location->second).is_ok()) {
+    if (location && !location->second.empty() && util::Uri::try_parse(location->second).is_ok()) {
         // If the location is valid, return it wholesale (e.g., it could include a path for API proxies)
         return location->second;
     }
     return std::nullopt;
 }
 
+// Create a Response object with the given client error, message and optional http status code
+Response AppUtils::make_clienterror_response(ErrorCodes::Error code, const std::string_view message,
+                                             std::optional<int> http_status)
+{
+    return Response{http_status ? *http_status : 0, 0, {}, std::string(message), code};
+}
+
+#if REALM_APP_SERVICES
 std::optional<AppError> AppUtils::check_for_errors(const Response& response)
 {
     std::string error_msg;
@@ -107,7 +87,7 @@ std::optional<AppError> AppUtils::check_for_errors(const Response& response)
 
     try {
         auto ct = find_header("content-type", response.headers);
-        if (ct && ct->second == "application/json") {
+        if (ct && ct->second == "application/json" && !response.body.empty()) {
             auto body = nlohmann::json::parse(response.body);
             auto message = body.find("error");
             auto link = body.find("link");
@@ -197,12 +177,6 @@ Response AppUtils::make_apperror_response(const AppError& error)
     return {error.additional_status_code.value_or(0), 0, {}, std::string(error.reason()), error.code()};
 }
 
-// Create a Response object with the given client error, message and optional http status code
-Response AppUtils::make_clienterror_response(ErrorCodes::Error code, const std::string_view message,
-                                             std::optional<int> http_status)
-{
-    return Response{http_status ? *http_status : 0, 0, {}, std::string(message), code};
-}
+#endif // REALM_APP_SERVICES
 
-} // namespace app
-} // namespace realm
+} // namespace realm::app

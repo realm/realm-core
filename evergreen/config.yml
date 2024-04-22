@@ -1100,6 +1100,7 @@ tasks:
             --ignore='build/external/**' \
             --ignore='external/**' \
             --ignore='src/external/**' \
+            --ignore='test/external/**' \
             --ignore='src/realm/parser/generated/**' \
             --ignore='test/large_tests/**' \
             --excl-line='LCOV_EXCL_LINE|REALM_TERMINATE|REALM_UNREACHABLE' \
@@ -1891,6 +1892,20 @@ buildvariants:
     max_jobs: $(($(grep -c proc /proc/cpuinfo) / 2))
     fetch_missing_dependencies: On
     python3: "/cygdrive/c/python/python37/python.exe"
+    disable_tests_against_baas: On
+  tasks:
+  - name: compile_local_tests
+
+- name: ubuntu-no-app-services
+  display_name: "Ubuntu (AppServices Disabled)"
+  run_on: ubuntu2204-arm64-large
+  expansions:
+    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.26.3-linux-aarch64.tar.gz"
+    cmake_bindir: "./cmake_binaries/bin"
+    fetch_missing_dependencies: On
+    c_compiler: "/opt/clang+llvm/bin/clang"
+    cxx_compiler: "/opt/clang+llvm/bin/clang++"
+    extra_flags: "-DREALM_APP_SERVICES=OFF"
     disable_tests_against_baas: On
   tasks:
   - name: compile_local_tests

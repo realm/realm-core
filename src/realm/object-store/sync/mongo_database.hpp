@@ -22,12 +22,10 @@
 #include <memory>
 #include <string>
 
-namespace realm {
-class SyncUser;
-namespace app {
-
+namespace realm::app {
 class AppServiceClient;
 class MongoCollection;
+class User;
 
 class MongoDatabase {
 public:
@@ -54,7 +52,7 @@ public:
     MongoCollection operator[](const std::string& collection_name);
 
 private:
-    MongoDatabase(std::string name, std::shared_ptr<SyncUser> user, std::shared_ptr<AppServiceClient> service,
+    MongoDatabase(std::string name, std::shared_ptr<User> user, std::shared_ptr<AppServiceClient> service,
                   std::string service_name)
         : m_name(std::move(name))
         , m_user(std::move(user))
@@ -66,12 +64,11 @@ private:
     friend class MongoClient;
 
     std::string m_name;
-    std::shared_ptr<SyncUser> m_user;
+    std::shared_ptr<User> m_user;
     std::shared_ptr<AppServiceClient> m_service;
     std::string m_service_name;
 };
 
-} // namespace app
-} // namespace realm
+} // namespace realm::app
 
 #endif /* REALM_OS_MONGO_DATABASE_HPP */

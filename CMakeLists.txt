@@ -267,6 +267,7 @@ option(REALM_SYNC_MULTIPLEXING "Enables/disables sync session multiplexing by de
 set(REALM_MAX_BPNODE_SIZE "1000" CACHE STRING "Max B+ tree node size.")
 option(REALM_ENABLE_GEOSPATIAL "Enable geospatial types and queries." ON)
 option(REALM_COMPRESS "Compress all the arrays by default in flex format." OFF)
+option(REALM_APP_SERVICES "Enable the default app services implementation." ON)
 
 # Find dependencies
 set(THREADS_PREFER_PTHREAD_FLAG ON)
@@ -400,27 +401,14 @@ install(FILES tools/cmake/AcquireRealmDependency.cmake
         COMPONENT devel
         )
 
-if(CMAKE_SYSTEM_NAME MATCHES "^Windows")
-    # Increase the Catch2 virtual console width because our test names can be very long and they break test reports
-    set(CATCH_CONFIG_CONSOLE_WIDTH 300)
-elseif(APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "Darwin")
-    set(CATCH_CONFIG_NO_POSIX_SIGNALS ON CACHE BOOL "Disable Catch support for POSIX signals on Apple platforms other than macOS")
-endif()
-set(CATCH_CONFIG_ENABLE_ALL_STRINGMAKERS ON CACHE BOOL "Enable Catch2's optional standard library stringmakers")
-
-add_subdirectory(external EXCLUDE_FROM_ALL)
-
-# Cmake does not let us easily set the deployment target per-target, but Catch2
-# can use modern features because we only run tests on recent OS versions.
-target_compile_definitions(Catch2 PRIVATE _LIBCPP_DISABLE_AVAILABILITY)
-
-# Enable CTest and include unit tests
-enable_testing()
-
-if(REALM_BUILD_LIB_ONLY OR REALM_NO_TESTS)
+if(REALM_BUILD_LIB_ONLY)
     set(REALM_EXCLUDE_TESTS EXCLUDE_FROM_ALL)
 endif()
-add_subdirectory(test ${REALM_EXCLUDE_TESTS})
+
+if (NOT REALM_NO_TESTS)
+    enable_testing()
+    add_subdirectory(test)
+endif()
 
 if (REALM_BUILD_TEST_CLIENT)
     add_subdirectory(test/client)

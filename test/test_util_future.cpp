@@ -2235,6 +2235,17 @@ TEST(Future_Void_Fail_onCompletionFutureAsync)
     });
 }
 
+TEST(Future_PromiseUpdatesSharedStateBeforeCompletingCallbacks)
+{
+    auto pf = util::make_promise_future<void>();
+    std::move(pf.future).get_async([&](Status) {
+        // If pf.promise != nullptr here this will hit an assertion failure
+        // when `promise` is destroyed
+        auto promise = std::move(pf.promise);
+    });
+    pf.promise.emplace_value();
+}
+
 } // namespace
 } // namespace realm::util
 
