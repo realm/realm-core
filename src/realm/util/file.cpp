@@ -23,6 +23,7 @@
 #include <realm/util/file_mapper.hpp>
 
 #include <algorithm>
+#include <atomic>
 #include <cerrno>
 #include <climits>
 #include <cstddef>
@@ -49,6 +50,7 @@
 using namespace realm::util;
 
 namespace {
+constexpr size_t c_min_supported_page_size = 4096;
 size_t get_page_size()
 {
 #ifdef _WIN32
@@ -60,13 +62,13 @@ size_t get_page_size()
 #else
     long size = sysconf(_SC_PAGESIZE);
 #endif
-    REALM_ASSERT(size > 0 && size % 4096 == 0);
+    REALM_ASSERT(size > 0 && size % c_min_supported_page_size == 0);
     return static_cast<size_t>(size);
 }
 
 // This variable exists such that page_size() can return the page size without having to make any system calls.
 // It could also have been a static local variable, but Valgrind/Helgrind gives a false error on that.
-size_t cached_page_size = get_page_size();
+std::atomic<size_t> cached_page_size = get_page_size();
 
 bool for_each_helper(const std::string& path, const std::string& dir, realm::util::File::ForEachHandler& handler)
 {
@@ -395,25 +397,33 @@ std::string make_temp_file(const char* prefix)
     char* tmp_dir_env = getenv("TMPDIR");
     std::string base_dir = tmp_dir_env ? tmp_dir_env : std::string(P_tmpdir);
     if (!base_dir.empty() && base_dir[base_dir.length() - 1] != '/') {
-        base_dir = base_dir + "/";
+        base_dir += '/';
     }
 #endif
-    std::string tmp = base_dir + prefix + std::string("_XXXXXX") + std::string("\0", 1);
-    std::unique_ptr<char[]> buffer = std::make_unique<char[]>(tmp.size()); // Throws
-    memcpy(buffer.get(), tmp.c_str(), tmp.size());
-    char* filename = buffer.get();
-    auto fd = mkstemp(filename);
+    std::string filename = util::format("%1%2_XXXXXX", base_dir, prefix);
+    auto fd = mkstemp(filename.data());
     if (fd == -1) {
         throw std::system_error(errno, std::system_category(), "mkstemp() failed"); // LCOV_EXCL_LINE
     }
     close(fd);
-    return std::string(filename);
+    return filename;
 #endif
 }
 
 size_t page_size()
 {
-    return cached_page_size;
+    return cached_page_size.load(std::memory_order::memory_order_relaxed);
+}
+
+OnlyForTestingPageSizeChange::OnlyForTestingPageSizeChange(size_t new_page_size)
+{
+    REALM_ASSERT(new_page_size % c_min_supported_page_size == 0);
+    cached_page_size = new_page_size;
+}
+
+OnlyForTestingPageSizeChange::~OnlyForTestingPageSizeChange()
+{
+    cached_page_size = get_page_size();
 }
 
 void File::open_internal(const std::string& path, AccessMode a, CreateMode c, int flags, bool* success)

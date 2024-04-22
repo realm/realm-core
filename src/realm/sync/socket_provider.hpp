@@ -18,18 +18,16 @@
 
 #pragma once
 
-#include <map>
-#include <memory>
-#include <string>
-
 #include <realm/status.hpp>
-
 #include <realm/sync/config.hpp>
 #include <realm/sync/network/websocket_error.hpp>
-
 #include <realm/util/functional.hpp>
 #include <realm/util/optional.hpp>
 #include <realm/util/span.hpp>
+
+#include <map>
+#include <memory>
+#include <string>
 
 namespace realm::sync {
 namespace websocket {

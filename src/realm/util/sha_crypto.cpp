@@ -28,13 +28,23 @@
 #include <bcrypt.h>
 #pragma comment(lib, "bcrypt.lib")
 #define REALM_USE_BUNDLED_SHA2 1
-#elif REALM_HAVE_OPENSSL
+#elif !REALM_HAVE_OPENSSL
+#include <sha1.h>
+#define REALM_USE_BUNDLED_SHA2 1
+#endif
+
+/*
+ * OpenSSL can be used with Windows. If this is the case:
+ * The Sha-1 & Sha-2 submodules are no longer needed, so the
+ * REALM_USE_BUNDLED_SHA2 macro should be undefined.
+ * This is particularly relevant when integrating realm-core
+ * via vcpkg.
+ */
+#if REALM_HAVE_OPENSSL
 #include <openssl/sha.h>
 #include <openssl/evp.h>
 #include <openssl/hmac.h>
-#else
-#include <sha1.h>
-#define REALM_USE_BUNDLED_SHA2 1
+#undef REALM_USE_BUNDLED_SHA2
 #endif
 
 #ifdef REALM_USE_BUNDLED_SHA2
