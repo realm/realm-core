@@ -2,6 +2,19 @@ add_subdirectory(util)
 add_custom_target(benchmarks)
 add_subdirectory(object-store)
 
+if(CMAKE_SYSTEM_NAME MATCHES "^Windows")
+    # Increase the Catch2 virtual console width because our test names can be very long and they break test reports
+    set(CATCH_CONFIG_CONSOLE_WIDTH 300)
+elseif(APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+    set(CATCH_CONFIG_NO_POSIX_SIGNALS ON CACHE BOOL "Disable Catch support for POSIX signals on Apple platforms other than macOS")
+endif()
+set(CATCH_CONFIG_ENABLE_ALL_STRINGMAKERS ON CACHE BOOL "Enable Catch2's optional standard library stringmakers")
+add_subdirectory(external/catch)
+
+# Cmake does not let us easily set the deployment target per-target, but Catch2
+# can use modern features because we only run tests on recent OS versions.
+target_compile_definitions(Catch2 PRIVATE _LIBCPP_DISABLE_AVAILABILITY)
+
 # AFL and LIBFUZZER not yet supported by Windows
 if(NOT CMAKE_SYSTEM_NAME MATCHES "^Windows" AND NOT EMSCRIPTEN AND NOT ANDROID)
     add_subdirectory(fuzzy)

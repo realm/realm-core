@@ -3,7 +3,7 @@
 import PackageDescription
 import Foundation
 
-let versionStr = "14.5.1"
+let versionStr = "14.5.2"
 let versionPieces = versionStr.split(separator: "-")
 let versionCompontents = versionPieces[0].split(separator: ".")
 let versionExtra = versionPieces.count > 1 ? versionPieces[1] : ""
@@ -17,6 +17,7 @@ var cxxSettings: [CXXSetting] = [
     .define("REALM_ENABLE_ENCRYPTION", to: "1"),
     .define("REALM_ENABLE_SYNC", to: "1"),
     .define("REALM_ENABLE_GEOSPATIAL", to: "1"),
+    .define("REALM_APP_SERVICES", to: "1"),
 
     .define("REALM_VERSION_MAJOR", to: String(versionCompontents[0])),
     .define("REALM_VERSION_MINOR", to: String(versionCompontents[1])),
@@ -493,10 +494,11 @@ let package = Package(
         .target(
             name: "RealmFFI",
             dependencies: ["Capi"],
-            path: "src/swift"),
+            path: "src/swift",
+            cxxSettings: (cxxSettings) as [CXXSetting]),
         .target(
             name: "Catch2Generated",
-            path: "external/generated",
+            path: "test/external/generated",
             // this file was manually generated with catch v3.0.1
             // and should be regenerated when catch is upgraded
             resources: [.copy("catch2/catch_user_config.hpp")],
@@ -504,7 +506,7 @@ let package = Package(
         .target(
             name: "Catch2",
             dependencies: ["Catch2Generated"],
-            path: "external/catch/src",
+            path: "test/external/catch/src",
             exclude: [
                 "CMakeLists.txt",
                 "catch2/catch_user_config.hpp.in",

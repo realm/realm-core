@@ -29,7 +29,6 @@
 
 namespace realm {
 namespace app {
-class App;
 struct AppError;
 } // namespace app
 class SyncManager;
