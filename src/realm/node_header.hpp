@@ -86,8 +86,8 @@ public:
         WTypBits = 0, // Corresponds to wtype_Bits
         WTypMult = 1, // Corresponds to wtype_Multiply
         WTypIgn = 2,  // Corresponds to wtype_Ignore
-        Packed = 4,   // wtype is wtype_Extend
-        Flex = 5      // wtype is wtype_Extend
+        Packed = 3,   // wtype is wtype_Extend
+        Flex = 4      // wtype is wtype_Extend
     };
     // * Packed: tightly packed array (any element size <= 64)
     // * WTypBits: less tightly packed. Correspond to wtype_Bits
@@ -568,6 +568,7 @@ inline size_t NodeHeader::get_num_elements(const char* header, Encoding encoding
             return get_arrayB_num_elements(header);
             break;
         default:
+            printf("Encoding %d\n", int(encoding));
             REALM_UNREACHABLE();
     }
 }
@@ -754,8 +755,8 @@ static inline void init_header(char* header, realm::NodeHeader::Encoding enc, ui
     REALM_ASSERT_DEBUG(bits_pr_elemB <= 64);
     REALM_ASSERT_DEBUG(num_elemsA < 1024);
     REALM_ASSERT_DEBUG(num_elemsB < 1024);
-    hw[3] = static_cast<uint16_t>(((bits_pr_elemB - 1) << 10) | num_elemsB);
     hw[1] = static_cast<uint16_t>(((bits_pr_elemA - 1) << 10) | num_elemsA);
+    hw[3] = static_cast<uint16_t>(((bits_pr_elemB - 1) << 10) | num_elemsB);
 }
 } // namespace
 

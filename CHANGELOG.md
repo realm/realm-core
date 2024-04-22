@@ -2,7 +2,6 @@
 
 ### Enhancements
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
-* None.
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
@@ -21,6 +20,33 @@
 
 ----------------------------------------------
 
+# 14.5.2 Release notes
+
+### Fixed
+* Fix compilation errors when using command-line `swift build` ([#7587](https://github.com/realm/realm-core/pull/7587), since v14.5.1).
+* Fixed crash when integrating removal of already removed dictionary key ([#7488](https://github.com/realm/realm-core/issues/7488), since v10.0.0).
+
+### Compatibility
+* Fileformat: Generates files with format v24. Reads and automatically upgrade from fileformat v10. If you want to upgrade from an earlier file format version you will have to use RealmCore v13.x.y or earlier.
+
+-----------
+
+### Internals
+* `prior_size` field in Clear instruction is being repurposed as `collection_type` (no protocol changes required)
+
+----------------------------------------------
+
+# 14.5.1 Release notes
+
+### Fixed
+* Clearing a nested collection may end with a crash ([#7556](https://github.com/realm/realm-core/issues/7556), since v14.0.0)
+* Removing nested collections in Mixed for synced realms throws realm::StaleAccessor ([#7573](https://github.com/realm/realm-core/issues/7573), since v14.0.0)
+* Add a privacy manifest to the Swift package ([Swift #8535](https://github.com/realm/realm-swift/issues/8535)).
+
+### Compatibility
+* Fileformat: Generates files with format v24. Reads and automatically upgrade from fileformat v10. If you want to upgrade from an earlier file format version you will have to use RealmCore v13.x.y or earlier.
+
+----------------------------------------------
 # 14.5.0 Release notes
 
 ### Enhancements
@@ -262,7 +288,7 @@
 * Use `clonefile()` when possible in `File::copy()` on Apple platforms for faster copying. ([PR #7341](https://github.com/realm/realm-core/pull/7341)).
 
 ### Fixed
-* Fixed queries like `indexed_property == NONE {x}` which mistakenly matched on only x instead of not x. This only applies when an indexed property with equality (==, or IN) matches with `NONE` on a list of one item. If the constant list contained more than one value then it was working correctly. ([realm-js #7862](https://github.com/realm/realm-java/issues/7862), since v12.5.0) 
+* Fixed queries like `indexed_property == NONE {x}` which mistakenly matched on only x instead of not x. This only applies when an indexed property with equality (==, or IN) matches with `NONE` on a list of one item. If the constant list contained more than one value then it was working correctly. ([realm-js #7862](https://github.com/realm/realm-java/issues/7862), since v12.5.0)
 * Uploading the changesets recovered during an automatic client reset recovery may lead to 'Bad server version' errors and a new client reset. ([#7279](https://github.com/realm/realm-core/issues/7279), since v13.24.1)
 * Fixed invalid data in error reason string when registering a subscription change notification after the subscription has already failed. ([#6839](https://github.com/realm/realm-core/issues/6839), since v11.8.0)
 * Fixed crash in fulltext index using prefix search with no matches ([#7309](https://github.com/realm/realm-core/issues/7309), since v13.18.0)
@@ -271,7 +297,7 @@
 * Fixed a crash with `Assertion failed: m_initiated` during sync session startup ([#7074](https://github.com/realm/realm-core/issues/7074), since v10.0.0).
 * Fixed a TSAN violation where the user thread could race to read `m_finalized` with the sync event loop ([#6844](https://github.com/realm/realm-core/issues/6844), since v13.15.1)
 * Fix a minor race condition when backing up Realm files before a client reset which could have lead to overwriting an existing file. ([PR #7341](https://github.com/realm/realm-core/pull/7341)).
- 
+
 ### Breaking changes
 * SyncManager no longer supports reconfiguring after calling reset_for_testing(). SyncManager::configure() has been folded into the constructor, and reset_for_testing() has been renamed to tear_down_for_testing(). ([PR #7351](https://github.com/realm/realm-core/pull/7351))
 
