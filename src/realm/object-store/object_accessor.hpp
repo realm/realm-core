@@ -670,7 +670,8 @@ void Dictionary::insert(Context& ctx, StringData key, T&& value, CreatePolicy po
         U new_val;
         if constexpr (std::is_same_v<U, Obj>) {
             ObjKey old_key;
-            if (auto old_value = dict().try_get(key)) {
+            if (auto old_value = dict().try_get(key); old_value && !old_value->is_null()) {
+                // Value is either null or an ObjKey
                 old_key = old_value->get_link().get_obj_key();
             }
             new_val = ctx.template unbox<Obj>(value, policy, old_key);
