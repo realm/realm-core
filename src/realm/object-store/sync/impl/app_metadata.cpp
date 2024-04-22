@@ -38,6 +38,12 @@
 using namespace realm;
 using realm::app::UserData;
 
+template <>
+inline SyncUser::State Obj::get(ColKey ck) const
+{
+    return static_cast<SyncUser::State>(get<int64_t>(ck));
+}
+
 namespace {
 
 struct CurrentUserSchema {
@@ -223,7 +229,7 @@ void migrate_to_v7(std::shared_ptr<Realm> old_realm, std::shared_ptr<Realm> real
         // removed we'll use the logged out state. If both are logged out or
         // both are removed then it doesn't matter which we pick.
         using State = SyncUser::State;
-        auto state = State(obj.get<int64_t>(schema.state_col));
+        auto state = obj.get<State>(schema.state_col);
         auto existing_state = State(existing.get<int64_t>(schema.state_col));
         if (state == existing_state) {
             if (state == State::LoggedIn) {
@@ -340,6 +346,8 @@ struct PersistedSyncMetadataManager : public app::MetadataStore {
     UserIdentitySchema m_user_identity_schema;
     CurrentUserSchema m_current_user_schema;
 
+    using UserState = SyncUser::State;
+
     PersistedSyncMetadataManager(const app::AppConfig& app_config, SyncFileManager& file_manager)
     {
         // Note that there are several deferred schema changes which don't
@@ -378,10 +386,73 @@ struct PersistedSyncMetadataManager : public app::MetadataStore {
         m_current_user_schema.read(*realm);
 
         m_coordinator = _impl::RealmCoordinator::get_existing_coordinator(config.path);
+
+        // When App::remove_user() is called, we mark the user as "removed" but
+        // don't actually delete the UserMetadata object or the files on disk
+        // immediately, and instead defer the actual removal until the next
+        // launch of the application. This makes it so that we don't have to
+        // require developers to ensure that all Realms associated with a user
+        // are closed before removing the user, as that can be a difficult thing
+        // to do.
+        //
+        // The "next launch" in a multiprocess scenario can be a somewhat
+        // complicated concept. If one process calls remove_user(), exits, and
+        // then is restarted, it still isn't safe to delete the user's files yet
+        // if another process has also been running the whole time. Instead, we
+        // need to wait for *all* of the processes which share a metadata Realm
+        // to exit, and perform the cleanup actions only when one is launching
+        // in a fresh state with no other processes running (but also we need to
+        // work if multiple processes launch at once).
+        //
+        // The lock file management code already solves this problem - using a
+        // mix of exclusive and shared locks on the lock file, opening a Realm
+        // will reinitialize the lock file from scratch only if it is the
+        // "session initiator" and no one already has the file open. We therefore
+        // can detect the scenario where we want to perform launch actions by
+        // using a flag in the lock file: we begin a frozen read transaction,
+        // attempt to atomically set the flag, and if we were able we proceeed
+        // to perform the launch actions present in that frozen version.
+        //
+        // In the simple scenario of an unshared metadata Realm which is only
+        // ever accessed by a single process, this all behaves identically to
+        // the naive solution of always processing all launch actions on launch.
+        // If the metadata Realm was already open in another process, the flag
+        // will already be set and we'll skip performing launch actions. If two
+        // processes open the metadata Realm at once we get to the complicated
+        // scenario: one of them will successfully set the flag and the other
+        // will fail. The one which failed may then go on to perform writes on
+        // the metadata Realm, possibly creating new launch actions. This is why
+        // we need the frozen read transaction created *before* trying to set
+        // the flag. The process which does successfully set the flag will only
+        // process launch actions present in that frozen read, and thus only ones
+        // which already existing before it set the flag. Any new actions created
+        // by the second process won't be visible and will wait for the next
+        // launch.
+        //
+        // User cleanup is made slightly more complicated by that users can be
+        // logged back in after being removed. To handle this, we only delete
+        // users (and their files) if the user is Removed in both the frozen
+        // transaction and inside the write transaction. If a second process
+        // logs the user back in between when we start the frozen read and when
+        // we acquire the write lock we'll skip it, and if it tries to log in
+        // after we acquire the write lock it'll be blocked by that and only
+        // log in after we have completed cleanup.
+        //
+        // This scheme is only fully safe if synchronized Realms are only ever
+        // opened using a non-Removed user, and not by using the fake sync history
+        // mode where no user is provided. That mode is hopefully only ever used
+        // by Realm Studio.
+        //
+        // To avoid a lockfile format change, the flag used happens to be the
+        // sync agent flag, which is otherwise unused for the metadata Realm
+        // (which is a local unsynchronized Realm). The use of this flag should
+        // not be confused for there actually being a sync agent for the
+        // metadata Realm.
+        auto frozen = realm->freeze();
         if (m_coordinator->try_claim_sync_agent()) {
             realm->begin_transaction();
-            perform_file_actions(*realm, file_manager);
-            remove_dead_users(*realm, file_manager);
+            perform_file_actions(frozen->read_group(), realm->read_group(), file_manager);
+            remove_dead_users(frozen->read_group(), realm->read_group(), file_manager);
             realm->commit_transaction();
         }
     }
@@ -391,15 +462,37 @@ struct PersistedSyncMetadataManager : public app::MetadataStore {
         return m_coordinator->get_realm(util::Scheduler::make_dummy());
     }
 
-    void remove_dead_users(Realm& realm, SyncFileManager& file_manager)
+    void for_each_obj(Group& frozen, Group& live, TableKey tk, util::FunctionRef<void(Obj&, Obj&)> fn)
     {
-        auto& schema = m_user_schema;
-        TableRef table = realm.read_group().get_table(schema.table_key);
-        for (auto obj : *table) {
-            if (static_cast<SyncUser::State>(obj.get<int64_t>(schema.state_col)) == SyncUser::State::Removed) {
-                delete_user_realms(file_manager, obj);
+        auto frozen_table = frozen.get_table(tk);
+        if (frozen_table->is_empty())
+            return;
+
+        // We want to iterate the objects present in both the before and after
+        // realms. Any other objects are either no longer relevant or too new.
+        TableRef table = live.get_table(tk);
+        for (auto frozen_obj : *frozen_table) {
+            if (auto obj = table->get_object(frozen_obj.get_key())) {
+                fn(frozen_obj, obj);
             }
         }
+    }
+
+    void remove_dead_users(Group& frozen, Group& live, SyncFileManager& file_manager)
+    {
+        auto& schema = m_user_schema;
+        for_each_obj(frozen, live, schema.table_key, [&](Obj& frozen_obj, Obj& live_obj) {
+            // The frozen object being removed but not the live object means that
+            // another process logged the user back in. The live object being
+            // removed but not the frozen one means that the removal happened
+            // after we acquired the sync agent, and so we shouldn't process
+            // the user yet.
+            if (frozen_obj.get<UserState>(schema.state_col) != UserState::Removed)
+                return;
+            if (live_obj.get<UserState>(schema.state_col) != UserState::Removed)
+                return;
+            delete_user_realms(file_manager, live_obj);
+        });
     }
 
     void delete_user_realms(SyncFileManager& file_manager, Obj& obj)
@@ -455,16 +548,12 @@ struct PersistedSyncMetadataManager : public app::MetadataStore {
         return false;
     }
 
-    void perform_file_actions(Realm& realm, SyncFileManager& file_manager)
+    void perform_file_actions(Group& frozen, Group& live, SyncFileManager& file_manager)
     {
-        TableRef table = realm.read_group().get_table(m_file_action_schema.table_key);
-        if (table->is_empty())
-            return;
-
-        for (auto obj : *table) {
+        for_each_obj(frozen, live, m_file_action_schema.table_key, [&](Obj&, Obj& obj) {
             if (perform_file_action(file_manager, obj))
                 obj.remove();
-        }
+        });
     }
 
     bool immediately_run_file_actions(SyncFileManager& file_manager, std::string_view realm_path) override
@@ -514,7 +603,7 @@ struct PersistedSyncMetadataManager : public app::MetadataStore {
             current_user.set<String>(m_current_user_schema.user_id, user_id);
         }
 
-        obj.set(schema.state_col, (int64_t)SyncUser::State::LoggedIn);
+        obj.set(schema.state_col, (int64_t)UserState::LoggedIn);
         obj.set<String>(schema.refresh_token_col, refresh_token);
         obj.set<String>(schema.access_token_col, access_token);
         obj.set<String>(schema.device_id_col, device_id);
@@ -537,8 +626,7 @@ struct PersistedSyncMetadataManager : public app::MetadataStore {
         auto& data = *opt_data;
         update_fn(data);
 
-        obj.set(schema.state_col,
-                int64_t(data.access_token ? SyncUser::State::LoggedIn : SyncUser::State::LoggedOut));
+        obj.set(schema.state_col, int64_t(data.access_token ? UserState::LoggedIn : UserState::LoggedOut));
         obj.set<String>(schema.refresh_token_col, data.refresh_token.token);
         obj.set<String>(schema.access_token_col, data.access_token.token);
         obj.set<String>(schema.device_id_col, data.device_id);
@@ -587,13 +675,13 @@ struct PersistedSyncMetadataManager : public app::MetadataStore {
         if (!obj) {
             return {};
         }
-        auto state = SyncUser::State(obj.get<Int>(m_user_schema.state_col));
-        if (state == SyncUser::State::Removed) {
+        auto state = obj.get<UserState>(m_user_schema.state_col);
+        if (state == UserState::Removed) {
             return {};
         }
 
         UserData data;
-        if (state == SyncUser::State::LoggedIn) {
+        if (state == UserState::LoggedIn) {
             try {
                 data.access_token = RealmJWT(get_string(obj, m_user_schema.access_token_col));
                 data.refresh_token = RealmJWT(get_string(obj, m_user_schema.refresh_token_col));
@@ -637,9 +725,9 @@ struct PersistedSyncMetadataManager : public app::MetadataStore {
         }
     }
 
-    void log_out(std::string_view user_id, SyncUser::State new_state) override
+    void log_out(std::string_view user_id, UserState new_state) override
     {
-        REALM_ASSERT(new_state != SyncUser::State::LoggedIn);
+        REALM_ASSERT(new_state != UserState::LoggedIn);
         auto realm = get_realm();
         realm->begin_transaction();
         if (auto obj = find_user(*realm, user_id)) {
@@ -677,7 +765,7 @@ struct PersistedSyncMetadataManager : public app::MetadataStore {
         // This is overly cautious and merely checking the state should suffice,
         // but because this is a persisted file that can be modified it's possible
         // to get invalid combinations of data.
-        return obj && obj.get<int64_t>(m_user_schema.state_col) == int64_t(SyncUser::State::LoggedIn) &&
+        return obj && obj.get<UserState>(m_user_schema.state_col) == UserState::LoggedIn &&
                RealmJWT::validate(get_string(obj, m_user_schema.access_token_col)) &&
                RealmJWT::validate(get_string(obj, m_user_schema.refresh_token_col));
     }
@@ -689,7 +777,7 @@ struct PersistedSyncMetadataManager : public app::MetadataStore {
         std::vector<std::string> users;
         users.reserve(table->size());
         for (auto& obj : *table) {
-            if (obj.get<int64_t>(m_user_schema.state_col) != int64_t(SyncUser::State::Removed)) {
+            if (obj.get<UserState>(m_user_schema.state_col) != UserState::Removed) {
                 users.emplace_back(obj.get<String>(m_user_schema.user_id_col));
             }
         }
