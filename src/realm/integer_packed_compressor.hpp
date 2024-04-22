@@ -80,7 +80,7 @@ inline std::vector<int64_t> PackedCompressor::get_all(const IntegerCompressor& c
     unaligned_word_iter unaligned_data_iterator(data, starting_bit);
     auto cnt_bits = starting_bit;
     while ((cnt_bits + bit_per_it) < total_bits) {
-        auto word = unaligned_data_iterator.get_with_unsafe_prefetch(bit_per_it);
+        auto word = unaligned_data_iterator.get(bit_per_it);
         const auto next_chunk = cnt_bits + bit_per_it;
         while(cnt_bits < next_chunk && cnt_bits < total_bits) {
             res.push_back(sign_extend_field_by_mask(sign_mask, word & mask));
@@ -90,7 +90,7 @@ inline std::vector<int64_t> PackedCompressor::get_all(const IntegerCompressor& c
         unaligned_data_iterator.bump(bit_per_it);
     }
     if (cnt_bits < total_bits) {
-        auto word = unaligned_data_iterator.get_with_unsafe_prefetch(static_cast<unsigned>(total_bits - cnt_bits));
+        auto word = unaligned_data_iterator.get(static_cast<unsigned>(total_bits - cnt_bits));
         while (cnt_bits < total_bits) {
             res.push_back(sign_extend_field_by_mask(sign_mask, word & mask));
             cnt_bits += v_w;
