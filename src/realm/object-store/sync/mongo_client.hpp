@@ -22,12 +22,10 @@
 #include <memory>
 #include <string>
 
-namespace realm {
-class SyncUser;
-
-namespace app {
+namespace realm::app {
 class AppServiceClient;
 class MongoDatabase;
+class User;
 
 /// A client responsible for communication with a remote MongoDB database.
 class MongoClient {
@@ -47,21 +45,19 @@ public:
     MongoDatabase db(const std::string& name);
 
 private:
-    friend ::realm::SyncUser;
-
-    MongoClient(std::shared_ptr<SyncUser> user, std::shared_ptr<AppServiceClient> service, std::string service_name)
+    friend class User;
+    MongoClient(std::shared_ptr<User> user, std::shared_ptr<AppServiceClient> service, std::string service_name)
         : m_user(std::move(user))
         , m_service(std::move(service))
         , m_service_name(std::move(service_name))
     {
     }
 
-    std::shared_ptr<SyncUser> m_user;
+    std::shared_ptr<User> m_user;
     std::shared_ptr<AppServiceClient> m_service;
     std::string m_service_name;
 };
 
-} // namespace app
-} // namespace realm
+} // namespace realm::app
 
 #endif /* mongo_client_hpp */

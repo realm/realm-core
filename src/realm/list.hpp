@@ -541,6 +541,8 @@ private:
         return unresolved_to_null(m_tree->get(ndx));
     }
     bool clear_backlink(size_t ndx, CascadeState& state) const;
+    template <class T>
+    inline std::shared_ptr<T> do_get_collection(const PathElement& path_elem);
 };
 
 // Specialization of Lst<StringData>:

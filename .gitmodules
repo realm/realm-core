@@ -1,9 +1,9 @@
-[submodule "external/catch"]
-	path = external/catch
-	url = https://github.com/catchorg/Catch2.git
 [submodule "src/external/sha-1"]
 	path = src/external/sha-1
 	url = https://github.com/clibs/sha1.git
 [submodule "src/external/sha-2"]
 	path = src/external/sha-2
 	url = https://github.com/kalven/sha-2.git
+[submodule "test/external/catch"]
+	path = test/external/catch
+	url = https://github.com/catchorg/Catch2.git
