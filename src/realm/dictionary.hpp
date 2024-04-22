@@ -277,6 +277,8 @@ private:
     void get_key_type();
 
     UpdateStatus do_update_if_needed(bool allow_create) const;
+    template <class T>
+    std::shared_ptr<T> do_get_collection(const PathElement& path_elem);
 };
 
 class Dictionary::Iterator {
