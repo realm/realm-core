@@ -517,7 +517,7 @@ public:
         m_alloc.enable_debug(enable);
     }
 #endif
-    ref_type typed_write_tables(_impl::ArrayWriterBase& out, bool deep, bool only_modified, bool compress) const;
+    ref_type typed_write_tables(_impl::ArrayWriterBase& out) const;
     void table_typed_print(std::string prefix, ref_type ref) const;
     void typed_print(std::string prefix) const;
 
