@@ -889,21 +889,22 @@ Query& Query::like(ColKey column_key, Mixed value, bool case_sensitive)
 Query& Query::in(ColKey column_key, const Mixed* begin, const Mixed* end)
 {
     REALM_ASSERT(!column_key.is_collection());
+    ColumnType col_type = column_key.get_type();
     std::unique_ptr<ParentNode> node;
     try {
         if (begin == end) {
             node = std::make_unique<ExpressionNode>(std::make_unique<FalseExpression>());
         }
-        else if (column_key.get_type() == col_type_UUID) {
+        else if (col_type == col_type_UUID) {
             node = std::make_unique<UUIDNode<Equal>>(column_key, begin, end);
         }
-        else if (column_key.get_type() == col_type_ObjectId) {
+        else if (col_type == col_type_ObjectId) {
             node = std::make_unique<ObjectIdNode<Equal>>(column_key, begin, end);
         }
-        else if (column_key.get_type() == col_type_String) {
+        else if (col_type == col_type_String) {
             node = std::make_unique<StringNode<Equal>>(column_key, begin, end);
         }
-        else if (column_key.get_type() == col_type_Int) {
+        else if (col_type == col_type_Int) {
             if (column_key.is_nullable()) {
                 node = std::make_unique<IntegerNode<ArrayIntNull, Equal>>(column_key, begin, end);
             }
@@ -914,7 +915,6 @@ Query& Query::in(ColKey column_key, const Mixed* begin, const Mixed* end)
         else {
             // general path for nodes that don't have this optimization yet
             Query cond = this->m_table->where();
-            ColumnType col_type = column_key.get_type();
             if (col_type == col_type_Mixed) {
                 for (const Mixed* it = begin; it != end; ++it) {
                     cond.add_node(make_condition_node<Equal>(*m_table, column_key, *it));

@@ -391,11 +391,10 @@ StringNode<Equal>::StringNode(ColKey col, const Mixed* begin, const Mixed* end)
         if (it->is_null()) {
             m_needles.emplace();
         }
-        else if (it->is_type(type_String)) {
-            StringData str = it->get<StringData>();
-            m_needle_storage.push_back(std::make_unique<char[]>(str.size()));
-            std::copy(str.data(), str.data() + str.size(), m_needle_storage.back().get());
-            m_needles.insert(StringData(m_needle_storage.back().get(), str.size()));
+        else if (const StringData* str = it->get_if<StringData>()) {
+            m_needle_storage.push_back(std::make_unique<char[]>(str->size()));
+            std::copy(str->data(), str->data() + str->size(), m_needle_storage.back().get());
+            m_needles.insert(StringData(m_needle_storage.back().get(), str->size()));
         }
     }
     if (m_needles.empty()) {
