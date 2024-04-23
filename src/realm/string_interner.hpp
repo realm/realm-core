@@ -23,6 +23,8 @@
 #include <realm/string_compressor.hpp>
 #include <realm/keys.hpp>
 
+#include <unordered_map>
+#include <vector>
 template <>
 struct std::hash<CompressedString> {
     std::size_t operator()(const CompressedString& c) const noexcept

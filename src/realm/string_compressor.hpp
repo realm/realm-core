@@ -20,7 +20,7 @@
 #define REALM_STRING_COMPRESSOR_HPP
 
 #include <realm/utilities.hpp>
-
+#include <vector>
 
 using CompressionSymbol = uint16_t;
 using CompressedString = std::vector<CompressionSymbol>;

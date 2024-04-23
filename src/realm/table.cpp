@@ -3482,9 +3482,12 @@ StringInterner* Table::get_string_interner(ColKey col_key) const
     if (col_key.get_type() != col_type_String)
         return nullptr;
     auto idx = col_key.get_index().val;
-    REALM_ASSERT_DEBUG(idx < m_string_interners.size());
+    if (idx >= m_string_interners.size())
+        return nullptr;
+
+    // REALM_ASSERT_DEBUG(idx < m_string_interners.size());
     auto interner = m_string_interners[idx].get();
-    REALM_ASSERT_DEBUG(interner);
+    // REALM_ASSERT_DEBUG(interner);
     return interner;
 #if 0
     // TODO: This method likely needs to be lock-free. Possibly by moving all
