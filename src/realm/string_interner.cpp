@@ -23,23 +23,27 @@
 
 namespace realm {
 
-enum positions { Pos_Version, Pos_Size, Pos_Compressor, Pos_Data, Top_Size };
+enum positions { Pos_Version, Pos_ColKey, Pos_Size, Pos_Compressor, Pos_Data, Top_Size };
 
-StringInterner::StringInterner(Allocator& alloc, Array& parent, size_t index)
+StringInterner::StringInterner(Allocator& alloc, Array& parent, ColKey col_key)
 {
+    REALM_ASSERT_DEBUG(col_key != ColKey());
+    size_t index = col_key.get_index().val;
     // ensure that m_top and m_data is well defined and reflect any existing data
     m_top = std::make_unique<Array>(alloc);
     m_top->set_parent(&parent, index);
     if (parent.get_as_ref(index)) {
-        m_top->update_from_parent();
+        m_top->init_from_parent();
+        REALM_ASSERT_DEBUG(col_key.value = m_top->get_as_ref_or_tagged(Pos_ColKey).get_as_int());
         m_data = std::make_unique<Array>(alloc);
         m_data->set_parent(m_top.get(), Pos_Data);
-        m_data->update_from_parent();
+        m_data->init_from_parent();
     }
     else {
         m_top->create(NodeHeader::type_HasRefs, false, Top_Size, 0);
-        m_top->set(Pos_Version, 2 + 1); // version number 1.
-        m_top->set(Pos_Size, 1);        // total size 0
+        m_top->set(Pos_Version, (1 << 1) + 1); // version number 1.
+        m_top->set(Pos_Size, (0 << 1) + 1);    // total size 0
+        m_top->set(Pos_ColKey, (col_key.value << 1) + 1);
         // create first level of data tree here (to simplify other stuff)
         m_data = std::make_unique<Array>(alloc);
         m_data->set_parent(m_top.get(), Pos_Data);
@@ -52,8 +56,17 @@ StringInterner::StringInterner(Allocator& alloc, Array& parent, size_t index)
     rebuild_internal();
 }
 
-void StringInterner::refresh()
+void StringInterner::update_from_parent()
 {
+    // handle parent holding a zero ref....
+    auto parent = m_top->get_parent();
+    auto parent_idx = m_top->get_ndx_in_parent();
+    if (!parent->get_child_ref(parent_idx)) {
+        m_compressor.reset();
+        m_compressed_strings.clear();
+        m_compressed_string_map.clear();
+        return;
+    }
     m_top->update_from_parent();
     m_data->update_from_parent();
     m_compressor->refresh();

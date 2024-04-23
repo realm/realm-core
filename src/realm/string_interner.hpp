@@ -21,6 +21,7 @@
 
 #include <realm/utilities.hpp>
 #include <realm/string_compressor.hpp>
+#include <realm/keys.hpp>
 
 template <>
 struct std::hash<CompressedString> {
@@ -47,8 +48,8 @@ class Allocator;
 class StringInterner {
 public:
     // To be used exclusively from Table
-    StringInterner(Allocator& alloc, Array& parent, size_t position);
-    void refresh();
+    StringInterner(Allocator& alloc, Array& parent, ColKey col_key);
+    void update_from_parent();
     ~StringInterner();
 
     // To be used from Obj and for searching

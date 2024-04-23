@@ -532,6 +532,9 @@ void Table::remove_column(ColKey col_key)
 
     erase_root_column(col_key); // Throws
     m_has_any_embedded_objects.reset();
+    auto i = col_key.get_index().val;
+    if (i < m_string_interners.size() && m_string_interners[i])
+        m_string_interners[i].reset();
 }
 
 
@@ -654,7 +657,10 @@ void Table::init(ref_type top_ref, ArrayParent* parent, size_t ndx_in_parent, bo
         // Interner data exist
         m_interner_data.init_from_parent();
     }
-    m_string_interners.clear();
+    else {
+        REALM_ASSERT_DEBUG(!m_interner_data.is_attached());
+    }
+    refresh_string_interners();
     m_cookie = cookie_initialized;
 }
 
@@ -1056,7 +1062,21 @@ ColKey Table::do_insert_root_column(ColKey col_key, ColumnType type, StringData 
     if (m_tombstones) {
         m_tombstones->insert_column(col_key);
     }
-
+    // create string interners internal rep as well as data area
+    REALM_ASSERT(m_top.size() > top_position_for_interners);
+    if (!m_interner_data.is_attached()) {
+        m_interner_data.create(NodeHeader::type_HasRefs);
+        m_interner_data.update_parent();
+        REALM_ASSERT(m_interner_data.is_attached());
+        REALM_ASSERT(m_top.get_as_ref(top_position_for_interners) == m_interner_data.get_ref());
+    }
+    while (col_ndx >= m_string_interners.size()) {
+        m_string_interners.push_back({});
+        m_interner_data.add(0);
+    }
+    REALM_ASSERT(!m_string_interners[col_ndx]);
+    if (col_key.get_type() == col_type_String)
+        m_string_interners[col_ndx] = std::make_unique<StringInterner>(m_alloc, m_interner_data, col_key);
     bump_storage_version();
 
     return col_key;
@@ -1087,6 +1107,12 @@ void Table::do_erase_root_column(ColKey col_key)
     while (m_index_accessors.size() > m_leaf_ndx2colkey.size()) {
         REALM_ASSERT(m_index_accessors.back() == nullptr);
         m_index_accessors.pop_back();
+    }
+    REALM_ASSERT_DEBUG(col_ndx < m_string_interners.size());
+    if (m_string_interners[col_ndx]) {
+        Array::destroy_deep(m_interner_data.get_as_ref(col_ndx), m_alloc);
+        m_interner_data.set(col_ndx, 0);
+        m_string_interners[col_ndx].reset();
     }
     bump_content_version();
     bump_storage_version();
@@ -1241,18 +1267,9 @@ void Table::detach(LifeCycleCookie cookie) noexcept
 {
     m_cookie = cookie;
     m_alloc.bump_instance_version();
-    // release string interners (if not shared and hosted by DB)
-    Group* g = get_parent_group();
-    Transaction* t = nullptr;
-    if (g) {
-        t = dynamic_cast<Transaction*>(g);
-    }
-    if (!t) {
-        // we have our own local string interners - delete them
-        for (auto ptr : m_string_interners)
-            delete ptr;
-    }
+    // release string interners
     m_string_interners.clear();
+    m_interner_data.detach();
 }
 
 void Table::fully_detach() noexcept
@@ -2002,6 +2019,13 @@ void Table::update_from_parent() noexcept
 
         refresh_content_version();
         m_has_any_embedded_objects.reset();
+        if (m_top.size() > top_position_for_interners) {
+            if (m_top.get_as_ref(top_position_for_interners))
+                m_interner_data.update_from_parent();
+            else
+                m_interner_data.detach();
+        }
+        refresh_string_interners();
     }
     m_alloc.bump_storage_version();
 }
@@ -2160,6 +2184,12 @@ void Table::refresh_accessor_tree()
     else {
         m_tombstones = nullptr;
     }
+    if (m_top.size() > top_position_for_interners) {
+        if (m_top.get_as_ref(top_position_for_interners))
+            m_interner_data.init_from_parent();
+        else
+            m_interner_data.detach();
+    }
     refresh_content_version();
     bump_storage_version();
     build_column_mapping();
@@ -2169,9 +2199,27 @@ void Table::refresh_accessor_tree()
 
 void Table::refresh_string_interners()
 {
-    std::lock_guard lock(m_string_interners_mutex);
-    // force later calls to get_string_interner() to rebuild interners from storage
-    m_string_interners.clear();
+    // bring string interners in line with underlying data.
+    // Precondition: we rely on the col keys in m_leaf_ndx2colkey[] being up to date.
+    for (auto col_key : m_leaf_ndx2colkey) {
+        size_t idx = col_key.get_index().val;
+        while (idx >= m_string_interners.size()) {
+            m_string_interners.push_back({});
+        }
+        if (m_interner_data.is_attached() && idx < m_interner_data.size() && m_interner_data.get_as_ref(idx)) {
+            if (!m_string_interners[idx]) {
+                m_string_interners[idx] = std::make_unique<StringInterner>(m_alloc, m_interner_data, col_key);
+            }
+            else {
+                m_string_interners[idx]->update_from_parent();
+            }
+        }
+        else /* no interner data for this interner, so it has been deleted */ {
+            if (m_string_interners[idx]) {
+                m_string_interners[idx].reset({});
+            }
+        }
+    }
 }
 
 void Table::refresh_index_accessors()
@@ -3431,19 +3479,27 @@ void Table::typed_print(std::string prefix, ref_type ref) const
 
 StringInterner* Table::get_string_interner(ColKey col_key) const
 {
-    auto idx = col_key.get_index();
-
+    if (col_key.get_type() != col_type_String)
+        return nullptr;
+    auto idx = col_key.get_index().val;
+    REALM_ASSERT_DEBUG(idx < m_string_interners.size());
+    auto interner = m_string_interners[idx].get();
+    REALM_ASSERT_DEBUG(interner);
+    return interner;
+#if 0
     // TODO: This method likely needs to be lock-free. Possibly by moving all
     // setup to Table::init(). (But careful - or it will pose a perf problem....)
     std::lock_guard lock(m_string_interners_mutex);
     auto This = const_cast<Table*>(this);
     size_t j = idx.val;
     while (j >= m_string_interners.size()) {
-        m_string_interners.push_back((StringInterner*)nullptr);
+        m_string_interners.push_back({});
     }
-    auto interner = m_string_interners[j];
+    auto interner = m_string_interners[j].get();
     if (interner)
         return interner;
+    if (m_top.get_as_ref(top_position_for_interners))
+        This->m_interner_data.update_from_parent();
     if (!m_interner_data.is_attached()) {
         // This is the first interner for this Table.
         // Make sure top array is large enough to hold interner data
@@ -3461,27 +3517,7 @@ StringInterner* Table::get_string_interner(ColKey col_key) const
         }
         This->m_interner_data.update_parent();
     }
-    interner = new StringInterner(m_alloc, This->m_interner_data, idx.val);
-    m_string_interners[j] = interner;
-    return interner;
-#if 0
-    // if we're in a transactional scenario, we need to obtain the interner from DB
-    auto group = get_parent_group();
-    DBRef db;
-    if (group) {
-        auto transaction = dynamic_cast<Transaction*>(group);
-        if (transaction)
-            db = transaction->get_db();
-    }
-    if (db) {
-        // obtain interner from DB
-        interner = db->get_string_interner(get_key(), idx);
-    }
-    else {
-        // create a local interner instead
-        interner = new StringInterner;
-    }
-    m_string_interners[j] = interner;
-    return interner;
+    m_string_interners[j] = std::make_unique<StringInterner>(m_alloc, This->m_interner_data, col_key);
+    return m_string_interners[j].get();
 #endif
 }

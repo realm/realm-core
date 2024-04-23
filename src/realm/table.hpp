@@ -859,7 +859,7 @@ private:
     std::vector<ColKey> m_leaf_ndx2colkey;
     std::vector<ColKey::Idx> m_spec_ndx2leaf_ndx;
     std::vector<size_t> m_leaf_ndx2spec_ndx;
-    mutable std::vector<StringInterner*> m_string_interners;
+    mutable std::vector<std::unique_ptr<StringInterner>> m_string_interners;
     mutable std::mutex m_string_interners_mutex; // we should be able to make access lock-free, but not yet.
     Type m_table_type = Type::TopLevel;
     uint64_t m_in_file_version_at_transaction_boundary = 0;

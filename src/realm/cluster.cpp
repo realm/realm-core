@@ -1065,10 +1065,9 @@ void Cluster::verify(ref_type ref, size_t index, util::Optional<size_t>& sz) con
     ArrayType arr(get_alloc());
     set_spec(arr, ColKey::Idx{unsigned(index) - 1});
     auto table = get_owning_table();
-    auto col_key = table->m_leaf_ndx2colkey[index];
+    REALM_ASSERT(index <= table->m_leaf_ndx2colkey.size());
+    auto col_key = table->m_leaf_ndx2colkey[index - 1];
     set_string_interner(arr, col_key);
-    // TODO: find col_key for this call instead of index:
-    // set_string_interner(arr, ColKey::Idx{unsigned(index) - 1});
     arr.set_parent(const_cast<Cluster*>(this), index);
     arr.init_from_ref(ref);
     arr.verify();
