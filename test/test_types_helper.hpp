@@ -84,7 +84,7 @@ inline ObjectId TestValueGenerator::convert_for_test<ObjectId>(int64_t v)
     uint64_t cur = static_cast<uint64_t>(v);
     for (size_t i = 0; i < 24; ++i) {
         value += char(hex_digits[cur % 16]);
-        cur -= (cur % 16);
+        cur = cur >> 1;
         if (cur == 0) {
             cur += static_cast<uint64_t>(v);
         }
