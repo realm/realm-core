@@ -165,7 +165,7 @@ public:
         return written_node.write(out);
     }
 
-    virtual void typed_print(std::string prefix, const Table& table) const override
+    virtual void typed_print(std::string prefix) const override
     {
         REALM_ASSERT(get_is_inner_bptree_node_from_header(get_header()));
         REALM_ASSERT(has_refs());
@@ -187,13 +187,13 @@ public:
                         ClusterNodeInner a(m_alloc, m_tree_top);
                         a.init(m);
                         std::cout << pref;
-                        a.typed_print(pref, table);
+                        a.typed_print(pref);
                     }
                     else {
                         Cluster a(j, m_alloc, m_tree_top);
                         a.init(m);
                         std::cout << pref;
-                        a.typed_print(pref, table);
+                        a.typed_print(pref);
                     }
                 }
             }

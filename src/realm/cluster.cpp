@@ -1689,10 +1689,11 @@ ref_type Cluster::typed_write(ref_type ref, _impl::ArrayWriterBase& out) const
     return written_cluster.write(out);
 }
 
-void Cluster::typed_print(std::string prefix, const Table& table) const
+void Cluster::typed_print(std::string prefix) const
 {
     REALM_ASSERT_DEBUG(!get_is_inner_bptree_node_from_header(get_header()));
     std::cout << "Cluster of size " << size() << " " << header_to_string(get_header()) << std::endl;
+    const auto table = get_owning_table();
     for (unsigned j = 0; j < size(); ++j) {
         RefOrTagged rot = get_as_ref_or_tagged(j);
         auto pref = prefix + "  " + std::to_string(j) + ":\t";
@@ -1704,7 +1705,7 @@ void Cluster::typed_print(std::string prefix, const Table& table) const
                 a.typed_print(pref);
             }
             else {
-                auto col_key = table.m_leaf_ndx2colkey[j - 1];
+                auto col_key = table->m_leaf_ndx2colkey[j - 1];
                 auto col_type = col_key.get_type();
                 auto col_attr = col_key.get_attrs();
                 std::string attr_string;
