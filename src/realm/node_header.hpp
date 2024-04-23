@@ -208,7 +208,7 @@ public:
     static size_t unsigned_to_num_bits(uint64_t value)
     {
         if constexpr (sizeof(size_t) == sizeof(uint64_t))
-            return 1 + log2(value);
+            return static_cast<size_t>(1) + log2(value);
         uint32_t high = value >> 32;
         if (high)
             return 33 + log2(high);
@@ -300,9 +300,11 @@ public:
         auto wtype = get_wtype_from_header(header);
         if (wtype == wtype_Extend) {
             const auto h = reinterpret_cast<const uint8_t*>(header);
-            return Encoding{static_cast<int>(h[5]) + 3};
+            int encoding = h[5] + 3;
+            REALM_ASSERT_DEBUG_EX(encoding >= int(Encoding::Packed) && encoding <= int(Encoding::Flex), encoding);
+            return static_cast<Encoding>(encoding);
         }
-        return Encoding(static_cast<int>(wtype));
+        return Encoding(int(wtype));
     }
     static void set_encoding(char* header, Encoding enc)
     {
@@ -566,6 +568,7 @@ inline size_t NodeHeader::get_num_elements(const char* header, Encoding encoding
             return get_arrayB_num_elements(header);
             break;
         default:
+            printf("Encoding %d\n", int(encoding));
             REALM_UNREACHABLE();
     }
 }
@@ -669,7 +672,6 @@ size_t inline NodeHeader::get_byte_size_from_header(const char* header) noexcept
     const auto h = header;
 
     const auto encoding = get_encoding(h);
-    REALM_ASSERT_DEBUG(encoding >= Encoding::WTypBits && encoding <= Encoding::Flex);
     const auto size = get_num_elements(h, encoding);
     switch (encoding) {
         case Encoding::WTypBits:
