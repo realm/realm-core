@@ -1063,7 +1063,9 @@ ColKey Table::do_insert_root_column(ColKey col_key, ColumnType type, StringData 
         m_tombstones->insert_column(col_key);
     }
     // create string interners internal rep as well as data area
-    REALM_ASSERT(m_top.size() > top_position_for_interners);
+    while (m_top.size() <= top_position_for_interners) {
+        m_top.add(0);
+    }
     if (!m_interner_data.is_attached()) {
         m_interner_data.create(NodeHeader::type_HasRefs);
         m_interner_data.update_parent();
@@ -1072,6 +1074,8 @@ ColKey Table::do_insert_root_column(ColKey col_key, ColumnType type, StringData 
     }
     while (col_ndx >= m_string_interners.size()) {
         m_string_interners.push_back({});
+    }
+    while (col_ndx >= m_interner_data.size()) {
         m_interner_data.add(0);
     }
     REALM_ASSERT(!m_string_interners[col_ndx]);
