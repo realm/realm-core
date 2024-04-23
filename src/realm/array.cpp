@@ -246,7 +246,6 @@ struct Array::VTableForEncodedArray {
 template <size_t width>
 const typename Array::VTableForWidth<width>::PopulatedVTable Array::VTableForWidth<width>::vtable;
 const typename Array::VTableForEncodedArray::PopulatedVTableEncoded Array::VTableForEncodedArray::vtable;
-
 void Array::init_from_mem(MemRef mem) noexcept
 {
     // Header is the type of header that has been allocated, in case we are decompressing,
@@ -355,73 +354,6 @@ void Array::destroy_children(size_t offset) noexcept
 //     REALM_ASSERT_7(m_alloc.is_read_only(m_ref), ==, true, ||, num_bytes, <=, get_capacity_from_header(header));
 //     return num_bytes;
 // }
-
-ref_type Array::write(_impl::ArrayWriterBase& out, bool deep, bool only_if_modified, bool compress_in_flight) const
-{
-    REALM_ASSERT_DEBUG(is_attached());
-    // The default allocator cannot be trusted wrt is_read_only():
-    REALM_ASSERT_DEBUG(!only_if_modified || &m_alloc != &Allocator::get_default());
-    if (only_if_modified && m_alloc.is_read_only(m_ref))
-        return m_ref;
-
-    if (!deep || !m_has_refs) {
-        // however - creating an array using ANYTHING BUT the default allocator during commit is also wrong....
-        // it only works by accident, because the whole slab area is reinitialized after commit.
-        // We should have: Array encoded_array{Allocator::get_default()};
-        Array compressed_array{Allocator::get_default()};
-        if (compress_in_flight && size() != 0 && compress_array(compressed_array)) {
-#ifdef REALM_DEBUG
-            const auto encoding = compressed_array.m_integer_compressor.get_encoding();
-            REALM_ASSERT_DEBUG(encoding == Encoding::Flex || encoding == Encoding::Packed);
-            REALM_ASSERT_DEBUG(size() == compressed_array.size());
-            for (size_t i = 0; i < compressed_array.size(); ++i) {
-                REALM_ASSERT_DEBUG(get(i) == compressed_array.get(i));
-            }
-#endif
-            auto ref = compressed_array.do_write_shallow(out);
-            compressed_array.destroy();
-            return ref;
-        }
-        return do_write_shallow(out); // Throws
-    }
-
-    return do_write_deep(out, only_if_modified, compress_in_flight); // Throws
-}
-
-ref_type Array::write(ref_type ref, Allocator& alloc, _impl::ArrayWriterBase& out, bool only_if_modified,
-                      bool compress_in_flight)
-{
-    // The default allocator cannot be trusted wrt is_read_only():
-    REALM_ASSERT_DEBUG(!only_if_modified || &alloc != &Allocator::get_default());
-    if (only_if_modified && alloc.is_read_only(ref))
-        return ref;
-
-    Array array(alloc);
-    array.init_from_ref(ref);
-    REALM_ASSERT_DEBUG(array.is_attached());
-
-    if (!array.m_has_refs) {
-        Array compressed_array{Allocator::get_default()};
-        if (compress_in_flight && array.size() != 0 && array.compress_array(compressed_array)) {
-#ifdef REALM_DEBUG
-            const auto encoding = compressed_array.m_integer_compressor.get_encoding();
-            REALM_ASSERT_DEBUG(encoding == Encoding::Flex || encoding == Encoding::Packed);
-            REALM_ASSERT_DEBUG(array.size() == compressed_array.size());
-            for (size_t i = 0; i < compressed_array.size(); ++i) {
-                REALM_ASSERT_DEBUG(array.get(i) == compressed_array.get(i));
-            }
-#endif
-            auto ref = compressed_array.do_write_shallow(out);
-            compressed_array.destroy();
-            return ref;
-        }
-        else {
-            return array.do_write_shallow(out); // Throws
-        }
-    }
-    return array.do_write_deep(out, only_if_modified, compress_in_flight); // Throws
-}
-
 
 ref_type Array::do_write_shallow(_impl::ArrayWriterBase& out) const
 {
@@ -1236,11 +1168,14 @@ void Array::typed_print(std::string prefix) const
     }
     else {
         std::cout << " Leaf of unknown type }" << std::endl;
-        /*
-        for (unsigned n = 0; n < size(); ++n) {
-            auto pref = prefix + to_string(n) + ":\t";
-            std::cout << pref << get(n) << std::endl;
-        }
-        */
     }
+}
+
+ref_type ArrayPayload::typed_write(ref_type ref, _impl::ArrayWriterBase& out, Allocator& alloc)
+{
+    Array arr(alloc);
+    arr.init_from_ref(ref);
+    // By default we are not compressing
+    constexpr bool compress = false;
+    return arr.write(out, true, out.only_modified, compress);
 }

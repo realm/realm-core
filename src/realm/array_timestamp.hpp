@@ -109,6 +109,7 @@ public:
     size_t find_first(Timestamp value, size_t begin, size_t end) const noexcept;
 
     void verify() const;
+    static ref_type typed_write(ref_type ref, _impl::ArrayWriterBase& out, Allocator& alloc);
 
 private:
     ArrayIntNull m_seconds;

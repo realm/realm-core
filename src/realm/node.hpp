@@ -346,6 +346,10 @@ private:
 class Spec;
 class Mixed;
 
+namespace _impl {
+class ArrayWriterBase;
+}
+
 /// Base class for all nodes holding user data
 class ArrayPayload {
 public:
@@ -358,6 +362,7 @@ public:
         return false;
     }
     virtual void set_spec(Spec*, size_t) const {}
+    static ref_type typed_write(ref_type ref, _impl::ArrayWriterBase& out, Allocator& alloc);
 };
 
 } // namespace realm

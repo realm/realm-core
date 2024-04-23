@@ -232,6 +232,8 @@ public:
 
     LinkCollectionPtr clone_as_obj_list() const final;
 
+    static ref_type typed_write(ref_type ref, _impl::ArrayWriterBase& out, Allocator& alloc);
+
 private:
     using Base::set_collection;
 
@@ -277,6 +279,8 @@ private:
     void get_key_type();
 
     UpdateStatus do_update_if_needed(bool allow_create) const;
+    template <class T>
+    std::shared_ptr<T> do_get_collection(const PathElement& path_elem);
 };
 
 class Dictionary::Iterator {
