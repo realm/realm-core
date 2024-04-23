@@ -554,6 +554,23 @@ private:
     friend class ArrayWithFind;
 };
 
+class TempArray : public Array {
+public:
+    TempArray(size_t sz, Type type = Type::type_HasRefs)
+        : Array(Allocator::get_default())
+    {
+        create(type, false, sz);
+    }
+    ~TempArray()
+    {
+        destroy();
+    }
+    ref_type write(_impl::ArrayWriterBase& out)
+    {
+        return Array::write(out, false, false, false);
+    }
+};
+
 // Implementation:
 
 

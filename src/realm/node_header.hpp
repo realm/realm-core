@@ -302,7 +302,7 @@ public:
         if (wtype == wtype_Extend) {
             const auto h = reinterpret_cast<const uint8_t*>(header);
             int encoding = h[5] + 3;
-            REALM_ASSERT_DEBUG(encoding >= int(Encoding::Packed) && encoding <= int(Encoding::Flex));
+            REALM_ASSERT_DEBUG_EX(encoding >= int(Encoding::Packed) && encoding <= int(Encoding::Flex), encoding);
             return static_cast<Encoding>(encoding);
         }
         return Encoding(int(wtype));

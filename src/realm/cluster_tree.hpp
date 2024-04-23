@@ -190,11 +190,10 @@ public:
     }
     void verify() const;
 
-    ref_type typed_write(ref_type ref, _impl::ArrayWriterBase& out, const Table& table, bool deep, bool only_modified,
-                         bool compress) const
+    ref_type typed_write(ref_type ref, _impl::ArrayWriterBase& out) const
     {
         REALM_ASSERT_DEBUG(m_root);
-        return m_root->typed_write(ref, out, table, deep, only_modified, compress);
+        return m_root->typed_write(ref, out);
     }
 
     void typed_print(std::string prefix, const Table& table) const

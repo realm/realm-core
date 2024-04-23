@@ -941,16 +941,15 @@ void Group::validate(ObjLink link) const
     }
 }
 
-ref_type Group::typed_write_tables(_impl::ArrayWriterBase& out, bool deep, bool only_modified, bool compress) const
+ref_type Group::typed_write_tables(_impl::ArrayWriterBase& out) const
 {
     ref_type ref = m_top.get_as_ref(1);
-    if (only_modified && m_alloc.is_read_only(ref))
+    if (out.only_modified && m_alloc.is_read_only(ref))
         return ref;
     Array a(m_alloc);
     a.init_from_ref(ref);
     REALM_ASSERT_DEBUG(a.has_refs());
-    Array dest(Allocator::get_default());
-    dest.create(NodeHeader::type_HasRefs, false, a.size());
+    TempArray dest(a.size());
     for (unsigned j = 0; j < a.size(); ++j) {
         RefOrTagged rot = a.get_as_ref_or_tagged(j);
         if (rot.is_tagged()) {
@@ -959,12 +958,10 @@ ref_type Group::typed_write_tables(_impl::ArrayWriterBase& out, bool deep, bool 
         else {
             auto table = do_get_table(j);
             REALM_ASSERT_DEBUG(table);
-            dest.set_as_ref(j, table->typed_write(rot.get_as_ref(), out, deep, only_modified, compress));
+            dest.set_as_ref(j, table->typed_write(rot.get_as_ref(), out));
         }
     }
-    ref = dest.write(out, false, false, false);
-    dest.destroy();
-    return ref;
+    return dest.write(out);
 }
 void Group::table_typed_print(std::string prefix, ref_type ref) const
 {
@@ -1018,11 +1015,11 @@ ref_type Group::DefaultTableWriter::write_names(_impl::OutputStream& out)
 }
 ref_type Group::DefaultTableWriter::write_tables(_impl::OutputStream& out)
 {
-    bool deep = true;              // Deep
-    bool only_if_modified = false; // Always
-    bool compress = false;         // true;
+    // bool deep = true;              // Deep
+    // bool only_if_modified = false; // Always
+    // bool compress = false;         // true;
     // return m_group->m_tables.write(out, deep, only_if_modified, compress); // Throws
-    return m_group->typed_write_tables(out, deep, only_if_modified, compress);
+    return m_group->typed_write_tables(out);
 }
 
 auto Group::DefaultTableWriter::write_history(_impl::OutputStream& out) -> HistoryInfo
@@ -1126,6 +1123,7 @@ void Group::write(std::ostream& out, int file_format_version, TableWriter& table
                   bool pad_for_encryption, uint_fast64_t version_number)
 {
     _impl::OutputStream out_2(out);
+    out_2.only_modified = false;
 
     // Write the file header
     SlabAlloc::Header streaming_header;
