@@ -185,11 +185,6 @@ endif()
 
 enable_stdfilesystem(CoreTests)
 
-if(UNIX AND NOT APPLE)
-    # This enables symbols in backtraces
-    target_link_libraries(CoreTests "-rdynamic")
-endif()
-
 target_include_directories(CoreTests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
 
 add_bundled_test(CoreTests)
@@ -257,11 +252,6 @@ if(REALM_ENABLE_SYNC)
     enable_stdfilesystem(SyncTests)
     target_link_libraries(SyncTests SyncTestLib TestUtil)
     add_bundled_test(SyncTests)
-
-    if(UNIX AND NOT APPLE)
-        # This enables symbols in backtraces
-        target_link_libraries(SyncTests "-rdynamic")
-    endif()
 endif()
 
 # CombinedTests
