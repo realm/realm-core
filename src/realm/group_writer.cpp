@@ -787,9 +787,7 @@ ref_type GroupWriter::write_group()
             top.set(Group::s_file_size_ndx, RefOrTagged::make_tagged(m_logical_size));
             auto ref = top.get_as_ref(Group::s_evacuation_point_ndx);
             REALM_ASSERT(ref);
-            Array destroy_array(m_alloc);
-            destroy_array.init_from_ref(ref);
-            destroy_array.destroy();
+            Array::destroy(ref, m_alloc);
             top.set(Group::s_evacuation_point_ndx, 0);
             m_evacuation_limit = 0;
 
