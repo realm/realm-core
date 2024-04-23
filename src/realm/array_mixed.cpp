@@ -368,8 +368,9 @@ ref_type ArrayMixed::typed_write(ref_type top_ref, _impl::ArrayWriterBase& out, 
     composite.init_from_ref(top.get_as_ref(0));
     written_leaf.set_as_ref(0, composite.write(out, true, out.only_modified, false));
     for (size_t i = 1; i < sz; ++i) {
-        ref_type new_ref = 0;
-        if (auto ref = top.get(i)) {
+        auto ref = top.get(i);
+        ref_type new_ref = ref;
+        if (ref && !(out.only_modified && alloc.is_read_only(ref))) {
             if (i < 3) { // int, and pair_int
                 // integer arrays
                 new_ref = Array::write(ref, alloc, out, out.only_modified, out.compress);
