@@ -149,10 +149,6 @@ public:
     static std::shared_ptr<SyncManager> create(const SyncClientConfig& config);
     SyncManager(Private, const SyncClientConfig& config);
 
-    // Attempt to perform all pending file actions for the given path. Returns
-    // true if any were performed.
-    bool immediately_run_file_actions(std::string_view realm_path);
-
 private:
     friend class SyncSession;
     friend class SyncUser;

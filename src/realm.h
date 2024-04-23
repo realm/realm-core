@@ -3482,35 +3482,6 @@ RLM_API realm_app_t* realm_user_get_app(const realm_user_t*) RLM_API_NOEXCEPT;
 
 #endif // REALM_APP_SERVICES
 
-/**
- * Return the identiy for the user passed as argument
- * @param user ptr to the user for which the identiy has to be retrieved
- * @return a ptr to the identity string. This must be manually released with realm_free().
- */
-RLM_API char* realm_user_get_identity(const realm_user_t* user) RLM_API_NOEXCEPT;
-
-/**
- * Retrieve the state for the user passed as argument
- * @param user ptr to the user for which the state has to be retrieved
- * @return realm_user_state_e value
- */
-RLM_API realm_user_state_e realm_user_get_state(const realm_user_t* user) RLM_API_NOEXCEPT;
-
-RLM_API bool realm_user_is_logged_in(const realm_user_t*) RLM_API_NOEXCEPT;
-
-/**
- * Return the access token associated with the user.
- * @return a string that rapresents the access token
- */
-RLM_API char* realm_user_get_access_token(const realm_user_t*);
-
-/**
- * Return the refresh token associated with the user.
- * @return a string that represents the refresh token
- */
-RLM_API char* realm_user_get_refresh_token(const realm_user_t*);
-
-
 /* Sync */
 typedef enum realm_sync_client_reconnect_mode {
     RLM_SYNC_CLIENT_RECONNECT_MODE_NORMAL,
@@ -3562,8 +3533,15 @@ typedef enum realm_sync_error_action {
     RLM_SYNC_ERROR_ACTION_REVERT_TO_PBS,
 } realm_sync_error_action_e;
 
+typedef enum realm_sync_file_action {
+    RLM_SYNC_FILE_ACTION_DELETE_REALM,
+    RLM_SYNC_FILE_ACTION_BACK_UP_THEN_DELETE_REALM,
+} realm_sync_file_action_e;
+
+
 typedef struct realm_sync_session realm_sync_session_t;
 typedef struct realm_async_open_task realm_async_open_task_t;
+typedef struct realm_sync_manager realm_sync_manager_t;
 
 typedef struct realm_sync_error_user_info {
     const char* key;
@@ -3575,6 +3553,78 @@ typedef struct realm_sync_error_compensating_write_info {
     const char* object_name;
     realm_value_t primary_key;
 } realm_sync_error_compensating_write_info_t;
+
+/**
+ * Generic completion callback for asynchronous Realm User operations.
+ * @param userdata This must be the faithfully forwarded data parameter that was provided along with this callback.
+ * @param error Pointer to an error object if the operation failed, otherwise null if it completed successfully.
+ */
+typedef void (*realm_user_void_completion_func_t)(realm_userdata_t userdata, const realm_app_error_t* error);
+
+
+typedef const char* (*realm_user_get_access_token_cb_t)(realm_userdata_t userdata);
+typedef const char* (*realm_user_get_refresh_token_cb_t)(realm_userdata_t userdata);
+typedef realm_user_state_e (*realm_user_state_cb_t)(realm_userdata_t userdata);
+typedef bool (*realm_user_access_token_refresh_required_cb_t)(realm_userdata_t userdata);
+typedef realm_sync_manager_t* (*realm_user_get_sync_manager_cb_t)(realm_userdata_t userdata);
+typedef void (*realm_user_request_log_out_cb_t)(realm_userdata_t userdata);
+typedef void (*realm_user_request_refresh_user_cb_t)(realm_userdata_t userdata, realm_user_void_completion_func_t cb,
+                                                     realm_userdata_t cb_data);
+typedef void (*realm_user_request_refresh_location_cb_t)(realm_userdata_t userdata,
+                                                         realm_user_void_completion_func_t cb,
+                                                         realm_userdata_t cb_data);
+typedef void (*realm_user_request_access_token_cb_t)(realm_userdata_t userdata, realm_user_void_completion_func_t cb,
+                                                     realm_userdata_t cb_data);
+typedef void (*realm_user_track_realm_cb_t)(realm_userdata_t userdata, const char* path);
+typedef const char* (*realm_user_create_file_action_cb_t)(realm_userdata_t userdata, realm_sync_file_action_e action,
+                                                          const char* original_path,
+                                                          const char* requested_recovery_dir);
+
+
+/*
+ * Construct a SyncUser instance that uses SDK provided
+ * callbacks instead of core's User implementation. This type
+ * of user should not be used with core's App implementation.
+ */
+RLM_API realm_user_t* realm_user_new(
+    realm_userdata_t userdata, realm_free_userdata_func_t free_func, const char* app_id, const char* user_id,
+    realm_user_get_access_token_cb_t access_token_cb, realm_user_get_refresh_token_cb_t refresh_token_cb,
+    realm_user_state_cb_t state_cb, realm_user_access_token_refresh_required_cb_t atrr_cb,
+    realm_user_get_sync_manager_cb_t sync_manager_cb, realm_user_request_log_out_cb_t request_log_out_cb,
+    realm_user_request_refresh_user_cb_t requst_refresh_user_cb,
+    realm_user_request_refresh_location_cb_t request_refresh_location_cb,
+    realm_user_request_access_token_cb_t request_access_token_cb, realm_user_track_realm_cb_t track_realm_cb,
+    realm_user_create_file_action_cb_t create_fa_cb) RLM_API_NOEXCEPT;
+
+/**
+ * Return the identiy for the user passed as argument
+ * @param user ptr to the user for which the identiy has to be retrieved
+ * @return a ptr to the identity string. This must be manually released with realm_free().
+ */
+RLM_API char* realm_user_get_identity(const realm_user_t* user) RLM_API_NOEXCEPT;
+
+/**
+ * Retrieve the state for the user passed as argument
+ * @param user ptr to the user for which the state has to be retrieved
+ * @return realm_user_state_e value
+ */
+RLM_API realm_user_state_e realm_user_get_state(const realm_user_t* user) RLM_API_NOEXCEPT;
+
+RLM_API bool realm_user_is_logged_in(const realm_user_t*) RLM_API_NOEXCEPT;
+
+/**
+ * Return the access token associated with the user.
+ * @return a string that rapresents the access token
+ */
+RLM_API char* realm_user_get_access_token(const realm_user_t*);
+
+/**
+ * Return the refresh token associated with the user.
+ * @return a string that represents the refresh token
+ */
+RLM_API char* realm_user_get_refresh_token(const realm_user_t*);
+
+RLM_API bool realm_user_access_token_refresh_required(const realm_user_t*);
 
 // This type should never be returned from a function.
 // It's only meant as an asynchronous callback argument.
@@ -4065,6 +4115,18 @@ RLM_API void realm_sync_session_wait_for_upload_completion(realm_sync_session_t*
 RLM_API void realm_sync_session_handle_error_for_testing(const realm_sync_session_t* session,
                                                          realm_errno_e error_code, const char* error_str,
                                                          bool is_fatal);
+
+/**
+ * Create realm_sync_manager_t* instance given a valid realm sync client configuration.
+ *
+ * @return A non-null pointer if no error occurred.
+ */
+RLM_API realm_sync_manager_t* realm_sync_manager_create(const realm_sync_client_config_t*);
+
+/**
+ * See SyncManager::set_sync_route()
+ */
+RLM_API void realm_sync_manager_set_route(const realm_sync_manager_t* session, const char* route, bool is_verified);
 
 /**
  * In case of exception thrown in user code callbacks, this api will allow the sdk to store the user code exception
