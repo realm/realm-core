@@ -431,7 +431,7 @@ void Changeset::Reflector::operator()(const Instruction::AddColumn& p) const
     if (p.type == Instruction::Payload::Type::Link) {
         m_tracer.field("target_table", p.link_target_table);
     }
-    if (p.collection_type == Instruction::AddColumn::CollectionType::Dictionary) {
+    if (p.collection_type == Instruction::CollectionType::Dictionary) {
         m_tracer.field("key_type", p.key_type);
     }
 }
@@ -505,7 +505,7 @@ void Changeset::Printer::field(StringData n, Instruction::Payload::Type type)
     print_field(n, get_type_name(type));
 }
 
-void Changeset::Printer::field(StringData n, Instruction::AddColumn::CollectionType type)
+void Changeset::Printer::field(StringData n, Instruction::CollectionType type)
 {
     print_field(n, get_collection_type(type));
 }

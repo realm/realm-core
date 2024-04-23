@@ -50,30 +50,38 @@ endif()
 if(REALM_ENABLE_SYNC)
     list(APPEND HEADERS
         util/sync/baas_admin_api.hpp
-        util/sync/flx_sync_harness.hpp
         util/sync/session_util.hpp
         util/sync/sync_test_utils.hpp
-        util/unit_test_transport.hpp
     )
     list(APPEND SOURCES
         bson.cpp
-        sync/app.cpp
-        sync/client_reset.cpp
         sync/file.cpp
-        sync/flx_migration.cpp
-        sync/flx_schema_migration.cpp
-        sync/flx_sync.cpp
-        sync/metadata.cpp
-        sync/migration_store_test.cpp
-        sync/remote_mongo_tests.cpp
         sync/session/connection_change_notifications.cpp
         sync/session/progress_notifications.cpp
         sync/session/session.cpp
         sync/session/wait_for_completion.cpp
         sync/sync_manager.cpp
         util/sync/sync_test_utils.cpp
-        util/unit_test_transport.cpp
     )
+
+    if (REALM_APP_SERVICES)
+        list(APPEND HEADERS
+            util/sync/flx_sync_harness.hpp
+            util/unit_test_transport.hpp
+        )
+        list(APPEND SOURCES
+            sync/app.cpp
+            sync/client_reset.cpp
+            sync/flx_migration.cpp
+            sync/flx_schema_migration.cpp
+            sync/flx_sync.cpp
+            sync/metadata.cpp
+            sync/migration_store_test.cpp
+            sync/remote_mongo_tests.cpp
+            util/unit_test_transport.cpp
+        )
+    endif()
+
     if(APPLE)
         list(APPEND SOURCES audit.cpp)
     endif()
@@ -136,6 +144,10 @@ if(REALM_ENABLE_SYNC)
     target_link_libraries(ObjectStoreTestLib SyncServer)
     option(REALM_ENABLE_AUTH_TESTS "" OFF)
     if(REALM_ENABLE_AUTH_TESTS)
+        if (NOT REALM_APP_SERVICES)
+            message(SEND_ERROR "Unsupported configuration: REALM_ENABLE_AUTH_TESTS=ON and REALM_APP_SERVICES=OFF")
+        endif()
+
         target_compile_definitions(ObjectStoreTestLib PRIVATE
             REALM_ENABLE_AUTH_TESTS=1
         )

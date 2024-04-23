@@ -232,7 +232,9 @@ struct SyncTestFile : TestFile {
     }
 
     SyncTestFile(TestSyncManager&, std::string name = "", std::string user_name = "test");
+#if REALM_APP_SERVICES
     SyncTestFile(OfflineAppSession&, std::string name = "");
+#endif
     SyncTestFile(std::shared_ptr<realm::SyncUser> user, realm::bson::Bson partition,
                  realm::util::Optional<realm::Schema> schema = realm::util::none);
     SyncTestFile(std::shared_ptr<realm::SyncUser> user, realm::bson::Bson partition,
@@ -276,6 +278,7 @@ private:
     const bool m_should_teardown_test_directory = true;
 };
 
+#if REALM_APP_SERVICES
 class OfflineAppSession {
 public:
     struct Config {
@@ -357,14 +360,14 @@ private:
     std::shared_ptr<realm::app::GenericNetworkTransport> m_transport;
     realm::app::AppCredentials user_creds;
 };
-#endif
-
-
-bool wait_for_upload(realm::Realm& realm, std::chrono::seconds timeout = std::chrono::seconds(60));
-bool wait_for_download(realm::Realm& realm, std::chrono::seconds timeout = std::chrono::seconds(60));
+#endif // REALM_ENABLE_AUTH_TESTS
 
 void set_app_config_defaults(realm::app::AppConfig& app_config,
                              const std::shared_ptr<realm::app::GenericNetworkTransport>& transport);
+#endif // REALM_APP_SERVICES
+
+bool wait_for_upload(realm::Realm& realm, std::chrono::seconds timeout = std::chrono::seconds(60));
+bool wait_for_download(realm::Realm& realm, std::chrono::seconds timeout = std::chrono::seconds(60));
 
 #endif // REALM_ENABLE_SYNC
 

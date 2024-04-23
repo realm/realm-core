@@ -104,6 +104,9 @@ public:
     {
         m_observer = observer;
     }
+#if REALM_DEBUG
+    std::string print_debug();
+#endif // REALM_DEBUG
 
 private:
     SharedFileInfo& m_file;
@@ -167,12 +170,13 @@ private:
 
 inline size_t EncryptedFileMapping::get_offset_of_address(const void* addr) const
 {
-    return reinterpret_cast<size_t>(addr) & ((1 << m_page_shift) - 1);
+    REALM_ASSERT_3(reinterpret_cast<size_t>(addr), >=, reinterpret_cast<size_t>(m_addr));
+    return (reinterpret_cast<size_t>(addr) - reinterpret_cast<size_t>(m_addr)) & ((1ULL << m_page_shift) - 1);
 }
 
 inline size_t EncryptedFileMapping::get_local_index_of_address(const void* addr, size_t offset) const
 {
-    REALM_ASSERT_EX(addr >= m_addr, addr, m_addr);
+    REALM_ASSERT_EX(addr >= m_addr, size_t(addr), size_t(m_addr));
 
     size_t local_ndx =
         ((reinterpret_cast<uintptr_t>(addr) - reinterpret_cast<uintptr_t>(m_addr) + offset) >> m_page_shift);
@@ -188,6 +192,46 @@ inline bool EncryptedFileMapping::contains_page(size_t page_in_file) const
     return page_in_file >= m_first_page && page_in_file - m_first_page < m_page_state.size();
 }
 
+#if REALM_DEBUG
+inline std::string EncryptedFileMapping::print_debug()
+{
+    auto state_name = [](const PageState& s) -> std::string {
+        if (s == PageState::Clean) {
+            return "Clean";
+        }
+        std::string state = "{";
+        if (s & PageState::Touched) {
+            state += "Touched";
+        }
+        if (s & PageState::UpToDate) {
+            state += "UpToDate";
+        }
+        if (s & PageState::StaleIV) {
+            state += "StaleIV";
+        }
+        if (s & PageState::Writable) {
+            state += "Writable";
+        }
+        if (s & PageState::Dirty) {
+            state += "Dirty";
+        }
+        state += "}";
+        return state;
+    };
+    std::string page_states;
+    for (PageState& s : m_page_state) {
+        if (!page_states.empty()) {
+            page_states += ", ";
+        }
+        page_states += state_name(s);
+    }
+    return util::format("%1 pages from %2 to %3: %4", m_page_state.size(), m_first_page,
+                        m_page_state.size() + m_first_page, page_states);
+}
+#endif // REALM_DEBUG
+
+constexpr inline size_t c_min_encrypted_file_size = 8192;
+
 } // namespace realm::util
 
 #endif // REALM_ENABLE_ENCRYPTION
@@ -197,13 +241,14 @@ namespace realm::util {
 /// contain valid encrypted data
 struct DecryptionFailed : FileAccessError {
     DecryptionFailed()
-        : FileAccessError(ErrorCodes::DecryptionFailed, "Decryption failed", std::string(), 0)
+        : FileAccessError(ErrorCodes::DecryptionFailed, get_message_with_bt(""), std::string(), 0)
     {
     }
     DecryptionFailed(const std::string& msg)
-        : FileAccessError(ErrorCodes::DecryptionFailed, util::format("Decryption failed: '%1'", msg), std::string())
+        : FileAccessError(ErrorCodes::DecryptionFailed, get_message_with_bt(msg), std::string())
     {
     }
+    static std::string get_message_with_bt(std::string_view msg);
 };
 } // namespace realm::util
 

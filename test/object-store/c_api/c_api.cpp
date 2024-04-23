@@ -569,6 +569,7 @@ TEST_CASE("C API (non-database)", "[c_api]") {
         CHECK(test_sync_client_config->timeouts.reconnect_backoff_info.resumption_delay_backoff_multiplier == 1010);
     }
 
+#if REALM_APP_SERVICES
     SECTION("realm_app_config_t") {
         const uint64_t request_timeout = 2500;
         std::string base_url = "https://path/to/app";
@@ -715,6 +716,7 @@ TEST_CASE("C API (non-database)", "[c_api]") {
         realm_release(sync_user);
         realm_release(token);
     }
+#endif // REALM_APP_SERVICES
 #endif // REALM_ENABLE_SYNC
 }
 
