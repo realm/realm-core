@@ -209,7 +209,6 @@ size_t Array::bit_width(int64_t v)
     return uint64_t(v) >> 31 ? 64 : uint64_t(v) >> 15 ? 32 : uint64_t(v) >> 7 ? 16 : 8;
 }
 
-
 void Array::init_from_mem(MemRef mem) noexcept
 {
     char* header = Node::init_from_mem(mem);
@@ -289,7 +288,7 @@ ref_type Array::do_write_shallow(_impl::ArrayWriterBase& out) const
 }
 
 
-ref_type Array::do_write_deep(_impl::ArrayWriterBase& out, bool only_if_modified) const
+ref_type Array::do_write_deep(_impl::ArrayWriterBase& out, bool only_if_modified, bool compress) const
 {
     // Temp array for updated refs
     Array new_array(Allocator::get_default());
@@ -304,7 +303,7 @@ ref_type Array::do_write_deep(_impl::ArrayWriterBase& out, bool only_if_modified
         bool is_ref = (value != 0 && (value & 1) == 0);
         if (is_ref) {
             ref_type subref = to_ref(value);
-            ref_type new_subref = write(subref, m_alloc, out, only_if_modified); // Throws
+            ref_type new_subref = write(subref, m_alloc, out, only_if_modified, compress); // Throws
             value = from_ref(new_subref);
         }
         new_array.add(value); // Throws
@@ -1333,4 +1332,47 @@ bool QueryStateFindAll<IntegerColumn>::match(size_t index) noexcept
     m_keys.add(index);
 
     return (m_limit > m_match_count);
+}
+
+void Array::typed_print(std::string prefix) const
+{
+    std::cout << "Generic Array " << header_to_string(get_header()) << " @ " << m_ref;
+    if (!is_attached()) {
+        std::cout << " Unattached";
+        return;
+    }
+    if (size() == 0) {
+        std::cout << " Empty" << std::endl;
+        return;
+    }
+    std::cout << " size = " << size() << " {";
+    if (has_refs()) {
+        std::cout << std::endl;
+        for (unsigned n = 0; n < size(); ++n) {
+            auto pref = prefix + "  " + to_string(n) + ":\t";
+            RefOrTagged rot = get_as_ref_or_tagged(n);
+            if (rot.is_ref() && rot.get_as_ref()) {
+                Array a(m_alloc);
+                a.init_from_ref(rot.get_as_ref());
+                std::cout << pref;
+                a.typed_print(pref);
+            }
+            else if (rot.is_tagged()) {
+                std::cout << pref << rot.get_as_int() << std::endl;
+            }
+        }
+        std::cout << prefix << "}" << std::endl;
+    }
+    else {
+        std::cout << " Leaf of unknown type }" << std::endl;
+    }
+}
+
+ref_type ArrayPayload::typed_write(ref_type ref, _impl::ArrayWriterBase& out, Allocator& alloc)
+{
+    Array arr(alloc);
+    arr.init_from_ref(ref);
+    // By default we are not compressing
+    constexpr bool compress = false;
+    return arr.write(out, true, out.only_modified, compress);
 }

@@ -126,6 +126,8 @@ public:
 /*****************************************************************************/
 class BPlusTreeBase {
 public:
+    using TypedWriteFunc = ref_type (*)(ref_type, _impl::ArrayWriterBase&, Allocator&);
+
     BPlusTreeBase(Allocator& alloc)
         : m_alloc(alloc)
     {
@@ -215,6 +217,10 @@ public:
     {
         m_root->verify();
     }
+
+    static ref_type typed_write(ref_type, _impl::ArrayWriterBase&, Allocator&, TypedWriteFunc);
+    static void typed_print(std::string prefix, Allocator& alloc, ref_type root, ColumnType col_type);
+
 
 protected:
     template <class U>
@@ -556,6 +562,11 @@ public:
         }
     }
 
+    static ref_type typed_write(ref_type ref, _impl::ArrayWriterBase& out, Allocator& alloc)
+    {
+        return BPlusTreeBase::typed_write(ref, out, alloc, LeafArray::typed_write);
+    }
+
 protected:
     LeafNode m_leaf_cache;
 
@@ -685,6 +696,7 @@ ColumnAverageType<T> bptree_average(const BPlusTree<T>& tree, size_t* return_cnt
         *return_cnt = cnt;
     return avg;
 }
+
 } // namespace realm
 
 #endif /* REALM_BPLUSTREE_HPP */

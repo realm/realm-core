@@ -22,6 +22,8 @@
 #include <realm/node_header.hpp>
 #include <realm/alloc.hpp>
 
+#include <iostream>
+
 namespace realm {
 
 class Mixed;
@@ -261,6 +263,11 @@ public:
         }
     }
 
+    void typed_print(int) const
+    {
+        std::cout << "Generic Node ERROR\n";
+    }
+
 protected:
     /// The total size in bytes (including the header) of a new empty
     /// array. Must be a multiple of 8 (i.e., 64-bit aligned).
@@ -339,6 +346,10 @@ private:
 class Spec;
 class Mixed;
 
+namespace _impl {
+class ArrayWriterBase;
+}
+
 /// Base class for all nodes holding user data
 class ArrayPayload {
 public:
@@ -351,6 +362,7 @@ public:
         return false;
     }
     virtual void set_spec(Spec*, size_t) const {}
+    static ref_type typed_write(ref_type ref, _impl::ArrayWriterBase& out, Allocator& alloc);
 };
 
 } // namespace realm

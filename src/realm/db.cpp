@@ -2557,6 +2557,10 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction, b
         // Add 4k to ensure progress on small commits
         size_t work_limit = commit_size / 2 + out.get_free_list_size() + 0x1000;
         transaction.cow_outliers(out.get_evacuation_progress(), limit, work_limit);
+        // moving blocks around may have left table accessors with stale data,
+        // and we need them to work later in the process when we determine which
+        // arrays to compress during writing, so make sure they're up to date:
+        transaction.update_table_accessors();
     }
 
     ref_type new_top_ref;
@@ -2755,7 +2759,7 @@ TransactionRef DB::start_write(bool nonblocking)
         end_write_on_correct_thread();
         throw;
     }
-
+    tr->update_allocator_wrappers(true);
     return tr;
 }
 

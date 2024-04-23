@@ -1531,4 +1531,233 @@ void Cluster::remove_backlinks(const Table* origin_table, ObjKey origin_key, Col
     }
 }
 
+namespace {
+
+template <typename Fn>
+static void switch_on_type(ColKey ck, Fn&& fn)
+{
+    bool is_optional = ck.is_nullable();
+    auto type = ck.get_type();
+    switch (type) {
+        case col_type_Int:
+            return is_optional ? fn((util::Optional<int64_t>*)0) : fn((int64_t*)0);
+        case col_type_Bool:
+            return is_optional ? fn((util::Optional<bool>*)0) : fn((bool*)0);
+        case col_type_Float:
+            return is_optional ? fn((util::Optional<float>*)0) : fn((float*)0);
+        case col_type_Double:
+            return is_optional ? fn((util::Optional<double>*)0) : fn((double*)0);
+        case col_type_String:
+            return fn((StringData*)0);
+        case col_type_Binary:
+            return fn((BinaryData*)0);
+        case col_type_Timestamp:
+            return fn((Timestamp*)0);
+        case col_type_Link:
+            return fn((ObjKey*)0);
+        case col_type_ObjectId:
+            return is_optional ? fn((util::Optional<ObjectId>*)0) : fn((ObjectId*)0);
+        case col_type_Decimal:
+            return fn((Decimal128*)0);
+        case col_type_UUID:
+            return is_optional ? fn((util::Optional<UUID>*)0) : fn((UUID*)0);
+        case col_type_Mixed:
+            return fn((Mixed*)0);
+        default:
+            REALM_COMPILER_HINT_UNREACHABLE();
+    }
+}
+
+} // namespace
+
+ref_type Cluster::typed_write(ref_type ref, _impl::ArrayWriterBase& out) const
+{
+    REALM_ASSERT_DEBUG(ref == get_mem().get_ref());
+    bool only_modified = out.only_modified;
+    if (only_modified && m_alloc.is_read_only(ref))
+        return ref;
+    REALM_ASSERT_DEBUG(!get_is_inner_bptree_node_from_header(get_header()));
+    REALM_ASSERT_DEBUG(!get_context_flag_from_header(get_header()));
+    TempArray written_cluster(size());
+    for (size_t j = 0; j < size(); ++j) {
+        RefOrTagged leaf_rot = get_as_ref_or_tagged(j);
+        // Handle nulls
+        if (!leaf_rot.is_ref() || !leaf_rot.get_as_ref()) {
+            written_cluster.set(j, leaf_rot);
+            continue;
+        }
+        // prune subtrees which should not be written:
+        if (only_modified && m_alloc.is_read_only(leaf_rot.get_as_ref())) {
+            written_cluster.set(j, leaf_rot);
+            continue;
+        }
+        // from here: this leaf exists and needs to be written.
+        ref = leaf_rot.get_as_ref();
+        ref_type new_ref = ref;
+        if (j == 0) {
+            // Keys  (ArrayUnsigned me thinks, so don't compress)
+            Array leaf(m_alloc);
+            leaf.init_from_ref(ref);
+            new_ref = leaf.write(out, false, only_modified, false);
+        }
+        else {
+            // Columns
+            auto col_key = out.table->m_leaf_ndx2colkey[j - 1];
+            auto col_type = col_key.get_type();
+            if (col_key.is_collection()) {
+                ArrayRef arr_ref(m_alloc);
+                arr_ref.init_from_ref(ref);
+                auto sz = arr_ref.size();
+                TempArray written_ref_leaf(sz);
+
+                for (size_t k = 0; k < sz; k++) {
+                    ref_type new_sub_ref = 0;
+                    // Now we have to find out if the nested collection is a
+                    // dictionary or a list. If the top array has a size of 2
+                    // and it is not a BplusTree inner node, then it is a dictionary
+                    if (auto sub_ref = arr_ref.get(k)) {
+                        if (col_key.is_dictionary()) {
+                            new_sub_ref = Dictionary::typed_write(sub_ref, out, m_alloc);
+                        }
+                        else {
+                            // List or set - Can be handled the same way
+                            // For some reason, switch_on_type() would not compile on Windows
+                            // switch_on_type(col_key, [&](auto t) {
+                            //     using U = std::decay_t<decltype(*t)>;
+                            //     new_sub_ref = BPlusTree<U>::typed_write(sub_ref, out, m_alloc);
+                            // });
+                            switch (col_type) {
+                                case col_type_Int:
+                                    new_sub_ref = BPlusTree<int64_t>::typed_write(sub_ref, out, m_alloc);
+                                    break;
+                                case col_type_Bool:
+                                    new_sub_ref = BPlusTree<bool>::typed_write(sub_ref, out, m_alloc);
+                                    break;
+                                case col_type_Float:
+                                    new_sub_ref = BPlusTree<float>::typed_write(sub_ref, out, m_alloc);
+                                    break;
+                                case col_type_Double:
+                                    new_sub_ref = BPlusTree<double>::typed_write(sub_ref, out, m_alloc);
+                                    break;
+                                case col_type_String:
+                                    new_sub_ref = BPlusTree<StringData>::typed_write(sub_ref, out, m_alloc);
+                                    break;
+                                case col_type_Binary:
+                                    new_sub_ref = BPlusTree<BinaryData>::typed_write(sub_ref, out, m_alloc);
+                                    break;
+                                case col_type_Timestamp:
+                                    new_sub_ref = BPlusTree<Timestamp>::typed_write(sub_ref, out, m_alloc);
+                                    break;
+                                case col_type_Link:
+                                    new_sub_ref = BPlusTree<ObjKey>::typed_write(sub_ref, out, m_alloc);
+                                    break;
+                                case col_type_ObjectId:
+                                    new_sub_ref = BPlusTree<ObjectId>::typed_write(sub_ref, out, m_alloc);
+                                    break;
+                                case col_type_Decimal:
+                                    new_sub_ref = BPlusTree<Decimal128>::typed_write(sub_ref, out, m_alloc);
+                                    break;
+                                case col_type_UUID:
+                                    new_sub_ref = BPlusTree<UUID>::typed_write(sub_ref, out, m_alloc);
+                                    break;
+                                case col_type_Mixed:
+                                    new_sub_ref = BPlusTree<Mixed>::typed_write(sub_ref, out, m_alloc);
+                                    break;
+                                default:
+                                    REALM_COMPILER_HINT_UNREACHABLE();
+                            }
+                        }
+                    }
+                    written_ref_leaf.set_as_ref(k, new_sub_ref);
+                }
+                new_ref = written_ref_leaf.write(out);
+            }
+            else if (col_type == col_type_BackLink) {
+                Array leaf(m_alloc);
+                leaf.init_from_ref(ref);
+                new_ref = leaf.write(out, true, only_modified, false);
+            }
+            else {
+                switch_on_type(col_key, [&](auto t) {
+                    using U = std::decay_t<decltype(*t)>;
+                    new_ref = ColumnTypeTraits<U>::cluster_leaf_type::typed_write(ref, out, m_alloc);
+                });
+            }
+        }
+        written_cluster.set_as_ref(j, new_ref);
+    }
+    return written_cluster.write(out);
+}
+
+void Cluster::typed_print(std::string prefix) const
+{
+    REALM_ASSERT_DEBUG(!get_is_inner_bptree_node_from_header(get_header()));
+    std::cout << "Cluster of size " << size() << " " << header_to_string(get_header()) << std::endl;
+    const auto table = get_owning_table();
+    for (unsigned j = 0; j < size(); ++j) {
+        RefOrTagged rot = get_as_ref_or_tagged(j);
+        auto pref = prefix + "  " + std::to_string(j) + ":\t";
+        if (rot.is_ref() && rot.get_as_ref()) {
+            if (j == 0) {
+                std::cout << pref << "Keys as ArrayUnsigned as ";
+                Array a(m_alloc);
+                a.init_from_ref(rot.get_as_ref());
+                a.typed_print(pref);
+            }
+            else {
+                auto col_key = table->m_leaf_ndx2colkey[j - 1];
+                auto col_type = col_key.get_type();
+                auto col_attr = col_key.get_attrs();
+                std::string attr_string;
+                if (col_attr.test(col_attr_Dictionary))
+                    attr_string = "Dict:";
+                if (col_attr.test(col_attr_List))
+                    attr_string = "List:";
+                if (col_attr.test(col_attr_Set))
+                    attr_string = "Set:";
+                if (col_attr.test(col_attr_Nullable))
+                    attr_string += "Null:";
+                std::cout << pref << "Column[" << attr_string << col_type << "] as ";
+                // special cases for the types we want to compress
+                if (col_attr.test(col_attr_List) || col_attr.test(col_attr_Set)) {
+                    // That is a single bplustree
+                    // propagation of nullable missing here?
+                    // handling of mixed missing here?
+                    BPlusTreeBase::typed_print(pref, m_alloc, rot.get_as_ref(), col_type);
+                }
+                else if (col_attr.test(col_attr_Dictionary)) {
+                    Array dict_top(m_alloc);
+                    dict_top.init_from_ref(rot.get_as_ref());
+                    if (dict_top.size() == 0) {
+                        std::cout << "{ empty }" << std::endl;
+                        continue;
+                    }
+                    std::cout << "{" << std::endl;
+                    auto ref0 = dict_top.get_as_ref(0);
+                    if (ref0) {
+                        auto p = pref + "  0:\t";
+                        std::cout << p;
+                        BPlusTreeBase::typed_print(p, m_alloc, ref0, col_type);
+                    }
+                    if (dict_top.size() == 1) {
+                        continue; // is this really possible? or should all dicts have both trees?
+                    }
+                    auto ref1 = dict_top.get_as_ref(1);
+                    if (ref1) {
+                        auto p = pref + "  1:\t";
+                        std::cout << p;
+                        BPlusTreeBase::typed_print(p, m_alloc, dict_top.get_as_ref(1), col_type);
+                    }
+                }
+                else {
+                    // handle all other cases as generic arrays
+                    Array a(m_alloc);
+                    a.init_from_ref(rot.get_as_ref());
+                    a.typed_print(pref);
+                }
+            }
+        }
+    }
+}
+
 } // namespace realm

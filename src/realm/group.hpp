@@ -517,6 +517,9 @@ public:
         m_alloc.enable_debug(enable);
     }
 #endif
+    ref_type typed_write_tables(_impl::ArrayWriterBase& out) const;
+    void table_typed_print(std::string prefix, ref_type ref) const;
+    void typed_print(std::string prefix) const;
 
 protected:
     static constexpr size_t s_table_name_ndx = 0;
@@ -638,7 +641,7 @@ private:
     void reset_free_space_tracking();
 
     void remap_and_update_refs(ref_type new_top_ref, size_t new_file_size, bool writable);
-
+    void update_table_accessors();
     /// Recursively update refs stored in all cached array
     /// accessors. This includes cached array accessors in any
     /// currently attached table accessors. This ensures that the
@@ -1128,6 +1131,10 @@ public:
     virtual ref_type write_names(_impl::OutputStream&) = 0;
     virtual ref_type write_tables(_impl::OutputStream&) = 0;
     virtual HistoryInfo write_history(_impl::OutputStream&) = 0;
+    void typed_print(std::string prefix)
+    {
+        m_group->typed_print(prefix);
+    }
     virtual ~TableWriter() noexcept {}
 
     void set_group(const Group* g)

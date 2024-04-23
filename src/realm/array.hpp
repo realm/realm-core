@@ -379,11 +379,12 @@ public:
     ///
     /// \param only_if_modified Set to `false` to always write, or to `true` to
     /// only write the array if it has been modified.
-    ref_type write(_impl::ArrayWriterBase& out, bool deep, bool only_if_modified) const;
+    ref_type write(_impl::ArrayWriterBase& out, bool deep, bool only_if_modified, bool compress_in_flight) const;
 
     /// Same as non-static write() with `deep` set to true. This is for the
     /// cases where you do not already have an array accessor available.
-    static ref_type write(ref_type, Allocator&, _impl::ArrayWriterBase&, bool only_if_modified);
+    static ref_type write(ref_type, Allocator&, _impl::ArrayWriterBase&, bool only_if_modified,
+                          bool compress_in_flight);
 
     size_t find_first(int64_t value, size_t begin = 0, size_t end = size_t(-1)) const;
 
@@ -459,6 +460,13 @@ public:
     Array& operator=(const Array&) = delete; // not allowed
     Array(const Array&) = delete;            // not allowed
 
+    /// Takes a 64-bit value and returns the minimum number of bits needed
+    /// to fit the value. For alignment this is rounded up to nearest
+    /// log2. Possible results {0, 1, 2, 4, 8, 16, 32, 64}
+    static size_t bit_width(int64_t value);
+
+    void typed_print(std::string prefix) const;
+
 protected:
     // This returns the minimum value ("lower bound") of the representable values
     // for the given bit width. Valid widths are 0, 1, 2, 4, 8, 16, 32, and 64.
@@ -519,12 +527,6 @@ protected:
     int64_t get_universal(const char* const data, const size_t ndx) const;
 
 protected:
-    /// Takes a 64-bit value and returns the minimum number of bits needed
-    /// to fit the value. For alignment this is rounded up to nearest
-    /// log2. Posssible results {0, 1, 2, 4, 8, 16, 32, 64}
-    static size_t bit_width(int64_t value);
-
-protected:
     Getter m_getter = nullptr; // cached to avoid indirection
     const VTable* m_vtable = nullptr;
 
@@ -538,7 +540,7 @@ protected:
 
 private:
     ref_type do_write_shallow(_impl::ArrayWriterBase&) const;
-    ref_type do_write_deep(_impl::ArrayWriterBase&, bool only_if_modified) const;
+    ref_type do_write_deep(_impl::ArrayWriterBase&, bool only_if_modified, bool compress) const;
 
     void _mem_usage(size_t& mem) const noexcept;
 
@@ -550,6 +552,23 @@ private:
     friend class SlabAlloc;
     friend class GroupWriter;
     friend class ArrayWithFind;
+};
+
+class TempArray : public Array {
+public:
+    TempArray(size_t sz, Type type = Type::type_HasRefs)
+        : Array(Allocator::get_default())
+    {
+        create(type, false, sz);
+    }
+    ~TempArray()
+    {
+        destroy();
+    }
+    ref_type write(_impl::ArrayWriterBase& out)
+    {
+        return Array::write(out, false, false, false);
+    }
 };
 
 // Implementation:
@@ -829,7 +848,7 @@ inline void Array::destroy_deep() noexcept
     m_data = nullptr;
 }
 
-inline ref_type Array::write(_impl::ArrayWriterBase& out, bool deep, bool only_if_modified) const
+inline ref_type Array::write(_impl::ArrayWriterBase& out, bool deep, bool only_if_modified, bool compress) const
 {
     REALM_ASSERT(is_attached());
 
@@ -839,10 +858,11 @@ inline ref_type Array::write(_impl::ArrayWriterBase& out, bool deep, bool only_i
     if (!deep || !m_has_refs)
         return do_write_shallow(out); // Throws
 
-    return do_write_deep(out, only_if_modified); // Throws
+    return do_write_deep(out, only_if_modified, compress); // Throws
 }
 
-inline ref_type Array::write(ref_type ref, Allocator& alloc, _impl::ArrayWriterBase& out, bool only_if_modified)
+inline ref_type Array::write(ref_type ref, Allocator& alloc, _impl::ArrayWriterBase& out, bool only_if_modified,
+                             bool compress)
 {
     if (only_if_modified && alloc.is_read_only(ref))
         return ref;
@@ -853,7 +873,7 @@ inline ref_type Array::write(ref_type ref, Allocator& alloc, _impl::ArrayWriterB
     if (!array.m_has_refs)
         return array.do_write_shallow(out); // Throws
 
-    return array.do_write_deep(out, only_if_modified); // Throws
+    return array.do_write_deep(out, only_if_modified, compress); // Throws
 }
 
 inline void Array::add(int_fast64_t value)

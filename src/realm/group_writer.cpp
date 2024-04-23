@@ -659,15 +659,17 @@ ref_type GroupWriter::write_group()
     // that has been release during the current transaction (or since the last
     // commit), as that would lead to clobbering of the previous database
     // version.
-    bool deep = true, only_if_modified = true;
+    constexpr bool deep = true;
+    _impl::ArrayWriterBase::compress = true;
+    _impl::ArrayWriterBase::only_modified = true;
     std::unique_ptr<InMemoryWriter> in_memory_writer;
     _impl::ArrayWriterBase* writer = this;
     if (m_alloc.is_in_memory()) {
         in_memory_writer = std::make_unique<InMemoryWriter>(*this);
         writer = in_memory_writer.get();
     }
-    ref_type names_ref = m_group.m_table_names.write(*writer, deep, only_if_modified); // Throws
-    ref_type tables_ref = m_group.m_tables.write(*writer, deep, only_if_modified);     // Throws
+    ref_type names_ref = m_group.m_table_names.write(*writer, deep, only_modified, compress); // Throws
+    ref_type tables_ref = m_group.typed_write_tables(*writer);
 
     int_fast64_t value_1 = from_ref(names_ref);
     int_fast64_t value_2 = from_ref(tables_ref);
@@ -680,8 +682,8 @@ ref_type GroupWriter::write_group()
     if (top.size() > Group::s_hist_ref_ndx) {
         if (ref_type history_ref = top.get_as_ref(Group::s_hist_ref_ndx)) {
             Allocator& alloc = top.get_alloc();
-            ref_type new_history_ref = Array::write(history_ref, alloc, *writer, only_if_modified); // Throws
-            top.set(Group::s_hist_ref_ndx, from_ref(new_history_ref));                              // Throws
+            ref_type new_history_ref = Array::write(history_ref, alloc, *writer, only_modified, false);    // Throws
+            top.set(Group::s_hist_ref_ndx, from_ref(new_history_ref));                                     // Throws
         }
     }
     if (top.size() > Group::s_evacuation_point_ndx) {
@@ -703,7 +705,7 @@ ref_type GroupWriter::write_group()
             for (auto index : m_evacuation_progress) {
                 arr.add(int64_t(index));
             }
-            ref = arr.write(*writer, false, only_if_modified);
+            ref = arr.write(*writer, false, only_modified, compress);
             top.set_as_ref(Group::s_evacuation_point_ndx, ref);
         }
         else if (ref) {
