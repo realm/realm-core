@@ -659,8 +659,9 @@ void Dictionary::insert(Context& ctx, StringData key, T&& value, CreatePolicy po
     if (m_is_embedded) {
         validate_embedded(ctx, value, policy);
         auto old_value = dict().try_get(key);
-        auto obj_key = (policy.diff && old_value) ? old_value->get<ObjKey>()
-                                                  : dict().create_and_insert_linked_object(key).get_key();
+        auto obj_key = (policy.diff && old_value && !old_value->is_null())
+                           ? old_value->get<ObjKey>()
+                           : dict().create_and_insert_linked_object(key).get_key();
         ctx.template unbox<Obj>(value, policy, obj_key);
         return;
     };

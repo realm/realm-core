@@ -1044,6 +1044,7 @@ TEST_CASE("embedded dictionary", "[dictionary]") {
     object_store::Dictionary dict(r, obj, col_links);
     for (int i = 0; i < 10; ++i)
         dict.insert_embedded(util::to_string(i));
+    dict.insert("null", ObjKey());
 
     r->commit_transaction();
 
@@ -1063,15 +1064,22 @@ TEST_CASE("embedded dictionary", "[dictionary]") {
 
         SECTION("creates new object for dictionary") {
             dict.insert(ctx, "foo", std::any(AnyDict{{"value", INT64_C(20)}}));
-            REQUIRE(dict.size() == 11);
+            REQUIRE(dict.size() == 12);
             REQUIRE(target->size() == initial_target_size + 1);
             REQUIRE(dict.get_object("foo").get<Int>(col_value) == 20);
+        }
+
+        SECTION("overwrite null value") {
+            dict.insert(ctx, "null", std::any(AnyDict{{"value", INT64_C(17)}}), CreatePolicy::UpdateModified);
+            REQUIRE(dict.size() == 11);
+            REQUIRE(target->size() == initial_target_size + 1);
+            REQUIRE(dict.get_object("null").get<Int>(col_value) == 17);
         }
 
         SECTION("mutates the existing object for update mode Modified") {
             auto old_object = dict.get<Obj>("0");
             dict.insert(ctx, "0", std::any(AnyDict{{"value", INT64_C(20)}}), CreatePolicy::UpdateModified);
-            REQUIRE(dict.size() == 10);
+            REQUIRE(dict.size() == 11);
             REQUIRE(target->size() == initial_target_size);
             REQUIRE(dict.get_object("0").get<Int>(col_value) == 20);
             REQUIRE(old_object.is_valid());
@@ -1121,8 +1129,10 @@ TEMPLATE_TEST_CASE("dictionary of objects", "[dictionary][links]", cf::MixedVal,
         Obj target_obj = target->create_object().set(col_target_value, T(values[i]));
         dict.insert(keys[i], target_obj);
     }
+
     r->commit_transaction();
     r->begin_transaction();
+
     SECTION("min()") {
         if constexpr (!TestType::can_minmax) {
             REQUIRE_EXCEPTION(
@@ -1352,13 +1362,25 @@ TEST_CASE("dictionary nullify", "[dictionary]") {
                               Any{AnyDict{{"intDictionary", AnyDict{{"0", Any(AnyDict{{"intCol", INT64_C(0)}})},
                                                                     {"1", Any(AnyDict{{"intCol", INT64_C(1)}})},
                                                                     {"2", Any(AnyDict{{"intCol", INT64_C(2)}})}}}}});
+    auto obj1 = Object::create(ctx, r, *r->schema().find("DictionaryObject"),
+                               Any{AnyDict{{"intDictionary", AnyDict{{"null", Any()}}}}});
     r->commit_transaction();
 
     r->begin_transaction();
-    // Before fix, we would crash here
-    r->read_group().get_table("class_IntObject")->clear();
+    SECTION("clear dictionary") {
+        // Before fix, we would crash here
+        r->read_group().get_table("class_IntObject")->clear();
+        // r->read_group().to_json(std::cout);
+    }
+
+    SECTION("overwrite null value") {
+        obj1.set_property_value(ctx, "intDictionary", Any(AnyDict{{"null", Any(AnyDict{{"intCol", INT64_C(3)}})}}),
+                                CreatePolicy::UpdateModified);
+        auto dict =
+            util::any_cast<object_store::Dictionary&&>(obj1.get_property_value<std::any>(ctx, "intDictionary"));
+        REQUIRE(dict.get_object("null").get<Int>("intCol") == 3);
+    }
     r->commit_transaction();
-    // r->read_group().to_json(std::cout);
 }
 
 TEST_CASE("nested collection set by Object::create", "[dictionary]") {
