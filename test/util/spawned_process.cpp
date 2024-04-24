@@ -141,8 +141,8 @@ std::unique_ptr<SpawnedProcess> spawn_process(const std::string& test_name, cons
 
     std::vector<std::string> env_vars = {"REALM_SPAWNED=1", util::format("UNITTEST_FILTER=%1", test_name),
                                          util::format("REALM_CHILD_IDENT=%1", process_ident)};
-    if (getenv("UNITTEST_ENCRYPT_ALL")) {
-        env_vars.push_back("UNITTEST_ENCRYPT_ALL=1");
+    if (auto value = getenv("UNITTEST_ENCRYPT_ALL")) {
+        env_vars.push_back(util::format("UNITTEST_ENCRYPT_ALL=%1", value));
     }
     if (getenv("TMPDIR")) {
         env_vars.push_back(util::format("TMPDIR=%1", getenv("TMPDIR")));
