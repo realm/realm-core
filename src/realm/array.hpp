@@ -117,7 +117,7 @@ public:
     /// pointer.
     void init_from_mem(MemRef) noexcept;
 
-    /// Same as `init_from_ref(get_ref_from_parent())`.
+    /// Same as `init_from_ref(ref_from_parent())`.
     void init_from_parent() noexcept
     {
         ref_type ref = get_ref_from_parent();

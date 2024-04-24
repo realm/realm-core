@@ -845,9 +845,9 @@ private:
 
     /// Refresh the part of the accessor tree that is rooted at this
     /// table.
-    void refresh_accessor_tree();
+    void refresh_accessor_tree(bool writable);
     void refresh_index_accessors();
-    void refresh_string_interners();
+    void refresh_string_interners(bool writable);
     void refresh_content_version();
     void flush_for_commit();
 
@@ -860,7 +860,6 @@ private:
     std::vector<ColKey::Idx> m_spec_ndx2leaf_ndx;
     std::vector<size_t> m_leaf_ndx2spec_ndx;
     mutable std::vector<std::unique_ptr<StringInterner>> m_string_interners;
-    mutable std::mutex m_string_interners_mutex; // we should be able to make access lock-free, but not yet.
     Type m_table_type = Type::TopLevel;
     uint64_t m_in_file_version_at_transaction_boundary = 0;
     AtomicLifeCycleCookie m_cookie;

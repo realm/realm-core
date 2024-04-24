@@ -32,8 +32,8 @@ class Allocator;
 
 class StringCompressor {
 public:
-    StringCompressor(Allocator& alloc, Array& parent, size_t index);
-    void refresh();
+    StringCompressor(Allocator& alloc, Array& parent, size_t index, bool writable);
+    void refresh(bool writable);
     ~StringCompressor();
 
     int compare(CompressedString& A, CompressedString& B);

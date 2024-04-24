@@ -24,8 +24,13 @@
 #include <iostream>
 namespace realm {
 
-StringCompressor::StringCompressor(Allocator& alloc, Array& parent, size_t index)
+StringCompressor::StringCompressor(Allocator& alloc, Array& parent, size_t index, bool writable)
 {
+    m_data = std::make_unique<Array>(alloc);
+    m_data->set_parent(&parent, index);
+    refresh(writable);
+
+#if 0
     m_compression_map.resize(65536, {0, 0, 0});
     m_symbols.reserve(65536);
 
@@ -39,11 +44,21 @@ StringCompressor::StringCompressor(Allocator& alloc, Array& parent, size_t index
         m_data->update_parent();
     }
     rebuild_internal();
+#endif
 }
 
-void StringCompressor::refresh()
+void StringCompressor::refresh(bool writable)
 {
-    m_data->update_from_parent();
+    // we assume that compressors are only created from a valid parent.
+    // String interners in 'dead' mode should never instantiate a string compressor.
+    if (m_data->get_ref_from_parent() == 0) {
+        REALM_ASSERT(writable);
+        m_data->create(NodeHeader::type_Normal, false, 0, 0);
+        m_data->update_parent();
+    }
+    else {
+        m_data->update_from_parent();
+    }
     rebuild_internal();
 }
 
@@ -58,6 +73,7 @@ static size_t symbol_pair_hash(CompressionSymbol a, CompressionSymbol b)
 void StringCompressor::rebuild_internal()
 {
     m_symbols.resize(0);
+    m_symbols.reserve(65536);
     m_compression_map.clear();
     m_compression_map.resize(65536, {0, 0, 0});
     auto num_symbols = m_data->size();

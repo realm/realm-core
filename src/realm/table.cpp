@@ -660,7 +660,7 @@ void Table::init(ref_type top_ref, ArrayParent* parent, size_t ndx_in_parent, bo
     else {
         REALM_ASSERT_DEBUG(!m_interner_data.is_attached());
     }
-    refresh_string_interners();
+    refresh_string_interners(is_writable);
     m_cookie = cookie_initialized;
 }
 
@@ -1063,15 +1063,7 @@ ColKey Table::do_insert_root_column(ColKey col_key, ColumnType type, StringData 
         m_tombstones->insert_column(col_key);
     }
     // create string interners internal rep as well as data area
-    while (m_top.size() <= top_position_for_interners) {
-        m_top.add(0);
-    }
-    if (!m_interner_data.is_attached()) {
-        m_interner_data.create(NodeHeader::type_HasRefs);
-        m_interner_data.update_parent();
-        REALM_ASSERT(m_interner_data.is_attached());
-        REALM_ASSERT(m_top.get_as_ref(top_position_for_interners) == m_interner_data.get_ref());
-    }
+    REALM_ASSERT_DEBUG(m_interner_data.is_attached());
     while (col_ndx >= m_string_interners.size()) {
         m_string_interners.push_back({});
     }
@@ -1079,8 +1071,10 @@ ColKey Table::do_insert_root_column(ColKey col_key, ColumnType type, StringData 
         m_interner_data.add(0);
     }
     REALM_ASSERT(!m_string_interners[col_ndx]);
-    if (col_key.get_type() == col_type_String)
-        m_string_interners[col_ndx] = std::make_unique<StringInterner>(m_alloc, m_interner_data, col_key);
+    // FIX: Limit creation of interners to EXACTLY the columns, where they can be
+    // relevant.
+    // if (col_key.get_type() == col_type_String)
+    m_string_interners[col_ndx] = std::make_unique<StringInterner>(m_alloc, m_interner_data, col_key, true);
     bump_storage_version();
 
     return col_key;
@@ -1114,8 +1108,13 @@ void Table::do_erase_root_column(ColKey col_key)
     }
     REALM_ASSERT_DEBUG(col_ndx < m_string_interners.size());
     if (m_string_interners[col_ndx]) {
-        Array::destroy_deep(m_interner_data.get_as_ref(col_ndx), m_alloc);
+        REALM_ASSERT_DEBUG(m_interner_data.is_attached());
+        REALM_ASSERT_DEBUG(col_ndx < m_interner_data.size());
+        auto data_ref = m_interner_data.get_as_ref(col_ndx);
+        if (data_ref)
+            Array::destroy_deep(data_ref, m_alloc);
         m_interner_data.set(col_ndx, 0);
+        // m_string_interners[col_ndx]->update_from_parent(true);
         m_string_interners[col_ndx].reset();
     }
     bump_content_version();
@@ -2029,7 +2028,7 @@ void Table::update_from_parent() noexcept
             else
                 m_interner_data.detach();
         }
-        refresh_string_interners();
+        refresh_string_interners(false);
     }
     m_alloc.bump_storage_version();
 }
@@ -2158,7 +2157,7 @@ void Table::refresh_content_version()
 
 // Called when Group is moved to another version - either a rollback or an advance.
 // The content of the table is potentially different, so make no assumptions.
-void Table::refresh_accessor_tree()
+void Table::refresh_accessor_tree(bool writable)
 {
     REALM_ASSERT(m_cookie == cookie_initialized);
     REALM_ASSERT(m_top.is_attached());
@@ -2188,6 +2187,10 @@ void Table::refresh_accessor_tree()
     else {
         m_tombstones = nullptr;
     }
+    if (writable) {
+        while (m_top.size() < top_position_for_interners)
+            m_top.add(0);
+    }
     if (m_top.size() > top_position_for_interners) {
         if (m_top.get_as_ref(top_position_for_interners))
             m_interner_data.init_from_parent();
@@ -2197,31 +2200,56 @@ void Table::refresh_accessor_tree()
     refresh_content_version();
     bump_storage_version();
     build_column_mapping();
-    refresh_string_interners();
+    refresh_string_interners(writable);
     refresh_index_accessors();
 }
 
-void Table::refresh_string_interners()
+void Table::refresh_string_interners(bool writable)
 {
+    if (writable) {
+        // if we're in a write transaction, make sure interner arrays are created which will allow
+        // string interners to expand with their own data when "learning"
+        while (m_top.size() <= top_position_for_interners) {
+            m_top.add(0);
+        }
+    }
+    if (m_top.size() > top_position_for_interners && m_top.get_as_ref(top_position_for_interners))
+        m_interner_data.update_from_parent();
+    else
+        m_interner_data.detach();
+    if (writable) {
+        if (!m_interner_data.is_attached()) {
+            m_interner_data.create(NodeHeader::type_HasRefs);
+            m_interner_data.update_parent();
+        }
+    }
     // bring string interners in line with underlying data.
     // Precondition: we rely on the col keys in m_leaf_ndx2colkey[] being up to date.
-    for (auto col_key : m_leaf_ndx2colkey) {
-        size_t idx = col_key.get_index().val;
+    for (size_t idx = 0; idx < m_leaf_ndx2colkey.size(); ++idx) {
+        auto col_key = m_leaf_ndx2colkey[idx];
+        if (col_key == ColKey()) {
+            // deleted column, we really don't want a string interner for this
+            if (idx < m_string_interners.size() && m_string_interners[idx])
+                m_string_interners[idx].reset();
+            continue;
+        }
+        REALM_ASSERT_DEBUG(col_key.get_index().val == idx);
+        // maintain sufficient size of interner arrays to cover all columns
         while (idx >= m_string_interners.size()) {
             m_string_interners.push_back({});
         }
-        if (m_interner_data.is_attached() && idx < m_interner_data.size() && m_interner_data.get_as_ref(idx)) {
-            if (!m_string_interners[idx]) {
-                m_string_interners[idx] = std::make_unique<StringInterner>(m_alloc, m_interner_data, col_key);
-            }
-            else {
-                m_string_interners[idx]->update_from_parent();
-            }
+        while (writable && idx >= m_interner_data.size()) { // m_interner_data.is_attached() per above
+            m_interner_data.add(0);
         }
-        else /* no interner data for this interner, so it has been deleted */ {
-            if (m_string_interners[idx]) {
-                m_string_interners[idx].reset({});
-            }
+        if (m_string_interners[idx]) {
+            // existing interner
+            m_string_interners[idx]->update_from_parent(writable);
+        }
+        else {
+            // new interner. Note: if not in a writable state, the interner will not have a valid
+            // underlying data array. The interner will be set in a state, where it cannot "learn",
+            // and searches will not find any matching interned strings.
+            m_string_interners[idx] = std::make_unique<StringInterner>(m_alloc, m_interner_data, col_key, writable);
         }
     }
 }
@@ -3483,48 +3511,9 @@ void Table::typed_print(std::string prefix, ref_type ref) const
 
 StringInterner* Table::get_string_interner(ColKey col_key) const
 {
-    if (col_key.get_type() != col_type_String)
-        return nullptr;
     auto idx = col_key.get_index().val;
-    if (idx >= m_string_interners.size())
-        return nullptr;
-
-    // REALM_ASSERT_DEBUG(idx < m_string_interners.size());
+    REALM_ASSERT(idx < m_string_interners.size());
     auto interner = m_string_interners[idx].get();
-    // REALM_ASSERT_DEBUG(interner);
+    REALM_ASSERT(interner);
     return interner;
-#if 0
-    // TODO: This method likely needs to be lock-free. Possibly by moving all
-    // setup to Table::init(). (But careful - or it will pose a perf problem....)
-    std::lock_guard lock(m_string_interners_mutex);
-    auto This = const_cast<Table*>(this);
-    size_t j = idx.val;
-    while (j >= m_string_interners.size()) {
-        m_string_interners.push_back({});
-    }
-    auto interner = m_string_interners[j].get();
-    if (interner)
-        return interner;
-    if (m_top.get_as_ref(top_position_for_interners))
-        This->m_interner_data.update_from_parent();
-    if (!m_interner_data.is_attached()) {
-        // This is the first interner for this Table.
-        // Make sure top array is large enough to hold interner data
-        // and create array of interner data
-        while (This->m_top.size() <= top_position_for_interners)
-            This->m_top.add(0);
-        This->m_interner_data.create(NodeHeader::type_HasRefs);
-        This->m_interner_data.update_parent();
-    }
-    // ensure there is a spot for this interner in the interner data array
-    if (idx.val >= This->m_interner_data.size()) {
-        size_t elems_to_add = idx.val - This->m_interner_data.size() + 1;
-        while (elems_to_add--) {
-            This->m_interner_data.add(0);
-        }
-        This->m_interner_data.update_parent();
-    }
-    m_string_interners[j] = std::make_unique<StringInterner>(m_alloc, This->m_interner_data, col_key);
-    return m_string_interners[j].get();
-#endif
 }

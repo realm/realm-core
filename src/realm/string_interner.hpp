@@ -50,8 +50,8 @@ class Allocator;
 class StringInterner {
 public:
     // To be used exclusively from Table
-    StringInterner(Allocator& alloc, Array& parent, ColKey col_key);
-    void update_from_parent();
+    StringInterner(Allocator& alloc, Array& parent, ColKey col_key, bool writable);
+    void update_from_parent(bool writable);
     ~StringInterner();
 
     // To be used from Obj and for searching
@@ -62,11 +62,13 @@ public:
     StringData get(StringID);
 
 private:
+    Array& m_parent; // need to be able to check if this is attached or not
     std::unique_ptr<Array> m_top;
     std::unique_ptr<Array> m_data;
     std::unique_ptr<Array> m_current_leaf;
     void rebuild_internal();
 
+    ColKey m_col_key;
     std::unique_ptr<StringCompressor> m_compressor;
     std::vector<CompressedString> m_compressed_strings;
     std::unordered_map<CompressedString, size_t> m_compressed_string_map;

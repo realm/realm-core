@@ -1381,7 +1381,7 @@ void Group::flush_accessors_for_commit()
             acc->flush_for_commit();
 }
 
-void Group::refresh_dirty_accessors()
+void Group::refresh_dirty_accessors(bool writable)
 {
     if (!m_tables.is_attached()) {
         m_table_accessors.clear();
@@ -1411,7 +1411,7 @@ void Group::refresh_dirty_accessors()
                     same_table = true;
             }
             if (same_table) {
-                table_accessor->refresh_accessor_tree();
+                table_accessor->refresh_accessor_tree(writable);
             }
             else {
                 table_accessor->detach(Table::cookie_removed);
@@ -1469,7 +1469,7 @@ void Group::advance_transact(ref_type new_top_ref, util::InputStream* in, bool w
     m_top.detach();                                           // Soft detach
     bool create_group_when_missing = false;                   // See Group::attach_shared().
     attach(new_top_ref, writable, create_group_when_missing); // Throws
-    refresh_dirty_accessors();                                // Throws
+    refresh_dirty_accessors(writable);                        // Throws
 
     if (schema_changed)
         send_schema_change_notification();
