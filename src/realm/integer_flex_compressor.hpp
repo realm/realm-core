@@ -38,11 +38,11 @@ struct WordTypeIndex {};
 class FlexCompressor {
 public:
     // encoding/decoding
-    void init_array(char* h, uint8_t flags, size_t v_width, size_t ndx_width, size_t v_size, size_t ndx_size) const;
+    void init_array(char*, uint8_t, uint8_t, uint8_t, size_t, size_t) const;
     void copy_data(const Array&, const std::vector<int64_t>&, const std::vector<size_t>&) const;
     // getters/setters
     inline int64_t get(const IntegerCompressor&, size_t) const;
-    inline std::vector<int64_t> get_all(const IntegerCompressor&, size_t b, size_t e) const;
+    inline std::vector<int64_t> get_all(const IntegerCompressor&, size_t, size_t) const;
     inline void get_chunk(const IntegerCompressor&, size_t, int64_t[8]) const;
     inline void set_direct(const IntegerCompressor&, size_t, int64_t) const;
 
@@ -85,33 +85,39 @@ inline std::vector<int64_t> FlexCompressor::get_all(const IntegerCompressor& c, 
     const auto sign_mask = c.v_mask();
     const auto range = (e-b);
     const auto starting_bit = offset + b * ndx_w;
-    const auto total_bits = starting_bit + (ndx_w * range);
-    const auto ndx_mask = c.ndx_bit_mask();
+    const auto total_bits = starting_bit + ndx_w * range;
     const auto bit_per_it = num_bits_for_width(ndx_w);
-    
+    const auto ndx_mask = (1ULL << ndx_w) - 1; // c.bitmask_ndx();
+    const auto values_per_word = num_fields_for_width(ndx_w);
+
+    // this is very important, x4 faster pre-allocating the array
     std::vector<int64_t> res;
-    res.reserve(range); //this is very important, x4 faster pre-allocating the array
+    res.reserve(range);
+
     unaligned_word_iter unaligned_ndx_iterator(data, starting_bit);
-    auto cnt_bits = starting_bit;
     bf_iterator data_iterator{data, 0, v_w, v_w, 0};
-    while ((cnt_bits + bit_per_it) < total_bits) {
+    auto cnt_bits = starting_bit;
+    while (cnt_bits + bit_per_it < total_bits) {
         auto word = unaligned_ndx_iterator.get(bit_per_it);
-        const auto next_chunk = cnt_bits + bit_per_it;
-        while(cnt_bits < next_chunk && cnt_bits < total_bits) {
-            data_iterator.move(static_cast<size_t>(word & ndx_mask));
-            res.push_back(sign_extend_field_by_mask(sign_mask, *data_iterator));
-            cnt_bits+=ndx_w;
+        for (int i = 0; i < values_per_word; ++i) {
+            const auto index = word & ndx_mask;
+            data_iterator.move(static_cast<size_t>(index));
+            const auto sv = sign_extend_field_by_mask(sign_mask, *data_iterator);
+            res.push_back(sv);
             word>>=ndx_w;
         }
+        cnt_bits += bit_per_it;
         unaligned_ndx_iterator.bump(bit_per_it);
     }
     if (cnt_bits < total_bits) {
-        auto word = unaligned_ndx_iterator.get(static_cast<unsigned>(total_bits - cnt_bits));
+        auto last_word = unaligned_ndx_iterator.get(total_bits - cnt_bits);
         while (cnt_bits < total_bits) {
-            data_iterator.move(static_cast<size_t>(word & ndx_mask));
-            res.push_back(sign_extend_field_by_mask(sign_mask, *data_iterator));
+            const auto index = last_word & ndx_mask;
+            data_iterator.move(static_cast<size_t>(index));
+            const auto sv = sign_extend_field_by_mask(sign_mask, *data_iterator);
+            res.push_back(sv);
             cnt_bits += ndx_w;
-            word >>= ndx_w;
+            last_word >>= ndx_w;
         }
     }
     return res;
@@ -128,7 +134,7 @@ inline void FlexCompressor::get_chunk(const IntegerCompressor& c, size_t ndx, in
         res[index++] = get(c, i);
     }
     for (; index < 8; ++index) {
-        res[index++] = get(c, i);
+        res[index++] = get(c, i++);
     }
 }
 

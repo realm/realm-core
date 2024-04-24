@@ -143,7 +143,6 @@ bool IntegerCompressor::always_compress(const Array& origin, Array& arr, NodeHea
 bool IntegerCompressor::compress(const Array& origin, Array& arr) const
 {
 #if REALM_COMPRESS
-    // return always_compress(origin, arr, NodeHeader::Encoding::Packed);
     return always_compress(origin, arr, NodeHeader::Encoding::Flex);
 #else
     std::vector<int64_t> values;
@@ -197,12 +196,12 @@ bool IntegerCompressor::decompress(Array& arr) const
     const auto flags = NodeHeader::get_flags(arr.get_header());
     const auto size = values.size();
     const auto [min_v, max_v] = std::minmax_element(values.begin(), values.end());
-    auto width = std::max(Array::bit_width(*min_v), Array::bit_width(*max_v));
+    const auto width = std::max(Array::bit_width(*min_v), Array::bit_width(*max_v));
     REALM_ASSERT_DEBUG(width == 0 || width == 1 || width == 2 || width == 4 || width == 8 || width == 16 ||
                        width == 32 || width == 64);
-    auto byte_size = NodeHeader::calc_size(size, width, Encoding::WTypBits);
-    byte_size += 64; // this is some slab allocator magic number, this padding is needed in order to account for bit
-                     // width expansion.
+    // 64 is some slab allocator magic number.
+    // The padding is needed in order to account for bit width expansion.
+    const auto byte_size = 64 + NodeHeader::calc_size(size, width, Encoding::WTypBits);
 
     REALM_ASSERT_DEBUG(byte_size % 8 == 0); // nevertheless all the values my be aligned to 8
 
@@ -214,7 +213,7 @@ bool IntegerCompressor::decompress(Array& arr) const
 
     const auto mem = allocator.alloc(byte_size);
     const auto header = mem.get_addr();
-    init_header(header, Encoding::WTypBits, flags, static_cast<uint8_t>(width), values.size());
+    init_header(header, Encoding::WTypBits, flags, width, values.size());
     NodeHeader::set_capacity_in_header(byte_size, header);
     arr.init_from_mem(mem);
 

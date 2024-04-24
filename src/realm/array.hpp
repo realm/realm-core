@@ -500,7 +500,7 @@ public:
     /// Takes a 64-bit value and returns the minimum number of bits needed
     /// to fit the value. For alignment this is rounded up to nearest
     /// log2. Possible results {0, 1, 2, 4, 8, 16, 32, 64}
-    static size_t bit_width(int64_t value);
+    static uint8_t bit_width(int64_t value);
 
     void typed_print(std::string prefix) const;
 
@@ -677,6 +677,7 @@ inline int64_t Array::get(size_t ndx) const noexcept
 
 inline std::vector<int64_t> Array::get_all(size_t b, size_t e) const
 {
+    REALM_ASSERT_DEBUG(is_compressed());
     return (this->*(m_vtable->getter_all))(b, e);
 }
 

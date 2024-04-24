@@ -35,22 +35,23 @@ public:
     bool compress(const Array&, Array&) const;
     bool decompress(Array&) const;
 
-    bool init(const char* h);
+    bool init(const char*);
 
     // init from mem B
     inline const uint64_t* data() const;
     inline size_t size() const;
     inline NodeHeader::Encoding get_encoding() const;
-    inline size_t v_width() const;
+    inline uint8_t v_width() const;
+    inline uint8_t ndx_width() const;
     inline size_t v_size() const;
     inline size_t ndx_size() const;
-    inline size_t ndx_width() const;
+
     inline uint64_t v_mask() const;
     inline uint64_t ndx_mask() const;
     inline uint64_t msb() const;
     inline uint64_t ndx_msb() const;
-    inline uint64_t v_bit_mask() const;
-    inline uint64_t ndx_bit_mask() const;
+    inline uint64_t bitmask_v() const;
+    inline uint64_t bitmask_ndx() const;
 
     // get/set
     inline int64_t get(size_t) const;
@@ -66,8 +67,6 @@ private:
     // Same idea we have for Array, we want to avoid to constantly checking whether we
     // have compressed in packed or flex, and jump straight to the right implementation,
     // avoiding branch mis-predictions, which made some queries run ~6/7x slower.
-
-    using ArrayInitializer = void (IntegerCompressor::*)(const char*);
     using Getter = int64_t (IntegerCompressor::*)(size_t) const;
     using GetterAll = std::vector<int64_t> (IntegerCompressor::*)(size_t, size_t) const;
     using ChunkGetterChunk = void (IntegerCompressor::*)(size_t, int64_t[8]) const;
@@ -76,7 +75,6 @@ private:
     using FinderTable = std::array<Finder, cond_VTABLE_FINDER_COUNT>;
 
     struct VTable {
-        ArrayInitializer m_init{nullptr};
         Getter m_getter{nullptr};
         GetterAll m_getter_all{nullptr};
         ChunkGetterChunk m_chunk_getter{nullptr};
@@ -120,8 +118,8 @@ private:
     using Encoding = NodeHeader::Encoding;
     Encoding m_encoding{NodeHeader::Encoding::WTypBits};
     uint64_t* m_data;
-    size_t m_v_width = 0, m_v_size = 0, m_ndx_width = 0, m_ndx_size = 0;
-    mutable uint64_t m_mask = 0, m_ndx_mask = 0, m_msb = 0, m_ndx_msb = 0, m_v_bit_mask = 0, m_ndx_bit_mask = 0;
+    uint8_t m_v_width = 0, m_ndx_width = 0;
+    size_t m_v_size = 0, m_ndx_size = 0;
 };
 
 inline void IntegerCompressor::init_packed(const char* h)
@@ -173,13 +171,13 @@ inline size_t IntegerCompressor::ndx_size() const
     return m_ndx_size;
 }
 
-inline size_t IntegerCompressor::v_width() const
+inline uint8_t IntegerCompressor::v_width() const
 {
     REALM_ASSERT_DEBUG(is_packed() || is_flex());
     return m_v_width;
 }
 
-inline size_t IntegerCompressor::ndx_width() const
+inline uint8_t IntegerCompressor::ndx_width() const
 {
     REALM_ASSERT_DEBUG(is_flex());
     return m_ndx_width;
@@ -193,50 +191,37 @@ inline NodeHeader::Encoding IntegerCompressor::get_encoding() const
 inline uint64_t IntegerCompressor::v_mask() const
 {
     REALM_ASSERT_DEBUG(is_packed() || is_flex());
-    if (!m_mask)
-        m_mask = 1ULL << (m_v_width - 1);
-    return m_mask;
+    return 1ULL << (m_v_width - 1);
 }
 
 inline uint64_t IntegerCompressor::ndx_mask() const
 {
     REALM_ASSERT_DEBUG(is_flex());
-    if (!m_ndx_mask)
-        m_ndx_mask = 1ULL << (m_ndx_width - 1);
-    return m_ndx_mask;
+    return 1ULL << (m_ndx_width - 1);
 }
 
 inline uint64_t IntegerCompressor::msb() const
 {
     REALM_ASSERT_DEBUG(is_packed() || is_flex());
-    if (!m_msb)
-        m_msb = populate(m_v_width, v_mask());
-    return m_msb;
+    return populate(m_v_width, v_mask());
 }
 
 inline uint64_t IntegerCompressor::ndx_msb() const
 {
     REALM_ASSERT_DEBUG(is_flex());
-    if (!m_ndx_msb)
-        m_ndx_msb = populate(m_ndx_width, ndx_mask());
-    return m_ndx_msb;
+    return populate(m_ndx_width, ndx_mask());
 }
 
-inline uint64_t IntegerCompressor::v_bit_mask() const
+inline uint64_t IntegerCompressor::bitmask_v() const
 {
     REALM_ASSERT_DEBUG(is_packed() || is_flex());
-    if (!m_v_bit_mask)
-        m_v_bit_mask = (1ULL << m_v_width) - 1;
-    return m_v_bit_mask;
+    return (1ULL << m_v_width) - 1;
 }
 
-
-inline uint64_t IntegerCompressor::ndx_bit_mask() const
+inline uint64_t IntegerCompressor::bitmask_ndx() const
 {
     REALM_ASSERT_DEBUG(is_flex());
-    if (!m_ndx_bit_mask)
-        m_ndx_bit_mask = (1ULL << m_ndx_width) - 1;
-    return m_ndx_bit_mask;
+    return (1ULL << m_ndx_width) - 1;
 }
 
 inline int64_t IntegerCompressor::get(size_t ndx) const

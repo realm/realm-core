@@ -194,7 +194,7 @@ Array::Array(Allocator& allocator) noexcept
 {
 }
 
-size_t Array::bit_width(int64_t v)
+uint8_t Array::bit_width(int64_t v)
 {
     // FIXME: Assuming there is a 64-bit CPU reverse bitscan
     // instruction and it is fast, then this function could be
@@ -267,7 +267,7 @@ void Array::init_from_mem(MemRef mem) noexcept
     }
     else {
         // Old init phase.
-        (void)Node::init_from_mem(mem);
+        Node::init_from_mem(mem);
         update_width_cache_from_header();
     }
 }
@@ -275,7 +275,7 @@ void Array::init_from_mem(MemRef mem) noexcept
 void Array::update_width_cache_from_int_compressor() noexcept
 {
     m_size = m_integer_compressor.size();
-    m_width = static_cast<uint_least8_t>(m_integer_compressor.v_width());
+    m_width = m_integer_compressor.v_width();
     m_lbound = -m_integer_compressor.v_mask();
     m_ubound = m_integer_compressor.v_mask() - 1;
     m_vtable = &VTableForEncodedArray::vtable;
@@ -784,9 +784,9 @@ MemRef Array::create(Type type, bool context_flag, WidthType width_type, size_t 
 {
     REALM_ASSERT_DEBUG(value == 0 || width_type == wtype_Bits);
     REALM_ASSERT_DEBUG(size == 0 || width_type != wtype_Ignore);
-    int width = 0;
+    uint8_t width = 0;
     if (value != 0)
-        width = static_cast<int>(bit_width(value));
+        width = bit_width(value);
     auto mem = Node::create_node(size, alloc, context_flag, type, width_type, width);
     if (value != 0) {
         const auto header = mem.get_addr();
@@ -1048,7 +1048,6 @@ size_t Array::upper_bound_int_compressed(int64_t value) const noexcept
     return upper_bound(m_data, m_size, value, encoder);
 }
 
-static IntegerCompressor s_compressor;
 int_fast64_t Array::get(const char* header, size_t ndx) noexcept
 {
     // this is very important. Most of the times we end up here
@@ -1064,6 +1063,14 @@ int_fast64_t Array::get(const char* header, size_t ndx) noexcept
         uint_least8_t width = get_width_from_header(header);
         return get_direct(data, width, ndx);
     }
+    static IntegerCompressor s_compressor;
+    // we don't want to construct a compressor, every time we end up here.
+    // however since the compressor is usually unique per array, it caches a
+    // bunch of masks that are expensive to compute over and over again.
+    // In this case we need to compute the masks again at least once, so we
+    // need to call init and reset the compressor.
+    // If we don't do this, the values extracted from the arrays could be wrong,
+    // and lead to either wrong query results or even corrupting the data in the file.
     s_compressor.init(header);
     return s_compressor.get(ndx);
 }

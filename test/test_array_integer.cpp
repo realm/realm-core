@@ -1333,6 +1333,24 @@ TEST(Test_ArrayInt_encode_decode_needed)
 }
 #endif
 
+TEST(Test_ArrayInt_get_all)
+{
+    std::vector<int64_t> vs = {3656152302, 2814021986, 4195757081, 3272933168, 3466127978, 2777289082,
+                               4247467684, 3825361855, 2496524560, 4052938301, 3765455798, 2527633011,
+                               3448934593, 3699340964, 4057735040, 3294068800};
+    ArrayInteger a(Allocator::get_default());
+    ArrayInteger a1(Allocator::get_default());
+    a.create();
+    for (const auto i : vs)
+        a.add(i);
+    CHECK(a.try_compress(a1));
+    CHECK(a1.is_compressed());
+    auto res = a1.get_all(0, a1.size());
+    CHECK(res == vs);
+    a.destroy();
+    a1.destroy();
+}
+
 TEST(Test_array_same_size_less_bits)
 {
     ArrayInteger a(Allocator::get_default());

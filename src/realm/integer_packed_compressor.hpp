@@ -34,7 +34,7 @@ namespace realm {
 class PackedCompressor {
 public:
     // encoding/decoding
-    void init_array(char*, uint8_t, size_t, size_t) const;
+    void init_array(char*, uint8_t, uint8_t, size_t) const;
     void copy_data(const Array&, Array&) const;
     // get or set
     inline int64_t get(const IntegerCompressor&, size_t) const;
@@ -72,29 +72,30 @@ inline std::vector<int64_t> PackedCompressor::get_all(const IntegerCompressor& c
     const auto sign_mask = c.v_mask();
     const auto starting_bit = b * v_w;
     const auto total_bits = starting_bit + (v_w * range);
-    const auto mask = c.v_bit_mask();
+    const auto mask = (1ULL << v_w) - 1;
     const auto bit_per_it = num_bits_for_width(v_w);
-    
+    const auto values_per_word = num_fields_for_width(v_w);
+
     std::vector<int64_t> res;
-    res.reserve(range); //this is very important, x4 faster pre-allocating the array
+    res.reserve(range);
+
     unaligned_word_iter unaligned_data_iterator(data, starting_bit);
     auto cnt_bits = starting_bit;
-    while ((cnt_bits + bit_per_it) < total_bits) {
+    while (cnt_bits + bit_per_it < total_bits) {
         auto word = unaligned_data_iterator.get(bit_per_it);
-        const auto next_chunk = cnt_bits + bit_per_it;
-        while(cnt_bits < next_chunk && cnt_bits < total_bits) {
+        for (int i = 0; i < values_per_word; ++i) {
             res.push_back(sign_extend_field_by_mask(sign_mask, word & mask));
-            cnt_bits+=v_w;
             word>>=v_w;
         }
+        cnt_bits += bit_per_it;
         unaligned_data_iterator.bump(bit_per_it);
     }
     if (cnt_bits < total_bits) {
-        auto word = unaligned_data_iterator.get(static_cast<unsigned>(total_bits - cnt_bits));
+        auto last_word = unaligned_data_iterator.get(static_cast<unsigned>(total_bits - cnt_bits));
         while (cnt_bits < total_bits) {
-            res.push_back(sign_extend_field_by_mask(sign_mask, word & mask));
+            res.push_back(sign_extend_field_by_mask(sign_mask, last_word & mask));
             cnt_bits += v_w;
-            word >>= v_w;
+            last_word >>= v_w;
         }
     }
     return res;
