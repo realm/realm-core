@@ -144,6 +144,9 @@ std::unique_ptr<SpawnedProcess> spawn_process(const std::string& test_name, cons
     if (auto value = getenv("UNITTEST_ENCRYPT_ALL")) {
         env_vars.push_back(util::format("UNITTEST_ENCRYPT_ALL=%1", value));
     }
+    if (auto value = getenv("UNITTEST_ENABLE_SYNC_TO_DISK")) {
+        env_vars.push_back(util::format("UNITTEST_ENABLE_SYNC_TO_DISK=%1", value));
+    }
     if (getenv("TMPDIR")) {
         env_vars.push_back(util::format("TMPDIR=%1", getenv("TMPDIR")));
     }
