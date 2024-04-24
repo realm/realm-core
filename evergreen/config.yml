@@ -1244,7 +1244,7 @@ task_groups:
   - fuzzer
 
 buildvariants:
-- name: ubuntu2204
+- name: ubuntu
   display_name: "Ubuntu"
   run_on: ubuntu2204-arm64-large
   expansions:
