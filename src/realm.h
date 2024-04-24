@@ -3554,6 +3554,11 @@ typedef struct realm_sync_error_compensating_write_info {
     realm_value_t primary_key;
 } realm_sync_error_compensating_write_info_t;
 
+// The following interface allows C-API users to
+// bring their own users. This API shouldn't be mixed
+// with core's own implementation of User so it is
+// only defined with app services are compiled out
+#if !REALM_APP_SERVICES
 /**
  * Generic completion callback for asynchronous Realm User operations.
  * @param userdata This must be the faithfully forwarded data parameter that was provided along with this callback.
@@ -3579,22 +3584,45 @@ typedef void (*realm_user_track_realm_cb_t)(realm_userdata_t userdata, const cha
 typedef const char* (*realm_user_create_file_action_cb_t)(realm_userdata_t userdata, realm_sync_file_action_e action,
                                                           const char* original_path,
                                                           const char* requested_recovery_dir);
-
+typedef struct realm_sync_user_create_config {
+    realm_userdata_t userdata;
+    realm_free_userdata_func_t free_func;
+    const char* app_id;
+    const char* user_id;
+    realm_user_get_access_token_cb_t access_token_cb;
+    realm_user_get_refresh_token_cb_t refresh_token_cb;
+    realm_user_state_cb_t state_cb;
+    realm_user_access_token_refresh_required_cb_t atrr_cb;
+    realm_user_get_sync_manager_cb_t sync_manager_cb;
+    realm_user_request_log_out_cb_t request_log_out_cb;
+    realm_user_request_refresh_user_cb_t request_refresh_user_cb;
+    realm_user_request_refresh_location_cb_t request_refresh_location_cb;
+    realm_user_request_access_token_cb_t request_access_token_cb;
+    realm_user_track_realm_cb_t track_realm_cb;
+    realm_user_create_file_action_cb_t create_fa_cb;
+} realm_sync_user_create_config_t;
 
 /*
  * Construct a SyncUser instance that uses SDK provided
  * callbacks instead of core's User implementation. This type
  * of user should not be used with core's App implementation.
  */
-RLM_API realm_user_t* realm_user_new(
-    realm_userdata_t userdata, realm_free_userdata_func_t free_func, const char* app_id, const char* user_id,
-    realm_user_get_access_token_cb_t access_token_cb, realm_user_get_refresh_token_cb_t refresh_token_cb,
-    realm_user_state_cb_t state_cb, realm_user_access_token_refresh_required_cb_t atrr_cb,
-    realm_user_get_sync_manager_cb_t sync_manager_cb, realm_user_request_log_out_cb_t request_log_out_cb,
-    realm_user_request_refresh_user_cb_t requst_refresh_user_cb,
-    realm_user_request_refresh_location_cb_t request_refresh_location_cb,
-    realm_user_request_access_token_cb_t request_access_token_cb, realm_user_track_realm_cb_t track_realm_cb,
-    realm_user_create_file_action_cb_t create_fa_cb) RLM_API_NOEXCEPT;
+RLM_API realm_user_t* realm_user_new(realm_sync_user_create_config_t config) RLM_API_NOEXCEPT;
+
+/**
+ * Create realm_sync_manager_t* instance given a valid realm sync client configuration.
+ *
+ * @return A non-null pointer if no error occurred.
+ */
+RLM_API realm_sync_manager_t* realm_sync_manager_create(const realm_sync_client_config_t*);
+
+/**
+ * See SyncManager::set_sync_route()
+ */
+RLM_API void realm_sync_manager_set_route(const realm_sync_manager_t* session, const char* route, bool is_verified);
+
+
+#endif // !REALM_APP_SERVICES
 
 /**
  * Return the identiy for the user passed as argument
@@ -3623,8 +3651,6 @@ RLM_API char* realm_user_get_access_token(const realm_user_t*);
  * @return a string that represents the refresh token
  */
 RLM_API char* realm_user_get_refresh_token(const realm_user_t*);
-
-RLM_API bool realm_user_access_token_refresh_required(const realm_user_t*);
 
 // This type should never be returned from a function.
 // It's only meant as an asynchronous callback argument.
@@ -4115,18 +4141,6 @@ RLM_API void realm_sync_session_wait_for_upload_completion(realm_sync_session_t*
 RLM_API void realm_sync_session_handle_error_for_testing(const realm_sync_session_t* session,
                                                          realm_errno_e error_code, const char* error_str,
                                                          bool is_fatal);
-
-/**
- * Create realm_sync_manager_t* instance given a valid realm sync client configuration.
- *
- * @return A non-null pointer if no error occurred.
- */
-RLM_API realm_sync_manager_t* realm_sync_manager_create(const realm_sync_client_config_t*);
-
-/**
- * See SyncManager::set_sync_route()
- */
-RLM_API void realm_sync_manager_set_route(const realm_sync_manager_t* session, const char* route, bool is_verified);
 
 /**
  * In case of exception thrown in user code callbacks, this api will allow the sdk to store the user code exception

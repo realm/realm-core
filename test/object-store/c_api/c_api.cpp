@@ -569,6 +569,7 @@ TEST_CASE("C API (non-database)", "[c_api]") {
         CHECK(test_sync_client_config->timeouts.reconnect_backoff_info.resumption_delay_backoff_multiplier == 1010);
     }
 
+#if !REALM_APP_SERVICES
     SECTION("realm sync manager") {
         auto config = cptr(realm_sync_client_config_new());
         auto sync_manager = cptr(realm_sync_manager_create(config.get()));
@@ -665,10 +666,25 @@ TEST_CASE("C API (non-database)", "[c_api]") {
 
         TestSyncManager test_sync_manager;
         CustomUser custom_user("my_app_id", "User1");
-        auto sync_user = cptr(realm_user_new(
-            &custom_user, nullptr, custom_user.m_app_id.data(), custom_user.m_user_id.data(), cb_access_token,
-            cb_refresh_token, cb_state, cb_atrr, cb_sync_manager, cb_request_log_out, cb_request_refresh_user,
-            cb_request_refresh_location, cb_request_access_token, cb_track_realm, cb_create_file_action));
+
+        realm_sync_user_create_config_t config;
+        config.userdata = &custom_user;
+        config.free_func = nullptr;
+        config.app_id = custom_user.m_app_id.data();
+        config.user_id = custom_user.m_user_id.data();
+        config.access_token_cb = cb_access_token;
+        config.refresh_token_cb = cb_refresh_token;
+        config.state_cb = cb_state;
+        config.atrr_cb = cb_atrr;
+        config.sync_manager_cb = cb_sync_manager;
+        config.request_log_out_cb = cb_request_log_out;
+        config.request_refresh_user_cb = cb_request_refresh_user;
+        config.request_refresh_location_cb = cb_request_refresh_location;
+        config.request_access_token_cb = cb_request_access_token;
+        config.track_realm_cb = cb_track_realm;
+        config.create_fa_cb = cb_create_file_action;
+
+        auto sync_user = cptr(realm_user_new(config));
         SyncUser* cxx_user = (*(sync_user.get())).get();
 
         {
@@ -689,9 +705,9 @@ TEST_CASE("C API (non-database)", "[c_api]") {
             CHECK(realm_user_get_state(sync_user.get()) == realm_user_state_e::RLM_USER_STATE_REMOVED);
         }
         {
-            CHECK_FALSE(realm_user_access_token_refresh_required(sync_user.get()));
+            CHECK(!cxx_user->access_token_refresh_required());
             custom_user.m_access_token_refresh_required = true;
-            CHECK(realm_user_access_token_refresh_required(sync_user.get()));
+            CHECK(cxx_user->access_token_refresh_required());
         }
         {
             CHECK(!cxx_user->sync_manager());
@@ -736,6 +752,7 @@ TEST_CASE("C API (non-database)", "[c_api]") {
             CHECK(custom_user.m_file_action_state == "action_1_some-path_dir-requested");
         }
     }
+#endif // !REALM_APP_SERVICES
 
 #if REALM_APP_SERVICES
     SECTION("realm_app_config_t") {
