@@ -238,10 +238,10 @@ functions:
         script: |-
           set -o errexit
           set -o verbose
-          if [[ -n "${cmake_bindir|}" ]]; then
-              CTEST=$(pwd)/${cmake_bindir}/ctest
+          if [ -n "${cmake_bindir|}" ]; then
+              CTEST=$(./evergreen/abspath.sh ${cmake_bindir}/ctest)
           else
-              CTEST=ctest
+              CTEST="ctest"
           fi
 
           if [ -n "${xcode_developer_dir}" ]; then
