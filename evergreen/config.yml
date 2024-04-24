@@ -313,10 +313,8 @@ functions:
               rm "$UNITTEST_EVERGREEN_TEST_RESULTS"
           fi
           export UNITTEST_PROGRESS=1
+          export UNITTEST_ENCRYPT_ALL="${run_with_encryption|0}"
 
-          if [[ -n "${run_with_encryption}" ]]; then
-              export UNITTEST_ENCRYPT_ALL=1
-          fi
           export TSAN_OPTIONS="suppressions=$(pwd)/test/tsan.suppress history_size=4 $TSAN_OPTIONS"
           export UBSAN_OPTIONS="print_stacktrace=1"
 
