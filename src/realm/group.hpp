@@ -321,10 +321,8 @@ public:
     TableRef get_or_add_table_with_primary_key(StringData name, DataType pk_type, StringData pk_name,
                                                bool nullable = false, Table::Type table_type = Table::Type::TopLevel);
 
-    // Use 'ignore_backlinks' with caution. ignore_backlinks=true will leave things in an invalid state
-    // if the target table (or column) is not removed as well.
-    void remove_table(TableKey key, bool ignore_backlinks = false);
-    void remove_table(StringData name, bool ignore_backlinks = false);
+    void remove_table(TableKey key);
+    void remove_table(StringData name);
 
     void rename_table(TableKey key, StringData new_name, bool require_unique_name = true);
     void rename_table(StringData name, StringData new_name, bool require_unique_name = true);
@@ -633,7 +631,7 @@ private:
     void attach_shared(ref_type new_top_ref, size_t new_file_size, bool writable, VersionID version);
 
     void create_empty_group();
-    void remove_table(size_t table_ndx, TableKey key, bool ignore_backlinks);
+    void remove_table(size_t table_ndx, TableKey key);
 
     void reset_free_space_tracking();
 

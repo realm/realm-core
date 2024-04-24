@@ -37,8 +37,7 @@
 #include <realm/object-store/sync/impl/emscripten/socket_provider.hpp>
 #endif
 
-namespace realm {
-namespace _impl {
+namespace realm::_impl {
 
 struct SyncClient {
     SyncClient(const std::shared_ptr<util::Logger>& logger, SyncClientConfig const& config,
@@ -147,8 +146,6 @@ struct SyncClient {
         return m_client.notify_session_terminated();
     }
 
-    ~SyncClient() {}
-
 private:
     std::shared_ptr<sync::SyncSocketProvider> m_socket_provider;
     sync::Client m_client;
@@ -159,7 +156,6 @@ private:
 #endif
 };
 
-} // namespace _impl
-} // namespace realm
+} // namespace realm::_impl
 
 #endif // REALM_OS_SYNC_CLIENT_HPP

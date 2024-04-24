@@ -16,17 +16,13 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#ifndef AUTH_REQUEST_CLIENT_HPP
-#define AUTH_REQUEST_CLIENT_HPP
+#ifndef REALM_OS_AUTH_REQUEST_CLIENT_HPP
+#define REALM_OS_AUTH_REQUEST_CLIENT_HPP
 
-#include <realm/util/functional.hpp>
-#include <memory>
-#include <string>
+#include <realm/object-store/sync/generic_network_transport.hpp>
 
-namespace realm {
-class SyncUser;
-namespace app {
-struct Request;
+namespace realm::app {
+class User;
 struct Response;
 
 class AuthRequestClient {
@@ -35,11 +31,11 @@ public:
 
     virtual std::string url_for_path(const std::string& path) const = 0;
 
-    virtual void do_authenticated_request(Request&&, const std::shared_ptr<SyncUser>& sync_user,
+    virtual void do_authenticated_request(HttpMethod, std::string&& route, std::string&& body,
+                                          const std::shared_ptr<User>& user, RequestTokenType,
                                           util::UniqueFunction<void(const Response&)>&&) = 0;
 };
 
-} // namespace app
-} // namespace realm
+} // namespace realm::app
 
-#endif /* AUTH_REQUEST_CLIENT_HPP */
+#endif /* REALM_OS_AUTH_REQUEST_CLIENT_HPP */

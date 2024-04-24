@@ -6,7 +6,12 @@
     },
     "dict": {
       "$dictionary": {
-        "key1": "t2o2"
+        "key1": {
+          "$link": {
+            "table": "table2",
+            "key": "t2o2"
+          }
+        }
       }
     }
   },
@@ -26,8 +31,18 @@
     },
     "dict": {
       "$dictionary": {
-        "key2": "t2o2",
-        "key3": "t2o3",
+        "key2": {
+          "$link": {
+            "table": "table2",
+            "key": "t2o2"
+          }
+        },
+        "key3": {
+          "$link": {
+            "table": "table2",
+            "key": "t2o3"
+          }
+        },
         "key4": null,
         "key5": null
       }

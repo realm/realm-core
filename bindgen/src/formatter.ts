@@ -67,4 +67,4 @@ export function format(formatter: Formatter, cwd: string, filePaths: string[]): 
   }
 }
 
-export const clangFormat = createCommandFormatter("clang", ["npx", "clang-format", "-i"]);
+export const clangFormat = createCommandFormatter("clang", ["clang-format", "-i"]);
