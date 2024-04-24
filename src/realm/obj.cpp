@@ -240,12 +240,12 @@ bool Obj::compare_list_in_mixed(Lst<Mixed>& val1, Lst<Mixed>& val2, ColKey ck, O
         auto m2 = val2.get_any(i);
 
         if (m1.is_type(type_List) && m2.is_type(type_List)) {
-            DummyParent parent(get_table(), m2.get_ref());
+            DummyParent parent(other.get_table(), m2.get_ref());
             Lst<Mixed> list(parent, 0);
             return compare_list_in_mixed(*val1.get_list(i), list, ck, other, col_name);
         }
         else if (m1.is_type(type_Dictionary) && m2.is_type(type_Dictionary)) {
-            DummyParent parent(get_table(), m2.get_ref());
+            DummyParent parent(other.get_table(), m2.get_ref());
             Dictionary dict(parent, 0);
             return compare_dict_in_mixed(*val1.get_dictionary(i), dict, ck, other, col_name);
         }
@@ -269,12 +269,12 @@ bool Obj::compare_dict_in_mixed(Dictionary& val1, Dictionary& val2, ColKey ck, O
             return false;
 
         if (m1.is_type(type_List) && m2.is_type(type_List)) {
-            DummyParent parent(get_table(), m2.get_ref());
+            DummyParent parent(other.get_table(), m2.get_ref());
             Lst<Mixed> list(parent, 0);
             return compare_list_in_mixed(*val1.get_list(k1.get_string()), list, ck, other, col_name);
         }
         else if (m1.is_type(type_Dictionary) && m2.is_type(type_Dictionary)) {
-            DummyParent parent(get_table(), m2.get_ref());
+            DummyParent parent(other.get_table(), m2.get_ref());
             Dictionary dict(parent, 0);
             return compare_dict_in_mixed(*val1.get_dictionary(k1.get_string()), dict, ck, other, col_name);
         }

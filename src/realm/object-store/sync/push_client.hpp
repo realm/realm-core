@@ -24,8 +24,8 @@
 
 namespace realm::app {
 class AuthRequestClient;
-class User;
 struct AppError;
+class User;
 
 class PushClient {
 public:

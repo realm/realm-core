@@ -47,13 +47,6 @@ realm_app_user_subscription_token::~realm_app_user_subscription_token()
 
 namespace realm::c_api {
 
-static_assert(realm_sync_client_metadata_mode_e(app::AppConfig::MetadataMode::NoEncryption) ==
-              RLM_SYNC_CLIENT_METADATA_MODE_PLAINTEXT);
-static_assert(realm_sync_client_metadata_mode_e(app::AppConfig::MetadataMode::Encryption) ==
-              RLM_SYNC_CLIENT_METADATA_MODE_ENCRYPTED);
-static_assert(realm_sync_client_metadata_mode_e(app::AppConfig::MetadataMode::InMemory) ==
-              RLM_SYNC_CLIENT_METADATA_MODE_DISABLED);
-
 static_assert(realm_sync_client_reconnect_mode_e(ReconnectMode::normal) == RLM_SYNC_CLIENT_RECONNECT_MODE_NORMAL);
 static_assert(realm_sync_client_reconnect_mode_e(ReconnectMode::testing) == RLM_SYNC_CLIENT_RECONNECT_MODE_TESTING);
 
@@ -770,15 +763,6 @@ RLM_API void realm_sync_session_get_file_ident(realm_sync_session_t* session, re
     auto file_ident = (*session)->get_file_ident();
     out->ident = file_ident.ident;
     out->salt = file_ident.salt;
-}
-
-RLM_API bool realm_sync_immediately_run_file_actions(realm_app_t* realm_app, const char* sync_path,
-                                                     bool* did_run) noexcept
-{
-    return wrap_err([&]() {
-        *did_run = (*realm_app)->immediately_run_file_actions(sync_path);
-        return true;
-    });
 }
 
 RLM_API realm_sync_session_connection_state_notification_token_t*

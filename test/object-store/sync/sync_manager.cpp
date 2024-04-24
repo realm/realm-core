@@ -41,6 +41,7 @@ static const auto base_path =
     fs::path{util::make_temp_dir()}.make_preferred() / "realm_objectstore_sync_manager.test-dir";
 static const std::string dummy_device_id = "123400000000000000000000";
 
+#if REALM_APP_SERVICES
 TEST_CASE("App: path_for_realm API", "[sync][app][file]") {
     const std::string raw_url = "realms://realm.example.org/a/b/~/123456/xyz";
 
@@ -156,6 +157,8 @@ TEST_CASE("App: path_for_realm API", "[sync][app][file]") {
         REQUIRE_DIR_PATH_EXISTS(base_path);
     }
 }
+
+#endif // REALM_APP_SERVICES
 
 TEST_CASE("SyncManager: set_session_multiplexing", "[sync][sync manager]") {
     TestSyncManager::Config tsm_config;

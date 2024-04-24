@@ -130,12 +130,15 @@ void CopyReplication::list_clear(const CollectionBase& coll)
     m_current.obj_in_destination.get_listbase_ptr(dest_col_key)->clear();
 }
 
-void CopyReplication::list_insert(const CollectionBase& coll, size_t idx, Mixed value, size_t)
+void CopyReplication::list_insert(const CollectionBase& source_coll, size_t idx, Mixed value, size_t)
 {
-    ColKey col_key = coll.get_col_key();
-    sync(coll);
+    ColKey col_key = source_coll.get_col_key();
+    sync(source_coll);
     auto dest_col_key = get_colkey_in_destination_realm(col_key);
-    auto list = m_current.obj_in_destination.get_listbase_ptr(dest_col_key);
+    auto path = source_coll.get_short_path();
+    path[0] = dest_col_key;
+    auto coll = m_current.obj_in_destination.get_collection_ptr(path);
+    auto list = dynamic_cast<LstBase*>(coll.get());
     if (value.is_type(type_Link, type_TypedLink)) {
         value = handle_link(col_key, value, [&](TableRef) {
             auto link_list = m_current.obj_in_destination.get_linklist(dest_col_key);
@@ -162,18 +165,21 @@ void CopyReplication::set_insert(const CollectionBase& coll, size_t, Mixed value
     set->insert_any(value);
 }
 
-void CopyReplication::dictionary_insert(const CollectionBase& coll, size_t, Mixed key, Mixed value)
+void CopyReplication::dictionary_insert(const CollectionBase& source_coll, size_t, Mixed key, Mixed value)
 {
-    ColKey col_key = coll.get_col_key();
-    sync(coll);
+    ColKey col_key = source_coll.get_col_key();
+    sync(source_coll);
     auto dest_col_key = get_colkey_in_destination_realm(col_key);
-    auto dict = m_current.obj_in_destination.get_dictionary(dest_col_key);
+    auto path = source_coll.get_short_path();
+    path[0] = dest_col_key;
+    auto coll = m_current.obj_in_destination.get_collection_ptr(path);
+    auto dict = dynamic_cast<Dictionary*>(coll.get());
     if (value.is_type(type_Link, type_TypedLink)) {
         value = handle_link(col_key, value, [&](TableRef dest_target_table) {
             // Check if dictionary obj has embedded obj already
-            size_t ndx = dict.find_any_key(key);
+            size_t ndx = dict->find_any_key(key);
             if (ndx != realm::not_found) {
-                auto val = dict.get_any(ndx);
+                auto val = dict->get_any(ndx);
                 if (val.is_type(type_Link)) {
                     ObjKey key = val.get<ObjKey>();
                     m_current.obj_in_destination = dest_target_table->get_object(key);
@@ -181,12 +187,12 @@ void CopyReplication::dictionary_insert(const CollectionBase& coll, size_t, Mixe
                 }
             }
             // If not, create one
-            m_current.obj_in_destination = dict.create_and_insert_linked_object(key);
+            m_current.obj_in_destination = dict->create_and_insert_linked_object(key);
         });
         if (value.is_null())
             return;
     }
-    dict.insert(key, value);
+    dict->insert(key, value);
 }
 
 void CopyReplication::sync(const Table* t, ObjKey obj_key)

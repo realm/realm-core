@@ -154,7 +154,6 @@ public:
     bool immediately_run_file_actions(std::string_view realm_path);
 
 private:
-    friend class app::App;
     friend class SyncSession;
     friend class SyncUser;
     friend class ::TestSyncManager;

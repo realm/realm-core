@@ -537,6 +537,19 @@ Query EqualityNode::visit(ParserDriver* drv)
         }
     }
 
+    if (op == CompareType::IN || op == CompareType::EQUAL) {
+        if (auto mixed_list = dynamic_cast<ConstantMixedList*>(right.get());
+            mixed_list && mixed_list->size() &&
+            mixed_list->get_comparison_type().value_or(ExpressionComparisonType::Any) ==
+                ExpressionComparisonType::Any) {
+            if (auto lhs = dynamic_cast<ObjPropertyBase*>(left.get());
+                lhs && lhs->column_key() && !lhs->column_key().is_collection() && !lhs->links_exist() &&
+                lhs->column_key().get_type() != col_type_Mixed) {
+                return drv->m_base_table->where().in(lhs->column_key(), mixed_list->begin(), mixed_list->end());
+            }
+        }
+    }
+
     if (left_type == type_Link && left_type == right_type && right->has_constant_evaluation()) {
         if (auto link_column = dynamic_cast<const Columns<Link>*>(left.get())) {
             if (link_column->link_map().get_nb_hops() == 1 &&

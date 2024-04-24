@@ -141,6 +141,7 @@ std::ostream& operator<<(std::ostream& os, util::Optional<app::AppError> error);
 
 void subscribe_to_all_and_bootstrap(Realm& realm);
 
+#if REALM_APP_SERVICES
 struct AutoVerifiedEmailCredentials : app::AppCredentials {
     AutoVerifiedEmailCredentials();
     std::string email;
@@ -151,6 +152,8 @@ AutoVerifiedEmailCredentials create_user_and_log_in(app::SharedApp app);
 // Log in the user again using the AutoVerifiedEmailCredentials returned
 // when calling create_user_and_log_in()
 void log_in_user(app::SharedApp app, app::AppCredentials creds);
+
+#endif // REALM_APP_SERVICES
 
 #if REALM_ENABLE_AUTH_TESTS
 void wait_for_sessions_to_close(const TestAppSession& test_app_session);
