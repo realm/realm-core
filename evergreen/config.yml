@@ -1623,39 +1623,23 @@ buildvariants:
   tasks:
   - name: compile_test
 
-- name: macos
-  display_name: "MacOS 11.0 x86_64"
-  run_on: macos-1100
-  expansions:
-    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.26.3-macos-universal.tar.gz"
-    cmake_bindir: "./cmake_binaries/CMake.app/Contents/bin"
-    cmake_toolchain_file: "./tools/cmake/xcode.toolchain.cmake"
-    cmake_generator: Xcode
-    max_jobs: $(sysctl -n hw.logicalcpu)
-    xcode_developer_dir: /Applications/Xcode13.1.app/Contents/Developer
-    extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=x86_64
-  tasks:
-  - name: compile_test
-  - name: swift-build-and-test
-  - name: validate-installed-headers
-
 - name: macos-encrypted
-  display_name: "MacOS 11.0 x86_64 (Encryption enabled)"
-  run_on: macos-1100
+  display_name: "MacOS 14.0 arm64 (Encryption enabled)"
+  run_on: macos-14-arm64
   expansions:
-    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.26.3-macos-universal.tar.gz"
-    cmake_bindir: "./cmake_binaries/CMake.app/Contents/bin"
+    cmake_bindir: "/opt/homebrew/bin"
     cmake_toolchain_file: "./tools/cmake/xcode.toolchain.cmake"
+    cmake_build_tool_options: "-sdk macosx"
     cmake_generator: Xcode
     max_jobs: $(sysctl -n hw.logicalcpu)
-    xcode_developer_dir: /Applications/Xcode13.1.app/Contents/Developer
-    extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=x86_64
+    xcode_developer_dir: /Applications/Xcode15.2.app/Contents/Developer
+    extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=arm64
     run_with_encryption: On
   tasks:
   - name: core_tests_group
 
 - name: macos-release
-  display_name: "MacOS 11.0 x86_64 (Release build)"
+  display_name: "MacOS 11.0 x86_64 (Release benchmarks)"
   run_on: macos-1100
   expansions:
     cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.26.3-macos-universal.tar.gz"
@@ -1667,11 +1651,7 @@ buildvariants:
     xcode_developer_dir: /Applications/Xcode13.1.app/Contents/Developer
     extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=x86_64
   tasks:
-  - name: compile_test_and_package
   - name: benchmarks
-  - name: long-running-tests
-  - name: swift-build-and-test
-  - name: test-on-exfat
 
 - name: macos-14-arm64
   display_name: "MacOS 14 arm64"
@@ -1687,8 +1667,10 @@ buildvariants:
   tasks:
   - name: compile_test
   - name: swift-build-and-test
+  - name: validate-installed-headers
+  - name: test-on-exfat
 
-- name: macos-14-arm64-release
+- name: macos-14-release
   display_name: "MacOS 14 arm64 (Release build)"
   run_on: macos-14-arm64
   expansions:
@@ -1703,42 +1685,13 @@ buildvariants:
 
   tasks:
   - name: compile_test_and_package
-  - name: benchmarks
+  # benchmarks are disabled for now because of perf problems on AWS macos instances.
+  # - name: benchmarks
   - name: long-running-tests
   - name: swift-build-and-test
+  - name: test-on-exfat
 
-- name: macos-1100-x64-asan
-  display_name: "MacOS 11.0 x86_64 (ASAN)"
-  run_on: macos-1100
-  expansions:
-    cmake_bindir: "./cmake_binaries/CMake.app/Contents/bin"
-    cmake_toolchain_file: "./tools/cmake/xcode.toolchain.cmake"
-    cmake_generator: Xcode
-    max_jobs: $(sysctl -n hw.logicalcpu)
-    xcode_developer_dir: /Applications/Xcode13.1.app/Contents/Developer
-    extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=x86_64
-    cmake_build_type: RelWithDebInfo
-    enable_asan: On
-  tasks:
-  - name: compile_test
-
-- name: macos-1100-x64-tsan
-  display_name: "MacOS 11.0 x86_64 (TSAN)"
-  run_on: macos-1100
-  expansions:
-    cmake_bindir: "/opt/homebrew/bin"
-    cmake_toolchain_file: "./tools/cmake/xcode.toolchain.cmake"
-    cmake_build_tool_options: "-sdk macosx"
-    cmake_generator: Xcode
-    max_jobs: $(sysctl -n hw.logicalcpu)
-    xcode_developer_dir: /Applications/Xcode13.1.app/Contents/Developer
-    extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=x86_64
-    cmake_build_type: RelWithDebInfo
-    enable_tsan: On
-  tasks:
-  - name: compile_test
-
-- name: macos-14-arm64-asan
+- name: macos-asan
   display_name: "MacOS 14 arm64 (ASAN)"
   run_on: macos-14-arm64
   expansions:
@@ -1754,7 +1707,7 @@ buildvariants:
   tasks:
   - name: compile_test
 
-- name: macos-14-arm64-tsan
+- name: macos-tsan
   display_name: "MacOS 14 arm64 (TSAN)"
   run_on: macos-14-arm64
   expansions:
@@ -1768,8 +1721,6 @@ buildvariants:
     cmake_build_type: RelWithDebInfo
     enable_tsan: On
   tasks:
-  # FIXME: tsan is not stable on arm64, fails often with internal errors
-  # - name: compile_test
   - name: compile_test
 
 - name: macos-coverage
