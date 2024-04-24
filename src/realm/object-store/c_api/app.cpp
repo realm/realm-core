@@ -836,7 +836,6 @@ struct CAPIAppUser : SyncUser {
     realm_user_access_token_refresh_required_cb_t m_atrr_cb = nullptr;
     realm_user_get_sync_manager_cb_t m_sync_manager_cb = nullptr;
     realm_user_request_log_out_cb_t m_request_log_out_cb = nullptr;
-    realm_user_request_refresh_user_cb_t m_request_refresh_user_cb = nullptr;
     realm_user_request_refresh_location_cb_t m_request_refresh_location_cb = nullptr;
     realm_user_request_access_token_cb_t m_request_access_token_cb = nullptr;
     realm_user_track_realm_cb_t m_track_realm_cb = nullptr;
@@ -858,7 +857,6 @@ struct CAPIAppUser : SyncUser {
         , m_atrr_cb(std::move(other.m_atrr_cb))
         , m_sync_manager_cb(std::move(other.m_sync_manager_cb))
         , m_request_log_out_cb(std::move(other.m_request_log_out_cb))
-        , m_request_refresh_user_cb(std::move(other.m_request_refresh_user_cb))
         , m_request_refresh_location_cb(std::move(other.m_request_refresh_location_cb))
         , m_request_access_token_cb(std::move(other.m_request_access_token_cb))
         , m_track_realm_cb(std::move(other.m_track_realm_cb))
@@ -907,11 +905,6 @@ struct CAPIAppUser : SyncUser {
     {
         m_request_log_out_cb(m_userdata);
     }
-    void request_refresh_user(CompletionHandler&& callback) override
-    {
-        auto unscoped_cb = new CompletionHandler(std::move(callback));
-        m_request_refresh_user_cb(m_userdata, cb_proxy_for_completion, unscoped_cb);
-    }
     void request_refresh_location(CompletionHandler&& callback) override
     {
         auto unscoped_cb = new CompletionHandler(std::move(callback));
@@ -956,7 +949,6 @@ RLM_API realm_user_t* realm_user_new(realm_sync_user_create_config_t c) noexcept
     REALM_ASSERT(c.atrr_cb);
     REALM_ASSERT(c.sync_manager_cb);
     REALM_ASSERT(c.request_log_out_cb);
-    REALM_ASSERT(c.request_refresh_user_cb);
     REALM_ASSERT(c.request_refresh_location_cb);
     REALM_ASSERT(c.request_access_token_cb);
 
@@ -970,7 +962,6 @@ RLM_API realm_user_t* realm_user_new(realm_sync_user_create_config_t c) noexcept
         capi_user->m_atrr_cb = c.atrr_cb;
         capi_user->m_sync_manager_cb = c.sync_manager_cb;
         capi_user->m_request_log_out_cb = c.request_log_out_cb;
-        capi_user->m_request_refresh_user_cb = c.request_refresh_user_cb;
         capi_user->m_request_refresh_location_cb = c.request_refresh_location_cb;
         capi_user->m_request_access_token_cb = c.request_access_token_cb;
         capi_user->m_track_realm_cb = c.track_realm_cb;

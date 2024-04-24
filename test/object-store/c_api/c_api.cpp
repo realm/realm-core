@@ -636,11 +636,6 @@ TEST_CASE("C API (non-database)", "[c_api]") {
             CustomUser* user = static_cast<CustomUser*>(data);
             ++user->m_log_out_requested_count;
         };
-        auto cb_request_refresh_user = [](realm_userdata_t data, realm_user_void_completion_func_t cb,
-                                          realm_userdata_t cb_data) {
-            CustomUser* user = static_cast<CustomUser*>(data);
-            cb(cb_data, &user->m_fake_app_error);
-        };
         auto cb_request_refresh_location = [](realm_userdata_t data, realm_user_void_completion_func_t cb,
                                               realm_userdata_t cb_data) {
             CustomUser* user = static_cast<CustomUser*>(data);
@@ -678,7 +673,6 @@ TEST_CASE("C API (non-database)", "[c_api]") {
         config.atrr_cb = cb_atrr;
         config.sync_manager_cb = cb_sync_manager;
         config.request_log_out_cb = cb_request_log_out;
-        config.request_refresh_user_cb = cb_request_refresh_user;
         config.request_refresh_location_cb = cb_request_refresh_location;
         config.request_access_token_cb = cb_request_access_token;
         config.track_realm_cb = cb_track_realm;
@@ -730,16 +724,12 @@ TEST_CASE("C API (non-database)", "[c_api]") {
             ++completions;
         };
         {
-            cxx_user->request_refresh_user(verify_completion);
+            cxx_user->request_refresh_location(verify_completion);
             CHECK(completions == 1);
         }
         {
-            cxx_user->request_refresh_location(verify_completion);
-            CHECK(completions == 2);
-        }
-        {
             cxx_user->request_access_token(verify_completion);
-            CHECK(completions == 3);
+            CHECK(completions == 2);
         }
         {
             CHECK(custom_user.m_track_realm_state == "");

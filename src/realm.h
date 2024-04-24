@@ -3573,8 +3573,6 @@ typedef realm_user_state_e (*realm_user_state_cb_t)(realm_userdata_t userdata);
 typedef bool (*realm_user_access_token_refresh_required_cb_t)(realm_userdata_t userdata);
 typedef realm_sync_manager_t* (*realm_user_get_sync_manager_cb_t)(realm_userdata_t userdata);
 typedef void (*realm_user_request_log_out_cb_t)(realm_userdata_t userdata);
-typedef void (*realm_user_request_refresh_user_cb_t)(realm_userdata_t userdata, realm_user_void_completion_func_t cb,
-                                                     realm_userdata_t cb_data);
 typedef void (*realm_user_request_refresh_location_cb_t)(realm_userdata_t userdata,
                                                          realm_user_void_completion_func_t cb,
                                                          realm_userdata_t cb_data);
@@ -3595,7 +3593,6 @@ typedef struct realm_sync_user_create_config {
     realm_user_access_token_refresh_required_cb_t atrr_cb;
     realm_user_get_sync_manager_cb_t sync_manager_cb;
     realm_user_request_log_out_cb_t request_log_out_cb;
-    realm_user_request_refresh_user_cb_t request_refresh_user_cb;
     realm_user_request_refresh_location_cb_t request_refresh_location_cb;
     realm_user_request_access_token_cb_t request_access_token_cb;
     realm_user_track_realm_cb_t track_realm_cb;
