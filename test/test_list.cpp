@@ -824,6 +824,10 @@ TEST(List_Nested_InMixed)
                  "[{\"Seven\":7, \"Six\":6}, \"Hello\", {\"Points\": [1.25, 4.5, 6.75], \"Hello\": \"World\"}]");
     CHECK_EQUAL(obj.get_list_ptr<Mixed>(col_any)->size(), 3);
     // tr->to_json(std::cout);
+    tr->commit();
+    db->compact();
+    tr = db->start_write();
+    tr->verify();
 }
 
 
