@@ -197,13 +197,13 @@ std::unique_ptr<SpawnedProcess> spawn_process(const std::string& test_name, cons
 #endif
     REALM_ASSERT(name_of_exe.size());
     char* arg_v[] = {name_of_exe.data(), test_path_prefix.data(), nullptr};
-    char* env_v[] = {env_vars[0].data(),
-                     env_vars[1].data(),
-                     env_vars[2].data(),
-                     env_vars.size() > 3 ? env_vars[3].data() : nullptr,
-                     env_vars.size() > 4 ? env_vars[4].data() : nullptr,
-                     nullptr}; // last arg must be null
-    int ret = posix_spawn(&pid_of_child, name_of_exe.data(), nullptr, nullptr, arg_v, env_v);
+    std::vector<char*> env_var_ptrs;
+    env_var_ptrs.reserve(env_vars.size() + 1);
+    std::transform(env_vars.begin(), env_vars.end(), std::back_inserter(env_var_ptrs), [](std::string& str) {
+        return str.data();
+    });
+    env_var_ptrs.push_back(nullptr);
+    int ret = posix_spawn(&pid_of_child, name_of_exe.data(), nullptr, nullptr, arg_v, env_var_ptrs.data());
     REALM_ASSERT_EX(ret == 0, ret);
     process->set_pid(pid_of_child);
 #endif
