@@ -581,7 +581,7 @@ TEST(File_GetUniqueID)
     file2_1.resize(1);
     file1_1.resize(1);
     bool running_on_buggy_exfat = test_util::test_dir_is_exfat();
-#ifdef REALM_PLATFORM_APPLE
+#if TARGET_OS_MAC
     if (__builtin_available(macOS 14, *)) {
         running_on_buggy_exfat = false;
     }

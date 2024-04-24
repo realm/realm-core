@@ -806,6 +806,8 @@ tasks:
     params:
       working_dir: realm-core/build
       shell: /bin/bash
+      env:
+        UNITTEST_ENCRYPT_ALL: "${run_with_encryption|0}"
       script: ../tools/run-tests-on-exfat.sh
 
 - name: valgrind
@@ -1390,7 +1392,7 @@ buildvariants:
     fetch_missing_dependencies: On
     c_compiler: "./clang_binaries/bin/clang"
     cxx_compiler: "./clang_binaries/bin/clang++"
-    run_with_encryption: On
+    run_with_encryption: 1
     enable_tsan: On
     cmake_build_type: RelWithDebInfo
   tasks:
@@ -1409,7 +1411,7 @@ buildvariants:
     c_compiler: "./clang_binaries/bin/clang"
     cxx_compiler: "./clang_binaries/bin/clang++"
     llvm_symbolizer: "./clang_binaries/bin/llvm-symbolizer"
-    run_with_encryption: On
+    run_with_encryption: 1
     enable_asan: On
     cmake_build_type: RelWithDebInfo
   tasks:
@@ -1503,7 +1505,7 @@ buildvariants:
     c_compiler: "./clang_binaries/bin/clang"
     cxx_compiler: "./clang_binaries/bin/clang++"
     cmake_build_type: RelWithDebInfo
-    run_with_encryption: On
+    run_with_encryption: 1
     enable_fuzzer: On
   tasks:
   - name: fuzzer-tests
@@ -1634,9 +1636,10 @@ buildvariants:
     max_jobs: $(sysctl -n hw.logicalcpu)
     xcode_developer_dir: /Applications/Xcode15.2.app/Contents/Developer
     extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=arm64
-    run_with_encryption: On
+    run_with_encryption: 1
   tasks:
   - name: core_tests_group
+  - name: test-on-exfat
 
 - name: macos-release
   display_name: "MacOS 11.0 x86_64 (Release benchmarks)"
