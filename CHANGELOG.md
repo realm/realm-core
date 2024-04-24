@@ -56,6 +56,7 @@
 * Sha-2 is no longer required as a submodule on Windows if linking with OpenSSL.
 * The Catch2 submodule has moved to `test/external/catch`.
 * Fix possible file corruption if using Transaction::copy_to if nested collections are present.
+* Evergreen config was udpated so most linux CI testing is done on ubuntu 22.04 on aarch64 with clang 18, upgrading from clang 11 on ubuntu 20.04 mostly on x86_64 ([PR #7475](https://github.com/realm/realm-core/pull/7475)).
 
 ----------------------------------------------
 
