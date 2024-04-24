@@ -188,6 +188,7 @@ public:
     Query& ends_with(ColKey column_key, Mixed value, bool case_sensitive = true);
     Query& contains(ColKey column_key, Mixed value, bool case_sensitive = true);
     Query& like(ColKey column_key, Mixed value, bool case_sensitive = true);
+    Query& in(ColKey column_key, const Mixed* begin, const Mixed* end);
 
     // Conditions: size
     Query& size_equal(ColKey column_key, int64_t value);

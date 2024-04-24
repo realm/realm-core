@@ -5353,6 +5353,12 @@ TEST(Parser_NestedMixedDictionaryList)
     list_george.add(2);
     list_george.add(3);
 
+    Obj ringo = persons->create_object_with_primary_key("Ringo");
+    ringo.set(col_self, ringo.get_key());
+    ringo.set_collection(col, CollectionType::Dictionary);
+    auto dict_ringo = ringo.get_dictionary(col);
+    dict_ringo.insert("Foo", "Bar");
+
     auto q = persons->column<Mixed>(col).path({"instruments", 0, "strings"}) == 6;
     CHECK_EQUAL(q.count(), 1);
 
@@ -5369,15 +5375,16 @@ TEST(Parser_NestedMixedDictionaryList)
     verify_query(test_context, persons, "properties[*] == {3, 2, 1}", 0);
     verify_query(test_context, persons, "properties[*] == {1, 2, 3}", 1);
     verify_query(test_context, persons, "ANY properties[*] == 2", 1);
-    verify_query(test_context, persons, "NONE properties[*] == 2", 2);
+    verify_query(test_context, persons, "NONE properties[*] == 2", 3);
     verify_query(test_context, persons, "properties.@keys == 'instruments'", 2);
     verify_query(test_context, persons, "properties.@keys == 'pets'", 2);
     verify_query(test_context, persons, "properties.@keys == 'tickets'", 1);
     verify_query(test_context, persons, "properties.@size == 3", 2);
     verify_query(test_context, persons, "properties.instruments.@size == 2", 1);
-    verify_query(test_context, persons, "properties.@type == 'object'", 2);
+    verify_query(test_context, persons, "properties.@type == 'object'", 3);
     verify_query(test_context, persons, "properties.@type == 'array'", 1);
-    verify_query(test_context, persons, "properties.@type == 'collection'", 3);
+    verify_query(test_context, persons, "properties.@type == 'collection'", 4);
+    verify_query(test_context, persons, "properties.Foo == 'Bar'", 1);
 }
 
 TEST(Parser_NestedDictionaryDeep)

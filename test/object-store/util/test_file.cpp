@@ -138,10 +138,12 @@ SyncTestFile::SyncTestFile(TestSyncManager& tsm, std::string name, std::string u
 {
 }
 
+#if REALM_APP_SERVICES
 SyncTestFile::SyncTestFile(OfflineAppSession& oas, std::string name)
     : SyncTestFile(oas.make_user(), bson::Bson(name))
 {
 }
+#endif // REALM_APP_SERVICES
 
 SyncTestFile::SyncTestFile(std::shared_ptr<SyncUser> user, bson::Bson partition, util::Optional<Schema> schema)
 {
@@ -294,6 +296,7 @@ bool wait_for_download(Realm& realm, std::chrono::seconds timeout)
     return !wait_for_session(realm, &SyncSession::wait_for_download_completion, timeout).is_ok();
 }
 
+#if REALM_APP_SERVICES
 void set_app_config_defaults(app::AppConfig& app_config,
                              const std::shared_ptr<app::GenericNetworkTransport>& transport)
 {
@@ -319,6 +322,7 @@ void set_app_config_defaults(app::AppConfig& app_config,
         app_config.app_id = "app_id";
     app_config.metadata_mode = app::AppConfig::MetadataMode::InMemory;
 }
+#endif // REALM_APP_SERVICES
 
 // MARK: - TestAppSession
 
@@ -448,7 +452,9 @@ TestSyncManager::~TestSyncManager()
             catch (const std::exception& ex) {
                 std::cerr << ex.what() << "\n";
             }
+#if REALM_APP_SERVICES
             app::App::clear_cached_apps();
+#endif // REALM_APP_SERVICES
         }
     }
 }
@@ -461,6 +467,7 @@ std::shared_ptr<TestUser> TestSyncManager::fake_user(const std::string& name)
     return user;
 }
 
+#if REALM_APP_SERVICES
 OfflineAppSession::Config::Config(std::shared_ptr<realm::app::GenericNetworkTransport> t)
     : transport(t)
 {
@@ -514,6 +521,7 @@ std::shared_ptr<realm::app::User> OfflineAppSession::make_user() const
     return app()->current_user();
 }
 
+#endif // REALM_APP_SERVICES
 #endif // REALM_ENABLE_SYNC
 
 #if REALM_HAVE_CLANG_FEATURE(thread_sanitizer)
