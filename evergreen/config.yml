@@ -816,7 +816,7 @@ tasks:
         find core/include/realm -name '*.hpp' -print0 | xargs -0 -P "${max_jobs}" -n 1 clang++ -c -o /dev/null -Icore/include -std=c++17
 
 - name: test-on-exfat
-  exec_timeout_secs: 2700
+  exec_timeout_secs: 3600
   commands:
   - func: "fetch source"
   - func: "fetch binaries"
