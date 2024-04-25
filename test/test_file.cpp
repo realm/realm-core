@@ -580,7 +580,14 @@ TEST(File_GetUniqueID)
     file2_1.resize(0);
     file2_1.resize(1);
     file1_1.resize(1);
-    if (!test_util::test_dir_is_exfat()) {
+    bool running_on_buggy_exfat = test_util::test_dir_is_exfat();
+#if TARGET_OS_MAC
+    if (__builtin_available(macOS 14, *)) {
+        running_on_buggy_exfat = false;
+    }
+#endif
+
+    if (!running_on_buggy_exfat) {
         CHECK(uid1_1 == file1_1.get_unique_id());
         CHECK(uid2_1 == file2_1.get_unique_id());
     }
