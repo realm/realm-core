@@ -3451,6 +3451,34 @@ RLM_API char* realm_user_get_custom_data(const realm_user_t*) RLM_API_NOEXCEPT;
  */
 RLM_API char* realm_user_get_profile_data(const realm_user_t*);
 
+/**
+ * Return the identiy for the user passed as argument
+ * @param user ptr to the user for which the identiy has to be retrieved
+ * @return a ptr to the identity string. This must be manually released with realm_free().
+ */
+RLM_API char* realm_user_get_identity(const realm_user_t* user) RLM_API_NOEXCEPT;
+
+/**
+ * Retrieve the state for the user passed as argument
+ * @param user ptr to the user for which the state has to be retrieved
+ * @return realm_user_state_e value
+ */
+RLM_API realm_user_state_e realm_user_get_state(const realm_user_t* user) RLM_API_NOEXCEPT;
+
+RLM_API bool realm_user_is_logged_in(const realm_user_t*) RLM_API_NOEXCEPT;
+
+/**
+ * Return the access token associated with the user.
+ * @return a string that rapresents the access token
+ */
+RLM_API char* realm_user_get_access_token(const realm_user_t*);
+
+/**
+ * Return the refresh token associated with the user.
+ * @return a string that represents the refresh token
+ */
+RLM_API char* realm_user_get_refresh_token(const realm_user_t*);
+
 typedef struct realm_app_user_subscription_token realm_app_user_subscription_token_t;
 typedef void (*realm_sync_on_user_state_changed_t)(realm_userdata_t userdata, realm_user_state_e s);
 /**
@@ -3620,34 +3648,6 @@ RLM_API void realm_sync_manager_set_route(const realm_sync_manager_t* session, c
 
 
 #endif // !REALM_APP_SERVICES
-
-/**
- * Return the identiy for the user passed as argument
- * @param user ptr to the user for which the identiy has to be retrieved
- * @return a ptr to the identity string. This must be manually released with realm_free().
- */
-RLM_API char* realm_user_get_identity(const realm_user_t* user) RLM_API_NOEXCEPT;
-
-/**
- * Retrieve the state for the user passed as argument
- * @param user ptr to the user for which the state has to be retrieved
- * @return realm_user_state_e value
- */
-RLM_API realm_user_state_e realm_user_get_state(const realm_user_t* user) RLM_API_NOEXCEPT;
-
-RLM_API bool realm_user_is_logged_in(const realm_user_t*) RLM_API_NOEXCEPT;
-
-/**
- * Return the access token associated with the user.
- * @return a string that rapresents the access token
- */
-RLM_API char* realm_user_get_access_token(const realm_user_t*);
-
-/**
- * Return the refresh token associated with the user.
- * @return a string that represents the refresh token
- */
-RLM_API char* realm_user_get_refresh_token(const realm_user_t*);
 
 // This type should never be returned from a function.
 // It's only meant as an asynchronous callback argument.

@@ -682,21 +682,19 @@ TEST_CASE("C API (non-database)", "[c_api]") {
         SyncUser* cxx_user = (*(sync_user.get())).get();
 
         {
-            auto access_token = realm_user_get_access_token(sync_user.get());
-            CHECK(strcmp(access_token, "access token for User1") == 0);
-            realm_free(access_token);
+            auto access_token = cxx_user->access_token();
+            CHECK(access_token == "access token for User1");
         }
         {
-            auto refresh_token = realm_user_get_refresh_token(sync_user.get());
-            CHECK(strcmp(refresh_token, "refresh token for User1") == 0);
-            realm_free(refresh_token);
+            auto refresh_token = cxx_user->refresh_token();
+            CHECK(refresh_token == "refresh token for User1");
         }
         {
-            CHECK(realm_user_get_state(sync_user.get()) == realm_user_state_e::RLM_USER_STATE_LOGGED_IN);
+            CHECK(cxx_user->state() == SyncUser::State::LoggedIn);
             custom_user.m_state = SyncUser::State::LoggedOut;
-            CHECK(realm_user_get_state(sync_user.get()) == realm_user_state_e::RLM_USER_STATE_LOGGED_OUT);
+            CHECK(cxx_user->state() == SyncUser::State::LoggedOut);
             custom_user.m_state = SyncUser::State::Removed;
-            CHECK(realm_user_get_state(sync_user.get()) == realm_user_state_e::RLM_USER_STATE_REMOVED);
+            CHECK(cxx_user->state() == SyncUser::State::Removed);
         }
         {
             CHECK(!cxx_user->access_token_refresh_required());

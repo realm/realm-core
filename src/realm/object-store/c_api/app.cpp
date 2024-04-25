@@ -751,32 +751,6 @@ RLM_API realm_app_t* realm_user_get_app(const realm_user_t* user) noexcept
     });
 }
 
-
-RLM_API realm_app_user_subscription_token_t*
-realm_sync_user_on_state_change_register_callback(realm_user_t* user, realm_sync_on_user_state_changed_t callback,
-                                                  realm_userdata_t userdata, realm_free_userdata_func_t userdata_free)
-{
-    return with_app_user(user, [&](auto& user) {
-        auto cb = [callback,
-                   userdata = SharedUserdata{userdata, FreeUserdata(userdata_free)}](const SyncUser& sync_user) {
-            callback(userdata.get(), realm_user_state_e(sync_user.state()));
-        };
-        auto token = user->subscribe(std::move(cb));
-        return new realm_app_user_subscription_token_t{user, std::move(token)};
-    });
-}
-
-RLM_API bool realm_sync_immediately_run_file_actions(realm_app_t* realm_app, const char* sync_path,
-                                                     bool* did_run) noexcept
-{
-    return wrap_err([&]() {
-        *did_run = (*realm_app)->immediately_run_file_actions(sync_path);
-        return true;
-    });
-}
-
-#endif // REALM_APP_SERVICES
-
 RLM_API char* realm_user_get_identity(const realm_user_t* user) noexcept
 {
     return duplicate_string((*user)->user_id());
@@ -805,6 +779,31 @@ RLM_API char* realm_user_get_refresh_token(const realm_user_t* user)
         return duplicate_string((*user)->refresh_token());
     });
 }
+
+RLM_API realm_app_user_subscription_token_t*
+realm_sync_user_on_state_change_register_callback(realm_user_t* user, realm_sync_on_user_state_changed_t callback,
+                                                  realm_userdata_t userdata, realm_free_userdata_func_t userdata_free)
+{
+    return with_app_user(user, [&](auto& user) {
+        auto cb = [callback,
+                   userdata = SharedUserdata{userdata, FreeUserdata(userdata_free)}](const SyncUser& sync_user) {
+            callback(userdata.get(), realm_user_state_e(sync_user.state()));
+        };
+        auto token = user->subscribe(std::move(cb));
+        return new realm_app_user_subscription_token_t{user, std::move(token)};
+    });
+}
+
+RLM_API bool realm_sync_immediately_run_file_actions(realm_app_t* realm_app, const char* sync_path,
+                                                     bool* did_run) noexcept
+{
+    return wrap_err([&]() {
+        *did_run = (*realm_app)->immediately_run_file_actions(sync_path);
+        return true;
+    });
+}
+
+#endif // REALM_APP_SERVICES
 
 #if !REALM_APP_SERVICES
 

@@ -1217,7 +1217,6 @@ classes:
     methods:
       access_token_refresh_required: bool
       request_log_out: '(cb: AsyncCallback<(err: std::optional<AppError>)>&&)'
-      request_refresh_user: '(cb: AsyncCallback<(err: std::optional<AppError>)>&&)'
       request_refresh_location: '(cb: AsyncCallback<(err: std::optional<AppError>)>&&)'
       request_access_token: '(cb: AsyncCallback<(err: std::optional<AppError>)>&&)'
       track_realm: '(std::string_view)'
