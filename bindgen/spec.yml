@@ -1,3 +1,5 @@
+# yaml-language-server: $schema=generated/spec.schema.json
+
 headers:
   - "realm/sync/config.hpp"
   - "realm/sync/subscriptions.hpp"
@@ -17,8 +19,8 @@ headers:
   - "realm/object-store/sync/app.hpp"
   - "realm/object-store/sync/sync_manager.hpp"
   - "realm/object-store/sync/sync_session.hpp"
-  - "realm/object-store/sync/sync_user.hpp"
   - "realm/object-store/sync/app_user.hpp"
+  - "realm/object-store/sync/sync_user.hpp"
   - "realm/object-store/sync/mongo_collection.hpp"
   - "realm/util/bson/bson.hpp"
 
@@ -484,7 +486,7 @@ records:
 
   SyncConfig:
     fields:
-      user: SharedUser
+      user: SharedSyncUser
       partition_value:
         type: std::string
         default: ""
@@ -1202,9 +1204,8 @@ classes:
   UserSubscriptionToken:
     cppName: app::User::Token
 
-  User:
-    cppName: app::User
-    sharedPtrWrapped: SharedUser
+  SyncUser:
+    sharedPtrWrapped: SharedSyncUser
     properties:
       is_logged_in: bool
       user_id: std::string
@@ -1213,6 +1214,21 @@ classes:
       access_token: std::string
       refresh_token: std::string
       state: SyncUserState
+      sync_manager: SharedSyncManager
+    methods:
+      access_token_refresh_required: '() -> bool'
+#      request_log_out: '(cb: AsyncCallback<(err: std::optional<AppError>)>&&)'
+      request_refresh_user: '(cb: AsyncCallback<(err: std::optional<AppError>)>&&)'
+      request_refresh_location: '(cb: AsyncCallback<(err: std::optional<AppError>)>&&)'
+      request_access_token: '(cb: AsyncCallback<(err: std::optional<AppError>)>&&)'
+      track_realm: '(path: std::string_view)'
+      create_file_action: '(action: SyncFileAction, original_path: std::string_view, requested_recovery_dir: std::optional<std::string>, partition_value: std::string_view) -> std::string'
+
+  User:
+    base: SyncUser
+    cppName: app::User
+    sharedPtrWrapped: SharedUser
+    properties:
       is_anonymous: bool
       device_id: std::string
       has_device_id: bool
@@ -1223,16 +1239,9 @@ classes:
       app: SharedApp
     methods:
       log_out: ()
-      path_for_realm: '(config: SyncConfig&, custom_file_name: std::optional<std::string>&) -> std::string'
       subscribe: '(observer: (user: IgnoreArgument<const User&>)) -> UserSubscriptionToken'
       unsubscribe: '(token: UserSubscriptionToken)'
-      access_token_refresh_required: '() -> bool'
-      request_log_out: '(cb: AsyncCallback<(err: std::optional<AppError>)>&&)'
-      request_refresh_user: '(cb: AsyncCallback<(err: std::optional<AppError>)>&&)'
-      request_refresh_location: '(cb: AsyncCallback<(err: std::optional<AppError>)>&&)'
-      request_access_token: '(cb: AsyncCallback<(err: std::optional<AppError>)>&&)'
-      track_realm: '(path: std::string_view)'
-      create_file_action: '(action: SyncFileAction, original_path: std::string_view, requested_recovery_dir: std::optional<std::string>, partition_value: std::string_view) -> std::string'
+      path_for_realm: '(config: SyncConfig&, custom_file_name: std::optional<std::string>&) -> std::string'
 
   UserProfile:
     cppName: app::UserProfile
@@ -1265,6 +1274,7 @@ classes:
       get_cached_app: '(app_id: const std::string&) -> SharedApp'
       clear_cached_apps: ()
       close_all_sync_sessions: ()
+
     methods:
       log_in_with_credentials: '(credentials: AppCredentials, cb: AsyncCallback<(user: const Nullable<SharedUser>&, err: std::optional<AppError>)>&&)'
       log_out:
@@ -1351,7 +1361,7 @@ classes:
       reconnect: ()
       wait_for_sessions_to_terminate: ()
       get_existing_active_session: '(path: const std::string&) -> Nullable<SharedSyncSession>'
-      get_all_sessions_for: '(user: const User&) -> std::vector<SharedSyncSession>'
+      get_all_sessions_for: '(user: const SyncUser&) -> std::vector<SharedSyncSession>'
 
   ThreadSafeReference: {}
   AsyncOpenTask:
@@ -1368,6 +1378,7 @@ classes:
       state: SyncSessionState
       connection_state: SyncSessionConnectionState
       path: std::string
+      user: SharedSyncUser
       config: SyncConfig
       full_realm_url: std::string
     methods:
