@@ -476,7 +476,7 @@ constexpr int num_bits_table[65] = {-1, 64, 64, 63, 64, 60, 60, 63, // 0-7
 inline int num_fields_for_width(size_t width)
 {
     REALM_ASSERT_DEBUG(width);
-    auto retval = num_fields_table[width];
+    const auto retval = num_fields_table[width];
 #ifdef REALM_DEBUG
     REALM_ASSERT_DEBUG(width == 0 || retval == int(64 / width));
 #endif
@@ -488,7 +488,7 @@ inline int num_bits_for_width(size_t width)
     return num_bits_table[width];
 }
 
-inline uint64_t cares_about(int width)
+inline uint64_t cares_about(size_t width)
 {
     return 0xFFFFFFFFFFFFFFFFULL >> (64 - num_bits_table[width]);
 }
@@ -972,7 +972,7 @@ inline int64_t default_fetcher(const char* data, size_t ndx)
 }
 
 template <typename T>
-struct EncodedFetcher {
+struct CompressedDataFetcher {
 
     int64_t operator()(const char*, size_t ndx) const
     {
@@ -1007,7 +1007,7 @@ struct EncodedFetcher {
 //
 // We currently use binary search. See for example
 // http://www.tbray.org/ongoing/When/200x/2003/03/22/Binary.
-template <int width, typename F = decltype(default_fetcher<width>)>
+template <typename F>
 inline size_t lower_bound(const char* data, size_t start, size_t end, int64_t value,
                           F fetcher = default_fetcher) noexcept
 {
@@ -1085,7 +1085,7 @@ inline size_t lower_bound(const char* data, size_t start, size_t end, int64_t va
         size_t other_half = size - half;
         size_t probe = low + half;
         size_t other_low = low + other_half;
-        int64_t v = fetcher(data, probe); // get_direct<width>(data, probe);
+        int64_t v = fetcher(data, probe);
         size = half;
         // for max performance, the line below should compile into a conditional
         // move instruction. Not all compilers do this. To maximize chance
@@ -1098,7 +1098,7 @@ inline size_t lower_bound(const char* data, size_t start, size_t end, int64_t va
 }
 
 // See lower_bound()
-template <int width, typename F = decltype(default_fetcher<width>)>
+template <typename F>
 inline size_t upper_bound(const char* data, size_t start, size_t end, int64_t value,
                           F fetcher = default_fetcher) noexcept
 {
@@ -1149,27 +1149,27 @@ inline size_t upper_bound(const char* data, size_t start, size_t end, int64_t va
 template <int width>
 inline size_t lower_bound(const char* data, size_t size, int64_t value) noexcept
 {
-    return impl::lower_bound<width>(data, 0, size, value, impl::default_fetcher<width>);
+    return impl::lower_bound(data, 0, size, value, impl::default_fetcher<width>);
 }
 
 template <typename T>
 inline size_t lower_bound(const char* data, size_t size, int64_t value,
-                          const impl::EncodedFetcher<T>& encoder) noexcept
+                          const impl::CompressedDataFetcher<T>& fetcher) noexcept
 {
-    return impl::lower_bound<0>(data, 0, size, value, encoder);
+    return impl::lower_bound(data, 0, size, value, fetcher);
 }
 
 template <int width>
 inline size_t upper_bound(const char* data, size_t size, int64_t value) noexcept
 {
-    return impl::upper_bound<width>(data, 0, size, value, impl::default_fetcher<width>);
+    return impl::upper_bound(data, 0, size, value, impl::default_fetcher<width>);
 }
 
 template <typename T>
 inline size_t upper_bound(const char* data, size_t size, int64_t value,
-                          const impl::EncodedFetcher<T>& encoder) noexcept
+                          const impl::CompressedDataFetcher<T>& fetcher) noexcept
 {
-    return impl::lower_bound<0>(data, 0, size, value, encoder);
+    return impl::upper_bound(data, 0, size, value, fetcher);
 }
 
 } // namespace realm
