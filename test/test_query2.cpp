@@ -5630,6 +5630,51 @@ TEST_TYPES(Query_Mixed, std::true_type, std::false_type)
     CHECK_EQUAL(tv.size(), 1);
 }
 
+TEST(Query_NestedListNull)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    auto hist = make_in_realm_history();
+    DBRef db = DB::create(*hist, path);
+    auto tr = db->start_write();
+    auto foo = tr->add_table("foo");
+    auto col_any = foo->add_column(type_Mixed, "mixed");
+
+    const char* listOfListOfNull = R"([[null]])";
+
+    foo->create_object().set_json(col_any, R"("not a list")");
+    foo->create_object().set_json(col_any, listOfListOfNull);
+    foo->create_object().set_json(col_any, listOfListOfNull);
+    foo->create_object().set_json(col_any, listOfListOfNull);
+
+    CHECK_EQUAL(foo->query("mixed[0][0] == null").count(), 3);
+    CHECK_EQUAL(foo->query("mixed[0][5] == null").count(), 0);
+    CHECK_EQUAL(foo->query("mixed[0][*] == null").count(), 3);
+}
+
+TEST(Query_NestedDictionaryNull)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    auto hist = make_in_realm_history();
+    DBRef db = DB::create(*hist, path);
+    auto tr = db->start_write();
+    auto foo = tr->add_table("foo");
+    auto col_any = foo->add_column(type_Mixed, "mixed");
+
+    const char* dictOfDictOfNull = R"({ "nestedDict": { "nullValue": null }})";
+
+    foo->create_object().set_json(col_any, R"("not a dictionary")");
+    foo->create_object().set_json(col_any, dictOfDictOfNull);
+    foo->create_object().set_json(col_any, dictOfDictOfNull);
+    foo->create_object().set_json(col_any, dictOfDictOfNull);
+
+    CHECK_EQUAL(foo->query("mixed['nestedDict']['nullValue'] == null").count(), 3);
+    CHECK_EQUAL(foo->query("mixed.nestedDict.nullValue == null").count(), 3);
+    CHECK_EQUAL(foo->query("mixed['nestedDict']['foo'] == null").count(), 3);
+    CHECK_EQUAL(foo->query("mixed.nestedDict.foo == null").count(), 3);
+    CHECK_EQUAL(foo->query("mixed.nestedDict[*] == null").count(), 3);
+    CHECK_EQUAL(foo->query("mixed.nestedDict[*].@type == 'null'").count(), 3);
+}
+
 TEST(Query_ListOfMixed)
 {
     Group g;

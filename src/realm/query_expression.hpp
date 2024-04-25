@@ -2076,7 +2076,7 @@ public:
                     }
                 }
                 if (!index.set_size(m_ctrl.matches.size())) {
-                    dest.init(true, 0);
+                    destination.init(true, 0);
                     return;
                 }
             }
