@@ -1547,7 +1547,7 @@ buildvariants:
   - name: test-on-exfat
 
 - name: macos-release
-  display_name: "MacOS 11.0 x86_64 (Release benchmarks)"
+  display_name: "MacOS 11.0 x86_64 (Release build)"
   run_on: macos-1100
   expansions:
     cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.26.3-macos-universal.tar.gz"
@@ -1560,6 +1560,7 @@ buildvariants:
     extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=x86_64
   tasks:
   - name: benchmarks
+  - name: compile_test
 
 - name: macos-1100-arm64-release
   display_name: "MacOS 11 arm64 (Release benchmarks)"
