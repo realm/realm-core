@@ -51,7 +51,14 @@ target_compile_definitions(Bson PRIVATE _GNU_SOURCE _XOPEN_SOURCE=700 BSON_COMPI
 if (CMAKE_SYSTEM_NAME MATCHES "Darwin")
   target_compile_definitions(Bson PRIVATE _DARWIN_C_SOURCE)
 endif()
+
 # disable warnings in this project
-target_compile_options(Bson PUBLIC -w)
+# warnings should be checked when updating the library code
+if (MSVC)
+  target_compile_options(Bson PUBLIC /W0)
+else()
+  target_compile_options(Bson PUBLIC -w)
+endif()
+
 target_include_directories(Bson PUBLIC .. ${PROJECT_BINARY_DIR}/src/external)
 target_compile_definitions(Bson INTERFACE BSON_STATIC)

@@ -27,6 +27,12 @@ if(MSVC)
 endif()
 
 # disable warnings in this project
-target_compile_options(Bid PUBLIC -w)
+# warnings should be checked when updating the library code
+if (MSVC)
+  target_compile_options(Bid PUBLIC /W0)
+else()
+  target_compile_options(Bid PUBLIC -w)
+endif()
+
 
 set_target_properties(Bid PROPERTIES CXX_VISIBILITY_PRESET hidden)
