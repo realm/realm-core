@@ -46,6 +46,12 @@ using namespace realm;
 using namespace realm::util;
 namespace cf = realm::collection_fixtures;
 
+// Dummy implementation to satisfy StringifyingContext
+inline std::ostream& operator<<(std::ostream& out, const realm::object_store::Collection&)
+{
+    return out;
+}
+
 struct StringifyingContext {
     template <typename T>
     std::string box(T value)
@@ -808,24 +814,32 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", cf::MixedVal, cf::Int, cf::
         if (!util::EventLoop::has_implementation())
             return;
 
-        SyncServer server;
-        SyncTestFile sync_config(server, "shared");
-        sync_config.schema = config.schema;
+        TestSyncManager init_sync_manager({}, {false});
+        auto& server = init_sync_manager.sync_server();
+        SyncTestFile sync_config(init_sync_manager, "shared");
+        sync_config.schema = Schema{
+            {"object",
+             {{"value", PropertyType::Array | TestType::property_type},
+              {"_id", PropertyType::Int, Property::IsPrimary{true}}}},
+        };
         sync_config.schema_version = 0;
+        server.start();
 
         {
             auto r = Realm::get_shared_realm(sync_config);
             r->begin_transaction();
 
             CppContext ctx(r);
-            auto obj = Object::create(ctx, r, *r->schema().find("object"), std::any(AnyDict{}));
+            auto obj = Object::create(ctx, r, *r->schema().find("object"), std::any(AnyDict{{"_id", INT64_C(5)}}));
             auto list = util::any_cast<List>(obj.get_property_value<std::any>(ctx, "value"));
             list.add(static_cast<T>(values[0]));
 
             r->commit_transaction();
             wait_for_upload(*r);
+            wait_for_download(*r);
         }
 
+        std::this_thread::sleep_for(std::chrono::milliseconds(5));
         util::File::remove(sync_config.path);
 
         {

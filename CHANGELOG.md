@@ -92,6 +92,7 @@
 
 ### Enhancements
 * Introduce sync 'progress_estimate' parameter (value from 0.0 to 1.0) for existing sync 'ProgressNotifierCallback' api to report sync progress on current batch of upload/download until completion ([#7450](https://github.com/realm/realm-core/issues/7450))
+* Support assigning nested collections via templated API (PR [#7478](https://github.com/realm/realm-core/pull/7478))
 
 ### Fixed
 * Fix an assertion failure "m_lock_info && m_lock_info->m_file.get_path() == m_filename" that appears to be related to opening a Realm while the file is in the process of being closed on another thread ([Swift #8507](https://github.com/realm/realm-swift/issues/8507)).
