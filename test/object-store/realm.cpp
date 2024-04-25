@@ -46,6 +46,9 @@
 #if REALM_ENABLE_SYNC
 #include <util/sync/flx_sync_harness.hpp>
 #include <util/sync/sync_test_utils.hpp>
+#ifdef REALM_ENABLE_AUTH_TESTS
+#include <util/sync/baas_admin_api.hpp>
+#endif // REALM_ENABLE_AUTH_TESTS
 
 #include <realm/object-store/sync/async_open_task.hpp>
 #include <realm/object-store/sync/impl/app_metadata.hpp>
@@ -53,7 +56,7 @@
 
 #include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/subscriptions.hpp>
-#endif
+#endif // REALM_ENABLE_SYNC
 
 #include <catch2/catch_all.hpp>
 #include <catch2/matchers/catch_matchers_string.hpp>
@@ -63,7 +66,7 @@
 #include <array>
 #if REALM_HAVE_UV
 #include <uv.h>
-#endif
+#endif // REALM_HAVE_UV
 
 namespace realm {
 class TestHelper {
@@ -1473,6 +1476,7 @@ TEST_CASE("Get Realm using Async Open", "[sync][pbs][async open]") {
     }
 }
 
+#if REALM_ENABLE_AUTH_TESTS
 
 TEST_CASE("Syhcnronized realm: AutoOpen", "[sync][baas][pbs][async open]") {
     const auto partition = random_string(100);
@@ -1571,6 +1575,7 @@ TEST_CASE("Syhcnronized realm: AutoOpen", "[sync][baas][pbs][async open]") {
     wait_for_download(*r);
 }
 
+#endif // REALM_ENABLE_AUTH_TESTS
 
 TEST_CASE("SharedRealm: convert", "[sync][pbs][convert]") {
     TestSyncManager tsm;

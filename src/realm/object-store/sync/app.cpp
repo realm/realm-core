@@ -1285,8 +1285,8 @@ void App::refresh_access_token(const std::shared_ptr<User>& user, bool update_lo
         return;
     }
 
-    log_debug("App: refresh_access_token: email: %1 %2", user->user_id(),
-              update_location ? "(updating location)" : "");
+    log_debug("App: refresh_access_token: user-id: %1%2", user->user_id(),
+              update_location ? " (updating location)" : "");
 
     // If update_location is set, force the location info to be updated before sending the request
     do_request(
