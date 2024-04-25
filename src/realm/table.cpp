@@ -511,6 +511,14 @@ CollectionType Table::get_collection_type(ColKey col_key) const
     return CollectionType::Dictionary;
 }
 
+void Table::remove_columns()
+{
+    for (size_t i = get_column_count(); i > 0; --i) {
+        ColKey col_key = spec_ndx2colkey(i - 1);
+        remove_column(col_key);
+    }
+}
+
 void Table::remove_column(ColKey col_key)
 {
     check_column(col_key);

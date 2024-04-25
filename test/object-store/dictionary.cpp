@@ -190,6 +190,10 @@ TEST_CASE("nested dictionary in mixed", "[dictionary]") {
         REQUIRE(val.is_type(type_List));
         auto list = results.get_list(1);
         REQUIRE(list.is_valid());
+
+        CppContext ctx(r);
+        CHECK(util::any_cast<object_store::Dictionary&&>(results.get(ctx, 0)).is_valid());
+        CHECK(util::any_cast<List&&>(results.get(ctx, 1)).is_valid());
     }
 }
 
@@ -1040,6 +1044,7 @@ TEST_CASE("embedded dictionary", "[dictionary]") {
     object_store::Dictionary dict(r, obj, col_links);
     for (int i = 0; i < 10; ++i)
         dict.insert_embedded(util::to_string(i));
+    dict.insert("null", ObjKey());
 
     r->commit_transaction();
 
@@ -1059,9 +1064,25 @@ TEST_CASE("embedded dictionary", "[dictionary]") {
 
         SECTION("creates new object for dictionary") {
             dict.insert(ctx, "foo", std::any(AnyDict{{"value", INT64_C(20)}}));
-            REQUIRE(dict.size() == 11);
+            REQUIRE(dict.size() == 12);
             REQUIRE(target->size() == initial_target_size + 1);
             REQUIRE(dict.get_object("foo").get<Int>(col_value) == 20);
+        }
+
+        SECTION("overwrite null value") {
+            dict.insert(ctx, "null", std::any(AnyDict{{"value", INT64_C(17)}}), CreatePolicy::UpdateModified);
+            REQUIRE(dict.size() == 11);
+            REQUIRE(target->size() == initial_target_size + 1);
+            REQUIRE(dict.get_object("null").get<Int>(col_value) == 17);
+        }
+
+        SECTION("mutates the existing object for update mode Modified") {
+            auto old_object = dict.get<Obj>("0");
+            dict.insert(ctx, "0", std::any(AnyDict{{"value", INT64_C(20)}}), CreatePolicy::UpdateModified);
+            REQUIRE(dict.size() == 11);
+            REQUIRE(target->size() == initial_target_size);
+            REQUIRE(dict.get_object("0").get<Int>(col_value) == 20);
+            REQUIRE(old_object.is_valid());
         }
 
         r->cancel_transaction();
@@ -1108,8 +1129,10 @@ TEMPLATE_TEST_CASE("dictionary of objects", "[dictionary][links]", cf::MixedVal,
         Obj target_obj = target->create_object().set(col_target_value, T(values[i]));
         dict.insert(keys[i], target_obj);
     }
+
     r->commit_transaction();
     r->begin_transaction();
+
     SECTION("min()") {
         if constexpr (!TestType::can_minmax) {
             REQUIRE_EXCEPTION(
@@ -1339,13 +1362,145 @@ TEST_CASE("dictionary nullify", "[dictionary]") {
                               Any{AnyDict{{"intDictionary", AnyDict{{"0", Any(AnyDict{{"intCol", INT64_C(0)}})},
                                                                     {"1", Any(AnyDict{{"intCol", INT64_C(1)}})},
                                                                     {"2", Any(AnyDict{{"intCol", INT64_C(2)}})}}}}});
+    auto obj1 = Object::create(ctx, r, *r->schema().find("DictionaryObject"),
+                               Any{AnyDict{{"intDictionary", AnyDict{{"null", Any()}}}}});
     r->commit_transaction();
 
     r->begin_transaction();
-    // Before fix, we would crash here
-    r->read_group().get_table("class_IntObject")->clear();
+    SECTION("clear dictionary") {
+        // Before fix, we would crash here
+        r->read_group().get_table("class_IntObject")->clear();
+        // r->read_group().to_json(std::cout);
+    }
+
+    SECTION("overwrite null value") {
+        obj1.set_property_value(ctx, "intDictionary", Any(AnyDict{{"null", Any(AnyDict{{"intCol", INT64_C(3)}})}}),
+                                CreatePolicy::UpdateModified);
+        auto dict =
+            util::any_cast<object_store::Dictionary&&>(obj1.get_property_value<std::any>(ctx, "intDictionary"));
+        REQUIRE(dict.get_object("null").get<Int>("intCol") == 3);
+    }
     r->commit_transaction();
-    // r->read_group().to_json(std::cout);
+}
+
+TEST_CASE("nested collection set by Object::create", "[dictionary]") {
+    InMemoryTestFile config;
+    config.schema = Schema{
+        {"DictionaryObject",
+         {
+             {"_id", PropertyType::Int, Property::IsPrimary{true}},
+             {"any", PropertyType::Mixed | PropertyType::Nullable},
+         }},
+    };
+
+    auto r = Realm::get_shared_realm(config);
+    CppContext ctx(r);
+
+    Any value{AnyDict{{"_id", INT64_C(5)},
+                      {"any", AnyDict{{"0", Any(AnyDict{{"zero", INT64_C(0)}})},
+                                      {"1", Any(AnyVector{std::string("one"), INT64_C(1)})},
+                                      {"2", Any(AnyDict{{"two", INT64_C(2)}, {"three", INT64_C(3)}})}}}}};
+    r->begin_transaction();
+    auto obj = Object::create(ctx, r, *r->schema().find("DictionaryObject"), value);
+    r->commit_transaction();
+
+    auto dict = util::any_cast<object_store::Dictionary&&>(obj.get_property_value<std::any>(ctx, "any"));
+
+    auto dict0 = util::any_cast<object_store::Dictionary&&>(dict.get(ctx, "0"));
+    auto list1 = util::any_cast<List&&>(dict.get(ctx, "1"));
+    auto dict2 = dict.get_dictionary("2");
+    CHECK(dict0.get_any("zero") == Mixed(0));
+    CHECK(list1.get_any(0) == Mixed("one"));
+    CHECK(list1.get_any(1) == Mixed(1));
+    CHECK(dict2.get_any("two") == Mixed(2));
+    CHECK(dict2.get_any("three") == Mixed(3));
+
+    SECTION("modify list only") {
+        Any new_value{
+            AnyDict{{"_id", INT64_C(5)}, {"any", AnyDict{{"1", Any(AnyVector{std::string("seven"), INT64_C(7)})}}}}};
+
+        r->begin_transaction();
+        Object::create(ctx, r, *r->schema().find("DictionaryObject"), new_value, CreatePolicy::UpdateModified);
+        r->commit_transaction();
+        CHECK(list1.get_any(0) == Mixed("seven"));
+        CHECK(list1.get_any(1) == Mixed(7));
+    }
+
+    SECTION("update with less data") {
+        Any new_value{
+            AnyDict{{"_id", INT64_C(5)}, {"any", AnyDict{{"1", Any(AnyVector{std::string("seven"), INT64_C(7)})}}}}};
+
+        r->begin_transaction();
+        Object::create(ctx, r, *r->schema().find("DictionaryObject"), new_value, CreatePolicy::UpdateAll);
+        r->commit_transaction();
+        CHECK(dict.size() == 1);
+        list1 = dict.get_list("1");
+        CHECK(list1.get_any(0) == Mixed("seven"));
+        CHECK(list1.get_any(1) == Mixed(7));
+    }
+
+    SECTION("replace list with dictionary") {
+        Any new_value{AnyDict{{"_id", INT64_C(5)}, {"any", AnyDict{{"1", Any(AnyDict{{"seven", INT64_C(7)}})}}}}};
+
+        r->begin_transaction();
+        Object::create(ctx, r, *r->schema().find("DictionaryObject"), new_value, CreatePolicy::UpdateModified);
+        r->commit_transaction();
+        auto dict1 = dict.get_dictionary("1");
+        CHECK(dict1.get_any("seven") == Mixed(7));
+    }
+
+    SECTION("replace dictionary with list on top level") {
+        value = Any{AnyDict{
+            {"_id", INT64_C(5)},
+            {"any", AnyVector{Any(AnyDict{{"zero", INT64_C(0)}}), Any(AnyVector{std::string("one"), INT64_C(1)}),
+                              Any(AnyDict{{"two", INT64_C(2)}, {"three", INT64_C(3)}})}}}};
+
+        r->begin_transaction();
+        Object::create(ctx, r, *r->schema().find("DictionaryObject"), value, CreatePolicy::UpdateModified);
+        r->commit_transaction();
+        auto list = util::any_cast<List&&>(obj.get_property_value<std::any>(ctx, "any"));
+        dict0 = util::any_cast<object_store::Dictionary&&>(list.get(ctx, 0));
+        CHECK(dict0.get_any("zero") == Mixed(0));
+
+        SECTION("modify dictionary only") {
+            Any new_value{
+                AnyDict{{"_id", INT64_C(5)}, {"any", AnyVector{Any(AnyDict{{std::string("seven"), INT64_C(7)}})}}}};
+
+            r->begin_transaction();
+            Object::create(ctx, r, *r->schema().find("DictionaryObject"), new_value, CreatePolicy::UpdateModified);
+            r->commit_transaction();
+            CHECK(dict0.get_any("seven") == Mixed(7));
+        }
+
+        SECTION("replace dictionary with list") {
+            Any new_value{
+                AnyDict{{"_id", INT64_C(5)}, {"any", AnyVector{Any(AnyVector{std::string("seven"), INT64_C(7)})}}}};
+
+            r->begin_transaction();
+            Object::create(ctx, r, *r->schema().find("DictionaryObject"), new_value, CreatePolicy::UpdateModified);
+            r->commit_transaction();
+            auto list0 = util::any_cast<List&&>(list.get(ctx, 0));
+            CHECK(list0.get_any(0) == Mixed("seven"));
+            CHECK(list0.get_any(1) == Mixed(7));
+        }
+
+        SECTION("assign dictionary directly to nested list") {
+            r->begin_transaction();
+            list.set(ctx, 1, Any(AnyDict{{std::string("ten"), INT64_C(10)}}));
+            r->commit_transaction();
+            auto dict0 = list.get_dictionary(1);
+            CHECK(dict0.get_any("ten") == Mixed(10));
+        }
+
+        SECTION("assign list directly to nested list") {
+            r->begin_transaction();
+            list.set(ctx, 0, Any(AnyVector{std::string("ten"), INT64_C(10)}));
+            r->commit_transaction();
+            auto list0 = list.get_list(0);
+            CHECK(list0.get_any(0) == Mixed("ten"));
+            CHECK(list0.get_any(1) == Mixed(10));
+        }
+    }
 }
 
 TEST_CASE("dictionary assign", "[dictionary]") {
