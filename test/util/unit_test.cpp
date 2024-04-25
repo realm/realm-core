@@ -718,10 +718,10 @@ void TestList::ThreadContextImpl::run(SharedContextImpl::Entry entry, UniqueLock
     const Test& test = *entry.test;
     TestContext test_context(*this, test.details, entry.test_index, entry.recurrence_index);
     shared_context.reporter.begin(test_context);
-    lock.unlock();
-
     last_line_seen = test.details.line_number;
     errors_seen = false;
+    lock.unlock();
+
     Timer timer;
     try {
         (*test.run_func)(test_context);
@@ -735,10 +735,11 @@ void TestList::ThreadContextImpl::run(SharedContextImpl::Entry entry, UniqueLock
         test_context.test_failed(util::format("Unhandled exception after line %1 of unknown type", last_line_seen));
     }
     double elapsed_time = timer.get_elapsed_time();
+
+    lock.lock();
     if (errors_seen)
         ++num_failed_tests;
 
-    lock.lock();
     shared_context.reporter.end(test_context, elapsed_time);
 }
 
