@@ -253,7 +253,7 @@ int RobustMutex::try_low_level_lock()
 
 bool RobustMutex::is_valid() noexcept
 {
-#ifdef _WIN32    
+#ifdef _WIN32
     REALM_ASSERT_RELEASE(false);
 #else
     // FIXME: This check tries to lock the mutex, and only unlocks it if the

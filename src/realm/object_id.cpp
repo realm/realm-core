@@ -52,8 +52,9 @@ static_assert(sizeof(ObjectId) == 12, "changing the size of an ObjectId is a fil
 
 bool ObjectId::is_valid_str(StringData str) noexcept
 {
-    return str.size() == 24 &&
-           std::all_of(str.data(), str.data() + str.size(), [](unsigned char c) { return std::isxdigit(c); });
+    return str.size() == 24 && std::all_of(str.data(), str.data() + str.size(), [](unsigned char c) {
+               return std::isxdigit(c);
+           });
 }
 
 ObjectId::ObjectId(StringData init) noexcept

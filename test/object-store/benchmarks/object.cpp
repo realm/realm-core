@@ -97,50 +97,43 @@ TEST_CASE("Benchmark index change calculations", "[benchmark][index]") {
         }
         ObjKeys objkeys(indices);
 
-        BENCHMARK("no changes")
-        {
+        BENCHMARK("no changes") {
             c = calc(objkeys, objkeys, none_modified);
         };
         REQUIRE(c.insertions.empty());
         REQUIRE(c.deletions.empty());
 
-        BENCHMARK("all modified")
-        {
+        BENCHMARK("all modified") {
             c = calc(objkeys, objkeys, all_modified);
         };
         REQUIRE(c.insertions.empty());
         REQUIRE(c.deletions.empty());
 
-        BENCHMARK("calc 1")
-        {
+        BENCHMARK("calc 1") {
             c = calc({1, 2, 3}, {1, 3, 2}, none_modified);
         };
         REQUIRE_INDICES(c.insertions, 1);
         REQUIRE_INDICES(c.deletions, 2);
 
-        BENCHMARK("calc 2")
-        {
+        BENCHMARK("calc 2") {
             c = calc({1, 2, 3}, {2, 1, 3}, none_modified);
         };
         REQUIRE_INDICES(c.insertions, 0);
         REQUIRE_INDICES(c.deletions, 1);
 
-        BENCHMARK("calc 3")
-        {
+        BENCHMARK("calc 3") {
             c = calc({1, 2, 3}, {2, 3, 1}, none_modified);
         };
         REQUIRE_INDICES(c.insertions, 2);
         REQUIRE_INDICES(c.deletions, 0);
 
-        BENCHMARK("calc 4")
-        {
+        BENCHMARK("calc 4") {
             c = calc({1, 2, 3}, {3, 1, 2}, none_modified);
         };
         REQUIRE_INDICES(c.insertions, 0);
         REQUIRE_INDICES(c.deletions, 2);
 
-        BENCHMARK("calc 5")
-        {
+        BENCHMARK("calc 5") {
             c = calc({1, 2, 3}, {3, 2, 1}, none_modified);
         };
         REQUIRE_INDICES(c.insertions, 0, 1);
@@ -209,8 +202,7 @@ TEST_CASE("Benchmark object", "[benchmark][object]") {
         ObjectSchema all_types = *r->schema().find("all types");
 
         int64_t benchmark_pk = 0;
-        BENCHMARK("create object")
-        {
+        BENCHMARK("create object") {
             return Object::create(d, r, all_types,
                                   std::any(AnyDict{
                                       {"pk", benchmark_pk++},

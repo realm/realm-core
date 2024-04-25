@@ -21,46 +21,33 @@
 #include <limits>
 
 #if defined(_MSC_VER)
-#  define REALM_RESTRICT __restrict
+#define REALM_RESTRICT __restrict
 #elif defined(__GNUC__) || defined(__clang__)
-#  define REALM_RESTRICT __restrict__
+#define REALM_RESTRICT __restrict__
 #else
-#  define REALM_RESTRICT
+#define REALM_RESTRICT
 #endif
 
 
 namespace {
 
 static const char g_base64_encoding_chars[] = {
-    'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H',
-    'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P',
-    'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X',
-    'Y', 'Z', 'a', 'b', 'c', 'd', 'e', 'f',
-    'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n',
-    'o', 'p', 'q', 'r', 's', 't', 'u', 'v',
-    'w', 'x', 'y', 'z', '0', '1', '2', '3',
-    '4', '5', '6', '7', '8', '9', '+', '/'
-};
+    'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V',
+    'W', 'X', 'Y', 'Z', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r',
+    's', 't', 'u', 'v', 'w', 'x', 'y', 'z', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '+', '/'};
 
 // ASCII table -- 16 entries per row
 static const unsigned char g_base64_chars[] = {
-    66, 66, 66, 66, 66, 66, 66, 66, 66, 65, 65, 66, 66, 66, 66, 66,
-    66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66,
-    65, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 62, 66, 62, 66, 63,
-    52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 66, 66, 66, 64, 66, 66,
-    66,  0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14,
-    15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 66, 66, 66, 66, 63,
-    66, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40,
-    41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 66, 66, 66, 66, 66,
-    66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66,
-    66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66,
-    66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66,
-    66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66,
-    66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66,
-    66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66,
-    66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66,
-    66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66
-};
+    66, 66, 66, 66, 66, 66, 66, 66, 66, 65, 65, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66,
+    66, 66, 66, 66, 66, 66, 65, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 62, 66, 62, 66, 63, 52, 53, 54, 55,
+    56, 57, 58, 59, 60, 61, 66, 66, 66, 64, 66, 66, 66, 0,  1,  2,  3,  4,  5,  6,  7,  8,  9,  10, 11, 12,
+    13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 66, 66, 66, 66, 63, 66, 26, 27, 28, 29, 30, 31, 32,
+    33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 66, 66, 66, 66, 66, 66, 66,
+    66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66,
+    66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66,
+    66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66,
+    66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66,
+    66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66};
 
 inline unsigned int index_of_base64_byte(unsigned char c)
 {
@@ -126,9 +113,9 @@ std::optional<size_t> base64_decode(Span<const char> input, Span<char> out_buffe
     char* REALM_RESTRICT o = out_buffer.data();
 
     enum b64_byte_type {
-        equals     = 64,  // used as padding at the end
+        equals = 64, // used as padding at the end
         whitespace = 65,
-        invalid    = 66,
+        invalid = 66,
     };
 
     size_t bytes_written = 0;
@@ -139,9 +126,13 @@ std::optional<size_t> base64_decode(Span<const char> input, Span<char> out_buffe
         // classify the base64 character
         unsigned int x = index_of_base64_byte(static_cast<unsigned char>(p[i]));
         switch (x) {
-            case equals:     ++num_trailing_equals; continue;
-            case whitespace: continue; // ignore whitespace
-            case invalid:    return none;
+            case equals:
+                ++num_trailing_equals;
+                continue;
+            case whitespace:
+                continue; // ignore whitespace
+            case invalid:
+                return none;
         }
 
         if (num_trailing_equals > 0)
@@ -153,8 +144,8 @@ std::optional<size_t> base64_decode(Span<const char> input, Span<char> out_buffe
 
         if (buffer_size == 4) {
             *o++ = (buffer >> 16) & 0xff;
-            *o++ = (buffer >>  8) & 0xff;
-            *o++ = (buffer >>  0) & 0xff;
+            *o++ = (buffer >> 8) & 0xff;
+            *o++ = (buffer >> 0) & 0xff;
             buffer = 0;
             buffer_size = 0;
             bytes_written += 3;
@@ -166,7 +157,7 @@ std::optional<size_t> base64_decode(Span<const char> input, Span<char> out_buffe
     if (num_trailing_equals == 0 && extra > 1) {
         num_trailing_equals = 4 - extra;
     }
-    
+
     // trailing bytes
     if (num_trailing_equals == 0) {
         if (buffer_size != 0)
@@ -174,11 +165,11 @@ std::optional<size_t> base64_decode(Span<const char> input, Span<char> out_buffe
     }
     else if (num_trailing_equals == 1) {
         *o++ = (buffer >> 10) & 0xff;
-        *o++ = (buffer >>  2) & 0xff;
+        *o++ = (buffer >> 2) & 0xff;
         bytes_written += 2;
     }
     else if (num_trailing_equals == 2) {
-        *o++ = (buffer >>  4) & 0xff;
+        *o++ = (buffer >> 4) & 0xff;
         bytes_written += 1;
     }
     else {

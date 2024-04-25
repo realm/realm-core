@@ -1578,7 +1578,7 @@ bool File::copy(const std::string& origin_path, const std::string& target_path, 
     }
 #endif
 
-    File origin_file{origin_path, mode_Read};  // Throws
+    File origin_file{origin_path, mode_Read}; // Throws
     File target_file;
     bool did_create = false;
     target_file.open(target_path, did_create); // Throws
