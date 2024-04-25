@@ -19,6 +19,7 @@
   * Fixed an issue during a subsequent open of an encrypted Realm for some rare allocation patterns when the top ref was within ~50 bytes of the end of a page. This could manifest as a DecryptionFailed exception or as an assertion: `encrypted_file_mapping.hpp:183: Assertion failed: local_ndx < m_page_state.size()`. ([#7319](https://github.com/realm/realm-core/issues/7319))
 * Non-streaming download sync progress notification is fixed for flexible sync Realms where before it was sometimes stopping to emit values right after the registration of the callback (PR [#7561](https://github.com/realm/realm-core/issues/7561)).
 * Schema initialization could hit an assertion failure if the sync client applied a downloaded changeset while the Realm file was in the process of being opened ([#7041](https://github.com/realm/realm-core/issues/7041), since v11.4.0).
+* Queries using query paths on Mixed values returns inconsistent results ([#7587](https://github.com/realm/realm-core/issues/7587), since v14.0.0)
 
 ### Breaking changes
 * The following things have been renamed or moved as part of moving all of the App Services functionality to the app namespace:
@@ -91,6 +92,7 @@
 
 ### Enhancements
 * Introduce sync 'progress_estimate' parameter (value from 0.0 to 1.0) for existing sync 'ProgressNotifierCallback' api to report sync progress on current batch of upload/download until completion ([#7450](https://github.com/realm/realm-core/issues/7450))
+* Support assigning nested collections via templated API (PR [#7478](https://github.com/realm/realm-core/pull/7478))
 
 ### Fixed
 * Fix an assertion failure "m_lock_info && m_lock_info->m_file.get_path() == m_filename" that appears to be related to opening a Realm while the file is in the process of being closed on another thread ([Swift #8507](https://github.com/realm/realm-swift/issues/8507)).

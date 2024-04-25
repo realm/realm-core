@@ -2322,6 +2322,62 @@ TEST_CASE("Embedded Object") {
     }
 }
 
+TEST_CASE("Typed Object") {
+    InMemoryTestFile config;
+    config.schema = Schema{{"MixedObject",
+                            {
+                                {"_id", PropertyType::Int, Property::IsPrimary{true}},
+                                {"any", PropertyType::Mixed | PropertyType::Nullable},
+                            }},
+                           {"StringObject",
+                            {
+                                {"_id", PropertyType::Int, Property::IsPrimary{true}},
+                                {"string", PropertyType::String},
+                            }}};
+    auto r = Realm::get_shared_realm(config);
+    CppContext ctx(r);
+
+    UnmanagedObject unmanaged{"StringObject", AnyDict{{"_id", INT64_C(2)}, {"string", std::string("hello")}}};
+    util::Any value1{AnyDict{{"_id", INT64_C(6)}, {"any", unmanaged}}};
+    util::Any value2{AnyDict{{"_id", INT64_C(3)}, {"string", std::string("godbye")}}};
+    util::Any value3{AnyDict{{"_id", INT64_C(7)}, {"any", AnyDict{{"obj", INT64_C(5)}}}}};
+    util::Any value4{AnyDict{{"_id", INT64_C(7)}, {"any", AnyDict{{"obj", unmanaged}}}}};
+
+    r->begin_transaction();
+    Obj mixed_obj = Object::create(ctx, r, *r->schema().find("MixedObject"), value1).get_obj();
+    Obj string_obj = Object::create(ctx, r, *r->schema().find("StringObject"), value2).get_obj();
+    Object::create(ctx, r, *r->schema().find("MixedObject"), value3);
+    Object::create(ctx, r, *r->schema().find("MixedObject"), value4, CreatePolicy::UpdateModified);
+    r->commit_transaction();
+    CHECK(r->read_group().get_table("class_StringObject")->size() == 2);
+
+    auto link = mixed_obj.get_any("any");
+    auto linked_obj = r->read_group().get_object(link.get_link());
+    CHECK(linked_obj.get<String>("string") == "hello");
+
+    SECTION("assign managed object") {
+        r->begin_transaction();
+        util::Any new_value{AnyDict{{"_id", INT64_C(6)}, {"any", string_obj}}};
+        Object::create(ctx, r, *r->schema().find("MixedObject"), new_value, CreatePolicy::UpdateModified);
+        r->commit_transaction();
+        auto link = mixed_obj.get_any("any");
+        auto linked_obj = r->read_group().get_object(link.get_link());
+        CHECK(linked_obj.get<String>("string") == "godbye");
+    }
+
+    SECTION("assign unmanaged object again") {
+        util::Any new_value{AnyDict{{"_id", INT64_C(8)}, {"any", unmanaged}}};
+        r->begin_transaction();
+        auto obj = Object::create(ctx, r, *r->schema().find("MixedObject"), new_value, CreatePolicy::UpdateModified)
+                       .get_obj();
+        r->commit_transaction();
+        CHECK(r->read_group().get_table("class_StringObject")->size() == 2);
+        auto link = obj.get_any("any");
+        auto linked_obj = r->read_group().get_object(link.get_link());
+        CHECK(linked_obj.get<String>("string") == "hello");
+    }
+}
+
 #if REALM_ENABLE_SYNC
 
 TEST_CASE("Asymmetric Object") {

@@ -243,10 +243,6 @@ UpdateStatus CollectionBase::do_init_from_parent(BPlusTreeBase* tree, ref_type r
         tree->init_from_ref(ref);
     }
     else {
-        if (tree->init_from_parent()) {
-            // All is well
-            return UpdateStatus::Updated;
-        }
         if (!allow_create) {
             tree->detach();
             return UpdateStatus::Detached;
