@@ -299,7 +299,7 @@ private:
         // Create the client history arrays in the target group
         Arrays(DB&, Group& group);
         // Initialize accessors for the existing history arrays
-        Arrays(Allocator& alloc, Group& group, ref_type ref);
+        Arrays(Allocator& alloc, Group* group, ref_type ref);
 
         void init_from_ref(ref_type ref);
         void verify() const;

@@ -762,6 +762,94 @@ struct BenchmarkEraseObjectForType : public BenchmarkWithType<Type> {
     }
 };
 
+template <typename Type, size_t NUM_CONDITIONS>
+struct BenchmarkParsedChainedOrEquality : public BenchmarkWithType<Type> {
+    using Base = BenchmarkWithType<Type>;
+    using underlying_type = typename Type::underlying_type;
+    BenchmarkParsedChainedOrEquality<Type, NUM_CONDITIONS>()
+        : BenchmarkWithType<Type>()
+    {
+        BenchmarkWithType<Type>::set_name_with_prefix(util::format("QueryChainedOrEquality_%1", NUM_CONDITIONS));
+    }
+    void before_all(DBRef db) override
+    {
+        Random r;
+        Base::before_all(db);
+        auto wt = db->start_write();
+        TableRef table = wt->get_table(Base::name());
+        REALM_ASSERT(Base::needles.size());
+        while (Base::needles.size() < NUM_CONDITIONS) {
+            OwnedMixed needle;
+            while (needle.is_null()) {
+                needle = table->get_object(r.draw_int<size_t>(0, table->size())).get_any(Base::m_col);
+            }
+            Base::needles.push_back(std::move(needle));
+        }
+
+        table->rename_column(Base::m_col, "col");
+        std::string col_name = table->get_column_name(Base::m_col);
+
+        for (size_t i = 0; i < Base::needles.size(); ++i) {
+            m_query_string += util::format("%1%2 == %3", i == 0 ? "" : " or ", col_name, Base::needles[i]);
+        }
+
+        wt->commit();
+    }
+
+    void operator()(DBRef) override
+    {
+        TableView tv = Base::m_table->query(m_query_string).find_all();
+        tv.clear();
+    }
+
+    std::string m_query_string;
+};
+
+template <typename Type, size_t NUM_CONDITIONS>
+struct BenchmarkParsedIn : public BenchmarkWithType<Type> {
+    using Base = BenchmarkWithType<Type>;
+    using underlying_type = typename Type::underlying_type;
+    BenchmarkParsedIn<Type, NUM_CONDITIONS>()
+        : BenchmarkWithType<Type>()
+    {
+        BenchmarkWithType<Type>::set_name_with_prefix(util::format("QueryParsedIN_%1", NUM_CONDITIONS));
+    }
+    void before_all(DBRef db) override
+    {
+        Random r;
+        Base::before_all(db);
+        auto wt = db->start_write();
+        TableRef table = wt->get_table(Base::name());
+        REALM_ASSERT(Base::needles.size());
+        while (Base::needles.size() < NUM_CONDITIONS) {
+            OwnedMixed needle;
+            while (needle.is_null()) {
+                needle = table->get_object(r.draw_int<size_t>(0, table->size())).get_any(Base::m_col);
+            }
+            Base::needles.push_back(std::move(needle));
+        }
+
+        table->rename_column(Base::m_col, "col");
+        std::string col_name = table->get_column_name(Base::m_col);
+
+        m_query_string = "col IN {";
+        for (size_t i = 0; i < Base::needles.size(); ++i) {
+            m_query_string += util::format("%1%2", i == 0 ? "" : ", ", Base::needles[i]);
+        }
+        m_query_string += "}";
+        wt->commit();
+    }
+
+    void operator()(DBRef) override
+    {
+        TableView tv = Base::m_table->query(m_query_string).find_all();
+        tv.clear();
+    }
+
+    std::string m_query_string;
+};
+
+
 struct BenchmarkWithTimestamps : Benchmark {
     std::multiset<Timestamp> values;
     Timestamp needle;
@@ -2550,7 +2638,7 @@ int benchmark_common_tasks_main()
     results_file_stem += "results";
     BenchmarkResults results(40, "benchmark-common-tasks", results_file_stem.c_str());
 
-#define BENCH(B) run_benchmark<B>(results)
+#define BENCH(...) run_benchmark<__VA_ARGS__>(results)
 #define BENCH2(B, mode) run_benchmark<B>(results, mode)
     BENCH2(BenchmarkEmptyCommit, true);
     BENCH2(BenchmarkEmptyCommit, false);
@@ -2628,6 +2716,19 @@ int benchmark_common_tasks_main()
     BENCH(BenchmarkMixedCaseInsensitiveEqual<Indexed<Mixed>>);
     BENCH(BenchmarkMixedCaseInsensitiveEqual<Prop<String>>);
     BENCH(BenchmarkMixedCaseInsensitiveEqual<Indexed<String>>);
+
+    BENCH(BenchmarkParsedChainedOrEquality<Indexed<UUID>, 5000>);
+    BENCH(BenchmarkParsedChainedOrEquality<Indexed<ObjectId>, 5000>);
+    BENCH(BenchmarkParsedChainedOrEquality<Prop<UUID>, 5000>);
+    BENCH(BenchmarkParsedChainedOrEquality<Prop<ObjectId>, 5000>);
+    BENCH(BenchmarkParsedIn<Indexed<UUID>, 5000>);
+    BENCH(BenchmarkParsedIn<Indexed<ObjectId>, 5000>);
+    BENCH(BenchmarkParsedIn<Prop<UUID>, 5000>);
+    BENCH(BenchmarkParsedIn<Prop<ObjectId>, 5000>);
+    BENCH(BenchmarkParsedIn<Indexed<UUID>, 5>);
+    BENCH(BenchmarkParsedIn<Indexed<ObjectId>, 5>);
+    BENCH(BenchmarkParsedIn<Prop<UUID>, 5>);
+    BENCH(BenchmarkParsedIn<Prop<ObjectId>, 5>);
 
     BENCH(BenchmarkRangeForType<Prop<Int>>);
     BENCH(BenchmarkCreateIndexForType<NullableIndexed<String>>);
