@@ -411,10 +411,23 @@ auto Results::dispatch(Fn&& fn) const
 }
 
 template <typename Context>
-auto Results::get(Context& ctx, size_t row_ndx)
+auto Results::get(Context& ctx, size_t ndx)
 {
     return dispatch([&](auto t) {
-        return ctx.box(this->get<std::decay_t<decltype(*t)>>(row_ndx));
+        using U = std::decay_t<decltype(*t)>;
+        if constexpr (std::is_same_v<U, Mixed>) {
+            Mixed value = this->get<Mixed>(ndx);
+            if (value.is_type(type_Dictionary)) {
+                return ctx.box(get_dictionary(ndx));
+            }
+            if (value.is_type(type_List)) {
+                return ctx.box(get_list(ndx));
+            }
+            return ctx.box(value);
+        }
+        else {
+            return ctx.box(this->get<U>(ndx));
+        }
     });
 }
 
