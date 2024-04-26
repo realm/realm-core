@@ -5664,11 +5664,13 @@ TEST(Query_NestedDictionaryNull)
     auto col_any = foo->add_column(type_Mixed, "mixed");
 
     const char* dictOfDictOfNull = R"({ "nestedDict": { "nullValue": null }})";
+    const char* dictOfPrim = R"({ "double": 2.5, "nullValue": null })";
 
     foo->create_object().set_json(col_any, R"("not a dictionary")");
     foo->create_object().set_json(col_any, dictOfDictOfNull);
     foo->create_object().set_json(col_any, dictOfDictOfNull);
     foo->create_object().set_json(col_any, dictOfDictOfNull);
+    foo->create_object().set_json(col_any, dictOfPrim);
 
     CHECK_EQUAL(foo->query("mixed['nestedDict']['nullValue'] == null").count(), 3);
     CHECK_EQUAL(foo->query("mixed.nestedDict.nullValue == null").count(), 3);
@@ -5676,6 +5678,7 @@ TEST(Query_NestedDictionaryNull)
     CHECK_EQUAL(foo->query("mixed.nestedDict.foo == null").count(), 3);
     CHECK_EQUAL(foo->query("mixed.nestedDict[*] == null").count(), 3);
     CHECK_EQUAL(foo->query("mixed.nestedDict[*].@type == 'null'").count(), 3);
+    CHECK_EQUAL(foo->query("mixed.double IN {2.5, 3.5}").count(), 1);
 }
 
 TEST(Query_ListOfMixed)

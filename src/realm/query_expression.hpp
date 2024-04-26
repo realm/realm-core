@@ -783,6 +783,7 @@ public:
     {
         return util::none;
     }
+    virtual void set_comparison_type(util::Optional<ExpressionComparisonType>) {}
 };
 
 template <typename T, typename... Args>
@@ -1346,7 +1347,7 @@ public:
         return m_comparison_type;
     }
 
-    void set_comparison_type(util::Optional<ExpressionComparisonType> type)
+    void set_comparison_type(util::Optional<ExpressionComparisonType> type) final
     {
         m_comparison_type = type;
     }

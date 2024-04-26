@@ -535,6 +535,10 @@ Query EqualityNode::visit(ParserDriver* drv)
             throw InvalidQueryArgError("The keypath following 'IN' must contain a list. Found '" +
                                        r->description(drv->m_serializer_state) + "'");
         }
+        // Any should be the default when using the 'IN' operator
+        if (!r->get_comparison_type()) {
+            r->set_comparison_type(ExpressionComparisonType::Any);
+        }
     }
 
     if (op == CompareType::IN || op == CompareType::EQUAL) {
