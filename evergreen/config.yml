@@ -1303,7 +1303,7 @@ buildvariants:
 
 - name: ubuntu-no-encryption
   display_name: "Ubuntu (No encryption support)"
-  run_on: ubutnu2204-arm64-large
+  run_on: ubuntu2204-arm64-large
   expansions:
     fetch_missing_dependencies: On
     c_compiler: "/opt/clang+llvm/bin/clang"
