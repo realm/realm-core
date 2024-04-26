@@ -21,6 +21,8 @@ import { strict as assert } from "assert";
 import chalk from "chalk";
 import fs from "fs";
 import yaml from "yaml";
+import cp from "child_process";
+import path from "path";
 
 import {
   ClassSpec,
@@ -65,7 +67,27 @@ export class InvalidSpecError extends Error {
 }
 
 const ajv = new Ajv({ allowUnionTypes: true });
-const schemaFile = new URL("../generated/spec.schema.json", import.meta.url);
+const rootPath = new URL("../..", import.meta.url).pathname;
+const schemaFile = path.resolve(rootPath, "bindgen/generated/spec.schema.json");
+
+if (!fs.existsSync(schemaFile)) {
+  console.log("Generating spec.schema.json");
+  cp.spawnSync(
+    "typescript-json-schema",
+    [
+      path.resolve(rootPath, "bindgen/tsconfig.json"),
+      "RelaxedSpec",
+      "--include",
+      path.resolve(rootPath, "bindgen/src/spec/relaxed-model.ts"),
+      "--out",
+      schemaFile,
+      "--required",
+      "--noExtraProps",
+    ],
+    { stdio: "inherit" },
+  );
+}
+
 const schemaJson = JSON.parse(fs.readFileSync(schemaFile, { encoding: "utf8" }));
 export const validate = ajv.compile<RelaxedSpec>(schemaJson);
 
