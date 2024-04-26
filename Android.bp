@@ -156,6 +156,7 @@ cc_defaults {
         "-DREALM_ENABLE_SYNC=1",
         "-DREALM_ENABLE_GEOSPATIAL=1",
         "-DREALM_HAVE_EPOLL=1",
+        "-DREALM_AOSP_VENDOR=1",
         "-Wno-non-virtual-dtor",
         "-Wno-missing-field-initializers",
     ],

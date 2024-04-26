@@ -33,7 +33,7 @@
 // As a result, we cannot utilize the built-in ALooper functionality.
 // Instead, we require users to provide their own scheduler implementation.
 
-#if REALM_ANDROID && __has_include(<android/looper.h>)
+#if REALM_ANDROID && !defined(REALM_AOSP_VENDOR)
 #define HAS_ANDROID_ALOOPER
 #endif
 
