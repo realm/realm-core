@@ -66,7 +66,7 @@ inline int64_t PackedCompressor::get(const IntegerCompressor& c, size_t ndx) con
 
 inline std::vector<int64_t> PackedCompressor::get_all(const IntegerCompressor& c, size_t b, size_t e) const
 {
-    const auto range = (e-b);
+    const auto range = (e - b);
     const auto v_w = c.v_width();
     const auto data = c.data();
     const auto sign_mask = c.v_mask();
@@ -85,7 +85,7 @@ inline std::vector<int64_t> PackedCompressor::get_all(const IntegerCompressor& c
         auto word = unaligned_data_iterator.get(bit_per_it);
         for (int i = 0; i < values_per_word; ++i) {
             res.push_back(sign_extend_field_by_mask(sign_mask, word & mask));
-            word>>=v_w;
+            word >>= v_w;
         }
         cnt_bits += bit_per_it;
         unaligned_data_iterator.bump(bit_per_it);

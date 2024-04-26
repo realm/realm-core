@@ -83,7 +83,7 @@ inline std::vector<int64_t> FlexCompressor::get_all(const IntegerCompressor& c, 
     const auto v_w = c.v_width();
     const auto data = c.data();
     const auto sign_mask = c.v_mask();
-    const auto range = (e-b);
+    const auto range = (e - b);
     const auto starting_bit = offset + b * ndx_w;
     const auto total_bits = starting_bit + ndx_w * range;
     const auto bit_per_it = num_bits_for_width(ndx_w);
@@ -104,7 +104,7 @@ inline std::vector<int64_t> FlexCompressor::get_all(const IntegerCompressor& c, 
             data_iterator.move(static_cast<size_t>(index));
             const auto sv = sign_extend_field_by_mask(sign_mask, *data_iterator);
             res.push_back(sv);
-            word>>=ndx_w;
+            word >>= ndx_w;
         }
         cnt_bits += bit_per_it;
         unaligned_ndx_iterator.bump(bit_per_it);

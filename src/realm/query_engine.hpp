@@ -454,22 +454,20 @@ static size_t find_first_haystack(LeafType& leaf, NeedleContainer& needles, size
 {
     // for a small number of conditions, it is faster to do a linear search than to compute the hash
     // the exact thresholds were found experimentally
-    
-    if constexpr(std::is_same_v<LeafType, ArrayInteger>)
-    {
-        if(needles.size() >= linear_search_threshold && leaf.is_compressed())
-        {
+
+    if constexpr (std::is_same_v<LeafType, ArrayInteger>) {
+        if (needles.size() >= linear_search_threshold && leaf.is_compressed()) {
             const auto& values = leaf.get_all(start, end);
             size_t ndx = start;
-            for(const auto& v : values) {
-                if(needles.count(v))
+            for (const auto& v : values) {
+                if (needles.count(v))
                     return ndx;
-                ndx+=1;
+                ndx += 1;
             }
             return realm::npos;
         }
     }
-    
+
     if (needles.size() < linear_search_threshold) {
         for (size_t i = start; i < end; ++i) {
             auto element = leaf.get(i);

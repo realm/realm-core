@@ -90,10 +90,10 @@ private:
     inline void init_flex(const char*);
     int64_t get_packed(size_t) const;
     int64_t get_flex(size_t) const;
-    
+
     std::vector<int64_t> get_all_packed(size_t, size_t) const;
     std::vector<int64_t> get_all_flex(size_t, size_t) const;
-    
+
     void get_chunk_packed(size_t, int64_t[8]) const;
     void get_chunk_flex(size_t, int64_t[8]) const;
     void set_direct_packed(size_t, int64_t) const;
