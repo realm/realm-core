@@ -171,21 +171,12 @@ public:
     void summary(const SharedContext& context, const Summary& results_summary) override
     {
         m_out << "<?xml version=\"1.0\"?>\n"
-                 "<unittest-results "
-                 "tests=\""
-              << results_summary.num_executed_tests
-              << "\" "
-                 "failedtests=\""
-              << results_summary.num_failed_tests
-              << "\" "
-                 "checks=\""
-              << results_summary.num_executed_checks
-              << "\" "
-                 "failures=\""
-              << results_summary.num_failed_checks
-              << "\" "
-                 "time=\""
-              << results_summary.elapsed_seconds << "\">\n";
+              << "<unittest-results "
+              << "tests=\"" << results_summary.num_executed_tests << "\" "
+              << "failedtests=\"" << results_summary.num_failed_tests << "\" "
+              << "checks=\"" << results_summary.num_executed_checks << "\" "
+              << "failures=\"" << results_summary.num_failed_checks << "\" "
+              << "time=\"" << results_summary.elapsed_seconds << "\">\n";
 
         for (const auto& p : m_tests) {
             auto key = p.first;
@@ -198,13 +189,9 @@ public:
                 test_name = test_name + "#" + util::to_string(recurrence_index + 1);
             }
 
-            m_out << "  <test suite=\"" << xml_escape(details.suite_name)
-                  << "\" "
-                     "name=\""
-                  << xml_escape(test_name)
-                  << "\" "
-                     "time=\""
-                  << t.elapsed_seconds << "\"";
+            m_out << "  <test suite=\"" << xml_escape(details.suite_name) << "\" "
+                  << "name=\"" << xml_escape(test_name) << "\" "
+                  << "time=\"" << t.elapsed_seconds << "\"";
             if (t.failures.empty()) {
                 m_out << "/>\n";
                 continue;
@@ -861,10 +848,8 @@ void TestContext::inexact_compare_failed(const char* file, long line, const char
 {
     std::ostringstream out;
     out.precision(std::numeric_limits<long double>::digits10 + 1);
-    out << macro_name << "(" << a_text << ", " << b_text << ", " << eps_text
-        << ") "
-           "failed with ("
-        << a << ", " << b << ", " << eps << ")";
+    out << macro_name << "(" << a_text << ", " << b_text << ", " << eps_text << ") "
+        << "failed with (" << a << ", " << b << ", " << eps << ")";
     check_failed(file, line, out.str());
 }
 
