@@ -1,7 +1,6 @@
-# NEXT RELEASE
+# 14.6.0 Release notes
 
 ### Enhancements
-* <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
 * Add `SyncClientConfig::security_access_group` which allows specifying the access group to use for the sync metadata Realm's encryption key. Setting this is required when sharing the metadata Realm between apps on Apple platforms ([#7552](https://github.com/realm/realm-core/pull/7552)).
 * When connecting to multiple server apps, a unique encryption key is used for each of the metadata Realms rather than sharing one between them ([#7552](https://github.com/realm/realm-core/pull/7552)).
 * Introduce the new `SyncUser` interface which can be implemented by SDKs to use sync without the core App Services implementation (or just for greater control over user behavior in tests). ([PR #7300](https://github.com/realm/realm-core/pull/7300).
@@ -9,7 +8,6 @@
 * Introducing `Query::in()` which allows SDKs to take advantage of improved performance when building equality conditions against many constants. ([#7582](https://github.com/realm/realm-core/pull/7582))
 
 ### Fixed
-* <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * SyncUser::all_sessions() included sessions in every state *except* for waiting for access token, which was weirdly inconsistent. It now includes all sessions. ([PR #7300](https://github.com/realm/realm-core/pull/7300)).
 * App::all_users() included logged out users only if they were logged out while the App instance existed. It now always includes all logged out users. ([PR #7300](https://github.com/realm/realm-core/pull/7300)).
 * Deleting the active user left the active user unset rather than selecting another logged-in user as the active user like logging out and removing users did. ([PR #7300](https://github.com/realm/realm-core/pull/7300)).
@@ -20,6 +18,7 @@
 * Non-streaming download sync progress notification is fixed for flexible sync Realms where before it was sometimes stopping to emit values right after the registration of the callback (PR [#7561](https://github.com/realm/realm-core/issues/7561)).
 * Schema initialization could hit an assertion failure if the sync client applied a downloaded changeset while the Realm file was in the process of being opened ([#7041](https://github.com/realm/realm-core/issues/7041), since v11.4.0).
 * Queries using query paths on Mixed values returns inconsistent results ([#7587](https://github.com/realm/realm-core/issues/7587), since v14.0.0)
+* Enabling 'cancel_waits_on_nonfatal_error' does not cancel waits during location update while offline ([#7527](https://github.com/realm/realm-core/issues/7527), since v13.26.0)
 
 ### Breaking changes
 * The following things have been renamed or moved as part of moving all of the App Services functionality to the app namespace:

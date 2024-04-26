@@ -313,6 +313,7 @@ public:
     }
 
 private:
+    realm::app::AppConfig m_app_config;
     std::shared_ptr<realm::app::App> m_app;
     std::string m_base_file_path;
     std::shared_ptr<realm::app::GenericNetworkTransport> m_transport;
@@ -346,6 +347,11 @@ public:
         REALM_ASSERT(m_app);
         return m_app->sync_manager();
     }
+
+    // Close the app instance (or tear down the TestAppSession)
+    void close(bool tear_down = false);
+    // Re-open the app instance using app_config
+    void reopen(bool log_in = false);
 
     realm::app::AppConfig app_config;
 
