@@ -87,12 +87,32 @@ struct IntegerCompressor::VTableForFlex {
 const typename IntegerCompressor::VTableForPacked::PopulatedVTablePacked IntegerCompressor::VTableForPacked::vtable;
 const typename IntegerCompressor::VTableForFlex::PopulatedVTableFlex IntegerCompressor::VTableForFlex::vtable;
 
-using SetDirect = void (*)(char*, size_t, int_fast64_t);
-static std::unordered_map<size_t, SetDirect> s_direct_array_set = {
-    {0, &realm::set_direct<0>},   {1, &realm::set_direct<1>},   {2, &realm::set_direct<2>},
-    {4, &realm::set_direct<4>},   {8, &realm::set_direct<8>},   {16, &realm::set_direct<16>},
-    {32, &realm::set_direct<32>}, {64, &realm::set_direct<64>},
+class ArraySetter {
+public:
+    ArraySetter()
+    {
+        m_width_setters.resize(65);
+        m_width_setters[0] = &realm::set_direct<0>;
+        m_width_setters[1] = &realm::set_direct<1>;
+        m_width_setters[2] = &realm::set_direct<2>;
+        m_width_setters[4] = &realm::set_direct<4>;
+        m_width_setters[8] = &realm::set_direct<8>;
+        m_width_setters[16] = &realm::set_direct<16>;
+        m_width_setters[32] = &realm::set_direct<32>;
+        m_width_setters[64] = &realm::set_direct<64>;
+    }
+    void set(uint8_t width, char* data, size_t pos, int_fast64_t value) const
+    {
+        const auto setter = m_width_setters[width];
+        REALM_ASSERT_DEBUG(setter != nullptr);
+        (setter)(data, pos, value);
+    }
+
+private:
+    using SetDirect = void (*)(char*, size_t, int_fast64_t);
+    std::vector<SetDirect> m_width_setters;
 };
+static ArraySetter s_array_setter;
 
 
 template <typename T, typename... Arg>
@@ -220,10 +240,8 @@ bool IntegerCompressor::decompress(Array& arr) const
     // this is copying the bits straight, without doing any COW, since the array is basically restored, we just need
     // to copy the data straight back into it. This makes decompressing the array equivalent to copy on write for
     // normal arrays, in fact for a compressed array, we skip COW and we just decompress, getting the same result.
-    const auto set = s_direct_array_set[width];
-    REALM_ASSERT_DEBUG(set != nullptr);
     for (size_t ndx = 0; ndx < size; ++ndx)
-        (set)(arr.m_data, ndx, values[ndx]);
+        s_array_setter.set(width, arr.m_data, ndx, values[ndx]);
 
     // very important: since the ref of the current array has changed, the parent must be informed.
     // Otherwise we will lose the link between parent array and child array.
