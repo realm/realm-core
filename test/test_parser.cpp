@@ -4098,12 +4098,18 @@ TEST(Parser_OrOfIn)
     Group g;
 
     TableRef persons = g.add_table("class_Person");
-    auto col_name = persons->add_column(type_String, "name");
+    constexpr bool nullable = true;
+    auto col_name = persons->add_column(type_String, "name", nullable);
     persons->create_object().set(col_name, "Ani");
     persons->create_object().set(col_name, "Teddy");
     persons->create_object().set(col_name, "Poly");
+    persons->create_object().set(col_name, ""); // empty string
+    persons->create_object();                   // null value
 
     verify_query(test_context, persons, "name IN {'Ani', 'Teddy'} OR name IN {'Poly', 'Teddy'}", 3);
+    verify_query(test_context, persons, "name IN {'Ani', 'Teddy'} OR name IN {'Poly', 'Teddy'} OR name IN {null}", 4);
+    verify_query(test_context, persons,
+                 "name IN {'Ani', 'Teddy'} OR name IN {'Poly', 'Teddy'} OR name IN {null} OR name IN {''}", 5);
 }
 
 TEST(Parser_KeyPathSubstitution)

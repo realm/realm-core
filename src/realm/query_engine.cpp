@@ -423,21 +423,25 @@ bool StringNode<Equal>::do_consume_condition(ParentNode& node)
     }
     auto add_string = [&](const StringData& str) {
         if (m_needles.count(str) == 0) {
-            m_needle_storage.push_back(std::make_unique<char[]>(str.size()));
-            std::copy(str.data(), str.data() + str.size(), m_needle_storage.back().get());
-            m_needles.insert(StringData(m_needle_storage.back().get(), str.size()));
+            if (str.size()) {
+                m_needle_storage.push_back(std::make_unique<char[]>(str.size()));
+                std::copy(str.data(), str.data() + str.size(), m_needle_storage.back().get());
+                m_needles.insert(StringData(m_needle_storage.back().get(), str.size()));
+            }
+            else {
+                // this code path is different because we need to
+                // distinguish null from the empty string
+                m_needles.insert(str);
+            }
         }
     };
-    if (auto& str = other.m_value) {
-        add_string(*str);
-    }
-    else if (!other.m_needles.empty()) {
+    if (!other.m_needles.empty()) {
         for (const auto& str : other.m_needles) {
             add_string(str);
         }
     }
     else {
-        m_needles.emplace();
+        add_string(other.m_string_value);
     }
     return true;
 }
