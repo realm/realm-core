@@ -218,16 +218,16 @@ TEST(Utils_File_TryRemoveDirRecursive)
     TEST_DIR(dir_0);
     bool did_exist = false;
 
-    std::string dir_1  = File::resolve("dir_1",  dir_0);
+    std::string dir_1 = File::resolve("dir_1", dir_0);
     make_dir(dir_1);
     did_exist = try_remove_dir_recursive(dir_1);
     CHECK(did_exist);
 
-    std::string dir_2  = File::resolve("dir_2",  dir_0);
+    std::string dir_2 = File::resolve("dir_2", dir_0);
     did_exist = try_remove_dir_recursive(dir_2);
     CHECK(!did_exist);
 
-    std::string dir_3  = File::resolve("dir_3",  dir_0);
+    std::string dir_3 = File::resolve("dir_3", dir_0);
     make_dir(dir_3);
     std::string file_1 = File::resolve("file_1", dir_3);
     File(file_1, File::mode_Write);
@@ -245,19 +245,19 @@ TEST(Utils_File_ForEach)
     auto touch = [](const std::string& path) {
         File(path, File::mode_Write);
     };
-    std::string dir_1  = File::resolve("dir_1",  dir_0);
+    std::string dir_1 = File::resolve("dir_1", dir_0);
     make_dir(dir_1);
     std::string file_1 = File::resolve("file_1", dir_0);
     touch(file_1);
-    std::string dir_2  = File::resolve("dir_2",  dir_0);
+    std::string dir_2 = File::resolve("dir_2", dir_0);
     make_dir(dir_2);
     std::string file_2 = File::resolve("file_2", dir_0);
     touch(file_2);
-    std::string dir_3  = File::resolve("dir_3",  dir_1);
+    std::string dir_3 = File::resolve("dir_3", dir_1);
     make_dir(dir_3);
     std::string file_3 = File::resolve("file_3", dir_1);
     touch(file_3);
-    std::string dir_4  = File::resolve("dir_4",  dir_2);
+    std::string dir_4 = File::resolve("dir_4", dir_2);
     make_dir(dir_4);
     std::string file_4 = File::resolve("file_4", dir_2);
     touch(file_4);
@@ -275,17 +275,17 @@ TEST(Utils_File_ForEach)
     std::string dir_1_3 = File::resolve("dir_3", "dir_1");
     std::string dir_2_4 = File::resolve("dir_4", "dir_2");
     if (CHECK_EQUAL(6, files.size())) {
-        CHECK_EQUAL("",       files[0].first);
+        CHECK_EQUAL("", files[0].first);
         CHECK_EQUAL("file_1", files[0].second);
-        CHECK_EQUAL("",       files[1].first);
+        CHECK_EQUAL("", files[1].first);
         CHECK_EQUAL("file_2", files[1].second);
-        CHECK_EQUAL("dir_1",  files[2].first);
+        CHECK_EQUAL("dir_1", files[2].first);
         CHECK_EQUAL("file_3", files[2].second);
-        CHECK_EQUAL(dir_1_3,  files[3].first);
+        CHECK_EQUAL(dir_1_3, files[3].first);
         CHECK_EQUAL("file_5", files[3].second);
-        CHECK_EQUAL("dir_2",  files[4].first);
+        CHECK_EQUAL("dir_2", files[4].first);
         CHECK_EQUAL("file_4", files[4].second);
-        CHECK_EQUAL(dir_2_4,  files[5].first);
+        CHECK_EQUAL(dir_2_4, files[5].first);
         CHECK_EQUAL("file_6", files[5].second);
     }
 }

@@ -1330,8 +1330,8 @@ _impl::History* ServerHistory::_get_history_write()
 // Overriding member in Replication
 std::unique_ptr<_impl::History> ServerHistory::_create_history_read()
 {
-    auto server_hist = std::make_unique<ServerHistory>(m_context);                     // Throws
-    server_hist->initialize(*m_db);                                                    // Throws
+    auto server_hist = std::make_unique<ServerHistory>(m_context); // Throws
+    server_hist->initialize(*m_db);                                // Throws
     return std::unique_ptr<_impl::History>(server_hist.release());
 }
 

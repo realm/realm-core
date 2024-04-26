@@ -224,14 +224,14 @@ size_t ArrayTimestamp::find_first<NotEqual>(Timestamp value, size_t begin, size_
         util::Optional<int64_t> seconds = m_seconds.get(begin);
         if (!seconds || *seconds != sec) {
             return begin;
-       }
-       // We now know that neither m_value nor current value is null and that seconds part equals
-       // We are just missing to compare nanoseconds part
-       int32_t nanos = int32_t(m_nanoseconds.get(begin));
-       if (nanos != value.get_nanoseconds()) {
-           return begin;
-       }
-       ++begin;
+        }
+        // We now know that neither m_value nor current value is null and that seconds part equals
+        // We are just missing to compare nanoseconds part
+        int32_t nanos = int32_t(m_nanoseconds.get(begin));
+        if (nanos != value.get_nanoseconds()) {
+            return begin;
+        }
+        ++begin;
     }
     return not_found;
 }

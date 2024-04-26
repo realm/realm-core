@@ -192,6 +192,6 @@ inline std::ostream& operator<<(std::ostream& out, const IntegerColumnIterator& 
     out << "IntegerColumnIterator at index: " << it.get_position();
     return out;
 }
-}
+} // namespace realm
 
 #endif /* REALM_COLUMN_INTEGER_HPP */

@@ -228,11 +228,11 @@ TEST(TableView_Sum)
     Table table;
     auto c0 = table.add_column(type_Int, "1");
 
-    table.create_object().set_all( 2);
-    table.create_object().set_all( 2);
-    table.create_object().set_all( 2);
-    table.create_object().set_all( 2);
-    table.create_object().set_all( 2);
+    table.create_object().set_all(2);
+    table.create_object().set_all(2);
+    table.create_object().set_all(2);
+    table.create_object().set_all(2);
+    table.create_object().set_all(2);
 
     TableView v = table.find_all_int(c0, 2);
     CHECK_EQUAL(5, v.size());
@@ -246,11 +246,11 @@ TEST(TableView_Average)
     Table table;
     auto c0 = table.add_column(type_Int, "1");
 
-    table.create_object().set_all( 2);
-    table.create_object().set_all( 2);
-    table.create_object().set_all( 2);
-    table.create_object().set_all( 2);
-    table.create_object().set_all( 2);
+    table.create_object().set_all(2);
+    table.create_object().set_all(2);
+    table.create_object().set_all(2);
+    table.create_object().set_all(2);
+    table.create_object().set_all(2);
 
     TableView v = table.find_all_int(c0, 2);
     CHECK_EQUAL(5, v.size());
@@ -264,9 +264,9 @@ TEST(TableView_SumNegative)
     Table table;
     auto c0 = table.add_column(type_Int, "1");
 
-    table.create_object().set_all( 0);
-    table.create_object().set_all( 0);
-    table.create_object().set_all( 0);
+    table.create_object().set_all(0);
+    table.create_object().set_all(0);
+    table.create_object().set_all(0);
 
     TableView v = table.find_all_int(c0, 0);
     v[0].set<Int>(c0, 11);
@@ -281,9 +281,9 @@ TEST(TableView_IsAttached)
     Table table;
     auto c0 = table.add_column(type_Int, "1");
 
-    table.create_object().set_all( 0);
-    table.create_object().set_all( 0);
-    table.create_object().set_all( 0);
+    table.create_object().set_all(0);
+    table.create_object().set_all(0);
+    table.create_object().set_all(0);
 
     TableView v = table.find_all_int(c0, 0);
     TableView v2 = table.find_all_int(c0, 0);
@@ -300,9 +300,9 @@ TEST(TableView_Max)
     Table table;
     auto c0 = table.add_column(type_Int, "1");
 
-    table.create_object().set_all( 0);
-    table.create_object().set_all( 0);
-    table.create_object().set_all( 0);
+    table.create_object().set_all(0);
+    table.create_object().set_all(0);
+    table.create_object().set_all(0);
 
     TableView v = table.find_all_int(c0, 0);
     v[0].set<Int>(c0, -1);
@@ -318,9 +318,9 @@ TEST(TableView_Max2)
     Table table;
     auto c0 = table.add_column(type_Int, "1");
 
-    table.create_object().set_all( 0);
-    table.create_object().set_all( 0);
-    table.create_object().set_all( 0);
+    table.create_object().set_all(0);
+    table.create_object().set_all(0);
+    table.create_object().set_all(0);
 
     TableView v = table.find_all_int(c0, 0);
     v[0].set<Int>(c0, -1);
@@ -337,9 +337,9 @@ TEST(TableView_Min)
     Table table;
     auto c0 = table.add_column(type_Int, "first");
 
-    table.create_object().set_all( 0);
-    table.create_object().set_all( 0);
-    table.create_object().set_all( 0);
+    table.create_object().set_all(0);
+    table.create_object().set_all(0);
+    table.create_object().set_all(0);
 
     TableView v = table.find_all_int(c0, 0);
     v[0].set<Int>(c0, -1);
@@ -360,9 +360,9 @@ TEST(TableView_Min2)
     Table table;
     auto c0 = table.add_column(type_Int, "first");
 
-    table.create_object().set_all( 0);
-    table.create_object().set_all( 0);
-    table.create_object().set_all( 0);
+    table.create_object().set_all(0);
+    table.create_object().set_all(0);
+    table.create_object().set_all(0);
 
     TableView v = table.find_all_int(c0, 0);
     v[0].set<Int>(c0, -1);
@@ -574,10 +574,10 @@ TEST(TableView_StringSort)
     Table table;
     auto col = table.add_column(type_String, "1");
 
-    table.create_object().set_all( "alpha");
-    table.create_object().set_all( "zebra");
-    table.create_object().set_all( "ALPHA");
-    table.create_object().set_all( "ZEBRA");
+    table.create_object().set_all("alpha");
+    table.create_object().set_all("zebra");
+    table.create_object().set_all("ALPHA");
+    table.create_object().set_all("ZEBRA");
 
     // Core-only is default comparer
     TableView v = table.where().find_all();
@@ -2241,7 +2241,7 @@ TEST(TableView_TimestampMaxRemoveRow)
     CHECK_EQUAL(tv.max(col_date)->get_timestamp(), Timestamp(9, 0));
 
     table.remove_object(ObjKey(9));
-    CHECK_EQUAL(tv.size(), 10);                            // not changed since sync_if_needed hasn't been called
+    CHECK_EQUAL(tv.size(), 10); // not changed since sync_if_needed hasn't been called
     CHECK_EQUAL(tv.max(col_date)->get_timestamp(), Timestamp(8, 0)); // but aggregate functions skip removed rows
 
     tv.sync_if_needed();
