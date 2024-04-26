@@ -1177,7 +1177,7 @@ template <typename T>
 inline size_t upper_bound(const char* data, size_t size, int64_t value,
                           const impl::EncodedFetcher<T>& encoder) noexcept
 {
-    return impl::lower_bound<0>(data, 0, size, value, encoder);
+    return impl::upper_bound<0>(data, 0, size, value, encoder);
 }
 
 } // namespace realm
