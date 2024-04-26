@@ -524,8 +524,7 @@ OfflineAppSession::OfflineAppSession(OfflineAppSession::Config config)
     , m_delete_storage(config.delete_storage)
 {
     REALM_ASSERT(m_transport);
-    app::AppConfig app_config;
-    set_app_config_defaults(app_config, m_transport);
+    set_app_config_defaults(m_app_config, m_transport);
 
     if (config.storage_path) {
         m_base_file_path = *config.storage_path;
@@ -535,16 +534,16 @@ OfflineAppSession::OfflineAppSession(OfflineAppSession::Config config)
         m_base_file_path = util::make_temp_dir();
     }
 
-    app_config.base_file_path = m_base_file_path;
-    app_config.metadata_mode = config.metadata_mode;
+    m_app_config.base_file_path = m_base_file_path;
+    m_app_config.metadata_mode = config.metadata_mode;
     if (config.base_url) {
-        app_config.base_url = *config.base_url;
+        m_app_config.base_url = *config.base_url;
     }
     if (config.app_id) {
-        app_config.app_id = *config.app_id;
+        m_app_config.app_id = *config.app_id;
     }
-    app_config.sync_client_config.socket_provider = config.socket_provider;
-    m_app = app::App::get_app(app::App::CacheMode::Disabled, app_config);
+    m_app_config.sync_client_config.socket_provider = config.socket_provider;
+    m_app = app::App::get_app(app::App::CacheMode::Disabled, m_app_config);
 }
 
 OfflineAppSession::~OfflineAppSession()
@@ -565,6 +564,12 @@ std::shared_ptr<realm::app::User> OfflineAppSession::make_user() const
 {
     create_user_and_log_in(app());
     return app()->current_user();
+}
+
+void OfflineAppSession::restart_app()
+{
+    m_app.reset();
+    m_app = app::App::get_app(app::App::CacheMode::Disabled, m_app_config);
 }
 
 #endif // REALM_APP_SERVICES

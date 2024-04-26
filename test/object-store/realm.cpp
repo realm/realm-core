@@ -46,6 +46,7 @@
 #if REALM_ENABLE_SYNC
 #include <util/sync/flx_sync_harness.hpp>
 #include <util/sync/sync_test_utils.hpp>
+#include <util/test_file.hpp>
 #ifdef REALM_ENABLE_AUTH_TESTS
 #include <util/sync/baas_admin_api.hpp>
 #endif // REALM_ENABLE_AUTH_TESTS
@@ -1219,6 +1220,8 @@ TEST_CASE("Get Realm using Async Open", "[sync][pbs][async open]") {
         REQUIRE(got_error);
     }
 
+#if REALM_APP_SERVICES
+
     SECTION("waiters are cancelled if cancel_waits_on_nonfatal_error") {
         auto logger = util::Logger::get_default_logger();
         auto transport = std::make_shared<HookedTransport<UnitTestTransport>>();
@@ -1250,15 +1253,44 @@ TEST_CASE("Get Realm using Async Open", "[sync][pbs][async open]") {
             }
         };
 
-        OfflineAppSession::Config oas_config;
-        oas_config.transport = transport;
-        oas_config.socket_provider = socket_provider;
-        OfflineAppSession oas(oas_config);
+        app::AppConfig app_config;
+        set_app_config_defaults(app_config, transport);
+        app_config.sync_client_config.socket_provider = socket_provider;
+        app_config.base_file_path = util::make_temp_dir();
+        app_config.metadata_mode = app::AppConfig::MetadataMode::NoEncryption;
 
-        SyncTestFile config(oas, "realm");
-        auto user = config.sync_config->user;
-        config.sync_config->cancel_waits_on_nonfatal_error = true;
-        config.sync_config->error_handler = [&logger](std::shared_ptr<SyncSession> session, SyncError error) {
+        auto the_app = app::App::get_app(app::App::CacheMode::Disabled, app_config);
+        create_user_and_log_in(the_app);
+        auto user = the_app->current_user();
+        // User should be logged in at this point
+        REQUIRE(user->is_logged_in());
+
+        bool not_authorized = false;
+        bool token_refresh_called = false;
+        bool location_refresh_called = false;
+
+        TestMode test_mode = GENERATE(expired_at_start, expired_by_websocket, websocket_fails);
+        FailureMode failure = GENERATE(location_fails, token_fails, token_not_authorized);
+
+        DYNAMIC_SECTION(txt_test_mode(test_mode) << " - " << txt_failure_mode(failure)) {
+            logger->info("TEST: %1 - %2", txt_test_mode(test_mode), txt_failure_mode(failure));
+            if (test_mode == TestMode::expired_at_start) {
+                // invalidate the user's cached access token
+                auto app_user = the_app->current_user();
+                app_user->update_data_for_testing([&](app::UserData& data) {
+                    data.access_token = RealmJWT(expired_token);
+                });
+            }
+            else if (test_mode == TestMode::expired_by_websocket) {
+                // tell websocket to return not authorized to refresh access token
+                not_authorized = true;
+            }
+        }
+
+        the_app.reset();
+
+        auto err_handler = [](std::shared_ptr<SyncSession> session, SyncError error) {
+            auto logger = util::Logger::get_default_logger();
             logger->debug("The sync error handler caught an error: '%1' for '%2'", error.status, session->path());
             // Ignore connection failed non-fatal errors and check for access token refresh unauthorized fatal errors
             if (error.status.code() == ErrorCodes::SyncConnectFailed) {
@@ -1269,29 +1301,6 @@ TEST_CASE("Get Realm using Async Open", "[sync][pbs][async open]") {
             REQUIRE(error.status.code() == ErrorCodes::AuthError);
             REQUIRE(error.is_fatal);
         };
-
-        // User should be logged in at this point
-        REQUIRE(user->is_logged_in());
-        bool not_authorized = false;
-        bool token_refresh_called = false;
-        bool location_refresh_called = false;
-
-        TestMode test_mode = GENERATE(expired_at_start, expired_by_websocket, websocket_fails);
-        FailureMode failure = GENERATE(location_fails, token_fails, token_not_authorized);
-
-        DYNAMIC_SECTION(txt_test_mode(test_mode) << " - " << txt_failure_mode(failure)) {
-            if (test_mode == TestMode::expired_at_start) {
-                // invalidate the user's cached access token
-                auto app_user = oas.app()->current_user();
-                app_user->update_data_for_testing([&](app::UserData& data) {
-                    data.access_token = RealmJWT(expired_token);
-                });
-            }
-            else if (test_mode == TestMode::expired_by_websocket) {
-                // tell websocket to return not authorized to refresh access token
-                not_authorized = true;
-            }
-        }
 
         transport->request_hook = [&](const app::Request& req) -> std::optional<app::Response> {
             static constexpr int CURLE_OPERATION_TIMEDOUT = 28;
@@ -1325,6 +1334,14 @@ TEST_CASE("Get Realm using Async Open", "[sync][pbs][async open]") {
                                        "Operation timed out");
         };
 
+        the_app = app::App::get_app(app::App::CacheMode::Disabled, app_config);
+        SyncTestFile config(the_app->current_user(), "realm");
+        config.sync_config->cancel_waits_on_nonfatal_error = true;
+        config.sync_config->error_handler = err_handler;
+
+        // User should be logged in at this point
+        REQUIRE(config.sync_config->user->is_logged_in());
+
         auto task = Realm::get_synchronized_realm(config);
         auto pf = util::make_promise_future<std::exception_ptr>();
         task->start([&pf](auto ref, auto error) mutable {
@@ -1342,6 +1359,8 @@ TEST_CASE("Get Realm using Async Open", "[sync][pbs][async open]") {
             REQUIRE(token_refresh_called);
         }
     }
+
+#endif // REALM_APP_SERVICES
 
     SECTION("read-only mode sets the schema version") {
         {
@@ -1477,6 +1496,7 @@ TEST_CASE("Get Realm using Async Open", "[sync][pbs][async open]") {
 }
 
 #if REALM_ENABLE_AUTH_TESTS
+#if REALM_APP_SERVICES
 
 TEST_CASE("Syhcnronized realm: AutoOpen", "[sync][baas][pbs][async open]") {
     const auto partition = random_string(100);
@@ -1563,10 +1583,12 @@ TEST_CASE("Syhcnronized realm: AutoOpen", "[sync][baas][pbs][async open]") {
     auto result = pf.future.get_no_throw();
     REQUIRE(result.is_ok());
     REQUIRE(result.get_value());
-    std::lock_guard<std::mutex> lock(mutex);
-    REQUIRE(location_refresh_called);
-    if (failure != FailureMode::location_fails) {
-        REQUIRE(token_refresh_called);
+    {
+        std::lock_guard<std::mutex> lock(mutex);
+        REQUIRE(location_refresh_called);
+        if (failure != FailureMode::location_fails) {
+            REQUIRE(token_refresh_called);
+        }
     }
 
     transport->request_hook = nullptr;
@@ -1575,6 +1597,7 @@ TEST_CASE("Syhcnronized realm: AutoOpen", "[sync][baas][pbs][async open]") {
     wait_for_download(*r);
 }
 
+#endif // REALM_APP_SERVICES
 #endif // REALM_ENABLE_AUTH_TESTS
 
 TEST_CASE("SharedRealm: convert", "[sync][pbs][convert]") {
