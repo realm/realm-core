@@ -32,7 +32,9 @@
   - SyncUser::session_for_on_disk_path() -> SyncManager::get_existing_session()
   - SyncUser::all_sessions() -> SyncManager::get_all_sessions_for(User&)
   - SyncManager::immediately_run_file_actions() -> App::immediately_run_file_actions()
-  - realm_sync_user_subscription_token -> realm_app_user_subscription_token ([PR #7300](https://github.com/realm/realm-core/pull/7300)).
+  - realm_sync_user_subscription_token -> realm_app_user_subscription_token
+  - SyncManager::get_user -> App::create_fake_user_for_testing
+  ([PR #7300](https://github.com/realm/realm-core/pull/7300)).
 * The `ClientAppDeallocated` error code no longer exists as this error code can no longer occur. ([PR #7300](https://github.com/realm/realm-core/pull/7300)).
 * Some fields have moved from SyncClientConfig to AppConfig. AppConfig now has a SyncClientConfig field rather than it being passed separately to App::get_app(). ([PR #7300](https://github.com/realm/realm-core/pull/7300)).
 * Sync user management has been removed from SyncManager. This functionality was already additionally available on App. ([PR #7300](https://github.com/realm/realm-core/pull/7300)).
