@@ -566,12 +566,6 @@ std::shared_ptr<realm::app::User> OfflineAppSession::make_user() const
     return app()->current_user();
 }
 
-void OfflineAppSession::restart_app()
-{
-    m_app.reset();
-    m_app = app::App::get_app(app::App::CacheMode::Disabled, m_app_config);
-}
-
 #endif // REALM_APP_SERVICES
 #endif // REALM_ENABLE_SYNC
 

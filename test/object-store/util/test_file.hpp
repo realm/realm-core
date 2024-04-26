@@ -312,8 +312,6 @@ public:
         return m_app->sync_manager();
     }
 
-    void restart_app();
-
 private:
     realm::app::AppConfig m_app_config;
     std::shared_ptr<realm::app::App> m_app;
