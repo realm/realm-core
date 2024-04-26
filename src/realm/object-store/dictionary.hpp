@@ -142,7 +142,6 @@ private:
     Obj get_object(StringData key) const;
 };
 
-
 template <typename Fn>
 auto Dictionary::dispatch(Fn&& fn) const
 {
@@ -178,62 +177,7 @@ inline Obj Dictionary::get<Obj>(StringData key) const
     return get_object(key);
 }
 
-template <typename T, typename Context>
-void Dictionary::insert(Context& ctx, StringData key, T&& value, CreatePolicy policy)
-{
-    if (ctx.is_null(value)) {
-        this->insert(key, Mixed());
-        return;
-    }
-    if (m_is_embedded) {
-        validate_embedded(ctx, value, policy);
-        auto obj_key = dict().create_and_insert_linked_object(key).get_key();
-        ctx.template unbox<Obj>(value, policy, obj_key);
-        return;
-    }
-    dispatch([&](auto t) {
-        this->insert(key, ctx.template unbox<std::decay_t<decltype(*t)>>(value, policy));
-    });
-}
-
-template <typename Context>
-auto Dictionary::get(Context& ctx, StringData key) const
-{
-    return dispatch([&](auto t) {
-        return ctx.box(this->get<std::decay_t<decltype(*t)>>(key));
-    });
-}
-
-template <typename T, typename Context>
-void Dictionary::assign(Context& ctx, T&& values, CreatePolicy policy)
-{
-    if (ctx.is_same_dictionary(*this, values))
-        return;
-
-    if (ctx.is_null(values)) {
-        remove_all();
-        return;
-    }
-
-    if (!policy.diff)
-        remove_all();
-
-    ctx.enumerate_dictionary(values, [&](StringData key, auto&& value) {
-        if (policy.diff) {
-            util::Optional<Mixed> old_value = dict().try_get(key);
-            auto new_value = ctx.template unbox<Mixed>(value);
-            if (!old_value || *old_value != new_value) {
-                dict().insert(key, new_value);
-            }
-        }
-        else {
-            this->insert(ctx, key, value, policy);
-        }
-    });
-}
-
 } // namespace object_store
 } // namespace realm
-
 
 #endif /* REALM_OS_DICTIONARY_HPP */

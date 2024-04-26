@@ -380,6 +380,28 @@ size_t IndexEvaluator::do_search_index(const Cluster* cluster, size_t start, siz
     return not_found;
 }
 
+StringNode<Equal>::StringNode(ColKey col, const Mixed* begin, const Mixed* end)
+    : StringNodeEqualBase(StringData(), col)
+{
+    // Don't use the search index if present since we're in a scenario where
+    // it'd be slower
+    m_index_evaluator.reset();
+
+    for (const Mixed* it = begin; it != end; ++it) {
+        if (it->is_null()) {
+            m_needles.emplace();
+        }
+        else if (const StringData* str = it->get_if<StringData>()) {
+            m_needle_storage.push_back(std::make_unique<char[]>(str->size()));
+            std::copy(str->data(), str->data() + str->size(), m_needle_storage.back().get());
+            m_needles.insert(StringData(m_needle_storage.back().get(), str->size()));
+        }
+    }
+    if (m_needles.empty()) {
+        throw InvalidArgument("No string arguments in query");
+    }
+}
+
 void StringNode<Equal>::_search_index_init()
 {
     REALM_ASSERT(bool(m_index_evaluator));
