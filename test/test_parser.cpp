@@ -4093,6 +4093,19 @@ TEST(Parser_OperatorIN)
                    CHECK_EQUAL(e.what(), "The keypath following 'IN' must contain a list. Found 'fav_item.price'"));
 }
 
+TEST(Parser_OrOfIn)
+{
+    Group g;
+
+    TableRef persons = g.add_table("class_Person");
+    auto col_name = persons->add_column(type_String, "name");
+    persons->create_object().set(col_name, "Ani");
+    persons->create_object().set(col_name, "Teddy");
+    persons->create_object().set(col_name, "Poly");
+
+    verify_query(test_context, persons, "name IN {'Ani', 'Teddy'} OR name IN {'Poly', 'Teddy'}", 3);
+}
+
 TEST(Parser_KeyPathSubstitution)
 {
     Group g;
