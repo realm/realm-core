@@ -979,10 +979,16 @@ void App::link_user(const std::shared_ptr<User>& user, const AppCredentials& cre
 std::shared_ptr<User> App::create_fake_user_for_testing(const std::string& user_id, const std::string& access_token,
                                                         const std::string& refresh_token)
 {
-    m_metadata_store->create_user(user_id, refresh_token, access_token, "fake_device");
-    util::CheckedLockGuard lock(m_user_mutex);
-    user_data_updated(user_id); // FIXME: needs to be callback from metadata store
-    return get_user_for_id(user_id);
+    std::shared_ptr<User> user;
+    {
+        m_metadata_store->create_user(user_id, refresh_token, access_token, "fake_device");
+        util::CheckedLockGuard lock(m_user_mutex);
+        user_data_updated(user_id); // FIXME: needs to be callback from metadata store
+        user = get_user_for_id(user_id);
+    }
+
+    switch_user(user);
+    return user;
 }
 
 
