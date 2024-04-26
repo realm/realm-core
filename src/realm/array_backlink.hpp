@@ -86,6 +86,6 @@ public:
     void verify() const;
     bool verify_backlink(size_t ndx, int64_t link);
 };
-}
+} // namespace realm
 
 #endif /* SRC_REALM_ARRAY_KEY_HPP_ */

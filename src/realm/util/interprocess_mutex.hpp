@@ -83,8 +83,7 @@ public:
     InterprocessMutex& operator=(const InterprocessMutex&) = delete;
 
 #if REALM_ROBUST_MUTEX_EMULATION || defined(_WIN32)
-    struct SharedPart {
-    };
+    struct SharedPart {};
 #else
     using SharedPart = RobustMutex;
 #endif

@@ -133,8 +133,7 @@ TEST(ToString_DataTypes)
     CHECK_ENUM(col_type_OldDateTime);
 }
 
-struct StreamableType {
-};
+struct StreamableType {};
 static std::ostream& operator<<(std::ostream& os, StreamableType)
 {
     return os << "Custom streamable type";

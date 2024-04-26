@@ -929,7 +929,7 @@ TEST(Transform_EraseSelectedLinkView)
         LnkLst link_list = (origin->begin() + 1)->get_linklist("ll");
         auto target_table = link_list.get_target_table();
         link_list.set(0, target_table->get_object(2).get_key()); // Select the link list of the 2nd row
-        origin->remove_object(origin->begin() + 0);     // Move that link list
+        origin->remove_object(origin->begin() + 0);              // Move that link list
         if (link_list.size() > 1) {
             link_list.set(1, target_table->get_object(3).get_key()); // Now modify it again
         }

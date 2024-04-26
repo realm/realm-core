@@ -779,7 +779,7 @@ TEST_CASE("sync metadata: can open old metadata realms", "[sync][metadata]") {
                 user->set_identities({{"identity 1", "a"}, {"shared identity", "shared"}});
                 user->add_realm_file_path("file 1");
                 user->add_realm_file_path("file 2");
-                
+
                 user = manager.get_or_make_user_metadata(name, "b");
                 user->set_state_and_tokens(state2, token_2, refresh_token_2);
                 user->set_identities({{"identity 2", "b"}, {"shared identity", "shared"}});
