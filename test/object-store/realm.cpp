@@ -1496,7 +1496,6 @@ TEST_CASE("Get Realm using Async Open", "[sync][pbs][async open]") {
 }
 
 #if REALM_ENABLE_AUTH_TESTS
-#if REALM_APP_SERVICES
 
 TEST_CASE("Syhcnronized realm: AutoOpen", "[sync][baas][pbs][async open]") {
     const auto partition = random_string(100);
@@ -1597,7 +1596,6 @@ TEST_CASE("Syhcnronized realm: AutoOpen", "[sync][baas][pbs][async open]") {
     wait_for_download(*r);
 }
 
-#endif // REALM_APP_SERVICES
 #endif // REALM_ENABLE_AUTH_TESTS
 
 TEST_CASE("SharedRealm: convert", "[sync][pbs][convert]") {

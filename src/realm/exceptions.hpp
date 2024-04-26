@@ -21,7 +21,6 @@
 
 #include <realm/status.hpp>
 
-#include <exception>
 #include <stdexcept>
 #include <system_error>
 
@@ -50,7 +49,7 @@ private:
  *
  * Currently this works for exceptions that derive from std::exception or Exception only.
  */
-Status exception_to_status(std::exception_ptr exc_ptr = nullptr) noexcept;
+Status exception_to_status() noexcept;
 
 
 /// The UnsupportedFileFormatVersion exception is thrown by DB::open()
