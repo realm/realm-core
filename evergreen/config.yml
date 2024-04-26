@@ -137,7 +137,7 @@ functions:
               set_cmake_var realm_vars REALM_LLVM_COVERAGE BOOL On
           fi
 
-          set_cmake_var realm_vars REALM_BUILD_COMMANDLINE_TOOLS BOOL On
+          set_cmake_var realm_vars REALM_BUILD_COMMANDLINE_TOOLS BOOL "${build_command_line_tools|On}"
           set_cmake_var realm_vars REALM_ENABLE_ENCRYPTION BOOL "${enable_realm_encryption|On}"
 
           if [[ -n "${fetch_missing_dependencies|}" ]]; then
@@ -1298,6 +1298,7 @@ buildvariants:
     c_compiler: "/opt/clang+llvm/bin/clang"
     cxx_compiler: "/opt/clang+llvm/bin/clang++"
     extra_flags: -DREALM_MAX_BPNODE_SIZE=4
+    build_command_line_tools: Off
   tasks:
   - name: compile_local_tests
 
@@ -1309,6 +1310,8 @@ buildvariants:
     c_compiler: "/opt/clang+llvm/bin/clang"
     cxx_compiler: "/opt/clang+llvm/bin/clang++"
     enable_realm_encryption: Off
+    build_command_line_tools: Off
+    disable_tests_against_baas: On
   tasks:
   - name: compile_local_tests
 
@@ -1322,6 +1325,7 @@ buildvariants:
     run_with_encryption: On
     enable_tsan: On
     cmake_build_type: RelWithDebInfo
+    disable_tests_against_baas: On
   tasks:
   - name: core_tests_group
 
