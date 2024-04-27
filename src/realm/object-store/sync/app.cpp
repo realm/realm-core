@@ -842,6 +842,7 @@ void App::log_out(const std::shared_ptr<User>& user, SyncUser::State new_state,
         return;
     }
 
+    log_debug("App: log_out(%1)", user->user_id());
     auto request =
         make_request(HttpMethod::del, url_for_path("/auth/session"), user, RequestTokenType::RefreshToken, "");
 
@@ -1300,14 +1301,17 @@ void App::refresh_access_token(const std::shared_ptr<User>& user, bool update_lo
         return;
     }
 
-    log_debug("App: refresh_access_token: email: %1 %2", user->user_profile().email(),
-              update_location ? "(updating location)" : "");
+    log_debug("App: refresh_access_token: user_id: %1%2", user->user_id(),
+              update_location ? " (updating location)" : "");
 
     // If update_location is set, force the location info to be updated before sending the request
     do_request(
         make_request(HttpMethod::post, url_for_path("/auth/session"), user, RequestTokenType::RefreshToken, ""),
         [completion = std::move(completion), self = shared_from_this(), user](auto&&, const Response& response) {
             if (auto error = AppUtils::check_for_errors(response)) {
+                self->log_error("App: refresh_access_token: %1 -> %2 ERROR: %3", user->user_id(),
+                                response.http_status_code, error->what());
+
                 return completion(std::move(error));
             }
 
