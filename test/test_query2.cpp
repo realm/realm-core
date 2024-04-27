@@ -4941,9 +4941,12 @@ TEST(Query_IntOrQueryOptimisation)
         auto obj = table->create_object();
         obj.set<bool>(col_active, (i % 10) != 0);
         obj.set<int>(col_id, i);
-        if (i == 0) obj.set(col_optype, "CREATE");
-        if (i == 1) obj.set(col_optype, "DELETE");
-        if (i == 2) obj.set(col_optype, "CREATE");
+        if (i == 0)
+            obj.set(col_optype, "CREATE");
+        if (i == 1)
+            obj.set(col_optype, "DELETE");
+        if (i == 2)
+            obj.set(col_optype, "CREATE");
     }
     auto optype = table->column<String>(col_optype);
     auto active = table->column<Bool>(col_active);
@@ -5360,9 +5363,9 @@ TEST(Query_LinksWithIndex)
 
     Query q1 =
         origin->link(col_linklist).link(col_link).backlink(*foo, col_foo).column<String>(col_location) == "Fyn";
-    CHECK_EQUAL(q1.find(),  obj0.get_key());
+    CHECK_EQUAL(q1.find(), obj0.get_key());
     Query q2 = origin->link(col_linklist).link(col_link).backlink(*foo, col_foo).column<Int>(col_score) == 5;
-    CHECK_EQUAL(q2.find(),  obj0.get_key());
+    CHECK_EQUAL(q2.find(), obj0.get_key());
 
     // Make sure that changes in the table are reflected in the query result
     middle->get_object(m3).set(col_link, target->find_first(col_value, strings[1]));

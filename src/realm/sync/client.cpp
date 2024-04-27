@@ -1422,7 +1422,7 @@ void SessionWrapper::on_commit(version_type new_version)
         if (REALM_UNLIKELY(!self->m_sess))
             return; // Already finalized
         SessionImpl& sess = *self->m_sess;
-        sess.recognize_sync_version(new_version); // Throws
+        sess.recognize_sync_version(new_version);                           // Throws
         self->on_upload_progress(/* only_if_new_uploadable_data = */ true); // Throws
     });
 }

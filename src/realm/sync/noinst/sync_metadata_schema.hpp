@@ -36,7 +36,7 @@ namespace internal_schema_groups {
 constexpr static std::string_view c_flx_subscription_store("flx_subscription_store");
 constexpr static std::string_view c_pending_bootstraps("pending_bootstraps");
 constexpr static std::string_view c_flx_migration_store("flx_migration_store");
-}
+} // namespace internal_schema_groups
 
 /*
  * The types in this file represent the schema for tables used internally by the sync client. They are similar
@@ -88,8 +88,7 @@ struct SyncMetadataTable {
     util::Optional<SyncMetadataColumn> pk_info;
     std::vector<SyncMetadataColumn> columns;
 
-    struct IsEmbeddedTag {
-    };
+    struct IsEmbeddedTag {};
     SyncMetadataTable(TableKey* out, std::string_view name, IsEmbeddedTag,
                       std::initializer_list<SyncMetadataColumn> columns)
         : key_out(out)

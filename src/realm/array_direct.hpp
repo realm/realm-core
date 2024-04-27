@@ -350,6 +350,6 @@ inline size_t upper_bound(const char* data, size_t size, int64_t value) noexcept
 
     return low;
 }
-}
+} // namespace realm
 
 #endif /* ARRAY_TPL_HPP_ */

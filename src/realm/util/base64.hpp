@@ -62,7 +62,6 @@ inline size_t base64_decoded_size(size_t base64_size) noexcept
 }
 
 
-
 /// base64_decode_to_vector() is a convenience function that decodes \param
 /// encoded and returns the result in a std::vector<char> with the correct size.
 /// This function returns none if the input is invalid.
@@ -71,4 +70,3 @@ std::optional<std::vector<char>> base64_decode_to_vector(Span<const char> encode
 } // namespace realm::util
 
 #endif // REALM_UTIL_BASE64_HPP
-

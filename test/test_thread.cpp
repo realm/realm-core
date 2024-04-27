@@ -529,7 +529,9 @@ TEST(Thread_MutexTryLock)
             init_done = true;
         }
         cv.notify_one();
-        while(!mutex2.try_lock()) { millisleep(1); }
+        while (!mutex2.try_lock()) {
+            millisleep(1);
+        }
         CHECK(mutex2.owns_lock());
         mutex2.unlock();
     };
@@ -541,7 +543,9 @@ TEST(Thread_MutexTryLock)
     thread.start(do_async);
     {
         std::unique_lock<std::mutex> guard(cv_lock);
-        cv.wait(guard, [&]{return init_done;});
+        cv.wait(guard, [&] {
+            return init_done;
+        });
     }
     m.unlock();
     thread.join();
@@ -578,7 +582,9 @@ TEST(Thread_RobustMutexTryLock)
             init_done = true;
         }
         control_cv.notify_one();
-        while(!m.try_lock(recover_function)) { millisleep(1); }
+        while (!m.try_lock(recover_function)) {
+            millisleep(1);
+        }
         // exit the thread with the lock held to check robustness
     };
 
@@ -587,7 +593,9 @@ TEST(Thread_RobustMutexTryLock)
     thread.start(do_async);
     {
         std::unique_lock<std::mutex> lock(control_mutex);
-        control_cv.wait(lock, [&]{ return init_done; });
+        control_cv.wait(lock, [&] {
+            return init_done;
+        });
     }
     m.unlock();
     thread.join();
@@ -628,7 +636,9 @@ NONCONCURRENT_TEST(Thread_InterprocessMutexTryLock)
             init_done = true;
         }
         cv.notify_one();
-        while(!m2.try_lock()) { millisleep(1); }
+        while (!m2.try_lock()) {
+            millisleep(1);
+        }
         m2.unlock();
     };
 
@@ -637,7 +647,9 @@ NONCONCURRENT_TEST(Thread_InterprocessMutexTryLock)
     thread.start(do_async);
     {
         std::unique_lock<std::mutex> ul(cv_mutex);
-        cv.wait(ul, [&]{return init_done;});
+        cv.wait(ul, [&] {
+            return init_done;
+        });
     }
     m.unlock();
     thread.join();
@@ -689,7 +701,6 @@ void wakeup_signaller(int* signal_state, InterprocessMutex* mutex, InterprocessC
 }
 
 
-
 void waiter(InterprocessMutex* mutex, InterprocessCondVar* cv, std::mutex* control_mutex,
             std::condition_variable* control_cv, size_t* num_threads_holding_lock)
 {
@@ -703,7 +714,7 @@ void waiter(InterprocessMutex* mutex, InterprocessCondVar* cv, std::mutex* contr
 
     cv->wait(*mutex, nullptr);
 }
-}
+} // namespace
 
 // Verify, that a wait on a condition variable actually waits
 // - this test relies on assumptions about scheduling, which
@@ -835,7 +846,9 @@ NONCONCURRENT_TEST(Thread_CondvarNotifyAllWakeup)
     {
         // allow all waiters to start and obtain the InterprocessCondVar
         std::unique_lock<std::mutex> unique_lock(control_mutex);
-        control_cv.wait(unique_lock, [&]{ return num_threads_holding_lock == num_waiters; });
+        control_cv.wait(unique_lock, [&] {
+            return num_threads_holding_lock == num_waiters;
+        });
     }
 
     mutex.lock();
@@ -887,15 +900,15 @@ TEST_IF(Thread_CondvarAtomicWaitUnlock, !running_with_valgrind && TEST_DURATION 
                     signal = true;
 
                     // A gap in wait() could be very tight, so we need a way to preemt it between two instructions.
-                    // Problem is that we have so many/frequent operating system wait calls in this that they might 
-                    // be invoked closer than a thread time slice, so preemption would never occur. So we create 
+                    // Problem is that we have so many/frequent operating system wait calls in this that they might
+                    // be invoked closer than a thread time slice, so preemption would never occur. So we create
                     // some work that some times willsome times bring the current time slice close to its end.
 
                     // Wait between 0 and number of clocks on 100 ms on a on 3 GHz machine (100 ms is Linux default
                     // time slice)
-                    uint64_t clocks_to_wait = fastrand(3ULL * 1000000000ULL / 1000000ULL * 100ULL); 
+                    uint64_t clocks_to_wait = fastrand(3ULL * 1000000000ULL / 1000000ULL * 100ULL);
 
-                    // This loop can wait alot more than 100 ms because each iteration takes many more clocks than 
+                    // This loop can wait alot more than 100 ms because each iteration takes many more clocks than
                     // just 1. That's intentional and will cover other OS'es with bigger time slices.
                     volatile int sum = 0; // must be volatile, else it compiles into no-op
                     for (uint64_t t = 0; t < clocks_to_wait; t++) {
@@ -920,7 +933,7 @@ TEST_IF(Thread_CondvarAtomicWaitUnlock, !running_with_valgrind && TEST_DURATION 
                     mutex.unlock();
                 }
             });
-            
+
             t1.join();
             t2.join();
         }));

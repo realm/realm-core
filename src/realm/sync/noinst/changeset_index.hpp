@@ -178,8 +178,7 @@ struct ChangesetIndex::RangeIterator {
         }
     }
 
-    struct end_tag {
-    };
+    struct end_tag {};
     /// Create an iterator representing the end.
     RangeIterator(ChangesetIndex::Ranges* ranges, end_tag) noexcept
         : m_ranges(ranges)
