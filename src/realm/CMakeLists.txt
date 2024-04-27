@@ -387,7 +387,7 @@ if(REALM_HAVE_BACKTRACE AND NOT CMAKE_GENERATOR STREQUAL Xcode)
     target_link_libraries(Storage PUBLIC ${Backtrace_LIBRARIES})
 endif()
 
-if(REALM_ENABLE_ENCRYPTION AND REALM_HAVE_OPENSSL AND (UNIX OR WIN32))
+if(REALM_HAVE_OPENSSL AND (UNIX OR WIN32))
     target_link_libraries(Storage PUBLIC OpenSSL::Crypto)
 endif()
 

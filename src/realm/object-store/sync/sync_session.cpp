@@ -359,8 +359,14 @@ SyncSession::handle_refresh(const std::shared_ptr<SyncSession>& session, bool re
                 // internal backoff timer which will happen automatically so nothing needs to
                 // happen here.
                 util::CheckedUniqueLock lock(session->m_state_mutex);
+                // If updating access token while opening realm, just become active at this point
+                // and try to use the current access token.
                 if (session->m_state == State::WaitingForAccessToken) {
                     session->become_active();
+                }
+                // If `cancel_waits_on_nonfatal_error` is true, then cancel the waiters and pass along the error
+                else if (session->config(&SyncConfig::cancel_waits_on_nonfatal_error)) {
+                    session->cancel_pending_waits(std::move(lock), error->to_status()); // unlocks the mutex
                 }
             }
         }

@@ -20,6 +20,8 @@
 
 #include <realm/util/file_mapper.hpp>
 
+#include <sstream>
+
 #if REALM_ENABLE_ENCRYPTION
 #include <realm/util/aes_cryptor.hpp>
 #include <realm/util/errno.hpp>
@@ -30,7 +32,6 @@
 #include <cstdlib>
 #include <algorithm>
 #include <chrono>
-#include <sstream>
 #include <stdexcept>
 #include <string_view>
 #include <system_error>

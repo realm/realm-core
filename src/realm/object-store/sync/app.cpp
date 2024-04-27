@@ -842,6 +842,7 @@ void App::log_out(const std::shared_ptr<User>& user, SyncUser::State new_state,
         return;
     }
 
+    log_debug("App: log_out(%1)", user->user_id());
     auto request =
         make_request(HttpMethod::del, url_for_path("/auth/session"), user, RequestTokenType::RefreshToken, "");
 
@@ -975,6 +976,22 @@ void App::link_user(const std::shared_ptr<User>& user, const AppCredentials& cre
 
     log_in_with_credentials(credentials, user, std::move(completion));
 }
+
+std::shared_ptr<User> App::create_fake_user_for_testing(const std::string& user_id, const std::string& access_token,
+                                                        const std::string& refresh_token)
+{
+    std::shared_ptr<User> user;
+    {
+        m_metadata_store->create_user(user_id, refresh_token, access_token, "fake_device");
+        util::CheckedLockGuard lock(m_user_mutex);
+        user_data_updated(user_id); // FIXME: needs to be callback from metadata store
+        user = get_user_for_id(user_id);
+    }
+
+    switch_user(user);
+    return user;
+}
+
 
 void App::refresh_custom_data(const std::shared_ptr<User>& user,
                               UniqueFunction<void(Optional<AppError>)>&& completion)
@@ -1284,14 +1301,17 @@ void App::refresh_access_token(const std::shared_ptr<User>& user, bool update_lo
         return;
     }
 
-    log_debug("App: refresh_access_token: email: %1 %2", user->user_profile().email(),
-              update_location ? "(updating location)" : "");
+    log_debug("App: refresh_access_token: user_id: %1%2", user->user_id(),
+              update_location ? " (updating location)" : "");
 
     // If update_location is set, force the location info to be updated before sending the request
     do_request(
         make_request(HttpMethod::post, url_for_path("/auth/session"), user, RequestTokenType::RefreshToken, ""),
         [completion = std::move(completion), self = shared_from_this(), user](auto&&, const Response& response) {
             if (auto error = AppUtils::check_for_errors(response)) {
+                self->log_error("App: refresh_access_token: %1 -> %2 ERROR: %3", user->user_id(),
+                                response.http_status_code, error->what());
+
                 return completion(std::move(error));
             }
 

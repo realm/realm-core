@@ -381,6 +381,52 @@ TestAppSession::~TestAppSession()
     }
 }
 
+void TestAppSession::close(bool tear_down)
+{
+    try {
+        if (tear_down) {
+            // If tearing down, make sure there's an app to work with
+            if (!m_app) {
+                reopen(false);
+            }
+            REALM_ASSERT(m_app);
+            // Clean up the app data
+            m_app->sync_manager()->tear_down_for_testing();
+        }
+        else if (m_app) {
+            // Otherwise, make sure all the session are closed
+            m_app->sync_manager()->close_all_sessions();
+        }
+        m_app.reset();
+
+        // If tearing down, clean up the test file directory
+        if (tear_down && !m_base_file_path.empty() && util::File::exists(m_base_file_path)) {
+            util::try_remove_dir_recursive(m_base_file_path);
+            m_base_file_path.clear();
+        }
+    }
+    catch (const std::exception& ex) {
+        std::cerr << "Error tearing down TestAppSession: " << ex.what() << "\n";
+    }
+    // Ensure all cached apps are cleared
+    app::App::clear_cached_apps();
+}
+
+void TestAppSession::reopen(bool log_in)
+{
+    REALM_ASSERT(!m_base_file_path.empty());
+    if (m_app) {
+        close(false);
+    }
+    m_app = app::App::get_app(app::App::CacheMode::Disabled, app_config);
+
+    // initialize sync client
+    m_app->sync_manager()->get_sync_client();
+    if (log_in) {
+        log_in_user(m_app, user_creds);
+    }
+}
+
 std::vector<bson::BsonDocument> TestAppSession::get_documents(app::User& user, const std::string& object_type,
                                                               size_t expected_count) const
 {
@@ -478,8 +524,7 @@ OfflineAppSession::OfflineAppSession(OfflineAppSession::Config config)
     , m_delete_storage(config.delete_storage)
 {
     REALM_ASSERT(m_transport);
-    app::AppConfig app_config;
-    set_app_config_defaults(app_config, m_transport);
+    set_app_config_defaults(m_app_config, m_transport);
 
     if (config.storage_path) {
         m_base_file_path = *config.storage_path;
@@ -489,16 +534,16 @@ OfflineAppSession::OfflineAppSession(OfflineAppSession::Config config)
         m_base_file_path = util::make_temp_dir();
     }
 
-    app_config.base_file_path = m_base_file_path;
-    app_config.metadata_mode = config.metadata_mode;
+    m_app_config.base_file_path = m_base_file_path;
+    m_app_config.metadata_mode = config.metadata_mode;
     if (config.base_url) {
-        app_config.base_url = *config.base_url;
+        m_app_config.base_url = *config.base_url;
     }
     if (config.app_id) {
-        app_config.app_id = *config.app_id;
+        m_app_config.app_id = *config.app_id;
     }
-    app_config.sync_client_config.socket_provider = config.socket_provider;
-    m_app = app::App::get_app(app::App::CacheMode::Disabled, app_config);
+    m_app_config.sync_client_config.socket_provider = config.socket_provider;
+    m_app = app::App::get_app(app::App::CacheMode::Disabled, m_app_config);
 }
 
 OfflineAppSession::~OfflineAppSession()
