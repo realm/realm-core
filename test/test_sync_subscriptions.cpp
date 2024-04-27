@@ -399,7 +399,9 @@ TEST(Sync_SubscriptionStoreRefreshSubscriptionSetInvalid)
     CHECK_THROW(latest->refresh(), RuntimeError);
 }
 
-TEST(Sync_SubscriptionStoreInternalSchemaMigration)
+// Only runs if REALM_MAX_BPNODE_SIZE is 1000 since that's what the pre-created
+// test realm files were created with
+TEST_IF(Sync_SubscriptionStoreInternalSchemaMigration, REALM_MAX_BPNODE_SIZE == 1000)
 {
     SHARED_GROUP_TEST_PATH(sub_store_path)
 

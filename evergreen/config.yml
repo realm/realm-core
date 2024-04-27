@@ -137,8 +137,8 @@ functions:
               set_cmake_var realm_vars REALM_LLVM_COVERAGE BOOL On
           fi
 
-          set_cmake_var realm_vars REALM_BUILD_COMMANDLINE_TOOLS BOOL On
-          set_cmake_var realm_vars REALM_ENABLE_ENCRYPTION BOOL On
+          set_cmake_var realm_vars REALM_BUILD_COMMANDLINE_TOOLS BOOL "${build_command_line_tools|On}"
+          set_cmake_var realm_vars REALM_ENABLE_ENCRYPTION BOOL "${enable_realm_encryption|On}"
 
           if [[ -n "${fetch_missing_dependencies|}" ]]; then
               set_cmake_var realm_vars REALM_FETCH_MISSING_DEPENDENCIES BOOL On
@@ -1289,6 +1289,31 @@ buildvariants:
     extra_flags: "-DREALM_ENABLE_GEOSPATIAL=OFF"
   tasks:
   - name: compile_test
+
+- name: ubuntu-small-bpnode-size
+  display_name: "Ubuntu (Small BPNode size)"
+  run_on: ubuntu2204-arm64-large
+  expansions:
+    fetch_missing_dependencies: On
+    c_compiler: "/opt/clang+llvm/bin/clang"
+    cxx_compiler: "/opt/clang+llvm/bin/clang++"
+    extra_flags: -DREALM_MAX_BPNODE_SIZE=4
+    build_command_line_tools: Off
+  tasks:
+  - name: compile_local_tests
+
+- name: ubuntu-no-encryption
+  display_name: "Ubuntu (No encryption support)"
+  run_on: ubuntu2204-arm64-large
+  expansions:
+    fetch_missing_dependencies: On
+    c_compiler: "/opt/clang+llvm/bin/clang"
+    cxx_compiler: "/opt/clang+llvm/bin/clang++"
+    enable_realm_encryption: Off
+    build_command_line_tools: Off
+    disable_tests_against_baas: On
+  tasks:
+  - name: compile_local_tests
 
 - name: ubuntu-encryption-tsan
   display_name: "Ubuntu (Encryption Enabled w/TSAN)"
