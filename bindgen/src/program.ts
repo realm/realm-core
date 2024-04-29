@@ -109,9 +109,9 @@ program
         optInSpec = parseOptInSpec(optInPath);
       }
       generate({ rawSpec, optInSpec, template: await template, outputPath });
-      process.exit(0);
     } catch (err) {
       printError(err);
+      process.exitCode = 1;
     }
   });
 
@@ -122,8 +122,8 @@ program.command("generate-schema").action(() => {
   } catch (err) {
     printError(err);
     process.exitCode = 1;
-    }
-  });
+  }
+});
 
 program
   .command("validate")
@@ -138,9 +138,8 @@ program
     try {
       parseSpecs(specPaths);
       console.log(chalk.green("Validation passed!"));
-      process.exit(0);
     } catch (err) {
       printError(err);
-      process.exit(1);
+      process.exitCode = 1;
     }
   });
