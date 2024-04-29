@@ -16,7 +16,7 @@ set(SCHEMA_FILE ${CMAKE_CURRENT_SOURCE_DIR}/generated/spec.schema.json)
 add_custom_command(
     OUTPUT ${SCHEMA_FILE}
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-    COMMAND ${NPX} typescript-json-schema ${CMAKE_CURRENT_SOURCE_DIR}/tsconfig.json RelaxedSpec --include ${CMAKE_CURRENT_SOURCE_DIR}/src/spec/relaxed-model.ts --out ${SCHEMA_FILE} --required --noExtraProps --aliasRefs
+    COMMAND ${NPX} tsx -- "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/realm-bindgen.ts" generate-schema
     VERBATIM
     MAIN_DEPENDENCY src/spec/relaxed-model.ts
     DEPENDS
@@ -48,12 +48,6 @@ function(bindgen)
         endif()
     endforeach()
 
-    # Don't want to set cmake_minimum_required() here because it has other effects and needs to be done early.
-    # Remove this once https://github.com/realm/realm-core/issues/6537 bumps realm-core's minimum.
-    if(NOT CMAKE_CURRENT_FUNCTION_LIST_DIR)
-        message(FATAL_ERROR "bindgen() requires cmake 3.17+")
-    endif()
-
     get_property(BINDGEN_LIB_TS_FILES TARGET BindgenSpecJsonSchema PROPERTY BINDGEN_LIB_TS_FILES)
     get_property(NPX TARGET BindgenSpecJsonSchema PROPERTY NPX)
 
@@ -62,7 +56,7 @@ function(bindgen)
     add_custom_command(
         OUTPUT ${BINDGEN_OUTPUTS}
         WORKING_DIRECTORY ${CMAKE_CURRENT_FUNCTION_LIST_DIR}
-        COMMAND ${NPX} tsx -- "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/realm-bindgen.ts"
+        COMMAND ${NPX} tsx -- "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/realm-bindgen.ts" generate
             --spec "$<JOIN:${CORE_SPEC_FILE};${BINDGEN_SPECS},;--spec;>"
             "$<$<BOOL:${BINDGEN_OPTIN}>:--opt-in;${BINDGEN_OPTIN}>"
             --template "${BINDGEN_TEMPLATE}"

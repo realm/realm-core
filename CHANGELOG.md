@@ -19,6 +19,7 @@
 
 ### Internals
 * Follow on to ([PR #7300](https://github.com/realm/realm-core/pull/7300)) to allow SDKs to construct a fake user for testing SyncManager::get_user -> App::create_fake_user_for_testing ([PR #7632](https://github.com/realm/realm-core/pull/7632))
+* Bindgen: Generating spec schema if missing. ([PR #7636](https://github.com/realm/realm-core/pull/7636))
 
 ----------------------------------------------
 

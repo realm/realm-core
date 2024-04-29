@@ -16,11 +16,13 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-import Ajv, { ErrorObject } from "ajv";
+import Ajv, { ErrorObject, ValidateFunction } from "ajv";
 import { strict as assert } from "assert";
 import chalk from "chalk";
 import fs from "fs";
 import yaml from "yaml";
+import cp from "child_process";
+import path from "path";
 
 import {
   ClassSpec,
@@ -65,9 +67,42 @@ export class InvalidSpecError extends Error {
 }
 
 const ajv = new Ajv({ allowUnionTypes: true });
-const schemaFile = new URL("../generated/spec.schema.json", import.meta.url);
-const schemaJson = JSON.parse(fs.readFileSync(schemaFile, { encoding: "utf8" }));
-export const validate = ajv.compile<RelaxedSpec>(schemaJson);
+const rootPath = new URL("../..", import.meta.url).pathname;
+const schemaFile = path.resolve(rootPath, "bindgen/generated/spec.schema.json");
+
+export function generateSchema() {
+  cp.spawnSync(
+    "typescript-json-schema",
+    [
+      path.resolve(rootPath, "bindgen/tsconfig.json"),
+      "RelaxedSpec",
+      "--include",
+      path.resolve(rootPath, "bindgen/src/spec/relaxed-model.ts"),
+      "--out",
+      schemaFile,
+      "--required",
+      "--noExtraProps",
+      "--aliasRefs",
+    ],
+    { stdio: "inherit" },
+  );
+}
+
+let validate: ValidateFunction<RelaxedSpec> | null;
+
+function compileValidate(): ValidateFunction<RelaxedSpec> {
+  if (validate) {
+    return validate;
+  } else {
+    if (!fs.existsSync(schemaFile)) {
+      console.log("Generating spec.schema.json");
+      generateSchema();
+    }
+    const schemaJson = JSON.parse(fs.readFileSync(schemaFile, { encoding: "utf8" }));
+    validate = ajv.compile<RelaxedSpec>(schemaJson);
+    return validate;
+  }
+}
 
 function parseYaml(filePath: string): unknown {
   const text = fs.readFileSync(filePath, { encoding: "utf8" });
@@ -103,6 +138,7 @@ export function parseSpecs(specs: ReadonlyArray<string>): Spec {
 
 export function parseSpec(filePath: string): AnySpec {
   const parsed = parseYaml(filePath);
+  const validate = compileValidate();
   const isValid = validate(parsed);
   if (isValid) {
     return normalizeSpec(parsed);
