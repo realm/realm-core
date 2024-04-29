@@ -354,8 +354,8 @@ let bidExcludes: [String] = [
 
 let platforms: [SupportedPlatform] = [
     .macOS(.v10_13),
-    .iOS(.v11),
-    .tvOS(.v11),
+    .iOS(.v12),
+    .tvOS(.v12),
     .watchOS(.v4)
 ]
 
