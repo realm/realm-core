@@ -16,7 +16,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-import Ajv, { ErrorObject } from "ajv";
+import Ajv, { ErrorObject, ValidateFunction } from "ajv";
 import { strict as assert } from "assert";
 import chalk from "chalk";
 import fs from "fs";
@@ -70,8 +70,7 @@ const ajv = new Ajv({ allowUnionTypes: true });
 const rootPath = new URL("../..", import.meta.url).pathname;
 const schemaFile = path.resolve(rootPath, "bindgen/generated/spec.schema.json");
 
-if (!fs.existsSync(schemaFile)) {
-  console.log("Generating spec.schema.json");
+export function generateSchema() {
   cp.spawnSync(
     "typescript-json-schema",
     [
@@ -83,13 +82,27 @@ if (!fs.existsSync(schemaFile)) {
       schemaFile,
       "--required",
       "--noExtraProps",
+      "--aliasRefs",
     ],
     { stdio: "inherit" },
   );
 }
 
-const schemaJson = JSON.parse(fs.readFileSync(schemaFile, { encoding: "utf8" }));
-export const validate = ajv.compile<RelaxedSpec>(schemaJson);
+let validate: ValidateFunction<RelaxedSpec> | null;
+
+function compileValidate(): ValidateFunction<RelaxedSpec> {
+  if (validate) {
+    return validate;
+  } else {
+    if (!fs.existsSync(schemaFile)) {
+      console.log("Generating spec.schema.json");
+      generateSchema();
+    }
+    const schemaJson = JSON.parse(fs.readFileSync(schemaFile, { encoding: "utf8" }));
+    validate = ajv.compile<RelaxedSpec>(schemaJson);
+    return validate;
+  }
+}
 
 function parseYaml(filePath: string): unknown {
   const text = fs.readFileSync(filePath, { encoding: "utf8" });
@@ -125,6 +138,7 @@ export function parseSpecs(specs: ReadonlyArray<string>): Spec {
 
 export function parseSpec(filePath: string): AnySpec {
   const parsed = parseYaml(filePath);
+  const validate = compileValidate();
   const isValid = validate(parsed);
   if (isValid) {
     return normalizeSpec(parsed);

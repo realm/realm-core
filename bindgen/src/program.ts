@@ -23,7 +23,7 @@ import path from "path";
 
 import { debug, enableDebugging } from "./debug";
 import { generate } from "./generator";
-import { OptInSpec, InvalidSpecError, parseOptInSpec, parseSpecs } from "./spec";
+import { OptInSpec, InvalidSpecError, parseOptInSpec, parseSpecs, generateSchema } from "./spec";
 import { Template, importTemplate } from "./templates";
 
 type GenerateOptions = {
@@ -112,7 +112,16 @@ program
       process.exit(0);
     } catch (err) {
       printError(err);
-      process.exit(1);
+    }
+  });
+
+program.command("generate-schema").action(() => {
+  try {
+    console.log("Generating spec.schema.json");
+    generateSchema();
+  } catch (err) {
+    printError(err);
+    process.exitCode = 1;
     }
   });
 
