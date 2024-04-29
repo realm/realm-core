@@ -1058,7 +1058,7 @@ int_fast64_t Array::get(const char* header, size_t ndx) noexcept
     // integer compressor, if needed. Otherwise we should just call
     // get_direct. On average there should be one more access to the header
     // while traversing the cluster tree.
-    if (REALM_UNLIKELY(!NodeHeader::wtype_is_extended(header))) {
+    if (REALM_LIKELY(!NodeHeader::wtype_is_extended(header))) {
         const char* data = get_data_from_header(header);
         uint_least8_t width = get_width_from_header(header);
         return get_direct(data, width, ndx);
