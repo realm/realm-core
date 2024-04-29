@@ -190,7 +190,7 @@ public:
     /// @param access_token The access token of the user
     /// @param refresh_token The refresh token of the user
     std::shared_ptr<User> create_fake_user_for_testing(const std::string& user_id, const std::string& access_token,
-                                                       const std::string& refresh_token);
+                                                       const std::string& refresh_token) REQUIRES(!m_user_mutex);
 
     // MARK: - Provider Clients
 
