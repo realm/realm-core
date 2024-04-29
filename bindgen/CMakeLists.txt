@@ -16,7 +16,7 @@ set(SCHEMA_FILE ${CMAKE_CURRENT_SOURCE_DIR}/generated/spec.schema.json)
 add_custom_command(
     OUTPUT ${SCHEMA_FILE}
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-    COMMAND ${NPX} typescript-json-schema ${CMAKE_CURRENT_SOURCE_DIR}/tsconfig.json RelaxedSpec --include ${CMAKE_CURRENT_SOURCE_DIR}/src/spec/relaxed-model.ts --out ${SCHEMA_FILE} --required --noExtraProps --aliasRefs
+    COMMAND ${NPX} tsx -- "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/realm-bindgen.ts" generate-schema
     VERBATIM
     MAIN_DEPENDENCY src/spec/relaxed-model.ts
     DEPENDS
