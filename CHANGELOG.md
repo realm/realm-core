@@ -21,6 +21,8 @@
 * Follow on to ([PR #7300](https://github.com/realm/realm-core/pull/7300)) to allow SDKs to construct a fake user for testing SyncManager::get_user -> App::create_fake_user_for_testing ([PR #7632](https://github.com/realm/realm-core/pull/7632))
 * Fix build-apple-device.sh, broken in [#7603](https://github.com/realm/realm-core/pull/7603) ([PR #7640](https://github.com/realm/realm-core/pull/7640)).
 * Added a CAPI interface for SDKs to bring their own managed users with core's app services turned off. ([PR #7615](https://github.com/realm/realm-core/pull/7615)).
+* Bump the minimum deployment targets on Apple platforms to the minimums supported by Xcode 15 and clean up now unused availability checks. ([PR #7648](https://github.com/realm/realm-core/pull/7648)).
+
 ----------------------------------------------
 
 # 14.6.0 Release notes
