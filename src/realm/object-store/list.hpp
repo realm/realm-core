@@ -127,9 +127,6 @@ private:
     template <typename T>
     auto& as() const;
 
-    template <typename T, typename Context>
-    void set_if_different(Context&, size_t row_ndx, T&& value, CreatePolicy);
-
     friend struct std::hash<List>;
 };
 
@@ -164,120 +161,6 @@ auto List::dispatch(Fn&& fn) const
     return switch_on_type(get_type(), std::forward<Fn>(fn));
 }
 
-template <typename Context>
-auto List::get(Context& ctx, size_t row_ndx) const
-{
-    return dispatch([&](auto t) {
-        return ctx.box(this->get<std::decay_t<decltype(*t)>>(row_ndx));
-    });
-}
-
-template <typename T, typename Context>
-size_t List::find(Context& ctx, T&& value) const
-{
-    return dispatch([&](auto t) {
-        return this->find(ctx.template unbox<std::decay_t<decltype(*t)>>(value, CreatePolicy::Skip));
-    });
-}
-
-template <typename T, typename Context>
-void List::add(Context& ctx, T&& value, CreatePolicy policy)
-{
-    if (m_is_embedded) {
-        validate_embedded(ctx, value, policy);
-        auto key = as<Obj>().create_and_insert_linked_object(size()).get_key();
-        ctx.template unbox<Obj>(value, policy, key);
-        return;
-    }
-    dispatch([&](auto t) {
-        this->add(ctx.template unbox<std::decay_t<decltype(*t)>>(value, policy));
-    });
-}
-
-template <typename T, typename Context>
-void List::insert(Context& ctx, size_t list_ndx, T&& value, CreatePolicy policy)
-{
-    if (m_is_embedded) {
-        validate_embedded(ctx, value, policy);
-        auto key = as<Obj>().create_and_insert_linked_object(list_ndx).get_key();
-        ctx.template unbox<Obj>(value, policy, key);
-        return;
-    }
-    dispatch([&](auto t) {
-        this->insert(list_ndx, ctx.template unbox<std::decay_t<decltype(*t)>>(value, policy));
-    });
-}
-
-template <typename T, typename Context>
-void List::set(Context& ctx, size_t list_ndx, T&& value, CreatePolicy policy)
-{
-    if (m_is_embedded) {
-        validate_embedded(ctx, value, policy);
-
-        auto& list = as<Obj>();
-        auto key = policy.diff ? list.get(list_ndx) : list.create_and_set_linked_object(list_ndx).get_key();
-        ctx.template unbox<Obj>(value, policy, key);
-        return;
-    }
-    dispatch([&](auto t) {
-        this->set(list_ndx, ctx.template unbox<std::decay_t<decltype(*t)>>(value, policy));
-    });
-}
-
-template <typename T, typename Context>
-void List::set_if_different(Context& ctx, size_t row_ndx, T&& value, CreatePolicy policy)
-{
-    if (m_is_embedded) {
-        validate_embedded(ctx, value, policy);
-        auto key = policy.diff ? this->get<Obj>(row_ndx) : as<Obj>().create_and_set_linked_object(row_ndx);
-        ctx.template unbox<Obj>(value, policy, key.get_key());
-        return;
-    }
-    dispatch([&](auto t) {
-        using U = std::decay_t<decltype(*t)>;
-        if constexpr (std::is_same_v<U, Obj>) {
-            auto old_value = this->get<U>(row_ndx);
-            auto new_value = ctx.template unbox<U>(value, policy, old_value.get_key());
-            if (new_value.get_key() != old_value.get_key())
-                this->set(row_ndx, new_value);
-        }
-        else {
-            auto old_value = this->get<U>(row_ndx);
-            auto new_value = ctx.template unbox<U>(value, policy);
-            if (old_value != new_value)
-                this->set(row_ndx, new_value);
-        }
-    });
-}
-
-template <typename T, typename Context>
-void List::assign(Context& ctx, T&& values, CreatePolicy policy)
-{
-    if (ctx.is_same_list(*this, values))
-        return;
-
-    if (ctx.is_null(values)) {
-        remove_all();
-        return;
-    }
-
-    if (!policy.diff)
-        remove_all();
-
-    size_t sz = size();
-    size_t index = 0;
-    ctx.enumerate_collection(values, [&](auto&& element) {
-        if (index >= sz)
-            this->add(ctx, element, policy);
-        else if (policy.diff)
-            this->set_if_different(ctx, index, element, policy);
-        else
-            this->set(ctx, index, element, policy);
-        index++;
-    });
-    while (index < sz)
-        remove(--sz);
-}
 } // namespace realm
 
 namespace std {

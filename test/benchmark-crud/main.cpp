@@ -70,7 +70,7 @@ inline void erase(TableRef table, const OrderVec& order)
         table->remove_object(order[i]);
 }
 
-} // anonymous namepsace
+} // namespace
 
 extern "C" int benchmark_crud_main();
 

@@ -39,7 +39,7 @@ void quoted(std::ostream& out, T&& str, ...)
 {
     out << '"' << str << '"';
 }
-}
+} // namespace
 
 namespace realm {
 namespace util {

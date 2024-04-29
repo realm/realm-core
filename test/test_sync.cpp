@@ -6188,7 +6188,6 @@ TEST(Sync_CollectionInMixed)
         CHECK_EQUAL(list.size(), 0);
         // Replace list with Dictionary on property
         obj.set_collection(col_any, CollectionType::Dictionary);
-
     });
 
     session_2.wait_for_upload_complete_or_client_stopped();
@@ -7296,6 +7295,18 @@ TEST(Sync_RowForGlobalKey)
             CHECK_NOT(row_ndx);
         }
     }
+}
+
+TEST(Sync_FirstPromoteToWriteAdvancesRead)
+{
+    TEST_CLIENT_DB(db);
+    auto db2 = DB::create(make_client_replication(), db_path);
+    auto read = db->start_read();
+    db2->start_write()->commit();
+    // This will hit `ClientHistory::update_from_ref_and_version()` with m_group
+    // unset since it's advancing the read transaction without ever having been
+    // in a write transaction before.
+    read->promote_to_write();
 }
 
 
