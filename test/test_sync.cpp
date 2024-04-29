@@ -3663,59 +3663,107 @@ TEST(Sync_UploadProgress_EmptyCommits)
     CHECK_EQUAL(entry, 4);
 }
 
-TEST(Sync_MultipleSyncAgentsNotAllowed)
+TEST(Sync_MultipleSyncAgents_FinalizingSyncAgentActualizesWaitingWrapper)
 {
-    // At most one sync agent is allowed to participate in a Realm file access
-    // session at any particular point in time. Note that a Realm file access
-    // session is a group of temporally overlapping accesses to a Realm file,
-    // and that the group of participants is the transitive closure of a
-    // particular session participant over the "temporally overlapping access"
-    // relation.
-
     TEST_DIR(server_dir);
     TEST_CLIENT_DB(db);
 
-    auto pf = util::make_promise_future();
-    struct Observer : BindingCallbackThreadObserver {
-        unit_test::TestContext& test_context;
-        util::Promise<void>& got_error;
-        Observer(unit_test::TestContext& test_context, util::Promise<void>& got_error)
-            : test_context(test_context)
-            , got_error(got_error)
-        {
-        }
-
-        bool has_handle_error() override
-        {
-            return true;
-        }
-        bool handle_error(const std::exception& e) override
-        {
-            CHECK(dynamic_cast<const MultipleSyncAgents*>(&e));
-            got_error.emplace_value();
-            return true;
-        }
-    };
-
-    auto observer = std::make_shared<Observer>(test_context, pf.promise);
-    ClientServerFixture::Config config;
-    config.socket_provider_observer = observer;
-    ClientServerFixture fixture(server_dir, test_context, std::move(config));
+    ClientServerFixture fixture(server_dir, test_context);
     fixture.start();
+    std::optional<Session> session = fixture.make_session(db, "/test");
+    Session session2 = fixture.make_session(db, "/test");
+    session.reset();
+    session2.wait_for_upload_complete_or_client_stopped();
+}
 
-    {
-        Session session = fixture.make_session(db, "/test");
-        Session session2 = fixture.make_session(db, "/test");
-        pf.future.get();
+TEST(Sync_MultipleSyncAgents_DestroyBeforeActualize)
+{
+    TEST_DIR(server_dir);
+    TEST_CLIENT_DB(db);
 
-        // The exception caused the event loop to stop so we need to restart it
-        fixture.start_client(0);
-    }
-
-    // Verify that after the error occurs (and is ignored) things are still
-    // in a functional state
+    ClientServerFixture fixture(server_dir, test_context);
+    fixture.start();
     Session session = fixture.make_session(db, "/test");
+    CHECK(session.wait_for_actualization().get());
+    {
+        Session session2 = fixture.make_session(db, "/test");
+        // Should not be able to actualize as session already claimed the sync agent
+        CHECK_NOT(session2.wait_for_actualization().get());
+    }
+    // Ensure we take another hop through the client's event loop after
+    // session2 is destroyed
     session.wait_for_upload_complete_or_client_stopped();
+}
+
+TEST(Sync_MultipleSyncAgents_RequestCompletionNotificationBeforeActualization)
+{
+    TEST_DIR(server_dir);
+    TEST_CLIENT_DB(db);
+
+    ClientServerFixture fixture(server_dir, test_context);
+    fixture.start();
+    std::optional<Session> session = fixture.make_session(db, "/test");
+    Session session2 = fixture.make_session(db, "/test");
+    auto pf = util::make_promise_future();
+    session2.async_wait_for_sync_completion([&](Status status) {
+        if (status.is_ok())
+            pf.promise.emplace_value();
+        else
+            pf.promise.set_error(status);
+    });
+    session.reset();
+    pf.future.get();
+}
+
+TEST(Sync_MultipleSyncAgents_MultipleClients)
+{
+    TEST_DIR(server_dir);
+    TEST_CLIENT_DB(db_1);
+    auto db_2 = DB::create(make_client_replication(), db_1_path);
+
+    MultiClientServerFixture::Config config;
+    config.sync_agent_delay_info.resumption_delay_interval = std::chrono::milliseconds(1);
+    MultiClientServerFixture fixture(2, 1, server_dir, test_context, std::move(config));
+    fixture.start();
+    std::optional<Session> session = fixture.make_session(0, 0, db_1, "/test");
+    CHECK(session->wait_for_actualization().get());
+    Session session2 = fixture.make_session(1, 0, db_2, "/test");
+    CHECK_NOT(session2.wait_for_actualization().get());
+    session.reset();
+    while (!session2.wait_for_actualization().get())
+        std::this_thread::yield();
+}
+
+TEST(Sync_MultipleSyncAgents_SynchronousWaitForCompletion)
+{
+    TEST_DIR(server_dir);
+    TEST_CLIENT_DB(db);
+
+    ClientServerFixture fixture(server_dir, test_context);
+    fixture.start();
+    std::optional<Session> session = fixture.make_session(db, "/test");
+    CHECK(session->wait_for_actualization().get());
+    Session session2 = fixture.make_session(db, "/test");
+
+    // The goal here is to have a thread blocked on the condition variable
+    // before we make it possible for session2 to claim the sync agent, which
+    // isn't possible to do deterministically. We post two messages to the client
+    // event loop from the background thread and unblock the main thread from
+    // the first. If this does get scheduled incorrectly the test will still
+    // pass and just fail to test the thing it's trying to test.
+    auto pf = util::make_promise_future<bool>();
+    CHECK_NOT(session2.wait_for_actualization().get());
+    std::thread thread([&] {
+        pf.promise.set_from(session2.wait_for_actualization());
+        session2.wait_for_upload_complete_or_client_stopped();
+    });
+    CHECK_NOT(pf.future.get());
+    std::this_thread::yield();
+    session->wait_for_upload_complete_or_client_stopped();
+    // Allow session2 to actualize. The background thread is hopefully waiting
+    // for upload completion at this point.
+    session.reset();
+    thread.join();
 }
 
 TEST(Sync_CancelReconnectDelay)
@@ -4577,7 +4625,6 @@ TEST(Sync_UploadLogCompactionDisabled)
 
     ClientServerFixture::Config config;
     config.disable_upload_compaction = true;
-    config.disable_history_compaction = true;
     ClientServerFixture fixture{server_dir, test_context, std::move(config)};
     fixture.start();
 
@@ -6635,14 +6682,14 @@ TEST(Sync_DifferentUsersMultiplexing)
     SessionBundle user_1_sess_2(test_context, fixture, "user_1_db_2", g_user_0_token, "user_0");
     SessionBundle user_2_sess_2(test_context, fixture, "user_2_db_2", g_user_1_token, "user_1");
 
-    CHECK_EQUAL(user_1_sess_1.sess.get_appservices_connection_id(),
-                user_1_sess_2.sess.get_appservices_connection_id());
-    CHECK_EQUAL(user_2_sess_1.sess.get_appservices_connection_id(),
-                user_2_sess_2.sess.get_appservices_connection_id());
-    CHECK_NOT_EQUAL(user_1_sess_1.sess.get_appservices_connection_id(),
-                    user_2_sess_1.sess.get_appservices_connection_id());
-    CHECK_NOT_EQUAL(user_1_sess_2.sess.get_appservices_connection_id(),
-                    user_2_sess_2.sess.get_appservices_connection_id());
+    CHECK_EQUAL(user_1_sess_1.sess.get_appservices_connection_id().get(),
+                user_1_sess_2.sess.get_appservices_connection_id().get());
+    CHECK_EQUAL(user_2_sess_1.sess.get_appservices_connection_id().get(),
+                user_2_sess_2.sess.get_appservices_connection_id().get());
+    CHECK_NOT_EQUAL(user_1_sess_1.sess.get_appservices_connection_id().get(),
+                    user_2_sess_1.sess.get_appservices_connection_id().get());
+    CHECK_NOT_EQUAL(user_1_sess_2.sess.get_appservices_connection_id().get(),
+                    user_2_sess_2.sess.get_appservices_connection_id().get());
 }
 
 TEST(Sync_TransformAgainstEmptyReciprocalChangeset)

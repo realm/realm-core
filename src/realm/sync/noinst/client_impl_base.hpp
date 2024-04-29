@@ -71,6 +71,7 @@ class SessionWrapperStack {
 public:
     bool empty() const noexcept;
     void push(util::bind_ptr<SessionWrapper>) noexcept;
+    void push(SessionWrapperStack&&) noexcept;
     util::bind_ptr<SessionWrapper> pop() noexcept;
     void clear() noexcept;
     bool erase(SessionWrapper*) noexcept;
@@ -81,29 +82,17 @@ private:
     SessionWrapper* m_back = nullptr;
 };
 
-template <typename ErrorType, typename RandomEngine>
-struct ErrorBackoffState {
-    ErrorBackoffState() = default;
-    explicit ErrorBackoffState(ResumptionDelayInfo default_delay_info, RandomEngine& random_engine)
+template <typename RandomEngine>
+struct BackoffState {
+    BackoffState() = default;
+    explicit BackoffState(ResumptionDelayInfo default_delay_info, RandomEngine& random_engine)
         : default_delay_info(std::move(default_delay_info))
         , m_random_engine(random_engine)
     {
     }
 
-    void update(ErrorType new_error, std::optional<ResumptionDelayInfo> new_delay_info)
-    {
-        if (triggering_error && *triggering_error == new_error) {
-            return;
-        }
-
-        delay_info = new_delay_info.value_or(default_delay_info);
-        cur_delay_interval = util::none;
-        triggering_error = new_error;
-    }
-
     void reset()
     {
-        triggering_error = util::none;
         cur_delay_interval = util::none;
         delay_info = default_delay_info;
     }
@@ -132,7 +121,6 @@ struct ErrorBackoffState {
     ResumptionDelayInfo default_delay_info;
     ResumptionDelayInfo delay_info;
     util::Optional<std::chrono::milliseconds> cur_delay_interval;
-    util::Optional<ErrorType> triggering_error;
 
 private:
     std::chrono::milliseconds jitter_value(std::chrono::milliseconds value)
@@ -147,6 +135,33 @@ private:
     }
 
     std::reference_wrapper<RandomEngine> m_random_engine;
+};
+
+template <typename ErrorType, typename RandomEngine>
+struct ErrorBackoffState : private BackoffState<RandomEngine> {
+    using Base = BackoffState<RandomEngine>;
+    using BackoffState<RandomEngine>::BackoffState;
+    using Base::delay_interval;
+    using Base::cur_delay_interval;
+
+    void update(ErrorType new_error, std::optional<ResumptionDelayInfo> new_delay_info)
+    {
+        if (triggering_error && *triggering_error == new_error) {
+            return;
+        }
+
+        this->delay_info = new_delay_info.value_or(this->default_delay_info);
+        this->cur_delay_interval = util::none;
+        triggering_error = new_error;
+    }
+
+    void reset()
+    {
+        triggering_error = util::none;
+        Base::reset();
+    }
+
+    util::Optional<ErrorType> triggering_error;
 };
 
 class ClientImpl {
@@ -286,6 +301,9 @@ private:
     bool m_drained GUARDED_BY(m_drain_mutex) = false;
     uint64_t m_outstanding_posts GUARDED_BY(m_drain_mutex) = 0;
     uint64_t m_num_connections GUARDED_BY(m_drain_mutex) = 0;
+
+    BackoffState<RandomEngine> m_actualize_backoff_state;
+    SyncSocketProvider::SyncTimer m_actualize_timer;
 
     util::CheckedMutex m_mutex;
 
@@ -854,7 +872,6 @@ public:
     /// to not be called before activation, and also not after initiation of
     /// deactivation.
     Session(SessionWrapper&, ClientImpl::Connection&);
-    ~Session();
 
     void force_close();
 

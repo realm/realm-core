@@ -622,12 +622,13 @@ public:
     void cancel_reconnect_delay();
 
     util::Future<std::string> send_test_command(std::string command_body);
+    util::Future<bool> wait_for_actualization();
 
     /// Returns the app services connection id if the session is connected, otherwise
     /// returns an empty string. This function blocks until the value is set from
     /// the event loop thread. If an error occurs, this will throw an ExceptionForStatus
     /// with the error.
-    std::string get_appservices_connection_id();
+    util::Future<std::string> get_appservices_connection_id();
 
 private:
     // This is a bare pointer rather than bind_ptr to avoid requiring the

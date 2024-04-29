@@ -155,9 +155,11 @@ ClientImpl::ClientImpl(ClientConfig config)
     , m_roundtrip_time_handler{std::move(config.roundtrip_time_handler)}
     , m_socket_provider{std::move(config.socket_provider)}
     , m_one_connection_per_session{config.one_connection_per_session}
-    , m_actualize_and_finalize{*this, [this] {
+    , m_actualize_and_finalize{*this,
+                               [this] {
                                    actualize_and_finalize_session_wrappers(); // Throws
                                }}
+    , m_actualize_backoff_state{config.sync_agent_backoff_info, m_random}
 
 {
     // FIXME: Would be better if seeding was up to the application.
@@ -846,9 +848,8 @@ void Connection::handle_connection_established()
             fast_reconnect = true;
     }
 
-    for (auto& p : m_sessions) {
-        Session& sess = *p.second;
-        sess.connection_established(fast_reconnect); // Throws
+    for (auto& [_, sess] : m_sessions) {
+        sess->connection_established(fast_reconnect); // Throws
     }
 
     report_connection_state_change(ConnectionState::connected); // Throws
@@ -1635,18 +1636,9 @@ void Session::on_changesets_integrated(version_type client_version, const SyncPr
 }
 
 
-Session::~Session()
-{
-    //    REALM_ASSERT_EX(m_state == Unactivated || m_state == Deactivated, m_state);
-}
-
-
 std::string Session::make_logger_prefix(session_ident_type ident)
 {
-    std::ostringstream out;
-    out.imbue(std::locale::classic());
-    out << "Session[" << ident << "]: "; // Throws
-    return out.str();                    // Throws
+    return util::format("Session[%1]: ", ident); // Throws
 }
 
 

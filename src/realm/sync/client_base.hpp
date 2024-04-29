@@ -181,6 +181,7 @@ struct ClientConfig {
     /// sync protocol ERROR message, this parameter will be used to decide how
     /// long to wait between each re-connect attempt.
     ResumptionDelayInfo reconnect_backoff_info;
+    ResumptionDelayInfo sync_agent_backoff_info;
 
     /// Set to true to completely disable delaying of the upload process. In
     /// this mode, the upload process will be activated immediately, and the

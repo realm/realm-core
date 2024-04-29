@@ -1323,7 +1323,7 @@ sync::SaltedFileIdent SyncSession::get_file_ident() const
     return ret;
 }
 
-std::string SyncSession::get_appservices_connection_id() const
+util::Future<std::string> SyncSession::get_appservices_connection_id() const
 {
     util::CheckedLockGuard lk(m_state_mutex);
     if (!m_session) {

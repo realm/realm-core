@@ -95,7 +95,7 @@ inline void spin_runloop(int count = 2)
 
 inline std::string conn_id_for_realm(const SharedRealm& realm)
 {
-    return SyncSession::OnlyForTesting::get_appservices_connection_id(*realm->sync_session());
+    return SyncSession::OnlyForTesting::get_appservices_connection_id(*realm->sync_session()).get();
 }
 
 inline void require_no_error(std::shared_ptr<SyncSession>, SyncError error)

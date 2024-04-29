@@ -94,23 +94,22 @@ public:
 
     // These are called from ClientImpl
     // Must be called from event loop thread.
-    void actualize();
+    bool actualize();
+    // Isolated as-if it was called from event loop thread.
     void finalize();
-    void finalize_before_actualization() noexcept;
-
-    // Can be called from any thread.
-    util::Future<std::string> send_test_command(std::string body);
 
     void handle_pending_client_reset_acknowledgement();
 
     void update_subscription_version_info();
 
-    // Can be called from any thread.
-    std::string get_appservices_connection_id();
-
     // Can be called from any thread, but inherently cannot be called
     // concurrently with calls to any of the other non-confined functions.
     bool mark_abandoned();
+
+    // Testing helpers which can be called from any thread.
+    util::Future<std::string> send_test_command(std::string body);
+    util::Future<std::string> get_appservices_connection_id();
+    util::Future<bool> wait_for_actualization();
 
 private:
     ClientImpl& m_client;
@@ -265,6 +264,13 @@ inline void SessionWrapperStack::push(util::bind_ptr<SessionWrapper> w) noexcept
 }
 
 
+inline void SessionWrapperStack::push(SessionWrapperStack&& other) noexcept
+{
+    while (auto w = other.pop())
+        push(std::move(w));
+}
+
+
 inline util::bind_ptr<SessionWrapper> SessionWrapperStack::pop() noexcept
 {
     util::bind_ptr<SessionWrapper> w{m_back, util::bind_ptr_base::adopt_tag{}};
@@ -278,10 +284,8 @@ inline util::bind_ptr<SessionWrapper> SessionWrapperStack::pop() noexcept
 
 inline void SessionWrapperStack::clear() noexcept
 {
-    while (m_back) {
-        util::bind_ptr<SessionWrapper> w{m_back, util::bind_ptr_base::adopt_tag{}};
-        m_back = w->m_next;
-    }
+    while (pop())
+        ;
 }
 
 
@@ -300,7 +304,7 @@ inline bool SessionWrapperStack::erase(SessionWrapper* w) noexcept
 }
 
 
-SessionWrapperStack::~SessionWrapperStack()
+inline SessionWrapperStack::~SessionWrapperStack()
 {
     clear();
 }
@@ -492,10 +496,11 @@ void ClientImpl::register_unactualized_session_wrapper(SessionWrapper* wrapper)
         // We can't actualize the session if we've already been stopped, so
         // just finalize it immediately.
         if (m_stopped) {
-            wrapper->finalize_before_actualization();
+            wrapper->finalize();
             return;
         }
 
+        m_actualize_backoff_state.reset();
         m_unactualized_session_wrappers.push(util::bind_ptr(wrapper));
     }
     m_actualize_and_finalize.trigger();
@@ -517,7 +522,7 @@ void ClientImpl::register_abandoned_session_wrapper(util::bind_ptr<SessionWrappe
         // generally not actualize a session wrapper that has already been
         // abandoned.
         if (m_unactualized_session_wrappers.erase(wrapper.get())) {
-            wrapper->finalize_before_actualization();
+            wrapper->finalize();
             return;
         }
         m_abandoned_session_wrappers.push(std::move(wrapper));
@@ -540,27 +545,37 @@ void ClientImpl::actualize_and_finalize_session_wrappers()
     // actualizing first would result in overlapping sessions. Because we're
     // releasing the lock new sessions may come in as we're looping, so we need
     // a single loop that checks both fields.
+    SessionWrapperStack failed;
     while (true) {
         bool finalize = true;
-        bool stopped;
         util::bind_ptr<SessionWrapper> wrapper;
         {
             util::CheckedLockGuard lock{m_mutex};
             wrapper = m_abandoned_session_wrappers.pop();
-            if (!wrapper) {
-                wrapper = m_unactualized_session_wrappers.pop();
-                finalize = false;
+            if (wrapper) {
+                m_unactualized_session_wrappers.push(std::move(failed));
             }
-            stopped = m_stopped;
+            else {
+                wrapper = m_unactualized_session_wrappers.pop();
+                finalize = m_stopped;
+            }
         }
         if (!wrapper)
             break;
         if (finalize)
             wrapper->finalize(); // Throws
-        else if (stopped)
-            wrapper->finalize_before_actualization();
-        else
-            wrapper->actualize(); // Throws
+        // FIXME: we discard failed if this throws. does that matter?
+        else if (!wrapper->actualize()) // Throws
+            failed.push(std::move(wrapper));
+    }
+
+    util::CheckedLockGuard lock{m_mutex};
+    m_actualize_timer.reset();
+    if (!failed.empty()) {
+        m_unactualized_session_wrappers.push(std::move(failed));
+        m_actualize_timer = create_timer(m_actualize_backoff_state.delay_interval(), [this] {
+            actualize_and_finalize_session_wrappers();
+        });
     }
 }
 
@@ -1334,8 +1349,7 @@ void SessionWrapper::cancel_reconnect_delay()
     // Thread safety required
 
     m_client.post([self = util::bind_ptr{this}] {
-        REALM_ASSERT(self->m_actualized);
-        if (REALM_UNLIKELY(self->m_closed)) {
+        if (REALM_UNLIKELY(!self->m_actualized || self->m_closed)) {
             return;
         }
 
@@ -1355,8 +1369,7 @@ void SessionWrapper::async_wait_for(bool upload_completion, bool download_comple
 
     m_client.post([self = util::bind_ptr{this}, handler = std::move(handler), upload_completion,
                    download_completion]() mutable {
-        REALM_ASSERT(self->m_actualized);
-        if (REALM_UNLIKELY(!self->m_sess)) {
+        if (REALM_UNLIKELY(self->m_actualized && !self->m_sess)) {
             // Already finalized
             handler({ErrorCodes::OperationAborted, "Session finalized before callback could run"}); // Throws
             return;
@@ -1375,12 +1388,14 @@ void SessionWrapper::async_wait_for(bool upload_completion, bool download_comple
             // Wait for download completion only
             self->m_download_completion_handlers.push_back(std::move(handler)); // Throws
         }
-        SessionImpl& sess = *self->m_sess;
-        if (upload_completion)
-            sess.request_upload_completion_notification(); // Throws
-        if (download_completion)
-            sess.request_download_completion_notification(); // Throws
-    });                                                      // Throws
+        if (self->m_actualized) {
+            SessionImpl& sess = *self->m_sess;
+            if (upload_completion)
+                sess.request_upload_completion_notification(); // Throws
+            if (download_completion)
+                sess.request_download_completion_notification(); // Throws
+        }
+    }); // Throws
 }
 
 
@@ -1396,19 +1411,31 @@ bool SessionWrapper::wait_for_upload_complete_or_client_stopped()
     }
 
     m_client.post([self = util::bind_ptr{this}, target_mark] {
-        REALM_ASSERT(self->m_actualized);
-        // The session wrapper may already have been finalized. This can only
-        // happen if it was abandoned, but in that case, the call of
-        // wait_for_upload_complete_or_client_stopped() must have returned
-        // already.
+        // If multiple threads request completion at the same time, the second
+        // thread to acquire a target mark may post to the event loop first. When
+        // this happens we need to not lower the completion mark, and don't have
+        // to (but could) request completion notifications a second time.
+        if (target_mark <= self->m_staged_upload_mark)
+            return;
+        self->m_staged_upload_mark = target_mark;
+
+        // The wrapper has either not been actualized or has already been
+        // finalized. In the former case, we will end up requesting upload
+        // completion notifications once the session gets actualized (or if it
+        // never does we're just waiting for the client to stop).
+        //
+        // To get here with the wrapper already having been finalized requires
+        // that Client::shutdown() was called, letting the wait for completion
+        // return, and then the wrapper was abandoned. This means that no one
+        // is waiting to be notified and we don't need to do anything. Abandoning
+        // the wrapper while still waiting for completion would require that
+        // the calling code perform a use-after-free.
         if (REALM_UNLIKELY(!self->m_sess))
             return;
-        if (target_mark > self->m_staged_upload_mark) {
-            self->m_staged_upload_mark = target_mark;
-            SessionImpl& sess = *self->m_sess;
-            sess.request_upload_completion_notification(); // Throws
-        }
-    }); // Throws
+
+        SessionImpl& sess = *self->m_sess;
+        sess.request_upload_completion_notification(); // Throws
+    });                                                // Throws
 
     bool completion_condition_was_satisfied;
     {
@@ -1434,19 +1461,31 @@ bool SessionWrapper::wait_for_download_complete_or_client_stopped()
     }
 
     m_client.post([self = util::bind_ptr{this}, target_mark] {
-        REALM_ASSERT(self->m_actualized);
-        // The session wrapper may already have been finalized. This can only
-        // happen if it was abandoned, but in that case, the call of
-        // wait_for_download_complete_or_client_stopped() must have returned
-        // already.
+        // If multiple threads request completion at the same time, the second
+        // thread to acquire a target mark may post to the event loop first. When
+        // this happens we need to not lower the completion mark, and don't have
+        // to (but could) request completion notifications a second time.
+        if (target_mark <= self->m_staged_download_mark)
+            return;
+        self->m_staged_download_mark = target_mark;
+
+        // The wrapper has either not been actualized or has already been
+        // finalized. In the former case, we will end up requesting upload
+        // completion notifications once the session gets actualized (or if it
+        // never does we're just waiting for the client to stop).
+        //
+        // To get here with the wrapper already having been finalized requires
+        // that Client::shutdown() was called, letting the wait for completion
+        // return, and then the wrapper was abandoned. This means that no one
+        // is waiting to be notified and we don't need to do anything. Abandoning
+        // the wrapper while still waiting for completion would require that
+        // the calling code perform a use-after-free.
         if (REALM_UNLIKELY(!self->m_sess))
             return;
-        if (target_mark > self->m_staged_download_mark) {
-            self->m_staged_download_mark = target_mark;
-            SessionImpl& sess = *self->m_sess;
-            sess.request_download_completion_notification(); // Throws
-        }
-    }); // Throws
+
+        SessionImpl& sess = *self->m_sess;
+        sess.request_download_completion_notification(); // Throws
+    });                                                  // Throws
 
     bool completion_condition_was_satisfied;
     {
@@ -1488,7 +1527,7 @@ void SessionWrapper::abandon(util::bind_ptr<SessionWrapper> wrapper) noexcept
 
 
 // Must be called from event loop thread
-void SessionWrapper::actualize()
+bool SessionWrapper::actualize()
 {
     // actualize() can only ever be called once
     REALM_ASSERT(!m_actualized);
@@ -1498,13 +1537,26 @@ void SessionWrapper::actualize()
     REALM_ASSERT(!m_finalized);
     REALM_ASSERT(!m_closed);
 
+    auto& logger = m_client.logger;
+
+    try {
+        logger.trace("Attempting to claim sync agent for '%1'", m_db->get_path());
+        m_db->claim_sync_agent();
+    }
+    catch (MultipleSyncAgents) {
+        logger.trace("Sync agent for '%1' is already claimed", m_db->get_path());
+        return false;
+    }
+    ScopeExitFail release_sync_agent([&]() noexcept {
+        m_db->release_sync_agent();
+    });
+
     m_actualized = true;
 
     ScopeExitFail close_on_error([&]() noexcept {
         m_closed = true;
     });
 
-    m_db->claim_sync_agent();
     m_db->add_commit_listener(this);
     ScopeExitFail remove_commit_listener([&]() noexcept {
         m_db->remove_commit_listener(this);
@@ -1554,6 +1606,14 @@ void SessionWrapper::actualize()
 
     if (!m_client_reset_config)
         on_upload_progress(/* only_if_new_uploadable_data = */ true); // Throws
+
+    // Check if we got any requests for completion notifications before actualization
+    if (m_staged_upload_mark > 0)
+        m_sess->request_upload_completion_notification();
+    if (m_staged_download_mark > 0)
+        m_sess->request_download_completion_notification();
+
+    return true;
 }
 
 void SessionWrapper::force_close()
@@ -1564,6 +1624,8 @@ void SessionWrapper::force_close()
     REALM_ASSERT(m_actualized);
     REALM_ASSERT(m_sess);
     m_closed = true;
+
+    m_client.logger.trace("Closing SessionWrapper for '%1'", m_db->get_path());
 
     ClientImpl::Connection& conn = m_sess->get_connection();
     conn.initiate_session_deactivation(m_sess); // Throws
@@ -1582,16 +1644,24 @@ void SessionWrapper::force_close()
     m_connection_state_change_listener = {};
 }
 
-// Must be called from event loop thread
-//
-// `m_client.m_mutex` is not held while this is called, but it is guaranteed to
-// have been acquired at some point in between the final read or write ever made
-// from a different thread and when this is called.
+// The thread-safety of this function is somewhat complicated. It is either
+// called with `m_client.m_mutex` held *or* is it called at a point where it is
+// known that the only existent reference to the SessionWrapper is held on the
+// current thread, and `m_client.m_mutex` has been acquired at some point after
+// the final access from a different thread.
 void SessionWrapper::finalize()
 {
-    REALM_ASSERT(m_actualized);
-    REALM_ASSERT(m_abandoned);
     REALM_ASSERT(!m_finalized);
+
+    if (!m_actualized) {
+        REALM_ASSERT(!m_sess);
+        m_actualized = true;
+        m_finalized = true;
+        m_closed = true;
+        m_db = nullptr;
+        return;
+    }
+    REALM_ASSERT(m_abandoned);
 
     force_close();
 
@@ -1600,6 +1670,7 @@ void SessionWrapper::finalize()
     // The Realm file can be closed now, as no access to the Realm file is
     // supposed to happen on behalf of a session after initiation of
     // deactivation.
+    m_client.logger.trace("Releasing sync agent for '%1'", m_db->get_path());
     m_db->release_sync_agent();
     m_db = nullptr;
 
@@ -1621,22 +1692,6 @@ void SessionWrapper::finalize()
         m_sync_completion_handlers.pop_back();
         handler({ErrorCodes::OperationAborted, "Sync session is being finalized before sync was complete"}); // Throws
     }
-}
-
-
-// Must be called only when an unactualized session wrapper becomes abandoned.
-//
-// Called with a lock on `m_client.m_mutex`.
-inline void SessionWrapper::finalize_before_actualization() noexcept
-{
-    REALM_ASSERT(!m_finalized);
-    REALM_ASSERT(!m_sess);
-    m_actualized = true;
-    m_finalized = true;
-    m_closed = true;
-    m_db->remove_commit_listener(this);
-    m_db->release_sync_agent();
-    m_db = nullptr;
 }
 
 inline void SessionWrapper::on_upload_progress(bool only_if_new_uploadable_data)
@@ -1912,7 +1967,7 @@ void SessionWrapper::update_subscription_version_info()
     m_flx_pending_mark_version = versions_info.pending_mark;
 }
 
-std::string SessionWrapper::get_appservices_connection_id()
+util::Future<std::string> SessionWrapper::get_appservices_connection_id()
 {
     auto pf = util::make_promise_future<std::string>();
 
@@ -1930,8 +1985,25 @@ std::string SessionWrapper::get_appservices_connection_id()
         promise.emplace_value(self->m_sess->get_connection().get_active_appservices_connection_id());
     });
 
-    return pf.future.get();
+    return std::move(pf.future);
 }
+
+util::Future<bool> SessionWrapper::wait_for_actualization()
+{
+    auto pf = util::make_promise_future<bool>();
+
+    m_client.post([self = util::bind_ptr{this}, promise = std::move(pf.promise)](Status status) mutable {
+        if (status.is_ok()) {
+            promise.emplace_value(self->m_actualized);
+        }
+        else {
+            promise.set_error(status);
+        }
+    });
+
+    return std::move(pf.future);
+}
+
 
 // ################ ClientImpl::Connection ################
 
@@ -2147,9 +2219,14 @@ util::Future<std::string> Session::send_test_command(std::string body)
     return m_impl->send_test_command(std::move(body));
 }
 
-std::string Session::get_appservices_connection_id()
+util::Future<std::string> Session::get_appservices_connection_id()
 {
     return m_impl->get_appservices_connection_id();
+}
+
+util::Future<bool> Session::wait_for_actualization()
+{
+    return m_impl->wait_for_actualization();
 }
 
 std::ostream& operator<<(std::ostream& os, ProxyConfig::Type proxyType)

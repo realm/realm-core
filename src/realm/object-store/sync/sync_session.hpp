@@ -340,7 +340,7 @@ public:
             return session.m_db;
         }
 
-        static std::string get_appservices_connection_id(SyncSession& session)
+        static util::Future<std::string> get_appservices_connection_id(SyncSession& session)
         {
             return session.get_appservices_connection_id();
         }
@@ -455,7 +455,7 @@ private:
     void add_completion_callback(util::UniqueFunction<void(Status)> callback, ProgressDirection direction)
         REQUIRES(m_state_mutex);
 
-    std::string get_appservices_connection_id() const REQUIRES(!m_state_mutex);
+    util::Future<std::string> get_appservices_connection_id() const REQUIRES(!m_state_mutex);
 
     util::Future<std::string> send_test_command(std::string body) REQUIRES(!m_state_mutex);
 

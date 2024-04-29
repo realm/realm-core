@@ -450,6 +450,8 @@ public:
         // Must be empty (encryption disabled) or contain 64 bytes.
         std::string server_encryption_key;
 
+        ResumptionDelayInfo sync_agent_delay_info;
+
         std::shared_ptr<BindingCallbackThreadObserver> socket_provider_observer;
     };
 
@@ -535,6 +537,7 @@ public:
             config_2.disable_upload_compaction = config.disable_upload_compaction;
             config_2.one_connection_per_session = config.one_connection_per_session;
             config_2.disable_upload_activation_delay = config.disable_upload_activation_delay;
+            config_2.sync_agent_backoff_info = config.sync_agent_delay_info;
             config_2.fix_up_object_ids = true;
             m_clients[i] = std::make_unique<Client>(std::move(config_2));
         }
