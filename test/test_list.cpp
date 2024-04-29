@@ -969,6 +969,32 @@ TEST(List_NestedCollection_Unresolved)
     CHECK_EQUAL(list.get(0), Mixed(obj.get_link()));
 }
 
+TEST(List_Avoid_cyclic_dependecy)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    DBRef db = DB::create(make_in_realm_history(), path);
+    auto tr = db->start_write();
+    auto origin = tr->add_table("origin");
+    auto col_any = origin->add_column(type_Mixed, "any");
+
+    Obj o = origin->create_object();
+    std::vector<Obj> objs;
+    for (size_t i = 0; i < 10; ++i)
+        objs.push_back(origin->create_object());
+
+    o.set_collection(col_any, CollectionType::List);
+    Lst<Mixed> list(o, col_any);
+    size_t i = 0;
+    for (auto& obj : objs)
+        list.insert(i++, obj.get_link());
+
+    for (auto& obj : objs)
+        CHECK(obj.get_backlink_count() == 1);
+
+    for (auto& obj : objs)
+        obj.invalidate();
+}
+
 TEST(List_NestedList_Path)
 {
     Group g;
