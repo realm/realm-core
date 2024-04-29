@@ -48,7 +48,7 @@ using namespace realm::test_util;
 namespace {
 
 #if !REALM_MOBILE
-TEST(Sync_HistoryMigration)
+TEST_IF(Sync_HistoryMigration, REALM_MAX_BPNODE_SIZE == 1000)
 {
     // Set to true to produce new versions of client and server-side files in
     // `resources/history_migration/` as needed. This should be done whenever
