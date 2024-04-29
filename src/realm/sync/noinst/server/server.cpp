@@ -1100,13 +1100,11 @@ public:
         m_output_buffer.exceptions(std::ios_base::badbit | std::ios_base::failbit);
 
         network::Service& service = m_server.get_service();
-        auto handler = [this](Status status) {
-            if (!status.is_ok())
-                return;
+        auto handler = [this] {
             if (!m_is_sending)
                 send_next_message(); // Throws
         };
-        m_send_trigger = std::make_unique<Trigger<network::Service>>(&service, std::move(handler)); // Throws
+        m_send_trigger = std::make_unique<Trigger<network::Service>>(service, std::move(handler)); // Throws
     }
 
     ~SyncConnection() noexcept;

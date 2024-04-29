@@ -20,7 +20,7 @@
 
 #include <realm/status.hpp>
 #include <realm/util/bind_ptr.hpp>
-#include <realm/sync/socket_provider.hpp>
+#include <realm/util/thread.hpp>
 
 namespace realm::sync {
 
@@ -40,7 +40,9 @@ namespace realm::sync {
 template <class Service>
 class Trigger final {
 public:
-    Trigger(Service* service, SyncSocketProvider::FunctionHandler&& handler);
+    using Handler = util::UniqueFunction<void()>;
+
+    Trigger(Service& service, Handler&& handler);
     ~Trigger() noexcept;
 
     Trigger() noexcept = delete;
@@ -77,18 +79,18 @@ public:
     void trigger();
 
 private:
-    Service* m_service;
+    Service& m_service;
 
     struct HandlerInfo : public util::AtomicRefCountBase {
         enum class State { Idle, Triggered, Destroyed };
 
-        HandlerInfo(SyncSocketProvider::FunctionHandler&& handler)
+        HandlerInfo(Handler&& handler)
             : handler(std::move(handler))
             , state(State::Idle)
         {
         }
 
-        SyncSocketProvider::FunctionHandler handler;
+        Handler handler;
         util::Mutex mutex;
         State state;
     };
@@ -96,7 +98,7 @@ private:
 };
 
 template <class Service>
-inline Trigger<Service>::Trigger(Service* service, SyncSocketProvider::FunctionHandler&& handler)
+inline Trigger<Service>::Trigger(Service& service, Handler&& handler)
     : m_service(service)
     , m_handler_info(new HandlerInfo(std::move(handler)))
 {
@@ -115,7 +117,6 @@ inline Trigger<Service>::~Trigger() noexcept
 template <class Service>
 inline void Trigger<Service>::trigger()
 {
-    REALM_ASSERT(m_service);
     REALM_ASSERT(m_handler_info);
 
     util::LockGuard lock{m_handler_info->mutex};
@@ -126,7 +127,12 @@ inline void Trigger<Service>::trigger()
     }
     m_handler_info->state = HandlerInfo::State::Triggered;
 
-    auto handler = [handler_info = util::bind_ptr(m_handler_info)](Status status) {
+    m_service.post([handler_info = util::bind_ptr(m_handler_info)](Status status) {
+        if (status == ErrorCodes::OperationAborted)
+            return;
+        if (!status.is_ok())
+            throw Exception(status);
+
         {
             util::LockGuard lock{handler_info->mutex};
             // Do not execute the handler if the Trigger does not exist anymore.
@@ -135,9 +141,8 @@ inline void Trigger<Service>::trigger()
             }
             handler_info->state = HandlerInfo::State::Idle;
         }
-        handler_info->handler(status);
-    };
-    m_service->post(std::move(handler));
+        handler_info->handler();
+    });
 }
 
 } // namespace realm::sync
