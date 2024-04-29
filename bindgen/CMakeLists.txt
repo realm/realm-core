@@ -48,12 +48,6 @@ function(bindgen)
         endif()
     endforeach()
 
-    # Don't want to set cmake_minimum_required() here because it has other effects and needs to be done early.
-    # Remove this once https://github.com/realm/realm-core/issues/6537 bumps realm-core's minimum.
-    if(NOT CMAKE_CURRENT_FUNCTION_LIST_DIR)
-        message(FATAL_ERROR "bindgen() requires cmake 3.17+")
-    endif()
-
     get_property(BINDGEN_LIB_TS_FILES TARGET BindgenSpecJsonSchema PROPERTY BINDGEN_LIB_TS_FILES)
     get_property(NPX TARGET BindgenSpecJsonSchema PROPERTY NPX)
 
