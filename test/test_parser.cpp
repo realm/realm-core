@@ -6504,4 +6504,18 @@ TEST(Parser_Wildcard)
     CHECK_EQUAL(q.count(), 1);
 }
 
+TEST(Parser_7642)
+{
+    Group g;
+    auto cars = g.add_table("class_Car");
+    auto col_make = cars->add_column(type_String, "make");
+
+    cars->create_object().set(col_make, "Tesla");
+    cars->create_object().set(col_make, "Ford");
+    cars->create_object().set(col_make, "Audi");
+
+    using Vec = std::vector<Mixed>;
+    verify_query(test_context, cars, "make IN $0", {Vec{"Tesla", "Audi"}}, 2);
+}
+
 #endif // TEST_PARSER
