@@ -62,7 +62,7 @@ function(bindgen)
     add_custom_command(
         OUTPUT ${BINDGEN_OUTPUTS}
         WORKING_DIRECTORY ${CMAKE_CURRENT_FUNCTION_LIST_DIR}
-        COMMAND ${NPX} tsx -- "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/realm-bindgen.ts"
+        COMMAND ${NPX} tsx -- "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/realm-bindgen.ts" generate
             --spec "$<JOIN:${CORE_SPEC_FILE};${BINDGEN_SPECS},;--spec;>"
             "$<$<BOOL:${BINDGEN_OPTIN}>:--opt-in;${BINDGEN_OPTIN}>"
             --template "${BINDGEN_TEMPLATE}"
